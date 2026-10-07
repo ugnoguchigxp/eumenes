@@ -1,0 +1,137 @@
+{
+	"rubric_version": "1.1.0",
+	"technical_profile": "desktop",
+	"mode": "technical",
+	"assessment_kind": "current",
+	"target": {
+		"locator": "https://github.com/ugnoguchigxp/eumenes (local working tree before commit)",
+		"snapshot": "code manifest sha256:16301e5a1c8fae15691d131f4f2a9636ff7f6319b222a6929f774af7c31237e9 (snapshot.json); uncommitted working tree",
+		"reviewed_at": "2026-10-08",
+		"stage": "prototype",
+		"scope": "Local single-user Bun/Hono/React voice dialogue, SQLite writer, LARM integration, queue/scheduler and manual continuity; macOS/Chromium fixture. Real microphone/headphone acceptance and release/distribution excluded."
+	},
+	"depth": "deep",
+	"tracks": {
+		"technical": {
+			"raw_observed_score": 59.3,
+			"provisional_score": 59.3,
+			"score": null,
+			"score_status": "provisional",
+			"coverage_percent": 71.7,
+			"excluded_dimension_weight_percent": 0.0,
+			"raw_bounds": [42.5, 70.8],
+			"bounds": [42.5, 70.8],
+			"confidence": "Medium",
+			"required_dimensions_complete": true,
+			"incomplete_required_dimensions": [],
+			"unresolved_severe_suspicions": [],
+			"gates": [],
+			"production_readiness": "no blocker identified in reviewed scope",
+			"dimensions": {
+				"architecture": {
+					"status": "assessed",
+					"score": 6.7,
+					"coverage_percent": 100.0,
+					"bounds": [6.7, 6.7],
+					"base_weight": 10,
+					"confidence": "Medium",
+					"effective_weight_percent": 10.0
+				},
+				"correctness": {
+					"status": "assessed",
+					"score": 6.7,
+					"coverage_percent": 100.0,
+					"bounds": [6.7, 6.7],
+					"base_weight": 15,
+					"confidence": "High",
+					"effective_weight_percent": 15.0
+				},
+				"security": {
+					"status": "assessed",
+					"score": 5.0,
+					"coverage_percent": 100.0,
+					"bounds": [5.0, 5.0],
+					"base_weight": 12,
+					"confidence": "Medium",
+					"effective_weight_percent": 12.0
+				},
+				"reliability": {
+					"status": "assessed",
+					"score": 5.8,
+					"coverage_percent": 100.0,
+					"bounds": [5.8, 5.8],
+					"base_weight": 10,
+					"confidence": "Medium",
+					"effective_weight_percent": 10.0
+				},
+				"maintainability": {
+					"status": "partial",
+					"score": 5.0,
+					"coverage_percent": 66.7,
+					"bounds": [3.3, 6.7],
+					"base_weight": 10,
+					"confidence": "Medium",
+					"effective_weight_percent": 10.0
+				},
+				"common_components": {
+					"status": "partial",
+					"score": null,
+					"coverage_percent": 0.0,
+					"bounds": [0.0, 10.0],
+					"base_weight": 5,
+					"confidence": "Unknown",
+					"effective_weight_percent": 5.0
+				},
+				"testing": {
+					"status": "assessed",
+					"score": 6.7,
+					"coverage_percent": 100.0,
+					"bounds": [6.7, 6.7],
+					"base_weight": 10,
+					"confidence": "High",
+					"effective_weight_percent": 10.0
+				},
+				"supply_chain": {
+					"status": "partial",
+					"score": null,
+					"coverage_percent": 0.0,
+					"bounds": [0.0, 10.0],
+					"base_weight": 8,
+					"confidence": "Unknown",
+					"effective_weight_percent": 8.0
+				},
+				"performance": {
+					"status": "partial",
+					"score": null,
+					"coverage_percent": 0.0,
+					"bounds": [0.0, 10.0],
+					"base_weight": 8,
+					"confidence": "Unknown",
+					"effective_weight_percent": 8.0
+				},
+				"operability": {
+					"status": "partial",
+					"score": 5.0,
+					"coverage_percent": 66.7,
+					"bounds": [3.3, 6.7],
+					"base_weight": 12,
+					"confidence": "Medium",
+					"effective_weight_percent": 12.0
+				}
+			}
+		}
+	},
+	"confirmed_findings": {
+		"Critical": 0,
+		"High": 0,
+		"Medium": 0,
+		"Low": 0
+	},
+	"priorities": {
+		"P0": 0,
+		"P1": 0,
+		"P2": 0,
+		"P3": 0
+	},
+	"suspected_findings": 0
+}

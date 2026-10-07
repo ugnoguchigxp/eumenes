@@ -1,0 +1,11 @@
+node_modules/
+dist-web/
+data/
+*.sqlite3*
+*.lock
+!bun.lock
+.env
+verification-reports/
+test-results/
+playwright-report/
+.serena/

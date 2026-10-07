@@ -1,0 +1,376 @@
+{
+	"rubric_version": "1.1.0",
+	"mode": "technical",
+	"depth": "deep",
+	"technical_profile": "desktop",
+	"assessment_kind": "current",
+	"target": {
+		"locator": "https://github.com/ugnoguchigxp/eumenes (local working tree before commit)",
+		"snapshot": "code manifest sha256:16301e5a1c8fae15691d131f4f2a9636ff7f6319b222a6929f774af7c31237e9 (snapshot.json); uncommitted working tree",
+		"reviewed_at": "2026-10-08",
+		"stage": "prototype",
+		"scope": "Local single-user Bun/Hono/React voice dialogue, SQLite writer, LARM integration, queue/scheduler and manual continuity; macOS/Chromium fixture. Real microphone/headphone acceptance and release/distribution excluded."
+	},
+	"evidence": [
+		{
+			"id": "E01",
+			"kind": "code",
+			"locator": "api/application/server.ts; api/application/app.ts; scripts/boundaries.ts @ 16301e5a1c8f",
+			"observed_at": "2026-10-08",
+			"observation": "Runtime assembles domain services, one SQLite owner, authenticated HTTP routes; boundary checker enforces declared imports.",
+			"scope": "Current source tree; source trace."
+		},
+		{
+			"id": "E02",
+			"kind": "code",
+			"locator": "api/domains/dialogue/service/index.ts; api/domains/voice-dialogue/service/index.ts @ 16301e5a1c8f",
+			"observed_at": "2026-10-08",
+			"observation": "Input, run and queue job persist before LARM inference; adopted answer and run status settle in one transaction; voice stages track ASR and TTS.",
+			"scope": "Primary text and voice paths traced."
+		},
+		{
+			"id": "E03",
+			"kind": "code",
+			"locator": "api/infrastructure/sqlite/index.ts; api/infrastructure/sqlite/owner.test.ts @ 16301e5a1c8f",
+			"observed_at": "2026-10-08",
+			"observation": "A nonblocking OS lock is acquired before DB opening; WAL, readonly lane and serialized bounded writer are configured.",
+			"scope": "macOS Bun runtime only."
+		},
+		{
+			"id": "E04",
+			"kind": "code",
+			"locator": "api/domains/larm/service/index.ts; api/domains/larm/test/larm.test.ts @ 16301e5a1c8f",
+			"observed_at": "2026-10-08",
+			"observation": "Profile, connection, claim, expiry, provider and bounded response checks precede inference; simultaneous capability upgrade is regression tested.",
+			"scope": "Fixture provider plus prior individual live LARM probe; no real browser voice cycle."
+		},
+		{
+			"id": "E05",
+			"kind": "code",
+			"locator": "web/src/domains/audio/controller/index.ts; web/src/domains/voice-dialogue/hooks/index.ts @ 16301e5a1c8f",
+			"observed_at": "2026-10-08",
+			"observation": "Playback is invalidated on interruption, delayed audio fetch checks the active turn, and pending session starts can be cancelled.",
+			"scope": "Chromium browser fixture and hook tests."
+		},
+		{
+			"id": "E06",
+			"kind": "code",
+			"locator": "api/application/app.ts; api/domains/voice-dialogue/controller/index.ts; api/domains/continuity/controller/index.ts @ 16301e5a1c8f",
+			"observed_at": "2026-10-08",
+			"observation": "API Bearer and Origin guards, request schemas, and bounded audio upload apply at ingress.",
+			"scope": "Loopback single-user deployment."
+		},
+		{
+			"id": "E07",
+			"kind": "code",
+			"locator": "api/domains/queue/service/runner.ts; api/domains/scheduler/service/index.ts @ 16301e5a1c8f",
+			"observed_at": "2026-10-08",
+			"observation": "Jobs use persisted states, leases, deadlines, cancellation and recovery; scheduler scans all active due candidates before applying in-memory deferral.",
+			"scope": "Local single-writer runtime."
+		},
+		{
+			"id": "E08",
+			"kind": "execution",
+			"locator": "verification-reports/latest.json @ 16301e5a1c8f",
+			"observed_at": "2026-10-08",
+			"observation": "bun run verify:all exited 0: format, lint, typecheck, 88 backend tests, 25 web tests, web build and one Playwright browser fixture passed in 18.267 seconds.",
+			"scope": "macOS 26.6.2, Bun 1.4.2, fixture LARM and synthetic browser microphone; 2026-10-08."
+		},
+		{
+			"id": "E09",
+			"kind": "execution",
+			"locator": "tests/browser/voice.spec.ts @ 16301e5a1c8f",
+			"observed_at": "2026-10-08",
+			"observation": "Playwright exercised actual API, Vite, CLI, text and voice turns, TTS playback and manual bookmark creation through the assembled app.",
+			"scope": "Synthetic microphone and fixture provider; one Chromium scenario."
+		},
+		{
+			"id": "E10",
+			"kind": "primary_doc",
+			"locator": "docs/acceptance.md; README.md @ 16301e5a1c8f",
+			"observed_at": "2026-10-08",
+			"observation": "The project records real microphone/headphone three-turn acceptance and selected failure-display checks as not yet complete.",
+			"scope": "Declared limitation, not a runtime failure observation."
+		},
+		{
+			"id": "E11",
+			"kind": "code",
+			"locator": "api/domains/continuity/service/index.ts; api/application/server.ts; web/src/App.tsx @ 16301e5a1c8f",
+			"observed_at": "2026-10-08",
+			"observation": "Manual bookmarks now persist through the assembled runtime and are exposed in the Web UI.",
+			"scope": "Does not automatically inject bookmarks into model prompts."
+		},
+		{
+			"id": "E12",
+			"kind": "code",
+			"locator": "package.json; bun.lock; scripts/verify.ts @ 16301e5a1c8f",
+			"observed_at": "2026-10-08",
+			"observation": "Versions are pinned and domain/full verification commands are defined; no external release pipeline was inspected.",
+			"scope": "Dependency update and release process unknown."
+		}
+	],
+	"claims": [
+		{
+			"id": "C01",
+			"type": "Fact",
+			"statement": "The primary fixture path and all configured local checks pass in the reviewed source snapshot.",
+			"evidence_ids": ["E08", "E09"],
+			"limitations": "Synthetic microphone and fixture provider do not establish real device acceptance."
+		},
+		{
+			"id": "C02",
+			"type": "Fact",
+			"statement": "The assembled backend and Web app expose manual continuity bookmarks.",
+			"evidence_ids": ["E11", "E09"],
+			"limitations": "Automatic model use of bookmarks is outside this implemented path."
+		},
+		{
+			"id": "C03",
+			"type": "Unknown",
+			"statement": "Real microphone and headphone use across three Japanese turns is not yet accepted.",
+			"limitations": "Requires human-operated hardware and real LARM end-to-end test."
+		}
+	],
+	"findings": [],
+	"tracks": {
+		"technical": {
+			"dimensions": {
+				"architecture": {
+					"criteria": {
+						"boundaries": {
+							"status": "assessed",
+							"value": 3,
+							"confidence": "High",
+							"evidence_ids": ["E01", "E08"],
+							"rationale": "Domain ownership and dependency direction are explicit and checked; runtime assembly stays at the application edge.",
+							"countercheck": "Boundary tests and assembled-app integration were checked after adding continuity."
+						},
+						"flow": {
+							"status": "assessed",
+							"value": 3,
+							"confidence": "High",
+							"evidence_ids": ["E02", "E03", "E08"],
+							"rationale": "Primary accepted input, durable run, external inference and atomic answer adoption are traceable; voice stages are separately recorded.",
+							"countercheck": "Cancellation, persistence failure and restart tests counter the normal path."
+						},
+						"fit": {
+							"status": "assessed",
+							"value": 2,
+							"confidence": "Medium",
+							"evidence_ids": ["E01", "E03", "E10"],
+							"rationale": "One local backend and SQLite owner fit the declared single-user macOS prototype; actual hardware envelope remains unmeasured."
+						}
+					}
+				},
+				"correctness": {
+					"criteria": {
+						"contracts": {
+							"status": "assessed",
+							"value": 2,
+							"confidence": "High",
+							"evidence_ids": ["E02", "E04", "E08", "E09"],
+							"rationale": "The primary text, voice and bookmark operations satisfy their fixture-visible contracts, with schemas and state checks at boundaries."
+						},
+						"edge_cases": {
+							"status": "assessed",
+							"value": 3,
+							"confidence": "High",
+							"evidence_ids": ["E04", "E05", "E07", "E08"],
+							"rationale": "Upload limits, concurrent connection upgrades, playback interruption, queue saturation and deferred schedule starvation have regression checks.",
+							"countercheck": "A failed full browser run exposed a selector collision, which was fixed and rerun."
+						},
+						"concurrency": {
+							"status": "assessed",
+							"value": 3,
+							"confidence": "High",
+							"evidence_ids": ["E03", "E04", "E07", "E08"],
+							"rationale": "Writer ownership, transactions, queue claims and cancellation ordering are exercised, including the capability-upgrade race.",
+							"countercheck": "Crash-owner, lease loss and concurrent revision tests provide counterchecks."
+						}
+					}
+				},
+				"security": {
+					"criteria": {
+						"access": {
+							"status": "assessed",
+							"value": 2,
+							"confidence": "High",
+							"evidence_ids": ["E06", "E08"],
+							"rationale": "The local API requires a Bearer token and restricts browser Origin; invalid routes and operations are schema checked."
+						},
+						"input_secrets": {
+							"status": "assessed",
+							"value": 2,
+							"confidence": "Medium",
+							"evidence_ids": ["E04", "E06"],
+							"rationale": "LARM credentials remain in the backend; local endpoint validation and bounded input/output reading constrain exposed data."
+						},
+						"abuse": {
+							"status": "assessed",
+							"value": 2,
+							"confidence": "Medium",
+							"evidence_ids": ["E04", "E06", "E08"],
+							"rationale": "The relevant local abuse paths have token, origin, upload and provider response bounds, and queue capacity rejection."
+						}
+					}
+				},
+				"reliability": {
+					"criteria": {
+						"failure": {
+							"status": "assessed",
+							"value": 2,
+							"confidence": "High",
+							"evidence_ids": ["E02", "E05", "E08"],
+							"rationale": "Failed writes keep voice audio for retry; stale playback and cancelled inference are not adopted; errors are represented in run/turn state."
+						},
+						"recovery": {
+							"status": "assessed",
+							"value": 3,
+							"confidence": "High",
+							"evidence_ids": ["E03", "E07", "E08"],
+							"rationale": "Restart and crash tests cover queued work, running interruption and writer lock recovery; request IDs deduplicate accepted work.",
+							"countercheck": "Old-owner late result and duplicate request tests counter the success-only path."
+						},
+						"resilience": {
+							"status": "assessed",
+							"value": 2,
+							"confidence": "Medium",
+							"evidence_ids": ["E04", "E07", "E08"],
+							"rationale": "Audio uploads, provider responses, writer queue and background jobs have finite caps and explicit overload behavior."
+						}
+					}
+				},
+				"maintainability": {
+					"criteria": {
+						"clarity": {
+							"status": "assessed",
+							"value": 2,
+							"confidence": "Medium",
+							"evidence_ids": ["E01", "E02", "E12"],
+							"rationale": "Entry points, contracts and domain ownership let a maintainer trace core behavior and locate verification commands."
+						},
+						"change": {
+							"status": "assessed",
+							"value": 2,
+							"confidence": "Medium",
+							"evidence_ids": ["E01", "E08"],
+							"rationale": "The reviewed fixes were local to owning domains and domain/full verification exposed integration regressions."
+						},
+						"debt": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "No maintenance history for this new project."
+						}
+					}
+				},
+				"common_components": {
+					"criteria": {
+						"duplication": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Repeated contracts outside reviewed paths were not systematically compared."
+						},
+						"reuse": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Shared component benefit across multiple independent changes was not established."
+						},
+						"abstraction": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Long-term abstraction cost is not observable in a new prototype."
+						}
+					}
+				},
+				"testing": {
+					"criteria": {
+						"risk_coverage": {
+							"status": "assessed",
+							"value": 3,
+							"confidence": "High",
+							"evidence_ids": ["E08", "E09"],
+							"rationale": "Automated checks cover primary paths, concurrency, restart, negative inputs, and a real assembled browser fixture.",
+							"countercheck": "Remaining real-device and failure-display cases are explicitly outside verified coverage."
+						},
+						"quality": {
+							"status": "assessed",
+							"value": 3,
+							"confidence": "High",
+							"evidence_ids": ["E08", "E09"],
+							"rationale": "Tests assert persistent outcomes and real browser effects; new tests detected two races and an integration omission.",
+							"countercheck": "The first integrated browser run failed on a selector collision and passed after a targeted fix."
+						},
+						"automation": {
+							"status": "assessed",
+							"value": 2,
+							"confidence": "High",
+							"evidence_ids": ["E08", "E12"],
+							"rationale": "One documented command reproduces static checks, backend/Web tests, build and browser fixture locally."
+						}
+					}
+				},
+				"supply_chain": {
+					"criteria": {
+						"dependencies": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Pinned versions are visible but update/vulnerability handling has not been inspected."
+						},
+						"build_release": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "No distribution or update artifact path is in the reviewed prototype scope."
+						},
+						"license": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Distribution rights and dependency license review were not established."
+						}
+					}
+				},
+				"performance": {
+					"criteria": {
+						"budget": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "No representative latency or resource budget for real hardware is established."
+						},
+						"hot_path": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "No representative volume measurement of primary hot paths exists."
+						},
+						"measurement": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Fixture and single live probes do not cover tails or growth."
+						}
+					}
+				},
+				"operability": {
+					"criteria": {
+						"signals": {
+							"status": "assessed",
+							"value": 2,
+							"confidence": "Medium",
+							"evidence_ids": ["E02", "E05", "E09"],
+							"rationale": "The UI and API expose turn, run, queue and LARM states and surface common failures; some hardware failure displays remain unaccepted."
+						},
+						"lifecycle": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Install/update/removal and real-device recovery were not exercised end to end."
+						},
+						"interaction": {
+							"status": "assessed",
+							"value": 2,
+							"confidence": "Medium",
+							"evidence_ids": ["E09", "E10"],
+							"rationale": "Text, voice, CLI and bookmark tasks are exercised in Chromium with fixture services; real device interaction is still unverified."
+						}
+					}
+				}
+			}
+		}
+	}
+}

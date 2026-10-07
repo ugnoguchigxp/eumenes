@@ -1,0 +1,21 @@
+import type { Hono } from "hono";
+import type { DialogueService } from "..";
+import { submitSchema } from "../contracts";
+export function registerDialogue(app: Hono, service: DialogueService) {
+	app.get("/api/conversations/:id/runs", (c) =>
+		c.json(service.list(c.req.param("id"))),
+	);
+	app.post("/api/runs", async (c) => {
+		const parsed = submitSchema.safeParse(await c.req.json().catch(() => null));
+		if (!parsed.success) return c.json({ error: "invalid_input" }, 400);
+		return c.json(await service.submit(parsed.data), 202);
+	});
+	app.get("/api/runs/:id", (c) => {
+		const run = service.get(c.req.param("id"));
+		return run ? c.json(run) : c.json({ error: "not_found" }, 404);
+	});
+	app.post("/api/runs/:id/cancel", async (c) => {
+		const run = await service.cancel(c.req.param("id"));
+		return run ? c.json(run) : c.json({ error: "not_found" }, 404);
+	});
+}

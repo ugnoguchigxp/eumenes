@@ -1,0 +1,27 @@
+{
+	"$schema": "./node_modules/oxfmt/configuration_schema.json",
+	"useTabs": true,
+	"tabWidth": 2,
+	"printWidth": 80,
+	"singleQuote": false,
+	"jsxSingleQuote": false,
+	"quoteProps": "as-needed",
+	"trailingComma": "all",
+	"semi": true,
+	"arrowParens": "always",
+	"bracketSameLine": false,
+	"bracketSpacing": true,
+	"sortPackageJson": false,
+	"ignorePatterns": [
+		"**/*.md",
+		"node_modules/**",
+		"dist/**",
+		"dist-web/**",
+		"coverage/**",
+		"data/**",
+		"verification-reports/**",
+		"test-results/**",
+		"playwright-report/**",
+		".serena/**"
+	]
+}

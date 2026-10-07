@@ -1,0 +1,624 @@
+import type { SqliteStore } from "../../../infrastructure/sqlite";
+import {
+	candidates,
+	claimJob,
+	endAttempt,
+	expiredQueued,
+	finishJob,
+	getJob,
+	laneStats,
+	nextEventAt,
+	renewLease,
+	requeueJob,
+	runningJobs,
+	earlierOpenSameKey,
+	setWaitReason,
+} from "../repository";
+import type {
+	HandlerDefinition,
+	JobClaim,
+	JobRecord,
+	QueueOptions,
+	SettleOutcome,
+	Tx,
+} from "../types";
+import { type Registry, sync } from "./registry";
+
+export interface Resolved {
+	now: () => number;
+	id: () => string;
+	sleep: (ms: number, signal?: AbortSignal) => Promise<void>;
+	random: () => number;
+	resources: Record<string, number>;
+	leaseMs: number;
+	heartbeatMs: number;
+	pollMs: number;
+	backoff: { baseMs: number; maxMs: number };
+	tickClaims: number;
+}
+
+export function resolveOptions(o: QueueOptions = {}): Resolved {
+	return {
+		now: o.now ?? Date.now,
+		id: o.id ?? (() => crypto.randomUUID()),
+		sleep:
+			o.sleep ??
+			((ms, signal) =>
+				new Promise((resolve) => {
+					const timer = setTimeout(resolve, ms);
+					signal?.addEventListener(
+						"abort",
+						() => {
+							clearTimeout(timer);
+							resolve();
+						},
+						{ once: true },
+					);
+				})),
+		random: o.random ?? Math.random,
+		resources: o.resources ?? { "larm.llm": 1 },
+		leaseMs: o.leaseMs ?? 30_000,
+		heartbeatMs: o.heartbeatMs ?? 10_000,
+		pollMs: o.pollMs ?? 1_000,
+		backoff: o.backoff ?? { baseMs: 1_000, maxMs: 30_000 },
+		tickClaims: o.tickClaims ?? 16,
+	};
+}
+
+interface Active {
+	claim: JobClaim;
+	input: unknown;
+	handler: HandlerDefinition<unknown, unknown, unknown>;
+	controller: AbortController;
+	heartbeat: AbortController;
+	resourceKey: string | null;
+	concurrencyKey: string | null;
+	promise: Promise<void>;
+	lost: boolean;
+	revoked: boolean;
+	deadlineHit: boolean;
+}
+
+function claimOf(job: JobRecord): JobClaim {
+	return {
+		jobId: job.id,
+		scope: job.scope,
+		kind: job.kind,
+		payloadVersion: job.payloadVersion,
+		payload: JSON.parse(job.payloadJson),
+		subjectRef: job.subjectRef,
+		owner: job.owner ?? "",
+		attempt: job.attempt,
+		generation: job.generation,
+		maxAttempts: job.maxAttempts,
+		deadlineAtMs: job.deadlineAtMs,
+	};
+}
+
+export function createRunner(
+	store: SqliteStore,
+	registry: Registry,
+	opts: Resolved,
+) {
+	const ownerId = `runner:${opts.id()}`;
+	const active = new Map<string, Active>();
+	let closing = false;
+	let started: Promise<void> | null = null;
+	let lastScanMs: number | null = null;
+	let deferred = defer();
+	let tickChain: Promise<unknown> = Promise.resolve();
+
+	function defer() {
+		let resolve: () => void = () => {};
+		const promise = new Promise<void>((r) => {
+			resolve = r;
+		});
+		return { promise, resolve };
+	}
+	function wake() {
+		const current = deferred;
+		deferred = defer();
+		current.resolve();
+	}
+	const keyOf = (c: { jobId: string; attempt: number; generation: number }) =>
+		`${c.jobId}:${c.attempt}:${c.generation}`;
+	function findActive(jobId: string, generation?: number) {
+		for (const a of active.values())
+			if (
+				a.claim.jobId === jobId &&
+				(generation === undefined || a.claim.generation === generation)
+			)
+				return a;
+		return undefined;
+	}
+	function usage(resource: string) {
+		let n = 0;
+		for (const a of active.values()) if (a.resourceKey === resource) n++;
+		return n;
+	}
+	function backoffMs(attempt: number) {
+		const base = Math.min(
+			opts.backoff.maxMs,
+			opts.backoff.baseMs * 2 ** (attempt - 1),
+		);
+		return Math.min(
+			opts.backoff.maxMs,
+			Math.round(base + base * 0.2 * opts.random()),
+		);
+	}
+	/** Run a per-job step; a throwing business callback must not poison the whole sweep/recovery. */
+	function isolated(db: Tx, step: () => void, onError: () => void) {
+		db.exec("SAVEPOINT queue_isolated");
+		try {
+			step();
+			db.exec("RELEASE queue_isolated");
+		} catch {
+			db.exec("ROLLBACK TO queue_isolated");
+			db.exec("RELEASE queue_isolated");
+			onError();
+		}
+	}
+	/** Close the running attempt as non-adopted and finish the job. */
+	function finishRunning(
+		db: Tx,
+		job: JobRecord,
+		state:
+			| "failed"
+			| "expired"
+			| "interrupted"
+			| "outcome_unknown"
+			| "cancelled",
+		errorCode: string | null,
+		now: number,
+	) {
+		if (finishJob(db, job, state, errorCode, now))
+			endAttempt(db, job.id, job.attempt, state, errorCode, now);
+	}
+	function applyOutcome(
+		db: Tx,
+		job: JobRecord,
+		handler: HandlerDefinition<unknown, unknown, unknown> | undefined,
+		input: unknown,
+		outcome: SettleOutcome<unknown>,
+		now: number,
+	): void {
+		const claim = claimOf(job);
+		if (handler) {
+			const result = sync(
+				handler.settleInTransaction(db, claim, input, outcome),
+			);
+			if (result === "stale") {
+				finishRunning(db, job, "interrupted", "stale_result", now);
+				return;
+			}
+		}
+		switch (outcome.type) {
+			case "success":
+				if (finishJob(db, job, "completed", null, now, outcome.resultRef))
+					endAttempt(db, job.id, job.attempt, "completed", null, now);
+				return;
+			case "retry":
+				if (requeueJob(db, job, outcome.errorCode, outcome.availableAtMs, now))
+					endAttempt(db, job.id, job.attempt, "retry", outcome.errorCode, now);
+				return;
+			case "failed":
+				return finishRunning(db, job, "failed", outcome.errorCode, now);
+			case "expired":
+				return finishRunning(db, job, "expired", "deadline_exceeded", now);
+			case "interrupted":
+				return finishRunning(db, job, "interrupted", outcome.errorCode, now);
+		}
+	}
+	/** Resolve a running job whose execution cannot be trusted (lease lost, restart, forced shutdown). */
+	function recoverRunning(
+		db: Tx,
+		job: JobRecord,
+		code: string,
+		now: number,
+		allowReplay = true,
+	) {
+		if (job.state === "cancel_requested") {
+			finishRunning(db, job, "outcome_unknown", code, now);
+			return;
+		}
+		const handler = registry.get(job.kind);
+		const replay =
+			allowReplay &&
+			handler?.recovery === "replay_safe" &&
+			job.attempt < job.maxAttempts &&
+			(job.deadlineAtMs === null || now < job.deadlineAtMs);
+		isolated(
+			db,
+			() =>
+				applyOutcome(
+					db,
+					job,
+					handler,
+					null,
+					replay
+						? {
+								type: "retry",
+								errorCode: code,
+								availableAtMs: now + backoffMs(job.attempt),
+							}
+						: { type: "interrupted", errorCode: code },
+					now,
+				),
+			() => finishRunning(db, job, "interrupted", "settle_failed", now),
+		);
+	}
+
+	/** A claim that cannot start still settles the owning domain so its state never hangs. */
+	function failClaim(
+		db: Tx,
+		job: JobRecord,
+		handler: HandlerDefinition<unknown, unknown, unknown> | undefined,
+		code: string,
+		now: number,
+	) {
+		isolated(
+			db,
+			() =>
+				applyOutcome(
+					db,
+					job,
+					handler,
+					null,
+					{ type: "failed", errorCode: code },
+					now,
+				),
+			() => finishRunning(db, job, "failed", code, now),
+		);
+	}
+
+	type ClaimResult =
+		| { type: "none" }
+		| { type: "progress" }
+		| { type: "claimed"; active: Omit<Active, "promise"> };
+
+	function claimOne(db: Tx, now: number): ClaimResult {
+		const reserved = new Set<string>();
+		for (const a of active.values())
+			if (a.concurrencyKey) reserved.add(a.concurrencyKey);
+		for (const job of candidates(db, now, 256)) {
+			const handler = registry.get(job.kind);
+			const resource = job.resourceKey ?? handler?.resourceKey ?? null;
+			let reason: string | null = null;
+			if (handler && resource) {
+				const cap = opts.resources[resource] ?? 1;
+				if (usage(resource) >= cap) reason = "resource_busy";
+			}
+			if (
+				!reason &&
+				job.concurrencyKey &&
+				(reserved.has(job.concurrencyKey) || earlierOpenSameKey(db, job))
+			)
+				reason = "conversation_order";
+			if (reason) {
+				setWaitReason(db, job.id, reason, now);
+				continue;
+			}
+			if (!handler || !handler.payloadVersions.includes(job.payloadVersion)) {
+				const code = handler
+					? "unsupported_payload_version"
+					: "handler_not_registered";
+				const current = claimJob(db, job, ownerId, now + opts.leaseMs, now);
+				const claimed: JobRecord = {
+					...job,
+					...current,
+					state: "running",
+					owner: ownerId,
+				};
+				failClaim(db, claimed, handler, code, now);
+				return { type: "progress" };
+			}
+			const claimed = claimJob(db, job, ownerId, now + opts.leaseMs, now);
+			const running: JobRecord = {
+				...job,
+				...claimed,
+				state: "running",
+				owner: ownerId,
+			};
+			const claim = claimOf(running);
+			db.exec("SAVEPOINT queue_prepare");
+			try {
+				const prepared = sync(handler.prepareInTransaction(db, claim));
+				db.exec("RELEASE queue_prepare");
+				if (prepared.status === "stale") {
+					finishRunning(db, running, "cancelled", prepared.reason, now);
+					return { type: "progress" };
+				}
+				return {
+					type: "claimed",
+					active: {
+						claim,
+						input: prepared.input,
+						handler,
+						controller: new AbortController(),
+						heartbeat: new AbortController(),
+						resourceKey: resource,
+						concurrencyKey: job.concurrencyKey,
+						lost: false,
+						revoked: false,
+						deadlineHit: false,
+					},
+				};
+			} catch {
+				db.exec("ROLLBACK TO queue_prepare");
+				db.exec("RELEASE queue_prepare");
+				failClaim(db, running, handler, "prepare_failed", now);
+				return { type: "progress" };
+			}
+		}
+		return { type: "none" };
+	}
+
+	async function heartbeat(a: Active) {
+		while (!a.heartbeat.signal.aborted) {
+			await opts.sleep(opts.heartbeatMs, a.heartbeat.signal);
+			if (a.heartbeat.signal.aborted) return;
+			try {
+				const now = opts.now();
+				const ok = await store.write((db) =>
+					renewLease(db, a.claim, now + opts.leaseMs, now),
+				);
+				if (!ok) {
+					a.lost = true;
+					a.controller.abort(new Error("lease_lost"));
+					return;
+				}
+			} catch {
+				// Writer busy: retry next interval; the lease sweep decides if it expired.
+			}
+		}
+	}
+
+	async function execute(a: Active) {
+		void heartbeat(a);
+		let result: { ok: true; value: unknown } | { ok: false; error: unknown };
+		try {
+			result = {
+				ok: true,
+				value: await a.handler.execute(a.input, {
+					signal: a.controller.signal,
+					jobId: a.claim.jobId,
+					attempt: a.claim.attempt,
+					generation: a.claim.generation,
+				}),
+			};
+		} catch (error) {
+			result = { ok: false, error };
+		}
+		a.heartbeat.abort();
+		try {
+			if (a.revoked || a.lost) return;
+			await settle(a, result);
+		} catch {
+			// Settlement transaction failed; the lease sweep resolves the job.
+		} finally {
+			active.delete(keyOf(a.claim));
+			wake();
+		}
+	}
+
+	async function settle(
+		a: Active,
+		result: { ok: true; value: unknown } | { ok: false; error: unknown },
+	) {
+		const attemptSettle = (
+			pick: (job: JobRecord, now: number) => SettleOutcome<unknown>,
+		) =>
+			store.write((db) => {
+				const now = opts.now();
+				const job = getJob(db, a.claim.jobId);
+				if (
+					!job ||
+					job.owner !== a.claim.owner ||
+					job.attempt !== a.claim.attempt ||
+					job.generation !== a.claim.generation ||
+					a.revoked
+				)
+					return;
+				if (job.state === "cancel_requested") {
+					finishRunning(db, job, "cancelled", job.errorCode, now);
+					return;
+				}
+				if (job.state !== "running") return;
+				applyOutcome(db, job, a.handler, a.input, pick(job, now), now);
+			});
+		const pick = (job: JobRecord, now: number): SettleOutcome<unknown> => {
+			const late = job.deadlineAtMs !== null && now >= job.deadlineAtMs;
+			if (result.ok)
+				return late || a.deadlineHit
+					? { type: "expired" }
+					: { type: "success", result: result.value };
+			if (closing) return { type: "interrupted", errorCode: "shutdown" };
+			if (a.deadlineHit || late) return { type: "expired" };
+			const errorCode =
+				result.error instanceof Error && result.error.message
+					? result.error.message.slice(0, 120)
+					: "execution_failed";
+			const retryable =
+				a.handler.classify?.(result.error) === "retry" &&
+				job.attempt < job.maxAttempts;
+			if (!retryable) return { type: "failed", errorCode };
+			const availableAtMs = now + backoffMs(job.attempt);
+			if (job.deadlineAtMs !== null && availableAtMs >= job.deadlineAtMs)
+				return { type: "failed", errorCode };
+			return { type: "retry", errorCode, availableAtMs };
+		};
+		try {
+			await attemptSettle(pick);
+		} catch {
+			// Business settlement threw and rolled back; record a plain failure through the handler.
+			await attemptSettle(() => ({
+				type: "failed",
+				errorCode: "settle_failed",
+			}));
+		}
+	}
+
+	async function sweep(now: number) {
+		const needed = store.read(
+			(db) =>
+				expiredQueued(db, now).length > 0 ||
+				runningJobs(db).some(
+					(j) =>
+						(j.deadlineAtMs !== null && j.deadlineAtMs <= now) ||
+						(j.leaseUntilMs !== null && j.leaseUntilMs < now),
+				),
+		);
+		if (!needed) return;
+		await store.write((db) => {
+			for (const job of expiredQueued(db, now)) {
+				const handler = registry.get(job.kind);
+				const claim = claimOf(job);
+				isolated(
+					db,
+					() => {
+						if (handler)
+							sync(
+								handler.settleInTransaction(db, claim, null, {
+									type: "expired",
+								}),
+							);
+					},
+					() => {},
+				);
+				db.query(
+					"UPDATE queue_jobs SET state='expired', error_code='deadline_exceeded', finished_at_ms=?, wait_reason=NULL, updated_at_ms=?, revision=revision+1 WHERE id=? AND state IN ('queued','retry_wait')",
+				).run(now, now, job.id);
+			}
+			for (const job of runningJobs(db)) {
+				const a = findActive(job.id, job.generation);
+				if (
+					a &&
+					job.deadlineAtMs !== null &&
+					job.deadlineAtMs <= now &&
+					!a.deadlineHit
+				) {
+					a.deadlineHit = true;
+					a.controller.abort(new Error("deadline_exceeded"));
+				}
+				if (job.leaseUntilMs !== null && job.leaseUntilMs < now) {
+					if (a) {
+						a.lost = true;
+						a.controller.abort(new Error("lease_expired"));
+						a.heartbeat.abort();
+					}
+					recoverRunning(db, job, "lease_expired", now);
+				}
+			}
+		});
+	}
+
+	async function tickInner() {
+		const now = opts.now();
+		await sweep(now);
+		for (let i = 0; i < opts.tickClaims && !closing; i++) {
+			if (!store.read((db) => candidates(db, opts.now(), 1).length > 0)) break;
+			const result = await store.write((db) => claimOne(db, opts.now()));
+			if (result.type === "none") break;
+			if (result.type === "claimed") {
+				const a = result.active as Active;
+				active.set(keyOf(a.claim), a);
+				if (closing) a.controller.abort(new Error("shutdown"));
+				a.promise = execute(a);
+			}
+		}
+		lastScanMs = opts.now();
+	}
+	function tick() {
+		const run = tickChain.then(tickInner, tickInner);
+		tickChain = run.catch(() => {});
+		return run;
+	}
+
+	async function loop() {
+		while (!closing) {
+			const mine = deferred;
+			let delay = opts.pollMs;
+			try {
+				await tick();
+				const next = store.read((db) => nextEventAt(db, opts.now()));
+				if (next !== null)
+					delay = Math.max(10, Math.min(opts.pollMs, next - opts.now()));
+			} catch {
+				// Writer full or closing: back off and re-check; do not fake progress.
+				delay = Math.min(opts.pollMs, opts.backoff.baseMs);
+			}
+			if (closing) break;
+			const timer = new AbortController();
+			await Promise.race([mine.promise, opts.sleep(delay, timer.signal)]);
+			timer.abort();
+		}
+	}
+
+	return {
+		wake,
+		tick,
+		start() {
+			if (!started && !closing) started = loop();
+		},
+		async recover() {
+			const now = opts.now();
+			return store.write((db) => {
+				let n = 0;
+				for (const job of runningJobs(db)) {
+					recoverRunning(db, job, "backend_restarted", now);
+					n++;
+				}
+				return n;
+			});
+		},
+		abort(jobId: string, reason: string) {
+			for (const a of active.values())
+				if (a.claim.jobId === jobId) a.controller.abort(new Error(reason));
+		},
+		async close(drainMs = 10_000) {
+			if (closing) return;
+			closing = true;
+			wake();
+			for (const a of active.values())
+				a.controller.abort(new Error("shutdown"));
+			await started?.catch(() => {});
+			const pending = [...active.values()].map((a) => a.promise);
+			const drain = new AbortController();
+			await Promise.race([
+				Promise.allSettled(pending),
+				opts.sleep(drainMs, drain.signal),
+			]);
+			drain.abort();
+			const leftover = [...active.values()];
+			if (leftover.length === 0) return;
+			for (const a of leftover) {
+				a.revoked = true;
+				a.heartbeat.abort();
+			}
+			const now = opts.now();
+			await store
+				.write((db) => {
+					for (const a of leftover) {
+						const job = getJob(db, a.claim.jobId);
+						if (
+							job &&
+							(job.state === "running" || job.state === "cancel_requested")
+						)
+							recoverRunning(db, job, "shutdown_timeout", now, false);
+					}
+				})
+				.catch(() => {});
+		},
+		inUse(resource: string) {
+			return usage(resource);
+		},
+		activeIds: () => [...active.values()].map((a) => a.claim.jobId),
+		laneStats(now: number) {
+			return store.read((db) => laneStats(db, now));
+		},
+		lastScanMs: () => lastScanMs,
+	};
+}
+export type Runner = ReturnType<typeof createRunner>;
+
+export type { HandlerDefinition };
