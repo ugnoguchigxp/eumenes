@@ -23,14 +23,16 @@ import {
 	sequenceMigration as voiceSequenceMigration,
 } from "../domains/voice-dialogue";
 import { openStore } from "../infrastructure/sqlite";
+import {
+	resolveApiToken,
+	resolveLarmToken,
+} from "../infrastructure/auth-config";
 import { createApp } from "./app";
 
 const host = process.env.EUMENES_HOST ?? "127.0.0.1";
 if (host !== "127.0.0.1" && host !== "localhost")
 	throw new Error("loopback_host_required");
-const token = process.env.EUMENES_API_TOKEN;
-if (!token || token.length < 24)
-	throw new Error("EUMENES_API_TOKEN must be at least 24 characters");
+const token = resolveApiToken(process.env);
 const store = openStore(process.env.EUMENES_DB ?? "./data/eumenes.sqlite3", [
 	conversationMigration,
 	dialogueMigration,
@@ -46,8 +48,9 @@ const conversation = createConversationService(store);
 const continuity = createContinuityService(store, conversation);
 const larm = createLarm({
 	baseUrl: process.env.LARM_BASE_URL,
-	token: process.env.LARM_CONTROL_TOKEN ?? process.env.LARM_API_TOKEN,
+	token: resolveLarmToken(process.env),
 	profile: process.env.LARM_PROFILE,
+	audience: process.env.LARM_AUDIENCE,
 	voice: process.env.EUMENES_TTS_VOICE,
 });
 const queue = createQueue(store);

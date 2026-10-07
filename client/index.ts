@@ -8,7 +8,7 @@ import { createTransport } from "./transport";
 import { voiceDialogueClient } from "./voice-dialogue";
 
 export { ApiError } from "./transport";
-export function createClient(baseUrl: string, token: string) {
+export function createClient(baseUrl: string, token?: string) {
 	const transport = createTransport(baseUrl, token);
 	return {
 		...conversationClient(transport),

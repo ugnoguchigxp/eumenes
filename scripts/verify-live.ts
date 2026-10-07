@@ -21,6 +21,7 @@ const larm = createLarm({
 	baseUrl: process.env.LARM_BASE_URL,
 	token: process.env.LARM_CONTROL_TOKEN ?? process.env.LARM_API_TOKEN,
 	profile: process.env.LARM_PROFILE,
+	audience: process.env.LARM_AUDIENCE,
 	voice: process.env.EUMENES_TTS_VOICE,
 });
 try {

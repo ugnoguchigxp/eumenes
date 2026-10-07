@@ -37,15 +37,20 @@ test.beforeAll(async () => {
 	await ready(`http://127.0.0.1:${larmPort}/v3/agent-profiles`);
 	launch(["api/application/server.ts"], {
 		EUMENES_DB: join(dir, "test.sqlite3"),
-		EUMENES_API_TOKEN: "fixture-api-token-123456789",
+		EUMENES_API_TOKEN: "",
 		EUMENES_PORT: String(apiPort),
 		EUMENES_ORIGIN: `http://127.0.0.1:${webPort}`,
 		LARM_BASE_URL: `http://127.0.0.1:${larmPort}`,
-		LARM_CONTROL_TOKEN: "fixture-control",
+		LARM_API_TOKEN: "fixture-control",
+		LARM_CONTROL_TOKEN: "",
 	});
 	await ready(`http://127.0.0.1:${apiPort}/api/status`);
 	launch(["x", "vite", "--host", "127.0.0.1", "--port", String(webPort)], {
 		EUMENES_PROXY_URL: `http://127.0.0.1:${apiPort}`,
+		EUMENES_API_TOKEN: "",
+		LARM_API_TOKEN: "fixture-control",
+		LARM_CONTROL_TOKEN: "",
+		EUMENES_ORIGIN: `http://127.0.0.1:${webPort}`,
 	});
 	await ready(`http://127.0.0.1:${webPort}/`);
 });
@@ -56,9 +61,54 @@ test.afterAll(async () => {
 		if (child.exitCode === null) child.kill("SIGKILL");
 	rmSync(dir, { recursive: true, force: true });
 });
+test("exported LARM token connects the UI and CLI without browser credentials", async ({
+	page,
+}) => {
+	const browserAuthHeaders: Array<string | undefined> = [];
+	page.on("request", (request) => {
+		if (new URL(request.url()).pathname.startsWith("/api/"))
+			browserAuthHeaders.push(request.headers().authorization);
+	});
+	const statusResponse = page.waitForResponse(
+		(response) => new URL(response.url()).pathname === "/api/status",
+	);
+	await page.goto(`http://127.0.0.1:${webPort}/`);
+	const response = await statusResponse;
+	expect(response.status()).toBe(200);
+	expect(await response.text()).not.toContain("fixture-control");
+	await expect(page.getByRole("heading", { name: "会話" })).toBeVisible();
+	await expect(page.locator('input[type="password"]')).toHaveCount(0);
+	expect(browserAuthHeaders.length).toBeGreaterThan(0);
+	expect(browserAuthHeaders.every((header) => header === undefined)).toBe(true);
+	expect((await fetch(`http://127.0.0.1:${apiPort}/api/status`)).status).toBe(
+		401,
+	);
+	const cli = spawnSync("bun", ["cli/index.ts", "status", "--json"], {
+		cwd: root,
+		encoding: "utf8",
+		env: {
+			...process.env,
+			EUMENES_URL: `http://127.0.0.1:${apiPort}`,
+			EUMENES_API_TOKEN: "",
+			LARM_API_TOKEN: "fixture-control",
+			LARM_CONTROL_TOKEN: "",
+		},
+	});
+	expect(cli.status, cli.stderr).toBe(0);
+	expect(JSON.parse(cli.stdout)).toHaveProperty("larm");
+});
 test("text and browser audio complete through real services with fixture provider", async ({
 	page,
 }) => {
+	const browserAuthHeaders: Array<string | undefined> = [];
+	page.on("request", (request) => {
+		if (new URL(request.url()).pathname.startsWith("/api/"))
+			browserAuthHeaders.push(request.headers().authorization);
+	});
+	// The API still requires auth; only the local dev proxy supplies it.
+	expect((await fetch(`http://127.0.0.1:${apiPort}/api/status`)).status).toBe(
+		401,
+	);
 	await page.addInitScript(() => {
 		const media = navigator.mediaDevices;
 		Object.defineProperty(media, "getUserMedia", {
@@ -82,10 +132,8 @@ test("text and browser audio complete through real services with fixture provide
 		});
 	});
 	await page.goto(`http://127.0.0.1:${webPort}/`);
-	await page
-		.getByRole("textbox", { name: "API トークン" })
-		.fill("fixture-api-token-123456789");
-	await page.getByRole("button", { name: "接続" }).click();
+	await expect(page.getByRole("heading", { name: "会話" })).toBeVisible();
+	await expect(page.locator('input[type="password"]')).toHaveCount(0);
 	await page
 		.getByRole("textbox", { name: "メッセージ" })
 		.fill("以前の話を覚えていますか");
@@ -93,6 +141,8 @@ test("text and browser audio complete through real services with fixture provide
 	await expect(
 		page.getByText("承知しました。先ほどの話を覚えています。").first(),
 	).toBeVisible();
+	expect(browserAuthHeaders.length).toBeGreaterThan(0);
+	expect(browserAuthHeaders.every((header) => header === undefined)).toBe(true);
 	const continuity = page
 		.getByRole("heading", { name: "継続情報" })
 		.locator("..");
@@ -108,7 +158,9 @@ test("text and browser audio complete through real services with fixture provide
 			env: {
 				...process.env,
 				EUMENES_URL: `http://127.0.0.1:${apiPort}`,
-				EUMENES_API_TOKEN: "fixture-api-token-123456789",
+				EUMENES_API_TOKEN: "",
+				LARM_API_TOKEN: "fixture-control",
+				LARM_CONTROL_TOKEN: "",
 			},
 		});
 	const sent = cli([
@@ -153,7 +205,7 @@ test("text and browser audio complete through real services with fixture provide
 	await expect(
 		page.locator(".messages").getByText("こんにちは", { exact: true }).first(),
 	).toBeVisible({ timeout: 20000 });
-	await expect(page.getByText("playing", { exact: true })).toBeVisible({
+	await expect(page.getByText(/^(playing|played)$/)).toBeVisible({
 		timeout: 20000,
 	});
 	await page.evaluate(() =>

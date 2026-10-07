@@ -1,5 +1,6 @@
 import { ApiError, createClient } from "../client";
 import type { Run } from "../api/domains/dialogue/contracts";
+import { resolveApiToken } from "../api/infrastructure/auth-config";
 
 const args = process.argv.slice(2);
 const json = args.includes("--json");
@@ -21,9 +22,13 @@ for (let i = 0; i < args.length; i++) {
 }
 const command = positional.shift();
 const url = process.env.EUMENES_URL ?? "http://127.0.0.1:8787";
-const token = process.env.EUMENES_API_TOKEN ?? "";
-if (!token) {
-	console.error("EUMENES_API_TOKEN is required");
+let token: string;
+try {
+	token = resolveApiToken(process.env);
+} catch (error) {
+	console.error(
+		error instanceof Error ? error.message : "API auth is not configured",
+	);
 	process.exit(2);
 }
 const client = createClient(url, token);

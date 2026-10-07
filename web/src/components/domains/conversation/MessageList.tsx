@@ -1,4 +1,5 @@
 import type { Conversation } from "../../../../../api/domains/conversation/contracts";
+import { renderSafeMarkdown } from "./markdownRenderer";
 export function MessageList({
 	conversation,
 }: {
@@ -13,7 +14,16 @@ export function MessageList({
 						className={`message message-${message.role}`}
 					>
 						<small>{message.role === "user" ? "あなた" : "Eumenes"}</small>
-						<p>{message.text}</p>
+						{message.role === "assistant" ? (
+							<div
+								className="markdown-content"
+								dangerouslySetInnerHTML={{
+									__html: renderSafeMarkdown(message.text),
+								}}
+							/>
+						) : (
+							<p>{message.text}</p>
+						)}
 					</article>
 				))
 			) : (

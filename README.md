@@ -5,15 +5,19 @@ TypeScript、Bun、Hono、React、SQLite によるローカル音声対話の初
 ## 起動
 
 1. `bun install`
-2. `.env.example` を `.env` にコピーし、`EUMENES_API_TOKEN` を十分に長いランダム値へ変更します。LARM の現行接続先を `LARM_BASE_URL` に設定します。認証は `LARM_CONTROL_TOKEN` または SAAA と共通の環境変数 `LARM_API_TOKEN` から読みます。TTS の voice が LARM の claim に含まれない場合は `EUMENES_TTS_VOICE` を設定します。秘密をリポジトリへコピーしないでください。
+2. 必要に応じて `.env.example` を `.env` にコピーします。`LARM_API_TOKEN` が export 済みなら追加のトークン設定は不要です。backend・開発サーバー・CLI は同じ環境変数を引き継ぐシェルから起動してください。`EUMENES_API_TOKEN` は空欄のままにでき、ローカル API 用の認証値を LARM トークンから用途を分けて生成します。明示的に指定する場合は24文字以上にします。同じ `.env` を backend と Vite が読み、Vite のローカル proxy が API 認証を付けます。ブラウザには token を渡しません。LARM は `http://192.168.0.130:9810` の `SAAA-gemma4-26b` を既定値とし、同じ Linux ホストから使う場合は URL を `http://127.0.0.1:9810`、`LARM_AUDIENCE` を `same-host` にします。LARM 認証は SAAA と共通の `LARM_API_TOKEN` を優先し、未指定なら `LARM_CONTROL_TOKEN` を使います。TTS の voice が LARM の claim に含まれない場合は `EUMENES_TTS_VOICE` を設定します。秘密をリポジトリへコピーしないでください。
 3. 別々のターミナルで `bun run start` と `bun run dev` を実行します。
-4. `http://127.0.0.1:5173` を開き、API token を入力します。「音声開始」でマイクを許可し、日本語で話します。「停止」で録音と再生を終了します。再生中の次の発話は前の再生を割り込みます。
+4. `http://127.0.0.1:5173` を開くと会話欄に入ります。「音声を開始」でマイクを許可し、日本語で話します。「停止」で録音と再生を終了します。再生中の次の発話は前の再生を割り込みます。
 
 backend は `127.0.0.1:8787` のみで待ち受けます。Chrome/Chromium の Playwright fixture で画面・音声経路を確認しています。実マイク・ヘッドホンによる3往復の受入は未実施です。
 
+LARM 接続では毎回接続状態を API で確認し、claim が返した `configuration.fields.baseURL`、`configuration.fields.model`、`credential.token` を使用します。LLM のみなら `providers: ["llm"]`、音声を使う場合は `providers` を省略して Profile 全体を要求します。期限前の renew 後は再claimで token を更新し、終了時に接続を解放します。メインの入力予算は 256072 token、出力上限は 4096 token です。4 セッション構成の目標は、同じ 512K のランタイムを共有するメイン 256K × 1 と補助 64K × 3 です。補助の入力予算は各 59464 token とし、利用側でセッション数と予算を管理します。補助 selector `SAAA-gemma4-26b-64k` は 2026-10-08 時点で catalog が 404 を返すため、コードからも接続を禁止しています。配備後に catalog を確認し、補助の管理処理を実装してから有効化します。
+
+DesignSystem は `packages/design-system` にソースとビルド設定を持つ workspace package です。元の `main` から取り込み、Eumenes 内では `@eumenes/design-system` として管理します。`bun run build:design-system` で再ビルドでき、元の MIT ライセンスを同梱しています。
+
 ## CLI
 
-backend を先に起動し、同じ `EUMENES_API_TOKEN` を持つシェルから実行します。通常の CLI 操作は backend や DB writer を起動しません。
+backend を先に起動し、同じ認証環境（`LARM_API_TOKEN`、明示指定時は `EUMENES_API_TOKEN`）を持つシェルから実行します。通常の CLI 操作は backend や DB writer を起動しません。
 
 ```sh
 bun cli/index.ts status --json

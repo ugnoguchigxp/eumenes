@@ -2,6 +2,8 @@ export {};
 
 const port = Number(process.env.LARM_FIXTURE_PORT ?? 9822);
 const claimed = new Map<string, string[]>();
+const profile = "SAAA-gemma4-26b";
+const agentProfile = "saaa-conversation-gemma4-26b-voice";
 const names = ["llm", "asr", "tts"] as const;
 const protocol = {
 	llm: "openai.chat-completions.v1",
@@ -59,35 +61,45 @@ const server = Bun.serve({
 			return Response.json({
 				contractVersion: "agent-connection.v3",
 				catalogRevision: "fixture1",
-				requestedProfile: "SAAA",
+				requestedProfile: profile,
 				profiles: [
 					{
-						id: "fixture-profile",
+						id: agentProfile,
 						providers: names.map((name) => ({
 							name,
 							protocol: protocol[name],
 							endpoint: endpoint[name],
-							model: `model-${name}`,
+							model: name === "llm" ? "gemma4-26b-a4b" : `model-${name}`,
+							...(name === "llm"
+								? {
+										contextWindow: {
+											maxTokens: 262144,
+											outputReserveTokens: 4096,
+											safetyMarginTokens: 1976,
+										},
+									}
+								: {}),
 						})),
 						services: [],
 					},
 				],
 			});
 		if (path === "/v1/agent-connections" && request.method === "POST") {
-			const body = (await request.json()) as { providers: string[] };
+			const body = (await request.json()) as { providers?: string[] };
 			const id = crypto.randomUUID();
-			claimed.set(id, body.providers);
+			const requested = body.providers ?? [...names];
+			claimed.set(id, requested);
 			return Response.json(
 				{
 					id,
-					profile: "SAAA",
-					agentProfile: "fixture-profile",
+					profile,
+					agentProfile,
 					status: "ready",
-					providers: body.providers.map((name) => ({
+					providers: requested.map((name) => ({
 						name,
 						protocol: protocol[name as keyof typeof protocol],
 						endpoint: endpoint[name as keyof typeof endpoint],
-						model: `model-${name}`,
+						model: name === "llm" ? "gemma4-26b-a4b" : `model-${name}`,
 						readiness: "ready",
 						claimable: true,
 					})),
@@ -107,6 +119,14 @@ const server = Bun.serve({
 				claimed.delete(id);
 				return new Response(null, { status: 204 });
 			}
+			if (request.method === "GET")
+				return Response.json({
+					id,
+					profile,
+					agentProfile,
+					status: "ready",
+					expiresAt: new Date(Date.now() + 900000).toISOString(),
+				});
 			if (path.endsWith("/claim"))
 				return Response.json({
 					id,
@@ -117,21 +137,21 @@ const server = Bun.serve({
 						name,
 						protocol: protocol[name as keyof typeof protocol],
 						baseUrl: `${origin}/${name}/v1`,
-						model: `model-${name}`,
+						model: name === "llm" ? "gemma4-26b-a4b" : `model-${name}`,
 						credential: { token: `fixture-${name}` },
 						configuration: {
 							fields: {
 								baseURL: `${origin}/${name}/v1`,
-								model: `model-${name}`,
+								model: name === "llm" ? "gemma4-26b-a4b" : `model-${name}`,
 								...(name === "tts" ? { voice: "fixture-voice" } : {}),
 							},
 						},
 						contextWindow:
 							name === "llm"
 								? {
-										maxTokens: 4096,
-										outputReserveTokens: 512,
-										safetyMarginTokens: 128,
+										maxTokens: 262144,
+										outputReserveTokens: 4096,
+										safetyMarginTokens: 1976,
 									}
 								: undefined,
 					})),

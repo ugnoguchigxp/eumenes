@@ -3,7 +3,7 @@ import {
 	QueryClientProvider,
 	useQuery,
 } from "@tanstack/react-query";
-import { type FormEvent, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "zustand";
 import { createClient, type EumenesClient } from "../../client";
 import { MessageList } from "./components/domains/conversation/MessageList";
@@ -11,8 +11,8 @@ import {
 	BookmarkList,
 	CreateBookmarkForm,
 } from "./components/domains/continuity";
-import { Button } from "./components/ui/Button";
 import { StatusBadge } from "./components/ui/StatusBadge";
+import { Button, Textarea } from "./design-system";
 import { type AudioStore, createAudioStore } from "./domains/audio";
 import { useConversation } from "./domains/conversation";
 import { useCancel, useRuns, useSubmit } from "./domains/dialogue";
@@ -26,138 +26,297 @@ function Workspace({
 	store: AudioStore;
 }) {
 	const [draft, setDraft] = useState("");
+	const [sidePanel, setSidePanel] = useState<"continuity" | "runs">(
+		"continuity",
+	);
+	const historyRef = useRef<HTMLDivElement>(null);
+	const followLatest = useRef(true);
+	const [showLatest, setShowLatest] = useState(false);
 	const conversation = useConversation(client, "main");
 	const runs = useRuns(client, "main");
 	const submit = useSubmit(client, "main");
 	const cancel = useCancel(client, "main");
 	const voice = useVoiceDialogue(client, store);
-	const phase = useStore(store, (s) => s.phase);
-	const level = useStore(store, (s) => s.level);
-	const audioError = useStore(store, (s) => s.error);
+	const phase = useStore(store, (state) => state.phase);
+	const level = useStore(store, (state) => state.level);
+	const audioError = useStore(store, (state) => state.error);
 	const status = useQuery({
 		queryKey: ["larm", client.identity],
 		queryFn: () => client.status(),
 		refetchInterval: 5000,
 		retry: 0,
 	});
+	const activeRun = runs.data?.find(
+		(run) => run.status === "queued" || run.status === "running",
+	);
+	const messageCount = conversation.data?.messages.length ?? 0;
+	useEffect(() => {
+		if (followLatest.current && historyRef.current)
+			historyRef.current.scrollTop = historyRef.current.scrollHeight;
+	}, [messageCount, activeRun?.id]);
+	function scrollLatest() {
+		const history = historyRef.current;
+		if (!history) return;
+		history.scrollTop = history.scrollHeight;
+		followLatest.current = true;
+		setShowLatest(false);
+	}
 	function send(event: FormEvent) {
 		event.preventDefault();
 		const text = draft.trim();
-		if (!text) return;
-		submit.mutate(text);
-		setDraft("");
+		if (!text || submit.isPending) return;
+		void submit
+			.mutateAsync(text)
+			.then(() => {
+				setDraft((current) => (current.trim() === text ? "" : current));
+			})
+			.catch(() => {});
 	}
+	const route = [
+		{
+			id: "microphone",
+			label: "マイク",
+			active: voice.active && phase === "listening",
+		},
+		{ id: "asr", label: "音声認識", active: !!voice.turn && !voice.turn.text },
+		{ id: "llm", label: "Gemma 4", active: !!activeRun },
+		{ id: "speech", label: "音声再生", active: phase === "playing" },
+	];
 	return (
-		<main className="shell">
-			<p className="eyebrow">Personal voice companion</p>
-			<h1 className="title">Eumenes</h1>
-			<p className="sub">
-				日本語で話しかけてください。会話と実行状況はローカルの保存先から読み直されます。
-			</p>
-			<section className="panel">
-				<div className="row">
-					<strong>音声対話</strong>
-					<StatusBadge status={phase} />
-					<StatusBadge status={status.data?.larm.state ?? "connecting"} />
-					<meter
-						className="level"
-						aria-label="マイク音量"
-						min={0}
-						max={100}
-						value={Math.min(100, level * 800)}
+		<main className="app-shell">
+			<header className="app-header">
+				<div className="brand">
+					<span className="brand-mark" aria-hidden="true">
+						E
+					</span>
+					<span>Eumenes</span>
+				</div>
+				<div className="header-status">
+					<span>ローカル会話</span>
+					<StatusBadge
+						status={
+							status.data?.larm.state ??
+							(status.isError ? "failed" : "connecting")
+						}
 					/>
 				</div>
-				<p className="hint">
-					マイクとヘッドホンで使ってください。再生中もマイク入力を受け付けます。
-				</p>
-				<div className="row">
-					<Button
-						onClick={() => void voice.start()}
-						disabled={voice.active || phase !== "idle"}
-					>
-						音声を開始
-					</Button>
-					<Button
-						className="secondary"
-						onClick={() => void voice.stop()}
-						disabled={!voice.active}
-					>
-						停止
-					</Button>
-					<span>{voice.turn?.status ?? "待機中"}</span>
-				</div>
-				{voice.turn?.text && <p>認識: {voice.turn.text}</p>}
-				{(voice.error || audioError) && (
-					<p className="error" role="alert">
-						{voice.error || audioError}
-					</p>
-				)}
-			</section>
-			<section className="panel">
-				<h2>会話</h2>
-				{conversation.isError && <p className="error">履歴を取得できません</p>}
-				<MessageList conversation={conversation.data} />
-				<form className="composer" onSubmit={send}>
-					<input
-						aria-label="メッセージ"
-						value={draft}
-						onChange={(e) => setDraft(e.target.value)}
-						placeholder="文字で話しかける"
-						maxLength={8000}
-					/>
-					<Button disabled={!draft.trim() || submit.isPending}>送信</Button>
-				</form>
-				{submit.isError && (
-					<p className="error" role="alert">
-						送信できませんでした: {String(submit.error)}
-					</p>
-				)}
-			</section>
-			<section className="panel">
-				<h2>継続情報</h2>
-				<CreateBookmarkForm
-					client={client}
-					conversationId="main"
-					messages={
-						conversation.data?.messages
-							.filter((message) => message.role === "user")
-							.map((message) => ({ id: message.id, text: message.text })) ?? []
-					}
-				/>
-				<BookmarkList client={client} conversationId="main" />
-			</section>
-			<section className="panel">
-				<h2>実行記録</h2>
-				<ul className="runs">
-					{runs.data?.length ? (
-						runs.data.map((run) => (
-							<li key={run.id}>
-								<div>
-									<code>{run.id.slice(0, 8)}</code>{" "}
-									<StatusBadge status={run.status} />
-									{run.error && <small className="error"> {run.error}</small>}
-								</div>
-								{["queued", "running"].includes(run.status) && (
-									<Button
-										className="secondary"
-										onClick={() => cancel.mutate(run.id)}
-									>
-										取消
-									</Button>
-								)}
-							</li>
-						))
-					) : (
-						<li className="hint">記録はまだありません</li>
+			</header>
+			<div className="workspace-layout">
+				<section className="chat-panel" aria-label="会話">
+					<header className="chat-header">
+						<div>
+							<span className="section-kicker">CONVERSATION</span>
+							<h1>会話</h1>
+						</div>
+						<span className="model-label">Gemma 4 26B-A4B</span>
+					</header>
+					{status.isError && (
+						<p className="chat-error" role="alert">
+							ローカル API に接続できません。Eumenes の backend
+							と設定を確認してください。
+						</p>
 					)}
-				</ul>
-			</section>
+					{conversation.isError && (
+						<p className="chat-error" role="alert">
+							会話履歴を取得できませんでした。
+						</p>
+					)}
+					<div
+						className="chat-history"
+						ref={historyRef}
+						onScroll={(event) => {
+							const target = event.currentTarget;
+							followLatest.current =
+								target.scrollHeight - target.scrollTop - target.clientHeight <
+								80;
+							setShowLatest(!followLatest.current);
+						}}
+					>
+						<MessageList conversation={conversation.data} />
+						{activeRun && (
+							<div className="thinking">
+								<span className="thinking-dots" aria-hidden="true">
+									<i />
+									<i />
+									<i />
+								</span>
+								<output>
+									{activeRun.status === "queued"
+										? "応答を準備中"
+										: "Gemma が応答中"}
+								</output>
+								<Button
+									variant="ghost"
+									size="sm"
+									onClick={() => cancel.mutate(activeRun.id)}
+									disabled={cancel.isPending}
+								>
+									中止
+								</Button>
+							</div>
+						)}
+					</div>
+					{showLatest && (
+						<button
+							className="latest-button"
+							type="button"
+							onClick={scrollLatest}
+						>
+							最新の発言へ ↓
+						</button>
+					)}
+					<div className="chat-bottom">
+						<div className="route-track" aria-label="回答の経路">
+							{route.map((node, index) => (
+								<div className="route-part" key={node.id}>
+									{index > 0 && (
+										<span className="route-arrow" aria-hidden="true">
+											→
+										</span>
+									)}
+									<span className={`route-node${node.active ? " active" : ""}`}>
+										<i aria-hidden="true" />
+										{node.label}
+									</span>
+								</div>
+							))}
+						</div>
+						<form className="chat-composer" onSubmit={send}>
+							<div className="composer-row">
+								<div className="voice-controls">
+									<Button
+										type="button"
+										variant={voice.active ? "destructive" : "secondary"}
+										onClick={() =>
+											void (voice.active ? voice.stop() : voice.start())
+										}
+										disabled={!voice.active && phase !== "idle"}
+										aria-label={voice.active ? "停止" : "音声を開始"}
+									>
+										{voice.active ? "停止" : "音声を開始"}
+									</Button>
+									<meter
+										className="level"
+										aria-label="マイク音量"
+										min={0}
+										max={100}
+										value={Math.min(100, level * 800)}
+									/>
+								</div>
+								<Textarea
+									aria-label="メッセージ"
+									value={draft}
+									onChange={(event) => setDraft(event.target.value)}
+									onKeyDown={(event) => {
+										if (
+											(event.metaKey || event.ctrlKey) &&
+											event.key === "Enter"
+										)
+											event.currentTarget.form?.requestSubmit();
+									}}
+									placeholder="メッセージを入力、または話しかけてください"
+									maxLength={8000}
+									rows={2}
+								/>
+								<Button
+									type="submit"
+									disabled={!draft.trim() || submit.isPending}
+									aria-label="送信"
+								>
+									送信
+								</Button>
+							</div>
+							<div className="composer-meta">
+								<span>
+									{voice.turn?.status ??
+										(voice.active ? "音声を待機中" : "待機中")}
+								</span>
+								{voice.turn?.text && <span>認識: {voice.turn.text}</span>}
+								<span className="composer-shortcut">⌘/Ctrl + Enter で送信</span>
+							</div>
+						</form>
+						{(submit.isError || voice.error || audioError) && (
+							<p className="chat-error" role="alert">
+								{submit.isError
+									? `送信できませんでした: ${String(submit.error)}`
+									: voice.error || audioError}
+							</p>
+						)}
+					</div>
+				</section>
+				<aside className="side-panel" aria-label="会話の補助情報">
+					<div className="side-tabs" role="tablist" aria-label="補助情報">
+						<button
+							role="tab"
+							aria-selected={sidePanel === "continuity"}
+							onClick={() => setSidePanel("continuity")}
+						>
+							継続情報
+						</button>
+						<button
+							role="tab"
+							aria-selected={sidePanel === "runs"}
+							onClick={() => setSidePanel("runs")}
+						>
+							実行記録
+						</button>
+					</div>
+					{sidePanel === "continuity" ? (
+						<section className="side-content" role="tabpanel">
+							<h2>継続情報</h2>
+							<p className="side-intro">残したい発言をしおりに保存できます。</p>
+							<CreateBookmarkForm
+								client={client}
+								conversationId="main"
+								messages={
+									conversation.data?.messages
+										.filter((message) => message.role === "user")
+										.map((message) => ({
+											id: message.id,
+											text: message.text,
+										})) ?? []
+								}
+							/>
+							<BookmarkList client={client} conversationId="main" />
+						</section>
+					) : (
+						<section className="side-content" role="tabpanel">
+							<h2>実行記録</h2>
+							<ul className="runs">
+								{runs.data?.length ? (
+									runs.data.map((run) => (
+										<li key={run.id}>
+											<div>
+												<code>{run.id.slice(0, 8)}</code>{" "}
+												<StatusBadge status={run.status} />
+												{run.error && (
+													<small className="error"> {run.error}</small>
+												)}
+											</div>
+											{["queued", "running"].includes(run.status) && (
+												<Button
+													variant="secondary"
+													size="sm"
+													onClick={() => cancel.mutate(run.id)}
+												>
+													取消
+												</Button>
+											)}
+										</li>
+									))
+								) : (
+									<li className="hint">記録はまだありません</li>
+								)}
+							</ul>
+						</section>
+					)}
+				</aside>
+			</div>
 		</main>
 	);
 }
+
 export function App() {
-	const [input, setInput] = useState("");
-	const [token, setToken] = useState("");
 	const queryClient = useMemo(
 		() =>
 			new QueryClient({
@@ -166,40 +325,7 @@ export function App() {
 		[],
 	);
 	const store = useMemo(() => createAudioStore(), []);
-	const client = useMemo(
-		() => (token ? createClient(window.location.origin, token) : null),
-		[token],
-	);
-	if (!client)
-		return (
-			<main className="shell">
-				<p className="eyebrow">Local setup</p>
-				<h1 className="title">Eumenes</h1>
-				<section className="panel">
-					<h2>ローカル API に接続</h2>
-					<p className="hint">
-						起動時に設定した EUMENES_API_TOKEN
-						を入力してください。画面内の一時状態として使います。
-					</p>
-					<form
-						className="composer"
-						onSubmit={(e) => {
-							e.preventDefault();
-							if (input.trim()) setToken(input.trim());
-						}}
-					>
-						<input
-							className="token-input"
-							type="password"
-							aria-label="API トークン"
-							value={input}
-							onChange={(e) => setInput(e.target.value)}
-						/>
-						<Button>接続</Button>
-					</form>
-				</section>
-			</main>
-		);
+	const client = useMemo(() => createClient(window.location.origin), []);
 	return (
 		<QueryClientProvider client={queryClient}>
 			<Workspace client={client} store={store} />

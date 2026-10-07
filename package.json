@@ -2,6 +2,9 @@
 	"name": "eumenes",
 	"private": true,
 	"type": "module",
+	"workspaces": [
+		"packages/*"
+	],
 	"scripts": {
 		"start": "bun api/application/server.ts",
 		"dev": "vite --host 127.0.0.1",
@@ -14,14 +17,17 @@
 		"test:domain": "bun scripts/test-domain.ts",
 		"verify:all": "bun scripts/verify.ts --all",
 		"verify:live": "bun scripts/verify-live.ts",
-		"build:web": "vite build",
+		"build:design-system": "cd packages/design-system && bun run build",
+		"build:web": "bun run build:design-system && vite build",
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
+		"@eumenes/design-system": "workspace:*",
 		"@tanstack/react-query": "5.101.0",
 		"hono": "4.12.34",
 		"react": "19.2.7",
 		"react-dom": "19.2.7",
+		"react-hook-form": "7.71.0",
 		"zod": "4.4.3",
 		"zustand": "5.0.8"
 	},

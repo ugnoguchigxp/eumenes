@@ -13,6 +13,7 @@
 		"verification-reports/**",
 		"test-results/**",
 		"playwright-report/**",
-		".serena/**"
+		".serena/**",
+		"packages/design-system/**"
 	]
 }

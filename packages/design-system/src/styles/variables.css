@@ -1,0 +1,177 @@
+/* Density Variables Definition */
+
+/* Base Density (Normal) */
+:root {
+	--radius: 0.5rem; /* 8px */
+	--ui-component-height: 2.5rem;
+	/* 40px */
+	--ui-list-row-height: 2.5rem;
+	/* 40px */
+	--ui-component-padding-x: 0.75rem;
+	/* 12px */
+	--ui-component-padding-y: 0.5rem;
+	/* 8px */
+
+	--ui-button-padding-x: 1rem;
+	/* 16px */
+	--ui-button-padding-y: 0.5rem;
+	/* 8px */
+	--ui-button-padding-x-tight: 0.5rem;
+	--ui-button-padding-y-tight: 0.25rem;
+
+	--ui-gap-base: 0.5rem;
+	/* 8px */
+	--ui-font-size-base: 0.875rem;
+	/* 14px */
+	--ui-table-cell-padding: 0.75rem;
+	--ui-touch-target-min: 0px;
+	--ui-icon-size: 1.125rem;
+	/* 18px */
+	--ui-modal-padding: 1.5rem;
+	/* 24px */
+	--ui-keypad-button-height: 3.5rem;
+	--ui-checkbox-size: 1rem;
+	/* 16px */
+	--ui-badge-padding-x: 0.5rem;
+	--ui-badge-padding-y: 0.25rem;
+	--ui-card-padding: 1.5rem;
+	/* 24px */
+	--ui-drawer-width-left: 320px;
+	--ui-drawer-width-right: 420px;
+	--ui-step-circle-size: 2.5rem;
+
+	--ui-switch-width: 2.75rem;
+	/* 44px */
+	--ui-switch-height: 1.5rem;
+	/* 24px */
+	--ui-switch-thumb-size: 1.25rem;
+	/* 20px */
+	--ui-switch-thumb-translate: 1.25rem;
+	/* 20px */
+}
+
+/* Density: Compact */
+:root[data-density="compact"] {
+	--ui-component-height: 2rem;
+	/* 32px */
+	--ui-list-row-height: 2rem;
+	/* 32px */
+	--ui-component-padding-x: 0.5rem;
+	/* 8px */
+	--ui-component-padding-y: 0.25rem;
+	/* 4px */
+	--ui-button-padding-x: 0.5rem;
+	/* 8px */
+	--ui-button-padding-y: 0.25rem;
+	/* 4px */
+	--ui-font-size-base: 0.825rem;
+	/* 13.2px */
+	--ui-button-padding-x-tight: 0.25rem;
+	--ui-button-padding-y-tight: 0.25rem;
+
+	--ui-gap-base: 0.25rem;
+	/* 4px */
+	--ui-icon-size: 1rem;
+	/* 16px */
+	--ui-modal-padding: 1rem;
+	--ui-keypad-button-height: 3rem;
+	--ui-table-cell-padding: 0.5rem;
+	--ui-checkbox-size: 0.875rem;
+	/* 14px */
+	--ui-badge-padding-x: 0.25rem;
+	--ui-badge-padding-y: 0px;
+	--ui-card-padding: 1rem;
+	--ui-drawer-width-left: 280px;
+	--ui-drawer-width-right: 384px;
+	--ui-step-circle-size: 2rem;
+
+	--ui-switch-width: 2.25rem;
+	/* 36px */
+	--ui-switch-height: 1.25rem;
+	/* 20px */
+	--ui-switch-thumb-size: 1rem;
+	/* 16px */
+	--ui-switch-thumb-translate: 1rem;
+	/* 16px */
+}
+
+/* Density: Spacious */
+:root[data-density="spacious"] {
+	--ui-component-height: 3rem;
+	/* 48px */
+	--ui-list-row-height: 3.5rem;
+	/* 56px */
+	--ui-component-padding-x: 1.25rem;
+	/* 20px */
+	--ui-component-padding-y: 0.75rem;
+	/* 12px */
+	--ui-button-padding-x: 1.25rem;
+	/* 20px */
+	--ui-button-padding-y: 0.75rem;
+	/* 12px */
+	--ui-font-size-base: 1rem;
+	/* 16px */
+	--ui-modal-padding: 2rem;
+	--ui-table-cell-padding: 1rem;
+	--ui-checkbox-size: 1.25rem;
+	/* 20px */
+	--ui-badge-padding-x: 0.75rem;
+	--ui-badge-padding-y: 0.5rem;
+	--ui-card-padding: 2rem;
+	--ui-drawer-width-left: 360px;
+	--ui-drawer-width-right: 560px;
+	--ui-step-circle-size: 3rem;
+
+	--ui-switch-width: 3.25rem;
+	/* 52px */
+	--ui-switch-height: 1.75rem;
+	/* 28px */
+	--ui-switch-thumb-size: 1.5rem;
+	/* 24px */
+	--ui-switch-thumb-translate: 1.5rem;
+	/* 24px */
+}
+
+/* Tablet Mode Overrides */
+/* Overrides density settings for touch-optimized UI */
+/* Font: 18px, Touch target: 44px minimum */
+:root[data-tablet-mode="true"] {
+	--ui-component-height: 2.75rem;
+	/* 44px - touch target */
+	--ui-list-row-height: 2.75rem;
+	/* 44px */
+	--ui-component-padding-x: 1rem;
+	/* 16px */
+	--ui-component-padding-y: 0.5rem;
+	/* 8px */
+	--ui-button-padding-x: 1.25rem;
+	/* 20px */
+	--ui-button-padding-y: 0.625rem;
+	/* 10px */
+	--ui-button-padding-x-tight: 0.75rem;
+	--ui-button-padding-y-tight: 0.375rem;
+	--ui-gap-base: 0.75rem;
+	/* 12px */
+	--ui-font-size-base: 1.125rem;
+	/* 18px */
+	--ui-table-cell-padding: 1rem;
+	/* 16px */
+	--ui-touch-target-min: 44px;
+	/* Enforce 44px minimum for all interactive elements */
+	--ui-icon-size: 1.5rem;
+	/* 24px */
+	/* 22px */
+	--ui-card-padding: 1.5rem;
+	--ui-drawer-width-left: 320px;
+	--ui-drawer-width-right: 420px;
+	--ui-step-circle-size: 2.75rem;
+
+	--ui-switch-width: 3rem;
+	/* 48px */
+	--ui-switch-height: 1.75rem;
+	/* 28px */
+	--ui-switch-thumb-size: 1.5rem;
+	/* 24px */
+	--ui-switch-thumb-translate: 1.25rem;
+	/* 20px */
+}

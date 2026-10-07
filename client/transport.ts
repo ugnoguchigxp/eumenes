@@ -6,7 +6,7 @@ export class ApiError extends Error {
 		super(message);
 	}
 }
-export function createTransport(baseUrl: string, token: string) {
+export function createTransport(baseUrl: string, token?: string) {
 	const base = new URL(baseUrl);
 	if (!["127.0.0.1", "localhost"].includes(base.hostname))
 		throw new Error("loopback_api_required");
@@ -15,7 +15,10 @@ export function createTransport(baseUrl: string, token: string) {
 		async call(path: string, init: RequestInit = {}) {
 			const response = await fetch(new URL(path, base), {
 				...init,
-				headers: { Authorization: `Bearer ${token}`, ...init.headers },
+				headers: {
+					...(token ? { Authorization: `Bearer ${token}` } : {}),
+					...init.headers,
+				},
 				cache: "no-store",
 			});
 			if (!response.ok) {

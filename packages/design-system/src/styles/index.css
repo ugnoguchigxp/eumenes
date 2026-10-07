@@ -1,0 +1,136 @@
+@import "tailwindcss";
+@import "./variables.css";
+@import "./themes.css";
+
+@source "../**/*.{js,ts,jsx,tsx}";
+@source "../../.storybook/**/*.{js,ts,jsx,tsx}";
+
+/* Tailwind v4: Register CSS variables as theme tokens */
+@theme {
+	/* Colors */
+	--color-background: var(--background);
+	--color-foreground: var(--foreground);
+	--color-card: var(--card);
+	--color-card-foreground: var(--card-foreground);
+	--color-popover: var(--popover);
+	--color-popover-foreground: var(--popover-foreground);
+	--color-primary: var(--primary);
+	--color-primary-foreground: var(--primary-foreground);
+	--color-secondary: var(--secondary);
+	--color-secondary-foreground: var(--secondary-foreground);
+	--color-muted: var(--muted);
+	--color-muted-foreground: var(--muted-foreground);
+	--color-accent: var(--accent);
+	--color-accent-foreground: var(--accent-foreground);
+	--color-destructive: var(--destructive);
+	--color-destructive-foreground: var(--destructive-foreground);
+	--color-success: var(--success);
+	--color-success-foreground: var(--success-foreground);
+	--color-warning: var(--warning);
+	--color-warning-foreground: var(--warning-foreground);
+	--color-border: var(--border);
+	--color-input: var(--input);
+	--color-ring: var(--ring);
+
+	/* Chart colors */
+	--color-chart-1: var(--chart-1);
+	--color-chart-2: var(--chart-2);
+	--color-chart-3: var(--chart-3);
+	--color-chart-4: var(--chart-4);
+
+	/* Sidebar */
+	--color-sidebar-background: var(--sidebar-background);
+	--color-sidebar-foreground: var(--sidebar-foreground);
+	--color-sidebar-primary: var(--sidebar-primary);
+	--color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+	--color-sidebar-accent: var(--sidebar-accent);
+	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+	--color-sidebar-border: var(--sidebar-border);
+	--color-sidebar-ring: var(--sidebar-ring);
+
+	/* Border radius */
+	--radius-lg: var(--radius);
+	--radius-md: max(0px, calc(var(--radius) - 2px));
+	--radius-sm: max(0px, calc(var(--radius) - 4px));
+
+	/* UI sizing */
+	--spacing-ui: var(--ui-component-height);
+	--spacing-ui-x: var(--ui-component-padding-x);
+	--spacing-ui-y: var(--ui-component-padding-y);
+	--spacing-ui-button: var(--ui-button-padding-x);
+	--spacing-ui-button-x: var(--ui-button-padding-x);
+	--spacing-ui-button-y: var(--ui-button-padding-y);
+	--spacing-ui-cell: var(--ui-table-cell-padding);
+	--spacing-ui-gap: var(--ui-gap-base);
+}
+
+@layer base {
+	* {
+		border-color: var(--color-border);
+		outline-color: var(--color-ring);
+	}
+
+	body {
+		background-color: var(--color-background);
+		color: var(--color-foreground);
+	}
+}
+
+button,
+input,
+select,
+textarea {
+	color: inherit;
+}
+
+@layer utilities {
+	.px-ui {
+		padding-left: var(--ui-component-padding-x);
+		padding-right: var(--ui-component-padding-x);
+	}
+
+	.py-ui {
+		padding-top: var(--ui-component-padding-y);
+		padding-bottom: var(--ui-component-padding-y);
+	}
+
+	.px-ui-button {
+		padding-left: var(--ui-button-padding-x);
+		padding-right: var(--ui-button-padding-x);
+	}
+
+	.py-ui-button {
+		padding-top: var(--ui-button-padding-y);
+		padding-bottom: var(--ui-button-padding-y);
+	}
+
+	.gap-ui {
+		gap: var(--ui-gap-base);
+	}
+
+	.text-ui {
+		font-size: var(--ui-font-size-base);
+		line-height: 1.5;
+	}
+
+	.h-ui {
+		height: var(--ui-component-height);
+	}
+
+	.w-ui {
+		width: var(--ui-component-height);
+	}
+
+	/* Border radius overrides using CSS variables */
+	.rounded-lg {
+		border-radius: var(--radius);
+	}
+
+	.rounded-md {
+		border-radius: calc(var(--radius) - 2px);
+	}
+
+	.rounded-sm {
+		border-radius: calc(var(--radius) - 4px);
+	}
+}

@@ -17,8 +17,18 @@ type Lease = {
 	id: string;
 	expiresAt: number;
 	providers: Map<Capability, Provider>;
+	agentProfile: string;
 	useCount: number;
 	closing: boolean;
+	renewTimer?: ReturnType<typeof setTimeout>;
+};
+const gemmaProfile = "SAAA-gemma4-26b";
+const auxiliaryProfile = "SAAA-gemma4-26b-64k";
+const gemmaAgentProfile = "saaa-conversation-gemma4-26b-voice";
+const gemmaContext = {
+	maxTokens: 262144,
+	outputReserveTokens: 4096,
+	safetyMarginTokens: 1976,
 };
 const protocols: Record<Capability, string> = {
 	llm: "openai.chat-completions.v1",
@@ -108,13 +118,26 @@ export function createLarm(config: {
 	baseUrl?: string;
 	token?: string;
 	profile?: string;
+	audience?: string;
+	client?: string;
 	voice?: string;
 	fetch?: Fetcher;
 }): LarmPort {
 	const base = config.baseUrl ? localEndpoint(config.baseUrl) : undefined;
 	const token = config.token;
 	const request = config.fetch ?? fetch;
-	const profile = config.profile ?? "SAAA";
+	const profile = config.profile ?? gemmaProfile;
+	if (profile === auxiliaryProfile) throw new Error("larm_aux_not_enabled");
+	const audience = config.audience ?? "saaa-desktop";
+	const client = config.client ?? "gemma-client";
+	if (audience !== "saaa-desktop" && audience !== "same-host")
+		throw new Error("larm_invalid_audience");
+	if (
+		audience === "same-host" &&
+		base &&
+		!["127.0.0.1", "localhost"].includes(base.hostname)
+	)
+		throw new Error("larm_same_host_requires_loopback");
 	const voice = config.voice;
 	let lease: Lease | undefined;
 	let connecting: Promise<Lease> | undefined;
@@ -140,6 +163,7 @@ export function createLarm(config: {
 	}
 	async function release(current: Lease) {
 		current.closing = true;
+		if (current.renewTimer) clearTimeout(current.renewTimer);
 		if (current.useCount > 0) return;
 		if (lease === current) lease = undefined;
 		try {
@@ -152,28 +176,153 @@ export function createLarm(config: {
 			lastError = "larm_release_unconfirmed";
 		}
 	}
+	function scheduleRenew(current: Lease) {
+		if (current.renewTimer) clearTimeout(current.renewTimer);
+		const delay = Math.max(0, current.expiresAt - Date.now() - 180_000);
+		current.renewTimer = setTimeout(() => {
+			if (lease === current && !closed && !current.closing)
+				void connect(["llm"]).catch(() => {});
+		}, delay);
+		current.renewTimer.unref?.();
+	}
+	async function refresh(
+		current: Lease,
+		required: Capability[],
+	): Promise<boolean> {
+		const state = record(
+			await readJson(
+				await control(
+					`/v1/agent-connections/${current.id}`,
+					{ method: "GET" },
+					[200],
+				),
+			),
+		);
+		if (
+			state.id !== current.id ||
+			state.profile !== profile ||
+			state.agentProfile !== current.agentProfile
+		)
+			throw new Error("larm_invalid_connection");
+		if (state.status === "failed" || state.status === "expired")
+			throw new Error(`larm_connection_${state.status}`);
+		if (state.status !== "ready") return false;
+		if (!required.every((name) => current.providers.has(name))) return false;
+		const expiresAt = Date.parse(string(state.expiresAt));
+		if (!Number.isFinite(expiresAt) || expiresAt <= Date.now())
+			throw new Error("larm_expired");
+		current.expiresAt = Math.min(current.expiresAt, expiresAt);
+		if (current.expiresAt > Date.now() + 180_000) return true;
+		for (let attempt = 0; current.useCount > 0 && attempt < 120; attempt++)
+			await wait(1000);
+		if (current.useCount > 0) throw new Error("larm_renew_busy");
+		try {
+			const renewed = record(
+				await readJson(
+					await control(
+						`/v1/agent-connections/${current.id}/renew`,
+						{
+							method: "POST",
+							headers: {
+								"content-type": "application/json",
+								"Idempotency-Key": crypto.randomUUID(),
+							},
+							body: JSON.stringify({ ttlSeconds: 900 }),
+						},
+						[200, 201],
+					),
+				),
+			);
+			if (renewed.id !== current.id || renewed.status !== "ready")
+				throw new Error("larm_renew_invalid");
+			const claimed = record(
+				await readJson(
+					await control(
+						`/v1/agent-connections/${current.id}/claim`,
+						{
+							method: "POST",
+							headers: { "content-type": "application/json" },
+							body: JSON.stringify({ format: "openai-provider-v1" }),
+						},
+						[200],
+					),
+				),
+			);
+			if (
+				claimed.id !== current.id ||
+				claimed.status !== "ready" ||
+				!Array.isArray(claimed.providers)
+			)
+				throw new Error("larm_invalid_claim");
+			const nextExpiry = Date.parse(string(claimed.expiresAt));
+			if (!Number.isFinite(nextExpiry) || nextExpiry <= Date.now() + 180_000)
+				throw new Error("larm_renew_expired");
+			const next = new Map<Capability, Provider>();
+			for (const [name, previous] of current.providers) {
+				const info = claimed.providers.map(record).find((p) => p.name === name);
+				if (
+					!info ||
+					info.model !== previous.model ||
+					info.protocol !== previous.protocol
+				)
+					throw new Error("larm_renew_claim_mismatch");
+				const fields = record(record(info.configuration).fields);
+				const baseUrl = string(fields.baseURL);
+				localEndpoint(baseUrl);
+				if (baseUrl !== info.baseUrl || fields.model !== previous.model)
+					throw new Error("larm_renew_claim_mismatch");
+				const contextWindow =
+					name === "llm" ? record(info.contextWindow) : undefined;
+				if (
+					name === "llm" &&
+					Object.entries(previous.contextWindow ?? {}).some(
+						([key, value]) => contextWindow?.[key] !== value,
+					)
+				)
+					throw new Error("larm_renew_context_changed");
+				next.set(name, {
+					...previous,
+					baseUrl,
+					token: string(record(info.credential).token),
+				});
+			}
+			current.providers = next;
+			current.expiresAt = nextExpiry;
+			scheduleRenew(current);
+			return true;
+		} catch (error) {
+			await release(current);
+			throw error;
+		}
+	}
 	async function connect(required: Capability[]): Promise<Lease> {
 		if (closed) throw new Error("larm_closed");
 		if (!base || !token) throw new Error("larm_unconfigured");
-		if (
-			lease &&
-			!lease.closing &&
-			lease.expiresAt > Date.now() + 30_000 &&
-			required.every((name) => lease?.providers.has(name))
-		)
-			return lease;
 		if (connecting) {
-			const result = await connecting;
-			if (
-				!result.closing &&
-				result.expiresAt > Date.now() + 30_000 &&
-				required.every((name) => result.providers.has(name))
-			)
-				return result;
+			await connecting;
 			return connect(required);
 		}
 		connecting = (async () => {
-			if (lease) await release(lease);
+			if (lease && !lease.closing) {
+				try {
+					if (await refresh(lease, required)) return lease;
+				} catch (error) {
+					if (
+						!(error instanceof Error) ||
+						![
+							"larm_expired",
+							"larm_connection_failed",
+							"larm_connection_expired",
+							"larm_control_404",
+						].includes(error.message)
+					)
+						throw error;
+				}
+				for (let attempt = 0; lease.useCount > 0 && attempt < 120; attempt++)
+					await wait(1000);
+				if (lease.useCount > 0) throw new Error("larm_connection_busy");
+				await release(lease);
+			}
 			const catalog = record(
 				await readJson(
 					await control(
@@ -192,6 +341,8 @@ export function createLarm(config: {
 				throw new Error("larm_catalog_invalid");
 			const catalogRevision = string(catalog.catalogRevision);
 			const catalogProfile = record(catalog.profiles[0]);
+			if (profile === gemmaProfile && catalogProfile.id !== gemmaAgentProfile)
+				throw new Error("larm_gemma_agent_profile_mismatch");
 			const catalogProviders = Array.isArray(catalogProfile.providers)
 				? catalogProfile.providers.map(record)
 				: [];
@@ -205,6 +356,18 @@ export function createLarm(config: {
 				)
 					throw new Error("larm_catalog_provider_missing");
 			}
+			if (profile === gemmaProfile) {
+				const llm = catalogProviders.find((p) => p.name === "llm");
+				const context = record(llm?.contextWindow);
+				if (
+					llm?.model !== "gemma4-26b-a4b" ||
+					Object.entries(gemmaContext).some(
+						([key, value]) => context[key] !== value,
+					)
+				)
+					throw new Error("larm_gemma_contract_mismatch");
+			}
+			const fullProfile = required.some((name) => name !== "llm");
 			const createdResponse = await control(
 				"/v1/agent-connections",
 				{
@@ -216,12 +379,12 @@ export function createLarm(config: {
 					},
 					body: JSON.stringify({
 						profile,
-						audience: "saaa-desktop",
-						client: "saaa-desktop",
+						client,
+						audience,
 						ttlSeconds: 900,
 						allowFallback: false,
 						deploymentPolicy: "existing-only",
-						providers: required,
+						...(fullProfile ? {} : { providers: ["llm"] }),
 						expectedCatalogRevision: catalogRevision,
 					}),
 				},
@@ -232,6 +395,8 @@ export function createLarm(config: {
 			if (!/^[A-Za-z0-9_-]{1,160}$/.test(id))
 				throw new Error("larm_invalid_connection_id");
 			try {
+				if (created.status === "failed" || created.status === "expired")
+					throw new Error(`larm_connection_${created.status}`);
 				for (let attempt = 0; created.status !== "ready"; attempt++) {
 					if (attempt >= 60) throw new Error("larm_capacity_timeout");
 					await wait(1000);
@@ -244,8 +409,8 @@ export function createLarm(config: {
 							),
 						),
 					);
-					if (created.status === "failed")
-						throw new Error("larm_connection_failed");
+					if (created.status === "failed" || created.status === "expired")
+						throw new Error(`larm_connection_${created.status}`);
 				}
 				if (
 					created.id !== id ||
@@ -305,7 +470,7 @@ export function createLarm(config: {
 						throw new Error("larm_claim_mismatch");
 					const credential = record(info.credential);
 					const configuration = record(record(info.configuration).fields);
-					const baseUrl = string(info.baseUrl);
+					const baseUrl = string(configuration.baseURL);
 					localEndpoint(baseUrl);
 					if (
 						configuration.baseURL !== baseUrl ||
@@ -323,6 +488,14 @@ export function createLarm(config: {
 						)
 					)
 						throw new Error("larm_invalid_context_window");
+					if (
+						name === "llm" &&
+						profile === gemmaProfile &&
+						Object.entries(gemmaContext).some(
+							([key, value]) => contextWindow?.[key] !== value,
+						)
+					)
+						throw new Error("larm_gemma_contract_mismatch");
 					providers.set(name, {
 						name,
 						baseUrl,
@@ -340,10 +513,12 @@ export function createLarm(config: {
 					id,
 					expiresAt,
 					providers,
+					agentProfile: string(catalogProfile.id),
 					useCount: 0,
 					closing: false,
 				};
 				lease = current;
+				scheduleRenew(current);
 				lastError = undefined;
 				return current;
 			} catch (error) {
