@@ -279,7 +279,19 @@ function Workspace({
 				hidden={settingsOpen}
 			>
 				<section className="chat-panel" aria-label="会話">
-					<LightAvatarBackground active={!settingsOpen} />
+					<LightAvatarBackground
+						active={!settingsOpen}
+						cue={voice.avatarCue}
+						phase={
+							phase === "playing"
+								? "neutral"
+								: activeRun
+									? "thinking"
+									: voice.active
+										? "listening"
+										: "neutral"
+						}
+					/>
 					<div className="conversation-status" aria-label="接続状態とモデル">
 						<span
 							className="connection-health"

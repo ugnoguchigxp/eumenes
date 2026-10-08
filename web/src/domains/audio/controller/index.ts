@@ -209,6 +209,7 @@ export function createAudioController(
 				waitForPrevious?: boolean;
 				shouldPlay?: () => boolean;
 				volume?: number;
+				onStarted?: () => void;
 			} = {},
 		) {
 			const waitingEpoch = playbackEpoch;
@@ -257,6 +258,7 @@ export function createAudioController(
 				}
 			};
 			next.start();
+			playOptions.onStarted?.();
 			emit("playing");
 		},
 		stopPlayback() {

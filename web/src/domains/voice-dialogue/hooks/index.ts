@@ -8,6 +8,7 @@ import {
 } from "../../audio";
 import { invalidateDialogueViews } from "../../dialogue";
 import type { Settings } from "../../../../../api/domains/settings/contracts";
+import type { AvatarCue } from "../../avatar";
 export function useVoiceDialogue(
 	client: VoiceDialogueClient,
 	store: AudioStore,
@@ -42,6 +43,7 @@ export function useVoiceDialogue(
 		latest?: Uint8Array;
 	} | null>(null);
 	const [previewText, setPreviewText] = useState<string | null>(null);
+	const [avatarCue, setAvatarCue] = useState<AvatarCue | null>(null);
 	const [subtitle, setSubtitle] = useState<{
 		key: string;
 		text: string;
@@ -51,6 +53,7 @@ export function useVoiceDialogue(
 		player.current?.finish?.();
 		player.current = null;
 		setSubtitle(null);
+		setAvatarCue(null);
 	}
 	function partial(wav: Uint8Array) {
 		const active = session.current,
@@ -151,6 +154,7 @@ export function useVoiceDialogue(
 							const ended = () => {
 								queue.finish = undefined;
 								setSubtitle((s) => (s?.key === key ? null : s));
+								setAvatarCue((cue) => (cue?.key === key ? null : cue));
 								if (!valid() || player.current !== queue) {
 									resolve();
 									return;
@@ -173,6 +177,14 @@ export function useVoiceDialogue(
 									waitForPrevious: true,
 									volume: options.current?.outputVolume,
 									shouldPlay: () => canPlay() && player.current === queue,
+									onStarted: () => {
+										if (!canPlay() || player.current !== queue) return;
+										if ((options.current?.outputVolume ?? 1) > 0)
+											setAvatarCue({
+												key,
+												motion: chunk.delivery?.motion ?? "neutral",
+											});
+									},
 								})
 								.then(() => {
 									if (!valid() || player.current !== queue) resolve();
@@ -424,5 +436,6 @@ export function useVoiceDialogue(
 				? "音声処理の結果を取得できません。接続を再確認してください。"
 				: null),
 		active: !!session.current || starting,
+		avatarCue,
 	};
 }
