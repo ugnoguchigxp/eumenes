@@ -5,10 +5,11 @@ import { larmClient } from "./larm";
 import { queueClient } from "./queue";
 import { schedulerClient } from "./scheduler";
 import { settingsClient } from "./settings";
+import { ttsDictionaryClient } from "./tts-dictionary";
 import { createTransport } from "./transport";
 import { voiceDialogueClient } from "./voice-dialogue";
 
-export { ApiError } from "./transport";
+export { ApiError, ApiConnectionError } from "./transport";
 export function createClient(baseUrl: string, token?: string) {
 	const transport = createTransport(baseUrl, token);
 	return {
@@ -17,6 +18,7 @@ export function createClient(baseUrl: string, token?: string) {
 		...dialogueClient(transport),
 		...larmClient(transport),
 		...settingsClient(transport),
+		...ttsDictionaryClient(transport),
 		...queueClient(transport),
 		...schedulerClient(transport),
 		...voiceDialogueClient(transport),

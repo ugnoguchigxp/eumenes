@@ -247,7 +247,6 @@ export const DropdownMenu: React.FC<IDropdownMenuProps> = React.memo(
 		}, [isOpen]);
 
 		const handleItemClick = (item: IDropdownMenuItem) => {
-			log.debug("Menu item clicked", { label: item.label });
 			item.onClick();
 			setIsOpen(false);
 		};

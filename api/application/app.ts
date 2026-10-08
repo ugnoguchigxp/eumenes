@@ -13,6 +13,10 @@ import {
 } from "../domains/voice-dialogue";
 import { registerSettings, type SettingsService } from "../domains/settings";
 import { registerInference, type InferenceService } from "../domains/inference";
+import {
+	registerTtsDictionary,
+	type TtsDictionaryService,
+} from "../domains/tts-dictionary";
 import type { Changes } from "./events";
 export function createApp(deps: {
 	token: string;
@@ -25,6 +29,7 @@ export function createApp(deps: {
 	scheduler: SchedulerService;
 	settings?: SettingsService;
 	inference?: InferenceService;
+	ttsDictionary?: TtsDictionaryService;
 	changes?: Changes;
 }) {
 	const app = new Hono();
@@ -51,6 +56,7 @@ export function createApp(deps: {
 	registerLarmStatus(app, deps.larm);
 	if (deps.settings) registerSettings(app, deps.settings);
 	if (deps.inference) registerInference(app, deps.inference);
+	if (deps.ttsDictionary) registerTtsDictionary(app, deps.ttsDictionary);
 	registerConversation(app, deps.conversation);
 	registerDialogue(app, deps.dialogue);
 	registerVoiceDialogue(app, deps.voice);

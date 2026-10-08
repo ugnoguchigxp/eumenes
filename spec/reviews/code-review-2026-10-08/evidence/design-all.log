@@ -1,0 +1,470 @@
+$ vitest run --project unit
+│ ┌────────────────────────────────────────────────────────────────────────────┐
+│ │  Info: Found a setup file with "setProjectAnnotations".                    │
+│ │  Skipping automatic provisioning of preview annotations to avoid           │
+│ │  conflicts. Since Storybook 10.3, "@storybook/addon-vitest" applies these  │
+│ │   automatically.                                                           │
+│ │  You can safely remove the "setProjectAnnotations" call from your setup    │
+│ │  file, or remove the file entirely if you don't have custom code there.    │
+│ └────────────────────────────────────────────────────────────────────────────┘
+
+ RUN  v4.0.16 /Users/y.noguchi/Code/eumenes/packages/design-system
+
+stdout | src/components/Select/Select.test.tsx
+Test setup running...
+
+stdout | src/components/Select/Select.test.tsx
+Test setup running...
+
+stdout | src/components/TextInput/TextInput.test.tsx
+Test setup running...
+
+stdout | src/components/TextInput/TextInput.test.tsx
+Test setup running...
+
+stdout | src/components/Tabs/Tabs.test.tsx
+Test setup running...
+
+stdout | src/components/Tabs/Tabs.test.tsx
+Test setup running...
+
+stdout | src/components/Calculator/Calculator.test.tsx
+Test setup running...
+
+stdout | src/components/Calculator/Calculator.test.tsx
+Test setup running...
+
+stdout | src/components/DropdownMenu/DropdownMenu.test.tsx
+Test setup running...
+
+stdout | src/components/ErrorState/ErrorState.test.tsx
+Test setup running...
+
+stdout | src/components/DropdownMenu/DropdownMenu.test.tsx
+Test setup running...
+
+stdout | src/components/ErrorState/ErrorState.test.tsx
+Test setup running...
+
+stdout | src/components/Form/Form.test.tsx
+Test setup running...
+
+stdout | src/components/InfiniteListMenu/InfiniteListMenu.test.tsx
+Test setup running...
+
+stdout | src/components/InfiniteListMenu/InfiniteListMenu.test.tsx
+Test setup running...
+
+stdout | src/components/Form/Form.test.tsx
+Test setup running...
+
+stdout | src/components/Modal/Modal.test.tsx
+Test setup running...
+
+stdout | src/components/Modal/Modal.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/TextInput/TextInput.test.tsx (8 tests) 646ms
+ ✓ |unit| src/components/InfiniteListMenu/InfiniteListMenu.test.tsx (9 tests) 635ms
+     ✓ selects item on click and returns object  317ms
+ ✓ |unit| src/components/ErrorState/ErrorState.test.tsx (39 tests) 729ms
+ ✓ |unit| src/components/Form/Form.test.tsx (5 tests) 784ms
+     ✓ submits form data  580ms
+ ✓ |unit| src/components/Tabs/Tabs.test.tsx (10 tests) 1251ms
+     ✓ renders with default value  554ms
+ ✓ |unit| src/components/DropdownMenu/DropdownMenu.test.tsx (19 tests) 1849ms
+     ✓ renders trigger  340ms
+ ✓ |unit| src/components/Modal/Modal.test.tsx (36 tests) 2187ms
+       ✓ renders modal when open  491ms
+stdout | src/components/LanguageSelector/LanguageSelector.test.tsx
+Test setup running...
+
+stdout | src/components/LanguageSelector/LanguageSelector.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/Select/Select.test.tsx (23 tests) 3447ms
+     ✓ renders correctly  412ms
+       ✓ opens content when clicked  344ms
+       ✓ selects an item and updates value  585ms
+stdout | src/components/ActionButton/ActionButton.test.tsx
+Test setup running...
+
+stdout | src/components/ActionButton/ActionButton.test.tsx
+Test setup running...
+
+stdout | src/components/Input/Input.test.tsx
+Test setup running...
+
+stdout | src/components/Input/Input.test.tsx
+Test setup running...
+
+stdout | src/components/ActionButton/CreateButton.test.tsx
+Test setup running...
+
+stdout | src/components/ActionButton/CreateButton.test.tsx
+Test setup running...
+
+stdout | src/components/Drawer/Drawer.test.tsx
+Test setup running...
+
+stdout | src/components/Drawer/Drawer.test.tsx
+Test setup running...
+
+stdout | src/components/ContentHeader/ContentHeader.test.tsx
+Test setup running...
+
+stdout | src/components/ContentHeader/ContentHeader.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/Input/Input.test.tsx (53 tests) 1011ms
+     ✓ renders with default type  362ms
+ ✓ |unit| src/components/ActionButton/CreateButton.test.tsx (26 tests) 729ms
+       ✓ renders with default props  439ms
+ ✓ |unit| src/components/ActionButton/ActionButton.test.tsx (40 tests) 931ms
+       ✓ renders with default props on desktop  347ms
+ ✓ |unit| src/components/Drawer/Drawer.test.tsx (9 tests) 595ms
+stdout | src/components/ChatDock/ChatDock.test.tsx
+Test setup running...
+
+stdout | src/components/ChatDock/ChatDock.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/Calculator/Calculator.test.tsx (12 tests) 5087ms
+     ✓ performs basic addition  1035ms
+     ✓ performs basic subtraction  437ms
+     ✓ performs multiplication with precedence  385ms
+     ✓ handles decimal numbers  534ms
+     ✓ handles division by zero  351ms
+     ✓ calls onResult callback  363ms
+     ✓ resets error state on new input  395ms
+     ✓ handles invalid expressions  838ms
+ ✓ |unit| src/components/ContentHeader/ContentHeader.test.tsx (36 tests) 984ms
+       ✓ renders header with patient name  492ms
+ ✓ |unit| src/components/ChatDock/ChatDock.test.tsx (7 tests) 549ms
+     ✓ renders closed state correctly  424ms
+stdout | src/components/NotificationToast/NotificationToast.test.tsx
+Test setup running...
+
+stdout | src/components/NotificationToast/NotificationToast.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/LanguageSelector/LanguageSelector.test.tsx (8 tests) 2273ms
+     ✓ renders current language (default Japanese)  715ms
+     ✓ opens menu on click  334ms
+     ✓ changes language using i18n.changeLanguage when onValueChange is not provided  326ms
+     ✓ handles missing global log gracefully  354ms
+ ✓ |unit| src/components/NotificationToast/NotificationToast.test.tsx (14 tests) 305ms
+stdout | src/components/Spinner/Spinner.test.tsx
+Test setup running...
+
+stdout | src/components/Spinner/Spinner.test.tsx
+Test setup running...
+
+stdout | src/components/EditableSelect/EditableSelect.test.tsx
+Test setup running...
+
+stdout | src/components/ScaleInput/ScaleInput.test.tsx
+Test setup running...
+
+stdout | src/components/EditableSelect/EditableSelect.test.tsx
+Test setup running...
+
+stdout | src/components/ScaleInput/ScaleInput.test.tsx
+Test setup running...
+
+stdout | src/components/CopyClipButton/CopyClipButton.test.tsx
+Test setup running...
+
+stdout | src/components/CopyClipButton/CopyClipButton.test.tsx
+Test setup running...
+
+stdout | src/components/AdaptiveText/AdaptiveText.test.tsx
+Test setup running...
+
+stdout | src/components/AdaptiveText/AdaptiveText.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/Spinner/Spinner.test.tsx (32 tests) 654ms
+ ✓ |unit| src/components/ScaleInput/ScaleInput.test.tsx (8 tests) 674ms
+       ✓ renders with default range 0-10  364ms
+ ✓ |unit| src/components/EditableSelect/EditableSelect.test.tsx (8 tests) 684ms
+       ✓ renders with initial value  411ms
+stdout | src/components/AsyncDataWrapper/AsyncDataWrapper.test.tsx
+Test setup running...
+
+stdout | src/components/AsyncDataWrapper/AsyncDataWrapper.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/AdaptiveText/AdaptiveText.test.tsx (13 tests) 605ms
+stdout | src/components/MenuButtonGroup/MenuButtonGroup.test.tsx
+Test setup running...
+
+stdout | src/components/MenuButtonGroup/MenuButtonGroup.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/CopyClipButton/CopyClipButton.test.tsx (24 tests) 1031ms
+       ✓ renders button with text  596ms
+stdout | src/components/NavigationStepper/NavigationStepper.test.tsx
+Test setup running...
+
+stdout | src/components/NavigationStepper/NavigationStepper.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/AsyncDataWrapper/AsyncDataWrapper.test.tsx (29 tests) 1568ms
+       ✓ preserves children structure  855ms
+stdout | src/components/Label/Label.test.tsx
+Test setup running...
+
+stdout | src/components/Label/Label.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/MenuButtonGroup/MenuButtonGroup.test.tsx (34 tests) 1239ms
+     ✓ renders all items correctly  424ms
+ ✓ |unit| src/components/NavigationStepper/NavigationStepper.test.tsx (8 tests) 1037ms
+     ✓ renders interactive buttons when onStepChange provided  654ms
+ ✓ |unit| src/components/Label/Label.test.tsx (21 tests) 731ms
+       ✓ supports form association  383ms
+stdout | src/components/ScrollArea/ScrollArea.test.tsx
+Test setup running...
+
+stdout | src/components/ScrollArea/ScrollArea.test.tsx
+Test setup running...
+
+stdout | src/components/MenuBar/MenuBar.test.tsx
+Test setup running...
+
+stdout | src/components/MenuBar/MenuBar.test.tsx
+Test setup running...
+
+stdout | src/components/KeypadModal/KeypadModal.test.tsx
+Test setup running...
+
+stdout | src/components/KeypadModal/KeypadModal.test.tsx
+Test setup running...
+
+stdout | src/components/OptionButtonGroup/OptionButtonGroup.test.tsx
+Test setup running...
+
+stdout | src/components/OptionButtonGroup/OptionButtonGroup.test.tsx
+Test setup running...
+
+stdout | src/components/Separator/Separator.test.tsx
+Test setup running...
+
+stdout | src/components/Separator/Separator.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/ScrollArea/ScrollArea.test.tsx (29 tests) 1084ms
+       ✓ passes through style prop  461ms
+ ✓ |unit| src/components/MenuBar/MenuBar.test.tsx (21 tests) 1303ms
+     ✓ renders top-level menu items  392ms
+stdout | src/components/SelectableTextInput/SelectableTextInput.test.tsx
+Test setup running...
+
+stdout | src/components/SelectableTextInput/SelectableTextInput.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/Separator/Separator.test.tsx (34 tests) 923ms
+       ✓ passes through style prop  552ms
+ ✓ |unit| src/components/OptionButtonGroup/OptionButtonGroup.test.tsx (10 tests) 1482ms
+     ✓ calls onChange with the option value when a non-null button is clicked (single)  629ms
+stdout | src/components/ConfirmModal/ConfirmModal.test.tsx
+Test setup running...
+
+stdout | src/components/ConfirmModal/ConfirmModal.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/SelectableTextInput/SelectableTextInput.test.tsx (3 tests) 1101ms
+     ✓ renders select with options and input  987ms
+stdout | src/components/Skeleton/Skeleton.test.tsx
+Test setup running...
+
+stdout | src/components/Skeleton/Skeleton.test.tsx
+Test setup running...
+
+stdout | src/components/SimpleSearchInput/SimpleSearchInput.test.tsx
+Test setup running...
+
+stdout | src/components/SimpleSearchInput/SimpleSearchInput.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/ConfirmModal/ConfirmModal.test.tsx (28 tests) 1324ms
+       ✓ renders both confirm and cancel buttons by default  608ms
+ ✓ |unit| src/components/SimpleSearchInput/SimpleSearchInput.test.tsx (5 tests) 766ms
+     ✓ calls onSearch when value changes  397ms
+ ✓ |unit| src/components/KeypadModal/KeypadModal.test.tsx (22 tests) 4438ms
+       ✓ renders with default props  946ms
+       ✓ inputs numbers and displays them  354ms
+       ✓ backspaces input  441ms
+       ✓ handles decimal input if allowed  389ms
+       ✓ validates time on submit  331ms
+ ✓ |unit| src/components/Skeleton/Skeleton.test.tsx (38 tests) 1368ms
+       ✓ shows spinner when showSpinner is true  376ms
+stdout | src/components/MiniTable/MiniTable.test.tsx
+Test setup running...
+
+stdout | src/components/MiniTable/MiniTable.test.tsx
+Test setup running...
+
+stdout | src/components/Tooltip/Tooltip.test.tsx
+Test setup running...
+
+stdout | src/components/Tooltip/Tooltip.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/MiniTable/MiniTable.test.tsx (4 tests) 814ms
+     ✓ applies styles for alignment and width  485ms
+stdout | src/components/ProgressBar/ProgressBar.test.tsx
+Test setup running...
+
+stdout | src/components/ProgressBar/ProgressBar.test.tsx
+Test setup running...
+
+stdout | src/components/SearchableSelect/SearchableSelect.test.tsx
+Test setup running...
+
+stdout | src/components/SearchableSelect/SearchableSelect.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/Tooltip/Tooltip.test.tsx (18 tests) 891ms
+stdout | src/components/Avatar/Avatar.test.tsx
+Test setup running...
+
+stdout | src/components/Avatar/Avatar.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/Avatar/Avatar.test.tsx (40 tests) 877ms
+ ✓ |unit| src/components/ProgressBar/ProgressBar.test.tsx (11 tests) 1430ms
+     ✓ renders with default props  800ms
+ ✓ |unit| src/components/SearchableSelect/SearchableSelect.test.tsx (16 tests) 1565ms
+     ✓ closes on Escape  777ms
+stdout | src/components/Card/Card.test.tsx
+Test setup running...
+
+stdout | src/components/Card/Card.test.tsx
+Test setup running...
+
+stdout | src/components/Collapsible/Collapsible.test.tsx
+Test setup running...
+
+stdout | src/components/Collapsible/Collapsible.test.tsx
+Test setup running...
+
+stdout | src/components/DateFormat/DateFormat.test.tsx
+Test setup running...
+
+stdout | src/components/DateFormat/DateFormat.test.tsx
+Test setup running...
+
+stdout | src/components/TreeMenu/TreeMenu.test.tsx
+Test setup running...
+
+stdout | src/components/TreeMenu/TreeMenu.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/Card/Card.test.tsx (42 tests) 809ms
+stderr | src/components/Collapsible/Collapsible.test.tsx > Collapsible Components > Integration with Radix UI > handles Radix UI specific props
+React does not recognize the `asChild` prop on a DOM element. If you intentionally want it to appear in the DOM as a custom attribute, spell it as lowercase `aschild` instead. If you accidentally passed it from a parent component, remove it from the DOM element.
+React does not recognize the `forceMount` prop on a DOM element. If you intentionally want it to appear in the DOM as a custom attribute, spell it as lowercase `forcemount` instead. If you accidentally passed it from a parent component, remove it from the DOM element.
+React does not recognize the `defaultOpen` prop on a DOM element. If you intentionally want it to appear in the DOM as a custom attribute, spell it as lowercase `defaultopen` instead. If you accidentally passed it from a parent component, remove it from the DOM element.
+
+ ✓ |unit| src/components/Collapsible/Collapsible.test.tsx (27 tests) 537ms
+       ✓ renders root component  307ms
+ ✓ |unit| src/components/DateFormat/DateFormat.test.tsx (32 tests) 663ms
+stdout | src/components/ImageViewer/ImageViewer.test.tsx
+Test setup running...
+
+stdout | src/components/ImageViewer/ImageViewer.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/TreeMenu/TreeMenu.test.tsx (7 tests) 1288ms
+     ✓ expands node on click  523ms
+stdout | src/components/Textarea/Textarea.test.tsx
+Test setup running...
+
+stdout | src/components/Textarea/Textarea.test.tsx
+Test setup running...
+
+stdout | src/components/Badge/Badge.test.tsx
+Test setup running...
+
+stdout | src/components/Badge/Badge.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/ImageViewer/ImageViewer.test.tsx (7 tests) 1337ms
+       ✓ renders when open  880ms
+stdout | src/components/Checkbox/Checkbox.test.tsx
+Test setup running...
+
+stdout | src/components/Checkbox/Checkbox.test.tsx
+Test setup running...
+
+stdout | src/components/Button/Button.test.tsx
+Test setup running...
+
+stdout | src/components/Button/Button.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/Badge/Badge.test.tsx (22 tests) 388ms
+ ✓ |unit| src/components/Textarea/Textarea.test.tsx (3 tests) 1290ms
+     ✓ renders correctly  901ms
+     ✓ handles input changes  363ms
+stdout | src/components/ViewSwitcher/ViewSwitcher.test.tsx
+Test setup running...
+
+stdout | src/components/ViewSwitcher/ViewSwitcher.test.tsx
+Test setup running...
+
+stdout | src/components/Pagination/Pagination.test.tsx
+Test setup running...
+
+stdout | src/components/Pagination/Pagination.test.tsx
+Test setup running...
+
+stdout | src/components/NumberFormat/NumberFormat.test.tsx
+Test setup running...
+
+stdout | src/components/NumberFormat/NumberFormat.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/ViewSwitcher/ViewSwitcher.test.tsx (4 tests) 454ms
+ ✓ |unit| src/components/Button/Button.test.tsx (37 tests) 1697ms
+     ✓ renders correctly  735ms
+ ✓ |unit| src/components/Pagination/Pagination.test.tsx (7 tests) 364ms
+ ✓ |unit| src/components/NumberFormat/NumberFormat.test.tsx (16 tests) 350ms
+ ✓ |unit| src/components/Checkbox/Checkbox.test.tsx (34 tests) 1725ms
+       ✓ renders correctly with default variant  629ms
+stdout | src/components/DateDisplay/DateDisplay.test.tsx
+Test setup running...
+
+stdout | src/components/DateDisplay/DateDisplay.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/DateDisplay/DateDisplay.test.tsx (13 tests) 178ms
+stdout | src/contexts/CalendarContext.test.tsx
+Test setup running...
+
+stdout | src/contexts/CalendarContext.test.tsx
+Test setup running...
+
+ ✓ |unit| src/contexts/CalendarContext.test.tsx (5 tests) 85ms
+stdout | src/components/Switch/Switch.test.tsx
+Test setup running...
+
+stdout | src/components/Switch/Switch.test.tsx
+Test setup running...
+
+stdout | src/hooks/useMobile.test.ts
+Test setup running...
+
+stdout | src/hooks/useMobile.test.ts
+Test setup running...
+
+ ✓ |unit| src/hooks/useMobile.test.ts (4 tests) 42ms
+ ✓ |unit| src/components/Switch/Switch.test.tsx (9 tests) 85ms
+
+ Test Files  56 passed (56)
+      Tests  1079 passed (1079)
+   Start at  12:02:59
+   Duration  33.87s (transform 2.88s, setup 26.26s, import 20.46s, tests 62.87s, environment 163.52s)
+

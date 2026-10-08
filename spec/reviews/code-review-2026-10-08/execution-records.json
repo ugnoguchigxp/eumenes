@@ -1,0 +1,103 @@
+{
+	"environment": "macOS; Bun 1.4.2; Node 24.11.1; temporary SQLite and loopback fixture servers; no live provider/hardware acceptance",
+	"records": [
+		{
+			"command": "bun run verify -- --domain settings",
+			"cwd": "repository root",
+			"exit_code": 0,
+			"log": "evidence/settings-verify.log",
+			"condition": "fixture; after production fixes"
+		},
+		{
+			"command": "bun run verify -- --domain larm",
+			"cwd": "repository root",
+			"exit_code": 0,
+			"log": "evidence/verify-larm.log",
+			"condition": "fixture; after production fixes"
+		},
+		{
+			"command": "bun run verify -- --domain queue",
+			"cwd": "repository root",
+			"exit_code": 0,
+			"log": "evidence/verify-queue.log",
+			"condition": "fixture; after production fixes"
+		},
+		{
+			"command": "bun run verify -- --domain inference",
+			"cwd": "repository root",
+			"exit_code": 0,
+			"log": "evidence/verify-inference.log",
+			"condition": "fixture; after production fixes"
+		},
+		{
+			"command": "bun run verify -- --domain dialogue",
+			"cwd": "repository root",
+			"exit_code": 0,
+			"log": "evidence/verify-dialogue.log",
+			"condition": "fixture; after production fixes"
+		},
+		{
+			"command": "bun run verify -- --domain voice-dialogue",
+			"cwd": "repository root",
+			"exit_code": 0,
+			"log": "evidence/verify-voice-dialogue.log",
+			"condition": "fixture; after production fixes"
+		},
+		{
+			"command": "bun run verify -- --domain audio",
+			"cwd": "repository root",
+			"exit_code": 0,
+			"log": "evidence/verify-audio.log",
+			"condition": "fixture; after production fixes"
+		},
+		{
+			"command": "bun run verify:all",
+			"cwd": "repository root",
+			"exit_code": 0,
+			"log": "evidence/all.log",
+			"condition": "Before final shared UI fixes; API 136, Web 15, browser 8; not the final whole-source acceptance"
+		},
+		{
+			"command": "bun run test",
+			"cwd": "packages/design-system",
+			"exit_code": 0,
+			"log": "evidence/design-all.log",
+			"condition": "After shared UI behavior fixes; 56 files, 1079 tests; subsequent formatting only"
+		},
+		{
+			"command": "bun run verify:all",
+			"cwd": "repository root",
+			"exit_code": 0,
+			"log": "evidence/final-all.log",
+			"condition": "Final source acceptance: 136 API, 15 Web, 8 browser, checks and production build pass; 65316 ms"
+		},
+		{
+			"command": "bun x vitest run --project unit src/components/ImageViewer/ImageViewer.test.tsx src/components/DropdownMenu/DropdownMenu.test.tsx src/components/ProgressBar/ProgressBar.test.tsx",
+			"cwd": "packages/design-system",
+			"exit_code": 0,
+			"log": "evidence/design-final.log",
+			"condition": "After final ImageViewer argument type correction; 37 tests pass"
+		},
+		{
+			"command": "bun run test",
+			"cwd": "packages/design-system",
+			"exit_code": 0,
+			"log": "evidence/design-final-all.log",
+			"condition": "Final source; 56 files / 1079 tests pass"
+		},
+		{
+			"command": "bun -e <program in evidence/built-package-command.txt>",
+			"cwd": "repository root",
+			"exit_code": 0,
+			"log": "evidence/built-package.log",
+			"condition": "SSR verification of built artifact after successful build"
+		},
+		{
+			"command": "bun run verify:all",
+			"cwd": "repository root",
+			"exit_code": 1,
+			"log": "evidence/final-build-type-checkpoint.log",
+			"condition": "Intermediate checkpoint detected ImageViewer string/undefined argument type mismatch; corrected and rerun successfully. Not a final result."
+		}
+	]
+}

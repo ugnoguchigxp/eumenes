@@ -20,14 +20,20 @@ describe("ProgressBar", () => {
 
 	it("clamps value between 0 and 100", () => {
 		const { rerender } = render(<ProgressBar value={150} />);
-		// Radix UI might reject 150 and not render aria-valuenow, or render default.
-		// We focus on our visual indicator logic which clamps it to 100%.
+		expect(screen.getByRole("progressbar")).toHaveAttribute(
+			"aria-valuenow",
+			"100",
+		);
 
 		const indicator = screen.getByRole("progressbar").firstElementChild;
 		// 150 clamped to 100 -> translateX(0%)
 		expect(indicator).toHaveStyle({ transform: "translateX(-0%)" });
 
 		rerender(<ProgressBar value={-20} />);
+		expect(screen.getByRole("progressbar")).toHaveAttribute(
+			"aria-valuenow",
+			"0",
+		);
 		// -20 clamped to 0 -> translateX(-100%)
 		expect(indicator).toHaveStyle({ transform: "translateX(-100%)" });
 	});
@@ -81,5 +87,15 @@ describe("ProgressBar", () => {
 	it("does not show percentage for small height", () => {
 		render(<ProgressBar value={50} height="h-2" />);
 		expect(screen.queryByText("50%")).not.toBeInTheDocument();
+	});
+});
+
+it("custom maximum keeps the visible percent and accessible value consistent", () => {
+	render(<ProgressBar value={50} max={200} />);
+	const progress = screen.getByRole("progressbar");
+	expect(progress).toHaveAttribute("aria-valuenow", "50");
+	expect(progress).toHaveAttribute("aria-valuemax", "200");
+	expect(progress.firstElementChild).toHaveStyle({
+		transform: "translateX(-75%)",
 	});
 });

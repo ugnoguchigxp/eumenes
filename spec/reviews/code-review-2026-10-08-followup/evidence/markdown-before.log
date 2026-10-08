@@ -1,0 +1,15 @@
+{
+  "base": "HEAD",
+  "source_sha256": "a6349b48e8fe2d823d6677c97623c7ebcbfd89dabf01b3d2c182fa097bbf46e9",
+  "command": "bun -e import historical renderSafeMarkdown; call input; timeout 1s",
+  "results": [
+    {
+      "input": "- ",
+      "result": "timeout after 1 s; isolated child killed"
+    },
+    {
+      "input": "1. ",
+      "result": "timeout after 1 s; isolated child killed"
+    }
+  ]
+}

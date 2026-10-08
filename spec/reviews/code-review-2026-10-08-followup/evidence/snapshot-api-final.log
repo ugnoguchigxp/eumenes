@@ -1,0 +1,127 @@
+bun test v1.4.2 (744846f84)
+
+api/application/events-client.test.ts:
+(pass) two listeners share one authenticated transport, fragmented frames and last unsubscribe cleans up [32.23ms]
+(pass) reconnect carries a cursor and reset refreshes changes missed while disconnected [8.67ms]
+(pass) a half-open stream reconnects; heartbeat comments do not invalidate snapshots [16.91ms]
+(pass) 401, 403 and 404 stop automatic reconnect [48.72ms]
+(pass) explicit reconnect repairs a stopped stream without changing mounted listeners [17.52ms]
+(pass) update transport failure is observable even when other API reads still succeed [2.50ms]
+
+api/application/app.test.ts:
+(pass) status polling is passive and explicit reconnect requires auth and origin [14.69ms]
+(pass) auth and origin apply to the new endpoints [19.64ms]
+(pass) register → fire → history → pause/resume → cancel through the API [66.36ms]
+(pass) full queue is reported as 503 for submissions [10.91ms]
+(pass) authenticated SSE notifies a background commit and the existing API supplies the snapshot [12.41ms]
+
+api/application/events.test.ts:
+(pass) SSE coalesces changes, resnapshots every connection and releases disconnected clients [1.25ms]
+(pass) heartbeat keeps SSE alive without a state invalidation and shutdown ends reads [5.13ms]
+(pass) a slow reader is disconnected with a bounded buffer [51.39ms]
+
+api/application/dev.test.ts:
+(pass) bun run dev serves browser requests on 127.0.0.1 and Ctrl+C releases both ports [382.41ms]
+(pass) bun run dev serves browser requests on localhost and Ctrl+C releases both ports [523.24ms]
+(pass) dev refuses --host before exposing the authenticated proxy [67.25ms]
+(pass) dev refuses --host 0.0.0.0 before exposing the authenticated proxy [61.28ms]
+(pass) occupied API port is reported without starting Web or stopping its owner [59.42ms]
+(pass) Vite port failure stops the API instead of silently moving Web to another port [294.46ms]
+
+api/application/cli.test.ts:
+(pass) CLI connection failure has the documented exit code and stdout stays empty [49.87ms]
+(pass) CLI rejects missing or invalid request IDs before submitting a new run [100.54ms]
+(pass) CLI reports invalid API configuration as an argument error [59.55ms]
+(pass) CLI rejects invalid ftp API URL before requesting or exposing credentials [48.98ms]
+(pass) CLI rejects invalid http API URL before requesting or exposing credentials [50.36ms]
+
+api/infrastructure/chat-stream.test.ts:
+(pass) provider UTF-8 splits publish answer text before completion and exclude reasoning fields [1.56ms]
+(pass) a disconnected stream is not adopted as a complete answer [0.14ms]
+(pass) cancellation closes a blocked reader and prevents late content [0.06ms]
+
+api/infrastructure/auth-config.test.ts:
+(pass) LARM_API_TOKEN alone supplies distinct, consistent local API auth [0.16ms]
+(pass) empty optional settings do not mask the exported LARM token [0.02ms]
+(pass) explicit API credentials and legacy LARM settings remain supported [0.03ms]
+
+api/infrastructure/snapshot-stream.test.ts:
+(pass) a pending reader receives each snapshot once and terminal delivery releases the observer [1.31ms]
+(pass) a slow reader has bounded snapshots and still receives the final state [0.10ms]
+
+api/infrastructure/sqlite/owner.test.ts:
+(pass) OS lock excludes another process and releases after crash [45.37ms]
+
+api/infrastructure/sqlite/commit.test.ts:
+(pass) commit notifications see persisted state, exclude idle scans/rollback, and cannot fail writes [10.92ms]
+
+api/domains/scheduler/test/scheduler.test.ts:
+(pass) once: nothing before the time, exactly one job after, completed state is not job success [11.55ms]
+(pass) offsets are required and interval bounds enforced by the API schema [0.31ms]
+(pass) interval keeps phase, fires once per period, and ignores duplicate ticks and clock going back [12.95ms]
+(pass) long stop: coalesce creates one occurrence and advances into the future [10.48ms]
+(pass) skip policy: late beyond grace is skipped and summarised; within grace dispatches [9.58ms]
+(pass) overlap: previous open job makes the next occurrence skipped without touching the job [9.25ms]
+(pass) pause/resume/cancel with revisions; resume skips stopped periods; cancelled never revives [7.97ms]
+(pass) materialize failure rolls back job and occurrence; queue full keeps the schedule due and retries [8.67ms]
+(pass) create is idempotent per requestId, conflicts on different input, validates target and caps count [7.65ms]
+(pass) tick processes at most the configured batch [11.88ms]
+(pass) deferred schedules cannot hide later due schedules beyond one candidate page [20.65ms]
+
+api/domains/dialogue/test/queue.test.ts:
+(pass) a run only sees earlier accepted turns; later inputs never leak into it [30.02ms]
+(pass) a failed earlier run leaves only its input in later history [18.86ms]
+(pass) full queue rejects the submit and stores neither message nor run [11.40ms]
+(pass) restart: queued runs continue, a running run is interrupted, late result from the old owner is rejected [54.85ms]
+(pass) runs from before the queue existed are interrupted, not given a new job [11.35ms]
+(pass) scheduled prompt creates exactly one background run per occurrence; interactive input is claimed first [23.11ms]
+(pass) waitForTerminal honours abort and its own deadline without cancelling the run [52.65ms]
+(pass) rejected answer adoption fails both the run and its queue job [19.04ms]
+
+api/domains/dialogue/test/controller.test.ts:
+(pass) dialogue controller validates requests and delegates one run [13.18ms]
+
+api/domains/dialogue/test/dialogue.test.ts:
+(pass) request ID is idempotent and answer adoption is atomic [19.86ms]
+(pass) failed input persistence prevents any provider request [0.18ms]
+(pass) cancelled inference cannot append an answer [43.78ms]
+
+api/domains/queue/test/sleep.test.ts:
+(pass) heartbeat waits release abort listeners after each elapsed interval [22.82ms]
+(pass) a wait on an already cancelled signal returns immediately [0.07ms]
+
+api/domains/queue/test/queue.test.ts:
+(pass) same dedupe key converges; different content conflicts; capacity rejects atomically [10.98ms]
+(pass) success settles business and job together; failure of business rolls both back [22.89ms]
+(pass) resource slot and concurrency key serialize claims; interactive goes first [32.13ms]
+(pass) order within a conversation is kept even when a later job is interactive and earlier is background [24.69ms]
+(pass) retry only for allowed transient failures, with finite attempts and backoff [44.48ms]
+(pass) unregistered kind and unsupported version fail explicitly [10.25ms]
+(pass) cancel of running job rejects late result and keeps the slot until the handler stops [1152.46ms]
+(pass) cancel of queued job is immediate and routed through the handler [10.41ms]
+(pass) lost lease: old result is rejected and the resource is not reused while the old handler lives [27.11ms]
+(pass) deadline aborts the running handler and expires the job without adopting a late result [9.36ms]
+(pass) recover: queued continue, running follows policy, cancel_requested becomes outcome_unknown [10.45ms]
+(pass) lost wake-up: the loop still finds committed work within the poll interval; idle never calls handlers [80.84ms]
+(pass) close aborts running handlers, settles them interrupted, and blocks late writes [63.85ms]
+(pass) async transaction callbacks are rejected [8.08ms]
+(pass) a claim that cannot start still settles the owning domain [8.04ms]
+(pass) past-due blocked work does not make the loop spin [9.58ms]
+(pass) resource aliases make persisted old jobs and new jobs share the same concurrency limit [31.00ms]
+
+api/domains/queue/test/recovery.test.ts:
+(pass) process killed after commit but before claim: the job survives and runs after restart [83.14ms]
+(pass) process killed while a handler is running: restart marks it interrupted with a closed attempt [70.48ms]
+(pass) second process cannot own the same database while the first lives [10.58ms]
+
+api/domains/queue/test/boundaries.test.ts:
+(pass) queue and scheduler declare only their real dependencies [0.09ms]
+(pass) a dependency cycle stops with an explicit error [0.05ms]
+
+api/domains/conversation/test/conversation.test.ts:
+(pass) conversation saves and survives reopen; second writer is refused [19.45ms]
+
+ 83 pass
+ 0 fail
+ 350 expect() calls
+Ran 83 tests across 19 files. [4.37s]

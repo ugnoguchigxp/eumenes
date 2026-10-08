@@ -5,6 +5,7 @@ const claimed = new Map<string, string[]>();
 let holdNext = false;
 const releaseStreams = new Set<() => void>();
 const ttsInputs: string[] = [];
+const ttsParameters: Array<Record<string, unknown>> = [];
 const asrInputs: Array<{ rate: number; bytes: number }> = [];
 const profile = "SAAA-gemma4-26b";
 const agentProfile = "saaa-conversation-gemma4-26b-voice";
@@ -20,6 +21,32 @@ const endpoint = {
 	tts: "/v1/audio/speech",
 };
 const origin = `http://127.0.0.1:${port}`;
+const model = (name: string) =>
+	name === "llm"
+		? "gemma4-26b-a4b"
+		: name === "tts"
+			? "voicevox-core"
+			: `model-${name}`;
+const voiceCatalog = {
+	default_voice: "fixture-voice",
+	voices: ["fixture-voice", "fixture-voice-soft"].map((id, i) => ({
+		id,
+		display_name: i ? "テスト話者B" : "テスト話者A",
+		default_style: i ? "sweet" : "normal",
+		styles: i
+			? [{ id: "sweet", display_name: "あまあま", style_id: 2 }]
+			: [
+					{ id: "normal", display_name: "ノーマル", style_id: 0 },
+					{ id: "whisper", display_name: "ささやき", style_id: 1 },
+				],
+		capabilities: {
+			speed: { minimum: 0.5, maximum: 2, default: 1 },
+			pitch_scale: { minimum: -0.15, maximum: 0.15, default: 0 },
+			intonation_scale: { minimum: 0, maximum: 2, default: 1 },
+		},
+		credit: `VOICEVOX:テスト話者${i ? "B" : "A"}`,
+	})),
+};
 function wav() {
 	const count = 22050 * 2;
 	const bytes = new Uint8Array(44 + count * 2);
@@ -64,6 +91,7 @@ const server = Bun.serve({
 		if (path === "/fixture/hold-next") {
 			holdNext = true;
 			ttsInputs.length = 0;
+			ttsParameters.length = 0;
 			asrInputs.length = 0;
 			return Response.json({ ok: true });
 		}
@@ -73,7 +101,12 @@ const server = Bun.serve({
 			return Response.json({ ok: true });
 		}
 		if (path === "/fixture/observations")
-			return Response.json({ ttsInputs, asrInputs });
+			return Response.json({ ttsInputs, asrInputs, ttsParameters });
+		if (path === "/tts/v1/audio/voices") {
+			if (request.headers.get("authorization") !== "Bearer fixture-tts")
+				return Response.json({ error: "unauthorized" }, { status: 401 });
+			return Response.json(voiceCatalog);
+		}
 		if (path === "/v3/agent-profiles")
 			return Response.json({
 				contractVersion: "agent-connection.v3",
@@ -86,7 +119,7 @@ const server = Bun.serve({
 							name,
 							protocol: protocol[name],
 							endpoint: endpoint[name],
-							model: name === "llm" ? "gemma4-26b-a4b" : `model-${name}`,
+							model: model(name),
 							...(name === "llm"
 								? {
 										contextWindow: {
@@ -116,7 +149,7 @@ const server = Bun.serve({
 						name,
 						protocol: protocol[name as keyof typeof protocol],
 						endpoint: endpoint[name as keyof typeof endpoint],
-						model: name === "llm" ? "gemma4-26b-a4b" : `model-${name}`,
+						model: model(name),
 						readiness: "ready",
 						claimable: true,
 					})),
@@ -154,12 +187,12 @@ const server = Bun.serve({
 						name,
 						protocol: protocol[name as keyof typeof protocol],
 						baseUrl: `${origin}/${name}/v1`,
-						model: name === "llm" ? "gemma4-26b-a4b" : `model-${name}`,
+						model: model(name),
 						credential: { token: `fixture-${name}` },
 						configuration: {
 							fields: {
 								baseURL: `${origin}/${name}/v1`,
-								model: name === "llm" ? "gemma4-26b-a4b" : `model-${name}`,
+								model: model(name),
 								...(name === "tts" ? { voice: "fixture-voice" } : {}),
 							},
 						},
@@ -232,9 +265,20 @@ const server = Bun.serve({
 			);
 		}
 		if (path === "/tts/v1/audio/speech") {
-			const body = (await request.json()) as { input: string };
+			const body = (await request.json()) as { input: string; voice: string };
 			ttsInputs.push(body.input);
-			return new Response(wav(), { headers: { "Content-Type": "audio/wav" } });
+			ttsParameters.push(body);
+			const credit = voiceCatalog.voices.find(
+				(v) => v.id === body.voice,
+			)?.credit;
+			return new Response(wav(), {
+				headers: {
+					"Content-Type": "audio/wav",
+					...(credit
+						? { "X-VOICEVOX-Credit": `UTF-8''${encodeURIComponent(credit)}` }
+						: {}),
+				},
+			});
 		}
 
 		return Response.json({ error: "not_found" }, { status: 404 });

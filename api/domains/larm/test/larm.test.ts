@@ -18,6 +18,7 @@ function fixture(
 	mismatch = false,
 	selectedProfile = "SAAA",
 	initialExpiryMs = 900_000,
+	ttsModel = "model-tts",
 ) {
 	const calls: string[] = [];
 	const requests: Record<string, unknown>[] = [];
@@ -26,9 +27,11 @@ function fixture(
 			? "saaa-conversation-gemma4-26b-voice"
 			: "fixture-profile";
 	const model = (name: string) =>
-		selectedProfile === "SAAA-gemma4-26b" && name === "llm"
-			? "gemma4-26b-a4b"
-			: `model-${name}`;
+		name === "tts"
+			? ttsModel
+			: selectedProfile === "SAAA-gemma4-26b" && name === "llm"
+				? "gemma4-26b-a4b"
+				: `model-${name}`;
 	const contextWindow =
 		selectedProfile === "SAAA-gemma4-26b"
 			? {
@@ -172,6 +175,180 @@ test("catalog, claim, ASR/LLM/TTS and release use public contract", async () => 
 	await larm.close();
 	expect(fake.calls.filter((x) => x.includes("/claim"))).toHaveLength(2);
 	expect(fake.calls.filter((x) => x.startsWith("DELETE"))).toHaveLength(2);
+});
+test("voice menu uses claimed provider auth and TTS sends selected voice and speed", async () => {
+	const fake = fixture();
+	let payload: unknown;
+	const larm = createLarm({
+		baseUrl: "http://127.0.0.1:9810",
+		profile: "SAAA",
+		token: "control",
+		voice: "menu-voice",
+		speed: 1.3,
+		fetch: async (input, init) => {
+			const url = new URL(String(input));
+			if (url.pathname === "/tts/v1/audio/voices") {
+				expect(new Headers(init?.headers).get("Authorization")).toBe(
+					"Bearer secret-tts-1",
+				);
+				expect(url.searchParams.get("model")).toBe("model-tts");
+				return result({
+					voices: [{ id: "menu-voice", credential: "must-not-leak" }],
+				});
+			}
+			if (url.pathname === "/tts/v1/audio/speech") {
+				payload = JSON.parse(String(init?.body));
+				const wav = new Uint8Array(44);
+				wav.set(new TextEncoder().encode("RIFF"));
+				wav.set(new TextEncoder().encode("WAVE"), 8);
+				return new Response(wav);
+			}
+			return fake.fetcher(input, init);
+		},
+	});
+	const signal = new AbortController().signal;
+	expect(await larm.voices?.(signal)).toEqual({
+		model: "model-tts",
+		voices: [
+			{
+				id: "menu-voice",
+				display_name: "menu-voice",
+				styles: [],
+				capabilities: {},
+			},
+		],
+	});
+	expect(fake.calls.filter((c) => c.includes("/claim"))).toHaveLength(1);
+	await larm.speak("hello", signal);
+	expect(payload).toMatchObject({ voice: "menu-voice", speed: 1.3 });
+	await larm.close();
+});
+test("VOICEVOX catalog labels, style, inclusive numeric bounds and decoded credits reach phrase synthesis", async () => {
+	for (const [speed, pitchScale, intonationScale] of [
+		[0.5, -0.15, 0],
+		[2, 0.15, 2],
+	]) {
+		const fake = fixture(false, "SAAA", 900000, "voicevox-core");
+		let body: Record<string, unknown> = {};
+		let catalogRequests = 0;
+		const larm = createLarm({
+			baseUrl: "http://127.0.0.1:9810",
+			profile: "SAAA",
+			token: "control",
+			voice: "Kasukabe_Tsumugi",
+			style: "normal",
+			speed,
+			pitchScale,
+			intonationScale,
+			fetch: async (input, init) => {
+				const url = new URL(String(input));
+				if (url.pathname === "/tts/v1/audio/voices") {
+					catalogRequests++;
+					expect(url.searchParams.get("model")).toBe("voicevox-core");
+					expect(new Headers(init?.headers).get("Authorization")).toBe(
+						"Bearer secret-tts-1",
+					);
+					return result({
+						default_voice: "Kasukabe_Tsumugi",
+						voices: [
+							{
+								id: "Kasukabe_Tsumugi",
+								display_name: "春日部つむぎ",
+								default_style: "normal",
+								styles: [
+									{ id: "normal", display_name: "ノーマル", style_id: 8 },
+								],
+								capabilities: {
+									speed: { minimum: 0.5, maximum: 2, default: 1 },
+									pitch_scale: { minimum: -0.15, maximum: 0.15, default: 0 },
+									intonation_scale: { minimum: 0, maximum: 2, default: 1 },
+								},
+								credit: "VOICEVOX:春日部つむぎ",
+								credential: "strip-me",
+							},
+						],
+					});
+				}
+				if (url.pathname === "/tts/v1/audio/speech") {
+					body = JSON.parse(String(init?.body));
+					const wav = new Uint8Array(44);
+					wav.set(new TextEncoder().encode("RIFF"));
+					wav.set(new TextEncoder().encode("WAVE"), 8);
+					return new Response(wav, {
+						headers: {
+							"X-VOICEVOX-Credit": `UTF-8''${encodeURIComponent("VOICEVOX:春日部つむぎ")}`,
+						},
+					});
+				}
+				return fake.fetcher(input, init);
+			},
+		});
+		const signal = new AbortController().signal;
+		const catalog = await larm.voices?.(signal);
+		expect(catalog?.voices[0]?.display_name).toBe("春日部つむぎ");
+		expect(JSON.stringify(catalog)).not.toContain("strip-me");
+		const exchanges: Array<import("../contracts").LarmExchange> = [];
+		await larm.speak("こんにちは。", signal, {
+			onExchange: async (exchange) => {
+				exchanges.push(exchange);
+			},
+		});
+		expect(body).toEqual({
+			model: "voicevox-core",
+			input: "こんにちは。",
+			voice: "Kasukabe_Tsumugi",
+			style: "normal",
+			speed,
+			pitch_scale: pitchScale,
+			intonation_scale: intonationScale,
+			response_format: "wav",
+		});
+		expect(exchanges[0]).toMatchObject({
+			speechVoice: "Kasukabe_Tsumugi",
+			speechCredit: "VOICEVOX:春日部つむぎ",
+		});
+		expect(catalogRequests).toBe(1);
+		await larm.close();
+	}
+});
+test("other models omit VOICEVOX fields and busy responses never replay or replace the connection", async () => {
+	for (const status of [200, 429, 422]) {
+		const fake = fixture();
+		let body: Record<string, unknown> = {},
+			calls = 0;
+		const larm = createLarm({
+			baseUrl: "http://127.0.0.1:9810",
+			profile: "SAAA",
+			token: "control",
+			style: "whisper",
+			pitchScale: 0.03,
+			intonationScale: 1.15,
+			fetch: async (input, init) => {
+				if (new URL(String(input)).pathname === "/tts/v1/audio/speech") {
+					calls++;
+					body = JSON.parse(String(init?.body));
+					if (status !== 200)
+						return Response.json(
+							{ detail: "invalid style" },
+							{ status, headers: { "Retry-After": "2" } },
+						);
+				}
+				return fake.fetcher(input, init);
+			},
+		});
+		const speech = larm.speak("確認", new AbortController().signal, {
+			intonationScale: 1.8,
+		});
+		if (status === 200) await speech;
+		else await expect(speech).rejects.toThrow(`larm_inference_${status}`);
+		expect(body.style).toBeUndefined();
+		expect(body.pitch_scale).toBeUndefined();
+		expect(body.intonation_scale).toBeUndefined();
+		expect(body.speed).toBeUndefined();
+		expect(calls).toBe(1);
+		expect(fake.calls.filter((c) => c.includes("/claim"))).toHaveLength(1);
+		await larm.close();
+	}
 });
 test("mismatched claim is rejected before inference and lease is released", async () => {
 	const fake = fixture(true);
@@ -333,7 +510,7 @@ test("exported token alone connects to the documented default URL", async () => 
 	await larm.close();
 });
 
-test("missing claim voice discovers and caches the advertised default with control auth", async () => {
+test("missing claim voice discovers and caches the advertised default with provider auth", async () => {
 	const fake = fixture();
 	let discoveries = 0;
 	const larm = createLarm({
@@ -343,12 +520,12 @@ test("missing claim voice discovers and caches the advertised default with contr
 		voice: "",
 		fetch: async (input, init) => {
 			const url = new URL(String(input));
-			if (url.pathname === "/v1/audio/voices") {
+			if (url.pathname === "/tts/v1/audio/voices") {
 				discoveries++;
-				expect(url.origin).toBe("http://127.0.0.1:9810");
+				expect(url.origin).toBe("http://127.0.0.1");
 				expect(url.searchParams.get("model")).toBe("model-tts");
 				expect(new Headers(init?.headers).get("Authorization")).toBe(
-					"Bearer control",
+					"Bearer secret-tts-1",
 				);
 				return result({
 					default_voice: "fixture-voice",
@@ -383,7 +560,7 @@ test("an unadvertised default voice is rejected before speech inference", async 
 		token: "control",
 		fetch: async (input, init) => {
 			const url = new URL(String(input));
-			if (url.pathname === "/v1/audio/voices")
+			if (url.pathname === "/tts/v1/audio/voices")
 				return result({
 					default_voice: "missing",
 					voices: [{ id: "fixture-voice" }],
@@ -401,7 +578,7 @@ test("an unadvertised default voice is rejected before speech inference", async 
 	try {
 		await expect(
 			larm.speak("確認", new AbortController().signal),
-		).rejects.toThrow("larm_tts_voice_unconfigured");
+		).rejects.toThrow("larm_invalid_voice_catalog");
 		expect(fake.calls.some((call) => call.includes("/audio/speech"))).toBe(
 			false,
 		);
@@ -907,5 +1084,34 @@ test("unauthorized can recover only when control confirms the old connection is 
 		} finally {
 			await larm.close();
 		}
+	}
+});
+
+test("context trimming retains the current input after an unanswered prior turn", async () => {
+	const fake = fixture();
+	const latest = { role: "user" as const, content: "今回の質問" };
+	let sent: unknown;
+	const larm = createLarm({
+		baseUrl: "http://127.0.0.1:9810",
+		profile: "SAAA",
+		token: "control",
+		fetch: async (input, init) => {
+			if (new URL(String(input)).pathname.endsWith("chat/completions"))
+				sent = JSON.parse(String(init?.body)).messages;
+			return fake.fetcher(input, init);
+		},
+	});
+	try {
+		await larm.answer(
+			[
+				{ role: "system", content: "system" },
+				{ role: "user", content: "x".repeat(4000) },
+				latest,
+			],
+			new AbortController().signal,
+		);
+		expect(sent).toEqual([{ role: "system", content: "system" }, latest]);
+	} finally {
+		await larm.close();
 	}
 });

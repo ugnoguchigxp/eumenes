@@ -72,7 +72,10 @@ export type SettleOutcome<O> =
 	| { type: "expired" }
 	| { type: "interrupted"; errorCode: string };
 
-export type SettleResult = "applied" | "stale";
+export type SettleResult =
+	| "applied"
+	| "stale"
+	| { status: "failed"; errorCode: string };
 
 /**
  * Typed handler. The three transactional callbacks are synchronous: they run

@@ -1,0 +1,1 @@
+$ oxlint --deny-warnings scripts/dev.ts api/application/dev.test.ts api/application/cli.test.ts client/transport.ts web/src/domains/dialogue web/src/components/domains/conversation tests/browser/voice.spec.ts

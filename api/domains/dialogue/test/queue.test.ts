@@ -8,6 +8,7 @@ import {
 	createConversationService,
 } from "../../conversation";
 import type { LarmPort } from "../../larm";
+import type { InferencePort } from "../../inference";
 import { createQueue, migration as queueMigration } from "../../queue";
 import {
 	createScheduler,
@@ -36,13 +37,16 @@ async function until(cond: () => boolean) {
 	throw new Error("condition not reached");
 }
 type Call = { texts: string[]; resolve: (v: string) => void };
-function setup(queueOptions: Parameters<typeof createQueue>[1] = {}) {
+function setup(
+	queueOptions: Parameters<typeof createQueue>[1] = {},
+	overrides: Partial<InferencePort> = {},
+) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-dq-"));
 	dirs.push(dir);
 	const store = openStore(join(dir, "db.sqlite3"), migrations);
 	stores.push(store);
 	const calls: Call[] = [];
-	const larm: LarmPort = {
+	const larm: LarmPort & InferencePort = {
 		status: () => ({ state: "ready", capabilities: ["llm"] }),
 		connect: async () => {},
 		answer: (messages, signal) =>
@@ -56,6 +60,7 @@ function setup(queueOptions: Parameters<typeof createQueue>[1] = {}) {
 		transcribe: async () => "",
 		speak: async () => new Uint8Array(),
 		close: async () => {},
+		...overrides,
 	};
 	const conversation = createConversationService(store);
 	const queue = createQueue(store, queueOptions);
@@ -236,4 +241,35 @@ test("waitForTerminal honours abort and its own deadline without cancelling the 
 		(await h.dialogue.waitForTerminal(run.id, { signal: controller.signal }))
 			?.status,
 	).toBe("queued");
+});
+
+test("rejected answer adoption fails both the run and its queue job", async () => {
+	const h = setup(
+		{},
+		{
+			requestFor: () => "request",
+			executeRequest: async () => ({
+				requestId: "request",
+				attemptId: "attempt",
+				value: "revoked answer",
+			}),
+			acceptInTransaction: () => false,
+		},
+	);
+	try {
+		const run = await submit(h.dialogue, "question");
+		await h.queue.tick();
+		await until(
+			() => !["queued", "running"].includes(h.queue.get(run.jobId!)!.state),
+		);
+		expect(h.dialogue.get(run.id)?.status).toBe("failed");
+		expect(h.dialogue.get(run.id)?.error).toBe("permission_revoked");
+		expect(h.queue.get(run.jobId!)?.state).toBe("failed");
+		expect(h.queue.get(run.jobId!)?.errorCode).toBe("permission_revoked");
+		expect(h.conversation.get("main").messages.map((m) => m.text)).toEqual([
+			"question",
+		]);
+	} finally {
+		await h.queue.close(100);
+	}
 });

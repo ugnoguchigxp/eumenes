@@ -1,0 +1,24 @@
+bun test v1.4.2 (744846f84)
+
+api/application/dev.test.ts:
+ 99 | 		});
+100 | 		const browserResponse = await fetch(url, {
+101 | 			headers: { Origin: `http://127.0.0.1:${webPort}` },
+102 | 			signal: AbortSignal.timeout(1000),
+103 | 		});
+104 | 		expect(browserResponse.status, await browserResponse.text()).toBe(200);
+                                                                     ^
+error: {"error":"origin_forbidden"}
+
+Expected: 200
+Received: 403
+
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/application/dev.test.ts:104:64)
+(fail) bun run dev starts API before serving Web and Ctrl+C releases both ports [272.68ms]
+(pass) occupied API port is reported without starting Web or stopping its owner [29.05ms]
+(pass) Vite port failure stops the API instead of silently moving Web to another port [260.77ms]
+
+ 2 pass
+ 1 fail
+ 11 expect() calls
+Ran 3 tests across 1 file. [591.00ms]

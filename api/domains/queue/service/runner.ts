@@ -46,15 +46,17 @@ export function resolveOptions(o: QueueOptions = {}): Resolved {
 			o.sleep ??
 			((ms, signal) =>
 				new Promise((resolve) => {
-					const timer = setTimeout(resolve, ms);
-					signal?.addEventListener(
-						"abort",
-						() => {
-							clearTimeout(timer);
-							resolve();
-						},
-						{ once: true },
-					);
+					if (signal?.aborted) {
+						resolve();
+						return;
+					}
+					const finish = () => {
+						clearTimeout(timer);
+						signal?.removeEventListener("abort", finish);
+						resolve();
+					};
+					const timer = setTimeout(finish, ms);
+					signal?.addEventListener("abort", finish, { once: true });
 				})),
 		random: o.random ?? Math.random,
 		resources: o.resources ?? { "inference.llm": 1 },
@@ -191,6 +193,10 @@ export function createRunner(
 			);
 			if (result === "stale") {
 				finishRunning(db, job, "interrupted", "stale_result", now);
+				return;
+			}
+			if (typeof result === "object" && result.status === "failed") {
+				finishRunning(db, job, "failed", result.errorCode, now);
 				return;
 			}
 		}

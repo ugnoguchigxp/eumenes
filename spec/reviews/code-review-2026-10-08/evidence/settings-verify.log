@@ -1,0 +1,29 @@
+$ bun scripts/verify.ts --domain settings
+[verify] selected=settings dependencyClosure=settings
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check api/domains/settings web/src/domains/settings
+$ oxfmt --check api/domains/settings web/src/domains/settings
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 7ms on 7 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint api/domains/settings web/src/domains/settings
+$ oxlint --deny-warnings api/domains/settings web/src/domains/settings
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun x tsc -p /Users/y.noguchi/Code/eumenes/verification-reports/tsconfig.selected.json
+[verify] TypeScript workspace closure: 27 files; api/domains/settings, api/infrastructure/sqlite, api/domains/conversation, client/transport.ts, client/conversation.ts, api/domains/dialogue, client/run-stream.ts, client/dialogue.ts, client/events.ts, api/domains/larm, client/larm.ts, api/domains/queue, client/queue.ts, api/domains/scheduler, client/scheduler.ts, client/settings.ts, api/domains/voice-dialogue, client/voice-dialogue.ts, client/index.ts, packages/design-system/dist, web/src/design-system, web/src/domains
+[verify] domain tests: /Users/y.noguchi/.bun/bin/bun run test:domain -- settings
+$ bun scripts/test-domain.ts settings
+bun test v1.4.2 (744846f84)
+
+api/domains/settings/test/settings.test.ts:
+(pass) bootstraps once; atomic revision and idempotency; encrypted secret never in document [20.77ms]
+(pass) revocation epochs cannot be reset by client; origin changes cannot reuse credential [8.34ms]
+(pass) missing or wrong master key preserves data, disables ciphertext and does not regenerate [7.95ms]
+(pass) deleting then recreating the same connection ID cannot revive old permissions [7.28ms]
+(pass) malformed LARM URLs are validation errors and same-host requires loopback [6.89ms]
+(pass) key replacement, key deletion and connection deletion discard obsolete ciphertext [8.37ms]
+
+ 6 pass
+ 0 fail
+ 30 expect() calls
+Ran 6 tests across 1 file. [89.00ms]
+[verify] passed 1746 ms

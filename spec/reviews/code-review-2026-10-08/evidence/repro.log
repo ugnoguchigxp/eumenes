@@ -1,0 +1,123 @@
+bun test v1.4.2 (744846f84)
+
+api/domains/settings/test/settings.test.ts:
+(pass) bootstraps once; atomic revision and idempotency; encrypted secret never in document [17.76ms]
+(pass) revocation epochs cannot be reset by client; origin changes cannot reuse credential [9.75ms]
+(pass) missing or wrong master key preserves data, disables ciphertext and does not regenerate [10.64ms]
+(pass) deleting then recreating the same connection ID cannot revive old permissions [10.52ms]
+104 | 	.strict()
+105 | 	.superRefine((s, ctx) => {
+106 | 		if (s.larm.profile === "SAAA-gemma4-26b-64k")
+107 | 			ctx.addIssue({ code: "custom", message: "補助Profileは利用できません" });
+108 | 		if (s.larm.baseUrl) {
+109 | 			const u = new URL(s.larm.baseUrl);
+                   ^
+TypeError: Invalid URL
+ input: "bad-url",
+  code: "ERR_INVALID_URL"
+
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/domains/settings/contracts/index.ts:109:14)
+      at runChecks (/Users/y.noguchi/Code/eumenes/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/schemas.js:48:35)
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/parse.js:33:32)
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/domains/settings/test/settings.test.ts:199:24)
+(fail) malformed LARM URLs are validation errors and same-host requires loopback [9.76ms]
+207 | 	const apply = (settings: Settings, keys: Array<{ connectionId: string; value: string | null }>) =>
+208 | 		h.settings.apply({ requestId: crypto.randomUUID(), expectedRevision: settings.revision, settings, keys });
+209 | 	const count = () => h.store.read(db => (db.query("SELECT count(*) AS n FROM settings_credentials").get() as { n: number }).n);
+210 | 	let saved = await apply(s, [{ connectionId: c, value: "first-key" }]);
+211 | 	saved = await apply(saved, [{ connectionId: c, value: "replacement-key" }]);
+212 | 	expect(count()).toBe(1);
+                       ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 2
+
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/domains/settings/test/settings.test.ts:212:18)
+(fail) key replacement, key deletion and connection deletion discard obsolete ciphertext [10.46ms]
+
+api/domains/larm/test/inference-error.test.ts:
+(pass) provider diagnostics retain the code and meaningful message, redact credentials and bound input [0.81ms]
+(pass) cancelled error-body read cannot trigger recovery [0.09ms]
+
+api/domains/larm/test/larm.test.ts:
+(pass) catalog, claim, ASR/LLM/TTS and release use public contract [5.49ms]
+(pass) mismatched claim is rejected before inference and lease is released [0.51ms]
+(pass) oversized inference response is rejected while streaming [0.28ms]
+(pass) simultaneous capability upgrades share one replacement connection [1003.09ms]
+(pass) Gemma requests the live profile and renews by reclaiming the rotated token [0.59ms]
+(pass) voice requests every provider in the Gemma profile [0.23ms]
+(pass) an expired connection stops polling and is released [0.17ms]
+(pass) exported token alone connects to the documented default URL [0.16ms]
+(pass) missing claim voice discovers and caches the advertised default with control auth [0.37ms]
+(pass) an unadvertised default voice is rejected before speech inference [0.84ms]
+(pass) cancelling a caller returns promptly during allocation and close stops polling [5.85ms]
+(pass) runtime changes notify connecting and ready/failed without exposing credentials [0.28ms]
+(pass) idle-released JSON before SSE recreates and claims once; both exchanges survive [0.54ms]
+(pass) local idle expires a still-valid lease without requests; next voice use requests the profile again [56.39ms]
+(pass) an active inference pauses the local idle timer and completion starts a new idle interval [127.70ms]
+(pass) only the explicit idle-released 409 can replay, and recovery is bounded at one replacement [1.82ms]
+(pass) cancellation after the 409 diagnostic prevents replacement and replay [0.31ms]
+(pass) a late concurrent rejection cannot discard the replacement lease [0.44ms]
+(pass) manual connection check follows released state even with unexpired credentials [0.74ms]
+(pass) renew rotates every claimed provider while leaving the idle deadline unchanged [142.86ms]
+(pass) published SSE prefix errors never reconnect or replay inference [0.93ms]
+(pass) idle expiry during a health check cannot revive the released local lease [66.79ms]
+(pass) invalid reclaim after renew discards every old credential before another request [0.85ms]
+(pass) a ready connection waits for requested providers to become claimable before claim [1001.80ms]
+(pass) unauthorized can recover only when control confirms the old connection is released [0.65ms]
+928 | 		await larm.answer([
+929 | 			{ role: "system", content: "system" },
+930 | 			{ role: "user", content: "x".repeat(4000) },
+931 | 			latest,
+932 | 		], new AbortController().signal);
+933 | 		expect(sent).toEqual([{ role: "system", content: "system" }, latest]);
+                     ^
+error: expect(received).toEqual(expected)
+
+  [
+    {
+      "content": "system",
+      "role": "system",
+    },
+-   {
+-     "content": "今回の質問",
+-     "role": "user",
+-   },
+  ]
+
+- Expected  - 4
++ Received  + 0
+
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/domains/larm/test/larm.test.ts:933:16)
+(fail) context trimming retains the current input after an unanswered prior turn [0.52ms]
+
+api/domains/voice-dialogue/test/voice.test.ts:
+(pass) voice capture to ASR, dialogue, TTS; duplicate utterance is ignored [16.25ms]
+(pass) restart cancels the run of a stale voice turn so no old answer is spoken [19.99ms]
+(pass) evicting cached audio also clears the ready state [19.39ms]
+222 | 	const voice = createVoiceDialogue(store, {} as ReturnType<typeof createDialogueService>, larm);
+223 | 	try {
+224 | 		const session = crypto.randomUUID(), id = crypto.randomUUID();
+225 | 		voice.start(session, 1);
+226 | 		const accepted = voice.accept(session, 1, 1, id, wav);
+227 | 		const rejected = expect(accepted).rejects.toThrow("voice_session_inactive");
+                                                  ^
+error: expect(received).rejects.toThrow(expected)
+
+Expected promise that rejects
+Received promise that resolved: Promise { <resolved> }
+
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/domains/voice-dialogue/test/voice.test.ts:227:45)
+(fail) stopping a session fences acceptance waiting in the writer queue [6.94ms]
+
+4 tests failed:
+(fail) malformed LARM URLs are validation errors and same-host requires loopback [9.76ms]
+(fail) key replacement, key deletion and connection deletion discard obsolete ciphertext [10.46ms]
+(fail) context trimming retains the current input after an unanswered prior turn [0.52ms]
+(fail) stopping a session fences acceptance waiting in the writer queue [6.94ms]
+
+ 34 pass
+ 4 fail
+ 315 expect() calls
+Ran 38 tests across 4 files. [2.60s]

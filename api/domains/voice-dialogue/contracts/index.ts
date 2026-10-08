@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { speechDeliverySchema } from "../../delivery";
 export const voiceStartSchema = z.object({
 	sessionId: z.uuid(),
 	generation: z.number().int().positive(),
@@ -25,7 +26,11 @@ export const voiceTurnSchema = z.object({
 	revision: z.number().int(),
 	audioChunks: z
 		.array(
-			z.object({ index: z.number().int().nonnegative(), text: z.string() }),
+			z.object({
+				index: z.number().int().nonnegative(),
+				text: z.string(),
+				delivery: speechDeliverySchema.optional(),
+			}),
 		)
 		.optional(),
 	audioComplete: z.boolean().optional(),

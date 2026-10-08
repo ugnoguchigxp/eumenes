@@ -1,0 +1,20 @@
+bun test v1.4.2 (744846f84)
+
+api/domains/dialogue/test/queue.test.ts:
+(pass) a run only sees earlier accepted turns; later inputs never leak into it [34.07ms]
+(pass) a failed earlier run leaves only its input in later history [15.43ms]
+(pass) full queue rejects the submit and stores neither message nor run [7.68ms]
+(pass) restart: queued runs continue, a running run is interrupted, late result from the old owner is rejected [50.77ms]
+(pass) runs from before the queue existed are interrupted, not given a new job [7.74ms]
+(pass) scheduled prompt creates exactly one background run per occurrence; interactive input is claimed first [22.59ms]
+(pass) waitForTerminal honours abort and its own deadline without cancelling the run [52.24ms]
+(pass) rejected answer adoption fails both the run and its queue job [21.75ms]
+
+api/domains/queue/test/sleep.test.ts:
+(pass) heartbeat waits release abort listeners after each elapsed interval [23.17ms]
+(pass) a wait on an already cancelled signal returns immediately [0.09ms]
+
+ 10 pass
+ 0 fail
+ 35 expect() calls
+Ran 10 tests across 2 files. [279.00ms]

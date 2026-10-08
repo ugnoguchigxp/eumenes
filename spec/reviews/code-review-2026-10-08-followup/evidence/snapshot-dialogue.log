@@ -1,0 +1,48 @@
+$ bun scripts/verify.ts --domain dialogue
+[verify] selected=dialogue dependencyClosure=conversation,settings,larm,inference,queue,scheduler,dialogue
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check api/domains/dialogue web/src/domains/dialogue
+$ oxfmt --check api/domains/dialogue web/src/domains/dialogue
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 8ms on 12 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint api/domains/dialogue web/src/domains/dialogue
+$ oxlint --deny-warnings api/domains/dialogue web/src/domains/dialogue
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun x tsc -p /private/var/folders/mx/jbv8qfwd52z14q0mby_273lhlp5gd2/T/eumenes-review2-snapshot-07h5rqj4/verification-reports/tsconfig.selected.json
+[verify] TypeScript workspace closure: 58 files; api/domains/dialogue, api/infrastructure/sqlite, api/domains/conversation, api/domains/larm, api/infrastructure/chat-stream.ts, api/domains/settings, api/domains/inference, api/domains/queue, api/domains/scheduler, api/infrastructure/snapshot-stream.ts, client/transport.ts, client/run-stream.ts, client/dialogue.ts, client/conversation.ts, web/src/domains
+[verify] domain tests: /Users/y.noguchi/.bun/bin/bun run test:domain -- dialogue
+$ bun scripts/test-domain.ts dialogue
+bun test v1.4.2 (744846f84)
+
+api/domains/dialogue/test/queue.test.ts:
+(pass) a run only sees earlier accepted turns; later inputs never leak into it [32.39ms]
+(pass) a failed earlier run leaves only its input in later history [17.57ms]
+(pass) full queue rejects the submit and stores neither message nor run [9.53ms]
+(pass) restart: queued runs continue, a running run is interrupted, late result from the old owner is rejected [54.77ms]
+(pass) runs from before the queue existed are interrupted, not given a new job [11.74ms]
+(pass) scheduled prompt creates exactly one background run per occurrence; interactive input is claimed first [24.30ms]
+(pass) waitForTerminal honours abort and its own deadline without cancelling the run [53.28ms]
+(pass) rejected answer adoption fails both the run and its queue job [18.23ms]
+
+api/domains/dialogue/test/controller.test.ts:
+(pass) dialogue controller validates requests and delegates one run [14.30ms]
+
+api/domains/dialogue/test/dialogue.test.ts:
+(pass) request ID is idempotent and answer adoption is atomic [16.24ms]
+(pass) failed input persistence prevents any provider request [0.17ms]
+(pass) cancelled inference cannot append an answer [44.91ms]
+
+ 12 pass
+ 0 fail
+ 47 expect() calls
+Ran 12 tests across 3 files. [357.00ms]
+
+ RUN  v4.1.8 /private/var/folders/mx/jbv8qfwd52z14q0mby_273lhlp5gd2/T/eumenes-review2-snapshot-07h5rqj4
+
+
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+   Start at  22:48:25
+   Duration  845ms (transform 53ms, setup 0ms, import 173ms, tests 11ms, environment 529ms)
+
+[verify] passed 3468 ms

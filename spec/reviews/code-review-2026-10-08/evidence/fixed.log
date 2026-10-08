@@ -1,0 +1,68 @@
+bun test v1.4.2 (744846f84)
+
+api/domains/settings/test/settings.test.ts:
+(pass) bootstraps once; atomic revision and idempotency; encrypted secret never in document [22.57ms]
+(pass) revocation epochs cannot be reset by client; origin changes cannot reuse credential [9.25ms]
+(pass) missing or wrong master key preserves data, disables ciphertext and does not regenerate [9.25ms]
+(pass) deleting then recreating the same connection ID cannot revive old permissions [9.43ms]
+(pass) malformed LARM URLs are validation errors and same-host requires loopback [10.72ms]
+(pass) key replacement, key deletion and connection deletion discard obsolete ciphertext [11.06ms]
+
+api/domains/larm/test/inference-error.test.ts:
+(pass) provider diagnostics retain the code and meaningful message, redact credentials and bound input [0.60ms]
+(pass) cancelled error-body read cannot trigger recovery [0.09ms]
+
+api/domains/larm/test/larm.test.ts:
+(pass) catalog, claim, ASR/LLM/TTS and release use public contract [4.24ms]
+(pass) mismatched claim is rejected before inference and lease is released [0.40ms]
+(pass) oversized inference response is rejected while streaming [1.15ms]
+(pass) simultaneous capability upgrades share one replacement connection [1002.45ms]
+(pass) Gemma requests the live profile and renews by reclaiming the rotated token [0.46ms]
+(pass) voice requests every provider in the Gemma profile [0.17ms]
+(pass) an expired connection stops polling and is released [0.14ms]
+(pass) exported token alone connects to the documented default URL [0.13ms]
+(pass) missing claim voice discovers and caches the advertised default with control auth [0.29ms]
+(pass) an unadvertised default voice is rejected before speech inference [0.78ms]
+(pass) cancelling a caller returns promptly during allocation and close stops polling [5.95ms]
+(pass) runtime changes notify connecting and ready/failed without exposing credentials [0.47ms]
+(pass) idle-released JSON before SSE recreates and claims once; both exchanges survive [0.88ms]
+(pass) local idle expires a still-valid lease without requests; next voice use requests the profile again [58.68ms]
+(pass) an active inference pauses the local idle timer and completion starts a new idle interval [127.67ms]
+(pass) only the explicit idle-released 409 can replay, and recovery is bounded at one replacement [1.09ms]
+(pass) cancellation after the 409 diagnostic prevents replacement and replay [1.03ms]
+(pass) a late concurrent rejection cannot discard the replacement lease [0.59ms]
+(pass) manual connection check follows released state even with unexpired credentials [0.22ms]
+(pass) renew rotates every claimed provider while leaving the idle deadline unchanged [141.85ms]
+(pass) published SSE prefix errors never reconnect or replay inference [0.67ms]
+(pass) idle expiry during a health check cannot revive the released local lease [66.50ms]
+(pass) invalid reclaim after renew discards every old credential before another request [1.06ms]
+(pass) a ready connection waits for requested providers to become claimable before claim [1002.08ms]
+(pass) unauthorized can recover only when control confirms the old connection is released [0.76ms]
+(pass) context trimming retains the current input after an unanswered prior turn [0.33ms]
+
+api/domains/voice-dialogue/test/voice.test.ts:
+(pass) voice capture to ASR, dialogue, TTS; duplicate utterance is ignored [16.86ms]
+(pass) restart cancels the run of a stale voice turn so no old answer is spoken [21.56ms]
+(pass) evicting cached audio also clears the ready state [19.70ms]
+222 | 	const voice = createVoiceDialogue(store, {} as ReturnType<typeof createDialogueService>, larm);
+223 | 	try {
+224 | 		const session = crypto.randomUUID(), id = crypto.randomUUID();
+225 | 		voice.start(session, 1);
+226 | 		const accepted = voice.accept(session, 1, 1, id, wav);
+227 | 		const rejected = expect(accepted).rejects.toThrow("voice_session_inactive");
+                                                  ^
+error: expect(received).rejects.toThrow(expected)
+
+Expected promise that rejects
+Received promise that resolved: Promise { <resolved> }
+
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/domains/voice-dialogue/test/voice.test.ts:227:45)
+(fail) stopping a session fences acceptance waiting in the writer queue [8.25ms]
+
+1 tests failed:
+(fail) stopping a session fences acceptance waiting in the writer queue [8.25ms]
+
+ 37 pass
+ 1 fail
+ 321 expect() calls
+Ran 38 tests across 4 files. [2.61s]

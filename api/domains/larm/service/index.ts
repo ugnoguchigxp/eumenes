@@ -6,9 +6,12 @@ import type {
 	LarmCallOptions,
 } from "../contracts";
 import { LarmInferenceError, providerError } from "./inference-error";
+import { ttsVoicesSchema } from "../contracts";
+import type { TtsVoices } from "../contracts";
 
+type ProviderName = Capability | "system-one";
 type Provider = {
-	name: Capability;
+	name: ProviderName;
 	baseUrl: string;
 	model: string;
 	protocol: string;
@@ -23,7 +26,7 @@ type Provider = {
 type Lease = {
 	id: string;
 	expiresAt: number;
-	providers: Map<Capability, Provider>;
+	providers: Map<ProviderName, Provider>;
 	agentProfile: string;
 	useCount: number;
 	closing: boolean;
@@ -39,15 +42,17 @@ const gemmaContext = {
 	outputReserveTokens: 4096,
 	safetyMarginTokens: 1976,
 };
-const protocols: Record<Capability, string> = {
+const protocols: Record<ProviderName, string> = {
 	llm: "openai.chat-completions.v1",
 	asr: "openai.audio-transcriptions.v1",
 	tts: "openai.audio-speech.v1",
+	"system-one": "larm.system-one.v1",
 };
-const endpoints: Record<Capability, string> = {
+const endpoints: Record<ProviderName, string> = {
 	llm: "/v1/chat/completions",
 	asr: "/v1/audio/transcriptions",
 	tts: "/v1/audio/speech",
+	"system-one": "/v1/systemone",
 };
 const wait = (ms: number, signal: AbortSignal) =>
 	new Promise<void>((resolve, reject) => {
@@ -161,6 +166,10 @@ export function createLarm(config: {
 	client?: string;
 	voice?: string;
 	fetch?: Fetcher;
+	speed?: number;
+	style?: string;
+	pitchScale?: number;
+	intonationScale?: number;
 	/** Internal timing seam; production follows LARM's 300-second foreground idle policy. */
 	idleTimeoutMs?: number;
 }): LarmPort {
@@ -182,12 +191,31 @@ export function createLarm(config: {
 	)
 		throw new Error("larm_same_host_requires_loopback");
 	const voice = config.voice?.trim() || undefined;
+	const speed = config.speed ?? 1;
+	if (!Number.isFinite(speed) || speed < 0.5 || speed > 2)
+		throw new Error("larm_tts_speed_invalid");
+	if (
+		config.pitchScale !== undefined &&
+		(!Number.isFinite(config.pitchScale) ||
+			config.pitchScale < -0.15 ||
+			config.pitchScale > 0.15)
+	)
+		throw new Error("larm_tts_pitch_invalid");
+	if (
+		config.intonationScale !== undefined &&
+		(!Number.isFinite(config.intonationScale) ||
+			config.intonationScale < 0 ||
+			config.intonationScale > 2)
+	)
+		throw new Error("larm_tts_intonation_invalid");
 	const idleTimeoutMs = config.idleTimeoutMs ?? 300_000;
 	const lifetime = new AbortController();
+	const voiceCatalogs = new WeakMap<Provider, TtsVoices>();
 	let lease: Lease | undefined;
 	let connecting: Promise<Lease> | undefined;
 	let lastError: string | undefined;
 	let closed = false;
+	let judging = false;
 	const listeners = new Set<() => void>();
 	function status(): LarmStatus {
 		return {
@@ -200,7 +228,11 @@ export function createLarm(config: {
 						: lease
 							? "ready"
 							: "idle",
-			capabilities: lease ? [...lease.providers.keys()] : [],
+			capabilities: lease
+				? [...lease.providers.keys()].filter(
+						(name): name is Capability => name !== "system-one",
+					)
+				: [],
 			...(lastError ? { error: lastError } : {}),
 		};
 	}
@@ -370,9 +402,30 @@ export function createLarm(config: {
 			const nextExpiry = Date.parse(string(claimed.expiresAt));
 			if (!Number.isFinite(nextExpiry) || nextExpiry <= Date.now() + 180_000)
 				throw new Error("larm_renew_expired");
-			const next = new Map<Capability, Provider>();
+			const next = new Map<ProviderName, Provider>();
 			for (const [name, previous] of current.providers) {
 				const info = claimed.providers.map(record).find((p) => p.name === name);
+				if (name === "system-one") {
+					try {
+						if (
+							info?.model === previous.model &&
+							info.protocol === previous.protocol
+						) {
+							const fields = record(record(info.configuration).fields);
+							const baseUrl = string(fields.daemonURL);
+							localEndpoint(baseUrl);
+							if (baseUrl === info.baseUrl && fields.model === previous.model)
+								next.set(name, {
+									...previous,
+									baseUrl,
+									token: string(record(info.credential).token),
+								});
+						}
+					} catch {
+						/* Optional decisions can disappear without ending speech. */
+					}
+					continue;
+				}
 				if (
 					!info ||
 					info.model !== previous.model ||
@@ -625,7 +678,7 @@ export function createLarm(config: {
 				const expiresAt = Date.parse(string(claimed.expiresAt));
 				if (!Number.isFinite(expiresAt) || expiresAt < Date.now() + 30_000)
 					throw new Error("larm_expired");
-				const providers = new Map<Capability, Provider>();
+				const providers = new Map<ProviderName, Provider>();
 				for (const name of required) {
 					const info = claimed.providers
 						.map(record)
@@ -681,6 +734,46 @@ export function createLarm(config: {
 								? configuration.voice
 								: undefined,
 					});
+				}
+				// Optional decisions never make the speech providers unusable.
+				const declaredDecision = catalogProviders.find(
+					(p) => p.name === "system-one",
+				);
+				if (
+					fullProfile &&
+					declaredDecision?.capability === "decision.system-one" &&
+					declaredDecision.protocol === protocols["system-one"] &&
+					declaredDecision.endpoint === endpoints["system-one"]
+				) {
+					try {
+						const announced = created.providers
+							.map(record)
+							.find((p) => p.name === "system-one");
+						const info = claimed.providers
+							.map(record)
+							.find((p) => p.name === "system-one");
+						if (
+							announced?.claimable === true &&
+							announced.readiness === "ready" &&
+							info?.protocol === protocols["system-one"] &&
+							info.model === declaredDecision.model &&
+							info.model === announced.model
+						) {
+							const fields = record(record(info.configuration).fields);
+							const baseUrl = string(fields.daemonURL);
+							localEndpoint(baseUrl);
+							if (baseUrl === info.baseUrl && fields.model === info.model)
+								providers.set("system-one", {
+									name: "system-one",
+									baseUrl,
+									model: string(info.model),
+									protocol: string(info.protocol),
+									token: string(record(info.credential).token),
+								});
+						}
+					} catch {
+						/* Malformed optional provider falls back to normal speech. */
+					}
 				}
 				const current: Lease = {
 					id,
@@ -741,7 +834,7 @@ export function createLarm(config: {
 		);
 	}
 	async function withProvider<T>(
-		name: Capability,
+		name: ProviderName,
 		signal: AbortSignal,
 		use: (p: Provider, connectionId: string) => Promise<T>,
 	): Promise<T> {
@@ -751,6 +844,8 @@ export function createLarm(config: {
 			signal.throwIfAborted();
 			const current = await untilAborted(connect(required, signal), signal);
 			const provider = current.providers.get(name);
+			if (name === "system-one" && !provider)
+				throw new Error("larm_system_one_unavailable");
 			if (
 				!provider ||
 				current.expiresAt <= Date.now() + 10_000 ||
@@ -846,11 +941,29 @@ export function createLarm(config: {
 			throw new LarmInferenceError(response.status, details.errorCode);
 		}
 		try {
+			let speechCredit: string | undefined;
+			const encodedCredit = response.headers.get("X-VOICEVOX-Credit");
+			if (
+				operation === "audio/speech" &&
+				encodedCredit?.startsWith("UTF-8''")
+			) {
+				try {
+					speechCredit = decodeURIComponent(encodedCredit.slice(7)).slice(
+						0,
+						2048,
+					);
+				} catch {
+					/* Invalid optional credit does not invalidate audio. */
+				}
+			}
 			await options?.onExchange?.({
 				connectionId,
 				model: provider.model,
 				started,
 				httpStatus: response.status,
+				...(speechCredit
+					? { speechCredit, speechVoice: options?.speechVoice }
+					: {}),
 			});
 		} catch (error) {
 			await response.body?.cancel();
@@ -876,7 +989,7 @@ export function createLarm(config: {
 			const estimate = (items: typeof messages) =>
 				new TextEncoder().encode(JSON.stringify(items)).length;
 			while (selected.length > 2 && estimate(selected) > budget)
-				selected.splice(1, 2);
+				selected.splice(1, Math.min(2, selected.length - 2));
 			if (estimate(selected) > budget)
 				throw new Error("context_window_exceeded");
 			const response = await infer(
@@ -899,8 +1012,67 @@ export function createLarm(config: {
 			return (await readChatResponse(response, signal, onDelta)).text;
 		});
 	}
+	async function readVoices(
+		p: Provider,
+		connectionId: string,
+		signal: AbortSignal,
+	): Promise<TtsVoices> {
+		const available = record(
+			await readJson(
+				await infer(
+					p,
+					`audio/voices?model=${encodeURIComponent(p.model)}`,
+					{ method: "GET" },
+					signal,
+					connectionId,
+				),
+			),
+		);
+		const parsed = ttsVoicesSchema.safeParse({ ...available, model: p.model });
+		if (!parsed.success) throw new Error("larm_invalid_voice_catalog");
+		signal.throwIfAborted();
+		voiceCatalogs.set(p, parsed.data);
+		return parsed.data;
+	}
 
 	return {
+		async judge(state, questions, signal) {
+			if (judging) throw new Error("larm_decision_busy");
+			judging = true;
+			try {
+				const scoped = AbortSignal.any([signal, lifetime.signal]);
+				return await withProvider(
+					"system-one",
+					scoped,
+					async (p, connectionId) => {
+						const response = await infer(
+							p,
+							"systemone",
+							{
+								method: "POST",
+								headers: {
+									"content-type": "application/json",
+									accept: "application/json",
+								},
+								body: JSON.stringify({ model: p.model, state, questions }),
+							},
+							scoped,
+							connectionId,
+						);
+						const result = await readJson(response);
+						scoped.throwIfAborted();
+						return result;
+					},
+				);
+			} finally {
+				judging = false;
+			}
+		},
+		async voices(signal) {
+			return withProvider("tts", signal, (p, connectionId) =>
+				readVoices(p, connectionId, signal),
+			);
+		},
 		async connect() {
 			await connect(["llm"], undefined, true);
 		},
@@ -909,12 +1081,17 @@ export function createLarm(config: {
 				profile,
 				...(lease ? { connectionId: lease.id } : {}),
 				providers: lease
-					? [...lease.providers.values()].map((p) => ({
-							name: p.name,
-							model: p.model,
-							baseUrl: p.baseUrl,
-							protocol: p.protocol,
-						}))
+					? [...lease.providers.values()]
+							.filter(
+								(p): p is Provider & { name: Capability } =>
+									p.name !== "system-one",
+							)
+							.map((p) => ({
+								name: p.name,
+								model: p.model,
+								baseUrl: p.baseUrl,
+								protocol: p.protocol,
+							}))
 					: [],
 			};
 		},
@@ -958,29 +1135,78 @@ export function createLarm(config: {
 		},
 		speak(text, signal, options) {
 			return withProvider("tts", signal, async (p, connectionId) => {
+				if (!text.trim() || text.length > 4096)
+					throw new Error("larm_tts_input_invalid");
 				let selectedVoice = voice ?? p.voice;
-				if (!selectedVoice) {
-					// The connection credential is scoped to inference. Voice discovery
-					// uses the backend control credential at the control origin only.
-					const available = record(
-						await readJson(
-							await control(
-								`/v1/audio/voices?model=${encodeURIComponent(p.model)}`,
-								{ method: "GET" },
-								[200],
-							),
-						),
-					);
-					if (
-						typeof available.default_voice === "string" &&
-						Array.isArray(available.voices) &&
-						available.voices.some(
-							(item) => record(item).id === available.default_voice,
-						)
-					)
-						selectedVoice = p.voice = string(available.default_voice);
-				}
+				const voicevox = p.model === "voicevox-core";
+				const catalog =
+					voicevox || !selectedVoice
+						? (voiceCatalogs.get(p) ??
+							(await readVoices(p, connectionId, signal)))
+						: undefined;
+				if (!voice && voicevox)
+					selectedVoice = catalog?.default_voice ?? selectedVoice;
+				if (!selectedVoice) selectedVoice = p.voice = catalog?.default_voice;
 				if (!selectedVoice) throw new Error("larm_tts_voice_unconfigured");
+				const speaker = catalog?.voices.find((v) => v.id === selectedVoice);
+				if (voicevox && !speaker) throw new Error("larm_tts_voice_missing");
+				if (
+					voicevox &&
+					config.style &&
+					!speaker?.styles.some((s) => s.id === config.style)
+				)
+					throw new Error("larm_tts_voice_style_invalid");
+				let intonationScale = config.intonationScale;
+				const selectedSpeed =
+					voicevox && options?.speed !== undefined
+						? options.speed
+						: config.speed;
+				const selectedPitch =
+					voicevox && options?.pitchScale !== undefined
+						? options.pitchScale
+						: config.pitchScale;
+				const boundedParameter = (
+					value: number | undefined,
+					key: "speed" | "pitch_scale",
+					override: boolean,
+				) => {
+					if (value === undefined || !override) return value;
+					const range = speaker?.capabilities[key];
+					return range
+						? Math.max(range.minimum, Math.min(range.maximum, value))
+						: value;
+				};
+				const speechSpeed = boundedParameter(
+					selectedSpeed,
+					"speed",
+					voicevox && options?.speed !== undefined,
+				);
+				const speechPitch = boundedParameter(
+					selectedPitch,
+					"pitch_scale",
+					voicevox && options?.pitchScale !== undefined,
+				);
+				if (options?.intonationScale !== undefined) {
+					const range = speaker?.capabilities.intonation_scale;
+					intonationScale = Math.max(
+						range?.minimum ?? 0,
+						Math.min(range?.maximum ?? 2, options.intonationScale),
+					);
+				}
+				for (const [key, value] of [
+					["speed", speechSpeed],
+					["pitch_scale", speechPitch],
+					["intonation_scale", intonationScale],
+				] as const) {
+					if (voicevox && value !== undefined) {
+						const range = speaker?.capabilities[key];
+						if (
+							!Number.isFinite(value) ||
+							(range && (value < range.minimum || value > range.maximum))
+						)
+							throw new Error("larm_tts_parameter_invalid");
+					}
+				}
 				const response = await infer(
 					p,
 					"audio/speech",
@@ -991,12 +1217,20 @@ export function createLarm(config: {
 							model: p.model,
 							input: text,
 							voice: selectedVoice,
+							...(speechSpeed !== undefined ? { speed: speechSpeed } : {}),
+							...(voicevox && config.style ? { style: config.style } : {}),
+							...(voicevox && speechPitch !== undefined
+								? { pitch_scale: speechPitch }
+								: {}),
+							...(voicevox && intonationScale !== undefined
+								? { intonation_scale: intonationScale }
+								: {}),
 							response_format: "wav",
 						}),
 					},
 					signal,
 					connectionId,
-					options,
+					{ ...options, speechVoice: selectedVoice },
 				);
 				const bytes = await readBounded(response, 16_000_000);
 				if (

@@ -1,0 +1,334 @@
+$ bun scripts/verify.ts --all
+[verify] selected=settings,inference,tts-dictionary,conversation,larm,audio,queue,scheduler,dialogue,voice-dialogue dependencyClosure=settings,larm,inference,tts-dictionary,conversation,audio,queue,scheduler,dialogue,voice-dialogue
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check .
+$ oxfmt --check .
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 76ms on 169 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint .
+$ oxlint --deny-warnings .
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun run typecheck
+$ tsc --noEmit
+[verify] tests: /Users/y.noguchi/.bun/bin/bun test api
+bun test v1.4.2 (744846f84)
+
+api/application/events-client.test.ts:
+(pass) two listeners share one authenticated transport, fragmented frames and last unsubscribe cleans up [25.15ms]
+(pass) reconnect carries a cursor and reset refreshes changes missed while disconnected [7.72ms]
+(pass) a half-open stream reconnects; heartbeat comments do not invalidate snapshots [16.63ms]
+(pass) 401, 403 and 404 stop automatic reconnect [48.28ms]
+(pass) explicit reconnect repairs a stopped stream without changing mounted listeners [17.47ms]
+(pass) update transport failure is observable even when other API reads still succeed [2.50ms]
+
+api/application/app.test.ts:
+(pass) status polling is passive and explicit reconnect requires auth and origin [13.77ms]
+(pass) auth and origin apply to the new endpoints [9.93ms]
+(pass) register → fire → history → pause/resume → cancel through the API [24.94ms]
+(pass) full queue is reported as 503 for submissions [12.09ms]
+(pass) authenticated SSE notifies a background commit and the existing API supplies the snapshot [12.07ms]
+
+api/application/events.test.ts:
+(pass) SSE coalesces changes, resnapshots every connection and releases disconnected clients [1.18ms]
+(pass) heartbeat keeps SSE alive without a state invalidation and shutdown ends reads [5.06ms]
+(pass) a slow reader is disconnected with a bounded buffer [51.09ms]
+
+api/application/dev.test.ts:
+(pass) bun run dev serves browser requests on 127.0.0.1 and Ctrl+C releases both ports [325.32ms]
+(pass) bun run dev serves browser requests on localhost and Ctrl+C releases both ports [269.50ms]
+(pass) dev refuses --host before exposing the authenticated proxy [27.12ms]
+(pass) dev refuses --host 0.0.0.0 before exposing the authenticated proxy [27.69ms]
+(pass) occupied API port is reported without starting Web or stopping its owner [30.07ms]
+(pass) Vite port failure stops the API instead of silently moving Web to another port [258.14ms]
+
+api/application/cli.test.ts:
+(pass) CLI connection failure has the documented exit code and stdout stays empty [31.89ms]
+(pass) CLI rejects missing or invalid request IDs before submitting a new run [65.34ms]
+(pass) CLI reports invalid API configuration as an argument error [30.32ms]
+
+api/infrastructure/chat-stream.test.ts:
+(pass) provider UTF-8 splits publish answer text before completion and exclude reasoning fields [1.52ms]
+(pass) a disconnected stream is not adopted as a complete answer [0.13ms]
+(pass) cancellation closes a blocked reader and prevents late content [0.06ms]
+
+api/infrastructure/auth-config.test.ts:
+(pass) LARM_API_TOKEN alone supplies distinct, consistent local API auth [0.11ms]
+(pass) empty optional settings do not mask the exported LARM token [0.01ms]
+(pass) explicit API credentials and legacy LARM settings remain supported [0.03ms]
+
+api/infrastructure/snapshot-stream.test.ts:
+(pass) a pending reader receives each snapshot once and terminal delivery releases the observer [1.29ms]
+(pass) a slow reader has bounded snapshots and still receives the final state [0.10ms]
+
+api/infrastructure/sqlite/owner.test.ts:
+(pass) OS lock excludes another process and releases after crash [33.63ms]
+
+api/infrastructure/sqlite/commit.test.ts:
+(pass) commit notifications see persisted state, exclude idle scans/rollback, and cannot fail writes [7.00ms]
+
+api/domains/settings/test/settings.test.ts:
+(pass) old settings retain normal playback; speech adjustments validate and persist [12.90ms]
+(pass) bootstraps once; atomic revision and idempotency; encrypted secret never in document [10.57ms]
+(pass) revocation epochs cannot be reset by client; origin changes cannot reuse credential [8.10ms]
+(pass) missing or wrong master key preserves data, disables ciphertext and does not regenerate [10.14ms]
+(pass) deleting then recreating the same connection ID cannot revive old permissions [12.01ms]
+(pass) malformed LARM URLs are validation errors and same-host requires loopback [8.08ms]
+(pass) key replacement, key deletion and connection deletion discard obsolete ciphertext [9.01ms]
+
+api/domains/larm/test/inference-error.test.ts:
+(pass) provider diagnostics retain the code and meaningful message, redact credentials and bound input [0.46ms]
+(pass) cancelled error-body read cannot trigger recovery [0.06ms]
+
+api/domains/larm/test/larm.test.ts:
+(pass) catalog, claim, ASR/LLM/TTS and release use public contract [2.64ms]
+(pass) voice menu uses claimed provider auth and TTS sends selected voice and speed [0.74ms]
+(pass) VOICEVOX catalog labels, style, inclusive numeric bounds and decoded credits reach phrase synthesis [1.96ms]
+(pass) other models omit VOICEVOX fields and busy responses never replay or replace the connection [0.59ms]
+(pass) mismatched claim is rejected before inference and lease is released [0.38ms]
+(pass) oversized inference response is rejected while streaming [0.20ms]
+(pass) simultaneous capability upgrades share one replacement connection [1003.64ms]
+(pass) Gemma requests the live profile and renews by reclaiming the rotated token [1.18ms]
+(pass) voice requests every provider in the Gemma profile [0.31ms]
+(pass) an expired connection stops polling and is released [0.27ms]
+(pass) exported token alone connects to the documented default URL [0.37ms]
+(pass) missing claim voice discovers and caches the advertised default with provider auth [0.63ms]
+(pass) an unadvertised default voice is rejected before speech inference [0.73ms]
+(pass) cancelling a caller returns promptly during allocation and close stops polling [6.21ms]
+(pass) runtime changes notify connecting and ready/failed without exposing credentials [1.04ms]
+(pass) idle-released JSON before SSE recreates and claims once; both exchanges survive [3.24ms]
+(pass) local idle expires a still-valid lease without requests; next voice use requests the profile again [57.62ms]
+(pass) an active inference pauses the local idle timer and completion starts a new idle interval [128.08ms]
+(pass) only the explicit idle-released 409 can replay, and recovery is bounded at one replacement [3.38ms]
+(pass) cancellation after the 409 diagnostic prevents replacement and replay [0.55ms]
+(pass) a late concurrent rejection cannot discard the replacement lease [0.89ms]
+(pass) manual connection check follows released state even with unexpired credentials [0.56ms]
+(pass) renew rotates every claimed provider while leaving the idle deadline unchanged [143.45ms]
+(pass) published SSE prefix errors never reconnect or replay inference [0.95ms]
+(pass) idle expiry during a health check cannot revive the released local lease [66.66ms]
+(pass) invalid reclaim after renew discards every old credential before another request [2.00ms]
+(pass) a ready connection waits for requested providers to become claimable before claim [1002.57ms]
+(pass) unauthorized can recover only when control confirms the old connection is released [2.48ms]
+(pass) context trimming retains the current input after an unanswered prior turn [0.53ms]
+
+api/domains/scheduler/test/scheduler.test.ts:
+(pass) once: nothing before the time, exactly one job after, completed state is not job success [27.63ms]
+(pass) offsets are required and interval bounds enforced by the API schema [2.11ms]
+(pass) interval keeps phase, fires once per period, and ignores duplicate ticks and clock going back [18.00ms]
+(pass) long stop: coalesce creates one occurrence and advances into the future [16.04ms]
+(pass) skip policy: late beyond grace is skipped and summarised; within grace dispatches [13.18ms]
+(pass) overlap: previous open job makes the next occurrence skipped without touching the job [13.29ms]
+(pass) pause/resume/cancel with revisions; resume skips stopped periods; cancelled never revives [12.79ms]
+(pass) materialize failure rolls back job and occurrence; queue full keeps the schedule due and retries [13.03ms]
+(pass) create is idempotent per requestId, conflicts on different input, validates target and caps count [11.46ms]
+(pass) tick processes at most the configured batch [15.57ms]
+(pass) deferred schedules cannot hide later due schedules beyond one candidate page [28.96ms]
+
+api/domains/dialogue/test/queue.test.ts:
+(pass) a run only sees earlier accepted turns; later inputs never leak into it [33.25ms]
+(pass) a failed earlier run leaves only its input in later history [20.00ms]
+(pass) full queue rejects the submit and stores neither message nor run [12.20ms]
+(pass) restart: queued runs continue, a running run is interrupted, late result from the old owner is rejected [57.32ms]
+(pass) runs from before the queue existed are interrupted, not given a new job [14.85ms]
+(pass) scheduled prompt creates exactly one background run per occurrence; interactive input is claimed first [30.64ms]
+(pass) waitForTerminal honours abort and its own deadline without cancelling the run [56.31ms]
+(pass) rejected answer adoption fails both the run and its queue job [26.07ms]
+
+api/domains/dialogue/test/controller.test.ts:
+(pass) dialogue controller validates requests and delegates one run [18.85ms]
+
+api/domains/dialogue/test/dialogue.test.ts:
+(pass) request ID is idempotent and answer adoption is atomic [25.11ms]
+(pass) failed input persistence prevents any provider request [0.45ms]
+(pass) cancelled inference cannot append an answer [46.42ms]
+
+api/domains/queue/test/sleep.test.ts:
+(pass) heartbeat waits release abort listeners after each elapsed interval [23.23ms]
+(pass) a wait on an already cancelled signal returns immediately [0.27ms]
+
+api/domains/queue/test/queue.test.ts:
+(pass) same dedupe key converges; different content conflicts; capacity rejects atomically [15.65ms]
+(pass) success settles business and job together; failure of business rolls both back [28.69ms]
+(pass) resource slot and concurrency key serialize claims; interactive goes first [41.66ms]
+(pass) order within a conversation is kept even when a later job is interactive and earlier is background [36.13ms]
+(pass) retry only for allowed transient failures, with finite attempts and backoff [53.93ms]
+(pass) unregistered kind and unsupported version fail explicitly [21.57ms]
+(pass) cancel of running job rejects late result and keeps the slot until the handler stops [1172.28ms]
+(pass) cancel of queued job is immediate and routed through the handler [14.31ms]
+(pass) lost lease: old result is rejected and the resource is not reused while the old handler lives [34.03ms]
+(pass) deadline aborts the running handler and expires the job without adopting a late result [15.48ms]
+(pass) recover: queued continue, running follows policy, cancel_requested becomes outcome_unknown [19.86ms]
+(pass) lost wake-up: the loop still finds committed work within the poll interval; idle never calls handlers [88.11ms]
+(pass) close aborts running handlers, settles them interrupted, and blocks late writes [73.48ms]
+(pass) async transaction callbacks are rejected [18.81ms]
+(pass) a claim that cannot start still settles the owning domain [19.73ms]
+(pass) past-due blocked work does not make the loop spin [19.91ms]
+(pass) resource aliases make persisted old jobs and new jobs share the same concurrency limit [44.05ms]
+
+api/domains/queue/test/recovery.test.ts:
+(pass) process killed after commit but before claim: the job survives and runs after restart [80.87ms]
+(pass) process killed while a handler is running: restart marks it interrupted with a closed attempt [47.63ms]
+(pass) second process cannot own the same database while the first lives [7.37ms]
+
+api/domains/queue/test/boundaries.test.ts:
+(pass) queue and scheduler declare only their real dependencies [0.08ms]
+(pass) a dependency cycle stops with an explicit error [0.04ms]
+
+api/domains/inference/test/speech-intonation.test.ts:
+(pass) phrase intonation follows punctuation and questions, preserves baseline and stays bounded [0.11ms]
+
+api/domains/inference/test/inference.test.ts:
+(pass) three purposes fall back once, adapters preserve paths and usage; no duplicate adoption [14.31ms]
+(pass) cloud TTS keeps its own voice and speed from the accepted settings snapshot [10.94ms]
+(pass) automatic intonation uses each phrase and its immutable manual baseline; disabling restores manual delivery [11.64ms]
+(pass) authentication, invalid contracts and caller cancellation never trigger cloud [56.05ms]
+(pass) local timeout fences a late adapter result; immutable snapshot and revocation at adoption [34.13ms]
+(pass) revocation aborts pending cloud; regrant does not revive old request [18.85ms]
+(pass) acceptance updates rollback together with the caller transaction [12.61ms]
+(pass) a failed stream cannot append a cloud fallback to already published local text [14.19ms]
+(pass) late provider deltas are fenced after caller cancellation [19.01ms]
+(pass) provider diagnostics preserve the rejected and recovered Connection IDs on the same attempt [13.82ms]
+(pass) a failed provider still saves the rejected Connection ID and error fields [14.60ms]
+
+api/domains/inference/test/migration.test.ts:
+(pass) append-only diagnostics migration preserves previous inference attempts [18.35ms]
+
+api/domains/voice-dialogue/test/sentences.test.ts:
+(pass) punctuation clauses and decimal numbers survive every token split without repeated tails [0.49ms]
+(pass) long unpunctuated output is bounded and conflicting final text is rejected [0.15ms]
+
+api/domains/voice-dialogue/test/upload.test.ts:
+(pass) bounded audio stream rejects oversized upload before ASR [1.76ms]
+(pass) valid bounded WAV reaches voice service once [2.33ms]
+
+api/domains/voice-dialogue/test/migration.test.ts:
+(pass) a database with only the original three migrations (plus later ones) upgrades in place and keeps history [29.66ms]
+
+api/domains/voice-dialogue/test/settings-integration.test.ts:
+(pass) one voice turn uses fallback in all three stages, adopts one answer, and does not repeat duplicate upload [23.09ms]
+(pass) autoSpeak false is captured at voice acceptance and ends successfully without TTS [19.48ms]
+(pass) cancellation during cloud ASR cannot create a dialogue run even with late HTTP completion [52.32ms]
+(pass) queued snapshots survive recovery without re-running an attempted provider [15.38ms]
+(pass) revoking a cloud answer aborts downstream TTS and never publishes late audio [42.46ms]
+(pass) a provisional sentence is playable while LLM is running and cancellation clears both streams [31.98ms]
+(pass) render ahead is bounded at three clauses and playback releases the next clause [49.71ms]
+(pass) final recognition preempts a slow prefix and never submits a late hypothesis [29.30ms]
+
+api/domains/voice-dialogue/test/voice.test.ts:
+(pass) voice capture to ASR, dialogue, TTS; duplicate utterance is ignored [15.82ms]
+(pass) restart cancels the run of a stale voice turn so no old answer is spoken [22.99ms]
+(pass) evicting cached audio also clears the ready state [23.24ms]
+(pass) stopping a session fences acceptance waiting in the writer queue [8.05ms]
+
+api/domains/tts-dictionary/test/tts-dictionary.test.ts:
+(pass) saves, applies longest match first, and rebuilds after change [13.76ms]
+(pass) stale expectations and duplicate headwords conflict; delete is guarded [10.45ms]
+(pass) HTTP validation rejects malformed entries [12.56ms]
+
+api/domains/conversation/test/conversation.test.ts:
+(pass) conversation saves and survives reopen; second writer is refused [28.22ms]
+
+ 152 pass
+ 0 fail
+ 897 expect() calls
+Ran 152 tests across 31 files. [7.00s]
+[verify] web tests: /Users/y.noguchi/.bun/bin/bun x vitest run web
+
+ RUN  v4.1.8 /Users/y.noguchi/Code/eumenes
+
+
+ Test Files  8 passed (8)
+      Tests  27 passed (27)
+   Start at  22:35:15
+   Duration  1.36s (transform 311ms, setup 0ms, import 800ms, tests 550ms, environment 5.44s)
+
+[verify] web build: /Users/y.noguchi/.bun/bin/bun run build:web
+$ bun run build:design-system && vite build
+$ cd packages/design-system && bun run build
+$ tsc -p tsconfig.build.json && vite build
+vite v7.3.6 building client environment for production...
+transforming...
+✓ 1862 modules transformed.
+rendering chunks...
+
+[vite:dts] Start generate declaration files...
+computing gzip size...
+dist/design-system.css   83.24 kB │ gzip:  14.37 kB
+dist/index.mjs          454.80 kB │ gzip: 111.12 kB
+[vite:dts] Start rollup declaration files...
+Analysis will use the bundled TypeScript version 5.9.3
+[vite:dts] Declaration files built in 1919ms.
+
+dist/design-system.css   83.24 kB │ gzip: 14.37 kB
+dist/index.js           279.58 kB │ gzip: 87.91 kB
+✓ built in 4.04s
+vite v8.0.16 building client environment for production...
+[2Ktransforming...✓ 215 modules transformed.
+rendering chunks...
+computing gzip size...
+dist-web/index.html                   0.39 kB │ gzip:   0.27 kB
+dist-web/assets/index-DRlyASCa.css   97.17 kB │ gzip:  17.63 kB
+dist-web/assets/index-BYoCqTeC.js   610.75 kB │ gzip: 185.44 kB
+
+✓ built in 134ms
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+[verify] browser fixture: /Users/y.noguchi/.bun/bin/bun x playwright test
+
+Running 10 tests using 1 worker
+
+(node:31240) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘   1 tests/browser/voice.spec.ts:64:1 › avatar voice controls save and survive a settings reload (409ms)
+(node:31311) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   2 tests/browser/voice.spec.ts:222:1 › missing catalog or character preserves saved controls until an explicit default reset (604ms)
+  ✓   3 tests/browser/voice.spec.ts:324:1 › exported LARM token connects the UI and CLI without browser credentials (229ms)
+  ✓   4 tests/browser/voice.spec.ts:361:1 › a backend outage does not poll snapshots and explicit reconnect reloads the views (2.4s)
+  ✓   5 tests/browser/voice.spec.ts:409:1 › text and browser audio complete through real services with fixture provider (14.1s)
+  ✓   6 tests/browser/voice.spec.ts:537:1 › settings save, reload, theme and automatic fallback use backend credentials (2.0s)
+  ✓   7 tests/browser/voice.spec.ts:660:1 › settings schedule controls create, pause, resume and cancel future work (476ms)
+  ✓   8 tests/browser/voice.spec.ts:696:1 › idle views keep one SSE stream without periodic snapshot requests (7.0s)
+  ✓   9 tests/browser/voice.spec.ts:735:1 › failed notifications are visible while API works; returning to the page restores missed answers (1.3s)
+  ✓  10 tests/browser/voice.spec.ts:799:1 › partial ASR, arriving characters and the first speech clause precede answer completion (8.6s)
+
+
+  1) tests/browser/voice.spec.ts:64:1 › avatar voice controls save and survive a settings reload ───
+
+    Error: locator.selectOption: Error: Element is not a <select> element
+    Call log:
+      - waiting for getByLabel('キャラクター', { exact: true })
+        - locator resolved to <input value="" id="_r_7_" maxlength="200" placeholder="空欄で自動選択" aria-describedby="_r_7_-hint" class="flex h-ui w-full rounded-md border border-input bg-background px-3 text-ui ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-ui-touch"/>
+      - attempting select option action
+        - waiting for element to be visible and enabled
+
+
+      77 | 		await page
+      78 | 			.getByLabel("キャラクター", { exact: true })
+    > 79 | 			.selectOption("fixture-voice-soft");
+         | 			 ^
+      80 | 		await expect(page.getByLabel("発話スタイル", { exact: true })).toHaveValue(
+      81 | 			"sweet",
+      82 | 		);
+        at /Users/y.noguchi/Code/eumenes/tests/browser/voice.spec.ts:79:5
+
+    Error Context: test-results/voice-avatar-voice-control-d9068-d-survive-a-settings-reload/error-context.md
+
+    Error Context: test-results/voice-avatar-voice-control-d9068-d-survive-a-settings-reload/error-context.md
+
+  1 failed
+    tests/browser/voice.spec.ts:64:1 › avatar voice controls save and survive a settings reload ────
+  9 passed (39.4s)
+103 | 	steps.push({
+104 | 		name,
+105 | 		ms: Math.round(performance.now() - start),
+106 | 		result: code === 0 ? "pass" : `exit ${code}`,
+107 | 	});
+108 | 	if (code !== 0) throw new Error(`${name} failed (${code})`);
+                                 ^
+error: browser fixture failed (1)
+      at run (/Users/y.noguchi/Code/eumenes/scripts/verify.ts:108:28)
+
+error: script "verify:all" exited with code 1

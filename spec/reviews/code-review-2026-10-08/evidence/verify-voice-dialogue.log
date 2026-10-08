@@ -1,0 +1,57 @@
+$ bun scripts/verify.ts --domain voice-dialogue
+[verify] selected=voice-dialogue dependencyClosure=audio,settings,larm,inference,conversation,queue,scheduler,dialogue,voice-dialogue
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check api/domains/voice-dialogue web/src/domains/voice-dialogue
+$ oxfmt --check api/domains/voice-dialogue web/src/domains/voice-dialogue
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 12ms on 14 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint api/domains/voice-dialogue web/src/domains/voice-dialogue
+$ oxlint --deny-warnings api/domains/voice-dialogue web/src/domains/voice-dialogue
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun x tsc -p /Users/y.noguchi/Code/eumenes/verification-reports/tsconfig.selected.json
+[verify] TypeScript workspace closure: 71 files; api/domains/voice-dialogue, api/infrastructure/sqlite, api/domains/dialogue, api/infrastructure/snapshot-stream.ts, api/domains/conversation, api/infrastructure/chat-stream.ts, api/domains/larm, api/domains/settings, api/domains/inference, api/domains/queue, api/domains/scheduler, client/transport.ts, client/voice-dialogue.ts, web/src/domains, client/run-stream.ts, client/dialogue.ts, client/conversation.ts
+[verify] domain tests: /Users/y.noguchi/.bun/bin/bun run test:domain -- voice-dialogue
+$ bun scripts/test-domain.ts voice-dialogue
+bun test v1.4.2 (744846f84)
+
+api/domains/voice-dialogue/test/sentences.test.ts:
+(pass) punctuation clauses and decimal numbers survive every token split without repeated tails [0.82ms]
+(pass) long unpunctuated output is bounded and conflicting final text is rejected [0.71ms]
+
+api/domains/voice-dialogue/test/upload.test.ts:
+(pass) bounded audio stream rejects oversized upload before ASR [6.99ms]
+(pass) valid bounded WAV reaches voice service once [0.83ms]
+
+api/domains/voice-dialogue/test/migration.test.ts:
+(pass) a database with only the original three migrations (plus later ones) upgrades in place and keeps history [49.63ms]
+
+api/domains/voice-dialogue/test/settings-integration.test.ts:
+(pass) one voice turn uses fallback in all three stages, adopts one answer, and does not repeat duplicate upload [60.29ms]
+(pass) autoSpeak false is captured at voice acceptance and ends successfully without TTS [36.52ms]
+(pass) cancellation during cloud ASR cannot create a dialogue run even with late HTTP completion [63.64ms]
+(pass) queued snapshots survive recovery without re-running an attempted provider [28.13ms]
+(pass) revoking a cloud answer aborts downstream TTS and never publishes late audio [56.73ms]
+(pass) a provisional sentence is playable while LLM is running and cancellation clears both streams [48.80ms]
+(pass) render ahead is bounded at three clauses and playback releases the next clause [67.39ms]
+(pass) final recognition preempts a slow prefix and never submits a late hypothesis [33.34ms]
+
+api/domains/voice-dialogue/test/voice.test.ts:
+(pass) voice capture to ASR, dialogue, TTS; duplicate utterance is ignored [18.60ms]
+(pass) restart cancels the run of a stale voice turn so no old answer is spoken [24.95ms]
+(pass) evicting cached audio also clears the ready state [27.78ms]
+(pass) stopping a session fences acceptance waiting in the writer queue [12.87ms]
+
+ 17 pass
+ 0 fail
+ 123 expect() calls
+Ran 17 tests across 5 files. [685.00ms]
+
+ RUN  v4.1.8 /Users/y.noguchi/Code/eumenes
+
+
+ Test Files  1 passed (1)
+      Tests  5 passed (5)
+   Start at  12:03:43
+   Duration  2.26s (transform 197ms, setup 0ms, import 490ms, tests 428ms, environment 1.16s)
+
+[verify] passed 9221 ms

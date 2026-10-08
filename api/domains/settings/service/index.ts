@@ -17,6 +17,7 @@ import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import {
 	applySchema,
+	defaultSubtitles,
 	purposeSchema,
 	settingsSchema,
 	type ApplySettings,
@@ -39,12 +40,14 @@ export function defaults(env: Record<string, string | undefined>): Settings {
 			profile: env.LARM_PROFILE ?? "SAAA-gemma4-26b",
 			audience: env.LARM_AUDIENCE ?? "saaa-desktop",
 			voice: env.EUMENES_TTS_VOICE ?? "",
+			speed: 1,
 		},
 		connections: [],
 		resources: [],
 		routes: { llm: route(), asr: route(), tts: route() },
 		voice: {
 			autoSpeak: true,
+			outputVolume: 1,
 			bargeIn: true,
 			inputDevice: "",
 			outputDevice: "",
@@ -54,7 +57,7 @@ export function defaults(env: Record<string, string | undefined>): Settings {
 			noiseSuppression: true,
 			autoGainControl: true,
 		},
-		general: { theme: "system" },
+		general: { theme: "system", subtitles: defaultSubtitles },
 	});
 }
 export async function createSettings(
@@ -278,6 +281,18 @@ export async function createSettings(
 						(old.routes[p].cloudAllowed && !next.routes[p].cloudAllowed
 							? 1
 							: 0);
+				// Only the current encrypted credential survives a replacement or deletion.
+				// Old snapshots are fenced by their connection epoch before inference.
+				const retained = new Set(
+					next.connections
+						.filter((c) => !c.envRef)
+						.map((c) => `${c.id}:${c.epoch}`),
+				);
+				for (const row of db
+					.query("SELECT id FROM settings_credentials")
+					.all() as { id: string }[])
+					if (!retained.has(row.id))
+						db.query("DELETE FROM settings_credentials WHERE id=?").run(row.id);
 				save(db, next);
 				db.query("INSERT INTO settings_requests VALUES(?,?,?)").run(
 					input.requestId,

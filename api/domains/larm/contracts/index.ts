@@ -6,16 +6,38 @@ export type LarmExchange = {
 	httpStatus?: number;
 	errorCode?: string;
 	errorMessage?: string;
+	speechVoice?: string;
+	speechCredit?: string;
 };
 export type LarmCallOptions = {
 	onExchange?: (exchange: LarmExchange) => Promise<void>;
+	speechVoice?: string;
+	intonationScale?: number;
+	speed?: number;
+	pitchScale?: number;
 };
 export type LarmStatus = {
 	state: "unconfigured" | "idle" | "ready" | "connecting" | "failed";
 	capabilities: Capability[];
 	error?: string;
 };
+import type { TtsVoices } from "./voices";
+export {
+	ttsVoicesSchema,
+	type TtsVoices,
+	type TtsVoice,
+	type TtsRange,
+} from "./voices";
 export interface LarmPort {
+	judge?(
+		state: Record<string, string>,
+		questions: Record<
+			string,
+			{ type: "choice"; instructions: string; criteria: Record<string, string> }
+		>,
+		signal: AbortSignal,
+	): Promise<unknown>;
+	voices?(signal: AbortSignal): Promise<TtsVoices>;
 	status(): LarmStatus;
 	onChange?(listener: () => void): () => void;
 	inspect?(): {

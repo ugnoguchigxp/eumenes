@@ -23,6 +23,7 @@ const ProgressBar = React.forwardRef<
 		{
 			className,
 			value,
+			max = 100,
 			label,
 			subLabel,
 			height = "h-[var(--ui-progress-height)]",
@@ -34,7 +35,9 @@ const ProgressBar = React.forwardRef<
 		},
 		ref,
 	) => {
-		const percentage = Math.min(Math.max(value || 0, 0), 100);
+		const maximum = Number.isFinite(max) && max > 0 ? max : 100;
+		const normalized = Math.min(Math.max(value || 0, 0), maximum);
+		const percentage = (normalized / maximum) * 100;
 
 		const interpolateColor = (
 			start: number[],
@@ -91,7 +94,8 @@ const ProgressBar = React.forwardRef<
 						height,
 						className,
 					)}
-					value={value}
+					value={normalized}
+					max={maximum}
 					{...props}
 				>
 					<ProgressPrimitive.Indicator

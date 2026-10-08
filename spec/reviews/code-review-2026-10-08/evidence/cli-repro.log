@@ -1,0 +1,50 @@
+bun test v1.4.2 (744846f84)
+
+api/application/cli.test.ts:
+15 | test("CLI connection failure has the documented exit code and stdout stays empty", async () => {
+16 | 	const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response() });
+17 | 	const url = `http://127.0.0.1:${server.port}`;
+18 | 	await server.stop(true);
+19 | 	const result = await cli(["status", "--json"], url);
+20 | 	expect(result.code).toBe(5);
+                          ^
+error: expect(received).toBe(expected)
+
+Expected: 5
+Received: 2
+
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/application/cli.test.ts:20:22)
+(fail) CLI connection failure has the documented exit code and stdout stays empty [31.88ms]
+32 | 		for (const id of [[], ["not-a-uuid"]]) {
+33 | 			const result = await cli(["send", "hello", "--request-id", ...id], `http://127.0.0.1:${server.port}`);
+34 | 			expect(result.code).toBe(2);
+35 | 			expect(result.stdout).toBe("");
+36 | 		}
+37 | 		expect(submissions).toBe(0);
+                           ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 2
+
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/application/cli.test.ts:37:23)
+(fail) CLI rejects missing or invalid request IDs before submitting a new run [66.84ms]
+38 | 	} finally { await server.stop(true); }
+39 | });
+40 | 
+41 | test("CLI reports invalid API configuration as an argument error", async () => {
+42 | 	const result = await cli(["status", "--json"], "http://example.test");
+43 | 	expect(result.code).toBe(2);
+                          ^
+error: expect(received).toBe(expected)
+
+Expected: 2
+Received: 1
+
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/application/cli.test.ts:43:22)
+(fail) CLI reports invalid API configuration as an argument error [30.28ms]
+
+ 0 pass
+ 3 fail
+ 7 expect() calls
+Ran 3 tests across 1 file. [156.00ms]

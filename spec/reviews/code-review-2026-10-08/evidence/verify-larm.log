@@ -1,0 +1,53 @@
+$ bun scripts/verify.ts --domain larm
+[verify] selected=larm dependencyClosure=larm
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check api/domains/larm
+$ oxfmt --check api/domains/larm
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 12ms on 7 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint api/domains/larm
+$ oxlint --deny-warnings api/domains/larm
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun x tsc -p /Users/y.noguchi/Code/eumenes/verification-reports/tsconfig.selected.json
+[verify] TypeScript workspace closure: 8 files; api/domains/larm, api/infrastructure/chat-stream.ts
+[verify] domain tests: /Users/y.noguchi/.bun/bin/bun run test:domain -- larm
+$ bun scripts/test-domain.ts larm
+bun test v1.4.2 (744846f84)
+
+api/domains/larm/test/inference-error.test.ts:
+(pass) provider diagnostics retain the code and meaningful message, redact credentials and bound input [1.63ms]
+(pass) cancelled error-body read cannot trigger recovery [0.17ms]
+
+api/domains/larm/test/larm.test.ts:
+(pass) catalog, claim, ASR/LLM/TTS and release use public contract [8.05ms]
+(pass) mismatched claim is rejected before inference and lease is released [0.55ms]
+(pass) oversized inference response is rejected while streaming [0.68ms]
+(pass) simultaneous capability upgrades share one replacement connection [1004.67ms]
+(pass) Gemma requests the live profile and renews by reclaiming the rotated token [0.65ms]
+(pass) voice requests every provider in the Gemma profile [0.34ms]
+(pass) an expired connection stops polling and is released [0.23ms]
+(pass) exported token alone connects to the documented default URL [0.24ms]
+(pass) missing claim voice discovers and caches the advertised default with control auth [0.51ms]
+(pass) an unadvertised default voice is rejected before speech inference [1.31ms]
+(pass) cancelling a caller returns promptly during allocation and close stops polling [6.21ms]
+(pass) runtime changes notify connecting and ready/failed without exposing credentials [0.49ms]
+(pass) idle-released JSON before SSE recreates and claims once; both exchanges survive [0.62ms]
+(pass) local idle expires a still-valid lease without requests; next voice use requests the profile again [57.60ms]
+(pass) an active inference pauses the local idle timer and completion starts a new idle interval [128.81ms]
+(pass) only the explicit idle-released 409 can replay, and recovery is bounded at one replacement [1.71ms]
+(pass) cancellation after the 409 diagnostic prevents replacement and replay [0.29ms]
+(pass) a late concurrent rejection cannot discard the replacement lease [0.47ms]
+(pass) manual connection check follows released state even with unexpired credentials [1.67ms]
+(pass) renew rotates every claimed provider while leaving the idle deadline unchanged [143.94ms]
+(pass) published SSE prefix errors never reconnect or replay inference [1.14ms]
+(pass) idle expiry during a health check cannot revive the released local lease [66.97ms]
+(pass) invalid reclaim after renew discards every old credential before another request [1.20ms]
+(pass) a ready connection waits for requested providers to become claimable before claim [1002.51ms]
+(pass) unauthorized can recover only when control confirms the old connection is released [4.28ms]
+(pass) context trimming retains the current input after an unanswered prior turn [2.39ms]
+
+ 28 pass
+ 0 fail
+ 270 expect() calls
+Ran 28 tests across 2 files. [2.49s]
+[verify] passed 4888 ms

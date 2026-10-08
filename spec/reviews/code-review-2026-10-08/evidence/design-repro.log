@@ -1,0 +1,202 @@
+│ ┌────────────────────────────────────────────────────────────────────────────┐
+│ │  Info: Found a setup file with "setProjectAnnotations".                    │
+│ │  Skipping automatic provisioning of preview annotations to avoid           │
+│ │  conflicts. Since Storybook 10.3, "@storybook/addon-vitest" applies these  │
+│ │   automatically.                                                           │
+│ │  You can safely remove the "setProjectAnnotations" call from your setup    │
+│ │  file, or remove the file entirely if you don't have custom code there.    │
+│ └────────────────────────────────────────────────────────────────────────────┘
+
+ RUN  v4.0.16 /Users/y.noguchi/Code/eumenes/packages/design-system
+
+stdout | src/components/DropdownMenu/DropdownMenu.test.tsx
+Test setup running...
+
+stdout | src/components/ImageViewer/ImageViewer.test.tsx
+Test setup running...
+
+stdout | src/components/ProgressBar/ProgressBar.test.tsx
+Test setup running...
+
+stdout | src/components/ImageViewer/ImageViewer.test.tsx
+Test setup running...
+
+stdout | src/components/ProgressBar/ProgressBar.test.tsx
+Test setup running...
+
+stdout | src/components/DropdownMenu/DropdownMenu.test.tsx
+Test setup running...
+
+ ❯ |unit| src/components/ImageViewer/ImageViewer.test.tsx (7 tests | 5 failed) 102ms
+       × renders when open 13ms
+       × does not render when closed 1ms
+       × missing src does not trigger a page request or require host globals 1ms
+       × closes on Escape key without host globals 1ms
+       ✓ manages state correctly 3ms
+       ✓ renders thumbnail and opens viewer on click 79ms
+       × opens viewer on Enter key 2ms
+stderr | src/components/ProgressBar/ProgressBar.test.tsx > ProgressBar > clamps value between 0 and 100
+Invalid prop `value` of value `150` supplied to `Progress`. The `value` prop must be:
+  - a positive number
+  - less than the value passed to `max` (or 100 if no `max` prop is set)
+  - `null` or `undefined` if the progress is indeterminate.
+
+Defaulting to `null`.
+
+ ❯ |unit| src/components/ProgressBar/ProgressBar.test.tsx (11 tests | 2 failed) 148ms
+     ✓ renders with default props 88ms
+     ✓ renders with label and subLabel 8ms
+     × clamps value between 0 and 100 12ms
+     ✓ applies custom color 4ms
+     ✓ applies status-based colors 6ms
+     ✓ interpolates color for normal status 3ms
+     ✓ renders striped and animated by default 4ms
+     ✓ disables animation and stripes 3ms
+     ✓ shows percentage inside bar for sufficient height 3ms
+     ✓ does not show percentage for small height 2ms
+   × custom maximum keeps the visible percent and accessible value consistent 13ms
+ ❯ |unit| src/components/DropdownMenu/DropdownMenu.test.tsx (19 tests | 1 failed) 629ms
+     ✓ renders trigger 79ms
+     ✓ opens menu on trigger click 53ms
+     × calls item onClick and closes menu 26ms
+     ✓ closes on outside click 39ms
+     ✓ closes on Escape key 34ms
+     ✓ opens on Enter key 25ms
+     ✓ opens on Space key 26ms
+     ✓ flips to top when space below is insufficient (autoSide) 28ms
+     ✓ flips to right when space on left is insufficient (autoFlip) 27ms
+     ✓ updates position on resize 28ms
+     ✓ flips to top when bottom overflows due to offset even if spaceBelow was technically enough for height 30ms
+     ✓ does not flip if flipping does not help (both sides overflow) 31ms
+     ✓ prefers top when both sides insufficient but top is larger 33ms
+     ✓ flips back to bottom if top fits height but offset causes clip (Lines 163-164) 31ms
+     ✓ toggles menu closed when trigger is clicked again 40ms
+     ✓ toggles menu closed on Enter key again 31ms
+     ✓ renders item with icon 12ms
+     ✓ debounces scroll events using requestAnimationFrame 26ms
+     ✓ cancels animation frame on unmount 26ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |unit| src/components/DropdownMenu/DropdownMenu.test.tsx > DropdownMenu > calls item onClick and closes menu
+AssertionError: expected "vi.fn()" to be called at least once
+ ❯ src/components/DropdownMenu/DropdownMenu.test.tsx:83:29
+     81|   await user.click(item1);
+     82| 
+     83|   expect(items[0]?.onClick).toHaveBeenCalled();
+       |                             ^
+     84| 
+     85|   // Wait for removal
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯
+
+ FAIL  |unit| src/components/ImageViewer/ImageViewer.test.tsx > ImageViewer Component > ImageViewer > renders when open
+ FAIL  |unit| src/components/ImageViewer/ImageViewer.test.tsx > ImageViewer Component > ImageViewer > does not render when closed
+ FAIL  |unit| src/components/ImageViewer/ImageViewer.test.tsx > ImageViewer Component > ImageViewer > missing src does not trigger a page request or require host globals
+ FAIL  |unit| src/components/ImageViewer/ImageViewer.test.tsx > ImageViewer Component > ImageViewer > closes on Escape key without host globals
+ReferenceError: t is not defined
+ ❯ src/components/ImageViewer/ImageViewer.tsx:55:12
+     53|       ref={imgRef}
+     54|       src={src}
+     55|       alt={alt || t("image")}
+       |            ^
+     56|       className={cn(
+     57|        "rounded-md object-contain shadow-lg",
+ ❯ Object.react_stack_bottom_frame ../../node_modules/.bun/react-dom@19.2.7/node_modules/react-dom/cjs/react-dom-client.development.js:25904:20
+ ❯ renderWithHooks ../../node_modules/.bun/react-dom@19.2.7/node_modules/react-dom/cjs/react-dom-client.development.js:7662:22
+ ❯ updateFunctionComponent ../../node_modules/.bun/react-dom@19.2.7/node_modules/react-dom/cjs/react-dom-client.development.js:10166:19
+ ❯ updateSimpleMemoComponent ../../node_modules/.bun/react-dom@19.2.7/node_modules/react-dom/cjs/react-dom-client.development.js:9830:14
+ ❯ updateMemoComponent ../../node_modules/.bun/react-dom@19.2.7/node_modules/react-dom/cjs/react-dom-client.development.js:9763:13
+ ❯ beginWork ../../node_modules/.bun/react-dom@19.2.7/node_modules/react-dom/cjs/react-dom-client.development.js:12204:18
+ ❯ runWithFiberInDEV ../../node_modules/.bun/react-dom@19.2.7/node_modules/react-dom/cjs/react-dom-client.development.js:874:13
+ ❯ performUnitOfWork ../../node_modules/.bun/react-dom@19.2.7/node_modules/react-dom/cjs/react-dom-client.development.js:17641:22
+ ❯ workLoopSync ../../node_modules/.bun/react-dom@19.2.7/node_modules/react-dom/cjs/react-dom-client.development.js:17469:41
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/8]⎯
+
+ FAIL  |unit| src/components/ImageViewer/ImageViewer.test.tsx > ImageViewer Component > ImageWithPreview > opens viewer on Enter key
+ReferenceError: t is not defined
+ ❯ ImageWithPreview src/components/ImageViewer/ImageViewer.tsx:116:16
+    114|  // const { t } = useTranslation();
+    115|  const [open, setOpen] = React.useState(false);
+    116|  const label = alt || t("image");
+       |                ^
+    117| 
+    118|  return (
+ ❯ Object.react_stack_bottom_frame ../../node_modules/.bun/react-dom@19.2.7/node_modules/react-dom/cjs/react-dom-client.development.js:25904:20
+ ❯ renderWithHooks ../../node_modules/.bun/react-dom@19.2.7/node_modules/react-dom/cjs/react-dom-client.development.js:7662:22
+ ❯ updateFunctionComponent ../../node_modules/.bun/react-dom@19.2.7/node_modules/react-dom/cjs/react-dom-client.development.js:10166:19
+ ❯ beginWork ../../node_modules/.bun/react-dom@19.2.7/node_modules/react-dom/cjs/react-dom-client.development.js:11778:18
+ ❯ runWithFiberInDEV ../../node_modules/.bun/react-dom@19.2.7/node_modules/react-dom/cjs/react-dom-client.development.js:874:13
+ ❯ performUnitOfWork ../../node_modules/.bun/react-dom@19.2.7/node_modules/react-dom/cjs/react-dom-client.development.js:17641:22
+ ❯ workLoopSync ../../node_modules/.bun/react-dom@19.2.7/node_modules/react-dom/cjs/react-dom-client.development.js:17469:41
+ ❯ renderRootSync ../../node_modules/.bun/react-dom@19.2.7/node_modules/react-dom/cjs/react-dom-client.development.js:17450:11
+ ❯ performWorkOnRoot ../../node_modules/.bun/react-dom@19.2.7/node_modules/react-dom/cjs/react-dom-client.development.js:16583:35
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/8]⎯
+
+ FAIL  |unit| src/components/ProgressBar/ProgressBar.test.tsx > ProgressBar > clamps value between 0 and 100
+Error: expect(element).toHaveAttribute("aria-valuenow", "100") // element.getAttribute("aria-valuenow") === "100"
+
+Expected the element to have attribute:
+  aria-valuenow="100"
+Received:
+  null
+ ❯ src/components/ProgressBar/ProgressBar.test.tsx:23:43
+     21|  it("clamps value between 0 and 100", () => {
+     22|   const { rerender } = render(<ProgressBar value={150} />);
+     23|   expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuen…
+       |                                           ^
+     24| 
+     25|   const indicator = screen.getByRole("progressbar").firstElementChild;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/8]⎯
+
+ FAIL  |unit| src/components/ProgressBar/ProgressBar.test.tsx > custom maximum keeps the visible percent and accessible value consistent
+Error: expect(element).toHaveStyle()
+
+- Expected
+
+- transform: translateX(-75%);
++ transform: translateX(-50%);
+ ❯ src/components/ProgressBar/ProgressBar.test.tsx:93:37
+     91|  expect(progress).toHaveAttribute("aria-valuenow", "50");
+     92|  expect(progress).toHaveAttribute("aria-valuemax", "200");
+     93|  expect(progress.firstElementChild).toHaveStyle({ transform: "translat…
+       |                                     ^
+     94| });
+     95| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/8]⎯
+
+⎯⎯⎯⎯⎯⎯ Unhandled Errors ⎯⎯⎯⎯⎯⎯
+
+Vitest caught 1 unhandled error during the test run.
+This might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+ReferenceError: log is not defined
+ ❯ handleItemClick src/components/DropdownMenu/DropdownMenu.tsx:250:4
+ ❯ onClick src/components/DropdownMenu/DropdownMenu.tsx:328:26
+ ❯ executeDispatch ../../node_modules/.bun/react-dom@19.2.7/node_modules/react-dom/cjs/react-dom-client.development.js:19116:9
+ ❯ runWithFiberInDEV ../../node_modules/.bun/react-dom@19.2.7/node_modules/react-dom/cjs/react-dom-client.development.js:874:13
+ ❯ processDispatchQueue ../../node_modules/.bun/react-dom@19.2.7/node_modules/react-dom/cjs/react-dom-client.development.js:19166:19
+ ❯ ../../node_modules/.bun/react-dom@19.2.7/node_modules/react-dom/cjs/react-dom-client.development.js:19767:9
+ ❯ batchedUpdates$1 ../../node_modules/.bun/react-dom@19.2.7/node_modules/react-dom/cjs/react-dom-client.development.js:3255:40
+ ❯ dispatchEventForPluginEventSystem ../../node_modules/.bun/react-dom@19.2.7/node_modules/react-dom/cjs/react-dom-client.development.js:19320:7
+ ❯ dispatchEvent ../../node_modules/.bun/react-dom@19.2.7/node_modules/react-dom/cjs/react-dom-client.development.js:23585:11
+ ❯ dispatchDiscreteEvent ../../node_modules/.bun/react-dom@19.2.7/node_modules/react-dom/cjs/react-dom-client.development.js:23553:11
+
+This error originated in "src/components/DropdownMenu/DropdownMenu.test.tsx" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "calls item onClick and closes menu". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+
+
+ Test Files  3 failed (3)
+      Tests  8 failed | 29 passed (37)
+     Errors  1 error
+   Start at  12:02:14
+   Duration  2.11s (transform 199ms, setup 492ms, import 349ms, tests 879ms, environment 3.06s)
+

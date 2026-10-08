@@ -28,6 +28,10 @@ import {
 	migration as voiceMigration,
 	sequenceMigration as voiceSequenceMigration,
 } from "../domains/voice-dialogue";
+import {
+	createTtsDictionary,
+	migration as ttsDictionaryMigration,
+} from "../domains/tts-dictionary";
 import { openStore } from "../infrastructure/sqlite";
 import {
 	resolveApiToken,
@@ -59,13 +63,16 @@ const store = openStore(dbPath, [
 	settingsEpochsMigration,
 	inferenceParentsMigration,
 	inferenceDiagnosticsMigration,
+	ttsDictionaryMigration,
 ]);
 const changes = createChanges();
 const unsubscribeCommits = store.onCommit(() => changes.publish());
 const conversation = createConversationService(store);
 const settings = await createSettings(store, { dbPath });
+const ttsDictionary = createTtsDictionary(store);
 const larm = createInference(store, settings, {
 	token: resolveLarmToken(process.env),
+	speechText: ttsDictionary.apply,
 });
 const unsubscribeStatus = larm.onChange(() => changes.publish());
 const queue = createQueue(store, {
@@ -94,6 +101,7 @@ const app = createApp({
 	scheduler,
 	settings,
 	inference: larm,
+	ttsDictionary,
 	changes,
 });
 const port = Number(process.env.EUMENES_PORT ?? 8787);

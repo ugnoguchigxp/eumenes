@@ -5,6 +5,8 @@ import {
 	useQueryClient,
 } from "@tanstack/react-query";
 import type { DialogueClient } from "../../../../../client/dialogue";
+import { useRef } from "react";
+import type { Submit } from "../../../../../api/domains/dialogue/contracts";
 import { conversationKey } from "../../conversation";
 export const runsKey = (identity: string, id: string) =>
 	["dialogue", identity, id, "runs"] as const;
@@ -26,13 +28,31 @@ export function useRuns(client: DialogueClient, id: string) {
 }
 export function useSubmit(client: DialogueClient, id: string) {
 	const cache = useQueryClient();
+	const pending = useRef<{ client: DialogueClient; input: Submit } | null>(
+		null,
+	);
 	return useMutation({
-		mutationFn: (text: string) =>
-			client.submit({
-				requestId: crypto.randomUUID(),
-				conversationId: id,
-				text,
-			}),
+		mutationFn: async (text: string) => {
+			const previous = pending.current;
+			const request =
+				previous?.client === client &&
+				previous.input.conversationId === id &&
+				previous.input.text === text
+					? previous
+					: {
+							client,
+							input: {
+								requestId: crypto.randomUUID(),
+								conversationId: id,
+								text,
+							},
+						};
+			// A failed acknowledgement does not prove that the server rejected the request.
+			pending.current = request;
+			const run = await client.submit(request.input);
+			if (pending.current === request) pending.current = null;
+			return run;
+		},
 		retry: false,
 		onSuccess: () => {
 			void cache.invalidateQueries({

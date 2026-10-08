@@ -1,0 +1,24 @@
+$ bun scripts/verify.ts --domain audio
+[verify] selected=audio dependencyClosure=audio
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check web/src/domains/audio
+$ oxfmt --check web/src/domains/audio
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 4ms on 6 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint web/src/domains/audio
+$ oxlint --deny-warnings web/src/domains/audio
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun x tsc -p /Users/y.noguchi/Code/eumenes/verification-reports/tsconfig.selected.json
+[verify] TypeScript workspace closure: 6 files; web/src/domains
+[verify] domain tests: /Users/y.noguchi/.bun/bin/bun run test:domain -- audio
+$ bun scripts/test-domain.ts audio
+
+ RUN  v4.1.8 /Users/y.noguchi/Code/eumenes
+
+
+ Test Files  2 passed (2)
+      Tests  7 passed (7)
+   Start at  12:03:49
+   Duration  1.69s (transform 91ms, setup 0ms, import 156ms, tests 85ms, environment 2.49s)
+
+[verify] passed 4882 ms

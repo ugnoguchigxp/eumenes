@@ -71,3 +71,10 @@ live 音声: 隔離DB・実LARM・ローカル合成日本語WAV（3.32秒）の
 2026-10-08 ASR表示場所の変更: ユーザーの依頼に合わせ、下部の「認識:」ラベルを削除し、暫定・確定文字起こしをプロンプトのtextareaへ順次反映した。音声の自動応答は維持する。録音中の未編集認識文は手動二重送信を抑止し、「音声入力は自動送信されます」と表示。手で入力を修正した発話は遅い認識結果で上書きせず、停止後は認識文を通常の入力として編集・送信できる。発話IDを使って前のquery結果を次の入力に採用しない。変更はWeb表示とその試験に限定し、backend/API/DBは変更していない。
 
 fixture: voice-dialogue選択検証 backend16件・Web5件成功。ブラウザ試験で、発話途中のtextareaへの暫定結果、確定結果の保持、旧ラベルの削除、未編集認識の手動二重送信抑止、手入力後の確定ASRによる上書き防止、停止後の通常送信を確認。最終verify:allはbackend126件・Web14件・browser8件成功、52711ms、検証中の入力hash変更なし。詳細は verification-reports/asr-composer.json。開発Webへ反映し、現在の会話画面を確認した。今回の実マイクでの表示受入は未実施、音声MVPの実機器3往復も引き続き未受入。Context Stillはcontext_compile1回・compile_eval1回。
+
+
+2026-10-08 全体コードレビュー: fixtureによるCLIプロセス試験で、接続不能時の終了コード5、標準出力の非汚染、不正または欠落したrequest IDによる送信の抑止、接続先設定不正時の終了コード2を確認。CLIのSIGINT中断と実機器3往復は引き続き未受入。レビューの修正と再検証の根拠は `spec/reviews/code-review-2026-10-08/README.md` に記録する。
+
+2026-10-08 TTSの調整設定: キャラクター、発話スタイル、話す速さ、声の高さ、抑揚、再生音量を保存し、各発話へ反映する。claimしたTTS ProviderのbaseUrl・model・tokenによるcatalog取得、表示名と送信IDの分離、voice変更時のdefault_style、catalog範囲、取得失敗・保存済みvoice消失時の保存値保持と明示リセット、合成クレジットの復号をfixtureで確認。VOICEVOX専用値は他modelへ送らず、cloudのvoice・speedは用途別設定を使う。応答句の記号と注意語による簡易抑揚を追加したが、Layaによる意味の判断ではない。
+
+settings・inference・larm・voice-dialogue・audioの個別verifyは成功。直近のverify:allはbackend154件・Web27件・browser fixture10件と型・境界・ビルド検査が成功したが、検証中に別作業の背景アバターなどのソースが変わり、最後の入力hash一致検査で失敗。最終checkout全体の合格とは扱わない。詳細は[実行ログ](../verification-reports/tts-settings-all.log)。LayaのAPI接続、手動ロック、アバターの再生同期は[実装計画](../spec/laya-voicevox-avatar-plan.md)として整理し、未実装。実Laya・実VOICEVOXの音質と遅延、および実マイク・ヘッドホンの3往復は今回未受入。Context Stillはcontext_compile2回・compile_eval2回。

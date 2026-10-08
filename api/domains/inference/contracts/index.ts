@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite";
 import type { Settings, Purpose } from "../../settings/contracts";
+import type { SpeechDelivery } from "../../delivery";
 export type Messages = Array<{
 	role: "system" | "user" | "assistant";
 	content: string;
@@ -8,6 +9,7 @@ export interface Receipt {
 	requestId: string;
 	attemptId: string;
 	value: string | Uint8Array;
+	delivery?: SpeechDelivery;
 }
 export interface InferencePort {
 	status(): {

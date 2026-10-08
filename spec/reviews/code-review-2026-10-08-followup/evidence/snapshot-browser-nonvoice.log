@@ -1,0 +1,13 @@
+
+Running 6 tests using 1 worker
+
+(node:39069) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 tests/browser/voice.spec.ts:423:1 › exported LARM token connects the UI and CLI without browser credentials (281ms)
+  ✓  2 tests/browser/voice.spec.ts:460:1 › a backend outage does not poll snapshots and explicit reconnect reloads the views (2.4s)
+  ✓  3 tests/browser/voice.spec.ts:639:1 › settings save, reload, theme and automatic fallback use backend credentials (2.0s)
+  ✓  4 tests/browser/voice.spec.ts:761:1 › settings schedule controls create, pause, resume and cancel future work (523ms)
+  ✓  5 tests/browser/voice.spec.ts:797:1 › idle views keep one SSE stream without periodic snapshot requests (7.0s)
+  ✓  6 tests/browser/voice.spec.ts:836:1 › failed notifications are visible while API works; returning to the page restores missed answers (1.3s)
+
+  6 passed (14.6s)

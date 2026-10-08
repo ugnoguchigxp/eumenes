@@ -42,10 +42,15 @@ export function useVoiceDialogue(
 		latest?: Uint8Array;
 	} | null>(null);
 	const [previewText, setPreviewText] = useState<string | null>(null);
+	const [subtitle, setSubtitle] = useState<{
+		key: string;
+		text: string;
+	} | null>(null);
 	const [recognitionId, setRecognitionId] = useState<string | null>(null);
 	function cancelPlayback() {
 		player.current?.finish?.();
 		player.current = null;
+		setSubtitle(null);
 	}
 	function partial(wav: Uint8Array) {
 		const active = session.current,
@@ -145,6 +150,7 @@ export function useVoiceDialogue(
 							queue.finish = resolve;
 							const ended = () => {
 								queue.finish = undefined;
+								setSubtitle((s) => (s?.key === key ? null : s));
 								if (!valid() || player.current !== queue) {
 									resolve();
 									return;
@@ -165,10 +171,13 @@ export function useVoiceDialogue(
 							void controller.current
 								?.play(bytes, ended, {
 									waitForPrevious: true,
+									volume: options.current?.outputVolume,
 									shouldPlay: () => canPlay() && player.current === queue,
 								})
 								.then(() => {
 									if (!valid() || player.current !== queue) resolve();
+									else if (chunk.text.trim())
+										setSubtitle({ key, text: chunk.text.trim() });
 								}, reject);
 						});
 					})
@@ -212,6 +221,7 @@ export function useVoiceDialogue(
 						},
 						{
 							waitForPrevious: options.current?.bargeIn === false,
+							volume: options.current?.outputVolume,
 							shouldPlay: () => session.current === active && canPlay(),
 						},
 					);
@@ -400,6 +410,7 @@ export function useVoiceDialogue(
 	return {
 		start,
 		stop,
+		subtitle: subtitle?.text ?? null,
 		turn: turn.data,
 		previewText,
 		recognitionId,

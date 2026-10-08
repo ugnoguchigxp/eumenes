@@ -15,29 +15,18 @@ interface IImageViewerProps {
 /** Responsive image viewer using shadcn dialog */
 export const ImageViewer: React.FC<IImageViewerProps> = React.memo(
 	({ src, alt, open, onOpenChange, maxWidthPx = 900 }) => {
-		// const { t } = useTranslation();
 		const imgRef = useRef<HTMLImageElement | null>(null);
 
-		// Close on outside click handled by Dialog; add escape logging
+		// Keep the controlled viewer in sync with Escape.
 		useEffect(() => {
 			const handleKey = (e: KeyboardEvent) => {
 				if (e.key === "Escape" && open) {
-					log.debug("Escape pressed, closing viewer");
 					onOpenChange(false);
 				}
 			};
 			window.addEventListener("keydown", handleKey);
 			return () => window.removeEventListener("keydown", handleKey);
 		}, [open, onOpenChange]);
-
-		useEffect(() => {
-			if (open) {
-				// reduced log noise: only warn for missing src
-				if (!src) {
-					log.warn("ImageViewer opened without src");
-				}
-			}
-		}, [open, src]);
 
 		return (
 			<Modal
@@ -51,8 +40,8 @@ export const ImageViewer: React.FC<IImageViewerProps> = React.memo(
 				<div className="w-full h-full flex items-center justify-center">
 					<img
 						ref={imgRef}
-						src={src}
-						alt={alt || t("image")}
+						src={src || undefined}
+						alt={alt || "Image"}
 						className={cn(
 							"rounded-md object-contain shadow-lg",
 							"max-h-[80vh] w-auto",
@@ -111,9 +100,8 @@ export const ImageWithPreview: React.FC<IImageWithPreviewProps> = ({
 	height,
 	children,
 }) => {
-	// const { t } = useTranslation();
 	const [open, setOpen] = React.useState(false);
-	const label = alt || t("image");
+	const label = alt || "Image";
 
 	return (
 		<>
@@ -135,14 +123,19 @@ export const ImageWithPreview: React.FC<IImageWithPreviewProps> = ({
 			>
 				{children || (
 					<img
-						src={src}
+						src={src || undefined}
 						alt={alt || "Image"}
 						className="w-full h-full object-cover"
 					/>
 				)}
 			</button>
 
-			<ImageViewer src={src} alt={alt} open={open} onOpenChange={setOpen} />
+			<ImageViewer
+				src={src}
+				alt={alt}
+				open={open}
+				onOpenChange={setOpen}
+			/>
 		</>
 	);
 };

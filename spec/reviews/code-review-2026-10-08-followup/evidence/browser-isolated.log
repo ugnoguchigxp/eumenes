@@ -1,0 +1,13 @@
+
+Running 6 tests using 1 worker
+
+(node:33170) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 verification-reports/review2-browser-fixture/voice.spec.ts:322:1 › exported LARM token connects the UI and CLI without browser credentials (341ms)
+  ✓  2 verification-reports/review2-browser-fixture/voice.spec.ts:359:1 › a backend outage does not poll snapshots and explicit reconnect reloads the views (2.4s)
+  ✓  3 verification-reports/review2-browser-fixture/voice.spec.ts:535:1 › settings save, reload, theme and automatic fallback use backend credentials (2.0s)
+  ✓  4 verification-reports/review2-browser-fixture/voice.spec.ts:658:1 › settings schedule controls create, pause, resume and cancel future work (548ms)
+  ✓  5 verification-reports/review2-browser-fixture/voice.spec.ts:694:1 › idle views keep one SSE stream without periodic snapshot requests (7.0s)
+  ✓  6 verification-reports/review2-browser-fixture/voice.spec.ts:733:1 › failed notifications are visible while API works; returning to the page restores missed answers (1.3s)
+
+  6 passed (14.8s)

@@ -120,7 +120,7 @@ export function renderSafeMarkdown(content: string): string {
 		if (/^\s*[-*+]\s+/.test(line)) {
 			const items: string[] = [];
 			while (index < lines.length) {
-				const item = (lines[index] ?? "").match(/^\s*[-*+]\s+(.+)$/);
+				const item = (lines[index] ?? "").match(/^\s*[-*+]\s+(.*)$/);
 				if (!item) break;
 				items.push(`<li>${renderInline(item[1] ?? "")}</li>`);
 				index += 1;
@@ -131,7 +131,7 @@ export function renderSafeMarkdown(content: string): string {
 		if (/^\s*\d+[.)]\s+/.test(line)) {
 			const items: string[] = [];
 			while (index < lines.length) {
-				const item = (lines[index] ?? "").match(/^\s*\d+[.)]\s+(.+)$/);
+				const item = (lines[index] ?? "").match(/^\s*\d+[.)]\s+(.*)$/);
 				if (!item) break;
 				items.push(`<li>${renderInline(item[1] ?? "")}</li>`);
 				index += 1;

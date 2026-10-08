@@ -1,0 +1,39 @@
+bun test v1.4.2 (744846f84)
+
+api/application/cli.test.ts:
+(pass) CLI connection failure has the documented exit code and stdout stays empty [30.39ms]
+(pass) CLI rejects missing or invalid request IDs before submitting a new run [61.03ms]
+(pass) CLI reports invalid API configuration as an argument error [31.06ms]
+74 | 			requests++;
+75 | 			return Response.json({ service: "eumenes", larm: { state: "unconfigured", capabilities: [] } });
+76 | 		} });
+77 | 		try {
+78 | 			const result = await cli(["status", "--json"], `${scheme}://${userInfo}127.0.0.1:${server.port}`);
+79 | 			expect(result.code).toBe(2);
+                            ^
+error: expect(received).toBe(expected)
+
+Expected: 2
+Received: 5
+
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/application/cli.test.ts:79:24)
+(fail) CLI rejects invalid ftp API URL before requesting or exposing credentials [31.87ms]
+74 | 			requests++;
+75 | 			return Response.json({ service: "eumenes", larm: { state: "unconfigured", capabilities: [] } });
+76 | 		} });
+77 | 		try {
+78 | 			const result = await cli(["status", "--json"], `${scheme}://${userInfo}127.0.0.1:${server.port}`);
+79 | 			expect(result.code).toBe(2);
+                            ^
+error: expect(received).toBe(expected)
+
+Expected: 2
+Received: 0
+
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/application/cli.test.ts:79:24)
+(fail) CLI rejects invalid http API URL before requesting or exposing credentials [33.33ms]
+
+ 3 pass
+ 2 fail
+ 13 expect() calls
+Ran 5 tests across 1 file. [214.00ms]

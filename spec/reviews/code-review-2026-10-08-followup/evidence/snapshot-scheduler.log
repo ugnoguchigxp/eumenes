@@ -1,0 +1,34 @@
+$ bun scripts/verify.ts --domain scheduler
+[verify] selected=scheduler dependencyClosure=queue,scheduler
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check api/domains/scheduler
+$ oxfmt --check api/domains/scheduler
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 3ms on 8 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint api/domains/scheduler
+$ oxlint --deny-warnings api/domains/scheduler
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun x tsc -p /private/var/folders/mx/jbv8qfwd52z14q0mby_273lhlp5gd2/T/eumenes-review2-snapshot-07h5rqj4/verification-reports/tsconfig.selected.json
+[verify] TypeScript workspace closure: 17 files; api/domains/scheduler, api/domains/queue, api/infrastructure/sqlite
+[verify] domain tests: /Users/y.noguchi/.bun/bin/bun run test:domain -- scheduler
+$ bun scripts/test-domain.ts scheduler
+bun test v1.4.2 (744846f84)
+
+api/domains/scheduler/test/scheduler.test.ts:
+(pass) once: nothing before the time, exactly one job after, completed state is not job success [13.99ms]
+(pass) offsets are required and interval bounds enforced by the API schema [1.64ms]
+(pass) interval keeps phase, fires once per period, and ignores duplicate ticks and clock going back [8.85ms]
+(pass) long stop: coalesce creates one occurrence and advances into the future [7.47ms]
+(pass) skip policy: late beyond grace is skipped and summarised; within grace dispatches [7.83ms]
+(pass) overlap: previous open job makes the next occurrence skipped without touching the job [9.59ms]
+(pass) pause/resume/cancel with revisions; resume skips stopped periods; cancelled never revives [8.28ms]
+(pass) materialize failure rolls back job and occurrence; queue full keeps the schedule due and retries [8.91ms]
+(pass) create is idempotent per requestId, conflicts on different input, validates target and caps count [6.99ms]
+(pass) tick processes at most the configured batch [9.02ms]
+(pass) deferred schedules cannot hide later due schedules beyond one candidate page [18.84ms]
+
+ 11 pass
+ 0 fail
+ 49 expect() calls
+Ran 11 tests across 1 file. [154.00ms]
+[verify] passed 1547 ms

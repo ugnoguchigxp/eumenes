@@ -1,0 +1,30 @@
+
+ RUN  v4.1.8 /Users/y.noguchi/Code/eumenes
+
+ ❯ web/src/domains/dialogue/test/hooks.test.tsx (2 tests | 1 failed) 11ms
+   × resending after a lost acknowledgement reuses the accepted run; a later send is new 9ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  web/src/domains/dialogue/test/hooks.test.tsx > resending after a lost acknowledgement reuses the accepted run; a later send is new
+AssertionError: expected '36d5d3b1-8980-4689-9148-d1672bede5b7' to be '454c5ad0-1266-4687-b7a8-b26190cc5bae' // Object.is equality
+
+Expected: "454c5ad0-1266-4687-b7a8-b26190cc5bae"
+Received: "36d5d3b1-8980-4689-9148-d1672bede5b7"
+
+ ❯ web/src/domains/dialogue/test/hooks.test.tsx:60:21
+     58|  const originalId = [...h.accepted.keys()][0];
+     59|  const retried = await h.send("こんにちは");
+     60|  expect(retried.id).toBe(originalId);
+       |                     ^
+     61|  expect(h.accepted.size).toBe(1);
+     62|  const next = await h.send("こんにちは");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)
+   Start at  22:32:17
+   Duration  523ms (transform 26ms, setup 0ms, import 115ms, tests 11ms, environment 326ms)
+

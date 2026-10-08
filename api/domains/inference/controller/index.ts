@@ -3,6 +3,13 @@ import type { InferenceService } from "../service";
 export function registerInference(app: Hono, service: InferenceService) {
 	app.get("/api/inference/status", (c) => c.json(service.status()));
 	app.get("/api/inference/larm", (c) => c.json(service.inspect()));
+	app.get("/api/inference/voices", async (c) =>
+		c.json(
+			await service.voices(
+				AbortSignal.any([c.req.raw.signal, AbortSignal.timeout(15_000)]),
+			),
+		),
+	);
 	app.get("/api/inference/usage", (c) => c.json(service.usage()));
 	app.get("/api/inference/probes", (c) => c.json(service.probes()));
 	app.post("/api/inference/probes", async (c) => {

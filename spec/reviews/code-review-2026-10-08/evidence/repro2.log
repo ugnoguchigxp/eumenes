@@ -1,0 +1,59 @@
+bun test v1.4.2 (744846f84)
+
+api/domains/dialogue/test/queue.test.ts:
+(pass) a run only sees earlier accepted turns; later inputs never leak into it [59.13ms]
+(pass) a failed earlier run leaves only its input in later history [18.87ms]
+(pass) full queue rejects the submit and stores neither message nor run [8.60ms]
+(pass) restart: queued runs continue, a running run is interrupted, late result from the old owner is rejected [53.27ms]
+(pass) runs from before the queue existed are interrupted, not given a new job [13.07ms]
+(pass) scheduled prompt creates exactly one background run per occurrence; interactive input is claimed first [27.90ms]
+(pass) waitForTerminal honours abort and its own deadline without cancelling the run [55.24ms]
+251 | 		const run = await submit(h.dialogue, "question");
+252 | 		await h.queue.tick();
+253 | 		await until(() => !["queued", "running"].includes(h.queue.get(run.jobId!)!.state));
+254 | 		expect(h.dialogue.get(run.id)?.status).toBe("failed");
+255 | 		expect(h.dialogue.get(run.id)?.error).toBe("permission_revoked");
+256 | 		expect(h.queue.get(run.jobId!)?.state).toBe("failed");
+                                               ^
+error: expect(received).toBe(expected)
+
+Expected: "failed"
+Received: "completed"
+
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/domains/dialogue/test/queue.test.ts:256:42)
+(fail) rejected answer adoption fails both the run and its queue job [22.44ms]
+
+api/domains/queue/test/sleep.test.ts:
+3 | import { resolveOptions } from "../service/runner";
+4 | 
+5 | test("heartbeat waits release abort listeners after each elapsed interval", async () => {
+6 | 	const signal = new AbortController().signal;
+7 | 	for (let i = 0; i < 20; i++) await resolveOptions().sleep(1, signal);
+8 | 	expect(getEventListeners(signal, "abort")).toHaveLength(0);
+                                                ^
+error: expect(received).toHaveLength(expected)
+
+Expected length: 0
+Received length: 20
+
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/domains/queue/test/sleep.test.ts:8:45)
+(fail) heartbeat waits release abort listeners after each elapsed interval [23.32ms]
+12 | 	const controller = new AbortController(); controller.abort();
+13 | 	const finished = await Promise.race([
+14 | 		resolveOptions().sleep(100, controller.signal).then(() => true),
+15 | 		Bun.sleep(10).then(() => false),
+16 | 	]);
+17 | 	expect(finished).toBe(true);
+                       ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/domains/queue/test/sleep.test.ts:17:19)
+(fail) a wait on an already cancelled signal returns immediately [11.38ms]
+
+ 7 pass
+ 3 fail
+ 33 expect() calls
+Ran 10 tests across 2 files. [336.00ms]

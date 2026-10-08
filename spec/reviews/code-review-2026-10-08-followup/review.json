@@ -1,0 +1,510 @@
+{
+	"rubric_version": "1.1.0",
+	"mode": "technical",
+	"depth": "deep",
+	"technical_profile": "service",
+	"assessment_kind": "re-evaluated",
+	"target": {
+		"locator": "/Users/y.noguchi/Code/eumenes",
+		"snapshot": "fixed source copy sha256:2a681973dfdcf02fd146f2d326d5bf309c6b8c55797dd7b70a8846f51b7bde8b; manifest snapshot.json; uncommitted base 75e7e4b7561411a00573712bf9efc550cffed380",
+		"reviewed_at": "2026-10-08",
+		"stage": "prototype",
+		"scope": "User narrowed the scope to nonvoice code while voice, dictionary and avatar changes continued in the shared checkout. Reviewed dev orchestration and proxy auth, CLI/transport, conversation send/render, queue/scheduler/writer, event streams and fixture isolation. Voice settings/dictionary/ASR/TTS/audio/avatar implementation excluded; test bootstrap alone modified. Source-only fixed copy excludes ignored .env, DBs/secrets; node_modules reused. No actual provider/device/release/performance certification; no current whole-project score. macOS/Bun 1.4.2/Node 24.11.1; loopback fixture servers and temporary DBs."
+	},
+	"evidence": [
+		{
+			"id": "E01",
+			"kind": "code",
+			"locator": "scripts/dev.ts:60-156; vite.config.ts; api/application/app.ts; node_modules/vite/dist/node/cli.js:704",
+			"observed_at": "2026-10-08",
+			"observation": "Derived Origin is passed to both children for custom loopback host/port; public/bare host overrides are rejected before spawning. Vite proxy adds bearer for requests with no Origin, hence network binding is a trust boundary.",
+			"scope": "Scoped fixed source snapshot; fixture-only. See README for runtime limitations and excluded work."
+		},
+		{
+			"id": "E02",
+			"kind": "execution",
+			"locator": "evidence/dev-before.log; evidence/dev-after.log",
+			"observed_at": "2026-10-08",
+			"observation": "bun test api/application/dev.test.ts: browser Origin on custom port failed 403 before fix; after fix exit 0, 6 tests/30 assertions include both loopback hosts, foreign Origin 403, disallowed exposure, port ownership and cleanup.",
+			"scope": "Scoped fixed source snapshot; fixture-only. See README for runtime limitations and excluded work."
+		},
+		{
+			"id": "E03",
+			"kind": "code",
+			"locator": "web/src/domains/dialogue/hooks/index.ts; api/domains/dialogue/service/index.ts; api/domains/dialogue/test/controller.test.ts",
+			"observed_at": "2026-10-08",
+			"observation": "Pending submissions retain requestId until acknowledgement; identical retry converges on server dedupe. Confirmed next successful send uses a new ID and changed text does not reuse a conflicting ID.",
+			"scope": "Scoped fixed source snapshot; fixture-only. See README for runtime limitations and excluded work."
+		},
+		{
+			"id": "E04",
+			"kind": "execution",
+			"locator": "evidence/submit-before.log; evidence/submit-after.log",
+			"observed_at": "2026-10-08",
+			"observation": "bun x vitest run web/src/domains/dialogue/test/hooks.test.tsx: before fix 1 failure/1 pass; after fix exit 0, 2 pass. Test stores accepted request then loses acknowledgement, retries, and subsequently sends the same text intentionally.",
+			"scope": "Scoped fixed source snapshot; fixture-only. See README for runtime limitations and excluded work."
+		},
+		{
+			"id": "E05",
+			"kind": "execution",
+			"locator": "evidence/markdown-before.log; evidence/markdown-after.log",
+			"observed_at": "2026-10-08",
+			"observation": "Historical renderer from HEAD on empty - / 1. list items did not return within 1 second; isolated children forcibly terminated. After fix bun x vitest run markdownRenderer.test.tsx exit 0 with 7 cases, including following content and HTML escaping.",
+			"scope": "Scoped fixed source snapshot; fixture-only. See README for runtime limitations and excluded work."
+		},
+		{
+			"id": "E06",
+			"kind": "code",
+			"locator": "web/src/components/domains/conversation/markdownRenderer.ts; MessageList.tsx; web/src/components/domains/artifact/ArtifactPanel.tsx",
+			"observed_at": "2026-10-08",
+			"observation": "Every matching empty list item now advances the line cursor. Raw HTML and unsafe links remain escaped; both chat and artifact projection use the same function.",
+			"scope": "Scoped fixed source snapshot; fixture-only. See README for runtime limitations and excluded work."
+		},
+		{
+			"id": "E07",
+			"kind": "execution",
+			"locator": "evidence/cli-before.log; evidence/cli-after.log",
+			"observed_at": "2026-10-08",
+			"observation": "bun test api/application/cli.test.ts: unsupported scheme and URL userinfo failed rejection before fix (exit 5 and 0); after fix exit 0, 5 tests pass. Isolated fixture receives zero requests for invalid configuration; stdout stays empty, credential text is absent.",
+			"scope": "Scoped fixed source snapshot; fixture-only. See README for runtime limitations and excluded work."
+		},
+		{
+			"id": "E08",
+			"kind": "execution",
+			"locator": "evidence/browser-scoped.log; evidence/browser-isolated.log; evidence/browser-1.log; evidence/browser-2.log; evidence/snapshot-browser-final.log",
+			"observed_at": "2026-10-08",
+			"observation": "Fixed-port run observed foreign persisted fixture state, spurious active runs and 3 failures. Same captured tests with only three fixture ports changed passed all 6. After ephemeral port allocation, concurrent runs no longer observed foreign cloud registrations, but exposed explicit reconnect timing and readiness races; reconnect race was corrected by restoring availability on POST /api/larm/connect. New avatar implementation is excluded; its final validation conditions are in README.",
+			"scope": "Scoped fixed source snapshot; fixture-only. See README for runtime limitations and excluded work."
+		},
+		{
+			"id": "E09",
+			"kind": "execution",
+			"locator": "evidence/snapshot-api-final.log; evidence/snapshot-{dialogue,conversation,queue,scheduler}.log; evidence/snapshot-{types,lint}-final.log",
+			"observed_at": "2026-10-08",
+			"observation": "Fixed-source nonvoice backend command exit 0: 83 pass across 19 files. Four domain verify commands exit 0. Full typecheck and targeted lint exit 0. Conversation renderer/hook unit tests pass inside domain verification. Fixture-only; excludes release/device certification.",
+			"scope": "Scoped fixed source snapshot; fixture-only. See README for runtime limitations and excluded work."
+		},
+		{
+			"id": "E10",
+			"kind": "execution",
+			"locator": "evidence/snapshot-all.log; evidence/all-final.log",
+			"observed_at": "2026-10-08",
+			"observation": "verify:all attempted. Fixed snapshot failed boundary check settings -> tts-dictionary in excluded in-progress work. Earlier live-checkout run passed API 152, Web 27, type/lint/build then failed one voice browser test; not claimed as final whole-project success.",
+			"scope": "Scoped fixed source snapshot; fixture-only. See README for runtime limitations and excluded work."
+		},
+		{
+			"id": "E11",
+			"kind": "code",
+			"locator": "api/infrastructure/sqlite/index.ts; api/domains/queue/service/runner.ts; api/domains/scheduler/service/index.ts; api/application/events.ts; client/events.ts; client/run-stream.ts",
+			"observed_at": "2026-10-08",
+			"observation": "Traced one locked writer, transaction settlement, FIFO/dedupe, cancellation/lease/deadline fences and observer cleanup. Separate falsification passes checked callers, passive polling and reconnection; no further confirmed nonvoice production defect identified.",
+			"scope": "Scoped fixed source snapshot; fixture-only. See README for runtime limitations and excluded work."
+		},
+		{
+			"id": "E12",
+			"kind": "execution",
+			"locator": "evidence/snapshot-browser-nonvoice.log; evidence/no-webgl.config.ts",
+			"observed_at": "2026-10-08",
+			"observation": "Fixed snapshot browser run with only WebGL disabled (avatar explicitly excluded): bun x playwright test --config verification-reports/no-webgl.config.ts --grep selected six nonvoice cases; exit 0, 6 passed in 14.6s. New browser fixture allocates ephemeral ports and synchronizes explicit reconnect. Native WebGL run had 5 pass / 1 fail (initial UI remained connecting at 5s); not claimed as full acceptance.",
+			"scope": "Temporary DB, own fixture ports, Chromium headless, Bun 1.4.2/Node 24.11.1. This checks nonvoice interaction only; avatar rendering/performance and all voice acceptance are unassessed."
+		}
+	],
+	"claims": [
+		{
+			"id": "C01",
+			"type": "Unknown",
+			"statement": "Current whole-project quality, voice acceptance and avatar latency are not assessed.",
+			"limitations": "User excluded ongoing voice/dictionary/avatar work; live, devices, dependency audit and representative performance also excluded."
+		}
+	],
+	"findings": [
+		{
+			"id": "F12",
+			"status": "withdrawn",
+			"severity": "Medium",
+			"priority": "P1",
+			"priority_reason": "Fix before relying on this reviewed operation; confirmed code change and fixture regression are proportionate.",
+			"confidence": "High",
+			"title": "Custom Web Origin is inconsistent",
+			"root_cause": "Custom Web Origin is inconsistent",
+			"evidence_ids": ["E01", "E02"],
+			"condition": "--port or --host=localhost changes browser Origin",
+			"consequence": "Browser API requests fail 403 despite both servers running",
+			"counterevidence": "After correction the acceptance check for this specific failure passes. Withdrawn means fixed, not a claim that the original finding was false; voice/GPU conditions remain excluded.",
+			"fix": "Share resolved Origin with API and Vite",
+			"verification": "See E02, README validation table and retained pre/post logs.",
+			"impacts": [
+				{
+					"track": "technical",
+					"dimension": "correctness",
+					"criterion": "contracts",
+					"reason": "Browser API requests fail 403 despite both servers running"
+				}
+			]
+		},
+		{
+			"id": "F13",
+			"status": "withdrawn",
+			"severity": "Medium",
+			"priority": "P1",
+			"priority_reason": "Fix before relying on this reviewed operation; confirmed code change and fixture regression are proportionate.",
+			"confidence": "Medium",
+			"title": "Authenticated proxy can be exposed by forwarded host override",
+			"root_cause": "Authenticated proxy can be exposed by forwarded host override",
+			"evidence_ids": ["E01", "E02"],
+			"condition": "--host or --host 0.0.0.0 overrides the initial loopback option",
+			"consequence": "LAN callers could reach a proxy that injects local bearer without caller authentication",
+			"counterevidence": "After correction the acceptance check for this specific failure passes. Withdrawn means fixed, not a claim that the original finding was false; voice/GPU conditions remain excluded.",
+			"fix": "Reject non-loopback and valueless host arguments before spawning",
+			"verification": "See E02, README validation table and retained pre/post logs.",
+			"impacts": [
+				{
+					"track": "technical",
+					"dimension": "security",
+					"criterion": "access",
+					"reason": "LAN callers could reach a proxy that injects local bearer without caller authentication"
+				}
+			]
+		},
+		{
+			"id": "F14",
+			"status": "withdrawn",
+			"severity": "Medium",
+			"priority": "P1",
+			"priority_reason": "Fix before relying on this reviewed operation; confirmed code change and fixture regression are proportionate.",
+			"confidence": "High",
+			"title": "Lost send acknowledgement creates duplicate conversation",
+			"root_cause": "Lost send acknowledgement creates duplicate conversation",
+			"evidence_ids": ["E03", "E04"],
+			"condition": "Server accepts send, response is lost, user retries unchanged text",
+			"consequence": "New request ID inserts a second run/message",
+			"counterevidence": "After correction the acceptance check for this specific failure passes. Withdrawn means fixed, not a claim that the original finding was false; voice/GPU conditions remain excluded.",
+			"fix": "Keep pending request ID until success; start new ID for changed input or later acknowledged sends",
+			"verification": "See E04, README validation table and retained pre/post logs.",
+			"impacts": [
+				{
+					"track": "technical",
+					"dimension": "reliability",
+					"criterion": "recovery",
+					"reason": "New request ID inserts a second run/message"
+				}
+			]
+		},
+		{
+			"id": "F15",
+			"status": "withdrawn",
+			"severity": "High",
+			"priority": "P1",
+			"priority_reason": "Fix before relying on this reviewed operation; confirmed code change and fixture regression are proportionate.",
+			"confidence": "High",
+			"title": "Empty list item freezes chat rendering",
+			"root_cause": "Empty list item freezes chat rendering",
+			"evidence_ids": ["E06", "E05"],
+			"condition": "Assistant returns empty - or 1. item",
+			"consequence": "Renderer never increments line and blocks the browser main thread",
+			"counterevidence": "After correction the acceptance check for this specific failure passes. Withdrawn means fixed, not a claim that the original finding was false; voice/GPU conditions remain excluded.",
+			"fix": "Consume empty item and retain escaping/following content",
+			"verification": "See E05, README validation table and retained pre/post logs.",
+			"impacts": [
+				{
+					"track": "technical",
+					"dimension": "correctness",
+					"criterion": "edge_cases",
+					"reason": "Renderer never increments line and blocks the browser main thread"
+				}
+			]
+		},
+		{
+			"id": "F16",
+			"status": "withdrawn",
+			"severity": "Medium",
+			"priority": "P2",
+			"priority_reason": "Fix before relying on this reviewed operation; confirmed code change and fixture regression are proportionate.",
+			"confidence": "High",
+			"title": "API URL accepts unsupported scheme and embedded credentials",
+			"root_cause": "API URL accepts unsupported scheme and embedded credentials",
+			"evidence_ids": ["E07"],
+			"condition": "CLI URL is ftp or contains userinfo",
+			"consequence": "Unsupported schemes are treated as network failure and userinfo URLs are accepted; connection-error diagnostics interpolate the full URL and can expose embedded credentials.",
+			"counterevidence": "Local Bun fetch with explicit Bearer preserved that header even with URL userinfo; no auth-override claim is made. Invalid URL rejection now runs before fetch and verified diagnostics omit fixture-password. Withdrawn means fixed, not disproven.",
+			"fix": "Reject unsupported protocols and userinfo before fetch",
+			"verification": "See E07, README validation table and retained pre/post logs.",
+			"impacts": [
+				{
+					"track": "technical",
+					"dimension": "security",
+					"criterion": "access",
+					"reason": "Unsupported schemes are treated as network failure and userinfo URLs are accepted; connection-error diagnostics interpolate the full URL and can expose embedded credentials."
+				}
+			]
+		},
+		{
+			"id": "F17",
+			"status": "withdrawn",
+			"severity": "Low",
+			"priority": "P2",
+			"priority_reason": "Fix before relying on this reviewed operation; confirmed code change and fixture regression are proportionate.",
+			"confidence": "High",
+			"title": "Concurrent fixture runs share ports and state",
+			"root_cause": "Concurrent fixture runs share ports and state",
+			"evidence_ids": ["E08", "E12"],
+			"condition": "Two browser suites run at the same time",
+			"consequence": "Readiness accepts another process and tests use unrelated fixture DB/state",
+			"counterevidence": "After correction the acceptance check for this specific failure passes. Withdrawn means fixed, not a claim that the original finding was false; voice/GPU conditions remain excluded.",
+			"fix": "Reserve three distinct ephemeral ports per worker before bootstrap",
+			"verification": "E12: all six selected nonvoice browser cases pass in fixed source with excluded avatar WebGL disabled. Port isolation additionally verified by separate fixture-only copy and concurrent live-checkout runs; excluded GPU failures retained.",
+			"impacts": [
+				{
+					"track": "technical",
+					"dimension": "testing",
+					"criterion": "quality",
+					"reason": "Readiness accepts another process and tests use unrelated fixture DB/state"
+				}
+			]
+		},
+		{
+			"id": "F18",
+			"status": "withdrawn",
+			"severity": "Low",
+			"priority": "P2",
+			"priority_reason": "Fix before relying on this reviewed operation; confirmed code change and fixture regression are proportionate.",
+			"confidence": "High",
+			"title": "Browser fixture recovery and readiness are unsynchronized",
+			"root_cause": "Browser fixture recovery and readiness are unsynchronized",
+			"evidence_ids": ["E08", "E12"],
+			"condition": "Fixture is restored before clicking reconnect, or Web starts before LARM bootstrap is ready",
+			"consequence": "SSE recovery removes target button and tests fail depending on timing",
+			"counterevidence": "After correction the acceptance check for this specific failure passes. Withdrawn means fixed, not a claim that the original finding was false; voice/GPU conditions remain excluded.",
+			"fix": "Wait for authenticated fixture ready state; restore outage on explicit reconnect POST",
+			"verification": "E12: all six selected nonvoice browser cases pass in fixed source with excluded avatar WebGL disabled. Port isolation additionally verified by separate fixture-only copy and concurrent live-checkout runs; excluded GPU failures retained.",
+			"impacts": [
+				{
+					"track": "technical",
+					"dimension": "testing",
+					"criterion": "quality",
+					"reason": "SSE recovery removes target button and tests fail depending on timing"
+				}
+			]
+		}
+	],
+	"tracks": {
+		"technical": {
+			"dimensions": {
+				"architecture": {
+					"criteria": {
+						"boundaries": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Not fully reassessed in this scoped followup; previous whole-project score does not apply to this evolving checkout."
+						},
+						"flow": {
+							"status": "assessed",
+							"value": 2,
+							"confidence": "Medium",
+							"evidence_ids": ["E09", "E11"],
+							"rationale": "Nonvoice transition, publication and transaction ownership are traceable through actual callers.",
+							"countercheck": "Queue cancellation/lease/settlement and scheduler misfire/overlap tests inspected and executed; excluded voice paths do not establish this score."
+						},
+						"fit": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Not fully reassessed in this scoped followup; previous whole-project score does not apply to this evolving checkout."
+						}
+					}
+				},
+				"correctness": {
+					"criteria": {
+						"contracts": {
+							"status": "assessed",
+							"value": 2,
+							"confidence": "Medium",
+							"evidence_ids": ["E02", "E04", "E05", "E07", "E09"],
+							"rationale": "Observed nonvoice API, send, configuration and rendering contracts hold under valid operation and the identified failure inputs.",
+							"countercheck": "Primary backend assertions pass; intentionally repeated acknowledged messages remain distinct."
+						},
+						"edge_cases": {
+							"status": "assessed",
+							"value": 2,
+							"confidence": "Medium",
+							"evidence_ids": ["E02", "E04", "E05", "E07"],
+							"rationale": "The identified empty list, ambiguous acknowledgement, browser Origin and invalid URL boundaries are handled.",
+							"countercheck": "Original behavior fails targeted regressions; unknown excluded inputs are not generalized from this sample."
+						},
+						"concurrency": {
+							"status": "assessed",
+							"value": 2,
+							"confidence": "Medium",
+							"evidence_ids": ["E09", "E11"],
+							"rationale": "Writer transactions and queue/scheduler ordering preserve the declared nonvoice invariants.",
+							"countercheck": "Executed cancellation, late result, resource slot, lost lease, atomic rollback and overlap tests."
+						}
+					}
+				},
+				"security": {
+					"criteria": {
+						"access": {
+							"status": "assessed",
+							"value": 2,
+							"confidence": "Medium",
+							"evidence_ids": ["E01", "E02", "E07", "E09"],
+							"rationale": "Loopback, API bearer/Origin and transport URL access boundaries are explicit for the reviewed tasks.",
+							"countercheck": "Foreign Origin remains 403; public dev bind is rejected; invalid URL does not send a request."
+						},
+						"input_secrets": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Not fully reassessed in this scoped followup; previous whole-project score does not apply to this evolving checkout."
+						},
+						"abuse": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Not fully reassessed in this scoped followup; previous whole-project score does not apply to this evolving checkout."
+						}
+					}
+				},
+				"reliability": {
+					"criteria": {
+						"failure": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Not fully reassessed in this scoped followup; previous whole-project score does not apply to this evolving checkout."
+						},
+						"recovery": {
+							"status": "assessed",
+							"value": 2,
+							"confidence": "Medium",
+							"evidence_ids": ["E03", "E04", "E09", "E11"],
+							"rationale": "Retry deduplication and persistent queued work are preserved within the declared single-writer runtime.",
+							"countercheck": "Lost acknowledgement negative control, intentional later same text, reopened store and queue recovery cases inspected."
+						},
+						"resilience": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Not fully reassessed in this scoped followup; previous whole-project score does not apply to this evolving checkout."
+						}
+					}
+				},
+				"maintainability": {
+					"criteria": {
+						"clarity": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Not fully reassessed in this scoped followup; previous whole-project score does not apply to this evolving checkout."
+						},
+						"change": {
+							"status": "assessed",
+							"value": 2,
+							"confidence": "Medium",
+							"evidence_ids": ["E01", "E03", "E06", "E09"],
+							"rationale": "Changes are local to the owning launcher, transport, dialogue hooks, renderer and fixture bootstrap.",
+							"countercheck": "Boundary checks passed in all four selected nonvoice domains; excluded settings/dictionary dependency remains explicitly unverified."
+						},
+						"debt": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Not fully reassessed in this scoped followup; previous whole-project score does not apply to this evolving checkout."
+						}
+					}
+				},
+				"common_components": {
+					"criteria": {
+						"duplication": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Not fully reassessed in this scoped followup; previous whole-project score does not apply to this evolving checkout."
+						},
+						"reuse": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Not fully reassessed in this scoped followup; previous whole-project score does not apply to this evolving checkout."
+						},
+						"abstraction": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Not fully reassessed in this scoped followup; previous whole-project score does not apply to this evolving checkout."
+						}
+					}
+				},
+				"testing": {
+					"criteria": {
+						"risk_coverage": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Not fully reassessed in this scoped followup; previous whole-project score does not apply to this evolving checkout."
+						},
+						"quality": {
+							"status": "assessed",
+							"value": 3,
+							"confidence": "High",
+							"evidence_ids": ["E02", "E04", "E05", "E07", "E08"],
+							"rationale": "Regressions detect original contract violations; isolated time-bounded negative controls avoid hanging the reviewer.",
+							"countercheck": "Acknowledgement accepted-before-error and changed-payload controls are distinct; original fixture timing failures retained rather than hidden."
+						},
+						"automation": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Not fully reassessed in this scoped followup; previous whole-project score does not apply to this evolving checkout."
+						}
+					}
+				},
+				"supply_chain": {
+					"criteria": {
+						"dependencies": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Not fully reassessed in this scoped followup; previous whole-project score does not apply to this evolving checkout."
+						},
+						"build_release": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Not fully reassessed in this scoped followup; previous whole-project score does not apply to this evolving checkout."
+						},
+						"license": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Not fully reassessed in this scoped followup; previous whole-project score does not apply to this evolving checkout."
+						}
+					}
+				},
+				"performance": {
+					"criteria": {
+						"budget": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Not fully reassessed in this scoped followup; previous whole-project score does not apply to this evolving checkout."
+						},
+						"hot_path": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Not fully reassessed in this scoped followup; previous whole-project score does not apply to this evolving checkout."
+						},
+						"measurement": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Not fully reassessed in this scoped followup; previous whole-project score does not apply to this evolving checkout."
+						}
+					}
+				},
+				"operability": {
+					"criteria": {
+						"signals": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Not fully reassessed in this scoped followup; previous whole-project score does not apply to this evolving checkout."
+						},
+						"lifecycle": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Not fully reassessed in this scoped followup; previous whole-project score does not apply to this evolving checkout."
+						},
+						"interaction": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Not fully reassessed in this scoped followup; previous whole-project score does not apply to this evolving checkout."
+						}
+					}
+				}
+			}
+		}
+	}
+}

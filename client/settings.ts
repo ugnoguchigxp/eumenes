@@ -1,4 +1,5 @@
 import type { LarmExchange } from "../api/domains/larm/contracts";
+import { ttsVoicesSchema } from "../api/domains/larm/contracts";
 import {
 	settingsSchema,
 	type ApplySettings,
@@ -38,6 +39,10 @@ export interface Diagnostics {
 }
 export function settingsClient(t: Transport) {
 	return {
+		larmVoices: async (signal?: AbortSignal) =>
+			ttsVoicesSchema.parse(
+				await (await t.call("/api/inference/voices", { signal })).json(),
+			),
 		settings: async () =>
 			settingsSchema.parse(await (await t.call("/api/settings")).json()),
 		applySettings: async (input: ApplySettings) =>

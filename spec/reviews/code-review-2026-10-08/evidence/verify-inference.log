@@ -1,0 +1,35 @@
+$ bun scripts/verify.ts --domain inference
+[verify] selected=inference dependencyClosure=settings,larm,inference
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check api/domains/inference
+$ oxfmt --check api/domains/inference
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 39ms on 7 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint api/domains/inference
+$ oxlint --deny-warnings api/domains/inference
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun x tsc -p /Users/y.noguchi/Code/eumenes/verification-reports/tsconfig.selected.json
+[verify] TypeScript workspace closure: 19 files; api/domains/settings, api/domains/inference, api/infrastructure/sqlite, api/domains/larm, api/infrastructure/chat-stream.ts
+[verify] domain tests: /Users/y.noguchi/.bun/bin/bun run test:domain -- inference
+$ bun scripts/test-domain.ts inference
+bun test v1.4.2 (744846f84)
+
+api/domains/inference/test/inference.test.ts:
+(pass) three purposes fall back once, adapters preserve paths and usage; no duplicate adoption [174.17ms]
+(pass) authentication, invalid contracts and caller cancellation never trigger cloud [262.07ms]
+(pass) local timeout fences a late adapter result; immutable snapshot and revocation at adoption [63.28ms]
+(pass) revocation aborts pending cloud; regrant does not revive old request [85.37ms]
+(pass) acceptance updates rollback together with the caller transaction [32.77ms]
+(pass) a failed stream cannot append a cloud fallback to already published local text [25.85ms]
+(pass) late provider deltas are fenced after caller cancellation [132.53ms]
+(pass) provider diagnostics preserve the rejected and recovered Connection IDs on the same attempt [18.22ms]
+(pass) a failed provider still saves the rejected Connection ID and error fields [42.44ms]
+
+api/domains/inference/test/migration.test.ts:
+(pass) append-only diagnostics migration preserves previous inference attempts [21.99ms]
+
+ 10 pass
+ 0 fail
+ 48 expect() calls
+Ran 10 tests across 2 files. [1047.00ms]
+[verify] passed 14036 ms

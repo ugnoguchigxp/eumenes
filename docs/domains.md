@@ -2,6 +2,9 @@
 
 | Domain | Backend 入口 | Web 入口 | 所有する試験 |
 | --- | --- | --- | --- |
+| settings | `api/domains/settings/index.ts` | `web/src/domains/settings/index.tsx` | `api/domains/settings/test/` |
+| inference | `api/domains/inference/index.ts` | なし | `api/domains/inference/test/` |
+| tts-dictionary | `api/domains/tts-dictionary/index.ts` | `web/src/domains/tts-dictionary/index.tsx` | `api/domains/tts-dictionary/test/` |
 | conversation | `api/domains/conversation/index.ts` | `web/src/domains/conversation/index.ts` | `api/domains/conversation/test/` |
 | larm | `api/domains/larm/index.ts` | なし | `api/domains/larm/test/` |
 | audio | なし | `web/src/domains/audio/index.ts` | `web/src/domains/audio/test/` |

@@ -17,6 +17,12 @@ import {
 	type Purpose,
 	type ApplySettings,
 } from "../../../../api/domains/settings/contracts";
+type TtsRange = NonNullable<
+	Awaited<
+		ReturnType<EumenesClient["larmVoices"]>
+	>["voices"][number]["capabilities"]["speed"]
+>;
+import { TtsDictionaryPanel } from "../tts-dictionary";
 import {
 	Button,
 	Input,
@@ -37,6 +43,7 @@ const categories = [
 	"データと利用記録",
 	"予約",
 	"表示",
+	"TTS辞書",
 ];
 function Field({
 	label,
@@ -59,6 +66,32 @@ function Field({
 				: children}
 			{hint && <small id={`${id}-hint`}>{hint}</small>}
 		</div>
+	);
+}
+import { knownLarmVoices } from "./larm-voices";
+import { Subtitle } from "../../components/domains/subtitle/Subtitle";
+function KnownVoiceSelect({
+	value,
+	emptyLabel,
+	onChange,
+}: {
+	value: string;
+	emptyLabel: string;
+	onChange: (id: string) => void;
+}) {
+	const known = knownLarmVoices.some((v) => v.id === value);
+	return (
+		<select value={value} onChange={(e) => onChange(e.target.value)}>
+			<option value="">{emptyLabel}</option>
+			{value && !known && (
+				<option value={value}>{value}（候補にありません）</option>
+			)}
+			{knownLarmVoices.map((v) => (
+				<option key={v.id} value={v.id}>
+					{v.name}
+				</option>
+			))}
+		</select>
 	);
 }
 function Toggle({
@@ -84,6 +117,31 @@ function Toggle({
 				{hint && <small>{hint}</small>}
 			</span>
 		</label>
+	);
+}
+function SpeechSpeed({
+	value,
+	onChange,
+	range,
+}: {
+	value: number;
+	onChange: (v: number) => void;
+	range?: TtsRange;
+}) {
+	return (
+		<Field
+			label={`話す速さ（${value.toFixed(1)}倍）`}
+			hint="1.0倍が標準です。音声サービスの対応範囲で反映されます。"
+		>
+			<input
+				type="range"
+				min={range?.minimum ?? 0.5}
+				max={range?.maximum ?? 2}
+				step={0.1}
+				value={value}
+				onChange={(e) => onChange(Number(e.target.value))}
+			/>
+		</Field>
 	);
 }
 export function useSettings(client: EumenesClient) {
@@ -146,6 +204,24 @@ export function SettingsPage({
 	});
 	const value = draft ?? query.data;
 	const dirty = !!draft || keys.length > 0 || adding;
+	const larmChanged =
+		!!value &&
+		!!query.data &&
+		(value.larm.baseUrl !== query.data.larm.baseUrl ||
+			value.larm.profile !== query.data.larm.profile ||
+			value.larm.audience !== query.data.larm.audience);
+	const voices = useQuery({
+		queryKey: [
+			"larm-voices",
+			client.identity,
+			query.data?.larm.baseUrl,
+			query.data?.larm.profile,
+			query.data?.larm.audience,
+		],
+		queryFn: ({ signal }) => client.larmVoices(signal),
+		enabled: category === 2 && !!value && !larmChanged,
+		retry: 0,
+	});
 	useEffect(() => {
 		onDirty(dirty);
 		const prevent = (e: BeforeUnloadEvent) => {
@@ -338,6 +414,44 @@ export function SettingsPage({
 	const outputSupported =
 		typeof AudioContext !== "undefined" &&
 		"setSinkId" in AudioContext.prototype;
+	const voiceCatalog = larmChanged ? undefined : voices.data;
+	const character = voiceCatalog?.voices.find(
+		(v) => v.id === (value.larm.voice || voiceCatalog.default_voice),
+	);
+	const voicevox = voiceCatalog?.model === "voicevox-core";
+	function selectCharacter(id: string) {
+		const selected = voiceCatalog?.voices.find(
+			(v) => v.id === (id || voiceCatalog.default_voice),
+		);
+		change((s) => {
+			s.larm.voice = id;
+			s.larm.style = selected?.default_style;
+			for (const [field, capability] of [
+				["speed", "speed"],
+				["pitchScale", "pitch_scale"],
+				["intonationScale", "intonation_scale"],
+			] as const) {
+				const range = selected?.capabilities[capability];
+				const current = s.larm[field];
+				if (
+					range &&
+					current !== undefined &&
+					(current < range.minimum || current > range.maximum)
+				)
+					s.larm[field] = range.default;
+			}
+		});
+	}
+	const speechCredit =
+		usage.data
+			?.filter((u) => u.purpose === "tts" && u.accepted && u.source === "larm")
+			.flatMap((u) => u.providerDetails ?? [])
+			.find(
+				(d) =>
+					d.model === voiceCatalog?.model &&
+					d.speechVoice === character?.id &&
+					d.speechCredit,
+			)?.speechCredit ?? character?.credit;
 	return (
 		<div className="settings-layout">
 			<nav className="settings-nav" aria-label="設定カテゴリ">
@@ -358,7 +472,9 @@ export function SettingsPage({
 					<span className="section-kicker">SETTINGS</span>
 					<h2>{categories[category]}</h2>
 					<p className="hint">
-						普段はLARMを使い、必要なときに登録済みのクラウドへ切り替えます。
+						{category === 6
+							? "読み上げの直前に、登録した文字を読み方へ置き換えます（長い登録が優先）。会話の表示は変わりません。変更は行ごとにすぐ保存されます。"
+							: "普段はLARMを使い、必要なときに登録済みのクラウドへ切り替えます。"}
 					</p>
 				</header>
 				{category === 0 && (
@@ -495,11 +611,12 @@ export function SettingsPage({
 									label="読み上げ音声の上書き"
 									hint="空欄ならLARMが指定する音声を使います。"
 								>
-									<Input
+									<KnownVoiceSelect
 										value={value.larm.voice}
-										onChange={(e) =>
+										emptyLabel="LARMの指定に従う"
+										onChange={(id) =>
 											change((s) => {
-												s.larm.voice = e.target.value;
+												s.larm.voice = id;
 											})
 										}
 									/>
@@ -904,157 +1021,433 @@ export function SettingsPage({
 					</>
 				)}
 				{category === 2 && (
-					<Card>
-						<CardHeader>
-							<CardTitle>声での会話</CardTitle>
-						</CardHeader>
-						<CardContent>
-							<p className="hint">
-								録音と機器の調整は次の音声開始から、読み上げの設定は次の発話から反映します。
-							</p>
-							<Toggle
-								label="回答を読み上げる"
-								value={value.voice.autoSpeak}
-								onChange={(v) =>
-									change((s) => {
-										s.voice.autoSpeak = v;
-									})
-								}
-								hint="オフでも回答のテキストは会話に残ります。"
-							/>
-							<Toggle
-								label="話し始めたら読み上げを止める"
-								value={value.voice.bargeIn}
-								onChange={(v) =>
-									change((s) => {
-										s.voice.bargeIn = v;
-									})
-								}
-							/>
-							<Button variant="secondary" onClick={() => void discover()}>
-								音声機器を確認
-							</Button>
-							{deviceError && <p role="alert">{deviceError}</p>}
-							<Field
-								label="マイク"
-								hint="変更は次に音声を開始したときに反映されます。"
-							>
-								<select
-									value={value.voice.inputDevice}
-									onChange={(e) =>
-										change((s) => {
-											s.voice.inputDevice = e.target.value;
-										})
-									}
+					<>
+						<Card>
+							<CardHeader>
+								<CardTitle>アバターの読み上げ音声</CardTitle>
+							</CardHeader>
+							<CardContent>
+								<p className="hint">
+									変更を適用すると、声と速さは次の発話から、音量は次の再生から反映します。
+								</p>
+								<Field
+									label={`読み上げ音量（${Math.round(value.voice.outputVolume * 100)}%）`}
+									hint="0%で消音になります。マイクの音量には影響しません。"
 								>
-									<option value="">システム標準</option>
-									{devices
-										.filter((d) => d.kind === "audioinput")
-										.map((d) => (
-											<option key={d.deviceId} value={d.deviceId}>
-												{d.label || "マイク"}
-											</option>
-										))}
-									{value.voice.inputDevice &&
-										!devices.some(
-											(d) => d.deviceId === value.voice.inputDevice,
-										) && (
-											<option value={value.voice.inputDevice}>
-												選択したマイクを確認できません
-											</option>
-										)}
-								</select>
-							</Field>
-							{outputSupported ? (
-								<Field label="再生機器">
-									<select
-										value={value.voice.outputDevice}
+									<input
+										type="range"
+										min={0}
+										max={1}
+										step={0.05}
+										value={value.voice.outputVolume}
 										onChange={(e) =>
 											change((s) => {
-												s.voice.outputDevice = e.target.value;
+												s.voice.outputVolume = Number(e.target.value);
+											})
+										}
+									/>
+								</Field>
+								<div className="settings-resource">
+									<h3>LARMの声</h3>
+									<Field
+										label="キャラクター"
+										hint="自動選択では、LARMが指定する声を使います。"
+									>
+										{voices.data &&
+										!larmChanged &&
+										voices.data.voices.length > 0 ? (
+											<select
+												value={value.larm.voice}
+												onChange={(e) => selectCharacter(e.target.value)}
+											>
+												<option value="">
+													既定のキャラクター
+													{voiceCatalog?.default_voice &&
+														`（${voiceCatalog.voices.find((v) => v.id === voiceCatalog.default_voice)?.display_name ?? voiceCatalog.default_voice}）`}
+												</option>
+												{value.larm.voice &&
+													!voices.data.voices.some(
+														(v) => v.id === value.larm.voice,
+													) && (
+														<option value={value.larm.voice}>
+															{value.larm.voice}（現在の一覧にありません）
+														</option>
+													)}
+												{voices.data.voices.map((v) => (
+													<option key={v.id} value={v.id}>
+														{v.display_name}
+													</option>
+												))}
+											</select>
+										) : (
+											<KnownVoiceSelect
+												value={value.larm.voice}
+												emptyLabel="既定のキャラクター"
+												onChange={selectCharacter}
+											/>
+										)}
+									</Field>
+									{larmChanged ? (
+										<p className="hint">
+											接続先の変更を適用すると、声の一覧を取得できます。
+										</p>
+									) : voices.isFetching ? (
+										<output>声の一覧を取得しています…</output>
+									) : (
+										(voices.isError || voices.data?.voices.length === 0) && (
+											<p className="hint">
+												声の一覧を取得できません。保存したキャラクターと調整値は保持しています。
+											</p>
+										)
+									)}
+									{voiceCatalog && value.larm.voice && !character && (
+										<p role="alert">
+											保存したキャラクターが一覧にありません。再取得するか、既定のキャラクターに戻してください。
+										</p>
+									)}
+									<div className="settings-actions">
+										<Button
+											variant="secondary"
+											disabled={voices.isFetching || larmChanged}
+											onClick={() => void voices.refetch()}
+										>
+											声の一覧を再取得
+										</Button>
+										<Button
+											variant="secondary"
+											onClick={() => selectCharacter("")}
+										>
+											既定のキャラクターに戻す
+										</Button>
+									</div>
+									{voicevox && character && (
+										<>
+											<Field label="発話スタイル">
+												<select
+													value={
+														value.larm.style ?? character.default_style ?? ""
+													}
+													onChange={(e) =>
+														change((s) => {
+															s.larm.style = e.target.value || undefined;
+														})
+													}
+												>
+													<option value="">キャラクターの既定スタイル</option>
+													{value.larm.style &&
+														!character.styles.some(
+															(s) => s.id === value.larm.style,
+														) && (
+															<option value={value.larm.style}>
+																{value.larm.style}（このキャラクターでは未対応）
+															</option>
+														)}
+													{character.styles.map((s) => (
+														<option key={s.id} value={s.id}>
+															{s.display_name}
+														</option>
+													))}
+												</select>
+											</Field>
+											{(
+												[
+													[
+														"pitchScale",
+														"pitch_scale",
+														"声の高さ",
+														-0.15,
+														0.15,
+														0,
+														0.01,
+													],
+													[
+														"intonationScale",
+														"intonation_scale",
+														"抑揚",
+														0,
+														2,
+														1,
+														0.05,
+													],
+												] as const
+											).map(
+												([
+													field,
+													capability,
+													label,
+													min,
+													max,
+													standard,
+													step,
+												]) => {
+													const range = character.capabilities[capability];
+													const setting =
+														value.larm[field] ?? range?.default ?? standard;
+													return (
+														<Field
+															key={field}
+															label={`${label}（${setting.toFixed(2)}）`}
+															hint={
+																field === "pitchScale"
+																	? "数値は音声サービスの調整値です。0が基準です。"
+																	: "1が基準、0で平坦になります。"
+															}
+														>
+															<input
+																type="range"
+																min={range?.minimum ?? min}
+																max={range?.maximum ?? max}
+																step={step}
+																value={setting}
+																disabled={!range}
+																onChange={(e) =>
+																	change((s) => {
+																		s.larm[field] = Number(e.target.value);
+																	})
+																}
+															/>
+														</Field>
+													);
+												},
+											)}
+											<Toggle
+												label="文章に合わせて抑揚を変える（簡易）"
+												value={value.larm.autoIntonation ?? false}
+												onChange={(v) =>
+													change((s) => {
+														s.larm.autoIntonation = v;
+														if (v && s.larm.intonationScale === undefined)
+															s.larm.intonationScale =
+																character.capabilities.intonation_scale
+																	?.default ?? 1;
+													})
+												}
+												hint="疑問文・感嘆文・注意を促す文の抑揚を、設定値を基準に句ごとに強めます。"
+											/>
+										</>
+									)}
+									{voiceCatalog && !voicevox && (
+										<p className="hint">
+											このモデルではVOICEVOXのスタイル・高さ・抑揚を使いません。
+										</p>
+									)}
+									<SpeechSpeed
+										value={
+											value.larm.speed ??
+											character?.capabilities.speed?.default ??
+											1
+										}
+										range={character?.capabilities.speed}
+										onChange={(v) =>
+											change((s) => {
+												s.larm.speed = v;
+											})
+										}
+									/>
+									{speechCredit && (
+										<p className="hint">クレジット: {speechCredit}</p>
+									)}
+								</div>
+								{value.resources
+									.filter((r) => r.purpose === "tts")
+									.map((r) => (
+										<div className="settings-resource" key={r.id}>
+											<h3>
+												{
+													value.connections.find((c) => c.id === r.connectionId)
+														?.name
+												}{" "}
+												/ {r.model}
+											</h3>
+											<p className="hint">
+												{value.routes.tts.fallbackId === r.id
+													? "現在のクラウド読み上げ先です。"
+													: "この接続先を読み上げに選んだときに使います。"}
+											</p>
+											<Field
+												label="クラウドの声の種類（音声ID）"
+												hint="このサービスが提供する音声IDを入力してください。"
+											>
+												<Input
+													value={r.voice ?? ""}
+													maxLength={200}
+													onChange={(e) =>
+														change((s) => {
+															s.resources.find((x) => x.id === r.id)!.voice =
+																e.target.value;
+														})
+													}
+												/>
+											</Field>
+											<SpeechSpeed
+												value={r.speed ?? 1}
+												onChange={(v) =>
+													change((s) => {
+														s.resources.find((x) => x.id === r.id)!.speed = v;
+													})
+												}
+											/>
+										</div>
+									))}
+								{!value.resources.some((r) => r.purpose === "tts") && (
+									<p className="hint">
+										クラウドの声を使う場合は「接続先」で読み上げ用のモデルを登録してください。
+									</p>
+								)}
+							</CardContent>
+						</Card>
+						<Card>
+							<CardHeader>
+								<CardTitle>声での会話</CardTitle>
+							</CardHeader>
+							<CardContent>
+								<p className="hint">
+									録音と機器の調整は次の音声開始から、読み上げの設定は次の発話から反映します。
+								</p>
+								<Toggle
+									label="回答を読み上げる"
+									value={value.voice.autoSpeak}
+									onChange={(v) =>
+										change((s) => {
+											s.voice.autoSpeak = v;
+										})
+									}
+									hint="オフでも回答のテキストは会話に残ります。"
+								/>
+								<Toggle
+									label="話し始めたら読み上げを止める"
+									value={value.voice.bargeIn}
+									onChange={(v) =>
+										change((s) => {
+											s.voice.bargeIn = v;
+										})
+									}
+								/>
+								<Button variant="secondary" onClick={() => void discover()}>
+									音声機器を確認
+								</Button>
+								{deviceError && <p role="alert">{deviceError}</p>}
+								<Field
+									label="マイク"
+									hint="変更は次に音声を開始したときに反映されます。"
+								>
+									<select
+										value={value.voice.inputDevice}
+										onChange={(e) =>
+											change((s) => {
+												s.voice.inputDevice = e.target.value;
 											})
 										}
 									>
 										<option value="">システム標準</option>
 										{devices
-											.filter((d) => d.kind === "audiooutput")
+											.filter((d) => d.kind === "audioinput")
 											.map((d) => (
 												<option key={d.deviceId} value={d.deviceId}>
-													{d.label || "再生機器"}
+													{d.label || "マイク"}
 												</option>
 											))}
-										{value.voice.outputDevice &&
+										{value.voice.inputDevice &&
 											!devices.some(
-												(d) => d.deviceId === value.voice.outputDevice,
+												(d) => d.deviceId === value.voice.inputDevice,
 											) && (
-												<option value={value.voice.outputDevice}>
-													選択した機器を確認できません
+												<option value={value.voice.inputDevice}>
+													選択したマイクを確認できません
 												</option>
 											)}
 									</select>
 								</Field>
-							) : (
-								<p className="hint">
-									このブラウザでは再生先の切替に対応していません。システム標準を使います。
-								</p>
-							)}
-							<Field
-								label="声を検出するしきい値"
-								hint="小さい値ほど小さな声を拾います。"
-							>
-								<Input
-									type="number"
-									min={0.001}
-									max={0.1}
-									step={0.001}
-									value={value.voice.threshold}
-									onChange={(e) =>
-										change((s) => {
-											s.voice.threshold = Number(e.target.value);
-										})
-									}
-								/>
-							</Field>
-							<Field label="発話を確定する無音時間（ミリ秒）">
-								<Input
-									type="number"
-									min={300}
-									max={3000}
-									step={100}
-									value={value.voice.silenceMs}
-									onChange={(e) =>
-										change((s) => {
-											s.voice.silenceMs = Number(e.target.value);
-										})
-									}
-								/>
-							</Field>
-							{(
-								[
-									"echoCancellation",
-									"noiseSuppression",
-									"autoGainControl",
-								] as const
-							).map((key, i) => (
-								<Toggle
-									key={key}
-									label={
-										[
-											"エコーを抑える",
-											"周囲の雑音を抑える",
-											"音量を自動調整する",
-										][i]!
-									}
-									value={value.voice[key]}
-									onChange={(v) =>
-										change((s) => {
-											s.voice[key] = v;
-										})
-									}
-								/>
-							))}
-						</CardContent>
-					</Card>
+								{outputSupported ? (
+									<Field label="再生機器">
+										<select
+											value={value.voice.outputDevice}
+											onChange={(e) =>
+												change((s) => {
+													s.voice.outputDevice = e.target.value;
+												})
+											}
+										>
+											<option value="">システム標準</option>
+											{devices
+												.filter((d) => d.kind === "audiooutput")
+												.map((d) => (
+													<option key={d.deviceId} value={d.deviceId}>
+														{d.label || "再生機器"}
+													</option>
+												))}
+											{value.voice.outputDevice &&
+												!devices.some(
+													(d) => d.deviceId === value.voice.outputDevice,
+												) && (
+													<option value={value.voice.outputDevice}>
+														選択した機器を確認できません
+													</option>
+												)}
+										</select>
+									</Field>
+								) : (
+									<p className="hint">
+										このブラウザでは再生先の切替に対応していません。システム標準を使います。
+									</p>
+								)}
+								<Field
+									label="声を検出するしきい値"
+									hint="小さい値ほど小さな声を拾います。"
+								>
+									<Input
+										type="number"
+										min={0.001}
+										max={0.1}
+										step={0.001}
+										value={value.voice.threshold}
+										onChange={(e) =>
+											change((s) => {
+												s.voice.threshold = Number(e.target.value);
+											})
+										}
+									/>
+								</Field>
+								<Field label="発話を確定する無音時間（ミリ秒）">
+									<Input
+										type="number"
+										min={300}
+										max={3000}
+										step={100}
+										value={value.voice.silenceMs}
+										onChange={(e) =>
+											change((s) => {
+												s.voice.silenceMs = Number(e.target.value);
+											})
+										}
+									/>
+								</Field>
+								{(
+									[
+										"echoCancellation",
+										"noiseSuppression",
+										"autoGainControl",
+									] as const
+								).map((key, i) => (
+									<Toggle
+										key={key}
+										label={
+											[
+												"エコーを抑える",
+												"周囲の雑音を抑える",
+												"マイクの音量を自動調整する",
+											][i]!
+										}
+										value={value.voice[key]}
+										onChange={(v) =>
+											change((s) => {
+												s.voice[key] = v;
+											})
+										}
+									/>
+								))}
+							</CardContent>
+						</Card>
+					</>
 				)}
 				{category === 3 && (
 					<>
@@ -1121,6 +1514,7 @@ export function SettingsPage({
 					</>
 				)}
 				{category === 4 && <SchedulePanel client={client} />}
+				{category === 6 && <TtsDictionaryPanel client={client} />}
 				{category === 5 && (
 					<Card>
 						<CardHeader>
@@ -1142,42 +1536,93 @@ export function SettingsPage({
 									<option value="dark">ダーク</option>
 								</select>
 							</Field>
+							<Toggle
+								label="読み上げ字幕を表示する"
+								value={value.general.subtitles.enabled}
+								onChange={(v) =>
+									change((s) => {
+										s.general.subtitles.enabled = v;
+									})
+								}
+								hint="読み上げに合わせて画面中央に字幕を出します。"
+							/>
+							<Field label="字幕のデザイン">
+								<select
+									value={value.general.subtitles.style}
+									onChange={(e) =>
+										change((s) => {
+											s.general.subtitles.style = e.target
+												.value as Settings["general"]["subtitles"]["style"];
+										})
+									}
+								>
+									<option value="netflix">シネマ（白文字・影）</option>
+									<option value="prime">ボックス（半透明の黒背景）</option>
+									<option value="classic">クラシック（黄文字・黒縁）</option>
+									<option value="glass">ガラス（ぼかし背景）</option>
+								</select>
+							</Field>
+							<Field label="字幕の大きさ">
+								<select
+									value={value.general.subtitles.size}
+									onChange={(e) =>
+										change((s) => {
+											s.general.subtitles.size = e.target
+												.value as Settings["general"]["subtitles"]["size"];
+										})
+									}
+								>
+									<option value="medium">中</option>
+									<option value="large">大</option>
+									<option value="xlarge">特大</option>
+								</select>
+							</Field>
+							<div className="subtitle-preview-stage" aria-hidden="true">
+								<Subtitle
+									text="これは字幕のプレビューです。"
+									style={value.general.subtitles.style}
+									size={value.general.subtitles.size}
+									inline
+								/>
+							</div>
 						</CardContent>
 					</Card>
 				)}
-				<footer className="settings-footer">
-					<output>
-						{message && dirty && message === "変更を適用しました"
-							? "送信した変更を適用しました。追加の変更は未適用です。"
-							: message ||
-								(dirty
-									? "変更はまだ保存されていません"
-									: "すべての変更を保存済み")}
-					</output>
-					<div className="settings-actions">
-						<Button
-							variant="secondary"
-							disabled={busy}
-							onClick={() => {
-								setDraft(null);
-								setKeys([]);
-								setRetry(null);
-								setAdding(false);
-								setNewCloud((n) => ({ ...n, key: "" }));
-								setMessage("");
-								void query.refetch();
-							}}
-						>
-							最新の設定を読み直す
-						</Button>
-						<Button
-							disabled={!dirty || adding || busy}
-							onClick={() => void apply()}
-						>
-							{busy ? "適用中…" : "変更を適用"}
-						</Button>
-					</div>
-				</footer>
+				{category !== 6 && (
+					<footer className="settings-footer">
+						<output>
+							{message && dirty && message === "変更を適用しました"
+								? "送信した変更を適用しました。追加の変更は未適用です。"
+								: message ||
+									(dirty
+										? "変更はまだ保存されていません"
+										: "すべての変更を保存済み")}
+						</output>
+						<div className="settings-actions">
+							<Button
+								variant="secondary"
+								disabled={busy}
+								onClick={() => {
+									setDraft(null);
+									setKeys([]);
+									setRetry(null);
+									setAdding(false);
+									setNewCloud((n) => ({ ...n, key: "" }));
+									setMessage("");
+									void query.refetch();
+								}}
+							>
+								最新の設定を読み直す
+							</Button>
+							<Button
+								disabled={!dirty || adding || busy}
+								onClick={() => void apply()}
+							>
+								{busy ? "適用中…" : "変更を適用"}
+							</Button>
+						</div>
+					</footer>
+				)}
 			</section>
 		</div>
 	);

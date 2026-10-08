@@ -1,0 +1,12 @@
+$ bun scripts/verify.ts --all
+121 | 			: tsFiles
+122 | 		)
+123 | 			.filter((file) => /\.tsx?$/.test(file))
+124 | 			.map((file) => file.slice(root.length + 1)),
+125 | 	);
+126 | 	if (errors.length) throw new Error(errors.join("\n"));
+                                    ^
+error: web/src/domains/settings/index.tsx: forbidden dependency settings -> tts-dictionary
+      at /private/var/folders/mx/jbv8qfwd52z14q0mby_273lhlp5gd2/T/eumenes-review2-snapshot-07h5rqj4/scripts/verify.ts:126:31
+
+error: script "verify:all" exited with code 1

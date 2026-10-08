@@ -11,3 +11,17 @@ test("chat markdown keeps formatting while escaping raw HTML and unsafe links", 
 	expect(html).not.toContain("<script>");
 	expect(html).not.toContain('href="javascript:');
 });
+
+test.each(["- ", "* ", "+ ", "1. ", "1) "])(
+	"an empty list marker %j terminates instead of freezing the conversation",
+	(marker) => {
+		const tag = /^\d/.test(marker) ? "ol" : "ul";
+		expect(renderSafeMarkdown(marker)).toBe(`<${tag}><li></li></${tag}>`);
+	},
+);
+
+test("an empty list entry does not hide the following answer or bypass escaping", () => {
+	expect(renderSafeMarkdown("- 最初\n- \n- <script>次</script>\n\n続き")).toBe(
+		"<ul><li>最初</li><li></li><li>&lt;script&gt;次&lt;/script&gt;</li></ul><p>続き</p>",
+	);
+});

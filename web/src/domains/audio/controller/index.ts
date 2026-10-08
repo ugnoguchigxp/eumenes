@@ -51,6 +51,7 @@ export function createAudioController(
 	let processor: ScriptProcessorNode | undefined;
 	let source: MediaStreamAudioSourceNode | undefined;
 	let playback: AudioBufferSourceNode | undefined;
+	let playbackGain: GainNode | undefined;
 	let playbackEpoch = 0;
 	let playbackDone: Promise<void> = Promise.resolve();
 	let finishPlayback: () => void = () => {};
@@ -115,14 +116,17 @@ export function createAudioController(
 					});
 					return;
 				}
-				context = new AudioContext();
-				if (options.outputDevice && "setSinkId" in context)
+				const startedContext = new AudioContext();
+				context = startedContext;
+				if (options.outputDevice && "setSinkId" in startedContext)
 					await (
-						context as AudioContext & {
+						startedContext as AudioContext & {
 							setSinkId: (id: string) => Promise<void>;
 						}
 					).setSinkId(options.outputDevice);
-				await context.resume();
+				if (disposed || context !== startedContext) return;
+				await startedContext.resume();
+				if (disposed || context !== startedContext) return;
 				detector = new VoiceActivityDetector({
 					sampleRate: context.sampleRate,
 					silenceTimeoutMs: options.silenceMs ?? 700,
@@ -190,6 +194,7 @@ export function createAudioController(
 				processor.connect(context.destination);
 				emit("listening");
 			} catch (error) {
+				if (disposed) return;
 				emit(
 					"error",
 					error instanceof Error ? error.message : "microphone_unavailable",
@@ -203,6 +208,7 @@ export function createAudioController(
 			playOptions: {
 				waitForPrevious?: boolean;
 				shouldPlay?: () => boolean;
+				volume?: number;
 			} = {},
 		) {
 			const waitingEpoch = playbackEpoch;
@@ -227,7 +233,15 @@ export function createAudioController(
 				return;
 			const next = context.createBufferSource();
 			next.buffer = buffer;
-			next.connect(context.destination);
+			const volume = playOptions.volume ?? 1;
+			if (!Number.isFinite(volume) || volume < 0 || volume > 1)
+				throw new Error("audio_volume_invalid");
+			if (volume !== 1) {
+				playbackGain = context.createGain();
+				playbackGain.gain.value = volume;
+				next.connect(playbackGain);
+				playbackGain.connect(context.destination);
+			} else next.connect(context.destination);
 			playback = next;
 			playbackDone = new Promise<void>((resolve) => {
 				finishPlayback = resolve;
@@ -235,6 +249,8 @@ export function createAudioController(
 			next.onended = () => {
 				if (playback === next) {
 					playback = undefined;
+					playbackGain?.disconnect();
+					playbackGain = undefined;
 					finishPlayback();
 					emit("listening");
 					onEnded();
@@ -248,6 +264,8 @@ export function createAudioController(
 			finishPlayback();
 			const old = playback;
 			playback = undefined;
+			playbackGain?.disconnect();
+			playbackGain = undefined;
 			if (old) {
 				old.onended = null;
 				old.stop();

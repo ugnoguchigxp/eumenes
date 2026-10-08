@@ -17,7 +17,11 @@ import {
 import { useStore } from "zustand";
 import { createClient, type EumenesClient } from "../../client";
 import { MessageList } from "./components/domains/conversation/MessageList";
+import { LightAvatarBackground } from "./components/domains/conversation/LightAvatarBackground";
 import { Button, Textarea } from "./design-system";
+import { Subtitle } from "./components/domains/subtitle/Subtitle";
+import { ArtifactPanel } from "./components/domains/artifact/ArtifactPanel";
+import { useArtifactWorkspace } from "./domains/artifact";
 import { type AudioStore, createAudioStore } from "./domains/audio";
 import { useConversation } from "./domains/conversation";
 import {
@@ -46,6 +50,7 @@ function Workspace({
 	const onDirty = useCallback((v: boolean) => {
 		dirtySettings.current = v;
 	}, []);
+	const artifacts = useArtifactWorkspace();
 	const settings = useSettings(client);
 	const usage = useQuery({
 		queryKey: ["inference-usage", client.identity],
@@ -259,8 +264,22 @@ function Workspace({
 					}}
 				/>
 			)}
-			<div className="workspace-layout" hidden={settingsOpen}>
+			{settings.data?.general.subtitles.enabled &&
+				voice.subtitle &&
+				phase === "playing" &&
+				!settingsOpen && (
+					<Subtitle
+						text={voice.subtitle}
+						style={settings.data.general.subtitles.style}
+						size={settings.data.general.subtitles.size}
+					/>
+				)}
+			<div
+				className={`workspace-layout${artifacts.tabs.length ? " workspace-layout-split" : ""}`}
+				hidden={settingsOpen}
+			>
 				<section className="chat-panel" aria-label="会話">
+					<LightAvatarBackground active={!settingsOpen} />
 					<div className="conversation-status" aria-label="接続状態とモデル">
 						<span
 							className="connection-health"
@@ -324,6 +343,16 @@ function Workspace({
 						<MessageList
 							conversation={conversation.data}
 							streaming={streamingText}
+							onOpenArtifact={(message) =>
+								artifacts.open({
+									id: `message:${message.id}`,
+									title:
+										message.text.replace(/\s+/g, " ").trim().slice(0, 24) ||
+										"回答",
+									kind: "markdown",
+									content: message.text,
+								})
+							}
 						/>
 						{activeRun && (
 							<div className="thinking">
@@ -448,6 +477,15 @@ function Workspace({
 						)}
 					</div>
 				</section>
+				{artifacts.tabs.length > 0 && (
+					<ArtifactPanel
+						tabs={artifacts.tabs}
+						activeTabId={artifacts.activeTabId}
+						onSelect={artifacts.select}
+						onClose={artifacts.close}
+						onCloseAll={artifacts.closeAll}
+					/>
+				)}
 			</div>
 		</main>
 	);

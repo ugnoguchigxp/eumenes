@@ -2,6 +2,7 @@ import { SpeechSentences } from "./sentences";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { DialogueService } from "../../dialogue";
 import type { InferencePort, Receipt } from "../../inference";
+import type { SpeechDelivery } from "../../delivery";
 import type { VoiceTurn } from "../contracts";
 import {
 	activeIds,
@@ -26,6 +27,7 @@ export function createVoiceDialogue(
 		text: string;
 		wav: Uint8Array;
 		requestId?: string;
+		delivery?: SpeechDelivery;
 	};
 	type Speech = {
 		chunks: Map<number, Chunk>;
@@ -138,7 +140,13 @@ export function createVoiceDialogue(
 							return false;
 						if (receipt && !larm.acceptInTransaction?.(db, receipt))
 							throw new Error("permission_revoked");
-						state.chunks.set(n, { index: n, text, wav, requestId });
+						state.chunks.set(n, {
+							index: n,
+							text,
+							wav,
+							requestId,
+							...(receipt?.delivery ? { delivery: receipt.delivery } : {}),
+						});
 						return update(db, id, turn.revision, turn.status, clock());
 					});
 					if (!published) {
@@ -357,6 +365,8 @@ export function createVoiceDialogue(
 			)
 				throw new Error("invalid_wav");
 			const { turn, fresh } = await store.write((db) => {
+				if (sessions.get(sessionId) !== generation)
+					throw new Error("voice_session_inactive");
 				const existing = get(db, utteranceId);
 				if (existing) {
 					if (
@@ -443,6 +453,7 @@ export function createVoiceDialogue(
 				audioChunks: [...(state?.chunks.values() ?? [])].map((c) => ({
 					index: c.index,
 					text: c.text,
+					...(c.delivery ? { delivery: c.delivery } : {}),
 				})),
 				audioComplete: state?.finished ?? false,
 			};

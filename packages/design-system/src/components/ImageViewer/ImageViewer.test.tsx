@@ -42,22 +42,13 @@ vi.mock("../../../src/components/Modal", () => ({
 		) : null,
 }));
 
-// Mock globals that seem to be missing in the component file but used
-// This suggests the environment might have them or they are auto-imported
-// biome-ignore lint/suspicious/noExplicitAny: Mocking global
-const globalAny = global as any;
-globalAny.t = (key: string) => key;
-globalAny.log = {
-	debug: vi.fn(),
-	warn: vi.fn(),
-	error: vi.fn(),
-};
-
 describe("ImageViewer Component", () => {
 	const mockOnOpenChange = vi.fn();
 
 	beforeEach(() => {
 		vi.clearAllMocks();
+		delete (globalThis as unknown as Record<string, unknown>).t;
+		delete (globalThis as unknown as Record<string, unknown>).log;
 	});
 
 	describe("ImageViewer", () => {
@@ -86,18 +77,13 @@ describe("ImageViewer Component", () => {
 			expect(screen.queryByTestId("modal")).not.toBeInTheDocument();
 		});
 
-		it("logs warning if opened without src", () => {
-			const logWarn = vi.fn();
-			vi.stubGlobal("log", { debug: vi.fn(), warn: logWarn });
-
+		it("missing src does not trigger a page request or require host globals", () => {
 			render(<ImageViewer src="" open={true} onOpenChange={vi.fn()} />);
-			expect(logWarn).toHaveBeenCalledWith("ImageViewer opened without src");
+			expect(screen.getByRole("img")).not.toHaveAttribute("src");
 		});
 
-		it("closes on Escape key and logs debug message", () => {
+		it("closes on Escape key without host globals", () => {
 			const onOpenChange = vi.fn();
-			const logDebug = vi.fn();
-			vi.stubGlobal("log", { debug: logDebug, warn: vi.fn() });
 
 			render(
 				<ImageViewer src="test.jpg" open={true} onOpenChange={onOpenChange} />,
@@ -105,7 +91,6 @@ describe("ImageViewer Component", () => {
 
 			fireEvent.keyDown(window, { key: "Escape" });
 			expect(onOpenChange).toHaveBeenCalledWith(false);
-			expect(logDebug).toHaveBeenCalledWith("Escape pressed, closing viewer");
 		});
 	});
 

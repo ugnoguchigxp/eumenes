@@ -1,0 +1,44 @@
+
+Running 6 tests using 1 worker
+
+(node:34765) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 tests/browser/voice.spec.ts:350:1 › exported LARM token connects the UI and CLI without browser credentials (556ms)
+  ✘  2 tests/browser/voice.spec.ts:387:1 › a backend outage does not poll snapshots and explicit reconnect reloads the views (30.0s)
+(node:34980) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  3 tests/browser/voice.spec.ts:563:1 › settings save, reload, theme and automatic fallback use backend credentials (7.4s)
+  ✓  4 tests/browser/voice.spec.ts:686:1 › settings schedule controls create, pause, resume and cancel future work (521ms)
+  ✓  5 tests/browser/voice.spec.ts:722:1 › idle views keep one SSE stream without periodic snapshot requests (7.0s)
+  ✓  6 tests/browser/voice.spec.ts:761:1 › failed notifications are visible while API works; returning to the page restores missed answers (6.1s)
+
+
+  1) tests/browser/voice.spec.ts:387:1 › a backend outage does not poll snapshots and explicit reconnect reloads the views 
+
+    Test timeout of 30000ms exceeded.
+
+    Error: locator.click: Test timeout of 30000ms exceeded.
+    Call log:
+      - waiting for getByRole('button', { name: '接続を再確認' })
+        - locator resolved to <button class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 min-w-0 overflow-hidden bg-secondary shadow-sm hover:bg-secondary/80 h-ui px-ui-button py-ui-button text-ui min-h-ui-touch">…</button>
+      - attempting click action
+        - waiting for element to be visible, enabled and stable
+      - element was detached from the DOM, retrying
+
+
+      422 | 	expect(watched.map((path) => counts.get(path))).toEqual(initial);
+      423 | 	unavailable = false;
+    > 424 | 	await page.getByRole("button", { name: "接続を再確認" }).click();
+          | 	                                                   ^
+      425 | 	await expect(page.locator(".connection-health .health-state")).toHaveText(
+      426 | 		"ready",
+      427 | 	);
+        at /Users/y.noguchi/Code/eumenes/tests/browser/voice.spec.ts:424:53
+
+    Error Context: verification-reports/review2-browser-2/voice-a-backend-outage-doe-570ca-reconnect-reloads-the-views/error-context.md
+
+    Error Context: verification-reports/review2-browser-2/voice-a-backend-outage-doe-570ca-reconnect-reloads-the-views/error-context.md
+
+  1 failed
+    tests/browser/voice.spec.ts:387:1 › a backend outage does not poll snapshots and explicit reconnect reloads the views 
+  5 passed (54.0s)

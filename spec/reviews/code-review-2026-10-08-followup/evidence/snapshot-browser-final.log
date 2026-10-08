@@ -1,0 +1,47 @@
+
+Running 6 tests using 1 worker
+
+(node:37809) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 tests/browser/voice.spec.ts:423:1 › exported LARM token connects the UI and CLI without browser credentials (379ms)
+  ✓  2 tests/browser/voice.spec.ts:460:1 › a backend outage does not poll snapshots and explicit reconnect reloads the views (7.0s)
+  ✓  3 tests/browser/voice.spec.ts:639:1 › settings save, reload, theme and automatic fallback use backend credentials (7.7s)
+  ✓  4 tests/browser/voice.spec.ts:761:1 › settings schedule controls create, pause, resume and cancel future work (523ms)
+  ✘  5 tests/browser/voice.spec.ts:797:1 › idle views keep one SSE stream without periodic snapshot requests (5.1s)
+(node:37990) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  6 tests/browser/voice.spec.ts:836:1 › failed notifications are visible while API works; returning to the page restores missed answers (6.2s)
+
+
+  1) tests/browser/voice.spec.ts:797:1 › idle views keep one SSE stream without periodic snapshot requests 
+
+    Error: expect(locator).toHaveText(expected) failed
+
+    Locator: locator('.connection-health .health-state')
+    Expected pattern: /^(ready|idle)$/
+    Received string:  "connecting"
+    Timeout: 5000ms
+
+    Call log:
+      - Expect "toHaveText" with timeout 5000ms
+      - waiting for locator('.connection-health .health-state')
+        - locator resolved to <span class="health-state">connecting</span>
+        - unexpected value "connecting"
+
+
+      818 | 	page.on("requestfailed", end);
+      819 | 	await page.goto(`http://127.0.0.1:${webPort}/`);
+    > 820 | 	await expect(page.locator(".connection-health .health-state")).toHaveText(
+          | 	                                                               ^
+      821 | 		/^(ready|idle)$/,
+      822 | 	);
+      823 | 	await expect.poll(() => counts.get("/api/events") ?? 0).toBeGreaterThan(0);
+        at /private/var/folders/mx/jbv8qfwd52z14q0mby_273lhlp5gd2/T/eumenes-review2-snapshot-07h5rqj4/tests/browser/voice.spec.ts:820:65
+
+    Error Context: verification-reports/final-browser/voice-idle-views-keep-one--57d8c--periodic-snapshot-requests/error-context.md
+
+    Error Context: verification-reports/final-browser/voice-idle-views-keep-one--57d8c--periodic-snapshot-requests/error-context.md
+
+  1 failed
+    tests/browser/voice.spec.ts:797:1 › idle views keep one SSE stream without periodic snapshot requests 
+  5 passed (29.2s)

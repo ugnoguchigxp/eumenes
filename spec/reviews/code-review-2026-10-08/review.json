@@ -1,0 +1,749 @@
+{
+	"rubric_version": "1.1.0",
+	"mode": "technical",
+	"depth": "deep",
+	"technical_profile": "service",
+	"assessment_kind": "re-evaluated",
+	"target": {
+		"locator": "/Users/y.noguchi/Code/eumenes",
+		"snapshot": "uncommitted source snapshot sha256:5c25e39a33f3c7140ddc1dadd428cd8152c6461f7f5a3a83bba78c47037d920a; manifest snapshot.json; base 75e7e4b7561411a00573712bf9efc550cffed380",
+		"reviewed_at": "2026-10-08",
+		"stage": "prototype; voice MVP hardware acceptance pending",
+		"scope": "Whole-project risk-based technical review, service profile. Traced Web/CLI→authenticated API→settings/inference/LARM→dialogue/queue/SQLite and voice/audio, scheduler, streams, migrations, verification tooling; sampled shared UI and ran its full unit suite. macOS, Bun 1.4.2, Node 24.11.1, loopback fixture servers and temporary DBs. Generated/vendor code not line-by-line reviewed; actual cloud/LARM, microphone/speaker, release/update paths, dependency vulnerability/provenance audit and representative performance measurements excluded. No production DB/config/secret modification."
+	},
+	"evidence": [
+		{
+			"id": "E01",
+			"kind": "code",
+			"locator": "scripts/domains.ts; scripts/boundaries.ts; docs/domains.md; api/application/server.ts:1-109",
+			"observed_at": "2026-10-08",
+			"observation": "Public domain entries, dependency closure and boundary checking are explicit; application constructs services and owns bootstrap/recovery order.",
+			"scope": "Current source snapshot in snapshot.json; fixture evidence only where execution is cited."
+		},
+		{
+			"id": "E02",
+			"kind": "code",
+			"locator": "api/infrastructure/sqlite/index.ts:35-140; api/domains/dialogue/service/index.ts:187-257; api/domains/queue/service/runner.ts:160-227",
+			"observed_at": "2026-10-08",
+			"observation": "One locked SQLite writer serializes transactions; accepted dialogue answer and owning queue outcome settle together; failed business adoption is propagated.",
+			"scope": "Current source snapshot in snapshot.json; fixture evidence only where execution is cited."
+		},
+		{
+			"id": "E03",
+			"kind": "code",
+			"locator": "api/application/app.ts:32-92; api/infrastructure/auth-config.ts; api/domains/settings/contracts/index.ts; api/domains/settings/service/index.ts:190-313; api/domains/voice-dialogue/controller/index.ts",
+			"observed_at": "2026-10-08",
+			"observation": "Loopback/bearer/origin control, schema checks, encrypted backend credentials, bounded input and internal-error sanitization traced. Full hostile-host and distribution audit excluded.",
+			"scope": "Current source snapshot in snapshot.json; fixture evidence only where execution is cited."
+		},
+		{
+			"id": "E04",
+			"kind": "code",
+			"locator": "api/domains/inference/service/index.ts; api/domains/larm/service/index.ts; api/domains/queue/service/runner.ts; api/domains/voice-dialogue/service/index.ts",
+			"observed_at": "2026-10-08",
+			"observation": "Cancellation, generation/epoch fences, one-time fallback/recovery, bounded streaming, leases, retries and queue saturation paths traced with their callers and tests.",
+			"scope": "Current source snapshot in snapshot.json; fixture evidence only where execution is cited."
+		},
+		{
+			"id": "E05",
+			"kind": "execution",
+			"locator": "evidence/final-all.log; evidence/design-final-all.log; evidence/*verify*.log; evidence/final-verification.json",
+			"observed_at": "2026-10-08",
+			"observation": "Final bun run verify:all exit 0 (65316 ms): format, lint, typecheck, boundaries, API 136, Web 15, build and browser 8 pass. Final bun run test in packages/design-system exit 0: 56 files / 1079 tests. All seven affected/consumer domain verifications exit 0.",
+			"scope": "macOS; Bun 1.4.2; Node 24.11.1; temporary SQLite / loopback fixture providers; no real devices/live services. Earlier failed intermediate type build retained separately; final results are after its correction."
+		},
+		{
+			"id": "E06",
+			"kind": "execution",
+			"locator": "evidence/repro.log; evidence/repro2.log; evidence/voice-negative.log; evidence/audio-repro.log; evidence/cli-repro.log; evidence/design-repro.log",
+			"observed_at": "2026-10-08",
+			"observation": "Targeted regressions failed against original behavior. The voice acceptance test was independently falsified by removing only the new writer guard (exit 1), then restoring it. Original test-global UI stubs hid production exceptions.",
+			"scope": "Fixture reproduction; original source at base commit plus newly introduced regression tests. Early voice assertion needed correction; fixed.log is not acceptance evidence for that case."
+		},
+		{
+			"id": "E07",
+			"kind": "execution",
+			"locator": "evidence/voice.log; evidence/fixed2.log; evidence/audio-fixed.log; evidence/cli-fixed.log; evidence/design-fixed.log; evidence/*verify*.log",
+			"observed_at": "2026-10-08",
+			"observation": "Corrected voice test 4 pass; adoption/sleep 10 pass; audio 5 pass; process-level CLI 3 pass; shared UI targeted 37 pass; all affected domain checks passed after production fixes.",
+			"scope": "Fixture-only commands: bun test for the named test files in each log; bun run verify -- --domain <name>; shared UI bun x vitest run --project unit src/components/{ImageViewer,DropdownMenu,ProgressBar}/*.test.tsx from package cwd. Exit 0 for green acceptance records."
+		},
+		{
+			"id": "E08",
+			"kind": "code",
+			"locator": "client/transport.ts:1-52; cli/index.ts:1-40,120-140; web/src/domains/audio/controller/index.ts:100-210; packages/design-system/src/components/{DropdownMenu,ImageViewer,ProgressBar}/",
+			"observed_at": "2026-10-08",
+			"observation": "Explicit connection errors, validated CLI UUID/configuration, stopped audio start fences, removal of undefined test-only globals and aligned visual/ARIA progress values implemented.",
+			"scope": "Current source snapshot in snapshot.json; fixture evidence only where execution is cited."
+		},
+		{
+			"id": "E09",
+			"kind": "primary_doc",
+			"locator": "README.md; docs/acceptance.md; scripts/verify.ts; package.json",
+			"observed_at": "2026-10-08",
+			"observation": "Local verification commands and acceptance gaps are documented. Real hardware three-turn acceptance remains a completion requirement; measured live performance and release provenance were not established.",
+			"scope": "Current source snapshot in snapshot.json; fixture evidence only where execution is cited."
+		},
+		{
+			"id": "E10",
+			"kind": "code",
+			"locator": "web/src/domains/settings/index.tsx; web/src/domains/dialogue/index.ts; web/src/domains/voice-dialogue/index.ts; api/application/events.ts; api/infrastructure/{chat-stream,snapshot-stream}.ts; api/domains/inference/contracts/index.ts",
+			"observed_at": "2026-10-08",
+			"observation": "Settings/errors, connection/run/voice status and bounded event snapshots are available; diagnostics separate identifiers and error state from credential values.",
+			"scope": "Current source snapshot in snapshot.json; fixture evidence only where execution is cited."
+		},
+		{
+			"id": "E01F",
+			"kind": "code",
+			"locator": "api/domains/larm/service/index.ts:879; regression api/domains/larm/test/larm.test.ts:913",
+			"observed_at": "2026-10-08",
+			"observation": "長履歴の縮約で今回の入力を削除のproduction修正と回帰試験がある。",
+			"scope": "Current source snapshot in snapshot.json; fixture evidence only where execution is cited."
+		},
+		{
+			"id": "E02F",
+			"kind": "code",
+			"locator": "api/domains/settings/contracts/index.ts:108; regression api/domains/settings/test/settings.test.ts:189",
+			"observed_at": "2026-10-08",
+			"observation": "設定URLの検証例外と利用不能なsame-host設定のproduction修正と回帰試験がある。",
+			"scope": "Current source snapshot in snapshot.json; fixture evidence only where execution is cited."
+		},
+		{
+			"id": "E03F",
+			"kind": "code",
+			"locator": "api/domains/settings/service/index.ts:281; regression api/domains/settings/test/settings.test.ts:215",
+			"observed_at": "2026-10-08",
+			"observation": "削除・置換済みcredential暗号文が残存のproduction修正と回帰試験がある。",
+			"scope": "Current source snapshot in snapshot.json; fixture evidence only where execution is cited."
+		},
+		{
+			"id": "E04F",
+			"kind": "code",
+			"locator": "api/domains/voice-dialogue/service/index.ts:360; regression api/domains/voice-dialogue/test/voice.test.ts:212",
+			"observed_at": "2026-10-08",
+			"observation": "音声停止後のwriter待ち受付が保存されるのproduction修正と回帰試験がある。",
+			"scope": "Current source snapshot in snapshot.json; fixture evidence only where execution is cited."
+		},
+		{
+			"id": "E05F",
+			"kind": "code",
+			"locator": "api/domains/dialogue/service/index.ts:232; api/domains/queue/service/runner.ts:198; regression api/domains/dialogue/test/queue.test.ts:246",
+			"observed_at": "2026-10-08",
+			"observation": "採用拒否の回答がqueue完了になるのproduction修正と回帰試験がある。",
+			"scope": "Current source snapshot in snapshot.json; fixture evidence only where execution is cited."
+		},
+		{
+			"id": "E06F",
+			"kind": "code",
+			"locator": "api/domains/queue/service/runner.ts:49; regression api/domains/queue/test/sleep.test.ts:5",
+			"observed_at": "2026-10-08",
+			"observation": "heartbeat待機でabort listenerが蓄積のproduction修正と回帰試験がある。",
+			"scope": "Current source snapshot in snapshot.json; fixture evidence only where execution is cited."
+		},
+		{
+			"id": "E07F",
+			"kind": "code",
+			"locator": "web/src/domains/audio/controller/index.ts:118; regression web/src/domains/audio/test/audio.test.ts:213",
+			"observed_at": "2026-10-08",
+			"observation": "音声開始待ち中の停止後に例外のproduction修正と回帰試験がある。",
+			"scope": "Current source snapshot in snapshot.json; fixture evidence only where execution is cited."
+		},
+		{
+			"id": "E08F",
+			"kind": "code",
+			"locator": "client/transport.ts:9; cli/index.ts:127; regression api/application/cli.test.ts:24",
+			"observed_at": "2026-10-08",
+			"observation": "CLI接続不能が終了コード2になるのproduction修正と回帰試験がある。",
+			"scope": "Current source snapshot in snapshot.json; fixture evidence only where execution is cited."
+		},
+		{
+			"id": "E09F",
+			"kind": "code",
+			"locator": "cli/index.ts:12-40; regression api/application/cli.test.ts:38",
+			"observed_at": "2026-10-08",
+			"observation": "CLIの不正request-idが新規送信になるのproduction修正と回帰試験がある。",
+			"scope": "Current source snapshot in snapshot.json; fixture evidence only where execution is cited."
+		},
+		{
+			"id": "E10F",
+			"kind": "code",
+			"locator": "packages/design-system/src/components/DropdownMenu/DropdownMenu.tsx:249; packages/design-system/src/components/ImageViewer/ImageViewer.tsx:44; regression packages/design-system/src/components/{DropdownMenu,ImageViewer}/*.test.tsx",
+			"observed_at": "2026-10-08",
+			"observation": "共通画像ビューア・メニューが未定義globalで落ちるのproduction修正と回帰試験がある。",
+			"scope": "Current source snapshot in snapshot.json; fixture evidence only where execution is cited."
+		},
+		{
+			"id": "E11F",
+			"kind": "code",
+			"locator": "packages/design-system/src/components/ProgressBar/ProgressBar.tsx:38; regression packages/design-system/src/components/ProgressBar/ProgressBar.test.tsx",
+			"observed_at": "2026-10-08",
+			"observation": "進捗の見た目と読み上げ値が不一致のproduction修正と回帰試験がある。",
+			"scope": "Current source snapshot in snapshot.json; fixture evidence only where execution is cited."
+		},
+		{
+			"id": "E11",
+			"kind": "execution",
+			"locator": "evidence/built-package.log; evidence/built-package-command.txt; generated-artifacts.json",
+			"observed_at": "2026-10-08",
+			"observation": "Built index.mjs SSR probe exit 0: empty/default image props render without undefined globals; progress clamp ARIA=100 and custom max=200 renders 25%. Build regenerated tracked index.js/index.mjs.",
+			"scope": "Bun/React static rendering of actual package artifact; menu interaction also tested in source-unit suite. Artifact hashes retained; complete release provenance excluded."
+		}
+	],
+	"claims": [
+		{
+			"id": "C01",
+			"type": "Fact",
+			"statement": "Eleven root-cause groups were reproduced or traced, fixed, and regression-checked; no unresolved confirmed finding remains in the re-evaluated scope.",
+			"evidence_ids": ["E06", "E07", "E08"],
+			"limitations": "Risk-based review and fixture checks do not prove universal absence of defects."
+		},
+		{
+			"id": "C02",
+			"type": "Assumption",
+			"statement": "Single-user loopback service on macOS is the current deployment boundary.",
+			"evidence_ids": ["E01", "E03"],
+			"limitations": "Multi-host deployment and hostile local accounts are outside this review."
+		},
+		{
+			"id": "C03",
+			"type": "Unknown",
+			"statement": "Live provider acceptance, three physical voice exchanges, realistic latency/cost and actual release integrity are not established.",
+			"evidence_ids": ["E09"],
+			"limitations": "No live provider or hardware acceptance performed in this review; these gaps are not inferred code defects."
+		}
+	],
+	"findings": [
+		{
+			"id": "F01",
+			"status": "withdrawn",
+			"resolution": "fixed and acceptance checked; original finding was confirmed, not false",
+			"severity": "High",
+			"priority": "P1",
+			"priority_reason": "Primary user/data contract fails under realistic conditions.",
+			"confidence": "High",
+			"title": "長履歴の縮約で今回の入力を削除",
+			"root_cause": "固定で2件を削除していた",
+			"condition": "未回答の過去入力があり、3件の履歴が予算を超える",
+			"consequence": "providerに今回の問いが届かず別内容へ回答する",
+			"counterevidence": "通常のuser/assistant対だけなら再現しない。修正後の再検証で再現しない。",
+			"fix": "最後のsystemと今回入力を必ず保持し、収まらない場合は明示失敗",
+			"verification": "api/domains/larm/test/larm.test.ts:913; E06 red and E07 green; full-suite evidence E05",
+			"withdrawn_reason": "Implemented and verified; retained as resolved historical defect.",
+			"evidence_ids": ["E01F", "E06", "E07"],
+			"impacts": [
+				{
+					"track": "technical",
+					"dimension": "correctness",
+					"criterion": "edge_cases",
+					"reason": "providerに今回の問いが届かず別内容へ回答する"
+				}
+			]
+		},
+		{
+			"id": "F02",
+			"status": "withdrawn",
+			"resolution": "fixed and acceptance checked; original finding was confirmed, not false",
+			"severity": "Medium",
+			"priority": "P1",
+			"priority_reason": "Primary user/data contract fails under realistic conditions.",
+			"confidence": "High",
+			"title": "設定URLの検証例外と利用不能なsame-host設定",
+			"root_cause": "refine失敗後にnew URLを呼び、same-hostのnullを許容",
+			"condition": "URLが不正、またはsame-hostでbaseUrl未設定",
+			"consequence": "safeParseがthrow、または保存後接続できない",
+			"counterevidence": "有効なloopback設定は正常だった。修正後の再検証で再現しない。",
+			"fix": "解析可能なURLだけを追加検証し、same-hostにはURLを要求",
+			"verification": "api/domains/settings/test/settings.test.ts:189; E06 red and E07 green; full-suite evidence E05",
+			"withdrawn_reason": "Implemented and verified; retained as resolved historical defect.",
+			"evidence_ids": ["E02F", "E06", "E07"],
+			"impacts": [
+				{
+					"track": "technical",
+					"dimension": "correctness",
+					"criterion": "contracts",
+					"reason": "safeParseがthrow、または保存後接続できない"
+				}
+			]
+		},
+		{
+			"id": "F03",
+			"status": "withdrawn",
+			"resolution": "fixed and acceptance checked; original finding was confirmed, not false",
+			"severity": "Medium",
+			"priority": "P1",
+			"priority_reason": "Primary user/data contract fails under realistic conditions.",
+			"confidence": "High",
+			"title": "削除・置換済みcredential暗号文が残存",
+			"root_cause": "古い接続epochの秘密情報を削除していない",
+			"condition": "キー置換・キー削除・接続削除",
+			"consequence": "不要な暗号文が残り、全削除後もmaster key再生成が妨げられる",
+			"counterevidence": "epochによる旧権限の失効は既にある。修正後の再検証で再現しない。",
+			"fix": "現在のcredentialだけを同一transactionで残す",
+			"verification": "api/domains/settings/test/settings.test.ts:215; E06 red and E07 green; full-suite evidence E05",
+			"withdrawn_reason": "Implemented and verified; retained as resolved historical defect.",
+			"evidence_ids": ["E03F", "E06", "E07"],
+			"impacts": [
+				{
+					"track": "technical",
+					"dimension": "security",
+					"criterion": "input_secrets",
+					"reason": "不要な暗号文が残り、全削除後もmaster key再生成が妨げられる"
+				}
+			]
+		},
+		{
+			"id": "F04",
+			"status": "withdrawn",
+			"resolution": "fixed and acceptance checked; original finding was confirmed, not false",
+			"severity": "High",
+			"priority": "P1",
+			"priority_reason": "Primary user/data contract fails under realistic conditions.",
+			"confidence": "High",
+			"title": "音声停止後のwriter待ち受付が保存される",
+			"root_cause": "transaction外でしかsession世代を確認しない",
+			"condition": "accept後、writer callback前にstopする",
+			"consequence": "停止後のturn保存とASR呼出が始まる",
+			"counterevidence": "保存後の遅い結果には既存世代fenceがある。修正後の再検証で再現しない。",
+			"fix": "writer内でもsession世代を確認",
+			"verification": "api/domains/voice-dialogue/test/voice.test.ts:212; E06 red and E07 green; full-suite evidence E05",
+			"withdrawn_reason": "Implemented and verified; retained as resolved historical defect.",
+			"evidence_ids": ["E04F", "E06", "E07"],
+			"impacts": [
+				{
+					"track": "technical",
+					"dimension": "correctness",
+					"criterion": "concurrency",
+					"reason": "停止後のturn保存とASR呼出が始まる"
+				}
+			]
+		},
+		{
+			"id": "F05",
+			"status": "withdrawn",
+			"resolution": "fixed and acceptance checked; original finding was confirmed, not false",
+			"severity": "Medium",
+			"priority": "P1",
+			"priority_reason": "Primary user/data contract fails under realistic conditions.",
+			"confidence": "High",
+			"title": "採用拒否の回答がqueue完了になる",
+			"root_cause": "業務失敗をsettleのappliedとして返す",
+			"condition": "推論receiptの採用が拒否される",
+			"consequence": "run failedとqueue completedが食い違う",
+			"counterevidence": "正常採用の一括commitは既存設計で担保。修正後の再検証で再現しない。",
+			"fix": "settleから業務失敗を返しjob/attemptも同一transactionでfailedにする",
+			"verification": "api/domains/dialogue/test/queue.test.ts:246; E06 red and E07 green; full-suite evidence E05",
+			"withdrawn_reason": "Implemented and verified; retained as resolved historical defect.",
+			"evidence_ids": ["E05F", "E06", "E07"],
+			"impacts": [
+				{
+					"track": "technical",
+					"dimension": "correctness",
+					"criterion": "contracts",
+					"reason": "run failedとqueue completedが食い違う"
+				}
+			]
+		},
+		{
+			"id": "F06",
+			"status": "withdrawn",
+			"resolution": "fixed and acceptance checked; original finding was confirmed, not false",
+			"severity": "Low",
+			"priority": "P2",
+			"priority_reason": "Bounded resource or accessibility contract needs repair.",
+			"confidence": "High",
+			"title": "heartbeat待機でabort listenerが蓄積",
+			"root_cause": "timer完了時にlistener解除せず、既にabortしたsignalも待つ",
+			"condition": "同じsignalで繰り返し待機する、または取消済みsignalを渡す",
+			"consequence": "listener蓄積・停止遅延",
+			"counterevidence": "abort時timer解除は既存実装にもある。修正後の再検証で再現しない。",
+			"fix": "完了とabortを共通cleanupにし、事前abortは即時resolve",
+			"verification": "api/domains/queue/test/sleep.test.ts:5; E06 red and E07 green; full-suite evidence E05",
+			"withdrawn_reason": "Implemented and verified; retained as resolved historical defect.",
+			"evidence_ids": ["E06F", "E06", "E07"],
+			"impacts": [
+				{
+					"track": "technical",
+					"dimension": "reliability",
+					"criterion": "resilience",
+					"reason": "listener蓄積・停止遅延"
+				}
+			]
+		},
+		{
+			"id": "F07",
+			"status": "withdrawn",
+			"resolution": "fixed and acceptance checked; original finding was confirmed, not false",
+			"severity": "Medium",
+			"priority": "P1",
+			"priority_reason": "Primary user/data contract fails under realistic conditions.",
+			"confidence": "High",
+			"title": "音声開始待ち中の停止後に例外",
+			"root_cause": "resume/setSinkId await後に共有contextを無条件利用",
+			"condition": "audio開始のawait中にstopする",
+			"consequence": "消えたcontextを参照し遅いerror通知が出る",
+			"counterevidence": "getUserMediaと再生decodeの停止には既存fenceがある。修正後の再検証で再現しない。",
+			"fix": "開始したcontextを保持しawaitごとにidentity/disposed確認",
+			"verification": "web/src/domains/audio/test/audio.test.ts:213; E06 red and E07 green; full-suite evidence E05",
+			"withdrawn_reason": "Implemented and verified; retained as resolved historical defect.",
+			"evidence_ids": ["E07F", "E06", "E07"],
+			"impacts": [
+				{
+					"track": "technical",
+					"dimension": "correctness",
+					"criterion": "concurrency",
+					"reason": "消えたcontextを参照し遅いerror通知が出る"
+				}
+			]
+		},
+		{
+			"id": "F08",
+			"status": "withdrawn",
+			"resolution": "fixed and acceptance checked; original finding was confirmed, not false",
+			"severity": "Medium",
+			"priority": "P1",
+			"priority_reason": "Primary user/data contract fails under realistic conditions.",
+			"confidence": "High",
+			"title": "CLI接続不能が終了コード2になる",
+			"root_cause": "fetchエラーをメッセージ中のfetchという文字で判定",
+			"condition": "Bunがfetchを含まない接続不能TypeErrorを返す",
+			"consequence": "約束した終了コード5にならず呼出側が原因を誤認する",
+			"counterevidence": "HTTP応答エラーの終了コードは別経路で処理済み。修正後の再検証で再現しない。",
+			"fix": "transportで型を分け、取消は保持してCLIで接続不能を判定",
+			"verification": "api/application/cli.test.ts:24; E06 red and E07 green; full-suite evidence E05",
+			"withdrawn_reason": "Implemented and verified; retained as resolved historical defect.",
+			"evidence_ids": ["E08F", "E06", "E07"],
+			"impacts": [
+				{
+					"track": "technical",
+					"dimension": "reliability",
+					"criterion": "failure",
+					"reason": "約束した終了コード5にならず呼出側が原因を誤認する"
+				}
+			]
+		},
+		{
+			"id": "F09",
+			"status": "withdrawn",
+			"resolution": "fixed and acceptance checked; original finding was confirmed, not false",
+			"severity": "Medium",
+			"priority": "P1",
+			"priority_reason": "Primary user/data contract fails under realistic conditions.",
+			"confidence": "High",
+			"title": "CLIの不正request-idが新規送信になる",
+			"root_cause": "値欠落時undefinedを新UUIDへ置換し、URL初期化はcatch外",
+			"condition": "--request-id値欠落/不正、または不正API URL",
+			"consequence": "重複送信の危険、設定エラーの終了コード不一致",
+			"counterevidence": "正しいrequest-idのbackend重複防止は存在。修正後の再検証で再現しない。",
+			"fix": "引数を送信前検証しclient初期化も設定エラー処理内へ",
+			"verification": "api/application/cli.test.ts:38; E06 red and E07 green; full-suite evidence E05",
+			"withdrawn_reason": "Implemented and verified; retained as resolved historical defect.",
+			"evidence_ids": ["E09F", "E06", "E07"],
+			"impacts": [
+				{
+					"track": "technical",
+					"dimension": "correctness",
+					"criterion": "contracts",
+					"reason": "重複送信の危険、設定エラーの終了コード不一致"
+				}
+			]
+		},
+		{
+			"id": "F10",
+			"status": "withdrawn",
+			"resolution": "fixed and acceptance checked; original finding was confirmed, not false",
+			"severity": "Medium",
+			"priority": "P1",
+			"priority_reason": "Primary user/data contract fails under realistic conditions.",
+			"confidence": "High",
+			"title": "共通画像ビューア・メニューが未定義globalで落ちる",
+			"root_cause": "t/logの宣言だけ存在し、試験がglobal stubを注入",
+			"condition": "通常の製品環境でalt省略/メニュー選択/画像Escape",
+			"consequence": "ReferenceErrorにより表示やclick処理が失敗",
+			"counterevidence": "旧試験はglobal stubによって成功していた。修正後の再検証で再現しない。",
+			"fix": "暗黙globalを除き標準altと通常callbackにし、偽のglobal宣言も削除",
+			"verification": "packages/design-system/src/components/{DropdownMenu,ImageViewer}/*.test.tsx; E06 red and E07 green; full-suite evidence E05",
+			"withdrawn_reason": "Implemented and verified; retained as resolved historical defect.",
+			"evidence_ids": ["E10F", "E06", "E07"],
+			"impacts": [
+				{
+					"track": "technical",
+					"dimension": "common_components",
+					"criterion": "reuse",
+					"reason": "ReferenceErrorにより表示やclick処理が失敗"
+				}
+			]
+		},
+		{
+			"id": "F11",
+			"status": "withdrawn",
+			"resolution": "fixed and acceptance checked; original finding was confirmed, not false",
+			"severity": "Low",
+			"priority": "P2",
+			"priority_reason": "Bounded resource or accessibility contract needs repair.",
+			"confidence": "High",
+			"title": "進捗の見た目と読み上げ値が不一致",
+			"root_cause": "視覚だけ0..100へ丸めARIAにはraw値、maxも計算に不使用",
+			"condition": "負/超過value、またはmax=200",
+			"consequence": "ARIA値と見た目の進捗率が食い違う",
+			"counterevidence": "0..100の通常値は一致する。修正後の再検証で再現しない。",
+			"fix": "value/maxを正規化して表示とRadix両方へ適用",
+			"verification": "packages/design-system/src/components/ProgressBar/ProgressBar.test.tsx; E06 red and E07 green; full-suite evidence E05",
+			"withdrawn_reason": "Implemented and verified; retained as resolved historical defect.",
+			"evidence_ids": ["E11F", "E06", "E07"],
+			"impacts": [
+				{
+					"track": "technical",
+					"dimension": "correctness",
+					"criterion": "edge_cases",
+					"reason": "ARIA値と見た目の進捗率が食い違う"
+				}
+			]
+		}
+	],
+	"tracks": {
+		"technical": {
+			"dimensions": {
+				"architecture": {
+					"criteria": {
+						"boundaries": {
+							"status": "assessed",
+							"value": 3,
+							"confidence": "High",
+							"evidence_ids": ["E01", "E05"],
+							"rationale": "Public entry points and domain-specific tests keep dependency direction explicit; boundary script verifies directions.",
+							"countercheck": "Consumer-domain verification and full boundary checks pass; settings/inference documentation omissions corrected."
+						},
+						"flow": {
+							"status": "assessed",
+							"value": 3,
+							"confidence": "High",
+							"evidence_ids": ["E02", "E04", "E07"],
+							"rationale": "State transitions, one writer, receipts/epochs and atomic domain/queue settlement are traced and cancellation/restart tested.",
+							"countercheck": "Reproduced and fixed two adoption/acceptance races; stale owner and rollback tests preserve atomicity."
+						},
+						"fit": {
+							"status": "assessed",
+							"value": 2,
+							"confidence": "Medium",
+							"evidence_ids": ["E01", "E02", "E09"],
+							"rationale": "Single-process loopback and one SQLite writer match documented macOS prototype scope. Real provider/scale acceptance remains separate."
+						}
+					}
+				},
+				"correctness": {
+					"criteria": {
+						"contracts": {
+							"status": "assessed",
+							"value": 3,
+							"confidence": "High",
+							"evidence_ids": ["E03", "E07", "E08"],
+							"rationale": "Valid and invalid schema/process/HTTP contracts checked; CLI UUID and error codes corrected.",
+							"countercheck": "Malformed URL, missing/invalid UUID, offline process and permission rejection exercised."
+						},
+						"edge_cases": {
+							"status": "assessed",
+							"value": 3,
+							"confidence": "High",
+							"evidence_ids": ["E04", "E07", "E08"],
+							"rationale": "History budget, bounded streams, duplicate requests, progress ranges and settings key lifecycle cover important edge invariants.",
+							"countercheck": "Unanswered prior turn, deleted/replaced keys, min/max progress and existing SSE-prefix cases checked."
+						},
+						"concurrency": {
+							"status": "assessed",
+							"value": 3,
+							"confidence": "High",
+							"evidence_ids": ["E02", "E04", "E07"],
+							"rationale": "Ordering, cancellation, writer transactions, resource slots and late-result fences tested across backend and browser audio.",
+							"countercheck": "Writer-window voice negative control plus pending resume, owner loss and cancelled inference regressions pass."
+						}
+					}
+				},
+				"security": {
+					"criteria": {
+						"access": {
+							"status": "assessed",
+							"value": 2,
+							"confidence": "Medium",
+							"evidence_ids": ["E03", "E04", "E05"],
+							"rationale": "Loopback, bearer and Origin controls traced; epoch revocation and stale parent receipts protect provider/adoption boundary in inspected scope."
+						},
+						"input_secrets": {
+							"status": "assessed",
+							"value": 2,
+							"confidence": "Medium",
+							"evidence_ids": ["E03", "E07"],
+							"rationale": "Schema validation, bounded audio/stream inputs, backend-only encrypted credentials and pruning of obsolete ciphertext verified; privileges limited to configured providers/local store."
+						},
+						"abuse": {
+							"status": "assessed",
+							"value": 2,
+							"confidence": "Medium",
+							"evidence_ids": ["E03", "E04", "E05"],
+							"rationale": "Body/response/SSE limits, queue capacity, finite retry and concurrency bounds control inspected authenticated loopback abuse paths."
+						}
+					}
+				},
+				"reliability": {
+					"criteria": {
+						"failure": {
+							"status": "assessed",
+							"value": 3,
+							"confidence": "Medium",
+							"evidence_ids": ["E02", "E04", "E07", "E08"],
+							"rationale": "Timeout/errors/cancellation preserve run/job state; partial stream cannot append fallback; offline CLI becomes explicit.",
+							"countercheck": "Adoption rejection, pending audio start, expired connection, timeout late result and interrupted streams exercised."
+						},
+						"recovery": {
+							"status": "assessed",
+							"value": 3,
+							"confidence": "Medium",
+							"evidence_ids": ["E02", "E04", "E05"],
+							"rationale": "Persisted pending queue work, atomic idempotency and crash/restart behavior verified with process tests; LARM recovery bounded to explicit conditions.",
+							"countercheck": "Killed-process cases before claim/during handler and forbidden replay after SSE publication pass; live provider semantics excluded."
+						},
+						"resilience": {
+							"status": "assessed",
+							"value": 2,
+							"confidence": "Medium",
+							"evidence_ids": ["E04", "E07"],
+							"rationale": "Bounded response/queue/voice-ahead resources and finite provider fallback handle modeled dependency failure; heartbeat listener cleanup prevents accumulation."
+						}
+					}
+				},
+				"maintainability": {
+					"criteria": {
+						"clarity": {
+							"status": "assessed",
+							"value": 2,
+							"confidence": "Medium",
+							"evidence_ids": ["E01", "E02", "E09"],
+							"rationale": "Principal behavior traced through named public contracts and owned repositories; docs now match settings/inference entry points."
+						},
+						"change": {
+							"status": "assessed",
+							"value": 3,
+							"confidence": "Medium",
+							"evidence_ids": ["E01", "E05", "E07"],
+							"rationale": "Eleven representative fixes remain in owning domains/common interfaces with targeted verification and useful regressions.",
+							"countercheck": "Queue settle type change verified in dialogue/inference/voice consumers and full suite; shared UI implicit globals removed."
+						},
+						"debt": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Sustained maintenance cost/history not investigated sufficiently."
+						}
+					}
+				},
+				"common_components": {
+					"criteria": {
+						"duplication": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "All repeated cross-project contracts were not exhaustively compared."
+						},
+						"reuse": {
+							"status": "assessed",
+							"value": 2,
+							"confidence": "Medium",
+							"evidence_ids": ["E08", "E05"],
+							"rationale": "Web and CLI share transport; common UI contracts are exercised without hidden globals and built into Web."
+						},
+						"abstraction": {
+							"status": "assessed",
+							"value": 2,
+							"confidence": "Medium",
+							"evidence_ids": ["E01", "E02", "E08"],
+							"rationale": "Shared transport, typed ports/settle outcomes and UI primitives have concrete consumers and keep DB/credentials in backend."
+						}
+					}
+				},
+				"testing": {
+					"criteria": {
+						"risk_coverage": {
+							"status": "assessed",
+							"value": 3,
+							"confidence": "High",
+							"evidence_ids": ["E05", "E06", "E07"],
+							"rationale": "Primary API/voice/queue/state/recovery/security cases plus fixture browser tests and shared component suite exercised.",
+							"countercheck": "Reproduced eleven root-cause groups; removed artificial globals and added process and race assertions; real audio remains untested."
+						},
+						"quality": {
+							"status": "assessed",
+							"value": 3,
+							"confidence": "High",
+							"evidence_ids": ["E06", "E07"],
+							"rationale": "Red/green regressions check provider inputs, no-ASR-after-stop, stored state, listener counts, exit codes and ARIA values.",
+							"countercheck": "Negative-control removal of voice writer guard fails; fixed initial Bun assertion scheduling problem; UI global mocks no longer hide exceptions."
+						},
+						"automation": {
+							"status": "assessed",
+							"value": 2,
+							"confidence": "High",
+							"evidence_ids": ["E01", "E05", "E09"],
+							"rationale": "Documented per-domain and full commands enforce format/lint/type/boundary/tests/build/browser checks with source mutation guard. Actual CI/release history not established."
+						}
+					}
+				},
+				"supply_chain": {
+					"criteria": {
+						"dependencies": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Actual vulnerability reachability, provenance/update process, release distribution/integrity and complete dependency rights were not audited."
+						},
+						"build_release": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Actual vulnerability reachability, provenance/update process, release distribution/integrity and complete dependency rights were not audited."
+						},
+						"license": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Actual vulnerability reachability, provenance/update process, release distribution/integrity and complete dependency rights were not audited."
+						}
+					}
+				},
+				"performance": {
+					"criteria": {
+						"budget": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "No representative live/hardware workload, latency/resource/cost budget or benchmark established."
+						},
+						"hot_path": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "No representative live/hardware workload, latency/resource/cost budget or benchmark established."
+						},
+						"measurement": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "No representative live/hardware workload, latency/resource/cost budget or benchmark established."
+						}
+					}
+				},
+				"operability": {
+					"criteria": {
+						"signals": {
+							"status": "assessed",
+							"value": 2,
+							"confidence": "Medium",
+							"evidence_ids": ["E08", "E10", "E05"],
+							"rationale": "Run/job failures, settings/connection/voice states and bounded notifications expose primary progress/errors; connection code and accessibility values now consistent."
+						},
+						"lifecycle": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Real setup/update/removal and physical three-exchange voice acceptance not executed."
+						},
+						"interaction": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Real setup/update/removal and physical three-exchange voice acceptance not executed."
+						}
+					}
+				}
+			}
+		}
+	}
+}

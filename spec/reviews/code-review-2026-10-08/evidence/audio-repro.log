@@ -1,0 +1,27 @@
+
+ RUN  v4.1.8 /Users/y.noguchi/Code/eumenes
+
+ ❯ web/src/domains/audio/test/audio.test.ts (5 tests | 1 failed) 66ms
+   × stopping while audio resume is pending never installs capture or reports a late error 54ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  web/src/domains/audio/test/audio.test.ts > stopping while audio resume is pending never installs capture or reports a late error
+TypeError: Cannot read properties of undefined (reading 'sampleRate')
+ ❯ Object.start web/src/domains/audio/controller/index.ts:127:26
+    125|     await context.resume();
+    126|     detector = new VoiceActivityDetector({
+    127|      sampleRate: context.sampleRate,
+       |                          ^
+    128|      silenceTimeoutMs: options.silenceMs ?? 700,
+    129|      speechThresholdRms: options.threshold ?? 0.008,
+ ❯ web/src/domains/audio/test/audio.test.ts:235:2
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 passed (5)
+   Start at  11:58:10
+   Duration  1.12s (transform 38ms, setup 0ms, import 60ms, tests 66ms, environment 897ms)
+

@@ -1,0 +1,13 @@
+bun test v1.4.2 (744846f84)
+
+api/application/cli.test.ts:
+(pass) CLI connection failure has the documented exit code and stdout stays empty [32.30ms]
+(pass) CLI rejects missing or invalid request IDs before submitting a new run [63.22ms]
+(pass) CLI reports invalid API configuration as an argument error [30.28ms]
+(pass) CLI rejects invalid ftp API URL before requesting or exposing credentials [29.88ms]
+(pass) CLI rejects invalid http API URL before requesting or exposing credentials [31.35ms]
+
+ 5 pass
+ 0 fail
+ 21 expect() calls
+Ran 5 tests across 1 file. [216.00ms]

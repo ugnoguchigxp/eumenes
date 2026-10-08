@@ -6,8 +6,19 @@ export class ApiError extends Error {
 		super(message);
 	}
 }
+export class ApiConnectionError extends TypeError {
+	constructor() {
+		super("api_connection_failed");
+	}
+}
 export function createTransport(baseUrl: string, token?: string) {
 	const base = new URL(baseUrl);
+	if (
+		!["http:", "https:"].includes(base.protocol) ||
+		base.username ||
+		base.password
+	)
+		throw new Error("invalid_api_url");
 	if (!["127.0.0.1", "localhost"].includes(base.hostname))
 		throw new Error("loopback_api_required");
 	return {
@@ -20,6 +31,10 @@ export function createTransport(baseUrl: string, token?: string) {
 					...init.headers,
 				},
 				cache: "no-store",
+			}).catch((error: unknown) => {
+				if (error instanceof TypeError && !init.signal?.aborted)
+					throw new ApiConnectionError();
+				throw error;
 			});
 			if (!response.ok) {
 				const error = (await response

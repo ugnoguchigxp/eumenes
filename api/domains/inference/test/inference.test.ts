@@ -34,6 +34,7 @@ async function setup(
 	options: {
 		local?: LarmPort["answer"];
 		localStream?: LarmPort["answerStream"];
+		localSpeech?: LarmPort["speak"];
 		fetch?: typeof fetch;
 		localMs?: number;
 	} = {},
@@ -90,9 +91,11 @@ async function setup(
 		transcribe: async () => {
 			throw new Error("larm_control_503");
 		},
-		speak: async () => {
-			throw new Error("larm_control_503");
-		},
+		speak:
+			options.localSpeech ??
+			(async () => {
+				throw new Error("larm_control_503");
+			}),
 		close: async () => {},
 	};
 	const fetcher = (async (url: URL | Request | string, init?: RequestInit) => {
@@ -152,6 +155,88 @@ test("three purposes fall back once, adapters preserve paths and usage; no dupli
 	expect(usage.filter((u) => u.accepted)).toHaveLength(3);
 	expect(usage.filter((u) => u.source === "larm")).toHaveLength(3);
 	expect(usage.some((u) => u.inputTokens === 7)).toBe(true);
+});
+test("cloud TTS keeps its own voice and speed from the accepted settings snapshot", async () => {
+	const h = await setup();
+	const s = h.settings.get();
+	s.larm.voice = "local-voice";
+	s.larm.speed = 0.7;
+	const resource = s.resources.find((r) => r.purpose === "tts")!;
+	resource.voice = "cloud-voice";
+	resource.speed = 1.5;
+	await h.settings.apply({
+		requestId: crypto.randomUUID(),
+		expectedRevision: s.revision,
+		settings: s,
+		keys: [],
+	});
+	const id = await h.store.write((db) =>
+		h.inference.captureInTransaction(
+			db,
+			"speech-settings",
+			"tts",
+			Date.now() + 10000,
+		),
+	);
+	const newer = h.settings.get();
+	newer.resources.find((r) => r.purpose === "tts")!.speed = 1.9;
+	await h.settings.apply({
+		requestId: crypto.randomUUID(),
+		expectedRevision: newer.revision,
+		settings: newer,
+		keys: [],
+	});
+	await h.inference.executeRequest(id, "answer", new AbortController().signal);
+	expect(JSON.parse(String(h.payloads.at(-1)))).toMatchObject({
+		voice: "cloud-voice",
+		speed: 1.5,
+		response_format: "wav",
+	});
+});
+test("automatic intonation uses each phrase and its immutable manual baseline; disabling restores manual delivery", async () => {
+	const adjustments: Array<number | undefined> = [];
+	const h = await setup({
+		localSpeech: async (_text, _signal, options) => {
+			adjustments.push(options?.intonationScale);
+			return wav();
+		},
+	});
+	const s = h.settings.get();
+	s.larm.autoIntonation = true;
+	s.larm.intonationScale = 1.1;
+	await h.settings.apply({
+		requestId: crypto.randomUUID(),
+		expectedRevision: s.revision,
+		settings: s,
+		keys: [],
+	});
+	const id = await h.store.write((db) =>
+		h.inference.captureInTransaction(
+			db,
+			"question-phrase",
+			"tts",
+			Date.now() + 10000,
+		),
+	);
+	const newer = h.settings.get();
+	newer.larm.intonationScale = 1.9;
+	newer.larm.autoIntonation = false;
+	await h.settings.apply({
+		requestId: crypto.randomUUID(),
+		expectedRevision: newer.revision,
+		settings: newer,
+		keys: [],
+	});
+	await h.inference.executeRequest(
+		id,
+		"確認しますか？",
+		new AbortController().signal,
+	);
+	await h.inference.speak(
+		"ありがとうございます！",
+		new AbortController().signal,
+	);
+	expect(adjustments).toEqual([1.32, undefined]);
 });
 test("authentication, invalid contracts and caller cancellation never trigger cloud", async () => {
 	for (const code of [

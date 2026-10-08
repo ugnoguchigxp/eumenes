@@ -9,15 +9,9 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DropdownMenu } from "./DropdownMenu";
 
-// Mock global log object if it exists in the component but not imported
-vi.stubGlobal("log", {
-	debug: vi.fn(),
-	info: vi.fn(),
-	error: vi.fn(),
-});
-
 // Mock ResizeObserver
 beforeEach(() => {
+	delete (globalThis as unknown as Record<string, unknown>).log;
 	global.ResizeObserver = class ResizeObserver {
 		observe = vi.fn();
 		unobserve = vi.fn();

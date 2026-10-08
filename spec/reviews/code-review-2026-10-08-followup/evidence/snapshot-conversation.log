@@ -1,0 +1,33 @@
+$ bun scripts/verify.ts --domain conversation
+[verify] selected=conversation dependencyClosure=conversation
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check api/domains/conversation web/src/domains/conversation web/src/components/domains/conversation
+$ oxfmt --check api/domains/conversation web/src/domains/conversation web/src/components/domains/conversation
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 4ms on 16 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint api/domains/conversation web/src/domains/conversation web/src/components/domains/conversation
+$ oxlint --deny-warnings api/domains/conversation web/src/domains/conversation web/src/components/domains/conversation
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun x tsc -p /private/var/folders/mx/jbv8qfwd52z14q0mby_273lhlp5gd2/T/eumenes-review2-snapshot-07h5rqj4/verification-reports/tsconfig.selected.json
+[verify] TypeScript workspace closure: 17 files; api/domains/conversation, api/infrastructure/sqlite, client/transport.ts, client/conversation.ts, web/src/domains, web/src/components
+[verify] domain tests: /Users/y.noguchi/.bun/bin/bun run test:domain -- conversation
+$ bun scripts/test-domain.ts conversation
+bun test v1.4.2 (744846f84)
+
+api/domains/conversation/test/conversation.test.ts:
+(pass) conversation saves and survives reopen; second writer is refused [14.05ms]
+
+ 1 pass
+ 0 fail
+ 3 expect() calls
+Ran 1 test across 1 file. [50.00ms]
+
+ RUN  v4.1.8 /private/var/folders/mx/jbv8qfwd52z14q0mby_273lhlp5gd2/T/eumenes-review2-snapshot-07h5rqj4
+
+
+ Test Files  2 passed (2)
+      Tests  8 passed (8)
+   Start at  22:48:27
+   Duration  606ms (transform 38ms, setup 0ms, import 133ms, tests 63ms, environment 732ms)
+
+[verify] passed 2257 ms

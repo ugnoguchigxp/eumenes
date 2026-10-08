@@ -208,3 +208,46 @@ test("evicting cached audio also clears the ready state", async () => {
 		rmSync(dir, { recursive: true, force: true });
 	}
 });
+
+test("stopping a session fences acceptance waiting in the writer queue", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "eumenes-voice-stop-"));
+	const store = openStore(join(dir, "db.sqlite3"), [
+		migration,
+		sequenceMigration,
+	]);
+	let asr = 0;
+	const larm: LarmPort = {
+		status: () => ({ state: "ready", capabilities: ["asr"] }),
+		connect: async () => {},
+		answer: async () => "answer",
+		transcribe: async () => {
+			asr++;
+			return "text";
+		},
+		speak: async () => wav,
+		close: async () => {},
+	};
+	const voice = createVoiceDialogue(
+		store,
+		{} as ReturnType<typeof createDialogueService>,
+		larm,
+	);
+	try {
+		const session = crypto.randomUUID(),
+			id = crypto.randomUUID();
+		voice.start(session, 1);
+		const accepted = voice.accept(session, 1, 1, id, wav);
+		const outcome = accepted.then(
+			() => null,
+			(error: Error) => error,
+		);
+		await voice.stop(session, 1);
+		expect((await outcome)?.message).toBe("voice_session_inactive");
+		expect(voice.get(id)).toBeNull();
+		expect(asr).toBe(0);
+	} finally {
+		await voice.close();
+		await store.close();
+		rmSync(dir, { recursive: true, force: true });
+	}
+});

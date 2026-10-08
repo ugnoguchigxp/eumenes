@@ -1,0 +1,53 @@
+$ bun scripts/verify.ts --domain queue
+[verify] selected=queue dependencyClosure=queue
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check api/domains/queue
+$ oxfmt --check api/domains/queue
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 4ms on 13 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint api/domains/queue
+$ oxlint --deny-warnings api/domains/queue
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun x tsc -p /private/var/folders/mx/jbv8qfwd52z14q0mby_273lhlp5gd2/T/eumenes-review2-snapshot-07h5rqj4/verification-reports/tsconfig.selected.json
+[verify] TypeScript workspace closure: 15 files; api/domains/queue, api/infrastructure/sqlite, scripts/domains.ts
+[verify] domain tests: /Users/y.noguchi/.bun/bin/bun run test:domain -- queue
+$ bun scripts/test-domain.ts queue
+bun test v1.4.2 (744846f84)
+
+api/domains/queue/test/sleep.test.ts:
+(pass) heartbeat waits release abort listeners after each elapsed interval [23.01ms]
+(pass) a wait on an already cancelled signal returns immediately [0.13ms]
+
+api/domains/queue/test/queue.test.ts:
+(pass) same dedupe key converges; different content conflicts; capacity rejects atomically [14.13ms]
+(pass) success settles business and job together; failure of business rolls both back [21.19ms]
+(pass) resource slot and concurrency key serialize claims; interactive goes first [32.71ms]
+(pass) order within a conversation is kept even when a later job is interactive and earlier is background [27.66ms]
+(pass) retry only for allowed transient failures, with finite attempts and backoff [43.46ms]
+(pass) unregistered kind and unsupported version fail explicitly [11.31ms]
+(pass) cancel of running job rejects late result and keeps the slot until the handler stops [1155.69ms]
+(pass) cancel of queued job is immediate and routed through the handler [8.17ms]
+(pass) lost lease: old result is rejected and the resource is not reused while the old handler lives [25.94ms]
+(pass) deadline aborts the running handler and expires the job without adopting a late result [10.44ms]
+(pass) recover: queued continue, running follows policy, cancel_requested becomes outcome_unknown [12.25ms]
+(pass) lost wake-up: the loop still finds committed work within the poll interval; idle never calls handlers [80.75ms]
+(pass) close aborts running handlers, settles them interrupted, and blocks late writes [61.65ms]
+(pass) async transaction callbacks are rejected [10.90ms]
+(pass) a claim that cannot start still settles the owning domain [10.06ms]
+(pass) past-due blocked work does not make the loop spin [9.83ms]
+(pass) resource aliases make persisted old jobs and new jobs share the same concurrency limit [31.91ms]
+
+api/domains/queue/test/recovery.test.ts:
+(pass) process killed after commit but before claim: the job survives and runs after restart [79.01ms]
+(pass) process killed while a handler is running: restart marks it interrupted with a closed attempt [55.27ms]
+(pass) second process cannot own the same database while the first lives [9.33ms]
+
+api/domains/queue/test/boundaries.test.ts:
+(pass) queue and scheduler declare only their real dependencies [0.62ms]
+(pass) a dependency cycle stops with an explicit error [0.25ms]
+
+ 24 pass
+ 0 fail
+ 77 expect() calls
+Ran 24 tests across 4 files. [1.78s]
+[verify] passed 3487 ms

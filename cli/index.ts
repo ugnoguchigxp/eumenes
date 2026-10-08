@@ -1,5 +1,5 @@
-import { ApiError, createClient } from "../client";
-import type { Run } from "../api/domains/dialogue/contracts";
+import { ApiError, ApiConnectionError, createClient } from "../client";
+import { submitSchema, type Run } from "../api/domains/dialogue/contracts";
 import { resolveApiToken } from "../api/infrastructure/auth-config";
 
 const args = process.argv.slice(2);
@@ -12,6 +12,10 @@ for (let i = 0; i < args.length; i++) {
 	if (value === "--json" || value === "--wait") continue;
 	if (value === "--request-id") {
 		explicitRequestId = args[++i];
+		if (!submitSchema.shape.requestId.safeParse(explicitRequestId).success) {
+			console.error("--request-id requires a UUID");
+			process.exit(2);
+		}
 		continue;
 	}
 	if (!value || value.startsWith("--")) {
@@ -22,16 +26,15 @@ for (let i = 0; i < args.length; i++) {
 }
 const command = positional.shift();
 const url = process.env.EUMENES_URL ?? "http://127.0.0.1:8787";
-let token: string;
+let client: ReturnType<typeof createClient>;
 try {
-	token = resolveApiToken(process.env);
+	client = createClient(url, resolveApiToken(process.env));
 } catch (error) {
 	console.error(
 		error instanceof Error ? error.message : "API auth is not configured",
 	);
 	process.exit(2);
 }
-const client = createClient(url, token);
 function show(value: unknown) {
 	console.log(
 		json
@@ -121,7 +124,7 @@ try {
 	if (error instanceof ApiError) {
 		console.error(error.message);
 		process.exitCode = error.status === 401 ? 2 : 3;
-	} else if (error instanceof TypeError && /fetch/i.test(error.message)) {
+	} else if (error instanceof ApiConnectionError) {
 		console.error(
 			`Cannot connect to ${url}. Start backend with bun run start.`,
 		);

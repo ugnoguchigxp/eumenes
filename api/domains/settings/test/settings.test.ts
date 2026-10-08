@@ -11,7 +11,48 @@ import { join } from "node:path";
 import { openStore } from "../../../infrastructure/sqlite";
 import { createSettings, migration, epochsMigration } from "..";
 import type { Settings } from "../contracts";
+import { settingsSchema } from "../contracts";
 const cleanup: Array<() => Promise<void>> = [];
+test("old settings retain normal playback; speech adjustments validate and persist", async () => {
+	const h = await setup();
+	const old = JSON.parse(JSON.stringify(h.settings.get()));
+	delete old.voice.outputVolume;
+	delete old.larm.speed;
+	expect(settingsSchema.parse(old).voice.outputVolume).toBe(1);
+	const s = settingsSchema.parse(old);
+	s.voice.outputVolume = 0;
+	s.larm.voice = "selected-voice";
+	s.larm.speed = 1.4;
+	s.larm.style = "sweet";
+	s.larm.pitchScale = 0.03;
+	s.larm.intonationScale = 1.15;
+	s.larm.autoIntonation = true;
+	await h.settings.apply({
+		requestId: crypto.randomUUID(),
+		expectedRevision: s.revision,
+		settings: s,
+		keys: [],
+	});
+	const reopened = await createSettings(h.store, { dbPath: h.dbPath, env: {} });
+	expect(reopened.get().larm).toMatchObject({
+		voice: "selected-voice",
+		speed: 1.4,
+		style: "sweet",
+		pitchScale: 0.03,
+		intonationScale: 1.15,
+		autoIntonation: true,
+	});
+	expect(reopened.get().voice.outputVolume).toBe(0);
+	for (const speed of [0, 2.1, NaN])
+		expect(
+			settingsSchema.safeParse({ ...s, larm: { ...s.larm, speed } }).success,
+		).toBe(false);
+	for (const outputVolume of [-0.1, 1.1, NaN])
+		expect(
+			settingsSchema.safeParse({ ...s, voice: { ...s.voice, outputVolume } })
+				.success,
+		).toBe(false);
+});
 afterEach(async () => {
 	for (const close of cleanup.splice(0)) await close();
 });
@@ -77,7 +118,7 @@ test("bootstraps once; atomic revision and idempotency; encrypted secret never i
 	await expect(
 		h.settings.apply({
 			...input,
-			settings: { ...s, general: { theme: "dark" } },
+			settings: { ...s, general: { ...s.general, theme: "dark" } },
 		}),
 	).rejects.toThrow("request_conflict");
 	await expect(
@@ -184,4 +225,70 @@ test("deleting then recreating the same connection ID cannot revive old permissi
 			h.settings.valid(db, saved, "llm", saved.connections[0]),
 		),
 	).toBe(false);
+});
+
+test("malformed LARM URLs are validation errors and same-host requires loopback", async () => {
+	const h = await setup();
+	const s = h.settings.get();
+	for (const baseUrl of ["bad-url", "", "https://public.example"])
+		await expect(
+			h.settings.apply({
+				requestId: crypto.randomUUID(),
+				expectedRevision: 0,
+				settings: { ...s, larm: { ...s.larm, baseUrl } },
+				keys: [],
+			}),
+		).rejects.toThrow();
+	// safeParse must return an issue instead of throwing from URL construction.
+	const { settingsSchema } = await import("../contracts");
+	expect(
+		settingsSchema.safeParse({ ...s, larm: { ...s.larm, baseUrl: "bad-url" } })
+			.success,
+	).toBe(false);
+	expect(
+		settingsSchema.safeParse({
+			...s,
+			larm: { ...s.larm, audience: "same-host", baseUrl: null },
+		}).success,
+	).toBe(false);
+});
+
+test("key replacement, key deletion and connection deletion discard obsolete ciphertext", async () => {
+	const h = await setup();
+	const s = h.settings.get();
+	const c = cloud(s);
+	const apply = (
+		settings: Settings,
+		keys: Array<{ connectionId: string; value: string | null }>,
+	) =>
+		h.settings.apply({
+			requestId: crypto.randomUUID(),
+			expectedRevision: settings.revision,
+			settings,
+			keys,
+		});
+	const count = () =>
+		h.store.read(
+			(db) =>
+				(
+					db.query("SELECT count(*) AS n FROM settings_credentials").get() as {
+						n: number;
+					}
+				).n,
+		);
+	let saved = await apply(s, [{ connectionId: c, value: "first-key" }]);
+	saved = await apply(saved, [{ connectionId: c, value: "replacement-key" }]);
+	expect(count()).toBe(1);
+	expect(h.settings.credential(saved.connections[0]!)).toBe("replacement-key");
+	saved = await apply(saved, [{ connectionId: c, value: null }]);
+	expect(count()).toBe(0);
+	saved = await apply(saved, [{ connectionId: c, value: "last-key" }]);
+	saved.connections = [];
+	saved.resources = [];
+	saved.routes.llm.fallbackId = null;
+	await apply(saved, []);
+	expect(count()).toBe(0);
+	unlinkSync(join(h.dir, "keys/settings.key"));
+	const reopened = await createSettings(h.store, { dbPath: h.dbPath, env: {} });
+	expect(reopened.diagnostics().keyError).toBeNull();
 });

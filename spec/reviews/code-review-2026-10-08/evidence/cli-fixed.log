@@ -1,0 +1,11 @@
+bun test v1.4.2 (744846f84)
+
+api/application/cli.test.ts:
+(pass) CLI connection failure has the documented exit code and stdout stays empty [29.18ms]
+(pass) CLI rejects missing or invalid request IDs before submitting a new run [60.09ms]
+(pass) CLI reports invalid API configuration as an argument error [28.09ms]
+
+ 3 pass
+ 0 fail
+ 11 expect() calls
+Ran 3 tests across 1 file. [144.00ms]

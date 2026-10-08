@@ -5,8 +5,8 @@ TypeScript、Bun、Hono、React、SQLite によるローカル音声対話の初
 ## 起動
 
 1. `bun install`
-2. 必要に応じて `.env.example` を `.env` にコピーします。`LARM_API_TOKEN` が export 済みなら追加のトークン設定は不要です。backend・開発サーバー・CLI は同じ環境変数を引き継ぐシェルから起動してください。`EUMENES_API_TOKEN` は空欄のままにでき、ローカル API 用の認証値を LARM トークンから用途を分けて生成します。明示的に指定する場合は24文字以上にします。同じ `.env` を backend と Vite が読み、Vite のローカル proxy が API 認証を付けます。ブラウザには token を渡しません。LARM は `http://192.168.0.130:9810` の `SAAA-gemma4-26b` を既定値とし、同じ Linux ホストから使う場合は URL を `http://127.0.0.1:9810`、`LARM_AUDIENCE` を `same-host` にします。LARM 認証は SAAA と共通の `LARM_API_TOKEN` を優先し、未指定なら `LARM_CONTROL_TOKEN` を使います。TTS の voice は `EUMENES_TTS_VOICE`、claim の voice、LARM の声一覧 API が公開する `default_voice` の順に解決します。声一覧の取得には backend の control token を使い、一覧に存在する既定 voice だけを採用します。秘密をリポジトリへコピーしないでください。
-3. 別々のターミナルで `bun run start` と `bun run dev` を実行します。
+2. 必要に応じて `.env.example` を `.env` にコピーします。`LARM_API_TOKEN` が export 済みなら追加のトークン設定は不要です。backend・開発サーバー・CLI は同じ環境変数を引き継ぐシェルから起動してください。`EUMENES_API_TOKEN` は空欄のままにでき、ローカル API 用の認証値を LARM トークンから用途を分けて生成します。明示的に指定する場合は24文字以上にします。同じ `.env` を backend と Vite が読み、Vite のローカル proxy が API 認証を付けます。ブラウザには token を渡しません。LARM は `http://192.168.0.130:9810` の `SAAA-gemma4-26b` を既定値とし、同じ Linux ホストから使う場合は URL を `http://127.0.0.1:9810`、`LARM_AUDIENCE` を `same-host` にします。LARM 認証は SAAA と共通の `LARM_API_TOKEN` を優先し、未指定なら `LARM_CONTROL_TOKEN` を使います。TTS の声は「設定 → 音声」でキャラクター・発話スタイル・話す速さ・声の高さ・抑揚・音量を調整できます。声一覧と合成には claim した TTS Provider の baseUrl・model・token を使い、秘密をブラウザへ渡しません。VOICEVOXの自動選択では catalog の `default_voice` を使います。スタイル・高さ・抑揚は `voicevox-core` にだけ送信します。設定がまだない場合の voice 初期値は `EUMENES_TTS_VOICE` で、他モデルでは claim の voice または catalog の既定 voice を使います。秘密をリポジトリへコピーしないでください。
+3. `bun run dev` を実行します。APIが起動してから画面用サーバーを起動し、Ctrl+Cで両方を終了します。既にAPIを起動している場合は、一度終了してから実行してください。個別に起動する場合は、別々のターミナルで `bun run start` と `bun run dev:web` を使えます。
 4. `http://127.0.0.1:5173` を開くと会話欄に入ります。「音声を開始」でマイクを許可し、日本語で話します。「停止」で録音と再生を終了します。再生中の次の発話は前の再生を割り込みます。
 
 backend は `127.0.0.1:8787` のみで待ち受けます。Chrome/Chromium の Playwright fixture で画面・音声経路を確認しています。実マイク・ヘッドホンによる3往復の受入は未実施です。
@@ -61,7 +61,7 @@ LARM_BASE_URL=... EUMENES_LIVE_ASR_WAV=/absolute/path/speech.wav EUMENES_LIVE_EX
 ## 現在の限界と次の工程
 
 
-実マイク・ヘッドホンでの3往復と再生中割込みの受入、機器ごとの権限・echo、CLI の中断・接続不能のプロセス試験を残しています。発話ごとの音声は最大4 MB に制限し、backend は受信 stream を読みながら上限を検査します。sequence と発話 ID で順序・再送を検査します。録音中の逐次 ASR は未実装です。LARM の実接続は合成音声を入力として個別操作を確認しました。受入項目は [docs/acceptance.md](docs/acceptance.md)、SAAA 参照元と教訓は [docs/saaa-provenance.md](docs/saaa-provenance.md) に記録しています。
+実マイク・ヘッドホンでの3往復と再生中割込みの受入、機器ごとの権限・echo、CLI の中断のプロセス試験を残しています。接続不能と引数不正はfixtureのプロセス試験で確認済みです。発話ごとの音声は最大4 MB に制限し、backend は受信 stream を読みながら上限を検査します。sequence と発話 ID で順序・再送を検査します。録音中の逐次 ASR は未実装です。LARM の実接続は合成音声を入力として個別操作を確認しました。受入項目は [docs/acceptance.md](docs/acceptance.md)、SAAA 参照元と教訓は [docs/saaa-provenance.md](docs/saaa-provenance.md) に記録しています。
 
 RAG、個人記憶、ToolChain、経験再利用、Tauri、native AEC は後続構想です。[SAAA 全体コンセプト](https://chatgpt.com/space/page_9fc5877949748191b556705128f6a2f5) を継承先として扱い、この初版では先行実装していません。
 

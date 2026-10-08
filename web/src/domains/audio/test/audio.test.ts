@@ -2,6 +2,81 @@ import { afterEach, expect, test, vi } from "vitest";
 import { createAudioController, createAudioStore } from "..";
 
 afterEach(() => vi.unstubAllGlobals());
+test("playback volume includes mute and releases gain on completion and cancellation", async () => {
+	const gains: Array<{
+		gain: { value: number };
+		connect: ReturnType<typeof vi.fn>;
+		disconnect: ReturnType<typeof vi.fn>;
+	}> = [];
+	const sources: Array<{
+		onended: (() => void) | null;
+		buffer: unknown;
+		connect: ReturnType<typeof vi.fn>;
+		start: ReturnType<typeof vi.fn>;
+		stop: ReturnType<typeof vi.fn>;
+	}> = [];
+	vi.stubGlobal("navigator", {
+		mediaDevices: {
+			getUserMedia: async () => ({ getTracks: () => [{ stop() {} }] }),
+		},
+	});
+	class Context {
+		sampleRate = 48000;
+		destination = {};
+		async resume() {}
+		async close() {}
+		createMediaStreamSource() {
+			return { connect() {}, disconnect() {} };
+		}
+		createScriptProcessor() {
+			return { connect() {}, disconnect() {} };
+		}
+		async decodeAudioData() {
+			return {};
+		}
+		createGain() {
+			const gain = {
+				gain: { value: 1 },
+				connect: vi.fn(),
+				disconnect: vi.fn(),
+			};
+			gains.push(gain);
+			return gain;
+		}
+		createBufferSource() {
+			const source = {
+				onended: null as (() => void) | null,
+				buffer: null as unknown,
+				connect: vi.fn(),
+				start: vi.fn(),
+				stop: vi.fn(),
+			};
+			sources.push(source);
+			return source;
+		}
+	}
+	vi.stubGlobal("AudioContext", Context);
+	const audio = createAudioController(
+		() => {},
+		() => {},
+		() => {},
+	);
+	await audio.start();
+	const ended = vi.fn();
+	await audio.play(new Uint8Array(44), ended, { volume: 0.4 });
+	expect(gains[0]!.gain.value).toBe(0.4);
+	expect(sources[0]!.connect).toHaveBeenCalledWith(gains[0]);
+	sources[0]!.onended?.();
+	expect(ended).toHaveBeenCalledOnce();
+	expect(gains[0]!.disconnect).toHaveBeenCalledOnce();
+	await audio.play(new Uint8Array(44), ended, { volume: 0 });
+	expect(gains[1]!.gain.value).toBe(0);
+	audio.stopPlayback();
+	expect(sources[1]!.stop).toHaveBeenCalledOnce();
+	expect(gains[1]!.disconnect).toHaveBeenCalledOnce();
+	expect(ended).toHaveBeenCalledOnce();
+	await audio.stop();
+});
 test("audio store instances do not leak state", () => {
 	const first = createAudioStore(),
 		second = createAudioStore();
@@ -208,4 +283,51 @@ test("without interruption the next response waits, while superseded waiting aud
 	await next;
 	expect(started).toBe(3);
 	await audio.stop();
+});
+
+test("stopping while audio resume is pending never installs capture or reports a late error", async () => {
+	let resume: (() => void) | undefined;
+	let stopped = 0,
+		installed = 0;
+	const states: string[] = [];
+	vi.stubGlobal("navigator", {
+		mediaDevices: {
+			getUserMedia: async () => ({
+				getTracks: () => [{ stop: () => stopped++ }],
+			}),
+		},
+	});
+	class Context {
+		sampleRate = 48000;
+		destination = {};
+		resume() {
+			return new Promise<void>((resolve) => {
+				resume = resolve;
+			});
+		}
+		async close() {}
+		createMediaStreamSource() {
+			installed++;
+			return { connect() {}, disconnect() {} };
+		}
+		createScriptProcessor() {
+			return { connect() {}, disconnect() {} };
+		}
+	}
+	vi.stubGlobal("AudioContext", Context);
+	const audio = createAudioController(
+		(state) => states.push(state.phase),
+		() => {},
+		() => {},
+	);
+	const starting = audio.start();
+	await vi.waitFor(() => expect(resume).not.toBeUndefined());
+	// getUserMedia resolves in the first microtask, before start awaits resume.
+	await Promise.resolve();
+	await audio.stop();
+	resume!();
+	await starting;
+	expect(stopped).toBe(1);
+	expect(installed).toBe(0);
+	expect(states.at(-1)).toBe("idle");
 });

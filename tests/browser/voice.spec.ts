@@ -1,15 +1,41 @@
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
+import { type AddressInfo, createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
+import { resolveApiToken } from "../../api/infrastructure/auth-config";
 
 const root = process.cwd();
 const processes: ChildProcess[] = [];
 let dir: string;
-const apiPort = 18787,
-	webPort = 15173,
-	larmPort = 19810;
+let apiPort: number, webPort: number, larmPort: number;
+async function fixturePorts() {
+	const servers = [createServer(), createServer(), createServer()];
+	try {
+		await Promise.all(
+			servers.map(
+				(server) =>
+					new Promise<void>((resolve, reject) => {
+						server.once("error", reject);
+						server.listen(0, "127.0.0.1", resolve);
+					}),
+			),
+		);
+		return servers.map((server) => (server.address() as AddressInfo).port) as [
+			number,
+			number,
+			number,
+		];
+	} finally {
+		await Promise.all(
+			servers.map(
+				(server) =>
+					new Promise<void>((resolve) => server.close(() => resolve())),
+			),
+		);
+	}
+}
 async function ready(url: string) {
 	for (let i = 0; i < 100; i++) {
 		try {
@@ -30,6 +56,7 @@ function launch(args: string[], env: Record<string, string> = {}) {
 	return child;
 }
 test.beforeAll(async () => {
+	[apiPort, webPort, larmPort] = await fixturePorts();
 	dir = mkdtempSync(join(tmpdir(), "eumenes-browser-"));
 	launch(["scripts/larm-fixture-server.ts"], {
 		LARM_FIXTURE_PORT: String(larmPort),
@@ -45,6 +72,20 @@ test.beforeAll(async () => {
 		LARM_CONTROL_TOKEN: "",
 	});
 	await ready(`http://127.0.0.1:${apiPort}/api/status`);
+	await expect
+		.poll(
+			async () => {
+				const response = await fetch(`http://127.0.0.1:${apiPort}/api/status`, {
+					headers: {
+						Authorization: `Bearer ${resolveApiToken({ LARM_API_TOKEN: "fixture-control" })}`,
+					},
+				});
+				if (!response.ok) return response.status;
+				return (await response.json()).larm.state;
+			},
+			{ timeout: 15000 },
+		)
+		.toBe("ready");
 	launch(["x", "vite", "--host", "127.0.0.1", "--port", String(webPort)], {
 		EUMENES_PROXY_URL: `http://127.0.0.1:${apiPort}`,
 		EUMENES_API_TOKEN: "",
@@ -60,6 +101,337 @@ test.afterAll(async () => {
 	for (const child of processes)
 		if (child.exitCode === null) child.kill("SIGKILL");
 	rmSync(dir, { recursive: true, force: true });
+});
+test.describe("light avatar rendering", () => {
+	test("light avatar stays behind usable chat and releases its canvas on navigation", async ({
+		playwright,
+	}) => {
+		const browser = await playwright.chromium.launch({
+			args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"],
+		});
+		try {
+			const context = await browser.newContext();
+			const page = await context.newPage();
+			const url = `http://127.0.0.1:${webPort}`;
+			await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
+			await page.setViewportSize({ width: 390, height: 844 });
+			await page.goto(url);
+			const canvas = page.locator(".light-avatar-background canvas");
+			await expect(canvas).toHaveCount(1);
+			await expect(canvas).toBeVisible();
+			expect(
+				await canvas.evaluate((element) => {
+					const canvas = element as HTMLCanvasElement;
+					return canvas.getContext("webgl2")?.getContextAttributes()?.alpha;
+				}),
+			).toBe(true);
+			await expect(page.locator(".chat-panel")).toHaveCSS(
+				"background-color",
+				"rgba(0, 0, 0, 0)",
+			);
+			await page
+				.getByRole("textbox", { name: "メッセージ" })
+				.fill("配置の確認");
+			await expect(
+				page.getByRole("button", { name: "送信", exact: true }),
+			).toBeEnabled();
+			const composer = await page.locator(".chat-composer").boundingBox();
+			expect(composer).not.toBeNull();
+			expect(composer!.y + composer!.height).toBeLessThanOrEqual(844);
+			for (let i = 0; i < 2; i++) {
+				const menu = page.getByRole("button", { name: "設定メニュー" });
+				if (await menu.count()) await menu.click();
+				await page.getByRole("button", { name: "設定", exact: true }).click();
+				await expect(canvas).toHaveCount(0);
+				await page.getByRole("button", { name: "会話に戻る" }).click();
+				await expect(canvas).toHaveCount(1);
+			}
+			await expect(
+				page.getByRole("textbox", { name: "メッセージ" }),
+			).toHaveValue("配置の確認");
+			const fallback = await context.newPage();
+			try {
+				await fallback.addInitScript(() => {
+					Object.defineProperty(window, "WebGL2RenderingContext", {
+						value: undefined,
+					});
+				});
+				await fallback.goto(url);
+				await fallback
+					.getByRole("textbox", { name: "メッセージ" })
+					.fill("描画なしでも入力");
+				await expect(
+					fallback.locator(".light-avatar-background canvas"),
+				).toHaveCount(0);
+				await expect(
+					fallback.getByRole("button", { name: "送信", exact: true }),
+				).toBeEnabled();
+			} finally {
+				await fallback.close();
+			}
+		} finally {
+			await browser.close();
+		}
+	});
+});
+test("avatar voice controls save and survive a settings reload", async ({
+	page,
+}) => {
+	const url = `http://127.0.0.1:${webPort}`;
+	const original = await (await fetch(`${url}/api/settings`)).json();
+	try {
+		await page.goto(url);
+		await page.getByRole("button", { name: "設定", exact: true }).click();
+		await page.getByRole("button", { name: "音声", exact: true }).click();
+		await expect(
+			page.getByText("アバターの読み上げ音声", { exact: true }),
+		).toBeVisible();
+		await page
+			.getByRole("combobox", { name: "キャラクター", exact: true })
+			.selectOption("fixture-voice-soft");
+		await expect(page.getByLabel("発話スタイル", { exact: true })).toHaveValue(
+			"sweet",
+		);
+		await expect(
+			page.getByText("クレジット: VOICEVOX:テスト話者B", { exact: true }),
+		).toBeVisible();
+		await page
+			.getByLabel("キャラクター", { exact: true })
+			.selectOption("fixture-voice");
+		await expect(page.getByLabel("発話スタイル", { exact: true })).toHaveValue(
+			"normal",
+		);
+		await page
+			.getByLabel("発話スタイル", { exact: true })
+			.selectOption("whisper");
+		const pitch = page.getByRole("slider", { name: /声の高さ/ });
+		await pitch.focus();
+		await pitch.press("Home");
+		for (let i = 0; i < 18; i++) await pitch.press("ArrowRight");
+		const intonation = page.getByRole("slider", { name: /^抑揚/ });
+		await intonation.focus();
+		await intonation.press("Home");
+		for (let i = 0; i < 23; i++) await intonation.press("ArrowRight");
+		await page
+			.getByRole("checkbox", { name: /文章に合わせて抑揚を変える/ })
+			.check();
+		const speed = page.getByRole("slider", { name: /話す速さ/ });
+		await speed.focus();
+		await speed.press("Home");
+		for (let i = 0; i < 9; i++) await speed.press("ArrowRight");
+		const volume = page.getByRole("slider", { name: /読み上げ音量/ });
+		await volume.focus();
+		await volume.press("End");
+		for (let i = 0; i < 12; i++) await volume.press("ArrowLeft");
+		await page.getByRole("button", { name: "変更を適用", exact: true }).click();
+		await expect(
+			page.getByRole("status").filter({ hasText: "変更を適用しました" }),
+		).toBeVisible();
+		const saved = await (await fetch(`${url}/api/settings`)).json();
+		expect(saved.larm).toMatchObject({
+			voice: "fixture-voice",
+			speed: 1.4,
+			style: "whisper",
+			pitchScale: 0.03,
+			intonationScale: 1.15,
+			autoIntonation: true,
+		});
+		expect(saved.voice.outputVolume).toBeCloseTo(0.4);
+		await page.reload();
+		await page.getByRole("button", { name: "音声", exact: true }).click();
+		await expect(page.getByLabel("キャラクター", { exact: true })).toHaveValue(
+			"fixture-voice",
+		);
+		await expect(page.getByLabel("発話スタイル", { exact: true })).toHaveValue(
+			"whisper",
+		);
+		await expect(page.getByRole("slider", { name: /声の高さ/ })).toHaveValue(
+			"0.03",
+		);
+		await expect(page.getByRole("slider", { name: /^抑揚/ })).toHaveValue(
+			"1.15",
+		);
+		await expect(page.getByRole("slider", { name: /話す速さ/ })).toHaveValue(
+			"1.4",
+		);
+		await expect(
+			page.getByRole("slider", { name: /読み上げ音量/ }),
+		).toHaveValue("0.4");
+		// Run the saved settings through the actual backend and its phrase TTS queue.
+		const sessionId = crypto.randomUUID(),
+			utteranceId = crypto.randomUUID();
+		const bytes = new Uint8Array(44);
+		bytes.set(new TextEncoder().encode("RIFF"));
+		bytes.set(new TextEncoder().encode("WAVE"), 8);
+		await fetch(`${url}/api/voice/sessions`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ sessionId, generation: 1 }),
+		});
+		await fetch(`${url}/api/voice/turns`, {
+			method: "POST",
+			headers: {
+				"Content-Type": "audio/wav",
+				"X-Session-Id": sessionId,
+				"X-Generation": "1",
+				"X-Sequence": "1",
+				"X-Utterance-Id": utteranceId,
+			},
+			body: bytes,
+		});
+		await expect
+			.poll(
+				async () =>
+					(await (await fetch(`${url}/api/voice/turns/${utteranceId}`)).json())
+						.status,
+			)
+			.toBe("ready");
+		const observations = await (
+			await fetch(`http://127.0.0.1:${larmPort}/fixture/observations`, {
+				headers: { Authorization: "Bearer fixture-control" },
+			})
+		).json();
+		expect(observations.ttsParameters.at(-1)).toMatchObject({
+			model: "voicevox-core",
+			voice: "fixture-voice",
+			style: "whisper",
+			speed: 1.4,
+			pitch_scale: 0.03,
+			intonation_scale: 1.15,
+			response_format: "wav",
+		});
+		const usage = await (await fetch(`${url}/api/inference/usage`)).json();
+		expect(
+			usage
+				.find(
+					(u: { purpose: string; accepted: number }) =>
+						u.purpose === "tts" && u.accepted,
+				)
+				?.providerDetails.at(-1),
+		).toMatchObject({
+			speechVoice: "fixture-voice",
+			speechCredit: "VOICEVOX:テスト話者A",
+		});
+		await fetch(`${url}/api/voice/sessions/stop`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ sessionId, generation: 1 }),
+		});
+	} finally {
+		const current = await (await fetch(`${url}/api/settings`)).json();
+		await fetch(`${url}/api/settings/apply`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				requestId: crypto.randomUUID(),
+				expectedRevision: current.revision,
+				settings: { ...original, revision: current.revision },
+				keys: [],
+			}),
+		});
+	}
+});
+test("missing catalog or character preserves saved controls until an explicit default reset", async ({
+	page,
+}) => {
+	const url = `http://127.0.0.1:${webPort}`;
+	const original = await (await fetch(`${url}/api/settings`)).json();
+	const selected = {
+		...original,
+		larm: {
+			...original.larm,
+			voice: "fixture-voice",
+			style: "whisper",
+			speed: 1.2,
+			pitchScale: 0.02,
+			intonationScale: 1.1,
+		},
+	};
+	const save = async (settings: typeof selected) => {
+		const current = await (await fetch(`${url}/api/settings`)).json();
+		return fetch(`${url}/api/settings/apply`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				requestId: crypto.randomUUID(),
+				expectedRevision: current.revision,
+				settings,
+				keys: [],
+			}),
+		});
+	};
+	let mode: "failed" | "missing" | "normal" = "failed";
+	await page.route(`${url}/api/inference/voices`, async (route) => {
+		if (mode === "failed")
+			return route.fulfill({
+				status: 503,
+				contentType: "application/json",
+				body: JSON.stringify({ error: "unavailable" }),
+			});
+		if (mode === "normal") return route.continue();
+		const response = await route.fetch();
+		const catalog = await response.json();
+		catalog.default_voice = "fixture-voice-soft";
+		catalog.voices = catalog.voices.filter(
+			(v: { id: string }) => v.id !== "fixture-voice",
+		);
+		return route.fulfill({ response, json: catalog });
+	});
+	try {
+		await save(selected);
+		await page.goto(`${url}/#settings`);
+		await page.getByRole("button", { name: "音声", exact: true }).click();
+		await expect(
+			page.getByText(
+				"声の一覧を取得できません。保存したキャラクターと調整値は保持しています。",
+				{ exact: true },
+			),
+		).toBeVisible();
+		await expect(page.getByLabel("キャラクター", { exact: true })).toHaveValue(
+			"fixture-voice",
+		);
+		expect((await (await fetch(`${url}/api/settings`)).json()).larm).toEqual(
+			selected.larm,
+		);
+		mode = "missing";
+		await page
+			.getByRole("button", { name: "声の一覧を再取得", exact: true })
+			.click();
+		await expect(page.getByRole("alert")).toContainText(
+			"保存したキャラクターが一覧にありません",
+		);
+		expect((await (await fetch(`${url}/api/settings`)).json()).larm).toEqual(
+			selected.larm,
+		);
+		mode = "normal";
+		await page
+			.getByRole("button", { name: "声の一覧を再取得", exact: true })
+			.click();
+		await expect(page.getByLabel("発話スタイル", { exact: true })).toHaveValue(
+			"whisper",
+		);
+		await expect(page.getByRole("slider", { name: /声の高さ/ })).toHaveValue(
+			"0.02",
+		);
+		await page
+			.getByRole("button", { name: "既定のキャラクターに戻す", exact: true })
+			.click();
+		await expect(page.getByLabel("キャラクター", { exact: true })).toHaveValue(
+			"",
+		);
+		await expect(page.getByLabel("発話スタイル", { exact: true })).toHaveValue(
+			"normal",
+		);
+		await page.getByRole("button", { name: "変更を適用", exact: true }).click();
+		await expect(
+			page.getByRole("status").filter({ hasText: "変更を適用しました" }),
+		).toBeVisible();
+		expect(
+			(await (await fetch(`${url}/api/settings`)).json()).larm,
+		).toMatchObject({ voice: "", style: "normal", pitchScale: 0.02 });
+	} finally {
+		await save(original);
+	}
 });
 test("exported LARM token connects the UI and CLI without browser credentials", async ({
 	page,
@@ -105,6 +477,10 @@ test("a backend outage does not poll snapshots and explicit reconnect reloads th
 	const counts = new Map<string, number>();
 	await page.route(`http://127.0.0.1:${webPort}/api/**`, async (route) => {
 		const path = new URL(route.request().url()).pathname;
+		// Restore the fixture only after the user's reconnect action reaches the API.
+		// Background SSE retries must not remove the button before Playwright clicks it.
+		if (path === "/api/larm/connect" && route.request().method() === "POST")
+			unavailable = false;
 		counts.set(path, (counts.get(path) ?? 0) + 1);
 		if (unavailable)
 			await route.fulfill({
@@ -134,7 +510,6 @@ test("a backend outage does not poll snapshots and explicit reconnect reloads th
 	const initial = watched.map((path) => counts.get(path));
 	await page.waitForTimeout(2000);
 	expect(watched.map((path) => counts.get(path))).toEqual(initial);
-	unavailable = false;
 	await page.getByRole("button", { name: "接続を再確認" }).click();
 	await expect(page.locator(".connection-health .health-state")).toHaveText(
 		"ready",

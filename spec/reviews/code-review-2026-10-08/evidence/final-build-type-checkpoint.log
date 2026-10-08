@@ -1,0 +1,238 @@
+$ bun scripts/verify.ts --all
+[verify] selected=settings,inference,conversation,larm,audio,queue,scheduler,dialogue,voice-dialogue dependencyClosure=settings,larm,inference,conversation,audio,queue,scheduler,dialogue,voice-dialogue
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check .
+$ oxfmt --check .
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 111ms on 147 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint .
+$ oxlint --deny-warnings .
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun run typecheck
+$ tsc --noEmit
+[verify] tests: /Users/y.noguchi/.bun/bin/bun test api
+bun test v1.4.2 (744846f84)
+
+api/application/events-client.test.ts:
+(pass) two listeners share one authenticated transport, fragmented frames and last unsubscribe cleans up [25.72ms]
+(pass) reconnect carries a cursor and reset refreshes changes missed while disconnected [8.20ms]
+(pass) a half-open stream reconnects; heartbeat comments do not invalidate snapshots [17.28ms]
+(pass) 401, 403 and 404 stop automatic reconnect [48.83ms]
+(pass) explicit reconnect repairs a stopped stream without changing mounted listeners [17.44ms]
+(pass) update transport failure is observable even when other API reads still succeed [2.72ms]
+
+api/application/app.test.ts:
+(pass) status polling is passive and explicit reconnect requires auth and origin [27.01ms]
+(pass) auth and origin apply to the new endpoints [16.44ms]
+(pass) register → fire → history → pause/resume → cancel through the API [34.65ms]
+(pass) full queue is reported as 503 for submissions [15.60ms]
+(pass) authenticated SSE notifies a background commit and the existing API supplies the snapshot [18.28ms]
+
+api/application/events.test.ts:
+(pass) SSE coalesces changes, resnapshots every connection and releases disconnected clients [1.42ms]
+(pass) heartbeat keeps SSE alive without a state invalidation and shutdown ends reads [5.21ms]
+(pass) a slow reader is disconnected with a bounded buffer [51.27ms]
+
+api/application/cli.test.ts:
+(pass) CLI connection failure has the documented exit code and stdout stays empty [52.45ms]
+(pass) CLI rejects missing or invalid request IDs before submitting a new run [98.23ms]
+(pass) CLI reports invalid API configuration as an argument error [44.74ms]
+
+api/infrastructure/chat-stream.test.ts:
+(pass) provider UTF-8 splits publish answer text before completion and exclude reasoning fields [1.72ms]
+(pass) a disconnected stream is not adopted as a complete answer [0.20ms]
+(pass) cancellation closes a blocked reader and prevents late content [0.16ms]
+
+api/infrastructure/auth-config.test.ts:
+(pass) LARM_API_TOKEN alone supplies distinct, consistent local API auth [0.20ms]
+(pass) empty optional settings do not mask the exported LARM token [0.03ms]
+(pass) explicit API credentials and legacy LARM settings remain supported [0.04ms]
+
+api/infrastructure/snapshot-stream.test.ts:
+(pass) a pending reader receives each snapshot once and terminal delivery releases the observer [1.42ms]
+(pass) a slow reader has bounded snapshots and still receives the final state [0.20ms]
+
+api/infrastructure/sqlite/owner.test.ts:
+(pass) OS lock excludes another process and releases after crash [34.98ms]
+
+api/infrastructure/sqlite/commit.test.ts:
+(pass) commit notifications see persisted state, exclude idle scans/rollback, and cannot fail writes [11.19ms]
+
+api/domains/settings/test/settings.test.ts:
+(pass) bootstraps once; atomic revision and idempotency; encrypted secret never in document [17.67ms]
+(pass) revocation epochs cannot be reset by client; origin changes cannot reuse credential [15.74ms]
+(pass) missing or wrong master key preserves data, disables ciphertext and does not regenerate [16.45ms]
+(pass) deleting then recreating the same connection ID cannot revive old permissions [12.97ms]
+(pass) malformed LARM URLs are validation errors and same-host requires loopback [11.29ms]
+(pass) key replacement, key deletion and connection deletion discard obsolete ciphertext [15.04ms]
+
+api/domains/larm/test/inference-error.test.ts:
+(pass) provider diagnostics retain the code and meaningful message, redact credentials and bound input [0.64ms]
+(pass) cancelled error-body read cannot trigger recovery [0.07ms]
+
+api/domains/larm/test/larm.test.ts:
+(pass) catalog, claim, ASR/LLM/TTS and release use public contract [6.04ms]
+(pass) mismatched claim is rejected before inference and lease is released [0.89ms]
+(pass) oversized inference response is rejected while streaming [3.11ms]
+(pass) simultaneous capability upgrades share one replacement connection [1002.24ms]
+(pass) Gemma requests the live profile and renews by reclaiming the rotated token [2.35ms]
+(pass) voice requests every provider in the Gemma profile [0.85ms]
+(pass) an expired connection stops polling and is released [0.70ms]
+(pass) exported token alone connects to the documented default URL [0.69ms]
+(pass) missing claim voice discovers and caches the advertised default with control auth [1.66ms]
+(pass) an unadvertised default voice is rejected before speech inference [1.39ms]
+(pass) cancelling a caller returns promptly during allocation and close stops polling [6.51ms]
+(pass) runtime changes notify connecting and ready/failed without exposing credentials [1.09ms]
+(pass) idle-released JSON before SSE recreates and claims once; both exchanges survive [2.86ms]
+(pass) local idle expires a still-valid lease without requests; next voice use requests the profile again [57.38ms]
+(pass) an active inference pauses the local idle timer and completion starts a new idle interval [127.42ms]
+(pass) only the explicit idle-released 409 can replay, and recovery is bounded at one replacement [5.09ms]
+(pass) cancellation after the 409 diagnostic prevents replacement and replay [1.48ms]
+(pass) a late concurrent rejection cannot discard the replacement lease [1.30ms]
+(pass) manual connection check follows released state even with unexpired credentials [0.69ms]
+(pass) renew rotates every claimed provider while leaving the idle deadline unchanged [145.82ms]
+(pass) published SSE prefix errors never reconnect or replay inference [1.91ms]
+(pass) idle expiry during a health check cannot revive the released local lease [68.60ms]
+(pass) invalid reclaim after renew discards every old credential before another request [2.53ms]
+(pass) a ready connection waits for requested providers to become claimable before claim [1002.39ms]
+(pass) unauthorized can recover only when control confirms the old connection is released [5.00ms]
+(pass) context trimming retains the current input after an unanswered prior turn [1.01ms]
+
+api/domains/scheduler/test/scheduler.test.ts:
+(pass) once: nothing before the time, exactly one job after, completed state is not job success [21.35ms]
+(pass) offsets are required and interval bounds enforced by the API schema [0.76ms]
+(pass) interval keeps phase, fires once per period, and ignores duplicate ticks and clock going back [21.72ms]
+(pass) long stop: coalesce creates one occurrence and advances into the future [15.77ms]
+(pass) skip policy: late beyond grace is skipped and summarised; within grace dispatches [16.59ms]
+(pass) overlap: previous open job makes the next occurrence skipped without touching the job [16.45ms]
+(pass) pause/resume/cancel with revisions; resume skips stopped periods; cancelled never revives [13.64ms]
+(pass) materialize failure rolls back job and occurrence; queue full keeps the schedule due and retries [14.55ms]
+(pass) create is idempotent per requestId, conflicts on different input, validates target and caps count [12.63ms]
+(pass) tick processes at most the configured batch [15.91ms]
+(pass) deferred schedules cannot hide later due schedules beyond one candidate page [34.04ms]
+
+api/domains/dialogue/test/queue.test.ts:
+(pass) a run only sees earlier accepted turns; later inputs never leak into it [32.56ms]
+(pass) a failed earlier run leaves only its input in later history [23.27ms]
+(pass) full queue rejects the submit and stores neither message nor run [14.59ms]
+(pass) restart: queued runs continue, a running run is interrupted, late result from the old owner is rejected [58.59ms]
+(pass) runs from before the queue existed are interrupted, not given a new job [10.93ms]
+(pass) scheduled prompt creates exactly one background run per occurrence; interactive input is claimed first [29.04ms]
+(pass) waitForTerminal honours abort and its own deadline without cancelling the run [52.49ms]
+(pass) rejected answer adoption fails both the run and its queue job [17.96ms]
+
+api/domains/dialogue/test/controller.test.ts:
+(pass) dialogue controller validates requests and delegates one run [14.54ms]
+
+api/domains/dialogue/test/dialogue.test.ts:
+(pass) request ID is idempotent and answer adoption is atomic [16.78ms]
+(pass) failed input persistence prevents any provider request [0.28ms]
+(pass) cancelled inference cannot append an answer [42.67ms]
+
+api/domains/queue/test/sleep.test.ts:
+(pass) heartbeat waits release abort listeners after each elapsed interval [22.93ms]
+(pass) a wait on an already cancelled signal returns immediately [0.16ms]
+
+api/domains/queue/test/queue.test.ts:
+(pass) same dedupe key converges; different content conflicts; capacity rejects atomically [10.39ms]
+(pass) success settles business and job together; failure of business rolls both back [20.34ms]
+(pass) resource slot and concurrency key serialize claims; interactive goes first [30.15ms]
+(pass) order within a conversation is kept even when a later job is interactive and earlier is background [24.85ms]
+(pass) retry only for allowed transient failures, with finite attempts and backoff [42.45ms]
+(pass) unregistered kind and unsupported version fail explicitly [12.95ms]
+(pass) cancel of running job rejects late result and keeps the slot until the handler stops [1148.11ms]
+(pass) cancel of queued job is immediate and routed through the handler [17.18ms]
+(pass) lost lease: old result is rejected and the resource is not reused while the old handler lives [40.21ms]
+(pass) deadline aborts the running handler and expires the job without adopting a late result [19.43ms]
+(pass) recover: queued continue, running follows policy, cancel_requested becomes outcome_unknown [18.23ms]
+(pass) lost wake-up: the loop still finds committed work within the poll interval; idle never calls handlers [85.10ms]
+(pass) close aborts running handlers, settles them interrupted, and blocks late writes [72.74ms]
+(pass) async transaction callbacks are rejected [16.77ms]
+(pass) a claim that cannot start still settles the owning domain [20.40ms]
+(pass) past-due blocked work does not make the loop spin [19.68ms]
+(pass) resource aliases make persisted old jobs and new jobs share the same concurrency limit [38.09ms]
+
+api/domains/queue/test/recovery.test.ts:
+(pass) process killed after commit but before claim: the job survives and runs after restart [86.31ms]
+(pass) process killed while a handler is running: restart marks it interrupted with a closed attempt [51.60ms]
+(pass) second process cannot own the same database while the first lives [8.12ms]
+
+api/domains/queue/test/boundaries.test.ts:
+(pass) queue and scheduler declare only their real dependencies [0.11ms]
+(pass) a dependency cycle stops with an explicit error [0.05ms]
+
+api/domains/inference/test/inference.test.ts:
+(pass) three purposes fall back once, adapters preserve paths and usage; no duplicate adoption [14.95ms]
+(pass) authentication, invalid contracts and caller cancellation never trigger cloud [50.82ms]
+(pass) local timeout fences a late adapter result; immutable snapshot and revocation at adoption [34.58ms]
+(pass) revocation aborts pending cloud; regrant does not revive old request [20.05ms]
+(pass) acceptance updates rollback together with the caller transaction [14.26ms]
+(pass) a failed stream cannot append a cloud fallback to already published local text [10.65ms]
+(pass) late provider deltas are fenced after caller cancellation [18.23ms]
+(pass) provider diagnostics preserve the rejected and recovered Connection IDs on the same attempt [15.11ms]
+(pass) a failed provider still saves the rejected Connection ID and error fields [13.65ms]
+
+api/domains/inference/test/migration.test.ts:
+(pass) append-only diagnostics migration preserves previous inference attempts [19.51ms]
+
+api/domains/voice-dialogue/test/sentences.test.ts:
+(pass) punctuation clauses and decimal numbers survive every token split without repeated tails [0.42ms]
+(pass) long unpunctuated output is bounded and conflicting final text is rejected [0.09ms]
+
+api/domains/voice-dialogue/test/upload.test.ts:
+(pass) bounded audio stream rejects oversized upload before ASR [2.67ms]
+(pass) valid bounded WAV reaches voice service once [0.33ms]
+
+api/domains/voice-dialogue/test/migration.test.ts:
+(pass) a database with only the original three migrations (plus later ones) upgrades in place and keeps history [31.77ms]
+
+api/domains/voice-dialogue/test/settings-integration.test.ts:
+(pass) one voice turn uses fallback in all three stages, adopts one answer, and does not repeat duplicate upload [24.00ms]
+(pass) autoSpeak false is captured at voice acceptance and ends successfully without TTS [18.84ms]
+(pass) cancellation during cloud ASR cannot create a dialogue run even with late HTTP completion [49.86ms]
+(pass) queued snapshots survive recovery without re-running an attempted provider [17.61ms]
+(pass) revoking a cloud answer aborts downstream TTS and never publishes late audio [46.05ms]
+(pass) a provisional sentence is playable while LLM is running and cancellation clears both streams [28.66ms]
+(pass) render ahead is bounded at three clauses and playback releases the next clause [52.69ms]
+(pass) final recognition preempts a slow prefix and never submits a late hypothesis [26.31ms]
+
+api/domains/voice-dialogue/test/voice.test.ts:
+(pass) voice capture to ASR, dialogue, TTS; duplicate utterance is ignored [16.48ms]
+(pass) restart cancels the run of a stale voice turn so no old answer is spoken [24.23ms]
+(pass) evicting cached audio also clears the ready state [24.66ms]
+(pass) stopping a session fences acceptance waiting in the writer queue [9.25ms]
+
+api/domains/conversation/test/conversation.test.ts:
+(pass) conversation saves and survives reopen; second writer is refused [16.80ms]
+
+ 136 pass
+ 0 fail
+ 781 expect() calls
+Ran 136 tests across 28 files. [6.11s]
+[verify] web tests: /Users/y.noguchi/.bun/bin/bun x vitest run web
+
+ RUN  v4.1.8 /Users/y.noguchi/Code/eumenes
+
+
+ Test Files  6 passed (6)
+      Tests  15 passed (15)
+   Start at  12:13:02
+   Duration  2.97s (transform 516ms, setup 0ms, import 1.48s, tests 597ms, environment 11.19s)
+
+[verify] web build: /Users/y.noguchi/.bun/bin/bun run build:web
+$ bun run build:design-system && vite build
+$ cd packages/design-system && bun run build
+$ tsc -p tsconfig.build.json && vite build
+src/components/ImageViewer/ImageViewer.tsx(134,5): error TS2322: Type 'string | undefined' is not assignable to type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+103 | 	steps.push({
+104 | 		name,
+105 | 		ms: Math.round(performance.now() - start),
+106 | 		result: code === 0 ? "pass" : `exit ${code}`,
+107 | 	});
+108 | 	if (code !== 0) throw new Error(`${name} failed (${code})`);
+                                 ^
+error: web build failed (2)
+      at run (/Users/y.noguchi/Code/eumenes/scripts/verify.ts:108:28)
+
+error: script "verify:all" exited with code 1

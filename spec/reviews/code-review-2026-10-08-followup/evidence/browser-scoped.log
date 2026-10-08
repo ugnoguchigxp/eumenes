@@ -1,0 +1,104 @@
+
+Running 6 tests using 1 worker
+
+(node:32421) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 tests/browser/voice.spec.ts:324:1 › exported LARM token connects the UI and CLI without browser credentials (284ms)
+  ✓  2 tests/browser/voice.spec.ts:361:1 › a backend outage does not poll snapshots and explicit reconnect reloads the views (2.5s)
+  ✘  3 tests/browser/voice.spec.ts:537:1 › settings save, reload, theme and automatic fallback use backend credentials (308ms)
+(node:32508) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  4 tests/browser/voice.spec.ts:660:1 › settings schedule controls create, pause, resume and cancel future work (511ms)
+  ✘  5 tests/browser/voice.spec.ts:696:1 › idle views keep one SSE stream without periodic snapshot requests (7.0s)
+(node:32609) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  6 tests/browser/voice.spec.ts:735:1 › failed notifications are visible while API works; returning to the page restores missed answers (5.1s)
+
+
+  1) tests/browser/voice.spec.ts:537:1 › settings save, reload, theme and automatic fallback use backend credentials 
+
+    Error: locator.fill: Error: strict mode violation: getByLabel('接続名', { exact: true }) resolved to 2 elements:
+        1) <input id="_r_a_" value="Browser fixture cloud edited" class="flex h-ui w-full rounded-md border border-input bg-background px-3 text-ui ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-ui-touch"/> aka locator('[id="_r_a_"]')
+        2) <input value="" id="_r_h_" class="flex h-ui w-full rounded-md border border-input bg-background px-3 text-ui ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-ui-touch"/> aka locator('[id="_r_h_"]')
+
+    Call log:
+      - waiting for getByLabel('接続名', { exact: true })
+
+
+      549 | 	await page
+      550 | 		.getByLabel("接続名", { exact: true })
+    > 551 | 		.fill("Browser fixture cloud");
+          | 		 ^
+      552 | 	await page
+      553 | 		.getByLabel("APIのベースURL", { exact: true })
+      554 | 		.fill(`http://127.0.0.1:${larmPort}/llm/v1`);
+        at /Users/y.noguchi/Code/eumenes/tests/browser/voice.spec.ts:551:4
+
+    Error Context: test-results/voice-settings-save-reload-a6d4c-ack-use-backend-credentials/error-context.md
+
+    Error Context: test-results/voice-settings-save-reload-a6d4c-ack-use-backend-credentials/error-context.md
+
+  2) tests/browser/voice.spec.ts:696:1 › idle views keep one SSE stream without periodic snapshot requests 
+
+    Error: expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 6
+    + Received  + 7
+
+      Object {
+    -   "/api/conversations/main": 2,
+    -   "/api/conversations/main/runs": 2,
+    -   "/api/events": 1,
+    -   "/api/inference/usage": 1,
+    -   "/api/settings": 1,
+    -   "/api/status": 1,
+    +   "/api/conversations/main": 9,
+    +   "/api/conversations/main/runs": 9,
+    +   "/api/events": 2,
+    +   "/api/inference/usage": 7,
+    +   "/api/runs/f14ec1af-2388-4892-bad7-7636589f8341/stream": 1,
+    +   "/api/settings": 7,
+    +   "/api/status": 6,
+      }
+
+      726 | 	const before = Object.fromEntries(counts);
+      727 | 	await page.waitForTimeout(6200);
+    > 728 | 	expect(Object.fromEntries(counts)).toEqual(before);
+          | 	                                   ^
+      729 | 	expect(activeStreams).toBe(1);
+      730 | 	expect(maxStreams).toBe(1);
+      731 | 	await page.goto("about:blank");
+        at /Users/y.noguchi/Code/eumenes/tests/browser/voice.spec.ts:728:37
+
+    Error Context: test-results/voice-idle-views-keep-one--57d8c--periodic-snapshot-requests/error-context.md
+
+    Error Context: test-results/voice-idle-views-keep-one--57d8c--periodic-snapshot-requests/error-context.md
+
+  3) tests/browser/voice.spec.ts:735:1 › failed notifications are visible while API works; returning to the page restores missed answers 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: "completed"
+    Received: "running"
+
+    Call Log:
+    - Timeout 5000ms exceeded while waiting on the predicate
+
+      777 | 				).status,
+      778 | 		)
+    > 779 | 		.toBe("completed");
+          | 		 ^
+      780 | 	await expect(
+      781 | 		page.locator(".messages").getByText(prompt, { exact: true }),
+      782 | 	).toHaveCount(0);
+        at /Users/y.noguchi/Code/eumenes/tests/browser/voice.spec.ts:779:4
+
+    Error Context: test-results/voice-failed-notifications-159be-age-restores-missed-answers/error-context.md
+
+    Error Context: test-results/voice-failed-notifications-159be-age-restores-missed-answers/error-context.md
+
+  3 failed
+    tests/browser/voice.spec.ts:537:1 › settings save, reload, theme and automatic fallback use backend credentials 
+    tests/browser/voice.spec.ts:696:1 › idle views keep one SSE stream without periodic snapshot requests 
+    tests/browser/voice.spec.ts:735:1 › failed notifications are visible while API works; returning to the page restores missed answers 
+  3 passed (17.5s)

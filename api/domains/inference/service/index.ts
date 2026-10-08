@@ -1,7 +1,17 @@
 import { readChatResponse } from "../../../infrastructure/chat-stream";
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
-import { createLarm, type LarmPort, type LarmExchange } from "../../larm";
+import {
+	createLarm,
+	type LarmPort,
+	type LarmExchange,
+	type LarmCallOptions,
+} from "../../larm";
+import {
+	chooseSpeechDelivery,
+	speechParameters,
+	type SpeechDelivery,
+} from "../../delivery";
 import type {
 	SettingsService,
 	Settings,
@@ -93,6 +103,9 @@ export function createInference(
 		larmFactory?: (s: Settings) => LarmPort;
 		localMs?: number;
 		cloudMs?: number;
+		decisionMs?: number;
+		/** Rewrites text just before synthesis (e.g. pronunciation dictionary). */
+		speechText?: (text: string) => string;
 	} = {},
 ) {
 	const ports = new Map<string, LarmPort>();
@@ -138,6 +151,10 @@ export function createInference(
 					profile: s.larm.profile,
 					audience: s.larm.audience,
 					voice: s.larm.voice || undefined,
+					speed: s.larm.speed,
+					style: s.larm.style,
+					pitchScale: s.larm.pitchScale,
+					intonationScale: s.larm.intonationScale,
 				});
 			ports.set(key, p);
 			const unsubscribeStatus = p.onChange?.(() => {
@@ -228,6 +245,7 @@ export function createInference(
 					model: resource.model,
 					input,
 					voice: resource.voice,
+					...((resource.speed ?? 1) !== 1 ? { speed: resource.speed } : {}),
 					response_format: "wav",
 				};
 			else {
@@ -423,7 +441,15 @@ export function createInference(
 					),
 			);
 			const exchanges: LarmExchange[] = [];
-			const callOptions = {
+			const callOptions: LarmCallOptions = {
+				...(row.purpose === "tts" && row.snapshot.larm.autoIntonation
+					? {
+							intonationScale: speechIntonation(
+								input as string,
+								row.snapshot.larm.intonationScale ?? 1,
+							),
+						}
+					: {}),
 				onExchange: async (exchange: LarmExchange) => {
 					// A call can use the old lease and one replacement. Keep both for correlation.
 					if (exchanges.length >= 2) return;
@@ -437,6 +463,11 @@ export function createInference(
 					);
 				},
 			};
+			// Dictionary rewrites apply to every synthesis path, local and cloud.
+			const sent =
+				row.purpose === "tts" && options.speechText
+					? options.speechText(input as string)
+					: input;
 			const abort = new AbortController();
 			const configuredDuration =
 				source === "cloud"
@@ -474,11 +505,35 @@ export function createInference(
 					}
 				: undefined;
 			try {
+				let delivery: SpeechDelivery | undefined;
+				if (
+					row.purpose === "tts" &&
+					source === "larm" &&
+					port(row.snapshot).judge
+				) {
+					const p = port(row.snapshot);
+					delivery = await chooseSpeechDelivery(
+						p.judge!.bind(p),
+						sent as string,
+						attemptSignal,
+						options.decisionMs,
+					);
+					attemptSignal.throwIfAborted();
+					if (!store.read((db) => allowed(db, row, connection)))
+						throw new Error("permission_revoked");
+					// Laya and punctuation heuristics are exclusive. Failure keeps the saved baseline.
+					delete callOptions.intonationScale;
+					if (delivery.source === "laya")
+						Object.assign(
+							callOptions,
+							speechParameters(delivery, row.snapshot.larm),
+						);
+				}
 				const work =
 					source === "cloud"
 						? cloud(
 								row,
-								input,
+								sent,
 								selected!.connection,
 								selected!.resource,
 								attemptSignal,
@@ -506,7 +561,7 @@ export function createInference(
 										callOptions,
 									)
 								: port(row.snapshot).speak(
-										input as string,
+										sent as string,
 										attemptSignal,
 										callOptions,
 									);
@@ -539,7 +594,12 @@ export function createInference(
 						)
 						.run(Date.now(), localModel ?? null, attemptId),
 				);
-				return { requestId: row.id, attemptId, value };
+				return {
+					requestId: row.id,
+					attemptId,
+					value,
+					...(delivery ? { delivery } : {}),
+				};
 			} catch (error) {
 				const code =
 					abort.signal.aborted && !signal.aborted
@@ -827,6 +887,14 @@ export function createInference(
 				profile: settings.get().larm.profile,
 				providers: [],
 			},
+		voices: async (signal: AbortSignal) => {
+			const snapshot = settings.get();
+			const result = await port(snapshot).voices?.(signal);
+			if (!result) throw new Error("larm_voice_discovery_unsupported");
+			if (JSON.stringify(snapshot.larm) !== JSON.stringify(settings.get().larm))
+				throw new Error("stale_voice_settings");
+			return result;
+		},
 		answer: (messages: Messages, signal: AbortSignal) =>
 			standalone("llm", messages, signal) as Promise<string>,
 		answerStream: (
@@ -983,3 +1051,4 @@ export function createInference(
 	return service;
 }
 export type InferenceService = ReturnType<typeof createInference>;
+import { speechIntonation } from "./speech-intonation";

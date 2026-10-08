@@ -3,9 +3,11 @@ import { renderSafeMarkdown } from "./markdownRenderer";
 export function MessageList({
 	conversation,
 	streaming,
+	onOpenArtifact,
 }: {
 	conversation: Conversation | undefined;
 	streaming?: string;
+	onOpenArtifact?: (message: { id: string; text: string }) => void;
 }) {
 	return (
 		<div className="messages" aria-live="polite">
@@ -25,6 +27,15 @@ export function MessageList({
 							/>
 						) : (
 							<p>{message.text}</p>
+						)}
+						{message.role === "assistant" && onOpenArtifact && (
+							<button
+								type="button"
+								className="artifact-open"
+								onClick={() => onOpenArtifact(message)}
+							>
+								パネルで開く
+							</button>
 						)}
 					</article>
 				))

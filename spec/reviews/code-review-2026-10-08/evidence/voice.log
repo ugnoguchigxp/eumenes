@@ -1,0 +1,12 @@
+bun test v1.4.2 (744846f84)
+
+api/domains/voice-dialogue/test/voice.test.ts:
+(pass) voice capture to ASR, dialogue, TTS; duplicate utterance is ignored [19.16ms]
+(pass) restart cancels the run of a stale voice turn so no old answer is spoken [22.73ms]
+(pass) evicting cached audio also clears the ready state [23.29ms]
+(pass) stopping a session fences acceptance waiting in the writer queue [11.87ms]
+
+ 4 pass
+ 0 fail
+ 23 expect() calls
+Ran 4 tests across 1 file. [117.00ms]

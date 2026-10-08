@@ -229,7 +229,7 @@ export function createDialogueService(
 						clock(),
 						"permission_revoked",
 					);
-					return "applied";
+					return { status: "failed", errorCode: "permission_revoked" };
 				}
 				const messageId = id();
 				conversation.appendInTransaction(tx, {

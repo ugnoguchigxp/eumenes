@@ -1,0 +1,64 @@
+{
+	"selected": [
+		"settings",
+		"inference",
+		"conversation",
+		"larm",
+		"audio",
+		"queue",
+		"scheduler",
+		"dialogue",
+		"voice-dialogue"
+	],
+	"dependencySet": [
+		"settings",
+		"larm",
+		"inference",
+		"conversation",
+		"audio",
+		"queue",
+		"scheduler",
+		"dialogue",
+		"voice-dialogue"
+	],
+	"revision": "2c03741d8c5f576db0ee6d1f5d7c175c060b466208e33cff7c440dbc23369aac",
+	"steps": [
+		{
+			"name": "format",
+			"ms": 219,
+			"result": "pass"
+		},
+		{
+			"name": "lint",
+			"ms": 126,
+			"result": "pass"
+		},
+		{
+			"name": "typecheck",
+			"ms": 2588,
+			"result": "pass"
+		},
+		{
+			"name": "tests",
+			"ms": 6158,
+			"result": "pass"
+		},
+		{
+			"name": "web tests",
+			"ms": 1871,
+			"result": "pass"
+		},
+		{
+			"name": "web build",
+			"ms": 12036,
+			"result": "pass"
+		},
+		{
+			"name": "browser fixture",
+			"ms": 42110,
+			"result": "pass"
+		}
+	],
+	"totalMs": 65316,
+	"result": "pass"
+}
