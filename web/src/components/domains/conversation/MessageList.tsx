@@ -2,7 +2,9 @@ import type {
 	Conversation,
 	Message,
 } from "../../../../../api/domains/conversation/contracts";
-import { motionEmoji } from "./motionEmoji";
+import type { SpeechDelivery } from "../../../../../api/domains/delivery";
+import { acceptedEmotion } from "../../../../../api/domains/delivery";
+import { emotionEmoji } from "./emotionEmoji";
 import { renderSafeMarkdown } from "./markdownRenderer";
 export function MessageList({
 	conversation,
@@ -28,17 +30,8 @@ export function MessageList({
 					>
 						<small className="message-author">
 							{message.role === "user" ? "あなた" : assistantLabel}
-							{message.role === "assistant" && message.avatarMotion && (
-								<span
-									className="message-emotion"
-									// Emoji is text; an img element would require a separate image asset.
-									// oxlint-disable-next-line jsx-a11y/prefer-tag-over-role
-									role="img"
-									aria-label={motionEmoji[message.avatarMotion].label}
-									title={motionEmoji[message.avatarMotion].label}
-								>
-									{motionEmoji[message.avatarMotion].emoji}
-								</span>
+							{message.role === "assistant" && (
+								<EmotionIcon delivery={message.delivery} />
 							)}
 						</small>
 						{message.role === "assistant" && onReplay && (
@@ -101,5 +94,25 @@ export function MessageList({
 				</article>
 			)}
 		</div>
+	);
+}
+
+function EmotionIcon({ delivery }: { delivery?: SpeechDelivery }) {
+	const emotion = delivery ? acceptedEmotion(delivery) : null;
+	if (!emotion) return null;
+	const { emoji, label } = emotionEmoji[emotion];
+	return (
+		<span
+			className="message-emotion"
+			data-emotion={emotion}
+			data-emotion-source="laya"
+			// Emoji is text and has no image URL.
+			// oxlint-disable-next-line jsx-a11y/prefer-tag-over-role
+			role="img"
+			aria-label={label}
+			title={label}
+		>
+			{emoji}
+		</span>
 	);
 }
