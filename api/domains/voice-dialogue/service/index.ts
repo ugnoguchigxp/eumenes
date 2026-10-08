@@ -1,7 +1,11 @@
+import type { SpeechPreparation } from "../../delivery";
+import { getLogger, withLogContext } from "../../../infrastructure/logger";
+const log = getLogger("voice-dialogue");
 import { SpeechSentences } from "./sentences";
+import { transcriptAllowed } from "./asr-language";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { DialogueService } from "../../dialogue";
-import type { InferencePort, Receipt } from "../../inference";
+import type { InferencePort, Receipt, SpeechOverride } from "../../inference";
 import type { SpeechDelivery } from "../../delivery";
 import type { VoiceTurn } from "../contracts";
 import {
@@ -68,6 +72,7 @@ export function createVoiceDialogue(
 		id: string,
 		runId: string,
 		controller: AbortController,
+		preparation: SpeechPreparation = {},
 	): Speech {
 		if (audio.size >= 8) {
 			const oldest = audio.keys().next().value;
@@ -90,6 +95,8 @@ export function createVoiceDialogue(
 		const pending: string[] = [];
 		const sentences = new SpeechSentences();
 		let inputDone = false,
+			spoken = false,
+			skipError: unknown,
 			index = 0;
 		const wakes = new Set<() => void>();
 		const wake = () => {
@@ -115,19 +122,67 @@ export function createVoiceDialogue(
 					const text = pending.shift()!;
 					if (!canSpeak(id, runId, controller.signal))
 						throw new Error("permission_revoked");
-					const n = index++;
-					const requestId = larm.captureSpeechChunkInTransaction
-						? await store.write((db) =>
-								larm.captureSpeechChunkInTransaction!(db, id, n),
+					// A transient LARM failure on one clause must not end the whole turn:
+					// retry with a fresh chunk index (each attempt is its own request),
+					// then skip the clause and keep speaking the rest.
+					let synthesized:
+						| {
+								n: number;
+								requestId?: string;
+								receipt?: Receipt;
+								wav: Uint8Array;
+						  }
+						| undefined;
+					let lastError: unknown;
+					for (let attempt = 0; attempt < 3 && !synthesized; attempt++) {
+						const n = index++;
+						try {
+							const requestId = larm.captureSpeechChunkInTransaction
+								? await store.write((db) =>
+										larm.captureSpeechChunkInTransaction!(db, id, n),
+									)
+								: undefined;
+							const receipt =
+								requestId && larm.executeRequest
+									? await larm.executeRequest(
+											requestId,
+											text,
+											controller.signal,
+											preparation,
+										)
+									: undefined;
+							const wav = receipt
+								? (receipt.value as Uint8Array)
+								: await larm.speak(text, controller.signal);
+							synthesized = { n, requestId, receipt, wav };
+						} catch (error) {
+							if (
+								controller.signal.aborted ||
+								(error instanceof Error &&
+									error.message === "permission_revoked")
 							)
-						: undefined;
-					const receipt =
-						requestId && larm.executeRequest
-							? await larm.executeRequest(requestId, text, controller.signal)
-							: undefined;
-					const wav = receipt
-						? (receipt.value as Uint8Array)
-						: await larm.speak(text, controller.signal);
+								throw error;
+							lastError = error;
+							// A text LARM cannot analyze fails identically every time.
+							if (
+								error instanceof Error &&
+								error.message === "larm_inference_422"
+							)
+								break;
+							log.warn(
+								"voice.chunk_retry",
+								{ utteranceId: id, runId, count: n, attempt: attempt + 1 },
+								error,
+							);
+						}
+					}
+					if (!synthesized) {
+						// The turn fails only if no clause could be spoken at all.
+						skipError ??= lastError;
+						log.warn("voice.chunk_skipped", { utteranceId: id, runId });
+						continue;
+					}
+					const { n, requestId, receipt, wav } = synthesized;
 					if (!canSpeak(id, runId, controller.signal))
 						throw new Error("permission_revoked");
 					const published = await store.write((db) => {
@@ -140,6 +195,12 @@ export function createVoiceDialogue(
 							return false;
 						if (receipt && !larm.acceptInTransaction?.(db, receipt))
 							throw new Error("permission_revoked");
+						if (receipt?.delivery)
+							dialogue.recordAnswerDeliveryInTransaction?.(
+								db,
+								runId,
+								receipt.delivery,
+							);
 						state.chunks.set(n, {
 							index: n,
 							text,
@@ -153,9 +214,19 @@ export function createVoiceDialogue(
 						state.chunks.delete(n);
 						return;
 					}
+					if (receipt?.delivery) preparation.delivery = receipt.delivery;
+					spoken = true;
+					log.debug("voice.chunk_ready", {
+						utteranceId: id,
+						runId,
+						inferenceId: requestId,
+						count: n,
+						bytes: wav.length,
+					});
 					continue;
 				}
 				if (inputDone && !pending.length) {
+					if (!spoken && skipError) throw skipError;
 					state.finished = true;
 					return;
 				}
@@ -184,7 +255,7 @@ export function createVoiceDialogue(
 		patch: { text?: string; runId?: string; error?: string } = {},
 		receipt?: Receipt,
 	) {
-		return store.write((db) => {
+		const result = await store.write((db) => {
 			const current = get(db, id);
 			if (
 				status !== "failed" &&
@@ -222,109 +293,204 @@ export function createVoiceDialogue(
 				? update(db, id, current.revision, status, clock(), patch)
 				: false;
 		});
+		if (result)
+			log.debug("voice.transition", {
+				utteranceId: id,
+				runId: patch.runId,
+				status,
+			});
+		else log.debug("voice.transition_skipped", { utteranceId: id, status });
+		return result;
 	}
 	async function process(
 		turn: VoiceTurn,
 		wav: Uint8Array,
 		controller: AbortController,
 	) {
-		let stopProgress = () => {};
-		try {
-			const asrId = store.read((db) =>
-				larm.requestFor?.(db, turn.utteranceId, "asr"),
-			);
-			const asrReceipt =
-				asrId && larm.executeRequest
-					? await larm.executeRequest(asrId, wav, controller.signal)
-					: undefined;
-			const text = asrReceipt
-				? (asrReceipt.value as string)
-				: await larm.transcribe(wav, controller.signal);
-			if (controller.signal.aborted) return;
-			if (
-				!(await advance(turn.utteranceId, "responding", { text }, asrReceipt))
-			)
-				return;
-			if (asrId && !larm.validRequest?.(asrId))
-				throw new Error("permission_revoked");
-			const submit = larm.bindInTransaction
-				? (input: Parameters<typeof dialogue.submit>[0]) =>
-						dialogue.submitVoice(input, turn.utteranceId)
-				: dialogue.submit;
-			const run = await submit({
-				requestId: turn.utteranceId,
+		return withLogContext(
+			{
 				utteranceId: turn.utteranceId,
-				conversationId: "main",
-				text,
-			});
-			if (!(await advance(turn.utteranceId, "responding", { runId: run.id }))) {
-				await dialogue.cancel(run.id);
-				return;
-			}
+				sessionId: turn.sessionId,
+				generation: turn.generation,
+			},
+			async () => {
+				const started = performance.now();
+				log.info("voice.processing_started", { bytes: wav.length });
+				const stopProgress = () => {};
+				try {
+					const asrId = store.read((db) =>
+						larm.requestFor?.(db, turn.utteranceId, "asr"),
+					);
+					const asrReceipt =
+						asrId && larm.executeRequest
+							? await larm.executeRequest(asrId, wav, controller.signal)
+							: undefined;
+					const text = asrReceipt
+						? (asrReceipt.value as string)
+						: await larm.transcribe(wav, controller.signal);
+					if (controller.signal.aborted) return;
+					const languages = (
+						store.read((db) => larm.snapshotFor?.(db, turn.utteranceId)) ??
+						store.read((db) => larm.snapshotInTransaction?.(db))
+					)?.general.asrLanguages;
+					if (languages && !transcriptAllowed(text, languages))
+						throw new Error("asr_language_not_allowed");
+					if (
+						!(await advance(
+							turn.utteranceId,
+							"responding",
+							{ text },
+							asrReceipt,
+						))
+					)
+						return;
+					if (asrId && !larm.validRequest?.(asrId))
+						throw new Error("permission_revoked");
+					const submit = larm.bindInTransaction
+						? (input: Parameters<typeof dialogue.submit>[0]) =>
+								dialogue.submitVoice(input, turn.utteranceId)
+						: dialogue.submit;
+					const run = await submit({
+						requestId: turn.utteranceId,
+						utteranceId: turn.utteranceId,
+						conversationId: "main",
+						text,
+					});
+					if (
+						!(await advance(turn.utteranceId, "responding", { runId: run.id }))
+					) {
+						await dialogue.cancel(run.id);
+						return;
+					}
 
-			const snapshot = store.read((db) =>
-				larm.snapshotFor?.(db, turn.utteranceId),
-			);
-			const autoSpeak = !snapshot || snapshot.voice.autoSpeak;
-			let speech: Speech | undefined;
-			if (autoSpeak) {
-				await store.write((db) =>
-					larm.skipInTransaction?.(db, turn.utteranceId, "tts"),
-				);
-				speech = createSpeech(turn.utteranceId, run.id, controller);
-				stopProgress = dialogue.subscribeProgress(run.id, (value) => {
-					if (value.status === "running") speech!.append(value.text);
-				});
-			}
-			const stop = () => stopProgress();
-			controller.signal.addEventListener("abort", stop, { once: true });
-			const waitMs = run.deadlineAt
-				? Math.max(0, Date.parse(run.deadlineAt) - Date.now()) + 10_000
-				: undefined;
-			const final = await dialogue.waitForTerminal(run.id, {
-				signal: controller.signal,
-				timeoutMs: waitMs,
-			});
-			if (controller.signal.aborted) return;
-			if (final && ["queued", "running"].includes(final.status)) {
-				// Stop waiting and make sure a late answer can never be adopted.
-				await dialogue.cancel(run.id);
-				throw new Error("dialogue_wait_timeout");
-			}
-			if (final?.status !== "completed" || !final.answerMessageId)
-				throw new Error(final?.error ?? "dialogue_incomplete");
-			const answer = dialogue.answerText(run.id);
-			if (!answer) throw new Error("answer_missing");
-			stopProgress();
-			controller.signal.removeEventListener("abort", stop);
-			if (!autoSpeak) {
-				await store.write((db) =>
-					larm.skipInTransaction?.(db, turn.utteranceId, "tts"),
-				);
-				await advance(turn.utteranceId, "completed");
-				return;
-			}
-			if (!(await advance(turn.utteranceId, "synthesizing"))) return;
-			speech!.append(answer, true);
-			await speech!.work;
-			if (controller.signal.aborted) return;
-			if (speech!.error) throw speech!.error;
-			await advance(turn.utteranceId, speech!.chunks.size ? "ready" : "played");
-			if (!speech!.chunks.size) audio.delete(turn.utteranceId);
-		} catch (error) {
-			audio.delete(turn.utteranceId);
-			if (!controller.signal.aborted)
-				await advance(turn.utteranceId, "failed", {
-					error: error instanceof Error ? error.message : "voice_failed",
-				}).catch(() => {});
-		} finally {
-			stopProgress();
-			controller.abort();
-			if (controller.signal.aborted) audio.get(turn.utteranceId)?.wake();
-			controllers.delete(turn.utteranceId);
-		}
+					const snapshot = store.read((db) =>
+						larm.snapshotFor?.(db, turn.utteranceId),
+					);
+					const autoSpeak = !snapshot || snapshot.voice.autoSpeak;
+					let speech: Speech | undefined;
+					// Text may stream to the UI, but speech waits for the adopted complete answer.
+					// A partial "なるほど" must not decide the expression of the whole response.
+					if (autoSpeak)
+						await store.write((db) =>
+							larm.skipInTransaction?.(db, turn.utteranceId, "tts"),
+						);
+					const stop = () => stopProgress();
+					controller.signal.addEventListener("abort", stop, { once: true });
+					const waitMs = run.deadlineAt
+						? Math.max(0, Date.parse(run.deadlineAt) - Date.now()) + 10_000
+						: undefined;
+					const final = await dialogue.waitForTerminal(run.id, {
+						signal: controller.signal,
+						timeoutMs: waitMs,
+					});
+					if (controller.signal.aborted) return;
+					if (final && ["queued", "running"].includes(final.status)) {
+						// Stop waiting and make sure a late answer can never be adopted.
+						await dialogue.cancel(run.id);
+						throw new Error("dialogue_wait_timeout");
+					}
+					if (final?.status !== "completed" || !final.answerMessageId)
+						throw new Error(final?.error ?? "dialogue_incomplete");
+					const answer = dialogue.answerText(run.id);
+					if (!answer) throw new Error("answer_missing");
+					stopProgress();
+					controller.signal.removeEventListener("abort", stop);
+					if (!autoSpeak) {
+						await store.write((db) =>
+							larm.skipInTransaction?.(db, turn.utteranceId, "tts"),
+						);
+						await advance(turn.utteranceId, "completed");
+						return;
+					}
+					if (!(await advance(turn.utteranceId, "synthesizing"))) return;
+					speech = createSpeech(turn.utteranceId, run.id, controller, {
+						context: dialogue.answerContext?.(run.id) ?? { answer, turns: [] },
+					});
+					speech.append(answer, true);
+					await speech!.work;
+					if (controller.signal.aborted) return;
+					if (speech!.error) throw speech!.error;
+					await advance(
+						turn.utteranceId,
+						speech!.chunks.size ? "ready" : "played",
+					);
+					if (!speech!.chunks.size) audio.delete(turn.utteranceId);
+				} catch (error) {
+					if (!controller.signal.aborted)
+						log.error("voice.processing_failed", {}, error);
+					audio.delete(turn.utteranceId);
+					if (!controller.signal.aborted)
+						await advance(turn.utteranceId, "failed", {
+							error: error instanceof Error ? error.message : "voice_failed",
+						}).catch(() => {});
+				} finally {
+					log.info("voice.processing_ended", {
+						status: store.read((db) => get(db, turn.utteranceId))?.status,
+						durationMs: Math.round(performance.now() - started),
+					});
+					stopProgress();
+					controller.abort();
+					if (controller.signal.aborted) audio.get(turn.utteranceId)?.wake();
+					controllers.delete(turn.utteranceId);
+				}
+			},
+		);
 	}
 	return {
+		/** Splits finished answer text into speakable clauses for replay. */
+		replaySentences(text: string) {
+			return new SpeechSentences().append(text, true);
+		},
+		/** Synthesizes one clause on demand; it is not tied to any voice turn. */
+		async replayAudio(text: string, signal: AbortSignal) {
+			if (!text.trim() || text.length > 400)
+				throw new Error("replay_text_invalid");
+			return larm.speak(text, signal);
+		},
+		async replaySpeech(text: string, signal: AbortSignal, runId?: string) {
+			if (!text.trim() || text.length > 400)
+				throw new Error("replay_text_invalid");
+			if (runId) {
+				const run = dialogue.get(runId);
+				if (
+					run?.status !== "completed" ||
+					!new SpeechSentences()
+						.append(dialogue.answerText(runId) ?? "", true)
+						.includes(text)
+				)
+					throw new Error("replay_text_invalid");
+			}
+			const context = runId ? dialogue.answerContext?.(runId) : undefined;
+			const previous = runId ? dialogue.answerDelivery?.(runId) : undefined;
+			const preparation: SpeechPreparation = {
+				...(context ? { context } : {}),
+				...(previous?.version === 2 && previous.source === "laya"
+					? { delivery: previous }
+					: {}),
+			};
+			const speech = larm.speakWithDelivery
+				? await larm.speakWithDelivery(text, signal, preparation)
+				: { wav: await larm.speak(text, signal) };
+			signal.throwIfAborted();
+			if (runId && speech.delivery)
+				await store.write((db) => {
+					signal.throwIfAborted();
+					dialogue.recordAnswerDeliveryInTransaction(
+						db,
+						runId,
+						speech.delivery!,
+					);
+				});
+			return speech;
+		},
+		/** Synthesizes a fixed sample with unsaved voice settings. */
+		async sampleAudio(override: SpeechOverride, signal: AbortSignal) {
+			return larm.speak(
+				"こんにちは。これは音声のサンプルです。",
+				signal,
+				override,
+			);
+		},
 		async recover() {
 			// Stale turns are interrupted first, then their runs/jobs are cancelled so
 			// a restarted backend never answers a voice turn nobody is listening to.
@@ -336,6 +502,7 @@ export function createVoiceDialogue(
 			const previous = sessions.get(sessionId) ?? 0;
 			if (generation <= previous) throw new Error("stale_voice_generation");
 			sessions.set(sessionId, generation);
+			log.info("voice.session_started", { sessionId, generation });
 			const warm = new AbortController();
 			warming.set(sessionId, warm);
 			void larm
@@ -429,8 +596,11 @@ export function createVoiceDialogue(
 			const controller = new AbortController();
 			previews.set(id, { sessionId, controller });
 			try {
-				const text = await larm.transcribe(wav, controller.signal);
+				let text = await larm.transcribe(wav, controller.signal);
 				controller.signal.throwIfAborted();
+				const languages = store.read((db) => larm.snapshotInTransaction?.(db))
+					?.general.asrLanguages;
+				if (languages && !transcriptAllowed(text, languages)) text = "";
 				if (
 					sessions.get(sessionId) !== generation ||
 					store.read((db) => get(db, id))
@@ -518,12 +688,18 @@ export function createVoiceDialogue(
 		},
 		async stop(sessionId: string, generation: number) {
 			if (sessions.get(sessionId) !== generation) return;
+			log.info("voice.session_stopping", { sessionId, generation });
 			sessions.delete(sessionId);
 			warming.get(sessionId)?.abort();
 			for (const p of previews.values())
 				if (p.sessionId === sessionId) p.controller.abort();
 			const ids = store.read((db) => activeIds(db, sessionId, generation));
 			await Promise.all(ids.map((id) => this.cancel(id)));
+			log.info("voice.session_stopped", {
+				sessionId,
+				generation,
+				count: ids.length,
+			});
 		},
 		async close() {
 			for (const c of controllers.values()) c.abort();

@@ -6,11 +6,13 @@ const protocols = {
 	llm: "openai.chat-completions.v1",
 	asr: "openai.audio-transcriptions.v1",
 	tts: "openai.audio-speech.v1",
+	"system-one": "larm.system-one.v1",
 };
 const paths = {
 	llm: "/v1/chat/completions",
 	asr: "/v1/audio/transcriptions",
 	tts: "/v1/audio/speech",
+	"system-one": "/v1/systemone",
 };
 const result = (value: unknown, status = 200) =>
 	Response.json(value, { status });
@@ -19,7 +21,9 @@ function fixture(
 	selectedProfile = "SAAA",
 	initialExpiryMs = 900_000,
 	ttsModel = "model-tts",
+	decisions = false,
 ) {
+	const providerNames = decisions ? ([...names, "system-one"] as const) : names;
 	const calls: string[] = [];
 	const requests: Record<string, unknown>[] = [];
 	const agentProfile =
@@ -49,8 +53,11 @@ function fixture(
 		profiles: [
 			{
 				id: agentProfile,
-				providers: names.map((name) => ({
+				providers: providerNames.map((name) => ({
 					name,
+					...(name === "system-one"
+						? { capability: "decision.system-one" }
+						: {}),
 					protocol: protocols[name],
 					endpoint: paths[name],
 					model: model(name),
@@ -87,7 +94,8 @@ function fixture(
 			secretFields: { apiKey: `providers.${name}.credential.token` },
 			configuration: {
 				fields: {
-					baseURL: `http://127.0.0.1/${name}/v1`,
+					[name === "system-one" ? "daemonURL" : "baseURL"]:
+						`http://127.0.0.1/${name}/v1`,
 					model: mismatch && name === "llm" ? "wrong-model" : model(name),
 					...(name === "tts" ? { voice: "fixture-voice" } : {}),
 				},
@@ -106,7 +114,7 @@ function fixture(
 		if (url.pathname === "/v1/agent-connections" && init?.method === "POST") {
 			const body = JSON.parse(String(init.body));
 			requests.push(body);
-			requested = body.providers ?? [...names];
+			requested = body.providers ?? [...providerNames];
 			expect(body.expectedCatalogRevision).toBe("rev1");
 			expect(new Headers(init.headers).get("Idempotency-Key")).toBeTruthy();
 			return result(created(requested), 201);
@@ -187,9 +195,9 @@ test("voice menu uses claimed provider auth and TTS sends selected voice and spe
 		speed: 1.3,
 		fetch: async (input, init) => {
 			const url = new URL(String(input));
-			if (url.pathname === "/tts/v1/audio/voices") {
+			if (url.pathname === "/v1/audio/voices") {
 				expect(new Headers(init?.headers).get("Authorization")).toBe(
-					"Bearer secret-tts-1",
+					"Bearer control",
 				);
 				expect(url.searchParams.get("model")).toBe("model-tts");
 				return result({
@@ -242,11 +250,11 @@ test("VOICEVOX catalog labels, style, inclusive numeric bounds and decoded credi
 			intonationScale,
 			fetch: async (input, init) => {
 				const url = new URL(String(input));
-				if (url.pathname === "/tts/v1/audio/voices") {
+				if (url.pathname === "/v1/audio/voices") {
 					catalogRequests++;
 					expect(url.searchParams.get("model")).toBe("voicevox-core");
 					expect(new Headers(init?.headers).get("Authorization")).toBe(
-						"Bearer secret-tts-1",
+						"Bearer control",
 					);
 					return result({
 						default_voice: "Kasukabe_Tsumugi",
@@ -310,6 +318,80 @@ test("VOICEVOX catalog labels, style, inclusive numeric bounds and decoded credi
 		expect(catalogRequests).toBe(1);
 		await larm.close();
 	}
+});
+test("a refused VOICEVOX catalog does not block synthesis of a chosen voice", async () => {
+	const fake = fixture(false, "SAAA", 900000, "voicevox-core");
+	let body: Record<string, unknown> = {};
+	const larm = createLarm({
+		baseUrl: "http://127.0.0.1:9810",
+		profile: "SAAA",
+		token: "control",
+		voice: "Zundamon",
+		fetch: async (input, init) => {
+			const url = new URL(String(input));
+			if (url.pathname === "/v1/audio/voices")
+				return new Response(
+					JSON.stringify({ error: { code: "unauthorized" } }),
+					{
+						status: 401,
+					},
+				);
+			if (url.pathname === "/tts/v1/audio/speech") {
+				body = JSON.parse(String(init?.body));
+				const wav = new Uint8Array(44);
+				wav.set(new TextEncoder().encode("RIFF"));
+				wav.set(new TextEncoder().encode("WAVE"), 8);
+				return new Response(wav);
+			}
+			return fake.fetcher(input, init);
+		},
+	});
+	await larm.speak("こんにちは。", new AbortController().signal);
+	expect(body).toMatchObject({ voice: "Zundamon" });
+	await larm.close();
+});
+test("a caller's deadline that aborts a shared connection attempt does not fail other callers", async () => {
+	const fake = fixture();
+	let slow = true;
+	const larm = createLarm({
+		baseUrl: "http://127.0.0.1:9810",
+		profile: "SAAA",
+		token: "control",
+		voice: "v",
+		fetch: async (input, init) => {
+			const url = new URL(String(input));
+			if (url.pathname === "/tts/v1/audio/speech") {
+				const wav = new Uint8Array(44);
+				wav.set(new TextEncoder().encode("RIFF"));
+				wav.set(new TextEncoder().encode("WAVE"), 8);
+				return new Response(wav);
+			}
+			if (slow && String(input).includes("/v3/")) {
+				await new Promise<void>((resolve, reject) => {
+					const timer = setTimeout(resolve, 150);
+					init?.signal?.addEventListener(
+						"abort",
+						() => {
+							clearTimeout(timer);
+							reject(init.signal?.reason);
+						},
+						{ once: true },
+					);
+				});
+			}
+			return fake.fetcher(input, init);
+		},
+	});
+	const first = larm.speak("a", AbortSignal.timeout(40)).then(
+		() => "ok",
+		() => "aborted",
+	);
+	await new Promise((resolve) => setTimeout(resolve, 5));
+	const second = larm.speak("b", new AbortController().signal);
+	expect(await first).toBe("aborted");
+	slow = false;
+	expect((await second).length).toBeGreaterThanOrEqual(44);
+	await larm.close();
 });
 test("other models omit VOICEVOX fields and busy responses never replay or replace the connection", async () => {
 	for (const status of [200, 429, 422]) {
@@ -510,7 +592,7 @@ test("exported token alone connects to the documented default URL", async () => 
 	await larm.close();
 });
 
-test("missing claim voice discovers and caches the advertised default with provider auth", async () => {
+test("missing claim voice discovers and caches the advertised default with the control credential", async () => {
 	const fake = fixture();
 	let discoveries = 0;
 	const larm = createLarm({
@@ -520,12 +602,12 @@ test("missing claim voice discovers and caches the advertised default with provi
 		voice: "",
 		fetch: async (input, init) => {
 			const url = new URL(String(input));
-			if (url.pathname === "/tts/v1/audio/voices") {
+			if (url.pathname === "/v1/audio/voices") {
 				discoveries++;
-				expect(url.origin).toBe("http://127.0.0.1");
+				expect(url.origin).toBe("http://127.0.0.1:9810");
 				expect(url.searchParams.get("model")).toBe("model-tts");
 				expect(new Headers(init?.headers).get("Authorization")).toBe(
-					"Bearer secret-tts-1",
+					"Bearer control",
 				);
 				return result({
 					default_voice: "fixture-voice",
@@ -560,7 +642,7 @@ test("an unadvertised default voice is rejected before speech inference", async 
 		token: "control",
 		fetch: async (input, init) => {
 			const url = new URL(String(input));
-			if (url.pathname === "/tts/v1/audio/voices")
+			if (url.pathname === "/v1/audio/voices")
 				return result({
 					default_voice: "missing",
 					voices: [{ id: "fixture-voice" }],
@@ -1113,5 +1195,170 @@ test("context trimming retains the current input after an unanswered prior turn"
 		expect(sent).toEqual([{ role: "system", content: "system" }, latest]);
 	} finally {
 		await larm.close();
+	}
+});
+
+test("native decision shares the voice lease, uses its own auth, and rotates credentials", async () => {
+	const fake = fixture(false, "SAAA", 60000, "model-tts", true);
+	const bodies: unknown[] = [],
+		tokens: (string | null)[] = [];
+	const larm = createLarm({
+		baseUrl: "http://127.0.0.1:9810",
+		profile: "SAAA",
+		token: "control",
+		fetch: async (input, init) => {
+			if (new URL(String(input)).pathname === "/system-one/v1/systemone") {
+				bodies.push(JSON.parse(String(init?.body)));
+				const headers = new Headers(init?.headers);
+				tokens.push(headers.get("Authorization"));
+				expect(headers.get("Accept")).toBe("application/json");
+				return result({
+					answers: {
+						motion: { type: "choice", choice: "greeting", confidence: 0.9 },
+					},
+				});
+			}
+			return fake.fetcher(input, init);
+		},
+	});
+	try {
+		await larm.prepareVoice!(freshSignal());
+		const questions = {
+			motion: {
+				type: "choice" as const,
+				instructions: "choose",
+				criteria: { greeting: "hello" },
+			},
+		};
+		await larm.judge!({ utterance: "こんにちは" }, questions, freshSignal());
+		await larm.speak("こんにちは", freshSignal());
+		expect(bodies).toEqual([
+			{
+				model: "model-system-one",
+				state: { utterance: "こんにちは" },
+				questions,
+			},
+		]);
+		expect(tokens).toEqual(["Bearer secret-system-one-2"]);
+		expect(fake.requests).toHaveLength(1);
+		expect(larm.status().capabilities).toEqual(["llm", "asr", "tts"]);
+		expect(fake.calls.filter((c) => c.endsWith("/renew"))).toHaveLength(1);
+	} finally {
+		await larm.close();
+	}
+});
+
+test("absent or invalid optional decision never breaks ordinary voice providers", async () => {
+	for (const present of [false, true]) {
+		const fake = fixture(false, "SAAA", 900000, "model-tts", present);
+		const larm = createLarm({
+			baseUrl: "http://127.0.0.1:9810",
+			profile: "SAAA",
+			token: "control",
+			fetch: async (input, init) => {
+				const response = await fake.fetcher(input, init);
+				if (present && String(input).endsWith("/claim")) {
+					const body = (await response.json()) as {
+						providers: Array<{
+							name: string;
+							configuration: { fields: Record<string, string> };
+						}>;
+					};
+					body.providers.find(
+						(p) => p.name === "system-one",
+					)!.configuration.fields.daemonURL = "http://wrong.invalid";
+					return result(body);
+				}
+				return response;
+			},
+		});
+		try {
+			await larm.prepareVoice!(freshSignal());
+			await expect(
+				larm.judge!({ utterance: "hello" }, {}, freshSignal()),
+			).rejects.toThrow("larm_system_one_unavailable");
+			expect(await larm.transcribe(new Uint8Array(44), freshSignal())).toBe(
+				"こんにちは",
+			);
+			expect((await larm.speak("hello", freshSignal())).length).toBe(44);
+			expect(fake.requests).toHaveLength(1);
+		} finally {
+			await larm.close();
+		}
+	}
+});
+
+test("caller cancellation is logged separately from a provider network failure", async () => {
+	const { configureLogging } = await import("../../../infrastructure/logger");
+	const lines: string[] = [];
+	configureLogging({
+		level: "info",
+		destination: {
+			write: (line) => {
+				lines.push(line);
+			},
+		},
+	});
+	try {
+		for (const cancelled of [true, false]) {
+			const fake = fixture();
+			let began = () => {};
+			const started = new Promise<void>((resolve) => {
+				began = resolve;
+			});
+			const controller = new AbortController();
+			const larm = createLarm({
+				token: "control",
+				profile: "SAAA",
+				fetch: async (input, init) => {
+					if (new URL(String(input)).pathname === "/llm/v1/chat/completions") {
+						began();
+						if (!cancelled) throw new TypeError("network down");
+						return new Promise<Response>((_resolve, reject) => {
+							init?.signal?.addEventListener(
+								"abort",
+								() => reject(init.signal?.reason),
+								{ once: true },
+							);
+						});
+					}
+					return fake.fetcher(input, init);
+				},
+			});
+			try {
+				const outcome = larm
+					.answer([{ role: "user", content: "test" }], controller.signal)
+					.catch((error) => error);
+				await started;
+				if (cancelled) controller.abort(new Error("cancelled"));
+				expect(await outcome).toBeInstanceOf(Error);
+				const event = cancelled
+					? "larm.inference_cancelled"
+					: "larm.inference_unreachable";
+				for (
+					let i = 0;
+					i < 20 && !lines.some((line) => JSON.parse(line).event === event);
+					i++
+				)
+					await Bun.sleep(1);
+				const entry = lines
+					.map((line) => JSON.parse(line))
+					.find((line) => line.event === event);
+				expect(entry?.reason).toBe(
+					cancelled ? "cancelled" : "network_unavailable",
+				);
+				expect(entry?.level).toBe(cancelled ? "info" : "warn");
+				if (cancelled)
+					expect(
+						lines.some(
+							(line) => JSON.parse(line).event === "larm.inference_unreachable",
+						),
+					).toBe(false);
+			} finally {
+				await larm.close();
+			}
+		}
+	} finally {
+		configureLogging({ level: "silent" });
 	}
 });

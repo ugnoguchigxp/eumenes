@@ -47,6 +47,8 @@ domain の公開入口と試験は [docs/domains.md](docs/domains.md) にあり�
 
 ## 検証
 
+運用ログは Pino の JSONL 形式で `data/logs/api.jsonl` に保存します。`bun run logs -- --level warn` で警告・エラー、`bun run logs -- --id <run-id> --json` で処理ごとの記録、`bun run logs -- --follow` で追加分を確認できます。正常系は主要処理の開始・終了だけを残し、成功したGETや音声の細かな経過は `EUMENES_LOG_LEVEL=debug` で出します。保存先・世代管理・相関IDの使い方は [ログの確認](docs/logging.md) を参照してください。
+
 ```sh
 bun run verify -- --domain conversation
 bun run verify -- --domain audio

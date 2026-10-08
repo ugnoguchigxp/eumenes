@@ -728,7 +728,8 @@ select:focus-visible {
 	opacity: 0.48;
 	cursor: default;
 }
-.tts-dictionary-toolbar span {
+.tts-dictionary-toolbar span,
+.tts-dictionary-toolbar output {
 	color: var(--muted-foreground);
 	font-size: 0.78rem;
 }
@@ -1041,4 +1042,67 @@ select:focus-visible {
 		border-top: 1px solid var(--border);
 		min-height: 50dvh;
 	}
+}
+
+.message {
+	position: relative;
+}
+.message-replay {
+	position: absolute;
+	top: 6px;
+	right: 6px;
+	width: 28px;
+	height: 28px;
+	display: grid;
+	place-items: center;
+	padding: 0;
+	border: 0;
+	border-radius: 50%;
+	color: var(--muted-foreground);
+	background: transparent;
+	cursor: pointer;
+}
+.message-replay:hover,
+.message-replay[aria-pressed="true"] {
+	color: var(--foreground);
+	background: var(--accent);
+}
+.message-assistant {
+	padding-right: 44px;
+}
+
+.message small.message-author {
+	display: flex;
+	align-items: center;
+	gap: 0.35rem;
+}
+.message-emotion {
+	font-size: 1rem;
+	line-height: 1;
+}
+
+.language-options {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+	gap: 8px;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	min-inline-size: 0;
+}
+.language-options .settings-toggle {
+	align-items: center;
+	gap: 8px;
+	margin: 0;
+	padding: 8px 12px;
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	background: var(--background);
+	cursor: pointer;
+}
+.language-options .settings-toggle:has(input:checked) {
+	border-color: var(--primary);
+}
+.language-options .settings-toggle input {
+	margin: 0;
 }

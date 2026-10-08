@@ -5,6 +5,8 @@ import { join } from "node:path";
 import { openStore, type SqliteStore } from "../infrastructure/sqlite";
 import {
 	migration as conversationMigration,
+	avatarMotionMigration as conversationAvatarMotionMigration,
+	answerDeliveryMigration as conversationAnswerDeliveryMigration,
 	createConversationService,
 } from "../domains/conversation";
 import {
@@ -45,6 +47,8 @@ function setup() {
 	dirs.push(dir);
 	const store = openStore(join(dir, "db.sqlite3"), [
 		conversationMigration,
+		conversationAvatarMotionMigration,
+		conversationAnswerDeliveryMigration,
 		dialogueMigration,
 		voiceMigration,
 		queueMigration,
@@ -400,4 +404,36 @@ test("authenticated SSE notifies a background commit and the existing API suppli
 	} finally {
 		await reader.cancel();
 	}
+});
+
+test("replay endpoints split text and synthesize one clause, with auth and limits", async () => {
+	const { call } = setup();
+	const split = await call("/api/voice/replay/sentences", {
+		text: "今日は晴れです。明日は雨です。",
+	});
+	expect(split.status).toBe(200);
+	expect(await split.json()).toEqual({
+		sentences: ["今日は晴れです。", "明日は雨です。"],
+	});
+	const audio = await call("/api/voice/replay/audio", {
+		text: "今日は晴れです。",
+	});
+	expect(audio.status).toBe(200);
+	expect(audio.headers.get("content-type")).toBe("audio/wav");
+	expect(
+		(await call("/api/voice/replay/audio", { text: "あ".repeat(401) })).status,
+	).toBe(400);
+	expect(
+		(await call("/api/voice/replay/sentences", { text: "x" }, {})).status,
+	).toBe(401);
+});
+
+test("sample endpoint validates unsaved voice settings and returns audio", async () => {
+	const { call } = setup();
+	const ok = await call("/api/voice/sample", { voice: "Zundamon", speed: 1.2 });
+	expect(ok.status).toBe(200);
+	expect(ok.headers.get("content-type")).toBe("audio/wav");
+	expect((await call("/api/voice/sample", { speed: 3 })).status).toBe(400);
+	expect((await call("/api/voice/sample", { extra: 1 })).status).toBe(400);
+	expect((await call("/api/voice/sample", {}, {})).status).toBe(401);
 });

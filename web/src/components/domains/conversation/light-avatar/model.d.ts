@@ -15,7 +15,12 @@ export type AvatarMotion =
 export interface LightAvatar {
 	canvas: HTMLCanvasElement;
 	resize(): void;
-	render(time?: number, motion?: AvatarMotion, elapsed?: number): void;
+	render(
+		time?: number,
+		motion?: AvatarMotion,
+		elapsed?: number,
+		speaking?: boolean,
+	): void;
 	beginMotion(): void;
 	dispose(): void;
 	stats(): {

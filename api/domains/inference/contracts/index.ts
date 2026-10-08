@@ -1,10 +1,17 @@
 import type { Database } from "bun:sqlite";
 import type { Settings, Purpose } from "../../settings/contracts";
-import type { SpeechDelivery } from "../../delivery";
+import type { SpeechDelivery, SpeechPreparation } from "../../delivery";
 export type Messages = Array<{
 	role: "system" | "user" | "assistant";
 	content: string;
 }>;
+/** One-off voice settings for a sample; never persisted. */
+export type SpeechOverride = Partial<
+	Pick<
+		Settings["larm"],
+		"voice" | "style" | "speed" | "pitchScale" | "intonationScale"
+	>
+>;
 export interface Receipt {
 	requestId: string;
 	attemptId: string;
@@ -26,7 +33,16 @@ export interface InferencePort {
 	): Promise<string>;
 	answer(messages: Messages, signal: AbortSignal): Promise<string>;
 	transcribe(wav: Uint8Array, signal: AbortSignal): Promise<string>;
-	speak(text: string, signal: AbortSignal): Promise<Uint8Array>;
+	speak(
+		text: string,
+		signal: AbortSignal,
+		override?: SpeechOverride,
+	): Promise<Uint8Array>;
+	speakWithDelivery?(
+		text: string,
+		signal: AbortSignal,
+		preparation?: SpeechPreparation,
+	): Promise<{ wav: Uint8Array; delivery?: SpeechDelivery }>;
 	close(): Promise<void>;
 	captureInTransaction?(
 		db: Database,
@@ -49,6 +65,7 @@ export interface InferencePort {
 		requestId: string,
 		input: Messages | string | Uint8Array,
 		signal: AbortSignal,
+		preparation?: SpeechPreparation,
 	): Promise<Receipt>;
 	executeStream?(
 		requestId: string,

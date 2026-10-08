@@ -35,6 +35,9 @@ async function setup(
 		local?: LarmPort["answer"];
 		localStream?: LarmPort["answerStream"];
 		localSpeech?: LarmPort["speak"];
+		judge?: LarmPort["judge"];
+		decisionMs?: number;
+		speechText?: (text: string) => string;
 		fetch?: typeof fetch;
 		localMs?: number;
 	} = {},
@@ -78,10 +81,12 @@ async function setup(
 		keys: [{ connectionId, value: "fixture-key" }],
 	});
 	const calls: string[] = [];
+	const seen: Array<{ voice: string; style?: string; speed?: number }> = [];
 	const payloads: unknown[] = [];
 	const port: LarmPort = {
 		status: () => ({ state: "unconfigured", capabilities: [] }),
 		answerStream: options.localStream,
+		judge: options.judge,
 		connect: async () => {},
 		answer:
 			options.local ??
@@ -113,17 +118,22 @@ async function setup(
 		});
 	}) as typeof fetch;
 	const inference = createInference(store, settings, {
-		larmFactory: () => port,
+		larmFactory: (s) => {
+			seen.push(s.larm);
+			return port;
+		},
 		fetch: options.fetch ?? fetcher,
 		localMs: options.localMs,
 		cloudMs: 1000,
+		decisionMs: options.decisionMs,
+		speechText: options.speechText,
 	});
 	cleanup.push(async () => {
 		await inference.close();
 		await store.close();
 		rmSync(dir, { recursive: true, force: true });
 	});
-	return { store, settings, inference, calls, payloads };
+	return { store, settings, inference, calls, payloads, seen };
 }
 function wav() {
 	const b = new Uint8Array(48);
@@ -487,3 +497,181 @@ test("a failed provider still saves the rejected Connection ID and error fields"
 function freshSignal() {
 	return new AbortController().signal;
 }
+
+const judged = {
+	answers: {
+		motion: {
+			type: "choice",
+			choice: "greeting",
+			confidence: 0.9,
+			answer_confidence: 0.9,
+		},
+		voice: {
+			type: "choice",
+			choice: "bright",
+			confidence: 0.8,
+			answer_confidence: 0.8,
+		},
+	},
+};
+test("Laya judges the spoken text and carries one decision with bounded immutable voice settings", async () => {
+	const states: unknown[] = [],
+		parameters: Array<import("../../larm").LarmCallOptions | undefined> = [];
+	const h = await setup({
+		speechText: (text) => text.replace("SAAA", "サー"),
+		judge: async (state) => {
+			states.push(state);
+			return judged;
+		},
+		localSpeech: async (_text, _signal, options) => {
+			parameters.push(options);
+			return wav();
+		},
+	});
+	const s = h.settings.get();
+	s.larm.autoIntonation = true;
+	s.larm.speed = 1.1;
+	s.larm.pitchScale = 0.01;
+	s.larm.intonationScale = 1.2;
+	await h.settings.apply({
+		requestId: crypto.randomUUID(),
+		expectedRevision: s.revision,
+		settings: s,
+		keys: [],
+	});
+	const id = await h.store.write((db) =>
+		h.inference.captureInTransaction(db, "delivery", "tts", Date.now() + 10000),
+	);
+	const changed = h.settings.get();
+	changed.larm.speed = 1.8;
+	changed.larm.autoIntonation = false;
+	await h.settings.apply({
+		requestId: crypto.randomUUID(),
+		expectedRevision: changed.revision,
+		settings: changed,
+		keys: [],
+	});
+	const receipt = await h.inference.executeRequest(
+		id,
+		"こんにちはSAAA！",
+		freshSignal(),
+	);
+	expect(states).toEqual([
+		{ utterance: "こんにちはサー！", phase: "response_ready" },
+	]);
+	expect(receipt.delivery).toMatchObject({
+		motion: "greeting",
+		tone: "bright",
+		source: "laya",
+		confidence: 0.8,
+	});
+	expect(parameters[0]?.speed).toBeCloseTo(1.15);
+	expect(parameters[0]?.pitchScale).toBeCloseTo(0.03);
+	expect(parameters[0]?.intonationScale).toBeCloseTo(1.35);
+	await h.inference.speak("手動設定", freshSignal());
+	expect(parameters[1]).not.toHaveProperty("speed");
+	expect(parameters[1]).not.toHaveProperty("pitchScale");
+	expect(parameters[1]).not.toHaveProperty("intonationScale");
+	const beforeReplay = new Set(
+		h.inference.usage().map((attempt) => attempt.id),
+	);
+	const replay = await h.inference.speakWithDelivery(
+		"もう一度こんにちは！",
+		freshSignal(),
+	);
+	expect(replay.wav).toEqual(wav());
+	expect(replay.delivery).toMatchObject({ motion: "greeting", source: "laya" });
+	const replayAttempts = h.inference
+		.usage()
+		.filter((attempt) => !beforeReplay.has(attempt.id));
+	expect(replayAttempts).toHaveLength(1);
+	expect(replayAttempts[0]?.accepted).toBe(1);
+});
+test("decision timeout keeps manual voice, fences late results and cancellation prevents synthesis", async () => {
+	let resolve!: (value: unknown) => void;
+	let judging: AbortSignal | undefined;
+	const parameters: unknown[] = [];
+	const h = await setup({
+		decisionMs: 10,
+		judge: async (_state, _q, signal) => {
+			judging = signal;
+			return new Promise((r) => {
+				resolve = r;
+			});
+		},
+		localSpeech: async (_text, _signal, options) => {
+			parameters.push(options);
+			return wav();
+		},
+	});
+	const s = h.settings.get();
+	s.larm.autoIntonation = true;
+	await h.settings.apply({
+		requestId: crypto.randomUUID(),
+		expectedRevision: s.revision,
+		settings: s,
+		keys: [],
+	});
+	const id = await h.store.write((db) =>
+		h.inference.captureInTransaction(db, "timeout", "tts", Date.now() + 10000),
+	);
+	const receipt = await h.inference.executeRequest(
+		id,
+		"やった！",
+		freshSignal(),
+	);
+	expect(receipt.delivery).toMatchObject({
+		source: "fallback",
+		reason: "timeout",
+		motion: "neutral",
+	});
+	expect(parameters[0]).not.toHaveProperty("intonationScale");
+	expect(judging?.aborted).toBe(true);
+	resolve(judged);
+	await Bun.sleep(1);
+	expect(receipt.delivery?.source).toBe("fallback");
+	const next = await h.store.write((db) =>
+		h.inference.captureInTransaction(db, "cancel", "tts", Date.now() + 10000),
+	);
+	const abort = new AbortController();
+	const pending = h.inference.executeRequest(next, "続き", abort.signal);
+	await until(() => judging !== undefined && !judging.aborted);
+	abort.abort();
+	await expect(pending).rejects.toThrow();
+	resolve(judged);
+	expect(parameters).toHaveLength(1);
+	expect(h.calls).toHaveLength(0);
+});
+test("speech text is rewritten for the local provider and for the cloud fallback", async () => {
+	const local: string[] = [];
+	const h = await setup({
+		speechText: (text) => text.replace("SAAA", "サー"),
+		localSpeech: async (text) => {
+			local.push(text);
+			return wav();
+		},
+	});
+	await h.inference.speak("SAAAです", new AbortController().signal);
+	expect(local).toEqual(["サーです"]);
+	const cloud = await setup({
+		speechText: (text) => text.replace("SAAA", "サー"),
+	});
+	await cloud.inference.speak("SAAAです", new AbortController().signal);
+	expect(JSON.parse(cloud.payloads.at(-1) as string).input).toBe("サーです");
+});
+
+test("speak with an override synthesizes with unsaved voice settings without changing saved ones", async () => {
+	const h = await setup({ localSpeech: async () => wav() });
+	const before = h.settings.get().larm;
+	await h.inference.speak("サンプル", new AbortController().signal, {
+		voice: "Zundamon",
+		style: "normal",
+		speed: 1.4,
+	});
+	expect(h.seen.at(-1)).toMatchObject({
+		voice: "Zundamon",
+		style: "normal",
+		speed: 1.4,
+	});
+	expect(h.settings.get().larm).toEqual(before);
+});

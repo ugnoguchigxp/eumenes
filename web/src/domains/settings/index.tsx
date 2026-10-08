@@ -6,12 +6,15 @@ import {
 import {
 	cloneElement,
 	isValidElement,
+	useCallback,
 	useId,
 	useEffect,
+	useRef,
 	useState,
 } from "react";
 import type { EumenesClient } from "../../../../client";
 import {
+	asrLanguages,
 	settingsSchema,
 	type Settings,
 	type Purpose,
@@ -37,6 +40,7 @@ const purposes: Record<Purpose, string> = {
 	tts: "読み上げ",
 };
 const categories = [
+	"全般",
 	"AIの使い方",
 	"接続先",
 	"音声",
@@ -70,18 +74,110 @@ function Field({
 }
 import { knownLarmVoices } from "./larm-voices";
 import { Subtitle } from "../../components/domains/subtitle/Subtitle";
+const presentationLabel: Record<string, string> = {
+	masculine: "（男性）",
+	feminine: "（女性）",
+	androgynous: "（中性）",
+};
+function SamplePlayer({
+	client,
+	voice,
+	disabled,
+}: {
+	client: EumenesClient;
+	voice: Parameters<EumenesClient["voiceSample"]>[0];
+	disabled?: boolean;
+}) {
+	const [state, setState] = useState<"idle" | "loading" | "playing">("idle");
+	const [error, setError] = useState<string | null>(null);
+	const run = useRef<{ abort: AbortController; audio?: HTMLAudioElement }>(
+		null,
+	);
+	const stop = useCallback(() => {
+		run.current?.abort.abort();
+		run.current?.audio?.pause();
+		run.current = null;
+		setState("idle");
+	}, []);
+	useEffect(() => stop, [stop]);
+	async function play() {
+		stop();
+		setError(null);
+		const mine = { abort: new AbortController() } as {
+			abort: AbortController;
+			audio?: HTMLAudioElement;
+		};
+		run.current = mine;
+		setState("loading");
+		try {
+			const bytes = await client.voiceSample(voice, mine.abort.signal);
+			if (run.current !== mine) return;
+			const url = URL.createObjectURL(
+				new Blob([new Uint8Array(bytes)], { type: "audio/wav" }),
+			);
+			const audio = new Audio(url);
+			mine.audio = audio;
+			const finish = () => {
+				URL.revokeObjectURL(url);
+				if (run.current === mine) {
+					run.current = null;
+					setState("idle");
+				}
+			};
+			audio.onended = finish;
+			audio.onerror = () => {
+				finish();
+				setError("サンプルを再生できませんでした。");
+			};
+			setState("playing");
+			await audio.play();
+		} catch (e) {
+			if (mine.abort.signal.aborted) return;
+			run.current = null;
+			setState("idle");
+			setError(
+				`サンプルを作れませんでした（${e instanceof Error ? e.message : "不明なエラー"}）`,
+			);
+		}
+	}
+	return (
+		<>
+			<Button
+				variant="secondary"
+				disabled={disabled || state === "loading"}
+				onClick={() => (state === "playing" ? stop() : void play())}
+			>
+				{state === "loading"
+					? "準備中…"
+					: state === "playing"
+						? "サンプルを停止"
+						: "サンプルを再生"}
+			</Button>
+			{error && <span role="alert">{error}</span>}
+		</>
+	);
+}
 function KnownVoiceSelect({
 	value,
 	emptyLabel,
 	onChange,
+	id,
+	"aria-describedby": describedBy,
 }: {
 	value: string;
 	emptyLabel: string;
 	onChange: (id: string) => void;
+	id?: string;
+	"aria-describedby"?: string;
 }) {
 	const known = knownLarmVoices.some((v) => v.id === value);
 	return (
-		<select value={value} onChange={(e) => onChange(e.target.value)}>
+		<select
+			id={id}
+			aria-describedby={describedBy}
+			value={value}
+			onChange={(e) => onChange(e.target.value)}
+		>
 			<option value="">{emptyLabel}</option>
 			{value && !known && (
 				<option value={value}>{value}（候補にありません）</option>
@@ -151,6 +247,42 @@ export function useSettings(client: EumenesClient) {
 		retry: 0,
 	});
 }
+/** Toggles spoken replies without opening the settings page. */
+export function useVoiceMute(client: EumenesClient) {
+	const cache = useQueryClient();
+	const query = useSettings(client);
+	const [busy, setBusy] = useState(false);
+	const [error, setError] = useState<string | null>(null);
+	const value = query.data;
+	async function toggle() {
+		if (!value || busy) return;
+		setBusy(true);
+		setError(null);
+		try {
+			const settings = structuredClone(value);
+			settings.voice.autoSpeak = !value.voice.autoSpeak;
+			const saved = await client.applySettings({
+				requestId: crypto.randomUUID(),
+				expectedRevision: value.revision,
+				settings,
+				keys: [],
+			});
+			cache.setQueryData(["settings", client.identity], saved);
+		} catch {
+			setError("ミュートを切り替えられませんでした");
+			void cache.invalidateQueries({ queryKey: ["settings", client.identity] });
+		} finally {
+			setBusy(false);
+		}
+	}
+	return {
+		muted: value ? !value.voice.autoSpeak : false,
+		ready: !!value,
+		busy,
+		error,
+		toggle,
+	};
+}
 export function SettingsPage({
 	client,
 	onDirty,
@@ -219,7 +351,7 @@ export function SettingsPage({
 			query.data?.larm.audience,
 		],
 		queryFn: ({ signal }) => client.larmVoices(signal),
-		enabled: category === 2 && !!value && !larmChanged,
+		enabled: category === 3 && !!value && !larmChanged,
 		retry: 0,
 	});
 	useEffect(() => {
@@ -472,12 +604,85 @@ export function SettingsPage({
 					<span className="section-kicker">SETTINGS</span>
 					<h2>{categories[category]}</h2>
 					<p className="hint">
-						{category === 6
+						{category === 7
 							? "読み上げの直前に、登録した文字を読み方へ置き換えます（長い登録が優先）。会話の表示は変わりません。変更は行ごとにすぐ保存されます。"
-							: "普段はLARMを使い、必要なときに登録済みのクラウドへ切り替えます。"}
+							: category === 0
+								? "AIの名前・あなたの名前・話し方を設定します。次の返答から反映されます。"
+								: "普段はLARMを使い、必要なときに登録済みのクラウドへ切り替えます。"}
 					</p>
 				</header>
 				{category === 0 && (
+					<Card>
+						<CardHeader>
+							<CardTitle>会話</CardTitle>
+						</CardHeader>
+						<CardContent>
+							<Field label="AIの名前" hint="空欄の場合は名前を設定しません。">
+								<input
+									type="text"
+									maxLength={40}
+									value={value.general.agentName}
+									onChange={(e) =>
+										change((s) => {
+											s.general.agentName = e.target.value;
+										})
+									}
+								/>
+							</Field>
+							<Field label="あなたの名前" hint="空欄の場合は名前で呼びません。">
+								<input
+									type="text"
+									maxLength={40}
+									value={value.general.userName}
+									onChange={(e) =>
+										change((s) => {
+											s.general.userName = e.target.value;
+										})
+									}
+								/>
+							</Field>
+							<Field
+								label="利用する言語"
+								hint="聞き取り結果がここにない言語の文字を含む場合は破棄します（最低1つ）。"
+							>
+								<fieldset className="language-options">
+									{asrLanguages.map(([code, label]) => (
+										<Toggle
+											key={code}
+											label={label}
+											value={value.general.asrLanguages.includes(code)}
+											onChange={(on) =>
+												change((s) => {
+													const next = on
+														? [...s.general.asrLanguages, code]
+														: s.general.asrLanguages.filter((c) => c !== code);
+													if (next.length) s.general.asrLanguages = next;
+												})
+											}
+										/>
+									))}
+								</fieldset>
+							</Field>
+							<Field label="口調">
+								<select
+									value={value.general.persona}
+									onChange={(e) =>
+										change((s) => {
+											s.general.persona = e.target
+												.value as Settings["general"]["persona"];
+										})
+									}
+								>
+									<option value="butler">執事</option>
+									<option value="maid">メイド</option>
+									<option value="strategist">参謀</option>
+									<option value="sage">老師</option>
+								</select>
+							</Field>
+						</CardContent>
+					</Card>
+				)}
+				{category === 1 && (
 					<>
 						<div className="settings-notice">
 							クラウドへの自動切替は初期値で有効です。代替先を登録すると、会話・録音・読み上げ用のテキストが設定したAPIへ送信されます。
@@ -562,7 +767,7 @@ export function SettingsPage({
 						))}
 					</>
 				)}
-				{category === 1 && (
+				{category === 2 && (
 					<>
 						<Card>
 							<CardHeader>
@@ -1020,7 +1225,7 @@ export function SettingsPage({
 						</div>
 					</>
 				)}
-				{category === 2 && (
+				{category === 3 && (
 					<>
 						<Card>
 							<CardHeader>
@@ -1076,6 +1281,8 @@ export function SettingsPage({
 												{voices.data.voices.map((v) => (
 													<option key={v.id} value={v.id}>
 														{v.display_name}
+														{presentationLabel[v.voice_presentation ?? ""] ??
+															""}
 													</option>
 												))}
 											</select>
@@ -1119,6 +1326,17 @@ export function SettingsPage({
 										>
 											既定のキャラクターに戻す
 										</Button>
+										<SamplePlayer
+											client={client}
+											disabled={larmChanged}
+											voice={{
+												voice: value.larm.voice || undefined,
+												style: value.larm.style,
+												speed: value.larm.speed,
+												pitchScale: value.larm.pitchScale,
+												intonationScale: value.larm.intonationScale,
+											}}
+										/>
 									</div>
 									{voicevox && character && (
 										<>
@@ -1211,7 +1429,7 @@ export function SettingsPage({
 												},
 											)}
 											<Toggle
-												label="文章に合わせて抑揚を変える（簡易）"
+												label="文章に合わせて抑揚・速さ・高さを変える（簡易）"
 												value={value.larm.autoIntonation ?? false}
 												onChange={(v) =>
 													change((s) => {
@@ -1222,8 +1440,27 @@ export function SettingsPage({
 																	?.default ?? 1;
 													})
 												}
-												hint="疑問文・感嘆文・注意を促す文の抑揚を、設定値を基準に句ごとに強めます。"
+												hint="疑問文・感嘆文・注意を促す文の抑揚・速さ・高さを、設定値を基準に句ごとに増減させます。"
 											/>
+											{value.larm.autoIntonation && (
+												<Field
+													label={`自動調整の強さ（${Math.round((value.larm.autoStrength ?? 1) * 100)}%）`}
+													hint="上の設定値を基準に、文章ごとに増減させる幅の倍率です。0%で基準値のまま、200%で2倍まで動かします。"
+												>
+													<input
+														type="range"
+														min={0}
+														max={2}
+														step={0.05}
+														value={value.larm.autoStrength ?? 1}
+														onChange={(e) =>
+															change((s) => {
+																s.larm.autoStrength = Number(e.target.value);
+															})
+														}
+													/>
+												</Field>
+											)}
 										</>
 									)}
 									{voiceCatalog && !voicevox && (
@@ -1449,7 +1686,7 @@ export function SettingsPage({
 						</Card>
 					</>
 				)}
-				{category === 3 && (
+				{category === 4 && (
 					<>
 						<Card>
 							<CardHeader>
@@ -1513,9 +1750,9 @@ export function SettingsPage({
 						{usage.isError && <p role="alert">利用記録を読み込めません。</p>}
 					</>
 				)}
-				{category === 4 && <SchedulePanel client={client} />}
-				{category === 6 && <TtsDictionaryPanel client={client} />}
-				{category === 5 && (
+				{category === 5 && <SchedulePanel client={client} />}
+				{category === 7 && <TtsDictionaryPanel client={client} />}
+				{category === 6 && (
 					<Card>
 						<CardHeader>
 							<CardTitle>表示</CardTitle>
@@ -1588,7 +1825,7 @@ export function SettingsPage({
 						</CardContent>
 					</Card>
 				)}
-				{category !== 6 && (
+				{category !== 7 && (
 					<footer className="settings-footer">
 						<output>
 							{message && dirty && message === "変更を適用しました"

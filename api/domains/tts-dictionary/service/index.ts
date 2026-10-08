@@ -2,14 +2,22 @@ import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { DeleteInput, Entry, SaveInput } from "../contracts";
 import { list, lookup, remove, upsert } from "../repository";
 import { compile } from "./matcher";
+const MAX_SPEECH = 4000;
 export function createTtsDictionary(store: SqliteStore) {
-	let apply: ((text: string) => string) | null = null;
+	// Dropped inside the same synchronous transaction callback that writes, so
+	// no read can recompile from pre-commit data in between.
+	let compiled: ((text: string) => string) | null = null;
 	return {
 		list: () => store.read(list),
 		/** Replaces registered written forms with their readings for one speech request. */
 		apply(text: string) {
-			apply ??= compile(store.read(list));
-			return apply(text);
+			compiled ??= compile(store.read(list));
+			const replaced = compiled(text);
+			// An empty or oversized result would make the TTS provider reject the
+			// chunk and silence the rest of the reply, so keep the original text.
+			return replaced.trim() === "" || replaced.length > MAX_SPEECH
+				? text
+				: replaced;
 		},
 		save: (input: SaveInput): Promise<Entry[]> =>
 			store.write((db) => {
@@ -24,7 +32,7 @@ export function createTtsDictionary(store: SqliteStore) {
 				if (original !== null && original !== entry.written)
 					remove(db, original);
 				upsert(db, entry, Date.now());
-				apply = null;
+				compiled = null;
 				return list(db);
 			}),
 		delete: (input: DeleteInput): Promise<Entry[]> =>
@@ -34,7 +42,7 @@ export function createTtsDictionary(store: SqliteStore) {
 				if (previous !== input.expected.spoken)
 					throw new Error("revision_conflict");
 				remove(db, input.written);
-				apply = null;
+				compiled = null;
 				return list(db);
 			}),
 	};

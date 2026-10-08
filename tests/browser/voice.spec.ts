@@ -1,5 +1,11 @@
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import {
+	existsSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { type AddressInfo, createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -64,6 +70,8 @@ test.beforeAll(async () => {
 	await ready(`http://127.0.0.1:${larmPort}/v3/agent-profiles`);
 	launch(["api/application/server.ts"], {
 		EUMENES_DB: join(dir, "test.sqlite3"),
+		EUMENES_LOG_FILE: join(dir, "logs/api.jsonl"),
+		EUMENES_LOG_LEVEL: "debug",
 		EUMENES_API_TOKEN: "",
 		EUMENES_PORT: String(apiPort),
 		EUMENES_ORIGIN: `http://127.0.0.1:${webPort}`,
@@ -87,6 +95,7 @@ test.beforeAll(async () => {
 		)
 		.toBe("ready");
 	launch(["x", "vite", "--host", "127.0.0.1", "--port", String(webPort)], {
+		EUMENES_VITE_CACHE_DIR: join(dir, "vite-cache"),
 		EUMENES_PROXY_URL: `http://127.0.0.1:${apiPort}`,
 		EUMENES_API_TOKEN: "",
 		LARM_API_TOKEN: "fixture-control",
@@ -95,6 +104,20 @@ test.beforeAll(async () => {
 	});
 	await ready(`http://127.0.0.1:${webPort}/`);
 });
+// Preserve operational evidence before fixture teardown removes its temporary DB.
+test.afterEach(async ({ page: _page }, testInfo) => {
+	if (testInfo.status === testInfo.expectedStatus) return;
+	const file = join(dir, "logs/api.jsonl");
+	if (existsSync(file)) {
+		const output = testInfo.outputPath("backend.jsonl");
+		writeFileSync(output, readFileSync(file));
+		await testInfo.attach("backend-log", {
+			path: output,
+			contentType: "application/x-ndjson",
+		});
+	}
+});
+
 test.afterAll(async () => {
 	for (const child of processes) child.kill("SIGTERM");
 	await new Promise((resolve) => setTimeout(resolve, 200));
@@ -102,10 +125,21 @@ test.afterAll(async () => {
 		if (child.exitCode === null) child.kill("SIGKILL");
 	rmSync(dir, { recursive: true, force: true });
 });
+test.beforeEach(async ({ page }) => {
+	// Business-flow tests exercise the supported WebGL fallback. The dedicated
+	// rendering test creates its own browser with SwiftShader and checks pixels.
+	// This avoids slow GPU initialization starving unrelated UI assertions.
+	await page.addInitScript(() => {
+		Object.defineProperty(window, "WebGL2RenderingContext", {
+			value: undefined,
+		});
+	});
+});
 test.describe("light avatar rendering", () => {
 	test("light avatar stays behind usable chat and releases its canvas on navigation", async ({
 		playwright,
 	}) => {
+		test.setTimeout(45000);
 		const browser = await playwright.chromium.launch({
 			args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"],
 		});
@@ -129,6 +163,24 @@ test.describe("light avatar rendering", () => {
 				"background-color",
 				"rgba(0, 0, 0, 0)",
 			);
+			const still = await canvas.screenshot();
+			await page.waitForTimeout(250);
+			expect((await canvas.screenshot()).equals(still)).toBe(true);
+			const stillCanvas = await canvas.elementHandle();
+			await page.emulateMedia({ reducedMotion: "no-preference" });
+			await expect
+				.poll(() => stillCanvas!.evaluate((node) => node.isConnected))
+				.toBe(false);
+			await expect(canvas).toHaveCount(1);
+			const breathing = await canvas.screenshot();
+			await page.waitForTimeout(600);
+			expect((await canvas.screenshot()).equals(breathing)).toBe(false);
+			const movingCanvas = await canvas.elementHandle();
+			await page.emulateMedia({ reducedMotion: "reduce" });
+			await expect
+				.poll(() => movingCanvas!.evaluate((node) => node.isConnected))
+				.toBe(false);
+			await expect(canvas).toHaveCount(1);
 			await page
 				.getByRole("textbox", { name: "メッセージ" })
 				.fill("配置の確認");
@@ -142,7 +194,26 @@ test.describe("light avatar rendering", () => {
 				const menu = page.getByRole("button", { name: "設定メニュー" });
 				if (await menu.count()) await menu.click();
 				await page.getByRole("button", { name: "設定", exact: true }).click();
-				await expect(canvas).toHaveCount(0);
+				await expect(canvas)
+					.toHaveCount(0)
+					.catch(async (error) => {
+						console.log(
+							"avatar navigation",
+							await page.evaluate(() => ({
+								hash: window.location.hash,
+								state: document
+									.querySelector(".light-avatar-background")
+									?.getAttribute("data-avatar-state"),
+								hidden: document
+									.querySelector(".workspace-layout")
+									?.hasAttribute("hidden"),
+								button: document
+									.querySelector(".floating-settings")
+									?.getAttribute("aria-label"),
+							})),
+						);
+						throw error;
+					});
 				await page.getByRole("button", { name: "会話に戻る" }).click();
 				await expect(canvas).toHaveCount(1);
 			}
@@ -213,7 +284,7 @@ test("avatar voice controls save and survive a settings reload", async ({
 		await intonation.press("Home");
 		for (let i = 0; i < 23; i++) await intonation.press("ArrowRight");
 		await page
-			.getByRole("checkbox", { name: /文章に合わせて抑揚を変える/ })
+			.getByRole("checkbox", { name: /文章に合わせて抑揚.*を変える/ })
 			.check();
 		const speed = page.getByRole("slider", { name: /話す速さ/ });
 		await speed.focus();
@@ -655,7 +726,7 @@ test("settings save, reload, theme and automatic fallback use backend credential
 	await page.setViewportSize({ width: 1440, height: 1000 });
 	await page.goto(`http://127.0.0.1:${webPort}/#settings`);
 	await expect(
-		page.getByRole("heading", { name: "AIの使い方", exact: true }),
+		page.getByRole("heading", { name: "全般", exact: true }),
 	).toBeVisible();
 	await page.getByRole("button", { name: "接続先", exact: true }).click();
 	await page
@@ -769,6 +840,20 @@ test("settings save, reload, theme and automatic fallback use backend credential
 	await expect(
 		page.getByText("変更を適用しました", { exact: true }),
 	).toBeVisible();
+	// Restore the fixture connection after deliberately exercising an offline URL.
+	// Later tests must not inherit its asynchronous connection preparation.
+	const restored = await fetch(`http://127.0.0.1:${webPort}/api/larm/connect`, {
+		method: "POST",
+	});
+	expect(restored.ok).toBe(true);
+	await expect
+		.poll(
+			async () =>
+				(await (await fetch(`http://127.0.0.1:${webPort}/api/status`)).json())
+					.larm.state,
+			{ timeout: 15000 },
+		)
+		.toBe("ready");
 });
 
 test("settings schedule controls create, pause, resume and cancel future work", async ({
@@ -832,6 +917,7 @@ test("idle views keep one SSE stream without periodic snapshot requests", async 
 	await page.goto(`http://127.0.0.1:${webPort}/`);
 	await expect(page.locator(".connection-health .health-state")).toHaveText(
 		/^(ready|idle)$/,
+		{ timeout: 15000 },
 	);
 	await expect.poll(() => counts.get("/api/events") ?? 0).toBeGreaterThan(0);
 	await page.waitForTimeout(600);
@@ -991,4 +1077,52 @@ test("partial ASR, arriving characters and the first speech clause precede answe
 		if (await page.getByRole("button", { name: "停止", exact: true }).count())
 			await page.getByRole("button", { name: "停止", exact: true }).click();
 	}
+});
+
+test("answer emoji sits beside Eumenes and remains after reload", async ({
+	page,
+}) => {
+	const url = `http://127.0.0.1:${webPort}`;
+	await page.route("**/api/conversations/main", (route) =>
+		route.fulfill({
+			json: {
+				id: "main",
+				revision: 1,
+				messages: [
+					{
+						id: "u1",
+						conversationId: "main",
+						role: "user",
+						text: "良い知らせがありました。",
+						createdAt: "2026-10-09T00:00:00Z",
+						runId: "r1",
+					},
+					{
+						id: "a1",
+						conversationId: "main",
+						role: "assistant",
+						text: "よかったですね。\n\n一緒に喜べてうれしいです。",
+						createdAt: "2026-10-09T00:00:01Z",
+						runId: "r1",
+						avatarMotion: "joyful",
+					},
+				],
+			},
+		}),
+	);
+	await page.emulateMedia({ colorScheme: "dark" });
+	await page.setViewportSize({ width: 1100, height: 800 });
+	await page.goto(`${url}/#conversation`);
+	const emoji = page.getByRole("img", { name: "喜び" });
+	await expect(emoji).toHaveText("😊");
+	await expect(page.locator(".message-author").last()).toHaveText("Eumenes😊");
+	await expect(page.locator(".markdown-content")).toHaveText(
+		"よかったですね。一緒に喜べてうれしいです。",
+	);
+	await expect(page.locator(".message-user [role=img]")).toHaveCount(0);
+	await page.reload();
+	await expect(emoji).toBeVisible();
+	await page.screenshot({
+		path: "verification-reports/avatar-emotion-emoji.png",
+	});
 });

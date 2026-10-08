@@ -4,6 +4,19 @@ export const voiceStartSchema = z.object({
 	sessionId: z.uuid(),
 	generation: z.number().int().positive(),
 });
+export const sampleInputSchema = z
+	.object({
+		voice: z.string().trim().max(200).optional(),
+		style: z.string().trim().min(1).max(200).optional(),
+		speed: z.number().min(0.5).max(2).optional(),
+		pitchScale: z.number().min(-0.15).max(0.15).optional(),
+		intonationScale: z.number().min(0).max(2).optional(),
+	})
+	.strict();
+export const replayInputSchema = z.object({
+	runId: z.string().min(1).max(120).optional(),
+	text: z.string().trim().min(1).max(65536),
+});
 export const voiceTurnSchema = z.object({
 	utteranceId: z.uuid(),
 	sessionId: z.uuid(),

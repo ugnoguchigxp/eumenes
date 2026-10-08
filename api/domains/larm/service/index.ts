@@ -1,3 +1,5 @@
+import { getLogger } from "../../../infrastructure/logger";
+const log = getLogger("larm");
 import { readChatResponse } from "../../../infrastructure/chat-stream";
 import type {
 	Capability,
@@ -271,8 +273,16 @@ export function createLarm(config: {
 							...(init.signal ? [init.signal] : []),
 						]),
 		});
-		if (!accepted.includes(response.status))
+		if (!accepted.includes(response.status)) {
+			log.warn("larm.control_rejected", {
+				route: path
+					.split("?")[0]!
+					.replace(/(agent-connections\/)[^/]+/, "$1:id"),
+				method: init.method ?? "GET",
+				status: response.status,
+			});
 			throw new Error(`larm_control_${response.status}`);
+		}
 		return response;
 	}
 	async function release(current: Lease) {
@@ -495,11 +505,20 @@ export function createLarm(config: {
 				await untilAborted(connecting, signal ?? lifetime.signal);
 			} catch (error) {
 				(signal ?? lifetime.signal).throwIfAborted();
-				if (!(error instanceof DOMException && error.name === "AbortError"))
+				// The attempt belongs to another caller; its own cancellation or
+				// deadline (AbortError / TimeoutError) must not fail this caller.
+				if (
+					!(
+						error instanceof DOMException &&
+						(error.name === "AbortError" || error.name === "TimeoutError")
+					)
+				)
 					throw error;
 			}
 			return connect(required, signal, force);
 		}
+		const connectStarted = performance.now();
+		log.info("larm.connection_started", { count: required.length });
 		connecting = (async () => {
 			if (lease && !lease.closing) {
 				const current = lease;
@@ -804,8 +823,18 @@ export function createLarm(config: {
 		})();
 		notify();
 		try {
-			return await connecting;
+			const connected = await connecting;
+			log.info("larm.connection_ready", {
+				count: connected.providers.size,
+				durationMs: Math.round(performance.now() - connectStarted),
+			});
+			return connected;
 		} catch (error) {
+			log.warn(
+				"larm.connection_failed",
+				{ durationMs: Math.round(performance.now() - connectStarted) },
+				error,
+			);
 			lastError = error instanceof Error ? error.message : "larm_failed";
 			throw error;
 		} finally {
@@ -919,6 +948,22 @@ export function createLarm(config: {
 				redirect: "error",
 			});
 		} catch (error) {
+			if (signal.aborted)
+				log.info("larm.inference_cancelled", {
+					kind: operation,
+					reason: "cancelled",
+					durationMs: Date.now() - started,
+				});
+			else
+				log.warn(
+					"larm.inference_unreachable",
+					{
+						kind: operation,
+						reason: "network_unavailable",
+						durationMs: Date.now() - started,
+					},
+					error,
+				);
 			await options?.onExchange?.({
 				connectionId,
 				model: provider.model,
@@ -931,6 +976,12 @@ export function createLarm(config: {
 				provider.token,
 				token ?? "",
 			]);
+			log.warn("larm.inference_rejected", {
+				kind: operation,
+				status: response.status,
+				reason: `larm_inference_${response.status}`,
+				durationMs: Date.now() - started,
+			});
 			await options?.onExchange?.({
 				connectionId,
 				model: provider.model,
@@ -1014,18 +1065,18 @@ export function createLarm(config: {
 	}
 	async function readVoices(
 		p: Provider,
-		connectionId: string,
 		signal: AbortSignal,
 	): Promise<TtsVoices> {
+		// The connection credential is scoped to inference. Voice discovery uses
+		// the backend control credential at the control origin only.
 		const available = record(
-			await readJson(
-				await infer(
-					p,
-					`audio/voices?model=${encodeURIComponent(p.model)}`,
+			await untilAborted(
+				control(
+					`/v1/audio/voices?model=${encodeURIComponent(p.model)}`,
 					{ method: "GET" },
-					signal,
-					connectionId,
-				),
+					[200],
+				).then(readJson),
+				signal,
 			),
 		);
 		const parsed = ttsVoicesSchema.safeParse({ ...available, model: p.model });
@@ -1069,9 +1120,7 @@ export function createLarm(config: {
 			}
 		},
 		async voices(signal) {
-			return withProvider("tts", signal, (p, connectionId) =>
-				readVoices(p, connectionId, signal),
-			);
+			return withProvider("tts", signal, (p) => readVoices(p, signal));
 		},
 		async connect() {
 			await connect(["llm"], undefined, true);
@@ -1139,19 +1188,47 @@ export function createLarm(config: {
 					throw new Error("larm_tts_input_invalid");
 				let selectedVoice = voice ?? p.voice;
 				const voicevox = p.model === "voicevox-core";
-				const catalog =
-					voicevox || !selectedVoice
-						? (voiceCatalogs.get(p) ??
-							(await readVoices(p, connectionId, signal)))
-						: undefined;
+				let catalog: TtsVoices | undefined;
+				if (voicevox || !selectedVoice) {
+					try {
+						catalog = voiceCatalogs.get(p) ?? (await readVoices(p, signal));
+					} catch (error) {
+						// The catalog only validates and clamps; a voice that is already
+						// chosen can still be synthesized when the catalog is refused.
+						signal.throwIfAborted();
+						log.warn(
+							"larm.voice_catalog_unavailable",
+							{
+								reason: "voice_catalog_unavailable",
+								kind: selectedVoice
+									? "continue_with_selected_voice"
+									: "no_voice",
+							},
+							error,
+						);
+						if (!selectedVoice) throw error;
+					}
+				}
+				const catalogUnavailable = (voicevox || !selectedVoice) && !catalog;
 				if (!voice && voicevox)
 					selectedVoice = catalog?.default_voice ?? selectedVoice;
 				if (!selectedVoice) selectedVoice = p.voice = catalog?.default_voice;
 				if (!selectedVoice) throw new Error("larm_tts_voice_unconfigured");
 				const speaker = catalog?.voices.find((v) => v.id === selectedVoice);
-				if (voicevox && !speaker) throw new Error("larm_tts_voice_missing");
+				if (voicevox && !catalogUnavailable && !speaker) {
+					log.warn("larm.tts_voice_missing", {
+						kind: selectedVoice,
+						count: catalog?.voices.length,
+						reason: `catalog: ${(catalog?.voices ?? [])
+							.slice(0, 12)
+							.map((v) => v.id)
+							.join(",")}`.slice(0, 250),
+					});
+					throw new Error("larm_tts_voice_missing");
+				}
 				if (
 					voicevox &&
+					!catalogUnavailable &&
 					config.style &&
 					!speaker?.styles.some((s) => s.id === config.style)
 				)

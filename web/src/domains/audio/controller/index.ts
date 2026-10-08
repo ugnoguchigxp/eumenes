@@ -31,6 +31,8 @@ function wav(samples: Float32Array, rate: number): Uint8Array {
 		);
 	return bytes;
 }
+/** Output-to-ear latency allowance after playback ends (Bluetooth can add ~300 ms). */
+const OUTPUT_TAIL_MS = 500;
 export function createAudioController(
 	onState: (state: AudioState) => void,
 	onSpeech: () => void,
@@ -44,6 +46,14 @@ export function createAudioController(
 		noiseSuppression?: boolean;
 		autoGainControl?: boolean;
 		onPartial?: (wav: Uint8Array) => void;
+		/**
+		 * Half duplex: while our own speech plays (and briefly after, for output
+		 * latency such as Bluetooth) the microphone is treated as silent, so the
+		 * reply is never recognized as the next utterance. Evaluated per frame.
+		 */
+		halfDuplex?: () => boolean;
+		/** Keep the output device awake with an inaudible bed (default on). */
+		keepAlive?: boolean;
 	} = {},
 ) {
 	let context: AudioContext | undefined;
@@ -52,6 +62,7 @@ export function createAudioController(
 	let source: MediaStreamAudioSourceNode | undefined;
 	let playback: AudioBufferSourceNode | undefined;
 	let playbackGain: GainNode | undefined;
+	let keepAliveSource: AudioBufferSourceNode | undefined;
 	let playbackEpoch = 0;
 	let playbackDone: Promise<void> = Promise.resolve();
 	let finishPlayback: () => void = () => {};
@@ -65,8 +76,32 @@ export function createAudioController(
 	let lastLevel = 0;
 	let nextPartialAt = 0;
 	let lastEmit = 0;
+	let listenAfter = 0;
+	let wasGated = false;
 	const emit = (phase: AudioState["phase"], error?: string) =>
 		onState({ phase, error, level: lastLevel });
+
+	// Bluetooth outputs sleep on digital silence and clip the start of the next
+	// sound while waking. A ~-80 dBFS noise bed (a few 16-bit LSBs) keeps the
+	// link open without being audible. Best effort: playback never depends on it.
+	function startKeepAlive(ctx: AudioContext) {
+		if (options.keepAlive === false || typeof ctx.createBuffer !== "function")
+			return;
+		try {
+			const buffer = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+			const data = buffer.getChannelData(0);
+			for (let i = 0; i < data.length; i++)
+				data[i] = (Math.random() * 2 - 1) * 1e-4;
+			const bed = ctx.createBufferSource();
+			bed.buffer = buffer;
+			bed.loop = true;
+			bed.connect(ctx.destination);
+			bed.start();
+			keepAliveSource = bed;
+		} catch {
+			keepAliveSource = undefined;
+		}
+	}
 
 	function encodeFrames(): Uint8Array {
 		const joined = new Float32Array(sampleCount);
@@ -127,6 +162,7 @@ export function createAudioController(
 				if (disposed || context !== startedContext) return;
 				await startedContext.resume();
 				if (disposed || context !== startedContext) return;
+				startKeepAlive(startedContext);
 				detector = new VoiceActivityDetector({
 					sampleRate: context.sampleRate,
 					silenceTimeoutMs: options.silenceMs ?? 700,
@@ -138,6 +174,26 @@ export function createAudioController(
 					if (disposed || !context) return;
 					const data = event.inputBuffer.getChannelData(0);
 					const frame = new Float32Array(data);
+					const gated =
+						!!options.halfDuplex?.() &&
+						(!!playback || performance.now() < listenAfter);
+					if (gated) {
+						// Drop anything heard so far; the reply must not become input.
+						frame.fill(0);
+						if (!wasGated) {
+							speaking = false;
+							frames = [];
+							sampleCount = 0;
+							candidateFrames = [];
+							candidateSamples = 0;
+							detector = new VoiceActivityDetector({
+								sampleRate: context.sampleRate,
+								silenceTimeoutMs: options.silenceMs ?? 700,
+								speechThresholdRms: options.threshold ?? 0.008,
+							});
+						}
+					}
+					wasGated = gated;
 					const observation = detector?.observe(frame);
 					lastLevel = observation?.rms ?? 0;
 					if (!speaking) {
@@ -249,6 +305,7 @@ export function createAudioController(
 			});
 			next.onended = () => {
 				if (playback === next) {
+					listenAfter = performance.now() + OUTPUT_TAIL_MS;
 					playback = undefined;
 					playbackGain?.disconnect();
 					playbackGain = undefined;
@@ -278,6 +335,13 @@ export function createAudioController(
 			disposed = true;
 			lastLevel = 0;
 			this.stopPlayback();
+			try {
+				keepAliveSource?.stop();
+			} catch {
+				// Already stopped together with its context.
+			}
+			keepAliveSource?.disconnect();
+			keepAliveSource = undefined;
 			processor?.disconnect();
 			source?.disconnect();
 			stream?.getTracks().forEach((t) => {

@@ -62,8 +62,11 @@ test("playback volume includes mute and releases gain on completion and cancella
 		() => {},
 	);
 	await audio.start();
-	const ended = vi.fn();
-	await audio.play(new Uint8Array(44), ended, { volume: 0.4 });
+	const ended = vi.fn(),
+		onStarted = vi.fn();
+	await audio.play(new Uint8Array(44), ended, { volume: 0.4, onStarted });
+	expect(sources[0]!.start).toHaveBeenCalledOnce();
+	expect(onStarted).toHaveBeenCalledOnce();
 	expect(gains[0]!.gain.value).toBe(0.4);
 	expect(sources[0]!.connect).toHaveBeenCalledWith(gains[0]);
 	sources[0]!.onended?.();
@@ -204,11 +207,14 @@ test("stopping playback while WAV decoding prevents a late start", async () => {
 		() => {},
 	);
 	await audio.start();
-	const pending = audio.play(new Uint8Array(44), () => {});
+	const onStarted = vi.fn();
+	const pending = audio.play(new Uint8Array(44), () => {}, { onStarted });
+	expect(onStarted).not.toHaveBeenCalled();
 	audio.stopPlayback();
 	resolveDecode?.({} as AudioBuffer);
 	await pending;
 	expect(started).toBe(0);
+	expect(onStarted).not.toHaveBeenCalled();
 	await audio.stop();
 });
 
@@ -330,4 +336,155 @@ test("stopping while audio resume is pending never installs capture or reports a
 	expect(stopped).toBe(1);
 	expect(installed).toBe(0);
 	expect(states.at(-1)).toBe("idle");
+});
+test("an inaudible looping bed keeps the output awake until stop, unless disabled", async () => {
+	const beds: Array<{
+		loop: boolean;
+		start: ReturnType<typeof vi.fn>;
+		stop: ReturnType<typeof vi.fn>;
+		buffer?: { data: Float32Array };
+	}> = [];
+	class Context {
+		sampleRate = 8000;
+		destination = {};
+		resume = async () => {};
+		close = async () => {};
+		createBuffer(_channels: number, length: number) {
+			const data = new Float32Array(length);
+			return { getChannelData: () => data, data };
+		}
+		createBufferSource() {
+			const bed = {
+				loop: false,
+				buffer: undefined,
+				start: vi.fn(),
+				stop: vi.fn(),
+				connect: vi.fn(),
+				disconnect: vi.fn(),
+			};
+			beds.push(bed);
+			return bed;
+		}
+		createMediaStreamSource() {
+			return { connect() {}, disconnect() {} };
+		}
+		createScriptProcessor() {
+			return { connect() {}, disconnect() {} };
+		}
+	}
+	vi.stubGlobal("AudioContext", Context);
+	vi.stubGlobal("navigator", {
+		mediaDevices: {
+			getUserMedia: async () => ({ getTracks: () => [] }),
+		},
+	});
+	const audio = createAudioController(
+		() => {},
+		() => {},
+		() => {},
+	);
+	await audio.start();
+	expect(beds).toHaveLength(1);
+	expect(beds[0]!.loop).toBe(true);
+	expect(beds[0]!.start).toHaveBeenCalledOnce();
+	const peak = Math.max(...(beds[0]!.buffer?.data ?? []).map(Math.abs));
+	expect(peak).toBeGreaterThan(1 / 32768);
+	expect(peak).toBeLessThanOrEqual(1e-3);
+	await audio.stop();
+	expect(beds[0]!.stop).toHaveBeenCalledOnce();
+	const quiet = createAudioController(
+		() => {},
+		() => {},
+		() => {},
+		{ keepAlive: false },
+	);
+	await quiet.start();
+	expect(beds).toHaveLength(1);
+	await quiet.stop();
+});
+
+test("half duplex ignores the microphone while our own reply plays and briefly after", async () => {
+	type Process = (event: {
+		inputBuffer: { getChannelData: () => Float32Array };
+	}) => void;
+	let process: Process | null = null;
+	const sources: Array<{ onended: (() => void) | null }> = [];
+	vi.stubGlobal("navigator", {
+		mediaDevices: {
+			getUserMedia: async () => ({ getTracks: () => [{ stop() {} }] }),
+		},
+	});
+	class Context {
+		sampleRate = 48000;
+		destination = {};
+		async resume() {}
+		async close() {}
+		createMediaStreamSource() {
+			return { connect() {}, disconnect() {} };
+		}
+		createScriptProcessor() {
+			const processor = {
+				set onaudioprocess(value: Process | null) {
+					process = value;
+				},
+				connect() {},
+				disconnect() {},
+			};
+			return processor;
+		}
+		async decodeAudioData() {
+			return {};
+		}
+		createBufferSource() {
+			const source = {
+				onended: null as (() => void) | null,
+				buffer: null as unknown,
+				connect() {},
+				start() {},
+				stop() {},
+			};
+			sources.push(source);
+			return source;
+		}
+	}
+	vi.stubGlobal("AudioContext", Context);
+	let half = true;
+	let speech = 0,
+		segments = 0;
+	const audio = createAudioController(
+		() => {},
+		() => speech++,
+		() => segments++,
+		{ keepAlive: false, halfDuplex: () => half },
+	);
+	await audio.start();
+	const feed = (value: number) =>
+		(process as Process | null)?.({
+			inputBuffer: {
+				getChannelData: () =>
+					Float32Array.from({ length: 2048 }, (_, i) =>
+						i % 2 ? value : -value,
+					),
+			},
+		});
+	const utterance = () => {
+		for (let i = 0; i < 7; i++) feed(0.2);
+		for (let i = 0; i < 18; i++) feed(0);
+		feed(0.2);
+	};
+	await audio.play(new Uint8Array(44), () => {});
+	utterance();
+	expect([speech, segments]).toEqual([0, 0]);
+	sources[0]?.onended?.();
+	utterance();
+	expect([speech, segments]).toEqual([0, 0]);
+	vi.spyOn(performance, "now").mockReturnValue(performance.now() + 1000);
+	utterance();
+	expect([speech, segments]).toEqual([1, 1]);
+	half = false;
+	await audio.play(new Uint8Array(44), () => {});
+	utterance();
+	expect([speech, segments]).toEqual([2, 2]);
+	await audio.stop();
+	vi.restoreAllMocks();
 });

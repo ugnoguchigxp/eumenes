@@ -1,3 +1,4 @@
+import { getLogger, withLogContext } from "../infrastructure/logger";
 import { Hono } from "hono";
 import {
 	type ConversationService,
@@ -33,6 +34,26 @@ export function createApp(deps: {
 	changes?: Changes;
 }) {
 	const app = new Hono();
+	const log = getLogger("http");
+	app.use("/api/*", async (c, next) => {
+		const requestId = crypto.randomUUID();
+		const started = performance.now();
+		c.header("X-Request-Id", requestId);
+		return withLogContext({ httpRequestId: requestId }, async () => {
+			log.debug("http.started", { method: c.req.method });
+			await next();
+			const fields = {
+				method: c.req.method,
+				route: c.req.routePath,
+				status: c.res.status,
+				durationMs: Math.round(performance.now() - started),
+			};
+			if (c.res.status >= 500) log.error("http.completed", fields);
+			else if (c.res.status >= 400) log.warn("http.completed", fields);
+			else if (c.req.method === "GET") log.debug("http.completed", fields);
+			else log.info("http.completed", fields);
+		});
+	});
 	app.use("/api/*", async (c, next) => {
 		const origin = c.req.header("origin");
 		if (origin && origin !== deps.origin)
@@ -40,6 +61,7 @@ export function createApp(deps: {
 		if (origin) {
 			c.header("Access-Control-Allow-Origin", origin);
 			c.header("Vary", "Origin");
+			c.header("Access-Control-Expose-Headers", "X-Request-Id");
 			c.header(
 				"Access-Control-Allow-Headers",
 				"Authorization, Content-Type, Last-Event-ID, X-Session-Id, X-Generation, X-Sequence, X-Utterance-Id",
@@ -85,9 +107,10 @@ export function createApp(deps: {
 						: 500;
 		// Internal failures never leak details to the client.
 		if (status === 500) {
-			console.error(`internal_error: ${message}`);
+			log.error("http.failed", { reason: "internal_error", status }, error);
 			return c.json({ error: "internal_error" }, 500);
 		}
+		log.warn("http.rejected", { reason: message, status });
 		return c.json({ error: message }, status);
 	});
 	return app;

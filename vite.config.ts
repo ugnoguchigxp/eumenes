@@ -1,5 +1,6 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig, loadEnv } from "vite";
+import { resolve } from "node:path";
 import { resolveApiToken } from "./api/infrastructure/auth-config";
 export default defineConfig(({ command, mode }) => {
 	// Read backend settings on the dev server; never expose them through VITE_*.
@@ -8,6 +9,10 @@ export default defineConfig(({ command, mode }) => {
 	return {
 		plugins: [react()],
 		root: "web",
+		// Fixture servers must not replace the running developer server's dependencies.
+		cacheDir:
+			env.EUMENES_VITE_CACHE_DIR ?? resolve("node_modules/.vite/development"),
+		optimizeDeps: { include: ["three"] },
 		server: {
 			host: "127.0.0.1",
 			proxy: {

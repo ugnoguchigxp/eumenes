@@ -5,6 +5,8 @@ import { join } from "node:path";
 import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
 import {
 	migration as conversationMigration,
+	avatarMotionMigration as conversationAvatarMotionMigration,
+	answerDeliveryMigration as conversationAnswerDeliveryMigration,
 	createConversationService,
 } from "../../conversation";
 import {
@@ -15,6 +17,10 @@ import {
 import type { LarmPort } from "../../larm";
 import { createQueue, migration as queueMigration } from "../../queue";
 import { createVoiceDialogue, migration, sequenceMigration } from "..";
+import { SpeechSentences } from "../service/sentences";
+import { Hono } from "hono";
+import { registerVoiceDialogue } from "..";
+import type { InferencePort } from "../../inference";
 
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const wav = (() => {
@@ -49,6 +55,8 @@ test("voice capture to ASR, dialogue, TTS; duplicate utterance is ignored", asyn
 	try {
 		const store = openStore(join(dir, "db.sqlite3"), [
 			conversationMigration,
+			conversationAvatarMotionMigration,
+			conversationAnswerDeliveryMigration,
 			dialogueMigration,
 			migration,
 			queueMigration,
@@ -122,6 +130,8 @@ test("restart cancels the run of a stale voice turn so no old answer is spoken",
 	try {
 		const store = openStore(join(dir, "db.sqlite3"), [
 			conversationMigration,
+			conversationAvatarMotionMigration,
+			conversationAnswerDeliveryMigration,
 			dialogueMigration,
 			migration,
 			queueMigration,
@@ -250,4 +260,150 @@ test("stopping a session fences acceptance waiting in the writer queue", async (
 		await store.close();
 		rmSync(dir, { recursive: true, force: true });
 	}
+});
+
+test("replay splits finished text into clauses and synthesizes on demand", async () => {
+	const spoken: string[] = [];
+	const dir = mkdtempSync(join(tmpdir(), "eumenes-replay-"));
+	const store = openStore(join(dir, "db.sqlite3"), []);
+	const voice = createVoiceDialogue(
+		store,
+		{} as never,
+		{
+			speak: async (text: string) => {
+				spoken.push(text);
+				return wav;
+			},
+		} as unknown as LarmPort,
+	);
+	try {
+		expect(voice.replaySentences("今日は晴れです。明日は雨です。")).toEqual([
+			"今日は晴れです。",
+			"明日は雨です。",
+		]);
+		await voice.replayAudio("今日は晴れです。", new AbortController().signal);
+		expect(spoken).toEqual(["今日は晴れです。"]);
+		await expect(
+			voice.replayAudio("あ".repeat(401), new AbortController().signal),
+		).rejects.toThrow("replay_text_invalid");
+	} finally {
+		await store.close();
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("replay HTTP returns the adopted Laya motion with the same audio and supports legacy adapters", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "eumenes-replay-motion-"));
+	const store = openStore(join(dir, "db.sqlite3"), []);
+	let synthesis = 0;
+	const port: InferencePort = {
+		status: () => ({ state: "ready", capabilities: ["tts"] }),
+		answer: async () => {
+			throw new Error("unexpected_answer");
+		},
+		transcribe: async () => {
+			throw new Error("unexpected_transcribe");
+		},
+		close: async () => {},
+		speak: async () => {
+			synthesis++;
+			return wav;
+		},
+		speakWithDelivery: async () => {
+			synthesis++;
+			return {
+				wav,
+				delivery: {
+					id: crypto.randomUUID(),
+					motion: "joyful",
+					tone: "bright",
+					source: "laya",
+					confidence: 0.9,
+					latencyMs: 10,
+				},
+			};
+		},
+	};
+	const service = createVoiceDialogue(store, {} as never, port);
+	const app = new Hono();
+	registerVoiceDialogue(app, service);
+	const request = () =>
+		app.request("/api/voice/replay/audio", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ text: "よかったですね。" }),
+		});
+	try {
+		const response = await request();
+		expect(response.status).toBe(200);
+		expect(response.headers.get("X-Avatar-Motion")).toBe("joyful");
+		expect(new Uint8Array(await response.arrayBuffer())).toEqual(wav);
+		expect(synthesis).toBe(1);
+		delete port.speakWithDelivery;
+		const legacy = await request();
+		expect(legacy.status).toBe(200);
+		expect(legacy.headers.get("X-Avatar-Motion")).toBeNull();
+		expect(synthesis).toBe(2);
+	} finally {
+		await store.close();
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("a clause that keeps failing is skipped and the rest is still spoken", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "eumenes-voice-skip-"));
+	try {
+		const store = openStore(join(dir, "db.sqlite3"), [
+			migration,
+			sequenceMigration,
+		]);
+		const dialogue = {
+			submit: async () => ({ id: crypto.randomUUID(), deadlineAt: null }),
+			get: () => ({ status: "completed" }),
+			subscribeProgress: () => () => {},
+			waitForTerminal: async () => ({
+				status: "completed",
+				answerMessageId: "answer",
+			}),
+			answerText: () => "最初です。壊れます。最後です。",
+			cancel: async () => null,
+		} as unknown as ReturnType<typeof createDialogueService>;
+		const calls: string[] = [];
+		const larm: LarmPort = {
+			status: () => ({ state: "ready", capabilities: ["llm", "asr", "tts"] }),
+			connect: async () => {},
+			answer: async () => "回答",
+			transcribe: async () => "質問",
+			speak: async (text) => {
+				calls.push(text);
+				if (text.includes("壊れ")) throw new Error("larm_inference_500");
+				return wav;
+			},
+			close: async () => {},
+		};
+		const voice = createVoiceDialogue(store, dialogue, larm);
+		const sessionId = crypto.randomUUID(),
+			utteranceId = crypto.randomUUID();
+		voice.start(sessionId, 1);
+		await voice.accept(sessionId, 1, 1, utteranceId, wav);
+		for (let i = 0; i < 100 && voice.get(utteranceId)?.status !== "ready"; i++)
+			await pause(20);
+		expect(voice.get(utteranceId)?.status).toBe("ready");
+		expect(calls.filter((t) => t.includes("壊れ"))).toHaveLength(3);
+		expect(voice.get(utteranceId)?.audioChunks.map((c) => c.text)).toEqual([
+			"最初です。",
+			"最後です。",
+		]);
+		await voice.close();
+		await store.close();
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("clauses without any phoneme are never sent to TTS", () => {
+	expect(new SpeechSentences().append("はい。…。！？ 次です。", true)).toEqual([
+		"はい。",
+		"次です。",
+	]);
 });

@@ -5,6 +5,8 @@ import { join } from "node:path";
 import { openStore } from "../../../infrastructure/sqlite";
 import {
 	migration as conversationMigration,
+	avatarMotionMigration as conversationAvatarMotionMigration,
+	answerDeliveryMigration as conversationAnswerDeliveryMigration,
 	createConversationService,
 } from "../../conversation";
 import {
@@ -43,6 +45,8 @@ test("a database with only the original three migrations (plus later ones) upgra
 			schedulerMigration,
 			queueLinkMigration,
 			sequenceMigration,
+			conversationAvatarMotionMigration,
+			conversationAnswerDeliveryMigration,
 		]);
 		const rows = upgraded.read((db) =>
 			db
@@ -95,7 +99,7 @@ test("a database with only the original three migrations (plus later ones) upgra
 		).toBe(3);
 		expect(
 			upgraded.read((db) => db.query("SELECT id FROM schema_migrations").all()),
-		).toHaveLength(7);
+		).toHaveLength(9);
 		await upgraded.close();
 		// second start is a no-op
 		const again = openStore(file, [
@@ -104,10 +108,12 @@ test("a database with only the original three migrations (plus later ones) upgra
 			schedulerMigration,
 			queueLinkMigration,
 			sequenceMigration,
+			conversationAvatarMotionMigration,
+			conversationAnswerDeliveryMigration,
 		]);
 		expect(
 			again.read((db) => db.query("SELECT id FROM schema_migrations").all()),
-		).toHaveLength(7);
+		).toHaveLength(9);
 		await again.close();
 	} finally {
 		rmSync(dir, { recursive: true, force: true });

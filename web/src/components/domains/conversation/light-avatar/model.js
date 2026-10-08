@@ -1,5 +1,7 @@
 import * as THREE from "three";
 import { sampleMotion, blendPose } from "./motion.js";
+import { sampleIdlePose } from "./idle.ts";
+import { samplePerformancePose } from "./performance.ts";
 const TAU = Math.PI * 2;
 const clamp = THREE.MathUtils.clamp;
 const commonDeform = `
@@ -911,6 +913,9 @@ export function createLightAvatar(host) {
 			pong.setSize(Math.round((w * d) / 2), Math.round((h * d) / 2));
 		}
 		let activeMode = null,
+			activeSpeaking = false,
+			idleGestureWeight = 1,
+			lastIdleTime = 0,
 			previousPose = sampleMotion("neutral", 0),
 			acting = previousPose;
 		const headEuler = new THREE.Euler(),
@@ -918,23 +923,46 @@ export function createLightAvatar(host) {
 			headCamera = new THREE.Vector3(),
 			headNormal = new THREE.Vector3(),
 			eyeQuaternion = new THREE.Quaternion();
-		function render(time = 0, mode = "neutral", elapsed = 0) {
+		function render(time = 0, mode = "neutral", elapsed = 0, speaking = false) {
 			renderer.info.reset();
 			uniforms.uTime.value = time;
-			if (activeMode !== mode) {
+			if (activeMode !== mode || activeSpeaking !== speaking) {
 				previousPose = { ...acting };
 				activeMode = mode;
+				activeSpeaking = speaking;
 			}
 			const phraseTime = Math.max(0, elapsed);
-			acting = blendPose(
-				previousPose,
-				sampleMotion(mode, phraseTime),
-				Math.min(1, phraseTime / 0.7),
+			const softened = samplePerformancePose(mode, phraseTime, speaking);
+			acting = blendPose(previousPose, softened, Math.min(1, phraseTime / 0.7));
+			const fadeStep = Math.min(0.25, Math.max(0, time - lastIdleTime)) / 0.7;
+			const idleTarget = mode === "neutral" && !speaking ? 1 : 0;
+			idleGestureWeight += clamp(
+				idleTarget - idleGestureWeight,
+				-fadeStep,
+				fadeStep,
 			);
-			const p = acting;
+			lastIdleTime = time;
+			const idle = sampleIdlePose(time, idleGestureWeight);
+			const p = { ...acting };
+			for (const part of [
+				"lift",
+				"bx",
+				"by",
+				"bz",
+				"hx",
+				"hy",
+				"hz",
+				"left",
+				"right",
+				"leftInner",
+				"rightInner",
+				"energy",
+			])
+				p[part] += idle[part];
+			if (mode === "neutral" && !speaking) p.open *= idle.open;
 			uniforms.uEnergy.value = p.energy;
 			uniforms.uThinking.value = mode === "thinking" ? 1 : 0;
-			root.position.set(0, p.lift + Math.sin(time * 0.65) * 0.008, p.forward);
+			root.position.set(0, p.lift, p.forward);
 			root.rotation.set(
 				pitch + p.bx,
 				yaw + p.by + (current === "b" ? 0.34 : 0),

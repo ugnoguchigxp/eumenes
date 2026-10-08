@@ -6,6 +6,8 @@ import { Hono } from "hono";
 import { openStore } from "../../../infrastructure/sqlite";
 import {
 	migration as conversationMigration,
+	avatarMotionMigration as conversationAvatarMotionMigration,
+	answerDeliveryMigration as conversationAnswerDeliveryMigration,
 	createConversationService,
 } from "../../conversation";
 import type { LarmPort } from "../../larm";
@@ -30,6 +32,8 @@ test("dialogue controller validates requests and delegates one run", async () =>
 	try {
 		const store = openStore(join(dir, "db.sqlite3"), [
 			conversationMigration,
+			conversationAvatarMotionMigration,
+			conversationAnswerDeliveryMigration,
 			migration,
 			queueMigration,
 			queueLinkMigration,

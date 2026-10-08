@@ -102,8 +102,8 @@ const server = Bun.serve({
 		}
 		if (path === "/fixture/observations")
 			return Response.json({ ttsInputs, asrInputs, ttsParameters });
-		if (path === "/tts/v1/audio/voices") {
-			if (request.headers.get("authorization") !== "Bearer fixture-tts")
+		if (path === "/v1/audio/voices") {
+			if (request.headers.get("authorization") !== "Bearer fixture-control")
 				return Response.json({ error: "unauthorized" }, { status: 401 });
 			return Response.json(voiceCatalog);
 		}

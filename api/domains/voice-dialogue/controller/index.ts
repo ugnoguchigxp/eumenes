@@ -1,7 +1,13 @@
 import type { Hono, Context } from "hono";
 import type { VoiceDialogueService } from "..";
-import { voiceStartSchema } from "../contracts";
+import { getLogger } from "../../../infrastructure/logger";
+import {
+	replayInputSchema,
+	sampleInputSchema,
+	voiceStartSchema,
+} from "../contracts";
 
+const log = getLogger("voice");
 const MAX_AUDIO_BYTES = 4_000_000;
 async function readAudio(body: ReadableStream<Uint8Array> | null) {
 	if (!body) throw new Error("audio_empty");
@@ -97,6 +103,73 @@ export function registerVoiceDialogue(
 			202,
 		);
 	};
+	app.post("/api/voice/replay/sentences", async (c) => {
+		const parsed = replayInputSchema.safeParse(
+			await c.req.json().catch(() => null),
+		);
+		if (!parsed.success) return c.json({ error: "invalid_input" }, 400);
+		return c.json({ sentences: service.replaySentences(parsed.data.text) });
+	});
+	app.post("/api/voice/replay/audio", async (c) => {
+		const parsed = replayInputSchema.safeParse(
+			await c.req.json().catch(() => null),
+		);
+		if (!parsed.success || parsed.data.text.length > 400)
+			return c.json({ error: "invalid_input" }, 400);
+		try {
+			const speech = await service.replaySpeech(
+				parsed.data.text,
+				AbortSignal.any([c.req.raw.signal, AbortSignal.timeout(60_000)]),
+				parsed.data.runId,
+			);
+			return c.body(new Uint8Array(speech.wav), 200, {
+				"Content-Type": "audio/wav",
+				"Cache-Control": "no-store",
+				...(speech.delivery
+					? { "X-Avatar-Motion": speech.delivery.motion }
+					: {}),
+			});
+		} catch (error) {
+			// Only machine-readable codes (e.g. larm_inference_401) reach the client.
+			const code = error instanceof Error ? error.message : "";
+			log.error(
+				"voice.replay_failed",
+				{ route: "/api/voice/replay/audio", reason: code || "unknown" },
+				error,
+			);
+			return c.json(
+				{ error: /^[a-z][a-z0-9_]{0,63}$/.test(code) ? code : "replay_failed" },
+				502,
+			);
+		}
+	});
+	app.post("/api/voice/sample", async (c) => {
+		const parsed = sampleInputSchema.safeParse(
+			await c.req.json().catch(() => null),
+		);
+		if (!parsed.success) return c.json({ error: "invalid_input" }, 400);
+		try {
+			const wav = await service.sampleAudio(
+				parsed.data,
+				AbortSignal.any([c.req.raw.signal, AbortSignal.timeout(60_000)]),
+			);
+			return c.body(new Uint8Array(wav), 200, {
+				"Content-Type": "audio/wav",
+				"Cache-Control": "no-store",
+			});
+		} catch (error) {
+			const code = error instanceof Error ? error.message : "";
+			log.error(
+				"voice.sample_failed",
+				{ route: "/api/voice/sample", reason: code || "unknown" },
+				error,
+			);
+			return c.json(
+				{ error: /^[a-z][a-z0-9_]{0,63}$/.test(code) ? code : "sample_failed" },
+				502,
+			);
+		}
+	});
 	app.post("/api/voice/turns", receive(false));
 	app.post("/api/voice/preview", receive(true));
 	app.get("/api/voice/turns/:id", (c) => {

@@ -2,7 +2,18 @@
 
 2026年10月8日。対象は、応答本文に合う話し方をLayaで判断し、VOICEVOXの合成とアバターの再生を同期させる機能。利用者の怒りや不安をそのまま演技に移さず、回答の内容と場面に適した態度を選ぶ。
 
-音声の手動調整は今回の変更で実装した。背景アバターのモデルと動作候補も存在する。Layaの判断、手動ロック、アバターの不足部位と再生同期は以下の計画の対象であり、まだ実装していない。実サービスでのAPI受入と、人が音声や動きを確認する試聴受入は別に行う。
+音声の手動調整に加え、Laya の判断と既存の光アバターへの接続を実装した。以下の「今回接続した範囲」が現在の実装を示す。それ以降は当初の拡張案であり、6分類・score/noul・個別ロック・口の振幅同期・pause/resume・turn内再利用はまだ実装していない。実サービスでのAPI受入と、人が音声や動きを確認する試聴受入は別に行う。
+
+## 今回接続した範囲
+
+- LARMの音声用Profile全体をclaimする既存経路に、optionalな `system-one` を追加した。discoveryの `decision.system-one`、`larm.system-one.v1`、`/v1/systemone` とclaimの `configuration.fields.daemonURL` / model / tokenを検査する。同じConnectionをASR、LLM、TTS、Layaで共有し、更新時は専用tokenも取り直す。公開の3用途とクラウド許可設定は従来通り。
+- delivery domainが、13種類のmotionと5種類のvoice toneをnative choiceで一度に質問する。判断対象は各句の辞書置換後の実際の読み上げ文とphaseだけ。受信したchoiceの型・候補・数値範囲、切詰めを検証し、motionとtoneを個別に判定し、各 `answer_confidence` が0.6以上ならその結果を採用する。片方だけ低確度なら、その項目だけneutral / naturalに戻す。別の `confidence` を選択候補の確率として扱わない。
+- 各TTS句に2秒の判断予算を設けた。判定結果を音声のreceiptへ添付し、既存のwriter transactionで世代・許可を検査してからaudio chunkとともに公開する。ネットワーク要求はtransactionの外。再起動時は音声と同様に失効し、判断を別DBへ永続化しない。turn内再利用と250ms目標は今後の最適化対象。
+- 自動抑揚がオンのときだけ、受付時の速度・高さ・抑揚の基準へtoneの差分を適用する。natural=(0,0,0)、bright=(+0.05,+0.02,+0.15)、gentle=(−0.06,−0.01,−0.10)、serious=(−0.04,0,+0.05)、excited=(+0.08,+0.025,+0.20)。話者とstyleを維持し、VOICEVOXの絶対範囲と話者catalogの範囲に収める。オフでもアバターのmotionは判断するが声は手動設定に従う。
+- Layaのtimeout・形式違反・失敗、両項目の低確度は通常の声とneutral動作に戻る。optional Providerが存在しない場合は従来の簡易抑揚を維持する。判断失敗を理由に回答を取消したり、判断だけをクラウドへ送ったりしない。取消後の遅着結果は採用しない。
+- WebのAudioBufferSourceの実再生開始に合わせ、各句の発話cueを一度だけ開始する。頷きや手振りにLayaのmotionを重ね、8秒の動作を実音声終了まで繰り返す。消音時は発話動作を開始しない。終了・取消・割込みで旧cueとその予約frameを失効させ、0.7秒で待機へ戻す。待機中も呼吸・揺れ・光の動きを継続し、約30秒間隔で4.8秒だけ体を左右に振る。発話や回答動作中はこの仕草を抑える。listeningとthinkingは実処理状態から導く。待機12fps・身振りと発話24fps上限、控えめな身振り、タブ非表示・画面破棄時の解放、`prefers-reduced-motion` に対応した。
+
+接続済みの対象は音声対話の回答句と「読み上げ直し」。読み上げ直しでは、既存のwriter transactionで採用したreceiptから音声とmotionを返し、HTMLAudioElementのplayingで同期を開始する。文章だけの回答は、読み上げ操作をしたときに発話動作を行う。口の部位追加・音声振幅同期・個別ロック・pause/resume・モデル判断の品質調整は次の段階。
 
 ## 現行実装との対応
 
@@ -17,22 +28,24 @@
 | 保存済み話者が消えた場合 | 今回実装 | [音声設定画面](../web/src/domains/settings/index.tsx)。保存値を保持し、再取得と既定話者へ戻す操作を提供 |
 | クレジット | 今回実装 | catalogのcreditを表示し、合成応答のX-VOICEVOX-Creditを復号して採用済みの利用記録に保存。選択話者に一致する記録を表示 |
 | 文章による自動抑揚 | 簡易版を実装 | [句の判定](../api/domains/inference/service/speech-intonation.ts)。応答の疑問符・感嘆符・注意語による補正。意味や感情をLayaで判断する機能とは異なる |
-| 取消とbarge-in | 実装済み | session、generation、utteranceIdとplaybackEpochで旧音声を拒否。Laya判断・アニメーションにも同じ世代検査を拡張する必要がある |
+| 取消とbarge-in | 実装済み | session、generation、utteranceIdとplaybackEpochで旧音声を拒否。Laya判断・アニメーションにも取消と遅着拒否を接続した |
 | busyと認証とidle解放 | 区別済み | 429や400/422でConnectionを作り直さない。Retry-Afterに従う待機とdetail形式の診断保存は未実装 |
-| Layaのsystem-one Provider | 未実装 | [LARM契約](../api/domains/larm/contracts/index.ts)のCapabilityはllm、asr、ttsのみ。claimした非OpenAI形式のendpointと専用tokenを扱う経路が必要 |
-| 判断結果からの話し方計画 | 未実装 | choice、score、noulの検証、低確度・矛盾時のfallback、250ms予算、turn内再利用が必要 |
+| Layaのsystem-one Provider | 実装済み | [LARM adapter](../api/domains/larm/service/index.ts)がoptional Providerの専用endpointとtokenを扱う。公開Capabilityは従来の3用途 |
+| 判断結果からの話し方計画 | choiceを実装 | [delivery](../api/domains/delivery/service/index.ts)が13動作と5toneを検証。2秒予算と低確度fallback。score/noul、250ms、turn内再利用は未実装 |
 | 手動ロック | 未実装 | 現在は手動基準と簡易抑揚のオン・オフ。速度・高さ・抑揚を個別に固定する設定が必要 |
-| アバター描画と素材 | 背景モデルあり | 同時作業で[LightAvatarBackground](../web/src/components/domains/conversation/LightAvatarBackground.tsx)と[モデル](../web/src/components/domains/conversation/light-avatar/model.js)が追加された。頭・目・腕と[動作候補](../web/src/components/domains/conversation/light-avatar/motion.js)を持つ。現在は会話の状態や音声の再生値を受け取っていない |
-| 口と動きの再生同期 | 未実装 | [audio controller](../web/src/domains/audio/controller/index.ts)のlevelはマイクRMS。再生音声の振幅、再生クロック、開始イベントと動作取消が必要 |
-| 動きを減らす設定 | 一部実装 | [CSS](../web/src/app.css)はthinking-dotsのprefers-reduced-motionに対応。アバターにも適用する必要がある |
+| アバター描画と素材 | 音声句と接続済み | [LightAvatarBackground](../web/src/components/domains/conversation/LightAvatarBackground.tsx)へ実処理状態と各句のmotionを渡す。既存モデルの頭・目・腕を使用 |
+| 口と動きの再生同期 | 動作開始と取消を実装 | [audio controller](../web/src/domains/audio/controller/index.ts)の実再生開始に合わせる。口の振幅同期とpause/resumeは未実装 |
+| 動きを減らす設定 | OS設定に対応 | アバターもprefers-reduced-motion時は静止姿勢を表示する。製品内の個別設定は未実装 |
 
-## domainの責務
+## 当初の拡張案（以下は次段階の計画）
+
+### domainの責務
 
 LARM domainはdiscovery、Connectionの作成・ready確認・claim、Providerごとの認証、更新・解放、公開APIの入力と応答の検証を所有する。system-oneはProvider名として追加し、会話・聞き取り・読み上げの用途を表すPurposeと区別する。既存の3用途へdecision.system-oneを混ぜて、クラウド送信の許可や保存済み設定を変質させない。
 
 inference domainには、現在の設定snapshotに対応するLARM接続を使って判断を実行する公開操作を追加する。同じProfileのConnectionをLLM、Laya、TTSで共有し、判断のたびに別のConnectionを作らない。system-oneは自動cloud代替の対象に追加しない。判断結果はLLMの回答採用・発話許可を変更しない。
 
-新しいdelivery domainが、質問の定義、態度の検証、手動基準とプリセットの合成、ロック、確度判定、計画の記録とfallbackを所有する。依存先はsettingsとinferenceの公開入口とし、下位domainからvoice-dialogueを参照しない。[domain検査](../scripts/domains.ts)にも追加する。
+新しいdelivery domainが、質問の定義、態度の検証、手動基準とプリセットの合成、ロック、確度判定、計画の記録とfallbackを所有する。deliveryは判断規則と値の合成を所有する下位domainとし、settings、inference、voice-dialogueを参照しない。inferenceが受付時snapshotから基準値を渡す。[domain検査](../scripts/domains.ts)にも追加する。
 
 voice-dialogue domainが最初の句でdeliveryを呼び、turn内で計画を再利用する。判断を待つ間もLLMの生成は継続する。計画と句を公開するときは、単一writerのtransactionでvoice turnの状態と世代を確認してから保存する。ネットワーク待ちをtransaction内に入れない。
 
@@ -132,6 +145,71 @@ barge-inと明示取消、許可取消、session終了、再起動、画面の�
 
 変更前のsettings verifyは6試験成功。変更後は設定の互換性・保存と、cloudの独立したvoice/speed、受付時snapshotによる各句の簡易抑揚を確認した。
 
-ブラウザfixtureで、表示名によるキャラクター選択、変更時のdefault_style、速度・高さ・抑揚・音量の保存と再読込、保存値からvoicevox-coreの合成bodyへの反映、合成headerのクレジット復号を確認した。これは実Layaや実VOICEVOXの音質・遅延、および実機器の受入を示す結果ではない。Layaとアバターについての実装・受入は上記の計画に従う。
+ブラウザfixtureで、表示名によるキャラクター選択、変更時のdefault_style、速度・高さ・抑揚・音量の保存と再読込、保存値からvoicevox-coreの合成bodyへの反映、合成headerのクレジット復号を確認した。これは実Layaや実VOICEVOXの音質・遅延、および実機器の受入を示す結果ではない。この節は音声調整のみを実装した時点の検証記録。後続のLaya・アバター接続の検証は末尾に追記する。
 
 settings、inference、larm、voice-dialogue、audioの個別verifyは成功。直近のverify:allではbackend154件、Web27件、browser fixture10件と型・境界・ビルドの検査が成功したが、検証中に背景アバターなど別作業のソースが変更され、最後の入力hash一致検査で失敗した。このため最終checkout全体の合格とは扱わない。実行ログは[tts-settings-all.log](../verification-reports/tts-settings-all.log)。今回のContext Still呼出しはcontext_compile2回・compile_eval2回。
+
+
+## Layaと光アバター接続の検証（2026年10月8日追記）
+
+fixtureでnative Providerの専用認証・同じ音声Connectionの共有・更新時のtoken交換・optional Provider不在/形式違反でも従来の音声が継続することを確認した。deliveryではchoiceの型、候補、数値範囲、answer_confidenceとconfidenceの区別、項目ごとの低確度fallback、切詰め、timeout、取消、遅着拒否を試験した。inferenceでは辞書置換後の実際の読み上げ文、受付時の手動基準、自動抑揚オフ、遅着拒否を確認した。voice-dialogueでは採用した音声句への判断結果の添付と取消時の同時失効を確認した。Webでは実再生開始のcallback、旧句の遅い開始/終了通知、取消済みframe、有限再生、動きを減らす設定を試験した。
+
+直近のverify:allはbackend175件、Web30件、ブラウザ11件、型・境界・ビルドの各検査が通過した。ただし最後の入力hash比較で、検証中の別作業のソース変更を検出して失敗した。最終checkout全体の合格とは扱わない。ログは[avatar-agent-all.log](../verification-reports/avatar-agent-all.log)。操作のブラウザ試験はWebGL非対応時の経路を使い、専用の描画試験は別ブラウザのSwiftShaderで透過canvas、配置、移動時の解放を確認する。
+
+実LARMのProfileでsystem-one / laya-multilingualを確認し、native応答を受信した。「おめでとうございます！とても嬉しいお知らせですね。」ではmotion=joyful、answer_confidence=0.9736を採用し、voiceの0.5369は低確度としてnaturalを維持した。判断時間は195ms。これはAPIの接続と採用規則の確認であり、分類品質の保証ではない。実TTSは話者一覧取得でlarm_inference_401となり、音声合成までの受入は未完了。追加の切分け要求はConnection準備で20秒のtimeoutとなった。[live記録](../verification-reports/avatar-agent-live-accepted.log)。マイク・ヘッドホンの3往復試聴は実施していない。
+
+この依頼のContext Still呼出しはcontext_compile1回・compile_eval1回。前回の静止配置の依頼を含むこのチャットの累計は2回・2回。
+
+最終確認では別のverifyが実行中だったためdomain verifyの排他ロックを取得できなかった。関連domainを直接再試験し、backend74件・Web15件が通過した。これらは最終checkout全体のverify合格を意味しない。[backend記録](../verification-reports/avatar-agent-final-backend.log)、[Web記録](../verification-reports/avatar-agent-final-web.log)。
+
+## 待機アニメーションの検証（2026年10月8日追記）
+
+待機中も呼吸・小さな揺れ・光の動きを継続し、身振りは元の半分に抑えた。表示全体の時計を句の時計から分離し、回答終了後も動きを継続する。非表示時の破棄と「動きを減らす」設定での静止は維持する。
+
+avatarの5試験で長時間の待機、句の切替、通常姿勢への復帰、取消後の古いframe拒否、破棄、静止設定、描画失敗を確認した。専用のブラウザ描画試験では、待機中のcanvas画像が時間とともに変わり、静止設定では同じ画像を維持することを確認した。avatar、conversation、voice-dialogueのdomain verifyは成功した。
+
+全体検証はbackend182件、Web34件、ブラウザ11件、型・境界・ビルドの各検査が通過した。ただし検証中に別作業のソースが変更され、最後の入力hash比較で失敗したため、最終checkout全体の合格とは扱わない。[全体記録](../verification-reports/avatar-idle-all.log)、[描画試験](../verification-reports/avatar-idle-browser.log)。実音声・実機器の受入を示す結果ではない。この依頼のContext Still呼出しはcontext_compile1回・compile_eval1回。
+
+## 表示消失の修正（2026年10月8日追記）
+
+実行中の開発サーバーで、model.jsが参照するThree.jsの依存URLが504を返し、ブラウザで動的import失敗を確認した。開発用Viteとfixture用Viteの依存キャッシュを分離し、Three.jsを起動時最適化に含めた。修正後は確認用の実ブラウザでready・canvas1枚と表示復帰を確認し、fixture試験終了後も同じ開発用依存URLが200を維持した。
+
+初期化失敗をエラー種類だけで記録し、hostの描画状態で消失原因を判別できるようにした。最初の静止frameで描画が失敗した場合も、一度だけ破棄し、失敗状態を維持する試験を追加した。avatar verify5件、conversation verifyのWeb10件とbackend1件、専用ブラウザ描画1件、全体型チェックは成功。verify:allは別作業のdelivery/inference内4ファイルの書式検査で停止したため、全体合格とは扱わない。[全体記録](../verification-reports/avatar-display-all.log)、[描画試験](../verification-reports/avatar-display-browser.log)。この依頼のContext Still呼出しはcontext_compile1回・compile_eval1回。
+
+## 視認できる待機動作の追加（2026年10月8日追記）
+
+初期の上下・揺れが小さく、neutralには瞬きがなかったため、待機専用の動きを追加した。6秒周期の上下移動、首・身体・腕の揺れと、17秒の周期内に3回の短い瞬きを行う。待機姿勢を回答動作へ加算し、表示時計を維持する。静止設定では時刻0の動きなし・目を開いた姿勢になる。
+
+avatar verify5件、conversation verifyのWeb13件とbackend1件、全体型チェック、専用ブラウザ描画試験1件が成功。振幅・長時間継続・瞬きの閉眼と復帰・静止姿勢を試験し、利用中の実ブラウザでもready/animatedと待機動作を確認した。[動作記録](../verification-reports/avatar-idle-visible.gif)。全体verifyは別作業のdelivery/inference内4ファイルの書式検査で停止しており、全体合格とは扱わない。[全体記録](../verification-reports/avatar-idle-visible-all.log)。この依頼のContext Still呼出しはcontext_compile1回・compile_eval1回。
+
+## 時折の体振りと発話・感情の合成（2026年10月9日追記）
+
+待機中に約30秒間隔で4.8秒だけ体を左右に振る動きを追加した。左右の順を交互にし、開始と終了で振幅と速度が0へ近づく。回答動作や発話中は0.7秒で抑える。発話cueは実再生開始で有効にし、通常の頷き・手振りとLayaのmotionを重ねる。長い音声でも8秒で待機へ戻らず、滑らかに8秒の動作を繰り返し、終了・取消で待機へ戻す。Layaの判断がない場合は通常の話す仕草を行い、消音・静止設定では発話を開始しない。
+
+読み上げ直しは、inferenceの既存writer transactionで採用したreceiptから音声とdeliveryを取り出す公開操作を使う。同じ音声のmotionだけをHTTP headerへ渡し、Webで候補を検証する。HTMLAudioElementのplayingで開始し、終了・取消・古いplaying/endedと遅いplay完了を世代ごとに拒否する。分類要求や音声合成を二重に実行しない。
+
+avatar verify6件、conversation verifyのWeb17件とbackend1件、voice-dialogue verifyのWeb8件とbackend22件が成功。inference全19件とWeb全47件を直接試験し、型・変更箇所lint・Web build、既存の描画ブラウザ試験1件も成功した。時折の動作の静かな時間・両端の連続性、長い発話、感情の区別、再生イベント、取消、消音、HTTPの音声とmotionの対応を確認した。実ブラウザのモデルで発話とjoyfulを重ね、8秒を超えて動くことを確認した。[描画例](../verification-reports/avatar-speaking.gif)。これは音声を伴わない描画確認であり、実TTSやマイク・ヘッドホンの試聴受入は未実施。
+
+inferenceのdomain verifyは別作業のspeech-intonation2ファイルの書式で停止したため、試験を直接実行した。verify:allは別作業のdialogueからsettingsへの依存関係で境界検査に失敗しており、全体合格とは扱わない。[全体記録](../verification-reports/avatar-speaking-all.log)、[inference試験](../verification-reports/avatar-speaking-inference-tests.log)、[Web試験](../verification-reports/avatar-speaking-web.log)。この依頼のContext Still呼出しはcontext_compile1回・compile_eval1回。
+
+
+### 2026-10-09 回答の名前横に判断を表示
+
+採用済みのLaya motionを13種の絵文字に対応させ、回答の名前横へ表示する。本文は変更しない。確度0.6以上のmotionのみ対象とし、voiceだけ確度が高い場合やfallbackには付けない。名前変更時もその名前の横に表示し、各絵文字には日本語の意味を付ける。
+
+回答生成とTTSの順序に依存しないよう、conversation所有の追加migrationでrunごとの最初の採用済みmotionを保存する。voice chunkのreceipt採用と同じwriter transactionから、dialogueの公開操作を通して保存する。取消・失敗したrunには保存しない。読み上げ直しもrunと本文の句の一致を確認し、取消を確認した後に同じ公開操作を使う。保存によるconversation更新で画面を再取得し、再読込後も表示する。判断未取得の過去回答には付けず、読み上げ直しで判断が得られれば表示する。
+
+fixtureの関連backend47件、conversationのbackend2件・Web18件、voice-dialogueのbackend25件・Web9件、専用ブラウザ1件が成功した。旧schemaからの追加migration、先行する判定、最初の判断の維持、rollback、取消、fallback、独立したmotion確度、読み上げ直し、本文の保持と再読込を確認した。全体型チェックとWeb buildも成功。[表示例](../verification-reports/avatar-emotion-emoji.png)。実Laya/TTS・実機器受入は今回未実施。
+
+verify:allは既存のdialogueからsettingsへの未宣言依存で停止しており、全体合格とは扱わない。[全体記録](../verification-reports/avatar-emoji-all.log)。Context Stillはcontext_compile1回・compile_eval1回。
+
+
+### 2026-10-09 判定の実経路確認と説明の訂正
+
+前項の画面確認はfixtureによる表示確認であり、実会話の適切な感情判断を確認した結果ではない。実会話APIでは「それは素敵な由来ですね。」に採用済みmotionがなく、前の質問にはsleepyが保存されていた。処理先4つの接続だけで適切な判断ができたと説明してはいけない。
+
+同じbackendの読み上げ直しAPIをrunIdなしで実行し、会話の保存内容を変更せずにlive Laya/TTS経路を確認した。「それは素敵な由来ですね。」「それは素敵な名前ですね。」はともにsource=fallback、reason=low-confidence、motion=neutral。「やった！大成功です！本当にうれしいです！」はsource=laya、motion=joyfulだった。HTTPはいずれも200で音声を返したが、ブラウザ再生や実マイクの受入は行っていない。[判定記録](../verification-reports/laya-judgement-live-decisions.jsonl)。別clientによる独立接続の試行は15秒でタイムアウトしたため、その試行は成功扱いしない。
+
+調査のため、inference.delivery_selectedにsource・motion(kind)・fallbackのreason・所要時間・既存の相関IDを記録するよう変更した。本文・音声・Provider生応答・認証情報はログへ渡さない。fallbackはLayaによるneutralの採用と区別できる。inference fixture19件・変更ファイルlint・全体型チェックは成功。domain verifyとverify:allは別の検証が実行中でlockにより開始できなかった。
+
+短い読み上げ文だけを判断対象にしており、会話文脈を渡す改善や、不自然なsleepyの意味判断の改善は未実装。今回のContext Stillはcontext_compile1回・compile_eval1回。

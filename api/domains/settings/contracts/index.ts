@@ -85,6 +85,46 @@ export const defaultSubtitles: SubtitleSettings = {
 	style: "netflix",
 	size: "large",
 };
+/** ASR languages offered in settings (same set as SAAA's Voice settings). */
+export const asrLanguages = [
+	["ja", "日本語"],
+	["en", "英語"],
+	["zh", "中国語"],
+	["yue", "広東語"],
+	["ko", "韓国語"],
+	["ar", "アラビア語"],
+	["de", "ドイツ語"],
+	["fr", "フランス語"],
+	["es", "スペイン語"],
+	["pt", "ポルトガル語"],
+	["id", "インドネシア語"],
+	["it", "イタリア語"],
+	["ru", "ロシア語"],
+	["th", "タイ語"],
+	["vi", "ベトナム語"],
+	["tr", "トルコ語"],
+	["hi", "ヒンディー語"],
+	["ms", "マレー語"],
+	["nl", "オランダ語"],
+	["sv", "スウェーデン語"],
+	["da", "デンマーク語"],
+	["fi", "フィンランド語"],
+	["pl", "ポーランド語"],
+	["cs", "チェコ語"],
+	["fil", "フィリピン語"],
+	["fa", "ペルシャ語"],
+	["el", "ギリシャ語"],
+	["ro", "ルーマニア語"],
+	["hu", "ハンガリー語"],
+	["mk", "マケドニア語"],
+] as const;
+export type AsrLanguage = (typeof asrLanguages)[number][0];
+const asrLanguageCodes = asrLanguages.map(([code]) => code) as [
+	AsrLanguage,
+	...AsrLanguage[],
+];
+export const personas = ["butler", "maid", "strategist", "sage"] as const;
+export type Persona = (typeof personas)[number];
 export const settingsSchema = z
 	.object({
 		revision: z.number().int().nonnegative(),
@@ -99,6 +139,8 @@ export const settingsSchema = z
 				pitchScale: z.number().min(-0.15).max(0.15).optional(),
 				intonationScale: z.number().min(0).max(2).optional(),
 				autoIntonation: z.boolean().optional(),
+				/** Scales how far per-phrase adjustments move from the saved baseline. */
+				autoStrength: z.number().min(0).max(2).optional(),
 			})
 			.strict(),
 		connections: z.array(connectionSchema).max(32),
@@ -122,6 +164,15 @@ export const settingsSchema = z
 			.strict(),
 		general: z
 			.object({
+				agentName: z.string().trim().max(40).default(""),
+				userName: z.string().trim().max(40).default(""),
+				persona: z.enum(personas).default("butler"),
+				asrLanguages: z
+					.array(z.enum(asrLanguageCodes))
+					.min(1)
+					.max(asrLanguageCodes.length)
+					.refine((v) => new Set(v).size === v.length, "言語が重複しています")
+					.default(["ja", "en"]),
 				theme: z.enum(["system", "light", "dark"]),
 				subtitles: subtitleSchema.default(defaultSubtitles),
 			})

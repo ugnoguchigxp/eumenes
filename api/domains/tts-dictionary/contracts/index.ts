@@ -1,16 +1,22 @@
 import { z } from "zod";
 const noControl = (s: string) => ![...s].some((c) => /\p{Cc}/u.test(c));
+// The speech chunker splits on these, so a headword containing one could never match.
+const boundary = /[。！？、!?.,;]/u;
+const text = z
+	.string()
+	.refine((s) => !/\p{Cs}/u.test(s) && s.trim() === s && noControl(s))
+	// Compare in NFC so a decomposed headword matches the model's precomposed text.
+	.transform((s) => s.normalize("NFC"));
 export const entrySchema = z.strictObject({
-	written: z
-		.string()
-		.min(1)
-		.max(200)
-		.refine((s) => s.trim() === s && noControl(s)),
+	written: text.pipe(
+		z
+			.string()
+			.min(1)
+			.max(200)
+			.refine((s) => !boundary.test(s)),
+	),
 	// An empty reading means "skip when speaking".
-	spoken: z
-		.string()
-		.max(400)
-		.refine((s) => s.trim() === s && noControl(s)),
+	spoken: text.pipe(z.string().max(400)),
 });
 export type Entry = z.infer<typeof entrySchema>;
 // The wrapper distinguishes "no guard" from "row must not exist".

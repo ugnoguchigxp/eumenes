@@ -5,6 +5,8 @@ import { join } from "node:path";
 import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
 import {
 	migration as conversationMigration,
+	avatarMotionMigration as conversationAvatarMotionMigration,
+	answerDeliveryMigration as conversationAnswerDeliveryMigration,
 	createConversationService,
 } from "../../conversation";
 import type { LarmPort } from "../../larm";
@@ -24,6 +26,8 @@ afterEach(async () => {
 });
 const migrations = [
 	conversationMigration,
+	conversationAvatarMotionMigration,
+	conversationAnswerDeliveryMigration,
 	migration,
 	queueMigration,
 	schedulerMigration,
@@ -272,4 +276,51 @@ test("rejected answer adoption fails both the run and its queue job", async () =
 	} finally {
 		await h.queue.close(100);
 	}
+});
+
+test("only adopted, confident motion labels a running or completed answer; cancelled judgments are rejected", async () => {
+	const h = setup();
+	h.queue.start();
+	const run = await submit(h.dialogue, "良い知らせ");
+	await until(() => h.calls.length === 1);
+	const decision = {
+		id: crypto.randomUUID(),
+		source: "laya" as const,
+		motion: "joyful" as const,
+		tone: "natural" as const,
+		confidence: 0.2,
+		motionConfidence: 0.9,
+		toneConfidence: 0.2,
+		latencyMs: 10,
+	};
+	for (const delivery of [
+		{ ...decision, source: "fallback" as const },
+		{ ...decision, motionConfidence: 0.2 },
+	]) {
+		expect(
+			await h.store.write((db) =>
+				h.dialogue.recordAnswerDeliveryInTransaction(db, run.id, delivery),
+			),
+		).toBe(false);
+	}
+	expect(
+		await h.store.write((db) =>
+			h.dialogue.recordAnswerDeliveryInTransaction(db, run.id, decision),
+		),
+	).toBe(true);
+	h.calls[0]?.resolve("よかったですね。");
+	await until(() => h.dialogue.get(run.id)?.status === "completed");
+	expect(h.conversation.get("main").messages.at(-1)).toMatchObject({
+		text: "よかったですね。",
+		avatarMotion: "joyful",
+	});
+	const cancelled = await submit(h.dialogue, "取消");
+	await until(() => h.calls.length === 2);
+	await h.dialogue.cancel(cancelled.id);
+	expect(
+		await h.store.write((db) =>
+			h.dialogue.recordAnswerDeliveryInTransaction(db, cancelled.id, decision),
+		),
+	).toBe(false);
+	await h.queue.close(100);
 });

@@ -30,8 +30,8 @@ import {
 	useSubmit,
 	useRunProgress,
 } from "./domains/dialogue";
-import { useVoiceDialogue } from "./domains/voice-dialogue";
-import { SettingsPage, useSettings } from "./domains/settings";
+import { useReplay, useVoiceDialogue } from "./domains/voice-dialogue";
+import { SettingsPage, useSettings, useVoiceMute } from "./domains/settings";
 
 function Workspace({
 	client,
@@ -101,6 +101,8 @@ function Workspace({
 		undefined,
 		settings.data?.voice,
 	);
+	const replay = useReplay(client, settings.data?.voice.outputVolume);
+	const mute = useVoiceMute(client);
 	const automaticInput = input.dictated && voice.active;
 	const recognitionId = voice.recognitionId;
 	const recognitionText = voice.transcription?.text;
@@ -265,11 +267,14 @@ function Workspace({
 				/>
 			)}
 			{settings.data?.general.subtitles.enabled &&
-				voice.subtitle &&
-				phase === "playing" &&
-				!settingsOpen && (
+				!settingsOpen &&
+				(replay.subtitle ?? (phase === "playing" ? voice.subtitle : null)) && (
 					<Subtitle
-						text={voice.subtitle}
+						text={
+							replay.subtitle ??
+							(phase === "playing" ? voice.subtitle : null) ??
+							""
+						}
 						style={settings.data.general.subtitles.style}
 						size={settings.data.general.subtitles.size}
 					/>
@@ -281,7 +286,7 @@ function Workspace({
 				<section className="chat-panel" aria-label="会話">
 					<LightAvatarBackground
 						active={!settingsOpen}
-						cue={voice.avatarCue}
+						cue={replay.avatarCue ?? voice.avatarCue}
 						phase={
 							phase === "playing"
 								? "neutral"
@@ -336,6 +341,11 @@ function Workspace({
 							{reconnect.isPending ? "接続を確認中" : "接続を再確認"}
 						</Button>
 					)}
+					{replay.error && (
+						<p className="chat-error" role="alert">
+							{replay.error}
+						</p>
+					)}
 					{conversation.isError && (
 						<p className="chat-error" role="alert">
 							会話履歴を取得できませんでした。
@@ -355,15 +365,12 @@ function Workspace({
 						<MessageList
 							conversation={conversation.data}
 							streaming={streamingText}
-							onOpenArtifact={(message) =>
-								artifacts.open({
-									id: `message:${message.id}`,
-									title:
-										message.text.replace(/\s+/g, " ").trim().slice(0, 24) ||
-										"回答",
-									kind: "markdown",
-									content: message.text,
-								})
+							agentName={settings.data?.general.agentName}
+							replayingId={replay.playingId}
+							onReplay={(message) =>
+								replay.playingId === message.id
+									? replay.stop()
+									: void replay.play(message.id, message.text, message.runId)
 							}
 						/>
 						{activeRun && (
@@ -427,6 +434,40 @@ function Workspace({
 										aria-label={voice.active ? "停止" : "音声を開始"}
 									>
 										{voice.active ? "停止" : "音声を開始"}
+									</Button>
+									<Button
+										type="button"
+										variant={mute.muted ? "destructive" : "secondary"}
+										size="icon"
+										onClick={() => void mute.toggle()}
+										disabled={!mute.ready || mute.busy}
+										aria-pressed={mute.muted}
+										aria-label={mute.muted ? "ミュートを解除" : "ミュート"}
+										title={
+											mute.error ??
+											(mute.muted
+												? "読み上げをオフにしています"
+												: "読み上げをオフにする")
+										}
+									>
+										<svg
+											width="20"
+											height="20"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											strokeWidth="1.8"
+											strokeLinecap="round"
+											strokeLinejoin="round"
+											aria-hidden="true"
+										>
+											<path d="M11 5 6 9H3v6h3l5 4z" />
+											{mute.muted ? (
+												<path d="m16 9 5 6M21 9l-5 6" />
+											) : (
+												<path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" />
+											)}
+										</svg>
 									</Button>
 									<meter
 										className="level"

@@ -5,6 +5,8 @@ import { join } from "node:path";
 import { openStore } from "../../../infrastructure/sqlite";
 import {
 	migration as conversationMigration,
+	avatarMotionMigration as conversationAvatarMotionMigration,
+	answerDeliveryMigration as conversationAnswerDeliveryMigration,
 	createConversationService,
 } from "../../conversation";
 import type { LarmPort } from "../../larm";
@@ -38,6 +40,8 @@ test("request ID is idempotent and answer adoption is atomic", async () => {
 	try {
 		const store = openStore(file, [
 			conversationMigration,
+			conversationAvatarMotionMigration,
+			conversationAnswerDeliveryMigration,
 			migration,
 			queueMigration,
 			queueLinkMigration,
@@ -67,6 +71,8 @@ test("request ID is idempotent and answer adoption is atomic", async () => {
 		await store.close();
 		const reopened = openStore(file, [
 			conversationMigration,
+			conversationAvatarMotionMigration,
+			conversationAnswerDeliveryMigration,
 			migration,
 			queueMigration,
 			queueLinkMigration,
@@ -133,6 +139,8 @@ test("cancelled inference cannot append an answer", async () => {
 	try {
 		const store = openStore(join(dir, "db.sqlite3"), [
 			conversationMigration,
+			conversationAvatarMotionMigration,
+			conversationAnswerDeliveryMigration,
 			migration,
 			queueMigration,
 			queueLinkMigration,

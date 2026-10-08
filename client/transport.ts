@@ -2,6 +2,7 @@ export class ApiError extends Error {
 	constructor(
 		public status: number,
 		message: string,
+		public requestId?: string,
 	) {
 		super(message);
 	}
@@ -45,6 +46,7 @@ export function createTransport(baseUrl: string, token?: string) {
 				throw new ApiError(
 					response.status,
 					error.error ?? `HTTP ${response.status}`,
+					response.headers.get("X-Request-Id") ?? undefined,
 				);
 			}
 			return response;

@@ -1,4 +1,5 @@
 import { voiceTurnSchema } from "../api/domains/voice-dialogue/contracts";
+import { avatarMotionSchema } from "../api/domains/delivery";
 import type { Transport } from "./transport";
 import { json } from "./transport";
 export function voiceDialogueClient(transport: Transport) {
@@ -84,6 +85,56 @@ export function voiceDialogueClient(transport: Transport) {
 						json({}),
 					)
 				).json(),
+			),
+		replaySentences: async (text: string): Promise<string[]> =>
+			(
+				(await (
+					await transport.call("/api/voice/replay/sentences", json({ text }))
+				).json()) as { sentences: string[] }
+			).sentences,
+		replayAudio: async (text: string, signal?: AbortSignal) =>
+			new Uint8Array(
+				await (
+					await transport.call("/api/voice/replay/audio", {
+						...json({ text }),
+						signal,
+					})
+				).arrayBuffer(),
+			),
+		replaySpeech: async (
+			text: string,
+			signal?: AbortSignal,
+			runId?: string,
+		) => {
+			const response = await transport.call("/api/voice/replay/audio", {
+				...json({ text, ...(runId ? { runId } : {}) }),
+				signal,
+			});
+			const motion = avatarMotionSchema.safeParse(
+				response.headers.get("X-Avatar-Motion"),
+			);
+			return {
+				wav: new Uint8Array(await response.arrayBuffer()),
+				motion: motion.success ? motion.data : ("neutral" as const),
+			};
+		},
+		voiceSample: async (
+			voice: {
+				voice?: string;
+				style?: string;
+				speed?: number;
+				pitchScale?: number;
+				intonationScale?: number;
+			},
+			signal?: AbortSignal,
+		) =>
+			new Uint8Array(
+				await (
+					await transport.call("/api/voice/sample", {
+						...json(voice),
+						signal,
+					})
+				).arrayBuffer(),
 			),
 		voiceCancel: async (id: string) =>
 			voiceTurnSchema.parse(

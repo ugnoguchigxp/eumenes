@@ -123,6 +123,7 @@ try {
 } catch (error) {
 	if (error instanceof ApiError) {
 		console.error(error.message);
+		if (error.requestId) console.error(`API request ID: ${error.requestId}`);
 		process.exitCode = error.status === 401 ? 2 : 3;
 	} else if (error instanceof ApiConnectionError) {
 		console.error(

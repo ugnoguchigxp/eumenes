@@ -6,3 +6,4 @@
 - Web と CLI は API を使い、DB を直接開かない。LARM credential は backend 内に留め、古い結果を取消後に採用しない。
 - 日常は `bun run verify -- --domain <name>`、横断変更は利用側 domain と `bun run verify:all` を実行する。fixture、live、実機器受入の結果を分けて記録する。
 - 実装済み、検証済み、計画を区別する。実機器の3往復受入を通すまで音声 MVP の完成を宣言しない。
+- 障害調査では `bun run logs -- --level warn` から始め、runId・jobId・HTTPの `X-Request-Id` で JSONL を絞る。手順は `docs/logging.md`。ログに会話本文・音声・認証情報・設定・Providerの生応答を渡さない。

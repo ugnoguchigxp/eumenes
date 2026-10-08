@@ -78,3 +78,10 @@ fixture: voice-dialogue選択検証 backend16件・Web5件成功。ブラウザ�
 2026-10-08 TTSの調整設定: キャラクター、発話スタイル、話す速さ、声の高さ、抑揚、再生音量を保存し、各発話へ反映する。claimしたTTS ProviderのbaseUrl・model・tokenによるcatalog取得、表示名と送信IDの分離、voice変更時のdefault_style、catalog範囲、取得失敗・保存済みvoice消失時の保存値保持と明示リセット、合成クレジットの復号をfixtureで確認。VOICEVOX専用値は他modelへ送らず、cloudのvoice・speedは用途別設定を使う。応答句の記号と注意語による簡易抑揚を追加したが、Layaによる意味の判断ではない。
 
 settings・inference・larm・voice-dialogue・audioの個別verifyは成功。直近のverify:allはbackend154件・Web27件・browser fixture10件と型・境界・ビルド検査が成功したが、検証中に別作業の背景アバターなどのソースが変わり、最後の入力hash一致検査で失敗。最終checkout全体の合格とは扱わない。詳細は[実行ログ](../verification-reports/tts-settings-all.log)。LayaのAPI接続、手動ロック、アバターの再生同期は[実装計画](../spec/laya-voicevox-avatar-plan.md)として整理し、未実装。実Laya・実VOICEVOXの音質と遅延、および実マイク・ヘッドホンの3往復は今回未受入。Context Stillはcontext_compile2回・compile_eval2回。
+
+
+2026-10-09 音声入力後の無回答調査と修正: 直近の取消されたLLM 5件をrun/job/HTTP IDで照合し、3件はセッション停止、2件は発話単位の取消要求による中断を確認。最新の例はASR 827msで成功し、その後LLMが1487msで取消された。停止ボタンと画面の自動停止・設定変更の区別、および発話取消の画面側の発生理由はログだけでは断定しない。
+
+コードレビューと失敗する回帰試験で、旧マイクの遅い通知・送信エラーが新セッションに混ざること、遅い停止完了が新しいturn取得を消すこと、次の送信拒否前に前の回答を取消すことを再現した。通知・状態・再送・エラーをセッションで照合し、停止時のquery解除を非同期処理より前へ移動。次の音声の受理後に前のturnを取消し、送信失敗時は未送信区間を破棄して前の回答の取得・再生を復旧する。再生中の即時割込みと明示停止による取消は維持。LARMの呼出元による取消を通信障害と誤記していたログも区別した。全体検証で見つかったdomainの型参照規則違反、同時刻の試行順に依存した試験、古い設定画面のラベルを探す試験も修正。
+
+fixture: voice-dialogue backend25件・Web13件、LARM36件、dialogueとinferenceの選択検証が成功。最終verify:allはbackend194件・Web54件・browser12件、型・参照規則・整形・lint・ビルドが成功、87356ms、検証中の入力hash変更なし。アバターの画面移動時の解放試験は先行する全体実行2回で失敗し、単独・ブラウザ一括・最終全体では成功。先行失敗の原因は未確定で、失敗時の移動状態を記録する診断を加えた。詳細は[調査・修正記録](../verification-reports/voice-no-answer-review.json)。liveは既存運用ログの調査のみで、新しいProvider疎通・実マイクとヘッドホンの症状解消・3往復は未受入。稼働backendの再起動は行っていない。Context Stillはcontext_compile1回・compile_eval1回。

@@ -94,7 +94,7 @@ export function useVoiceDialogue(
 	}
 	const [turnId, setTurnId] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
-	const [starting, setStarting] = useState(false);
+	const [active, setActive] = useState(false);
 	const turn = useQuery({
 		queryKey: ["voice-dialogue", client.identity, turnId],
 		enabled: !!turnId,
@@ -183,6 +183,7 @@ export function useVoiceDialogue(
 											setAvatarCue({
 												key,
 												motion: chunk.delivery?.motion ?? "neutral",
+												speaking: true,
 											});
 									},
 								})
@@ -249,7 +250,7 @@ export function useVoiceDialogue(
 		setTurnId(null);
 		const pending = { cancelled: false };
 		pendingStart.current = pending;
-		setStarting(true);
+		setActive(true);
 		const next = {
 			id: crypto.randomUUID(),
 			generation: 1,
@@ -266,8 +267,11 @@ export function useVoiceDialogue(
 			}
 			session.current = next;
 			const audio = createAudio(
-				(state) => store.setState(state),
+				(state) => {
+					if (session.current === next) store.setState(state);
+				},
 				() => {
+					if (session.current !== next || next.failed) return;
 					candidate.current?.controller?.abort();
 					const nextCandidate = {
 						id: crypto.randomUUID(),
@@ -294,7 +298,7 @@ export function useVoiceDialogue(
 				},
 				(wav) => {
 					const active = session.current;
-					if (!active || active.failed) return;
+					if (active !== next || active.failed) return;
 					if (active.pending >= 2) {
 						setError("音声の送信待ちが上限に達しました");
 						return;
@@ -318,8 +322,6 @@ export function useVoiceDialogue(
 					active.tail = active.tail
 						.then(async () => {
 							if (session.current !== active || active.failed) return;
-							if (old && old !== id)
-								await client.voiceCancel(old).catch(() => {});
 							try {
 								await client.voiceSend(
 									active.id,
@@ -332,6 +334,7 @@ export function useVoiceDialogue(
 								if (!(error instanceof TypeError) || session.current !== active)
 									throw error;
 								await new Promise((resolve) => setTimeout(resolve, 250));
+								if (session.current !== active) return;
 								await client.voiceSend(
 									active.id,
 									active.generation,
@@ -341,20 +344,43 @@ export function useVoiceDialogue(
 								);
 							}
 							if (session.current !== active) return;
+							// Keep the previous answer until the replacement has been accepted.
+							if (old && old !== id)
+								await client.voiceCancel(old).catch(() => {});
+							if (session.current !== active) return;
 							setTurnId(id);
 							await cache.invalidateQueries({
 								queryKey: ["voice-dialogue", client.identity, id],
 							});
 						})
 						.catch((e) => {
+							if (session.current !== active) return;
 							active.failed = true;
 							setError(String(e));
+							// The failed upload also drops any unsent segments behind it.
+							candidate.current?.controller?.abort();
+							candidate.current = null;
+							setPreviewText(null);
+							current.current = old;
+							setRecognitionId(old);
+							cancelPlayback();
+							if (old)
+								void cache.invalidateQueries({
+									queryKey: ["voice-dialogue", client.identity, old],
+								});
 						})
 						.finally(() => {
 							active.pending--;
 						});
 				},
-				{ ...options.current, onPartial: partial },
+				{
+					...options.current,
+					onPartial: (wav) => {
+						if (session.current === next) partial(wav);
+					},
+					// Without barge-in nothing may interrupt a reply, so it must not be heard either.
+					halfDuplex: () => options.current?.bargeIn === false,
+				},
 			);
 			controller.current = audio;
 			try {
@@ -376,7 +402,7 @@ export function useVoiceDialogue(
 		} finally {
 			if (pendingStart.current === pending) {
 				pendingStart.current = null;
-				setStarting(false);
+				setActive(!!session.current);
 			}
 		}
 	}
@@ -385,7 +411,7 @@ export function useVoiceDialogue(
 			pendingStart.current.cancelled = true;
 			pendingStart.current = null;
 		}
-		setStarting(false);
+		setActive(false);
 		setRecognitionId(null);
 		candidate.current?.controller?.abort();
 		candidate.current = null;
@@ -396,13 +422,26 @@ export function useVoiceDialogue(
 		current.current = null;
 		const audio = controller.current;
 		controller.current = null;
+		setTurnId(null);
+		store.setState({ phase: "idle", level: 0 });
 		await audio?.stop();
 		if (active)
-			await client
-				.voiceStop(active.id, active.generation)
-				.catch((e) => setError(String(e)));
-		setTurnId(null);
+			await client.voiceStop(active.id, active.generation).catch((e) => {
+				if (!session.current && !pendingStart.current) setError(String(e));
+			});
 	}
+	const autoSpeak = settings?.autoSpeak;
+	useEffect(() => {
+		// Muting takes effect now: drop what is playing and release the turn.
+		if (autoSpeak !== false) return;
+		controller.current?.stopPlayback();
+		// oxlint-disable-next-line react/set-state-in-effect
+		cancelPlayback();
+		const id = current.current;
+		if (!id) return;
+		current.current = null;
+		void client.voiceCancel(id).catch(() => {});
+	}, [autoSpeak, client]);
 	useEffect(
 		() => () => {
 			if (pendingStart.current) pendingStart.current.cancelled = true;
@@ -435,7 +474,7 @@ export function useVoiceDialogue(
 			(turn.isError
 				? "音声処理の結果を取得できません。接続を再確認してください。"
 				: null),
-		active: !!session.current || starting,
+		active,
 		avatarCue,
 	};
 }

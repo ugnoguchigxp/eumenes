@@ -82,3 +82,69 @@ test("HTTP validation rejects malformed entries", async () => {
 		entries: [{ written: "x", spoken: "y" }],
 	});
 });
+const add = (d: ReturnType<typeof setup>, written: string, spoken: string) =>
+	d.save({
+		original: null,
+		entry: { written, spoken },
+		expected: { spoken: null },
+	});
+test("Latin headwords match whole words only; surrogate pairs and CJK still match", async () => {
+	const d = setup();
+	await add(d, "AI", "エーアイ");
+	await add(d, "😀", "えがお");
+	expect(d.apply("MAIN と AI と AIs")).toBe("MAIN と エーアイ と AIs");
+	expect(d.apply("a😀b")).toBe("aえがおb");
+});
+test("a reading that would empty or inflate the chunk keeps the original text", async () => {
+	const d = setup();
+	await add(d, "(笑)", "");
+	await add(d, "長", "あ".repeat(400));
+	expect(d.apply("(笑)")).toBe("(笑)");
+	expect(d.apply("こんにちは(笑)")).toBe("こんにちは");
+	expect(d.apply("長".repeat(11))).toBe("長".repeat(11));
+});
+test("rename moves the row atomically and refuses stale or conflicting renames", async () => {
+	const d = setup();
+	await add(d, "A", "えー");
+	await add(d, "B", "びー");
+	await expect(
+		d.save({
+			original: "A",
+			entry: { written: "B", spoken: "x" },
+			expected: { spoken: "えー" },
+		}),
+	).rejects.toThrow("revision_conflict");
+	await expect(
+		d.save({
+			original: "A",
+			entry: { written: "C", spoken: "しー" },
+			expected: { spoken: "stale" },
+		}),
+	).rejects.toThrow("revision_conflict");
+	const entries = await d.save({
+		original: "A",
+		entry: { written: "C", spoken: "しー" },
+		expected: { spoken: "えー" },
+	});
+	expect(entries.map((e) => e.written)).toEqual(["B", "C"]);
+});
+test("HTTP rejects boundary headwords, normalizes to NFC, and deletes", async () => {
+	const app = new Hono();
+	registerTtsDictionary(app, setup());
+	const post = (path: string, body: unknown) =>
+		app.request(path, { method: "POST", body: JSON.stringify(body) });
+	const save = (written: string, spoken: string) =>
+		post("/api/tts-dictionary/save", {
+			original: null,
+			entry: { written, spoken },
+			expected: { spoken: null },
+		});
+	expect((await save("Node.js", "ノード")).status).toBe(400);
+	expect((await save("\ud800", "x")).status).toBe(400);
+	expect((await save("が".normalize("NFD"), "が")).status).toBe(200);
+	const removed = await post("/api/tts-dictionary/delete", {
+		written: "が",
+		expected: { spoken: "が" },
+	});
+	expect(await removed.json()).toEqual({ entries: [] });
+});

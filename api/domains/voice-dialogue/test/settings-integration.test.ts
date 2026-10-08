@@ -6,6 +6,8 @@ import { openStore } from "../../../infrastructure/sqlite";
 import {
 	createConversationService,
 	migration as conversationMigration,
+	avatarMotionMigration as conversationAvatarMotionMigration,
+	answerDeliveryMigration as conversationAnswerDeliveryMigration,
 } from "../../conversation";
 import {
 	createDialogueService,
@@ -26,6 +28,7 @@ import {
 	diagnosticsMigration as inferenceDiagnosticsMigration,
 } from "../../inference";
 import { createVoiceDialogue, migration, sequenceMigration } from "..";
+import type { LarmPort } from "../../larm";
 const cleanup: Array<() => Promise<void>> = [];
 afterEach(async () => {
 	for (const close of cleanup.splice(0)) await close();
@@ -38,11 +41,14 @@ function wav() {
 }
 async function setup(
 	fetcher?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
+	local: Partial<LarmPort> = {},
 ) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-settings-voice-"));
 	const dbPath = join(dir, "test.db");
 	const store = openStore(dbPath, [
 		conversationMigration,
+		conversationAvatarMotionMigration,
+		conversationAnswerDeliveryMigration,
 		dialogueMigration,
 		migration,
 		queueMigration,
@@ -110,6 +116,7 @@ async function setup(
 				throw new Error("larm_unconfigured");
 			},
 			close: async () => {},
+			...local,
 		}),
 	});
 	const conversation = createConversationService(store);
@@ -408,4 +415,110 @@ test("final recognition preempts a slow prefix and never submits a late hypothes
 		"確定",
 		"回答",
 	]);
+});
+
+test("accepted audio chunks publish Laya delivery and cancellation removes the plan with the audio", async () => {
+	const h = await setup(undefined, {
+		answer: async () => "こんにちは。",
+		transcribe: async () => "挨拶してください",
+		speak: async () => wav(),
+		judge: async () => ({
+			answers: {
+				motion: {
+					type: "choice",
+					choice: "greeting",
+					confidence: 0.9,
+					answer_confidence: 0.9,
+				},
+				voice: {
+					type: "choice",
+					choice: "bright",
+					confidence: 0.8,
+					answer_confidence: 0.8,
+				},
+			},
+		}),
+	});
+	const session = crypto.randomUUID(),
+		id = crypto.randomUUID();
+	h.voice.start(session, 1);
+	await h.voice.accept(session, 1, 1, id, wav());
+	await until(() => h.voice.get(id)?.status === "ready");
+	expect(h.voice.get(id)?.audioChunks).toEqual([
+		expect.objectContaining({
+			index: 0,
+			text: "こんにちは。",
+			delivery: expect.objectContaining({
+				source: "laya",
+				motion: "greeting",
+				tone: "bright",
+			}),
+		}),
+	]);
+	expect(
+		h.conversation
+			.get("main")
+			.messages.find((message) => message.role === "assistant")?.avatarMotion,
+	).toBe("greeting");
+	expect(h.voice.takeAudio(id, 0)).toEqual(wav());
+	await h.voice.cancel(id);
+	expect(h.voice.get(id)?.audioChunks).toEqual([]);
+	expect(h.voice.takeAudio(id, 0)).toBeNull();
+});
+
+test("replaying an answer persists its native motion, rejects unrelated text and ignores cancelled synthesis", async () => {
+	const h = await setup(undefined, {
+		answer: async () => "よかったですね。",
+		speak: async () => wav(),
+		judge: async () => ({
+			answers: {
+				motion: {
+					type: "choice",
+					choice: "joyful",
+					confidence: 0.95,
+					answer_confidence: 0.95,
+				},
+				voice: {
+					type: "choice",
+					choice: "bright",
+					confidence: 0.9,
+					answer_confidence: 0.9,
+				},
+			},
+		}),
+	});
+	const run = await h.dialogue.submit({
+		requestId: crypto.randomUUID(),
+		conversationId: "main",
+		text: "良い知らせ",
+	});
+	await until(() => h.dialogue.get(run.id)?.status === "completed");
+	const answer = () =>
+		h.conversation
+			.get("main")
+			.messages.find((message) => message.role === "assistant");
+	expect(answer()?.avatarMotion).toBeUndefined();
+	await expect(
+		h.voice.replaySpeech(
+			"関係のない回答。",
+			new AbortController().signal,
+			run.id,
+		),
+	).rejects.toThrow("replay_text_invalid");
+	const aborted = new AbortController();
+	aborted.abort();
+	await expect(
+		h.voice.replaySpeech("よかったですね。", aborted.signal, run.id),
+	).rejects.toThrow();
+	expect(answer()?.avatarMotion).toBeUndefined();
+	const response = await h.voice.replaySpeech(
+		"よかったですね。",
+		new AbortController().signal,
+		run.id,
+	);
+	expect(response.wav).toEqual(wav());
+	expect(answer()).toMatchObject({
+		text: "よかったですね。",
+		avatarMotion: "joyful",
+	});
 });

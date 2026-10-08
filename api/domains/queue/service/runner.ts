@@ -1,3 +1,5 @@
+import { getLogger, withLogContext } from "../../../infrastructure/logger";
+const log = getLogger("queue");
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import {
 	candidates,
@@ -379,12 +381,27 @@ export function createRunner(
 					return;
 				}
 			} catch {
+				log.warn("queue.heartbeat_failed", { jobId: a.claim.jobId });
 				// Writer busy: retry next interval; the lease sweep decides if it expired.
 			}
 		}
 	}
 
 	async function execute(a: Active) {
+		return withLogContext(
+			{
+				httpRequestId: undefined,
+				requestId: undefined,
+				jobId: a.claim.jobId,
+				attempt: a.claim.attempt,
+				generation: a.claim.generation,
+			},
+			() => executeLogged(a),
+		);
+	}
+	async function executeLogged(a: Active) {
+		const started = performance.now();
+		log.info("queue.execution_started", { kind: a.handler.kind });
 		void heartbeat(a);
 		let result: { ok: true; value: unknown } | { ok: false; error: unknown };
 		try {
@@ -399,12 +416,31 @@ export function createRunner(
 			};
 		} catch (error) {
 			result = { ok: false, error };
+			log.warn(
+				"queue.execution_failed",
+				{
+					kind: a.handler.kind,
+					durationMs: Math.round(performance.now() - started),
+				},
+				error,
+			);
 		}
 		a.heartbeat.abort();
 		try {
-			if (a.revoked || a.lost) return;
+			if (a.revoked || a.lost) {
+				log.warn("queue.result_discarded", {
+					reason: a.lost ? "lease_lost" : "revoked",
+				});
+				return;
+			}
 			await settle(a, result);
-		} catch {
+			const current = store.read((db) => getJob(db, a.claim.jobId));
+			log.info("queue.settled", {
+				status: current?.state,
+				durationMs: Math.round(performance.now() - started),
+			});
+		} catch (error) {
+			log.error("queue.settlement_failed", { reason: "settle_failed" }, error);
 			// Settlement transaction failed; the lease sweep resolves the job.
 		} finally {
 			active.delete(keyOf(a.claim));
@@ -460,7 +496,12 @@ export function createRunner(
 		};
 		try {
 			await attemptSettle(pick);
-		} catch {
+		} catch (error) {
+			log.error(
+				"queue.business_settlement_failed",
+				{ reason: "settle_failed" },
+				error,
+			);
 			// Business settlement threw and rolled back; record a plain failure through the handler.
 			await attemptSettle(() => ({
 				type: "failed",
@@ -555,6 +596,7 @@ export function createRunner(
 				if (next !== null)
 					delay = Math.max(10, Math.min(opts.pollMs, next - opts.now()));
 			} catch {
+				log.warn("queue.tick_failed");
 				// Writer full or closing: back off and re-check; do not fake progress.
 				delay = Math.min(opts.pollMs, opts.backoff.baseMs);
 			}

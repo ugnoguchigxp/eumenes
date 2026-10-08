@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { avatarMotionSchema, speechDeliverySchema } from "../../delivery";
 export const messageSchema = z.object({
 	id: z.string(),
 	conversationId: z.string(),
@@ -6,6 +7,8 @@ export const messageSchema = z.object({
 	text: z.string(),
 	createdAt: z.string(),
 	runId: z.string().nullable(),
+	avatarMotion: avatarMotionSchema.optional(),
+	delivery: speechDeliverySchema.optional(),
 });
 export type Message = z.infer<typeof messageSchema>;
 export const conversationSchema = z.object({

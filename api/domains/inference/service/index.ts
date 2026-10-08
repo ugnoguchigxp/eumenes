@@ -1,3 +1,5 @@
+import { getLogger } from "../../../infrastructure/logger";
+const log = getLogger("inference");
 import { readChatResponse } from "../../../infrastructure/chat-stream";
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
@@ -11,6 +13,7 @@ import {
 	chooseSpeechDelivery,
 	speechParameters,
 	type SpeechDelivery,
+	type SpeechPreparation,
 } from "../../delivery";
 import type {
 	SettingsService,
@@ -19,7 +22,12 @@ import type {
 	Connection,
 	Resource,
 } from "../../settings";
-import type { InferencePort, Messages, Receipt } from "../contracts";
+import type {
+	InferencePort,
+	Messages,
+	Receipt,
+	SpeechOverride,
+} from "../contracts";
 import { get, type RequestRow } from "../repository";
 type UsageRow = {
 	id: string;
@@ -361,6 +369,7 @@ export function createInference(
 		input: Messages | string | Uint8Array,
 		caller: AbortSignal,
 		onDelta?: (text: string) => void,
+		preparation?: SpeechPreparation,
 	): Promise<Receipt> {
 		caller.throwIfAborted();
 		if (closed) throw new Error("inference_closed");
@@ -422,6 +431,14 @@ export function createInference(
 			)
 				throw new Error("cloud_fallback_unconfigured");
 			const attemptId = crypto.randomUUID();
+			const started = performance.now();
+			const logFields = {
+				inferenceId: row.id,
+				subjectId: row.subject,
+				attemptId,
+				purpose: row.purpose,
+				source,
+			};
 			await store.write((db) =>
 				db
 					.query(
@@ -440,15 +457,18 @@ export function createInference(
 						Date.now(),
 					),
 			);
+			log.info("inference.attempt_started", {
+				...logFields,
+				reason: reason ?? undefined,
+			});
 			const exchanges: LarmExchange[] = [];
 			const callOptions: LarmCallOptions = {
 				...(row.purpose === "tts" && row.snapshot.larm.autoIntonation
-					? {
-							intonationScale: speechIntonation(
-								input as string,
-								row.snapshot.larm.intonationScale ?? 1,
-							),
-						}
+					? speechAdjustment(
+							input as string,
+							row.snapshot.larm,
+							row.snapshot.larm.autoStrength ?? 1,
+						)
 					: {}),
 				onExchange: async (exchange: LarmExchange) => {
 					// A call can use the old lease and one replacement. Keep both for correlation.
@@ -463,11 +483,6 @@ export function createInference(
 					);
 				},
 			};
-			// Dictionary rewrites apply to every synthesis path, local and cloud.
-			const sent =
-				row.purpose === "tts" && options.speechText
-					? options.speechText(input as string)
-					: input;
 			const abort = new AbortController();
 			const configuredDuration =
 				source === "cloud"
@@ -505,6 +520,11 @@ export function createInference(
 					}
 				: undefined;
 			try {
+				// Dictionary rewrites apply to every synthesis path, local and cloud.
+				const sent =
+					row.purpose === "tts" && options.speechText
+						? options.speechText(input as string)
+						: input;
 				let delivery: SpeechDelivery | undefined;
 				if (
 					row.purpose === "tts" &&
@@ -512,18 +532,42 @@ export function createInference(
 					port(row.snapshot).judge
 				) {
 					const p = port(row.snapshot);
-					delivery = await chooseSpeechDelivery(
-						p.judge!.bind(p),
-						sent as string,
-						attemptSignal,
-						options.decisionMs,
-					);
+					delivery =
+						preparation?.delivery?.version === 2
+							? preparation.delivery
+							: await chooseSpeechDelivery(
+									p.judge!.bind(p),
+									sent as string,
+									attemptSignal,
+									options.decisionMs,
+									preparation?.context
+										? {
+												...preparation.context,
+												answer:
+													options.speechText?.(preparation.context.answer) ??
+													preparation.context.answer,
+											}
+										: undefined,
+								);
 					attemptSignal.throwIfAborted();
+					log.info("inference.delivery_selected", {
+						inferenceId: row.id,
+						subjectId: row.subject,
+						source: delivery.source,
+						kind: delivery.emotion ?? delivery.motion,
+						...(delivery.reason ? { reason: delivery.reason } : {}),
+						durationMs: delivery.latencyMs,
+					});
 					if (!store.read((db) => allowed(db, row, connection)))
 						throw new Error("permission_revoked");
-					// Laya and punctuation heuristics are exclusive. Failure keeps the saved baseline.
-					delete callOptions.intonationScale;
-					if (delivery.source === "laya")
+					// Optional-provider absence preserves the existing automatic intonation.
+					// A present Laya is exclusive with heuristics; failures keep the saved baseline.
+					if (delivery.reason !== "unavailable") {
+						delete callOptions.intonationScale;
+						delete callOptions.speed;
+						delete callOptions.pitchScale;
+					}
+					if (delivery.source === "laya" && row.snapshot.larm.autoIntonation)
 						Object.assign(
 							callOptions,
 							speechParameters(delivery, row.snapshot.larm),
@@ -594,6 +638,10 @@ export function createInference(
 						)
 						.run(Date.now(), localModel ?? null, attemptId),
 				);
+				log.info("inference.attempt_succeeded", {
+					...logFields,
+					durationMs: Math.round(performance.now() - started),
+				});
 				return {
 					requestId: row.id,
 					attemptId,
@@ -611,6 +659,15 @@ export function createInference(
 							"UPDATE inference_attempts SET status='failed',reason=?,ended=? WHERE id=?",
 						)
 						.run(code, Date.now(), attemptId),
+				);
+				log.warn(
+					"inference.attempt_failed",
+					{
+						...logFields,
+						reason: code,
+						durationMs: Math.round(performance.now() - started),
+					},
+					error,
 				);
 				throw new Error(code);
 			} finally {
@@ -645,6 +702,12 @@ export function createInference(
 						cooldown.set(key, Date.now() + 30_000);
 					}
 			}
+			log.warn("inference.cloud_selected", {
+				inferenceId: row.id,
+				subjectId: row.subject,
+				purpose: row.purpose,
+				reason: reason ?? "cloud_only",
+			});
 			return await attempt("cloud");
 		} catch (error) {
 			await store.write((db) =>
@@ -686,24 +749,46 @@ export function createInference(
 		);
 		return true;
 	}
+	async function standaloneReceipt(
+		purpose: Purpose,
+		input: Messages | string | Uint8Array,
+		signal: AbortSignal,
+		onDelta?: (text: string) => void,
+		override?: SpeechOverride,
+		preparation?: SpeechPreparation,
+	) {
+		const id = await store.write((db) => {
+			const current = settings.inTransaction(db);
+			return capture(
+				db,
+				crypto.randomUUID(),
+				purpose,
+				Date.now() + (purpose === "llm" ? 180_000 : 45_000),
+				override
+					? { ...current, larm: { ...current.larm, ...override } }
+					: current,
+			);
+		});
+		const receipt = await executeRequest(
+			id,
+			input,
+			signal,
+			onDelta,
+			preparation,
+		);
+		if (!(await store.write((db) => accept(db, receipt))))
+			throw new Error("permission_revoked");
+		return receipt;
+	}
 	async function standalone(
 		purpose: Purpose,
 		input: Messages | string | Uint8Array,
 		signal: AbortSignal,
 		onDelta?: (text: string) => void,
+		override?: SpeechOverride,
 	) {
-		const id = await store.write((db) =>
-			capture(
-				db,
-				crypto.randomUUID(),
-				purpose,
-				Date.now() + (purpose === "llm" ? 180_000 : 45_000),
-			),
-		);
-		const receipt = await executeRequest(id, input, signal, onDelta);
-		if (!(await store.write((db) => accept(db, receipt))))
-			throw new Error("permission_revoked");
-		return receipt.value;
+		return (await standaloneReceipt(purpose, input, signal, onDelta, override))
+			.value;
 	}
 	function valid(db: Database, id: string) {
 		const row = get(db, id);
@@ -817,7 +902,12 @@ export function createInference(
 		},
 		snapshotInTransaction: settings.inTransaction,
 		captureInTransaction: capture,
-		executeRequest,
+		executeRequest: (
+			id: string,
+			input: Messages | string | Uint8Array,
+			signal: AbortSignal,
+			preparation?: SpeechPreparation,
+		) => executeRequest(id, input, signal, undefined, preparation),
 		executeStream: (
 			requestId: string,
 			messages: Messages,
@@ -904,8 +994,29 @@ export function createInference(
 		) => standalone("llm", messages, signal, onDelta) as Promise<string>,
 		transcribe: (wav: Uint8Array, signal: AbortSignal) =>
 			standalone("asr", wav, signal) as Promise<string>,
-		speak: (text: string, signal: AbortSignal) =>
-			standalone("tts", text, signal) as Promise<Uint8Array>,
+		speak: (text: string, signal: AbortSignal, override?: SpeechOverride) =>
+			standalone(
+				"tts",
+				text,
+				signal,
+				undefined,
+				override,
+			) as Promise<Uint8Array>,
+		speakWithDelivery: async (
+			text: string,
+			signal: AbortSignal,
+			preparation?: SpeechPreparation,
+		) => {
+			const receipt = await standaloneReceipt(
+				"tts",
+				text,
+				signal,
+				undefined,
+				undefined,
+				preparation,
+			);
+			return { wav: receipt.value as Uint8Array, delivery: receipt.delivery };
+		},
 		usage: () =>
 			store.read((db) =>
 				db
@@ -1051,4 +1162,4 @@ export function createInference(
 	return service;
 }
 export type InferenceService = ReturnType<typeof createInference>;
-import { speechIntonation } from "./speech-intonation";
+import { speechAdjustment } from "./speech-intonation";

@@ -1,3 +1,6 @@
+/** VOICEVOX fails on clauses with no phoneme (e.g. "。", "…", "！？"). */
+const speakable = (text: string) => /[\p{L}\p{N}]/u.test(text);
+
 /** Incremental speech clauses, independent of provider token boundaries. */
 export class SpeechSentences {
 	private buffer = "";
@@ -37,13 +40,14 @@ export class SpeechSentences {
 					boundary--;
 			}
 			if (!boundary) {
-				if (final && this.buffer.trim()) chunks.push(this.buffer.trim());
+				if (final && speakable(this.buffer.trim()))
+					chunks.push(this.buffer.trim());
 				if (final) this.buffer = "";
 				return chunks;
 			}
 			const chunk = this.buffer.slice(0, boundary).trim();
 			this.buffer = this.buffer.slice(boundary);
-			if (chunk) chunks.push(chunk);
+			if (speakable(chunk)) chunks.push(chunk);
 		}
 	}
 }

@@ -57,7 +57,14 @@ export function defaults(env: Record<string, string | undefined>): Settings {
 			noiseSuppression: true,
 			autoGainControl: true,
 		},
-		general: { theme: "system", subtitles: defaultSubtitles },
+		general: {
+			agentName: "",
+			userName: "",
+			persona: "butler",
+			asrLanguages: ["ja", "en"],
+			theme: "system",
+			subtitles: defaultSubtitles,
+		},
 	});
 }
 export async function createSettings(

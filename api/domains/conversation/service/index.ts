@@ -1,15 +1,34 @@
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
+import type { AvatarMotion, SpeechDelivery } from "../../delivery";
 import type { Conversation, Message } from "../contracts";
 import {
 	appendMessage,
 	ensureConversation,
 	listMessages,
 	revision,
+	recordAnswerMotion,
+	recordAnswerDelivery,
 } from "../repository";
 
 export function createConversationService(store: SqliteStore) {
 	return {
+		recordAnswerMotionInTransaction(
+			db: Database,
+			runId: string,
+			conversationId: string,
+			motion: AvatarMotion,
+		) {
+			return recordAnswerMotion(db, runId, conversationId, motion);
+		},
+		recordAnswerDeliveryInTransaction(
+			db: Database,
+			runId: string,
+			conversationId: string,
+			delivery: SpeechDelivery,
+		) {
+			return recordAnswerDelivery(db, runId, conversationId, delivery);
+		},
 		get(id: string): Conversation {
 			return store.read((db) => ({
 				id,

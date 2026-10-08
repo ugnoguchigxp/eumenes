@@ -5,4 +5,4 @@ export {
 	diagnosticsMigration,
 } from "./repository";
 export { registerInference } from "./controller";
-export type { InferencePort, Receipt } from "./contracts";
+export type { InferencePort, Receipt, SpeechOverride } from "./contracts";
