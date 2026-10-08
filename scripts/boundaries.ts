@@ -6,7 +6,7 @@ import { closure, type Domain, domains } from "./domains";
 const root = resolve(import.meta.dir, "..");
 function owner(path: string): { domain: Domain; root: string } | null {
 	for (const [domain, info] of Object.entries(domains))
-		for (const location of [info.backend, info.web]) {
+		for (const location of [info.backend, info.web, info.components]) {
 			if (!location) continue;
 			const base = resolve(root, location);
 			if (path === base || path.startsWith(`${base}${sep}`))
@@ -38,7 +38,7 @@ export function checkBoundaries(files: string[]): string[] {
 			const target = owner(targetPath);
 			if (!target || target.domain === source.domain) continue;
 			const allowed = (
-				path.includes(`${sep}test${sep}`)
+				path.includes(`${sep}test${sep}`) || /\.test\.[tj]sx?$/.test(path)
 					? closure(source.domain)
 					: (domains[source.domain].depends as readonly Domain[])
 			).includes(target.domain);

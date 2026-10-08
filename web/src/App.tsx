@@ -1,22 +1,33 @@
 import {
 	QueryClient,
 	QueryClientProvider,
+	useMutation,
 	useQuery,
+	useQueryClient,
 } from "@tanstack/react-query";
-import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+	type FormEvent,
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+	useSyncExternalStore,
+} from "react";
 import { useStore } from "zustand";
 import { createClient, type EumenesClient } from "../../client";
 import { MessageList } from "./components/domains/conversation/MessageList";
-import {
-	BookmarkList,
-	CreateBookmarkForm,
-} from "./components/domains/continuity";
-import { StatusBadge } from "./components/ui/StatusBadge";
 import { Button, Textarea } from "./design-system";
 import { type AudioStore, createAudioStore } from "./domains/audio";
 import { useConversation } from "./domains/conversation";
-import { useCancel, useRuns, useSubmit } from "./domains/dialogue";
+import {
+	useCancel,
+	useRuns,
+	useSubmit,
+	useRunProgress,
+} from "./domains/dialogue";
 import { useVoiceDialogue } from "./domains/voice-dialogue";
+import { SettingsPage, useSettings } from "./domains/settings";
 
 function Workspace({
 	client,
@@ -25,10 +36,53 @@ function Workspace({
 	client: EumenesClient;
 	store: AudioStore;
 }) {
-	const [draft, setDraft] = useState("");
-	const [sidePanel, setSidePanel] = useState<"continuity" | "runs">(
-		"continuity",
+	const [input, setInput] = useState({ text: "", dictated: false });
+	const draft = input.text;
+	const editedRecognition = useRef<string | null>(null);
+	const [settingsOpen, setSettingsOpen] = useState(
+		window.location.hash.startsWith("#settings"),
 	);
+	const dirtySettings = useRef(false);
+	const onDirty = useCallback((v: boolean) => {
+		dirtySettings.current = v;
+	}, []);
+	const settings = useSettings(client);
+	const usage = useQuery({
+		queryKey: ["inference-usage", client.identity],
+		queryFn: () => client.inferenceUsage(),
+		retry: 0,
+	});
+	const actualModel = usage.data?.find(
+		(u) => u.purpose === "llm" && u.accepted,
+	);
+	useEffect(() => {
+		const media = window.matchMedia("(prefers-color-scheme: dark)");
+		const apply = () => {
+			const theme = settings.data?.general.theme ?? "system";
+			document.documentElement.dataset.theme =
+				theme === "system" ? (media.matches ? "dark" : "light") : theme;
+		};
+		apply();
+		media.addEventListener("change", apply);
+		return () => media.removeEventListener("change", apply);
+	}, [settings.data?.general.theme]);
+	useEffect(() => {
+		const navigate = () => {
+			const open = window.location.hash.startsWith("#settings");
+			if (
+				!open &&
+				dirtySettings.current &&
+				!window.confirm("設定の未保存の変更を破棄して会話に戻りますか？")
+			) {
+				window.history.replaceState(null, "", "#settings");
+				return;
+			}
+			dirtySettings.current = false;
+			setSettingsOpen(open);
+		};
+		window.addEventListener("hashchange", navigate);
+		return () => window.removeEventListener("hashchange", navigate);
+	}, []);
 	const historyRef = useRef<HTMLDivElement>(null);
 	const followLatest = useRef(true);
 	const [showLatest, setShowLatest] = useState(false);
@@ -36,24 +90,102 @@ function Workspace({
 	const runs = useRuns(client, "main");
 	const submit = useSubmit(client, "main");
 	const cancel = useCancel(client, "main");
-	const voice = useVoiceDialogue(client, store);
+	const voice = useVoiceDialogue(
+		client,
+		store,
+		undefined,
+		settings.data?.voice,
+	);
+	const automaticInput = input.dictated && voice.active;
+	const recognitionId = voice.recognitionId;
+	const recognitionText = voice.transcription?.text;
+	useEffect(() => {
+		if (
+			!recognitionId ||
+			!recognitionText ||
+			editedRecognition.current === recognitionId
+		)
+			return;
+		// This is the external ASR result; manual edits take ownership for this utterance.
+		// oxlint-disable-next-line react/set-state-in-effect
+		setInput({ text: recognitionText, dictated: true });
+	}, [recognitionId, recognitionText]);
+	const previousSettings = useRef(settings.data);
+	useEffect(() => {
+		const old = previousSettings.current;
+		const next = settings.data;
+		previousSettings.current = next;
+		if (!old || !next || old.revision === next.revision) return;
+		const revoked =
+			(["llm", "asr", "tts"] as const).some(
+				(p) => old.routes[p].epoch !== next.routes[p].epoch,
+			) ||
+			old.connections.some((c) => {
+				const n = next.connections.find((n) => n.id === c.id);
+				return !n || n.epoch !== c.epoch || (c.enabled && !n.enabled);
+			});
+		if (revoked) void voice.stop();
+	}, [settings.data, voice]);
 	const phase = useStore(store, (state) => state.phase);
 	const level = useStore(store, (state) => state.level);
 	const audioError = useStore(store, (state) => state.error);
+	const cache = useQueryClient();
+	const changesState = useSyncExternalStore(
+		client.subscribeChangesState,
+		client.changesState,
+	);
+	useEffect(() => {
+		let pending: ReturnType<typeof setTimeout> | undefined;
+		const resume = () => {
+			if (document.visibilityState !== "visible") return;
+			clearTimeout(pending);
+			pending = setTimeout(() => {
+				client.reconnectChanges();
+				void cache.invalidateQueries();
+			}, 100);
+		};
+		window.addEventListener("focus", resume);
+		document.addEventListener("visibilitychange", resume);
+		return () => {
+			clearTimeout(pending);
+			window.removeEventListener("focus", resume);
+			document.removeEventListener("visibilitychange", resume);
+		};
+	}, [client, cache]);
+	useEffect(
+		() =>
+			client.subscribeChanges(() => {
+				void cache.invalidateQueries();
+			}),
+		[client, cache],
+	);
 	const status = useQuery({
 		queryKey: ["larm", client.identity],
 		queryFn: () => client.status(),
-		refetchInterval: 5000,
 		retry: 0,
 	});
+	const reconnect = useMutation({
+		mutationFn: () => client.connectLarm(),
+		retry: false,
+		onSuccess: (data) => {
+			cache.setQueryData(["larm", client.identity], data);
+			client.reconnectChanges();
+			void cache.invalidateQueries();
+		},
+	});
+	const connectionError = status.data?.larm.error;
+	const connectionState =
+		status.data?.larm.state ?? (status.isError ? "failed" : "connecting");
+	const latestRun = runs.data?.at(-1);
 	const activeRun = runs.data?.find(
 		(run) => run.status === "queued" || run.status === "running",
 	);
 	const messageCount = conversation.data?.messages.length ?? 0;
+	const streamingText = useRunProgress(client, activeRun?.id);
 	useEffect(() => {
 		if (followLatest.current && historyRef.current)
 			historyRef.current.scrollTop = historyRef.current.scrollHeight;
-	}, [messageCount, activeRun?.id]);
+	}, [messageCount, activeRun?.id, streamingText]);
 	function scrollLatest() {
 		const history = historyRef.current;
 		if (!history) return;
@@ -64,11 +196,14 @@ function Workspace({
 	function send(event: FormEvent) {
 		event.preventDefault();
 		const text = draft.trim();
-		if (!text || submit.isPending) return;
+		if (!text || automaticInput || submit.isPending) return;
+		const sentInput = input;
 		void submit
 			.mutateAsync(text)
 			.then(() => {
-				setDraft((current) => (current.trim() === text ? "" : current));
+				setInput((current) =>
+					current === sentInput ? { text: "", dictated: false } : current,
+				);
 			})
 			.catch(() => {});
 	}
@@ -79,42 +214,96 @@ function Workspace({
 			active: voice.active && phase === "listening",
 		},
 		{ id: "asr", label: "音声認識", active: !!voice.turn && !voice.turn.text },
-		{ id: "llm", label: "Gemma 4", active: !!activeRun },
+		{ id: "llm", label: "回答", active: !!activeRun },
 		{ id: "speech", label: "音声再生", active: phase === "playing" },
 	];
 	return (
 		<main className="app-shell">
-			<header className="app-header">
-				<div className="brand">
-					<span className="brand-mark" aria-hidden="true">
-						E
-					</span>
-					<span>Eumenes</span>
-				</div>
-				<div className="header-status">
-					<span>ローカル会話</span>
-					<StatusBadge
-						status={
-							status.data?.larm.state ??
-							(status.isError ? "failed" : "connecting")
-						}
-					/>
-				</div>
-			</header>
-			<div className="workspace-layout">
+			<Button
+				className={`floating-settings${settingsOpen ? " floating-settings-close" : ""}`}
+				variant="secondary"
+				size="icon"
+				aria-label={settingsOpen ? "会話に戻る" : "設定"}
+				title={settingsOpen ? "会話に戻る" : "設定"}
+				onClick={() => {
+					window.location.hash = settingsOpen ? "conversation" : "settings";
+				}}
+			>
+				<svg
+					width="22"
+					height="22"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					strokeWidth={settingsOpen ? 2.2 : 1.8}
+					strokeLinecap="round"
+					strokeLinejoin="round"
+					aria-hidden="true"
+				>
+					{settingsOpen ? (
+						<path d="M6 6l12 12M18 6 6 18" />
+					) : (
+						<>
+							<path d="m9.5 3-.5 2-2 1.2-2-.6-2.5 4.3L4 11.3v2l-1.5 1.4L5 19l2-.6 2 1.2.5 2.4h5l.5-2.4 2-1.2 2 .6 2.5-4.3-1.5-1.4v-2l1.5-1.4L19 5.6l-2 .6L15 5l-.5-2z" />
+							<circle cx="12" cy="12" r="3" />
+						</>
+					)}
+				</svg>
+			</Button>
+			{settingsOpen && (
+				<SettingsPage
+					client={client}
+					onDirty={onDirty}
+					onSaved={() => {
+						void cache.invalidateQueries();
+					}}
+				/>
+			)}
+			<div className="workspace-layout" hidden={settingsOpen}>
 				<section className="chat-panel" aria-label="会話">
-					<header className="chat-header">
-						<div>
-							<span className="section-kicker">CONVERSATION</span>
-							<h1>会話</h1>
-						</div>
-						<span className="model-label">Gemma 4 26B-A4B</span>
-					</header>
+					<div className="conversation-status" aria-label="接続状態とモデル">
+						<span
+							className="connection-health"
+							data-state={connectionState}
+							aria-label={`LARMの接続状態: ${connectionState}`}
+						>
+							<i className="health-dot" aria-hidden="true" />
+							<span>LARM</span>
+							<span className="health-state">{connectionState}</span>
+						</span>
+						<span className="model-label">
+							{actualModel?.source === "cloud" && "クラウド / "}
+							{actualModel?.model ?? settings.data?.larm.profile}
+						</span>
+					</div>
 					{status.isError && (
 						<p className="chat-error" role="alert">
 							ローカル API に接続できません。Eumenes の backend
 							と設定を確認してください。
 						</p>
+					)}
+					{connectionError && (
+						<p className="chat-error" role="alert">
+							LARM に接続できませんでした: {connectionError}
+						</p>
+					)}
+					{changesState === "failed" && !status.isError && (
+						<p className="chat-error" role="alert">
+							更新情報に接続できません。文字起こしや回答の表示が遅れる場合があります。
+						</p>
+					)}
+					{(status.isError ||
+						changesState === "failed" ||
+						["failed", "unconfigured", "idle"].includes(
+							status.data?.larm.state ?? "",
+						)) && (
+						<Button
+							variant="secondary"
+							onClick={() => reconnect.mutate()}
+							disabled={reconnect.isPending}
+						>
+							{reconnect.isPending ? "接続を確認中" : "接続を再確認"}
+						</Button>
 					)}
 					{conversation.isError && (
 						<p className="chat-error" role="alert">
@@ -132,7 +321,10 @@ function Workspace({
 							setShowLatest(!followLatest.current);
 						}}
 					>
-						<MessageList conversation={conversation.data} />
+						<MessageList
+							conversation={conversation.data}
+							streaming={streamingText}
+						/>
 						{activeRun && (
 							<div className="thinking">
 								<span className="thinking-dots" aria-hidden="true">
@@ -143,7 +335,7 @@ function Workspace({
 								<output>
 									{activeRun.status === "queued"
 										? "応答を準備中"
-										: "Gemma が応答中"}
+										: "回答を作成中"}
 								</output>
 								<Button
 									variant="ghost"
@@ -206,7 +398,10 @@ function Workspace({
 								<Textarea
 									aria-label="メッセージ"
 									value={draft}
-									onChange={(event) => setDraft(event.target.value)}
+									onChange={(event) => {
+										editedRecognition.current = recognitionId ?? null;
+										setInput({ text: event.target.value, dictated: false });
+									}}
 									onKeyDown={(event) => {
 										if (
 											(event.metaKey || event.ctrlKey) &&
@@ -220,7 +415,7 @@ function Workspace({
 								/>
 								<Button
 									type="submit"
-									disabled={!draft.trim() || submit.isPending}
+									disabled={!draft.trim() || automaticInput || submit.isPending}
 									aria-label="送信"
 								>
 									送信
@@ -231,8 +426,11 @@ function Workspace({
 									{voice.turn?.status ??
 										(voice.active ? "音声を待機中" : "待機中")}
 								</span>
-								{voice.turn?.text && <span>認識: {voice.turn.text}</span>}
-								<span className="composer-shortcut">⌘/Ctrl + Enter で送信</span>
+								<span className="composer-shortcut">
+									{automaticInput
+										? "音声入力は自動送信されます"
+										: "⌘/Ctrl + Enter で送信"}
+								</span>
 							</div>
 						</form>
 						{(submit.isError || voice.error || audioError) && (
@@ -242,75 +440,14 @@ function Workspace({
 									: voice.error || audioError}
 							</p>
 						)}
+						{latestRun?.status === "failed" && (
+							<p className="chat-error" role="alert">
+								回答を取得できませんでした:{" "}
+								{latestRun.error ?? "応答に失敗しました"}
+							</p>
+						)}
 					</div>
 				</section>
-				<aside className="side-panel" aria-label="会話の補助情報">
-					<div className="side-tabs" role="tablist" aria-label="補助情報">
-						<button
-							role="tab"
-							aria-selected={sidePanel === "continuity"}
-							onClick={() => setSidePanel("continuity")}
-						>
-							継続情報
-						</button>
-						<button
-							role="tab"
-							aria-selected={sidePanel === "runs"}
-							onClick={() => setSidePanel("runs")}
-						>
-							実行記録
-						</button>
-					</div>
-					{sidePanel === "continuity" ? (
-						<section className="side-content" role="tabpanel">
-							<h2>継続情報</h2>
-							<p className="side-intro">残したい発言をしおりに保存できます。</p>
-							<CreateBookmarkForm
-								client={client}
-								conversationId="main"
-								messages={
-									conversation.data?.messages
-										.filter((message) => message.role === "user")
-										.map((message) => ({
-											id: message.id,
-											text: message.text,
-										})) ?? []
-								}
-							/>
-							<BookmarkList client={client} conversationId="main" />
-						</section>
-					) : (
-						<section className="side-content" role="tabpanel">
-							<h2>実行記録</h2>
-							<ul className="runs">
-								{runs.data?.length ? (
-									runs.data.map((run) => (
-										<li key={run.id}>
-											<div>
-												<code>{run.id.slice(0, 8)}</code>{" "}
-												<StatusBadge status={run.status} />
-												{run.error && (
-													<small className="error"> {run.error}</small>
-												)}
-											</div>
-											{["queued", "running"].includes(run.status) && (
-												<Button
-													variant="secondary"
-													size="sm"
-													onClick={() => cancel.mutate(run.id)}
-												>
-													取消
-												</Button>
-											)}
-										</li>
-									))
-								) : (
-									<li className="hint">記録はまだありません</li>
-								)}
-							</ul>
-						</section>
-					)}
-				</aside>
 			</div>
 		</main>
 	);

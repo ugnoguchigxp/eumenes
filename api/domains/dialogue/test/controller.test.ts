@@ -21,6 +21,7 @@ test("dialogue controller validates requests and delegates one run", async () =>
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-controller-"));
 	const larm: LarmPort = {
 		status: () => ({ state: "ready", capabilities: ["llm"] }),
+		connect: async () => {},
 		answer: async () => "回答",
 		transcribe: async () => "",
 		speak: async () => new Uint8Array(),

@@ -14,6 +14,7 @@ export const voiceTurnSchema = z.object({
 		"synthesizing",
 		"ready",
 		"played",
+		"completed",
 		"failed",
 		"cancelled",
 		"interrupted",
@@ -22,5 +23,11 @@ export const voiceTurnSchema = z.object({
 	runId: z.string().nullable(),
 	error: z.string().nullable(),
 	revision: z.number().int(),
+	audioChunks: z
+		.array(
+			z.object({ index: z.number().int().nonnegative(), text: z.string() }),
+		)
+		.optional(),
+	audioComplete: z.boolean().optional(),
 });
 export type VoiceTurn = z.infer<typeof voiceTurnSchema>;

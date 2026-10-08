@@ -32,6 +32,12 @@ export const runSchema = z.object({
 	updatedAt: z.string(),
 });
 export type Run = z.infer<typeof runSchema>;
+export const progressSchema = z.object({
+	runId: z.string(),
+	status: runSchema.shape.status,
+	text: z.string().max(65_536),
+});
+export type RunProgress = z.infer<typeof progressSchema>;
 export const promptTargetSchema = z.object({
 	conversationId: z.string().min(1).max(120),
 	text: z.string().trim().min(1).max(8000),

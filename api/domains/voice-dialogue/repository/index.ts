@@ -68,7 +68,7 @@ export function update(
 	return (
 		db
 			.query(
-				"UPDATE voice_turns SET status=?,text=COALESCE(?,text),run_id=COALESCE(?,run_id),error=COALESCE(?,error),revision=revision+1,updated_at=? WHERE utterance_id=? AND revision=? AND status NOT IN ('cancelled','failed','interrupted','played')",
+				"UPDATE voice_turns SET status=?,text=COALESCE(?,text),run_id=COALESCE(?,run_id),error=COALESCE(?,error),revision=revision+1,updated_at=? WHERE utterance_id=? AND revision=? AND status NOT IN ('cancelled','failed','interrupted','played','completed')",
 			)
 			.run(
 				status,

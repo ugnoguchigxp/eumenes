@@ -30,6 +30,7 @@ export class WriterBusyError extends Error {
 export interface SqliteStore {
 	read<T>(operation: (db: Database) => T): T;
 	write<T>(operation: (db: Database) => T): Promise<T>;
+	onCommit(listener: () => void): () => void;
 	close(): Promise<void>;
 }
 
@@ -95,6 +96,10 @@ export function openStore(
 	let tail: Promise<unknown> = Promise.resolve();
 	let pending = 0;
 	let closing = false;
+	const listeners = new Set<() => void>();
+	const changes = w.query<{ count: number }, []>(
+		"SELECT total_changes() AS count",
+	);
 	return {
 		read: (operation) => {
 			if (closing) throw new Error("database_closing");
@@ -104,7 +109,20 @@ export function openStore(
 			if (closing) return Promise.reject(new Error("database_closing"));
 			if (pending >= 64) return Promise.reject(new WriterBusyError());
 			pending++;
-			const task = tail.then(() => w.transaction(() => operation(w))());
+			const task = tail.then(() => {
+				const before = changes.get()?.count;
+				const result = w.transaction(() => operation(w))();
+				// Only committed mutations notify. Idle worker scans and rollbacks do not.
+				if (changes.get()?.count !== before)
+					for (const listener of listeners) {
+						try {
+							listener();
+						} catch {
+							// Notification failures cannot turn a committed write into a failure.
+						}
+					}
+				return result;
+			});
 			tail = task
 				.catch(() => {})
 				.finally(() => {
@@ -112,10 +130,18 @@ export function openStore(
 				});
 			return task;
 		},
+		onCommit(listener) {
+			if (closing) throw new Error("database_closing");
+			listeners.add(listener);
+			return () => {
+				listeners.delete(listener);
+			};
+		},
 		async close() {
 			if (closing) return;
 			closing = true;
 			await tail;
+			listeners.clear();
 			r.close();
 			w.close();
 			libc.symbols.flock(lockFd, LOCK_UN);

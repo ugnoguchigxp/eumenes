@@ -1,7 +1,25 @@
 import type { Hono } from "hono";
 import type { DialogueService } from "..";
-import { submitSchema } from "../contracts";
+import { submitSchema, type RunProgress } from "../contracts";
+import { snapshotStream } from "../../../infrastructure/snapshot-stream";
 export function registerDialogue(app: Hono, service: DialogueService) {
+	app.get("/api/runs/:id/stream", (c) => {
+		const id = c.req.param("id");
+		if (!service.get(id)) return c.json({ error: "not_found" }, 404);
+		return c.body(
+			snapshotStream<RunProgress>(
+				(listener) => service.subscribeProgress(id, listener),
+				(value) => !["queued", "running"].includes(value.status),
+				c.req.raw.signal,
+			),
+			200,
+			{
+				"Content-Type": "text/event-stream",
+				"Cache-Control": "no-store",
+				"X-Accel-Buffering": "no",
+			},
+		);
+	});
 	app.get("/api/conversations/:id/runs", (c) =>
 		c.json(service.list(c.req.param("id"))),
 	);

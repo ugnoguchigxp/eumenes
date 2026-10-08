@@ -26,6 +26,7 @@ test("request ID is idempotent and answer adoption is atomic", async () => {
 	let calls = 0;
 	const larm: LarmPort = {
 		status: () => ({ state: "ready", capabilities: ["llm"] }),
+		connect: async () => {},
 		answer: async () => {
 			calls++;
 			return "お答えします";
@@ -83,6 +84,7 @@ test("failed input persistence prevents any provider request", async () => {
 	let calls = 0;
 	const larm: LarmPort = {
 		status: () => ({ state: "ready", capabilities: ["llm"] }),
+		connect: async () => {},
 		answer: async () => {
 			calls++;
 			return "answer";
@@ -92,6 +94,7 @@ test("failed input persistence prevents any provider request", async () => {
 		close: async () => {},
 	};
 	const store = {
+		onCommit: () => () => {},
 		read: () => {
 			throw new Error("storage_failed");
 		},
@@ -118,6 +121,7 @@ test("cancelled inference cannot append an answer", async () => {
 	let resolveAnswer: (text: string) => void = () => {};
 	const larm: LarmPort = {
 		status: () => ({ state: "ready", capabilities: ["llm"] }),
+		connect: async () => {},
 		answer: () =>
 			new Promise((resolve) => {
 				resolveAnswer = resolve;

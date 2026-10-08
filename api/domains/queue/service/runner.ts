@@ -30,6 +30,7 @@ export interface Resolved {
 	sleep: (ms: number, signal?: AbortSignal) => Promise<void>;
 	random: () => number;
 	resources: Record<string, number>;
+	resourceAliases: Record<string, string>;
 	leaseMs: number;
 	heartbeatMs: number;
 	pollMs: number;
@@ -56,7 +57,8 @@ export function resolveOptions(o: QueueOptions = {}): Resolved {
 					);
 				})),
 		random: o.random ?? Math.random,
-		resources: o.resources ?? { "larm.llm": 1 },
+		resources: o.resources ?? { "inference.llm": 1 },
+		resourceAliases: o.resourceAliases ?? {},
 		leaseMs: o.leaseMs ?? 30_000,
 		heartbeatMs: o.heartbeatMs ?? 10_000,
 		pollMs: o.pollMs ?? 1_000,
@@ -282,7 +284,10 @@ export function createRunner(
 			if (a.concurrencyKey) reserved.add(a.concurrencyKey);
 		for (const job of candidates(db, now, 256)) {
 			const handler = registry.get(job.kind);
-			const resource = job.resourceKey ?? handler?.resourceKey ?? null;
+			const originalResource = job.resourceKey ?? handler?.resourceKey ?? null;
+			const resource = originalResource
+				? (opts.resourceAliases[originalResource] ?? originalResource)
+				: null;
 			let reason: string | null = null;
 			if (handler && resource) {
 				const cap = opts.resources[resource] ?? 1;

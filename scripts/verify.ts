@@ -116,6 +116,7 @@ try {
 		(all
 			? files(join(root, "api/domains")).concat(
 					files(join(root, "web/src/domains")),
+					files(join(root, "web/src/components/domains")),
 				)
 			: tsFiles
 		)

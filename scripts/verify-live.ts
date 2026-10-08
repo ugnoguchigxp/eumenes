@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { createLarm } from "../api/domains/larm";
+import { resolveLarmToken } from "../api/infrastructure/auth-config";
 
 const args = process.argv.slice(2).filter((x) => x !== "--");
 if (args[0] !== "--domain" || args[1] !== "larm") {
@@ -7,11 +8,7 @@ if (args[0] !== "--domain" || args[1] !== "larm") {
 	process.exit(2);
 }
 const path = process.env.EUMENES_LIVE_ASR_WAV;
-if (
-	!process.env.LARM_BASE_URL ||
-	!(process.env.LARM_CONTROL_TOKEN ?? process.env.LARM_API_TOKEN) ||
-	!path
-) {
+if (!process.env.LARM_BASE_URL || !resolveLarmToken(process.env) || !path) {
 	console.error(
 		"Live verification requires LARM_BASE_URL, LARM_CONTROL_TOKEN or LARM_API_TOKEN, and EUMENES_LIVE_ASR_WAV. No fixture fallback is used.",
 	);
@@ -19,7 +16,7 @@ if (
 }
 const larm = createLarm({
 	baseUrl: process.env.LARM_BASE_URL,
-	token: process.env.LARM_CONTROL_TOKEN ?? process.env.LARM_API_TOKEN,
+	token: resolveLarmToken(process.env),
 	profile: process.env.LARM_PROFILE,
 	audience: process.env.LARM_AUDIENCE,
 	voice: process.env.EUMENES_TTS_VOICE,

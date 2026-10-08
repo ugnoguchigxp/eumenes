@@ -35,6 +35,16 @@ export function createAudioController(
 	onState: (state: AudioState) => void,
 	onSpeech: () => void,
 	onSegment: (wav: Uint8Array) => void,
+	options: {
+		inputDevice?: string;
+		outputDevice?: string;
+		threshold?: number;
+		silenceMs?: number;
+		echoCancellation?: boolean;
+		noiseSuppression?: boolean;
+		autoGainControl?: boolean;
+		onPartial?: (wav: Uint8Array) => void;
+	} = {},
 ) {
 	let context: AudioContext | undefined;
 	let stream: MediaStream | undefined;
@@ -42,6 +52,8 @@ export function createAudioController(
 	let source: MediaStreamAudioSourceNode | undefined;
 	let playback: AudioBufferSourceNode | undefined;
 	let playbackEpoch = 0;
+	let playbackDone: Promise<void> = Promise.resolve();
+	let finishPlayback: () => void = () => {};
 	let disposed = false;
 	let speaking = false;
 	let detector: VoiceActivityDetector | undefined;
@@ -50,34 +62,51 @@ export function createAudioController(
 	let frames: Float32Array[] = [];
 	let sampleCount = 0;
 	let lastLevel = 0;
+	let nextPartialAt = 0;
 	let lastEmit = 0;
 	const emit = (phase: AudioState["phase"], error?: string) =>
 		onState({ phase, error, level: lastLevel });
-	function flush() {
-		if (!context || sampleCount < context.sampleRate * 0.25) {
-			frames = [];
-			sampleCount = 0;
-			return;
-		}
+
+	function encodeFrames(): Uint8Array {
 		const joined = new Float32Array(sampleCount);
 		let offset = 0;
 		for (const frame of frames) {
 			joined.set(frame, offset);
 			offset += frame.length;
 		}
+		const rate = context!.sampleRate;
+		if (rate <= 16000) return wav(joined, rate);
+		const ratio = rate / 16000;
+		const downsampled = new Float32Array(Math.floor(joined.length / ratio));
+		for (let i = 0; i < downsampled.length; i++) {
+			const begin = Math.floor(i * ratio),
+				end = Math.floor((i + 1) * ratio);
+			let sum = 0;
+			for (let n = begin; n < end; n++) sum += joined[n] ?? 0;
+			downsampled[i] = sum / Math.max(1, end - begin);
+		}
+		return wav(downsampled, 16000);
+	}
+	function flush() {
+		if (context && sampleCount >= context.sampleRate * 0.25)
+			onSegment(encodeFrames());
 		frames = [];
 		sampleCount = 0;
-		onSegment(wav(joined, context.sampleRate));
+		nextPartialAt = 0;
 	}
+
 	return {
 		async start() {
 			if (disposed || context) return;
 			try {
 				stream = await navigator.mediaDevices.getUserMedia({
 					audio: {
-						echoCancellation: true,
-						noiseSuppression: true,
-						autoGainControl: true,
+						deviceId: options.inputDevice
+							? { exact: options.inputDevice }
+							: undefined,
+						echoCancellation: options.echoCancellation ?? true,
+						noiseSuppression: options.noiseSuppression ?? true,
+						autoGainControl: options.autoGainControl ?? true,
 					},
 				});
 				if (disposed) {
@@ -87,10 +116,17 @@ export function createAudioController(
 					return;
 				}
 				context = new AudioContext();
+				if (options.outputDevice && "setSinkId" in context)
+					await (
+						context as AudioContext & {
+							setSinkId: (id: string) => Promise<void>;
+						}
+					).setSinkId(options.outputDevice);
 				await context.resume();
 				detector = new VoiceActivityDetector({
 					sampleRate: context.sampleRate,
-					silenceTimeoutMs: 700,
+					silenceTimeoutMs: options.silenceMs ?? 700,
+					speechThresholdRms: options.threshold ?? 0.008,
 				});
 				source = context.createMediaStreamSource(stream);
 				processor = context.createScriptProcessor(2048, 1, 1);
@@ -111,6 +147,7 @@ export function createAudioController(
 						}
 						if (observation?.hasSpeech) {
 							speaking = true;
+							nextPartialAt = context.sampleRate * 1.8;
 							frames = candidateFrames;
 							sampleCount = candidateSamples;
 							candidateFrames = [];
@@ -124,13 +161,22 @@ export function createAudioController(
 							sampleCount += frame.length;
 						}
 						if (
+							options.onPartial &&
+							!observation?.shouldFinalize &&
+							sampleCount >= nextPartialAt
+						) {
+							nextPartialAt = sampleCount + context.sampleRate * 0.6;
+							options.onPartial(encodeFrames());
+						}
+						if (
 							observation?.shouldFinalize ||
 							sampleCount > context.sampleRate * 10
 						) {
 							speaking = false;
 							detector = new VoiceActivityDetector({
 								sampleRate: context.sampleRate,
-								silenceTimeoutMs: 700,
+								silenceTimeoutMs: options.silenceMs ?? 700,
+								speechThresholdRms: options.threshold ?? 0.008,
 							});
 							flush();
 						}
@@ -151,21 +197,45 @@ export function createAudioController(
 				throw error;
 			}
 		},
-		async play(bytes: Uint8Array, onEnded: () => void) {
+		async play(
+			bytes: Uint8Array,
+			onEnded: () => void,
+			playOptions: {
+				waitForPrevious?: boolean;
+				shouldPlay?: () => boolean;
+			} = {},
+		) {
+			const waitingEpoch = playbackEpoch;
+			if (playOptions.waitForPrevious && playback) await playbackDone;
+			if (
+				disposed ||
+				waitingEpoch !== playbackEpoch ||
+				playOptions.shouldPlay?.() === false
+			)
+				return;
 			if (!context || disposed) throw new Error("audio_not_started");
 			this.stopPlayback();
 			const epoch = playbackEpoch;
 			const buffer = await context.decodeAudioData(
 				new Uint8Array(bytes).buffer,
 			);
-			if (disposed || epoch !== playbackEpoch) return;
+			if (
+				disposed ||
+				epoch !== playbackEpoch ||
+				playOptions.shouldPlay?.() === false
+			)
+				return;
 			const next = context.createBufferSource();
 			next.buffer = buffer;
 			next.connect(context.destination);
 			playback = next;
+			playbackDone = new Promise<void>((resolve) => {
+				finishPlayback = resolve;
+			});
 			next.onended = () => {
 				if (playback === next) {
 					playback = undefined;
+					finishPlayback();
 					emit("listening");
 					onEnded();
 				}
@@ -175,6 +245,7 @@ export function createAudioController(
 		},
 		stopPlayback() {
 			playbackEpoch++;
+			finishPlayback();
 			const old = playback;
 			playback = undefined;
 			if (old) {
@@ -185,6 +256,7 @@ export function createAudioController(
 		},
 		async stop() {
 			disposed = true;
+			lastLevel = 0;
 			this.stopPlayback();
 			processor?.disconnect();
 			source?.disconnect();

@@ -41,25 +41,46 @@ export function voiceDialogueClient(transport: Transport) {
 				).json(),
 			);
 		},
+		voicePreview: async (
+			sessionId: string,
+			generation: number,
+			id: string,
+			wav: Uint8Array,
+			signal: AbortSignal,
+		) => {
+			const response = await transport.call("/api/voice/preview", {
+				method: "POST",
+				signal,
+				headers: {
+					"Content-Type": "audio/wav",
+					"X-Session-Id": sessionId,
+					"X-Generation": String(generation),
+					"X-Sequence": "1",
+					"X-Utterance-Id": id,
+				},
+				body: new Uint8Array(wav),
+			});
+			return (await response.json()) as { utteranceId: string; text: string };
+		},
 		voiceTurn: async (id: string) =>
 			voiceTurnSchema.parse(
 				await (
 					await transport.call(`/api/voice/turns/${encodeURIComponent(id)}`)
 				).json(),
 			),
-		voiceAudio: async (id: string) =>
+		voiceAudio: async (id: string, index?: number) =>
 			new Uint8Array(
 				await (
 					await transport.call(
-						`/api/voice/turns/${encodeURIComponent(id)}/audio`,
+						`/api/voice/turns/${encodeURIComponent(id)}/audio${index === undefined ? "" : `?index=${index}`}`,
 					)
 				).arrayBuffer(),
 			),
-		voicePlayed: async (id: string) =>
+		voicePlayed: async (id: string, index?: number) =>
 			voiceTurnSchema.parse(
 				await (
 					await transport.call(
-						`/api/voice/turns/${encodeURIComponent(id)}/played`,
+						`/api/voice/turns/${encodeURIComponent(id)}/played${index === undefined ? "" : `?index=${index}`}`,
 						json({}),
 					)
 				).json(),

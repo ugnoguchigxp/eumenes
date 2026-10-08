@@ -70,6 +70,7 @@ test("a database with only the original three migrations (plus later ones) upgra
 			createConversationService(upgraded),
 			{
 				status: () => ({ state: "ready", capabilities: [] }),
+				connect: async () => {},
 				answer: async () => "ok",
 				transcribe: async () => "",
 				speak: async () => new Uint8Array(),

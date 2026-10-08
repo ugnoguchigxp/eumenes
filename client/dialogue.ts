@@ -1,9 +1,15 @@
 import { runSchema, type Submit } from "../api/domains/dialogue/contracts";
 import type { Transport } from "./transport";
 import { json } from "./transport";
+import { watchRun } from "./run-stream";
 export function dialogueClient(transport: Transport) {
 	return {
 		identity: transport.identity,
+		watchRun: (
+			id: string,
+			signal: AbortSignal,
+			onProgress: Parameters<typeof watchRun>[3],
+		) => watchRun(transport, id, signal, onProgress),
 		runs: async (id: string, signal?: AbortSignal) =>
 			runSchema
 				.array()

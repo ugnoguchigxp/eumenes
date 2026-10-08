@@ -2,6 +2,10 @@ export {};
 
 const port = Number(process.env.LARM_FIXTURE_PORT ?? 9822);
 const claimed = new Map<string, string[]>();
+let holdNext = false;
+const releaseStreams = new Set<() => void>();
+const ttsInputs: string[] = [];
+const asrInputs: Array<{ rate: number; bytes: number }> = [];
 const profile = "SAAA-gemma4-26b";
 const agentProfile = "saaa-conversation-gemma4-26b-voice";
 const names = ["llm", "asr", "tts"] as const;
@@ -57,6 +61,19 @@ const server = Bun.serve({
 			!path.startsWith("/tts/")
 		)
 			return Response.json({ error: "unauthorized" }, { status: 401 });
+		if (path === "/fixture/hold-next") {
+			holdNext = true;
+			ttsInputs.length = 0;
+			asrInputs.length = 0;
+			return Response.json({ ok: true });
+		}
+		if (path === "/fixture/release") {
+			for (const release of releaseStreams) release();
+			releaseStreams.clear();
+			return Response.json({ ok: true });
+		}
+		if (path === "/fixture/observations")
+			return Response.json({ ttsInputs, asrInputs });
 		if (path === "/v3/agent-profiles")
 			return Response.json({
 				contractVersion: "agent-connection.v3",
@@ -157,16 +174,69 @@ const server = Bun.serve({
 					})),
 				});
 		}
-		if (path === "/asr/v1/audio/transcriptions")
-			return Response.json({ text: "こんにちは" });
-		if (path === "/llm/v1/chat/completions")
-			return Response.json({
-				choices: [
-					{ message: { content: "承知しました。先ほどの話を覚えています。" } },
-				],
+
+		if (path === "/asr/v1/audio/transcriptions") {
+			const form = await request.formData();
+			const file = form.get("file") as File;
+			const bytes = await file.arrayBuffer();
+			asrInputs.push({
+				rate: new DataView(bytes).getUint32(24, true),
+				bytes: bytes.byteLength,
 			});
-		if (path === "/tts/v1/audio/speech")
+			return Response.json({ text: "こんにちは" });
+		}
+		if (path === "/llm/v1/chat/completions") {
+			const body = (await request.json()) as { stream?: boolean };
+			const text = "承知しました。先ほどの話を覚えています。";
+			if (!body.stream)
+				return Response.json({ choices: [{ message: { content: text } }] });
+			let hold = holdNext;
+			holdNext = false;
+			const encoder = new TextEncoder();
+			return new Response(
+				new ReadableStream<Uint8Array>({
+					async start(controller) {
+						try {
+							for (const char of text) {
+								if (request.signal.aborted) break;
+								controller.enqueue(
+									encoder.encode(
+										`data: ${JSON.stringify({ choices: [{ index: 0, delta: { content: char } }] })}\n\n`,
+									),
+								);
+								if (hold && char === "。") {
+									hold = false;
+									await new Promise<void>((resolve) => {
+										const release = () => {
+											request.signal.removeEventListener("abort", release);
+											releaseStreams.delete(release);
+											resolve();
+										};
+										releaseStreams.add(release);
+										request.signal.addEventListener("abort", release, {
+											once: true,
+										});
+									});
+								}
+								await Bun.sleep(20);
+							}
+							if (!request.signal.aborted)
+								controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+							controller.close();
+						} catch {
+							/* consumer canceled */
+						}
+					},
+				}),
+				{ headers: { "Content-Type": "text/event-stream" } },
+			);
+		}
+		if (path === "/tts/v1/audio/speech") {
+			const body = (await request.json()) as { input: string };
+			ttsInputs.push(body.input);
 			return new Response(wav(), { headers: { "Content-Type": "audio/wav" } });
+		}
+
 		return Response.json({ error: "not_found" }, { status: 404 });
 	},
 });

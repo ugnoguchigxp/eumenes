@@ -20,3 +20,13 @@
 | 古い計画と現実の検証結果が食い違った | `scripts/verify.ts` | 実行前後の入力 hash を比較し、変化した run を成功扱いしない |
 | 部品が存在しても利用側まで接続されなかった | `voice-dialogue` と browser fixture | 実 controller、service、SQLite、画面を接続した受入を実行 |
 | 全体 gate の失敗と checkpoint の判断が混同された | 作業運用 | 依頼された checkpoint は検証結果と限界を併記する。今回は commit・push を行わない |
+
+2026-10-08 逐次音声処理の参照: HEAD は引き続き `28616e61ce5fe853383d4af6ec14e5b5d542c076`。今回も参照専用で、SAAA の設定・製品DB・秘密はコピーしていない。
+
+| 参照元 | SHA-256 | Eumenesでの対応 |
+| --- | --- | --- |
+| `src-tauri/src/voice/streaming_asr/batch_engine.rs` | `2bc260b1c4430dd0e18119fac6d5bb519a6e4dc66381ff57fc46b91820ea623b` | batch方式の契約を参考に、1.8秒の録音prefixから認識し、以後600msごとの最新1件を保持。確定入力が途中認識を取り消す。途中の仮説を会話履歴へ採用しない |
+| `src-tauri/src/voice/streaming_tts/chunker/select_reason.rs` | `faa42e4fb24cd70f287968c88b6e8bd5a6cf2213f14cab297a87c158136e1735` | providerのtoken境界と独立して句読点で分割。小数の途中を切らず、240文字の長文上限と確定時の末尾処理を行う。今回はユーザーの指定に合わせ読点でも直ちに合成する |
+| `src-tauri/tests/tts_streaming_contract.rs` | `400d6590c796843be6bbd9cf0edfe89eb9eb8128b718e3527412934860d7022e` | LLM完了前の最初の区切り、任意のtoken分割、途中の取消しを契約試験と実ブラウザで確認。未再生・合成中を含め最大3区切りまで先行する |
+
+LLMの途中表示は状態更新通知とは別の認証付きSSEで配信する。途中の本文は確定した履歴と分け、再接続時は最新のsnapshotから再開。失敗・取消しでは途中表示を消し、既に出した文字にクラウドの別回答を継ぎ足さない。TTSの各区切りは元の設定snapshotとASR/LLMの依存関係を使い、取消し・権限取消し後の音声を公開しない。

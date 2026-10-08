@@ -8,10 +8,6 @@ import {
 	createConversationService,
 } from "../domains/conversation";
 import {
-	createContinuityService,
-	migration as continuityMigration,
-} from "../domains/continuity";
-import {
 	createDialogueService,
 	migration as dialogueMigration,
 	queueLinkMigration,
@@ -28,10 +24,13 @@ import {
 	sequenceMigration as voiceSequenceMigration,
 } from "../domains/voice-dialogue";
 import { createApp } from "./app";
+import { createChanges, type Changes } from "./events";
 
 const dirs: string[] = [];
 const stores: SqliteStore[] = [];
+const streams: Changes[] = [];
 afterEach(async () => {
+	for (const stream of streams.splice(0)) stream.close();
 	for (const s of stores.splice(0)) await s.close().catch(() => {});
 	for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
 });
@@ -52,12 +51,16 @@ function setup() {
 		schedulerMigration,
 		queueLinkMigration,
 		voiceSequenceMigration,
-		continuityMigration,
+		"SELECT 1", // retired continuity slot
 	]);
 	stores.push(store);
+	const changes = createChanges({ debounceMs: 1 });
+	streams.push(changes);
+	store.onCommit(() => changes.publish());
 	const clock = { t: Date.parse("2026-03-01T00:00:00Z") };
 	const larm: LarmPort = {
 		status: () => ({ state: "ready", capabilities: ["llm"] }),
+		connect: async () => {},
 		answer: async () => "予約への回答",
 		transcribe: async () => "",
 		speak: async () => new Uint8Array(),
@@ -69,15 +72,14 @@ function setup() {
 		sleep: () => new Promise(() => {}),
 	});
 	const conversation = createConversationService(store);
-	const continuity = createContinuityService(store, conversation);
 	const dialogue = createDialogueService(store, conversation, larm, queue);
 	scheduler.registerTarget(dialogue.promptTarget);
 	const voice = createVoiceDialogue(store, dialogue, larm);
 	const app = createApp({
 		token,
+		changes,
 		origin: "http://127.0.0.1:5173",
 		conversation,
-		continuity,
 		dialogue,
 		voice,
 		larm,
@@ -95,16 +97,47 @@ function setup() {
 				? { headers }
 				: { method: "POST", headers, body: JSON.stringify(body) },
 		);
-	return { app, call, queue, scheduler, clock, dialogue };
+	return { app, call, queue, scheduler, clock, dialogue, larm, conversation };
 }
+
+test("status polling is passive and explicit reconnect requires auth and origin", async () => {
+	const h = setup();
+	let connections = 0;
+	h.larm.connect = async () => {
+		connections++;
+	};
+	for (let i = 0; i < 3; i++)
+		expect((await h.call("/api/status")).status).toBe(200);
+	expect(connections).toBe(0);
+	expect(
+		(await h.app.request("/api/larm/connect", { method: "POST" })).status,
+	).toBe(401);
+	expect(
+		(
+			await h.call(
+				"/api/larm/connect",
+				{},
+				{ ...auth, origin: "http://evil.example" },
+			)
+		).status,
+	).toBe(403);
+	expect(connections).toBe(0);
+	const response = await h.call("/api/larm/connect", {});
+	expect(response.status).toBe(200);
+	expect(connections).toBe(1);
+	expect(await response.json()).toEqual({
+		service: "eumenes",
+		larm: { state: "ready", capabilities: ["llm"] },
+	});
+});
 
 test("auth and origin apply to the new endpoints", async () => {
 	const h = setup();
 	for (const path of [
+		"/api/events",
 		"/api/jobs",
 		"/api/queue/status",
 		"/api/schedules",
-		"/api/conversations/main/bookmarks",
 	]) {
 		expect((await h.app.request(path)).status).toBe(401);
 		expect(
@@ -119,29 +152,6 @@ test("auth and origin apply to the new endpoints", async () => {
 		(await h.app.request("/api/schedules", { method: "POST", body: "{}" }))
 			.status,
 	).toBe(401);
-});
-
-test("the assembled app serves continuity writes and reads", async () => {
-	const h = setup();
-	const store = stores[0] as SqliteStore;
-	await createConversationService(store).append({
-		id: "source-message",
-		conversationId: "main",
-		role: "user",
-		text: "決定したこと",
-		createdAt: "2026-03-01T00:00:00Z",
-		runId: null,
-	});
-	const created = await h.call("/api/conversations/main/bookmarks", {
-		requestId: crypto.randomUUID(),
-		sourceMessageId: "source-message",
-		kind: "decision",
-		text: "決定したこと",
-	});
-	expect(created.status).toBe(201);
-	const listed = await h.call("/api/conversations/main/bookmarks");
-	expect(listed.status).toBe(200);
-	expect((await listed.json()).bookmarks).toHaveLength(1);
 });
 
 test("register → fire → history → pause/resume → cancel through the API", async () => {
@@ -316,6 +326,7 @@ test("full queue is reported as 503 for submissions", async () => {
 		createConversationService(store),
 		{
 			status: () => ({ state: "ready", capabilities: [] }),
+			connect: async () => {},
 			answer: async () => "",
 			transcribe: async () => "",
 			speak: async () => new Uint8Array(),
@@ -327,13 +338,10 @@ test("full queue is reported as 503 for submissions", async () => {
 		token,
 		origin: "http://127.0.0.1:5173",
 		conversation: createConversationService(store),
-		continuity: createContinuityService(
-			store,
-			createConversationService(store),
-		),
 		dialogue,
 		voice: createVoiceDialogue(store, dialogue, {
 			status: () => ({ state: "ready", capabilities: [] }),
+			connect: async () => {},
 			answer: async () => "",
 			transcribe: async () => "",
 			speak: async () => new Uint8Array(),
@@ -341,10 +349,7 @@ test("full queue is reported as 503 for submissions", async () => {
 		}),
 		larm: {
 			status: () => ({ state: "ready", capabilities: [] }),
-			answer: async () => "",
-			transcribe: async () => "",
-			speak: async () => new Uint8Array(),
-			close: async () => {},
+			connect: async () => {},
 		},
 		queue: small,
 		scheduler: h.scheduler,
@@ -362,4 +367,37 @@ test("full queue is reported as 503 for submissions", async () => {
 	expect(((await response.json()) as { error: string }).error).toBe(
 		"queue_full",
 	);
+});
+
+test("authenticated SSE notifies a background commit and the existing API supplies the snapshot", async () => {
+	const h = setup();
+	const abort = new AbortController();
+	const response = await h.app.request("/api/events", {
+		headers: auth,
+		signal: abort.signal,
+	});
+	const reader = response.body!.getReader();
+	const decode = (bytes?: Uint8Array) => new TextDecoder().decode(bytes);
+	try {
+		expect(response.status).toBe(200);
+		expect(decode((await reader.read()).value)).toContain("event: reset");
+		await h.conversation.append({
+			id: "external",
+			conversationId: "main",
+			role: "user",
+			text: "通知で更新",
+			createdAt: new Date().toISOString(),
+			runId: null,
+		});
+		const notification = decode((await reader.read()).value);
+		expect(notification).toContain("event: change");
+		expect(notification).not.toContain("通知で更新");
+		expect(
+			await (await h.call("/api/conversations/main")).json(),
+		).toMatchObject({ messages: [{ text: "通知で更新" }] });
+		abort.abort();
+		expect((await reader.read()).done).toBe(true);
+	} finally {
+		await reader.cancel();
+	}
 });

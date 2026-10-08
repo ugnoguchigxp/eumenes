@@ -6,8 +6,7 @@ export function useConversation(client: ConversationClient, id: string) {
 	return useQuery({
 		queryKey: conversationKey(client.identity, id),
 		queryFn: ({ signal }) => client.conversation(id, signal),
-		refetchInterval: 1500,
 		staleTime: 1000,
-		retry: 1,
+		retry: 0,
 	});
 }

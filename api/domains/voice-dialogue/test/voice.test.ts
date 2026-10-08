@@ -31,6 +31,7 @@ test("voice capture to ASR, dialogue, TTS; duplicate utterance is ignored", asyn
 		tts = 0;
 	const larm: LarmPort = {
 		status: () => ({ state: "ready", capabilities: ["llm", "asr", "tts"] }),
+		connect: async () => {},
 		answer: async () => {
 			llm++;
 			return "今日は晴れです";
@@ -60,6 +61,7 @@ test("voice capture to ASR, dialogue, TTS; duplicate utterance is ignored", asyn
 		const dialogue = createDialogueService(store, conversation, larm, queue);
 		let failNextWrite = false;
 		const voiceStore: SqliteStore = {
+			onCommit: (listener) => store.onCommit(listener),
 			read: (operation) => store.read(operation),
 			write: (operation) =>
 				failNextWrite
@@ -111,6 +113,7 @@ test("restart cancels the run of a stale voice turn so no old answer is spoken",
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-voice-recover-"));
 	const larm: LarmPort = {
 		status: () => ({ state: "ready", capabilities: ["llm", "asr", "tts"] }),
+		connect: async () => {},
 		answer: () => new Promise(() => {}),
 		transcribe: async () => "質問",
 		speak: async () => wav,
@@ -164,6 +167,8 @@ test("evicting cached audio also clears the ready state", async () => {
 		]);
 		const dialogue = {
 			submit: async () => ({ id: crypto.randomUUID(), deadlineAt: null }),
+			get: () => ({ status: "completed" }),
+			subscribeProgress: () => () => {},
 			waitForTerminal: async () => ({
 				status: "completed",
 				answerMessageId: "answer",
@@ -173,6 +178,7 @@ test("evicting cached audio also clears the ready state", async () => {
 		} as unknown as ReturnType<typeof createDialogueService>;
 		const larm: LarmPort = {
 			status: () => ({ state: "ready", capabilities: ["llm", "asr", "tts"] }),
+			connect: async () => {},
 			answer: async () => "回答",
 			transcribe: async () => "質問",
 			speak: async () => wav,
@@ -186,7 +192,9 @@ test("evicting cached audio also clears the ready state", async () => {
 			await voice.accept(sessionId, 1, index + 1, utteranceId, wav);
 		for (
 			let i = 0;
-			i < 100 && voice.get(ids[0] as string)?.status !== "failed";
+			i < 100 &&
+			(voice.get(ids[0] as string)?.status !== "failed" ||
+				voice.get(ids[8] as string)?.status !== "ready");
 			i++
 		)
 			await pause(10);

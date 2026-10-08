@@ -1,15 +1,21 @@
 export const domains = {
+	settings: {
+		backend: "api/domains/settings",
+		web: "web/src/domains/settings",
+		components: null,
+		depends: [],
+	},
+	inference: {
+		backend: "api/domains/inference",
+		web: null,
+		components: null,
+		depends: ["settings", "larm"],
+	},
 	conversation: {
 		backend: "api/domains/conversation",
 		web: "web/src/domains/conversation",
 		components: "web/src/components/domains/conversation",
 		depends: [],
-	},
-	continuity: {
-		backend: "api/domains/continuity",
-		web: "web/src/domains/continuity",
-		components: "web/src/components/domains/continuity",
-		depends: ["conversation"],
 	},
 	larm: {
 		backend: "api/domains/larm",
@@ -39,13 +45,13 @@ export const domains = {
 		backend: "api/domains/dialogue",
 		web: "web/src/domains/dialogue",
 		components: null,
-		depends: ["conversation", "larm", "queue", "scheduler"],
+		depends: ["conversation", "inference", "queue", "scheduler"],
 	},
 	"voice-dialogue": {
 		backend: "api/domains/voice-dialogue",
 		web: "web/src/domains/voice-dialogue",
 		components: null,
-		depends: ["audio", "larm", "dialogue"],
+		depends: ["audio", "inference", "dialogue", "settings"],
 	},
 } as const;
 export type Domain = keyof typeof domains;

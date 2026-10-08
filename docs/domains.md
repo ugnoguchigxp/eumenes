@@ -3,7 +3,6 @@
 | Domain | Backend 入口 | Web 入口 | 所有する試験 |
 | --- | --- | --- | --- |
 | conversation | `api/domains/conversation/index.ts` | `web/src/domains/conversation/index.ts` | `api/domains/conversation/test/` |
-| continuity | `api/domains/continuity/index.ts` | `web/src/domains/continuity/index.ts` | `api/domains/continuity/test/`、`web/src/domains/continuity/test/` |
 | larm | `api/domains/larm/index.ts` | なし | `api/domains/larm/test/` |
 | audio | なし | `web/src/domains/audio/index.ts` | `web/src/domains/audio/test/` |
 | queue | `api/domains/queue/index.ts` | なし | `api/domains/queue/test/` |

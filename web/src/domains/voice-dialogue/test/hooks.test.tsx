@@ -136,3 +136,251 @@ test("stopping during session creation prevents a late microphone start", async 
 	hook.unmount();
 	query.clear();
 });
+
+test("failure to read an accepted voice turn is shown instead of leaving silent waiting", async () => {
+	const query = new QueryClient({
+		defaultOptions: { queries: { retry: false } },
+	});
+	const wrapper = ({ children }: PropsWithChildren) => (
+		<QueryClientProvider client={query}>{children}</QueryClientProvider>
+	);
+	let segment = (_bytes: Uint8Array) => {};
+	const createAudio = (
+		_state: Parameters<typeof createAudioController>[0],
+		_speech: () => void,
+		onSegment: (bytes: Uint8Array) => void,
+	): AudioController => {
+		segment = onSegment;
+		return {
+			start: async () => {},
+			stop: async () => {},
+			stopPlayback: () => {},
+			play: async () => {},
+		};
+	};
+	const client = {
+		identity: "http://127.0.0.1:8787",
+		voiceStart: async (id: string) => ({ sessionId: id, generation: 1 }),
+		voiceStop: async () => ({ stopped: true }),
+		voiceSend: async () => ({}),
+		voiceTurn: async () => {
+			throw new Error("unavailable");
+		},
+	} as unknown as VoiceDialogueClient;
+	const hook = renderHook(
+		() => useVoiceDialogue(client, createAudioStore(), createAudio),
+		{ wrapper },
+	);
+	try {
+		await act(async () => hook.result.current.start());
+		act(() => segment(new Uint8Array(44)));
+		await waitFor(() =>
+			expect(hook.result.current.error).toBe(
+				"音声処理の結果を取得できません。接続を再確認してください。",
+			),
+		);
+	} finally {
+		hook.unmount();
+		query.clear();
+	}
+});
+
+test("chunk playback stays ordered and interruption releases the old queue for a new utterance", async () => {
+	const query = new QueryClient({
+		defaultOptions: { queries: { retry: false } },
+	});
+	const wrapper = ({ children }: PropsWithChildren) => (
+		<QueryClientProvider client={query}>{children}</QueryClientProvider>
+	);
+	let speech = () => {},
+		segment = (_wav: Uint8Array) => {},
+		sessionId = "";
+	const endings: Array<() => void> = [];
+	const play = vi.fn(async (_bytes: Uint8Array, onEnded: () => void) => {
+		endings.push(onEnded);
+	});
+	const createAudio: typeof createAudioController = (
+		_state,
+		onSpeech,
+		onSegment,
+	) => {
+		speech = onSpeech;
+		segment = onSegment;
+		return {
+			start: async () => {},
+			stop: async () => {},
+			stopPlayback: () => {},
+			play,
+		};
+	};
+	const voiceAudio = vi.fn(
+		async (_id: string, _index?: number) => new Uint8Array(44),
+	);
+	const voicePlayed = vi.fn(async (_id: string, _index?: number) => ({})),
+		voiceCancel = vi.fn(async (_id: string) => ({}));
+	const client = {
+		identity: "http://127.0.0.1:8787",
+		voiceStart: async (id: string) => {
+			sessionId = id;
+			return {};
+		},
+		voiceStop: async () => ({}),
+		voiceSend: async () => ({}),
+		voiceAudio,
+		voicePlayed,
+		voiceCancel,
+		voiceTurn: async (id: string) => ({
+			utteranceId: id,
+			sessionId,
+			generation: 1,
+			sequence: 1,
+			status: "ready",
+			text: "質問",
+			runId: "run",
+			error: null,
+			revision: 3,
+			audioChunks: [
+				{ index: 0, text: "先。" },
+				{ index: 1, text: "続き。" },
+			],
+			audioComplete: true,
+		}),
+	} as unknown as VoiceDialogueClient;
+	const store = createAudioStore();
+	const hook = renderHook(() => useVoiceDialogue(client, store, createAudio), {
+		wrapper,
+	});
+	await act(async () => hook.result.current.start());
+	act(() => segment(new Uint8Array(44)));
+	await waitFor(() => expect(play).toHaveBeenCalledTimes(1));
+	expect(voiceAudio).toHaveBeenCalledTimes(1);
+	const oldId = voiceAudio.mock.calls[0]?.[0];
+	act(() => {
+		speech();
+		segment(new Uint8Array(44));
+	});
+	await waitFor(() => expect(play).toHaveBeenCalledTimes(2));
+	expect(voiceCancel).toHaveBeenCalledWith(oldId);
+	await act(async () => {
+		endings[0]?.();
+		endings[1]?.();
+	});
+	await waitFor(() => expect(play).toHaveBeenCalledTimes(3));
+	await act(async () => endings[2]?.());
+	expect(voicePlayed).not.toHaveBeenCalledWith(oldId, expect.anything());
+	expect(voiceAudio.mock.calls.map((call) => call[1])).toEqual([0, 0, 1]);
+	hook.unmount();
+	query.clear();
+});
+
+test("an unfinalized speech candidate neither cancels nor hides an accepted recognition", async () => {
+	const query = new QueryClient({
+		defaultOptions: { queries: { retry: false } },
+	});
+	const wrapper = ({ children }: PropsWithChildren) => (
+		<QueryClientProvider client={query}>{children}</QueryClientProvider>
+	);
+	let speech = () => {},
+		segment = (_wav: Uint8Array) => {},
+		sessionId = "";
+	let acceptFirst = () => {};
+	const order: string[] = [];
+	const createAudio: typeof createAudioController = (
+		state,
+		onSpeech,
+		onSegment,
+	) => {
+		speech = onSpeech;
+		segment = onSegment;
+		return {
+			start: async () => state({ phase: "listening", level: 0 }),
+			stop: async () => {},
+			stopPlayback: () => {},
+			play: async () => {},
+		};
+	};
+	const voiceSend = vi.fn(
+		async (
+			_session: string,
+			_generation: number,
+			sequence: number,
+			id: string,
+		) => {
+			if (sequence === 1)
+				await new Promise<void>((resolve) => {
+					acceptFirst = resolve;
+				});
+			order.push(`accepted:${id}`);
+			return {};
+		},
+	);
+	const voiceCancel = vi.fn(async (id: string) => {
+		order.push(`cancelled:${id}`);
+		return {};
+	});
+	const voiceTurn = vi.fn(async (id: string) => ({
+		utteranceId: id,
+		sessionId,
+		generation: 1,
+		sequence: 1,
+		status: "responding",
+		text: "認識できています。",
+		runId: "run",
+		error: null,
+		revision: 2,
+		audioChunks: [],
+		audioComplete: false,
+	}));
+	const client = {
+		identity: "http://127.0.0.1:8787",
+		voiceSend,
+		voiceCancel,
+		voiceTurn,
+		voiceStart: async (id: string) => {
+			sessionId = id;
+			return {};
+		},
+		voiceStop: async () => ({}),
+	} as unknown as VoiceDialogueClient;
+	const hook = renderHook(
+		() => useVoiceDialogue(client, createAudioStore(), createAudio),
+		{ wrapper },
+	);
+	try {
+		await act(async () => hook.result.current.start());
+		act(() => {
+			speech();
+			segment(new Uint8Array(44));
+		});
+		await waitFor(() => expect(voiceSend).toHaveBeenCalledTimes(1));
+		const firstId = voiceSend.mock.calls[0]![3];
+		act(() => speech());
+		expect(voiceCancel).not.toHaveBeenCalled();
+		await act(async () => acceptFirst());
+		await waitFor(() =>
+			expect(hook.result.current.turn?.text).toBe("認識できています。"),
+		);
+		expect(voiceTurn).toHaveBeenCalledWith(firstId);
+		expect(hook.result.current.transcription).toBeNull(); // result belongs to the previous utterance
+		act(() => segment(new Uint8Array(44)));
+		await waitFor(() => expect(voiceSend).toHaveBeenCalledTimes(2));
+		expect(voiceCancel).toHaveBeenCalledWith(firstId);
+		await waitFor(() =>
+			expect(hook.result.current.transcription?.text).toBe(
+				"認識できています。",
+			),
+		);
+		expect(hook.result.current.transcription?.id).toBe(
+			voiceSend.mock.calls[1]![3],
+		);
+		await act(async () => hook.result.current.stop());
+		expect(hook.result.current.transcription).toBeNull();
+		expect(order.slice(0, 2)).toEqual([
+			`accepted:${firstId}`,
+			`cancelled:${firstId}`,
+		]);
+	} finally {
+		hook.unmount();
+		query.clear();
+	}
+});

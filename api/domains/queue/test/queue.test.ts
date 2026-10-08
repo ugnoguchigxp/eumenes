@@ -504,3 +504,29 @@ test("past-due blocked work does not make the loop spin", async () => {
 		start + 100_000,
 	);
 });
+
+test("resource aliases make persisted old jobs and new jobs share the same concurrency limit", async () => {
+	const h = setup({
+		resources: { "new.res": 1 },
+		resourceAliases: { "old.res": "new.res" },
+	});
+	const c = control();
+	h.queue.registerHandler(fakeHandler(h.store, c));
+	await enqueue(h, "old", { resourceKey: "old.res" });
+	await enqueue(h, "new", { resourceKey: "new.res" });
+	await h.queue.tick();
+	await until(() => c.calls.length === 1);
+	const first = c.calls[0]!.replace("prepare:", "");
+	await until(() => c.gates.has(first));
+	await h.queue.tick();
+	expect(c.calls).toHaveLength(1);
+	c.gates.get(first)!.resolve("first");
+	await until(() =>
+		h.queue.list({}).items.some((j) => j.state === "completed"),
+	);
+	await h.queue.tick();
+	await until(() => c.calls.length === 2);
+	expect([...c.calls].sort()).toEqual(["prepare:new", "prepare:old"]);
+	c.gates.get(c.calls[1]!.replace("prepare:", ""))!.resolve("second");
+	await flush();
+});

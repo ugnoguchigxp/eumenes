@@ -20,9 +20,8 @@ export function useRuns(client: DialogueClient, id: string) {
 	return useQuery({
 		queryKey: runsKey(client.identity, id),
 		queryFn: ({ signal }) => client.runs(id, signal),
-		refetchInterval: 1000,
 		staleTime: 500,
-		retry: 1,
+		retry: 0,
 	});
 }
 export function useSubmit(client: DialogueClient, id: string) {

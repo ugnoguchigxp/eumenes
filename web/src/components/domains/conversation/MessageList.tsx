@@ -2,8 +2,10 @@ import type { Conversation } from "../../../../../api/domains/conversation/contr
 import { renderSafeMarkdown } from "./markdownRenderer";
 export function MessageList({
 	conversation,
+	streaming,
 }: {
 	conversation: Conversation | undefined;
+	streaming?: string;
 }) {
 	return (
 		<div className="messages" aria-live="polite">
@@ -26,10 +28,16 @@ export function MessageList({
 						)}
 					</article>
 				))
-			) : (
+			) : !streaming ? (
 				<p className="empty">
 					まだ会話はありません。声か文字で話しかけてください。
 				</p>
+			) : null}
+			{streaming && (
+				<article className="message message-assistant" aria-busy="true">
+					<small>Eumenes</small>
+					<p>{streaming}</p>
+				</article>
 			)}
 		</div>
 	);

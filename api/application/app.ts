@@ -3,10 +3,6 @@ import {
 	type ConversationService,
 	registerConversation,
 } from "../domains/conversation";
-import {
-	type ContinuityService,
-	registerContinuity,
-} from "../domains/continuity";
 import { type DialogueService, registerDialogue } from "../domains/dialogue";
 import { type LarmPort, registerLarmStatus } from "../domains/larm";
 import { type QueueService, registerQueue } from "../domains/queue";
@@ -15,16 +11,21 @@ import {
 	registerVoiceDialogue,
 	type VoiceDialogueService,
 } from "../domains/voice-dialogue";
+import { registerSettings, type SettingsService } from "../domains/settings";
+import { registerInference, type InferenceService } from "../domains/inference";
+import type { Changes } from "./events";
 export function createApp(deps: {
 	token: string;
 	origin: string;
 	conversation: ConversationService;
-	continuity: ContinuityService;
 	dialogue: DialogueService;
 	voice: VoiceDialogueService;
-	larm: LarmPort;
+	larm: Pick<LarmPort, "status" | "connect"> & Partial<LarmPort>;
 	queue: QueueService;
 	scheduler: SchedulerService;
+	settings?: SettingsService;
+	inference?: InferenceService;
+	changes?: Changes;
 }) {
 	const app = new Hono();
 	app.use("/api/*", async (c, next) => {
@@ -36,7 +37,7 @@ export function createApp(deps: {
 			c.header("Vary", "Origin");
 			c.header(
 				"Access-Control-Allow-Headers",
-				"Authorization, Content-Type, X-Session-Id, X-Generation, X-Sequence, X-Utterance-Id",
+				"Authorization, Content-Type, Last-Event-ID, X-Session-Id, X-Generation, X-Sequence, X-Utterance-Id",
 			);
 			c.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
 		}
@@ -45,9 +46,12 @@ export function createApp(deps: {
 			return c.json({ error: "unauthorized" }, 401);
 		await next();
 	});
+	if (deps.changes)
+		app.get("/api/events", (c) => deps.changes!.open(c.req.raw.signal));
 	registerLarmStatus(app, deps.larm);
+	if (deps.settings) registerSettings(app, deps.settings);
+	if (deps.inference) registerInference(app, deps.inference);
 	registerConversation(app, deps.conversation);
-	registerContinuity(app, deps.continuity);
 	registerDialogue(app, deps.dialogue);
 	registerVoiceDialogue(app, deps.voice);
 	registerQueue(app, deps.queue);
@@ -59,7 +63,8 @@ export function createApp(deps: {
 			message === "revision_conflict" ||
 			message === "voice_sequence_out_of_order" ||
 			message === "voice_utterance_conflict" ||
-			message === "schedule_state_conflict"
+			message === "schedule_state_conflict" ||
+			message === "voice_preview_busy"
 				? 409
 				: message.startsWith("invalid_") ||
 					  message === "voice_sequence_invalid" ||
@@ -68,7 +73,8 @@ export function createApp(deps: {
 					? 400
 					: message === "database_writer_queue_full" ||
 						  message === "queue_full" ||
-						  message === "schedule_limit_reached"
+						  message === "schedule_limit_reached" ||
+						  message === "stream_capacity"
 						? 503
 						: 500;
 		// Internal failures never leak details to the client.

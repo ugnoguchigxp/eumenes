@@ -1,4 +1,4 @@
-import type { Hono } from "hono";
+import type { Hono, Context } from "hono";
 import type { VoiceDialogueService } from "..";
 import { voiceStartSchema } from "../contracts";
 
@@ -58,7 +58,7 @@ export function registerVoiceDialogue(
 		await service.stop(parsed.data.sessionId, parsed.data.generation);
 		return c.json({ stopped: true });
 	});
-	app.post("/api/voice/turns", async (c) => {
+	const receive = (preview: boolean) => async (c: Context) => {
 		const sessionId = c.req.header("x-session-id") ?? "";
 		const generation = Number(c.req.header("x-generation"));
 		const sequence = Number(c.req.header("x-sequence"));
@@ -88,17 +88,26 @@ export function registerVoiceDialogue(
 					: "audio_incomplete";
 			return c.json({ error: code }, code === "audio_too_large" ? 413 : 400);
 		}
+		if (preview)
+			return c.json(
+				await service.preview(sessionId, generation, utteranceId, wav),
+			);
 		return c.json(
 			await service.accept(sessionId, generation, sequence, utteranceId, wav),
 			202,
 		);
-	});
+	};
+	app.post("/api/voice/turns", receive(false));
+	app.post("/api/voice/preview", receive(true));
 	app.get("/api/voice/turns/:id", (c) => {
 		const turn = service.get(c.req.param("id"));
 		return turn ? c.json(turn) : c.json({ error: "not_found" }, 404);
 	});
 	app.get("/api/voice/turns/:id/audio", (c) => {
-		const wav = service.takeAudio(c.req.param("id"));
+		const index = Number(c.req.query("index") ?? 0);
+		if (!Number.isSafeInteger(index) || index < 0)
+			return c.json({ error: "invalid_audio_index" }, 400);
+		const wav = service.takeAudio(c.req.param("id"), index);
 		return wav
 			? c.body(new Uint8Array(wav), 200, {
 					"Content-Type": "audio/wav",
@@ -107,7 +116,10 @@ export function registerVoiceDialogue(
 			: c.json({ error: "audio_unavailable" }, 404);
 	});
 	app.post("/api/voice/turns/:id/played", async (c) => {
-		const turn = await service.played(c.req.param("id"));
+		const index = Number(c.req.query("index") ?? 0);
+		if (!Number.isSafeInteger(index) || index < 0)
+			return c.json({ error: "invalid_audio_index" }, 400);
+		const turn = await service.played(c.req.param("id"), index);
 		return turn ? c.json(turn) : c.json({ error: "not_found" }, 404);
 	});
 	app.post("/api/voice/turns/:id/cancel", async (c) => {

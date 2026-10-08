@@ -126,6 +126,7 @@ export interface EnqueueInput {
 }
 
 export interface QueueOptions {
+	resourceAliases?: Record<string, string>;
 	now?: () => number;
 	id?: () => string;
 	sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;

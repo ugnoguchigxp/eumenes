@@ -1,4 +1,11 @@
-import type { Capability, LarmPort, LarmStatus } from "../contracts";
+import { readChatResponse } from "../../../infrastructure/chat-stream";
+import type {
+	Capability,
+	LarmPort,
+	LarmStatus,
+	LarmCallOptions,
+} from "../contracts";
+import { LarmInferenceError, providerError } from "./inference-error";
 
 type Provider = {
 	name: Capability;
@@ -21,6 +28,8 @@ type Lease = {
 	useCount: number;
 	closing: boolean;
 	renewTimer?: ReturnType<typeof setTimeout>;
+	idleTimer?: ReturnType<typeof setTimeout>;
+	idleAt: number;
 };
 const gemmaProfile = "SAAA-gemma4-26b";
 const auxiliaryProfile = "SAAA-gemma4-26b-64k";
@@ -40,8 +49,37 @@ const endpoints: Record<Capability, string> = {
 	asr: "/v1/audio/transcriptions",
 	tts: "/v1/audio/speech",
 };
-const wait = (ms: number) =>
-	new Promise<void>((resolve) => setTimeout(resolve, ms));
+const wait = (ms: number, signal: AbortSignal) =>
+	new Promise<void>((resolve, reject) => {
+		signal.throwIfAborted();
+		const abort = () => {
+			clearTimeout(timer);
+			reject(signal.reason);
+		};
+		const timer = setTimeout(() => {
+			signal.removeEventListener("abort", abort);
+			resolve();
+		}, ms);
+		signal.addEventListener("abort", abort, { once: true });
+	});
+async function untilAborted<T>(
+	task: Promise<T>,
+	signal: AbortSignal,
+): Promise<T> {
+	signal.throwIfAborted();
+	let abort: () => void = () => {};
+	try {
+		return await Promise.race([
+			task,
+			new Promise<never>((_, reject) => {
+				abort = () => reject(signal.reason);
+				signal.addEventListener("abort", abort, { once: true });
+			}),
+		]);
+	} finally {
+		signal.removeEventListener("abort", abort);
+	}
+}
 async function readBounded(
 	response: Response,
 	limit: number,
@@ -101,10 +139,11 @@ function localEndpoint(value: string): URL {
 			!url.hash &&
 			(url.hostname === "localhost" ||
 				url.hostname.endsWith(".local") ||
-				url.hostname.startsWith("127.") ||
-				url.hostname.startsWith("10.") ||
-				url.hostname.startsWith("192.168.") ||
-				/^172\.(1[6-9]|2\d|3[01])\./.test(url.hostname))
+				(/^(?:\d{1,3}\.){3}\d{1,3}$/.test(url.hostname) &&
+					url.hostname.split(".").every((part) => Number(part) <= 255) &&
+					/^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(
+						url.hostname,
+					)))
 		)
 	)
 		throw new Error("larm_nonlocal_endpoint");
@@ -122,13 +161,17 @@ export function createLarm(config: {
 	client?: string;
 	voice?: string;
 	fetch?: Fetcher;
+	/** Internal timing seam; production follows LARM's 300-second foreground idle policy. */
+	idleTimeoutMs?: number;
 }): LarmPort {
-	const base = config.baseUrl ? localEndpoint(config.baseUrl) : undefined;
-	const token = config.token;
+	const base = localEndpoint(
+		config.baseUrl?.trim() || "http://192.168.0.130:9810",
+	);
+	const token = config.token?.trim();
 	const request = config.fetch ?? fetch;
-	const profile = config.profile ?? gemmaProfile;
+	const profile = config.profile?.trim() || gemmaProfile;
 	if (profile === auxiliaryProfile) throw new Error("larm_aux_not_enabled");
-	const audience = config.audience ?? "saaa-desktop";
+	const audience = config.audience?.trim() || "saaa-desktop";
 	const client = config.client ?? "gemma-client";
 	if (audience !== "saaa-desktop" && audience !== "same-host")
 		throw new Error("larm_invalid_audience");
@@ -138,11 +181,42 @@ export function createLarm(config: {
 		!["127.0.0.1", "localhost"].includes(base.hostname)
 	)
 		throw new Error("larm_same_host_requires_loopback");
-	const voice = config.voice;
+	const voice = config.voice?.trim() || undefined;
+	const idleTimeoutMs = config.idleTimeoutMs ?? 300_000;
+	const lifetime = new AbortController();
 	let lease: Lease | undefined;
 	let connecting: Promise<Lease> | undefined;
 	let lastError: string | undefined;
 	let closed = false;
+	const listeners = new Set<() => void>();
+	function status(): LarmStatus {
+		return {
+			state: !token
+				? "unconfigured"
+				: connecting
+					? "connecting"
+					: lastError
+						? "failed"
+						: lease
+							? "ready"
+							: "idle",
+			capabilities: lease ? [...lease.providers.keys()] : [],
+			...(lastError ? { error: lastError } : {}),
+		};
+	}
+	let previousStatus = JSON.stringify(status());
+	function notify() {
+		const next = JSON.stringify(status());
+		if (previousStatus === next) return;
+		previousStatus = next;
+		for (const listener of listeners) {
+			try {
+				listener();
+			} catch {
+				/* Independent subscribers. */
+			}
+		}
+	}
 	async function control(
 		path: string,
 		init: RequestInit,
@@ -155,7 +229,15 @@ export function createLarm(config: {
 		const response = await request(url, {
 			...init,
 			headers: { Authorization: `Bearer ${token}`, ...init.headers },
-			signal: AbortSignal.timeout(15_000),
+			redirect: "error",
+			signal:
+				init.method === "DELETE"
+					? AbortSignal.timeout(15_000)
+					: AbortSignal.any([
+							lifetime.signal,
+							AbortSignal.timeout(init.signal ? 3_000 : 15_000),
+							...(init.signal ? [init.signal] : []),
+						]),
 		});
 		if (!accepted.includes(response.status))
 			throw new Error(`larm_control_${response.status}`);
@@ -164,17 +246,42 @@ export function createLarm(config: {
 	async function release(current: Lease) {
 		current.closing = true;
 		if (current.renewTimer) clearTimeout(current.renewTimer);
+		clearTimeout(current.idleTimer);
 		if (current.useCount > 0) return;
 		if (lease === current) lease = undefined;
+		notify();
 		try {
 			await control(
 				`/v1/agent-connections/${encodeURIComponent(current.id)}`,
 				{ method: "DELETE" },
-				[204, 200],
+				[204, 200, 404, 410],
 			);
 		} catch {
-			lastError = "larm_release_unconfirmed";
+			if (!lease) {
+				lastError = "larm_release_unconfirmed";
+				notify();
+			}
 		}
+	}
+	function discard(current: Lease, error?: string) {
+		current.closing = true;
+		clearTimeout(current.renewTimer);
+		clearTimeout(current.idleTimer);
+		if (lease === current) {
+			lease = undefined;
+			lastError = error;
+			notify();
+		}
+	}
+	function scheduleIdle(current: Lease) {
+		clearTimeout(current.idleTimer);
+		current.idleTimer = setTimeout(
+			() => {
+				if (lease === current && !current.useCount) discard(current);
+			},
+			Math.max(0, current.idleAt - Date.now()),
+		);
+		current.idleTimer.unref?.();
 	}
 	function scheduleRenew(current: Lease) {
 		if (current.renewTimer) clearTimeout(current.renewTimer);
@@ -188,24 +295,30 @@ export function createLarm(config: {
 	async function refresh(
 		current: Lease,
 		required: Capability[],
+		signal?: AbortSignal,
 	): Promise<boolean> {
+		const scopedControl = (
+			path: string,
+			init: RequestInit,
+			accepted: number[],
+		) => control(path, { ...init, signal }, accepted);
 		const state = record(
 			await readJson(
-				await control(
+				await scopedControl(
 					`/v1/agent-connections/${current.id}`,
 					{ method: "GET" },
 					[200],
 				),
 			),
 		);
+		if (state.id !== current.id) throw new Error("larm_invalid_connection");
+		if (["failed", "expired", "released"].includes(String(state.status)))
+			throw new Error(`larm_connection_${state.status}`);
 		if (
-			state.id !== current.id ||
 			state.profile !== profile ||
 			state.agentProfile !== current.agentProfile
 		)
 			throw new Error("larm_invalid_connection");
-		if (state.status === "failed" || state.status === "expired")
-			throw new Error(`larm_connection_${state.status}`);
 		if (state.status !== "ready") return false;
 		if (!required.every((name) => current.providers.has(name))) return false;
 		const expiresAt = Date.parse(string(state.expiresAt));
@@ -214,12 +327,12 @@ export function createLarm(config: {
 		current.expiresAt = Math.min(current.expiresAt, expiresAt);
 		if (current.expiresAt > Date.now() + 180_000) return true;
 		for (let attempt = 0; current.useCount > 0 && attempt < 120; attempt++)
-			await wait(1000);
+			await wait(1000, lifetime.signal);
 		if (current.useCount > 0) throw new Error("larm_renew_busy");
 		try {
 			const renewed = record(
 				await readJson(
-					await control(
+					await scopedControl(
 						`/v1/agent-connections/${current.id}/renew`,
 						{
 							method: "POST",
@@ -237,7 +350,7 @@ export function createLarm(config: {
 				throw new Error("larm_renew_invalid");
 			const claimed = record(
 				await readJson(
-					await control(
+					await scopedControl(
 						`/v1/agent-connections/${current.id}/claim`,
 						{
 							method: "POST",
@@ -286,6 +399,8 @@ export function createLarm(config: {
 					token: string(record(info.credential).token),
 				});
 			}
+			if (current.closing || lease !== current)
+				throw new Error("larm_connection_released");
 			current.providers = next;
 			current.expiresAt = nextExpiry;
 			scheduleRenew(current);
@@ -295,17 +410,55 @@ export function createLarm(config: {
 			throw error;
 		}
 	}
-	async function connect(required: Capability[]): Promise<Lease> {
+	async function connect(
+		required: Capability[],
+		signal?: AbortSignal,
+		force = false,
+	): Promise<Lease> {
+		signal?.throwIfAborted();
+		const scopedControl = (
+			path: string,
+			init: RequestInit,
+			accepted: number[],
+		) => control(path, { ...init, signal }, accepted);
+		const pause = (ms: number) =>
+			wait(
+				ms,
+				signal ? AbortSignal.any([signal, lifetime.signal]) : lifetime.signal,
+			);
 		if (closed) throw new Error("larm_closed");
 		if (!base || !token) throw new Error("larm_unconfigured");
+		if (lease && !lease.useCount && lease.idleAt <= Date.now()) discard(lease);
+		if (
+			!force &&
+			lease &&
+			!lease.closing &&
+			lease.expiresAt > Date.now() + 180_000 &&
+			required.every((name) => lease!.providers.has(name))
+		)
+			return lease;
 		if (connecting) {
-			await connecting;
-			return connect(required);
+			try {
+				await untilAborted(connecting, signal ?? lifetime.signal);
+			} catch (error) {
+				(signal ?? lifetime.signal).throwIfAborted();
+				if (!(error instanceof DOMException && error.name === "AbortError"))
+					throw error;
+			}
+			return connect(required, signal, force);
 		}
 		connecting = (async () => {
 			if (lease && !lease.closing) {
+				const current = lease;
 				try {
-					if (await refresh(lease, required)) return lease;
+					if (
+						(await refresh(current, required, signal)) &&
+						lease === current &&
+						!current.closing
+					) {
+						lastError = undefined;
+						return current;
+					}
 				} catch (error) {
 					if (
 						!(error instanceof Error) ||
@@ -313,19 +466,20 @@ export function createLarm(config: {
 							"larm_expired",
 							"larm_connection_failed",
 							"larm_connection_expired",
+							"larm_connection_released",
 							"larm_control_404",
 						].includes(error.message)
 					)
 						throw error;
 				}
-				for (let attempt = 0; lease.useCount > 0 && attempt < 120; attempt++)
-					await wait(1000);
-				if (lease.useCount > 0) throw new Error("larm_connection_busy");
-				await release(lease);
+				for (let attempt = 0; current.useCount > 0 && attempt < 120; attempt++)
+					await pause(1000);
+				if (current.useCount > 0) throw new Error("larm_connection_busy");
+				await release(current);
 			}
 			const catalog = record(
 				await readJson(
-					await control(
+					await scopedControl(
 						`/v3/agent-profiles?profile=${encodeURIComponent(profile)}`,
 						{ method: "GET" },
 						[200],
@@ -368,7 +522,7 @@ export function createLarm(config: {
 					throw new Error("larm_gemma_contract_mismatch");
 			}
 			const fullProfile = required.some((name) => name !== "llm");
-			const createdResponse = await control(
+			const createdResponse = await scopedControl(
 				"/v1/agent-connections",
 				{
 					method: "POST",
@@ -395,21 +549,40 @@ export function createLarm(config: {
 			if (!/^[A-Za-z0-9_-]{1,160}$/.test(id))
 				throw new Error("larm_invalid_connection_id");
 			try {
-				if (created.status === "failed" || created.status === "expired")
+				if (["failed", "expired", "released"].includes(String(created.status)))
 					throw new Error(`larm_connection_${created.status}`);
-				for (let attempt = 0; created.status !== "ready"; attempt++) {
+				// Profile switching can report connection ready before its providers are claimable.
+				const providersPending = () => {
+					const providers = Array.isArray(created.providers)
+						? created.providers.map(record)
+						: [];
+					return required.some((name) => {
+						const provider = providers.find((p) => p.name === name);
+						return (
+							provider &&
+							(provider.readiness !== "ready" || provider.claimable !== true)
+						);
+					});
+				};
+				for (
+					let attempt = 0;
+					created.status !== "ready" || providersPending();
+					attempt++
+				) {
 					if (attempt >= 60) throw new Error("larm_capacity_timeout");
-					await wait(1000);
+					await pause(1000);
 					created = record(
 						await readJson(
-							await control(
+							await scopedControl(
 								`/v1/agent-connections/${id}`,
 								{ method: "GET" },
 								[200],
 							),
 						),
 					);
-					if (created.status === "failed" || created.status === "expired")
+					if (
+						["failed", "expired", "released"].includes(String(created.status))
+					)
 						throw new Error(`larm_connection_${created.status}`);
 				}
 				if (
@@ -432,7 +605,7 @@ export function createLarm(config: {
 				}
 				const claimed = record(
 					await readJson(
-						await control(
+						await scopedControl(
 							`/v1/agent-connections/${id}/claim`,
 							{
 								method: "POST",
@@ -516,9 +689,11 @@ export function createLarm(config: {
 					agentProfile: string(catalogProfile.id),
 					useCount: 0,
 					closing: false,
+					idleAt: Date.now() + idleTimeoutMs,
 				};
 				lease = current;
 				scheduleRenew(current);
+				scheduleIdle(current);
 				lastError = undefined;
 				return current;
 			} catch (error) {
@@ -534,6 +709,7 @@ export function createLarm(config: {
 				throw error;
 			}
 		})();
+		notify();
 		try {
 			return await connecting;
 		} catch (error) {
@@ -541,32 +717,85 @@ export function createLarm(config: {
 			throw error;
 		} finally {
 			connecting = undefined;
+			notify();
 		}
+	}
+	async function isReleased(
+		current: Lease,
+		signal: AbortSignal,
+	): Promise<boolean> {
+		if (current.closing) return true;
+		const response = await control(
+			`/v1/agent-connections/${encodeURIComponent(current.id)}`,
+			{ method: "GET", signal },
+			[200, 404, 410],
+		);
+		if (response.status !== 200) {
+			await response.body?.cancel();
+			return true;
+		}
+		const state = record(await readJson(response));
+		return (
+			state.id === current.id &&
+			["released", "expired"].includes(String(state.status))
+		);
 	}
 	async function withProvider<T>(
 		name: Capability,
 		signal: AbortSignal,
-		use: (p: Provider) => Promise<T>,
+		use: (p: Provider, connectionId: string) => Promise<T>,
 	): Promise<T> {
 		const required: Capability[] =
 			name === "llm" ? ["llm"] : ["llm", "asr", "tts"];
-		let current = await connect(required);
-		if (current.closing || current.expiresAt <= Date.now() + 10_000)
-			current = await connect(required);
-		const provider = current.providers.get(name);
-		if (
-			!provider ||
-			current.expiresAt <= Date.now() + 10_000 ||
-			current.closing
-		)
-			throw new Error("larm_credential_expired");
-		current.useCount++;
-		try {
-			if (signal.aborted) throw new Error("cancelled");
-			return await use(provider);
-		} finally {
-			current.useCount--;
-			if (current.closing && current.useCount === 0) await release(current);
+		for (let attempt = 0; ; attempt++) {
+			signal.throwIfAborted();
+			const current = await untilAborted(connect(required, signal), signal);
+			const provider = current.providers.get(name);
+			if (
+				!provider ||
+				current.expiresAt <= Date.now() + 10_000 ||
+				current.closing
+			)
+				throw new Error("larm_credential_expired");
+			current.useCount++;
+			clearTimeout(current.idleTimer);
+			try {
+				signal.throwIfAborted();
+				return await use(provider, current.id);
+			} catch (error) {
+				let unusable =
+					error instanceof LarmInferenceError &&
+					error.status === 409 &&
+					error.code === "connection_idle_released";
+				// Some gateway versions return unauthorized after an idle profile switch.
+				// Confirm the old connection is terminal; a ready connection's 401 stays an error.
+				if (
+					!signal.aborted &&
+					error instanceof LarmInferenceError &&
+					error.status === 401 &&
+					error.code === "unauthorized"
+				) {
+					try {
+						unusable = await isReleased(current, signal);
+					} catch {
+						signal.throwIfAborted();
+					}
+				}
+				if (unusable) {
+					discard(current, "larm_connection_released");
+					// The gateway rejected before inference began. Only this explicit
+					// lifecycle rejection may replay once; streamed output is never replayed.
+					if (!attempt && !signal.aborted) continue;
+				}
+				throw error;
+			} finally {
+				current.useCount--;
+				if (current.closing && current.useCount === 0) await release(current);
+				else if (!current.closing && !current.useCount) {
+					current.idleAt = Date.now() + idleTimeoutMs;
+					scheduleIdle(current);
+				}
+			}
 		}
 	}
 	async function infer(
@@ -574,6 +803,8 @@ export function createLarm(config: {
 		operation: string,
 		init: RequestInit,
 		signal: AbortSignal,
+		connectionId: string,
+		options?: LarmCallOptions,
 	): Promise<Response> {
 		const endpoint = new URL(
 			provider.baseUrl.endsWith("/")
@@ -583,72 +814,127 @@ export function createLarm(config: {
 		const url = new URL(operation, endpoint);
 		if (url.origin !== endpoint.origin)
 			throw new Error("larm_endpoint_mismatch");
-		const response = await request(url, {
-			...init,
-			headers: { Authorization: `Bearer ${provider.token}`, ...init.headers },
-			signal: AbortSignal.any([signal, AbortSignal.timeout(120_000)]),
-		});
-		if (!response.ok) throw new Error(`larm_inference_${response.status}`);
+		const started = Date.now();
+		let response: Response;
+		try {
+			response = await request(url, {
+				...init,
+				headers: { Authorization: `Bearer ${provider.token}`, ...init.headers },
+				signal: AbortSignal.any([signal, AbortSignal.timeout(120_000)]),
+				redirect: "error",
+			});
+		} catch (error) {
+			await options?.onExchange?.({
+				connectionId,
+				model: provider.model,
+				started,
+			});
+			throw error;
+		}
+		if (!response.ok) {
+			const details = await providerError(response, signal, [
+				provider.token,
+				token ?? "",
+			]);
+			await options?.onExchange?.({
+				connectionId,
+				model: provider.model,
+				started,
+				httpStatus: response.status,
+				...details,
+			});
+			throw new LarmInferenceError(response.status, details.errorCode);
+		}
+		try {
+			await options?.onExchange?.({
+				connectionId,
+				model: provider.model,
+				started,
+				httpStatus: response.status,
+			});
+		} catch (error) {
+			await response.body?.cancel();
+			throw error;
+		}
 		return response;
 	}
+	async function answer(
+		messages: Parameters<LarmPort["answer"]>[0],
+		signal: AbortSignal,
+		onDelta?: (text: string) => void,
+		options?: LarmCallOptions,
+	) {
+		return withProvider("llm", signal, async (p, connectionId) => {
+			const window = p.contextWindow;
+			if (!window) throw new Error("larm_missing_context_window");
+			const budget =
+				window.maxTokens -
+				window.outputReserveTokens -
+				window.safetyMarginTokens;
+			if (budget <= 0) throw new Error("larm_invalid_context_window");
+			const selected = [...messages];
+			const estimate = (items: typeof messages) =>
+				new TextEncoder().encode(JSON.stringify(items)).length;
+			while (selected.length > 2 && estimate(selected) > budget)
+				selected.splice(1, 2);
+			if (estimate(selected) > budget)
+				throw new Error("context_window_exceeded");
+			const response = await infer(
+				p,
+				"chat/completions",
+				{
+					method: "POST",
+					headers: { "content-type": "application/json" },
+					body: JSON.stringify({
+						model: p.model,
+						messages: selected,
+						stream: !!onDelta,
+						max_tokens: Math.min(window.outputReserveTokens, 4096),
+					}),
+				},
+				signal,
+				connectionId,
+				options,
+			);
+			return (await readChatResponse(response, signal, onDelta)).text;
+		});
+	}
+
 	return {
-		status(): LarmStatus {
+		async connect() {
+			await connect(["llm"], undefined, true);
+		},
+		inspect() {
 			return {
-				state:
-					!base || !token
-						? "unconfigured"
-						: connecting
-							? "connecting"
-							: lastError
-								? "failed"
-								: lease
-									? "ready"
-									: "connecting",
-				capabilities: lease ? [...lease.providers.keys()] : [],
-				...(lastError ? { error: lastError } : {}),
+				profile,
+				...(lease ? { connectionId: lease.id } : {}),
+				providers: lease
+					? [...lease.providers.values()].map((p) => ({
+							name: p.name,
+							model: p.model,
+							baseUrl: p.baseUrl,
+							protocol: p.protocol,
+						}))
+					: [],
 			};
 		},
-		answer(messages, signal) {
-			return withProvider("llm", signal, async (p) => {
-				const window = p.contextWindow;
-				if (!window) throw new Error("larm_missing_context_window");
-				const budget =
-					window.maxTokens -
-					window.outputReserveTokens -
-					window.safetyMarginTokens;
-				if (budget <= 0) throw new Error("larm_invalid_context_window");
-				const selected = [...messages];
-				const estimate = (items: typeof messages) =>
-					new TextEncoder().encode(JSON.stringify(items)).length;
-				while (selected.length > 2 && estimate(selected) > budget)
-					selected.splice(1, 2);
-				if (estimate(selected) > budget)
-					throw new Error("context_window_exceeded");
-				const response = await infer(
-					p,
-					"chat/completions",
-					{
-						method: "POST",
-						headers: { "content-type": "application/json" },
-						body: JSON.stringify({
-							model: p.model,
-							messages: selected,
-							stream: false,
-							max_tokens: Math.min(window.outputReserveTokens, 4096),
-						}),
-					},
-					signal,
-				);
-				const json = record(await readJson(response));
-				const choices = json.choices;
-				const content = Array.isArray(choices)
-					? record(record(choices[0]).message).content
-					: undefined;
-				return string(content);
-			});
+		async probe(signal) {
+			await connect(["llm"], signal);
 		},
-		transcribe(wav, signal) {
-			return withProvider("asr", signal, async (p) => {
+		status,
+		onChange(listener) {
+			listeners.add(listener);
+			return () => {
+				listeners.delete(listener);
+			};
+		},
+		answer: (messages, signal, options) =>
+			answer(messages, signal, undefined, options),
+		answerStream: answer,
+		prepareVoice: (signal) =>
+			connect(["llm", "asr", "tts"], signal).then(() => {}),
+		transcribe(wav, signal, options) {
+			return withProvider("asr", signal, async (p, connectionId) => {
 				if (wav.length < 44 || wav.length > 4_000_000)
 					throw new Error("audio_size_invalid");
 				const form = new FormData();
@@ -664,13 +950,36 @@ export function createLarm(config: {
 					"audio/transcriptions",
 					{ method: "POST", body: form },
 					signal,
+					connectionId,
+					options,
 				);
 				return string(record(await readJson(response)).text);
 			});
 		},
-		speak(text, signal) {
-			return withProvider("tts", signal, async (p) => {
-				const selectedVoice = voice ?? p.voice;
+		speak(text, signal, options) {
+			return withProvider("tts", signal, async (p, connectionId) => {
+				let selectedVoice = voice ?? p.voice;
+				if (!selectedVoice) {
+					// The connection credential is scoped to inference. Voice discovery
+					// uses the backend control credential at the control origin only.
+					const available = record(
+						await readJson(
+							await control(
+								`/v1/audio/voices?model=${encodeURIComponent(p.model)}`,
+								{ method: "GET" },
+								[200],
+							),
+						),
+					);
+					if (
+						typeof available.default_voice === "string" &&
+						Array.isArray(available.voices) &&
+						available.voices.some(
+							(item) => record(item).id === available.default_voice,
+						)
+					)
+						selectedVoice = p.voice = string(available.default_voice);
+				}
 				if (!selectedVoice) throw new Error("larm_tts_voice_unconfigured");
 				const response = await infer(
 					p,
@@ -686,6 +995,8 @@ export function createLarm(config: {
 						}),
 					},
 					signal,
+					connectionId,
+					options,
 				);
 				const bytes = await readBounded(response, 16_000_000);
 				if (
@@ -699,8 +1010,10 @@ export function createLarm(config: {
 		},
 		async close() {
 			closed = true;
+			lifetime.abort(new Error("larm_closed"));
 			if (connecting) await connecting.catch(() => {});
 			if (lease) await release(lease);
+			listeners.clear();
 		},
 	};
 }

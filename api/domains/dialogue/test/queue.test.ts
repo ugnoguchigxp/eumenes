@@ -44,6 +44,7 @@ function setup(queueOptions: Parameters<typeof createQueue>[1] = {}) {
 	const calls: Call[] = [];
 	const larm: LarmPort = {
 		status: () => ({ state: "ready", capabilities: ["llm"] }),
+		connect: async () => {},
 		answer: (messages, signal) =>
 			new Promise((resolve, reject) => {
 				calls.push({
