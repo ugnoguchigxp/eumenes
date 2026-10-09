@@ -1,0 +1,42 @@
+.digital-clock {
+	color: var(--foreground);
+	font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+	font-variant-numeric: tabular-nums;
+	font-feature-settings: "tnum";
+	line-height: 1;
+	container-type: inline-size;
+}
+
+.digital-clock-digits {
+	display: inline-block;
+	min-width: 5ch;
+	text-align: center;
+	font-variant-numeric: tabular-nums;
+}
+
+.digital-clock-sm {
+	font-size: 1.25rem;
+}
+.digital-clock-md {
+	font-size: 2rem;
+}
+.digital-clock-lg {
+	font-size: 3.5rem;
+}
+.digital-clock-hero {
+	width: 100%;
+}
+.digital-clock-hero .digital-clock-digits {
+	width: 100%;
+	font-size: clamp(2.5rem, 22cqw, 8rem);
+}
+
+.digital-clock-warning {
+	color: var(--warning);
+}
+.digital-clock-finished {
+	color: var(--success);
+}
+.digital-clock-muted {
+	color: var(--muted-foreground);
+}

@@ -6,11 +6,14 @@ import { eventsClient } from "./events";
 import { larmClient } from "./larm";
 import { memoryClient } from "./memory";
 import { queueClient } from "./queue";
+import { researchRoutesClient } from "./research-routes";
 import { schedulerClient } from "./scheduler";
 import { settingsClient } from "./settings";
 import { serviceTestsClient } from "./service-tests";
 import { ttsDictionaryClient } from "./tts-dictionary";
 import { createTransport } from "./transport";
+import { tasksClient } from "./tasks";
+import { timersClient } from "./timers";
 import { voiceDialogueClient } from "./voice-dialogue";
 import { webResearchClient } from "./web-research";
 
@@ -32,6 +35,9 @@ export function createClient(baseUrl: string, token?: string) {
 		...voiceDialogueClient(transport),
 		...webResearchClient(transport),
 		...agentRuntimeClient(transport),
+		...tasksClient(transport),
+		...researchRoutesClient(transport),
+		...timersClient(transport),
 	};
 }
 export type EumenesClient = ReturnType<typeof createClient>;

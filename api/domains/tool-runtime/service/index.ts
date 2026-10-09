@@ -10,18 +10,39 @@ import {
 	type Prepared,
 } from "../../capabilities";
 import type { QueueService } from "../../queue";
-import type { ToolAdapter, Invocation, Source, ToolResult } from "../contracts";
-import { get } from "../repository";
+import type {
+	ToolAdapter,
+	Invocation,
+	Source,
+	ToolResult,
+	CachedSourceAuthorizationPort,
+	CachedRouteGrantInput,
+	CandidateImportInput,
+} from "../contracts";
+import { get, hasSupersededColumn } from "../repository";
 export function createToolRuntime(
 	store: SqliteStore,
 	capabilities: Capabilities,
 	queue: QueueService,
 	adapter: ToolAdapter,
 	now = Date.now,
+	cachedSource?: CachedSourceAuthorizationPort,
 ) {
+	type Grant = {
+		bindingToken: string;
+		exactUrl: string;
+		argsDigest: string;
+		attemptTimeoutMs?: number;
+	};
 	const refs = new Map<
 		string,
-		{ owner: Owner; tool: FixedDefinition; prepared: Prepared; expires: number }
+		{
+			owner: Owner;
+			tool: FixedDefinition;
+			prepared: Prepared;
+			expires: number;
+			grant?: Grant;
+		}
 	>();
 	const vault = new Map<
 		string,
@@ -36,17 +57,19 @@ export function createToolRuntime(
 		}
 	>();
 	const ownerKey = (o: Owner) => JSON.stringify(o);
+	function reserve(owner: Owner) {
+		if (
+			[...refs.values()].filter((r) => ownerKey(r.owner) === ownerKey(owner))
+				.length >= 64
+		)
+			throw new Error("reference_capacity");
+	}
 	function bind(owner: Owner, prepared: Prepared, deadline: number) {
 		const allowed = new Set(prepared.package.toolRevisionIds);
 		return prepared.dependencies
 			.filter((d) => d.kind === "tool" && allowed.has(d.revisionId))
 			.map((tool) => {
-				if (
-					[...refs.values()].filter(
-						(r) => ownerKey(r.owner) === ownerKey(owner),
-					).length >= 64
-				)
-					throw new Error("reference_capacity");
+				reserve(owner);
 				const executionRef = crypto.randomUUID();
 				refs.set(executionRef, {
 					owner,
@@ -56,6 +79,79 @@ export function createToolRuntime(
 				});
 				return { executionRef, tool };
 			});
+	}
+	function authorize(
+		db: Database,
+		owner: Owner,
+		prepared: Prepared,
+		bindingToken: string,
+		exactUrl: string,
+	) {
+		const decision = cachedSource?.validateInTransaction(db, {
+			owner,
+			bindingToken,
+			packageHash: prepared.package.hash,
+			exactUrl,
+		});
+		if (!decision) throw new Error("cached_source_unavailable");
+		if (decision.status !== "allowed")
+			throw new Error("cached_source_rejected");
+	}
+	/**
+	 * Host-only: a fresh reference for ONE recipe tool, bound to this owner, binding token and
+	 * exact URL. Never copies another owner's reference; the port is re-checked on every use.
+	 */
+	function issueCachedGrantInTransaction(
+		db: Database,
+		input: CachedRouteGrantInput,
+	) {
+		if (input.deadline <= now()) throw new Error("tool_ref_invalid");
+		capabilities.validateInTransaction(db, input.prepared);
+		authorize(
+			db,
+			input.owner,
+			input.prepared,
+			input.bindingToken,
+			input.exactUrl,
+		);
+		const allowed = new Set(input.prepared.package.toolRevisionIds);
+		const tool = input.prepared.dependencies.find(
+			(d) =>
+				d.kind === "tool" && d.id === input.toolId && allowed.has(d.revisionId),
+		);
+		if (!tool?.schemaKey) throw new Error("invalid_tool_schema");
+		const parsed = validators[tool.schemaKey].safeParse(input.arguments);
+		if (!parsed.success) throw new Error("invalid_tool_input");
+		if (
+			input.toolId === "web.read" &&
+			(parsed.data as { url: string }).url !== input.exactUrl
+		)
+			throw new Error("tool_url_out_of_scope");
+		reserve(input.owner);
+		const executionRef = crypto.randomUUID();
+		refs.set(executionRef, {
+			owner: input.owner,
+			tool,
+			prepared: input.prepared,
+			expires: Math.min(now() + 300000, input.deadline),
+			grant: {
+				bindingToken: input.bindingToken,
+				exactUrl: input.exactUrl,
+				argsDigest: hash(parsed.data),
+				attemptTimeoutMs: input.attemptTimeoutMs,
+			},
+		});
+		return { executionRef, tool };
+	}
+	/** Post-commit memory release of every grant under a binding token (DB revocation is the port's job). */
+	function releaseBinding(bindingToken: string) {
+		let n = 0;
+		for (const [key, ref] of refs)
+			if (ref.grant?.bindingToken === bindingToken) {
+				refs.delete(key);
+				n++;
+			}
+		return n;
 	}
 	function invokeInTransaction(
 		db: Database,
@@ -81,10 +177,25 @@ export function createToolRuntime(
 		)
 			throw new Error("tool_ref_invalid");
 		capabilities.validateInTransaction(db, ref.prepared);
+		if (ref.grant)
+			authorize(
+				db,
+				owner,
+				ref.prepared,
+				ref.grant.bindingToken,
+				ref.grant.exactUrl,
+			);
 		if (!ref.tool.schemaKey) throw new Error("invalid_tool_schema");
 		const parsed = validators[ref.tool.schemaKey].safeParse(args);
 		if (!parsed.success) throw new Error("invalid_tool_input");
-		if (
+		if (ref.grant) {
+			if (hash(parsed.data) !== ref.grant.argsDigest)
+				throw new Error(
+					ref.tool.id === "web.read"
+						? "tool_url_out_of_scope"
+						: "invalid_tool_input",
+				);
+		} else if (
 			ref.tool.id === "web.read" &&
 			!allowedUrls.includes((parsed.data as { url: string }).url)
 		)
@@ -110,6 +221,12 @@ export function createToolRuntime(
 			deadline,
 			parentJobId,
 			question,
+			...(ref.grant
+				? {
+						grantedUrl: ref.grant.exactUrl,
+						attemptTimeoutMs: ref.grant.attemptTimeoutMs,
+					}
+				: {}),
 		});
 		if (!operation?.operationId || !operation.jobId)
 			throw new Error("operation_missing");
@@ -148,7 +265,7 @@ export function createToolRuntime(
 	function observations(db: Database, taskId: string) {
 		const invocations = db
 			.query(
-				"SELECT * FROM tool_invocations WHERE owner_task_id=? ORDER BY created_at,id",
+				`SELECT * FROM tool_invocations WHERE owner_task_id=?${hasSupersededColumn(db) ? " AND superseded=0" : ""} ORDER BY created_at,id`,
 			)
 			.all(taskId) as Invocation[];
 		return invocations.map((inv) =>
@@ -286,6 +403,72 @@ export function createToolRuntime(
 		).run(now(), taskId);
 		return jobs;
 	}
+	/**
+	 * Host-only: turn a stored search candidate into an observation owned by THIS owner
+	 * (origin candidate-cache, no queue job, no inference/HTTP). It counts as one lookup
+	 * allowance through countInTransaction but is excluded from countRealInTransaction.
+	 */
+	function importSearchCandidatesInTransaction(
+		db: Database,
+		input: CandidateImportInput,
+	) {
+		if (input.hits.length < 1 || input.hits.length > 5)
+			throw new Error("invalid_candidate_import");
+		if (input.deadline <= now()) throw new Error("tool_ref_invalid");
+		capabilities.validateInTransaction(db, input.prepared);
+		const allowed = new Set(input.prepared.package.toolRevisionIds);
+		const lookup = input.prepared.dependencies.find(
+			(d) =>
+				d.kind === "tool" && d.id === "web.lookup" && allowed.has(d.revisionId),
+		);
+		if (!lookup) throw new Error("invalid_tool_schema");
+		const old = db
+			.query("SELECT * FROM tool_invocations WHERE step_id=?")
+			.get(input.stepId) as Invocation | null;
+		if (old) {
+			if (
+				old.owner_task_id !== input.owner.taskId ||
+				old.root_run_id !== input.owner.rootRunId ||
+				old.origin !== "candidate-cache"
+			)
+				throw new Error("idempotency_conflict");
+			return old;
+		}
+		for (const hit of input.hits)
+			authorize(db, input.owner, input.prepared, input.bindingToken, hit.url);
+		const id = crypto.randomUUID();
+		const args = {
+			query: input.query,
+			provenanceDigest: input.provenanceDigest,
+		};
+		db.query(
+			"INSERT INTO tool_invocations(id,owner_task_id,root_run_id,tool_revision_id,step_id,request_id,args_json,args_digest,operation_id,job_id,state,deadline,created_at,origin) VALUES(?,?,?,?,?,?,?,?,?,?,'pending',?,?,'candidate-cache')",
+		).run(
+			id,
+			input.owner.taskId,
+			input.owner.rootRunId,
+			lookup.revisionId,
+			input.stepId,
+			crypto.randomUUID(),
+			JSON.stringify(args),
+			hash(args),
+			`candidate-cache:${id}`,
+			"candidate-cache",
+			input.deadline,
+			now(),
+		);
+		const inv = get(db, id)!;
+		settleInTransaction(db, inv, {
+			state: "succeeded",
+			result: {
+				observedAt: input.searchedAt,
+				hits: input.hits,
+				documents: [],
+				failures: [],
+			},
+		});
+		return get(db, id)!;
+	}
 	function release(taskId: string) {
 		for (const [key, ref] of refs)
 			if (ref.owner.taskId === taskId) refs.delete(key);
@@ -306,6 +489,9 @@ export function createToolRuntime(
 			}>;
 		},
 		bind,
+		issueCachedGrantInTransaction,
+		importSearchCandidatesInTransaction,
+		releaseBinding,
 		invokeInTransaction,
 		observationsInTransaction: observations,
 		settleInTransaction,
@@ -323,6 +509,48 @@ export function createToolRuntime(
 					)
 					.get(taskId, toolRevisionId) as { n: number }
 			).n,
+		/** Real executions only (excludes candidate-cache imports). Needs routeGrantMigration. */
+		countRealInTransaction: (
+			db: Database,
+			taskId: string,
+			toolRevisionId: string,
+		) =>
+			(
+				db
+					.query(
+						"SELECT COUNT(*) AS n FROM tool_invocations WHERE owner_task_id=? AND tool_revision_id=? AND origin='tool'",
+					)
+					.get(taskId, toolRevisionId) as { n: number }
+			).n,
+		/** Every invocation of the task (including superseded ones) for budget/provenance checks. */
+		invocationsInTransaction: (db: Database, taskId: string) =>
+			(
+				db
+					.query(
+						"SELECT * FROM tool_invocations WHERE owner_task_id=? ORDER BY created_at,id",
+					)
+					.all(taskId) as Array<Invocation & { superseded?: number }>
+			).map((r) => ({
+				toolRevisionId: r.tool_revision_id,
+				stepId: r.step_id,
+				argsDigest: r.args_digest,
+				state: r.state,
+				origin: (r.origin ?? "tool") as "tool" | "candidate-cache",
+				superseded: !!r.superseded,
+			})),
+		/**
+		 * Hide the task's current invocations from observations (so their sources grant no
+		 * reads) while countInTransaction/countRealInTransaction keep counting them.
+		 * Needs supersedeMigration; returns the number of rows affected.
+		 */
+		supersedeInvocationsInTransaction: (db: Database, taskId: string) => {
+			if (!hasSupersededColumn(db)) throw new Error("supersede_unavailable");
+			return db
+				.query(
+					"UPDATE tool_invocations SET superseded=1 WHERE owner_task_id=? AND superseded=0",
+				)
+				.run(taskId).changes;
+		},
 		pending: (cursor = "", limit = 100) =>
 			store.read(
 				(db) =>

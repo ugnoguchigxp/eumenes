@@ -1,4 +1,4 @@
 export { createCapabilities, zSchema, type Capabilities } from "./service";
-export { migration } from "./repository";
+export { migration, learnedMigration } from "./repository";
 export * from "./contracts";
 export { registerCapabilities } from "./controller";

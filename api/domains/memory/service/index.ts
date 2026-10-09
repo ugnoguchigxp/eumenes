@@ -84,11 +84,18 @@ export function createMemoryService(
 ) {
 	const clock = options.clock ?? (() => new Date().toISOString());
 	let healthy = false;
+	/**
+	 * The policy revision access() puts into every AccessContext. Other domains
+	 * (World) that must present the SAME revision to Memory read it here, never
+	 * from the settings table.
+	 */
+	const policyRevisionInTransaction = (db: Database): string =>
+		String(readSettings(db).revision);
 	const access = (db: Database, purpose: string): AccessContext => ({
 		principal: PRINCIPAL,
 		scopeKeys: [PROFILE_SCOPE],
 		purpose,
-		policyRevision: String(readSettings(db).revision),
+		policyRevision: policyRevisionInTransaction(db),
 	});
 	const scoped = (db: Database, purpose: string) => ({
 		contractVersion: VERSION,
@@ -469,6 +476,8 @@ export function createMemoryService(
 		healthy: boolean;
 		reapplied: number;
 		reason?: string;
+		/** The database was older than the journal: change-feed subscribers must drop their cursors. */
+		feedResyncRequired?: true;
 	}> {
 		const fail = (reason: string) => {
 			healthy = false;
@@ -507,7 +516,13 @@ export function createMemoryService(
 					),
 				);
 				healthy = true;
-				return { healthy, reapplied: result.reapplied };
+				return {
+					healthy,
+					reapplied: result.reapplied,
+					...(result.feedResyncRequired === true
+						? { feedResyncRequired: true as const }
+						: {}),
+				};
 			});
 		} catch {
 			return fail("recover_failed");
@@ -515,6 +530,7 @@ export function createMemoryService(
 	}
 
 	return {
+		policyRevisionInTransaction,
 		status(): MemoryStatus {
 			return { enabled: store.read((db) => readSettings(db).enabled), healthy };
 		},

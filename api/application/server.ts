@@ -1,4 +1,5 @@
 import { createToolchain, toolchainEnabled } from "./toolchain";
+import { createOperations } from "../domains/research-routes";
 import {
 	createAttitudeDataset,
 	openAttitudeStore,
@@ -11,6 +12,7 @@ import { createSettings } from "../domains/settings";
 import { createInference } from "../domains/inference";
 import { createQueue } from "../domains/queue";
 import { createScheduler } from "../domains/scheduler";
+import { createTimers } from "../domains/timers";
 import { createVoiceDialogue } from "../domains/voice-dialogue";
 import { createTtsDictionary } from "../domains/tts-dictionary";
 import { createContinuityService } from "../domains/continuity";
@@ -29,6 +31,7 @@ import {
 import { createApp } from "./app";
 import { createChanges } from "./events";
 import { createServiceTests } from "../domains/service-tests";
+import { createDelegatedTasks, delegatedTasksEnabled } from "./delegated-tasks";
 
 const dbPath = process.env.EUMENES_DB ?? "./data/eumenes.sqlite3";
 configureLogging({
@@ -41,7 +44,10 @@ configureLogging({
 const log = getLogger("server");
 log.info("server.starting");
 /** Production wiring: every dependency is mandatory (tests may still assemble a partial createApp). */
-function createProductionApp(deps: Required<Parameters<typeof createApp>[0]>) {
+function createProductionApp(
+	deps: Required<Omit<Parameters<typeof createApp>[0], "researchRoutes">> &
+		Pick<Parameters<typeof createApp>[0], "researchRoutes">,
+) {
 	return createApp(deps);
 }
 async function main() {
@@ -52,7 +58,9 @@ async function main() {
 	const store = openStore(dbPath, migrations);
 	const changes = createChanges();
 	const unsubscribeCommits = store.onCommit(() => changes.publish());
-	const conversation = createConversationService(store);
+	const conversation = createConversationService(store, {
+		requireOutbox: true,
+	});
 	const settings = await createSettings(store, { dbPath });
 	const ttsDictionary = createTtsDictionary(store);
 	const datasetPath = resolve(
@@ -86,6 +94,15 @@ async function main() {
 	}
 	const webResearch = createWebResearch({ store, queue, cache: webCache });
 	const scheduler = createScheduler(store, queue);
+	const timers = createTimers(store, { scheduler, queue }, {
+		publish: () => changes.publish(),
+	});
+	const delegated = createDelegatedTasks({
+		store,
+		queue,
+		scheduler,
+		enabled: delegatedTasksEnabled(),
+	});
 	const continuity = createContinuityService(store);
 	const memory = createMemoryService(store, conversation, continuity, {
 		journalPath: resolve(
@@ -102,6 +119,7 @@ async function main() {
 		queue,
 		memory,
 		agents: enabled ? toolchain.agents : undefined,
+		postAnswer: enabled ? toolchain.postAnswer : undefined,
 	});
 	const voice = createVoiceDialogue(store, dialogue, inference);
 	scheduler.registerTarget(dialogue.promptTarget);
@@ -118,12 +136,72 @@ async function main() {
 	await dialogue.recover();
 	await webResearch.recover();
 	await queue.recover();
+	await delegated.recover();
+	await timers.recover();
 	await scheduler.recover();
 	log.info("server.recovery_completed");
+	// Route recovery (interrupt unfinished author/review drafts) precedes every runner.
+	const routeOps = toolchain.routeService
+		? createOperations({
+				routes: toolchain.routeService,
+				store,
+				skills: (db, id) =>
+					toolchain.capabilities.getDefinitionInTransaction(db, id),
+			})
+		: undefined;
+	let routeSweep: ReturnType<typeof setInterval> | undefined;
+	if (toolchain.routeService) {
+		const routes = toolchain.routeService;
+		await store.write((db) => {
+			routes.recoverInTransaction(db);
+			routes.enqueueSweepInTransaction(db, { mode: "ttl" });
+		});
+		routeSweep = setInterval(() => {
+			void store
+				.write((db) => routes.enqueueSweepInTransaction(db, { mode: "ttl" }))
+				.catch((error) =>
+					log.warn(
+						"research_routes.sweep_enqueue_failed",
+						{ reason: "enqueue_failed" },
+						error,
+					),
+				);
+		}, 3_600_000);
+		routeSweep.unref();
+	}
 	toolchain.agents.start();
 	queue.start();
 	webResearch.start();
 	scheduler.start();
+	const taskMaintenance = setInterval(() => {
+		void delegated.tasks
+			.maintenance()
+			.catch((error) =>
+				log.warn(
+					"tasks.maintenance_failed",
+					{ reason: "maintenance_failed" },
+					error,
+				),
+			);
+	}, 60_000);
+	taskMaintenance.unref();
+	let timerMaintenanceBusy: Promise<unknown> | null = null;
+	const timerMaintenance = setInterval(() => {
+		if (timerMaintenanceBusy) return;
+		timerMaintenanceBusy = timers
+			.maintenance()
+			.catch((error) =>
+				log.warn(
+					"timers.maintenance_failed",
+					{ reason: "maintenance_failed" },
+					error,
+				),
+			)
+			.finally(() => {
+				timerMaintenanceBusy = null;
+			});
+	}, 1000);
+	timerMaintenance.unref();
 	const app = createProductionApp({
 		capabilities: toolchain.capabilities,
 		agents: toolchain.agents,
@@ -144,6 +222,9 @@ async function main() {
 		webResearch,
 		changes,
 		serviceTests,
+		tasks: delegated.tasks,
+		researchRoutes: routeOps,
+		timers,
 	});
 	const port = Number(process.env.EUMENES_PORT ?? 8787);
 	const server = Bun.serve({
@@ -172,6 +253,10 @@ async function main() {
 			unsubscribeStatus();
 			changes.close();
 			server.stop(true);
+			clearInterval(taskMaintenance);
+			clearInterval(timerMaintenance);
+			await timerMaintenanceBusy;
+			delegated.close();
 			await scheduler.close();
 			await serviceTests.close();
 			await voice.close();

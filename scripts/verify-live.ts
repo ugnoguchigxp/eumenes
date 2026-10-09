@@ -7,8 +7,12 @@ if (args[0] === "--domain" && args[1] === "agent-runtime") {
 	await import("./toolchain-live");
 	process.exit(process.exitCode ?? 0);
 }
+if (args[0] === "--domain" && args[1] === "research-routes") {
+	await import("./research-routes-live");
+	process.exit(process.exitCode ?? 0);
+}
 if (args[0] !== "--domain" || args[1] !== "larm") {
-	console.error("Use --domain larm");
+	console.error("Use --domain larm|agent-runtime|research-routes");
 	process.exit(2);
 }
 const path = process.env.EUMENES_LIVE_ASR_WAV;

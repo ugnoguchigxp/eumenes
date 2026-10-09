@@ -26,6 +26,7 @@ export * from "./components/ConfirmModal";
 export * from "./components/ContentHeader";
 export * from "./components/CopyClipButton";
 export { DateDisplay } from "./components/DateDisplay";
+export { DigitalClock, type DigitalClockProps } from "./components/DigitalClock";
 export * from "./components/DateFormat";
 export * from "./components/Drawer";
 export * from "./components/DropdownMenu";

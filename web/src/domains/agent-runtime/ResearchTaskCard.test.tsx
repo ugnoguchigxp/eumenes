@@ -79,3 +79,40 @@ test("a completed failure notice is displayed as retrieval failure, not research
 		cache.clear();
 	}
 });
+test("the card shows the acquisition mode taken from the persisted task state", async () => {
+	const client = {
+		identity: "mode-card",
+		agentTasks: vi.fn(async () => [
+			{
+				...root,
+				status: "waiting_child",
+				reportState: "none",
+				phase: "research",
+			},
+			{
+				...root,
+				id: "child",
+				kind: "worker" as const,
+				parentTaskId: "root",
+				status: "running",
+				phase: "read",
+				reportState: "none",
+				acquisitionMode: "cached" as const,
+			},
+		]),
+		agentReport: vi.fn(),
+	} as unknown as EumenesClient;
+	const cache = new QueryClient({
+		defaultOptions: { queries: { retry: false } },
+	});
+	try {
+		render(
+			<QueryClientProvider client={cache}>
+				<ResearchTaskCard client={client} rootRunId="run" title="鎌倉の天気" />
+			</QueryClientProvider>,
+		);
+		await screen.findByText("登録サイトを確認");
+	} finally {
+		cache.clear();
+	}
+});

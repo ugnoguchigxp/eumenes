@@ -1,5 +1,5 @@
 import type { Database } from "bun:sqlite";
-import type { Task, TaskDto } from "../contracts";
+import type { AcquisitionMode, Task, TaskDto } from "../contracts";
 export const migration = `
 CREATE TABLE agent_tasks(id TEXT PRIMARY KEY,kind TEXT NOT NULL,root_run_id TEXT NOT NULL,parent_task_id TEXT,package_revision_id TEXT,input_json TEXT,state TEXT NOT NULL,phase TEXT NOT NULL,revision INTEGER NOT NULL DEFAULT 0,cancel_epoch INTEGER NOT NULL DEFAULT 0,data_epoch INTEGER NOT NULL DEFAULT 0,report_state TEXT NOT NULL DEFAULT 'none',report_task_id TEXT,current_step INTEGER NOT NULL DEFAULT 0,deadline INTEGER NOT NULL,model_calls INTEGER NOT NULL DEFAULT 0,tool_calls INTEGER NOT NULL DEFAULT 0,json_repairs INTEGER NOT NULL DEFAULT 0,refinements INTEGER NOT NULL DEFAULT 0,job_id TEXT,invocation_id TEXT,error_code TEXT,created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL);
 CREATE UNIQUE INDEX agent_root_once ON agent_tasks(root_run_id) WHERE kind='coordinator';
@@ -9,6 +9,15 @@ CREATE TABLE agent_reports(task_id TEXT PRIMARY KEY,report_json TEXT NOT NULL,re
 CREATE TABLE agent_events(id TEXT PRIMARY KEY,task_id TEXT NOT NULL,root_run_id TEXT NOT NULL,kind TEXT NOT NULL,state TEXT NOT NULL,answer_job_id TEXT,created_at INTEGER NOT NULL,consumed_at INTEGER,UNIQUE(task_id,kind));
 CREATE INDEX agent_waiting ON agent_tasks(state,deadline);
 `;
+/** Appended migration: acquisition-plan JSON, host/model step origin, safe projection storage. */
+export const acquisitionMigration = `
+ALTER TABLE agent_tasks ADD COLUMN acquisition_plan_json TEXT;
+ALTER TABLE agent_tasks ADD COLUMN acquisition_binding_json TEXT;
+ALTER TABLE agent_steps ADD COLUMN action_origin TEXT NOT NULL DEFAULT 'model';
+ALTER TABLE agent_reports ADD COLUMN safe_projection_json TEXT;
+ALTER TABLE agent_reports ADD COLUMN safe_projection_digest TEXT;
+ALTER TABLE agent_reports ADD COLUMN acquisition_binding_json TEXT;
+`;
 export const get = (db: Database, id: string) =>
 	db.query("SELECT * FROM agent_tasks WHERE id=?").get(id) as Task | null;
 export const byRoot = (db: Database, id: string) =>
@@ -17,6 +26,33 @@ export const byRoot = (db: Database, id: string) =>
 			"SELECT * FROM agent_tasks WHERE root_run_id=? AND kind='coordinator'",
 		)
 		.get(id) as Task | null;
+function acquisitionMode(t: Task): AcquisitionMode | null {
+	try {
+		if (t.acquisition_binding_json) {
+			const k = JSON.parse(t.acquisition_binding_json).initialAction?.kind;
+			return k === "host-lookup"
+				? "search"
+				: k === "candidate-import"
+					? "candidate"
+					: k === "direct-invoke"
+						? "cached"
+						: null;
+		}
+		if (t.acquisition_plan_json) {
+			const k = JSON.parse(t.acquisition_plan_json).kind;
+			return k === "search-first"
+				? "search"
+				: k === "candidate"
+					? "candidate"
+					: k === "direct"
+						? "cached"
+						: null;
+		}
+	} catch {
+		return null;
+	}
+	return null;
+}
 export const dto = (t: Task): TaskDto => ({
 	id: t.id,
 	kind: t.kind,
@@ -31,6 +67,7 @@ export const dto = (t: Task): TaskDto => ({
 	createdAt: new Date(t.created_at).toISOString(),
 	deadlineAt: new Date(t.deadline).toISOString(),
 	reportState: t.report_state,
+	acquisitionMode: acquisitionMode(t),
 });
 export function update(
 	db: Database,

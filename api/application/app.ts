@@ -29,6 +29,7 @@ import {
 	type ContinuityService,
 } from "../domains/continuity";
 import { registerScheduler, type SchedulerService } from "../domains/scheduler";
+import { registerTimers, type TimersService } from "../domains/timers";
 import {
 	registerVoiceDialogue,
 	type VoiceDialogueService,
@@ -41,6 +42,11 @@ import {
 } from "../domains/tts-dictionary";
 import type { Changes } from "./events";
 import { statusForError } from "./error-status";
+import { registerTasks, type TasksService } from "../domains/tasks";
+import {
+	registerResearchRoutes,
+	type RouteOperations,
+} from "../domains/research-routes";
 import { createHash, timingSafeEqual } from "node:crypto";
 import {
 	registerServiceTests,
@@ -74,6 +80,9 @@ export function createApp(deps: {
 	continuity?: ContinuityService;
 	changes?: Changes;
 	serviceTests?: ServiceTests;
+	tasks?: TasksService;
+	researchRoutes?: RouteOperations;
+	timers?: TimersService;
 }) {
 	const app = new Hono();
 	const log = getLogger("http");
@@ -136,6 +145,8 @@ export function createApp(deps: {
 	if (deps.settings) registerSettings(app, deps.settings);
 	if (deps.inference) registerInference(app, deps.inference);
 	if (deps.serviceTests) registerServiceTests(app, deps.serviceTests);
+	if (deps.tasks) registerTasks(app, deps.tasks);
+	if (deps.researchRoutes) registerResearchRoutes(app, deps.researchRoutes);
 	if (deps.ttsDictionary) registerTtsDictionary(app, deps.ttsDictionary);
 	if (deps.memory) registerMemory(app, deps.memory);
 	if (deps.webResearch) registerWebResearch(app, deps.webResearch);
@@ -145,6 +156,7 @@ export function createApp(deps: {
 	registerVoiceDialogue(app, deps.voice);
 	registerQueue(app, deps.queue);
 	registerScheduler(app, deps.scheduler);
+	if (deps.timers) registerTimers(app, deps.timers);
 	app.onError((error, c) => {
 		const message = error instanceof Error ? error.message : "internal_error";
 		const status = statusForError(message);

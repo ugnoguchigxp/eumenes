@@ -7,3 +7,5 @@ export {
 	maxArtifactTabs,
 	reduceArtifactWorkspace,
 } from "./store";
+
+export { createShowcaseFixture } from "./showcaseFixture";

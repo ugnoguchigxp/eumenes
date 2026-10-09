@@ -3,6 +3,10 @@ const skill = readFileSync(
 	new URL("./web-research/SKILL.md", import.meta.url),
 	"utf8",
 );
+const skillV2 = readFileSync(
+	new URL("./web-research/SKILL.v2.md", import.meta.url),
+	"utf8",
+);
 import type { Definition } from "../contracts";
 const base = { revision: 1, aliases: [], tags: [], useWhen: [], avoidWhen: [] };
 export const builtins: Definition[] = [
@@ -14,6 +18,16 @@ export const builtins: Definition[] = [
 		summary: "根拠付き要約と外部命令の隔離",
 		dependencies: [],
 		body: skill,
+	},
+	{
+		...base,
+		revision: 2,
+		kind: "skill",
+		id: "web.research",
+		title: "公開資料の調査",
+		summary: "根拠付き要約と外部命令の隔離。未登録の依頼は検索から開始",
+		dependencies: [],
+		body: skillV2,
 	},
 	{
 		...base,
@@ -112,5 +126,41 @@ export const builtins: Definition[] = [
 						"tool:web.forecast@1",
 						"tool:web.quote@1",
 					],
+	})),
+	...(["research", "lookup"] as const).map((name) => ({
+		...base,
+		revision: 3,
+		kind: "package" as const,
+		id: `web.${name}`,
+		title: name === "research" ? "Web調査" : "Web検索して要約",
+		summary:
+			name === "research"
+				? "天気・株価・最新情報・比較を、まずWeb検索して公開資料から調べ、根拠付き要約を返す"
+				: "明示検索の候補を要約する",
+		aliases:
+			name === "research"
+				? ["天気", "株価", "weather", "stock", "最新情報", "調査"]
+				: ["検索", "search"],
+		tags: name === "research" ? ["weather", "finance", "research"] : [name],
+		useWhen: ["公開情報の取得・確認"],
+		avoidWhen: ["雑談", "翻訳", "手元の文章の推敲"],
+		backend: "web",
+		schemaKey: "research" as const,
+		dependencies: [
+			"profile:web.research@1",
+			"skill:web.research@2",
+			"tool:web.lookup@1",
+			"tool:web.read@1",
+			"tool:web.forecast@1",
+			"tool:web.quote@1",
+		],
+		profileRevisionId: "profile:web.research@1",
+		requiredSkillRevisionIds: ["skill:web.research@2"],
+		toolRevisionIds: [
+			"tool:web.lookup@1",
+			"tool:web.read@1",
+			"tool:web.forecast@1",
+			"tool:web.quote@1",
+		],
 	})),
 ];

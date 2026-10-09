@@ -1,29 +1,57 @@
-import { migration as capabilitiesMigration } from "../domains/capabilities";
-import { migration as toolRuntimeMigration } from "../domains/tool-runtime";
-import { migration as agentRuntimeMigration } from "../domains/agent-runtime";
+import {
+	learnedMigration as capabilitiesLearnedMigration,
+	migration as capabilitiesMigration,
+} from "../domains/capabilities";
+import { migration as researchRoutesMigration } from "../domains/research-routes";
+import {
+	migration as toolRuntimeMigration,
+	routeGrantMigration as toolRouteGrantMigration,
+	supersedeMigration as toolSupersedeMigration,
+} from "../domains/tool-runtime";
+import {
+	acquisitionMigration as agentAcquisitionMigration,
+	migration as agentRuntimeMigration,
+} from "../domains/agent-runtime";
 import { controlMigration } from "../domains/inference";
 import { agentLinkMigration } from "../domains/dialogue";
 import { migrations as memoryPackageMigrations } from "eumenes-memory/sqlite";
+import { migrations as worldPackageMigrations } from "eumenes-world-model/sqlite";
 import { migration as serviceTestsMigration } from "../domains/service-tests";
+import { migration as tasksMigration } from "../domains/tasks";
 import {
 	avatarMotionMigration as conversationAvatarMotionMigration,
 	answerDeliveryMigration as conversationAnswerDeliveryMigration,
 	migration as conversationMigration,
+	outboxMigration as conversationOutboxMigration,
+	retractionMigration as conversationRetractionMigration,
 } from "../domains/conversation";
+import {
+	migration as goalsMigration,
+	operationMigration as goalsOperationMigration,
+} from "../domains/goals";
 import { migration as continuityMigration } from "../domains/continuity";
 import {
 	migration as dialogueMigration,
 	queueLinkMigration as dialogueQueueLinkMigration,
 } from "../domains/dialogue";
 import { migration as memoryMigration } from "../domains/memory";
-import { migration as webResearchMigration } from "../domains/web-research";
+import {
+	attemptTimeoutMigration as webAttemptTimeoutMigration,
+	migration as webResearchMigration,
+} from "../domains/web-research";
 import {
 	diagnosticsMigration as inferenceDiagnosticsMigration,
 	migration as inferenceMigration,
 	parentsMigration as inferenceParentsMigration,
 } from "../domains/inference";
+import {
+	hostStateMigration as worldHostStateMigration,
+	lifecycleMigration as worldLifecycleMigration,
+	usageMigration as worldUsageMigration,
+} from "../domains/world";
 import { migration as queueMigration } from "../domains/queue";
 import { migration as schedulerMigration } from "../domains/scheduler";
+import { migration as timersMigration } from "../domains/timers";
 import {
 	epochsMigration as settingsEpochsMigration,
 	migration as settingsMigration,
@@ -78,4 +106,29 @@ export const migrations: readonly string[] = [
 	agentRuntimeMigration,
 	controlMigration,
 	agentLinkMigration,
+	// World integration (P3-03/04): appended after every deployed migration, never reordered.
+	conversationOutboxMigration,
+	goalsMigration,
+	tasksMigration,
+	// Retraction tombstone column: appended last, never reordered.
+	conversationRetractionMigration,
+	// Goal idempotency keys: appended after the already-listed goals migration.
+	goalsOperationMigration,
+	// Research-route learning (2026-10-09): appended last, never reordered.
+	capabilitiesLearnedMigration,
+	agentAcquisitionMigration,
+	researchRoutesMigration,
+	webAttemptTimeoutMigration,
+	toolRouteGrantMigration,
+	toolSupersedeMigration,
+	// World package migrations (P3-06): appended after EVERY entry above, then the host-owned
+	// world_host_* state. Never reorder, edit or insert before them; later work appends below.
+	...worldPackageMigrations,
+	worldHostStateMigration,
+	// World lifecycle (P3-05): forget intake, confirmations, registered dependents, restore marker.
+	worldLifecycleMigration,
+	// World answer adoption (P3-07): the UsageReceipt of an adopted World-backed answer.
+	worldUsageMigration,
+	// Timers (2026-10-09): appended after every deployed migration, never reordered.
+	timersMigration,
 ];

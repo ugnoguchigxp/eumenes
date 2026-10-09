@@ -1,9 +1,6 @@
-export type ArtifactTab = {
-	id: string;
-	title: string;
-	kind: "markdown";
-	content: string;
-};
+export type ArtifactTab =
+	| { id: string; title: string; kind: "markdown" | "showcase"; content: string }
+	| { id: string; kind: "timer"; title: string; timerId: string };
 
 export type ArtifactWorkspaceState = {
 	tabs: ArtifactTab[];

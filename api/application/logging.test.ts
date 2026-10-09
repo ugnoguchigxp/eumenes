@@ -63,7 +63,10 @@ test("real backend persists startup, correlated job failure and final shutdown w
 		const run = (await response.json()) as { id: string; jobId: string };
 		for (
 			let n = 0;
-			n < 100 && !entries().some((entry) => entry.event === "queue.settled");
+			n < 100 &&
+			!entries().some(
+				(entry) => entry.event === "queue.settled" && entry.jobId === run.jobId,
+			);
 			n++
 		)
 			await Bun.sleep(25);
@@ -88,7 +91,9 @@ test("real backend persists startup, correlated job failure and final shutdown w
 			reason: "larm_unconfigured",
 		});
 		expect(
-			records.find((entry) => entry.event === "queue.settled"),
+			records.find(
+				(entry) => entry.event === "queue.settled" && entry.jobId === run.jobId,
+			),
 		).toMatchObject({ jobId: run.jobId, status: "failed" });
 		child.kill("SIGTERM");
 		expect(await child.exited).toBe(0);

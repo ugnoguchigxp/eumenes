@@ -32,6 +32,7 @@ bun run logs -- --since 2026-10-08T10:00:00+09:00 --component inference --json
 | `httpRequestId` | HTTP要求ごとにbackendが発行するID。レスポンスの `X-Request-Id` と一致 |
 | `requestId` / `runId` / `jobId` | 入力要求、回答処理、ジョブ。`dialogue.accepted` が相互の対応を記録 |
 | `taskId` / `invocationId` | 調査担当の親子taskとtool呼出し。`agent.state_changed` のrunId/jobIdと対応させる |
+| `workTaskId` | 会話より長く保持する委任タスク。`tasks.registered`、`tasks.start_requested`、`tasks.stop_requested` とAPIのtaskIdを対応させる |
 | `inferenceId` / `attemptId` / `subjectId` | 推論要求、各試行、その要求を所有するrunや発話。ASR・LLM・TTSと代替先を追う |
 | `sessionId` / `utteranceId` / `generation` | 音声セッション、発話、割込みの世代 |
 | `status` / `reason` / `durationMs` | 保存後の状態、処理側で定義した理由、処理の所要時間 |
@@ -54,6 +55,12 @@ bun run logs -- --since 2026-10-08T10:00:00+09:00 --component inference --json
 `EUMENES_LOG_FILE` で保存先を変更できます。空欄は既定の保存先、`-` は stderr のみ。ファイルは10 MiBを超える前に世代を切り替え、現在分と過去4世代を保持します（約50 MiB）。ファイルの権限は `0600`、新規ログディレクトリは `0700`。ファイル保存に失敗した場合は `logging.file_unavailable` を一度 stderr に通知し、stderr出力で継続します。ファイル出力の復旧にはbackendを再起動します。
 
 会話本文、認識結果、音声バイナリ、HTTPヘッダー・query・body、設定、認証情報、Providerの生応答は出力しません。loggerは許可した運用項目だけを通します。IDやエラー発生箇所には運用上の情報があるため、外部へ共有する前には確認してください。ログはローカルの障害調査用で、改ざん防止や永続的な監査証跡を保証するものではありません。長期保存が必要な記録は世代削除前に別途保管します。
+
+## 取得先学習（research-routes）のログ
+
+出せるのは固定イベント名、`runId`、`jobId`、`reason`（固定の理由code。例: `queue_full`、`stale`、`proof_unavailable`）、`status`、`bytes`、`durationMs` だけです。経路は検索キーワードそのものではなく、必要ならキーのdigestで識別します。調査は通常どおり `bun run logs -- --level warn` から始め、`research_routes.learning_skipped`（回答後の学習がskipされた理由）と、author/review jobの `queue.settled` を jobId で追います。
+
+出さないもの: 検索キーワード・地点・銘柄、SKILL/Context本文、ページ本文・引用、facts、編集指示、Providerの生応答、認証情報、設定。回答後の学習が失敗しても元の回答は保持されるため、skip理由はここだけで確認します。
 
 ## 検証
 

@@ -25,6 +25,7 @@ const categories = [
 	{ id: "ai", label: "AIの使い方" },
 	{ id: "connections", label: "接続先" },
 	{ id: "services", label: "サービスを試す" },
+	{ id: "routes", label: "取得先と手順" },
 	{ id: "voice", label: "音声" },
 	{ id: "data", label: "データと利用記録" },
 	{ id: "schedule", label: "予約" },
@@ -79,6 +80,7 @@ export function useVoiceMute(client: EumenesClient) {
 }
 export function SettingsPage({
 	renderServiceTests,
+	renderResearchRoutes,
 	client,
 	onDirty,
 	onSaved,
@@ -87,6 +89,7 @@ export function SettingsPage({
 	onDirty: (dirty: boolean) => void;
 	onSaved: (value: Settings) => void;
 	renderServiceTests?: (disabled: boolean) => React.ReactNode;
+	renderResearchRoutes?: (disabled: boolean) => React.ReactNode;
 }) {
 	const query = useSettings(client);
 	const cache = useQueryClient();
@@ -336,16 +339,19 @@ export function SettingsPage({
 					<p className="hint">
 						{category === "services"
 							? "プロバイダを選んで、入力と結果を確認できます。"
-							: category === "memory"
-								? "保存した記憶を会話で使うかを切り替えます。変更はすぐに保存されます。"
-								: category === "dictionary"
-									? "読み上げの直前に、登録した文字を読み方へ置き換えます（長い登録が優先）。会話の表示は変わりません。変更は行ごとにすぐ保存されます。"
-									: category === "general"
-										? "AIの名前・あなたの名前・話し方を設定します。次の返答から反映されます。"
-										: "普段はLARMを使い、必要なときに登録済みのクラウドへ切り替えます。"}
+							: category === "routes"
+								? "検索で見つけた取得先と、その手順を確認・編集できます。値は毎回取得し直します。"
+								: category === "memory"
+									? "保存した記憶を会話で使うかを切り替えます。変更はすぐに保存されます。"
+									: category === "dictionary"
+										? "読み上げの直前に、登録した文字を読み方へ置き換えます（長い登録が優先）。会話の表示は変わりません。変更は行ごとにすぐ保存されます。"
+										: category === "general"
+											? "AIの名前・あなたの名前・話し方を設定します。次の返答から反映されます。"
+											: "普段はLARMを使い、必要なときに登録済みのクラウドへ切り替えます。"}
 					</p>
 				</header>
 				{category === "services" && renderServiceTests?.(dirty)}
+				{category === "routes" && renderResearchRoutes?.(false)}
 				{category === "general" && (
 					<GeneralSection value={value} change={change} />
 				)}
@@ -403,7 +409,8 @@ export function SettingsPage({
 				)}
 				{category !== "dictionary" &&
 					category !== "memory" &&
-					category !== "services" && (
+					category !== "services" &&
+					category !== "routes" && (
 						<footer className="settings-footer">
 							<output>
 								{message && dirty && message === "変更を適用しました"

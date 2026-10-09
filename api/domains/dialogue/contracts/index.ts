@@ -1,3 +1,4 @@
+import type { Database } from "bun:sqlite";
 import { z } from "zod";
 export const submitSchema = z.object({
 	requestId: z.uuid(),
@@ -45,3 +46,79 @@ export const promptTargetSchema = z.object({
 	deadlineMs: z.number().int().min(10_000).max(600_000).optional(),
 });
 export type PromptTarget = z.infer<typeof promptTargetSchema>;
+
+/** Optional post-answer hook owned by dialogue. It never receives message text. */
+export type PostAnswerObservation = {
+	runId: string;
+	ticketId: string;
+	reportEpoch: number;
+};
+export type PostAnswerObserverResult =
+	| { status: "recorded" }
+	| { status: "skipped"; code: string };
+export interface PostAnswerObserverPort {
+	/** Called inside a SAVEPOINT after the answer is adopted; must be synchronous. */
+	recordInTransaction(
+		db: Database,
+		input: PostAnswerObservation,
+	): PostAnswerObserverResult;
+}
+
+/**
+ * Optional World context owned by dialogue's caller (the Context Broker).
+ * Dialogue knows no World types: it passes the opaque `context` back and
+ * treats the block as reference data in its own labelled message. With no
+ * port, or a port answering `disabled`, dialogue behaves as it always did.
+ */
+export type WorldContextPrepareInput = {
+	runId: string;
+	conversationId: string;
+	jobId: string;
+	attempt: number;
+	generation: number;
+	/** Bytes of reference data already fixed for this input (Memory's recall block). */
+	reservedBytes: number;
+	nowMs: number;
+};
+export type WorldContextPrepared =
+	| { status: "disabled" }
+	/** The run ends with `reason`; it is never continued without the context. */
+	| { status: "blocked"; reason: string }
+	| { status: "ready"; block: string; context: unknown };
+export type WorldContextVerdict = { ok: true } | { ok: false; reason: string };
+export type WorldContextSettleInput = {
+	runId: string;
+	conversationId: string;
+	jobId: string;
+	attempt: number;
+	generation: number;
+	inference: { requestId: string; attemptId: string } | null;
+	nowMs: number;
+};
+export interface WorldContextPort {
+	/** Same Writer transaction as the Memory recall. Writes nothing unless `ready`. */
+	prepareInTransaction(
+		db: Database,
+		input: WorldContextPrepareInput,
+	): WorldContextPrepared;
+	/** Just before the model is called; not ok means nothing is sent. */
+	checkBeforeSend(context: unknown): Promise<WorldContextVerdict>;
+	/** Adoption check in the Writer transaction; read-only. */
+	validateInTransaction(
+		db: Database,
+		input: WorldContextSettleInput,
+		context: unknown,
+	): WorldContextVerdict;
+	/** Same transaction as the answer message, after every check passed. */
+	recordUsageInTransaction(
+		db: Database,
+		input: WorldContextSettleInput,
+		context: unknown,
+	): void;
+	/** The run does not adopt: drop its usage record and input dependencies. */
+	releaseInTransaction(
+		db: Database,
+		runId: string,
+		conversationId: string,
+	): void;
+}

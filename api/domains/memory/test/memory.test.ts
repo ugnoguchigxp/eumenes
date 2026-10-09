@@ -1,3 +1,4 @@
+import type { Database } from "bun:sqlite";
 import { expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -83,6 +84,48 @@ test("remember, stop, retract and forget work end to end over HTTP without dialo
 		const forgotten = await post(`/api/memory/items/${item.id}/forget`, {});
 		expect(forgotten.status).toBe(200);
 		expect(memory.list(true)).toEqual([]);
+		await store.close();
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("policyRevisionInTransaction is the revision memory's access() uses and moves with the memory ON/OFF setting", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "eumenes-memory-policy-"));
+	try {
+		const store = openStore(join(dir, "db.sqlite3"), [
+			conversationMigration,
+			avatarMotionMigration,
+			answerDeliveryMigration,
+			continuityMigration,
+			migration,
+			...memoryPackageMigrations,
+		]);
+		const memory = createMemoryService(
+			store,
+			createConversationService(store),
+			createContinuityService(store),
+			{ journalPath: join(dir, "journal.jsonl") },
+		);
+		const raw = (db: Database) =>
+			String(
+				(
+					db
+						.query("SELECT revision FROM memory_host_settings WHERE id = 1")
+						.get() as { revision: number }
+				).revision,
+			);
+		const before = store.read((db) => memory.policyRevisionInTransaction(db));
+		expect(before).toBe(store.read(raw));
+		await memory.setEnabled(false);
+		const after = store.read((db) => memory.policyRevisionInTransaction(db));
+		expect(after).toBe(store.read(raw));
+		expect(after).not.toBe(before);
+		// recover() reports whether change-feed subscribers must resync (false on a clean start).
+		expect(await memory.recover()).toMatchObject({
+			healthy: true,
+			reapplied: 0,
+		});
 		await store.close();
 	} finally {
 		rmSync(dir, { recursive: true, force: true });

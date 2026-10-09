@@ -105,6 +105,8 @@ export interface HandlerDefinition<P, I, O> {
 		input: I | null,
 		outcome: SettleOutcome<O>,
 	): SettleResult;
+	/** Called only after a successful commit that applied this settlement. */
+	afterCommit?(): void;
 	cancelInTransaction(
 		tx: Tx,
 		job: { jobId: string; subjectRef: string | null; payload: P },

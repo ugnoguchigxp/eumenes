@@ -2,6 +2,7 @@
 
 | Domain | Backend 入口 | Web 入口 | 所有する試験 |
 | --- | --- | --- | --- |
+| tasks | `api/domains/tasks/index.ts` | 共通client/API・CLI（`docs/delegated-tasks.md`） | `api/domains/tasks/test/`、結合試験 `api/application/delegated-tasks.test.ts` |
 | attitude-dataset | `api/domains/attitude-dataset/index.ts` | CLI/API（`docs/ruri-collection.md`） | `api/domains/attitude-dataset/test/` |
 | delivery | `api/domains/delivery/index.ts` | なし | `api/domains/delivery/test/` |
 | avatar | なし | `web/src/domains/avatar/index.ts` | `web/src/domains/avatar/test/` |
@@ -14,6 +15,7 @@
 | capabilities | `api/domains/capabilities/index.ts` | CLI/API | `api/domains/capabilities/test/` |
 | tool-runtime | `api/domains/tool-runtime/index.ts` | なし | `api/domains/tool-runtime/test/` |
 | agent-runtime | `api/domains/agent-runtime/index.ts` | `web/src/domains/agent-runtime/index.ts` | `api/domains/agent-runtime/test/`、`api/application/toolchain.test.ts`、`tests/browser/toolchain.spec.ts` |
+| research-routes | `api/domains/research-routes/index.ts` | `web/src/domains/research-routes/index.tsx`（設定の「取得先と手順」） / CLI/API（`docs/research-routes.md`） | `api/domains/research-routes/test/`、結合試験 `api/application/research-routes.test.ts` |
 | web-research | `api/domains/web-research/index.ts` | CLI/API | `api/domains/web-research/test/` |
 | memory | `api/domains/memory/index.ts` | なし | `api/domains/memory/test/` |
 | larm | `api/domains/larm/index.ts` | なし | `api/domains/larm/test/` |

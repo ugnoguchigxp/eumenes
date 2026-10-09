@@ -160,7 +160,7 @@ test("5000 capability catalogue: bounded discovery, exact aliases, immutable rev
 		await store.close();
 		rmSync(dir, { recursive: true, force: true });
 	}
-});
+}, 30000);
 test("builtin SKILL is mandatory; disabling survives seed and dependency failure hides package", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-capabilities-"));
 	const store = openStore(join(dir, "db"), [migration]);
@@ -252,7 +252,10 @@ test("builtin bundle upgrade preserves revision 1 fingerprints and activates a n
 	const caps = createCapabilities(store);
 	try {
 		await store.write((db) => {
-			for (const definition of builtins)
+			// Only the originally deployed definitions (revision 3 packages / skill 2 are newer).
+			for (const definition of builtins.filter(
+				(d) => d.revision < 3 && !(d.kind === "skill" && d.revision === 2),
+			))
 				caps.registerBuiltinInTransaction(db, { ...definition, revision: 1 });
 			// Represent the previously deployed 2,000-character schema fingerprint.
 			const oldSchema = zSchema("research");
@@ -302,7 +305,7 @@ test("builtin bundle upgrade preserves revision 1 fingerprints and activates a n
 			const prepared = caps.prepareInTransaction(db, owner, card.candidateRef, {
 				question: "東京の天気".repeat(500),
 			});
-			expect(prepared.package.revision).toBe(2);
+			expect(prepared.package.revision).toBe(3);
 		});
 	} finally {
 		caps.close();

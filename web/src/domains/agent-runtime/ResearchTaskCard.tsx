@@ -15,6 +15,11 @@ const phases: Record<string, string> = {
 	cancelled: "停止",
 	interrupted: "中断",
 };
+const modes: Record<string, string> = {
+	search: "検索して確認",
+	candidate: "保存した候補を確認",
+	cached: "登録サイトを確認",
+};
 export function ResearchTaskCard({
 	client,
 	rootRunId,
@@ -74,6 +79,7 @@ export function ResearchTaskCard({
 				? "failed"
 				: root.phase;
 	const data = root.reportState === "available" ? report.data : undefined;
+	const mode = modes[child?.acquisitionMode ?? root.acquisitionMode ?? ""];
 	const unavailable =
 		["deleted", "expired"].includes(root.reportState) ||
 		(report.error instanceof ApiError &&
@@ -87,6 +93,7 @@ export function ResearchTaskCard({
 					? "一部未確認"
 					: (phases[phase ?? ""] ?? "調査中")}
 			</output>
+			{mode && <small>{mode}</small>}
 			{!["completed", "failed", "cancelled", "interrupted"].includes(
 				root.status,
 			) && (

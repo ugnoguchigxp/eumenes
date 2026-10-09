@@ -1,8 +1,13 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve, join, dirname } from "node:path";
 import { ApiError, ApiConnectionError, createClient } from "../client";
 import { submitSchema, type Run } from "../api/domains/dialogue/contracts";
 import { resolveApiToken } from "../api/infrastructure/auth-config";
+import {
+	createTaskSchema,
+	amendTaskSchema,
+	answerTaskSchema,
+} from "../api/domains/tasks/contracts";
 
 const args = process.argv.slice(2);
 const json = args.includes("--json");
@@ -67,7 +72,120 @@ function show(value: unknown) {
 				: JSON.stringify(value, null, 2),
 	);
 }
+async function submitTaskCommand<T>(
+	requestId: string,
+	operation: () => Promise<T>,
+) {
+	try {
+		return await operation();
+	} catch (error) {
+		console.error(
+			`Request ID: ${requestId}. Check task status before retrying.`,
+		);
+		throw error;
+	}
+}
 async function main() {
+	if (command === "tasks") {
+		if (wait)
+			throw new Error(
+				"tasks commands return saved state; --wait is not supported",
+			);
+		const sub = positional.shift() ?? "list";
+		if (sub === "list")
+			return show(
+				await client.workTasks(positional[0] ? { state: positional[0] } : {}),
+			);
+		if (sub === "show" && positional[0])
+			return show(await client.workTask(positional[0]));
+		if (sub === "events" && positional[0])
+			return show(
+				await client.workTaskEvents(positional[0], positional[1] ?? "0"),
+			);
+		const requestId = explicitRequestId ?? crypto.randomUUID();
+		if (sub === "create" && positional[0]) {
+			const body: unknown = await Bun.file(positional[0]).json();
+			if (!body || typeof body !== "object" || Array.isArray(body))
+				throw new Error("invalid_task_input");
+			const parsed = createTaskSchema.safeParse({
+				...body,
+				requestId:
+					explicitRequestId ??
+					("requestId" in body ? body.requestId : requestId),
+			});
+			if (!parsed.success) throw new Error("invalid_task_input");
+			return show(
+				await submitTaskCommand(parsed.data.requestId, () =>
+					client.createTask(parsed.data),
+				),
+			);
+		}
+		const [taskId, revisionText] = positional;
+		const expectedRevision = Number(revisionText);
+		if (
+			!taskId ||
+			revisionText === undefined ||
+			!Number.isSafeInteger(expectedRevision) ||
+			expectedRevision < 0
+		)
+			throw new Error(
+				"usage: tasks list [state]|show <id>|events <id> [cursor]|create <json>|start <id> <revision>|stop <id> <revision> <pause|cancel>|answer <id> <revision> <questionId> <answer>|amend <id> <revision> <grant-json>|forget <id> <revision>",
+			);
+		if (sub === "forget")
+			return show(
+				await submitTaskCommand(requestId, () =>
+					client.forgetTask(taskId, requestId, expectedRevision),
+				),
+			);
+		if (sub === "start")
+			return show(
+				await submitTaskCommand(requestId, () =>
+					client.startTask(taskId, requestId, expectedRevision),
+				),
+			);
+		if (
+			sub === "stop" &&
+			(positional[2] === "pause" || positional[2] === "cancel")
+		)
+			return show(
+				await submitTaskCommand(requestId, () =>
+					client.stopTask(
+						taskId,
+						requestId,
+						expectedRevision,
+						positional[2] as "pause" | "cancel",
+					),
+				),
+			);
+		if (sub === "answer") {
+			const parsed = answerTaskSchema.safeParse({
+				requestId,
+				expectedRevision,
+				questionId: positional[2],
+				answer: positional.slice(3).join(" "),
+			});
+			if (!parsed.success) throw new Error("invalid_task_input");
+			return show(
+				await submitTaskCommand(requestId, () =>
+					client.answerTask(taskId, parsed.data),
+				),
+			);
+		}
+		if (sub === "amend" && positional[2]) {
+			const parsed = amendTaskSchema.safeParse({
+				requestId,
+				expectedRevision,
+				grant: await Bun.file(positional[2]).json(),
+			});
+			if (!parsed.success) throw new Error("invalid_task_input");
+			return show(
+				await submitTaskCommand(requestId, () =>
+					client.amendTask(taskId, parsed.data),
+				),
+			);
+		}
+		throw new Error("invalid_tasks_command");
+	}
 	if (command === "web") {
 		const sub = positional.shift();
 		if ((stable || fresh) && sub !== "read")
@@ -316,6 +434,56 @@ async function main() {
 		}
 		return;
 	}
+	if (command === "research-routes") {
+		const sub = positional.shift();
+		const usage =
+			"usage: research-routes list [cursor] [limit]|show <key>|edit <key> <stateToken> <instruction-file>|disable <key> <stateToken>|rediscover <key> <stateToken>|clear <expectedEpoch> [--request-id UUID]";
+		const requestId = explicitRequestId ?? crypto.randomUUID();
+		if (sub === "list") {
+			const [cursor, limit] = positional;
+			return show(
+				await client.researchRoutes({
+					...(cursor && cursor !== "-" ? { cursor } : {}),
+					...(limit ? { limit: Number(limit) } : {}),
+				}),
+			);
+		}
+		const [key, token, file] = positional;
+		if (sub === "show" && key) return show(await client.researchRoute(key));
+		if (sub === "edit" && key && token && file) {
+			// The instruction comes from a file so the text never passes through a shell line.
+			const instruction = (await readFile(file, "utf8")).trim();
+			return show(
+				await client.editResearchRoute(key, {
+					requestId,
+					expectedStateToken: token,
+					instruction,
+				}),
+			);
+		}
+		if (sub === "disable" && key && token)
+			return show(
+				await client.disableResearchRoute(key, {
+					requestId,
+					expectedStateToken: token,
+				}),
+			);
+		if (sub === "rediscover" && key && token)
+			return show(
+				await client.rediscoverResearchRoute(key, {
+					requestId,
+					expectedStateToken: token,
+				}),
+			);
+		if (sub === "clear" && key !== undefined && /^\d+$/.test(key))
+			return show(
+				await client.clearResearchRoutes({
+					requestId,
+					expectedEpoch: Number(key),
+				}),
+			);
+		throw new Error(usage);
+	}
 	if (command === "memory") {
 		const sub = positional.shift();
 		if (!sub || sub === "list") return show(await client.memoryItems(false));
@@ -356,7 +524,7 @@ async function main() {
 		);
 	}
 	throw new Error(
-		"usage: bun cli/index.ts status|web search|web read|web run|web cancel|web cache|web clear|memory ...|send [text] [--wait] [--json] [--request-id UUID]|history [id]|run <id>|cancel <id>",
+		"usage: bun cli/index.ts status|web search|web read|web run|web cancel|web cache|web clear|research-routes ...|memory ...|send [text] [--wait] [--json] [--request-id UUID]|history [id]|run <id>|cancel <id>",
 	);
 }
 try {

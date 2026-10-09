@@ -9,3 +9,24 @@ export const get = (db: Database, id: string) =>
 	db
 		.query("SELECT * FROM tool_invocations WHERE id=?")
 		.get(id) as Invocation | null;
+/** Appended migration: marks observations imported from the candidate cache (never a real lookup). */
+export const routeGrantMigration = `
+ALTER TABLE tool_invocations ADD COLUMN origin TEXT NOT NULL DEFAULT 'tool';
+`;
+/** Appended migration: invocations replaced by a new acquisition plan stay budgeted but are no longer observed. */
+export const supersedeMigration = `
+ALTER TABLE tool_invocations ADD COLUMN superseded INTEGER NOT NULL DEFAULT 0;
+`;
+const columnCache = new WeakMap<Database, boolean>();
+export function hasSupersededColumn(db: Database) {
+	let v = columnCache.get(db);
+	if (v === undefined) {
+		v = (
+			db.query("PRAGMA table_info(tool_invocations)").all() as {
+				name: string;
+			}[]
+		).some((c) => c.name === "superseded");
+		columnCache.set(db, v);
+	}
+	return v;
+}

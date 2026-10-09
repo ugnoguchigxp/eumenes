@@ -21,10 +21,16 @@ import {
 	type Task,
 	type Report,
 	type AnswerTicket,
+	type AcquisitionPlanPort,
+	type AcquisitionProposal,
+	type AcquisitionLookupProvenance,
+	type AdoptedEvidence,
+	type StoredBinding,
 } from "../contracts";
 import { get, byRoot, update, dto } from "../repository";
 import { coordinatorContext, workerContext } from "./context";
 import { verifyReport, parentProjection } from "./verify-report";
+import { createRouteStep, siteFailureCodes } from "./route-step";
 const terminal = new Set(["completed", "failed", "cancelled", "interrupted"]);
 const active = (t: Task | null): t is Task => !!t && !terminal.has(t.state);
 const owner = (t: Task): Owner => ({
@@ -32,6 +38,8 @@ const owner = (t: Task): Owner => ({
 	taskId: t.id,
 	cancelEpoch: t.cancel_epoch,
 });
+const codeOf = (code: string, fallback: string) =>
+	/^[a-z_]{1,80}$/.test(code) ? code : fallback;
 const safeCode = (e: unknown) =>
 	e instanceof Error && /^[a-z_]{1,80}$/.test(e.message)
 		? e.message
@@ -55,6 +63,7 @@ export function createAgentRuntime({
 	queue,
 	now = Date.now,
 	invocationHint,
+	acquisition,
 }: {
 	store: SqliteStore;
 	capabilities: Capabilities;
@@ -65,6 +74,8 @@ export function createAgentRuntime({
 	invocationHint?: (
 		question: string,
 	) => { toolId: string; arguments: unknown } | null;
+	/** Optional generic acquisition plan. Without it every path is the pre-port one. */
+	acquisition?: AcquisitionPlanPort;
 }) {
 	const log = getLogger("agent-runtime");
 	const traceIds = new Set<string>();
@@ -80,8 +91,82 @@ export function createAgentRuntime({
 	const abortJobs = new Set<string>(),
 		abortRequests = new Set<string>(),
 		releases = new Set<string>();
+	const releaseTokens = new Set<string>();
 	let maintaining: Promise<void> | null = null;
 	let maintenanceTimer: ReturnType<typeof setInterval> | null = null;
+	const storedBinding = (t: Task | null): StoredBinding | null => {
+		if (!t?.acquisition_binding_json) return null;
+		try {
+			return JSON.parse(t.acquisition_binding_json) as StoredBinding;
+		} catch {
+			return null;
+		}
+	};
+	/** tool-runtime may expose per-invocation rows; absent until it does (then `tools` is empty). */
+	function invocationDigests(db: Database, taskId: string) {
+		const fn = (
+			tools as unknown as {
+				invocationsInTransaction?: (
+					db: Database,
+					taskId: string,
+				) => {
+					toolRevisionId: string;
+					stepId: string;
+					argsDigest: string;
+					state: string;
+				}[];
+			}
+		).invocationsInTransaction;
+		const p = prepared.get(taskId);
+		if (!fn || !p) return [];
+		const ids = new Map(p.dependencies.map((d) => [d.revisionId, d.id]));
+		return fn(db, taskId).map((r) => ({
+			toolId: ids.get(r.toolRevisionId) ?? r.toolRevisionId,
+			stepId: r.stepId,
+			argsDigest: r.argsDigest,
+			state: r.state,
+		}));
+	}
+	/** A cached (direct) plan may be swapped for a normal search once, only for site-side failures. */
+	function canReplace(t: Task | null) {
+		const b = storedBinding(t);
+		return (
+			!!routeStep &&
+			!!b &&
+			b.initialAction.kind === "direct-invoke" &&
+			(b.replacements ?? 0) < 1
+		);
+	}
+	function replaceOrFail(
+		db: Database,
+		childId: string,
+		code: string,
+		parentJobId: string,
+	) {
+		try {
+			routeStep!.replace(db, childId, code, parentJobId);
+		} catch {
+			// No replacement: report the original site failure, never an older value.
+			// The swap rolled back, but the route's failure is a separate durable fact.
+			const t = get(db, childId);
+			if (t) releaseBinding(db, t, code);
+			if (active(t)) fail(db, t, code);
+		}
+	}
+	function releaseBinding(db: Database, t: Task, reason?: string) {
+		const b = storedBinding(t);
+		if (!b || !acquisition) return;
+		try {
+			acquisition.releaseInTransaction(db, {
+				bindingToken: b.bindingToken,
+				owner: owner(t),
+				reason,
+			});
+			releaseTokens.add(b.bindingToken);
+		} catch {
+			// release is best effort; the port re-checks ownership on every use
+		}
+	}
 	function enqueue(db: Database, t: Task, parentJobId?: string) {
 		traceIds.add(t.id);
 		const ordinal = t.current_step + 1,
@@ -158,6 +243,8 @@ export function createAgentRuntime({
 		endSteps(db, t.id, "failed", code);
 		if (t.kind === "worker") {
 			update(db, current, "failed", "failed", code);
+			// A failed bound child hands its route verdict/candidates to the port durably.
+			releaseBinding(db, current, code);
 			const parent = current.parent_task_id
 				? get(db, current.parent_task_id)
 				: null;
@@ -219,6 +306,7 @@ export function createAgentRuntime({
 			}
 			for (const job of tools.cancelInTransaction(db, t.id)) jobs.add(job);
 			releases.add(t.id);
+			releaseBinding(db, t);
 		}
 		db.query(
 			"UPDATE agent_events SET state='cancelled' WHERE root_run_id=? AND state!='consumed'",
@@ -232,11 +320,16 @@ export function createAgentRuntime({
 		for (const request of requests) abortRequests.add(request);
 		return { jobIds: [...jobs], requestIds: [...requests] };
 	}
+	/** A cached (direct) plan allows exactly one use of its single granted tool. */
+	function toolLimit(t: Task, toolId: string) {
+		if (storedBinding(t)?.initialAction.kind === "direct-invoke") return 1;
+		return toolId === "web.lookup" ? 2 : toolId === "web.read" ? 3 : 1;
+	}
 	function usableTools(db: Database, t: Task) {
 		return (bindings.get(t.id) ?? []).filter(
 			(b) =>
 				tools.countInTransaction(db, t.id, b.tool.revisionId) <
-				(b.tool.id === "web.lookup" ? 2 : b.tool.id === "web.read" ? 3 : 1),
+				toolLimit(t, b.tool.id),
 		);
 	}
 	const handler: HandlerDefinition<
@@ -293,7 +386,11 @@ export function createAgentRuntime({
 							errorCode: "errorCode" in o ? o.errorCode : null,
 							failures: o.failures,
 						})),
-						invocationHint?.(researchInput.parse(p.input).question),
+						// A bound plan already fixed the first action; a legacy forecast/quote hint
+						// must never pre-empt a required search.
+						storedBinding(t)
+							? null
+							: invocationHint?.(researchInput.parse(p.input).question),
 					);
 				}
 				const requestId = inference.captureControlInTransaction(db, {
@@ -479,15 +576,7 @@ export function createAgentRuntime({
 						t.id,
 						tool.tool.revisionId,
 					);
-					if (
-						t.tool_calls >= 5 ||
-						count >=
-							(tool.tool.id === "web.lookup"
-								? 2
-								: tool.tool.id === "web.read"
-									? 3
-									: 1)
-					)
+					if (t.tool_calls >= 5 || count >= toolLimit(t, tool.tool.id))
 						throw new Error("agent_budget_exhausted");
 					const taskInput = researchInput.parse(p.input);
 					const obs = tools.observationsInTransaction(db, t.id);
@@ -518,17 +607,91 @@ export function createAgentRuntime({
 				} else if (action.action === "finish") {
 					// Re-resolve all source operations while accepting; expired/cancelled data cannot be adopted.
 					const obs = tools.observationsInTransaction(db, t.id);
-					const report = verifyReport(
-						action.report,
-						input.visible,
-						obs.some((o) => o.state !== "succeeded" || o.failures.length > 0),
+					const hasFailures = obs.some(
+						(o) => o.state !== "succeeded" || o.failures.length > 0,
 					);
-					db.query("INSERT INTO agent_reports VALUES(?,?,?,?)").run(
-						t.id,
-						JSON.stringify(report),
-						hash(report),
-						now(),
-					);
+					let report = verifyReport(action.report, input.visible, hasFailures);
+					const binding = storedBinding(t);
+					let safe: {
+						json: string;
+						digest: string;
+						binding: string;
+					} | null = null;
+					if (binding) {
+						if (!acquisition) throw new Error("acquisition_unavailable");
+						const allowed = acquisition.validateInTransaction(db, {
+							bindingToken: binding.bindingToken,
+							owner: owner(t),
+							stage: "finish",
+						});
+						if (allowed.kind !== "allowed")
+							throw new Error(codeOf(allowed.code, "acquisition_rejected"));
+						const result = acquisition.recordObservationInTransaction(db, {
+							bindingToken: binding.bindingToken,
+							owner: owner(t),
+							visibleSources: input.visible.map((s) => ({
+								sourceId: s.sourceId,
+								url: s.url,
+								body: s.body,
+								basis: s.basis,
+								fetchedAt: s.fetchedAt,
+								truncated: s.truncated,
+							})),
+							lookupProvenance: binding.lookupProvenance,
+							tools: invocationDigests(db, t.id),
+							report,
+							facts: action.facts,
+						});
+						if (result.kind !== "valid")
+							throw new Error(
+								result.kind === "report_invalid"
+									? "invalid_report"
+									: result.kind === "source_unusable"
+										? "source_unusable"
+										: "policy_unavailable",
+							);
+						// Canonical, host-verified content replaces the model's free text.
+						report = verifyReport(
+							result.canonicalReportPatch,
+							input.visible,
+							hasFailures,
+						);
+						const projection = {
+							...result.safeProjection,
+							coverage: report.coverage,
+							verification: report.verification,
+							sources: report.sources.map((s) => ({
+								sourceId: s.sourceId,
+								url: s.url,
+								basis: s.basis,
+								fetchedAt: s.fetchedAt,
+							})),
+						};
+						safe = {
+							json: JSON.stringify(projection),
+							digest: result.projectionDigest,
+							binding: JSON.stringify({
+								bindingToken: binding.bindingToken,
+								proofId: result.proofId,
+							}),
+						};
+					}
+					if (safe)
+						db.query(
+							"INSERT INTO agent_reports(task_id,report_json,report_digest,created_at,safe_projection_json,safe_projection_digest,acquisition_binding_json) VALUES(?,?,?,?,?,?,?)",
+						).run(
+							t.id,
+							JSON.stringify(report),
+							hash(report),
+							now(),
+							safe.json,
+							safe.digest,
+							safe.binding,
+						);
+					else
+						db.query(
+							"INSERT INTO agent_reports(task_id,report_json,report_digest,created_at) VALUES(?,?,?,?)",
+						).run(t.id, JSON.stringify(report), hash(report), now());
 					db.query(
 						"UPDATE agent_tasks SET report_state='available' WHERE id=?",
 					).run(t.id);
@@ -553,6 +716,15 @@ export function createAgentRuntime({
 					code,
 				);
 				if (
+					code === "source_unusable" &&
+					t.kind === "worker" &&
+					canReplace(get(db, t.id))
+				) {
+					db.query(
+						"UPDATE agent_steps SET state='rejected',error_code=? WHERE id=?",
+					).run(code, input.stepId);
+					replaceOrFail(db, t.id, code, claim.jobId);
+				} else if (
 					["invalid_tool_input", "invalid_evidence", "invalid_report"].includes(
 						code,
 					) &&
@@ -582,7 +754,33 @@ export function createAgentRuntime({
 			}
 		},
 	};
+	const routeStep = acquisition
+		? createRouteStep({
+				acquisition,
+				capabilities,
+				tools,
+				queue,
+				now,
+				get,
+				byRoot,
+				update,
+				insertTask,
+				ready,
+				fail,
+				next,
+				owner,
+				storedBinding,
+				bindAcquisition,
+				prepared,
+				bindings,
+				releaseTokens,
+				releaseBinding,
+				codeOf,
+				safeCode,
+			})
+		: null;
 	queue.registerHandler(handler);
+	if (routeStep) queue.registerHandler(routeStep.handler);
 	function flush() {
 		for (const id of traceIds) {
 			const task = store.read((db) => get(db, id));
@@ -624,6 +822,26 @@ export function createAgentRuntime({
 			}
 		}
 		releases.clear();
+		// Grants of a replaced/cancelled binding leave memory only once the DB confirms no live
+		// task still holds that token (a rolled-back replacement keeps its grants).
+		for (const token of releaseTokens) {
+			const holders = store.read(
+				(db) =>
+					db
+						.query(
+							"SELECT * FROM agent_tasks WHERE acquisition_binding_json LIKE ?",
+						)
+						.all(`%${token}%`) as Task[],
+			);
+			if (
+				!holders.some(
+					(t) =>
+						!terminal.has(t.state) && storedBinding(t)?.bindingToken === token,
+				)
+			)
+				tools.releaseBinding(token);
+		}
+		releaseTokens.clear();
 		queue.flushCancellations([...abortJobs]);
 		inference.flushCancelledRequests?.([...abortRequests]);
 		abortJobs.clear();
@@ -752,6 +970,12 @@ export function createAgentRuntime({
 								settled.state === "interrupted"
 							)
 								fail(db, t, settled.error_code ?? "tool_failed");
+							else if (
+								settled.state === "failed" &&
+								canReplace(t) &&
+								siteFailureCodes.has(settled.error_code ?? "")
+							)
+								replaceOrFail(db, t.id, settled.error_code!, inv.job_id);
 							else next(db, t, inv.job_id);
 						});
 					}
@@ -818,6 +1042,61 @@ export function createAgentRuntime({
 			.get(target.id) as { report_json: string } | null;
 		return row ? (JSON.parse(row.report_json) as Report) : null;
 	}
+	function bindAcquisition(
+		db: Database,
+		rootTaskId: string,
+		childTaskId: string,
+	): StoredBinding {
+		if (!acquisition) throw new Error("acquisition_unavailable");
+		const root = get(db, rootTaskId);
+		const child = get(db, childTaskId);
+		if (
+			!active(root) ||
+			!active(child) ||
+			root.kind !== "coordinator" ||
+			child.kind !== "worker" ||
+			child.parent_task_id !== root.id ||
+			child.root_run_id !== root.root_run_id
+		)
+			throw new Error("task_cancelled");
+		const plan = root.acquisition_plan_json
+			? (JSON.parse(root.acquisition_plan_json) as AcquisitionProposal)
+			: null;
+		if (
+			!plan ||
+			(plan.kind !== "search-first" &&
+				plan.kind !== "candidate" &&
+				plan.kind !== "direct")
+		)
+			throw new Error("acquisition_plan_missing");
+		const bound = acquisition.bindInTransaction(db, {
+			proposalToken: plan.proposalToken,
+			childOwner: owner(child),
+			deadline: child.deadline,
+		});
+		if (bound.kind !== "bound")
+			throw new Error(codeOf(bound.code, "acquisition_rejected"));
+		const stored: StoredBinding = {
+			bindingToken: bound.bindingToken,
+			packageRevisionId: bound.packageRevisionId,
+			initialAction: bound.initialAction,
+			lookupProvenance: null,
+		};
+		db.query(
+			"UPDATE agent_tasks SET acquisition_binding_json=? WHERE id=?",
+		).run(JSON.stringify(stored), child.id);
+		return stored;
+	}
+	function safeRow(db: Database, taskId: string) {
+		return db
+			.query(
+				"SELECT safe_projection_json,safe_projection_digest FROM agent_reports WHERE task_id=?",
+			)
+			.get(taskId) as {
+			safe_projection_json: string | null;
+			safe_projection_digest: string | null;
+		} | null;
+	}
 	function prepareAnswerInTransaction(
 		db: Database,
 		rootRunId: string,
@@ -836,7 +1115,23 @@ export function createAgentRuntime({
 		const child = root.report_task_id ? get(db, root.report_task_id) : null;
 		const report = reportInTransaction(db, root.id);
 		if (root.report_task_id && !report) throw new Error("report_deleted");
+		const safe = child ? safeRow(db, child.id) : null;
+		const binding = storedBinding(child);
+		if (binding) {
+			// Cached authority is rechecked at adoption: clear/disable/disqualified results are refused.
+			if (!acquisition || !safe?.safe_projection_digest)
+				throw new Error("acquisition_unavailable");
+			const ok = acquisition.validateAdoptionInTransaction(db, {
+				bindingToken: binding.bindingToken,
+				owner: owner(child!),
+				projectionDigest: safe.safe_projection_digest,
+			});
+			if (ok.kind !== "allowed")
+				throw new Error(codeOf(ok.code, "acquisition_rejected"));
+		}
 		return {
+			projectionDigest: safe?.safe_projection_digest ?? null,
+			acquisitionBindingToken: binding?.bindingToken ?? null,
 			taskId: root.id,
 			eventId: event.id,
 			revision: root.revision,
@@ -847,7 +1142,8 @@ export function createAgentRuntime({
 			failureCode:
 				root.error_code === "clarification_required" ? null : root.error_code,
 			projection: report
-				? JSON.stringify(parentProjection(report))
+				? (safe?.safe_projection_json ??
+					JSON.stringify(parentProjection(report)))
 				: root.error_code
 					? JSON.stringify(
 							root.error_code === "clarification_required"
@@ -886,11 +1182,70 @@ export function createAgentRuntime({
 				hash(report) !== ticket.reportDigest
 			)
 				return false;
+			const binding = storedBinding(child);
+			if (binding || ticket.projectionDigest) {
+				const safe = safeRow(db, child.id);
+				if (
+					!binding ||
+					!acquisition ||
+					!safe?.safe_projection_digest ||
+					safe.safe_projection_digest !== ticket.projectionDigest
+				)
+					return false;
+				try {
+					const ok = acquisition.validateAdoptionInTransaction(db, {
+						bindingToken: binding.bindingToken,
+						owner: owner(child),
+						projectionDigest: safe.safe_projection_digest,
+					});
+					if (ok.kind !== "allowed") return false;
+				} catch {
+					return false;
+				}
+			}
 		}
 		return true;
 	}
+	function adoptedEvidence(
+		db: Database,
+		input: { rootRunId: string; ticketId: string; reportEpoch: number },
+	): AdoptedEvidence | null {
+		const root = byRoot(db, input.rootRunId);
+		if (!root || root.state !== "completed" || !root.report_task_id)
+			return null;
+		const event = db
+			.query(
+				"SELECT id,state FROM agent_events WHERE id=? AND task_id=? AND state='consumed'",
+			)
+			.get(input.ticketId, root.id) as { id: string } | null;
+		const child = get(db, root.report_task_id);
+		if (
+			!event ||
+			!child ||
+			child.state !== "completed" ||
+			root.report_state !== "available" ||
+			child.report_state !== "available" ||
+			child.data_epoch !== input.reportEpoch
+		)
+			return null;
+		const report = reportInTransaction(db, child.id);
+		if (!report) return null;
+		return {
+			rootRunId: root.root_run_id,
+			rootTaskId: root.id,
+			childTaskId: child.id,
+			ticketId: event.id,
+			rootDataEpoch: root.data_epoch,
+			reportEpoch: child.data_epoch,
+			reportDigest: hash(report),
+			projectionDigest: safeRow(db, child.id)?.safe_projection_digest ?? null,
+			bindingToken: storedBinding(child)?.bindingToken ?? null,
+		};
+	}
 	return {
 		handler,
+		/** Host (non-inference) step handler; undefined without an acquisition port. */
+		routeStepHandler: routeStep?.handler,
 		cancelTreeInTransaction,
 		prepareAnswerInTransaction,
 		validAnswerInTransaction,
@@ -905,9 +1260,113 @@ export function createAgentRuntime({
 				input.input,
 				input.deadline,
 			);
-			return { taskId: t.id, jobId: enqueue(db, t) };
+			return {
+				taskId: t.id,
+				jobId: routeStep ? routeStep.enqueueHost(db, t) : enqueue(db, t),
+			};
 		},
 		byRootInTransaction: byRoot,
+		/** Ask the port for a root proposal; stored on the coordinator, never a read grant. */
+		resolveAcquisitionInTransaction(
+			db: Database,
+			rootTaskId: string,
+			requestAtMs: number,
+		): AcquisitionProposal {
+			if (!acquisition) return { kind: "unmatched" };
+			const root = get(db, rootTaskId);
+			if (!active(root) || root.kind !== "coordinator")
+				throw new Error("task_not_active");
+			const question = JSON.parse(root.input_json ?? "{}").question;
+			if (typeof question !== "string") return { kind: "unmatched" };
+			const proposal = acquisition.resolveInTransaction(db, {
+				rootRunId: root.root_run_id,
+				coordinatorTaskId: root.id,
+				question,
+				requestAtMs,
+			});
+			db.query("UPDATE agent_tasks SET acquisition_plan_json=? WHERE id=?").run(
+				JSON.stringify({ ...proposal, requestAtMs }),
+				root.id,
+			);
+			return proposal;
+		},
+		/** Bind the stored root proposal to a freshly created child (parent/root/cancel epoch checked). */
+		bindAcquisitionInTransaction: bindAcquisition,
+		bindingInTransaction(db: Database, taskId: string) {
+			return storedBinding(get(db, taskId));
+		},
+		/** Record the provenance of the host lookup / candidate import for later proof. */
+		setLookupProvenanceInTransaction(
+			db: Database,
+			childTaskId: string,
+			provenance: AcquisitionLookupProvenance,
+		) {
+			const b = storedBinding(get(db, childTaskId));
+			if (!b) throw new Error("acquisition_binding_missing");
+			db.query(
+				"UPDATE agent_tasks SET acquisition_binding_json=? WHERE id=?",
+			).run(
+				JSON.stringify({ ...b, lookupProvenance: provenance }),
+				childTaskId,
+			);
+		},
+		/** Stage check by the port (prepare/finish). */
+		validateAcquisitionInTransaction(
+			db: Database,
+			childTaskId: string,
+			stage: "prepare" | "finish",
+		) {
+			const child = get(db, childTaskId);
+			const b = storedBinding(child);
+			if (!child || !b || !acquisition)
+				return { kind: "rejected", code: "acquisition_unavailable" } as const;
+			return acquisition.validateInTransaction(db, {
+				bindingToken: b.bindingToken,
+				owner: owner(child),
+				stage,
+			});
+		},
+		/**
+		 * Host-only: swap a failed cached plan of an active child for a normal search plan.
+		 * Same owner / deadline / step ordinals / budgets; at most once per child.
+		 */
+		replaceAcquisitionPlanInTransaction(
+			db: Database,
+			childTaskId: string,
+			reason: string,
+			parentJobId: string,
+		) {
+			if (!routeStep) throw new Error("acquisition_unavailable");
+			return routeStep.replace(db, childTaskId, reason, parentJobId);
+		},
+		releaseAcquisitionInTransaction(db: Database, taskId: string) {
+			const t = get(db, taskId);
+			if (t) releaseBinding(db, t);
+		},
+		/**
+		 * Host-only: evidence of a consumed, completed answer. Unlike validAnswer this does not
+		 * depend on ready_for_answer or on the revision that completion bumped.
+		 */
+		getAdoptedEvidenceInTransaction: adoptedEvidence,
+		/** Re-check previously obtained evidence: deletion, cancel or a report change refuse it. */
+		validateAdoptedEvidenceInTransaction(
+			db: Database,
+			evidence: AdoptedEvidence,
+		): boolean {
+			const current = adoptedEvidence(db, {
+				rootRunId: evidence.rootRunId,
+				ticketId: evidence.ticketId,
+				reportEpoch: evidence.reportEpoch,
+			});
+			return (
+				!!current &&
+				current.rootTaskId === evidence.rootTaskId &&
+				current.childTaskId === evidence.childTaskId &&
+				current.rootDataEpoch === evidence.rootDataEpoch &&
+				current.reportDigest === evidence.reportDigest &&
+				current.projectionDigest === evidence.projectionDigest
+			);
+		},
 		pendingEvents: () =>
 			store.read(
 				(db) =>

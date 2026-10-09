@@ -315,78 +315,106 @@ export function createScheduler(
 			});
 	}
 
+	function createInTransaction(db: Tx, input: CreateSchedule): ScheduleDto {
+		const target = targets.get(input.target.kind);
+		if (!target) throw new Error("invalid_unknown_target");
+		const payload = target.schema.safeParse(input.target.payload);
+		if (!payload.success) throw new Error("invalid_target_payload");
+		const mode = input.schedule.type;
+		const first = Date.parse(
+			input.schedule.type === "once"
+				? input.schedule.at
+				: input.schedule.anchor,
+		);
+		if (!Number.isFinite(first) || Math.abs(first) > MAX_ABS_MS)
+			throw new Error("invalid_schedule_time");
+		const intervalMs =
+			input.schedule.type === "interval" ? input.schedule.intervalMs : null;
+		const digest = new Bun.CryptoHasher("sha256")
+			.update(
+				canonical({
+					kind: target.kind,
+					version: target.version,
+					payload: payload.data,
+					mode,
+					first,
+					intervalMs,
+					misfire: input.misfirePolicy,
+					grace: input.graceMs,
+				}),
+			)
+			.digest("hex");
+		const existing = getByRequest(db, input.requestId);
+		if (existing) {
+			if (existing.inputDigest !== digest) throw new Error("request_conflict");
+			return toDto(existing);
+		}
+		if (countLive(db) >= maxSchedules)
+			throw new Error("schedule_limit_reached");
+		target.validateInTransaction?.(db, payload.data);
+		const at = now();
+		const nextDue =
+			intervalMs === null
+				? first
+				: firstBoundaryAtOrAfter(first, intervalMs, at);
+		return toDto(
+			insertSchedule(db, {
+				id: newId(),
+				requestId: input.requestId,
+				inputDigest: digest,
+				scope: "default",
+				targetKind: target.kind,
+				targetVersion: target.version,
+				targetPayloadJson: canonical(payload.data),
+				state: "active",
+				revision: 0,
+				mode,
+				anchorAtMs: first,
+				intervalMs,
+				nextDueAtMs: nextDue,
+				misfirePolicy: input.misfirePolicy,
+				graceMs: input.graceMs,
+				createdAtMs: at,
+				updatedAtMs: at,
+			}),
+		);
+	}
+
 	return {
 		registerTarget<P>(definition: TargetDefinition<P>) {
 			if (targets.has(definition.kind))
 				throw new Error(`invalid_duplicate_target:${definition.kind}`);
 			targets.set(definition.kind, definition as TargetDefinition<unknown>);
 		},
+		createInTransaction,
 		async create(input: CreateSchedule): Promise<ScheduleDto> {
-			const target = targets.get(input.target.kind);
-			if (!target) throw new Error("invalid_unknown_target");
-			const payload = target.schema.safeParse(input.target.payload);
-			if (!payload.success) throw new Error("invalid_target_payload");
-			const mode = input.schedule.type;
-			const first = Date.parse(
-				input.schedule.type === "once"
-					? input.schedule.at
-					: input.schedule.anchor,
-			);
-			if (!Number.isFinite(first) || Math.abs(first) > MAX_ABS_MS)
-				throw new Error("invalid_schedule_time");
-			const intervalMs =
-				input.schedule.type === "interval" ? input.schedule.intervalMs : null;
-			const digest = new Bun.CryptoHasher("sha256")
-				.update(
-					canonical({
-						kind: target.kind,
-						version: target.version,
-						payload: payload.data,
-						mode,
-						first,
-						intervalMs,
-						misfire: input.misfirePolicy,
-						grace: input.graceMs,
-					}),
-				)
-				.digest("hex");
-			const created = await store.write((db) => {
-				const existing = getByRequest(db, input.requestId);
-				if (existing) {
-					if (existing.inputDigest !== digest)
-						throw new Error("request_conflict");
-					return existing;
-				}
-				if (countLive(db) >= maxSchedules)
-					throw new Error("schedule_limit_reached");
-				target.validateInTransaction?.(db, payload.data);
-				const at = now();
-				const nextDue =
-					intervalMs === null
-						? first
-						: firstBoundaryAtOrAfter(first, intervalMs, at);
-				return insertSchedule(db, {
-					id: newId(),
-					requestId: input.requestId,
-					inputDigest: digest,
-					scope: "default",
-					targetKind: target.kind,
-					targetVersion: target.version,
-					targetPayloadJson: canonical(payload.data),
-					state: "active",
-					revision: 0,
-					mode,
-					anchorAtMs: first,
-					intervalMs,
-					nextDueAtMs: nextDue,
-					misfirePolicy: input.misfirePolicy,
-					graceMs: input.graceMs,
-					createdAtMs: at,
-					updatedAtMs: at,
-				});
-			});
+			const created = await store.write((db) => createInTransaction(db, input));
 			wake();
-			return toDto(created);
+			return created;
+		},
+		getInTransaction(db: Tx, id: string): ScheduleDto | null {
+			const s = getSchedule(db, id);
+			return s ? toDto(s) : null;
+		},
+		cancelInTransaction(db: Tx, id: string, expectedRevision: number) {
+			const s = getSchedule(db, id);
+			if (!s) throw new Error("invalid_schedule_id");
+			if (s.revision !== expectedRevision) throw new Error("revision_conflict");
+			if (!["active", "paused"].includes(s.state))
+				throw new Error("schedule_state_conflict");
+			if (
+				!transitionSchedule(
+					db,
+					id,
+					expectedRevision,
+					["active", "paused"],
+					"cancelled",
+					null,
+					now(),
+				)
+			)
+				throw new Error("revision_conflict");
+			return toDto(getSchedule(db, id)!);
 		},
 		get(id: string): ScheduleDto | null {
 			const s = store.read((db) => getSchedule(db, id));

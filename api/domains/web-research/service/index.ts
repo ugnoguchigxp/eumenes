@@ -33,6 +33,7 @@ interface Prepared {
 	request: ResearchRequest;
 	generation: number;
 	hit: CacheHit | null;
+	attemptTimeoutMs: number | null;
 }
 interface Executed extends Acquisition {
 	hit: CacheHit | null;
@@ -77,6 +78,10 @@ export function createWebResearch({
 	now = Date.now,
 	id = () => crypto.randomUUID(),
 	acquisitionTimeoutMs = 15000,
+	timers = {
+		set: (fn: () => void, ms: number): unknown => setTimeout(fn, ms),
+		clear: (handle: unknown) => clearTimeout(handle as never),
+	},
 }: {
 	store: SqliteStore;
 	queue: QueueService;
@@ -85,6 +90,11 @@ export function createWebResearch({
 	now?: () => number;
 	id?: () => string;
 	acquisitionTimeoutMs?: number;
+	/** Injectable for tests: the per-attempt timer starts when the acquisition starts executing. */
+	timers?: {
+		set(fn: () => void, ms: number): unknown;
+		clear(handle: unknown): void;
+	};
 }) {
 	if (
 		!Number.isSafeInteger(acquisitionTimeoutMs) ||
@@ -157,21 +167,38 @@ export function createWebResearch({
 		const active = work;
 		active.users++;
 		return new Promise((resolve, reject) => {
-			let released = false;
+			let released = false,
+				attempt: unknown;
 			const release = () => {
 				if (released) return;
 				released = true;
+				if (attempt !== undefined) timers.clear(attempt);
 				signal.removeEventListener("abort", abort);
 				if (--active.users === 0) {
 					active.controller.abort();
 					if (shares.get(key) === active) shares.delete(key);
 				}
 			};
+			// Only this consumer leaves on its own attempt/queue deadline; the shared fetch is
+			// aborted solely when the last consumer is gone (see release()).
 			const abort = () => {
 				release();
-				reject(new Error("web_cancelled"));
+				const reason = signal.reason;
+				reject(
+					new Error(
+						reason instanceof Error && reason.message === "deadline_exceeded"
+							? "web_deadline_exceeded"
+							: "web_cancelled",
+					),
+				);
 			};
 			signal.addEventListener("abort", abort, { once: true });
+			if (input.attemptTimeoutMs !== null)
+				attempt = timers.set(() => {
+					if (released) return;
+					release();
+					reject(new Error("web_attempt_timeout"));
+				}, input.attemptTimeoutMs);
 			active.promise.then(
 				(value) => {
 					release();
@@ -209,7 +236,13 @@ export function createWebResearch({
 			}
 			return {
 				status: "ready",
-				input: { id: run.id, request, generation, hit },
+				input: {
+					id: run.id,
+					request,
+					generation,
+					hit,
+					attemptTimeoutMs: run.attempt_timeout_ms ?? null,
+				},
 			};
 		},
 		async execute(input, context) {
@@ -236,6 +269,13 @@ export function createWebResearch({
 					hit: null,
 				};
 			} catch (error) {
+				if (
+					error instanceof Error &&
+					["web_attempt_timeout", "web_deadline_exceeded"].includes(
+						error.message,
+					)
+				)
+					throw error;
 				throw new Error(acquisitionError(error));
 			}
 		},
@@ -367,11 +407,21 @@ export function createWebResearch({
 		raw: unknown,
 		hostOptions?: {
 			deadlineAtMs: number;
-			parentJobId: string;
+			parentJobId?: string;
 			lane: "interactive" | "background";
+			/** 1..15000 ms, counted from execute start (never from Queue admission). */
+			attemptTimeoutMs?: number;
 		},
 	) {
 		if (closing) throw new Error("web_research_unavailable");
+		const attemptTimeoutMs = hostOptions?.attemptTimeoutMs;
+		if (
+			attemptTimeoutMs !== undefined &&
+			(!Number.isSafeInteger(attemptTimeoutMs) ||
+				attemptTimeoutMs < 1 ||
+				attemptTimeoutMs > 15000)
+		)
+			throw new Error("invalid_web_attempt_timeout");
 		const parsed = submitResearchSchema.safeParse(raw);
 		if (!parsed.success) throw new Error("invalid_web_research_input");
 		const request = parsed.data,
@@ -400,7 +450,15 @@ export function createWebResearch({
 				// Serialize cache writes for a URL, including fresh bypasses, so older fetches cannot replace newer content.
 				concurrencyKey: cacheKey(request) ?? undefined,
 			});
-			insert(db, runId, request, inputDigest, job.job.id, now());
+			insert(
+				db,
+				runId,
+				request,
+				inputDigest,
+				job.job.id,
+				now(),
+				attemptTimeoutMs,
+			);
 			return { runId, jobId: job.job.id, fresh: true };
 		})();
 	}

@@ -38,7 +38,9 @@ export async function harness(
 	const store = openStore(join(dir, "db"), migrations);
 	const changes = createChanges();
 	const unsubscribeChanges = store.onCommit(() => changes.publish());
-	const conversation = createConversationService(store),
+	const conversation = createConversationService(store, {
+			requireOutbox: true,
+		}),
 		settings = await createSettings(store, { dbPath: join(dir, "db") });
 	const parentContexts: string[] = [],
 		workerContexts: string[] = [];
@@ -235,6 +237,7 @@ export async function harness(
 		larm: inference,
 		queue,
 		agents: toolchain.agents,
+		postAnswer: toolchain.postAnswer,
 	});
 	const voice = createVoiceDialogue(store, dialogue, inference),
 		scheduler = createScheduler(store, queue);

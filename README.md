@@ -112,3 +112,7 @@ APIキーはAES-256-GCMで暗号化します。暗号鍵は32バイトをBase64�
 予報の専用読取りは東京、大阪、神奈川、京都、愛知、福岡、兵庫に対応します。他の地域は検索を使います。株価は依頼にtickerが明示された場合に専用読取りを使い、市場終了・遅延・価格時点を区別します。上流の取得拒否やguard拒否を迂回しません。結果データは14日、本文を含まない処理metadataは30日で整理し、既存の会話は残します。
 
 `EUMENES_LIVE_TOOLCHAIN=1 bun run verify:live -- --domain agent-runtime` は一時DBを持つ隔離backendを起動し、実LARMと公開データで天気・株価を確認します。LARM認証はbackendの環境変数から読み、通常DBは使いません。判定は子の報告と最終回答の数値まで確認します。[実装・検証記録](spec/verification/toolchain/README.md)を参照してください。
+
+## 取得先と手順（research-routes）
+
+初回の「天気予報 鎌倉」「株価 AAPL」のような依頼はWeb検索で取得先を探し、回答後に成功した1サイトの取得手順を登録します。同じキーワードの次回は登録サイトを直接確認し、値は毎回取得し直します。サイト故障時は再検索して新しい取得先に更新します。操作は設定の「取得先と手順」またはCLI（`bun run cli research-routes list|show|edit|disable|rediscover|clear`）で、どちらもAPIだけを使います。詳しくは [docs/research-routes.md](docs/research-routes.md)。静岡市のlive対応は未確認で、実機器の音声3往復も未実施です（[検証記録](spec/verification/research-routes/README.md)）。

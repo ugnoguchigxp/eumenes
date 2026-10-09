@@ -1,4 +1,10 @@
 export const domains = {
+	tasks: {
+		backend: "api/domains/tasks",
+		web: null,
+		components: null,
+		depends: [],
+	},
 	capabilities: {
 		backend: "api/domains/capabilities",
 		web: null,
@@ -16,6 +22,12 @@ export const domains = {
 		web: "web/src/domains/agent-runtime",
 		components: null,
 		depends: ["capabilities", "tool-runtime", "inference", "queue"],
+	},
+	"research-routes": {
+		backend: "api/domains/research-routes",
+		web: "web/src/domains/research-routes",
+		components: null,
+		depends: ["capabilities", "inference", "queue"],
 	},
 	"web-research": {
 		backend: "api/domains/web-research",
@@ -77,6 +89,18 @@ export const domains = {
 		components: null,
 		depends: [],
 	},
+	goals: {
+		backend: "api/domains/goals",
+		web: null,
+		components: null,
+		depends: [],
+	},
+	world: {
+		backend: "api/domains/world",
+		web: null,
+		components: null,
+		depends: ["conversation", "goals", "memory"],
+	},
 	memory: {
 		backend: "api/domains/memory",
 		web: null,
@@ -106,6 +130,12 @@ export const domains = {
 		web: null,
 		components: null,
 		depends: ["queue"],
+	},
+	timers: {
+		backend: "api/domains/timers",
+		web: "web/src/domains/timers",
+		components: "web/src/components/domains/timers",
+		depends: ["queue", "scheduler"],
 	},
 	dialogue: {
 		backend: "api/domains/dialogue",

@@ -79,7 +79,13 @@ export type Definition = {
 	toolRevisionIds?: string[];
 	requiredSkillRevisionIds?: string[];
 	profileRevisionId?: string;
+	/** Learned definitions are route-only: never indexed, never listed, prepared by exact ID. */
+	discoveryMode?: "catalog" | "route-only";
 };
+export const learnedIdPattern = /^learned\.web\.[0-9a-f]{32}$/;
+export const learnedMaxBytes = 16384;
+export const commonSkillRevisionId = "skill:web.research@2";
+export const commonProfileRevisionId = "profile:web.research@1";
 export type FixedDefinition = Definition & {
 	revisionId: string;
 	hash: string;

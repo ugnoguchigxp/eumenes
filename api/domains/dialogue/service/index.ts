@@ -15,11 +15,14 @@ import type { HandlerDefinition, QueueService, Tx } from "../../queue";
 import type { TargetDefinition } from "../../scheduler";
 import type { MemoryService } from "../../memory";
 import {
+	type PostAnswerObserverPort,
 	type PromptTarget,
 	promptTargetSchema,
 	type Run,
 	type RunProgress,
 	type Submit,
+	type WorldContextPort,
+	type WorldContextSettleInput,
 } from "../contracts";
 import {
 	unfinishedAgentRuns,
@@ -98,6 +101,8 @@ interface GenerateInput {
 	requestId?: string;
 	/** The memory view fixed at prepare time; re-checked in the adoption transaction. */
 	memory?: { view: unknown };
+	/** The World context fixed at prepare time (opaque here); re-checked before sending and at adoption. */
+	world?: { context: unknown };
 	agent?: AnswerTicket;
 	/** A host-owned failure notice; generated facts are never used on acquisition failure. */
 	fixedAnswer?: string;
@@ -123,6 +128,8 @@ export function createDialogueService({
 	id = () => crypto.randomUUID(),
 	memory,
 	agents,
+	postAnswer,
+	worldContext,
 }: {
 	store: SqliteStore;
 	conversation: ConversationService;
@@ -132,7 +139,30 @@ export function createDialogueService({
 	id?: () => string;
 	memory?: MemoryService;
 	agents?: AgentRuntime;
+	postAnswer?: PostAnswerObserverPort;
+	worldContext?: WorldContextPort;
 }) {
+	/** Optional learning runs in its own SAVEPOINT: any failure rolls back only that part. */
+	function observeAnswer(tx: Tx, runId: string, ticket?: AnswerTicket) {
+		if (!postAnswer || !ticket || ticket.reportEpoch === null) return;
+		const name = "dialogue_post_answer";
+		tx.exec(`SAVEPOINT ${name}`);
+		try {
+			const result = postAnswer.recordInTransaction(tx, {
+				runId,
+				ticketId: ticket.eventId,
+				reportEpoch: ticket.reportEpoch,
+			});
+			if (result.status !== "recorded") {
+				tx.exec(`ROLLBACK TO ${name}`);
+				log.info("dialogue.post_answer_skipped", { reason: result.code });
+			}
+		} catch {
+			tx.exec(`ROLLBACK TO ${name}`);
+			log.warn("dialogue.post_answer_skipped", { reason: "observer_error" });
+		}
+		tx.exec(`RELEASE ${name}`);
+	}
 	const partials = new Map<string, string>();
 	const watchers = new Map<string, Set<(value: RunProgress) => void>>();
 	const watchedStatuses = new Map<string, string>();
@@ -176,7 +206,11 @@ export function createDialogueService({
 	});
 
 	/** Model-visible history: earlier accepted runs (input + adopted answer) then this run's input. */
-	function historyFor(tx: Tx, run: Run, memoryBlock?: string): ChatMessage[] {
+	function historyFor(
+		tx: Tx,
+		run: Run,
+		referenceBlocks: readonly string[] = [],
+	): ChatMessage[] {
 		const messages = new Map(
 			conversation
 				.messagesInTransaction(tx, run.conversationId)
@@ -191,8 +225,9 @@ export function createDialogueService({
 				),
 			},
 		];
-		// Memory is reference data, never an instruction: it gets its own labelled message.
-		if (memoryBlock) out.push({ role: "system", content: memoryBlock });
+		// Memory and World are reference data, never an instruction: each gets its own labelled message.
+		for (const block of referenceBlocks)
+			if (block) out.push({ role: "system", content: block });
 		const push = (messageId: string | null, role: "user" | "assistant") => {
 			const m = messageId ? messages.get(messageId) : undefined;
 			if (m) out.push({ role, content: m.text });
@@ -259,6 +294,40 @@ export function createDialogueService({
 				);
 				return { status: "stale", reason: `memory_${recalled.reason}` };
 			}
+			// World reads in the SAME transaction as Memory's recall and shares its budget.
+			const world =
+				worldContext && !agent?.failureCode
+					? worldContext.prepareInTransaction(tx, {
+							runId: run.id,
+							conversationId: run.conversationId,
+							jobId: claim.jobId,
+							attempt: claim.attempt,
+							generation: claim.generation,
+							reservedBytes:
+								recalled?.status === "ready"
+									? new TextEncoder().encode(recalled.block).length
+									: 0,
+							nowMs: Date.parse(clock()),
+						})
+					: undefined;
+			if (world?.status === "blocked") {
+				if (run.agentTaskId)
+					agents?.failAnswerInTransaction(tx, run.id, world.reason);
+				// Never silently run without the World context; end the run with the reason.
+				transition(
+					tx,
+					run.id,
+					current.revision,
+					"failed",
+					clock(),
+					world.reason,
+				);
+				return { status: "stale", reason: world.reason };
+			}
+			const referenceBlocks = [
+				...(recalled?.status === "ready" ? [recalled.block] : []),
+				...(world?.status === "ready" ? [world.block] : []),
+			];
 			if (larm.captureInTransaction && !larm.requestFor?.(tx, run.id, "llm")) {
 				const snapshot = larm.snapshotInTransaction?.(tx);
 				if (snapshot) {
@@ -275,17 +344,13 @@ export function createDialogueService({
 					);
 				}
 			}
-			let messages = historyFor(
-				tx,
-				current,
-				recalled?.status === "ready" ? recalled.block : undefined,
-			);
+			let messages = historyFor(tx, current, referenceBlocks);
 			if (agent?.projection) {
 				const input = messages.at(-1)!;
-				const memoryMessages =
-					recalled?.status === "ready"
-						? [{ role: "system" as const, content: recalled.block }]
-						: [];
+				const memoryMessages = referenceBlocks.map((content) => ({
+					role: "system" as const,
+					content,
+				}));
 				const optional = messages.slice(1 + memoryMessages.length, -1);
 				const required = [
 					{
@@ -327,11 +392,14 @@ export function createDialogueService({
 					...(recalled?.status === "ready"
 						? { memory: { view: recalled.view } }
 						: {}),
+					...(world?.status === "ready"
+						? { world: { context: world.context } }
+						: {}),
 					requestId: larm.requestFor?.(tx, run.id, "llm") ?? undefined,
 				},
 			};
 		},
-		async execute(input, { signal }) {
+		async execute(input, { signal, jobId, attempt, generation }) {
 			const run = store.read((db) => byId(db, input.runId));
 			return withLogContext(
 				{
@@ -341,6 +409,27 @@ export function createDialogueService({
 				},
 				async () => {
 					log.info("dialogue.generation_started");
+					if (input.world && worldContext) {
+						// The last gate before the model. A source, policy or forget change makes
+						// the context stale; a stopped run or a replaced attempt must not send either.
+						// All of it is checked last, right before the send. Anything sent after this
+						// cannot be recalled: later changes can only stop the adoption.
+						const verdict = await worldContext.checkBeforeSend(
+							input.world.context,
+						);
+						if (!verdict.ok) throw new Error(verdict.reason);
+						signal.throwIfAborted();
+						const now = store.read((db) => byId(db, input.runId));
+						if (now?.status !== "running" || now.revision !== input.revision)
+							throw new Error("cancelled");
+						const job = queue.get(jobId);
+						if (
+							job?.state !== "running" ||
+							job.attempt !== attempt ||
+							job.generation !== generation
+						)
+							throw new Error("attempt_changed");
+					}
 					let held = 0;
 					const delta = (text: string) => {
 						signal.throwIfAborted();
@@ -350,8 +439,8 @@ export function createDialogueService({
 							current.revision !== input.revision
 						)
 							throw new Error("cancelled");
-						if (input.memory || input.agent?.projection) {
-							// Memory-backed text is not shown or spoken before the adoption check passes.
+						if (input.memory || input.world || input.agent?.projection) {
+							// Memory/World-backed text is not shown or spoken before the adoption check passes.
 							held += text.length;
 							if (held > 65536) throw new Error("chat_output_too_large");
 							return;
@@ -402,7 +491,7 @@ export function createDialogueService({
 					}
 					const prefix = partials.get(input.runId) ?? "";
 					if (!text.startsWith(prefix)) throw new Error("chat_stream_diverged");
-					if (input.memory || input.agent?.projection) {
+					if (input.memory || input.world || input.agent?.projection) {
 						// Held text was already counted while streaming; check the final length directly.
 						if (text.length > 65536) throw new Error("chat_output_too_large");
 					} else if (text.length > prefix.length)
@@ -421,8 +510,12 @@ export function createDialogueService({
 					!input ||
 					run.status !== "running" ||
 					run.revision !== input.revision
-				)
+				) {
+					// The result is not adopted: nothing it stood on stays registered.
+					if (input?.world && run.status !== "completed")
+						worldContext?.releaseInTransaction(tx, run.id, run.conversationId);
 					return "stale";
+				}
 				if (
 					input.agent &&
 					agents &&
@@ -438,6 +531,46 @@ export function createDialogueService({
 					);
 					agents.failAnswerInTransaction(tx, run.id, "report_invalidated");
 					return { status: "failed", errorCode: "report_invalidated" };
+				}
+				const worldSettle: WorldContextSettleInput | null =
+					input.world && worldContext
+						? {
+								runId: run.id,
+								conversationId: run.conversationId,
+								jobId: claim.jobId,
+								attempt: claim.attempt,
+								generation: claim.generation,
+								inference: outcome.result.receipt
+									? {
+											requestId: outcome.result.receipt.requestId,
+											attemptId: outcome.result.receipt.attemptId,
+										}
+									: null,
+								nowMs: Date.parse(clock()),
+							}
+						: null;
+				if (input.world && worldContext && worldSettle) {
+					// Read-only, before anything is written: a stale World context adopts
+					// neither the answer nor a usage record.
+					const verdict = worldContext.validateInTransaction(
+						tx,
+						worldSettle,
+						input.world.context,
+					);
+					if (!verdict.ok) {
+						worldContext.releaseInTransaction(tx, run.id, run.conversationId);
+						if (run.agentTaskId)
+							agents?.failAnswerInTransaction(tx, run.id, verdict.reason);
+						transition(
+							tx,
+							run.id,
+							run.revision,
+							"failed",
+							clock(),
+							verdict.reason,
+						);
+						return { status: "failed", errorCode: verdict.reason };
+					}
 				}
 				if (input.memory && memory) {
 					const adopted = memory.settleInTransaction(
@@ -475,8 +608,17 @@ export function createDialogueService({
 						clock(),
 						"permission_revoked",
 					);
+					if (input.world)
+						worldContext?.releaseInTransaction(tx, run.id, run.conversationId);
 					return { status: "failed", errorCode: "permission_revoked" };
 				}
+				// The usage record and the answer are written together, after every check.
+				if (input.world && worldContext && worldSettle)
+					worldContext.recordUsageInTransaction(
+						tx,
+						worldSettle,
+						input.world.context,
+					);
 				if (input.agent && agents)
 					agents.completeAnswerInTransaction(tx, input.agent);
 				const messageId = id();
@@ -495,7 +637,7 @@ export function createDialogueService({
 						run.conversationId,
 						outcome.result.receipt.delivery,
 					);
-				return transition(
+				const done = transition(
 					tx,
 					run.id,
 					run.revision,
@@ -503,12 +645,16 @@ export function createDialogueService({
 					clock(),
 					null,
 					messageId,
-				)
-					? "applied"
-					: "stale";
+				);
+				if (done) observeAnswer(tx, run.id, input.agent);
+				else if (input.world)
+					worldContext?.releaseInTransaction(tx, run.id, run.conversationId);
+				return done ? "applied" : "stale";
 			}
 			// A run that is already terminal (e.g. cancelled) keeps its state.
 			if (run.status !== "queued" && run.status !== "running") return "applied";
+			// Not adopted (failed, retried, expired, interrupted): drop the input dependencies.
+			worldContext?.releaseInTransaction(tx, run.id, run.conversationId);
 			const next: [Run["status"], string | null] =
 				outcome.type === "retry"
 					? ["queued", outcome.errorCode]
@@ -525,7 +671,7 @@ export function createDialogueService({
 		},
 		cancelInTransaction(tx, job) {
 			const run = byId(tx, job.payload.runId);
-			if (run && (run.status === "queued" || run.status === "running"))
+			if (run && (run.status === "queued" || run.status === "running")) {
 				transition(
 					tx,
 					run.id,
@@ -534,6 +680,9 @@ export function createDialogueService({
 					clock(),
 					"cancel_requested",
 				);
+				// A late result is rejected by the queue; what the run registered is released.
+				worldContext?.releaseInTransaction(tx, run.id, run.conversationId);
+			}
 		},
 	};
 	queue.registerHandler(handler);

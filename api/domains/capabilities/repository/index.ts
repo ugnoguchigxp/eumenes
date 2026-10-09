@@ -6,6 +6,12 @@ CREATE TABLE capability_revisions (id TEXT PRIMARY KEY,item_key TEXT NOT NULL,re
 CREATE TABLE capability_dependencies (revision_id TEXT NOT NULL,dependency_revision_id TEXT NOT NULL,PRIMARY KEY(revision_id,dependency_revision_id));
 CREATE VIRTUAL TABLE capability_search USING fts5(key UNINDEXED,content,tokenize='trigram');
 `;
+/** Appended migration: never fold into the first one. */
+export const learnedMigration = `
+ALTER TABLE capability_items ADD COLUMN discovery_mode TEXT NOT NULL DEFAULT 'catalog';
+ALTER TABLE capability_items ADD COLUMN origin TEXT NOT NULL DEFAULT 'builtin';
+CREATE INDEX capability_items_origin ON capability_items(origin,kind);
+`;
 export function get(db: Database, revisionId: string): FixedDefinition | null {
 	const row = db
 		.query(

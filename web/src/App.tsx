@@ -22,6 +22,7 @@ import { LightAvatarBackground } from "./components/domains/conversation/LightAv
 import { Button, Textarea } from "./design-system";
 import { Subtitle } from "./components/domains/subtitle/Subtitle";
 import { ArtifactPanel } from "./components/domains/artifact/ArtifactPanel";
+import { TimerArtifact } from "./components/domains/timers/TimerArtifact";
 import { useArtifactWorkspace } from "./domains/artifact";
 import { type AudioStore, createAudioStore } from "./domains/audio";
 import { useConversation } from "./domains/conversation";
@@ -33,6 +34,7 @@ import {
 } from "./domains/dialogue";
 import { useReplay, useVoiceDialogue } from "./domains/voice-dialogue";
 import { ServiceTestsPanel } from "./domains/service-tests";
+import { ResearchRoutesPanel } from "./domains/research-routes";
 import { SettingsPage, useSettings, useVoiceMute } from "./domains/settings";
 import { changeRoots, queryRoots } from "./queryKeys";
 import {
@@ -71,7 +73,21 @@ function Workspace({
 	const onDirty = useCallback((v: boolean) => {
 		dirtySettings.current = v;
 	}, []);
+	// Research-route edits are tracked apart from settings; leaving the page checks both.
+	const dirtyRoutes = useRef(false);
+	const onRoutesDirty = useCallback((v: boolean) => {
+		dirtyRoutes.current = v;
+	}, []);
+	useEffect(() => {
+		const prevent = (e: BeforeUnloadEvent) => {
+			if (dirtyRoutes.current) e.preventDefault();
+		};
+		window.addEventListener("beforeunload", prevent);
+		return () => window.removeEventListener("beforeunload", prevent);
+	}, []);
 	const artifacts = useArtifactWorkspace();
+	const openedTimers = useRef(new Set<string>());
+	const [timerWatchId, setTimerWatchId] = useState<string | null>(null);
 	const settings = useSettings(client);
 	const usage = useQuery({
 		queryKey: [queryRoots.inferenceUsage, client.identity],
@@ -97,13 +113,14 @@ function Workspace({
 			const open = window.location.hash.startsWith("#settings");
 			if (
 				!open &&
-				dirtySettings.current &&
+				(dirtySettings.current || dirtyRoutes.current) &&
 				!window.confirm("設定の未保存の変更を破棄して会話に戻りますか？")
 			) {
 				window.history.replaceState(null, "", "#settings");
 				return;
 			}
 			dirtySettings.current = false;
+			dirtyRoutes.current = false;
 			setSettingsOpen(open);
 		};
 		window.addEventListener("hashchange", navigate);
@@ -236,13 +253,44 @@ function Workspace({
 		const sentInput = input;
 		void submit
 			.mutateAsync(text)
-			.then(() => {
+			.then((run) => {
+				if (run?.id) setTimerWatchId(run.id);
 				setInput((current) =>
 					current === sentInput ? { text: "", dictated: false } : current,
 				);
 			})
 			.catch(() => {});
 	}
+	useEffect(() => {
+		if (!timerWatchId) return;
+		let stop = false;
+		const look = () => {
+			void client
+				.timerReceiptByRun(timerWatchId)
+				.then((view) => {
+					if (stop || view.receipt?.action !== "started") return;
+					const timerId = view.receipt.artifact.timerId;
+					if (openedTimers.current.has(timerId)) return;
+					openedTimers.current.add(timerId);
+					artifacts.open({
+						id: `timer:${timerId}`,
+						kind: "timer",
+						title: view.receipt.timer.label,
+						timerId,
+					});
+					setTimerWatchId(null);
+				})
+				.catch(() => {});
+		};
+		look();
+		const interval = window.setInterval(look, 2000);
+		const timeout = window.setTimeout(() => setTimerWatchId(null), 180_000);
+		return () => {
+			stop = true;
+			window.clearInterval(interval);
+			window.clearTimeout(timeout);
+		};
+	}, [artifacts, client, timerWatchId]);
 	const route = [
 		{
 			id: "microphone",
@@ -290,6 +338,13 @@ function Workspace({
 				<SettingsPage
 					renderServiceTests={(disabled) => (
 						<ServiceTestsPanel client={client} disabled={disabled} />
+					)}
+					renderResearchRoutes={(disabled) => (
+						<ResearchRoutesPanel
+							client={client}
+							disabled={disabled}
+							onDirty={onRoutesDirty}
+						/>
 					)}
 					client={client}
 					onDirty={onDirty}
@@ -341,6 +396,7 @@ function Workspace({
 								{describeConnectionState(connectionState)}
 							</span>
 						</span>
+						<Button variant="secondary" size="sm" onClick={() => artifacts.open({ id: "ui-showcase", title: "UIショーケース", kind: "showcase", content: "" })}>UIショーケース</Button>
 						<span className="model-label">
 							{actualModel?.source === "cloud" && "クラウド / "}
 							{actualModel?.model ?? settings.data?.larm.profile}
@@ -581,6 +637,9 @@ function Workspace({
 						onSelect={artifacts.select}
 						onClose={artifacts.close}
 						onCloseAll={artifacts.closeAll}
+						renderTimer={(timerId) => (
+							<TimerArtifact client={client} timerId={timerId} />
+						)}
 					/>
 				)}
 			</div>

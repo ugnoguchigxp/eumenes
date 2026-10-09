@@ -1,0 +1,20 @@
+/** Fixed first-version limits. Tests replace `now` only; there is no settings UI. */
+export const TIMER_POLICY = {
+	minSeconds: 1,
+	maxSeconds: 86400,
+	maxLabelChars: 80,
+	maxActive: 32,
+	maxRows: 4096,
+	maxOperations: 32768,
+	cancelReserve: 64,
+	listDefault: 50,
+	listMax: 100,
+	maintenanceMs: 1000,
+	batchSize: 100,
+	soundFreshMs: 300_000,
+	claimLeaseMs: 15_000,
+	requestMaxAgeMs: 86_400_000,
+	requestFutureToleranceMs: 30_000,
+	retentionMs: 30 * 86_400_000,
+	tombstoneMs: 30 * 86_400_000,
+} as const;

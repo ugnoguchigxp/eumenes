@@ -18,6 +18,8 @@ export const queryRoots = {
 	serviceCatalog: "service-catalog",
 	serviceRuns: "service-runs",
 	voiceDialogue: "voice-dialogue",
+	researchRoutes: "research-routes",
+	timers: "timers",
 } as const;
 
 /**
@@ -41,4 +43,6 @@ export const changeRoots = [
 	queryRoots.serviceCatalog,
 	queryRoots.serviceRuns,
 	queryRoots.voiceDialogue,
+	queryRoots.researchRoutes,
+	queryRoots.timers,
 ] as const;

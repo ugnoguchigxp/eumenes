@@ -9,6 +9,10 @@ CREATE TABLE web_research_runs (
 );
 CREATE INDEX web_research_runs_expiry ON web_research_runs(finished_at_ms);
 `;
+/** Host-set per-attempt timeout (ms), counted from execute start. Appended migration. */
+export const attemptTimeoutMigration = `
+ALTER TABLE web_research_runs ADD COLUMN attempt_timeout_ms INTEGER;
+`;
 export interface RunRow {
 	id: string;
 	request_id: string;
@@ -20,6 +24,8 @@ export interface RunRow {
 	created_at_ms: number;
 	finished_at_ms: number | null;
 	error_code: string | null;
+	/** Absent before attemptTimeoutMigration is applied. */
+	attempt_timeout_ms?: number | null;
 }
 export const byId = (db: Database, id: string) =>
 	db
@@ -38,10 +44,9 @@ export function insert(
 	digest: string,
 	jobId: string,
 	now: number,
+	attemptTimeoutMs?: number,
 ) {
-	db.query(
-		"INSERT INTO web_research_runs VALUES (?,?,?,?,?,?,'queued',?,NULL,NULL)",
-	).run(
+	const base = [
 		id,
 		request.requestId,
 		digest,
@@ -49,7 +54,16 @@ export function insert(
 		jobId,
 		request.operation,
 		now,
-	);
+	];
+	// Explicit column lists keep older schemas (without the appended column) working.
+	if (attemptTimeoutMs === undefined)
+		db.query(
+			"INSERT INTO web_research_runs(id,request_id,input_digest,input_json,job_id,operation,status,created_at_ms) VALUES (?,?,?,?,?,?,'queued',?)",
+		).run(...base);
+	else
+		db.query(
+			"INSERT INTO web_research_runs(id,request_id,input_digest,input_json,job_id,operation,status,created_at_ms,attempt_timeout_ms) VALUES (?,?,?,?,?,?,'queued',?,?)",
+		).run(...base, attemptTimeoutMs);
 }
 export function finish(
 	db: Database,

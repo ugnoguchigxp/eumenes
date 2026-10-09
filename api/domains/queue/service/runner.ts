@@ -195,7 +195,8 @@ export function createRunner(
 		input: unknown,
 		outcome: SettleOutcome<unknown>,
 		now: number,
-	): void {
+		hooks: Array<() => void>,
+	): SettleResult {
 		const claim = claimOf(job);
 		if (handler) {
 			const result = sync(
@@ -203,28 +204,62 @@ export function createRunner(
 			);
 			if (result === "stale") {
 				finishRunning(db, job, "interrupted", "stale_result", now);
-				return;
+				return "stale";
 			}
 			if (typeof result === "object" && result.status === "failed") {
 				finishRunning(db, job, "failed", result.errorCode, now);
-				return;
+				return result;
 			}
 		}
 		switch (outcome.type) {
 			case "success":
 				if (finishJob(db, job, "completed", null, now, outcome.resultRef))
 					endAttempt(db, job.id, job.attempt, "completed", null, now);
-				return;
+				break;
 			case "retry":
 				if (requeueJob(db, job, outcome.errorCode, outcome.availableAtMs, now))
 					endAttempt(db, job.id, job.attempt, "retry", outcome.errorCode, now);
-				return;
+				break;
 			case "failed":
-				return finishRunning(db, job, "failed", outcome.errorCode, now);
+				finishRunning(db, job, "failed", outcome.errorCode, now);
+				break;
 			case "expired":
-				return finishRunning(db, job, "expired", "deadline_exceeded", now);
+				finishRunning(db, job, "expired", "deadline_exceeded", now);
+				break;
 			case "interrupted":
-				return finishRunning(db, job, "interrupted", outcome.errorCode, now);
+				finishRunning(db, job, "interrupted", outcome.errorCode, now);
+				break;
+		}
+		if (handler?.afterCommit) hooks.push(() => handler.afterCommit?.());
+		return "applied";
+	}
+	function runHooks(hooks: Array<() => void>) {
+		for (const hook of hooks) {
+			try {
+				hook();
+			} catch (error) {
+				log.warn(
+					"queue.after_commit_failed",
+					{ reason: "after_commit_failed" },
+					error,
+				);
+			}
+		}
+	}
+	const pendingHooks: Array<() => void> = [];
+	function flushHooks() {
+		const hooks = pendingHooks.splice(0, pendingHooks.length);
+		runHooks(hooks);
+	}
+	async function writeAndFlush<T>(fn: (db: Tx) => T): Promise<T> {
+		pendingHooks.length = 0;
+		try {
+			const result = await store.write(fn);
+			flushHooks();
+			return result;
+		} catch (error) {
+			pendingHooks.length = 0;
+			throw error;
 		}
 	}
 	/** Resolve a running job whose execution cannot be trusted (lease lost, restart, forced shutdown). */
@@ -261,6 +296,7 @@ export function createRunner(
 							}
 						: { type: "interrupted", errorCode: code },
 					now,
+					pendingHooks,
 				),
 			() => finishRunning(db, job, "interrupted", "settle_failed", now),
 		);
@@ -284,6 +320,7 @@ export function createRunner(
 					null,
 					{ type: "failed", errorCode: code },
 					now,
+					pendingHooks,
 				),
 			() => finishRunning(db, job, "failed", code, now),
 		);
@@ -463,7 +500,7 @@ export function createRunner(
 		const attemptSettle = (
 			pick: (job: JobRecord, now: number) => SettleOutcome<unknown>,
 		) =>
-			store.write((db) => {
+			writeAndFlush((db) => {
 				const now = opts.now();
 				const job = getJob(db, a.claim.jobId);
 				if (
@@ -479,7 +516,7 @@ export function createRunner(
 					return;
 				}
 				if (job.state !== "running") return;
-				applyOutcome(db, job, a.handler, a.input, pick(job, now), now);
+				applyOutcome(db, job, a.handler, a.input, pick(job, now), now, pendingHooks);
 			});
 		const pick = (job: JobRecord, now: number): SettleOutcome<unknown> => {
 			const late = job.deadlineAtMs !== null && now >= job.deadlineAtMs;
@@ -526,7 +563,7 @@ export function createRunner(
 				),
 		);
 		if (!needed) return;
-		await store.write((db) => {
+		await writeAndFlush((db) => {
 			for (const job of expiredQueued(db, now)) {
 				const handler = registry.get(job.kind);
 				const claim = claimOf(job);
@@ -574,7 +611,7 @@ export function createRunner(
 		await sweep(now);
 		for (let i = 0; i < opts.tickClaims && !closing; i++) {
 			if (!store.read((db) => candidates(db, opts.now(), 1).length > 0)) break;
-			const result = await store.write((db) => claimOne(db, opts.now()));
+			const result = await writeAndFlush((db) => claimOne(db, opts.now()));
 			if (result.type === "none") break;
 			if (result.type === "claimed") {
 				const a = result.active as Active;
@@ -620,7 +657,7 @@ export function createRunner(
 		},
 		async recover() {
 			const now = opts.now();
-			return store.write((db) => {
+			return writeAndFlush((db) => {
 				let n = 0;
 				for (const job of runningJobs(db)) {
 					recoverRunning(db, job, "backend_restarted", now);
@@ -654,8 +691,7 @@ export function createRunner(
 				a.heartbeat.abort();
 			}
 			const now = opts.now();
-			await store
-				.write((db) => {
+			await writeAndFlush((db) => {
 					for (const a of leftover) {
 						const job = getJob(db, a.claim.jobId);
 						if (

@@ -326,6 +326,32 @@ export function createInference(
 			);
 			return requestId;
 		},
+		/**
+		 * Host-only control request that does not depend on a pending parent
+		 * (e.g. after the source answer was accepted). Uses the *current* settings
+		 * snapshot, LARM only, exact context, never inherits another deadline.
+		 */
+		captureMaintenanceControlInTransaction(
+			db: Database,
+			input: { subject: string; deadline: number; maxOutputTokens: number },
+		) {
+			if (!input.subject || input.deadline <= Date.now())
+				throw new Error("invalid_maintenance_control");
+			const snapshot = structuredClone(settings.inTransaction(db));
+			snapshot.routes.llm.mode = "larm-only";
+			snapshot.routes.llm.cloudAllowed = false;
+			const requestId = capture(
+				db,
+				input.subject,
+				"llm",
+				input.deadline,
+				snapshot,
+			);
+			db.query(
+				"UPDATE inference_requests SET mode='control',output_limit=?,context_policy='exact',parents='[]' WHERE id=? AND status='pending'",
+			).run(Math.min(2048, Math.max(1, input.maxOutputTokens)), requestId);
+			return requestId;
+		},
 		executeControl(requestId: string, messages: Messages, signal: AbortSignal) {
 			if (store.read((db) => get(db, requestId))?.mode !== "control")
 				throw new Error("invalid_control_request");

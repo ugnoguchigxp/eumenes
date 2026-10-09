@@ -1,0 +1,48 @@
+.route-panel {
+	display: grid;
+	gap: 16px;
+	font-size: 14px;
+}
+.route-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: grid;
+	gap: 8px;
+}
+.route-list button {
+	width: 100%;
+	display: flex;
+	gap: 12px;
+	align-items: baseline;
+	flex-wrap: wrap;
+	text-align: left;
+	padding: 12px 16px;
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	background: var(--card);
+	color: var(--foreground);
+}
+.route-list button[aria-current="true"] {
+	border-color: var(--primary);
+}
+.route-detail dl {
+	display: grid;
+	grid-template-columns: max-content 1fr;
+	gap: 4px 16px;
+}
+.route-detail pre {
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+.route-detail textarea {
+	display: block;
+	width: 100%;
+	margin: 8px 0;
+}
+.route-actions {
+	display: flex;
+	gap: 8px;
+	flex-wrap: wrap;
+	margin: 12px 0;
+}
