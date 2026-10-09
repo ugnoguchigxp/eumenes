@@ -57,7 +57,7 @@ test.afterAll(async () => {
 		if (process.exitCode === null) process.kill("SIGKILL");
 	rmSync(dir, { recursive: true, force: true });
 });
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ page }, testInfo) => {
 	await page.addInitScript(() =>
 		Object.defineProperty(window, "WebGL2RenderingContext", {
 			value: undefined,
@@ -74,6 +74,7 @@ test.beforeEach(async ({ page }) => {
 			);
 		});
 	expect(startupErrors).toEqual([]);
+	if (testInfo.tags.includes("@load-failure")) return;
 	await page
 		.getByRole("button", { name: "UIショーケース", exact: true })
 		.click();
@@ -91,6 +92,43 @@ test.beforeEach(async ({ page }) => {
 		.filter({ hasText: /^操作履歴/ })
 		.click();
 });
+
+test(
+	"failed showcase import preserves the conversation and offers reload recovery",
+	{ tag: "@load-failure" },
+	async ({ page }) => {
+		const input = page.getByRole("textbox", {
+			name: "メッセージ",
+			exact: true,
+		});
+		await input.fill("読み込み失敗でも残す下書き");
+		const moduleUrl =
+			"**/src/components/domains/artifact/ArtifactShowcase.tsx*";
+		await page.route(moduleUrl, (route) => route.abort());
+		await page
+			.getByRole("button", { name: "UIショーケース", exact: true })
+			.click();
+		const artifact = page.getByRole("complementary", {
+			name: "アーティファクト",
+			exact: true,
+		});
+		await expect(artifact.getByRole("alert")).toContainText(
+			"ショーケースを読み込めませんでした",
+		);
+		await expect(input).toBeVisible();
+		await expect(input).toHaveValue("読み込み失敗でも残す下書き");
+		await page.unroute(moduleUrl);
+		await artifact
+			.getByRole("button", { name: "画面を再読み込み", exact: true })
+			.click();
+		await page
+			.getByRole("button", { name: "UIショーケース", exact: true })
+			.click();
+		await expect(
+			page.getByRole("region", { name: "UIショーケース", exact: true }),
+		).toContainText("入力と操作の見本");
+	},
+);
 
 test("workspace boundary resizes with drag and keyboard, preserves drafts and disappears with the last artifact", async ({
 	page,
@@ -510,9 +548,10 @@ test("question and form validation, retry, reset, input retention and duplicate 
 	await s.getByRole("button", { name: "入力をリセット", exact: true }).click();
 	await expect(s.getByLabel("呼び名（必須）")).toHaveValue("");
 });
-test("settings theme matches the visible preview immediately, after save, revisit and reset", async ({
+test("settings theme shares the width and density toolbar and matches the visible preview", async ({
 	page,
 }) => {
+	await page.setViewportSize({ width: 1280, height: 1100 });
 	await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
 	await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 	const s = page.getByRole("region", { name: "UIショーケース", exact: true });
@@ -520,7 +559,7 @@ test("settings theme matches the visible preview immediately, after save, revisi
 		.getByLabel("プレビューのテーマ", { exact: true })
 		.selectOption("dark");
 	await s.getByRole("tab", { name: "表示と音声の設定", exact: true }).click();
-	const theme = s.getByLabel("表示テーマ", { exact: true });
+	const theme = s.getByLabel("プレビューのテーマ", { exact: true });
 	const card = s.locator(".aui-settings-theme");
 	const saved = s.getByRole("region", {
 		name: "試用データの現在値",
@@ -534,13 +573,23 @@ test("settings theme matches the visible preview immediately, after save, revisi
 				.map(Number);
 			return channels.reduce((sum, channel) => sum + channel, 0) / 3;
 		});
-	await expect(theme).toHaveValue("light");
+	await expect(theme).toHaveValue("dark");
+	await expect.poll(brightness).toBeLessThan(60);
+	await expect(s.getByLabel("表示テーマ", { exact: true })).toHaveCount(0);
+	const controls = s.locator(".aui-controls");
+	await expect(controls.getByRole("combobox")).toHaveCount(5);
+	const boxes = await Promise.all([
+		theme.boundingBox(),
+		s.getByLabel("プレビューの幅", { exact: true }).boundingBox(),
+		s.getByLabel("表示の密度", { exact: true }).boundingBox(),
+	]);
+	for (const box of boxes) expect(box!.y).toBeCloseTo(boxes[0]!.y, 0);
+	await theme.selectOption("light");
 	await expect.poll(brightness).toBeGreaterThan(200);
-	await expect(s.getByLabel("プレビューのテーマ", { exact: true })).toHaveCount(
-		0,
-	);
+	await expect(card).toHaveCSS("color-scheme", "light");
 	await theme.selectOption("dark");
 	await expect.poll(brightness).toBeLessThan(60);
+	await expect(card).toHaveCSS("color-scheme", "dark");
 	await expect(saved).toContainText("ライト");
 	await s
 		.getByRole("button", { name: "次の送信を失敗させる", exact: true })
@@ -556,21 +605,41 @@ test("settings theme matches the visible preview immediately, after save, revisi
 	await expect(theme).toHaveValue("dark");
 	await expect.poll(brightness).toBeLessThan(60);
 	await s.getByText("開発用の確認", { exact: true }).click();
-	await card.screenshot({
-		path: resolve("spec/verification/openui-artifact/settings-theme-dark.png"),
+	await s.screenshot({
+		path: resolve(
+			"spec/verification/openui-artifact/settings-controls-dark.png",
+		),
 		animations: "disabled",
 	});
 	await s
 		.getByRole("button", { name: "このサンプルを初期化", exact: true })
 		.click();
-	await expect(theme).toHaveValue("light");
-	await expect.poll(brightness).toBeGreaterThan(200);
+	await expect(theme).toHaveValue("dark");
+	await expect.poll(brightness).toBeLessThan(60);
 	await expect(saved).toContainText("ライト");
-	await card.screenshot({
-		path: resolve("spec/verification/openui-artifact/settings-theme-light.png"),
+	await theme.selectOption("light");
+	await expect.poll(brightness).toBeGreaterThan(200);
+	await s.screenshot({
+		path: resolve(
+			"spec/verification/openui-artifact/settings-controls-light.png",
+		),
 		animations: "disabled",
 	});
 	await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+	await page.setViewportSize({ width: 390, height: 844 });
+	const mobileBoxes = await Promise.all([
+		theme.boundingBox(),
+		s.getByLabel("プレビューの幅", { exact: true }).boundingBox(),
+		s.getByLabel("表示の密度", { exact: true }).boundingBox(),
+	]);
+	for (const box of mobileBoxes)
+		expect(box!.y).toBeCloseTo(mobileBoxes[0]!.y, 0);
+	await controls.screenshot({
+		path: resolve(
+			"spec/verification/openui-artifact/settings-controls-mobile.png",
+		),
+		animations: "disabled",
+	});
 });
 
 test("memory correction and settings save affect only fixture state; theme, responsive layout and screenshots", async ({
@@ -588,7 +657,9 @@ test("memory correction and settings save affect only fixture state; theme, resp
 		s.getByRole("checkbox", { name: /利用候補に選ぶ:/ }),
 	).toBeChecked();
 	await s.getByRole("tab", { name: "表示と音声の設定", exact: true }).click();
-	await s.getByLabel("表示テーマ", { exact: true }).selectOption("dark");
+	await s
+		.getByLabel("プレビューのテーマ", { exact: true })
+		.selectOption("dark");
 	await s
 		.getByRole("switch", { name: "回答を読み上げる", exact: true })
 		.check();
@@ -723,7 +794,9 @@ test("sample operations show concrete results and only relevant test controls", 
 	).toContainText("選択済み");
 	await s.getByRole("tab", { name: "表示と音声の設定", exact: true }).click();
 	const productTheme = await page.locator("html").getAttribute("data-theme");
-	await s.getByLabel("表示テーマ", { exact: true }).selectOption("dark");
+	await s
+		.getByLabel("プレビューのテーマ", { exact: true })
+		.selectOption("dark");
 	await s
 		.getByRole("switch", { name: "回答を読み上げる", exact: true })
 		.check();
@@ -827,4 +900,247 @@ test("tabs fit the pane without horizontal scrolling and clearly distinguish sel
 			path: join(screenshotDir, `interaction-review-${name}.png`),
 		});
 	}
+});
+
+test("all design presets affect the sample and settings while the host and sample tabs stay unchanged", async ({
+	page,
+}) => {
+	const s = page.getByRole("region", { name: "UIショーケース", exact: true });
+	const preview = s.locator(".aui-preview");
+	const hostBefore = await page.locator("html").evaluate((el) => ({
+		theme: el.getAttribute("data-theme"),
+		density: el.getAttribute("data-density"),
+		radius: getComputedStyle(el).getPropertyValue("--radius"),
+	}));
+	const tabsBefore = await s.locator(".aui-sample-tabs").evaluate((el) => ({
+		height: el.getBoundingClientRect().height,
+		radius: getComputedStyle(el).borderRadius,
+	}));
+	const theme = s.getByLabel("プレビューのテーマ", { exact: true });
+	await expect(theme.locator("option")).toHaveCount(11);
+	await s.getByRole("tab", { name: "表示と音声の設定", exact: true }).click();
+	for (const name of await theme
+		.locator("option")
+		.evaluateAll((options) =>
+			options.map((option) => (option as HTMLOptionElement).value),
+		)) {
+		await theme.selectOption(name);
+		await expect(preview).toHaveAttribute("data-theme", name);
+		const colors = await preview.evaluate((el) => {
+			const reference = document.createElement("div");
+			reference.style.backgroundColor =
+				getComputedStyle(el).getPropertyValue("--card");
+			el.append(reference);
+			const expected = getComputedStyle(reference).backgroundColor;
+			reference.remove();
+			return {
+				expected,
+				actual: getComputedStyle(el.querySelector(".aui-settings-theme")!)
+					.backgroundColor,
+			};
+		});
+		expect(colors.actual, name).toBe(colors.expected);
+	}
+	await s.getByRole("tab", { name: "基本コンポーネント", exact: true }).click();
+	const input = s.getByLabel("入力の見本", { exact: true });
+	await s.getByLabel("角の丸み", { exact: true }).selectOption("0rem");
+	await expect(input).toHaveCSS("border-radius", "0px");
+	await s.getByLabel("角の丸み", { exact: true }).selectOption("1rem");
+	await expect(input).toHaveCSS("border-radius", "14px");
+	await s.getByLabel("表示の密度", { exact: true }).selectOption("spacious");
+	await expect(input).toHaveCSS("font-size", "16px");
+	await s.getByLabel("タッチ操作", { exact: true }).selectOption("true");
+	await expect(input).toHaveCSS("font-size", "18px");
+	await expect
+		.poll(() =>
+			preview.evaluate((el) =>
+				getComputedStyle(el).getPropertyValue("--ui-touch-target-min"),
+			),
+		)
+		.toBe("44px");
+	await s
+		.getByRole("button", { name: "このサンプルを初期化", exact: true })
+		.click();
+	await expect(s.getByLabel("角の丸み", { exact: true })).toHaveValue("1rem");
+	await expect(s.getByLabel("表示の密度", { exact: true })).toHaveValue(
+		"spacious",
+	);
+	await expect(s.getByLabel("タッチ操作", { exact: true })).toHaveValue("true");
+	expect(
+		await page.locator("html").evaluate((el) => ({
+			theme: el.getAttribute("data-theme"),
+			density: el.getAttribute("data-density"),
+			radius: getComputedStyle(el).getPropertyValue("--radius"),
+		})),
+	).toEqual(hostBefore);
+	expect(
+		await s.locator(".aui-sample-tabs").evaluate((el) => ({
+			height: el.getBoundingClientRect().height,
+			radius: getComputedStyle(el).borderRadius,
+		})),
+	).toEqual(tabsBefore);
+});
+
+test("every design token can be edited, invalid input preserves the preview, and reset restores all values", async ({
+	page,
+}) => {
+	const s = page.getByRole("region", { name: "UIショーケース", exact: true });
+	const preview = s.locator(".aui-preview");
+	const hostBefore = await page.locator("html").evaluate((el) => ({
+		style: el.getAttribute("style"),
+		theme: el.getAttribute("data-theme"),
+	}));
+	const defaultTokens = await preview.evaluate((el) =>
+		Object.fromEntries(
+			Array.from((el as HTMLElement).style)
+				.filter(
+					(name) =>
+						name.startsWith("--") &&
+						!name.startsWith("--color-") &&
+						!name.startsWith("--spacing-") &&
+						!/^--radius-(lg|md|sm)$/.test(name),
+				)
+				.map((name) => [
+					name,
+					(el as HTMLElement).style.getPropertyValue(name),
+				]),
+		),
+	);
+	await s.locator(".aui-token-editor > summary").click();
+	await s.getByLabel("トークンの種類", { exact: true }).selectOption("すべて");
+	const tokens = await s.locator(".aui-token-field").evaluateAll((fields) =>
+		fields.map((field) => ({
+			name: field.getAttribute("data-token")!,
+			color: !!field.querySelector(".aui-token-color"),
+		})),
+	);
+	expect(tokens.length).toBeGreaterThan(60);
+	for (const token of tokens) {
+		const value = token.color ? "#168a6e" : "12px";
+		await s.getByLabel(`トークン ${token.name}`, { exact: true }).fill(value);
+		await expect
+			.poll(() =>
+				preview.evaluate(
+					(el, name) => getComputedStyle(el).getPropertyValue(name).trim(),
+					token.name,
+				),
+			)
+			.toBe(value);
+	}
+	await s
+		.getByLabel("トークン --primary-foreground", { exact: true })
+		.fill("#fafafa");
+	await expect(s.getByRole("button", { name: "試す", exact: true })).toHaveCSS(
+		"color",
+		"rgb(250, 250, 250)",
+	);
+	await expect(s.getByLabel("入力の見本", { exact: true })).toHaveCSS(
+		"font-size",
+		"12px",
+	);
+	await expect(s.getByLabel("入力の見本", { exact: true })).toHaveCSS(
+		"padding-left",
+		"12px",
+	);
+	await s.getByLabel("トークン --radius", { exact: true }).fill("-3px");
+	await expect(
+		s.getByLabel("トークン --radius", { exact: true }),
+	).toHaveAttribute("aria-invalid", "true");
+	await expect(s.getByLabel("入力の見本", { exact: true })).toHaveCSS(
+		"border-radius",
+		"10px",
+	);
+	await s
+		.getByLabel("トークン --primary", { exact: true })
+		.fill("broken-color");
+	await expect(
+		s.getByLabel("トークン --primary", { exact: true }),
+	).toHaveAttribute("aria-invalid", "true");
+	await s
+		.getByRole("button", { name: "--radius を元に戻す", exact: true })
+		.click();
+	await expect(s.getByLabel("角の丸み", { exact: true })).toHaveValue("0.5rem");
+	await s.getByRole("tab", { name: "表示と音声の設定", exact: true }).click();
+	await expect(s.locator(".aui-settings-theme")).toHaveCSS(
+		"background-color",
+		"rgb(22, 138, 110)",
+	);
+	await s
+		.getByRole("button", { name: "デザイントークンを初期化", exact: true })
+		.click();
+	expect(
+		await preview.evaluate((el) =>
+			Object.fromEntries(
+				Array.from((el as HTMLElement).style)
+					.filter(
+						(name) =>
+							name.startsWith("--") &&
+							!name.startsWith("--color-") &&
+							!name.startsWith("--spacing-") &&
+							!/^--radius-(lg|md|sm)$/.test(name),
+					)
+					.map((name) => [
+						name,
+						(el as HTMLElement).style.getPropertyValue(name),
+					]),
+			),
+		),
+	).toEqual(defaultTokens);
+	expect(
+		await page.locator("html").evaluate((el) => ({
+			style: el.getAttribute("style"),
+			theme: el.getAttribute("data-theme"),
+		})),
+	).toEqual(hostBefore);
+});
+
+test("design token controls and long token names fit a mobile panel without horizontal scrolling", async ({
+	page,
+}) => {
+	await page.setViewportSize({ width: 390, height: 844 });
+	const s = page.getByRole("region", { name: "UIショーケース", exact: true });
+	await s.getByRole("tab", { name: "基本コンポーネント", exact: true }).click();
+	await s.locator(".aui-token-editor > summary").click();
+	await s
+		.getByLabel("トークンを検索", { exact: true })
+		.fill("sidebar-primary-foreground");
+	await expect(s.locator(".aui-token-field")).toHaveCount(1);
+	await s
+		.getByLabel("トークン --sidebar-primary-foreground", { exact: true })
+		.fill("#eeeeee");
+	expect(
+		await page.evaluate(
+			() => document.documentElement.scrollWidth <= innerWidth,
+		),
+	).toBe(true);
+	for (const selector of [
+		".aui-controls",
+		".aui-token-editor",
+		".aui-sample-tabs",
+	])
+		expect(
+			await s
+				.locator(selector)
+				.evaluate((el) => el.scrollWidth <= el.clientWidth),
+		).toBe(true);
+	await s.getByText("開発用の確認", { exact: true }).click();
+	await page.locator(".artifact-panel-body").evaluate((el) => {
+		el.scrollTop = 0;
+	});
+	await page.locator(".artifact-panel").screenshot({
+		path: resolve("spec/verification/openui-artifact/design-tokens-mobile.png"),
+		animations: "disabled",
+	});
+	await page.setViewportSize({ width: 1280, height: 1100 });
+	await s.getByLabel("トークンを検索", { exact: true }).fill("");
+	await s.getByLabel("角の丸み", { exact: true }).selectOption("1rem");
+	await page.locator(".artifact-panel-body").evaluate((el) => {
+		el.scrollTop = 0;
+	});
+	await page.locator(".artifact-panel").screenshot({
+		path: resolve(
+			"spec/verification/openui-artifact/design-tokens-desktop.png",
+		),
+		animations: "disabled",
+	});
 });

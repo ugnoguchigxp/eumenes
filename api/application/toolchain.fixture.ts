@@ -38,6 +38,8 @@ export async function harness(
 		failureAnswer?: string;
 		badQuote?: boolean;
 		badQuoteOnce?: boolean;
+		excerptEvidence?: boolean;
+		incompleteWeatherFirstRead?: boolean;
 		badToolArgs?: boolean;
 		badExecutionRefOnce?: boolean;
 		clarify?: boolean;
@@ -98,9 +100,23 @@ export async function harness(
 					basis: string;
 					url: string;
 					body: string;
+					excerpts: { excerptId: string; quote: string }[];
 				}[];
-				const page = obs.find((s) => s.basis === "page");
+				for (const source of obs)
+					source.body = source.excerpts.map((e) => e.quote).join("");
+				const page = options.incompleteWeatherFirstRead
+					? (obs.find((s) => s.basis === "page" && s.body.includes("最高")) ??
+						obs.find((s) => s.basis === "page"))
+					: obs.find((s) => s.basis === "page");
 				if (page) {
+					if (
+						options.incompleteWeatherFirstRead &&
+						!page.body.includes("最高") &&
+						messages.some((m) =>
+							m.content.includes("前回の報告は根拠または依頼項目が不十分"),
+						)
+					)
+						return JSON.stringify(data.nextInvocation);
 					if (options.workerReportOutput !== undefined)
 						return options.workerReportOutput;
 					const quote = page.body.split("\n")[0]!;
@@ -115,10 +131,15 @@ export async function harness(
 								{
 									text: quote,
 									evidence: [
-										{
-											sourceId: page.sourceId,
-											quote: forged ? "fabricated" : quote,
-										},
+										options.excerptEvidence
+											? {
+													sourceId: page.sourceId,
+													excerptId: page.excerpts[0]!.excerptId,
+												}
+											: {
+													sourceId: page.sourceId,
+													quote: forged ? "fabricated" : quote,
+												},
 									],
 								},
 							],
@@ -256,7 +277,7 @@ export async function harness(
 			if (options.gate) await options.gate;
 			signal.throwIfAborted();
 			const observedAt = new Date().toISOString();
-			const sentence =
+			let sentence =
 				req.operation === "lookup"
 					? req.query.includes("天気")
 						? weather
@@ -264,10 +285,15 @@ export async function harness(
 					: req.url.includes("weather")
 						? weather
 						: stock;
-			const url =
+			let url =
 				sentence === weather
 					? "https://example.com/weather"
 					: "https://example.com/stock";
+			if (options.incompleteWeatherFirstRead && req.operation === "read") {
+				url = req.url;
+				if (url.endsWith("/empty"))
+					sentence = "鎌倉の天気予報は公開されています。";
+			}
 			return {
 				freshUntilMs: null,
 				result: {
@@ -277,6 +303,19 @@ export async function harness(
 					hits:
 						req.operation === "lookup"
 							? [
+									...(options.incompleteWeatherFirstRead
+										? [
+												{
+													url: `${url}/empty`,
+													title: "天気予報",
+													snippet: "鎌倉の天気予報は公開されています。",
+													provider: "fixture",
+													trust: "untrusted" as const,
+													tainted: true as const,
+													verification: "search_summary" as const,
+												},
+											]
+										: []),
 									{
 										url,
 										title: "一次資料",

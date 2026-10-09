@@ -4,6 +4,7 @@ import type { AccessContext, SourceRef } from "eumenes-memory";
 import type { CanonicalHasher, ScopeRef } from "eumenes-world-model";
 import {
 	applyWorldOperation,
+	readAssertionHistory,
 	readWorldSnapshot,
 	validateWorldUsage,
 	type HostChecks,
@@ -19,6 +20,8 @@ import type {
 	WorldApplyRequest,
 	WorldApplyResult,
 	WorldFeed,
+	WorldHistoryReadResult,
+	WorldHistoryRequest,
 	WorldReadRequest,
 	WorldReadResult,
 	WorldSchemaStatus,
@@ -303,6 +306,30 @@ export function createWorldService(options: WorldServiceOptions) {
 		return readWorldSnapshot(db, build(resolved.ok ? resolved.states : []));
 	}
 
+	/**
+	 * Revision history of ONE assertion, newest first. Not a side door: the
+	 * gate, tombstone and access checks of a normal read apply again.
+	 */
+	function readHistoryInTransaction(
+		db: Database,
+		request: WorldHistoryRequest,
+	): WorldHistoryReadResult {
+		requireTransaction(db);
+		if (options.gate && !options.gate.isOpen())
+			return { status: "blocked", reasonCode: "WORLD_RECOVERY_REQUIRED" };
+		if (!readHostState(db).enabled)
+			return { status: "blocked", reasonCode: "WORLD_DISABLED" };
+		const access = accessOf(db, request);
+		return readAssertionHistory(db, {
+			contractVersion: 1,
+			access,
+			scope: request.scope,
+			hostChecks: hostChecks(db, request.scope, access, []),
+			assertionId: request.assertionId,
+			...(request.limit === undefined ? {} : { limit: request.limit }),
+		});
+	}
+
 	function validateUsageInTransaction(
 		db: Database,
 		receipt: unknown,
@@ -373,6 +400,7 @@ export function createWorldService(options: WorldServiceOptions) {
 		typedFailure,
 
 		readSnapshot: readSnapshotInTransaction,
+		readHistory: readHistoryInTransaction,
 		async read(request: WorldReadRequest): Promise<WorldReadResult> {
 			try {
 				return store.readSnapshot((db) =>

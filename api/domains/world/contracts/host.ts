@@ -1,6 +1,7 @@
 import type { AccessContext, SourceRef } from "eumenes-memory";
 import type { ScopeRef } from "eumenes-world-model";
 import type {
+	WorldHistoryResult,
 	WorldOperation,
 	WorldOperationResult,
 	WorldSnapshotResult,
@@ -83,6 +84,20 @@ export type WorldReadResult =
 				| "WORLD_DISABLED"
 				| "STORE_CLOSING"
 				| "WORLD_RECOVERY_REQUIRED";
+	  };
+
+export type WorldHistoryRequest = {
+	access: WorldRequestAccess;
+	scope: ScopeRef;
+	assertionId: string;
+	limit?: number;
+};
+
+export type WorldHistoryReadResult =
+	| WorldHistoryResult
+	| {
+			status: "blocked";
+			reasonCode: "WORLD_DISABLED" | "WORLD_RECOVERY_REQUIRED";
 	  };
 
 export type WorldUsageCheck =

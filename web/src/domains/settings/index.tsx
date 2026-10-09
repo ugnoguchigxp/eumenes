@@ -32,6 +32,7 @@ const categories = [
 	{ id: "appearance", label: "表示" },
 	{ id: "dictionary", label: "TTS辞書" },
 	{ id: "memory", label: "メモリー" },
+	{ id: "world", label: "World" },
 ] as const;
 export function useSettings(client: EumenesClient) {
 	return useQuery({
@@ -81,6 +82,7 @@ export function useVoiceMute(client: EumenesClient) {
 export function SettingsPage({
 	renderServiceTests,
 	renderResearchRoutes,
+	renderWorld,
 	client,
 	onDirty,
 	onSaved,
@@ -90,6 +92,7 @@ export function SettingsPage({
 	onSaved: (value: Settings) => void;
 	renderServiceTests?: (disabled: boolean) => React.ReactNode;
 	renderResearchRoutes?: (disabled: boolean) => React.ReactNode;
+	renderWorld?: () => React.ReactNode;
 }) {
 	const query = useSettings(client);
 	const cache = useQueryClient();
@@ -346,14 +349,17 @@ export function SettingsPage({
 								? "検索で見つけた取得先と、その手順を確認・編集できます。値は毎回取得し直します。"
 								: category === "memory"
 									? "保存した記憶を会話で使うかを切り替えます。変更はすぐに保存されます。"
-									: category === "dictionary"
-										? "読み上げの直前に、登録した文字を読み方へ置き換えます（長い登録が優先）。会話の表示は変わりません。変更は行ごとにすぐ保存されます。"
-										: category === "general"
-											? "AIの名前・あなたの名前・話し方を設定します。次の返答から反映されます。"
-											: "普段はLARMを使い、必要なときに登録済みのクラウドへ切り替えます。"}
+									: category === "world"
+										? "Worldが覚えている主張と、その根拠・条件を確認し、明示的に訂正・撤回・忘却できます。この画面は読み上げません。"
+										: category === "dictionary"
+											? "読み上げの直前に、登録した文字を読み方へ置き換えます（長い登録が優先）。会話の表示は変わりません。変更は行ごとにすぐ保存されます。"
+											: category === "general"
+												? "AIの名前・あなたの名前・話し方を設定します。次の返答から反映されます。"
+												: "普段はLARMを使い、必要なときに登録済みのクラウドへ切り替えます。"}
 					</p>
 				</header>
 				{category === "services" && renderServiceTests?.(dirty)}
+				{category === "world" && renderWorld?.()}
 				{routesOpened && (
 					<div hidden={category !== "routes"}>
 						{renderResearchRoutes?.(false)}

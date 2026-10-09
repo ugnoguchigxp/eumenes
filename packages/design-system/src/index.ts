@@ -43,6 +43,7 @@ export * from "./components/MenuButtonGroup";
 export { MiniTable } from "./components/MiniTable";
 export * from "./components/Modal";
 export * from "./components/NavigationStepper";
+export * from "./components/NotificationCard";
 export {
 	NotificationToast,
 	type NotificationToastProps,

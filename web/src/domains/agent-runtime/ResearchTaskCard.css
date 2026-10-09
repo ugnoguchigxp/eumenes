@@ -1,0 +1,71 @@
+.research-activity {
+	align-self: flex-start;
+	max-width: min(780px, 100%);
+	min-width: 0;
+	padding: 2px 0 2px 12px;
+	border-left: 2px solid var(--border);
+	color: var(--muted-foreground);
+	font-size: 0.78rem;
+	line-height: 1.6;
+	overflow-wrap: anywhere;
+}
+
+.research-activity-progress {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 6px 10px;
+}
+
+.research-activity-marker {
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: currentColor;
+	flex-shrink: 0;
+}
+
+.research-activity-stop {
+	padding: 4px 8px;
+	border: 0;
+	border-radius: 4px;
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	cursor: pointer;
+}
+
+.research-activity-stop:hover {
+	background: var(--accent);
+	color: var(--foreground);
+}
+
+.research-activity-stop:focus-visible,
+.research-activity-details > summary:focus-visible {
+	outline: 2px solid var(--primary);
+	outline-offset: 3px;
+}
+
+.research-activity-stop:disabled {
+	opacity: 0.5;
+	cursor: wait;
+}
+
+.research-activity-details {
+	margin-top: 4px;
+}
+
+.research-activity-details > summary {
+	width: fit-content;
+	cursor: pointer;
+}
+
+.research-activity-details p {
+	margin: 8px 0;
+	white-space: pre-wrap;
+}
+
+.research-activity-details ul {
+	margin: 8px 0;
+	padding-left: 20px;
+}

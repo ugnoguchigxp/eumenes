@@ -12,7 +12,8 @@ export default defineConfig(({ command, mode }) => {
 		// Fixture servers must not replace the running developer server's dependencies.
 		cacheDir:
 			env.EUMENES_VITE_CACHE_DIR ?? resolve("node_modules/.vite/development"),
-		optimizeDeps: { include: ["three"] },
+		// The lazy showcase needs this on first open, without a mid-session dependency rebuild.
+		optimizeDeps: { include: ["three", "@openuidev/react-lang"] },
 		server: {
 			host: "127.0.0.1",
 			proxy: {

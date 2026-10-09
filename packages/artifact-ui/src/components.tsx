@@ -497,6 +497,7 @@ export function MemoryReview({ request }: { request: ArtifactRequest }) {
 	);
 }
 export function SettingsForm({ request }: { request: ArtifactRequest }) {
+	const runtime = useArtifactRuntime();
 	const action = useAction(request);
 	const data = action.resource as SettingsResource;
 	const [values, setValues] = useState({
@@ -505,10 +506,11 @@ export function SettingsForm({ request }: { request: ArtifactRequest }) {
 		volume: String(data.volume),
 	});
 	const prefix = useId();
+	const theme = runtime.previewTheme ?? values.theme;
 	return (
 		<Card
-			className={`aui-settings-theme ds-theme-${values.theme}`}
-			data-theme={values.theme}
+			className={`aui-settings-theme ${runtime.previewTheme === undefined ? `ds-theme-${theme}` : ""}`}
+			data-theme={theme}
 		>
 			<CardHeader>
 				<CardTitle>{request.title ?? "表示と音声"}</CardTitle>
@@ -518,30 +520,32 @@ export function SettingsForm({ request }: { request: ArtifactRequest }) {
 					className="aui-stack"
 					onSubmit={(e) => {
 						e.preventDefault();
-						void action.send("settings-save", values);
+						void action.send("settings-save", { ...values, theme });
 					}}
 				>
 					<p>
 						テーマはこのプレビューに反映します。保存先は試用データです。
 						音声再生やアプリの設定は変更しません。
 					</p>
-					<label>
-						表示テーマ
-						<select
-							aria-label="表示テーマ"
-							value={values.theme}
-							onChange={(e) =>
-								setValues((v) => ({
-									...v,
-									theme: e.target.value as "light" | "dark",
-								}))
-							}
-							disabled={action.pending}
-						>
-							<option value="light">ライト</option>
-							<option value="dark">ダーク</option>
-						</select>
-					</label>
+					{runtime.previewTheme === undefined && (
+						<label>
+							表示テーマ
+							<select
+								aria-label="表示テーマ"
+								value={values.theme}
+								onChange={(e) =>
+									setValues((v) => ({
+										...v,
+										theme: e.target.value as "light" | "dark",
+									}))
+								}
+								disabled={action.pending}
+							>
+								<option value="light">ライト</option>
+								<option value="dark">ダーク</option>
+							</select>
+						</label>
+					)}
 					<label className="aui-row" htmlFor={`${prefix}-speak`}>
 						回答を読み上げる
 						<Switch
@@ -574,7 +578,7 @@ export function SettingsForm({ request }: { request: ArtifactRequest }) {
 					<Result
 						title="試用データの現在値"
 						entries={[
-							["表示テーマ", data.theme === "dark" ? "ダーク" : "ライト"],
+							["保存済みのテーマ", data.theme === "dark" ? "ダーク" : "ライト"],
 							["読み上げ", data.autoSpeak ? "オン" : "オフ"],
 							["音量", String(data.volume)],
 						]}

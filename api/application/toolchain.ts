@@ -5,6 +5,7 @@ import {
 	publicDataUrl,
 	sourceMatchesQuestion,
 	publicInvocationHint,
+	shortForecastReportGap,
 } from "../domains/web-research";
 import type { WebResearchService } from "../domains/web-research";
 import { createCapabilities } from "../domains/capabilities";
@@ -235,6 +236,7 @@ export async function createToolchain(
 		queue,
 		inference,
 		invocationHint: publicInvocationHint,
+		reportFeedback: shortForecastReportGap,
 		acquisition: wiring?.acquisition,
 	});
 	wiring?.attach({ agents, tools });

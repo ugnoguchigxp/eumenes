@@ -1,0 +1,27 @@
+{
+	"date": "2026-10-10",
+	"change": "調査状況を発言の吹き出しから独立した進捗表示に変更。名前と依頼文の再掲を削除し、詳細と出典は初期状態で折りたたむ。",
+	"before": "message-assistantの吹き出しにエージェント名、依頼文、進捗、停止操作を表示。報告の詳細は初期展開。",
+	"after": "独立したresearch-activityに進捗と停止操作を表示。発言と同じスタイルを使用せず、報告の詳細は利用者が展開。",
+	"fixture": {
+		"agentRuntime": { "result": "pass", "backendTests": 30, "webTests": 9 },
+		"conversation": { "result": "pass", "backendTests": 12, "webTests": 21 },
+		"browser": {
+			"result": "pass",
+			"tests": 2,
+			"viewports": ["1280x720", "390x844"]
+		},
+		"typecheck": "pass",
+		"webBuild": "pass",
+		"verifyAll": {
+			"result": "blocked_by_format",
+			"file": "scripts/toolchain-live.ts",
+			"note": "今回の変更対象外。全体検証は整形チェックで停止。"
+		}
+	},
+	"live": "not_run",
+	"deviceAcceptance": "not_run",
+	"screenshots": ["desktop.png", "mobile.png"],
+	"contextCompileCalls": 1,
+	"compileEvalCalls": 1
+}

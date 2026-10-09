@@ -14,8 +14,25 @@ import {
 	TabsTrigger,
 	TabsContent,
 } from "@eumenes/design-system";
-import { useEffect, useId, useState, useSyncExternalStore } from "react";
+import {
+	useEffect,
+	useId,
+	useState,
+	useSyncExternalStore,
+	type CSSProperties,
+} from "react";
 import { createShowcaseFixture } from "../../../domains/artifact";
+
+import { DesignTokenEditor } from "./DesignTokenEditor";
+import {
+	designThemes,
+	themeLabels,
+	themeTone,
+	radiusPresets,
+	resolveDesignTokens,
+	designTokenAliases,
+	type DesignTokenOverrides,
+} from "../../../domains/artifact/designTokens";
 
 const sources: Record<View, string> = {
 	components: "c1",
@@ -76,11 +93,31 @@ export function ArtifactShowcase() {
 	);
 	const [mode, setMode] = useState<"json" | "lang">("json");
 	const [error, setError] = useState("");
-	const [theme, setTheme] = useState(() =>
-		document.documentElement.dataset.theme === "dark" ? "dark" : "light",
-	);
+	const [initialTheme] = useState(() => {
+		const current = document.documentElement.dataset.theme ?? "light";
+		return designThemes.includes(current) ? current : "light";
+	});
+	const [theme, setTheme] = useState(initialTheme);
 	const [width, setWidth] = useState("full");
 	const [density, setDensity] = useState("comfortable");
+	const [radius, setRadius] = useState("0.5rem");
+	const [tablet, setTablet] = useState(false);
+	const [tokenOverrides, setTokenOverrides] = useState<DesignTokenOverrides>(
+		{},
+	);
+	const tokenValues = resolveDesignTokens({
+		theme,
+		density,
+		radius,
+		tablet,
+		overrides: tokenOverrides,
+	});
+	const previewStyle = {
+		...tokenValues,
+		...designTokenAliases,
+		colorScheme: themeTone(theme),
+	} as CSSProperties;
+	const currentRadius = tokenValues["--radius"]!;
 	const [resetKey, setResetKey] = useState(0);
 	const view = compiled.request.view;
 	const source = compiled.request.source ?? `inline-${view}`;
@@ -135,19 +172,24 @@ export function ArtifactShowcase() {
 				</TabsList>
 				<p className="aui-description">{examples[view].description}</p>
 				<div className="aui-row aui-controls">
-					{view !== "settings" && (
-						<label>
-							テーマ
-							<select
-								aria-label="プレビューのテーマ"
-								value={theme}
-								onChange={(e) => setTheme(e.target.value)}
-							>
-								<option value="light">ライト</option>
-								<option value="dark">ダーク</option>
-							</select>
-						</label>
-					)}
+					<label>
+						表示テーマ
+						<select
+							aria-label="プレビューのテーマ"
+							value={theme}
+							onChange={(e) => setTheme(e.target.value)}
+							disabled={
+								view === "settings" &&
+								operations.some((operation) => operation.status === "pending")
+							}
+						>
+							{designThemes.map((name) => (
+								<option key={name} value={name}>
+									{themeLabels[name] ?? name}
+								</option>
+							))}
+						</select>
+					</label>
 					<label>
 						幅
 						<select
@@ -166,11 +208,62 @@ export function ArtifactShowcase() {
 							value={density}
 							onChange={(e) => setDensity(e.target.value)}
 						>
-							<option value="comfortable">ゆったり</option>
+							<option value="comfortable">標準</option>
 							<option value="compact">コンパクト</option>
+							<option value="spacious">ゆったり</option>
+						</select>
+					</label>
+					<label>
+						角の丸み
+						<select
+							aria-label="角の丸み"
+							value={currentRadius}
+							onChange={(e) => {
+								setRadius(e.target.value);
+								setTokenOverrides(({ "--radius": _radius, ...rest }) => rest);
+							}}
+						>
+							{radiusPresets.map((value) => (
+								<option key={value} value={value}>
+									{value === "0rem" ? "なし" : value}
+								</option>
+							))}
+							{!radiusPresets.includes(currentRadius) && (
+								<option value={currentRadius}>{currentRadius}（個別）</option>
+							)}
+						</select>
+					</label>
+					<label>
+						タッチ操作
+						<select
+							aria-label="タッチ操作"
+							value={String(tablet)}
+							onChange={(e) => setTablet(e.target.value === "true")}
+						>
+							<option value="false">通常</option>
+							<option value="true">44px以上</option>
 						</select>
 					</label>
 				</div>
+				<DesignTokenEditor
+					values={tokenValues}
+					overrides={tokenOverrides}
+					onChange={(name, value) =>
+						setTokenOverrides((current) => {
+							const next = { ...current };
+							if (value === undefined) delete next[name];
+							else next[name] = value;
+							return next;
+						})
+					}
+					onReset={() => {
+						setTokenOverrides({});
+						setTheme(initialTheme);
+						setDensity("comfortable");
+						setRadius("0.5rem");
+						setTablet(false);
+					}}
+				/>
 				<div className="aui-row aui-sample-actions">
 					{view === "generated-image" && (
 						<>
@@ -209,7 +302,9 @@ export function ArtifactShowcase() {
 				</div>
 				<TabsContent
 					value={compiled.request.view}
-					className={`aui-preview ds-theme-${theme} ${density === "compact" ? "ds-density-compact" : ""} ${theme === "dark" ? "dark" : ""}`}
+					className={`aui-preview ${themeTone(theme) === "dark" ? "dark" : ""}`}
+					style={previewStyle}
+					data-tablet-mode={tablet}
 					data-theme={theme}
 					data-density={density}
 					data-width={width}
@@ -218,7 +313,11 @@ export function ArtifactShowcase() {
 					<ArtifactRenderer
 						key={resetKey}
 						lang={compiled.lang}
-						runtime={{ snapshot: state.resources, dispatch: fixture.dispatch }}
+						runtime={{
+							snapshot: state.resources,
+							dispatch: fixture.dispatch,
+							previewTheme: themeTone(theme),
+						}}
 					/>
 				</TabsContent>
 				<details>

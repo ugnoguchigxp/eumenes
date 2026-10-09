@@ -11,7 +11,7 @@ import {
 } from "../../audio";
 import { useVoiceDialogue } from "..";
 
-for (const recognized of [false, true])
+for (const recognized of [false, true, "failed"])
 	test(`replacement cancels the accepted answer only after confirmed speech: ${recognized}`, async () => {
 		const query = new QueryClient({
 			defaultOptions: { queries: { retry: false } },
@@ -54,7 +54,7 @@ for (const recognized of [false, true])
 				sequence: ids.indexOf(id) + 1,
 				...states.get(id),
 				runId: "run",
-				error: null,
+				error: states.get(id)?.status === "failed" ? "larm_timeout" : null,
 				revision: 1,
 			}),
 			voiceAudio: async () => new Uint8Array(44),
@@ -91,14 +91,16 @@ for (const recognized of [false, true])
 			expect(voiceCancel).not.toHaveBeenCalled();
 			states.set(
 				ids[1]!,
-				recognized
-					? { status: "responding", text: "新しい依頼" }
-					: { status: "completed", text: "" },
+				recognized === "failed"
+					? { status: "failed", text: "" }
+					: recognized
+						? { status: "responding", text: "新しい依頼" }
+						: { status: "completed", text: "" },
 			);
 			await act(async () => {
 				await query.invalidateQueries();
 			});
-			if (recognized) {
+			if (recognized === true) {
 				await waitFor(() => expect(voiceCancel).toHaveBeenCalledWith(ids[0]));
 				expect(voiceCancel).toHaveBeenCalledTimes(1);
 			} else {
@@ -106,6 +108,8 @@ for (const recognized of [false, true])
 					expect(hook.result.current.turn?.utteranceId).toBe(ids[0]),
 				);
 				expect(voiceCancel).not.toHaveBeenCalled();
+				if (recognized === "failed")
+					expect(hook.result.current.error).toBe("larm_timeout");
 				states.set(ids[0]!, { status: "ready", text: "受け付けた依頼" });
 				await act(async () => {
 					await query.invalidateQueries();

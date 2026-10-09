@@ -303,28 +303,31 @@ test("expiry plays one real beep and posts an assistant message even after the a
 	).toBe(0);
 });
 
-test("timer notifications keep chat and artifact in the same layout columns", async ({
+test("top-right banners and notification drawer fit desktop and mobile in both themes", async ({
 	page,
 }) => {
 	await page.emulateMedia({ colorScheme: "dark" });
-	// Layout fixture only: expiration and playback have separate acceptance tests.
+	const now = new Date().toISOString();
+	// Presentation fixture: real expiration, speech and repeated tones are checked separately.
 	await page.route("**/api/timer-notifications?*", (route) =>
 		route.fulfill({
 			json: {
-				serverNow: new Date().toISOString(),
+				serverNow: now,
+				activeTimers: 0,
 				nextCursor: null,
-				items: [
-					{
-						id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-						timerId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
-						generation: 0,
-						revision: 0,
-						status: "played",
-						reason: null,
-						dueAt: new Date().toISOString(),
-						message: "画面分割の検証のタイマーが終了しました。",
-					},
-				],
+				items: Array.from({ length: 12 }, (_, index) => ({
+					id: `aaaaaaaa-aaaa-4aaa-8aaa-${String(index).padStart(12, "0")}`,
+					timerId: `bbbbbbbb-bbbb-4bbb-8bbb-${String(index).padStart(12, "0")}`,
+					generation: 0,
+					revision: 0,
+					status: index === 1 ? "silent" : "played",
+					reason: index === 1 ? "muted" : null,
+					dueAt: new Date(Date.parse(now) - index * 60000).toISOString(),
+					message:
+						index === 0
+							? "3分のタイマーが終了しました。"
+							: `${index + 1}件目のタイマーが終了しました。`,
+				})),
 			},
 		}),
 	);
@@ -342,9 +345,19 @@ test("timer notifications keep chat and artifact in the same layout columns", as
 			.evaluate((workspace) => {
 				const chat = workspace.querySelector(".chat-panel")!;
 				const artifact = workspace.querySelector(".artifact-panel")!;
-				const notification = workspace.querySelector(".timer-notifications")!;
+				const notification = document.querySelector(".timer-notifications")!;
 				const c = chat.getBoundingClientRect(),
-					a = artifact.getBoundingClientRect();
+					a = artifact.getBoundingClientRect(),
+					n = notification.getBoundingClientRect();
+				const trigger = document
+					.querySelector(".notification-center-trigger")!
+					.getBoundingClientRect();
+				const settings = document
+					.querySelector(".floating-settings")!
+					.getBoundingClientRect();
+				const status = document
+					.querySelector(".conversation-status")!
+					.getBoundingClientRect();
 				return {
 					panelCount: [...workspace.children].filter((child) =>
 						child.matches(".chat-panel, .artifact-panel"),
@@ -353,18 +366,182 @@ test("timer notifications keep chat and artifact in the same layout columns", as
 					aligned: Math.abs(c.top - a.top) < 1,
 					artifactBelow: a.top >= c.bottom - 1,
 					overflow: document.documentElement.scrollWidth > innerWidth,
+					right: innerWidth - n.right,
+					top: n.top,
+					width: n.width,
+					iconsOverlap: trigger.right > settings.left,
+					statusOverlaps:
+						status.right > trigger.left && status.bottom > trigger.top,
 				};
 			});
 		expect(geometry.panelCount).toBe(2);
-		expect(geometry.noticeInChat).toBe(true);
+		expect(geometry.noticeInChat).toBe(false);
 		expect(geometry.overflow).toBe(false);
+		expect(geometry.iconsOverlap).toBe(false);
+		expect(geometry.statusOverlaps).toBe(false);
+		expect(geometry.right).toBeCloseTo(16, 0);
+		expect(geometry.top).toBeCloseTo(64, 0);
+		expect(geometry.width).toBeLessThanOrEqual(380);
 		if (width > 900) expect(geometry.aligned).toBe(true);
 		else expect(geometry.artifactBelow).toBe(true);
 	}
-	await page.setViewportSize({ width: 1840, height: 1000 });
-	const directory = resolve("spec/verification/openui-artifact");
+	const directory = resolve("spec/verification/timers");
 	await mkdir(directory, { recursive: true });
-	await page.screenshot({
-		path: resolve(directory, "interaction-review-notification-layout.png"),
+	for (const theme of ["dark", "light"] as const) {
+		await page.emulateMedia({ colorScheme: theme });
+		await page.setViewportSize({ width: 1280, height: 900 });
+		await expect(
+			notice.getByRole("button", { name: "通知を停止" }).first(),
+		).toBeEnabled();
+		await expect(page.locator(".notification-center-overlay")).toHaveCount(0);
+		await page.screenshot({
+			path: resolve(directory, `notification-banner-${theme}.png`),
+		});
+		const trigger = page.getByRole("button", { name: "通知センター、12件" });
+		await trigger.click();
+		const drawer = page.getByRole("dialog", { name: "通知センター" });
+		await expect(drawer).toBeVisible();
+		await expect(drawer.getByRole("article")).toHaveCount(12);
+		await expect(notice).toHaveCount(0);
+		await page.screenshot({
+			path: resolve(directory, `notification-center-${theme}.png`),
+		});
+		await page.setViewportSize({ width: 390, height: 844 });
+		const bounds = await drawer.boundingBox();
+		expect(bounds!.x).toBeGreaterThanOrEqual(0);
+		expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(390);
+		expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(844);
+		await drawer
+			.getByText("12件目のタイマーが終了しました。", { exact: true })
+			.scrollIntoViewIfNeeded();
+		await expect(
+			drawer.getByText("12件目のタイマーが終了しました。", { exact: true }),
+		).toBeInViewport();
+		await drawer
+			.getByText("3分のタイマーが終了しました。", { exact: true })
+			.scrollIntoViewIfNeeded();
+		await page.screenshot({
+			path: resolve(directory, `notification-center-mobile-${theme}.png`),
+		});
+		await page.keyboard.press("Escape");
+		await expect(drawer).toHaveCount(0);
+		await expect(trigger).toBeFocused();
+		await expect(notice).toBeVisible();
+	}
+	// Notification UI is global even when the workspace is hidden by settings.
+	await page.getByRole("button", { name: "設定", exact: true }).click();
+	await expect(notice).toBeVisible();
+	await page.getByRole("button", { name: "通知センター、12件" }).click();
+	await expect(
+		page.getByRole("dialog", { name: "通知センター" }),
+	).toBeVisible();
+	await page.getByRole("button", { name: "通知センターを閉じる" }).click();
+	await expect(page.getByRole("dialog", { name: "通知センター" })).toHaveCount(
+		0,
+	);
+});
+
+test("a restored alarm waits for audio activation and then beeps and requests TTS", async ({
+	page,
+	request,
+}) => {
+	const started = await request.post(`http://127.0.0.1:${apiPort}/api/timers`, {
+		headers: { authorization: `Bearer ${TOKEN}` },
+		data: {
+			requestId: crypto.randomUUID(),
+			issuedAt: new Date().toISOString(),
+			durationSeconds: 15,
+			label: "音声再開の確認",
+		},
 	});
+	expect(started.ok()).toBe(true);
+	const { timer } = await started.json();
+	await page.addInitScript(() => {
+		const counter = window as unknown as { timerBeeps: number };
+		counter.timerBeeps = 0;
+		const create = AudioContext.prototype.createBufferSource;
+		AudioContext.prototype.createBufferSource = function () {
+			const source = create.call(this);
+			const start = source.start.bind(source);
+			source.start = (...args) => {
+				if (Math.abs((source.buffer?.duration ?? 0) - 0.6) < 0.01)
+					counter.timerBeeps++;
+				start(...args);
+			};
+			return source;
+		};
+	});
+	await page.goto(`http://127.0.0.1:${webPort}`);
+	const message = "「音声再開の確認」のタイマー（15秒）が終了しました。";
+	await expect(
+		page.getByRole("region", { name: "タイマーの終了" }).getByText(message),
+	).toBeVisible({ timeout: 20000 });
+	const getNote = async () =>
+		(
+			await (
+				await request.get(
+					`http://127.0.0.1:${apiPort}/api/timers/${timer.id}`,
+					{
+						headers: { authorization: `Bearer ${TOKEN}` },
+					},
+				)
+			).json()
+		).notification;
+	expect((await getNote()).status).toBe("pending");
+	expect(
+		await page.evaluate(
+			() => (window as unknown as { timerBeeps: number }).timerBeeps,
+		),
+	).toBe(0);
+	const speech = page.waitForRequest(
+		(req) =>
+			req.url().endsWith("/api/voice/replay/audio") &&
+			req.postDataJSON()?.text === message,
+	);
+	await page.getByRole("button", { name: "通知音を有効にする" }).click();
+	await speech;
+	await expect
+		.poll(() =>
+			page.evaluate(
+				() => (window as unknown as { timerBeeps: number }).timerBeeps,
+			),
+		)
+		.toBe(1);
+	await expect.poll(async () => (await getNote()).status).toBe("played");
+	await expect
+		.poll(() =>
+			page.evaluate(
+				() => (window as unknown as { timerBeeps: number }).timerBeeps,
+			),
+		)
+		.toBeGreaterThanOrEqual(2);
+	await mkdir(resolve("spec/verification/timers"), { recursive: true });
+	await page
+		.getByRole("region", { name: "タイマーの終了" })
+		.screenshot({ path: resolve("spec/verification/timers/audio-repeat.png") });
+	await page
+		.getByRole("region", { name: "タイマーの終了" })
+		.getByRole("button", { name: "通知を停止" })
+		.click();
+	await expect
+		.poll(async () => (await getNote())?.status ?? "dismissed")
+		.toBe("dismissed");
+	const stoppedAt = await page.evaluate(
+		() => (window as unknown as { timerBeeps: number }).timerBeeps,
+	);
+	await expect
+		.poll(
+			() =>
+				page.evaluate(
+					() => (window as unknown as { timerBeeps: number }).timerBeeps,
+				),
+			{ timeout: 4000 },
+		)
+		.toBe(stoppedAt);
+	await page.waitForTimeout(3500);
+	expect(
+		await page.evaluate(
+			() => (window as unknown as { timerBeeps: number }).timerBeeps,
+		),
+	).toBe(stoppedAt);
 });

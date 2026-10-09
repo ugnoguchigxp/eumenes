@@ -53,6 +53,8 @@ import {
 	registerResearchRoutes,
 	type RouteOperations,
 } from "../domains/research-routes";
+import { registerWorldClaims } from "../domains/world";
+import type { WorldClaims, WorldClaimsContext } from "../domains/world";
 import { createHash, timingSafeEqual } from "node:crypto";
 import {
 	registerServiceTests,
@@ -92,6 +94,8 @@ export function createApp(deps: {
 	taskReports?: TaskReports;
 	researchRoutes?: RouteOperations;
 	timers?: TimersService;
+	/** World claim list and corrections (P5-02). Absent with World OFF: the routes do not exist. */
+	worldClaims?: { claims: WorldClaims; context: () => WorldClaimsContext };
 }) {
 	const app = new Hono();
 	const log = getLogger("http");
@@ -170,6 +174,8 @@ export function createApp(deps: {
 	registerQueue(app, deps.queue);
 	registerScheduler(app, deps.scheduler);
 	if (deps.timers) registerTimers(app, deps.timers);
+	if (deps.worldClaims)
+		registerWorldClaims(app, deps.worldClaims.claims, deps.worldClaims.context);
 	app.onError((error, c) => {
 		const message = error instanceof Error ? error.message : "internal_error";
 		const status = statusForError(message);

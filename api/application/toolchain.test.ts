@@ -1,5 +1,100 @@
 import { test, expect } from "bun:test";
 import { harness, forbidden } from "./toolchain.fixture";
+test("the current report follows earlier failed answers and stays adjacent to the repeated request", async () => {
+	const options = {
+		badQuote: true,
+		failureAnswer: "前回は取得できませんでした。",
+	};
+	const h = await harness(options);
+	try {
+		const question = "今日の鎌倉の天気教えて。";
+		const first = await h.dialogue.submit({
+			requestId: crypto.randomUUID(),
+			conversationId: "main",
+			text: question,
+		});
+		await h.dialogue.waitForTerminal(first.id, { timeoutMs: 5000 });
+		expect(h.dialogue.answerText(first.id)).toBe(options.failureAnswer);
+		options.badQuote = false;
+		const second = await h.dialogue.submit({
+			requestId: crypto.randomUUID(),
+			conversationId: "main",
+			text: question,
+		});
+		await h.dialogue.waitForTerminal(second.id, { timeoutMs: 5000 });
+		const messages = JSON.parse(h.parentContexts.at(-1)!);
+		const oldFailure = messages.findIndex(
+			(m: { content: string }) => m.content === options.failureAnswer,
+		);
+		const currentReport = messages.findIndex((m: { content: string }) =>
+			m.content.includes('"summary":"東京の天気は晴れ'),
+		);
+		expect(oldFailure).toBeGreaterThan(0);
+		expect(currentReport).toBeGreaterThan(oldFailure);
+		expect(currentReport).toBe(messages.length - 2);
+		expect(messages.at(-1).content).toBe(question);
+		expect(h.dialogue.answerText(second.id)).toContain("26度");
+	} finally {
+		await h.close();
+	}
+});
+test("a premature unavailable forecast reads the next candidate before adopting an answer", async () => {
+	const h = await harness({
+		incompleteWeatherFirstRead: true,
+		excerptEvidence: true,
+	});
+	try {
+		const run = await h.dialogue.submit({
+			requestId: crypto.randomUUID(),
+			conversationId: "main",
+			text: "今日の鎌倉の天気教えて。",
+		});
+		expect(
+			(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 }))?.status,
+		).toBe("completed");
+		expect(h.acquisitions).toBe(3);
+		expect(h.dialogue.answerText(run.id)).toContain("晴れ");
+		const report = h.toolchain.agents.report(run.agentTaskId!)!;
+		expect(report.summary).toContain("最高気温26度");
+		expect(report.sources.every((s) => !s.url.endsWith("/empty"))).toBe(true);
+		expect(
+			h.workerContexts.some((c) => c.includes("weather_condition_missing")),
+		).toBe(true);
+	} finally {
+		await h.close();
+	}
+});
+test("authenticated search/read/report/answer resolves model excerpt selections to canonical citations", async () => {
+	const h = await harness({ excerptEvidence: true });
+	try {
+		const response = await h.request("/api/runs", {
+			requestId: crypto.randomUUID(),
+			conversationId: "main",
+			text: "今日の鎌倉の天気をWeb検索してください。",
+		});
+		expect(response.status).toBe(202);
+		const run = await response.json();
+		expect(
+			(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 }))?.status,
+		).toBe("completed");
+		const tasks = h.toolchain.agents.list(run.id);
+		expect(tasks.every((t) => t.status === "completed" && !t.errorCode)).toBe(
+			true,
+		);
+		const report = await (
+			await h.request(`/api/agent-tasks/${run.agentTaskId}/report`)
+		).json();
+		expect(report.claims[0].evidence[0].quote).toContain("26度");
+		expect(report.claims[0].evidence[0].excerptId).toBeUndefined();
+		expect(report.verification).toBe("evidence_linked");
+		expect(h.dialogue.answerText(run.id)).toContain("26度");
+		expect(h.acquisitions).toBe(2);
+		expect(h.parentContexts[0]).not.toContain(forbidden);
+		expect(h.parentContexts[0]).not.toContain('"quote"');
+	} finally {
+		await h.close();
+	}
+});
 test("unmapped location uses search and read without offering incompatible fixed forecast tools", async () => {
 	const h = await harness();
 	try {

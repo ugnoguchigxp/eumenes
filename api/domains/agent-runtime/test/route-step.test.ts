@@ -123,7 +123,13 @@ test("A02 the child keeps its own executionRefs: foreign owners cannot use them 
 	expect(prep.status).toBe("ready");
 	const user = (prep as { input: { messages: { content: string }[] } }).input
 		.messages[1]!.content;
-	expect(JSON.parse(user).nextInvocation).toBeNull();
+	// The host may suggest this child's observed lookup hit, never the legacy
+	// structured forecast hint or a foreign owner's execution reference.
+	expect(JSON.parse(user).nextInvocation).toEqual({
+		action: "invoke",
+		executionRef: "web.read",
+		arguments: { url: URL_A },
+	});
 	expect(h.captures.length).toBe(1); // exactly the child's own summary/decision call
 });
 

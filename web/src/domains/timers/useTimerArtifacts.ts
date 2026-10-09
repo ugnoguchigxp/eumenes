@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { EumenesClient } from "../../../../client";
 import { queryRoots } from "../../queryKeys";
@@ -10,6 +10,7 @@ export function useTimerArtifacts(
 	open: (ref: Ref, title: string) => void,
 	runs?: ReadonlyArray<{ id: string; status: string }>,
 ) {
+	const cache = useQueryClient();
 	const opened = useRef(new Set<string>());
 	const [watched, setWatched] = useState<Array<{ id: string; until: number }>>(
 		[],
@@ -30,6 +31,14 @@ export function useTimerArtifacts(
 				? 5000
 				: false,
 	});
+	useEffect(() => {
+		if (!runs?.length) return;
+		// Voice results can reach the conversation before the local turn callback.
+		// Discover persisted timers even if the change stream missed their creation.
+		void cache.invalidateQueries({
+			queryKey: [queryRoots.timers, "workspace"],
+		});
+	}, [cache, runs]);
 	const receipts = useQuery({
 		queryKey: [queryRoots.timers, "artifacts", ...watched.map((run) => run.id)],
 		enabled: watched.length > 0,

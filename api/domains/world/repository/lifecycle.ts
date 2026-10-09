@@ -226,6 +226,22 @@ export function listOpenIntakes(db: Database): IntakeRow[] {
 	).map(toIntake);
 }
 
+/** Forgets of ONE Scope, newest first (any state): what the owner may be shown. */
+export function listIntakesOfScope(
+	db: Database,
+	principal: string,
+	scopeKey: string,
+	limit: number,
+): IntakeRow[] {
+	return (
+		db
+			.query(
+				"SELECT * FROM world_host_forget_intake WHERE principal = ? AND scope_key = ? ORDER BY rowid DESC LIMIT ?",
+			)
+			.all(principal, scopeKey, limit) as RawIntake[]
+	).map(toIntake);
+}
+
 /** Intakes that name a Memory forget (any state), oldest first. */
 export function listMemoryLinkedIntakes(db: Database): IntakeRow[] {
 	return (

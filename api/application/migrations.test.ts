@@ -26,6 +26,7 @@ import {
 	guardMigration as worldGuardMigration,
 	extractionMigration as worldExtractionMigration,
 	runtimeMigration as worldRuntimeMigration,
+	gapTaskMigration as worldGapTaskMigration,
 } from "../domains/world";
 import { worldStateMigration as dialogueWorldStateMigration } from "../domains/dialogue";
 import { migration as codingMigration } from "../domains/coding";
@@ -424,12 +425,17 @@ test("World's package migrations stay contiguous, and timers is appended after t
 	expect(migrations.indexOf(worldExtractionMigration)).toBeGreaterThan(
 		migrations.indexOf(dialogueWorldStateMigration),
 	);
-	// World runtime observation (P4-04) is the very tail, right after the extraction record.
+	// World runtime observation (P4-04) follows the extraction record.
 	expect(migrations.filter((m) => m === worldRuntimeMigration)).toHaveLength(1);
 	expect(migrations.indexOf(worldRuntimeMigration)).toBe(
 		migrations.indexOf(worldExtractionMigration) + 1,
 	);
-	expect(migrations.at(-1)).toBe(worldRuntimeMigration);
+	// World decision API (P5-01) is the very tail, right after the runtime observation.
+	expect(migrations.filter((m) => m === worldGapTaskMigration)).toHaveLength(1);
+	expect(migrations.indexOf(worldGapTaskMigration)).toBe(
+		migrations.indexOf(worldRuntimeMigration) + 1,
+	);
+	expect(migrations.at(-1)).toBe(worldGapTaskMigration);
 	// Nothing that was already deployed moved: the prefix is unchanged and contiguous.
 	expect(beforeWorld().length).toBe(worldStart);
 	expect(beforeWorld()).toContain(conversationRetractionMigration);

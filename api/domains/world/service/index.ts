@@ -43,6 +43,7 @@ export type {
 export { createWorldLifecycle } from "./lifecycle-adapter";
 export type {
 	ConsumeReport,
+	ForgetListItem,
 	ForgetReport,
 	ForgetRefusal,
 	ForgetRequest,
@@ -51,6 +52,15 @@ export type {
 	RecoverReport,
 	WorldLifecycle,
 } from "./lifecycle-adapter";
+export { conversationReasonSource } from "./reason-source";
+export { conditionText, createWorldClaims } from "./world-claims";
+export type {
+	ClaimFailure,
+	ClaimResult,
+	WorldClaims,
+	WorldClaimsContext,
+	WorldClaimsOptions,
+} from "./world-claims";
 export { defaultMemoryPort } from "./lifecycle-memory";
 export type { MemoryPort } from "./lifecycle-memory";
 export {
@@ -126,3 +136,13 @@ export type {
 	RuntimeObservationOptions,
 	RuntimeRefusal,
 } from "./runtime-adapter";
+export {
+	WORLD_QUERY_DEFAULT_PURPOSE,
+	createWorldQuery,
+	gapTaskKey,
+	gapTaskRequestId,
+	parseWorldQuery,
+} from "./world-query";
+export type { WorldQuery, WorldQueryOptions } from "./world-query";
+export { WORLD_QUERY_TOOL_ID, createWorldQueryTool } from "./world-query-tool";
+export type { WorldQueryTool } from "./world-query-tool";

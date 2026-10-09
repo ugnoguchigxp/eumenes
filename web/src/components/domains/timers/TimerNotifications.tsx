@@ -2,8 +2,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import type { EumenesClient } from "../../../../../client";
 import { queryRoots } from "../../../queryKeys";
-import { Button } from "../../../design-system";
-import "./TimerNotifications.css";
+import type { TimerNotificationDto } from "../../../../../api/domains/timers/contracts";
+import { TimerNotificationCenter } from "./TimerNotificationCenter";
 
 type Attempt = {
 	id: string;
@@ -20,6 +20,9 @@ export function TimerNotifications({
 	muted = false,
 	busy = false,
 	inputBusy,
+	audioReady = true,
+	prepareAudio,
+	repeatTone,
 }: {
 	client: EumenesClient;
 	playTone: (
@@ -30,6 +33,9 @@ export function TimerNotifications({
 	muted?: boolean;
 	busy?: boolean;
 	inputBusy?: () => boolean;
+	audioReady?: boolean;
+	prepareAudio?: () => Promise<void>;
+	repeatTone?: (signal: AbortSignal) => Promise<void>;
 }) {
 	const cache = useQueryClient();
 	const clientId = useRef(crypto.randomUUID());
@@ -40,6 +46,9 @@ export function TimerNotifications({
 		latest.current = { playTone, muted, busy, inputBusy };
 	}, [playTone, muted, busy, inputBusy]);
 	const [error, setError] = useState<string | null>(null);
+	const [stoppingIds, setStoppingIds] = useState<string[]>([]);
+	const [ringingId, setRingingId] = useState<string | null>(null);
+	const alarm = useRef<AbortController | null>(null);
 	const query = useQuery({
 		queryKey: [queryRoots.timers, "notifications"],
 		queryFn: async ({ signal }) => {
@@ -96,6 +105,7 @@ export function TimerNotifications({
 	useEffect(() => {
 		if (
 			active.current.attempt ||
+			(!audioReady && !muted) ||
 			((busy || latest.current.inputBusy?.()) && !muted) ||
 			!query.data
 		)
@@ -165,6 +175,7 @@ export function TimerNotifications({
 					claimId,
 					outcome: "played",
 				});
+				if (repeatTone) setRingingId(note.id);
 			} catch {
 				if (
 					claimId &&
@@ -180,6 +191,7 @@ export function TimerNotifications({
 									? "muted"
 									: "blocked",
 						});
+						if (attempt.delivered && repeatTone) setRingingId(note.id);
 					} catch {
 						/* A cancelled or expired claim must not be adopted. */
 					}
@@ -192,51 +204,91 @@ export function TimerNotifications({
 				});
 			}
 		})();
-	}, [cache, client, query.data, query.dataUpdatedAt, busy, muted]);
+	}, [
+		cache,
+		client,
+		query.data,
+		query.dataUpdatedAt,
+		busy,
+		muted,
+		audioReady,
+		repeatTone,
+	]);
+	const canRing =
+		!busy &&
+		!muted &&
+		audioReady &&
+		query.data?.items.some(
+			(item) => item.id === ringingId && item.status === "played",
+		);
+	useEffect(() => {
+		if (!canRing || !repeatTone) return;
+		const controller = new AbortController();
+		alarm.current = controller;
+		void repeatTone(controller.signal).catch(() => {});
+		return () => {
+			controller.abort();
+			if (alarm.current === controller) alarm.current = null;
+		};
+	}, [canRing, ringingId, repeatTone]);
 	const notices = (query.data?.items ?? []).filter(
 		(item) => item.status !== "dismissed",
 	);
-	if (!notices.length) return null;
+	const needsAudio =
+		!audioReady &&
+		!muted &&
+		prepareAudio &&
+		((query.data?.activeTimers ?? 0) > 0 ||
+			notices.some((item) => item.status === "pending"));
+	const stop = (item: TimerNotificationDto) => {
+		if (stoppingIds.includes(item.id)) return;
+		setStoppingIds((ids) => [...ids, item.id]);
+		if (ringingId === item.id) {
+			alarm.current?.abort();
+			setRingingId(null);
+		}
+		if (active.current.attempt?.id === item.id)
+			active.current.attempt.controller.abort();
+		void (async () => {
+			try {
+				const current = await client.timer(item.timerId);
+				await client.cancelTimer(item.timerId, {
+					requestId: crypto.randomUUID(),
+					issuedAt: current.serverNow,
+					expectedRevision: current.timer.revision,
+				});
+				setError(null);
+			} catch {
+				setError("通知を停止できませんでした。もう一度試してください。");
+			} finally {
+				await refresh();
+				setStoppingIds((ids) => ids.filter((id) => id !== item.id));
+			}
+		})();
+	};
 	return (
-		<section className="timer-notifications" aria-label="タイマーの終了">
-			{notices.map((item) => (
-				<div className="timer-notification" key={item.id}>
-					<span className="timer-notification-sender">Eumenes</span>
-					<output className="timer-notification-message">{item.message}</output>
-					{item.status === "silent" && (
-						<p className="timer-notification-silent">通知音なし</p>
-					)}
-					<Button
-						type="button"
-						variant="outline"
-						className="timer-notification-dismiss"
-						onClick={() => {
-							if (active.current.attempt?.id === item.id)
-								active.current.attempt.controller.abort();
-							void (async () => {
-								try {
-									const current = await client.timer(item.timerId);
-									await client.cancelTimer(item.timerId, {
-										requestId: crypto.randomUUID(),
-										issuedAt: current.serverNow,
-										expectedRevision: current.timer.revision,
-									});
-									setError(null);
-								} catch {
-									setError(
-										"通知を停止できませんでした。もう一度試してください。",
-									);
-								} finally {
-									await refresh();
-								}
-							})();
-						}}
-					>
-						通知を停止
-					</Button>
-				</div>
-			))}
-			{error && <p role="alert">{error}</p>}
-		</section>
+		<TimerNotificationCenter
+			notices={notices}
+			ringingId={canRing ? ringingId : null}
+			stoppingIds={stoppingIds}
+			onStop={stop}
+			onPrepareAudio={
+				needsAudio
+					? () => {
+							void prepareAudio!().catch(() =>
+								setError(
+									"音声を開始できませんでした。もう一度お試しください。",
+								),
+							);
+						}
+					: undefined
+			}
+			error={
+				error ??
+				(query.isError
+					? "通知を取得できませんでした。画面を再読み込みしてください。"
+					: null)
+			}
+		/>
 	);
 }

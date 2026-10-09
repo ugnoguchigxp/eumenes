@@ -39,6 +39,7 @@ import {
 import { useReplay, useVoiceDialogue } from "./domains/voice-dialogue";
 import { ServiceTestsPanel } from "./domains/service-tests";
 import { ResearchRoutesPanel } from "./domains/research-routes";
+import { WorldPanel } from "./domains/world";
 import { createUnsavedFlags } from "./unsavedFlags";
 import { SettingsPage, useSettings, useVoiceMute } from "./domains/settings";
 import { changeRoots, queryRoots } from "./queryKeys";
@@ -152,7 +153,7 @@ function Workspace({
 		undefined,
 		settings.data?.voice,
 	);
-	const playTimerTone = useTimerTone(
+	const timerAudio = useTimerTone(
 		settings.data?.voice,
 		voice.audio,
 		(text, signal) => client.replayAudio(text, signal),
@@ -325,11 +326,31 @@ function Workspace({
 					)}
 				</svg>
 			</Button>
+			<TimerNotifications
+				client={client}
+				playTone={timerAudio.play}
+				repeatTone={timerAudio.repeat}
+				audioReady={timerAudio.ready}
+				prepareAudio={timerAudio.prepare}
+				inputBusy={() => voice.audio()?.isInputBusy?.() ?? false}
+				muted={mute.muted || settings.data?.voice.outputVolume === 0}
+				busy={
+					!mute.ready ||
+					settings.isPending ||
+					!!activeRun ||
+					(!!voice.turn &&
+						["recognizing", "responding", "synthesizing", "ready"].includes(
+							voice.turn.status,
+						)) ||
+					replay.playingId !== null
+				}
+			/>
 			{settingsOpen && (
 				<SettingsPage
 					renderServiceTests={(disabled) => (
 						<ServiceTestsPanel client={client} disabled={disabled} />
 					)}
+					renderWorld={() => <WorldPanel client={client} />}
 					renderResearchRoutes={(disabled) => (
 						<ResearchRoutesPanel
 							client={client}
@@ -479,7 +500,6 @@ function Workspace({
 										client={client}
 										rootRunId={run.id}
 										title={message.text}
-										agentName={settings.data?.general.agentName}
 									/>
 								) : null;
 							}}
@@ -525,25 +545,6 @@ function Workspace({
 						</button>
 					)}
 					<div className="chat-bottom">
-						<TimerNotifications
-							client={client}
-							playTone={playTimerTone}
-							inputBusy={() => voice.audio()?.isInputBusy?.() ?? false}
-							muted={mute.muted || settings.data?.voice.outputVolume === 0}
-							busy={
-								!mute.ready ||
-								settings.isPending ||
-								!!activeRun ||
-								(!!voice.turn &&
-									[
-										"recognizing",
-										"responding",
-										"synthesizing",
-										"ready",
-									].includes(voice.turn.status)) ||
-								replay.playingId !== null
-							}
-						/>
 						<div className="route-track" aria-label="回答の経路">
 							{route.map((node, index) => (
 								<div className="route-part" key={node.id}>

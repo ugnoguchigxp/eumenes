@@ -449,7 +449,12 @@ export function createAudioController(
 		isInputBusy: () => speaking,
 		/** Output only (no microphone): used to read text aloud outside a voice session. */
 		async startOutput() {
-			if (disposed || context) return;
+			if (disposed) return;
+			if (context) {
+				// A previous resume can still be waiting for a browser user gesture.
+				await context.resume();
+				return;
+			}
 			const startedContext = new AudioContext();
 			context = startedContext;
 			try {

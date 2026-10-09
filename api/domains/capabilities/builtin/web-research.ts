@@ -7,6 +7,10 @@ const skillV2 = readFileSync(
 	new URL("./web-research/SKILL.v2.md", import.meta.url),
 	"utf8",
 );
+const skillV3 = readFileSync(
+	new URL("./web-research/SKILL.v3.md", import.meta.url),
+	"utf8",
+);
 import type { Definition } from "../contracts";
 const base = { revision: 1, aliases: [], tags: [], useWhen: [], avoidWhen: [] };
 export const builtins: Definition[] = [
@@ -164,3 +168,20 @@ export const builtins: Definition[] = [
 		],
 	})),
 ];
+
+// New immutable revisions: existing installations keep their previous fingerprints.
+builtins.push(
+    {
+        ...base, revision: 3, kind: "skill", id: "web.research",
+        title: "公開資料の調査", summary: "質問に必要な事実と前後情報を根拠付きで整理。未登録の依頼は検索から開始",
+        dependencies: [], body: skillV3,
+    },
+    ...builtins.filter((d) => d.kind === "package" && (
+        ((d.id === "web.research" || d.id === "web.lookup") && d.revision === 3) ||
+        (d.id === "web.read" && d.revision === 2)
+    )).map((d) => ({
+        ...d, revision: d.revision + 1,
+        dependencies: d.dependencies.map((id) => id.startsWith("skill:web.research@") ? "skill:web.research@3" : id),
+        requiredSkillRevisionIds: ["skill:web.research@3"],
+    })),
+);

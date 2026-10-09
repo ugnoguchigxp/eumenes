@@ -20,6 +20,7 @@ export const queryRoots = {
 	voiceDialogue: "voice-dialogue",
 	researchRoutes: "research-routes",
 	timers: "timers",
+	world: "world",
 } as const;
 
 /**
@@ -45,4 +46,5 @@ export const changeRoots = [
 	queryRoots.voiceDialogue,
 	queryRoots.researchRoutes,
 	queryRoots.timers,
+	queryRoots.world,
 ] as const;

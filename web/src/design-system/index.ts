@@ -9,4 +9,6 @@ export {
 	Input,
 	Textarea,
 	DigitalClock,
+	Drawer,
+	NotificationCard,
 } from "@eumenes/design-system";

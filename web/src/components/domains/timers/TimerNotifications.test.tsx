@@ -8,7 +8,7 @@ import {
 } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, expect, test, vi } from "vitest";
-import { StrictMode } from "react";
+import { StrictMode, useState } from "react";
 import { TimerNotifications } from "./TimerNotifications";
 import { queryRoots } from "../../../queryKeys";
 
@@ -163,6 +163,40 @@ test("muted notices stay visible without claiming or playing audio", async () =>
 	expect(h.api.claimTimerNotification).not.toHaveBeenCalled();
 });
 
+test("an unprepared browser retains the pending alarm until audio is enabled", async () => {
+	const h = fixture();
+	const tone = vi.fn(async () => {});
+	function Notice() {
+		const [ready, setReady] = useState(false);
+		return (
+			<TimerNotifications
+				client={h.api as never}
+				playTone={tone}
+				audioReady={ready}
+				prepareAudio={async () => setReady(true)}
+			/>
+		);
+	}
+	render(
+		<QueryClientProvider client={h.cache}>
+			<Notice />
+		</QueryClientProvider>,
+	);
+	await waitFor(() =>
+		expect(screen.getByText("3分のタイマーが終了しました。")).toBeTruthy(),
+	);
+	expect(h.api.claimTimerNotification).not.toHaveBeenCalled();
+	expect(h.api.ackTimerNotification).not.toHaveBeenCalled();
+	fireEvent.click(screen.getByRole("button", { name: "通知音を有効にする" }));
+	await waitFor(() => expect(tone).toHaveBeenCalledOnce());
+	await waitFor(() =>
+		expect(h.api.ackTimerNotification).toHaveBeenCalledWith(
+			"notice",
+			expect.objectContaining({ outcome: "played" }),
+		),
+	);
+});
+
 test("busy output defers the claim until output becomes free", async () => {
 	const h = fixture();
 	const tone = vi.fn(async () => {});
@@ -263,4 +297,127 @@ test("interrupting speech after a delivered beep settles the notice and does not
 	view.rerender(renderNotice(false));
 	await h.refresh();
 	expect(tone).toHaveBeenCalledOnce();
+});
+
+test("after speech completes the owning client keeps ringing until the notice is stopped", async () => {
+	const h = fixture();
+	const tone = vi.fn(async () => {});
+	let ringingSignal: AbortSignal | undefined;
+	const repeatTone = vi.fn((signal: AbortSignal) => {
+		ringingSignal = signal;
+		return new Promise<void>((resolve) =>
+			signal.addEventListener("abort", () => resolve(), { once: true }),
+		);
+	});
+	h.show(tone, { repeatTone });
+	await waitFor(() => expect(repeatTone).toHaveBeenCalledOnce());
+	expect(tone).toHaveBeenCalledOnce();
+	expect(h.api.ackTimerNotification).toHaveBeenCalledWith(
+		"notice",
+		expect.objectContaining({ outcome: "played" }),
+	);
+	await h.refresh();
+	expect(repeatTone).toHaveBeenCalledOnce();
+	expect(ringingSignal?.aborted).toBe(false);
+	fireEvent.click(screen.getByRole("button", { name: /通知センター/ }));
+	await screen.findByRole("dialog", { name: "通知センター" });
+	expect(ringingSignal?.aborted).toBe(false);
+	fireEvent.click(screen.getByRole("button", { name: "通知センターを閉じる" }));
+	await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+	expect(ringingSignal?.aborted).toBe(false);
+	expect(tone).toHaveBeenCalledOnce();
+	fireEvent.click(screen.getByRole("button", { name: /通知センター/ }));
+	await screen.findByRole("dialog", { name: "通知センター" });
+	fireEvent.click(screen.getByRole("button", { name: "通知を停止" }));
+	expect(ringingSignal?.aborted).toBe(true);
+	await waitFor(() => expect(h.api.cancelTimer).toHaveBeenCalledOnce());
+});
+
+test("a played notice restored in another client does not start a second alarm", async () => {
+	const h = fixture("played");
+	const repeatTone = vi.fn(async () => {});
+	h.show(
+		vi.fn(async () => {}),
+		{ repeatTone },
+	);
+	await waitFor(() =>
+		expect(screen.getByText("3分のタイマーが終了しました。")).toBeTruthy(),
+	);
+	expect(repeatTone).not.toHaveBeenCalled();
+});
+
+test("ringing pauses for another voice and resumes without repeating the announcement", async () => {
+	const h = fixture();
+	const tone = vi.fn(async () => {});
+	const signals: AbortSignal[] = [];
+	const repeatTone = vi.fn((signal: AbortSignal) => {
+		signals.push(signal);
+		return new Promise<void>((resolve) =>
+			signal.addEventListener("abort", () => resolve(), { once: true }),
+		);
+	});
+	const view = (busy: boolean) => (
+		<QueryClientProvider client={h.cache}>
+			<TimerNotifications
+				client={h.api as never}
+				playTone={tone}
+				repeatTone={repeatTone}
+				busy={busy}
+			/>
+		</QueryClientProvider>
+	);
+	const host = render(view(false));
+	await waitFor(() => expect(repeatTone).toHaveBeenCalledOnce());
+	host.rerender(view(true));
+	expect(signals[0]?.aborted).toBe(true);
+	host.rerender(view(false));
+	await waitFor(() => expect(repeatTone).toHaveBeenCalledTimes(2));
+	expect(tone).toHaveBeenCalledOnce();
+	host.unmount();
+	expect(signals[1]?.aborted).toBe(true);
+});
+
+test("notification center remains available when there are no notices", async () => {
+	const h = fixture("dismissed");
+	h.show(async () => {});
+	await h.refresh();
+	expect(screen.queryByRole("region", { name: "タイマーの終了" })).toBeNull();
+	fireEvent.click(screen.getByRole("button", { name: "通知センター" }));
+	await screen.findByRole("dialog", { name: "通知センター" });
+	expect(screen.getByText("通知はありません")).toBeTruthy();
+});
+
+test("banners show the newest three while the drawer contains the entire notification list", async () => {
+	const h = fixture("played");
+	h.api.timerNotifications.mockImplementation(async () => ({
+		serverNow: NOW,
+		nextCursor: null,
+		items: [0, 1, 2, 3, 4].map((index) => ({
+			id: `notice-${index}`,
+			timerId: `timer-${index}`,
+			generation: 1,
+			revision: 0,
+			status: "played",
+			reason: null,
+			dueAt: new Date(Date.parse(NOW) - index * 60000).toISOString(),
+			message: `終了したタイマー ${index}`,
+		})),
+	}));
+	h.show(async () => {});
+	await screen.findByText("終了したタイマー 0");
+	expect(screen.queryByText("終了したタイマー 3")).toBeNull();
+	fireEvent.click(screen.getByRole("button", { name: "ほか2件の通知を見る" }));
+	await screen.findByRole("dialog", { name: "通知センター" });
+	expect(screen.getByText("終了したタイマー 4")).toBeTruthy();
+	expect(
+		screen
+			.getAllByRole("article")
+			.map((article) => article.textContent?.match(/終了したタイマー \d/)?.[0]),
+	).toEqual([
+		"終了したタイマー 0",
+		"終了したタイマー 1",
+		"終了したタイマー 2",
+		"終了したタイマー 3",
+		"終了したタイマー 4",
+	]);
 });

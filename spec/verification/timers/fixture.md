@@ -34,3 +34,36 @@ C04〜C08 も `bun test api/application/timer-toolchain.test.ts` で確認した
 ## 未達
 
 通知音の複数画面、live、実機器の 3 往復は未実施。live 済みではない。
+
+## 2026-10-10 表示復旧・音声準備・繰り返し通知
+
+- 会話 run 更新で保存済み active timer を再取得する。ローカル run callback や change event がなくても時計を開く回帰テストを追加。
+- 音声未準備のページでは pending 通知を claim / ack しない。通知音の有効化後にビープ、TTS、played へ進む。
+- 読み上げ後は同じクライアントで約3秒間隔のビープを続ける。「通知を停止」、ミュート、別の音声再生、アンマウントで停止する。別の音声が終わると再開し、TTS は繰り返さない。別クライアントの played 通知からはループを開始しない。
+- Web の timer / audio 対象テスト46件、workspace typecheck / 対象 lint が通過。timer domain verify は backend 10件・Web 18件を含め通過。
+- ブラウザの音声復旧テストで pending → 有効化 → 実 AudioBufferSource のビープ → TTS リクエスト → 2回目のビープ → 停止後に回数が増えないことを確認。
+- 既存の clock 閉鎖後ビープ/TTS テストも単独実行で通過。並行検証中の初回実行は終了処理待ち・TTS待ちでタイムアウトしており、全ブラウザケースの通過とは区別する。
+- 繰り返し音の所有権は今回再生に成功したページ内で保持する。ページの再読み込み後や別クライアントでは既配信通知から自動で再開しない。
+
+- audio domain verify は28件を含め通過。verify:all は並行変更中の World query 3ファイルの書式チェックで停止した。該当箇所は今回の timer / audio 修正外。
+
+## 2026-10-10 通知センターの再デザイン
+
+- 共通 DesignSystem に NotificationCard を追加。Drawer にトリガーと閉じるボタンのラベル・背景指定を追加。
+- 通知は右上のコンパクトなカードで最大3件表示し、残りは件数ボタンから確認する。右上の通知センターアイコンは通知が0件でも利用できる。
+- Drawer は未停止の通知を新しい順に全件表示し、停止後は一覧・件数から除く。件数は未読件数ではなく、サーバーに残っている未停止通知の件数。停止済みの履歴の保存は今回の対象外。
+- 通知UIをWorkspaceの外に置き、設定画面でも表示する。Drawerの開閉は通知音の停止・再読上げを起こさない。
+- 通知の所有権・claim/ack・ミュート・会話音声の優先順位を維持し、停止処理中の連打を防ぐ。
+- Web単体テストで空の一覧、最新3件と全件表示、Drawer開閉後もBeepが続くこと、Drawer内で停止できることを確認。
+- ブラウザの表示fixtureで1840/1280/790/390px、明暗テーマ、12件のスクロール、Escapeでの閉鎖とトリガーへのフォーカス復帰、設定画面での通知表示を確認。
+- 画像: `notification-banner-{dark,light}.png`、`notification-center-{dark,light}.png`、`notification-center-mobile-{dark,light}.png`。実機器の音声3往復受入とは区別する。
+
+今回の検証結果:
+
+- timer domain verify: backend10件・Web20件を含め通過。
+- audio domain verify: 28件を含め通過。音声準備のタイミングをpointerdownからclick、keydownからkeyupへ移し、押している途中のボタンが消える競合を防止。
+- artifact domain verify: 37件を含め通過。DesignSystem Drawerの既存9件も通過。
+- workspace typecheck、Webの本番ビルドが通過。
+- 表示fixtureと音声復旧fixtureを連続実行し、2件とも通過（50.3秒）。実AudioBufferSourceの初回ビープ、TTSリクエスト、2回目以降のビープ、停止後に回数が増えないことを確認。
+- 途中の音声検証にはタイムアウトがあった。クリック中に準備カードが消える競合を修正し、別の実行は検証途中のDesignSystem再ビルドと重なったため、結果を採用しなかった。ビルド後、検証中のソース更新を避けた上記の連続実行が通過。
+- verify:allは今回の変更外のWorld claims関連5ファイルの書式チェックで停止。全体検証の通過とは扱わない。

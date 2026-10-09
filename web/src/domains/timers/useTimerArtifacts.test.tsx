@@ -23,9 +23,11 @@ function fixture(items: Array<{ id: string; label: string }> = []) {
 	const wrapper = ({ children }: { children: ReactNode }) => (
 		<QueryClientProvider client={cache}>{children}</QueryClientProvider>
 	);
-	const hook = renderHook(() => useTimerArtifacts(api as never, open), {
-		wrapper,
-	});
+	const hook = renderHook(
+		({ runs }: { runs?: Array<{ id: string; status: string }> }) =>
+			useTimerArtifacts(api as never, open, runs),
+		{ wrapper, initialProps: {} },
+	);
 	return { api, cache, open, hook };
 }
 test("saved active timers reopen after reload and polling does not reopen closed tabs", async () => {
@@ -41,6 +43,21 @@ test("saved active timers reopen after reload and polling does not reopen closed
 		});
 	});
 	expect(h.open).toHaveBeenCalledOnce();
+});
+test("a new conversation result discovers a timer without a local run callback or change event", async () => {
+	const h = fixture();
+	await waitFor(() => expect(h.api.timers).toHaveBeenCalledOnce());
+	expect(h.open).not.toHaveBeenCalled();
+	h.api.timers.mockResolvedValue({
+		items: [{ id: "voice-timer", label: "音声のタイマー" }],
+	});
+	h.hook.rerender({ runs: [{ id: "voice-run", status: "completed" }] });
+	await waitFor(() =>
+		expect(h.open).toHaveBeenCalledWith(
+			{ kind: "timer", version: 1, timerId: "voice-timer" },
+			"音声のタイマー",
+		),
+	);
 });
 test("voice and rapid successive runs open their own saved artifacts", async () => {
 	const h = fixture();

@@ -18,6 +18,7 @@ const fields = new Set([
 	"text",
 	"evidence",
 	"sourceId",
+	"excerptId",
 	"quote",
 	"limitations",
 	"facts",

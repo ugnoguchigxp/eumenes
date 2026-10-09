@@ -65,6 +65,10 @@ bun run logs -- --since 2026-10-08T10:00:00+09:00 --component inference --json
 
 音声は同じ会話runIdで `voice.synthesis_started` → `voice.synthesis_completed` を確認します。`voice.synthesis_skipped` の `reason=auto_speak_disabled` は自動読上げ設定による省略です。`voice.processing_failed` には停止した `phase` と固定の `reason` を残します。回答の推論成功と音声合成成功は別です。取消は音声turnのcancel、`voice.session_stopping`、会話runのcancelをHTTPの `X-Request-Id` とsession/utterance/runのIDで追います。セッション停止と次の発話による割込みで進行中の回答が取り消される場合は、LLMの停止障害と区別します。
 
+空の音声認識は `voice.input_ignored` の `reason=empty_transcript` で確認します。本文や音声は記録せず、会話runを作らずに終了します。画面の「マイクを停止」は録音だけを止め、受付済みの推論・検索・読上げを続行します。雑音の検出だけでは割り込まず、新しい認識文の会話runが受け付けられた後に以前の回答を取り消します。明示的な回答中止・権限失効・画面終了時の取消は維持します。
+
+本文の検査予算は4,096区画・2,000,000文字に設定しています。通常の属性やメタデータが多いページも全区画を検査し、命令混入や検査未完了は引き続き拒否します。モデルに提示するtool参照は `web.lookup` などの短い名前です。実行時は現在のtaskに所属する許可へ解決し、内部のUUID・所有者・取消・予算の検査を通します。
+
 ## 正常系の出力量
 
 既定は `info`。起動・復旧・終了、入力受付、ジョブと推論の開始・終了、音声処理の開始・終了とセッション開始・停止を残します。開始だけ残って終了がない処理や、遅いASR・LLM・TTSを見つけるために必要な範囲です。警告・エラーだけでは途中で止まった処理を特定できません。
@@ -90,5 +94,7 @@ bun run logs -- --since 2026-10-08T10:00:00+09:00 --component inference --json
 ブラウザfixtureが失敗した場合は、試験結果のディレクトリに `backend.jsonl` を保存し、`backend-log` として添付します。fixture用backendは `debug` で記録するため、一時DBの削除後も失敗直前の経過を調べられます。`bun run logs -- --file <backend.jsonlのパス> --level warn` で閲覧できます。
 
 Toolchainのlive検証も、一時DBを削除する前に運用ログを `verification-reports/toolchain/live-backend.jsonl`（0600）へ保存します。通常の安全なlogger出力だけを保存し、Providerの生応答は記録しません。
+
+`EUMENES_LIVE_VOICE=1 bun scripts/voice-live.ts` は、一時DBの隔離backendで実TTSの試験入力→実ASR→検索・本文取得→実LLM回答→実TTSを確認します。最終回答と読上げ文の一致・音声の取得も合格条件です。運用ログは `verification-reports/voice-live/backend.jsonl`、試験の入力・回答・出典は `result.json`（双方0600）へ別々に保存します。試験結果は会話本文を除外した運用ログとは区別し、実マイク・スピーカーの受入試験とも区別します。
 
 `api/infrastructure/logger.test.ts` はJSON形式、並行処理のID分離、秘密の除外、世代管理、書込み失敗時の継続、HTTPの相関ID、閲覧時の絞込みを確認します。`api/application/logging.test.ts` は一時DBとLARM未設定のbackendを実際に起動し、入力受付→ジョブ→推論失敗→終了のログを確認します。これらはfixture試験であり、liveのProvider疎通や実マイク・再生の受入ではありません。

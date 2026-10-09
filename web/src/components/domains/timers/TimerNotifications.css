@@ -1,52 +1,161 @@
-.timer-notifications {
+.notification-center-trigger {
 	position: fixed;
-	z-index: 12;
-	right: 24px;
-	bottom: 24px;
-	display: grid;
-	gap: 12px;
-	width: min(360px, calc(100% - 32px));
-	max-height: calc(100dvh - 100px);
-	overflow: auto;
-}
-
-.timer-notification {
-	padding: 20px;
+	z-index: 11;
+	top: calc(12px + env(safe-area-inset-top, 0px));
+	right: calc(60px + env(safe-area-inset-right, 0px));
+	width: 36px;
+	height: 36px;
+	padding: 0;
 	border: 1px solid var(--border);
-	border-radius: 16px;
+	border-radius: 50%;
 	color: var(--foreground);
 	background: var(--card);
-	box-shadow: 0 8px 32px color-mix(in srgb, var(--foreground) 12%, transparent);
+	box-shadow: none;
+	overflow: visible;
 }
-
-.timer-notification-sender {
-	color: var(--primary);
+.notification-center-trigger:hover {
+	background: var(--accent);
+}
+.notification-center-badge {
+	position: absolute;
+	top: -4px;
+	right: -4px;
+	min-width: 17px;
+	height: 17px;
+	padding: 0 4px;
+	border: 2px solid var(--background);
+	border-radius: 12px;
+	color: #fff;
+	background: #df4b54;
+	font-size: 10px;
+	line-height: 13px;
+	font-variant-numeric: tabular-nums;
+}
+.timer-notifications {
+	position: fixed;
+	z-index: 20;
+	top: calc(64px + env(safe-area-inset-top, 0px));
+	right: calc(16px + env(safe-area-inset-right, 0px));
+	display: grid;
+	gap: 10px;
+	width: min(380px, calc(100vw - 32px - env(safe-area-inset-right, 0px)));
+	max-height: calc(
+		100dvh - 80px - env(safe-area-inset-top, 0px) -
+			env(safe-area-inset-bottom, 0px)
+	);
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	padding-bottom: 12px;
+}
+.timer-notification-dismiss {
+	min-height: 32px;
+	padding: 0 14px;
+	border-radius: 9px;
 	font-size: 12px;
-	font-weight: 600;
+	box-shadow: none;
 }
-
-.timer-notification-message {
-	display: block;
-	margin: 8px 0 16px;
-	font-size: 15px;
-	line-height: 1.6;
-	overflow-wrap: anywhere;
+.notification-ringing {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
 }
-
-.timer-notification-silent {
-	margin: -8px 0 12px;
-	color: var(--muted-foreground);
+.notification-ringing i {
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: #53ae88;
+}
+.notification-more {
+	border-radius: 16px;
 	font-size: 12px;
 }
-
-.timer-notifications .timer-notification-dismiss {
-	height: 44px;
+.notification-error {
+	margin: 0;
+	padding: 12px 16px;
+	border-radius: 16px;
+	color: var(--destructive);
+	background: var(--card);
 	font-size: 13px;
+	line-height: 1.6;
 }
-
-@media (max-width: 700px) {
-	.timer-notifications {
-		right: 16px;
-		bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+.notification-center-overlay {
+	background: color-mix(in srgb, #000 12%, transparent);
+	backdrop-filter: blur(2px);
+}
+.notification-center-drawer {
+	display: flex;
+	flex-direction: column;
+	gap: 0;
+	top: calc(64px + env(safe-area-inset-top, 0px));
+	bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+	right: calc(16px + env(safe-area-inset-right, 0px));
+	width: min(400px, calc(100vw - 32px - env(safe-area-inset-right, 0px)));
+	max-width: 400px;
+	height: auto;
+	padding: 0;
+	border: 1px solid color-mix(in srgb, var(--foreground) 12%, transparent);
+	border-radius: 24px;
+	background: color-mix(in srgb, var(--background) 88%, transparent);
+	box-shadow: 0 20px 60px #00000030;
+	backdrop-filter: blur(32px) saturate(150%);
+	overflow: hidden;
+}
+.notification-center-drawer > div:first-child {
+	margin: 0;
+	padding: 23px 60px 20px 22px;
+	text-align: left;
+}
+.notification-center-drawer > div:nth-child(2) {
+	min-height: 0;
+	margin: 0;
+	padding: 0 14px 14px;
+	overscroll-behavior: contain;
+}
+.notification-center-drawer > button {
+	display: grid;
+	place-items: center;
+	width: 36px;
+	height: 36px;
+	top: 16px;
+	right: 14px;
+	border-radius: 50%;
+	background: color-mix(in srgb, var(--foreground) 6%, transparent);
+}
+.notification-center-list {
+	display: grid;
+	gap: 12px;
+}
+.notification-center-list .notification-card {
+	box-shadow: 0 3px 12px #00000008;
+}
+.notification-center-empty {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	padding: 64px 20px;
+	color: var(--muted-foreground);
+	text-align: center;
+}
+.notification-center-empty > svg {
+	width: 36px;
+	height: 36px;
+	opacity: 0.5;
+}
+.notification-center-empty h3 {
+	margin: 18px 0 8px;
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--foreground);
+}
+.notification-center-empty p {
+	margin: 0;
+	font-size: 12px;
+	line-height: 1.7;
+}
+@media (prefers-reduced-motion: reduce) {
+	.notification-center-drawer,
+	.notification-center-overlay {
+		animation: none;
+		transition: none;
 	}
 }

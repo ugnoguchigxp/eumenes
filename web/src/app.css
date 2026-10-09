@@ -86,7 +86,7 @@ select:focus-visible {
 	max-width: min(
 		420px,
 		calc(
-			100% - 92px - env(safe-area-inset-left, 0px) -
+			100% - 136px - env(safe-area-inset-left, 0px) -
 				env(safe-area-inset-right, 0px)
 		)
 	);

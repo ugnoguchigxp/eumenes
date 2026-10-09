@@ -90,12 +90,14 @@ try {
 		!!audio &&
 		audio.length > 44 &&
 		new TextDecoder().decode(audio.subarray(0, 4)) === "RIFF";
+	const spoken = turn.audioChunks?.map((chunk) => chunk.text).join("");
 	const ok =
 		turn.status === "ready" &&
 		run?.status === "completed" &&
 		!!turn.text?.includes("鎌倉") &&
 		!!turn.text.includes("天気") &&
 		!!answer &&
+		spoken === answer &&
 		!!task?.claims.length &&
 		hasWav;
 	const result = {
@@ -107,7 +109,7 @@ try {
 		runStatus: run?.status,
 		transcript: turn.text,
 		answer,
-		spoken: turn.audioChunks?.map((chunk) => chunk.text).join(""),
+		spoken,
 		audioBytes: audio?.length,
 		claims: task?.claims,
 		sources: task?.sources,

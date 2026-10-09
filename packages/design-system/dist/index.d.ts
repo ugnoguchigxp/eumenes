@@ -13,6 +13,7 @@ import { FieldPath } from 'react-hook-form';
 import { FieldValues } from 'react-hook-form';
 import { FormProviderProps } from 'react-hook-form';
 import { ForwardRefExoticComponent } from 'react';
+import { HTMLAttributes } from 'react';
 import { JSX } from 'react';
 import * as LabelPrimitive from '@radix-ui/react-label';
 import * as PopoverPrimitive from '@radix-ui/react-popover';
@@ -141,7 +142,7 @@ export declare interface ButtonProps extends React_2.ButtonHTMLAttributes<HTMLBu
 }
 
 export declare const buttonVariants: (props?: ({
-    variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link" | "success" | "warning" | "info" | "outline-success" | "outline-warning" | "outline-destructive" | "fab" | "circle-help" | "circle-alert" | "option" | "option-active" | null | undefined;
+    variant?: "link" | "default" | "destructive" | "outline" | "secondary" | "ghost" | "success" | "warning" | "info" | "outline-success" | "outline-warning" | "outline-destructive" | "fab" | "circle-help" | "circle-alert" | "option" | "option-active" | null | undefined;
     size?: "default" | "sm" | "lg" | "icon" | "circle" | null | undefined;
 } & ClassProp) | undefined) => string;
 
@@ -328,10 +329,13 @@ declare interface DrawerProps extends VariantProps<typeof drawerVariants> {
     title?: string;
     description?: string;
     className?: string;
+    trigger?: React_2.ReactNode;
+    overlayClassName?: string;
+    closeLabel?: string;
 }
 
 declare const drawerVariants: (props?: ({
-    side?: "left" | "right" | "bottom" | "top" | null | undefined;
+    side?: "bottom" | "left" | "right" | "top" | null | undefined;
 } & ClassProp) | undefined) => string;
 
 /**
@@ -719,6 +723,20 @@ declare interface NavigationStepperProps {
     compactOnMobile?: boolean;
     inlineContentOnVerticalMobile?: boolean;
     className?: string;
+}
+
+/** A compact notification surface; playback and dismissal belong to the caller. */
+export declare function NotificationCard({ appName, title, message, icon, timestamp, dateTime, status, actions, className, ...props }: NotificationCardProps): JSX.Element;
+
+export declare interface NotificationCardProps extends HTMLAttributes<HTMLElement> {
+    appName: string;
+    title: string;
+    message: string;
+    icon?: ReactNode;
+    timestamp?: string;
+    dateTime?: string;
+    status?: ReactNode;
+    actions?: ReactNode;
 }
 
 export declare const NotificationToast: React_2.NamedExoticComponent<NotificationToastProps>;

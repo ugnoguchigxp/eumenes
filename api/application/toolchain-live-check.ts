@@ -1,6 +1,25 @@
 type EvidenceReport = {
 	claims: Array<{ text: string; evidence: Array<{ quote: string }> }>;
 };
+/** Forecast pages also print month/day dates such as 10/10(Sat). */
+export function checkLiveForecastDate(
+	requestedDate: string,
+	report: (EvidenceReport & { summary: string }) | null,
+) {
+	if (!report || !/^\d{4}-\d{2}-\d{2}$/.test(requestedDate)) return false;
+	const [year, month, day] = requestedDate.split("-");
+	const pattern = new RegExp(
+		`${requestedDate}|${year}年${Number(month)}月${Number(day)}日|${Number(month)}月${Number(day)}日|(?:^|[^\\d/])0?${Number(month)}/0?${Number(day)}(?![\\d/])`,
+	);
+	return (
+		pattern.test(
+			[report.summary, ...report.claims.map((c) => c.text)].join("\n"),
+		) &&
+		pattern.test(
+			report.claims.flatMap((c) => c.evidence.map((e) => e.quote)).join("\n"),
+		)
+	);
+}
 const amount = (text: string) =>
 	Number(
 		text.includes(".")

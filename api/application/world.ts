@@ -22,6 +22,8 @@ import type { MemoryService } from "../domains/memory";
 import {
 	SourceCursorError,
 	createConversationSourceAdapter,
+	conversationReasonSource,
+	createWorldClaims,
 	createWorldContextBroker,
 	createWorldExtraction,
 	createWorldHostGate,
@@ -36,6 +38,8 @@ import {
 	type LifecycleOptions,
 	type PreparedWorldContext,
 	type RecoverReport,
+	type WorldClaims,
+	type WorldClaimsContext,
 	type WorldExtraction,
 	type WorldHostGate,
 	type WorldLifecycle,
@@ -214,6 +218,10 @@ export type WorldAssembly = {
 	readonly extraction: WorldExtraction | undefined;
 	/** The port dialogue consumes. World OFF makes it answer `disabled`. */
 	readonly context: WorldContextPort;
+	/** The owner's claim list and explicit corrections (P5-02). */
+	readonly claims: WorldClaims;
+	/** Who the HTTP surface acts for: bound by the host, never by a request. */
+	readonly claimsContext: () => WorldClaimsContext;
 	/**
 	 * Startup step, AFTER `memory.recover()` and BEFORE the queue starts. Never
 	 * throws: a failed recovery leaves the gate closed (World fails closed) and
@@ -289,6 +297,17 @@ export function createWorldAssembly(
 		sources: [adapter],
 		scopes: [scope],
 		...options.lifecycle,
+	});
+	const claims = createWorldClaims({
+		store,
+		world: service,
+		lifecycle,
+		state: () => ({ mode: options.mode, gateOpen: gate.isOpen() }),
+		reasonSource: conversationReasonSource(options.conversation, scope),
+		readPurpose: WORLD_BROKER_PURPOSE,
+		writePurpose: WORLD_MANUAL_PURPOSE,
+		onForgetAdvanceFailed: (error) =>
+			log.warn("world.forget_advance_failed", { reason: "advance" }, error),
 	});
 	const broker = createWorldContextBroker({
 		store,
@@ -498,6 +517,11 @@ export function createWorldAssembly(
 		broker,
 		extraction,
 		context: worldContextPort(broker),
+		claims,
+		claimsContext: () => ({
+			principal: scope.principal,
+			scopeKeys: [scope.scopeKey],
+		}),
 		recover,
 		initialSync,
 		async setEnabled(enabled) {

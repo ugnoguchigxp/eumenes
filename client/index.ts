@@ -18,6 +18,7 @@ import { codingClient } from "./coding";
 import { timersClient } from "./timers";
 import { voiceDialogueClient } from "./voice-dialogue";
 import { webResearchClient } from "./web-research";
+import { worldClient } from "./world";
 
 export { ApiError, ApiConnectionError } from "./transport";
 export function createClient(baseUrl: string, token?: string) {
@@ -42,6 +43,7 @@ export function createClient(baseUrl: string, token?: string) {
 		...codingSupervisionClient(transport),
 		...researchRoutesClient(transport),
 		...timersClient(transport),
+		...worldClient(transport),
 	};
 }
 export type EumenesClient = ReturnType<typeof createClient>;

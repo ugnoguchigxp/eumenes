@@ -3,12 +3,13 @@ import { useEffect } from "react";
 import type { EumenesClient } from "../../../../client";
 import { ApiError } from "../../../../client";
 import { queryRoots } from "../../queryKeys";
+import "./ResearchTaskCard.css";
 const phases: Record<string, string> = {
 	route: "依頼を確認中",
 	select: "調べ方を準備中",
 	research: "調査中",
 	search: "検索中",
-	read: "資料を読取り中",
+	read: "資料を確認中",
 	answer: "回答を準備中",
 	completed: "完了",
 	failed: "調査未完了",
@@ -25,12 +26,10 @@ export function ResearchTaskCard({
 	client,
 	rootRunId,
 	title,
-	agentName,
 }: {
 	client: EumenesClient;
 	rootRunId: string;
 	title: string;
-	agentName?: string;
 }) {
 	const cache = useQueryClient();
 	const tasks = useQuery({
@@ -75,12 +74,16 @@ export function ResearchTaskCard({
 		return null;
 	const failed =
 		!!root.errorCode && root.errorCode !== "clarification_required";
-	const phase =
-		root.status === "waiting_child"
+	const terminal = ["completed", "failed", "cancelled", "interrupted"].includes(
+		root.status,
+	);
+	const phase = terminal
+		? root.status === "completed" && failed
+			? "failed"
+			: root.status
+		: root.status === "waiting_child"
 			? child?.phase
-			: root.status === "completed" && failed
-				? "failed"
-				: root.phase;
+			: root.phase;
 	const data = root.reportState === "available" ? report.data : undefined;
 	const mode = modes[child?.acquisitionMode ?? root.acquisitionMode ?? ""];
 	const unavailable =
@@ -88,64 +91,68 @@ export function ResearchTaskCard({
 		(report.error instanceof ApiError &&
 			[404, 410].includes(report.error.status));
 	return (
-		<aside
-			className="message message-assistant research-card"
-			aria-label={`調査: ${title}`}
-		>
-			<small className="message-author">{agentName || "Eumenes"}</small>
-			<strong>{title.slice(0, 80)}</strong>
-			<output>
-				{data?.coverage === "partial" &&
-				!["failed", "cancelled", "interrupted"].includes(phase ?? "")
-					? "一部未確認"
-					: (phases[phase ?? ""] ?? "調査中")}
-			</output>
-			{mode && <small>{mode}</small>}
-			{!["completed", "failed", "cancelled", "interrupted"].includes(
-				root.status,
-			) && (
-				<button
-					type="button"
-					disabled={cancel.isPending}
-					onClick={() => cancel.mutate()}
-				>
-					調査を停止
-				</button>
-			)}
-			{cancel.isError && <p>停止できませんでした。</p>}
-			{unavailable ? (
-				<p>
-					{root.reportState === "deleted"
-						? "調査の詳細は削除されました。"
-						: "詳細の保持期間が終了しました。"}
-				</p>
-			) : report.isError ? (
-				<p>調査結果を読み込めませんでした。</p>
-			) : null}
-			{data && (
-				<details open>
-					<summary>調査の要約と出典</summary>
-					<p>{data.summary}</p>
-					<ul>
-						{data.claims.map((c, i) => (
-							<li key={i}>{c.text}</li>
-						))}
-					</ul>
-					{!!data.limitations.length && <p>{data.limitations.join(" / ")}</p>}
-					<ul>
-						{data.sources.map((s) => (
-							<li key={s.sourceId}>
-								<a href={s.url} target="_blank" rel="noopener noreferrer">
-									{s.title || s.url}
-								</a>{" "}
-								— {s.basis === "snippet" ? "検索要約のみ" : "本文確認"} / 取得{" "}
-								{new Date(s.fetchedAt).toLocaleString("ja-JP")}
-							</li>
-						))}
-					</ul>
-					<small>
-						出典との対応を確認しています。内容の正しさを保証する表示ではありません。
-					</small>
+		<aside className="research-activity" aria-label={`調査: ${title}`}>
+			<div className="research-activity-progress">
+				<span className="research-activity-marker" aria-hidden="true" />
+				<span>調査</span>
+				<output aria-live="polite">
+					{data?.coverage === "partial" &&
+					!["failed", "cancelled", "interrupted"].includes(phase ?? "")
+						? "一部未確認"
+						: (phases[phase ?? ""] ?? "調査中")}
+				</output>
+				{!terminal && (
+					<button
+						type="button"
+						className="research-activity-stop"
+						disabled={cancel.isPending}
+						onClick={() => cancel.mutate()}
+					>
+						調査を停止
+					</button>
+				)}
+			</div>
+			{cancel.isError && <p role="alert">停止できませんでした。</p>}
+			{(mode || unavailable || report.isError || data) && (
+				<details className="research-activity-details" open>
+					<summary>調査の詳細・出典</summary>
+					{mode && <p>{mode}</p>}
+					{unavailable ? (
+						<p>
+							{root.reportState === "deleted"
+								? "調査の詳細は削除されました。"
+								: "詳細の保持期間が終了しました。"}
+						</p>
+					) : report.isError ? (
+						<p>調査結果を読み込めませんでした。</p>
+					) : null}
+					{data && (
+						<div>
+							<p>{data.summary}</p>
+							<ul>
+								{data.claims.map((c, i) => (
+									<li key={i}>{c.text}</li>
+								))}
+							</ul>
+							{!!data.limitations.length && (
+								<p>{data.limitations.join(" / ")}</p>
+							)}
+							<ul>
+								{data.sources.map((s) => (
+									<li key={s.sourceId}>
+										<a href={s.url} target="_blank" rel="noopener noreferrer">
+											{s.title || s.url}
+										</a>{" "}
+										— {s.basis === "snippet" ? "検索要約のみ" : "本文確認"} /
+										取得 {new Date(s.fetchedAt).toLocaleString("ja-JP")}
+									</li>
+								))}
+							</ul>
+							<small>
+								出典との対応を確認しています。内容の正しさを保証する表示ではありません。
+							</small>
+						</div>
+					)}
 				</details>
 			)}
 		</aside>

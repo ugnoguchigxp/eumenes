@@ -64,12 +64,20 @@ function createProductionApp(
 	deps: Required<
 		Omit<
 			Parameters<typeof createApp>[0],
-			"researchRoutes" | "coding" | "codingSupervision" | "taskReports"
+			| "researchRoutes"
+			| "coding"
+			| "codingSupervision"
+			| "taskReports"
+			| "worldClaims"
 		>
 	> &
 		Pick<
 			Parameters<typeof createApp>[0],
-			"researchRoutes" | "coding" | "codingSupervision" | "taskReports"
+			| "researchRoutes"
+			| "coding"
+			| "codingSupervision"
+			| "taskReports"
+			| "worldClaims"
 		>,
 ) {
 	return createApp(deps);
@@ -374,6 +382,15 @@ async function main() {
 		taskReports,
 		researchRoutes: routeOps,
 		timers,
+		// With World OFF nothing is assembled and the routes do not exist.
+		...(world
+			? {
+					worldClaims: {
+						claims: world.claims,
+						context: world.claimsContext,
+					},
+				}
+			: {}),
 	});
 	const port = Number(process.env.EUMENES_PORT ?? 8787);
 	const server = Bun.serve({

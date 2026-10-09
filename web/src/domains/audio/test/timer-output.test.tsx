@@ -39,7 +39,7 @@ test("configured output is reused and tone completion follows the actual ended c
 	);
 	const signal = new AbortController().signal;
 	let completed = false;
-	const first = hook.result.current(signal).then(() => {
+	const first = hook.result.current.play(signal).then(() => {
 		completed = true;
 	});
 	await waitFor(() => expect(fake.output.play).toHaveBeenCalledOnce());
@@ -53,7 +53,7 @@ test("configured output is reused and tone completion follows the actual ended c
 		callbacks[0]!();
 		await first;
 	});
-	const next = hook.result.current(signal);
+	const next = hook.result.current.play(signal);
 	await waitFor(() => expect(fake.output.play).toHaveBeenCalledTimes(2));
 	await act(async () => {
 		callbacks[1]!();
@@ -68,7 +68,7 @@ test("aborting a stalled output releases resources and rejects instead of report
 	fake.output.startOutput.mockImplementation(() => new Promise<void>(() => {}));
 	const hook = renderHook(() => useTimerTone({ outputVolume: 1 }));
 	const abort = new AbortController();
-	const playback = hook.result.current(abort.signal);
+	const playback = hook.result.current.play(abort.signal);
 	const rejected = expect(playback).rejects.toThrow("audio_interrupted");
 	abort.abort();
 	await rejected;
@@ -87,7 +87,7 @@ test("a live session shares its output and aborting a tone leaves the microphone
 		useTimerTone({ outputVolume: 0.5 }, () => session),
 	);
 	const abort = new AbortController();
-	const playback = hook.result.current(abort.signal);
+	const playback = hook.result.current.play(abort.signal);
 	const rejected = expect(playback).rejects.toThrow("audio_interrupted");
 	await waitFor(() => expect(session.play).toHaveBeenCalledOnce());
 	expect(session.play.mock.calls[0]?.[2].suppressInput).toBe(true);
@@ -99,12 +99,34 @@ test("a live session shares its output and aborting a tone leaves the microphone
 });
 
 test("a user gesture prepares the output before the deadline without playing a sound", async () => {
-	renderHook(() => useTimerTone({ outputVolume: 1 }));
+	const hook = renderHook(() => useTimerTone({ outputVolume: 1 }));
+	expect(hook.result.current.ready).toBe(false);
 	fireEvent.pointerDown(window);
+	expect(fake.output.startOutput).not.toHaveBeenCalled();
+	fireEvent.click(window);
 	await waitFor(() => expect(fake.output.startOutput).toHaveBeenCalledOnce());
+	await waitFor(() => expect(hook.result.current.ready).toBe(true));
 	expect(fake.output.play).not.toHaveBeenCalled();
-	fireEvent.keyDown(window, { key: "Enter" });
+	fireEvent.keyUp(window, { key: "Enter" });
 	expect(fake.create).toHaveBeenCalledOnce();
+});
+
+test("a later gesture retries preparation instead of caching a suspended output as ready", async () => {
+	let resume!: () => void;
+	fake.output.startOutput.mockImplementationOnce(
+		() =>
+			new Promise<void>((resolve) => {
+				resume = resolve;
+			}),
+	);
+	const hook = renderHook(() => useTimerTone({ outputVolume: 1 }));
+	fireEvent.click(window);
+	expect(hook.result.current.ready).toBe(false);
+	fireEvent.keyUp(window, { key: "Enter" });
+	await waitFor(() => expect(hook.result.current.ready).toBe(true));
+	expect(fake.output.startOutput).toHaveBeenCalledTimes(2);
+	expect(fake.create).toHaveBeenCalledOnce();
+	await act(async () => resume());
 });
 
 test("the beep ends before speech starts, and the completion message uses the same output", async () => {
@@ -119,7 +141,10 @@ test("the beep ends before speech starts, and the completion message uses the sa
 		useTimerTone({ outputVolume: 0.4 }, undefined, speech),
 	);
 	const signal = new AbortController().signal;
-	const playing = hook.result.current(signal, "3分のタイマーが終了しました。");
+	const playing = hook.result.current.play(
+		signal,
+		"3分のタイマーが終了しました。",
+	);
 	await waitFor(() => expect(fake.output.play).toHaveBeenCalledOnce());
 	expect(speech).not.toHaveBeenCalled();
 	await act(async () => {
@@ -150,10 +175,38 @@ test("unavailable speech leaves an already delivered beep successful", async () 
 		useTimerTone({ outputVolume: 1 }, undefined, speech),
 	);
 	await expect(
-		hook.result.current(
+		hook.result.current.play(
 			new AbortController().signal,
 			"タイマーが終了しました。",
 		),
 	).resolves.toBeUndefined();
 	expect(fake.output.play).toHaveBeenCalledOnce();
+});
+
+test("repeating alarms play only beeps and stop promptly without requesting speech again", async () => {
+	vi.useFakeTimers();
+	try {
+		fake.output.play.mockImplementation(async (_bytes, done, options) => {
+			options.onStarted();
+			done();
+		});
+		const speech = vi.fn(async () => new Uint8Array([1]));
+		const h = renderHook(() =>
+			useTimerTone({ outputVolume: 1 }, undefined, speech),
+		);
+		const abort = new AbortController();
+		const ringing = h.result.current.repeat(abort.signal);
+		const stopped = expect(ringing).rejects.toThrow("audio_interrupted");
+		await act(async () => vi.advanceTimersByTimeAsync(2500));
+		expect(fake.output.play).toHaveBeenCalledOnce();
+		await act(async () => vi.advanceTimersByTimeAsync(2500));
+		expect(fake.output.play).toHaveBeenCalledTimes(2);
+		abort.abort();
+		await stopped;
+		await act(async () => vi.advanceTimersByTimeAsync(10000));
+		expect(fake.output.play).toHaveBeenCalledTimes(2);
+		expect(speech).not.toHaveBeenCalled();
+	} finally {
+		vi.useRealTimers();
+	}
 });

@@ -110,6 +110,10 @@ export function useVoiceDialogue(
 	useEffect(() => {
 		const value = turn.data;
 		if (!value) return;
+		if (value.status === "failed")
+			// Keep the failure visible when restoring a previous accepted turn.
+			// oxlint-disable-next-line react/set-state-in-effect
+			setError(value.error ?? "音声処理に失敗しました");
 		const pending = replacement.current;
 		if (pending?.id === value.utteranceId) {
 			if (
@@ -143,10 +147,6 @@ export function useVoiceDialogue(
 			}
 		}
 		if (value.text) invalidateDialogueViews(cache, client.identity, "main");
-		if (value.status === "failed")
-			// Keep the failure visible after the query changes, until a new session starts.
-			// oxlint-disable-next-line react/set-state-in-effect
-			setError(value.error ?? "音声処理に失敗しました");
 		const active = machine.get().session;
 		const valid = () =>
 			!!active && isCurrent(machine.get(), active.token, value.utteranceId);

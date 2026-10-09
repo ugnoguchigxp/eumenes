@@ -121,8 +121,8 @@ export const domains = {
 	},
 	world: {
 		backend: "api/domains/world",
-		web: null,
-		components: null,
+		web: "web/src/domains/world",
+		components: "web/src/components/domains/world",
 		depends: ["conversation", "goals", "memory"],
 	},
 	memory: {

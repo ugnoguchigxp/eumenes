@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import type { EumenesClient } from "../../../../client";
 import { queryRoots } from "../../queryKeys";
@@ -43,6 +43,10 @@ test("deleted reports disappear even when a previous response remains in the que
 			</QueryClientProvider>,
 		);
 		await screen.findByText("OLD_REPORT");
+		const details = screen.getByText("OLD_REPORT").closest("details")!;
+		expect(details.open).toBe(false);
+		fireEvent.click(screen.getByText("調査の詳細・出典"));
+		expect(details.open).toBe(true);
 		current = { ...root, reportState: "deleted" };
 		await cache.invalidateQueries({ queryKey: [queryRoots.agentTasks] });
 		await vi.waitFor(() => expect(screen.queryByText("OLD_REPORT")).toBeNull());
@@ -73,13 +77,12 @@ test("failed research stays a status indicator; the agent's response supplies th
 			</QueryClientProvider>,
 		);
 		await screen.findByText("調査未完了");
-		const bubble = screen.getByRole("complementary", {
+		const activity = screen.getByRole("complementary", {
 			name: "調査: 東京の天気",
 		});
-		expect(bubble.classList.contains("message-assistant")).toBe(true);
-		expect(bubble.querySelector(".message-author")?.textContent).toBe(
-			"Eumenes",
-		);
+		expect(activity.closest(".message")).toBeNull();
+		expect(screen.queryByText("Eumenes")).toBeNull();
+		expect(screen.queryByText("東京の天気")).toBeNull();
 		expect(screen.queryByText("完了")).toBeNull();
 		expect(screen.queryByText(/もう一度依頼してください/)).toBeNull();
 		expect(client.agentReport).not.toHaveBeenCalled();
@@ -116,17 +119,14 @@ test("the card shows the acquisition mode taken from the persisted task state", 
 	try {
 		render(
 			<QueryClientProvider client={cache}>
-				<ResearchTaskCard
-					client={client}
-					rootRunId="run"
-					title="鎌倉の天気"
-					agentName="光"
-				/>
+				<ResearchTaskCard client={client} rootRunId="run" title="鎌倉の天気" />
 			</QueryClientProvider>,
 		);
 		await screen.findByText("登録サイトを確認");
-		expect(screen.getByText("光").closest(".message-assistant")).toBe(
-			screen.getByRole("complementary", { name: "調査: 鎌倉の天気" }),
+		expect(screen.getByText("資料を確認中")).toBeTruthy();
+		expect(screen.queryByText("鎌倉の天気")).toBeNull();
+		expect(screen.getByText("登録サイトを確認").closest("details")?.open).toBe(
+			false,
 		);
 	} finally {
 		cache.clear();
@@ -154,7 +154,7 @@ test("ordinary replies do not leave an empty assistant activity bubble", async (
 					?.status,
 			).toBe("success"),
 		);
-		expect(container.querySelector(".message-assistant")).toBeNull();
+		expect(container.querySelector(".research-activity")).toBeNull();
 	} finally {
 		cache.clear();
 	}
@@ -196,6 +196,74 @@ test("a replaced route shows the rediscovery mode instead of a plain search", as
 		);
 		await screen.findByText("取得先を探し直し中");
 		expect(screen.queryByText("検索して確認")).toBeNull();
+	} finally {
+		cache.clear();
+	}
+});
+
+for (const [status, label] of [
+	["cancelled", "停止"],
+	["interrupted", "中断"],
+	["failed", "調査未完了"],
+])
+	test(`${status} overrides the last active phase and removes stop control`, async () => {
+		const client = {
+			identity: `terminal-${status}`,
+			agentTasks: vi.fn(async () => [
+				{ ...root, status, phase: "read", reportState: "none" },
+			]),
+			agentReport: vi.fn(),
+		} as unknown as EumenesClient;
+		const cache = new QueryClient({
+			defaultOptions: { queries: { retry: false } },
+		});
+		try {
+			render(
+				<QueryClientProvider client={cache}>
+					<ResearchTaskCard client={client} rootRunId="run" title="天気" />
+				</QueryClientProvider>,
+			);
+			await screen.findByText(label!);
+			expect(screen.queryByText("資料を確認中")).toBeNull();
+			expect(screen.queryByRole("button", { name: "調査を停止" })).toBeNull();
+		} finally {
+			cache.clear();
+		}
+	});
+
+test("progress can stop research and refresh the persisted terminal state", async () => {
+	let status = "waiting_child";
+	const client = {
+		identity: "stop-activity",
+		agentTasks: vi.fn(async () => [
+			{ ...root, status, phase: "research", reportState: "none" },
+			{
+				...root,
+				id: "worker",
+				kind: "worker",
+				status: "running",
+				phase: "read",
+				reportState: "none",
+			},
+		]),
+		agentReport: vi.fn(),
+		cancelAgentTask: vi.fn(async () => {
+			status = "cancelled";
+		}),
+	} as unknown as EumenesClient;
+	const cache = new QueryClient({
+		defaultOptions: { queries: { retry: false } },
+	});
+	try {
+		render(
+			<QueryClientProvider client={cache}>
+				<ResearchTaskCard client={client} rootRunId="run" title="天気" />
+			</QueryClientProvider>,
+		);
+		fireEvent.click(await screen.findByRole("button", { name: "調査を停止" }));
+		await screen.findByText("停止");
+		expect(client.cancelAgentTask).toHaveBeenCalledExactlyOnceWith("root");
+		expect(screen.queryByRole("button", { name: "調査を停止" })).toBeNull();
 	} finally {
 		cache.clear();
 	}

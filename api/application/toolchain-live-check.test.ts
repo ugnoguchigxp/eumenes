@@ -1,5 +1,30 @@
 import { test, expect } from "bun:test";
-import { checkLiveResearch } from "./toolchain-live-check";
+import {
+	checkLiveResearch,
+	checkLiveForecastDate,
+} from "./toolchain-live-check";
+test("live date checking accepts forecast month/day notation and rejects another day", () => {
+	const report = {
+		summary: "2026年10月10日の鎌倉の天気",
+		claims: [
+			{
+				text: "晴れ",
+				evidence: [{ quote: "今日10日の関東は秋晴れ 10/10(Sat)08:03" }],
+			},
+		],
+	};
+	expect(checkLiveForecastDate("2026-10-10", report)).toBe(true);
+	expect(checkLiveForecastDate("2026-10-11", report)).toBe(false);
+	expect(
+		checkLiveForecastDate("2026-10-10", {
+			...report,
+			claims: [
+				{ text: "晴れ", evidence: [{ quote: "10/100 110/10 10/10/2025" }] },
+			],
+		}),
+	).toBe(false);
+	expect(checkLiveForecastDate("2026-10-10", null)).toBe(false);
+});
 const stock = {
 	claims: [
 		{

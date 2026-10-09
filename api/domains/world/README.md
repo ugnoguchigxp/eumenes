@@ -144,6 +144,85 @@ settings, reached through the inference control path that pins the route to
 and refuses to run unless it says so (no snapshot, no proof, no run). A LAN
 address is never the criterion. Cloud fallback does not exist on that route.
 
+## Decision API: `world.query` (P5-01)
+
+`createWorldQuery({ store, world, gapTasks?, resourceStates? })` (`service/world-query.ts`)
+is the one product entry for World's pure reasoning. Read-only, enumerated:
+
+| `mode` | Pure API | Needs |
+|---|---|---|
+| `snapshot` | (projection entries) | optional `entityIds` (<= 10), `depth` (<= 4) |
+| `relevance` | `explainRelevance` | `entityId` |
+| `influence` | `traceInfluence` | `entityId`, `direction` forward/reverse |
+| `dependencies` | `checkDependencies` | `entityId`; resource states come from the host port only |
+| `scenarios` | `compareScenarios` | `entityId`, two hypothetical overlays (never stored) |
+| `gaps` | `findResearchGaps` | optional `entityIds`, `goalId` (adopted or withdrawn Goal of the scope) |
+
+- No free-form SQL and no graph mutation exist in the request vocabulary. A strict schema
+  rejects every unknown key (a `principal`, `sql`, resource states, ...). The caller binds
+  `WorldQueryContext` (principal + granted scope keys); the request cannot name a principal.
+- Bounds (`WORLD_QUERY_LIMITS`): request 64 KiB, ids 256 bytes, budgets = the C5 defaults
+  (a value above it is `limit_exceeded`, never clamped; `candidates`/`expansions` >= 2),
+  start points 10, overlay edges 100. A budget stop gives `completeness: "partial"` with the
+  reason and the real counters (`retrieval.fetchedRows/expandedRows`).
+- Answers: `ok` (with `basis`: the evidence sources, conditions, freshness and refutations of
+  every claim named), `disabled` (World OFF), `blocked world_unavailable` (startup gate,
+  store closing), `rejected` (`invalid_request`, `unknown_mode`, `limit_exceeded`,
+  `not_available`). A scope/Goal not granted, a foreign or non-adopted Goal, a forgotten
+  entity and a blocked read all give the one `not_available`; an unknown start entity is an
+  empty `ok` (no path found, never "no effect").
+- Claim text is reference data (`referenceOnly: true`) and a result grants nothing
+  (`executionPermission: "none"`). Gaps are investigation candidates.
+- Gap -> Task: `linkGaps: true` (not in the model vocabulary) hands the first 5 Gaps to the
+  host's `GapTaskPort` in one writer transaction. The port checks delegation and budget and
+  may deny; World keeps only `world_host_gap_task` (hashed Gap key -> task ref), so the same
+  Gap never reaches the port twice. Without a port the answer is `taskLinkage:
+  not_accepted`. **Task linkage is NOT accepted against the real Tasks domain**: its only
+  kind is `coding` and needs a user-issued workspace grant that a Gap cannot supply; the
+  port is tested with a fake host only.
+- `createWorldQueryTool` is the model-callable definition (id `world.query`); registering it
+  in the capability catalog / tool runtime is host wiring in those domains (not done).
+  `registerWorldQuery` (`controller/`) is `POST /api/world/query`, not mounted by default.
+- Condition evaluation gets no observations here, so a condition on a measurement stays
+  `unknown`; an `explicitly_unconditional` claim is satisfied.
+
+## Grounded claim list and correction screen (P5-02)
+
+`createWorldClaims({ store, world, lifecycle, state, reasonSource, ... })`
+(`service/world-claims.ts`) behind `registerWorldClaims` (`controller/claims.ts`), mounted by
+`createApp({ worldClaims })` only when World is configured (`EUMENES_WORLD` protect or on). With
+World OFF nothing is assembled and every `/api/world/*` route is a plain 404 (the bearer and
+origin checks of `/api/*` still come first). The Scope is bound by the host (`claimsContext`),
+never by a body or a query string.
+
+| Route | What |
+|---|---|
+| `GET /api/world/status` | mode, enabled, usable, gate, the granted Scopes |
+| `GET /api/world/claims[?scopeKey]` | list: target, claim, adoption, origin/evidence kinds, freshness, `tone` as SEPARATE fields; `complete:false` = a budget stopped the read; `stopped` = claims stopped by a changed source |
+| `GET /api/world/claims/:id[?scopeKey]` | detail: condition (`unknown` without observations, never assumed true), supports, refutations, source versions (current / changed / unavailable), history |
+| `GET /api/world/forgets[?scopeKey]` | the durable forget intake of the Scope (works with World OFF and with a closed gate): `pending`, `awaiting_confirmation`, `abandoned`, `complete`; only `complete` is "done" |
+| `POST /api/world/claims/correct` | explicit correction: supersede + explicit adoption in ONE writer transaction, citing the person's own confirmed message (`reasonMessageId`) |
+| `POST /api/world/claims/retract` | explicit retraction; the reason source is the person's own confirmed message |
+| `POST /api/world/claims/forget` | durable intake of a forget of every revision of the claim; the answer is `accepted` with the ledger's own state |
+
+- Every change carries `expectedRevision` (what the person saw) and a `requestId` (one per action).
+  A different current revision is `409 {error: "revision_conflict", reload: true}` and nothing is
+  written. The target is `{claimId}` or `{subjectId, predicate}`; a selector that matches more than
+  one live claim answers `200 {status: "unresolved", candidates}` and writes nothing.
+- Unknown claim, Scope not granted, other principal, a closed gate and a forgotten claim are ONE
+  answer: `404 {error: "not_found"}`. World OFF is `409 world_disabled`.
+- `claimTone`: only an adopted report/document is `adopted`; an adopted `model_hypothesis` is
+  `hypothesis`, a `runtime_observation` is `measured`, and any unadopted claim is `candidate`.
+- A forget that stops while advancing is still accepted (the intake is durable) and shown as
+  pending; the host's pass resumes it. While a forget is unfinished the Scope gate is closed, so
+  the list answers `not_found` and the screen explains that from the forget list.
+- No graph, no edge editing, and the screen is a settings page: it is not read aloud.
+- Known limits: correction and retraction need a confirmed message of the person as the reason
+  (the screen offers the latest 20 of the main conversation); a relation claim cannot be
+  corrected by value; source text is not shown (opaque id and version only); a retry of an
+  already applied change is a revision conflict (reload shows the result); the forget intake
+  covers revisions up to the one the person saw.
+
 ## What is fixture-grade
 
 - Deterministic evidence uses a fixture inference port and a TTS spy. No real Local Provider was run: `api/application/world-real-local-provider.test.ts` is skipped by default, fails on purpose when forced, and is reported as **not executed** (carried to P4-05).
@@ -167,4 +246,6 @@ address is never the criterion. Cloud fallback does not exist on that route.
 - `api/application/world.test.ts`: mode flag, cursor secret, enabling, idle quietness, cursor reset.
 - `api/application/world-acceptance-p3.test.ts`: P3-09 on the real assembly (A34 host side, A35 to A41). It lives in `application` because the world domain may not depend on dialogue, voice or queue.
 - `api/domains/dialogue/test/world-context.test.ts`, `api/domains/voice-dialogue/test/world-release.test.ts`: A40 and A41 in depth.
+- `api/domains/world/test/world-query.test.ts`: P5-01 (A14 to A16, A47) on a real store, fake host Task port.
+- `api/domains/world/test/world-claims.test.ts`, `api/application/world-claims-http.test.ts`: P5-02 server side (A48) on a real store and the real HTTP app. Web: `web/src/components/domains/world/WorldPanel.test.tsx`; browser: `tests/browser/world.spec.ts` against `api/application/world-claims.fixture.ts` (fixture backend, stub model).
 - Run: `bun test api/application/world*.test.ts` and `bun run verify -- --domain world`.

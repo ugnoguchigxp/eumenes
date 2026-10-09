@@ -9,7 +9,10 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createClient } from "../client";
-import { checkLiveResearch } from "../api/application/toolchain-live-check";
+import {
+	checkLiveResearch,
+	checkLiveForecastDate,
+} from "../api/application/toolchain-live-check";
 import {
 	resolveApiToken,
 	resolveLarmToken,
@@ -65,20 +68,52 @@ try {
 	const connection = await client.connectLarm();
 	if (connection.larm.state !== "ready")
 		throw new Error("isolated_larm_not_ready");
-	const cases = [
-		{
-			name: "weather",
-			question:
-				"東京都千代田区の明日の天気と最高気温を調べてください。予報対象日時も確認してください。",
-		},
-		{
-			name: "stock",
-			question:
-				"Apple (NASDAQ: AAPL) の最新の株価を調べてください。価格、通貨、価格の時点を確認してください。",
-		},
-	];
+	const searchSuite = process.argv.includes("search");
+	const cases = searchSuite
+		? [
+				{
+					name: "kamakura-today",
+					kind: "weather" as const,
+					question:
+						"今日の鎌倉の天気と最高気温をWeb検索で調べてください。予報対象日も確認してください。",
+				},
+				{
+					name: "kamakura-tomorrow",
+					kind: "weather" as const,
+					question:
+						"明日の鎌倉の天気と最高気温をWeb検索で調べてください。予報対象日も確認してください。",
+				},
+				{
+					name: "bun-docs",
+					kind: "general" as const,
+					question:
+						"Bunの公式ドキュメントをWeb検索し、テストを実行するコマンドを確認してください。",
+				},
+			]
+		: [
+				{
+					name: "weather",
+					kind: "weather" as const,
+					question:
+						"東京都千代田区の明日の天気と最高気温を調べてください。予報対象日時も確認してください。",
+				},
+				{
+					name: "stock",
+					kind: "stock" as const,
+					question:
+						"Apple (NASDAQ: AAPL) の最新の株価を調べてください。価格、通貨、価格の時点を確認してください。",
+				},
+			];
 	for (const item of cases) {
 		const started = performance.now();
+		const requestedDate = new Intl.DateTimeFormat("en-CA", {
+			timeZone: "Asia/Tokyo",
+			year: "numeric",
+			month: "2-digit",
+			day: "2-digit",
+		}).format(
+			new Date(Date.now() + (item.name === "kamakura-tomorrow" ? 86400000 : 0)),
+		);
 		const run = await client.submit({
 			requestId: crypto.randomUUID(),
 			conversationId: "live-toolchain",
@@ -102,11 +137,56 @@ try {
 		const answer = history.messages.find(
 			(m) => m.id === current.answerMessageId,
 		)?.text;
-		const { numeric, valuesMatch, priceTimeVerified } = checkLiveResearch(
-			item.name as "weather" | "stock",
-			report,
-			answer,
+		const { numeric, valuesMatch, priceTimeVerified } =
+			item.kind === "general"
+				? {
+						numeric: true,
+						valuesMatch:
+							!!answer?.includes("bun test") &&
+							!!report &&
+							[report.summary, ...report.claims.map((c) => c.text)].some(
+								(text) => text.includes("bun test"),
+							) &&
+							report.claims.some((c) =>
+								c.evidence.some(
+									(e) =>
+										e.quote.includes("bun test") &&
+										report.sources.some(
+											(s) =>
+												s.sourceId === e.sourceId &&
+												(/^(?:www\.)?bun\.(?:sh|com)$/.test(
+													new URL(s.url).hostname,
+												) ||
+													(new URL(s.url).hostname === "github.com" &&
+														new URL(s.url).pathname.startsWith(
+															"/oven-sh/bun/",
+														))),
+										),
+								),
+							),
+						priceTimeVerified: !!report?.sources.some(
+							(s) =>
+								/^(?:www\.)?bun\.(?:sh|com)$/.test(new URL(s.url).hostname) ||
+								(new URL(s.url).hostname === "github.com" &&
+									new URL(s.url).pathname.startsWith("/oven-sh/bun/")),
+						),
+					}
+				: checkLiveResearch(item.kind, report, answer);
+		const searchVerified = !!child?.toolOutcomes?.some(
+			(t) =>
+				t.toolRevisionId.startsWith("tool:web.lookup@") &&
+				t.state === "succeeded",
 		);
+		const fullTextVerified = !!report?.sources.some((s) => s.basis === "page");
+		const targetDateVerified =
+			!searchSuite ||
+			item.kind !== "weather" ||
+			checkLiveForecastDate(requestedDate, report);
+		// A static command can be supported by an official search excerpt after a
+		// guarded read fails. Forecast numbers still require the actual page.
+		const acquisitionVerified =
+			!searchSuite ||
+			(searchVerified && (item.kind === "general" || fullTextVerified));
 		const ok =
 			current.status === "completed" &&
 			child?.status === "completed" &&
@@ -114,12 +194,18 @@ try {
 			!!answer &&
 			numeric &&
 			valuesMatch &&
-			priceTimeVerified;
+			priceTimeVerified &&
+			targetDateVerified &&
+			acquisitionVerified;
 		const result = {
 			case: item.name,
+			requestedDate,
 			numeric,
 			valuesMatch,
 			priceTimeVerified,
+			searchVerified,
+			fullTextVerified,
+			targetDateVerified,
 			ok,
 			status: current.status,
 			errorCode: current.error,
@@ -144,7 +230,7 @@ try {
 	const path = "verification-reports/toolchain";
 	mkdirSync(path, { recursive: true });
 	writeFileSync(
-		join(path, "live.json"),
+		join(path, searchSuite ? "search-live.json" : "live.json"),
 		JSON.stringify(
 			{
 				at: new Date().toISOString(),

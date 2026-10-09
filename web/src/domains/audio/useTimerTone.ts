@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
 	createAudioController,
 	type AudioController,
@@ -12,6 +12,7 @@ export function useTimerTone(
 	sessionAudio?: () => Pick<AudioController, "play" | "stopPlayback"> | null,
 	speech?: (text: string, signal: AbortSignal) => Promise<Uint8Array>,
 ) {
+	const [ready, setReady] = useState(false);
 	const latest = useRef({ settings, sessionAudio, speech });
 	useEffect(() => {
 		latest.current = { settings, sessionAudio, speech };
@@ -40,25 +41,39 @@ export function useTimerTone(
 		}
 		return output.current!;
 	}, []);
-	useEffect(() => {
-		// Prepare output inside a user gesture so the later alarm is allowed by autoplay rules.
-		const unlock = () => {
-			const { settings: audio, sessionAudio: session } = latest.current;
-			if ((audio.outputVolume ?? 1) <= 0 || session?.()) return;
-			if (output.current?.device === (audio.outputDevice ?? "")) return;
-			const owned = ensureOutput(audio.outputDevice ?? "");
-			void owned.audio.startOutput().catch(() => {
-				if (output.current === owned) release();
-			});
-		};
-		window.addEventListener("pointerdown", unlock, { capture: true });
-		window.addEventListener("keydown", unlock, { capture: true });
-		return () => {
-			window.removeEventListener("pointerdown", unlock, { capture: true });
-			window.removeEventListener("keydown", unlock, { capture: true });
-		};
+	const prepare = useCallback(async () => {
+		const { settings: audio, sessionAudio: session } = latest.current;
+		if ((audio.outputVolume ?? 1) <= 0) return;
+		if (session?.()) {
+			setReady(true);
+			return;
+		}
+		const owned = ensureOutput(audio.outputDevice ?? "");
+		try {
+			await owned.audio.startOutput();
+			if (output.current === owned) setReady(true);
+		} catch (error) {
+			if (output.current === owned) {
+				release();
+				setReady(false);
+			}
+			throw error;
+		}
 	}, [ensureOutput, release]);
-	return useCallback(
+	useEffect(() => {
+		// Finish the gesture before hiding the preparation card. Preparing on pointerdown
+		// can remove a pressed button before its click and send the click to another card.
+		const unlock = () => {
+			void prepare().catch(() => {});
+		};
+		window.addEventListener("click", unlock, { capture: true });
+		window.addEventListener("keyup", unlock, { capture: true });
+		return () => {
+			window.removeEventListener("click", unlock, { capture: true });
+			window.removeEventListener("keyup", unlock, { capture: true });
+		};
+	}, [prepare]);
+	const playTone = useCallback(
 		async (
 			signal: AbortSignal,
 			message?: string,
@@ -139,4 +154,25 @@ export function useTimerTone(
 		},
 		[ensureOutput],
 	);
+	const repeat = useCallback(
+		async (signal: AbortSignal) => {
+			while (!signal.aborted) {
+				await new Promise<void>((resolve, reject) => {
+					const abort = () => {
+						clearTimeout(timer);
+						reject(new Error("audio_interrupted"));
+					};
+					const timer = setTimeout(() => {
+						signal.removeEventListener("abort", abort);
+						resolve();
+					}, 2500);
+					signal.addEventListener("abort", abort, { once: true });
+					if (signal.aborted) abort();
+				});
+				await playTone(signal);
+			}
+		},
+		[playTone],
+	);
+	return { play: playTone, repeat, ready, prepare };
 }

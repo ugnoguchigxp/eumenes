@@ -1,5 +1,43 @@
 # OpenUI Artifact P0/P1 検証記録
 
+## 2026-10-10 全デザイントークンの試用
+
+Storybook にあった全11テーマ・3段階の密度・5段階の丸み・タッチ操作をショーケースに揃え、全64基礎トークンの個別編集・検索・初期化を追加。CSS の宣言を正本とし、派生する色・寸法・丸みもプレビュー内で再計算する。「表示と音声」はホストの配色を継承し、アプリ本体とサンプル選択タブには変更を適用しない。
+
+- artifact domain gate：37件を含む整形・lint・型・source固定確認が pass。
+- DesignSystem 単体試験：59ファイル・1,086件 pass。文字サイズの `text-ui` が文字色のクラスを消す問題と、base layer 外の初期文字色指定を修正し、色・サイズの独立した上書きを検査。
+- Web 全単体試験：39ファイル・177件 pass。トークン追加の抜け、全テーマの値、密度・タッチ・個別変更の優先順、不正な寸法を検査。
+- fixture Chromium：16 / 16 pass。全64項目を実際に入力し、CSS値への反映・不正入力時の保持・項目別と全体の初期化・別サンプルへの切替・全11テーマと設定カードの実配色・ボタンの文字色・入力の文字サイズと余白・0と1remの丸み・390pxでの横はみ出しなしを確認。テーマ・幅・密度の3項目は狭い画面でも同じ行を維持する。
+- 全体 TypeScript、対象の整形 / lint、Webビルド：pass。検証開始時に配布物の `NotificationCard` export がソースより古かったため、既存ソースから DesignSystem を再生成してからブラウザを検証した。
+- `verify:all`：最初は範囲外の world 3ファイルの書式で停止。最終再試行も範囲外の9ファイル（`api/application/world-claims-http.test.ts`、world の `contracts/claims.ts` / `controller/claims.ts` / `test/world-claims.test.ts`、Web world の `ClaimDrawer.tsx` / `WorldPanel.test.tsx` / `WorldPanel.tsx` / `test/present.test.ts`、`web/src/domains/settings/index.tsx`）の書式で停止。全体 gate の通過とは扱わない。
+- context_compile / compile_eval：今回各1回。
+
+実サーバー `127.0.0.1:5173` の Brave でも Tokyo Night と個別の12pxの丸みを試し、入力部品の実寸が派生値10pxへ変わることを確認：[実画面](design-tokens-live.png)。製品への会話送信や設定保存は行っていない。画面確認：[デスクトップ](design-tokens-desktop.png) / [390px](design-tokens-mobile.png)。ライブ Provider・音声実機器の受入は含まない。
+
+## 2026-10-10 起動中のショーケース読み込み失敗
+
+通常の Brave / 開発サーバー `127.0.0.1:5173` で、OpenUI SDK の依存URLが `504 Outdated Optimize Dep` となり、遅延 import の失敗がパネル外へ伝播して画面が空になる状態を確認。初回ロード用SDKを `optimizeDeps.include` に追加し、パネルに例外 boundary と再読み込みの案内を置いた。
+
+同じ実サーバーの Brave で表示回復、閉じて再度開く操作を確認：[実画面](live-showcase-restored.png)。調査中にはタイマーの `ensureOutput` 初期化前参照も表示されたが、最新ソースでその例外は再現せず、この変更では audio のソースを編集していない。実サーバー確認では会話送信や設定保存を行っていない。
+
+fixture Chromium：13 / 13 pass。追加試験は遅延モジュールの取得を遮断し、エラーの案内、会話と下書きの保持、再読み込み後の表示復帰を確認。artifact domain gate（34件・source 固定確認を含む）、全体 TypeScript、対象の整形 / lint、既存 DesignSystem 配布物を使った Vite Web ビルドは pass。verify:all は範囲外の `api/domains/world/contracts/query.ts` / `api/domains/world/service/world-query.ts` の書式で停止。context_compile / compile_eval は今回各1回。
+
+## 2026-10-10 表示テーマの配置訂正
+
+表示テーマを幅・密度と同じ共通操作行へ戻した。「表示と音声」内の重複選択は除去し、ホストの `previewTheme` を配色と保存内容に使う。サンプル初期化で共通のプレビュー設定は変更しない。保存済みのテーマはラベルで区別する。以下の「テーマ一致」節は配置訂正前の検証記録。
+
+fixture / ローカル検証：artifact domain gate（34件を含む）pass、Showcase Chromium 12 / 12 pass、最終配置試験の再実行 1 / 1 pass、Web / DesignSystem ビルド pass。1280px / 390px の両方で3つの選択欄が同じ行にあることを実寸で確認した。context_compile / compile_eval は今回各1回。
+
+実画面を目視確認：[ライト](settings-controls-light.png) / [ダーク](settings-controls-dark.png) / [390pxの操作行](settings-controls-mobile.png)。
+
+## 2026-10-10 表示と音声のテーマ一致
+
+設定値の初期テーマはライトだが外側のプレビュー配色がダークのまま、という二重管理を修正。設定フォームは選択中の theme で局所配色し、CSS の semantic alias と native control の color-scheme も同じ値へ揃える。このタブでは外側のテーマ選択を非表示にする。製品のテーマ変更や音声再生への接続は含まない。
+
+fixture / ローカル検証：artifact domain gate（整形・lint・型・34件・source 固定確認）pass。Showcase Chromium 12 / 12 pass。ダーク環境でライトを初期表示、保存前の即時切替、送信失敗・再試行、保存後の再表示、初期化を確認。最終 Web / DesignSystem ビルドも pass。context_compile / compile_eval は今回各1回。
+
+選択値だけでなく computed background color と color-scheme を検査し、実画面を目視確認：[ライト](settings-theme-light.png) / [ダーク](settings-theme-dark.png)。
+
 ## 2026-10-10 質問と回答の RadioButtonGroup
 
 標準 input を並べる表示から、共通 `RadioButtonGroup` に変更。行全体を選択でき、選択状態を丸印・青い枠・背景で区別する。長文は省略せず折り返し、矢印キーとフォーカス表示を維持する。選択だけでは送信しない。回答済みの表示は runtime の回答を正本にし、サンプル切替から戻っても選択と変更禁止を保つ。

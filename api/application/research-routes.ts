@@ -37,7 +37,7 @@ type Agents = ReturnType<typeof createAgentRuntime>;
 type Owner = { rootRunId: string; taskId: string; cancelEpoch: number };
 
 /** The cold/fallback package: web search first, then a normal worker. */
-export const coldPackageRevisionId = "package:web.research@3";
+export const coldPackageRevisionId = "package:web.research@4";
 /** Direct warm fetch attempt budget (ms); fixed by the plan. */
 const warmAttemptTimeoutMs = 5_000;
 const memoryLimit = 256;

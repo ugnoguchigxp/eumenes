@@ -192,9 +192,12 @@ export async function routeHarness(options: Options = {}) {
 						basis: string;
 						url: string;
 						body: string;
+						excerpts: { excerptId: string; quote: string }[];
 					}[];
 					task: { question: string };
 				};
+				for (const source of data.observations)
+					source.body = source.excerpts.map((e) => e.quote).join("");
 				const tools = JSON.parse(
 					system.split("TOOLS=")[1]!.split("\nOUTPUT_SCHEMA=")[0]!,
 				) as { executionRef: string; id: string }[];
@@ -294,9 +297,15 @@ export async function routeHarness(options: Options = {}) {
 			if (system.includes("OUTPUT_SCHEMA="))
 				return JSON.stringify({ action: "respond" });
 			counts.answer++;
-			const max = /最高気温(-?\d+)℃/.exec(all)?.[1];
-			const price = /直近価格は([\d.]+) USD/.exec(all)?.[1];
-			const city = /(静岡市|鎌倉)/.exec(all)?.[1] ?? "鎌倉";
+			const currentReport =
+				[...messages]
+					.reverse()
+					.find((m) =>
+						m.content.startsWith("調査担当が出典に対応づけた要約データです。"),
+					)?.content ?? all;
+			const max = /最高気温(-?\d+)℃/.exec(currentReport)?.[1];
+			const price = /直近価格は([\d.]+) USD/.exec(currentReport)?.[1];
+			const city = /(静岡市|鎌倉)/.exec(currentReport)?.[1] ?? "鎌倉";
 			if (price) return `AAPLは${price}ドルでございます。`;
 			return max
 				? `${city}は晴れ、最高${max}度でございます。`

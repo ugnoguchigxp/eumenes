@@ -30,6 +30,7 @@ import {
 	listConfirmations,
 	listDependents,
 	listIntakesOfMemoryForget,
+	listIntakesOfScope,
 	listKnownScopes,
 	listMemoryLinkedIntakes,
 	listOpenIntakes,
@@ -191,6 +192,14 @@ export type ForgetReport = {
 	 * with any of them is NEVER reported `complete`, however far its state is.
 	 */
 	abandoned: { parts: number; roots: number };
+};
+
+/** One forget of a Scope as the owner may see it (metadata only, no root ids). */
+export type ForgetListItem = ForgetReport & {
+	origin: ForgetOrigin;
+	rootCount: number;
+	createdAt: number;
+	updatedAt: number;
 };
 
 export type ForgetRefusal = {
@@ -2068,6 +2077,27 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 				const row = getIntake(db, forgetId);
 				return row ? reportOf(db, row) : null;
 			}),
+		/**
+		 * Every forget of ONE Scope, newest first, from the durable intake: it
+		 * survives a restart and does not depend on World being ON or the Scope
+		 * gate being open. `world`/`externals` are only known to a call that
+		 * advanced the forget, so they are null here.
+		 */
+		listForgets: (scope: ScopeRef, limit = 50): ForgetListItem[] =>
+			store.read((db) =>
+				listIntakesOfScope(
+					db,
+					scope.principal,
+					scope.scopeKey,
+					Math.max(1, Math.min(limit, 200)),
+				).map((row) => ({
+					...reportOf(db, row),
+					origin: row.origin,
+					rootCount: row.roots.length,
+					createdAt: row.createdAt,
+					updatedAt: row.updatedAt,
+				})),
+			),
 		recoverWorld,
 		/**
 		 * Retry sweep for Memory dependents whose unregistration was refused

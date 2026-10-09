@@ -34,6 +34,44 @@ export type Report = z.infer<typeof reportSchema> & {
 	coverage: "complete" | "partial";
 	verification: "evidence_linked";
 };
+const excerptEvidenceSchema = z
+	.object({
+		sourceId: z.string(),
+		excerptId: z
+			.string()
+			.regex(/^e[0-9]+$/)
+			.max(12),
+	})
+	.strict();
+/** Model references are resolved to canonical quotes before storage or projection. */
+export const referencedReportSchema = reportSchema.extend({
+	claims: z
+		.array(
+			reportSchema.shape.claims.element.extend({
+				evidence: z.array(excerptEvidenceSchema).min(1).max(3),
+			}),
+		)
+		.min(1)
+		.max(8),
+});
+const workerReportSchema = reportSchema.extend({
+	claims: z
+		.array(
+			reportSchema.shape.claims.element.extend({
+				evidence: z
+					.array(
+						z.union([
+							excerptEvidenceSchema,
+							reportSchema.shape.claims.element.shape.evidence.element,
+						]),
+					)
+					.min(1)
+					.max(3),
+			}),
+		)
+		.min(1)
+		.max(8),
+});
 export const routeSchema = z.discriminatedUnion("action", [
 	z.object({ action: z.literal("respond") }).strict(),
 	z
@@ -92,7 +130,7 @@ export const workerSchema = z.discriminatedUnion("action", [
 	z
 		.object({
 			action: z.literal("finish"),
-			report: reportSchema,
+			report: workerReportSchema,
 			// Opaque to the runtime: only an acquisition port may interpret it.
 			facts: z.unknown().optional(),
 		})

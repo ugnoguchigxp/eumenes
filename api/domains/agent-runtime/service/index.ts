@@ -87,6 +87,7 @@ export function createAgentRuntime({
 	queue,
 	now = Date.now,
 	invocationHint,
+	reportFeedback,
 	acquisition,
 }: {
 	store: SqliteStore;
@@ -98,6 +99,8 @@ export function createAgentRuntime({
 	invocationHint?: (
 		question: string,
 	) => { toolId: string; arguments: unknown } | null;
+	/** Domain feedback may request another in-scope read, within the existing repair budget. */
+	reportFeedback?: (question: string, report: Report) => string | null;
 	/** Optional generic acquisition plan. Without it every path is the pre-port one. */
 	acquisition?: AcquisitionPlanPort;
 }) {
@@ -442,6 +445,7 @@ export function createAgentRuntime({
 		return toolId === "web.lookup" ? 2 : toolId === "web.read" ? 3 : 1;
 	}
 	function usableTools(db: Database, t: Task) {
+		if (t.tool_calls >= 5) return [];
 		const direct = storedBinding(t)?.initialAction.kind === "direct-invoke";
 		const input = researchInput.safeParse(prepared.get(t.id)?.input);
 		const hint = input.success ? invocationHint?.(input.data.question) : null;
@@ -580,7 +584,7 @@ export function createAgentRuntime({
 						context.messages.push({
 							role: "system",
 							content:
-								"前回の出力の拒否理由です。該当項目だけを現在の契約に合わせて修正してください。未知の値は補いません。executionRefは現在のTOOLSの短い名前を指定し、argumentsはそのツールのinputSchemaに合わせます。引用は提示済み本文の連続した短い原文を使います。DIAGNOSTIC=" +
+								"前回の出力の拒否理由です。該当項目だけを現在の契約に合わせて修正してください。未知の値は補いません。executionRefは現在のTOOLSの短い名前を指定し、argumentsはそのツールのinputSchemaに合わせます。根拠は現在のobservationsのsourceIdと同じ資料のexcerptIdを選びます。DIAGNOSTIC=" +
 								JSON.stringify({
 									reason: feedback.reason,
 									issues: feedback.issues,
@@ -936,6 +940,27 @@ export function createAgentRuntime({
 					);
 					let report = verifyReport(action.report, input.visible, hasFailures);
 					const binding = storedBinding(t);
+					// Bound acquisition plans already perform their domain's canonical
+					// validation below. This feedback covers the legacy search/read path.
+					const gap = !binding
+						? reportFeedback?.(
+								researchInput.parse(prepared.get(t.id)!.input).question,
+								report,
+							)
+						: null;
+					const readUrls = new Set(
+						input.visible.filter((s) => s.basis === "page").map((s) => s.url),
+					);
+					if (
+						gap &&
+						usableTools(db, t).some((b) => b.tool.id === "web.read") &&
+						input.visible.some(
+							(s) => s.basis === "snippet" && !readUrls.has(s.url),
+						)
+					)
+						throw new ValidationFailure("invalid_report", [
+							{ validationPath: "report.claims", validationCode: gap },
+						]);
 					let safe: {
 						json: string;
 						digest: string;

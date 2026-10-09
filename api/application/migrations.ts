@@ -60,6 +60,7 @@ import {
 	guardMigration as worldGuardMigration,
 	extractionMigration as worldExtractionMigration,
 	runtimeMigration as worldRuntimeMigration,
+	gapTaskMigration as worldGapTaskMigration,
 } from "../domains/world";
 import { migration as queueMigration } from "../domains/queue";
 import { migration as schedulerMigration } from "../domains/scheduler";
@@ -157,4 +158,6 @@ export const migrations: readonly string[] = [
 	worldExtractionMigration,
 	// World runtime observation (P4-04): host trace of verified ledger results behind Outcomes; the very tail.
 	worldRuntimeMigration,
+	// World decision API (P5-01): which Gap already has an investigation Task (hashed key only); the very tail.
+	worldGapTaskMigration,
 ];

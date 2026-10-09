@@ -791,3 +791,37 @@ test("capture falls back to ScriptProcessorNode when the worklet cannot load", a
 	expect(processors).toHaveLength(1);
 	await audio.stop();
 });
+
+test("output preparation resumes an existing context that is waiting for a gesture", async () => {
+	let unblock!: () => void;
+	const resume = vi
+		.fn()
+		.mockImplementationOnce(
+			() =>
+				new Promise<void>((resolve) => {
+					unblock = resolve;
+				}),
+		)
+		.mockResolvedValue(undefined);
+	const close = vi.fn(async () => {});
+	vi.stubGlobal(
+		"AudioContext",
+		class {
+			resume = resume;
+			close = close;
+		},
+	);
+	const output = createAudioController(
+		() => {},
+		() => {},
+		() => {},
+		{ keepAlive: false },
+	);
+	const pending = output.startOutput();
+	await output.startOutput();
+	expect(resume).toHaveBeenCalledTimes(2);
+	unblock();
+	await pending;
+	await output.stop();
+	expect(close).toHaveBeenCalledOnce();
+});

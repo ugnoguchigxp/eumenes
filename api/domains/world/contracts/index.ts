@@ -122,6 +122,8 @@ export type {
 	WorldApplyRequest,
 	WorldApplyResult,
 	WorldFeed,
+	WorldHistoryReadResult,
+	WorldHistoryRequest,
 	WorldHostReasonCode,
 	WorldReadRequest,
 	WorldReadResult,
@@ -137,3 +139,28 @@ export type {
 	RuntimeSnapshot,
 	RuntimeVerification,
 } from "./runtime";
+export {
+	WORLD_QUERY_LIMITS,
+	WORLD_QUERY_MODES,
+	WORLD_QUERY_REJECTIONS,
+	worldQuerySchema,
+	worldQueryToolSchema,
+} from "./query";
+export type {
+	GapTaskDecision,
+	GapTaskLink,
+	GapTaskLinkage,
+	GapTaskLinkStatus,
+	GapTaskPort,
+	GapTaskRequest,
+	ResourceStatePort,
+	WorldQueryBasis,
+	WorldQueryBudget,
+	WorldQueryContext,
+	WorldQueryMode,
+	WorldQueryPayload,
+	WorldQueryRejection,
+	WorldQueryRequest,
+	WorldQueryResult,
+} from "./query";
+export * from "./claims";
