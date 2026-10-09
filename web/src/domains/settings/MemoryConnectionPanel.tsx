@@ -8,6 +8,7 @@ import {
 	CardHeader,
 	CardTitle,
 } from "../../design-system";
+import { queryRoots } from "../../queryKeys";
 
 type Client = Pick<
 	EumenesClient,
@@ -16,7 +17,7 @@ type Client = Pick<
 
 export function MemoryConnectionPanel({ client }: { client: Client }) {
 	const cache = useQueryClient();
-	const queryKey = ["memory-status", client.identity];
+	const queryKey = [queryRoots.memoryStatus, client.identity];
 	const query = useQuery({
 		queryKey,
 		queryFn: () => client.memoryStatus(),

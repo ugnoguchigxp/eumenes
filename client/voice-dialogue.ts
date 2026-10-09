@@ -1,5 +1,9 @@
-import { voiceTurnSchema } from "../api/domains/voice-dialogue/contracts";
-import { avatarMotionSchema } from "../api/domains/delivery";
+import {
+	previewResultSchema,
+	replaySentencesSchema,
+	voiceTurnSchema,
+} from "../api/domains/voice-dialogue/contracts";
+import { avatarMotionSchema } from "../api/domains/delivery/contracts";
 import type { Transport } from "./transport";
 import { json } from "./transport";
 export function voiceDialogueClient(transport: Transport) {
@@ -61,7 +65,7 @@ export function voiceDialogueClient(transport: Transport) {
 				},
 				body: new Uint8Array(wav),
 			});
-			return (await response.json()) as { utteranceId: string; text: string };
+			return previewResultSchema.parse(await response.json());
 		},
 		voiceTurn: async (id: string) =>
 			voiceTurnSchema.parse(
@@ -87,10 +91,10 @@ export function voiceDialogueClient(transport: Transport) {
 				).json(),
 			),
 		replaySentences: async (text: string): Promise<string[]> =>
-			(
-				(await (
+			replaySentencesSchema.parse(
+				await (
 					await transport.call("/api/voice/replay/sentences", json({ text }))
-				).json()) as { sentences: string[] }
+				).json(),
 			).sentences,
 		replayAudio: async (text: string, signal?: AbortSignal) =>
 			new Uint8Array(

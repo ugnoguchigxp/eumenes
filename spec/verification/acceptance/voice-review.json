@@ -1,0 +1,96 @@
+{
+	"verification": {
+		"selected": [
+			"settings",
+			"inference",
+			"conversation",
+			"larm",
+			"audio",
+			"queue",
+			"scheduler",
+			"dialogue",
+			"voice-dialogue"
+		],
+		"dependencySet": [
+			"settings",
+			"larm",
+			"inference",
+			"conversation",
+			"audio",
+			"queue",
+			"scheduler",
+			"dialogue",
+			"voice-dialogue"
+		],
+		"revision": "0f7b3b86924767570eee4a5cc7be9e416a4f5fda821b022d05317be48f0de0c5",
+		"steps": [
+			{
+				"name": "format",
+				"ms": 179,
+				"result": "pass"
+			},
+			{
+				"name": "lint",
+				"ms": 91,
+				"result": "pass"
+			},
+			{
+				"name": "typecheck",
+				"ms": 1883,
+				"result": "pass"
+			},
+			{
+				"name": "tests",
+				"ms": 4189,
+				"result": "pass"
+			},
+			{
+				"name": "web tests",
+				"ms": 1413,
+				"result": "pass"
+			},
+			{
+				"name": "web build",
+				"ms": 6405,
+				"result": "pass"
+			},
+			{
+				"name": "browser fixture",
+				"ms": 37631,
+				"result": "pass"
+			}
+		],
+		"totalMs": 51921,
+		"result": "pass"
+	},
+	"testCounts": {
+		"backend": 108,
+		"web": 14,
+		"browserFixture": 8
+	},
+	"contextStill": {
+		"context_compile": 1,
+		"compile_eval": 1,
+		"runId": "00000000-0000-0000-18dc-66ae1f00567a"
+	},
+	"live": {
+		"at": "2026-10-08T09:40:02.382+09:00",
+		"runId": "772ddede-bef3-4ffe-9a5f-fd9c8ea10da2",
+		"status": "failed",
+		"error": "larm_inference_409",
+		"readyDespiteFailure": true,
+		"elapsedMs": 111,
+		"cause": "unconfirmed; Eumenes discards provider error body"
+	},
+	"physicalAcceptance": "not completed",
+	"fixes": [
+		"Preserve accepted recognition observation across an unfinalized speech candidate",
+		"Cancel pending generation after a finalized replacement segment, retaining immediate audible interruption",
+		"Order replacement cancellation after previous upload acceptance"
+	],
+	"remaining": [
+		"Reason for live provider HTTP 409",
+		"Cause of missing UI updates observed before reload",
+		"Physical microphone three-turn acceptance"
+	]
+}

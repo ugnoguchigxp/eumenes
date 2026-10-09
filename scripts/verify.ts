@@ -114,9 +114,10 @@ try {
 	const tsFiles = paths.flatMap(files).filter((file) => /\.tsx?$/.test(file));
 	const errors = checkBoundaries(
 		(all
-			? files(join(root, "api/domains")).concat(
-					files(join(root, "web/src/domains")),
-					files(join(root, "web/src/components/domains")),
+			? files(join(root, "api")).concat(
+					files(join(root, "web/src")),
+					files(join(root, "client")),
+					files(join(root, "cli")),
 				)
 			: tsFiles
 		)

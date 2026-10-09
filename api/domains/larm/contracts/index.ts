@@ -1,3 +1,4 @@
+import { z } from "zod";
 export type Capability = "llm" | "asr" | "tts";
 export type LarmExchange = {
 	connectionId: string;
@@ -29,6 +30,7 @@ export {
 	type TtsRange,
 } from "./voices";
 export interface LarmPort {
+	decisionModel?(): string | null;
 	judge?(
 		state: Record<string, string>,
 		questions: Record<
@@ -42,6 +44,7 @@ export interface LarmPort {
 	onChange?(listener: () => void): () => void;
 	inspect?(): {
 		profile: string;
+		decisionModel?: string | null;
 		connectionId?: string;
 		providers: Array<{
 			name: Capability;
@@ -76,3 +79,14 @@ export interface LarmPort {
 	): Promise<Uint8Array>;
 	close(): Promise<void>;
 }
+
+export const larmStatusSchema: z.ZodType<LarmStatus> = z.object({
+	state: z.enum(["unconfigured", "idle", "ready", "connecting", "failed"]),
+	capabilities: z.array(z.enum(["llm", "asr", "tts"])),
+	error: z.string().optional(),
+});
+export const statusResponseSchema = z.object({
+	service: z.string(),
+	larm: larmStatusSchema,
+});
+export type StatusResponse = z.infer<typeof statusResponseSchema>;

@@ -1,0 +1,110 @@
+{
+	"date": "2026-10-09",
+	"scope": "Voice input recognition, LLM response, cancellation, Web lifecycle, and operational logging",
+	"contextStill": {
+		"context_compile": 1,
+		"compile_eval": 1,
+		"runId": "00000000-0000-0000-18dc-9790d5edb17a"
+	},
+	"observed": {
+		"windowUtc": ["2026-10-08T15:09:55Z", "2026-10-08T15:29:55Z"],
+		"cancelledLlmRuns": 5,
+		"sessionStopRequests": 3,
+		"turnCancelRequests": 2,
+		"latestCancelledRun": {
+			"runId": "f595769d-2d0e-4ec9-9d5d-2a6e0733fed3",
+			"jobId": "514a0df3-d3e2-4bd0-b0df-33dcc2e3bd80",
+			"asrDurationMs": 827,
+			"llmDurationMs": 1487,
+			"stopRequestId": "6e871ebb-d341-4616-858d-e693657819e7"
+		},
+		"qualification": "Cancellation is proved by correlation IDs. Logs do not distinguish a stop button from UI cleanup or configuration revocation, nor the UI trigger of a turn cancellation. The last live voice request subsequently completed generation and reached ready with played acknowledgements, but this was not this task's hardware acceptance."
+	},
+	"findings": [
+		{
+			"priority": "P2",
+			"file": "web/src/domains/voice-dialogue/hooks/index.ts",
+			"problem": "Old microphone callbacks, a rejected old upload, and a delayed stop could alter a newly started voice session or remove its query.",
+			"fix": "Fence callbacks, upload errors and retries to their own session. Clear the old query before asynchronous stop work, ignore late audio-state notifications, and render active state explicitly.",
+			"baseline": "Old callbacks changed the new recognition ID; a delayed stop removed the new turn. Both were reproduced in failing regression tests.",
+			"status": "fixed"
+		},
+		{
+			"priority": "P2",
+			"file": "web/src/domains/voice-dialogue/hooks/index.ts",
+			"problem": "The preceding answer was cancelled before the next upload was accepted, even when the next upload was rejected.",
+			"fix": "Cancel after successful acceptance; on failure drop unsent segments and provisional previews, restore the previous turn, and reload it for playback, including two queued segments. Immediate interruption during playback is preserved.",
+			"baseline": "Regression test observed an unwanted voiceCancel call on rejected replacement.",
+			"status": "fixed"
+		},
+		{
+			"priority": "P3",
+			"file": "api/domains/larm/service/index.ts",
+			"problem": "Intentional cancellation was recorded as network_unavailable.",
+			"fix": "Record caller cancellation as larm.inference_cancelled at info; keep actual network failures as warn.",
+			"status": "fixed"
+		},
+		{
+			"priority": "P2",
+			"file": "api/domains/dialogue/service/index.ts",
+			"problem": "Full verification found a direct settings type import forbidden by the domain graph.",
+			"fix": "Derive the necessary prompt settings type from the public InferencePort snapshot contract. Prompt behavior is unchanged.",
+			"status": "fixed"
+		},
+		{
+			"priority": "P3",
+			"file": "api/domains/inference/test/inference.test.ts",
+			"problem": "A test assumed millisecond timestamps uniquely order attempts; it read an older, unaccepted attempt during fast fixture execution.",
+			"fix": "Identify the replay attempt by its newly created ID instead of its position.",
+			"status": "fixed"
+		},
+		{
+			"priority": "P3",
+			"file": "tests/browser/voice.spec.ts",
+			"problem": "Browser checks used the previous default settings heading and old intonation label.",
+			"fix": "Match the current general settings heading and the expanded intonation/speed/pitch label.",
+			"status": "fixed"
+		}
+	],
+	"verification": {
+		"fixture": {
+			"voiceDialogue": "pass: backend 25, Web 13",
+			"larm": "pass: backend 36",
+			"dialogue": "pass",
+			"inference": "pass: backend 19",
+			"full": {
+				"result": "pass",
+				"backend": 194,
+				"web": 54,
+				"browser": 12,
+				"totalMs": 87356,
+				"revision": "b8b5c01997a0e6459530f19e955329edab7dcefab0740f27a80f577ca9812c27",
+				"sourceHashUnchanged": true,
+				"checks": [
+					"domain boundaries",
+					"format",
+					"lint",
+					"typecheck",
+					"backend tests",
+					"Web tests",
+					"Web build",
+					"browser fixture"
+				]
+			},
+			"previousFull": "backend 194 and Web 54 passed; browser 9 passed, 3 failed (two outdated UI selectors and one SSE count check during source changes)",
+			"avatarIsolated": "pass: 1 browser test, 32.7 s",
+			"browserStandalone": "pass: all 12 browser fixture tests, 1.1 min",
+			"avatarQualification": "Two earlier combined runs failed the canvas removal assertion. The isolated rendering test, the standalone 12-test suite, and the final combined gate passed. The intermediate rendering instability itself was not causally explained; diagnostic navigation state is now captured on failure."
+		},
+		"live": "Existing diagnostic logs only; no new provider probe",
+		"hardware": "Not performed; three-turn microphone/headphone acceptance remains open",
+		"runtime": "No production backend restart was performed. Web uses the existing development server; a production build/deployment is outside this code repair."
+	},
+	"logs": [
+		"voice-no-answer-domain.log",
+		"voice-no-answer-larm.log",
+		"voice-no-answer-dialogue.log",
+		"voice-no-answer-inference.log",
+		"voice-no-answer-all.log"
+	]
+}

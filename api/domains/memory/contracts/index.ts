@@ -66,3 +66,26 @@ export type PrepareResult =
 export type SettleResult =
 	| { ok: true }
 	| { ok: false; reason: "memory_stale" | "memory_unavailable" };
+
+export const memoryStatusSchema: z.ZodType<MemoryStatus> = z.object({
+	enabled: z.boolean(),
+	healthy: z.boolean(),
+});
+export const memoryItemSchema: z.ZodType<MemoryItemDto> = z.object({
+	id: z.string(),
+	kind: z.string(),
+	semanticKey: z.string(),
+	text: z.string(),
+	polarity: z.enum(["affirmed", "negated"]),
+	status: z.string(),
+	origin: z.string(),
+	revision: z.number(),
+	sourceMessageIds: z.array(z.string()),
+	validFromMs: z.number().nullable(),
+	validUntilMs: z.number().nullable(),
+});
+export const memoryItemsSchema = z.object({ items: z.array(memoryItemSchema) });
+export const forgetResultSchema = z.object({
+	forgetId: z.string(),
+	completed: z.boolean(),
+});

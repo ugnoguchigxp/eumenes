@@ -49,3 +49,11 @@ export const voiceTurnSchema = z.object({
 	audioComplete: z.boolean().optional(),
 });
 export type VoiceTurn = z.infer<typeof voiceTurnSchema>;
+
+export const previewResultSchema = z.object({
+	utteranceId: z.string(),
+	text: z.string(),
+});
+export const replaySentencesSchema = z.object({
+	sentences: z.array(z.string()),
+});

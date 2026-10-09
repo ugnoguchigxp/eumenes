@@ -37,7 +37,7 @@ try {
 			const predicted = delivery.emotion ?? "none";
 			const match =
 				predicted === sample.expected &&
-				(sample.expected === "none" || delivery.source === "laya");
+				(sample.expected === "none" || delivery.source !== "fallback");
 			if (match) hits++;
 			if (sample.expected !== "none") {
 				expressive++;

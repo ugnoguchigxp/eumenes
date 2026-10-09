@@ -1,3 +1,4 @@
+import { attitudeDatasetClient } from "./attitude-dataset";
 import { conversationClient } from "./conversation";
 import { dialogueClient } from "./dialogue";
 import { eventsClient } from "./events";
@@ -15,6 +16,7 @@ export { ApiError, ApiConnectionError } from "./transport";
 export function createClient(baseUrl: string, token?: string) {
 	const transport = createTransport(baseUrl, token);
 	return {
+		...attitudeDatasetClient(transport),
 		...eventsClient(transport),
 		...conversationClient(transport),
 		...dialogueClient(transport),

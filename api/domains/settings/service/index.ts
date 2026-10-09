@@ -67,11 +67,36 @@ export function defaults(env: Record<string, string | undefined>): Settings {
 		},
 	});
 }
+const knownProviderKeys = [
+	"OPENAI_API_KEY",
+	"ANTHROPIC_API_KEY",
+	"GEMINI_API_KEY",
+	"GOOGLE_API_KEY",
+	"AZURE_OPENAI_API_KEY",
+	"GROQ_API_KEY",
+	"MISTRAL_API_KEY",
+	"DEEPSEEK_API_KEY",
+];
+/** A connection may only name an environment variable meant for cloud credentials. */
+export function isAllowedEnvRef(
+	name: string,
+	allowlist: readonly string[],
+): boolean {
+	return (
+		name.startsWith("EUMENES_CLOUD_") ||
+		knownProviderKeys.includes(name) ||
+		allowlist.includes(name)
+	);
+}
 export async function createSettings(
 	store: SqliteStore,
 	options: { dbPath: string; env?: Record<string, string | undefined> },
 ) {
 	const env = options.env ?? process.env;
+	const envRefAllowlist = (env.EUMENES_ENV_REF_ALLOWLIST ?? "")
+		.split(",")
+		.map((v) => v.trim())
+		.filter(Boolean);
 	let key: Buffer | null = null;
 	let keyError: string | null = null;
 	const path = join(dirname(options.dbPath), "keys", "settings.key");
@@ -134,7 +159,11 @@ export async function createSettings(
 	});
 	const listeners = new Set<() => void>();
 	function credential(db: Database, c: Connection): string | null {
-		if (c.envRef) return env[c.envRef]?.trim() || null;
+		if (c.envRef) {
+			if (!isAllowedEnvRef(c.envRef, envRefAllowlist))
+				throw new Error("env_ref_not_allowed");
+			return env[c.envRef]?.trim() || null;
+		}
 		if (!key) return null;
 		const row = db
 			.query("SELECT encrypted FROM settings_credentials WHERE id=?")
@@ -163,7 +192,13 @@ export async function createSettings(
 				connections: read(db).connections.map((c) => ({
 					id: c.id,
 					enabled: c.enabled,
-					credentialAvailable: !!credential(db, c),
+					credentialAvailable: (() => {
+						try {
+							return !!credential(db, c);
+						} catch {
+							return false;
+						}
+					})(),
 					source: c.envRef ? "environment" : "encrypted",
 				})),
 			})),
@@ -236,6 +271,13 @@ export async function createSettings(
 				for (const c of next.connections) {
 					const prior = old.connections.find((x) => x.id === c.id);
 					const mutation = input.keys.find((k) => k.connectionId === c.id);
+					// A previously saved ref stays untouched (it fails on use instead).
+					if (
+						c.envRef &&
+						c.envRef !== prior?.envRef &&
+						!isAllowedEnvRef(c.envRef, envRefAllowlist)
+					)
+						throw new Error("invalid_env_ref");
 					const originChanged =
 						prior &&
 						new URL(prior.baseUrl).origin !== new URL(c.baseUrl).origin;
@@ -274,7 +316,12 @@ export async function createSettings(
 						!originChanged &&
 						!c.envRef
 					) {
-						const value = credential(db, prior);
+						let value: string | null = null;
+						try {
+							value = credential(db, prior);
+						} catch {
+							// A disallowed env ref never yields a value to copy.
+						}
 						if (value)
 							db.query("INSERT INTO settings_credentials VALUES(?,?)").run(
 								`${c.id}:${c.epoch}`,

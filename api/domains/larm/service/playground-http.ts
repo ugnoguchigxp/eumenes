@@ -1,3 +1,4 @@
+import { readBounded } from "../../../infrastructure/bounded-read";
 import { setTimeout as delay } from "node:timers/promises";
 export const pause = (ms: number, signal: AbortSignal) =>
 	delay(ms, undefined, { signal });
@@ -35,32 +36,12 @@ export function localUrl(value: string): URL {
 		throw new Error("invalid_larm_url");
 	return u;
 }
-export async function bytes(
-	response: Response,
-	limit: number,
-): Promise<Uint8Array> {
-	const reader = response.body?.getReader();
-	if (!reader) throw new Error("invalid_provider_response");
-	const parts: Uint8Array[] = [];
-	let size = 0;
-	try {
-		for (;;) {
-			const chunk = await reader.read();
-			if (chunk.done) break;
-			size += chunk.value.length;
-			if (size > limit) throw new Error("response_too_large");
-			parts.push(chunk.value);
-		}
-	} finally {
-		await reader.cancel().catch(() => {});
-	}
-	const result = new Uint8Array(size);
-	let offset = 0;
-	for (const part of parts) {
-		result.set(part, offset);
-		offset += part.length;
-	}
-	return result;
+export function bytes(response: Response, limit: number): Promise<Uint8Array> {
+	return readBounded(response.body, {
+		limit,
+		tooLarge: "response_too_large",
+		missing: "invalid_provider_response",
+	});
 }
 export async function json(response: Response) {
 	try {

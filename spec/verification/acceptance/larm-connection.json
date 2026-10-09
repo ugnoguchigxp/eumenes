@@ -1,0 +1,100 @@
+{
+	"date": "2026-10-08 Asia/Tokyo",
+	"scope": "LARM connection repair",
+	"verificationMode": "fixed source snapshot; browser test ports isolated",
+	"snapshotRoot": "/var/folders/mx/jbv8qfwd52z14q0mby_273lhlp5gd2/T/eumenes-larm-verified-qjiumf1d",
+	"fixture": {
+		"selected": [
+			"settings",
+			"inference",
+			"conversation",
+			"continuity",
+			"larm",
+			"audio",
+			"queue",
+			"scheduler",
+			"dialogue",
+			"voice-dialogue"
+		],
+		"dependencySet": [
+			"settings",
+			"larm",
+			"inference",
+			"conversation",
+			"continuity",
+			"audio",
+			"queue",
+			"scheduler",
+			"dialogue",
+			"voice-dialogue"
+		],
+		"revision": "405ed1e184fc9717f8de18e3783100ac39a5d5d583d201d4615361f8f2a8087a",
+		"steps": [
+			{
+				"name": "format",
+				"ms": 187,
+				"result": "pass"
+			},
+			{
+				"name": "lint",
+				"ms": 106,
+				"result": "pass"
+			},
+			{
+				"name": "typecheck",
+				"ms": 1706,
+				"result": "pass"
+			},
+			{
+				"name": "tests",
+				"ms": 4231,
+				"result": "pass"
+			},
+			{
+				"name": "web tests",
+				"ms": 2501,
+				"result": "pass"
+			},
+			{
+				"name": "web build",
+				"ms": 6283,
+				"result": "pass"
+			},
+			{
+				"name": "browser fixture",
+				"ms": 18309,
+				"result": "pass"
+			}
+		],
+		"totalMs": 33446,
+		"result": "pass"
+	},
+	"live": {
+		"individualOperations": {
+			"asrMs": 1356,
+			"llmMs": 3396,
+			"ttsMs": 978,
+			"outputWavBytes": 523820,
+			"expectedAsrTextMatched": true
+		},
+		"eumenesApi": {
+			"textRun": "completed",
+			"voiceTurn": "ready",
+			"outputWavBytes": 329260,
+			"serverStartupLogLines": 1,
+			"serverErrorLogLines": 0
+		},
+		"normalStartup": {
+			"api": "http://127.0.0.1:8787",
+			"web": "http://127.0.0.1:5173",
+			"webProxyHttpStatus": 200,
+			"larmState": "ready"
+		}
+	},
+	"limitations": [
+		"Current workspace was being concurrently edited by the settings implementation chat; its verify:all detected source changes.",
+		"Real microphone/headphones three-round acceptance remains unverified."
+	],
+	"contextCompileCount": 1,
+	"compileEvalCount": 1
+}

@@ -3,9 +3,10 @@ import { type FocusEvent, useEffect, useRef, useState } from "react";
 import type { Entry } from "../../../../api/domains/tts-dictionary/contracts";
 import type { EumenesClient } from "../../../../client";
 import { ApiError } from "../../../../client";
+import { queryRoots } from "../../queryKeys";
 
 type Draft = Entry & { original: string | null; expectedSpoken: string | null };
-const KEY = "tts-dictionary";
+const KEY = queryRoots.ttsDictionary;
 const NEW_ROW = "\0new";
 const COLUMNS = 3;
 const ROW_HEIGHT = 38;

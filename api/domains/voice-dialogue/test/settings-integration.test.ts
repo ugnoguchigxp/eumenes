@@ -121,7 +121,12 @@ async function setup(
 	});
 	const conversation = createConversationService(store);
 	const queue = createQueue(store, { pollMs: 5 });
-	const dialogue = createDialogueService(store, conversation, inference, queue);
+	const dialogue = createDialogueService({
+		store,
+		conversation,
+		larm: inference,
+		queue,
+	});
 	const voice = createVoiceDialogue(store, dialogue, inference);
 	queue.start();
 	cleanup.push(async () => {

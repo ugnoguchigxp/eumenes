@@ -68,7 +68,7 @@ function setup(
 	};
 	const conversation = createConversationService(store);
 	const queue = createQueue(store, queueOptions);
-	const dialogue = createDialogueService(store, conversation, larm, queue);
+	const dialogue = createDialogueService({ store, conversation, larm, queue });
 	return { store, calls, conversation, queue, dialogue, larm };
 }
 const submit = (
@@ -130,12 +130,12 @@ test("restart: queued runs continue, a running run is interrupted, late result f
 	expect(h.dialogue.get(a.id)?.status).toBe("running");
 	// "restart": new queue/service instances over the same database
 	const queue2 = createQueue(h.store);
-	const dialogue2 = createDialogueService(
-		h.store,
-		h.conversation,
-		h.larm,
-		queue2,
-	);
+	const dialogue2 = createDialogueService({
+		store: h.store,
+		conversation: h.conversation,
+		larm: h.larm,
+		queue: queue2,
+	});
 	await dialogue2.recover();
 	expect(await queue2.recover()).toBe(1);
 	expect(dialogue2.get(a.id)?.status).toBe("interrupted");

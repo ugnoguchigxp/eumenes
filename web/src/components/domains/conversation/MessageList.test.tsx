@@ -1,6 +1,6 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, expect, test } from "vitest";
-import type { SpeechDelivery } from "../../../../../api/domains/delivery";
+import type { SpeechDelivery } from "../../../../../api/domains/delivery/contracts";
 import { MessageList } from "./MessageList";
 afterEach(cleanup);
 const delivery: SpeechDelivery = {
@@ -86,4 +86,29 @@ test("plain, fallback, weak confidence and legacy motion are not displayed as em
 	}));
 	render(<MessageList conversation={{ id: "main", revision: 1, messages }} />);
 	expect(screen.queryAllByRole("img")).toHaveLength(0);
+});
+
+test("Ruri emotion is displayed and attributed to Ruri", () => {
+	const view = render(
+		<MessageList
+			conversation={{
+				id: "c",
+				revision: 1,
+				messages: [
+					{
+						id: "a",
+						conversationId: "c",
+						role: "assistant",
+						text: "おめでとうございます。",
+						createdAt: "2026-10-09",
+						runId: "r",
+						delivery: { ...delivery, source: "ruri" },
+					},
+				],
+			}}
+		/>,
+	);
+	expect(
+		view.container.querySelector('[data-emotion-source="ruri"]'),
+	).not.toBeNull();
 });

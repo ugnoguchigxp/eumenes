@@ -49,7 +49,12 @@ test("request ID is idempotent and answer adoption is atomic", async () => {
 		const conversation = createConversationService(store);
 		const queue = createQueue(store);
 		queue.start();
-		const dialogue = createDialogueService(store, conversation, larm, queue);
+		const dialogue = createDialogueService({
+			store,
+			conversation,
+			larm,
+			queue,
+		});
 		const input = {
 			requestId: crypto.randomUUID(),
 			conversationId: "main",
@@ -111,7 +116,7 @@ test("failed input persistence prevents any provider request", async () => {
 	};
 	const conversation = createConversationService(store);
 	const queue = createQueue(store);
-	const dialogue = createDialogueService(store, conversation, larm, queue);
+	const dialogue = createDialogueService({ store, conversation, larm, queue });
 	await expect(
 		dialogue.submit({
 			requestId: crypto.randomUUID(),
@@ -148,7 +153,12 @@ test("cancelled inference cannot append an answer", async () => {
 		const conversation = createConversationService(store);
 		const queue = createQueue(store);
 		queue.start();
-		const dialogue = createDialogueService(store, conversation, larm, queue);
+		const dialogue = createDialogueService({
+			store,
+			conversation,
+			larm,
+			queue,
+		});
 		const run = await dialogue.submit({
 			requestId: crypto.randomUUID(),
 			conversationId: "main",

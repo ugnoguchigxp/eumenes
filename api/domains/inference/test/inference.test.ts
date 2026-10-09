@@ -1,3 +1,9 @@
+import {
+	createAttitudeDataset,
+	migration as datasetMigration,
+	type Sample,
+} from "../../attitude-dataset";
+import { RURI_MODEL, emotionSchema } from "../../delivery";
 import { afterEach, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -37,6 +43,7 @@ async function setup(
 		localSpeech?: LarmPort["speak"];
 		judge?: LarmPort["judge"];
 		decisionMs?: number;
+		dataset?: boolean;
 		speechText?: (text: string) => string;
 		fetch?: typeof fetch;
 		localMs?: number;
@@ -84,6 +91,7 @@ async function setup(
 	const seen: Array<{ voice: string; style?: string; speed?: number }> = [];
 	const payloads: unknown[] = [];
 	const port: LarmPort = {
+		decisionModel: () => (options.dataset ? RURI_MODEL : null),
 		status: () => ({ state: "unconfigured", capabilities: [] }),
 		answerStream: options.localStream,
 		judge: options.judge,
@@ -117,7 +125,14 @@ async function setup(
 			usage: { prompt_tokens: 7, completion_tokens: 3 },
 		});
 	}) as typeof fetch;
+	const datasetStore = options.dataset
+		? openStore(join(dir, "dataset.sqlite3"), [datasetMigration])
+		: undefined;
+	const dataset = datasetStore
+		? createAttitudeDataset(datasetStore, dir)
+		: undefined;
 	const inference = createInference(store, settings, {
+		attitudeDataset: dataset,
 		larmFactory: (s) => {
 			seen.push(s.larm);
 			return port;
@@ -130,10 +145,12 @@ async function setup(
 	});
 	cleanup.push(async () => {
 		await inference.close();
+		await dataset?.close();
+		await datasetStore?.close();
 		await store.close();
 		rmSync(dir, { recursive: true, force: true });
 	});
-	return { store, settings, inference, calls, payloads, seen };
+	return { store, settings, inference, calls, payloads, seen, dataset };
 }
 function wav() {
 	const b = new Uint8Array(48);
@@ -579,7 +596,9 @@ test("Laya judges the spoken text and carries one decision with bounded immutabl
 		"こんにちはSAAA！",
 		freshSignal(),
 	);
-	expect(states).toEqual([{ response: "こんにちはサー！" }]);
+	expect(states).toEqual([
+		{ response: "こんにちはサー！", current_chunk: "こんにちはサー！" },
+	]);
 	expect(receipt.delivery).toMatchObject({
 		motion: "agreeing",
 		tone: "bright",
@@ -699,4 +718,77 @@ test("speak with an override synthesizes with unsaved voice settings without cha
 		speed: 1.4,
 	});
 	expect(h.settings.get().larm).toEqual(before);
+});
+
+test("Ruri dataset captures real-turn receipt adoption once; a technical collection request does not delay answer or TTS", async () => {
+	let finish!: (value: unknown) => void;
+	let calls = 0;
+	const h = await setup({
+		dataset: true,
+		local: async () => "手順を説明します。",
+		localSpeech: async () => wav(),
+		judge: async () => {
+			calls++;
+			return new Promise((resolve) => {
+				finish = resolve;
+			});
+		},
+	});
+	await h.dataset!.setEnabled(true);
+	const id = await h.store.write((db) =>
+		h.inference.captureInTransaction(db, "real-run", "llm", Date.now() + 10000),
+	);
+	const preparation = {
+		collection: {
+			conversationId: "conversation",
+			turnId: "real-run",
+			granularity: "answer" as const,
+			chunkOrder: null,
+		},
+	};
+	const receipt = await h.inference.executeStream(
+		id,
+		[{ role: "user", content: "設定方法は？" }],
+		freshSignal(),
+		() => {},
+		preparation,
+	);
+	expect(receipt.delivery!.reason).toBe("not-expressive");
+	expect(calls).toBe(1);
+	expect(h.dataset!.status().pending).toBe(1);
+	await h.store.write((db) => h.inference.acceptInTransaction(db, receipt));
+	const audio = await h.inference.speakWithDelivery(
+		"手順を説明します。",
+		freshSignal(),
+		{ delivery: receipt.delivery, collection: preparation.collection },
+	);
+	expect(audio.wav.length).toBeGreaterThan(0);
+	expect(calls).toBe(1);
+	finish({
+		model: RURI_MODEL,
+		answers: {
+			emotion: {
+				type: "choice",
+				choice: "none",
+				confidence: 0.9,
+				answer_confidence: 0.9,
+				logits: Object.fromEntries(
+					emotionSchema.options.map((k) => [k, k === "none" ? 3 : 0]),
+				),
+				probabilities: Object.fromEntries(
+					emotionSchema.options.map((k) => [k, k === "none" ? 0.9 : 0.02]),
+				),
+			},
+		},
+	});
+	await h.dataset!.drain();
+	const sample = h.dataset!.get(
+		h.dataset!.list()[0]!.sample_id,
+		false,
+	) as Sample;
+	expect(sample.user_utterance).toBe("設定方法は？");
+	expect(sample.adopted?.source).toBe("fallback");
+	expect(sample.adopted?.voice_application).toBe("manual");
+	expect(sample.adopted?.tone).toBeNull();
+	expect(sample.primary_label).toBeNull();
 });

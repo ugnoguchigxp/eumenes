@@ -1,3 +1,5 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import { resolve, join, dirname } from "node:path";
 import { ApiError, ApiConnectionError, createClient } from "../client";
 import { submitSchema, type Run } from "../api/domains/dialogue/contracts";
 import { resolveApiToken } from "../api/infrastructure/auth-config";
@@ -54,6 +56,74 @@ function show(value: unknown) {
 	);
 }
 async function main() {
+	if (command === "collection") {
+		const sub = positional.shift() ?? "status";
+		if (sub === "start") return show(await client.attitudeStart());
+		if (sub === "stop") return show(await client.attitudeStop());
+		if (sub === "status") return show(await client.attitudeStatus());
+		if (sub === "list") return show(await client.attitudeSamples());
+		if (sub === "report") return show(await client.attitudeReport());
+		if (sub === "split") return show(await client.attitudeSplit());
+		if (sub === "show" && positional[0])
+			return show(
+				await client.attitudeSample(
+					positional[0],
+					positional[1] === "predictions",
+				),
+			);
+		if (sub === "prepare" && positional[0] && positional[1]) {
+			const sample = (await client.attitudeSample(
+				positional[0],
+			)) as import("../api/domains/attitude-dataset/contracts").Sample;
+			const draft = {
+				revision: sample.revision,
+				primary_label: sample.primary_label,
+				acceptable_labels: sample.acceptable_labels,
+				expression_transition: sample.expression_transition,
+				review_status: sample.review_status,
+				correction_reason: sample.correction_reason,
+				template_group_id: sample.template_group_id,
+				template_group_confirmed: sample.template_group_confirmed,
+				coverage_tags: sample.coverage_tags,
+			};
+			const file = resolve(positional[1]);
+			await writeFile(file, JSON.stringify(draft, null, 2) + "\n", {
+				mode: 0o600,
+				flag: "wx",
+			});
+			return show({ file });
+		}
+		if (sub === "review" && positional[0] && positional[1])
+			return show(
+				await client.attitudeReview(
+					positional[0],
+					await Bun.file(positional[1]).json(),
+				),
+			);
+		if (sub === "export" && positional[0]) {
+			const bundle = await client.attitudeExport();
+			const directory = resolve(positional[0]);
+			await mkdir(dirname(directory), { recursive: true, mode: 0o700 });
+			// Claim a fresh directory before writing any part of the export.
+			await mkdir(directory, { mode: 0o700 });
+			for (const [name, contents] of [
+				["reviewed.jsonl", bundle.jsonl],
+				["train.jsonl", bundle.partitions.train],
+				["calibration.jsonl", bundle.partitions.calibration],
+				["eval.jsonl", bundle.partitions.eval],
+				["report.json", JSON.stringify(bundle.report, null, 2)],
+				["schema.json", JSON.stringify(bundle.schema, null, 2)],
+			])
+				await writeFile(join(directory, name!), contents!, {
+					mode: 0o600,
+					flag: "wx",
+				});
+			return show({ directory });
+		}
+		throw new Error(
+			"usage: collection status|start|stop|list|show <id> [predictions]|prepare <id> <private-file>|review <id> <review.json>|report|split|export <private-directory>",
+		);
+	}
 	if (command === "status") return show(await client.status());
 	if (command === "history")
 		return show(await client.conversation(positional[0] ?? conversationId));

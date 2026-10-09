@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type { Database } from "bun:sqlite";
 import type { Settings, Purpose } from "../../settings/contracts";
 import type { SpeechDelivery, SpeechPreparation } from "../../delivery";
@@ -72,6 +73,7 @@ export interface InferencePort {
 		messages: Messages,
 		signal: AbortSignal,
 		onDelta: (text: string) => void,
+		preparation?: SpeechPreparation,
 	): Promise<Receipt>;
 	captureSpeechChunkInTransaction?(
 		db: Database,
@@ -84,3 +86,54 @@ export interface InferencePort {
 	validInTransaction?(db: Database, id: string): boolean;
 	skipInTransaction?(db: Database, subject: string, purpose: Purpose): void;
 }
+
+const exchangeSchema = z.object({
+	connectionId: z.string(),
+	model: z.string(),
+	started: z.number(),
+	httpStatus: z.number().optional(),
+	errorCode: z.string().optional(),
+	errorMessage: z.string().optional(),
+	speechVoice: z.string().optional(),
+	speechCredit: z.string().optional(),
+});
+export const usageSchema = z.object({
+	id: z.string(),
+	requestId: z.string(),
+	subject: z.string(),
+	purpose: z.enum(["llm", "asr", "tts"]),
+	source: z.string(),
+	model: z.string(),
+	status: z.string(),
+	reason: z.string().nullable(),
+	started: z.number(),
+	ended: z.number().nullable(),
+	accepted: z.number(),
+	inputTokens: z.number().nullable(),
+	outputTokens: z.number().nullable(),
+	providerDetails: z.array(exchangeSchema).optional(),
+});
+export type Usage = z.infer<typeof usageSchema>;
+export const probeSchema = z.object({
+	id: z.string(),
+	target: z.string(),
+	status: z.string(),
+	error: z.string().nullable(),
+	revision: z.number(),
+	created: z.number(),
+});
+export type Probe = z.infer<typeof probeSchema>;
+export const larmDetailsSchema = z.object({
+	profile: z.string(),
+	connectionId: z.string().optional(),
+	providers: z.array(
+		z.object({
+			name: z.string(),
+			model: z.string(),
+			baseUrl: z.string(),
+			protocol: z.string(),
+		}),
+	),
+});
+export type LarmDetails = z.infer<typeof larmDetailsSchema>;
+export const startedProbeSchema = z.object({ id: z.string() });

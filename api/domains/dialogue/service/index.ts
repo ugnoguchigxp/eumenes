@@ -107,15 +107,23 @@ interface Accept {
 	voiceSubject?: string;
 }
 
-export function createDialogueService(
-	store: SqliteStore,
-	conversation: ConversationService,
-	larm: InferencePort,
-	queue: QueueService,
-	clock: () => string = () => new Date().toISOString(),
-	id: () => string = () => crypto.randomUUID(),
-	memory?: MemoryService,
-) {
+export function createDialogueService({
+	store,
+	conversation,
+	larm,
+	queue,
+	clock = () => new Date().toISOString(),
+	id = () => crypto.randomUUID(),
+	memory,
+}: {
+	store: SqliteStore;
+	conversation: ConversationService;
+	larm: InferencePort;
+	queue: QueueService;
+	clock?: () => string;
+	id?: () => string;
+	memory?: MemoryService;
+}) {
 	const partials = new Map<string, string>();
 	const watchers = new Map<string, Set<(value: RunProgress) => void>>();
 	const watchedStatuses = new Map<string, string>();
@@ -282,6 +290,16 @@ export function createDialogueService(
 						partials.set(input.runId, next);
 						publish(input.runId);
 					};
+					const preparation = run
+						? {
+								collection: {
+									conversationId: run.conversationId,
+									turnId: run.id,
+									granularity: "answer" as const,
+									chunkOrder: null,
+								},
+							}
+						: undefined;
 					let receipt: Receipt | undefined;
 					let text: string;
 					if (input.requestId && larm.executeRequest) {
@@ -291,11 +309,13 @@ export function createDialogueService(
 									input.messages,
 									signal,
 									delta,
+									preparation,
 								)
 							: await larm.executeRequest(
 									input.requestId,
 									input.messages,
 									signal,
+									preparation,
 								);
 						text = receipt.value as string;
 					} else

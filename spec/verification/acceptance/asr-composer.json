@@ -1,0 +1,74 @@
+{
+	"selected": [
+		"settings",
+		"inference",
+		"conversation",
+		"larm",
+		"audio",
+		"queue",
+		"scheduler",
+		"dialogue",
+		"voice-dialogue"
+	],
+	"dependencySet": [
+		"settings",
+		"larm",
+		"inference",
+		"conversation",
+		"audio",
+		"queue",
+		"scheduler",
+		"dialogue",
+		"voice-dialogue"
+	],
+	"revision": "14ff4b145f67289dd9395712a382ffbb0ec3cfd8fc7f41804a88c88d8b2595fb",
+	"steps": [
+		{
+			"name": "format",
+			"ms": 177,
+			"result": "pass"
+		},
+		{
+			"name": "lint",
+			"ms": 113,
+			"result": "pass"
+		},
+		{
+			"name": "typecheck",
+			"ms": 1669,
+			"result": "pass"
+		},
+		{
+			"name": "tests",
+			"ms": 5760,
+			"result": "pass"
+		},
+		{
+			"name": "web tests",
+			"ms": 1410,
+			"result": "pass"
+		},
+		{
+			"name": "web build",
+			"ms": 5676,
+			"result": "pass"
+		},
+		{
+			"name": "browser fixture",
+			"ms": 37789,
+			"result": "pass"
+		}
+	],
+	"totalMs": 52711,
+	"result": "pass",
+	"fixture": {
+		"backend": 126,
+		"web": 14,
+		"browser": 8
+	},
+	"physicalASRDisplay": "not accepted this turn",
+	"contextStill": {
+		"compileCalls": 1,
+		"evalCalls": 1
+	}
+}

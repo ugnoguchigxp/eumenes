@@ -1,4 +1,4 @@
-import type { AvatarMotion } from "../../../../../api/domains/delivery";
+import type { AvatarMotion } from "../../../../../api/domains/delivery/contracts";
 
 export type AvatarCue = {
 	key: string;

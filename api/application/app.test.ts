@@ -76,7 +76,7 @@ function setup() {
 		sleep: () => new Promise(() => {}),
 	});
 	const conversation = createConversationService(store);
-	const dialogue = createDialogueService(store, conversation, larm, queue);
+	const dialogue = createDialogueService({ store, conversation, larm, queue });
 	scheduler.registerTarget(dialogue.promptTarget);
 	const voice = createVoiceDialogue(store, dialogue, larm);
 	const app = createApp({
@@ -325,10 +325,10 @@ test("full queue is reported as 503 for submissions", async () => {
 	const small = createQueue(store, {
 		limits: { total: 0, background: 0, scope: 0 },
 	});
-	const dialogue = createDialogueService(
+	const dialogue = createDialogueService({
 		store,
-		createConversationService(store),
-		{
+		conversation: createConversationService(store),
+		larm: {
 			status: () => ({ state: "ready", capabilities: [] }),
 			connect: async () => {},
 			answer: async () => "",
@@ -336,8 +336,8 @@ test("full queue is reported as 503 for submissions", async () => {
 			speak: async () => new Uint8Array(),
 			close: async () => {},
 		},
-		small,
-	);
+		queue: small,
+	});
 	const app = createApp({
 		token,
 		origin: "http://127.0.0.1:5173",
@@ -436,4 +436,26 @@ test("sample endpoint validates unsaved voice settings and returns audio", async
 	expect((await call("/api/voice/sample", { speed: 3 })).status).toBe(400);
 	expect((await call("/api/voice/sample", { extra: 1 })).status).toBe(400);
 	expect((await call("/api/voice/sample", {}, {})).status).toBe(401);
+});
+
+test("oversized JSON bodies are rejected with 413 and normal requests pass", async () => {
+	const h = setup();
+	const big = await h.app.request("/api/conversations", {
+		method: "POST",
+		headers: { ...auth, "content-length": String(2 * 1024 * 1024) },
+		body: "{}",
+	});
+	expect(big.status).toBe(413);
+	expect(await big.json()).toEqual({ error: "payload_too_large" });
+	expect((await h.call("/api/queue/status")).status).toBe(200);
+});
+
+test("error codes map to HTTP statuses through the table", async () => {
+	const { statusForError } = await import("./error-status");
+	expect(statusForError("request_conflict")).toBe(409);
+	expect(statusForError("invalid_input")).toBe(400);
+	expect(statusForError("env_ref_not_allowed")).toBe(400);
+	expect(statusForError("payload_too_large")).toBe(413);
+	expect(statusForError("queue_full")).toBe(503);
+	expect(statusForError("something_unknown")).toBe(500);
 });

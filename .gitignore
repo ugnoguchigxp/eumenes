@@ -9,4 +9,6 @@ verification-reports/
 test-results/
 playwright-report/
 .serena/
-packages/design-system/tsconfig.build.tsbuildinfo
+*.tsbuildinfo
+.DS_Store
+*-E

@@ -2,11 +2,14 @@ import type {
 	Conversation,
 	Message,
 } from "../../../../../api/domains/conversation/contracts";
-import type { SpeechDelivery } from "../../../../../api/domains/delivery";
-import { acceptedEmotion } from "../../../../../api/domains/delivery";
+import {
+	acceptedEmotion,
+	type SpeechDelivery,
+} from "../../../../../api/domains/delivery/contracts";
+import { memo, useMemo } from "react";
 import { emotionEmoji } from "./emotionEmoji";
 import { renderSafeMarkdown } from "./markdownRenderer";
-export function MessageList({
+export const MessageList = memo(function MessageList({
 	conversation,
 	streaming,
 	replayingId,
@@ -20,8 +23,18 @@ export function MessageList({
 	agentName?: string;
 }) {
 	const assistantLabel = agentName || "Eumenes";
+	// Streaming text is not announced; the settled answer is, once.
+	const lastAssistant = conversation?.messages
+		.filter((message) => message.role === "assistant")
+		.at(-1);
+	const announcement = streaming
+		? ""
+		: (lastAssistant?.text.slice(0, 80) ?? "");
 	return (
-		<div className="messages" aria-live="polite">
+		<div className="messages">
+			<output className="visually-hidden" aria-live="polite">
+				{announcement}
+			</output>
 			{conversation?.messages.length ? (
 				conversation.messages.map((message) => (
 					<article
@@ -71,12 +84,7 @@ export function MessageList({
 							</button>
 						)}
 						{message.role === "assistant" ? (
-							<div
-								className="markdown-content"
-								dangerouslySetInnerHTML={{
-									__html: renderSafeMarkdown(message.text),
-								}}
-							/>
+							<MarkdownContent text={message.text} />
 						) : (
 							<p>{message.text}</p>
 						)}
@@ -95,7 +103,21 @@ export function MessageList({
 			)}
 		</div>
 	);
-}
+});
+
+const MarkdownContent = memo(function MarkdownContent({
+	text,
+}: {
+	text: string;
+}) {
+	const html = useMemo(() => renderSafeMarkdown(text), [text]);
+	return (
+		<div
+			className="markdown-content"
+			dangerouslySetInnerHTML={{ __html: html }}
+		/>
+	);
+});
 
 function EmotionIcon({ delivery }: { delivery?: SpeechDelivery }) {
 	const emotion = delivery ? acceptedEmotion(delivery) : null;
@@ -105,7 +127,7 @@ function EmotionIcon({ delivery }: { delivery?: SpeechDelivery }) {
 		<span
 			className="message-emotion"
 			data-emotion={emotion}
-			data-emotion-source="laya"
+			data-emotion-source={delivery?.source}
 			// Emoji is text and has no image URL.
 			// oxlint-disable-next-line jsx-a11y/prefer-tag-over-role
 			role="img"

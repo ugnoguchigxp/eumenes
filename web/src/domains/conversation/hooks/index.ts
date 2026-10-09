@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import type { ConversationClient } from "../../../../../client/conversation";
+import { queryRoots } from "../../../queryKeys";
 export const conversationKey = (identity: string, id: string) =>
-	["conversation", identity, id] as const;
+	[queryRoots.conversation, identity, id] as const;
 export function useConversation(client: ConversationClient, id: string) {
 	return useQuery({
 		queryKey: conversationKey(client.identity, id),

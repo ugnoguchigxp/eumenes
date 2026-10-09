@@ -222,7 +222,10 @@ test("long data stays bounded, preserves beginnings and endings, excludes system
 	expect(state.response?.startsWith("開始")).toBe(true);
 	expect(state.response?.endsWith("終端")).toBe(true);
 	expect(JSON.parse(state.conversation!)).toHaveLength(4);
-	expect(new TextEncoder().encode(JSON.stringify(state)).length).toBeLessThan(
+	expect(state.current_chunk?.startsWith("開始")).toBe(true);
+	expect(Array.from(state.current_chunk!).length).toBeLessThanOrEqual(600);
+	const { current_chunk: _current, ...legacy } = state;
+	expect(new TextEncoder().encode(JSON.stringify(legacy)).length).toBeLessThan(
 		4000,
 	);
 });

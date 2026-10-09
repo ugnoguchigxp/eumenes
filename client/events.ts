@@ -15,11 +15,14 @@ const pause = (ms: number, signal: AbortSignal) =>
 		signal.addEventListener("abort", finish, { once: true });
 	});
 
+/** `reset` means missed events: consumers must resynchronize everything. */
+export type ChangeKind = "change" | "reset";
+
 export function eventsClient(
 	transport: Transport,
 	options: { retryMs?: number; idleMs?: number } = {},
 ) {
-	const listeners = new Set<() => void>();
+	const listeners = new Set<(kind: ChangeKind) => void>();
 	const stateListeners = new Set<() => void>();
 	let state: "idle" | "connecting" | "connected" | "failed" = "idle";
 	function setState(next: typeof state) {
@@ -35,10 +38,10 @@ export function eventsClient(
 	}
 	let connection: AbortController | undefined;
 	let lastId: string | undefined;
-	const notify = () => {
+	const notify = (kind: ChangeKind) => {
 		for (const listener of listeners) {
 			try {
-				listener();
+				listener(kind);
 			} catch {
 				/* A listener cannot close the shared stream. */
 			}
@@ -100,7 +103,7 @@ export function eventsClient(
 									if (id) lastId = id;
 									failures = 0;
 									setState("connected");
-									notify();
+									notify(event === "reset" ? "reset" : "change");
 								}
 								event = "";
 								id = "";
@@ -126,7 +129,7 @@ export function eventsClient(
 			if (lifetime.signal.aborted) break;
 			setState("failed");
 			// Refresh once on connection loss so the existing error/reconnect UI stays useful.
-			if (failures === 0) notify();
+			if (failures === 0) notify("reset");
 			await pause(
 				Math.min(
 					(options.retryMs ?? 5000) * 2 ** Math.min(failures++, 3),
@@ -153,7 +156,7 @@ export function eventsClient(
 				void run(connection);
 			}
 		},
-		subscribeChanges(listener: () => void) {
+		subscribeChanges(listener: (kind: ChangeKind) => void) {
 			listeners.add(listener);
 			if (!connection) {
 				connection = new AbortController();

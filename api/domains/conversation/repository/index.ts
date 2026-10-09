@@ -34,7 +34,7 @@ export function recordAnswerDelivery(
 		// An accepted answer-wide decision is stable. A fallback may be retried on replay.
 		if (
 			previous.version === 2 &&
-			(previous.source === "laya" || parsed.source !== "laya")
+			(previous.source !== "fallback" || parsed.source === "fallback")
 		)
 			return false;
 	}

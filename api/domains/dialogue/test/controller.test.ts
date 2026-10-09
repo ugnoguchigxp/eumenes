@@ -41,7 +41,12 @@ test("dialogue controller validates requests and delegates one run", async () =>
 		const conversation = createConversationService(store);
 		const queue = createQueue(store);
 		queue.start();
-		const dialogue = createDialogueService(store, conversation, larm, queue);
+		const dialogue = createDialogueService({
+			store,
+			conversation,
+			larm,
+			queue,
+		});
 		const app = new Hono();
 		registerDialogue(app, dialogue);
 		const invalid = await app.request("/api/runs", {

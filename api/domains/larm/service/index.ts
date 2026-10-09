@@ -1,3 +1,4 @@
+import { readBounded } from "../../../infrastructure/bounded-read";
 import { getLogger } from "../../../infrastructure/logger";
 const log = getLogger("larm");
 import { readChatResponse } from "../../../infrastructure/chat-stream";
@@ -7,159 +8,34 @@ import type {
 	LarmStatus,
 	LarmCallOptions,
 } from "../contracts";
+import {
+	auxiliaryProfile,
+	gemmaProfile,
+	type Fetcher,
+	type Lease,
+	type Provider,
+	type ProviderName,
+} from "./profiles";
+import { assertRuriQuestions, decodeSpeechCredit, fitContext } from "./context";
+import {
+	awaitReady,
+	renewProviders,
+	claimProviders,
+	createConnection,
+	fetchCatalog,
+} from "./connect";
+import {
+	localEndpoint,
+	readJson,
+	record,
+	string,
+	untilAborted,
+	wait,
+} from "./guards";
 import { LarmInferenceError, providerError } from "./inference-error";
 import { ttsVoicesSchema } from "../contracts";
 import type { TtsVoices } from "../contracts";
 
-type ProviderName = Capability | "system-one";
-type Provider = {
-	name: ProviderName;
-	baseUrl: string;
-	model: string;
-	protocol: string;
-	token: string;
-	contextWindow?: {
-		maxTokens: number;
-		outputReserveTokens: number;
-		safetyMarginTokens: number;
-	};
-	voice?: string;
-};
-type Lease = {
-	id: string;
-	expiresAt: number;
-	providers: Map<ProviderName, Provider>;
-	agentProfile: string;
-	useCount: number;
-	closing: boolean;
-	renewTimer?: ReturnType<typeof setTimeout>;
-	idleTimer?: ReturnType<typeof setTimeout>;
-	idleAt: number;
-};
-const gemmaProfile = "SAAA-gemma4-26b";
-const auxiliaryProfile = "SAAA-gemma4-26b-64k";
-const gemmaAgentProfile = "saaa-conversation-gemma4-26b-voice";
-const gemmaContext = {
-	maxTokens: 262144,
-	outputReserveTokens: 4096,
-	safetyMarginTokens: 1976,
-};
-const protocols: Record<ProviderName, string> = {
-	llm: "openai.chat-completions.v1",
-	asr: "openai.audio-transcriptions.v1",
-	tts: "openai.audio-speech.v1",
-	"system-one": "larm.system-one.v1",
-};
-const endpoints: Record<ProviderName, string> = {
-	llm: "/v1/chat/completions",
-	asr: "/v1/audio/transcriptions",
-	tts: "/v1/audio/speech",
-	"system-one": "/v1/systemone",
-};
-const wait = (ms: number, signal: AbortSignal) =>
-	new Promise<void>((resolve, reject) => {
-		signal.throwIfAborted();
-		const abort = () => {
-			clearTimeout(timer);
-			reject(signal.reason);
-		};
-		const timer = setTimeout(() => {
-			signal.removeEventListener("abort", abort);
-			resolve();
-		}, ms);
-		signal.addEventListener("abort", abort, { once: true });
-	});
-async function untilAborted<T>(
-	task: Promise<T>,
-	signal: AbortSignal,
-): Promise<T> {
-	signal.throwIfAborted();
-	let abort: () => void = () => {};
-	try {
-		return await Promise.race([
-			task,
-			new Promise<never>((_, reject) => {
-				abort = () => reject(signal.reason);
-				signal.addEventListener("abort", abort, { once: true });
-			}),
-		]);
-	} finally {
-		signal.removeEventListener("abort", abort);
-	}
-}
-async function readBounded(
-	response: Response,
-	limit: number,
-): Promise<Uint8Array> {
-	if (!response.body) throw new Error("larm_empty_response");
-	const reader = response.body.getReader();
-	const chunks: Uint8Array[] = [];
-	let size = 0;
-	try {
-		for (;;) {
-			const { value, done } = await reader.read();
-			if (done) break;
-			size += value.byteLength;
-			if (size > limit) throw new Error("larm_response_too_large");
-			chunks.push(value);
-		}
-	} catch (error) {
-		await reader.cancel().catch(() => {});
-		throw error;
-	} finally {
-		reader.releaseLock();
-	}
-	const bytes = new Uint8Array(size);
-	let offset = 0;
-	for (const chunk of chunks) {
-		bytes.set(chunk, offset);
-		offset += chunk.byteLength;
-	}
-	return bytes;
-}
-async function readJson(response: Response): Promise<unknown> {
-	const bytes = await readBounded(response, 1_000_000);
-	try {
-		return JSON.parse(new TextDecoder().decode(bytes));
-	} catch {
-		throw new Error("larm_invalid_json");
-	}
-}
-function record(value: unknown): Record<string, unknown> {
-	if (!value || typeof value !== "object" || Array.isArray(value))
-		throw new Error("larm_invalid_contract");
-	return value as Record<string, unknown>;
-}
-function string(value: unknown): string {
-	if (typeof value !== "string" || !value || value.length > 4096)
-		throw new Error("larm_invalid_contract");
-	return value;
-}
-function localEndpoint(value: string): URL {
-	const url = new URL(value);
-	if (
-		!(
-			["http:", "https:"].includes(url.protocol) &&
-			!url.username &&
-			!url.password &&
-			!url.search &&
-			!url.hash &&
-			(url.hostname === "localhost" ||
-				url.hostname.endsWith(".local") ||
-				(/^(?:\d{1,3}\.){3}\d{1,3}$/.test(url.hostname) &&
-					url.hostname.split(".").every((part) => Number(part) <= 255) &&
-					/^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(
-						url.hostname,
-					)))
-		)
-	)
-		throw new Error("larm_nonlocal_endpoint");
-	return url;
-}
-type Fetcher = (
-	input: RequestInfo | URL,
-	init?: RequestInit,
-) => Promise<Response>;
 export function createLarm(config: {
 	baseUrl?: string;
 	token?: string;
@@ -372,96 +248,10 @@ export function createLarm(config: {
 			await wait(1000, lifetime.signal);
 		if (current.useCount > 0) throw new Error("larm_renew_busy");
 		try {
-			const renewed = record(
-				await readJson(
-					await scopedControl(
-						`/v1/agent-connections/${current.id}/renew`,
-						{
-							method: "POST",
-							headers: {
-								"content-type": "application/json",
-								"Idempotency-Key": crypto.randomUUID(),
-							},
-							body: JSON.stringify({ ttlSeconds: 900 }),
-						},
-						[200, 201],
-					),
-				),
+			const { providers: next, expiresAt: nextExpiry } = await renewProviders(
+				scopedControl,
+				current,
 			);
-			if (renewed.id !== current.id || renewed.status !== "ready")
-				throw new Error("larm_renew_invalid");
-			const claimed = record(
-				await readJson(
-					await scopedControl(
-						`/v1/agent-connections/${current.id}/claim`,
-						{
-							method: "POST",
-							headers: { "content-type": "application/json" },
-							body: JSON.stringify({ format: "openai-provider-v1" }),
-						},
-						[200],
-					),
-				),
-			);
-			if (
-				claimed.id !== current.id ||
-				claimed.status !== "ready" ||
-				!Array.isArray(claimed.providers)
-			)
-				throw new Error("larm_invalid_claim");
-			const nextExpiry = Date.parse(string(claimed.expiresAt));
-			if (!Number.isFinite(nextExpiry) || nextExpiry <= Date.now() + 180_000)
-				throw new Error("larm_renew_expired");
-			const next = new Map<ProviderName, Provider>();
-			for (const [name, previous] of current.providers) {
-				const info = claimed.providers.map(record).find((p) => p.name === name);
-				if (name === "system-one") {
-					try {
-						if (
-							info?.model === previous.model &&
-							info.protocol === previous.protocol
-						) {
-							const fields = record(record(info.configuration).fields);
-							const baseUrl = string(fields.daemonURL);
-							localEndpoint(baseUrl);
-							if (baseUrl === info.baseUrl && fields.model === previous.model)
-								next.set(name, {
-									...previous,
-									baseUrl,
-									token: string(record(info.credential).token),
-								});
-						}
-					} catch {
-						/* Optional decisions can disappear without ending speech. */
-					}
-					continue;
-				}
-				if (
-					!info ||
-					info.model !== previous.model ||
-					info.protocol !== previous.protocol
-				)
-					throw new Error("larm_renew_claim_mismatch");
-				const fields = record(record(info.configuration).fields);
-				const baseUrl = string(fields.baseURL);
-				localEndpoint(baseUrl);
-				if (baseUrl !== info.baseUrl || fields.model !== previous.model)
-					throw new Error("larm_renew_claim_mismatch");
-				const contextWindow =
-					name === "llm" ? record(info.contextWindow) : undefined;
-				if (
-					name === "llm" &&
-					Object.entries(previous.contextWindow ?? {}).some(
-						([key, value]) => contextWindow?.[key] !== value,
-					)
-				)
-					throw new Error("larm_renew_context_changed");
-				next.set(name, {
-					...previous,
-					baseUrl,
-					token: string(record(info.credential).token),
-				});
-			}
 			if (current.closing || lease !== current)
 				throw new Error("larm_connection_released");
 			current.providers = next;
@@ -549,251 +339,32 @@ export function createLarm(config: {
 				if (current.useCount > 0) throw new Error("larm_connection_busy");
 				await release(current);
 			}
-			const catalog = record(
-				await readJson(
-					await scopedControl(
-						`/v3/agent-profiles?profile=${encodeURIComponent(profile)}`,
-						{ method: "GET" },
-						[200],
-					),
-				),
-			);
-			if (
-				catalog.contractVersion !== "agent-connection.v3" ||
-				catalog.requestedProfile !== profile ||
-				!Array.isArray(catalog.profiles) ||
-				catalog.profiles.length !== 1
-			)
-				throw new Error("larm_catalog_invalid");
-			const catalogRevision = string(catalog.catalogRevision);
-			const catalogProfile = record(catalog.profiles[0]);
-			if (profile === gemmaProfile && catalogProfile.id !== gemmaAgentProfile)
-				throw new Error("larm_gemma_agent_profile_mismatch");
-			const catalogProviders = Array.isArray(catalogProfile.providers)
-				? catalogProfile.providers.map(record)
-				: [];
-			for (const name of required) {
-				const provider = catalogProviders.find((item) => item.name === name);
-				if (
-					!provider ||
-					provider.protocol !== protocols[name] ||
-					provider.endpoint !== endpoints[name] ||
-					!provider.model
-				)
-					throw new Error("larm_catalog_provider_missing");
-			}
-			if (profile === gemmaProfile) {
-				const llm = catalogProviders.find((p) => p.name === "llm");
-				const context = record(llm?.contextWindow);
-				if (
-					llm?.model !== "gemma4-26b-a4b" ||
-					Object.entries(gemmaContext).some(
-						([key, value]) => context[key] !== value,
-					)
-				)
-					throw new Error("larm_gemma_contract_mismatch");
-			}
+			const { catalogRevision, catalogProfile, catalogProviders } =
+				await fetchCatalog(scopedControl, profile, required);
 			const fullProfile = required.some((name) => name !== "llm");
-			const createdResponse = await scopedControl(
-				"/v1/agent-connections",
-				{
-					method: "POST",
-					headers: {
-						"content-type": "application/json",
-						"Idempotency-Key": crypto.randomUUID(),
-						Prefer: "wait=1",
-					},
-					body: JSON.stringify({
-						profile,
-						client,
-						audience,
-						ttlSeconds: 900,
-						allowFallback: false,
-						deploymentPolicy: "existing-only",
-						...(fullProfile ? {} : { providers: ["llm"] }),
-						expectedCatalogRevision: catalogRevision,
-					}),
-				},
-				[201, 202],
-			);
-			let created = record(await readJson(createdResponse));
-			const id = string(created.id);
-			if (!/^[A-Za-z0-9_-]{1,160}$/.test(id))
-				throw new Error("larm_invalid_connection_id");
+			const { id, created } = await createConnection(scopedControl, {
+				profile,
+				client,
+				audience,
+				fullProfile,
+				catalogRevision,
+			});
 			try {
-				if (["failed", "expired", "released"].includes(String(created.status)))
-					throw new Error(`larm_connection_${created.status}`);
-				// Profile switching can report connection ready before its providers are claimable.
-				const providersPending = () => {
-					const providers = Array.isArray(created.providers)
-						? created.providers.map(record)
-						: [];
-					return required.some((name) => {
-						const provider = providers.find((p) => p.name === name);
-						return (
-							provider &&
-							(provider.readiness !== "ready" || provider.claimable !== true)
-						);
-					});
-				};
-				for (
-					let attempt = 0;
-					created.status !== "ready" || providersPending();
-					attempt++
-				) {
-					if (attempt >= 60) throw new Error("larm_capacity_timeout");
-					await pause(1000);
-					created = record(
-						await readJson(
-							await scopedControl(
-								`/v1/agent-connections/${id}`,
-								{ method: "GET" },
-								[200],
-							),
-						),
-					);
-					if (
-						["failed", "expired", "released"].includes(String(created.status))
-					)
-						throw new Error(`larm_connection_${created.status}`);
-				}
-				if (
-					created.id !== id ||
-					created.profile !== profile ||
-					created.agentProfile !== catalogProfile.id ||
-					!Array.isArray(created.providers)
-				)
-					throw new Error("larm_invalid_connection");
-				for (const name of required) {
-					const p = created.providers.map(record).find((p) => p.name === name);
-					if (
-						!p ||
-						p.protocol !== protocols[name] ||
-						p.endpoint !== endpoints[name] ||
-						p.claimable !== true ||
-						p.readiness !== "ready"
-					)
-						throw new Error("larm_provider_not_ready");
-				}
-				const claimed = record(
-					await readJson(
-						await scopedControl(
-							`/v1/agent-connections/${id}/claim`,
-							{
-								method: "POST",
-								headers: { "content-type": "application/json" },
-								body: JSON.stringify({ format: "openai-provider-v1" }),
-							},
-							[200],
-						),
-					),
-				);
-				if (
-					claimed.id !== id ||
-					claimed.status !== "ready" ||
-					!Array.isArray(claimed.providers)
-				)
-					throw new Error("larm_invalid_claim");
-				const expiresAt = Date.parse(string(claimed.expiresAt));
-				if (!Number.isFinite(expiresAt) || expiresAt < Date.now() + 30_000)
-					throw new Error("larm_expired");
-				const providers = new Map<ProviderName, Provider>();
-				for (const name of required) {
-					const info = claimed.providers
-						.map(record)
-						.find((p) => p.name === name);
-					const announced = created.providers
-						.map(record)
-						.find((p) => p.name === name);
-					const declared = catalogProviders.find((p) => p.name === name);
-					if (
-						!info ||
-						info.protocol !== protocols[name] ||
-						info.model !== announced?.model ||
-						info.model !== declared?.model
-					)
-						throw new Error("larm_claim_mismatch");
-					const credential = record(info.credential);
-					const configuration = record(record(info.configuration).fields);
-					const baseUrl = string(configuration.baseURL);
-					localEndpoint(baseUrl);
-					if (
-						configuration.baseURL !== baseUrl ||
-						configuration.model !== info.model
-					)
-						throw new Error("larm_claim_configuration_mismatch");
-					const contextWindow =
-						name === "llm" ? record(info.contextWindow) : undefined;
-					if (
-						contextWindow &&
-						!["maxTokens", "outputReserveTokens", "safetyMarginTokens"].every(
-							(key) =>
-								Number.isInteger(contextWindow[key]) &&
-								Number(contextWindow[key]) > 0,
-						)
-					)
-						throw new Error("larm_invalid_context_window");
-					if (
-						name === "llm" &&
-						profile === gemmaProfile &&
-						Object.entries(gemmaContext).some(
-							([key, value]) => contextWindow?.[key] !== value,
-						)
-					)
-						throw new Error("larm_gemma_contract_mismatch");
-					providers.set(name, {
-						name,
-						baseUrl,
-						model: string(info.model),
-						protocol: string(info.protocol),
-						token: string(credential.token),
-						contextWindow: contextWindow as Provider["contextWindow"],
-						voice:
-							typeof configuration.voice === "string"
-								? configuration.voice
-								: undefined,
-					});
-				}
-				// Optional decisions never make the speech providers unusable.
-				const declaredDecision = catalogProviders.find(
-					(p) => p.name === "system-one",
-				);
-				if (
-					fullProfile &&
-					declaredDecision?.capability === "decision.system-one" &&
-					declaredDecision.protocol === protocols["system-one"] &&
-					declaredDecision.endpoint === endpoints["system-one"]
-				) {
-					try {
-						const announced = created.providers
-							.map(record)
-							.find((p) => p.name === "system-one");
-						const info = claimed.providers
-							.map(record)
-							.find((p) => p.name === "system-one");
-						if (
-							announced?.claimable === true &&
-							announced.readiness === "ready" &&
-							info?.protocol === protocols["system-one"] &&
-							info.model === declaredDecision.model &&
-							info.model === announced.model
-						) {
-							const fields = record(record(info.configuration).fields);
-							const baseUrl = string(fields.daemonURL);
-							localEndpoint(baseUrl);
-							if (baseUrl === info.baseUrl && fields.model === info.model)
-								providers.set("system-one", {
-									name: "system-one",
-									baseUrl,
-									model: string(info.model),
-									protocol: string(info.protocol),
-									token: string(record(info.credential).token),
-								});
-						}
-					} catch {
-						/* Malformed optional provider falls back to normal speech. */
-					}
-				}
+				const ready = await awaitReady(scopedControl, pause, {
+					id,
+					created,
+					required,
+					profile,
+					agentProfile: catalogProfile.id,
+				});
+				const { expiresAt, providers } = await claimProviders(scopedControl, {
+					id,
+					created: ready,
+					required,
+					profile,
+					catalogProviders,
+					fullProfile,
+				});
 				const current: Lease = {
 					id,
 					expiresAt,
@@ -992,21 +563,10 @@ export function createLarm(config: {
 			throw new LarmInferenceError(response.status, details.errorCode);
 		}
 		try {
-			let speechCredit: string | undefined;
-			const encodedCredit = response.headers.get("X-VOICEVOX-Credit");
-			if (
-				operation === "audio/speech" &&
-				encodedCredit?.startsWith("UTF-8''")
-			) {
-				try {
-					speechCredit = decodeURIComponent(encodedCredit.slice(7)).slice(
-						0,
-						2048,
-					);
-				} catch {
-					/* Invalid optional credit does not invalidate audio. */
-				}
-			}
+			const speechCredit =
+				operation === "audio/speech"
+					? decodeSpeechCredit(response.headers.get("X-VOICEVOX-Credit"))
+					: undefined;
 			await options?.onExchange?.({
 				connectionId,
 				model: provider.model,
@@ -1031,18 +591,7 @@ export function createLarm(config: {
 		return withProvider("llm", signal, async (p, connectionId) => {
 			const window = p.contextWindow;
 			if (!window) throw new Error("larm_missing_context_window");
-			const budget =
-				window.maxTokens -
-				window.outputReserveTokens -
-				window.safetyMarginTokens;
-			if (budget <= 0) throw new Error("larm_invalid_context_window");
-			const selected = [...messages];
-			const estimate = (items: typeof messages) =>
-				new TextEncoder().encode(JSON.stringify(items)).length;
-			while (selected.length > 2 && estimate(selected) > budget)
-				selected.splice(1, Math.min(2, selected.length - 2));
-			if (estimate(selected) > budget)
-				throw new Error("context_window_exceeded");
+			const selected = fitContext(messages, window);
 			const response = await infer(
 				p,
 				"chat/completions",
@@ -1087,6 +636,7 @@ export function createLarm(config: {
 	}
 
 	return {
+		decisionModel: () => lease?.providers.get("system-one")?.model ?? null,
 		async judge(state, questions, signal) {
 			if (judging) throw new Error("larm_decision_busy");
 			judging = true;
@@ -1096,6 +646,12 @@ export function createLarm(config: {
 					"system-one",
 					scoped,
 					async (p, connectionId) => {
+						const ruri = p.model === "ruri-v3-30m-speaking-attitude";
+						if (ruri) assertRuriQuestions(questions);
+						const { current_chunk, ...legacyState } = state;
+						const sentState = ruri
+							? { current_chunk: current_chunk ?? state.response ?? "" }
+							: legacyState;
 						const response = await infer(
 							p,
 							"systemone",
@@ -1105,14 +661,23 @@ export function createLarm(config: {
 									"content-type": "application/json",
 									accept: "application/json",
 								},
-								body: JSON.stringify({ model: p.model, state, questions }),
+								body: JSON.stringify({
+									model: p.model,
+									state: sentState,
+									questions,
+								}),
 							},
 							scoped,
 							connectionId,
 						);
 						const result = await readJson(response);
 						scoped.throwIfAborted();
-						return result;
+						if (!result || typeof result !== "object" || Array.isArray(result))
+							throw new Error("larm_invalid_decision_response");
+						const body = result as Record<string, unknown>;
+						if (body.model !== undefined && body.model !== p.model)
+							throw new Error("larm_decision_model_mismatch");
+						return { ...body, claimed_model: p.model };
 					},
 				);
 			} finally {
@@ -1128,6 +693,7 @@ export function createLarm(config: {
 		inspect() {
 			return {
 				profile,
+				decisionModel: lease?.providers.get("system-one")?.model ?? null,
 				...(lease ? { connectionId: lease.id } : {}),
 				providers: lease
 					? [...lease.providers.values()]
@@ -1309,7 +875,11 @@ export function createLarm(config: {
 					connectionId,
 					{ ...options, speechVoice: selectedVoice },
 				);
-				const bytes = await readBounded(response, 16_000_000);
+				const bytes = await readBounded(response.body, {
+					limit: 16_000_000,
+					tooLarge: "larm_response_too_large",
+					missing: "larm_empty_response",
+				});
 				if (
 					bytes.length < 44 ||
 					String.fromCharCode(...bytes.subarray(0, 4)) !== "RIFF" ||

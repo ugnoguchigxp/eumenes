@@ -1,4 +1,10 @@
 export const domains = {
+	"attitude-dataset": {
+		backend: "api/domains/attitude-dataset",
+		web: null,
+		components: null,
+		depends: ["delivery"],
+	},
 	"service-tests": {
 		backend: "api/domains/service-tests",
 		web: "web/src/domains/service-tests",
@@ -27,7 +33,7 @@ export const domains = {
 		backend: "api/domains/inference",
 		web: null,
 		components: null,
-		depends: ["settings", "larm", "delivery"],
+		depends: ["settings", "larm", "delivery", "attitude-dataset"],
 	},
 	"tts-dictionary": {
 		backend: "api/domains/tts-dictionary",

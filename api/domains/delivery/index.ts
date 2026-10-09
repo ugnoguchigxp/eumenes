@@ -19,3 +19,9 @@ export {
 	type AvatarMotion,
 	type ChoiceQuestions,
 } from "./contracts";
+export {
+	decisionDetails,
+	RURI_MODEL,
+	type DecisionDetails,
+} from "./service/result";
+export type { Judge } from "./service";

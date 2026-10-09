@@ -1,0 +1,33 @@
+{
+	"started": "2026-10-08T01:26:13.990Z",
+	"exchanges": [
+		{
+			"connectionId": "aconn_epoch-e1e5c2a7-0bf0-4635-ab6b-1d315b840fb7_ac2e05d0-74de-4070-9032-89d6829d4e90",
+			"model": "gemma4-26b-a4b",
+			"started": 1791422774414,
+			"httpStatus": 200
+		},
+		{
+			"connectionId": "aconn_epoch-e1e5c2a7-0bf0-4635-ab6b-1d315b840fb7_ac2e05d0-74de-4070-9032-89d6829d4e90",
+			"model": "gemma4-26b-a4b",
+			"started": 1791422778608,
+			"httpStatus": 401,
+			"errorCode": "unauthorized",
+			"errorMessage": "provider bearer token is no longer valid"
+		},
+		{
+			"connectionId": "aconn_epoch-e1e5c2a7-0bf0-4635-ab6b-1d315b840fb7_cbf8010a-e9b2-44a2-8b5a-124df38918b6",
+			"model": "gemma4-26b-a4b",
+			"started": 1791422778648,
+			"httpStatus": 200
+		}
+	],
+	"first": "承知しました。",
+	"originalId": "aconn_epoch-e1e5c2a7-0bf0-4635-ab6b-1d315b840fb7_ac2e05d0-74de-4070-9032-89d6829d4e90",
+	"releaseStatus": 204,
+	"oldState": "released",
+	"second": "承知しました。",
+	"deltas": 4,
+	"replacementId": "aconn_epoch-e1e5c2a7-0bf0-4635-ab6b-1d315b840fb7_cbf8010a-e9b2-44a2-8b5a-124df38918b6",
+	"finished": "2026-10-08T01:26:21.431Z"
+}

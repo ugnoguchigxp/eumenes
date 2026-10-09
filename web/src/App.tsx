@@ -33,6 +33,25 @@ import {
 import { useReplay, useVoiceDialogue } from "./domains/voice-dialogue";
 import { ServiceTestsPanel } from "./domains/service-tests";
 import { SettingsPage, useSettings, useVoiceMute } from "./domains/settings";
+import { changeRoots, queryRoots } from "./queryKeys";
+import {
+	describeConnectionState,
+	describeError,
+	describeTurnStatus,
+} from "./errorMessages";
+
+function MicLevelMeter({ store }: { store: AudioStore }) {
+	const level = useStore(store, (state) => state.level);
+	return (
+		<meter
+			className="level"
+			aria-label="マイク音量"
+			min={0}
+			max={100}
+			value={Math.min(100, level * 800)}
+		/>
+	);
+}
 
 function Workspace({
 	client,
@@ -54,7 +73,7 @@ function Workspace({
 	const artifacts = useArtifactWorkspace();
 	const settings = useSettings(client);
 	const usage = useQuery({
-		queryKey: ["inference-usage", client.identity],
+		queryKey: [queryRoots.inferenceUsage, client.identity],
 		queryFn: () => client.inferenceUsage(),
 		retry: 0,
 	});
@@ -102,7 +121,10 @@ function Workspace({
 		undefined,
 		settings.data?.voice,
 	);
-	const replay = useReplay(client, settings.data?.voice.outputVolume);
+	const replay = useReplay(client, settings.data?.voice, {
+		sessionAudio: voice.audio,
+		interruptLive: voice.interrupt,
+	});
 	const mute = useVoiceMute(client);
 	const automaticInput = input.dictated && voice.active;
 	const recognitionId = voice.recognitionId;
@@ -135,7 +157,6 @@ function Workspace({
 		if (revoked) void voice.stop();
 	}, [settings.data, voice]);
 	const phase = useStore(store, (state) => state.phase);
-	const level = useStore(store, (state) => state.level);
 	const audioError = useStore(store, (state) => state.error);
 	const cache = useQueryClient();
 	const changesState = useSyncExternalStore(
@@ -148,8 +169,8 @@ function Workspace({
 			if (document.visibilityState !== "visible") return;
 			clearTimeout(pending);
 			pending = setTimeout(() => {
+				// Queries refetch through refetchOnWindowFocus; only the stream needs a nudge.
 				client.reconnectChanges();
-				void cache.invalidateQueries();
 			}, 100);
 		};
 		window.addEventListener("focus", resume);
@@ -159,16 +180,21 @@ function Workspace({
 			window.removeEventListener("focus", resume);
 			document.removeEventListener("visibilitychange", resume);
 		};
-	}, [client, cache]);
+	}, [client]);
 	useEffect(
 		() =>
-			client.subscribeChanges(() => {
-				void cache.invalidateQueries();
+			client.subscribeChanges((kind) => {
+				if (kind === "reset") {
+					void cache.invalidateQueries();
+					return;
+				}
+				for (const root of changeRoots)
+					void cache.invalidateQueries({ queryKey: [root] });
 			}),
 		[client, cache],
 	);
 	const status = useQuery({
-		queryKey: ["larm", client.identity],
+		queryKey: [queryRoots.larm, client.identity],
 		queryFn: () => client.status(),
 		retry: 0,
 	});
@@ -176,7 +202,7 @@ function Workspace({
 		mutationFn: () => client.connectLarm(),
 		retry: false,
 		onSuccess: (data) => {
-			cache.setQueryData(["larm", client.identity], data);
+			cache.setQueryData([queryRoots.larm, client.identity], data);
 			client.reconnectChanges();
 			void cache.invalidateQueries();
 		},
@@ -305,11 +331,13 @@ function Workspace({
 						<span
 							className="connection-health"
 							data-state={connectionState}
-							aria-label={`LARMの接続状態: ${connectionState}`}
+							aria-label={`LARMの接続状態: ${describeConnectionState(connectionState)}`}
 						>
 							<i className="health-dot" aria-hidden="true" />
 							<span>LARM</span>
-							<span className="health-state">{connectionState}</span>
+							<span className="health-state">
+								{describeConnectionState(connectionState)}
+							</span>
 						</span>
 						<span className="model-label">
 							{actualModel?.source === "cloud" && "クラウド / "}
@@ -432,7 +460,9 @@ function Workspace({
 										type="button"
 										variant={voice.active ? "destructive" : "secondary"}
 										onClick={() =>
-											void (voice.active ? voice.stop() : voice.start())
+											void (voice.active
+												? voice.stop()
+												: (replay.stop(), voice.start()))
 										}
 										disabled={!voice.active && phase !== "idle"}
 										aria-label={voice.active ? "停止" : "音声を開始"}
@@ -473,13 +503,7 @@ function Workspace({
 											)}
 										</svg>
 									</Button>
-									<meter
-										className="level"
-										aria-label="マイク音量"
-										min={0}
-										max={100}
-										value={Math.min(100, level * 800)}
-									/>
+									<MicLevelMeter store={store} />
 								</div>
 								<Textarea
 									aria-label="メッセージ"
@@ -509,8 +533,9 @@ function Workspace({
 							</div>
 							<div className="composer-meta">
 								<span>
-									{voice.turn?.status ??
-										(voice.active ? "音声を待機中" : "待機中")}
+									{(voice.turn?.status
+										? describeTurnStatus(voice.turn.status)
+										: null) ?? (voice.active ? "音声を待機中" : "待機中")}
 								</span>
 								<span className="composer-shortcut">
 									{automaticInput
@@ -522,8 +547,9 @@ function Workspace({
 						{(submit.isError || voice.error || audioError) && (
 							<p className="chat-error" role="alert">
 								{submit.isError
-									? `送信できませんでした: ${String(submit.error)}`
-									: voice.error || audioError}
+									? `送信できませんでした: ${describeError(submit.error)}`
+									: voice.error ||
+										(audioError ? describeError(audioError) : null)}
 							</p>
 						)}
 						{latestRun?.status === "failed" && (

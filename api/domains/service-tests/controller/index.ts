@@ -1,29 +1,13 @@
+import { readBounded } from "../../../infrastructure/bounded-read";
 import type { Hono } from "hono";
 import type { ServiceTests } from "../service";
 import { startSchema } from "../contracts";
-async function bounded(request: Request, limit: number) {
-	const reader = request.body?.getReader();
-	if (!reader) throw new Error("invalid_body");
-	const chunks: Uint8Array[] = [];
-	let n = 0;
-	try {
-		for (;;) {
-			const c = await reader.read();
-			if (c.done) break;
-			n += c.value.length;
-			if (n > limit) throw new Error("invalid_body_size");
-			chunks.push(c.value);
-		}
-	} finally {
-		await reader.cancel().catch(() => {});
-	}
-	const result = new Uint8Array(n);
-	let at = 0;
-	for (const b of chunks) {
-		result.set(b, at);
-		at += b.length;
-	}
-	return result;
+function bounded(request: Request, limit: number) {
+	return readBounded(request.body, {
+		limit,
+		tooLarge: "invalid_body_size",
+		missing: "invalid_body",
+	});
 }
 export function registerServiceTests(app: Hono, s: ServiceTests) {
 	app.get("/api/service-tests/catalog", (c) => c.json(s.catalog()));

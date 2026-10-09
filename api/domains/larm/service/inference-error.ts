@@ -1,3 +1,4 @@
+import { readBounded } from "../../../infrastructure/bounded-read";
 export class LarmInferenceError extends Error {
 	constructor(
 		public status: number,
@@ -13,27 +14,14 @@ export async function providerError(
 	signal: AbortSignal,
 	secrets: string[],
 ): Promise<{ errorCode?: string; errorMessage?: string }> {
-	const reader = response.body?.getReader();
-	if (!reader) return {};
-	const abort = () => {
-		void reader.cancel().catch(() => {});
-	};
-	const deadline = AbortSignal.any([signal, AbortSignal.timeout(3000)]);
-	deadline.addEventListener("abort", abort, { once: true });
-	let text = "",
-		size = 0;
-	const decoder = new TextDecoder();
 	try {
-		deadline.throwIfAborted();
-		for (;;) {
-			const { done, value } = await reader.read();
-			deadline.throwIfAborted();
-			if (done) break;
-			size += value.byteLength;
-			if (size > 16384) return {};
-			text += decoder.decode(value, { stream: true });
-		}
-		const error = JSON.parse(text + decoder.decode())?.error;
+		const bytes = await readBounded(response.body, {
+			limit: 16384,
+			tooLarge: "provider_error_too_large",
+			missing: "invalid_provider_response",
+			signal: AbortSignal.any([signal, AbortSignal.timeout(3000)]),
+		});
+		const error = JSON.parse(new TextDecoder().decode(bytes))?.error;
 		const errorCode =
 			typeof error?.code === "string" &&
 			/^[a-z][a-z0-9_]{0,100}$/.test(error.code)
@@ -55,9 +43,5 @@ export async function providerError(
 		return { errorCode, errorMessage };
 	} catch {
 		return {};
-	} finally {
-		deadline.removeEventListener("abort", abort);
-		await reader.cancel().catch(() => {});
-		reader.releaseLock();
 	}
 }

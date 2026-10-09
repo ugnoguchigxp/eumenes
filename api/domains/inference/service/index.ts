@@ -1,26 +1,12 @@
-import { getLogger } from "../../../infrastructure/logger";
-const log = getLogger("inference");
-import { readChatResponse } from "../../../infrastructure/chat-stream";
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
-import {
-	createLarm,
-	type LarmPort,
-	type LarmExchange,
-	type LarmCallOptions,
-} from "../../larm";
-import {
-	chooseSpeechDelivery,
-	speechParameters,
-	type SpeechDelivery,
-	type SpeechPreparation,
-} from "../../delivery";
+import { createLarm, type LarmPort, type LarmExchange } from "../../larm";
+import type { SpeechPreparation } from "../../delivery/contracts";
 import type {
 	SettingsService,
 	Settings,
 	Purpose,
 	Connection,
-	Resource,
 } from "../../settings";
 import type {
 	InferencePort,
@@ -29,6 +15,15 @@ import type {
 	SpeechOverride,
 } from "../contracts";
 import { get, type RequestRow } from "../repository";
+import {
+	executeRequest as runRequest,
+	type CollectionAdoption,
+	type Env,
+	type InferenceOptions,
+	type Running,
+} from "./execute";
+import { probeWav } from "./wav";
+import { safeError } from "./errors";
 type UsageRow = {
 	id: string;
 	requestId: string;
@@ -45,90 +40,32 @@ type UsageRow = {
 	outputTokens: number | null;
 	providerDetails: string;
 };
-const fallbackErrors =
-	/^(larm_unconfigured|larm_(control|inference)_(429|502|503|504)|larm_connection_(failed|expired)|larm_expired|larm_credential_expired|larm_renew_busy|larm_connect_timeout|network_unavailable|local_timeout)$/;
-function probeWav() {
-	const bytes = new Uint8Array(32044);
-	const view = new DataView(bytes.buffer);
-	const tag = (offset: number, text: string) =>
-		bytes.set(new TextEncoder().encode(text), offset);
-	tag(0, "RIFF");
-	view.setUint32(4, bytes.length - 8, true);
-	tag(8, "WAVE");
-	tag(12, "fmt ");
-	view.setUint32(16, 16, true);
-	view.setUint16(20, 1, true);
-	view.setUint16(22, 1, true);
-	view.setUint32(24, 16000, true);
-	view.setUint32(28, 32000, true);
-	view.setUint16(32, 2, true);
-	view.setUint16(34, 16, true);
-	tag(36, "data");
-	view.setUint32(40, 32000, true);
-	return bytes;
-}
-function safeError(error: unknown, signal: AbortSignal): string {
-	if (signal.aborted)
-		return signal.reason instanceof DOMException &&
-			signal.reason.name === "TimeoutError"
-			? "deadline_exceeded"
-			: "cancelled";
-	if (error instanceof DOMException && error.name === "TimeoutError")
-		return "local_timeout";
-	if (error instanceof TypeError) return "network_unavailable";
-	const message = error instanceof Error ? error.message : "inference_failed";
-	return /^[a-z][a-z0-9_]{0,100}$/.test(message) ? message : "inference_failed";
-}
-async function bounded(response: Response, limit: number) {
-	const reader = response.body?.getReader();
-	if (!reader) throw new Error("invalid_response");
-	const chunks: Uint8Array[] = [];
-	let length = 0;
-	for (;;) {
-		const { value, done } = await reader.read();
-		if (done) break;
-		length += value.length;
-		if (length > limit) {
-			await reader.cancel();
-			throw new Error("response_too_large");
-		}
-		chunks.push(value);
-	}
-	const bytes = new Uint8Array(length);
-	let offset = 0;
-	for (const c of chunks) {
-		bytes.set(c, offset);
-		offset += c.length;
-	}
-	return bytes;
-}
 export function createInference(
 	store: SqliteStore,
 	settings: SettingsService,
-	options: {
-		token?: string;
-		fetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
-		larmFactory?: (s: Settings) => LarmPort;
-		localMs?: number;
-		cloudMs?: number;
-		decisionMs?: number;
-		/** Rewrites text just before synthesis (e.g. pronunciation dictionary). */
-		speechText?: (text: string) => string;
-	} = {},
+	options: InferenceOptions = {},
 ) {
 	const ports = new Map<string, LarmPort>();
+	const collectionAdoptions = new Map<string, CollectionAdoption>();
+	const unsubscribeCollection = options.attitudeDataset
+		? store.onCommit(() => {
+				for (const [id, entry] of collectionAdoptions) {
+					const state = store.read((db) => get(db, id))?.status;
+					if (state === "accepted") {
+						collectionAdoptions.delete(id);
+						options.attitudeDataset!.adopt(
+							entry.identity,
+							entry.delivery,
+							entry.voice,
+						);
+					} else if (state && state !== "pending")
+						collectionAdoptions.delete(id);
+				}
+			})
+		: () => {};
 	const listeners = new Set<() => void>();
 	const statusSubscriptions = new Map<string, () => void>();
-	const active = new Map<
-		string,
-		{
-			controller: AbortController;
-			row: RequestRow;
-			connection?: Connection;
-			done: Promise<void>;
-			finish: () => void;
-		}
-	>();
+	const active = new Map<string, Running>();
 	const cooldown = new Map<string, number>();
 	const closingPorts = new Set<Promise<void>>();
 	function prune() {
@@ -214,550 +151,26 @@ export function createInference(
 		).run(id, subject, purpose, JSON.stringify(snapshot), deadline);
 		return id;
 	}
-	async function cloud(
-		row: RequestRow,
-		input: Messages | string | Uint8Array,
-		connection: Connection,
-		resource: Resource,
-		signal: AbortSignal,
-		attemptId: string,
-		onDelta?: (text: string) => void,
-	) {
-		const credential = settings.credential(connection);
-		if (!credential) throw new Error("cloud_credential_unavailable");
-		const base = new URL(
-			connection.baseUrl.endsWith("/")
-				? connection.baseUrl
-				: `${connection.baseUrl}/`,
-		);
-		const init: RequestInit = {
-			method: "POST",
-			signal,
-			redirect: "error",
-			headers: { Authorization: `Bearer ${credential}` },
-		};
-		if (row.purpose === "asr") {
-			const form = new FormData();
-			form.append(
-				"file",
-				new Blob([new Uint8Array(input as Uint8Array)], { type: "audio/wav" }),
-				"speech.wav",
-			);
-			form.append("model", resource.model);
-			form.append("response_format", "json");
-			init.body = form;
-		} else {
-			let body: unknown;
-			if (row.purpose === "tts")
-				body = {
-					model: resource.model,
-					input,
-					voice: resource.voice,
-					...((resource.speed ?? 1) !== 1 ? { speed: resource.speed } : {}),
-					response_format: "wav",
-				};
-			else {
-				const messages = [...(input as Messages)];
-				const reserve = Math.min(
-					4096,
-					Math.floor((resource.contextWindow ?? 0) / 4),
-				);
-				const budget = (resource.contextWindow ?? 0) - reserve - 512;
-				const estimate = () =>
-					new TextEncoder().encode(JSON.stringify(messages)).length +
-					messages.length * 16;
-				while (messages.length > 2 && estimate() > budget)
-					messages.splice(1, Math.min(2, messages.length - 2));
-				if (estimate() > budget) throw new Error("context_window_exceeded");
-				body = {
-					model: resource.model,
-					messages,
-					stream: !!onDelta,
-					max_tokens: reserve,
-				};
-			}
-			init.headers = { ...init.headers, "Content-Type": "application/json" };
-			init.body = JSON.stringify(body);
-		}
-		const path =
-			row.purpose === "llm"
-				? "chat/completions"
-				: row.purpose === "asr"
-					? "audio/transcriptions"
-					: "audio/speech";
-		const response = await (options.fetch ?? fetch)(new URL(path, base), init);
-		if (!response.ok) {
-			await response.body?.cancel();
-			throw new Error(`cloud_http_${response.status}`);
-		}
-		if (row.purpose === "llm") {
-			const result = await readChatResponse(response, signal, onDelta);
-			const count = (v: unknown) =>
-				typeof v === "number" && Number.isSafeInteger(v) && v >= 0 ? v : null;
-			signal.throwIfAborted();
-			await store.write((db) =>
-				db
-					.query(
-						"UPDATE inference_attempts SET input_tokens=?,output_tokens=? WHERE id=?",
-					)
-					.run(
-						count(result.usage?.prompt_tokens),
-						count(result.usage?.completion_tokens),
-						attemptId,
-					),
-			);
-			return result.text;
-		}
-
-		const bytes = await bounded(
-			response,
-			row.purpose === "tts" ? 16_000_000 : 1_000_000,
-		);
-		if (row.purpose === "tts") {
-			if (
-				bytes.length < 44 ||
-				new TextDecoder().decode(bytes.subarray(0, 4)) !== "RIFF" ||
-				new TextDecoder().decode(bytes.subarray(8, 12)) !== "WAVE"
-			)
-				throw new Error("invalid_tts_audio");
-			return bytes;
-		}
-		let json: Record<string, unknown>;
-		try {
-			json = JSON.parse(new TextDecoder().decode(bytes)) as Record<
-				string,
-				unknown
-			>;
-		} catch {
-			throw new Error("invalid_response_json");
-		}
-		const value =
-			row.purpose === "asr"
-				? json.text
-				: (
-						json.choices as
-							| Array<{ message?: { content?: unknown } }>
-							| undefined
-					)?.[0]?.message?.content;
-		if (
-			typeof value !== "string" ||
-			(!value.trim() &&
-				!(row.purpose === "asr" && row.subject.startsWith("probe:")))
-		)
-			throw new Error("invalid_response_text");
-		const usage = json.usage as
-			| { prompt_tokens?: unknown; completion_tokens?: unknown }
-			| undefined;
-		signal.throwIfAborted();
-		const count = (v: unknown) =>
-			typeof v === "number" && Number.isSafeInteger(v) && v >= 0 ? v : null;
-		await store.write((db) =>
-			db
-				.query(
-					"UPDATE inference_attempts SET input_tokens=?,output_tokens=? WHERE id=?",
-				)
-				.run(
-					count(usage?.prompt_tokens),
-					count(usage?.completion_tokens),
-					attemptId,
-				),
-		);
-		return value;
-	}
-	async function executeRequest(
+	const env: Env = {
+		store,
+		settings,
+		options,
+		active,
+		cooldown,
+		collectionAdoptions,
+		port,
+		resolve,
+		allowed,
+		prune,
+		isClosed: () => closed,
+	};
+	const executeRequest = (
 		requestId: string,
 		input: Messages | string | Uint8Array,
 		caller: AbortSignal,
 		onDelta?: (text: string) => void,
 		preparation?: SpeechPreparation,
-	): Promise<Receipt> {
-		caller.throwIfAborted();
-		if (closed) throw new Error("inference_closed");
-		const found = store.read((db) => get(db, requestId));
-		if (!found) throw new Error("inference_request_missing");
-		const row: RequestRow = found;
-		if (
-			row.purpose === "asr" &&
-			(!(input instanceof Uint8Array) ||
-				input.length < 44 ||
-				input.length > 4_000_000)
-		)
-			throw new Error("invalid_audio");
-		const route = row.snapshot.routes[row.purpose];
-		const selected = resolve(row);
-		const controller = new AbortController();
-		const deadline = Math.min(
-			row.deadline,
-			Date.now() + (row.purpose === "llm" ? 180_000 : 45_000),
-		);
-		row.deadline = deadline;
-		await store.write((db) =>
-			db
-				.query(
-					"UPDATE inference_requests SET deadline=MIN(deadline,?) WHERE id=?",
-				)
-				.run(deadline, row.id),
-		);
-		const signal = AbortSignal.any([
-			caller,
-			controller.signal,
-			AbortSignal.timeout(Math.max(1, deadline - Date.now())),
-		]);
-		if (active.has(row.id)) throw new Error("inference_request_running");
-		let finish: () => void = () => {};
-		const done = new Promise<void>((resolve) => {
-			finish = resolve;
-		});
-		const running: {
-			controller: AbortController;
-			row: RequestRow;
-			connection?: Connection;
-			done: Promise<void>;
-			finish: () => void;
-		} = { controller, row, done, finish };
-		active.set(row.id, running);
-		let reason: string | null = null;
-		let published = false;
-		const key = `${row.purpose}:${JSON.stringify({ larm: row.snapshot.larm, route, resource: selected?.resource, connection: selected?.connection })}`;
-		async function attempt(source: "larm" | "cloud") {
-			if (signal.aborted) throw new Error("cancelled");
-			const connection = source === "cloud" ? selected?.connection : undefined;
-			running.connection = connection;
-			if (!store.read((db) => allowed(db, row, connection)))
-				throw new Error("permission_revoked");
-			if (
-				source === "cloud" &&
-				(!selected || !selected.connection.enabled || !route.cloudAllowed)
-			)
-				throw new Error("cloud_fallback_unconfigured");
-			const attemptId = crypto.randomUUID();
-			const started = performance.now();
-			const logFields = {
-				inferenceId: row.id,
-				subjectId: row.subject,
-				attemptId,
-				purpose: row.purpose,
-				source,
-			};
-			await store.write((db) =>
-				db
-					.query(
-						"INSERT INTO inference_attempts(id,request_id,source,connection_id,resource_id,model,status,reason,started) VALUES(?,?,?,?,?,?,'running',?,?)",
-					)
-					.run(
-						attemptId,
-						row.id,
-						source,
-						connection?.id ?? null,
-						source === "cloud" ? (selected?.resource.id ?? null) : null,
-						source === "cloud"
-							? (selected?.resource.model ?? null)
-							: row.snapshot.larm.profile,
-						reason,
-						Date.now(),
-					),
-			);
-			log.info("inference.attempt_started", {
-				...logFields,
-				reason: reason ?? undefined,
-			});
-			const exchanges: LarmExchange[] = [];
-			const callOptions: LarmCallOptions = {
-				...(row.purpose === "tts" && row.snapshot.larm.autoIntonation
-					? speechAdjustment(
-							input as string,
-							row.snapshot.larm,
-							row.snapshot.larm.autoStrength ?? 1,
-						)
-					: {}),
-				onExchange: async (exchange: LarmExchange) => {
-					// A call can use the old lease and one replacement. Keep both for correlation.
-					if (exchanges.length >= 2) return;
-					exchanges.push(exchange);
-					await store.write((db) =>
-						db
-							.query(
-								"UPDATE inference_attempts SET provider_details=?,model=? WHERE id=?",
-							)
-							.run(JSON.stringify(exchanges), exchange.model, attemptId),
-					);
-				},
-			};
-			const abort = new AbortController();
-			const configuredDuration =
-				source === "cloud"
-					? (options.cloudMs ?? (row.purpose === "llm" ? 60_000 : 30_000))
-					: (options.localMs ?? (row.purpose === "llm" ? 120_000 : 15_000));
-			const remaining = Math.max(0, deadline - Date.now());
-			const reserve =
-				source === "larm" &&
-				route.mode === "larm-preferred" &&
-				selected?.connection.enabled &&
-				route.cloudAllowed
-					? Math.min(
-							options.cloudMs ?? (row.purpose === "llm" ? 60_000 : 30_000),
-							remaining,
-						)
-					: 0;
-			const duration = Math.min(
-				configuredDuration,
-				Math.max(1, remaining - reserve),
-			);
-			const timer = setTimeout(
-				() => abort.abort(new DOMException("deadline", "TimeoutError")),
-				Math.min(duration, Math.max(1, deadline - Date.now())),
-			);
-			const attemptSignal = AbortSignal.any([signal, abort.signal]);
-			const delta = onDelta
-				? (text: string) => {
-						attemptSignal.throwIfAborted();
-						if (!store.read((db) => allowed(db, row, connection)))
-							throw new Error("permission_revoked");
-						if (text) {
-							published = true;
-							onDelta(text);
-						}
-					}
-				: undefined;
-			try {
-				// Dictionary rewrites apply to every synthesis path, local and cloud.
-				const sent =
-					row.purpose === "tts" && options.speechText
-						? options.speechText(input as string)
-						: input;
-				let delivery: SpeechDelivery | undefined =
-					row.purpose === "tts" && preparation?.delivery?.version === 2
-						? preparation.delivery
-						: undefined;
-				if (
-					row.purpose === "tts" &&
-					source === "larm" &&
-					port(row.snapshot).judge
-				) {
-					const p = port(row.snapshot);
-					delivery =
-						preparation?.delivery?.version === 2
-							? preparation.delivery
-							: await chooseSpeechDelivery(
-									p.judge!.bind(p),
-									sent as string,
-									attemptSignal,
-									options.decisionMs,
-									preparation?.context
-										? {
-												...preparation.context,
-												answer:
-													options.speechText?.(preparation.context.answer) ??
-													preparation.context.answer,
-											}
-										: undefined,
-								);
-					attemptSignal.throwIfAborted();
-					log.info("inference.delivery_selected", {
-						inferenceId: row.id,
-						subjectId: row.subject,
-						source: delivery.source,
-						kind: delivery.emotion ?? delivery.motion,
-						...(delivery.reason ? { reason: delivery.reason } : {}),
-						durationMs: delivery.latencyMs,
-					});
-					if (!store.read((db) => allowed(db, row, connection)))
-						throw new Error("permission_revoked");
-					// Optional-provider absence preserves the existing automatic intonation.
-					// A present Laya is exclusive with heuristics; failures keep the saved baseline.
-					if (delivery.reason !== "unavailable") {
-						delete callOptions.intonationScale;
-						delete callOptions.speed;
-						delete callOptions.pitchScale;
-					}
-					if (delivery.source === "laya" && row.snapshot.larm.autoIntonation)
-						Object.assign(
-							callOptions,
-							speechParameters(delivery, row.snapshot.larm),
-						);
-				}
-				const work =
-					source === "cloud"
-						? cloud(
-								row,
-								sent,
-								selected!.connection,
-								selected!.resource,
-								attemptSignal,
-								attemptId,
-								delta,
-							)
-						: row.purpose === "llm"
-							? delta && port(row.snapshot).answerStream
-								? port(row.snapshot).answerStream!(
-										input as Messages,
-										attemptSignal,
-										delta,
-										callOptions,
-									)
-								: port(row.snapshot)
-										.answer(input as Messages, attemptSignal, callOptions)
-										.then((value) => {
-											delta?.(value);
-											return value;
-										})
-							: row.purpose === "asr"
-								? port(row.snapshot).transcribe(
-										input as Uint8Array,
-										attemptSignal,
-										callOptions,
-									)
-								: port(row.snapshot).speak(
-										sent as string,
-										attemptSignal,
-										callOptions,
-									);
-				// Fence even adapters that ignore cancellation: their late result is never adopted.
-				const value = await new Promise<string | Uint8Array>(
-					(resolve, reject) => {
-						const stop = () => reject(attemptSignal.reason);
-						attemptSignal.addEventListener("abort", stop, { once: true });
-						if (attemptSignal.aborted) stop();
-						void work
-							.then(resolve, reject)
-							.finally(() => attemptSignal.removeEventListener("abort", stop));
-					},
-				);
-				if (row.purpose === "llm" && typeof value === "string") {
-					const p = port(row.snapshot);
-					const turns = (input as Messages)
-						.filter(
-							(
-								message,
-							): message is { role: "user" | "assistant"; content: string } =>
-								message.role !== "system",
-						)
-						.slice(-4)
-						.map(({ role, content }) => ({ role, text: content }));
-					const judge =
-						options.larmFactory || p.status().state !== "unconfigured"
-							? p.judge?.bind(p)
-							: undefined;
-					delivery = await chooseSpeechDelivery(
-						judge,
-						value,
-						attemptSignal,
-						options.decisionMs,
-						{ answer: value, turns },
-					);
-					log.info("inference.delivery_selected", {
-						inferenceId: row.id,
-						subjectId: row.subject,
-						source: delivery.source,
-						kind: delivery.emotion ?? delivery.motion,
-						...(delivery.reason ? { reason: delivery.reason } : {}),
-						durationMs: delivery.latencyMs,
-					});
-				}
-				if (
-					attemptSignal.aborted ||
-					!store.read((db) => allowed(db, row, connection))
-				)
-					throw new Error("permission_revoked");
-				const localModel =
-					source === "larm"
-						? port(row.snapshot)
-								.inspect?.()
-								.providers.find((p) => p.name === row.purpose)?.model
-						: undefined;
-				await store.write((db) =>
-					db
-						.query(
-							"UPDATE inference_attempts SET status='succeeded',ended=?,model=COALESCE(?,model) WHERE id=?",
-						)
-						.run(Date.now(), localModel ?? null, attemptId),
-				);
-				log.info("inference.attempt_succeeded", {
-					...logFields,
-					durationMs: Math.round(performance.now() - started),
-				});
-				return {
-					requestId: row.id,
-					attemptId,
-					value,
-					...(delivery ? { delivery } : {}),
-				};
-			} catch (error) {
-				const code =
-					abort.signal.aborted && !signal.aborted
-						? "local_timeout"
-						: safeError(error, signal);
-				await store.write((db) =>
-					db
-						.query(
-							"UPDATE inference_attempts SET status='failed',reason=?,ended=? WHERE id=?",
-						)
-						.run(code, Date.now(), attemptId),
-				);
-				log.warn(
-					"inference.attempt_failed",
-					{
-						...logFields,
-						reason: code,
-						durationMs: Math.round(performance.now() - started),
-					},
-					error,
-				);
-				throw new Error(code);
-			} finally {
-				clearTimeout(timer);
-				abort.abort();
-			}
-		}
-		try {
-			if (route.mode !== "cloud-only") {
-				if (
-					(cooldown.get(key) ?? 0) > Date.now() &&
-					route.mode === "larm-preferred" &&
-					selected &&
-					selected.connection.enabled &&
-					route.cloudAllowed
-				)
-					reason = "local_cooldown";
-				else
-					try {
-						const result = await attempt("larm");
-						cooldown.delete(key);
-						return result;
-					} catch (error) {
-						reason = safeError(error, signal);
-						if (
-							signal.aborted ||
-							published ||
-							route.mode === "larm-only" ||
-							!fallbackErrors.test(reason)
-						)
-							throw error;
-						cooldown.set(key, Date.now() + 30_000);
-					}
-			}
-			log.warn("inference.cloud_selected", {
-				inferenceId: row.id,
-				subjectId: row.subject,
-				purpose: row.purpose,
-				reason: reason ?? "cloud_only",
-			});
-			return await attempt("cloud");
-		} catch (error) {
-			await store.write((db) =>
-				db
-					.query(
-						"UPDATE inference_requests SET status='failed' WHERE id=? AND status='pending'",
-					)
-					.run(row.id),
-			);
-			throw error;
-		} finally {
-			active.delete(row.id);
-			running.finish();
-			prune();
-		}
-	}
+	) => runRequest(env, requestId, input, caller, onDelta, preparation);
 	function accept(db: Database, receipt: Receipt) {
 		const row = get(db, receipt.requestId);
 		const a = db
@@ -947,7 +360,8 @@ export function createInference(
 			messages: Messages,
 			signal: AbortSignal,
 			onDelta: (text: string) => void,
-		) => executeRequest(requestId, messages, signal, onDelta),
+			preparation?: SpeechPreparation,
+		) => executeRequest(requestId, messages, signal, onDelta, preparation),
 		liveRequest: (id: string) => store.read((db) => usable(db, id)),
 		captureSpeechChunkInTransaction(
 			db: Database,
@@ -1203,6 +617,8 @@ export function createInference(
 			});
 		},
 		async close() {
+			unsubscribeCollection();
+			collectionAdoptions.clear();
 			closed = true;
 			unsubscribe();
 			for (const stop of statusSubscriptions.values()) stop();
@@ -1222,4 +638,3 @@ export function createInference(
 	return service;
 }
 export type InferenceService = ReturnType<typeof createInference>;
-import { speechAdjustment } from "./speech-intonation";

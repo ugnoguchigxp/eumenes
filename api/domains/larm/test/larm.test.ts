@@ -1362,3 +1362,86 @@ test("caller cancellation is logged separately from a provider network failure",
 		configureLogging({ level: "silent" });
 	}
 });
+
+test("Ruri uses claimed model/token and current chunk only; rejects unsupported questions before provider request", async () => {
+	const fake = fixture(false, "SAAA-gemma4-26b", 900000, "model-tts", true);
+	const ruri = "ruri-v3-30m-speaking-attitude";
+	let calls = 0;
+	const bodies: Record<string, unknown>[] = [];
+	const larm = createLarm({
+		baseUrl: "http://127.0.0.1:9810",
+		profile: "SAAA-gemma4-26b",
+		token: "control",
+		fetch: async (input, init) => {
+			if (new URL(String(input)).pathname === "/system-one/v1/systemone") {
+				calls++;
+				bodies.push(JSON.parse(String(init?.body)));
+				expect(new Headers(init?.headers).get("Authorization")).toBe(
+					"Bearer secret-system-one-1",
+				);
+				return result({
+					model: ruri,
+					answers: {
+						emotion: {
+							type: "choice",
+							choice: "none",
+							confidence: 0.9,
+							answer_confidence: 0.9,
+						},
+					},
+				});
+			}
+			const response = await fake.fetcher(input, init);
+			if (response.headers.get("content-type")?.includes("application/json")) {
+				const body = await response.text();
+				return new Response(body.replaceAll("model-system-one", ruri), {
+					status: response.status,
+					headers: response.headers,
+				});
+			}
+			return response;
+		},
+	});
+	try {
+		await larm.prepareVoice!(freshSignal());
+		expect(larm.decisionModel?.()).toBe(ruri);
+		expect(larm.inspect?.().decisionModel).toBe(ruri);
+		const q = {
+			emotion: {
+				type: "choice" as const,
+				instructions: "現在の回答をアシスタント自身が話す表情と声色",
+				criteria: { none: "通常", warmth: "親しみ" },
+			},
+		};
+		await larm.judge!(
+			{
+				current_chunk: "現在",
+				response: "旧互換",
+				conversation: "送らない",
+				user_utterance: "送らない",
+			},
+			q,
+			freshSignal(),
+		);
+		await larm.judge!({ response: "旧互換" }, q, freshSignal());
+		expect(bodies.map((b) => b.state)).toEqual([
+			{ current_chunk: "現在" },
+			{ current_chunk: "旧互換" },
+		]);
+		expect(bodies[0]!.model).toBe(ruri);
+		for (const criteria of [
+			{ refund: "返金", none: "通常" },
+			{ warmth: "親しみ" },
+		] as Array<Record<string, string>>)
+			await expect(
+				larm.judge!(
+					{ current_chunk: "現在" },
+					{ emotion: { ...q.emotion, criteria } },
+					freshSignal(),
+				),
+			).rejects.toThrow("larm_invalid_ruri_question");
+		expect(calls).toBe(2);
+	} finally {
+		await larm.close();
+	}
+});

@@ -1,42 +1,23 @@
-import type { LarmExchange } from "../api/domains/larm/contracts";
 import { ttsVoicesSchema } from "../api/domains/larm/contracts";
 import {
+	larmDetailsSchema,
+	probeSchema,
+	startedProbeSchema,
+	usageSchema,
+} from "../api/domains/inference/contracts";
+import {
+	diagnosticsSchema,
 	settingsSchema,
 	type ApplySettings,
 } from "../api/domains/settings/contracts";
 import { json, type Transport } from "./transport";
-export interface Usage {
-	id: string;
-	requestId: string;
-	subject: string;
-	purpose: "llm" | "asr" | "tts";
-	source: string;
-	model: string;
-	status: string;
-	reason: string | null;
-	started: number;
-	ended: number | null;
-	accepted: number;
-	inputTokens: number | null;
-	outputTokens: number | null;
-	providerDetails?: LarmExchange[];
-}
-export interface Probe {
-	id: string;
-	target: string;
-	status: string;
-	error: string | null;
-	revision: number;
-	created: number;
-}
-export interface Diagnostics {
-	keyError: string | null;
-	connections: Array<{
-		id: string;
-		credentialAvailable: boolean;
-		source: string;
-	}>;
-}
+export type {
+	LarmDetails,
+	Usage,
+	Probe,
+} from "../api/domains/inference/contracts";
+export type { Diagnostics } from "../api/domains/settings/contracts";
+
 export function settingsClient(t: Transport) {
 	return {
 		larmVoices: async (signal?: AbortSignal) =>
@@ -50,26 +31,25 @@ export function settingsClient(t: Transport) {
 				await (await t.call("/api/settings/apply", json(input))).json(),
 			),
 		settingsDiagnostics: async () =>
-			(await (await t.call("/api/settings/diagnostics")).json()) as Diagnostics,
+			diagnosticsSchema.parse(
+				await (await t.call("/api/settings/diagnostics")).json(),
+			),
 		inferenceUsage: async () =>
-			(await (await t.call("/api/inference/usage")).json()) as Usage[],
+			usageSchema
+				.array()
+				.parse(await (await t.call("/api/inference/usage")).json()),
 		larmDetails: async () =>
-			(await (await t.call("/api/inference/larm")).json()) as {
-				profile: string;
-				connectionId?: string;
-				providers: Array<{
-					name: string;
-					model: string;
-					baseUrl: string;
-					protocol: string;
-				}>;
-			},
+			larmDetailsSchema.parse(
+				await (await t.call("/api/inference/larm")).json(),
+			),
 		inferenceProbes: async () =>
-			(await (await t.call("/api/inference/probes")).json()) as Probe[],
+			probeSchema
+				.array()
+				.parse(await (await t.call("/api/inference/probes")).json()),
 		startProbe: async (target: string) =>
-			(await (
-				await t.call("/api/inference/probes", json({ target }))
-			).json()) as { id: string },
+			startedProbeSchema.parse(
+				await (await t.call("/api/inference/probes", json({ target }))).json(),
+			),
 		cancelProbe: async (id: string) => {
 			await t.call(
 				`/api/inference/probes/${encodeURIComponent(id)}/cancel`,

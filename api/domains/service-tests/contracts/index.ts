@@ -155,3 +155,85 @@ export function testErrorLabel(code: string) {
 		"確認に失敗しました。接続先とサービスの状態を確認してください。"
 	);
 }
+
+const testKindSchema = z.enum([
+	"llm",
+	"asr",
+	"tts",
+	"embedding",
+	"decision",
+	"image",
+	"music",
+	"unsupported",
+]);
+export const serviceCatalogSchema: z.ZodType<ServiceCatalog> = z.object({
+	targets: z.array(
+		z.object({
+			id: z.string(),
+			name: z.string(),
+			model: z.string(),
+			capability: z.string(),
+			protocol: z.string(),
+			kind: testKindSchema,
+			source: z.enum(["larm", "cloud"]),
+			onDemand: z.boolean(),
+			primary: z.boolean(),
+			testable: z.boolean(),
+			reason: z.string().optional(),
+		}),
+	),
+	errors: z.array(z.string()),
+	discoveredAt: z.number().nullable(),
+	revision: z.number(),
+	stale: z.boolean(),
+});
+export const serviceRunSchema: z.ZodType<ServiceRun> = z.object({
+	id: z.string(),
+	targetId: z.string(),
+	model: z.string(),
+	actualModel: z.string().optional(),
+	kind: z.union([testKindSchema, z.literal("diagnostics")]),
+	status: z.enum([
+		"running",
+		"succeeded",
+		"failed",
+		"cancelled",
+		"unknown",
+		"interrupted",
+		"result-unavailable",
+	]),
+	phase: z.string(),
+	created: z.number(),
+	ended: z.number().optional(),
+	revision: z.number(),
+	error: z.string().optional(),
+	progress: z.number().optional(),
+	jobId: z.string().optional(),
+	text: z.string().optional(),
+	mime: z.string().optional(),
+	previewAvailable: z.boolean().optional(),
+	retryArtifact: z.boolean().optional(),
+	health: z
+		.array(
+			z.object({
+				state: z.enum([
+					"healthy",
+					"busy",
+					"unhealthy",
+					"on-demand",
+					"unknown",
+					"unsupported",
+				]),
+				reason: z.string(),
+				checkedAt: z.number(),
+				latencyMs: z.number().optional(),
+				targetId: z.string(),
+				name: z.string(),
+				model: z.string(),
+			}),
+		)
+		.optional(),
+	controlHealthy: z.boolean().optional(),
+});
+export const serviceRunsSchema = z.array(serviceRunSchema);
+export const uploadedSchema = z.object({ id: z.string() });

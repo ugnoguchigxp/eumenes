@@ -69,10 +69,10 @@ test("a database with only the original three migrations (plus later ones) upgra
 			createConversationService(upgraded).get("main").messages,
 		).toHaveLength(2);
 		const queue = createQueue(upgraded);
-		const dialogue = createDialogueService(
-			upgraded,
-			createConversationService(upgraded),
-			{
+		const dialogue = createDialogueService({
+			store: upgraded,
+			conversation: createConversationService(upgraded),
+			larm: {
 				status: () => ({ state: "ready", capabilities: [] }),
 				connect: async () => {},
 				answer: async () => "ok",
@@ -81,7 +81,7 @@ test("a database with only the original three migrations (plus later ones) upgra
 				close: async () => {},
 			},
 			queue,
-		);
+		});
 		const run = await dialogue.submit({
 			requestId: crypto.randomUUID(),
 			conversationId: "main",

@@ -1,0 +1,24 @@
+{
+	"started": "2026-10-08T01:18:33.654Z",
+	"exchanges": [
+		{
+			"connectionId": "aconn_epoch-e1e5c2a7-0bf0-4635-ab6b-1d315b840fb7_e2f6a223-563c-40e3-8190-438d9d54d0cc",
+			"model": "gemma4-26b-a4b",
+			"started": 1791422314003,
+			"httpStatus": 200
+		},
+		{
+			"connectionId": "aconn_epoch-e1e5c2a7-0bf0-4635-ab6b-1d315b840fb7_e2f6a223-563c-40e3-8190-438d9d54d0cc",
+			"model": "gemma4-26b-a4b",
+			"started": 1791422620090,
+			"httpStatus": 401,
+			"errorCode": "unauthorized",
+			"errorMessage": "provider bearer token is no longer valid"
+		}
+	],
+	"first": "承知しました。",
+	"firstDeltas": 4,
+	"originalId": "aconn_epoch-e1e5c2a7-0bf0-4635-ab6b-1d315b840fb7_e2f6a223-563c-40e3-8190-438d9d54d0cc",
+	"idleStarted": "2026-10-08T01:18:38.083Z",
+	"error": "larm_inference_401"
+}

@@ -1,0 +1,97 @@
+{
+	"change": "Voice recognition results remained persisted but invisible in the browser; expose notification failure and resume from latest API state without polling",
+	"date": "2026-10-08",
+	"baseline": {
+		"backend": "Two recent real LARM ASR/LLM/TTS attempts succeeded and were adopted",
+		"browser": "No conversation messages visible; reloading displayed four persisted messages",
+		"specificTransportFailureCause": "Not observed; no claim of a specific network error"
+	},
+	"fullGate": {
+		"selected": [
+			"settings",
+			"inference",
+			"conversation",
+			"continuity",
+			"larm",
+			"audio",
+			"queue",
+			"scheduler",
+			"dialogue",
+			"voice-dialogue"
+		],
+		"dependencySet": [
+			"settings",
+			"larm",
+			"inference",
+			"conversation",
+			"continuity",
+			"audio",
+			"queue",
+			"scheduler",
+			"dialogue",
+			"voice-dialogue"
+		],
+		"revision": "00d55e23858b9c3a711e04cc45336d0da8fb46b021949540bf95374c7bb909b8",
+		"steps": [
+			{
+				"name": "format",
+				"ms": 178,
+				"result": "pass"
+			},
+			{
+				"name": "lint",
+				"ms": 89,
+				"result": "pass"
+			},
+			{
+				"name": "typecheck",
+				"ms": 1794,
+				"result": "pass"
+			},
+			{
+				"name": "tests",
+				"ms": 5394,
+				"result": "pass"
+			},
+			{
+				"name": "web tests",
+				"ms": 2525,
+				"result": "pass"
+			},
+			{
+				"name": "web build",
+				"ms": 6159,
+				"result": "pass"
+			},
+			{
+				"name": "browser fixture",
+				"ms": 22746,
+				"result": "pass"
+			}
+		],
+		"totalMs": 39024,
+		"result": "pass"
+	},
+	"tests": {
+		"backend": 126,
+		"web": 29,
+		"browserFixture": 7
+	},
+	"regressions": [
+		"SSE-only 404 while ordinary API works: visible error and existing reconnect button",
+		"focus/visibility resume recovers missed answers without reloading",
+		"accepted voice turn GET failure is shown",
+		"stopping audio resets meter to zero",
+		"synthetic browser consecutive voice turns and playback",
+		"one SSE connection and no idle snapshot polling"
+	],
+	"live": {
+		"userConfirmed": "文字起こしが表示された",
+		"realMicrophoneThreeRoundAcceptance": "not completed; text display confirmation only"
+	},
+	"contextStill": {
+		"scope": "this voice display correction",
+		"context_compile": 1,
+		"compile_eval": 1
+	}
+}

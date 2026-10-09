@@ -399,6 +399,12 @@ export function createVoiceDialogue(
 					}
 					if (!(await advance(turn.utteranceId, "synthesizing"))) return;
 					speech = createSpeech(turn.utteranceId, run.id, controller, {
+						collection: {
+							conversationId: run.conversationId,
+							turnId: run.id,
+							granularity: "answer",
+							chunkOrder: null,
+						},
 						context: dialogue.answerContext?.(run.id) ?? { answer, turns: [] },
 						delivery: dialogue.answerDelivery?.(run.id),
 					});
@@ -457,9 +463,20 @@ export function createVoiceDialogue(
 			}
 			const context = runId ? dialogue.answerContext?.(runId) : undefined;
 			const previous = runId ? dialogue.answerDelivery?.(runId) : undefined;
+			const replayRun = runId ? dialogue.get(runId) : undefined;
 			const preparation: SpeechPreparation = {
+				...(replayRun
+					? {
+							collection: {
+								conversationId: replayRun.conversationId,
+								turnId: replayRun.id,
+								granularity: "answer",
+								chunkOrder: null,
+							},
+						}
+					: {}),
 				...(context ? { context } : {}),
-				...(previous?.version === 2 && previous.source === "laya"
+				...(previous?.version === 2 && previous.source !== "fallback"
 					? { delivery: previous }
 					: {}),
 			};

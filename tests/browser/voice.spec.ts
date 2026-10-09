@@ -140,7 +140,7 @@ test.describe("light avatar rendering", () => {
 	test("light avatar stays behind usable chat and releases its canvas on navigation", async ({
 		playwright,
 	}) => {
-		test.setTimeout(45000);
+		test.setTimeout(60000);
 		const browser = await playwright.chromium.launch({
 			args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"],
 		});
@@ -195,8 +195,9 @@ test.describe("light avatar rendering", () => {
 				const menu = page.getByRole("button", { name: "設定メニュー" });
 				if (await menu.count()) await menu.click();
 				await page.getByRole("button", { name: "設定", exact: true }).click();
+				// Software GL (swiftshader) can starve the main thread while a model builds.
 				await expect(canvas)
-					.toHaveCount(0)
+					.toHaveCount(0, { timeout: 20000 })
 					.catch(async (error) => {
 						console.log(
 							"avatar navigation",
@@ -584,7 +585,7 @@ test("a backend outage does not poll snapshots and explicit reconnect reloads th
 	expect(watched.map((path) => counts.get(path))).toEqual(initial);
 	await page.getByRole("button", { name: "接続を再確認" }).click();
 	await expect(page.locator(".connection-health .health-state")).toHaveText(
-		"ready",
+		"接続済み",
 	);
 	await expect(page.getByRole("button", { name: "接続を再確認" })).toHaveCount(
 		0,
@@ -697,7 +698,7 @@ test("text and browser audio complete through real services with fixture provide
 	await expect(
 		page.locator(".messages").getByText("こんにちは", { exact: true }).first(),
 	).toBeVisible({ timeout: 20000 });
-	await expect(page.getByText(/^(playing|played)$/)).toBeVisible({
+	await expect(page.getByText(/^(playing|再生済み)$/)).toBeVisible({
 		timeout: 20000,
 	});
 	await page.evaluate(() =>
@@ -708,7 +709,7 @@ test("text and browser audio complete through real services with fixture provide
 	).toHaveCount(2, {
 		timeout: 20000,
 	});
-	await expect(page.getByText("played", { exact: true })).toBeVisible({
+	await expect(page.getByText("再生済み", { exact: true })).toBeVisible({
 		timeout: 20000,
 	});
 	await page.getByRole("button", { name: "停止" }).click();
@@ -958,7 +959,7 @@ test("idle views keep one SSE stream without periodic snapshot requests", async 
 	page.on("requestfailed", end);
 	await page.goto(`http://127.0.0.1:${webPort}/`);
 	await expect(page.locator(".connection-health .health-state")).toHaveText(
-		/^(ready|idle)$/,
+		/^(接続済み|待機中)$/,
 		{ timeout: 15000 },
 	);
 	await expect.poll(() => counts.get("/api/events") ?? 0).toBeGreaterThan(0);
@@ -1095,7 +1096,7 @@ test("partial ASR and text arrive early; speech waits for the completed answer",
 		).toBe(true);
 		await control("release");
 		await expect(streaming).toHaveCount(0, { timeout: 10000 });
-		await expect(page.getByText("played", { exact: true })).toBeVisible({
+		await expect(page.getByText("再生済み", { exact: true })).toBeVisible({
 			timeout: 10000,
 		});
 		await expect(page.getByRole("textbox", { name: "メッセージ" })).toHaveValue(

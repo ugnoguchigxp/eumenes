@@ -1,4 +1,4 @@
-import type { Emotion } from "../../../../../api/domains/delivery";
+import type { Emotion } from "../../../../../api/domains/delivery/contracts";
 export const emotionEmoji: Record<
 	Exclude<Emotion, "none">,
 	{ emoji: string; label: string }

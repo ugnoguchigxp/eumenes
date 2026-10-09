@@ -12,6 +12,7 @@ import {
 } from "../../../../api/domains/service-tests/contracts";
 import { Button } from "../../design-system";
 import "./style.css";
+import { queryRoots } from "../../queryKeys";
 
 const samples: Record<string, string> = {
 	llm: "こんにちは。自己紹介を一文でお願いします。",
@@ -357,11 +358,11 @@ export function ServiceTestsPanel({
 	const lock = useRef(false);
 	const loaded = useRef(false);
 	const catalog = useQuery({
-		queryKey: ["service-catalog", client.identity],
+		queryKey: [queryRoots.serviceCatalog, client.identity],
 		queryFn: () => client.serviceCatalog(),
 	});
 	const runs = useQuery({
-		queryKey: ["service-runs", client.identity],
+		queryKey: [queryRoots.serviceRuns, client.identity],
 		queryFn: () => client.serviceRuns(),
 	});
 	async function act(fn: () => Promise<unknown>) {
@@ -373,10 +374,10 @@ export function ServiceTestsPanel({
 			await fn();
 			await Promise.all([
 				cache.invalidateQueries({
-					queryKey: ["service-catalog", client.identity],
+					queryKey: [queryRoots.serviceCatalog, client.identity],
 				}),
 				cache.invalidateQueries({
-					queryKey: ["service-runs", client.identity],
+					queryKey: [queryRoots.serviceRuns, client.identity],
 				}),
 			]);
 		} catch (e) {

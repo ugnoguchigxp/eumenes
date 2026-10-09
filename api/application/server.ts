@@ -1,3 +1,7 @@
+import {
+	createAttitudeDataset,
+	openAttitudeStore,
+} from "../domains/attitude-dataset";
 import { dirname, join, resolve } from "node:path";
 import { configureLogging, getLogger } from "../infrastructure/logger";
 import { createConversationService } from "../domains/conversation";
@@ -30,6 +34,10 @@ configureLogging({
 });
 const log = getLogger("server");
 log.info("server.starting");
+/** Production wiring: every dependency is mandatory (tests may still assemble a partial createApp). */
+function createProductionApp(deps: Required<Parameters<typeof createApp>[0]>) {
+	return createApp(deps);
+}
 async function main() {
 	const host = process.env.EUMENES_HOST ?? "127.0.0.1";
 	if (host !== "127.0.0.1" && host !== "localhost")
@@ -41,12 +49,20 @@ async function main() {
 	const conversation = createConversationService(store);
 	const settings = await createSettings(store, { dbPath });
 	const ttsDictionary = createTtsDictionary(store);
-	const larm = createInference(store, settings, {
+	const datasetPath = resolve(
+		process.env.EUMENES_ATTITUDE_DATASET ??
+			join(dirname(dbPath), "attitude-dataset/dataset.sqlite3"),
+	);
+	const datasetStore = openAttitudeStore(datasetPath);
+	const attitudeDataset = createAttitudeDataset(datasetStore, datasetPath);
+	await attitudeDataset.recover();
+	const inference = createInference(store, settings, {
 		token: resolveLarmToken(process.env),
 		speechText: ttsDictionary.apply,
+		attitudeDataset,
 	});
-	const unsubscribeStatus = larm.onChange(() => changes.publish());
-	const serviceTests = createServiceTests(store, settings, larm, {
+	const unsubscribeStatus = inference.onChange(() => changes.publish());
+	const serviceTests = createServiceTests(store, settings, inference, {
 		token: resolveLarmToken(process.env),
 	});
 	const queue = createQueue(store, {
@@ -60,16 +76,14 @@ async function main() {
 				join(dirname(dbPath), "memory-forget-journal.jsonl"),
 		),
 	});
-	const dialogue = createDialogueService(
+	const dialogue = createDialogueService({
 		store,
 		conversation,
-		larm,
+		larm: inference,
 		queue,
-		undefined,
-		undefined,
 		memory,
-	);
-	const voice = createVoiceDialogue(store, dialogue, larm);
+	});
+	const voice = createVoiceDialogue(store, dialogue, inference);
 	scheduler.registerTarget(dialogue.promptTarget);
 	// Recovery runs to completion before any worker starts; a failure aborts startup.
 	log.info("server.recovery_started");
@@ -78,7 +92,7 @@ async function main() {
 	if (!memoryRecovery.healthy)
 		log.warn("memory.unavailable", { reason: memoryRecovery.reason });
 	await voice.recover();
-	await larm.recover();
+	await inference.recover();
 	await serviceTests.recover();
 	await dialogue.recover();
 	await queue.recover();
@@ -86,17 +100,18 @@ async function main() {
 	log.info("server.recovery_completed");
 	queue.start();
 	scheduler.start();
-	const app = createApp({
+	const app = createProductionApp({
+		attitudeDataset,
 		token,
 		origin: process.env.EUMENES_ORIGIN ?? "http://127.0.0.1:5173",
 		conversation,
 		dialogue,
 		voice,
-		larm,
+		larm: inference,
 		queue,
 		scheduler,
 		settings,
-		inference: larm,
+		inference,
 		ttsDictionary,
 		memory,
 		continuity,
@@ -112,10 +127,15 @@ async function main() {
 	});
 	log.info("server.listening", { port: server.port });
 	// Probe once so the UI reports a real result before the first message.
-	void larm.connect().then(
-		() => log.info("larm.probe_completed", { status: larm.status().state }),
+	void inference.connect().then(
+		() =>
+			log.info("larm.probe_completed", { status: inference.status().state }),
 		(error) =>
-			log.warn("larm.probe_failed", { status: larm.status().state }, error),
+			log.warn(
+				"larm.probe_failed",
+				{ status: inference.status().state },
+				error,
+			),
 	);
 	let stopping: Promise<void> | null = null;
 	function shutdown() {
@@ -130,7 +150,9 @@ async function main() {
 			await voice.close();
 			await queue.close(10_000);
 			await dialogue.close();
-			await Promise.race([larm.close(), Bun.sleep(5_000)]);
+			await Promise.race([inference.close(), Bun.sleep(5_000)]);
+			await attitudeDataset.close();
+			await datasetStore.close();
 			await store.close();
 			log.info("server.shutdown_completed");
 		})();

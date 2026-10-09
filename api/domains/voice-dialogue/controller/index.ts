@@ -1,3 +1,4 @@
+import { readBounded } from "../../../infrastructure/bounded-read";
 import type { Hono, Context } from "hono";
 import type { VoiceDialogueService } from "..";
 import { getLogger } from "../../../infrastructure/logger";
@@ -10,31 +11,12 @@ import {
 const log = getLogger("voice");
 const MAX_AUDIO_BYTES = 4_000_000;
 async function readAudio(body: ReadableStream<Uint8Array> | null) {
-	if (!body) throw new Error("audio_empty");
-	const reader = body.getReader();
-	const chunks: Uint8Array[] = [];
-	let length = 0;
-	try {
-		for (;;) {
-			const { value, done } = await reader.read();
-			if (done) break;
-			length += value.byteLength;
-			if (length > MAX_AUDIO_BYTES) throw new Error("audio_too_large");
-			chunks.push(value);
-		}
-	} catch (error) {
-		await reader.cancel().catch(() => {});
-		throw error;
-	} finally {
-		reader.releaseLock();
-	}
-	if (length < 44) throw new Error("audio_empty");
-	const wav = new Uint8Array(length);
-	let offset = 0;
-	for (const chunk of chunks) {
-		wav.set(chunk, offset);
-		offset += chunk.length;
-	}
+	const wav = await readBounded(body, {
+		limit: MAX_AUDIO_BYTES,
+		tooLarge: "audio_too_large",
+		missing: "audio_empty",
+	});
+	if (wav.length < 44) throw new Error("audio_empty");
 	if (
 		String.fromCharCode(...wav.subarray(0, 4)) !== "RIFF" ||
 		String.fromCharCode(...wav.subarray(8, 12)) !== "WAVE"

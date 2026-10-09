@@ -66,7 +66,12 @@ test("voice capture to ASR, dialogue, TTS; duplicate utterance is ignored", asyn
 		const conversation = createConversationService(store);
 		const queue = createQueue(store);
 		queue.start();
-		const dialogue = createDialogueService(store, conversation, larm, queue);
+		const dialogue = createDialogueService({
+			store,
+			conversation,
+			larm,
+			queue,
+		});
 		let failNextWrite = false;
 		const voiceStore: SqliteStore = {
 			onCommit: (listener) => store.onCommit(listener),
@@ -140,7 +145,12 @@ test("restart cancels the run of a stale voice turn so no old answer is spoken",
 		]);
 		const conversation = createConversationService(store);
 		const queue = createQueue(store);
-		const dialogue = createDialogueService(store, conversation, larm, queue);
+		const dialogue = createDialogueService({
+			store,
+			conversation,
+			larm,
+			queue,
+		});
 		const voice = createVoiceDialogue(store, dialogue, larm);
 		const sessionId = crypto.randomUUID();
 		const utteranceId = crypto.randomUUID();
@@ -151,7 +161,12 @@ test("restart cancels the run of a stale voice turn so no old answer is spoken",
 		const runId = voice.get(utteranceId)?.runId as string;
 		expect(dialogue.get(runId)?.status).toBe("queued");
 		const queue2 = createQueue(store);
-		const dialogue2 = createDialogueService(store, conversation, larm, queue2);
+		const dialogue2 = createDialogueService({
+			store,
+			conversation,
+			larm,
+			queue: queue2,
+		});
 		const voice2 = createVoiceDialogue(store, dialogue2, larm);
 		await voice2.recover();
 		await dialogue2.recover();

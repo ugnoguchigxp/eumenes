@@ -1,0 +1,728 @@
+{
+	"mode": "isolated DB, real LARM, synthetic Japanese WAV; audio availability only, no physical playback",
+	"inputSeconds": 3.3179375,
+	"deltas": [
+		{
+			"status": "running",
+			"text": "",
+			"atMs": 980
+		},
+		{
+			"status": "running",
+			"text": "二次",
+			"atMs": 3505
+		},
+		{
+			"status": "running",
+			"text": "二次関数",
+			"atMs": 3518
+		},
+		{
+			"status": "running",
+			"text": "二次関数は",
+			"atMs": 3536
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、",
+			"atMs": 3556
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数",
+			"atMs": 3565
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数x",
+			"atMs": 3580
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの",
+			"atMs": 3599
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2",
+			"atMs": 3613
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗",
+			"atMs": 3632
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含ま",
+			"atMs": 3648
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる",
+			"atMs": 3665
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式",
+			"atMs": 3685
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です",
+			"atMs": 3700
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。",
+			"atMs": 3726
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\n",
+			"atMs": 3743
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフ",
+			"atMs": 3761
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは",
+			"atMs": 3780
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放",
+			"atMs": 3803
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物",
+			"atMs": 3818
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線",
+			"atMs": 3830
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描",
+			"atMs": 3849
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き",
+			"atMs": 3866
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、",
+			"atMs": 3883
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂",
+			"atMs": 3905
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点",
+			"atMs": 3916
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から",
+			"atMs": 3935
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右",
+			"atMs": 3956
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称",
+			"atMs": 3968
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に",
+			"atMs": 3986
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広が",
+			"atMs": 4008
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります",
+			"atMs": 4025
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。",
+			"atMs": 4045
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n",
+			"atMs": 4066
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係",
+			"atMs": 4084
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の",
+			"atMs": 4110
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値",
+			"atMs": 4125
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって",
+			"atMs": 4145
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、",
+			"atMs": 4166
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフ",
+			"atMs": 4190
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの",
+			"atMs": 4211
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向き",
+			"atMs": 4228
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや",
+			"atMs": 4243
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き",
+			"atMs": 4264
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合",
+			"atMs": 4283
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合が決",
+			"atMs": 4303
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合が決まります",
+			"atMs": 4322
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合が決まります。",
+			"atMs": 4344
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合が決まります。\n\n",
+			"atMs": 4367
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合が決まります。\n\n基本",
+			"atMs": 4388
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合が決まります。\n\n基本となる",
+			"atMs": 4418
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合が決まります。\n\n基本となる$",
+			"atMs": 4442
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合が決まります。\n\n基本となる$y",
+			"atMs": 4451
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合が決まります。\n\n基本となる$y=",
+			"atMs": 4470
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合が決まります。\n\n基本となる$y=x",
+			"atMs": 4491
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合が決まります。\n\n基本となる$y=x^",
+			"atMs": 4512
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合が決まります。\n\n基本となる$y=x^2",
+			"atMs": 4533
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合が決まります。\n\n基本となる$y=x^2$",
+			"atMs": 4554
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合が決まります。\n\n基本となる$y=x^2$を",
+			"atMs": 4580
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合が決まります。\n\n基本となる$y=x^2$を、",
+			"atMs": 4603
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合が決まります。\n\n基本となる$y=x^2$を、上下",
+			"atMs": 4625
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合が決まります。\n\n基本となる$y=x^2$を、上下左右",
+			"atMs": 4651
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合が決まります。\n\n基本となる$y=x^2$を、上下左右に",
+			"atMs": 4672
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合が決まります。\n\n基本となる$y=x^2$を、上下左右に移動",
+			"atMs": 4693
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合が決まります。\n\n基本となる$y=x^2$を、上下左右に移動させた",
+			"atMs": 4716
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合が決まります。\n\n基本となる$y=x^2$を、上下左右に移動させたものが",
+			"atMs": 4733
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合が決まります。\n\n基本となる$y=x^2$を、上下左右に移動させたものが一般",
+			"atMs": 4754
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合が決まります。\n\n基本となる$y=x^2$を、上下左右に移動させたものが一般形",
+			"atMs": 4771
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合が決まります。\n\n基本となる$y=x^2$を、上下左右に移動させたものが一般形です",
+			"atMs": 4789
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合が決まります。\n\n基本となる$y=x^2$を、上下左右に移動させたものが一般形です。",
+			"atMs": 4807
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合が決まります。\n\n基本となる$y=x^2$を、上下左右に移動させたものが一般形です。\n\n",
+			"atMs": 4826
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合が決まります。\n\n基本となる$y=x^2$を、上下左右に移動させたものが一般形です。\n\n頂",
+			"atMs": 4844
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合が決まります。\n\n基本となる$y=x^2$を、上下左右に移動させたものが一般形です。\n\n頂点の",
+			"atMs": 4865
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合が決まります。\n\n基本となる$y=x^2$を、上下左右に移動させたものが一般形です。\n\n頂点の座標",
+			"atMs": 4885
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合が決まります。\n\n基本となる$y=x^2$を、上下左右に移動させたものが一般形です。\n\n頂点の座標を",
+			"atMs": 4906
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合が決まります。\n\n基本となる$y=x^2$を、上下左右に移動させたものが一般形です。\n\n頂点の座標を求める",
+			"atMs": 4928
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合が決まります。\n\n基本となる$y=x^2$を、上下左右に移動させたものが一般形です。\n\n頂点の座標を求めることで",
+			"atMs": 4951
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合が決まります。\n\n基本となる$y=x^2$を、上下左右に移動させたものが一般形です。\n\n頂点の座標を求めることで、",
+			"atMs": 4967
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合が決まります。\n\n基本となる$y=x^2$を、上下左右に移動させたものが一般形です。\n\n頂点の座標を求めることで、グラフ",
+			"atMs": 4986
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合が決まります。\n\n基本となる$y=x^2$を、上下左右に移動させたものが一般形です。\n\n頂点の座標を求めることで、グラフの",
+			"atMs": 5005
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合が決まります。\n\n基本となる$y=x^2$を、上下左右に移動させたものが一般形です。\n\n頂点の座標を求めることで、グラフの正確",
+			"atMs": 5032
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合が決まります。\n\n基本となる$y=x^2$を、上下左右に移動させたものが一般形です。\n\n頂点の座標を求めることで、グラフの正確な",
+			"atMs": 5045
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合が決まります。\n\n基本となる$y=x^2$を、上下左右に移動させたものが一般形です。\n\n頂点の座標を求めることで、グラフの正確な形",
+			"atMs": 5065
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合が決まります。\n\n基本となる$y=x^2$を、上下左右に移動させたものが一般形です。\n\n頂点の座標を求めることで、グラフの正確な形が",
+			"atMs": 5087
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合が決まります。\n\n基本となる$y=x^2$を、上下左右に移動させたものが一般形です。\n\n頂点の座標を求めることで、グラフの正確な形が分",
+			"atMs": 5113
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合が決まります。\n\n基本となる$y=x^2$を、上下左右に移動させたものが一般形です。\n\n頂点の座標を求めることで、グラフの正確な形が分かります",
+			"atMs": 5135
+		},
+		{
+			"status": "running",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合が決まります。\n\n基本となる$y=x^2$を、上下左右に移動させたものが一般形です。\n\n頂点の座標を求めることで、グラフの正確な形が分かります。",
+			"atMs": 5157
+		},
+		{
+			"status": "completed",
+			"text": "二次関数は、変数xの2乗が含まれる方程式です。\n\nグラフは放物線を描き、頂点から左右対称に広がります。\n\n係数の値によって、グラフの向きや開き具合が決まります。\n\n基本となる$y=x^2$を、上下左右に移動させたものが一般形です。\n\n頂点の座標を求めることで、グラフの正確な形が分かります。",
+			"atMs": 5184
+		}
+	],
+	"chunks": [
+		{
+			"index": 0,
+			"text": "二次関数は、",
+			"bytes": 52268,
+			"atMs": 3828,
+			"llmStatusAtAvailability": "running"
+		},
+		{
+			"index": 1,
+			"text": "変数xの2乗が含まれる方程式です。",
+			"bytes": 147500,
+			"atMs": 4211,
+			"llmStatusAtAvailability": "running"
+		},
+		{
+			"index": 2,
+			"text": "グラフは放物線を描き、",
+			"bytes": 92716,
+			"atMs": 4471,
+			"llmStatusAtAvailability": "running"
+		},
+		{
+			"index": 3,
+			"text": "頂点から左右対称に広がります。",
+			"bytes": 118828,
+			"atMs": 4733,
+			"llmStatusAtAvailability": "running"
+		},
+		{
+			"index": 4,
+			"text": "係数の値によって、",
+			"bytes": 69676,
+			"atMs": 4954,
+			"llmStatusAtAvailability": "running"
+		},
+		{
+			"index": 5,
+			"text": "グラフの向きや開き具合が決まります。",
+			"bytes": 115756,
+			"atMs": 5246,
+			"llmStatusAtAvailability": "completed"
+		},
+		{
+			"index": 6,
+			"text": "基本となる$y=x^2$を、",
+			"bytes": 189996,
+			"atMs": 5538,
+			"llmStatusAtAvailability": "completed"
+		},
+		{
+			"index": 7,
+			"text": "上下左右に移動させたものが一般形です。",
+			"bytes": 139308,
+			"atMs": 5832,
+			"llmStatusAtAvailability": "completed"
+		},
+		{
+			"index": 8,
+			"text": "頂点の座標を求めることで、",
+			"bytes": 100396,
+			"atMs": 5992,
+			"llmStatusAtAvailability": "completed"
+		},
+		{
+			"index": 9,
+			"text": "グラフの正確な形が分かります。",
+			"bytes": 113196,
+			"atMs": 6319,
+			"llmStatusAtAvailability": "completed"
+		}
+	],
+	"warmMs": 516,
+	"preview": {
+		"ms": 657,
+		"text": "二次ができる仕組みを詳しく。"
+	},
+	"asrVisibleMs": 978,
+	"transcript": "二次ができる仕組みを詳しく説明してください。",
+	"runId": "ec732350-d63e-4648-985b-bb01b876383d",
+	"firstTextMs": 3505,
+	"answerCompleteMs": 5184,
+	"totalMs": 6352,
+	"firstAudioMs": 3828,
+	"firstAudioBeforeAnswerComplete": true,
+	"inference": [
+		{
+			"purpose": "tts",
+			"status": "succeeded",
+			"accepted": 1,
+			"model": "voicevox-core",
+			"providerDetails": [
+				{
+					"connectionId": "aconn_epoch-e1e5c2a7-0bf0-4635-ab6b-1d315b840fb7_8d8a0a9f-858c-4cba-ba4b-9c50ef621885",
+					"model": "voicevox-core",
+					"started": 1791422824057,
+					"httpStatus": 200
+				}
+			],
+			"ms": 308
+		},
+		{
+			"purpose": "tts",
+			"status": "succeeded",
+			"accepted": 1,
+			"model": "voicevox-core",
+			"providerDetails": [
+				{
+					"connectionId": "aconn_epoch-e1e5c2a7-0bf0-4635-ab6b-1d315b840fb7_8d8a0a9f-858c-4cba-ba4b-9c50ef621885",
+					"model": "voicevox-core",
+					"started": 1791422823876,
+					"httpStatus": 200
+				}
+			],
+			"ms": 180
+		},
+		{
+			"purpose": "tts",
+			"status": "succeeded",
+			"accepted": 1,
+			"model": "voicevox-core",
+			"providerDetails": [
+				{
+					"connectionId": "aconn_epoch-e1e5c2a7-0bf0-4635-ab6b-1d315b840fb7_8d8a0a9f-858c-4cba-ba4b-9c50ef621885",
+					"model": "voicevox-core",
+					"started": 1791422823607,
+					"httpStatus": 200
+				}
+			],
+			"ms": 268
+		},
+		{
+			"purpose": "tts",
+			"status": "succeeded",
+			"accepted": 1,
+			"model": "voicevox-core",
+			"providerDetails": [
+				{
+					"connectionId": "aconn_epoch-e1e5c2a7-0bf0-4635-ab6b-1d315b840fb7_8d8a0a9f-858c-4cba-ba4b-9c50ef621885",
+					"model": "voicevox-core",
+					"started": 1791422823318,
+					"httpStatus": 200
+				}
+			],
+			"ms": 288
+		},
+		{
+			"purpose": "tts",
+			"status": "succeeded",
+			"accepted": 1,
+			"model": "voicevox-core",
+			"providerDetails": [
+				{
+					"connectionId": "aconn_epoch-e1e5c2a7-0bf0-4635-ab6b-1d315b840fb7_8d8a0a9f-858c-4cba-ba4b-9c50ef621885",
+					"model": "voicevox-core",
+					"started": 1791422823026,
+					"httpStatus": 200
+				}
+			],
+			"ms": 289
+		},
+		{
+			"purpose": "tts",
+			"status": "succeeded",
+			"accepted": 1,
+			"model": "voicevox-core",
+			"providerDetails": [
+				{
+					"connectionId": "aconn_epoch-e1e5c2a7-0bf0-4635-ab6b-1d315b840fb7_8d8a0a9f-858c-4cba-ba4b-9c50ef621885",
+					"model": "voicevox-core",
+					"started": 1791422822806,
+					"httpStatus": 200
+				}
+			],
+			"ms": 218
+		},
+		{
+			"purpose": "tts",
+			"status": "succeeded",
+			"accepted": 1,
+			"model": "voicevox-core",
+			"providerDetails": [
+				{
+					"connectionId": "aconn_epoch-e1e5c2a7-0bf0-4635-ab6b-1d315b840fb7_8d8a0a9f-858c-4cba-ba4b-9c50ef621885",
+					"model": "voicevox-core",
+					"started": 1791422822517,
+					"httpStatus": 200
+				}
+			],
+			"ms": 286
+		},
+		{
+			"purpose": "tts",
+			"status": "succeeded",
+			"accepted": 1,
+			"model": "voicevox-core",
+			"providerDetails": [
+				{
+					"connectionId": "aconn_epoch-e1e5c2a7-0bf0-4635-ab6b-1d315b840fb7_8d8a0a9f-858c-4cba-ba4b-9c50ef621885",
+					"model": "voicevox-core",
+					"started": 1791422822281,
+					"httpStatus": 200
+				}
+			],
+			"ms": 233
+		},
+		{
+			"purpose": "tts",
+			"status": "succeeded",
+			"accepted": 1,
+			"model": "voicevox-core",
+			"providerDetails": [
+				{
+					"connectionId": "aconn_epoch-e1e5c2a7-0bf0-4635-ab6b-1d315b840fb7_8d8a0a9f-858c-4cba-ba4b-9c50ef621885",
+					"model": "voicevox-core",
+					"started": 1791422821893,
+					"httpStatus": 200
+				}
+			],
+			"ms": 387
+		},
+		{
+			"purpose": "tts",
+			"status": "succeeded",
+			"accepted": 1,
+			"model": "voicevox-core",
+			"providerDetails": [
+				{
+					"connectionId": "aconn_epoch-e1e5c2a7-0bf0-4635-ab6b-1d315b840fb7_8d8a0a9f-858c-4cba-ba4b-9c50ef621885",
+					"model": "voicevox-core",
+					"started": 1791422821655,
+					"httpStatus": 200
+				}
+			],
+			"ms": 259
+		},
+		{
+			"purpose": "llm",
+			"status": "succeeded",
+			"accepted": 1,
+			"model": "gemma4-26b-a4b",
+			"providerDetails": [
+				{
+					"connectionId": "aconn_epoch-e1e5c2a7-0bf0-4635-ab6b-1d315b840fb7_8d8a0a9f-858c-4cba-ba4b-9c50ef621885",
+					"model": "gemma4-26b-a4b",
+					"started": 1791422819050,
+					"httpStatus": 200
+				}
+			],
+			"ms": 4207
+		},
+		{
+			"purpose": "asr",
+			"status": "succeeded",
+			"accepted": 1,
+			"model": "qwen3-asr-1.7b",
+			"providerDetails": [
+				{
+					"connectionId": "aconn_epoch-e1e5c2a7-0bf0-4635-ab6b-1d315b840fb7_8d8a0a9f-858c-4cba-ba4b-9c50ef621885",
+					"model": "qwen3-asr-1.7b",
+					"started": 1791422818077,
+					"httpStatus": 200
+				}
+			],
+			"ms": 962
+		},
+		{
+			"purpose": "asr",
+			"status": "succeeded",
+			"accepted": 1,
+			"model": "qwen3-asr-1.7b",
+			"providerDetails": [
+				{
+					"connectionId": "aconn_epoch-e1e5c2a7-0bf0-4635-ab6b-1d315b840fb7_8d8a0a9f-858c-4cba-ba4b-9c50ef621885",
+					"model": "qwen3-asr-1.7b",
+					"started": 1791422817427,
+					"httpStatus": 200
+				}
+			],
+			"ms": 651
+		}
+	]
+}

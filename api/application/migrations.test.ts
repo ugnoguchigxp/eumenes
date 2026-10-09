@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { Database } from "bun:sqlite";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -42,6 +43,63 @@ test("a fresh database gets every migration and passes the memory schema check",
 		const store = openStore(join(dir, "db.sqlite3"), migrations);
 		store.read((db) => assertMemorySchema(db));
 		await store.close();
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("an applied migration that is rewritten later stops startup with its id only", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "eumenes-checksum-"));
+	try {
+		const path = join(dir, "db.sqlite3");
+		const original = [
+			"CREATE TABLE a (x INTEGER)",
+			"CREATE TABLE b (y INTEGER)",
+		];
+		const store = openStore(path, original);
+		await store.close();
+		const rewritten = [original[0]!, "CREATE TABLE b (y INTEGER, z TEXT)"];
+		let error: unknown;
+		try {
+			openStore(path, rewritten);
+		} catch (e) {
+			error = e;
+		}
+		expect(error).toBeInstanceOf(Error);
+		expect((error as Error).message).toBe("migration_checksum_mismatch");
+		expect((error as { migrationId: number }).migrationId).toBe(2);
+		expect(JSON.stringify(error)).not.toContain("CREATE TABLE");
+		// The unchanged list still opens.
+		const again = openStore(path, original);
+		await again.close();
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("a database from before checksums is backfilled once and then verified", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "eumenes-checksum-legacy-"));
+	try {
+		const path = join(dir, "db.sqlite3");
+		const list = ["CREATE TABLE a (x INTEGER)", "CREATE TABLE b (y INTEGER)"];
+		const legacy = new Database(path, { create: true });
+		legacy.exec(
+			"CREATE TABLE schema_migrations (id INTEGER PRIMARY KEY); INSERT INTO schema_migrations (id) VALUES (1),(2);" +
+				list.join(";"),
+		);
+		legacy.close();
+		const store = openStore(path, list);
+		const rows = store.read((db) =>
+			db.query("SELECT id, checksum FROM schema_migrations ORDER BY id").all(),
+		) as { id: number; checksum: string | null }[];
+		expect(rows.map((r) => r.id)).toEqual([1, 2]);
+		expect(rows.every((r) => /^[0-9a-f]{64}$/.test(r.checksum ?? ""))).toBe(
+			true,
+		);
+		await store.close();
+		expect(() =>
+			openStore(path, [list[0]!, "CREATE TABLE b (y TEXT)"]),
+		).toThrow("migration_checksum_mismatch");
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
 	}

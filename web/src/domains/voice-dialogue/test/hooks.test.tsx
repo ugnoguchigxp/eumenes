@@ -5,6 +5,7 @@ import { expect, test, vi } from "vitest";
 import type { VoiceDialogueClient } from "../../../../../client/voice-dialogue";
 import {
 	createAudioController,
+	type CreateAudio,
 	createAudioStore,
 	type AudioController,
 } from "../../audio";
@@ -114,7 +115,7 @@ test("stopping during session creation prevents a late microphone start", async 
 		stop: async () => {},
 		stopPlayback: () => {},
 		play: async () => {},
-	})) as unknown as typeof createAudioController;
+	})) as unknown as CreateAudio;
 	const hook = renderHook(
 		() => useVoiceDialogue(client, createAudioStore(), createAudio),
 		{ wrapper },
@@ -207,11 +208,7 @@ test("chunk playback stays ordered and interruption releases the old queue for a
 			starts.push(options?.onStarted ?? (() => {}));
 		},
 	);
-	const createAudio: typeof createAudioController = (
-		_state,
-		onSpeech,
-		onSegment,
-	) => {
+	const createAudio: CreateAudio = (_state, onSpeech, onSegment) => {
 		speech = onSpeech;
 		segment = onSegment;
 		return {
@@ -311,11 +308,7 @@ test("an unfinalized speech candidate neither cancels nor hides an accepted reco
 		sessionId = "";
 	let acceptFirst = () => {};
 	const order: string[] = [];
-	const createAudio: typeof createAudioController = (
-		state,
-		onSpeech,
-		onSegment,
-	) => {
+	const createAudio: CreateAudio = (state, onSpeech, onSegment) => {
 		speech = onSpeech;
 		segment = onSegment;
 		return {
@@ -423,11 +416,7 @@ test("muting stops playback at once and releases the running turn", async () => 
 		sessionId = "";
 	const stopPlayback = vi.fn();
 	const play = vi.fn(async () => {});
-	const createAudio: typeof createAudioController = (
-		_state,
-		_onSpeech,
-		onSegment,
-	) => {
+	const createAudio: CreateAudio = (_state, _onSpeech, onSegment) => {
 		segment = onSegment;
 		return { start: async () => {}, stop: async () => {}, stopPlayback, play };
 	};
@@ -488,12 +477,7 @@ test("callbacks and upload failures from a stopped microphone cannot affect a ne
 		segment: (wav: Uint8Array) => void;
 		partial?: (wav: Uint8Array) => void;
 	}> = [];
-	const createAudio: typeof createAudioController = (
-		_state,
-		speech,
-		segment,
-		options,
-	) => {
+	const createAudio: CreateAudio = (_state, speech, segment, options) => {
 		microphones.push({ speech, segment, partial: options?.onPartial });
 		return {
 			start: async () => {},
@@ -558,11 +542,7 @@ test("a rejected next upload does not cancel the previous accepted answer", asyn
 	let sessionId = "";
 	let ready = false;
 	const play = vi.fn(async () => {});
-	const createAudio: typeof createAudioController = (
-		_state,
-		_speech,
-		onSegment,
-	) => {
+	const createAudio: CreateAudio = (_state, _speech, onSegment) => {
 		segment = onSegment;
 		return {
 			start: async () => {},
@@ -640,11 +620,7 @@ test("stopping during the upload retry delay prevents a stale retry", async () =
 		<QueryClientProvider client={query}>{children}</QueryClientProvider>
 	);
 	let segment = (_wav: Uint8Array) => {};
-	const createAudio: typeof createAudioController = (
-		_state,
-		_speech,
-		onSegment,
-	) => {
+	const createAudio: CreateAudio = (_state, _speech, onSegment) => {
 		segment = onSegment;
 		return {
 			start: async () => {},
@@ -689,11 +665,7 @@ test("a delayed stop cannot clear a new turn or reset the new microphone state",
 	);
 	const microphones: Array<(wav: Uint8Array) => void> = [];
 	let finishStop = () => {};
-	const createAudio: typeof createAudioController = (
-		state,
-		_speech,
-		segment,
-	) => {
+	const createAudio: CreateAudio = (state, _speech, segment) => {
 		microphones.push(segment);
 		const first = microphones.length === 1;
 		return {

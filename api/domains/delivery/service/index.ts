@@ -1,7 +1,12 @@
+import { decisionDetails, RURI_MODEL } from "./result";
 import { z } from "zod";
 import { emotionCandidates, expressionText } from "./evidence";
 export { emotionCandidates } from "./evidence";
+export { acceptedEmotion };
+export type { Judge };
 import {
+	acceptedEmotion,
+	type Judge,
 	emotionSchema,
 	type Emotion,
 	type DeliveryContext,
@@ -13,7 +18,7 @@ export const speechQuestions: ChoiceQuestions = {
 	emotion: {
 		type: "choice",
 		instructions:
-			"アシスタントの返答に表れている感情は？会話は参考情報。返答を分類してください。",
+			"現在の回答をアシスタント自身が話す表情と声色を選んでください。文章中の感情やユーザーの感情ではなく、話す態度を分類してください。",
 		criteria: {
 			none: "通常。事実・操作手順の説明",
 			warmth: "親しみ。素敵・ありがとう・挨拶・温かい言葉",
@@ -24,7 +29,7 @@ export const speechQuestions: ChoiceQuestions = {
 		},
 	},
 };
-const resultSchema = z.object({
+export const resultSchema = z.object({
 	answers: z.object({
 		emotion: z.object({
 			type: z.literal("choice"),
@@ -33,6 +38,9 @@ const resultSchema = z.object({
 			answer_confidence: z.number().min(0).max(1),
 		}),
 	}),
+	model: z.string().optional(),
+	truncated: z.boolean().optional(),
+	state_tokens_dropped: z.number().nonnegative().optional(),
 	usage: z
 		.object({
 			truncated: z.boolean().optional(),
@@ -67,25 +75,22 @@ export function deliveryState(text: string, context?: DeliveryContext) {
 		text: excerpt(expressionText(turn.text), 120),
 	}));
 	if (turns?.length) state.conversation = JSON.stringify(turns);
+	state.current_chunk = excerpt(context?.answer || text, 600);
 	state.response = excerpt(expressionText(context?.answer || text), 600);
 	return state;
 }
-type Judge = (
-	state: Record<string, string>,
-	questions: ChoiceQuestions,
-	signal: AbortSignal,
-) => Promise<unknown>;
-
 export async function chooseSpeechDelivery(
 	judge: Judge | undefined,
 	text: string,
 	signal: AbortSignal,
 	budgetMs = 2000,
 	context?: DeliveryContext,
+	options: { fullCandidates?: boolean } = {},
 ): Promise<SpeechDelivery> {
 	signal.throwIfAborted();
 	const started = performance.now();
 	const id = crypto.randomUUID();
+	let details = decisionDetails(null);
 	const fallback = (reason: SpeechDelivery["reason"]): SpeechDelivery => ({
 		id,
 		version: 2,
@@ -96,10 +101,14 @@ export async function chooseSpeechDelivery(
 		source: "fallback",
 		reason,
 		confidence: 0,
+		model: details.model,
+		calibrationStatus: details.calibration_status,
 		latencyMs: Math.round(performance.now() - started),
 	});
 	if (!judge || !text.trim()) return fallback("unavailable");
-	const candidates = emotionCandidates(text, context);
+	const candidates = options.fullCandidates
+		? emotionSchema.options.filter((label) => label !== "none")
+		: emotionCandidates(text, context);
 	if (!candidates.length) return fallback("not-expressive");
 	const questions: ChoiceQuestions = {
 		emotion: {
@@ -135,15 +144,38 @@ export async function chooseSpeechDelivery(
 		]);
 		signal.throwIfAborted();
 		if (abort.signal.aborted) return fallback("timeout");
+		details = decisionDetails(response);
 		const parsed = resultSchema.safeParse(response);
 		if (
 			!parsed.success ||
+			parsed.data.truncated ||
+			(parsed.data.state_tokens_dropped ?? 0) > 0 ||
 			parsed.data.usage?.truncated ||
 			(parsed.data.usage?.state_tokens_dropped ?? 0) > 0
 		)
 			return fallback("invalid");
 		const choice = parsed.data.answers.emotion;
 		if (choice.choice !== "none" && !candidates.includes(choice.choice))
+			return fallback("invalid");
+		if (
+			(details.model ?? details.claimed_model) === RURI_MODEL &&
+			(!details.logits || !details.scores)
+		)
+			return fallback("invalid");
+		if (
+			(details.model ?? details.claimed_model) === RURI_MODEL &&
+			details.top_label &&
+			!(details.top_label in questions.emotion!.criteria)
+		)
+			return {
+				...fallback("candidate-restricted"),
+				model: details.model,
+				calibrationStatus: details.calibration_status,
+			};
+		if (
+			(details.model ?? details.claimed_model) === RURI_MODEL &&
+			!details.valid
+		)
 			return fallback("invalid");
 		const confidence = choice.answer_confidence;
 		if (confidence < 0.6) return fallback("low-confidence");
@@ -153,7 +185,15 @@ export async function chooseSpeechDelivery(
 			emotion: choice.choice,
 			emotionConfidence: confidence,
 			...emotionPerformance[choice.choice],
-			source: "laya",
+			source:
+				(details.model ?? details.claimed_model) === RURI_MODEL
+					? "ruri"
+					: (details.model ?? details.claimed_model) &&
+						  !(details.model ?? details.claimed_model)!.startsWith("laya")
+						? "system-one"
+						: "laya",
+			model: details.model,
+			calibrationStatus: details.calibration_status,
 			confidence,
 			motionConfidence: confidence,
 			toneConfidence: confidence,
@@ -176,20 +216,10 @@ export async function chooseSpeechDelivery(
 	}
 }
 
-/** None and uncertain judgments never become a visible emotion. */
-export function acceptedEmotion(delivery: SpeechDelivery) {
-	return delivery.version === 2 &&
-		delivery.source === "laya" &&
-		delivery.emotion &&
-		delivery.emotion !== "none" &&
-		(delivery.emotionConfidence ?? 0) >= 0.6
-		? delivery.emotion
-		: null;
-}
 export function acceptedAvatarMotion(delivery: SpeechDelivery) {
 	if (delivery.version === 2)
 		return acceptedEmotion(delivery) ? delivery.motion : null;
-	return delivery.source === "laya" &&
+	return delivery.source !== "fallback" &&
 		(delivery.motionConfidence ?? delivery.confidence) >= 0.6
 		? delivery.motion
 		: null;

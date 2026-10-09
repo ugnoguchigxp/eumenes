@@ -18,10 +18,31 @@ const endpoint = z
 			return false;
 		}
 	}, "URLには認証情報や検索文字列を含めないでください");
+const privateHost = (host: string) => {
+	const h = host.replace(/^\[|\]$/g, "");
+	if (h === "localhost" || h === "::1" || h.endsWith(".local")) return true;
+	const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(h);
+	if (!m) return false;
+	const [a, b] = [Number(m[1]), Number(m[2])];
+	return (
+		a === 127 ||
+		a === 10 ||
+		(a === 172 && b >= 16 && b <= 31) ||
+		(a === 192 && b === 168) ||
+		(a === 169 && b === 254)
+	);
+};
+// Bearer credentials may only travel over plain http on private networks.
+export const cloudEndpoint = endpoint.refine((value) => {
+	const u = new URL(value);
+	return u.protocol === "https:" || privateHost(u.hostname);
+}, "外部ホストには https が必要です");
 export const connectionSchema = z
 	.object({
 		id: z.uuid(),
 		name: z.string().trim().min(1).max(80),
+		// Read path stays lenient so settings saved before the https rule still load;
+		// applySchema enforces cloudEndpoint on input.
 		baseUrl: endpoint,
 		enabled: z.boolean(),
 		epoch: z.number().int().nonnegative(),
@@ -260,5 +281,27 @@ export const applySchema = z
 			)
 			.max(32),
 	})
-	.strict();
+	.strict()
+	.superRefine((input, ctx) => {
+		input.settings.connections.forEach((connection, index) => {
+			if (!cloudEndpoint.safeParse(connection.baseUrl).success)
+				ctx.addIssue({
+					code: "custom",
+					message: "外部ホストには https が必要です",
+					path: ["settings", "connections", index, "baseUrl"],
+				});
+		});
+	});
 export type ApplySettings = z.infer<typeof applySchema>;
+
+export const diagnosticsSchema = z.object({
+	keyError: z.string().nullable(),
+	connections: z.array(
+		z.object({
+			id: z.string(),
+			credentialAvailable: z.boolean(),
+			source: z.string(),
+		}),
+	),
+});
+export type Diagnostics = z.infer<typeof diagnosticsSchema>;

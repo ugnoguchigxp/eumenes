@@ -42,10 +42,11 @@ export function createLightAvatar(host) {
 	function dispose() {
 		if (disposed) return;
 		disposed = true;
+		// Detach promptly even if GPU resource cleanup is slow or throws.
+		renderer.domElement.remove();
 		for (const resource of resources) release(resource);
 		renderer.dispose();
 		renderer.forceContextLoss();
-		renderer.domElement.remove();
 	}
 	try {
 		renderer.info.autoReset = false;

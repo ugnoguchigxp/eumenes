@@ -1,3 +1,4 @@
+import { readBounded } from "../../../infrastructure/bounded-read";
 import type { Hono } from "hono";
 import { applySchema } from "../contracts";
 import type { SettingsService } from "../service";
@@ -5,25 +6,18 @@ export function registerSettings(app: Hono, settings: SettingsService) {
 	app.get("/api/settings", (c) => c.json(settings.get()));
 	app.get("/api/settings/diagnostics", (c) => c.json(settings.diagnostics()));
 	app.post("/api/settings/apply", async (c) => {
-		const reader = c.req.raw.body?.getReader();
-		if (!reader) return c.json({ error: "invalid_body" }, 400);
-		const chunks: Uint8Array[] = [];
-		let size = 0;
-		for (;;) {
-			const { done, value } = await reader.read();
-			if (done) break;
-			size += value.length;
-			if (size > 65536) {
-				await reader.cancel();
-				return c.json({ error: "invalid_body_size" }, 413);
-			}
-			chunks.push(value);
-		}
-		const bytes = new Uint8Array(size);
-		let offset = 0;
-		for (const chunk of chunks) {
-			bytes.set(chunk, offset);
-			offset += chunk.length;
+		let bytes: Uint8Array;
+		try {
+			bytes = await readBounded(c.req.raw.body, {
+				limit: 65536,
+				tooLarge: "invalid_body_size",
+				missing: "invalid_body",
+			});
+		} catch (error) {
+			const code = error instanceof Error ? error.message : "";
+			if (code === "invalid_body_size") return c.json({ error: code }, 413);
+			if (code === "invalid_body") return c.json({ error: code }, 400);
+			throw error;
 		}
 		let raw: unknown;
 		try {

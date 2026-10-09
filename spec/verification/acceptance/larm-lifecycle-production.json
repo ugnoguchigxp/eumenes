@@ -1,0 +1,33 @@
+{
+	"captured": "2026-10-08T01:31:17.211Z",
+	"latestAttempt": {
+		"id": "95d5a90c-66fa-466e-9227-6b6d364212b6",
+		"requestId": "fb66a847-42f2-4105-8da1-6345e7988a82",
+		"subject": "1dabdde7-80fe-4ead-ab0f-767dd03c71fa",
+		"purpose": "llm",
+		"source": "larm",
+		"model": "gemma4-26b-a4b",
+		"status": "succeeded",
+		"reason": null,
+		"started": 1791422962950,
+		"ended": 1791422967412,
+		"accepted": 1,
+		"inputTokens": null,
+		"outputTokens": null,
+		"providerDetails": [
+			{
+				"connectionId": "aconn_epoch-e1e5c2a7-0bf0-4635-ab6b-1d315b840fb7_d375e99e-45d9-4059-b96e-a3dc9bedb435",
+				"model": "gemma4-26b-a4b",
+				"started": 1791422962951,
+				"httpStatus": 200
+			}
+		]
+	},
+	"contextStill": {
+		"compileCalls": 1,
+		"evalCalls": 1,
+		"runId": "00000000-0000-0000-18dc-68b4fb76e68d",
+		"evalId": "00000000-0000-0000-18dc-69bca22a7848"
+	},
+	"physicalVoice": "not accepted"
+}

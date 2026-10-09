@@ -1,3 +1,7 @@
+import {
+	registerAttitudeDataset,
+	type AttitudeDataset,
+} from "../domains/attitude-dataset";
 import { getLogger, withLogContext } from "../infrastructure/logger";
 import { Hono } from "hono";
 import {
@@ -24,11 +28,22 @@ import {
 	type TtsDictionaryService,
 } from "../domains/tts-dictionary";
 import type { Changes } from "./events";
+import { statusForError } from "./error-status";
+import { createHash, timingSafeEqual } from "node:crypto";
 import {
 	registerServiceTests,
 	type ServiceTests,
 } from "../domains/service-tests";
+const digest = (value: string) => createHash("sha256").update(value).digest();
+const safeEqual = (a: string, b: string) =>
+	timingSafeEqual(digest(a), digest(b));
+const maxJsonBytes = 1024 * 1024;
+// Audio uploads are bounded by their own streaming reader (4MB).
+const isAudioUpload = (path: string) =>
+	path === "/api/voice/turns" || path === "/api/voice/preview";
+
 export function createApp(deps: {
+	attitudeDataset?: AttitudeDataset;
 	token: string;
 	origin: string;
 	conversation: ConversationService;
@@ -81,12 +96,25 @@ export function createApp(deps: {
 			c.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
 		}
 		if (c.req.method === "OPTIONS") return c.body(null, 204);
-		if (c.req.header("authorization") !== `Bearer ${deps.token}`)
+		if (!safeEqual(c.req.header("authorization") ?? "", `Bearer ${deps.token}`))
 			return c.json({ error: "unauthorized" }, 401);
+		if (
+			c.req.method !== "GET" &&
+			c.req.method !== "HEAD" &&
+			!isAudioUpload(c.req.path)
+		) {
+			const length = c.req.header("content-length");
+			if (length === undefined) {
+				if (c.req.header("transfer-encoding"))
+					return c.json({ error: "length_required" }, 411);
+			} else if (!(Number(length) <= maxJsonBytes))
+				return c.json({ error: "payload_too_large" }, 413);
+		}
 		await next();
 	});
 	if (deps.changes)
 		app.get("/api/events", (c) => deps.changes!.open(c.req.raw.signal));
+	if (deps.attitudeDataset) registerAttitudeDataset(app, deps.attitudeDataset);
 	registerLarmStatus(app, deps.larm);
 	if (deps.settings) registerSettings(app, deps.settings);
 	if (deps.inference) registerInference(app, deps.inference);
@@ -101,26 +129,7 @@ export function createApp(deps: {
 	registerScheduler(app, deps.scheduler);
 	app.onError((error, c) => {
 		const message = error instanceof Error ? error.message : "internal_error";
-		const status =
-			message === "request_conflict" ||
-			message === "revision_conflict" ||
-			message === "voice_sequence_out_of_order" ||
-			message === "voice_utterance_conflict" ||
-			message === "schedule_state_conflict" ||
-			message === "memory_unavailable" ||
-			message === "voice_preview_busy"
-				? 409
-				: message.startsWith("invalid_") ||
-					  message === "voice_sequence_invalid" ||
-					  message.startsWith("voice_session_") ||
-					  message.startsWith("stale_")
-					? 400
-					: message === "database_writer_queue_full" ||
-						  message === "queue_full" ||
-						  message === "schedule_limit_reached" ||
-						  message === "stream_capacity"
-						? 503
-						: 500;
+		const status = statusForError(message);
 		// Internal failures never leak details to the client.
 		if (status === 500) {
 			log.error("http.failed", { reason: "internal_error", status }, error);

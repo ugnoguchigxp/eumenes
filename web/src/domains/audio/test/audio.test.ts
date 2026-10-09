@@ -488,3 +488,218 @@ test("half duplex ignores the microphone while our own reply plays and briefly a
 	await audio.stop();
 	vi.restoreAllMocks();
 });
+
+function fakeAudioEnvironment(getUserMedia: (c: unknown) => Promise<unknown>) {
+	class FakeContext extends EventTarget {
+		sampleRate = 48000;
+		state = "running";
+		destination = {};
+		async resume() {}
+		async close() {}
+		createMediaStreamSource() {
+			return { connect: () => {}, disconnect: () => {} };
+		}
+		createScriptProcessor() {
+			return { connect: () => {}, disconnect: () => {} };
+		}
+	}
+	const contexts: FakeContext[] = [];
+	vi.stubGlobal(
+		"AudioContext",
+		class extends FakeContext {
+			constructor() {
+				super();
+				contexts.push(this);
+			}
+		},
+	);
+	const devices = Object.assign(new EventTarget(), {
+		getUserMedia,
+		enumerateDevices: async () => [] as MediaDeviceInfo[],
+	});
+	vi.stubGlobal("navigator", { mediaDevices: devices });
+	return { contexts, devices };
+}
+function fakeStream() {
+	const track = Object.assign(new EventTarget(), {
+		stop() {},
+		getSettings: () => ({ deviceId: "mic-1" }),
+	});
+	return {
+		track,
+		stream: { getTracks: () => [track], getAudioTracks: () => [track] },
+	};
+}
+
+test("a microphone track ending reports mic_lost once and listeners are released", async () => {
+	const { track, stream } = fakeStream();
+	fakeAudioEnvironment(async () => stream);
+	const lost = vi.fn();
+	const audio = createAudioController(
+		() => {},
+		() => {},
+		() => {},
+		{ onLost: lost },
+	);
+	await audio.start();
+	track.dispatchEvent(new Event("ended"));
+	track.dispatchEvent(new Event("ended"));
+	expect(lost).toHaveBeenCalledOnce();
+	expect(lost).toHaveBeenCalledWith("mic_lost");
+	await audio.stop();
+});
+
+test("removing the active device from the device list reports mic_lost", async () => {
+	const { stream } = fakeStream();
+	const env = fakeAudioEnvironment(async () => stream);
+	const lost = vi.fn();
+	const audio = createAudioController(
+		() => {},
+		() => {},
+		() => {},
+		{ onLost: lost },
+	);
+	await audio.start();
+	env.devices.dispatchEvent(new Event("devicechange"));
+	await vi.waitFor(() => expect(lost).toHaveBeenCalledWith("mic_lost"));
+	await audio.stop();
+	lost.mockClear();
+	env.devices.dispatchEvent(new Event("devicechange"));
+	await Promise.resolve();
+	expect(lost).not.toHaveBeenCalled();
+});
+
+test("a suspended AudioContext is resumed once, then reported", async () => {
+	const { stream } = fakeStream();
+	const env = fakeAudioEnvironment(async () => stream);
+	const lost = vi.fn();
+	const audio = createAudioController(
+		() => {},
+		() => {},
+		() => {},
+		{ onLost: lost },
+	);
+	await audio.start();
+	const context = env.contexts[0]!;
+	context.resume = vi.fn(async () => {});
+	context.state = "suspended";
+	context.dispatchEvent(new Event("statechange"));
+	await Promise.resolve();
+	expect(context.resume).toHaveBeenCalledOnce();
+	expect(lost).not.toHaveBeenCalled();
+	context.dispatchEvent(new Event("statechange"));
+	expect(lost).toHaveBeenCalledWith("audio_context_lost");
+	await audio.stop();
+});
+
+test("a missing saved device falls back to the default microphone once", async () => {
+	const { stream } = fakeStream();
+	const calls: unknown[] = [];
+	fakeAudioEnvironment(async (constraints) => {
+		calls.push(constraints);
+		if (calls.length === 1)
+			throw Object.assign(new Error(""), { name: "OverconstrainedError" });
+		return stream;
+	});
+	const notice = vi.fn();
+	const audio = createAudioController(
+		() => {},
+		() => {},
+		() => {},
+		{ inputDevice: "gone", onNotice: notice },
+	);
+	await audio.start();
+	expect(calls).toHaveLength(2);
+	expect(JSON.stringify(calls[1])).not.toContain("exact");
+	expect(notice).toHaveBeenCalledWith("saved_device_missing");
+	await audio.stop();
+});
+
+test("capture uses an AudioWorklet and batches its blocks into 2048-sample frames", async () => {
+	const { stream } = fakeStream();
+	const env = fakeAudioEnvironment(async () => stream);
+	const nodes: Array<{ port: { onmessage: ((e: unknown) => void) | null } }> =
+		[];
+	const addModule = vi.fn(async () => {});
+	vi.stubGlobal(
+		"AudioContext",
+		class extends EventTarget {
+			sampleRate = 48000;
+			state = "running";
+			destination = {};
+			audioWorklet = { addModule };
+			async resume() {}
+			async close() {}
+			createMediaStreamSource() {
+				return { connect: () => {}, disconnect: () => {} };
+			}
+		},
+	);
+	vi.stubGlobal(
+		"AudioWorkletNode",
+		class {
+			port: { onmessage: ((e: unknown) => void) | null } = { onmessage: null };
+			constructor() {
+				nodes.push(this);
+			}
+			connect() {}
+			disconnect() {}
+		},
+	);
+	void env;
+	const speech = vi.fn();
+	const audio = createAudioController(
+		() => {},
+		speech,
+		() => {},
+		{ threshold: 0.001 },
+	);
+	await audio.start();
+	expect(addModule).toHaveBeenCalledOnce();
+	const loud = Float32Array.from({ length: 128 }, (_, i) =>
+		i % 2 ? 0.5 : -0.5,
+	);
+	for (let i = 0; i < 15; i++) nodes[0]!.port.onmessage?.({ data: loud });
+	expect(speech).not.toHaveBeenCalled();
+	for (let i = 0; i < 16 * 12; i++) nodes[0]!.port.onmessage?.({ data: loud });
+	await vi.waitFor(() => expect(speech).toHaveBeenCalled());
+	await audio.stop();
+	expect(nodes[0]!.port.onmessage).toBeNull();
+});
+
+test("capture falls back to ScriptProcessorNode when the worklet cannot load", async () => {
+	const { stream } = fakeStream();
+	fakeAudioEnvironment(async () => stream);
+	const processors: unknown[] = [];
+	vi.stubGlobal(
+		"AudioContext",
+		class extends EventTarget {
+			sampleRate = 48000;
+			state = "running";
+			destination = {};
+			audioWorklet = {
+				addModule: async () => {
+					throw new Error("blocked");
+				},
+			};
+			async resume() {}
+			async close() {}
+			createMediaStreamSource() {
+				return { connect: () => {}, disconnect: () => {} };
+			}
+			createScriptProcessor() {
+				const node = { connect() {}, disconnect() {}, onaudioprocess: null };
+				processors.push(node);
+				return node;
+			}
+		},
+	);
+	const audio = createAudioController(
+		() => {},
+		() => {},
+		() => {},
+	);
+	await audio.start();
+	expect(processors).toHaveLength(1);
+	await audio.stop();
+});

@@ -7,7 +7,7 @@ TypeScript、Bun、Hono、React、SQLite によるローカル音声対話の初
 ## 起動
 
 1. `bun install`
-2. 必要に応じて `.env.example` を `.env` にコピーします。`LARM_API_TOKEN` が export 済みなら追加のトークン設定は不要です。backend・開発サーバー・CLI は同じ環境変数を引き継ぐシェルから起動してください。`EUMENES_API_TOKEN` は空欄のままにでき、ローカル API 用の認証値を LARM トークンから用途を分けて生成します。明示的に指定する場合は24文字以上にします。同じ `.env` を backend と Vite が読み、Vite のローカル proxy が API 認証を付けます。ブラウザには token を渡しません。LARM は `http://192.168.0.130:9810` の `SAAA-gemma4-26b` を既定値とし、同じ Linux ホストから使う場合は URL を `http://127.0.0.1:9810`、`LARM_AUDIENCE` を `same-host` にします。LARM 認証は SAAA と共通の `LARM_API_TOKEN` を優先し、未指定なら `LARM_CONTROL_TOKEN` を使います。TTS の声は「設定 → 音声」でキャラクター・発話スタイル・話す速さ・声の高さ・抑揚・音量を調整できます。声一覧と合成には claim した TTS Provider の baseUrl・model・token を使い、秘密をブラウザへ渡しません。VOICEVOXの自動選択では catalog の `default_voice` を使います。スタイル・高さ・抑揚は `voicevox-core` にだけ送信します。設定がまだない場合の voice 初期値は `EUMENES_TTS_VOICE` で、他モデルでは claim の voice または catalog の既定 voice を使います。秘密をリポジトリへコピーしないでください。
+2. 必要に応じて `.env.example` を `.env` にコピーします。`LARM_API_TOKEN` が export 済みなら追加のトークン設定は不要です。backend・開発サーバー・CLI は同じ環境変数を引き継ぐシェルから起動してください。`EUMENES_API_TOKEN` は空欄のままにでき、ローカル API 用の認証値を LARM トークンから用途を分けて生成します。明示的に指定する場合は24文字以上にします。同じ `.env` を backend と Vite が読み、Vite のローカル proxy が API 認証を付けます。ブラウザには token を渡しません。LARM は `http://192.168.0.130:9810` の `SAAA-gemma4-26b` を既定値とします。LARM token は LAN 上を平文で流れるため、信頼できる LAN でのみ使用してください。同じ Linux ホストから使う場合は URL を `http://127.0.0.1:9810`、`LARM_AUDIENCE` を `same-host` にします。LARM 認証は SAAA と共通の `LARM_API_TOKEN` を優先し、未指定なら `LARM_CONTROL_TOKEN` を使います。TTS の声は「設定 → 音声」でキャラクター・発話スタイル・話す速さ・声の高さ・抑揚・音量を調整できます。声一覧と合成には claim した TTS Provider の baseUrl・model・token を使い、秘密をブラウザへ渡しません。VOICEVOXの自動選択では catalog の `default_voice` を使います。スタイル・高さ・抑揚は `voicevox-core` にだけ送信します。設定がまだない場合の voice 初期値は `EUMENES_TTS_VOICE` で、他モデルでは claim の voice または catalog の既定 voice を使います。秘密をリポジトリへコピーしないでください。
 3. `bun run dev` を実行します。APIが起動してから画面用サーバーを起動し、Ctrl+Cで両方を終了します。既にAPIを起動している場合は、一度終了してから実行してください。個別に起動する場合は、別々のターミナルで `bun run start` と `bun run dev:web` を使えます。
 4. `http://127.0.0.1:5173` を開くと会話欄に入ります。「音声を開始」でマイクを許可し、日本語で話します。「停止」で録音と再生を終了します。再生中の次の発話は前の再生を割り込みます。
 
@@ -68,6 +68,8 @@ LARM_BASE_URL=... EUMENES_LIVE_ASR_WAV=/absolute/path/speech.wav EUMENES_LIVE_EX
 
 実機での実行、校正、モデルadapter、出力の読み方は[判断モデルのベンチマーク](scripts/decision-bench/README.md)を参照してください。通常の評価と集計はPython標準ライブラリで動き、モデルを直接ロードする場合だけ評価専用のライブラリ環境が必要です。
 
+GemmaのRuri発話態度判定は、実会話の異なる成功判定300件を専用DBへ収集できます。`bun run cli -- collection start`で開始し、`status`で収集・未レビュー・確認済み件数を確認、`stop`で停止します。初回の予測を隠した人手レビューと、会話・類似テンプレートを分けないtrain/calibration/evalのJSONL出力に対応しています。[収集・レビュー・exportの手順](docs/ruri-collection.md)と[互換性の検証記録](docs/ruri-verification.md)を参照してください。会話本文はGit管理外に保存します。
+
 ## 現在の限界と次の工程
 
 
@@ -80,7 +82,7 @@ RAG、個人記憶、ToolChain、経験再利用、Tauri、native AEC は後続�
 
 右上の「設定」から、AIの使い方、接続先、音声、データと利用記録、予約、表示を変更できます。LARMを優先し、接続不能・混雑・時間切れの場合は用途ごとに登録したクラウドへ自動で切り替えます。クラウドの送信許可と自動切替は初期値で有効ですが、代替先が未登録ならクラウドには送信しません。認証エラーや契約不一致、取消では自動切替しません。
 
-クラウドはOpenAI互換のChat Completions、multipart音声認識、WAV音声合成に対応します。接続名、ベースURL、モデルとAPIキーまたは環境変数名を登録し、「AIの使い方」で用途に割り当てて「変更を適用」を押します。一つの接続に複数の用途のモデルを追加できます。接続確認と少量の生成テストは保存済み設定を使い、サービスの利用が発生します。
+クラウドはOpenAI互換のChat Completions、multipart音声認識、WAV音声合成に対応します。ベースURLは、ループバック・プライベートLAN（10/172.16-31/192.168）・`.local`・リンクローカル以外では `https` が必要です。環境変数名で指定できるのは `EUMENES_CLOUD_` で始まる名前、主要プロバイダの標準キー名（`OPENAI_API_KEY`、`ANTHROPIC_API_KEY`、`GEMINI_API_KEY`、`GOOGLE_API_KEY`、`AZURE_OPENAI_API_KEY`、`GROQ_API_KEY`、`MISTRAL_API_KEY`、`DEEPSEEK_API_KEY`）、およびbackendの `EUMENES_ENV_REF_ALLOWLIST`（カンマ区切り）に載せた名前だけです。それ以外を指す既存設定は保存したままですが、利用時に `env_ref_not_allowed` で失敗します。接続名、ベースURL、モデルとAPIキーまたは環境変数名を登録し、「AIの使い方」で用途に割り当てて「変更を適用」を押します。一つの接続に複数の用途のモデルを追加できます。接続確認と少量の生成テストは保存済み設定を使い、サービスの利用が発生します。
 
 LARMのURL・Profile・audience・voiceは初回起動時に環境変数から取り込み、以降は設定画面に保存した値を使います。URLが空欄の場合はbackend既定の接続先を使います。LARM認証とクラウドキーの環境変数はbackendだけで読みます。環境変数を変更した場合はbackendを再起動してください。
 

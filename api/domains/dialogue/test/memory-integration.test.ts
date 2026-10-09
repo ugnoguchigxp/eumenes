@@ -117,15 +117,13 @@ async function setup(
 	const recovery = await memory.recover();
 	const queue = createQueue(store);
 	queue.start();
-	const dialogue = createDialogueService(
+	const dialogue = createDialogueService({
 		store,
 		conversation,
 		larm,
 		queue,
-		undefined,
-		undefined,
 		memory,
-	);
+	});
 	const harness = {
 		dir,
 		file,
@@ -826,8 +824,7 @@ test("a long multibyte conversation id works for continuity and runs", async () 
 test("the journal creates its directory on demand and repairs a missing trailing newline", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-journal-"));
 	try {
-		const { appendJournal, readJournal } =
-			await import("../../memory/service/journal");
+		const { appendJournal, readJournal } = await import("../../memory");
 		const path = join(dir, "a", "b", "journal.jsonl");
 		const entry = (seq: number) =>
 			({ journalFormat: 1, seq, forgetId: `f${seq}` }) as never;

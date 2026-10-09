@@ -1,5 +1,6 @@
 import { dlopen, FFIType } from "bun:ffi";
 import { Database } from "bun:sqlite";
+import { createHash } from "node:crypto";
 import {
 	closeSync,
 	constants,
@@ -19,6 +20,12 @@ const LOCK_UN = 8;
 export class WriterOwnedError extends Error {
 	constructor() {
 		super("database_writer_owned");
+	}
+}
+/** An applied migration was edited afterwards. Carries the id only, never SQL. */
+export class MigrationChecksumError extends Error {
+	constructor(public readonly migrationId: number) {
+		super("migration_checksum_mismatch");
 	}
 }
 export class WriterBusyError extends Error {
@@ -64,22 +71,41 @@ export function openStore(
 		migrationWriter.exec(
 			"CREATE TABLE IF NOT EXISTS schema_migrations (id INTEGER PRIMARY KEY)",
 		);
-		const applied = new Set(
+		const columns = migrationWriter
+			.query("PRAGMA table_info(schema_migrations)")
+			.all() as { name: string }[];
+		if (!columns.some((column) => column.name === "checksum"))
+			migrationWriter.exec(
+				"ALTER TABLE schema_migrations ADD COLUMN checksum TEXT",
+			);
+		const checksum = (sql: string) =>
+			createHash("sha256").update(sql).digest("hex");
+		const applied = new Map(
 			(
-				migrationWriter.query("SELECT id FROM schema_migrations").all() as {
-					id: number;
-				}[]
-			).map((x) => x.id),
+				migrationWriter
+					.query("SELECT id, checksum FROM schema_migrations")
+					.all() as { id: number; checksum: string | null }[]
+			).map((x) => [x.id, x.checksum]),
 		);
 		for (let i = 0; i < migrations.length; i++) {
-			if (applied.has(i + 1)) continue;
+			const id = i + 1;
 			const sql = migrations[i];
 			if (!sql) throw new Error("missing_migration");
+			if (applied.has(id)) {
+				const stored = applied.get(id);
+				// Rows from before checksums existed trust the current definition once.
+				if (stored == null)
+					migrationWriter
+						.query("UPDATE schema_migrations SET checksum=? WHERE id=?")
+						.run(checksum(sql), id);
+				else if (stored !== checksum(sql)) throw new MigrationChecksumError(id);
+				continue;
+			}
 			migrationWriter.transaction(() => {
 				migrationWriter.exec(sql);
 				migrationWriter
-					.query("INSERT INTO schema_migrations (id) VALUES (?)")
-					.run(i + 1);
+					.query("INSERT INTO schema_migrations (id, checksum) VALUES (?, ?)")
+					.run(id, checksum(sql));
 			})();
 		}
 		reader = new Database(canonical, { readonly: true });

@@ -1,0 +1,115 @@
+{
+	"change": "Web periodic snapshot polling replaced by authenticated shared SSE state invalidations; existing answer adoption and audio interaction retained",
+	"date": "2026-10-08",
+	"fullGate": {
+		"selected": [
+			"settings",
+			"inference",
+			"conversation",
+			"continuity",
+			"larm",
+			"audio",
+			"queue",
+			"scheduler",
+			"dialogue",
+			"voice-dialogue"
+		],
+		"dependencySet": [
+			"settings",
+			"larm",
+			"inference",
+			"conversation",
+			"continuity",
+			"audio",
+			"queue",
+			"scheduler",
+			"dialogue",
+			"voice-dialogue"
+		],
+		"revision": "c9af7720d90a507d04e25279d5f39e683596e9f1fc4b72b7ea72ab291f351dec",
+		"steps": [
+			{
+				"name": "format",
+				"ms": 189,
+				"result": "pass"
+			},
+			{
+				"name": "lint",
+				"ms": 95,
+				"result": "pass"
+			},
+			{
+				"name": "typecheck",
+				"ms": 1918,
+				"result": "pass"
+			},
+			{
+				"name": "tests",
+				"ms": 5515,
+				"result": "pass"
+			},
+			{
+				"name": "web tests",
+				"ms": 2582,
+				"result": "pass"
+			},
+			{
+				"name": "web build",
+				"ms": 5709,
+				"result": "pass"
+			},
+			{
+				"name": "browser fixture",
+				"ms": 22197,
+				"result": "pass"
+			}
+		],
+		"totalMs": 38342,
+		"result": "pass"
+	},
+	"tests": {
+		"backend": 125,
+		"web": 28,
+		"browserFixture": 6
+	},
+	"domainChecks": {
+		"larm": "pass (12 tests)",
+		"dialogue": "pass (11 tests)",
+		"voice-dialogue": "pass (11 backend + 2 Web tests)"
+	},
+	"fixture": {
+		"idleObservationMs": 6200,
+		"additionalSnapshotRequests": 0,
+		"settledActiveSSEConnections": 1,
+		"coverage": [
+			"text and CLI update notifications",
+			"two consecutive browser synthetic voice turns and playback",
+			"backend outage and explicit reconnect",
+			"shared connection and cancellation cleanup",
+			"missed changes and server-session reset",
+			"half-open watchdog",
+			"401/403/404 automatic retry stop",
+			"commit versus rollback and idle scan",
+			"bounded slow clients",
+			"settings and schedules"
+		]
+	},
+	"live": {
+		"apiProxyStatus": 200,
+		"larmState": "ready",
+		"sseProxyStatus": 200,
+		"sseContentType": "text/event-stream",
+		"initialReset": true,
+		"heartbeat": true,
+		"currentBrowserReloaded": true,
+		"serverErrorLinesAfterRestart": 0
+	},
+	"limitations": [
+		"Real microphone/headphone three-round acceptance remains unperformed. Browser voice tests use a synthetic microphone and fixture provider. Live SSE validation checks connectivity and heartbeat; no new real voice conversation was submitted."
+	],
+	"contextStill": {
+		"scope": "this SSE change",
+		"context_compile": 1,
+		"compile_eval": 1
+	}
+}

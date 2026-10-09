@@ -85,6 +85,14 @@ interface Active {
 	deadlineHit: boolean;
 }
 
+/** Only machine-readable codes are persisted; free text may carry Provider output. */
+export function toErrorCode(e: unknown): string {
+	if (!(e instanceof Error) || !e.message) return "execution_failed";
+	return /^[a-z][a-z0-9_:]{0,100}$/.test(e.message)
+		? e.message
+		: "handler_failed";
+}
+
 function claimOf(job: JobRecord): JobClaim {
 	return {
 		jobId: job.id,
@@ -481,10 +489,7 @@ export function createRunner(
 					: { type: "success", result: result.value };
 			if (closing) return { type: "interrupted", errorCode: "shutdown" };
 			if (a.deadlineHit || late) return { type: "expired" };
-			const errorCode =
-				result.error instanceof Error && result.error.message
-					? result.error.message.slice(0, 120)
-					: "execution_failed";
+			const errorCode = toErrorCode(result.error);
 			const retryable =
 				a.handler.classify?.(result.error) === "retry" &&
 				job.attempt < job.maxAttempts;

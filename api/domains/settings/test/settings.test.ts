@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { openStore } from "../../../infrastructure/sqlite";
 import { createSettings, migration, epochsMigration } from "..";
 import type { Settings } from "../contracts";
-import { settingsSchema } from "../contracts";
+import { applySchema, cloudEndpoint, settingsSchema } from "../contracts";
 const cleanup: Array<() => Promise<void>> = [];
 test("old settings retain normal playback; speech adjustments validate and persist", async () => {
 	const h = await setup();
@@ -291,4 +291,75 @@ test("key replacement, key deletion and connection deletion discard obsolete cip
 	unlinkSync(join(h.dir, "keys/settings.key"));
 	const reopened = await createSettings(h.store, { dbPath: h.dbPath, env: {} });
 	expect(reopened.diagnostics().keyError).toBeNull();
+});
+
+test("envRef must be allowlisted when saved and when resolved", async () => {
+	const { isAllowedEnvRef } = await import("../service");
+	expect(isAllowedEnvRef("EUMENES_CLOUD_KEY", [])).toBe(true);
+	expect(isAllowedEnvRef("OPENAI_API_KEY", [])).toBe(true);
+	expect(isAllowedEnvRef("MY_KEY", ["MY_KEY"])).toBe(true);
+	expect(isAllowedEnvRef("PATH", [])).toBe(false);
+	expect(isAllowedEnvRef("AWS_SECRET_ACCESS_KEY", [])).toBe(false);
+
+	const dir = mkdtempSync(join(tmpdir(), "eumenes-settings-"));
+	const dbPath = join(dir, "test.db");
+	const store = openStore(dbPath, [migration, epochsMigration]);
+	const settings = await createSettings(store, {
+		dbPath,
+		env: { AWS_SECRET_ACCESS_KEY: "x", OPENAI_API_KEY: "sk-test" },
+	});
+	cleanup.push(async () => {
+		await store.close();
+		rmSync(dir, { recursive: true, force: true });
+	});
+	const s = settings.get();
+	const c = cloud(s);
+	s.connections[0]!.envRef = "AWS_SECRET_ACCESS_KEY";
+	await expect(
+		settings.apply({
+			requestId: crypto.randomUUID(),
+			expectedRevision: 0,
+			settings: s,
+			keys: [],
+		}),
+	).rejects.toThrow("invalid_env_ref");
+	s.connections[0]!.envRef = "OPENAI_API_KEY";
+	const saved = await settings.apply({
+		requestId: crypto.randomUUID(),
+		expectedRevision: 0,
+		settings: s,
+		keys: [],
+	});
+	expect(settings.credential(saved.connections[0]!)).toBe("sk-test");
+	expect(String(saved.connections[0]!.id)).toBe(String(c));
+	expect(() =>
+		settings.credential({ ...saved.connections[0]!, envRef: "PATH" }),
+	).toThrow("env_ref_not_allowed");
+});
+
+test("cloud connections require https outside private networks", () => {
+	const ok = (baseUrl: string) => cloudEndpoint.safeParse(baseUrl).success;
+	expect(ok("http://192.168.0.5")).toBe(true);
+	expect(ok("http://localhost:8080")).toBe(true);
+	expect(ok("http://foo.local")).toBe(true);
+	expect(ok("http://172.20.1.1")).toBe(true);
+	expect(ok("https://example.com")).toBe(true);
+	expect(ok("http://example.com")).toBe(false);
+	expect(ok("http://172.32.0.1")).toBe(false);
+});
+
+test("a saved http cloud URL still loads, but applying it is rejected", async () => {
+	const h = await setup();
+	const s = h.settings.get();
+	cloud(s);
+	s.connections[0]!.baseUrl = "http://api.example.com/v1";
+	expect(settingsSchema.safeParse(s).success).toBe(true);
+	expect(
+		applySchema.safeParse({
+			requestId: crypto.randomUUID(),
+			expectedRevision: 0,
+			settings: s,
+			keys: [],
+		}).success,
+	).toBe(false);
 });
