@@ -1,6 +1,6 @@
 # Toolchain / 調査担当 / SKILL 実装記録
 
-2026-10-09。実装の詳細は[計画書の実装結果](../../toolchain-web-research-implementation-plan-2026-10-09.md#18-実装結果と確定した変更2026-10-09)。
+2026-10-09。実装の詳細は[計画書の実装結果](../../.archived/toolchain-web-research-implementation-plan-2026-10-09.md#18-実装結果と確定した変更2026-10-09)。
 
 ## 実装
 

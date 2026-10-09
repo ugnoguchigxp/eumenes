@@ -32,7 +32,7 @@ Eumenes の参照 HEAD は `828038afdefaf23917223a017e1e75152ed1959e`。2026-10-
 | `api/domains/capabilities/service/index.ts` | `fec859bf0f89ce1f7f9647d41c715154d348682d01bbf3d198865fc5dae83e9b` |
 | `web/src/domains/agent-runtime/ResearchTaskCard.tsx` | `e360f180e92deea6a4e90e4e955c6ab36383cc47494bb4bb199f078292e43428` |
 
-既存計画は [Web調査ツールチェーン計画](toolchain-web-research-implementation-plan-2026-10-09.md)、境界は [domain規則](../docs/domains.md)、ログは [logging規則](../docs/logging.md) を参照する。既存の fixture 成功やサービス試用を、今回の外部アプリ連携の検証済みとして数えない。
+既存計画は [Web調査ツールチェーン計画](.archived/toolchain-web-research-implementation-plan-2026-10-09.md)、境界は [domain規則](../docs/domains.md)、ログは [logging規則](../docs/logging.md) を参照する。既存の fixture 成功やサービス試用を、今回の外部アプリ連携の検証済みとして数えない。
 
 ## 2 利用先とリポジトリの責務
 

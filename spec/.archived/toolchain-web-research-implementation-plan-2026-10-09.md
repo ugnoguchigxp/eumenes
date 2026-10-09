@@ -1,6 +1,8 @@
 # Web調査を使ったツールチェーンとサブエージェントの実装計画
 
-作成日: 2026-10-09 JST。状態: 実装前。実装担当: Sol。
+作成日: 2026-10-09 JST。状態: 初版の実装・コードレビュー・fixture gate・天気/株価のlive E2E完了、アーカイブ済み。実装担当: Sol。
+
+実装とレビューは commit `db920ff` に収録した。第1〜17章は着手前の計画を保存しており、確定した実装は第18章、検証結果と未実施の意味品質評価・実機器受入は[検証記録](../verification/toolchain/README.md)を参照する。
 
 実装済みの Web 検索・本文取得を、能力検索 → SKILL と tool 契約の準備 → サブエージェントへの委任 → 取得 → 根拠付き報告 → 会話への採用、という一つの製品経路につなぐ。1000件以上の登録ツールを全件プロンプトへ展開しない。既存の単一 writer、queue、inference、Web取得を再利用する。
 
@@ -16,7 +18,7 @@
 | 検索最大5件、取得本文最大3件、応答32 KiB以内、本文合計24,000 bytes | 同 service と contracts | 上限を緩めない |
 | 検索結果の受取りバッファは15分、最大64件、再起動で消える | 同 service の `results` | 永続結果と誤認しない |
 | stable 本文だけ別 SQLite にキャッシュする | `service/cache.ts` | 今回の自動調査は `freshness=live`、`retention=none`。既存手動CLIの stable は保持 |
-| Web取得の fixture と全体 gate の記録がある | [Web取得計画の実装記録](web-research-cache-implementation-plan-2026-10-09.md#15-着手後の実装記録2026-10-09) | 過去の成功を今回の変更の成功として流用しない |
+| Web取得の fixture と全体 gate の記録がある | [Web取得計画の実装記録](../web-research-cache-implementation-plan-2026-10-09.md#15-着手後の実装記録2026-10-09) | 過去の成功を今回の変更の成功として流用しない |
 | 会話からの取得計画・結果採用は未実装 | 同計画の未実装欄、dialogue service | 本書がこの範囲を具体化 |
 | 推論資源は `inference.llm: 1`、取得は `web.fetch: 2` | `api/application/server.ts` | 1推論枠で受入。補助64K Profileに依存しない |
 | `InferencePort` は本文中心。LLM結果に発話態度判定が走る | `inference/contracts/index.ts`、`service/execute.ts` | 内部制御用推論を明示し、態度判定・TTS・収集から除外 |
@@ -524,7 +526,7 @@ voiceは実マイク・ヘッドホン3往復、調査中の新発話と取消�
 
 ## 18 実装結果と確定した変更（2026-10-09）
 
-第1〜17章は着手前の計画。本章を実装の正本とする。実装・検証件数と未測定項目は[検証記録](verification/toolchain/README.md)に分ける。
+第1〜17章は着手前の計画。本章を実装の正本とする。実装・検証件数と未測定項目は[検証記録](../verification/toolchain/README.md)に分ける。
 
 - 初版は3package、1profile、1SKILL、4tool。ユーザーの追加指示に従い、検索だけ・URL読取りだけでも必ず子を通して要約する。直接toolの生結果をメインへ渡す分岐は設けない。各packageの登録時にprofile・必須SKILL・許可toolが依存closureに存在することを検査する。
 - `web.forecast` と `web.quote` は、検索結果に数値がない場合への対応として追加した。予報は7予報区、株価は現在の依頼に明示されたtickerを対象とする。任意destinationを受け付けず、気象庁・Yahoo Financeの公開JSONを読む。llm-fetch 0.1.2のAcceptがtext固定なので、この2endpointのみJSONのContent negotiationを行うtransportを用意した。公開DNSを検査して接続先IPを固定、TLSのhostname検査、redirect拒否、15秒・256KiB制限を行う。JSONをtextとして正規化した後も同じcontext guardを必ず通す。拒否を迂回するfallbackはない。
@@ -541,6 +543,6 @@ voiceは実マイク・ヘッドホン3往復、調査中の新発話と取消�
 
 ### コードレビュー後の確定変更
 
-[レビュー記録](verification/toolchain/review-2026-10-09.md)に再現と修正を記録した。packageはrevision 2とし、元依頼の入力上限を会話APIと同じ8,000文字へ拡張した。revision 1の定義とfingerprintは書き換えない。子のContextは64KiB以内で、必須profile/SKILL・元依頼を保持し、容量調整で落とせるのは任意の観測だけとする。
+[レビュー記録](../verification/toolchain/review-2026-10-09.md)に再現と修正を記録した。packageはrevision 2とし、元依頼の入力上限を会話APIと同じ8,000文字へ拡張した。revision 1の定義とfingerprintは書き換えない。子のContextは64KiB以内で、必須profile/SKILL・元依頼を保持し、容量調整で落とせるのは任意の観測だけとする。
 
 候補参照は依存のgenerationまで固定し、停止・再開後も以前の候補を使えない。子への指示は選択したprofileと必須SKILLだけに限定する。取消rollbackの別rootへの波及、vaultの孤立結果による容量漏れ、終了後の未完了step、画面の削除済みreportと失敗表示を修正した。liveの数値検査は引用・子の主張・最終回答の一致を要求し、出典にない数値の併記も失敗とする。
