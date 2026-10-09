@@ -291,6 +291,76 @@ export function createInference(
 	}
 
 	const service = {
+		captureControlInTransaction(
+			db: Database,
+			input: {
+				subject: string;
+				policySubject: string;
+				deadline: number;
+				maxOutputTokens: number;
+			},
+		) {
+			const policy = db
+				.query(
+					"SELECT id FROM inference_requests WHERE subject=? AND purpose='llm'",
+				)
+				.get(input.policySubject) as { id: string } | null;
+			const root = policy ? get(db, policy.id) : null;
+			if (!root || !allowed(db, root)) throw new Error("permission_revoked");
+			const snapshot = structuredClone(root.snapshot);
+			snapshot.routes.llm.mode = "larm-only";
+			snapshot.routes.llm.cloudAllowed = false;
+			const requestId = capture(
+				db,
+				input.subject,
+				"llm",
+				Math.min(input.deadline, root.deadline),
+				snapshot,
+			);
+			db.query(
+				"UPDATE inference_requests SET mode='control',output_limit=?,context_policy='exact',parents=? WHERE id=? AND status='pending'",
+			).run(
+				Math.min(2048, Math.max(1, input.maxOutputTokens)),
+				JSON.stringify(root.parents),
+				requestId,
+			);
+			return requestId;
+		},
+		executeControl(requestId: string, messages: Messages, signal: AbortSignal) {
+			if (store.read((db) => get(db, requestId))?.mode !== "control")
+				throw new Error("invalid_control_request");
+			return executeRequest(requestId, messages, signal);
+		},
+		rejectControlInTransaction(db: Database, receipt: Receipt, _code: string) {
+			db.query(
+				"UPDATE inference_requests SET status='rejected' WHERE id=? AND mode='control' AND status='pending'",
+			).run(receipt.requestId);
+		},
+		setContextPolicyInTransaction(
+			db: Database,
+			requestId: string,
+			_policy: "exact",
+		) {
+			if (
+				db
+					.query(
+						"UPDATE inference_requests SET context_policy='exact' WHERE id=? AND status='pending'",
+					)
+					.run(requestId).changes !== 1
+			)
+				throw new Error("permission_revoked");
+		},
+		cancelRequestsInTransaction(db: Database, requestIds: string[]) {
+			for (const requestId of requestIds)
+				db.query(
+					"UPDATE inference_requests SET status='cancelled' WHERE id=? AND status='pending'",
+				).run(requestId);
+		},
+		flushCancelledRequests(requestIds: string[]) {
+			for (const requestId of requestIds)
+				if (store.read((db) => get(db, requestId))?.status === "cancelled")
+					active.get(requestId)?.controller.abort();
+		},
 		snapshotFor(db: Database, subject: string) {
 			const row = db
 				.query(

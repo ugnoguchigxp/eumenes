@@ -6,7 +6,7 @@ import {
 	acceptedEmotion,
 	type SpeechDelivery,
 } from "../../../../../api/domains/delivery/contracts";
-import { memo, useMemo } from "react";
+import { type ReactNode, memo, useMemo } from "react";
 import { emotionEmoji } from "./emotionEmoji";
 import { renderSafeMarkdown } from "./markdownRenderer";
 export const MessageList = memo(function MessageList({
@@ -15,12 +15,14 @@ export const MessageList = memo(function MessageList({
 	replayingId,
 	onReplay,
 	agentName,
+	renderAttachment,
 }: {
 	conversation: Conversation | undefined;
 	streaming?: string;
 	replayingId?: string | null;
 	onReplay?: (message: Pick<Message, "id" | "text" | "runId">) => void;
 	agentName?: string;
+	renderAttachment?: (message: Message) => ReactNode;
 }) {
 	const assistantLabel = agentName || "Eumenes";
 	// Streaming text is not announced; the settled answer is, once.
@@ -88,6 +90,7 @@ export const MessageList = memo(function MessageList({
 						) : (
 							<p>{message.text}</p>
 						)}
+						{renderAttachment?.(message)}
 					</article>
 				))
 			) : !streaming ? (

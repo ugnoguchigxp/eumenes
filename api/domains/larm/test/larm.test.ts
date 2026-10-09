@@ -166,6 +166,33 @@ function fixture(
 	};
 	return { fetcher, calls, requests };
 }
+test("control JSON generation is opt-in and ordinary answers keep provider defaults", async () => {
+	const fake = fixture();
+	const bodies: Record<string, unknown>[] = [];
+	const larm = createLarm({
+		baseUrl: "http://127.0.0.1:9810",
+		profile: "SAAA",
+		token: "control",
+		fetch: async (input, init) => {
+			if (new URL(String(input)).pathname === "/llm/v1/chat/completions")
+				bodies.push(JSON.parse(String(init?.body)));
+			return fake.fetcher(input, init);
+		},
+	});
+	try {
+		const messages = [{ role: "user" as const, content: "JSON" }];
+		await larm.answer(messages, new AbortController().signal, {
+			jsonOutput: true,
+		});
+		await larm.answer(messages, new AbortController().signal);
+		expect(bodies[0]?.response_format).toEqual({ type: "json_object" });
+		expect(bodies[0]?.temperature).toBe(0);
+		expect(bodies[1]?.response_format).toBeUndefined();
+		expect(bodies[1]?.temperature).toBeUndefined();
+	} finally {
+		await larm.close();
+	}
+});
 test("catalog, claim, ASR/LLM/TTS and release use public contract", async () => {
 	const fake = fixture();
 	const larm = createLarm({

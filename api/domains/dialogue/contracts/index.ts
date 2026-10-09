@@ -8,6 +8,7 @@ export const submitSchema = z.object({
 export type Submit = z.infer<typeof submitSchema>;
 export const runSchema = z.object({
 	id: z.string(),
+	agentTaskId: z.string().nullable().optional(),
 	requestId: z.string(),
 	conversationId: z.string(),
 	utteranceId: z.string().nullable(),

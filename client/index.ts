@@ -1,3 +1,4 @@
+import { agentRuntimeClient } from "./agent-runtime";
 import { attitudeDatasetClient } from "./attitude-dataset";
 import { conversationClient } from "./conversation";
 import { dialogueClient } from "./dialogue";
@@ -11,6 +12,7 @@ import { serviceTestsClient } from "./service-tests";
 import { ttsDictionaryClient } from "./tts-dictionary";
 import { createTransport } from "./transport";
 import { voiceDialogueClient } from "./voice-dialogue";
+import { webResearchClient } from "./web-research";
 
 export { ApiError, ApiConnectionError } from "./transport";
 export function createClient(baseUrl: string, token?: string) {
@@ -28,6 +30,8 @@ export function createClient(baseUrl: string, token?: string) {
 		...queueClient(transport),
 		...schedulerClient(transport),
 		...voiceDialogueClient(transport),
+		...webResearchClient(transport),
+		...agentRuntimeClient(transport),
 	};
 }
 export type EumenesClient = ReturnType<typeof createClient>;

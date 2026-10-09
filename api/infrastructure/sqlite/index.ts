@@ -5,6 +5,7 @@ import {
 	closeSync,
 	constants,
 	fchmodSync,
+	existsSync,
 	mkdirSync,
 	openSync,
 	realpathSync,
@@ -37,6 +38,8 @@ export class WriterBusyError extends Error {
 export interface SqliteStore {
 	read<T>(operation: (db: Database) => T): T;
 	write<T>(operation: (db: Database) => T): Promise<T>;
+	/** Serialized writer operation outside a transaction (checkpoint / incremental vacuum only). */
+	maintenance?<T>(operation: (db: Database) => T): Promise<T>;
 	onCommit(listener: () => void): () => void;
 	close(): Promise<void>;
 }
@@ -44,6 +47,7 @@ export interface SqliteStore {
 export function openStore(
 	filename: string,
 	migrations: readonly string[],
+	options: { incrementalVacuum?: boolean } = {},
 ): SqliteStore {
 	if (filename === ":memory:")
 		throw new Error("persistent_database_path_required");
@@ -63,8 +67,11 @@ export function openStore(
 	let writer: Database | undefined;
 	let reader: Database | undefined;
 	try {
+		const newDatabase = !existsSync(canonical);
 		const migrationWriter = new Database(canonical, { create: true });
 		writer = migrationWriter;
+		if (newDatabase && options.incrementalVacuum)
+			migrationWriter.exec("PRAGMA auto_vacuum=INCREMENTAL");
 		migrationWriter.exec(
 			"PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;",
 		);
@@ -126,16 +133,25 @@ export function openStore(
 	const changes = w.query<{ count: number }, []>(
 		"SELECT total_changes() AS count",
 	);
+	function serialized<T>(operation: () => T): Promise<T> {
+		if (closing) return Promise.reject(new Error("database_closing"));
+		if (pending >= 64) return Promise.reject(new WriterBusyError());
+		pending++;
+		const task = tail.then(operation);
+		tail = task
+			.catch(() => {})
+			.finally(() => {
+				pending--;
+			});
+		return task;
+	}
 	return {
 		read: (operation) => {
 			if (closing) throw new Error("database_closing");
 			return operation(r);
 		},
 		write: (operation) => {
-			if (closing) return Promise.reject(new Error("database_closing"));
-			if (pending >= 64) return Promise.reject(new WriterBusyError());
-			pending++;
-			const task = tail.then(() => {
+			return serialized(() => {
 				const before = changes.get()?.count;
 				const result = w.transaction(() => operation(w))();
 				// Only committed mutations notify. Idle worker scans and rollbacks do not.
@@ -149,13 +165,8 @@ export function openStore(
 					}
 				return result;
 			});
-			tail = task
-				.catch(() => {})
-				.finally(() => {
-					pending--;
-				});
-			return task;
 		},
+		maintenance: (operation) => serialized(() => operation(w)),
 		onCommit(listener) {
 			if (closing) throw new Error("database_closing");
 			listeners.add(listener);

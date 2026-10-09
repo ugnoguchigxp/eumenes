@@ -1,3 +1,5 @@
 [install]
 peer = false
 minimumReleaseAge = 604800
+# The user explicitly selected the newly published, pinned llm-fetch release.
+minimumReleaseAgeExcludes = ["llm-fetch"]

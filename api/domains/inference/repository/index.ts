@@ -7,6 +7,11 @@ CREATE TABLE inference_probes (id TEXT PRIMARY KEY,target TEXT NOT NULL,status T
 `;
 export const parentsMigration = `ALTER TABLE inference_requests ADD COLUMN parents TEXT NOT NULL DEFAULT '[]';`;
 export const diagnosticsMigration = `ALTER TABLE inference_attempts ADD COLUMN provider_details TEXT NOT NULL DEFAULT '[]';`;
+export const controlMigration = `
+ALTER TABLE inference_requests ADD COLUMN mode TEXT NOT NULL DEFAULT 'answer';
+ALTER TABLE inference_requests ADD COLUMN output_limit INTEGER;
+ALTER TABLE inference_requests ADD COLUMN context_policy TEXT NOT NULL DEFAULT 'legacy';
+`;
 export interface RequestRow {
 	id: string;
 	subject: string;
@@ -15,6 +20,9 @@ export interface RequestRow {
 	deadline: number;
 	status: string;
 	parents: string[];
+	mode: "answer" | "control";
+	outputLimit: number | null;
+	contextPolicy: "legacy" | "exact";
 }
 export function get(db: Database, id: string): RequestRow | null {
 	const row = db
@@ -23,6 +31,8 @@ export function get(db: Database, id: string): RequestRow | null {
 		| (Omit<RequestRow, "snapshot" | "parents"> & {
 				snapshot: string;
 				parents: string;
+				output_limit?: number | null;
+				context_policy?: "legacy" | "exact";
 		  })
 		| null;
 	return row
@@ -30,6 +40,9 @@ export function get(db: Database, id: string): RequestRow | null {
 				...row,
 				snapshot: JSON.parse(row.snapshot) as Settings,
 				parents: JSON.parse(row.parents) as string[],
+				mode: row.mode ?? "answer",
+				outputLimit: row.output_limit ?? null,
+				contextPolicy: row.context_policy ?? "legacy",
 			}
 		: null;
 }

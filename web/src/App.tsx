@@ -1,3 +1,4 @@
+import { ResearchTaskCard } from "./domains/agent-runtime";
 import {
 	QueryClient,
 	QueryClientProvider,
@@ -211,9 +212,10 @@ function Workspace({
 	const connectionState =
 		status.data?.larm.state ?? (status.isError ? "failed" : "connecting");
 	const latestRun = runs.data?.at(-1);
-	const activeRun = runs.data?.find(
-		(run) => run.status === "queued" || run.status === "running",
-	);
+	const activeRun = runs.data
+		?.slice()
+		.reverse()
+		.find((run) => run.status === "queued" || run.status === "running");
 	const messageCount = conversation.data?.messages.length ?? 0;
 	const streamingText = useRunProgress(client, activeRun?.id);
 	useEffect(() => {
@@ -396,6 +398,18 @@ function Workspace({
 					>
 						<MessageList
 							conversation={conversation.data}
+							renderAttachment={(message) => {
+								const run = runs.data?.find(
+									(r) => r.inputMessageId === message.id,
+								);
+								return run?.agentTaskId ? (
+									<ResearchTaskCard
+										client={client}
+										rootRunId={run.id}
+										title={message.text}
+									/>
+								) : null;
+							}}
 							streaming={streamingText}
 							agentName={settings.data?.general.agentName}
 							replayingId={replay.playingId}

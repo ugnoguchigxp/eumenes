@@ -1,4 +1,8 @@
 export { registerDialogue } from "./controller";
-export { migration, queueLinkMigration } from "./repository";
+export {
+	migration,
+	queueLinkMigration,
+	agentLinkMigration,
+} from "./repository";
 export type { DialogueService } from "./service";
 export { createDialogueService } from "./service";

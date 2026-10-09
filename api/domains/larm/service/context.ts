@@ -7,6 +7,7 @@ type Messages = Parameters<LarmPort["answer"]>[0];
 export function fitContext(
 	messages: Messages,
 	window: NonNullable<Provider["contextWindow"]>,
+	exact = false,
 ): Messages {
 	const budget =
 		window.maxTokens - window.outputReserveTokens - window.safetyMarginTokens;
@@ -14,7 +15,7 @@ export function fitContext(
 	const selected = [...messages];
 	const estimate = (items: Messages) =>
 		new TextEncoder().encode(JSON.stringify(items)).length;
-	while (selected.length > 2 && estimate(selected) > budget)
+	while (!exact && selected.length > 2 && estimate(selected) > budget)
 		selected.splice(1, Math.min(2, selected.length - 2));
 	if (estimate(selected) > budget) throw new Error("context_window_exceeded");
 	return selected;

@@ -8,6 +8,7 @@ import {
 	migrations as memoryPackageMigrations,
 } from "eumenes-memory/sqlite";
 import { openStore } from "../infrastructure/sqlite";
+import { createConversationService } from "../domains/conversation";
 import { hostMigrations, migrations } from "./migrations";
 import { migration as serviceTestsMigration } from "../domains/service-tests";
 
@@ -100,6 +101,61 @@ test("a database from before checksums is backfilled once and then verified", as
 		expect(() =>
 			openStore(path, [list[0]!, "CREATE TABLE b (y TEXT)"]),
 		).toThrow("migration_checksum_mismatch");
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("an existing 0.3.3 host database upgrades without rewriting migration checksums or losing data", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "eumenes-web-upgrade-"));
+	try {
+		const path = join(dir, "db.sqlite3");
+		const previous = [
+			...hostMigrations,
+			...memoryPackageMigrations.slice(0, 4),
+			serviceTestsMigration,
+		];
+		const before = openStore(path, previous);
+		await createConversationService(before).append({
+			id: "fixture-message",
+			conversationId: "fixture-conversation",
+			role: "user",
+			text: "preserved across upgrade",
+			createdAt: "2026-10-09T00:00:00.000Z",
+			runId: null,
+		});
+		const checksums = before.read((db) =>
+			db.query("SELECT id,checksum FROM schema_migrations ORDER BY id").all(),
+		);
+		await before.close();
+		const after = openStore(path, migrations);
+		try {
+			after.read((db) => assertMemorySchema(db));
+			expect(
+				createConversationService(after).get("fixture-conversation").messages[0]
+					?.text,
+			).toBe("preserved across upgrade");
+			expect(
+				after.read((db) =>
+					db
+						.query(
+							"SELECT id,checksum FROM schema_migrations WHERE id<=? ORDER BY id",
+						)
+						.all(previous.length),
+				),
+			).toEqual(checksums);
+			expect(
+				after.read((db) =>
+					db
+						.query(
+							"SELECT name FROM sqlite_master WHERE name IN ('memory_record_retention','web_research_runs') ORDER BY name",
+						)
+						.all(),
+				),
+			).toHaveLength(2);
+		} finally {
+			await after.close();
+		}
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
 	}

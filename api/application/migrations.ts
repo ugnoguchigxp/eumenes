@@ -1,3 +1,8 @@
+import { migration as capabilitiesMigration } from "../domains/capabilities";
+import { migration as toolRuntimeMigration } from "../domains/tool-runtime";
+import { migration as agentRuntimeMigration } from "../domains/agent-runtime";
+import { controlMigration } from "../domains/inference";
+import { agentLinkMigration } from "../domains/dialogue";
 import { migrations as memoryPackageMigrations } from "eumenes-memory/sqlite";
 import { migration as serviceTestsMigration } from "../domains/service-tests";
 import {
@@ -11,6 +16,7 @@ import {
 	queueLinkMigration as dialogueQueueLinkMigration,
 } from "../domains/dialogue";
 import { migration as memoryMigration } from "../domains/memory";
+import { migration as webResearchMigration } from "../domains/web-research";
 import {
 	diagnosticsMigration as inferenceDiagnosticsMigration,
 	migration as inferenceMigration,
@@ -63,5 +69,13 @@ export const migrations: readonly string[] = [
 	...hostMigrations,
 	...memoryPackageMigrations.slice(0, 4),
 	serviceTestsMigration,
-	...memoryPackageMigrations.slice(4),
+	// Package migration 5 was deployed before Web acquisition. Keep that slot fixed too.
+	...memoryPackageMigrations.slice(4, 5),
+	webResearchMigration,
+	...memoryPackageMigrations.slice(5),
+	capabilitiesMigration,
+	toolRuntimeMigration,
+	agentRuntimeMigration,
+	controlMigration,
+	agentLinkMigration,
 ];

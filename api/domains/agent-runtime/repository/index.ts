@@ -1,0 +1,51 @@
+import type { Database } from "bun:sqlite";
+import type { Task, TaskDto } from "../contracts";
+export const migration = `
+CREATE TABLE agent_tasks(id TEXT PRIMARY KEY,kind TEXT NOT NULL,root_run_id TEXT NOT NULL,parent_task_id TEXT,package_revision_id TEXT,input_json TEXT,state TEXT NOT NULL,phase TEXT NOT NULL,revision INTEGER NOT NULL DEFAULT 0,cancel_epoch INTEGER NOT NULL DEFAULT 0,data_epoch INTEGER NOT NULL DEFAULT 0,report_state TEXT NOT NULL DEFAULT 'none',report_task_id TEXT,current_step INTEGER NOT NULL DEFAULT 0,deadline INTEGER NOT NULL,model_calls INTEGER NOT NULL DEFAULT 0,tool_calls INTEGER NOT NULL DEFAULT 0,json_repairs INTEGER NOT NULL DEFAULT 0,refinements INTEGER NOT NULL DEFAULT 0,job_id TEXT,invocation_id TEXT,error_code TEXT,created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL);
+CREATE UNIQUE INDEX agent_root_once ON agent_tasks(root_run_id) WHERE kind='coordinator';
+CREATE TABLE agent_steps(id TEXT PRIMARY KEY,task_id TEXT NOT NULL,ordinal INTEGER NOT NULL,state TEXT NOT NULL,job_id TEXT NOT NULL,inference_request_id TEXT,manifest_digest TEXT,action_kind TEXT,error_code TEXT,UNIQUE(task_id,ordinal));
+CREATE TABLE agent_task_bindings(task_id TEXT NOT NULL,kind TEXT NOT NULL,revision_id TEXT NOT NULL,hash TEXT NOT NULL,PRIMARY KEY(task_id,revision_id));
+CREATE TABLE agent_reports(task_id TEXT PRIMARY KEY,report_json TEXT NOT NULL,report_digest TEXT NOT NULL,created_at INTEGER NOT NULL);
+CREATE TABLE agent_events(id TEXT PRIMARY KEY,task_id TEXT NOT NULL,root_run_id TEXT NOT NULL,kind TEXT NOT NULL,state TEXT NOT NULL,answer_job_id TEXT,created_at INTEGER NOT NULL,consumed_at INTEGER,UNIQUE(task_id,kind));
+CREATE INDEX agent_waiting ON agent_tasks(state,deadline);
+`;
+export const get = (db: Database, id: string) =>
+	db.query("SELECT * FROM agent_tasks WHERE id=?").get(id) as Task | null;
+export const byRoot = (db: Database, id: string) =>
+	db
+		.query(
+			"SELECT * FROM agent_tasks WHERE root_run_id=? AND kind='coordinator'",
+		)
+		.get(id) as Task | null;
+export const dto = (t: Task): TaskDto => ({
+	id: t.id,
+	kind: t.kind,
+	rootRunId: t.root_run_id,
+	parentTaskId: t.parent_task_id,
+	packageRevisionId: t.package_revision_id,
+	status: t.state,
+	phase: t.phase,
+	modelCalls: t.model_calls,
+	toolCalls: t.tool_calls,
+	errorCode: t.error_code,
+	createdAt: new Date(t.created_at).toISOString(),
+	deadlineAt: new Date(t.deadline).toISOString(),
+	reportState: t.report_state,
+});
+export function update(
+	db: Database,
+	t: Task,
+	state: string,
+	phase = state,
+	errorCode: string | null = null,
+) {
+	if (
+		db
+			.query(
+				"UPDATE agent_tasks SET state=?,phase=?,error_code=?,revision=revision+1,updated_at=? WHERE id=? AND revision=?",
+			)
+			.run(state, phase, errorCode, Date.now(), t.id, t.revision).changes !== 1
+	)
+		throw new Error("task_changed");
+	return get(db, t.id)!;
+}

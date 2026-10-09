@@ -130,6 +130,11 @@ async function recordAttemptStart(r: Request, source: Source) {
 function callOptionsFor(r: Request, attemptId: string): LarmCallOptions {
 	const exchanges: LarmExchange[] = [];
 	return {
+		...(r.row.mode === "control" ? { jsonOutput: true } : {}),
+		...(r.row.contextPolicy === "exact"
+			? { contextPolicy: "exact" as const }
+			: {}),
+		...(r.row.outputLimit ? { maxOutputTokens: r.row.outputLimit } : {}),
 		...(r.row.purpose === "tts" && r.row.snapshot.larm.autoIntonation
 			? speechAdjustment(
 					r.input as string,
@@ -416,7 +421,11 @@ async function attempt(r: Request, source: Source): Promise<Receipt> {
 			}),
 			attemptSignal,
 		);
-		if (row.purpose === "llm" && typeof value === "string")
+		if (
+			row.purpose === "llm" &&
+			row.mode !== "control" &&
+			typeof value === "string"
+		)
 			delivery = await chooseLlmDelivery(r, decide, value);
 		if (
 			attemptSignal.aborted ||

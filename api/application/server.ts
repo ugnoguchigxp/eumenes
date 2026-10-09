@@ -1,3 +1,4 @@
+import { createToolchain, toolchainEnabled } from "./toolchain";
 import {
 	createAttitudeDataset,
 	openAttitudeStore,
@@ -14,6 +15,11 @@ import { createVoiceDialogue } from "../domains/voice-dialogue";
 import { createTtsDictionary } from "../domains/tts-dictionary";
 import { createContinuityService } from "../domains/continuity";
 import { createMemoryService } from "../domains/memory";
+import {
+	createWebResearch,
+	createWebCache,
+	openWebCache,
+} from "../domains/web-research";
 import { migrations } from "./migrations";
 import { openStore } from "../infrastructure/sqlite";
 import {
@@ -67,7 +73,18 @@ async function main() {
 	});
 	const queue = createQueue(store, {
 		resourceAliases: { "larm.llm": "inference.llm" },
+		resources: { "inference.llm": 1, "web.fetch": 2 },
 	});
+	const cachePath = resolve(
+		join(dirname(dbPath), "cache/web-research.sqlite3"),
+	);
+	let webCache: ReturnType<typeof createWebCache> | undefined;
+	try {
+		webCache = createWebCache(openWebCache(cachePath), { path: cachePath });
+	} catch {
+		log.warn("web.cache_unavailable", { reason: "cache_open_failed" });
+	}
+	const webResearch = createWebResearch({ store, queue, cache: webCache });
 	const scheduler = createScheduler(store, queue);
 	const continuity = createContinuityService(store);
 	const memory = createMemoryService(store, conversation, continuity, {
@@ -76,12 +93,15 @@ async function main() {
 				join(dirname(dbPath), "memory-forget-journal.jsonl"),
 		),
 	});
+	const toolchain = await createToolchain(store, queue, inference, webResearch);
+	const enabled = toolchainEnabled();
 	const dialogue = createDialogueService({
 		store,
 		conversation,
 		larm: inference,
 		queue,
 		memory,
+		agents: enabled ? toolchain.agents : undefined,
 	});
 	const voice = createVoiceDialogue(store, dialogue, inference);
 	scheduler.registerTarget(dialogue.promptTarget);
@@ -94,13 +114,19 @@ async function main() {
 	await voice.recover();
 	await inference.recover();
 	await serviceTests.recover();
+	await toolchain.agents.recover();
 	await dialogue.recover();
+	await webResearch.recover();
 	await queue.recover();
 	await scheduler.recover();
 	log.info("server.recovery_completed");
+	toolchain.agents.start();
 	queue.start();
+	webResearch.start();
 	scheduler.start();
 	const app = createProductionApp({
+		capabilities: toolchain.capabilities,
+		agents: toolchain.agents,
 		attitudeDataset,
 		token,
 		origin: process.env.EUMENES_ORIGIN ?? "http://127.0.0.1:5173",
@@ -115,6 +141,7 @@ async function main() {
 		ttsDictionary,
 		memory,
 		continuity,
+		webResearch,
 		changes,
 		serviceTests,
 	});
@@ -148,7 +175,10 @@ async function main() {
 			await scheduler.close();
 			await serviceTests.close();
 			await voice.close();
+			await toolchain.agents.close();
+			toolchain.capabilities.close();
 			await queue.close(10_000);
+			await webResearch.close();
 			await dialogue.close();
 			await Promise.race([inference.close(), Bun.sleep(5_000)]);
 			await attitudeDataset.close();

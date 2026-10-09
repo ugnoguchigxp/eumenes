@@ -20,6 +20,7 @@ import {
 	migration,
 	parentsMigration,
 	diagnosticsMigration,
+	controlMigration,
 } from "..";
 const cleanup: Array<() => Promise<void>> = [];
 async function until(condition: () => boolean) {
@@ -57,6 +58,7 @@ async function setup(
 		settingsEpochsMigration,
 		parentsMigration,
 		diagnosticsMigration,
+		controlMigration,
 	]);
 	const settings = await createSettings(store, { dbPath, env: {} });
 	const s = settings.get();
@@ -791,4 +793,59 @@ test("Ruri dataset captures real-turn receipt adoption once; a technical collect
 	expect(sample.adopted?.voice_application).toBe("manual");
 	expect(sample.adopted?.tone).toBeNull();
 	expect(sample.primary_label).toBeNull();
+});
+
+test("control calls preserve exact context, stay local, skip emotion judgement, and rejected JSON is never adopted", async () => {
+	let judgement = 0;
+	let opts: unknown;
+	const h = await setup({
+		dataset: true,
+		judge: async () => {
+			judgement++;
+			throw new Error("unexpected_judge");
+		},
+		local: async (_messages, _signal, options) => {
+			opts = options;
+			return '{"action":"respond"}';
+		},
+	});
+	const id = await h.store.write((db) => {
+		h.inference.captureInTransaction(
+			db,
+			"root-control",
+			"llm",
+			Date.now() + 10000,
+		);
+		return h.inference.captureControlInTransaction(db, {
+			subject: "agent:control:1",
+			policySubject: "root-control",
+			deadline: Date.now() + 9000,
+			maxOutputTokens: 2048,
+		});
+	});
+	const receipt = await h.inference.executeControl(
+		id,
+		messages,
+		new AbortController().signal,
+	);
+	expect(receipt.value).toBe('{"action":"respond"}');
+	expect(opts).toMatchObject({
+		contextPolicy: "exact",
+		maxOutputTokens: 2048,
+		jsonOutput: true,
+	});
+	expect(judgement).toBe(0);
+	expect(h.calls).toHaveLength(0);
+	expect(receipt.delivery).toBeUndefined();
+	await h.store.write((db) =>
+		h.inference.rejectControlInTransaction(db, receipt, "invalid_control_json"),
+	);
+	expect(
+		await h.store.write((db) => h.inference.acceptInTransaction(db, receipt)),
+	).toBe(false);
+	expect(
+		h.store.read((db) =>
+			db.query("SELECT status,mode FROM inference_requests WHERE id=?").get(id),
+		),
+	).toEqual({ status: "rejected", mode: "control" });
 });

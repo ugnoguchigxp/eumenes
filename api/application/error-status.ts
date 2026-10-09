@@ -1,6 +1,15 @@
-export type ErrorStatus = 400 | 409 | 411 | 413 | 503;
+export type ErrorStatus = 400 | 404 | 409 | 410 | 411 | 413 | 429 | 503;
 
 const statusByCode: Record<string, ErrorStatus> = {
+	task_not_found: 404,
+	report_not_ready: 409,
+	report_deleted: 410,
+	capability_ref_invalid: 409,
+	tool_ref_invalid: 409,
+	result_capacity: 429,
+	reference_capacity: 429,
+	capability_unavailable: 503,
+	control_unavailable: 503,
 	request_conflict: 409,
 	revision_conflict: 409,
 	voice_sequence_out_of_order: 409,
@@ -16,6 +25,9 @@ const statusByCode: Record<string, ErrorStatus> = {
 	queue_full: 503,
 	schedule_limit_reached: 503,
 	stream_capacity: 503,
+	web_research_unavailable: 503,
+	web_cache_unavailable: 503,
+	web_cache_clear_blocked: 409,
 };
 
 const statusByPrefix: Array<[prefix: string, status: ErrorStatus]> = [

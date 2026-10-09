@@ -25,13 +25,20 @@ import {
 	migration as voiceMigration,
 	sequenceMigration as voiceSequenceMigration,
 } from "../domains/voice-dialogue";
+import {
+	createWebResearch,
+	migration as webMigration,
+	type WebResearchService,
+} from "../domains/web-research";
 import { createApp } from "./app";
 import { createChanges, type Changes } from "./events";
 
+const webServices: WebResearchService[] = [];
 const dirs: string[] = [];
 const stores: SqliteStore[] = [];
 const streams: Changes[] = [];
 afterEach(async () => {
+	for (const service of webServices.splice(0)) await service.close();
 	for (const stream of streams.splice(0)) stream.close();
 	for (const s of stores.splice(0)) await s.close().catch(() => {});
 	for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
@@ -55,6 +62,7 @@ function setup() {
 		schedulerMigration,
 		queueLinkMigration,
 		voiceSequenceMigration,
+		webMigration,
 		"SELECT 1", // retired continuity slot
 	]);
 	stores.push(store);
@@ -79,6 +87,17 @@ function setup() {
 	const dialogue = createDialogueService({ store, conversation, larm, queue });
 	scheduler.registerTarget(dialogue.promptTarget);
 	const voice = createVoiceDialogue(store, dialogue, larm);
+	const webResearch = createWebResearch({
+		store,
+		queue,
+		acquisition: {
+			async execute() {
+				throw new Error("fixture_unused");
+			},
+			async close() {},
+		},
+	});
+	webServices.push(webResearch);
 	const app = createApp({
 		token,
 		changes,
@@ -89,6 +108,7 @@ function setup() {
 		larm,
 		queue,
 		scheduler,
+		webResearch,
 	});
 	const call = (
 		path: string,
@@ -458,4 +478,34 @@ test("error codes map to HTTP statuses through the table", async () => {
 	expect(statusForError("payload_too_large")).toBe(413);
 	expect(statusForError("queue_full")).toBe(503);
 	expect(statusForError("something_unknown")).toBe(500);
+});
+
+test("Web research is authenticated, validates malformed JSON, and does not claim an unavailable cache was cleared", async () => {
+	const h = setup();
+	expect(
+		(await h.app.request("/api/web-research/cache/clear", { method: "POST" }))
+			.status,
+	).toBe(401);
+	expect(
+		(
+			await h.call(
+				"/api/web-research/cache/clear",
+				{},
+				{ ...auth, origin: "https://foreign.example" },
+			)
+		).status,
+	).toBe(403);
+	const clear = await h.call("/api/web-research/cache/clear", {});
+	expect(clear.status).toBe(503);
+	expect(await clear.json()).toEqual({ error: "web_cache_unavailable" });
+	expect(
+		(
+			await h.app.request("/api/web-research/runs", {
+				method: "POST",
+				headers: auth,
+				body: "{",
+			})
+		).status,
+	).toBe(400);
+	expect((await h.call("/api/web-research/cache/status")).status).toBe(200);
 });

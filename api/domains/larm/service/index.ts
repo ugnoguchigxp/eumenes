@@ -591,7 +591,11 @@ export function createLarm(config: {
 		return withProvider("llm", signal, async (p, connectionId) => {
 			const window = p.contextWindow;
 			if (!window) throw new Error("larm_missing_context_window");
-			const selected = fitContext(messages, window);
+			const selected = fitContext(
+				messages,
+				window,
+				options?.contextPolicy === "exact",
+			);
 			const response = await infer(
 				p,
 				"chat/completions",
@@ -601,8 +605,14 @@ export function createLarm(config: {
 					body: JSON.stringify({
 						model: p.model,
 						messages: selected,
+						...(options?.jsonOutput
+							? { temperature: 0, response_format: { type: "json_object" } }
+							: {}),
 						stream: !!onDelta,
-						max_tokens: Math.min(window.outputReserveTokens, 4096),
+						max_tokens: Math.min(
+							window.outputReserveTokens,
+							options?.maxOutputTokens ?? 4096,
+						),
 					}),
 				},
 				signal,

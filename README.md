@@ -29,9 +29,20 @@ bun cli/index.ts send 'こんにちは' --wait --json
 bun cli/index.ts history main --json
 bun cli/index.ts run <run-id> --json
 bun cli/index.ts cancel <run-id> --json
+bun cli/index.ts web search 'Bun SQLite' --read-pages --wait --json
+bun cli/index.ts web read https://example.com/ --wait --json
+bun cli/index.ts web read https://example.com/ --stable --wait --json
+bun cli/index.ts capabilities --json
+bun cli/index.ts task <agent-task-id> --json
+bun cli/index.ts task-report <agent-task-id> --json
+bun cli/index.ts task-cancel <agent-task-id> --json
+bun cli/index.ts web cache --json
+bun cli/index.ts web clear --json
 ```
 
 `send` は標準入力も読めます。応答が不明な送信には、表示された request ID を `--request-id <UUID>` に指定して同じ要求を照会・再試行できます。`--json` の結果は stdout、診断は stderr です。終了コードは成功 `0`、引数・認証 `2`、処理失敗 `3`、取消・待機結果不明 `4`、接続不能 `5` です。
+
+Web取得はnpm版 `llm-fetch@0.1.2` をbackendから利用します。検索と通常のページ取得は毎回実行し、`web read --stable` で指定したページだけ専用SQLiteに保存します。`--fresh` は保存済み本文を使わず取得し直します。保存データは最大24時間だけ再利用し、14日間使われなければ起動時・1時間ごとの掃除で削除します。HTTPが保存を禁止するページは保存しません。結果の受取期間は15分で、backendの再起動でも失われます。会話からの調査は、能力の検索→プロフィール・SKILL・必要なツールの読込み→子の調査→要約→回答の順に実行します。全ツールをモデル入力へ展開しません。天気は気象庁、明示tickerの株価は公開市場JSONの読取りを先に試します。詳しい状態は [実装計画書](spec/web-research-cache-implementation-plan-2026-10-09.md#15-着手後の実装記録2026-10-09) に記録します。
 
 ## 音声 MVP の所有境界
 
@@ -75,7 +86,7 @@ GemmaのRuri発話態度判定は、実会話の異なる成功判定300件を�
 
 実マイク・ヘッドホンでの3往復と再生中割込みの受入、機器ごとの権限・echo、CLI の中断のプロセス試験を残しています。接続不能と引数不正はfixtureのプロセス試験で確認済みです。発話ごとの音声は最大4 MB に制限し、backend は受信 stream を読みながら上限を検査します。sequence と発話 ID で順序・再送を検査します。録音中の逐次 ASR は未実装です。LARM の実接続は合成音声を入力として個別操作を確認しました。受入項目は [docs/acceptance.md](docs/acceptance.md)、SAAA 参照元と教訓は [docs/saaa-provenance.md](docs/saaa-provenance.md) に記録しています。
 
-RAG、個人記憶、ToolChain、経験再利用、Tauri、native AEC は後続構想です。[SAAA 全体コンセプト](https://chatgpt.com/space/page_9fc5877949748191b556705128f6a2f5) を継承先として扱い、この初版では先行実装していません。
+RAG、経験再利用、Tauri、native AEC は後続構想です。[SAAA 全体コンセプト](https://chatgpt.com/space/page_9fc5877949748191b556705128f6a2f5) を継承先として扱い、この初版では先行実装していません。
 
 
 ## 設定画面
@@ -91,3 +102,13 @@ APIキーはAES-256-GCMで暗号化します。暗号鍵は32バイトをBase64�
 送信許可の取消、キーの削除・更新、接続の無効化は実行中の結果にも反映します。読み上げの変更は次の発話、マイク・録音調整は次の音声開始から反映します。予約は一回と固定間隔に対応し、Eumenes起動中に実行します。予約の取消は今後の受付を停止し、受付済みの会話は実行記録から別途取り消します。
 
 実装と検証の詳細は [設定画面の検証記録](spec/verification/settings/README.md) を参照してください。
+
+## 会話からの調査
+
+通常の会話入力からWeb検索・読取りを選べます。`EUMENES_TOOLCHAIN_ENABLED` は既定 `1`、`0` なら従来の会話生成へ戻ります。制御用の推論はLARMのみを使い、内部JSONを読み上げや態度収集へ渡しません。子の待機中は推論枠を解放します。
+
+子は取得本文を読み、短い要約、主張、出典、未確認点を返します。メインへ本文・生引用・ページタイトルは渡しません。主張の引用が実際に子へ提示した資料に含まれるかを確認しますが、この検査だけで主張の意味まで正しいと保証するものではありません。メインでも報告を未信頼データとして扱います。調査cardに進行状態・停止・出典・確認できなかった点を表示します。
+
+予報の専用読取りは東京、大阪、神奈川、京都、愛知、福岡、兵庫に対応します。他の地域は検索を使います。株価は依頼にtickerが明示された場合に専用読取りを使い、市場終了・遅延・価格時点を区別します。上流の取得拒否やguard拒否を迂回しません。結果データは14日、本文を含まない処理metadataは30日で整理し、既存の会話は残します。
+
+`EUMENES_LIVE_TOOLCHAIN=1 bun run verify:live -- --domain agent-runtime` は一時DBを持つ隔離backendを起動し、実LARMと公開データで天気・株価を確認します。LARM認証はbackendの環境変数から読み、通常DBは使いません。判定は子の報告と最終回答の数値まで確認します。[実装・検証記録](spec/verification/toolchain/README.md)を参照してください。

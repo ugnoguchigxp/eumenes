@@ -3,6 +3,10 @@ import { createLarm } from "../api/domains/larm";
 import { resolveLarmToken } from "../api/infrastructure/auth-config";
 
 const args = process.argv.slice(2).filter((x) => x !== "--");
+if (args[0] === "--domain" && args[1] === "agent-runtime") {
+	await import("./toolchain-live");
+	process.exit(process.exitCode ?? 0);
+}
 if (args[0] !== "--domain" || args[1] !== "larm") {
 	console.error("Use --domain larm");
 	process.exit(2);

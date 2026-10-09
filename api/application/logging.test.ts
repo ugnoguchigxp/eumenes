@@ -14,6 +14,7 @@ test("real backend persists startup, correlated job failure and final shutdown w
 		env: {
 			...process.env,
 			EUMENES_DB: join(dir, "db.sqlite3"),
+			EUMENES_TOOLCHAIN_ENABLED: "0",
 			EUMENES_PORT: "0",
 			EUMENES_HOST: "127.0.0.1",
 			EUMENES_API_TOKEN: token,

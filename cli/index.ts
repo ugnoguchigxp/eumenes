@@ -7,12 +7,20 @@ import { resolveApiToken } from "../api/infrastructure/auth-config";
 const args = process.argv.slice(2);
 const json = args.includes("--json");
 const wait = args.includes("--wait");
+const fresh = args.includes("--fresh");
+const stable = args.includes("--stable");
+const readPages = args.includes("--read-pages");
 let explicitRequestId: string | undefined;
 let conversationId = "main";
 const positional: string[] = [];
 for (let i = 0; i < args.length; i++) {
 	const value = args[i];
-	if (value === "--json" || value === "--wait") continue;
+	if (
+		["--json", "--wait", "--fresh", "--stable", "--read-pages"].includes(
+			value ?? "",
+		)
+	)
+		continue;
 	if (value === "--request-id") {
 		explicitRequestId = args[++i];
 		if (!submitSchema.shape.requestId.safeParse(explicitRequestId).success) {
@@ -36,6 +44,10 @@ for (let i = 0; i < args.length; i++) {
 	positional.push(value);
 }
 const command = positional.shift();
+if (command !== "web" && (fresh || stable || readPages)) {
+	console.error("--fresh, --stable and --read-pages are web options");
+	process.exit(2);
+}
 const url = process.env.EUMENES_URL ?? "http://127.0.0.1:8787";
 let client: ReturnType<typeof createClient>;
 try {
@@ -56,6 +68,110 @@ function show(value: unknown) {
 	);
 }
 async function main() {
+	if (command === "web") {
+		const sub = positional.shift();
+		if ((stable || fresh) && sub !== "read")
+			throw new Error("--stable and --fresh require web read");
+		if (readPages && sub !== "search")
+			throw new Error("--read-pages requires web search");
+		if (sub === "cache") return show(await client.researchCacheStatus());
+		if (sub === "clear") return show(await client.clearResearchCache());
+		if (sub === "run" && positional[0])
+			return show(await client.researchRun(positional[0]));
+		if (sub === "cancel" && positional[0])
+			return show(await client.cancelResearch(positional[0]));
+		if (sub !== "search" && sub !== "read")
+			throw new Error(
+				"usage: web search <query>|read <url>|run <id>|cancel <id>|cache|clear [--wait] [--fresh] [--stable] [--read-pages]",
+			);
+		const value = positional.join(" ").trim();
+		if (!value) throw new Error("query or URL required");
+		const requestId = explicitRequestId ?? crypto.randomUUID();
+		const run = await client.submitResearch(
+			sub === "read"
+				? {
+						requestId,
+						operation: "read",
+						url: value,
+						retention: stable ? "stable" : "none",
+						freshness: fresh || !stable ? "live" : "normal",
+					}
+				: {
+						requestId,
+						operation: "lookup",
+						query: value,
+						readPages: readPages ? 3 : 0,
+						freshness: "live",
+					},
+		);
+		if (!wait) return show(run);
+		let cancelled = false;
+		const polling = new AbortController();
+		const waitSignal = AbortSignal.any([
+			polling.signal,
+			AbortSignal.timeout(40000),
+		]);
+		const abort = () => {
+			cancelled = true;
+			polling.abort();
+			void client
+				.cancelResearch(run.id, AbortSignal.timeout(1000))
+				.catch(() => {});
+		};
+		process.once("SIGINT", abort);
+		try {
+			const deadline = Date.now() + 40000;
+			while (Date.now() < deadline) {
+				const current = await client.researchRun(run.id, waitSignal);
+				if (!["queued", "running"].includes(current.status)) {
+					show(current);
+					process.exitCode =
+						current.status === "cancelled" || current.resultExpired
+							? 4
+							: ["completed", "partial"].includes(current.status)
+								? 0
+								: 3;
+					return;
+				}
+				if (cancelled) {
+					console.error(
+						`run ${run.id}: cancellation requested; outcome unconfirmed`,
+					);
+					process.exitCode = 4;
+					return;
+				}
+				await Bun.sleep(250);
+			}
+			await client
+				.cancelResearch(run.id, AbortSignal.timeout(1000))
+				.catch(() => {});
+			console.error(
+				`run ${run.id}: web research timed out; cancellation requested; outcome unconfirmed`,
+			);
+			process.exitCode = 4;
+			return;
+		} catch (error) {
+			if (
+				cancelled ||
+				waitSignal.aborted ||
+				(error instanceof Error &&
+					["TimeoutError", "AbortError"].includes(error.name))
+			) {
+				if (!cancelled)
+					void client
+						.cancelResearch(run.id, AbortSignal.timeout(1000))
+						.catch(() => {});
+				console.error(
+					`run ${run.id}: wait interrupted; cancellation requested; outcome unconfirmed`,
+				);
+				process.exitCode = 4;
+				return;
+			}
+			throw error;
+		} finally {
+			process.removeListener("SIGINT", abort);
+		}
+	}
 	if (command === "collection") {
 		const sub = positional.shift() ?? "status";
 		if (sub === "start") return show(await client.attitudeStart());
@@ -124,6 +240,13 @@ async function main() {
 			"usage: collection status|start|stop|list|show <id> [predictions]|prepare <id> <private-file>|review <id> <review.json>|report|split|export <private-directory>",
 		);
 	}
+	if (command === "capabilities") return show(await client.capabilities());
+	if (command === "task" && positional[0])
+		return show(await client.agentTask(positional[0]));
+	if (command === "task-report" && positional[0])
+		return show(await client.agentReport(positional[0]));
+	if (command === "task-cancel" && positional[0])
+		return show(await client.cancelAgentTask(positional[0]));
 	if (command === "status") return show(await client.status());
 	if (command === "history")
 		return show(await client.conversation(positional[0] ?? conversationId));
@@ -233,7 +356,7 @@ async function main() {
 		);
 	}
 	throw new Error(
-		"usage: bun cli/index.ts status|memory ...|send [text] [--wait] [--json] [--request-id UUID]|history [id]|run <id>|cancel <id>",
+		"usage: bun cli/index.ts status|web search|web read|web run|web cancel|web cache|web clear|memory ...|send [text] [--wait] [--json] [--request-id UUID]|history [id]|run <id>|cancel <id>",
 	);
 }
 try {
@@ -250,6 +373,11 @@ try {
 		process.exitCode = 5;
 	} else {
 		console.error(error instanceof Error ? error.message : String(error));
-		process.exitCode = 2;
+		process.exitCode =
+			command === "web" &&
+			error instanceof Error &&
+			["TimeoutError", "AbortError"].includes(error.name)
+				? 4
+				: 2;
 	}
 }

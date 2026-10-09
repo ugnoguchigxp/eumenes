@@ -1,5 +1,7 @@
 /** First element of every react-query key. Keys are `[root, identity, ...]`. */
 export const queryRoots = {
+	agentTasks: "agent-tasks",
+	agentReports: "agent-reports",
 	conversation: "conversation",
 	dialogue: "dialogue",
 	larm: "larm",
@@ -24,6 +26,8 @@ export const queryRoots = {
  * `change` events do not re-run them.
  */
 export const changeRoots = [
+	queryRoots.agentTasks,
+	queryRoots.agentReports,
 	queryRoots.conversation,
 	queryRoots.dialogue,
 	queryRoots.larm,

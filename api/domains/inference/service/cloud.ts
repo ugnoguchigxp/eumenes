@@ -73,7 +73,11 @@ export async function cloudRequest(
 			const estimate = () =>
 				new TextEncoder().encode(JSON.stringify(messages)).length +
 				messages.length * 16;
-			while (messages.length > 2 && estimate() > budget)
+			while (
+				row.contextPolicy !== "exact" &&
+				messages.length > 2 &&
+				estimate() > budget
+			)
 				messages.splice(1, Math.min(2, messages.length - 2));
 			if (estimate() > budget) throw new Error("context_window_exceeded");
 			body = {

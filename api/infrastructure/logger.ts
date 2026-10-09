@@ -18,6 +18,8 @@ export interface LogFields {
 	requestId?: string;
 	runId?: string;
 	jobId?: string;
+	taskId?: string;
+	invocationId?: string;
 	subjectId?: string;
 	utteranceId?: string;
 	sessionId?: string;
@@ -42,6 +44,8 @@ const keys = new Set<keyof LogFields>([
 	"requestId",
 	"runId",
 	"jobId",
+	"taskId",
+	"invocationId",
 	"subjectId",
 	"utteranceId",
 	"sessionId",

@@ -71,6 +71,7 @@ test.beforeAll(async () => {
 	await ready(`http://127.0.0.1:${larmPort}/v3/agent-profiles`);
 	launch(["api/application/server.ts"], {
 		EUMENES_DB: join(dir, "test.sqlite3"),
+		EUMENES_TOOLCHAIN_ENABLED: "0",
 		EUMENES_LOG_FILE: join(dir, "logs/api.jsonl"),
 		EUMENES_LOG_LEVEL: "debug",
 		EUMENES_API_TOKEN: "",

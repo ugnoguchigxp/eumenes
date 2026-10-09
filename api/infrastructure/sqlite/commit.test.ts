@@ -44,3 +44,38 @@ test("commit notifications see persisted state, exclude idle scans/rollback, and
 		rmSync(dir, { recursive: true, force: true });
 	}
 });
+
+test("cache maintenance runs in writer order outside a transaction and does not notify commits", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "eumenes-maintenance-"));
+	const store = openStore(
+		join(dir, "db.sqlite3"),
+		["CREATE TABLE items(value TEXT)"],
+		{ incrementalVacuum: true },
+	);
+	let notifications = 0;
+	store.onCommit(() => notifications++);
+	try {
+		const write = store.write((db) =>
+			db.query("INSERT INTO items VALUES('saved')").run(),
+		);
+		const maintain = store.maintenance!((db) => {
+			expect(db.inTransaction).toBe(false);
+			expect(db.query("SELECT value FROM items").all()).toEqual([
+				{ value: "saved" },
+			]);
+			expect(
+				db.query<{ auto_vacuum: number }, []>("PRAGMA auto_vacuum").get()!
+					.auto_vacuum,
+			).toBe(2);
+			db.exec(
+				"PRAGMA wal_checkpoint(TRUNCATE); PRAGMA incremental_vacuum(256)",
+			);
+		});
+		await write;
+		await maintain;
+		expect(notifications).toBe(1);
+	} finally {
+		await store.close();
+		rmSync(dir, { recursive: true, force: true });
+	}
+});

@@ -31,6 +31,7 @@ bun run logs -- --since 2026-10-08T10:00:00+09:00 --component inference --json
 | `bootId` / `pid` / `schemaVersion` | 起動ごとの識別、プロセス、ログ形式の版 |
 | `httpRequestId` | HTTP要求ごとにbackendが発行するID。レスポンスの `X-Request-Id` と一致 |
 | `requestId` / `runId` / `jobId` | 入力要求、回答処理、ジョブ。`dialogue.accepted` が相互の対応を記録 |
+| `taskId` / `invocationId` | 調査担当の親子taskとtool呼出し。`agent.state_changed` のrunId/jobIdと対応させる |
 | `inferenceId` / `attemptId` / `subjectId` | 推論要求、各試行、その要求を所有するrunや発話。ASR・LLM・TTSと代替先を追う |
 | `sessionId` / `utteranceId` / `generation` | 音声セッション、発話、割込みの世代 |
 | `status` / `reason` / `durationMs` | 保存後の状態、処理側で定義した理由、処理の所要時間 |

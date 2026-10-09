@@ -1,4 +1,28 @@
 export const domains = {
+	capabilities: {
+		backend: "api/domains/capabilities",
+		web: null,
+		components: null,
+		depends: [],
+	},
+	"tool-runtime": {
+		backend: "api/domains/tool-runtime",
+		web: null,
+		components: null,
+		depends: ["capabilities", "queue"],
+	},
+	"agent-runtime": {
+		backend: "api/domains/agent-runtime",
+		web: "web/src/domains/agent-runtime",
+		components: null,
+		depends: ["capabilities", "tool-runtime", "inference", "queue"],
+	},
+	"web-research": {
+		backend: "api/domains/web-research",
+		web: null,
+		components: null,
+		depends: ["queue"],
+	},
 	"attitude-dataset": {
 		backend: "api/domains/attitude-dataset",
 		web: null,
@@ -88,6 +112,7 @@ export const domains = {
 		web: "web/src/domains/dialogue",
 		components: null,
 		depends: [
+			"agent-runtime",
 			"conversation",
 			"inference",
 			"queue",

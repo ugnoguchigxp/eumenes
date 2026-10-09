@@ -1,7 +1,7 @@
 # Web取得とLuna調査およびキャッシュの実装計画
 
 作成日: 2026-10-09 Asia/Tokyo
-状態: 実装前の計画。数値は初期設定案。実装、fixture検証、live受入の完了は各工程で別々に記録する。
+状態: 初期実装に着手済み。第1〜14章は設計・工程の計画であり、実装済みの範囲と検証結果は第15章に記録する。
 
 範囲更新: Web調査の記憶利用に必要な変更は、Eumenesに加えて別プロジェクト `../eumenes_memory` も実装対象とする。既存の公開機能を再利用し、不足する共通契約・永続処理・試験を本体で拡張する。具体的な分担と配布・接続工程は第13章に記す。
 
@@ -33,7 +33,7 @@ Lunaが確認した資料を全件llm-fetchで再取得しない。原文の保�
 | `api/domains/dialogue/` | 会話revision、Queue、回答採用を所有 | 調査の依頼・待機・結果の採用を公開操作で接続 |
 | `api/application/migrations.ts` | migrationは配列位置で識別。vendorのmigrationも含む | 適用済み配列の末尾にだけ追加 |
 
-本書の追加domain、API、テーブル、設定は未実装である。現在のInferencePortが既にツールを使えるものとして実装を始めない。
+本章の表は着手時点の比較である。追加domain、API、テーブルの実装状況は第15章を参照する。現在のInferencePortが既にツールを使えるものとして実装を始めない。
 
 作業開始時に未コミット変更と最新のdomain依存を再確認する。他の進行中作業を上書きしない。SAAA、ContextStill等のDB・設定・秘密はコピーしない。
 
@@ -342,3 +342,62 @@ cacheのSQLはEumenes所有の取得metadataと本体所有のRecords等に分�
 - [Codexの利用枠と料金](https://learn.chatgpt.com/docs/pricing)
 
 外部仕様は2026-10-09の設計時確認を基準とする。SDK/CLIとproviderは実装時に採用版で再確認する。Firecrawlを含め、比較対象のコード移植や契約追加をこの計画の承認に含めない。
+
+
+## 15 着手後の実装記録（2026-10-09）
+
+今回の到達点は、明示依頼による検索・本文取得をAPI/CLIから利用し、安定した資料を期限付きで保存する初期実装である。会話LLMからの自動呼出しやLuna調査まで完了した段階ではない。
+
+### 実装済み
+
+- リリース済みnpmパッケージ `llm-fetch@0.1.2` を厳密固定して使用する。DuckDuckGo検索、最大5件の結果、指定時の最大3ページ取得、直接URL取得に対応する。ブラウザ描画は使用せず、HTTP安全取得と本文ガードをパッケージの公開APIに任せる。Tauriを起動するコードや依存は追加していない。
+- `web-research` domainが取得台帳・正規化・キャッシュ方針を所有する。Queueのbackground枠と `web.fetch` 資源枠2件で実行する。取得全体は15秒、Queue依頼は30秒、再試行1回（初回のみ）。同一入力の実行中取得を共有し、片方の取消で他の依頼を止めない。取消・古いgenerationの結果を採用しない。
+- APIは `POST /api/web-research/runs`、`GET /api/web-research/runs/:id`、`POST /api/web-research/runs/:id/cancel`、`GET /api/web-research/cache/status`、`POST /api/web-research/cache/clear`。認証・Origin検査は既存API共通処理を通す。client/CLIはAPIだけを使う。
+- 入力は `lookup` と `read` に限定する。標準の取得は `live`、保存は `read` の `retention: stable` 明示時だけ。検索一覧の永続保存はしない。`live` はcacheを読まず新しく取得するが、stable指定時は新規取得結果で保存を更新できる。
+- guard拒否・承認要求は失敗として返す。guardを無効化しての再取得はしない。出典URL・取得時刻・`untrusted`/`tainted`・本文確認と検索要約の区別・有限なguard理由コードを保持する。本文やProviderの生応答は運用ログに渡さない。
+- 本文は文書ごと最大12,000文字、合計24,000 bytes、正規化結果全体32 KiB以内に制限する。初期段階では回答採用が未接続なので、結果受取用のメモリは最大64件・15分。第7章の一時結果14日保存案はこの段階では実装しない。GETは再取得を起こさず、期限切れは `resultExpired` で明示する。再起動でも受取用結果は失われる。
+- キャッシュDBは主DBのディレクトリ配下 `cache/web-research.sqlite3`。本文はメモリーパッケージのRecordsに一度だけ保存し、ホストにはキー対応とgenerationだけを置く。主DBの確定後にbest-effortで保存し、保存失敗で完了済み依頼を失敗に変えない。
+- 安定資料のfresh上限24時間・idle14日、合計5,000件/128 MiB、単一1 MiB、DB/WAL/SHM合計256 MiB超で新規保存を停止する。idle削除は起動時と1時間ごと、1 transaction最大100件。LRU削除、checkpoint、incremental vacuumを行う。キャッシュの全削除はgenerationを進め、実行中だった取得が後から復元しない。
+- HTTP `no-store`、`no-cache`、`private`、Cookie、Vary、WWW-Authenticateを持つページは保存対象外。`max-age`・`Age`・`Date`・`Expires`で再利用期限を短縮する。304再検証はまだ実装せず、再検証が必要なページは再利用しない。
+- 別プロジェクト `../eumenes_memory` にretention v1とmigration 0005を追加した。公開操作は `retainRecord`、`readRetainedRecord`、`useRetainedRecord`、`retainedRecordStats`、`evictRetainedRecords`。読取だけで期限を延長せず、確定後の利用通知でidleだけ延長する。新規本文への置換では過去revision・本文・FTSを剪定する。既存の通常Recordsを自動削除対象に変更しない。evictはforget墓標を消さず、依存する永続Stateがある資料の削除を止める。
+- メモリーの配布候補はvendor `eumenes-memory-0.3.4.tgz`、schema 5。SHA-256、依存指定、lockfile、インストール済み版の整合を検査する。これはローカル配布候補でありnpm公開はしていない。既存のmemoryプロジェクトの作業中変更は保持し、その作業ツリーを元にパックした。
+
+### 検証
+
+- fixture: Web取得domain 10件、CLIプロセス6件、migration/SQLite writer 8件が成功。期限境界、アクセス時のfresh不延長、実行共有と個別取消、削除中取得の棄却、主DB確定失敗時の非公開、HTTP保持規則、容量一杯での同一キー更新を確認した。
+- Eumenes `bun run verify:all`: backend 306件、Web 92件、ブラウザfixture 14件の計412件成功。format/lint/型/境界/画面buildを含む。ローカルの `.claude/` 設定で全体format検査が停止したため、このGit管理外ディレクトリをformatter対象外に加えた。設定内容は変更していない。
+- メモリープロジェクト `bun run verify:all`: 1,610件成功。公開面・型・境界・互換性・evalを含む。retention公開APIの消費者試験5件を含む。
+- live: インストール済みnpm版を使い `https://example.com/` の本文156文字を取得（guard `allow`）。`https://bun.sh/docs/runtime/sqlite` は `GUARD_DENIED` / `require_approval` で本文を返さなかった。これは拒否の観測であり、全サイトを取得できることや原因が誤検知であることを証明しない。
+- 実機器の音声受入は今回の検証対象外。
+
+### 未実装と次の工程
+
+P1の天気・株価専用API、ニュース/RSS・記事再検証、会話の取得計画と結果採用、P3のLuna起動・調査結果保存、P4の設定・出典UI、M1/M2の調査メモ・派生資料選択・利用時の依存検証を残す。保存されたRecordsはまだ回答LLMへRecall経由で自動提供しない。外部知識をユーザー個人のStateに変換する処理も追加していない。
+
+## 16 コードレビューと修正記録（2026-10-09）
+
+第15章の初期実装を対象に、Web取得・キャッシュ・Queue確定・API/CLI・メモリー公開操作・配布物を再レビューした。問題を再現する試験を追加して修正し、再レビューで同じ条件と周辺の競合を確認した。今回確認した範囲では、残る具体的な不具合の指摘はない。第15章の件数と配布版は初期実装時の記録として残す。
+
+### 修正した問題
+
+- **鮮度と更新**: Expiresの期限計算で上流Age、サーバーDate、通信時間、ガード処理時間を反映する。ヘッダー名の大小文字を正規化し、重複・不正値は再利用しない。新しい応答が保存不可なら、同じキーの古い本文もキャッシュから外す。リダイレクト途中の保存方針を確認できない応答、206の部分本文は保存しない。計算の基準は [RFC 9111 §4.2.3](https://www.rfc-editor.org/rfc/rfc9111.html#section-4.2.3)。
+- **競合と削除**: stable指定の同じURLは、liveでの取得も含めて直列化し、遅い旧結果による上書きを防ぐ。URLのfragment違いは同じHTTP資料のキーとして扱う。キャッシュ全削除が無関係な検索を失敗させないようにし、保存先が使えない場合や永続依存により削除できない場合には成功と返さない。
+- **確定と資源解放**: 主DBとQueueの確定を確認してから結果を公開する。rollbackした結果が既存の受取用結果を追い出さない。取得側が中断通知を無視しても15秒の期限でQueue資源を解放し、後から返った結果は採用しない。掃除・全削除・終了処理の競合を待ち合わせ、一方の終了失敗でも他方のDBを閉じる。
+- **結果とCLI**: JSONエスケープ分も含めた結果サイズ制限で本文を切り詰め、正常取得をサイズ超過の失敗に変えない。Unicodeタイトルの制限でサロゲートを分断しない。ガードの承認要求と拒否を区別する。CLIの通信・待機・取消確認を期限付きにし、取消や受取結果の消失を成功扱いにしない。
+- **メモリー保持契約**: 権限確認を存在判定より先に行い、未知の入力キーやgetter付き入力を受け付けない。永続Stateや外部Providerへの出典依存がある本文は、更新時の旧版剪定やevictでも保護する。忘却したRecordsの保持metadataをmigration 0006とtriggerで除去し、墓標は維持する。同時刻のLRUで新規資料を優先して消さないようにし、削除不可の古い資料が他の削除対象を塞がないようにする。
+- **互換性**: 旧配布版からのmigration試験で実際の会話データを保存してから更新し、更新後も本文が残ることを確認する。APIの認証・Origin・不正JSON・保存先不在の試験を追加した。
+
+### 配布と検証
+
+メモリーの修正版はローカル配布候補 `eumenes-memory-0.3.6.tgz`、schema 6として接続した。旧版tarballは上書きせず、manifestのSHA-256、package.json、bun.lock、インストール済み版を一致させた。npmへの公開は行っていない。
+
+- fixture: Web取得domain 26件、CLIプロセス9件を含め、追加した再現・回帰試験が成功。
+- メモリープロジェクト `bun run verify:all`: 1,617件成功、0件失敗。retentionの公開消費者試験12件、型・format・lint・境界・互換性・eval・公開面の検証を含む。
+- Eumenes `bun run verify:all`: backend 326件、Web 92件、ブラウザfixture 14件、計432件成功、0件失敗。format・lint・型・domain境界・画面buildを含む。取り込んだ0.3.6の配布物で確認した。
+- このレビューではlive取得と実機器の音声受入を追加実施していない。Luna、会話LLMへの自動接続、調査メモなど第15章の未実装範囲は変わらない。
+
+## 17 Toolchain接続（2026-10-09）
+
+第15・16章の未実装欄は当時の記録として残す。今回、会話からの能力選択、プロフィールとSKILLを持つ調査担当の起動、Web取得、根拠付き要約、会話への回答採用、出典cardを接続した。子はメインへ本文を転送しない。専用の公開JSON読取りを天気・明示tickerの株価に追加し、既存Web domainのguard・Queue・結果契約を通す。
+
+Luna専用Providerを新規接続したものではなく、既存のLARM LLMを制御modeで使う。通常会話の最終回答には従来のinference経路を使う。取得結果の原文は短期メモリー、検査済み要約はagent-runtimeに14日保持する。M1/M2の調査メモ、派生資料選択、RecordsのRecall自動提供は今回も未実装。詳細と試験結果は[Toolchain実装記録](verification/toolchain/README.md)を参照する。

@@ -11,6 +11,10 @@ export type LarmExchange = {
 	speechCredit?: string;
 };
 export type LarmCallOptions = {
+	maxOutputTokens?: number;
+	/** Internal control calls only: JSON-object generation at temperature zero. */
+	jsonOutput?: boolean;
+	contextPolicy?: "exact";
 	onExchange?: (exchange: LarmExchange) => Promise<void>;
 	speechVoice?: string;
 	intonationScale?: number;

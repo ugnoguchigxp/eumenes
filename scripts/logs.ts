@@ -22,6 +22,8 @@ const idKeys = [
 	"requestId",
 	"runId",
 	"jobId",
+	"taskId",
+	"invocationId",
 	"subjectId",
 	"utteranceId",
 	"sessionId",

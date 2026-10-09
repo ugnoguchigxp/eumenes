@@ -20,6 +20,32 @@ export interface Receipt {
 	delivery?: SpeechDelivery;
 }
 export interface InferencePort {
+	captureControlInTransaction?(
+		db: Database,
+		input: {
+			subject: string;
+			policySubject: string;
+			deadline: number;
+			maxOutputTokens: number;
+		},
+	): string;
+	executeControl?(
+		requestId: string,
+		messages: Messages,
+		signal: AbortSignal,
+	): Promise<Receipt>;
+	rejectControlInTransaction?(
+		db: Database,
+		receipt: Receipt,
+		code: string,
+	): void;
+	cancelRequestsInTransaction?(db: Database, requestIds: string[]): void;
+	flushCancelledRequests?(requestIds: string[]): void;
+	setContextPolicyInTransaction?(
+		db: Database,
+		requestId: string,
+		policy: "exact",
+	): void;
 	status(): {
 		state: "unconfigured" | "idle" | "ready" | "connecting" | "failed";
 		capabilities: Purpose[];

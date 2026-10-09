@@ -22,11 +22,37 @@ UPDATE dialogue_runs SET seq = rowid;
 CREATE UNIQUE INDEX dialogue_runs_seq ON dialogue_runs(seq);
 CREATE INDEX dialogue_runs_conversation_seq ON dialogue_runs(conversation_id, seq);
 `;
-const columns =
-	"id, request_id, conversation_id, utterance_id, status, revision, input_message_id, answer_message_id, error, job_id, deadline_at, source_kind, schedule_id, occurrence_id, created_at, updated_at";
+export const agentLinkMigration = `ALTER TABLE dialogue_runs ADD COLUMN agent_task_id TEXT;`;
+export function linkAgent(
+	db: Database,
+	runId: string,
+	taskId: string,
+	jobId: string,
+) {
+	if (
+		db
+			.query(
+				"UPDATE dialogue_runs SET agent_task_id=?,job_id=? WHERE id=? AND status IN ('queued','running')",
+			)
+			.run(taskId, jobId, runId).changes !== 1
+	)
+		throw new Error("run_changed");
+}
+export function linkAnswer(db: Database, runId: string, jobId: string) {
+	if (
+		db
+			.query(
+				"UPDATE dialogue_runs SET job_id=? WHERE id=? AND status IN ('queued','running')",
+			)
+			.run(jobId, runId).changes !== 1
+	)
+		throw new Error("run_changed");
+}
+const columns = "*";
 function map(row: Record<string, unknown>): Run {
 	return {
 		id: row.id as string,
+		agentTaskId: (row.agent_task_id as string | null | undefined) ?? null,
 		requestId: row.request_id as string,
 		conversationId: row.conversation_id as string,
 		utteranceId: row.utterance_id as string | null,
@@ -122,5 +148,15 @@ export function priorRuns(db: Database, run: Run): Run[] {
 				`SELECT ${columns} FROM dialogue_runs WHERE conversation_id = ? AND seq < (SELECT seq FROM dialogue_runs WHERE id = ?) ORDER BY seq`,
 			)
 			.all(run.conversationId, run.id) as Record<string, unknown>[]
+	).map(map);
+}
+
+export function unfinishedAgentRuns(db: Database): Run[] {
+	return (
+		db
+			.query(
+				"SELECT * FROM dialogue_runs WHERE agent_task_id IS NOT NULL AND status IN ('queued','running')",
+			)
+			.all() as Record<string, unknown>[]
 	).map(map);
 }

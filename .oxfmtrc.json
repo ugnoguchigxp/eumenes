@@ -23,6 +23,7 @@
 		"test-results/**",
 		"playwright-report/**",
 		".serena/**",
+		".claude/**",
 		"packages/design-system/**"
 	]
 }

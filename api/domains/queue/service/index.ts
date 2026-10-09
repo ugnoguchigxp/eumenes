@@ -225,6 +225,17 @@ export function createQueue(
 			return store.read((db) => listAttempts(db, jobId)).map(attemptDto);
 		},
 		cancelInTransaction,
+		flushCancellations(jobIds: string[]) {
+			for (const jobId of jobIds) {
+				const job = store.read((db) => getJob(db, jobId));
+				if (
+					job &&
+					(job.state === "cancelled" || job.cancelRequestedAtMs !== null)
+				)
+					runner.abort(jobId, "cancelled");
+			}
+			runner.wake();
+		},
 		async cancel(jobId: string, reason = "cancel_requested") {
 			const result = await store.write((tx) =>
 				cancelInTransaction(tx, jobId, reason),

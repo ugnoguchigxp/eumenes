@@ -1,4 +1,12 @@
 import {
+	registerCapabilities,
+	type Capabilities,
+} from "../domains/capabilities";
+import {
+	registerAgentRuntime,
+	type AgentRuntime,
+} from "../domains/agent-runtime";
+import {
 	registerAttitudeDataset,
 	type AttitudeDataset,
 } from "../domains/attitude-dataset";
@@ -12,6 +20,10 @@ import { type DialogueService, registerDialogue } from "../domains/dialogue";
 import { type LarmPort, registerLarmStatus } from "../domains/larm";
 import { type QueueService, registerQueue } from "../domains/queue";
 import { registerMemory, type MemoryService } from "../domains/memory";
+import {
+	registerWebResearch,
+	type WebResearchService,
+} from "../domains/web-research";
 import {
 	registerContinuity,
 	type ContinuityService,
@@ -43,6 +55,8 @@ const isAudioUpload = (path: string) =>
 	path === "/api/voice/turns" || path === "/api/voice/preview";
 
 export function createApp(deps: {
+	capabilities?: Capabilities;
+	agents?: AgentRuntime;
 	attitudeDataset?: AttitudeDataset;
 	token: string;
 	origin: string;
@@ -56,6 +70,7 @@ export function createApp(deps: {
 	inference?: InferenceService;
 	ttsDictionary?: TtsDictionaryService;
 	memory?: MemoryService;
+	webResearch?: WebResearchService;
 	continuity?: ContinuityService;
 	changes?: Changes;
 	serviceTests?: ServiceTests;
@@ -114,6 +129,8 @@ export function createApp(deps: {
 	});
 	if (deps.changes)
 		app.get("/api/events", (c) => deps.changes!.open(c.req.raw.signal));
+	if (deps.capabilities) registerCapabilities(app, deps.capabilities);
+	if (deps.agents) registerAgentRuntime(app, deps.agents, deps.dialogue.cancel);
 	if (deps.attitudeDataset) registerAttitudeDataset(app, deps.attitudeDataset);
 	registerLarmStatus(app, deps.larm);
 	if (deps.settings) registerSettings(app, deps.settings);
@@ -121,6 +138,7 @@ export function createApp(deps: {
 	if (deps.serviceTests) registerServiceTests(app, deps.serviceTests);
 	if (deps.ttsDictionary) registerTtsDictionary(app, deps.ttsDictionary);
 	if (deps.memory) registerMemory(app, deps.memory);
+	if (deps.webResearch) registerWebResearch(app, deps.webResearch);
 	if (deps.continuity) registerContinuity(app, deps.continuity);
 	registerConversation(app, deps.conversation);
 	registerDialogue(app, deps.dialogue);
