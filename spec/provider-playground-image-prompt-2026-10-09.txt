@@ -1,0 +1,26 @@
+Use case: ui-mockup
+Asset type: High-fidelity desktop settings screen design concept for the existing Japanese Eumenes app.
+Reference image: The attached existing settings screenshot is a visual style reference only; create a new screen, preserving its charcoal/slate backgrounds, restrained blue accent, thin gray borders, clean Japanese sans-serif typography, Eumenes wordmark, and compact app header.
+Primary request: Design a polished, practical Japanese provider/service playground under settings. Wide desktop composition around 1800 by 1120, full screen shown straight-on, no browser chrome, no device frame, no perspective. This is a proposed UI, not an implementation screenshot. Make text large enough to read and preserve generous spacing.
+Layout:
+A 58px top bar with E logo and Eumenes on left, small pill "デザイン案" near wordmark, and "会話に戻る" right.
+A 220px existing settings navigation sidebar with heading "設定" and items "全般", "AIの使い方", "接続先", selected bright blue "サービスを試す", "音声", "データと利用記録", "予約", "表示", "TTS辞書", "メモリー".
+Main workspace title "サービスを試す" with description "プロバイダを選んで、入力と結果を確認できます。" On the right a subdued action "一覧を更新". Beneath title compact source tabs "LARM" selected and "登録済みクラウド", and small text "一覧取得済み".
+Below this, a service list column roughly 300px wide, and a spacious detail panel filling the rest. List search placeholder "サービスを検索".
+The list contains seven carefully aligned rows with simple outline icons, use-case title, model beneath in smaller muted text, and understated status:
+"会話" / "gemma4-26b-a4b";
+"音声認識" / "qwen3-asr-1.7b";
+"音声合成" / "voicevox-core";
+selected row "画像生成" / "qwen-image-2.1", outlined blue with dark-blue fill;
+"楽曲生成" / "ace-step-1.5";
+"埋め込み" / "multilingual-e5-small";
+"判断" / "laya-multilingual".
+Use muted "未テスト" labels, and "実行時に起動" for image and music. These labels must not imply live availability or proven success.
+Below the list a separated small muted area headed "将来の追加例" with two disabled outline chips "OCR" and "画像処理". This is explicitly future work.
+Detail panel: title "画像生成", secondary line "qwen-image-2.1", chips "LARM" and "実行時に起動". Top-right small "実行履歴".
+Inside the detail panel, an input form on left and result preview on right.
+Input section title "入力". Field label "プロンプト", a large textarea containing "朝の光が入る静かな書斎。木の机と観葉植物。" Small text button "サンプルを入力". Below are aligned dropdown controls "画像サイズ" showing "512 × 512" and "形式" showing "PNG". Collapsed "詳細設定" row. Note "実行時にサービスが起動します。". A blue primary button "画像を生成" with a simple play icon. Small subdued text "送信先：LARM".
+Result section heading "結果" with small explicit badge "表示例". A gorgeous square example output image of a calm minimal Japanese-inspired study room with warm early morning light, wood desk, plants and ivory walls, sharp professional interior photo. This preview supplies warmth against the dark UI but is contained neatly within the app. Beneath it "512 × 512 · PNG", and buttons "拡大" and "画像を保存". Do not show fabricated successful test timings or real provider success.
+Bottom of detail panel a shallow neutral information area "実行すると、ここに進捗と結果が表示されます。" 
+Bottom of canvas, tiny but readable annotation "画面と生成結果はデザイン上の表示例です。"
+Constraints: Japanese text accurate and crisp; consistent clean line icons; no neon glow, no gradients on UI surfaces, no decorative charts, no floating blobs, no oversized hero typography. Match reference's restrained functional aesthetic while making the new screen more usable. Avoid settings apply/save footer because this is a testing screen. Never show API keys, raw endpoints, credentials, or developer payloads.

@@ -1080,6 +1080,32 @@ export function createInference(
 					)
 					.all(),
 			),
+		async testResource(
+			resourceId: string,
+			input: Messages | string | Uint8Array,
+			signal: AbortSignal,
+		) {
+			const snapshot = settings.get();
+			const resource = snapshot.resources.find((r) => r.id === resourceId);
+			if (!resource) throw new Error("invalid_probe_target");
+			const fixed = structuredClone(snapshot);
+			fixed.routes[resource.purpose].mode = "cloud-only";
+			fixed.routes[resource.purpose].fallbackId = resourceId;
+			const id = await store.write((db) =>
+				capture(
+					db,
+					`probe:${crypto.randomUUID()}`,
+					resource.purpose,
+					Date.now() + 120_000,
+					fixed,
+				),
+			);
+			const receipt = await executeRequest(id, input, signal);
+			signal.throwIfAborted();
+			if (!(await store.write((db) => accept(db, receipt))))
+				throw new Error("permission_revoked");
+			return receipt.value;
+		},
 		async startProbe(target: string) {
 			const current = settings.get();
 			const id = crypto.randomUUID();

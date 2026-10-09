@@ -88,6 +88,56 @@ const server = Bun.serve({
 			!path.startsWith("/tts/")
 		)
 			return Response.json({ error: "unauthorized" }, { status: 401 });
+		if (path === "/health") return Response.json({ status: "ok" });
+		const healthMatch = path.match(
+			/^\/v1\/agent-connections\/([\w-]+)\/providers\/([\w-]+)\/health$/,
+		);
+		if (healthMatch)
+			return Response.json({
+				name: healthMatch[2],
+				capability: healthMatch[2],
+				ready: true,
+				acceptingRequests: true,
+			});
+		if (path === "/v1/images/generations")
+			return Response.json({
+				status: "succeeded",
+				artifact: {
+					id: "fixture-image",
+					model: "fixture-image",
+					contentUrl: "/v1/image-artifacts/fixture-image/content",
+					mimeType: "image/png",
+				},
+			});
+		if (path === "/v1/image-artifacts/fixture-image/content")
+			return new Response(
+				Buffer.from(
+					"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jD1sAAAAASUVORK5CYII=",
+					"base64",
+				),
+				{ headers: { "Content-Type": "image/png" } },
+			);
+		if (path === "/v1/music/generations")
+			return Response.json(
+				{ jobId: "fixture-music", status: "queued" },
+				{ status: 202 },
+			);
+		if (path === "/v1/music/generations/fixture-music")
+			return Response.json({
+				jobId: "fixture-music",
+				status: request.method === "DELETE" ? "cancelled" : "completed",
+				result: {
+					id: "fixture-music",
+					model: "fixture-music",
+					audioUrl: "/v1/music/generations/fixture-music/audio",
+					metadataUrl: "/v1/music/generations/fixture-music/metadata",
+					format: "wav",
+				},
+			});
+		if (path === "/v1/music/generations/fixture-music/metadata")
+			return Response.json({ id: "fixture-music" });
+		if (path === "/v1/music/generations/fixture-music/audio")
+			return new Response(wav(), { headers: { "Content-Type": "audio/wav" } });
 		if (path === "/fixture/hold-next") {
 			holdNext = true;
 			ttsInputs.length = 0;
@@ -111,12 +161,13 @@ const server = Bun.serve({
 			return Response.json({
 				contractVersion: "agent-connection.v3",
 				catalogRevision: "fixture1",
-				requestedProfile: profile,
+				requestedProfile: url.searchParams.get("profile") ?? undefined,
 				profiles: [
 					{
 						id: agentProfile,
 						providers: names.map((name) => ({
 							name,
+							capability: name,
 							protocol: protocol[name],
 							endpoint: endpoint[name],
 							model: model(name),
@@ -130,7 +181,35 @@ const server = Bun.serve({
 									}
 								: {}),
 						})),
-						services: [],
+						services: /SAAA-w-(Image|music)/.test(
+							url.searchParams.get("profile") ?? "",
+						)
+							? [
+									{
+										name:
+											url.searchParams.get("profile") === "SAAA-w-Image"
+												? "image"
+												: "music",
+										capability:
+											url.searchParams.get("profile") === "SAAA-w-Image"
+												? "media.image.generate"
+												: "media.music.generate",
+										protocol:
+											url.searchParams.get("profile") === "SAAA-w-Image"
+												? "larm.image-generation.v1"
+												: "larm.music-generation.v1",
+										endpoint:
+											url.searchParams.get("profile") === "SAAA-w-Image"
+												? "/v1/images/generations"
+												: "/v1/music/generations",
+										model:
+											url.searchParams.get("profile") === "SAAA-w-Image"
+												? "fixture-image"
+												: "fixture-music",
+										startupPolicy: { minWarmInstances: 0, idleTtlSeconds: 0 },
+									},
+								]
+							: [],
 					},
 				],
 			});
@@ -144,6 +223,7 @@ const server = Bun.serve({
 					id,
 					profile,
 					agentProfile,
+					catalogRevision: "fixture1",
 					status: "ready",
 					providers: requested.map((name) => ({
 						name,
@@ -188,7 +268,12 @@ const server = Bun.serve({
 						protocol: protocol[name as keyof typeof protocol],
 						baseUrl: `${origin}/${name}/v1`,
 						model: model(name),
-						credential: { token: `fixture-${name}` },
+						credential: {
+							type: "bearer",
+							token: `fixture-${name}`,
+							expiresAt: new Date(Date.now() + 900000).toISOString(),
+						},
+						endpoint: `${origin}/${name}${endpoint[name as keyof typeof endpoint]}`,
 						configuration: {
 							fields: {
 								baseURL: `${origin}/${name}/v1`,

@@ -1,6 +1,7 @@
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import {
 	existsSync,
+	mkdirSync,
 	mkdtempSync,
 	readFileSync,
 	rmSync,
@@ -856,6 +857,47 @@ test("settings save, reload, theme and automatic fallback use backend credential
 		.toBe("ready");
 });
 
+test("memory connection settings persist across reload and preserve saved items", async ({
+	page,
+}, testInfo) => {
+	const url = `http://127.0.0.1:${webPort}`;
+	const original = await (await fetch(`${url}/api/memory/status`)).json();
+	const items = await (await fetch(`${url}/api/memory/items?all=1`)).json();
+	try {
+		await page.goto(`${url}/#settings`);
+		await page.getByRole("button", { name: "メモリー", exact: true }).click();
+		await expect(page.getByText("会話への接続", { exact: true })).toBeVisible();
+		await expect(
+			page.getByRole("button", { name: "変更を適用", exact: true }),
+		).toHaveCount(0);
+		await page.getByRole("button", { name: "メモリーを切断" }).click();
+		await expect(page.getByText("非接続", { exact: true })).toBeVisible();
+		expect(
+			(await (await fetch(`${url}/api/memory/status`)).json()).enabled,
+		).toBe(false);
+		await page.reload();
+		await page.getByRole("button", { name: "メモリー", exact: true }).click();
+		await expect(page.getByText("非接続", { exact: true })).toBeVisible();
+		await page.screenshot({
+			path: testInfo.outputPath("memory-disconnected.png"),
+		});
+		await page.getByRole("button", { name: "メモリーを接続" }).click();
+		await expect(page.getByText("接続中", { exact: true })).toBeVisible();
+		expect(
+			(await (await fetch(`${url}/api/memory/status`)).json()).enabled,
+		).toBe(true);
+		expect(await (await fetch(`${url}/api/memory/items?all=1`)).json()).toEqual(
+			items,
+		);
+	} finally {
+		await fetch(`${url}/api/memory/settings`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ enabled: original.enabled }),
+		});
+	}
+});
+
 test("settings schedule controls create, pause, resume and cancel future work", async ({
 	page,
 }) => {
@@ -1172,5 +1214,48 @@ test("answer emotions sit beside Eumenes, neutral and legacy motions stay hidden
 	await expect(emoji).toBeVisible();
 	await page.screenshot({
 		path: "verification-reports/context-emotion-emoji-fixture.png",
+	});
+});
+
+test("settings playground exercises image, music and provider health through the API", async ({
+	page,
+}) => {
+	mkdirSync("spec/verification/service-tests", { recursive: true });
+	await page.setViewportSize({ width: 1600, height: 1100 });
+	await page.goto(`http://127.0.0.1:${webPort}`);
+	await page.getByRole("button", { name: "設定", exact: true }).click();
+	await page
+		.getByRole("button", { name: "サービスを試す", exact: true })
+		.click();
+	await page.getByRole("button", { name: /画像生成.*fixture-image/ }).click();
+	await page.getByRole("button", { name: "画像を生成", exact: false }).click();
+	await expect(page.getByAltText("生成した画像")).toBeVisible();
+	await expect(page.getByText("成功", { exact: true }).first()).toBeVisible();
+	await page.screenshot({
+		path: "spec/verification/service-tests/desktop.png",
+		fullPage: true,
+	});
+	await page.getByRole("button", { name: /楽曲生成.*fixture-music/ }).click();
+	await page.getByRole("button", { name: "楽曲を生成", exact: false }).click();
+	await expect(page.locator(".test-result audio")).toBeVisible();
+	await page.getByRole("button", { name: "自己診断", exact: true }).click();
+	await expect(
+		page.locator(".test-health").getByText("正常", { exact: true }),
+	).toHaveCount(3);
+	await expect(
+		page.locator(".test-health").getByText("実行時に起動", { exact: true }),
+	).toHaveCount(2);
+	await page.setViewportSize({ width: 390, height: 844 });
+	await expect(
+		page.getByRole("button", { name: "自己診断", exact: true }),
+	).toBeVisible();
+	expect(
+		await page.evaluate(
+			() => document.documentElement.scrollWidth <= window.innerWidth,
+		),
+	).toBe(true);
+	await page.screenshot({
+		path: "spec/verification/service-tests/mobile.png",
+		fullPage: true,
 	});
 });

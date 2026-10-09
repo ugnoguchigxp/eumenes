@@ -1,5 +1,17 @@
 # 独立 MemorySystem と Eumenes の接続計画
 
+2026-10-09 改訂（実装状況）: 下の E1/E2 の最小接続は実装済み（隔離 DB の結合試験まで。実モデル・実機器は未実施）。
+現行コードに合わせた差分: 旧 continuity は撤去済みだったため、`api/domains/continuity`（目的・決定・未解決事項）を新設し、
+`api/domains/memory`（明示登録・停止・再開・訂正・忘却、外部 journal、採用時検証、利用記録、設定 ON/OFF）を追加した。
+配布物は `vendor/eumenes-memory/`（版・sha256・DB スキーマ版は manifest.json）。dialogue は prepare で View v2 を固定し、
+settle の採用 transaction で `validateMemoryViewV2` を通す（失敗は `memory_stale` で理由つき終了。自動再生成はしない）。
+Memory の journal は DB の外（`EUMENES_MEMORY_JOURNAL`、既定は DB と同じディレクトリ）に置き、起動時に queue / worker より前に reconcile する。
+Web の「設定 → メモリー」で会話への接続・非接続を切り替えられる。変更は即時保存し、再起動後も維持する。
+非接続でも保存済みデータと忘却操作は維持し、会話履歴は従来どおり使う。生成中に切断した場合は、再接続しても切断前の view の回答を採用しない。
+接続設定が ON でも journal 等が不健全なら「利用停止中」と表示する。World はまだ接続しておらず、切替項目も設けない。
+未実装: 記憶の一覧・編集用 Web UI（CLI `bun cli/index.ts memory ...` と API のみ）、抽出由来の候補の接続（モデル adapter）、複数 scope・選択契約・
+公開版の対話への結線、Episode / World。
+
 2026-10-07 / 実装前。旧「Eumenes 内で本体を育ててから切り出す」構想を置き換える。本体は最初から隣接する `eumenes_memory` で開発する。
 
 - [MemorySystem 実装計画の正本](../../eumenes_memory/spec/implementation-plan.md)

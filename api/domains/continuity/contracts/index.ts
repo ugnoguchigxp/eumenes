@@ -1,11 +1,13 @@
 import { z } from "zod";
+/** Open items per conversation: keeps the recalled context inside its fixed byte budget. */
+export const MAX_ACTIVE_CONTINUITY = 30;
 export const continuityKinds = ["goal", "decision", "open_question"] as const;
 export const continuityStatuses = ["active", "resolved", "retracted"] as const;
 export const continuityItemSchema = z.object({
 	id: z.string(),
 	conversationId: z.string(),
 	kind: z.enum(continuityKinds),
-	text: z.string().min(1).max(2000),
+	text: z.string().min(1).max(500),
 	status: z.enum(continuityStatuses),
 	revision: z.number().int(),
 	createdAt: z.string(),
@@ -14,7 +16,7 @@ export const continuityItemSchema = z.object({
 export type ContinuityItem = z.infer<typeof continuityItemSchema>;
 export const addContinuitySchema = z.object({
 	kind: z.enum(continuityKinds),
-	text: z.string().trim().min(1).max(2000),
+	text: z.string().trim().min(1).max(500),
 });
 export type AddContinuity = z.infer<typeof addContinuitySchema>;
 export const continuityTransitionSchema = z.object({

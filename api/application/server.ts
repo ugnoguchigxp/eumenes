@@ -1,50 +1,16 @@
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { configureLogging, getLogger } from "../infrastructure/logger";
-import {
-	migration as conversationMigration,
-	avatarMotionMigration as conversationAvatarMotionMigration,
-	answerDeliveryMigration as conversationAnswerDeliveryMigration,
-	createConversationService,
-} from "../domains/conversation";
-import {
-	createDialogueService,
-	migration as dialogueMigration,
-	queueLinkMigration as dialogueQueueLinkMigration,
-} from "../domains/dialogue";
-import {
-	createSettings,
-	migration as settingsMigration,
-	epochsMigration as settingsEpochsMigration,
-} from "../domains/settings";
-import {
-	createInference,
-	migration as inferenceMigration,
-	parentsMigration as inferenceParentsMigration,
-	diagnosticsMigration as inferenceDiagnosticsMigration,
-} from "../domains/inference";
-import { createQueue, migration as queueMigration } from "../domains/queue";
-import {
-	createScheduler,
-	migration as schedulerMigration,
-} from "../domains/scheduler";
-import {
-	createVoiceDialogue,
-	migration as voiceMigration,
-	sequenceMigration as voiceSequenceMigration,
-} from "../domains/voice-dialogue";
-import {
-	createTtsDictionary,
-	migration as ttsDictionaryMigration,
-} from "../domains/tts-dictionary";
-import {
-	createContinuityService,
-	migration as continuityMigration,
-} from "../domains/continuity";
-import {
-	createMemoryService,
-	migration as memoryMigration,
-} from "../domains/memory";
-import { migrations as memoryPackageMigrations } from "eumenes-memory/sqlite";
+import { createConversationService } from "../domains/conversation";
+import { createDialogueService } from "../domains/dialogue";
+import { createSettings } from "../domains/settings";
+import { createInference } from "../domains/inference";
+import { createQueue } from "../domains/queue";
+import { createScheduler } from "../domains/scheduler";
+import { createVoiceDialogue } from "../domains/voice-dialogue";
+import { createTtsDictionary } from "../domains/tts-dictionary";
+import { createContinuityService } from "../domains/continuity";
+import { createMemoryService } from "../domains/memory";
+import { migrations } from "./migrations";
 import { openStore } from "../infrastructure/sqlite";
 import {
 	resolveApiToken,
@@ -52,6 +18,7 @@ import {
 } from "../infrastructure/auth-config";
 import { createApp } from "./app";
 import { createChanges } from "./events";
+import { createServiceTests } from "../domains/service-tests";
 
 const dbPath = process.env.EUMENES_DB ?? "./data/eumenes.sqlite3";
 configureLogging({
@@ -64,36 +31,11 @@ configureLogging({
 const log = getLogger("server");
 log.info("server.starting");
 async function main() {
-	// The continuity (bookmark) domain was removed. Migrations are applied by
-	// position, so keep a no-op in its slot; its old tables are left untouched.
-	const retiredContinuityMigration = "SELECT 1";
 	const host = process.env.EUMENES_HOST ?? "127.0.0.1";
 	if (host !== "127.0.0.1" && host !== "localhost")
 		throw new Error("loopback_host_required");
 	const token = resolveApiToken(process.env);
-	const store = openStore(dbPath, [
-		conversationMigration,
-		dialogueMigration,
-		voiceMigration,
-		// Appended migrations: never reorder or rewrite the ones above.
-		queueMigration,
-		schedulerMigration,
-		dialogueQueueLinkMigration,
-		voiceSequenceMigration,
-		retiredContinuityMigration,
-		settingsMigration,
-		inferenceMigration,
-		settingsEpochsMigration,
-		inferenceParentsMigration,
-		inferenceDiagnosticsMigration,
-		ttsDictionaryMigration,
-		conversationAvatarMotionMigration,
-		conversationAnswerDeliveryMigration,
-		// The memory package's migrations are appended one by one, in order, after the host's.
-		continuityMigration,
-		memoryMigration,
-		...memoryPackageMigrations,
-	]);
+	const store = openStore(dbPath, migrations);
 	const changes = createChanges();
 	const unsubscribeCommits = store.onCommit(() => changes.publish());
 	const conversation = createConversationService(store);
@@ -104,15 +46,19 @@ async function main() {
 		speechText: ttsDictionary.apply,
 	});
 	const unsubscribeStatus = larm.onChange(() => changes.publish());
+	const serviceTests = createServiceTests(store, settings, larm, {
+		token: resolveLarmToken(process.env),
+	});
 	const queue = createQueue(store, {
 		resourceAliases: { "larm.llm": "inference.llm" },
 	});
 	const scheduler = createScheduler(store, queue);
 	const continuity = createContinuityService(store);
 	const memory = createMemoryService(store, conversation, continuity, {
-		journalPath:
+		journalPath: resolve(
 			process.env.EUMENES_MEMORY_JOURNAL ??
-			join(dirname(dbPath), "memory-forget-journal.jsonl"),
+				join(dirname(dbPath), "memory-forget-journal.jsonl"),
+		),
 	});
 	const dialogue = createDialogueService(
 		store,
@@ -129,9 +75,11 @@ async function main() {
 	log.info("server.recovery_started");
 	// Journal reconciliation precedes any memory read or worker; a broken journal disables memory.
 	const memoryRecovery = await memory.recover();
-	if (!memoryRecovery.healthy) log.warn("memory.journal_inconsistent");
+	if (!memoryRecovery.healthy)
+		log.warn("memory.unavailable", { reason: memoryRecovery.reason });
 	await voice.recover();
 	await larm.recover();
+	await serviceTests.recover();
 	await dialogue.recover();
 	await queue.recover();
 	await scheduler.recover();
@@ -153,6 +101,7 @@ async function main() {
 		memory,
 		continuity,
 		changes,
+		serviceTests,
 	});
 	const port = Number(process.env.EUMENES_PORT ?? 8787);
 	const server = Bun.serve({
@@ -177,6 +126,7 @@ async function main() {
 			changes.close();
 			server.stop(true);
 			await scheduler.close();
+			await serviceTests.close();
 			await voice.close();
 			await queue.close(10_000);
 			await dialogue.close();

@@ -262,6 +262,7 @@ export function createDialogueService(
 				},
 				async () => {
 					log.info("dialogue.generation_started");
+					let held = 0;
 					const delta = (text: string) => {
 						signal.throwIfAborted();
 						const current = store.read((db) => byId(db, input.runId));
@@ -270,6 +271,12 @@ export function createDialogueService(
 							current.revision !== input.revision
 						)
 							throw new Error("cancelled");
+						if (input.memory) {
+							// Memory-backed text is not shown or spoken before the adoption check passes.
+							held += text.length;
+							if (held > 65536) throw new Error("chat_output_too_large");
+							return;
+						}
 						const next = (partials.get(input.runId) ?? "") + text;
 						if (next.length > 65536) throw new Error("chat_output_too_large");
 						partials.set(input.runId, next);
@@ -297,7 +304,11 @@ export function createDialogueService(
 							: await larm.answer(input.messages, signal);
 					const prefix = partials.get(input.runId) ?? "";
 					if (!text.startsWith(prefix)) throw new Error("chat_stream_diverged");
-					if (text.length > prefix.length) delta(text.slice(prefix.length));
+					if (input.memory) {
+						// Held text was already counted while streaming; check the final length directly.
+						if (text.length > 65536) throw new Error("chat_output_too_large");
+					} else if (text.length > prefix.length)
+						delta(text.slice(prefix.length));
 					log.info("dialogue.generation_completed");
 					return { text, receipt };
 				},
@@ -314,20 +325,6 @@ export function createDialogueService(
 					run.revision !== input.revision
 				)
 					return "stale";
-				if (
-					outcome.result.receipt &&
-					!larm.acceptInTransaction?.(tx, outcome.result.receipt)
-				) {
-					transition(
-						tx,
-						run.id,
-						run.revision,
-						"failed",
-						clock(),
-						"permission_revoked",
-					);
-					return { status: "failed", errorCode: "permission_revoked" };
-				}
 				if (input.memory && memory) {
 					const adopted = memory.settleInTransaction(
 						tx,
@@ -346,6 +343,21 @@ export function createDialogueService(
 						);
 						return { status: "failed", errorCode: adopted.reason };
 					}
+				}
+				if (
+					outcome.result.receipt &&
+					!larm.acceptInTransaction?.(tx, outcome.result.receipt)
+				) {
+					memory?.discardUsageInTransaction(tx, run.id);
+					transition(
+						tx,
+						run.id,
+						run.revision,
+						"failed",
+						clock(),
+						"permission_revoked",
+					);
+					return { status: "failed", errorCode: "permission_revoked" };
 				}
 				const messageId = id();
 				conversation.appendInTransaction(tx, {

@@ -1,8 +1,8 @@
 {
 	"package": "eumenes-memory",
-	"version": "0.1.0",
-	"artifact": "eumenes-memory-0.1.0.tgz",
-	"sha256": "e3117794fd9461c500fd20bdd6b01cde72260371d23f8e160d9de8a90caf6474",
+	"version": "0.3.3",
+	"artifact": "eumenes-memory-0.3.3.tgz",
+	"sha256": "033dd4c9fd6c5320bb5b615ac2903be45699251851c4653e492644daf9c7a356",
 	"contractVersions": {
 		"view": 2,
 		"records": 1,
@@ -12,6 +12,6 @@
 		"lifecycle": 1,
 		"external": 1
 	},
-	"dbSchemaVersion": 3,
-	"verifiedWith": "bun run verify:all (eumenes_memory) before pack; consumer tests run against the packed artifact in eumenes api/domains/memory/test"
+	"dbSchemaVersion": 4,
+	"verifiedWith": "bun run verify:all (eumenes_memory) before pack; Eumenes api/domains/memory and dialogue integration tests run against the packed artifact"
 }

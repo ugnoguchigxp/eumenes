@@ -1,4 +1,10 @@
 export const domains = {
+	"service-tests": {
+		backend: "api/domains/service-tests",
+		web: "web/src/domains/service-tests",
+		components: null,
+		depends: ["settings", "larm", "inference"],
+	},
 	delivery: {
 		backend: "api/domains/delivery",
 		web: null,

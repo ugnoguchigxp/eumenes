@@ -8,6 +8,12 @@ export const stateKinds = [
 	"constraint",
 	"habit",
 ] as const;
+const datePartSchema = z.object({
+	precision: z.enum(["year", "month", "day"]),
+	year: z.number().int(),
+	month: z.number().int().optional(),
+	day: z.number().int().optional(),
+});
 export const rememberSchema = z.object({
 	conversationId: z.string().min(1),
 	/** The user message the fact comes from. */
@@ -16,11 +22,19 @@ export const rememberSchema = z.object({
 	quote: z.string().min(1).max(1024),
 	kind: z.enum(stateKinds),
 	semanticKey: z.string().min(1).max(128),
-	text: z.string().trim().min(1).max(4096),
+	text: z.string().trim().min(1).max(500),
 	polarity: z.enum(["affirmed", "negated"]).default("affirmed"),
 	/** Optional validity (ms since epoch). `validUntilMs` is exclusive. */
 	validFromMs: z.number().int().nonnegative().optional(),
 	validUntilMs: z.number().int().nonnegative().optional(),
+	/** Calendar period with precision ("since September" stays month precision). Not combinable with the ms bounds. */
+	validity: z
+		.object({
+			from: datePartSchema.optional(),
+			until: datePartSchema.optional(),
+			basis: z.enum(["stated", "inferred", "unknown"]),
+		})
+		.optional(),
 });
 export type Remember = z.infer<typeof rememberSchema>;
 export const itemActionSchema = z.object({

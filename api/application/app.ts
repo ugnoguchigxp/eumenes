@@ -24,6 +24,10 @@ import {
 	type TtsDictionaryService,
 } from "../domains/tts-dictionary";
 import type { Changes } from "./events";
+import {
+	registerServiceTests,
+	type ServiceTests,
+} from "../domains/service-tests";
 export function createApp(deps: {
 	token: string;
 	origin: string;
@@ -39,6 +43,7 @@ export function createApp(deps: {
 	memory?: MemoryService;
 	continuity?: ContinuityService;
 	changes?: Changes;
+	serviceTests?: ServiceTests;
 }) {
 	const app = new Hono();
 	const log = getLogger("http");
@@ -85,6 +90,7 @@ export function createApp(deps: {
 	registerLarmStatus(app, deps.larm);
 	if (deps.settings) registerSettings(app, deps.settings);
 	if (deps.inference) registerInference(app, deps.inference);
+	if (deps.serviceTests) registerServiceTests(app, deps.serviceTests);
 	if (deps.ttsDictionary) registerTtsDictionary(app, deps.ttsDictionary);
 	if (deps.memory) registerMemory(app, deps.memory);
 	if (deps.continuity) registerContinuity(app, deps.continuity);

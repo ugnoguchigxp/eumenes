@@ -6,6 +6,7 @@ const args = process.argv.slice(2);
 const json = args.includes("--json");
 const wait = args.includes("--wait");
 let explicitRequestId: string | undefined;
+let conversationId = "main";
 const positional: string[] = [];
 for (let i = 0; i < args.length; i++) {
 	const value = args[i];
@@ -14,6 +15,14 @@ for (let i = 0; i < args.length; i++) {
 		explicitRequestId = args[++i];
 		if (!submitSchema.shape.requestId.safeParse(explicitRequestId).success) {
 			console.error("--request-id requires a UUID");
+			process.exit(2);
+		}
+		continue;
+	}
+	if (value === "--conversation") {
+		conversationId = args[++i] ?? "";
+		if (!conversationId) {
+			console.error("--conversation requires an ID");
 			process.exit(2);
 		}
 		continue;
@@ -47,7 +56,7 @@ function show(value: unknown) {
 async function main() {
 	if (command === "status") return show(await client.status());
 	if (command === "history")
-		return show(await client.conversation(positional[0] ?? "main"));
+		return show(await client.conversation(positional[0] ?? conversationId));
 	if (command === "run") {
 		if (!positional[0]) throw new Error("run ID required");
 		return show(await client.run(positional[0]));
@@ -64,7 +73,7 @@ async function main() {
 		try {
 			run = await client.submit({
 				requestId,
-				conversationId: "main",
+				conversationId,
 				text: content.trim(),
 			});
 		} catch (error) {
@@ -130,7 +139,7 @@ async function main() {
 				);
 			return show(
 				await client.rememberItem({
-					conversationId: "main",
+					conversationId,
 					messageId,
 					semanticKey,
 					kind: kind as "preference",

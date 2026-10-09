@@ -132,12 +132,27 @@ export function getMessage(
 ): { message: Message; ordinal: number } | null {
 	const row = db
 		.query(
-			"SELECT rowid AS ordinal, conversation_id FROM messages WHERE id = ?",
+			"SELECT m.rowid AS ordinal, m.id, m.conversation_id, m.role, m.text, m.created_at, m.run_id FROM messages m WHERE m.id = ?",
 		)
-		.get(id) as { ordinal: number; conversation_id: string } | null;
+		.get(id) as {
+		ordinal: number;
+		id: string;
+		conversation_id: string;
+		role: "user" | "assistant";
+		text: string;
+		created_at: string;
+		run_id: string | null;
+	} | null;
 	if (!row) return null;
-	const message = listMessages(db, row.conversation_id).find(
-		(m) => m.id === id,
-	);
-	return message ? { message, ordinal: row.ordinal } : null;
+	return {
+		ordinal: row.ordinal,
+		message: {
+			id: row.id,
+			conversationId: row.conversation_id,
+			role: row.role,
+			text: row.text,
+			createdAt: row.created_at,
+			runId: row.run_id,
+		},
+	};
 }

@@ -166,6 +166,35 @@ test("three purposes fall back once, adapters preserve paths and usage; no dupli
 	expect(usage.filter((u) => u.source === "larm")).toHaveLength(3);
 	expect(usage.some((u) => u.inputTokens === 7)).toBe(true);
 });
+
+test("service tests pin a cloud resource without changing routes or falling back", async () => {
+	let localCalls = 0;
+	const h = await setup({
+		local: async () => {
+			localCalls++;
+			return "local";
+		},
+	});
+	const before = h.settings.get();
+	const id = before.resources.find((r) => r.purpose === "llm")!.id;
+	expect(
+		await h.inference.testResource(id, messages, AbortSignal.timeout(1000)),
+	).toBe("cloud-answer");
+	expect(localCalls).toBe(0);
+	expect(h.settings.get()).toEqual(before);
+	expect(h.inference.usage()).toEqual([]);
+	before.routes.llm.cloudAllowed = false;
+	await h.settings.apply({
+		requestId: crypto.randomUUID(),
+		expectedRevision: before.revision,
+		settings: before,
+		keys: [],
+	});
+	await expect(
+		h.inference.testResource(id, messages, AbortSignal.timeout(1000)),
+	).rejects.toBeDefined();
+	expect(h.calls).toHaveLength(1);
+});
 test("cloud TTS keeps its own voice and speed from the accepted settings snapshot", async () => {
 	const h = await setup();
 	const s = h.settings.get();

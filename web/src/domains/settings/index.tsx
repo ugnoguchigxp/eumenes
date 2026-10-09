@@ -26,6 +26,7 @@ type TtsRange = NonNullable<
 	>["voices"][number]["capabilities"]["speed"]
 >;
 import { TtsDictionaryPanel } from "../tts-dictionary";
+import { MemoryConnectionPanel } from "./MemoryConnectionPanel";
 import {
 	Button,
 	Input,
@@ -40,15 +41,17 @@ const purposes: Record<Purpose, string> = {
 	tts: "読み上げ",
 };
 const categories = [
-	"全般",
-	"AIの使い方",
-	"接続先",
-	"音声",
-	"データと利用記録",
-	"予約",
-	"表示",
-	"TTS辞書",
-];
+	{ id: "general", label: "全般" },
+	{ id: "ai", label: "AIの使い方" },
+	{ id: "connections", label: "接続先" },
+	{ id: "services", label: "サービスを試す" },
+	{ id: "voice", label: "音声" },
+	{ id: "data", label: "データと利用記録" },
+	{ id: "schedule", label: "予約" },
+	{ id: "appearance", label: "表示" },
+	{ id: "dictionary", label: "TTS辞書" },
+	{ id: "memory", label: "メモリー" },
+] as const;
 function Field({
 	label,
 	children,
@@ -284,6 +287,7 @@ export function useVoiceMute(client: EumenesClient) {
 	};
 }
 export function SettingsPage({
+	renderServiceTests,
 	client,
 	onDirty,
 	onSaved,
@@ -291,12 +295,14 @@ export function SettingsPage({
 	client: EumenesClient;
 	onDirty: (dirty: boolean) => void;
 	onSaved: (value: Settings) => void;
+	renderServiceTests?: (disabled: boolean) => React.ReactNode;
 }) {
 	const query = useSettings(client);
 	const cache = useQueryClient();
 	const [draft, setDraft] = useState<Settings | null>(null);
 	const [keys, setKeys] = useState<ApplySettings["keys"]>([]);
-	const [category, setCategory] = useState(0);
+	const [category, setCategory] =
+		useState<(typeof categories)[number]["id"]>("general");
 	const [message, setMessage] = useState("");
 	const [busy, setBusy] = useState(false);
 	const [retry, setRetry] = useState<ApplySettings | null>(null);
@@ -351,7 +357,7 @@ export function SettingsPage({
 			query.data?.larm.audience,
 		],
 		queryFn: ({ signal }) => client.larmVoices(signal),
-		enabled: category === 3 && !!value && !larmChanged,
+		enabled: category === "voice" && !!value && !larmChanged,
 		retry: 0,
 	});
 	useEffect(() => {
@@ -588,30 +594,38 @@ export function SettingsPage({
 		<div className="settings-layout">
 			<nav className="settings-nav" aria-label="設定カテゴリ">
 				<h1>設定</h1>
-				{categories.map((label, i) => (
+				{categories.map(({ id, label }) => (
 					<button
 						type="button"
 						key={label}
-						aria-current={i === category ? "page" : undefined}
-						onClick={() => setCategory(i)}
+						aria-current={id === category ? "page" : undefined}
+						onClick={() => setCategory(id)}
 					>
 						{label}
 					</button>
 				))}
 			</nav>
-			<section className="settings-body" aria-label={categories[category]}>
+			<section
+				className={`settings-body${category === "services" ? " settings-playground" : ""}`}
+				aria-label={categories.find((c) => c.id === category)?.label}
+			>
 				<header>
 					<span className="section-kicker">SETTINGS</span>
-					<h2>{categories[category]}</h2>
+					<h2>{categories.find((c) => c.id === category)?.label}</h2>
 					<p className="hint">
-						{category === 7
-							? "読み上げの直前に、登録した文字を読み方へ置き換えます（長い登録が優先）。会話の表示は変わりません。変更は行ごとにすぐ保存されます。"
-							: category === 0
-								? "AIの名前・あなたの名前・話し方を設定します。次の返答から反映されます。"
-								: "普段はLARMを使い、必要なときに登録済みのクラウドへ切り替えます。"}
+						{category === "services"
+							? "プロバイダを選んで、入力と結果を確認できます。"
+							: category === "memory"
+								? "保存した記憶を会話で使うかを切り替えます。変更はすぐに保存されます。"
+								: category === "dictionary"
+									? "読み上げの直前に、登録した文字を読み方へ置き換えます（長い登録が優先）。会話の表示は変わりません。変更は行ごとにすぐ保存されます。"
+									: category === "general"
+										? "AIの名前・あなたの名前・話し方を設定します。次の返答から反映されます。"
+										: "普段はLARMを使い、必要なときに登録済みのクラウドへ切り替えます。"}
 					</p>
 				</header>
-				{category === 0 && (
+				{category === "services" && renderServiceTests?.(dirty)}
+				{category === "general" && (
 					<Card>
 						<CardHeader>
 							<CardTitle>会話</CardTitle>
@@ -682,7 +696,7 @@ export function SettingsPage({
 						</CardContent>
 					</Card>
 				)}
-				{category === 1 && (
+				{category === "ai" && (
 					<>
 						<div className="settings-notice">
 							クラウドへの自動切替は初期値で有効です。代替先を登録すると、会話・録音・読み上げ用のテキストが設定したAPIへ送信されます。
@@ -767,7 +781,7 @@ export function SettingsPage({
 						))}
 					</>
 				)}
-				{category === 2 && (
+				{category === "connections" && (
 					<>
 						<Card>
 							<CardHeader>
@@ -1225,7 +1239,7 @@ export function SettingsPage({
 						</div>
 					</>
 				)}
-				{category === 3 && (
+				{category === "voice" && (
 					<>
 						<Card>
 							<CardHeader>
@@ -1686,7 +1700,7 @@ export function SettingsPage({
 						</Card>
 					</>
 				)}
-				{category === 4 && (
+				{category === "data" && (
 					<>
 						<Card>
 							<CardHeader>
@@ -1750,9 +1764,12 @@ export function SettingsPage({
 						{usage.isError && <p role="alert">利用記録を読み込めません。</p>}
 					</>
 				)}
-				{category === 5 && <SchedulePanel client={client} />}
-				{category === 7 && <TtsDictionaryPanel client={client} />}
-				{category === 6 && (
+				{category === "schedule" && <SchedulePanel client={client} />}
+				{category === "dictionary" && <TtsDictionaryPanel client={client} />}
+				{category === "memory" && (
+					<MemoryConnectionPanel key={client.identity} client={client} />
+				)}
+				{category === "appearance" && (
 					<Card>
 						<CardHeader>
 							<CardTitle>表示</CardTitle>
@@ -1825,41 +1842,43 @@ export function SettingsPage({
 						</CardContent>
 					</Card>
 				)}
-				{category !== 7 && (
-					<footer className="settings-footer">
-						<output>
-							{message && dirty && message === "変更を適用しました"
-								? "送信した変更を適用しました。追加の変更は未適用です。"
-								: message ||
-									(dirty
-										? "変更はまだ保存されていません"
-										: "すべての変更を保存済み")}
-						</output>
-						<div className="settings-actions">
-							<Button
-								variant="secondary"
-								disabled={busy}
-								onClick={() => {
-									setDraft(null);
-									setKeys([]);
-									setRetry(null);
-									setAdding(false);
-									setNewCloud((n) => ({ ...n, key: "" }));
-									setMessage("");
-									void query.refetch();
-								}}
-							>
-								最新の設定を読み直す
-							</Button>
-							<Button
-								disabled={!dirty || adding || busy}
-								onClick={() => void apply()}
-							>
-								{busy ? "適用中…" : "変更を適用"}
-							</Button>
-						</div>
-					</footer>
-				)}
+				{category !== "dictionary" &&
+					category !== "memory" &&
+					category !== "services" && (
+						<footer className="settings-footer">
+							<output>
+								{message && dirty && message === "変更を適用しました"
+									? "送信した変更を適用しました。追加の変更は未適用です。"
+									: message ||
+										(dirty
+											? "変更はまだ保存されていません"
+											: "すべての変更を保存済み")}
+							</output>
+							<div className="settings-actions">
+								<Button
+									variant="secondary"
+									disabled={busy}
+									onClick={() => {
+										setDraft(null);
+										setKeys([]);
+										setRetry(null);
+										setAdding(false);
+										setNewCloud((n) => ({ ...n, key: "" }));
+										setMessage("");
+										void query.refetch();
+									}}
+								>
+									最新の設定を読み直す
+								</Button>
+								<Button
+									disabled={!dirty || adding || busy}
+									onClick={() => void apply()}
+								>
+									{busy ? "適用中…" : "変更を適用"}
+								</Button>
+							</div>
+						</footer>
+					)}
 			</section>
 		</div>
 	);

@@ -45,6 +45,12 @@ export function insertUsage(db: Database, receipt: UsageReceipt) {
 		receipt.createdAt,
 	);
 }
+/** Receipts only matter for recent runs: keep the newest ones. */
+export function pruneUsage(db: Database, keep = 5000) {
+	db.query(
+		"DELETE FROM memory_usage WHERE run_id IN (SELECT run_id FROM memory_usage ORDER BY created_at DESC, run_id DESC LIMIT -1 OFFSET ?)",
+	).run(keep);
+}
 export function getUsage(db: Database, runId: string): UsageReceipt | null {
 	const row = db
 		.query("SELECT * FROM memory_usage WHERE run_id = ?")

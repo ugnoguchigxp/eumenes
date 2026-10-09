@@ -31,6 +31,7 @@ import {
 	useRunProgress,
 } from "./domains/dialogue";
 import { useReplay, useVoiceDialogue } from "./domains/voice-dialogue";
+import { ServiceTestsPanel } from "./domains/service-tests";
 import { SettingsPage, useSettings, useVoiceMute } from "./domains/settings";
 
 function Workspace({
@@ -259,6 +260,9 @@ function Workspace({
 			</Button>
 			{settingsOpen && (
 				<SettingsPage
+					renderServiceTests={(disabled) => (
+						<ServiceTestsPanel client={client} disabled={disabled} />
+					)}
 					client={client}
 					onDirty={onDirty}
 					onSaved={() => {
