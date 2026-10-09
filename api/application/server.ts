@@ -36,6 +36,15 @@ import {
 	createTtsDictionary,
 	migration as ttsDictionaryMigration,
 } from "../domains/tts-dictionary";
+import {
+	createContinuityService,
+	migration as continuityMigration,
+} from "../domains/continuity";
+import {
+	createMemoryService,
+	migration as memoryMigration,
+} from "../domains/memory";
+import { migrations as memoryPackageMigrations } from "eumenes-memory/sqlite";
 import { openStore } from "../infrastructure/sqlite";
 import {
 	resolveApiToken,
@@ -80,6 +89,10 @@ async function main() {
 		ttsDictionaryMigration,
 		conversationAvatarMotionMigration,
 		conversationAnswerDeliveryMigration,
+		// The memory package's migrations are appended one by one, in order, after the host's.
+		continuityMigration,
+		memoryMigration,
+		...memoryPackageMigrations,
 	]);
 	const changes = createChanges();
 	const unsubscribeCommits = store.onCommit(() => changes.publish());
@@ -95,11 +108,28 @@ async function main() {
 		resourceAliases: { "larm.llm": "inference.llm" },
 	});
 	const scheduler = createScheduler(store, queue);
-	const dialogue = createDialogueService(store, conversation, larm, queue);
+	const continuity = createContinuityService(store);
+	const memory = createMemoryService(store, conversation, continuity, {
+		journalPath:
+			process.env.EUMENES_MEMORY_JOURNAL ??
+			join(dirname(dbPath), "memory-forget-journal.jsonl"),
+	});
+	const dialogue = createDialogueService(
+		store,
+		conversation,
+		larm,
+		queue,
+		undefined,
+		undefined,
+		memory,
+	);
 	const voice = createVoiceDialogue(store, dialogue, larm);
 	scheduler.registerTarget(dialogue.promptTarget);
 	// Recovery runs to completion before any worker starts; a failure aborts startup.
 	log.info("server.recovery_started");
+	// Journal reconciliation precedes any memory read or worker; a broken journal disables memory.
+	const memoryRecovery = await memory.recover();
+	if (!memoryRecovery.healthy) log.warn("memory.journal_inconsistent");
 	await voice.recover();
 	await larm.recover();
 	await dialogue.recover();
@@ -120,6 +150,8 @@ async function main() {
 		settings,
 		inference: larm,
 		ttsDictionary,
+		memory,
+		continuity,
 		changes,
 	});
 	const port = Number(process.env.EUMENES_PORT ?? 8787);

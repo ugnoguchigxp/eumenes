@@ -2,6 +2,7 @@ import { conversationClient } from "./conversation";
 import { dialogueClient } from "./dialogue";
 import { eventsClient } from "./events";
 import { larmClient } from "./larm";
+import { memoryClient } from "./memory";
 import { queueClient } from "./queue";
 import { schedulerClient } from "./scheduler";
 import { settingsClient } from "./settings";
@@ -19,6 +20,7 @@ export function createClient(baseUrl: string, token?: string) {
 		...larmClient(transport),
 		...settingsClient(transport),
 		...ttsDictionaryClient(transport),
+		...memoryClient(transport),
 		...queueClient(transport),
 		...schedulerClient(transport),
 		...voiceDialogueClient(transport),

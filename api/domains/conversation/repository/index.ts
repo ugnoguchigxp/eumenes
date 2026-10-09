@@ -125,3 +125,19 @@ export function revision(db: Database, id: string): number {
 		)?.revision ?? 0
 	);
 }
+/** One message with its acceptance-order ordinal (rowid), regardless of conversation. */
+export function getMessage(
+	db: Database,
+	id: string,
+): { message: Message; ordinal: number } | null {
+	const row = db
+		.query(
+			"SELECT rowid AS ordinal, conversation_id FROM messages WHERE id = ?",
+		)
+		.get(id) as { ordinal: number; conversation_id: string } | null;
+	if (!row) return null;
+	const message = listMessages(db, row.conversation_id).find(
+		(m) => m.id === id,
+	);
+	return message ? { message, ordinal: row.ordinal } : null;
+}

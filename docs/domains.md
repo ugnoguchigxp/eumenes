@@ -6,6 +6,8 @@
 | inference | `api/domains/inference/index.ts` | なし | `api/domains/inference/test/` |
 | tts-dictionary | `api/domains/tts-dictionary/index.ts` | `web/src/domains/tts-dictionary/index.tsx` | `api/domains/tts-dictionary/test/` |
 | conversation | `api/domains/conversation/index.ts` | `web/src/domains/conversation/index.ts` | `api/domains/conversation/test/` |
+| continuity | `api/domains/continuity/index.ts` | なし | `api/domains/continuity/test/` |
+| memory | `api/domains/memory/index.ts` | なし | `api/domains/memory/test/` |
 | larm | `api/domains/larm/index.ts` | なし | `api/domains/larm/test/` |
 | audio | なし | `web/src/domains/audio/index.ts` | `web/src/domains/audio/test/` |
 | queue | `api/domains/queue/index.ts` | なし | `api/domains/queue/test/` |

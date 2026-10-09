@@ -12,6 +12,7 @@ import type { ConversationService } from "../../conversation";
 import type { InferencePort, Receipt } from "../../inference";
 import type { HandlerDefinition, QueueService, Tx } from "../../queue";
 import type { TargetDefinition } from "../../scheduler";
+import type { MemoryService } from "../../memory";
 import {
 	type PromptTarget,
 	promptTargetSchema,
@@ -91,6 +92,8 @@ interface GenerateInput {
 	revision: number;
 	messages: ChatMessage[];
 	requestId?: string;
+	/** The memory view fixed at prepare time; re-checked in the adoption transaction. */
+	memory?: { view: unknown };
 }
 interface Accept {
 	requestId: string;
@@ -111,6 +114,7 @@ export function createDialogueService(
 	queue: QueueService,
 	clock: () => string = () => new Date().toISOString(),
 	id: () => string = () => crypto.randomUUID(),
+	memory?: MemoryService,
 ) {
 	const partials = new Map<string, string>();
 	const watchers = new Map<string, Set<(value: RunProgress) => void>>();
@@ -155,7 +159,7 @@ export function createDialogueService(
 	});
 
 	/** Model-visible history: earlier accepted runs (input + adopted answer) then this run's input. */
-	function historyFor(tx: Tx, run: Run): ChatMessage[] {
+	function historyFor(tx: Tx, run: Run, memoryBlock?: string): ChatMessage[] {
 		const messages = new Map(
 			conversation
 				.messagesInTransaction(tx, run.conversationId)
@@ -170,6 +174,8 @@ export function createDialogueService(
 				),
 			},
 		];
+		// Memory is reference data, never an instruction: it gets its own labelled message.
+		if (memoryBlock) out.push({ role: "system", content: memoryBlock });
 		const push = (messageId: string | null, role: "user" | "assistant") => {
 			const m = messageId ? messages.get(messageId) : undefined;
 			if (m) out.push({ role, content: m.text });
@@ -200,6 +206,19 @@ export function createDialogueService(
 			if (!transition(tx, run.id, run.revision, "running", clock()))
 				return { status: "stale", reason: "run_changed" };
 			const current = byId(tx, run.id) as Run;
+			const recalled = memory?.prepareInTransaction(tx, run.conversationId);
+			if (recalled?.status === "blocked") {
+				// Never silently drop memory and continue; end the run with the reason.
+				transition(
+					tx,
+					run.id,
+					current.revision,
+					"failed",
+					clock(),
+					`memory_${recalled.reason}`,
+				);
+				return { status: "stale", reason: `memory_${recalled.reason}` };
+			}
 			if (larm.captureInTransaction && !larm.requestFor?.(tx, run.id, "llm")) {
 				const snapshot = larm.snapshotInTransaction?.(tx);
 				if (snapshot) {
@@ -221,7 +240,14 @@ export function createDialogueService(
 				input: {
 					runId: run.id,
 					revision: current.revision,
-					messages: historyFor(tx, current),
+					messages: historyFor(
+						tx,
+						current,
+						recalled?.status === "ready" ? recalled.block : undefined,
+					),
+					...(recalled?.status === "ready"
+						? { memory: { view: recalled.view } }
+						: {}),
 					requestId: larm.requestFor?.(tx, run.id, "llm") ?? undefined,
 				},
 			};
@@ -301,6 +327,25 @@ export function createDialogueService(
 						"permission_revoked",
 					);
 					return { status: "failed", errorCode: "permission_revoked" };
+				}
+				if (input.memory && memory) {
+					const adopted = memory.settleInTransaction(
+						tx,
+						run.id,
+						run.conversationId,
+						input.memory.view,
+					);
+					if (!adopted.ok) {
+						transition(
+							tx,
+							run.id,
+							run.revision,
+							"failed",
+							clock(),
+							adopted.reason,
+						);
+						return { status: "failed", errorCode: adopted.reason };
+					}
 				}
 				const messageId = id();
 				conversation.appendInTransaction(tx, {

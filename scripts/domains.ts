@@ -35,6 +35,18 @@ export const domains = {
 		components: "web/src/components/domains/conversation",
 		depends: ["avatar", "delivery"],
 	},
+	continuity: {
+		backend: "api/domains/continuity",
+		web: null,
+		components: null,
+		depends: [],
+	},
+	memory: {
+		backend: "api/domains/memory",
+		web: null,
+		components: null,
+		depends: ["conversation", "continuity"],
+	},
 	larm: {
 		backend: "api/domains/larm",
 		web: null,
@@ -70,6 +82,7 @@ export const domains = {
 			"scheduler",
 			"delivery",
 			"settings",
+			"memory",
 		],
 	},
 	"voice-dialogue": {

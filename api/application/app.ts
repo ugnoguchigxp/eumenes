@@ -7,6 +7,11 @@ import {
 import { type DialogueService, registerDialogue } from "../domains/dialogue";
 import { type LarmPort, registerLarmStatus } from "../domains/larm";
 import { type QueueService, registerQueue } from "../domains/queue";
+import { registerMemory, type MemoryService } from "../domains/memory";
+import {
+	registerContinuity,
+	type ContinuityService,
+} from "../domains/continuity";
 import { registerScheduler, type SchedulerService } from "../domains/scheduler";
 import {
 	registerVoiceDialogue,
@@ -31,6 +36,8 @@ export function createApp(deps: {
 	settings?: SettingsService;
 	inference?: InferenceService;
 	ttsDictionary?: TtsDictionaryService;
+	memory?: MemoryService;
+	continuity?: ContinuityService;
 	changes?: Changes;
 }) {
 	const app = new Hono();
@@ -79,6 +86,8 @@ export function createApp(deps: {
 	if (deps.settings) registerSettings(app, deps.settings);
 	if (deps.inference) registerInference(app, deps.inference);
 	if (deps.ttsDictionary) registerTtsDictionary(app, deps.ttsDictionary);
+	if (deps.memory) registerMemory(app, deps.memory);
+	if (deps.continuity) registerContinuity(app, deps.continuity);
 	registerConversation(app, deps.conversation);
 	registerDialogue(app, deps.dialogue);
 	registerVoiceDialogue(app, deps.voice);
@@ -92,6 +101,7 @@ export function createApp(deps: {
 			message === "voice_sequence_out_of_order" ||
 			message === "voice_utterance_conflict" ||
 			message === "schedule_state_conflict" ||
+			message === "memory_unavailable" ||
 			message === "voice_preview_busy"
 				? 409
 				: message.startsWith("invalid_") ||

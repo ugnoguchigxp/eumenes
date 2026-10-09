@@ -114,8 +114,47 @@ async function main() {
 		}
 		return;
 	}
+	if (command === "memory") {
+		const sub = positional.shift();
+		if (!sub || sub === "list") return show(await client.memoryItems(false));
+		if (sub === "all") return show(await client.memoryItems(true));
+		if (sub === "status") return show(await client.memoryStatus());
+		if (sub === "on" || sub === "off")
+			return show(await client.setMemoryEnabled(sub === "on"));
+		if (sub === "remember") {
+			// remember <messageId> <semanticKey> <kind> <quote> [text]
+			const [messageId, semanticKey, kind, quote, ...rest] = positional;
+			if (!messageId || !semanticKey || !kind || !quote)
+				throw new Error(
+					"usage: memory remember <messageId> <semanticKey> <preference|personal_fact|constraint|habit> <quote> [text]",
+				);
+			return show(
+				await client.rememberItem({
+					conversationId: "main",
+					messageId,
+					semanticKey,
+					kind: kind as "preference",
+					quote,
+					text: rest.join(" ") || quote,
+				}),
+			);
+		}
+		if (sub === "forget") {
+			if (!positional[0]) throw new Error("item ID required");
+			return show(await client.forgetItem(positional[0]));
+		}
+		if (sub === "stop" || sub === "resume" || sub === "retract") {
+			const revision = Number(positional[1]);
+			if (!positional[0] || !Number.isInteger(revision))
+				throw new Error(`usage: memory ${sub} <itemId> <revision>`);
+			return show(await client.memoryAction(positional[0], sub, revision));
+		}
+		throw new Error(
+			"usage: memory list|all|status|on|off|remember|stop|resume|retract|forget",
+		);
+	}
 	throw new Error(
-		"usage: bun cli/index.ts status|send [text] [--wait] [--json] [--request-id UUID]|history [id]|run <id>|cancel <id>",
+		"usage: bun cli/index.ts status|memory ...|send [text] [--wait] [--json] [--request-id UUID]|history [id]|run <id>|cancel <id>",
 	);
 }
 try {

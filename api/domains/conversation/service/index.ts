@@ -5,6 +5,7 @@ import type { Conversation, Message } from "../contracts";
 import {
 	appendMessage,
 	ensureConversation,
+	getMessage,
 	listMessages,
 	revision,
 	recordAnswerMotion,
@@ -38,6 +39,9 @@ export function createConversationService(store: SqliteStore) {
 		},
 		messagesInTransaction(db: Database, id: string): Message[] {
 			return listMessages(db, id);
+		},
+		messageInTransaction(db: Database, id: string) {
+			return getMessage(db, id);
 		},
 		appendInTransaction(db: Database, message: Message): number {
 			ensureConversation(db, message.conversationId, message.createdAt);
