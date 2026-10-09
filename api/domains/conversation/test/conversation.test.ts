@@ -110,3 +110,76 @@ test("answer motion can arrive before text, keeps the first choice, and survives
 		rmSync(dir, { recursive: true, force: true });
 	}
 });
+
+test("answer-wide delivery persists provenance, upgrades fallback, and keeps an adopted none stable", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "eumenes-delivery-"));
+	const file = join(dir, "test.sqlite3");
+	const migrations = [
+		migration,
+		avatarMotionMigration,
+		answerDeliveryMigration,
+	];
+	let store = openStore(file, migrations);
+	try {
+		const service = createConversationService(store);
+		await service.append({
+			id: "answer",
+			conversationId: "main",
+			role: "assistant",
+			text: "素敵な由来ですね。",
+			createdAt: "now",
+			runId: "r",
+		});
+		const fallback = {
+			id: crypto.randomUUID(),
+			version: 2 as const,
+			emotion: "none" as const,
+			emotionConfidence: 0,
+			confidence: 0,
+			source: "fallback" as const,
+			reason: "timeout" as const,
+			motion: "neutral" as const,
+			tone: "natural" as const,
+			latencyMs: 2000,
+		};
+		const plain = {
+			...fallback,
+			id: crypto.randomUUID(),
+			source: "laya" as const,
+			reason: undefined,
+			confidence: 0.9,
+			emotionConfidence: 0.9,
+		};
+		await expect(
+			store.write((db) => {
+				service.recordAnswerDeliveryInTransaction(db, "r", "main", fallback);
+				throw new Error("rollback");
+			}),
+		).rejects.toThrow("rollback");
+		expect(service.get("main").messages[0]?.delivery).toBeUndefined();
+		await store.write((db) =>
+			service.recordAnswerDeliveryInTransaction(db, "r", "main", fallback),
+		);
+		await store.write((db) =>
+			service.recordAnswerDeliveryInTransaction(db, "r", "main", plain),
+		);
+		expect(
+			await store.write((db) =>
+				service.recordAnswerDeliveryInTransaction(db, "r", "main", {
+					...plain,
+					emotion: "joy",
+					motion: "joyful",
+				}),
+			),
+		).toBe(false);
+		expect(service.get("main").revision).toBe(3);
+		await store.close();
+		store = openStore(file, migrations);
+		expect(
+			createConversationService(store).get("main").messages[0]?.delivery,
+		).toEqual(plain);
+	} finally {
+		await store.close();
+		rmSync(dir, { recursive: true, force: true });
+	}
+});

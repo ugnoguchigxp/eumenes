@@ -49,7 +49,14 @@ export const speechDeliverySchema = z.object({
 	tone: speechToneSchema,
 	source: z.enum(["laya", "fallback"]),
 	reason: z
-		.enum(["unavailable", "timeout", "invalid", "low-confidence", "failed"])
+		.enum([
+			"unavailable",
+			"timeout",
+			"invalid",
+			"low-confidence",
+			"failed",
+			"not-expressive",
+		])
 		.optional(),
 	confidence: z.number().min(0).max(1),
 	motionConfidence: z.number().min(0).max(1).optional(),

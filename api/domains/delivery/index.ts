@@ -1,6 +1,7 @@
 export {
 	acceptedAvatarMotion,
 	acceptedEmotion,
+	emotionCandidates,
 	deliveryState,
 	emotionPerformance,
 	chooseSpeechDelivery,

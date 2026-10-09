@@ -213,3 +213,24 @@ verify:allは既存のdialogueからsettingsへの未宣言依存で停止して
 調査のため、inference.delivery_selectedにsource・motion(kind)・fallbackのreason・所要時間・既存の相関IDを記録するよう変更した。本文・音声・Provider生応答・認証情報はログへ渡さない。fallbackはLayaによるneutralの採用と区別できる。inference fixture19件・変更ファイルlint・全体型チェックは成功。domain verifyとverify:allは別の検証が実行中でlockにより開始できなかった。
 
 短い読み上げ文だけを判断対象にしており、会話文脈を渡す改善や、不自然なsleepyの意味判断の改善は未実装。今回のContext Stillはcontext_compile1回・compile_eval1回。
+
+### 2026-10-09 回答全体の感情へ改修（現行仕様）
+
+前節までの13種のmotion直接分類・最初の音声句への依存を置き換えた。現在は回答生成完了時に、回答全体と直近4発言から感情を一度判定する。音声なしの回答にも適用し、本文の生成はストリーム表示を維持する。発話は回答全体の採用まで待つため、従来の最初の句を先に話す動作より開始が遅くなる。その代わり、冒頭の「なるほど」だけで回答全体の表情を決めない。
+
+| 感情 | 名前横の表示 | 発話へ重ねる動作 | 抑揚 |
+| --- | --- | --- | --- |
+| 親しみ | 🙂 | agreeing | bright |
+| 喜び | 😊 | joyful | bright |
+| 寄り添う | 🤍 | listening | gentle |
+| 興味 | 🧐 | curious | natural |
+| 驚き | 😮 | surprised | bright |
+| 通常・不確実 | なし | 通常の発話動作 | 保存済み基準 |
+
+delivery所有の処理で、回答の表現と最新ユーザー発言から候補を絞る。引用・コード・用語の定義は感情を表す証拠にしない。候補とnoneを実Layaのnative choiceへ渡し、最終選択はLayaに任せる。候補がなければnative判断を実行せず、source=fallback / reason=not-expressiveと記録する。これはLayaがnoneを選んだ結果とは区別する。nativeのanswer_confidenceが0.6未満、切詰め、候補外、形式違反、2秒の期限超過、Provider不在もアイコンを付けない。6種類を常に比較する方法や長い指示文は実評価で誤判定が多かったため採用しなかった。眠さ・照れなどの動作を感情の分類に含めない。
+
+LLM receiptのv2 deliveryを回答と同じwriter transactionでconversationの追加tableに保存する。旧migrationを変更せず、末尾へ追加した。音声句と読み上げ直しは同じ採用済みdeliveryを使う。nativeのnoneも安定して保持し、fallbackのみ読み上げ直し時に再試行できる。取消・失敗したrunや、同じrunの回答に属さないreplay句には保存しない。旧13種motionのみの保存値を名前横へ表示する経路は廃止した。
+
+実Layaの調整用16例では15/16一致、感情を付けたい11例中10例を採用し、通常5例への誤付与は0だった。別の14例を各3回評価すると当初39/42一致で、感情の用語説明に親しみを誤付与した。定義文を除外した再評価は42/42一致（感情21/21、通常への誤付与0/21）。別例を用いた修正後の再評価なので、完全な未見データの精度とは扱わない。同じ例の反復は独立した42種類を意味しない。実会話の「それは素敵な由来ですね。」はreplay APIでwarmth / source=laya / answer_confidence=0.9682を採用し、名前横の🙂、HTTPのagreeing、実音声バイトを確認した。音声は合成までで、スピーカー・マイク・ヘッドホンの3往復受入は未実施。
+
+fixtureのverify:allはbackend201件・Web55件・browser12件、型・境界・書式・lint・ビルドと最終入力hashの検査すべて成功。取消中のnative遅着拒否、3句とreplayの一回判定共有、音声なしの保存、migration再起動、通常・低確度・旧motionの非表示、再読込後の名前横表示、透過WebGLと待機動作を含む。詳細は[検証記録](../verification-reports/context-emotion-report.md)、[全体ログ](../verification-reports/context-emotion-all.log)、[実画面](../verification-reports/context-emotion-real-ui.png)。開発用サーバーを再起動して追加migrationと新処理を反映した。Context Stillはcontext_compile1回・compile_eval1回。

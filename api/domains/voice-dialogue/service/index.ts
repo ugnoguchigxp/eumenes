@@ -316,7 +316,6 @@ export function createVoiceDialogue(
 			async () => {
 				const started = performance.now();
 				log.info("voice.processing_started", { bytes: wav.length });
-				const stopProgress = () => {};
 				try {
 					const asrId = store.read((db) =>
 						larm.requestFor?.(db, turn.utteranceId, "asr"),
@@ -374,8 +373,6 @@ export function createVoiceDialogue(
 						await store.write((db) =>
 							larm.skipInTransaction?.(db, turn.utteranceId, "tts"),
 						);
-					const stop = () => stopProgress();
-					controller.signal.addEventListener("abort", stop, { once: true });
 					const waitMs = run.deadlineAt
 						? Math.max(0, Date.parse(run.deadlineAt) - Date.now()) + 10_000
 						: undefined;
@@ -393,8 +390,6 @@ export function createVoiceDialogue(
 						throw new Error(final?.error ?? "dialogue_incomplete");
 					const answer = dialogue.answerText(run.id);
 					if (!answer) throw new Error("answer_missing");
-					stopProgress();
-					controller.signal.removeEventListener("abort", stop);
 					if (!autoSpeak) {
 						await store.write((db) =>
 							larm.skipInTransaction?.(db, turn.utteranceId, "tts"),
@@ -405,6 +400,7 @@ export function createVoiceDialogue(
 					if (!(await advance(turn.utteranceId, "synthesizing"))) return;
 					speech = createSpeech(turn.utteranceId, run.id, controller, {
 						context: dialogue.answerContext?.(run.id) ?? { answer, turns: [] },
+						delivery: dialogue.answerDelivery?.(run.id),
 					});
 					speech.append(answer, true);
 					await speech!.work;
@@ -428,7 +424,6 @@ export function createVoiceDialogue(
 						status: store.read((db) => get(db, turn.utteranceId))?.status,
 						durationMs: Math.round(performance.now() - started),
 					});
-					stopProgress();
 					controller.abort();
 					if (controller.signal.aborted) audio.get(turn.utteranceId)?.wake();
 					controllers.delete(turn.utteranceId);

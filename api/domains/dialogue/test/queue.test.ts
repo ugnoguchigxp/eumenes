@@ -324,3 +324,20 @@ test("only adopted, confident motion labels a running or completed answer; cance
 	).toBe(false);
 	await h.queue.close(100);
 });
+
+test("emotion context excludes later accepted inputs and uses the complete answer", async () => {
+	const h = setup();
+	h.queue.start();
+	const a = await submit(h.dialogue, "最初の話");
+	const b = await submit(h.dialogue, "後の話");
+	await until(() => h.calls.length === 1);
+	h.calls[0]?.resolve("最初への完全な返答。");
+	await until(() => h.calls.length === 2);
+	expect(h.dialogue.answerContext(a.id)).toEqual({
+		answer: "最初への完全な返答。",
+		turns: [{ role: "user", text: "最初の話" }],
+	});
+	await h.dialogue.cancel(b.id);
+	expect(h.dialogue.answerContext(b.id)).toBeNull();
+	await h.queue.close(100);
+});

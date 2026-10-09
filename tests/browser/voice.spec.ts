@@ -996,7 +996,7 @@ test("failed notifications are visible while API works; returning to the page re
 	).toHaveCount(0);
 });
 
-test("partial ASR, arriving characters and the first speech clause precede answer completion", async ({
+test("partial ASR and text arrive early; speech waits for the completed answer", async ({
 	page,
 }) => {
 	const control = (path: string) =>
@@ -1045,13 +1045,8 @@ test("partial ASR, arriving characters and the first speech clause precede answe
 		const streaming = page.locator('.message-assistant[aria-busy="true"]');
 		await expect(streaming).toContainText("承知しました。", { timeout: 10000 });
 		await expect(streaming).not.toContainText("先ほどの話");
-		await expect(
-			page.locator(".route-node.active").filter({ hasText: "音声再生" }),
-		).toBeVisible({
-			timeout: 10000,
-		});
 		const seen = await (await control("observations")).json();
-		expect(seen.ttsInputs).toEqual(["承知しました。"]);
+		expect(seen.ttsInputs).toEqual([]);
 		expect(seen.asrInputs.length).toBeGreaterThanOrEqual(2);
 		expect(
 			seen.asrInputs.every((a: { rate: number }) => a.rate === 16000),
@@ -1079,7 +1074,7 @@ test("partial ASR, arriving characters and the first speech clause precede answe
 	}
 });
 
-test("answer emoji sits beside Eumenes and remains after reload", async ({
+test("answer emotions sit beside Eumenes, neutral and legacy motions stay hidden, and reload preserves them", async ({
 	page,
 }) => {
 	const url = `http://127.0.0.1:${webPort}`;
@@ -1104,7 +1099,57 @@ test("answer emoji sits beside Eumenes and remains after reload", async ({
 						text: "よかったですね。\n\n一緒に喜べてうれしいです。",
 						createdAt: "2026-10-09T00:00:01Z",
 						runId: "r1",
-						avatarMotion: "joyful",
+						delivery: {
+							id: "00000000-0000-4000-8000-000000000001",
+							version: 2,
+							emotion: "joy",
+							emotionConfidence: 0.9,
+							confidence: 0.9,
+							source: "laya",
+							motion: "joyful",
+							tone: "bright",
+							latencyMs: 100,
+						},
+					},
+					{
+						id: "a2",
+						conversationId: "main",
+						role: "assistant",
+						text: "それは素敵な由来ですね。",
+						createdAt: "2026-10-09T00:00:02Z",
+						runId: "r2",
+						delivery: {
+							id: "00000000-0000-4000-8000-000000000002",
+							version: 2,
+							emotion: "warmth",
+							emotionConfidence: 0.8,
+							confidence: 0.8,
+							source: "laya",
+							motion: "agreeing",
+							tone: "bright",
+							latencyMs: 70,
+						},
+					},
+					{
+						id: "a3",
+						conversationId: "main",
+						role: "assistant",
+						text: "一時間は3600秒です。",
+						createdAt: "2026-10-09T00:00:03Z",
+						runId: "r3",
+						avatarMotion: "sleepy",
+						delivery: {
+							id: "00000000-0000-4000-8000-000000000003",
+							version: 2,
+							emotion: "none",
+							emotionConfidence: 0,
+							confidence: 0,
+							source: "fallback",
+							motion: "neutral",
+							tone: "natural",
+							latencyMs: 0,
+							reason: "not-expressive",
+						},
 					},
 				],
 			},
@@ -1115,14 +1160,17 @@ test("answer emoji sits beside Eumenes and remains after reload", async ({
 	await page.goto(`${url}/#conversation`);
 	const emoji = page.getByRole("img", { name: "喜び" });
 	await expect(emoji).toHaveText("😊");
-	await expect(page.locator(".message-author").last()).toHaveText("Eumenes😊");
-	await expect(page.locator(".markdown-content")).toHaveText(
+	await expect(page.locator(".message-author").nth(1)).toHaveText("Eumenes😊");
+	await expect(page.locator(".markdown-content").first()).toHaveText(
 		"よかったですね。一緒に喜べてうれしいです。",
 	);
 	await expect(page.locator(".message-user [role=img]")).toHaveCount(0);
+	await expect(page.getByRole("img", { name: "親しみ" })).toHaveText("🙂");
+	await expect(page.locator(".message-author").last()).toHaveText("Eumenes");
+	await expect(page.getByRole("img", { name: "眠い" })).toHaveCount(0);
 	await page.reload();
 	await expect(emoji).toBeVisible();
 	await page.screenshot({
-		path: "verification-reports/avatar-emotion-emoji.png",
+		path: "verification-reports/context-emotion-emoji-fixture.png",
 	});
 });

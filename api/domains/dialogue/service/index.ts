@@ -311,6 +311,13 @@ export function createDialogueService(
 					createdAt: clock(),
 					runId: run.id,
 				});
+				if (outcome.result.receipt?.delivery?.version === 2)
+					conversation.recordAnswerDeliveryInTransaction(
+						tx,
+						run.id,
+						run.conversationId,
+						outcome.result.receipt.delivery,
+					);
 				return transition(
 					tx,
 					run.id,

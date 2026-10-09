@@ -60,6 +60,12 @@ LARM_BASE_URL=... EUMENES_LIVE_ASR_WAV=/absolute/path/speech.wav EUMENES_LIVE_EX
 
 `verify` は対象 domain と型依存閉包を表示し、format、lint、型、境界、domain 試験を実行します。`verify:all` は全 TypeScript、保存・画面 build、ブラウザ fixture を含みます。`verify:live` は明示した LARM への ASR・LLM・TTS 個別疎通であり、ブラウザと実機器を使う循環受入ではありません。検証結果と入力 hash は `verification-reports/latest.json` に出力されます。
 
+## 判断モデルのベンチマーク
+
+製品の判断処理と独立したPython Scriptで、Laya等を同じ日本語データで測定できます。`bun run decision:bench validate`で同梱データを確認し、`bun run decision:bench:check`でモデル不要の自己検証を行います。`run`で確率・時間・資源量を保存し、`score`でモデルを再実行せず閾値や表情遷移を比較します。結果はGit対象外の`verification-reports/decision-bench/`へ保存します。
+
+実機での実行、校正、モデルadapter、出力の読み方は[判断モデルのベンチマーク](scripts/decision-bench/README.md)を参照してください。通常の評価と集計はPython標準ライブラリで動き、モデルを直接ロードする場合だけ評価専用のライブラリ環境が必要です。
+
 ## 現在の限界と次の工程
 
 

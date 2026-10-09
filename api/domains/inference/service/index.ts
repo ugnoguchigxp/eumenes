@@ -525,7 +525,10 @@ export function createInference(
 					row.purpose === "tts" && options.speechText
 						? options.speechText(input as string)
 						: input;
-				let delivery: SpeechDelivery | undefined;
+				let delivery: SpeechDelivery | undefined =
+					row.purpose === "tts" && preparation?.delivery?.version === 2
+						? preparation.delivery
+						: undefined;
 				if (
 					row.purpose === "tts" &&
 					source === "larm" &&
@@ -620,6 +623,37 @@ export function createInference(
 							.finally(() => attemptSignal.removeEventListener("abort", stop));
 					},
 				);
+				if (row.purpose === "llm" && typeof value === "string") {
+					const p = port(row.snapshot);
+					const turns = (input as Messages)
+						.filter(
+							(
+								message,
+							): message is { role: "user" | "assistant"; content: string } =>
+								message.role !== "system",
+						)
+						.slice(-4)
+						.map(({ role, content }) => ({ role, text: content }));
+					const judge =
+						options.larmFactory || p.status().state !== "unconfigured"
+							? p.judge?.bind(p)
+							: undefined;
+					delivery = await chooseSpeechDelivery(
+						judge,
+						value,
+						attemptSignal,
+						options.decisionMs,
+						{ answer: value, turns },
+					);
+					log.info("inference.delivery_selected", {
+						inferenceId: row.id,
+						subjectId: row.subject,
+						source: delivery.source,
+						kind: delivery.emotion ?? delivery.motion,
+						...(delivery.reason ? { reason: delivery.reason } : {}),
+						durationMs: delivery.latencyMs,
+					});
+				}
 				if (
 					attemptSignal.aborted ||
 					!store.read((db) => allowed(db, row, connection))

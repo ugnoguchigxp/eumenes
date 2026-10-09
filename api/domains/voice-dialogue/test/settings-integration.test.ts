@@ -294,7 +294,7 @@ test("revoking a cloud answer aborts downstream TTS and never publishes late aud
 	).toHaveLength(0);
 });
 
-test("a provisional sentence is playable while LLM is running and cancellation clears both streams", async () => {
+test("streaming text is visible but speech waits for completion; cancellation prevents partial-answer emotion", async () => {
 	let sink!: ReadableStreamDefaultController<Uint8Array>;
 	const spoken: string[] = [];
 	const h = await setup(async (url, init) => {
@@ -327,15 +327,20 @@ test("a provisional sentence is playable while LLM is running and cancellation c
 		id = crypto.randomUUID();
 	h.voice.start(session, 1);
 	await h.voice.accept(session, 1, 1, id, wav());
-	await until(() => !!h.voice.get(id)?.audioChunks?.length);
+	await until(
+		() =>
+			!!h.voice.get(id)?.runId &&
+			h.dialogue.progress(h.voice.get(id)!.runId!)?.text ===
+				"先にお届けします。",
+	);
 	const runId = h.voice.get(id)!.runId!;
 	expect(h.dialogue.get(runId)?.status).toBe("running");
 	expect(h.dialogue.progress(runId)?.text).toBe("先にお届けします。");
 	expect(h.conversation.get("main").messages.map((m) => m.text)).toEqual([
 		"質問",
 	]);
-	expect(h.voice.takeAudio(id, 0)).toEqual(wav());
-	expect(spoken).toEqual(["先にお届けします。"]);
+	expect(h.voice.takeAudio(id, 0)).toBeNull();
+	expect(spoken).toEqual([]);
 	await h.voice.cancel(id);
 	expect(h.voice.takeAudio(id, 0)).toBeNull();
 	expect(h.dialogue.progress(runId)?.text).toBe("");
@@ -424,17 +429,11 @@ test("accepted audio chunks publish Laya delivery and cancellation removes the p
 		speak: async () => wav(),
 		judge: async () => ({
 			answers: {
-				motion: {
+				emotion: {
 					type: "choice",
-					choice: "greeting",
+					choice: "warmth",
 					confidence: 0.9,
 					answer_confidence: 0.9,
-				},
-				voice: {
-					type: "choice",
-					choice: "bright",
-					confidence: 0.8,
-					answer_confidence: 0.8,
 				},
 			},
 		}),
@@ -450,7 +449,7 @@ test("accepted audio chunks publish Laya delivery and cancellation removes the p
 			text: "こんにちは。",
 			delivery: expect.objectContaining({
 				source: "laya",
-				motion: "greeting",
+				motion: "agreeing",
 				tone: "bright",
 			}),
 		}),
@@ -458,8 +457,9 @@ test("accepted audio chunks publish Laya delivery and cancellation removes the p
 	expect(
 		h.conversation
 			.get("main")
-			.messages.find((message) => message.role === "assistant")?.avatarMotion,
-	).toBe("greeting");
+			.messages.find((message) => message.role === "assistant")?.delivery
+			?.emotion,
+	).toBe("warmth");
 	expect(h.voice.takeAudio(id, 0)).toEqual(wav());
 	await h.voice.cancel(id);
 	expect(h.voice.get(id)?.audioChunks).toEqual([]);
@@ -468,21 +468,15 @@ test("accepted audio chunks publish Laya delivery and cancellation removes the p
 
 test("replaying an answer persists its native motion, rejects unrelated text and ignores cancelled synthesis", async () => {
 	const h = await setup(undefined, {
-		answer: async () => "よかったですね。",
+		answer: async () => "合格おめでとうございます。",
 		speak: async () => wav(),
 		judge: async () => ({
 			answers: {
-				motion: {
+				emotion: {
 					type: "choice",
-					choice: "joyful",
+					choice: "joy",
 					confidence: 0.95,
 					answer_confidence: 0.95,
-				},
-				voice: {
-					type: "choice",
-					choice: "bright",
-					confidence: 0.9,
-					answer_confidence: 0.9,
 				},
 			},
 		}),
@@ -508,17 +502,145 @@ test("replaying an answer persists its native motion, rejects unrelated text and
 	const aborted = new AbortController();
 	aborted.abort();
 	await expect(
-		h.voice.replaySpeech("よかったですね。", aborted.signal, run.id),
+		h.voice.replaySpeech("合格おめでとうございます。", aborted.signal, run.id),
 	).rejects.toThrow();
 	expect(answer()?.avatarMotion).toBeUndefined();
 	const response = await h.voice.replaySpeech(
-		"よかったですね。",
+		"合格おめでとうございます。",
 		new AbortController().signal,
 		run.id,
 	);
 	expect(response.wav).toEqual(wav());
 	expect(answer()).toMatchObject({
-		text: "よかったですね。",
-		avatarMotion: "joyful",
+		text: "合格おめでとうございます。",
+		delivery: expect.objectContaining({ emotion: "joy", source: "laya" }),
 	});
+});
+
+test("one adopted full-answer emotion works with audio off and is reused for all clauses and replay", async () => {
+	let judgments = 0;
+	const observed: Array<Record<string, string>> = [];
+	const h = await setup(undefined, {
+		answer: async () => "なるほど。素敵な名前ですね。ありがとうございます。",
+		speak: async () => wav(),
+		judge: async (state) => {
+			judgments++;
+			observed.push(state);
+			return {
+				answers: {
+					emotion: {
+						type: "choice",
+						choice: "warmth",
+						confidence: 0.9,
+						answer_confidence: 0.9,
+					},
+				},
+			};
+		},
+	});
+	const off = h.settings.get();
+	off.voice.autoSpeak = false;
+	await h.settings.apply({
+		requestId: crypto.randomUUID(),
+		expectedRevision: off.revision,
+		settings: off,
+		keys: [],
+	});
+	const run = await h.dialogue.submit({
+		requestId: crypto.randomUUID(),
+		conversationId: "main",
+		text: "大切な猫の名前です。",
+	});
+	await until(() => h.dialogue.get(run.id)?.status === "completed");
+	const saved = h.dialogue.answerDelivery(run.id);
+	expect(saved).toMatchObject({
+		version: 2,
+		emotion: "warmth",
+		source: "laya",
+	});
+	expect(judgments).toBe(1);
+	expect(observed[0]?.response).toBe(
+		"なるほど。素敵な名前ですね。ありがとうございます。",
+	);
+	expect(observed[0]?.conversation).toContain("大切な猫の名前です。");
+	for (const text of h.voice.replaySentences(h.dialogue.answerText(run.id)!)) {
+		const speech = await h.voice.replaySpeech(
+			text,
+			new AbortController().signal,
+			run.id,
+		);
+		expect(speech.delivery?.id).toBe(saved?.id);
+	}
+	expect(judgments).toBe(1);
+});
+
+test("automatic three-clause speech shares the adopted full-answer decision", async () => {
+	let judgments = 0;
+	const h = await setup(undefined, {
+		transcribe: async () => "大切な猫の名前です。",
+		answer: async () => "なるほど。素敵な名前ですね。ありがとうございます。",
+		speak: async () => wav(),
+		judge: async () => {
+			judgments++;
+			return {
+				answers: {
+					emotion: {
+						type: "choice",
+						choice: "warmth",
+						confidence: 0.9,
+						answer_confidence: 0.9,
+					},
+				},
+			};
+		},
+	});
+	const id = crypto.randomUUID();
+	h.voice.start("shared-emotion", 1);
+	await h.voice.accept("shared-emotion", 1, 1, id, wav());
+	await until(() => h.voice.get(id)?.status === "ready");
+	const turn = h.voice.get(id)!;
+	const saved = h.dialogue.answerDelivery(turn.runId!);
+	expect(turn.audioChunks).toHaveLength(3);
+	for (const chunk of turn.audioChunks)
+		expect(chunk.delivery?.id).toBe(saved?.id);
+	expect(saved?.emotion).toBe("warmth");
+	expect(judgments).toBe(1);
+});
+
+test("cancelling during final Laya classification rejects late emotion and assistant text", async () => {
+	let entered = false;
+	let finish!: (value: unknown) => void;
+	const pending = new Promise<unknown>((resolve) => {
+		finish = resolve;
+	});
+	const h = await setup(undefined, {
+		answer: async () => "素敵な名前ですね。",
+		judge: async () => {
+			entered = true;
+			return pending;
+		},
+	});
+	const run = await h.dialogue.submit({
+		requestId: crypto.randomUUID(),
+		conversationId: "main",
+		text: "猫の名前です。",
+	});
+	await until(() => entered);
+	await h.dialogue.cancel(run.id);
+	finish({
+		answers: {
+			emotion: {
+				type: "choice",
+				choice: "warmth",
+				confidence: 0.99,
+				answer_confidence: 0.99,
+			},
+		},
+	});
+	await Bun.sleep(20);
+	expect(h.dialogue.get(run.id)?.status).toBe("cancelled");
+	expect(h.dialogue.answerDelivery(run.id)).toBeUndefined();
+	expect(
+		h.conversation.get("main").messages.map((message) => message.role),
+	).toEqual(["user"]);
 });

@@ -19,6 +19,8 @@
 		"test:domain": "bun scripts/test-domain.ts",
 		"verify:all": "bun scripts/verify.ts --all",
 		"verify:live": "bun scripts/verify-live.ts",
+		"decision:bench": "python3 -B scripts/decision-bench/bench.py",
+		"decision:bench:check": "python3 -B scripts/decision-bench/bench.py self-test",
 		"build:design-system": "cd packages/design-system && bun run build",
 		"build:web": "bun run build:design-system && vite build",
 		"typecheck": "tsc --noEmit"

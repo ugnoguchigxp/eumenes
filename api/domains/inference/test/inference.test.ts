@@ -500,16 +500,10 @@ function freshSignal() {
 
 const judged = {
 	answers: {
-		motion: {
+		emotion: {
 			type: "choice",
-			choice: "greeting",
+			choice: "warmth",
 			confidence: 0.9,
-			answer_confidence: 0.9,
-		},
-		voice: {
-			type: "choice",
-			choice: "bright",
-			confidence: 0.8,
 			answer_confidence: 0.8,
 		},
 	},
@@ -556,11 +550,9 @@ test("Laya judges the spoken text and carries one decision with bounded immutabl
 		"こんにちはSAAA！",
 		freshSignal(),
 	);
-	expect(states).toEqual([
-		{ utterance: "こんにちはサー！", phase: "response_ready" },
-	]);
+	expect(states).toEqual([{ response: "こんにちはサー！" }]);
 	expect(receipt.delivery).toMatchObject({
-		motion: "greeting",
+		motion: "agreeing",
 		tone: "bright",
 		source: "laya",
 		confidence: 0.8,
@@ -580,7 +572,7 @@ test("Laya judges the spoken text and carries one decision with bounded immutabl
 		freshSignal(),
 	);
 	expect(replay.wav).toEqual(wav());
-	expect(replay.delivery).toMatchObject({ motion: "greeting", source: "laya" });
+	expect(replay.delivery).toMatchObject({ motion: "agreeing", source: "laya" });
 	const replayAttempts = h.inference
 		.usage()
 		.filter((attempt) => !beforeReplay.has(attempt.id));
@@ -634,7 +626,11 @@ test("decision timeout keeps manual voice, fences late results and cancellation 
 		h.inference.captureInTransaction(db, "cancel", "tts", Date.now() + 10000),
 	);
 	const abort = new AbortController();
-	const pending = h.inference.executeRequest(next, "続き", abort.signal);
+	const pending = h.inference.executeRequest(
+		next,
+		"こんにちは。",
+		abort.signal,
+	);
 	await until(() => judging !== undefined && !judging.aborted);
 	abort.abort();
 	await expect(pending).rejects.toThrow();
