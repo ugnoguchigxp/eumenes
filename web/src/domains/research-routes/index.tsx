@@ -52,17 +52,19 @@ function Detail({
 	client,
 	routeKey,
 	disabled,
-	onDirty,
+	instruction,
+	setInstruction,
 	onGone,
 }: {
 	client: EumenesClient;
 	routeKey: string;
 	disabled: boolean;
-	onDirty: (dirty: boolean) => void;
+	// The unsent text lives in the panel, keyed by route, so switching routes never drops it.
+	instruction: string;
+	setInstruction: (text: string) => void;
 	onGone: () => void;
 }) {
 	const cache = useQueryClient();
-	const [instruction, setInstruction] = useState("");
 	const [notice, setNotice] = useState("");
 	const detailKey = [
 		queryRoots.researchRoutes,
@@ -79,14 +81,10 @@ function Detail({
 	useEffect(() => {
 		if (!gone) return;
 		cache.removeQueries({ queryKey: detailKey, exact: true });
-		onDirty(false);
+		setInstruction("");
 		onGone();
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [gone]);
-	useEffect(() => {
-		onDirty(instruction.trim().length > 0);
-		return () => onDirty(false);
-	}, [instruction, onDirty]);
 	const refresh = () =>
 		cache.invalidateQueries({ queryKey: [queryRoots.researchRoutes] });
 	const onError = (error: unknown) => {
@@ -228,6 +226,24 @@ export function ResearchRoutesPanel({
 	const [selected, setSelected] = useState<string | null>(null);
 	const [notice, setNotice] = useState("");
 	const [confirmClear, setConfirmClear] = useState(false);
+	const [drafts, setDrafts] = useState<Record<string, string>>({});
+	const setDraft = (key: string, text: string) =>
+		setDrafts((old) => {
+			if (!text) {
+				const { [key]: _gone, ...rest } = old;
+				return rest;
+			}
+			return { ...old, [key]: text };
+		});
+	const clearTrigger = useRef<HTMLButtonElement>(null);
+	const cancelClear = useRef<HTMLButtonElement>(null);
+	const wasConfirming = useRef(false);
+	useEffect(() => {
+		// Keep keyboard focus when the confirm buttons replace the trigger and back.
+		if (confirmClear) cancelClear.current?.focus();
+		else if (wasConfirming.current) clearTrigger.current?.focus();
+		wasConfirming.current = confirmClear;
+	}, [confirmClear]);
 	const list = useInfiniteQuery({
 		queryKey: [queryRoots.researchRoutes, client.identity, "list"],
 		queryFn: ({ pageParam, signal }) =>
@@ -240,6 +256,12 @@ export function ResearchRoutesPanel({
 	const epoch = first?.epoch;
 	const items = list.data?.pages.flatMap((p) => p.items) ?? [];
 	const stale = list.error instanceof ApiError && list.error.status === 409;
+	useEffect(() => {
+		// A cursor from an older epoch can never recover by itself: reload from the first page.
+		if (stale)
+			void cache.invalidateQueries({ queryKey: [queryRoots.researchRoutes] });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [stale]);
 	const clear = useMutation({
 		mutationFn: () =>
 			client.clearResearchRoutes({
@@ -248,6 +270,7 @@ export function ResearchRoutesPanel({
 			}),
 		onSuccess: (r) => {
 			setSelected(null);
+			setDrafts({});
 			setConfirmClear(false);
 			setNotice(`${r.deletedKeys}件の取得先を削除しました。`);
 			cache.removeQueries({
@@ -266,6 +289,8 @@ export function ResearchRoutesPanel({
 		lastDirty.current = v;
 		onDirty(v);
 	};
+	const anyDraft = Object.values(drafts).some((t) => t.trim().length > 0);
+	useEffect(() => report(anyDraft));
 	useEffect(() => () => onDirty(false), [onDirty]);
 	return (
 		<div className="route-panel">
@@ -312,13 +337,15 @@ export function ResearchRoutesPanel({
 					client={client}
 					routeKey={selected}
 					disabled={disabled}
-					onDirty={report}
+					instruction={drafts[selected] ?? ""}
+					setInstruction={(text) => setDraft(selected, text)}
 					onGone={() => setSelected(null)}
 				/>
 			)}
 			<div className="route-clear">
 				{!confirmClear ? (
 					<Button
+						ref={clearTrigger}
 						variant="secondary"
 						disabled={disabled || epoch === undefined || clear.isPending}
 						onClick={() => setConfirmClear(true)}
@@ -331,7 +358,11 @@ export function ResearchRoutesPanel({
 						<Button disabled={clear.isPending} onClick={() => clear.mutate()}>
 							削除する
 						</Button>
-						<Button variant="secondary" onClick={() => setConfirmClear(false)}>
+						<Button
+							ref={cancelClear}
+							variant="secondary"
+							onClick={() => setConfirmClear(false)}
+						>
 							やめる
 						</Button>
 					</>

@@ -296,7 +296,7 @@ test("A01 observation failures: report_invalid is repaired once, source_unusable
 	});
 });
 
-test("A01 source_unusable ends the child with a distinct code (no repair)", async () => {
+test("A01 source_unusable on a cold child allows one re-read; a second ends it with a distinct code", async () => {
 	const h = setup();
 	await h.store.write((db) => seedTree(db));
 	await h.store.write((db) => {
@@ -311,10 +311,38 @@ test("A01 source_unusable ends the child with a distinct code (no repair)", asyn
 				"SELECT state,error_code,json_repairs FROM agent_tasks WHERE id='child'",
 			)
 			.get();
+		// First mismatch: the child is queued again to read another candidate (once).
+		expect(t).toEqual({
+			state: "queued",
+			error_code: "source_unusable",
+			json_repairs: 1,
+		});
+		expect(db.query("SELECT COUNT(*) n FROM agent_reports").get()).toEqual({
+			n: 0,
+		});
+	});
+});
+
+test("A01 source_unusable after the single re-read ends the child", async () => {
+	const h = setup();
+	await h.store.write((db) => seedTree(db));
+	await h.store.write((db) => {
+		h.runtime.resolveAcquisitionInTransaction(db, "root", 1);
+		h.runtime.bindAcquisitionInTransaction(db, "root", "child");
+		db.query("UPDATE agent_tasks SET json_repairs=1 WHERE id='child'").run();
+	});
+	h.setObservation({ kind: "source_unusable", code: "x" });
+	await finish(h);
+	await h.store.read((db) => {
+		const t = db
+			.query(
+				"SELECT state,error_code,json_repairs FROM agent_tasks WHERE id='child'",
+			)
+			.get();
 		expect(t).toEqual({
 			state: "failed",
 			error_code: "source_unusable",
-			json_repairs: 0,
+			json_repairs: 1,
 		});
 	});
 });

@@ -19,6 +19,7 @@ const modes: Record<string, string> = {
 	search: "検索して確認",
 	candidate: "保存した候補を確認",
 	cached: "登録サイトを確認",
+	rediscover: "取得先を探し直し中",
 };
 export function ResearchTaskCard({
 	client,

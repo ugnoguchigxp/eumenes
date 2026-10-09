@@ -18,6 +18,8 @@ import {
 	type PostAnswerObserverPort,
 } from "../domains/dialogue";
 import { buildSearchSpec, specKey } from "../domains/research-routes";
+import { LlmFetchError } from "llm-fetch";
+import { publicSourceText } from "../domains/web-research";
 import { createToolchain } from "./toolchain";
 import type { LarmPort } from "../domains/larm";
 import { createChanges } from "./events";
@@ -28,7 +30,10 @@ export const QUESTION = "天気予報 鎌倉 明日 最高気温";
 export const PAGE = "https://weather.example.test/kamakura";
 export const PAGE_B = "https://forecast.example.test/kamakura-b";
 export const SHIZUOKA = "https://weather.example.test/shizuoka";
-export const QUOTE = "https://quotes.example.test/aapl";
+/** The dedicated data endpoint web.quote reads, and the search hit that maps onto it (plan §6). */
+export const QUOTE =
+	"https://query1.finance.yahoo.com/v8/finance/chart/AAPL?interval=1d&range=1d";
+export const QUOTE_HIT = "https://finance.yahoo.com/quote/AAPL/";
 export const SHIZUOKA_Q = "天気予報 静岡市 明日 最高気温";
 export const AAPL_Q = "株価 AAPL";
 export const TOKEN = "fixture-token-for-research-routes-browser";
@@ -37,7 +42,7 @@ const prefectures: Record<string, string> = {
 	静岡市: "静岡県",
 };
 export type Site = {
-	mode: "ok" | "error" | "timeout" | "guard";
+	mode: "ok" | "error" | "timeout" | "guard" | "rate_limited" | "parse_changed";
 	text: () => string;
 };
 const jst = (ms: number) => new Date(ms + 9 * 3600_000);
@@ -77,8 +82,11 @@ export async function routeHarness(options: Options = {}) {
 	const lookupQueries: string[] = [];
 	const state = { max: 26, maxB: 30, price: 190.5 };
 	const gates: { author: Promise<void> | null } = { author: null };
+	/** Test hook awaited while a read is in flight (before its page is returned). */
+	const hooks: { onRead: ((url: string) => Promise<void>) | null } = {
+		onRead: null,
+	};
 	const readUrls: string[] = [];
-	const stamp = () => new Date(Date.now() - 3600_000).toISOString();
 	const sites: Record<string, Site> = {
 		[PAGE]: {
 			mode: "ok",
@@ -97,16 +105,29 @@ export async function routeHarness(options: Options = {}) {
 		},
 		[QUOTE]: {
 			mode: "ok",
+			// Real provider JSON, normalized by the same host function the acquisition path uses.
 			text: () =>
-				`AAPL regular market quote\n${JSON.stringify({
-					symbol: "AAPL",
-					currency: "USD",
-					regularMarketPrice: state.price,
-					exchangeTimezoneName: "America/New_York",
-					market: "NASDAQ",
-					priceTimeUtc: stamp(),
-					priceBasis: "regularMarketPrice",
-				})}`,
+				publicSourceText(
+					QUOTE,
+					JSON.stringify({
+						chart: {
+							result: [
+								{
+									meta: {
+										symbol: "AAPL",
+										currency: "USD",
+										regularMarketPrice: state.price,
+										regularMarketTime: Math.floor(
+											(Date.now() - 3600_000) / 1000,
+										),
+										exchangeTimezoneName: "America/New_York",
+										exchangeName: "NMS",
+									},
+								},
+							],
+						},
+					}),
+				),
 		},
 	};
 	const hits = {
@@ -114,7 +135,7 @@ export async function routeHarness(options: Options = {}) {
 			query.includes("静岡")
 				? [SHIZUOKA]
 				: query.includes("AAPL")
-					? [QUOTE]
+					? [QUOTE_HIT]
 					: [PAGE],
 	};
 	const model: LarmPort = {
@@ -255,10 +276,18 @@ export async function routeHarness(options: Options = {}) {
 				return JSON.stringify({
 					action: "invoke",
 					executionRef: tools.find(
-						(t) => t.id === (hit ? "web.read" : "web.lookup"),
+						(t) =>
+							t.id ===
+							(hit
+								? hit.url === QUOTE_HIT
+									? "web.quote"
+									: "web.read"
+								: "web.lookup"),
 					)!.executionRef,
 					arguments: hit
-						? { url: hit.url }
+						? hit.url === QUOTE_HIT
+							? { symbol: "AAPL" }
+							: { url: hit.url }
 						: { query: data.task.question.slice(0, 400) },
 				});
 			}
@@ -295,11 +324,22 @@ export async function routeHarness(options: Options = {}) {
 				readUrls.push(req.url);
 			}
 			const isLookup = req.operation === "lookup";
+			if (!isLookup && hooks.onRead) await hooks.onRead(req.url);
 			const readUrl = req.operation === "lookup" ? "" : req.url;
 			const site = req.operation === "lookup" ? undefined : sites[req.url];
-			if (site?.mode === "error") throw new Error("fixture_http_404");
+			// Real failure shapes: web-research maps LlmFetchError to web_${code} via acquisitionError.
+			if (site?.mode === "error")
+				throw new LlmFetchError("UPSTREAM_HTTP", "HTTP 404", { status: 404 });
+			if (site?.mode === "rate_limited")
+				throw new LlmFetchError("RATE_LIMITED", "HTTP 429", { status: 429 });
+			if (site?.mode === "parse_changed")
+				throw new LlmFetchError("PARSE_CHANGED", "page shape changed");
+			if (site?.mode === "guard")
+				throw new LlmFetchError("GUARD_DENIED", "Guard refused", {
+					guardDecision: "deny",
+				});
 			if (site?.mode === "timeout") throw new Error("web_attempt_timeout");
-			const guarded = site?.mode === "guard";
+			const guarded = false;
 			return {
 				freshUntilMs: null,
 				result: {
@@ -431,6 +471,7 @@ export async function routeHarness(options: Options = {}) {
 		skew,
 		hits,
 		gates,
+		hooks,
 		readUrls,
 		ask,
 		sql,

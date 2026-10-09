@@ -188,7 +188,15 @@ export function createMaintenance(opts: MaintenanceOptions = {}) {
 			limits.sweepLimit,
 			Math.max(1, input.limit ?? limits.sweepLimit),
 		);
-		return input.mode === "epoch" ? sweepEpoch(db, limit) : sweepTtl(db, limit);
+		if (input.mode === "epoch") return sweepEpoch(db, limit);
+		// The periodic pass also reclaims hidden (cleared) epochs: keys that were held by a running
+		// root, and clears whose own job could not be queued, are picked up here on a later pass.
+		const stale = sweepEpoch(db, Math.max(1, Math.floor(limit / 2)));
+		const live = sweepTtl(db, Math.max(1, limit - stale.removed));
+		return {
+			removed: stale.removed + live.removed,
+			hasMore: stale.hasMore || live.hasMore,
+		};
 	}
 
 	/** Startup: no author/review job survives a restart; interrupt every open draft. */

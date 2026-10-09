@@ -2,7 +2,6 @@ import { afterEach, expect, test } from "bun:test";
 import { ledger } from "..";
 import {
 	type Env,
-	authorJson,
 	authorScript,
 	coldAdopt,
 	draftOf,
@@ -202,5 +201,4 @@ test("L02 queue full on the correction hand-off, cancel, expiry and restart-styl
 		stale: "draft_not_reviewing",
 	});
 	expect(draftOf(env4, c4.draftId)!.state).toBe("queued");
-	expect(authorJson).toBeDefined();
 });

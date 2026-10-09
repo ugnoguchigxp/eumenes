@@ -1,5 +1,5 @@
 import { isPublicJsonSource, fetchPublicJson } from "./public-json";
-import { publicSourceText } from "../service/source-text";
+import { publicSourceText, weatherPageText } from "../service/source-text";
 import {
 	createLlmFetch,
 	createSafeHttpFetcher,
@@ -91,6 +91,14 @@ export function freshnessDeadline(
 function limited(text: string, characters: number) {
 	const value = text.slice(0, characters);
 	return /[\uD800-\uDBFF]$/u.test(value) ? value.slice(0, -1) : value;
+}
+/**
+ * Host-side finite normalization of known public sources. Public JSON and Yahoo!天気 pinpoint city pages
+ * become short, typed text the route validator can check; every other page is returned unchanged.
+ */
+export function sourceText(url: string, text: string): string {
+	if (isPublicJsonSource(url)) return publicSourceText(url, text);
+	return weatherPageText(text) ?? text;
 }
 export function acquisitionError(error: unknown): string {
 	if (error instanceof LlmFetchError)
@@ -190,9 +198,7 @@ export function createWebAcquisition(
 				document: {
 					url: doc.finalUrl,
 					title: limited(doc.title, 500),
-					text: isPublicJsonSource(url)
-						? publicSourceText(url, doc.text)
-						: doc.text,
+					text: sourceText(url, doc.text),
 					fetchedAt: doc.fetchedAt,
 					truncated: doc.truncated || status === 206,
 					trust: "untrusted",

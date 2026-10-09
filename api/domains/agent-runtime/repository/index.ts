@@ -29,7 +29,10 @@ export const byRoot = (db: Database, id: string) =>
 function acquisitionMode(t: Task): AcquisitionMode | null {
 	try {
 		if (t.acquisition_binding_json) {
-			const k = JSON.parse(t.acquisition_binding_json).initialAction?.kind;
+			const b = JSON.parse(t.acquisition_binding_json);
+			// A site failure replaced the saved route with a fresh search on this child.
+			if ((b.replacements ?? 0) >= 1) return "rediscover";
+			const k = b.initialAction?.kind;
 			return k === "host-lookup"
 				? "search"
 				: k === "candidate-import"

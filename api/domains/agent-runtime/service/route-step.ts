@@ -24,6 +24,15 @@ export const siteFailureCodes = new Set([
 	"web_result_too_large",
 	"web_quote_symbol_mismatch",
 	"result_expired",
+	// Codes the real acquisition path emits (web_${LlmFetchError.code}): HTTP errors, a changed
+	// page shape, and provider throttling all justify one fresh search; guard/unsafe/cancel never do.
+	"web_upstream_http",
+	"web_parse_changed",
+	"web_content_insufficient",
+	"web_unsupported_content_type",
+	"web_response_too_large",
+	"web_rate_limited",
+	"web_bot_challenge",
 ]);
 const terminal = new Set(["completed", "failed", "cancelled", "interrupted"]);
 
@@ -436,6 +445,7 @@ export function createRouteStep(ctx: RouteStepContext) {
 				coordinatorTaskId: root.id,
 				question,
 				requestAtMs: plan?.requestAtMs ?? now(),
+				replaceReason: reason,
 			});
 			if (next.kind !== "search-first")
 				throw new Error("replacement_unavailable");

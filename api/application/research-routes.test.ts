@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { buildSearchSpec } from "../domains/research-routes";
+import { buildSearchSpec, specKey } from "../domains/research-routes";
 import {
 	AAPL_Q,
 	PAGE,
@@ -399,4 +399,72 @@ test("H01/E02 management API: auth, stale tokens, disable/rediscover, and expire
 	expect(old.body.state).toBe("expired");
 	expect(old.body.skillRevision).toBeNull();
 	expect(old.body.contextProjection).toBeNull();
+});
+
+test("E02 a newer healthy version activated while a warm read is in flight does not revoke that answer", async () => {
+	const h = await harness();
+	await register(h, QUESTION);
+	const call = api(h);
+	const key = specKey(
+		(buildSearchSpec(QUESTION) as { spec: Parameters<typeof specKey>[0] }).spec,
+	);
+	const versions = () =>
+		h.sql<{ n: number }>("SELECT COUNT(*) n FROM research_route_revisions")[0]!
+			.n;
+	expect(versions()).toBe(1);
+	let fired = false;
+	h.hooks.onRead = async () => {
+		if (fired) return;
+		fired = true;
+		// While version A is being read, a description edit is authored, reviewed and activated as B.
+		const shown = await call("GET", `/api/research-routes/${key}`);
+		const edit = await call("POST", `/api/research-routes/${key}/edits`, {
+			requestId: crypto.randomUUID(),
+			expectedStateToken: shown.body.stateToken,
+			instruction: "説明を少し詳しくしてください",
+		});
+		expect(edit.status).toBe(202);
+		expect(await h.until(() => versions() === 2)).toBe(true);
+	};
+	h.state.max = 27;
+	const run = await h.ask(QUESTION);
+	h.hooks.onRead = null;
+	expect(run.done?.status).toBe("completed");
+	expect(versions()).toBe(2);
+	expect(h.routeState(QUESTION)).toBe("active");
+	expect(run.answer).toContain("最高27度");
+});
+
+test("E02 a changed page shape (web_parse_changed) disqualifies the route and a search answers from site B", async () => {
+	const h = await harness();
+	await register(h, QUESTION);
+	h.sites[PAGE]!.mode = "parse_changed";
+	h.hits.urls = () => [PAGE_B];
+	const before = { ...h.counts };
+	const run = await h.ask(QUESTION);
+	expect(run.done?.status).toBe("completed");
+	expect(run.answer).toContain("最高30度");
+	expect(h.counts.lookups - before.lookups).toBe(1);
+	expect(
+		h.sql<{ n: number }>(
+			"SELECT COUNT(*) n FROM research_route_revision_health",
+		)[0]!.n,
+	).toBe(1);
+});
+
+test("E02 provider throttling (429) searches elsewhere but does not condemn the route", async () => {
+	const h = await harness();
+	await register(h, QUESTION);
+	h.sites[PAGE]!.mode = "rate_limited";
+	h.hits.urls = () => [PAGE_B];
+	const before = { ...h.counts };
+	const run = await h.ask(QUESTION);
+	expect(run.done?.status).toBe("completed");
+	expect(run.answer).toContain("最高30度");
+	expect(h.counts.lookups - before.lookups).toBe(1);
+	expect(
+		h.sql<{ n: number }>(
+			"SELECT COUNT(*) n FROM research_route_revision_health",
+		)[0]!.n,
+	).toBe(0);
 });

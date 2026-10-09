@@ -15,7 +15,6 @@ import {
 	specOf,
 	authorScript,
 	reviewScript,
-	authorJson,
 } from "./support";
 
 const envs: Env[] = [];
@@ -446,8 +445,4 @@ test("D03 an edit whose base was disqualified meanwhile is superseded, and non-a
 		stale: "base_changed",
 	});
 	expect(draftOf(env, draftId)!.state).toBe("superseded");
-});
-
-test("D03 author output must keep the host recipe (also exercised via authorJson helper)", () => {
-	expect(JSON.parse(authorJson({ a: 1 })).recipe).toEqual({ a: 1 });
 });

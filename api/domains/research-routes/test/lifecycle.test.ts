@@ -309,3 +309,68 @@ test("D04 sweep job handler runs a pass in its settle transaction and chains whi
 	const next = env.queue.list({ kind: "research.clear-sweep" }).items;
 	expect(next.length).toBeGreaterThan(0);
 });
+
+test("D04 a cleared epoch whose own reclaim job could not be queued is reclaimed by the periodic pass", async () => {
+	const env = await mk();
+	await env.store.write((db) => {
+		for (let i = 0; i < 30; i++) fakeKey(db, 0);
+	});
+	const failing = {
+		...env.routes,
+		editInTransaction: env.routes.editInTransaction,
+		disableInTransaction: env.routes.disableInTransaction,
+		rediscoverInTransaction: env.routes.rediscoverInTransaction,
+		enqueueSweepInTransaction: () => {
+			throw new Error("queue_full");
+		},
+	};
+	const ops = createOperations({
+		routes: failing,
+		store: env.store,
+		clock: env.clock,
+	});
+	const cleared = await ops.clear({
+		requestId: crypto.randomUUID(),
+		expectedEpoch: 0,
+	});
+	expect(cleared.status).toBe(200);
+	expect(
+		count(env, "SELECT COUNT(*) n FROM research_route_keys WHERE epoch=0"),
+	).toBe(30);
+	// The hourly (ttl-mode) pass includes the hidden epochs.
+	await sweep(env);
+	expect(
+		count(env, "SELECT COUNT(*) n FROM research_route_keys WHERE epoch=0"),
+	).toBe(0);
+});
+
+test("D04 a hidden key still held by a running root is skipped, then reclaimed once released", async () => {
+	const env = await mk();
+	await activateRoute(env);
+	const versionId = env.store.read(
+		(db) =>
+			db.query("SELECT version_id v FROM research_route_revisions").get() as {
+				v: string;
+			},
+	).v;
+	const ops = createOperations({
+		routes: env.routes,
+		store: env.store,
+		clock: env.clock,
+	});
+	await ops.clear({ requestId: crypto.randomUUID(), expectedEpoch: 0 });
+	let held = [versionId];
+	const guarded = createResearchRoutes({
+		clock: env.clock,
+		adoption: { protectedBindingsInTransaction: () => held },
+	});
+	await env.store.write((db) =>
+		guarded.sweepInTransaction(db, { mode: "epoch" }),
+	);
+	const rows = () =>
+		count(env, "SELECT COUNT(*) n FROM research_route_keys WHERE epoch=0");
+	expect(rows()).toBe(1);
+	held = [];
+	await env.store.write((db) => guarded.sweepInTransaction(db));
+	expect(rows()).toBe(0);
+});

@@ -80,6 +80,14 @@ const siteFailure: Record<string, FailureKind> = {
 	web_acquisition_failed: "network_error",
 	web_result_too_large: "format_changed",
 	web_quote_symbol_mismatch: "wrong_target",
+	// Codes the real acquisition path emits. Throttling is not the site being wrong (ignored).
+	web_upstream_http: "http_5xx",
+	web_parse_changed: "format_changed",
+	web_content_insufficient: "missing_value",
+	web_unsupported_content_type: "format_changed",
+	web_response_too_large: "format_changed",
+	web_rate_limited: "rate_limited",
+	web_bot_challenge: "rate_limited",
 	// result_expired is a local vault/retention matter, never the site's fault.
 };
 const toolIdOf = (s: string): RouteRecipe["toolId"] | null => {
@@ -180,8 +188,18 @@ export function createRouteWiring(opts: RouteWiringOptions) {
 			!row.enabled
 		)
 			return false;
-		if (info.kind === "direct")
-			return row.active_version_id === info.versionId && r.state === "active";
+		if (info.kind === "direct") {
+			// The version this run used must still be healthy. A newer healthy version becoming
+			// active meanwhile does not revoke an answer fetched through the older one.
+			const rev = info.versionId
+				? ledger.getRevision(db, info.versionId)
+				: null;
+			return (
+				!!rev &&
+				rev.incarnation === info.fence.incarnation &&
+				!ledger.getHealth(db, rev.version_id)
+			);
+		}
 		const c = ledger.getCandidate(db, info.fence.epoch, info.fence.key);
 		return !!c && c.digest === info.candidateDigest;
 	}
@@ -198,7 +216,18 @@ export function createRouteWiring(opts: RouteWiringOptions) {
 				};
 			if (built.kind === "unsupported") return { kind: "unmatched" };
 			const binding = bindRequest(built.spec, input.requestAtMs);
-			const lookup = routes.lookupInTransaction(db, built.spec, binding);
+			let lookup = routes.lookupInTransaction(db, built.spec, binding);
+			// A replacement after a site-side failure is a real search even when the ledger still
+			// considers the route healthy (e.g. provider throttling does not disqualify it).
+			if (
+				input.replaceReason &&
+				(lookup.kind === "direct" || lookup.kind === "candidate")
+			)
+				lookup = {
+					kind: "lookup",
+					reason: "source_failure",
+					fence: lookup.fence,
+				};
 			if (lookup.kind === "unavailable")
 				return { kind: "unavailable", code: lookup.code };
 			prune();

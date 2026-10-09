@@ -131,3 +131,38 @@ test("quote text carries a host-mapped market from the provider exchange code", 
 		JSON.parse(publicSourceText(url, raw("XXX")).split("\n")[1]!).market,
 	).toBeUndefined();
 });
+
+import { sourceText } from "../adapters/llm-fetch";
+test("sourceText normalizes known sources and leaves every other page unchanged", () => {
+	const page = yahooPage("鎌倉市");
+	const normalized = sourceText(
+		"https://weather.yahoo.co.jp/weather/jp/14/4610/14204.html",
+		page,
+	);
+	expect(normalized).toBe(weatherPageText(page)!);
+	expect(normalized.split("\n")[1]).toContain("鎌倉市 2026-10-09 天気 晴れ");
+	const other = "一般のページ本文。天気の話はしない。";
+	expect(sourceText("https://example.com/a", other)).toBe(other);
+	const json = JSON.stringify({
+		chart: {
+			result: [
+				{
+					meta: {
+						symbol: "AAPL",
+						currency: "USD",
+						regularMarketPrice: 1,
+						regularMarketTime: 1791489600,
+						exchangeTimezoneName: "America/New_York",
+						exchangeName: "NMS",
+					},
+				},
+			],
+		},
+	});
+	expect(
+		sourceText(
+			"https://query1.finance.yahoo.com/v8/finance/chart/AAPL?interval=1d&range=1d",
+			json,
+		),
+	).toContain("NASDAQ");
+});

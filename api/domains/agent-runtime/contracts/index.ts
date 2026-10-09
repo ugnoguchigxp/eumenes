@@ -136,7 +136,7 @@ export type TaskDto = {
 	/** Generic progress mode derived from the acquisition plan: no site-specific data. */
 	acquisitionMode?: AcquisitionMode | null;
 };
-export type AcquisitionMode = "search" | "candidate" | "cached";
+export type AcquisitionMode = "search" | "candidate" | "cached" | "rediscover";
 export const taskDtoSchema = z.object({
 	id: z.string(),
 	kind: z.enum(["coordinator", "worker"]),
@@ -152,7 +152,7 @@ export const taskDtoSchema = z.object({
 	deadlineAt: z.string(),
 	reportState: z.string(),
 	acquisitionMode: z
-		.enum(["search", "candidate", "cached"])
+		.enum(["search", "candidate", "cached", "rediscover"])
 		.nullable()
 		.optional(),
 	toolOutcomes: z
@@ -225,6 +225,8 @@ export type AcquisitionResolveInput = {
 	coordinatorTaskId: string;
 	question: string;
 	requestAtMs: number;
+	/** Set only when replacing a failed plan: the answer must be a normal search even if the route stays healthy. */
+	replaceReason?: string;
 };
 export type AcquisitionProposal =
 	| { kind: "unmatched" }
@@ -257,6 +259,8 @@ export type AcquisitionObservationInput = {
 		stepId: string;
 		argsDigest: string;
 		state: string;
+		origin?: string;
+		superseded?: boolean;
 	}[];
 	report: Report;
 	facts: unknown;

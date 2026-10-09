@@ -114,6 +114,8 @@ export function createAgentRuntime({
 					stepId: string;
 					argsDigest: string;
 					state: string;
+					origin?: string;
+					superseded?: boolean;
 				}[];
 			}
 		).invocationsInTransaction;
@@ -125,6 +127,8 @@ export function createAgentRuntime({
 			stepId: r.stepId,
 			argsDigest: r.argsDigest,
 			state: r.state,
+			origin: r.origin,
+			superseded: r.superseded,
 		}));
 	}
 	/** A cached (direct) plan may be swapped for a normal search once, only for site-side failures. */
@@ -725,9 +729,17 @@ export function createAgentRuntime({
 					).run(code, input.stepId);
 					replaceOrFail(db, t.id, code, claim.jobId);
 				} else if (
-					["invalid_tool_input", "invalid_evidence", "invalid_report"].includes(
-						code,
-					) &&
+					([
+						"invalid_tool_input",
+						"invalid_evidence",
+						"invalid_report",
+					].includes(code) ||
+						// A bound (cold) child whose first source did not match the request may read another
+						// candidate once while its model/tool budget lasts. Only the code goes back to the model.
+						(code === "source_unusable" &&
+							!!storedBinding(get(db, t.id)) &&
+							t.tool_calls < 5 &&
+							t.model_calls < 7)) &&
 					t.kind === "worker" &&
 					t.json_repairs < 1
 				) {

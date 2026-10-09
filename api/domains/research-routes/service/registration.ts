@@ -27,6 +27,7 @@ import {
 } from "./flow";
 import { renderDraft, validateRegistrationScenarios } from "./assets";
 import { renderProjection } from "./projection";
+import { hitCoversSource } from "./mapping";
 import { type Clock, liveKey, stateTokenOf, versionHealth } from "./registry";
 import { checkObservation } from "./validation";
 import type { Plans } from "./plans";
@@ -211,7 +212,12 @@ export function createRegistration(
 			origin = orig.data;
 		}
 		if (origin.query !== input.spec.keywords) return out(null);
-		if (!input.lookupHitUrls?.includes(check.url)) return out(null);
+		if (
+			!input.lookupHitUrls?.some((u) =>
+				hitCoversSource(input.spec, input.toolId, u, check.url),
+			)
+		)
+			return out(null);
 		const recipe = buildRecipe(input.spec, input.toolId, check.url, fence.key);
 		if (
 			!recipe ||

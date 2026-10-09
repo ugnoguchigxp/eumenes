@@ -17,7 +17,7 @@ bun run cli research-routes rediscover <key> <stateToken>
 bun run cli research-routes clear <expectedEpoch>
 ```
 
-`stateToken` は `show`、`epoch` は `list` の結果から取ります。変更系は `--request-id` で再送できます。編集の指示はファイルから読みます。URL・tool・引数の変更は受け付けず、`rediscover` で次回検索に戻します。
+`stateToken` は `show`、`epoch` は `list` の結果から取ります。変更系の失敗時は使った `Request ID` を標準エラーへ出すので、`--request-id <UUID>` を付けて同じ要求を再送できます（二重適用されません）。編集の指示はファイルから読みます。URL・tool・引数の変更は受け付けず、`rediscover` で次回検索に戻します。
 
 ## 状態
 

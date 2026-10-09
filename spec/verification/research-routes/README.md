@@ -5,7 +5,7 @@
 | 項目 | 状態 | 備考 |
 | --- | --- | --- |
 | backend domain (T01〜T21) と application配線 | 実装済み | 各domainのfixture試験あり。最終の全体gate結果は下の記録欄 |
-| CLI・client・Web panel (T22〜T23) | 実装済み | clientを差し替えた試験。実backendのbrowser E2E（T24c）は未記録 |
+| CLI・client・Web panel (T22〜T23) | 実装済み | clientを差し替えた試験。実backend(fixture)のbrowser E2E（T24c）は1件通過、画面上の409表示は含まない（component試験で確認） |
 | 鎌倉 live（実LARM＋実Web） | 計画（未実施） | 実行結果なし |
 | 静岡市 live | 計画（未実施）かつ公開取得元が未対応 | [source-feasibility.md](source-feasibility.md): Yahoo!天気のページは「静岡市葵区」で、市単位の資料を確認できていない。city対応完了は宣言しない |
 | AAPL live | 計画（未実施） | quote-json-v1は形式確認とfixtureまで |

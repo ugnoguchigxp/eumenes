@@ -164,6 +164,8 @@ research-routesの登録serviceがcapabilitiesの公開操作を呼び、SKILL/p
 1. 現在の依頼からSearchSpecを作り、経路を照合する。新キーの台帳が容量内なら作成し、満杯ならlookup(reason=capacity, fence=null)で通常取得へ進む。台帳不足で会話を失敗させない。
 2. activeがなければWeb検索する。候補だけが有効なら、その候補を使う。過去に成功した経路がない新キーは、最初の候補保存前に必ずlookupを1回実行する。
 3. 子は許可された候補から一次資料を優先して1サイトを読み、対象・必要項目・対象日時を検査する。不足時だけ既存の上限内で別候補を確認する。
+   - 初回(cold)でホストの独立抽出が `source_unusable` を返した場合も、report_invalidの修正と同様に、子の予算(推論8・tool5、read3)が残る間は別候補の読み直しを子全体で1回だけ許す。モデルへ返すのはコードだけで、資料内容は返さない。2回目の `source_unusable` は子の失敗とする。
+   - 検索ヒットと専用APIの対応はホストの固定mappingだけを認める(quoteは `finance.yahoo.com/quote/<TICKER>` のヒット ↔ 同一tickerのYahoo chart JSON、`web.quote`のみ)。mappingにないURLは従来どおり完全一致のヒットだけを学習対象にする。
 4. 子の根拠付きreportをメインへ渡し、回答を通常のticket/epoch検査で採用する。
 5. 初回・期限切れ・代替取得成功だけを学習対象にする。回答採用transactionの任意学習用SAVEPOINTで、経路登録に使える成功証拠とauthor job受付を確定する。受付失敗は学習部分だけrollbackし、採用した回答は残す。登録のモデル呼出しは回答後に行う。
 

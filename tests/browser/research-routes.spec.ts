@@ -102,7 +102,8 @@ test("cold run registers a route; the settings panel reads, edits, stops, redisc
 	await detail.getByRole("button", { name: "編集を依頼" }).click();
 	await expect(detail).toContainText("編集を受け付けました");
 
-	// Another client changes the state: the stale token yields a visible conflict.
+	// Another client changes the state behind this page; SSE re-reads it (the 409 display itself is
+	// covered by the panel's component test, since the refresh normally beats any click).
 	const token = (
 		await (
 			await page.request.get(

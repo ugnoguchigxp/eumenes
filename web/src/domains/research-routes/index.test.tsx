@@ -142,3 +142,74 @@ test("U01 SSE invalidation covers research routes, settings never import the dom
 		readFileSync("web/src/domains/research-routes/index.tsx", "utf8"),
 	).not.toContain("refetchInterval");
 });
+
+const other: typeof summary = {
+	...summary,
+	key: "b".repeat(64),
+	keywords: "株価 AAPL NASDAQ USD regular",
+	target: {
+		ticker: "AAPL",
+		market: "NASDAQ",
+		currency: "USD",
+		priceKind: "regular",
+	} as never,
+};
+
+test("U01 an unsent edit survives switching routes and keeps the panel dirty", async () => {
+	const { onDirty } = setup({
+		researchRoutes: vi.fn(async () => ({
+			items: [summary, other],
+			nextCursor: null,
+			epoch: 4,
+		})),
+		researchRoute: vi.fn(async (k: string) => ({
+			...detail,
+			key: k,
+			keywords: k === key ? summary.keywords : other.keywords,
+		})),
+	});
+	fireEvent.click(await screen.findByText("天気予報 鎌倉"));
+	fireEvent.change(await screen.findByRole("textbox"), {
+		target: { value: "未送信の説明" },
+	});
+	await waitFor(() => expect(onDirty).toHaveBeenLastCalledWith(true));
+	fireEvent.click(screen.getByText("株価 AAPL NASDAQ USD regular"));
+	await screen.findByLabelText("取得先 株価 AAPL NASDAQ USD regular");
+	expect(onDirty).not.toHaveBeenLastCalledWith(false);
+	fireEvent.click(screen.getByText("天気予報 鎌倉"));
+	expect(
+		((await screen.findByRole("textbox")) as HTMLTextAreaElement).value,
+	).toBe("未送信の説明");
+});
+
+test("U01 a stale cursor (409) on 'more' reloads the list from the first page", async () => {
+	let epoch = 4;
+	const researchRoutes = vi.fn(
+		async (q: { cursor?: string }, _signal?: AbortSignal) => {
+			if (q.cursor && epoch !== 4) throw new ApiError(409, "stale_cursor");
+			return q.cursor
+				? { items: [other], nextCursor: null, epoch }
+				: { items: [summary], nextCursor: "c1", epoch };
+		},
+	);
+	setup({ researchRoutes });
+	await screen.findByText("天気予報 鎌倉");
+	epoch = 5; // another client cleared behind this panel
+	fireEvent.click(screen.getByText("さらに表示"));
+	await screen.findByText(/最新の状態を読み込みました/);
+	await waitFor(() => {
+		const calls = researchRoutes.mock.calls;
+		expect(calls[calls.length - 1]![0]).toEqual({});
+	});
+});
+
+test("U01 an SSE change invalidation re-reads the list without polling", async () => {
+	let items = [summary];
+	const { cache } = setup({
+		researchRoutes: vi.fn(async () => ({ items, nextCursor: null, epoch: 4 })),
+	});
+	await screen.findByText("天気予報 鎌倉");
+	items = [summary, other];
+	await cache.invalidateQueries({ queryKey: [queryRoots.researchRoutes] });
+	await screen.findByText("株価 AAPL NASDAQ USD regular");
+});

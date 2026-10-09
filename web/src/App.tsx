@@ -35,6 +35,7 @@ import {
 import { useReplay, useVoiceDialogue } from "./domains/voice-dialogue";
 import { ServiceTestsPanel } from "./domains/service-tests";
 import { ResearchRoutesPanel } from "./domains/research-routes";
+import { createUnsavedFlags } from "./unsavedFlags";
 import { SettingsPage, useSettings, useVoiceMute } from "./domains/settings";
 import { changeRoots, queryRoots } from "./queryKeys";
 import {
@@ -69,18 +70,17 @@ function Workspace({
 	const [settingsOpen, setSettingsOpen] = useState(
 		window.location.hash.startsWith("#settings"),
 	);
-	const dirtySettings = useRef(false);
+	// Settings and research-route edits are tracked apart; leaving the page checks both.
+	const unsaved = useRef(createUnsavedFlags());
 	const onDirty = useCallback((v: boolean) => {
-		dirtySettings.current = v;
+		unsaved.current.set("settings", v);
 	}, []);
-	// Research-route edits are tracked apart from settings; leaving the page checks both.
-	const dirtyRoutes = useRef(false);
 	const onRoutesDirty = useCallback((v: boolean) => {
-		dirtyRoutes.current = v;
+		unsaved.current.set("routes", v);
 	}, []);
 	useEffect(() => {
 		const prevent = (e: BeforeUnloadEvent) => {
-			if (dirtyRoutes.current) e.preventDefault();
+			if (unsaved.current.any()) e.preventDefault();
 		};
 		window.addEventListener("beforeunload", prevent);
 		return () => window.removeEventListener("beforeunload", prevent);
@@ -113,14 +113,13 @@ function Workspace({
 			const open = window.location.hash.startsWith("#settings");
 			if (
 				!open &&
-				(dirtySettings.current || dirtyRoutes.current) &&
+				unsaved.current.any() &&
 				!window.confirm("設定の未保存の変更を破棄して会話に戻りますか？")
 			) {
 				window.history.replaceState(null, "", "#settings");
 				return;
 			}
-			dirtySettings.current = false;
-			dirtyRoutes.current = false;
+			unsaved.current.reset();
 			setSettingsOpen(open);
 		};
 		window.addEventListener("hashchange", navigate);

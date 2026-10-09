@@ -97,6 +97,9 @@ export function SettingsPage({
 	const [keys, setKeys] = useState<ApplySettings["keys"]>([]);
 	const [category, setCategory] =
 		useState<(typeof categories)[number]["id"]>("general");
+	// Once opened, the routes panel stays mounted (hidden) so an unsent edit survives category changes.
+	const [routesOpened, setRoutesOpened] = useState(false);
+	if (category === "routes" && !routesOpened) setRoutesOpened(true);
 	const [message, setMessage] = useState("");
 	const [busy, setBusy] = useState(false);
 	const [retry, setRetry] = useState<ApplySettings | null>(null);
@@ -351,7 +354,11 @@ export function SettingsPage({
 					</p>
 				</header>
 				{category === "services" && renderServiceTests?.(dirty)}
-				{category === "routes" && renderResearchRoutes?.(false)}
+				{routesOpened && (
+					<div hidden={category !== "routes"}>
+						{renderResearchRoutes?.(false)}
+					</div>
+				)}
 				{category === "general" && (
 					<GeneralSection value={value} change={change} />
 				)}

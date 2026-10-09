@@ -17,6 +17,8 @@ const stable = args.includes("--stable");
 const readPages = args.includes("--read-pages");
 let explicitRequestId: string | undefined;
 let conversationId = "main";
+let listCursor: string | undefined;
+let listLimit: number | undefined;
 const positional: string[] = [];
 for (let i = 0; i < args.length; i++) {
 	const value = args[i];
@@ -30,6 +32,22 @@ for (let i = 0; i < args.length; i++) {
 		explicitRequestId = args[++i];
 		if (!submitSchema.shape.requestId.safeParse(explicitRequestId).success) {
 			console.error("--request-id requires a UUID");
+			process.exit(2);
+		}
+		continue;
+	}
+	if (value === "--cursor") {
+		listCursor = args[++i];
+		if (!listCursor) {
+			console.error("--cursor requires a value");
+			process.exit(2);
+		}
+		continue;
+	}
+	if (value === "--limit") {
+		listLimit = Number(args[++i]);
+		if (!Number.isInteger(listLimit) || listLimit < 1 || listLimit > 50) {
+			console.error("--limit requires an integer from 1 to 50");
 			process.exit(2);
 		}
 		continue;
@@ -437,14 +455,24 @@ async function main() {
 	if (command === "research-routes") {
 		const sub = positional.shift();
 		const usage =
-			"usage: research-routes list [cursor] [limit]|show <key>|edit <key> <stateToken> <instruction-file>|disable <key> <stateToken>|rediscover <key> <stateToken>|clear <expectedEpoch> [--request-id UUID]";
+			"usage: research-routes list [--cursor C] [--limit 1-50]|show <key>|edit <key> <stateToken> <instruction-file>|disable <key> <stateToken>|rediscover <key> <stateToken>|clear <expectedEpoch> [--request-id UUID]";
 		const requestId = explicitRequestId ?? crypto.randomUUID();
+		// Mutations surface the request ID on failure so an identical retry stays idempotent.
+		const mutate = async <T>(operation: () => Promise<T>) => {
+			try {
+				return await operation();
+			} catch (error) {
+				console.error(
+					`Request ID: ${requestId}. Retry with --request-id ${requestId} to repeat the same request.`,
+				);
+				throw error;
+			}
+		};
 		if (sub === "list") {
-			const [cursor, limit] = positional;
 			return show(
 				await client.researchRoutes({
-					...(cursor && cursor !== "-" ? { cursor } : {}),
-					...(limit ? { limit: Number(limit) } : {}),
+					...(listCursor ? { cursor: listCursor } : {}),
+					...(listLimit ? { limit: listLimit } : {}),
 				}),
 			);
 		}
@@ -454,33 +482,41 @@ async function main() {
 			// The instruction comes from a file so the text never passes through a shell line.
 			const instruction = (await readFile(file, "utf8")).trim();
 			return show(
-				await client.editResearchRoute(key, {
-					requestId,
-					expectedStateToken: token,
-					instruction,
-				}),
+				await mutate(() =>
+					client.editResearchRoute(key, {
+						requestId,
+						expectedStateToken: token,
+						instruction,
+					}),
+				),
 			);
 		}
 		if (sub === "disable" && key && token)
 			return show(
-				await client.disableResearchRoute(key, {
-					requestId,
-					expectedStateToken: token,
-				}),
+				await mutate(() =>
+					client.disableResearchRoute(key, {
+						requestId,
+						expectedStateToken: token,
+					}),
+				),
 			);
 		if (sub === "rediscover" && key && token)
 			return show(
-				await client.rediscoverResearchRoute(key, {
-					requestId,
-					expectedStateToken: token,
-				}),
+				await mutate(() =>
+					client.rediscoverResearchRoute(key, {
+						requestId,
+						expectedStateToken: token,
+					}),
+				),
 			);
 		if (sub === "clear" && key !== undefined && /^\d+$/.test(key))
 			return show(
-				await client.clearResearchRoutes({
-					requestId,
-					expectedEpoch: Number(key),
-				}),
+				await mutate(() =>
+					client.clearResearchRoutes({
+						requestId,
+						expectedEpoch: Number(key),
+					}),
+				),
 			);
 		throw new Error(usage);
 	}
