@@ -19,7 +19,22 @@ export interface Receipt {
 	value: string | Uint8Array;
 	delivery?: SpeechDelivery;
 }
+/** Host-issued background authority; independent of a conversation request. */
+export interface BackgroundControl {
+	taskId: string;
+	decisionId: string;
+	authorityEpoch: number;
+	executionGeneration: number;
+	deadline: number;
+	taskDeadline: number;
+	maxOutputTokens: number;
+}
 export interface InferencePort {
+	captureBackgroundControlInTransaction?(
+		db: Database,
+		input: BackgroundControl,
+	): string;
+	countControlTokens?(messages: Messages): number | null;
 	captureControlInTransaction?(
 		db: Database,
 		input: {

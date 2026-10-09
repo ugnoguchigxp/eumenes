@@ -1,0 +1,166 @@
+.timer-artifact {
+	--timer-accent: var(--primary);
+	display: grid;
+	place-items: center;
+	min-height: 400px;
+	height: 100%;
+	padding: clamp(24px, 5%, 64px) clamp(16px, 5%, 48px);
+	background: radial-gradient(
+		ellipse at 50% 42%,
+		color-mix(in srgb, var(--timer-accent) 5%, transparent),
+		transparent 65%
+	);
+	text-align: center;
+}
+
+.timer-artifact[data-state="elapsed"] {
+	--timer-accent: var(--success);
+}
+
+.timer-artifact[data-state="cancelled"] {
+	--timer-accent: var(--muted-foreground);
+}
+
+.timer-artifact-content {
+	width: 100%;
+	max-width: 480px;
+	min-width: 0;
+}
+
+.timer-artifact-heading {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 12px;
+}
+
+.timer-artifact-icon {
+	display: grid;
+	place-items: center;
+	width: 48px;
+	height: 48px;
+	margin-bottom: 4px;
+	border-radius: 50%;
+	background: color-mix(in srgb, var(--timer-accent) 9%, transparent);
+	color: var(--timer-accent);
+}
+
+.timer-artifact-heading h2 {
+	margin: 0;
+	color: var(--foreground);
+	font-size: 18px;
+	font-weight: 500;
+	line-height: 1.5;
+	overflow-wrap: anywhere;
+}
+
+.timer-artifact-duration {
+	margin: -8px 0 0;
+	color: var(--muted-foreground);
+	font-size: 13px;
+}
+
+.timer-artifact-status {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	margin: 24px 0 20px;
+	padding: 5px 10px;
+	border: 1px solid color-mix(in srgb, var(--timer-accent) 20%, transparent);
+	border-radius: 999px;
+	color: var(--timer-accent);
+	font-size: 12px;
+	line-height: 1.4;
+}
+
+.timer-artifact-status-dot {
+	width: 5px;
+	height: 5px;
+	border-radius: 50%;
+	background: currentColor;
+}
+
+.timer-artifact .timer-artifact-clock {
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+	font-weight: 300;
+	letter-spacing: -0.045em;
+}
+
+.timer-artifact .timer-artifact-clock .digital-clock-digits {
+	min-width: 0;
+	font-size: clamp(40px, 23cqw, 112px);
+	line-height: 1.15;
+}
+
+.timer-artifact .timer-artifact-clock-long .digital-clock-digits {
+	font-size: clamp(28px, 15cqw, 76px);
+}
+
+.timer-artifact-progress {
+	width: 80%;
+	height: 3px;
+	margin: 28px auto 20px;
+	overflow: hidden;
+	border-radius: 999px;
+	background: var(--muted);
+}
+
+.timer-artifact-progress > div {
+	height: 100%;
+	border-radius: inherit;
+	background: var(--timer-accent);
+	transition: width 250ms linear;
+}
+
+.timer-artifact-finish {
+	display: flex;
+	justify-content: center;
+	gap: 10px;
+	margin: 0;
+	color: var(--muted-foreground);
+	font-size: 13px;
+	line-height: 1.5;
+}
+
+.timer-artifact-finish time {
+	color: var(--foreground);
+	font-variant-numeric: tabular-nums;
+}
+
+.timer-artifact-actions {
+	min-height: 72px;
+	margin-top: 32px;
+}
+
+.timer-artifact .timer-artifact-cancel {
+	min-width: 136px;
+	height: 44px;
+	padding: 0 24px;
+	border-color: var(--border);
+	border-radius: 999px;
+	font-size: 13px;
+}
+
+.timer-artifact-error {
+	margin: 12px 0 0;
+	color: var(--destructive);
+	font-size: 13px;
+}
+
+.timer-artifact-message {
+	display: grid;
+	place-items: center;
+	min-height: 300px;
+	height: 100%;
+	margin: 0;
+	padding: 32px;
+	color: var(--muted-foreground);
+	font-size: 14px;
+	text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.timer-artifact-progress > div {
+		transition: none;
+	}
+}

@@ -23,6 +23,10 @@ export function useVoiceDialogue(
 	const options = useRef(settings);
 	options.current = settings;
 	const controller = useRef<AudioController | null>(null);
+	const inputEnabled = useRef(false);
+	const replacement = useRef<{ id: string; previous: string | null } | null>(
+		null,
+	);
 	// Bookkeeping lives in the machine; refs below are handles outside React.
 	const [machine] = useState(createVoiceMachine);
 	const tokens = useRef(0);
@@ -106,6 +110,38 @@ export function useVoiceDialogue(
 	useEffect(() => {
 		const value = turn.data;
 		if (!value) return;
+		const pending = replacement.current;
+		if (pending?.id === value.utteranceId) {
+			if (
+				value.text?.trim() &&
+				value.runId &&
+				!["failed", "cancelled", "interrupted"].includes(value.status)
+			) {
+				replacement.current = null;
+				machine.dispatch({
+					type: "turn_selected",
+					utteranceId: value.utteranceId,
+				});
+				if (
+					pending.previous &&
+					pending.previous !== value.utteranceId &&
+					options.current?.bargeIn !== false
+				) {
+					controller.current?.stopPlayback();
+					cancelPlayback();
+					void client.voiceCancel(pending.previous).catch(() => {});
+				}
+			} else if (
+				["completed", "failed", "cancelled", "interrupted"].includes(
+					value.status,
+				)
+			) {
+				replacement.current = null;
+				setTurnId(pending.previous);
+				setRecognitionId(pending.previous);
+				return;
+			}
+		}
 		if (value.text) invalidateDialogueViews(cache, client.identity, "main");
 		if (value.status === "failed")
 			// Keep the failure visible after the query changes, until a new session starts.
@@ -114,8 +150,7 @@ export function useVoiceDialogue(
 		const active = machine.get().session;
 		const valid = () =>
 			!!active && isCurrent(machine.get(), active.token, value.utteranceId);
-		const canPlay = () =>
-			valid() && !(candidate.current && options.current?.bargeIn !== false);
+		const canPlay = () => valid();
 		if (
 			value.audioChunks !== undefined &&
 			active &&
@@ -254,7 +289,26 @@ export function useVoiceDialogue(
 		}
 	}, [turn.data, client, cache, turnId, machine, cancelPlayback]);
 	async function start() {
-		if (machine.get().phase !== "idle") return;
+		if (machine.get().phase !== "idle") {
+			if (
+				machine.get().phase === "active" &&
+				!active &&
+				controller.current?.pauseInput
+			) {
+				inputEnabled.current = true;
+				setActive(true);
+				try {
+					await controller.current.start();
+				} catch (error) {
+					inputEnabled.current = false;
+					setActive(false);
+					setError(describeError(error));
+				}
+			}
+			return;
+		}
+		inputEnabled.current = true;
+		replacement.current = null;
 		setError(null);
 		setRecognitionId(null);
 		setPreviewText(null);
@@ -266,6 +320,7 @@ export function useVoiceDialogue(
 		const next = { id: crypto.randomUUID(), generation: 1 };
 		const sessionToken = ++tokens.current;
 		const live = () => isCurrent(machine.get(), sessionToken);
+		const inputLive = () => live() && inputEnabled.current;
 		try {
 			await client.voiceStart(next.id, next.generation);
 			if (cancelled()) {
@@ -284,7 +339,7 @@ export function useVoiceDialogue(
 					if (live()) store.setState(state);
 				},
 				() => {
-					if (!live() || machine.get().session?.failed) return;
+					if (!inputLive() || machine.get().session?.failed) return;
 					candidate.current?.controller?.abort();
 					const nextCandidate = {
 						id: crypto.randomUUID(),
@@ -294,24 +349,12 @@ export function useVoiceDialogue(
 					candidate.current = nextCandidate;
 					setRecognitionId(nextCandidate.id);
 					setPreviewText(null);
-					if (options.current?.bargeIn === false) return;
-					const playing = store.getState().phase === "playing";
-					controller.current?.stopPlayback();
-					cancelPlayback();
-					// An energy candidate can be noise. Stop audible output immediately,
-					// but preserve recognition/generation until another segment is finalized.
-					if (playing) {
-						const old = machine.get().current;
-						machine.dispatch({ type: "turn_released" });
-						if (old)
-							void upload.current?.tail
-								.then(() => client.voiceCancel(old))
-								.catch(() => {});
-					}
+					// Energy alone cannot distinguish speech from noise. Keep the answer
+					// until the replacement has a nonempty accepted transcript.
 				},
 				(wav) => {
 					const active = machine.get().session;
-					if (!live() || !active || active.failed) return;
+					if (!inputLive() || !active || active.failed) return;
 					if (active.pending >= 2) {
 						setError("音声の送信待ちが上限に達しました");
 						return;
@@ -331,6 +374,7 @@ export function useVoiceDialogue(
 					const sequence = machine.dispatch({
 						type: "segment_accepted",
 						utteranceId: id,
+						preserveCurrent: true,
 					}).session!.sequence;
 					const uploads = upload.current;
 					if (!uploads) return;
@@ -358,10 +402,7 @@ export function useVoiceDialogue(
 								);
 							}
 							if (!live()) return;
-							// Keep the previous answer until the replacement has been accepted.
-							if (old && old !== id)
-								await client.voiceCancel(old).catch(() => {});
-							if (!live()) return;
+							replacement.current = { id, previous: old };
 							setTurnId(id);
 							await cache.invalidateQueries({
 								queryKey: [queryRoots.voiceDialogue, client.identity, id],
@@ -393,13 +434,14 @@ export function useVoiceDialogue(
 				{
 					...options.current,
 					onPartial: (wav) => {
-						if (live()) partial(wav);
+						if (inputLive()) partial(wav);
 					},
 					// Without barge-in nothing may interrupt a reply, so it must not be heard either.
 					halfDuplex: () => options.current?.bargeIn === false,
 					onLost: (reason) => {
-						if (!live()) return;
-						void stop().then(() => setError(describeError(reason)));
+						if (!inputLive()) return;
+						void pause();
+						setError(describeError(reason));
 					},
 					onNotice: (reason) => {
 						if (live()) setError(describeError(reason));
@@ -433,6 +475,8 @@ export function useVoiceDialogue(
 		}
 	}
 	async function stop() {
+		inputEnabled.current = false;
+		replacement.current = null;
 		setActive(false);
 		setRecognitionId(null);
 		candidate.current?.controller?.abort();
@@ -452,6 +496,17 @@ export function useVoiceDialogue(
 			await client.voiceStop(active.id, active.generation).catch((e) => {
 				if (machine.get().phase === "idle") setError(describeError(e));
 			});
+	}
+	function pause() {
+		const audio = controller.current;
+		if (!audio?.pauseInput) return stop();
+		// The controller flushes a final spoken segment before detaching the mic.
+		audio.pauseInput();
+		inputEnabled.current = false;
+		setActive(false);
+		candidate.current?.controller?.abort();
+		candidate.current = null;
+		setPreviewText(null);
 	}
 	const autoSpeak = settings?.autoSpeak;
 	useEffect(() => {
@@ -484,6 +539,7 @@ export function useVoiceDialogue(
 	return {
 		start,
 		stop,
+		pause,
 		/** The running session's controller; replay shares its gate and playback epoch. */
 		audio: () => controller.current,
 		/** Cuts off the reply being spoken (as barge-in does) so another playback can start. */

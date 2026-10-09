@@ -1,4 +1,11 @@
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
+import {
+	mkdtempSync,
+	rmSync,
+	mkdirSync,
+	writeFileSync,
+	existsSync,
+	readFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createClient } from "../client";
@@ -53,6 +60,11 @@ try {
 		}
 	}
 	if (!ready) throw new Error("isolated_backend_start_timeout");
+	// HTTP startup precedes model connection readiness. Do not spend the
+	// coordinator's deadline waiting for the startup probe's connection.
+	const connection = await client.connectLarm();
+	if (connection.larm.state !== "ready")
+		throw new Error("isolated_larm_not_ready");
 	const cases = [
 		{
 			name: "weather",
@@ -151,6 +163,16 @@ try {
 	if (backend.exitCode === null) {
 		backend.kill("SIGKILL");
 		await backend.exited;
+	}
+	// Keep the sanitized operational diagnosis when the isolated database is removed.
+	const logPath = join(dir, "api.jsonl");
+	if (existsSync(logPath)) {
+		mkdirSync("verification-reports/toolchain", { recursive: true });
+		writeFileSync(
+			"verification-reports/toolchain/live-backend.jsonl",
+			readFileSync(logPath),
+			{ mode: 0o600 },
+		);
 	}
 	rmSync(dir, { recursive: true, force: true });
 }

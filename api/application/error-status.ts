@@ -1,7 +1,15 @@
 export type ErrorStatus = 400 | 404 | 409 | 410 | 411 | 413 | 429 | 503;
 
 const statusByCode: Record<string, ErrorStatus> = {
+	coding_execution_not_found: 404,
+	coding_invalid_cursor: 400,
+	coding_workspace_unavailable: 503,
+	coding_workspace_busy: 409,
+	coding_branch_conflict: 409,
+	coding_authority_stale: 409,
+	coding_operation_conflict: 409,
 	task_not_found: 404,
+	task_history_expired: 410,
 	task_execution_unavailable: 503,
 	task_grant_expired: 409,
 	task_runtime_expired: 409,

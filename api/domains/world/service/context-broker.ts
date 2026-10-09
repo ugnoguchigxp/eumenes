@@ -14,7 +14,10 @@ import {
 } from "eumenes-world-model";
 import { WORLD_INTERPRETATION_VERSION } from "eumenes-world-model/sqlite";
 import worldPackage from "eumenes-world-model/package.json";
-import type { SqliteStore } from "../../../infrastructure/sqlite";
+import {
+	WriterBusyError,
+	type SqliteStore,
+} from "../../../infrastructure/sqlite";
 import {
 	CONVERSATION_DEFAULT_PRINCIPAL,
 	CONVERSATION_DEFAULT_SCOPE,
@@ -22,7 +25,6 @@ import {
 import { goalEpochOf, goalRevisionOf, goalSnapshot } from "../../goals";
 import { WORLD_PROVIDER_REF } from "../contracts";
 import {
-	deleteDependents,
 	deleteUsage,
 	insertUsage,
 	listDependentIdsByPrefix,
@@ -32,7 +34,9 @@ import {
 import { upsertDependent } from "../repository/lifecycle";
 import {
 	CONTEXT_TOTAL_BYTES,
+	WORLD_MIN_BYTES,
 	allocateContextBudget,
+	goalRenderedBytes,
 	renderWorldBlock,
 	worldBlockBytes,
 	type RenderGoal,
@@ -43,13 +47,28 @@ import {
 	planDependents,
 	registerWorldDependents,
 } from "./memory-adapter";
-import { sliceDependentPrefix } from "./usage-ledger";
+import {
+	releaseScopeDependents,
+	sliceDependentPrefix,
+	sweepReleasePending,
+	type UnregisterDependents,
+} from "./usage-ledger";
 import type { WorldService } from "./world-service";
 
-/** Newest receipts kept per Scope; older ones are released with their Memory dependents. */
+/**
+ * Newest receipts kept per Scope; older ones are released with their Memory
+ * dependents. This is also the reach of a LATER forget: a forget invalidates
+ * (and unregisters) the answers whose receipts still exist. An answer whose
+ * receipt was pruned has no usage row and no Memory dependent any more, so a
+ * later forget no longer touches it (the receipt table is audit data; the
+ * answer text itself lives in the conversation and is forgotten there). The
+ * dependents are therefore kept registered exactly as long as the receipt is.
+ */
 export const KEEP_USAGE_PER_SCOPE = 500;
 /** World contract version the receipt records. */
 const CONTRACT_VERSION = 1;
+/** Shrink-and-render rounds before the rendered block is declared an overflow. */
+const MAX_FIT_ATTEMPTS = 6;
 
 export type ContextPrepareInput = {
 	runId: string;
@@ -68,7 +87,10 @@ export type ContextPrepared =
 	| { status: "blocked"; reason: string }
 	| { status: "ready"; block: string; context: PreparedWorldContext };
 
-export type ContextVerdict = { ok: true } | { ok: false; reason: string };
+export type ContextVerdict =
+	| { ok: true }
+	/** `retryable`: the check could not run now (writer busy / closing); a new attempt may succeed. */
+	| { ok: false; reason: string; retryable?: boolean };
 
 export type ContextSettleInput = {
 	runId: string;
@@ -124,8 +146,9 @@ export type ContextBrokerOptions = {
 
 const defaultHasher: CanonicalHasher = (bytes) =>
 	createHash("sha256").update(bytes).digest("hex");
-const utf8 = (text: string) => new TextEncoder().encode(text).length;
-const reasonOf = (code: string) => `world_${code.toLowerCase()}`;
+/** A content-free machine code the queue may persist (`^[a-z][a-z0-9_:]*$`). */
+const reasonOf = (code: string) =>
+	`world_${code.toLowerCase().replace(/^world_/, "")}`;
 
 function deepFreeze<T>(value: T): T {
 	if (typeof value === "object" && value !== null && !Object.isFrozen(value)) {
@@ -167,35 +190,45 @@ export function createWorldContextBroker(options: ContextBrokerOptions) {
 		return again.ok && again.value === digest;
 	}
 
+	/** Memory unregistration for one Scope; "blocked" when Memory refuses. */
+	const unregisterFor =
+		(db: Database, scope: ScopeRef, nowMs: number): UnregisterDependents =>
+		(ids) =>
+			unregisterExternalDependents(db, {
+				contractVersion: CONTRACT_VERSIONS.external,
+				access: world.accessInTransaction(db, {
+					access: requestAccess(scope),
+				}),
+				scopeKey: scope.scopeKey,
+				clock: { atMs: nowMs },
+				dependents: ids.map((externalId) => ({
+					providerRef: WORLD_PROVIDER_REF,
+					externalId,
+				})),
+			}).status;
+
+	/**
+	 * Never throws because of Memory: a refusal or a Memory store/contract
+	 * error keeps the host rows (marked release_pending) for the retry sweep,
+	 * so a dialogue settle or cancel transaction cannot fail on it.
+	 */
 	function releaseDependents(
 		db: Database,
 		scope: ScopeRef,
 		runId: string,
 		nowMs: number,
 	) {
-		const ids = listDependentIdsByPrefix(
+		releaseScopeDependents(
 			db,
-			scope.principal,
-			scope.scopeKey,
-			sliceDependentPrefix(scope, runId),
+			scope,
+			listDependentIdsByPrefix(
+				db,
+				scope.principal,
+				scope.scopeKey,
+				sliceDependentPrefix(scope, runId),
+			),
+			unregisterFor(db, scope, nowMs),
 		);
-		if (ids.length === 0) return;
-		const access = world.accessInTransaction(db, {
-			access: requestAccess(scope),
-		});
-		const result = unregisterExternalDependents(db, {
-			contractVersion: CONTRACT_VERSIONS.external,
-			access,
-			scopeKey: scope.scopeKey,
-			clock: { atMs: nowMs },
-			dependents: ids.map((externalId) => ({
-				providerRef: WORLD_PROVIDER_REF,
-				externalId,
-			})),
-		});
-		// A refusal keeps the host rows so the registration is not forgotten.
-		if (result.status === "unregistered")
-			deleteDependents(db, scope.principal, scope.scopeKey, ids);
 	}
 
 	/**
@@ -286,38 +319,58 @@ export function createWorldContextBroker(options: ContextBrokerOptions) {
 				totalBytes,
 				reservedBytes: input.reservedBytes,
 				sliceCapBytes: SLICE_MAX_BYTES,
-				goalBytes: shown.map((goal) => utf8(JSON.stringify(goal))),
+				goalBytes: shown.map(goalRenderedBytes),
 			});
 			if (!allocation.ok) return { status: "blocked", reason: "world_budget" };
 			const goalsShown = shown.slice(0, allocation.goalCount);
 			const top = inScope[0];
 
-			const built = buildWorldSlice(
-				{
-					contractVersion: 1,
-					snapshot: snapshot.snapshot,
-					request: {
-						...(top === undefined
-							? {}
-							: { goalRef: { id: top.goalId, revision: top.revision } }),
-						maxBytes: allocation.worldBytes,
+			// The slice is sized on its UNESCAPED JSON, the model sees the ESCAPED
+			// block (up to 6x per character), so the rendered block is measured and
+			// the slice shrunk (whole units are dropped by buildWorldSlice) until
+			// it fits the shared total; no room left means world_overflow.
+			let worldBytes = allocation.worldBytes;
+			let slice: WorldSlice | undefined;
+			let block = "";
+			for (let attempt = 0; ; attempt++) {
+				if (attempt >= MAX_FIT_ATTEMPTS || worldBytes < WORLD_MIN_BYTES)
+					return { status: "blocked", reason: "world_overflow" };
+				const built = buildWorldSlice(
+					{
+						contractVersion: 1,
+						snapshot: snapshot.snapshot,
+						request: {
+							...(top === undefined
+								? {}
+								: { goalRef: { id: top.goalId, revision: top.revision } }),
+							maxBytes: worldBytes,
+						},
 					},
-				},
-				hasher,
-			);
-			if (!built.ok)
-				return { status: "blocked", reason: "world_slice_invalid" };
-			const slice = built.value;
-			if (slice.status === "disabled") return { status: "disabled" };
-			if (slice.status === "overflow")
+					hasher,
+				);
+				if (!built.ok)
+					return { status: "blocked", reason: "world_slice_invalid" };
+				if (built.value.status === "disabled") return { status: "disabled" };
+				if (built.value.status === "overflow")
+					return { status: "blocked", reason: "world_overflow" };
+				if (built.value.status === "blocked")
+					return {
+						status: "blocked",
+						reason: reasonOf(built.value.reasonCodes[0] ?? "blocked"),
+					};
+				// Nothing to say: no usage, no receipt, no input dependency.
+				if (built.value.units.length === 0) return { status: "disabled" };
+				const rendered = renderWorldBlock(built.value, goalsShown);
+				const size = worldBlockBytes(rendered);
+				if (size <= allocation.blockLimitBytes) {
+					slice = built.value;
+					block = rendered;
+					break;
+				}
+				worldBytes -= size - allocation.blockLimitBytes;
+			}
+			if (slice === undefined)
 				return { status: "blocked", reason: "world_overflow" };
-			if (slice.status === "blocked")
-				return {
-					status: "blocked",
-					reason: reasonOf(slice.reasonCodes[0] ?? "blocked"),
-				};
-			// Nothing to say: no usage, no receipt, no input dependency.
-			if (slice.units.length === 0) return { status: "disabled" };
 
 			const dependentIds: string[] = [];
 			const planned = planDependents(
@@ -370,7 +423,6 @@ export function createWorldContextBroker(options: ContextBrokerOptions) {
 				}
 			}
 
-			const block = renderWorldBlock(slice, goalsShown);
 			const context: PreparedWorldContext = deepFreeze({
 				runId: input.runId,
 				scope,
@@ -403,8 +455,15 @@ export function createWorldContextBroker(options: ContextBrokerOptions) {
 		): Promise<ContextVerdict> {
 			try {
 				return await store.write((db) => verdictInTransaction(db, context));
-			} catch {
-				return { ok: false, reason: "world_check_unavailable" };
+			} catch (error) {
+				// A busy or closing Writer says nothing about the context: the caller
+				// may try again with a fresh attempt. Anything else fails closed.
+				const retryable =
+					error instanceof WriterBusyError ||
+					(error instanceof Error && error.message === "database_closing");
+				return retryable
+					? { ok: false, reason: "world_check_unavailable", retryable: true }
+					: { ok: false, reason: "world_check_unavailable" };
 			}
 		},
 
@@ -480,6 +539,31 @@ export function createWorldContextBroker(options: ContextBrokerOptions) {
 			const scope = scopeOf(conversationId);
 			deleteUsage(db, runId);
 			releaseDependents(db, scope, runId, clock());
+		},
+
+		/**
+		 * Retry sweep: finishes the Memory unregistration of dependents whose
+		 * release was refused or failed earlier (host rows marked release_pending).
+		 * Idempotent; call it periodically or at startup. Never throws on Memory.
+		 */
+		sweepPendingReleasesInTransaction(
+			db: Database,
+			limit = 200,
+		): { released: number; stillPending: number } {
+			const nowMs = clock();
+			return sweepReleasePending(db, limit, (scope) =>
+				unregisterFor(db, scope, nowMs),
+			);
+		},
+		sweepPendingReleases(
+			limit = 200,
+		): Promise<{ released: number; stillPending: number }> {
+			return store.write((db) => {
+				const nowMs = clock();
+				return sweepReleasePending(db, limit, (scope) =>
+					unregisterFor(db, scope, nowMs),
+				);
+			});
 		},
 	};
 }

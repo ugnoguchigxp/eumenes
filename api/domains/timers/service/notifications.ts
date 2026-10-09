@@ -7,6 +7,7 @@ import {
 	type TimerNotificationDto,
 } from "../contracts";
 import {
+	countActive,
 	claimNotification,
 	expiredClaims,
 	getNotification,
@@ -42,7 +43,8 @@ function decodeDue(cursor: string | undefined) {
 		if (!parsed.success) throw new Error("invalid_cursor");
 		return parsed.data;
 	} catch (error) {
-		if (error instanceof Error && error.message === "invalid_cursor") throw error;
+		if (error instanceof Error && error.message === "invalid_cursor")
+			throw error;
 		throw new Error("invalid_cursor");
 	}
 }
@@ -80,7 +82,8 @@ export function listNotificationsInTransaction(
 	const last = page.at(-1);
 	return {
 		serverNow: iso(at),
-		items: page.map(notificationDto),
+		activeTimers: countActive(tx, scope),
+		items: page.map((row) => notificationDto(row, tx)),
 		nextCursor:
 			rows.length > size && last ? encodeDue(last.dueAtMs, last.id) : null,
 	};
@@ -109,11 +112,12 @@ export function claimInTransaction(
 		row.clientId === input.clientId &&
 		row.leaseUntilMs !== null &&
 		row.leaseUntilMs > at &&
+		at - row.dueAtMs <= TIMER_POLICY.soundFreshMs &&
 		row.claimId
 	) {
 		return {
 			serverNow: iso(at),
-			notification: notificationDto(row),
+			notification: notificationDto(row, tx),
 			claimId: row.claimId,
 			leaseUntil: iso(row.leaseUntilMs),
 		};
@@ -125,7 +129,11 @@ export function claimInTransaction(
 		row.clientId !== input.clientId
 	)
 		throw new Error("notification_claimed");
-	if (row.status === "dismissed" || row.status === "played" || row.status === "silent")
+	if (
+		row.status === "dismissed" ||
+		row.status === "played" ||
+		row.status === "silent"
+	)
 		throw new Error("claim_invalid");
 	if (at - row.dueAtMs > TIMER_POLICY.soundFreshMs) {
 		if (row.status === "pending") {
@@ -135,9 +143,13 @@ export function claimInTransaction(
 			if (!silenceClaimedStale(tx, id, at)) throw new Error("claim_invalid");
 		}
 		const next = requireOwn(getNotification(tx, id), scope);
-		return { serverNow: iso(at), notification: notificationDto(next) };
+		return { serverNow: iso(at), notification: notificationDto(next, tx) };
 	}
-	if (row.status === "claimed" && row.leaseUntilMs !== null && row.leaseUntilMs <= at)
+	if (
+		row.status === "claimed" &&
+		row.leaseUntilMs !== null &&
+		row.leaseUntilMs <= at
+	)
 		releaseClaim(tx, id, at);
 	const current = requireOwn(getNotification(tx, id), scope);
 	if (current.status !== "pending") throw new Error("notification_claimed");
@@ -167,7 +179,7 @@ export function claimInTransaction(
 	});
 	return {
 		serverNow: iso(at),
-		notification: notificationDto(claimed),
+		notification: notificationDto(claimed, tx),
 		claimId,
 		leaseUntil: iso(leaseUntil),
 	};
@@ -185,9 +197,21 @@ export function ackInTransaction(
 	if (row.status === "dismissed") throw new Error("claim_invalid");
 	const played = input.outcome === "played";
 	const status = played ? "played" : "silent";
-	const reason = played ? null : input.outcome === "muted" ? "muted" : "blocked";
-	if (row.status === status && row.reason === reason && row.claimId === input.claimId)
-		return { serverNow: iso(deps.now()), notification: notificationDto(row) };
+	const reason = played
+		? null
+		: input.outcome === "muted"
+			? "muted"
+			: "blocked";
+	if (
+		row.status === status &&
+		row.reason === reason &&
+		row.claimId === input.claimId &&
+		row.clientId === input.clientId
+	)
+		return {
+			serverNow: iso(deps.now()),
+			notification: notificationDto(row, tx),
+		};
 	if (row.status === "played" || row.status === "silent")
 		throw new Error("claim_invalid");
 	const at = deps.now();
@@ -211,7 +235,7 @@ export function ackInTransaction(
 		status: next.status,
 		reason: next.reason ?? undefined,
 	});
-	return { serverNow: iso(at), notification: notificationDto(next) };
+	return { serverNow: iso(at), notification: notificationDto(next, tx) };
 }
 
 export function silenceInTransaction(
@@ -229,7 +253,7 @@ export function silenceInTransaction(
 	if (!silencePending(tx, id, scope, input.expectedRevision, input.reason, at))
 		throw new Error("revision_conflict");
 	const next = requireOwn(getNotification(tx, id), scope);
-	return { serverNow: iso(at), notification: notificationDto(next) };
+	return { serverNow: iso(at), notification: notificationDto(next, tx) };
 }
 
 export function releaseExpiredClaims(tx: Database, deps: TimerDeps) {

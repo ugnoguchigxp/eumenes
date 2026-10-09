@@ -28,7 +28,7 @@
 }
 .digital-clock-hero .digital-clock-digits {
 	width: 100%;
-	font-size: clamp(2.5rem, 22cqw, 8rem);
+	font-size: clamp(1.5rem, 16cqw, 8rem);
 }
 
 .digital-clock-warning {

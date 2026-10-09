@@ -320,7 +320,11 @@ test("forgetting erases the value, survives restart, and is re-applied on a rest
 	// Restore the pre-forget database: the external journal must win.
 	copyFileSync(backup, join(dir, "db.sqlite3"));
 	const restored = await setup({ dir });
-	expect(restored.recovery).toEqual({ healthy: true, reapplied: 1 });
+	expect(restored.recovery).toEqual({
+		healthy: true,
+		reapplied: 1,
+		feedResyncRequired: true,
+	});
 	expect(restored.memory.list(true)).toEqual([]);
 	expect(readFileSync(journal, "utf8").trim().split("\n")).toHaveLength(1);
 	await restored.ask("復元後");

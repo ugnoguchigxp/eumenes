@@ -55,7 +55,9 @@ export function createVoiceDialogue(
 			!turn ||
 			!["responding", "synthesizing", "ready"].includes(turn.status) ||
 			!run ||
-			!["running", "completed"].includes(run.status)
+			!["running", "completed"].includes(run.status) ||
+			// A World-using run is spoken only from its adopted (completed) answer.
+			(run.worldUsed && run.status !== "completed")
 		)
 			return false;
 		const refs = store.read((db) => ({
@@ -328,6 +330,20 @@ export function createVoiceDialogue(
 						? (asrReceipt.value as string)
 						: await larm.transcribe(wav, controller.signal);
 					if (controller.signal.aborted) return;
+					if (!text.trim()) {
+						await advance(
+							turn.utteranceId,
+							"completed",
+							{ text: "" },
+							asrReceipt,
+						);
+						await store.write((db) => {
+							larm.skipInTransaction?.(db, turn.utteranceId, "llm");
+							larm.skipInTransaction?.(db, turn.utteranceId, "tts");
+						});
+						log.info("voice.input_ignored", { reason: "empty_transcript" });
+						return;
+					}
 					const languages = (
 						store.read((db) => larm.snapshotFor?.(db, turn.utteranceId)) ??
 						store.read((db) => larm.snapshotInTransaction?.(db))
@@ -391,6 +407,10 @@ export function createVoiceDialogue(
 					const answer = dialogue.answerText(run.id);
 					if (!answer) throw new Error("answer_missing");
 					if (!autoSpeak) {
+						log.info("voice.synthesis_skipped", {
+							runId: run.id,
+							reason: "auto_speak_disabled",
+						});
 						await store.write((db) =>
 							larm.skipInTransaction?.(db, turn.utteranceId, "tts"),
 						);
@@ -398,6 +418,7 @@ export function createVoiceDialogue(
 						return;
 					}
 					if (!(await advance(turn.utteranceId, "synthesizing"))) return;
+					log.info("voice.synthesis_started", { runId: run.id });
 					speech = createSpeech(turn.utteranceId, run.id, controller, {
 						collection: {
 							conversationId: run.conversationId,
@@ -412,6 +433,10 @@ export function createVoiceDialogue(
 					await speech!.work;
 					if (controller.signal.aborted) return;
 					if (speech!.error) throw speech!.error;
+					log.info("voice.synthesis_completed", {
+						runId: run.id,
+						count: speech!.chunks.size,
+					});
 					await advance(
 						turn.utteranceId,
 						speech!.chunks.size ? "ready" : "played",
@@ -419,7 +444,21 @@ export function createVoiceDialogue(
 					if (!speech!.chunks.size) audio.delete(turn.utteranceId);
 				} catch (error) {
 					if (!controller.signal.aborted)
-						log.error("voice.processing_failed", {}, error);
+						log.error(
+							"voice.processing_failed",
+							{
+								runId:
+									store.read((db) => get(db, turn.utteranceId))?.runId ??
+									undefined,
+								phase: store.read((db) => get(db, turn.utteranceId))?.status,
+								reason:
+									error instanceof Error &&
+									/^[a-z][a-z0-9_]{0,79}$/.test(error.message)
+										? error.message
+										: "voice_failed",
+							},
+							error,
+						);
 					audio.delete(turn.utteranceId);
 					if (!controller.signal.aborted)
 						await advance(turn.utteranceId, "failed", {
@@ -630,8 +669,11 @@ export function createVoiceDialogue(
 			const turn = store.read((db) => get(db, id));
 			if (!turn) return null;
 			const state = audio.get(id);
+			const run = turn.runId ? dialogue.get(turn.runId) : null;
 			return {
 				...turn,
+				worldUsed: run?.worldUsed ?? false,
+				worldBlocked: run?.worldBlocked ?? false,
 				audioChunks: [...(state?.chunks.values() ?? [])].map((c) => ({
 					index: c.index,
 					text: c.text,

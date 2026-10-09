@@ -1,12 +1,12 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, relative, resolve, sep } from "node:path";
 import ts from "typescript";
-import { closure, type Domain, domains } from "./domains";
+import { closure, type Domain, domains, ownedPaths } from "./domains";
 
 const root = resolve(import.meta.dir, "..");
 function owner(path: string): { domain: Domain; root: string } | null {
-	for (const [domain, info] of Object.entries(domains))
-		for (const location of [info.backend, info.web, info.components]) {
+	for (const domain of Object.keys(domains) as Domain[])
+		for (const location of ownedPaths(domain)) {
 			if (!location) continue;
 			const base = resolve(root, location);
 			if (path === base || path.startsWith(`${base}${sep}`))
@@ -108,6 +108,21 @@ export function checkSource(name: string, text: string): string[] {
 		}
 		if (!spec.startsWith(".")) continue;
 		const targetPath = resolve(dirname(path), spec);
+		if (
+			inside(path, "packages/coding-runner") &&
+			["api", "web", "client", "cli"].some((dir) => inside(targetPath, dir))
+		)
+			errors.push(`${name}: coding-runner must not import product layers`);
+		if (
+			inside(path, "api/domains/coding") &&
+			!isTestFile(path) &&
+			inside(targetPath, "packages/coding-runner") &&
+			!["contracts", "client"].some(
+				(entry) =>
+					targetPath === resolve(root, `packages/coding-runner/src/${entry}`),
+			)
+		)
+			errors.push(`${name}: coding must use runner contracts/client entry`);
 		errors.push(...checkLayer(name, path, spec, targetPath));
 		if (!source) continue;
 		const target = owner(targetPath);

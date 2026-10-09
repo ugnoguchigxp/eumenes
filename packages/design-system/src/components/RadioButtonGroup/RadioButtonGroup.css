@@ -1,0 +1,98 @@
+@layer components {
+	.ds-radio-group {
+		min-inline-size: 0;
+		margin: 0;
+		padding: 0;
+		border: 0;
+		color: var(--foreground);
+	}
+	.ds-radio-legend {
+		margin-bottom: 0.75rem;
+		padding: 0;
+		color: var(--muted-foreground);
+		font-size: var(--ui-font-size-base);
+		line-height: 1.5;
+	}
+	.ds-radio-options {
+		display: grid;
+		gap: max(var(--ui-gap-base), 0.5rem);
+	}
+	.ds-radio-option {
+		display: grid;
+		grid-template-columns: 1.25rem minmax(0, 1fr);
+		align-items: center;
+		gap: 0.75rem;
+		min-width: 0;
+		min-height: max(3.25rem, var(--ui-component-height));
+		padding: max(0.625rem, var(--ui-component-padding-y))
+			var(--ui-component-padding-x);
+		border: 1px solid var(--border);
+		border-radius: var(--radius);
+		background: var(--card);
+		cursor: pointer;
+		transition:
+			border-color 120ms,
+			background-color 120ms;
+	}
+	.ds-radio-option:hover:not(:has(:disabled, :checked)) {
+		border-color: var(--muted-foreground);
+		background: var(--muted);
+	}
+	.ds-radio-option:has(:checked) {
+		border-color: var(--primary);
+		background: color-mix(in srgb, var(--primary) 10%, var(--card));
+		box-shadow: inset 0 0 0 1px var(--primary);
+	}
+	.ds-radio-option:has(:focus-visible) {
+		outline: 2px solid var(--ring);
+		outline-offset: 2px;
+	}
+	.ds-radio-input {
+		appearance: none;
+		width: 1.25rem;
+		height: 1.25rem;
+		margin: 0;
+		padding: 0;
+		border: 2px solid var(--muted-foreground);
+		border-radius: 50%;
+		background: transparent;
+		cursor: inherit;
+	}
+	.ds-radio-input:checked {
+		border-color: var(--primary);
+		background: radial-gradient(
+			circle,
+			var(--primary) 0 4px,
+			transparent 4.5px
+		);
+	}
+	.ds-radio-input:focus-visible {
+		outline: none;
+	}
+	.ds-radio-label {
+		min-width: 0;
+		font-size: var(--ui-font-size-base);
+		font-weight: 500;
+		line-height: 1.5;
+		overflow-wrap: anywhere;
+	}
+	.ds-radio-option:has(:disabled) {
+		cursor: not-allowed;
+	}
+	.ds-radio-option:has(:disabled:not(:checked)) {
+		opacity: 0.5;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.ds-radio-option {
+			transition: none;
+		}
+	}
+	@media (forced-colors: active) {
+		.ds-radio-input {
+			appearance: auto;
+		}
+		.ds-radio-option:has(:checked) {
+			border-color: Highlight;
+		}
+	}
+}

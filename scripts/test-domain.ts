@@ -31,7 +31,10 @@ if (tests.length === 0) {
 	console.error(`No tests selected for ${domain}${sub ? `/${sub}` : ""}`);
 	process.exit(3);
 }
-const backend = tests.filter((path) => path.startsWith("api/"));
+const backend = tests.filter(
+	(path) =>
+		path.startsWith("api/") || path.startsWith("packages/coding-runner/"),
+);
 const web = tests.filter((path) => path.startsWith("web/"));
 async function run(args: string[]) {
 	const child = Bun.spawn(args, { stdout: "inherit", stderr: "inherit" });

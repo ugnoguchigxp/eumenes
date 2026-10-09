@@ -14,9 +14,15 @@ describe("displayRemainingSeconds", () => {
 			cancelledAt: null,
 		};
 		expect(displayRemainingSeconds(snapshot, clock.baseServer + 0)).toBe(180);
-		expect(displayRemainingSeconds(snapshot, clock.baseServer + 1000)).toBe(179);
-		expect(displayRemainingSeconds(snapshot, clock.baseServer + 179_999)).toBe(1);
-		expect(displayRemainingSeconds(snapshot, clock.baseServer + 180_000)).toBe(0);
+		expect(displayRemainingSeconds(snapshot, clock.baseServer + 1000)).toBe(
+			179,
+		);
+		expect(displayRemainingSeconds(snapshot, clock.baseServer + 179_999)).toBe(
+			1,
+		);
+		expect(displayRemainingSeconds(snapshot, clock.baseServer + 180_000)).toBe(
+			0,
+		);
 		expect(
 			displayRemainingSeconds(
 				{

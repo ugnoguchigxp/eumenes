@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Home } from "lucide-react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -8,13 +8,6 @@ import {
 	TabsList,
 	TabsTrigger,
 } from "@/components/Tabs/Tabs";
-
-// Mock AdaptiveText to simplify trigger testing
-vi.mock("@/components/AdaptiveText", () => ({
-	AdaptiveText: ({ text, className }: { text: string; className?: string }) => (
-		<span className={className}>{text}</span>
-	),
-}));
 
 // ResizeObserver mock
 beforeEach(() => {
@@ -100,7 +93,7 @@ describe("Tabs", () => {
 		expect(screen.getByRole("tab").querySelector("svg")).toBeInTheDocument();
 	});
 
-	it("truncates long text in trigger", () => {
+	it("preserves the full accessible name for long tabs", () => {
 		const longText = "This is a very long tab name";
 		render(
 			<Tabs defaultValue="tab1">
@@ -110,8 +103,8 @@ describe("Tabs", () => {
 			</Tabs>,
 		);
 
-		// "This is a " (10 chars) + "..." -> "This is a ..."
-		expect(screen.getByText("This is a ...")).toBeInTheDocument();
+		expect(screen.getByRole("tab", { name: longText })).toBeInTheDocument();
+		expect(screen.getByText(longText)).toHaveAttribute("title", longText);
 	});
 
 	it("renders children directly when not a string", () => {
@@ -217,4 +210,61 @@ describe("Tabs", () => {
 		expect(screen.getByRole("tab")).toHaveClass("custom-trigger");
 		expect(screen.getByRole("tabpanel")).toHaveClass("custom-content");
 	});
+});
+
+it("workspace close is a separate button and does not select its tab", async () => {
+	const user = userEvent.setup();
+	const onClose = vi.fn();
+	const onChange = vi.fn();
+	render(
+		<Tabs defaultValue="first" onValueChange={onChange}>
+			<TabsList variant="workspace">
+				<TabsTrigger value="first">First</TabsTrigger>
+				<TabsTrigger
+					value="second"
+					onClose={onClose}
+					closeLabel="Secondを閉じる"
+				>
+					Second
+				</TabsTrigger>
+			</TabsList>
+			<TabsContent value="first">First content</TabsContent>
+		</Tabs>,
+	);
+	const tab = screen.getByRole("tab", { name: "Second" });
+	const close = screen.getByRole("button", { name: "Secondを閉じる" });
+	expect(tab.contains(close)).toBe(false);
+	await user.click(close);
+	expect(onClose).toHaveBeenCalledTimes(1);
+	expect(onChange).not.toHaveBeenCalled();
+	expect(screen.getByRole("tab", { name: "First" })).toHaveAttribute(
+		"aria-selected",
+		"true",
+	);
+});
+
+it("arrow navigation skips disabled tabs and connects the selected panel", async () => {
+	const user = userEvent.setup();
+	render(
+		<Tabs defaultValue="first">
+			<TabsList>
+				<TabsTrigger value="first">First</TabsTrigger>
+				<TabsTrigger value="disabled" disabled>
+					Disabled
+				</TabsTrigger>
+				<TabsTrigger value="last">Last</TabsTrigger>
+			</TabsList>
+			<TabsContent value="first">First content</TabsContent>
+			<TabsContent value="last">Last content</TabsContent>
+		</Tabs>,
+	);
+	act(() => screen.getByRole("tab", { name: "First" }).focus());
+	await user.keyboard("{ArrowRight}");
+	const last = screen.getByRole("tab", { name: "Last" });
+	expect(last).toHaveFocus();
+	expect(last).toHaveAttribute("aria-selected", "true");
+	expect(screen.getByRole("tabpanel")).toHaveAttribute(
+		"aria-labelledby",
+		last.id,
+	);
 });

@@ -53,6 +53,7 @@ export * from "./components/OptionButtonGroup";
 export * from "./components/Pagination";
 export * from "./components/Popover";
 export * from "./components/ProgressBar";
+export * from "./components/RadioButtonGroup";
 export * from "./components/ScaleInput";
 export * from "./components/ScrollArea";
 export * from "./components/SearchableSelect";

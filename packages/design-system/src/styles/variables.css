@@ -20,6 +20,8 @@
 	--ui-button-padding-y-tight: 0.25rem;
 
 	--ui-gap-base: 0.5rem;
+	--ui-tab-height: 2.5rem;
+	--ui-tab-gap: 0.5rem;
 	/* 8px */
 	--ui-font-size-base: 0.875rem;
 	/* 14px */
@@ -51,7 +53,9 @@
 }
 
 /* Density: Compact */
-:root[data-density="compact"] {
+:root[data-density="compact"],
+.ds-density-compact {
+	--ui-tab-height: 2rem;
 	--ui-component-height: 2rem;
 	/* 32px */
 	--ui-list-row-height: 2rem;
@@ -96,7 +100,9 @@
 }
 
 /* Density: Spacious */
-:root[data-density="spacious"] {
+:root[data-density="spacious"],
+.ds-density-spacious {
+	--ui-tab-height: 3rem;
 	--ui-component-height: 3rem;
 	/* 48px */
 	--ui-list-row-height: 3.5rem;

@@ -16,6 +16,7 @@ import {
 } from "../contracts";
 import { get } from "../repository";
 import { builtins } from "../builtin/web-research";
+import { timerBuiltins } from "../builtin/timers";
 const learnedColumns = new WeakMap<Database, boolean>();
 /** The learned-attributes migration is appended; older fixtures may lack it. */
 function hasLearned(db: Database) {
@@ -454,6 +455,8 @@ export function createCapabilities(
 		seed: () =>
 			store.write((db) => {
 				for (const d of builtins) registerBuiltinInTransaction(db, d);
+				if (backends.has("timer"))
+					for (const d of timerBuiltins) registerBuiltinInTransaction(db, d);
 			}),
 		list(cursor = "", limit = 50) {
 			return store.read((db) => {

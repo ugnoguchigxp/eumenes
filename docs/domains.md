@@ -2,6 +2,9 @@
 
 | Domain | Backend 入口 | Web 入口 | 所有する試験 |
 | --- | --- | --- | --- |
+| coding-supervision | `api/domains/coding-supervision/index.ts` | client/API（`docs/coding-supervision.md`） | `api/domains/coding-supervision/test/`、application結合試験 |
+| task-reports | `api/domains/task-reports/index.ts` | client/API | `api/domains/task-reports/test/` |
+| coding | `api/domains/coding/index.ts` | client/API（`docs/coding-runner.md`） | `api/domains/coding/test/`、`packages/coding-runner/test/`、application結合試験 |
 | tasks | `api/domains/tasks/index.ts` | 共通client/API・CLI（`docs/delegated-tasks.md`） | `api/domains/tasks/test/`、結合試験 `api/application/delegated-tasks.test.ts` |
 | attitude-dataset | `api/domains/attitude-dataset/index.ts` | CLI/API（`docs/ruri-collection.md`） | `api/domains/attitude-dataset/test/` |
 | delivery | `api/domains/delivery/index.ts` | なし | `api/domains/delivery/test/` |
@@ -22,6 +25,7 @@
 | audio | なし | `web/src/domains/audio/index.ts` | `web/src/domains/audio/test/` |
 | queue | `api/domains/queue/index.ts` | なし | `api/domains/queue/test/` |
 | scheduler | `api/domains/scheduler/index.ts` | なし | `api/domains/scheduler/test/` |
+| timers | `api/domains/timers/index.ts` | `web/src/domains/timers` と `web/src/components/domains/timers/TimerArtifact.tsx` | `api/domains/timers/test/` |
 | dialogue | `api/domains/dialogue/index.ts` | `web/src/domains/dialogue/index.ts` | `api/domains/dialogue/test/`、`web/src/domains/dialogue/test/` |
 | voice-dialogue | `api/domains/voice-dialogue/index.ts` | `web/src/domains/voice-dialogue/index.ts` | `api/domains/voice-dialogue/test/`、`web/src/domains/voice-dialogue/test/` |
 

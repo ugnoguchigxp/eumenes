@@ -55,7 +55,7 @@ test("deleted reports disappear even when a previous response remains in the que
 		cache.clear();
 	}
 });
-test("a completed failure notice is displayed as retrieval failure, not research success", async () => {
+test("failed research stays a status indicator; the agent's response supplies the spoken explanation", async () => {
 	const client = {
 		identity: "failed-card",
 		agentTasks: vi.fn(async () => [
@@ -72,8 +72,16 @@ test("a completed failure notice is displayed as retrieval failure, not research
 				<ResearchTaskCard client={client} rootRunId="run" title="東京の天気" />
 			</QueryClientProvider>,
 		);
-		await screen.findByText("取得失敗");
+		await screen.findByText("調査未完了");
+		const bubble = screen.getByRole("complementary", {
+			name: "調査: 東京の天気",
+		});
+		expect(bubble.classList.contains("message-assistant")).toBe(true);
+		expect(bubble.querySelector(".message-author")?.textContent).toBe(
+			"Eumenes",
+		);
 		expect(screen.queryByText("完了")).toBeNull();
+		expect(screen.queryByText(/もう一度依頼してください/)).toBeNull();
 		expect(client.agentReport).not.toHaveBeenCalled();
 	} finally {
 		cache.clear();
@@ -108,10 +116,45 @@ test("the card shows the acquisition mode taken from the persisted task state", 
 	try {
 		render(
 			<QueryClientProvider client={cache}>
-				<ResearchTaskCard client={client} rootRunId="run" title="鎌倉の天気" />
+				<ResearchTaskCard
+					client={client}
+					rootRunId="run"
+					title="鎌倉の天気"
+					agentName="光"
+				/>
 			</QueryClientProvider>,
 		);
 		await screen.findByText("登録サイトを確認");
+		expect(screen.getByText("光").closest(".message-assistant")).toBe(
+			screen.getByRole("complementary", { name: "調査: 鎌倉の天気" }),
+		);
+	} finally {
+		cache.clear();
+	}
+});
+
+test("ordinary replies do not leave an empty assistant activity bubble", async () => {
+	const client = {
+		identity: "ordinary-card",
+		agentTasks: vi.fn(async () => [{ ...root, reportState: "none" }]),
+		agentReport: vi.fn(),
+	} as unknown as EumenesClient;
+	const cache = new QueryClient({
+		defaultOptions: { queries: { retry: false } },
+	});
+	try {
+		const { container } = render(
+			<QueryClientProvider client={cache}>
+				<ResearchTaskCard client={client} rootRunId="run" title="こんにちは" />
+			</QueryClientProvider>,
+		);
+		await vi.waitFor(() =>
+			expect(
+				cache.getQueryState([queryRoots.agentTasks, client.identity, "run"])
+					?.status,
+			).toBe("success"),
+		);
+		expect(container.querySelector(".message-assistant")).toBeNull();
 	} finally {
 		cache.clear();
 	}

@@ -59,7 +59,7 @@ const utf8 = (text: string) => new TextEncoder().encode(text).length;
  * Never carries content or the raw ids: 1 letter tag + 40 hex + part < 256 bytes.
  */
 export function externalIdOf(
-	tag: "a" | "m" | "s",
+	tag: "a" | "m" | "o" | "s",
 	principal: string,
 	scopeKey: string,
 	key: readonly (string | number)[],

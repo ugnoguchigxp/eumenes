@@ -1,5 +1,30 @@
 import { test, expect } from "bun:test";
 import { harness, forbidden } from "./toolchain.fixture";
+test("unmapped location uses search and read without offering incompatible fixed forecast tools", async () => {
+	const h = await harness();
+	try {
+		const run = await h.dialogue.submit({
+			requestId: crypto.randomUUID(),
+			conversationId: "main",
+			text: "今日の鎌倉の天気を教えて。",
+		});
+		expect(
+			(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 }))?.status,
+		).toBe("completed");
+		const messages = JSON.parse(h.workerContexts[0]!);
+		const tools = JSON.parse(
+			messages[0].content.split("TOOLS=")[1].split("\nOUTPUT_SCHEMA=")[0],
+		);
+		expect(tools.map((tool: { id: string }) => tool.id)).toEqual([
+			"web.lookup",
+			"web.read",
+		]);
+		expect(JSON.parse(messages[1].content).nextInvocation).toBeNull();
+		expect(h.acquisitions).toBe(2);
+	} finally {
+		await h.close();
+	}
+});
 for (const [question, expected] of [
 	["東京の天気を調べて", "26度"],
 	["AAPLの株価を調べて", "250.12"],
@@ -159,7 +184,7 @@ for (const options of [{ badJson: true }, { badQuote: true }])
 			expect(child.modelCalls).toBeLessThanOrEqual(4);
 			expect(h.parentContexts[0]).not.toContain(forbidden);
 			expect(h.dialogue.answerText(run.id)).toBe(
-				"公開情報を取得できませんでした。",
+				"調査結果を確認できませんでした。",
 			);
 			expect(
 				h.store.read((db) =>

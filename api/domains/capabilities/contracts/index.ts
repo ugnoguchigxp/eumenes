@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { timerCancel, timerCommand, timerList, timerStart } from "./timers";
+export { timerCancel, timerCommand, timerList, timerStart };
 export const publicUrl = z
 	.string()
 	.url()
@@ -58,6 +60,10 @@ export const validators = {
 	research: researchInput,
 	lookup: lookupInput,
 	read: readInput,
+	timerStart,
+	timerList,
+	timerCancel,
+	timerCommand,
 };
 export type SchemaKey = keyof typeof validators;
 export type Owner = { rootRunId: string; taskId: string; cancelEpoch: number };

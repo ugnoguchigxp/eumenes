@@ -11,17 +11,33 @@ export {
 	WORLD_JOURNAL_FORMAT,
 	WorldJournalCorruptError,
 	CONTEXT_TOTAL_BYTES,
+	EXTRACT_CONFIRM_MS,
+	EXTRACT_INTERPRETATION_VERSION,
+	EXTRACT_STAGE_BUDGET_MS,
+	FOREGROUND_ACTIVE,
+	SKIP_REASONS,
+	SLOT_BUSY,
+	RUNTIME_REFUSALS,
+	WORLD_EXTRACT_KIND,
+	WORLD_EXTRACT_PURPOSE,
 	WORLD_BLOCK_CLOSE,
 	WORLD_BLOCK_OPEN,
 	allocateContextBudget,
 	appendWorldJournal,
 	createConversationSourceAdapter,
+	createForegroundHub,
 	createWorldContextBroker,
+	createWorldExtraction,
 	createWorldHostGate,
 	createWorldLifecycle,
+	createRuntimeObservation,
 	createWorldService,
 	defaultMemoryPort,
+	missingConditions,
+	runtimeOutcomeId,
 	deletionsFirst,
+	extractEventId,
+	extractionPayloadSchema,
 	externalIdOf,
 	isMemoryStateItem,
 	operationInputs,
@@ -33,13 +49,36 @@ export {
 	verifyWorldJournal,
 } from "./service";
 export type {
+	AssessedObservations,
+	LedgerVersion,
+	ObserveResult,
+	PredictionRef,
+	ReconcileReport,
+	RuntimeObservation,
+	RuntimeObservationOptions,
+	RuntimeRefusal,
 	ContextBroker,
 	ContextBrokerOptions,
 	ContextPrepareInput,
 	ContextPrepared,
 	ContextSettleInput,
 	ContextVerdict,
+	ExtractionHandler,
+	ExtractionInference,
+	ExtractionOptions,
+	ExtractionOutput,
+	ExtractionPayload,
+	ExtractionPoint,
+	ExtractionQueue,
+	ExtractionReport,
+	FeedStages,
+	ForegroundHub,
+	ForegroundSignal,
+	MemoryFeedStages,
+	PreparedExtraction,
 	PreparedWorldContext,
+	SourceFeedStages,
+	WorldExtraction,
 	ConsumeReport,
 	ConversationSourceAdapterOptions,
 	ForgetRefusal,
@@ -64,6 +103,18 @@ export {
 	hostStateMigration,
 } from "./repository";
 export { lifecycleMigration } from "./repository/lifecycle";
+export { guardMigration } from "./repository/guard";
+export { extractionMigration } from "./repository/extraction";
+export {
+	RUNTIME_OBSERVATION_STATES,
+	runtimeMigration,
+} from "./repository/runtime";
+export type {
+	RuntimeObservationRow,
+	RuntimeObservationState,
+} from "./repository/runtime";
+export { EXTRACT_EVENT_STATES } from "./repository/extraction";
+export type { ExtractEventState } from "./repository/extraction";
 export { getUsage as getWorldUsage, usageMigration } from "./repository/usage";
 export type { UsageRow as WorldUsageRow } from "./repository/usage";
 export type {
@@ -75,6 +126,7 @@ export type {
 export {
 	SOURCE_RANGE_REASON_CODES,
 	WORLD_FEEDS,
+	WORLD_RUNTIME_PURPOSE,
 	WORLD_HOST_REASON_CODES,
 	WORLD_PROVIDER_REF,
 } from "./contracts";
@@ -88,6 +140,10 @@ export type {
 	SourceContent,
 	SourceCurrent,
 	SourceKey,
+	RuntimeLedgerPort,
+	RuntimeMeasurement,
+	RuntimeSnapshot,
+	RuntimeVerification,
 	SourceRangeReasonCode,
 	SourceSpeaker,
 	WorldApplyRequest,

@@ -22,6 +22,7 @@ import type {
 	JobRecord,
 	QueueOptions,
 	SettleOutcome,
+	SettleResult,
 	Tx,
 } from "../types";
 import { type Registry, sync } from "./registry";
@@ -482,6 +483,10 @@ export function createRunner(
 			const current = store.read((db) => getJob(db, a.claim.jobId));
 			log.info("queue.settled", {
 				status: current?.state,
+				reason:
+					current?.errorCode && /^[a-z_]{1,80}$/.test(current.errorCode)
+						? current.errorCode
+						: undefined,
 				durationMs: Math.round(performance.now() - started),
 			});
 		} catch (error) {
@@ -516,7 +521,15 @@ export function createRunner(
 					return;
 				}
 				if (job.state !== "running") return;
-				applyOutcome(db, job, a.handler, a.input, pick(job, now), now, pendingHooks);
+				applyOutcome(
+					db,
+					job,
+					a.handler,
+					a.input,
+					pick(job, now),
+					now,
+					pendingHooks,
+				);
 			});
 		const pick = (job: JobRecord, now: number): SettleOutcome<unknown> => {
 			const late = job.deadlineAtMs !== null && now >= job.deadlineAtMs;
@@ -692,16 +705,15 @@ export function createRunner(
 			}
 			const now = opts.now();
 			await writeAndFlush((db) => {
-					for (const a of leftover) {
-						const job = getJob(db, a.claim.jobId);
-						if (
-							job &&
-							(job.state === "running" || job.state === "cancel_requested")
-						)
-							recoverRunning(db, job, "shutdown_timeout", now, false);
-					}
-				})
-				.catch(() => {});
+				for (const a of leftover) {
+					const job = getJob(db, a.claim.jobId);
+					if (
+						job &&
+						(job.state === "running" || job.state === "cancel_requested")
+					)
+						recoverRunning(db, job, "shutdown_timeout", now, false);
+				}
+			}).catch(() => {});
 		},
 		inUse(resource: string) {
 			return usage(resource);

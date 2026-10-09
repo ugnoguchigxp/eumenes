@@ -8,8 +8,14 @@ import {
 } from "../domains/web-research";
 import type { WebResearchService } from "../domains/web-research";
 import { createCapabilities } from "../domains/capabilities";
-import { createToolRuntime, type ToolAdapter } from "../domains/tool-runtime";
+import {
+	createToolRuntime,
+	type ActionAdapter,
+	type ToolAdapter,
+} from "../domains/tool-runtime";
 import { createAgentRuntime } from "../domains/agent-runtime";
+import { timerReceiptDigest as digest } from "../domains/timers";
+import { readActionOriginInTransaction } from "../domains/dialogue";
 import type { Clock } from "../domains/research-routes";
 import { createRouteWiring } from "./research-routes";
 export async function createToolchain(
@@ -17,9 +23,16 @@ export async function createToolchain(
 	queue: QueueService,
 	inference: InferencePort,
 	web: WebResearchService,
-	options: { researchRoutes?: boolean; routeClock?: Clock } = {},
+	options: {
+		researchRoutes?: boolean;
+		routeClock?: Clock;
+		timers?: import("../domains/timers").TimersService;
+	} = {},
 ) {
-	const capabilities = createCapabilities(store);
+	const capabilities = createCapabilities(
+		store,
+		options.timers ? new Set(["web", "timer"]) : new Set(["web"]),
+	);
 	await capabilities.seed();
 	// Peers are attached after construction: no constructor runs another service's operations.
 	const wiring =
@@ -112,6 +125,100 @@ export async function createToolchain(
 		cancelInTransaction: (db, id) =>
 			web.cancelInTransaction(db, id, "cancel_requested"),
 	};
+	const timerActions: ActionAdapter | undefined = options.timers
+		? {
+				contextInTransaction(db) {
+					return options.timers!.routeSnapshotInTransaction(db);
+				},
+				executeInTransaction(db, request) {
+					const timers = options.timers!;
+					agents.validateActionOwnerInTransaction(db, request.owner);
+					const [runId, epoch] = request.originToken.split(":");
+					if (
+						runId !== request.owner.rootRunId ||
+						Number(epoch) !== request.owner.cancelEpoch
+					)
+						throw new Error("origin_invalid");
+					const source = readActionOriginInTransaction(db, runId!);
+					if (!source || source.taskId !== request.owner.taskId)
+						throw new Error("origin_invalid");
+					const args = request.arguments as {
+						durationSeconds?: number;
+						label?: string;
+						timerId?: string;
+						state?: "active" | "elapsed" | "cancelled";
+						expectedRevision?: number;
+					};
+					const origin = {
+						scope: "default" as const,
+						conversationId: source.conversationId,
+						runId: request.owner.rootRunId,
+						messageId: source.messageId,
+						originKey: `${request.owner.rootRunId}:timer:0`,
+					};
+					const saved =
+						request.tool.id === "timer.start"
+							? timers.startInTransaction(
+									db,
+									{
+										requestId: request.requestId,
+										issuedAt: request.issuedAt,
+										durationSeconds: args.durationSeconds ?? 0,
+										...(args.label ? { label: args.label } : {}),
+									},
+									origin,
+								)
+							: request.tool.id === "timer.cancel"
+								? timers.cancelInTransaction(
+										db,
+										{
+											requestId: request.requestId,
+											issuedAt: request.issuedAt,
+											expectedRevision: args.expectedRevision ?? 0,
+										},
+										"default",
+										args.timerId ?? "",
+									)
+								: request.tool.id === "timer.list"
+									? timers.recordListOperationInTransaction(
+											db,
+											{
+												requestId: request.requestId,
+												issuedAt: request.issuedAt,
+												...(args.timerId ? { timerId: args.timerId } : {}),
+												...(args.state ? { state: args.state } : {}),
+											},
+											"default",
+										)
+									: (() => {
+											throw new Error("capability_unavailable");
+										})();
+					return {
+						kind: "local_action",
+						backend: "timer",
+						version: 1,
+						operationId: saved.receipt.operationId,
+						receiptDigest: digest(saved.receipt),
+						payload: saved.receipt,
+					};
+				},
+				readInTransaction(db, operationId) {
+					const row = options.timers!.readReceiptInTransaction(db, operationId);
+					if (!row) return null;
+					return {
+						kind: "local_action",
+						backend: "timer",
+						version: 1,
+						operationId: row.operationId,
+						receiptDigest: row.receiptDigest,
+						payload: options.timers!.projectReceiptInTransaction(
+							db,
+							operationId,
+						),
+					};
+				},
+			}
+		: undefined;
 	const tools = createToolRuntime(
 		store,
 		capabilities,
@@ -119,6 +226,7 @@ export async function createToolchain(
 		adapter,
 		Date.now,
 		wiring?.cachedSource,
+		timerActions,
 	);
 	const agents = createAgentRuntime({
 		store,

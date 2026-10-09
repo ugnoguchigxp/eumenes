@@ -47,6 +47,9 @@ export const voiceTurnSchema = z.object({
 		)
 		.optional(),
 	audioComplete: z.boolean().optional(),
+	/** P3-08: from the run (explicit): World was read, or World blocked the run. */
+	worldUsed: z.boolean().optional(),
+	worldBlocked: z.boolean().optional(),
 });
 export type VoiceTurn = z.infer<typeof voiceTurnSchema>;
 

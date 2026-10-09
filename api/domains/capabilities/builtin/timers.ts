@@ -1,7 +1,10 @@
 import { readFileSync } from "node:fs";
-import type { Definition } from "../../contracts";
+import type { Definition } from "../contracts";
 
-const skill = readFileSync(new URL("./timers/SKILL.md", import.meta.url), "utf8");
+const skill = readFileSync(
+	new URL("./timers/SKILL.md", import.meta.url),
+	"utf8",
+);
 const base = {
 	revision: 1,
 	aliases: [] as string[],

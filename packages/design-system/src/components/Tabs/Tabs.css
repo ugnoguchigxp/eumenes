@@ -1,0 +1,130 @@
+@layer components {
+	.ds-tabs-list {
+		display: flex;
+		align-items: stretch;
+		gap: var(--ui-tab-gap);
+		min-width: 0;
+		padding: 0;
+		overflow: hidden;
+		box-shadow: inset 0 -1px var(--border);
+		scrollbar-width: none;
+	}
+	.ds-tabs-list::-webkit-scrollbar {
+		display: none;
+	}
+	.ds-tabs-item {
+		display: inline-flex;
+		flex: 1 1 0;
+		min-width: 0;
+		max-width: 20rem;
+	}
+	.ds-tabs-trigger {
+		display: inline-flex;
+		flex: 1 1 auto;
+		align-items: center;
+		justify-content: center;
+		gap: var(--ui-gap-base);
+		min-width: 0;
+		min-height: max(var(--ui-tab-height), var(--ui-touch-target-min));
+		padding: var(--ui-component-padding-y) var(--ui-component-padding-x);
+		border: 0;
+		border-radius: 0;
+		color: var(--muted-foreground);
+		background: transparent;
+		font-size: var(--ui-font-size-base);
+		font-weight: 500;
+		line-height: 1.5;
+		white-space: nowrap;
+		cursor: pointer;
+		transition:
+			color 120ms,
+			background-color 120ms;
+	}
+	.ds-tabs-label {
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.ds-tabs-trigger:hover {
+		color: var(--foreground);
+		background: color-mix(in srgb, var(--muted) 40%, transparent);
+	}
+	.ds-tabs-trigger[data-state="active"] {
+		color: var(--primary);
+		background: color-mix(in srgb, var(--primary) 12%, var(--background));
+		font-weight: 700;
+		box-shadow: inset 0 -3px var(--primary);
+	}
+	.ds-tabs-close {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		flex: 0 0 auto;
+		align-self: center;
+		width: max(1.75rem, var(--ui-touch-target-min));
+		height: max(1.75rem, var(--ui-touch-target-min));
+		margin-inline-end: 0.25rem;
+		padding: 0;
+		border: 0;
+		border-radius: var(--radius-sm);
+		color: var(--muted-foreground);
+		background: transparent;
+		cursor: pointer;
+	}
+	.ds-tabs-close:hover {
+		color: var(--foreground);
+		background: var(--muted);
+	}
+	.ds-tabs-trigger:focus-visible,
+	.ds-tabs-close:focus-visible,
+	.ds-tabs-content:focus-visible {
+		outline: 2px solid var(--ring);
+		outline-offset: -2px;
+	}
+	.ds-tabs-trigger:disabled,
+	.ds-tabs-close:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+	.ds-tabs-list[data-variant="workspace"] {
+		gap: 0;
+		background: var(--card);
+	}
+	.ds-tabs-item[data-variant="workspace"] {
+		flex: 0 1 auto;
+		border: 1px solid transparent;
+		border-inline-end-color: var(--border);
+		border-bottom-color: var(--border);
+		border-radius: var(--radius) var(--radius) 0 0;
+	}
+	.ds-tabs-item[data-variant="workspace"]:has([data-state="active"]) {
+		border-color: var(--border);
+		border-bottom-color: var(--background);
+		background: var(--background);
+	}
+	.ds-tabs-item[data-variant="workspace"]
+		.ds-tabs-trigger[data-state="active"] {
+		color: var(--foreground);
+		background: transparent;
+		box-shadow: none;
+	}
+	.ds-tabs-item[data-variant="workspace"] .ds-tabs-trigger {
+		border-radius: var(--radius) var(--radius) 0 0;
+	}
+	.ds-tabs-content {
+		min-width: 0;
+		margin-top: var(--ui-gap-base);
+	}
+	.ds-tabs-list[aria-orientation="vertical"] {
+		flex-direction: column;
+		box-shadow: inset -1px 0 var(--border);
+	}
+	.ds-tabs-list[aria-orientation="vertical"] .ds-tabs-trigger {
+		flex: 1;
+		justify-content: flex-start;
+	}
+	.ds-tabs-list[aria-orientation="vertical"]
+		.ds-tabs-trigger[data-state="active"] {
+		box-shadow: inset -2px 0 var(--primary);
+	}
+}

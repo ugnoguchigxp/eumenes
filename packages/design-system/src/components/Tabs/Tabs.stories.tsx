@@ -112,3 +112,24 @@ export const WithDisabledTab: Story = {
 		</Tabs>
 	),
 };
+
+export const Workspace: Story = {
+	render: () => (
+		<Tabs defaultValue="showcase" className="w-[500px]">
+			<TabsList variant="workspace" aria-label="アーティファクトのタブ">
+				<TabsTrigger value="showcase" onClose={() => {}}>
+					UIショーケース
+				</TabsTrigger>
+				<TabsTrigger value="memo" onClose={() => {}}>
+					メモ
+				</TabsTrigger>
+			</TabsList>
+			<TabsContent value="showcase" className="p-2">
+				ワークスペースの表示内容
+			</TabsContent>
+			<TabsContent value="memo" className="p-2">
+				メモの表示内容
+			</TabsContent>
+		</Tabs>
+	),
+};

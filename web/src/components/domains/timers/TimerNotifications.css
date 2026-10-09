@@ -1,0 +1,52 @@
+.timer-notifications {
+	position: fixed;
+	z-index: 12;
+	right: 24px;
+	bottom: 24px;
+	display: grid;
+	gap: 12px;
+	width: min(360px, calc(100% - 32px));
+	max-height: calc(100dvh - 100px);
+	overflow: auto;
+}
+
+.timer-notification {
+	padding: 20px;
+	border: 1px solid var(--border);
+	border-radius: 16px;
+	color: var(--foreground);
+	background: var(--card);
+	box-shadow: 0 8px 32px color-mix(in srgb, var(--foreground) 12%, transparent);
+}
+
+.timer-notification-sender {
+	color: var(--primary);
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.timer-notification-message {
+	display: block;
+	margin: 8px 0 16px;
+	font-size: 15px;
+	line-height: 1.6;
+	overflow-wrap: anywhere;
+}
+
+.timer-notification-silent {
+	margin: -8px 0 12px;
+	color: var(--muted-foreground);
+	font-size: 12px;
+}
+
+.timer-notifications .timer-notification-dismiss {
+	height: 44px;
+	font-size: 13px;
+}
+
+@media (max-width: 700px) {
+	.timer-notifications {
+		right: 16px;
+		bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+	}
+}

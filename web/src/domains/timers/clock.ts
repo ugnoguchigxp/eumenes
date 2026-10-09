@@ -6,7 +6,11 @@ export type ClockSnapshot = {
 };
 
 /** Estimated server time from one snapshot. Display ticks must not call the API. */
-export function bindServerClock(serverNow: string, sentAt: number, receivedAt: number) {
+export function bindServerClock(
+	serverNow: string,
+	sentAt: number,
+	receivedAt: number,
+) {
 	const parsed = Date.parse(serverNow);
 	const baseServer = parsed + (receivedAt - sentAt) / 2;
 	return { baseServer, baseMono: receivedAt };

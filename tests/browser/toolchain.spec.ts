@@ -74,6 +74,13 @@ for (const [question, answer] of [
 		await expect(page.getByRole("textbox")).toHaveValue("");
 		const card = page.getByRole("complementary", { name: `調査: ${question}` });
 		await expect(card).toBeVisible({ timeout: 20000 });
+		await expect(page.locator(".message-user .research-card")).toHaveCount(0);
+		await expect(
+			page
+				.locator(".research-card.message-assistant")
+				.filter({ hasText: question! }),
+		).toHaveCount(1);
+		await expect(card.locator(".message-author")).toHaveText("Eumenes");
 		await expect(card).toContainText(answer!, { timeout: 20000 });
 		await expect(card.getByRole("link", { name: "一次資料" })).toHaveAttribute(
 			"href",

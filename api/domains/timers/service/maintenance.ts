@@ -25,37 +25,47 @@ export function maintenanceInTransaction(tx: Database, deps: TimerDeps) {
 		const scheduleState = schedule?.state ?? "missing";
 		if (scheduleState === "active" || scheduleState === "paused") continue;
 		const nextGeneration = current.dispatchGeneration + 1;
-		const enqueued = deps.queue.enqueueInTransaction(tx, {
-			scope: current.scope,
-			kind: TIMER_EXPIRE_KIND,
-			payloadVersion: 1,
-			dedupeKey: `timer:${current.id}:${current.cancelEpoch}:dispatch:${nextGeneration}`,
-			payload: {
-				timerId: current.id,
-				cancelEpoch: current.cancelEpoch,
-				dispatchGeneration: nextGeneration,
-			},
-			subjectRef: current.id,
-			lane: "background",
-			maxAttempts: 3,
-			deadlineAtMs: null,
-		});
-		if (
-			!attachExpiryJob(
-				tx,
-				current.id,
-				enqueued.job.id,
-				current.dispatchGeneration,
-				nextGeneration,
+		tx.exec("SAVEPOINT timer_redispatch");
+		try {
+			const enqueued = deps.queue.enqueueInTransaction(tx, {
+				scope: current.scope,
+				kind: TIMER_EXPIRE_KIND,
+				payloadVersion: 1,
+				dedupeKey: `timer:${current.id}:${current.cancelEpoch}:dispatch:${nextGeneration}`,
+				payload: {
+					timerId: current.id,
+					cancelEpoch: current.cancelEpoch,
+					dispatchGeneration: nextGeneration,
+				},
+				subjectRef: current.id,
+				lane: "background",
+				maxAttempts: 3,
+				deadlineAtMs: null,
+			});
+			if (
+				!attachExpiryJob(
+					tx,
+					current.id,
+					enqueued.job.id,
+					current.dispatchGeneration,
+					nextGeneration,
+				)
 			)
-		)
-			throw new Error("timer_unavailable");
-		deps.log.debug("timer.expiry_redispatched", {
-			timerId: current.id,
-			jobId: enqueued.job.id,
-			generation: nextGeneration,
-			status: "active",
-		});
+				throw new Error("timer_unavailable");
+			deps.log.debug("timer.expiry_redispatched", {
+				timerId: current.id,
+				jobId: enqueued.job.id,
+				generation: nextGeneration,
+				status: "active",
+			});
+			tx.exec("RELEASE timer_redispatch");
+		} catch (error) {
+			tx.exec("ROLLBACK TO timer_redispatch");
+			tx.exec("RELEASE timer_redispatch");
+			if (!(error instanceof Error) || error.message !== "queue_full")
+				throw error;
+			// Capacity delays this timer; it must not block lease recovery or retention.
+		}
 	}
 	releaseExpiredClaims(tx, deps);
 	const protectedIds = deps.protectedIds?.(tx) ?? [];

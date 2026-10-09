@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite";
 import { z } from "zod";
 import type { SourceMetadata } from "../../tool-runtime";
-import type { Owner } from "../../capabilities";
+import { timerCommand, type Owner } from "../../capabilities/contracts";
 export const reportSchema = z
 	.object({
 		summary: z.string().min(1).max(2000),
@@ -49,6 +49,12 @@ export const routeSchema = z.discriminatedUnion("action", [
 			terms: z.array(z.string().min(1).max(80)).min(1).max(8),
 		})
 		.strict(),
+	z
+		.object({
+			action: z.literal("timer"),
+			command: timerCommand,
+		})
+		.strict(),
 ]);
 export const selectSchema = z.discriminatedUnion("action", [
 	z
@@ -77,7 +83,9 @@ export const workerSchema = z.discriminatedUnion("action", [
 	z
 		.object({
 			action: z.literal("invoke"),
-			executionRef: z.string().uuid(),
+			// The model uses the current tool's short name. Legacy opaque grants
+			// remain accepted, but only the runtime can resolve either form.
+			executionRef: z.string().min(1).max(128),
 			arguments: z.unknown(),
 		})
 		.strict(),
@@ -180,6 +188,9 @@ export type AnswerTicket = {
 	projectionDigest?: string | null;
 	/** Binding token of the child that produced the report (cached-authority recheck at adoption). */
 	acquisitionBindingToken?: string | null;
+	/** Saved timer receipt, when this answer is an action rather than research. */
+	actionPayload?: string | null;
+	actionFailure?: boolean;
 };
 
 // ---------- generic acquisition plan port (owned here; implemented by application) ----------

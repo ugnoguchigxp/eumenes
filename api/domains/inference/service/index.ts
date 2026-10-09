@@ -13,6 +13,7 @@ import type {
 	Messages,
 	Receipt,
 	SpeechOverride,
+	BackgroundControl,
 } from "../contracts";
 import { get, type RequestRow } from "../repository";
 import {
@@ -64,6 +65,8 @@ export function createInference(
 			})
 		: () => {};
 	const listeners = new Set<() => void>();
+	/** Told when a request starts or ends running (see foregroundBusy). */
+	const activityListeners = new Set<() => void>();
 	const statusSubscriptions = new Map<string, () => void>();
 	const active = new Map<string, Running>();
 	const cooldown = new Map<string, number>();
@@ -121,6 +124,8 @@ export function createInference(
 	function allowed(db: Database, row: RequestRow, connection?: Connection) {
 		return (
 			get(db, row.id)?.status === "pending" &&
+			(!row.subject.startsWith("background:") ||
+				settings.inTransaction(db).revision === row.snapshot.revision) &&
 			row.deadline > Date.now() &&
 			settings.valid(db, row.snapshot, row.purpose, connection) &&
 			row.parents.every((id) =>
@@ -163,6 +168,15 @@ export function createInference(
 		allowed,
 		prune,
 		isClosed: () => closed,
+		touch: () => {
+			for (const listener of activityListeners) {
+				try {
+					listener();
+				} catch {
+					// a listener never disturbs a request
+				}
+			}
+		},
 	};
 	const executeRequest = (
 		requestId: string,
@@ -242,6 +256,8 @@ export function createInference(
 		if (
 			!row ||
 			row.status !== "accepted" ||
+			(row.subject.startsWith("background:") &&
+				settings.inTransaction(db).revision !== row.snapshot.revision) ||
 			!row.parents.every((parent) =>
 				row.purpose === "tts" ? usable(db, parent) : valid(db, parent),
 			)
@@ -291,6 +307,66 @@ export function createInference(
 	}
 
 	const service = {
+		countControlTokens(messages: Messages) {
+			const count = options.countControlTokens?.(messages) ?? null;
+			return count !== null && Number.isSafeInteger(count) && count >= 0
+				? count
+				: null;
+		},
+		captureBackgroundControlInTransaction(
+			db: Database,
+			input: BackgroundControl,
+		) {
+			if (
+				![input.taskId, input.decisionId].every((v) =>
+					/^[a-zA-Z0-9_.:-]{1,160}$/.test(v),
+				) ||
+				![
+					input.authorityEpoch,
+					input.executionGeneration,
+					input.maxOutputTokens,
+				].every((v) => Number.isSafeInteger(v) && v > 0) ||
+				!Number.isSafeInteger(input.deadline) ||
+				!Number.isSafeInteger(input.taskDeadline) ||
+				input.deadline <= Date.now() ||
+				input.deadline > input.taskDeadline ||
+				input.deadline > Date.now() + 30_000 ||
+				input.maxOutputTokens > 1500
+			)
+				throw new Error("invalid_background_control");
+			const binding = JSON.stringify([
+				input.taskId,
+				input.decisionId,
+				input.authorityEpoch,
+				input.executionGeneration,
+				input.deadline,
+				input.taskDeadline,
+				input.maxOutputTokens,
+			]);
+			const subject = `background:${input.taskId}:${input.decisionId}`;
+			const old = db
+				.query(
+					"SELECT r.id,b.binding FROM inference_requests r LEFT JOIN inference_background_controls b ON b.request_id=r.id WHERE r.subject=? AND r.purpose='llm'",
+				)
+				.get(subject) as { id: string; binding: string | null } | null;
+			if (old) {
+				if (old.binding !== binding)
+					throw new Error("background_control_conflict");
+				return old.id;
+			}
+			const snapshot = structuredClone(settings.inTransaction(db));
+			snapshot.routes.llm.mode = "larm-only";
+			snapshot.routes.llm.cloudAllowed = false;
+			const requestId = capture(db, subject, "llm", input.deadline, snapshot);
+			db.query(
+				"UPDATE inference_requests SET mode='control',output_limit=?,context_policy='exact',parents='[]' WHERE id=?",
+			).run(input.maxOutputTokens, requestId);
+			db.query("INSERT INTO inference_background_controls VALUES(?,?)").run(
+				requestId,
+				binding,
+			);
+			return requestId;
+		},
 		captureControlInTransaction(
 			db: Database,
 			input: {
@@ -514,6 +590,31 @@ export function createInference(
 			listeners.add(listener);
 			return () => {
 				listeners.delete(listener);
+			};
+		},
+		/**
+		 * True while a request that serves the user right now is running:
+		 * conversation answers, ASR and TTS. Background work (World extraction,
+		 * background controls) and probes never count. Read-only, in memory.
+		 */
+		foregroundBusy(): boolean {
+			for (const a of active.values()) {
+				const subject = a.row.subject;
+				if (
+					subject.startsWith("world-extract:") ||
+					subject.startsWith("background:") ||
+					subject.startsWith("probe:")
+				)
+					continue;
+				return true;
+			}
+			return false;
+		},
+		/** Told after a request started or ended running. Returns the unsubscribe function. */
+		onActivity(listener: () => void) {
+			activityListeners.add(listener);
+			return () => {
+				activityListeners.delete(listener);
 			};
 		},
 		inspect: () =>

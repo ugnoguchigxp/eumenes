@@ -520,6 +520,49 @@ async function main() {
 			);
 		throw new Error(usage);
 	}
+	if (command === "timer") {
+		const sub = positional.shift();
+		const issuedAt = new Date().toISOString();
+		if (!sub || sub === "list") return show(await client.timers());
+		if (sub === "show") {
+			const id = positional[0];
+			if (!id) throw new Error("usage: timer show <id>");
+			return show(await client.timer(id));
+		}
+		if (!explicitRequestId)
+			throw new Error("timer start and cancel require --request-id <UUID>");
+		if (sub === "start") {
+			const durationSeconds = Number(positional[0]);
+			if (!Number.isInteger(durationSeconds))
+				throw new Error("usage: timer start <seconds> --request-id <UUID>");
+			return show(
+				await client.startTimer({
+					requestId: explicitRequestId,
+					issuedAt,
+					durationSeconds,
+					label: positional[1],
+				}),
+			);
+		}
+		if (sub === "cancel") {
+			const id = positional[0];
+			const expectedRevision = Number(positional[1]);
+			if (!id || !Number.isInteger(expectedRevision))
+				throw new Error(
+					"usage: timer cancel <id> <revision> --request-id <UUID>",
+				);
+			return show(
+				await client.cancelTimer(id, {
+					requestId: explicitRequestId,
+					issuedAt,
+					expectedRevision,
+				}),
+			);
+		}
+		throw new Error(
+			"usage: timer start <seconds> | list | show <id> | cancel <id> <revision>",
+		);
+	}
 	if (command === "memory") {
 		const sub = positional.shift();
 		if (!sub || sub === "list") return show(await client.memoryItems(false));

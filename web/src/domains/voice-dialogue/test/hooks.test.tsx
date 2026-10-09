@@ -11,7 +11,203 @@ import {
 } from "../../audio";
 import { useVoiceDialogue } from "..";
 
-test("speech interruption prevents a fetched old answer from starting playback", async () => {
+for (const recognized of [false, true])
+	test(`replacement cancels the accepted answer only after confirmed speech: ${recognized}`, async () => {
+		const query = new QueryClient({
+			defaultOptions: { queries: { retry: false } },
+		});
+		const wrapper = ({ children }: PropsWithChildren) => (
+			<QueryClientProvider client={query}>{children}</QueryClientProvider>
+		);
+		let sessionId = "",
+			segment = (_wav: Uint8Array) => {},
+			speech = () => {};
+		const ids: string[] = [];
+		const states = new Map<string, { status: string; text: string | null }>();
+		const voiceCancel = vi.fn(async () => ({})),
+			play = vi.fn(async () => {});
+		const client = {
+			identity: "replacement-test",
+			voiceStart: async (id: string) => {
+				sessionId = id;
+			},
+			voiceStop: async () => ({}),
+			voiceSend: async (
+				_session: string,
+				_generation: number,
+				_sequence: number,
+				id: string,
+			) => {
+				ids.push(id);
+				states.set(
+					id,
+					ids.length === 1
+						? { status: "responding", text: "受け付けた依頼" }
+						: { status: "recognizing", text: null },
+				);
+				return { utteranceId: id };
+			},
+			voiceTurn: async (id: string) => ({
+				utteranceId: id,
+				sessionId,
+				generation: 1,
+				sequence: ids.indexOf(id) + 1,
+				...states.get(id),
+				runId: "run",
+				error: null,
+				revision: 1,
+			}),
+			voiceAudio: async () => new Uint8Array(44),
+			voicePlayed: async () => ({}),
+			voiceCancel,
+		} as unknown as VoiceDialogueClient;
+		const createAudio: CreateAudio = (_state, onSpeech, onSegment) => {
+			speech = onSpeech;
+			segment = onSegment;
+			return {
+				start: async () => {},
+				stop: async () => {},
+				stopPlayback: () => {},
+				play,
+			};
+		};
+		const hook = renderHook(
+			() => useVoiceDialogue(client, createAudioStore(), createAudio),
+			{ wrapper },
+		);
+		try {
+			await act(async () => hook.result.current.start());
+			act(() => segment(new Uint8Array(44)));
+			await waitFor(() =>
+				expect(hook.result.current.turn?.text).toBe("受け付けた依頼"),
+			);
+			act(() => {
+				speech();
+				segment(new Uint8Array(44));
+			});
+			await waitFor(() =>
+				expect(hook.result.current.turn?.status).toBe("recognizing"),
+			);
+			expect(voiceCancel).not.toHaveBeenCalled();
+			states.set(
+				ids[1]!,
+				recognized
+					? { status: "responding", text: "新しい依頼" }
+					: { status: "completed", text: "" },
+			);
+			await act(async () => {
+				await query.invalidateQueries();
+			});
+			if (recognized) {
+				await waitFor(() => expect(voiceCancel).toHaveBeenCalledWith(ids[0]));
+				expect(voiceCancel).toHaveBeenCalledTimes(1);
+			} else {
+				await waitFor(() =>
+					expect(hook.result.current.turn?.utteranceId).toBe(ids[0]),
+				);
+				expect(voiceCancel).not.toHaveBeenCalled();
+				states.set(ids[0]!, { status: "ready", text: "受け付けた依頼" });
+				await act(async () => {
+					await query.invalidateQueries();
+				});
+				await waitFor(() => expect(play).toHaveBeenCalledTimes(1));
+			}
+		} finally {
+			hook.unmount();
+			query.clear();
+		}
+	});
+
+test("microphone pause preserves pending generation and playback, and resumes the same session", async () => {
+	const query = new QueryClient({
+		defaultOptions: { queries: { retry: false } },
+	});
+	const wrapper = ({ children }: PropsWithChildren) => (
+		<QueryClientProvider client={query}>{children}</QueryClientProvider>
+	);
+	let sessionId = "",
+		id = "",
+		ready = false,
+		segment = (_wav: Uint8Array) => {};
+	const voiceStart = vi.fn(async (session: string) => {
+			sessionId = session;
+		}),
+		voiceStop = vi.fn(async () => ({})),
+		voiceCancel = vi.fn(async () => ({})),
+		voiceSend = vi.fn(
+			async (_s: string, _g: number, _sequence: number, utterance: string) => {
+				id = utterance;
+				return { utteranceId: id };
+			},
+		);
+	const start = vi.fn(async () => {}),
+		pauseInput = vi.fn(() => {}),
+		play = vi.fn(async () => {});
+	const client = {
+		identity: "pause-test",
+		voiceStart,
+		voiceStop,
+		voiceSend,
+		voiceCancel,
+		voiceTurn: async () => ({
+			utteranceId: id,
+			sessionId,
+			generation: 1,
+			sequence: 1,
+			status: ready ? "ready" : "responding",
+			text: "質問",
+			runId: "run",
+			error: null,
+			revision: 1,
+		}),
+		voiceAudio: async () => new Uint8Array(44),
+		voicePlayed: async () => ({}),
+	} as unknown as VoiceDialogueClient;
+	const createAudio: CreateAudio = (_state, _speech, onSegment) => {
+		segment = onSegment;
+		return {
+			start,
+			pauseInput,
+			stop: async () => {},
+			stopPlayback: () => {},
+			play,
+		};
+	};
+	const hook = renderHook(
+		() => useVoiceDialogue(client, createAudioStore(), createAudio),
+		{ wrapper },
+	);
+	try {
+		await act(async () => hook.result.current.start());
+		act(() => segment(new Uint8Array(44)));
+		await waitFor(() =>
+			expect(hook.result.current.turn?.status).toBe("responding"),
+		);
+		act(() => hook.result.current.pause());
+		expect(hook.result.current.active).toBe(false);
+		expect(pauseInput).toHaveBeenCalledTimes(1);
+		expect(voiceStop).not.toHaveBeenCalled();
+		expect(voiceCancel).not.toHaveBeenCalled();
+		act(() => segment(new Uint8Array(44)));
+		expect(voiceSend).toHaveBeenCalledTimes(1);
+		ready = true;
+		await act(async () => {
+			await query.invalidateQueries();
+		});
+		await waitFor(() => expect(play).toHaveBeenCalledTimes(1));
+		await act(async () => hook.result.current.start());
+		expect(start).toHaveBeenCalledTimes(2);
+		expect(voiceStart).toHaveBeenCalledTimes(1);
+		act(() => segment(new Uint8Array(44)));
+		await waitFor(() => expect(voiceSend).toHaveBeenCalledTimes(2));
+		expect(voiceSend.mock.calls[1]?.[2]).toBe(2);
+	} finally {
+		hook.unmount();
+		query.clear();
+	}
+});
+
+test("an unrecognized energy candidate preserves playback of an accepted answer", async () => {
 	const query = new QueryClient({
 		defaultOptions: { queries: { retry: false } },
 	});
@@ -87,7 +283,7 @@ test("speech interruption prevents a fetched old answer from starting playback",
 		resolveAudio?.(new Uint8Array(44));
 		await Promise.resolve();
 	});
-	expect(play).not.toHaveBeenCalled();
+	expect(play).toHaveBeenCalledTimes(1);
 	hook.unmount();
 	query.clear();
 });

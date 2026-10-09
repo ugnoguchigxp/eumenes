@@ -31,7 +31,9 @@ export function timersClient(transport: Transport) {
 			for (const [key, value] of Object.entries(query))
 				if (value !== undefined) params.set(key, String(value));
 			return timerListResponseSchema.parse(
-				await (await transport.call(`/api/timers?${params}`, { signal })).json(),
+				await (
+					await transport.call(`/api/timers?${params}`, { signal })
+				).json(),
 			);
 		},
 		timer: async (id: string, signal?: AbortSignal) =>
@@ -75,7 +77,11 @@ export function timersClient(transport: Transport) {
 		},
 		claimTimerNotification: async (
 			id: string,
-			input: { clientId: string; claimRequestId: string; expectedRevision: number },
+			input: {
+				clientId: string;
+				claimRequestId: string;
+				expectedRevision: number;
+			},
 		) =>
 			timerClaimResponseSchema.parse(
 				await (

@@ -114,6 +114,23 @@ export function acquisitionError(error: unknown): string {
 		return error.message;
 	return "web_acquisition_failed";
 }
+const guardReasons = new Set([
+	"PATTERN_DETECTED",
+	"SEGMENT_COUNT_LIMIT",
+	"CHARACTER_BUDGET_LIMIT",
+	"SEGMENT_TEXT_LIMIT",
+	"SEGMENT_COLLECTION_LIMIT",
+	"INSPECTION_INCOMPLETE",
+	"ADDITIONAL_GUARD_RESTRICTION",
+]);
+/** Only library-defined codes are safe diagnostics; never copy findings or error text. */
+export function acquisitionRejectionReasons(error: unknown): string[] {
+	return error instanceof LlmFetchError
+		? [...new Set(error.guardReasonCodes ?? [])]
+				.filter((code) => guardReasons.has(code))
+				.slice(0, 7)
+		: [];
+}
 
 export function createWebAcquisition(
 	options: {
@@ -155,6 +172,9 @@ export function createWebAcquisition(
 		let timing = { requestedAtMs: now(), receivedAtMs: now() };
 		const client = createLlmFetch({
 			cache: { enabled: false },
+			// Scan ordinary pages with hundreds of metadata/attribute segments in
+			// full; preserve denial when inspection is incomplete or finds an attack.
+			contextGuard: { maxSegments: 4096, maxCharacters: 2_000_000 },
 			readTimeoutMs: 15000,
 			fetcher: async (target, input) => {
 				const requestedAtMs = now();
@@ -190,6 +210,7 @@ export function createWebAcquisition(
 			)
 				throw new LlmFetchError("GUARD_DENIED", "Guard refused", {
 					guardDecision: doc.security.decision,
+					guardReasonCodes: doc.security.reasonCodes,
 				});
 			const requested = new URL(url),
 				final = new URL(doc.finalUrl);

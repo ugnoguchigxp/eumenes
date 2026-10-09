@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { LlmFetchError } from "llm-fetch";
 import { registerExternalDependents } from "eumenes-memory/sqlite";
 import { openStore } from "../../../infrastructure/sqlite";
+import { configureLogging } from "../../../infrastructure/logger";
 import { createQueue, migration as queueMigration } from "../../queue";
 import {
 	createWebResearch,
@@ -297,13 +298,27 @@ test("main settle failure never exposes a result or writes the cache", async () 
 });
 
 test("guard refusal is a finite error, never stored as provider text or retried", async () => {
+	const lines: string[] = [];
+	configureLogging({
+		level: "info",
+		destination: {
+			write: (line) => {
+				lines.push(line);
+			},
+		},
+	});
+	cleanup.unshift(async () => configureLogging({ level: "silent" }));
 	let calls = 0;
 	const { service, queue, store, cache } = setup({
 		async execute() {
 			calls++;
 			throw new LlmFetchError("GUARD_DENIED", "secret upstream content", {
 				guardDecision: "require_approval",
-				guardReasonCodes: ["INSPECTION_INCOMPLETE"],
+				guardReasonCodes: [
+					"INSPECTION_INCOMPLETE",
+					"SEGMENT_COUNT_LIMIT",
+					"secret guard finding" as never,
+				],
 			});
 		},
 		async close() {},
@@ -311,6 +326,22 @@ test("guard refusal is a finite error, never stored as provider text or retried"
 	const run = await service.submit(read());
 	await until(() => service.get(run.id)?.status === "failed", queue.tick);
 	expect(service.get(run.id)?.errorCode).toBe("web_guard_requires_approval");
+	await Bun.sleep(0);
+	expect(
+		lines
+			.map((line) => JSON.parse(line))
+			.filter((row) => row.event === "web.acquisition_rejected")
+			.map((row) => ({
+				runId: row.runId,
+				jobId: row.jobId,
+				reason: row.reason,
+			})),
+	).toEqual([
+		{ runId: run.id, jobId: run.jobId, reason: "SEGMENT_COUNT_LIMIT" },
+		{ runId: run.id, jobId: run.jobId, reason: "INSPECTION_INCOMPLETE" },
+	]);
+	expect(lines.join("")).not.toContain("secret guard finding");
+	expect(lines.join("")).not.toContain("secret upstream content");
 	expect(
 		JSON.stringify(
 			store.read((db) => db.query("SELECT * FROM web_research_runs").all()),

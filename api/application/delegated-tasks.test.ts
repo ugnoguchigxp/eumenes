@@ -33,8 +33,10 @@ function setup(
 		stopConfirmed?: boolean;
 		stopResult?: unknown;
 		dispatchGate?: Promise<void>;
+		backlogBatches?: number;
 		queueLimit?: number;
 		scheduleLimit?: number;
+		prepareResult?: () => unknown;
 	} = {},
 ) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-delegated-")),
@@ -69,6 +71,7 @@ function setup(
 	let release = () => {};
 	const execution: TaskExecutionPort = {
 		available: () => options.executionReady !== false,
+		prepareInTransaction: () => options.prepareResult?.(),
 		async dispatch(_task, context) {
 			calls.dispatch++;
 			calls.dispatchSignals.push(context.signal);
@@ -82,6 +85,7 @@ function setup(
 				await new Promise<void>((r) => {
 					release = r;
 				});
+			return { hasMore: calls.observe <= (options.backlogBatches ?? 0) };
 		},
 		async stop(_task, context) {
 			calls.stop++;
@@ -711,4 +715,41 @@ test("late observation after cancellation cannot revive the task or alter its bu
 	h.release();
 	await until(() => jobs(h, "tasks.observe.v1")[0]?.state === "cancelled");
 	expect(h.tasks.get(r.taskId).task.revision).toBe(revision);
+});
+
+test("observation backlog schedules the next bounded batch without waiting for the next minute", async () => {
+	const h = setup({ backlogBatches: 2 });
+	const r = await h.tasks.create(input());
+	await h.queue.tick();
+	await until(() => jobs(h, "tasks.dispatch.v1")[0]?.state === "completed");
+	h.clock.t += 60_000;
+	await h.scheduler.tick();
+	for (let count = 0; count < 3; count++) {
+		await h.queue.tick();
+		await until(
+			() =>
+				jobs(h, "tasks.observe.v1").filter((j) => j.state === "completed")
+					.length >=
+				count + 1,
+		);
+	}
+	expect(h.calls.observe).toBe(3);
+	expect(jobs(h, "tasks.observe.v1")).toHaveLength(3);
+	expect(h.tasks.get(r.taskId).task.state).toBe("active");
+});
+
+test("async execution preparation rolls back the task, dispatch job and monitor together", async () => {
+	const h = setup({
+		prepareResult: async () => {
+			await Promise.resolve();
+			throw new Error("late preparation failure");
+		},
+	});
+	await expect(h.tasks.create(input())).rejects.toThrow(
+		"task_async_preparation_forbidden",
+	);
+	await Bun.sleep(0);
+	expect(h.tasks.list().items).toHaveLength(0);
+	expect(h.queue.list().items).toHaveLength(0);
+	expect(h.scheduler.list().items).toHaveLength(0);
 });

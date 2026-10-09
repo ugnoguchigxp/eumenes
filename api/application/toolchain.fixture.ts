@@ -16,6 +16,8 @@ import {
 import { createDialogueService } from "../domains/dialogue";
 import { createVoiceDialogue } from "../domains/voice-dialogue";
 import { createToolchain } from "./toolchain";
+import { createTimers } from "../domains/timers";
+import { createTimerAnnouncements } from "./timer-announcements";
 import { createApp } from "./app";
 import type { LarmPort } from "../domains/larm";
 export const forbidden =
@@ -26,11 +28,23 @@ export async function harness(
 	options: {
 		gate?: Promise<void>;
 		answerGate?: Promise<void>;
+		routeGate?: Promise<void>;
+		routeGateQuestion?: string;
 		badJson?: boolean;
+		workerOutput?: string;
+		workerReportOutput?: string;
+		lookupTimeoutOnce?: boolean;
+		voiceText?: string;
+		failureAnswer?: string;
 		badQuote?: boolean;
 		badQuoteOnce?: boolean;
 		badToolArgs?: boolean;
+		badExecutionRefOnce?: boolean;
 		clarify?: boolean;
+		timers?: boolean;
+		timerNow?: () => number;
+		/** Model returns a timer command with a forbidden extra field. */
+		timerExtra?: boolean;
 		queueLimits?: { total: number; background: number; scope: number };
 	} = {},
 ) {
@@ -43,16 +57,24 @@ export async function harness(
 		}),
 		settings = await createSettings(store, { dbPath: join(dir, "db") });
 	const parentContexts: string[] = [],
-		workerContexts: string[] = [];
+		workerContexts: string[] = [],
+		routeContexts: string[] = [];
+	const spoken: string[] = [];
 	let calls = 0,
 		acquisitions = 0;
 	let quoteRejected = false;
 	const model: LarmPort = {
-		status: () => ({ state: "ready", capabilities: ["llm"] }),
+		status: () => ({ state: "ready", capabilities: ["llm", "asr", "tts"] }),
 		connect: async () => {},
 		close: async () => {},
-		transcribe: async () => "",
-		speak: async () => new Uint8Array(),
+		transcribe: async () => options.voiceText ?? "fixture speech",
+		speak: async (text) => {
+			spoken.push(text);
+			const wav = new Uint8Array(48);
+			wav.set(new TextEncoder().encode("RIFF"));
+			wav.set(new TextEncoder().encode("WAVE"), 8);
+			return wav;
+		},
 		answer: async (messages) => {
 			calls++;
 			const system = messages[0]!.content;
@@ -66,6 +88,7 @@ export async function harness(
 				: {};
 			if (system.includes("TOOLS=")) {
 				workerContexts.push(JSON.stringify(messages));
+				if (options.workerOutput !== undefined) return options.workerOutput;
 				if (options.badJson) return "```json\n{}\n```";
 				const tools = JSON.parse(
 					system.split("TOOLS=")[1]!.split("\nOUTPUT_SCHEMA=")[0]!,
@@ -78,6 +101,8 @@ export async function harness(
 				}[];
 				const page = obs.find((s) => s.basis === "page");
 				if (page) {
+					if (options.workerReportOutput !== undefined)
+						return options.workerReportOutput;
 					const quote = page.body.split("\n")[0]!;
 					const forged =
 						options.badQuote || (options.badQuoteOnce && !quoteRejected);
@@ -104,9 +129,11 @@ export async function harness(
 				const hit = obs[0];
 				return JSON.stringify({
 					action: "invoke",
-					executionRef: tools.find(
-						(t) => t.id === (hit ? "web.read" : "web.lookup"),
-					)!.executionRef,
+					executionRef:
+						options.badExecutionRefOnce && data.budget.modelCallsUsed === 1
+							? "00000000-0000-4000-8000-000000000000"
+							: tools.find((t) => t.id === (hit ? "web.read" : "web.lookup"))!
+									.executionRef,
 					arguments:
 						options.badToolArgs && data.budget.modelCallsUsed === 1
 							? { unexpected: "bad" }
@@ -116,6 +143,15 @@ export async function harness(
 				});
 			}
 			if (system.includes("OUTPUT_SCHEMA=")) {
+				if (!data.candidates) {
+					routeContexts.push(JSON.stringify(messages));
+					if (
+						options.routeGate &&
+						(!options.routeGateQuestion ||
+							data.task.question.includes(options.routeGateQuestion))
+					)
+						await options.routeGate;
+				}
 				if (data.candidates) {
 					const card =
 						data.candidates.find(
@@ -134,6 +170,45 @@ export async function harness(
 						action: "clarify",
 						question: "どの地域の天気を調べますか？",
 					});
+				if (options.timers && /タイマー/.test(data.task.question)) {
+					if (/確認|残り/.test(data.task.question))
+						return JSON.stringify({
+							action: "timer",
+							command: { operation: "list" },
+						});
+					if (/取消|止め/.test(data.task.question)) {
+						const targets =
+							data.timers?.items?.filter(
+								(item: { state: string }) => item.state === "active",
+							) ?? [];
+						return JSON.stringify(
+							targets.length === 1
+								? {
+										action: "timer",
+										command: {
+											operation: "cancel",
+											timerId: targets[0].id,
+											expectedRevision: targets[0].revision,
+										},
+									}
+								: { action: "clarify", question: "どのタイマーを止めますか？" },
+						);
+					}
+					const secondsOnly = /^(\d+)秒/.exec(data.task.question);
+					const durationSeconds = secondsOnly
+						? Number(secondsOnly[1])
+						: /1時間/.test(data.task.question)
+							? 3600
+							: /3分30秒/.test(data.task.question)
+								? 210
+								: 180;
+					return JSON.stringify({
+						action: "timer",
+						command: options.timerExtra
+							? { operation: "start", durationSeconds, scope: "other" }
+							: { operation: "start", durationSeconds },
+					});
+				}
 				return JSON.stringify(
 					/天気|株価|weather|stock|調べ/.test(data.task.question)
 						? {
@@ -152,7 +227,11 @@ export async function harness(
 			if (messages.some((m) => m.content.includes('"clarification":')))
 				return "どの地域の天気を調べますか？";
 			if (messages.some((m) => m.content.includes('"failure":')))
-				return "AAPLは999.99米ドル、明日は99度です。";
+				return options.failureAnswer ?? "調査結果を確認できませんでした。";
+			const action = messages.find((m) =>
+				m.content.startsWith('{"actionResult":'),
+			);
+			if (action) return JSON.parse(action.content).actionResult;
 			return messages.some((m) => m.content.includes("250.12"))
 				? "AAPLは250.12米ドルでございます。"
 				: messages.some((m) => m.content.includes("26度"))
@@ -172,6 +251,8 @@ export async function harness(
 		close: async () => {},
 		execute: async (req, signal) => {
 			acquisitions++;
+			if (options.lookupTimeoutOnce && acquisitions === 1)
+				throw new Error("web_timeout");
 			if (options.gate) await options.gate;
 			signal.throwIfAborted();
 			const observedAt = new Date().toISOString();
@@ -230,7 +311,21 @@ export async function harness(
 		},
 	};
 	const web = createWebResearch({ store, queue, acquisition });
-	const toolchain = await createToolchain(store, queue, inference, web);
+	const scheduler = createScheduler(store, queue, { now: options.timerNow });
+	const timers = options.timers
+		? createTimers(
+				store,
+				{ scheduler, queue },
+				{
+					now: options.timerNow,
+					publish: () => changes.publish(),
+					onElapsedInTransaction: createTimerAnnouncements(conversation),
+				},
+			)
+		: undefined;
+	const toolchain = await createToolchain(store, queue, inference, web, {
+		timers,
+	});
 	const dialogue = createDialogueService({
 		store,
 		conversation,
@@ -239,8 +334,7 @@ export async function harness(
 		agents: toolchain.agents,
 		postAnswer: toolchain.postAnswer,
 	});
-	const voice = createVoiceDialogue(store, dialogue, inference),
-		scheduler = createScheduler(store, queue);
+	const voice = createVoiceDialogue(store, dialogue, inference);
 	const app = createApp({
 		token: "fixture-token-for-toolchain-browser",
 		origin: process.env.EUMENES_ORIGIN ?? "http://localhost",
@@ -253,6 +347,7 @@ export async function harness(
 		queue,
 		scheduler,
 		inference,
+		timers,
 		...toolchain,
 	});
 	toolchain.agents.start();
@@ -272,10 +367,16 @@ export async function harness(
 		store,
 		dialogue,
 		toolchain,
+		timers,
+		scheduler,
 		queue,
 		request,
 		parentContexts,
+		voice,
+		settings,
+		spoken,
 		workerContexts,
+		routeContexts,
 		get acquisitions() {
 			return acquisitions;
 		},
@@ -286,6 +387,7 @@ export async function harness(
 			unsubscribeChanges();
 			changes.close();
 			await toolchain.agents.close();
+			await scheduler.close();
 			await queue.close(100);
 			await web.close();
 			await dialogue.close();

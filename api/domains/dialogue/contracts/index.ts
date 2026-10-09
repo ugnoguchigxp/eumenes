@@ -30,6 +30,13 @@ export const runSchema = z.object({
 	sourceKind: z.enum(["manual", "voice", "schedule"]),
 	scheduleId: z.string().nullable(),
 	occurrenceId: z.string().nullable(),
+	/**
+	 * P3-08: World was read for this run, or World refused (`worldBlocked`).
+	 * Explicit and sticky: a World-using run never streams or speaks its body
+	 * before adoption, and a blocked run is a failure, never "World not used".
+	 */
+	worldUsed: z.boolean().optional(),
+	worldBlocked: z.boolean().optional(),
 	createdAt: z.string(),
 	updatedAt: z.string(),
 });
@@ -37,7 +44,12 @@ export type Run = z.infer<typeof runSchema>;
 export const progressSchema = z.object({
 	runId: z.string(),
 	status: runSchema.shape.status,
+	/** Empty while a World-using run is unadopted; the complete adopted body once. */
 	text: z.string().max(65_536),
+	worldUsed: z.boolean().optional(),
+	worldBlocked: z.boolean().optional(),
+	/** Machine-readable end reason of a failed run (never body text). */
+	error: z.string().nullable().optional(),
 });
 export type RunProgress = z.infer<typeof progressSchema>;
 export const promptTargetSchema = z.object({
@@ -85,7 +97,10 @@ export type WorldContextPrepared =
 	/** The run ends with `reason`; it is never continued without the context. */
 	| { status: "blocked"; reason: string }
 	| { status: "ready"; block: string; context: unknown };
-export type WorldContextVerdict = { ok: true } | { ok: false; reason: string };
+export type WorldContextVerdict =
+	| { ok: true }
+	/** `retryable`: the check could not run (busy/closing writer); a later attempt may pass. */
+	| { ok: false; reason: string; retryable?: boolean };
 export type WorldContextSettleInput = {
 	runId: string;
 	conversationId: string;

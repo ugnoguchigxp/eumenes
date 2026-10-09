@@ -755,7 +755,11 @@ export function createLarm(config: {
 					connectionId,
 					options,
 				);
-				return string(record(await readJson(response)).text);
+				const text = record(await readJson(response)).text;
+				// An empty transcript is a valid result for silence, not a broken contract.
+				if (typeof text !== "string" || text.length > 4096)
+					throw new Error("larm_invalid_contract");
+				return text;
 			});
 		},
 		speak(text, signal, options) {

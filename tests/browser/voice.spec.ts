@@ -713,7 +713,7 @@ test("text and browser audio complete through real services with fixture provide
 	await expect(page.getByText("再生済み", { exact: true })).toBeVisible({
 		timeout: 20000,
 	});
-	await page.getByRole("button", { name: "停止" }).click();
+	await page.getByRole("button", { name: "マイクを停止" }).click();
 	await expect(page.getByRole("textbox", { name: "メッセージ" })).toHaveValue(
 		"こんにちは",
 	);
@@ -1113,8 +1113,14 @@ test("partial ASR and text arrive early; speech waits for the completed answer",
 		]);
 	} finally {
 		await control("release");
-		if (await page.getByRole("button", { name: "停止", exact: true }).count())
-			await page.getByRole("button", { name: "停止", exact: true }).click();
+		if (
+			await page
+				.getByRole("button", { name: "マイクを停止", exact: true })
+				.count()
+		)
+			await page
+				.getByRole("button", { name: "マイクを停止", exact: true })
+				.click();
 	}
 });
 

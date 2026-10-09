@@ -946,12 +946,12 @@ DesignSystemのtest/typecheckは同packageの既存scriptsを使い、G10ではD
 
 | 項目 | 記録 |
 | --- | --- |
-| 開始時のHEADと並行差分 | 未実施 |
-| G00〜G22の完了/未完了 | 未実施 |
-| fixture T01〜T18/C01〜C08 | 未実施 |
-| DesignSystem/stories/browser表示 | 未実施 |
-| live control回数/回答LLM回数/終了遅延 | 未実施 |
-| マイクと出力デバイスの3往復 | 未実施 |
-| 契約変更と理由 | なし |
+| 開始時のHEADと並行差分 | 継続時の HEAD は `ff2b237`。委任タスク、research-routes、world など既存の未コミット差分は戻していない。 |
+| G00〜G22の完了/未完了 | G00〜G21 は実装と一部 fixture まで。G22 の live と実機器は未実施。 |
+| fixture T01〜T18/C01〜C08 | timers domain と C01〜C03、90/210/3600 秒、C06、C08 は成功。C04、C05、C07 と browser は未実施。詳細は `spec/verification/timers/fixture.md`。 |
+| DesignSystem/stories/browser表示 | DigitalClock を追加。stories の目視と browser の timer タブは未実施。 |
+| live control回数/回答LLM回数/終了遅延 | 未実施。`spec/verification/timers/live.md`。 |
+| マイクと出力デバイスの3往復 | 未実施。`spec/verification/timers/devices.md`。音声受入完了ではない。 |
+| 契約変更と理由 | `createToolRuntime` の第6引数は既存の cached source のため、ActionAdapter は第7引数にした。migration は world の連続ブロックの後に timers、agent_action_results、tool_action_invocations を足した。 |
 
 最終報告には変更した入口、実行したgate、未実施の受入、既知の制限を短く記載する。「ツールチェーン対応」はC01〜C08、「音声受入完了」はG22の実機器試験が根拠になる。時計だけが動く、APIだけが動く、LLMが開始文だけを返す状態を完成と呼ばない。

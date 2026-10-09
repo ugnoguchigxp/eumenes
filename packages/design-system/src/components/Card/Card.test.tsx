@@ -19,7 +19,7 @@ describe("Card Components", () => {
 		it("has base card classes", () => {
 			render(<Card>Base classes</Card>);
 			const card = screen.getByText("Base classes");
-			expect(card).toHaveClass("rounded-lg", "border", "shadow-sm");
+			expect(card).toHaveClass("rounded-lg", "border");
 		});
 
 		describe("Variants", () => {

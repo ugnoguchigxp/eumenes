@@ -23,6 +23,8 @@ export interface TaskFence {
 	executionGeneration: number;
 }
 export interface TasksOptions {
+	/** Application composition hook; synchronous, in the same writer transaction. */
+	changedInTransaction?: (tx: Database, task: WorkTask) => void;
 	now?: () => number;
 	id?: () => string;
 	maxLiveTasks?: number;

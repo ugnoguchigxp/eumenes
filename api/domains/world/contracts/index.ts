@@ -130,3 +130,10 @@ export type {
 	WorldStatus,
 	WorldUsageCheck,
 } from "./host";
+export { WORLD_RUNTIME_PURPOSE } from "./runtime";
+export type {
+	RuntimeLedgerPort,
+	RuntimeMeasurement,
+	RuntimeSnapshot,
+	RuntimeVerification,
+} from "./runtime";

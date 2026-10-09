@@ -24,7 +24,9 @@ test("open activates a tab and replaces content of an existing id", () => {
 		tab: tab("a", "new"),
 	});
 	expect(state.tabs.map((t) => t.id)).toEqual(["a", "b"]);
-	expect(state.tabs[0]?.content).toBe("new");
+	expect(state.tabs[0]?.kind === "markdown" && state.tabs[0].content).toBe(
+		"new",
+	);
 	expect(state.activeTabId).toBe("a");
 });
 

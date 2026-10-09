@@ -182,6 +182,7 @@ async function setup(
 	const gate = createWorldHostGate("closed");
 	const adapter = createConversationSourceAdapter(conversation, {
 		allowedPurposes: [PURPOSE],
+		cursorSecret: "dialogue-test-cursor-secret",
 	});
 	const world: WorldService = createWorldService({
 		store,
@@ -207,7 +208,10 @@ async function setup(
 			})
 		: undefined;
 	if (memory) await memory.recover();
-	if (options.world !== false) await world.setEnabled(true);
+	if (options.world !== false) {
+		await world.markInitialSyncComplete();
+		await world.setEnabled(true);
+	}
 
 	// --- World content: a confirmed message, a target and one adopted claim. ---
 	await conversation.append({

@@ -69,6 +69,7 @@ async function setup<T>(
 	});
 	const adapter = createConversationSourceAdapter(conversation, {
 		allowedPurposes: [PURPOSE],
+		cursorSecret: "secret-test-0",
 	});
 	try {
 		return await run({ store, conversation, adapter });

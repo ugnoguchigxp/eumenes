@@ -12,7 +12,7 @@ type Script =
 	| "greek";
 const SCRIPT_PATTERNS: Record<Script, RegExp> = {
 	han: /\p{Script=Han}/u,
-	kana: /[\p{Script=Hiragana}\p{Script=Katakana}]/u,
+	kana: /[\p{Script_Extensions=Hiragana}\p{Script_Extensions=Katakana}]/u,
 	hangul: /\p{Script=Hangul}/u,
 	latin: /\p{Script=Latin}/u,
 	cyrillic: /\p{Script=Cyrillic}/u,

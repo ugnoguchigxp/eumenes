@@ -1,3 +1,4 @@
+import { codingSupervisionClient } from "./coding-supervision";
 import { agentRuntimeClient } from "./agent-runtime";
 import { attitudeDatasetClient } from "./attitude-dataset";
 import { conversationClient } from "./conversation";
@@ -13,6 +14,7 @@ import { serviceTestsClient } from "./service-tests";
 import { ttsDictionaryClient } from "./tts-dictionary";
 import { createTransport } from "./transport";
 import { tasksClient } from "./tasks";
+import { codingClient } from "./coding";
 import { timersClient } from "./timers";
 import { voiceDialogueClient } from "./voice-dialogue";
 import { webResearchClient } from "./web-research";
@@ -36,6 +38,8 @@ export function createClient(baseUrl: string, token?: string) {
 		...webResearchClient(transport),
 		...agentRuntimeClient(transport),
 		...tasksClient(transport),
+		...codingClient(transport),
+		...codingSupervisionClient(transport),
 		...researchRoutesClient(transport),
 		...timersClient(transport),
 	};

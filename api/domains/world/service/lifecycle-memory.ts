@@ -69,13 +69,14 @@ export type MemoryPort = {
 		scopeKey: string,
 		dependents: readonly ExternalDependent[],
 	): RegisterExternalDependentsResult;
+	/** "unregistered": Memory removed (or never had) the edges; "blocked": it refused (the rows must be kept). */
 	unregister(
 		db: Database,
 		access: AccessContext,
 		atMs: number,
 		scopeKey: string,
 		keys: readonly ExternalDependentKey[],
-	): void;
+	): "unregistered" | "blocked";
 };
 
 export const defaultMemoryPort: MemoryPort = {
@@ -139,12 +140,12 @@ export const defaultMemoryPort: MemoryPort = {
 		});
 	},
 	unregister(db, access, atMs, scopeKey, keys) {
-		unregisterExternalDependents(db, {
+		return unregisterExternalDependents(db, {
 			contractVersion: CONTRACT_VERSIONS.external,
 			access,
 			scopeKey,
 			clock: { atMs },
 			dependents: keys,
-		});
+		}).status;
 	},
 };

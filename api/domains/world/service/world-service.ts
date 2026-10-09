@@ -33,6 +33,7 @@ import {
 	writeEnabled,
 	writeFeedCursor,
 	writeForgetEpoch,
+	writeInitialSyncComplete,
 	writeRestoreEpoch,
 	type FeedCursorRow,
 } from "../repository";
@@ -340,10 +341,23 @@ export function createWorldService(options: WorldServiceOptions) {
 		statusInTransaction,
 		status: (): WorldStatus =>
 			store.readSnapshot((db) => statusInTransaction(db)),
-		/** Default OFF. Turning it ON does not override a schema mismatch. */
+		/**
+		 * Default OFF. Turning it ON does not override a schema mismatch, and is
+		 * refused (WorldHostStateError "initial_sync_required") until the host
+		 * recorded `markInitialSyncComplete`: forgets and corrections that
+		 * happened before World existed must have been consumed first.
+		 */
 		setEnabled: (enabled: boolean): Promise<void> =>
 			store.write((db) => writeEnabled(db, enabled)),
 		setEnabledInWriter: writeEnabled,
+		/** True once the host recorded `markInitialSyncComplete` (turning World ON needs it). */
+		initialSyncComplete: (): boolean =>
+			store.readSnapshot((db) => readHostState(db).initialSyncComplete),
+		/** The host's explicit statement that the first full feed pass is done. */
+		markInitialSyncComplete: (): Promise<void> =>
+			store.write((db) => writeInitialSyncComplete(db, true)),
+		markInitialSyncCompleteInWriter: (db: Database): void =>
+			writeInitialSyncComplete(db, true),
 
 		/** The AccessContext a request gets (with the policy revision Memory also sees). */
 		accessInTransaction: accessOf,

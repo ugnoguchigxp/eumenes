@@ -28,6 +28,7 @@ import {
 	NOW,
 	PURPOSE,
 	SCOPE,
+	TEST_CURSOR_SECRET,
 	memoryPolicyRevision,
 	type Harness,
 } from "./fixture";
@@ -73,6 +74,7 @@ function build(
 	});
 	const sourceAdapter = createConversationSourceAdapter(conversation, {
 		allowedPurposes: [PURPOSE],
+		cursorSecret: TEST_CURSOR_SECRET,
 	});
 	const world: WorldService = createWorldService({
 		store,
@@ -121,6 +123,7 @@ export async function openLife(
 				"CREATE TABLE host_probe (n INTEGER NOT NULL); CREATE TABLE host_queue (cursor TEXT NOT NULL);",
 			);
 		});
+		await life.world.markInitialSyncComplete();
 		await life.world.setEnabled(true);
 		return life;
 	} catch (error) {

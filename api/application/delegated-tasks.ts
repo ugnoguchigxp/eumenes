@@ -16,6 +16,12 @@ export function delegatedTasksEnabled(
 /** Future coding/runner wiring must provide confirmed receipts, never arbitrary shell text. */
 export interface TaskExecutionPort {
 	available(): boolean;
+	/** Optional lower-domain intent, committed atomically with the task and dispatch job. */
+	prepareInTransaction?(
+		tx: Database,
+		task: WorkTask,
+		context: { commandId: string; answerQuestionId?: string },
+	): void;
 	dispatch(
 		task: WorkTask,
 		context: {
@@ -24,7 +30,10 @@ export interface TaskExecutionPort {
 			answer?: { questionId: string; text: string };
 		},
 	): Promise<{ accepted: boolean }>;
-	observe(task: WorkTask, signal: AbortSignal): Promise<void>;
+	observe(
+		task: WorkTask,
+		signal: AbortSignal,
+	): Promise<void | { hasMore: boolean }>;
 	/** Stop deliveries may repeat after failure; commandId is stable for the revoked authority. */
 	stop(
 		task: WorkTask,
@@ -59,6 +68,7 @@ export function createDelegatedTasks(input: {
 	enabled: boolean;
 	execution?: TaskExecutionPort;
 	now?: () => number;
+	changedInTransaction?: (tx: Database, task: WorkTask) => void;
 }) {
 	const { store, queue, scheduler, execution } = input;
 	const now = input.now ?? Date.now;
@@ -98,9 +108,23 @@ export function createDelegatedTasks(input: {
 			maxAttempts: 1,
 		});
 		tasks.setRuntimeInTransaction(tx, t.id, { dispatchJobId: job.id });
+		const prepared: unknown = execution?.prepareInTransaction?.(tx, t, {
+			commandId: job.id,
+			...(answerQuestionId ? { answerQuestionId } : {}),
+		});
+		if (
+			prepared &&
+			(typeof prepared === "object" || typeof prepared === "function") &&
+			"then" in prepared &&
+			typeof prepared.then === "function"
+		) {
+			void Promise.resolve(prepared).catch(() => {});
+			throw new Error("task_async_preparation_forbidden");
+		}
 	}
 	const tasks = createTasks(store, {
 		now,
+		changedInTransaction: input.changedInTransaction,
 		kinds: [
 			{
 				kind: "coding",
@@ -228,7 +252,7 @@ export function createDelegatedTasks(input: {
 					commandId: string;
 					answer?: { questionId: string; text: string };
 				},
-				{ confirmed: boolean }
+				{ confirmed: boolean; hasMore?: boolean }
 			> = {
 				kind: `tasks.${op}.v1`,
 				payloadVersions: [1],
@@ -303,8 +327,8 @@ export function createDelegatedTasks(input: {
 								).stopped === true,
 						};
 					if (op === "observe") {
-						await execution!.observe(t, context.signal);
-						return { confirmed: true };
+						const result = await execution!.observe(t, context.signal);
+						return { confirmed: true, hasMore: result?.hasMore === true };
 					}
 					// The stable job ID survives retries/recovery; dispatch never invents a new operation ID.
 					return {
@@ -323,6 +347,19 @@ export function createDelegatedTasks(input: {
 					if (!t) return "stale";
 					if (outcome.type === "success" && outcome.result.confirmed) {
 						if (op === "stop") tasks.settleStopInTransaction(tx, fence(t));
+						if (op === "observe" && outcome.result.hasMore) {
+							const commandId = `backlog:${claim.jobId}`;
+							const { job } = queue.enqueueInTransaction(tx, {
+								scope: `work-task:${t.id}`,
+								kind: "tasks.observe.v1",
+								dedupeKey: commandId,
+								payload: payload(t, commandId),
+								subjectRef: t.id,
+								lane: "background",
+								concurrencyKey: `work-task:${t.id}:observe`,
+							});
+							tasks.setRuntimeInTransaction(tx, t.id, { observeJobId: job.id });
+						}
 						return "applied";
 					}
 					if (op === "dispatch" && ["queued", "active"].includes(t.state)) {

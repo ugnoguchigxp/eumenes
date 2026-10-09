@@ -41,9 +41,12 @@ export function useRunProgress(client: DialogueClient, runId?: string) {
 		})();
 		return () => controller.abort();
 	}, [client, runId, cache]);
+	// A World-using run shows no body until it completes (adoption); the server
+	// sends none either, this keeps a stale or foreign frame from showing one.
 	return value &&
 		value.runId === runId &&
-		["running", "completed"].includes(value.status)
+		(value.status === "completed" ||
+			(value.status === "running" && !value.worldUsed))
 		? value.text
 		: "";
 }

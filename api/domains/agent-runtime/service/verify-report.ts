@@ -1,23 +1,37 @@
 import { bytes } from "../../capabilities";
 import type { Source } from "../../tool-runtime";
 import { reportSchema, type Report } from "../contracts";
+import {
+	ValidationFailure,
+	validationIssues,
+} from "../../../infrastructure/validation-log";
 export function verifyReport(
 	raw: unknown,
 	visible: Source[],
 	hasFailures: boolean,
 ): Report {
 	const result = reportSchema.safeParse(raw);
-	if (!result.success) throw new Error("invalid_report");
+	if (!result.success)
+		throw new ValidationFailure(
+			"invalid_report",
+			validationIssues(result.error, raw, ["report"]),
+			result.error.issues.length,
+		);
 	const sources = new Map(visible.map((s) => [s.sourceId, s]));
 	const used = new Set<string>();
-	for (const claim of result.data.claims)
-		for (const evidence of claim.evidence) {
+	for (const [claimIndex, claim] of result.data.claims.entries())
+		for (const [evidenceIndex, evidence] of claim.evidence.entries()) {
 			const source = sources.get(evidence.sourceId);
 			if (
 				!source ||
 				!source.body.includes(evidence.quote.replaceAll("\r\n", "\n"))
 			)
-				throw new Error("invalid_evidence");
+				throw new ValidationFailure("invalid_evidence", [
+					{
+						validationPath: `report.claims.${claimIndex}.evidence.${evidenceIndex}.${source ? "quote" : "sourceId"}`,
+						validationCode: source ? "quote_mismatch" : "unknown_source",
+					},
+				]);
 			used.add(source.sourceId);
 		}
 	const metadata = [...used].map((id) => {

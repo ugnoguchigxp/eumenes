@@ -1,22 +1,29 @@
 import type { Database } from "bun:sqlite";
 import { createHash } from "node:crypto";
 import { MemoryStoreError } from "eumenes-memory/sqlite";
-import type { AccessContext, MemoryChange } from "eumenes-memory";
-import type { ScopeRef } from "eumenes-world-model";
+import { type AccessContext, type MemoryChange } from "eumenes-memory";
+import {
+	checkOpaque,
+	checkRevision,
+	isWellFormed,
+	type ScopeRef,
+} from "eumenes-world-model";
 import {
 	WriterBusyError,
 	type SqliteStore,
 } from "../../../infrastructure/sqlite";
-import type {
-	SourceAdapter,
-	WorldApplyRequest,
-	WorldApplyResult,
+import {
+	WORLD_PROVIDER_REF,
+	type SourceAdapter,
+	type WorldApplyRequest,
+	type WorldApplyResult,
 } from "../contracts";
 import {
 	advanceIntake,
 	allIntakeIds,
 	countUnconfirmed,
 	dropFeedCursors,
+	getDependent,
 	getIntake,
 	insertIntake,
 	intakesWithJournal,
@@ -27,6 +34,7 @@ import {
 	listMemoryLinkedIntakes,
 	listOpenIntakes,
 	readRestore,
+	reopenIntakeForMemory,
 	setBlockedReason,
 	setWorldProgress,
 	stateAtLeast,
@@ -41,11 +49,39 @@ import {
 	type IntakeRow,
 	type TombstoneReasonCode,
 } from "../repository/lifecycle";
+import {
+	listAbandoned,
+	listAbandonedForgetIds,
+	recordAbandoned,
+	type AbandonedPart,
+} from "../repository/guard";
+import {
+	purgeUnsettledExtractEvents,
+	writeExtractFeedScopeSet,
+} from "../repository/extraction";
+import {
+	purgeRuntimeObservations,
+	runtimeOutcomeRootsOfSources,
+} from "../repository/runtime";
+import {
+	candidateRootsFor,
+	memoryFeedStages,
+	purgeForgotten,
+	receiveSourceChanges,
+	scopeSetChanged,
+	scopeSetOf,
+	sourceFeedStages,
+	type FeedStages,
+} from "./extraction-intake";
 import type { WorldHostGate } from "./host-gate";
 import { sourceKeyOf } from "./inputs";
 import { defaultMemoryPort, type MemoryPort } from "./lifecycle-memory";
 import { deletionsFirst } from "./source-adapter";
-import { forgetUsageInScope } from "./usage-ledger";
+import {
+	forgetUsageInScope,
+	sweepReleasePending,
+	type UnregisterDependents,
+} from "./usage-ledger";
 import {
 	WorldJournalCorruptError,
 	appendWorldJournal,
@@ -58,11 +94,13 @@ const MAX_CHUNK_ROOTS = 500;
 const MAX_ROOTS_PER_FORGET = 50_000;
 const MAX_REGISTRATIONS = 200;
 const MAX_TOMBSTONES = 200;
-const DEPENDENT_PAGE = 100;
 const FEED_PAGE = 500;
 const FEED_MAX_ROWS = 5000;
 const INVALIDATE_KEYS = 20;
 const MAX_ID_BYTES = 200;
+/** Splits a forget id from its part number; reserved, so a caller id may not contain it. */
+const PART_SEPARATOR = "~";
+const DEFAULT_DEPENDENT_PAGE = 100;
 
 const sha256 = (text: string) =>
 	createHash("sha256").update(text).digest("hex");
@@ -79,6 +117,7 @@ export type LifecyclePoint =
 	| "world_applied"
 	| "memory_batch"
 	| "memory_confirmed"
+	| "world_part_abandoned"
 	| "before_reopen"
 	| "complete"
 	| "restore_begun"
@@ -108,6 +147,8 @@ export type LifecycleOptions = {
 	maxChunksPerCall?: number;
 	/** External deletions confirmed per writer callback. */
 	confirmBatch?: number;
+	/** Dependents re-registered per page during a restore (default 100; tests use a small value). */
+	dependentPageSize?: number;
 	/** Test seam: throw to simulate a process crash at that point. */
 	hook?: (point: LifecyclePoint, info: { forgetId?: string }) => void;
 };
@@ -117,7 +158,14 @@ export type ForgetRequest = {
 	scope: ScopeRef;
 	reasonCode: TombstoneReasonCode;
 	roots: readonly { kind: ForgetRoot["kind"]; id: string; revision?: number }[];
-	/** The Memory forget whose World dependents this forget owes confirmations for. */
+	/**
+	 * The Memory forget whose World dependents this forget owes confirmations
+	 * for. It is a claim, not a license: an external of that forget is
+	 * confirmed in Memory only when World content standing on it is verifiably
+	 * gone (its host row is gone or released, or one of the inputs it stood on is
+	 * among the roots erased by the intakes of this Memory forget). Externals the
+	 * roots do not reach stay pending (blocked MEMORY_EXTERNAL_NOT_COVERED).
+	 */
 	memoryForgetId?: string;
 	origin?: Exclude<ForgetOrigin, "restored">;
 };
@@ -137,6 +185,12 @@ export type ForgetReport = {
 	} | null;
 	/** Memory external deletions: total known and confirmed. null until Memory's receipt was read. */
 	externals: { total: number; confirmed: number } | null;
+	/**
+	 * Parts / roots World permanently refused as invalid input and that the
+	 * host therefore skipped (nothing stored can match such an id). A forget
+	 * with any of them is NEVER reported `complete`, however far its state is.
+	 */
+	abandoned: { parts: number; roots: number };
 };
 
 export type ForgetRefusal = {
@@ -150,6 +204,8 @@ export type RecoverReport =
 			restored: boolean;
 			/** Forgets that still wait for Memory or the reopen (World content already deleted). */
 			pendingForgets: string[];
+			/** Forgets with parts or roots World permanently refused (see ForgetReport.abandoned). */
+			abandonedForgets: string[];
 	  }
 	| { status: "closed"; reason: string };
 
@@ -161,6 +217,12 @@ export type ConsumeReport = {
 	invalidated: number;
 	hasMore: boolean;
 	blocked: string | null;
+	/** Roots of the change page that are not valid World ids and were skipped (never forgotten, never blocking). */
+	rejectedRoots: number;
+	/** Source feed only: extraction inputs World's inbox took in this pass (P4-01). */
+	received?: number;
+	/** Source feed only: inputs scanned while World was OFF (or its gate closed): never extracted. */
+	skippedInputs?: number;
 };
 
 class StepBlocked extends Error {
@@ -200,6 +262,56 @@ const rootDigest = (roots: readonly ForgetRoot[]): string =>
 		),
 	);
 
+/**
+ * The stored roots of an intake are the requested ones, plus `candidate` roots
+ * the host added for extraction events (P4-01). Used to recognise a resend.
+ */
+function rootsCover(
+	existing: Pick<IntakeRow, "roots">,
+	requested: readonly ForgetRoot[],
+): boolean {
+	return (
+		requested.every((r) =>
+			existing.roots.some(
+				(x) => x.kind === r.kind && x.id === r.id && x.revision === r.revision,
+			),
+		) &&
+		existing.roots.every(
+			(x) =>
+				x.kind === "candidate" ||
+				x.kind === "outcome" ||
+				requested.some((r) => r.kind === x.kind && r.id === x.id),
+		)
+	);
+}
+
+/**
+ * The same id rules World applies to a forget root (`checkTargetRef`): the
+ * kind is known, source/state ids may be 8192 bytes, every other kind 256,
+ * ids are non-empty and well-formed (no lone surrogates), revision >= 1.
+ */
+export function isValidRoot(root: {
+	kind: unknown;
+	id: unknown;
+	revision?: unknown;
+}): boolean {
+	if (!(ROOT_KINDS as readonly string[]).includes(root.kind as string))
+		return false;
+	const long = root.kind === "source" || root.kind === "state";
+	return (
+		checkOpaque(root.id, "id", long ? 8192 : 256).ok &&
+		checkRevision(root.revision ?? 1, "revision").ok
+	);
+}
+
+/** Well-formed id of a forget; the part separator is reserved. */
+const validForgetId = (id: unknown, allowSeparator: boolean): boolean =>
+	typeof id === "string" &&
+	id !== "" &&
+	isWellFormed(id) &&
+	utf8(id) <= MAX_ID_BYTES &&
+	(allowSeparator || !id.includes(PART_SEPARATOR));
+
 function normalizeRoots(
 	roots: ForgetRequest["roots"],
 ): ForgetRoot[] | ForgetRefusal {
@@ -210,22 +322,23 @@ function normalizeRoots(
 	const seen = new Set<string>();
 	const out: ForgetRoot[] = [];
 	for (const root of roots) {
-		const revision = root.revision ?? 1;
-		if (
-			!(ROOT_KINDS as readonly string[]).includes(root.kind) ||
-			typeof root.id !== "string" ||
-			root.id === "" ||
-			utf8(root.id) > 8192 ||
-			!Number.isSafeInteger(revision) ||
-			revision < 1
-		)
+		if (!isValidRoot(root))
 			return { status: "rejected", reasonCode: "INVALID_INPUT" };
+		const revision = root.revision ?? 1;
 		const slot = JSON.stringify([root.kind, root.id, revision]);
 		if (seen.has(slot)) continue;
 		seen.add(slot);
 		out.push({ kind: root.kind, id: root.id, revision });
 	}
 	return out;
+}
+
+/** Feeds: roots that are not valid World ids are counted and skipped, the rest still go. */
+function splitValidRoots<T extends { kind: string; id: string }>(
+	roots: readonly T[],
+): { valid: T[]; rejected: number } {
+	const valid = roots.filter((root) => isValidRoot(root));
+	return { valid, rejected: roots.length - valid.length };
 }
 
 const stateItemKey = (itemId: string) =>
@@ -265,6 +378,7 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 	const memory: MemoryPort = { ...defaultMemoryPort, ...options.memory };
 	const maxChunks = options.maxChunksPerCall ?? 50;
 	const confirmBatch = options.confirmBatch ?? 50;
+	const dependentPage = options.dependentPageSize ?? DEFAULT_DEPENDENT_PAGE;
 	const hook = (point: LifecyclePoint, forgetId?: string) =>
 		options.hook?.(point, forgetId === undefined ? {} : { forgetId });
 	const adapters = new Map(
@@ -293,6 +407,21 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 			},
 		});
 
+	/** Memory unregistration of World dependents of one Scope (refusal -> "blocked", rows kept). */
+	const unregisterFor =
+		(db: Database, scope: ScopeRef): UnregisterDependents =>
+		(ids) =>
+			memory.unregister(
+				db,
+				accessFor(db, scope),
+				now(),
+				scope.scopeKey,
+				ids.map((externalId) => ({
+					providerRef: WORLD_PROVIDER_REF,
+					externalId,
+				})),
+			);
+
 	function worldOp(
 		db: Database,
 		scope: ScopeRef,
@@ -315,7 +444,7 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 			operation.kind === "forget.chunk" &&
 			(result.status === "applied" || result.status === "no_op")
 		)
-			forgetUsageInScope(db, scope);
+			forgetUsageInScope(db, scope, unregisterFor(db, scope));
 		return result;
 	}
 
@@ -332,25 +461,56 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 		request: ForgetRequest,
 		extra: { memoryFinal?: boolean } = {},
 	): ForgetRefusal | { forgetId: string; created: boolean } {
-		const roots = normalizeRoots(request.roots);
-		if ("status" in roots) return roots;
+		const requested = normalizeRoots(request.roots);
+		if ("status" in requested) return requested;
+		// World cannot reach an unsettled inbox event from its source: name the
+		// extraction events these sources fed as `candidate` roots (P4-01).
+		const roots: ForgetRoot[] = [...requested];
+		const candidates = candidateRootsFor(
+			db,
+			request.scope,
+			requested.filter((r) => r.kind === "source").map((r) => r.id),
+		).filter((r) => !roots.some((x) => x.kind === r.kind && x.id === r.id));
+		roots.push(...candidates);
+		// World's closure from a source does not reach Outcomes either: the
+		// runtime observations (P4-04) that stand on these sources are named too.
+		const sourceKeys = requested
+			.filter((r) => r.kind === "source")
+			.map((r) => r.id);
+		for (const outcome of runtimeOutcomeRootsOfSources(
+			db,
+			request.scope.principal,
+			request.scope.scopeKey,
+			sourceKeys,
+		))
+			if (
+				!roots.some(
+					(x) =>
+						x.kind === outcome.kind &&
+						x.id === outcome.id &&
+						x.revision === outcome.revision,
+				)
+			)
+				roots.push(outcome);
 		if (
-			request.forgetId === "" ||
-			utf8(request.forgetId) > MAX_ID_BYTES ||
+			!validForgetId(request.forgetId, false) ||
 			!(TOMBSTONE_REASONS as readonly string[]).includes(request.reasonCode) ||
 			(request.memoryForgetId !== undefined &&
-				(request.memoryForgetId === "" ||
-					utf8(request.memoryForgetId) > MAX_ID_BYTES))
+				!validForgetId(request.memoryForgetId, true))
 		)
 			return { status: "rejected", reasonCode: "INVALID_INPUT" };
 		const digest = rootDigest(roots);
 		const existing = getIntake(db, request.forgetId);
 		if (existing) {
+			// A resend finds the extraction events already purged: the stored roots
+			// are then the requested ones plus candidate roots (P4-01).
+			const covers =
+				existing.rootsDigest === digest || rootsCover(existing, requested);
 			const same =
 				existing.principal === request.scope.principal &&
 				existing.scopeKey === request.scope.scopeKey &&
 				existing.reasonCode === request.reasonCode &&
-				existing.rootsDigest === digest &&
+				covers &&
 				existing.memoryForgetId === (request.memoryForgetId ?? null);
 			return same
 				? { forgetId: request.forgetId, created: false }
@@ -371,25 +531,51 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 			},
 			now(),
 		);
+		// The host's own record of the forgotten extraction inputs goes with it.
+		purgeForgotten(db, request.scope, roots);
+		purgeRuntimeObservations(
+			db,
+			request.scope.principal,
+			request.scope.scopeKey,
+			roots.filter((r) => r.kind === "source").map((r) => r.id),
+		);
+		// Defense in depth: an answer prepared before this forget can never be
+		// adopted afterwards, whatever World's own epoch checks say.
+		world.bumpForgetEpochInWriter(db, request.scope);
 		return { forgetId: request.forgetId, created: true };
 	}
 
 	function reportOf(
+		db: Database,
 		intake: IntakeRow,
 		extra: Partial<Pick<ForgetReport, "blocked" | "world" | "externals">> = {},
 	): ForgetReport {
+		const abandoned = listAbandoned(db, intake.forgetId);
+		const parts = abandoned.filter((a) => a.wholePart).length;
+		const roots = abandoned.reduce((sum, a) => sum + a.skippedRoots, 0);
+		const clean = parts === 0 && roots === 0;
 		return {
 			forgetId: intake.forgetId,
 			state: intake.state,
-			complete: intake.state === "complete",
+			// Never complete while World refused some of what was asked.
+			complete: intake.state === "complete" && clean,
 			blocked:
 				intake.state === "complete"
-					? null
+					? clean
+						? null
+						: "WORLD_ROOTS_ABANDONED"
 					: (extra.blocked ?? intake.blockedReason),
 			world: extra.world ?? null,
 			externals: extra.externals ?? null,
+			abandoned: { parts, roots },
 		};
 	}
+
+	const report = (
+		forgetId: string,
+		extra: Partial<Pick<ForgetReport, "blocked" | "world" | "externals">> = {},
+	): ForgetReport =>
+		store.read((db) => reportOf(db, getIntake(db, forgetId)!, extra));
 
 	// --- step 2: World journal (fsync) -------------------------------------------
 
@@ -426,7 +612,7 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 	 * part n is `<id>~n`. Each part is resumable on its own.
 	 */
 	const partId = (forgetId: string, part: number) =>
-		part === 0 ? forgetId : `${forgetId}~${part}`;
+		part === 0 ? forgetId : `${forgetId}${PART_SEPARATOR}${part}`;
 	const partCount = (row: IntakeRow) =>
 		Math.max(1, Math.ceil(row.roots.length / MAX_CHUNK_ROOTS));
 
@@ -448,13 +634,48 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 				let progress: ForgetReport["world"] = null;
 				for (let applied = 0; applied < maxChunks && part < parts; applied++) {
 					const id = partId(row.forgetId, part);
-					const roots =
-						chunks === 0
-							? row.roots.slice(
-									part * MAX_CHUNK_ROOTS,
-									(part + 1) * MAX_CHUNK_ROOTS,
-								)
-							: [];
+					let roots: ForgetRoot[] = [];
+					if (chunks === 0) {
+						// Roots World would refuse as ids are skipped (and said so), never
+						// allowed to block the valid ones of the same part.
+						const given = row.roots.slice(
+							part * MAX_CHUNK_ROOTS,
+							(part + 1) * MAX_CHUNK_ROOTS,
+						);
+						const split = splitValidRoots(given);
+						roots = split.valid;
+						if (roots.length === 0) {
+							// Nothing in this part can name stored data: no World forget exists.
+							recordAbandoned(
+								db,
+								{
+									forgetId: row.forgetId,
+									part,
+									skippedRoots: given.length,
+									wholePart: true,
+									reason: "NO_VALID_ROOTS",
+								},
+								now(),
+							);
+							part += 1;
+							chunks = 0;
+							setWorldProgress(db, row.forgetId, part, chunks, now());
+							hook("world_part_abandoned", row.forgetId);
+							continue;
+						}
+						if (split.rejected > 0)
+							recordAbandoned(
+								db,
+								{
+									forgetId: row.forgetId,
+									part,
+									skippedRoots: split.rejected,
+									wholePart: false,
+									reason: "INVALID_ROOT_ID",
+								},
+								now(),
+							);
+					}
 					const result = worldOp(
 						db,
 						scope,
@@ -466,6 +687,32 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 							roots,
 						},
 					);
+					if (
+						chunks === 0 &&
+						result.status === "rejected" &&
+						(result.reasonCode === "INVALID_INPUT" ||
+							result.reasonCode === "LIMIT_EXCEEDED")
+					) {
+						// World refuses this part for good and wrote nothing (its checks run
+						// before the first write). An explicit durable terminal, reported and
+						// never counted as complete, instead of a gate that never opens.
+						recordAbandoned(
+							db,
+							{
+								forgetId: row.forgetId,
+								part,
+								skippedRoots: roots.length,
+								wholePart: true,
+								reason: `WORLD_${result.reasonCode}`,
+							},
+							now(),
+						);
+						part += 1;
+						chunks = 0;
+						setWorldProgress(db, row.forgetId, part, chunks, now());
+						hook("world_part_abandoned", row.forgetId);
+						continue;
+					}
 					if (result.status !== "applied" && result.status !== "no_op") {
 						// A part that is already complete is never an excuse to skip
 						// roots: parts only get roots in their first op, so this is a refusal.
@@ -506,6 +753,8 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 				if (part < parts)
 					return { done: false as const, blocked: null, progress };
 				advanceIntake(db, row.forgetId, "journaled", "world_applied", now());
+				// The World content is gone: any answer still in flight is stale.
+				world.bumpForgetEpochInWriter(db, scope);
 				return { done: true as const, blocked: null, progress };
 			});
 			if (out.progress) last = out.progress;
@@ -522,15 +771,54 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 	// --- step 4: Memory external deletions ---------------------------------------
 
 	/**
+	 * Roots (source/state keys) the intakes of one Memory forget have erased from
+	 * World: only intakes whose World deletion is verified count.
+	 */
+	function erasedKeys(db: Database, memoryForgetId: string): Set<string> {
+		const keys = new Set<string>();
+		for (const intake of listIntakesOfMemoryForget(db, memoryForgetId)) {
+			if (!stateAtLeast(intake.state, "world_applied")) continue;
+			for (const root of intake.roots)
+				if (root.kind === "source" || root.kind === "state") keys.add(root.id);
+		}
+		return keys;
+	}
+
+	/**
+	 * May Memory be told that World deleted this external? Only when World
+	 * content standing on it is gone: the host row is gone (released / purged),
+	 * the row waits for its release, or an input it stood on is among the roots
+	 * erased for this Memory forget (World erases every version that stands on
+	 * an erased root, whatever its other inputs are). A forget with unrelated
+	 * roots therefore confirms nothing.
+	 */
+	function externalErased(
+		db: Database,
+		scope: ScopeRef,
+		externalId: string,
+		erased: ReadonlySet<string>,
+	): boolean {
+		const dependent = getDependent(
+			db,
+			scope.principal,
+			scope.scopeKey,
+			externalId,
+		);
+		if (dependent === null || dependent.releasePending) return true;
+		return dependent.dependsOn.some((d) => erased.has(d.key));
+	}
+
+	/**
 	 * Reads Memory's receipt, syncs the per-externalId rows to it (a row Memory
-	 * no longer shows as confirmed goes back to pending) and returns the ids
-	 * still owed. Needs the World deletion to be verified (state world_applied
-	 * or later) before it records anything.
+	 * no longer shows as confirmed goes back to pending) and sorts what is
+	 * still owed: `confirmable` (the World content is verifiably gone) and
+	 * `uncovered` (the roots given do not reach it: never confirmed). Needs the
+	 * World deletion to be verified (state world_applied or later).
 	 */
 	function syncConfirmations(
 		db: Database,
 		row: IntakeRow,
-	): { pending: string[]; total: number } {
+	): { confirmable: string[]; uncovered: string[]; total: number } {
 		const mid = row.memoryForgetId!;
 		const receipt = memory.receipt(db, accessFor(db, scopeOf(row)), mid);
 		if (receipt.status === "missing")
@@ -546,12 +834,18 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 				now(),
 			);
 		const rows = listConfirmations(db, mid);
-		return {
-			pending: rows
-				.filter((r) => r.state !== "confirmed")
-				.map((r) => r.externalId),
-			total: rows.length,
-		};
+		const erased = erasedKeys(db, mid);
+		const scope = scopeOf(row);
+		const confirmable: string[] = [];
+		const uncovered: string[] = [];
+		for (const r of rows) {
+			if (r.state === "confirmed") continue;
+			(externalErased(db, scope, r.externalId, erased)
+				? confirmable
+				: uncovered
+			).push(r.externalId);
+		}
+		return { confirmable, uncovered, total: rows.length };
 	}
 
 	/** Every intake of this Memory forget has deleted its World content, and the last batch is the final one. */
@@ -587,7 +881,12 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 			const first = await store.write((db) => {
 				const row = getIntake(db, intake.forgetId);
 				if (!row || row.state !== "world_applied")
-					return { pending: [] as string[], total: 0, skip: true };
+					return {
+						confirmable: [] as string[],
+						uncovered: [] as string[],
+						total: 0,
+						skip: true,
+					};
 				if (!groupReady(db, mid))
 					throw new StepBlocked("WAITING_FOR_FORGET_GROUP");
 				return { ...syncConfirmations(db, row), skip: false };
@@ -595,10 +894,11 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 			if (first.skip) return { externals, blocked: null };
 			externals = {
 				total: first.total,
-				confirmed: first.total - first.pending.length,
+				confirmed:
+					first.total - first.confirmable.length - first.uncovered.length,
 			};
 			// Phase 2: confirm in bounded batches, each its own transaction.
-			let pending = first.pending;
+			let pending = first.confirmable;
 			while (pending.length > 0) {
 				const batch = pending.slice(0, confirmBatch);
 				const rest = await store.write((db) => {
@@ -620,7 +920,7 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 				pending = rest;
 				externals = {
 					total: first.total,
-					confirmed: first.total - pending.length,
+					confirmed: first.total - pending.length - first.uncovered.length,
 				};
 				hook("memory_batch", intake.forgetId);
 			}
@@ -629,7 +929,9 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 				const row = getIntake(db, intake.forgetId);
 				if (!row || row.state !== "world_applied") return;
 				const check = syncConfirmations(db, row);
-				if (check.pending.length > 0 || countUnconfirmed(db, mid) > 0)
+				if (check.uncovered.length > 0)
+					throw new StepBlocked("MEMORY_EXTERNAL_NOT_COVERED");
+				if (check.confirmable.length > 0 || countUnconfirmed(db, mid) > 0)
 					throw new StepBlocked("MEMORY_UNCONFIRMED");
 				advanceIntake(
 					db,
@@ -662,7 +964,14 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 			)
 				throw new StepBlocked("MEMORY_UNCONFIRMED");
 			if (row.origin !== "restored") {
+				// A part World refused outright never became a World forget.
+				const absent = new Set(
+					listAbandoned(db, row.forgetId)
+						.filter((a: AbandonedPart) => a.wholePart)
+						.map((a) => a.part),
+				);
 				for (let part = 0; part < partCount(row); part++) {
+					if (absent.has(part)) continue;
 					const id = partId(row.forgetId, part);
 					const result = worldOp(db, scopeOf(row), forgetKey(id, "ro", 0), {
 						kind: "forget.reopen",
@@ -735,8 +1044,7 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 					break;
 				}
 			}
-			const finalRow = store.read((db) => getIntake(db, forgetId))!;
-			return reportOf(finalRow, { blocked, world, externals });
+			return report(forgetId, { blocked, world, externals });
 		});
 	}
 
@@ -749,8 +1057,7 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 		const accepted = await store.write((db) => acceptInWriter(db, request));
 		if ("status" in accepted) return accepted;
 		hook("accepted", accepted.forgetId);
-		if (settings.advance === false)
-			return reportOf(store.read((db) => getIntake(db, accepted.forgetId))!);
+		if (settings.advance === false) return report(accepted.forgetId);
 		return advance(accepted.forgetId);
 	}
 
@@ -844,7 +1151,7 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 				(e) => e.principal === scope.principal && e.scopeKey === scope.scopeKey,
 			)
 			.flatMap((entry) =>
-				entry.roots.map((root) => ({
+				entry.roots.filter(isValidRoot).map((root) => ({
 					ref: { kind: root.kind, id: root.id, revision: root.revision },
 					forgetId: entry.forgetId,
 					reasonCode: entry.reasonCode,
@@ -877,7 +1184,9 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 		hook("restore_begun");
 
 		// Re-register every recorded World dependent through Memory, page by page.
-		const seen = new Set<string>();
+		// What World was already told per key: a later page may only RAISE it
+		// (registered -> unknown -> tombstoned), never be skipped.
+		const told = new Map<string, RegistrationStatus>();
 		let after: string | null = null;
 		for (;;) {
 			const page: { next: string | null; error: string | null } =
@@ -887,11 +1196,14 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 						scope.principal,
 						scope.scopeKey,
 						after,
-						DEPENDENT_PAGE,
+						dependentPage,
 					);
 					if (rows.length === 0) return { next: null, error: null };
 					const statuses = classify(db, scope, rows, epoch);
-					const fresh = [...statuses].filter(([key]) => !seen.has(key));
+					const fresh = [...statuses].filter(([key, status]) => {
+						const previous = told.get(key);
+						return previous === undefined || rank[status] > rank[previous];
+					});
 					for (const group of chunk(fresh, MAX_REGISTRATIONS)) {
 						const registrations = group.map(([sourceKey, status]) => ({
 							sourceKey,
@@ -908,7 +1220,7 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 						);
 						if (error) throw new StepBlocked(error);
 					}
-					for (const [key] of fresh) seen.add(key);
+					for (const [key, status] of fresh) told.set(key, status);
 					return { next: rows[rows.length - 1]!.externalId, error: null };
 				});
 			if (page.next === null) break;
@@ -1018,8 +1330,8 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 						memoryFinal: true,
 						reasonCode: entry.reasonCode,
 						origin: "restored",
-						roots: entry.roots,
-						rootsDigest: rootDigest(entry.roots),
+						roots: entry.roots.filter(isValidRoot),
+						rootsDigest: rootDigest(entry.roots.filter(isValidRoot)),
 						state: "world_applied",
 						journalSeq: entry.seq,
 						journalHash: entry.hash,
@@ -1030,42 +1342,77 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 		});
 	}
 
-	/** After a restore every Memory confirmation is checked again against Memory's own receipt. */
-	async function reverifyMemory(): Promise<void> {
+	/**
+	 * After a restore every completed Memory-linked forget is checked again
+	 * against Memory's own receipt. A forget stays `complete` only when that
+	 * check succeeded and shows every external confirmed (after confirming what
+	 * is verifiably gone from World). Anything else - Memory still showing
+	 * pending externals the roots do not reach, or a check that hit a transient
+	 * error - moves the intake back to `world_applied` (World content stays
+	 * deleted), so resume re-confirms it and recoverWorld reports it. Returns
+	 * those forgets: the caller keeps the gate CLOSED for them (fail closed).
+	 */
+	async function reverifyMemory(): Promise<
+		{ forgetId: string; reason: string }[]
+	> {
 		const linked = store.read((db) => listMemoryLinkedIntakes(db));
+		const unresolved: { forgetId: string; reason: string }[] = [];
 		for (const row of linked) {
-			if (row.state === "complete") {
-				await withLock(row.forgetId, async () => {
+			if (row.state !== "complete") continue;
+			await withLock(row.forgetId, async () => {
+				const regress = async (reason: string) => {
 					try {
-						await store.write((db) => {
-							const current = getIntake(db, row.forgetId);
-							if (!current || current.memoryForgetId === null) return;
-							const synced = syncConfirmations(db, current);
-							const access = accessFor(db, scopeOf(current));
-							for (const externalId of synced.pending) {
-								const outcome = memory.record(db, access, now(), {
-									forgetId: current.memoryForgetId,
-									externalId,
-									state: "confirmed",
-								});
-								if (outcome !== "recorded")
-									throw new StepBlocked(`MEMORY_${outcome.toUpperCase()}`);
-								upsertConfirmation(
-									db,
-									current.memoryForgetId,
-									externalId,
-									"confirmed",
-									now(),
-								);
-							}
-						});
-					} catch (error) {
-						if (transientReason(error) === null) throw error;
-						// Stays reported through forgetStatus; the next recover tries again.
+						await store.write((db) =>
+							reopenIntakeForMemory(db, row.forgetId, reason, now()),
+						);
+					} catch {
+						/* the in-memory report below still keeps the gate closed */
 					}
-				});
-			}
+					unresolved.push({ forgetId: row.forgetId, reason });
+				};
+				try {
+					const outcome = await store.write((db) => {
+						const current = getIntake(db, row.forgetId);
+						if (!current || current.memoryForgetId === null) return null;
+						const synced = syncConfirmations(db, current);
+						const access = accessFor(db, scopeOf(current));
+						for (const externalId of synced.confirmable) {
+							const result = memory.record(db, access, now(), {
+								forgetId: current.memoryForgetId,
+								externalId,
+								state: "confirmed",
+							});
+							if (result !== "recorded")
+								throw new StepBlocked(`MEMORY_${result.toUpperCase()}`);
+							upsertConfirmation(
+								db,
+								current.memoryForgetId,
+								externalId,
+								"confirmed",
+								now(),
+							);
+						}
+						if (synced.uncovered.length > 0) {
+							reopenIntakeForMemory(
+								db,
+								current.forgetId,
+								"MEMORY_EXTERNAL_NOT_COVERED",
+								now(),
+							);
+							return "MEMORY_EXTERNAL_NOT_COVERED";
+						}
+						return null;
+					});
+					if (outcome !== null)
+						unresolved.push({ forgetId: row.forgetId, reason: outcome });
+				} catch (error) {
+					const reason = transientReason(error);
+					if (reason === null) throw error;
+					await regress(reason);
+				}
+			});
 		}
+		return unresolved;
 	}
 
 	type Decision =
@@ -1112,6 +1459,12 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 		};
 	}
 
+	// recoverWorld() calls are serialised: a second call waits for the first, and
+	// only the LAST one outstanding may open the gate, so a call that finishes
+	// early can never reopen it in the middle of another call's restore.
+	let recoveries = 0;
+	let recoverTail: Promise<unknown> = Promise.resolve();
+
 	/**
 	 * Startup gate. Call before the queue starts. It verifies the World journal
 	 * against the database, detects a restored (older) database, runs the whole
@@ -1119,7 +1472,7 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 	 * World content, and only then opens the host gate. Any failure leaves the
 	 * gate closed (fail closed) and says why.
 	 */
-	async function recoverWorld(
+	async function runRecover(
 		request: {
 			/** A database restore is known (operator action). */
 			restored?: boolean;
@@ -1127,7 +1480,6 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 			memoryFeedResyncRequired?: boolean;
 		} = {},
 	): Promise<RecoverReport> {
-		options.gate?.close("RECOVERY_REQUIRED");
 		const closed = (reason: string): RecoverReport => {
 			options.gate?.close(reason);
 			return { status: "closed", reason };
@@ -1163,6 +1515,8 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 					(await store.write((db) => {
 						const token = world.bumpRestoreEpochInWriter(db);
 						dropFeedCursors(db);
+						// World deletes the unsettled inbox events at restore.begin.
+						purgeUnsettledExtractEvents(db);
 						writeRestore(
 							db,
 							token,
@@ -1183,19 +1537,35 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 			}
 			// World content of every accepted forget must be gone before the gate opens.
 			const reports = await resumeForgets();
-			if (restored) await reverifyMemory();
 			const stuck = reports.filter(
 				(r) => r.state === "pending" || r.state === "journaled",
 			);
 			if (stuck.length > 0)
-				return closed(`FORGET_PENDING:${stuck[0]!.blocked ?? "UNKNOWN"}`);
-			options.gate?.open();
+				return closed(
+					`FORGET_PENDING:${stuck[0]!.blocked ?? stuck[0]!.state.toUpperCase()}:${stuck.length}`,
+				);
+			// Fail closed: after a restore, a forget whose Memory confirmations cannot
+			// be shown as complete (or checked at all) keeps the gate shut, even
+			// though its World content is already deleted. The next recoverWorld()
+			// without a restore finishes the confirmations and opens it.
+			if (restored) {
+				const unverified = await reverifyMemory();
+				if (unverified.length > 0)
+					return closed(
+						`MEMORY_UNVERIFIED:${unverified[0]!.reason}:${unverified.length}`,
+					);
+			}
+			// A concurrent recoverWorld() started meanwhile owns the final decision.
+			if (recoveries === 1) options.gate?.open();
+			const left = store.read((db) => ({
+				pending: listOpenIntakes(db).map((row) => row.forgetId),
+				abandoned: listAbandonedForgetIds(db),
+			}));
 			return {
 				status: "open",
 				restored,
-				pendingForgets: reports
-					.filter((r) => !r.complete)
-					.map((r) => r.forgetId),
+				pendingForgets: left.pending,
+				abandonedForgets: left.abandoned,
 			};
 		} catch (error) {
 			const reason = transientReason(error);
@@ -1207,7 +1577,36 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 		}
 	}
 
+	function recoverWorld(
+		request: {
+			/** A database restore is known (operator action). */
+			restored?: boolean;
+			/** Memory's recover() reported feedResyncRequired. */
+			memoryFeedResyncRequired?: boolean;
+		} = {},
+	): Promise<RecoverReport> {
+		recoveries += 1;
+		// Closed from the moment the call is made, also while it waits its turn.
+		options.gate?.close("RECOVERY_REQUIRED");
+		const run = recoverTail.then(
+			() => runRecover(request),
+			() => runRecover(request),
+		);
+		const done = run.then(
+			() => undefined,
+			() => undefined,
+		);
+		recoverTail = done;
+		return run.finally(() => {
+			recoveries -= 1;
+		});
+	}
+
 	// --- change feeds -------------------------------------------------------------
+
+	/** A Memory forget id may not contain the reserved part separator: such ids are hashed. */
+	const feedForgetId = (id: string): string =>
+		validForgetId(id, false) ? id : `mf-${short(id)}`;
 
 	function feedKeyOf(scope: ScopeRef, a: string | number, b: string | number) {
 		return short(
@@ -1267,6 +1666,73 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 		return count;
 	}
 
+	/** Whether this writer callback may hand extraction input to World (decided once per page). */
+	function receiveUsable(
+		db: Database,
+	): { ok: true } | { ok: false; reason: "WORLD_OFF" | "GATE_CLOSED" } {
+		if (options.gate && !options.gate.isOpen())
+			return { ok: false, reason: "GATE_CLOSED" };
+		return world.statusInTransaction(db).usable
+			? { ok: true }
+			: { ok: false, reason: "WORLD_OFF" };
+	}
+
+	/**
+	 * Where each feed stands, stage by stage: the owner (is there more at the
+	 * source?), the host's scan position, what World's inbox took, and what was
+	 * semantically settled. Unsettled events are never reported as applied; the
+	 * applied cursor stops before the oldest unsettled event.
+	 */
+	function feedStages(
+		scope: ScopeRef,
+		settings: { namespace?: string } = {},
+	): FeedStages {
+		const adapter = adapters.get(settings.namespace ?? "conversation");
+		return store.read((db) => {
+			let sourceAhead: boolean | "unknown" = "unknown";
+			if (adapter) {
+				const cursor = world.feedCursor(db, "source", scope);
+				const scopeKeys = scopeSetOf(options.scopes ?? [], scope);
+				try {
+					const head = adapter.listChanges(db, accessFor(db, scope), {
+						cursor: scopeSetChanged(db, "source", scope, scopeKeys)
+							? null
+							: cursor.cursor,
+						limit: 1,
+					});
+					sourceAhead = head.changes.length > 0 || head.hasMore;
+				} catch {
+					sourceAhead = "unknown";
+				}
+			}
+			let memoryAhead: boolean | "unknown" = "unknown";
+			const memoryCursor = world.feedCursor(db, "memory", scope);
+			const memoryKeys = scopeSetOf(options.scopes ?? [], scope);
+			const after = scopeSetChanged(db, "memory", scope, memoryKeys)
+				? 0
+				: memoryCursor.cursor === null
+					? 0
+					: Number(memoryCursor.cursor);
+			if (Number.isSafeInteger(after) && after >= 0) {
+				try {
+					const page = memory.listChanges(db, accessFor(db, scope), {
+						scopeKey: scope.scopeKey,
+						afterSeq: after,
+						limit: 1,
+					});
+					if (page.status === "ok")
+						memoryAhead = page.changes.length > 0 || page.hasMore;
+				} catch {
+					memoryAhead = "unknown";
+				}
+			}
+			return {
+				source: sourceFeedStages(db, scope, sourceAhead),
+				memory: memoryFeedStages(db, scope, memoryAhead),
+			};
+		});
+	}
+
 	/**
 	 * Reads Memory's change feed from the persisted cursor (valid only for the
 	 * current restore epoch; a stale cursor re-reads everything). In ONE writer
@@ -1286,11 +1752,16 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 			intakes: string[];
 			invalidated: number;
 			hasMore: boolean;
+			rejectedRoots: number;
 		};
 		try {
 			out = await store.write((db) => {
 				const cursor = world.feedCursor(db, "memory", scope);
-				const afterSeq = cursor.cursor === null ? 0 : Number(cursor.cursor);
+				// A different Scope set discards the cursor: the feed is read again.
+				const scopeKeys = scopeSetOf(options.scopes ?? [], scope);
+				const widened = scopeSetChanged(db, "memory", scope, scopeKeys);
+				const afterSeq =
+					widened || cursor.cursor === null ? 0 : Number(cursor.cursor);
 				if (!Number.isSafeInteger(afterSeq) || afterSeq < 0)
 					throw new StepBlocked("FEED_CURSOR_INVALID");
 				const access = accessFor(db, scope);
@@ -1356,12 +1827,27 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 				const firstSeq = rows[0]?.seq ?? 0;
 				const lastForget = rows[rows.length - 1]?.forgetId ?? null;
 				const intakes: string[] = [];
-				for (const [memoryForgetId, roots] of groups) {
+				let rejectedRoots = 0;
+				for (const [memoryForgetId, allRoots] of groups) {
+					// Ids World would refuse are counted and skipped; they must not
+					// keep the cursor (and every other root) from moving.
+					const split = splitValidRoots(allRoots);
+					rejectedRoots += split.rejected;
+					if (split.valid.length === 0) continue;
+					// Deduplicated first: both sides of the digest comparison are the
+					// stored (deduplicated) form.
+					const roots = normalizeRoots(split.valid);
+					if ("status" in roots)
+						throw new StepBlocked(`INTAKE_${roots.reasonCode}`);
 					const final = !(cut && memoryForgetId === lastForget);
-					let forgetId = memoryForgetId;
+					let forgetId = feedForgetId(memoryForgetId);
 					const existing = getIntake(db, forgetId);
-					if (existing && existing.rootsDigest !== rootDigest(roots))
-						forgetId = `${memoryForgetId}#${firstSeq}`;
+					if (
+						existing &&
+						existing.rootsDigest !== rootDigest(roots) &&
+						!rootsCover(existing, roots)
+					)
+						forgetId = feedForgetId(`${memoryForgetId}#${firstSeq}`);
 					const accepted = acceptInWriter(
 						db,
 						{
@@ -1386,13 +1872,21 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 						? 0
 						: invalidateKeys(db, scope, `mem:${firstSeq}:${position}`, stopped);
 				world.saveFeedCursorInWriter(db, "memory", scope, String(position));
+				writeExtractFeedScopeSet(
+					db,
+					"memory",
+					scope.principal,
+					scope.scopeKey,
+					JSON.stringify(scopeKeys),
+				);
 				hook("feed_cursor_saved");
 				return {
-					resync: cursor.stale,
+					resync: cursor.stale || widened,
 					changes: rows.length,
 					intakes,
 					invalidated,
 					hasMore,
+					rejectedRoots,
 				};
 			});
 		} catch (error) {
@@ -1405,6 +1899,7 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 				invalidated: 0,
 				hasMore: false,
 				blocked: reason,
+				rejectedRoots: 0,
 			};
 		}
 		const forgets: ForgetReport[] = [];
@@ -1416,6 +1911,7 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 			invalidated: out.invalidated,
 			hasMore: out.hasMore,
 			blocked: null,
+			rejectedRoots: out.rejectedRoots,
 		};
 	}
 
@@ -1423,9 +1919,11 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 	 * Reads the conversation outbox (SourceAdapter.listChanges) from its own
 	 * persisted cursor. Deletions and retractions are applied before additions
 	 * and corrections (deletionsFirst): a retraction becomes a forget intake, a
-	 * correction stops the assertions that stand on the old version, and an
-	 * addition changes nothing (World learns new facts only from explicit
-	 * operations). The cursor moves in the same writer callback.
+	 * correction stops the assertions that stand on the old version, and every
+	 * remaining user addition or correction is handed to World's inbox
+	 * (`inbox.receive`, P4-01) once those two are applied. The receipts and the
+	 * cursor move in the same writer callback; the semantic application
+	 * (extraction, `candidate.settle`) is a separate, later step.
 	 */
 	async function consumeSourceChanges(
 		scope: ScopeRef,
@@ -1440,6 +1938,7 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 				invalidated: 0,
 				hasMore: false,
 				blocked: "SOURCE_ADAPTER_MISSING",
+				rejectedRoots: 0,
 			};
 		let out: {
 			resync: boolean;
@@ -1447,13 +1946,19 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 			intakes: string[];
 			invalidated: number;
 			hasMore: boolean;
+			rejectedRoots: number;
+			received: number;
+			skipped: number;
 		};
 		try {
 			out = await store.write((db) => {
 				const cursor = world.feedCursor(db, "source", scope);
+				// A different Scope set discards the cursor: the feed is read again.
+				const scopeKeys = scopeSetOf(options.scopes ?? [], scope);
+				const widened = scopeSetChanged(db, "source", scope, scopeKeys);
 				const access = accessFor(db, scope);
 				const page = adapter.listChanges(db, access, {
-					cursor: cursor.cursor,
+					cursor: widened ? null : cursor.cursor,
 					limit: Math.min(settings.limit ?? FEED_PAGE, FEED_PAGE),
 				});
 				const ordered = deletionsFirst(
@@ -1464,17 +1969,20 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 				);
 				const intakes: string[] = [];
 				const retracted = ordered.filter((c) => c.kind === "retracted");
-				if (retracted.length > 0) {
+				const split = splitValidRoots(
+					retracted.map((c) => ({
+						kind: "source" as const,
+						id: sourceKeyOf(c.source),
+						revision: 1,
+					})),
+				);
+				if (split.valid.length > 0) {
 					const forgetId = `sf-${feedKeyOf(scope, "source", page.nextCursor)}`;
 					const accepted = acceptInWriter(db, {
 						forgetId,
 						scope,
 						reasonCode: "SOURCE_FORGOTTEN",
-						roots: retracted.map((c) => ({
-							kind: "source" as const,
-							id: sourceKeyOf(c.source),
-							revision: 1,
-						})),
+						roots: split.valid,
 						origin: "source_feed",
 					});
 					if ("status" in accepted)
@@ -1488,14 +1996,36 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 					corrected.length === 0
 						? 0
 						: invalidateKeys(db, scope, `src:${page.nextCursor}`, corrected);
+				// Corrections and forgets above come first; only then are the
+				// remaining additions persisted as extraction input (P4-01). The
+				// receipt and the cursor save are ONE writer callback: if it fails
+				// (database, Writer) nothing of it remains and the cursor stays.
+				const state = receiveUsable(db);
+				const receipt = receiveSourceChanges(
+					db,
+					{ worldOp, usable: () => state, now },
+					scope,
+					{ scopeKeys, restoreEpoch: cursor.restoreEpoch },
+					ordered,
+				);
 				world.saveFeedCursorInWriter(db, "source", scope, page.nextCursor);
+				writeExtractFeedScopeSet(
+					db,
+					"source",
+					scope.principal,
+					scope.scopeKey,
+					JSON.stringify(scopeKeys),
+				);
 				hook("feed_cursor_saved");
 				return {
-					resync: cursor.stale,
+					resync: cursor.stale || widened,
 					changes: page.changes.length,
 					intakes,
 					invalidated,
 					hasMore: page.hasMore,
+					rejectedRoots: split.rejected,
+					received: receipt.received,
+					skipped: receipt.skipped,
 				};
 			});
 		} catch (error) {
@@ -1508,6 +2038,7 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 				invalidated: 0,
 				hasMore: false,
 				blocked: reason,
+				rejectedRoots: 0,
 			};
 		}
 		const forgets: ForgetReport[] = [];
@@ -1519,6 +2050,9 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 			invalidated: out.invalidated,
 			hasMore: out.hasMore,
 			blocked: null,
+			rejectedRoots: out.rejectedRoots,
+			received: out.received,
+			skippedInputs: out.skipped,
 		};
 	}
 
@@ -1529,15 +2063,26 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 		resumeForget: advance,
 		/** Resume every forget that is not complete (also done by recoverWorld). */
 		resumeForgets,
-		forgetStatus: (forgetId: string): ForgetReport | null => {
-			const row = store.read((db) => getIntake(db, forgetId));
-			return row ? reportOf(row) : null;
-		},
+		forgetStatus: (forgetId: string): ForgetReport | null =>
+			store.read((db) => {
+				const row = getIntake(db, forgetId);
+				return row ? reportOf(db, row) : null;
+			}),
 		recoverWorld,
+		/**
+		 * Retry sweep for Memory dependents whose unregistration was refused
+		 * (host rows marked release_pending). Idempotent, never throws on Memory.
+		 */
+		sweepPendingReleases: (limit = 200) =>
+			store.write((db) =>
+				sweepReleasePending(db, limit, (scope) => unregisterFor(db, scope)),
+			),
 		/** Explicit restore: same procedure as a detected one. */
 		startRestore: () => recoverWorld({ restored: true }),
 		consumeMemoryChanges,
 		consumeSourceChanges,
+		/** Each checkpoint stage of both feeds (owner, scanned, received, applied). */
+		feedStages,
 	};
 }
 export type WorldLifecycle = ReturnType<typeof createWorldLifecycle>;

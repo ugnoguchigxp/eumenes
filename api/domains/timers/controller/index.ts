@@ -28,7 +28,8 @@ export function registerTimers(app: Hono, service: TimersService) {
 	});
 	app.get("/api/timers", (c) => {
 		const limit = limitOf(c.req.query("limit"));
-		if (Number.isNaN(limit)) return c.json({ error: "invalid_timer_input" }, 400);
+		if (Number.isNaN(limit))
+			return c.json({ error: "invalid_timer_input" }, 400);
 		const query = listTimersQuerySchema.safeParse({
 			state: c.req.query("state"),
 			conversationId: c.req.query("conversationId"),
@@ -41,9 +42,7 @@ export function registerTimers(app: Hono, service: TimersService) {
 	});
 	app.get("/api/timers/:id", (c) => {
 		const view = service.get(c.req.param("id"));
-		return view
-			? c.json(view)
-			: c.json({ error: "timer_not_found" }, 404);
+		return view ? c.json(view) : c.json({ error: "timer_not_found" }, 404);
 	});
 	app.get("/api/timer-actions/by-run/:runId", (c) => {
 		const runId = c.req.param("runId");
@@ -61,7 +60,8 @@ export function registerTimers(app: Hono, service: TimersService) {
 	});
 	app.get("/api/timer-notifications", (c) => {
 		const limit = limitOf(c.req.query("limit"));
-		if (Number.isNaN(limit)) return c.json({ error: "invalid_timer_input" }, 400);
+		if (Number.isNaN(limit))
+			return c.json({ error: "invalid_timer_input" }, 400);
 		if (
 			limit !== undefined &&
 			(!Number.isInteger(limit) || limit < 1 || limit > 100)

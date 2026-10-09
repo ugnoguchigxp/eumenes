@@ -1,6 +1,6 @@
 # 監督サブエージェントの実装計画
 
-作成日: 2026-10-09 JST。状態: 実装前。[全体計画](README.md) の P2〜P6 を担当する。共通状態は [01](01-tasks-and-queue.md)、CLI と証拠は [02](02-coding-runner-and-mcp.md)、報告は [04](04-conversation-and-reports.md) に従う。
+作成日: 2026-10-09 JST。状態: 監督ロジック・報告先行契約を実装済み、fixture検証済み。本番接続とlive受入は未完了。[全体計画](README.md) の P2〜P6 を担当する。共通状態は [01](01-tasks-and-queue.md)、CLI と証拠は [02](02-coding-runner-and-mcp.md)、報告は [04](04-conversation-and-reports.md) に従う。
 
 ## 1 役割と完了条件
 
@@ -142,3 +142,16 @@ S1: 決定的な状態機械と fixture。S2: 観測と dedupe。S3: 制約付�
 - モデル拒否、不正 JSON、期限切れ、判断採用前 crash でも操作を重複させない。
 
 live では固定したモデルで同一の受入依頼を実行し、工程と証拠・報告を照合する。モデル依存の成功率や速度は測定結果だけを記載し、fixture の成功を一般的な自律判断の保証にしない。
+
+
+## 2026-10-10 実装記録
+
+S1〜S5の監督状態、観測dedupe、独立した背景推論、固定工程の制約、予算、報告outboxを実装した。S6の障害fixtureを実施し、liveは未実施。コードは `api/domains/coding-supervision`、`api/domains/task-reports`、applicationの `coding-supervision.ts`。設定変更後の背景結果の拒否と独立期限はinferenceの公開操作が担当する。
+
+初期実装ではチェック/review権限を必要工程として要求し、commit/push権限がないタスクにGit操作を追加しない。レビューの指摘が残る場合は修正と再レビューを必要とし、指摘を任意に消して完了させる操作は設けていない。依頼から工程を柔軟に省略する機能は未実装。修正2回・同一ブロッカー1回はhost固定上限で、ユーザーの上限変更UIは後続。
+
+報告本文は不変台帳に保存するが、メイン会話への配達・既読・音声は計画04、モーダルは計画05。モデルの常駐sessionや別の推論資源は作っていない。
+
+本番は計画02 C6の操作ワーカーと隔離、および採用モデルのtokenizer計測が未接続。`WorkflowPort` と `countControlTokens` を模擬実装した試験で工程を確認した。本番の実CLI、Git、モデルによる自律実行を完成とは宣言しない。
+
+運用契約: [docs/coding-supervision.md](../../docs/coding-supervision.md)。検証: [supervision-fixtures.md](../verification/delegated-coding/supervision-fixtures.md)。

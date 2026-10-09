@@ -33,6 +33,34 @@ export type AdapterOperation = {
 	result?: ToolResult;
 	errorCode?: string;
 };
+export type ActionEnvelope = {
+	kind: "local_action";
+	backend: "timer";
+	version: 1;
+	operationId: string;
+	receiptDigest: string;
+	payload: unknown;
+};
+export interface ActionAdapter {
+	/** Host snapshots for route selection; no model-generated identifiers. */
+	contextInTransaction?(tx: Database, owner: Owner): unknown;
+	executeInTransaction(
+		tx: Database,
+		request: {
+			requestId: string;
+			issuedAt: string;
+			tool: FixedDefinition;
+			arguments: unknown;
+			owner: Owner;
+			originToken: string;
+		},
+	): ActionEnvelope;
+	readInTransaction(
+		tx: Database,
+		operationId: string,
+		owner: Owner,
+	): ActionEnvelope | null;
+}
 export interface ToolAdapter {
 	startInTransaction(
 		tx: Database,

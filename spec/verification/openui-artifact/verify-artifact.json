@@ -1,0 +1,29 @@
+{
+	"selected": ["artifact"],
+	"dependencySet": ["delivery", "avatar", "conversation", "artifact"],
+	"revision": "e6d6d015e5a0ce77bf92d365e070ecaa40585a7e3b6de60d385e52f8e244e233",
+	"steps": [
+		{
+			"name": "format",
+			"ms": 100,
+			"result": "pass"
+		},
+		{
+			"name": "lint",
+			"ms": 48,
+			"result": "pass"
+		},
+		{
+			"name": "typecheck",
+			"ms": 901,
+			"result": "pass"
+		},
+		{
+			"name": "domain tests",
+			"ms": 1238,
+			"result": "pass"
+		}
+	],
+	"totalMs": 2864,
+	"result": "pass"
+}

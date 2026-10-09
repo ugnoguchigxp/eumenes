@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { getLogger } from "../../../infrastructure/logger";
+import { getLogger, type LogFields } from "../../../infrastructure/logger";
+import {
+	ValidationFailure,
+	validationIssues,
+} from "../../../infrastructure/validation-log";
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import {
@@ -27,10 +31,24 @@ import {
 	type AdoptedEvidence,
 	type StoredBinding,
 } from "../contracts";
+import { timerCommand } from "../../capabilities";
 import { get, byRoot, update, dto } from "../repository";
 import { coordinatorContext, workerContext } from "./context";
 import { verifyReport, parentProjection } from "./verify-report";
 import { createRouteStep, siteFailureCodes } from "./route-step";
+import { parseControlOutput } from "./control-output";
+function actionInvocation(db: Database, taskId: string) {
+	const table = db
+		.query(
+			"SELECT 1 AS ok FROM sqlite_master WHERE type='table' AND name='agent_action_results'",
+		)
+		.get() as { ok: number } | null;
+	if (!table) return null;
+	const row = db
+		.query("SELECT invocation_id FROM agent_action_results WHERE task_id=?")
+		.get(taskId) as { invocation_id: string } | null;
+	return row?.invocation_id ?? null;
+}
 const terminal = new Set(["completed", "failed", "cancelled", "interrupted"]);
 const active = (t: Task | null): t is Task => !!t && !terminal.has(t.state);
 const owner = (t: Task): Owner => ({
@@ -53,8 +71,14 @@ type StepInput = {
 	messages: Array<{ role: "system" | "user" | "assistant"; content: string }>;
 	visible: Source[];
 	manifestDigest: string;
+	actionSnapshot?: unknown;
 };
-type StepOutput = { receipt: Receipt; action: unknown; invalid: boolean };
+type StepOutput = {
+	receipt: Receipt;
+	action: unknown;
+	invalid: boolean;
+	diagnostic?: LogFields;
+};
 export function createAgentRuntime({
 	store,
 	capabilities,
@@ -78,9 +102,97 @@ export function createAgentRuntime({
 	acquisition?: AcquisitionPlanPort;
 }) {
 	const log = getLogger("agent-runtime");
+	// Derived repair feedback lives only for this process. A restart interrupts
+	// these jobs; the committed rejected step remains its authority.
+	const repairFeedback = new Map<
+		string,
+		{ stepId: string; code: string; reason: string; issues: LogFields[] }
+	>();
+	function logRejection(
+		t: Task,
+		input: StepInput,
+		result: StepOutput,
+		jobId: string,
+		code: string,
+		diagnostic: LogFields,
+		issues: LogFields[] = [],
+		issueCount = issues.length,
+		error?: unknown,
+	) {
+		// A rejection is logged only after its transaction commits. A rollback or
+		// stale result must not look like an accepted state transition.
+		void Promise.resolve()
+			.then(() => {
+				const step = store.read((db) =>
+					db
+						.query("SELECT state,error_code FROM agent_steps WHERE id=?")
+						.get(input.stepId),
+				) as { state: string; error_code: string | null } | null;
+				if (
+					!step ||
+					!["rejected", "failed"].includes(step.state) ||
+					step.error_code !== code
+				)
+					return;
+				const current = store.read((db) => get(db, t.id));
+				if (current?.state === "queued")
+					repairFeedback.set(t.id, {
+						stepId: input.stepId,
+						code,
+						reason: diagnostic.reason ?? result.diagnostic?.reason ?? code,
+						issues: issues.map(
+							({
+								validationPath,
+								validationCode,
+								expectedType,
+								actualType,
+							}) => ({
+								validationPath,
+								validationCode,
+								expectedType,
+								actualType,
+							}),
+						),
+					});
+				const fields: LogFields = {
+					runId: t.root_run_id,
+					taskId: t.id,
+					jobId,
+					stepId: input.stepId,
+					inferenceId: input.requestId,
+					attemptId: result.receipt.attemptId,
+					kind: t.kind,
+					phase: t.phase,
+					repairAttempt: t.json_repairs,
+					status: current?.state === "queued" ? "repair_scheduled" : "failed",
+					controlSchema:
+						t.kind === "worker"
+							? "worker"
+							: t.phase === "route"
+								? "route"
+								: "select",
+					...result.diagnostic,
+					...diagnostic,
+					issueCount,
+					reportedIssueCount: issues.length,
+				};
+				log.warn("agent.control_rejected", fields, error);
+				for (const issue of issues)
+					log.warn("agent.control_validation_issue", { ...fields, ...issue });
+			})
+			.catch(() => {});
+	}
 	const traceIds = new Set<string>();
 	const traced = new Map<string, string>();
 	const prepared = new Map<string, Prepared>();
+	const actionPrepared = new Map<string, Prepared>();
+	function currentActionPayload(db: Database, task: Task) {
+		const invocation = actionInvocation(db, task.id);
+		if (!invocation) return null;
+		return JSON.stringify(
+			tools.readActionInTransaction(db, owner(task), invocation).payload,
+		);
+	}
 	const candidates = new Map<string, Candidate[]>();
 	const bindings = new Map<string, ReturnType<ToolRuntime["bind"]>>();
 	let closed = false,
@@ -330,10 +442,20 @@ export function createAgentRuntime({
 		return toolId === "web.lookup" ? 2 : toolId === "web.read" ? 3 : 1;
 	}
 	function usableTools(db: Database, t: Task) {
+		const direct = storedBinding(t)?.initialAction.kind === "direct-invoke";
+		const input = researchInput.safeParse(prepared.get(t.id)?.input);
+		const hint = input.success ? invocationHint?.(input.data.question) : null;
 		return (bindings.get(t.id) ?? []).filter(
 			(b) =>
+				// Structured regional/symbol tools must be applicable to this request.
+				// Otherwise keep the search/read path instead of offering a tool the
+				// adapter will reject. Exact cached grants retain their own authority.
+				(direct ||
+					!invocationHint ||
+					!["web.forecast", "web.quote"].includes(b.tool.id) ||
+					hint?.toolId === b.tool.id) &&
 				tools.countInTransaction(db, t.id, b.tool.revisionId) <
-				toolLimit(t, b.tool.id),
+					toolLimit(t, b.tool.id),
 		);
 	}
 	const handler: HandlerDefinition<
@@ -374,7 +496,49 @@ export function createAgentRuntime({
 							detail: "brief | normal",
 						},
 					}));
-					context = coordinatorContext(t, cards);
+					let actionContext;
+					if (t.phase === "route" && tools.actionsEnabled()) {
+						try {
+							const bundle = capabilities.prepareActiveByIdInTransaction(
+								db,
+								owner(t),
+								"package:timers.manage@1",
+								{ operation: "list" },
+							);
+							actionPrepared.set(t.id, bundle);
+							const required = new Set([
+								bundle.package.profileRevisionId,
+								...(bundle.package.requiredSkillRevisionIds ?? []),
+							]);
+							const sections = bundle.dependencies
+								.filter((item) => required.has(item.revisionId))
+								.map((item) => ({
+									revisionId: item.revisionId,
+									hash: item.hash,
+									body: item.body,
+								}));
+							if (
+								sections.length !== required.size ||
+								sections.some((item) => !item.body?.trim()) ||
+								bytes(sections) > 16384
+							)
+								throw new Error("required_context_missing");
+							actionContext = {
+								sections,
+								snapshot: tools.actionContextInTransaction(db, owner(t)),
+							};
+						} catch (error) {
+							actionPrepared.delete(t.id);
+							if (
+								!(error instanceof Error) ||
+								!["capability_unavailable", "capability_revoked"].includes(
+									error.message,
+								)
+							)
+								throw error;
+						}
+					}
+					context = coordinatorContext(t, cards, actionContext);
 				} else {
 					const p = prepared.get(t.id);
 					if (!p) throw new Error("capability_ref_invalid");
@@ -397,6 +561,32 @@ export function createAgentRuntime({
 							: invocationHint?.(researchInput.parse(p.input).question),
 					);
 				}
+				const feedback = t.json_repairs ? repairFeedback.get(t.id) : null;
+				if (feedback) {
+					const rejected = db
+						.query(
+							"SELECT state,error_code,ordinal FROM agent_steps WHERE id=? AND task_id=?",
+						)
+						.get(feedback.stepId, t.id) as {
+						state: string;
+						error_code: string;
+						ordinal: number;
+					} | null;
+					if (
+						rejected?.state === "rejected" &&
+						rejected.ordinal === t.current_step - 1 &&
+						rejected.error_code === feedback.code
+					)
+						context.messages.push({
+							role: "system",
+							content:
+								"前回の出力の拒否理由です。該当項目だけを現在の契約に合わせて修正してください。未知の値は補いません。executionRefは現在のTOOLSの短い名前を指定し、argumentsはそのツールのinputSchemaに合わせます。引用は提示済み本文の連続した短い原文を使います。DIAGNOSTIC=" +
+								JSON.stringify({
+									reason: feedback.reason,
+									issues: feedback.issues,
+								}),
+						});
+				}
 				const requestId = inference.captureControlInTransaction(db, {
 					subject: `agent:${t.id}:step:${t.current_step}`,
 					policySubject: t.root_run_id,
@@ -418,6 +608,9 @@ export function createAgentRuntime({
 						revision: current.revision,
 						requestId,
 						messages: context.messages,
+						...("actionSnapshot" in context
+							? { actionSnapshot: context.actionSnapshot }
+							: {}),
 						visible: context.visible ?? [],
 						manifestDigest: context.manifestDigest,
 					},
@@ -433,16 +626,7 @@ export function createAgentRuntime({
 				input.messages,
 				signal,
 			);
-			let action: unknown,
-				invalid = false;
-			try {
-				if (typeof receipt.value !== "string" || bytes(receipt.value) > 12288)
-					throw new Error("invalid_control_json");
-				action = JSON.parse(receipt.value.trim());
-			} catch {
-				invalid = true;
-			}
-			return { receipt, action, invalid };
+			return { receipt, ...parseControlOutput(receipt.value) };
 		},
 		classify: () => "fail",
 		settleInTransaction(db, claim, input, outcome) {
@@ -471,7 +655,41 @@ export function createAgentRuntime({
 						? routeSchema
 						: selectSchema;
 			const parsed = schema.safeParse(outcome.result.action);
+			if (
+				t.kind === "coordinator" &&
+				t.phase === "route" &&
+				(outcome.result.action as { action?: string } | null)?.action ===
+					"timer"
+			) {
+				db.query("UPDATE agent_tasks SET input_json=? WHERE id=?").run(
+					JSON.stringify({
+						...JSON.parse(t.input_json ?? "{}"),
+						timerRequested: true,
+					}),
+					t.id,
+				);
+			}
 			if (outcome.result.invalid || !parsed.success) {
+				const issues =
+					!outcome.result.invalid && !parsed.success
+						? validationIssues(parsed.error, outcome.result.action)
+						: [];
+				logRejection(
+					t,
+					input,
+					outcome.result,
+					claim.jobId,
+					"invalid_control_json",
+					{
+						reason: outcome.result.invalid
+							? (outcome.result.diagnostic?.reason ?? "control_json_syntax")
+							: "control_schema_invalid",
+					},
+					issues,
+					!outcome.result.invalid && !parsed.success
+						? parsed.error.issues.length
+						: 0,
+				);
 				inference.rejectControlInTransaction?.(
 					db,
 					outcome.result.receipt,
@@ -504,7 +722,92 @@ export function createAgentRuntime({
 					ready(db, get(db, t.id)!, "clarification_required");
 				} else if (action.action === "unavailable")
 					ready(db, t, "capability_unavailable");
-				else if (action.action === "discover" || action.action === "refine") {
+				else if (action.action === "timer") {
+					if (!input || t.kind !== "coordinator" || t.phase !== "route")
+						throw new Error("capability_unavailable");
+					if (!tools.actionsEnabled())
+						throw new Error("capability_unavailable");
+					const parsed = timerCommand.safeParse(action.command);
+					if (!parsed.success) throw new Error("invalid_timer_input");
+					if (
+						parsed.data.operation === "cancel" ||
+						(parsed.data.operation === "list" && parsed.data.timerId)
+					) {
+						const snapshot = input.actionSnapshot as
+							| { items?: Array<{ id: string; revision: number }> }
+							| undefined;
+						const command = parsed.data;
+						if (
+							!snapshot?.items?.some(
+								(item) =>
+									item.id === command.timerId &&
+									(command.operation !== "cancel" ||
+										item.revision === command.expectedRevision),
+							)
+						)
+							throw new Error("timer_target_invalid");
+					}
+					const routeBundle = actionPrepared.get(t.id);
+					if (!routeBundle) throw new Error("required_context_missing");
+					capabilities.validateInTransaction(db, routeBundle);
+					const preparedTimer = capabilities.prepareActiveByIdInTransaction(
+						db,
+						owner(t),
+						"package:timers.manage@1",
+						parsed.data,
+						{
+							hash: routeBundle.package.hash,
+							generation: routeBundle.package.generation,
+						},
+					);
+					prepared.set(t.id, preparedTimer);
+					const bound = tools.bind(owner(t), preparedTimer, t.deadline);
+					const toolId =
+						parsed.data.operation === "start"
+							? "timer.start"
+							: parsed.data.operation === "cancel"
+								? "timer.cancel"
+								: "timer.list";
+					const picked = bound.find((item) => item.tool.id === toolId);
+					if (!picked) throw new Error("capability_unavailable");
+					const command = parsed.data;
+					const args =
+						command.operation === "start"
+							? {
+									durationSeconds: command.durationSeconds,
+									...(command.label ? { label: command.label } : {}),
+								}
+							: command.operation === "cancel"
+								? {
+										timerId: command.timerId,
+										expectedRevision: command.expectedRevision,
+									}
+								: {
+										...(command.timerId ? { timerId: command.timerId } : {}),
+										...(command.state ? { state: command.state } : {}),
+									};
+					const saved = tools.invokeActionInTransaction(
+						db,
+						owner(t),
+						picked.executionRef,
+						args,
+						input.stepId,
+						t.deadline,
+						`${t.root_run_id}:${t.cancel_epoch}`,
+					);
+					db.query(
+						`INSERT INTO agent_action_results(task_id,invocation_id,operation_id,receipt_digest,payload_json,created_at)
+             VALUES(?,?,?,?,?,?)`,
+					).run(
+						t.id,
+						saved.invocationId,
+						saved.operationId,
+						saved.receiptDigest,
+						JSON.stringify(saved.payload),
+						now(),
+					);
+					ready(db, get(db, t.id)!);
+				} else if (action.action === "discover" || action.action === "refine") {
 					if (action.action === "refine" && t.refinements >= 1)
 						throw new Error("capability_unavailable");
 					const cards = capabilities.searchInTransaction(
@@ -522,7 +825,14 @@ export function createAgentRuntime({
 				} else if (action.action === "select") {
 					if (t.deadline - now() <= 15000)
 						throw new Error("agent_budget_exhausted");
-					const supplied = researchInput.parse(action.input);
+					const checkedInput = researchInput.safeParse(action.input);
+					if (!checkedInput.success)
+						throw new ValidationFailure(
+							"agent_failed",
+							validationIssues(checkedInput.error, action.input, ["input"]),
+							checkedInput.error.issues.length,
+						);
+					const supplied = checkedInput.data;
 					const original = JSON.parse(t.input_json ?? "{}").question as string;
 					if (supplied.urls?.some((url) => !original.includes(url)))
 						throw new Error("tool_url_out_of_scope");
@@ -562,10 +872,20 @@ export function createAgentRuntime({
 					const root = byRoot(db, t.root_run_id);
 					if (!active(root) || root.state !== "waiting_child")
 						throw new Error("task_cancelled");
-					const tool = bindings
-						.get(t.id)
-						?.find((b) => b.executionRef === action.executionRef);
-					if (!tool) throw new Error("tool_ref_invalid");
+					const tool = usableTools(db, t).find(
+						(b) =>
+							b.executionRef === action.executionRef ||
+							b.tool.id === action.executionRef,
+					);
+					if (!tool)
+						throw new ValidationFailure("invalid_tool_input", [
+							{
+								validationPath: "executionRef",
+								validationCode: "unknown_execution_ref",
+								expectedType: "enum",
+								actualType: "string",
+							},
+						]);
 					const expected = workerContext(
 						t,
 						p,
@@ -591,7 +911,7 @@ export function createAgentRuntime({
 					const inv = tools.invokeInTransaction(
 						db,
 						owner(t),
-						action.executionRef,
+						tool.executionRef,
 						action.arguments,
 						input.stepId,
 						t.deadline,
@@ -714,6 +1034,17 @@ export function createAgentRuntime({
 				db.exec("ROLLBACK TO agent_action");
 				db.exec("RELEASE agent_action");
 				const code = safeCode(e);
+				logRejection(
+					t,
+					input,
+					outcome.result,
+					claim.jobId,
+					code,
+					{ reason: code, controlAction: action.action },
+					e instanceof ValidationFailure ? e.issues : [],
+					e instanceof ValidationFailure ? e.issueCount : 0,
+					e,
+				);
 				inference.rejectControlInTransaction?.(
 					db,
 					outcome.result.receipt,
@@ -831,6 +1162,8 @@ export function createAgentRuntime({
 				bindings.delete(id);
 				candidates.delete(id);
 				prepared.delete(id);
+				repairFeedback.delete(id);
+				actionPrepared.delete(id);
 			}
 		}
 		releases.clear();
@@ -946,6 +1279,7 @@ export function createAgentRuntime({
 						tools.release(taskId);
 						capabilities.releaseOwner(taskId);
 						prepared.delete(taskId);
+						actionPrepared.delete(taskId);
 						bindings.delete(taskId);
 						candidates.delete(taskId);
 					}
@@ -970,12 +1304,12 @@ export function createAgentRuntime({
 							inv.deadline > now()
 						)
 							continue;
-						await store.write((db) => {
+						const applied = await store.write((db) => {
 							if (!tools.settleInTransaction(db, inv, operation)) return;
+							const settled = tools.getInTransaction(db, inv.id)!;
 							const t = get(db, inv.owner_task_id);
 							if (t?.state !== "waiting_tool" || t.invocation_id !== inv.id)
-								return;
-							const settled = tools.getInTransaction(db, inv.id)!;
+								return settled;
 							// Failure is an observation too. The worker may choose a different in-scope source within its budget.
 							if (
 								settled.state === "cancelled" ||
@@ -989,7 +1323,25 @@ export function createAgentRuntime({
 							)
 								replaceOrFail(db, t.id, settled.error_code!, inv.job_id);
 							else next(db, t, inv.job_id);
+							return settled;
 						});
+						if (applied) {
+							const fields: LogFields = {
+								runId: inv.root_run_id,
+								taskId: inv.owner_task_id,
+								invocationId: inv.id,
+								operationId: inv.operation_id,
+								jobId: inv.job_id,
+								status: applied.state,
+								reason: applied.error_code
+									? codeOf(applied.error_code, "tool_failed")
+									: undefined,
+								kind: inv.tool_revision_id,
+							};
+							if (["succeeded", "partial"].includes(applied.state))
+								log.info("agent.tool_completed", fields);
+							else log.warn("agent.tool_failed", fields);
+						}
 					}
 				}
 				const expired = store.read(
@@ -1126,6 +1478,28 @@ export function createAgentRuntime({
 		if (p) capabilities.validateInTransaction(db, p);
 		const child = root.report_task_id ? get(db, root.report_task_id) : null;
 		const report = reportInTransaction(db, root.id);
+		// Only operational progress reaches the parent on failure, never unverified
+		// snippets, page bodies or rejected worker claims.
+		const progress =
+			root.error_code && root.error_code !== "clarification_required"
+				? (
+						db
+							.query(
+								"SELECT id FROM agent_tasks WHERE root_run_id=? AND kind='worker'",
+							)
+							.all(rootRunId) as { id: string }[]
+					).flatMap((task) => tools.invocationsInTransaction(db, task.id))
+				: [];
+		const succeeded = (state: string) =>
+			state === "succeeded" || state === "partial";
+		const searches = progress.filter(
+			(item) =>
+				item.origin === "tool" &&
+				item.toolRevisionId.startsWith("tool:web.lookup@"),
+		);
+		const reads = progress.filter((item) =>
+			item.toolRevisionId.startsWith("tool:web.read@"),
+		);
 		if (root.report_task_id && !report) throw new Error("report_deleted");
 		const safe = child ? safeRow(db, child.id) : null;
 		const binding = storedBinding(child);
@@ -1144,6 +1518,10 @@ export function createAgentRuntime({
 		return {
 			projectionDigest: safe?.safe_projection_digest ?? null,
 			acquisitionBindingToken: binding?.bindingToken ?? null,
+			actionPayload: currentActionPayload(db, root),
+			actionFailure:
+				!!root.error_code &&
+				JSON.parse(root.input_json ?? "{}").timerRequested === true,
 			taskId: root.id,
 			eventId: event.id,
 			revision: root.revision,
@@ -1163,7 +1541,20 @@ export function createAgentRuntime({
 										clarification: JSON.parse(root.input_json ?? "{}")
 											.clarificationQuestion,
 									}
-								: { failure: root.error_code },
+								: {
+										failure: root.error_code,
+										researchProgress: {
+											searchAttempts: searches.length,
+											searchesSucceeded: searches.filter((item) =>
+												succeeded(item.state),
+											).length,
+											readAttempts: reads.length,
+											readsSucceeded: reads.filter((item) =>
+												succeeded(item.state),
+											).length,
+											verifiedReport: false,
+										},
+									},
 						)
 					: null,
 		};
@@ -1181,6 +1572,20 @@ export function createAgentRuntime({
 		try {
 			const p = prepared.get(t.id);
 			if (p) capabilities.validateInTransaction(db, p);
+			// Time fields may advance; authority and state must still match the ticket.
+			const state = (payload: string | null | undefined): unknown =>
+				payload
+					? JSON.parse(payload, (key, value) =>
+							key === "serverNow" || key === "remainingSeconds"
+								? undefined
+								: value,
+						)
+					: null;
+			if (
+				hash(state(ticket.actionPayload)) !==
+				hash(state(currentActionPayload(db, t)))
+			)
+				return false;
 		} catch {
 			return false;
 		}
@@ -1261,6 +1666,17 @@ export function createAgentRuntime({
 		cancelTreeInTransaction,
 		prepareAnswerInTransaction,
 		validAnswerInTransaction,
+		validateActionOwnerInTransaction(db: Database, input: Owner) {
+			const task = get(db, input.taskId);
+			if (
+				!active(task) ||
+				task.kind !== "coordinator" ||
+				task.phase !== "route" ||
+				task.root_run_id !== input.rootRunId ||
+				task.cancel_epoch !== input.cancelEpoch
+			)
+				throw new Error("origin_invalid");
+		},
 		startInTransaction(
 			db: Database,
 			input: { rootRunId: string; input: unknown; deadline: number },
@@ -1520,6 +1936,7 @@ export function createAgentRuntime({
 			});
 			flush();
 			prepared.clear();
+			actionPrepared.clear();
 			bindings.clear();
 			candidates.clear();
 			traceIds.clear();

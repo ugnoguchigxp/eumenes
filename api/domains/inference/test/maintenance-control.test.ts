@@ -15,6 +15,7 @@ import {
 	parentsMigration,
 	diagnosticsMigration,
 	controlMigration,
+	backgroundControlMigration,
 } from "..";
 
 const cleanup: Array<() => Promise<void>> = [];
@@ -35,6 +36,7 @@ async function setup() {
 		parentsMigration,
 		diagnosticsMigration,
 		controlMigration,
+		backgroundControlMigration,
 	]);
 	const settings = await createSettings(store, { dbPath, env: {} });
 	const s = settings.get();
@@ -218,4 +220,109 @@ test("I01 normal captureControl still requires a pending parent", async () => {
 			}),
 		),
 	).rejects.toThrow("permission_revoked");
+});
+
+test("background control binds task authority independently of an expired conversation, with exact limits", async () => {
+	const h = await setup();
+	const source = await h.store.write((db) =>
+		h.inference.captureInTransaction(
+			db,
+			"old-conversation",
+			"llm",
+			Date.now() - 1,
+		),
+	);
+	await h.store.write((db) =>
+		h.inference.cancelRequestsInTransaction(db, [source]),
+	);
+	const input = {
+		taskId: "coding-task",
+		decisionId: crypto.randomUUID(),
+		authorityEpoch: 1,
+		executionGeneration: 1,
+		deadline: Date.now() + 9000,
+		taskDeadline: Date.now() + 60000,
+		maxOutputTokens: 1500,
+	};
+	const id = await h.store.write((db) =>
+		h.inference.captureBackgroundControlInTransaction(db, input),
+	);
+	expect(
+		await h.store.write((db) =>
+			h.inference.captureBackgroundControlInTransaction(db, input),
+		),
+	).toBe(id);
+	await expect(
+		h.store.write((db) =>
+			h.inference.captureBackgroundControlInTransaction(db, {
+				...input,
+				authorityEpoch: 2,
+			}),
+		),
+	).rejects.toThrow("background_control_conflict");
+	const receipt = await h.inference.executeControl(
+		id,
+		messages,
+		new AbortController().signal,
+	);
+	expect(h.opts()).toMatchObject({
+		maxOutputTokens: 1500,
+		contextPolicy: "exact",
+	});
+	expect(
+		await h.store.write((db) => h.inference.acceptInTransaction(db, receipt)),
+	).toBe(true);
+	const row = h.store.read((db) =>
+		db
+			.query("SELECT parents,snapshot FROM inference_requests WHERE id=?")
+			.get(id),
+	) as { parents: string; snapshot: string };
+	expect(row.parents).toBe("[]");
+	expect(JSON.parse(row.snapshot).routes.llm).toMatchObject({
+		mode: "larm-only",
+		cloudAllowed: false,
+	});
+});
+test("background control rejects model budget expansion, expired authority and unavailable tokenizer", async () => {
+	const h = await setup();
+	const input = {
+		taskId: "coding-task",
+		decisionId: crypto.randomUUID(),
+		authorityEpoch: 1,
+		executionGeneration: 1,
+		deadline: Date.now() + 9000,
+		taskDeadline: Date.now() + 60000,
+		maxOutputTokens: 1500,
+	};
+	for (const bad of [
+		{ ...input, maxOutputTokens: 1501 },
+		{ ...input, deadline: Date.now() + 40000 },
+		{ ...input, taskDeadline: Date.now() - 1 },
+		{ ...input, executionGeneration: 0 },
+	])
+		await expect(
+			h.store.write((db) =>
+				h.inference.captureBackgroundControlInTransaction(db, bad),
+			),
+		).rejects.toThrow("invalid_background_control");
+	expect(h.inference.countControlTokens(messages)).toBeNull();
+	const id = await h.store.write((db) =>
+		h.inference.captureBackgroundControlInTransaction(db, input),
+	);
+	const receipt = await h.inference.executeControl(
+		id,
+		messages,
+		new AbortController().signal,
+	);
+	const s = h.settings.get();
+	s.larm.profile = "changed-after-background-receipt";
+	await h.settings.apply({
+		requestId: crypto.randomUUID(),
+		expectedRevision: s.revision,
+		settings: s,
+		keys: [],
+	});
+	expect(
+		await h.store.write((db) => h.inference.acceptInTransaction(db, receipt)),
+	).toBe(false);
 });

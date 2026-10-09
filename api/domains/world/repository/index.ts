@@ -38,7 +38,12 @@ CREATE TABLE world_host_feed_cursor (
 export const INITIAL_FORGET_EPOCH = "forget-0";
 
 export class WorldHostStateError extends Error {
-	constructor(readonly code: "state_missing" | "transaction_required") {
+	constructor(
+		readonly code:
+			| "state_missing"
+			| "transaction_required"
+			| "initial_sync_required",
+	) {
 		super(`world_host_${code}`);
 	}
 }
@@ -51,15 +56,26 @@ export type HostStateRow = {
 	enabled: boolean;
 	restoreEpoch: string;
 	revision: number;
+	/**
+	 * The host finished the first full pass over Memory's change feed and the
+	 * source outboxes (so every earlier forget/correction is already applied).
+	 * World cannot be turned ON before; see guardMigration.
+	 */
+	initialSyncComplete: boolean;
 };
 
 export function readHostState(db: Database): HostStateRow {
 	const row = db
 		.query(
-			"SELECT enabled, restore_epoch, revision FROM world_host_state WHERE id = 1",
+			"SELECT enabled, restore_epoch, revision, initial_sync_complete FROM world_host_state WHERE id = 1",
 		)
 		.get() as
-		| { enabled: number; restore_epoch: string; revision: number }
+		| {
+				enabled: number;
+				restore_epoch: string;
+				revision: number;
+				initial_sync_complete: number;
+		  }
 		| null
 		| undefined;
 	if (!row) throw new WorldHostStateError("state_missing");
@@ -67,14 +83,29 @@ export function readHostState(db: Database): HostStateRow {
 		enabled: row.enabled === 1,
 		restoreEpoch: row.restore_epoch,
 		revision: row.revision,
+		initialSyncComplete: row.initial_sync_complete === 1,
 	};
 }
 
+/**
+ * Turning World ON needs the explicit host flag `initialSyncComplete`; turning
+ * it OFF never does. Throws WorldHostStateError("initial_sync_required").
+ */
 export function writeEnabled(db: Database, enabled: boolean): void {
 	requireWriteTransaction(db);
+	if (enabled && !readHostState(db).initialSyncComplete)
+		throw new WorldHostStateError("initial_sync_required");
 	db.query(
 		"UPDATE world_host_state SET enabled = ?, revision = revision + 1 WHERE id = 1",
 	).run(enabled ? 1 : 0);
+}
+
+/** The host's statement that the first full feed pass is done. Never reset by World. */
+export function writeInitialSyncComplete(db: Database, done: boolean): void {
+	requireWriteTransaction(db);
+	db.query(
+		"UPDATE world_host_state SET initial_sync_complete = ?, revision = revision + 1 WHERE id = 1",
+	).run(done ? 1 : 0);
 }
 
 /** Replaces the restore epoch with a new opaque token. Cursors stamped with the old one stop being used. */
@@ -152,6 +183,18 @@ export function writeFeedCursor(
 	requireWriteTransaction(db);
 	assertFeed(feed);
 	const { restoreEpoch } = readHostState(db);
+	// An unchanged cursor writes nothing: an idle feed poll must not commit
+	// (a commit notifies every listener, e.g. the UI change stream).
+	const current = db
+		.query(
+			"SELECT restore_epoch, cursor FROM world_host_feed_cursor WHERE feed = ? AND principal = ? AND scope_key = ?",
+		)
+		.get(feed, principal, scopeKey) as
+		| { restore_epoch: string; cursor: string }
+		| null
+		| undefined;
+	if (current?.restore_epoch === restoreEpoch && current.cursor === cursor)
+		return;
 	db.query(
 		`INSERT INTO world_host_feed_cursor (feed, principal, scope_key, restore_epoch, cursor) VALUES (?, ?, ?, ?, ?)
 		ON CONFLICT (feed, principal, scope_key) DO UPDATE SET restore_epoch = excluded.restore_epoch, cursor = excluded.cursor`,

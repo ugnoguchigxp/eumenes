@@ -79,3 +79,50 @@ export {
 } from "./context-render";
 export type { BudgetAllocation, RenderGoal } from "./context-render";
 export { forgetUsageInScope, sliceDependentPrefix } from "./usage-ledger";
+export { SKIP_REASONS, extractEventId, scopeSetOf } from "./extraction-intake";
+export type {
+	FeedStages,
+	MemoryFeedStages,
+	SourceFeedStages,
+} from "./extraction-intake";
+export {
+	EXTRACT_CONFIRM_MS,
+	EXTRACT_INTERPRETATION_VERSION,
+	EXTRACT_STAGE_BUDGET_MS,
+	FOREGROUND_ACTIVE,
+	SLOT_BUSY,
+	WORLD_EXTRACT_KIND,
+	WORLD_EXTRACT_PURPOSE,
+	createWorldExtraction,
+	extractionPayloadSchema,
+} from "./extraction-handler";
+export { createForegroundHub } from "./foreground";
+export type { ForegroundHub, ForegroundSignal } from "./foreground";
+export type {
+	ExtractionHandler,
+	ExtractionInference,
+	ExtractionOptions,
+	ExtractionOutput,
+	ExtractionPayload,
+	ExtractionPoint,
+	ExtractionQueue,
+	ExtractionReport,
+	PreparedExtraction,
+	WorldExtraction,
+} from "./extraction-handler";
+export {
+	RUNTIME_REFUSALS,
+	createRuntimeObservation,
+	missingConditions,
+	runtimeOutcomeId,
+} from "./runtime-adapter";
+export type {
+	AssessedObservations,
+	LedgerVersion,
+	ObserveResult,
+	PredictionRef,
+	ReconcileReport,
+	RuntimeObservation,
+	RuntimeObservationOptions,
+	RuntimeRefusal,
+} from "./runtime-adapter";

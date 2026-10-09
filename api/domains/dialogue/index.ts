@@ -3,9 +3,11 @@ export {
 	migration,
 	queueLinkMigration,
 	agentLinkMigration,
+	worldStateMigration,
 } from "./repository";
 export type { DialogueService } from "./service";
 export { createDialogueService } from "./service";
+export { readActionOriginInTransaction } from "./service/action-origin";
 export type {
 	PostAnswerObservation,
 	PostAnswerObserverPort,

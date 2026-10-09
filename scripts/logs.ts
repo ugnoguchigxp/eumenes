@@ -30,6 +30,7 @@ const idKeys = [
 	"sessionId",
 	"inferenceId",
 	"attemptId",
+	"stepId",
 	"bootId",
 ];
 const args = process.argv.slice(2).filter((arg) => arg !== "--");

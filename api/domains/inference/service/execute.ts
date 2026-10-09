@@ -21,6 +21,8 @@ import { speechAdjustment } from "./speech-intonation";
 const log = getLogger("inference");
 
 export type InferenceOptions = {
+	/** Must use the selected model's tokenizer, including message framing. */
+	countControlTokens?: (messages: Messages) => number | null;
 	token?: string;
 	fetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 	larmFactory?: (s: Settings) => LarmPort;
@@ -58,6 +60,8 @@ export type Env = {
 	allowed(db: Database, row: RequestRow, connection?: Connection): boolean;
 	prune(): void;
 	isClosed(): boolean;
+	/** Tells the activity listeners that a request started or ended running. */
+	touch?(): void;
 };
 type Selected = ReturnType<Env["resolve"]>;
 type Input = Messages | string | Uint8Array;
@@ -575,6 +579,7 @@ export async function executeRequest(
 	});
 	const running: Running = { controller, row, done, finish };
 	env.active.set(row.id, running);
+	env.touch?.();
 	const request: Request = {
 		env,
 		row,
@@ -606,5 +611,6 @@ export async function executeRequest(
 		env.active.delete(row.id);
 		running.finish();
 		env.prune();
+		env.touch?.();
 	}
 }

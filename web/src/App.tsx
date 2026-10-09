@@ -22,7 +22,11 @@ import { LightAvatarBackground } from "./components/domains/conversation/LightAv
 import { Button, Textarea } from "./design-system";
 import { Subtitle } from "./components/domains/subtitle/Subtitle";
 import { ArtifactPanel } from "./components/domains/artifact/ArtifactPanel";
+import { ResizableWorkspace } from "./components/domains/artifact/ResizableWorkspace";
 import { TimerArtifact } from "./components/domains/timers/TimerArtifact";
+import { useTimerArtifacts } from "./domains/timers/useTimerArtifacts";
+import { TimerNotifications } from "./components/domains/timers/TimerNotifications";
+import { useTimerTone } from "./domains/audio";
 import { useArtifactWorkspace } from "./domains/artifact";
 import { type AudioStore, createAudioStore } from "./domains/audio";
 import { useConversation } from "./domains/conversation";
@@ -86,8 +90,17 @@ function Workspace({
 		return () => window.removeEventListener("beforeunload", prevent);
 	}, []);
 	const artifacts = useArtifactWorkspace();
-	const openedTimers = useRef(new Set<string>());
-	const [timerWatchId, setTimerWatchId] = useState<string | null>(null);
+	const openTimer = useCallback(
+		(ref: { timerId: string }, title: string) => {
+			artifacts.open({
+				id: `timer:${ref.timerId}`,
+				kind: "timer",
+				title,
+				timerId: ref.timerId,
+			});
+		},
+		[artifacts],
+	);
 	const settings = useSettings(client);
 	const usage = useQuery({
 		queryKey: [queryRoots.inferenceUsage, client.identity],
@@ -130,6 +143,7 @@ function Workspace({
 	const [showLatest, setShowLatest] = useState(false);
 	const conversation = useConversation(client, "main");
 	const runs = useRuns(client, "main");
+	const watchTimerRun = useTimerArtifacts(client, openTimer, runs.data);
 	const submit = useSubmit(client, "main");
 	const cancel = useCancel(client, "main");
 	const voice = useVoiceDialogue(
@@ -137,6 +151,11 @@ function Workspace({
 		store,
 		undefined,
 		settings.data?.voice,
+	);
+	const playTimerTone = useTimerTone(
+		settings.data?.voice,
+		voice.audio,
+		(text, signal) => client.replayAudio(text, signal),
 	);
 	const replay = useReplay(client, settings.data?.voice, {
 		sessionAudio: voice.audio,
@@ -253,7 +272,7 @@ function Workspace({
 		void submit
 			.mutateAsync(text)
 			.then((run) => {
-				if (run?.id) setTimerWatchId(run.id);
+				if (run?.id) watchTimerRun(run.id);
 				setInput((current) =>
 					current === sentInput ? { text: "", dictated: false } : current,
 				);
@@ -261,35 +280,8 @@ function Workspace({
 			.catch(() => {});
 	}
 	useEffect(() => {
-		if (!timerWatchId) return;
-		let stop = false;
-		const look = () => {
-			void client
-				.timerReceiptByRun(timerWatchId)
-				.then((view) => {
-					if (stop || view.receipt?.action !== "started") return;
-					const timerId = view.receipt.artifact.timerId;
-					if (openedTimers.current.has(timerId)) return;
-					openedTimers.current.add(timerId);
-					artifacts.open({
-						id: `timer:${timerId}`,
-						kind: "timer",
-						title: view.receipt.timer.label,
-						timerId,
-					});
-					setTimerWatchId(null);
-				})
-				.catch(() => {});
-		};
-		look();
-		const interval = window.setInterval(look, 2000);
-		const timeout = window.setTimeout(() => setTimerWatchId(null), 180_000);
-		return () => {
-			stop = true;
-			window.clearInterval(interval);
-			window.clearTimeout(timeout);
-		};
-	}, [artifacts, client, timerWatchId]);
+		if (voice.turn?.runId) watchTimerRun(voice.turn.runId);
+	}, [voice.turn?.runId, watchTimerRun]);
 	const route = [
 		{
 			id: "microphone",
@@ -365,9 +357,21 @@ function Workspace({
 						size={settings.data.general.subtitles.size}
 					/>
 				)}
-			<div
-				className={`workspace-layout${artifacts.tabs.length ? " workspace-layout-split" : ""}`}
+			<ResizableWorkspace
 				hidden={settingsOpen}
+				artifact={
+					artifacts.tabs.length > 0 ? (
+						<ArtifactPanel
+							tabs={artifacts.tabs}
+							activeTabId={artifacts.activeTabId}
+							onSelect={artifacts.select}
+							onClose={artifacts.close}
+							renderTimer={(timerId) => (
+								<TimerArtifact client={client} timerId={timerId} />
+							)}
+						/>
+					) : null
+				}
 			>
 				<section className="chat-panel" aria-label="会話">
 					<LightAvatarBackground
@@ -395,7 +399,20 @@ function Workspace({
 								{describeConnectionState(connectionState)}
 							</span>
 						</span>
-						<Button variant="secondary" size="sm" onClick={() => artifacts.open({ id: "ui-showcase", title: "UIショーケース", kind: "showcase", content: "" })}>UIショーケース</Button>
+						<Button
+							variant="secondary"
+							size="sm"
+							onClick={() =>
+								artifacts.open({
+									id: "ui-showcase",
+									title: "UIショーケース",
+									kind: "showcase",
+									content: "",
+								})
+							}
+						>
+							UIショーケース
+						</Button>
 						<span className="model-label">
 							{actualModel?.source === "cloud" && "クラウド / "}
 							{actualModel?.model ?? settings.data?.larm.profile}
@@ -453,7 +470,7 @@ function Workspace({
 					>
 						<MessageList
 							conversation={conversation.data}
-							renderAttachment={(message) => {
+							renderFollowingMessage={(message) => {
 								const run = runs.data?.find(
 									(r) => r.inputMessageId === message.id,
 								);
@@ -462,6 +479,7 @@ function Workspace({
 										client={client}
 										rootRunId={run.id}
 										title={message.text}
+										agentName={settings.data?.general.agentName}
 									/>
 								) : null;
 							}}
@@ -507,6 +525,25 @@ function Workspace({
 						</button>
 					)}
 					<div className="chat-bottom">
+						<TimerNotifications
+							client={client}
+							playTone={playTimerTone}
+							inputBusy={() => voice.audio()?.isInputBusy?.() ?? false}
+							muted={mute.muted || settings.data?.voice.outputVolume === 0}
+							busy={
+								!mute.ready ||
+								settings.isPending ||
+								!!activeRun ||
+								(!!voice.turn &&
+									[
+										"recognizing",
+										"responding",
+										"synthesizing",
+										"ready",
+									].includes(voice.turn.status)) ||
+								replay.playingId !== null
+							}
+						/>
 						<div className="route-track" aria-label="回答の経路">
 							{route.map((node, index) => (
 								<div className="route-part" key={node.id}>
@@ -530,13 +567,13 @@ function Workspace({
 										variant={voice.active ? "destructive" : "secondary"}
 										onClick={() =>
 											void (voice.active
-												? voice.stop()
+												? voice.pause()
 												: (replay.stop(), voice.start()))
 										}
 										disabled={!voice.active && phase !== "idle"}
-										aria-label={voice.active ? "停止" : "音声を開始"}
+										aria-label={voice.active ? "マイクを停止" : "音声を開始"}
 									>
-										{voice.active ? "停止" : "音声を開始"}
+										{voice.active ? "マイクを停止" : "音声を開始"}
 									</Button>
 									<Button
 										type="button"
@@ -629,19 +666,7 @@ function Workspace({
 						)}
 					</div>
 				</section>
-				{artifacts.tabs.length > 0 && (
-					<ArtifactPanel
-						tabs={artifacts.tabs}
-						activeTabId={artifacts.activeTabId}
-						onSelect={artifacts.select}
-						onClose={artifacts.close}
-						onCloseAll={artifacts.closeAll}
-						renderTimer={(timerId) => (
-							<TimerArtifact client={client} timerId={timerId} />
-						)}
-					/>
-				)}
-			</div>
+			</ResizableWorkspace>
 		</main>
 	);
 }

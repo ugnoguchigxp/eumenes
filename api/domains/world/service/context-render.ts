@@ -31,6 +31,11 @@ export const WORLD_FRAME = [
 
 export type RenderGoal = { desiredState: string; priority: number };
 
+/** Bytes one goal occupies in the rendered block (escaped JSON plus its separator). */
+export const goalRenderedBytes = (goal: RenderGoal): number =>
+	utf8(safeJson({ desiredState: goal.desiredState, priority: goal.priority })) +
+	1;
+
 /** The delimited data document for one slice (and the adopted goals, when any). */
 export function renderWorldData(
 	slice: WorldSlice,
@@ -73,7 +78,14 @@ export const GOAL_MAX_BYTES = 1_024;
 export type BudgetAllocation =
 	| {
 			ok: true;
-			/** The maxBytes handed to buildWorldSlice. */
+			/**
+			 * The most the whole RENDERED block (framing, escaped JSON, goals) may
+			 * occupy: everything the shared budget leaves after Memory's recall.
+			 * Escaping can expand text up to 6x, so the rendered block is measured
+			 * against this, not only the slice against `worldBytes`.
+			 */
+			blockLimitBytes: number;
+			/** The maxBytes handed to buildWorldSlice (measured on the unescaped slice). */
 			worldBytes: number;
 			/** How many of the goals (in the given order) are shown. */
 			goalCount: number;
@@ -82,7 +94,8 @@ export type BudgetAllocation =
 	| { ok: false };
 
 /**
- * Splits the one shared input budget. Memory's recall is already fixed when
+ * Splits the one shared input budget. `goalBytes` are the sizes of each goal
+ * AS RENDERED (see `goalRenderedBytes`), i.e. after escaping. Memory's recall is already fixed when
  * the Broker runs (`reservedBytes`) and is never shrunk; the Goal gets at most
  * GOAL_MAX_BYTES and only while the slice keeps WORLD_MIN_BYTES; the slice gets
  * the rest up to its own 8 KiB cap. Goals are dropped whole, from the lowest
@@ -107,6 +120,7 @@ export function allocateContextBudget(input: {
 	}
 	return {
 		ok: true,
+		blockLimitBytes: input.totalBytes - input.reservedBytes,
 		worldBytes: Math.min(input.sliceCapBytes, available - goalBytes),
 		goalCount,
 		goalBytes,

@@ -51,7 +51,8 @@ export type VoiceEvent =
 	  }
 	| { type: "start_settled"; token: number }
 	| { type: "stopped" }
-	| { type: "segment_accepted"; utteranceId: string }
+	| { type: "segment_accepted"; utteranceId: string; preserveCurrent?: boolean }
+	| { type: "turn_selected"; utteranceId: string }
 	| { type: "upload_settled"; sessionToken: number }
 	| { type: "upload_failed"; sessionToken: number; previous: string | null }
 	| { type: "playback_cancelled" }
@@ -117,9 +118,11 @@ export function reduce(state: VoiceState, event: VoiceEvent): VoiceState {
 					sequence: state.session.sequence + 1,
 					pending: state.session.pending + 1,
 				},
-				current: event.utteranceId,
-				delivered: new Set(),
+				current: event.preserveCurrent ? state.current : event.utteranceId,
+				delivered: event.preserveCurrent ? state.delivered : new Set(),
 			};
+		case "turn_selected":
+			return { ...state, current: event.utteranceId, delivered: new Set() };
 		case "upload_settled":
 			if (state.session?.token !== event.sessionToken) return state;
 			return {

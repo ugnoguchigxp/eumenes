@@ -1,4 +1,9 @@
 import {
+	registerCodingSupervision,
+	type CodingSupervision,
+} from "../domains/coding-supervision";
+import { registerTaskReports, type TaskReports } from "../domains/task-reports";
+import {
 	registerCapabilities,
 	type Capabilities,
 } from "../domains/capabilities";
@@ -43,6 +48,7 @@ import {
 import type { Changes } from "./events";
 import { statusForError } from "./error-status";
 import { registerTasks, type TasksService } from "../domains/tasks";
+import { registerCoding, type CodingService } from "../domains/coding";
 import {
 	registerResearchRoutes,
 	type RouteOperations,
@@ -81,6 +87,9 @@ export function createApp(deps: {
 	changes?: Changes;
 	serviceTests?: ServiceTests;
 	tasks?: TasksService;
+	coding?: CodingService;
+	codingSupervision?: CodingSupervision;
+	taskReports?: TaskReports;
 	researchRoutes?: RouteOperations;
 	timers?: TimersService;
 }) {
@@ -146,6 +155,10 @@ export function createApp(deps: {
 	if (deps.inference) registerInference(app, deps.inference);
 	if (deps.serviceTests) registerServiceTests(app, deps.serviceTests);
 	if (deps.tasks) registerTasks(app, deps.tasks);
+	if (deps.coding) registerCoding(app, deps.coding);
+	if (deps.codingSupervision)
+		registerCodingSupervision(app, deps.codingSupervision);
+	if (deps.taskReports) registerTaskReports(app, deps.taskReports);
 	if (deps.researchRoutes) registerResearchRoutes(app, deps.researchRoutes);
 	if (deps.ttsDictionary) registerTtsDictionary(app, deps.ttsDictionary);
 	if (deps.memory) registerMemory(app, deps.memory);

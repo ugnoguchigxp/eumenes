@@ -22,6 +22,8 @@ import {
 } from "..";
 
 export const PURPOSE = "world.test";
+/** Test-only cursor secret: the adapter has no default. */
+export const TEST_CURSOR_SECRET = "test-only-world-cursor-secret";
 export const SCOPE = {
 	principal: CONVERSATION_DEFAULT_PRINCIPAL,
 	scopeKey: CONVERSATION_DEFAULT_SCOPE,
@@ -54,7 +56,7 @@ export type Harness = {
 /** A temp-file store with the REAL production migrations (host, Memory, World). */
 export async function openHarness(
 	over: Partial<WorldServiceOptions> = {},
-	options: { enabled?: boolean } = {},
+	options: { enabled?: boolean; initialSync?: boolean } = {},
 ): Promise<Harness> {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-world-host-"));
 	const path = join(dir, "db.sqlite3");
@@ -77,10 +79,12 @@ export async function openHarness(
 			sources: [
 				createConversationSourceAdapter(conversation, {
 					allowedPurposes: [PURPOSE],
+					cursorSecret: TEST_CURSOR_SECRET,
 				}),
 				...(over.sources ?? []),
 			],
 		});
+		if (options.initialSync !== false) await world.markInitialSyncComplete();
 		if (options.enabled !== false) await world.setEnabled(true);
 		const opened = store;
 		return {
@@ -103,7 +107,7 @@ export async function openHarness(
 export async function withHarness<T>(
 	run: (h: Harness) => Promise<T>,
 	over: Partial<WorldServiceOptions> = {},
-	options: { enabled?: boolean } = {},
+	options: { enabled?: boolean; initialSync?: boolean } = {},
 ): Promise<T> {
 	const harness = await openHarness(over, options);
 	try {

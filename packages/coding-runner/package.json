@@ -1,0 +1,19 @@
+{
+	"name": "@eumenes/coding-runner",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"exports": {
+		"./contracts": "./src/contracts.ts",
+		"./client": "./src/client.ts",
+		"./host": "./src/host.ts"
+	},
+	"scripts": {
+		"start": "bun src/server.ts",
+		"test": "bun test test"
+	},
+	"dependencies": {
+		"@modelcontextprotocol/sdk": "1.31.0",
+		"zod": "4.4.3"
+	}
+}

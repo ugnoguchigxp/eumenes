@@ -1,6 +1,6 @@
 # 会話からの委任と背景報告の実装計画
 
-作成日: 2026-10-09 JST。状態: 実装前。[全体計画](README.md) の P1、P3、P5、P6 を担当する。タスク状態は [01](01-tasks-and-queue.md)、判断は [03](03-coding-supervision.md) を参照する。
+作成日: 2026-10-09 JST。状態: 計画03用の報告DTO・不変台帳・outbox・読取りAPIのみ先行実装。会話受付・配達・音声は未実装。[全体計画](README.md) の P1、P3、P5、P6 を担当する。タスク状態は [01](01-tasks-and-queue.md)、判断は [03](03-coding-supervision.md) を参照する。
 
 ## 1 役割と所有
 

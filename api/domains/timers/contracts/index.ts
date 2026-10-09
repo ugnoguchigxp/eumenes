@@ -126,6 +126,15 @@ export type TimerNotificationDto = {
 	status: NotificationStatus;
 	reason: NotificationReason | null;
 	dueAt: string;
+	message: string;
+};
+
+export type TimerCompletion = {
+	notificationId: string;
+	timerId: string;
+	conversationId: string | null;
+	message: string;
+	at: string;
 };
 
 export type TimerReceipt =
@@ -197,6 +206,7 @@ export const timerNotificationDtoSchema = z
 		status: z.enum(notificationStatuses),
 		reason: z.enum(notificationReasons).nullable(),
 		dueAt: offsetTime,
+		message: z.string(),
 	})
 	.strict();
 
@@ -258,6 +268,7 @@ export const timerRunReceiptSchema = z
 export const timerNotificationListSchema = z
 	.object({
 		serverNow: offsetTime,
+		activeTimers: z.number().int().min(0).default(0),
 		items: z.array(timerNotificationDtoSchema),
 		nextCursor: z.string().nullable(),
 	})

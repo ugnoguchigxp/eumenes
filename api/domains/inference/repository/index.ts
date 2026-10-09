@@ -12,6 +12,9 @@ ALTER TABLE inference_requests ADD COLUMN mode TEXT NOT NULL DEFAULT 'answer';
 ALTER TABLE inference_requests ADD COLUMN output_limit INTEGER;
 ALTER TABLE inference_requests ADD COLUMN context_policy TEXT NOT NULL DEFAULT 'legacy';
 `;
+export const backgroundControlMigration = `CREATE TABLE inference_background_controls (
+ request_id TEXT PRIMARY KEY REFERENCES inference_requests(id), binding TEXT NOT NULL
+);`;
 export interface RequestRow {
 	id: string;
 	subject: string;

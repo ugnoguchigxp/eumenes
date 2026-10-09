@@ -211,6 +211,21 @@ export function getTimer(db: Database, id: string): TimerRow | null {
 	return row ? mapTimer(row) : null;
 }
 
+/** Bounded route hints: recent notices that the user can still dismiss. */
+export function recentNotifiedTimers(
+	db: Database,
+	scope: string,
+	limit: number,
+): TimerRow[] {
+	return (
+		db
+			.query(`SELECT t.* FROM timers t JOIN timer_notifications n ON n.timer_id=t.id
+		WHERE t.scope=? AND t.state='elapsed' AND t.body_expired=0 AND n.status<>'dismissed'
+		ORDER BY n.due_at_ms DESC, n.id DESC LIMIT ?`)
+			.all(scope, limit) as SqlTimer[]
+	).map(mapTimer);
+}
+
 export function getTimerByOrigin(
 	db: Database,
 	scope: string,
@@ -385,6 +400,13 @@ export function setTimerError(
 			)
 			.run(errorCode, at, id),
 	);
+}
+
+export function getOperation(db: Database, id: string): OperationRow | null {
+	const row = db
+		.query("SELECT * FROM timer_operations WHERE id=?")
+		.get(id) as SqlTimer | null;
+	return row ? mapOperation(row) : null;
 }
 
 export function getOperationByRequest(

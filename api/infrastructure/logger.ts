@@ -29,6 +29,24 @@ export interface LogFields {
 	sessionId?: string;
 	inferenceId?: string;
 	attemptId?: string;
+	stepId?: string;
+	phase?: string;
+	controlSchema?: string;
+	controlAction?: string;
+	outputType?: string;
+	outputCharacters?: number;
+	repairAttempt?: number;
+	validationPath?: string;
+	validationCode?: string;
+	expectedType?: string;
+	actualType?: string;
+	issueCount?: number;
+	reportedIssueCount?: number;
+	limit?: number;
+	jsonOffset?: number;
+	hitCount?: number;
+	documentCount?: number;
+	failureCount?: number;
 	method?: string;
 	route?: string;
 	status?: string | number;
@@ -59,6 +77,24 @@ const keys = new Set<keyof LogFields>([
 	"sessionId",
 	"inferenceId",
 	"attemptId",
+	"stepId",
+	"phase",
+	"controlSchema",
+	"controlAction",
+	"outputType",
+	"outputCharacters",
+	"repairAttempt",
+	"validationPath",
+	"validationCode",
+	"expectedType",
+	"actualType",
+	"issueCount",
+	"reportedIssueCount",
+	"limit",
+	"jsonOffset",
+	"hitCount",
+	"documentCount",
+	"failureCount",
 	"method",
 	"route",
 	"status",

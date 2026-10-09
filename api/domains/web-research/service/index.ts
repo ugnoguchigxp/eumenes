@@ -21,6 +21,7 @@ import {
 import {
 	createWebAcquisition,
 	acquisitionError,
+	acquisitionRejectionReasons,
 	type AcquisitionPort,
 	type Acquisition,
 } from "../adapters/llm-fetch";
@@ -104,6 +105,7 @@ export function createWebResearch({
 		throw new Error("invalid_web_timeout");
 	// Delivery buffer, not a persistent search cache. Completed results expire after 15 minutes.
 	const results = new Map<string, { value: ResearchResult; expires: number }>();
+	const rejectionReasons = new Map<string, string[]>();
 	const shares = new Map<
 		string,
 		{
@@ -269,6 +271,12 @@ export function createWebResearch({
 					hit: null,
 				};
 			} catch (error) {
+				const reasons = acquisitionRejectionReasons(error);
+				if (reasons.length) {
+					if (rejectionReasons.size >= 128)
+						rejectionReasons.delete(rejectionReasons.keys().next().value!);
+					rejectionReasons.set(input.id, reasons);
+				}
 				if (
 					error instanceof Error &&
 					["web_attempt_timeout", "web_deadline_exceeded"].includes(
@@ -325,6 +333,10 @@ export function createWebResearch({
 							runId,
 							jobId: claim.jobId,
 							status: partial ? "partial" : "completed",
+							kind: input.request.operation,
+							hitCount: value.result.hits.length,
+							documentCount: value.result.documents.length,
+							failureCount: value.result.failures.length,
 						});
 						if (!cache) return;
 						if (value.hit) await cache.use(value.hit);
@@ -355,7 +367,32 @@ export function createWebResearch({
 					: outcome.type === "expired"
 						? "web_deadline_exceeded"
 						: "web_run_stale";
-			return finish(db, runId, state, now(), code) ? "applied" : "stale";
+			if (!finish(db, runId, state, now(), code)) return "stale";
+			const task = Promise.resolve().then(() => {
+				const reasons = rejectionReasons.get(runId) ?? [];
+				rejectionReasons.delete(runId);
+				const row = byIdRead(runId);
+				if (row?.status !== state || row.error_code !== code) return;
+				log.warn("web.failed", {
+					runId,
+					jobId: claim.jobId,
+					requestId: row.request_id,
+					kind: row.operation,
+					status: state,
+					reason: /^[a-z_]{1,80}$/.test(code) ? code : "web_acquisition_failed",
+				});
+				for (const reason of reasons)
+					log.warn("web.acquisition_rejected", {
+						runId,
+						jobId: claim.jobId,
+						requestId: row.request_id,
+						kind: row.operation,
+						status: state,
+						reason,
+					});
+			});
+			rememberWrite(task);
+			return "applied";
 		},
 		cancelInTransaction(db, job) {
 			finish(db, job.payload.runId, "cancelled", now(), "cancel_requested");
@@ -544,6 +581,7 @@ export function createWebResearch({
 				await Promise.allSettled([sweeping]);
 				await Promise.allSettled(writes);
 				results.clear();
+				rejectionReasons.clear();
 				const closed = await Promise.allSettled([
 					Promise.resolve().then(() => acquisition.close()),
 					Promise.resolve().then(() => cache?.close()),

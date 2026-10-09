@@ -23,6 +23,21 @@ CREATE UNIQUE INDEX dialogue_runs_seq ON dialogue_runs(seq);
 CREATE INDEX dialogue_runs_conversation_seq ON dialogue_runs(conversation_id, seq);
 `;
 export const agentLinkMigration = `ALTER TABLE dialogue_runs ADD COLUMN agent_task_id TEXT;`;
+/**
+ * P3-08: whether World was read for the run ('used') or refused it ('blocked').
+ * Written in the prepare transaction, so a restart and a reconnect derive the
+ * same answer; a run never goes back to unmarked.
+ */
+export const worldStateMigration = `ALTER TABLE dialogue_runs ADD COLUMN world_state TEXT CHECK (world_state IN ('used','blocked'));`;
+export function markWorld(
+	db: Database,
+	runId: string,
+	state: "used" | "blocked",
+) {
+	db.query(
+		"UPDATE dialogue_runs SET world_state=CASE WHEN world_state='blocked' THEN 'blocked' ELSE ? END WHERE id=?",
+	).run(state, runId);
+}
 export function linkAgent(
 	db: Database,
 	runId: string,
@@ -66,6 +81,8 @@ function map(row: Record<string, unknown>): Run {
 		sourceKind: row.source_kind as Run["sourceKind"],
 		scheduleId: row.schedule_id as string | null,
 		occurrenceId: row.occurrence_id as string | null,
+		worldUsed: row.world_state != null,
+		worldBlocked: row.world_state === "blocked",
 		createdAt: row.created_at as string,
 		updatedAt: row.updated_at as string,
 	};

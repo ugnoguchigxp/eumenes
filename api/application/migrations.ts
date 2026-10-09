@@ -1,3 +1,6 @@
+import { migration as supervisionMigration } from "../domains/coding-supervision";
+import { migration as taskReportsMigration } from "../domains/task-reports";
+import { backgroundControlMigration } from "../domains/inference";
 import {
 	learnedMigration as capabilitiesLearnedMigration,
 	migration as capabilitiesMigration,
@@ -7,17 +10,23 @@ import {
 	migration as toolRuntimeMigration,
 	routeGrantMigration as toolRouteGrantMigration,
 	supersedeMigration as toolSupersedeMigration,
+	actionMigration as toolActionMigration,
 } from "../domains/tool-runtime";
 import {
 	acquisitionMigration as agentAcquisitionMigration,
 	migration as agentRuntimeMigration,
+	actionResultMigration as agentActionResultMigration,
 } from "../domains/agent-runtime";
 import { controlMigration } from "../domains/inference";
-import { agentLinkMigration } from "../domains/dialogue";
+import {
+	agentLinkMigration,
+	worldStateMigration as dialogueWorldStateMigration,
+} from "../domains/dialogue";
 import { migrations as memoryPackageMigrations } from "eumenes-memory/sqlite";
 import { migrations as worldPackageMigrations } from "eumenes-world-model/sqlite";
 import { migration as serviceTestsMigration } from "../domains/service-tests";
 import { migration as tasksMigration } from "../domains/tasks";
+import { migration as codingMigration } from "../domains/coding";
 import {
 	avatarMotionMigration as conversationAvatarMotionMigration,
 	answerDeliveryMigration as conversationAnswerDeliveryMigration,
@@ -48,6 +57,9 @@ import {
 	hostStateMigration as worldHostStateMigration,
 	lifecycleMigration as worldLifecycleMigration,
 	usageMigration as worldUsageMigration,
+	guardMigration as worldGuardMigration,
+	extractionMigration as worldExtractionMigration,
+	runtimeMigration as worldRuntimeMigration,
 } from "../domains/world";
 import { migration as queueMigration } from "../domains/queue";
 import { migration as schedulerMigration } from "../domains/scheduler";
@@ -131,4 +143,18 @@ export const migrations: readonly string[] = [
 	worldUsageMigration,
 	// Timers (2026-10-09): appended after every deployed migration, never reordered.
 	timersMigration,
+	agentActionResultMigration,
+	toolActionMigration,
+	codingMigration,
+	// World hardening (review round 1): initial-sync flag, release-pending marks, abandoned forget parts.
+	worldGuardMigration,
+	// World answer release (P3-08): whether a run read World or was blocked by it.
+	dialogueWorldStateMigration,
+	backgroundControlMigration,
+	taskReportsMigration,
+	supervisionMigration,
+	// World continuous input (P4-01/P4-02): host record of delivered extraction events; appended at the very tail.
+	worldExtractionMigration,
+	// World runtime observation (P4-04): host trace of verified ledger results behind Outcomes; the very tail.
+	worldRuntimeMigration,
 ];

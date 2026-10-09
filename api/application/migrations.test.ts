@@ -23,8 +23,15 @@ import {
 	hostStateMigration as worldHostStateMigration,
 	lifecycleMigration as worldLifecycleMigration,
 	usageMigration as worldUsageMigration,
+	guardMigration as worldGuardMigration,
+	extractionMigration as worldExtractionMigration,
+	runtimeMigration as worldRuntimeMigration,
 } from "../domains/world";
+import { worldStateMigration as dialogueWorldStateMigration } from "../domains/dialogue";
+import { migration as codingMigration } from "../domains/coding";
 import { migration as timersMigration } from "../domains/timers";
+import { actionResultMigration as agentActionResultMigration } from "../domains/agent-runtime";
+import { actionMigration as toolActionMigration } from "../domains/tool-runtime";
 import { migration as serviceTestsMigration } from "../domains/service-tests";
 
 test("the memory package's migrations keep their order and every one is applied; the first four stay contiguous", () => {
@@ -392,6 +399,37 @@ test("World's package migrations stay contiguous, and timers is appended after t
 	expect(migrations[worldStart + worldPackageMigrations.length + 3]).toBe(
 		timersMigration,
 	);
+	expect(migrations[worldStart + worldPackageMigrations.length + 4]).toBe(
+		agentActionResultMigration,
+	);
+	expect(migrations[worldStart + worldPackageMigrations.length + 5]).toBe(
+		toolActionMigration,
+	);
+	expect(migrations[worldStart + worldPackageMigrations.length + 6]).toBe(
+		codingMigration,
+	);
+	// World hardening is appended at the tail, after everything deployed before it.
+	expect(migrations[worldStart + worldPackageMigrations.length + 7]).toBe(
+		worldGuardMigration,
+	);
+	// World answer release (P3-08) is the very tail.
+	expect(migrations[worldStart + worldPackageMigrations.length + 8]).toBe(
+		dialogueWorldStateMigration,
+	);
+	// World continuous input (P4-01/P4-02) is appended after everything deployed before it,
+	// including whatever else was appended after the answer release.
+	expect(migrations.filter((m) => m === worldExtractionMigration)).toHaveLength(
+		1,
+	);
+	expect(migrations.indexOf(worldExtractionMigration)).toBeGreaterThan(
+		migrations.indexOf(dialogueWorldStateMigration),
+	);
+	// World runtime observation (P4-04) is the very tail, right after the extraction record.
+	expect(migrations.filter((m) => m === worldRuntimeMigration)).toHaveLength(1);
+	expect(migrations.indexOf(worldRuntimeMigration)).toBe(
+		migrations.indexOf(worldExtractionMigration) + 1,
+	);
+	expect(migrations.at(-1)).toBe(worldRuntimeMigration);
 	// Nothing that was already deployed moved: the prefix is unchanged and contiguous.
 	expect(beforeWorld().length).toBe(worldStart);
 	expect(beforeWorld()).toContain(conversationRetractionMigration);
@@ -427,6 +465,7 @@ test("a fresh database gets the World schema; World is OFF and its schema is cur
 					"world_host_dependent",
 					"world_host_restore",
 					"world_host_usage",
+					"world_host_forget_abandoned",
 				]),
 			);
 			expect(
@@ -434,6 +473,14 @@ test("a fresh database gets the World schema; World is OFF and its schema is cur
 					db.query("SELECT enabled, restore_epoch FROM world_host_state").all(),
 				),
 			).toEqual([{ enabled: 0, restore_epoch: "restore-0" }]);
+			// World stays OFF and cannot be switched ON before the host's initial sync.
+			expect(
+				store.read((db) =>
+					db
+						.query("SELECT initial_sync_complete AS n FROM world_host_state")
+						.get(),
+				),
+			).toEqual({ n: 0 });
 			// Current schema: an empty request reaches World's own parser and is rejected there.
 			expect(worldProbe(store)).toMatchObject({
 				status: "rejected",

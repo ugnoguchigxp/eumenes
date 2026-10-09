@@ -9,7 +9,6 @@ import {
 	type TimerReceipt,
 	type TimerState,
 	cancelTimerSchema,
-	listTimersQuerySchema,
 	startTimerSchema,
 } from "../contracts";
 import {
@@ -128,7 +127,8 @@ export function decodeCreatedCursor(cursor: string | undefined) {
 		if (!parsed.success) throw new Error("invalid_cursor");
 		return parsed.data;
 	} catch (error) {
-		if (error instanceof Error && error.message === "invalid_cursor") throw error;
+		if (error instanceof Error && error.message === "invalid_cursor")
+			throw error;
 		throw new Error("invalid_cursor");
 	}
 }
@@ -191,9 +191,16 @@ export function startInTransaction(
 	if (origin.originKey) {
 		const prior = getTimerByOrigin(tx, origin.scope, origin.originKey);
 		if (prior) {
-			if (prior.durationSeconds !== input.durationSeconds || prior.label !== label)
+			if (
+				prior.durationSeconds !== input.durationSeconds ||
+				prior.label !== label
+			)
 				throw new Error("request_conflict");
-			const stored = getStartReceiptByOrigin(tx, origin.scope, origin.originKey);
+			const stored = getStartReceiptByOrigin(
+				tx,
+				origin.scope,
+				origin.originKey,
+			);
 			if (!stored) throw new Error("operation_expired");
 			return { receipt: readReceipt(stored), replay: true };
 		}
@@ -231,7 +238,8 @@ export function startInTransaction(
 		misfirePolicy: "coalesce",
 		graceMs: TIMER_POLICY.soundFreshMs,
 	});
-	if (!attachSchedule(tx, id, schedule.id)) throw new Error("timer_unavailable");
+	if (!attachSchedule(tx, id, schedule.id))
+		throw new Error("timer_unavailable");
 	const timer = getTimer(tx, id);
 	if (!timer) throw new Error("timer_unavailable");
 	const receipt: TimerReceipt = {
@@ -353,16 +361,45 @@ export function cancelInTransaction(
 		dismissNotifications(tx, timer.id, at);
 		if (!markCancelled(tx, timer.id, scope, timer.revision, at))
 			throw new Error("revision_conflict");
-		return persistCancel(tx, deps, input, issuedAtMs, inputDigest, scope, timer.id, at, "cancelled");
+		return persistCancel(
+			tx,
+			deps,
+			input,
+			issuedAtMs,
+			inputDigest,
+			scope,
+			timer.id,
+			at,
+			"cancelled",
+		);
 	}
 	if (timer.state === "elapsed" && undismissedCount(tx, timer.id) > 0) {
 		assertCancelCapacity(tx, scope);
 		dismissNotifications(tx, timer.id, at);
 		if (!bumpEpoch(tx, timer.id, scope, timer.revision, "elapsed", at))
 			throw new Error("revision_conflict");
-		return persistCancel(tx, deps, input, issuedAtMs, inputDigest, scope, timer.id, at, "dismissed");
+		return persistCancel(
+			tx,
+			deps,
+			input,
+			issuedAtMs,
+			inputDigest,
+			scope,
+			timer.id,
+			at,
+			"dismissed",
+		);
 	}
-	return persistUnchanged(tx, deps, input, issuedAtMs, inputDigest, scope, timer, at);
+	return persistUnchanged(
+		tx,
+		deps,
+		input,
+		issuedAtMs,
+		inputDigest,
+		scope,
+		timer,
+		at,
+	);
 }
 
 function assertCancelCapacity(tx: Database, scope: string) {
@@ -376,7 +413,10 @@ function assertCancelCapacity(tx: Database, scope: string) {
 function cancelScheduleAndJob(tx: Database, deps: TimerDeps, timer: TimerRow) {
 	if (timer.scheduleId) {
 		const schedule = deps.scheduler.getInTransaction(tx, timer.scheduleId);
-		if (schedule && (schedule.state === "active" || schedule.state === "paused"))
+		if (
+			schedule &&
+			(schedule.state === "active" || schedule.state === "paused")
+		)
 			deps.scheduler.cancelInTransaction(tx, schedule.id, schedule.revision);
 	}
 	if (timer.expiryJobId) {

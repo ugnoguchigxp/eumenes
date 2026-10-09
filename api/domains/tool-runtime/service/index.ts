@@ -1,6 +1,10 @@
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import {
+	ValidationFailure,
+	validationIssues,
+} from "../../../infrastructure/validation-log";
+import {
 	bytes,
 	hash,
 	validators,
@@ -18,6 +22,8 @@ import type {
 	CachedSourceAuthorizationPort,
 	CachedRouteGrantInput,
 	CandidateImportInput,
+	ActionAdapter,
+	ActionEnvelope,
 } from "../contracts";
 import { get, hasSupersededColumn } from "../repository";
 export function createToolRuntime(
@@ -27,6 +33,7 @@ export function createToolRuntime(
 	adapter: ToolAdapter,
 	now = Date.now,
 	cachedSource?: CachedSourceAuthorizationPort,
+	actions?: ActionAdapter,
 ) {
 	type Grant = {
 		bindingToken: string;
@@ -121,7 +128,12 @@ export function createToolRuntime(
 		);
 		if (!tool?.schemaKey) throw new Error("invalid_tool_schema");
 		const parsed = validators[tool.schemaKey].safeParse(input.arguments);
-		if (!parsed.success) throw new Error("invalid_tool_input");
+		if (!parsed.success)
+			throw new ValidationFailure(
+				"invalid_tool_input",
+				validationIssues(parsed.error, input.arguments, ["arguments"]),
+				parsed.error.issues.length,
+			);
 		if (
 			input.toolId === "web.read" &&
 			(parsed.data as { url: string }).url !== input.exactUrl
@@ -187,7 +199,12 @@ export function createToolRuntime(
 			);
 		if (!ref.tool.schemaKey) throw new Error("invalid_tool_schema");
 		const parsed = validators[ref.tool.schemaKey].safeParse(args);
-		if (!parsed.success) throw new Error("invalid_tool_input");
+		if (!parsed.success)
+			throw new ValidationFailure(
+				"invalid_tool_input",
+				validationIssues(parsed.error, args, ["arguments"]),
+				parsed.error.issues.length,
+			);
 		if (ref.grant) {
 			if (hash(parsed.data) !== ref.grant.argsDigest)
 				throw new Error(
@@ -578,6 +595,126 @@ export function createToolRuntime(
 		close() {
 			refs.clear();
 			vault.clear();
+		},
+		actionsEnabled: () => !!actions,
+		actionContextInTransaction: (db: Database, owner: Owner) =>
+			actions?.contextInTransaction?.(db, owner) ?? null,
+		readActionInTransaction(db: Database, owner: Owner, invocationId: string) {
+			const row = db
+				.query("SELECT * FROM tool_action_invocations WHERE id=?")
+				.get(invocationId) as {
+				owner_task_id: string;
+				root_run_id: string;
+				cancel_epoch: number;
+				operation_id: string;
+				receipt_digest: string;
+				state: string;
+			} | null;
+			if (
+				!row ||
+				row.state !== "committed" ||
+				row.owner_task_id !== owner.taskId ||
+				row.root_run_id !== owner.rootRunId ||
+				row.cancel_epoch !== owner.cancelEpoch
+			)
+				throw new Error("action_invalidated");
+			const result = actions?.readInTransaction(db, row.operation_id, owner);
+			if (!result || result.receiptDigest !== row.receipt_digest)
+				throw new Error("operation_expired");
+			return result;
+		},
+		invokeActionInTransaction(
+			db: Database,
+			owner: Owner,
+			executionRef: string,
+			args: unknown,
+			stepId: string,
+			deadline: number,
+			originToken: string,
+		): ActionEnvelope & { invocationId: string } {
+			if (!actions) throw new Error("capability_unavailable");
+			const ref = refs.get(executionRef);
+			if (
+				!ref ||
+				ref.expires <= now() ||
+				ownerKey(ref.owner) !== ownerKey(owner) ||
+				deadline <= now()
+			)
+				throw new Error("tool_ref_invalid");
+			capabilities.validateInTransaction(db, ref.prepared);
+			if (!ref.tool.schemaKey) throw new Error("invalid_tool_schema");
+			const parsed = validators[ref.tool.schemaKey].safeParse(args);
+			if (!parsed.success)
+				throw new ValidationFailure(
+					"invalid_tool_input",
+					validationIssues(parsed.error, args, ["arguments"]),
+					parsed.error.issues.length,
+				);
+			const argsDigest = hash(parsed.data);
+			const old = db
+				.query("SELECT * FROM tool_action_invocations WHERE step_id=?")
+				.get(stepId) as {
+				id: string;
+				owner_task_id: string;
+				root_run_id: string;
+				tool_revision_id: string;
+				args_digest: string;
+				operation_id: string;
+				receipt_digest: string;
+				cancel_epoch: number;
+			} | null;
+			if (old) {
+				if (
+					old.owner_task_id !== owner.taskId ||
+					old.root_run_id !== owner.rootRunId ||
+					old.tool_revision_id !== ref.tool.revisionId ||
+					old.args_digest !== argsDigest ||
+					old.cancel_epoch !== owner.cancelEpoch
+				)
+					throw new Error("idempotency_conflict");
+				const again = actions.readInTransaction(db, old.operation_id, owner);
+				if (!again || again.receiptDigest !== old.receipt_digest)
+					throw new Error("operation_expired");
+				return { ...again, invocationId: old.id };
+			}
+			const requestId = crypto.randomUUID();
+			const issuedAt = new Date(now()).toISOString();
+			const envelope = actions.executeInTransaction(db, {
+				requestId,
+				issuedAt,
+				tool: ref.tool,
+				arguments: parsed.data,
+				owner,
+				originToken,
+			});
+			if (
+				envelope.kind !== "local_action" ||
+				envelope.version !== 1 ||
+				!envelope.operationId ||
+				!envelope.receiptDigest
+			)
+				throw new Error("invalid_tool_input");
+			const invocationId = crypto.randomUUID();
+			db.query(
+				`INSERT INTO tool_action_invocations(
+          id,root_run_id,owner_task_id,cancel_epoch,step_id,tool_revision_id,
+          request_id,args_digest,operation_id,receipt_digest,state,created_at
+        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`,
+			).run(
+				invocationId,
+				owner.rootRunId,
+				owner.taskId,
+				owner.cancelEpoch,
+				stepId,
+				ref.tool.revisionId,
+				requestId,
+				argsDigest,
+				envelope.operationId,
+				envelope.receiptDigest,
+				"committed",
+				now(),
+			);
+			return { ...envelope, invocationId };
 		},
 	};
 }

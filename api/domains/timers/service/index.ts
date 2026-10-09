@@ -9,12 +9,15 @@ import {
 	type ListTimersQuery,
 	type StartTimerInput,
 	type TimerOrigin,
+	timerReceiptSchema,
 } from "../contracts";
 import {
 	getNotification,
+	getOperation,
 	getStartedReceiptByRun,
 	getTimer,
 	latestOpenNotification,
+	recentNotifiedTimers,
 } from "../repository";
 import type { TimerDeps } from "./deps";
 import { toDto } from "./dto";
@@ -33,7 +36,7 @@ import {
 	recordListOperationInTransaction,
 	startInTransaction,
 } from "./operations";
-import { iso } from "./canonical";
+import { iso, digest } from "./canonical";
 
 export function createTimers(
 	store: SqliteStore,
@@ -42,6 +45,7 @@ export function createTimers(
 		now?: () => number;
 		id?: () => string;
 		publish?: () => void;
+		onElapsedInTransaction?: TimerDeps["onElapsedInTransaction"];
 		protectedIds?: (tx: Database) => readonly string[];
 		scope?: string;
 	} = {},
@@ -53,6 +57,7 @@ export function createTimers(
 		scheduler: ports.scheduler,
 		queue: ports.queue,
 		publish: options.publish,
+		onElapsedInTransaction: options.onElapsedInTransaction,
 		protectedIds: options.protectedIds,
 		log,
 	};
@@ -61,7 +66,6 @@ export function createTimers(
 	ports.scheduler.registerTarget(expiry.target);
 	ports.queue.registerHandler(expiry.handler);
 	const apiOrigin = (extra?: Partial<TimerOrigin>): TimerOrigin => ({
-		scope,
 		conversationId: null,
 		runId: null,
 		messageId: null,
@@ -71,8 +75,19 @@ export function createTimers(
 	});
 
 	async function commit<T>(work: (tx: Database) => T, wake: boolean) {
-		const result = await store.write(work);
-		if (wake) {
+		const { result, changed } = await store.write((tx) => {
+			const before = (
+				tx.query("SELECT total_changes() AS n").get() as { n: number }
+			).n;
+			const result = work(tx);
+			return {
+				result,
+				changed:
+					(tx.query("SELECT total_changes() AS n").get() as { n: number }).n !==
+					before,
+			};
+		});
+		if (wake && changed) {
 			ports.scheduler.wake();
 			ports.queue.wake();
 			options.publish?.();
@@ -83,10 +98,35 @@ export function createTimers(
 	return {
 		target: expiry.target,
 		handler: expiry.handler,
+		routeSnapshotInTransaction(tx: Database) {
+			const at = deps.now();
+			const active = listInTransaction(
+				tx,
+				deps,
+				{ state: "active", limit: 100 },
+				scope,
+			);
+			return {
+				serverNow: iso(at),
+				items: [
+					...active.items,
+					...recentNotifiedTimers(tx, scope, 8).map((row) => toDto(row, at)),
+				].map(({ id, revision, state, label, remainingSeconds }) => ({
+					id,
+					revision,
+					state,
+					label,
+					remainingSeconds,
+				})),
+			};
+		},
 		startInTransaction: (tx: Database, command: unknown, origin: TimerOrigin) =>
 			startInTransaction(tx, deps, command, origin),
-		listInTransaction: (tx: Database, query: ListTimersQuery, listScope = scope) =>
-			listInTransaction(tx, deps, query, listScope),
+		listInTransaction: (
+			tx: Database,
+			query: ListTimersQuery,
+			listScope = scope,
+		) => listInTransaction(tx, deps, query, listScope),
 		recordListOperationInTransaction: (
 			tx: Database,
 			command: {
@@ -107,10 +147,18 @@ export function createTimers(
 			getInTransaction(tx, timerId, listScope, deps.now()),
 		maintenanceInTransaction: (tx: Database) =>
 			maintenanceInTransaction(tx, deps),
-		claimInTransaction: (tx: Database, id: string, command: unknown, listScope = scope) =>
-			claimInTransaction(tx, deps, id, listScope, command),
-		ackInTransaction: (tx: Database, id: string, command: unknown, listScope = scope) =>
-			ackInTransaction(tx, deps, id, listScope, command),
+		claimInTransaction: (
+			tx: Database,
+			id: string,
+			command: unknown,
+			listScope = scope,
+		) => claimInTransaction(tx, deps, id, listScope, command),
+		ackInTransaction: (
+			tx: Database,
+			id: string,
+			command: unknown,
+			listScope = scope,
+		) => ackInTransaction(tx, deps, id, listScope, command),
 		silenceInTransaction: (
 			tx: Database,
 			id: string,
@@ -135,9 +183,48 @@ export function createTimers(
 				return {
 					serverNow: iso(at),
 					timer,
-					notification: note ? notificationDto(note) : null,
+					notification: note ? notificationDto(note, tx) : null,
 				};
 			});
+		},
+		readReceiptInTransaction(db: Database, operationId: string) {
+			const row = getOperation(db, operationId);
+			if (!row || row.scope !== scope || !row.receiptJson) return null;
+			const receipt = timerReceiptSchema.parse(JSON.parse(row.receiptJson));
+			if (
+				digest(receipt) !== row.receiptDigest ||
+				receipt.operationId !== row.id
+			)
+				throw new Error("action_invalidated");
+			return { operationId: row.id, receiptDigest: row.receiptDigest, receipt };
+		},
+		projectReceiptInTransaction(db: Database, operationId: string) {
+			const row = getOperation(db, operationId);
+			if (!row || row.scope !== scope || !row.receiptJson)
+				throw new Error("operation_expired");
+			const receipt = timerReceiptSchema.parse(JSON.parse(row.receiptJson));
+			if (
+				digest(receipt) !== row.receiptDigest ||
+				receipt.operationId !== row.id
+			)
+				throw new Error("action_invalidated");
+			const at = deps.now();
+			if (receipt.action === "listed")
+				return {
+					...receipt,
+					serverNow: iso(at),
+					items: receipt.items.flatMap((saved) => {
+						const current = getInTransaction(db, saved.id, scope, at);
+						return current &&
+							!current.bodyExpired &&
+							(row.timerId || current.state === saved.state)
+							? [current]
+							: [];
+					}),
+				};
+			const current = getInTransaction(db, receipt.timer.id, scope, at);
+			if (!current || current.bodyExpired) throw new Error("operation_expired");
+			return { ...receipt, timer: current, serverNow: iso(at) };
 		},
 		receiptByRun(runId: string, listScope = scope) {
 			return store.read((tx) => {

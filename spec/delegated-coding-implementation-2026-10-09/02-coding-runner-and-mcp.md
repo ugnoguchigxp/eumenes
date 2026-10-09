@@ -1,6 +1,6 @@
 # CLI 実行と MCP 接続の実装計画
 
-作成日: 2026-10-09 JST。状態: 実装前。[全体計画](README.md) の P0、P2、P4、P6 を担当する。タスクと権限の共通契約は [01](01-tasks-and-queue.md) を参照する。
+作成日: 2026-10-09 JST。状態: 実装中（CLI/MCP基盤のfixture確認済み。実CLIの隔離・受入は未実施）。[全体計画](README.md) の P0、P2、P4、P6 を担当する。タスクと権限の共通契約は [01](01-tasks-and-queue.md) を参照する。[実装状況](../../docs/coding-runner.md)・[検証記録](../verification/delegated-coding/runner-fixtures.md)・[基盤のコードレビュー](../verification/delegated-coding/runner-review.md)。
 
 ## 1 目的と構成
 

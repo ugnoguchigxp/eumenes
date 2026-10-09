@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "./variables.css";
 @import "./themes.css";
+@import "../components/Tabs/Tabs.css";
 
 @source "../**/*.{js,ts,jsx,tsx}";
 @source "../../.storybook/**/*.{js,ts,jsx,tsx}";

@@ -14,6 +14,7 @@ import {
 import { TIMER_POLICY } from "./policy";
 import { iso } from "./canonical";
 import type { TimerDeps } from "./deps";
+import { timerCompletionMessage } from "./announcement";
 
 export const expireTargetSchema = z
 	.object({
@@ -36,7 +37,12 @@ type ExpireInput = {
 	dispatchGeneration: number;
 };
 
-export function notificationDto(row: NotificationRow): TimerNotificationDto {
+export function notificationDto(
+	row: NotificationRow,
+	tx: Database,
+): TimerNotificationDto {
+	const timer = getTimer(tx, row.timerId);
+	if (!timer) throw new Error("timer_not_found");
 	return {
 		id: row.id,
 		timerId: row.timerId,
@@ -45,6 +51,7 @@ export function notificationDto(row: NotificationRow): TimerNotificationDto {
 		status: row.status,
 		reason: row.reason,
 		dueAt: iso(row.dueAtMs),
+		message: timerCompletionMessage(timer),
 	};
 }
 
@@ -165,8 +172,9 @@ export function createExpiry(deps: TimerDeps) {
 			)
 				return "stale";
 			const stale = at - timer.dueAtMs > TIMER_POLICY.soundFreshMs;
-			insertNotificationIfAbsent(tx, {
-				id: deps.id(),
+			const notificationId = deps.id();
+			const inserted = insertNotificationIfAbsent(tx, {
+				id: notificationId,
 				timerId: timer.id,
 				scope: timer.scope,
 				generation: timer.cancelEpoch,
@@ -175,6 +183,14 @@ export function createExpiry(deps: TimerDeps) {
 				reason: stale ? "stale" : null,
 				at,
 			});
+			if (inserted)
+				deps.onElapsedInTransaction?.(tx, {
+					notificationId,
+					timerId: timer.id,
+					conversationId: timer.conversationId,
+					message: timerCompletionMessage(timer),
+					at: iso(at),
+				});
 			deps.log.debug("timer.elapsed", {
 				timerId: timer.id,
 				jobId: claim.jobId,

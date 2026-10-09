@@ -303,6 +303,17 @@ export declare const DEFAULT_THEME: ThemeName;
  */
 export declare const DeleteButton: default_2.FC<ActionButtonProps>;
 
+export declare function DigitalClock({ seconds, format, size, tone, label, className, }: DigitalClockProps): JSX.Element;
+
+export declare type DigitalClockProps = {
+    seconds: number;
+    format?: "mm:ss" | "hh:mm:ss" | "auto";
+    size?: "sm" | "md" | "lg" | "hero";
+    tone?: "default" | "warning" | "finished" | "muted";
+    label?: string;
+    className?: string;
+};
+
 export { DirectionProvider }
 
 export declare const Drawer: React_2.FC<DrawerProps>;
@@ -797,6 +808,24 @@ declare interface ProgressBarProps extends React_2.ComponentPropsWithoutRef<type
     status?: "normal" | "paused" | "error";
 }
 
+/** Native radio semantics with a full-row selection target. */
+export declare function RadioButtonGroup({ label, options, value, onValueChange, name, disabled, required, className, }: RadioButtonGroupProps): JSX.Element;
+
+export declare interface RadioButtonGroupProps {
+    label: string;
+    options: readonly {
+        value: string;
+        label: string;
+        disabled?: boolean;
+    }[];
+    value: string;
+    onValueChange: (value: string) => void;
+    name?: string;
+    disabled?: boolean;
+    required?: boolean;
+    className?: string;
+}
+
 /**
  * 保存ボタン
  */
@@ -894,16 +923,21 @@ export declare const TabsContent: React_2.ForwardRefExoticComponent<Omit<TabsPri
 
 export declare const TabsList: React_2.ForwardRefExoticComponent<TabsListProps & React_2.RefAttributes<HTMLDivElement>>;
 
-declare interface TabsListProps extends React_2.ComponentPropsWithoutRef<typeof TabsPrimitive.List> {
+export declare interface TabsListProps extends React_2.ComponentPropsWithoutRef<typeof TabsPrimitive.List> {
+    variant?: TabsVariant;
     onBack?: () => void;
     backButtonLabel?: string;
 }
 
 export declare const TabsTrigger: React_2.ForwardRefExoticComponent<TabsTriggerProps & React_2.RefAttributes<HTMLButtonElement>>;
 
-declare interface TabsTriggerProps extends React_2.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger> {
+export declare interface TabsTriggerProps extends React_2.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger> {
     icon?: React_2.ElementType;
+    onClose?: () => void;
+    closeLabel?: string;
 }
+
+export declare type TabsVariant = "line" | "workspace";
 
 export declare const Textarea: React_2.ForwardRefExoticComponent<TextareaProps & React_2.RefAttributes<HTMLTextAreaElement>>;
 

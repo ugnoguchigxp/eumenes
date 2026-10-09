@@ -4,7 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
 import { migration as queueMigration, createQueue } from "../../queue";
-import { migration as schedulerMigration, createScheduler } from "../../scheduler";
+import {
+	migration as schedulerMigration,
+	createScheduler,
+} from "../../scheduler";
 import {
 	createTimers,
 	migration as timerMigration,
@@ -18,6 +21,7 @@ const T0 = Date.parse("2026-10-09T00:00:00.000Z");
 
 export async function openTimers(options?: {
 	now?: () => number;
+	queueLimits?: { total: number; background: number; scope: number };
 	protectedIds?: (tx: import("bun:sqlite").Database) => readonly string[];
 }) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-timers-"));
@@ -27,7 +31,10 @@ export async function openTimers(options?: {
 		schedulerMigration,
 		timerMigration,
 	]);
-	const queue = createQueue(store, { now: () => clock() });
+	const queue = createQueue(store, {
+		now: () => clock(),
+		limits: options?.queueLimits,
+	});
 	const scheduler = createScheduler(store, queue, { now: () => clock() });
 	const timers = createTimers(
 		store,
@@ -58,7 +65,10 @@ export async function openTimers(options?: {
 
 const issued = "2026-10-09T00:00:00.000Z";
 
-export function startBody(durationSeconds: number, requestId = crypto.randomUUID()) {
+export function startBody(
+	durationSeconds: number,
+	requestId = crypto.randomUUID(),
+) {
 	return {
 		requestId,
 		issuedAt: issued,
@@ -121,12 +131,10 @@ test("180 second start fixes dueAt, replays the same receipt, and rolls back wit
 			h.timers.start({ ...body, durationSeconds: 90 }),
 		).rejects.toThrow("request_conflict");
 		expect(
-			(
-				h.store.read(
-					(db) =>
-						db.query("SELECT COUNT(*) AS n FROM timers").get() as { n: number },
-				).n
-			),
+			h.store.read(
+				(db) =>
+					db.query("SELECT COUNT(*) AS n FROM timers").get() as { n: number },
+			).n,
 		).toBe(1);
 	} finally {
 		await h.close();
@@ -158,15 +166,18 @@ test("a scheduler rejection rolls the timer and the operation back together", as
 			"schedule_limit_reached",
 		);
 		const counts = store.read((db) => ({
-			timers: (db.query("SELECT COUNT(*) AS n FROM timers").get() as { n: number })
-				.n,
+			timers: (
+				db.query("SELECT COUNT(*) AS n FROM timers").get() as { n: number }
+			).n,
 			ops: (
 				db.query("SELECT COUNT(*) AS n FROM timer_operations").get() as {
 					n: number;
 				}
 			).n,
 			schedules: (
-				db.query("SELECT COUNT(*) AS n FROM scheduler_schedules").get() as { n: number }
+				db.query("SELECT COUNT(*) AS n FROM scheduler_schedules").get() as {
+					n: number;
+				}
 			).n,
 		}));
 		expect(counts).toEqual({ timers: 0, ops: 0, schedules: 0 });
@@ -209,9 +220,7 @@ test("cancel of an active timer invalidates the schedule and a later expiry does
 				? (
 						h.store.read((db) =>
 							db
-								.query(
-									"SELECT request_id FROM timer_operations WHERE id=?",
-								)
+								.query("SELECT request_id FROM timer_operations WHERE id=?")
 								.get(cancelled.receipt.operationId),
 						) as { request_id: string }
 					).request_id
@@ -230,17 +239,20 @@ test("due boundary: 179999 stays active, 180000 elapses with one notification", 
 	try {
 		const started = await h.timers.start(startBody(180));
 		if (started.receipt.action !== "started") throw new Error("expected start");
+		const timerId = started.receipt.timer.id;
 		h.setNow(T0 + 179_999);
 		await h.scheduler.tick();
-		expect(h.timers.get(started.receipt.timer.id)?.timer.state).toBe("active");
+		expect(h.timers.get(timerId)?.timer.state).toBe("active");
 		expect(h.timers.notifications().items).toHaveLength(0);
+		expect(h.timers.notifications().activeTimers).toBe(1);
 		h.setNow(T0 + 180_000);
 		await h.scheduler.tick();
 		await settle(h.queue);
-		const view = h.timers.get(started.receipt.timer.id);
+		const view = h.timers.get(timerId);
 		expect(view?.timer.state).toBe("elapsed");
 		expect(view?.timer.remainingSeconds).toBe(0);
 		expect(h.timers.notifications().items).toHaveLength(1);
+		expect(h.timers.notifications().activeTimers).toBe(0);
 		const note = h.timers.notifications().items[0]!;
 		expect(note.status).toBe("pending");
 		await h.store.write((tx) => {
@@ -252,11 +264,11 @@ test("due boundary: 179999 stays active, 180000 elapses with one notification", 
 					kind: "timer.expire",
 					payloadVersion: 1,
 					payload: {
-						timerId: started.receipt.timer.id,
+						timerId,
 						cancelEpoch: 0,
 						dispatchGeneration: 1,
 					},
-					subjectRef: started.receipt.timer.id,
+					subjectRef: timerId,
 					owner: "test",
 					attempt: 1,
 					generation: 1,
@@ -264,11 +276,14 @@ test("due boundary: 179999 stays active, 180000 elapses with one notification", 
 					deadlineAtMs: null,
 				},
 				{
-					id: started.receipt.timer.id,
+					id: timerId,
 					epoch: 0,
 					dispatchGeneration: 1,
 				},
-				{ type: "success", result: { id: started.receipt.timer.id, epoch: 0, dispatchGeneration: 1 } },
+				{
+					type: "success",
+					result: { id: timerId, epoch: 0, dispatchGeneration: 1 },
+				},
 			);
 			expect(again).toBe("stale");
 		});
@@ -350,7 +365,10 @@ test("origin retry keeps one timer and a different duration conflicts", async ()
 			),
 		);
 		expect(second.replay).toBe(true);
-		if (first.receipt.action !== "started" || second.receipt.action !== "started")
+		if (
+			first.receipt.action !== "started" ||
+			second.receipt.action !== "started"
+		)
 			throw new Error("expected start");
 		expect(second.receipt.timer.id).toBe(first.receipt.timer.id);
 		await expect(
@@ -366,3 +384,96 @@ test("origin retry keeps one timer and a different duration conflicts", async ()
 void 0 as unknown as SqliteStore;
 void 0 as unknown as SchedulerService;
 void 0 as unknown as TimersService;
+
+test("a replayed live claim becomes silent when it crosses the five minute freshness boundary", async () => {
+	const h = await openTimers();
+	try {
+		await h.timers.start(startBody(1));
+		h.setNow(T0 + 1000);
+		await h.scheduler.tick();
+		await settle(h.queue);
+		const note = h.timers.notifications().items[0]!;
+		h.setNow(T0 + 1000 + 299999);
+		const input = {
+			clientId: crypto.randomUUID(),
+			claimRequestId: crypto.randomUUID(),
+			expectedRevision: note.revision,
+		};
+		const first = await h.timers.claim(note.id, input);
+		expect(first.claimId).toBeTruthy();
+		h.setNow(T0 + 1000 + 300001);
+		const replay = await h.timers.claim(note.id, input);
+		expect(replay.claimId).toBeUndefined();
+		expect(replay.notification.status).toBe("silent");
+		expect(replay.notification.reason).toBe("stale");
+	} finally {
+		await h.close();
+	}
+});
+
+test("acknowledgement replay belongs to the same client as the claim", async () => {
+	const h = await openTimers();
+	try {
+		await h.timers.start(startBody(1));
+		h.setNow(T0 + 1000);
+		await h.scheduler.tick();
+		await settle(h.queue);
+		const note = h.timers.notifications().items[0]!;
+		const clientId = crypto.randomUUID();
+		const claimed = await h.timers.claim(note.id, {
+			clientId,
+			claimRequestId: crypto.randomUUID(),
+			expectedRevision: note.revision,
+		});
+		const ack = {
+			clientId,
+			claimId: claimed.claimId!,
+			outcome: "played" as const,
+		};
+		await h.timers.ack(note.id, ack);
+		expect((await h.timers.ack(note.id, ack)).notification.status).toBe(
+			"played",
+		);
+		await expect(
+			h.timers.ack(note.id, { ...ack, clientId: crypto.randomUUID() }),
+		).rejects.toThrow("claim_invalid");
+	} finally {
+		await h.close();
+	}
+});
+
+test("a full expiry queue defers one timer without blocking recovery of an expired claim", async () => {
+	const limits = { total: 128, background: 128, scope: 128 };
+	const h = await openTimers({ queueLimits: limits });
+	try {
+		await h.timers.start(startBody(1));
+		h.setNow(T0 + 1000);
+		await h.scheduler.tick();
+		await settle(h.queue);
+		const note = h.timers.notifications().items[0]!;
+		await h.timers.claim(note.id, {
+			clientId: crypto.randomUUID(),
+			claimRequestId: crypto.randomUUID(),
+			expectedRevision: note.revision,
+		});
+		const second = await h.timers.start(startBody(1));
+		if (second.receipt.action !== "started") throw new Error("expected start");
+		const timerId = second.receipt.timer.id;
+		await h.store.write((db) => {
+			const timer = h.timers.readTimer(db, timerId)!;
+			const schedule = h.scheduler.getInTransaction(db, timer.scheduleId!)!;
+			h.scheduler.cancelInTransaction(db, schedule.id, schedule.revision);
+		});
+		limits.total = limits.background = limits.scope = 0;
+		h.setNow(T0 + 16001);
+		await h.timers.maintenance();
+		expect(h.timers.notifications().items[0]?.status).toBe("pending");
+		expect(h.timers.get(timerId)?.timer.state).toBe("active");
+		limits.total = limits.background = limits.scope = 128;
+		await h.timers.maintenance();
+		await settle(h.queue);
+		expect(h.timers.get(timerId)?.timer.state).toBe("elapsed");
+	} finally {
+		await h.close();
+	}
+});

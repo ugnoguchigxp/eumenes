@@ -62,8 +62,8 @@ export function uniqueByIdentity(values: readonly SourceRef[]): SourceRef[] {
 
 /** One derived World object whose inputs Memory must know about. */
 export type VersionInputs = {
-	/** a: one assertion revision. m: one input manifest. s: the Slice behind one answer run. */
-	tag: "a" | "m" | "s";
+	/** a: one assertion revision. m: one input manifest. o: one runtime Outcome revision. s: the Slice behind one answer run. */
+	tag: "a" | "m" | "o" | "s";
 	/** Identifies the version: [assertionId, revision] or [manifestId]. */
 	key: readonly (string | number)[];
 	refs: SourceRef[];

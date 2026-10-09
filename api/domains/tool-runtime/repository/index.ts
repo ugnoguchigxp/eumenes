@@ -17,6 +17,23 @@ ALTER TABLE tool_invocations ADD COLUMN origin TEXT NOT NULL DEFAULT 'tool';
 export const supersedeMigration = `
 ALTER TABLE tool_invocations ADD COLUMN superseded INTEGER NOT NULL DEFAULT 0;
 `;
+/** Appended: immediate local actions. Does not alter tool_invocations. */
+export const actionMigration = `
+CREATE TABLE tool_action_invocations(
+  id TEXT PRIMARY KEY,
+  root_run_id TEXT NOT NULL,
+  owner_task_id TEXT NOT NULL,
+  cancel_epoch INTEGER NOT NULL,
+  step_id TEXT NOT NULL UNIQUE,
+  tool_revision_id TEXT NOT NULL,
+  request_id TEXT NOT NULL UNIQUE,
+  args_digest TEXT NOT NULL,
+  operation_id TEXT NOT NULL,
+  receipt_digest TEXT NOT NULL,
+  state TEXT NOT NULL CHECK(state='committed'),
+  created_at INTEGER NOT NULL
+);
+`;
 const columnCache = new WeakMap<Database, boolean>();
 export function hasSupersededColumn(db: Database) {
 	let v = columnCache.get(db);

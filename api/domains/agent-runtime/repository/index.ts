@@ -18,6 +18,16 @@ ALTER TABLE agent_reports ADD COLUMN safe_projection_json TEXT;
 ALTER TABLE agent_reports ADD COLUMN safe_projection_digest TEXT;
 ALTER TABLE agent_reports ADD COLUMN acquisition_binding_json TEXT;
 `;
+export const actionResultMigration = `
+CREATE TABLE agent_action_results (
+  task_id TEXT PRIMARY KEY,
+  invocation_id TEXT NOT NULL,
+  operation_id TEXT NOT NULL,
+  receipt_digest TEXT NOT NULL,
+  payload_json TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+`;
 export const get = (db: Database, id: string) =>
 	db.query("SELECT * FROM agent_tasks WHERE id=?").get(id) as Task | null;
 export const byRoot = (db: Database, id: string) =>

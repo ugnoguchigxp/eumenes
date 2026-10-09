@@ -1,4 +1,28 @@
 export const domains = {
+	"task-reports": {
+		backend: "api/domains/task-reports",
+		web: null,
+		components: null,
+		depends: ["tasks"],
+	},
+	"coding-supervision": {
+		backend: "api/domains/coding-supervision",
+		web: null,
+		components: null,
+		depends: ["tasks", "coding", "task-reports", "queue", "inference"],
+	},
+	coding: {
+		backend: "api/domains/coding",
+		web: null,
+		components: null,
+		depends: [],
+	},
+	artifact: {
+		backend: null,
+		web: "web/src/domains/artifact",
+		components: "web/src/components/domains/artifact",
+		depends: ["conversation"],
+	},
 	tasks: {
 		backend: "api/domains/tasks",
 		web: null,
@@ -150,6 +174,7 @@ export const domains = {
 			"delivery",
 			"settings",
 			"memory",
+			"world",
 		],
 	},
 	"voice-dialogue": {
@@ -190,5 +215,11 @@ export function closure(
 }
 export function ownedPaths(domain: Domain): string[] {
 	const info = domains[domain];
-	return [info.backend, info.web, info.components].filter(Boolean) as string[];
+	return [
+		...([info.backend, info.web, info.components].filter(Boolean) as string[]),
+		...(domain === "artifact" ? ["packages/artifact-ui/src"] : []),
+		...(domain === "coding"
+			? ["packages/coding-runner/src", "packages/coding-runner/test"]
+			: []),
+	];
 }

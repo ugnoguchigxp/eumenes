@@ -125,6 +125,8 @@ export function createAudioController(
 	let finishPlayback: () => void = () => {};
 	let interruptedPlayback: (() => void) | undefined;
 	let disposed = false;
+	let inputPaused = false;
+	let inputEpoch = 0;
 	let speaking = false;
 	let detector: VoiceActivityDetector | undefined;
 	let candidateFrames: Float32Array[] = [];
@@ -135,6 +137,8 @@ export function createAudioController(
 	let nextPartialAt = 0;
 	let lastEmit = 0;
 	let listenAfter = 0;
+	let playbackSuppressInput = false;
+	let forcedInputGateUntil = 0;
 	let wasGated = false;
 	let releaseWatchers: () => void = () => {};
 	let lostReported = false;
@@ -227,7 +231,11 @@ export function createAudioController(
 		};
 	}
 	const emit = (phase: AudioState["phase"], error?: string) =>
-		onState({ phase, error, level: lastLevel });
+		onState({
+			phase: phase === "listening" && !stream ? "idle" : phase,
+			error,
+			level: lastLevel,
+		});
 
 	// Bluetooth outputs sleep on digital silence and clip the start of the next
 	// sound while waking. A ~-80 dBFS noise bed (a few 16-bit LSBs) keeps the
@@ -281,16 +289,20 @@ export function createAudioController(
 
 	return {
 		async start() {
-			if (disposed || context) return;
+			if (disposed || stream) return;
+			inputPaused = false;
+			lostReported = false;
+			const recordingEpoch = ++inputEpoch;
 			try {
-				stream = await openMicrophone();
-				if (disposed) {
-					stream.getTracks().forEach((t) => {
+				const opened = await openMicrophone();
+				if (disposed || inputPaused || recordingEpoch !== inputEpoch) {
+					opened.getTracks().forEach((t) => {
 						t.stop();
 					});
 					return;
 				}
-				const startedContext = new AudioContext();
+				stream = opened;
+				const startedContext = context ?? new AudioContext();
 				context = startedContext;
 				if (options.outputDevice && "setSinkId" in startedContext)
 					await (
@@ -298,10 +310,22 @@ export function createAudioController(
 							setSinkId: (id: string) => Promise<void>;
 						}
 					).setSinkId(options.outputDevice);
-				if (disposed || context !== startedContext) return;
+				if (
+					disposed ||
+					inputPaused ||
+					recordingEpoch !== inputEpoch ||
+					context !== startedContext
+				)
+					return;
 				await startedContext.resume();
-				if (disposed || context !== startedContext) return;
-				startKeepAlive(startedContext);
+				if (
+					disposed ||
+					inputPaused ||
+					recordingEpoch !== inputEpoch ||
+					context !== startedContext
+				)
+					return;
+				if (!keepAliveSource) startKeepAlive(startedContext);
 				watchDevices(startedContext, stream);
 				detector = new VoiceActivityDetector({
 					sampleRate: context.sampleRate,
@@ -310,10 +334,18 @@ export function createAudioController(
 				});
 				source = context.createMediaStreamSource(stream);
 				const handleFrame = (frame: Float32Array) => {
-					if (disposed || !context) return;
+					if (
+						disposed ||
+						inputPaused ||
+						recordingEpoch !== inputEpoch ||
+						!context
+					)
+						return;
 					const gated =
-						!!options.halfDuplex?.() &&
-						(!!playback || performance.now() < listenAfter);
+						(!!options.halfDuplex?.() &&
+							(!!playback || performance.now() < listenAfter)) ||
+						(!!playback && playbackSuppressInput) ||
+						performance.now() < forcedInputGateUntil;
 					if (gated) {
 						// Drop anything heard so far; the reply must not become input.
 						frame.fill(0);
@@ -386,7 +418,17 @@ export function createAudioController(
 				const recorder = await openRecorderNode(context, handleFrame, () =>
 					reportLost("mic_lost"),
 				);
-				if (disposed || context !== startedContext) return;
+				if (
+					disposed ||
+					inputPaused ||
+					recordingEpoch !== inputEpoch ||
+					context !== startedContext
+				) {
+					recorder.node.disconnect();
+					if (recorder.kind === "worklet") recorder.node.port.onmessage = null;
+					else recorder.node.onaudioprocess = null;
+					return;
+				}
 				if (recorder.kind === "worklet") worklet = recorder.node;
 				else processor = recorder.node;
 				const input = worklet ?? processor;
@@ -403,6 +445,8 @@ export function createAudioController(
 				throw error;
 			}
 		},
+		/** Read at notice dispatch time; silence while waiting for speech is not busy. */
+		isInputBusy: () => speaking,
 		/** Output only (no microphone): used to read text aloud outside a voice session. */
 		async startOutput() {
 			if (disposed || context) return;
@@ -432,6 +476,8 @@ export function createAudioController(
 				shouldPlay?: () => boolean;
 				volume?: number;
 				onStarted?: () => void;
+				/** Alarm tones never become microphone input, including their output tail. */
+				suppressInput?: boolean;
 				/** Called when this playback is cut off by another one or by stopPlayback(). */
 				onInterrupted?: () => void;
 			} = {},
@@ -468,6 +514,7 @@ export function createAudioController(
 				playbackGain.connect(context.destination);
 			} else next.connect(context.destination);
 			playback = next;
+			playbackSuppressInput = playOptions.suppressInput ?? false;
 			interruptedPlayback = playOptions.onInterrupted;
 			playbackDone = new Promise<void>((resolve) => {
 				finishPlayback = resolve;
@@ -476,6 +523,8 @@ export function createAudioController(
 				if (playback === next) {
 					interruptedPlayback = undefined;
 					listenAfter = performance.now() + OUTPUT_TAIL_MS;
+					if (playbackSuppressInput) forcedInputGateUntil = listenAfter;
+					playbackSuppressInput = false;
 					playback = undefined;
 					playbackGain?.disconnect();
 					playbackGain = undefined;
@@ -491,6 +540,9 @@ export function createAudioController(
 		stopPlayback() {
 			playbackEpoch++;
 			finishPlayback();
+			if (playbackSuppressInput)
+				forcedInputGateUntil = performance.now() + OUTPUT_TAIL_MS;
+			playbackSuppressInput = false;
 			const old = playback;
 			const interrupted = interruptedPlayback;
 			interruptedPlayback = undefined;
@@ -536,13 +588,39 @@ export function createAudioController(
 			detector = undefined;
 			emit("idle");
 		},
+		/** Stop recording while keeping the accepted answer's output context alive. */
+		pauseInput() {
+			if (speaking) flush();
+			inputPaused = true;
+			inputEpoch++;
+			releaseWatchers();
+			processor?.disconnect();
+			if (processor) processor.onaudioprocess = null;
+			if (worklet) worklet.port.onmessage = null;
+			worklet?.disconnect();
+			source?.disconnect();
+			stream?.getTracks().forEach((track) => track.stop());
+			stream = undefined;
+			processor = undefined;
+			worklet = undefined;
+			source = undefined;
+			detector = undefined;
+			speaking = false;
+			frames = [];
+			sampleCount = 0;
+			candidateFrames = [];
+			candidateSamples = 0;
+			lastLevel = 0;
+			emit(playback ? "playing" : "idle");
+		},
 	};
 }
 type Controller = ReturnType<typeof createAudioController>;
 export type AudioController = Pick<
 	Controller,
 	"start" | "stop" | "stopPlayback" | "play"
->;
+> &
+	Partial<Pick<Controller, "isInputBusy" | "pauseInput">>;
 /** Playback-only subset used for read-aloud outside a voice session. */
 export type OutputController = Pick<
 	Controller,

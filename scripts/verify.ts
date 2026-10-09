@@ -118,6 +118,9 @@ try {
 					files(join(root, "web/src")),
 					files(join(root, "client")),
 					files(join(root, "cli")),
+					files(join(root, "packages/artifact-ui/src")),
+					files(join(root, "packages/coding-runner/src")),
+					files(join(root, "packages/coding-runner/test")),
 				)
 			: tsFiles
 		)
@@ -167,7 +170,12 @@ try {
 		rmSync(config);
 	}
 	if (all) {
-		await run("tests", [process.execPath, "test", "api"]);
+		await run("tests", [
+			process.execPath,
+			"test",
+			"api",
+			"packages/coding-runner/test",
+		]);
 		await run("web tests", [process.execPath, "x", "vitest", "run", "web"]);
 		await run("web build", [process.execPath, "run", "build:web"]);
 		await run("browser fixture", [process.execPath, "x", "playwright", "test"]);

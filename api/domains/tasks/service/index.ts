@@ -142,6 +142,7 @@ export function createTasks(store: SqliteStore, options: TasksOptions = {}) {
 			createdAt: t.updatedAt,
 		});
 		if (terminal(t.state)) syncHook(kindFor(t)?.terminalInTransaction?.(tx, t));
+		syncHook(options.changedInTransaction?.(tx, t));
 		return t;
 	}
 	function once(
@@ -642,6 +643,7 @@ export function createTasks(store: SqliteStore, options: TasksOptions = {}) {
 		getInTransaction: (tx: Database, taskId: string) => repo.get(tx, taskId),
 		questionInTransaction: (tx: Database, questionId: string) =>
 			repo.question(tx, questionId),
+		openQuestionInTransaction: repo.openQuestion,
 		assertFenceInTransaction: fence,
 		create: (input: CreateTask, context?: TrustedTaskContext) =>
 			writeCommand(

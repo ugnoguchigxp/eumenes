@@ -15,6 +15,13 @@ import { WorldHostStateError } from "./index";
  *   the host owns); NULL when the inference port gave no receipt.
  * - `dependent_ids_json`: the Memory external dependents registered for the
  *   slice's inputs (the same ids `world_host_dependent` keeps).
+ *
+ * AUDIT data: the validate/adoption path never reads this table (World checks
+ * the receipt carried by the prepared context against its own state). It is
+ * read to find what to release: a forget in the Scope purges the Scope's rows
+ * (and unregisters their Memory dependents), pruning beyond
+ * KEEP_USAGE_PER_SCOPE releases the pruned run's dependents. A receipt and its
+ * Memory dependents therefore live and die together.
  */
 export const usageMigration = `
 CREATE TABLE world_host_usage (
@@ -256,4 +263,48 @@ export function deleteDependents(
 	);
 	for (const externalId of externalIds)
 		remove.run(principal, scopeKey, externalId);
+}
+
+/** Keeps the host rows but marks them for the retry sweep (Memory could not unregister them now). */
+export function markReleasePending(
+	db: Database,
+	principal: string,
+	scopeKey: string,
+	externalIds: readonly string[],
+): void {
+	requireTransaction(db);
+	const mark = db.query(
+		"UPDATE world_host_dependent SET release_pending = 1 WHERE principal = ? AND scope_key = ? AND external_id = ?",
+	);
+	for (const externalId of externalIds)
+		mark.run(principal, scopeKey, externalId);
+}
+
+export type PendingRelease = {
+	principal: string;
+	scopeKey: string;
+	externalId: string;
+};
+
+/** Dependents waiting for a Memory unregistration, oldest id first. */
+export function listReleasePending(
+	db: Database,
+	limit: number,
+): PendingRelease[] {
+	return (
+		db
+			.query(
+				`SELECT principal, scope_key, external_id FROM world_host_dependent
+				WHERE release_pending = 1 ORDER BY principal, scope_key, external_id LIMIT ?`,
+			)
+			.all(limit) as {
+			principal: string;
+			scope_key: string;
+			external_id: string;
+		}[]
+	).map((row) => ({
+		principal: row.principal,
+		scopeKey: row.scope_key,
+		externalId: row.external_id,
+	}));
 }

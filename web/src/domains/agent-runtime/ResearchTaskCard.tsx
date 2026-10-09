@@ -11,7 +11,7 @@ const phases: Record<string, string> = {
 	read: "資料を読取り中",
 	answer: "回答を準備中",
 	completed: "完了",
-	failed: "取得失敗",
+	failed: "調査未完了",
 	cancelled: "停止",
 	interrupted: "中断",
 };
@@ -25,10 +25,12 @@ export function ResearchTaskCard({
 	client,
 	rootRunId,
 	title,
+	agentName,
 }: {
 	client: EumenesClient;
 	rootRunId: string;
 	title: string;
+	agentName?: string;
 }) {
 	const cache = useQueryClient();
 	const tasks = useQuery({
@@ -86,7 +88,11 @@ export function ResearchTaskCard({
 		(report.error instanceof ApiError &&
 			[404, 410].includes(report.error.status));
 	return (
-		<aside className="research-card" aria-label={`調査: ${title}`}>
+		<aside
+			className="message message-assistant research-card"
+			aria-label={`調査: ${title}`}
+		>
+			<small className="message-author">{agentName || "Eumenes"}</small>
 			<strong>{title.slice(0, 80)}</strong>
 			<output>
 				{data?.coverage === "partial" &&
@@ -142,7 +148,6 @@ export function ResearchTaskCard({
 					</small>
 				</details>
 			)}
-			{failed && <p>調査を完了できませんでした。もう一度依頼してください。</p>}
 		</aside>
 	);
 }

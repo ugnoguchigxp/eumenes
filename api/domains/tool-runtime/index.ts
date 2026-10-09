@@ -3,5 +3,6 @@ export {
 	migration,
 	routeGrantMigration,
 	supersedeMigration,
+	actionMigration,
 } from "./repository";
 export * from "./contracts";

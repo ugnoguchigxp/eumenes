@@ -15,6 +15,30 @@ const delivery: SpeechDelivery = {
 	latencyMs: 100,
 };
 const base = { conversationId: "main", createdAt: "now", runId: "run" };
+test("activity after a request stays outside the user's bubble and before the answer", () => {
+	const { container } = render(
+		<MessageList
+			conversation={{
+				id: "main",
+				revision: 1,
+				messages: [
+					{ ...base, id: "user", role: "user", text: "今日の鎌倉の天気は。" },
+					{ ...base, id: "answer", role: "assistant", text: "回答" },
+				],
+			}}
+			renderFollowingMessage={(message) =>
+				message.id === "user" ? <aside>検索中</aside> : null
+			}
+		/>,
+	);
+	const userBubble = container.querySelector(".message-user");
+	const activity = screen.getByText("検索中");
+	expect(userBubble?.textContent).toBe("あなた今日の鎌倉の天気は。");
+	expect(userBubble?.nextElementSibling).toBe(activity);
+	expect(activity.nextElementSibling).toBe(
+		container.querySelector(".message-assistant"),
+	);
+});
 test("adopted emotion belongs beside the assistant name, preserves body and follows a custom name", () => {
 	const { container, rerender } = render(
 		<MessageList

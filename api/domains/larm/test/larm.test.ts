@@ -211,6 +211,31 @@ test("catalog, claim, ASR/LLM/TTS and release use public contract", async () => 
 	expect(fake.calls.filter((x) => x.includes("/claim"))).toHaveLength(2);
 	expect(fake.calls.filter((x) => x.startsWith("DELETE"))).toHaveLength(2);
 });
+test("ASR accepts empty silence but rejects missing, nontext or oversized transcripts", async () => {
+	for (const text of ["", "  ", undefined, 42, "x".repeat(4097)]) {
+		const fake = fixture();
+		const larm = createLarm({
+			baseUrl: "http://127.0.0.1:9810",
+			profile: "SAAA",
+			token: "control",
+			fetch: async (input, init) =>
+				new URL(String(input)).pathname === "/asr/v1/audio/transcriptions"
+					? result({ text })
+					: fake.fetcher(input, init),
+		});
+		try {
+			const transcript = larm.transcribe(
+				new Uint8Array(44),
+				new AbortController().signal,
+			);
+			if (typeof text === "string" && text.length <= 4096)
+				expect(await transcript).toBe(text);
+			else await expect(transcript).rejects.toThrow("larm_invalid_contract");
+		} finally {
+			await larm.close();
+		}
+	}
+});
 test("voice menu uses claimed provider auth and TTS sends selected voice and speed", async () => {
 	const fake = fixture();
 	let payload: unknown;

@@ -36,17 +36,19 @@ export class SourceCursorError extends Error {
 const MAX_PAGE = 500;
 const SCAN_BATCH = 200;
 const CURSOR = /^c1\.([0-9a-f]{14})\.([0-9a-f]{12})$/;
-const DEFAULT_CURSOR_SECRET = "eumenes.world.conversation.cursor.v1";
+const MIN_CURSOR_SECRET_CHARS = 8;
 /**
  * Opaque, versioned, tamper-evident cursor. The position is the conversation
  * outbox sequence (never exposed raw): it is masked with a key-derived value and
  * carries a short MAC, so a caller can neither read nor forge positions. The
  * cursor may point past events the caller cannot see (scanned out-of-scope tail)
- * and never moves backwards. Secrecy only holds as far as the secret does: the
- * host should pass a stable `cursorSecret`; the default is a public constant that
- * merely versions and checksums the token.
+ * and never moves backwards. Secrecy only holds as far as the secret does, so
+ * the host MUST pass a stable `cursorSecret`: there is deliberately no default,
+ * because a public constant would let anyone decode the raw global sequence.
  */
 function createCursorCodec(secret: string) {
+	if (typeof secret !== "string" || secret.length < MIN_CURSOR_SECRET_CHARS)
+		throw new Error("world_cursor_secret_required");
 	const hmac = (data: string) =>
 		createHmac("sha256", secret).update(data).digest();
 	const mask = BigInt(`0x${hmac("mask").subarray(0, 7).toString("hex")}`);
@@ -99,10 +101,11 @@ export type ConversationSourceAdapterOptions = {
 	 */
 	allowedPurposes: readonly string[];
 	/**
-	 * Stable secret that masks and authenticates the opaque change cursor.
-	 * Changing it invalidates stored cursors (callers get invalid_source_cursor).
+	 * REQUIRED stable secret (at least 8 characters, host-owned, never logged)
+	 * that masks and authenticates the opaque change cursor. Changing it
+	 * invalidates stored cursors (callers get invalid_source_cursor).
 	 */
-	cursorSecret?: string;
+	cursorSecret: string;
 };
 
 const key = (id: string): SourceKey => ({
@@ -130,9 +133,7 @@ export function createConversationSourceAdapter(
 	options: ConversationSourceAdapterOptions,
 ): SourceAdapter {
 	const purposes = new Set(options.allowedPurposes);
-	const cursors = createCursorCodec(
-		options.cursorSecret ?? DEFAULT_CURSOR_SECRET,
-	);
+	const cursors = createCursorCodec(options.cursorSecret);
 	function checkAccess(access: AccessContext) {
 		if (
 			typeof access?.principal !== "string" ||

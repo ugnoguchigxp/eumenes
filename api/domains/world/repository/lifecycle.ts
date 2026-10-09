@@ -308,6 +308,28 @@ export function advanceIntake(
 	return result.changes === 1;
 }
 
+/**
+ * complete -> world_applied again: Memory's receipt no longer backs the
+ * completion (a restore brought back pending external deletions, or the check
+ * could not be made). The only backwards move; World content stays deleted.
+ */
+export function reopenIntakeForMemory(
+	db: Database,
+	forgetId: string,
+	reason: string,
+	now: number,
+): boolean {
+	requireTransaction(db);
+	return (
+		db
+			.query(
+				`UPDATE world_host_forget_intake SET state = 'world_applied', blocked_reason = ?, updated_at = ?
+				WHERE forget_id = ? AND state IN ('complete', 'memory_confirmed')`,
+			)
+			.run(reason, now, forgetId).changes === 1
+	);
+}
+
 export function setWorldProgress(
 	db: Database,
 	forgetId: string,
@@ -427,8 +449,37 @@ export function upsertDependent(
 	requireTransaction(db);
 	db.query(
 		`INSERT INTO world_host_dependent (principal, scope_key, external_id, depends_json) VALUES (?, ?, ?, ?)
-		ON CONFLICT (principal, scope_key, external_id) DO UPDATE SET depends_json = excluded.depends_json`,
+		ON CONFLICT (principal, scope_key, external_id) DO UPDATE SET depends_json = excluded.depends_json, release_pending = 0`,
 	).run(principal, scopeKey, externalId, JSON.stringify(dependsOn));
+}
+
+export type DependentRecord = {
+	dependsOn: DependentDependency[];
+	releasePending: boolean;
+};
+
+/** The host's record of one registered dependent, or null when the row is gone. */
+export function getDependent(
+	db: Database,
+	principal: string,
+	scopeKey: string,
+	externalId: string,
+): DependentRecord | null {
+	const row = db
+		.query(
+			`SELECT depends_json, release_pending FROM world_host_dependent
+			WHERE principal = ? AND scope_key = ? AND external_id = ?`,
+		)
+		.get(principal, scopeKey, externalId) as {
+		depends_json: string;
+		release_pending: number;
+	} | null;
+	return row
+		? {
+				dependsOn: JSON.parse(row.depends_json) as DependentDependency[],
+				releasePending: row.release_pending === 1,
+			}
+		: null;
 }
 
 export function listDependents(

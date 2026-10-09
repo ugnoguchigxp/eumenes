@@ -25,11 +25,13 @@ body,
 body {
 	overflow: hidden;
 }
-button,
-input,
-textarea,
-select {
-	font: inherit;
+@layer base {
+	button,
+	input,
+	textarea,
+	select {
+		font: inherit;
+	}
 }
 button:focus-visible,
 input:focus-visible,
@@ -51,14 +53,14 @@ select:focus-visible {
 	z-index: 10;
 	top: calc(12px + env(safe-area-inset-top, 0px));
 	right: calc(16px + env(safe-area-inset-right, 0px));
-	width: 44px;
-	height: 44px;
+	width: 36px;
+	height: 36px;
 	padding: 0;
 	border: 1px solid var(--border);
 	border-radius: 50%;
 	color: var(--foreground);
 	background: var(--card);
-	box-shadow: 0 4px 16px color-mix(in srgb, var(--foreground) 16%, transparent);
+	box-shadow: none;
 }
 .app-shell .floating-settings:hover {
 	background: var(--accent);
@@ -481,6 +483,12 @@ select:focus-visible {
 		display: none;
 	}
 }
+
+@media (max-width: 700px) {
+	.app-shell:has(.artifact-panel) .conversation-status {
+		position: absolute;
+	}
+}
 @media (max-width: 700px) {
 	body {
 		overflow: auto;
@@ -489,13 +497,8 @@ select:focus-visible {
 		min-height: 100dvh;
 		height: 100dvh;
 	}
-	.workspace-layout {
-		display: flex;
-		flex-direction: column;
-	}
 	.chat-panel {
-		min-height: 100dvh;
-		height: 100dvh;
+		min-height: 0;
 	}
 	.chat-history {
 		min-height: 0;
@@ -536,7 +539,7 @@ select:focus-visible {
 	padding: 28px 18px;
 	border-right: 1px solid var(--border);
 	overflow: auto;
-	background: var(--card);
+	background: var(--background);
 }
 .settings-nav h1 {
 	font-size: 22px;
@@ -634,7 +637,7 @@ select:focus-visible {
 	padding: 18px;
 	border: 1px solid var(--border);
 	border-radius: 10px;
-	background: var(--card);
+	background: var(--background);
 	box-shadow: 0 -4px 24px color-mix(in srgb, var(--foreground) 6%, transparent);
 	display: flex;
 	align-items: center;
@@ -709,7 +712,7 @@ select:focus-visible {
 	border: 1px solid var(--border);
 	border-radius: 4px;
 	color: var(--foreground);
-	background: var(--card);
+	background: var(--background);
 	font: inherit;
 }
 .tts-dictionary-toolbar button {
@@ -718,7 +721,7 @@ select:focus-visible {
 	border: 1px solid var(--border);
 	border-radius: 4px;
 	color: var(--foreground);
-	background: var(--card);
+	background: var(--background);
 	font: inherit;
 	cursor: pointer;
 }
@@ -743,7 +746,7 @@ select:focus-visible {
 	width: 100%;
 	border-collapse: collapse;
 	table-layout: fixed;
-	background: var(--card);
+	background: var(--background);
 }
 .tts-dictionary-tables th,
 .tts-dictionary-tables td {
@@ -958,10 +961,6 @@ select:focus-visible {
 	}
 }
 
-/* Artifact split: chat on the left, artifact panel on the right */
-.workspace-layout-split {
-	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-}
 .artifact-open {
 	margin-top: 6px;
 	padding: 2px 8px;
@@ -980,68 +979,22 @@ select:focus-visible {
 	min-height: 0;
 	display: grid;
 	grid-template-rows: auto minmax(0, 1fr);
-	padding-top: calc(72px + env(safe-area-inset-top, 0px));
-	border-left: 1px solid var(--border);
-	background: var(--card);
+	padding: 0;
+	background: var(--background);
 }
 .artifact-panel-header {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	padding: 8px 12px;
-	border-bottom: 1px solid var(--border);
-}
-.artifact-tabs {
-	display: flex;
-	flex: 1;
 	min-width: 0;
-	gap: 6px;
-	overflow-x: auto;
 }
-.artifact-tab {
-	display: flex;
-	flex: 0 0 auto;
-	border: 1px solid var(--border);
-	border-radius: 8px;
-	overflow: hidden;
-}
-.artifact-tab button,
-.artifact-panel-close {
-	border: 0;
-	color: var(--muted-foreground);
-	background: transparent;
-	cursor: pointer;
-}
-.artifact-tab [role="tab"] {
-	max-width: 180px;
-	padding: 6px 10px;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-.artifact-tab [role="tab"][aria-selected="true"] {
-	color: var(--foreground);
-	background: var(--accent);
-}
-.artifact-tab .artifact-tab-close {
-	padding: 0 8px;
-	border-left: 1px solid var(--border);
+.artifact-panel-header .ds-tabs-list {
+	width: 100%;
 }
 .artifact-panel-body {
+	margin: 0;
 	min-height: 0;
-	padding: 16px;
+	padding: calc(var(--spacing) * 2);
 	overflow: auto;
-}
-@media (max-width: 900px) {
-	.workspace-layout-split {
-		grid-template-columns: minmax(0, 1fr);
-	}
-	.artifact-panel {
-		padding-top: 0;
-		border-left: 0;
-		border-top: 1px solid var(--border);
-		min-height: 50dvh;
-	}
+	scrollbar-width: thin;
+	scrollbar-color: var(--border) transparent;
 }
 
 .message {

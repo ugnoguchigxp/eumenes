@@ -8,4 +8,5 @@ export {
 	ChatDock,
 	Input,
 	Textarea,
+	DigitalClock,
 } from "@eumenes/design-system";
