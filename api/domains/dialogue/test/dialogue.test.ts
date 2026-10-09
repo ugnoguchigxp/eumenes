@@ -109,6 +109,9 @@ test("failed input persistence prevents any provider request", async () => {
 		read: () => {
 			throw new Error("storage_failed");
 		},
+		readSnapshot: () => {
+			throw new Error("storage_failed");
+		},
 		write: async () => {
 			throw new Error("storage_failed");
 		},

@@ -35,8 +35,16 @@ export class WriterBusyError extends Error {
 	}
 }
 
+type SyncResult<T> = T extends PromiseLike<unknown> ? never : T;
+
 export interface SqliteStore {
 	read<T>(operation: (db: Database) => T): T;
+	/**
+	 * Synchronous read transaction on the readonly reader: every SELECT in the
+	 * callback sees one committed snapshot. Never opens a writer; a write
+	 * attempted inside fails on the readonly connection.
+	 */
+	readSnapshot<T>(operation: (db: Database) => SyncResult<T>): T;
 	write<T>(operation: (db: Database) => T): Promise<T>;
 	/** Serialized writer operation outside a transaction (checkpoint / incremental vacuum only). */
 	maintenance?<T>(operation: (db: Database) => T): Promise<T>;
@@ -149,6 +157,20 @@ export function openStore(
 		read: (operation) => {
 			if (closing) throw new Error("database_closing");
 			return operation(r);
+		},
+		readSnapshot: (operation) => {
+			if (closing) throw new Error("database_closing");
+			return r.transaction(() => {
+				const value = operation(r);
+				if (
+					value !== null &&
+					(typeof value === "object" || typeof value === "function") &&
+					"then" in value &&
+					typeof value.then === "function"
+				)
+					throw new Error("async_snapshot_callback");
+				return value;
+			})();
 		},
 		write: (operation) => {
 			return serialized(() => {

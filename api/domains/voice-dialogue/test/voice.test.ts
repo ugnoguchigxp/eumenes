@@ -76,6 +76,7 @@ test("voice capture to ASR, dialogue, TTS; duplicate utterance is ignored", asyn
 		const voiceStore: SqliteStore = {
 			onCommit: (listener) => store.onCommit(listener),
 			read: (operation) => store.read(operation),
+			readSnapshot: (operation) => store.readSnapshot(operation),
 			write: (operation) =>
 				failNextWrite
 					? ((failNextWrite = false),
