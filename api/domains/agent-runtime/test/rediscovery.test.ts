@@ -33,7 +33,7 @@ async function warm(second: "search" | "unmatched" = "search") {
 	h.binds.set("pd", directBind("tok-old"));
 	h.binds.set("ps", searchBind("tok-new"));
 	const root = await h.start("run-1");
-	await h.runHostStep(root.taskId);
+
 	const child = h.agents.list("run-1").find((t) => t.kind === "worker")!;
 	return { h, root, child };
 }
@@ -115,8 +115,8 @@ test("A04 when no search plan is available the child ends with the original site
 		region: "JP",
 	});
 	h.binds.set("ps2", searchBind("tok-other"));
-	const other = await h.start("run-2");
-	await h.runHostStep(other.taskId);
+	const _other = await h.start("run-2");
+
 	const otherChild = h.agents.list("run-2").find((t) => t.kind === "worker")!;
 	h.proposals.length = 0;
 	h.proposals.push({ kind: "unmatched" });

@@ -5,6 +5,7 @@ import type { LogFields } from "./logger";
 // contain provider text or secrets, so none of them are copied into logs.
 const fields = new Set([
 	"action",
+	"tool",
 	"intent",
 	"terms",
 	"question",

@@ -68,6 +68,8 @@ type Input = Messages | string | Uint8Array;
 type Source = "larm" | "cloud";
 /** Per-request state shared by the larm attempt and a cloud fallback attempt. */
 type Request = {
+	tools?: import("../../../infrastructure/chat-stream").NativeTool[];
+	toolCalls?: import("../../../infrastructure/chat-stream").NativeToolCall[];
 	env: Env;
 	row: RequestRow;
 	input: Input;
@@ -134,6 +136,16 @@ async function recordAttemptStart(r: Request, source: Source) {
 function callOptionsFor(r: Request, attemptId: string): LarmCallOptions {
 	const exchanges: LarmExchange[] = [];
 	return {
+		...(r.tools?.length
+			? {
+					tools: r.tools,
+					onToolCalls: (
+						calls: import("../../../infrastructure/chat-stream").NativeToolCall[],
+					) => {
+						r.toolCalls = calls;
+					},
+				}
+			: {}),
 		...(r.row.mode === "control" ? { jsonOutput: true } : {}),
 		...(r.row.contextPolicy === "exact"
 			? { contextPolicy: "exact" as const }
@@ -270,6 +282,7 @@ function startWork(
 			args.attemptSignal,
 			args.attemptId,
 			args.delta,
+			args.callOptions,
 		);
 	const p = env.port(row.snapshot);
 	if (row.purpose === "llm") {
@@ -428,6 +441,7 @@ async function attempt(r: Request, source: Source): Promise<Receipt> {
 		if (
 			row.purpose === "llm" &&
 			row.mode !== "control" &&
+			!r.toolCalls?.length &&
 			typeof value === "string"
 		)
 			delivery = await chooseLlmDelivery(r, decide, value);
@@ -464,6 +478,7 @@ async function attempt(r: Request, source: Source): Promise<Receipt> {
 			requestId: row.id,
 			attemptId,
 			value,
+			...(r.toolCalls?.length ? { toolCalls: r.toolCalls } : {}),
 			...(delivery ? { delivery } : {}),
 		};
 	} catch (error) {
@@ -540,6 +555,7 @@ export async function executeRequest(
 	caller: AbortSignal,
 	onDelta?: (text: string) => void,
 	preparation?: SpeechPreparation,
+	tools?: import("../../../infrastructure/chat-stream").NativeTool[],
 ): Promise<Receipt> {
 	caller.throwIfAborted();
 	if (env.isClosed()) throw new Error("inference_closed");
@@ -591,6 +607,7 @@ export async function executeRequest(
 		running,
 		onDelta,
 		preparation,
+		tools,
 		reason: null,
 		published: false,
 	};

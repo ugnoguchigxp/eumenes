@@ -70,7 +70,7 @@ for (const [question, answer] of [
 		const response = await submission;
 		expect(response.status()).toBe(202);
 		const body = await response.json();
-		expect(body.agentTaskId).toBeTruthy();
+		expect(body.id).toBeTruthy();
 		await expect(page.getByRole("textbox")).toHaveValue("");
 		const card = page.getByRole("complementary", { name: `調査: ${question}` });
 		await expect(card).toBeVisible({ timeout: 20000 });

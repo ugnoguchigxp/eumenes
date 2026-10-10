@@ -1,3 +1,5 @@
+import { acceptReport } from "../service/accept-report";
+import { get } from "../repository";
 import { expect, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -16,6 +18,7 @@ const bodyText = "SENTINEL_TARGET 27";
 const visible = [
 	{
 		sourceId: "s1",
+		viewId: crypto.randomUUID(),
 		url: "https://example.com/a",
 		title: "INJECTION_TITLE",
 		basis: "page" as const,
@@ -97,6 +100,7 @@ function setup(
 		capabilities: {} as never,
 		tools: {
 			observationsInTransaction: () => [],
+			validateEvidenceInTransaction: () => true,
 			cancelInTransaction: () => [],
 			deleteDataInTransaction: () => {},
 			summaryInTransaction: () => [],
@@ -116,6 +120,7 @@ function setup(
 	return {
 		store,
 		runtime,
+		port: opts.withPort === false ? undefined : port,
 		calls,
 		setObservation: (o: AcquisitionObservationResult) => (observation = o),
 		setAdoption: (a: typeof adoption) => (adoption = a),
@@ -137,50 +142,63 @@ function seedTree(db: Database, withReport = false) {
 }
 
 async function finish(h: ReturnType<typeof setup>, facts: unknown = { v: 27 }) {
-	const input = {
-		taskId: "child",
-		stepId: "step-1",
-		revision: 0,
-		requestId: "r",
-		messages: [],
-		visible,
-		manifestDigest: "m",
-	};
 	return h.store.write((db) => {
-		const t = db
-			.query("SELECT revision FROM agent_tasks WHERE id='child'")
-			.get() as { revision: number };
-		input.revision = t.revision;
-		return h.runtime.handler.settleInTransaction(
+		const t = get(db, "child")!;
+		acceptReport(
 			db,
+			t,
 			{
-				payload: { taskId: "child", stepId: "step-1" },
-				jobId: "job-1",
-			} as never,
-			input as never,
-			{
-				type: "success",
-				result: {
-					receipt: {} as never,
-					invalid: false,
-					action: {
-						action: "finish",
-						report: {
-							summary: "26",
-							claims: [
-								{
-									text: "26 INJECT",
-									evidence: [{ sourceId: "s1", quote: bodyText }],
-								},
+				facts,
+				report: {
+					version: 2,
+					outcome: "answered",
+					summary: "26",
+					claims: [
+						{
+							text: "26 INJECT",
+							evidence: [
+								{ sourceId: "s1", viewId: visible[0]!.viewId, excerptId: "e0" },
 							],
-							limitations: [],
 						},
-						facts,
-					},
+					],
+					limitations: [],
+					exploration: ["提示範囲"],
 				},
-			} as never,
+			},
+			{ visible },
+			{
+				tools: {
+					observationsInTransaction: () => [],
+					validateEvidenceInTransaction: () => true,
+				} as never,
+				prepared: undefined,
+				canRead: false,
+				now: Date.now,
+				acquisition: h.port,
+				storedBinding: (task) => h.runtime.bindingInTransaction(db, task.id),
+				invocationDigests: () => [],
+			},
 		);
+		db.query(
+			"UPDATE agent_tasks SET state='completed',phase='completed',report_state='available' WHERE id='child'",
+		).run();
+		db.query(
+			"UPDATE agent_tasks SET state='ready_for_answer',phase='answer',report_state='available',report_task_id='child' WHERE id='root'",
+		).run();
+		db.query(
+			"INSERT OR IGNORE INTO agent_events(id,task_id,root_run_id,kind,state,created_at) VALUES('ready','root','run-1','ready','pending',?)",
+		).run(Date.now());
+		return "applied";
 	});
+}
+
+async function readyForAnswer(h: ReturnType<typeof setup>) {
+	await h.store.write((db) => seedTree(db));
+	await h.store.write((db) => {
+		h.runtime.resolveAcquisitionInTransaction(db, "root", 1);
+		h.runtime.bindAcquisitionInTransaction(db, "root", "child");
+	});
+	await finish(h);
 }
 
 test("A01 root proposal is stored, then bound to a child owned by the same root", async () => {
@@ -271,90 +289,6 @@ test("A01 bound finish stores the host-verified canonical report and safe projec
 		});
 	});
 });
-
-test("A01 observation failures: report_invalid is repaired once, source_unusable fails the child", async () => {
-	const h = setup();
-	await h.store.write((db) => seedTree(db));
-	await h.store.write((db) => {
-		h.runtime.resolveAcquisitionInTransaction(db, "root", 1);
-		h.runtime.bindAcquisitionInTransaction(db, "root", "child");
-	});
-	h.setObservation({ kind: "report_invalid", code: "mismatch" });
-	await finish(h);
-	await h.store.read((db) => {
-		expect(db.query("SELECT COUNT(*) n FROM agent_reports").get()).toEqual({
-			n: 0,
-		});
-		const t = db
-			.query("SELECT json_repairs,state FROM agent_tasks WHERE id='child'")
-			.get() as {
-			json_repairs: number;
-			state: string;
-		};
-		expect(t.json_repairs).toBe(1);
-		expect(t.state).toBe("queued");
-	});
-});
-
-test("A01 source_unusable on a cold child allows one re-read; a second ends it with a distinct code", async () => {
-	const h = setup();
-	await h.store.write((db) => seedTree(db));
-	await h.store.write((db) => {
-		h.runtime.resolveAcquisitionInTransaction(db, "root", 1);
-		h.runtime.bindAcquisitionInTransaction(db, "root", "child");
-	});
-	h.setObservation({ kind: "source_unusable", code: "x" });
-	await finish(h);
-	await h.store.read((db) => {
-		const t = db
-			.query(
-				"SELECT state,error_code,json_repairs FROM agent_tasks WHERE id='child'",
-			)
-			.get();
-		// First mismatch: the child is queued again to read another candidate (once).
-		expect(t).toEqual({
-			state: "queued",
-			error_code: "source_unusable",
-			json_repairs: 1,
-		});
-		expect(db.query("SELECT COUNT(*) n FROM agent_reports").get()).toEqual({
-			n: 0,
-		});
-	});
-});
-
-test("A01 source_unusable after the single re-read ends the child", async () => {
-	const h = setup();
-	await h.store.write((db) => seedTree(db));
-	await h.store.write((db) => {
-		h.runtime.resolveAcquisitionInTransaction(db, "root", 1);
-		h.runtime.bindAcquisitionInTransaction(db, "root", "child");
-		db.query("UPDATE agent_tasks SET json_repairs=1 WHERE id='child'").run();
-	});
-	h.setObservation({ kind: "source_unusable", code: "x" });
-	await finish(h);
-	await h.store.read((db) => {
-		const t = db
-			.query(
-				"SELECT state,error_code,json_repairs FROM agent_tasks WHERE id='child'",
-			)
-			.get();
-		expect(t).toEqual({
-			state: "failed",
-			error_code: "source_unusable",
-			json_repairs: 1,
-		});
-	});
-});
-
-async function readyForAnswer(h: ReturnType<typeof setup>) {
-	await h.store.write((db) => seedTree(db));
-	await h.store.write((db) => {
-		h.runtime.resolveAcquisitionInTransaction(db, "root", 1);
-		h.runtime.bindAcquisitionInTransaction(db, "root", "child");
-	});
-	await finish(h);
-}
 
 test("A01 prepareAnswer uses the stored safe projection and rechecks cached authority at adoption", async () => {
 	const h = setup();

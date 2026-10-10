@@ -14,6 +14,7 @@ import {
 	migration as toolMigration,
 	routeGrantMigration,
 	supersedeMigration,
+	readMetadataMigration,
 	type AdapterOperation,
 	type CachedSourceAuthorizationPort,
 	type ToolAdapter,
@@ -64,7 +65,7 @@ export const learnedPair = (): Definition[] => [
 		toolRevisionIds: ["tool:web.read@1"],
 	},
 ];
-export const coldPackage = "package:web.research@6";
+export const coldPackage = "package:web.research@7";
 export const directBind = (token = "tok-direct"): AcquisitionBindResult => ({
 	kind: "bound",
 	bindingToken: token,
@@ -89,7 +90,7 @@ export const searchBind = (token = "tok-search"): AcquisitionBindResult => ({
 	},
 });
 
-export async function harness() {
+export async function harness(now = Date.now) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-route-"));
 	const store = openStore(join(dir, "db"), [
 		capMigration,
@@ -98,6 +99,7 @@ export async function harness() {
 		toolMigration,
 		routeGrantMigration,
 		supersedeMigration,
+		readMetadataMigration,
 		agentMigration,
 		acquisitionMigration,
 	]);
@@ -121,6 +123,30 @@ export async function harness() {
 	}> = [];
 	const results = new Map<string, AdapterOperation>();
 	const adapter: ToolAdapter = {
+		prepareSourcesInTransaction: (_db, _inv, result) =>
+			result.readings ?? [
+				...result.hits.map((h) => ({
+					sourceId: crypto.randomUUID(),
+					viewId: crypto.randomUUID(),
+					url: h.url,
+					title: h.title,
+					basis: "snippet" as const,
+					fetchedAt: result.observedAt,
+					body: h.snippet,
+					truncated: true,
+				})),
+				...result.documents.map((d) => ({
+					sourceId: crypto.randomUUID(),
+					viewId: crypto.randomUUID(),
+					url: d.url,
+					title: d.title,
+					basis: "page" as const,
+					fetchedAt: d.fetchedAt,
+					body: d.text,
+					truncated: d.truncated,
+				})),
+			],
+		validateEvidenceInTransaction: () => true,
 		startInTransaction: (db, r) => {
 			started.push({
 				toolId: r.tool.id,
@@ -248,6 +274,7 @@ export async function harness() {
 		inference: inference as never,
 		queue,
 		acquisition: port,
+		now,
 		invocationHint: () => ({
 			toolId: "web.forecast",
 			arguments: { areaCode: "140000" },
@@ -265,34 +292,12 @@ export async function harness() {
 				deadline: Date.now() + 120_000,
 			}),
 		);
-	/** Run the queued host step exactly as the Queue runner would (prepare → execute → settle). */
-	async function runHostStep(rootTaskId: string) {
-		const t = task(rootTaskId);
-		const step = store.read(
-			(db) =>
-				db
-					.query("SELECT id FROM agent_steps WHERE task_id=? AND job_id=?")
-					.get(t.id, t.job_id) as { id: string },
-		);
-		const claim = {
-			jobId: t.job_id!,
-			payload: { taskId: t.id, stepId: step.id },
-		};
-		const h = agents.routeStepHandler!;
-		const prepared = await store.write((db) =>
-			h.prepareInTransaction(db, claim as never),
-		);
-		if (prepared.status !== "ready") return prepared;
-		await store.write((db) =>
-			h.settleInTransaction(db, claim as never, prepared.input, {
-				type: "success",
-				result: null,
-			}),
-		);
-		return prepared;
-	}
 	/** Prepare + settle the worker's queued model step with a fabricated model answer. */
-	async function runModelStep(taskId: string, action: unknown) {
+	async function runModelStep(
+		taskId: string,
+		action: unknown,
+		afterPrepare?: () => void,
+	) {
 		const t = task(taskId);
 		const step = store.read(
 			(db) =>
@@ -310,13 +315,31 @@ export async function harness() {
 		);
 		if (prep.status !== "ready") return { prep, applied: null };
 		// The model quotes the real visible source id.
-		const sid = prep.input.visible[0]?.sourceId ?? "none";
-		const real = JSON.parse(
-			JSON.stringify(action).replaceAll(
-				'"sourceId":"x"',
-				`"sourceId":"${sid}"`,
-			),
-		);
+		const supplied = action as any;
+		const data = JSON.parse(prep.input.messages[1]!.content);
+		const real =
+			supplied.action === "finish"
+				? {
+						action: "finish",
+						report: {
+							outcome: supplied.report.outcome ?? "answered",
+							summary: supplied.report.summary,
+							claims: supplied.report.claims.map((c: any) => ({
+								...c,
+								evidence: c.evidence.map((e: any) =>
+									typeof e === "string"
+										? e
+										: (data.evidence.find((r: any) =>
+												r.preview.includes(e.quote.slice(0, 12)),
+											)?.reference ?? "e999"),
+								),
+							})),
+							limitations: supplied.report.limitations,
+						},
+					}
+				: supplied;
+
+		afterPrepare?.();
 		const applied = await store.write((db) =>
 			agents.handler.settleInTransaction(db, claim as never, prep.input, {
 				type: "success",
@@ -357,7 +380,6 @@ export async function harness() {
 		portCalls,
 		task,
 		start,
-		runHostStep,
 		runModelStep,
 		doc,
 		setObservation: (o: typeof observation) => (observation = o),

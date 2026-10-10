@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { createCodingSupervision } from "../domains/coding-supervision";
+import { codingObservationReader } from "./coding-observation";
 import { createTaskReports } from "../domains/task-reports";
 import {
 	unavailableCodingWorkflow,
@@ -134,6 +135,7 @@ export async function buildServices(config: Config) {
 					tasks: () => delegated.tasks,
 					supervision: () => supervision!,
 					workflow,
+					coding: codingComposition?.coding,
 				})
 			: undefined;
 	const delegated = createDelegatedTasks({
@@ -153,6 +155,9 @@ export async function buildServices(config: Config) {
 				inference,
 				reports: taskReports,
 				workflow,
+				observationReader: codingComposition
+					? codingObservationReader(store, codingComposition.coding)
+					: undefined,
 				approveInstructions: () =>
 					settings.get().codingSupervision.approveInstructions,
 			})

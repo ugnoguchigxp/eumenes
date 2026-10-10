@@ -17,9 +17,11 @@ test("rolled-back and stale rejections are not logged as committed failures", as
 	const h = await harness();
 	try {
 		h.proposals.push({ kind: "unmatched" });
-		const root = await h.start("root");
-		await h.runHostStep(root.taskId);
-		const t = h.task(root.taskId);
+		const _root = await h.start("root");
+
+		const t = h.task(
+			h.agents.list("root").find((t) => t.kind === "worker")!.id,
+		);
 		const job = h.queue.get(t.job_id!)!;
 		const step = h.store.read((db) =>
 			db
@@ -87,7 +89,7 @@ test("rolled-back and stale rejections are not logged as committed failures", as
 		).toBe("stale");
 		await Bun.sleep(0);
 		expect(lines).toHaveLength(before);
-		const next = h.task(root.taskId);
+		const next = h.task(t.id);
 		const nextStep = h.store.read((db) =>
 			db
 				.query("SELECT id FROM agent_steps WHERE task_id=? AND job_id=?")

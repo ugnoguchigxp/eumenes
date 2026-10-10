@@ -104,12 +104,20 @@ function setup(postAnswer?: PostAnswerObserverPort, withTicket = true) {
 	});
 	return { store, queue, dialogue };
 }
-const submit = (d: ReturnType<typeof setup>["dialogue"]) =>
-	d.submit({
+const submit = async (h: ReturnType<typeof setup>) => {
+	const run = await h.dialogue.submit({
 		requestId: crypto.randomUUID(),
 		conversationId: "main",
 		text: "q",
 	});
+	await h.store.write((db) =>
+		db
+			.query("UPDATE dialogue_runs SET agent_task_id=? WHERE id=?")
+			.run("t", run.id),
+	);
+	h.queue.start();
+	return run;
+};
 
 test("E01 observer is called after adoption with ids only and its writes commit", async () => {
 	const calls: unknown[] = [];
@@ -120,8 +128,7 @@ test("E01 observer is called after adoption with ids only and its writes commit"
 			return { status: "recorded" };
 		},
 	});
-	h.queue.start();
-	const run = await submit(h.dialogue);
+	const run = await submit(h);
 	await until(() => h.dialogue.get(run.id)?.status === "completed");
 	expect(calls).toEqual([
 		{ runId: run.id, ticketId: "event-1", reportEpoch: 3 },
@@ -143,8 +150,7 @@ test("E01 observer throw or skipped rolls back only the learning part", async ()
 				return { status: "skipped", code: "skipped_capacity" };
 			},
 		});
-		h.queue.start();
-		const run = await submit(h.dialogue);
+		const run = await submit(h);
 		await until(() => h.dialogue.get(run.id)?.status === "completed");
 		expect(h.dialogue.get(run.id)?.answerMessageId).not.toBeNull();
 		expect(
@@ -158,8 +164,7 @@ test("E01 observer throw or skipped rolls back only the learning part", async ()
 
 test("E01 without an observer the answer completes as before", async () => {
 	const h = setup(undefined);
-	h.queue.start();
-	const run = await submit(h.dialogue);
+	const run = await submit(h);
 	await until(() => h.dialogue.get(run.id)?.status === "completed");
 	await h.queue.close(100);
 });

@@ -45,6 +45,37 @@ const weatherFacts = (over: Record<string, unknown> = {}): RouteFacts =>
 const w = spec("天気予報 鎌倉 2026-10-11 最高気温 最低気温");
 const wb = (s = w): RequestBinding => bindRequest(s, NOW);
 
+test("the fixed research report derives canonical facts only from its exact, cited excerpts", () => {
+	const run = (reportEvidence: Array<{ sourceId: string; quote: string }>) =>
+		checkObservation({
+			spec: w,
+			binding: wb(),
+			sources: [weatherSource(line)],
+			facts: undefined,
+			reportEvidence,
+			now: NOW,
+		});
+	const split = line.indexOf(" 最低気温");
+	const result = run([
+		{ sourceId: "s1", quote: line.slice(0, split) },
+		{ sourceId: "s1", quote: line.slice(split) },
+	]);
+	expect(result.kind).toBe("valid");
+	if (result.kind === "valid")
+		expect(result.facts).toMatchObject({ maxTemp: 27, minTemp: 17 });
+	expect(run([{ sourceId: "s1", quote: "最高気温 27" }])).toMatchObject({
+		kind: "report_invalid",
+		code: "evidence_missing",
+	});
+	expect(
+		run([{ sourceId: "s1", quote: line.replace("27", "99") }]),
+	).toMatchObject({ kind: "report_invalid", code: "evidence_missing" });
+	expect(run([{ sourceId: "other", quote: line }])).toMatchObject({
+		kind: "report_invalid",
+		code: "evidence_source_missing",
+	});
+});
+
 test("V01 weather valid, and every mismatch class is separated", () => {
 	const ok = checkObservation({
 		spec: w,

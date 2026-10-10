@@ -9,7 +9,12 @@ import {
 	type Supervisor,
 } from "../contracts";
 import * as repo from "../repository";
-import { allowedActions, digest, fence, live } from "./policy";
+import {
+	allowedActions,
+	fence,
+	live,
+	semanticObservationDigest,
+} from "./policy";
 import { messages } from "./prompt";
 import { payloadSchema, type SupervisionContext } from "./context";
 import type { Holds } from "./holds";
@@ -137,7 +142,7 @@ export function createDecisions(
 			fence: fence(t),
 			phase: t.phase,
 			fingerprint: s.fingerprint!,
-			observationDigest: digest(s.observation),
+			observationDigest: semanticObservationDigest(s.observation),
 			requestId,
 			deadline: end,
 			repair,
@@ -191,7 +196,7 @@ export function createDecisions(
 			return {
 				receipt,
 				decision: d.success ? d.data : null,
-				observationDigest: digest(fresh),
+				observationDigest: semanticObservationDigest(fresh),
 			};
 		},
 		settleInTransaction(db, claim, _r, outcome) {

@@ -2,6 +2,7 @@ import { createApproval } from "./approval";
 import { createApplier } from "./apply";
 import { createContext, type CodingSupervisionInput } from "./context";
 import { createDecisions } from "./decisions";
+import { createDiagnostics } from "./diagnostics";
 import { createHolds } from "./holds";
 import { createLifecycle } from "./lifecycle";
 import { createMonitor } from "./monitor";
@@ -20,11 +21,24 @@ export function createCodingSupervision(input: CodingSupervisionInput) {
 		escalate: holds.escalate,
 		apply: (...a) => applier.apply(...a),
 	});
-	const applier = createApplier(ctx, { holds, approval });
+	// Diagnosis feeds results back through the monitor, which is built last.
+	const diagnostics = createDiagnostics(ctx, {
+		lifecycle,
+		observe: (...a) => monitor.observeInTransaction(...a),
+	});
+	const applier = createApplier(ctx, { holds, approval, diagnostics });
 	const decisions = createDecisions(ctx, { holds, apply: applier.apply });
 	const steps = createSteps(ctx, { holds });
 	queue.registerHandler(decisions.handler);
 	queue.registerHandler(steps.handler);
+	queue.registerHandler(diagnostics.handler);
+	const monitor = createMonitor(ctx, {
+		lifecycle,
+		holds,
+		approval,
+		capture: decisions.capture,
+		diagnostics,
+	});
 	const unsubscribe = store.onCommit(() => {
 		for (const id of ctx.cancelledJobs) {
 			queue.flushCancellations([id]);
@@ -36,12 +50,7 @@ export function createCodingSupervision(input: CodingSupervisionInput) {
 		queue.wake();
 	});
 	return {
-		...createMonitor(ctx, {
-			lifecycle,
-			holds,
-			approval,
-			capture: decisions.capture,
-		}),
+		...monitor,
 		...createQueries(ctx),
 		close() {
 			if (ctx.state.closed) return;

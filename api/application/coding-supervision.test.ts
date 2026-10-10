@@ -14,10 +14,7 @@ import {
 import { createDelegatedTasks } from "./delegated-tasks";
 import { superviseCodingExecution } from "./coding-supervision";
 import { createCodingTaskExecution } from "./coding-tasks";
-import {
-	createCoding,
-	migration as codingMigration,
-} from "../domains/coding";
+import { createCoding, migration as codingMigration } from "../domains/coding";
 import { approvalChoices } from "../domains/coding-supervision/contracts";
 import { createApp } from "./app";
 import { createClient } from "../../client";
@@ -389,4 +386,56 @@ test("answering an approval question prepares no coding execution and applies th
 		delegated.close();
 		await scheduler.close();
 	}
+});
+
+test("a failed observation reaches supervision with a fixed code and the position, not the exception text", async () => {
+	const seen: unknown[] = [];
+	const execution = superviseCodingExecution({
+		store: {
+			write: async (fn: (db: unknown) => void) => fn({}),
+			readSnapshot: (fn: (db: unknown) => unknown) => fn({}),
+		} as never,
+		tasks: () => ({}) as never,
+		base: {
+			available: () => true,
+			observe: async () => {
+				throw new Error("coding_event_gap");
+			},
+		} as never,
+		supervision: () =>
+			({
+				observationFailedInTransaction: (
+					_db: unknown,
+					id: string,
+					failure: unknown,
+				) => seen.push([id, failure]),
+			}) as never,
+		workflow: {} as never,
+		coding: {
+			latestInTransaction: () => ({ id: "execution-1", cursor: 7 }),
+		} as never,
+	});
+	await expect(
+		execution.observe!(
+			{
+				id: "t",
+				executionGeneration: 2,
+				authorityEpoch: 3,
+				revision: 1,
+			} as never,
+			new AbortController().signal,
+		),
+	).rejects.toThrow("coding_event_gap");
+	expect(seen).toEqual([
+		[
+			"t",
+			{
+				code: "event_gap",
+				generation: 2,
+				authorityEpoch: 3,
+				executionId: "execution-1",
+				lastCursor: 7,
+			},
+		],
+	]);
 });

@@ -8,7 +8,12 @@ import {
 	type Supervisor,
 } from "../contracts";
 import * as repo from "../repository";
-import { digest, live, validateReceipt } from "./policy";
+import {
+	digest,
+	live,
+	semanticObservationDigest,
+	validateReceipt,
+} from "./policy";
 import { payloadSchema, type SupervisionContext } from "./context";
 import type { Holds } from "./holds";
 
@@ -67,7 +72,7 @@ export function createSteps(ctx: SupervisionContext, deps: { holds: Holds }) {
 			s.monitorHealth !== "healthy" ||
 			s.holdReason ||
 			s.observation?.snapshotHash !== r.intent.snapshotHash ||
-			digest(s.observation) !== r.intent.observationDigest
+			semanticObservationDigest(s.observation) !== r.intent.observationDigest
 		)
 			return null;
 		return { t, s };

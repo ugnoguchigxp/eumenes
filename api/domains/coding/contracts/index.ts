@@ -3,6 +3,9 @@ import type { HttpErrorStatus } from "../../../infrastructure/http";
 import {
 	eventSchema,
 	receiptSchema,
+	runObservationSchema,
+	type CodingEvent,
+	type ExecutionReceipt,
 } from "../../../../packages/coding-runner/src/contracts";
 
 export const executionViewSchema = z.strictObject({
@@ -23,12 +26,26 @@ export const executionViewSchema = z.strictObject({
 	turnFinished: z.boolean(),
 	childrenStopped: z.boolean(),
 	evidenceComplete: z.boolean(),
+	/** Turn terminal, process start and capture integrity; independent of evidenceComplete. */
+	observation: runObservationSchema,
 	reason: z.string().nullable(),
 	exitCode: z.number().nullable(),
 	createdAt: z.string(),
 	updatedAt: z.string(),
 });
 export type CodingExecutionView = z.infer<typeof executionViewSchema>;
+/** Adopted execution facts for one task, read in a single snapshot. */
+export interface ObservationSnapshot {
+	execution: CodingExecutionView;
+	legacy: boolean;
+	receipt: ExecutionReceipt | null;
+	cursor: number;
+	/** Messages in the whole execution, of which `messages` holds the newest few. */
+	messageCount: number;
+	/** Newest message events first. */
+	messages: CodingEvent[];
+	fileChange: CodingEvent | null;
+}
 export const codingEventsSchema = z.strictObject({
 	events: z.array(eventSchema),
 	cursor: z.number().int(),
@@ -54,4 +71,6 @@ export const errorStatus = {
 	coding_branch_conflict: 409,
 	coding_authority_stale: 409,
 	coding_operation_conflict: 409,
+	coding_legacy_continue_unsupported: 409,
+	coding_receipt_conflict: 409,
 } as const satisfies Record<string, HttpErrorStatus>;

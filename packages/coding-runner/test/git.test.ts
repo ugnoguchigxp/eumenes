@@ -28,7 +28,7 @@ async function setup() {
 		(r) => r.receipt.childrenStopped,
 	);
 	const commit = (files = ["source.txt"]): GitSpec => ({
-		version: "eumenes-coding/1",
+		version: "eumenes-coding/2",
 		kind: "commit",
 		executionId: spec.executionId,
 		operationId: crypto.randomUUID(),
@@ -131,7 +131,7 @@ test("push uses fixed branch/remote/SHA; lost receipt is reconciled and a change
 		publishGitSpec(f.config, "commit", c);
 		const committed = executeGit(f.config, "commit", c.operationId);
 		const push: GitSpec = {
-			version: "eumenes-coding/1",
+			version: "eumenes-coding/2",
 			kind: "push",
 			operationId: crypto.randomUUID(),
 			executionId: execution.executionId,

@@ -138,25 +138,32 @@ export function createReadInvocation({
 			}) ?? operationFingerprint(ref.tool.id, parsed.data);
 		const successful = db
 			.query(
-				`SELECT tool_revision_id,args_json,${hasReadMetadata(db) ? "operation_fingerprint" : "NULL AS operation_fingerprint"} FROM tool_invocations WHERE owner_task_id=? AND state IN ('succeeded','partial')`,
+				`SELECT id,tool_revision_id,args_json,${hasReadMetadata(db) ? "operation_fingerprint" : "NULL AS operation_fingerprint"} FROM tool_invocations WHERE owner_task_id=? AND state IN ('succeeded','partial')`,
 			)
 			.all(owner.taskId) as Array<{
+			id: string;
 			tool_revision_id: string;
 			operation_fingerprint: string | null;
 			args_json: string | null;
 		}>;
-		if (
-			successful.some(
-				(i) =>
-					i.operation_fingerprint === fingerprint ||
-					(i.args_json &&
-						operationFingerprint(
-							i.tool_revision_id.split(":").slice(1).join(":").split("@")[0]!,
-							JSON.parse(i.args_json),
-						) === fingerprint),
+		const replay = successful.find(
+			(i) =>
+				i.operation_fingerprint === fingerprint ||
+				(i.args_json &&
+					operationFingerprint(
+						i.tool_revision_id.split(":").slice(1).join(":").split("@")[0]!,
+						JSON.parse(i.args_json),
+					) === fingerprint),
+		);
+		if (replay) {
+			const existing = get(db, replay.id)!;
+			if (
+				existing.deadline <= now() ||
+				existing.cancel_epoch !== owner.cancelEpoch
 			)
-		)
-			throw new Error("operation_repeated");
+				throw new Error("tool_ref_invalid");
+			return existing;
+		}
 		const isLocal = [
 			"web.find",
 			"web.read_saved",

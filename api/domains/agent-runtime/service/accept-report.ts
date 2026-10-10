@@ -15,7 +15,7 @@ import type {
 } from "../contracts";
 import { ValidationFailure } from "../../../infrastructure/validation-log";
 import { verifyReport } from "./verify-report";
-import { newResearch, isHistory } from "./exploration";
+import { isHistory } from "./exploration";
 const owner = (t: Task): Owner => ({
 	rootRunId: t.root_run_id,
 	taskId: t.id,
@@ -54,12 +54,7 @@ export function acceptReport(
 	const hasFailures = obs.some(
 		(o) => o.state !== "succeeded" || o.failures.length > 0,
 	);
-	let report = verifyReport(
-		action.report,
-		input.visible,
-		hasFailures,
-		newResearch(prepared),
-	);
+	let report = verifyReport(action.report, input.visible, hasFailures, true);
 	if (
 		report.version === 2 &&
 		!tools.validateEvidenceInTransaction(db, owner(t), report.sources)

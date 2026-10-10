@@ -6,35 +6,21 @@ import type {
 	WorkflowPort,
 } from "../domains/coding-supervision";
 import type { TaskExecutionPort } from "./delegated-tasks";
+import {
+	codingObservationReader,
+	observationFailure,
+} from "./coding-observation";
 /** Read-only fallback. Registered checks/review/Git need the isolated operation worker from plan02 C6. */
 export function unavailableCodingWorkflow(
 	store: SqliteStore,
 	coding: CodingService,
 ): WorkflowPort {
+	const reader = codingObservationReader(store, coding);
 	return {
 		available: () => false,
 		policy: () => ({ checkIds: [], checksDigest: "", reviewPolicyDigest: "" }),
-		async observe(taskId, signal) {
-			signal.throwIfAborted();
-			return store.readSnapshot((db) => {
-				const e = coding.latestInTransaction(db, taskId);
-				if (!e) throw new Error("coding_intent_missing");
-				return {
-					executionId: e.id,
-					eventSeq: e.cursor,
-					sessionId: null,
-					snapshotHash: null,
-					turnFinished: e.turnFinished,
-					childrenStopped: e.childrenStopped,
-					evidenceComplete: e.evidenceComplete,
-					exitCode: e.exitCode,
-					question: null,
-					evidenceRefs: [],
-					facts: [`実行状態: ${e.state}`, `確認済みイベント数: ${e.cursor}`],
-					excerpt: "",
-				};
-			});
-		},
+		// Adopted facts plus a bounded read of stored text; `available` stays false for mutation.
+		observe: (taskId, signal) => reader.inspect(taskId, signal),
 		async execute() {
 			throw new Error("coding_workflow_unavailable");
 		},
@@ -46,8 +32,12 @@ export function superviseCodingExecution(input: {
 	base: TaskExecutionPort;
 	supervision: () => CodingSupervision;
 	workflow: WorkflowPort;
+	/** Used only to name a failed observation with a fixed code and the last adopted cursor. */
+	coding?: CodingService;
 }): TaskExecutionPort {
 	const { store, base, workflow } = input;
+	// Commands whose preparation ended in a fixed-code hold: nothing exists to dispatch.
+	const heldCommands = new Set<string>();
 	return {
 		available: base.available,
 		prepareInTransaction(db, t, c) {
@@ -61,7 +51,20 @@ export function superviseCodingExecution(input: {
 					.isApprovalAnswerInTransaction(db, t.id, c.answerQuestionId)
 			)
 				return;
-			return base.prepareInTransaction?.(db, t, c);
+			try {
+				return base.prepareInTransaction?.(db, t, c);
+			} catch (error) {
+				// A v1 session is never continued: hold with a fixed code and report, do not just fail.
+				if (
+					error instanceof Error &&
+					error.message === "coding_legacy_continue_unsupported"
+				) {
+					input.supervision().holdFixedInTransaction(db, t.id, error.message);
+					heldCommands.add(c.commandId);
+					return;
+				}
+				throw error;
+			}
 		},
 		dispatch(t, context) {
 			// The answer to an approval question is a decision, not text for the CLI.
@@ -71,6 +74,8 @@ export function superviseCodingExecution(input: {
 				input.supervision().isApprovalAnswer(t.id, context.answer.questionId)
 			)
 				return Promise.resolve({ accepted: true });
+			if (heldCommands.has(context.commandId))
+				return Promise.resolve({ accepted: false });
 			return base.dispatch(t, context);
 		},
 		stop: base.stop,
@@ -93,8 +98,18 @@ export function superviseCodingExecution(input: {
 				});
 				return result;
 			} catch (error) {
+				const failure = input.coding
+					? observationFailure(
+							store,
+							input.coding,
+							t.id,
+							error,
+							t.executionGeneration,
+							t.authorityEpoch,
+						)
+					: undefined;
 				await store.write((db) =>
-					input.supervision().observationFailedInTransaction(db, t.id),
+					input.supervision().observationFailedInTransaction(db, t.id, failure),
 				);
 				throw error;
 			}

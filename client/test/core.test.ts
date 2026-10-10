@@ -230,6 +230,13 @@ const execution = {
 	turnFinished: false,
 	childrenStopped: false,
 	evidenceComplete: false,
+	observation: {
+		turnOutcome: "unconfirmed",
+		terminalEventSeq: null,
+		processStarted: true,
+		captureState: "complete",
+		captureIssues: [],
+	},
 	reason: null,
 	exitCode: null,
 	createdAt: t0,

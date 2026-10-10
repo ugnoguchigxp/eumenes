@@ -1,5 +1,12 @@
 import { expect, test } from "bun:test";
-import { setup, observation, proposal, receipt, hash } from "./fixture";
+import {
+	setup,
+	observation,
+	details,
+	proposal,
+	receipt,
+	hash,
+} from "./fixture";
 import type { Observation } from "../contracts";
 import { approvalChoices } from "../contracts";
 import { fence } from "../service/policy";
@@ -216,4 +223,35 @@ test("a long multi-byte instruction still fits the task question", async () => {
 	expect(new TextEncoder().encode(prompt).length).toBeLessThanOrEqual(8192);
 	// The user can still read the full text through the supervisor view.
 	expect(h.supervision.get(h.taskId)?.pendingApproval?.instruction).toBe(long);
+});
+
+test("a host diagnostic read that only adds excerpt and coverage keeps the approval alive and the approved instruction runs", async () => {
+	const h = await setup({ approveInstructions: true });
+	await failChecks(h);
+	const base = observation({ details: details() });
+	h.decision(proposal("request_change", "型エラーを修正する"));
+	await h.observe(base);
+	await h.drain();
+	const question = h.tasks.get(h.taskId).question!;
+	const stored = h.supervision.get(h.taskId)!.pendingApproval!;
+	const more = observation({
+		eventSeq: 40,
+		excerpt: "追加で読んだ本文",
+		details: details({
+			excerptTruncated: true,
+			limitations: ["not_fully_observed"],
+			coverage: [{ ref: "r", digest: hash, totalBytes: 9, ranges: [[0, 9]] }],
+		}),
+	});
+	await h.store.write((db) =>
+		h.supervision.observeInTransaction(db, h.taskId, more, "diagnostic"),
+	);
+	expect(h.supervision.get(h.taskId)!.pendingApproval?.questionId).toBe(
+		stored.questionId,
+	);
+	await answer(h, approvalChoices.approve);
+	await h.observe(more);
+	await h.drain();
+	expect(changes(h)).toHaveLength(1);
+	expect(question.id).toBe(stored.questionId);
 });

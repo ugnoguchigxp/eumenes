@@ -151,9 +151,14 @@ test("cancel before Queue dispatch writes a durable negative start receipt", asy
 		const spec = coding.specInTransaction(db, e.id);
 		return coding.preparedInTransaction(db, spec.operationId);
 	});
-	expect((await runner.start(prepared.specRef, prepared.spec)).state).toBe(
-		"stopped",
-	);
+	expect(
+		(
+			await runner.start(
+				prepared.specRef,
+				prepared.spec as Parameters<typeof runner.start>[1],
+			)
+		).state,
+	).toBe("stopped");
 	expect(coding.get(e.id).reason).toBe("stopped_before_spawn");
 });
 test("grant revocation rejects old event adoption and heartbeat stops the old execution", async () => {

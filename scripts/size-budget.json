@@ -12,7 +12,6 @@
 		"api/application/research-routes.ts#createRouteWiring": 490,
 		"api/application/world.ts#createWorldAssembly": 326,
 		"api/domains/agent-runtime/service/index.ts#createAgentRuntime": 1862,
-		"api/domains/agent-runtime/service/route-step.ts#createRouteStep": 411,
 		"api/domains/attitude-dataset/service/index.ts#createAttitudeDataset": 624,
 		"api/domains/capabilities/service/index.ts#createCapabilities": 497,
 		"api/domains/coding/service/index.ts#createCoding": 375,

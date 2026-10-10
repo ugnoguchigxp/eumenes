@@ -7,5 +7,11 @@ export type {
 	Observation,
 	StepIntent,
 	StepReceipt,
+	ObservationReadPort,
+	ReadFocus,
+	ObservationFailure,
+	ExecutionObservation,
 } from "./contracts";
+export { selectReportMessages } from "./service/messages";
+export { semanticObservationDigest } from "./service/policy";
 export { migrations } from "./repository";

@@ -2,6 +2,24 @@ import { expect, test } from "bun:test";
 import type { Database } from "bun:sqlite";
 import { harness } from "./toolchain.fixture";
 
+async function manualActionRoot(
+	h: Awaited<ReturnType<typeof harness>>,
+	runId: string,
+) {
+	for (let i = 0; i < 100 && h.routeContexts.length === 0; i++)
+		await Bun.sleep(5);
+	const id = crypto.randomUUID();
+	await h.store.write((db) => {
+		db.query(
+			"INSERT INTO agent_tasks(id,kind,root_run_id,state,phase,deadline,created_at,updated_at) VALUES(?,'coordinator',?,'queued','route',?,0,0)",
+		).run(id, runId, Date.now() + 60000);
+		db.query("UPDATE dialogue_runs SET agent_task_id=? WHERE id=?").run(
+			id,
+			runId,
+		);
+	});
+	return id;
+}
 test("C01-C03: a relative timer request is saved through the toolchain", async () => {
 	const h = await harness({ timers: true });
 	try {
@@ -65,8 +83,8 @@ test("C01-C03: a relative timer request is saved through the toolchain", async (
 			saved.actions[0]?.receipt_digest,
 		);
 		expect(h.workerContexts).toHaveLength(0);
-		expect(h.routeContexts[0]).toContain("skill:timers.manage@1");
-		expect(h.routeContexts[0]).toContain("現在のユーザー依頼");
+		expect(h.routeContexts[0]).toContain("現在のタイマーのsnapshot");
+		expect(h.routeContexts[0]).toContain("3分タイマー測って");
 		const origin = h.store.read((db) =>
 			db.query("SELECT conversation_id, origin_message_id FROM timers").get(),
 		);
@@ -277,7 +295,7 @@ test("C05: a failure before the action result rolls the timer back, and the same
 		runId = run.id;
 		const owner = {
 			rootRunId: run.id,
-			taskId: run.agentTaskId!,
+			taskId: await manualActionRoot(h, run.id),
 			cancelEpoch: 0,
 		};
 		const stepId = crypto.randomUUID();
@@ -386,6 +404,7 @@ test("C07: list and cancel stay on one operation when the same step runs again",
 			text: "タイマーを確認して取り消して",
 		});
 		actionRunId = actionRun.id;
+		await manualActionRoot(h, actionRun.id);
 		const root = h.store.read(
 			(db) =>
 				db
@@ -613,7 +632,11 @@ test("a corrupted receipt after preparation cannot be adopted or streamed", asyn
 		if (corrupted) return;
 		if (
 			!h.store.read((db) =>
-				db.query("SELECT id FROM dialogue_runs WHERE status='running'").get(),
+				db
+					.query(
+						"SELECT d.id FROM dialogue_runs d WHERE d.status='running' AND EXISTS(SELECT 1 FROM agent_action_results a JOIN agent_tasks t ON t.id=a.task_id WHERE t.root_run_id=d.id)",
+					)
+					.get(),
 			)
 		)
 			return;

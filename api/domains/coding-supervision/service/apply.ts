@@ -13,7 +13,7 @@ import {
 	allowedActions,
 	blockerKey,
 	checked,
-	digest,
+	semanticObservationDigest,
 	fence,
 	operationFor,
 	phaseFor,
@@ -24,12 +24,17 @@ import type { createApproval } from "./approval";
 import { frameInstruction } from "./approval";
 import type { SupervisionContext } from "./context";
 import type { Holds } from "./holds";
+import type { Diagnostics } from "./diagnostics";
 import { evidence } from "./report";
 
 /** Turns an accepted decision into a completion, an escalation, an approval request or a queued step. */
 export function createApplier(
 	ctx: SupervisionContext,
-	deps: { holds: Holds; approval: ReturnType<typeof createApproval> },
+	deps: {
+		holds: Holds;
+		approval: ReturnType<typeof createApproval>;
+		diagnostics: Diagnostics;
+	},
 ) {
 	const { tasks, queue, workflow, approveInstructions, report } = ctx;
 	const { hold, escalate } = deps.holds;
@@ -97,7 +102,7 @@ export function createApplier(
 			executionId: s.observation!.executionId,
 			snapshotHash: s.observation!.snapshotHash,
 			implementationSessionId: s.observation!.sessionId,
-			observationDigest: digest(s.observation),
+			observationDigest: semanticObservationDigest(s.observation),
 			instruction:
 				d.instruction === null ? null : frameInstruction(d.instruction),
 			questionId: d.questionId,
@@ -143,6 +148,23 @@ export function createApplier(
 			return;
 		}
 		if (d.action === "wait") return;
+		// Reading more is not a mutation: it needs no workflow, policy, grant or healthy monitor.
+		if (d.action === "inspect_more") {
+			// Continue the first requested reference that still has unread bytes.
+			const open = s.observation?.details?.coverage.find(
+				(c) =>
+					d.evidenceRefs.includes(c.ref) &&
+					(c.ranges.at(-1)?.[1] ?? 0) < c.totalBytes,
+			);
+			deps.diagnostics.request(
+				db,
+				t,
+				s,
+				"inspect_more",
+				open ? { ref: open.ref, offset: open.ranges.at(-1)![1] } : undefined,
+			);
+			return;
+		}
 		if (d.action === "escalate") {
 			escalate(db, t, s, s.observation?.question?.summary ?? d.reason);
 			return;

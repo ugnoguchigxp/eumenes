@@ -152,7 +152,6 @@ function setup(
 		memory,
 		worldContext,
 	});
-	queue.start();
 	return {
 		dialogue,
 		queue,
@@ -165,6 +164,12 @@ function setup(
 				conversationId: "main",
 				text: "q",
 			});
+			await store.write((db) =>
+				db
+					.query("UPDATE dialogue_runs SET agent_task_id='t' WHERE id=?")
+					.run(run.id),
+			);
+			queue.start();
 			await until(() =>
 				["completed", "failed", "cancelled"].includes(
 					dialogue.get(run.id)?.status ?? "",

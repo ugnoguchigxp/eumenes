@@ -8,7 +8,7 @@
 
 `coding` domainはworkspace、実行意図、operation、reservation、receipt、イベントcursorを所有する。applicationがtasks・Queueと結合し、task、dispatch job、coding intent、reservationを同じwriter transactionで保存する。MCPへの配送はtransaction外で行う。
 
-MCP toolsは `runner.probe/start/inspect/continue/stop/read_evidence/git_operation` の7個に固定。path・shell文字列・executableをMCP引数にしない。`specRef` はbackendが構築したimmutable specの参照で、protocolは `eumenes-coding/1`。stdoutはMCP専用にし、CLIのstdout/stderrはworkerが常時drainする。
+MCP toolsは `runner.probe/start/inspect/continue/stop/read_evidence/git_operation` の7個に固定。path・shell文字列・executableをMCP引数にしない。`specRef` はbackendが構築したimmutable specの参照で、protocolは `eumenes-coding/2`。stdoutはMCP専用にし、CLIのstdout/stderrはworkerが常時drainする。
 
 起動意図・spec・その実行用の管理設定はspawn前にfsyncする。同じoperation ID/digestの再送は保存済みreceiptを返す。不明な起動は `outcome_unknown` に保持し、再実行しない。CLI起動intentが残ったworkerも再起動しない。指定sessionの継続には初回の専用CODEX_HOMEを使う。保存済みPIDからkillせず、所有workerへの停止要求とprocess groupの終了確認を分ける。開始前の停止にもreceiptを残すので、後から届いた開始を実行しない。
 
@@ -50,3 +50,14 @@ pushは登録済みremoteのfetch/push URL、固定branch、commit SHA、期待r
 `bun run verify -- --domain coding` にdomain/packageの境界・整形・lint・型・fixtureを含めた。`verify:all` もrunner package試験を含む。[検証記録](../spec/verification/delegated-coding/runner-fixtures.md)でfixture/live/実機器を分ける。
 
 2026-10-10の[コードレビューと修正記録](../spec/verification/delegated-coding/runner-review.md)：対象37試験、結合回帰137試験とcoding domain gate成功。全体verifyは別領域の整形で未通過。
+
+## 発言・終端・採取の事実（計画06）
+
+receiptは `observation` を持つ（`turnOutcome` unconfirmed/completed/failed/cancelled/conflict、`terminalEventSeq`、`processStarted`、`captureState`、`captureIssues`）。直接CLI 0.155.1のexec JSONLにはphaseもturnIdもないため、messageは常に `messageKind=unknown`（`phase_not_provided`、想定外のphaseは `phase_unsupported`）。commentary/final_answerとexplicit_contractは型に予約しただけで、adapterは出さない。本文は32,768 UTF-16 code unitのprefix（code pointを割らない）で、`sourceTruncated` と秘密除去後/保存後のbyte数、`contentPresence` を発言metadataに残す。孤立surrogateは置換せず `runner_invalid_unicode` の採取障害にする。
+
+終端は明示した `turn.completed` / `turn.failed` だけ。一般の `error`、process終了、停止要求から作らない。completed後のfailed等の矛盾は `conflict` になり、証拠適格性も下げる。`turnFinished` は引き続き「正常終端」の意味（失敗でtrueにならない）。`evidenceComplete`（Git/continueの保守的gate）と `captureState`（採取・保存の完全性）は別で、失敗turnでも採取が正常なら `captureState=complete`、`evidenceComplete=false`。長文の `sourceTruncated` は両方を変えない。
+
+`processStarted` は所有workerがspawnを確認したときだけtrue、起動前停止はfalse、spawn intentだけ残った場合と旧receiptはunknown。v1 spec/receiptは閲覧と停止照合に限り、新規start・continueはしない（`runner_protocol_mismatch`、`coding_legacy_continue_unsupported`）。protocolは `eumenes-coding/2`。
+
+macOSでは、全メンバーがzombieのprocess groupへの `kill(-pgid)` が EPERM を返す。停止確認ではESRCHと同じく「生存なし」として扱う。
+

@@ -13,7 +13,7 @@ async function setup() {
 const jobRow = (h: Awaited<ReturnType<typeof harness>>, id: string) =>
 	h.store.read((db) => h.queue.getInTransaction(db, id));
 
-test("A02 cold: host step performs the first REAL lookup with the spec keywords; no model call, no LLM slot", async () => {
+test("A02 cold: worker initialization performs the first REAL lookup with the spec keywords; no model call, no LLM slot", async () => {
 	const h = await setup();
 	h.proposals.push({
 		kind: "search-first",
@@ -25,9 +25,8 @@ test("A02 cold: host step performs the first REAL lookup with the spec keywords;
 	h.binds.set("p1", searchBind());
 	const root = await h.start("run-1");
 	const job = await jobRow(h, root.jobId);
-	expect(job?.kind).toBe("agent.route-step");
-	expect(job?.resourceKey).toBeNull();
-	await h.runHostStep(root.taskId);
+	expect(job).toBeNull();
+
 	// first lookup used the keywords; nothing else was fetched
 	expect(h.started).toEqual([
 		{
@@ -63,13 +62,11 @@ test("A02 cold: host step performs the first REAL lookup with the spec keywords;
 				"SELECT action_origin,action_kind,state FROM agent_steps WHERE task_id=?",
 			)
 			.all(root.taskId);
-		expect(steps).toEqual([
-			{ action_origin: "host", action_kind: "route", state: "completed" },
-		]);
+		expect(steps).toEqual([]);
 	});
 });
 
-test("A02 re-running the same host step cannot fetch twice and a stale claim is refused", async () => {
+test("A02 duplicate start keeps one child and performs no second acquisition", async () => {
 	const h = await setup();
 	h.proposals.push({
 		kind: "search-first",
@@ -80,11 +77,51 @@ test("A02 re-running the same host step cannot fetch twice and a stale claim is 
 	});
 	h.binds.set("p1", searchBind());
 	const root = await h.start("run-1");
-	const first = await h.runHostStep(root.taskId);
-	expect(first.status).toBe("ready");
-	const second = await h.runHostStep(root.taskId);
-	expect(second.status).toBe("stale");
+	const repeated = await h.start("run-1");
+	expect(repeated.taskId).toBe(root.taskId);
 	expect(h.started.length).toBe(1);
+});
+
+test("a cold source mismatch preserves the structural repair allowance and the same child budget", async () => {
+	const h = await setup();
+	h.proposals.push({
+		kind: "search-first",
+		proposalToken: "p1",
+		query: "q",
+		language: "ja",
+		region: "JP",
+	});
+	h.binds.set("p1", searchBind());
+	await h.start("run-1");
+	const child = h.agents.list("run-1").find((t) => t.kind === "worker")!;
+	const deadline = h.task(child.id).deadline;
+	h.results.set("op1", h.doc("SENTINEL_TARGET 27"));
+	await h.agents.reconcile();
+	h.setObservation({ kind: "source_unusable", code: "wrong_source" });
+	await h.runModelStep(child.id, {
+		action: "finish",
+		report: {
+			summary: "27",
+			claims: [{ text: "27", evidence: ["e1"] }],
+			limitations: [],
+		},
+	});
+	expect(h.task(child.id)).toMatchObject({
+		state: "queued",
+		json_repairs: 0,
+		model_calls: 1,
+		deadline,
+	});
+	const { prep } = await h.runModelStep(child.id, {
+		action: "invoke",
+		tool: "nonexistent",
+		arguments: {},
+	});
+	if (prep.status !== "ready") throw new Error("worker_not_ready");
+	expect(JSON.parse(prep.input.messages[1]!.content).lastResult).toEqual({
+		code: "source_unusable",
+	});
+	expect(h.task(child.id).json_repairs).toBe(1);
 });
 
 test("A02 the child keeps its own executionRefs: foreign owners cannot use them and the legacy hint is not applied", async () => {
@@ -97,8 +134,8 @@ test("A02 the child keeps its own executionRefs: foreign owners cannot use them 
 		region: "JP",
 	});
 	h.binds.set("p1", searchBind());
-	const root = await h.start("run-1");
-	await h.runHostStep(root.taskId);
+	const _root = await h.start("run-1");
+
 	const child = h.agents.list("run-1").find((t) => t.kind === "worker")!;
 	// lookup completes with hits → the child's own model step sees the snippets, with no forecast hint
 	h.results.set("op1", {
@@ -125,11 +162,8 @@ test("A02 the child keeps its own executionRefs: foreign owners cannot use them 
 		.messages[1]!.content;
 	// The host may suggest this child's observed lookup hit, never the legacy
 	// structured forecast hint or a foreign owner's execution reference.
-	expect(JSON.parse(user).nextInvocation).toEqual({
-		action: "invoke",
-		executionRef: "web.read",
-		arguments: { url: URL_A },
-	});
+	expect(JSON.parse(user).nextInvocation).toBeUndefined();
+	expect(JSON.parse(user).observations[0].url).toBe(URL_A);
 	expect(h.captures.length).toBe(1); // exactly the child's own summary/decision call
 });
 
@@ -157,9 +191,9 @@ test("A02 candidate: import yields an observation owned by the child, not a real
 			},
 		},
 	});
-	const root = await h.start("run-1");
+	const _root = await h.start("run-1");
 	// the candidate hit URL must be authorized by the route port for this binding
-	await h.runHostStep(root.taskId);
+
 	const child = h.agents.list("run-1").find((t) => t.kind === "worker")!;
 	expect(h.started.length).toBe(0);
 	const c = h.task(child.id);
@@ -173,12 +207,12 @@ test("A02 candidate: import yields an observation owned by the child, not a real
 	});
 });
 
-test("A02 unmatched falls back to the legacy coordinator model step; clarification/unavailable end without a child", async () => {
+test("A02 unmatched starts the shared worker loop; clarification/unavailable end without a child", async () => {
 	const h = await setup();
 	h.proposals.push({ kind: "unmatched" });
-	const root = await h.start("run-1", "東京の天気");
-	await h.runHostStep(root.taskId);
-	const t = h.task(root.taskId);
+	const _root = await h.start("run-1", "東京の天気");
+
+	const t = h.task(h.agents.list("run-1").find((t) => t.kind === "worker")!.id);
 	expect(t.state).toBe("queued");
 	const job = await jobRow(h, t.job_id!);
 	expect(job?.kind).toBe("agent.step");
@@ -187,7 +221,7 @@ test("A02 unmatched falls back to the legacy coordinator model step; clarificati
 	h.proposals.length = 0;
 	h.proposals.push({ kind: "clarification", question: "静岡市ですか?" });
 	const r2 = await h.start("run-2", "天気予報 静岡");
-	await h.runHostStep(r2.taskId);
+
 	expect(h.task(r2.taskId).state).toBe("ready_for_answer");
 	expect(h.task(r2.taskId).error_code).toBe("clarification_required");
 	expect(JSON.parse(h.task(r2.taskId).input_json!).clarificationQuestion).toBe(
@@ -197,7 +231,7 @@ test("A02 unmatched falls back to the legacy coordinator model step; clarificati
 	h.proposals.length = 0;
 	h.proposals.push({ kind: "unavailable", code: "route_disabled" });
 	const r3 = await h.start("run-3");
-	await h.runHostStep(r3.taskId);
+
 	expect(h.task(r3.taskId).state).toBe("ready_for_answer");
 	expect(h.task(r3.taskId).error_code).toBe("route_disabled");
 	expect(h.agents.list("run-3").filter((x) => x.kind === "worker")).toEqual([]);
@@ -215,7 +249,7 @@ test("A02 a bind or capability failure is an explicit failure, never a silent di
 	});
 	h.binds.set("p1", { kind: "rejected", code: "route_disabled" });
 	const root = await h.start("run-1");
-	await h.runHostStep(root.taskId);
+
 	const t = h.task(root.taskId);
 	expect(t.state).toBe("ready_for_answer");
 	expect(t.error_code).toBe("route_disabled");

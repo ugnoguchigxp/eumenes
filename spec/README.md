@@ -8,6 +8,7 @@ archive の基準: 本文の実施記録や完了記述で全項目が完了と�
 
 | 文書 | 状態 |
 | --- | --- |
+| [conversation-and-research-simplification-plan-2026-10-10.md](conversation-and-research-simplification-plan-2026-10-10.md) | 会話と調査の構造整理。残す機能・削除対象・移行・受入条件をまとめた実装前レビュー案 |
 | [improvement-plan-2026-10-10.md](improvement-plan-2026-10-10.md) | 改善実装手順書(2026-10-10)。全 WP の完了後に archive |
 | [research-and-history-tools-implementation-plan-2026-10-10.md](research-and-history-tools-implementation-plan-2026-10-10.md) | 調査・履歴ツールの実装計画。別セッションで作業中 |
 | [delegated-coding-implementation-2026-10-09/](delegated-coding-implementation-2026-10-09/README.md) | 委任コーディングの実装計画(01〜06)。06 は作業中 |

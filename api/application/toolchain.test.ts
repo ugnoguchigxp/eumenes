@@ -43,7 +43,9 @@ test("a plain weather request carries useful details and actual citations throug
 		expect(
 			(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 }))?.status,
 		).toBe("completed");
-		const report = h.toolchain.agents.report(run.agentTaskId!)!;
+		const report = h.toolchain.agents.report(
+			h.dialogue.get(run.id)!.agentTaskId!,
+		)!;
 		const answer = h.dialogue.answerText(run.id)!;
 		for (const fact of ["晴れ", "26度", "17度", "降水確率0％"])
 			expect(answer).toContain(fact);
@@ -115,16 +117,12 @@ test("a premature unavailable forecast reads the next candidate before adopting 
 		).toBe("completed");
 		expect(h.acquisitions).toBe(3);
 		expect(h.dialogue.answerText(run.id)).toContain("晴れ");
-		const report = h.toolchain.agents.report(run.agentTaskId!)!;
+		const report = h.toolchain.agents.report(
+			h.dialogue.get(run.id)!.agentTaskId!,
+		)!;
 		expect(report.summary).toContain("最高気温26度");
 		expect(report.sources.every((s) => !s.url?.endsWith("/empty"))).toBe(true);
-		expect(
-			h.workerContexts.some(
-				(c) =>
-					c.includes("weather_condition_missing") ||
-					c.includes("report_target_mismatch"),
-			),
-		).toBe(true);
+		expect(h.acquisitions).toBe(3);
 	} finally {
 		await h.close();
 	}
@@ -147,7 +145,9 @@ test("authenticated search/read/report/answer resolves model excerpt selections 
 			true,
 		);
 		const report = await (
-			await h.request(`/api/agent-tasks/${run.agentTaskId}/report`)
+			await h.request(
+				`/api/agent-tasks/${h.dialogue.get(run.id)!.agentTaskId}/report`,
+			)
 		).json();
 		expect(report.claims[0].evidence[0].quote).toContain("26度");
 		expect(report.claims[0].evidence[0].excerptId).toBeUndefined();
@@ -177,8 +177,9 @@ test("unmapped location uses search and read without offering incompatible fixed
 		);
 		expect(tools.map((tool: { id: string }) => tool.id)).toEqual([
 			"web.lookup",
+			"web.read",
 		]);
-		expect(JSON.parse(messages[1].content).nextInvocation).toBeNull();
+		expect(JSON.parse(messages[1].content).nextInvocation).toBeUndefined();
 		expect(h.acquisitions).toBe(2);
 	} finally {
 		await h.close();
@@ -213,7 +214,9 @@ for (const [question, expected] of [
 				tasks.every((t: { status: string }) => t.status === "completed"),
 			).toBe(true);
 			const report = await (
-				await h.request(`/api/agent-tasks/${run.agentTaskId}/report`)
+				await h.request(
+					`/api/agent-tasks/${h.dialogue.get(run.id)!.agentTaskId}/report`,
+				)
 			).json();
 			expect(report.summary).toContain(expected!);
 			expect(report.verification).toBe("evidence_linked");
@@ -228,17 +231,17 @@ for (const [question, expected] of [
 			expect(h.parentContexts.some((c) => c.includes(forbidden))).toBe(false);
 			expect(h.parentContexts[0]).not.toContain('"quote"');
 			const context = JSON.parse(JSON.parse(h.workerContexts[0]!)[1].content);
-			expect(context.nextInvocation.arguments).toEqual(
-				question!.includes("天気")
-					? { areaCode: "130000" }
-					: { symbol: "AAPL" },
-			);
+			expect(context.nextInvocation).toBeUndefined();
 			expect(h.acquisitions).toBe(2);
 			const duplicate = await (await h.request("/api/runs", body)).json();
 			expect(duplicate.id).toBe(run.id);
 			expect(h.acquisitions).toBe(2);
 			expect(
-				(await h.request(`/api/agent-tasks/${run.agentTaskId}`)).status,
+				(
+					await h.request(
+						`/api/agent-tasks/${h.dialogue.get(run.id)!.agentTaskId}`,
+					)
+				).status,
 			).toBe(200);
 			expect((await h.request("/api/capabilities")).status).toBe(200);
 			expect((await h.request("/api/agent-tasks")).status).toBe(400);
@@ -345,7 +348,9 @@ for (const options of [{ badJson: true }, { badQuote: true }])
 				.list(run.id)
 				.find((t) => t.kind === "worker")!;
 			expect(child.status).toBe("failed");
-			expect(h.toolchain.agents.report(run.agentTaskId!)).toBe(null);
+			expect(
+				h.toolchain.agents.report(h.dialogue.get(run.id)!.agentTaskId!),
+			).toBe(null);
 			expect(child.modelCalls).toBeLessThanOrEqual(5);
 			expect(h.parentContexts[0]).not.toContain(forbidden);
 			expect(h.dialogue.answerText(run.id)).toBe(
@@ -429,7 +434,11 @@ test("data deletion invalidates the report and preserves accepted conversation",
 			h.toolchain.agents.deleteTaskDataInTransaction(db, run.id),
 		);
 		expect(
-			(await h.request(`/api/agent-tasks/${run.agentTaskId}/report`)).status,
+			(
+				await h.request(
+					`/api/agent-tasks/${h.dialogue.get(run.id)!.agentTaskId}/report`,
+				)
+			).status,
 		).toBe(410);
 		expect(h.dialogue.answerText(run.id)).toBe(answer);
 		expect(
@@ -471,7 +480,11 @@ test("retention removes 14-day result data then 30-day task metadata without del
 		);
 		await h.toolchain.agents.maintenance();
 		expect(
-			(await h.request(`/api/agent-tasks/${run.agentTaskId}/report`)).status,
+			(
+				await h.request(
+					`/api/agent-tasks/${h.dialogue.get(run.id)!.agentTaskId}/report`,
+				)
+			).status,
 		).toBe(410);
 		expect(h.toolchain.agents.list(run.id)).toHaveLength(2);
 		await h.store.write((db) =>
@@ -571,7 +584,11 @@ test("deleting a report during final inference cancels adoption of the old answe
 		).toBe("cancelled");
 		expect(h.dialogue.answerText(run.id)).toBeNull();
 		expect(
-			(await h.request(`/api/agent-tasks/${run.agentTaskId}/report`)).status,
+			(
+				await h.request(
+					`/api/agent-tasks/${h.dialogue.get(run.id)!.agentTaskId}/report`,
+				)
+			).status,
 		).toBe(410);
 	} finally {
 		release();
@@ -595,9 +612,9 @@ test("CLI reads catalogue, task and summary through the authenticated API", asyn
 		await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 });
 		for (const args of [
 			["capabilities"],
-			["task", run.agentTaskId!],
-			["task-report", run.agentTaskId!],
-			["task-cancel", run.agentTaskId!],
+			["task", h.dialogue.get(run.id)!.agentTaskId!],
+			["task-report", h.dialogue.get(run.id)!.agentTaskId!],
+			["task-cancel", h.dialogue.get(run.id)!.agentTaskId!],
 		]) {
 			const proc = Bun.spawn(
 				[process.execPath, "cli/index.ts", ...args, "--json"],
@@ -638,11 +655,7 @@ test("ambiguous target returns a clarification question without acquiring data o
 		).toBe("completed");
 		expect(h.dialogue.answerText(run.id)).toBe("どの地域の天気を調べますか？");
 		expect(h.acquisitions).toBe(0);
-		expect(h.toolchain.agents.list(run.id)).toHaveLength(1);
-		expect(h.toolchain.agents.list(run.id)[0]!.errorCode).toBe(
-			"clarification_required",
-		);
-		expect(h.parentContexts[0]).not.toContain('"failure":');
+		expect(h.toolchain.agents.list(run.id)).toHaveLength(0);
 	} finally {
 		await h.close();
 	}

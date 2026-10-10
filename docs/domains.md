@@ -34,7 +34,7 @@
 | `queue` | `api/domains/queue/index.ts` | なし | なし | なし | なし | なし |
 | `scheduler` | `api/domains/scheduler/index.ts` | なし | なし | `queue` | なし | なし |
 | `timers` | `api/domains/timers/index.ts` | `web/src/domains/timers/` | `web/src/components/domains/timers/` | `queue`、`scheduler` | なし | なし |
-| `dialogue` | `api/domains/dialogue/index.ts` | `web/src/domains/dialogue/index.ts` | なし | `agent-runtime`、`conversation`、`delivery`、`inference`、`memory`、`queue`、`scheduler` | `conversation` | `world` |
+| `dialogue` | `api/domains/dialogue/index.ts` | `web/src/domains/dialogue/index.ts` | なし | `agent-runtime`、`capabilities`、`conversation`、`delivery`、`inference`、`memory`、`queue`、`scheduler` | `conversation` | `world` |
 | `voice-dialogue` | `api/domains/voice-dialogue/index.ts` | `web/src/domains/voice-dialogue/index.ts` | なし | `delivery`、`dialogue`、`inference`、`settings` | `audio`、`avatar`、`dialogue`、`settings` | なし |
 <!-- domains:end -->
 

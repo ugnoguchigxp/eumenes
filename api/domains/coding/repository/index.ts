@@ -168,6 +168,34 @@ export function events(db: Database, id: string, after: number, limit: number) {
 			.all(id, after, limit) as { data_json: string }[]
 	).map((r) => JSON.parse(r.data_json) as CodingEvent);
 }
+export function countEvents(
+	db: Database,
+	id: string,
+	kind: CodingEvent["kind"],
+) {
+	return (
+		db
+			.query(
+				"SELECT COUNT(*) AS n FROM coding_evidence WHERE execution_id=? AND json_extract(data_json,'$.kind')=?",
+			)
+			.get(id, kind) as { n: number }
+	).n;
+}
+/** Newest events of one kind, newest first. */
+export function lastEvents(
+	db: Database,
+	id: string,
+	kind: CodingEvent["kind"],
+	limit: number,
+) {
+	return (
+		db
+			.query(
+				"SELECT data_json FROM coding_evidence WHERE execution_id=? AND json_extract(data_json,'$.kind')=? ORDER BY seq DESC LIMIT ?",
+			)
+			.all(id, kind, limit) as { data_json: string }[]
+	).map((r) => JSON.parse(r.data_json) as CodingEvent);
+}
 export function oneEvent(db: Database, id: string, seq: number) {
 	const row = db
 		.query(

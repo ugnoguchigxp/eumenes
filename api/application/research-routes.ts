@@ -3,6 +3,7 @@ import type { QueueService } from "../domains/queue";
 import type { Capabilities } from "../domains/capabilities";
 import type {
 	AcquisitionPlanPort,
+	AcquisitionObservationInput,
 	AcquisitionInitialAction,
 	AcquisitionLookupProvenance,
 	createAgentRuntime,
@@ -94,6 +95,11 @@ const toolIdOf = (s: string): RouteRecipe["toolId"] | null => {
 	const m = /web\.(forecast|quote|read)/.exec(s);
 	return m ? (`web.${m[1]}` as RouteRecipe["toolId"]) : null;
 };
+
+const reportEvidence = (input: AcquisitionObservationInput) => ({
+	facts: input.facts,
+	reportEvidence: input.report.claims.flatMap((c) => c.evidence),
+});
 
 export type RouteWiringOptions = {
 	queue: QueueService;
@@ -412,7 +418,7 @@ export function createRouteWiring(opts: RouteWiringOptions) {
 				owner: { rootRunId: input.owner.rootRunId, taskId: input.owner.taskId },
 				toolId: info.recipe?.toolId ?? used.at(-1) ?? "web.read",
 				sources,
-				facts: input.facts,
+				...reportEvidence(input),
 				lookupProvenance: provenance,
 				originalProvenance: info.original ?? null,
 				lookupHitUrls: hitUrls,

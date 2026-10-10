@@ -15,7 +15,7 @@ async function warm() {
 	});
 	h.binds.set("pd", directBind());
 	const root = await h.start("run-1");
-	await h.runHostStep(root.taskId);
+
 	const child = h.agents.list("run-1").find((t) => t.kind === "worker")!;
 	return { h, root, child };
 }

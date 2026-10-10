@@ -27,6 +27,10 @@ import {
 } from "./workspace";
 
 type GitReceipt = ReturnType<typeof gitReceiptSchema.parse>;
+/** A normal turn end is a completed outcome, not just a flag. */
+function normalEnd(r: ReturnType<typeof readReceipt>) {
+	return r.turnFinished && r.observation.turnOutcome === "completed";
+}
 export function publishGitSpec(
 	config: RunnerConfig,
 	ref: string,
@@ -210,7 +214,7 @@ export function executeGit(
 				status.state !== "exited" ||
 				status.exitCode !== 0 ||
 				!status.childrenStopped ||
-				!status.turnFinished ||
+				!normalEnd(status) ||
 				!status.evidenceComplete ||
 				existsSync(
 					join(runPath(config.spoolRoot, spec.executionId), "stop.json"),

@@ -47,7 +47,7 @@ for (const mode of ["failed", "nonzero"])
 			expect(batch.receipt.reason).toBe("runner_cli_failed");
 			writeFileSync(join(f.workspace, "source.txt"), "changed\n");
 			const commit = {
-				version: "eumenes-coding/1" as const,
+				version: "eumenes-coding/2" as const,
 				kind: "commit" as const,
 				operationId: crypto.randomUUID(),
 				executionId: spec.executionId,

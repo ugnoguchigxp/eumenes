@@ -22,6 +22,18 @@ commit/pushはそれぞれ委任済みの場合にだけ実行する。branch、
 
 `WorkflowPort` は登録済み操作ワーカーを接続するhost専用入口。モデルのJSONをこのportのreceiptとして使ってはいけない。実装時には計画02 C6の固定チェック、read-only review、workspace予約、権限・lease・期限、専用Git operationの証拠を強制する必要がある。現在の本番組立ては `unavailableCodingWorkflow` を使い、実行不能を明示する。
 
+## 観測契約と診断（計画06）
+
+`Observation.details` は、発言（種別・空か・切詰め）、turn終端、process状態、採取の完全性、報告の有無、取得範囲を別々に持つ。未確認と失敗を一つの「失敗」にしない。unknown種別の発言は最終回答ではなく、execでは明示finalが識別できないので `finalReport=unidentifiable`。turnが completed 以外（failed/cancelled/conflict/unconfirmed）なら、最終回答があっても変更・continue・commit/push・完了候補を許可しない（`stopped()`）。空報告・報告欠落だけでは検証工程を止めない。
+
+読取りは `ObservationReadPort`（applicationの `codingObservationReader`）。coding domainの採用済みsnapshot（事実）をtransactionで固定し、transaction外で `coding.readEvidence` を最大4呼出し・4参照・64 KiB（1参照24 KiB）で読み、digestを照合し、読取り前後で意味のある変化があれば棄却する。coverageは一観測内だけで、観測間で合算しない。
+
+承認待ち・decision・stepの失効判定とfingerprintは `semanticObservationDigest` を使う。時刻・heartbeat位置・抜粋・coverageは含めない。新しい発言・終端・停止・採取欠落・snapshot・質問・観測障害codeは含める。
+
+観測失敗は、固定code・最後の正常cursor・実行/世代/権限を `observationFailedInTransaction` に渡す（自由な例外文字列は保存しない）。古い世代の障害は無視する。ホストの診断は専用Queue job（`coding-supervision.inspect.v1`、1回のみ・interrupt）で行い、変更用のavailable/policy/tokenizerに依存しない。回数は実行/世代/権限ごとにcode別2回・合計4回で、予約時に消費し再起動で戻さない。モデルの `inspect_more` も同じ読取りで、変更用のStepIntentに入らない。
+
+診断を打ち切る条件は「process停止確認済み かつ（上限到達 または 続行不能の確定）」。このとき自由入力の質問は出さず、固定codeのholdと、確認済み範囲・権限・残予算を含む報告を一回だけ作る（`monitoring_issue`、dedupe `blocked:<executionId>`。task-reportsのblockerは質問を要求するため使わない）。停止未確認の間は不足報告と停止監視を続ける。選択肢付きの復旧質問は計画07の範囲で未実装。
+
 ## 推論と予算
 
 `captureBackgroundControlInTransaction` はtask/decisionと権限・実行世代に結び付いた独立requestを作る。会話の期限やparentsを継承せず、現在の設定を固定したLARM-only/exact-contextで実行する。設定revisionの変更とtask取消は、別々の経路で古い結果の採用を止める。クラウドへの自動切替は行わない。

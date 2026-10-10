@@ -32,8 +32,10 @@ export function parseControlOutput(value: unknown): {
 			},
 		};
 	const text = value.trim();
+	// Decode a whole JSON code block only. Never search prose for a plausible action.
+	const wrapped = /^```(?:json)?[ \t]*\r?\n([\s\S]*?)\r?\n```$/i.exec(text);
 	try {
-		const action: unknown = JSON.parse(text);
+		const action: unknown = JSON.parse(wrapped?.[1] ?? text);
 		if (action && typeof action === "object" && "action" in action) {
 			diagnostic.controlAction =
 				typeof action.action === "string" &&

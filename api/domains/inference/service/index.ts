@@ -185,7 +185,8 @@ export function createInference(
 		caller: AbortSignal,
 		onDelta?: (text: string) => void,
 		preparation?: SpeechPreparation,
-	) => runRequest(env, requestId, input, caller, onDelta, preparation);
+		tools?: import("../../../infrastructure/chat-stream").NativeTool[],
+	) => runRequest(env, requestId, input, caller, onDelta, preparation, tools);
 	function accept(db: Database, receipt: Receipt) {
 		const row = get(db, receipt.requestId);
 		const a = db
@@ -529,12 +530,8 @@ export function createInference(
 			preparation?: SpeechPreparation,
 		) => executeRequest(id, input, signal, undefined, preparation),
 		executeStream: (
-			requestId: string,
-			messages: Messages,
-			signal: AbortSignal,
-			onDelta: (text: string) => void,
-			preparation?: SpeechPreparation,
-		) => executeRequest(requestId, messages, signal, onDelta, preparation),
+			...args: Parameters<NonNullable<InferencePort["executeStream"]>>
+		) => executeRequest(...args),
 		liveRequest: (id: string) => store.read((db) => usable(db, id)),
 		captureSpeechChunkInTransaction(
 			db: Database,

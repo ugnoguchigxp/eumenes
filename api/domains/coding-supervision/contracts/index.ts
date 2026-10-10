@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+	messageMetadataSchema,
+	runObservationSchema,
+} from "../../../../packages/coding-runner/src/contracts";
 const ref = z
 	.string()
 	.min(1)
@@ -33,7 +37,67 @@ export const decisionSchema = z
 	)
 	.refine((v) => v.action !== "answer_question" || v.questionId !== null);
 export type Decision = z.infer<typeof decisionSchema>;
+/** Execution facts kept apart: speech, turn terminal, process, capture and report limits. */
+export const executionObservationSchema = z.strictObject({
+	run: runObservationSchema,
+	processState: z.enum([
+		"intent",
+		"accepted",
+		"reserved",
+		"running",
+		"stopping",
+		"stopped",
+		"exited",
+		"outcome_unknown",
+	]),
+	messages: z
+		.array(
+			z.strictObject({
+				seq: z.number().int().positive(),
+				ref,
+				digest: hash,
+				metadata: messageMetadataSchema,
+			}),
+		)
+		.max(4),
+	publicReport: z.enum([
+		"nonempty_observed",
+		"empty_only",
+		"none_observed",
+		"not_fully_observed",
+	]),
+	finalReport: z.enum([
+		"observed",
+		"missing",
+		"unidentifiable",
+		"not_fully_observed",
+	]),
+	limitations: z.array(z.string().max(100)).max(16),
+	/** Fixed code of the last failed observation; null when the latest read succeeded. */
+	issue: z.string().max(100).nullable(),
+	/** Per reference, within this one observation only. */
+	coverage: z
+		.array(
+			z.strictObject({
+				ref,
+				digest: hash,
+				totalBytes: z.number().int().nonnegative(),
+				ranges: z
+					.array(
+						z.tuple([
+							z.number().int().nonnegative(),
+							z.number().int().nonnegative(),
+						]),
+					)
+					.max(8),
+			}),
+		)
+		.max(4),
+	excerptTruncated: z.boolean(),
+});
+export type ExecutionObservation = z.infer<typeof executionObservationSchema>;
 export const observationSchema = z.strictObject({
+	details: executionObservationSchema.optional(),
 	executionId: ref,
 	eventSeq: z.number().int().min(0),
 	sessionId: ref.nullable(),
@@ -135,6 +199,48 @@ export const stepReceiptSchema = z.strictObject({
 	conditionsMet: z.array(z.boolean()).max(20),
 });
 export type StepReceipt = z.infer<typeof stepReceiptSchema>;
+/** Read-only access for diagnosis; it has no shell, mutation, question or Git operation. */
+export interface ObservationReadPort {
+	/** `focus` continues one stored reference from an offset; its coverage is not merged with older reads. */
+	inspect(
+		taskId: string,
+		signal: AbortSignal,
+		focus?: ReadFocus,
+	): Promise<Observation>;
+}
+export interface ReadFocus {
+	ref: string;
+	offset: number;
+}
+/** The only kind of failure fact kept from a failed observation: fixed code and position. */
+export interface ObservationFailure {
+	code: string;
+	generation: number;
+	authorityEpoch: number;
+	executionId: string | null;
+	lastCursor: number | null;
+}
+export interface DiagnosticIntent {
+	id: string;
+	taskId: string;
+	generation: number;
+	authorityEpoch: number;
+	executionId: string;
+	code: string;
+	deadline: number;
+	focus?: ReadFocus;
+}
+export interface DiagnosticBudget {
+	/** executionId:generation:authorityEpoch; the budget never resets for the same key. */
+	scope: string;
+	total: number;
+	codes: Record<string, number>;
+	activeId: string | null;
+	/** Automatic diagnosis ended with a hold and one blocker report. */
+	blocked?: boolean;
+	/** Fingerprint a diagnostic read was already requested for. */
+	requestedFor?: string;
+}
 export interface WorkflowPort {
 	available(): boolean;
 	/** Configured by the host. CLI output cannot change these definitions. */
@@ -182,6 +288,14 @@ export interface Supervisor {
 	lastReportAt: number | null;
 	lastReportFingerprint: string | null;
 	holdReason: string | null;
+	/** Last failed observation (fixed code), for a different story than "network was down". */
+	observationIssue?: {
+		code: string;
+		executionId: string | null;
+		lastCursor: number | null;
+		at: number;
+	} | null;
+	diagnostics?: DiagnosticBudget | null;
 	/** Absent in rows saved before the approval gate existed. */
 	pendingApproval?: PendingApproval | null;
 }

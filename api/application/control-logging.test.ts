@@ -29,7 +29,7 @@ async function run(h: Awaited<ReturnType<typeof harness>>) {
 	return run;
 }
 
-test("an unbound execution reference invokes nothing and receives one bounded correction", async () => {
+test("an unknown tool name invokes nothing and receives one bounded correction", async () => {
 	const output = capture();
 	const h = await harness({ badExecutionRefOnce: true });
 	try {
@@ -41,18 +41,18 @@ test("an unbound execution reference invokes nothing and receives one bounded co
 			.filter((entry) => entry.event === "agent.control_validation_issue");
 		expect(issues).toHaveLength(1);
 		expect(issues[0]).toMatchObject({
-			validationPath: "executionRef",
-			validationCode: "unknown_execution_ref",
+			validationPath: "tool",
+			validationCode: "unknown_tool",
 		});
 		const repairIndex = h.workerContexts.findIndex((context) =>
-			context.includes("DIAGNOSTIC="),
+			context.includes("一度だけ修正"),
 		);
 		expect(repairIndex).toBeGreaterThanOrEqual(0);
-		expect(h.workerContexts[repairIndex]).toContain("unknown_execution_ref");
+		expect(h.workerContexts[repairIndex]).toContain("invalid_tool_input");
 		expect(
 			h.workerContexts
 				.slice(repairIndex + 1)
-				.some((context) => context.includes("DIAGNOSTIC=")),
+				.some((context) => context.includes("一度だけ修正")),
 		).toBe(false);
 	} finally {
 		await h.close();
@@ -101,7 +101,7 @@ test("search timeout, successful retry and malformed report are correlated and s
 		const rejected = rows.filter(
 			(entry) => entry.event === "agent.control_rejected",
 		);
-		expect(rejected).toHaveLength(3);
+		expect(rejected).toHaveLength(2);
 		expect(rejected[0]).toMatchObject({
 			runId: r.id,
 			taskId: failed.taskId,
@@ -111,9 +111,9 @@ test("search timeout, successful retry and malformed report are correlated and s
 			repairAttempt: 0,
 			status: "repair_scheduled",
 		});
-		expect(rejected[2]).toMatchObject({
+		expect(rejected[1]).toMatchObject({
 			reason: "control_json_syntax",
-			repairAttempt: 2,
+			repairAttempt: 1,
 			status: "failed",
 		});
 		for (const row of rejected) {
@@ -176,19 +176,20 @@ test("valid JSON with a missing report field records the field and expected type
 			expectedType: "string",
 			actualType: "undefined",
 			controlAction: "finish",
-			issueCount: 2,
-			reportedIssueCount: 2,
+			issueCount: 3,
+			reportedIssueCount: 3,
 		});
 		expect(
 			output
 				.entries()
 				.filter((entry) => entry.event === "agent.control_rejected"),
-		).toHaveLength(3);
+		).toHaveLength(2);
 		expect(output.lines.join("")).not.toContain("PRIVATE");
 		const feedback = JSON.parse(h.workerContexts[1]!).find(
-			(message: { content: string }) => message.content.includes("DIAGNOSTIC="),
+			(message: { content: string }) =>
+				message.content.includes("一度だけ修正"),
 		);
-		expect(feedback.content).toContain('"validationPath":"report.summary"');
+		expect(feedback.content).toContain("invalid_control_json");
 		expect(feedback.content).not.toContain("PRIVATE");
 	} finally {
 		await h.close();
@@ -210,19 +211,19 @@ for (const options of [{ badToolArgs: true }, { badQuote: true }])
 						entry.runId === r.id &&
 						(options.badToolArgs
 							? entry.reason === "invalid_tool_input" &&
-								entry.validationPath === "arguments.url" &&
+								entry.validationPath === "arguments.query" &&
 								entry.expectedType === "string"
 							: entry.reason === "invalid_evidence" &&
-								entry.validationPath === "report.claims.0.evidence.0.viewId" &&
-								entry.validationCode === "unknown_view"),
+								entry.validationPath === "report.claims.0.evidence.0" &&
+								entry.validationCode === "unknown_evidence"),
 				),
 			).toBe(true);
 			expect(output.lines.join("")).not.toContain(forbidden);
 			const repair = h.workerContexts.find((context) =>
-				context.includes("DIAGNOSTIC="),
+				context.includes("一度だけ修正"),
 			);
 			expect(repair).toContain(
-				options.badToolArgs ? "arguments.url" : "unknown_view",
+				options.badToolArgs ? "invalid_tool_input" : "invalid_evidence",
 			);
 		} finally {
 			await h.close();

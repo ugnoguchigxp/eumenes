@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { join } from "node:path";
+import { sha256Hex } from "../../../infrastructure/digest";
+import { canonicalJSON } from "../../../../packages/coding-runner/src/contracts";
 import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
 import { createCoding } from "../service";
 import { migration } from "../repository";
@@ -318,4 +320,160 @@ test("an unchanged epoch cannot extend the execution deadline or replace network
 			),
 		),
 	).rejects.toThrow("coding_authority_stale");
+});
+async function finished() {
+	const h = await setup();
+	const p = await h.store.write((db) =>
+		h.coding.prepareInTransaction(db, h.authority, {
+			operationId: crypto.randomUUID(),
+			instruction: "normal",
+			kind: "implement",
+		}),
+	);
+	await h.coding.dispatch(p);
+	const batch = await until(
+		() => h.coding.inspect(p.spec.executionId, 0, 100, false),
+		(r) => r.receipt.childrenStopped && r.receipt.state === "exited",
+	);
+	return { ...h, p, batch };
+}
+test("the observation snapshot exposes adopted facts only, with message metadata", async () => {
+	const { store, coding, authority, p, batch } = await finished();
+	await store.write((db) => coding.adoptInTransaction(db, authority, batch));
+	const s = store.readSnapshot((db) =>
+		coding.observationSnapshotInTransaction(db, "task"),
+	);
+	expect(s.legacy).toBe(false);
+	expect(s.cursor).toBe(batch.receipt.seq);
+	expect(s.execution.observation).toMatchObject({
+		turnOutcome: "completed",
+		processStarted: true,
+		captureState: "complete",
+	});
+	expect(s.messages[0]?.message).toMatchObject({
+		messageKind: "unknown",
+		classificationReason: "phase_not_provided",
+	});
+	expect(s.fileChange?.kind).toBe("file_changed");
+	expect(s.execution.id).toBe(p.spec.executionId);
+});
+test("terminal facts cannot be retracted, flipped or pointed at a non-terminal event", async () => {
+	const { store, coding, authority, batch } = await finished();
+	await store.write((db) => coding.adoptInTransaction(db, authority, batch));
+	const r = batch.receipt;
+	const variants = [
+		{
+			...r,
+			observation: {
+				...r.observation,
+				turnOutcome: "unconfirmed" as const,
+				terminalEventSeq: null,
+			},
+		},
+		{
+			...r,
+			observation: { ...r.observation, processStarted: false as const },
+		},
+	];
+	for (const v of variants)
+		await expect(
+			store.write((db) => coding.acceptInTransaction(db, authority, v)),
+		).rejects.toThrow(/coding_receipt_(stale|conflict)/);
+	const wrongSeq = structuredClone(batch);
+	wrongSeq.receipt.observation.terminalEventSeq = 1;
+	await expect(
+		store.write((db) => coding.adoptInTransaction(db, authority, wrongSeq)),
+	).rejects.toThrow("coding_receipt_conflict");
+});
+test("a v1 session stays viewable but is never continued, with a fixed code", async () => {
+	const { store, coding, authority, p, batch } = await finished();
+	await store.write((db) => {
+		coding.adoptInTransaction(db, authority, batch);
+		const legacy = { ...p.spec, version: "eumenes-coding/1" };
+		db.query("UPDATE coding_executions SET spec_json=? WHERE id=?").run(
+			JSON.stringify(legacy),
+			p.spec.executionId,
+		);
+	});
+	const legacy = store.readSnapshot((db) =>
+		coding.observationSnapshotInTransaction(db, "task"),
+	);
+	expect(legacy.legacy).toBe(true);
+	// Proven normal end projects to completed; the process start and capture stay unknown.
+	expect(legacy.execution.observation).toMatchObject({
+		turnOutcome: "completed",
+		terminalEventSeq: expect.any(Number),
+	});
+	await expect(
+		store.write((db) =>
+			coding.prepareInTransaction(db, authority, {
+				operationId: crypto.randomUUID(),
+				instruction: "continue",
+				kind: "continue",
+				previousExecutionId: p.spec.executionId,
+			}),
+		),
+	).rejects.toThrow("coding_legacy_continue_unsupported");
+});
+test("a finished v1 execution (no observation on its receipt) is adopted, stopped and projected, never started", async () => {
+	const { store, coding, authority, p, batch } = await finished();
+	const legacy = { ...p.spec, version: "eumenes-coding/1" as const };
+	await store.write((db) =>
+		db
+			.query("UPDATE coding_executions SET spec_json=? WHERE id=?")
+			.run(JSON.stringify(legacy), p.spec.executionId),
+	);
+	// What a v1 runner wrote: the v1 spec digest, a normal end, and no observation at all.
+	const receipt = {
+		...batch.receipt,
+		specDigest: sha256Hex(canonicalJSON(legacy)),
+	} as Record<string, unknown>;
+	delete receipt.observation;
+	const view = await store.write((db) =>
+		coding.adoptInTransaction(db, authority, { ...batch, receipt }),
+	);
+	expect(view.turnFinished).toBe(true);
+	expect(view.observation).toMatchObject({
+		turnOutcome: "completed",
+		processStarted: "unknown",
+	});
+	const prepared = store.read((db) =>
+		coding.preparedInTransaction(db, p.spec.operationId),
+	);
+	expect(prepared.spec.version).toBe("eumenes-coding/1");
+	await expect(coding.dispatch(prepared)).rejects.toThrow(
+		"runner_protocol_mismatch",
+	);
+	await store.write((db) =>
+		coding.confirmStoppedInTransaction(
+			db,
+			"task",
+			1,
+			receipt as unknown as typeof batch.receipt,
+		),
+	);
+});
+test("a conflicting terminal is adopted as a conflict, not rejected as inconsistent", async () => {
+	const { store, coding, authority, p } = await (async () => {
+		const h = await setup();
+		const p = await h.store.write((db) =>
+			h.coding.prepareInTransaction(db, h.authority, {
+				operationId: crypto.randomUUID(),
+				instruction: "conflict",
+				kind: "implement",
+			}),
+		);
+		await h.coding.dispatch(p);
+		return { ...h, p };
+	})();
+	const batch = await until(
+		() => coding.inspect(p.spec.executionId, 0, 100, false),
+		(r) => r.receipt.childrenStopped && r.receipt.state !== "stopping",
+	);
+	expect(batch.receipt.observation.turnOutcome).toBe("conflict");
+	const view = await store.write((db) =>
+		coding.adoptInTransaction(db, authority, batch),
+	);
+	expect(view.observation.turnOutcome).toBe("conflict");
+	expect(view.evidenceComplete).toBe(false);
 });

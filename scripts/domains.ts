@@ -184,6 +184,7 @@ export const domains = {
 		depends: {
 			api: [
 				"agent-runtime",
+				"capabilities",
 				"conversation",
 				"delivery",
 				"inference",

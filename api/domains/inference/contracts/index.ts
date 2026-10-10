@@ -13,7 +13,12 @@ export type SpeechOverride = Partial<
 		"voice" | "style" | "speed" | "pitchScale" | "intonationScale"
 	>
 >;
+import type {
+	NativeTool,
+	NativeToolCall,
+} from "../../../infrastructure/chat-stream";
 export interface Receipt {
+	toolCalls?: NativeToolCall[];
 	requestId: string;
 	attemptId: string;
 	value: string | Uint8Array;
@@ -115,6 +120,7 @@ export interface InferencePort {
 		signal: AbortSignal,
 		onDelta: (text: string) => void,
 		preparation?: SpeechPreparation,
+		tools?: NativeTool[],
 	): Promise<Receipt>;
 	captureSpeechChunkInTransaction?(
 		db: Database,

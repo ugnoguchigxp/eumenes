@@ -1,4 +1,3 @@
-import { z } from "zod";
 import type { Database } from "bun:sqlite";
 import {
 	hash,
@@ -6,7 +5,6 @@ import {
 	type Owner,
 	type Prepared,
 } from "../../capabilities";
-import type { HandlerDefinition, QueueService } from "../../queue";
 import type { ToolRuntime } from "../../tool-runtime";
 import type {
 	AcquisitionPlanPort,
@@ -15,7 +13,6 @@ import type {
 	Task,
 } from "../contracts";
 
-export const ROUTE_STEP_KIND = "agent.route-step";
 /** Site-side failures that justify one replacement by a normal search plan. Guard/safety/cancel never do. */
 export const siteFailureCodes = new Set([
 	"web_attempt_timeout",
@@ -37,11 +34,10 @@ export const siteFailureCodes = new Set([
 const terminal = new Set(["completed", "failed", "cancelled", "interrupted"]);
 
 type Binding = ReturnType<ToolRuntime["bind"]>;
-export type RouteStepContext = {
+export type AcquisitionToolsContext = {
 	acquisition: AcquisitionPlanPort;
 	capabilities: Capabilities;
 	tools: ToolRuntime;
-	queue: QueueService;
 	now: () => number;
 	get(db: Database, id: string): Task | null;
 	byRoot(db: Database, rootRunId: string): Task | null;
@@ -52,21 +48,6 @@ export type RouteStepContext = {
 		phase?: string,
 		code?: string | null,
 	): Task;
-	insertTask(
-		db: Database,
-		kind: Task["kind"],
-		rootRunId: string,
-		input: unknown,
-		deadline: number,
-		parentTaskId?: string | null,
-	): Task;
-	ready(
-		db: Database,
-		t: Task,
-		reason?: string | null,
-		reportTaskId?: string | null,
-	): void;
-	fail(db: Database, t: Task, code: string): void;
 	next(
 		db: Database,
 		t: Task,
@@ -88,41 +69,21 @@ export type RouteStepContext = {
 	safeCode(e: unknown): string;
 };
 
-export function createRouteStep(ctx: RouteStepContext) {
-	const { acquisition, capabilities, tools, queue, now } = ctx;
+export function createAcquisitionTools(ctx: AcquisitionToolsContext) {
+	const { acquisition, capabilities, tools, now } = ctx;
 	const active = (t: Task | null): t is Task => !!t && !terminal.has(t.state);
-
-	/** Enqueue a host (non-inference) step. No resourceKey: it never holds an LLM slot. */
-	function enqueueHost(db: Database, t: Task, parentJobId?: string) {
-		const ordinal = t.current_step + 1,
-			stepId = crypto.randomUUID();
-		const { job } = queue.enqueueInTransaction(db, {
-			scope: "agent",
-			kind: ROUTE_STEP_KIND,
-			dedupeKey: stepId,
-			payload: { taskId: t.id, stepId },
-			subjectRef: t.id,
-			parentJobId,
-			lane: t.kind === "coordinator" ? "interactive" : "background",
-			concurrencyKey: `agent:${t.id}`,
-			maxAttempts: 1,
-			deadlineAtMs: Math.min(t.deadline, now() + 15000),
-		});
-		db.query(
-			"INSERT INTO agent_steps(id,task_id,ordinal,state,job_id,action_origin) VALUES(?,?,?,'queued',?,'host')",
-		).run(stepId, t.id, ordinal, job.id);
-		db.query("UPDATE agent_tasks SET current_step=?,job_id=? WHERE id=?").run(
-			ordinal,
-			job.id,
-			t.id,
-		);
-		return job.id;
-	}
 
 	function install(db: Database, root: Task, child: Task, p: Prepared) {
 		db.query(
 			"UPDATE agent_tasks SET package_revision_id=?,input_json=? WHERE id=?",
-		).run(p.package.revisionId, JSON.stringify(p.input), child.id);
+		).run(
+			p.package.revisionId,
+			JSON.stringify({
+				...(p.input as object),
+				originalRequest: JSON.parse(child.input_json ?? "{}").originalRequest,
+			}),
+			child.id,
+		);
 		db.query("DELETE FROM agent_task_bindings WHERE task_id=?").run(child.id);
 		for (const d of [p.package, ...p.dependencies])
 			db.query("INSERT INTO agent_task_bindings VALUES(?,?,?,?)").run(
@@ -224,21 +185,17 @@ export function createRouteStep(ctx: RouteStepContext) {
 			"UPDATE agent_tasks SET tool_calls=tool_calls+1,invocation_id=? WHERE id=?",
 		).run(inv.id, child.id);
 		setProvenance(action.provenance);
-		ctx.next(db, ctx.get(db, child.id)!, parentJobId);
+		ctx.next(db, ctx.get(db, child.id)!, parentJobId || undefined);
 	}
 
-	/** Root host step: resolve → child → bind → prepare by ID → first host action. */
-	function rootStep(
+	/** Attach acquisition optimization to an already-created worker. */
+	function initialize(
 		db: Database,
 		root: Task,
-		stepId: string,
+		child: Task,
 		parentJobId: string,
 	) {
-		const question = JSON.parse(root.input_json ?? "{}").question;
-		if (typeof question !== "string") {
-			ctx.ready(db, root, "capability_unavailable");
-			return;
-		}
+		const question = JSON.parse(root.input_json ?? "{}").question as string;
 		const requestAtMs = now();
 		const proposal = acquisition.resolveInTransaction(db, {
 			rootRunId: root.root_run_id,
@@ -246,15 +203,7 @@ export function createRouteStep(ctx: RouteStepContext) {
 			question,
 			requestAtMs,
 		});
-		db.query("UPDATE agent_tasks SET acquisition_plan_json=? WHERE id=?").run(
-			JSON.stringify({ ...proposal, requestAtMs }),
-			root.id,
-		);
-		if (proposal.kind === "unmatched") {
-			// Legacy coordinator path: the only place a root model step is created.
-			ctx.next(db, root, parentJobId);
-			return;
-		}
+		if (proposal.kind === "unmatched") return false;
 		if (proposal.kind === "clarification") {
 			db.query("UPDATE agent_tasks SET input_json=? WHERE id=?").run(
 				JSON.stringify({
@@ -263,136 +212,49 @@ export function createRouteStep(ctx: RouteStepContext) {
 				}),
 				root.id,
 			);
-			ctx.ready(db, ctx.get(db, root.id)!, "clarification_required");
-			return;
+			throw new Error("clarification_required");
 		}
-		if (proposal.kind === "unavailable") {
-			// Authority is gone: finish without searching around it.
-			ctx.ready(db, root, ctx.codeOf(proposal.code, "capability_unavailable"));
-			return;
-		}
-		db.exec("SAVEPOINT agent_host_child");
-		let childId: string | null = null;
+		if (proposal.kind === "unavailable")
+			throw new Error(ctx.codeOf(proposal.code, "capability_unavailable"));
+		db.query("UPDATE agent_tasks SET acquisition_plan_json=? WHERE id=?").run(
+			JSON.stringify({ ...proposal, requestAtMs }),
+			root.id,
+		);
+		const stored = ctx.bindAcquisition(db, root.id, child.id);
+		const ok = acquisition.validateInTransaction(db, {
+			bindingToken: stored.bindingToken,
+			owner: ctx.owner(child),
+			stage: "prepare",
+		});
+		if (ok.kind !== "allowed")
+			throw new Error(ctx.codeOf(ok.code, "acquisition_rejected"));
+		let p: Prepared;
 		try {
-			const child = ctx.insertTask(
+			p = capabilities.prepareActiveByIdInTransaction(
 				db,
-				"worker",
-				root.root_run_id,
-				{},
-				Math.min(now() + 90000, root.deadline - 15000),
-				root.id,
+				ctx.owner(child),
+				stored.packageRevisionId,
+				{ question },
 			);
-			childId = child.id;
-			if (child.deadline <= now()) throw new Error("agent_budget_exhausted");
-			const stored = ctx.bindAcquisition(db, root.id, child.id);
-			const ok = acquisition.validateInTransaction(db, {
-				bindingToken: stored.bindingToken,
-				owner: ctx.owner(child),
-				stage: "prepare",
-			});
-			if (ok.kind !== "allowed")
-				throw new Error(ctx.codeOf(ok.code, "acquisition_rejected"));
-			const prepare = (input: unknown) =>
-				capabilities.prepareActiveByIdInTransaction(
-					db,
-					ctx.owner(child),
-					stored.packageRevisionId,
-					input,
-				);
-			let p: ReturnType<typeof prepare>;
-			try {
-				p = prepare({ question });
-			} catch (e) {
-				// A learned package takes its tool's schema: retry with the fixed recipe arguments.
-				if (
-					stored.initialAction.kind !== "direct-invoke" ||
-					!(e instanceof Error) ||
-					e.message !== "invalid_capability_input"
-				)
-					throw e;
-				p = prepare(stored.initialAction.arguments);
-			}
-			install(db, root, child, p);
-			runInitialAction(db, child, stored, p, stepId, parentJobId, question);
-			ctx.update(db, ctx.get(db, root.id)!, "waiting_child", "research");
-			db.exec("RELEASE agent_host_child");
 		} catch (e) {
-			db.exec("ROLLBACK TO agent_host_child");
-			db.exec("RELEASE agent_host_child");
-			if (childId) {
-				tools.release(childId);
-				ctx.prepared.delete(childId);
-				ctx.bindings.delete(childId);
-			}
-			ctx.prepared.delete(root.id);
-			// Explicit failure: never a silent fallback to a different (unvalidated) route.
-			ctx.fail(db, ctx.get(db, root.id)!, ctx.safeCode(e));
-		}
-	}
-
-	type Input = { taskId: string; stepId: string };
-	const handler: HandlerDefinition<Input, Input, null> = {
-		kind: ROUTE_STEP_KIND,
-		payloadVersions: [1],
-		schema: z.object({ taskId: z.string(), stepId: z.string() }),
-		recovery: "interrupt",
-		prepareInTransaction(db, claim) {
-			const t = ctx.get(db, claim.payload.taskId);
 			if (
-				!t ||
-				t.state !== "queued" ||
-				t.job_id !== claim.jobId ||
-				t.kind !== "coordinator"
+				stored.initialAction.kind !== "direct-invoke" ||
+				!(e instanceof Error) ||
+				e.message !== "invalid_capability_input"
 			)
-				return { status: "stale", reason: "task_not_queued" };
-			if (t.deadline <= now()) {
-				ctx.fail(db, t, "deadline_exceeded");
-				return { status: "stale", reason: "deadline_exceeded" };
-			}
-			db.query(
-				"UPDATE agent_steps SET state='running' WHERE id=? AND state='queued'",
-			).run(claim.payload.stepId);
-			// The whole host transition happens here; there is no model call and no receipt.
-			rootStep(db, t, claim.payload.stepId, claim.jobId);
-			return { status: "ready", input: claim.payload };
-		},
-		async execute() {
-			return null;
-		},
-		classify: () => "fail",
-		settleInTransaction(db, claim, _input, outcome) {
-			db.query(
-				"UPDATE agent_steps SET state=?,action_kind='route',error_code=? WHERE id=? AND state IN ('queued','running')",
-			).run(
-				outcome.type === "success" ? "completed" : "failed",
-				outcome.type === "success"
-					? null
-					: outcome.type === "expired"
-						? "deadline_exceeded"
-						: "errorCode" in outcome
-							? outcome.errorCode
-							: "agent_failed",
-				claim.payload.stepId,
+				throw e;
+			p = capabilities.prepareActiveByIdInTransaction(
+				db,
+				ctx.owner(child),
+				stored.packageRevisionId,
+				stored.initialAction.arguments,
 			);
-			if (outcome.type !== "success") {
-				const t = ctx.get(db, claim.payload.taskId);
-				if (active(t) && t.state === "queued")
-					ctx.fail(
-						db,
-						t,
-						outcome.type === "expired"
-							? "deadline_exceeded"
-							: "errorCode" in outcome
-								? ctx.codeOf(outcome.errorCode, "agent_failed")
-								: "agent_failed",
-					);
-			}
-			return "applied";
-		},
-		cancelInTransaction() {
-			// The agent tree cancellation already ended the task and its steps.
-		},
-	};
+		}
+		install(db, root, child, p);
+		const stepId = crypto.randomUUID();
+		runInitialAction(db, child, stored, p, stepId, parentJobId, question);
+		return true;
+	}
 
 	/**
 	 * Replace a failed cached (direct) plan by a normal search plan for the SAME child:
@@ -497,5 +359,5 @@ export function createRouteStep(ctx: RouteStepContext) {
 			throw e;
 		}
 	}
-	return { handler, enqueueHost, replace };
+	return { initialize, replace };
 }

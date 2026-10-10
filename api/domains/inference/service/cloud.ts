@@ -29,6 +29,7 @@ export async function cloudRequest(
 	signal: AbortSignal,
 	attemptId: string,
 	onDelta?: (text: string) => void,
+	options?: import("../../larm").LarmCallOptions,
 ) {
 	const credential = env.settings.credential(connection);
 	if (!credential) throw new Error("cloud_credential_unavailable");
@@ -83,6 +84,13 @@ export async function cloudRequest(
 			body = {
 				model: resource.model,
 				messages,
+				...(options?.tools?.length
+					? {
+							tools: options.tools,
+							tool_choice: "auto",
+							parallel_tool_calls: false,
+						}
+					: {}),
 				stream: !!onDelta,
 				max_tokens: reserve,
 			};
@@ -103,6 +111,11 @@ export async function cloudRequest(
 	}
 	if (row.purpose === "llm") {
 		const result = await readChatResponse(response, signal, onDelta);
+		if (result.toolCalls?.length) {
+			if (!options?.tools?.length || !options.onToolCalls)
+				throw new Error("chat_tool_calls_unexpected");
+			options.onToolCalls(result.toolCalls);
+		}
 		const count = (v: unknown) =>
 			typeof v === "number" && Number.isSafeInteger(v) && v >= 0 ? v : null;
 		signal.throwIfAborted();

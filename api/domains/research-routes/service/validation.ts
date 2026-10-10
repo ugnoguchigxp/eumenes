@@ -30,6 +30,7 @@ export type CheckInput = {
 	binding: RequestBinding;
 	sources: VisibleSource[];
 	facts: unknown;
+	reportEvidence?: Array<{ sourceId: string; quote: string }>;
 	now: number;
 };
 type Condition = (typeof weatherConditions)[number];
@@ -215,10 +216,15 @@ export function checkObservation(input: CheckInput): CheckResult {
 	if (binding.specDigest !== specKey(spec))
 		return { kind: "policy_unavailable", code: "binding_mismatch" };
 	const reported = routeFacts.safeParse(input.facts);
-	if (!reported.success)
+	const derive =
+		input.facts === undefined && input.reportEvidence !== undefined;
+	if (!reported.success && !derive)
 		return { kind: "report_invalid", code: "facts_schema" };
 	const byId = new Map(sources.map((s) => [s.sourceId, s]));
-	if (reported.data.evidence.some((e) => !byId.has(e.sourceId)))
+	const evidence = reported.success
+		? reported.data.evidence
+		: (input.reportEvidence ?? []);
+	if (evidence.some((e) => !byId.has(e.sourceId)))
 		return { kind: "report_invalid", code: "evidence_source_missing" };
 	if (!sources.length) return { kind: "source_unusable", code: "no_sources" };
 	const found: { source: VisibleSource; ex: Extraction & { ok: true } }[] = [];
@@ -232,21 +238,21 @@ export function checkObservation(input: CheckInput): CheckResult {
 	const base = found[0]!;
 	if (found.some((f) => !sameValues(f.ex.facts, base.ex.facts)))
 		return { kind: "source_unusable", code: "conflicting_values" };
-	const ids = new Set(reported.data.evidence.map((e) => e.sourceId));
+	const ids = new Set(evidence.map((e) => e.sourceId));
 	const chosen = found.find((f) => ids.has(f.source.sourceId)) ?? base;
-	if (!sameValues(chosen.ex.facts, reported.data))
+	if (reported.success && !sameValues(chosen.ex.facts, reported.data))
 		return { kind: "report_invalid", code: "facts_mismatch" };
 	const body = ws(chosen.source.body);
-	const good = reported.data.evidence.find((e) => {
-		const quote = ws(e.quote);
-		return (
+	const good = evidence.filter(
+		(e) =>
 			e.sourceId === chosen.source.sourceId &&
-			body.includes(quote) &&
-			chosen.ex.tokens.every((t) => quote.includes(t))
-		);
-	});
-	if (!good) return { kind: "report_invalid", code: "evidence_missing" };
-	const facts = { ...chosen.ex.facts, evidence: [good] } as RouteFacts;
+			ws(e.quote).length > 0 &&
+			body.includes(ws(e.quote)),
+	);
+	const quoted = good.map((e) => ws(e.quote)).join(" ");
+	if (!good.length || !chosen.ex.tokens.every((t) => quoted.includes(t)))
+		return { kind: "report_invalid", code: "evidence_missing" };
+	const facts = { ...chosen.ex.facts, evidence: good } as RouteFacts;
 	return {
 		kind: "valid",
 		facts,

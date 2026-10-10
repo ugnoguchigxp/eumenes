@@ -2,6 +2,7 @@ import { sha256Hex } from "../../../infrastructure/digest";
 import { canonicalJSON } from "../../../../packages/coding-runner/src/contracts";
 import type { WorkTask, TaskFence } from "../../tasks";
 import type {
+	Observation,
 	Supervisor,
 	StepKind,
 	StepReceipt,
@@ -21,6 +22,9 @@ export const live = (t: WorkTask, at: number) =>
 	Date.parse(t.executionDeadlineAt) > at;
 export const stopped = (s: Supervisor) =>
 	s.observation?.turnFinished === true &&
+	// Failed, cancelled, conflicting or unconfirmed turns never open mutation, even with a final answer.
+	(s.observation.details === undefined ||
+		s.observation.details.run.turnOutcome === "completed") &&
 	s.observation.childrenStopped &&
 	s.observation.evidenceComplete;
 export const blockerKey = (s: Supervisor) => {
@@ -148,3 +152,54 @@ export function validateReceipt(intent: StepIntent, r: StepReceipt) {
 		throw new Error("supervision_push_unconfirmed");
 }
 export const digest = (v: unknown) => sha256Hex(canonicalJSON(v));
+/**
+ * Digest of what an observation means. Time, heartbeat position, the excerpt, how much of a body
+ * was read (coverage) and the derived fact lines are excluded: reading more of the same evidence
+ * must not expire an approval, a queued decision or a step. New speech, terminals, stops,
+ * capture faults, snapshots, questions and failure codes do change it.
+ */
+export function semanticObservationDigest(o: Observation | null) {
+	if (!o) return digest(null);
+	const d = o.details;
+	return digest({
+		executionId: o.executionId,
+		sessionId: o.sessionId,
+		snapshotHash: o.snapshotHash,
+		turnFinished: o.turnFinished,
+		childrenStopped: o.childrenStopped,
+		evidenceComplete: o.evidenceComplete,
+		exitCode: o.exitCode,
+		question: o.question,
+		// Without details the fact lines are the only description of the run.
+		facts: d ? null : o.facts,
+		details: d
+			? {
+					run: d.run,
+					processState: d.processState,
+					messages: d.messages.map((m) => ({
+						seq: m.seq,
+						digest: m.digest,
+						kind: m.metadata.messageKind,
+						presence: m.metadata.contentPresence,
+						truncated: m.metadata.sourceTruncated,
+					})),
+					publicReport:
+						d.publicReport === "not_fully_observed" ? null : d.publicReport,
+					finalReport: d.finalReport,
+					// How much was read is coverage, not meaning.
+					limitations: d.limitations
+						.filter(
+							(l) =>
+								![
+									"not_fully_observed",
+									"context_excerpt_truncated",
+									"messages_omitted",
+									"evidence_unreadable",
+								].includes(l),
+						)
+						.sort(),
+					issue: d.issue,
+				}
+			: null,
+	});
+}

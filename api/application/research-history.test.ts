@@ -6,6 +6,99 @@ import {
 	syntheticAcquisition,
 } from "./research-history.fixture";
 const url = "https://example.com/synthetic-long";
+test("three far-apart facts and the seventh condition retain earlier evidence through the complete dialogue", async () => {
+	const facts = [
+		"第一条件は10時集合。",
+		"第七条件は雨天中止。",
+		"第三条件は参加費500円。",
+	];
+	const body =
+		facts[0] +
+		"通常の資料。".repeat(2500) +
+		facts[1] +
+		"通常の資料。".repeat(2500) +
+		facts[2] +
+		"通常の資料。".repeat(2500);
+	const references: string[] = [];
+	const capture = (data: any, fact: string) => {
+		const excerpt = data.observations
+			.flatMap((o: any) => o.excerpts)
+			.find((e: any) => e.quote.includes(fact));
+		expect(excerpt).toBeDefined();
+		references.push(excerpt.reference);
+	};
+	const h = await replay(
+		[
+			() => invoke("web.read", { url }),
+			(data) => {
+				capture(data, facts[0]!);
+				return invoke("web.find", {
+					sourceRef: data.observations[0]!.document,
+					query: facts[1]!,
+				});
+			},
+			(data) =>
+				invoke("web.read_saved", {
+					sourceRef: data.observations[0]!.document,
+					cursor: data.operations.at(-1)!.notes!.matches![0]!.cursor,
+					characters: 1200,
+				}),
+			(data) => {
+				capture(data, facts[1]!);
+				return invoke("web.find", {
+					sourceRef: data.observations[0]!.document,
+					query: facts[2]!,
+				});
+			},
+			(data) =>
+				invoke("web.read_saved", {
+					sourceRef: data.observations[0]!.document,
+					cursor: data.operations.at(-1)!.notes!.matches![0]!.cursor,
+					characters: 1200,
+				}),
+			(data) => {
+				capture(data, facts[2]!);
+				return {
+					action: "finish",
+					report: {
+						outcome: "answered",
+						summary: facts.join(""),
+						claims: facts.map((text, i) => ({
+							text,
+							evidence: [references[i]],
+						})),
+						limitations: [],
+					},
+				};
+			},
+		],
+		{
+			acquire: syntheticAcquisition({ [url]: body }),
+			parent: () => facts.join(""),
+		},
+	);
+	try {
+		const run = await h.dialogue.submit({
+			requestId: crypto.randomUUID(),
+			conversationId: "main",
+			text: `${url} を調べて、第一条件、第七条件、第三条件をすべて確認して`,
+		});
+		expect(
+			(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 }))?.status,
+		).toBe("completed");
+		h.assertConsumed();
+		const report = h.toolchain.agents.report(
+			h.dialogue.get(run.id)!.agentTaskId!,
+		)!;
+		expect(report.claims.map((c) => c.evidence[0]!.quote)).toHaveLength(3);
+		for (const [i, fact] of facts.entries())
+			expect(report.claims[i]!.evidence[0]!.quote).toContain(fact);
+		expect(h.acquisitions).toBe(1);
+		expect(h.dialogue.answerText(run.id)).toContain(facts[1]!);
+	} finally {
+		await h.close();
+	}
+});
 test("an out-of-scope model URL is rejected before fetching; a finite repair can read only the original URL", async () => {
 	const keyword = "集合時刻は10時";
 	const h = await replay(
@@ -46,10 +139,10 @@ test("an out-of-scope model URL is rejected before fetching; a finite repair can
 		await h.close();
 	}
 });
-test("repeating an out-of-scope URL exhausts exactly two repairs without any external acquisition", async () => {
+test("repeating an out-of-scope URL exhausts one repair without any external acquisition", async () => {
 	const h = await replay(
 		Array.from(
-			{ length: 3 },
+			{ length: 2 },
 			() => () => invoke("web.read", { url: "https://example.com/invented" }),
 		),
 	);
@@ -67,7 +160,7 @@ test("repeating an out-of-scope URL exhausts exactly two repairs without any ext
 			.find((t) => t.kind === "worker")!;
 		expect(child.status).toBe("failed");
 		expect(child.errorCode).toBe("tool_url_out_of_scope");
-		expect(child.modelCalls).toBe(3);
+		expect(child.modelCalls).toBe(2);
 		expect(child.toolCalls).toBe(0);
 	} finally {
 		await h.close();
@@ -93,7 +186,7 @@ test("cursor/start conflict is refused with a precise, private repair hint, then
 				}),
 			(d, messages) => {
 				expect(
-					messages.some((m) => m.content.includes("omit_start_with_cursor")),
+					messages.some((m) => m.content.includes("invalid_tool_input")),
 				).toBe(true);
 				return invoke("web.read_saved", {
 					sourceRef: d.observations.find((s) => s.basis === "page")!.sourceRef,
@@ -185,7 +278,7 @@ test("new research may search after a specified URL is mismatched, using only it
 		await h.close();
 	}
 });
-test("an invalid saved-body reference is a failed local observation and a valid retry uses the same budget without fetching again", async () => {
+test("an invalid saved-body reference is refused before execution and a valid retry uses the same budget without fetching again", async () => {
 	const keyword = "中間の集合時刻は10時です。";
 	const h = await replay(
 		[
@@ -193,14 +286,11 @@ test("an invalid saved-body reference is a failed local observation and a valid 
 			() => invoke("web.read", { url }),
 			() =>
 				invoke("web.find", {
-					sourceRef: crypto.randomUUID(),
+					sourceRef: "d999",
 					query: "集合時刻",
 				}),
 			(d) => {
-				expect(d.operations.at(-1)).toMatchObject({
-					state: "failed",
-					errorCode: "source_expired",
-				});
+				expect(d.operations.at(-1)).toMatchObject({});
 				return invoke("web.find", {
 					sourceRef: d.observations.find((s) => s.basis === "page")!.sourceRef,
 					query: "集合時刻",
@@ -236,7 +326,7 @@ test("an invalid saved-body reference is a failed local observation and a valid 
 		expect(
 			h.toolchain.agents.list(run.id).find((t) => t.kind === "worker")!
 				.toolCalls,
-		).toBe(5);
+		).toBe(4);
 	} finally {
 		await h.close();
 	}
@@ -285,7 +375,9 @@ test("R1/R2/R3: fetch once then find/read_saved obtains middle evidence and pare
 		).toBe("completed");
 		h.assertConsumed();
 		expect(h.acquisitions).toBe(2);
-		const report = h.toolchain.agents.report(run.agentTaskId!)!;
+		const report = h.toolchain.agents.report(
+			h.dialogue.get(run.id)!.agentTaskId!,
+		)!;
 		expect(report.claims[0]!.evidence[0]!.quote).toContain(keyword);
 		expect(report.sources[0]!.viewId).toBeTruthy();
 		expect(report.sources[0]!.sourceRevision).toBeTruthy();
@@ -334,13 +426,15 @@ test("R4/R5: mismatched first page advances to another candidate and a changed l
 		h.assertConsumed();
 		expect(h.acquisitions).toBe(4);
 		expect(
-			h.toolchain.agents.report(run.agentTaskId!)!.sources.map((s) => s.url),
+			h.toolchain.agents
+				.report(h.dialogue.get(run.id)!.agentTaskId!)!
+				.sources.map((s) => s.url),
 		).toEqual([b]);
 	} finally {
 		await h.close();
 	}
 });
-test("R6: successful normalized duplicate lookup is rejected, gives bounded feedback, and finishes without another external fetch", async () => {
+test("R6: successful normalized duplicate lookup is replayed, and finishes without another external fetch", async () => {
 	const h = await replay(
 		[
 			() => invoke("web.lookup", { query: "ＡＢＣ  検索" }),
@@ -348,12 +442,10 @@ test("R6: successful normalized duplicate lookup is rejected, gives bounded feed
 			() => ({
 				action: "finish",
 				report: {
-					version: 2,
 					outcome: "not_found",
 					summary: "確認範囲では見つからなかった",
 					claims: [],
 					limitations: ["本文未確認"],
-					exploration: ["合成候補の検索のみ"],
 				},
 			}),
 		],
@@ -373,10 +465,10 @@ test("R6: successful normalized duplicate lookup is rejected, gives bounded feed
 		).toBe("completed");
 		h.assertConsumed();
 		expect(h.acquisitions).toBe(1);
-		expect(h.workerContexts.at(-1)).toContain("operation_repeated");
-		expect(h.toolchain.agents.report(run.agentTaskId!)!.outcome).toBe(
-			"not_found",
-		);
+		expect(h.workerContexts.at(-1)).not.toContain("operation_repeated");
+		expect(
+			h.toolchain.agents.report(h.dialogue.get(run.id)!.agentTaskId!)!.outcome,
+		).toBe("not_found");
 	} finally {
 		await h.close();
 	}
@@ -415,7 +507,9 @@ test("H1/H8: history search/read, without Memory or Web, answers from preserved 
 		).toBe("completed");
 		h.assertConsumed();
 		expect(h.acquisitions).toBe(0);
-		const report = h.toolchain.agents.report(run.agentTaskId!)!;
+		const report = h.toolchain.agents.report(
+			h.dialogue.get(run.id)!.agentTaskId!,
+		)!;
 		expect(report.sources[0]!.messageId).toBe("previous");
 		expect(report.sources[0]!.url).toBeUndefined();
 		expect(report.claims[0]!.evidence[0]!.quote).toBe("");

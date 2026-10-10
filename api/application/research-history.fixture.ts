@@ -5,15 +5,16 @@ import type { AcquisitionPort } from "../domains/web-research";
 export type ReplayData = {
 	task: { question: string };
 	observations: Array<{
-		sourceId: string;
-		viewId: string;
+		document: string;
+		sourceId?: string;
+		viewId?: string;
 		sourceRef?: string;
 		messageRef?: string;
 		basis: string;
 		url?: string;
 		speaker?: string;
 		createdAt?: string;
-		excerpts: Array<{ excerptId: string; quote: string }>;
+		excerpts: Array<{ reference: string; excerptId?: string; quote: string }>;
 	}>;
 	operations: Array<{
 		notes?: {
@@ -46,39 +47,9 @@ export async function replay(
 				if (!step) throw new Error("replay_extra_model_call");
 				inputs.push(data);
 				const result = (await step(data, messages)) as object;
-				return JSON.stringify({
-					needs: [
-						{
-							id: "answer",
-							item: data.task.question.slice(0, 200),
-							requestQuote: data.task.question.slice(0, 300),
-							status: "missing",
-						},
-					],
-					...result,
-				});
+				return JSON.stringify(result);
 			}
-			if (data.candidates) {
-				const c = data.candidates.find(
-					(c: { id: string }) =>
-						c.id === (options.history ? "history.research" : "web.research"),
-				);
-				if (!c) throw new Error("replay_candidate_missing");
-				return JSON.stringify({
-					action: "select",
-					candidateRef: c.candidateRef,
-					input: {
-						question: data.task.question,
-						detail: "normal",
-						...(options.urls ? { urls: options.urls } : {}),
-					},
-				});
-			}
-			return JSON.stringify({
-				action: "discover",
-				intent: options.history ? "会話履歴の確認" : "公開資料の調査",
-				terms: [options.history ? "history" : "web.research"],
-			});
+			throw new Error("replay_unexpected_control_call");
 		},
 	});
 	return Object.assign(h, {
@@ -89,7 +60,7 @@ export async function replay(
 	});
 }
 export function invoke(tool: string, args: unknown) {
-	return { action: "invoke", executionRef: tool, arguments: args };
+	return { action: "invoke", tool, arguments: args };
 }
 export function finish(
 	data: ReplayData,
@@ -100,27 +71,19 @@ export function finish(
 		s.excerpts.some((e) => e.quote.includes(keyword)),
 	);
 	if (!source) throw new Error("replay_expected_evidence_missing");
+	const excerpt = source.excerpts.find((e) => e.quote.includes(keyword))!;
 	return {
 		action: "finish",
 		report: {
-			version: 2,
 			outcome,
 			summary: keyword,
 			claims: [
 				{
 					text: keyword,
-					evidence: [
-						{
-							sourceId: source.sourceId,
-							viewId: source.viewId,
-							excerptId: source.excerpts.find((e) => e.quote.includes(keyword))!
-								.excerptId,
-						},
-					],
+					evidence: [excerpt.reference],
 				},
 			],
 			limitations: [],
-			exploration: ["合成入力の許可範囲"],
 		},
 	};
 }

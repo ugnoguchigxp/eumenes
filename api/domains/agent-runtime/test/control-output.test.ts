@@ -33,3 +33,16 @@ test("control diagnostics distinguish non-text, empty, fenced, oversized and mal
 			.controlAction,
 	).toBe("unrecognized");
 });
+
+test("one whole JSON fence decodes without accepting surrounding prose, multiple blocks or malformed JSON", () => {
+	const action = { action: "finish", report: { claims: [] } };
+	const block = "```json\n" + JSON.stringify(action) + "\n```";
+	expect(parseControlOutput(block)).toMatchObject({ invalid: false, action });
+	for (const text of [
+		"説明\n" + block,
+		block + "\n説明",
+		block + "\n" + block,
+		'```json\n{"action":\n```',
+	])
+		expect(parseControlOutput(text).invalid).toBe(true);
+});

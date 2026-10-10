@@ -1,6 +1,14 @@
 import { z } from "zod";
+import {
+	messageMetadataSchema,
+	runObservationSchema,
+	unknownObservation,
+} from "./observation";
 
-export const protocolVersion = "eumenes-coding/1" as const;
+export { messageMetadataSchema, runObservationSchema, unknownObservation };
+export type { MessageMetadata, RunObservation } from "./observation";
+
+export const protocolVersion = "eumenes-coding/2" as const;
 /** Protocol digests use code-point ordering, independent of the host's locale. */
 export function canonicalJSON(value: unknown): string {
 	if (Array.isArray(value)) return `[${value.map(canonicalJSON).join(",")}]`;
@@ -54,7 +62,14 @@ export const executionSpecSchema = z.strictObject({
 	network: z.enum(["none", "registered"]),
 	previousExecutionId: id.nullable(),
 });
+/** v1 specs/receipts stay readable for viewing and stop reconciliation; nothing new is started from them. */
+export const legacyProtocolVersion = "eumenes-coding/1" as const;
+export const storedSpecSchema = z.union([
+	executionSpecSchema,
+	executionSpecSchema.extend({ version: z.literal(legacyProtocolVersion) }),
+]);
 export type ExecutionSpec = z.infer<typeof executionSpecSchema>;
+export type StoredSpec = z.infer<typeof storedSpecSchema>;
 export const eventSchema = z.strictObject({
 	executionId: id,
 	generation: z.number().int().positive(),
@@ -63,6 +78,7 @@ export const eventSchema = z.strictObject({
 	kind: z.enum(eventKinds),
 	payloadRef: id,
 	payloadDigest: digestSchema,
+	message: messageMetadataSchema.optional(),
 });
 export type CodingEvent = z.infer<typeof eventSchema>;
 export const receiptSchema = z
@@ -74,6 +90,7 @@ export const receiptSchema = z
 		state: z.enum(executionStates),
 		sessionId: z.uuid().nullable(),
 		seq: z.number().int().nonnegative(),
+		observation: runObservationSchema.default(unknownObservation),
 		turnFinished: z.boolean(),
 		childrenStopped: z.boolean(),
 		evidenceComplete: z.boolean(),

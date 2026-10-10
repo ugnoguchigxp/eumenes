@@ -1,7 +1,11 @@
+import { chatRequest } from "./chat-request";
 import { readBounded } from "../../../infrastructure/bounded-read";
 import { getLogger } from "../../../infrastructure/logger";
 const log = getLogger("larm");
-import { readChatResponse } from "../../../infrastructure/chat-stream";
+import {
+	readChatResponse,
+	forwardToolCalls,
+} from "../../../infrastructure/chat-stream";
 import type {
 	Capability,
 	LarmPort,
@@ -671,24 +675,15 @@ export function createLarm(config: {
 				{
 					method: "POST",
 					headers: { "content-type": "application/json" },
-					body: JSON.stringify({
-						model: p.model,
-						messages: selected,
-						...(options?.jsonOutput
-							? { temperature: 0, response_format: { type: "json_object" } }
-							: {}),
-						stream: !!onDelta,
-						max_tokens: Math.min(
-							window.outputReserveTokens,
-							options?.maxOutputTokens ?? 4096,
-						),
-					}),
+					body: JSON.stringify(chatRequest(p, selected, !!onDelta, options)),
 				},
 				signal,
 				connectionId,
 				options,
 			);
-			return (await readChatResponse(response, signal, onDelta)).text;
+			const result = await readChatResponse(response, signal, onDelta);
+			forwardToolCalls(result, options?.tools, options?.onToolCalls);
+			return result.text;
 		});
 	}
 	async function readVoices(

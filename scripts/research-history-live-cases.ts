@@ -23,7 +23,11 @@ const cases = [
 /** Real LARM + public Web; only isolated test conversation facts reach this evidence file. */
 export async function researchHistoryLiveCases(client: EumenesClient) {
 	const results: Record<string, unknown>[] = [];
-	for (const item of cases) {
+	for (const item of cases.filter(
+		(c) =>
+			!process.env.EUMENES_LIVE_CASE ||
+			c.name === process.env.EUMENES_LIVE_CASE,
+	)) {
 		const started = performance.now();
 		const run = await client.submit({
 			requestId: crypto.randomUUID(),
@@ -41,8 +45,8 @@ export async function researchHistoryLiveCases(client: EumenesClient) {
 		}
 		const tasks = await client.agentTasks(run.id),
 			child = tasks.find((t) => t.kind === "worker");
-		const report = run.agentTaskId
-			? await client.agentReport(run.agentTaskId).catch(() => null)
+		const report = current.agentTaskId
+			? await client.agentReport(current.agentTaskId!).catch(() => null)
 			: null;
 		const ops = child?.toolOutcomes ?? [];
 		const local = ops.filter((o) =>
@@ -98,7 +102,12 @@ export async function researchHistoryLiveCases(client: EumenesClient) {
 			fetchCalls: reads,
 			localCalls: local,
 			modelCalls: child?.modelCalls,
-			totalModelCalls: tasks.reduce((n, t) => n + t.modelCalls, 0),
+			totalModelCalls: (await client.inferenceUsage()).filter(
+				(u) =>
+					u.purpose === "llm" &&
+					(u.subject === run.id ||
+						tasks.some((t) => u.subject.startsWith(`agent:${t.id}:step:`))),
+			).length,
 			toolOutcomes: ops,
 			sourceCount: report?.sources.length,
 			viewCount: report?.sources.filter((s) => "viewId" in s && s.viewId)

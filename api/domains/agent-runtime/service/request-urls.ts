@@ -15,21 +15,3 @@ export function requestUrls(question: string, supplied?: string[]) {
 	}
 	return urls.length ? urls.slice(0, 3) : undefined;
 }
-export function selectedInput(
-	question: string,
-	supplied: { question: string; urls?: string[]; detail: "brief" | "normal" },
-	cards: Array<{ id: string; candidateRef: string }> | undefined,
-	candidateRef: string,
-) {
-	const web = cards?.some(
-		(c) => c.candidateRef === candidateRef && c.id.startsWith("web."),
-	);
-	const selected = {
-		...supplied,
-		question,
-		...(web ? { urls: requestUrls(question) } : {}),
-	};
-	if (selected.urls?.some((url) => !question.includes(url)))
-		throw new Error("tool_url_out_of_scope");
-	return selected;
-}

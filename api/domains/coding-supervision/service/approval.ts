@@ -6,7 +6,7 @@ import {
 	type Decision,
 	type Supervisor,
 } from "../contracts";
-import { fence, stopped } from "./policy";
+import { fence, semanticObservationDigest, stopped } from "./policy";
 import type { createReporting } from "./report";
 
 /** Fixed frame around every supervisor-generated instruction before it reaches the CLI. */
@@ -78,7 +78,7 @@ export function createApproval(input: {
 			s.pendingApproval = {
 				questionId,
 				decision: d,
-				observationDigest: digest(s.observation),
+				observationDigest: semanticObservationDigest(s.observation),
 				resolution: "pending",
 			};
 			report(
@@ -117,7 +117,7 @@ export function createApproval(input: {
 			p.resolution = "approved";
 			if (
 				!stopped(s) ||
-				digest(s.observation) !== p.observationDigest
+				semanticObservationDigest(s.observation) !== p.observationDigest
 			)
 				s.handledFingerprint = null;
 			else apply(db, t, s, p.decision, true);

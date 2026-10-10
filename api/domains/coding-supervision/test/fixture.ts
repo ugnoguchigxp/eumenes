@@ -66,6 +66,27 @@ export const observation = (
 	excerpt: "",
 	...overrides,
 });
+/** Execution facts for an observation; defaults describe a normally completed, fully captured run. */
+export const details = (
+	overrides: Partial<NonNullable<Observation["details"]>> = {},
+): NonNullable<Observation["details"]> => ({
+	run: {
+		turnOutcome: "completed",
+		terminalEventSeq: 2,
+		processStarted: true,
+		captureState: "complete",
+		captureIssues: [],
+	},
+	processState: "exited",
+	messages: [],
+	publicReport: "none_observed",
+	finalReport: "unidentifiable",
+	limitations: [],
+	issue: null,
+	coverage: [],
+	excerptTruncated: false,
+	...overrides,
+});
 export const proposal = (
 	action: Decision["action"],
 	instruction: string | null = null,
@@ -237,6 +258,9 @@ export async function setup(
 		inference,
 		reports,
 		workflow,
+		observationReader: {
+			inspect: (id, signal, focus) => reader(id, signal, focus),
+		},
 		approveInstructions: () => approve,
 		now: () => time,
 	});
@@ -279,6 +303,11 @@ export async function setup(
 		await store.close();
 		rmSync(dir, { recursive: true, force: true });
 	});
+	let reader: (
+		taskId: string,
+		signal: AbortSignal,
+		focus?: { ref: string; offset: number },
+	) => Promise<Observation> = async () => observed;
 	const observe = async (o = observed) => {
 		observed = o;
 		await store.write((db) =>
@@ -303,6 +332,9 @@ export async function setup(
 		supervision,
 		workflow,
 		taskId: t.taskId,
+		setReader: (fn: typeof reader) => {
+			reader = fn;
+		},
 		steps,
 		observe,
 		drain,

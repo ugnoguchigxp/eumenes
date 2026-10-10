@@ -47,6 +47,11 @@ elif mode=='partial': sys.stdout.write('{"type":');sys.stdout.flush()
 elif mode=='flood': sys.stdout.write('x'*4096+'\\n');sys.stdout.flush();time.sleep(30)
 elif mode=='background': subprocess.Popen(['/bin/sleep','30'])
 elif mode=='edit': open('source.txt','w').write('fixture edit\\n')
+elif mode=='longmsg': event({'type':'item.completed','item':{'type':'agent_message','text':'あ'*40000}})
+elif mode=='emptymsg': event({'type':'item.completed','item':{'type':'agent_message','text':'  \\n '}})
+elif mode=='conflict': event({'type':'turn.completed','usage':{}});event({'type':'turn.failed','error':{'message':'late'}})
+elif mode=='noterminal': sys.exit(0)
+elif mode=='trunc': sys.stdout.write('{"type":"turn');sys.stdout.flush();sys.exit(0)
 elif mode=='bom': event({'type':'item.completed','item':{'type':'agent_message','text':'\uFEFF日本語'}})
 elif mode=='env': event({'type':'item.completed','item':{'type':'agent_message','text':','.join(k for k in os.environ if 'TOKEN' in k or 'KEY' in k or k=='SSH_AUTH_SOCK')}})
 else:
@@ -89,7 +94,7 @@ if mode=='nonzero': sys.exit(1)
 	atomicWrite(configPath, config);
 	const spec = (instruction = "normal") =>
 		executionSpecSchema.parse({
-			version: "eumenes-coding/1",
+			version: "eumenes-coding/2",
 			executionId: crypto.randomUUID(),
 			operationId: crypto.randomUUID(),
 			taskId: "task",

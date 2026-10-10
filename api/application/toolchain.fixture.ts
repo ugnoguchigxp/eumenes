@@ -88,216 +88,151 @@ export async function harness(
 			wav.set(new TextEncoder().encode("WAVE"), 8);
 			return wav;
 		},
-		answer: async (messages) => {
+		answer: async (messages, _signal, callOptions) => {
 			calls++;
-			if (options.control && messages[0]?.content.includes("OUTPUT_SCHEMA=")) {
-				const result = await options.control(messages);
-				if (result !== undefined) {
-					if (messages[0]?.content.includes("TOOLS="))
-						workerContexts.push(JSON.stringify(messages));
-					return result;
-				}
-			}
 			const system = messages[0]!.content;
-			const data = system.includes("OUTPUT_SCHEMA=")
-				? JSON.parse(
-						messages
-							.slice()
-							.reverse()
-							.find((m) => m.role === "user")?.content ?? "{}",
-					)
-				: {};
+			const question = messages
+				.filter((m) => m.role === "user")
+				.at(-1)!.content;
+			if (callOptions?.tools?.length) {
+				routeContexts.push(JSON.stringify(messages));
+				if (
+					options.routeGate &&
+					(!options.routeGateQuestion ||
+						question.includes(options.routeGateQuestion))
+				)
+					await options.routeGate;
+				if (options.clarify) return "どの地域の天気を調べますか？";
+				const send = (name: string, args: unknown) => {
+					callOptions.onToolCalls!([
+						{ id: crypto.randomUUID(), name, arguments: JSON.stringify(args) },
+					]);
+					return "";
+				};
+				if (options.timers && /タイマー/.test(question)) {
+					const snapshotMessage = messages.find((m) =>
+						m.content.startsWith("現在のタイマーのsnapshot"),
+					);
+					const snapshot = snapshotMessage
+						? JSON.parse(snapshotMessage.content.split("=")[1]!)
+						: null;
+					if (/確認|残り/.test(question))
+						return send("timer", { operation: "list" });
+					if (/取消|止め/.test(question)) {
+						const targets =
+							snapshot?.items?.filter(
+								(item: { state: string }) => item.state === "active",
+							) ?? [];
+						if (targets.length !== 1) return "どのタイマーを止めますか？";
+						return send("timer", {
+							operation: "cancel",
+							timerId: targets[0].id,
+							expectedRevision: targets[0].revision,
+						});
+					}
+					const seconds = /^(\d+)秒/.exec(question);
+					const durationSeconds = seconds
+						? Number(seconds[1])
+						: /1時間/.test(question)
+							? 3600
+							: /3分30秒/.test(question)
+								? 210
+								: 180;
+					return send("timer", {
+						operation: "start",
+						durationSeconds,
+						...(options.timerExtra ? { scope: "other" } : {}),
+					});
+				}
+				if (
+					options.history ||
+					/天気|株価|weather|stock|調べ|検索|https?:|確認/.test(question)
+				)
+					return send("research", {
+						kind: options.history ? "history" : "web",
+						question,
+					});
+			}
 			if (system.includes("TOOLS=")) {
 				workerContexts.push(JSON.stringify(messages));
+				if (options.control) {
+					const result = await options.control(messages);
+					if (result !== undefined) return result;
+				}
 				if (options.workerOutput !== undefined) return options.workerOutput;
 				if (options.badJson) return "```json\n{}\n```";
-				const tools = JSON.parse(
+				const data = JSON.parse(
+					messages.find((m) => m.role === "user")!.content,
+				);
+				const available = JSON.parse(
 					system.split("TOOLS=")[1]!.split("\nOUTPUT_SCHEMA=")[0]!,
-				) as { executionRef: string; id: string }[];
-				const obs = data.observations as {
-					sourceId: string;
-					basis: string;
-					url: string;
-					viewId?: string;
-					body: string;
-					excerpts: { excerptId: string; quote: string }[];
-				}[];
-				for (const source of obs)
-					source.body = source.excerpts.map((e) => e.quote).join("");
-				const page = options.incompleteWeatherFirstRead
-					? (obs.find((s) => s.basis === "page" && s.body.includes("最高")) ??
-						obs.find((s) => s.basis === "page"))
-					: obs.find((s) => s.basis === "page");
+				);
+				const page = data.observations.find(
+					(o: any) =>
+						o.basis === "page" &&
+						(!options.incompleteWeatherFirstRead ||
+							o.excerpts.some((e: any) => e.quote.includes("最高"))),
+				);
 				if (page) {
-					if (
-						options.incompleteWeatherFirstRead &&
-						!page.body.includes("最高") &&
-						messages.some((m) =>
-							m.content.includes("前回の報告は根拠または依頼項目が不十分"),
-						)
-					)
-						return JSON.stringify(data.nextInvocation);
 					if (options.workerReportOutput !== undefined)
 						return options.workerReportOutput;
-					const quote = page.body.split("\n")[0]!;
+					const excerpt = page.excerpts[0];
 					const forged =
 						options.badQuote || (options.badQuoteOnce && !quoteRejected);
 					quoteRejected = true;
 					return JSON.stringify({
 						action: "finish",
-						needs: [
-							{
-								id: "answer",
-								item: data.task.question.slice(0, 200),
-								requestQuote: data.task.question.slice(0, 300),
-								status: "confirmed",
-							},
-						],
 						report: {
-							...(system.includes("version:2")
-								? {
-										version: 2,
-										outcome: "answered",
-										exploration: ["取得済み資料"],
-									}
-								: {}),
-							summary: quote,
+							outcome: "answered",
+							summary: excerpt.quote.split("\n")[0],
 							claims: [
 								{
-									text: quote,
-									evidence: [
-										system.includes("version:2") || options.excerptEvidence
-											? {
-													sourceId: page.sourceId,
-													...(system.includes("version:2")
-														? {
-																viewId: forged
-																	? crypto.randomUUID()
-																	: page.viewId,
-															}
-														: {}),
-													excerptId: page.excerpts[0]!.excerptId,
-												}
-											: {
-													sourceId: page.sourceId,
-													quote: forged ? "fabricated" : quote,
-												},
-									],
+									text: excerpt.quote.split("\n")[0],
+									evidence: [forged ? "e999" : excerpt.reference],
 								},
 							],
 							limitations: [],
 						},
 					});
 				}
-				const hit = obs[0];
+				const seen = new Set(
+					data.observations
+						.filter((o: any) => o.basis === "page")
+						.map((o: any) => o.url),
+				);
+				const hit = data.observations.find(
+					(o: any) => o.basis === "snippet" && !seen.has(o.url),
+				);
+				const tool = available.find(
+					(t: any) => t.id === (hit ? "web.read" : "web.lookup"),
+				);
+				if (!tool)
+					return JSON.stringify({
+						action: "finish",
+						report: {
+							outcome: "failed",
+							summary: "確認できませんでした。",
+							claims: [],
+							limitations: ["取得予算がありません。"],
+						},
+					});
+				const first =
+					data.operations.length === 0 &&
+					!messages.some((m) => m.content.includes("拒否コード="));
 				return JSON.stringify({
 					action: "invoke",
-					needs: [
-						{
-							id: "answer",
-							item: data.task.question.slice(0, 200),
-							requestQuote: data.task.question.slice(0, 300),
-							status: "missing",
-						},
-					],
-					executionRef:
-						options.badExecutionRefOnce && data.budget.modelCallsUsed === 1
-							? "00000000-0000-4000-8000-000000000000"
-							: tools.find((t) => t.id === (hit ? "web.read" : "web.lookup"))!
-									.executionRef,
+					tool: options.badExecutionRefOnce && first ? "unknown" : tool.id,
 					arguments:
-						options.badToolArgs && data.budget.modelCallsUsed === 1
+						options.badToolArgs && first
 							? { unexpected: "bad" }
 							: hit
 								? { url: hit.url }
 								: { query: data.task.question.slice(0, 400) },
 				});
 			}
-			if (system.includes("OUTPUT_SCHEMA=")) {
-				if (!data.candidates) {
-					routeContexts.push(JSON.stringify(messages));
-					if (
-						options.routeGate &&
-						(!options.routeGateQuestion ||
-							data.task.question.includes(options.routeGateQuestion))
-					)
-						await options.routeGate;
-				}
-				if (data.candidates) {
-					const card =
-						data.candidates.find(
-							(c: { id: string }) => c.id === "web.research",
-						) ?? data.candidates[0];
-					return card
-						? JSON.stringify({
-								action: "select",
-								candidateRef: card.candidateRef,
-								input: { question: data.task.question, detail: "normal" },
-							})
-						: JSON.stringify({ action: "unavailable" });
-				}
-				if (options.clarify)
-					return JSON.stringify({
-						action: "clarify",
-						question: "どの地域の天気を調べますか？",
-					});
-				if (options.timers && /タイマー/.test(data.task.question)) {
-					if (/確認|残り/.test(data.task.question))
-						return JSON.stringify({
-							action: "timer",
-							command: { operation: "list" },
-						});
-					if (/取消|止め/.test(data.task.question)) {
-						const targets =
-							data.timers?.items?.filter(
-								(item: { state: string }) => item.state === "active",
-							) ?? [];
-						return JSON.stringify(
-							targets.length === 1
-								? {
-										action: "timer",
-										command: {
-											operation: "cancel",
-											timerId: targets[0].id,
-											expectedRevision: targets[0].revision,
-										},
-									}
-								: { action: "clarify", question: "どのタイマーを止めますか？" },
-						);
-					}
-					const secondsOnly = /^(\d+)秒/.exec(data.task.question);
-					const durationSeconds = secondsOnly
-						? Number(secondsOnly[1])
-						: /1時間/.test(data.task.question)
-							? 3600
-							: /3分30秒/.test(data.task.question)
-								? 210
-								: 180;
-					return JSON.stringify({
-						action: "timer",
-						command: options.timerExtra
-							? { operation: "start", durationSeconds, scope: "other" }
-							: { operation: "start", durationSeconds },
-					});
-				}
-				return JSON.stringify(
-					/天気|株価|weather|stock|調べ/.test(data.task.question)
-						? {
-								action: "discover",
-								intent: "公開情報を調査",
-								terms: [
-									"調査",
-									data.task.question.includes("天気") ? "天気" : "株価",
-								],
-							}
-						: { action: "respond" },
-				);
-			}
 			parentContexts.push(JSON.stringify(messages));
 			if (options.parent) return options.parent(messages);
 			if (options.answerGate) await options.answerGate;
-			if (messages.some((m) => m.content.includes('"clarification":')))
-				return "どの地域の天気を調べますか？";
 			if (messages.some((m) => m.content.includes('"failure":')))
 				return options.failureAnswer ?? "調査結果を確認できませんでした。";
 			const action = messages.find((m) =>
@@ -310,7 +245,7 @@ export async function harness(
 				? JSON.parse(result.content.slice(result.content.indexOf("\n") + 1))
 				: null;
 			const source = projection?.sources?.[0];
-			const citation = source
+			const citation = source?.url
 				? `\n\nソース：[${new URL(source.url).hostname}](${source.url})`
 				: "";
 			return messages.some((m) => m.content.includes("250.12"))

@@ -1,4 +1,5 @@
 import { researchHistoryLiveCases } from "./research-history-live-cases";
+import { conversationLiveCases } from "./conversation-live-cases";
 import {
 	mkdtempSync,
 	rmSync,
@@ -73,9 +74,11 @@ try {
 	if (connection.larm.state !== "ready")
 		throw new Error("isolated_larm_not_ready");
 	const researchHistorySuite = process.argv.includes("research-history");
+	const conversationSuite = process.argv.includes("conversation");
 	const answerSuite = process.argv.includes("answers");
 	if (researchHistorySuite)
 		results.push(...(await researchHistoryLiveCases(client)));
+	if (conversationSuite) results.push(...(await conversationLiveCases(client)));
 	const weatherOnly = process.argv.includes("weather-only");
 	const searchSuite = process.argv.includes("search") || answerSuite;
 	if (answerSuite) {
@@ -88,35 +91,15 @@ try {
 			keys: [],
 		});
 	}
-	const cases = researchHistorySuite
-		? []
-		: answerSuite
-			? [
-					{
-						name: "kamakura-today",
-						kind: "weather" as const,
-						question: "今日の鎌倉の天気教えて。",
-					},
-					{
-						name: "bun-docs",
-						kind: "general" as const,
-						question:
-							"Bunの公式ドキュメントをWeb検索し、テストを実行するコマンドを確認してください。",
-					},
-				]
-			: searchSuite
+	const cases =
+		researchHistorySuite || conversationSuite
+			? []
+			: answerSuite
 				? [
 						{
 							name: "kamakura-today",
 							kind: "weather" as const,
-							question:
-								"今日の鎌倉の天気と最高気温をWeb検索で調べてください。予報対象日も確認してください。",
-						},
-						{
-							name: "kamakura-tomorrow",
-							kind: "weather" as const,
-							question:
-								"明日の鎌倉の天気と最高気温をWeb検索で調べてください。予報対象日も確認してください。",
+							question: "今日の鎌倉の天気教えて。",
 						},
 						{
 							name: "bun-docs",
@@ -125,20 +108,41 @@ try {
 								"Bunの公式ドキュメントをWeb検索し、テストを実行するコマンドを確認してください。",
 						},
 					]
-				: [
-						{
-							name: "weather",
-							kind: "weather" as const,
-							question:
-								"東京都千代田区の明日の天気と最高気温を調べてください。予報対象日時も確認してください。",
-						},
-						{
-							name: "stock",
-							kind: "stock" as const,
-							question:
-								"Apple (NASDAQ: AAPL) の最新の株価を調べてください。価格、通貨、価格の時点を確認してください。",
-						},
-					];
+				: searchSuite
+					? [
+							{
+								name: "kamakura-today",
+								kind: "weather" as const,
+								question:
+									"今日の鎌倉の天気と最高気温をWeb検索で調べてください。予報対象日も確認してください。",
+							},
+							{
+								name: "kamakura-tomorrow",
+								kind: "weather" as const,
+								question:
+									"明日の鎌倉の天気と最高気温をWeb検索で調べてください。予報対象日も確認してください。",
+							},
+							{
+								name: "bun-docs",
+								kind: "general" as const,
+								question:
+									"Bunの公式ドキュメントをWeb検索し、テストを実行するコマンドを確認してください。",
+							},
+						]
+					: [
+							{
+								name: "weather",
+								kind: "weather" as const,
+								question:
+									"東京都千代田区の明日の天気と最高気温を調べてください。予報対象日時も確認してください。",
+							},
+							{
+								name: "stock",
+								kind: "stock" as const,
+								question:
+									"Apple (NASDAQ: AAPL) の最新の株価を調べてください。価格、通貨、価格の時点を確認してください。",
+							},
+						];
 	for (const item of cases.filter(
 		(item) => !weatherOnly || item.kind === "weather",
 	)) {
@@ -167,8 +171,8 @@ try {
 		}
 		const tasks = await client.agentTasks(run.id);
 		const child = tasks.find((t) => t.kind === "worker");
-		const report = run.agentTaskId
-			? await client.agentReport(run.agentTaskId).catch(() => null)
+		const report = current.agentTaskId
+			? await client.agentReport(current.agentTaskId!).catch(() => null)
 			: null;
 		const history = await client.conversation("live-toolchain");
 		const answer = history.messages.find(
@@ -267,7 +271,12 @@ try {
 			childStatus: child?.status,
 			packageRevisionId: child?.packageRevisionId,
 			childError: child?.errorCode,
-			modelCalls: tasks.reduce((s, t) => s + t.modelCalls, 0),
+			modelCalls: (await client.inferenceUsage()).filter(
+				(u) =>
+					u.purpose === "llm" &&
+					(u.subject === run.id ||
+						tasks.some((t) => u.subject.startsWith(`agent:${t.id}:step:`))),
+			).length,
 			toolCalls: child?.toolCalls,
 			toolOutcomes: child?.toolOutcomes,
 			sourceCount: report?.sources.length,
@@ -287,18 +296,22 @@ try {
 	writeFileSync(
 		join(
 			path,
-			researchHistorySuite
-				? "research-history-live.json"
-				: answerSuite
-					? "answer-live.json"
-					: searchSuite
-						? "search-live.json"
-						: "live.json",
+			conversationSuite
+				? "conversation-live.json"
+				: researchHistorySuite
+					? "research-history-live.json"
+					: answerSuite
+						? "answer-live.json"
+						: searchSuite
+							? "search-live.json"
+							: "live.json",
 		),
 		JSON.stringify(
 			{
 				at: new Date().toISOString(),
-				mode: "real_larm_and_real_web_isolated_backend",
+				mode: conversationSuite
+					? "real_larm_and_raw_history_isolated_backend"
+					: "real_larm_and_real_web_isolated_backend",
 				results,
 			},
 			null,

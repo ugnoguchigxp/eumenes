@@ -144,7 +144,21 @@ export async function routeHarness(options: Options = {}) {
 		close: async () => {},
 		transcribe: async () => "",
 		speak: async () => new Uint8Array(),
-		answer: async (messages) => {
+		answer: async (messages, _signal, options) => {
+			if (options?.tools?.length) {
+				options.onToolCalls!([
+					{
+						id: crypto.randomUUID(),
+						name: "research",
+						arguments: JSON.stringify({
+							kind: "web",
+							question: messages.filter((m) => m.role === "user").at(-1)!
+								.content,
+						}),
+					},
+				]);
+				return "";
+			}
 			const all = messages.map((m) => m.content).join("\n");
 			const system = messages[0]!.content;
 			if (all.includes("取得手順SKILLを書く担当")) {
@@ -188,55 +202,41 @@ export async function routeHarness(options: Options = {}) {
 						.find((m) => m.role === "user")!.content,
 				) as {
 					observations: {
+						document: string;
 						sourceId: string;
 						viewId?: string;
 						basis: string;
 						url: string;
 						body: string;
-						excerpts: { excerptId: string; quote: string }[];
+						excerpts: { reference: string; excerptId: string; quote: string }[];
 					}[];
 					task: { question: string };
 				};
-				for (const source of data.observations)
+				for (const source of data.observations) {
+					source.sourceId = source.document;
 					source.body = source.excerpts.map((e) => e.quote).join("");
+				}
 				const tools = JSON.parse(
 					system.split("TOOLS=")[1]!.split("\nOUTPUT_SCHEMA=")[0]!,
-				) as { executionRef: string; id: string }[];
+				) as { id: string }[];
 				const respond = (value: any) => {
-					if (system.includes("version:2")) {
-						value.needs = [
-							{
-								id: "answer",
-								item: data.task.question.slice(0, 200),
-								requestQuote: data.task.question.slice(0, 300),
-								status: value.report ? "confirmed" : "missing",
-							},
-						];
-						if (value.report)
-							value.report = {
-								...value.report,
-								version: 2,
-								outcome: "answered",
-								exploration: ["fixture公開資料"],
-								claims: value.report.claims.map((c: any) => ({
-									...c,
-									evidence: c.evidence.map((e: any) => {
-										const source = data.observations.find(
-											(s) => s.sourceId === e.sourceId,
-										)!;
-										return {
-											sourceId: e.sourceId,
-											viewId: source.viewId,
-											excerptId:
-												source.excerpts.find(
-													(x) =>
-														x.quote.includes(e.quote) ||
-														e.quote.includes(x.quote),
-												)?.excerptId ?? source.excerpts[0]!.excerptId,
-										};
-									}),
-								})),
-							};
+					if (value.action === "invoke") {
+						value.tool = value.executionRef;
+						delete value.executionRef;
+					}
+					if (value.report) {
+						delete value.facts;
+						value.report.outcome = "answered";
+						value.report.claims = value.report.claims.map((claim: any) => ({
+							...claim,
+							evidence: claim.evidence
+								.flatMap((e: any) =>
+									data.observations
+										.find((o) => o.document === e.sourceId)!
+										.excerpts.map((x) => x.reference),
+								)
+								.slice(0, 3),
+						}));
 					}
 					return JSON.stringify(value);
 				};
@@ -325,7 +325,7 @@ export async function routeHarness(options: Options = {}) {
 									? "web.quote"
 									: "web.read"
 								: "web.lookup"),
-					)!.executionRef,
+					)!.id,
 					arguments: hit
 						? hit.url === QUOTE_HIT
 							? { symbol: "AAPL" }

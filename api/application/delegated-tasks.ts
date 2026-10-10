@@ -67,11 +67,7 @@ export function createDelegatedTasks(input: {
 	const aborted = new Set<string>();
 	const registeringMonitor = new Set<string>();
 	const available = () => input.enabled && execution?.available() === true;
-	function cancelRuntime(
-		tx: Database,
-		t: WorkTask,
-		exceptJobId?: string,
-	) {
+	function cancelRuntime(tx: Database, t: WorkTask, exceptJobId?: string) {
 		const refs = tasks.runtimeInTransaction(tx, t.id);
 		if (refs.scheduleId) {
 			const s = scheduler.getInTransaction(tx, refs.scheduleId);

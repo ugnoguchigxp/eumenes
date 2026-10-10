@@ -67,3 +67,80 @@ test("cancellation closes a blocked reader and prevents late content", async () 
 	expect(closed).toBe(true);
 	expect(parts).toHaveLength(0);
 });
+
+test("native tool calls survive split SSE arguments without publishing control data", async () => {
+	const chunks = [
+		{
+			choices: [
+				{
+					index: 0,
+					delta: {
+						tool_calls: [
+							{
+								index: 0,
+								id: "call1",
+								function: { name: "research", arguments: '{"kind":"web",' },
+							},
+						],
+					},
+				},
+			],
+		},
+		{
+			choices: [
+				{
+					index: 0,
+					delta: {
+						tool_calls: [
+							{
+								index: 0,
+								function: { arguments: '"question":"明日の鎌倉の天気"}' },
+							},
+						],
+					},
+					finish_reason: "tool_calls",
+				},
+			],
+		},
+	];
+	const response = new Response(
+		chunks.map((c) => `data: ${JSON.stringify(c)}\n\n`).join("") +
+			"data: [DONE]\n\n",
+		{ headers: { "content-type": "text/event-stream" } },
+	);
+	const visible: string[] = [];
+	const result = await readChatResponse(
+		response,
+		new AbortController().signal,
+		(t) => visible.push(t),
+	);
+	expect(result.text).toBe("");
+	expect(visible).toEqual([]);
+	expect(result.toolCalls?.[0]?.name).toBe("research");
+	expect(JSON.parse(result.toolCalls![0]!.arguments).question).toBe(
+		"明日の鎌倉の天気",
+	);
+});
+test("truncated native control is rejected before any operation can be adopted", async () => {
+	const response = new Response(
+		JSON.stringify({
+			choices: [
+				{
+					message: {
+						tool_calls: [
+							{
+								id: "call1",
+								function: { name: "research", arguments: '{"kind":' },
+							},
+						],
+					},
+					finish_reason: "length",
+				},
+			],
+		}),
+		{ headers: { "content-type": "application/json" } },
+	);
+	await expect(
+		readChatResponse(response, new AbortController().signal),
+	).rejects.toThrow("chat_stream_incomplete");
+});

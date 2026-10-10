@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite";
 import { z } from "zod";
 import type { SourceMetadata } from "../../tool-runtime";
-import { timerCommand, type Owner } from "../../capabilities/contracts";
+import { type Owner } from "../../capabilities/contracts";
 export const reportSchema = z
 	.object({
 		summary: z.string().min(1).max(2000),
@@ -120,89 +120,6 @@ export const reportV2Schema = z
 			? v.claims.length > 0
 			: v.claims.length === 0,
 	);
-export const needsSchema = z
-	.array(
-		z
-			.object({
-				id: z.string().min(1).max(32),
-				item: z.string().min(1).max(200),
-				requestQuote: z.string().min(1).max(300),
-				status: z.enum(["missing", "confirmed", "mismatch"]),
-			})
-			.strict(),
-	)
-	.min(1)
-	.max(8);
-export const routeSchema = z.discriminatedUnion("action", [
-	z.object({ action: z.literal("respond") }).strict(),
-	z
-		.object({
-			action: z.literal("clarify"),
-			question: z.string().min(1).max(300),
-		})
-		.strict(),
-	z
-		.object({
-			action: z.literal("discover"),
-			intent: z.string().max(400),
-			terms: z.array(z.string().min(1).max(80)).min(1).max(8),
-		})
-		.strict(),
-	z
-		.object({
-			action: z.literal("timer"),
-			command: timerCommand,
-		})
-		.strict(),
-]);
-export const selectSchema = z.discriminatedUnion("action", [
-	z
-		.object({
-			action: z.literal("select"),
-			candidateRef: z.string().uuid(),
-			input: z.unknown(),
-		})
-		.strict(),
-	z
-		.object({
-			action: z.literal("refine"),
-			intent: z.string().max(400),
-			terms: z.array(z.string().min(1).max(80)).min(1).max(8),
-		})
-		.strict(),
-	z
-		.object({
-			action: z.literal("clarify"),
-			question: z.string().min(1).max(300),
-		})
-		.strict(),
-	z.object({ action: z.literal("unavailable") }).strict(),
-]);
-export const workerSchema = z.discriminatedUnion("action", [
-	z
-		.object({
-			action: z.literal("invoke"),
-			// The model uses the current tool's short name. Legacy opaque grants
-			// remain accepted, but only the runtime can resolve either form.
-			executionRef: z.string().min(1).max(128),
-			arguments: z.unknown(),
-			needs: needsSchema.optional(),
-		})
-		.strict(),
-	z
-		.object({
-			action: z.literal("finish"),
-			report: z.union([reportV2Schema, legacyWorkerReportSchema]),
-			needs: needsSchema.optional(),
-			// Opaque to the runtime: only an acquisition port may interpret it.
-			facts: z.unknown().optional(),
-		})
-		.strict(),
-]);
-export const readWorkerSchema = z.discriminatedUnion("action", [
-	workerSchema.options[0],
-	workerSchema.options[1].extend({ report: reportV2Schema }),
-]);
 export type Task = {
 	id: string;
 	kind: "coordinator" | "worker";

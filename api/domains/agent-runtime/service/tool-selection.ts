@@ -2,7 +2,7 @@ import type { Database } from "bun:sqlite";
 import { researchInput, type Prepared } from "../../capabilities";
 import type { ToolRuntime } from "../../tool-runtime";
 import type { Task, StoredBinding } from "../contracts";
-import { explorationBudget, localTool, newResearch } from "./exploration";
+import { explorationBudget, localTool } from "./exploration";
 export function createToolSelection({
 	tools,
 	bindings,
@@ -56,7 +56,7 @@ export function createToolSelection({
 				(!input.success ||
 					!input.data.urls?.length ||
 					b.tool.id !== "web.lookup" ||
-					(newResearch(p) && !direct)) &&
+					!direct) &&
 				(localTool(b.tool.id)
 					? budget.localCalls < 4
 					: budget.externalCalls < 5 &&

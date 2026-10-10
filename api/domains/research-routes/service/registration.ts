@@ -43,6 +43,7 @@ export type ObservationInput = {
 	toolId: RouteRecipe["toolId"];
 	sources: VisibleSource[];
 	facts: unknown;
+	reportEvidence?: Array<{ sourceId: string; quote: string }>;
 	/** The lookup (or candidate import) that preceded this read. */
 	lookupProvenance: LookupProvenance | null;
 	/** Required when lookupProvenance.origin is candidate-cache: the real lookup that produced the candidate. */
@@ -181,13 +182,7 @@ export function createRegistration(
 		input: ObservationInput,
 	): ObservationResult {
 		const now = clock.now();
-		const check = checkObservation({
-			spec: input.spec,
-			binding: input.binding,
-			sources: input.sources,
-			facts: input.facts,
-			now,
-		});
+		const check = checkObservation({ ...input, now });
 		if (check.kind !== "valid") return check;
 		const rendered = renderProjection(check.facts, check.sourceId);
 		const out = (proofId: string | null): ObservationResult => ({

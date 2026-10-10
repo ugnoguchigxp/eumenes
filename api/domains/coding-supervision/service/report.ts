@@ -44,7 +44,19 @@ export function createReporting(input: {
 				)
 					.slice(0, 6)
 					.map((f) => f.slice(0, 300)),
-				limitations: code ? [code] : s.holdReason ? [s.holdReason] : [],
+				limitations: [
+					...new Set([
+						...(code ? [code] : s.holdReason ? [s.holdReason] : []),
+						// Fixed codes for what is still unknown; details stay in the private observation.
+						...(s.observation?.details?.limitations ?? []),
+						// Not checked, failed and passed are different facts, never one "failure".
+						...(!s.checks
+							? ["verification_not_checked"]
+							: !s.checks.checks?.results.every((r) => r.passed)
+								? ["verification_failed"]
+								: []),
+					]),
+				].slice(0, 8),
 				git:
 					s.commit || s.push
 						? {

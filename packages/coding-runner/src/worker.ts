@@ -1,25 +1,18 @@
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { randomUUID } from "node:crypto";
-import {
-	executionSpecSchema,
-	type CodingEvent,
-	type ExecutionReceipt,
-} from "./contracts";
+import { executionSpecSchema, type ExecutionReceipt } from "./contracts";
 import { loadConfig, childEnvironment, validateExecutable } from "./config";
 import {
 	atomicWrite,
-	canonical,
-	digest,
 	lock,
 	optionalJson,
 	privateDirectory,
 	readPrivate,
 	runPath,
-	totalSize,
 } from "./storage";
 import { normalize, JsonLineDecoder } from "./decoder";
+import { createEventWriter, recordCaptureFault } from "./event-writer";
 import { readReceipt } from "./core";
 import { workspace, snapshot } from "./workspace";
 
@@ -46,6 +39,7 @@ export async function runWorker(
 			state: "outcome_unknown",
 			childrenStopped: false,
 			evidenceComplete: false,
+			observation: { ...receipt.observation, processStarted: "unknown" },
 			reason: "runner_spawn_outcome_unknown",
 			updatedAt: Date.now(),
 		});
@@ -64,7 +58,6 @@ export async function runWorker(
 	mkdirSync(join(path, "home", ".codex"), { mode: 0o700, recursive: true });
 	const sessionHomeId = JSON.parse(readPrivate(join(path, "session-home.json")))
 		.executionId as string;
-	let used = 0;
 	let stopping = false;
 	let finalizing = false;
 	let child: ReturnType<typeof spawn> | null = null;
@@ -98,7 +91,9 @@ export async function runWorker(
 			process.kill(-child.pid, 0);
 			return true;
 		} catch (e) {
-			if ((e as NodeJS.ErrnoException).code === "ESRCH") return false;
+			// macOS reports EPERM for a group whose members are all zombies.
+			if (["ESRCH", "EPERM"].includes((e as NodeJS.ErrnoException).code ?? ""))
+				return false;
 			throw e;
 		}
 	}
@@ -107,7 +102,8 @@ export async function runWorker(
 		try {
 			process.kill(-child.pid, signal);
 		} catch (e) {
-			if ((e as NodeJS.ErrnoException).code !== "ESRCH") throw e;
+			if (!["ESRCH", "EPERM"].includes((e as NodeJS.ErrnoException).code ?? ""))
+				throw e;
 		}
 	}
 	function requestStop(reason: string) {
@@ -124,41 +120,22 @@ export async function runWorker(
 			receipt.evidenceComplete = false;
 		}
 	}
-	function event(kind: CodingEvent["kind"], text: string, essential = false) {
-		const payloadRef = randomUUID();
-		const metadata: CodingEvent = {
-			executionId,
-			generation: spec.generation,
-			seq: receipt.seq + 1,
-			observedAt: Date.now(),
-			kind,
-			payloadRef,
-			payloadDigest: digest(text),
-		};
-		const size =
-			Buffer.byteLength(text) + Buffer.byteLength(canonical(metadata));
-		const release = lock(join(config.spoolRoot, "quota.lock"));
-		try {
-			if (
-				!essential &&
-				(used + size > maxRunBytes ||
-					totalSize(config.spoolRoot) + size > 200 * 1024 * 1024)
-			) {
-				receipt.evidenceComplete = false;
-				requestStop("runner_output_limit");
-				return;
-			}
-			atomicWrite(join(path, "evidence", `${payloadRef}.txt`), text);
-			atomicWrite(join(path, "events", `${metadata.seq}.json`), metadata);
-			used += size;
-			receipt.seq = metadata.seq;
-			save();
-		} finally {
-			release();
-		}
-	}
+	const event = createEventWriter({
+		config,
+		path,
+		spec,
+		receipt,
+		maxRunBytes,
+		save: () => save(),
+		overLimit() {
+			receipt.evidenceComplete = false;
+			recordCaptureFault(receipt, "runner_output_limit");
+			requestStop("runner_output_limit");
+		},
+	});
 	function fault(code: string) {
 		receipt.evidenceComplete = false;
+		recordCaptureFault(receipt, code);
 		requestStop(code);
 	}
 	const decoder = new JsonLineDecoder(
@@ -172,8 +149,15 @@ export async function runWorker(
 				}
 				receipt.sessionId = normalized.sessionId;
 			}
-			if (normalized.turnFinished) receipt.turnFinished = true;
-			event(normalized.kind, normalized.text);
+			try {
+				event(normalized.kind, normalized.text, false, {
+					message: normalized.message,
+					turnOutcome: normalized.turnOutcome,
+				});
+			} catch {
+				fault("runner_spool_failure");
+				return;
+			}
 			if (normalized.kind === "error") fault("runner_cli_failed");
 		},
 		fault,
@@ -187,6 +171,7 @@ export async function runWorker(
 			receipt.childrenStopped = true;
 			receipt.evidenceComplete = false;
 			receipt.reason = "runner_network_policy_unsupported";
+			receipt.observation.processStarted = false;
 			save();
 			return;
 		}
@@ -205,6 +190,7 @@ export async function runWorker(
 			receipt.state = "stopped";
 			receipt.childrenStopped = true;
 			receipt.reason = "stopped_before_spawn";
+			receipt.observation.processStarted = false;
 			save();
 			return;
 		}
@@ -252,6 +238,8 @@ export async function runWorker(
 			nonce: JSON.parse(readPrivate(join(path, "identity.json"))).nonce,
 			spawnedAt: Date.now(),
 		});
+		// The owning worker saw the spawn; this is the only source of processStarted=true.
+		receipt.observation.processStarted = true;
 		receipt.state = "running";
 		save();
 		child.stdout!.on("data", (data: Buffer) => {
@@ -346,6 +334,11 @@ export async function runWorker(
 		receipt.childrenStopped = !child || !groupAlive();
 		ownedGroupStopped = receipt.childrenStopped;
 		receipt.evidenceComplete = false;
+		if (!existsSync(join(path, "cli-spawn-intent.json")))
+			// Failed before any spawn was attempted: the CLI provably never started.
+			receipt.observation.processStarted = false;
+		else if (receipt.observation.captureState === "complete")
+			receipt.observation.captureState = "unknown";
 		receipt.state = receipt.childrenStopped ? "stopped" : "outcome_unknown";
 		receipt.reason = "runner_worker_failed";
 		save();

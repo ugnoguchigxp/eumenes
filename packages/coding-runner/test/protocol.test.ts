@@ -30,7 +30,7 @@ test("SDK tools/list is fixed; unknown tool, unknown fields and protocol mismatc
 		const invalid = await client.callTool({
 			name: "runner.probe",
 			arguments: {
-				version: "eumenes-coding/1",
+				version: "eumenes-coding/2",
 				workspaceId: "fixture",
 				executable: "/bin/sh",
 			},

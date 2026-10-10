@@ -4,7 +4,7 @@ import type { TasksService } from "../../tasks";
 import type { QueueService } from "../../queue";
 import type { InferencePort } from "../../inference/contracts";
 import type { TaskReports } from "../../task-reports";
-import type { WorkflowPort } from "../contracts";
+import type { ObservationReadPort, WorkflowPort } from "../contracts";
 import { createReporting } from "./report";
 
 export const payloadSchema = z.strictObject({ id: z.string().min(1).max(160) });
@@ -16,6 +16,8 @@ export type CodingSupervisionInput = {
 	inference: InferencePort;
 	reports: TaskReports;
 	workflow: WorkflowPort;
+	/** Read-only observation source for diagnosis; defaults to workflow.observe. */
+	observationReader?: ObservationReadPort;
 	/** Whether request_change/answer_question wait for the user. Defaults to on. */
 	approveInstructions?: () => boolean;
 	now?: () => number;
@@ -29,6 +31,7 @@ export type SupervisionContext = {
 	inference: InferencePort;
 	reports: TaskReports;
 	workflow: WorkflowPort;
+	observationReader?: ObservationReadPort;
 	approveInstructions: () => boolean;
 	now: () => number;
 	/** Jobs and requests cancelled in a transaction; flushed after commit. */
@@ -49,6 +52,7 @@ export function createContext(
 		inference: input.inference,
 		reports: input.reports,
 		workflow: input.workflow,
+		observationReader: input.observationReader,
 		approveInstructions: input.approveInstructions ?? (() => true),
 		now,
 		cancelledJobs: new Set<string>(),

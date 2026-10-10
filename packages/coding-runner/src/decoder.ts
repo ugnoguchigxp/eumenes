@@ -1,5 +1,7 @@
+/* eslint-disable no-control-regex -- Deliberately remove ANSI and control bytes from terminal output. */
 import { z } from "zod";
 import type { CodingEvent } from "./contracts";
+import type { MessageMetadata } from "./observation";
 
 function sanitize(text: string) {
 	// eslint-disable-next-line no-control-regex -- ANSI and control bytes are untrusted terminal output.
@@ -9,15 +11,24 @@ function sanitize(text: string) {
 			"",
 		)
 		.replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, "")
-		.replace(/\b(?:sk-[\w-]{10,}|Bearer\s+[\w./+=-]{8,})/gi, "[redacted]")
-		.slice(0, 32768);
+		.replace(/\b(?:sk-[\w-]{10,}|Bearer\s+[\w./+=-]{8,})/gi, "[redacted]");
 }
 export type Normalized = {
 	kind: CodingEvent["kind"];
 	text: string;
 	sessionId?: string;
 	turnFinished?: boolean;
+	/** Set only by explicit turn.completed / turn.failed; a general error is never terminal. */
+	turnOutcome?: "completed" | "failed";
+	message?: MessageMetadata;
 };
+const MAX_MESSAGE_UNITS = 32768;
+/** Keeps whole code points; the limit counts UTF-16 code units, not bytes. */
+function prefix(text: string) {
+	let end = Math.min(MAX_MESSAGE_UNITS, text.length);
+	if (end < text.length && /[\uD800-\uDBFF]/.test(text[end - 1]!)) end--;
+	return text.slice(0, end);
+}
 export function normalize(line: string): Normalized | null {
 	let v: Record<string, unknown>;
 	try {
@@ -41,18 +52,49 @@ export function normalize(line: string): Normalized | null {
 			kind: "turn_finished",
 			text: "turn_completed",
 			turnFinished: true,
+			turnOutcome: "completed",
 		};
-	if (v.type === "turn.failed" || v.type === "error")
-		return { kind: "error", text: "cli_turn_failed" };
+	if (v.type === "turn.failed")
+		return { kind: "error", text: "cli_turn_failed", turnOutcome: "failed" };
+	if (v.type === "error") return { kind: "error", text: "cli_turn_failed" };
 	const item = v.item;
 	if (!item || typeof item !== "object" || Array.isArray(item)) return null;
 	const i = item as Record<string, unknown>;
 	if (
 		v.type === "item.completed" &&
 		i.type === "agent_message" &&
-		typeof i.text === "string"
+		typeof i.text !== "string"
 	)
-		return { kind: "message", text: sanitize(i.text) };
+		throw new Error("runner_invalid_event");
+	if (
+		v.type === "item.completed" &&
+		i.type === "agent_message" &&
+		typeof i.text === "string"
+	) {
+		// Lone surrogates cannot be stored faithfully; never substitute a replacement character.
+		if (
+			/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(
+				i.text,
+			)
+		)
+			throw new Error("runner_invalid_unicode");
+		const sanitized = sanitize(i.text);
+		const text = prefix(sanitized);
+		return {
+			kind: "message",
+			text,
+			// 0.155.1 exec JSONL carries no phase: the kind is never inferred from position or tone.
+			message: {
+				messageKind: "unknown",
+				classificationReason:
+					"phase" in i ? "phase_unsupported" : "phase_not_provided",
+				contentPresence: sanitized.trim() ? "nonempty" : "empty",
+				sourceTruncated: text.length < sanitized.length,
+				sanitizedBytes: Buffer.byteLength(sanitized),
+				retainedBytes: Buffer.byteLength(text),
+			},
+		};
+	}
 	if (
 		i.type === "command_execution" &&
 		["item.started", "item.completed"].includes(v.type)

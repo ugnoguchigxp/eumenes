@@ -11,7 +11,13 @@ export type LarmExchange = {
 	speechVoice?: string;
 	speechCredit?: string;
 };
+import type {
+	NativeTool,
+	NativeToolCall,
+} from "../../../infrastructure/chat-stream";
 export type LarmCallOptions = {
+	tools?: NativeTool[];
+	onToolCalls?: (calls: NativeToolCall[]) => void;
 	maxOutputTokens?: number;
 	/** Internal control calls only: JSON-object generation at temperature zero. */
 	jsonOutput?: boolean;
