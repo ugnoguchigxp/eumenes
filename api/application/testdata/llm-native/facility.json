@@ -1,0 +1,32 @@
+{
+	"version": 1,
+	"title": "施設利用条件",
+	"scope": "施設の利用時間と年齢条件の確認",
+	"requirements": [
+		{
+			"id": "hours",
+			"statement": "日曜日の利用時間を確認",
+			"required": true,
+			"applicability": "現在の依頼に適用するとき",
+			"allowNotApplicable": false,
+			"valueSchema": {
+				"type": "string",
+				"maxLength": 100
+			}
+		},
+		{
+			"id": "age",
+			"statement": "年齢の例外と同伴条件を確認し、矛盾を解消できない場合はunknown",
+			"required": true,
+			"applicability": "現在の依頼に適用するとき",
+			"allowNotApplicable": false,
+			"valueSchema": {
+				"type": "string",
+				"maxLength": 300
+			}
+		}
+	],
+	"provenance": {
+		"kind": "user"
+	}
+}

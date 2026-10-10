@@ -1,3 +1,5 @@
+import { liveLarmSettings } from "./live-larm";
+import { researchLiveMetrics } from "./research-live-metrics";
 import { researchHistoryLiveCases } from "./research-history-live-cases";
 import { conversationLiveCases } from "./conversation-live-cases";
 import {
@@ -22,11 +24,12 @@ import {
 } from "../api/infrastructure/auth-config";
 if (
 	process.env.EUMENES_LIVE_TOOLCHAIN !== "1" ||
-	!resolveLarmToken(process.env) ||
-	!process.env.LARM_BASE_URL?.trim()
+	!resolveLarmToken(process.env)
 )
-	throw new Error("live_toolchain_requires_explicit_flag_larm_url_and_token");
-// Always spawn an isolated real backend. Never copy or open the user's product database.
+	throw new Error("live_toolchain_requires_explicit_flag_and_token");
+// Read only the saved LARM connection through its backend domain, then run in an isolated DB.
+const savedLarm = liveLarmSettings();
+if (!savedLarm.baseUrl) throw new Error("saved_larm_connection_unconfigured");
 const dir = mkdtempSync(join(tmpdir(), "eumenes-live-toolchain-"));
 const reservation = Bun.serve({
 	hostname: "127.0.0.1",
@@ -68,6 +71,13 @@ try {
 		}
 	}
 	if (!ready) throw new Error("isolated_backend_start_timeout");
+	const initialSettings = await client.settings();
+	await client.applySettings({
+		requestId: crypto.randomUUID(),
+		expectedRevision: initialSettings.revision,
+		settings: { ...initialSettings, larm: savedLarm },
+		keys: [],
+	});
 	// HTTP startup precedes model connection readiness. Do not spend the
 	// coordinator's deadline waiting for the startup probe's connection.
 	const connection = await client.connectLarm();
@@ -271,12 +281,7 @@ try {
 			childStatus: child?.status,
 			packageRevisionId: child?.packageRevisionId,
 			childError: child?.errorCode,
-			modelCalls: (await client.inferenceUsage()).filter(
-				(u) =>
-					u.purpose === "llm" &&
-					(u.subject === run.id ||
-						tasks.some((t) => u.subject.startsWith(`agent:${t.id}:step:`))),
-			).length,
+			...researchLiveMetrics(await client.inferenceUsage(), run.id, tasks),
 			toolCalls: child?.toolCalls,
 			toolOutcomes: child?.toolOutcomes,
 			sourceCount: report?.sources.length,

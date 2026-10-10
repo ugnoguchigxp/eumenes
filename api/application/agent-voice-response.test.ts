@@ -55,6 +55,7 @@ for (const options of [
 		const answer = "わたくしの調査では確認できませんでした。";
 		const h = await harness({
 			...options,
+			fullResearch: true,
 			voiceText: "今日の鎌倉の天気は",
 			failureAnswer: answer,
 		});
@@ -86,9 +87,9 @@ for (const options of [
 			const data = JSON.parse(
 				dataMessage.content.slice(dataMessage.content.indexOf("{")),
 			);
-			expect(data.researchProgress.verifiedReport).toBe(false);
+			expect(data.report.researchProgress.verifiedReport).toBe(false);
 			if (options.lookupTimeoutOnce) {
-				expect(data.researchProgress).toMatchObject({
+				expect(data.report.researchProgress).toMatchObject({
 					searchAttempts: 2,
 					searchesSucceeded: 1,
 					readAttempts: 1,
@@ -168,7 +169,7 @@ test("a committed timer result follows the agent generation and speech path with
 		expect(h.voice.get(id)?.status).toBe("ready");
 		expect(h.parentContexts).toHaveLength(1);
 		expect(h.spoken).toEqual([h.dialogue.answerText(h.voice.get(id)!.runId!)!]);
-		expect(h.spoken[0]).toContain("3分");
+		expect(h.spoken[0]).toContain("180秒");
 		expect(
 			h.store.read((db) =>
 				db

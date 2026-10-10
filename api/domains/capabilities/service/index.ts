@@ -1,6 +1,8 @@
+import { registerRevision } from "./registry";
+import { zSchema } from "./schema";
+import { createRequirements } from "./requirements";
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
-import { getLogger } from "../../../infrastructure/logger";
 import {
 	bytes,
 	hash,
@@ -82,100 +84,12 @@ export function createCapabilities(
 			throw new Error("invalid_capability");
 		register(db, d, "builtin");
 	}
-	function register(
+	const register = (
 		db: Database,
 		d: Definition,
-		origin: "builtin" | "learned",
-	) {
-		if (d.schemaKey) {
-			const actual = hash(zSchema(d.schemaKey));
-			if (d.schemaHash && actual !== d.schemaHash)
-				throw new Error("invalid_capability_schema");
-			d = { ...d, schemaHash: actual };
-		}
-		if (
-			!/^[a-z][a-z0-9._-]{0,100}$/.test(d.id) ||
-			!Number.isInteger(d.revision) ||
-			d.revision < 1 ||
-			bytes(d) > 32768
-		)
-			throw new Error("invalid_capability");
-		if (d.schemaKey && !validators[d.schemaKey])
-			throw new Error("invalid_capability_schema");
-		const key = `${d.kind}:${d.id}`,
-			rev = `${key}@${d.revision}`,
-			digest = hash(d);
-		const old = db
-			.query("SELECT definition_hash FROM capability_revisions WHERE id=?")
-			.get(rev) as { definition_hash: string } | null;
-		if (old) {
-			if (old.definition_hash !== digest) {
-				if (origin === "builtin")
-					getLogger("capabilities").warn("capability.revision_conflict", {
-						subjectId: rev,
-						reason: "capability_revision_conflict",
-					});
-				throw new Error("capability_revision_conflict");
-			}
-			return;
-		}
-		const dependencies = d.dependencies.flatMap((id) => closure(db, id));
-		if (d.kind === "package") {
-			const has = (id: string | undefined, kind: Definition["kind"]) =>
-				!!id &&
-				dependencies.some(
-					(item) =>
-						item.revisionId === id &&
-						item.kind === kind &&
-						(kind === "tool" ? !!item.schemaKey : !!item.body?.trim()),
-				);
-			if (
-				!has(d.profileRevisionId, "profile") ||
-				!d.requiredSkillRevisionIds?.length ||
-				d.requiredSkillRevisionIds.some((id) => !has(id, "skill")) ||
-				!d.toolRevisionIds?.length ||
-				d.toolRevisionIds.some((id) => !has(id, "tool"))
-			)
-				throw new Error("invalid_capability_bundle");
-		}
-		db.query("INSERT INTO capability_revisions VALUES(?,?,?,?,?,?)").run(
-			rev,
-			key,
-			d.revision,
-			JSON.stringify(d),
-			digest,
-			now(),
-		);
-		if (hasLearned(db))
-			db.query(
-				"INSERT INTO capability_items(key,id,kind,active_revision_id,discovery_mode,origin) VALUES(?,?,?,?,?,?) ON CONFLICT(key) DO UPDATE SET active_revision_id=excluded.active_revision_id,generation=generation+1",
-			).run(
-				key,
-				d.id,
-				d.kind,
-				rev,
-				origin === "learned" ? "route-only" : "catalog",
-				origin,
-			);
-		else if (origin === "learned") throw new Error("learned_migration_missing");
-		else
-			db.query(
-				"INSERT INTO capability_items(key,id,kind,active_revision_id) VALUES(?,?,?,?) ON CONFLICT(key) DO UPDATE SET active_revision_id=excluded.active_revision_id,generation=generation+1",
-			).run(key, d.id, d.kind, rev);
-		for (const dependency of d.dependencies)
-			db.query("INSERT INTO capability_dependencies VALUES(?,?)").run(
-				rev,
-				dependency,
-			);
-		if (origin === "learned") return;
-		db.query("DELETE FROM capability_search WHERE key=?").run(key);
-		db.query("INSERT INTO capability_search(key,content) VALUES(?,?)").run(
-			key,
-			[d.id, d.title, d.summary, ...d.aliases, ...d.tags, ...d.useWhen].join(
-				" ",
-			),
-		);
-	}
+		origin: "builtin" | "learned" | "user",
+	) => registerRevision(db, d, origin, closure, now, hasLearned);
+
 	function validate(db: Database, p: Prepared) {
 		for (const fixed of [p.package, ...p.dependencies]) {
 			const current = get(db, fixed.revisionId);
@@ -461,6 +375,7 @@ export function createCapabilities(
 		};
 	}
 	return {
+		...createRequirements(store, register),
 		getDefinitionInTransaction,
 		registerBuiltinInTransaction,
 		registerLearnedInTransaction,
@@ -536,7 +451,5 @@ export function createCapabilities(
 		close: () => refs.clear(),
 	};
 }
-import { z } from "zod";
-export const zSchema = (key: keyof typeof validators) =>
-	z.toJSONSchema(validators[key]);
+export { zSchema } from "./schema";
 export type Capabilities = ReturnType<typeof createCapabilities>;

@@ -1,3 +1,5 @@
+import { createVoiceBinding } from "./voice-binding";
+import { bindControlPolicy } from "./control-policy";
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import { createLarm, type LarmPort, type LarmExchange } from "../../larm";
@@ -15,7 +17,7 @@ import type {
 	SpeechOverride,
 	BackgroundControl,
 } from "../contracts";
-import { get, type RequestRow } from "../repository";
+import { get, bindControlEngine, type RequestRow } from "../repository";
 import {
 	executeRequest as runRequest,
 	type CollectionAdoption,
@@ -26,12 +28,13 @@ import {
 import { probeWav } from "./wav";
 import { finishProbe, openProbe } from "./probe";
 import { safeError } from "./errors";
+import { validateReceipt as checkReceipt } from "./receipt-authority";
 type UsageRow = {
 	id: string;
 	requestId: string;
 	subject: string;
 	purpose: Purpose;
-	source: "larm" | "cloud";
+	source: "larm" | "cloud" | "codex";
 	model: string | null;
 	status: string;
 	reason: string | null;
@@ -187,28 +190,21 @@ export function createInference(
 		preparation?: SpeechPreparation,
 		tools?: import("../../../infrastructure/chat-stream").NativeTool[],
 	) => runRequest(env, requestId, input, caller, onDelta, preparation, tools);
+	function validateReceipt(db: Database, receipt: Receipt) {
+		const captured = get(db, receipt.requestId);
+		if (captured?.controlPolicyRequestId) {
+			const policy = get(db, captured.controlPolicyRequestId);
+			if (!policy || !allowed(db, policy)) return false;
+		}
+		return checkReceipt(db, receipt, allowed);
+	}
 	function accept(db: Database, receipt: Receipt) {
-		const row = get(db, receipt.requestId);
-		const a = db
-			.query(
-				"SELECT source,connection_id,status FROM inference_attempts WHERE id=? AND request_id=?",
-			)
-			.get(receipt.attemptId, receipt.requestId) as {
-			source: string;
-			connection_id: string | null;
-			status: string;
-		} | null;
-		if (!row || !a || a.status !== "succeeded") return false;
-		const connection =
-			a.source === "cloud"
-				? row.snapshot.connections.find((c) => c.id === a.connection_id)
-				: undefined;
-		if (!allowed(db, row, connection)) return false;
+		if (!validateReceipt(db, receipt)) return false;
 		db.query("UPDATE inference_attempts SET accepted=1 WHERE id=?").run(
 			receipt.attemptId,
 		);
 		db.query("UPDATE inference_requests SET status='accepted' WHERE id=?").run(
-			row.id,
+			receipt.requestId,
 		);
 		return true;
 	}
@@ -376,8 +372,14 @@ export function createInference(
 				policySubject: string;
 				deadline: number;
 				maxOutputTokens: number;
+				engine?: "codex_luna";
 			},
 		) {
+			if (
+				input.engine &&
+				(input.engine !== "codex_luna" || !options.codexResearch)
+			)
+				throw new Error("codex_research_unavailable");
 			const policy = db
 				.query(
 					"SELECT id FROM inference_requests WHERE subject=? AND purpose='llm'",
@@ -395,10 +397,12 @@ export function createInference(
 				Math.min(input.deadline, root.deadline),
 				snapshot,
 			);
+			bindControlEngine(db, requestId, input.engine);
+			bindControlPolicy(db, requestId, root.id);
 			db.query(
 				"UPDATE inference_requests SET mode='control',output_limit=?,context_policy='exact',parents=? WHERE id=? AND status='pending'",
 			).run(
-				Math.min(2048, Math.max(1, input.maxOutputTokens)),
+				Math.min(4096, Math.max(1, input.maxOutputTokens)),
 				JSON.stringify(root.parents),
 				requestId,
 			);
@@ -435,6 +439,7 @@ export function createInference(
 				throw new Error("invalid_control_request");
 			return executeRequest(requestId, messages, signal);
 		},
+		codexResearchAvailable: () => !!options.codexResearch,
 		rejectControlInTransaction(db: Database, receipt: Receipt, _code: string) {
 			db.query(
 				"UPDATE inference_requests SET status='rejected' WHERE id=? AND mode='control' AND status='pending'",
@@ -473,39 +478,7 @@ export function createInference(
 				.get(subject) as { snapshot: string } | null;
 			return row ? (JSON.parse(row.snapshot) as Settings) : null;
 		},
-		bindInTransaction(
-			db: Database,
-			voiceSubject: string,
-			runSubject: string,
-			deadline?: number,
-		) {
-			const transcription = db
-				.query(
-					"SELECT id FROM inference_requests WHERE subject=? AND purpose='asr'",
-				)
-				.get(voiceSubject) as { id: string } | null;
-			if (transcription && !valid(db, transcription.id))
-				throw new Error("permission_revoked");
-			const row = db
-				.query(
-					"SELECT id,status FROM inference_requests WHERE subject=? AND purpose='llm'",
-				)
-				.get(voiceSubject) as { id: string; status: string } | null;
-			if (!row || row.status !== "pending")
-				throw new Error("invalid_voice_inference");
-			if (transcription) {
-				db.query("UPDATE inference_requests SET parents=? WHERE id=?").run(
-					JSON.stringify([transcription.id]),
-					row.id,
-				);
-				db.query(
-					"UPDATE inference_requests SET parents=? WHERE subject=? AND purpose='tts'",
-				).run(JSON.stringify([transcription.id, row.id]), voiceSubject);
-			}
-			db.query(
-				"UPDATE inference_requests SET subject=?,deadline=MIN(deadline,?) WHERE id=?",
-			).run(runSubject, deadline ?? Number.MAX_SAFE_INTEGER, row.id);
-		},
+		bindInTransaction: createVoiceBinding(valid, allowed),
 		async cancelSubject(subject: string) {
 			await store.write((db) =>
 				db
@@ -560,6 +533,7 @@ export function createInference(
 			return id;
 		},
 		acceptInTransaction: accept,
+		validateReceiptInTransaction: validateReceipt,
 		requestFor(db: Database, subject: string, purpose: Purpose) {
 			return (
 				(

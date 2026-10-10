@@ -1,0 +1,35 @@
+{
+	"selected": ["attitude-dataset"],
+	"dependencySet": ["delivery", "attitude-dataset"],
+	"testDependencySet": ["delivery", "attitude-dataset"],
+	"revision": "eed95eb259b5b5e30f85615eb0880419dab8b106d3ce638c3f48b9b4ca6aa1f1",
+	"steps": [
+		{
+			"name": "size-budget",
+			"ms": 111,
+			"result": "pass"
+		},
+		{
+			"name": "format",
+			"ms": 95,
+			"result": "pass"
+		},
+		{
+			"name": "lint",
+			"ms": 47,
+			"result": "pass"
+		},
+		{
+			"name": "typecheck",
+			"ms": 557,
+			"result": "pass"
+		},
+		{
+			"name": "domain tests",
+			"ms": 2569,
+			"result": "pass"
+		}
+	],
+	"totalMs": 3802,
+	"result": "pass"
+}

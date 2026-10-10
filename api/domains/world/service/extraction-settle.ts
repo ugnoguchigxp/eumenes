@@ -7,6 +7,7 @@ import {
 import {
 	clearExtractPrepared,
 	getExtractEvent,
+	holdExtractEvents,
 	settleExtractEvent,
 } from "../repository/extraction";
 import {
@@ -35,6 +36,7 @@ export function createSettle(
 		usable,
 		releaseManifests,
 		endJob,
+		snapshotContext,
 	} = ctx;
 	const { appliedCursorOf, settleOp, rejectEvent, classify } = events;
 
@@ -147,7 +149,9 @@ export function createSettle(
 					return notAdopted("input_version_changed");
 				states.push(verdict.live.state);
 			}
-			if (!inference.acceptInTransaction(db, receipt))
+			if (snapshotContext(db, scope).digest !== input.contextDigest)
+				return notAdopted("extraction_context_changed");
+			if (!inference.validateReceiptInTransaction(db, receipt))
 				return notAdopted("inference_not_accepted", true);
 
 			const base = {
@@ -204,6 +208,32 @@ export function createSettle(
 				return "applied";
 			}
 			const verdicts = second.value.verdicts;
+			const held = verdicts.filter((v) => v.status === "held").length;
+			if (held > 0) {
+				// Keep the whole window received: no package settle operation or cursor.
+				holdExtractEvents(
+					db,
+					scope.principal,
+					scope.scopeKey,
+					claim.jobId,
+					events.map((e) => e.row.eventId),
+					input.contextDigest,
+				);
+				inference.rejectControlInTransaction(
+					db,
+					receipt,
+					"extraction_context_held",
+				);
+				endJob(db, scope, claim.jobId, false);
+				report("not_adopted", {
+					reasons: ["EXTRACTION_CONTEXT_HELD"],
+					held,
+					rejected: verdicts.filter((v) => v.status === "rejected").length,
+				});
+				return "applied";
+			}
+			if (!inference.acceptInTransaction(db, receipt))
+				return notAdopted("inference_not_accepted", true);
 			const reasons = [
 				...new Set(
 					verdicts.flatMap((v) =>

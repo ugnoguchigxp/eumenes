@@ -1,0 +1,1 @@
+過去のpreflightは環境変数に接続先を要求する誤った前提で終了した。保存済み設定がないことの根拠にはならない。現在はSQLiteの保存済み接続設定を使う。旧safe code: live_toolchain_requires_explicit_flag_larm_url_and_token、終了1。

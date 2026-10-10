@@ -198,13 +198,15 @@ async function boot(
 								new AbortController().signal,
 							),
 						acceptInTransaction: inference.acceptInTransaction.bind(inference),
+						validateReceiptInTransaction:
+							inference.validateReceiptInTransaction.bind(inference),
 						rejectControlInTransaction:
 							inference.rejectControlInTransaction.bind(inference),
 						cancelRequestsInTransaction:
 							inference.cancelRequestsInTransaction.bind(inference),
 						snapshotFor: inference.snapshotFor.bind(inference),
 					}
-				: inference) as unknown as ExtractionInference,
+				: inference) satisfies ExtractionInference,
 			entities: () => [ENTITY],
 			foreground: foreground.hub,
 			...(over.stageBudgetMs === undefined

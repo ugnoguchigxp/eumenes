@@ -6,7 +6,7 @@ test("control diagnostics distinguish non-text, empty, fenced, oversized and mal
 		[new Uint8Array([1]), "control_non_text"],
 		["  ", "control_empty_output"],
 		["```json\nSECRET_PROVIDER_TEXT\n```", "control_markdown_fence"],
-		["SECRET_PROVIDER_TEXT".repeat(1000), "control_output_too_large"],
+		["SECRET_PROVIDER_TEXT".repeat(3000), "control_output_too_large"],
 		['{"action":', "control_json_syntax"],
 		['{"action":"finish"', "control_json_syntax"],
 		["SECRET_PROVIDER_TEXT", "control_json_syntax"],

@@ -167,8 +167,8 @@ test("C01 5000 learned definitions never enter FTS/alias/list and do not displac
 			const found = caps.searchInTransaction(
 				db,
 				owner,
-				"天気",
-				["天気"],
+				"調査",
+				["調査"],
 				Date.now() + 10000,
 				8,
 			);
@@ -219,11 +219,44 @@ test("seed adds newer research rules and packages without touching old revisions
 			expect(ids).toContain(id);
 		expect(ids).toContain("package:web.read@6");
 		expect(ids).toContain("package:web.research@7");
+		expect(ids).toContain("package:web.research@8");
+		expect(ids).toContain("package:web.read@7");
+		expect(ids).toContain("skill:web.research@7");
 		expect(ids).toContain("skill:web.research@6");
 		const v1 = builtins.find((d) => d.kind === "skill" && d.revision === 1)!;
 		expect(v1.body).not.toContain("実Web検索とする");
 		const v2 = builtins.find((d) => d.kind === "skill" && d.revision === 2)!;
 		expect(v2.body).toContain("最初のactionは必ずweb.lookup");
+	} finally {
+		await done();
+	}
+});
+
+test("new research packages expose generic acquisition without topic-specific tools or skills", async () => {
+	const { store, caps, done } = await setup();
+	try {
+		await store.write((db) => {
+			for (const id of [
+				"package:web.research@9",
+				"package:web.lookup@8",
+				"package:web.read@7",
+			]) {
+				const prepared = caps.prepareActiveByIdInTransaction(db, owner, id, {
+					question: "複数の公開資料を比較する",
+				});
+				expect(prepared.package.toolRevisionIds).toEqual([
+					"tool:web.lookup@1",
+					"tool:web.read@1",
+					"tool:web.find@1",
+					"tool:web.read_saved@1",
+				]);
+				expect(prepared.package.requiredSkillRevisionIds).toEqual([
+					id === "package:web.research@9"
+						? "skill:web.research@8"
+						: "skill:web.research@7",
+				]);
+			}
+		});
 	} finally {
 		await done();
 	}

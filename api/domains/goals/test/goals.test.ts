@@ -388,21 +388,17 @@ test("an access-less revision lookup is not part of the World-facing exports", (
 	expect(typeof unscoped).toBe("function");
 });
 
-test("re-proposing the same thing from the same source is deduplicated", async () => {
+test("only the same proposal operation is deduplicated", async () => {
 	const goals = service();
-	const first = await goals.propose(alice, {
+	const input = {
 		scopeKey: "work",
 		desiredState: "Ship the  report",
 		source: src("m1"),
-	});
+		operationKey: "proposal-1",
+	};
+	const first = await goals.propose(alice, input);
 	for (let i = 0; i < 100; i++)
-		expect(
-			await goals.propose(alice, {
-				scopeKey: "work",
-				desiredState: " ship the report ",
-				source: src("m1"),
-			}),
-		).toEqual(first);
+		expect(await goals.propose(alice, input)).toEqual(first);
 	expect(await goals.proposals(alice)).toHaveLength(1);
 	// A different source, scope, principal or text is a different proposal.
 	await goals.propose(alice, {
@@ -432,6 +428,77 @@ test("re-proposing the same thing from the same source is deduplicated", async (
 		source: src("m1"),
 	});
 	expect(again.id).not.toBe(first.id);
+});
+
+test("distinct operations preserve proposal text, priority and source versions", async () => {
+	const goals = service();
+	const texts = [
+		"保管コードはUS",
+		"保管コードはus",
+		"保管コードはＵＳ",
+		"保管コードは  US",
+	];
+	for (const [i, desiredState] of texts.entries()) {
+		const input = {
+			scopeKey: "work",
+			desiredState,
+			priority: 10 + i,
+			source: { ...src("m1"), revision: `v${i}`, digest: `digest-${i}` },
+			operationKey: `proposal-${i}`,
+		};
+		const saved = await goals.propose(alice, input);
+		expect(saved).toMatchObject({
+			desiredState,
+			priority: input.priority,
+			source: input.source,
+		});
+		expect(await goals.propose(alice, input)).toEqual(saved);
+		for (const change of [
+			{ desiredState: `${desiredState}!` },
+			{ priority: 90 },
+			{ source: { ...input.source, revision: "new" } },
+			{ source: { ...input.source, digest: "new" } },
+		])
+			await expect(
+				goals.propose(alice, { ...input, ...change }),
+			).rejects.toThrow("operation_conflict");
+	}
+	// Even identical text is a separate operation, with or without a key.
+	const input = {
+		scopeKey: "work",
+		desiredState: texts[0]!,
+		source: src("m1"),
+	};
+	await goals.propose(alice, { ...input, operationKey: "another" });
+	await goals.propose(alice, input);
+	await goals.propose(alice, input);
+	const proposals = goals.proposals(alice);
+	// A semantic merge must neither discard the later metadata nor alias the ids.
+	expect(proposals).toHaveLength(7);
+	expect(new Set(proposals.map((g) => g.id)).size).toBe(7);
+	expect(proposals.map((g) => g.desiredState).sort()).toEqual(
+		[...texts, ...Array(3).fill(texts[0])].sort(),
+	);
+	expect(snap(alice).revision).toBe(0);
+});
+
+test("independent proposals respect capacity, while an operation replay uses no slot", async () => {
+	const goals = service();
+	const input = {
+		scopeKey: "work",
+		desiredState: "same text",
+		source: src("m1"),
+		operationKey: "first",
+	};
+	const first = await goals.propose(alice, input);
+	for (let i = 0; i < 49; i++)
+		await goals.propose(alice, { ...input, operationKey: undefined });
+	expect(goals.proposals(alice)).toHaveLength(50);
+	expect(await goals.propose(alice, input)).toEqual(first);
+	await expect(
+		goals.propose(alice, { ...input, operationKey: "new" }),
+	).rejects.toThrow("goal_limit");
+	expect(snap(alice).revision).toBe(0);
 });
 
 test("operationKey makes adopt and propose idempotent per principal and scope", async () => {

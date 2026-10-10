@@ -1,0 +1,29 @@
+$ bun scripts/verify.ts --domain capabilities
+[verify] selected=capabilities dependencyClosure=capabilities testClosure=capabilities
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts api/domains/capabilities
+size-budget ok (15 files)
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check api/domains/capabilities
+$ oxfmt --check api/domains/capabilities
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 5ms on 20 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint api/domains/capabilities
+$ oxlint --deny-warnings api/domains/capabilities
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun x tsc -p /Users/y.noguchi/Code/eumenes/verification-reports/tsconfig.selected.json
+api/domains/capabilities/service/requirement-schema.ts(42,53): error TS2538: Type 'unknown' cannot be used as an index type.
+api/domains/capabilities/service/requirement-schema.ts(53,34): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'string'.
+api/domains/capabilities/service/requirement-schema.ts(60,5): error TS18047: 's.enum' is possibly 'null'.
+api/domains/capabilities/service/requirement-schema.ts(60,12): error TS2339: Property 'some' does not exist on type '{}'.
+api/domains/capabilities/service/requirement-schema.ts(60,18): error TS7006: Parameter 'v' implicitly has an 'any' type.
+104 | 	steps.push({
+105 | 		name,
+106 | 		ms: Math.round(performance.now() - start),
+107 | 		result: code === 0 ? "pass" : `exit ${code}`,
+108 | 	});
+109 | 	if (code !== 0) throw new Error(`${name} failed (${code})`);
+                                 ^
+error: typecheck failed (2)
+      at run (/Users/y.noguchi/Code/eumenes/scripts/verify.ts:109:28)
+
+error: script "verify" exited with code 1

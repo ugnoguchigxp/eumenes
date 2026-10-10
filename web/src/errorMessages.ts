@@ -26,6 +26,8 @@ const messages: Record<string, string> = {
 	audio_too_large: "音声が長すぎます。短く区切って話してください。",
 	audio_empty: "音声が聞き取れませんでした。",
 	audio_invalid_wav: "音声データを読み取れませんでした。",
+	asr_language_unverified:
+		"音声の言語を確認できませんでした。もう一度話すか、文字で入力してください。",
 	asr_language_not_allowed: "設定で許可されていない言語です。",
 	larm_unconfigured: "LARMが設定されていません。",
 	larm_base_url_unconfigured: "LARMの接続先URLが設定されていません。",

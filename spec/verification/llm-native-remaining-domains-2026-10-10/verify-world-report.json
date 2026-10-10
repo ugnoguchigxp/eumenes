@@ -1,0 +1,34 @@
+{
+	"selected": ["world"],
+	"revision": "962f72c7b21884e6741d97674f60395af84f3e475229f3a32d5df740ba973176",
+	"steps": [
+		{
+			"name": "size-budget",
+			"ms": 165,
+			"result": "pass"
+		},
+		{
+			"name": "format",
+			"ms": 99,
+			"result": "pass"
+		},
+		{
+			"name": "lint",
+			"ms": 54,
+			"result": "pass"
+		},
+		{
+			"name": "typecheck",
+			"ms": 3008,
+			"result": "pass"
+		},
+		{
+			"name": "domain tests",
+			"ms": 11007,
+			"result": "pass"
+		}
+	],
+	"totalMs": 15319,
+	"result": "fail",
+	"error": "Error: source changed during verification"
+}

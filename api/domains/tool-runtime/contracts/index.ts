@@ -62,6 +62,7 @@ export type ActionEnvelope = {
 	operationId: string;
 	receiptDigest: string;
 	payload: unknown;
+	answerContext?: import("../../capabilities").TimerResultContext;
 };
 export interface ActionAdapter {
 	/** Host snapshots for route selection; no model-generated identifiers. */
@@ -177,6 +178,7 @@ export type CandidateImportInput = {
 export type Invocation = {
 	args_json?: string | null;
 	operation_fingerprint?: string | null;
+	superseded?: number;
 	id: string;
 	owner_task_id: string;
 	root_run_id: string;

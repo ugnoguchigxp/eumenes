@@ -1,3 +1,4 @@
+import { withLanguageControl } from "../domains/voice-dialogue/test/control-fixture";
 /**
  * P3-09 first product connection, accepted on the REAL assembly: a temp-file
  * store with the production migrations, the real Writer and queue, the real
@@ -164,7 +165,7 @@ async function boot(options: BootOptions) {
 	const seen: { role: string; content: string }[][] = [];
 	const spoken: string[] = [];
 	let sends = 0;
-	const larm: InferencePort = {
+	const larm: InferencePort = withLanguageControl({
 		status: () =>
 			options.modelStopped
 				? { state: "failed", capabilities: [], error: "model_stopped" }
@@ -203,7 +204,7 @@ async function boot(options: BootOptions) {
 			throw new Error("fixture streams");
 		},
 		acceptInTransaction: () => true,
-	};
+	});
 
 	// The receipts the Broker fixed at prepare (the test only observes them).
 	const prepared: PreparedWorldContext[] = [];

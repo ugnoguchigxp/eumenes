@@ -1,0 +1,35 @@
+{
+	"selected": ["goals"],
+	"dependencySet": ["goals"],
+	"testDependencySet": ["goals"],
+	"revision": "42c680aa1c502fbb2406c4bff9bae1c723804f8f2a64997cf52a3074d93fc4ed",
+	"steps": [
+		{
+			"name": "size-budget",
+			"ms": 108,
+			"result": "pass"
+		},
+		{
+			"name": "format",
+			"ms": 97,
+			"result": "pass"
+		},
+		{
+			"name": "lint",
+			"ms": 44,
+			"result": "pass"
+		},
+		{
+			"name": "typecheck",
+			"ms": 487,
+			"result": "pass"
+		},
+		{
+			"name": "domain tests",
+			"ms": 240,
+			"result": "pass"
+		}
+	],
+	"totalMs": 1400,
+	"result": "pass"
+}

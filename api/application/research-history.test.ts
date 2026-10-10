@@ -133,7 +133,7 @@ test("an out-of-scope model URL is rejected before fetching; a finite repair can
 			.list(run.id)
 			.find((t) => t.kind === "worker")!;
 		expect(child.status).toBe("completed");
-		expect(child.modelCalls).toBe(3);
+		expect(child.modelCalls).toBe(4);
 		expect(child.toolCalls).toBe(1);
 	} finally {
 		await h.close();
@@ -218,7 +218,7 @@ test("cursor/start conflict is refused with a precise, private repair hint, then
 			.list(run.id)
 			.find((t) => t.kind === "worker")!;
 		expect(child.toolCalls).toBe(4);
-		expect(child.modelCalls).toBe(6);
+		expect(child.modelCalls).toBe(7);
 	} finally {
 		await h.close();
 	}
@@ -643,7 +643,7 @@ test("H7: one stale-history retry uses the original budget and adopts only the f
 		const child = h.toolchain.agents
 			.list(run.id)
 			.find((t) => t.kind === "worker")!;
-		expect(child.modelCalls).toBe(5);
+		expect(child.modelCalls).toBe(6);
 		expect(child.toolCalls).toBe(4);
 		expect(h.acquisitions).toBe(0);
 		expect(

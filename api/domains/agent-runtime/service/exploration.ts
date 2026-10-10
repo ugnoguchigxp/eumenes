@@ -1,21 +1,49 @@
 import type { Prepared } from "../../capabilities";
 import type { Task } from "../contracts";
+export const RESEARCH_BUDGET = Object.freeze({
+	rootMilliseconds: 180000,
+	workerMilliseconds: 150000,
+	parentMilliseconds: 30000,
+	modelStepMilliseconds: 45000,
+	operationReserveMilliseconds: 60000,
+	webModelCalls: 12,
+	historyModelCalls: 7,
+	localCalls: 4,
+	externalCalls: 5,
+	searches: 2,
+	reads: 3,
+});
 export const isHistory = (p: Prepared | undefined) =>
 	p?.package.backend === "history";
-export const modelLimit = (p: Prepared | undefined) => (isHistory(p) ? 7 : 12);
+export const isQuickWeb = (p: Prepared | undefined) =>
+	p?.package.id === "web.quick";
+const QUICK_WEB_BUDGET = Object.freeze({
+	modelCalls: 5,
+	localCalls: 0,
+	externalCalls: 2,
+	searches: 1,
+	reads: 1,
+});
+export const operationLimits = (p: Prepared | undefined) =>
+	isQuickWeb(p) ? QUICK_WEB_BUDGET : RESEARCH_BUDGET;
+export const modelLimit = (p: Prepared | undefined) =>
+	isHistory(p)
+		? RESEARCH_BUDGET.historyModelCalls
+		: isQuickWeb(p)
+			? QUICK_WEB_BUDGET.modelCalls
+			: RESEARCH_BUDGET.webModelCalls;
 export const localTool = (id: string) =>
 	["web.find", "web.read_saved", "history.search", "history.read"].includes(id);
-export function workerDeadline(
-	p: Prepared,
-	parentDeadline: number,
-	now: number,
-) {
-	const deadline = Math.min(now + 150000, parentDeadline - 30000);
+export function workerDeadline(parentDeadline: number, now: number) {
+	const deadline = Math.min(
+		now + RESEARCH_BUDGET.workerMilliseconds,
+		parentDeadline - RESEARCH_BUDGET.parentMilliseconds,
+	);
 	if (deadline <= now) throw new Error("agent_budget_exhausted");
 	return deadline;
 }
-export function stepDeadline(t: Task, p: Prepared | undefined, now: number) {
-	return Math.min(t.deadline, now + 45000);
+export function stepDeadline(t: Task, now: number) {
+	return Math.min(t.deadline, now + RESEARCH_BUDGET.modelStepMilliseconds);
 }
 export function explorationBudget(
 	t: Task,
@@ -40,9 +68,13 @@ export function explorationBudget(
 		externalCalls: external,
 		reads,
 		searches,
-		maxLocalCalls: 4,
-		maxExternalCalls: 5,
+		maxLocalCalls: operationLimits(p).localCalls,
+		maxExternalCalls: operationLimits(p).externalCalls,
+		maxSearches: operationLimits(p).searches,
+		maxReads: operationLimits(p).reads,
 		maxModelCalls: modelLimit(p),
-		canOperate: t.model_calls < modelLimit(p) - 1 && t.deadline - now > 60000,
+		canOperate:
+			t.model_calls < modelLimit(p) - 2 &&
+			t.deadline - now > RESEARCH_BUDGET.operationReserveMilliseconds,
 	};
 }

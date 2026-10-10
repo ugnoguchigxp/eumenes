@@ -1,0 +1,46 @@
+bun test v1.4.2 (744846f84)
+
+api/domains/research-routes/test/keys.test.ts:
+(pass) K02 equivalent Kamakura phrasings share key and query; Shizuoka city differs [1.34ms]
+(pass) K02 time mode and required fields produce distinct keys [0.24ms]
+(pass) K02 quotes keep ticker characters and reject unconfirmed/compound input [0.50ms]
+(pass) K02 binding fixes the target date at acceptance [0.21ms]
+
+api/domains/research-routes/test/validation.test.ts:
+(pass) the fixed research report derives canonical facts only from its exact, cited excerpts [0.69ms]
+(pass) V01 weather valid, and every mismatch class is separated [0.95ms]
+(pass) V01 relative date follows the binding, not the clock [0.10ms]
+(pass) V01 quote: independent extraction, market from provider code, freshness [1.26ms]
+(pass) V01/V02 a page-controlled announcement token never reaches facts or the parent summary [0.12ms]
+
+api/domains/delivery/test/delivery.test.ts:
+(pass) full reply and recent conversation decide emotion; speech motion and voice are separate derived actions [1.50ms]
+(pass) unnecessary, uncertain, invalid or truncated choices never become emotion icons [0.45ms]
+(pass) evidence comes from this response and latest user; quotes, code and negation do not force emotion [0.21ms]
+(pass) selected-answer probability is required and is not question applicability [0.15ms]
+(pass) timeout is bounded and caller cancellation or a late answer cannot restore emotion [7.11ms]
+(pass) all expressions map to restrained motion without classifying drowsiness or actions as emotions [0.27ms]
+(pass) long data stays bounded, preserves beginnings and endings, excludes system instructions and older turns [127.73ms]
+
+api/domains/inference/test/speech-intonation.test.ts:
+(pass) phrase intonation follows punctuation and questions, preserves baseline and stays bounded [0.09ms]
+(pass) auto strength scales the deviation from the baseline
+(pass) phrase adjustment moves speed and pitch from the baseline and respects strength [0.06ms]
+
+api/domains/voice-dialogue/test/asr-language.test.ts:
+(pass) 日本語と英語のみ許可すると中国語の聞き取りを破棄する [0.27ms]
+(pass) 中国語を許可すると漢字のみの文を通す
+
+api/domains/agent-runtime/test/context.test.ts:
+(pass) retired evidence cannot be reported and its reference is never reassigned [0.29ms]
+(pass) fixed report schema publishes the same outcome/claim constraints as host validation [0.85ms]
+(pass) three distant ranges of one document keep immutable task evidence and use one document alias [0.39ms]
+(pass) evidence capacity stops additions without evicting previous references [1.89ms]
+(pass) fixed contract retains the whole request, removes needs and suggestions, and scopes operation references [0.58ms]
+(pass) one worker deadline policy reserves 30 seconds for the parent [0.05ms]
+(pass) bounded observations never register an excerpt absent from the actual model packet [0.54ms]
+
+ 28 pass
+ 0 fail
+ 199 expect() calls
+Ran 28 tests across 6 files. [238.00ms]

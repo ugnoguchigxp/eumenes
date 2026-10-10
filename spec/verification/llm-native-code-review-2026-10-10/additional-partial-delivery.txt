@@ -1,0 +1,43 @@
+$ bun scripts/verify.ts --domain delivery
+[verify] selected=delivery dependencyClosure=delivery testClosure=delivery
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts api/domains/delivery
+size-budget ok (5 files)
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check api/domains/delivery
+$ oxfmt --check api/domains/delivery
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 8ms on 11 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint api/domains/delivery
+$ oxlint --deny-warnings api/domains/delivery
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun x tsc -p /Users/y.noguchi/Code/eumenes/verification-reports/tsconfig.selected.json
+[verify] TypeScript workspace closure: 11 files; api/domains/delivery
+[verify] domain tests: /Users/y.noguchi/.bun/bin/bun run test:domain -- delivery
+$ bun scripts/test-domain.ts delivery
+bun test v1.4.2 (744846f84)
+
+api/domains/delivery/test/ruri.test.ts:
+(pass) Ruri source, calibration, 0.6 adoption and rejected subset preserve original six-class scores [3.08ms]
+(pass) top-level and legacy usage truncation are both rejected [0.30ms]
+(pass) inconsistent Ruri class or confidence cannot drive expressions while its original vectors remain inspectable [0.21ms]
+(pass) missing metadata stays null and unknown raw provider fields are not retained [0.04ms]
+(pass) recorded truncation agrees with rejection when top-level and legacy flags disagree [0.11ms]
+(pass) malformed Ruri metadata retains its identity and cannot be accepted as Laya [0.34ms]
+
+api/domains/delivery/test/strength.test.ts:
+(pass) tone offsets are scaled by autoStrength and stay within bounds [0.05ms]
+
+api/domains/delivery/test/delivery.test.ts:
+(pass) full reply and recent conversation decide emotion; speech motion and voice are separate derived actions [0.24ms]
+(pass) unnecessary, uncertain, invalid or truncated choices never become emotion icons [0.39ms]
+(pass) E01/E02/E03 every nonempty reply keeps quotes, negation and definitions and uses all candidates once [0.26ms]
+(pass) selected-answer probability is required and is not question applicability [0.10ms]
+(pass) timeout is bounded and caller cancellation or a late answer cannot restore emotion [7.22ms]
+(pass) all expressions map to restrained motion without classifying drowsiness or actions as emotions [0.37ms]
+(pass) long data stays bounded, preserves beginnings and endings, excludes system instructions and older turns [0.84ms]
+
+ 14 pass
+ 0 fail
+ 117 expect() calls
+Ran 14 tests across 3 files. [76.00ms]
+[verify] passed 1371 ms

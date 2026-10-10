@@ -43,18 +43,14 @@ test("gateway refuses foreign refs and unselected URLs; idempotent invocation an
 		await caps.seed();
 		const owner = { rootRunId: "root", taskId: "child", cancelEpoch: 0 };
 		const refs = await store.write((db) => {
-			const candidate = caps.searchInTransaction(
-				db,
-				owner,
-				"天気",
-				["天気"],
-				Date.now() + 100000,
-			)[0]!;
 			return tools.bind(
 				owner,
-				caps.prepareInTransaction(db, owner, candidate.candidateRef, {
-					question: "天気",
-				}),
+				caps.prepareActiveByIdInTransaction(
+					db,
+					owner,
+					"package:web.research@9",
+					{ question: "天気" },
+				),
 				Date.now() + 100000,
 			);
 		});

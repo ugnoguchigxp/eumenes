@@ -16,6 +16,7 @@ test("defaults are the values the server used before the config was centralised"
 		memoryJournalPath: "data/memory-forget-journal.jsonl",
 		worldJournalPath: undefined,
 		codingRunnerConfig: undefined,
+		researchCodexExecutable: "codex",
 		worldMode: "off",
 		worldPollMs: undefined,
 		worldCursorSecret: undefined,

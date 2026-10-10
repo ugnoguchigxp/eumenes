@@ -1,0 +1,941 @@
+{
+	"version": 1,
+	"cases": [
+		{
+			"id": "event-complete",
+			"suite": "requirements",
+			"engine": "default",
+			"request": "催しの申込締切と料金を確認してください。 https://example.org/fixtures/event-complete",
+			"profiles": [
+				{
+					"id": "event",
+					"file": "event.json"
+				}
+			],
+			"sources": [
+				{
+					"url": "https://example.org/fixtures/event-complete",
+					"title": "人工固定資料",
+					"body": "受付開始は2026年10月12日09:00 JST。申込締切は2026年10月15日18:00 JST。参加費は一人1,500 JPY。",
+					"fetchedAt": "2026-10-10T00:00:00Z"
+				}
+			],
+			"expected": {
+				"outcome": "answered",
+				"checks": [
+					{
+						"profileId": "event",
+						"localId": "deadline",
+						"status": "satisfied",
+						"value": "2026-10-15T09:00:00Z"
+					},
+					{
+						"profileId": "event",
+						"localId": "fee",
+						"status": "satisfied",
+						"value": {
+							"amount": 1500,
+							"currency": "JPY"
+						}
+					}
+				],
+				"semanticAssertions": [
+					"依頼の全条件が保持され、根拠にない値を補わない",
+					"本文内の開始・締切・否定・例外・矛盾を区別する"
+				]
+			}
+		},
+		{
+			"id": "event-missing",
+			"suite": "requirements",
+			"engine": "default",
+			"request": "催しの申込締切と料金を確認してください。 https://example.org/fixtures/event-missing",
+			"profiles": [
+				{
+					"id": "event",
+					"file": "event.json"
+				}
+			],
+			"sources": [
+				{
+					"url": "https://example.org/fixtures/event-missing",
+					"title": "人工固定資料",
+					"body": "受付開始は2026年10月12日09:00 JST。申込締切は記載がない。参加費は一人1,500 JPY。",
+					"fetchedAt": "2026-10-10T00:00:00Z"
+				}
+			],
+			"expected": {
+				"outcome": "partial",
+				"checks": [
+					{
+						"profileId": "event",
+						"localId": "deadline",
+						"status": "unknown",
+						"value": null
+					},
+					{
+						"profileId": "event",
+						"localId": "fee",
+						"status": "satisfied",
+						"value": {
+							"amount": 1500,
+							"currency": "JPY"
+						}
+					}
+				],
+				"semanticAssertions": [
+					"依頼の全条件が保持され、根拠にない値を補わない",
+					"本文内の開始・締切・否定・例外・矛盾を区別する"
+				]
+			}
+		},
+		{
+			"id": "facility-complete",
+			"suite": "requirements",
+			"engine": "default",
+			"request": "日曜日の利用時間と12歳未満の利用条件を確認してください。 https://example.org/fixtures/facility-complete",
+			"profiles": [
+				{
+					"id": "facility",
+					"file": "facility.json"
+				}
+			],
+			"sources": [
+				{
+					"url": "https://example.org/fixtures/facility-complete",
+					"title": "人工固定資料",
+					"body": "日曜日は10:00〜17:00。12歳未満は成人同伴が必要。一般料金500 JPY、会員料金300 JPY。",
+					"fetchedAt": "2026-10-10T00:00:00Z"
+				}
+			],
+			"expected": {
+				"outcome": "answered",
+				"checks": [
+					{
+						"profileId": "facility",
+						"localId": "hours",
+						"status": "satisfied",
+						"value": "10:00〜17:00"
+					},
+					{
+						"profileId": "facility",
+						"localId": "age",
+						"status": "satisfied",
+						"value": "12歳未満は成人同伴が必要"
+					}
+				],
+				"semanticAssertions": [
+					"依頼の全条件が保持され、根拠にない値を補わない",
+					"本文内の開始・締切・否定・例外・矛盾を区別する"
+				]
+			}
+		},
+		{
+			"id": "facility-conflict",
+			"suite": "requirements",
+			"engine": "default",
+			"request": "日曜日の利用時間と12歳未満の利用条件を確認してください。 https://example.org/fixtures/facility-conflict",
+			"profiles": [
+				{
+					"id": "facility",
+					"file": "facility.json"
+				}
+			],
+			"sources": [
+				{
+					"url": "https://example.org/fixtures/facility-conflict",
+					"title": "人工固定資料",
+					"body": "本館規程: 日曜日10:00〜17:00。12歳未満は成人同伴が必要。予約案内: 日曜日10:00〜17:00。12歳未満は同伴の有無によらず入館不可。どちらが有効かは記載なし。",
+					"fetchedAt": "2026-10-10T00:00:00Z"
+				}
+			],
+			"expected": {
+				"outcome": "partial",
+				"checks": [
+					{
+						"profileId": "facility",
+						"localId": "hours",
+						"status": "satisfied",
+						"value": "10:00〜17:00"
+					},
+					{
+						"profileId": "facility",
+						"localId": "age",
+						"status": "unknown",
+						"value": null
+					}
+				],
+				"semanticAssertions": [
+					"依頼の全条件が保持され、根拠にない値を補わない",
+					"本文内の開始・締切・否定・例外・矛盾を区別する"
+				]
+			}
+		},
+		{
+			"id": "delivery-explicit",
+			"suite": "delivery",
+			"text": "おめでとうございます",
+			"turns": [],
+			"expected": {
+				"emotion": "joy"
+			}
+		},
+		{
+			"id": "delivery-implicit",
+			"suite": "delivery",
+			"text": "努力が実りましたね。心から祝福します",
+			"turns": [],
+			"expected": {
+				"emotion": "joy"
+			}
+		},
+		{
+			"id": "delivery-quote",
+			"suite": "delivery",
+			"text": "「嬉しい」という言葉の意味を説明します",
+			"turns": [],
+			"expected": {
+				"emotion": "none"
+			}
+		},
+		{
+			"id": "delivery-negation",
+			"suite": "delivery",
+			"text": "嬉しいとは言えません",
+			"turns": [],
+			"expected": {
+				"emotion": "none"
+			}
+		},
+		{
+			"id": "delivery-empathy",
+			"suite": "delivery",
+			"text": "つらい状況でしたね。一緒に整理しましょう",
+			"turns": [],
+			"expected": {
+				"emotion": "empathy"
+			}
+		},
+		{
+			"id": "voice-ja-api",
+			"suite": "voice-language",
+			"text": "APIを確認してください",
+			"allowedLanguages": ["ja"],
+			"expected": {
+				"status": "allowed",
+				"languages": ["ja"]
+			}
+		},
+		{
+			"id": "voice-fr",
+			"suite": "voice-language",
+			"text": "Bonjour, comment allez-vous?",
+			"allowedLanguages": ["en"],
+			"expected": {
+				"status": "not_allowed",
+				"languages": ["fr"]
+			}
+		},
+		{
+			"id": "voice-mixed",
+			"suite": "voice-language",
+			"text": "設定を確認して、then explain the next step in English.",
+			"allowedLanguages": ["ja", "en"],
+			"expected": {
+				"status": "allowed",
+				"languages": ["ja", "en"]
+			}
+		},
+		{
+			"id": "voice-mixed-denied",
+			"suite": "voice-language",
+			"text": "設定を確認して、then explain the next step in English.",
+			"allowedLanguages": ["ja"],
+			"expected": {
+				"status": "not_allowed",
+				"languages": ["ja", "en"]
+			}
+		},
+		{
+			"id": "voice-short",
+			"suite": "voice-language",
+			"text": "OK",
+			"allowedLanguages": ["ja"],
+			"expected": {
+				"status": "unverified"
+			}
+		},
+		{
+			"id": "product-target",
+			"suite": "requirements",
+			"engine": "default",
+			"request": "NX-42のR2対応可否と必要firmwareを確認してください。 https://example.org/fixtures/product-target",
+			"profiles": [
+				{
+					"id": "product",
+					"file": "product.json"
+				}
+			],
+			"sources": [
+				{
+					"url": "https://example.org/fixtures/product-target",
+					"title": "人工仕様資料",
+					"body": "NX-42は規格R2対応。ただしfirmware 3.2以上が必要。旧型NX-24は規格R2非対応。",
+					"fetchedAt": "2026-10-10T00:00:00Z"
+				}
+			],
+			"expected": {
+				"outcome": "answered",
+				"checks": [
+					{
+						"profileId": "product",
+						"localId": "compatibility",
+						"status": "satisfied",
+						"value": "R2対応"
+					},
+					{
+						"profileId": "product",
+						"localId": "firmware",
+						"status": "satisfied",
+						"value": "3.2以上"
+					}
+				],
+				"semanticAssertions": [
+					"指定された型番の事実を別型番と取り違えない",
+					"非対応・必要firmware・適用外を区別する"
+				]
+			}
+		},
+		{
+			"id": "product-old",
+			"suite": "requirements",
+			"engine": "default",
+			"request": "NX-24のR2対応可否と必要firmwareを確認してください。 https://example.org/fixtures/product-old",
+			"profiles": [
+				{
+					"id": "product",
+					"file": "product.json"
+				}
+			],
+			"sources": [
+				{
+					"url": "https://example.org/fixtures/product-old",
+					"title": "人工仕様資料",
+					"body": "NX-42は規格R2対応。ただしfirmware 3.2以上が必要。旧型NX-24は規格R2非対応。",
+					"fetchedAt": "2026-10-10T00:00:00Z"
+				}
+			],
+			"expected": {
+				"outcome": "answered",
+				"checks": [
+					{
+						"profileId": "product",
+						"localId": "compatibility",
+						"status": "satisfied",
+						"value": "R2非対応"
+					},
+					{
+						"profileId": "product",
+						"localId": "firmware",
+						"status": "not_applicable",
+						"value": null
+					}
+				],
+				"semanticAssertions": [
+					"指定された型番の事実を別型番と取り違えない",
+					"非対応・必要firmware・適用外を区別する"
+				]
+			}
+		},
+		{
+			"id": "event-complete-luna",
+			"suite": "requirements",
+			"engine": "codex_luna",
+			"request": "催しの申込締切と料金を確認してください。 https://example.org/fixtures/event-complete 調査はCodex Lunaへ依頼してください。",
+			"profiles": [
+				{
+					"id": "event",
+					"file": "event.json"
+				}
+			],
+			"sources": [
+				{
+					"url": "https://example.org/fixtures/event-complete",
+					"title": "人工固定資料",
+					"body": "受付開始は2026年10月12日09:00 JST。申込締切は2026年10月15日18:00 JST。参加費は一人1,500 JPY。",
+					"fetchedAt": "2026-10-10T00:00:00Z"
+				}
+			],
+			"expected": {
+				"outcome": "answered",
+				"checks": [
+					{
+						"profileId": "event",
+						"localId": "deadline",
+						"status": "satisfied",
+						"value": "2026-10-15T09:00:00Z"
+					},
+					{
+						"profileId": "event",
+						"localId": "fee",
+						"status": "satisfied",
+						"value": {
+							"amount": 1500,
+							"currency": "JPY"
+						}
+					}
+				],
+				"semanticAssertions": [
+					"依頼の全条件が保持され、根拠にない値を補わない",
+					"本文内の開始・締切・否定・例外・矛盾を区別する"
+				]
+			}
+		},
+		{
+			"id": "event-missing-luna",
+			"suite": "requirements",
+			"engine": "codex_luna",
+			"request": "催しの申込締切と料金を確認してください。 https://example.org/fixtures/event-missing 調査はCodex Lunaへ依頼してください。",
+			"profiles": [
+				{
+					"id": "event",
+					"file": "event.json"
+				}
+			],
+			"sources": [
+				{
+					"url": "https://example.org/fixtures/event-missing",
+					"title": "人工固定資料",
+					"body": "受付開始は2026年10月12日09:00 JST。申込締切は記載がない。参加費は一人1,500 JPY。",
+					"fetchedAt": "2026-10-10T00:00:00Z"
+				}
+			],
+			"expected": {
+				"outcome": "partial",
+				"checks": [
+					{
+						"profileId": "event",
+						"localId": "deadline",
+						"status": "unknown",
+						"value": null
+					},
+					{
+						"profileId": "event",
+						"localId": "fee",
+						"status": "satisfied",
+						"value": {
+							"amount": 1500,
+							"currency": "JPY"
+						}
+					}
+				],
+				"semanticAssertions": [
+					"依頼の全条件が保持され、根拠にない値を補わない",
+					"本文内の開始・締切・否定・例外・矛盾を区別する"
+				]
+			}
+		},
+		{
+			"id": "facility-complete-luna",
+			"suite": "requirements",
+			"engine": "codex_luna",
+			"request": "日曜日の利用時間と12歳未満の利用条件を確認してください。 https://example.org/fixtures/facility-complete 調査はCodex Lunaへ依頼してください。",
+			"profiles": [
+				{
+					"id": "facility",
+					"file": "facility.json"
+				}
+			],
+			"sources": [
+				{
+					"url": "https://example.org/fixtures/facility-complete",
+					"title": "人工固定資料",
+					"body": "日曜日は10:00〜17:00。12歳未満は成人同伴が必要。一般料金500 JPY、会員料金300 JPY。",
+					"fetchedAt": "2026-10-10T00:00:00Z"
+				}
+			],
+			"expected": {
+				"outcome": "answered",
+				"checks": [
+					{
+						"profileId": "facility",
+						"localId": "hours",
+						"status": "satisfied",
+						"value": "10:00〜17:00"
+					},
+					{
+						"profileId": "facility",
+						"localId": "age",
+						"status": "satisfied",
+						"value": "12歳未満は成人同伴が必要"
+					}
+				],
+				"semanticAssertions": [
+					"依頼の全条件が保持され、根拠にない値を補わない",
+					"本文内の開始・締切・否定・例外・矛盾を区別する"
+				]
+			}
+		},
+		{
+			"id": "facility-conflict-luna",
+			"suite": "requirements",
+			"engine": "codex_luna",
+			"request": "日曜日の利用時間と12歳未満の利用条件を確認してください。 https://example.org/fixtures/facility-conflict 調査はCodex Lunaへ依頼してください。",
+			"profiles": [
+				{
+					"id": "facility",
+					"file": "facility.json"
+				}
+			],
+			"sources": [
+				{
+					"url": "https://example.org/fixtures/facility-conflict",
+					"title": "人工固定資料",
+					"body": "本館規程: 日曜日10:00〜17:00。12歳未満は成人同伴が必要。予約案内: 日曜日10:00〜17:00。12歳未満は同伴の有無によらず入館不可。どちらが有効かは記載なし。",
+					"fetchedAt": "2026-10-10T00:00:00Z"
+				}
+			],
+			"expected": {
+				"outcome": "partial",
+				"checks": [
+					{
+						"profileId": "facility",
+						"localId": "hours",
+						"status": "satisfied",
+						"value": "10:00〜17:00"
+					},
+					{
+						"profileId": "facility",
+						"localId": "age",
+						"status": "unknown",
+						"value": null
+					}
+				],
+				"semanticAssertions": [
+					"依頼の全条件が保持され、根拠にない値を補わない",
+					"本文内の開始・締切・否定・例外・矛盾を区別する"
+				]
+			}
+		},
+		{
+			"id": "product-target-luna",
+			"suite": "requirements",
+			"engine": "codex_luna",
+			"request": "NX-42のR2対応可否と必要firmwareを確認してください。 https://example.org/fixtures/product-target 調査はCodex Lunaへ依頼してください。",
+			"profiles": [
+				{
+					"id": "product",
+					"file": "product.json"
+				}
+			],
+			"sources": [
+				{
+					"url": "https://example.org/fixtures/product-target",
+					"title": "人工仕様資料",
+					"body": "NX-42は規格R2対応。ただしfirmware 3.2以上が必要。旧型NX-24は規格R2非対応。",
+					"fetchedAt": "2026-10-10T00:00:00Z"
+				}
+			],
+			"expected": {
+				"outcome": "answered",
+				"checks": [
+					{
+						"profileId": "product",
+						"localId": "compatibility",
+						"status": "satisfied",
+						"value": "R2対応"
+					},
+					{
+						"profileId": "product",
+						"localId": "firmware",
+						"status": "satisfied",
+						"value": "3.2以上"
+					}
+				],
+				"semanticAssertions": [
+					"指定された型番の事実を別型番と取り違えない",
+					"非対応・必要firmware・適用外を区別する"
+				]
+			}
+		},
+		{
+			"id": "product-old-luna",
+			"suite": "requirements",
+			"engine": "codex_luna",
+			"request": "NX-24のR2対応可否と必要firmwareを確認してください。 https://example.org/fixtures/product-old 調査はCodex Lunaへ依頼してください。",
+			"profiles": [
+				{
+					"id": "product",
+					"file": "product.json"
+				}
+			],
+			"sources": [
+				{
+					"url": "https://example.org/fixtures/product-old",
+					"title": "人工仕様資料",
+					"body": "NX-42は規格R2対応。ただしfirmware 3.2以上が必要。旧型NX-24は規格R2非対応。",
+					"fetchedAt": "2026-10-10T00:00:00Z"
+				}
+			],
+			"expected": {
+				"outcome": "answered",
+				"checks": [
+					{
+						"profileId": "product",
+						"localId": "compatibility",
+						"status": "satisfied",
+						"value": "R2非対応"
+					},
+					{
+						"profileId": "product",
+						"localId": "firmware",
+						"status": "not_applicable",
+						"value": null
+					}
+				],
+				"semanticAssertions": [
+					"指定された型番の事実を別型番と取り違えない",
+					"非対応・必要firmware・適用外を区別する"
+				]
+			}
+		},
+		{
+			"id": "lodging-complete",
+			"suite": "requirements",
+			"engine": "default",
+			"request": "公式サイトで予約した2026年11月8日宿泊について無料取消期限と期限後の取消料率を確認してください。 https://example.org/fixtures/lodging-complete",
+			"profiles": [
+				{
+					"id": "lodging",
+					"file": "lodging.json"
+				}
+			],
+			"sources": [
+				{
+					"url": "https://example.org/fixtures/lodging-complete",
+					"title": "人工固定資料・宿泊規程",
+					"body": "公式サイトで予約した2026年11月8日宿泊の予約は、11月4日18:00 JSTまで無料で取消可能。旅行代理店経由の予約は代理店の約款に従う。期限後は一泊あたり料金の40%が取消料となる。当日の無連絡は100%。",
+					"fetchedAt": "2026-10-10T00:00:00Z"
+				}
+			],
+			"expected": {
+				"outcome": "answered",
+				"checks": [
+					{
+						"profileId": "lodging",
+						"localId": "deadline",
+						"status": "satisfied",
+						"value": "2026-11-04 18:00 JST"
+					},
+					{
+						"profileId": "lodging",
+						"localId": "fee",
+						"status": "satisfied",
+						"value": 40
+					}
+				],
+				"semanticAssertions": [
+					"公式サイトの規程を選び代理店約款と混同しない",
+					"期限後の通常取消料と当日無連絡の料率を区別する",
+					"未記載の料率を100%から補わない"
+				]
+			}
+		},
+		{
+			"id": "lodging-complete-luna",
+			"suite": "requirements",
+			"engine": "codex_luna",
+			"request": "公式サイトで予約した2026年11月8日宿泊について無料取消期限と期限後の取消料率を確認してください。 https://example.org/fixtures/lodging-complete-luna 調査はCodex Lunaへ依頼してください。",
+			"profiles": [
+				{
+					"id": "lodging",
+					"file": "lodging.json"
+				}
+			],
+			"sources": [
+				{
+					"url": "https://example.org/fixtures/lodging-complete-luna",
+					"title": "人工固定資料・宿泊規程",
+					"body": "公式サイトで予約した2026年11月8日宿泊の予約は、11月4日18:00 JSTまで無料で取消可能。旅行代理店経由の予約は代理店の約款に従う。期限後は一泊あたり料金の40%が取消料となる。当日の無連絡は100%。",
+					"fetchedAt": "2026-10-10T00:00:00Z"
+				}
+			],
+			"expected": {
+				"outcome": "answered",
+				"checks": [
+					{
+						"profileId": "lodging",
+						"localId": "deadline",
+						"status": "satisfied",
+						"value": "2026-11-04 18:00 JST"
+					},
+					{
+						"profileId": "lodging",
+						"localId": "fee",
+						"status": "satisfied",
+						"value": 40
+					}
+				],
+				"semanticAssertions": [
+					"公式サイトの規程を選び代理店約款と混同しない",
+					"期限後の通常取消料と当日無連絡の料率を区別する",
+					"未記載の料率を100%から補わない"
+				]
+			}
+		},
+		{
+			"id": "lodging-missing",
+			"suite": "requirements",
+			"engine": "default",
+			"request": "公式サイトで予約した2026年11月8日宿泊について無料取消期限と期限後の取消料率を確認してください。 https://example.org/fixtures/lodging-missing",
+			"profiles": [
+				{
+					"id": "lodging",
+					"file": "lodging.json"
+				}
+			],
+			"sources": [
+				{
+					"url": "https://example.org/fixtures/lodging-missing",
+					"title": "人工固定資料・宿泊規程",
+					"body": "公式サイトで予約した2026年11月8日宿泊の予約は、11月4日18:00 JSTまで無料で取消可能。旅行代理店経由の予約は代理店の約款に従う。無料取消期限後の取消料率は記載されていない。当日の無連絡は100%。",
+					"fetchedAt": "2026-10-10T00:00:00Z"
+				}
+			],
+			"expected": {
+				"outcome": "partial",
+				"checks": [
+					{
+						"profileId": "lodging",
+						"localId": "deadline",
+						"status": "satisfied",
+						"value": "2026-11-04 18:00 JST"
+					},
+					{
+						"profileId": "lodging",
+						"localId": "fee",
+						"status": "unknown",
+						"value": null
+					}
+				],
+				"semanticAssertions": [
+					"公式サイトの規程を選び代理店約款と混同しない",
+					"期限後の通常取消料と当日無連絡の料率を区別する",
+					"未記載の料率を100%から補わない"
+				]
+			}
+		},
+		{
+			"id": "lodging-missing-luna",
+			"suite": "requirements",
+			"engine": "codex_luna",
+			"request": "公式サイトで予約した2026年11月8日宿泊について無料取消期限と期限後の取消料率を確認してください。 https://example.org/fixtures/lodging-missing-luna 調査はCodex Lunaへ依頼してください。",
+			"profiles": [
+				{
+					"id": "lodging",
+					"file": "lodging.json"
+				}
+			],
+			"sources": [
+				{
+					"url": "https://example.org/fixtures/lodging-missing-luna",
+					"title": "人工固定資料・宿泊規程",
+					"body": "公式サイトで予約した2026年11月8日宿泊の予約は、11月4日18:00 JSTまで無料で取消可能。旅行代理店経由の予約は代理店の約款に従う。無料取消期限後の取消料率は記載されていない。当日の無連絡は100%。",
+					"fetchedAt": "2026-10-10T00:00:00Z"
+				}
+			],
+			"expected": {
+				"outcome": "partial",
+				"checks": [
+					{
+						"profileId": "lodging",
+						"localId": "deadline",
+						"status": "satisfied",
+						"value": "2026-11-04 18:00 JST"
+					},
+					{
+						"profileId": "lodging",
+						"localId": "fee",
+						"status": "unknown",
+						"value": null
+					}
+				],
+				"semanticAssertions": [
+					"公式サイトの規程を選び代理店約款と混同しない",
+					"期限後の通常取消料と当日無連絡の料率を区別する",
+					"未記載の料率を100%から補わない"
+				]
+			}
+		},
+		{
+			"id": "rental-complete",
+			"suite": "requirements",
+			"engine": "default",
+			"request": "個人として機材を借りるときの最低年齢と保証金を確認してください。 https://example.org/fixtures/rental-complete",
+			"profiles": [
+				{
+					"id": "rental",
+					"file": "rental.json"
+				}
+			],
+			"sources": [
+				{
+					"url": "https://example.org/fixtures/rental-complete",
+					"title": "人工固定資料・機材貸出規程",
+					"body": "個人で機材を借りる契約者は21歳以上。18〜20歳の利用者は法人契約による機材の使用に限る。法人契約の保証金は不要。個人契約の保証金は8,000 JPYで、返却点検後に返金する。",
+					"fetchedAt": "2026-10-10T00:00:00Z"
+				}
+			],
+			"expected": {
+				"outcome": "answered",
+				"checks": [
+					{
+						"profileId": "rental",
+						"localId": "age",
+						"status": "satisfied",
+						"value": 21
+					},
+					{
+						"profileId": "rental",
+						"localId": "deposit",
+						"status": "satisfied",
+						"value": {
+							"amount": 8000,
+							"currency": "JPY"
+						}
+					}
+				],
+				"semanticAssertions": [
+					"利用者の年齢と個人契約者の最低年齢を区別する",
+					"個人契約と法人契約の保証金を区別し未記載を0円で補わない"
+				]
+			}
+		},
+		{
+			"id": "rental-complete-luna",
+			"suite": "requirements",
+			"engine": "codex_luna",
+			"request": "個人として機材を借りるときの最低年齢と保証金を確認してください。 https://example.org/fixtures/rental-complete-luna 調査はCodex Lunaへ依頼してください。",
+			"profiles": [
+				{
+					"id": "rental",
+					"file": "rental.json"
+				}
+			],
+			"sources": [
+				{
+					"url": "https://example.org/fixtures/rental-complete-luna",
+					"title": "人工固定資料・機材貸出規程",
+					"body": "個人で機材を借りる契約者は21歳以上。18〜20歳の利用者は法人契約による機材の使用に限る。法人契約の保証金は不要。個人契約の保証金は8,000 JPYで、返却点検後に返金する。",
+					"fetchedAt": "2026-10-10T00:00:00Z"
+				}
+			],
+			"expected": {
+				"outcome": "answered",
+				"checks": [
+					{
+						"profileId": "rental",
+						"localId": "age",
+						"status": "satisfied",
+						"value": 21
+					},
+					{
+						"profileId": "rental",
+						"localId": "deposit",
+						"status": "satisfied",
+						"value": {
+							"amount": 8000,
+							"currency": "JPY"
+						}
+					}
+				],
+				"semanticAssertions": [
+					"利用者の年齢と個人契約者の最低年齢を区別する",
+					"個人契約と法人契約の保証金を区別し未記載を0円で補わない"
+				]
+			}
+		},
+		{
+			"id": "rental-missing",
+			"suite": "requirements",
+			"engine": "default",
+			"request": "個人として機材を借りるときの最低年齢と保証金を確認してください。 https://example.org/fixtures/rental-missing",
+			"profiles": [
+				{
+					"id": "rental",
+					"file": "rental.json"
+				}
+			],
+			"sources": [
+				{
+					"url": "https://example.org/fixtures/rental-missing",
+					"title": "人工固定資料・機材貸出規程",
+					"body": "個人で機材を借りる契約者は21歳以上。18〜20歳の利用者は法人契約による機材の使用に限る。法人契約の保証金は不要。個人契約の保証金額はこの資料に記載されていない。",
+					"fetchedAt": "2026-10-10T00:00:00Z"
+				}
+			],
+			"expected": {
+				"outcome": "partial",
+				"checks": [
+					{
+						"profileId": "rental",
+						"localId": "age",
+						"status": "satisfied",
+						"value": 21
+					},
+					{
+						"profileId": "rental",
+						"localId": "deposit",
+						"status": "unknown",
+						"value": null
+					}
+				],
+				"semanticAssertions": [
+					"利用者の年齢と個人契約者の最低年齢を区別する",
+					"個人契約と法人契約の保証金を区別し未記載を0円で補わない"
+				]
+			}
+		},
+		{
+			"id": "rental-missing-luna",
+			"suite": "requirements",
+			"engine": "codex_luna",
+			"request": "個人として機材を借りるときの最低年齢と保証金を確認してください。 https://example.org/fixtures/rental-missing-luna 調査はCodex Lunaへ依頼してください。",
+			"profiles": [
+				{
+					"id": "rental",
+					"file": "rental.json"
+				}
+			],
+			"sources": [
+				{
+					"url": "https://example.org/fixtures/rental-missing-luna",
+					"title": "人工固定資料・機材貸出規程",
+					"body": "個人で機材を借りる契約者は21歳以上。18〜20歳の利用者は法人契約による機材の使用に限る。法人契約の保証金は不要。個人契約の保証金額はこの資料に記載されていない。",
+					"fetchedAt": "2026-10-10T00:00:00Z"
+				}
+			],
+			"expected": {
+				"outcome": "partial",
+				"checks": [
+					{
+						"profileId": "rental",
+						"localId": "age",
+						"status": "satisfied",
+						"value": 21
+					},
+					{
+						"profileId": "rental",
+						"localId": "deposit",
+						"status": "unknown",
+						"value": null
+					}
+				],
+				"semanticAssertions": [
+					"利用者の年齢と個人契約者の最低年齢を区別する",
+					"個人契約と法人契約の保証金を区別し未記載を0円で補わない"
+				]
+			}
+		}
+	]
+}

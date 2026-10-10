@@ -1,0 +1,44 @@
+{
+	"version": 1,
+	"title": "催しの申込条件",
+	"scope": "催しへの申込方法・料金・締切の確認",
+	"requirements": [
+		{
+			"id": "deadline",
+			"statement": "申込締切を受付開始時刻と区別する",
+			"required": true,
+			"applicability": "現在の依頼に適用するとき",
+			"allowNotApplicable": true,
+			"valueSchema": {
+				"type": "string",
+				"format": "date-time",
+				"maxLength": 40
+			}
+		},
+		{
+			"id": "fee",
+			"statement": "参加者一人当たりの料金と通貨を確認",
+			"required": true,
+			"applicability": "現在の依頼に適用するとき",
+			"allowNotApplicable": false,
+			"valueSchema": {
+				"type": "object",
+				"properties": {
+					"amount": {
+						"type": "number",
+						"minimum": 0
+					},
+					"currency": {
+						"type": "string",
+						"maxLength": 16
+					}
+				},
+				"required": ["amount", "currency"],
+				"additionalProperties": false
+			}
+		}
+	],
+	"provenance": {
+		"kind": "user"
+	}
+}

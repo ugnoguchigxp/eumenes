@@ -1,0 +1,38 @@
+{
+	"emotion": [
+		{
+			"text": "おめでとうございます。",
+			"calls": 1,
+			"emotion": "joy"
+		},
+		{
+			"text": "努力が実りましたね。心から祝福します。",
+			"calls": 0,
+			"emotion": "none",
+			"reason": "not-expressive"
+		}
+	],
+	"skillContext": {
+		"sameMessagesDespiteDifferentRules": true,
+		"differentManifestDigest": true,
+		"containsEitherRule": false
+	},
+	"timer": "タイマーが2件動いています",
+	"language": [
+		{
+			"text": "APIを確認してください",
+			"allow": ["ja"],
+			"accepted": false
+		},
+		{
+			"text": "Bonjour, comment allez-vous?",
+			"allow": ["en"],
+			"accepted": true
+		}
+	],
+	"intonation": {
+		"speed": 0.95,
+		"pitchScale": -0.01,
+		"intonationScale": 1.15
+	}
+}

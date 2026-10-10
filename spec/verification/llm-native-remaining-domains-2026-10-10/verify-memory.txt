@@ -1,0 +1,27 @@
+$ bun scripts/verify.ts --domain memory
+[verify] selected=memory dependencyClosure=continuity,delivery,conversation,memory testClosure=continuity,delivery,avatar,conversation,memory
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts api/domains/memory
+size-budget ok (6 files)
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check api/domains/memory
+$ oxfmt --check api/domains/memory
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 3ms on 7 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint api/domains/memory
+$ oxlint --deny-warnings api/domains/memory
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun x tsc -p /Users/y.noguchi/Code/eumenes/verification-reports/tsconfig.selected.json
+[verify] TypeScript workspace closure: 33 files; api/infrastructure/flock.ts, api/infrastructure/logger.ts, api/infrastructure/sqlite, api/domains/memory, api/domains/delivery, api/domains/conversation, api/infrastructure/http.ts, api/domains/continuity, api/infrastructure/digest.ts
+[verify] domain tests: /Users/y.noguchi/.bun/bin/bun run test:domain -- memory
+$ bun scripts/test-domain.ts memory
+bun test v1.4.2 (744846f84)
+
+api/domains/memory/test/memory.test.ts:
+(pass) remember, stop, retract and forget work end to end over HTTP without dialogue; memory is shared across conversations [30.21ms]
+(pass) policyRevisionInTransaction is the revision memory's access() uses and moves with the memory ON/OFF setting [12.29ms]
+
+ 2 pass
+ 0 fail
+ 15 expect() calls
+Ran 2 tests across 1 file. [118.00ms]
+[verify] passed 2117 ms

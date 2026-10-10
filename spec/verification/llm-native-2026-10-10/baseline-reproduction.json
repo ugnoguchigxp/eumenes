@@ -1,0 +1,16 @@
+{
+	"jaAbbreviation": false,
+	"frenchWithEn": true,
+	"negatedNotice": {
+		"speed": 0.95,
+		"pitchScale": -0.01,
+		"intonationScale": 1.15
+	},
+	"plain": {
+		"speed": 1,
+		"pitchScale": 0,
+		"intonationScale": 1
+	},
+	"twoTimers": "タイマーが2件動いています",
+	"implicitJoyCandidates": []
+}

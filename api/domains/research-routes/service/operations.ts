@@ -19,7 +19,7 @@ import {
 	ttl,
 } from "../contracts";
 import * as repo from "../repository";
-import type { EditResult } from "./registration";
+import type { EditResult } from ".";
 import { type Clock, deriveState, stateTokenOf, systemClock } from "./registry";
 import type { ControlResult } from "./plans";
 
@@ -253,32 +253,19 @@ export function createOperations(deps: OperationsDeps) {
 			path: `/api/research-routes/${key}/edits`,
 			requestId: b.data.requestId,
 			body: b.data,
-			run: (db, changes) => {
+			run: (db) => {
 				const r = deps.routes.editInTransaction(db, {
 					key,
 					expectedStateToken: b.data.expectedStateToken,
 					instruction: b.data.instruction,
 				});
 				switch (r.kind) {
-					case "accepted":
-						changes.push({ type: "edit_accepted", key, draftId: r.draftId });
-						return ok({ draftId: r.draftId }, 202);
 					case "not_found":
 						return err(404, "not_found");
 					case "conflict":
 						return err(409, r.code);
 					case "not_editable":
 						return err(409, "route_not_editable");
-					case "rejected":
-						return err(400, r.code);
-					case "busy":
-						return {
-							...err(
-								r.code === "queue_full" ? 429 : 503,
-								r.code === "queue_full" ? "control_busy" : r.code,
-							),
-							persist: false,
-						};
 				}
 			},
 		});

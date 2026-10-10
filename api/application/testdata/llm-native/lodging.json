@@ -1,0 +1,33 @@
+{
+	"version": 1,
+	"title": "宿泊予約の取消条件",
+	"scope": "予約経路と宿泊日で適用される取消条件を確認する",
+	"requirements": [
+		{
+			"id": "deadline",
+			"statement": "無料で取消できる期限を予約経路と宿泊日から確認する",
+			"required": true,
+			"applicability": "現在の予約",
+			"allowNotApplicable": false,
+			"valueSchema": {
+				"type": "string",
+				"maxLength": 100
+			}
+		},
+		{
+			"id": "fee",
+			"statement": "無料取消期限後に適用される一泊あたりの取消料率を確認する",
+			"required": true,
+			"applicability": "現在の予約",
+			"allowNotApplicable": false,
+			"valueSchema": {
+				"type": "integer",
+				"minimum": 0,
+				"maximum": 100
+			}
+		}
+	],
+	"provenance": {
+		"kind": "user"
+	}
+}

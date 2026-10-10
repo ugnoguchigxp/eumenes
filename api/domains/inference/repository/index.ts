@@ -17,6 +17,8 @@ export const backgroundControlMigration = `CREATE TABLE inference_background_con
  request_id TEXT PRIMARY KEY REFERENCES inference_requests(id), binding TEXT NOT NULL
 );`;
 export interface RequestRow {
+	controlEngine: "larm" | "codex_luna";
+	controlPolicyRequestId: string | null;
 	id: string;
 	subject: string;
 	purpose: Purpose;
@@ -37,6 +39,8 @@ export function get(db: Database, id: string): RequestRow | null {
 				parents: string;
 				output_limit?: number | null;
 				context_policy?: "legacy" | "exact";
+				control_engine?: "larm" | "codex_luna";
+				control_policy_request_id?: string | null;
 		  })
 		| null;
 	return row
@@ -47,8 +51,28 @@ export function get(db: Database, id: string): RequestRow | null {
 				mode: row.mode ?? "answer",
 				outputLimit: row.output_limit ?? null,
 				contextPolicy: row.context_policy ?? "legacy",
+				controlEngine: row.control_engine ?? "larm",
+				controlPolicyRequestId: row.control_policy_request_id ?? null,
 			}
 		: null;
+}
+
+/** Pin the host-selected provider when the control is first captured. */
+export function bindControlEngine(
+	db: Database,
+	id: string,
+	engine?: "codex_luna",
+) {
+	const row = get(db, id)!;
+	if (
+		(row.mode === "control" || !engine) &&
+		row.controlEngine !== (engine ?? "larm")
+	)
+		throw new Error("control_engine_conflict");
+	if (engine)
+		db.query(
+			"UPDATE inference_requests SET control_engine=? WHERE id=? AND status='pending'",
+		).run(engine, id);
 }
 
 /** Named migrations of this domain; the SQL above is frozen once deployed. */
@@ -58,4 +82,14 @@ export const migrations: readonly Migration[] = [
 	{ id: "inference/0003-diagnostics", sql: diagnosticsMigration },
 	{ id: "inference/0004-control", sql: controlMigration },
 	{ id: "inference/0005-background-control", sql: backgroundControlMigration },
+	{
+		id: "inference/0006-control-engine",
+		after: ["inference/0005-background-control"],
+		sql: "ALTER TABLE inference_requests ADD COLUMN control_engine TEXT NOT NULL DEFAULT 'larm' CHECK(control_engine IN ('larm','codex_luna'));",
+	},
+	{
+		id: "inference/0007-control-policy-binding",
+		sql: "ALTER TABLE inference_requests ADD COLUMN control_policy_request_id TEXT;",
+		after: ["inference/0006-control-engine"],
+	},
 ];

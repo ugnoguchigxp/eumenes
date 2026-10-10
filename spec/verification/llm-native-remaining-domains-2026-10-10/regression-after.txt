@@ -1,0 +1,41 @@
+bun test v1.4.2 (744846f84)
+
+api/domains/goals/test/goals.test.ts:
+(pass) no goal gives an explicit absent snapshot and invents nothing [17.59ms]
+(pass) explicit adopt, update and withdraw keep revisions and history [10.63ms]
+(pass) stale revisions are rejected for update, withdraw and complete [8.56ms]
+(pass) completed goals leave the adopted snapshot [8.21ms]
+(pass) other principals and scopes see nothing and cannot touch goals [6.23ms]
+(pass) proposals never appear as adopted and need an explicit call [7.60ms]
+(pass) rejecting a proposal does not move the goal epoch [6.35ms]
+(pass) epoch and revision change on every visible change, enabling receipt invalidation [8.14ms]
+(pass) snapshot orders by priority and is one consistent read [6.59ms]
+(pass) an access-less revision lookup is not part of the World-facing exports [4.64ms]
+(pass) only the same proposal operation is deduplicated [8.59ms]
+(pass) distinct operations preserve proposal text, priority and source versions [8.11ms]
+(pass) independent proposals respect capacity, while an operation replay uses no slot [10.24ms]
+(pass) operationKey makes adopt and propose idempotent per principal and scope [8.45ms]
+(pass) transaction rollback leaves the ledger, history and epoch unchanged [8.77ms]
+(pass) inputs are bounded and rejected rather than truncated [9.47ms]
+(pass) goals survive restart [11.03ms]
+
+api/domains/world/test/extraction-held.test.ts:
+(pass) held extraction remains received across polls and restart, then applies once with new entities [67.22ms]
+(pass) one held candidate holds the whole prefix; later input does not bypass it [51.32ms]
+(pass) a port mutated during inference cannot change the prepared entities or authorize the old result [42.72ms]
+(pass) prepare rechecks a queued retry when its context reverts to the held snapshot [40.76ms]
+(pass) a corrected or unavailable held head reaches final rejection before context suppression [81.65ms]
+(pass) forget removes held inputs and the digest without leaving a cursor-blocking row [43.71ms]
+(pass) a refused manifest release stays pending while the extraction is held [40.57ms]
+(pass) a failed held transaction rolls back its digest and remains recoverable [37.95ms]
+(pass) an interpretation version change releases a held prefix without language-specific code [39.11ms]
+(pass) a cancelled old result cannot hold or release the newer job's input [39.99ms]
+(pass) restore purges held metadata and redelivers only the unsettled input [41.20ms]
+
+api/domains/world/test/extraction-migration.test.ts:
+(pass) extraction hold migration preserves old received and terminal rows and refuses an old binary [69.11ms]
+
+ 29 pass
+ 0 fail
+ 312 expect() calls
+Ran 29 tests across 3 files. [953.00ms]

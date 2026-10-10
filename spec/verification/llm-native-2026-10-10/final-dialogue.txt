@@ -1,0 +1,149 @@
+$ bun scripts/verify.ts --domain dialogue
+[verify] selected=dialogue dependencyClosure=capabilities,delivery,attitude-dataset,larm,settings,inference,queue,tool-runtime,agent-runtime,conversation,continuity,memory,scheduler,dialogue,avatar testClosure=capabilities,delivery,attitude-dataset,larm,tts-dictionary,settings,inference,queue,tool-runtime,agent-runtime,avatar,conversation,continuity,memory,scheduler,goals,world,dialogue
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts api/domains/dialogue web/src/domains/dialogue
+size-budget ok (18 files)
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check api/domains/dialogue web/src/domains/dialogue
+$ oxfmt --check api/domains/dialogue web/src/domains/dialogue
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 4ms on 30 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint api/domains/dialogue web/src/domains/dialogue
+$ oxlint --deny-warnings api/domains/dialogue web/src/domains/dialogue
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun x tsc -p /Users/y.noguchi/Code/eumenes/verification-reports/tsconfig.selected.json
+[verify] TypeScript workspace closure: 332 files; api/infrastructure/flock.ts, api/infrastructure/logger.ts, api/infrastructure/sqlite, api/domains/dialogue, api/domains/capabilities, api/infrastructure/http.ts, api/infrastructure/validation-log.ts, api/domains/tool-runtime, api/domains/queue, api/infrastructure/digest.ts, api/domains/agent-runtime, api/domains/settings, api/domains/inference, api/infrastructure/chat-stream.ts, api/domains/larm, api/infrastructure/ignore-error.ts, api/infrastructure/bounded-read.ts, api/domains/delivery, api/domains/attitude-dataset, api/domains/conversation, api/infrastructure/snapshot-stream.ts, api/domains/memory, api/domains/continuity, api/domains/scheduler, packages/coding-runner/src, api/domains/coding, api/domains/coding-supervision, api/domains/tasks, api/domains/task-reports, api/domains/goals, api/domains/research-routes, api/domains/service-tests, api/domains/timers, api/domains/tts-dictionary, api/domains/voice-dialogue, api/domains/web-research, api/domains/world, api/application/migrations.ts, client/transport.ts, client/run-stream.ts, client/dialogue.ts, client/conversation.ts, web/src/queryKeys.ts, web/src/domains
+[verify] domain tests: /Users/y.noguchi/.bun/bin/bun run test:domain -- dialogue
+$ bun scripts/test-domain.ts dialogue
+bun test v1.4.2 (744846f84)
+
+api/domains/dialogue/test/post-answer.test.ts:
+(pass) E01 observer is called after adoption with ids only and its writes commit [22.97ms]
+(pass) E01 observer throw or skipped rolls back only the learning part [32.51ms]
+(pass) E01 without an observer the answer completes as before [18.33ms]
+
+api/domains/dialogue/test/queue.test.ts:
+(pass) a run only sees earlier accepted turns; later inputs never leak into it [14.69ms]
+(pass) a failed earlier run leaves only its input in later history [15.32ms]
+(pass) full queue rejects the submit and stores neither message nor run [12.86ms]
+(pass) restart: queued runs continue, a running run is interrupted, late result from the old owner is rejected [14.86ms]
+(pass) runs from before the queue existed are interrupted, not given a new job [13.59ms]
+(pass) scheduled prompt creates exactly one background run per occurrence; interactive input is claimed first [15.16ms]
+(pass) waitForTerminal honours abort and its own deadline without cancelling the run [56.09ms]
+(pass) rejected answer adoption fails both the run and its queue job [14.54ms]
+(pass) only adopted, confident motion labels a running or completed answer; cancelled judgments are rejected [17.45ms]
+(pass) emotion context excludes later accepted inputs and uses the complete answer [15.90ms]
+
+api/domains/dialogue/test/world-release.test.ts:
+(pass) a report invalidated at adoption releases the World context's input dependencies [21.08ms]
+(pass) a Memory adoption refusal releases the World context's input dependencies and records no usage [20.86ms]
+(pass) an adopted answer keeps its dependencies (control) [20.46ms]
+(pass) a pre-send check that cannot run (busy writer) sends nothing and ends the run with a content-free code [21.72ms]
+
+api/domains/dialogue/test/research-result-context.test.ts:
+(pass) final generation retains every request clause, reference block and report while trimming only optional history [1.95ms]
+(pass) required request overflow is explicit and cannot silently discard the request [0.14ms]
+
+api/domains/dialogue/test/controller.test.ts:
+(pass) dialogue controller validates requests and delegates one run [20.57ms]
+
+api/domains/dialogue/test/dialogue.test.ts:
+(pass) request ID is idempotent and answer adoption is atomic [25.29ms]
+(pass) failed input persistence prevents any provider request [0.18ms]
+(pass) cancelled inference cannot append an answer [51.34ms]
+
+api/domains/dialogue/test/research-routing.test.ts:
+(pass) researcher selection follows the LLM tool call regardless of topic [2.01ms]
+(pass) Luna is not callable when unavailable and cannot request history or coding scope [0.78ms]
+
+api/domains/dialogue/test/memory-integration.test.ts:
+(pass) a remembered fact is recalled in the next answer with a usage receipt, and Memory OFF injects nothing [72.25ms]
+(pass) disconnect during generation prevents adoption even after reconnect=false [44.29ms]
+(pass) disconnect during generation prevents adoption even after reconnect=true [45.23ms]
+(pass) continuity (goal / open question) is part of the recalled context [28.05ms]
+(pass) a correction during generation prevents adopting the answer [40.60ms]
+(pass) forgetting erases the value, survives restart, and is re-applied on a restored old database [69.55ms]
+(pass) a tampered journal makes memory unavailable (fail closed) instead of being used [51.12ms]
+(pass) stopping an item is reversible and removes it from the next answer; invalid sources are rejected [43.91ms]
+(pass) expired items are not recalled as current understanding [42.29ms]
+(pass) a period that has not started yet is not current understanding; a month-precision start that has passed is [44.69ms]
+(pass) forget validates the id, never wipes receipts via wildcards, and also forgets older versions of the same fact [48.34ms]
+(pass) a failed apply after the journal append is reconciled instead of poisoning the journal [375.30ms]
+(pass) a torn journal line disables memory without crashing startup, and listing fails closed [48.01ms]
+(pass) size and count limits keep the recalled context inside its budget; bad periods are caller errors [36.93ms]
+(pass) a reference text with newlines cannot forge extra lines in the reference block [41.26ms]
+(pass) the recalled context stays inside its byte budget: writes that would overflow are refused, runs keep working [60.49ms]
+(pass) an empty memory does not fix a view: adding a fact mid-run does not fail the run and no receipt is written [25.71ms]
+(pass) memory-backed text is not streamed before adoption [134.38ms]
+(pass) stop / resume / retract reject malformed ids as client errors, and a concurrent recover cannot misread the journal [37.47ms]
+(pass) resuming an item whose fact was re-stated is a client error, not a revision conflict [27.06ms]
+(pass) future-dated items count against the budget too, so they cannot make runs fail when they start [35.67ms]
+(pass) a long streamed answer is not double counted for memory-backed runs [41.61ms]
+(pass) receipts of a forget that was only re-applied on startup are purged [50.15ms]
+(pass) a long multibyte conversation id works for continuity and runs [28.37ms]
+(pass) the journal creates its directory on demand and repairs a missing trailing newline [7.13ms]
+
+api/domains/dialogue/test/research-citations.test.ts:
+(pass) research preserves acquired URLs and removes fabricated or obsolete citations [1.76ms]
+(pass) a failed report grants no citations, even if an earlier turn supplied that URL [0.14ms]
+
+api/domains/dialogue/test/conversation-generation.test.ts:
+(pass) ordinary dialogue streams one call and keeps preceding conversational context [0.24ms]
+(pass) one native research operation publishes no control text [0.13ms]
+(pass) malformed native arguments get exactly one structural correction [0.20ms]
+(pass) aborted generation never starts a correction [0.09ms]
+
+api/domains/dialogue/test/world-context.test.ts:
+(pass) native delegation rejects correction changed after generation without starting a child [56.20ms]
+(pass) native delegation rejects policy changed after generation without starting a child [50.47ms]
+(pass) native delegation rejects receipt changed after generation without starting a child [49.54ms]
+(pass) valid path: one answer and ONE receipt tying slice digest, versions, package, run, attempt and provider [51.69ms]
+(pass) prompt injection: the claim text reaches the model only as escaped data inside the delimiters [51.34ms]
+(pass) A40: correction injected after_prepare leaves no answer and no usage record [103.27ms]
+(pass) A40: refutation injected after_prepare leaves no answer and no usage record [102.19ms]
+(pass) A40: forget injected after_prepare leaves no answer and no usage record [104.15ms]
+(pass) A40: policy injected after_prepare leaves no answer and no usage record [115.77ms]
+(pass) A40: goal injected after_prepare leaves no answer and no usage record [113.04ms]
+(pass) A40: attempt injected after_prepare leaves no answer and no usage record [261.45ms]
+(pass) A40: cancel injected after_prepare leaves no answer and no usage record [128.97ms]
+(pass) A40: correction injected before_send leaves no answer and no usage record [115.25ms]
+(pass) A40: refutation injected before_send leaves no answer and no usage record [114.45ms]
+(pass) A40: forget injected before_send leaves no answer and no usage record [114.50ms]
+(pass) A40: policy injected before_send leaves no answer and no usage record [113.61ms]
+(pass) A40: goal injected before_send leaves no answer and no usage record [113.72ms]
+(pass) A40: attempt injected before_send leaves no answer and no usage record [262.30ms]
+(pass) A40: cancel injected before_send leaves no answer and no usage record [126.32ms]
+(pass) A40: correction injected during_generation leaves no answer and no usage record [118.22ms]
+(pass) A40: refutation injected during_generation leaves no answer and no usage record [112.64ms]
+(pass) A40: forget injected during_generation leaves no answer and no usage record [114.37ms]
+(pass) A40: policy injected during_generation leaves no answer and no usage record [114.74ms]
+(pass) A40: goal injected during_generation leaves no answer and no usage record [115.77ms]
+(pass) A40: attempt injected during_generation leaves no answer and no usage record [278.84ms]
+(pass) A40: cancel injected during_generation leaves no answer and no usage record [125.55ms]
+(pass) A40: correction injected before_settle leaves no answer and no usage record [116.80ms]
+(pass) A40: refutation injected before_settle leaves no answer and no usage record [114.26ms]
+(pass) A40: forget injected before_settle leaves no answer and no usage record [114.48ms]
+(pass) A40: policy injected before_settle leaves no answer and no usage record [115.73ms]
+(pass) A40: goal injected before_settle leaves no answer and no usage record [115.42ms]
+(pass) A40: attempt injected before_settle leaves no answer and no usage record [272.53ms]
+(pass) A40: cancel injected before_settle leaves no answer and no usage record [126.76ms]
+(pass) cancel is not recall: a late result after cancel is rejected, but what was already sent stays sent [224.41ms]
+(pass) a refused inference receipt adopts neither the answer nor a usage record [74.76ms]
+(pass) blocked is never turned into a World-less success: no budget ends the run with a reason [57.12ms]
+(pass) World OFF is unchanged: no World message, no usage, no registration; the answer streams as before [102.45ms]
+(pass) Memory and World are read in one prepare transaction and share one budget; both receipts are stored with the answer [66.78ms]
+(pass) a later forget in the Scope removes the usage receipts of answers that stood on it [54.01ms]
+
+ 95 pass
+ 0 fail
+ 539 expect() calls
+Ran 95 tests across 11 files. [6.86s]
+
+ RUN  v4.1.8 /Users/y.noguchi/Code/eumenes
+
+
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+   Start at  19:40:25
+   Duration  550ms (transform 29ms, setup 0ms, import 120ms, tests 9ms, environment 350ms)
+
+[verify] passed 10965 ms

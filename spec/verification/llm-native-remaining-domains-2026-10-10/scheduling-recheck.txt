@@ -1,0 +1,23 @@
+bun test v1.4.2 (744846f84)
+
+api/application/world-scheduling.test.ts:
+(pass) A44 an interactive queue job is the foreground: nothing is scheduled while it is open, the held input resumes by itself after it [250.20ms]
+(pass) A44 a conversation answer running in the inference service is the foreground [252.88ms]
+(pass) A44 a foreground start cancels the running extraction: the call ends, the Local job slot is free, the same input is extracted by a new attempt afterwards [297.11ms]
+49 | async function until(check: () => boolean, ms = 5000) {
+50 | 	for (let i = 0; i < ms / 10; i++) {
+51 | 		if (check()) return;
+52 | 		await pause(10);
+53 | 	}
+54 | 	throw new Error("timeout");
+                ^
+error: timeout
+      at until (/Users/y.noguchi/Code/eumenes/api/application/world-scheduling.test.ts:54:12)
+      at async <anonymous> (/Users/y.noguchi/Code/eumenes/api/application/world-scheduling.test.ts:478:8)
+(fail) A44 a cancel the provider never answers keeps the slot: no second extraction call until the provider really ends it [9125.45ms]
+(pass) A44 a restart with a held input: the unextracted input survives and is extracted after the foreground is gone [216.40ms]
+
+ 4 pass
+ 1 fail
+ 32 expect() calls
+Ran 5 tests across 1 file. [10.35s]

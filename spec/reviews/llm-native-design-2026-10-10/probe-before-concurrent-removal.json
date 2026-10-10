@@ -1,0 +1,109 @@
+{
+	"routes": [
+		{
+			"input": "天気予報 鎌倉",
+			"result": "matched"
+		},
+		{
+			"input": "明日の鎌倉市の天気を教えてください",
+			"result": "unsupported",
+			"reason": "shape"
+		},
+		{
+			"input": "天気予報 横浜",
+			"result": "unsupported",
+			"reason": "unknown_place"
+		},
+		{
+			"input": "株価 AAPL",
+			"result": "matched"
+		},
+		{
+			"input": "株価 MSFT",
+			"result": "unsupported",
+			"reason": "unconfirmed_ticker"
+		}
+	],
+	"extraction": [
+		{
+			"body": "鎌倉市 2026-10-11 天気 晴れ 最高気温 27 最低気温 17 発表 2026-10-10T09:00:00+09:00",
+			"result": {
+				"ok": true,
+				"facts": {
+					"purpose": "weather",
+					"location": {
+						"name": "鎌倉市",
+						"prefecture": "神奈川県",
+						"granularity": "city"
+					},
+					"targetDate": "2026-10-11",
+					"timeZone": "Asia/Tokyo",
+					"condition": "clear",
+					"maxTemp": 27,
+					"minTemp": 17,
+					"unit": "C",
+					"announcedAt": "2026-10-10T00:00:00.000Z",
+					"evidence": []
+				},
+				"tokens": [
+					"鎌倉市 2026-10-11 天気 晴れ 最高気温 27 最低気温 17 発表 2026-10-10T09:00:00+09:00"
+				]
+			}
+		},
+		{
+			"body": "鎌倉市の2026-10-11の予報は晴れ。最高気温27℃、最低気温17℃。発表日時: 2026-10-10T09:00:00+09:00",
+			"result": {
+				"ok": false,
+				"code": "format_unrecognized"
+			}
+		},
+		{
+			"body": "鎌倉市 2026-10-11 天気 晴時々曇 最高気温 27 最低気温 17 発表 2026-10-10T09:00:00+09:00",
+			"result": {
+				"ok": false,
+				"code": "condition_unmapped"
+			}
+		}
+	],
+	"emotion": [
+		{
+			"text": "おめでとうございます。",
+			"calls": 1,
+			"emotion": "joy"
+		},
+		{
+			"text": "努力が実りましたね。心から祝福します。",
+			"calls": 0,
+			"emotion": "none",
+			"reason": "not-expressive"
+		}
+	],
+	"skillContext": {
+		"containsSkillBody": false,
+		"messageRoles": ["system", "user"],
+		"manifestDigestPresent": true
+	},
+	"timer": "タイマーが2件動いています",
+	"language": [
+		{
+			"text": "APIを確認してください",
+			"allow": ["ja"],
+			"accepted": false
+		},
+		{
+			"text": "哎",
+			"allow": ["ja"],
+			"accepted": false
+		},
+		{
+			"text": "Bonjour, comment allez-vous?",
+			"allow": ["en"],
+			"accepted": true
+		}
+	],
+	"intonation": {
+		"speed": 0.95,
+		"pitchScale": -0.01,
+		"intonationScale": 1.15
+	}
+}

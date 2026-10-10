@@ -38,7 +38,8 @@ export type SavedView = {
 	previousCursor: string | null;
 };
 const sha = (s: string) => createHash("sha256").update(s).digest("hex");
-const key = (o: BodyOwner) => JSON.stringify(o);
+const key = (o: BodyOwner) =>
+	JSON.stringify([o.rootRunId, o.taskId, o.cancelEpoch]);
 /** Search-only normalization with a code-point position map; quotes always use the original text. */
 export function normalizedPositions(text: string) {
 	const parts: string[] = [],

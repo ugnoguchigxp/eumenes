@@ -66,3 +66,18 @@ export const historyBuiltins: Definition[] = [
 		toolRevisionIds: ["tool:history.search@1", "tool:history.read@1"],
 	},
 ];
+
+historyBuiltins.push({
+	...historyBuiltins.find((d) => d.kind === "skill")!,
+	revision: 2,
+	body: readFileSync(new URL("./history/SKILL.v2.md", import.meta.url), "utf8"),
+});
+const previous = historyBuiltins.find((d) => d.kind === "package")!;
+historyBuiltins.push({
+	...previous,
+	revision: 2,
+	dependencies: previous.dependencies.map((id) =>
+		id === "skill:history.research@1" ? "skill:history.research@2" : id,
+	),
+	requiredSkillRevisionIds: ["skill:history.research@2"],
+});

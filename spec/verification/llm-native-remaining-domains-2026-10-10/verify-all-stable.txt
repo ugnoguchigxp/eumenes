@@ -1,0 +1,3 @@
+$ bun scripts/verify.ts --all
+Another verification is running
+error: script "verify:all" exited with code 3

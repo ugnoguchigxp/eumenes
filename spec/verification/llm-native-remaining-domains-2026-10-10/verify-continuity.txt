@@ -1,0 +1,26 @@
+$ bun scripts/verify.ts --domain continuity
+[verify] selected=continuity dependencyClosure=continuity testClosure=continuity
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts api/domains/continuity
+size-budget ok (5 files)
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check api/domains/continuity
+$ oxfmt --check api/domains/continuity
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 2ms on 6 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint api/domains/continuity
+$ oxlint --deny-warnings api/domains/continuity
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun x tsc -p /Users/y.noguchi/Code/eumenes/verification-reports/tsconfig.selected.json
+[verify] TypeScript workspace closure: 10 files; api/infrastructure/flock.ts, api/infrastructure/logger.ts, api/infrastructure/sqlite, api/domains/continuity, api/infrastructure/http.ts
+[verify] domain tests: /Users/y.noguchi/.bun/bin/bun run test:domain -- continuity
+$ bun scripts/test-domain.ts continuity
+bun test v1.4.2 (744846f84)
+
+api/domains/continuity/test/continuity.test.ts:
+(pass) goals, decisions and open questions persist across restart and track revisions [13.77ms]
+
+ 1 pass
+ 0 fail
+ 7 expect() calls
+Ran 1 test across 1 file. [66.00ms]
+[verify] passed 1606 ms

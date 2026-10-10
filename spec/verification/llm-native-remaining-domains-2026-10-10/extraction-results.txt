@@ -1,0 +1,35 @@
+bun test v1.4.2 (744846f84)
+
+api/domains/world/test/extraction-handler.test.ts:
+(pass) A19 a valid candidate becomes a CANDIDATE claim with host-assigned ids, a manifest and Memory dependents [53.93ms]
+(pass) A19 type and meaning checks: negated, hypothetical, question, model ids, unknown subjects and bad quotes are not adopted [61.66ms]
+(pass) A19 at most 8 candidates are adopted: the 9th is rejected, never silently dropped [41.07ms]
+(pass) A19 malformed or oversize output is rejected: no claim, the events are final, the dependents are given back [153.66ms]
+(pass) A20 a window is at most 12 utterances; every input the model saw is in the manifest, cited or not [49.97ms]
+(pass) A20 an utterance that cannot be split is final for extraction, in order, and never reaches the model [40.84ms]
+(pass) A20 exactly 32 KiB in one utterance is allowed, one byte more is not [39.58ms]
+(pass) A43 a model call past the 30 s budget (60 ms here) is cancelled, confirmed ended, then retried once [101.07ms]
+(pass) A43 a second timeout fails the job: the input waits out a backoff, then a new job takes it [160.49ms]
+(pass) A43 a cancelled call that never ends keeps the Local slot: no second call starts [144.34ms]
+(pass) A43 an input version that moved after prepare voids the result: nothing is adopted and the new version is extracted [43.80ms]
+(pass) A43 Memory refusing the dependent registration stops the job before the model is called [39.32ms]
+(pass) A43 a provider that is unavailable leaves the input pending; no Cloud request exists [38.95ms]
+(pass) A43 extraction refuses a route that is not provably Local [115.34ms]
+(pass) extraction runs only while World is ON and its gate is open; one job per Scope at a time [36.29ms]
+(pass) cancelling a prepared job gives back its Memory dependents and its model request [36.71ms]
+
+api/domains/world/test/extraction-held.test.ts:
+(pass) held extraction remains received across polls and restart, then applies once with new entities [55.83ms]
+(pass) one held candidate holds the whole prefix; later input does not bypass it [43.16ms]
+(pass) a port mutated during inference cannot change the prepared entities or authorize the old result [40.01ms]
+(pass) prepare rechecks a queued retry when its context reverts to the held snapshot [36.52ms]
+(pass) a corrected or unavailable held head reaches final rejection before context suppression [75.19ms]
+(pass) forget removes held inputs and the digest without leaving a cursor-blocking row [41.08ms]
+(pass) a refused manifest release stays pending while the extraction is held [38.38ms]
+(pass) a failed held transaction rolls back its digest and remains recoverable [39.66ms]
+(pass) an interpretation version change releases a held prefix without language-specific code [38.80ms]
+
+ 25 pass
+ 0 fail
+ 292 expect() calls
+Ran 25 tests across 2 files. [1.77s]

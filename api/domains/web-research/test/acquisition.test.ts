@@ -132,7 +132,7 @@ test("unverified redirect cache policy and partial HTTP content are never retain
 	}
 });
 
-test("JSON is negotiated as data and still passes the unchanged context guard", async () => {
+test("JSON is read as untrusted data and still passes the unchanged context guard", async () => {
 	for (const attack of [false, true]) {
 		const port = createWebAcquisition({
 			fetcher: async (url) => ({
@@ -164,6 +164,81 @@ test("JSON is negotiated as data and still passes the unchanged context guard", 
 					r.result.documents[0]!.guardDecision,
 				);
 			}
+		} finally {
+			await port.close();
+		}
+	}
+});
+
+test("weather, market and technology JSON retain the original fields without host interpretation", async () => {
+	for (const [url, payload] of [
+		[
+			"https://www.jma.go.jp/bosai/forecast/data/forecast/140000.json",
+			[
+				{
+					reportDatetime: "2026-10-10T05:00:00+09:00",
+					timeSeries: [
+						{
+							areas: [
+								{
+									area: { name: "任意の地域" },
+									weatherCodes: ["101"],
+									conditions: ["原文の条件"],
+								},
+							],
+						},
+					],
+				},
+			],
+		],
+		[
+			"https://query1.finance.yahoo.com/v8/finance/chart/ACME",
+			{
+				chart: {
+					result: [
+						{
+							meta: {
+								symbol: "ACME",
+								currency: "EUR",
+								regularMarketPrice: 123.4,
+								providerNote: "Provider condition",
+							},
+						},
+					],
+				},
+			},
+		],
+		[
+			"https://example.com/technology.json",
+			{
+				name: "Harness",
+				requirements: ["Condition A", "Condition B"],
+				details: { revision: 3 },
+			},
+		],
+	] as const) {
+		const original = JSON.stringify(payload);
+		const port = createWebAcquisition({
+			fetcher: async (target) => ({
+				requestedUrl: target,
+				finalUrl: target,
+				status: 200,
+				contentType: "application/json",
+				headers: {},
+				body: new TextEncoder().encode(original),
+			}),
+		});
+		try {
+			const value = await port.execute(
+				submitResearchSchema.parse({
+					requestId: crypto.randomUUID(),
+					operation: "read",
+					url,
+				}),
+				AbortSignal.timeout(1000),
+			);
+			expect(JSON.parse(value.bodies![0]!.text)).toEqual(payload);
+			expect(JSON.parse(value.result.documents[0]!.text)).toEqual(payload);
 		} finally {
 			await port.close();
 		}

@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { randomUUID } from "node:crypto";
+import { sha256Hex } from "../../../infrastructure/digest";
 import { type ScopeRef } from "eumenes-world-model";
 import { WORLD_PROVIDER_REF } from "../contracts";
 import { releaseExtractJob } from "../repository/extraction";
@@ -22,6 +23,7 @@ import {
 	BACKOFF_MAX_MS,
 	EXTRACT_INTERPRETATION_VERSION,
 	defaultHasher,
+	SYSTEM_PROMPT,
 } from "./extraction-shared";
 
 /** Configuration and the pieces every part of the extraction handler shares. */
@@ -37,6 +39,21 @@ export function createExtractionCtx(options: ExtractionOptions) {
 	const interpretationVersion =
 		options.interpretationVersion ?? EXTRACT_INTERPRETATION_VERSION;
 	const adapters = new Map(options.sources.map((s) => [s.namespace, s]));
+	// Snapshot the exact JSON data supplied to the model, detached from the port.
+	// Entity order is the port's stable order; no textual meaning is inferred here.
+	const snapshotContext = (db: Database, scope: ScopeRef) => {
+		const json = JSON.stringify(options.entities?.(db, scope) ?? []);
+		const entities: unknown[] = JSON.parse(json);
+		const digest = sha256Hex(
+			JSON.stringify([
+				"world-extraction-context/1",
+				SYSTEM_PROMPT,
+				interpretationVersion,
+				entities,
+			]),
+		);
+		return { entities, digest };
+	};
 	const hook = (point: ExtractionPoint, jobId: string) =>
 		options.hook?.(point, { jobId });
 	const foregroundActive = (): boolean => {
@@ -155,6 +172,7 @@ export function createExtractionCtx(options: ExtractionOptions) {
 		budgetMs,
 		confirmMs,
 		interpretationVersion,
+		snapshotContext,
 		adapters,
 		hook,
 		foregroundActive,

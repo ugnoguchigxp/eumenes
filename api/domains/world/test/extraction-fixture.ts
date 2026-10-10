@@ -105,6 +105,9 @@ export function fakeInference(
 			state.accepted += 1;
 			return true;
 		},
+		validateReceiptInTransaction() {
+			return true;
+		},
 		rejectControlInTransaction(_db, _receipt, code) {
 			state.rejected.push(code);
 		},
@@ -294,7 +297,7 @@ export const mirrorRows = (life: Life) =>
 	life.store.read((db) =>
 		db
 			.query(
-				"SELECT event_id, seq, state, reason, failures, retry_at_ms, job_id, manifest_id, request_id, received_cursor FROM world_host_extract_event ORDER BY seq",
+				"SELECT event_id, seq, state, reason, held_context_digest, failures, retry_at_ms, job_id, manifest_id, request_id, received_cursor, settled_at_ms FROM world_host_extract_event ORDER BY seq",
 			)
 			.all(),
 	) as {
@@ -302,6 +305,8 @@ export const mirrorRows = (life: Life) =>
 		seq: number;
 		state: string;
 		reason: string | null;
+		held_context_digest: string | null;
+		settled_at_ms: number | null;
 		failures: number;
 		retry_at_ms: number;
 		job_id: string | null;

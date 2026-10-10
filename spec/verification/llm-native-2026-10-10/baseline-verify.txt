@@ -1,0 +1,41 @@
+$ bun scripts/verify.ts --domain capabilities agent-runtime dialogue delivery inference attitude-dataset voice-dialogue
+[verify] selected=capabilities dependencyClosure=capabilities testClosure=capabilities
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts api/domains/capabilities
+size-budget ok (9 files)
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check api/domains/capabilities
+$ oxfmt --check api/domains/capabilities
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 8ms on 12 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint api/domains/capabilities
+$ oxlint --deny-warnings api/domains/capabilities
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun x tsc -p /Users/y.noguchi/Code/eumenes/verification-reports/tsconfig.selected.json
+[verify] TypeScript workspace closure: 15 files; api/infrastructure/flock.ts, api/infrastructure/logger.ts, api/infrastructure/sqlite, api/domains/capabilities
+[verify] domain tests: /Users/y.noguchi/.bun/bin/bun run test:domain -- capabilities
+$ bun scripts/test-domain.ts capabilities
+bun test v1.4.2 (744846f84)
+
+api/domains/capabilities/test/prepare-learned.test.ts:
+(pass) C01 learned registration rejects conflicts, bad bundles and oversize; builtin hashes unchanged [19.53ms]
+(pass) C01 5000 learned definitions never enter FTS/alias/list and do not displace builtins [259.26ms]
+(pass) seed adds newer research rules and packages without touching old revisions [11.33ms]
+(pass) new research packages expose generic acquisition without topic-specific tools or skills [11.48ms]
+(pass) C02 prepare by ID keeps shared checks; independent registration does not disturb A; GC spares builtins/protected [10.47ms]
+
+api/domains/capabilities/test/capabilities.test.ts:
+(pass) 5000 capability catalogue: bounded discovery, exact aliases, immutable revisions and owner isolation [4813.85ms]
+(pass) builtin SKILL is mandatory; disabling survives seed and dependency failure hides package [14.90ms]
+(pass) revoking a dependency permanently invalidates already issued candidates, even after re-enabling [11.87ms]
+(pass) builtin bundle upgrade preserves revision 1 fingerprints and activates a new revision for the larger input contract [12.67ms]
+(pass) deployed research skill v3 upgrades without a revision conflict and restart preserves hashes [20.38ms]
+(pass) seed still rejects a changed newest builtin revision [9.87ms]
+(pass) history and web catalogue selection can be enabled independently without editing archived revisions [10.35ms]
+
+api/domains/capabilities/test/learned.test.ts:
+
+ 12 pass
+ 0 fail
+ 307 expect() calls
+Ran 12 tests across 3 files. [5.28s]
+[verify] passed 6663 ms

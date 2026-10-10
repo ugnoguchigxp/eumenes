@@ -1,0 +1,89 @@
+$ bun scripts/verify.ts --domain voice-dialogue
+[verify] selected=voice-dialogue dependencyClosure=delivery,capabilities,attitude-dataset,larm,settings,inference,queue,tool-runtime,agent-runtime,conversation,continuity,memory,scheduler,dialogue,voice-dialogue,audio,avatar,tts-dictionary testClosure=delivery,capabilities,attitude-dataset,larm,tts-dictionary,settings,inference,queue,tool-runtime,agent-runtime,avatar,conversation,continuity,memory,scheduler,goals,world,dialogue,audio,voice-dialogue
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts api/domains/voice-dialogue web/src/domains/voice-dialogue
+size-budget ok (14 files)
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check api/domains/voice-dialogue web/src/domains/voice-dialogue
+$ oxfmt --check api/domains/voice-dialogue web/src/domains/voice-dialogue
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 7ms on 27 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint api/domains/voice-dialogue web/src/domains/voice-dialogue
+$ oxlint --deny-warnings api/domains/voice-dialogue web/src/domains/voice-dialogue
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun x tsc -p /Users/y.noguchi/Code/eumenes/verification-reports/tsconfig.selected.json
+[verify] TypeScript workspace closure: 347 files; api/infrastructure/flock.ts, api/infrastructure/logger.ts, api/infrastructure/sqlite, api/infrastructure/http.ts, api/domains/delivery, api/domains/voice-dialogue, api/domains/settings, api/domains/inference, api/infrastructure/chat-stream.ts, api/domains/larm, api/infrastructure/ignore-error.ts, api/infrastructure/bounded-read.ts, api/domains/attitude-dataset, api/domains/capabilities, api/infrastructure/validation-log.ts, api/domains/tool-runtime, api/domains/queue, api/infrastructure/digest.ts, api/domains/agent-runtime, packages/coding-runner/src, api/domains/coding, api/domains/coding-supervision, api/domains/tasks, api/domains/task-reports, api/domains/continuity, api/domains/conversation, api/domains/dialogue, api/infrastructure/snapshot-stream.ts, api/domains/memory, api/domains/scheduler, api/domains/goals, api/domains/research-routes, api/domains/service-tests, api/domains/timers, api/domains/tts-dictionary, api/domains/web-research, api/domains/world, api/application/migrations.ts, client/transport.ts, client/voice-dialogue.ts, web/src/domains, client/run-stream.ts, client/dialogue.ts, client/conversation.ts, web/src/queryKeys.ts, web/src/errorMessages.ts
+[verify] domain tests: /Users/y.noguchi/.bun/bin/bun run test:domain -- voice-dialogue
+$ bun scripts/test-domain.ts voice-dialogue
+bun test v1.4.2 (744846f84)
+
+api/domains/voice-dialogue/test/spoken-text.test.ts:
+(pass) displayed citations stay out of speech while inline labels and surrounding facts survive [0.28ms]
+
+api/domains/voice-dialogue/test/world-release.test.ts:
+(pass) A41 invalidation by correction mid-generation: 0 body events, 0 TTS calls, also after reconnect [441.35ms]
+(pass) A41 invalidation by forget mid-generation: 0 body events, 0 TTS calls, also after reconnect [452.27ms]
+(pass) A41 invalidation by policy mid-generation: 0 body events, 0 TTS calls, also after reconnect [428.72ms]
+(pass) A41 invalidation by goal mid-generation: 0 body events, 0 TTS calls, also after reconnect [427.86ms]
+(pass) A41 cancel mid-generation drops the unpublished body: 0 body events, 0 TTS calls [295.79ms]
+(pass) A41 adoption: nothing before it, the complete body once after it, speech once, reconnect repeats no speech [482.29ms]
+(pass) A41 a blocked World run is reported as blocked (worldUsed), never as a World-less success [215.36ms]
+(pass) general conversation is unchanged: live partial text, speech only after completion, worldUsed false [272.28ms]
+
+api/domains/voice-dialogue/test/sentences.test.ts:
+(pass) punctuation clauses and decimal numbers survive every token split without repeated tails [0.98ms]
+(pass) long unpunctuated output is bounded and conflicting final text is rejected [0.38ms]
+
+api/domains/voice-dialogue/test/upload.test.ts:
+(pass) bounded audio stream rejects oversized upload before ASR [3.40ms]
+(pass) valid bounded WAV reaches voice service once [0.69ms]
+
+api/domains/voice-dialogue/test/migration.test.ts:
+(pass) a database with only the original three migrations (plus later ones) upgrades in place and keeps history [46.45ms]
+
+api/domains/voice-dialogue/test/transcript-language.test.ts:
+(pass) V01/V02/V03 host applies the allowlist to model languages rather than scripts [0.13ms]
+(pass) V04 ambiguous, invalid and uncertain languages remain unverified [2.13ms]
+
+api/domains/voice-dialogue/test/settings-integration.test.ts:
+(pass) one voice turn uses fallback in all three stages, adopts one answer, and does not repeat duplicate upload [40.06ms]
+(pass) autoSpeak false is captured at voice acceptance and ends successfully without TTS [24.03ms]
+(pass) cancellation during cloud ASR cannot create a dialogue run even with late HTTP completion [56.04ms]
+(pass) queued snapshots survive recovery without re-running an attempted provider [18.99ms]
+(pass) revoking a cloud answer aborts downstream TTS and never publishes late audio [45.95ms]
+(pass) streaming text is visible but speech waits for completion; cancellation prevents partial-answer emotion [36.19ms]
+(pass) render ahead is bounded at three clauses and playback releases the next clause [59.07ms]
+(pass) final recognition preempts a slow prefix and never submits a late hypothesis [34.50ms]
+(pass) accepted audio chunks publish Laya delivery and cancellation removes the plan with the audio [24.72ms]
+(pass) replaying an answer persists its native motion, rejects unrelated text and ignores cancelled synthesis [22.40ms]
+(pass) one adopted full-answer emotion works with audio off and is reused for all clauses and replay [23.87ms]
+(pass) automatic three-clause speech shares the adopted full-answer decision [24.31ms]
+(pass) cancelling during final Laya classification rejects late emotion and assistant text [43.95ms]
+(pass) V05 cancelling during language control rejects the late receipt before dialogue or speech [55.28ms]
+(pass) V02/V04 asr_language_not_allowed prevents dialogue and TTS through real inference receipts [25.00ms]
+(pass) V02/V04 asr_language_unverified prevents dialogue and TTS through real inference receipts [23.42ms]
+(pass) V06 empty final ASR performs zero language control and creates no dialogue [25.78ms]
+
+api/domains/voice-dialogue/test/voice.test.ts:
+(pass) voice capture to ASR, dialogue, TTS; duplicate utterance is ignored [17.94ms]
+(pass) restart cancels the run of a stale voice turn so no old answer is spoken [27.56ms]
+(pass) evicting cached audio also clears the ready state [27.50ms]
+(pass) stopping a session fences acceptance waiting in the writer queue [10.54ms]
+(pass) replay splits finished text into clauses and synthesizes on demand [8.86ms]
+(pass) replay HTTP returns the adopted Laya motion with the same audio and supports legacy adapters [9.46ms]
+(pass) a clause that keeps failing is skipped and the rest is still spoken [33.83ms]
+(pass) clauses without any phoneme are never sent to TTS [0.04ms]
+
+ 41 pass
+ 0 fail
+ 311 expect() calls
+Ran 41 tests across 8 files. [4.00s]
+
+ RUN  v4.1.8 /Users/y.noguchi/Code/eumenes
+
+
+ Test Files  4 passed (4)
+      Tests  32 passed (32)
+   Start at  19:45:34
+   Duration  2.54s (transform 202ms, setup 0ms, import 566ms, tests 2.41s, environment 1.57s)
+
+[verify] passed 10259 ms

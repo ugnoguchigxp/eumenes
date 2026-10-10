@@ -1,0 +1,35 @@
+{
+	"selected": ["tool-runtime"],
+	"dependencySet": ["capabilities", "queue", "tool-runtime"],
+	"testDependencySet": ["capabilities", "queue", "tool-runtime"],
+	"revision": "b46e9a5eb09b8ab76ceb5d423ff29d8c368320a991ad67608584c3d505cdb792",
+	"steps": [
+		{
+			"name": "size-budget",
+			"ms": 112,
+			"result": "pass"
+		},
+		{
+			"name": "format",
+			"ms": 98,
+			"result": "pass"
+		},
+		{
+			"name": "lint",
+			"ms": 48,
+			"result": "pass"
+		},
+		{
+			"name": "typecheck",
+			"ms": 803,
+			"result": "pass"
+		},
+		{
+			"name": "domain tests",
+			"ms": 189,
+			"result": "pass"
+		}
+	],
+	"totalMs": 1673,
+	"result": "pass"
+}

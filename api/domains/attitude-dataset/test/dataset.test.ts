@@ -142,41 +142,31 @@ test("off by default; authentic unit reuses normal judgment, strips raw metadata
 	await service.drain();
 	expect(service.status().successful).toBe(1);
 });
-test("technical skip makes exactly one asynchronous full-six call and never replaces normal performance", async () => {
+test("every technical reply uses the same single full-six judgment and records normal adoption", async () => {
 	const { service } = setup();
 	await service.setEnabled(true);
-	let complete!: (v: unknown) => void;
 	let calls = 0;
-	let sent: unknown;
+	let criteria: object = {};
 	const a = {
 		...args("technical", "設定を開いて保存してください。"),
-		judge: async (state: unknown, q: unknown) => {
+		judge: async (_state: unknown, q: any) => {
 			calls++;
-			sent = { state, q };
-			return new Promise((resolve) => {
-				complete = resolve;
-			});
+			criteria = q.emotion.criteria;
+			return result("none");
 		},
 	};
 	const delivery = await service.decide(a);
-	expect(delivery.reason).toBe("not-expressive");
+	expect(delivery.source).toBe("ruri");
 	expect(calls).toBe(1);
-	expect(service.status().pending).toBe(1);
-	expect(
-		Object.keys(
-			(sent as { q: { emotion: { criteria: object } } }).q.emotion.criteria,
-		),
-	).toEqual(emotionSchema.options);
-	complete(result("none"));
+	expect(Object.keys(criteria)).toEqual(emotionSchema.options);
 	await service.drain();
-	const s = service.get(service.list()[0]!.sample_id, false) as Sample;
-	expect(s.collection_only).toBe(true);
-	expect(s.decision.api_label).toBe("none");
-	expect(s.selected_delivery.source).toBe("fallback");
-	expect(service.status().skipped).toBe(1);
+	const sample = service.get(service.list()[0]!.sample_id, false) as Sample;
+	expect(sample.collection_only).toBe(false);
+	expect(sample.decision.api_label).toBe("none");
+	expect(service.status().skipped).toBe(0);
 	await service.decide(a);
 	await service.drain();
-	expect(calls).toBe(1);
+	expect(calls).toBe(2);
 	expect(service.status().successful).toBe(1);
 });
 test("stop, cancellation and restart reject collection late responses; no second call after normal failure", async () => {
@@ -381,32 +371,29 @@ test("credential-looking text is excluded, not partially copied; new examples in
 	expect(() => service.export()).toThrow("invalid_split_required");
 });
 
-test("text-only cold connection prepares Ruri in background before its one skipped-unit judgment", async () => {
+test("available judge is called once even when cached model identity is absent", async () => {
 	const { service } = setup();
 	await service.setEnabled(true);
-	let ready!: (model: string) => void;
-	let calls = 0;
+	let calls = 0,
+		prepares = 0;
 	const delivery = await service.decide({
 		...args("cold", "操作手順です。"),
 		model: null,
-		prepareJudge: async () =>
-			new Promise((resolve) => {
-				ready = resolve;
-			}),
+		prepareJudge: async () => {
+			prepares++;
+			return RURI_MODEL;
+		},
 		judge: async () => {
 			calls++;
 			return result();
 		},
 	});
-	expect(delivery.reason).toBe("not-expressive");
-	expect(calls).toBe(0);
-	expect(service.status().pending).toBe(1);
-	ready(RURI_MODEL);
+	expect(delivery.source).toBe("ruri");
 	await service.drain();
 	expect(calls).toBe(1);
+	expect(prepares).toBe(0);
 	expect(service.status().successful).toBe(1);
 });
-
 test("chunk collection sends only the current chunk, not a complete answer from its context", async () => {
 	const { service } = setup();
 	await service.setEnabled(true);

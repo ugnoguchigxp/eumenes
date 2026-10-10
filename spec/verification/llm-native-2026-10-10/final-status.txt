@@ -1,0 +1,243 @@
+ M .env.example
+ M .gitignore
+ M AGENTS.md
+ M README.md
+ M api/application/agent-voice-response.test.ts
+ M api/application/control-logging.test.ts
+ M api/application/dev.test.ts
+ M api/application/error-status.ts
+ M api/application/logging.test.ts
+ M api/application/research-history-ports.ts
+ M api/application/research-history.fixture.ts
+ M api/application/research-history.test.ts
+ M api/application/research-routes.fixture.ts
+ M api/application/research-routes.test.ts
+ D api/application/research-routes.ts
+ M api/application/server.ts
+ M api/application/timer-toolchain.test.ts
+ M api/application/toolchain.fixture.ts
+ M api/application/toolchain.test.ts
+ M api/application/toolchain.ts
+ M api/application/world-acceptance-p3.test.ts
+ M api/application/world-extraction.test.ts
+ M api/application/world-scheduling.test.ts
+ M api/domains/agent-runtime/contracts/index.ts
+ M api/domains/agent-runtime/index.ts
+ M api/domains/agent-runtime/repository/index.ts
+ M api/domains/agent-runtime/service/accept-report.ts
+ M api/domains/agent-runtime/service/acquisition-tools.ts
+ M api/domains/agent-runtime/service/context.ts
+ M api/domains/agent-runtime/service/control-output.ts
+ M api/domains/agent-runtime/service/evidence-catalog.ts
+ M api/domains/agent-runtime/service/exploration.ts
+ M api/domains/agent-runtime/service/index.ts
+ M api/domains/agent-runtime/service/research-contract.ts
+ M api/domains/agent-runtime/service/tool-selection.ts
+ M api/domains/agent-runtime/service/verify-report.ts
+ M api/domains/agent-runtime/test/acquisition-plan.test.ts
+ M api/domains/agent-runtime/test/acquisition-tools.test.ts
+ M api/domains/agent-runtime/test/context.test.ts
+ M api/domains/agent-runtime/test/control-output.test.ts
+ M api/domains/agent-runtime/test/deadline.test.ts
+ M api/domains/agent-runtime/test/rediscovery.test.ts
+ M api/domains/agent-runtime/test/route-harness.ts
+ M api/domains/agent-runtime/test/warm-route.test.ts
+ M api/domains/attitude-dataset/service/index.ts
+ M api/domains/attitude-dataset/test/dataset.test.ts
+ M api/domains/capabilities/builtin/history.ts
+ M api/domains/capabilities/builtin/web-research.ts
+ M api/domains/capabilities/contracts/index.ts
+ M api/domains/capabilities/contracts/timers.ts
+ M api/domains/capabilities/controller/index.ts
+ M api/domains/capabilities/index.ts
+ M api/domains/capabilities/service/index.ts
+ M api/domains/capabilities/test/capabilities.test.ts
+ M api/domains/capabilities/test/learned.test.ts
+ M api/domains/capabilities/test/prepare-learned.test.ts
+ M api/domains/delivery/index.ts
+ D api/domains/delivery/service/evidence.ts
+ M api/domains/delivery/service/index.ts
+ M api/domains/delivery/test/delivery.test.ts
+ M api/domains/delivery/test/ruri.test.ts
+ M api/domains/dialogue/service/conversation-tools.ts
+ M api/domains/dialogue/service/delegate-conversation.ts
+ M api/domains/dialogue/service/index.ts
+ D api/domains/dialogue/service/timer-phrase.ts
+ M api/domains/dialogue/test/world-context.test.ts
+ M api/domains/goals/service/index.ts
+ M api/domains/goals/test/goals.test.ts
+ M api/domains/inference/contracts/index.ts
+ M api/domains/inference/index.ts
+ M api/domains/inference/repository/index.ts
+ M api/domains/inference/service/execute.ts
+ M api/domains/inference/service/index.ts
+ D api/domains/inference/service/speech-intonation.ts
+ M api/domains/inference/test/inference.test.ts
+ D api/domains/inference/test/speech-intonation.test.ts
+ M api/domains/memory/service/index.ts
+ M api/domains/memory/test/memory.test.ts
+ D api/domains/research-routes/service/assets.ts
+ D api/domains/research-routes/service/authoring.ts
+ D api/domains/research-routes/service/flow.ts
+ M api/domains/research-routes/service/index.ts
+ D api/domains/research-routes/service/keys.ts
+ M api/domains/research-routes/service/maintenance.ts
+ D api/domains/research-routes/service/mapping.ts
+ M api/domains/research-routes/service/operations.ts
+ M api/domains/research-routes/service/plans.ts
+ D api/domains/research-routes/service/projection.ts
+ D api/domains/research-routes/service/registration.ts
+ M api/domains/research-routes/service/registry.ts
+ D api/domains/research-routes/service/reviewing.ts
+ D api/domains/research-routes/service/validation.ts
+ D api/domains/research-routes/test/authoring.test.ts
+ D api/domains/research-routes/test/controller.test.ts
+ D api/domains/research-routes/test/keys.test.ts
+ D api/domains/research-routes/test/lifecycle.test.ts
+ D api/domains/research-routes/test/mapping.test.ts
+ D api/domains/research-routes/test/plans.test.ts
+ D api/domains/research-routes/test/projection.test.ts
+ D api/domains/research-routes/test/registration.test.ts
+ D api/domains/research-routes/test/reviewing.test.ts
+ D api/domains/research-routes/test/support.ts
+ D api/domains/research-routes/test/validation.test.ts
+ M api/domains/settings/index.ts
+ M api/domains/settings/service/index.ts
+ M api/domains/settings/test/settings.test.ts
+ M api/domains/tool-runtime/contracts/index.ts
+ M api/domains/tool-runtime/service/index.ts
+ M api/domains/tool-runtime/service/read-invocation.ts
+ M api/domains/tool-runtime/test/cached-source.test.ts
+ M api/domains/tool-runtime/test/invoke.test.ts
+ D api/domains/voice-dialogue/service/asr-language.ts
+ M api/domains/voice-dialogue/service/index.ts
+ D api/domains/voice-dialogue/test/asr-language.test.ts
+ M api/domains/voice-dialogue/test/settings-integration.test.ts
+ M api/domains/voice-dialogue/test/voice.test.ts
+ M api/domains/voice-dialogue/test/world-release.test.ts
+ M api/domains/web-research/adapters/llm-fetch.ts
+ D api/domains/web-research/adapters/public-json.ts
+ M api/domains/web-research/index.ts
+ D api/domains/web-research/service/report-gap.ts
+ M api/domains/web-research/service/saved-bodies.ts
+ D api/domains/web-research/service/source-text.ts
+ D api/domains/web-research/service/sources.ts
+ M api/domains/web-research/test/acquisition.test.ts
+ D api/domains/web-research/test/public-sources.test.ts
+ D api/domains/web-research/test/report-gap.test.ts
+ D api/domains/web-research/test/source-text.test.ts
+ M api/domains/world/README.md
+ M api/domains/world/repository/extraction.ts
+ M api/domains/world/repository/migrations.ts
+ M api/domains/world/service/extraction-ctx.ts
+ M api/domains/world/service/extraction-events.ts
+ M api/domains/world/service/extraction-prepare.ts
+ M api/domains/world/service/extraction-settle.ts
+ M api/domains/world/service/extraction-types.ts
+ M api/domains/world/test/extraction-fixture.ts
+ M api/domains/world/test/extraction-handler.test.ts
+ M api/infrastructure/config.test.ts
+ M api/infrastructure/config.ts
+ M api/infrastructure/validation-log.ts
+ M cli/commands/index.ts
+ M cli/commands/types.ts
+ M client/agent-runtime.ts
+ M client/index.ts
+ M docs/domains.md
+ M docs/larm.md
+ M docs/research-routes.md
+ M docs/settings.md
+ M docs/setup.md
+ M docs/toolchain.md
+ M docs/web-research.md
+ M scripts/conversation-live-cases.ts
+ M scripts/domains.ts
+ M scripts/evaluate-delivery-live.ts
+ M scripts/larm-fixture-server.ts
+ M scripts/research-history-live-cases.ts
+ D scripts/research-routes-live.ts
+ M scripts/toolchain-live.ts
+ M scripts/verify-live.ts
+ M spec/.archived/queue-scheduler-implementation-plan.md
+ M spec/README.md
+ M spec/conversation-and-research-simplification-plan-2026-10-10.md
+ M spec/improvement-plan-2026-10-10.md
+ M spec/memory-system-incremental-adoption-concept.md
+ M spec/verification/research-activity/desktop.png
+ M spec/verification/research-activity/mobile.png
+ M spec/verification/research-and-history-tools/README.md
+ M spec/verification/research-routes/README.md
+ M tests/browser/fixture.ts
+ M tests/browser/research-routes.spec.ts
+ M tests/browser/timers.spec.ts
+ M web/src/domains/research-routes/index.test.tsx
+ M web/src/domains/research-routes/index.tsx
+ M web/src/errorMessages.ts
+?? api/application/llm-native-evaluation.fixture.ts
+?? api/application/llm-native-runner.fixture.ts
+?? api/application/requirements-client.test.ts
+?? api/application/requirements-toolchain.test.ts
+?? api/application/testdata/
+?? api/application/timer-result-context.ts
+?? api/domains/agent-runtime/contracts/requirements.ts
+?? api/domains/agent-runtime/prompts/
+?? api/domains/agent-runtime/repository/requirements.ts
+?? api/domains/agent-runtime/service/rejection-log.ts
+?? api/domains/agent-runtime/service/requirement-verification.ts
+?? api/domains/agent-runtime/service/requirements.ts
+?? api/domains/agent-runtime/service/timer-operation.ts
+?? api/domains/agent-runtime/test/requirement-adoption.test.ts
+?? api/domains/agent-runtime/test/requirement-harness.ts
+?? api/domains/agent-runtime/test/requirement-verification.test.ts
+?? api/domains/agent-runtime/test/requirements.test.ts
+?? api/domains/agent-runtime/test/research-engine.test.ts
+?? api/domains/agent-runtime/test/research-fixture.ts
+?? api/domains/capabilities/builtin/history/SKILL.v2.md
+?? api/domains/capabilities/builtin/web-research/SKILL.v7.md
+?? api/domains/capabilities/builtin/web-research/SKILL.v8.md
+?? api/domains/capabilities/contracts/public-url.ts
+?? api/domains/capabilities/contracts/requirements.ts
+?? api/domains/capabilities/service/registry.ts
+?? api/domains/capabilities/service/requirement-schema.ts
+?? api/domains/capabilities/service/requirements.ts
+?? api/domains/capabilities/service/schema.ts
+?? api/domains/capabilities/test/requirement-controller.test.ts
+?? api/domains/capabilities/test/requirement-schema.test.ts
+?? api/domains/capabilities/test/requirements.test.ts
+?? api/domains/delivery/data/
+?? api/domains/delivery/service/settings.ts
+?? api/domains/dialogue/service/operation-authority.ts
+?? api/domains/dialogue/service/research-result-context.ts
+?? api/domains/dialogue/test/research-result-context.test.ts
+?? api/domains/dialogue/test/research-routing.test.ts
+?? api/domains/goals/README.md
+?? api/domains/inference/adapters/
+?? api/domains/inference/service/control-policy.ts
+?? api/domains/inference/service/receipt-authority.ts
+?? api/domains/inference/service/voice-binding.ts
+?? api/domains/inference/test/codex-adapter.test.ts
+?? api/domains/inference/test/codex-control.test.ts
+?? api/domains/research-routes/test/management.test.ts
+?? api/domains/settings/repository/stored-larm.ts
+?? api/domains/voice-dialogue/prompts/
+?? api/domains/voice-dialogue/service/process.ts
+?? api/domains/voice-dialogue/service/speech-state.ts
+?? api/domains/voice-dialogue/service/transcript-language.ts
+?? api/domains/voice-dialogue/test/control-fixture.ts
+?? api/domains/voice-dialogue/test/transcript-language.test.ts
+?? api/domains/world/repository/extraction-hold.ts
+?? api/domains/world/test/extraction-held.test.ts
+?? api/domains/world/test/extraction-migration.test.ts
+?? cli/commands/requirements.ts
+?? client/requirements.ts
+?? scripts/live-larm.ts
+?? scripts/llm-native-live.ts
+?? scripts/research-live-metrics.test.ts
+?? scripts/research-live-metrics.ts
+?? spec/llm-native-implementation-plan-2026-10-10.md
+?? spec/llm-native-remaining-domains-implementation-plan-2026-10-10.md
+?? spec/reviews/llm-native-design-2026-10-10/
+?? spec/reviews/llm-native-remaining-domains-2026-10-10/
+?? spec/verification/conversation-and-research-simplification/
+?? spec/verification/llm-native-2026-10-10/
+?? spec/verification/llm-native-remaining-domains-2026-10-10/

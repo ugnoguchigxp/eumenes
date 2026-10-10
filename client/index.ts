@@ -1,3 +1,4 @@
+import { requirementsClient } from "./requirements";
 import { codingSupervisionClient } from "./coding-supervision";
 import { agentRuntimeClient } from "./agent-runtime";
 import { attitudeDatasetClient } from "./attitude-dataset";
@@ -24,6 +25,7 @@ export { ApiError, ApiConnectionError } from "./transport";
 export function createClient(baseUrl: string, token?: string) {
 	const transport = createTransport(baseUrl, token);
 	return {
+		...requirementsClient(transport),
 		...attitudeDatasetClient(transport),
 		...eventsClient(transport),
 		...conversationClient(transport),

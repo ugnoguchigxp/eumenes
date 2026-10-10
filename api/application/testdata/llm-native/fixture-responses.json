@@ -1,0 +1,560 @@
+{
+	"event-complete": {
+		"outcome": "answered",
+		"summary": "受付開始は2026年10月12日09:00 JST。申込締切は2026年10月15日18:00 JST。参加費は一人1,500 JPY。",
+		"claims": [
+			{
+				"text": "受付開始は2026年10月12日09:00 JST。申込締切は2026年10月15日18:00 JST。参加費は一人1,500 JPY。",
+				"evidence": ["e1"]
+			}
+		],
+		"limitations": [],
+		"checks": [
+			{
+				"localId": "deadline",
+				"status": "satisfied",
+				"value": "2026-10-15T09:00:00Z",
+				"evidence": ["e1"],
+				"reason": "人工fixtureの指定結果"
+			},
+			{
+				"localId": "fee",
+				"status": "satisfied",
+				"value": {
+					"amount": 1500,
+					"currency": "JPY"
+				},
+				"evidence": ["e1"],
+				"reason": "人工fixtureの指定結果"
+			}
+		]
+	},
+	"event-missing": {
+		"outcome": "partial",
+		"summary": "受付開始は2026年10月12日09:00 JST。申込締切は記載がない。参加費は一人1,500 JPY。",
+		"claims": [
+			{
+				"text": "受付開始は2026年10月12日09:00 JST。申込締切は記載がない。参加費は一人1,500 JPY。",
+				"evidence": ["e1"]
+			}
+		],
+		"limitations": ["未確認の条件がある"],
+		"checks": [
+			{
+				"localId": "deadline",
+				"status": "unknown",
+				"value": null,
+				"evidence": [],
+				"reason": "人工fixtureの指定結果"
+			},
+			{
+				"localId": "fee",
+				"status": "satisfied",
+				"value": {
+					"amount": 1500,
+					"currency": "JPY"
+				},
+				"evidence": ["e1"],
+				"reason": "人工fixtureの指定結果"
+			}
+		]
+	},
+	"facility-complete": {
+		"outcome": "answered",
+		"summary": "日曜日は10:00〜17:00。12歳未満は成人同伴が必要。一般料金500 JPY、会員料金300 JPY。",
+		"claims": [
+			{
+				"text": "日曜日は10:00〜17:00。12歳未満は成人同伴が必要。一般料金500 JPY、会員料金300 JPY。",
+				"evidence": ["e1"]
+			}
+		],
+		"limitations": [],
+		"checks": [
+			{
+				"localId": "hours",
+				"status": "satisfied",
+				"value": "10:00〜17:00",
+				"evidence": ["e1"],
+				"reason": "人工fixtureの指定結果"
+			},
+			{
+				"localId": "age",
+				"status": "satisfied",
+				"value": "12歳未満は成人同伴が必要",
+				"evidence": ["e1"],
+				"reason": "人工fixtureの指定結果"
+			}
+		]
+	},
+	"facility-conflict": {
+		"outcome": "partial",
+		"summary": "本館規程: 日曜日10:00〜17:00。12歳未満は成人同伴が必要。予約案内: 日曜日10:00〜17:00。12歳未満は同伴の有無によらず入館不可。どちらが有効かは記載なし。",
+		"claims": [
+			{
+				"text": "本館規程: 日曜日10:00〜17:00。12歳未満は成人同伴が必要。予約案内: 日曜日10:00〜17:00。12歳未満は同伴の有無によらず入館不可。どちらが有効かは記載なし。",
+				"evidence": ["e1"]
+			}
+		],
+		"limitations": ["未確認の条件がある"],
+		"checks": [
+			{
+				"localId": "hours",
+				"status": "satisfied",
+				"value": "10:00〜17:00",
+				"evidence": ["e1"],
+				"reason": "人工fixtureの指定結果"
+			},
+			{
+				"localId": "age",
+				"status": "unknown",
+				"value": null,
+				"evidence": [],
+				"reason": "人工fixtureの指定結果"
+			}
+		]
+	},
+	"product-target": {
+		"outcome": "answered",
+		"summary": "NX-42はR2対応。firmwareは3.2以上。",
+		"claims": [
+			{
+				"text": "NX-42はR2対応",
+				"evidence": ["e1"]
+			}
+		],
+		"limitations": [],
+		"checks": [
+			{
+				"localId": "compatibility",
+				"status": "satisfied",
+				"value": "R2対応",
+				"evidence": ["e1"],
+				"reason": "人工fixtureの指定結果"
+			},
+			{
+				"localId": "firmware",
+				"status": "satisfied",
+				"value": "3.2以上",
+				"evidence": ["e1"],
+				"reason": "人工fixtureの指定結果"
+			}
+		]
+	},
+	"product-old": {
+		"outcome": "answered",
+		"summary": "NX-24はR2非対応。必要firmwareの条件は適用外。",
+		"claims": [
+			{
+				"text": "NX-24はR2非対応",
+				"evidence": ["e1"]
+			}
+		],
+		"limitations": [],
+		"checks": [
+			{
+				"localId": "compatibility",
+				"status": "satisfied",
+				"value": "R2非対応",
+				"evidence": ["e1"],
+				"reason": "人工fixtureの指定結果"
+			},
+			{
+				"localId": "firmware",
+				"status": "not_applicable",
+				"value": null,
+				"evidence": ["e1"],
+				"reason": "人工fixtureの指定結果"
+			}
+		]
+	},
+	"event-complete-luna": {
+		"outcome": "answered",
+		"summary": "受付開始は2026年10月12日09:00 JST。申込締切は2026年10月15日18:00 JST。参加費は一人1,500 JPY。",
+		"claims": [
+			{
+				"text": "受付開始は2026年10月12日09:00 JST。申込締切は2026年10月15日18:00 JST。参加費は一人1,500 JPY。",
+				"evidence": ["e1"]
+			}
+		],
+		"limitations": [],
+		"checks": [
+			{
+				"localId": "deadline",
+				"status": "satisfied",
+				"value": "2026-10-15T09:00:00Z",
+				"evidence": ["e1"],
+				"reason": "人工fixtureの指定結果"
+			},
+			{
+				"localId": "fee",
+				"status": "satisfied",
+				"value": {
+					"amount": 1500,
+					"currency": "JPY"
+				},
+				"evidence": ["e1"],
+				"reason": "人工fixtureの指定結果"
+			}
+		]
+	},
+	"event-missing-luna": {
+		"outcome": "partial",
+		"summary": "受付開始は2026年10月12日09:00 JST。申込締切は記載がない。参加費は一人1,500 JPY。",
+		"claims": [
+			{
+				"text": "受付開始は2026年10月12日09:00 JST。申込締切は記載がない。参加費は一人1,500 JPY。",
+				"evidence": ["e1"]
+			}
+		],
+		"limitations": ["未確認の条件がある"],
+		"checks": [
+			{
+				"localId": "deadline",
+				"status": "unknown",
+				"value": null,
+				"evidence": [],
+				"reason": "人工fixtureの指定結果"
+			},
+			{
+				"localId": "fee",
+				"status": "satisfied",
+				"value": {
+					"amount": 1500,
+					"currency": "JPY"
+				},
+				"evidence": ["e1"],
+				"reason": "人工fixtureの指定結果"
+			}
+		]
+	},
+	"facility-complete-luna": {
+		"outcome": "answered",
+		"summary": "日曜日は10:00〜17:00。12歳未満は成人同伴が必要。一般料金500 JPY、会員料金300 JPY。",
+		"claims": [
+			{
+				"text": "日曜日は10:00〜17:00。12歳未満は成人同伴が必要。一般料金500 JPY、会員料金300 JPY。",
+				"evidence": ["e1"]
+			}
+		],
+		"limitations": [],
+		"checks": [
+			{
+				"localId": "hours",
+				"status": "satisfied",
+				"value": "10:00〜17:00",
+				"evidence": ["e1"],
+				"reason": "人工fixtureの指定結果"
+			},
+			{
+				"localId": "age",
+				"status": "satisfied",
+				"value": "12歳未満は成人同伴が必要",
+				"evidence": ["e1"],
+				"reason": "人工fixtureの指定結果"
+			}
+		]
+	},
+	"facility-conflict-luna": {
+		"outcome": "partial",
+		"summary": "本館規程: 日曜日10:00〜17:00。12歳未満は成人同伴が必要。予約案内: 日曜日10:00〜17:00。12歳未満は同伴の有無によらず入館不可。どちらが有効かは記載なし。",
+		"claims": [
+			{
+				"text": "本館規程: 日曜日10:00〜17:00。12歳未満は成人同伴が必要。予約案内: 日曜日10:00〜17:00。12歳未満は同伴の有無によらず入館不可。どちらが有効かは記載なし。",
+				"evidence": ["e1"]
+			}
+		],
+		"limitations": ["未確認の条件がある"],
+		"checks": [
+			{
+				"localId": "hours",
+				"status": "satisfied",
+				"value": "10:00〜17:00",
+				"evidence": ["e1"],
+				"reason": "人工fixtureの指定結果"
+			},
+			{
+				"localId": "age",
+				"status": "unknown",
+				"value": null,
+				"evidence": [],
+				"reason": "人工fixtureの指定結果"
+			}
+		]
+	},
+	"product-target-luna": {
+		"outcome": "answered",
+		"summary": "NX-42はR2対応。firmwareは3.2以上。",
+		"claims": [
+			{
+				"text": "NX-42はR2対応",
+				"evidence": ["e1"]
+			}
+		],
+		"limitations": [],
+		"checks": [
+			{
+				"localId": "compatibility",
+				"status": "satisfied",
+				"value": "R2対応",
+				"evidence": ["e1"],
+				"reason": "人工fixtureの指定結果"
+			},
+			{
+				"localId": "firmware",
+				"status": "satisfied",
+				"value": "3.2以上",
+				"evidence": ["e1"],
+				"reason": "人工fixtureの指定結果"
+			}
+		]
+	},
+	"product-old-luna": {
+		"outcome": "answered",
+		"summary": "NX-24はR2非対応。必要firmwareの条件は適用外。",
+		"claims": [
+			{
+				"text": "NX-24はR2非対応",
+				"evidence": ["e1"]
+			}
+		],
+		"limitations": [],
+		"checks": [
+			{
+				"localId": "compatibility",
+				"status": "satisfied",
+				"value": "R2非対応",
+				"evidence": ["e1"],
+				"reason": "人工fixtureの指定結果"
+			},
+			{
+				"localId": "firmware",
+				"status": "not_applicable",
+				"value": null,
+				"evidence": ["e1"],
+				"reason": "人工fixtureの指定結果"
+			}
+		]
+	},
+	"lodging-complete": {
+		"outcome": "answered",
+		"summary": "公式サイト予約の2026年11月8日宿泊は2026-11-04 18:00 JSTまで無料取消可能。期限後の取消料率は40%。",
+		"claims": [
+			{
+				"text": "公式サイト予約の2026年11月8日宿泊は2026-11-04 18:00 JSTまで無料取消可能。期限後の取消料率は40%。",
+				"evidence": ["e1"]
+			}
+		],
+		"limitations": [],
+		"checks": [
+			{
+				"localId": "deadline",
+				"status": "satisfied",
+				"value": "2026-11-04 18:00 JST",
+				"evidence": ["e1"],
+				"reason": "人工fixtureの指定結果"
+			},
+			{
+				"localId": "fee",
+				"status": "satisfied",
+				"value": 40,
+				"evidence": ["e1"],
+				"reason": "人工fixtureの指定結果"
+			}
+		]
+	},
+	"lodging-complete-luna": {
+		"outcome": "answered",
+		"summary": "公式サイト予約の2026年11月8日宿泊は2026-11-04 18:00 JSTまで無料取消可能。期限後の取消料率は40%。",
+		"claims": [
+			{
+				"text": "公式サイト予約の2026年11月8日宿泊は2026-11-04 18:00 JSTまで無料取消可能。期限後の取消料率は40%。",
+				"evidence": ["e1"]
+			}
+		],
+		"limitations": [],
+		"checks": [
+			{
+				"localId": "deadline",
+				"status": "satisfied",
+				"value": "2026-11-04 18:00 JST",
+				"evidence": ["e1"],
+				"reason": "人工fixtureの指定結果"
+			},
+			{
+				"localId": "fee",
+				"status": "satisfied",
+				"value": 40,
+				"evidence": ["e1"],
+				"reason": "人工fixtureの指定結果"
+			}
+		]
+	},
+	"lodging-missing": {
+		"outcome": "partial",
+		"summary": "公式サイト予約の2026年11月8日宿泊は2026-11-04 18:00 JSTまで無料取消可能。期限後の取消料率は不明。",
+		"claims": [
+			{
+				"text": "公式サイト予約の2026年11月8日宿泊は2026-11-04 18:00 JSTまで無料取消可能。期限後の取消料率は不明。",
+				"evidence": ["e1"]
+			}
+		],
+		"limitations": ["未確認の条件がある"],
+		"checks": [
+			{
+				"localId": "deadline",
+				"status": "satisfied",
+				"value": "2026-11-04 18:00 JST",
+				"evidence": ["e1"],
+				"reason": "人工fixtureの指定結果"
+			},
+			{
+				"localId": "fee",
+				"status": "unknown",
+				"value": null,
+				"evidence": [],
+				"reason": "人工fixtureの指定結果"
+			}
+		]
+	},
+	"lodging-missing-luna": {
+		"outcome": "partial",
+		"summary": "公式サイト予約の2026年11月8日宿泊は2026-11-04 18:00 JSTまで無料取消可能。期限後の取消料率は不明。",
+		"claims": [
+			{
+				"text": "公式サイト予約の2026年11月8日宿泊は2026-11-04 18:00 JSTまで無料取消可能。期限後の取消料率は不明。",
+				"evidence": ["e1"]
+			}
+		],
+		"limitations": ["未確認の条件がある"],
+		"checks": [
+			{
+				"localId": "deadline",
+				"status": "satisfied",
+				"value": "2026-11-04 18:00 JST",
+				"evidence": ["e1"],
+				"reason": "人工fixtureの指定結果"
+			},
+			{
+				"localId": "fee",
+				"status": "unknown",
+				"value": null,
+				"evidence": [],
+				"reason": "人工fixtureの指定結果"
+			}
+		]
+	},
+	"rental-complete": {
+		"outcome": "answered",
+		"summary": "個人契約の最低年齢は21歳。保証金は8,000 JPY。",
+		"claims": [
+			{
+				"text": "個人契約の最低年齢は21歳。保証金は8,000 JPY。",
+				"evidence": ["e1"]
+			}
+		],
+		"limitations": [],
+		"checks": [
+			{
+				"localId": "age",
+				"status": "satisfied",
+				"value": 21,
+				"evidence": ["e1"],
+				"reason": "人工fixtureの指定結果"
+			},
+			{
+				"localId": "deposit",
+				"status": "satisfied",
+				"value": {
+					"amount": 8000,
+					"currency": "JPY"
+				},
+				"evidence": ["e1"],
+				"reason": "人工fixtureの指定結果"
+			}
+		]
+	},
+	"rental-complete-luna": {
+		"outcome": "answered",
+		"summary": "個人契約の最低年齢は21歳。保証金は8,000 JPY。",
+		"claims": [
+			{
+				"text": "個人契約の最低年齢は21歳。保証金は8,000 JPY。",
+				"evidence": ["e1"]
+			}
+		],
+		"limitations": [],
+		"checks": [
+			{
+				"localId": "age",
+				"status": "satisfied",
+				"value": 21,
+				"evidence": ["e1"],
+				"reason": "人工fixtureの指定結果"
+			},
+			{
+				"localId": "deposit",
+				"status": "satisfied",
+				"value": {
+					"amount": 8000,
+					"currency": "JPY"
+				},
+				"evidence": ["e1"],
+				"reason": "人工fixtureの指定結果"
+			}
+		]
+	},
+	"rental-missing": {
+		"outcome": "partial",
+		"summary": "個人契約の最低年齢は21歳。保証金額は未記載のため不明。",
+		"claims": [
+			{
+				"text": "個人契約の最低年齢は21歳。保証金額は未記載のため不明。",
+				"evidence": ["e1"]
+			}
+		],
+		"limitations": ["未確認の条件がある"],
+		"checks": [
+			{
+				"localId": "age",
+				"status": "satisfied",
+				"value": 21,
+				"evidence": ["e1"],
+				"reason": "人工fixtureの指定結果"
+			},
+			{
+				"localId": "deposit",
+				"status": "unknown",
+				"value": null,
+				"evidence": [],
+				"reason": "人工fixtureの指定結果"
+			}
+		]
+	},
+	"rental-missing-luna": {
+		"outcome": "partial",
+		"summary": "個人契約の最低年齢は21歳。保証金額は未記載のため不明。",
+		"claims": [
+			{
+				"text": "個人契約の最低年齢は21歳。保証金額は未記載のため不明。",
+				"evidence": ["e1"]
+			}
+		],
+		"limitations": ["未確認の条件がある"],
+		"checks": [
+			{
+				"localId": "age",
+				"status": "satisfied",
+				"value": 21,
+				"evidence": ["e1"],
+				"reason": "人工fixtureの指定結果"
+			},
+			{
+				"localId": "deposit",
+				"status": "unknown",
+				"value": null,
+				"evidence": [],
+				"reason": "人工fixtureの指定結果"
+			}
+		]
+	}
+}

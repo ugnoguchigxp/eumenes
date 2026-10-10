@@ -171,6 +171,7 @@ async function setup(
 		claimText?: string;
 		goal?: boolean;
 		withBroker?: boolean;
+		delegate?: boolean;
 	} = {},
 ) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-world-dialogue-"));
@@ -297,6 +298,7 @@ async function setup(
 	let sends = 0;
 	let allowSettle = options.acceptReceipt !== false;
 	let lastCtx: Ctx | undefined;
+	let delegations = 0;
 	const larm: InferencePort = {
 		status: () => ({ state: "ready", capabilities: ["llm"] }),
 		connect: async () => {},
@@ -311,6 +313,24 @@ async function setup(
 		executeStream: async (requestId, messages, _signal, onDelta) => {
 			sends += 1;
 			seen.push(messages.map((m) => ({ ...m })));
+			if (options.delegate) {
+				if (hooks.beforeSettle && lastCtx) await hooks.beforeSettle(lastCtx);
+				return {
+					requestId,
+					attemptId: `att-${sends}`,
+					value: "",
+					toolCalls: [
+						{
+							id: "call",
+							name: "research",
+							arguments: JSON.stringify({
+								kind: "web",
+								question: "提供時期を確認する",
+							}),
+						},
+					],
+				};
+			}
 			onDelta(ANSWER.slice(0, 3));
 			if (hooks.duringGeneration && lastCtx)
 				await hooks.duringGeneration(lastCtx);
@@ -327,6 +347,7 @@ async function setup(
 			throw new Error("fixture streams");
 		},
 		acceptInTransaction: () => allowSettle,
+		validateReceiptInTransaction: () => allowSettle,
 	};
 
 	const queue = createQueue(store);
@@ -378,6 +399,17 @@ async function setup(
 		conversation,
 		larm,
 		queue,
+		...(options.delegate
+			? {
+					agents: {
+						pendingEvents: () => [],
+						startInTransaction: () => {
+							delegations++;
+							throw new Error("unexpected_delegation");
+						},
+					} as unknown as import("../../agent-runtime").AgentRuntime,
+				}
+			: {}),
 		...(memory ? { memory } : {}),
 		...(worldContext ? { worldContext } : {}),
 	});
@@ -397,6 +429,7 @@ async function setup(
 		hooks,
 		prepared,
 		sends: () => sends,
+		delegations: () => delegations,
 		denyReceipt: () => {
 			allowSettle = false;
 		},
@@ -441,6 +474,7 @@ async function setup(
 						.all() as { dependent_id: string }[],
 			),
 		async close() {
+			await dialogue.close();
 			await queue.close(100).catch(() => {});
 			await store.close().catch(() => {});
 		},
@@ -452,6 +486,21 @@ async function setup(
 	return h;
 }
 type Harness = Awaited<ReturnType<typeof setup>>;
+
+for (const cause of ["correction", "policy", "receipt"] as const)
+	test(`native delegation rejects ${cause} changed after generation without starting a child`, async () => {
+		const h = await setup({ delegate: true });
+		h.hooks.beforeSettle = async (ctx) => {
+			if (cause === "receipt") h.denyReceipt();
+			else await mutation(h, cause)(ctx);
+		};
+		const run = await h.ask();
+		expect((await h.finish(run.id)).status).toBe("failed");
+		expect(h.delegations()).toBe(0);
+		expect(h.answers()).toEqual([]);
+		expect(h.usageRows()).toEqual([]);
+		expect(h.sliceDependents()).toEqual([]);
+	});
 
 /** Each cause as one injected change. `ctx` names the run that is in flight. */
 function mutation(h: Harness, cause: Cause): (ctx: Ctx) => Promise<unknown> {

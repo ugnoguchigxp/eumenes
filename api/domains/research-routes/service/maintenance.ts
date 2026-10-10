@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { HandlerDefinition } from "../../queue";
 import { jobKinds, limits, ownerScope, ttl } from "../contracts";
 import * as repo from "../repository";
-import type { QueueSlice, SourceAdoptionPort } from "./flow";
+import type { QueueService } from "../../queue";
 import { type Clock, systemClock } from "./registry";
 
 export type PruneLearned = (
@@ -15,8 +15,8 @@ export type MaintenanceOptions = {
 	externalBytes?: (db: Database) => number;
 	/** capabilities' public GC: only learned, route-only package revisions outside `protect` are removed. */
 	prune?: PruneLearned;
-	adoption?: Pick<SourceAdoptionPort, "protectedBindingsInTransaction">;
-	queue?: QueueSlice;
+	protectedBindingsInTransaction?: (db: Database) => string[];
+	queue?: Pick<QueueService, "enqueueInTransaction">;
 };
 export type SweepMode = "ttl" | "epoch";
 export type SweepResult = { removed: number; hasMore: boolean };
@@ -38,7 +38,7 @@ export function createMaintenance(opts: MaintenanceOptions = {}) {
 	/** Versions held by running roots plus the base of every open draft; they must survive reclaim. */
 	function heldVersions(db: Database): Set<string> {
 		const held = new Set<string>(
-			opts.adoption?.protectedBindingsInTransaction?.(db) ?? [],
+			opts.protectedBindingsInTransaction?.(db) ?? [],
 		);
 		for (const r of db
 			.query(

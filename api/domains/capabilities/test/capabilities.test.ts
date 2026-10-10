@@ -12,6 +12,24 @@ import {
 	type Definition,
 } from "..";
 import { builtins } from "../builtin/web-research";
+test("quick Web capability grants only lookup and read and preserves Luna tools", () => {
+	const quick = builtins.find(
+		(d) => d.kind === "package" && d.id === "web.quick",
+	);
+	expect(quick).toMatchObject({
+		revision: 1,
+		profileRevisionId: "profile:web.quick@1",
+		toolRevisionIds: ["tool:web.lookup@1", "tool:web.read@1"],
+	});
+	expect(quick!.dependencies).not.toContain("tool:web.find@1");
+	expect(quick!.dependencies).not.toContain("tool:web.read_saved@1");
+	expect(
+		builtins.find(
+			(d) =>
+				d.kind === "package" && d.id === "web.research" && d.revision === 9,
+		)?.toolRevisionIds,
+	).toContain("tool:web.read_saved@1");
+});
 test("5000 capability catalogue: bounded discovery, exact aliases, immutable revisions and owner isolation", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-capabilities-"));
 	const store = openStore(join(dir, "db"), [migration]);
@@ -194,8 +212,8 @@ test("builtin SKILL is mandatory; disabling survives seed and dependency failure
 				caps.searchInTransaction(
 					db,
 					{ taskId: "task", rootRunId: "root", cancelEpoch: 0 },
-					"天気",
-					["天気"],
+					"調査",
+					["調査"],
 					Date.now() + 10000,
 				),
 			).toHaveLength(0),
@@ -216,8 +234,8 @@ test("revoking a dependency permanently invalidates already issued candidates, e
 			const old = caps.searchInTransaction(
 				db,
 				owner,
-				"天気",
-				["天気"],
+				"調査",
+				["調査"],
 				Date.now() + 10000,
 			)[0]!;
 			caps.setEnabledInTransaction(db, "skill", "web.research", false);
@@ -230,8 +248,8 @@ test("revoking a dependency permanently invalidates already issued candidates, e
 			const fresh = caps.searchInTransaction(
 				db,
 				owner,
-				"天気",
-				["天気"],
+				"調査",
+				["調査"],
 				Date.now() + 10000,
 			)[0]!;
 			expect(
@@ -255,6 +273,7 @@ test("builtin bundle upgrade preserves revision 1 fingerprints and activates a n
 			// Only the originally deployed definitions (revision 3 packages / skill 2 are newer).
 			for (const definition of builtins.filter(
 				(d) =>
+					d.id != "web.quick" &&
 					d.revision < 3 &&
 					!(d.kind === "skill" && d.revision === 2) &&
 					!(d.kind === "profile" && d.revision === 2),
@@ -293,24 +312,20 @@ test("builtin bundle upgrade preserves revision 1 fingerprints and activates a n
 			store.read((db) =>
 				db
 					.query(
-						"SELECT id,definition_hash FROM capability_revisions WHERE item_key LIKE 'package:%' AND revision=1 ORDER BY id",
+						"SELECT id,definition_hash FROM capability_revisions WHERE item_key LIKE 'package:%' AND revision=1 AND item_key != 'package:web.quick' ORDER BY id",
 					)
 					.all(),
 			),
 		).toEqual(old);
 		await store.write((db) => {
 			const owner = { rootRunId: "root", taskId: "task", cancelEpoch: 0 };
-			const card = caps.searchInTransaction(
-				db,
-				owner,
-				"天気",
-				["天気"],
-				Date.now() + 10000,
-			)[0]!;
+			const card = caps
+				.searchInTransaction(db, owner, "調査", ["調査"], Date.now() + 10000)
+				.find((card) => card.id === "web.research")!;
 			const prepared = caps.prepareInTransaction(db, owner, card.candidateRef, {
 				question: "東京の天気".repeat(500),
 			});
-			expect(prepared.package.revision).toBe(7);
+			expect(prepared.package.revision).toBe(9);
 		});
 	} finally {
 		caps.close();
@@ -330,10 +345,12 @@ test("deployed research skill v3 upgrades without a revision conflict and restar
 			"587d033849b45dcf4a13a26c7131ebe9ff93c26cd2cb959b2b7155b7962630b0",
 		);
 		await store.write((db) => {
-			for (const d of builtins.filter((d) =>
-				d.kind === "package"
-					? d.revision <= (d.id === "web.read" ? 3 : 4)
-					: d.revision <= 3,
+			for (const d of builtins.filter(
+				(d) =>
+					d.id !== "web.quick" &&
+					(d.kind === "package"
+						? d.revision <= (d.id === "web.read" ? 3 : 4)
+						: d.revision <= 3),
 			))
 				caps.registerBuiltinInTransaction(
 					db,
@@ -361,19 +378,15 @@ test("deployed research skill v3 upgrades without a revision conflict and restar
 			).toBe(row.definition_hash);
 		await store.write((db) => {
 			const owner = { rootRunId: "root", taskId: "task", cancelEpoch: 0 };
-			const card = caps.searchInTransaction(
-				db,
-				owner,
-				"天気",
-				["天気"],
-				Date.now() + 10000,
-			)[0]!;
+			const card = caps
+				.searchInTransaction(db, owner, "調査", ["調査"], Date.now() + 10000)
+				.find((card) => card.id === "web.research")!;
 			const prepared = caps.prepareInTransaction(db, owner, card.candidateRef, {
 				question: "東京の天気",
 			});
-			expect(prepared.package.revision).toBe(7);
+			expect(prepared.package.revision).toBe(9);
 			expect(prepared.package.requiredSkillRevisionIds).toEqual([
-				"skill:web.research@6",
+				"skill:web.research@8",
 			]);
 			expect(
 				caps.getDefinitionInTransaction(db, "skill:web.research@6")?.body,
@@ -394,7 +407,7 @@ test("seed still rejects a changed newest builtin revision", async () => {
 	const caps = createCapabilities(store);
 	try {
 		const latest = builtins.find(
-			(d) => d.kind === "skill" && d.revision === 6,
+			(d) => d.kind === "skill" && d.revision === 8,
 		)!;
 		await store.write((db) =>
 			caps.registerBuiltinInTransaction(db, { ...latest, body: "別の内容" }),

@@ -1,0 +1,33 @@
+$ bun scripts/verify.ts --domain tool-runtime
+[verify] selected=tool-runtime dependencyClosure=capabilities,queue,tool-runtime testClosure=capabilities,queue,tool-runtime
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts api/domains/tool-runtime
+size-budget ok (6 files)
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check api/domains/tool-runtime
+$ oxfmt --check api/domains/tool-runtime
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 3ms on 8 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint api/domains/tool-runtime
+$ oxlint --deny-warnings api/domains/tool-runtime
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun x tsc -p /Users/y.noguchi/Code/eumenes/verification-reports/tsconfig.selected.json
+[verify] TypeScript workspace closure: 37 files; api/infrastructure/flock.ts, api/infrastructure/logger.ts, api/infrastructure/sqlite, api/domains/capabilities, api/infrastructure/http.ts, api/domains/tool-runtime, api/domains/queue, api/infrastructure/digest.ts, api/infrastructure/validation-log.ts
+[verify] domain tests: /Users/y.noguchi/.bun/bin/bun run test:domain -- tool-runtime
+$ bun scripts/test-domain.ts tool-runtime
+bun test v1.4.2 (744846f84)
+
+api/domains/tool-runtime/test/cached-source.test.ts:
+(pass) R01 cached grant is per-owner, exact-URL, exact-args and re-checked against the port on every use [20.15ms]
+(pass) R01 candidate import yields an owner-scoped observation, never a real lookup, and counts as one lookup allowance [10.62ms]
+(pass) R01 without a configured port, cached grants and imports are unavailable (no silent success) [10.03ms]
+(pass) superseded invocations leave observations but stay in the budget and the invocation list [10.28ms]
+(pass) replay rechecks authority, source revision and supersession before admitting a consumed grant [10.40ms]
+
+api/domains/tool-runtime/test/invoke.test.ts:
+(pass) gateway refuses foreign refs and unselected URLs; idempotent invocation and rolled-back result is not exposed [19.27ms]
+
+ 6 pass
+ 0 fail
+ 113 expect() calls
+Ran 6 tests across 2 files. [155.00ms]
+[verify] passed 1673 ms

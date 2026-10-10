@@ -26,3 +26,40 @@ export const timerCommand = z.discriminatedUnion("operation", [
 	timerList.extend({ operation: z.literal("list") }),
 	timerCancel.extend({ operation: z.literal("cancel") }),
 ]);
+
+export const timerResultContext = z
+	.object({
+		version: z.literal(1),
+		kind: z.literal("timer_action"),
+		action: z.enum([
+			"started",
+			"listed",
+			"cancelled",
+			"dismissed",
+			"unchanged",
+			"failed",
+		]),
+		observedAt: z.iso.datetime({ offset: true }),
+		items: z
+			.array(
+				z
+					.object({
+						id: z.uuid(),
+						revision: z.number().int().nonnegative(),
+						label: z.string().max(80),
+						state: z.enum(timerStates),
+						durationSeconds: z.number().int().min(1).max(86400),
+						remainingSeconds: z.number().int().min(0).max(86400),
+						dueAt: z.iso.datetime({ offset: true }),
+					})
+					.strict(),
+			)
+			.max(50),
+		complete: z.boolean(),
+		errorCode: z
+			.string()
+			.regex(/^[a-z_]{1,80}$/)
+			.nullable(),
+	})
+	.strict();
+export type TimerResultContext = z.infer<typeof timerResultContext>;

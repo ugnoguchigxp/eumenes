@@ -3,7 +3,6 @@ import {
 	acceptedEmotion,
 	chooseSpeechDelivery,
 	deliveryState,
-	emotionCandidates,
 	speechParameters,
 	speechQuestions,
 	type Emotion,
@@ -31,10 +30,9 @@ test("full reply and recent conversation decide emotion; speech motion and voice
 		async (state, questions) => {
 			expect(state.response).toBe(context.answer);
 			expect(JSON.parse(state.conversation!)).toEqual(context.turns);
-			expect(questions.emotion?.criteria).toEqual({
-				none: speechQuestions.emotion!.criteria.none!,
-				warmth: speechQuestions.emotion!.criteria.warmth!,
-			});
+			expect(questions.emotion?.criteria).toEqual(
+				speechQuestions.emotion!.criteria,
+			);
 			expect(Object.keys(questions)).toEqual(["emotion"]);
 			return decision("warmth");
 		},
@@ -64,7 +62,6 @@ test("unnecessary, uncertain, invalid or truncated choices never become emotion 
 		[decision("none"), "laya", undefined],
 		[decision("warmth", 0.59), "fallback", "low-confidence"],
 		[decision("sleepy"), "fallback", "invalid"],
-		[decision("joy", 0.99), "fallback", "invalid"],
 		[decision("joy", Number.NaN), "fallback", "invalid"],
 		[
 			{ ...decision(), usage: { state_tokens_dropped: 1 } },
@@ -83,47 +80,47 @@ test("unnecessary, uncertain, invalid or truncated choices never become emotion 
 		expect(acceptedEmotion(delivery)).toBeNull();
 	}
 });
-test("evidence comes from this response and latest user; quotes, code and negation do not force emotion", async () => {
+test("E01/E02/E03 every nonempty reply keeps quotes, negation and definitions and uses all candidates once", async () => {
 	for (const answer of [
-		"一時間は3600秒です。",
-		"「ありがとう。素敵ですね！」は二文です。",
-		"値は `素敵ですね、ありがとう` です。",
+		"おめでとうございます",
+		"努力が実りましたね。心から祝福します",
+		"『嬉しい』という言葉の意味を説明します",
+		"嬉しいとは言えません",
+		"つらい状況でしたね。一緒に整理しましょう",
 		"```\nおめでとうございます！\n```\nこれはコードの例です。",
 		"> 合格おめでとうございます！\n引用です。",
-		"うれしくない、という文です。",
-		"親しみとは、人や物に近しさを感じることです。",
 	]) {
 		let calls = 0;
-		const delivery = await chooseSpeechDelivery(
-			async () => {
+		const result = await chooseSpeechDelivery(
+			async (state, questions) => {
 				calls++;
-				return decision("joy");
+				expect(state.response).toBe(answer);
+				expect(Object.keys(questions.emotion!.criteria)).toEqual([
+					"none",
+					"warmth",
+					"joy",
+					"empathy",
+					"curiosity",
+					"surprise",
+				]);
+				return decision("none");
 			},
 			answer,
 			new AbortController().signal,
 		);
-		expect(calls).toBe(0);
-		expect(delivery.reason).toBe("not-expressive");
+		expect(calls).toBe(1);
+		expect(result.emotion).toBe("none");
 	}
-	expect(
-		emotionCandidates("無理せず休んでください。", {
-			answer: "無理せず休んでください。",
-			turns: [
-				{ role: "user", text: "悲しいです。" },
-				{ role: "assistant", text: "つらいですね。" },
-				{ role: "user", text: "PCのスリープ設定は？" },
-			],
-		}),
-	).toEqual([]);
-	expect(
-		emotionCandidates("無理に喜ばなくても大丈夫です。", {
-			answer: "無理に喜ばなくても大丈夫です。",
-			turns: [{ role: "user", text: "合格したのに喜べない。" }],
-		}),
-	).toEqual(["empathy"]);
-	expect(
-		emotionCandidates("親しみとは近しさを感じることです。素敵なお名前ですね。"),
-	).toEqual(["warmth"]);
+	let calls = 0;
+	await chooseSpeechDelivery(
+		async () => {
+			calls++;
+			return decision();
+		},
+		"",
+		new AbortController().signal,
+	);
+	expect(calls).toBe(0);
 });
 test("selected-answer probability is required and is not question applicability", async () => {
 	const result = await chooseSpeechDelivery(
@@ -219,6 +216,7 @@ test("long data stays bounded, preserves beginnings and endings, excludes system
 			text: `${i}:` + "い".repeat(2000) + "末尾",
 		})),
 	});
+	expect(state.context_truncated).toBe("true");
 	expect(state.response?.startsWith("開始")).toBe(true);
 	expect(state.response?.endsWith("終端")).toBe(true);
 	expect(JSON.parse(state.conversation!)).toHaveLength(4);

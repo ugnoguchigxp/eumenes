@@ -1,0 +1,35 @@
+{
+	"selected": ["delivery"],
+	"dependencySet": ["delivery"],
+	"testDependencySet": ["delivery"],
+	"revision": "e0210369aa4f2827dcc7d67ad7cc649b2401125d2ae327ad3d32426b5568228a",
+	"steps": [
+		{
+			"name": "size-budget",
+			"ms": 112,
+			"result": "pass"
+		},
+		{
+			"name": "format",
+			"ms": 98,
+			"result": "pass"
+		},
+		{
+			"name": "lint",
+			"ms": 45,
+			"result": "pass"
+		},
+		{
+			"name": "typecheck",
+			"ms": 444,
+			"result": "pass"
+		},
+		{
+			"name": "domain tests",
+			"ms": 77,
+			"result": "pass"
+		}
+	],
+	"totalMs": 1164,
+	"result": "pass"
+}

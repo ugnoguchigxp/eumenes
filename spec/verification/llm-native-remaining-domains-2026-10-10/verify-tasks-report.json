@@ -1,0 +1,35 @@
+{
+	"selected": ["tasks"],
+	"dependencySet": ["tasks"],
+	"testDependencySet": ["tasks"],
+	"revision": "b069a2f661db7d7ed593d01bb76eae99258cbc32e92aa850c4e6a2700d61ef04",
+	"steps": [
+		{
+			"name": "size-budget",
+			"ms": 132,
+			"result": "pass"
+		},
+		{
+			"name": "format",
+			"ms": 100,
+			"result": "pass"
+		},
+		{
+			"name": "lint",
+			"ms": 42,
+			"result": "pass"
+		},
+		{
+			"name": "typecheck",
+			"ms": 642,
+			"result": "pass"
+		},
+		{
+			"name": "domain tests",
+			"ms": 336,
+			"result": "pass"
+		}
+	],
+	"totalMs": 1694,
+	"result": "pass"
+}

@@ -8,6 +8,7 @@ import type { Database } from "bun:sqlite";
 import { openStore } from "../../../infrastructure/sqlite";
 import {
 	acquisitionMigration,
+	requirementsMigration,
 	createAgentRuntime,
 	migration,
 	type AcquisitionPlanPort,
@@ -32,11 +33,14 @@ function setup(
 	opts: {
 		port?: Partial<AcquisitionPlanPort>;
 		withPort?: boolean;
-		legacySchema?: boolean;
 	} = {},
 ) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-acq-"));
-	const store = openStore(join(dir, "db"), [migration, acquisitionMigration]);
+	const store = openStore(join(dir, "db"), [
+		migration,
+		acquisitionMigration,
+		requirementsMigration,
+	]);
 	const calls: string[] = [];
 	let observation: AcquisitionObservationResult = {
 		kind: "valid",
@@ -84,8 +88,8 @@ function setup(
 			};
 		},
 		validateInTransaction: () => ({ kind: "allowed" }),
-		recordObservationInTransaction: (_db, i) => {
-			calls.push(`observe:${JSON.stringify(i.facts)}`);
+		recordObservationInTransaction: (_db, _i) => {
+			calls.push("observe:report");
 			return observation;
 		},
 		validateAdoptionInTransaction: () => adoption,
@@ -130,7 +134,7 @@ function setup(
 function seedTree(db: Database, withReport = false) {
 	const now = Date.now();
 	db.query(
-		"INSERT INTO agent_tasks(id,kind,root_run_id,input_json,state,phase,deadline,created_at,updated_at) VALUES('root','coordinator','run-1',?,'waiting_child','select',?,?,?)",
+		"INSERT INTO agent_tasks(id,kind,root_run_id,input_json,state,phase,deadline,created_at,updated_at) VALUES('root','coordinator','run-1',?,'waiting_child','created',?,?,?)",
 	).run(JSON.stringify({ question: "q" }), now + 60000, now, now);
 	db.query(
 		"INSERT INTO agent_tasks(id,kind,root_run_id,parent_task_id,input_json,state,phase,deadline,created_at,updated_at,current_step) VALUES('child','worker','run-1','root','{}','running','research',?,?,?,1)",
@@ -141,14 +145,13 @@ function seedTree(db: Database, withReport = false) {
 	if (withReport) return;
 }
 
-async function finish(h: ReturnType<typeof setup>, facts: unknown = { v: 27 }) {
+async function finish(h: ReturnType<typeof setup>) {
 	return h.store.write((db) => {
 		const t = get(db, "child")!;
 		acceptReport(
 			db,
 			t,
 			{
-				facts,
 				report: {
 					version: 2,
 					outcome: "answered",
@@ -171,8 +174,6 @@ async function finish(h: ReturnType<typeof setup>, facts: unknown = { v: 27 }) {
 					observationsInTransaction: () => [],
 					validateEvidenceInTransaction: () => true,
 				} as never,
-				prepared: undefined,
-				canRead: false,
 				now: Date.now,
 				acquisition: h.port,
 				storedBinding: (task) => h.runtime.bindingInTransaction(db, task.id),
@@ -265,8 +266,8 @@ test("A01 bound finish stores the host-verified canonical report and safe projec
 		h.runtime.resolveAcquisitionInTransaction(db, "root", 1);
 		h.runtime.bindAcquisitionInTransaction(db, "root", "child");
 	});
-	expect(await finish(h, { v: 27 })).toBe("applied");
-	expect(h.calls).toContain('observe:{"v":27}');
+	expect(await finish(h)).toBe("applied");
+	expect(h.calls).toContain("observe:report");
 	await h.store.read((db) => {
 		const row = db
 			.query("SELECT * FROM agent_reports WHERE task_id='child'")
@@ -390,7 +391,11 @@ test("A01 acquisitionMigration upgrades a legacy DB: old 4-column rows keep the 
 		);
 	});
 	await old.close();
-	const upgraded = openStore(path, [migration, acquisitionMigration]);
+	const upgraded = openStore(path, [
+		migration,
+		acquisitionMigration,
+		requirementsMigration,
+	]);
 	await upgraded.read((db) => {
 		const row = db.query("SELECT * FROM agent_reports").get() as Record<
 			string,

@@ -304,7 +304,25 @@ const server = Bun.serve({
 			return Response.json({ text: "こんにちは" });
 		}
 		if (path === "/llm/v1/chat/completions") {
-			const body = (await request.json()) as { stream?: boolean };
+			const body = (await request.json()) as {
+				stream?: boolean;
+				messages?: Array<{ role: string; content: string }>;
+			};
+			// Synthetic language-control response; fixture data, not production classification.
+			if (body.messages?.[0]?.content.includes("転記された発話の主要な言語"))
+				return Response.json({
+					choices: [
+						{
+							message: {
+								content: JSON.stringify({
+									status: "identified",
+									languages: ["ja"],
+									confidence: 0.99,
+								}),
+							},
+						},
+					],
+				});
 			const text = "承知しました。先ほどの話を覚えています。";
 			if (!body.stream)
 				return Response.json({ choices: [{ message: { content: text } }] });

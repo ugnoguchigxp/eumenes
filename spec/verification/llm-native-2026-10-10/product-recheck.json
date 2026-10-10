@@ -1,0 +1,10 @@
+{
+	"baselineDigest": "bc71cc237c0aec2715adef8fb7f93eec2082de9759988ce4933f82e4207e30ab",
+	"currentDigest": "bc71cc237c0aec2715adef8fb7f93eec2082de9759988ce4933f82e4207e30ab",
+	"files": 706,
+	"changes": [],
+	"unchanged": true,
+	"unseenScenario": "rental",
+	"fixtureSemantics": "unchecked; synthetic model",
+	"liveSemantics": "skipped; missing LARM URL"
+}

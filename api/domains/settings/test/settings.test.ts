@@ -11,10 +11,47 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore } from "../../../infrastructure/sqlite";
-import { createSettings, migration, epochsMigration } from "..";
+import { createSettings, migration, epochsMigration, readStoredLarm } from "..";
+import { defaults } from "../service";
 import type { Settings } from "../contracts";
 import { applySchema, cloudEndpoint, settingsSchema } from "../contracts";
 const cleanup: Array<() => Promise<void>> = [];
+test("same-host can start unconfigured while configured URLs still require loopback", () => {
+	const settings = defaults({ LARM_AUDIENCE: "same-host" });
+	expect(settings.larm.baseUrl).toBeNull();
+	for (const baseUrl of ["http://192.168.1.10", "http://device.local"])
+		expect(
+			settingsSchema.safeParse({
+				...settings,
+				larm: { ...settings.larm, baseUrl },
+			}).success,
+		).toBe(false);
+	expect(
+		settingsSchema.safeParse({
+			...settings,
+			larm: { ...settings.larm, baseUrl: "http://127.0.0.1:9810" },
+		}).success,
+	).toBe(true);
+});
+test("backend live evaluation reads the saved LARM connection without changing settings", async () => {
+	const h = await setup();
+	const saved = h.settings.get();
+	expect(saved.larm.baseUrl).toBeNull();
+	saved.larm.baseUrl = "http://127.0.0.1:9810";
+	saved.larm.profile = "saved-profile";
+	saved.larm.audience = "same-host";
+	await h.settings.apply({
+		requestId: crypto.randomUUID(),
+		expectedRevision: saved.revision,
+		settings: saved,
+		keys: [],
+	});
+	const before = h.settings.get();
+	expect(readStoredLarm(h.dbPath)).toEqual(before.larm);
+	expect(h.settings.get()).toEqual(before);
+	const reopened = await createSettings(h.store, { dbPath: h.dbPath, env: {} });
+	expect(reopened.get().larm).toEqual(before.larm);
+});
 test("new voice settings wait for a conversational pause and retain a saved custom interval", async () => {
 	const h = await setup();
 	const s = h.settings.get();
@@ -293,7 +330,7 @@ test("malformed LARM URLs are validation errors and same-host requires loopback"
 			...s,
 			larm: { ...s.larm, audience: "same-host", baseUrl: null },
 		}).success,
-	).toBe(false);
+	).toBe(true);
 });
 
 test("key replacement, key deletion and connection deletion discard obsolete ciphertext", async () => {

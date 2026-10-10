@@ -4,7 +4,6 @@ import {
 	mkdirSync,
 	openSync,
 	readdirSync,
-	readFileSync,
 	rmSync,
 	statSync,
 	writeFileSync,
@@ -17,6 +16,7 @@ import {
 	unusedDependencies,
 } from "./boundaries";
 import { closure, type Domain, domains, isDomain, ownedPaths } from "./domains";
+import { verificationRevision } from "./verification-inputs";
 
 const args = process.argv.slice(2).filter((x) => x !== "--");
 const all = args.includes("--all");
@@ -67,29 +67,7 @@ function files(path: string): string[] {
 		return [];
 	}
 }
-function sourceFiles() {
-	return files(root)
-		.filter(
-			(path) =>
-				!path.includes("node_modules/") &&
-				!path.includes("dist-web/") &&
-				!path.includes("verification-reports/") &&
-				!path.includes("test-results/") &&
-				!path.includes("playwright-report/") &&
-				!path.includes(".git/") &&
-				(/\.(ts|tsx|css|json)$/.test(path) || path.endsWith("bun.lock")),
-		)
-		.sort();
-}
-async function revision() {
-	const hash = new Bun.CryptoHasher("sha256");
-	for (const file of sourceFiles()) {
-		hash.update(file.slice(root.length));
-		hash.update(readFileSync(file));
-	}
-	return hash.digest("hex");
-}
-const startHash = await revision();
+const startHash = verificationRevision(root);
 const started = performance.now();
 const steps: Array<{ name: string; ms: number; result: string }> = [];
 async function run(name: string, command: string[]) {
@@ -238,7 +216,7 @@ try {
 			"--",
 			selected[0] ?? "",
 		]);
-	if ((await revision()) !== startHash)
+	if (verificationRevision(root) !== startHash)
 		throw new Error("source changed during verification");
 	const report = {
 		selected,

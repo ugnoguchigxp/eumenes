@@ -1,32 +1,22 @@
 import { decisionDetails, RURI_MODEL } from "./result";
 import { z } from "zod";
-import { emotionCandidates, expressionText } from "./evidence";
-export { emotionCandidates } from "./evidence";
-export { acceptedEmotion };
-export type { Judge };
+import { speechDeliverySettings } from "./settings";
 import {
 	acceptedEmotion,
 	type Judge,
 	emotionSchema,
-	type Emotion,
 	type DeliveryContext,
 	type ChoiceQuestions,
 	type SpeechDelivery,
 } from "../contracts";
+export { acceptedEmotion };
+export type { Judge };
 
 export const speechQuestions: ChoiceQuestions = {
 	emotion: {
 		type: "choice",
-		instructions:
-			"現在の回答をアシスタント自身が話す表情と声色を選んでください。文章中の感情やユーザーの感情ではなく、話す態度を分類してください。",
-		criteria: {
-			none: "通常。事実・操作手順の説明",
-			warmth: "親しみ。素敵・ありがとう・挨拶・温かい言葉",
-			joy: "喜び。達成・成功・良い知らせを喜ぶ",
-			empathy: "共感。つらいですね・大丈夫・無理しないで・一緒に整理",
-			curiosity: "興味。相手の話の続きを知りたい",
-			surprise: "驚き。予想外の出来事への驚き",
-		},
+		instructions: speechDeliverySettings.instructions,
+		criteria: speechDeliverySettings.criteria,
 	},
 };
 export const resultSchema = z.object({
@@ -49,17 +39,7 @@ export const resultSchema = z.object({
 		.optional(),
 });
 
-export const emotionPerformance: Record<
-	Emotion,
-	{ motion: SpeechDelivery["motion"]; tone: SpeechDelivery["tone"] }
-> = {
-	none: { motion: "neutral", tone: "natural" },
-	warmth: { motion: "agreeing", tone: "bright" },
-	joy: { motion: "joyful", tone: "bright" },
-	empathy: { motion: "listening", tone: "gentle" },
-	curiosity: { motion: "curious", tone: "natural" },
-	surprise: { motion: "surprised", tone: "bright" },
-};
+export const emotionPerformance = speechDeliverySettings.performance;
 
 /** Bound dynamic data without hiding the reply's ending or copying system instructions. */
 function excerpt(value: string, limit: number) {
@@ -72,11 +52,20 @@ export function deliveryState(text: string, context?: DeliveryContext) {
 	const state: Record<string, string> = {};
 	const turns = context?.turns.slice(-4).map((turn) => ({
 		role: turn.role,
-		text: excerpt(expressionText(turn.text), 120),
+		text: excerpt(turn.text, 120),
 	}));
 	if (turns?.length) state.conversation = JSON.stringify(turns);
 	state.current_chunk = excerpt(context?.answer || text, 600);
-	state.response = excerpt(expressionText(context?.answer || text), 600);
+	state.response = excerpt(context?.answer || text, 600);
+	if (
+		(context?.turns.length ?? 0) > 4 ||
+		(context?.turns
+			.slice(-4)
+			.some((t) => Array.from(t.text.trim()).length > 120) ??
+			false) ||
+		Array.from((context?.answer || text).trim()).length > 600
+	)
+		state.context_truncated = "true";
 	return state;
 }
 export async function chooseSpeechDelivery(
@@ -85,7 +74,6 @@ export async function chooseSpeechDelivery(
 	signal: AbortSignal,
 	budgetMs = 2000,
 	context?: DeliveryContext,
-	options: { fullCandidates?: boolean } = {},
 ): Promise<SpeechDelivery> {
 	signal.throwIfAborted();
 	const started = performance.now();
@@ -106,24 +94,7 @@ export async function chooseSpeechDelivery(
 		latencyMs: Math.round(performance.now() - started),
 	});
 	if (!judge || !text.trim()) return fallback("unavailable");
-	const candidates = options.fullCandidates
-		? emotionSchema.options.filter((label) => label !== "none")
-		: emotionCandidates(text, context);
-	if (!candidates.length) return fallback("not-expressive");
-	const questions: ChoiceQuestions = {
-		emotion: {
-			...speechQuestions.emotion!,
-			criteria: {
-				none: speechQuestions.emotion!.criteria.none!,
-				...Object.fromEntries(
-					candidates.map((emotion) => [
-						emotion,
-						speechQuestions.emotion!.criteria[emotion]!,
-					]),
-				),
-			},
-		},
-	};
+	const questions = speechQuestions;
 
 	const abort = new AbortController();
 	const scoped = AbortSignal.any([signal, abort.signal]);
@@ -155,8 +126,7 @@ export async function chooseSpeechDelivery(
 		)
 			return fallback("invalid");
 		const choice = parsed.data.answers.emotion;
-		if (choice.choice !== "none" && !candidates.includes(choice.choice))
-			return fallback("invalid");
+
 		if (
 			(details.model ?? details.claimed_model) === RURI_MODEL &&
 			(!details.logits || !details.scores)
@@ -168,7 +138,7 @@ export async function chooseSpeechDelivery(
 			!(details.top_label in questions.emotion!.criteria)
 		)
 			return {
-				...fallback("candidate-restricted"),
+				...fallback("invalid"),
 				model: details.model,
 				calibrationStatus: details.calibration_status,
 			};
@@ -235,14 +205,8 @@ export function speechParameters(
 	},
 ) {
 	const strength = base.autoStrength ?? 1;
-	const preset = {
-		natural: [0, 0, 0],
-		bright: [0.05, 0.02, 0.15],
-		gentle: [-0.06, -0.01, -0.1],
-		serious: [-0.04, 0, 0.05],
-		excited: [0.08, 0.025, 0.2],
-	} as const;
-	const [speed, pitch, intonation] = preset[delivery.tone];
+	const [speed, pitch, intonation] =
+		speechDeliverySettings.presets[delivery.tone];
 	const clamp = (v: number, min: number, max: number) =>
 		Math.max(min, Math.min(max, v));
 	return {

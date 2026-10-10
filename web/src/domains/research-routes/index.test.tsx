@@ -60,33 +60,17 @@ test("U01 read: list, detail with SKILL/Context, and a failed draft does not hid
 	fireEvent.click(await screen.findByText("天気予報 鎌倉"));
 	await screen.findByText("SKILL_BODY");
 	expect(screen.getByText("CONTEXT_BODY")).toBeTruthy();
-	expect(screen.getAllByText("利用中").length).toBeGreaterThan(0);
+	expect(screen.getAllByText("保存済み（旧方式）").length).toBeGreaterThan(0);
 	expect(screen.getAllByText(/登録できませんでした/).length).toBeGreaterThan(0);
 });
 
-test("U01 edit marks dirty, sends the state token, and a 409 reloads instead of writing", async () => {
-	const edit = vi.fn(async () => {
-		throw new ApiError(409, "stale_state_token");
-	});
-	const { client, onDirty } = setup({ editResearchRoute: edit });
+test("legacy records have no editing or automatic acquisition controls", async () => {
+	const { client, onDirty } = setup();
 	fireEvent.click(await screen.findByText("天気予報 鎌倉"));
-	const box = await screen.findByRole("textbox");
-	fireEvent.change(box, { target: { value: "もっと短く" } });
-	await waitFor(() => expect(onDirty).toHaveBeenLastCalledWith(true));
-	fireEvent.click(screen.getByText("編集を依頼"));
-	await screen.findByText(/他の操作で状態が変わりました/);
-	expect(edit).toHaveBeenCalledWith(
-		key,
-		expect.objectContaining({
-			expectedStateToken: summary.stateToken,
-			instruction: "もっと短く",
-		}),
-	);
-	await waitFor(() =>
-		expect(
-			(client.researchRoutes as ReturnType<typeof vi.fn>).mock.calls.length,
-		).toBeGreaterThan(1),
-	);
+	await screen.findByText("SKILL_BODY");
+	expect(screen.queryByRole("textbox")).toBeNull();
+	expect(client.editResearchRoute).not.toHaveBeenCalled();
+	expect(onDirty).toHaveBeenLastCalledWith(false);
 });
 
 test("U01 disable / rediscover / clear use the persisted tokens and epoch", async () => {
@@ -94,7 +78,7 @@ test("U01 disable / rediscover / clear use the persisted tokens and epoch", asyn
 	fireEvent.click(await screen.findByText("天気予報 鎌倉"));
 	fireEvent.click(await screen.findByText("この取得先を停止"));
 	await waitFor(() => expect(client.disableResearchRoute).toHaveBeenCalled());
-	fireEvent.click(screen.getByText("次回は取得先を探し直す"));
+	fireEvent.click(screen.getByText("保存した手順を解除"));
 	await waitFor(() =>
 		expect(client.rediscoverResearchRoute).toHaveBeenCalled(),
 	);
@@ -154,33 +138,6 @@ const other: typeof summary = {
 		priceKind: "regular",
 	} as never,
 };
-
-test("U01 an unsent edit survives switching routes and keeps the panel dirty", async () => {
-	const { onDirty } = setup({
-		researchRoutes: vi.fn(async () => ({
-			items: [summary, other],
-			nextCursor: null,
-			epoch: 4,
-		})),
-		researchRoute: vi.fn(async (k: string) => ({
-			...detail,
-			key: k,
-			keywords: k === key ? summary.keywords : other.keywords,
-		})),
-	});
-	fireEvent.click(await screen.findByText("天気予報 鎌倉"));
-	fireEvent.change(await screen.findByRole("textbox"), {
-		target: { value: "未送信の説明" },
-	});
-	await waitFor(() => expect(onDirty).toHaveBeenLastCalledWith(true));
-	fireEvent.click(screen.getByText("株価 AAPL NASDAQ USD regular"));
-	await screen.findByLabelText("取得先 株価 AAPL NASDAQ USD regular");
-	expect(onDirty).not.toHaveBeenLastCalledWith(false);
-	fireEvent.click(screen.getByText("天気予報 鎌倉"));
-	expect(
-		((await screen.findByRole("textbox")) as HTMLTextAreaElement).value,
-	).toBe("未送信の説明");
-});
 
 test("U01 a stale cursor (409) on 'more' reloads the list from the first page", async () => {
 	let epoch = 4;

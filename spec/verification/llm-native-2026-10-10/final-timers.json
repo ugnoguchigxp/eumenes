@@ -1,0 +1,35 @@
+{
+	"selected": ["timers"],
+	"dependencySet": ["queue", "scheduler", "timers"],
+	"testDependencySet": ["queue", "scheduler", "timers"],
+	"revision": "dfb109339dbf2aef5acc3313a1d10285b6fe9d88a8061945d099a1d864c21092",
+	"steps": [
+		{
+			"name": "size-budget",
+			"ms": 121,
+			"result": "pass"
+		},
+		{
+			"name": "format",
+			"ms": 100,
+			"result": "pass"
+		},
+		{
+			"name": "lint",
+			"ms": 57,
+			"result": "pass"
+		},
+		{
+			"name": "typecheck",
+			"ms": 1463,
+			"result": "pass"
+		},
+		{
+			"name": "domain tests",
+			"ms": 2261,
+			"result": "pass"
+		}
+	],
+	"totalMs": 4633,
+	"result": "pass"
+}

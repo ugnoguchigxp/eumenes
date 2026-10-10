@@ -1,0 +1,73 @@
+$ bun scripts/verify.ts --domain coding-supervision
+[verify] selected=coding-supervision dependencyClosure=coding,delivery,attitude-dataset,larm,settings,inference,queue,tasks,task-reports,coding-supervision testClosure=coding,delivery,attitude-dataset,larm,tts-dictionary,settings,inference,queue,tasks,task-reports,coding-supervision
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts api/domains/coding-supervision
+size-budget ok (19 files)
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check api/domains/coding-supervision
+$ oxfmt --check api/domains/coding-supervision
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 3ms on 23 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint api/domains/coding-supervision
+$ oxlint --deny-warnings api/domains/coding-supervision
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun x tsc -p /Users/y.noguchi/Code/eumenes/verification-reports/tsconfig.selected.json
+[verify] TypeScript workspace closure: 107 files; api/infrastructure/flock.ts, api/infrastructure/logger.ts, api/infrastructure/sqlite, packages/coding-runner/src, api/domains/coding-supervision, api/infrastructure/http.ts, api/domains/tasks, api/infrastructure/digest.ts, api/infrastructure/bounded-read.ts, api/domains/task-reports, api/domains/queue, api/domains/settings, api/domains/delivery, api/infrastructure/chat-stream.ts, api/domains/inference, api/domains/larm, api/infrastructure/ignore-error.ts, api/domains/attitude-dataset
+[verify] domain tests: /Users/y.noguchi/.bun/bin/bun run test:domain -- coding-supervision
+$ bun scripts/test-domain.ts coding-supervision
+bun test v1.4.2 (744846f84)
+
+api/domains/coding-supervision/test/supervision.test.ts:
+(pass) 60 unchanged running ticks and silent CLI never consume inference or claim completion [23.35ms]
+(pass) a complete CLI turn is decided once despite duplicate polling and question hint [23.44ms]
+(pass) fixed checks, separate read-only review, authorized commit/push, and final report run in order [39.23ms]
+(pass) changed snapshot invalidates checks and review before a commit [28.25ms]
+(pass) children alive or incomplete evidence cannot be a completion candidate [35.08ms]
+(pass) invalid JSON is repaired once within the original deadline [20.38ms]
+(pass) input token limits require the model tokenizer and reject oversized context [34.45ms]
+(pass) decision budget is persisted and stops even a JSON repair [18.91ms]
+(pass) two observation failures hold new effects, while a successful observation restores monitoring [17.66ms]
+(pass) 150 seconds without observation marks delayed monitoring, not CLI failure [13.50ms]
+(pass) a review in the implementation session is rejected and never permits commit [26.73ms]
+(pass) fixed checks cannot be weakened, and remote SHA must equal the committed SHA [58.34ms]
+(pass) local question receives one answer, specification questions are reported to the user [42.91ms]
+(pass) untrusted CLI requests cannot authorize an ungranted push [19.65ms]
+(pass) stale decisions after cancellation cannot execute a step [23.04ms]
+(pass) changed observations supersede a queued decision before any inference [19.52ms]
+(pass) crashed action is not replayed, and recovery cancels pending decisions [46.60ms]
+(pass) forgotten task removes private supervisor and report history atomically [19.18ms]
+(pass) fresh receipt read rejects an external snapshot change during the model call [17.59ms]
+(pass) repair loops cannot exceed two across repeated failed checks [46.62ms]
+(pass) a repeated blocker with a new CLI question ID does not reset its answer budget [22.92ms]
+(pass) a queued decision deadline stops inference without launching a step [14.94ms]
+(pass) a changed question while a step runs cannot adopt its stale receipt [23.42ms]
+
+api/domains/coding-supervision/test/observation.test.ts:
+(pass) message selection is deterministic, keeps kinds apart and never promotes unknown to final [0.12ms]
+(pass) the semantic digest ignores heartbeat position, excerpt and coverage but sees new speech and terminals [0.20ms]
+(pass) heartbeat-only changes cause no judgement and no extra model call [175.57ms]
+(pass) a failed turn with a final-looking report opens no decision and no mutation [28.45ms]
+(pass) an exited process without a terminal is held with a fixed code after one confirming read, with a single blocker and no question [24.21ms]
+(pass) diagnosis is not ended while the process is not confirmed stopped [16.16ms]
+(pass) failed observations keep a fixed code; an older generation's failure changes nothing [17.20ms]
+(pass) diagnostic reads are bounded in total, persisted, and end in one report [35.19ms]
+(pass) inspect_more reads again without a workflow, a policy or a healthy monitor [29.82ms]
+(pass) a success claim cannot complete the task while the fixed checks failed [22.64ms]
+(pass) a transient read failure is left to the ordinary monitoring policy, never a diagnosis hold [19.39ms]
+(pass) inspect_more resumes the unread part of the requested reference and the new text is judged once [22.07ms]
+
+api/domains/coding-supervision/test/approval.test.ts:
+(pass) with approval on, request_change waits for the user and enqueues no step [19.65ms]
+(pass) approving enqueues the stored instruction inside the fixed frame, once [27.52ms]
+(pass) rejecting never reaches the CLI and asks the user for a direction instead [24.35ms]
+(pass) after a rejection asks a new question, the same observation pass does not capture a decision on the stale task [24.32ms]
+(pass) with approval off, the framed instruction is enqueued immediately [23.92ms]
+(pass) answer_question is gated too and its single attempt is spent only on approval [18.37ms]
+(pass) an approved instruction is dropped when the observation changed meanwhile [24.13ms]
+(pass) a long multi-byte instruction still fits the task question [20.96ms]
+(pass) a host diagnostic read that only adds excerpt and coverage keeps the approval alive and the approved instruction runs [25.50ms]
+
+ 44 pass
+ 0 fail
+ 163 expect() calls
+Ran 44 tests across 3 files. [1321.00ms]
+[verify] passed 3424 ms

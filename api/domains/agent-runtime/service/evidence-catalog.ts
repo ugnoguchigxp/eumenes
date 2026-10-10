@@ -12,14 +12,29 @@ export class EvidenceCatalog {
 		{ source: Source; excerptId: string; quote: string; document: string }
 	>();
 	private identities = new Map<string, string>();
+	private unavailable = new Set<string>();
 	full = false;
 	copy() {
 		const copy = new EvidenceCatalog();
 		copy.documents = new Map(this.documents);
 		copy.entries = new Map(this.entries);
 		copy.identities = new Map(this.identities);
+		copy.unavailable = new Set(this.unavailable);
 		copy.full = this.full;
 		return copy;
+	}
+	reconcile(sources: Source[]) {
+		const current = new Set(
+			sources.map((s) => `${s.sourceId}:${s.viewId ?? ""}`),
+		);
+		this.unavailable = new Set(
+			[...this.entries]
+				.filter(
+					([, e]) =>
+						!current.has(`${e.source.sourceId}:${e.source.viewId ?? ""}`),
+				)
+				.map(([ref]) => ref),
+		);
 	}
 	document(reference: string) {
 		const known = [...this.documents].find(([, alias]) => alias === reference);
@@ -124,19 +139,73 @@ export class EvidenceCatalog {
 			reference,
 			document: e.document,
 			preview: e.quote.slice(0, 24),
+			...(this.unavailable.has(reference) ? { available: false } : {}),
 		}));
 	}
 	sources() {
 		return [
 			...new Map(
-				[...this.entries.values()].map((e) => [
-					`${e.source.sourceId}:${e.source.viewId ?? ""}`,
-					e.source,
-				]),
+				[...this.entries]
+					.filter(([ref]) => !this.unavailable.has(ref))
+					.map(([, e]) => [
+						`${e.source.sourceId}:${e.source.viewId ?? ""}`,
+						e.source,
+					]),
 			).values(),
 		];
 	}
-	report(raw: z.infer<typeof researchReport>, exploration: string[]) {
+	verificationEvidence(refs: string[]) {
+		return refs.map((reference) => {
+			const e = this.entries.get(reference);
+			if (this.unavailable.has(reference))
+				throw new Error("evidence_invalidated");
+			if (!e || !e.source.viewId)
+				throw new ValidationFailure("invalid_evidence", [
+					{
+						validationPath: "report.evidence",
+						validationCode: e ? "missing_view" : "unknown_evidence",
+					},
+				]);
+			return {
+				reference,
+				quote: e.quote,
+				sourceId: e.source.sourceId,
+				viewId: e.source.viewId,
+				sourceRevision: e.source.sourceRevision ?? e.source.revision ?? null,
+				viewDigest: e.source.viewDigest ?? null,
+				url: e.source.url ?? null,
+				speaker: e.source.speaker ?? null,
+				createdAt: e.source.createdAt ?? null,
+			};
+		});
+	}
+	canonicalEvidence(refs: string[]) {
+		return this.verificationEvidence(refs).map((e) => ({
+			sourceId: e.sourceId,
+			viewId: e.viewId,
+			quote:
+				this.entries.get(e.reference)!.source.kind === "conversation_source"
+					? ""
+					: e.quote,
+		}));
+	}
+	referencedSources(refs: string[]) {
+		this.verificationEvidence(refs);
+		return [
+			...new Map(
+				refs.map((ref) => {
+					const s = this.entries.get(ref)!.source;
+					return [`${s.sourceId}:${s.viewId}`, s] as const;
+				}),
+			).values(),
+		];
+	}
+
+	report(
+		raw: Omit<z.infer<typeof researchReport>, "checks" | "externalRules"> &
+			Partial<Pick<z.infer<typeof researchReport>, "checks" | "externalRules">>,
+		exploration: string[],
+	) {
 		return {
 			...raw,
 			version: 2 as const,
@@ -145,6 +214,8 @@ export class EvidenceCatalog {
 				...c,
 				evidence: c.evidence.map((ref, index) => {
 					const e = this.entries.get(ref);
+					if (this.unavailable.has(ref))
+						throw new Error("evidence_invalidated");
 					if (!e || !e.source.viewId)
 						throw new ValidationFailure("invalid_evidence", [
 							{

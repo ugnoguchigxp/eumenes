@@ -1,0 +1,33 @@
+bun test v1.4.2 (744846f84)
+
+api/domains/delivery/test/delivery.test.ts:
+(pass) full reply and recent conversation decide emotion; speech motion and voice are separate derived actions [2.21ms]
+(pass) unnecessary, uncertain, invalid or truncated choices never become emotion icons [0.59ms]
+(pass) evidence comes from this response and latest user; quotes, code and negation do not force emotion [0.22ms]
+(pass) selected-answer probability is required and is not question applicability [0.15ms]
+(pass) timeout is bounded and caller cancellation or a late answer cannot restore emotion [7.01ms]
+(pass) all expressions map to restrained motion without classifying drowsiness or actions as emotions [0.23ms]
+(pass) long data stays bounded, preserves beginnings and endings, excludes system instructions and older turns [128.50ms]
+
+api/domains/inference/test/speech-intonation.test.ts:
+(pass) phrase intonation follows punctuation and questions, preserves baseline and stays bounded [0.10ms]
+(pass) auto strength scales the deviation from the baseline [0.01ms]
+(pass) phrase adjustment moves speed and pitch from the baseline and respects strength [0.06ms]
+
+api/domains/voice-dialogue/test/asr-language.test.ts:
+(pass) 日本語と英語のみ許可すると中国語の聞き取りを破棄する [0.30ms]
+(pass) 中国語を許可すると漢字のみの文を通す
+
+api/domains/agent-runtime/test/context.test.ts:
+(pass) retired evidence cannot be reported and its reference is never reassigned [0.31ms]
+(pass) fixed report schema publishes the same outcome/claim constraints as host validation [1.01ms]
+(pass) three distant ranges of one document keep immutable task evidence and use one document alias [0.44ms]
+(pass) evidence capacity stops additions without evicting previous references [0.60ms]
+(pass) fixed contract retains the whole request, removes needs and suggestions, and scopes operation references [0.48ms]
+(pass) one worker deadline policy reserves 30 seconds for the parent [0.04ms]
+(pass) bounded observations never register an excerpt absent from the actual model packet [0.58ms]
+
+ 19 pass
+ 0 fail
+ 140 expect() calls
+Ran 19 tests across 4 files. [217.00ms]

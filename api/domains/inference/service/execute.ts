@@ -16,11 +16,14 @@ import type { Messages, Receipt } from "../contracts";
 import { get, type RequestRow } from "../repository";
 import { cloudRequest } from "./cloud";
 import { fallbackErrors, safeError } from "./errors";
-import { speechAdjustment } from "./speech-intonation";
 
 const log = getLogger("inference");
 
 export type InferenceOptions = {
+	codexResearch?: {
+		model: string;
+		execute(messages: Messages, signal: AbortSignal): Promise<string>;
+	};
 	/** Must use the selected model's tokenizer, including message framing. */
 	countControlTokens?: (messages: Messages) => number | null;
 	token?: string;
@@ -65,7 +68,7 @@ export type Env = {
 };
 type Selected = ReturnType<Env["resolve"]>;
 type Input = Messages | string | Uint8Array;
-type Source = "larm" | "cloud";
+type Source = "larm" | "cloud" | "codex";
 /** Per-request state shared by the larm attempt and a cloud fallback attempt. */
 type Request = {
 	tools?: import("../../../infrastructure/chat-stream").NativeTool[];
@@ -124,7 +127,9 @@ async function recordAttemptStart(r: Request, source: Source) {
 				source === "cloud" ? (r.selected?.resource.id ?? null) : null,
 				source === "cloud"
 					? (r.selected?.resource.model ?? null)
-					: r.row.snapshot.larm.profile,
+					: source === "codex"
+						? r.env.options.codexResearch!.model
+						: r.row.snapshot.larm.profile,
 				r.reason,
 				Date.now(),
 			),
@@ -151,13 +156,7 @@ function callOptionsFor(r: Request, attemptId: string): LarmCallOptions {
 			? { contextPolicy: "exact" as const }
 			: {}),
 		...(r.row.outputLimit ? { maxOutputTokens: r.row.outputLimit } : {}),
-		...(r.row.purpose === "tts" && r.row.snapshot.larm.autoIntonation
-			? speechAdjustment(
-					r.input as string,
-					r.row.snapshot.larm,
-					r.row.snapshot.larm.autoStrength ?? 1,
-				)
-			: {}),
+
 		onExchange: async (exchange: LarmExchange) => {
 			// A call can use the old lease and one replacement. Keep both for correlation.
 			if (exchanges.length >= 2) return;
@@ -244,13 +243,7 @@ async function chooseTtsDelivery(
 	logDelivery(r, delivery);
 	if (!env.store.read((db) => env.allowed(db, r.row, args.connection)))
 		throw new Error("permission_revoked");
-	// Optional-provider absence preserves the existing automatic intonation.
-	// A present Laya is exclusive with heuristics; failures keep the saved baseline.
-	if (delivery.reason !== "unavailable") {
-		delete args.callOptions.intonationScale;
-		delete args.callOptions.speed;
-		delete args.callOptions.pitchScale;
-	}
+
 	if (delivery.source !== "fallback" && r.row.snapshot.larm.autoIntonation)
 		Object.assign(
 			args.callOptions,
@@ -272,6 +265,11 @@ function startWork(
 	},
 ): Promise<string | Uint8Array> {
 	const { env, row } = r;
+	if (args.source === "codex")
+		return env.options.codexResearch!.execute(
+			r.input as Messages,
+			args.attemptSignal,
+		);
 	if (args.source === "cloud")
 		return cloudRequest(
 			{ store: env.store, settings: env.settings, fetch: env.options.fetch },
@@ -356,9 +354,7 @@ function voiceAdoption(
 		return { tone: null, application: "manual" };
 	if (delivery.source !== "fallback")
 		return { tone: delivery.tone, application: "preset" };
-	return delivery.reason !== "unavailable"
-		? { tone: "natural", application: "baseline" }
-		: { tone: null, application: "unmeasured" };
+	return { tone: "natural", application: "baseline" };
 }
 
 async function attempt(r: Request, source: Source): Promise<Receipt> {
@@ -512,6 +508,15 @@ async function attempt(r: Request, source: Source): Promise<Receipt> {
 /** Runs the request: larm first (unless cloud-only), then the cloud fallback when allowed. */
 async function runAttempts(r: Request, key: string): Promise<Receipt> {
 	const { env, row } = r;
+	if (row.controlEngine === "codex_luna") {
+		if (
+			row.mode !== "control" ||
+			row.purpose !== "llm" ||
+			!env.options.codexResearch
+		)
+			throw new Error("codex_research_unavailable");
+		return attempt(r, "codex");
+	}
 	const mode = route(r).mode;
 	if (mode !== "cloud-only") {
 		if (

@@ -84,6 +84,8 @@ async function boot(
 		dir?: string;
 		/** Leave the queue stopped: a job is created but never runs. */
 		runQueue?: boolean;
+		/** Real pipeline, host entity snapshot supplied by a test. */
+		entities?: () => readonly unknown[];
 	} = {},
 ) {
 	const dir = over.dir ?? mkdtempSync(join(tmpdir(), "eumenes-world-extract-"));
@@ -186,7 +188,7 @@ async function boot(
 		extraction: {
 			queue,
 			inference: inference as unknown as ExtractionInference,
-			entities: () => [ENTITY],
+			entities: over.entities ?? (() => [ENTITY]),
 			...(over.stageBudgetMs === undefined
 				? {}
 				: { stageBudgetMs: over.stageBudgetMs }),
@@ -322,6 +324,52 @@ test("A19/A43 the real queue runs ONE Local job: a candidate is adopted, no Clou
 	const stage = h.world.lifecycle.feedStages(SCOPE).source;
 	expect(stage.applied).toMatchObject({ applied: 1, pending: 0 });
 	expect(stage.applied.cursor).not.toBeNull();
+});
+
+test("held input on the real queue/inference remains pending with an unadopted receipt until entity data changes", async () => {
+	let entities: unknown[] = [];
+	const h = await boot(
+		async (messages) => {
+			const output = JSON.parse(candidateFor(utteranceIdOf(messages)));
+			output.candidates[0].subject = {
+				kind: "alias",
+				text: ENTITY.displayName,
+			};
+			return JSON.stringify(output);
+		},
+		{ entities: () => entities },
+	);
+	await h.register();
+	await h.say("held-real", TEXT);
+	await h.world.pump();
+	await until(() => h.jobs().some((j) => j.state === "completed"));
+	expect(events(h)).toEqual([{ state: "received", failures: 0 }]);
+	expect(assertions(h)).toHaveLength(0);
+	expect(h.q("SELECT status FROM world_inbox")).toEqual([
+		{ status: "received" },
+	]);
+	expect(
+		h.q(
+			"SELECT status FROM inference_requests WHERE subject LIKE 'world-extract:%'",
+		),
+	).toEqual([{ status: "rejected" }]);
+	expect(h.q("SELECT accepted FROM inference_attempts")).toEqual([
+		{ accepted: 0 },
+	]);
+	await h.world.pump();
+	expect(h.jobs()).toHaveLength(1);
+	expect(h.larmCalls).toHaveLength(1);
+	entities = [ENTITY];
+	await h.world.pump();
+	await until(
+		() => h.jobs().filter((j) => j.state === "completed").length === 2,
+	);
+	expect(events(h)).toEqual([{ state: "applied", failures: 0 }]);
+	expect(assertions(h)).toHaveLength(1);
+	expect(h.larmCalls).toHaveLength(2);
+	expect(h.cloudRequests()).toBe(0);
+	await h.world.pump();
+	expect(h.jobs()).toHaveLength(2);
 });
 
 test("A43 an unavailable Local provider leaves the input pending; the Cloud route that is armed is never used", async () => {

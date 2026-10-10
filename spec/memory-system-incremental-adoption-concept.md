@@ -1,5 +1,11 @@
 # 独立 MemorySystem と Eumenes の接続計画
 
+## 自動抽出の接続前条件（2026-10-10追記）
+
+現行の明示登録・View v2接続を維持し、自動抽出は未接続のままとする。配布版0.3.6のadmissionには括弧内を引用と推定してmodelのmodalityを覆す処理があるため、接続前に依存側で撤去し、新版配布物とconsumer試験で確認する。原文role・所有・scope・UTF-8根拠・改訂・temporal・user overrideの検証は残す。
+
+接続には依存側の差分・回帰試験、新版tgzのversion/SHA-256/schema互換性、モデルへのkind/subject/modality/temporal契約の提示、現在sourceの再検証とforget/restore/cancel競合の受入が必要。[具体的な接続条件](llm-native-remaining-domains-implementation-plan-2026-10-10.md#5-m01将来のmemory自動抽出の接続条件)に従う。Eumenesで依存内部関数をimportして迂回しない。今回の作業ではMemory製品コード・依存パッケージを変更していない。
+
 2026-10-09 改訂（実装状況）: 下の E1/E2 の最小接続は実装済み（隔離 DB の結合試験まで。実モデル・実機器は未実施）。
 現行コードに合わせた差分: 旧 continuity は撤去済みだったため、`api/domains/continuity`（目的・決定・未解決事項）を新設し、
 `api/domains/memory`（明示登録・停止・再開・訂正・忘却、外部 journal、採用時検証、利用記録、設定 ON/OFF）を追加した。

@@ -41,6 +41,7 @@ export function createExtractionEvents(ctx: ExtractionCtx) {
 		slot,
 		accessOf,
 		usable,
+		snapshotContext,
 	} = ctx;
 
 	// --- World settle helpers --------------------------------------------------
@@ -212,6 +213,13 @@ export function createExtractionEvents(ctx: ExtractionCtx) {
 				return { status: "idle", reason: "job_open" };
 		}
 		if (head.retryAtMs > now()) return { status: "idle", reason: "backoff" };
+		// A superseded/unavailable head must still reach prepare's final rejection.
+		if (
+			head.heldContextDigest !== null &&
+			classify(db, scope, head).kind === "live" &&
+			head.heldContextDigest === snapshotContext(db, scope).digest
+		)
+			return { status: "idle", reason: "extraction_context_held" };
 		const events = open.slice(0, extractionLimits.maxUtterances);
 		const { job } = queue.enqueueInTransaction(db, {
 			scope: "world",

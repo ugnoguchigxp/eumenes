@@ -1,38 +1,36 @@
 import type { Database } from "bun:sqlite";
-import { researchInput, type Prepared } from "../../capabilities";
+import { type Prepared } from "../../capabilities";
 import type { ToolRuntime } from "../../tool-runtime";
 import type { Task, StoredBinding } from "../contracts";
-import { explorationBudget, localTool } from "./exploration";
+import { explorationBudget, localTool, operationLimits } from "./exploration";
 export function createToolSelection({
 	tools,
 	bindings,
 	prepared,
 	storedBinding,
 	now,
-	invocationHint,
 }: {
 	tools: ToolRuntime;
 	bindings: Map<string, ReturnType<ToolRuntime["bind"]>>;
 	prepared: Map<string, Prepared>;
 	storedBinding: (t: Task) => StoredBinding | null;
 	now: () => number;
-	invocationHint?: (
-		question: string,
-	) => { toolId: string; arguments: unknown } | null;
 }) {
-	/** A cached (direct) plan allows exactly one use of its single granted tool. */
+	/** A cached direct plan permits one acquisition; successful results remain replayable. */
 	function toolLimit(t: Task, toolId: string) {
 		if (storedBinding(t)?.initialAction.kind === "direct-invoke") return 1;
+		const limits = operationLimits(prepared.get(t.id));
 		return localTool(toolId)
-			? 4
+			? limits.localCalls
 			: toolId === "web.lookup"
-				? 2
+				? limits.searches
 				: toolId === "web.read"
-					? 3
+					? limits.reads
 					: 1;
 	}
 	function usableTools(db: Database, t: Task, preparing = false) {
-		if (!bindings.get(t.id)?.length) return [];
+		if (!bindings.get(t.id)?.length || t.error_code === "research_no_progress")
+			return [];
 		const p = prepared.get(t.id);
 		const budget = explorationBudget(
 			preparing ? { ...t, model_calls: t.model_calls + 1 } : t,
@@ -41,36 +39,35 @@ export function createToolSelection({
 			now(),
 		);
 		if (!budget.canOperate) return [];
-		const direct = storedBinding(t)?.initialAction.kind === "direct-invoke";
-		const input = researchInput.safeParse(prepared.get(t.id)?.input);
-		const hint = input.success ? invocationHint?.(input.data.question) : null;
 		const hasSavedBody = tools
 			.observationsInTransaction(db, t.id)
 			.some((o) => o.sources.some((s) => s.sourceRef));
-		return (bindings.get(t.id) ?? []).filter(
-			(b) =>
-				(!["web.find", "web.read_saved"].includes(b.tool.id) || hasSavedBody) &&
-				// Structured regional/symbol tools must be applicable to this request.
-				// Otherwise keep the search/read path instead of offering a tool the
-				// adapter will reject. Exact cached grants retain their own authority.
-				(!input.success ||
-					!input.data.urls?.length ||
-					b.tool.id !== "web.lookup" ||
-					!direct) &&
+		const invocations = tools.invocationsInTransaction(db, t.id);
+		return (bindings.get(t.id) ?? []).flatMap((b) => {
+			if (["web.find", "web.read_saved"].includes(b.tool.id) && !hasSavedBody)
+				return [];
+			const replayOnly =
 				(localTool(b.tool.id)
-					? budget.localCalls < 4
-					: budget.externalCalls < 5 &&
+					? budget.localCalls >= budget.maxLocalCalls
+					: budget.externalCalls >= budget.maxExternalCalls ||
 						(b.tool.id === "web.lookup"
-							? budget.searches < 2
-							: budget.reads < 3)) &&
-				(direct ||
-					!invocationHint ||
-					!["web.forecast", "web.quote"].includes(b.tool.id) ||
-					hint?.toolId === b.tool.id) &&
-				tools.countInTransaction(db, t.id, b.tool.revisionId) <
-					toolLimit(t, b.tool.id),
-		);
+							? budget.searches >= budget.maxSearches
+							: budget.reads >= budget.maxReads)) ||
+				tools.countInTransaction(db, t.id, b.tool.revisionId) >=
+					toolLimit(t, b.tool.id);
+			if (
+				replayOnly &&
+				!invocations.some(
+					(i) =>
+						i.toolRevisionId === b.tool.revisionId &&
+						!i.superseded &&
+						["succeeded", "partial"].includes(i.state),
+				)
+			)
+				return [];
+			return [{ ...b, replayOnly }];
+		});
 	}
 
-	return { toolLimit, usableTools };
+	return { usableTools };
 }

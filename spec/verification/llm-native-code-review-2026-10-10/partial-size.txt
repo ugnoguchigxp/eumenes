@@ -1,0 +1,2 @@
+$ bun scripts/size-budget.ts
+size-budget ok (658 files)

@@ -59,7 +59,7 @@ export const domains = {
 		backend: "api/domains/research-routes",
 		web: "web/src/domains/research-routes",
 		components: null,
-		depends: { api: ["capabilities", "inference", "queue"], web: [], test: [] },
+		depends: { api: ["queue"], web: [], test: [] },
 	},
 	"web-research": {
 		backend: "api/domains/web-research",

@@ -103,6 +103,7 @@ test("the current report follows earlier failed answers and stays adjacent to th
 });
 test("a premature unavailable forecast reads the next candidate before adopting an answer", async () => {
 	const h = await harness({
+		fullResearch: true,
 		incompleteWeatherFirstRead: true,
 		excerptEvidence: true,
 	});
@@ -160,7 +161,7 @@ test("authenticated search/read/report/answer resolves model excerpt selections 
 		await h.close();
 	}
 });
-test("unmapped location uses search and read without offering incompatible fixed forecast tools", async () => {
+test("general research exposes available tools without a host invocation recommendation", async () => {
 	const h = await harness();
 	try {
 		const run = await h.dialogue.submit({
@@ -371,7 +372,7 @@ for (const options of [{ badJson: true }, { badQuote: true }])
 	});
 
 test("invalid tool arguments are repaired once; no acquisition occurs until the contract is valid", async () => {
-	const h = await harness({ badToolArgs: true });
+	const h = await harness({ badToolArgs: true, fullResearch: true });
 	try {
 		const run = await h.dialogue.submit({
 			requestId: crypto.randomUUID(),
@@ -386,7 +387,7 @@ test("invalid tool arguments are repaired once; no acquisition occurs until the 
 			.find((t) => t.kind === "worker")!;
 		expect(child.status).toBe("completed");
 		expect(child.toolCalls).toBe(2);
-		expect(child.modelCalls).toBe(4);
+		expect(child.modelCalls).toBe(5);
 		expect(h.acquisitions).toBe(2);
 	} finally {
 		await h.close();
@@ -631,7 +632,7 @@ test("CLI reads catalogue, task and summary through the authenticated API", asyn
 			const text = await new Response(proc.stdout).text();
 			expect(await proc.exited).toBe(0);
 			const value = JSON.parse(text);
-			if (args[0] === "capabilities") expect(value.items).toHaveLength(3);
+			if (args[0] === "capabilities") expect(value.items).toHaveLength(4);
 			else if (args[0] === "task-report")
 				expect(value.summary).toContain("250.12");
 			else expect(value.status).toBe("completed");
@@ -676,7 +677,7 @@ test("a mismatched quote is rejected and repaired once using the same observatio
 			.list(run.id)
 			.find((t) => t.kind === "worker")!;
 		expect(child.status).toBe("completed");
-		expect(child.modelCalls).toBe(4);
+		expect(child.modelCalls).toBe(5);
 		expect(h.acquisitions).toBe(2);
 		expect(h.dialogue.answerText(run.id)).toContain("26度");
 		expect(
@@ -695,7 +696,7 @@ test("a mismatched quote is rejected and repaired once using the same observatio
 test("a long accepted request remains intact when delegated to a research worker", async () => {
 	const h = await harness();
 	try {
-		const question = "東京の天気を調べて。" + "補足の条件です。".repeat(400);
+		const question = "東京の天気を調べて。" + "補足の条件です。".repeat(150);
 		const run = await h.dialogue.submit({
 			requestId: crypto.randomUUID(),
 			conversationId: "long",

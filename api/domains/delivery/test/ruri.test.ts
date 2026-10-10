@@ -53,12 +53,12 @@ test("Ruri source, calibration, 0.6 adoption and rejected subset preserve origin
 	);
 	expect((await select(response("warmth", "warmth", 0.6))).source).toBe("ruri");
 	const r = response("joy", "none", 0);
-	expect((await select(r)).reason).toBe("candidate-restricted");
+	expect((await select(r)).reason).toBe("low-confidence");
 	expect(decisionDetails(r).scores!.joy).toBe(0.9);
 	expect(decisionDetails(r).api_label).toBe("none");
 	// Even a provider erroneously renormalizing a subset cannot force adoption.
 	expect((await select(response("joy", "warmth", 0.99))).reason).toBe(
-		"candidate-restricted",
+		"invalid",
 	);
 });
 test("top-level and legacy usage truncation are both rejected", async () => {

@@ -1,0 +1,35 @@
+{
+	"selected": ["continuity"],
+	"dependencySet": ["continuity"],
+	"testDependencySet": ["continuity"],
+	"revision": "cee6a1e3acd4c7d6d0e31c68db238f831c28c63f62fb3c572053ff696f181b96",
+	"steps": [
+		{
+			"name": "size-budget",
+			"ms": 115,
+			"result": "pass"
+		},
+		{
+			"name": "format",
+			"ms": 101,
+			"result": "pass"
+		},
+		{
+			"name": "lint",
+			"ms": 44,
+			"result": "pass"
+		},
+		{
+			"name": "typecheck",
+			"ms": 821,
+			"result": "pass"
+		},
+		{
+			"name": "domain tests",
+			"ms": 92,
+			"result": "pass"
+		}
+	],
+	"totalMs": 1606,
+	"result": "pass"
+}

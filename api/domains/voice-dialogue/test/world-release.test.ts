@@ -1,3 +1,4 @@
+import { withLanguageControl } from "./control-fixture";
 /**
  * P3-08 / A41: a World-backed answer's body and speech are released only by
  * adoption. The real dialogue handler, queue runner, Writer, World Broker and
@@ -289,7 +290,7 @@ async function setup(
 	const spoken: string[] = [];
 	let sends = 0;
 	let lastRun = "";
-	const larm: InferencePort = {
+	const larm: InferencePort = withLanguageControl({
 		status: () => ({ state: "ready", capabilities: ["llm", "asr", "tts"] }),
 		connect: async () => {},
 		answer: async () => {
@@ -321,7 +322,7 @@ async function setup(
 			throw new Error("fixture streams");
 		},
 		acceptInTransaction: () => true,
-	};
+	});
 	const queue = createQueue(store);
 	queue.start();
 	let worldContext: WorldContextPort | undefined;

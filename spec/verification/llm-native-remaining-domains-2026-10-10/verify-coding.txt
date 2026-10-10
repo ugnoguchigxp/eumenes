@@ -1,0 +1,107 @@
+$ bun scripts/verify.ts --domain coding
+[verify] selected=coding dependencyClosure=coding testClosure=coding
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts api/domains/coding packages/coding-runner/src packages/coding-runner/test
+size-budget ok (21 files)
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check api/domains/coding packages/coding-runner/src packages/coding-runner/test
+$ oxfmt --check api/domains/coding packages/coding-runner/src packages/coding-runner/test
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 4ms on 29 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint api/domains/coding packages/coding-runner/src packages/coding-runner/test
+$ oxlint --deny-warnings api/domains/coding packages/coding-runner/src packages/coding-runner/test
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun x tsc -p /Users/y.noguchi/Code/eumenes/verification-reports/tsconfig.selected.json
+[verify] TypeScript workspace closure: 34 files; api/infrastructure/flock.ts, api/infrastructure/logger.ts, api/infrastructure/sqlite, packages/coding-runner/src, api/domains/coding, api/infrastructure/digest.ts, api/infrastructure/http.ts, packages/coding-runner/test
+[verify] domain tests: /Users/y.noguchi/.bun/bin/bun run test:domain -- coding
+$ bun scripts/test-domain.ts coding
+bun test v1.4.2 (744846f84)
+
+packages/coding-runner/test/protocol.test.ts:
+(pass) SDK tools/list is fixed; unknown tool, unknown fields and protocol mismatch are rejected [254.45ms]
+(pass) RPC cancellation is not CLI stop; inspect retains the execution identity [1839.68ms]
+(pass) continue needs the exact completed session and a fresh operation; revocation forbids reuse [2467.66ms]
+
+packages/coding-runner/test/observation.test.ts:
+(pass) decoder observation facts > messages are unknown without a phase and never inferred from position [0.25ms]
+(pass) decoder observation facts > an unsupported phase stays unknown and a blank message is empty [0.09ms]
+(pass) decoder observation facts > the 32768-unit limit keeps whole code points and reports truncation [0.26ms]
+(pass) decoder observation facts > a lone surrogate is a protocol fault, not a replacement character [0.02ms]
+(pass) decoder observation facts > only turn.completed and turn.failed are terminal; a general error is not [0.01ms]
+(pass) decoder observation facts > a classification needs an explicit contract [0.26ms]
+(pass) runner observation > completed turn: terminal seq, started process, complete capture [1193.16ms]
+(pass) runner observation > failed turn keeps a complete capture while the success gate is false [1194.18ms]
+(pass) runner observation > process exit without a terminal leaves the turn unconfirmed [1009.61ms]
+(pass) runner observation > a contradictory terminal is a conflict, not an overwrite [1039.27ms]
+(pass) runner observation > a 40000-character message is flagged as truncated without a capture fault [1045.14ms]
+(pass) runner observation > an empty message is reported as empty and a malformed line is a capture fault [3047.57ms]
+(pass) runner observation > stopping before spawn proves the CLI never started [195.23ms]
+(pass) runner observation > a receipt written before observations exist reads as unknown, never as success [1166.35ms]
+(pass) continuation and legacy specs > a v1 session or a non-completed turn is never continued [1164.38ms]
+(pass) continuation and legacy specs > a v1 spec is never started [178.36ms]
+
+packages/coding-runner/test/git.test.ts:
+(pass) snapshot includes untracked, deletion, binary bytes and mode; explicit commit cannot capture other changes [2858.17ms]
+(pass) review snapshot change invalidates commit; a hook added by the agent is detected as tampering and never runs [1607.90ms]
+(pass) lost commit receipt reconciles evidence without creating another commit [2257.82ms]
+(pass) push uses fixed branch/remote/SHA; lost receipt is reconciled and a changed remote is rejected [3111.98ms]
+(pass) explicit staging treats wildcard characters as literal filenames [2121.66ms]
+(pass) a changed .git/config is refused before the next host git operation [1210.32ms]
+(pass) a clean or smudge filter attribute is forbidden [1250.01ms]
+(pass) files hidden through .git/info/exclude fail the snapshot, while .gitignore ones do not [1348.04ms]
+
+packages/coding-runner/test/runner.test.ts:
+(pass) coding runner > review evidence is invalidated if the workspace changes during its turn [1077.18ms]
+(pass) coding runner > a spec that requests the registered network is refused before the CLI starts [313.31ms]
+(pass) coding runner > backend credentials and SSH agent are absent from the CLI environment [1061.47ms]
+(pass) coding runner > UTF-8 fragments, incomplete and oversized lines are bounded [0.35ms]
+(pass) coding runner > production refuses fixture configuration [180.95ms]
+(pass) coding runner > stdio MCP start, durable duplicate receipt, inspect and private normalized evidence [1303.76ms]
+(pass) coding runner > stop is an intent; owning worker confirms process group termination [1811.41ms]
+(pass) coding runner > MCP disconnect does not stop the worker; host lease eventually does [688.72ms]
+(pass) coding runner > background children are stopped before completion [1115.19ms]
+(pass) coding runner > oversized output drains and stops with incomplete evidence [1094.69ms]
+(pass) coding runner > saved spawn intent is never replayed, unknown PID is never signalled [1097.81ms]
+(pass) coding runner > workspace and executable replacement are rejected [259.01ms]
+
+packages/coding-runner/test/review.test.ts:
+(pass) CLI failed cannot supply complete evidence or authorize commit [1334.35ms]
+(pass) CLI nonzero cannot supply complete evidence or authorize commit [1332.05ms]
+(pass) cancel after pause irreversibly revokes the exact session and stop operation IDs cannot be rebound [1315.65ms]
+(pass) worker replay of a reserved receipt with CLI spawn intent stays unknown without launching again [1087.85ms]
+(pass) concurrent start retries share one pinned configuration and one durable execution [1063.03ms]
+(pass) evidence byte ranges preserve UTF-8 and reject changed payload bytes [1101.96ms]
+(pass) snapshot rejects an oversized sparse file before loading its contents [330.10ms]
+(pass) evidence preserves a leading Unicode BOM as part of its authenticated payload [1075.58ms]
+(pass) terminal receipt waits for the durable process-exited event even when finalization is delayed [1505.04ms]
+(pass) concurrent atomic receipt replacements remain readable from the already opened private inode [321.71ms]
+
+api/domains/coding/test/coding.test.ts:
+(pass) coding domain > intent and reservation rollback together; duplicate operations never create another execution [285.41ms]
+(pass) coding domain > cursor and event adoption are atomic; duplicates, gaps and changed digests are checked [1181.34ms]
+(pass) coding domain > old authority cannot adopt output; confirmed stop remains usable after grant expiration [1170.64ms]
+(pass) coding domain > recovery preserves intent and reservation without replaying start [256.92ms]
+(pass) coding domain > gap cannot advance a zero cursor [1279.83ms]
+(pass) coding domain > public view hides session and instruction [252.71ms]
+(pass) receipt flags and state cannot regress after completion, and continuation waits for imported evidence [1221.42ms]
+(pass) an unchanged epoch cannot extend the execution deadline or replace network and operation authority [1192.52ms]
+(pass) the observation snapshot exposes adopted facts only, with message metadata [1258.67ms]
+(pass) terminal facts cannot be retracted, flipped or pointed at a non-terminal event [1213.57ms]
+(pass) a v1 session stays viewable but is never continued, with a fixed code [1146.72ms]
+(pass) a finished v1 execution (no observation on its receipt) is adopted, stopped and projected, never started [1159.00ms]
+(pass) a conflicting terminal is adopted as a conflict, not rejected as inconsistent [1203.61ms]
+
+ 62 pass
+ 0 fail
+ 1197 expect() calls
+Ran 62 tests across 6 files. [64.96s]
+237 | 			"test:domain",
+238 | 			"--",
+239 | 			selected[0] ?? "",
+240 | 		]);
+241 | 	if ((await revision()) !== startHash)
+242 | 		throw new Error("source changed during verification");
+                  ^
+error: source changed during verification
+      at /Users/y.noguchi/Code/eumenes/scripts/verify.ts:242:13
+
+error: script "verify" exited with code 1

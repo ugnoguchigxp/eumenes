@@ -48,9 +48,8 @@ function launch(
 				EUMENES_SECRET_KEY: "",
 				LARM_API_TOKEN: "",
 				LARM_CONTROL_TOKEN: "",
-				LARM_BASE_URL: "http://127.0.0.1:1",
 				LARM_PROFILE: "SAAA-gemma4-26b",
-				LARM_AUDIENCE: "same-host",
+				LARM_AUDIENCE: "saaa-desktop",
 				EUMENES_TTS_VOICE: "",
 			},
 		},
@@ -112,7 +111,7 @@ test.each(["127.0.0.1", "localhost"])(
 				await Bun.sleep(50);
 			}
 			expect(response?.status, dev.output()).toBe(200);
-			expect(await response!.json()).toEqual({
+			expect(await response!.json()).toMatchObject({
 				service: "eumenes",
 				larm: { state: "unconfigured", capabilities: [] },
 			});

@@ -21,6 +21,7 @@ import {
 	parentsMigration,
 	diagnosticsMigration,
 	controlMigration,
+	migrations as inferenceMigrations,
 } from "..";
 const cleanup: Array<() => Promise<void>> = [];
 async function until(condition: () => boolean) {
@@ -59,6 +60,7 @@ async function setup(
 		parentsMigration,
 		diagnosticsMigration,
 		controlMigration,
+		...inferenceMigrations.slice(4).map((m) => m.sql),
 	]);
 	const settings = await createSettings(store, { dbPath, env: {} });
 	const s = settings.get();
@@ -251,7 +253,7 @@ test("cloud TTS keeps its own voice and speed from the accepted settings snapsho
 		response_format: "wav",
 	});
 });
-test("automatic intonation uses each phrase and its immutable manual baseline; disabling restores manual delivery", async () => {
+test("judge absence preserves the immutable manual baseline for every phrase", async () => {
 	const adjustments: Array<number | undefined> = [];
 	const h = await setup({
 		localSpeech: async (_text, _signal, options) => {
@@ -294,7 +296,7 @@ test("automatic intonation uses each phrase and its immutable manual baseline; d
 		"ありがとうございます！",
 		new AbortController().signal,
 	);
-	expect(adjustments).toEqual([1.32, undefined]);
+	expect(adjustments).toEqual([undefined, undefined]);
 });
 test("authentication, invalid contracts and caller cancellation never trigger cloud", async () => {
 	for (const code of [
@@ -408,6 +410,14 @@ test("acceptance updates rollback together with the caller transaction", async (
 	);
 	await expect(
 		h.store.write((db) => {
+			expect(h.inference.validateReceiptInTransaction(db, receipt)).toBe(true);
+			expect(h.inference.usage().every((u) => u.accepted === 0)).toBe(true);
+			expect(
+				h.inference.validateReceiptInTransaction(db, {
+					...receipt,
+					attemptId: "foreign",
+				}),
+			).toBe(false);
 			expect(h.inference.acceptInTransaction(db, receipt)).toBe(true);
 			throw new Error("rollback");
 		}),
@@ -723,7 +733,6 @@ test("speak with an override synthesizes with unsaved voice settings without cha
 });
 
 test("Ruri dataset captures real-turn receipt adoption once; a technical collection request does not delay answer or TTS", async () => {
-	let finish!: (value: unknown) => void;
 	let calls = 0;
 	const h = await setup({
 		dataset: true,
@@ -731,9 +740,23 @@ test("Ruri dataset captures real-turn receipt adoption once; a technical collect
 		localSpeech: async () => wav(),
 		judge: async () => {
 			calls++;
-			return new Promise((resolve) => {
-				finish = resolve;
-			});
+			return {
+				model: RURI_MODEL,
+				answers: {
+					emotion: {
+						type: "choice",
+						choice: "none",
+						confidence: 0.9,
+						answer_confidence: 0.9,
+						logits: Object.fromEntries(
+							emotionSchema.options.map((k) => [k, k === "none" ? 3 : 0]),
+						),
+						probabilities: Object.fromEntries(
+							emotionSchema.options.map((k) => [k, k === "none" ? 0.9 : 0.02]),
+						),
+					},
+				},
+			};
 		},
 	});
 	await h.dataset!.setEnabled(true);
@@ -755,9 +778,10 @@ test("Ruri dataset captures real-turn receipt adoption once; a technical collect
 		() => {},
 		preparation,
 	);
-	expect(receipt.delivery!.reason).toBe("not-expressive");
+	expect(receipt.delivery!.source).toBe("ruri");
 	expect(calls).toBe(1);
-	expect(h.dataset!.status().pending).toBe(1);
+	await h.dataset!.drain();
+	expect(h.dataset!.status().successful).toBe(1);
 	await h.store.write((db) => h.inference.acceptInTransaction(db, receipt));
 	const audio = await h.inference.speakWithDelivery(
 		"手順を説明します。",
@@ -766,30 +790,14 @@ test("Ruri dataset captures real-turn receipt adoption once; a technical collect
 	);
 	expect(audio.wav.length).toBeGreaterThan(0);
 	expect(calls).toBe(1);
-	finish({
-		model: RURI_MODEL,
-		answers: {
-			emotion: {
-				type: "choice",
-				choice: "none",
-				confidence: 0.9,
-				answer_confidence: 0.9,
-				logits: Object.fromEntries(
-					emotionSchema.options.map((k) => [k, k === "none" ? 3 : 0]),
-				),
-				probabilities: Object.fromEntries(
-					emotionSchema.options.map((k) => [k, k === "none" ? 0.9 : 0.02]),
-				),
-			},
-		},
-	});
+
 	await h.dataset!.drain();
 	const sample = h.dataset!.get(
 		h.dataset!.list()[0]!.sample_id,
 		false,
 	) as Sample;
 	expect(sample.user_utterance).toBe("設定方法は？");
-	expect(sample.adopted?.source).toBe("fallback");
+	expect(sample.adopted?.source).toBe("ruri");
 	expect(sample.adopted?.voice_application).toBe("manual");
 	expect(sample.adopted?.tone).toBeNull();
 	expect(sample.primary_label).toBeNull();

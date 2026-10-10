@@ -1,0 +1,58 @@
+{
+	"selected": ["coding-supervision"],
+	"dependencySet": [
+		"coding",
+		"delivery",
+		"attitude-dataset",
+		"larm",
+		"settings",
+		"inference",
+		"queue",
+		"tasks",
+		"task-reports",
+		"coding-supervision"
+	],
+	"testDependencySet": [
+		"coding",
+		"delivery",
+		"attitude-dataset",
+		"larm",
+		"tts-dictionary",
+		"settings",
+		"inference",
+		"queue",
+		"tasks",
+		"task-reports",
+		"coding-supervision"
+	],
+	"revision": "747ea319ed0a1837878314555f0ec26b47a482114c0bfd6523601b1d0011fd10",
+	"steps": [
+		{
+			"name": "size-budget",
+			"ms": 123,
+			"result": "pass"
+		},
+		{
+			"name": "format",
+			"ms": 98,
+			"result": "pass"
+		},
+		{
+			"name": "lint",
+			"ms": 50,
+			"result": "pass"
+		},
+		{
+			"name": "typecheck",
+			"ms": 1259,
+			"result": "pass"
+		},
+		{
+			"name": "domain tests",
+			"ms": 1406,
+			"result": "pass"
+		}
+	],
+	"totalMs": 3424,
+	"result": "pass"
+}

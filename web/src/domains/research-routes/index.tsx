@@ -18,9 +18,9 @@ import "./style.css";
 const stateLabels: Record<RouteState, string> = {
 	unregistered: "未登録",
 	preparing: "準備中",
-	active: "利用中",
+	active: "保存済み（旧方式）",
 	suspended: "停止中（取得に失敗）",
-	expired: "期限切れ（次回は検索から）",
+	expired: "期限切れ",
 	disabled: "停止",
 };
 const draftLabels: Record<DraftState, string> = {
@@ -52,16 +52,11 @@ function Detail({
 	client,
 	routeKey,
 	disabled,
-	instruction,
-	setInstruction,
 	onGone,
 }: {
 	client: EumenesClient;
 	routeKey: string;
 	disabled: boolean;
-	// The unsent text lives in the panel, keyed by route, so switching routes never drops it.
-	instruction: string;
-	setInstruction: (text: string) => void;
 	onGone: () => void;
 }) {
 	const cache = useQueryClient();
@@ -81,7 +76,6 @@ function Detail({
 	useEffect(() => {
 		if (!gone) return;
 		cache.removeQueries({ queryKey: detailKey, exact: true });
-		setInstruction("");
 		onGone();
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [gone]);
@@ -111,21 +105,7 @@ function Detail({
 				expectedStateToken: token!,
 			}),
 		onSuccess: () => {
-			setNotice("次回の依頼で取得先を探し直します。");
-			void refresh();
-		},
-		onError,
-	});
-	const edit = useMutation({
-		mutationFn: () =>
-			client.editResearchRoute(routeKey, {
-				requestId: crypto.randomUUID(),
-				expectedStateToken: token!,
-				instruction: instruction.trim(),
-			}),
-		onSuccess: () => {
-			setInstruction("");
-			setNotice("編集を受け付けました。確認が済むまで現在の手順を使います。");
+			setNotice("保存した手順を解除しました。調査時は資料を選び直します。");
 			void refresh();
 		},
 		onError,
@@ -134,8 +114,7 @@ function Detail({
 	if (detail.isPending) return <p>読み込み中…</p>;
 	if (detail.isError) return <p role="alert">詳細を読み込めませんでした。</p>;
 	const d = detail.data;
-	const busy = disable.isPending || rediscover.isPending || edit.isPending;
-	const canEdit = d.state === "active";
+	const busy = disable.isPending || rediscover.isPending;
 	return (
 		<section className="route-detail" aria-label={`取得先 ${d.keywords}`}>
 			<h3>{d.keywords}</h3>
@@ -167,7 +146,7 @@ function Detail({
 			)}
 			{d.contextProjection != null && (
 				<details>
-					<summary>会話に渡す内容（SystemContext）</summary>
+					<summary>保存された補足（SystemContext）</summary>
 					<pre>{d.contextProjection}</pre>
 				</details>
 			)}
@@ -184,30 +163,9 @@ function Detail({
 					disabled={disabled || busy}
 					onClick={() => rediscover.mutate()}
 				>
-					次回は取得先を探し直す
+					保存した手順を解除
 				</Button>
 			</div>
-			{canEdit && (
-				<form
-					onSubmit={(e) => {
-						e.preventDefault();
-						if (instruction.trim()) edit.mutate();
-					}}
-				>
-					<label>
-						手順の説明を編集（取得先・対象は変わりません）
-						<textarea
-							value={instruction}
-							maxLength={2000}
-							rows={4}
-							onChange={(e) => setInstruction(e.target.value)}
-						/>
-					</label>
-					<Button disabled={disabled || busy || !instruction.trim()}>
-						編集を依頼
-					</Button>
-				</form>
-			)}
 			{notice && <output>{notice}</output>}
 		</section>
 	);
@@ -226,15 +184,6 @@ export function ResearchRoutesPanel({
 	const [selected, setSelected] = useState<string | null>(null);
 	const [notice, setNotice] = useState("");
 	const [confirmClear, setConfirmClear] = useState(false);
-	const [drafts, setDrafts] = useState<Record<string, string>>({});
-	const setDraft = (key: string, text: string) =>
-		setDrafts((old) => {
-			if (!text) {
-				const { [key]: _gone, ...rest } = old;
-				return rest;
-			}
-			return { ...old, [key]: text };
-		});
 	const clearTrigger = useRef<HTMLButtonElement>(null);
 	const cancelClear = useRef<HTMLButtonElement>(null);
 	const wasConfirming = useRef(false);
@@ -270,7 +219,6 @@ export function ResearchRoutesPanel({
 			}),
 		onSuccess: (r) => {
 			setSelected(null);
-			setDrafts({});
 			setConfirmClear(false);
 			setNotice(`${r.deletedKeys}件の取得先を削除しました。`);
 			cache.removeQueries({
@@ -283,17 +231,11 @@ export function ResearchRoutesPanel({
 			void cache.invalidateQueries({ queryKey: [queryRoots.researchRoutes] });
 		},
 	});
-	const lastDirty = useRef(false);
-	const report = (v: boolean) => {
-		if (lastDirty.current === v) return;
-		lastDirty.current = v;
-		onDirty(v);
-	};
-	const anyDraft = Object.values(drafts).some((t) => t.trim().length > 0);
-	useEffect(() => report(anyDraft));
+	useEffect(() => onDirty(false), [onDirty]);
 	useEffect(() => () => onDirty(false), [onDirty]);
 	return (
 		<div className="route-panel">
+			<p>過去に保存した取得先と手順です。現在の調査では資料を選び直します。</p>
 			{list.isPending && <p>読み込み中…</p>}
 			{(list.isError || stale) && (
 				<p role="alert">
@@ -337,8 +279,6 @@ export function ResearchRoutesPanel({
 					client={client}
 					routeKey={selected}
 					disabled={disabled}
-					instruction={drafts[selected] ?? ""}
-					setInstruction={(text) => setDraft(selected, text)}
 					onGone={() => setSelected(null)}
 				/>
 			)}

@@ -1,3 +1,7 @@
+import {
+	fixtureResearchOutput,
+	fixtureVerification,
+} from "../domains/agent-runtime/test/research-fixture";
 import { createChanges } from "./events";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -17,6 +21,7 @@ import { createDialogueService } from "../domains/dialogue";
 import { createVoiceDialogue } from "../domains/voice-dialogue";
 import { createToolchain } from "./toolchain";
 import { createTimers } from "../domains/timers";
+import { createOperations } from "../domains/research-routes";
 import { createTimerAnnouncements } from "./timer-announcements";
 import { createApp } from "./app";
 import type { LarmPort } from "../domains/larm";
@@ -27,6 +32,14 @@ const weather =
 const stock = "AAPLの株価は250.12 USD、2026-10-08終値です。";
 export async function harness(
 	options: {
+		model?: LarmPort;
+		codexResearch?: {
+			model: string;
+			execute: (
+				messages: import("../domains/inference/contracts").Messages,
+				signal: AbortSignal,
+			) => Promise<string>;
+		};
 		gate?: Promise<void>;
 		answerGate?: Promise<void>;
 		routeGate?: Promise<void>;
@@ -50,6 +63,7 @@ export async function harness(
 			messages: import("../domains/inference/contracts").Messages,
 		) => string | Promise<string>;
 		history?: boolean;
+		fullResearch?: boolean;
 		incompleteWeatherFirstRead?: boolean;
 		badToolArgs?: boolean;
 		badExecutionRefOnce?: boolean;
@@ -90,6 +104,12 @@ export async function harness(
 		},
 		answer: async (messages, _signal, callOptions) => {
 			calls++;
+			if (messages[0]!.content.includes("転記された発話の主要な言語"))
+				return JSON.stringify({
+					status: "identified",
+					languages: ["ja"],
+					confidence: 0.99,
+				});
 			const system = messages[0]!.content;
 			const question = messages
 				.filter((m) => m.role === "user")
@@ -148,22 +168,34 @@ export async function harness(
 					options.history ||
 					/天気|株価|weather|stock|調べ|検索|https?:|確認/.test(question)
 				)
-					return send("research", {
-						kind: options.history ? "history" : "web",
-						question,
-					});
+					return send(
+						options.fullResearch && !options.history
+							? "research_web_luna"
+							: "research",
+						{
+							...(!(options.fullResearch && !options.history)
+								? { kind: options.history ? "history" : "web" }
+								: {}),
+							question,
+						},
+					);
 			}
 			if (system.includes("TOOLS=")) {
-				workerContexts.push(JSON.stringify(messages));
-				if (options.control) {
-					const result = await options.control(messages);
-					if (result !== undefined) return result;
-				}
-				if (options.workerOutput !== undefined) return options.workerOutput;
-				if (options.badJson) return "```json\n{}\n```";
 				const data = JSON.parse(
 					messages.find((m) => m.role === "user")!.content,
 				);
+				if (data.draftReport)
+					return JSON.stringify(fixtureVerification(data.draftReport));
+				workerContexts.push(JSON.stringify(messages));
+				const output = (value: unknown) =>
+					fixtureResearchOutput(data, JSON.stringify(value));
+				if (options.control) {
+					const result = await options.control(messages);
+					if (result !== undefined) return fixtureResearchOutput(data, result);
+				}
+				if (options.workerOutput !== undefined) return options.workerOutput;
+				if (options.badJson) return "```json\n{}\n```";
+
 				const available = JSON.parse(
 					system.split("TOOLS=")[1]!.split("\nOUTPUT_SCHEMA=")[0]!,
 				);
@@ -175,12 +207,12 @@ export async function harness(
 				);
 				if (page) {
 					if (options.workerReportOutput !== undefined)
-						return options.workerReportOutput;
+						return fixtureResearchOutput(data, options.workerReportOutput);
 					const excerpt = page.excerpts[0];
 					const forged =
 						options.badQuote || (options.badQuoteOnce && !quoteRejected);
 					quoteRejected = true;
-					return JSON.stringify({
+					return output({
 						action: "finish",
 						report: {
 							outcome: "answered",
@@ -207,7 +239,7 @@ export async function harness(
 					(t: any) => t.id === (hit ? "web.read" : "web.lookup"),
 				);
 				if (!tool)
-					return JSON.stringify({
+					return output({
 						action: "finish",
 						report: {
 							outcome: "failed",
@@ -219,7 +251,7 @@ export async function harness(
 				const first =
 					data.operations.length === 0 &&
 					!messages.some((m) => m.content.includes("拒否コード="));
-				return JSON.stringify({
+				return output({
 					action: "invoke",
 					tool: options.badExecutionRefOnce && first ? "unknown" : tool.id,
 					arguments:
@@ -238,12 +270,25 @@ export async function harness(
 			const action = messages.find((m) =>
 				m.content.startsWith('{"actionResult":'),
 			);
-			if (action) return JSON.parse(action.content).actionResult;
+			if (action) {
+				const result = JSON.parse(action.content).actionResult;
+				if (result.items[0]?.state === "cancelled")
+					return "タイマーを取り消しました";
+				if (result.action === "started")
+					return `${result.items[0].durationSeconds}秒のタイマーを開始しました`;
+				if (result.action === "cancelled") return "タイマーを取り消しました";
+				return (
+					result.items
+						.map(
+							(item: any) =>
+								`${item.label}: 残り${item.remainingSeconds}秒 (${item.state})`,
+						)
+						.join("、") || "動いているタイマーはありません"
+				);
+			}
 			if (options.parentAnswer !== undefined) return options.parentAnswer;
 			const result = messages.find((m) => m.content.includes('"sources":'));
-			const projection = result
-				? JSON.parse(result.content.slice(result.content.indexOf("\n") + 1))
-				: null;
+			const projection = result ? JSON.parse(result.content).report : null;
 			const source = projection?.sources?.[0];
 			const citation = source?.url
 				? `\n\nソース：[${new URL(source.url).hostname}](${source.url})`
@@ -258,7 +303,17 @@ export async function harness(
 		},
 	};
 	const inference = createInference(store, settings, {
-		larmFactory: () => model,
+		larmFactory: () => options.model ?? model,
+		...(options.codexResearch
+			? { codexResearch: options.codexResearch }
+			: options.fullResearch
+				? {
+						codexResearch: {
+							model: "fixture-control",
+							execute: (messages, signal) => model.answer(messages, signal),
+						},
+					}
+				: {}),
 	});
 	const queue = createQueue(store, {
 		resources: { "inference.llm": 1, "web.fetch": 2 },
@@ -373,6 +428,14 @@ export async function harness(
 		postAnswer: toolchain.postAnswer,
 	});
 	const voice = createVoiceDialogue(store, dialogue, inference);
+	const researchRoutes = toolchain.routeService
+		? createOperations({
+				routes: toolchain.routeService,
+				store,
+				skills: (db, id) =>
+					toolchain.capabilities.getDefinitionInTransaction(db, id),
+			})
+		: undefined;
 	const app = createApp({
 		token: "fixture-token-for-toolchain-browser",
 		origin: process.env.EUMENES_ORIGIN ?? "http://localhost",
@@ -386,6 +449,7 @@ export async function harness(
 		scheduler,
 		inference,
 		timers,
+		researchRoutes,
 		...toolchain,
 	});
 	toolchain.agents.start();
@@ -413,6 +477,7 @@ export async function harness(
 		parentContexts,
 		voice,
 		settings,
+		inference,
 		spoken,
 		workerContexts,
 		routeContexts,

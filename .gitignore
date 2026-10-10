@@ -1,6 +1,8 @@
 node_modules/
 dist-web/
 data/
+!api/domains/delivery/data/
+!api/domains/delivery/data/speech-delivery.v1.json
 *.sqlite3*
 *.lock
 !bun.lock

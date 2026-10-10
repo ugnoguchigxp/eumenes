@@ -58,6 +58,19 @@ const fields = new Set([
 	"timerId",
 	"expectedRevision",
 	"state",
+	"requirements",
+	"statement",
+	"valueSchema",
+	"checks",
+	"requirementId",
+	"externalRules",
+	"value",
+	"reason",
+	"requestCovered",
+	"summarySupported",
+	"limitationsConsistent",
+	"supported",
+	"index",
 ]);
 const types = new Set([
 	"string",
@@ -81,6 +94,11 @@ export function valueType(value: unknown): string {
 			: typeof value;
 }
 function pathLabel(path: PropertyKey[]): string {
+	// JSON values and schemas may contain arbitrary user-defined property names.
+	const dynamic = path.findIndex(
+		(key) => key === "value" || key === "valueSchema",
+	);
+	if (dynamic >= 0) path = path.slice(0, dynamic + 1);
 	return (
 		path
 			.slice(0, 12)

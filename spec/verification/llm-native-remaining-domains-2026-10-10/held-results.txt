@@ -1,0 +1,32 @@
+bun test v1.4.2 (744846f84)
+
+api/application/world-extraction.test.ts:
+(pass) A19/A43 the real queue runs ONE Local job: a candidate is adopted, no Cloud request exists [85.70ms]
+(pass) held input on the real queue/inference remains pending with an unadopted receipt until entity data changes [88.01ms]
+(pass) A43 an unavailable Local provider leaves the input pending; the Cloud route that is armed is never used [181.61ms]
+(pass) A43 the 30 s stage budget (80 ms here) cancels the call and the job fails after one retry [263.67ms]
+(pass) no input, no job: an idle World creates no extraction job and no model call [266.93ms]
+(pass) protect mode registers no extraction handler: no job kind exists, input is never delivered [41.59ms]
+(pass) A42 a restart resumes the unapplied inbox: the input received before the stop is extracted after it [66.33ms]
+
+api/domains/world/test/extraction-held.test.ts:
+(pass) held extraction remains received across polls and restart, then applies once with new entities [50.48ms]
+(pass) one held candidate holds the whole prefix; later input does not bypass it [40.80ms]
+(pass) a port mutated during inference cannot change the prepared entities or authorize the old result [38.98ms]
+(pass) prepare rechecks a queued retry when its context reverts to the held snapshot [38.56ms]
+(pass) a corrected or unavailable held head reaches final rejection before context suppression [74.54ms]
+(pass) forget removes held inputs and the digest without leaving a cursor-blocking row [40.64ms]
+(pass) a refused manifest release stays pending while the extraction is held [38.09ms]
+(pass) a failed held transaction rolls back its digest and remains recoverable [38.84ms]
+(pass) an interpretation version change releases a held prefix without language-specific code [40.11ms]
+(pass) a cancelled old result cannot hold or release the newer job's input [40.83ms]
+(pass) restore purges held metadata and redelivers only the unsettled input [40.53ms]
+(pass) a refused inference authority check cannot persist a semantic hold [36.61ms]
+
+api/domains/world/test/extraction-migration.test.ts:
+(pass) extraction hold migration preserves old received and terminal rows and refuses an old binary [62.03ms]
+
+ 20 pass
+ 0 fail
+ 148 expect() calls
+Ran 20 tests across 3 files. [1.78s]

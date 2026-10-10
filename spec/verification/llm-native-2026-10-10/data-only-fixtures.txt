@@ -1,0 +1,31 @@
+bun test v1.4.2 (744846f84)
+
+api/application/requirements-client.test.ts:
+(pass) requirements API client and CLI keep CAS and enable/disable state through authenticated HTTP [378.34ms]
+
+api/application/requirements-toolchain.test.ts:
+(pass) data-only requirement host fixture: event-complete [75.99ms]
+(pass) data-only requirement host fixture: event-missing [62.37ms]
+(pass) data-only requirement host fixture: facility-complete [60.53ms]
+(pass) data-only requirement host fixture: facility-conflict [58.65ms]
+(pass) data-only requirement host fixture: product-target [62.05ms]
+(pass) data-only requirement host fixture: product-old [58.18ms]
+(pass) data-only requirement host fixture: event-complete-luna [59.60ms]
+(pass) data-only requirement host fixture: event-missing-luna [65.36ms]
+(pass) data-only requirement host fixture: facility-complete-luna [61.01ms]
+(pass) data-only requirement host fixture: facility-conflict-luna [64.71ms]
+(pass) data-only requirement host fixture: product-target-luna [61.69ms]
+(pass) data-only requirement host fixture: product-old-luna [58.74ms]
+(pass) data-only requirement host fixture: lodging-complete [59.84ms]
+(pass) data-only requirement host fixture: lodging-complete-luna [60.29ms]
+(pass) data-only requirement host fixture: lodging-missing [61.86ms]
+(pass) data-only requirement host fixture: lodging-missing-luna [57.91ms]
+(pass) data-only requirement host fixture: rental-complete [55.86ms]
+(pass) data-only requirement host fixture: rental-complete-luna [59.99ms]
+(pass) data-only requirement host fixture: rental-missing [60.10ms]
+(pass) data-only requirement host fixture: rental-missing-luna [60.71ms]
+
+ 21 pass
+ 0 fail
+ 90 expect() calls
+Ran 21 tests across 2 files. [1.83s]

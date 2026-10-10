@@ -146,7 +146,6 @@ export function createToolRuntime(
 		});
 		return { executionRef, tool };
 	}
-	/** Post-commit memory release of every grant under a binding token (DB revocation is the port's job). */
 	function releaseBinding(bindingToken: string) {
 		let n = 0;
 		for (const [key, ref] of refs)
@@ -170,6 +169,7 @@ export function createToolRuntime(
 		const inv = get(db, entry.invocationId);
 		if (
 			!inv ||
+			inv.superseded ||
 			inv.owner_task_id !== taskId ||
 			!["succeeded", "partial"].includes(inv.state) ||
 			inv.result_digest !== entry.digest ||
@@ -418,9 +418,9 @@ export function createToolRuntime(
 				? (
 						db
 							.query(
-								"SELECT p.proof_json FROM tool_read_proofs p JOIN tool_invocations i ON i.id=p.invocation_id WHERE i.owner_task_id=? AND i.state IN ('succeeded','partial') AND i.cancel_epoch=? ORDER BY i.created_at,i.rowid",
+								`SELECT p.proof_json FROM tool_read_proofs p JOIN tool_invocations i ON i.id=p.invocation_id WHERE i.owner_task_id=? AND i.root_run_id=? AND i.state IN ('succeeded','partial') AND i.cancel_epoch=?${hasSupersededColumn(db) ? " AND i.superseded=0" : ""} ORDER BY i.created_at,i.rowid`,
 							)
-							.all(owner.taskId, owner.cancelEpoch) as Array<{
+							.all(owner.taskId, owner.rootRunId, owner.cancelEpoch) as Array<{
 							proof_json: string;
 						}>
 					).map(
@@ -448,7 +448,7 @@ export function createToolRuntime(
 						(s) =>
 							!db
 								.query(
-									"SELECT 1 FROM tool_views v JOIN tool_invocations i ON i.id=v.invocation_id WHERE v.view_id=? AND i.owner_task_id=? AND i.root_run_id=? AND i.cancel_epoch=? AND i.state IN ('succeeded','partial')",
+									`SELECT 1 FROM tool_views v JOIN tool_invocations i ON i.id=v.invocation_id WHERE v.view_id=? AND i.owner_task_id=? AND i.root_run_id=? AND i.cancel_epoch=? AND i.state IN ('succeeded','partial')${hasSupersededColumn(db) ? " AND i.superseded=0" : ""}`,
 								)
 								.get(
 									s.viewId!,

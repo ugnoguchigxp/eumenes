@@ -1,0 +1,94 @@
+$ bun scripts/verify.ts --domain larm
+[verify] selected=larm dependencyClosure=larm testClosure=larm
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts api/domains/larm
+size-budget ok (14 files)
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check api/domains/larm
+$ oxfmt --check api/domains/larm
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 4ms on 18 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint api/domains/larm
+$ oxlint --deny-warnings api/domains/larm
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun x tsc -p /Users/y.noguchi/Code/eumenes/verification-reports/tsconfig.selected.json
+[verify] TypeScript workspace closure: 23 files; api/infrastructure/http.ts, api/infrastructure/chat-stream.ts, api/domains/larm, api/infrastructure/logger.ts, api/infrastructure/ignore-error.ts, api/infrastructure/bounded-read.ts
+[verify] domain tests: /Users/y.noguchi/.bun/bin/bun run test:domain -- larm
+$ bun scripts/test-domain.ts larm
+bun test v1.4.2 (744846f84)
+
+api/domains/larm/test/context-exact.test.ts:
+(pass) required control and summary segments are never silently truncated [0.26ms]
+
+api/domains/larm/test/playground.test.ts:
+(pass) catalog merges selector-only cold services without starting anything [1.10ms]
+(pass) every warm provider executes independently, validates claim and releases [2.19ms]
+(pass) semantic health is distinct from catalog presence, and cold diagnosis does not generate [0.29ms]
+(pass) image and music fetch artifacts without making a warm connection [0.51ms]
+(pass) image POST failures are not retried and late cancellation is reported unknown [0.21ms]
+(pass) artifact origin mismatch never forwards control credential [0.44ms]
+(pass) music cancellation collects a late job and confirms remote cancellation [0.30ms]
+(pass) invalid claim cannot run inference and still releases connection [0.20ms]
+(pass) direct service runtime model IDs are returned separately from catalog IDs [0.13ms]
+(pass) malformed local hostnames cannot receive credentials [0.01ms]
+(pass) playground claims on the LARM host, another port included, are accepted [0.21ms]
+(pass) playground claims on another private host are refused unless listed [0.72ms]
+(pass) a missing baseUrl leaves the playground unconfigured [0.21ms]
+
+api/domains/larm/test/inference-error.test.ts:
+(pass) provider diagnostics retain the code and meaningful message, redact credentials and bound input [0.32ms]
+(pass) cancelled error-body read cannot trigger recovery [0.06ms]
+
+api/domains/larm/test/larm.test.ts:
+(pass) control JSON generation is opt-in and ordinary answers keep provider defaults [2.03ms]
+(pass) catalog, claim, ASR/LLM/TTS and release use public contract [1.17ms]
+(pass) ASR accepts empty silence but rejects missing, nontext or oversized transcripts [0.69ms]
+(pass) voice menu uses claimed provider auth and TTS sends selected voice and speed [1.08ms]
+(pass) VOICEVOX catalog labels, style, inclusive numeric bounds and decoded credits reach phrase synthesis [1.46ms]
+(pass) a refused VOICEVOX catalog does not block synthesis of a chosen voice [0.41ms]
+(pass) a caller's deadline that aborts a shared connection attempt does not fail other callers [0.34ms]
+(pass) other models omit VOICEVOX fields and busy responses never replay or replace the connection [0.48ms]
+(pass) mismatched claim is rejected before inference and lease is released [0.68ms]
+(pass) oversized inference response is rejected while streaming [0.21ms]
+(pass) simultaneous capability upgrades share one replacement connection [0.72ms]
+(pass) Gemma requests the live profile and renews by reclaiming the rotated token [0.41ms]
+(pass) voice requests every provider in the Gemma profile [0.13ms]
+(pass) an expired connection stops polling and is released [0.13ms]
+(pass) an explicit baseUrl is the only control origin the token is sent to [0.10ms]
+(pass) without a baseUrl LARM stays unconfigured and never contacts any host [0.10ms]
+(pass) missing claim voice discovers and caches the advertised default with the control credential [0.71ms]
+(pass) an unadvertised default voice is rejected before speech inference [0.36ms]
+(pass) cancelling a caller returns promptly during allocation and close stops polling [0.14ms]
+(pass) runtime changes notify connecting and ready/failed without exposing credentials [0.21ms]
+(pass) idle-released JSON before SSE recreates and claims once; both exchanges survive [0.37ms]
+(pass) local idle expires a still-valid lease without requests; next voice use requests the profile again [0.22ms]
+(pass) an active inference pauses the local idle timer and completion starts a new idle interval [0.61ms]
+(pass) only the explicit idle-released 409 can replay, and recovery is bounded at one replacement [0.57ms]
+(pass) cancellation after the 409 diagnostic prevents replacement and replay [0.13ms]
+(pass) a late concurrent rejection cannot discard the replacement lease [0.81ms]
+(pass) manual connection check follows released state even with unexpired credentials [0.19ms]
+(pass) renew rotates every claimed provider while leaving the idle deadline unchanged [0.33ms]
+(pass) published SSE prefix errors never reconnect or replay inference [0.17ms]
+(pass) idle expiry during a health check cannot revive the released local lease [0.60ms]
+(pass) invalid reclaim after renew discards every old credential before another request [0.43ms]
+(pass) a ready connection waits for requested providers to become claimable before claim [0.19ms]
+(pass) unauthorized can recover only when control confirms the old connection is released [0.36ms]
+(pass) context trimming retains the current input after an unanswered prior turn [0.58ms]
+(pass) native decision shares the voice lease, uses its own auth, and rotates credentials [0.38ms]
+(pass) absent or invalid optional decision never breaks ordinary voice providers [0.32ms]
+(pass) caller cancellation is logged separately from a provider network failure [0.86ms]
+(pass) Ruri uses claimed model/token and current chunk only; rejects unsupported questions before provider request [0.83ms]
+(pass) control POSTs keep the 15 s budget while status GETs with a caller signal use 3 s [0.26ms]
+(pass) a timed-out connection POST is retried with the same Idempotency-Key [0.13ms]
+(pass) a caller abort during renewal neither fails the status nor releases the shared lease [0.19ms]
+(pass) close waits for in-use leases before sending DELETE [0.23ms]
+(pass) a valid lease serves new inference while a renewal is still waiting [1.22ms]
+(pass) a provider on the LARM host with another port is accepted [0.14ms]
+(pass) a provider on a different private host is rejected before any token is sent [0.79ms]
+(pass) EUMENES_LARM_PROVIDER_HOSTS or the providerHosts config allow another host [0.30ms]
+(pass) a .local provider is accepted only when the LARM base itself is .local [0.10ms]
+
+ 63 pass
+ 0 fail
+ 555 expect() calls
+Ran 63 tests across 4 files. [100.00ms]
+[verify] passed 1599 ms

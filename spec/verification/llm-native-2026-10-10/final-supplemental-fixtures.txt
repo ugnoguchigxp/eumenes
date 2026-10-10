@@ -1,0 +1,33 @@
+bun test v1.4.2 (744846f84)
+
+api/domains/voice-dialogue/test/settings-integration.test.ts:
+(pass) one voice turn uses fallback in all three stages, adopts one answer, and does not repeat duplicate upload [36.53ms]
+(pass) autoSpeak false is captured at voice acceptance and ends successfully without TTS [20.38ms]
+(pass) cancellation during cloud ASR cannot create a dialogue run even with late HTTP completion [50.48ms]
+(pass) queued snapshots survive recovery without re-running an attempted provider [13.43ms]
+(pass) revoking a cloud answer aborts downstream TTS and never publishes late audio [41.27ms]
+(pass) streaming text is visible but speech waits for completion; cancellation prevents partial-answer emotion [36.42ms]
+(pass) render ahead is bounded at three clauses and playback releases the next clause [57.29ms]
+(pass) final recognition preempts a slow prefix and never submits a late hypothesis [30.14ms]
+(pass) accepted audio chunks publish Laya delivery and cancellation removes the plan with the audio [22.72ms]
+(pass) replaying an answer persists its native motion, rejects unrelated text and ignores cancelled synthesis [23.65ms]
+(pass) one adopted full-answer emotion works with audio off and is reused for all clauses and replay [23.67ms]
+(pass) automatic three-clause speech shares the adopted full-answer decision [25.42ms]
+(pass) cancelling during final Laya classification rejects late emotion and assistant text [43.82ms]
+(pass) V05 cancelling during language control rejects the late receipt before dialogue or speech [54.28ms]
+(pass) V02/V04 asr_language_not_allowed prevents dialogue and TTS through real inference receipts [21.92ms]
+(pass) V02/V04 asr_language_unverified prevents dialogue and TTS through real inference receipts [19.21ms]
+(pass) V06 empty final ASR performs zero language control and creates no dialogue [20.11ms]
+
+api/domains/agent-runtime/test/requirement-verification.test.ts:
+(pass) semantic rejection requestCovered never adopts a pending draft or retries [21.82ms]
+(pass) semantic rejection summarySupported never adopts a pending draft or retries [14.41ms]
+(pass) semantic rejection limitationsConsistent never adopts a pending draft or retries [13.72ms]
+(pass) a structurally invalid first action rolls back frozen requirements with zero tool execution [15.05ms]
+(pass) a pending draft is accepted only after one complete verification [13.44ms]
+(pass) R13 a valid deadline value backed by an opening-time excerpt is rejected by semantic verification [15.99ms]
+
+ 23 pass
+ 0 fail
+ 117 expect() calls
+Ran 23 tests across 2 files. [731.00ms]

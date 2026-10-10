@@ -433,7 +433,7 @@ bun run verify:live -- --domain larm
 
 `--domain`は選択ドメインのテストを実行し、依存closure全体のテスト合格を保証しない。Queueだけの成功をDialogue/Voiceの成功として報告しない。`verify:all`は現状、Playwrightも呼ぶため、fixture/configの有無をP0で確認する。既存の不足・失敗は記録し、対象API結合試験を確実に実行する経路を用意する。全体gateが失敗したまま全体成功とは書かず、テスト削除・skip・チェック緩和で成功にしない。
 
-現行`verify:live -- --domain larm`には`LARM_BASE_URL`、`LARM_CONTROL_TOKEN`、`EUMENES_LIVE_ASR_WAV`が必要で、録音ファイルによるASR/LLM/TTSの個別操作を確認する。Queue/Scheduler経由の統合試験、ブラウザの録音・再生、実際の割込み受入の代わりにはならない。
+現行`verify:live -- --domain larm`にはSQLiteに保存済みのLARM接続設定、LARM認証情報、`EUMENES_LIVE_ASR_WAV`が必要で、録音ファイルによるASR/LLM/TTSの個別操作を確認する。Queue/Scheduler経由の統合試験、ブラウザの録音・再生、実際の割込み受入の代わりにはならない。
 
 検証は同一workspaceで並行実行せず、現在のverify lockを尊重する。今回の変更に必要な試験を正規の検証経路へ登録し、意味のない全体build反復は行わない。
 

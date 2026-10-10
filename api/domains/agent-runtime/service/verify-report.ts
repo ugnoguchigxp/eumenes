@@ -96,6 +96,24 @@ export function verifyReport(
 export function parentProjection(report: Report) {
 	return {
 		summary: report.summary,
+		...(report.version === 3
+			? {
+					requirements: {
+						items: report.requirements.items,
+						checks: report.requirements.checks.map(({ evidence, ...c }) => ({
+							...c,
+							sourceIds: evidence.map((e) => e.sourceId),
+						})),
+						externalRules: report.requirements.externalRules.map(
+							({ evidence, ...r }) => ({
+								...r,
+								sourceIds: evidence.map((e) => e.sourceId),
+							}),
+						),
+						semanticVerification: report.requirements.semanticVerification,
+					},
+				}
+			: {}),
 		...(report.version
 			? {
 					version: report.version,
@@ -128,4 +146,14 @@ export function parentProjection(report: Report) {
 					},
 		),
 	};
+}
+
+export function isNegativeReport(report: Report | null) {
+	return (
+		(report?.version === 2 || report?.version === 3) &&
+		report.claims.length === 0 &&
+		["not_found", "clarification_required", "failed"].includes(
+			report.outcome ?? "",
+		)
+	);
 }

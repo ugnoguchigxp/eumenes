@@ -17,7 +17,7 @@ import { configureLogging, getLogger } from "../infrastructure/logger";
 import { createConversationService } from "../domains/conversation";
 import { createDialogueService } from "../domains/dialogue";
 import { createSettings } from "../domains/settings";
-import { createInference } from "../domains/inference";
+import { createInference, createCodexResearch } from "../domains/inference";
 import { createQueue } from "../domains/queue";
 import { createScheduler } from "../domains/scheduler";
 import { createTimers } from "../domains/timers";
@@ -78,6 +78,9 @@ export async function buildServices(config: Config) {
 	const attitudeDataset = createAttitudeDataset(datasetStore, datasetPath);
 	await attitudeDataset.recover();
 	const inference = createInference(store, settings, {
+		codexResearch: config.webResearchToolsEnabled
+			? createCodexResearch(config.env, config.researchCodexExecutable)
+			: undefined,
 		token: config.larmToken,
 		speechText: ttsDictionary.apply,
 		attitudeDataset,

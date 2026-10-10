@@ -1,0 +1,9 @@
+
+Running 2 tests using 1 worker
+
+(node:44131) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 tests/browser/toolchain.spec.ts:60:2 › browser → API → child → web → summary → main: 東京の天気を調べて (17.2s)
+  ✓  2 tests/browser/toolchain.spec.ts:60:2 › browser → API → child → web → summary → main: AAPLの株価を調べて (14.1s)
+
+  2 passed (32.2s)

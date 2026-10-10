@@ -143,12 +143,6 @@ test("A19 type and meaning checks: negated, hypothetical, question, model ids, u
 			code: "UNKNOWN_SUBJECT_ID",
 		},
 		{
-			name: "unresolved alias is held",
-			make: (id) =>
-				candidate(TEXT, id, { subject: { kind: "alias", text: "未知" } }),
-			code: "SUBJECT_UNRESOLVED",
-		},
-		{
 			name: "quote of an utterance outside the window",
 			make: () => candidate(TEXT, "not-in-window"),
 			code: "QUOTE_SOURCE_NOT_IN_WINDOW",

@@ -1,0 +1,42 @@
+$ bun scripts/verify.ts --domain goals
+[verify] selected=goals dependencyClosure=goals testClosure=goals
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts api/domains/goals
+size-budget ok (4 files)
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check api/domains/goals
+$ oxfmt --check api/domains/goals
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 3ms on 5 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint api/domains/goals
+$ oxlint --deny-warnings api/domains/goals
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun x tsc -p /Users/y.noguchi/Code/eumenes/verification-reports/tsconfig.selected.json
+[verify] TypeScript workspace closure: 8 files; api/infrastructure/flock.ts, api/infrastructure/logger.ts, api/infrastructure/sqlite, api/domains/goals
+[verify] domain tests: /Users/y.noguchi/.bun/bin/bun run test:domain -- goals
+$ bun scripts/test-domain.ts goals
+bun test v1.4.2 (744846f84)
+
+api/domains/goals/test/goals.test.ts:
+(pass) no goal gives an explicit absent snapshot and invents nothing [11.81ms]
+(pass) explicit adopt, update and withdraw keep revisions and history [9.50ms]
+(pass) stale revisions are rejected for update, withdraw and complete [8.74ms]
+(pass) completed goals leave the adopted snapshot [7.28ms]
+(pass) other principals and scopes see nothing and cannot touch goals [8.65ms]
+(pass) proposals never appear as adopted and need an explicit call [8.10ms]
+(pass) rejecting a proposal does not move the goal epoch [6.61ms]
+(pass) epoch and revision change on every visible change, enabling receipt invalidation [6.45ms]
+(pass) snapshot orders by priority and is one consistent read [7.16ms]
+(pass) an access-less revision lookup is not part of the World-facing exports [6.08ms]
+(pass) only the same proposal operation is deduplicated [8.28ms]
+(pass) distinct operations preserve proposal text, priority and source versions [7.99ms]
+(pass) independent proposals respect capacity, while an operation replay uses no slot [12.51ms]
+(pass) operationKey makes adopt and propose idempotent per principal and scope [8.14ms]
+(pass) transaction rollback leaves the ledger, history and epoch unchanged [8.31ms]
+(pass) inputs are bounded and rejected rather than truncated [8.35ms]
+(pass) goals survive restart [12.10ms]
+
+ 17 pass
+ 0 fail
+ 228 expect() calls
+Ran 17 tests across 1 file. [212.00ms]
+[verify] passed 1400 ms

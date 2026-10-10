@@ -33,7 +33,6 @@ export function createPrepare(
 	events: ExtractionEvents,
 ): Pick<ExtractionHandler, "prepareInTransaction"> {
 	const {
-		options,
 		inference,
 		now,
 		hasher,
@@ -46,6 +45,7 @@ export function createPrepare(
 		usable,
 		releaseManifests,
 		endJob,
+		snapshotContext,
 	} = ctx;
 	const { rejectEvent, classify } = events;
 
@@ -138,6 +138,11 @@ export function createPrepare(
 				),
 			);
 			if (live.length === 0) return { status: "stale", reason: "no_input" };
+			const { entities, digest } = snapshotContext(db, scope);
+			if (live[0]!.event.heldContextDigest === digest) {
+				endJob(db, scope, claim.jobId, false);
+				return { status: "stale", reason: "extraction_context_held" };
+			}
 
 			const utterances = live.map((l) => ({
 				utteranceId: l.event.eventId,
@@ -287,7 +292,6 @@ export function createPrepare(
 					requestId,
 				);
 
-			const entities = [...(options.entities?.(db, scope) ?? [])];
 			const messages: Message[] = [
 				{ role: "system", content: SYSTEM_PROMPT },
 				{
@@ -315,6 +319,7 @@ export function createPrepare(
 				})),
 				entities,
 				requestId,
+				contextDigest: digest,
 				messages,
 				dependentIds: planned.dependents.map((d) => d.externalId),
 			};

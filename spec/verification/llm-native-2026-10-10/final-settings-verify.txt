@@ -1,0 +1,50 @@
+$ bun scripts/verify.ts --domain settings
+[verify] selected=settings dependencyClosure=settings,tts-dictionary testClosure=tts-dictionary,settings
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts api/domains/settings web/src/domains/settings
+size-budget ok (22 files)
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check api/domains/settings web/src/domains/settings
+$ oxfmt --check api/domains/settings web/src/domains/settings
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 5ms on 34 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint api/domains/settings web/src/domains/settings
+$ oxlint --deny-warnings api/domains/settings web/src/domains/settings
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun x tsc -p /Users/y.noguchi/Code/eumenes/verification-reports/tsconfig.selected.json
+[verify] TypeScript workspace closure: 143 files; api/infrastructure/flock.ts, api/infrastructure/logger.ts, api/infrastructure/sqlite, api/domains/settings, api/infrastructure/bounded-read.ts, api/domains/capabilities, client/transport.ts, client/requirements.ts, packages/coding-runner/src, api/domains/coding-supervision, api/infrastructure/http.ts, api/domains/task-reports, client/coding-supervision.ts, api/infrastructure/validation-log.ts, api/domains/tool-runtime, api/domains/queue, api/infrastructure/digest.ts, api/domains/agent-runtime, client/agent-runtime.ts, client/attitude-dataset.ts, api/domains/delivery, api/domains/conversation, client/conversation.ts, api/domains/dialogue, client/run-stream.ts, client/dialogue.ts, client/events.ts, api/infrastructure/chat-stream.ts, api/domains/larm, client/larm.ts, api/domains/memory, client/memory.ts, client/queue.ts, api/domains/research-routes, client/research-routes.ts, api/domains/scheduler, client/scheduler.ts, api/domains/inference, client/settings.ts, api/infrastructure/ignore-error.ts, api/domains/service-tests, client/service-tests.ts, api/domains/tts-dictionary, client/tts-dictionary.ts, api/domains/tasks, client/tasks.ts, api/domains/coding, client/coding.ts, api/domains/timers, client/timers.ts, api/domains/voice-dialogue, client/voice-dialogue.ts, api/domains/web-research, client/web-research.ts, api/domains/world, client/world.ts, client/index.ts, web/src/queryKeys.ts, web/src/domains, packages/design-system/dist, web/src/design-system, web/src/components, web/src/errorMessages.ts
+[verify] domain tests: /Users/y.noguchi/.bun/bin/bun run test:domain -- settings
+$ bun scripts/test-domain.ts settings
+bun test v1.4.2 (744846f84)
+
+api/domains/settings/test/settings.test.ts:
+(pass) backend live evaluation reads the saved LARM connection without changing settings [18.64ms]
+(pass) new voice settings wait for a conversational pause and retain a saved custom interval [8.21ms]
+(pass) old settings retain normal playback; speech adjustments validate and persist [11.87ms]
+(pass) coding supervision instruction approval defaults to on, including for saved documents without it [11.61ms]
+(pass) bootstraps once; atomic revision and idempotency; encrypted secret never in document [9.68ms]
+(pass) revocation epochs cannot be reset by client; origin changes cannot reuse credential [7.64ms]
+(pass) missing or wrong master key preserves data, disables ciphertext and does not regenerate [8.13ms]
+(pass) deleting then recreating the same connection ID cannot revive old permissions [8.93ms]
+(pass) malformed LARM URLs are validation errors and same-host requires loopback [7.95ms]
+(pass) key replacement, key deletion and connection deletion discard obsolete ciphertext [8.64ms]
+(pass) envRef must be allowlisted when saved and when resolved [8.65ms]
+(pass) cloud connections require https outside private networks [0.19ms]
+(pass) a saved http cloud URL still loads, but applying it is rejected [7.96ms]
+(pass) credential ciphertext is bound to its row [10.42ms]
+(pass) v1 ciphertext is upgraded to v2 on startup and survives restart [10.84ms]
+(pass) keyDir option and EUMENES_KEY_DIR relocate the master key [10.96ms]
+
+ 16 pass
+ 0 fail
+ 84 expect() calls
+Ran 16 tests across 1 file. [210.00ms]
+
+ RUN  v4.1.8 /Users/y.noguchi/Code/eumenes
+
+
+ Test Files  11 passed (11)
+      Tests  26 passed (26)
+   Start at  20:12:32
+   Duration  2.27s (transform 1.46s, setup 0ms, import 5.26s, tests 1.38s, environment 7.79s)
+
+[verify] passed 5416 ms

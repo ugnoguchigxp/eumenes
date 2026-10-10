@@ -189,8 +189,6 @@ export function createGoalsService(
 		if (countGoals(db, goal.principal, goal.scopeKey, status) >= limit)
 			throw new Error("goal_limit");
 	}
-	const normalized = (text: string) =>
-		text.normalize("NFKC").replace(/\s+/g, " ").trim().toLowerCase();
 	const operationDigest = (
 		status: string,
 		value: {
@@ -251,20 +249,6 @@ export function createGoalsService(
 					throw new Error("operation_conflict");
 				return done.goal;
 			}
-		}
-		if (status === "proposed") {
-			// A loop re-proposing the same thing from the same source must not fill the slots.
-			const wanted = normalized(value.desiredState);
-			const same = listProposedGoals(db, access.principal, [
-				value.scopeKey,
-			]).find(
-				(open) =>
-					normalized(open.desiredState) === wanted &&
-					open.source.namespace === value.source.namespace &&
-					open.source.kind === value.source.kind &&
-					open.source.id === value.source.id,
-			);
-			if (same) return same;
 		}
 		const now = clock();
 		const goal: Goal = {

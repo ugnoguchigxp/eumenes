@@ -1,0 +1,33 @@
+{
+	"version": 1,
+	"title": "製品の規格対応",
+	"scope": "対象型番の対応可否と必要firmwareの確認",
+	"requirements": [
+		{
+			"id": "compatibility",
+			"statement": "指定型番の対応規格を旧型の記述と区別して確認する",
+			"required": true,
+			"applicability": "現在の依頼の型番",
+			"allowNotApplicable": false,
+			"valueSchema": {
+				"type": "string",
+				"enum": ["R2対応", "R2非対応"],
+				"maxLength": 40
+			}
+		},
+		{
+			"id": "firmware",
+			"statement": "対応に必要な最小firmwareを確認する",
+			"required": true,
+			"applicability": "対応している型番",
+			"allowNotApplicable": true,
+			"valueSchema": {
+				"type": "string",
+				"maxLength": 40
+			}
+		}
+	],
+	"provenance": {
+		"kind": "user"
+	}
+}

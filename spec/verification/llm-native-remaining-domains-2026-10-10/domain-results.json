@@ -1,0 +1,44 @@
+[
+	{
+		"domain": "goals",
+		"exitCode": 0
+	},
+	{
+		"domain": "world",
+		"exitCode": 1,
+		"retryExitCode": 0
+	},
+	{
+		"domain": "memory",
+		"exitCode": 0
+	},
+	{
+		"domain": "dialogue",
+		"exitCode": 0
+	},
+	{
+		"domain": "continuity",
+		"exitCode": 0
+	},
+	{
+		"domain": "tasks",
+		"exitCode": 0
+	},
+	{
+		"domain": "task-reports",
+		"exitCode": 0
+	},
+	{
+		"domain": "coding",
+		"exitCode": 1,
+		"retryExitCode": 1
+	},
+	{
+		"domain": "coding-supervision",
+		"exitCode": 0
+	},
+	{
+		"domain": "inference",
+		"exitCode": 0
+	}
+]

@@ -84,6 +84,7 @@ export type ExtractEventRow = {
 	source: ExtractSourceRef;
 	state: ExtractEventState;
 	reason: string | null;
+	heldContextDigest: string | null;
 	failures: number;
 	retryAtMs: number;
 	jobId: string | null;
@@ -105,6 +106,7 @@ type Raw = {
 	source_json: string;
 	state: ExtractEventState;
 	reason: string | null;
+	held_context_digest: string | null;
 	failures: number;
 	retry_at_ms: number;
 	job_id: string | null;
@@ -115,7 +117,7 @@ type Raw = {
 };
 
 const COLUMNS =
-	"principal, scope_key, event_id, seq, feed_scope_keys, feed_restore_epoch, received_cursor, source_key, source_json, state, reason, failures, retry_at_ms, job_id, manifest_id, request_id, received_at_ms, settled_at_ms";
+	"principal, scope_key, event_id, seq, feed_scope_keys, feed_restore_epoch, received_cursor, source_key, source_json, state, reason, held_context_digest, failures, retry_at_ms, job_id, manifest_id, request_id, received_at_ms, settled_at_ms";
 
 const toRow = (raw: Raw): ExtractEventRow => ({
 	principal: raw.principal,
@@ -129,6 +131,7 @@ const toRow = (raw: Raw): ExtractEventRow => ({
 	source: JSON.parse(raw.source_json) as ExtractSourceRef,
 	state: raw.state,
 	reason: raw.reason,
+	heldContextDigest: raw.held_context_digest,
 	failures: raw.failures,
 	retryAtMs: raw.retry_at_ms,
 	jobId: raw.job_id,
@@ -276,13 +279,40 @@ export function settleExtractEvent(
 	const changed = db
 		.query(
 			`UPDATE world_host_extract_event
-			SET state = ?, reason = ?, settled_at_ms = ?, job_id = NULL, manifest_id = NULL, request_id = NULL
+			SET state = ?, reason = ?, settled_at_ms = ?, job_id = NULL, manifest_id = NULL, request_id = NULL, held_context_digest = NULL
 			WHERE principal = ? AND scope_key = ? AND event_id = ? AND state = 'received'`,
 		)
 		.run(state, reason, nowMs, principal, scopeKey, eventId) as {
 		changes: number;
 	};
 	if (changed.changes !== 1) throw new WorldHostStateError("state_missing");
+}
+
+/** Records a semantic hold only for the events this attempt still owns. */
+export function holdExtractEvents(
+	db: Database,
+	principal: string,
+	scopeKey: string,
+	jobId: string,
+	eventIds: readonly string[],
+	contextDigest: string,
+): void {
+	requireTransaction(db);
+	const update = db.query(
+		`UPDATE world_host_extract_event
+		SET held_context_digest = ?, reason = 'EXTRACTION_CONTEXT_HELD'
+		WHERE principal = ? AND scope_key = ? AND event_id = ? AND job_id = ? AND state = 'received'`,
+	);
+	for (const eventId of eventIds) {
+		const changed = update.run(
+			contextDigest,
+			principal,
+			scopeKey,
+			eventId,
+			jobId,
+		);
+		if (changed.changes !== 1) throw new WorldHostStateError("state_missing");
+	}
 }
 
 /** Hands the events to one queue job and records what was fixed at prepare. */

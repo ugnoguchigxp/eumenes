@@ -1,16 +1,9 @@
 import { z } from "zod";
 import { timerCancel, timerCommand, timerList, timerStart } from "./timers";
 export { timerCancel, timerCommand, timerList, timerStart };
-export const publicUrl = z
-	.string()
-	.url()
-	.max(2048)
-	.refine((v) => {
-		const u = new URL(v);
-		return (
-			["http:", "https:"].includes(u.protocol) && !u.username && !u.password
-		);
-	});
+export { timerResultContext, type TimerResultContext } from "./timers";
+import { publicUrl } from "./public-url";
+export { publicUrl };
 export const researchInput = z
 	.object({
 		question: z.string().min(1).max(8000),
@@ -117,7 +110,8 @@ export const validators = {
 export type SchemaKey = keyof typeof validators;
 export type Owner = { rootRunId: string; taskId: string; cancelEpoch: number };
 export type Definition = {
-	kind: "package" | "profile" | "skill" | "tool";
+	kind: "package" | "profile" | "skill" | "tool" | "requirement";
+	requirementData?: import("./requirements").RequirementProfileData;
 	id: string;
 	revision: number;
 	title: string;
@@ -166,3 +160,5 @@ export const hash = (v: unknown) =>
 	new Bun.CryptoHasher("sha256")
 		.update(typeof v === "string" ? v : JSON.stringify(v))
 		.digest("hex");
+
+export * from "./requirements";

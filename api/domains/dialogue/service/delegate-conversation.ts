@@ -1,3 +1,4 @@
+import type { RequirementCatalog } from "../../capabilities";
 import type { Database } from "bun:sqlite";
 import type { AgentRuntime } from "../../agent-runtime";
 import type { ConversationService } from "../../conversation";
@@ -19,6 +20,7 @@ export function delegateConversation(
 	selected: ConversationOperation,
 	context: {
 		parentJobId: string;
+		requirementCatalog?: RequirementCatalog;
 		authorizedUrls?: string[];
 		actionSnapshot?: unknown;
 		timerCapability?: ReturnType<
@@ -41,6 +43,14 @@ export function delegateConversation(
 		parentJobId: context.parentJobId,
 		actionSnapshot: context.actionSnapshot,
 		timerCapability: context.timerCapability,
+		requirementProfiles:
+			selected.kind === "timer"
+				? []
+				: agents.resolveRequirementProfilesInTransaction(
+						db,
+						context.requirementCatalog ?? { items: [], snapshots: {} },
+						selected.requirementProfiles ?? [],
+					),
 		onCreated: (taskId) => linkAgent(db, run.id, taskId, context.parentJobId),
 	});
 	linkAgent(db, run.id, root.taskId, root.jobId);
@@ -56,14 +66,24 @@ export function prepareConversation(
 	if (!agents || run.agentTaskId || run.sourceKind === "schedule") return {};
 	const context = agents.conversationContextInTransaction?.(db, run.id) ?? {
 		timersEnabled: false,
+		lunaEnabled: false,
 		timers: null,
 		timerCapability: undefined,
+		requirementCatalog: { items: [], snapshots: {} },
 	};
 	appendConversationPolicy(messages, context.timers);
+	if (context.requirementCatalog?.items.length)
+		messages.splice(messages.length - 1, 0, {
+			role: "user",
+			content: JSON.stringify({
+				requirementCatalog: context.requirementCatalog.items,
+			}),
+		});
 	return {
-		tools: conversationTools(context.timersEnabled),
+		tools: conversationTools(context.timersEnabled, context.lunaEnabled),
 		actionSnapshot: context.timers,
 		timerCapability: context.timerCapability,
+		requirementCatalog: context.requirementCatalog,
 		authorizedUrls: conversationUrls(
 			messages.filter((m) => m.role !== "system").map((m) => m.content),
 		),

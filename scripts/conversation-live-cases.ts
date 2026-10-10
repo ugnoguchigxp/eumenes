@@ -1,3 +1,4 @@
+import { researchLiveMetrics } from "./research-live-metrics";
 import type { EumenesClient } from "../client";
 
 /** Isolated test messages only; Memory remains off while raw history is verified. */
@@ -11,6 +12,17 @@ export async function conversationLiveCases(client: EumenesClient) {
 			conversationId,
 			text,
 		});
+		let firstTextMilliseconds: number | null = null;
+		let streamCompleted = false;
+		const streamController = new AbortController();
+		const stream = client
+			.watchRun(submitted.id, streamController.signal, (progress) => {
+				if (firstTextMilliseconds === null && progress.text)
+					firstTextMilliseconds = Math.round(performance.now() - started);
+				if (!["queued", "running"].includes(progress.status))
+					streamCompleted = true;
+			})
+			.catch(() => {});
 		let run = submitted;
 		const deadline = Date.now() + 190000;
 		while (
@@ -20,21 +32,25 @@ export async function conversationLiveCases(client: EumenesClient) {
 			await Bun.sleep(250);
 			run = await client.run(run.id);
 		}
+		streamController.abort();
+		await stream;
 		const tasks = await client.agentTasks(run.id);
 		const answer = (await client.conversation(conversationId)).messages.find(
 			(m) => m.id === run.answerMessageId,
 		)?.text;
-		const calls = (await client.inferenceUsage()).filter(
-			(u) =>
-				u.purpose === "llm" &&
-				(u.subject === run.id ||
-					tasks.some((t) => u.subject.startsWith(`agent:${t.id}:step:`))),
-		).length;
+		const metrics = researchLiveMetrics(
+			await client.inferenceUsage(),
+			run.id,
+			tasks,
+		);
 		return {
 			run,
 			tasks,
 			answer,
-			calls,
+			calls: metrics.totalModelCalls,
+			metrics,
+			firstTextMilliseconds,
+			streamCompleted,
 			ms: Math.round(performance.now() - started),
 		};
 	};
@@ -53,8 +69,10 @@ export async function conversationLiveCases(client: EumenesClient) {
 				seed.calls === 1 &&
 				!seed.tasks.length &&
 				!!seed.answer,
-			totalModelCalls: seed.calls,
+			...seed.metrics,
 			ms: seed.ms,
+			firstTextMilliseconds: seed.firstTextMilliseconds,
+			streamCompleted: seed.streamCompleted,
 		};
 		results.push(ordinary);
 		console.log(JSON.stringify(ordinary));
@@ -96,9 +114,11 @@ export async function conversationLiveCases(client: EumenesClient) {
 			memoryOff,
 			rawSourceVerified,
 			childError: child?.errorCode,
-			totalModelCalls: history.calls,
+			...history.metrics,
 			toolOutcomes: ops,
 			ms: history.ms,
+			firstTextMilliseconds: history.firstTextMilliseconds,
+			streamCompleted: history.streamCompleted,
 		};
 		results.push(result);
 		console.log(JSON.stringify(result));

@@ -21,14 +21,14 @@ export function parseControlOutput(value: unknown): {
 		};
 	diagnostic.bytes = bytes(value);
 	diagnostic.outputCharacters = value.length;
-	if (diagnostic.bytes > 12288)
+	if (diagnostic.bytes > 32768)
 		return {
 			action: undefined,
 			invalid: true,
 			diagnostic: {
 				...diagnostic,
 				reason: "control_output_too_large",
-				limit: 12288,
+				limit: 32768,
 			},
 		};
 	const text = value.trim();
@@ -39,17 +39,7 @@ export function parseControlOutput(value: unknown): {
 		if (action && typeof action === "object" && "action" in action) {
 			diagnostic.controlAction =
 				typeof action.action === "string" &&
-				[
-					"respond",
-					"clarify",
-					"discover",
-					"timer",
-					"select",
-					"refine",
-					"unavailable",
-					"invoke",
-					"finish",
-				].includes(action.action)
+				["invoke", "finish"].includes(action.action)
 					? action.action
 					: "unrecognized";
 		}

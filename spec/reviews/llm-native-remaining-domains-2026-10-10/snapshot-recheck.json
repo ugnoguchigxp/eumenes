@@ -1,0 +1,26 @@
+{
+	"checkedAt": "2026-10-10T10:10:06.699591+00:00",
+	"filesChecked": 517,
+	"changed": [
+		{
+			"path": "api/application/toolchain.ts",
+			"before": "a601652a4f49362a7198867be86ffc2adc57849cb22f660bc82ef046bbf1bc07",
+			"after": "17413b27b448a4c94ec2e4475fd1c112d1cb7b241b4c4d5df5ab56c32eed08ba"
+		},
+		{
+			"path": "api/domains/dialogue/service/delegate-conversation.ts",
+			"before": "e6e2f029b6e3fd827615fe05aa86dca243f8f9333043458b16d0d9904e70bda5",
+			"after": "87496e8a3c7dad9f418348b836460dd1eae15fcba8ad4752e23d2d274828cec1"
+		},
+		{
+			"path": "api/domains/dialogue/service/index.ts",
+			"before": "17d95bd89abff25a2f682d0357a86af5c527d8114b06683bb3c3922a56b49f42",
+			"after": "d5fa877dc19f0869bcc4d7db2a6c7370bebdb8c8573128266f8c58e376ab22ca"
+		},
+		{
+			"path": "api/domains/inference/service/execute.ts",
+			"before": "bf680e101641ac3ab1748e5f217cfbb7042b2240247efc4709cfcb92aa05eecf",
+			"after": "d681f0057639de64158352077675cfc89c0902c9d8503e84846eab517d19fa13"
+		}
+	]
+}

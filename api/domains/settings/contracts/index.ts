@@ -209,12 +209,6 @@ export const settingsSchema = z
 	.superRefine((s, ctx) => {
 		if (s.larm.profile === "SAAA-gemma4-26b-64k")
 			ctx.addIssue({ code: "custom", message: "補助Profileは利用できません" });
-		if (s.larm.audience === "same-host" && !s.larm.baseUrl)
-			ctx.addIssue({
-				code: "custom",
-				message: "同一ホストではloopbackのURLが必要です",
-				path: ["larm", "baseUrl"],
-			});
 		if (s.larm.baseUrl && URL.canParse(s.larm.baseUrl)) {
 			const u = new URL(s.larm.baseUrl);
 			const host = u.hostname;

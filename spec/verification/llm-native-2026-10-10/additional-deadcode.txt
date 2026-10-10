@@ -1,0 +1,594 @@
+$ knip --include exports,types
+Unused exports (312)
+toolchainEnabled                      function  api/application/toolchain.ts:221:17                                 
+WORLD_ENV                                       api/application/world.ts:68:14                                      
+WORLD_LIFECYCLE_PURPOSE                         api/application/world.ts:79:14                                      
+WORLD_MANUAL_PURPOSE                            api/application/world.ts:81:14                                      
+WORLD_DEFAULT_SCOPE                             api/application/world.ts:83:14                                      
+worldContextPort                      function  api/application/world.ts:245:17                                     
+referencedReportSchema                          api/domains/agent-runtime/contracts/index.ts:65:14                  
+frozenRequirement                               api/domains/agent-runtime/contracts/requirements.ts:18:14           
+evidenceRefs                                    api/domains/agent-runtime/contracts/requirements.ts:57:14           
+requirementCheck                                api/domains/agent-runtime/contracts/requirements.ts:58:14           
+externalRuleBase                                api/domains/agent-runtime/contracts/requirements.ts:68:14           
+externalRule                                    api/domains/agent-runtime/contracts/requirements.ts:79:14           
+canonicalEvidence                               api/domains/agent-runtime/contracts/requirements.ts:159:14          
+STEP_KIND                                       api/domains/agent-runtime/index.ts:1:49                             
+actionResultMigration                           api/domains/agent-runtime/index.ts:5:2                              
+actionResultMigration                           api/domains/agent-runtime/repository/index.ts:22:14                 
+explorationMigration                            api/domains/agent-runtime/repository/index.ts:105:14                
+policy                                          api/domains/agent-runtime/service/context.ts:17:14                  
+evidenceObservation                   function  api/domains/agent-runtime/service/evidence-excerpts.ts:28:17        
+isQuickWeb                                      api/domains/agent-runtime/service/exploration.ts:18:14              
+STEP_KIND                                       api/domains/agent-runtime/service/index.ts:84:14                    
+validateVerification                  function  api/domains/agent-runtime/service/requirement-verification.ts:115:17
+URL_A                                           api/domains/agent-runtime/test/route-harness.ts:34:14               
+URL_B                                           api/domains/agent-runtime/test/route-harness.ts:35:14               
+learnedId                                       api/domains/agent-runtime/test/route-harness.ts:36:14               
+learnedPair                                     api/domains/agent-runtime/test/route-harness.ts:39:14               
+coldPackage                                     api/domains/agent-runtime/test/route-harness.ts:70:14               
+reviewSchema                                    api/domains/attitude-dataset/index.ts:5:2                           
+coverageTags                                    api/domains/attitude-dataset/index.ts:6:2                           
+migrations                                      api/domains/attitude-dataset/index.ts:11:10                         
+migrations                                      api/domains/attitude-dataset/repository/index.ts:34:14              
+timerCancel                                     api/domains/capabilities/contracts/index.ts:3:10                    
+timerList                                       api/domains/capabilities/contracts/index.ts:3:37                    
+timerStart                                      api/domains/capabilities/contracts/index.ts:3:48                    
+lookupInput                                     api/domains/capabilities/contracts/index.ts:14:14                   
+readInput                                       api/domains/capabilities/contracts/index.ts:29:14                   
+forecastInput                                   api/domains/capabilities/contracts/index.ts:30:14                   
+quoteInput                                      api/domains/capabilities/contracts/index.ts:40:14                   
+savedFindInput                                  api/domains/capabilities/contracts/index.ts:50:14                   
+savedReadInput                                  api/domains/capabilities/contracts/index.ts:57:14                   
+historyInput                                    api/domains/capabilities/contracts/index.ts:66:14                   
+historySearch                                   api/domains/capabilities/contracts/index.ts:72:14                   
+historyRead                                     api/domains/capabilities/contracts/index.ts:85:14                   
+timerStates                                     api/domains/capabilities/contracts/timers.ts:4:14                   
+actions                                         api/domains/coding-supervision/contracts/index.ts:12:14             
+executionObservationSchema                      api/domains/coding-supervision/contracts/index.ts:41:14             
+approvalPrompt                        function  api/domains/coding-supervision/service/approval.ts:27:17            
+isApproved                                      api/domains/coding-supervision/service/approval.ts:51:14            
+diagnosticLimits                                api/domains/coding-supervision/service/diagnostics.ts:33:14         
+codingEventsSchema                              api/domains/coding/contracts/index.ts:49:14                         
+migrations                      repo            api/domains/coding/repository/index.ts:225:14                       
+continuityKinds                                 api/domains/continuity/contracts/index.ts:4:14                      
+continuityStatuses                              api/domains/continuity/contracts/index.ts:5:14                      
+continuityItemSchema                            api/domains/continuity/contracts/index.ts:6:14                      
+historyViewSchema                               api/domains/conversation/contracts/history.ts:25:14                 
+historyScopeSchema                              api/domains/conversation/contracts/history.ts:42:14                 
+messageSchema                                   api/domains/conversation/contracts/index.ts:3:14                    
+textRevision                          function  api/domains/conversation/repository/index.ts:72:17                  
+emotionPerformance                              api/domains/delivery/index.ts:5:2                                   
+resultSchema                                    api/domains/delivery/service/index.ts:22:14                         
+emotionPerformance                              api/domains/delivery/service/index.ts:42:14                         
+conversationPolicy                              api/domains/dialogue/service/conversation-tools.ts:98:14            
+GENERATE_KIND                                   api/domains/dialogue/service/index.ts:56:14                         
+PROMPT_TARGET_KIND                              api/domains/dialogue/service/index.ts:57:14                         
+buildSystemPrompt                               api/domains/dialogue/service/index.ts:59:10                         
+MAX_DESIRED_STATE_LENGTH                        api/domains/goals/contracts/index.ts:4:14                           
+MAX_KEY_LENGTH                                  api/domains/goals/contracts/index.ts:5:14                           
+MAX_SNAPSHOT_SCOPES                             api/domains/goals/contracts/index.ts:6:14                           
+MIN_PRIORITY                                    api/domains/goals/contracts/index.ts:11:14                          
+MAX_PRIORITY                                    api/domains/goals/contracts/index.ts:12:14                          
+DEFAULT_PRIORITY                                api/domains/goals/contracts/index.ts:13:14                          
+goalStatuses                                    api/domains/goals/contracts/index.ts:15:14                          
+goalSourceSchema                                api/domains/goals/contracts/index.ts:29:14                          
+PROBE_STALE_MS                                  api/domains/inference/service/probe.ts:6:14                         
+writeWithRetry                        function  api/domains/inference/service/probe.ts:13:23                        
+larmStatusSchema                                api/domains/larm/contracts/index.ts:94:14                           
+stateKinds                                      api/domains/memory/contracts/index.ts:7:14                          
+jobStates                                       api/domains/queue/contracts/index.ts:3:14                           
+lanes                                           api/domains/queue/contracts/index.ts:22:14                          
+keyVersion                                      api/domains/research-routes/contracts/index.ts:45:14                
+weatherTarget                                   api/domains/research-routes/contracts/index.ts:66:14                
+quoteTarget                                     api/domains/research-routes/contracts/index.ts:73:14                
+weatherField                                    api/domains/research-routes/contracts/index.ts:81:14                
+quoteFields                                     api/domains/research-routes/contracts/index.ts:82:14                
+requestBinding                                  api/domains/research-routes/contracts/index.ts:141:14               
+validationProfile                               api/domains/research-routes/contracts/index.ts:152:14               
+lookupHit                                       api/domains/research-routes/contracts/index.ts:199:14               
+lookupProvenance                                api/domains/research-routes/contracts/index.ts:207:14               
+weatherConditions                               api/domains/research-routes/contracts/index.ts:221:14               
+evidence                                        api/domains/research-routes/contracts/index.ts:229:14               
+weatherFacts                                    api/domains/research-routes/contracts/index.ts:235:14               
+quoteFacts                                      api/domains/research-routes/contracts/index.ts:249:14               
+draftStates                                     api/domains/research-routes/contracts/index.ts:310:14               
+terminalDraftStates                             api/domains/research-routes/contracts/index.ts:320:14               
+isTerminalDraft                                 api/domains/research-routes/contracts/index.ts:326:14               
+draftOrigin                                     api/domains/research-routes/contracts/index.ts:328:14               
+authorStep                                      api/domains/research-routes/contracts/index.ts:329:14               
+jobPayload                                      api/domains/research-routes/contracts/index.ts:336:14               
+authorOutput                                    api/domains/research-routes/contracts/index.ts:341:14               
+reviewCodes                                     api/domains/research-routes/contracts/index.ts:351:14               
+reviewOutput                                    api/domains/research-routes/contracts/index.ts:359:14               
+draftStatus                                     api/domains/research-routes/contracts/index.ts:377:14               
+bytesOf                                         api/domains/research-routes/contracts/index.ts:444:14               
+getKeyByIncarnation             repo            api/domains/research-routes/repository/index.ts:189:14              
+markUsed                        repo            api/domains/research-routes/repository/index.ts:285:14              
+getCandidate                    repo            api/domains/research-routes/repository/index.ts:305:14              
+putCandidate                    repo            api/domains/research-routes/repository/index.ts:309:14              
+updateProof                     repo            api/domains/research-routes/repository/index.ts:435:14              
+updateDraftContent              repo            api/domains/research-routes/repository/index.ts:461:14              
+getProof                        repo            api/domains/research-routes/repository/index.ts:511:14              
+getDraft                        repo            api/domains/research-routes/repository/index.ts:541:14              
+sweepPayload                                    api/domains/research-routes/service/maintenance.ts:24:14            
+versionHealth                         function  api/domains/research-routes/service/registry.ts:23:17               
+MIN_INTERVAL_MS                                 api/domains/scheduler/contracts/index.ts:4:14                       
+MAX_INTERVAL_MS                                 api/domains/scheduler/contracts/index.ts:5:14                       
+misfirePolicies                                 api/domains/scheduler/contracts/index.ts:6:14                       
+scheduleStates                                  api/domains/scheduler/contracts/index.ts:7:14                       
+occurrenceSchema                                api/domains/scheduler/contracts/index.ts:65:14                      
+inputSchema                                     api/domains/service-tests/contracts/index.ts:24:14                  
+connectionSchema                                api/domains/settings/contracts/index.ts:39:14                       
+resourceSchema                                  api/domains/settings/contracts/index.ts:61:14                       
+subtitleStyles                                  api/domains/settings/contracts/index.ts:94:14                       
+subtitleSchema                                  api/domains/settings/contracts/index.ts:95:14                       
+personas                                        api/domains/settings/contracts/index.ts:146:14                      
+reportKinds                                     api/domains/task-reports/contracts/index.ts:3:14                    
+taskReportSchema                                api/domains/task-reports/contracts/index.ts:44:14                   
+taskStates                                      api/domains/tasks/contracts/index.ts:10:14                          
+taskOperations                                  api/domains/tasks/contracts/index.ts:32:14                          
+taskGrantSchema                                 api/domains/tasks/contracts/index.ts:51:14                          
+taskQuestionSchema                              api/domains/tasks/contracts/index.ts:177:14                         
+taskEventSchema                                 api/domains/tasks/contracts/index.ts:205:14                         
+timerStates                                     api/domains/timers/contracts/index.ts:4:14                          
+notificationStatuses                            api/domains/timers/contracts/index.ts:6:14                          
+notificationReasons                             api/domains/timers/contracts/index.ts:14:14                         
+timerCommandSchema                              api/domains/timers/contracts/index.ts:50:14                         
+timerNotificationDtoSchema                      api/domains/timers/contracts/index.ts:201:14                        
+TIMER_POLICY                                    api/domains/timers/index.ts:5:10                                    
+DEFAULT_TIMER_LABEL                             api/domains/timers/index.ts:17:2                                    
+DEFAULT_TIMER_SCOPE                             api/domains/timers/index.ts:18:2                                    
+ackNotificationSchema                           api/domains/timers/index.ts:19:2                                    
+cancelTimerSchema                               api/domains/timers/index.ts:20:2                                    
+claimNotificationSchema                         api/domains/timers/index.ts:21:2                                    
+listTimersQuerySchema                           api/domains/timers/index.ts:22:2                                    
+silenceNotificationSchema                       api/domains/timers/index.ts:23:2                                    
+timerClaimResponseSchema                        api/domains/timers/index.ts:25:2                                    
+timerCommandSchema                              api/domains/timers/index.ts:26:2                                    
+timerGetResponseSchema                          api/domains/timers/index.ts:27:2                                    
+timerListResponseSchema                         api/domains/timers/index.ts:28:2                                    
+timerNotificationDtoSchema                      api/domains/timers/index.ts:29:2                                    
+timerNotificationListSchema                     api/domains/timers/index.ts:30:2                                    
+timerReceiptSchema                              api/domains/timers/index.ts:31:2                                    
+timerRunReceiptSchema                           api/domains/timers/index.ts:32:2                                    
+actionMigration                                 api/domains/tool-runtime/index.ts:6:2                               
+actionMigration                                 api/domains/tool-runtime/repository/index.ts:22:14                  
+entrySchema                                     api/domains/tts-dictionary/contracts/index.ts:10:14                 
+transcriptLanguageResult                        api/domains/voice-dialogue/service/transcript-language.ts:5:14      
+documentSchema                                  api/domains/web-research/contracts/index.ts:48:14                   
+normalizedPositions                   function  api/domains/web-research/service/saved-bodies.ts:44:17              
+WORLD_HOST_REASON_CODES                         api/domains/world/contracts/host.ts:39:14                           
+SOURCE_RANGE_REASON_CODES                       api/domains/world/contracts/index.ts:37:14                          
+WORLD_HOST_REASON_CODES                         api/domains/world/contracts/index.ts:116:2                          
+WORLD_QUERY_REJECTIONS                          api/domains/world/contracts/index.ts:145:2                          
+worldQuerySchema                                api/domains/world/contracts/index.ts:146:2                          
+WORLD_QUERY_REJECTIONS                          api/domains/world/contracts/query.ts:197:14                         
+CLAIM_ADOPTIONS                                 api/domains/world/contracts/view.ts:13:14                           
+CLAIM_ORIGINS                                   api/domains/world/contracts/view.ts:17:14                           
+EVIDENCE_KINDS                                  api/domains/world/contracts/view.ts:25:14                           
+CLAIM_FRESHNESS                                 api/domains/world/contracts/view.ts:33:14                           
+typedValueSchema                                api/domains/world/contracts/view.ts:67:14                           
+claimContentSchema                              api/domains/world/contracts/view.ts:80:14                           
+claimRowSchema                                  api/domains/world/contracts/view.ts:91:14                           
+scopeChoiceSchema                               api/domains/world/contracts/view.ts:107:14                          
+CONDITION_STATES                                api/domains/world/contracts/view.ts:137:14                          
+forgetViewSchema                                api/domains/world/contracts/view.ts:197:14                          
+claimAppliedSchema                              api/domains/world/contracts/view.ts:272:14                          
+claimUnresolvedSchema                           api/domains/world/contracts/view.ts:277:14                          
+WORLD_CLAIM_ERRORS                              api/domains/world/contracts/view.ts:294:14                          
+DEFAULT_MAX_INPUTS_PER_VERSION                  api/domains/world/index.ts:2:2                                      
+MEMORY_STATE_ITEM_KIND                          api/domains/world/index.ts:4:2                                      
+MEMORY_STATE_ITEM_NAMESPACE                     api/domains/world/index.ts:5:2                                      
+PROTECTIVE_KINDS                                api/domains/world/index.ts:7:2                                      
+WORLD_GENESIS_HASH                              api/domains/world/index.ts:10:2                                     
+WORLD_JOURNAL_FORMAT                            api/domains/world/index.ts:11:2                                     
+EXTRACT_CONFIRM_MS                              api/domains/world/index.ts:14:2                                     
+EXTRACT_INTERPRETATION_VERSION                  api/domains/world/index.ts:15:2                                     
+EXTRACT_STAGE_BUDGET_MS                         api/domains/world/index.ts:16:2                                     
+FOREGROUND_ACTIVE                               api/domains/world/index.ts:17:2                                     
+SKIP_REASONS                                    api/domains/world/index.ts:18:2                                     
+SLOT_BUSY                                       api/domains/world/index.ts:19:2                                     
+RUNTIME_REFUSALS                                api/domains/world/index.ts:20:2                                     
+parseWorldQuery                                 api/domains/world/index.ts:41:2                                     
+WORLD_QUERY_DEFAULT_PURPOSE                     api/domains/world/index.ts:42:2                                     
+WORLD_QUERY_TOOL_ID                             api/domains/world/index.ts:43:2                                     
+runtimeOutcomeId                                api/domains/world/index.ts:46:2                                     
+extractionPayloadSchema                         api/domains/world/index.ts:49:2                                     
+isMemoryStateItem                               api/domains/world/index.ts:51:2                                     
+operationInputs                                 api/domains/world/index.ts:52:2                                     
+registerWorldDependents                         api/domains/world/index.ts:55:2                                     
+resolveSources                                  api/domains/world/index.ts:56:2                                     
+gapTaskMigration                                api/domains/world/index.ts:120:10                                   
+INITIAL_FORGET_EPOCH                            api/domains/world/index.ts:122:2                                    
+hostStateMigration                              api/domains/world/index.ts:124:2                                    
+lifecycleMigration                              api/domains/world/index.ts:126:10                                   
+guardMigration                                  api/domains/world/index.ts:127:10                                   
+extractionMigration                             api/domains/world/index.ts:128:10                                   
+RUNTIME_OBSERVATION_STATES                      api/domains/world/index.ts:130:2                                    
+runtimeMigration                                api/domains/world/index.ts:131:2                                    
+EXTRACT_EVENT_STATES                            api/domains/world/index.ts:137:10                                   
+usageMigration                                  api/domains/world/index.ts:139:37                                   
+SOURCE_RANGE_REASON_CODES                       api/domains/world/index.ts:148:2                                    
+CLAIM_ADOPTIONS                                 api/domains/world/index.ts:149:2                                    
+CLAIM_TONES                                     api/domains/world/index.ts:150:2                                    
+FORGET_DISPLAYS                                 api/domains/world/index.ts:151:2                                    
+claimTone                                       api/domains/world/index.ts:152:2                                    
+WORLD_QUERY_REJECTIONS                          api/domains/world/index.ts:155:2                                    
+worldQuerySchema                                api/domains/world/index.ts:156:2                                    
+WORLD_FEEDS                                     api/domains/world/index.ts:158:2                                    
+WORLD_RUNTIME_PURPOSE                           api/domains/world/index.ts:159:2                                    
+WORLD_HOST_REASON_CODES                         api/domains/world/index.ts:160:2                                    
+EXTRACT_EVENT_STATES                            api/domains/world/repository/extraction.ts:58:14                    
+INITIAL_FORGET_EPOCH                            api/domains/world/repository/index.ts:38:14                         
+FORGET_STATES                                   api/domains/world/repository/lifecycle.ts:67:14                     
+RUNTIME_OBSERVATION_STATES                      api/domains/world/repository/runtime.ts:44:14                       
+KEEP_USAGE_PER_SCOPE                            api/domains/world/service/context-broker.ts:67:14                   
+safeJson                              function  api/domains/world/service/context-render.ts:20:17                   
+WORLD_FRAME                                     api/domains/world/service/context-render.ts:26:14                   
+FRAME_BYTES                                     api/domains/world/service/context-render.ts:73:14                   
+GOAL_MAX_BYTES                                  api/domains/world/service/context-render.ts:76:14                   
+EXTRACT_CONFIRM_MS                              api/domains/world/service/extraction-handler.ts:15:2                
+EXTRACT_INTERPRETATION_VERSION                  api/domains/world/service/extraction-handler.ts:16:2                
+EXTRACT_STAGE_BUDGET_MS                         api/domains/world/service/extraction-handler.ts:17:2                
+FOREGROUND_ACTIVE                               api/domains/world/service/extraction-handler.ts:18:2                
+SLOT_BUSY                                       api/domains/world/service/extraction-handler.ts:19:2                
+extractionPayloadSchema                         api/domains/world/service/extraction-handler.ts:23:10               
+SKIP_REASONS                                    api/domains/world/service/extraction-intake.ts:24:14                
+isExtractionInput                               api/domains/world/service/extraction-intake.ts:66:14                
+DEFAULT_MAX_INPUTS_PER_VERSION                  api/domains/world/service/index.ts:9:2                              
+registerWorldDependents                         api/domains/world/service/index.ts:14:2                             
+MEMORY_STATE_ITEM_KIND                          api/domains/world/service/index.ts:17:2                             
+MEMORY_STATE_ITEM_NAMESPACE                     api/domains/world/service/index.ts:18:2                             
+isMemoryStateItem                               api/domains/world/service/index.ts:19:2                             
+operationInputs                                 api/domains/world/service/index.ts:20:2                             
+resolveSources                                  api/domains/world/service/index.ts:21:2                             
+PROTECTIVE_KINDS                                api/domains/world/service/index.ts:24:10                            
+WORLD_GENESIS_HASH                              api/domains/world/service/index.ts:30:2                             
+WORLD_JOURNAL_FORMAT                            api/domains/world/service/index.ts:31:2                             
+hashWorldJournalEntry                           api/domains/world/service/index.ts:34:15                            
+conditionText                                   api/domains/world/service/index.ts:56:10                            
+KEEP_USAGE_PER_SCOPE                            api/domains/world/service/index.ts:67:2                             
+FRAME_BYTES                                     api/domains/world/service/index.ts:81:2                             
+GOAL_MAX_BYTES                                  api/domains/world/service/index.ts:82:2                             
+WORLD_MIN_BYTES                                 api/domains/world/service/index.ts:85:2                             
+renderWorldBlock                                api/domains/world/service/index.ts:87:2                             
+safeJson                                        api/domains/world/service/index.ts:88:2                             
+forgetUsageInScope                              api/domains/world/service/index.ts:91:10                            
+sliceDependentPrefix                            api/domains/world/service/index.ts:91:30                            
+SKIP_REASONS                                    api/domains/world/service/index.ts:92:10                            
+scopeSetOf                                      api/domains/world/service/index.ts:92:40                            
+EXTRACT_CONFIRM_MS                              api/domains/world/service/index.ts:99:2                             
+EXTRACT_INTERPRETATION_VERSION                  api/domains/world/service/index.ts:100:2                            
+EXTRACT_STAGE_BUDGET_MS                         api/domains/world/service/index.ts:101:2                            
+FOREGROUND_ACTIVE                               api/domains/world/service/index.ts:102:2                            
+SLOT_BUSY                                       api/domains/world/service/index.ts:103:2                            
+extractionPayloadSchema                         api/domains/world/service/index.ts:107:2                            
+RUNTIME_REFUSALS                                api/domains/world/service/index.ts:124:2                            
+runtimeOutcomeId                                api/domains/world/service/index.ts:127:2                            
+WORLD_QUERY_DEFAULT_PURPOSE                     api/domains/world/service/index.ts:140:2                            
+parseWorldQuery                                 api/domains/world/service/index.ts:144:2                            
+WORLD_QUERY_TOOL_ID                             api/domains/world/service/index.ts:147:10                           
+MEMORY_STATE_ITEM_NAMESPACE                     api/domains/world/service/inputs.ts:25:14                           
+MEMORY_STATE_ITEM_KIND                          api/domains/world/service/inputs.ts:26:14                           
+isValidRoot                                     api/domains/world/service/lifecycle-adapter.ts:15:10                
+MAX_ROOTS_PER_FORGET                            api/domains/world/service/lifecycle-shared.ts:21:14                 
+MAX_ID_BYTES                                    api/domains/world/service/lifecycle-shared.ts:27:14                 
+PART_SEPARATOR                                  api/domains/world/service/lifecycle-shared.ts:29:14                 
+utf8                                            api/domains/world/service/lifecycle-shared.ts:33:14                 
+memoryUnavailable                               api/domains/world/service/lifecycle-shared.ts:41:14                 
+DEFAULT_MAX_INPUTS_PER_VERSION                  api/domains/world/service/memory-adapter.ts:28:14                   
+RUNTIME_REFUSALS                                api/domains/world/service/runtime-adapter.ts:93:14                  
+runtimeOutcomeId                                api/domains/world/service/runtime-adapter.ts:193:14                 
+conditionText                         function  api/domains/world/service/world-claims.ts:170:17                    
+WORLD_JOURNAL_FORMAT                            api/domains/world/service/world-journal.ts:25:14                    
+WORLD_GENESIS_HASH                              api/domains/world/service/world-journal.ts:26:14                    
+hashEntry                             function  api/domains/world/service/world-journal.ts:58:17                    
+journalHead                           function  api/domains/world/service/world-journal.ts:216:17                   
+WORLD_QUERY_TOOL_ID                             api/domains/world/service/world-query-tool.ts:9:14                  
+WORLD_QUERY_DEFAULT_PURPOSE                     api/domains/world/service/world-query.ts:39:14                      
+parseWorldQuery                       function  api/domains/world/service/world-query.ts:99:17                      
+PROTECTIVE_KINDS                                api/domains/world/service/world-service.ts:63:14                    
+fakeQueue                             function  api/domains/world/test/extraction-fixture.ts:20:17                  
+fakeInference                         function  api/domains/world/test/extraction-fixture.ts:77:17                  
+SERVICE_ENTITY                                  api/domains/world/test/extraction-fixture.ts:122:14                 
+openHarness                           function  api/domains/world/test/fixture.ts:57:23                             
+WORLD_TABLES                                    api/domains/world/test/fixture.ts:268:14                            
+receiptOf                             function  api/domains/world/test/lifecycle-fixture.ts:198:17                  
+yes                                             api/domains/world/test/query-fixture.ts:14:14                       
+NOW                                             api/domains/world/test/query-fixture.ts:64:10                       
+SCOPE                                           api/domains/world/test/query-fixture.ts:64:15                       
+LEDGER_NAMESPACE                                api/domains/world/test/runtime-fixture.ts:15:14                     
+MigrationChecksumError                class     api/infrastructure/sqlite/index.ts:35:14                            
+MigrationUnknownAppliedError          class     api/infrastructure/sqlite/index.ts:41:14                            
+captureIssueCodes                               packages/coding-runner/src/observation.ts:25:14                     
+motionNames                                     web/src/components/domains/conversation/light-avatar/motion.js:6:14 
+motionModes                                     web/src/components/domains/conversation/light-avatar/motion.js:20:14
+Badge                                           web/src/design-system/index.ts:2:2                                  
+ChatDock                                        web/src/design-system/index.ts:8:2                                  
+timerTonePcm                                    web/src/domains/audio/index.ts:7:10                                 
+timerToneWav                                    web/src/domains/audio/index.ts:7:24                                 
+TIMER_TONE                                      web/src/domains/audio/index.ts:7:38                                 
+runsKey                                         web/src/domains/dialogue/hooks/index.ts:12:14                       
+runsKey                                         web/src/domains/dialogue/index.ts:3:2                               
+liveProviderRoots                               web/src/queryKeys.ts:55:14                                          
+Unused exported types (278)
+InitialSyncReport                       type       api/application/world.ts:192:13                            
+PumpReport                              type       api/application/world.ts:196:13                            
+AcquisitionSource                       type       api/domains/agent-runtime/contracts/index.ts:232:13        
+AcquisitionInitialAction                type       api/domains/agent-runtime/contracts/index.ts:249:13        
+AcquisitionResolveInput                 type       api/domains/agent-runtime/contracts/index.ts:269:13        
+FrozenRequirement                       type       api/domains/agent-runtime/contracts/requirements.ts:50:13  
+RequirementCheck                        type       api/domains/agent-runtime/contracts/requirements.ts:67:13  
+ReportRequirements                      type       api/domains/agent-runtime/contracts/requirements.ts:223:13 
+Review                                  type       api/domains/attitude-dataset/contracts/index.ts:56:13      
+Identity                                type       api/domains/attitude-dataset/index.ts:8:7                  
+TimerResultContext                      type       api/domains/capabilities/contracts/index.ts:4:35           
+RequirementSpec                         type       api/domains/capabilities/contracts/requirements.ts:48:13   
+WorkflowPolicy                          interface  api/domains/coding-supervision/contracts/index.ts:137:18   
+DiagnosticBudget                        interface  api/domains/coding-supervision/contracts/index.ts:233:18   
+PendingApproval                         interface  api/domains/coding-supervision/contracts/index.ts:259:18   
+WorkflowPolicy                          type       api/domains/coding-supervision/index.ts:6:2                
+StepIntent                              type       api/domains/coding-supervision/index.ts:8:2                
+StepReceipt                             type       api/domains/coding-supervision/index.ts:9:2                
+ReadFocus                               type       api/domains/coding-supervision/index.ts:11:2               
+ObservationFailure                      type       api/domains/coding-supervision/index.ts:12:2               
+ReadResult                              type       api/domains/coding-supervision/service/diagnostics.ts:58:13
+ContinuityItem                          type       api/domains/continuity/index.ts:5:15                       
+ContinuitySnapshot                      type       api/domains/continuity/index.ts:5:31                       
+ChangeResult                            type       api/domains/conversation/index.ts:10:2                     
+ConversationSourceState                 type       api/domains/conversation/index.ts:11:2                     
+OutboxKind                              type       api/domains/conversation/index.ts:13:2                     
+ConversationServiceOptions              type       api/domains/conversation/index.ts:24:2                     
+HistoryView                             type       api/domains/conversation/index.ts:31:2                     
+HistoryScope                            type       api/domains/conversation/index.ts:32:2                     
+ChoiceQuestions                         type       api/domains/delivery/index.ts:19:7                         
+PostAnswerObservation                   type       api/domains/dialogue/contracts/index.ts:63:13              
+PostAnswerObserverResult                type       api/domains/dialogue/contracts/index.ts:68:13              
+WorldContextPrepared                    type       api/domains/dialogue/contracts/index.ts:95:13              
+PostAnswerObservation                   type       api/domains/dialogue/index.ts:12:2                         
+PostAnswerObserverResult                type       api/domains/dialogue/index.ts:14:2                         
+WorldContextPrepared                    type       api/domains/dialogue/index.ts:17:2                         
+WorldContextSettleInput                 type       api/domains/dialogue/index.ts:18:2                         
+GoalsService                            type       api/domains/goals/index.ts:2:15                            
+GoalRef                                 type       api/domains/goals/index.ts:12:2                            
+GoalRevision                            type       api/domains/goals/index.ts:13:2                            
+GoalSnapshot                            type       api/domains/goals/index.ts:14:2                            
+GoalSource                              type       api/domains/goals/index.ts:15:2                            
+GoalStatus                              type       api/domains/goals/index.ts:16:2                            
+GoalsService                            type       api/domains/goals/service/index.ts:464:13                  
+TtsVoice                                type       api/domains/larm/contracts/index.ts:40:7                   
+TtsRange                                type       api/domains/larm/contracts/index.ts:41:7                   
+StatusResponse                          type       api/domains/larm/contracts/index.ts:103:13                 
+HealthState                             type       api/domains/larm/contracts/playground.ts:48:13             
+TtsVoice                                type       api/domains/larm/contracts/voices.ts:60:13                 
+TtsRange                                type       api/domains/larm/contracts/voices.ts:61:13                 
+LarmStatus                              type       api/domains/larm/index.ts:3:2                              
+TestInput                               type       api/domains/larm/index.ts:16:2                             
+MemoryItemDto                           type       api/domains/memory/index.ts:5:15                           
+PrepareResult                           type       api/domains/memory/index.ts:5:30                           
+SettleResult                            type       api/domains/memory/index.ts:5:45                           
+EnqueueInput                            type       api/domains/queue/index.ts:6:2                             
+JobRecord                               type       api/domains/queue/index.ts:9:2                             
+PrepareResult                           type       api/domains/queue/index.ts:10:2                            
+QueueOptions                            type       api/domains/queue/index.ts:11:2                            
+SettleOutcome                           type       api/domains/queue/index.ts:12:2                            
+SettleResult                            type       api/domains/queue/index.ts:13:2                            
+Runner                                  type       api/domains/queue/service/runner.ts:753:13                 
+PrepareResult                           type       api/domains/queue/types/index.ts:64:13                     
+WeatherSpec                             type       api/domains/research-routes/contracts/index.ts:133:13      
+QuoteSpec                               type       api/domains/research-routes/contracts/index.ts:134:13      
+BuiltSpec                               type       api/domains/research-routes/contracts/index.ts:136:13      
+RequestBinding                          type       api/domains/research-routes/contracts/index.ts:149:13      
+RouteRecipe                             type       api/domains/research-routes/contracts/index.ts:168:13      
+RouteFence                              type       api/domains/research-routes/contracts/index.ts:171:13      
+RouteLookup                             type       api/domains/research-routes/contracts/index.ts:177:13      
+LookupHit                               type       api/domains/research-routes/contracts/index.ts:206:13      
+LookupProvenance                        type       api/domains/research-routes/contracts/index.ts:218:13      
+RouteFacts                              type       api/domains/research-routes/contracts/index.ts:269:13      
+VisibleSource                           type       api/domains/research-routes/contracts/index.ts:272:13      
+CanonicalReportPatch                    type       api/domains/research-routes/contracts/index.ts:280:13      
+SafeProjection                          type       api/domains/research-routes/contracts/index.ts:285:13      
+ObservationResult                       type       api/domains/research-routes/contracts/index.ts:290:13      
+AuthorStep                              type       api/domains/research-routes/contracts/index.ts:335:13      
+JobPayload                              type       api/domains/research-routes/contracts/index.ts:339:13      
+AuthorOutput                            type       api/domains/research-routes/contracts/index.ts:350:13      
+ReviewOutput                            type       api/domains/research-routes/contracts/index.ts:374:13      
+DraftStatus                             type       api/domains/research-routes/contracts/index.ts:384:13      
+ResearchRoutes                          type       api/domains/research-routes/index.ts:4:37                  
+CandidateRow                      repo  type       api/domains/research-routes/repository/index.ts:85:13      
+ResearchRoutes                          type       api/domains/research-routes/service/index.ts:28:13         
+ControlResult                           type       api/domains/research-routes/service/index.ts:30:15         
+ApiResult                               type       api/domains/research-routes/service/index.ts:33:7          
+OperationsDeps                          type       api/domains/research-routes/service/index.ts:34:7          
+RouteChange                             type       api/domains/research-routes/service/index.ts:35:7          
+SkillReader                             type       api/domains/research-routes/service/index.ts:37:7          
+PruneLearned                            type       api/domains/research-routes/service/maintenance.ts:9:13    
+Maintenance                             type       api/domains/research-routes/service/maintenance.ts:277:13  
+SkillReader                             type       api/domains/research-routes/service/operations.ts:27:13    
+OperationsRoutes                        type       api/domains/research-routes/service/operations.ts:38:13    
+Health                                  type       api/domains/research-routes/service/registry.ts:16:13      
+SchedulerOptions                        type       api/domains/scheduler/index.ts:6:2                         
+TargetOccurrence                        type       api/domains/scheduler/index.ts:8:2                         
+TargetOccurrence                        interface  api/domains/scheduler/types/index.ts:4:18                  
+ServiceCatalog                          type       api/domains/service-tests/index.ts:5:2                     
+ServiceRun                              type       api/domains/service-tests/index.ts:6:2                     
+ServiceTarget                           type       api/domains/service-tests/index.ts:7:2                     
+StartTest                               type       api/domains/service-tests/index.ts:8:2                     
+HealthRow                               type       api/domains/service-tests/index.ts:9:2                     
+Persona                                 type       api/domains/settings/contracts/index.ts:147:13             
+TaskReport                              type       api/domains/task-reports/index.ts:4:15                     
+TaskResult                              type       api/domains/tasks/contracts/index.ts:137:13                
+TasksOptions                            type       api/domains/tasks/index.ts:7:2                             
+TrustedTaskContext                      type       api/domains/tasks/index.ts:8:2                             
+TaskReceipt                             type       api/domains/tasks/index.ts:12:2                            
+TaskGrant                               type       api/domains/tasks/index.ts:13:2                            
+TaskOrigin                              type       api/domains/tasks/index.ts:14:2                            
+TaskQuestion                            type       api/domains/tasks/index.ts:15:2                            
+TaskGrant                               type       api/domains/tasks/service/index.ts:111:15                  
+TaskOrigin                              type       api/domains/tasks/service/index.ts:111:26                  
+TimerCommand                            type       api/domains/timers/contracts/index.ts:73:13                
+ClaimNotificationInput                  type       api/domains/timers/contracts/index.ts:82:13                
+AckNotificationInput                    type       api/domains/timers/contracts/index.ts:91:13                
+SilenceNotificationInput                type       api/domains/timers/contracts/index.ts:99:13                
+TimerArtifactRefV1                      type       api/domains/timers/contracts/index.ts:120:13               
+TimerArtifactRefV1                      type       api/domains/timers/index.ts:8:2                            
+TimerCommand                            type       api/domains/timers/index.ts:9:2                            
+TimerDto                                type       api/domains/timers/index.ts:10:2                           
+TimerNotificationDto                    type       api/domains/timers/index.ts:11:2                           
+TimerOrigin                             type       api/domains/timers/index.ts:12:2                           
+TimerReceipt                            type       api/domains/timers/index.ts:13:2                           
+TimerState                              type       api/domains/timers/index.ts:14:2                           
+TimerLog                                type       api/domains/timers/service/deps.ts:7:13                    
+ExpireClaim                             type       api/domains/timers/service/expiry.ts:232:13                
+StartTimerInput                         type       api/domains/timers/service/operations.ts:507:15            
+CachedSourceDecision                    type       api/domains/tool-runtime/contracts/index.ts:138:13         
+Entry                                   type       api/domains/tts-dictionary/index.ts:4:15                   
+Chunk                                   type       api/domains/voice-dialogue/service/speech-state.ts:2:13    
+WebCache                                type       api/domains/web-research/index.ts:4:45                     
+Acquisition                             type       api/domains/web-research/index.ts:6:32                     
+WorldRequestAccess                      type       api/domains/world/contracts/host.ts:19:13                  
+ResolvedInput                           type       api/domains/world/contracts/host.ts:120:13                 
+SourceSpeaker                           type       api/domains/world/contracts/index.ts:14:13                 
+SourceRangeReasonCode                   type       api/domains/world/contracts/index.ts:42:13                 
+ResolvedInput                           type       api/domains/world/contracts/index.ts:121:2                 
+WorldRequestAccess                      type       api/domains/world/contracts/index.ts:130:2                 
+RuntimeSnapshot                         type       api/domains/world/contracts/index.ts:139:2                 
+GapTaskLink                             type       api/domains/world/contracts/index.ts:151:2                 
+GapTaskLinkage                          type       api/domains/world/contracts/index.ts:152:2                 
+GapTaskLinkStatus                       type       api/domains/world/contracts/index.ts:153:2                 
+ResourceStatePort                       type       api/domains/world/contracts/index.ts:156:2                 
+WorldQueryBasis                         type       api/domains/world/contracts/index.ts:157:2                 
+WorldQueryBudget                        type       api/domains/world/contracts/index.ts:158:2                 
+WorldQueryMode                          type       api/domains/world/contracts/index.ts:160:2                 
+WorldQueryPayload                       type       api/domains/world/contracts/index.ts:161:2                 
+WorldQueryRejection                     type       api/domains/world/contracts/index.ts:162:2                 
+WorldQueryRequest                       type       api/domains/world/contracts/index.ts:163:2                 
+WorldQueryMode                          type       api/domains/world/contracts/query.ts:26:13                 
+WorldQueryBudget                        type       api/domains/world/contracts/query.ts:101:13                
+GapTaskLinkStatus                       type       api/domains/world/contracts/query.ts:228:13                
+RuntimeSnapshot                         type       api/domains/world/contracts/runtime.ts:45:13               
+ClaimValue                              type       api/domains/world/contracts/view.ts:77:13                  
+AssessedObservations                    type       api/domains/world/index.ts:61:2                            
+LedgerVersion                           type       api/domains/world/index.ts:62:2                            
+PredictionRef                           type       api/domains/world/index.ts:64:2                            
+ReconcileReport                         type       api/domains/world/index.ts:65:2                            
+RuntimeObservation                      type       api/domains/world/index.ts:66:2                            
+RuntimeRefusal                          type       api/domains/world/index.ts:68:2                            
+ContextBrokerOptions                    type       api/domains/world/index.ts:70:2                            
+ContextSettleInput                      type       api/domains/world/index.ts:73:2                            
+ContextVerdict                          type       api/domains/world/index.ts:74:2                            
+ExtractionOutput                        type       api/domains/world/index.ts:78:2                            
+ExtractionPayload                       type       api/domains/world/index.ts:79:2                            
+ExtractionPoint                         type       api/domains/world/index.ts:80:2                            
+ExtractionReport                        type       api/domains/world/index.ts:82:2                            
+FeedStages                              type       api/domains/world/index.ts:83:2                            
+MemoryFeedStages                        type       api/domains/world/index.ts:86:2                            
+SourceFeedStages                        type       api/domains/world/index.ts:89:2                            
+ConversationSourceAdapterOptions        type       api/domains/world/index.ts:92:2                            
+ClaimFailure                            type       api/domains/world/index.ts:93:2                            
+ClaimResult                             type       api/domains/world/index.ts:94:2                            
+ForgetListItem                          type       api/domains/world/index.ts:95:2                            
+ForgetRefusal                           type       api/domains/world/index.ts:96:2                            
+ForgetRequest                           type       api/domains/world/index.ts:98:2                            
+MemoryPort                              type       api/domains/world/index.ts:101:2                           
+WorldJournalDraft                       type       api/domains/world/index.ts:105:2                           
+WorldJournalEntry                       type       api/domains/world/index.ts:106:2                           
+WorldJournalFailure                     type       api/domains/world/index.ts:107:2                           
+WorldClaimsOptions                      type       api/domains/world/index.ts:111:2                           
+WorldQuery                              type       api/domains/world/index.ts:112:2                           
+WorldQueryTool                          type       api/domains/world/index.ts:114:2                           
+RuntimeObservationRow                   type       api/domains/world/index.ts:134:2                           
+RuntimeObservationState                 type       api/domains/world/index.ts:135:2                           
+ExtractEventState                       type       api/domains/world/index.ts:138:15                          
+WorldUsageRow                           type       api/domains/world/index.ts:140:27                          
+ForgetOrigin                            type       api/domains/world/index.ts:142:2                           
+ForgetRoot                              type       api/domains/world/index.ts:143:2                           
+ForgetState                             type       api/domains/world/index.ts:144:2                           
+TombstoneReasonCode                     type       api/domains/world/index.ts:145:2                           
+GapTaskLink                             type       api/domains/world/index.ts:165:2                           
+GapTaskLinkage                          type       api/domains/world/index.ts:166:2                           
+GapTaskLinkStatus                       type       api/domains/world/index.ts:167:2                           
+MemoryRegistrationSummary               type       api/domains/world/index.ts:171:2                           
+ResourceStatePort                       type       api/domains/world/index.ts:172:2                           
+WorldQueryBasis                         type       api/domains/world/index.ts:173:2                           
+WorldQueryBudget                        type       api/domains/world/index.ts:174:2                           
+WorldQueryMode                          type       api/domains/world/index.ts:176:2                           
+WorldQueryPayload                       type       api/domains/world/index.ts:177:2                           
+WorldQueryRejection                     type       api/domains/world/index.ts:178:2                           
+WorldQueryRequest                       type       api/domains/world/index.ts:179:2                           
+SourceChangePage                        type       api/domains/world/index.ts:184:2                           
+SourceContent                           type       api/domains/world/index.ts:185:2                           
+SourceCurrent                           type       api/domains/world/index.ts:186:2                           
+RuntimeSnapshot                         type       api/domains/world/index.ts:190:2                           
+SourceRangeReasonCode                   type       api/domains/world/index.ts:192:2                           
+SourceSpeaker                           type       api/domains/world/index.ts:193:2                           
+WorldApplyResult                        type       api/domains/world/index.ts:195:2                           
+WorldFeed                               type       api/domains/world/index.ts:196:2                           
+WorldHostReasonCode                     type       api/domains/world/index.ts:197:2                           
+WorldReadRequest                        type       api/domains/world/index.ts:198:2                           
+WorldReadResult                         type       api/domains/world/index.ts:199:2                           
+WorldRequestAccess                      type       api/domains/world/index.ts:200:2                           
+WorldSchemaStatus                       type       api/domains/world/index.ts:201:2                           
+WorldUsageCheck                         type       api/domains/world/index.ts:203:2                           
+ExtractEventState                       type       api/domains/world/repository/extraction.ts:64:13           
+ExtractSourceRef                        type       api/domains/world/repository/extraction.ts:66:13           
+RootKind                                type       api/domains/world/repository/lifecycle.ts:99:13            
+ExtractionOutput                        type       api/domains/world/service/extraction-handler.ts:28:2       
+ExtractionPayload                       type       api/domains/world/service/extraction-handler.ts:29:2       
+ExtractionPoint                         type       api/domains/world/service/extraction-handler.ts:30:2       
+ExtractionReport                        type       api/domains/world/service/extraction-handler.ts:32:2       
+JobClaim                                type       api/domains/world/service/extraction-handler.ts:33:2       
+SettleOutcome                           type       api/domains/world/service/extraction-handler.ts:35:2       
+SkipReason                              type       api/domains/world/service/extraction-intake.ts:29:13       
+ExtractionPayload                       type       api/domains/world/service/extraction-types.ts:64:13        
+Receipt                                 type       api/domains/world/service/extraction-types.ts:66:13        
+ExtractionOutput                        type       api/domains/world/service/extraction-types.ts:98:13        
+JobClaim                                type       api/domains/world/service/extraction-types.ts:101:13       
+SettleOutcome                           type       api/domains/world/service/extraction-types.ts:114:13       
+ConversationSourceAdapterOptions        type       api/domains/world/service/index.ts:7:15                    
+WorldJournalDraft                       type       api/domains/world/service/index.ts:39:2                    
+WorldJournalEntry                       type       api/domains/world/service/index.ts:40:2                    
+WorldJournalFailure                     type       api/domains/world/service/index.ts:41:2                    
+ForgetListItem                          type       api/domains/world/service/index.ts:46:2                    
+ForgetRefusal                           type       api/domains/world/service/index.ts:48:2                    
+ForgetRequest                           type       api/domains/world/service/index.ts:49:2                    
+ClaimFailure                            type       api/domains/world/service/index.ts:58:2                    
+ClaimResult                             type       api/domains/world/service/index.ts:59:2                    
+WorldClaimsOptions                      type       api/domains/world/service/index.ts:62:2                    
+MemoryPort                              type       api/domains/world/service/index.ts:65:15                   
+ContextBrokerOptions                    type       api/domains/world/service/index.ts:72:2                    
+ContextSettleInput                      type       api/domains/world/service/index.ts:75:2                    
+ContextVerdict                          type       api/domains/world/service/index.ts:76:2                    
+BudgetAllocation                        type       api/domains/world/service/index.ts:90:15                   
+RenderGoal                              type       api/domains/world/service/index.ts:90:33                   
+FeedStages                              type       api/domains/world/service/index.ts:94:2                    
+MemoryFeedStages                        type       api/domains/world/service/index.ts:95:2                    
+SourceFeedStages                        type       api/domains/world/service/index.ts:96:2                    
+ExtractionOutput                        type       api/domains/world/service/index.ts:115:2                   
+ExtractionPayload                       type       api/domains/world/service/index.ts:116:2                   
+ExtractionPoint                         type       api/domains/world/service/index.ts:117:2                   
+ExtractionReport                        type       api/domains/world/service/index.ts:119:2                   
+AssessedObservations                    type       api/domains/world/service/index.ts:130:2                   
+LedgerVersion                           type       api/domains/world/service/index.ts:131:2                   
+PredictionRef                           type       api/domains/world/service/index.ts:133:2                   
+ReconcileReport                         type       api/domains/world/service/index.ts:134:2                   
+RuntimeObservation                      type       api/domains/world/service/index.ts:135:2                   
+RuntimeRefusal                          type       api/domains/world/service/index.ts:137:2                   
+WorldQuery                              type       api/domains/world/service/index.ts:146:15                  
+WorldQueryTool                          type       api/domains/world/service/index.ts:148:15                  
+RuntimeObservation                      type       api/domains/world/service/runtime-adapter.ts:707:13        
+WorldQueryTool                          type       api/domains/world/service/world-query-tool.ts:38:13        
+FakeInferenceState                      type       api/domains/world/test/extraction-fixture.ts:64:13         
+Client                                  type       cli/commands/types.ts:3:13                                 
+HistoryClient                           type       client/conversation.ts:52:13                               
+LarmClient                              type       client/larm.ts:18:13                                       
+QueueClient                             type       client/queue.ts:49:13                                      
+SchedulerClient                         type       client/scheduler.ts:66:13                                  
+WorldClient                             type       client/world.ts:54:13                                      
+ArtifactAction                          type       web/src/domains/artifact/index.ts:3:7                      
+ArtifactWorkspaceState                  type       web/src/domains/artifact/index.ts:5:7                      
+Session                                 type       web/src/domains/voice-dialogue/hooks/machine.ts:21:13      
+VoicePhase                              type       web/src/domains/voice-dialogue/hooks/machine.ts:30:13      
+VoiceMachine                            type       web/src/domains/voice-dialogue/hooks/machine.ts:178:13     
+error: script "deadcode" exited with code 1

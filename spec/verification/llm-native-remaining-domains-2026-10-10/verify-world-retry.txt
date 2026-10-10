@@ -1,0 +1,263 @@
+$ bun scripts/verify.ts --domain world
+[verify] selected=world dependencyClosure=delivery,conversation,goals,world,avatar testClosure=delivery,avatar,conversation,goals,continuity,memory,world
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts api/domains/world web/src/domains/world web/src/components/domains/world
+size-budget ok (62 files)
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check api/domains/world web/src/domains/world web/src/components/domains/world
+$ oxfmt --check api/domains/world web/src/domains/world web/src/components/domains/world
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 7ms on 90 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint api/domains/world web/src/domains/world web/src/components/domains/world
+$ oxlint --deny-warnings api/domains/world web/src/domains/world web/src/components/domains/world
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun x tsc -p /Users/y.noguchi/Code/eumenes/verification-reports/tsconfig.selected.json
+[verify] TypeScript workspace closure: 375 files; api/domains/world, api/infrastructure/flock.ts, api/infrastructure/logger.ts, api/infrastructure/sqlite, api/domains/capabilities, api/infrastructure/http.ts, api/infrastructure/validation-log.ts, api/domains/tool-runtime, api/domains/queue, api/infrastructure/digest.ts, api/domains/agent-runtime, api/domains/settings, api/domains/inference, api/infrastructure/chat-stream.ts, api/domains/larm, api/infrastructure/ignore-error.ts, api/infrastructure/bounded-read.ts, api/domains/delivery, api/domains/attitude-dataset, packages/coding-runner/src, api/domains/coding, api/domains/coding-supervision, api/domains/tasks, api/domains/task-reports, api/domains/continuity, api/domains/conversation, api/domains/dialogue, api/infrastructure/snapshot-stream.ts, api/domains/memory, api/domains/scheduler, api/domains/goals, api/domains/research-routes, api/domains/service-tests, api/domains/timers, api/domains/tts-dictionary, api/domains/voice-dialogue, api/domains/web-research, api/application/migrations.ts, client/transport.ts, client/requirements.ts, client/coding-supervision.ts, client/agent-runtime.ts, client/attitude-dataset.ts, client/conversation.ts, client/run-stream.ts, client/dialogue.ts, client/events.ts, client/larm.ts, client/memory.ts, client/queue.ts, client/research-routes.ts, client/scheduler.ts, client/settings.ts, client/service-tests.ts, client/tts-dictionary.ts, client/tasks.ts, client/coding.ts, client/timers.ts, client/voice-dialogue.ts, client/web-research.ts, client/world.ts, client/index.ts, web/src/domains, web/src/queryKeys.ts, packages/design-system/dist, web/src/design-system, web/src/components
+[verify] domain tests: /Users/y.noguchi/.bun/bin/bun run test:domain -- world
+$ bun scripts/test-domain.ts world
+bun test v1.4.2 (744846f84)
+
+api/domains/world/test/extraction-handler.test.ts:
+(pass) A19 a valid candidate becomes a CANDIDATE claim with host-assigned ids, a manifest and Memory dependents [52.91ms]
+(pass) A19 type and meaning checks: negated, hypothetical, question, model ids, unknown subjects and bad quotes are not adopted [62.94ms]
+(pass) A19 at most 8 candidates are adopted: the 9th is rejected, never silently dropped [38.54ms]
+(pass) A19 malformed or oversize output is rejected: no claim, the events are final, the dependents are given back [152.44ms]
+(pass) A20 a window is at most 12 utterances; every input the model saw is in the manifest, cited or not [51.46ms]
+(pass) A20 an utterance that cannot be split is final for extraction, in order, and never reaches the model [38.80ms]
+(pass) A20 exactly 32 KiB in one utterance is allowed, one byte more is not [38.85ms]
+(pass) A43 a model call past the 30 s budget (60 ms here) is cancelled, confirmed ended, then retried once [99.73ms]
+(pass) A43 a second timeout fails the job: the input waits out a backoff, then a new job takes it [158.68ms]
+(pass) A43 a cancelled call that never ends keeps the Local slot: no second call starts [146.37ms]
+(pass) A43 an input version that moved after prepare voids the result: nothing is adopted and the new version is extracted [39.98ms]
+(pass) A43 Memory refusing the dependent registration stops the job before the model is called [37.07ms]
+(pass) A43 a provider that is unavailable leaves the input pending; no Cloud request exists [39.42ms]
+(pass) A43 extraction refuses a route that is not provably Local [114.89ms]
+(pass) extraction runs only while World is ON and its gate is open; one job per Scope at a time [35.08ms]
+(pass) cancelling a prepared job gives back its Memory dependents and its model request [36.55ms]
+
+api/domains/world/test/lifecycle-feeds.test.ts:
+(pass) source feed: deletions and retractions are applied before additions and corrections [48.07ms]
+(pass) source feed: the cursor and the World effect roll back together [54.77ms]
+(pass) real conversation outbox: a retraction forgets what stood on it; a later Memory forget closes the loop [51.93ms]
+(pass) Memory notifications map to World roots: source/state/record forgotten become forget roots, other status changes only stop [42.14ms]
+
+api/domains/world/test/context-broker.test.ts:
+(pass) shared budget: Memory is never shrunk, the Goal is capped and dropped whole, the slice keeps its minimum [0.08ms]
+(pass) World OFF or nothing to say: disabled, and nothing is written or registered [35.87ms]
+(pass) prepare fixes an immutable context, registers the Slice inputs with Memory, and shows the claim as data [38.87ms]
+(pass) World text is reference data: an injection-like claim cannot leave the delimited, escaped JSON [37.20ms]
+(pass) validate/record: the receipt ties slice digest, versions, package, run, attempt and provider; usage and answer ids are one run [37.19ms]
+(pass) A24: a correction, a new refutation or a policy change stops the old context; an unrelated Scope does not [42.28ms]
+(pass) Goal: the adopted goal is the slice's goalRef; withdrawal or any later Goal change stops the context [40.57ms]
+(pass) release drops the usage record and the Memory input dependencies of a run that did not adopt [37.86ms]
+(pass) blocked is never turned into success: the shared budget has no room [37.64ms]
+(pass) ACCESS fixture is the scope the broker reads (default scope = the conversation default) [0.01ms]
+(pass) the pre-send check fails closed when the Writer cannot run it [38.84ms]
+
+api/domains/world/test/world-service.test.ts:
+(pass) schema mismatch disables World without breaking anything else [37.05ms]
+(pass) a future schema (an unknown later migration row) also blocks World [35.94ms]
+(pass) OFF: normal changes are refused but corrections and forgetting keep their way in [35.96ms]
+(pass) hostChecks come from the writer's own database: epochs and policy move the receipts [40.00ms]
+(pass) feed cursors are valid only for the restore epoch that issued them [36.12ms]
+(pass) host state writes need the writer's transaction [33.77ms]
+
+api/domains/world/test/memory-adapter.test.ts:
+(pass) a registered assertion records one opaque Memory dependent per version [37.15ms]
+(pass) a replay with the same operationKey is a no_op and registers nothing again [34.74ms]
+(pass) new versions get their own dependents and never overwrite an older version's [38.66ms]
+(pass) planDependents splits above 32 inputs, in a stable order, without truncating [0.47ms]
+(pass) 32 manifest inputs plus a distinct cited source: two Memory dependents, none cut [45.15ms]
+(pass) out-of-scope, unknown and retracted inputs are refused before anything is written [36.97ms]
+(pass) A25: World accepted, Memory refuses (id in use) -> World, Memory and host rows all roll back [37.61ms]
+(pass) TOMBSTONED: a source Memory has forgotten cannot get a new dependent; the whole operation rolls back [37.11ms]
+(pass) a Memory State item input is scope-checked by Memory: a missing item rolls everything back [37.34ms]
+
+api/domains/world/test/change-feed.test.ts:
+(pass) A28 the inbox row, the host record and the cursor move together; unsettled input is not applied [37.70ms]
+(pass) A28 sequence gaps are accepted and a re-delivered event is received once [37.15ms]
+(pass) A28 a failed receipt does not move the cursor: the input is received on the next pass [51.47ms]
+(pass) A42 a crash right after receipt: the unapplied inbox is resumed, nothing is received twice [48.90ms]
+(pass) A42 a crash while applying leaves nothing half applied; the next job applies once [40.08ms]
+(pass) A28 the applied position is the settled PREFIX: 13 inputs, 12 settled, one pending [49.78ms]
+(pass) A29 a forget overtakes the pending extraction: nothing of the forgotten message is read or kept [39.62ms]
+(pass) A29 a correction stops the old claim before the pending extraction, which then reads only the new text [40.96ms]
+(pass) A29 forgetting does not wait for World or the model: it proceeds while World is OFF [38.80ms]
+(pass) A42 adding a Scope discards the cursor and reads the feed again; unsettled input still settles [51.51ms]
+(pass) A42 a restore epoch change drops the cursors; unsettled input is delivered again, settled input is not [43.18ms]
+(pass) A42 an empty feed creates no job and no model request [38.30ms]
+(pass) input scanned while World is OFF is never delivered or extracted [38.54ms]
+(pass) A28 a deterministic refusal of one receipt is recorded as skipped and never holds a retraction on the page [37.77ms]
+
+api/domains/world/test/world-claims.test.ts:
+(pass) the list shows target, claim, adoption, evidence kind and freshness as separate fields; hypothesis and measured are never the adopted style [42.80ms]
+(pass) the detail carries conditions, supports, refutations, source versions and history [43.73ms]
+(pass) a correction carries the revision: a stale one is 409 with a reload hint and nothing is written [40.65ms]
+(pass) an explicit correction supersedes the old revision, cites the person's statement and is adopted with it [42.11ms]
+(pass) a retraction needs the person's own confirmed statement as the reason [45.69ms]
+(pass) an ambiguous target returns the candidates and changes nothing (no auto-pick) [42.13ms]
+(pass) Scope switch: only granted Scopes answer, the others look exactly like not found, and Scopes do not leak into each other [41.43ms]
+(pass) no existence leak: an unknown claim, a hidden Scope and a forgotten claim give the same answer [42.30ms]
+(pass) forget: accepted, never shown as complete before the ledger says so; it persists across a restart [67.76ms]
+(pass) a forget interrupted by a crash is shown as awaiting confirmation (never complete) and finishes after the restart [58.86ms]
+(pass) forget that is not finished is shown as pending / awaiting confirmation, and an abandoned part is never complete [40.76ms]
+(pass) World OFF (protect): reads and changes answer world_disabled; the forget list still tells the truth [40.85ms]
+(pass) invalid requests are 400 and write nothing; a body cannot name a principal [40.06ms]
+
+api/domains/world/test/world-query.test.ts:
+(pass) the surface is the six enumerated modes; unknown mode, free text and extra keys are rejected [48.42ms]
+(pass) A14 causal direction: A->B->C propagates; correlation does not; reverse lists causes without flipping edges; the cycle ends [49.30ms]
+(pass) A16 dependencies: resource states come from the host only; available never confirms success; unknown stays unknown [46.35ms]
+(pass) scenarios: overlays are hypothetical copies; nothing is stored; a malformed overlay is rejected [46.54ms]
+(pass) A15 every mode: each bound is accepted AT its limit and rejected one above; zero is invalid [66.19ms]
+(pass) A15 partial: a small budget stops retrieval with a reason and real counters at or under the budget; no path is not no effect [72.31ms]
+(pass) out of scope: not granted, foreign principal and unknown look the same; nothing about existence is said [46.81ms]
+(pass) A16 Goal: an adopted Goal of the scope is accepted; a withdrawn one blocks nothing; Gaps never grant execution [47.57ms]
+(pass) World OFF is an explicit disabled answer; a closed startup gate is unavailable; neither reads or writes [81.28ms]
+(pass) A47 Gap -> Task: no port means display only; no delegation means zero Tasks; the same Gap is one Task [48.77ms]
+(pass) A47 Gap -> Task: per-call link limit, all-or-nothing on a port failure, no linkage from a model tool [49.25ms]
+(pass) a query never expands permissions or changes anything: every mode leaves all tables as they were [48.78ms]
+(pass) the model tool binds the scope from the host, not from the model [46.43ms]
+(pass) HTTP: status mapping, size and JSON limits; not-found and not-allowed are one answer [81.98ms]
+
+api/domains/world/test/outcomes.test.ts:
+(pass) A18/A45 the same baseline and conditions: 90 supports, 110 refutes, 99 is incomparable (resolution), each only from a VERIFIED ledger version [112.61ms]
+(pass) A45 a success REPORT against a failing measurement: the measurement decides, an unverified ledger entry is never an observation [35.37ms]
+(pass) A18/A45 missing comparison conditions are incomparable: no Outcome is created, the missing fields are the reasons [34.22ms]
+(pass) A18 conditions that are present but different are incomparable with the exact reason (unit, statistic, input profile, window, comparison) [36.70ms]
+(pass) A45 a duplicate notice is idempotent: one Outcome, one trace row, one Memory dependent [35.76ms]
+(pass) A45 the Outcome stands on the ledger version in Memory: its dependent depends on the ledger source [35.28ms]
+(pass) A45 a Memory refusal rolls the whole observation back: no Outcome, no trace [37.01ms]
+(pass) A45 the real Memory registration: accepted for a live ledger source, refused (and rolled back) once Memory forgot that source [37.07ms]
+(pass) A45 a ledger correction supersedes: the next verified revision is the next Outcome revision, only it is judged [37.18ms]
+(pass) A45 a correction that removes verification withdraws the measurement from World [38.32ms]
+(pass) A45 the ledger forgets the result: it is not judged, and the Outcome is erased by the forget procedure [36.17ms]
+(pass) A45 Memory forgets the ledger source: World's forget reaches the Outcome (not only assertions), the trace goes with it, the external deletion is confirmed truthfully [39.23ms]
+(pass) A45 World OFF or a closed gate observes nothing; a missing prediction is refused without a trace [36.32ms]
+(pass) A18 a qualitative claim has no measurement plan: it is a measurement gap, an observation of it is incomparable [36.09ms]
+
+api/domains/world/test/lifecycle-hardening.test.ts:
+(pass) unrelated roots never confirm a Memory forget's externals; a covering intake of the same forget does [46.61ms]
+(pass) an external whose host row is gone has no World content left: it is confirmed even with unrelated roots [42.69ms]
+(pass) roots are validated like World before intake and journal; the part separator is reserved [39.72ms]
+(pass) one invalid root does not block the valid roots of its part; the forget is reported, never complete [40.17ms]
+(pass) a part with no valid root is abandoned (durable), the next part still runs and every part is reopened except it [47.08ms]
+(pass) a part World itself refuses as invalid input is abandoned explicitly instead of holding the gate forever [41.51ms]
+(pass) the gate message names the real reason and how many forgets wait [40.69ms]
+(pass) feeds: roots World would refuse are counted and skipped, and never stop the cursor [44.72ms]
+(pass) a Memory notification with duplicate targets re-read after a cursor reset is the same intake [40.61ms]
+(pass) after a restore, a completed forget whose Memory receipt shows unreachable pending externals does not stay complete [44.74ms]
+(pass) after a restore, a transient Memory error while re-checking never leaves the forget complete or the gate open [46.19ms]
+(pass) restore: a later page whose dependent Memory rejects overrides an earlier 'registered' for the same key [42.48ms]
+(pass) concurrent recoverWorld calls are serialised: the gate stays shut while a restore runs [40.35ms]
+(pass) accepting a forget moves the Scope's forget epoch: in-flight slice usage is rejected by it [40.53ms]
+(pass) A30+: >500 roots with a Memory forget confirm every external and reopen each part [78.18ms]
+
+api/domains/world/test/extraction-held.test.ts:
+(pass) held extraction remains received across polls and restart, then applies once with new entities [53.39ms]
+(pass) one held candidate holds the whole prefix; later input does not bypass it [42.98ms]
+(pass) a port mutated during inference cannot change the prepared entities or authorize the old result [40.14ms]
+(pass) prepare rechecks a queued retry when its context reverts to the held snapshot [37.98ms]
+(pass) a corrected or unavailable held head reaches final rejection before context suppression [73.75ms]
+(pass) forget removes held inputs and the digest without leaving a cursor-blocking row [37.45ms]
+(pass) a refused manifest release stays pending while the extraction is held [38.30ms]
+(pass) a failed held transaction rolls back its digest and remains recoverable [38.33ms]
+(pass) an interpretation version change releases a held prefix without language-specific code [38.06ms]
+(pass) a cancelled old result cannot hold or release the newer job's input [40.35ms]
+(pass) restore purges held metadata and redelivers only the unsettled input [40.03ms]
+(pass) a refused inference authority check cannot persist a semantic hold [36.52ms]
+
+api/domains/world/test/lifecycle-restore.test.ts:
+(pass) Memory change feed: a forgotten source becomes a durable forget and completes; the cursor moves with it [45.63ms]
+(pass) a stale feed cursor (restore epoch bumped) is ignored and the whole feed is read again [44.20ms]
+(pass) the feed cursor and the intake are written in the same callback: a rolled-back callback moves nothing [52.56ms]
+(pass) A32: old DB + newer journal reaches restore.finish, keeps forgotten items forgotten, and keeps the gate closed until then [76.09ms]
+(pass) A32: the journal alone detects a restored DB; an unreconciled Memory keeps the confirmation pending, honestly [73.36ms]
+(pass) a crash during restore (restore_begun) resumes the same restore, not a new epoch [85.30ms]
+(pass) a crash during restore (restore_registered) resumes the same restore, not a new epoch [91.40ms]
+(pass) a crash during restore (restore_reconciled) resumes the same restore, not a new epoch [80.97ms]
+(pass) a crash during restore (before_restore_finish) resumes the same restore, not a new epoch [95.66ms]
+(pass) journal corruption, truncation and rollback keep World closed (fail closed) [247.51ms]
+
+api/domains/world/test/extraction-migration.test.ts:
+(pass) extraction hold migration preserves old received and terminal rows and refuses an old binary [62.55ms]
+
+api/domains/world/test/scheduling.test.ts:
+(pass) A44 no input and no foreground: a periodic tick creates no job and no model request [36.44ms]
+(pass) A44 foreground active: nothing is scheduled; the input waits and is scheduled when the foreground ends [39.00ms]
+(pass) A44 foreground starts after the job was queued: the claim is held un-run, the input keeps its place, a new attempt resumes it [37.85ms]
+(pass) A44 cancel answered at once: the running call ends, nothing is adopted, a NEW attempt takes the same input after the foreground [58.03ms]
+(pass) A44 cancel answered late (within the confirmation window): still a clean cancel [120.65ms]
+(pass) A44 cancel never answered: the slot stays held, no second call starts, the late provider end frees it and the input resumes [118.36ms]
+(pass) A44 a late result from an OLD attempt is rejected at settle; the newer attempt alone is adopted [39.98ms]
+(pass) A44 a late result from a job that no longer owns the events is rejected without touching them [40.09ms]
+(pass) A44 restart in the middle of an extraction: the checkpointed input is not lost and is extracted by a new process [39.52ms]
+(pass) A44 at most one Local extraction: a second job cannot start a call while one is in flight [49.17ms]
+(pass) A44 a broken foreground signal reads as busy: background work yields, never runs by accident [37.39ms]
+
+api/domains/world/test/host-guards.test.ts:
+(pass) World stays OFF and cannot be turned ON before the host recorded its initial sync [31.99ms]
+(pass) the conversation cursor secret is required: no public default exists [29.21ms]
+(pass) a cursor cannot be decoded or forged with another secret [37.05ms]
+
+api/domains/world/test/manual-world.test.ts:
+(pass) manual input end to end: target -> explicit claim -> Slice -> correction -> old Slice refused [38.27ms]
+(pass) injection: a Memory refusal rolls back World, host rows and the Memory write; the next change works [38.63ms]
+(pass) injection: a full Writer queue yields typed WRITER_BUSY and writes nothing for the refused ones [45.79ms]
+(pass) injection: a closing store refuses new changes and reads with typed results [33.92ms]
+
+api/domains/world/test/context-hardening.test.ts:
+(pass) a refused Memory release never fails the settle/cancel transaction; the host rows wait for a retry sweep [37.12ms]
+(pass) a forget removes the usage receipts AND their Memory dependents; a refusal keeps them tracked for the sweep [84.60ms]
+(pass) usage pruning keeps the dependents registered exactly as long as the receipt (KEEP_USAGE_PER_SCOPE) [40.14ms]
+(pass) escape expansion cannot push the block past the shared total: blocked world_overflow, or a block that fits [40.08ms]
+(pass) goal bytes are measured on the escaped JSON too [0.08ms]
+(pass) a busy or closing Writer is a retryable verdict, any other failure stays a hard no [37.53ms]
+
+api/domains/world/test/source-adapter.test.ts:
+(pass) conversation default principal/scope equal memory's constants
+(pass) resolveCurrent returns revision/digest/scope/speaker/confirmed and follows correction [9.50ms]
+(pass) missing and retracted sources return an explicit missing state [9.87ms]
+(pass) a stale revision/digest reads as changed without a body [8.53ms]
+(pass) another principal or scope gets no body, no count and no existence hint [9.19ms]
+(pass) request-level purpose and access shape are enforced before any source is touched [8.07ms]
+(pass) Unicode quote ranges use UTF-8 byte offsets on code point boundaries [8.82ms]
+(pass) listChanges pages by opaque cursor, tolerates gaps, and includes deletions [7.93ms]
+(pass) a deletion can be applied before earlier events of the same source [10.62ms]
+(pass) draft or unconfirmed text is never a source [9.26ms]
+(pass) cursor is opaque, authenticated and advances past an out-of-scope tail [10.08ms]
+
+api/domains/world/test/lifecycle-forget.test.ts:
+(pass) forget flow: intake -> World journal -> World delete -> Memory confirmed -> reopen -> complete [46.34ms]
+(pass) crash at accepted: the incomplete stage is re-run and the forget completes [71.41ms]
+(pass) crash at journal_appended: the incomplete stage is re-run and the forget completes [65.45ms]
+(pass) crash at journaled: the incomplete stage is re-run and the forget completes [65.25ms]
+(pass) crash at world_chunk: the incomplete stage is re-run and the forget completes [65.81ms]
+(pass) crash at world_call_done: the incomplete stage is re-run and the forget completes [76.58ms]
+(pass) crash at world_applied: the incomplete stage is re-run and the forget completes [66.00ms]
+(pass) crash at memory_batch: the incomplete stage is re-run and the forget completes [61.21ms]
+(pass) crash at memory_confirmed: the incomplete stage is re-run and the forget completes [67.25ms]
+(pass) crash at before_reopen: the incomplete stage is re-run and the forget completes [106.12ms]
+(pass) A30: more than 500 roots are applied in bounded chunks and resume after a crash between writer callbacks [128.04ms]
+(pass) forget works with World OFF: content is deleted, the report is honest, the flag stays OFF [43.78ms]
+(pass) Memory unavailable: World content is deleted but the forget stays pending, never complete [51.99ms]
+(pass) Memory not_permitted: World content is deleted but the forget stays pending, never complete [58.61ms]
+(pass) a partial confirmation is not complete: one confirmed external, the next refused [41.11ms]
+(pass) an unknown Memory forget is never treated as 'nothing to confirm' [39.83ms]
+(pass) a corrupt journal keeps World closed and a pending forget is not deleted without its journal entry [41.12ms]
+(pass) Memory confirmation is always per externalId, only for the closure of this forget (A38) [42.22ms]
+(pass) World journal: chained, idempotent per forgetId, and any damage is detected [5.14ms]
+
+ 193 pass
+ 0 fail
+ 2184 expect() calls
+Ran 193 tests across 19 files. [9.49s]
+
+ RUN  v4.1.8 /Users/y.noguchi/Code/eumenes
+
+
+ Test Files  3 passed (3)
+      Tests  26 passed (26)
+   Start at  20:11:09
+   Duration  1.64s (transform 501ms, setup 0ms, import 1.33s, tests 671ms, environment 1.78s)
+
+[verify] passed 15511 ms

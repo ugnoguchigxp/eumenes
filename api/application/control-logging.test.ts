@@ -31,7 +31,7 @@ async function run(h: Awaited<ReturnType<typeof harness>>) {
 
 test("an unknown tool name invokes nothing and receives one bounded correction", async () => {
 	const output = capture();
-	const h = await harness({ badExecutionRefOnce: true });
+	const h = await harness({ badExecutionRefOnce: true, fullResearch: true });
 	try {
 		const r = await run(h);
 		expect(h.acquisitions).toBe(2);
@@ -62,6 +62,7 @@ test("an unknown tool name invokes nothing and receives one bounded correction",
 test("search timeout, successful retry and malformed report are correlated and separately diagnosed", async () => {
 	const output = capture();
 	const h = await harness({
+		fullResearch: true,
 		lookupTimeoutOnce: true,
 		workerReportOutput: '{"action":',
 	});
@@ -140,19 +141,11 @@ test("valid JSON with a missing report field records the field and expected type
 		workerOutput: JSON.stringify({
 			action: "finish",
 			report: {
-				version: 2,
 				outcome: "answered",
-				exploration: ["fixture scope"],
 				claims: [
 					{
 						text: "PRIVATE_CLAIM",
-						evidence: [
-							{
-								sourceId: "PRIVATE_SOURCE",
-								viewId: "00000000-0000-4000-8000-000000000000",
-								excerptId: "e0",
-							},
-						],
+						evidence: ["e1"],
 					},
 				],
 				limitations: [],
@@ -167,17 +160,17 @@ test("valid JSON with a missing report field records the field and expected type
 			.find(
 				(entry) =>
 					entry.event === "agent.control_validation_issue" &&
-					entry.validationPath === "report.summary",
+					entry.validationPath === "requirements",
 			);
 		expect(issue).toMatchObject({
 			runId: r.id,
 			reason: "control_schema_invalid",
 			validationCode: "invalid_type",
-			expectedType: "string",
+			expectedType: "array",
 			actualType: "undefined",
 			controlAction: "finish",
-			issueCount: 3,
-			reportedIssueCount: 3,
+			issueCount: 5,
+			reportedIssueCount: 5,
 		});
 		expect(
 			output
@@ -214,7 +207,7 @@ for (const options of [{ badToolArgs: true }, { badQuote: true }])
 								entry.validationPath === "arguments.query" &&
 								entry.expectedType === "string"
 							: entry.reason === "invalid_evidence" &&
-								entry.validationPath === "report.claims.0.evidence.0" &&
+								entry.validationPath === "report.evidence" &&
 								entry.validationCode === "unknown_evidence"),
 				),
 			).toBe(true);

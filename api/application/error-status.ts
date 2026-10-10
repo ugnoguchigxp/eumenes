@@ -1,3 +1,4 @@
+import { errorStatus as capabilities } from "../domains/capabilities/contracts";
 import type { HttpErrorStatus } from "../infrastructure/http";
 import { errorStatus as coding } from "../domains/coding/contracts";
 import { errorStatus as larm } from "../domains/larm/contracts";
@@ -62,6 +63,7 @@ export function mergeErrorStatus(
 }
 
 const statusByCode = mergeErrorStatus(
+	capabilities,
 	shared,
 	pending,
 	coding,

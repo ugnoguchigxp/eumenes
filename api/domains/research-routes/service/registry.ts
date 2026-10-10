@@ -1,11 +1,5 @@
 import type { Database } from "bun:sqlite";
-import {
-	type RouteFence,
-	type RouteState,
-	limits,
-	sha256,
-	validationPolicyVersion,
-} from "../contracts";
+import { type RouteState, sha256, validationPolicyVersion } from "../contracts";
 import * as repo from "../repository";
 
 export type Clock = { now: () => number; id: () => string };
@@ -19,24 +13,6 @@ export const stateTokenOf = (k: repo.KeyRow) =>
 	sha256(
 		`${k.epoch}:${k.incarnation}:${k.generation}:${k.control_version}:${k.active_version_id ?? ""}`,
 	);
-export const fenceOf = (k: repo.KeyRow): RouteFence => ({
-	key: k.key,
-	epoch: k.epoch,
-	incarnation: k.incarnation,
-	generation: k.generation,
-});
-
-/** Does the fence still name the live key row? Epoch is checked against the current epoch. */
-export function liveKey(db: Database, fence: RouteFence): repo.KeyRow | null {
-	if (fence.epoch !== repo.getEpoch(db)) return null;
-	const k = repo.getKey(db, fence.epoch, fence.key);
-	return k &&
-		k.incarnation === fence.incarnation &&
-		k.generation === fence.generation
-		? k
-		: null;
-}
-
 export type Health =
 	| "healthy"
 	| "disqualified"
@@ -75,20 +51,4 @@ export function deriveState(
 		return "active";
 	}
 	return repo.openDraftOf(db, k.incarnation) ? "preparing" : "unregistered";
-}
-
-export type Capacity =
-	| { ok: true }
-	| { ok: false; code: "keys_full" | "bytes_full" };
-/** New-key admission. `externalBytes` = learned definition/index bytes held by capabilities. */
-export function capacityFor(
-	db: Database,
-	epoch: number,
-	externalBytes = 0,
-): Capacity {
-	if (repo.countKeys(db, epoch) >= limits.keysMax)
-		return { ok: false, code: "keys_full" };
-	if (repo.ledgerBytes(db) + externalBytes >= limits.totalBytes)
-		return { ok: false, code: "bytes_full" };
-	return { ok: true };
 }

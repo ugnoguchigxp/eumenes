@@ -8,6 +8,8 @@ archive の基準: 本文の実施記録や完了記述で全項目が完了と�
 
 | 文書 | 状態 |
 | --- | --- |
+| [llm-native-remaining-domains-implementation-plan-2026-10-10.md](llm-native-remaining-domains-implementation-plan-2026-10-10.md) | Goals内容同一視の撤去とWorld保留入力保持を実装。Memoryは接続前条件の文書化のみ。fixture実施、live・実機器未達 |
+| [llm-native-implementation-plan-2026-10-10.md](llm-native-implementation-plan-2026-10-10.md) | LLM-Native設計への移行。要件データ・共通検証・残存5件の撤去を、契約・変更箇所・移行・受入まで定めたSol実装用計画。実装前 |
 | [conversation-and-research-simplification-plan-2026-10-10.md](conversation-and-research-simplification-plan-2026-10-10.md) | 会話と調査の構造整理。残す機能・削除対象・移行・受入条件をまとめた実装前レビュー案 |
 | [improvement-plan-2026-10-10.md](improvement-plan-2026-10-10.md) | 改善実装手順書(2026-10-10)。全 WP の完了後に archive |
 | [research-and-history-tools-implementation-plan-2026-10-10.md](research-and-history-tools-implementation-plan-2026-10-10.md) | 調査・履歴ツールの実装計画。別セッションで作業中 |
@@ -41,6 +43,8 @@ archive の基準: 本文の実施記録や完了記述で全項目が完了と�
 
 | 場所 | 内容 |
 | --- | --- |
+| [verification/llm-native-remaining-domains-2026-10-10/](verification/llm-native-remaining-domains-2026-10-10/README.md) | Goalsの内容同一視撤去・World保留入力修正の実施記録。Memoryは接続前条件の文書化のみ、live・実機器未実施 |
+| [reviews/llm-native-remaining-domains-2026-10-10/](reviews/llm-native-remaining-domains-2026-10-10/README.md) | Memory・World・coding系と隣接domainのLLM-Native監査。到達性・反証・再現・fixture420件、live未実施 |
 | [verification/](verification/) | 機能ごとの検証記録(fixture、live、実機器を分けて記録)と画面キャプチャ |
 | [reviews/](reviews/) | コードレビューの記録(2026-10-07、2026-10-08、follow-up) |
 | [design/](design/) | 設計画像 |

@@ -30,7 +30,9 @@ export function createReadPorts(
 		const origin = readActionOriginInTransaction(db, owner.rootRunId);
 		if (!origin || !conversation) throw new Error("history_scope_unavailable");
 		return {
-			key: "agent:" + JSON.stringify(owner),
+			key:
+				"agent:" +
+				JSON.stringify([owner.rootRunId, owner.taskId, owner.cancelEpoch]),
 			conversationId: origin.conversationId,
 			deadline: root.deadline,
 			excludeMessageId: origin.messageId,

@@ -1,0 +1,40 @@
+{
+	"worldHeld": {
+		"report": {
+			"jobId": "job-1",
+			"disposition": "adopted",
+			"reasons": ["SUBJECT_UNRESOLVED"],
+			"events": 1,
+			"accepted": 0,
+			"held": 1,
+			"rejected": 0
+		},
+		"hostState": "applied",
+		"inboxState": "applied",
+		"afterEntityData": {
+			"status": "idle",
+			"reason": "no_input"
+		},
+		"claims": 0,
+		"modelCalls": 1
+	},
+	"goalNormalization": {
+		"sameId": true,
+		"secondText": "保管コードはUS",
+		"secondPriority": 10,
+		"proposals": 1
+	},
+	"memoryDormantQuote": {
+		"plain": {
+			"decision": "admitted"
+		},
+		"title": {
+			"decision": "pending_user",
+			"reasonCode": "MODALITY_QUOTED"
+		}
+	},
+	"memoryExactKeyLookup": {
+		"registered": true,
+		"unregistered": false
+	}
+}

@@ -1,0 +1,21 @@
+bun test v1.4.2 (744846f84)
+
+api/application/dev.test.ts:
+(pass) bun run dev serves browser requests on 127.0.0.1 and Ctrl+C releases both ports [493.90ms]
+(pass) bun run dev serves browser requests on localhost and Ctrl+C releases both ports [488.12ms]
+(pass) dev refuses --host before exposing the authenticated proxy [28.03ms]
+(pass) dev refuses --host 0.0.0.0 before exposing the authenticated proxy [30.53ms]
+(pass) occupied API port is reported without starting Web or stopping its owner [32.91ms]
+(pass) Vite port failure stops the API instead of silently moving Web to another port [470.81ms]
+
+api/application/world-scheduling.test.ts:
+(pass) A44 an interactive queue job is the foreground: nothing is scheduled while it is open, the held input resumes by itself after it [250.25ms]
+(pass) A44 a conversation answer running in the inference service is the foreground [265.82ms]
+(pass) A44 a foreground start cancels the running extraction: the call ends, the Local job slot is free, the same input is extracted by a new attempt afterwards [284.63ms]
+(pass) A44 a cancel the provider never answers keeps the slot: no second extraction call until the provider really ends it [549.70ms]
+(pass) A44 a restart with a held input: the unextracted input survives and is extracted after the foreground is gone [219.58ms]
+
+ 11 pass
+ 0 fail
+ 64 expect() calls
+Ran 11 tests across 2 files. [3.33s]

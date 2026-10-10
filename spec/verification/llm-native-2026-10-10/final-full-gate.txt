@@ -1,0 +1,2193 @@
+$ bun scripts/verify.ts --all
+[verify] selected=task-reports,coding-supervision,coding,artifact,tasks,capabilities,tool-runtime,agent-runtime,research-routes,web-research,attitude-dataset,service-tests,delivery,avatar,settings,inference,tts-dictionary,conversation,continuity,goals,world,memory,larm,audio,queue,scheduler,timers,dialogue,voice-dialogue dependencyClosure=tasks,task-reports,coding,delivery,attitude-dataset,larm,settings,inference,queue,coding-supervision,artifact,avatar,conversation,capabilities,tool-runtime,agent-runtime,research-routes,web-research,service-tests,tts-dictionary,continuity,goals,world,memory,audio,scheduler,timers,dialogue,voice-dialogue testClosure=tasks,task-reports,coding,delivery,attitude-dataset,larm,tts-dictionary,settings,inference,queue,coding-supervision,avatar,conversation,artifact,capabilities,tool-runtime,agent-runtime,research-routes,web-research,service-tests,continuity,goals,memory,world,audio,scheduler,timers,dialogue,voice-dialogue
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts
+size-budget ok (658 files)
+[verify] sql-boundaries: /Users/y.noguchi/.bun/bin/bun scripts/sql-boundaries.ts
+[sql-boundaries] ok: 143 tables, 0 allowed cross-domain accesses
+[verify] domain-docs: /Users/y.noguchi/.bun/bin/bun scripts/domain-docs.ts --check
+docs/domains.md: domain 表は最新です
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check .
+$ oxfmt --check .
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 110ms on 859 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint .
+$ oxlint --deny-warnings .
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun run typecheck
+$ tsc --noEmit
+[verify] tests: /Users/y.noguchi/.bun/bin/bun test api packages/coding-runner/test scripts
+bun test v1.4.2 (744846f84)
+
+scripts/domain-docs.test.ts:
+(pass) entryOf prefers index.ts, then index.tsx, then the directory [0.06ms]
+(pass) renderDomainTable lists every domain with its dependencies [0.14ms]
+(pass) replaceBlock rewrites only the marked block and requires both markers [0.06ms]
+(pass) docs/domains.md is up to date with scripts/domains.ts [0.31ms]
+
+scripts/research-live-metrics.test.ts:
+(pass) live counts include initial decision, rejected repair, child and final answer; unrelated models stay out [0.27ms]
+
+scripts/size-budget.test.ts:
+(pass) measures named, variable-held and nested functions by name, not line [4.44ms]
+(pass) duplicate and anonymous names stay distinct [0.19ms]
+(pass) ratchet fails on growth and new offenders, not on shrinkage [0.06ms]
+
+scripts/sql-boundaries.test.ts:
+(pass) derives table owners from CREATE TABLE, mapping packages to their domain [0.01ms]
+(pass) extracts tables across keywords and whitespace [0.07ms]
+(pass) reports each foreign table access once per domain [3.08ms]
+(pass) only accesses missing from the allow list fail [0.07ms]
+
+scripts/boundaries.test.ts:
+(pass) application may use a domain public entry and contracts only [0.97ms]
+(pass) application tests and fixtures may also use domain test helpers [0.19ms]
+(pass) infrastructure must not import domains or application [0.18ms]
+(pass) path aliases are forbidden but npm packages pass [0.27ms]
+(pass) domain dependencies are checked per layer [0.33ms]
+(pass) unused dependency detection [366.61ms]
+(pass) web and client reach world only through contracts/view [0.86ms]
+
+api/application/timer-announcements.test.ts:
+(pass) a three-minute tool request posts one assistant completion at the deadline and survives recovery [97.13ms]
+(pass) cancelling before the deadline creates neither an assistant completion nor an audible notice [44.38ms]
+(pass) the announcement participates in the caller transaction and replays without a duplicate [42.00ms]
+
+api/application/coding-tasks.test.ts:
+(pass) task, Queue job, coding intent and workspace reservation commit together [324.65ms]
+(pass) dispatch is short; finished CLI turn does not complete the user task [1713.39ms]
+(pass) cancel before Queue dispatch writes a durable negative start receipt [319.34ms]
+(pass) grant revocation rejects old event adoption and heartbeat stops the old execution [787.16ms]
+(pass) an inspect transport failure enters reconciliation and heartbeat revokes the blind execution [760.87ms]
+(pass) a lease renewal racing cancellation is followed by revocation, and shutdown joins heartbeat [741.63ms]
+
+api/application/events-client.test.ts:
+(pass) two listeners share one authenticated transport, fragmented frames and last unsubscribe cleans up [25.08ms]
+(pass) reconnect carries a cursor and reset refreshes changes missed while disconnected [8.19ms]
+(pass) a half-open stream reconnects; heartbeat comments do not invalidate snapshots [17.07ms]
+(pass) 401, 403 and 404 stop automatic reconnect [48.29ms]
+(pass) explicit reconnect repairs a stopped stream without changing mounted listeners [17.40ms]
+(pass) update transport failure is observable even when other API reads still succeed [2.53ms]
+
+api/application/app.test.ts:
+(pass) status polling is passive and explicit reconnect requires auth and origin [17.68ms]
+(pass) auth and origin apply to the new endpoints [15.45ms]
+(pass) register → fire → history → pause/resume → cancel through the API [23.46ms]
+(pass) full queue is reported as 503 for submissions [14.38ms]
+(pass) authenticated SSE notifies a background commit and the existing API supplies the snapshot [16.43ms]
+(pass) replay endpoints split text and synthesize one clause, with auth and limits [15.25ms]
+(pass) sample endpoint validates unsaved voice settings and returns audio [14.52ms]
+(pass) oversized JSON bodies are rejected with 413 and normal requests pass [14.25ms]
+(pass) responses carry anti-framing security headers [9.99ms]
+(pass) requests with both Content-Length and Transfer-Encoding are rejected [12.15ms]
+(pass) error codes map to HTTP statuses through the table [0.12ms]
+(pass) Web research is authenticated, validates malformed JSON, and does not claim an unavailable cache was cleared [12.28ms]
+(pass) modules mount in order behind the shared auth and origin checks [0.32ms]
+(pass) service-test concurrency limits cover the slow endpoints but not cancel or retry [11.57ms]
+(pass) CORS preflight allows every method the API serves [0.13ms]
+
+api/application/coding-observation.test.ts:
+(pass) a normal run exposes unknown-kind speech, a stopped terminal and no identifiable final [1311.76ms]
+(pass) a long message keeps sourceTruncated, is read only within this observation's bound, and is not full coverage [1193.45ms]
+(pass) an empty-only report is reported as empty, not as failure [1210.84ms]
+(pass) a failed turn is reported as failed with a complete capture [1195.23ms]
+(pass) changed evidence digest or a state change while reading is rejected, not adopted [1172.11ms]
+(pass) a failed observation is named by a fixed code and the last adopted cursor [1324.81ms]
+(pass) a focused read resumes one reference but keeps the snapshot and the observation's meaning [1293.35ms]
+(pass) an unreadable body degrades to a limitation without changing what was said or the digest [1230.06ms]
+(pass) an unreadable snapshot fails the observation instead of guessing the snapshot [1188.57ms]
+
+api/application/toolchain-live-check.test.ts:
+(pass) live date checking accepts forecast month/day notation and rejects another day [0.21ms]
+(pass) answer links point to acquired pages, not invented paths or home pages [0.09ms]
+(pass) live stock checking rejects a different generated price or date, including fabricated source claims [0.26ms]
+(pass) live weather checking uses the sourced highest-temperature claim rather than another number [0.08ms]
+
+api/application/timer-toolchain.test.ts:
+(pass) C01-C03: a relative timer request is saved through the toolchain [47.70ms]
+(pass) relative duration 90秒タイマー is stored as 90 seconds [44.73ms]
+(pass) relative duration 1時間のタイマー is stored as 3600 seconds [44.55ms]
+(pass) relative duration 3分30秒のタイマー is stored as 210 seconds [46.32ms]
+(pass) C06: cancelling the dialogue run leaves the committed timer active [44.47ms]
+(pass) C04: a revoked skill or a strict-invalid command does not start a timer [82.99ms]
+(pass) C04: another owner or extra arguments are refused before a timer is saved [44.81ms]
+(pass) C05: a failure before the action result rolls the timer back, and the same step then saves one [49.95ms]
+(pass) C07: list and cancel stay on one operation when the same step runs again [52.55ms]
+(pass) C08: without timer ports a timer request does not invent a start [43.77ms]
+(pass) real dialogue list and cancel select an authoritative timer snapshot [63.65ms]
+(pass) a made-up origin cannot authorize a timer through a valid capability reference [42.13ms]
+(pass) cancellation after preparation refreshes the result before the agent phrases it [45.88ms]
+(pass) a corrupted receipt after preparation cannot be adopted or streamed [46.05ms]
+(pass) T01/T03 both timer facts reach the model and action-like user text stays unchanged [47.31ms]
+
+api/application/events.test.ts:
+(pass) SSE coalesces changes, resnapshots every connection and releases disconnected clients [2.80ms]
+(pass) heartbeat keeps SSE alive without a state invalidation and shutdown ends reads [5.08ms]
+(pass) a slow reader is disconnected with a bounded buffer [50.45ms]
+
+api/application/vendor.test.ts:
+(pass) the vendored memory package matches its manifest, package.json, the lockfile and the installed copy [0.75ms]
+(pass) the vendored world-model package matches its manifest, package.json, the lockfile and the installed copy [0.78ms]
+
+api/application/world.test.ts:
+(pass) mode flag: unset/off/0 mean nothing is assembled; protect and on are explicit; a typo fails startup [0.34ms]
+(pass) cursor secret: host-owned file (dir 0700, file 0600), created once, stable, never from the database; env overrides; short values fail [5.98ms]
+(pass) journal path sits next to the Memory journal [0.02ms]
+(pass) protect: recovery opens the gate, World stays OFF, and turning it ON runs the initial sync first [48.07ms]
+(pass) protect forces an enabled World OFF at startup; on turns it ON once the initial sync is done [64.25ms]
+(pass) a closed gate (corrupt World journal) skips the passes and keeps World closed; nothing throws [49.81ms]
+(pass) idle passes write nothing: no commit, so no change-stream traffic and no feedback loop [340.18ms]
+(pass) a retraction reaches World by commit notification alone [63.72ms]
+(pass) a changed cursor secret does not wedge the feed: the stored cursor is reset through a restore and the feed is read again [54.00ms]
+
+api/application/dev.test.ts:
+(pass) bun run dev serves browser requests on 127.0.0.1 and Ctrl+C releases both ports [650.22ms]
+(pass) bun run dev serves browser requests on localhost and Ctrl+C releases both ports [638.79ms]
+(pass) dev refuses --host before exposing the authenticated proxy [30.42ms]
+(pass) dev refuses --host 0.0.0.0 before exposing the authenticated proxy [29.35ms]
+(pass) occupied API port is reported without starting Web or stopping its owner [33.28ms]
+(pass) Vite port failure stops the API instead of silently moving Web to another port [592.69ms]
+
+api/application/delegated-tasks.test.ts:
+(pass) atomic start links one task, dispatch and schedule; 100 retries create nothing extra [48.17ms]
+(pass) registration-only has no jobs or schedules, reads emit no commit, unsupported start is explicit [38.31ms]
+(pass) Queue or Scheduler capacity failure rolls back every part of registration [73.28ms]
+(pass) 60-second observation coalesces missed ticks, skips overlap and never changes business revision [53.90ms]
+(pass) cancellation invalidates queued dispatch and disables monitoring, but only confirmed stop is terminal [44.31ms]
+(pass) an unconfirmed stop cannot complete its job or the task [45.76ms]
+(pass) failed stop delivery is retried after recovery with one stable stop command and no new dispatch [55.43ms]
+(pass) a generic schedule cannot duplicate or replace the task-owned monitor [39.65ms]
+(pass) a lost execution connection before dispatch moves the task to reconciliation without sending work [40.20ms]
+(pass) a failed dispatch preparation cannot leave a queued task with no runnable job [38.70ms]
+(pass) cancelling dispatch through the generic Queue API leaves explicit reconciliation rather than an orphaned task [39.61ms]
+(pass) a truthy malformed stop receipt is never adopted as confirmed [44.30ms]
+(pass) a rolled-back revocation never aborts a live dispatch on the next unrelated commit [44.87ms]
+(pass) task HTTP bodies are rejected while streaming past the bound, before the peer finishes sending [35.34ms]
+(pass) saved answers are passed to the next dispatch without leaking another task's answer [46.39ms]
+(pass) recovery after registration commit cancels old dispatch without starting it again [37.00ms]
+(pass) HTTP rejects spoofed origins and arbitrary state, authenticates tasks, and validates query limits [38.62ms]
+(pass) API client and CLI register, read and cancel through authenticated HTTP; unavailable execution stays explicit [501.91ms]
+(pass) delegated feature flag is strict, and disabled execution still permits registration [37.32ms]
+(pass) a full Queue cannot discard a cancellation; maintenance dispatches the saved stop intent when capacity returns [53.89ms]
+(pass) late observation after cancellation cannot revive the task or alter its business revision [55.59ms]
+(pass) observation backlog schedules the next bounded batch without waiting for the next minute [62.26ms]
+(pass) async execution preparation rolls back the task, dispatch job and monitor together [38.09ms]
+
+api/application/world-scheduling.test.ts:
+(pass) A44 an interactive queue job is the foreground: nothing is scheduled while it is open, the held input resumes by itself after it [257.26ms]
+(pass) A44 a conversation answer running in the inference service is the foreground [265.44ms]
+(pass) A44 a foreground start cancels the running extraction: the call ends, the Local job slot is free, the same input is extracted by a new attempt afterwards [276.61ms]
+(pass) A44 a cancel the provider never answers keeps the slot: no second extraction call until the provider really ends it [546.22ms]
+(pass) A44 a restart with a held input: the unextracted input survives and is extracted after the foreground is gone [197.44ms]
+
+api/application/logging.test.ts:
+(pass) real backend persists startup, correlated job failure and final shutdown without credentials or conversation text [371.18ms]
+
+api/application/coding-http.test.ts:
+(pass) coding HTTP/client authenticate reads, validate cursors and hide private execution fields [358.05ms]
+
+api/application/research-routes.test.ts:
+(pass) weather, term lookup and detailed research follow the model's operations without topic routing or automatic learning [198.48ms]
+
+api/application/error-status.test.ts:
+(pass) statusForError > keeps every pre-ARC-10 mapping [0.06ms]
+(pass) statusForError > keeps prefix rules and the 500 fallback [0.02ms]
+(pass) statusForError > maps the LARM configuration errors
+(pass) mergeErrorStatus > accepts the same code with the same status in several tables [0.01ms]
+(pass) mergeErrorStatus > throws when two tables disagree on a status [0.06ms]
+
+api/application/research-routes-client.test.ts:
+(pass) H02 client uses the documented method/path/body and surfaces 409 [3.40ms]
+(pass) H02 CLI drives list/show/edit/disable/rediscover/clear through the API only [547.39ms]
+
+api/application/world-acceptance-p3.test.ts:
+(pass) A35/A36/A37/A38/A39/A40/A41 one Scope end to end: register -> ask -> correct -> re-ask -> forget during generation -> restart -> ask [967.79ms]
+(pass) A34 (host side) the host consumes only the vendored World tgz: package.json points at it and the receipt names the pinned package [226.66ms]
+(pass) A34-A41 World OFF (protect) + Memory OFF + model stopped: a forget is still processed and completes [77.81ms]
+(pass) A38 Memory unavailable: World content is deleted at once, the forget stays pending (never complete) and finishes when Memory is back [398.98ms]
+
+api/application/toolchain.test.ts:
+(pass) adoption removes a fabricated model citation and cannot reuse sources after failed research [90.80ms]
+(pass) a plain weather request carries useful details and actual citations through research, answer and replay [65.19ms]
+(pass) the current report follows earlier failed answers and stays adjacent to the repeated request [78.22ms]
+(pass) a premature unavailable forecast reads the next candidate before adopting an answer [72.72ms]
+(pass) authenticated search/read/report/answer resolves model excerpt selections to canonical citations [72.10ms]
+(pass) general research exposes available tools without a host invocation recommendation [69.38ms]
+(pass) authenticated API E2E: 東京の天気を調べて; child returns summary, never raw pages [70.51ms]
+(pass) authenticated API E2E: AAPLの株価を調べて; child returns summary, never raw pages [57.16ms]
+(pass) 1 inference slot: conversation continues while child waits; cancellation rejects late results [83.36ms]
+(pass) rolled-back cancellation cannot cancel another conversation's pending inference [67.84ms]
+(pass) bounded rejected worker output: {"badJson":true} [48.78ms]
+(pass) bounded rejected worker output: {"badQuote":true} [60.33ms]
+(pass) invalid tool arguments are repaired once; no acquisition occurs until the contract is valid [65.94ms]
+(pass) restart interrupts the whole tree; late acquisition cannot append an answer [49.64ms]
+(pass) data deletion invalidates the report and preserves accepted conversation [64.47ms]
+(pass) retention removes 14-day result data then 30-day task metadata without deleting the answer [65.32ms]
+(pass) queue capacity failure rolls back child creation and reaches a terminal answer [46.03ms]
+(pass) worker deadline cancels acquisition and returns a bounded failure to the parent [48.39ms]
+(pass) deleting a report during final inference cancels adoption of the old answer [59.96ms]
+(pass) CLI reads catalogue, task and summary through the authenticated API [291.28ms]
+(pass) ambiguous target returns a clarification question without acquiring data or treating it as a retrieval failure [46.27ms]
+(pass) a mismatched quote is rejected and repaired once using the same observations [61.75ms]
+(pass) a long accepted request remains intact when delegated to a research worker [62.25ms]
+
+api/application/world-extraction.test.ts:
+(pass) A19/A43 the real queue runs ONE Local job: a candidate is adopted, no Cloud request exists [68.12ms]
+(pass) held input on the real queue/inference remains pending with an unadopted receipt until entity data changes [87.22ms]
+(pass) A43 an unavailable Local provider leaves the input pending; the Cloud route that is armed is never used [184.50ms]
+(pass) A43 the 30 s stage budget (80 ms here) cancels the call and the job fails after one retry [261.12ms]
+(pass) no input, no job: an idle World creates no extraction job and no model call [267.83ms]
+(pass) protect mode registers no extraction handler: no job kind exists, input is never delivered [54.58ms]
+(pass) A42 a restart resumes the unapplied inbox: the input received before the stop is extracted after it [73.68ms]
+
+api/application/requirements-client.test.ts:
+(pass) requirements API client and CLI keep CAS and enable/disable state through authenticated HTTP [345.87ms]
+
+api/application/research-history.test.ts:
+(pass) three far-apart facts and the seventh condition retain earlier evidence through the complete dialogue [97.03ms]
+(pass) an out-of-scope model URL is rejected before fetching; a finite repair can read only the original URL [59.78ms]
+(pass) repeating an out-of-scope URL exhausts one repair without any external acquisition [53.44ms]
+(pass) cursor/start conflict is refused with a precise, private repair hint, then a correct saved read succeeds [80.34ms]
+(pass) new research may search after a specified URL is mismatched, using only its existing grants and budget [66.64ms]
+(pass) an invalid saved-body reference is refused before execution and a valid retry uses the same budget without fetching again [85.95ms]
+(pass) R1/R2/R3: fetch once then find/read_saved obtains middle evidence and parent adopts a view after child completion [82.63ms]
+(pass) R4/R5: mismatched first page advances to another candidate and a changed lookup within the original budget [69.85ms]
+(pass) R6: successful normalized duplicate lookup is replayed, and finishes without another external fetch [59.51ms]
+(pass) H1/H8: history search/read, without Memory or Web, answers from preserved raw messages with speaker/time and no fabricated URL [60.09ms]
+(pass) H4/R8: correction during final inference refuses old completed text and voice [58.31ms]
+(pass) H4/R8: withdrawal during final inference refuses old completed text and voice [57.60ms]
+(pass) H4/R8: cancellation during final inference refuses old completed text and voice [58.18ms]
+(pass) H7: one stale-history retry uses the original budget and adopts only the fresh scope [69.87ms]
+
+api/application/requirements-toolchain.test.ts:
+(pass) data-only requirement host fixture: event-complete [62.58ms]
+(pass) data-only requirement host fixture: event-missing [60.06ms]
+(pass) data-only requirement host fixture: facility-complete [60.50ms]
+(pass) data-only requirement host fixture: facility-conflict [58.40ms]
+(pass) data-only requirement host fixture: product-target [57.02ms]
+(pass) data-only requirement host fixture: product-old [60.43ms]
+(pass) data-only requirement host fixture: event-complete-luna [62.14ms]
+(pass) data-only requirement host fixture: event-missing-luna [59.73ms]
+(pass) data-only requirement host fixture: facility-complete-luna [57.76ms]
+(pass) data-only requirement host fixture: facility-conflict-luna [59.72ms]
+(pass) data-only requirement host fixture: product-target-luna [59.01ms]
+(pass) data-only requirement host fixture: product-old-luna [60.41ms]
+(pass) data-only requirement host fixture: lodging-complete [60.25ms]
+(pass) data-only requirement host fixture: lodging-complete-luna [60.80ms]
+(pass) data-only requirement host fixture: lodging-missing [58.98ms]
+(pass) data-only requirement host fixture: lodging-missing-luna [59.03ms]
+(pass) data-only requirement host fixture: rental-complete [61.59ms]
+(pass) data-only requirement host fixture: rental-complete-luna [59.01ms]
+(pass) data-only requirement host fixture: rental-missing [58.61ms]
+(pass) data-only requirement host fixture: rental-missing-luna [62.12ms]
+
+api/application/migrations.test.ts:
+(pass) GOLDEN: the legacy order and every deployed SQL string are byte-for-byte unchanged [1.66ms]
+(pass) a database built by the old positional scheme opens, is moved to schema_migrations_v2, and applies nothing [45.10ms]
+(pass) a partly migrated positional database applies only the missing migrations, in the legacy order [71.91ms]
+(pass) a positional database with a row beyond the frozen order, or a pre-checksum row, is handled [74.58ms]
+(pass) a database that holds a migration this code does not know refuses to start [45.56ms]
+(pass) a migration with `after` is applied after its dependencies, wherever it sits in the list [18.04ms]
+(pass) migration ordering is stable and rejects cycles, unknown dependencies and duplicate ids [0.16ms]
+(pass) the memory package's migrations keep their order and every one is applied; the first four stay contiguous [0.12ms]
+(pass) host migrations are frozen: the count and the retired slot never move [0.01ms]
+(pass) every migration is named once, and none outside the frozen order exists yet without `after` [0.10ms]
+(pass) a fresh database gets every migration and passes the memory schema check [37.00ms]
+(pass) an applied migration that is rewritten later stops startup with its id only [18.52ms]
+(pass) a database from before checksums is backfilled once and then verified [16.79ms]
+(pass) an existing 0.3.3 host database upgrades without rewriting migration checksums or losing data [47.40ms]
+(pass) World source/goal migrations are appended last and upgrade an already-deployed database [45.94ms]
+(pass) with the full production migrations, retracting a message referenced by a dialogue run tombstones it [43.19ms]
+(pass) World's package migrations stay contiguous, and timers is appended after them [0.15ms]
+(pass) a fresh database gets the World schema; World is OFF and its schema is current [35.52ms]
+(pass) an already-deployed database (data present, no World yet) upgrades and keeps its data [59.49ms]
+(pass) a drifted World schema disables World; an edited World migration stops startup [40.99ms]
+(pass) research/history metadata migrations append after the frozen legacy order and upgrade without copying message bodies [55.80ms]
+
+api/application/agent-voice-response.test.ts:
+(pass) silence completes without creating a dialogue, cancelling another run or synthesizing speech [48.03ms]
+(pass) failed research generates and adopts the agent's response before TTS: {"badJson":true} [56.78ms]
+(pass) failed research generates and adopts the agent's response before TTS: {"badQuote":true} [64.22ms]
+(pass) failed research generates and adopts the agent's response before TTS: {"lookupTimeoutOnce":true,"workerReportOutput":"{\"action\":"} [103.30ms]
+(pass) cancelling while the agent phrases a failure discards the late response and never speaks [87.03ms]
+(pass) failure response honours autoSpeak=false without bypassing the agent [49.66ms]
+(pass) a committed timer result follows the agent generation and speech path without executing twice [49.60ms]
+
+api/application/coding-supervision.test.ts:
+(pass) the existing 60-second Scheduler monitor feeds supervision through the public task execution port [28.10ms]
+(pass) supervision releases the shared inference slot while waiting on a CLI step [20.28ms]
+(pass) HTTP/client authenticate report and supervisor reads and omit private CLI text [20.82ms]
+(pass) the answer to a supervision approval question is never dispatched to the CLI [0.12ms]
+(pass) answering an approval question prepares no coding execution and applies the approved instruction [29.71ms]
+(pass) a failed observation reaches supervision with a fixed code and the position, not the exception text [0.17ms]
+
+api/application/history-cli.test.ts:
+(pass) history CLI uses authenticated POST API, emits opaque continuation refs, and refuses stale or cross-conversation refs [319.24ms]
+
+api/application/control-logging.test.ts:
+(pass) an unknown tool name invokes nothing and receives one bounded correction [69.01ms]
+(pass) search timeout, successful retry and malformed report are correlated and separately diagnosed [64.98ms]
+(pass) valid JSON with a missing report field records the field and expected type, not its private contents [49.97ms]
+(pass) action rejection logs precise diagnostics: {"badToolArgs":true} [56.29ms]
+(pass) action rejection logs precise diagnostics: {"badQuote":true} [61.27ms]
+
+api/application/world-real-local-provider.test.ts:
+(skip) real-local-provider: one Scope end to end on a real Local Provider (NOT EXECUTED)
+
+api/application/server.test.ts:
+(pass) importing server.ts has no side effects [1.29ms]
+(pass) a separate process that imports server.ts neither starts nor touches the data directory, and exits by itself [223.77ms]
+(pass) the shutdown order is fixed, and a freshly built set of services closes cleanly through it [67.98ms]
+
+api/application/cli.test.ts:
+(pass) CLI connection failure has the documented exit code and stdout stays empty [56.96ms]
+(pass) CLI rejects missing or invalid request IDs before submitting a new run [110.93ms]
+(pass) CLI reports invalid API configuration as an argument error [54.50ms]
+(pass) CLI rejects invalid ftp API URL before requesting or exposing credentials [54.95ms]
+(pass) CLI rejects invalid http API URL before requesting or exposing credentials [56.65ms]
+(pass) web CLI uses authenticated API, fresh search, explicit stable retention and result polling [328.42ms]
+(pass) web wait distinguishes cancellation, failure and expired delivery [163.90ms]
+(pass) web SIGINT exits with unconfirmed cancellation even if the API never confirms it [313.91ms]
+(pass) SIGINT also cancels a web status request whose response never arrives [72.87ms]
+(pass) collection CLI maps each subcommand to the attitude API and prints JSON [767.33ms]
+(pass) collection CLI reports usage errors as 2 and API failures as 3 [108.75ms]
+(pass) timer CLI lists, shows, starts and cancels with validated request IDs [276.58ms]
+(pass) timer CLI rejects mutations without a request ID or valid arguments before calling the API [321.99ms]
+(pass) memory CLI covers list, status, toggle, remember, actions and forget [613.25ms]
+(pass) memory CLI rejects bad arguments with 2 and surfaces API failures as 3 [273.20ms]
+(pass) send --wait polls the run and maps its terminal status to the exit code [166.56ms]
+(pass) send without --wait prints the queued run, reads stdin and honours --conversation [112.53ms]
+(pass) send reports the request ID when submission fails so a retry stays idempotent [54.12ms]
+(pass) CLI rejects unknown commands with usage and exit code 2 [105.67ms]
+
+api/application/lifecycle.test.ts:
+(pass) recover and start follow registration order; close is the reverse [0.16ms]
+(pass) items without a hook are skipped, so per-phase order is expressed as separate items [0.07ms]
+(pass) a recover failure aborts startup and stops later recoveries [0.06ms]
+(pass) a failing close is logged by name and never skips the rest; the result is false [0.09ms]
+(pass) the overall deadline abandons a hung close, starts nothing further, and reports failure [1.29ms]
+(pass) a close that finishes in time clears its deadline timer [0.04ms]
+(pass) intervalLifecycle skips a tick while the previous one runs, and close waits for it [4.77ms]
+(pass) intervalLifecycle stop and idle can be used apart, and a rejecting job is contained [2.49ms]
+(pass) a non-exclusive interval fires every tick and does not track them [1.18ms]
+(pass) terminator: a successful shutdown exits 0 and a failed one exits 1 [3.60ms]
+(pass) terminator: a second signal while shutting down exits 130 at once [1.25ms]
+(pass) terminator: the 30 s process deadline exits 1 when shutdown never finishes [0.05ms]
+
+api/application/world-claims-http.test.ts:
+(pass) World OFF: the claim routes do not exist (404), and the token is still required first [39.92ms]
+(pass) World configured: same bearer and origin rules as every API route [41.27ms]
+(pass) World ON: list, detail, status and forgets over HTTP; the Scope comes from the host [44.83ms]
+(pass) World protect: routes exist, reads say world_disabled (409), nothing is ON [38.11ms]
+
+api/infrastructure/concurrency.test.ts:
+(pass) requests above the limit get 429 and slots are released [0.22ms]
+31 | 
+32 | test("a failing handler still releases its slot", async () => {
+33 | 	const app = new Hono();
+34 | 	app.use("*", limitConcurrency(1));
+35 | 	app.get("/boom", () => {
+36 | 		throw new Error("boom");
+                 ^
+error: boom
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/infrastructure/concurrency.test.ts:36:13)
+      at dispatch (/Users/y.noguchi/Code/eumenes/node_modules/.bun/hono@4.12.34/node_modules/hono/dist/compose.js:22:23)
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/infrastructure/concurrency.ts:16:10)
+      at dispatch (/Users/y.noguchi/Code/eumenes/node_modules/.bun/hono@4.12.34/node_modules/hono/dist/compose.js:22:23)
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/node_modules/.bun/hono@4.12.34/node_modules/hono/dist/hono-base.js:306:31)
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/infrastructure/concurrency.test.ts:38:20)
+
+31 | 
+32 | test("a failing handler still releases its slot", async () => {
+33 | 	const app = new Hono();
+34 | 	app.use("*", limitConcurrency(1));
+35 | 	app.get("/boom", () => {
+36 | 		throw new Error("boom");
+                 ^
+error: boom
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/infrastructure/concurrency.test.ts:36:13)
+      at dispatch (/Users/y.noguchi/Code/eumenes/node_modules/.bun/hono@4.12.34/node_modules/hono/dist/compose.js:22:23)
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/infrastructure/concurrency.ts:16:10)
+      at dispatch (/Users/y.noguchi/Code/eumenes/node_modules/.bun/hono@4.12.34/node_modules/hono/dist/compose.js:22:23)
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/node_modules/.bun/hono@4.12.34/node_modules/hono/dist/hono-base.js:306:31)
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/infrastructure/concurrency.test.ts:39:20)
+
+(pass) a failing handler still releases its slot [0.29ms]
+
+api/infrastructure/chat-stream.test.ts:
+(pass) provider UTF-8 splits publish answer text before completion and exclude reasoning fields [1.55ms]
+(pass) a disconnected stream is not adopted as a complete answer [0.13ms]
+(pass) cancellation closes a blocked reader and prevents late content [0.06ms]
+(pass) native tool calls survive split SSE arguments without publishing control data [0.11ms]
+(pass) truncated native control is rejected before any operation can be adopted [0.05ms]
+
+api/infrastructure/validation-log.test.ts:
+(pass) validation diagnostics expose paths, types and bounds, but never values, unknown keys or Zod messages [0.42ms]
+(pass) many invalid entries keep the first eight field locations, including array indices [0.20ms]
+
+api/infrastructure/http.test.ts:
+(pass) parseJsonBody > returns the validated data [0.15ms]
+(pass) parseJsonBody > answers 400 invalid_input for malformed JSON, a missing body and schema mismatch [0.14ms]
+(pass) parseJsonBody > uses the given error code [0.03ms]
+(pass) parseJsonBody > validates emptyAs for an empty body but still rejects malformed JSON [0.11ms]
+
+api/infrastructure/ignore-error.test.ts:
+(pass) records a debug event with the reason and swallows the failure [0.04ms]
+
+api/infrastructure/auth-config.test.ts:
+(pass) empty optional settings do not mask the exported LARM token [0.03ms]
+(pass) an explicit API token is used as is [0.05ms]
+(pass) an explicit API token under 24 characters is rejected
+(pass) a missing token file is generated with mode 0600 [3.05ms]
+(pass) an existing token file is read [2.10ms]
+(pass) an invalid token file is rejected [2.67ms]
+(pass) the LARM token never determines the API token [4.69ms]
+(pass) an empty EUMENES_DB is treated as unset [3.38ms]
+(pass) EUMENES_KEY_DIR relocates the token file like the settings key [2.87ms]
+(pass) token creation leaves no temp files and keeps an existing target [2.93ms]
+(pass) concurrent starters all observe one complete token [87.53ms]
+
+api/infrastructure/bounded-read.test.ts:
+(pass) reads a body within the limit [0.12ms]
+(pass) rejects a missing body and an oversized body [0.05ms]
+(pass) an oversized body cancels the source and releases the lock [0.04ms]
+(pass) an abort mid-read cancels the source and throws the reason [0.06ms]
+
+api/infrastructure/snapshot-stream.test.ts:
+(pass) a pending reader receives each snapshot once and terminal delivery releases the observer [1.32ms]
+(pass) a slow reader has bounded snapshots and still receives the final state [0.13ms]
+(pass) a subscribe failure releases its slot so capacity is never exhausted [0.13ms]
+
+api/infrastructure/dev-proxy.test.ts:
+(pass) matching Origin is authorized [0.01ms]
+(pass) other Origin is not authorized
+(pass) no Origin with same-origin fetch metadata is authorized
+(pass) no Origin with cross-site fetch metadata is not authorized
+(pass) no Origin and no fetch metadata (curl) is not authorized
+
+api/infrastructure/digest.test.ts:
+(pass) canonicalJson golden (bit-identical to pre-ARC-9 output) > spec: locale (tasks) [0.04ms]
+(pass) canonicalJson golden (bit-identical to pre-ARC-9 output) > spec: codeUnit (timers/scheduler/queue) [0.01ms]
+(pass) canonicalJson golden (bit-identical to pre-ARC-9 output) > spec: research-routes [0.07ms]
+(pass) canonicalJson golden (bit-identical to pre-ARC-9 output) > empty: locale (tasks)
+(pass) canonicalJson golden (bit-identical to pre-ARC-9 output) > empty: codeUnit (timers/scheduler/queue)
+(pass) canonicalJson golden (bit-identical to pre-ARC-9 output) > empty: research-routes
+(pass) canonicalJson golden (bit-identical to pre-ARC-9 output) > nestedArrays: locale (tasks)
+(pass) canonicalJson golden (bit-identical to pre-ARC-9 output) > nestedArrays: codeUnit (timers/scheduler/queue)
+(pass) canonicalJson golden (bit-identical to pre-ARC-9 output) > nestedArrays: research-routes
+(pass) canonicalJson golden (bit-identical to pre-ARC-9 output) > numbers: locale (tasks)
+(pass) canonicalJson golden (bit-identical to pre-ARC-9 output) > numbers: codeUnit (timers/scheduler/queue)
+(pass) canonicalJson golden (bit-identical to pre-ARC-9 output) > numbers: research-routes
+(pass) canonicalJson golden (bit-identical to pre-ARC-9 output) > intKeys: locale (tasks)
+(pass) canonicalJson golden (bit-identical to pre-ARC-9 output) > intKeys: codeUnit (timers/scheduler/queue)
+(pass) canonicalJson golden (bit-identical to pre-ARC-9 output) > intKeys: research-routes [0.02ms]
+(pass) canonicalJson golden (bit-identical to pre-ARC-9 output) > caseAndAccents: locale (tasks)
+(pass) canonicalJson golden (bit-identical to pre-ARC-9 output) > caseAndAccents: codeUnit (timers/scheduler/queue)
+(pass) canonicalJson golden (bit-identical to pre-ARC-9 output) > caseAndAccents: research-routes [0.01ms]
+(pass) canonicalJson golden (bit-identical to pre-ARC-9 output) > unicode: locale (tasks)
+(pass) canonicalJson golden (bit-identical to pre-ARC-9 output) > unicode: codeUnit (timers/scheduler/queue)
+(pass) canonicalJson golden (bit-identical to pre-ARC-9 output) > unicode: research-routes
+(pass) canonicalJson golden (bit-identical to pre-ARC-9 output) > undefInArray: locale (tasks)
+(pass) canonicalJson golden (bit-identical to pre-ARC-9 output) > undefInArray: codeUnit (timers/scheduler/queue)
+(pass) canonicalJson golden (bit-identical to pre-ARC-9 output) > undefInArray: research-routes
+(pass) canonicalJson golden (bit-identical to pre-ARC-9 output) > scalars: locale (tasks)
+(pass) canonicalJson golden (bit-identical to pre-ARC-9 output) > scalars: codeUnit (timers/scheduler/queue)
+(pass) canonicalJson golden (bit-identical to pre-ARC-9 output) > scalars: research-routes
+(pass) canonicalJson golden (bit-identical to pre-ARC-9 output) > nullTop: locale (tasks)
+(pass) canonicalJson golden (bit-identical to pre-ARC-9 output) > nullTop: codeUnit (timers/scheduler/queue)
+(pass) canonicalJson golden (bit-identical to pre-ARC-9 output) > nullTop: research-routes
+(pass) canonicalJson golden (bit-identical to pre-ARC-9 output) > boolTop: locale (tasks)
+(pass) canonicalJson golden (bit-identical to pre-ARC-9 output) > boolTop: codeUnit (timers/scheduler/queue)
+(pass) canonicalJson golden (bit-identical to pre-ARC-9 output) > boolTop: research-routes
+(pass) canonicalJson golden (bit-identical to pre-ARC-9 output) > numberTop: locale (tasks)
+(pass) canonicalJson golden (bit-identical to pre-ARC-9 output) > numberTop: codeUnit (timers/scheduler/queue)
+(pass) canonicalJson golden (bit-identical to pre-ARC-9 output) > numberTop: research-routes
+(pass) canonicalJson golden (bit-identical to pre-ARC-9 output) > undefTop: locale (tasks)
+(pass) canonicalJson golden (bit-identical to pre-ARC-9 output) > undefTop: codeUnit (timers/scheduler/queue)
+(pass) canonicalJson golden (bit-identical to pre-ARC-9 output) > dateNested: locale (tasks)
+(pass) canonicalJson golden (bit-identical to pre-ARC-9 output) > dateNested: codeUnit (timers/scheduler/queue)
+(pass) canonicalJson golden (bit-identical to pre-ARC-9 output) > dateNested: research-routes
+(pass) sha256Hex > ""
+(pass) sha256Hex > "abc"
+(pass) sha256Hex > "日本語"
+(pass) sha256Hex > "\ud800x"
+(pass) sha256Hex > "😀"
+
+api/infrastructure/flock.test.ts:
+(pass) the libc path is chosen per platform and unsupported hosts have none [0.01ms]
+(pass) an exclusive lock on one descriptor blocks a second descriptor until released [1.22ms]
+
+api/infrastructure/config.test.ts:
+(pass) defaults are the values the server used before the config was centralised [0.07ms]
+(pass) derived paths follow the database directory [0.02ms]
+(pass) explicit values, the log file switch, and empty strings as unset [0.12ms]
+(pass) LARM_API_TOKEN wins over LARM_CONTROL_TOKEN [0.02ms]
+(pass) flags: 1/true/on and 0/false/off; anything else fails with the variable name only [0.19ms]
+(pass) EUMENES_WORLD keeps its three modes and the 0/false/1/true aliases [0.15ms]
+(pass) numbers are validated; the World poll keeps its 1000 ms floor [0.23ms]
+(pass) an invalid value never appears in the error [0.03ms]
+(pass) the raw environment is kept for Settings [0.01ms]
+(pass) history and web research switches are independent typed flags [0.10ms]
+(pass) whitespace-only values are unset, and the World enum is still trimmed [0.08ms]
+(pass) numbers are strict decimal: hex, exponent, signs and fractions are rejected [0.16ms]
+
+api/infrastructure/logger.test.ts:
+(pass) JSONL records isolate concurrent context and exclude raw payloads and error messages [2.50ms]
+(pass) file output rotates with bounded retention and private permissions [6.58ms]
+{"time":"2026-10-10T11:25:01.350Z","level":"error","event":"logging.file_unavailable","component":"logger","service":"eumenes","pid":31242,"bootId":"53999494-a1b6-4d2e-bc23-ff06117c69c7","schemaVersion":1}
+(pass) unwritable file leaves structured stderr destination working [0.77ms]
+(pass) HTTP response IDs correlate auth failures and errors without URL or body secrets [0.75ms]
+(pass) log reader searches backups, matches exact IDs and skips malformed and partial records [17.27ms]
+(pass) following logs survives rotation without duplicates and retries an incomplete final line [4035.57ms]
+
+api/infrastructure/sqlite/owner.test.ts:
+(pass) OS lock excludes another process and releases after crash [58.89ms]
+
+api/infrastructure/sqlite/write-guard.test.ts:
+(pass) write rejects an async callback and rolls back its first statement [9.30ms]
+(pass) database, WAL and SHM files are owner-only [7.21ms]
+
+api/infrastructure/sqlite/snapshot.test.ts:
+(pass) readSnapshot shows one committed snapshot while a writer commits in between [9.53ms]
+(pass) A35 readSnapshot is read-only, synchronous and refused while closing [10.01ms]
+(pass) A35 the snapshot callback never gets a writer: nested store.write queues after it [10.24ms]
+
+api/infrastructure/sqlite/commit.test.ts:
+(pass) commit notifications see persisted state, exclude idle scans/rollback, and cannot fail writes [8.28ms]
+(pass) cache maintenance runs in writer order outside a transaction and does not notify commits [7.34ms]
+
+packages/coding-runner/test/protocol.test.ts:
+(pass) SDK tools/list is fixed; unknown tool, unknown fields and protocol mismatch are rejected [326.58ms]
+(pass) RPC cancellation is not CLI stop; inspect retains the execution identity [2029.19ms]
+(pass) continue needs the exact completed session and a fresh operation; revocation forbids reuse [2046.66ms]
+
+packages/coding-runner/test/observation.test.ts:
+(pass) decoder observation facts > messages are unknown without a phase and never inferred from position [0.20ms]
+(pass) decoder observation facts > an unsupported phase stays unknown and a blank message is empty [0.05ms]
+(pass) decoder observation facts > the 32768-unit limit keeps whole code points and reports truncation [0.22ms]
+(pass) decoder observation facts > a lone surrogate is a protocol fault, not a replacement character [0.02ms]
+(pass) decoder observation facts > only turn.completed and turn.failed are terminal; a general error is not [0.01ms]
+(pass) decoder observation facts > a classification needs an explicit contract [0.11ms]
+(pass) runner observation > completed turn: terminal seq, started process, complete capture [1070.88ms]
+(pass) runner observation > failed turn keeps a complete capture while the success gate is false [1024.38ms]
+(pass) runner observation > process exit without a terminal leaves the turn unconfirmed [1053.04ms]
+(pass) runner observation > a contradictory terminal is a conflict, not an overwrite [1067.73ms]
+(pass) runner observation > a 40000-character message is flagged as truncated without a capture fault [1105.26ms]
+(pass) runner observation > an empty message is reported as empty and a malformed line is a capture fault [3311.07ms]
+(pass) runner observation > stopping before spawn proves the CLI never started [188.99ms]
+(pass) runner observation > a receipt written before observations exist reads as unknown, never as success [1053.42ms]
+(pass) continuation and legacy specs > a v1 session or a non-completed turn is never continued [1238.24ms]
+(pass) continuation and legacy specs > a v1 spec is never started [188.09ms]
+
+packages/coding-runner/test/git.test.ts:
+(pass) snapshot includes untracked, deletion, binary bytes and mode; explicit commit cannot capture other changes [2853.16ms]
+(pass) review snapshot change invalidates commit; a hook added by the agent is detected as tampering and never runs [1643.62ms]
+(pass) lost commit receipt reconciles evidence without creating another commit [2458.66ms]
+(pass) push uses fixed branch/remote/SHA; lost receipt is reconciled and a changed remote is rejected [3486.51ms]
+(pass) explicit staging treats wildcard characters as literal filenames [2273.60ms]
+(pass) a changed .git/config is refused before the next host git operation [1249.60ms]
+(pass) a clean or smudge filter attribute is forbidden [1616.90ms]
+(pass) files hidden through .git/info/exclude fail the snapshot, while .gitignore ones do not [1528.52ms]
+
+packages/coding-runner/test/runner.test.ts:
+(pass) coding runner > review evidence is invalidated if the workspace changes during its turn [1162.97ms]
+(pass) coding runner > a spec that requests the registered network is refused before the CLI starts [326.62ms]
+(pass) coding runner > backend credentials and SSH agent are absent from the CLI environment [1172.26ms]
+(pass) coding runner > UTF-8 fragments, incomplete and oversized lines are bounded [0.27ms]
+(pass) coding runner > production refuses fixture configuration [186.54ms]
+(pass) coding runner > stdio MCP start, durable duplicate receipt, inspect and private normalized evidence [1318.69ms]
+(pass) coding runner > stop is an intent; owning worker confirms process group termination [1818.42ms]
+(pass) coding runner > MCP disconnect does not stop the worker; host lease eventually does [726.55ms]
+(pass) coding runner > background children are stopped before completion [1304.35ms]
+(pass) coding runner > oversized output drains and stops with incomplete evidence [1157.96ms]
+(pass) coding runner > saved spawn intent is never replayed, unknown PID is never signalled [1173.38ms]
+(pass) coding runner > workspace and executable replacement are rejected [265.03ms]
+
+packages/coding-runner/test/review.test.ts:
+(pass) CLI failed cannot supply complete evidence or authorize commit [1366.45ms]
+(pass) CLI nonzero cannot supply complete evidence or authorize commit [1357.59ms]
+(pass) cancel after pause irreversibly revokes the exact session and stop operation IDs cannot be rebound [1234.63ms]
+(pass) worker replay of a reserved receipt with CLI spawn intent stays unknown without launching again [1251.50ms]
+(pass) concurrent start retries share one pinned configuration and one durable execution [1097.34ms]
+(pass) evidence byte ranges preserve UTF-8 and reject changed payload bytes [1125.29ms]
+(pass) snapshot rejects an oversized sparse file before loading its contents [329.46ms]
+(pass) evidence preserves a leading Unicode BOM as part of its authenticated payload [1087.79ms]
+(pass) terminal receipt waits for the durable process-exited event even when finalization is delayed [1508.13ms]
+(pass) concurrent atomic receipt replacements remain readable from the already opened private inode [360.47ms]
+
+api/domains/continuity/test/continuity.test.ts:
+(pass) goals, decisions and open questions persist across restart and track revisions [22.21ms]
+
+api/domains/settings/test/settings.test.ts:
+(pass) backend live evaluation reads the saved LARM connection without changing settings [8.88ms]
+(pass) new voice settings wait for a conversational pause and retain a saved custom interval [7.90ms]
+(pass) old settings retain normal playback; speech adjustments validate and persist [6.96ms]
+(pass) coding supervision instruction approval defaults to on, including for saved documents without it [8.10ms]
+(pass) bootstraps once; atomic revision and idempotency; encrypted secret never in document [8.93ms]
+(pass) revocation epochs cannot be reset by client; origin changes cannot reuse credential [7.82ms]
+(pass) missing or wrong master key preserves data, disables ciphertext and does not regenerate [8.45ms]
+(pass) deleting then recreating the same connection ID cannot revive old permissions [8.16ms]
+(pass) malformed LARM URLs are validation errors and same-host requires loopback [7.32ms]
+(pass) key replacement, key deletion and connection deletion discard obsolete ciphertext [9.47ms]
+(pass) envRef must be allowlisted when saved and when resolved [8.47ms]
+(pass) cloud connections require https outside private networks [0.14ms]
+(pass) a saved http cloud URL still loads, but applying it is rejected [6.74ms]
+(pass) credential ciphertext is bound to its row [7.55ms]
+(pass) v1 ciphertext is upgraded to v2 on startup and survives restart [8.75ms]
+(pass) keyDir option and EUMENES_KEY_DIR relocate the master key [7.92ms]
+
+api/domains/tasks/test/tasks.test.ts:
+(pass) 100 identical registrations return one receipt, with conflict on changed input and no automatic text dedupe [9.99ms]
+(pass) start is idempotent after revisions change; unavailable execution rolls back the whole initial registration [13.76ms]
+(pass) a failed transaction hook rolls back task, grant, commands and events [7.87ms]
+(pass) authority change fences old work, requests a confirmed pause, then resume creates a new execution generation [8.40ms]
+(pass) stop receipt is stopping until confirmed, cancel cannot be downgraded to pause, late completion cannot win [7.27ms]
+(pass) an unstarted registration can be cancelled without requiring a runner [5.93ms]
+(pass) answers bind task, question, revision, epoch and generation, and only valid choices resume the task [7.16ms]
+(pass) concurrent answer and cancellation have a single winner and supersede obsolete questions [8.56ms]
+(pass) task completion requires all declared conditions and evidence, not an arbitrary queue state [8.38ms]
+(pass) reopening preserves tasks independently of conversation lifetime, and recovery does not replay work [14.03ms]
+(pass) conversation input has unique operation provenance even with different request IDs [6.28ms]
+(pass) expired grants fence execution immediately, and maintenance requests cancellation without replay [7.40ms]
+(pass) terminal bodies expire at seven days, runtime history at thirty, while minimal replay receipts stay valid [6.92ms]
+(pass) pagination uses a stable sequence and rejects unsafe cursors and excess byte limits [7.50ms]
+(pass) capacity limits reject new registrations without removing paused or reconciling tasks [7.38ms]
+(pass) asynchronous domain hooks cannot escape the single writer transaction [7.44ms]
+(pass) runtime budget is bound to the task and is not extended by pause and resume [8.13ms]
+(pass) explicit forgetting revokes live work, redacts private history and cannot be undone by replaying registration [7.83ms]
+(pass) explicit budget amendments retain the original execution start and apply shorter budgets immediately [8.83ms]
+(pass) expiry of a confirmed pause reaches cancelled without another runner acknowledgement [9.01ms]
+(pass) invalid runtime question types cannot create an unreadable waiting state [7.81ms]
+(pass) storage admission bounds new grant history while revocation and cancellation remain available [18.05ms]
+(pass) public list operations reject nondecimal cursors just like the HTTP contract [10.15ms]
+(pass) shortening a running budget below elapsed time immediately requests cancellation [11.12ms]
+(pass) oversized question material rolls back both the question and waiting state [16.95ms]
+(pass) Promise-like transaction callbacks are rejected as well as native Promises [6.97ms]
+(pass) available actions reflect a missing answer capability and an exhausted runtime [7.29ms]
+(pass) expiry while pause acknowledgement is pending cannot produce a resumable pause [16.46ms]
+
+api/domains/tool-runtime/test/cached-source.test.ts:
+(pass) R01 cached grant is per-owner, exact-URL, exact-args and re-checked against the port on every use [17.09ms]
+(pass) R01 candidate import yields an owner-scoped observation, never a real lookup, and counts as one lookup allowance [12.07ms]
+(pass) R01 without a configured port, cached grants and imports are unavailable (no silent success) [9.27ms]
+(pass) superseded invocations leave observations but stay in the budget and the invocation list [9.29ms]
+(pass) replay rechecks authority, source revision and supersession before admitting a consumed grant [14.75ms]
+
+api/domains/tool-runtime/test/invoke.test.ts:
+(pass) gateway refuses foreign refs and unselected URLs; idempotent invocation and rolled-back result is not exposed [14.41ms]
+
+api/domains/capabilities/test/prepare-learned.test.ts:
+(pass) C01 learned registration rejects conflicts, bad bundles and oversize; builtin hashes unchanged [9.95ms]
+(pass) C01 5000 learned definitions never enter FTS/alias/list and do not displace builtins [270.06ms]
+(pass) seed adds newer research rules and packages without touching old revisions [15.90ms]
+(pass) new research packages expose generic acquisition without topic-specific tools or skills [12.45ms]
+(pass) C02 prepare by ID keeps shared checks; independent registration does not disturb A; GC spares builtins/protected [14.45ms]
+
+api/domains/capabilities/test/requirement-schema.test.ts:
+(pass) R04 unsupported keywords, incompatible keywords and resource limits reject before conversion [0.20ms]
+(pass) R05 standard schema conversion is strict and does not coerce, default or ignore fields [0.80ms]
+
+api/domains/capabilities/test/capabilities.test.ts:
+(pass) quick Web capability grants only lookup and read and preserves Luna tools [0.05ms]
+(pass) 5000 capability catalogue: bounded discovery, exact aliases, immutable revisions and owner isolation [5093.12ms]
+(pass) builtin SKILL is mandatory; disabling survives seed and dependency failure hides package [17.20ms]
+(pass) revoking a dependency permanently invalidates already issued candidates, even after re-enabling [19.57ms]
+(pass) builtin bundle upgrade preserves revision 1 fingerprints and activates a new revision for the larger input contract [14.98ms]
+(pass) deployed research skill v3 upgrades without a revision conflict and restart preserves hashes [22.32ms]
+(pass) seed still rejects a changed newest builtin revision [7.93ms]
+(pass) history and web catalogue selection can be enabled independently without editing archived revisions [12.02ms]
+
+api/domains/capabilities/test/requirements.test.ts:
+(pass) R02/R03/R06 immutable profile revisions, CAS, independent catalogs and invalidation [12.83ms]
+
+api/domains/capabilities/test/learned.test.ts:
+
+api/domains/capabilities/test/requirement-controller.test.ts:
+(pass) management API validates bodies, exposes CAS state and keeps requirement profiles out of executable catalog [9.17ms]
+
+api/domains/memory/test/memory.test.ts:
+(pass) remember, stop, retract and forget work end to end over HTTP without dialogue; memory is shared across conversations [18.63ms]
+(pass) policyRevisionInTransaction is the revision memory's access() uses and moves with the memory ON/OFF setting [13.34ms]
+
+api/domains/goals/test/goals.test.ts:
+(pass) no goal gives an explicit absent snapshot and invents nothing [10.90ms]
+(pass) explicit adopt, update and withdraw keep revisions and history [11.83ms]
+(pass) stale revisions are rejected for update, withdraw and complete [9.10ms]
+(pass) completed goals leave the adopted snapshot [8.97ms]
+(pass) other principals and scopes see nothing and cannot touch goals [13.08ms]
+(pass) proposals never appear as adopted and need an explicit call [10.49ms]
+(pass) rejecting a proposal does not move the goal epoch [9.69ms]
+(pass) epoch and revision change on every visible change, enabling receipt invalidation [11.05ms]
+(pass) snapshot orders by priority and is one consistent read [11.26ms]
+(pass) an access-less revision lookup is not part of the World-facing exports [7.24ms]
+(pass) only the same proposal operation is deduplicated [11.91ms]
+(pass) distinct operations preserve proposal text, priority and source versions [15.33ms]
+(pass) independent proposals respect capacity, while an operation replay uses no slot [11.17ms]
+(pass) operationKey makes adopt and propose idempotent per principal and scope [10.52ms]
+(pass) transaction rollback leaves the ledger, history and epoch unchanged [7.46ms]
+(pass) inputs are bounded and rejected rather than truncated [9.62ms]
+(pass) goals survive restart [17.86ms]
+
+api/domains/service-tests/test/service-tests.test.ts:
+(pass) idempotent acceptance, isolated results and no plaintext input persistence [12.36ms]
+(pass) busy rejection and cancelled late result never becomes a preview [11.33ms]
+(pass) settings changes invalidate in-flight results and stale requests [13.85ms]
+(pass) artifact retry uses GET adapter only, not generation [15.39ms]
+(pass) diagnostics persist individual Health states without generation [13.32ms]
+(pass) controller bounds uploads and rejects arbitrary URLs and unknown input fields [11.37ms]
+(pass) crash recovery resumes a known music job without resubmitting POST [14.73ms]
+
+api/domains/larm/test/context-exact.test.ts:
+(pass) required control and summary segments are never silently truncated [0.10ms]
+
+api/domains/larm/test/playground.test.ts:
+(pass) catalog merges selector-only cold services without starting anything [0.78ms]
+(pass) every warm provider executes independently, validates claim and releases [1.15ms]
+(pass) semantic health is distinct from catalog presence, and cold diagnosis does not generate [0.30ms]
+(pass) image and music fetch artifacts without making a warm connection [0.49ms]
+(pass) image POST failures are not retried and late cancellation is reported unknown [0.18ms]
+(pass) artifact origin mismatch never forwards control credential [2.08ms]
+(pass) music cancellation collects a late job and confirms remote cancellation [0.28ms]
+(pass) invalid claim cannot run inference and still releases connection [0.23ms]
+(pass) direct service runtime model IDs are returned separately from catalog IDs [0.15ms]
+(pass) malformed local hostnames cannot receive credentials [0.02ms]
+(pass) playground claims on the LARM host, another port included, are accepted [0.25ms]
+(pass) playground claims on another private host are refused unless listed [0.42ms]
+(pass) a missing baseUrl leaves the playground unconfigured [0.19ms]
+
+api/domains/larm/test/inference-error.test.ts:
+(pass) provider diagnostics retain the code and meaningful message, redact credentials and bound input [0.30ms]
+(pass) cancelled error-body read cannot trigger recovery [0.05ms]
+
+api/domains/larm/test/larm.test.ts:
+(pass) control JSON generation is opt-in and ordinary answers keep provider defaults [2.02ms]
+(pass) catalog, claim, ASR/LLM/TTS and release use public contract [0.71ms]
+(pass) ASR accepts empty silence but rejects missing, nontext or oversized transcripts [0.63ms]
+(pass) voice menu uses claimed provider auth and TTS sends selected voice and speed [0.68ms]
+(pass) VOICEVOX catalog labels, style, inclusive numeric bounds and decoded credits reach phrase synthesis [0.77ms]
+(pass) a refused VOICEVOX catalog does not block synthesis of a chosen voice [0.30ms]
+(pass) a caller's deadline that aborts a shared connection attempt does not fail other callers [0.31ms]
+(pass) other models omit VOICEVOX fields and busy responses never replay or replace the connection [0.43ms]
+(pass) mismatched claim is rejected before inference and lease is released [0.20ms]
+(pass) oversized inference response is rejected while streaming [1.13ms]
+(pass) simultaneous capability upgrades share one replacement connection [0.40ms]
+(pass) Gemma requests the live profile and renews by reclaiming the rotated token [0.45ms]
+(pass) voice requests every provider in the Gemma profile [0.13ms]
+(pass) an expired connection stops polling and is released [0.13ms]
+(pass) an explicit baseUrl is the only control origin the token is sent to [0.12ms]
+(pass) without a baseUrl LARM stays unconfigured and never contacts any host [0.10ms]
+(pass) missing claim voice discovers and caches the advertised default with the control credential [0.28ms]
+(pass) an unadvertised default voice is rejected before speech inference [0.24ms]
+(pass) cancelling a caller returns promptly during allocation and close stops polling [0.16ms]
+(pass) runtime changes notify connecting and ready/failed without exposing credentials [0.22ms]
+(pass) idle-released JSON before SSE recreates and claims once; both exchanges survive [0.43ms]
+(pass) local idle expires a still-valid lease without requests; next voice use requests the profile again [0.27ms]
+(pass) an active inference pauses the local idle timer and completion starts a new idle interval [0.19ms]
+(pass) only the explicit idle-released 409 can replay, and recovery is bounded at one replacement [0.52ms]
+(pass) cancellation after the 409 diagnostic prevents replacement and replay [0.13ms]
+(pass) a late concurrent rejection cannot discard the replacement lease [0.28ms]
+(pass) manual connection check follows released state even with unexpired credentials [0.16ms]
+(pass) renew rotates every claimed provider while leaving the idle deadline unchanged [0.34ms]
+(pass) published SSE prefix errors never reconnect or replay inference [0.14ms]
+(pass) idle expiry during a health check cannot revive the released local lease [0.17ms]
+(pass) invalid reclaim after renew discards every old credential before another request [0.42ms]
+(pass) a ready connection waits for requested providers to become claimable before claim [0.20ms]
+(pass) unauthorized can recover only when control confirms the old connection is released [0.36ms]
+(pass) context trimming retains the current input after an unanswered prior turn [0.13ms]
+(pass) native decision shares the voice lease, uses its own auth, and rotates credentials [0.40ms]
+(pass) absent or invalid optional decision never breaks ordinary voice providers [0.33ms]
+(pass) caller cancellation is logged separately from a provider network failure [0.71ms]
+(pass) Ruri uses claimed model/token and current chunk only; rejects unsupported questions before provider request [0.36ms]
+(pass) control POSTs keep the 15 s budget while status GETs with a caller signal use 3 s [0.17ms]
+(pass) a timed-out connection POST is retried with the same Idempotency-Key [0.12ms]
+(pass) a caller abort during renewal neither fails the status nor releases the shared lease [0.21ms]
+(pass) close waits for in-use leases before sending DELETE [0.23ms]
+(pass) a valid lease serves new inference while a renewal is still waiting [3.26ms]
+(pass) a provider on the LARM host with another port is accepted [0.26ms]
+(pass) a provider on a different private host is rejected before any token is sent [0.39ms]
+(pass) EUMENES_LARM_PROVIDER_HOSTS or the providerHosts config allow another host [0.32ms]
+(pass) a .local provider is accepted only when the LARM base itself is .local [0.11ms]
+
+api/domains/timers/test/timers.test.ts:
+(pass) duration bounds reject 0, 86401, fractions and NaN; 1 and 86400 pass [0.29ms]
+(pass) 180 second start fixes dueAt, replays the same receipt, and rolls back with the schedule [12.30ms]
+(pass) a scheduler rejection rolls the timer and the operation back together [10.77ms]
+(pass) cancel of an active timer invalidates the schedule and a later expiry does not adopt it [11.34ms]
+(pass) due boundary: 179999 stays active, 180000 elapses with one notification [33.93ms]
+(pass) a fresh claim lease lasts 15s and a second client is rejected [35.20ms]
+(pass) origin retry keeps one timer and a different duration conflicts [10.40ms]
+(pass) a replayed live claim becomes silent when it crosses the five minute freshness boundary [32.27ms]
+(pass) acknowledgement replay belongs to the same client as the claim [31.62ms]
+(pass) a full expiry queue defers one timer without blocking recovery of an expired claim [55.90ms]
+
+api/domains/task-reports/test/reports.test.ts:
+(pass) immutable report sequence and origin are deduplicated with a durable outbox [11.37ms]
+(pass) report and outbox roll back together, and contract size bounds are enforced [11.21ms]
+(pass) resolved blocker outbox is superseded without mutating the report [11.18ms]
+
+api/domains/scheduler/test/scheduler.test.ts:
+(pass) once: nothing before the time, exactly one job after, completed state is not job success [12.06ms]
+(pass) offsets are required and interval bounds enforced by the API schema [0.20ms]
+(pass) interval keeps phase, fires once per period, and ignores duplicate ticks and clock going back [10.05ms]
+(pass) long stop: coalesce creates one occurrence and advances into the future [10.76ms]
+(pass) skip policy: late beyond grace is skipped and summarised; within grace dispatches [11.89ms]
+(pass) overlap: previous open job makes the next occurrence skipped without touching the job [11.36ms]
+(pass) pause/resume/cancel with revisions; resume skips stopped periods; cancelled never revives [11.31ms]
+(pass) materialize failure rolls back job and occurrence; queue full keeps the schedule due and retries [11.91ms]
+(pass) create is idempotent per requestId, conflicts on different input, validates target and caps count [8.98ms]
+(pass) tick processes at most the configured batch [11.98ms]
+(pass) deferred schedules cannot hide later due schedules beyond one candidate page [21.33ms]
+(pass) a paused schedule's stale retry time does not spin the loop [11.92ms]
+(pass) a due backlog larger than the tick limit drains without waiting pollMs per batch [34.01ms]
+(pass) unexpected failures back off exponentially [10.79ms]
+
+api/domains/world/test/extraction-handler.test.ts:
+(pass) A19 a valid candidate becomes a CANDIDATE claim with host-assigned ids, a manifest and Memory dependents [41.64ms]
+(pass) A19 type and meaning checks: negated, hypothetical, question, model ids, unknown subjects and bad quotes are not adopted [64.28ms]
+(pass) A19 at most 8 candidates are adopted: the 9th is rejected, never silently dropped [42.27ms]
+(pass) A19 malformed or oversize output is rejected: no claim, the events are final, the dependents are given back [154.29ms]
+(pass) A20 a window is at most 12 utterances; every input the model saw is in the manifest, cited or not [51.24ms]
+(pass) A20 an utterance that cannot be split is final for extraction, in order, and never reaches the model [43.37ms]
+(pass) A20 exactly 32 KiB in one utterance is allowed, one byte more is not [41.38ms]
+(pass) A43 a model call past the 30 s budget (60 ms here) is cancelled, confirmed ended, then retried once [101.49ms]
+(pass) A43 a second timeout fails the job: the input waits out a backoff, then a new job takes it [160.36ms]
+(pass) A43 a cancelled call that never ends keeps the Local slot: no second call starts [148.07ms]
+(pass) A43 an input version that moved after prepare voids the result: nothing is adopted and the new version is extracted [42.35ms]
+(pass) A43 Memory refusing the dependent registration stops the job before the model is called [39.99ms]
+(pass) A43 a provider that is unavailable leaves the input pending; no Cloud request exists [38.96ms]
+(pass) A43 extraction refuses a route that is not provably Local [113.63ms]
+(pass) extraction runs only while World is ON and its gate is open; one job per Scope at a time [39.40ms]
+(pass) cancelling a prepared job gives back its Memory dependents and its model request [40.42ms]
+
+api/domains/world/test/lifecycle-feeds.test.ts:
+(pass) source feed: deletions and retractions are applied before additions and corrections [42.38ms]
+(pass) source feed: the cursor and the World effect roll back together [52.58ms]
+(pass) real conversation outbox: a retraction forgets what stood on it; a later Memory forget closes the loop [50.72ms]
+(pass) Memory notifications map to World roots: source/state/record forgotten become forget roots, other status changes only stop [43.70ms]
+
+api/domains/world/test/context-broker.test.ts:
+(pass) shared budget: Memory is never shrunk, the Goal is capped and dropped whole, the slice keeps its minimum [0.13ms]
+(pass) World OFF or nothing to say: disabled, and nothing is written or registered [75.75ms]
+(pass) prepare fixes an immutable context, registers the Slice inputs with Memory, and shows the claim as data [82.68ms]
+(pass) World text is reference data: an injection-like claim cannot leave the delimited, escaped JSON [69.00ms]
+(pass) validate/record: the receipt ties slice digest, versions, package, run, attempt and provider; usage and answer ids are one run [39.45ms]
+(pass) A24: a correction, a new refutation or a policy change stops the old context; an unrelated Scope does not [43.54ms]
+(pass) Goal: the adopted goal is the slice's goalRef; withdrawal or any later Goal change stops the context [40.68ms]
+(pass) release drops the usage record and the Memory input dependencies of a run that did not adopt [39.42ms]
+(pass) blocked is never turned into success: the shared budget has no room [39.48ms]
+(pass) ACCESS fixture is the scope the broker reads (default scope = the conversation default) [0.02ms]
+(pass) the pre-send check fails closed when the Writer cannot run it [39.62ms]
+
+api/domains/world/test/world-service.test.ts:
+(pass) schema mismatch disables World without breaking anything else [40.82ms]
+(pass) a future schema (an unknown later migration row) also blocks World [37.41ms]
+(pass) OFF: normal changes are refused but corrections and forgetting keep their way in [36.42ms]
+(pass) hostChecks come from the writer's own database: epochs and policy move the receipts [39.21ms]
+(pass) feed cursors are valid only for the restore epoch that issued them [38.03ms]
+(pass) host state writes need the writer's transaction [34.91ms]
+
+api/domains/world/test/memory-adapter.test.ts:
+(pass) a registered assertion records one opaque Memory dependent per version [38.99ms]
+(pass) a replay with the same operationKey is a no_op and registers nothing again [37.91ms]
+(pass) new versions get their own dependents and never overwrite an older version's [38.59ms]
+(pass) planDependents splits above 32 inputs, in a stable order, without truncating [0.47ms]
+(pass) 32 manifest inputs plus a distinct cited source: two Memory dependents, none cut [51.03ms]
+(pass) out-of-scope, unknown and retracted inputs are refused before anything is written [40.48ms]
+(pass) A25: World accepted, Memory refuses (id in use) -> World, Memory and host rows all roll back [40.67ms]
+(pass) TOMBSTONED: a source Memory has forgotten cannot get a new dependent; the whole operation rolls back [40.15ms]
+(pass) a Memory State item input is scope-checked by Memory: a missing item rolls everything back [36.58ms]
+
+api/domains/world/test/change-feed.test.ts:
+(pass) A28 the inbox row, the host record and the cursor move together; unsettled input is not applied [37.42ms]
+(pass) A28 sequence gaps are accepted and a re-delivered event is received once [37.78ms]
+(pass) A28 a failed receipt does not move the cursor: the input is received on the next pass [55.56ms]
+(pass) A42 a crash right after receipt: the unapplied inbox is resumed, nothing is received twice [50.70ms]
+(pass) A42 a crash while applying leaves nothing half applied; the next job applies once [43.87ms]
+(pass) A28 the applied position is the settled PREFIX: 13 inputs, 12 settled, one pending [52.41ms]
+(pass) A29 a forget overtakes the pending extraction: nothing of the forgotten message is read or kept [41.17ms]
+(pass) A29 a correction stops the old claim before the pending extraction, which then reads only the new text [42.41ms]
+(pass) A29 forgetting does not wait for World or the model: it proceeds while World is OFF [40.91ms]
+(pass) A42 adding a Scope discards the cursor and reads the feed again; unsettled input still settles [53.53ms]
+(pass) A42 a restore epoch change drops the cursors; unsettled input is delivered again, settled input is not [47.11ms]
+(pass) A42 an empty feed creates no job and no model request [39.38ms]
+(pass) input scanned while World is OFF is never delivered or extracted [39.12ms]
+(pass) A28 a deterministic refusal of one receipt is recorded as skipped and never holds a retraction on the page [42.04ms]
+
+api/domains/world/test/world-claims.test.ts:
+(pass) the list shows target, claim, adoption, evidence kind and freshness as separate fields; hypothesis and measured are never the adopted style [44.85ms]
+(pass) the detail carries conditions, supports, refutations, source versions and history [45.87ms]
+(pass) a correction carries the revision: a stale one is 409 with a reload hint and nothing is written [46.33ms]
+(pass) an explicit correction supersedes the old revision, cites the person's statement and is adopted with it [44.33ms]
+(pass) a retraction needs the person's own confirmed statement as the reason [48.26ms]
+(pass) an ambiguous target returns the candidates and changes nothing (no auto-pick) [43.02ms]
+(pass) Scope switch: only granted Scopes answer, the others look exactly like not found, and Scopes do not leak into each other [43.92ms]
+(pass) no existence leak: an unknown claim, a hidden Scope and a forgotten claim give the same answer [44.59ms]
+(pass) forget: accepted, never shown as complete before the ledger says so; it persists across a restart [57.97ms]
+(pass) a forget interrupted by a crash is shown as awaiting confirmation (never complete) and finishes after the restart [56.13ms]
+(pass) forget that is not finished is shown as pending / awaiting confirmation, and an abandoned part is never complete [42.22ms]
+(pass) World OFF (protect): reads and changes answer world_disabled; the forget list still tells the truth [42.84ms]
+(pass) invalid requests are 400 and write nothing; a body cannot name a principal [39.38ms]
+
+api/domains/world/test/world-query.test.ts:
+(pass) the surface is the six enumerated modes; unknown mode, free text and extra keys are rejected [49.11ms]
+(pass) A14 causal direction: A->B->C propagates; correlation does not; reverse lists causes without flipping edges; the cycle ends [45.86ms]
+(pass) A16 dependencies: resource states come from the host only; available never confirms success; unknown stays unknown [47.35ms]
+(pass) scenarios: overlays are hypothetical copies; nothing is stored; a malformed overlay is rejected [47.43ms]
+(pass) A15 every mode: each bound is accepted AT its limit and rejected one above; zero is invalid [68.98ms]
+(pass) A15 partial: a small budget stops retrieval with a reason and real counters at or under the budget; no path is not no effect [75.22ms]
+(pass) out of scope: not granted, foreign principal and unknown look the same; nothing about existence is said [47.36ms]
+(pass) A16 Goal: an adopted Goal of the scope is accepted; a withdrawn one blocks nothing; Gaps never grant execution [47.46ms]
+(pass) World OFF is an explicit disabled answer; a closed startup gate is unavailable; neither reads or writes [86.28ms]
+(pass) A47 Gap -> Task: no port means display only; no delegation means zero Tasks; the same Gap is one Task [52.55ms]
+(pass) A47 Gap -> Task: per-call link limit, all-or-nothing on a port failure, no linkage from a model tool [50.51ms]
+(pass) a query never expands permissions or changes anything: every mode leaves all tables as they were [51.19ms]
+(pass) the model tool binds the scope from the host, not from the model [46.86ms]
+(pass) HTTP: status mapping, size and JSON limits; not-found and not-allowed are one answer [85.36ms]
+
+api/domains/world/test/outcomes.test.ts:
+(pass) A18/A45 the same baseline and conditions: 90 supports, 110 refutes, 99 is incomparable (resolution), each only from a VERIFIED ledger version [115.13ms]
+(pass) A45 a success REPORT against a failing measurement: the measurement decides, an unverified ledger entry is never an observation [36.30ms]
+(pass) A18/A45 missing comparison conditions are incomparable: no Outcome is created, the missing fields are the reasons [36.08ms]
+(pass) A18 conditions that are present but different are incomparable with the exact reason (unit, statistic, input profile, window, comparison) [39.55ms]
+(pass) A45 a duplicate notice is idempotent: one Outcome, one trace row, one Memory dependent [37.87ms]
+(pass) A45 the Outcome stands on the ledger version in Memory: its dependent depends on the ledger source [41.26ms]
+(pass) A45 a Memory refusal rolls the whole observation back: no Outcome, no trace [37.67ms]
+(pass) A45 the real Memory registration: accepted for a live ledger source, refused (and rolled back) once Memory forgot that source [35.23ms]
+(pass) A45 a ledger correction supersedes: the next verified revision is the next Outcome revision, only it is judged [38.96ms]
+(pass) A45 a correction that removes verification withdraws the measurement from World [38.87ms]
+(pass) A45 the ledger forgets the result: it is not judged, and the Outcome is erased by the forget procedure [39.30ms]
+(pass) A45 Memory forgets the ledger source: World's forget reaches the Outcome (not only assertions), the trace goes with it, the external deletion is confirmed truthfully [42.78ms]
+(pass) A45 World OFF or a closed gate observes nothing; a missing prediction is refused without a trace [38.18ms]
+(pass) A18 a qualitative claim has no measurement plan: it is a measurement gap, an observation of it is incomparable [35.41ms]
+
+api/domains/world/test/lifecycle-hardening.test.ts:
+(pass) unrelated roots never confirm a Memory forget's externals; a covering intake of the same forget does [45.12ms]
+(pass) an external whose host row is gone has no World content left: it is confirmed even with unrelated roots [44.55ms]
+(pass) roots are validated like World before intake and journal; the part separator is reserved [42.75ms]
+(pass) one invalid root does not block the valid roots of its part; the forget is reported, never complete [43.80ms]
+(pass) a part with no valid root is abandoned (durable), the next part still runs and every part is reopened except it [46.08ms]
+(pass) a part World itself refuses as invalid input is abandoned explicitly instead of holding the gate forever [38.76ms]
+(pass) the gate message names the real reason and how many forgets wait [39.98ms]
+(pass) feeds: roots World would refuse are counted and skipped, and never stop the cursor [44.16ms]
+(pass) a Memory notification with duplicate targets re-read after a cursor reset is the same intake [41.56ms]
+(pass) after a restore, a completed forget whose Memory receipt shows unreachable pending externals does not stay complete [49.20ms]
+(pass) after a restore, a transient Memory error while re-checking never leaves the forget complete or the gate open [46.48ms]
+(pass) restore: a later page whose dependent Memory rejects overrides an earlier 'registered' for the same key [43.32ms]
+(pass) concurrent recoverWorld calls are serialised: the gate stays shut while a restore runs [38.35ms]
+(pass) accepting a forget moves the Scope's forget epoch: in-flight slice usage is rejected by it [39.92ms]
+(pass) A30+: >500 roots with a Memory forget confirm every external and reopen each part [79.52ms]
+
+api/domains/world/test/extraction-held.test.ts:
+(pass) held extraction remains received across polls and restart, then applies once with new entities [53.48ms]
+(pass) one held candidate holds the whole prefix; later input does not bypass it [42.06ms]
+(pass) a port mutated during inference cannot change the prepared entities or authorize the old result [41.98ms]
+(pass) prepare rechecks a queued retry when its context reverts to the held snapshot [38.66ms]
+(pass) a corrected or unavailable held head reaches final rejection before context suppression [79.84ms]
+(pass) forget removes held inputs and the digest without leaving a cursor-blocking row [42.69ms]
+(pass) a refused manifest release stays pending while the extraction is held [41.06ms]
+(pass) a failed held transaction rolls back its digest and remains recoverable [36.62ms]
+(pass) an interpretation version change releases a held prefix without language-specific code [39.02ms]
+(pass) a cancelled old result cannot hold or release the newer job's input [40.24ms]
+(pass) restore purges held metadata and redelivers only the unsettled input [41.50ms]
+(pass) a refused inference authority check cannot persist a semantic hold [40.88ms]
+
+api/domains/world/test/lifecycle-restore.test.ts:
+(pass) Memory change feed: a forgotten source becomes a durable forget and completes; the cursor moves with it [41.49ms]
+(pass) a stale feed cursor (restore epoch bumped) is ignored and the whole feed is read again [40.33ms]
+(pass) the feed cursor and the intake are written in the same callback: a rolled-back callback moves nothing [51.33ms]
+(pass) A32: old DB + newer journal reaches restore.finish, keeps forgotten items forgotten, and keeps the gate closed until then [77.05ms]
+(pass) A32: the journal alone detects a restored DB; an unreconciled Memory keeps the confirmation pending, honestly [76.46ms]
+(pass) a crash during restore (restore_begun) resumes the same restore, not a new epoch [87.03ms]
+(pass) a crash during restore (restore_registered) resumes the same restore, not a new epoch [82.78ms]
+(pass) a crash during restore (restore_reconciled) resumes the same restore, not a new epoch [78.39ms]
+(pass) a crash during restore (before_restore_finish) resumes the same restore, not a new epoch [83.09ms]
+(pass) journal corruption, truncation and rollback keep World closed (fail closed) [248.94ms]
+
+api/domains/world/test/extraction-migration.test.ts:
+(pass) extraction hold migration preserves old received and terminal rows and refuses an old binary [73.20ms]
+
+api/domains/world/test/scheduling.test.ts:
+(pass) A44 no input and no foreground: a periodic tick creates no job and no model request [34.87ms]
+(pass) A44 foreground active: nothing is scheduled; the input waits and is scheduled when the foreground ends [40.32ms]
+(pass) A44 foreground starts after the job was queued: the claim is held un-run, the input keeps its place, a new attempt resumes it [42.05ms]
+(pass) A44 cancel answered at once: the running call ends, nothing is adopted, a NEW attempt takes the same input after the foreground [61.55ms]
+(pass) A44 cancel answered late (within the confirmation window): still a clean cancel [121.38ms]
+(pass) A44 cancel never answered: the slot stays held, no second call starts, the late provider end frees it and the input resumes [113.02ms]
+(pass) A44 a late result from an OLD attempt is rejected at settle; the newer attempt alone is adopted [43.15ms]
+(pass) A44 a late result from a job that no longer owns the events is rejected without touching them [38.78ms]
+(pass) A44 restart in the middle of an extraction: the checkpointed input is not lost and is extracted by a new process [38.00ms]
+(pass) A44 at most one Local extraction: a second job cannot start a call while one is in flight [49.62ms]
+(pass) A44 a broken foreground signal reads as busy: background work yields, never runs by accident [40.87ms]
+
+api/domains/world/test/host-guards.test.ts:
+(pass) World stays OFF and cannot be turned ON before the host recorded its initial sync [35.74ms]
+(pass) the conversation cursor secret is required: no public default exists [59.88ms]
+(pass) a cursor cannot be decoded or forged with another secret [80.40ms]
+
+api/domains/world/test/manual-world.test.ts:
+(pass) manual input end to end: target -> explicit claim -> Slice -> correction -> old Slice refused [94.46ms]
+(pass) injection: a Memory refusal rolls back World, host rows and the Memory write; the next change works [40.78ms]
+(pass) injection: a full Writer queue yields typed WRITER_BUSY and writes nothing for the refused ones [48.10ms]
+(pass) injection: a closing store refuses new changes and reads with typed results [35.23ms]
+
+api/domains/world/test/context-hardening.test.ts:
+(pass) a refused Memory release never fails the settle/cancel transaction; the host rows wait for a retry sweep [41.23ms]
+(pass) a forget removes the usage receipts AND their Memory dependents; a refusal keeps them tracked for the sweep [88.32ms]
+(pass) usage pruning keeps the dependents registered exactly as long as the receipt (KEEP_USAGE_PER_SCOPE) [40.51ms]
+(pass) escape expansion cannot push the block past the shared total: blocked world_overflow, or a block that fits [39.62ms]
+(pass) goal bytes are measured on the escaped JSON too [0.12ms]
+(pass) a busy or closing Writer is a retryable verdict, any other failure stays a hard no [37.95ms]
+
+api/domains/world/test/source-adapter.test.ts:
+(pass) conversation default principal/scope equal memory's constants [0.02ms]
+(pass) resolveCurrent returns revision/digest/scope/speaker/confirmed and follows correction [10.80ms]
+(pass) missing and retracted sources return an explicit missing state [7.50ms]
+(pass) a stale revision/digest reads as changed without a body [7.58ms]
+(pass) another principal or scope gets no body, no count and no existence hint [8.99ms]
+(pass) request-level purpose and access shape are enforced before any source is touched [9.24ms]
+(pass) Unicode quote ranges use UTF-8 byte offsets on code point boundaries [8.93ms]
+(pass) listChanges pages by opaque cursor, tolerates gaps, and includes deletions [9.51ms]
+(pass) a deletion can be applied before earlier events of the same source [11.32ms]
+(pass) draft or unconfirmed text is never a source [11.19ms]
+(pass) cursor is opaque, authenticated and advances past an out-of-scope tail [9.96ms]
+
+api/domains/world/test/lifecycle-forget.test.ts:
+(pass) forget flow: intake -> World journal -> World delete -> Memory confirmed -> reopen -> complete [43.16ms]
+(pass) crash at accepted: the incomplete stage is re-run and the forget completes [68.95ms]
+(pass) crash at journal_appended: the incomplete stage is re-run and the forget completes [67.39ms]
+(pass) crash at journaled: the incomplete stage is re-run and the forget completes [63.72ms]
+(pass) crash at world_chunk: the incomplete stage is re-run and the forget completes [68.77ms]
+(pass) crash at world_call_done: the incomplete stage is re-run and the forget completes [77.21ms]
+(pass) crash at world_applied: the incomplete stage is re-run and the forget completes [87.89ms]
+(pass) crash at memory_batch: the incomplete stage is re-run and the forget completes [68.92ms]
+(pass) crash at memory_confirmed: the incomplete stage is re-run and the forget completes [70.11ms]
+(pass) crash at before_reopen: the incomplete stage is re-run and the forget completes [67.81ms]
+(pass) A30: more than 500 roots are applied in bounded chunks and resume after a crash between writer callbacks [139.09ms]
+(pass) forget works with World OFF: content is deleted, the report is honest, the flag stays OFF [42.22ms]
+(pass) Memory unavailable: World content is deleted but the forget stays pending, never complete [53.70ms]
+(pass) Memory not_permitted: World content is deleted but the forget stays pending, never complete [59.57ms]
+(pass) a partial confirmation is not complete: one confirmed external, the next refused [40.60ms]
+(pass) an unknown Memory forget is never treated as 'nothing to confirm' [39.45ms]
+(pass) a corrupt journal keeps World closed and a pending forget is not deleted without its journal entry [40.92ms]
+(pass) Memory confirmation is always per externalId, only for the closure of this forget (A38) [41.88ms]
+(pass) World journal: chained, idempotent per forgetId, and any damage is detected [5.06ms]
+
+api/domains/coding-supervision/test/supervision.test.ts:
+(pass) 60 unchanged running ticks and silent CLI never consume inference or claim completion [12.64ms]
+(pass) a complete CLI turn is decided once despite duplicate polling and question hint [16.06ms]
+(pass) fixed checks, separate read-only review, authorized commit/push, and final report run in order [36.49ms]
+(pass) changed snapshot invalidates checks and review before a commit [23.57ms]
+(pass) children alive or incomplete evidence cannot be a completion candidate [22.14ms]
+(pass) invalid JSON is repaired once within the original deadline [15.65ms]
+(pass) input token limits require the model tokenizer and reject oversized context [22.28ms]
+(pass) decision budget is persisted and stops even a JSON repair [12.65ms]
+(pass) two observation failures hold new effects, while a successful observation restores monitoring [13.24ms]
+(pass) 150 seconds without observation marks delayed monitoring, not CLI failure [8.58ms]
+(pass) a review in the implementation session is rejected and never permits commit [19.20ms]
+(pass) fixed checks cannot be weakened, and remote SHA must equal the committed SHA [51.58ms]
+(pass) local question receives one answer, specification questions are reported to the user [33.32ms]
+(pass) untrusted CLI requests cannot authorize an ungranted push [14.06ms]
+(pass) stale decisions after cancellation cannot execute a step [17.14ms]
+(pass) changed observations supersede a queued decision before any inference [15.06ms]
+(pass) crashed action is not replayed, and recovery cancels pending decisions [34.11ms]
+(pass) forgotten task removes private supervisor and report history atomically [11.42ms]
+(pass) fresh receipt read rejects an external snapshot change during the model call [13.88ms]
+(pass) repair loops cannot exceed two across repeated failed checks [43.96ms]
+(pass) a repeated blocker with a new CLI question ID does not reset its answer budget [20.39ms]
+(pass) a queued decision deadline stops inference without launching a step [14.26ms]
+(pass) a changed question while a step runs cannot adopt its stale receipt [19.90ms]
+
+api/domains/coding-supervision/test/observation.test.ts:
+(pass) message selection is deterministic, keeps kinds apart and never promotes unknown to final [0.18ms]
+(pass) the semantic digest ignores heartbeat position, excerpt and coverage but sees new speech and terminals [0.14ms]
+(pass) heartbeat-only changes cause no judgement and no extra model call [159.96ms]
+(pass) a failed turn with a final-looking report opens no decision and no mutation [19.50ms]
+(pass) an exited process without a terminal is held with a fixed code after one confirming read, with a single blocker and no question [19.32ms]
+(pass) diagnosis is not ended while the process is not confirmed stopped [17.08ms]
+(pass) failed observations keep a fixed code; an older generation's failure changes nothing [17.04ms]
+(pass) diagnostic reads are bounded in total, persisted, and end in one report [35.62ms]
+(pass) inspect_more reads again without a workflow, a policy or a healthy monitor [28.44ms]
+(pass) a success claim cannot complete the task while the fixed checks failed [21.19ms]
+(pass) a transient read failure is left to the ordinary monitoring policy, never a diagnosis hold [17.05ms]
+(pass) inspect_more resumes the unread part of the requested reference and the new text is judged once [19.70ms]
+
+api/domains/coding-supervision/test/approval.test.ts:
+(pass) with approval on, request_change waits for the user and enqueues no step [20.94ms]
+(pass) approving enqueues the stored instruction inside the fixed frame, once [28.57ms]
+(pass) rejecting never reaches the CLI and asks the user for a direction instead [22.34ms]
+(pass) after a rejection asks a new question, the same observation pass does not capture a decision on the stale task [24.37ms]
+(pass) with approval off, the framed instruction is enqueued immediately [23.51ms]
+(pass) answer_question is gated too and its single attempt is spent only on approval [18.67ms]
+(pass) an approved instruction is dropped when the observation changed meanwhile [27.97ms]
+(pass) a long multi-byte instruction still fits the task question [22.89ms]
+(pass) a host diagnostic read that only adds excerpt and coverage keeps the approval alive and the approved instruction runs [24.36ms]
+
+api/domains/dialogue/test/post-answer.test.ts:
+(pass) E01 observer is called after adoption with ids only and its writes commit [20.63ms]
+(pass) E01 observer throw or skipped rolls back only the learning part [40.65ms]
+(pass) E01 without an observer the answer completes as before [19.96ms]
+
+api/domains/dialogue/test/queue.test.ts:
+(pass) a run only sees earlier accepted turns; later inputs never leak into it [16.13ms]
+(pass) a failed earlier run leaves only its input in later history [13.17ms]
+(pass) full queue rejects the submit and stores neither message nor run [13.44ms]
+(pass) restart: queued runs continue, a running run is interrupted, late result from the old owner is rejected [14.32ms]
+(pass) runs from before the queue existed are interrupted, not given a new job [12.12ms]
+(pass) scheduled prompt creates exactly one background run per occurrence; interactive input is claimed first [15.08ms]
+(pass) waitForTerminal honours abort and its own deadline without cancelling the run [52.66ms]
+(pass) rejected answer adoption fails both the run and its queue job [15.75ms]
+(pass) only adopted, confident motion labels a running or completed answer; cancelled judgments are rejected [16.64ms]
+(pass) emotion context excludes later accepted inputs and uses the complete answer [16.98ms]
+
+api/domains/dialogue/test/world-release.test.ts:
+(pass) a report invalidated at adoption releases the World context's input dependencies [18.55ms]
+(pass) a Memory adoption refusal releases the World context's input dependencies and records no usage [20.52ms]
+(pass) an adopted answer keeps its dependencies (control) [19.93ms]
+(pass) a pre-send check that cannot run (busy writer) sends nothing and ends the run with a content-free code [19.45ms]
+
+api/domains/dialogue/test/research-result-context.test.ts:
+(pass) final generation retains every request clause, reference block and report while trimming only optional history [0.55ms]
+(pass) required request overflow is explicit and cannot silently discard the request [0.10ms]
+
+api/domains/dialogue/test/controller.test.ts:
+(pass) dialogue controller validates requests and delegates one run [13.96ms]
+
+api/domains/dialogue/test/dialogue.test.ts:
+(pass) request ID is idempotent and answer adoption is atomic [22.70ms]
+(pass) failed input persistence prevents any provider request [0.24ms]
+(pass) cancelled inference cannot append an answer [46.16ms]
+
+api/domains/dialogue/test/research-routing.test.ts:
+(pass) researcher selection follows the LLM tool call regardless of topic [0.41ms]
+(pass) Luna is not callable when unavailable and cannot request history or coding scope [0.29ms]
+
+api/domains/dialogue/test/memory-integration.test.ts:
+(pass) a remembered fact is recalled in the next answer with a usage receipt, and Memory OFF injects nothing [67.83ms]
+(pass) disconnect during generation prevents adoption even after reconnect=false [45.96ms]
+(pass) disconnect during generation prevents adoption even after reconnect=true [46.08ms]
+(pass) continuity (goal / open question) is part of the recalled context [28.92ms]
+(pass) a correction during generation prevents adopting the answer [44.77ms]
+(pass) forgetting erases the value, survives restart, and is re-applied on a restored old database [75.75ms]
+(pass) a tampered journal makes memory unavailable (fail closed) instead of being used [63.14ms]
+(pass) stopping an item is reversible and removes it from the next answer; invalid sources are rejected [46.91ms]
+(pass) expired items are not recalled as current understanding [47.12ms]
+(pass) a period that has not started yet is not current understanding; a month-precision start that has passed is [52.99ms]
+(pass) forget validates the id, never wipes receipts via wildcards, and also forgets older versions of the same fact [53.44ms]
+(pass) a failed apply after the journal append is reconciled instead of poisoning the journal [391.26ms]
+(pass) a torn journal line disables memory without crashing startup, and listing fails closed [37.73ms]
+(pass) size and count limits keep the recalled context inside its budget; bad periods are caller errors [37.90ms]
+(pass) a reference text with newlines cannot forge extra lines in the reference block [41.43ms]
+(pass) the recalled context stays inside its byte budget: writes that would overflow are refused, runs keep working [59.35ms]
+(pass) an empty memory does not fix a view: adding a fact mid-run does not fail the run and no receipt is written [28.69ms]
+(pass) memory-backed text is not streamed before adoption [123.66ms]
+(pass) stop / resume / retract reject malformed ids as client errors, and a concurrent recover cannot misread the journal [32.17ms]
+(pass) resuming an item whose fact was re-stated is a client error, not a revision conflict [30.53ms]
+(pass) future-dated items count against the budget too, so they cannot make runs fail when they start [36.87ms]
+(pass) a long streamed answer is not double counted for memory-backed runs [41.94ms]
+(pass) receipts of a forget that was only re-applied on startup are purged [60.03ms]
+(pass) a long multibyte conversation id works for continuity and runs [33.62ms]
+(pass) the journal creates its directory on demand and repairs a missing trailing newline [5.11ms]
+
+api/domains/dialogue/test/research-citations.test.ts:
+(pass) research preserves acquired URLs and removes fabricated or obsolete citations [0.20ms]
+(pass) a failed report grants no citations, even if an earlier turn supplied that URL [0.15ms]
+
+api/domains/dialogue/test/conversation-generation.test.ts:
+(pass) ordinary dialogue streams one call and keeps preceding conversational context [0.27ms]
+(pass) one native research operation publishes no control text [0.12ms]
+(pass) malformed native arguments get exactly one structural correction [0.17ms]
+(pass) aborted generation never starts a correction [0.08ms]
+
+api/domains/dialogue/test/world-context.test.ts:
+(pass) native delegation rejects correction changed after generation without starting a child [57.05ms]
+(pass) native delegation rejects policy changed after generation without starting a child [52.67ms]
+(pass) native delegation rejects receipt changed after generation without starting a child [51.16ms]
+(pass) valid path: one answer and ONE receipt tying slice digest, versions, package, run, attempt and provider [52.02ms]
+(pass) prompt injection: the claim text reaches the model only as escaped data inside the delimiters [50.51ms]
+(pass) A40: correction injected after_prepare leaves no answer and no usage record [102.14ms]
+(pass) A40: refutation injected after_prepare leaves no answer and no usage record [103.81ms]
+(pass) A40: forget injected after_prepare leaves no answer and no usage record [105.07ms]
+(pass) A40: policy injected after_prepare leaves no answer and no usage record [109.29ms]
+(pass) A40: goal injected after_prepare leaves no answer and no usage record [112.13ms]
+(pass) A40: attempt injected after_prepare leaves no answer and no usage record [259.01ms]
+(pass) A40: cancel injected after_prepare leaves no answer and no usage record [125.85ms]
+(pass) A40: correction injected before_send leaves no answer and no usage record [114.52ms]
+(pass) A40: refutation injected before_send leaves no answer and no usage record [102.53ms]
+(pass) A40: forget injected before_send leaves no answer and no usage record [104.06ms]
+(pass) A40: policy injected before_send leaves no answer and no usage record [100.97ms]
+(pass) A40: goal injected before_send leaves no answer and no usage record [99.39ms]
+(pass) A40: attempt injected before_send leaves no answer and no usage record [244.68ms]
+(pass) A40: cancel injected before_send leaves no answer and no usage record [111.55ms]
+(pass) A40: correction injected during_generation leaves no answer and no usage record [101.92ms]
+(pass) A40: refutation injected during_generation leaves no answer and no usage record [102.10ms]
+(pass) A40: forget injected during_generation leaves no answer and no usage record [102.68ms]
+(pass) A40: policy injected during_generation leaves no answer and no usage record [101.56ms]
+(pass) A40: goal injected during_generation leaves no answer and no usage record [100.99ms]
+(pass) A40: attempt injected during_generation leaves no answer and no usage record [257.28ms]
+(pass) A40: cancel injected during_generation leaves no answer and no usage record [108.12ms]
+(pass) A40: correction injected before_settle leaves no answer and no usage record [102.49ms]
+(pass) A40: refutation injected before_settle leaves no answer and no usage record [100.19ms]
+(pass) A40: forget injected before_settle leaves no answer and no usage record [99.40ms]
+(pass) A40: policy injected before_settle leaves no answer and no usage record [103.45ms]
+(pass) A40: goal injected before_settle leaves no answer and no usage record [116.65ms]
+(pass) A40: attempt injected before_settle leaves no answer and no usage record [270.97ms]
+(pass) A40: cancel injected before_settle leaves no answer and no usage record [115.94ms]
+(pass) cancel is not recall: a late result after cancel is rejected, but what was already sent stays sent [225.55ms]
+(pass) a refused inference receipt adopts neither the answer nor a usage record [73.10ms]
+(pass) blocked is never turned into a World-less success: no budget ends the run with a reason [54.72ms]
+(pass) World OFF is unchanged: no World message, no usage, no registration; the answer streams as before [96.82ms]
+(pass) Memory and World are read in one prepare transaction and share one budget; both receipts are stored with the answer [61.39ms]
+(pass) a later forget in the Scope removes the usage receipts of answers that stood on it [51.91ms]
+
+api/domains/research-routes/test/repository.test.ts:
+(pass) D01 same key in different epochs coexists; incarnation is unique [9.13ms]
+(pass) D01 revision numbers are unique per incarnation only; FKs reject orphans [9.69ms]
+(pass) D01 drafts: origin decides proof requirement; one open draft per incarnation [8.58ms]
+(pass) D01 activateVersionCas verifies incarnation and expected previous version [6.95ms]
+(pass) D01 rollback leaves nothing behind and operations are unique per scope/request [8.25ms]
+(pass) D01 ledger bytes count UTF-8 bytes, not characters [12.99ms]
+
+api/domains/research-routes/test/management.test.ts:
+(pass) stored procedures remain readable but editing cannot schedule retired learning jobs [11.47ms]
+(pass) disable and release retain token checks and idempotent receipts [12.80ms]
+(pass) clear invalidates paged cursors and details before physical reclaim [10.88ms]
+(pass) idle cleanup preserves disabled records and reclaims enabled legacy data [9.99ms]
+(pass) management authentication runs before request parsing and stale writes fail [10.92ms]
+
+api/domains/research-routes/test/contracts.test.ts:
+(pass) K01 specs accept the frozen shapes and reject type errors [0.71ms]
+(pass) K01 facts reject unknown fields and oversized payloads [0.36ms]
+(pass) canonicalJson sorts keys but keeps array order [0.02ms]
+
+api/domains/queue/test/sleep.test.ts:
+(pass) heartbeat waits release abort listeners after each elapsed interval [22.99ms]
+(pass) a wait on an already cancelled signal returns immediately [0.08ms]
+
+api/domains/queue/test/queue.test.ts:
+(pass) same dedupe key converges; different content conflicts; capacity rejects atomically [12.09ms]
+(pass) success settles business and job together; failure of business rolls both back [9.54ms]
+(pass) resource slot and concurrency key serialize claims; interactive goes first [11.58ms]
+(pass) order within a conversation is kept even when a later job is interactive and earlier is background [11.35ms]
+(pass) retry only for allowed transient failures, with finite attempts and backoff [12.35ms]
+(pass) unregistered kind and unsupported version fail explicitly [12.80ms]
+(pass) cancel of running job rejects late result and keeps the slot until the handler stops [16.17ms]
+(pass) cancel of queued job is immediate and routed through the handler [10.67ms]
+(pass) lost lease: old result is rejected and the resource is not reused while the old handler lives [11.88ms]
+(pass) deadline aborts the running handler and expires the job without adopting a late result [13.21ms]
+(pass) recover: queued continue, running follows policy, cancel_requested becomes outcome_unknown [12.22ms]
+(pass) lost wake-up: the loop still finds committed work within the poll interval; idle never calls handlers [13.58ms]
+(pass) close aborts running handlers, settles them interrupted, and blocks late writes [13.63ms]
+(pass) async transaction callbacks are rejected [9.99ms]
+(pass) a claim that cannot start still settles the owning domain [11.24ms]
+(pass) past-due blocked work does not make the loop spin [12.70ms]
+(pass) resource aliases make persisted old jobs and new jobs share the same concurrency limit [13.13ms]
+(pass) afterCommit hooks of concurrent settlements are not lost [14.12ms]
+(pass) a runnable job behind more than one page of blocked jobs is still claimed [53.15ms]
+
+api/domains/queue/test/error-code.test.ts:
+(pass) snake_case error codes are stored as-is [0.02ms]
+(pass) free text from providers never becomes an error code [0.07ms]
+
+api/domains/queue/test/recovery.test.ts:
+(pass) process killed after commit but before claim: the job survives and runs after restart [88.01ms]
+(pass) process killed while a handler is running: restart marks it interrupted with a closed attempt [73.13ms]
+(pass) second process cannot own the same database while the first lives [12.03ms]
+
+api/domains/queue/test/boundaries.test.ts:
+(pass) queue and scheduler declare only their real dependencies [2.55ms]
+(pass) a dependency cycle stops with an explicit error [0.10ms]
+(pass) export-from, dynamic import and import types are checked like imports [1.06ms]
+(pass) an undeclared dependency through export-from is rejected [0.09ms]
+(pass) a declared re-export (service-tests contracts → larm) is legal [0.07ms]
+(pass) web and client may reach api only through domain contracts [0.27ms]
+(pass) cli may use client, contracts and auth-config only [0.24ms]
+
+api/domains/delivery/test/ruri.test.ts:
+(pass) Ruri source, calibration, 0.6 adoption and rejected subset preserve original six-class scores [1.28ms]
+(pass) top-level and legacy usage truncation are both rejected [0.25ms]
+(pass) inconsistent Ruri class or confidence cannot drive expressions while its original vectors remain inspectable [0.17ms]
+(pass) missing metadata stays null and unknown raw provider fields are not retained [0.03ms]
+(pass) recorded truncation agrees with rejection when top-level and legacy flags disagree [0.07ms]
+(pass) malformed Ruri metadata retains its identity and cannot be accepted as Laya [0.29ms]
+
+api/domains/delivery/test/strength.test.ts:
+(pass) tone offsets are scaled by autoStrength and stay within bounds [0.05ms]
+
+api/domains/delivery/test/delivery.test.ts:
+(pass) full reply and recent conversation decide emotion; speech motion and voice are separate derived actions [0.15ms]
+(pass) unnecessary, uncertain, invalid or truncated choices never become emotion icons [0.25ms]
+(pass) E01/E02/E03 every nonempty reply keeps quotes, negation and definitions and uses all candidates once [0.23ms]
+(pass) selected-answer probability is required and is not question applicability [0.11ms]
+(pass) timeout is bounded and caller cancellation or a late answer cannot restore emotion [7.07ms]
+(pass) all expressions map to restrained motion without classifying drowsiness or actions as emotions [0.21ms]
+(pass) long data stays bounded, preserves beginnings and endings, excludes system instructions and older turns [0.77ms]
+
+api/domains/inference/test/codex-adapter.test.ts:
+(pass) Codex adapter fixes Luna, sends only supplied context, disables native tools and omits product secrets [359.58ms]
+(pass) Codex adapter kills its process on cancellation and discards partial answers [1349.85ms]
+(pass) Codex adapter reports fixed error codes and rejects oversized output [720.65ms]
+
+api/domains/inference/test/maintenance-control.test.ts:
+(pass) I01 captures after the source answer was accepted, with its own deadline and fixed control limits [21.85ms]
+(pass) I01 rejects expired deadlines, cancelled requests and settings changes before the receipt is adopted [12.74ms]
+(pass) I01 normal captureControl still requires a pending parent [10.26ms]
+(pass) background control binds task authority independently of an expired conversation, with exact limits [10.13ms]
+(pass) background control rejects model budget expansion, expired authority and unavailable tokenizer [11.58ms]
+
+api/domains/inference/test/codex-control.test.ts:
+(pass) Luna controls persist their engine and use common receipts, cancellation and usage history [11.08ms]
+(pass) cancelled Luna work cannot return a late result even if the provider ignores its signal [11.75ms]
+(pass) unavailable Luna is rejected without recording a request or falling back to another model [8.46ms]
+
+api/domains/inference/test/inference.test.ts:
+(pass) three purposes fall back once, adapters preserve paths and usage; no duplicate adoption [14.03ms]
+(pass) service tests pin a cloud resource without changing routes or falling back [14.80ms]
+(pass) cloud TTS keeps its own voice and speed from the accepted settings snapshot [13.52ms]
+(pass) judge absence preserves the immutable manual baseline for every phrase [15.21ms]
+(pass) authentication, invalid contracts and caller cancellation never trigger cloud [69.61ms]
+(pass) local timeout fences a late adapter result; immutable snapshot and revocation at adoption [37.94ms]
+(pass) revocation aborts pending cloud; regrant does not revive old request [21.16ms]
+(pass) acceptance updates rollback together with the caller transaction [14.65ms]
+(pass) a failed stream cannot append a cloud fallback to already published local text [13.94ms]
+(pass) late provider deltas are fenced after caller cancellation [21.23ms]
+(pass) provider diagnostics preserve the rejected and recovered Connection IDs on the same attempt [15.69ms]
+(pass) a failed provider still saves the rejected Connection ID and error fields [15.58ms]
+(pass) Laya judges the spoken text and carries one decision with bounded immutable voice settings [18.63ms]
+(pass) decision timeout keeps manual voice, fences late results and cancellation prevents synthesis [35.61ms]
+(pass) speech text is rewritten for the local provider and for the cloud fallback [33.54ms]
+(pass) speak with an override synthesizes with unsaved voice settings without changing saved ones [15.83ms]
+(pass) Ruri dataset captures real-turn receipt adoption once; a technical collection request does not delay answer or TTS [28.97ms]
+(pass) control calls preserve exact context, stay local, skip emotion judgement, and rejected JSON is never adopted [21.00ms]
+(pass) a probe stuck running for over 10 minutes is marked probe_stale and a new probe starts [18.63ms]
+(pass) a recent running probe still blocks a new one [14.11ms]
+(pass) the final probe status survives a momentarily full writer queue [212.10ms]
+
+api/domains/inference/test/migration.test.ts:
+(pass) append-only diagnostics migration preserves previous inference attempts [14.78ms]
+
+api/domains/coding/test/coding.test.ts:
+(pass) coding domain > intent and reservation rollback together; duplicate operations never create another execution [267.06ms]
+(pass) coding domain > cursor and event adoption are atomic; duplicates, gaps and changed digests are checked [1122.32ms]
+(pass) coding domain > old authority cannot adopt output; confirmed stop remains usable after grant expiration [1156.82ms]
+(pass) coding domain > recovery preserves intent and reservation without replaying start [245.57ms]
+(pass) coding domain > gap cannot advance a zero cursor [1217.36ms]
+(pass) coding domain > public view hides session and instruction [258.14ms]
+(pass) receipt flags and state cannot regress after completion, and continuation waits for imported evidence [1235.94ms]
+(pass) an unchanged epoch cannot extend the execution deadline or replace network and operation authority [1199.18ms]
+(pass) the observation snapshot exposes adopted facts only, with message metadata [1178.49ms]
+(pass) terminal facts cannot be retracted, flipped or pointed at a non-terminal event [1179.85ms]
+(pass) a v1 session stays viewable but is never continued, with a fixed code [1179.97ms]
+(pass) a finished v1 execution (no observation on its receipt) is adopted, stopped and projected, never started [1213.93ms]
+(pass) a conflicting terminal is adopted as a conflict, not rejected as inconsistent [1209.64ms]
+
+api/domains/attitude-dataset/test/dataset.test.ts:
+(pass) off by default; authentic unit reuses normal judgment, strips raw metadata, keeps human labels null and blind predictions hidden [8.80ms]
+(pass) every technical reply uses the same single full-six judgment and records normal adoption [6.61ms]
+(pass) stop, cancellation and restart reject collection late responses; no second call after normal failure [2012.67ms]
+(pass) non-ruri, malformed, timeout, probes and missing identity never count as successful real Ruri units [18.73ms]
+(pass) review is validated and optimistic, original prediction survives correction; export only reviewed split examples [19.37ms]
+(pass) connected conversations/templates including unreviewed bridges never leak across splits [0.93ms]
+(pass) three independent reviewed groups always reserve calibration and eval without splitting a conversation [6.20ms]
+(pass) duplicate coverage tags cannot inflate reviewed coverage [17.05ms]
+(pass) 300 successful distinct units stops collection; repetitions and synthetic/probe identities cannot inflate count [219.02ms]
+(pass) credential-looking text is excluded, not partially copied; new examples invalidate old split assignments [9.67ms]
+(pass) available judge is called once even when cached model identity is absent [9.38ms]
+(pass) chunk collection sends only the current chunk, not a complete answer from its context [7.87ms]
+(pass) human review cannot introduce credential-looking text into the dataset or export [7.98ms]
+(pass) six malformed Ruri scores do not count toward the 300 successful judgments [8.36ms]
+
+api/domains/attitude-dataset/test/api.test.ts:
+(pass) API provides control, blind sample lookup, review validation and empty safe export without opening client DB [12.24ms]
+(pass) private dataset database and WAL/SHM stay private even in an existing public parent directory [11.52ms]
+(pass) CLI export refuses existing directories before creating partial output and exports to a fresh private directory [120.93ms]
+
+api/domains/voice-dialogue/test/spoken-text.test.ts:
+(pass) displayed citations stay out of speech while inline labels and surrounding facts survive [0.09ms]
+
+api/domains/voice-dialogue/test/world-release.test.ts:
+(pass) A41 invalidation by correction mid-generation: 0 body events, 0 TTS calls, also after reconnect [415.21ms]
+(pass) A41 invalidation by forget mid-generation: 0 body events, 0 TTS calls, also after reconnect [411.82ms]
+(pass) A41 invalidation by policy mid-generation: 0 body events, 0 TTS calls, also after reconnect [417.48ms]
+(pass) A41 invalidation by goal mid-generation: 0 body events, 0 TTS calls, also after reconnect [417.29ms]
+(pass) A41 cancel mid-generation drops the unpublished body: 0 body events, 0 TTS calls [294.48ms]
+(pass) A41 adoption: nothing before it, the complete body once after it, speech once, reconnect repeats no speech [490.91ms]
+(pass) A41 a blocked World run is reported as blocked (worldUsed), never as a World-less success [228.13ms]
+(pass) general conversation is unchanged: live partial text, speech only after completion, worldUsed false [283.37ms]
+
+api/domains/voice-dialogue/test/sentences.test.ts:
+(pass) punctuation clauses and decimal numbers survive every token split without repeated tails [0.85ms]
+(pass) long unpunctuated output is bounded and conflicting final text is rejected [0.39ms]
+
+api/domains/voice-dialogue/test/upload.test.ts:
+(pass) bounded audio stream rejects oversized upload before ASR [2.19ms]
+(pass) valid bounded WAV reaches voice service once [0.47ms]
+
+api/domains/voice-dialogue/test/migration.test.ts:
+(pass) a database with only the original three migrations (plus later ones) upgrades in place and keeps history [40.35ms]
+
+api/domains/voice-dialogue/test/transcript-language.test.ts:
+(pass) V01/V02/V03 host applies the allowlist to model languages rather than scripts [0.07ms]
+(pass) V04 ambiguous, invalid and uncertain languages remain unverified [1.02ms]
+
+api/domains/voice-dialogue/test/settings-integration.test.ts:
+(pass) one voice turn uses fallback in all three stages, adopts one answer, and does not repeat duplicate upload [34.96ms]
+(pass) autoSpeak false is captured at voice acceptance and ends successfully without TTS [23.99ms]
+(pass) cancellation during cloud ASR cannot create a dialogue run even with late HTTP completion [54.04ms]
+(pass) queued snapshots survive recovery without re-running an attempted provider [20.42ms]
+(pass) revoking a cloud answer aborts downstream TTS and never publishes late audio [47.01ms]
+(pass) streaming text is visible but speech waits for completion; cancellation prevents partial-answer emotion [36.46ms]
+(pass) render ahead is bounded at three clauses and playback releases the next clause [57.89ms]
+(pass) final recognition preempts a slow prefix and never submits a late hypothesis [35.78ms]
+(pass) accepted audio chunks publish Laya delivery and cancellation removes the plan with the audio [24.46ms]
+(pass) replaying an answer persists its native motion, rejects unrelated text and ignores cancelled synthesis [23.15ms]
+(pass) one adopted full-answer emotion works with audio off and is reused for all clauses and replay [24.76ms]
+(pass) automatic three-clause speech shares the adopted full-answer decision [25.85ms]
+(pass) cancelling during final Laya classification rejects late emotion and assistant text [42.58ms]
+(pass) V05 cancelling during language control rejects the late receipt before dialogue or speech [54.08ms]
+(pass) V02/V04 asr_language_not_allowed prevents dialogue and TTS through real inference receipts [22.86ms]
+(pass) V02/V04 asr_language_unverified prevents dialogue and TTS through real inference receipts [23.32ms]
+(pass) V06 empty final ASR performs zero language control and creates no dialogue [23.63ms]
+
+api/domains/voice-dialogue/test/voice.test.ts:
+(pass) voice capture to ASR, dialogue, TTS; duplicate utterance is ignored [18.44ms]
+(pass) restart cancels the run of a stale voice turn so no old answer is spoken [25.82ms]
+(pass) evicting cached audio also clears the ready state [26.44ms]
+(pass) stopping a session fences acceptance waiting in the writer queue [12.97ms]
+(pass) replay splits finished text into clauses and synthesizes on demand [10.67ms]
+(pass) replay HTTP returns the adopted Laya motion with the same audio and supports legacy adapters [10.00ms]
+(pass) a clause that keeps failing is skipped and the rest is still spoken [35.15ms]
+(pass) clauses without any phoneme are never sent to TTS [0.04ms]
+
+api/domains/web-research/test/acquisition.test.ts:
+(pass) R2/R8: isolated llm-fetch permits guarded >12000 text while denying a hidden attack after the preview [29.50ms]
+(pass) large ordinary pages are fully inspected and hidden instructions beyond the old segment budget are denied [15.03ms]
+(pass) astral Unicode titles respect the contract's UTF-16 limit without splitting a surrogate pair [6.60ms]
+(pass) unverified redirect cache policy and partial HTTP content are never retained [1.30ms]
+(pass) JSON is read as untrusted data and still passes the unchanged context guard [1.60ms]
+(pass) weather, market and technology JSON retain the original fields without host interpretation [0.94ms]
+(pass) pages the guard only allows with a warning are refused [0.55ms]
+
+api/domains/web-research/test/attempt-timeout.test.ts:
+(pass) W01 attempt timer starts at execute, not while the job waits in Queue [15.47ms]
+(pass) W01 attempt timeout is web_attempt_timeout, single HTTP attempt, and success after a slow-but-in-time fetch is not expired [22.98ms]
+(pass) W01 a shared fetch survives when only one consumer times out; last consumer leaving aborts it [26.40ms]
+(pass) W01 cancellation stays web_cancelled and invalid timeouts are rejected; default timeout path is unchanged [12.23ms]
+
+api/domains/web-research/test/web-research.test.ts:
+(pass) API idempotency, validation, run polling and cancellation are backed by Queue [33.03ms]
+(pass) stable document hits reuse; live and lookup bypass persistent cache; GET expires without a new search [44.36ms]
+(pass) fresh deadline does not extend on access; idle expiry sweeps bodies and cache mappings [22.95ms]
+(pass) LRU capacity and clear generation refuse late repopulation [26.02ms]
+(pass) inflight sharing respects cancellation of individual subscribers [31.18ms]
+(pass) clear during acquisition rejects old result and does not write a completed cache [30.19ms]
+(pass) main settle failure never exposes a result or writes the cache [28.64ms]
+(pass) guard refusal is a finite error, never stored as provider text or retried [31.31ms]
+(pass) HTTP retention honors no-store, revalidation, age, expires, variation and personalization [0.19ms]
+(pass) refreshing an existing key at capacity preserves other pages and prunes the previous body [29.01ms]
+(pass) clearing the document cache does not invalidate an unrelated live lookup [33.74ms]
+(pass) a successful fresh response that disallows retention invalidates the previous saved body [35.17ms]
+(pass) JSON escaping truncates large successful results rather than turning them into acquisition failures [35.79ms]
+(pass) same-clock admissions evict the previous page rather than the newly fetched page [35.78ms]
+(pass) a rolled-back Queue settlement does not publish a result or evict a successful delivery [81.42ms]
+(pass) Expires freshness subtracts upstream Age, using the server Date rather than the local clock [0.10ms]
+(pass) the acquisition deadline releases Queue resources even when the adapter ignores abort [38.39ms]
+(pass) same URL cacheable acquisitions are serialized, including live bypasses [36.82ms]
+(pass) network delay and local guard time consume HTTP freshness without extending max-age [0.07ms]
+(pass) cache shutdown waits for a concurrent clear and refuses later admissions [26.16ms]
+(pass) cache keys reuse the same HTTP resource across URL fragment variants [22.33ms]
+(pass) freshness header names are case insensitive and conflicting values are not reused [0.15ms]
+(pass) clear reports protected cache sources instead of claiming all data was deleted [25.10ms]
+(pass) an acquisition cleanup error does not prevent the cache writer from closing [22.72ms]
+
+api/domains/web-research/test/saved-bodies.test.ts:
+(pass) R1/R2/R3: middle and >12000 positions are reached without fetch; raw normalized quote and cursors stay bound to a revision [17.86ms]
+(pass) R7/R8: refetch gets a new immutable revision; foreign owner/cursor/epoch, expiry and restart refuse reads [4.36ms]
+(pass) capacity never evicts active references and shared bodies survive another owner's release [0.09ms]
+(pass) find normalization preserves grapheme positions; result counts and encoded read sizes are bounded [15.29ms]
+
+api/domains/tts-dictionary/test/tts-dictionary.test.ts:
+(pass) saves, applies longest match first, and rebuilds after change [9.54ms]
+(pass) stale expectations and duplicate headwords conflict; delete is guarded [6.01ms]
+(pass) HTTP validation rejects malformed entries [9.41ms]
+(pass) Latin headwords match whole words only; surrogate pairs and CJK still match [9.84ms]
+(pass) a reading that would empty or inflate the chunk keeps the original text [9.02ms]
+(pass) rename moves the row atomically and refuses stale or conflicting renames [8.93ms]
+(pass) HTTP rejects boundary headwords, normalizes to NFC, and deletes [7.15ms]
+
+api/domains/agent-runtime/test/read-evidence.test.ts:
+(pass) R7: equal e0 identifiers in different views never redirect an old quotation; unpresented and forged views fail [0.45ms]
+(pass) zero evidence has bounded not_found/clarification/failed outcomes; answered/partial still require evidence [0.12ms]
+
+api/domains/agent-runtime/test/rediscovery.test.ts:
+(pass) new research has no legacy route-replacement lookup after an unavailable proposal [14.90ms]
+
+api/domains/agent-runtime/test/research-engine.test.ts:
+(pass) Luna uses the common Web worker and retains the selected engine across steps [20.12ms]
+(pass) Luna cannot be used for history or when its provider is absent [23.51ms]
+
+api/domains/agent-runtime/test/warm-route.test.ts:
+(pass) a cached legacy route never replaces the model-selected new worker package [14.42ms]
+
+api/domains/agent-runtime/test/deadline.test.ts:
+(pass) an operation granted with 70 seconds remains valid after the model spends 25 seconds; only the next step stops exploration [16.96ms]
+(pass) a failed model-selected read retains the deadline and reserves finish plus verification [18.18ms]
+
+api/domains/agent-runtime/test/requirement-verification.test.ts:
+(pass) unsupported extracted schema uses the shared single repair and cannot freeze or execute [17.03ms]
+(pass) semantic rejection requestCovered never adopts a pending draft or retries [13.91ms]
+(pass) semantic rejection summarySupported never adopts a pending draft or retries [15.78ms]
+(pass) semantic rejection limitationsConsistent never adopts a pending draft or retries [15.62ms]
+(pass) a structurally invalid first action rolls back frozen requirements with zero tool execution [16.34ms]
+(pass) a pending draft is accepted only after one complete verification [15.57ms]
+(pass) R13 a valid deadline value backed by an opening-time excerpt is rejected by semantic verification [14.39ms]
+
+api/domains/agent-runtime/test/requirement-adoption.test.ts:
+(pass) R19 profile revision invalidates pending verification authority [15.31ms]
+(pass) R19 profile revision invalidates accepted verification authority [15.98ms]
+(pass) R19/R23 accepted report cannot outlive deletion of its frozen contract and draft [15.39ms]
+
+api/domains/agent-runtime/test/rejection-logging.test.ts:
+(pass) rolled-back and stale rejections are not logged as committed failures [18.59ms]
+
+api/domains/agent-runtime/test/context.test.ts:
+(pass) quick Web work is bounded independently of question wording while Luna keeps exploration [0.57ms]
+(pass) retired evidence cannot be reported and its reference is never reassigned [0.13ms]
+(pass) fixed report schema publishes the same outcome/claim constraints as host validation [0.27ms]
+(pass) three distant ranges of one document keep immutable task evidence and use one document alias [0.11ms]
+(pass) evidence capacity stops additions without evicting previous references [0.55ms]
+(pass) fixed contract retains the whole request, removes needs and suggestions, and scopes operation references [0.24ms]
+(pass) one worker deadline policy reserves 30 seconds for the parent [0.02ms]
+(pass) bounded observations never register an excerpt absent from the actual model packet [0.62ms]
+(pass) R16/R17 check-only evidence remains in the union and verification receives the complete excerpt [0.13ms]
+
+api/domains/agent-runtime/test/requirements.test.ts:
+(pass) R10/R12/R14 request quote, profile merge and unknown/null constraints are fixed once [16.95ms]
+(pass) R08/R11 invalid quote and 13 conditions fail without truncating or saving any contract [14.38ms]
+
+api/domains/agent-runtime/test/control-output.test.ts:
+(pass) control diagnostics distinguish non-text, empty, fenced, oversized and malformed output without retaining the response [0.12ms]
+(pass) one whole JSON fence decodes without accepting surrounding prose, multiple blocks or malformed JSON [0.12ms]
+
+api/domains/agent-runtime/test/acquisition-tools.test.ts:
+(pass) new research never prefetches a legacy host lookup or imports cached candidates before requirements freeze [15.05ms]
+
+api/domains/agent-runtime/test/report.test.ts:
+(pass) parent receives summary and citation metadata; neither raw text, quotes nor titles cross boundary [0.07ms]
+(pass) unseen source and fabricated quote are refused; snippet and incomplete acquisition are partial [0.12ms]
+(pass) model-selected excerpt references become exact canonical quotes without copying or normalizing source text [0.07ms]
+(pass) references cannot cite missing sources, unseen text, another source's excerpt, or override canonical quotes [0.18ms]
+(pass) excerpt boundaries preserve Unicode and bound every quote to the public report contract [0.07ms]
+
+api/domains/agent-runtime/test/acquisition-plan.test.ts:
+(pass) A01 root proposal is stored, then bound to a child owned by the same root [8.83ms]
+(pass) A01 without a port nothing changes: bind refuses and resolve is unmatched [6.36ms]
+(pass) A01 port-less finish keeps the legacy 4-column report and projection shape (NULL new columns) [8.25ms]
+(pass) A01 bound finish stores the host-verified canonical report and safe projection, not the model's text [8.55ms]
+(pass) A01 prepareAnswer uses the stored safe projection and rechecks cached authority at adoption [5.56ms]
+(pass) A01 adopted evidence survives completion's revision bump; deletion or a changed report refuses it [6.56ms]
+(pass) A01 a cancelled tree releases its binding [6.33ms]
+(pass) A01 acquisitionMigration upgrades a legacy DB: old 4-column rows keep the legacy projection [18.12ms]
+
+api/domains/conversation/test/history.test.ts:
+(pass) H1/H5/H6/H8: exact search and ordered context exclude drafts, retractions, another conversation and the current request [15.48ms]
+(pass) H2/H3: 240 turns, identical timestamps and sparse rowids paginate without duplicate/lost IDs; 500-row scan returns a cursor even on zero matches [39.05ms]
+(pass) H2/H3: a large single message is scanned in finite chunks and a boundary-spanning match is not lost; read continues in Unicode positions [20.56ms]
+(pass) H4/H7: correction, append, retraction, TTL and restart invalidate cursors/views before adoption [10.06ms]
+
+api/domains/conversation/test/outbox.test.ts:
+(pass) append records an added event with memory-compatible revision, no text [10.37ms]
+(pass) principal and scope are injectable [9.56ms]
+(pass) message save and outbox event roll back together on a mid-save exception [12.39ms]
+(pass) correction changes the revision, emits corrected, and replay is idempotent [10.90ms]
+(pass) retraction removes the text, emits retracted once, and blocks correction/re-add [11.95ms]
+(pass) seq is increasing with gaps allowed and drafts have no path to the outbox [12.03ms]
+(pass) a database without the outbox migration keeps working unless required [10.77ms]
+(pass) correction scrubs the digest of superseded revisions but keeps seq order and the newest digest [13.06ms]
+(pass) without the retraction column reads and corrections work and retraction fails clearly [13.04ms]
+
+api/domains/conversation/test/conversation.test.ts:
+(pass) conversation saves and survives reopen; second writer is refused [19.06ms]
+(pass) answer motion can arrive before text, keeps the first choice, and survives upgrade/reopen [27.90ms]
+(pass) answer-wide delivery persists provenance, upgrades fallback, and keeps an adopted none stable [21.69ms]
+
+1 tests skipped:
+(skip) real-local-provider: one Scope end to end on a real Local Provider (NOT EXECUTED)
+
+ 1231 pass
+ 1 skip
+ 0 fail
+ 9810 expect() calls
+Ran 1232 tests across 164 files. [144.88s]
+[verify] web tests: /Users/y.noguchi/.bun/bin/bun x vitest run web
+
+ RUN  v4.1.8 /Users/y.noguchi/Code/eumenes
+
+
+ Test Files  53 passed (53)
+      Tests  253 passed (253)
+   Start at  20:26:48
+   Duration  9.02s (transform 2.79s, setup 0ms, import 14.59s, tests 11.27s, environment 46.74s)
+
+[verify] client tests: /Users/y.noguchi/.bun/bin/bun x vitest run client
+
+ RUN  v4.1.8 /Users/y.noguchi/Code/eumenes
+
+
+ Test Files  5 passed (5)
+      Tests  329 passed (329)
+   Start at  20:26:57
+   Duration  1.03s (transform 804ms, setup 0ms, import 1.77s, tests 133ms, environment 2.66s)
+
+[verify] design-system typecheck: /Users/y.noguchi/.bun/bin/bun run --cwd packages/design-system typecheck
+$ tsc --noEmit
+[verify] design-system tests: /Users/y.noguchi/.bun/bin/bun run --cwd packages/design-system test
+$ vitest run --project unit
+│ ┌────────────────────────────────────────────────────────────────────────────┐
+│ │  Info: Found a setup file with "setProjectAnnotations".                    │
+│ │  Skipping automatic provisioning of preview annotations to avoid           │
+│ │  conflicts. Since Storybook 10.3, "@storybook/addon-vitest" applies these  │
+│ │   automatically.                                                           │
+│ │  You can safely remove the "setProjectAnnotations" call from your setup    │
+│ │  file, or remove the file entirely if you don't have custom code there.    │
+│ └────────────────────────────────────────────────────────────────────────────┘
+
+ RUN  v4.0.16 /Users/y.noguchi/Code/eumenes/packages/design-system
+
+stdout | src/components/Calculator/Calculator.test.tsx
+Test setup running...
+
+stdout | src/components/Calculator/Calculator.test.tsx
+Test setup running...
+
+stdout | src/components/NavigationStepper/NavigationStepper.test.tsx
+Test setup running...
+
+stdout | src/components/Tabs/Tabs.test.tsx
+Test setup running...
+
+stdout | src/components/Tabs/Tabs.test.tsx
+Test setup running...
+
+stdout | src/components/NavigationStepper/NavigationStepper.test.tsx
+Test setup running...
+
+stdout | src/components/LanguageSelector/LanguageSelector.test.tsx
+Test setup running...
+
+stdout | src/components/Modal/Modal.test.tsx
+Test setup running...
+
+stdout | src/components/KeypadModal/KeypadModal.test.tsx
+Test setup running...
+
+stdout | src/components/Button/Button.test.tsx
+Test setup running...
+
+stdout | src/components/DropdownMenu/DropdownMenu.test.tsx
+Test setup running...
+
+stdout | src/components/LanguageSelector/LanguageSelector.test.tsx
+Test setup running...
+
+stdout | src/components/Modal/Modal.test.tsx
+Test setup running...
+
+stdout | src/components/KeypadModal/KeypadModal.test.tsx
+Test setup running...
+
+stdout | src/components/Button/Button.test.tsx
+Test setup running...
+
+stdout | src/components/Select/Select.test.tsx
+Test setup running...
+
+stdout | src/components/DropdownMenu/DropdownMenu.test.tsx
+Test setup running...
+
+stdout | src/components/Select/Select.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/NavigationStepper/NavigationStepper.test.tsx (8 tests) 275ms
+ ✓ |unit| src/components/Button/Button.test.tsx (37 tests) 326ms
+ ✓ |unit| src/components/Tabs/Tabs.test.tsx (12 tests) 368ms
+ ✓ |unit| src/components/KeypadModal/KeypadModal.test.tsx (22 tests) 667ms
+ ✓ |unit| src/components/LanguageSelector/LanguageSelector.test.tsx (8 tests) 591ms
+ ✓ |unit| src/components/Modal/Modal.test.tsx (36 tests) 620ms
+ ✓ |unit| src/components/DropdownMenu/DropdownMenu.test.tsx (19 tests) 852ms
+ ✓ |unit| src/components/Select/Select.test.tsx (23 tests) 864ms
+ ✓ |unit| src/components/Calculator/Calculator.test.tsx (12 tests) 1246ms
+stdout | src/components/TreeMenu/TreeMenu.test.tsx
+Test setup running...
+
+stdout | src/components/TreeMenu/TreeMenu.test.tsx
+Test setup running...
+
+stdout | src/components/Form/Form.test.tsx
+Test setup running...
+
+stdout | src/components/Form/Form.test.tsx
+Test setup running...
+
+stdout | src/components/Skeleton/Skeleton.test.tsx
+Test setup running...
+
+stdout | src/components/ActionButton/ActionButton.test.tsx
+Test setup running...
+
+stdout | src/components/Skeleton/Skeleton.test.tsx
+Test setup running...
+
+stdout | src/components/ActionButton/ActionButton.test.tsx
+Test setup running...
+
+stdout | src/components/ContentHeader/ContentHeader.test.tsx
+Test setup running...
+
+stdout | src/components/ContentHeader/ContentHeader.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/TreeMenu/TreeMenu.test.tsx (7 tests) 230ms
+stdout | src/components/ErrorState/ErrorState.test.tsx
+Test setup running...
+
+stdout | src/components/ErrorState/ErrorState.test.tsx
+Test setup running...
+
+stdout | src/components/Spinner/Spinner.test.tsx
+Test setup running...
+
+stdout | src/components/Spinner/Spinner.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/Form/Form.test.tsx (5 tests) 315ms
+stdout | src/components/ProgressBar/ProgressBar.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/Skeleton/Skeleton.test.tsx (38 tests) 367ms
+stdout | src/components/ProgressBar/ProgressBar.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/ActionButton/ActionButton.test.tsx (40 tests) 325ms
+ ✓ |unit| src/components/ErrorState/ErrorState.test.tsx (39 tests) 281ms
+ ✓ |unit| src/components/Spinner/Spinner.test.tsx (32 tests) 257ms
+ ✓ |unit| src/components/ContentHeader/ContentHeader.test.tsx (36 tests) 263ms
+ ✓ |unit| src/components/ProgressBar/ProgressBar.test.tsx (11 tests) 146ms
+stdout | src/components/Input/Input.test.tsx
+Test setup running...
+
+stdout | src/components/Input/Input.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/Input/Input.test.tsx (53 tests) 294ms
+stdout | src/components/Checkbox/Checkbox.test.tsx
+Test setup running...
+
+stdout | src/components/Checkbox/Checkbox.test.tsx
+Test setup running...
+
+stdout | src/components/TextInput/TextInput.test.tsx
+Test setup running...
+
+stdout | src/components/TextInput/TextInput.test.tsx
+Test setup running...
+
+stdout | src/components/ScaleInput/ScaleInput.test.tsx
+Test setup running...
+
+stdout | src/components/ScaleInput/ScaleInput.test.tsx
+Test setup running...
+
+stdout | src/components/Textarea/Textarea.test.tsx
+Test setup running...
+
+stdout | src/components/Textarea/Textarea.test.tsx
+Test setup running...
+
+stdout | src/components/CopyClipButton/CopyClipButton.test.tsx
+Test setup running...
+
+stdout | src/components/CopyClipButton/CopyClipButton.test.tsx
+Test setup running...
+
+stdout | src/components/RadioButtonGroup/RadioButtonGroup.test.tsx
+Test setup running...
+
+stdout | src/components/RadioButtonGroup/RadioButtonGroup.test.tsx
+Test setup running...
+
+stdout | src/components/ConfirmModal/ConfirmModal.test.tsx
+Test setup running...
+
+stdout | src/components/ConfirmModal/ConfirmModal.test.tsx
+Test setup running...
+
+stdout | src/components/ChatDock/ChatDock.test.tsx
+Test setup running...
+
+stdout | src/components/ChatDock/ChatDock.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/Checkbox/Checkbox.test.tsx (34 tests) 256ms
+ ✓ |unit| src/components/ScaleInput/ScaleInput.test.tsx (8 tests) 219ms
+ ✓ |unit| src/components/TextInput/TextInput.test.tsx (8 tests) 237ms
+ ✓ |unit| src/components/Textarea/Textarea.test.tsx (3 tests) 196ms
+ ✓ |unit| src/components/ConfirmModal/ConfirmModal.test.tsx (28 tests) 187ms
+ ✓ |unit| src/components/CopyClipButton/CopyClipButton.test.tsx (24 tests) 267ms
+ ✓ |unit| src/components/RadioButtonGroup/RadioButtonGroup.test.tsx (2 tests) 248ms
+ ✓ |unit| src/components/ChatDock/ChatDock.test.tsx (7 tests) 268ms
+stdout | src/components/ActionButton/CreateButton.test.tsx
+Test setup running...
+
+stdout | src/components/ActionButton/CreateButton.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/ActionButton/CreateButton.test.tsx (26 tests) 281ms
+stdout | src/components/NotificationToast/NotificationToast.test.tsx
+Test setup running...
+
+stdout | src/components/NotificationToast/NotificationToast.test.tsx
+Test setup running...
+
+stdout | src/components/OptionButtonGroup/OptionButtonGroup.test.tsx
+Test setup running...
+
+stdout | src/components/OptionButtonGroup/OptionButtonGroup.test.tsx
+Test setup running...
+
+stdout | src/components/ScrollArea/ScrollArea.test.tsx
+Test setup running...
+
+stdout | src/components/ScrollArea/ScrollArea.test.tsx
+Test setup running...
+
+stdout | src/components/SearchableSelect/SearchableSelect.test.tsx
+Test setup running...
+
+stdout | src/components/SearchableSelect/SearchableSelect.test.tsx
+Test setup running...
+
+stdout | src/components/Separator/Separator.test.tsx
+Test setup running...
+
+stdout | src/components/Separator/Separator.test.tsx
+Test setup running...
+
+stdout | src/components/Drawer/Drawer.test.tsx
+Test setup running...
+
+stdout | src/components/Drawer/Drawer.test.tsx
+Test setup running...
+
+stdout | src/components/AsyncDataWrapper/AsyncDataWrapper.test.tsx
+Test setup running...
+
+stdout | src/components/AsyncDataWrapper/AsyncDataWrapper.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/NotificationToast/NotificationToast.test.tsx (14 tests) 158ms
+stdout | src/components/AdaptiveText/AdaptiveText.test.tsx
+Test setup running...
+
+stdout | src/components/AdaptiveText/AdaptiveText.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/ScrollArea/ScrollArea.test.tsx (29 tests) 163ms
+ ✓ |unit| src/components/Separator/Separator.test.tsx (34 tests) 191ms
+ ✓ |unit| src/components/SearchableSelect/SearchableSelect.test.tsx (16 tests) 216ms
+ ✓ |unit| src/components/OptionButtonGroup/OptionButtonGroup.test.tsx (10 tests) 287ms
+ ✓ |unit| src/components/Drawer/Drawer.test.tsx (9 tests) 253ms
+ ✓ |unit| src/components/AsyncDataWrapper/AsyncDataWrapper.test.tsx (29 tests) 324ms
+ ✓ |unit| src/components/AdaptiveText/AdaptiveText.test.tsx (13 tests) 274ms
+stdout | src/components/SimpleSearchInput/SimpleSearchInput.test.tsx
+Test setup running...
+
+stdout | src/components/SimpleSearchInput/SimpleSearchInput.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/SimpleSearchInput/SimpleSearchInput.test.tsx (5 tests) 158ms
+stdout | src/components/MenuButtonGroup/MenuButtonGroup.test.tsx
+Test setup running...
+
+stdout | src/components/MenuButtonGroup/MenuButtonGroup.test.tsx
+Test setup running...
+
+stdout | src/components/Label/Label.test.tsx
+Test setup running...
+
+stdout | src/components/Label/Label.test.tsx
+Test setup running...
+
+stdout | src/components/ImageViewer/ImageViewer.test.tsx
+Test setup running...
+
+stdout | src/components/ImageViewer/ImageViewer.test.tsx
+Test setup running...
+
+stdout | src/components/InfiniteListMenu/InfiniteListMenu.test.tsx
+Test setup running...
+
+stdout | src/components/InfiniteListMenu/InfiniteListMenu.test.tsx
+Test setup running...
+
+stdout | src/components/MenuBar/MenuBar.test.tsx
+Test setup running...
+
+stdout | src/components/MenuBar/MenuBar.test.tsx
+Test setup running...
+
+stdout | src/components/SelectableTextInput/SelectableTextInput.test.tsx
+Test setup running...
+
+stdout | src/components/SelectableTextInput/SelectableTextInput.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/Label/Label.test.tsx (21 tests) 238ms
+stdout | src/components/EditableSelect/EditableSelect.test.tsx
+Test setup running...
+
+stdout | src/components/EditableSelect/EditableSelect.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/MenuButtonGroup/MenuButtonGroup.test.tsx (34 tests) 250ms
+stdout | src/components/Avatar/Avatar.test.tsx
+Test setup running...
+
+stdout | src/components/Avatar/Avatar.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/SelectableTextInput/SelectableTextInput.test.tsx (3 tests) 166ms
+ ✓ |unit| src/components/ImageViewer/ImageViewer.test.tsx (7 tests) 195ms
+ ✓ |unit| src/components/MenuBar/MenuBar.test.tsx (21 tests) 187ms
+ ✓ |unit| src/components/InfiniteListMenu/InfiniteListMenu.test.tsx (9 tests) 196ms
+ ✓ |unit| src/components/Avatar/Avatar.test.tsx (40 tests) 139ms
+ ✓ |unit| src/components/EditableSelect/EditableSelect.test.tsx (8 tests) 200ms
+stdout | src/components/Tooltip/Tooltip.test.tsx
+Test setup running...
+
+stdout | src/components/Tooltip/Tooltip.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/Tooltip/Tooltip.test.tsx (18 tests) 142ms
+stdout | src/components/MiniTable/MiniTable.test.tsx
+Test setup running...
+
+stdout | src/components/MiniTable/MiniTable.test.tsx
+Test setup running...
+
+stdout | src/components/Collapsible/Collapsible.test.tsx
+Test setup running...
+
+stdout | src/components/Collapsible/Collapsible.test.tsx
+Test setup running...
+
+stdout | src/components/NumberFormat/NumberFormat.test.tsx
+Test setup running...
+
+stdout | src/components/NumberFormat/NumberFormat.test.tsx
+Test setup running...
+
+stdout | src/components/DateFormat/DateFormat.test.tsx
+Test setup running...
+
+stdout | src/components/DateFormat/DateFormat.test.tsx
+Test setup running...
+
+stdout | src/components/Card/Card.test.tsx
+Test setup running...
+
+stdout | src/components/Card/Card.test.tsx
+Test setup running...
+
+stdout | src/components/DateDisplay/DateDisplay.test.tsx
+Test setup running...
+
+stdout | src/components/DateDisplay/DateDisplay.test.tsx
+Test setup running...
+
+stderr | src/components/Collapsible/Collapsible.test.tsx > Collapsible Components > Integration with Radix UI > handles Radix UI specific props
+React does not recognize the `asChild` prop on a DOM element. If you intentionally want it to appear in the DOM as a custom attribute, spell it as lowercase `aschild` instead. If you accidentally passed it from a parent component, remove it from the DOM element.
+React does not recognize the `forceMount` prop on a DOM element. If you intentionally want it to appear in the DOM as a custom attribute, spell it as lowercase `forcemount` instead. If you accidentally passed it from a parent component, remove it from the DOM element.
+React does not recognize the `defaultOpen` prop on a DOM element. If you intentionally want it to appear in the DOM as a custom attribute, spell it as lowercase `defaultopen` instead. If you accidentally passed it from a parent component, remove it from the DOM element.
+
+ ✓ |unit| src/components/Collapsible/Collapsible.test.tsx (27 tests) 77ms
+ ✓ |unit| src/components/NumberFormat/NumberFormat.test.tsx (16 tests) 81ms
+ ✓ |unit| src/components/MiniTable/MiniTable.test.tsx (4 tests) 156ms
+stdout | src/components/Badge/Badge.test.tsx
+Test setup running...
+
+stdout | src/components/Badge/Badge.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/DateFormat/DateFormat.test.tsx (32 tests) 85ms
+ ✓ |unit| src/components/Card/Card.test.tsx (42 tests) 106ms
+stdout | src/components/Pagination/Pagination.test.tsx
+Test setup running...
+
+stdout | src/components/Pagination/Pagination.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/DateDisplay/DateDisplay.test.tsx (13 tests) 203ms
+ ✓ |unit| src/components/Badge/Badge.test.tsx (22 tests) 101ms
+ ✓ |unit| src/components/Pagination/Pagination.test.tsx (7 tests) 56ms
+stdout | src/components/ViewSwitcher/ViewSwitcher.test.tsx
+Test setup running...
+
+stdout | src/components/ViewSwitcher/ViewSwitcher.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/ViewSwitcher/ViewSwitcher.test.tsx (4 tests) 52ms
+stdout | src/contexts/CalendarContext.test.tsx
+Test setup running...
+
+stdout | src/components/Switch/Switch.test.tsx
+Test setup running...
+
+stdout | src/contexts/CalendarContext.test.tsx
+Test setup running...
+
+stdout | src/components/Switch/Switch.test.tsx
+Test setup running...
+
+stdout | src/hooks/useMobile.test.ts
+Test setup running...
+
+stdout | src/hooks/useMobile.test.ts
+Test setup running...
+
+stdout | src/utils/cn.test.ts
+Test setup running...
+
+stdout | src/utils/cn.test.ts
+Test setup running...
+
+stdout | src/components/DigitalClock/DigitalClock.test.tsx
+Test setup running...
+
+ ✓ |unit| src/utils/cn.test.ts (2 tests) 5ms
+stdout | src/components/DigitalClock/DigitalClock.test.tsx
+Test setup running...
+
+ ✓ |unit| src/hooks/useMobile.test.ts (4 tests) 13ms
+ ✓ |unit| src/components/DigitalClock/DigitalClock.test.tsx (1 test) 1ms
+ ✓ |unit| src/contexts/CalendarContext.test.tsx (5 tests) 26ms
+ ✓ |unit| src/components/Switch/Switch.test.tsx (9 tests) 22ms
+
+ Test Files  59 passed (59)
+      Tests  1086 passed (1086)
+   Start at  20:27:01
+   Duration  11.30s (transform 2.38s, setup 9.68s, import 8.24s, tests 15.17s, environment 56.08s)
+
+[verify] web build: /Users/y.noguchi/.bun/bin/bun run build:web
+$ bun run build:design-system && vite build
+$ cd packages/design-system && bun run build
+$ tsc -p tsconfig.build.json && vite build
+vite v7.3.6 building client environment for production...
+transforming...
+✓ 1872 modules transformed.
+rendering chunks...
+
+[vite:dts] Start generate declaration files...
+computing gzip size...
+dist/design-system.css   79.91 kB │ gzip:  14.83 kB
+dist/index.mjs          459.19 kB │ gzip: 112.44 kB
+[vite:dts] Start rollup declaration files...
+Analysis will use the bundled TypeScript version 5.9.3
+[vite:dts] Declaration files built in 1969ms.
+
+dist/design-system.css   79.91 kB │ gzip: 14.83 kB
+dist/index.js           282.43 kB │ gzip: 88.93 kB
+✓ built in 4.01s
+vite v8.0.16 building client environment for production...
+[2K
+transforming...✓ 339 modules transformed.
+rendering chunks...
+computing gzip size...
+dist-web/assets/recorder.worklet-Bgy7XVhN.js     0.21 kB
+dist-web/index.html                              0.69 kB │ gzip:   0.35 kB
+dist-web/assets/research-routes-BHsgdAZs.css     0.67 kB │ gzip:   0.36 kB
+dist-web/assets/WorldPanel-BLKBvYjh.css          2.35 kB │ gzip:   0.80 kB
+dist-web/assets/service-tests-C7Hn8gw3.css       4.65 kB │ gzip:   1.37 kB
+dist-web/assets/ArtifactShowcase-BeMpeZcW.css    6.23 kB │ gzip:   1.77 kB
+dist-web/assets/index-DeAGh8ja.css             105.86 kB │ gzip:  20.52 kB
+dist-web/assets/rolldown-runtime-Cyuzqnbw.js     0.82 kB │ gzip:   0.47 kB
+dist-web/assets/ci-info-bi_Uoa3u.js              5.26 kB │ gzip:   1.98 kB
+dist-web/assets/research-routes-CELFi30m.js      6.31 kB │ gzip:   2.50 kB
+dist-web/assets/service-tests-Dc1Niuvr.js       13.70 kB │ gzip:   5.20 kB
+dist-web/assets/WorldPanel-D_NtOxJJ.js          17.20 kB │ gzip:   5.71 kB
+dist-web/assets/query-YehRu5uT.js               44.34 kB │ gzip:  13.46 kB
+dist-web/assets/SettingsPage-B0yCuON5.js        50.87 kB │ gzip:  16.55 kB
+dist-web/assets/zod-BSEiWcpk.js                 76.49 kB │ gzip:  20.33 kB
+dist-web/assets/ArtifactShowcase-BbcszIMc.js   132.83 kB │ gzip:  41.15 kB
+dist-web/assets/react-B3HVIE8t.js              181.78 kB │ gzip:  57.19 kB
+dist-web/assets/index-BHIGcYZs.js              387.36 kB │ gzip: 121.92 kB
+dist-web/assets/model-hmC4BBej.js              572.75 kB │ gzip: 145.53 kB
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 212ms
+[verify] browser fixture: /Users/y.noguchi/.bun/bin/bun x playwright test
+
+Running 43 tests using 1 worker
+
+(node:35272) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 tests/browser/artifact-showcase.spec.ts:74:1 › failed showcase import preserves the conversation and offers reload recovery @load-failure (1.8s)
+  ✓   2 tests/browser/artifact-showcase.spec.ts:111:1 › workspace boundary resizes with drag and keyboard, preserves drafts and disappears with the last artifact (1.1s)
+  ✓   3 tests/browser/artifact-showcase.spec.ts:182:1 › stacked boundary adjusts height and retains independent widths across viewport changes (1.0s)
+  ✓   4 tests/browser/artifact-showcase.spec.ts:232:1 › touch resize ends cleanly after release or cancellation (856ms)
+  ✓   5 tests/browser/artifact-showcase.spec.ts:280:1 › all six registered views render through OpenUI; compact JSON and Lang validation (1.5s)
+  ✓   6 tests/browser/artifact-showcase.spec.ts:329:1 › image placeholder, asynchronous completion, fullscreen, download, failure and cancellation (2.0s)
+  ✓   7 tests/browser/artifact-showcase.spec.ts:388:1 › radio answers have full-row targets, native keyboard selection and retain submitted answers (1.6s)
+  ✓   8 tests/browser/artifact-showcase.spec.ts:471:1 › question and form validation, retry, reset, input retention and duplicate submit protection (2.1s)
+  ✓   9 tests/browser/artifact-showcase.spec.ts:527:1 › settings theme shares the width and density toolbar and matches the visible preview (2.1s)
+  ✓  10 tests/browser/artifact-showcase.spec.ts:615:1 › memory correction and settings save affect only fixture state; theme, responsive layout and screenshots (1.8s)
+  ✓  11 tests/browser/artifact-showcase.spec.ts:680:1 › tabs use keyboard navigation; only the body has p-2 and closing the last tab removes the pane (799ms)
+  ✓  12 tests/browser/artifact-showcase.spec.ts:726:1 › sample operations show concrete results and only relevant test controls (2.7s)
+  ✓  13 tests/browser/artifact-showcase.spec.ts:795:1 › tabs fit the pane without horizontal scrolling and clearly distinguish selection, including zoom (2.2s)
+  ✓  14 tests/browser/artifact-showcase.spec.ts:875:1 › all design presets affect the sample and settings while the host and sample tabs stay unchanged (1.1s)
+  ✓  15 tests/browser/artifact-showcase.spec.ts:954:1 › every design token can be edited, invalid input preserves the preview, and reset restores all values (1.8s)
+  ✓  16 tests/browser/artifact-showcase.spec.ts:1067:1 › design token controls and long token names fit a mobile panel without horizontal scrolling (1.0s)
+  ✓  17 tests/browser/research-routes.spec.ts:40:1 › the settings panel reads, stops, releases and clears stored legacy records (2.4s)
+  ✓  18 tests/browser/timers.spec.ts:47:1 › a 90-second request opens the saved timer (8.6s)
+  ✓  19 tests/browser/timers.spec.ts:110:1 › the 24-hour clock fits a narrow artifact and is restored after reload (5.9s)
+  ✓  20 tests/browser/timers.spec.ts:145:1 › a persisted timer expires and its notice survives closing the clock (23.4s)
+  ✓  21 tests/browser/timers.spec.ts:201:1 › the timer has usable controls and fits both themes and a narrow screen (6.2s)
+  ✓  22 tests/browser/timers.spec.ts:249:1 › expiry plays one real beep and posts an assistant message even after the artifact closes (8.3s)
+  ✓  23 tests/browser/timers.spec.ts:308:1 › top-right banners and notification drawer fit desktop and mobile in both themes (15.3s)
+  ✓  24 tests/browser/timers.spec.ts:446:1 › a restored alarm waits for audio activation and then beeps and requests TTS (22.1s)
+  ✓  25 tests/browser/toolchain.spec.ts:60:2 › browser → API → child → web → summary → main: 東京の天気を調べて (16.6s)
+  ✓  26 tests/browser/toolchain.spec.ts:60:2 › browser → API → child → web → summary → main: AAPLの株価を調べて (13.4s)
+  ✓  27 tests/browser/voice.spec.ts:75:2 › light avatar rendering › light avatar stays behind usable chat and releases its canvas on navigation (20.8s)
+  ✓  28 tests/browser/voice.spec.ts:222:1 › avatar voice controls save and survive a settings reload (2.7s)
+  ✓  29 tests/browser/voice.spec.ts:382:1 › missing catalog or character preserves saved controls until an explicit default reset (647ms)
+  ✓  30 tests/browser/voice.spec.ts:490:1 › exported LARM token connects the UI and CLI without browser credentials (312ms)
+  ✓  31 tests/browser/voice.spec.ts:527:1 › a backend outage does not poll snapshots and explicit reconnect reloads the views (346ms)
+  ✓  32 tests/browser/voice.spec.ts:581:1 › text and browser audio complete through real services with fixture provider (9.2s)
+  ✓  33 tests/browser/voice.spec.ts:709:1 › settings save, reload, theme and automatic fallback use backend credentials (2.1s)
+  ✓  34 tests/browser/voice.spec.ts:851:1 › memory connection settings persist across reload and preserve saved items (764ms)
+  ✓  35 tests/browser/voice.spec.ts:892:1 › settings schedule controls create, pause, resume and cancel future work (622ms)
+  ✓  36 tests/browser/voice.spec.ts:928:1 › idle views keep one SSE stream without periodic snapshot requests (298ms)
+  ✓  37 tests/browser/voice.spec.ts:969:1 › failed notifications are visible while API works; returning to the page restores missed answers (1.3s)
+  ✓  38 tests/browser/voice.spec.ts:1050:1 › partial ASR and text arrive early; speech waits for the completed answer (10.1s)
+  ✓  39 tests/browser/voice.spec.ts:1134:1 › answer emotions sit beside Eumenes, neutral and legacy motions stay hidden, and reload preserves them (476ms)
+  ✓  40 tests/browser/voice.spec.ts:1235:1 › settings playground exercises image, music and provider health through the API (2.3s)
+  ✓  41 tests/browser/voice.spec.ts:1278:1 › a long question with a one-second pause is sent once after final silence (14.6s)
+  ✓  42 tests/browser/world.spec.ts:83:1 › the list separates the axes and never styles hypothesis or measurement as confirmed; conflict, retract and forget behave honestly; a restart finishes the forget (4.8s)
+  -  43 tests/browser/voice-media.spec.ts:51:1 › fake microphone speech reaches the transcript through the AudioWorklet
+
+  1 skipped
+  42 passed (3.7m)
+237 | 			"test:domain",
+238 | 			"--",
+239 | 			selected[0] ?? "",
+240 | 		]);
+241 | 	if ((await revision()) !== startHash)
+242 | 		throw new Error("source changed during verification");
+                  ^
+error: source changed during verification
+      at /Users/y.noguchi/Code/eumenes/scripts/verify.ts:242:13
+
+error: script "verify:all" exited with code 1

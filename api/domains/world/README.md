@@ -128,13 +128,25 @@ creates no job and so no model call.
   `extract_cancel_unconfirmed` (no retry) and the next execute is refused
   (`extract_slot_busy`) until it ends: the slot is not reused.
 - settle: any source version that moved since prepare voids the result (nothing
-  adopted, events stay pending). Otherwise `validateCandidates` runs against the
+  adopted, events stay pending). The prompt/interpretation version/entities JSON
+  snapshot is also rechecked; changing it voids the old result. Otherwise `validateCandidates` runs against the
   current states; ids, lifecycle (always `candidate`), origin, evidence ids and
   times are assigned by the host, never the model. Malformed/oversize output ->
   events `rejected` (final). 9th and later candidates -> `CANDIDATE_OVERFLOW`.
   Accepted drafts and the manifest go through `candidate.settle` per event, in
   order, in the queue's settle transaction with the inference receipt; any
   failure rolls everything back.
+- Any `held` candidate holds the WHOLE window: no drafts, package settle or applied
+  cursor are written. Host and package inbox stay `received`. Memory manifests and
+  the inference request are released using the existing lifecycle. A host-only
+  `held_context_digest` prevents another job/request for the same extraction
+  context, including after restart. New context permits re-evaluation. An unchanged
+  held head blocks later application; source retraction/correction and forget still
+  take priority. Empty valid output and final rejected output keep their existing policy.
+- `world/0008-extraction-hold` appends a nullable column; old terminal events are
+  not reopened and history is not re-extracted. An older binary refuses a database
+  with this unknown migration. Downgrade by ignoring the column is not supported;
+  keep the migrated binary or use a separately planned backup restoration.
 - Failures that are not about the content (provider unavailable, timeout, Memory
   refusal) leave the events pending with an exponential backoff (30 s .. 15 min).
 
@@ -231,7 +243,9 @@ never by a body or a query string.
   and fakes (`test/extraction-handler.test.ts`). Extraction quality on a real model is not measured.
 - World's entities cannot be listed through the package, so the production
   default for `extraction.entities` is none: every named subject is held
-  (`SUBJECT_UNRESOLVED`) until a listing exists. Subjects by id still resolve.
+  (`SUBJECT_UNRESOLVED`) until a listing exists. IDs also need to exist in the
+  supplied entity snapshot; an empty snapshot does not resolve them. This fix
+  preserves held input but does not supply the missing production listing port.
 - No product entry point forgets a message yet. Nothing calls `conversation.retract` or Memory's host-source forget in production; the acceptance test composes both. The consumers handle either when it happens.
 - Only the default Scope (`local:owner` / `profile:owner`) is consumed.
 - Answers already adopted stay in the conversation history. They are conversation data and are removed by the conversation domain, not by World.

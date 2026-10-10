@@ -35,6 +35,7 @@ export interface BackgroundControl {
 	maxOutputTokens: number;
 }
 export interface InferencePort {
+	codexResearchAvailable?(): boolean;
 	captureBackgroundControlInTransaction?(
 		db: Database,
 		input: BackgroundControl,
@@ -47,6 +48,7 @@ export interface InferencePort {
 			policySubject: string;
 			deadline: number;
 			maxOutputTokens: number;
+			engine?: "codex_luna";
 		},
 	): string;
 	executeControl?(
@@ -104,6 +106,7 @@ export interface InferencePort {
 		voiceSubject: string,
 		runSubject: string,
 		deadline?: number,
+		validation?: { validationRequestIds: string[] },
 	): void;
 	cancelSubject?(subject: string): Promise<void>;
 	snapshotInTransaction?(db: Database): Settings;
@@ -129,6 +132,8 @@ export interface InferencePort {
 	): string;
 	liveRequest?(id: string): boolean;
 	acceptInTransaction?(db: Database, receipt: Receipt): boolean;
+	/** Check a control receipt before delegation without adopting an answer. */
+	validateReceiptInTransaction?(db: Database, receipt: Receipt): boolean;
 	validRequest?(id: string): boolean;
 	validInTransaction?(db: Database, id: string): boolean;
 	skipInTransaction?(db: Database, subject: string, purpose: Purpose): void;

@@ -1,0 +1,131 @@
+{
+	"at": "2026-10-10T11:10:06.870Z",
+	"casesPath": "/Users/y.noguchi/Code/eumenes/api/application/testdata/llm-native/cases.json",
+	"repeats": 2,
+	"lane": "live",
+	"accepted": false,
+	"results": [
+		{
+			"caseId": "event-complete",
+			"repeat": 1,
+			"elapsedMs": 50207,
+			"status": "failed",
+			"engine": "default",
+			"structureMatched": false,
+			"semanticChecks": [
+				{
+					"assertion": "依頼の全条件が保持され、根拠にない値を補わない",
+					"status": "unchecked"
+				},
+				{
+					"assertion": "本文内の開始・締切・否定・例外・矛盾を区別する",
+					"status": "unchecked"
+				}
+			],
+			"model": [
+				{
+					"purpose": "llm",
+					"source": "larm",
+					"model": "gemma4-26b-a4b",
+					"status": "succeeded",
+					"elapsedMs": 5556
+				},
+				{
+					"purpose": "llm",
+					"source": "larm",
+					"model": "gemma4-26b-a4b",
+					"status": "succeeded",
+					"elapsedMs": 24518
+				},
+				{
+					"purpose": "llm",
+					"source": "larm",
+					"model": "gemma4-26b-a4b",
+					"status": "succeeded",
+					"elapsedMs": 20071
+				}
+			],
+			"counts": {
+				"conversation": 1,
+				"parent": 1,
+				"worker": 1,
+				"verify": {
+					"n": 0
+				},
+				"tools": 0
+			},
+			"unknownCount": 0,
+			"safeCode": "invalid_requirement_schema",
+			"report": null,
+			"lane": "live_model_fixed_artificial_sources"
+		},
+		{
+			"caseId": "event-complete",
+			"repeat": 2,
+			"elapsedMs": 48052,
+			"status": "failed",
+			"engine": "default",
+			"structureMatched": false,
+			"semanticChecks": [
+				{
+					"assertion": "依頼の全条件が保持され、根拠にない値を補わない",
+					"status": "unchecked"
+				},
+				{
+					"assertion": "本文内の開始・締切・否定・例外・矛盾を区別する",
+					"status": "unchecked"
+				}
+			],
+			"model": [
+				{
+					"purpose": "llm",
+					"source": "larm",
+					"model": "gemma4-26b-a4b",
+					"status": "succeeded",
+					"elapsedMs": 5616
+				},
+				{
+					"purpose": "llm",
+					"source": "larm",
+					"model": "gemma4-26b-a4b",
+					"status": "succeeded",
+					"elapsedMs": 17867
+				},
+				{
+					"purpose": "llm",
+					"source": "larm",
+					"model": "gemma4-26b-a4b",
+					"status": "succeeded",
+					"elapsedMs": 14778
+				},
+				{
+					"purpose": "llm",
+					"source": "larm",
+					"model": "gemma4-26b-a4b",
+					"status": "succeeded",
+					"elapsedMs": 5917
+				},
+				{
+					"purpose": "llm",
+					"source": "larm",
+					"model": "gemma4-26b-a4b",
+					"status": "succeeded",
+					"elapsedMs": 3795
+				}
+			],
+			"counts": {
+				"conversation": 1,
+				"parent": 1,
+				"worker": 3,
+				"verify": {
+					"n": 0
+				},
+				"tools": 1
+			},
+			"unknownCount": 0,
+			"safeCode": "invalid_requirement_report",
+			"report": null,
+			"lane": "live_model_fixed_artificial_sources"
+		}
+	]
+}

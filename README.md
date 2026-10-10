@@ -5,7 +5,7 @@ TypeScript、Bun、Hono、React、SQLite によるローカル音声対話の初
 ## クイックスタート
 
 1. `bun install`
-2. `.env.example` を `.env` にコピーし、`LARM_BASE_URL`(例 `http://<LARMのホスト>:9810`)と、`LARM_API_TOKEN`(export 済みでもよい)を設定します。`EUMENES_API_TOKEN` は空欄なら初回起動時に自動生成されます。
+2. 必要に応じて `.env.example` を `.env` にコピーし、`LARM_API_TOKEN` を設定します（export 済みでもよい）。LARMの接続先は「設定 → 接続」で保存し、SQLite内の設定を使います。`EUMENES_API_TOKEN` は空欄なら初回起動時に自動生成されます。
 3. `bun run dev` で API と画面用サーバーを起動します(Ctrl+C で両方終了)。個別に起動する場合は `bun run start` と `bun run dev:web` を使います。
 4. `http://127.0.0.1:5173` を開き、「音声を開始」でマイクを許可して日本語で話します。「停止」で録音と再生を終了します。
 
@@ -44,7 +44,7 @@ bun run verify -- --domain audio
 bun run verify -- --domain voice-dialogue
 bun run test:domain -- conversation
 bun run verify:all
-LARM_BASE_URL=... EUMENES_LIVE_ASR_WAV=/absolute/path/speech.wav EUMENES_LIVE_EXPECT_TEXT=こんにちは bun run verify:live -- --domain larm
+EUMENES_LIVE_ASR_WAV=/absolute/path/speech.wav EUMENES_LIVE_EXPECT_TEXT=こんにちは bun run verify:live -- --domain larm
 ```
 
 - `bun run verify -- --domain <name>` は対象 domain と型依存閉包の format、lint、型、境界、domain 試験を実行します。`verify:all` は全 TypeScript、保存・画面 build、ブラウザ fixture を含みます。

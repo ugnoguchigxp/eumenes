@@ -1,3 +1,5 @@
+import type { LarmPort } from "../../larm";
+import { withLanguageControl } from "./control-fixture";
 import { expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -14,7 +16,6 @@ import {
 	migration as dialogueMigration,
 	queueLinkMigration,
 } from "../../dialogue";
-import type { LarmPort } from "../../larm";
 import { createQueue, migration as queueMigration } from "../../queue";
 import { createVoiceDialogue, migration, sequenceMigration } from "..";
 import { SpeechSentences } from "../service/sentences";
@@ -35,7 +36,7 @@ test("voice capture to ASR, dialogue, TTS; duplicate utterance is ignored", asyn
 	let asr = 0,
 		llm = 0,
 		tts = 0;
-	const larm: LarmPort = {
+	const larm = withLanguageControl({
 		status: () => ({ state: "ready", capabilities: ["llm", "asr", "tts"] }),
 		connect: async () => {},
 		answer: async () => {
@@ -51,7 +52,7 @@ test("voice capture to ASR, dialogue, TTS; duplicate utterance is ignored", asyn
 			return wav;
 		},
 		close: async () => {},
-	};
+	});
 	try {
 		const store = openStore(join(dir, "db.sqlite3"), [
 			conversationMigration,
@@ -125,14 +126,14 @@ test("voice capture to ASR, dialogue, TTS; duplicate utterance is ignored", asyn
 
 test("restart cancels the run of a stale voice turn so no old answer is spoken", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-voice-recover-"));
-	const larm: LarmPort = {
+	const larm = withLanguageControl({
 		status: () => ({ state: "ready", capabilities: ["llm", "asr", "tts"] }),
 		connect: async () => {},
 		answer: () => new Promise(() => {}),
 		transcribe: async () => "質問",
 		speak: async () => wav,
 		close: async () => {},
-	};
+	});
 	try {
 		const store = openStore(join(dir, "db.sqlite3"), [
 			conversationMigration,
@@ -192,7 +193,7 @@ test("evicting cached audio also clears the ready state", async () => {
 			sequenceMigration,
 		]);
 		const dialogue = {
-			submit: async () => ({ id: crypto.randomUUID(), deadlineAt: null }),
+			submitVoice: async () => ({ id: crypto.randomUUID(), deadlineAt: null }),
 			get: () => ({ status: "completed" }),
 			subscribeProgress: () => () => {},
 			waitForTerminal: async () => ({
@@ -202,14 +203,14 @@ test("evicting cached audio also clears the ready state", async () => {
 			answerText: () => "回答",
 			cancel: async () => null,
 		} as unknown as ReturnType<typeof createDialogueService>;
-		const larm: LarmPort = {
+		const larm = withLanguageControl({
 			status: () => ({ state: "ready", capabilities: ["llm", "asr", "tts"] }),
 			connect: async () => {},
 			answer: async () => "回答",
 			transcribe: async () => "質問",
 			speak: async () => wav,
 			close: async () => {},
-		};
+		});
 		const voice = createVoiceDialogue(store, dialogue, larm);
 		const sessionId = crypto.randomUUID();
 		voice.start(sessionId, 1);
@@ -242,7 +243,7 @@ test("stopping a session fences acceptance waiting in the writer queue", async (
 		sequenceMigration,
 	]);
 	let asr = 0;
-	const larm: LarmPort = {
+	const larm = withLanguageControl({
 		status: () => ({ state: "ready", capabilities: ["asr"] }),
 		connect: async () => {},
 		answer: async () => "answer",
@@ -252,7 +253,7 @@ test("stopping a session fences acceptance waiting in the writer queue", async (
 		},
 		speak: async () => wav,
 		close: async () => {},
-	};
+	});
 	const voice = createVoiceDialogue(
 		store,
 		{} as ReturnType<typeof createDialogueService>,
@@ -385,7 +386,7 @@ test("a clause that keeps failing is skipped and the rest is still spoken", asyn
 			sequenceMigration,
 		]);
 		const dialogue = {
-			submit: async () => ({ id: crypto.randomUUID(), deadlineAt: null }),
+			submitVoice: async () => ({ id: crypto.randomUUID(), deadlineAt: null }),
 			get: () => ({ status: "completed" }),
 			subscribeProgress: () => () => {},
 			waitForTerminal: async () => ({
@@ -396,7 +397,7 @@ test("a clause that keeps failing is skipped and the rest is still spoken", asyn
 			cancel: async () => null,
 		} as unknown as ReturnType<typeof createDialogueService>;
 		const calls: string[] = [];
-		const larm: LarmPort = {
+		const larm = withLanguageControl({
 			status: () => ({ state: "ready", capabilities: ["llm", "asr", "tts"] }),
 			connect: async () => {},
 			answer: async () => "回答",
@@ -407,7 +408,7 @@ test("a clause that keeps failing is skipped and the rest is still spoken", asyn
 				return wav;
 			},
 			close: async () => {},
-		};
+		});
 		const voice = createVoiceDialogue(store, dialogue, larm);
 		const sessionId = crypto.randomUUID(),
 			utteranceId = crypto.randomUUID();

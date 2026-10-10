@@ -36,6 +36,8 @@ export type ExtractionInference = {
 			value: string | Uint8Array;
 		},
 	): boolean;
+	/** Existing inference authority check, without marking a held result adopted. */
+	validateReceiptInTransaction(db: Database, receipt: Receipt): boolean;
 	rejectControlInTransaction(
 		db: Database,
 		receipt: {
@@ -91,6 +93,7 @@ export type PreparedExtraction = {
 		rootEvidenceId: string;
 	}[];
 	entities: unknown[];
+	contextDigest: string;
 	requestId: string;
 	messages: Message[];
 	dependentIds: string[];
@@ -209,7 +212,7 @@ export type ExtractionOptions = {
 	 */
 	foreground?: ForegroundSignal;
 	purpose?: string;
-	/** Entities World knows in the Scope (the package has no read API for them; default: none). */
+	/** Synchronous JSON snapshot in stable order (no public package listing yet; default: none). */
 	entities?: (db: Database, scope: ScopeRef) => readonly unknown[];
 	clock?: () => number;
 	id?: () => string;

@@ -1,5 +1,3 @@
-import { isPublicJsonSource, fetchPublicJson } from "./public-json";
-import { publicSourceText, weatherPageText } from "../service/source-text";
 import {
 	createLlmFetch,
 	createSafeHttpFetcher,
@@ -94,14 +92,6 @@ function limited(text: string, characters: number) {
 	const value = text.slice(0, characters);
 	return /[\uD800-\uDBFF]$/u.test(value) ? value.slice(0, -1) : value;
 }
-/**
- * Host-side finite normalization of known public sources. Public JSON and Yahoo!天気 pinpoint city pages
- * become short, typed text the route validator can check; every other page is returned unchanged.
- */
-export function sourceText(url: string, text: string): string {
-	if (isPublicJsonSource(url)) return publicSourceText(url, text);
-	return weatherPageText(text) ?? text;
-}
 export function acquisitionError(error: unknown): string {
 	if (error instanceof LlmFetchError)
 		return error.guardDecision === "require_approval"
@@ -158,21 +148,19 @@ export function createWebAcquisition(
 	}> {
 		const transport =
 			options.fetcher ??
-			(isPublicJsonSource(url)
-				? fetchPublicJson
-				: createSafeHttpFetcher({
-						timeoutMs: 15000,
-						userAgent: "Eumenes/0.1 (llm-fetch/0.1.2)",
-						allowedContentTypes: [
-							"text/html",
-							"text/plain",
-							"application/xhtml+xml",
-							"application/xml",
-							"text/xml",
-							"text/markdown",
-							"application/json",
-						],
-					}));
+			createSafeHttpFetcher({
+				timeoutMs: 15000,
+				userAgent: "Eumenes/0.1 (llm-fetch/0.1.2)",
+				allowedContentTypes: [
+					"text/html",
+					"text/plain",
+					"application/xhtml+xml",
+					"application/xml",
+					"text/xml",
+					"text/markdown",
+					"application/json",
+				],
+			});
 		let headers: Readonly<Record<string, string>> = {};
 		let status = 200;
 		let timing = { requestedAtMs: now(), receivedAtMs: now() };
@@ -222,7 +210,7 @@ export function createWebAcquisition(
 			const requested = new URL(url),
 				final = new URL(doc.finalUrl);
 			requested.hash = final.hash = "";
-			const text = sourceText(url, doc.text).replaceAll("\r\n", "\n");
+			const text = doc.text.replaceAll("\r\n", "\n");
 			return {
 				body: {
 					url: doc.finalUrl,

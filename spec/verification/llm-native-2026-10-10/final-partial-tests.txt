@@ -1,0 +1,251 @@
+bun test v1.4.2 (744846f84)
+
+api/application/dev.test.ts:
+(pass) bun run dev serves browser requests on 127.0.0.1 and Ctrl+C releases both ports [493.00ms]
+(pass) bun run dev serves browser requests on localhost and Ctrl+C releases both ports [499.06ms]
+(pass) dev refuses --host before exposing the authenticated proxy [29.61ms]
+(pass) dev refuses --host 0.0.0.0 before exposing the authenticated proxy [27.41ms]
+(pass) occupied API port is reported without starting Web or stopping its owner [30.25ms]
+(pass) Vite port failure stops the API instead of silently moving Web to another port [492.87ms]
+
+api/application/logging.test.ts:
+(pass) real backend persists startup, correlated job failure and final shutdown without credentials or conversation text [370.83ms]
+
+api/application/requirements-client.test.ts:
+(pass) requirements API client and CLI keep CAS and enable/disable state through authenticated HTTP [347.52ms]
+
+api/application/requirements-toolchain.test.ts:
+(pass) data-only requirement host fixture: event-complete [77.66ms]
+(pass) data-only requirement host fixture: event-missing [69.10ms]
+(pass) data-only requirement host fixture: facility-complete [72.14ms]
+(pass) data-only requirement host fixture: facility-conflict [60.50ms]
+(pass) data-only requirement host fixture: product-target [61.66ms]
+(pass) data-only requirement host fixture: product-old [59.79ms]
+(pass) data-only requirement host fixture: event-complete-luna [64.97ms]
+(pass) data-only requirement host fixture: event-missing-luna [62.90ms]
+(pass) data-only requirement host fixture: facility-complete-luna [60.18ms]
+(pass) data-only requirement host fixture: facility-conflict-luna [63.42ms]
+(pass) data-only requirement host fixture: product-target-luna [60.63ms]
+(pass) data-only requirement host fixture: product-old-luna [59.43ms]
+(pass) data-only requirement host fixture: lodging-complete [63.46ms]
+(pass) data-only requirement host fixture: lodging-complete-luna [63.43ms]
+(pass) data-only requirement host fixture: lodging-missing [63.41ms]
+(pass) data-only requirement host fixture: lodging-missing-luna [62.49ms]
+(pass) data-only requirement host fixture: rental-complete [66.72ms]
+(pass) data-only requirement host fixture: rental-complete-luna [62.40ms]
+(pass) data-only requirement host fixture: rental-missing [59.20ms]
+(pass) data-only requirement host fixture: rental-missing-luna [61.99ms]
+
+api/domains/settings/test/settings.test.ts:
+(pass) backend live evaluation reads the saved LARM connection without changing settings [15.14ms]
+(pass) new voice settings wait for a conversational pause and retain a saved custom interval [10.04ms]
+(pass) old settings retain normal playback; speech adjustments validate and persist [9.92ms]
+(pass) coding supervision instruction approval defaults to on, including for saved documents without it [8.79ms]
+(pass) bootstraps once; atomic revision and idempotency; encrypted secret never in document [9.42ms]
+(pass) revocation epochs cannot be reset by client; origin changes cannot reuse credential [8.91ms]
+(pass) missing or wrong master key preserves data, disables ciphertext and does not regenerate [9.29ms]
+(pass) deleting then recreating the same connection ID cannot revive old permissions [9.65ms]
+(pass) malformed LARM URLs are validation errors and same-host requires loopback [9.10ms]
+(pass) key replacement, key deletion and connection deletion discard obsolete ciphertext [10.86ms]
+(pass) envRef must be allowlisted when saved and when resolved [11.05ms]
+(pass) cloud connections require https outside private networks [0.14ms]
+(pass) a saved http cloud URL still loads, but applying it is rejected [9.41ms]
+(pass) credential ciphertext is bound to its row [10.94ms]
+(pass) v1 ciphertext is upgraded to v2 on startup and survives restart [13.69ms]
+(pass) keyDir option and EUMENES_KEY_DIR relocate the master key [14.00ms]
+
+api/domains/dialogue/test/post-answer.test.ts:
+(pass) E01 observer is called after adoption with ids only and its writes commit [19.61ms]
+(pass) E01 observer throw or skipped rolls back only the learning part [37.08ms]
+(pass) E01 without an observer the answer completes as before [17.82ms]
+
+api/domains/dialogue/test/queue.test.ts:
+(pass) a run only sees earlier accepted turns; later inputs never leak into it [16.63ms]
+(pass) a failed earlier run leaves only its input in later history [11.62ms]
+(pass) full queue rejects the submit and stores neither message nor run [10.57ms]
+(pass) restart: queued runs continue, a running run is interrupted, late result from the old owner is rejected [14.78ms]
+(pass) runs from before the queue existed are interrupted, not given a new job [12.87ms]
+(pass) scheduled prompt creates exactly one background run per occurrence; interactive input is claimed first [17.84ms]
+(pass) waitForTerminal honours abort and its own deadline without cancelling the run [50.83ms]
+(pass) rejected answer adoption fails both the run and its queue job [12.47ms]
+(pass) only adopted, confident motion labels a running or completed answer; cancelled judgments are rejected [13.48ms]
+(pass) emotion context excludes later accepted inputs and uses the complete answer [12.81ms]
+
+api/domains/dialogue/test/world-release.test.ts:
+(pass) a report invalidated at adoption releases the World context's input dependencies [17.22ms]
+(pass) a Memory adoption refusal releases the World context's input dependencies and records no usage [17.17ms]
+(pass) an adopted answer keeps its dependencies (control) [17.10ms]
+(pass) a pre-send check that cannot run (busy writer) sends nothing and ends the run with a content-free code [15.08ms]
+
+api/domains/dialogue/test/research-result-context.test.ts:
+(pass) final generation retains every request clause, reference block and report while trimming only optional history [0.44ms]
+(pass) required request overflow is explicit and cannot silently discard the request [0.06ms]
+
+api/domains/dialogue/test/controller.test.ts:
+(pass) dialogue controller validates requests and delegates one run [12.03ms]
+
+api/domains/dialogue/test/dialogue.test.ts:
+(pass) request ID is idempotent and answer adoption is atomic [18.48ms]
+(pass) failed input persistence prevents any provider request [0.18ms]
+(pass) cancelled inference cannot append an answer [43.93ms]
+
+api/domains/dialogue/test/research-routing.test.ts:
+(pass) researcher selection follows the LLM tool call regardless of topic [0.21ms]
+(pass) Luna is not callable when unavailable and cannot request history or coding scope [0.24ms]
+
+api/domains/dialogue/test/memory-integration.test.ts:
+(pass) a remembered fact is recalled in the next answer with a usage receipt, and Memory OFF injects nothing [67.02ms]
+(pass) disconnect during generation prevents adoption even after reconnect=false [39.31ms]
+(pass) disconnect during generation prevents adoption even after reconnect=true [40.85ms]
+(pass) continuity (goal / open question) is part of the recalled context [24.17ms]
+(pass) a correction during generation prevents adopting the answer [39.00ms]
+(pass) forgetting erases the value, survives restart, and is re-applied on a restored old database [62.20ms]
+(pass) a tampered journal makes memory unavailable (fail closed) instead of being used [43.33ms]
+(pass) stopping an item is reversible and removes it from the next answer; invalid sources are rejected [36.36ms]
+(pass) expired items are not recalled as current understanding [39.16ms]
+(pass) a period that has not started yet is not current understanding; a month-precision start that has passed is [42.18ms]
+(pass) forget validates the id, never wipes receipts via wildcards, and also forgets older versions of the same fact [49.35ms]
+(pass) a failed apply after the journal append is reconciled instead of poisoning the journal [368.72ms]
+(pass) a torn journal line disables memory without crashing startup, and listing fails closed [43.82ms]
+(pass) size and count limits keep the recalled context inside its budget; bad periods are caller errors [41.00ms]
+(pass) a reference text with newlines cannot forge extra lines in the reference block [42.19ms]
+(pass) the recalled context stays inside its byte budget: writes that would overflow are refused, runs keep working [72.81ms]
+(pass) an empty memory does not fix a view: adding a fact mid-run does not fail the run and no receipt is written [32.64ms]
+(pass) memory-backed text is not streamed before adoption [130.28ms]
+(pass) stop / resume / retract reject malformed ids as client errors, and a concurrent recover cannot misread the journal [38.62ms]
+(pass) resuming an item whose fact was re-stated is a client error, not a revision conflict [35.00ms]
+(pass) future-dated items count against the budget too, so they cannot make runs fail when they start [39.86ms]
+(pass) a long streamed answer is not double counted for memory-backed runs [39.39ms]
+(pass) receipts of a forget that was only re-applied on startup are purged [57.32ms]
+(pass) a long multibyte conversation id works for continuity and runs [30.58ms]
+(pass) the journal creates its directory on demand and repairs a missing trailing newline [5.00ms]
+
+api/domains/dialogue/test/research-citations.test.ts:
+(pass) research preserves acquired URLs and removes fabricated or obsolete citations [0.25ms]
+(pass) a failed report grants no citations, even if an earlier turn supplied that URL [0.19ms]
+
+api/domains/dialogue/test/conversation-generation.test.ts:
+(pass) ordinary dialogue streams one call and keeps preceding conversational context [0.29ms]
+(pass) one native research operation publishes no control text [0.13ms]
+(pass) malformed native arguments get exactly one structural correction [0.20ms]
+(pass) aborted generation never starts a correction [0.09ms]
+
+api/domains/dialogue/test/world-context.test.ts:
+(pass) native delegation rejects correction changed after generation without starting a child [62.80ms]
+(pass) native delegation rejects policy changed after generation without starting a child [56.92ms]
+(pass) native delegation rejects receipt changed after generation without starting a child [52.15ms]
+(pass) valid path: one answer and ONE receipt tying slice digest, versions, package, run, attempt and provider [52.63ms]
+(pass) prompt injection: the claim text reaches the model only as escaped data inside the delimiters [51.09ms]
+(pass) A40: correction injected after_prepare leaves no answer and no usage record [102.13ms]
+(pass) A40: refutation injected after_prepare leaves no answer and no usage record [108.17ms]
+(pass) A40: forget injected after_prepare leaves no answer and no usage record [110.35ms]
+(pass) A40: policy injected after_prepare leaves no answer and no usage record [104.64ms]
+(pass) A40: goal injected after_prepare leaves no answer and no usage record [102.73ms]
+(pass) A40: attempt injected after_prepare leaves no answer and no usage record [244.82ms]
+(pass) A40: cancel injected after_prepare leaves no answer and no usage record [108.14ms]
+(pass) A40: correction injected before_send leaves no answer and no usage record [102.60ms]
+(pass) A40: refutation injected before_send leaves no answer and no usage record [106.60ms]
+(pass) A40: forget injected before_send leaves no answer and no usage record [103.90ms]
+(pass) A40: policy injected before_send leaves no answer and no usage record [101.85ms]
+(pass) A40: goal injected before_send leaves no answer and no usage record [103.64ms]
+(pass) A40: attempt injected before_send leaves no answer and no usage record [241.79ms]
+(pass) A40: cancel injected before_send leaves no answer and no usage record [103.57ms]
+(pass) A40: correction injected during_generation leaves no answer and no usage record [103.58ms]
+(pass) A40: refutation injected during_generation leaves no answer and no usage record [106.62ms]
+(pass) A40: forget injected during_generation leaves no answer and no usage record [102.34ms]
+(pass) A40: policy injected during_generation leaves no answer and no usage record [101.29ms]
+(pass) A40: goal injected during_generation leaves no answer and no usage record [100.79ms]
+(pass) A40: attempt injected during_generation leaves no answer and no usage record [261.42ms]
+(pass) A40: cancel injected during_generation leaves no answer and no usage record [124.48ms]
+(pass) A40: correction injected before_settle leaves no answer and no usage record [114.47ms]
+(pass) A40: refutation injected before_settle leaves no answer and no usage record [108.97ms]
+(pass) A40: forget injected before_settle leaves no answer and no usage record [104.06ms]
+(pass) A40: policy injected before_settle leaves no answer and no usage record [102.42ms]
+(pass) A40: goal injected before_settle leaves no answer and no usage record [102.30ms]
+(pass) A40: attempt injected before_settle leaves no answer and no usage record [254.81ms]
+(pass) A40: cancel injected before_settle leaves no answer and no usage record [105.84ms]
+(pass) cancel is not recall: a late result after cancel is rejected, but what was already sent stays sent [203.79ms]
+(pass) a refused inference receipt adopts neither the answer nor a usage record [56.83ms]
+(pass) blocked is never turned into a World-less success: no budget ends the run with a reason [52.24ms]
+(pass) World OFF is unchanged: no World message, no usage, no registration; the answer streams as before [98.15ms]
+(pass) Memory and World are read in one prepare transaction and share one budget; both receipts are stored with the answer [66.24ms]
+(pass) a later forget in the Scope removes the usage receipts of answers that stood on it [63.26ms]
+
+api/domains/agent-runtime/test/read-evidence.test.ts:
+(pass) R7: equal e0 identifiers in different views never redirect an old quotation; unpresented and forged views fail [0.52ms]
+(pass) zero evidence has bounded not_found/clarification/failed outcomes; answered/partial still require evidence [0.23ms]
+
+api/domains/agent-runtime/test/rediscovery.test.ts:
+(pass) new research has no legacy route-replacement lookup after an unavailable proposal [13.37ms]
+
+api/domains/agent-runtime/test/research-engine.test.ts:
+(pass) Luna uses the common Web worker and retains the selected engine across steps [18.86ms]
+(pass) Luna cannot be used for history or when its provider is absent [23.89ms]
+
+api/domains/agent-runtime/test/warm-route.test.ts:
+(pass) a cached legacy route never replaces the model-selected new worker package [16.39ms]
+
+api/domains/agent-runtime/test/deadline.test.ts:
+(pass) an operation granted with 70 seconds remains valid after the model spends 25 seconds; only the next step stops exploration [14.45ms]
+(pass) a failed model-selected read retains the deadline and reserves finish plus verification [17.71ms]
+
+api/domains/agent-runtime/test/requirement-verification.test.ts:
+(pass) unsupported extracted schema uses the shared single repair and cannot freeze or execute [17.43ms]
+(pass) semantic rejection requestCovered never adopts a pending draft or retries [16.29ms]
+(pass) semantic rejection summarySupported never adopts a pending draft or retries [15.12ms]
+(pass) semantic rejection limitationsConsistent never adopts a pending draft or retries [15.66ms]
+(pass) a structurally invalid first action rolls back frozen requirements with zero tool execution [19.30ms]
+(pass) a pending draft is accepted only after one complete verification [15.25ms]
+(pass) R13 a valid deadline value backed by an opening-time excerpt is rejected by semantic verification [21.86ms]
+
+api/domains/agent-runtime/test/requirement-adoption.test.ts:
+(pass) R19 profile revision invalidates pending verification authority [15.46ms]
+(pass) R19 profile revision invalidates accepted verification authority [16.44ms]
+(pass) R19/R23 accepted report cannot outlive deletion of its frozen contract and draft [18.65ms]
+
+api/domains/agent-runtime/test/rejection-logging.test.ts:
+(pass) rolled-back and stale rejections are not logged as committed failures [19.05ms]
+
+api/domains/agent-runtime/test/context.test.ts:
+(pass) quick Web work is bounded independently of question wording while Luna keeps exploration [0.47ms]
+(pass) retired evidence cannot be reported and its reference is never reassigned [0.10ms]
+(pass) fixed report schema publishes the same outcome/claim constraints as host validation [0.27ms]
+(pass) three distant ranges of one document keep immutable task evidence and use one document alias [0.12ms]
+(pass) evidence capacity stops additions without evicting previous references [0.56ms]
+(pass) fixed contract retains the whole request, removes needs and suggestions, and scopes operation references [0.22ms]
+(pass) one worker deadline policy reserves 30 seconds for the parent [0.01ms]
+(pass) bounded observations never register an excerpt absent from the actual model packet [0.62ms]
+(pass) R16/R17 check-only evidence remains in the union and verification receives the complete excerpt [0.14ms]
+
+api/domains/agent-runtime/test/requirements.test.ts:
+(pass) R10/R12/R14 request quote, profile merge and unknown/null constraints are fixed once [14.87ms]
+(pass) R08/R11 invalid quote and 13 conditions fail without truncating or saving any contract [14.12ms]
+
+api/domains/agent-runtime/test/control-output.test.ts:
+(pass) control diagnostics distinguish non-text, empty, fenced, oversized and malformed output without retaining the response [0.12ms]
+(pass) one whole JSON fence decodes without accepting surrounding prose, multiple blocks or malformed JSON [0.10ms]
+
+api/domains/agent-runtime/test/acquisition-tools.test.ts:
+(pass) new research never prefetches a legacy host lookup or imports cached candidates before requirements freeze [12.65ms]
+
+api/domains/agent-runtime/test/report.test.ts:
+(pass) parent receives summary and citation metadata; neither raw text, quotes nor titles cross boundary [0.10ms]
+(pass) unseen source and fabricated quote are refused; snippet and incomplete acquisition are partial [0.12ms]
+(pass) model-selected excerpt references become exact canonical quotes without copying or normalizing source text [0.09ms]
+(pass) references cannot cite missing sources, unseen text, another source's excerpt, or override canonical quotes [0.24ms]
+(pass) excerpt boundaries preserve Unicode and bound every quote to the public report contract [0.07ms]
+
+api/domains/agent-runtime/test/acquisition-plan.test.ts:
+(pass) A01 root proposal is stored, then bound to a child owned by the same root [9.57ms]
+(pass) A01 without a port nothing changes: bind refuses and resolve is unmatched [6.16ms]
+(pass) A01 port-less finish keeps the legacy 4-column report and projection shape (NULL new columns) [7.07ms]
+(pass) A01 bound finish stores the host-verified canonical report and safe projection, not the model's text [6.68ms]
+(pass) A01 prepareAnswer uses the stored safe projection and rechecks cached authority at adoption [4.96ms]
+(pass) A01 adopted evidence survives completion's revision bump; deletion or a changed report refuses it [7.15ms]
+(pass) A01 a cancelled tree releases its binding [6.01ms]
+(pass) A01 acquisitionMigration upgrades a legacy DB: old 4-column rows keep the legacy projection [18.05ms]
+
+ 185 pass
+ 0 fail
+ 1098 expect() calls
+Ran 185 tests across 30 files. [10.58s]

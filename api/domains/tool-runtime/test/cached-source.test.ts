@@ -14,6 +14,7 @@ import {
 	migration,
 	routeGrantMigration,
 	supersedeMigration,
+	readMetadataMigration,
 	type CachedSourceAuthorizationPort,
 	type ToolAdapter,
 } from "..";
@@ -33,11 +34,16 @@ async function setup() {
 		migration,
 		routeGrantMigration,
 		supersedeMigration,
+		readMetadataMigration,
 	]);
 	const caps = createCapabilities(store),
 		queue = createQueue(store);
 	const started: Array<Record<string, unknown>> = [];
+	let revision = "r1";
 	const adapter: ToolAdapter = {
+		operationFingerprintInTransaction: () => revision,
+		prepareSourcesInTransaction: (_db, _inv, result) => result.readings,
+		validateEvidenceInTransaction: () => true,
 		startInTransaction: (_db, r) => {
 			started.push(r as unknown as Record<string, unknown>);
 			return {
@@ -64,22 +70,28 @@ async function setup() {
 	const tools = createToolRuntime(store, caps, queue, adapter, Date.now, port);
 	await caps.seed();
 	const prepared = await store.write((db) => {
-		const c = caps.searchInTransaction(
+		return caps.prepareActiveByIdInTransaction(
 			db,
 			owner,
-			"天気",
-			["天気"],
-			Date.now() + 100000,
-		)[0]!;
-		return caps.prepareInTransaction(db, owner, c.candidateRef, {
-			question: "天気",
-		});
+			"package:web.research@9",
+			{ question: "天気" },
+		);
 	});
 	cleanup.push(() => {
 		tools.close();
 		rmSync(dir, { recursive: true, force: true });
 	});
-	return { store, tools, prepared, ledger, started, caps };
+	return {
+		store,
+		tools,
+		prepared,
+		ledger,
+		started,
+		caps,
+		setRevision: (r: string) => {
+			revision = r;
+		},
+	};
 }
 const deadline = () => Date.now() + 100000;
 const invoke = (
@@ -309,4 +321,84 @@ test("superseded invocations leave observations but stay in the budget and the i
 			t.tools.supersedeInvocationsInTransaction(db, "child"),
 		),
 	).toBe(0);
+});
+
+test("replay rechecks authority, source revision and supersession before admitting a consumed grant", async () => {
+	const t = await setup();
+	t.ledger.set("tok", { urls: new Set([URL_A]), owner: "child" });
+	const ref = await t.store.write((db) =>
+		t.tools.issueCachedGrantInTransaction(db, {
+			owner,
+			prepared: t.prepared,
+			bindingToken: "tok",
+			toolId: "web.read",
+			arguments: { url: URL_A },
+			exactUrl: URL_A,
+			deadline: deadline(),
+		}),
+	);
+	const inv = await invoke(t, ref.executionRef, { url: URL_A }, "original");
+	const source = {
+		sourceId: "s1",
+		viewId: "v1",
+		url: URL_A,
+		title: "A",
+		basis: "page" as const,
+		fetchedAt: new Date().toISOString(),
+		body: "fact",
+		truncated: false,
+	};
+	await t.store.write((db) =>
+		t.tools.settleInTransaction(db, inv, {
+			state: "succeeded",
+			result: {
+				observedAt: source.fetchedAt,
+				readings: [source],
+				hits: [],
+				documents: [],
+				failures: [],
+			},
+		}),
+	);
+	const replay = (step: string) =>
+		t.store.write((db) =>
+			t.tools.invokeInTransaction(
+				db,
+				owner,
+				ref.executionRef,
+				{ url: URL_A },
+				step,
+				deadline(),
+				"p",
+				[],
+				undefined,
+				false,
+			),
+		);
+	expect((await replay("replay")).id).toBe(inv.id);
+	expect(t.started).toHaveLength(1);
+	expect(
+		t.store.read((db) =>
+			t.tools.validateEvidenceInTransaction(db, owner, [source]),
+		),
+	).toBe(true);
+	t.setRevision("r2");
+	await expect(replay("changed")).rejects.toThrow("agent_budget_exhausted");
+	t.setRevision("r1");
+	t.ledger.delete("tok");
+	await expect(replay("revoked")).rejects.toThrow("cached_source_rejected");
+	t.ledger.set("tok", { urls: new Set([URL_A]), owner: "child" });
+	await t.store.write((db) =>
+		t.tools.supersedeInvocationsInTransaction(db, "child"),
+	);
+	expect(
+		t.store.read((db) =>
+			t.tools.validateEvidenceInTransaction(db, owner, [source]),
+		),
+	).toBe(false);
+	await expect(replay("superseded")).rejects.toThrow("agent_budget_exhausted");
+	await expect(
+		invoke(t, ref.executionRef, { url: URL_A }, "original"),
+	).rejects.toThrow("tool_ref_invalid");
+	expect(t.started).toHaveLength(1);
 });

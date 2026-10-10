@@ -59,3 +59,67 @@ test("an operation granted with 70 seconds remains valid after the model spends 
 		await h.close();
 	}
 });
+
+test("a failed model-selected read retains the deadline and reserves finish plus verification", async () => {
+	let now = Date.now();
+	const h = await harness(() => now);
+	try {
+		const { learnedPackage, directBind, searchBind } =
+			await import("./route-harness");
+		h.proposals.push(
+			{
+				kind: "direct",
+				proposalToken: "direct",
+				packageRevisionId: learnedPackage,
+			},
+			{
+				kind: "search-first",
+				proposalToken: "search",
+				query: "公開情報",
+				language: "ja",
+				region: "JP",
+			},
+		);
+		h.binds.set("direct", directBind("old"));
+		h.binds.set("search", searchBind("new"));
+		await h.start("late-replacement");
+		const child = h.agents
+			.list("late-replacement")
+			.find((t) => t.kind === "worker")!;
+		await h.runModelStep(child.id, {
+			action: "invoke",
+			tool: "web.lookup",
+			arguments: { query: "資料" },
+		});
+		const deadline = h.task(child.id).deadline;
+		now = deadline - 45000;
+		h.results.set("op1", { state: "failed", errorCode: "web_attempt_timeout" });
+		await h.agents.reconcile();
+		expect(h.started).toHaveLength(1);
+		expect(h.task(child.id)).toMatchObject({
+			state: "queued",
+			deadline,
+			json_repairs: 0,
+			tool_calls: 1,
+		});
+		const final = await h.runModelStep(child.id, {
+			action: "finish",
+			report: {
+				outcome: "failed",
+				summary: "取得が失敗し、新規検索に使える時間がありません。",
+				claims: [],
+				limitations: ["時間上限"],
+			},
+		});
+		expect(final.prep.status).toBe("ready");
+		const packet = JSON.parse(
+			(final.prep as { input: { messages: { content: string }[] } }).input
+				.messages[1]!.content,
+		);
+		expect(packet.budget.canInvoke).toBe(false);
+		expect(h.started).toHaveLength(1);
+		expect(h.task(child.id).state).toBe("completed");
+	} finally {
+		await h.close();
+	}
+});

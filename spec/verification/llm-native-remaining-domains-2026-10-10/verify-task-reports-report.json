@@ -1,0 +1,35 @@
+{
+	"selected": ["task-reports"],
+	"dependencySet": ["tasks", "task-reports"],
+	"testDependencySet": ["tasks", "task-reports"],
+	"revision": "a533cbcd59b23e5bde6df210c5d6c79c13b21c5b7028470a7fdca987e038c53f",
+	"steps": [
+		{
+			"name": "size-budget",
+			"ms": 113,
+			"result": "pass"
+		},
+		{
+			"name": "format",
+			"ms": 101,
+			"result": "pass"
+		},
+		{
+			"name": "lint",
+			"ms": 44,
+			"result": "pass"
+		},
+		{
+			"name": "typecheck",
+			"ms": 635,
+			"result": "pass"
+		},
+		{
+			"name": "domain tests",
+			"ms": 108,
+			"result": "pass"
+		}
+	],
+	"totalMs": 1405,
+	"result": "pass"
+}

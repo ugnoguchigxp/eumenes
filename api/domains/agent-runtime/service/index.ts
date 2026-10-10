@@ -1,5 +1,23 @@
+import { createTimerOperation } from "./timer-operation";
+import { timerResultContext } from "../../capabilities";
+import { deleteRequirementData } from "../repository/requirements";
+import {
+	freezeRequirements,
+	readRequirements,
+	validateDraft,
+	saveDraft,
+	draftReferences,
+} from "./requirements";
+import {
+	prepareRequirementVerification,
+	acceptRequirementVerification,
+	validateRequirementAdoption,
+} from "./requirement-verification";
+import { requirementVerification } from "../contracts/requirements";
+import { firstResearchAction } from "./research-contract";
+import type { ProfileSnapshot } from "../../capabilities";
 import { createToolSelection } from "./tool-selection";
-import { acceptReport } from "./accept-report";
+import { logRejection } from "./rejection-log";
 import { z } from "zod";
 import { getLogger, type LogFields } from "../../../infrastructure/logger";
 import {
@@ -28,13 +46,12 @@ import {
 	type AdoptedEvidence,
 	type StoredBinding,
 } from "../contracts";
-import { timerCommand } from "../../capabilities";
 import { get, byRoot, update, dto } from "../repository";
 import { workerContext } from "./context";
 import { EvidenceCatalog } from "./evidence-catalog";
 import { researchAction } from "./research-contract";
 import { requestUrls } from "./request-urls";
-import { parentProjection } from "./verify-report";
+import { parentProjection, isNegativeReport } from "./verify-report";
 import { createAcquisitionTools, siteFailureCodes } from "./acquisition-tools";
 import {
 	isHistory,
@@ -67,6 +84,8 @@ const owner = (t: Task): Owner => ({
 export const STEP_KIND = "agent.step";
 type StepInput = {
 	catalog: EvidenceCatalog;
+	mode: "research" | "verify_requirements";
+	first: boolean;
 	taskId: string;
 	stepId: string;
 	revision: number;
@@ -74,8 +93,7 @@ type StepInput = {
 	messages: Array<{ role: "system" | "user" | "assistant"; content: string }>;
 	visible: Source[];
 	manifestDigest: string;
-	grants: Array<{ id: string; executionRef: string }>;
-	actionSnapshot?: unknown;
+	grants: Array<{ id: string; executionRef: string; replayOnly?: boolean }>;
 };
 type StepOutput = {
 	receipt: Receipt;
@@ -90,8 +108,6 @@ export function createAgentRuntime({
 	inference,
 	queue,
 	now = Date.now,
-	invocationHint,
-	reportFeedback,
 	acquisition,
 }: {
 	store: SqliteStore;
@@ -100,70 +116,10 @@ export function createAgentRuntime({
 	inference: InferencePort;
 	queue: QueueService;
 	now?: () => number;
-	invocationHint?: (
-		question: string,
-	) => { toolId: string; arguments: unknown } | null;
-	/** Domain feedback may request another in-scope read, within the existing repair budget. */
-	reportFeedback?: (question: string, report: Report) => string | null;
-	/** Optional generic acquisition plan. Without it every path is the pre-port one. */
+	/** Acquisition optimization uses the same worker loop, with or without this port. */
 	acquisition?: AcquisitionPlanPort;
 }) {
 	const log = getLogger("agent-runtime");
-	function logRejection(
-		t: Task,
-		input: StepInput,
-		result: StepOutput,
-		jobId: string,
-		code: string,
-		diagnostic: LogFields,
-		issues: LogFields[] = [],
-		issueCount = issues.length,
-		error?: unknown,
-	) {
-		// A rejection is logged only after its transaction commits. A rollback or
-		// stale result must not look like an accepted state transition.
-		void Promise.resolve()
-			.then(() => {
-				const step = store.read((db) =>
-					db
-						.query("SELECT state,error_code FROM agent_steps WHERE id=?")
-						.get(input.stepId),
-				) as { state: string; error_code: string | null } | null;
-				if (
-					!step ||
-					!["rejected", "failed"].includes(step.state) ||
-					step.error_code !== code
-				)
-					return;
-				const current = store.read((db) => get(db, t.id));
-				const fields: LogFields = {
-					runId: t.root_run_id,
-					taskId: t.id,
-					jobId,
-					stepId: input.stepId,
-					inferenceId: input.requestId,
-					attemptId: result.receipt.attemptId,
-					kind: t.kind,
-					phase: t.phase,
-					repairAttempt: t.json_repairs,
-					status: current?.state === "queued" ? "repair_scheduled" : "failed",
-					controlSchema:
-						t.kind === "worker"
-							? "worker"
-							: t.phase === "route"
-								? "route"
-								: "select",
-					...result.diagnostic,
-					...diagnostic,
-					issueCount,
-					reportedIssueCount: issues.length,
-				};
-				log.warn("agent.control_rejected", fields, error);
-				for (const issue of issues)
-					log.warn("agent.control_validation_issue", { ...fields, ...issue });
-			})
-			.catch(() => {});
-	}
 	const traceIds = new Set<string>();
 	const traced = new Map<string, string>();
 	const prepared = new Map<string, Prepared>();
@@ -171,10 +127,25 @@ export function createAgentRuntime({
 	const actionPrepared = new Map<string, Prepared>();
 	function currentActionPayload(db: Database, task: Task) {
 		const invocation = actionInvocation(db, task.id);
-		if (!invocation) return null;
-		return JSON.stringify(
-			tools.readActionInTransaction(db, owner(task), invocation).payload,
-		);
+		if (!invocation) {
+			if (JSON.parse(task.input_json ?? "{}").timerRequested && task.error_code)
+				return JSON.stringify(
+					timerResultContext.parse({
+						version: 1,
+						kind: "timer_action",
+						action: "failed",
+						observedAt: new Date(now()).toISOString(),
+						items: [],
+						complete: false,
+						errorCode: task.error_code,
+					}),
+				);
+			return null;
+		}
+		const envelope = tools.readActionInTransaction(db, owner(task), invocation);
+		const parsed = timerResultContext.safeParse(envelope.answerContext);
+		if (!parsed.success) throw new Error("invalid_action_result");
+		return JSON.stringify(parsed.data);
 	}
 	const bindings = new Map<string, ReturnType<ToolRuntime["bind"]>>();
 	let closed = false,
@@ -196,35 +167,6 @@ export function createAgentRuntime({
 			return null;
 		}
 	};
-	/** tool-runtime may expose per-invocation rows; absent until it does (then `tools` is empty). */
-	function invocationDigests(db: Database, taskId: string) {
-		const fn = (
-			tools as unknown as {
-				invocationsInTransaction?: (
-					db: Database,
-					taskId: string,
-				) => {
-					toolRevisionId: string;
-					stepId: string;
-					argsDigest: string;
-					state: string;
-					origin?: string;
-					superseded?: boolean;
-				}[];
-			}
-		).invocationsInTransaction;
-		const p = prepared.get(taskId);
-		if (!fn || !p) return [];
-		const ids = new Map(p.dependencies.map((d) => [d.revisionId, d.id]));
-		return fn(db, taskId).map((r) => ({
-			toolId: ids.get(r.toolRevisionId) ?? r.toolRevisionId,
-			stepId: r.stepId,
-			argsDigest: r.argsDigest,
-			state: r.state,
-			origin: r.origin,
-			superseded: r.superseded,
-		}));
-	}
 	/** A cached (direct) plan may be swapped for a normal search once, only for site-side failures. */
 	function canReplace(t: Task | null) {
 		const b = storedBinding(t);
@@ -276,11 +218,11 @@ export function createAgentRuntime({
 			payload: { taskId: t.id, stepId },
 			subjectRef: t.id,
 			parentJobId,
-			lane: t.kind === "coordinator" ? "interactive" : "background",
+			lane: "background",
 			resourceKey: "inference.llm",
 			concurrencyKey: `agent:${t.id}`,
 			maxAttempts: 1,
-			deadlineAtMs: stepDeadline(t, prepared.get(t.id), now()),
+			deadlineAtMs: stepDeadline(t, now()),
 		});
 		db.query(
 			"INSERT INTO agent_steps(id,task_id,ordinal,state,job_id) VALUES(?,?,?,'queued',?)",
@@ -309,7 +251,7 @@ export function createAgentRuntime({
 			rootRunId,
 			parentTaskId,
 			JSON.stringify(input),
-			kind === "coordinator" ? "route" : "research",
+			kind === "coordinator" ? "created" : "research",
 			deadline,
 			now(),
 			now(),
@@ -415,107 +357,23 @@ export function createAgentRuntime({
 		for (const request of requests) abortRequests.add(request);
 		return { jobIds: [...jobs], requestIds: [...requests] };
 	}
-	const { toolLimit, usableTools } = createToolSelection({
+	const { usableTools } = createToolSelection({
 		tools,
 		bindings,
 		prepared,
 		storedBinding,
 		now,
-		invocationHint,
 	});
 
-	function runTimer(
-		db: Database,
-		t: Task,
-		rawCommand: unknown,
-		snapshot: unknown,
-		stepId: string,
-	) {
-		const action = { command: rawCommand };
-		if (t.kind !== "coordinator" || t.phase !== "route")
-			throw new Error("capability_unavailable");
-		if (!tools.actionsEnabled()) throw new Error("capability_unavailable");
-		const parsed = timerCommand.safeParse(action.command);
-		if (!parsed.success) throw new Error("invalid_timer_input");
-		if (
-			parsed.data.operation === "cancel" ||
-			(parsed.data.operation === "list" && parsed.data.timerId)
-		) {
-			const targets = snapshot as
-				| { items?: Array<{ id: string; revision: number }> }
-				| undefined;
-			const command = parsed.data;
-			if (
-				!targets?.items?.some(
-					(item) =>
-						item.id === command.timerId &&
-						(command.operation !== "cancel" ||
-							item.revision === command.expectedRevision),
-				)
-			)
-				throw new Error("timer_target_invalid");
-		}
-		const routeBundle = actionPrepared.get(t.id);
-		if (!routeBundle) throw new Error("required_context_missing");
-		capabilities.validateInTransaction(db, routeBundle);
-		const preparedTimer = capabilities.prepareActiveByIdInTransaction(
-			db,
-			owner(t),
-			"package:timers.manage@1",
-			parsed.data,
-			{
-				hash: routeBundle.package.hash,
-				generation: routeBundle.package.generation,
-			},
-		);
-		prepared.set(t.id, preparedTimer);
-		const bound = tools.bind(owner(t), preparedTimer, t.deadline);
-		const toolId =
-			parsed.data.operation === "start"
-				? "timer.start"
-				: parsed.data.operation === "cancel"
-					? "timer.cancel"
-					: "timer.list";
-		const picked = bound.find((item) => item.tool.id === toolId);
-		if (!picked) throw new Error("capability_unavailable");
-		const command = parsed.data;
-		const args =
-			command.operation === "start"
-				? {
-						durationSeconds: command.durationSeconds,
-						...(command.label ? { label: command.label } : {}),
-					}
-				: command.operation === "cancel"
-					? {
-							timerId: command.timerId,
-							expectedRevision: command.expectedRevision,
-						}
-					: {
-							...(command.timerId ? { timerId: command.timerId } : {}),
-							...(command.state ? { state: command.state } : {}),
-						};
-		const saved = tools.invokeActionInTransaction(
-			db,
-			owner(t),
-			picked.executionRef,
-			args,
-			stepId,
-			t.deadline,
-			`${t.root_run_id}:${t.cancel_epoch}`,
-		);
-		db.query(
-			`INSERT INTO agent_action_results(task_id,invocation_id,operation_id,receipt_digest,payload_json,created_at)
-             VALUES(?,?,?,?,?,?)`,
-		).run(
-			t.id,
-			saved.invocationId,
-			saved.operationId,
-			saved.receiptDigest,
-			JSON.stringify(saved.payload),
-			now(),
-		);
-		ready(db, get(db, t.id)!);
-	}
+	const runTimer = createTimerOperation({
+		tools,
+		capabilities,
+		actionPrepared,
+		prepared,
+		owner,
+		ready,
+		now,
+	});
 	const handler: HandlerDefinition<
 		{ taskId: string; stepId: string },
 		StepInput,
@@ -535,8 +393,12 @@ export function createAgentRuntime({
 				t.model_calls >=
 					(t.kind === "worker" ? modelLimit(prepared.get(t.id)) : 4)
 			) {
-				fail(db, t, "agent_budget_exhausted");
-				return { status: "stale", reason: "agent_budget_exhausted" };
+				const code =
+					t.phase === "verify_requirements"
+						? "requirement_verification_unavailable"
+						: "agent_budget_exhausted";
+				fail(db, t, code);
+				return { status: "stale", reason: code };
 			}
 			if (!inference.captureControlInTransaction || !inference.executeControl) {
 				fail(db, t, "control_unavailable");
@@ -548,30 +410,52 @@ export function createAgentRuntime({
 					throw new Error("capability_ref_invalid");
 				capabilities.validateInTransaction(db, p);
 				const obs = tools.observationsInTransaction(db, t.id);
+				// A replay must present the requested result again, even if newer results exist.
+				const latest = obs.findIndex((o) => o.invocationId === t.invocation_id);
+				if (latest >= 0) obs.push(...obs.splice(latest, 1));
 				const catalog = (catalogs.get(t.id) ?? new EvidenceCatalog()).copy();
-				const context = workerContext(
-					t,
-					p,
-					catalog.full ? [] : usableTools(db, t, true),
-					obs.flatMap((o) => o.sources),
-					obs.map((o) => ({
-						tool: tools
-							.invocationsInTransaction(db, t.id)
-							.find((i) => i.id === o.invocationId)?.toolRevisionId,
-						state: o.state,
-						errorCode: "errorCode" in o ? o.errorCode : null,
-						failures: o.failures,
-						notes: "notes" in o ? o.notes : null,
-					})),
-					null,
-					catalog,
-					now(),
-				);
+				const mode =
+					t.phase === "verify_requirements"
+						? "verify_requirements"
+						: "research";
+				const frozen = readRequirements(db, t, capabilities);
+				const profiles = (JSON.parse(t.input_json ?? "{}")
+					.requirementProfiles ?? []) as ProfileSnapshot[];
+				capabilities.validateRequirementProfilesInTransaction(db, profiles);
+				const context =
+					mode === "verify_requirements"
+						? prepareRequirementVerification(
+								db,
+								t,
+								capabilities,
+								tools,
+								catalog,
+								now(),
+							)
+						: workerContext(
+								t,
+								p,
+								catalog.full ? [] : usableTools(db, t, true),
+								obs.flatMap((o) => o.sources),
+								obs.map((o) => ({
+									tool: tools
+										.invocationsInTransaction(db, t.id)
+										.find((i) => i.id === o.invocationId)?.toolRevisionId,
+									state: o.state,
+									errorCode: "errorCode" in o ? o.errorCode : null,
+									failures: o.failures,
+									notes: "notes" in o ? o.notes : null,
+								})),
+								catalog,
+								now(),
+								{ profiles, contract: frozen?.contract ?? null },
+							);
 				const requestId = inference.captureControlInTransaction(db, {
 					subject: `agent:${t.id}:step:${t.current_step}`,
 					policySubject: t.root_run_id,
 					deadline: claim.deadlineAtMs ?? t.deadline,
-					maxOutputTokens: 2048,
+					maxOutputTokens: 4096,
+					engine: JSON.parse(t.input_json ?? "{}").researcher,
 				});
 				const current = update(db, t, "running", t.phase);
 				db.query(
@@ -584,6 +468,8 @@ export function createAgentRuntime({
 					status: "ready",
 					input: {
 						catalog,
+						mode,
+						first: !frozen,
 						taskId: t.id,
 						stepId: claim.payload.stepId,
 						revision: current.revision,
@@ -645,13 +531,25 @@ export function createAgentRuntime({
 				return "applied";
 			}
 			catalogs.set(t.id, input.catalog);
-			const parsed = researchAction.safeParse(outcome.result.action);
+			if (
+				(t.phase === "verify_requirements") !==
+				(input.mode === "verify_requirements")
+			)
+				return "stale";
+			const parsed = (
+				input.mode === "verify_requirements"
+					? requirementVerification
+					: input.first
+						? firstResearchAction
+						: researchAction
+			).safeParse(outcome.result.action);
 			if (outcome.result.invalid || !parsed.success) {
 				const issues =
 					!outcome.result.invalid && !parsed.success
 						? validationIssues(parsed.error, outcome.result.action)
 						: [];
 				logRejection(
+					store,
 					t,
 					input,
 					outcome.result,
@@ -687,118 +585,150 @@ export function createAgentRuntime({
 			const action = parsed.data;
 			db.exec("SAVEPOINT agent_action");
 			try {
-				if (action.action === "invoke") {
-					const p = prepared.get(t.id);
-					if (!p) throw new Error("capability_ref_invalid");
-					capabilities.validateInTransaction(db, p);
-					const root = byRoot(db, t.root_run_id);
-					if (!active(root) || root.state !== "waiting_child")
-						throw new Error("task_cancelled");
-					// Authority at prepare is immutable for this step. Cancellation,
-					// registry revision and the hard deadline are still checked at invoke.
-					const grant = input.grants.find((g) => g.id === action.tool);
-					const tool = (bindings.get(t.id) ?? []).find(
-						(b) => b.executionRef === grant?.executionRef,
-					);
-					if (!tool)
-						throw new ValidationFailure("invalid_tool_input", [
-							{ validationPath: "tool", validationCode: "unknown_tool" },
-						]);
-					const count = tools.countInTransaction(
-						db,
-						t.id,
-						tool.tool.revisionId,
-					);
-					if (count >= toolLimit(t, tool.tool.id))
-						throw new Error("agent_budget_exhausted");
-					if (isHistory(p) && tool.tool.id === "history.search") {
-						const stale = tools
-							.observationsInTransaction(db, t.id)
-							.filter(
-								(o) =>
-									"errorCode" in o && o.errorCode === "history_cursor_stale",
-							).length;
-						if (stale > 1) throw new Error("agent_budget_exhausted");
-					}
-					const taskInput = researchInput.parse(p.input);
-					const obs = tools.observationsInTransaction(db, t.id);
-					const urls = [
-						...(taskInput.urls ?? []),
-						...obs.flatMap((o) =>
-							o.sources.flatMap((s) => (s.url ? [s.url] : [])),
-						),
-					];
-					const inv = tools.invokeInTransaction(
-						db,
-						owner(t),
-						tool.executionRef,
-						catalogs.get(t.id)!.arguments(action.arguments),
-						input.stepId,
-						t.deadline,
-						claim.jobId,
-						urls,
-						taskInput.question,
-					);
-					db.query(
-						"UPDATE agent_tasks SET tool_calls=tool_calls+1,invocation_id=? WHERE id=?",
-					).run(inv.id, t.id);
-					if (inv.state !== "pending") {
-						next(db, get(db, t.id)!, claim.jobId);
-					} else
-						update(
-							db,
-							get(db, t.id)!,
-							"waiting_tool",
-							tool.tool.id === "web.lookup" ? "search" : "read",
-						);
-				} else if (action.action === "finish") {
-					const catalog = catalogs.get(t.id)!;
-					const operations = tools.invocationsInTransaction(db, t.id);
-					const report = catalog.report(action.report, [
-						`確認した操作${operations.length}件。`,
-					]);
-					acceptReport(
+				const p = prepared.get(t.id);
+				if (!p) throw new Error("capability_ref_invalid");
+				capabilities.validateInTransaction(db, p);
+				const root = byRoot(db, t.root_run_id);
+				if (
+					!active(root) ||
+					root.state !== "waiting_child" ||
+					root.id !== t.parent_task_id
+				)
+					throw new Error("task_cancelled");
+				if (input.mode === "verify_requirements") {
+					const verification = requirementVerification.parse(action);
+					acceptRequirementVerification(
 						db,
 						t,
-						{ report },
-						{ ...input, visible: catalog.sources() },
-						{
-							tools,
-							prepared: prepared.get(t.id),
-							canRead: usableTools(db, t).some((b) => b.tool.id === "web.read"),
-							now,
-							acquisition,
-							reportFeedback,
-							storedBinding,
-							invocationDigests: () => invocationDigests(db, t.id),
-						},
+						capabilities,
+						tools,
+						input.catalog,
+						input,
+						verification,
+						now(),
 					);
 					db.query(
 						"UPDATE agent_tasks SET report_state='available' WHERE id=?",
 					).run(t.id);
 					update(db, get(db, t.id)!, "completed", "completed");
-					const parent = t.parent_task_id ? get(db, t.parent_task_id) : null;
-					if (!active(parent)) throw new Error("task_cancelled");
-					ready(db, parent, null, t.id);
+					ready(db, root, null, t.id);
 					releases.add(t.id);
+				} else {
+					const research = (
+						input.first ? firstResearchAction : researchAction
+					).parse(parsed.data);
+					if (input.first)
+						freezeRequirements(
+							db,
+							t,
+							firstResearchAction.parse(parsed.data).requirements,
+							capabilities,
+							now(),
+						);
+					const frozen = readRequirements(db, t, capabilities);
+					if (!frozen) throw new Error("required_context_missing");
+					const action = research;
+					if (action.action === "invoke") {
+						// Authority at prepare is immutable for this step. Cancellation,
+						// registry revision and the hard deadline are still checked at invoke.
+						const grant = input.grants.find((g) => g.id === action.tool);
+						const tool = (bindings.get(t.id) ?? []).find(
+							(b) => b.executionRef === grant?.executionRef,
+						);
+						if (!tool)
+							throw new ValidationFailure("invalid_tool_input", [
+								{ validationPath: "tool", validationCode: "unknown_tool" },
+							]);
+						if (isHistory(p) && tool.tool.id === "history.search") {
+							const stale = tools
+								.observationsInTransaction(db, t.id)
+								.filter(
+									(o) =>
+										"errorCode" in o && o.errorCode === "history_cursor_stale",
+								).length;
+							if (stale > 1) throw new Error("agent_budget_exhausted");
+						}
+						const taskInput = researchInput.parse(p.input);
+						const obs = tools.observationsInTransaction(db, t.id);
+						const urls = [
+							...(taskInput.urls ?? []),
+							...obs.flatMap((o) =>
+								o.sources.flatMap((s) => (s.url ? [s.url] : [])),
+							),
+						];
+						const inv = tools.invokeInTransaction(
+							db,
+							owner(t),
+							tool.executionRef,
+							catalogs.get(t.id)!.arguments(action.arguments),
+							input.stepId,
+							t.deadline,
+							claim.jobId,
+							urls,
+							taskInput.question,
+							!grant?.replayOnly,
+						);
+						db.query(
+							"UPDATE agent_tasks SET tool_calls=?,invocation_id=? WHERE id=?",
+						).run(
+							tools.invocationsInTransaction(db, t.id).length,
+							inv.id,
+							t.id,
+						);
+						if (inv.state !== "pending") {
+							next(db, get(db, t.id)!, claim.jobId, "research_no_progress");
+						} else
+							update(
+								db,
+								get(db, t.id)!,
+								"waiting_tool",
+								tool.tool.id === "web.lookup" ? "search" : "read",
+							);
+					} else if (action.action === "finish") {
+						const draft = validateDraft(action.report, frozen.contract);
+						const catalog = catalogs.get(t.id)!;
+						catalog.verificationEvidence(draftReferences(draft));
+						if (
+							!tools.validateEvidenceInTransaction(
+								db,
+								owner(t),
+								catalog.referencedSources(draftReferences(draft)),
+							)
+						)
+							throw new Error("evidence_invalidated");
+						if (t.model_calls >= modelLimit(p) || t.deadline <= now())
+							throw new Error("requirement_verification_unavailable");
+						saveDraft(db, t, frozen.digest, draft, now());
+						update(db, get(db, t.id)!, "queued", "verify_requirements");
+						enqueue(db, get(db, t.id)!, claim.jobId);
+					}
 				}
+
 				if (!inference.acceptInTransaction?.(db, outcome.result.receipt))
 					throw new Error("permission_revoked");
 				db.query(
 					"UPDATE agent_steps SET state='completed',action_kind=? WHERE id=?",
-				).run(action.action, input.stepId);
+				).run(
+					"action" in action ? action.action : "verify_requirements",
+					input.stepId,
+				);
 				db.exec("RELEASE agent_action");
 			} catch (e) {
 				db.exec("ROLLBACK TO agent_action");
 				db.exec("RELEASE agent_action");
 				const code = safeCode(e);
 				logRejection(
+					store,
 					t,
 					input,
 					outcome.result,
 					claim.jobId,
 					code,
-					{ reason: code, controlAction: action.action },
+					{
+						reason: code,
+						controlAction:
+							"action" in action ? action.action : "verify_requirements",
+					},
 					e instanceof ValidationFailure ? e.issues : [],
 					e instanceof ValidationFailure ? e.issueCount : 0,
 					e,
@@ -838,6 +768,10 @@ export function createAgentRuntime({
 						"invalid_tool_input",
 						"invalid_evidence",
 						"invalid_report",
+						"invalid_requirement_report",
+						"invalid_requirement_contract",
+						"invalid_requirement_schema",
+						"invalid_requirement_verification",
 					].includes(code) ||
 						code === "tool_url_out_of_scope") &&
 					t.kind === "worker" &&
@@ -992,6 +926,7 @@ export function createAgentRuntime({
 					db.query(
 						"DELETE FROM agent_reports WHERE task_id IN (SELECT id FROM agent_tasks WHERE root_run_id=?)",
 					).run(root.root_run_id);
+					deleteRequirementData(db, root.root_run_id);
 					tools.deleteDataInTransaction(db, root.root_run_id);
 				}
 			});
@@ -1006,6 +941,7 @@ export function createAgentRuntime({
 		if (old.length)
 			await store.write((db) => {
 				for (const root of old) {
+					deleteRequirementData(db, root.root_run_id);
 					tools.purgeMetadataInTransaction(db, root.root_run_id);
 					for (const table of [
 						"agent_steps",
@@ -1044,6 +980,7 @@ export function createAgentRuntime({
 						prepared.delete(taskId);
 						actionPrepared.delete(taskId);
 						bindings.delete(taskId);
+						catalogs.delete(taskId);
 					}
 				}
 				for (let cursor = ""; !closed;) {
@@ -1223,6 +1160,31 @@ export function createAgentRuntime({
 			safe_projection_digest: string | null;
 		} | null;
 	}
+	function validateReportAuthority(
+		db: Database,
+		child: Task,
+		report: Report | null,
+	) {
+		const binding = storedBinding(child);
+		if (!binding) return;
+		if (!acquisition) throw new Error("acquisition_unavailable");
+		const digest = safeRow(db, child.id)?.safe_projection_digest;
+		if (!isNegativeReport(report) && !digest)
+			throw new Error("acquisition_unavailable");
+		const result = isNegativeReport(report)
+			? acquisition.validateInTransaction(db, {
+					bindingToken: binding.bindingToken,
+					owner: owner(child),
+					stage: "finish",
+				})
+			: acquisition.validateAdoptionInTransaction(db, {
+					bindingToken: binding.bindingToken,
+					owner: owner(child),
+					projectionDigest: digest!,
+				});
+		if (result.kind !== "allowed")
+			throw new Error(codeOf(result.code, "acquisition_rejected"));
+	}
 	function prepareAnswerInTransaction(
 		db: Database,
 		rootRunId: string,
@@ -1242,7 +1204,7 @@ export function createAgentRuntime({
 		const report = reportInTransaction(db, root.id);
 		if (
 			child &&
-			report?.version === 2 &&
+			(report?.version === 2 || report?.version === 3) &&
 			!tools.validateEvidenceInTransaction(db, owner(child), report.sources)
 		)
 			throw new Error("evidence_invalidated");
@@ -1273,19 +1235,14 @@ export function createAgentRuntime({
 		if (root.report_task_id && !report) throw new Error("report_deleted");
 		const safe = child ? safeRow(db, child.id) : null;
 		const binding = storedBinding(child);
-		if (binding) {
-			// Cached authority is rechecked at adoption: clear/disable/disqualified results are refused.
-			if (!acquisition || !safe?.safe_projection_digest)
-				throw new Error("acquisition_unavailable");
-			const ok = acquisition.validateAdoptionInTransaction(db, {
-				bindingToken: binding.bindingToken,
-				owner: owner(child!),
-				projectionDigest: safe.safe_projection_digest,
-			});
-			if (ok.kind !== "allowed")
-				throw new Error(codeOf(ok.code, "acquisition_rejected"));
-		}
+		if (child && report)
+			validateRequirementAdoption(db, child, report, capabilities);
+		if (child) validateReportAuthority(db, child, report);
 		return {
+			requirementContractDigest:
+				report?.version === 3 ? report.requirements.contractDigest : null,
+			requirementVerificationDigest:
+				report?.version === 3 ? report.requirements.verificationDigest : null,
 			projectionDigest: safe?.safe_projection_digest ?? null,
 			acquisitionBindingToken: binding?.bindingToken ?? null,
 			actionPayload: currentActionPayload(db, root),
@@ -1346,7 +1303,9 @@ export function createAgentRuntime({
 			const state = (payload: string | null | undefined): unknown =>
 				payload
 					? JSON.parse(payload, (key, value) =>
-							key === "serverNow" || key === "remainingSeconds"
+							key === "serverNow" ||
+							key === "observedAt" ||
+							key === "remainingSeconds"
 								? undefined
 								: value,
 						)
@@ -1370,27 +1329,34 @@ export function createAgentRuntime({
 			)
 				return false;
 			if (
-				report.version === 2 &&
+				(report.version === 2 || report.version === 3) &&
 				!tools.validateEvidenceInTransaction(db, owner(child), report.sources)
 			)
 				return false;
+			try {
+				validateRequirementAdoption(db, child, report, capabilities);
+				if (
+					report.version === 3 &&
+					(ticket.requirementContractDigest !==
+						report.requirements.contractDigest ||
+						ticket.requirementVerificationDigest !==
+							report.requirements.verificationDigest)
+				)
+					return false;
+			} catch {
+				return false;
+			}
 			const binding = storedBinding(child);
 			if (binding || ticket.projectionDigest) {
-				const safe = safeRow(db, child.id);
 				if (
 					!binding ||
-					!acquisition ||
-					!safe?.safe_projection_digest ||
-					safe.safe_projection_digest !== ticket.projectionDigest
+					binding.bindingToken !== ticket.acquisitionBindingToken ||
+					(safeRow(db, child.id)?.safe_projection_digest ?? null) !==
+						ticket.projectionDigest
 				)
 					return false;
 				try {
-					const ok = acquisition.validateAdoptionInTransaction(db, {
-						bindingToken: binding.bindingToken,
-						owner: owner(child),
-						projectionDigest: safe.safe_projection_digest,
-					});
-					if (ok.kind !== "allowed") return false;
+					validateReportAuthority(db, child, report);
 				} catch {
 					return false;
 				}
@@ -1421,7 +1387,7 @@ export function createAgentRuntime({
 		)
 			return null;
 		const report = reportInTransaction(db, child.id);
-		if (!report) return null;
+		if (!report || isNegativeReport(report)) return null;
 		return {
 			rootRunId: root.root_run_id,
 			rootTaskId: root.id,
@@ -1460,8 +1426,8 @@ export function createAgentRuntime({
 			return !!get(db, taskId) && prepared.has(taskId);
 		},
 		handler,
-		/** Host (non-inference) step handler; undefined without an acquisition port. */
-
+		resolveRequirementProfilesInTransaction:
+			capabilities.resolveRequirementProfilesInTransaction,
 		cancelTreeInTransaction,
 		prepareAnswerInTransaction,
 		validAnswerInTransaction,
@@ -1470,7 +1436,7 @@ export function createAgentRuntime({
 			if (
 				!active(task) ||
 				task.kind !== "coordinator" ||
-				task.phase !== "route" ||
+				task.phase !== "created" ||
 				task.root_run_id !== input.rootRunId ||
 				task.cancel_epoch !== input.cancelEpoch
 			)
@@ -1504,8 +1470,10 @@ export function createAgentRuntime({
 			}
 			return {
 				timers: snapshot,
+				lunaEnabled: inference.codexResearchAvailable?.() ?? false,
 				timersEnabled: !!timerCapability,
 				timerCapability,
+				requirementCatalog: capabilities.requirementCatalogInTransaction(db),
 			};
 		},
 		startInTransaction(
@@ -1517,6 +1485,7 @@ export function createAgentRuntime({
 				parentJobId?: string;
 				actionSnapshot?: unknown;
 				timerCapability?: Prepared;
+				requirementProfiles?: ProfileSnapshot[];
 				onCreated?: (taskId: string) => void;
 			},
 		) {
@@ -1532,7 +1501,15 @@ export function createAgentRuntime({
 				originalRequest?: string;
 				urls?: string[];
 				command?: unknown;
+				researcher?: "codex_luna";
 			};
+			if (
+				request.researcher &&
+				(request.kind !== "web" ||
+					request.researcher !== "codex_luna" ||
+					!inference.codexResearchAvailable?.())
+			)
+				throw new Error("codex_research_unavailable");
 			const root = insertTask(
 				db,
 				"coordinator",
@@ -1563,8 +1540,10 @@ export function createAgentRuntime({
 			}
 			const packageId =
 				request.kind === "history"
-					? "package:history.research@1"
-					: "package:web.research@7";
+					? "package:history.research@2"
+					: request.researcher === "codex_luna"
+						? "package:web.research@9"
+						: "package:web.quick@1";
 			const workerInput = {
 				question: request.question,
 				detail: "normal",
@@ -1580,54 +1559,49 @@ export function createAgentRuntime({
 			let childId: string | undefined;
 			db.exec("SAVEPOINT start_worker");
 			try {
+				capabilities.validateRequirementProfilesInTransaction(
+					db,
+					input.requirementProfiles ?? [],
+				);
 				// Every entry creates exactly one child with the same deadline policy.
 				const child = insertTask(
 					db,
 					"worker",
 					root.root_run_id,
-					{ ...workerInput, originalRequest: request.originalRequest },
-					workerDeadline({} as Prepared, root.deadline, now()),
+					{
+						...workerInput,
+						originalRequest: request.originalRequest ?? request.question,
+						requirementProfiles: input.requirementProfiles ?? [],
+						researcher: request.researcher,
+					},
+					workerDeadline(root.deadline, now()),
 					root.id,
 				);
 				childId = child.id;
 				update(db, root, "waiting_child", "research");
-				const initialized =
-					request.kind !== "history" &&
-					acquisitionTools?.initialize(
-						db,
-						root,
-						child,
-						input.parentJobId ?? "",
+				const p = capabilities.prepareActiveByIdInTransaction(
+					db,
+					owner(child),
+					packageId,
+					workerInput,
+				);
+				db.query("UPDATE agent_tasks SET package_revision_id=? WHERE id=?").run(
+					p.package.revisionId,
+					child.id,
+				);
+				for (const d of [p.package, ...p.dependencies])
+					db.query("INSERT INTO agent_task_bindings VALUES(?,?,?,?)").run(
+						child.id,
+						d.kind,
+						d.revisionId,
+						d.hash,
 					);
-				if (!initialized) {
-					const p = capabilities.prepareActiveByIdInTransaction(
-						db,
-						owner(child),
-						packageId,
-						workerInput,
-					);
-					db.query(
-						"UPDATE agent_tasks SET package_revision_id=? WHERE id=?",
-					).run(p.package.revisionId, child.id);
-					for (const d of [p.package, ...p.dependencies])
-						db.query("INSERT INTO agent_task_bindings VALUES(?,?,?,?)").run(
-							child.id,
-							d.kind,
-							d.revisionId,
-							d.hash,
-						);
-					prepared.set(child.id, p);
-					prepared.set(root.id, p);
-					bindings.set(child.id, tools.bind(owner(child), p, child.deadline));
-					const jobId = enqueue(db, child, input.parentJobId);
-					db.exec("RELEASE start_worker");
-					return { taskId: root.id, jobId };
-				}
+				prepared.set(child.id, p);
+				prepared.set(root.id, p);
+				bindings.set(child.id, tools.bind(owner(child), p, child.deadline));
+				const jobId = enqueue(db, child, input.parentJobId);
 				db.exec("RELEASE start_worker");
-				return {
-					taskId: root.id,
-					jobId: get(db, child.id)!.job_id ?? input.parentJobId ?? root.id,
-				};
+				return { taskId: root.id, jobId };
 			} catch (e) {
 				const metadata = get(db, root.id)!.input_json;
 				db.exec("ROLLBACK TO start_worker");
@@ -1829,6 +1803,7 @@ export function createAgentRuntime({
 			db.query(
 				"DELETE FROM agent_reports WHERE task_id IN (SELECT id FROM agent_tasks WHERE root_run_id=?)",
 			).run(rootRunId);
+			deleteRequirementData(db, rootRunId);
 			tools.deleteDataInTransaction(db, rootRunId);
 		},
 		async recover() {

@@ -1,3 +1,4 @@
+import { run as requirements } from "./requirements";
 import type { CommandRun } from "./types";
 import { run as cancel } from "./cancel";
 import { run as capabilities } from "./capabilities";
@@ -15,6 +16,7 @@ import { run as web } from "./web";
 
 /** Command name to implementation. `task-report` and `task-cancel` share `task.ts`. */
 export const commands: Readonly<Record<string, CommandRun>> = {
+	requirements,
 	cancel,
 	capabilities,
 	collection,

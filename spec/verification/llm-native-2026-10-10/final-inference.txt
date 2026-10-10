@@ -1,0 +1,66 @@
+$ bun scripts/verify.ts --domain inference
+[verify] selected=inference dependencyClosure=delivery,attitude-dataset,larm,settings,inference testClosure=delivery,attitude-dataset,larm,tts-dictionary,settings,inference
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts api/domains/inference
+size-budget ok (14 files)
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check api/domains/inference
+$ oxfmt --check api/domains/inference
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 4ms on 19 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint api/domains/inference
+$ oxlint --deny-warnings api/domains/inference
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun x tsc -p /Users/y.noguchi/Code/eumenes/verification-reports/tsconfig.selected.json
+[verify] TypeScript workspace closure: 59 files; api/infrastructure/flock.ts, api/infrastructure/logger.ts, api/infrastructure/sqlite, api/domains/settings, api/domains/inference, api/infrastructure/http.ts, api/infrastructure/chat-stream.ts, api/domains/larm, api/infrastructure/ignore-error.ts, api/infrastructure/bounded-read.ts, api/domains/delivery, api/domains/attitude-dataset
+[verify] domain tests: /Users/y.noguchi/.bun/bin/bun run test:domain -- inference
+$ bun scripts/test-domain.ts inference
+bun test v1.4.2 (744846f84)
+
+api/domains/inference/test/codex-adapter.test.ts:
+(pass) Codex adapter fixes Luna, sends only supplied context, disables native tools and omits product secrets [437.34ms]
+(pass) Codex adapter kills its process on cancellation and discards partial answers [1359.87ms]
+(pass) Codex adapter reports fixed error codes and rejects oversized output [717.77ms]
+
+api/domains/inference/test/maintenance-control.test.ts:
+(pass) I01 captures after the source answer was accepted, with its own deadline and fixed control limits [31.15ms]
+(pass) I01 rejects expired deadlines, cancelled requests and settings changes before the receipt is adopted [15.48ms]
+(pass) I01 normal captureControl still requires a pending parent [13.47ms]
+(pass) background control binds task authority independently of an expired conversation, with exact limits [14.09ms]
+(pass) background control rejects model budget expansion, expired authority and unavailable tokenizer [14.88ms]
+
+api/domains/inference/test/codex-control.test.ts:
+(pass) Luna controls persist their engine and use common receipts, cancellation and usage history [14.75ms]
+(pass) cancelled Luna work cannot return a late result even if the provider ignores its signal [15.00ms]
+(pass) unavailable Luna is rejected without recording a request or falling back to another model [12.77ms]
+
+api/domains/inference/test/inference.test.ts:
+(pass) three purposes fall back once, adapters preserve paths and usage; no duplicate adoption [21.24ms]
+(pass) service tests pin a cloud resource without changing routes or falling back [14.87ms]
+(pass) cloud TTS keeps its own voice and speed from the accepted settings snapshot [15.36ms]
+(pass) judge absence preserves the immutable manual baseline for every phrase [15.26ms]
+(pass) authentication, invalid contracts and caller cancellation never trigger cloud [74.31ms]
+(pass) local timeout fences a late adapter result; immutable snapshot and revocation at adoption [42.02ms]
+(pass) revocation aborts pending cloud; regrant does not revive old request [24.60ms]
+(pass) acceptance updates rollback together with the caller transaction [15.91ms]
+(pass) a failed stream cannot append a cloud fallback to already published local text [16.29ms]
+(pass) late provider deltas are fenced after caller cancellation [24.03ms]
+(pass) provider diagnostics preserve the rejected and recovered Connection IDs on the same attempt [19.91ms]
+(pass) a failed provider still saves the rejected Connection ID and error fields [16.65ms]
+(pass) Laya judges the spoken text and carries one decision with bounded immutable voice settings [19.36ms]
+(pass) decision timeout keeps manual voice, fences late results and cancellation prevents synthesis [38.59ms]
+(pass) speech text is rewritten for the local provider and for the cloud fallback [35.03ms]
+(pass) speak with an override synthesizes with unsaved voice settings without changing saved ones [16.67ms]
+(pass) Ruri dataset captures real-turn receipt adoption once; a technical collection request does not delay answer or TTS [29.02ms]
+(pass) control calls preserve exact context, stay local, skip emotion judgement, and rejected JSON is never adopted [27.86ms]
+(pass) a probe stuck running for over 10 minutes is marked probe_stale and a new probe starts [24.53ms]
+(pass) a recent running probe still blocks a new one [14.10ms]
+(pass) the final probe status survives a momentarily full writer queue [222.26ms]
+
+api/domains/inference/test/migration.test.ts:
+(pass) append-only diagnostics migration preserves previous inference attempts [29.61ms]
+
+ 33 pass
+ 0 fail
+ 165 expect() calls
+Ran 33 tests across 5 files. [3.48s]
+[verify] passed 5135 ms

@@ -1,0 +1,45 @@
+Listing tests:
+  artifact-showcase.spec.ts:74:1 › failed showcase import preserves the conversation and offers reload recovery
+  artifact-showcase.spec.ts:111:1 › workspace boundary resizes with drag and keyboard, preserves drafts and disappears with the last artifact
+  artifact-showcase.spec.ts:182:1 › stacked boundary adjusts height and retains independent widths across viewport changes
+  artifact-showcase.spec.ts:232:1 › touch resize ends cleanly after release or cancellation
+  artifact-showcase.spec.ts:280:1 › all six registered views render through OpenUI; compact JSON and Lang validation
+  artifact-showcase.spec.ts:329:1 › image placeholder, asynchronous completion, fullscreen, download, failure and cancellation
+  artifact-showcase.spec.ts:388:1 › radio answers have full-row targets, native keyboard selection and retain submitted answers
+  artifact-showcase.spec.ts:471:1 › question and form validation, retry, reset, input retention and duplicate submit protection
+  artifact-showcase.spec.ts:527:1 › settings theme shares the width and density toolbar and matches the visible preview
+  artifact-showcase.spec.ts:615:1 › memory correction and settings save affect only fixture state; theme, responsive layout and screenshots
+  artifact-showcase.spec.ts:680:1 › tabs use keyboard navigation; only the body has p-2 and closing the last tab removes the pane
+  artifact-showcase.spec.ts:726:1 › sample operations show concrete results and only relevant test controls
+  artifact-showcase.spec.ts:795:1 › tabs fit the pane without horizontal scrolling and clearly distinguish selection, including zoom
+  artifact-showcase.spec.ts:875:1 › all design presets affect the sample and settings while the host and sample tabs stay unchanged
+  artifact-showcase.spec.ts:954:1 › every design token can be edited, invalid input preserves the preview, and reset restores all values
+  artifact-showcase.spec.ts:1067:1 › design token controls and long token names fit a mobile panel without horizontal scrolling
+  research-routes.spec.ts:40:1 › the settings panel reads, stops, releases and clears stored legacy records
+  timers.spec.ts:47:1 › a 90-second request opens the saved timer
+  timers.spec.ts:110:1 › the 24-hour clock fits a narrow artifact and is restored after reload
+  timers.spec.ts:145:1 › a persisted timer expires and its notice survives closing the clock
+  timers.spec.ts:201:1 › the timer has usable controls and fits both themes and a narrow screen
+  timers.spec.ts:249:1 › expiry plays one real beep and posts an assistant message even after the artifact closes
+  timers.spec.ts:308:1 › top-right banners and notification drawer fit desktop and mobile in both themes
+  timers.spec.ts:446:1 › a restored alarm waits for audio activation and then beeps and requests TTS
+  toolchain.spec.ts:60:2 › browser → API → child → web → summary → main: 東京の天気を調べて
+  toolchain.spec.ts:60:2 › browser → API → child → web → summary → main: AAPLの株価を調べて
+  voice-media.spec.ts:51:1 › fake microphone speech reaches the transcript through the AudioWorklet
+  voice.spec.ts:75:2 › light avatar rendering › light avatar stays behind usable chat and releases its canvas on navigation
+  voice.spec.ts:222:1 › avatar voice controls save and survive a settings reload
+  voice.spec.ts:382:1 › missing catalog or character preserves saved controls until an explicit default reset
+  voice.spec.ts:490:1 › exported LARM token connects the UI and CLI without browser credentials
+  voice.spec.ts:527:1 › a backend outage does not poll snapshots and explicit reconnect reloads the views
+  voice.spec.ts:581:1 › text and browser audio complete through real services with fixture provider
+  voice.spec.ts:709:1 › settings save, reload, theme and automatic fallback use backend credentials
+  voice.spec.ts:851:1 › memory connection settings persist across reload and preserve saved items
+  voice.spec.ts:892:1 › settings schedule controls create, pause, resume and cancel future work
+  voice.spec.ts:928:1 › idle views keep one SSE stream without periodic snapshot requests
+  voice.spec.ts:969:1 › failed notifications are visible while API works; returning to the page restores missed answers
+  voice.spec.ts:1050:1 › partial ASR and text arrive early; speech waits for the completed answer
+  voice.spec.ts:1134:1 › answer emotions sit beside Eumenes, neutral and legacy motions stay hidden, and reload preserves them
+  voice.spec.ts:1235:1 › settings playground exercises image, music and provider health through the API
+  voice.spec.ts:1278:1 › a long question with a one-second pause is sent once after final silence
+  world.spec.ts:83:1 › the list separates the axes and never styles hypothesis or measurement as confirmed; conflict, retract and forget behave honestly; a restart finishes the forget
+Total: 43 tests in 7 files

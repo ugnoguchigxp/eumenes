@@ -1,0 +1,104 @@
+{
+  "selected": [
+    "task-reports",
+    "coding-supervision",
+    "coding",
+    "artifact",
+    "tasks",
+    "capabilities",
+    "tool-runtime",
+    "agent-runtime",
+    "research-routes",
+    "web-research",
+    "attitude-dataset",
+    "service-tests",
+    "delivery",
+    "avatar",
+    "settings",
+    "inference",
+    "tts-dictionary",
+    "conversation",
+    "continuity",
+    "goals",
+    "world",
+    "memory",
+    "larm",
+    "audio",
+    "queue",
+    "scheduler",
+    "timers",
+    "dialogue",
+    "voice-dialogue"
+  ],
+  "revision": "423b0082b5c84d9ad113acc34e8ce6921f2baf598866e117d627240fc8177f0b",
+  "steps": [
+    {
+      "name": "size-budget",
+      "ms": 381,
+      "result": "pass"
+    },
+    {
+      "name": "sql-boundaries",
+      "ms": 523,
+      "result": "pass"
+    },
+    {
+      "name": "domain-docs",
+      "ms": 12,
+      "result": "pass"
+    },
+    {
+      "name": "format",
+      "ms": 215,
+      "result": "pass"
+    },
+    {
+      "name": "lint",
+      "ms": 132,
+      "result": "pass"
+    },
+    {
+      "name": "typecheck",
+      "ms": 4877,
+      "result": "pass"
+    },
+    {
+      "name": "tests",
+      "ms": 145012,
+      "result": "pass"
+    },
+    {
+      "name": "web tests",
+      "ms": 9230,
+      "result": "pass"
+    },
+    {
+      "name": "client tests",
+      "ms": 1203,
+      "result": "pass"
+    },
+    {
+      "name": "design-system typecheck",
+      "ms": 1199,
+      "result": "pass"
+    },
+    {
+      "name": "design-system tests",
+      "ms": 12836,
+      "result": "pass"
+    },
+    {
+      "name": "web build",
+      "ms": 6324,
+      "result": "pass"
+    },
+    {
+      "name": "browser fixture",
+      "ms": 223850,
+      "result": "pass"
+    }
+  ],
+  "totalMs": 406506,
+  "result": "fail",
+  "error": "Error: source changed during verification"
+}

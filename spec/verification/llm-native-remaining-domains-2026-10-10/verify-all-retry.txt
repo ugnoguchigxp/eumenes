@@ -1,0 +1,28 @@
+$ bun scripts/verify.ts --all
+[verify] selected=task-reports,coding-supervision,coding,artifact,tasks,capabilities,tool-runtime,agent-runtime,research-routes,web-research,attitude-dataset,service-tests,delivery,avatar,settings,inference,tts-dictionary,conversation,continuity,goals,world,memory,larm,audio,queue,scheduler,timers,dialogue,voice-dialogue dependencyClosure=tasks,task-reports,coding,delivery,attitude-dataset,larm,settings,inference,queue,coding-supervision,artifact,avatar,conversation,capabilities,tool-runtime,agent-runtime,research-routes,web-research,service-tests,tts-dictionary,continuity,goals,world,memory,audio,scheduler,timers,dialogue,voice-dialogue testClosure=tasks,task-reports,coding,delivery,attitude-dataset,larm,tts-dictionary,settings,inference,queue,coding-supervision,avatar,conversation,artifact,capabilities,tool-runtime,agent-runtime,research-routes,web-research,service-tests,continuity,goals,memory,world,audio,scheduler,timers,dialogue,voice-dialogue
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts
+size-budget ok (658 files)
+[verify] sql-boundaries: /Users/y.noguchi/.bun/bin/bun scripts/sql-boundaries.ts
+[sql-boundaries] ok: 143 tables, 0 allowed cross-domain accesses
+[verify] domain-docs: /Users/y.noguchi/.bun/bin/bun scripts/domain-docs.ts --check
+docs/domains.md: domain 表は最新です
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check .
+$ oxfmt --check .
+Checking formatting...
+
+spec/verification/llm-native-2026-10-10/live-final/results.json (0ms)
+
+Format issues found in above 1 files. Run without `--check` to fix.
+Finished in 119ms on 859 files using 10 threads.
+error: script "format:check" exited with code 1
+104 | 	steps.push({
+105 | 		name,
+106 | 		ms: Math.round(performance.now() - start),
+107 | 		result: code === 0 ? "pass" : `exit ${code}`,
+108 | 	});
+109 | 	if (code !== 0) throw new Error(`${name} failed (${code})`);
+                                 ^
+error: format failed (1)
+      at run (/Users/y.noguchi/Code/eumenes/scripts/verify.ts:109:28)
+
+error: script "verify:all" exited with code 1

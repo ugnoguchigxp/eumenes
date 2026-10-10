@@ -74,7 +74,7 @@ test("a 90-second request opens the saved timer", async ({ page, request }) => {
 	expect(body.receipt?.artifact.timerId).toBe(body.receipt?.timer.id);
 	await expect(
 		page.getByRole("paragraph").filter({
-			hasText: "1分30秒のタイマーを開始いたしました",
+			hasText: "90秒のタイマーを開始しました",
 		}),
 	).toBeVisible({ timeout: 20000 });
 	const clock = page.getByRole("timer");

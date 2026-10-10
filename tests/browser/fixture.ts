@@ -1,6 +1,7 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { join } from "node:path";
 import { createServer, type Server } from "node:net";
+import { createClient } from "../../client";
 
 /** Sends `signal` to the whole process group of `child`; false when it is already gone. */
 function signalGroup(child: ChildProcess, signal: NodeJS.Signals): boolean {
@@ -190,13 +191,22 @@ export function createFixture() {
 				EUMENES_API_TOKEN: options.token,
 				EUMENES_PORT: String(apiPort),
 				EUMENES_ORIGIN: `http://127.0.0.1:${webPort}`,
-				LARM_BASE_URL: `http://127.0.0.1:${larmPort}`,
 				LARM_API_TOKEN: "fixture-control",
 				LARM_CONTROL_TOKEN: "",
 			},
 			{ ports: [apiPort] },
 		);
 		await ready(`http://127.0.0.1:${apiPort}/api/status`);
+		const client = createClient(`http://127.0.0.1:${apiPort}`, options.token);
+		const settings = await client.settings();
+		settings.larm.baseUrl = `http://127.0.0.1:${larmPort}`;
+		await client.applySettings({
+			requestId: crypto.randomUUID(),
+			expectedRevision: settings.revision,
+			settings,
+			keys: [],
+		});
+		await client.connectLarm();
 		await waitUntil(
 			async () => {
 				const response = await fetch(`http://127.0.0.1:${apiPort}/api/status`, {

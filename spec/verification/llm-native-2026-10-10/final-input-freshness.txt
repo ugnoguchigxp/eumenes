@@ -1,0 +1,9 @@
+{
+  "originalRevision": "423b0082b5c84d9ad113acc34e8ce6921f2baf598866e117d627240fc8177f0b",
+  "reconstructedRevision": "423b0082b5c84d9ad113acc34e8ce6921f2baf598866e117d627240fc8177f0b",
+  "unchangedOriginalInputs": true,
+  "addedOutput": "spec/verification/llm-native-remaining-domains-2026-10-10/verify-all-freshness-failed-report.json",
+  "method": "Recomputed the runner SHA-256 over every original input in the same order, excluding only the output file added during the run. Exact match confirmed. Original gate remains exit 1.",
+  "stepsPassed": true,
+  "totalMs": 406506
+}

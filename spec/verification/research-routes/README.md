@@ -1,5 +1,7 @@
 # 取得先学習・動的SKILL 検証記録
 
+**旧実装の検証記録。** 2026-10-10に専用分類・抽出・回答生成・自動学習の実行コードとliveスクリプトを廃止した。以下のコマンドと成功記録は現行版の実行仕様・受入結果ではない。保存済みデータの管理は維持している。
+
 状態の区別: **実装済み**はコードとfixture試験が存在する範囲、**検証済み**はこの記録に結果を書いたものだけ、**計画**は未実施。fixture、live、実機器は混ぜない。
 
 | 項目 | 状態 | 備考 |
@@ -16,14 +18,14 @@
 ```sh
 bun run verify -- --domain research-routes   # 以降、capabilities / tool-runtime / agent-runtime / web-research / queue / inference / larm / dialogue / voice-dialogue / settings
 bun run verify:all
-EUMENES_LIVE_RESEARCH_ROUTES=1 LARM_BASE_URL=... LARM_API_TOKEN=... bun run verify:live -- --domain research-routes
+EUMENES_LIVE_RESEARCH_ROUTES=1 LARM_API_TOKEN=... bun run verify:live -- --domain research-routes
 ```
 
-liveには`EUMENES_LIVE_RESEARCH_ROUTES=1`、`LARM_BASE_URL`、backend側のLARM credential（`LARM_CONTROL_TOKEN`または`LARM_API_TOKEN`）が必須で、fixture fallbackはありません。一時DBの隔離backendを起動し、認証付きAPIから鎌倉・静岡市・AAPLのcold→登録完了待ち→warmを実行します。登録待ちは初回回答時間に含めません。生出力は`verification-reports/research-routes/live.json`（Git対象外）。
+liveには`EUMENES_LIVE_RESEARCH_ROUTES=1`、SQLiteに保存したLARM接続設定、backend側のLARM credential（`LARM_CONTROL_TOKEN`または`LARM_API_TOKEN`）が必須で、fixture fallbackはありません。一時DBの隔離backendを起動し、認証付きAPIから鎌倉・静岡市・AAPLのcold→登録完了待ち→warmを実行します。登録待ちは初回回答時間に含めません。生出力は`verification-reports/research-routes/live.json`（Git対象外）。
 
 ## 判定の分け方
 
-- 機能合格（スクリプトが数えるもの）: coldの実検索（acquisitionMode=search、tool呼出し2以上）、登録がactiveになる、warmがcachedで1tool・モデル2回、warm前後でdraft/版が増えない（登録job0）。
+- 機能合格（スクリプトが数えるもの）: coldの実検索（acquisitionMode=search、tool呼出し2以上）、登録がactiveになる、warmがcachedで1tool・モデル3回（最初の会話判断、子の報告、最終回答）、warm前後でdraft/版が増えない（登録job0）。
 - 値・日付・対象の一致は人が回答と照合する（`valueReview: required_manual`）。自動合格にしない。
 - 速度目標（warm≤10秒、coldの半分以下）は機能と別欄。1組の結果から達成を主張しない（最低5組、比較対象ごと、sourceChanged/unsupported注記）。
 - 実サイトの404/timeout/構造変更はfixture E2Eのみで、live成功と記録しない。

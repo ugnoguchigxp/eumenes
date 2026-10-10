@@ -1,0 +1,28 @@
+$ bun scripts/verify.ts --domain task-reports
+[verify] selected=task-reports dependencyClosure=tasks,task-reports testClosure=tasks,task-reports
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts api/domains/task-reports
+size-budget ok (5 files)
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check api/domains/task-reports
+$ oxfmt --check api/domains/task-reports
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 5ms on 6 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint api/domains/task-reports
+$ oxlint --deny-warnings api/domains/task-reports
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun x tsc -p /Users/y.noguchi/Code/eumenes/verification-reports/tsconfig.selected.json
+[verify] TypeScript workspace closure: 25 files; api/infrastructure/flock.ts, api/infrastructure/logger.ts, api/infrastructure/sqlite, api/infrastructure/http.ts, api/domains/task-reports, api/domains/tasks, api/infrastructure/digest.ts, api/infrastructure/bounded-read.ts
+[verify] domain tests: /Users/y.noguchi/.bun/bin/bun run test:domain -- task-reports
+$ bun scripts/test-domain.ts task-reports
+bun test v1.4.2 (744846f84)
+
+api/domains/task-reports/test/reports.test.ts:
+(pass) immutable report sequence and origin are deduplicated with a durable outbox [14.56ms]
+(pass) report and outbox roll back together, and contract size bounds are enforced [7.43ms]
+(pass) resolved blocker outbox is superseded without mutating the report [9.02ms]
+
+ 3 pass
+ 0 fail
+ 15 expect() calls
+Ran 3 tests across 1 file. [85.00ms]
+[verify] passed 1405 ms

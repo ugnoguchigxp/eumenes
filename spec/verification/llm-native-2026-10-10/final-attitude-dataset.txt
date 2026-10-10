@@ -1,0 +1,44 @@
+$ bun scripts/verify.ts --domain attitude-dataset
+[verify] selected=attitude-dataset dependencyClosure=delivery,attitude-dataset testClosure=delivery,attitude-dataset
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts api/domains/attitude-dataset
+size-budget ok (8 files)
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check api/domains/attitude-dataset
+$ oxfmt --check api/domains/attitude-dataset
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 2ms on 10 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint api/domains/attitude-dataset
+$ oxlint --deny-warnings api/domains/attitude-dataset
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun x tsc -p /Users/y.noguchi/Code/eumenes/verification-reports/tsconfig.selected.json
+[verify] TypeScript workspace closure: 19 files; api/infrastructure/flock.ts, api/infrastructure/logger.ts, api/infrastructure/sqlite, api/domains/attitude-dataset, api/domains/delivery
+[verify] domain tests: /Users/y.noguchi/.bun/bin/bun run test:domain -- attitude-dataset
+$ bun scripts/test-domain.ts attitude-dataset
+bun test v1.4.2 (744846f84)
+
+api/domains/attitude-dataset/test/dataset.test.ts:
+(pass) off by default; authentic unit reuses normal judgment, strips raw metadata, keeps human labels null and blind predictions hidden [15.48ms]
+(pass) every technical reply uses the same single full-six judgment and records normal adoption [8.41ms]
+(pass) stop, cancellation and restart reject collection late responses; no second call after normal failure [2015.30ms]
+(pass) non-ruri, malformed, timeout, probes and missing identity never count as successful real Ruri units [15.66ms]
+(pass) review is validated and optimistic, original prediction survives correction; export only reviewed split examples [14.61ms]
+(pass) connected conversations/templates including unreviewed bridges never leak across splits [0.93ms]
+(pass) three independent reviewed groups always reserve calibration and eval without splitting a conversation [5.44ms]
+(pass) duplicate coverage tags cannot inflate reviewed coverage [10.04ms]
+(pass) 300 successful distinct units stops collection; repetitions and synthetic/probe identities cannot inflate count [213.72ms]
+(pass) credential-looking text is excluded, not partially copied; new examples invalidate old split assignments [8.72ms]
+(pass) available judge is called once even when cached model identity is absent [6.73ms]
+(pass) chunk collection sends only the current chunk, not a complete answer from its context [7.36ms]
+(pass) human review cannot introduce credential-looking text into the dataset or export [8.40ms]
+(pass) six malformed Ruri scores do not count toward the 300 successful judgments [7.93ms]
+
+api/domains/attitude-dataset/test/api.test.ts:
+(pass) API provides control, blind sample lookup, review validation and empty safe export without opening client DB [10.53ms]
+(pass) private dataset database and WAL/SHM stay private even in an existing public parent directory [9.10ms]
+(pass) CLI export refuses existing directories before creating partial output and exports to a fresh private directory [125.36ms]
+
+ 17 pass
+ 0 fail
+ 102 expect() calls
+Ran 17 tests across 2 files. [2.54s]
+[verify] passed 3802 ms

@@ -15,7 +15,7 @@
 | `capabilities` | `api/domains/capabilities/index.ts` | なし | なし | なし | なし | なし |
 | `tool-runtime` | `api/domains/tool-runtime/index.ts` | なし | なし | `capabilities`、`queue` | なし | なし |
 | `agent-runtime` | `api/domains/agent-runtime/index.ts` | `web/src/domains/agent-runtime/index.ts` | なし | `capabilities`、`inference`、`queue`、`tool-runtime` | なし | なし |
-| `research-routes` | `api/domains/research-routes/index.ts` | `web/src/domains/research-routes/index.tsx` | なし | `capabilities`、`inference`、`queue` | なし | なし |
+| `research-routes` | `api/domains/research-routes/index.ts` | `web/src/domains/research-routes/index.tsx` | なし | `queue` | なし | なし |
 | `web-research` | `api/domains/web-research/index.ts` | なし | なし | `queue` | なし | なし |
 | `attitude-dataset` | `api/domains/attitude-dataset/index.ts` | なし | なし | `delivery` | なし | なし |
 | `service-tests` | `api/domains/service-tests/index.ts` | `web/src/domains/service-tests/index.tsx` | なし | `inference`、`larm`、`settings` | なし | なし |

@@ -1,0 +1,47 @@
+
+Running 2 tests using 1 worker
+
+(node:6172) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  1 tests/browser/research-routes.spec.ts:40:1 › the settings panel reads, stops, releases and clears stored legacy records (2.2s)
+(node:6218) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  2 tests/browser/timers.spec.ts:47:1 › a 90-second request opens the saved timer (8.6s)
+
+
+  1) tests/browser/research-routes.spec.ts:40:1 › the settings panel reads, stops, releases and clears stored legacy records 
+
+    Error: locator.click: Error: strict mode violation: getByRole('region', { name: /取得先 天気予報 鎌倉/ }).getByText(/保存された補足/) resolved to 2 elements:
+        1) <summary>保存された補足（SystemContext）</summary> aka getByText('保存された補足（SystemContext）')
+        2) <pre>過去に保存された補足です。現在の調査では資料を選び直します。</pre> aka getByText('過去に保存された補足です。現在の調査では資料を選び直します。')
+
+    Call log:
+      - waiting for getByRole('region', { name: /取得先 天気予報 鎌倉/ }).getByText(/保存された補足/)
+
+
+      55 | 	await detail.getByText("手順（SKILL）").click();
+      56 | 	await expect(detail.locator("pre").first()).toContainText("鎌倉");
+    > 57 | 	await detail.getByText(/保存された補足/).click();
+         | 	                                  ^
+      58 | 	await expect(detail.locator("pre").nth(1)).not.toBeEmpty();
+      59 | 	await page.screenshot({
+      60 | 		path: info.outputPath("research-routes-detail.png"),
+        at /Users/y.noguchi/Code/eumenes/tests/browser/research-routes.spec.ts:57:36
+
+    Error Context: test-results/research-routes-the-settin-c9473-lears-stored-legacy-records/error-context.md
+
+    Error Context: test-results/research-routes-the-settin-c9473-lears-stored-legacy-records/error-context.md
+
+  1 failed
+    tests/browser/research-routes.spec.ts:40:1 › the settings panel reads, stops, releases and clears stored legacy records 
+  1 passed (12.7s)
+
+
+Running 2 tests using 1 worker
+
+(node:6390) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 tests/browser/research-routes.spec.ts:40:1 › the settings panel reads, stops, releases and clears stored legacy records (2.1s)
+  ✓  2 tests/browser/voice.spec.ts:581:1 › text and browser audio complete through real services with fixture provider (16.7s)
+
+  2 passed (20.7s)

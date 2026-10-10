@@ -38,6 +38,7 @@ export async function replay(
 	let position = 0;
 	const inputs: ReplayData[] = [];
 	const h = await harness({
+		fullResearch: true,
 		...options,
 		async control(messages) {
 			const system = messages[0]!.content;

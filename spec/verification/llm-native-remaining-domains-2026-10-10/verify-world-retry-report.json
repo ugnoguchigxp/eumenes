@@ -1,0 +1,43 @@
+{
+	"selected": ["world"],
+	"dependencySet": ["delivery", "conversation", "goals", "world", "avatar"],
+	"testDependencySet": [
+		"delivery",
+		"avatar",
+		"conversation",
+		"goals",
+		"continuity",
+		"memory",
+		"world"
+	],
+	"revision": "64871e6225bd2932526ce370ee20db72afbcfd9d573ecbf59a142ced1a3bccc5",
+	"steps": [
+		{
+			"name": "size-budget",
+			"ms": 158,
+			"result": "pass"
+		},
+		{
+			"name": "format",
+			"ms": 104,
+			"result": "pass"
+		},
+		{
+			"name": "lint",
+			"ms": 64,
+			"result": "pass"
+		},
+		{
+			"name": "typecheck",
+			"ms": 2836,
+			"result": "pass"
+		},
+		{
+			"name": "domain tests",
+			"ms": 11367,
+			"result": "pass"
+		}
+	],
+	"totalMs": 15511,
+	"result": "pass"
+}

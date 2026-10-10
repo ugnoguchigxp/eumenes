@@ -1,0 +1,245 @@
+{
+	"at": "2026-10-10T11:15:38.494Z",
+	"casesPath": "/Users/y.noguchi/Code/eumenes/api/application/testdata/llm-native/cases.json",
+	"repeats": 2,
+	"lane": "live",
+	"accepted": false,
+	"results": [
+		{
+			"caseId": "event-complete",
+			"repeat": 1,
+			"elapsedMs": 39105,
+			"status": "failed",
+			"engine": "default",
+			"structureMatched": false,
+			"semanticChecks": [
+				{
+					"assertion": "依頼の全条件が保持され、根拠にない値を補わない",
+					"status": "unchecked"
+				},
+				{
+					"assertion": "本文内の開始・締切・否定・例外・矛盾を区別する",
+					"status": "unchecked"
+				}
+			],
+			"model": [
+				{
+					"purpose": "llm",
+					"source": "larm",
+					"model": "gemma4-26b-a4b",
+					"status": "succeeded",
+					"elapsedMs": 5083
+				},
+				{
+					"purpose": "llm",
+					"source": "larm",
+					"model": "gemma4-26b-a4b",
+					"status": "succeeded",
+					"elapsedMs": 7270
+				},
+				{
+					"purpose": "llm",
+					"source": "larm",
+					"model": "gemma4-26b-a4b",
+					"status": "succeeded",
+					"elapsedMs": 12472
+				},
+				{
+					"purpose": "llm",
+					"source": "larm",
+					"model": "gemma4-26b-a4b",
+					"status": "succeeded",
+					"elapsedMs": 10850
+				},
+				{
+					"purpose": "llm",
+					"source": "larm",
+					"model": "gemma4-26b-a4b",
+					"status": "succeeded",
+					"elapsedMs": 3336
+				}
+			],
+			"counts": {
+				"conversation": 1,
+				"parent": 1,
+				"worker": 3,
+				"verify": {
+					"n": 1
+				},
+				"tools": 1
+			},
+			"unknownCount": 0,
+			"safeCode": null,
+			"report": {
+				"version": 3,
+				"outcome": "answered",
+				"summary": "指定されたURLの内容に基づき、催しの申込締切と料金を確認しました。",
+				"claims": [
+					{
+						"text": "催しの申込締切は2026年10月15日18:00 JSTです。",
+						"evidence": [
+							{
+								"sourceId": "caf72188-3309-4d8b-8d6b-446e187e880c",
+								"quote": "受付開始は2026年10月12日09:00 JST。申込締切は2026年10月15日18:00 JST。参加費は一人1,500 JPY。",
+								"viewId": "b0f17e5d-9398-4f28-8265-70141e770bb3"
+							}
+						]
+					},
+					{
+						"text": "料金（参加費）は一人1,500 JPYです。",
+						"evidence": [
+							{
+								"sourceId": "caf72188-3309-4d8b-8d6b-446e187e880c",
+								"quote": "受付開始は2026年10月12日09:00 JST。申込締切は2026年10月15日18:00 JST。参加費は一人1,500 JPY。",
+								"viewId": "b0f17e5d-9398-4f28-8265-70141e770bb3"
+							}
+						]
+					}
+				],
+				"limitations": [],
+				"exploration": ["確認した操作1件。"],
+				"sources": [
+					{
+						"kind": "web_source",
+						"sourceId": "caf72188-3309-4d8b-8d6b-446e187e880c",
+						"sourceRef": "1de8aaec-8d2e-4b10-bc73-6eac59ffce49",
+						"sourceRevision": "042b27fc-aba3-4273-ac43-7e1489adfd65:c7d912dd1ea9cdebe05313e400b0f917fe04170253c0e4ec62bc31fafe38fda5",
+						"viewId": "b0f17e5d-9398-4f28-8265-70141e770bb3",
+						"viewDigest": "c7d912dd1ea9cdebe05313e400b0f917fe04170253c0e4ec62bc31fafe38fda5",
+						"url": "https://example.org/fixtures/event-complete",
+						"title": "人工固定資料",
+						"basis": "page",
+						"fetchedAt": "2026-10-10T00:00:00Z",
+						"truncated": false,
+						"acquisitionTruncated": false,
+						"previewTruncated": false,
+						"start": 0,
+						"end": 68,
+						"nextCursor": null,
+						"previousCursor": null
+					}
+				],
+				"coverage": "complete",
+				"verification": "evidence_linked",
+				"requirements": {
+					"contractDigest": "bc76ee221e563e89f60bbf4b6dd93cc23aced0700f448eabf7903b3678272358",
+					"requestDigest": "09a616cee7bbfd9c10cd230197c5087a464eafd81204903b006fd1e6a8d2e892",
+					"profiles": [],
+					"items": [
+						{
+							"id": "r1",
+							"statement": "催しの申込締切を確認する",
+							"required": true,
+							"applicability": "現在の依頼",
+							"origin": {
+								"kind": "request"
+							}
+						},
+						{
+							"id": "r2",
+							"statement": "料金を確認する",
+							"required": true,
+							"applicability": "現在の依頼",
+							"origin": {
+								"kind": "request"
+							}
+						}
+					],
+					"checks": [
+						{
+							"requirementId": "r1",
+							"status": "satisfied",
+							"value": "2026年10月15日18:00 JST",
+							"evidence": [
+								{
+									"sourceId": "caf72188-3309-4d8b-8d6b-446e187e880c",
+									"viewId": "b0f17e5d-9398-4f28-8265-70141e770bb3",
+									"quote": "受付開始は2026年10月12日09:00 JST。申込締切は2026年10月15日18:00 JST。参加費は一人1,500 JPY。"
+								}
+							],
+							"reason": "資料に申込締切の記載があります。"
+						},
+						{
+							"requirementId": "r2",
+							"status": "satisfied",
+							"value": "一人1,500 JPY",
+							"evidence": [
+								{
+									"sourceId": "caf72188-3309-4d8b-8d6b-446e187e880c",
+									"viewId": "b0f17e5d-9398-4f28-8265-70141e770bb3",
+									"quote": "受付開始は2026年10月12日09:00 JST。申込締切は2026年10月15日18:00 JST。参加費は一人1,500 JPY。"
+								}
+							],
+							"reason": "資料に参加費の記載があります。"
+						}
+					],
+					"externalRules": [],
+					"verificationDigest": "bb4610526f2e023997755950c397922a80b95f88d97d6ce16f0666631ad94a5a",
+					"semanticVerification": "model_checked"
+				}
+			},
+			"lane": "live_model_fixed_artificial_sources"
+		},
+		{
+			"caseId": "event-complete",
+			"repeat": 2,
+			"elapsedMs": 20669,
+			"status": "failed",
+			"engine": "default",
+			"structureMatched": false,
+			"semanticChecks": [
+				{
+					"assertion": "依頼の全条件が保持され、根拠にない値を補わない",
+					"status": "unchecked"
+				},
+				{
+					"assertion": "本文内の開始・締切・否定・例外・矛盾を区別する",
+					"status": "unchecked"
+				}
+			],
+			"model": [
+				{
+					"purpose": "llm",
+					"source": "larm",
+					"model": "gemma4-26b-a4b",
+					"status": "succeeded",
+					"elapsedMs": 4595
+				},
+				{
+					"purpose": "llm",
+					"source": "larm",
+					"model": "gemma4-26b-a4b",
+					"status": "succeeded",
+					"elapsedMs": 6077
+				},
+				{
+					"purpose": "llm",
+					"source": "larm",
+					"model": "gemma4-26b-a4b",
+					"status": "succeeded",
+					"elapsedMs": 6347
+				},
+				{
+					"purpose": "llm",
+					"source": "larm",
+					"model": "gemma4-26b-a4b",
+					"status": "succeeded",
+					"elapsedMs": 3593
+				}
+			],
+			"counts": {
+				"conversation": 1,
+				"parent": 1,
+				"worker": 2,
+				"verify": {
+					"n": 0
+				},
+				"tools": 0
+			},
+			"unknownCount": 0,
+			"safeCode": "invalid_requirement_schema",
+			"report": null,
+			"lane": "live_model_fixed_artificial_sources"
+		}
+	]
+}

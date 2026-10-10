@@ -1,0 +1,103 @@
+bun test v1.4.2 (744846f84)
+
+api/application/coding-observation.test.ts:
+(pass) a normal run exposes unknown-kind speech, a stopped terminal and no identifiable final [1610.48ms]
+(pass) a long message keeps sourceTruncated, is read only within this observation's bound, and is not full coverage [1337.88ms]
+(pass) an empty-only report is reported as empty, not as failure [1396.41ms]
+(pass) a failed turn is reported as failed with a complete capture [1203.28ms]
+(pass) changed evidence digest or a state change while reading is rejected, not adopted [1123.76ms]
+(pass) a failed observation is named by a fixed code and the last adopted cursor [1177.51ms]
+(pass) a focused read resumes one reference but keeps the snapshot and the observation's meaning [1188.25ms]
+(pass) an unreadable body degrades to a limitation without changing what was said or the digest [1150.92ms]
+(pass) an unreadable snapshot fails the observation instead of guessing the snapshot [1155.07ms]
+
+api/application/world.test.ts:
+(pass) mode flag: unset/off/0 mean nothing is assembled; protect and on are explicit; a typo fails startup [0.67ms]
+(pass) cursor secret: host-owned file (dir 0700, file 0600), created once, stable, never from the database; env overrides; short values fail [3.88ms]
+(pass) journal path sits next to the Memory journal [0.02ms]
+(pass) protect: recovery opens the gate, World stays OFF, and turning it ON runs the initial sync first [46.20ms]
+(pass) protect forces an enabled World OFF at startup; on turns it ON once the initial sync is done [55.25ms]
+(pass) a closed gate (corrupt World journal) skips the passes and keeps World closed; nothing throws [51.06ms]
+(pass) idle passes write nothing: no commit, so no change-stream traffic and no feedback loop [337.73ms]
+(pass) a retraction reaches World by commit notification alone [61.86ms]
+(pass) a changed cursor secret does not wedge the feed: the stored cursor is reset through a restore and the feed is read again [53.26ms]
+
+api/application/world-extraction.test.ts:
+(pass) A19/A43 the real queue runs ONE Local job: a candidate is adopted, no Cloud request exists [82.48ms]
+(pass) A43 an unavailable Local provider leaves the input pending; the Cloud route that is armed is never used [186.19ms]
+(pass) A43 the 30 s stage budget (80 ms here) cancels the call and the job fails after one retry [244.13ms]
+(pass) no input, no job: an idle World creates no extraction job and no model call [246.31ms]
+(pass) protect mode registers no extraction handler: no job kind exists, input is never delivered [42.20ms]
+(pass) A42 a restart resumes the unapplied inbox: the input received before the stop is extracted after it [64.69ms]
+
+api/application/coding-supervision.test.ts:
+(pass) the existing 60-second Scheduler monitor feeds supervision through the public task execution port [32.48ms]
+(pass) supervision releases the shared inference slot while waiting on a CLI step [21.73ms]
+(pass) HTTP/client authenticate report and supervisor reads and omit private CLI text [29.80ms]
+(pass) the answer to a supervision approval question is never dispatched to the CLI [0.21ms]
+(pass) answering an approval question prepares no coding execution and applies the approved instruction [33.50ms]
+(pass) a failed observation reaches supervision with a fixed code and the position, not the exception text [0.30ms]
+
+packages/coding-runner/test/protocol.test.ts:
+(pass) SDK tools/list is fixed; unknown tool, unknown fields and protocol mismatch are rejected [265.73ms]
+(pass) RPC cancellation is not CLI stop; inspect retains the execution identity [1859.56ms]
+(pass) continue needs the exact completed session and a fresh operation; revocation forbids reuse [2404.05ms]
+
+packages/coding-runner/test/observation.test.ts:
+(pass) decoder observation facts > messages are unknown without a phase and never inferred from position [0.25ms]
+(pass) decoder observation facts > an unsupported phase stays unknown and a blank message is empty [0.06ms]
+(pass) decoder observation facts > the 32768-unit limit keeps whole code points and reports truncation [0.23ms]
+(pass) decoder observation facts > a lone surrogate is a protocol fault, not a replacement character [0.02ms]
+(pass) decoder observation facts > only turn.completed and turn.failed are terminal; a general error is not [0.01ms]
+(pass) decoder observation facts > a classification needs an explicit contract [0.18ms]
+(pass) runner observation > completed turn: terminal seq, started process, complete capture [1119.94ms]
+(pass) runner observation > failed turn keeps a complete capture while the success gate is false [1263.37ms]
+(pass) runner observation > process exit without a terminal leaves the turn unconfirmed [1323.66ms]
+(pass) runner observation > a contradictory terminal is a conflict, not an overwrite [1189.96ms]
+(pass) runner observation > a 40000-character message is flagged as truncated without a capture fault [1276.79ms]
+(pass) runner observation > an empty message is reported as empty and a malformed line is a capture fault [3344.21ms]
+(pass) runner observation > stopping before spawn proves the CLI never started [190.70ms]
+(pass) runner observation > a receipt written before observations exist reads as unknown, never as success [1090.70ms]
+(pass) continuation and legacy specs > a v1 session or a non-completed turn is never continued [1332.19ms]
+(pass) continuation and legacy specs > a v1 spec is never started [267.17ms]
+
+packages/coding-runner/test/git.test.ts:
+(pass) snapshot includes untracked, deletion, binary bytes and mode; explicit commit cannot capture other changes [3128.07ms]
+(pass) review snapshot change invalidates commit; a hook added by the agent is detected as tampering and never runs [1766.38ms]
+(pass) lost commit receipt reconciles evidence without creating another commit [2478.62ms]
+(pass) push uses fixed branch/remote/SHA; lost receipt is reconciled and a changed remote is rejected [3739.86ms]
+(pass) explicit staging treats wildcard characters as literal filenames [2444.78ms]
+(pass) a changed .git/config is refused before the next host git operation [1189.91ms]
+(pass) a clean or smudge filter attribute is forbidden [1195.29ms]
+(pass) files hidden through .git/info/exclude fail the snapshot, while .gitignore ones do not [1321.48ms]
+
+packages/coding-runner/test/runner.test.ts:
+(pass) coding runner > review evidence is invalidated if the workspace changes during its turn [1049.91ms]
+(pass) coding runner > a spec that requests the registered network is refused before the CLI starts [307.84ms]
+(pass) coding runner > backend credentials and SSH agent are absent from the CLI environment [1041.11ms]
+(pass) coding runner > UTF-8 fragments, incomplete and oversized lines are bounded [0.36ms]
+(pass) coding runner > production refuses fixture configuration [199.25ms]
+(pass) coding runner > stdio MCP start, durable duplicate receipt, inspect and private normalized evidence [1297.13ms]
+(pass) coding runner > stop is an intent; owning worker confirms process group termination [1698.37ms]
+(pass) coding runner > MCP disconnect does not stop the worker; host lease eventually does [624.30ms]
+(pass) coding runner > background children are stopped before completion [1036.50ms]
+(pass) coding runner > oversized output drains and stops with incomplete evidence [1055.10ms]
+(pass) coding runner > saved spawn intent is never replayed, unknown PID is never signalled [1058.87ms]
+(pass) coding runner > workspace and executable replacement are rejected [251.12ms]
+
+packages/coding-runner/test/review.test.ts:
+(pass) CLI failed cannot supply complete evidence or authorize commit [1296.94ms]
+(pass) CLI nonzero cannot supply complete evidence or authorize commit [1295.07ms]
+(pass) cancel after pause irreversibly revokes the exact session and stop operation IDs cannot be rebound [1114.94ms]
+(pass) worker replay of a reserved receipt with CLI spawn intent stays unknown without launching again [1013.01ms]
+(pass) concurrent start retries share one pinned configuration and one durable execution [1019.16ms]
+(pass) evidence byte ranges preserve UTF-8 and reject changed payload bytes [1020.60ms]
+(pass) snapshot rejects an oversized sparse file before loading its contents [314.88ms]
+(pass) evidence preserves a leading Unicode BOM as part of its authenticated payload [1098.88ms]
+(pass) terminal receipt waits for the durable process-exited event even when finalization is delayed [1491.63ms]
+(pass) concurrent atomic receipt replacements remain readable from the already opened private inode [318.97ms]
+
+ 79 pass
+ 0 fail
+ 1314 expect() calls
+Ran 79 tests across 9 files. [66.98s]

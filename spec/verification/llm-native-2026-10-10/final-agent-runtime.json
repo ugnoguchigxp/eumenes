@@ -1,0 +1,56 @@
+{
+	"selected": ["agent-runtime"],
+	"dependencySet": [
+		"capabilities",
+		"delivery",
+		"attitude-dataset",
+		"larm",
+		"settings",
+		"inference",
+		"queue",
+		"tool-runtime",
+		"agent-runtime"
+	],
+	"testDependencySet": [
+		"capabilities",
+		"delivery",
+		"attitude-dataset",
+		"larm",
+		"tts-dictionary",
+		"settings",
+		"inference",
+		"queue",
+		"tool-runtime",
+		"agent-runtime"
+	],
+	"revision": "6114b107eb7a9996992b96aaeee509cfced70b7e88095e2bcb8fbbb66942771e",
+	"steps": [
+		{
+			"name": "size-budget",
+			"ms": 129,
+			"result": "pass"
+		},
+		{
+			"name": "format",
+			"ms": 98,
+			"result": "pass"
+		},
+		{
+			"name": "lint",
+			"ms": 51,
+			"result": "pass"
+		},
+		{
+			"name": "typecheck",
+			"ms": 1459,
+			"result": "pass"
+		},
+		{
+			"name": "domain tests",
+			"ms": 1762,
+			"result": "pass"
+		}
+	],
+	"totalMs": 4089,
+	"result": "pass"
+}

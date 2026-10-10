@@ -1,0 +1,27 @@
+{
+	"version": 1,
+	"instructions": "回答をアシスタント自身が話す態度を、会話と回答全体から選ぶ。登場人物・利用者の感情をそのまま採用しない。引用、否定、仮定、用語説明を区別する。特定の単語の有無で決めず、判断材料が不足すればnoneを選ぶ。",
+	"criteria": {
+		"none": "事実や手順を平静に伝える。明確な情緒的態度がない。",
+		"warmth": "相手への親しみや温かさを表している。",
+		"joy": "達成や良い出来事を喜び、祝福している。",
+		"empathy": "相手の困難やつらさを受け止め、寄り添っている。",
+		"curiosity": "相手の話や対象をさらに知ろうとする関心を表している。",
+		"surprise": "予想外の出来事に対する驚きを表している。"
+	},
+	"performance": {
+		"none": { "motion": "neutral", "tone": "natural" },
+		"warmth": { "motion": "agreeing", "tone": "bright" },
+		"joy": { "motion": "joyful", "tone": "bright" },
+		"empathy": { "motion": "listening", "tone": "gentle" },
+		"curiosity": { "motion": "curious", "tone": "natural" },
+		"surprise": { "motion": "surprised", "tone": "bright" }
+	},
+	"presets": {
+		"natural": [0, 0, 0],
+		"bright": [0.05, 0.02, 0.15],
+		"gentle": [-0.06, -0.01, -0.1],
+		"serious": [-0.04, 0, 0.05],
+		"excited": [0.08, 0.025, 0.2]
+	}
+}

@@ -68,12 +68,24 @@ test("remember, stop, retract and forget work end to end over HTTP without dialo
 		// Profile memory is not tied to the conversation it came from.
 		const block = store.read((db) => memory.prepareInTransaction(db, "c2"));
 		expect(block.status === "ready" && block.block).toContain("コーヒーが好き");
+		if (block.status !== "ready") throw new Error("fixture_not_ready");
+		expect(
+			store.read((db) => memory.validateInTransaction(db, "c2", block.view)),
+		).toEqual({ ok: true });
+		expect(
+			store.read((db) =>
+				db.query("SELECT count(*) AS n FROM memory_usage").get(),
+			),
+		).toEqual({ n: 0 });
 		const stopped = await post(`/api/memory/items/${item.id}/stop`, {
 			expectedRevision: item.revision,
 		});
 		expect(((await stopped.json()) as { status: string }).status).toBe(
 			"inactive",
 		);
+		expect(
+			store.read((db) => memory.validateInTransaction(db, "c2", block.view)),
+		).toEqual({ ok: false, reason: "memory_stale" });
 		expect(
 			(
 				await post(`/api/memory/items/${item.id}/stop`, {

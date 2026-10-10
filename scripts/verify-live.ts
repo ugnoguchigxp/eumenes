@@ -1,34 +1,23 @@
 import { readFileSync } from "node:fs";
-import { createLarm } from "../api/domains/larm";
-import { resolveLarmToken } from "../api/infrastructure/auth-config";
+import { createLiveLarm } from "./live-larm";
 
 const args = process.argv.slice(2).filter((x) => x !== "--");
 if (args[0] === "--domain" && args[1] === "agent-runtime") {
 	await import("./toolchain-live");
 	process.exit(process.exitCode ?? 0);
 }
-if (args[0] === "--domain" && args[1] === "research-routes") {
-	await import("./research-routes-live");
-	process.exit(process.exitCode ?? 0);
-}
 if (args[0] !== "--domain" || args[1] !== "larm") {
-	console.error("Use --domain larm|agent-runtime|research-routes");
+	console.error("Use --domain larm|agent-runtime");
 	process.exit(2);
 }
 const path = process.env.EUMENES_LIVE_ASR_WAV;
-if (!process.env.LARM_BASE_URL || !resolveLarmToken(process.env) || !path) {
+if (!path) {
 	console.error(
-		"Live verification requires LARM_BASE_URL, LARM_CONTROL_TOKEN or LARM_API_TOKEN, and EUMENES_LIVE_ASR_WAV. No fixture fallback is used.",
+		"Live verification requires EUMENES_LIVE_ASR_WAV and the saved LARM connection. No fixture fallback is used.",
 	);
 	process.exit(2);
 }
-const larm = createLarm({
-	baseUrl: process.env.LARM_BASE_URL,
-	token: resolveLarmToken(process.env),
-	profile: process.env.LARM_PROFILE,
-	audience: process.env.LARM_AUDIENCE,
-	voice: process.env.EUMENES_TTS_VOICE,
-});
+const larm = createLiveLarm();
 try {
 	const signal = new AbortController().signal;
 	const asrStarted = performance.now();

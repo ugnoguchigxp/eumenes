@@ -1,0 +1,35 @@
+{
+	"selected": ["capabilities"],
+	"dependencySet": ["capabilities"],
+	"testDependencySet": ["capabilities"],
+	"revision": "a0e790f6dbce569b05e4f143f9c72283a6b229eb8321e84fbb8c913c118e8b8a",
+	"steps": [
+		{
+			"name": "size-budget",
+			"ms": 117,
+			"result": "pass"
+		},
+		{
+			"name": "format",
+			"ms": 100,
+			"result": "pass"
+		},
+		{
+			"name": "lint",
+			"ms": 44,
+			"result": "pass"
+		},
+		{
+			"name": "typecheck",
+			"ms": 732,
+			"result": "pass"
+		},
+		{
+			"name": "domain tests",
+			"ms": 5156,
+			"result": "pass"
+		}
+	],
+	"totalMs": 6578,
+	"result": "pass"
+}

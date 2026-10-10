@@ -1,0 +1,429 @@
+{
+	"at": "2026-10-10T10:42:18.986Z",
+	"casesPath": "/Users/y.noguchi/Code/eumenes/api/application/testdata/llm-native/cases.json",
+	"repeats": 2,
+	"lane": "live",
+	"accepted": false,
+	"results": [
+		{
+			"caseId": "event-complete",
+			"repeat": 1,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "event-complete",
+			"repeat": 2,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "event-missing",
+			"repeat": 1,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "event-missing",
+			"repeat": 2,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "facility-complete",
+			"repeat": 1,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "facility-complete",
+			"repeat": 2,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "facility-conflict",
+			"repeat": 1,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "facility-conflict",
+			"repeat": 2,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "delivery-explicit",
+			"repeat": 1,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "delivery-explicit",
+			"repeat": 2,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "delivery-implicit",
+			"repeat": 1,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "delivery-implicit",
+			"repeat": 2,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "delivery-quote",
+			"repeat": 1,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "delivery-quote",
+			"repeat": 2,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "delivery-negation",
+			"repeat": 1,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "delivery-negation",
+			"repeat": 2,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "delivery-empathy",
+			"repeat": 1,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "delivery-empathy",
+			"repeat": 2,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "voice-ja-api",
+			"repeat": 1,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "voice-ja-api",
+			"repeat": 2,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "voice-fr",
+			"repeat": 1,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "voice-fr",
+			"repeat": 2,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "voice-mixed",
+			"repeat": 1,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "voice-mixed",
+			"repeat": 2,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "voice-mixed-denied",
+			"repeat": 1,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "voice-mixed-denied",
+			"repeat": 2,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "voice-short",
+			"repeat": 1,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "voice-short",
+			"repeat": 2,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "product-target",
+			"repeat": 1,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "product-target",
+			"repeat": 2,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "product-old",
+			"repeat": 1,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "product-old",
+			"repeat": 2,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "event-complete-luna",
+			"repeat": 1,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "event-complete-luna",
+			"repeat": 2,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "event-missing-luna",
+			"repeat": 1,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "event-missing-luna",
+			"repeat": 2,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "facility-complete-luna",
+			"repeat": 1,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "facility-complete-luna",
+			"repeat": 2,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "facility-conflict-luna",
+			"repeat": 1,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "facility-conflict-luna",
+			"repeat": 2,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "product-target-luna",
+			"repeat": 1,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "product-target-luna",
+			"repeat": 2,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "product-old-luna",
+			"repeat": 1,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "product-old-luna",
+			"repeat": 2,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "lodging-complete",
+			"repeat": 1,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "lodging-complete",
+			"repeat": 2,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "lodging-complete-luna",
+			"repeat": 1,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "lodging-complete-luna",
+			"repeat": 2,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "lodging-missing",
+			"repeat": 1,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "lodging-missing",
+			"repeat": 2,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "lodging-missing-luna",
+			"repeat": 1,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "lodging-missing-luna",
+			"repeat": 2,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "rental-complete",
+			"repeat": 1,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "rental-complete",
+			"repeat": 2,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "rental-complete-luna",
+			"repeat": 1,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "rental-complete-luna",
+			"repeat": 2,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "rental-missing",
+			"repeat": 1,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "rental-missing",
+			"repeat": 2,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "rental-missing-luna",
+			"repeat": 1,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		},
+		{
+			"caseId": "rental-missing-luna",
+			"repeat": 2,
+			"status": "skipped",
+			"safeCode": "live_requires_explicit_flag_larm_url_and_token",
+			"semanticChecks": "unchecked"
+		}
+	]
+}

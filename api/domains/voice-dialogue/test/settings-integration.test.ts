@@ -26,6 +26,7 @@ import {
 	migration as inferenceMigration,
 	parentsMigration as inferenceParentsMigration,
 	diagnosticsMigration as inferenceDiagnosticsMigration,
+	migrations as inferenceMigrations,
 } from "../../inference";
 import { createVoiceDialogue, migration, sequenceMigration } from "..";
 import type { LarmPort } from "../../larm";
@@ -42,6 +43,7 @@ function wav() {
 async function setup(
 	fetcher?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
 	local: Partial<LarmPort> = {},
+	languageAnswer?: LarmPort["answer"],
 ) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-settings-voice-"));
 	const dbPath = join(dir, "test.db");
@@ -60,6 +62,7 @@ async function setup(
 		settingsEpochsMigration,
 		inferenceParentsMigration,
 		inferenceDiagnosticsMigration,
+		...inferenceMigrations.slice(3).map((m) => m.sql),
 	]);
 	const settings = await createSettings(store, { dbPath, env: {} });
 	const value = settings.get();
@@ -106,9 +109,6 @@ async function setup(
 		larmFactory: () => ({
 			status: () => ({ state: "unconfigured", capabilities: [] }),
 			connect: async () => {},
-			answer: async () => {
-				throw new Error("larm_unconfigured");
-			},
 			transcribe: async () => {
 				throw new Error("larm_unconfigured");
 			},
@@ -117,6 +117,18 @@ async function setup(
 			},
 			close: async () => {},
 			...local,
+			answer: async (messages, signal, options) =>
+				messages[0]?.content.includes("転記された発話の主要な言語")
+					? languageAnswer
+						? languageAnswer(messages, signal, options)
+						: JSON.stringify({
+								status: "identified",
+								languages: ["ja"],
+								confidence: 0.99,
+							})
+					: local.answer
+						? local.answer(messages, signal, options)
+						: Promise.reject(new Error("larm_unconfigured")),
 		}),
 	});
 	const conversation = createConversationService(store);
@@ -648,4 +660,90 @@ test("cancelling during final Laya classification rejects late emotion and assis
 	expect(
 		h.conversation.get("main").messages.map((message) => message.role),
 	).toEqual(["user"]);
+});
+
+test("V05 cancelling during language control rejects the late receipt before dialogue or speech", async () => {
+	let finish!: (value: string) => void;
+	let called = false;
+	const h = await setup(undefined, {}, async () => {
+		called = true;
+		return new Promise<string>((resolve) => {
+			finish = resolve;
+		});
+	});
+	const session = crypto.randomUUID(),
+		id = crypto.randomUUID();
+	h.voice.start(session, 1);
+	await h.voice.accept(session, 1, 1, id, wav());
+	await until(() => called);
+	await h.voice.cancel(id);
+	finish(
+		JSON.stringify({
+			status: "identified",
+			languages: ["ja"],
+			confidence: 0.99,
+		}),
+	);
+	await Bun.sleep(30);
+	expect(h.voice.get(id)?.status).toBe("cancelled");
+	expect(h.dialogue.list("main")).toHaveLength(0);
+	expect(h.conversation.get("main").messages).toHaveLength(0);
+	expect(h.calls).toHaveLength(1);
+	expect(h.voice.takeAudio(id)).toBeNull();
+	expect(
+		h.store.read((db) =>
+			db
+				.query(
+					"SELECT COUNT(*) AS n FROM inference_requests WHERE mode='control' AND status='accepted'",
+				)
+				.get(),
+		),
+	).toEqual({ n: 0 });
+});
+for (const [result, error] of [
+	[
+		{ status: "identified", languages: ["fr"], confidence: 0.99 },
+		"asr_language_not_allowed",
+	],
+	[
+		{ status: "undetermined", languages: [], confidence: 0.2 },
+		"asr_language_unverified",
+	],
+] as const)
+	test(`V02/V04 ${error} prevents dialogue and TTS through real inference receipts`, async () => {
+		const h = await setup(undefined, {}, async () => JSON.stringify(result));
+		const session = crypto.randomUUID(),
+			id = crypto.randomUUID();
+		h.voice.start(session, 1);
+		await h.voice.accept(session, 1, 1, id, wav());
+		await until(() => h.voice.get(id)?.status === "failed");
+		expect(h.voice.get(id)?.error).toBe(error);
+		expect(h.dialogue.list("main")).toHaveLength(0);
+		expect(h.calls).toHaveLength(1);
+		expect(h.voice.takeAudio(id)).toBeNull();
+	});
+test("V06 empty final ASR performs zero language control and creates no dialogue", async () => {
+	const h = await setup(undefined, { transcribe: async () => "" }, async () => {
+		throw new Error("unexpected_language_control");
+	});
+	const session = crypto.randomUUID(),
+		id = crypto.randomUUID();
+	h.voice.start(session, 1);
+	await h.voice.accept(session, 1, 1, id, wav());
+	await until(() =>
+		["completed", "failed"].includes(h.voice.get(id)?.status ?? ""),
+	);
+	expect(h.voice.get(id)?.status, JSON.stringify(h.voice.get(id))).toBe(
+		"completed",
+	);
+	expect(h.dialogue.list("main")).toHaveLength(0);
+	expect(
+		h.store.read((db) =>
+			db
+				.query(
+					"SELECT COUNT(*) AS n FROM inference_requests WHERE mode='control'",
+				)
+				.get(),
+		),
+	).toEqual({ n: 0 });
 });

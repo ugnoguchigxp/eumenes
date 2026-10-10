@@ -71,6 +71,7 @@ const schema = z.object({
 	EUMENES_MEMORY_JOURNAL: text,
 	EUMENES_WORLD_JOURNAL: text,
 	EUMENES_CODING_RUNNER_CONFIG: text,
+	EUMENES_RESEARCH_CODEX_EXECUTABLE: text,
 	EUMENES_WORLD: worldMode,
 	EUMENES_WORLD_POLL_MS: integer(),
 	EUMENES_WORLD_CURSOR_SECRET: text,
@@ -97,6 +98,7 @@ export type Config = {
 	/** Undefined: the World journal sits beside the Memory journal. */
 	worldJournalPath: string | undefined;
 	codingRunnerConfig: string | undefined;
+	researchCodexExecutable: string;
 	worldMode: WorldMode;
 	/** Already clamped to the 1000 ms floor. */
 	worldPollMs: number | undefined;
@@ -150,6 +152,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
 			v.EUMENES_MEMORY_JOURNAL ?? join(dataDir, "memory-forget-journal.jsonl"),
 		worldJournalPath: v.EUMENES_WORLD_JOURNAL,
 		codingRunnerConfig: v.EUMENES_CODING_RUNNER_CONFIG,
+		researchCodexExecutable: v.EUMENES_RESEARCH_CODEX_EXECUTABLE ?? "codex",
 		worldMode: v.EUMENES_WORLD,
 		worldPollMs:
 			v.EUMENES_WORLD_POLL_MS === undefined

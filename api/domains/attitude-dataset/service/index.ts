@@ -264,7 +264,6 @@ export function createAttitudeDataset(store: SqliteStore, path: string) {
 					signal,
 					args.budgetMs,
 					decisionContext,
-					{ fullCandidates: true },
 				);
 			}
 			const details = observed;

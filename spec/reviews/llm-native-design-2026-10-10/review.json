@@ -1,0 +1,441 @@
+{
+	"rubric_version": "1.1.0",
+	"mode": "technical",
+	"depth": "deep",
+	"technical_profile": "agent",
+	"assessment_kind": "current",
+	"target": {
+		"locator": "/Users/y.noguchi/Code/eumenes",
+		"snapshot": "30f9524905f8fdf281a53b7c207c467d27e2f1e5 + working tree; source manifest SHA-256 5da8fbd854773bda122e243bc137544763abd6c0fcb5e0f913516747de5a6009",
+		"reviewed_at": "2026-10-10",
+		"stage": "MVP development; physical-device acceptance incomplete",
+		"scope": "LLM-Native constraints only. Source trace: dialogue, agent-runtime, capabilities, former research-routes, tool-runtime, delivery, inference, voice-dialogue. Limited search in world, memory, coding-supervision. Snapshot contains concurrent changes; old research-routes executors were removed during review. Pure/stub checks, Bun, local macOS. No live providers, production data, device acceptance, dependency/security or full product audit. Product Potential excluded."
+	},
+	"evidence": [
+		{
+			"id": "E01",
+			"kind": "code",
+			"locator": "api/domains/agent-runtime/service/context.ts:28-39,84-106,126-158 @ snapshot",
+			"observed_at": "2026-10-10",
+			"observation": "Required definition bodies are checked for presence but absent from messages. Definition hashes enter manifest.",
+			"scope": "Fixed source snapshot; callers and counterconditions checked."
+		},
+		{
+			"id": "E02",
+			"kind": "code",
+			"locator": "api/domains/delivery/service/evidence.ts:20-74; service/index.ts:109-125; inference/service/execute.ts:176-200 @ snapshot",
+			"observed_at": "2026-10-10",
+			"observation": "Regex-selected candidates constrain normal model calls; an empty candidate set skips the judge. Full-candidate mode is optional and absent from the ordinary inference caller.",
+			"scope": "Fixed source snapshot; callers and counterconditions checked."
+		},
+		{
+			"id": "E03",
+			"kind": "code",
+			"locator": "api/domains/dialogue/service/timer-phrase.ts:16-35,73-88; service/index.ts:323-333,369-399 @ snapshot",
+			"observed_at": "2026-10-10",
+			"observation": "Timer payloads become persona-adjusted text before LLM input; multiple entries are reduced to a count. Another snapshot can sometimes carry details.",
+			"scope": "Fixed source snapshot; callers and counterconditions checked."
+		},
+		{
+			"id": "E04",
+			"kind": "code",
+			"locator": "api/domains/voice-dialogue/service/asr-language.ts:24-92; service/index.ts:352-353,655 @ snapshot",
+			"observed_at": "2026-10-10",
+			"observation": "Script membership and a Chinese character list decide language acceptance; results gate actual voice input.",
+			"scope": "Fixed source snapshot; callers and counterconditions checked."
+		},
+		{
+			"id": "E05",
+			"kind": "code",
+			"locator": "api/domains/inference/service/speech-intonation.ts:7-52; service/execute.ts:154-160,247-258 @ snapshot",
+			"observed_at": "2026-10-10",
+			"observation": "Punctuation and notice keywords determine speech parameters. An available decision provider normally removes heuristics, limiting the finding to fallback/absence paths with autoIntonation enabled.",
+			"scope": "Fixed source snapshot; callers and counterconditions checked."
+		},
+		{
+			"id": "E06",
+			"kind": "execution",
+			"locator": "probe-current-result.json; /tmp/eumenes-llm-native-review.hrculf/probe-current.ts",
+			"observed_at": "2026-10-10",
+			"observation": "Command: bun /tmp/eumenes-llm-native-review.hrculf/probe-current.ts. Exit 0. Fixed source snapshot, local Bun/macOS, pure functions and stub judge, no external calls. Reproduced unchanged model messages after rule changes, skipped emotion model, count-only timer text, language false reject/accept, and notice prosody on negated notice.",
+			"scope": "Demonstrates host decisions and model inputs, not live model accuracy or complete end-to-end answers."
+		},
+		{
+			"id": "E07",
+			"kind": "execution",
+			"locator": "tests-current.txt",
+			"observed_at": "2026-10-10",
+			"observation": "Command: bun test api/domains/agent-runtime/test/context.test.ts api/domains/delivery/test/delivery.test.ts api/domains/inference/test/speech-intonation.test.ts api/domains/voice-dialogue/test/asr-language.test.ts. Cwd /tmp/eumenes-llm-native-review.hrculf/snapshot. Exit 0; 19 pass, 0 fail, 140 assertions; fixture/stub only.",
+			"scope": "Existing tests validate current behavior; success is not compliance with the newly adopted principles."
+		},
+		{
+			"id": "E08",
+			"kind": "code",
+			"locator": "api/domains/research-routes/service/index.ts:1-24; api/application/toolchain.ts @ snapshot; snapshot-manifest.json",
+			"observed_at": "2026-10-10",
+			"observation": "Old route learning/execution retired; management remains. keys.ts, validation.ts, projection.ts, registration.ts, assets.ts and application/research-routes.ts absent from fixed snapshot.",
+			"scope": "Removal by concurrent work, not by this review. Legacy compatibility definitions remain and are not counted as active semantic decisions."
+		},
+		{
+			"id": "E09",
+			"kind": "execution",
+			"locator": "probe-before-concurrent-removal.json; tests-before-concurrent-removal.txt",
+			"observed_at": "2026-10-10",
+			"observation": "Before the source freeze, bun probe.ts exited 0; route grammar rejected natural variants, unknown locations/tickers, and weather extraction rejected equivalent prose. A separate bun test invocation of keys, validation, context, delivery, speech-intonation and asr-language exited 0: 28 tests, 199 assertions.",
+			"scope": "Historical working tree changed concurrently and was not an immutable full snapshot; excluded from current confirmed findings."
+		},
+		{
+			"id": "E10",
+			"kind": "code",
+			"locator": "api/domains/agent-runtime/service/verify-report.ts:31-73; api/domains/capabilities/service/index.ts:178-191 @ snapshot",
+			"observed_at": "2026-10-10",
+			"observation": "Source/quote linkage checks and definition hash/generation checks provide topic-independent integrity primitives.",
+			"scope": "Evidence of specific reusable checks, not a full security or correctness assurance."
+		}
+	],
+	"claims": [
+		{
+			"id": "C01",
+			"type": "Fact",
+			"statement": "Five host behaviors were reproduced on the fixed snapshot.",
+			"evidence_ids": ["E06"],
+			"limitations": "Live model quality was not evaluated."
+		},
+		{
+			"id": "C02",
+			"type": "Inference",
+			"statement": "Scenario requirements need versioned data delivery plus shared structural and semantic validation; moving regex lists to JSON alone preserves semantic rigidity.",
+			"evidence_ids": ["E01", "E02", "E03", "E04", "E05", "E10"],
+			"limitations": "Proposed architecture, not an implemented or measured fix."
+		},
+		{
+			"id": "C03",
+			"type": "Fact",
+			"statement": "Former weather and quote executor findings no longer exist in the frozen source snapshot.",
+			"evidence_ids": ["E08"],
+			"limitations": "Legacy schemas and historical definitions remain; removal was concurrent work and acceptance was not retested end-to-end."
+		}
+	],
+	"findings": [
+		{
+			"id": "F01",
+			"status": "confirmed",
+			"severity": "Medium",
+			"priority": "P1",
+			"priority_reason": "Establish requirement-data delivery and remove model-bypassing semantic gates first.",
+			"confidence": "High",
+			"title": "保存したSKILLの本文がworkerへ届かない",
+			"root_cause": "Presence checks and manifest digests do not include scenario bodies in the actual model input.",
+			"evidence_ids": ["E01", "E06"],
+			"condition": "A prepared capability has different required skill content.",
+			"consequence": "Changing the stored rule alone cannot change the worker requirements.",
+			"counterevidence": "Current common policy deliberately replaces old planner prompts; general research can still proceed.",
+			"fix": "Pass selected, versioned requirement data in runtime context, separate from the stable host policy.",
+			"verification": "Different requirements change model inputs and requirement results; versions and cancellation stay bound.",
+			"impacts": [
+				{
+					"track": "technical",
+					"dimension": "architecture",
+					"criterion": "fit",
+					"reason": "Conflicts with the explicitly required boundary between scenario data, model interpretation, and shared execution."
+				}
+			]
+		},
+		{
+			"id": "F02",
+			"status": "confirmed",
+			"severity": "Medium",
+			"priority": "P1",
+			"priority_reason": "Establish requirement-data delivery and remove model-bypassing semantic gates first.",
+			"confidence": "High",
+			"title": "語句判定で感情モデルの候補と起動を制限する",
+			"root_cause": "Semantic choices are preselected by Japanese regex lists.",
+			"evidence_ids": ["E02", "E06"],
+			"condition": "An expressive paraphrase lacks listed words.",
+			"consequence": "The normal path can skip the judge and force neutral irrespective of model capability.",
+			"counterevidence": "Full-candidate mode exists, but the ordinary inference caller does not request it.",
+			"fix": "Use model interpretation of the full criteria and context; preserve enums, confidence, timeouts, and output bounds.",
+			"verification": "Paraphrases reach the judge; quotes and negation are evaluated as data rather than new keyword cases.",
+			"impacts": [
+				{
+					"track": "technical",
+					"dimension": "architecture",
+					"criterion": "fit",
+					"reason": "Conflicts with the explicitly required boundary between scenario data, model interpretation, and shared execution."
+				}
+			]
+		},
+		{
+			"id": "F03",
+			"status": "confirmed",
+			"severity": "Medium",
+			"priority": "P2",
+			"priority_reason": "Remove remaining specialized interpretation after the shared contract is available.",
+			"confidence": "High",
+			"title": "タイマー結果を口調付き定型文へ縮めて渡す",
+			"root_cause": "A semantic summarizer and persona suffix rules sit before an existing answer LLM.",
+			"evidence_ids": ["E03", "E06"],
+			"condition": "A list operation returns multiple timers with distinct remaining times.",
+			"consequence": "actionResult loses per-item facts, requiring reconstruction from other context or losing specificity.",
+			"counterevidence": "The final response is generated by an LLM; a separate timer snapshot may retain some details.",
+			"fix": "Pass the public structured receipt fields and persona instructions directly, retaining adoption validation.",
+			"verification": "All relevant labels, states and times reach the answer model; execution stays once-only.",
+			"impacts": [
+				{
+					"track": "technical",
+					"dimension": "architecture",
+					"criterion": "fit",
+					"reason": "Conflicts with the explicitly required boundary between scenario data, model interpretation, and shared execution."
+				}
+			]
+		},
+		{
+			"id": "F04",
+			"status": "confirmed",
+			"severity": "Medium",
+			"priority": "P2",
+			"priority_reason": "Remove remaining specialized interpretation after the shared contract is available.",
+			"confidence": "High",
+			"title": "文字種を言語と見なして入力を拒否する",
+			"root_cause": "Language identity is approximated by scripts and a character blacklist.",
+			"evidence_ids": ["E04", "E06"],
+			"condition": "Allowed ja with an English acronym, or allowed en with another Latin-script language.",
+			"consequence": "Legitimate Japanese can be rejected and a disallowed language can be accepted.",
+			"counterevidence": "The implementation documents missing detected-language metadata from ASR; the script check is not proof of actual language.",
+			"fix": "Check ASR language capabilities first; use model detection or explicitly narrow the setting, with an explicit unknown state.",
+			"verification": "Mixed Japanese acronyms pass appropriately; French is not automatically accepted as English.",
+			"impacts": [
+				{
+					"track": "technical",
+					"dimension": "architecture",
+					"criterion": "fit",
+					"reason": "Conflicts with the explicitly required boundary between scenario data, model interpretation, and shared execution."
+				}
+			]
+		},
+		{
+			"id": "F05",
+			"status": "confirmed",
+			"severity": "Low",
+			"priority": "P2",
+			"priority_reason": "Remove remaining specialized interpretation after the shared contract is available.",
+			"confidence": "High",
+			"title": "単語で意味上の音声強調を決める",
+			"root_cause": "Notice words and punctuation choose prosody without semantic interpretation.",
+			"evidence_ids": ["E05", "E06"],
+			"condition": "autoIntonation enabled and decision provider unavailable.",
+			"consequence": "Negated notice text can still receive notice emphasis.",
+			"counterevidence": "When the judge is available, execute.ts removes the heuristic parameters.",
+			"fix": "Use the common semantic decision path and saved baseline on absence; data-driven presets and numerical clamps remain.",
+			"verification": "Negation and quotation do not trigger keyword-only changes; absence uses a stable baseline.",
+			"impacts": [
+				{
+					"track": "technical",
+					"dimension": "architecture",
+					"criterion": "fit",
+					"reason": "Conflicts with the explicitly required boundary between scenario data, model interpretation, and shared execution."
+				}
+			]
+		}
+	],
+	"tracks": {
+		"technical": {
+			"dimensions": {
+				"architecture": {
+					"criteria": {
+						"boundaries": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Outside this focused LLM-Native review, or insufficient evidence for the complete rubric baseline."
+						},
+						"flow": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Outside this focused LLM-Native review, or insufficient evidence for the complete rubric baseline."
+						},
+						"fit": {
+							"status": "assessed",
+							"value": 1,
+							"confidence": "High",
+							"evidence_ids": ["E01", "E02", "E03", "E04", "E05", "E06"],
+							"rationale": "Observed semantic decisions in host code conflict with the declared model-native design constraint; changing scenario data alone does not reach the worker."
+						}
+					}
+				},
+				"correctness": {
+					"criteria": {
+						"contracts": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Outside this focused LLM-Native review, or insufficient evidence for the complete rubric baseline."
+						},
+						"edge_cases": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Outside this focused LLM-Native review, or insufficient evidence for the complete rubric baseline."
+						},
+						"concurrency": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Outside this focused LLM-Native review, or insufficient evidence for the complete rubric baseline."
+						}
+					}
+				},
+				"security": {
+					"criteria": {
+						"access": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Outside this focused LLM-Native review, or insufficient evidence for the complete rubric baseline."
+						},
+						"input_secrets": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Outside this focused LLM-Native review, or insufficient evidence for the complete rubric baseline."
+						},
+						"abuse": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Outside this focused LLM-Native review, or insufficient evidence for the complete rubric baseline."
+						}
+					}
+				},
+				"reliability": {
+					"criteria": {
+						"failure": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Outside this focused LLM-Native review, or insufficient evidence for the complete rubric baseline."
+						},
+						"recovery": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Outside this focused LLM-Native review, or insufficient evidence for the complete rubric baseline."
+						},
+						"resilience": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Outside this focused LLM-Native review, or insufficient evidence for the complete rubric baseline."
+						}
+					}
+				},
+				"maintainability": {
+					"criteria": {
+						"clarity": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Outside this focused LLM-Native review, or insufficient evidence for the complete rubric baseline."
+						},
+						"change": {
+							"status": "assessed",
+							"value": 1,
+							"confidence": "High",
+							"evidence_ids": ["E01", "E02", "E04", "E06"],
+							"rationale": "New paraphrases and language cases depend on edits to host regex/maps, while changing skill data leaves model messages unchanged. This fails the required data-only extension workflow."
+						},
+						"debt": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Outside this focused LLM-Native review, or insufficient evidence for the complete rubric baseline."
+						}
+					}
+				},
+				"common_components": {
+					"criteria": {
+						"duplication": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Outside this focused LLM-Native review, or insufficient evidence for the complete rubric baseline."
+						},
+						"reuse": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Outside this focused LLM-Native review, or insufficient evidence for the complete rubric baseline."
+						},
+						"abstraction": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Outside this focused LLM-Native review, or insufficient evidence for the complete rubric baseline."
+						}
+					}
+				},
+				"testing": {
+					"criteria": {
+						"risk_coverage": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Outside this focused LLM-Native review, or insufficient evidence for the complete rubric baseline."
+						},
+						"quality": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Outside this focused LLM-Native review, or insufficient evidence for the complete rubric baseline."
+						},
+						"automation": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Outside this focused LLM-Native review, or insufficient evidence for the complete rubric baseline."
+						}
+					}
+				},
+				"supply_chain": {
+					"criteria": {
+						"dependencies": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Outside this focused LLM-Native review, or insufficient evidence for the complete rubric baseline."
+						},
+						"build_release": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Outside this focused LLM-Native review, or insufficient evidence for the complete rubric baseline."
+						},
+						"license": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Outside this focused LLM-Native review, or insufficient evidence for the complete rubric baseline."
+						}
+					}
+				},
+				"performance": {
+					"criteria": {
+						"budget": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Outside this focused LLM-Native review, or insufficient evidence for the complete rubric baseline."
+						},
+						"hot_path": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Outside this focused LLM-Native review, or insufficient evidence for the complete rubric baseline."
+						},
+						"measurement": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Outside this focused LLM-Native review, or insufficient evidence for the complete rubric baseline."
+						}
+					}
+				},
+				"operability": {
+					"criteria": {
+						"signals": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Outside this focused LLM-Native review, or insufficient evidence for the complete rubric baseline."
+						},
+						"lifecycle": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Outside this focused LLM-Native review, or insufficient evidence for the complete rubric baseline."
+						},
+						"interaction": {
+							"status": "unknown",
+							"value": null,
+							"unknown_reason": "Outside this focused LLM-Native review, or insufficient evidence for the complete rubric baseline."
+						}
+					}
+				}
+			}
+		}
+	}
+}

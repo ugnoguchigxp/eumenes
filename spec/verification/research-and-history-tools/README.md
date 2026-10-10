@@ -61,7 +61,7 @@ CLIの日時だけの入力はAsia/Tokyoの00:00へ解決し、開始を含み�
 live用に既存経路へ `research-history` ケースを追加した。長いSQLite公式資料、最初の資料の対象不一致、不足を反映した検索語変更を実LARMと実Webで確認し、到達・操作列・外部/ローカル取得数・モデル回数・終了理由を記録する。期待した操作列を実際に行わなければ `scenarioExercised:false` として失敗にする。
 
 ```sh
-EUMENES_LIVE_TOOLCHAIN=1 LARM_BASE_URL=<接続URL> bun scripts/toolchain-live.ts research-history
+EUMENES_LIVE_TOOLCHAIN=1 bun scripts/toolchain-live.ts research-history
 ```
 
 試験用DB・API token・ログ・会話は専用一時ディレクトリに作り、終了時にDBを削除する。LARM credentialは既存のbackend環境だけで使う。製品の設定やDBを複製しない。

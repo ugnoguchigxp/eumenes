@@ -1,0 +1,53 @@
+$ bun scripts/verify.ts --domain tasks
+[verify] selected=tasks dependencyClosure=tasks testClosure=tasks
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts api/domains/tasks
+size-budget ok (13 files)
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check api/domains/tasks
+$ oxfmt --check api/domains/tasks
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 4ms on 14 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint api/domains/tasks
+$ oxlint --deny-warnings api/domains/tasks
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun x tsc -p /Users/y.noguchi/Code/eumenes/verification-reports/tsconfig.selected.json
+[verify] TypeScript workspace closure: 20 files; api/infrastructure/flock.ts, api/infrastructure/logger.ts, api/infrastructure/sqlite, api/infrastructure/http.ts, api/domains/tasks, api/infrastructure/digest.ts, api/infrastructure/bounded-read.ts
+[verify] domain tests: /Users/y.noguchi/.bun/bin/bun run test:domain -- tasks
+$ bun scripts/test-domain.ts tasks
+bun test v1.4.2 (744846f84)
+
+api/domains/tasks/test/tasks.test.ts:
+(pass) 100 identical registrations return one receipt, with conflict on changed input and no automatic text dedupe [17.99ms]
+(pass) start is idempotent after revisions change; unavailable execution rolls back the whole initial registration [16.46ms]
+(pass) a failed transaction hook rolls back task, grant, commands and events [7.77ms]
+(pass) authority change fences old work, requests a confirmed pause, then resume creates a new execution generation [8.49ms]
+(pass) stop receipt is stopping until confirmed, cancel cannot be downgraded to pause, late completion cannot win [8.18ms]
+(pass) an unstarted registration can be cancelled without requiring a runner [7.57ms]
+(pass) answers bind task, question, revision, epoch and generation, and only valid choices resume the task [8.92ms]
+(pass) concurrent answer and cancellation have a single winner and supersede obsolete questions [7.33ms]
+(pass) task completion requires all declared conditions and evidence, not an arbitrary queue state [6.52ms]
+(pass) reopening preserves tasks independently of conversation lifetime, and recovery does not replay work [11.40ms]
+(pass) conversation input has unique operation provenance even with different request IDs [5.60ms]
+(pass) expired grants fence execution immediately, and maintenance requests cancellation without replay [6.70ms]
+(pass) terminal bodies expire at seven days, runtime history at thirty, while minimal replay receipts stay valid [8.33ms]
+(pass) pagination uses a stable sequence and rejects unsafe cursors and excess byte limits [8.22ms]
+(pass) capacity limits reject new registrations without removing paused or reconciling tasks [6.96ms]
+(pass) asynchronous domain hooks cannot escape the single writer transaction [7.08ms]
+(pass) runtime budget is bound to the task and is not extended by pause and resume [8.17ms]
+(pass) explicit forgetting revokes live work, redacts private history and cannot be undone by replaying registration [7.50ms]
+(pass) explicit budget amendments retain the original execution start and apply shorter budgets immediately [7.48ms]
+(pass) expiry of a confirmed pause reaches cancelled without another runner acknowledgement [7.50ms]
+(pass) invalid runtime question types cannot create an unreadable waiting state [8.52ms]
+(pass) storage admission bounds new grant history while revocation and cancellation remain available [12.92ms]
+(pass) public list operations reject nondecimal cursors just like the HTTP contract [5.37ms]
+(pass) shortening a running budget below elapsed time immediately requests cancellation [6.25ms]
+(pass) oversized question material rolls back both the question and waiting state [14.60ms]
+(pass) Promise-like transaction callbacks are rejected as well as native Promises [6.80ms]
+(pass) available actions reflect a missing answer capability and an exhausted runtime [8.05ms]
+(pass) expiry while pause acknowledgement is pending cannot produce a resumable pause [15.54ms]
+
+ 28 pass
+ 0 fail
+ 213 expect() calls
+Ran 28 tests across 1 file. [313.00ms]
+[verify] passed 1694 ms

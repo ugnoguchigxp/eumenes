@@ -1,0 +1,41 @@
+{
+	"selected": ["memory"],
+	"dependencySet": ["continuity", "delivery", "conversation", "memory"],
+	"testDependencySet": [
+		"continuity",
+		"delivery",
+		"avatar",
+		"conversation",
+		"memory"
+	],
+	"revision": "90f96fb1d0375ba93d0897459e9bd16d4b1c651b9812cb9857919b46f87bfc6f",
+	"steps": [
+		{
+			"name": "size-budget",
+			"ms": 176,
+			"result": "pass"
+		},
+		{
+			"name": "format",
+			"ms": 97,
+			"result": "pass"
+		},
+		{
+			"name": "lint",
+			"ms": 43,
+			"result": "pass"
+		},
+		{
+			"name": "typecheck",
+			"ms": 1162,
+			"result": "pass"
+		},
+		{
+			"name": "domain tests",
+			"ms": 141,
+			"result": "pass"
+		}
+	],
+	"totalMs": 2117,
+	"result": "pass"
+}

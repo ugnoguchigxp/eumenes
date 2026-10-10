@@ -1,0 +1,91 @@
+bun test v1.4.2 (744846f84)
+
+api/domains/goals/test/goals.test.ts:
+(pass) no goal gives an explicit absent snapshot and invents nothing [16.02ms]
+(pass) explicit adopt, update and withdraw keep revisions and history [8.64ms]
+(pass) stale revisions are rejected for update, withdraw and complete [6.53ms]
+(pass) completed goals leave the adopted snapshot [7.50ms]
+(pass) other principals and scopes see nothing and cannot touch goals [8.62ms]
+(pass) proposals never appear as adopted and need an explicit call [7.79ms]
+(pass) rejecting a proposal does not move the goal epoch [6.40ms]
+(pass) epoch and revision change on every visible change, enabling receipt invalidation [6.84ms]
+(pass) snapshot orders by priority and is one consistent read [7.50ms]
+(pass) an access-less revision lookup is not part of the World-facing exports [5.67ms]
+(pass) only the same proposal operation is deduplicated [9.12ms]
+438 | 			scopeKey: "work", desiredState, priority: 10 + i,
+439 | 			source: { ...src("m1"), revision: `v${i}`, digest: `digest-${i}` },
+440 | 			operationKey: `proposal-${i}`,
+441 | 		};
+442 | 		const saved = await goals.propose(alice, input);
+443 | 		expect(saved).toMatchObject({ desiredState, priority: input.priority, source: input.source });
+                      ^
+error: expect(received).toMatchObject(expected)
+
+  {
+-   "desiredState": "保管コードはus",
+-   "priority": 11,
++   "createdAt": "2026-01-01T00:00:00.000Z",
++   "desiredState": "保管コードはUS",
++   "id": "g1",
++   "principal": "alice",
++   "priority": 10,
++   "proposedFrom": null,
++   "revision": 1,
++   "scopeKey": "work",
+    "source": {
+-     "digest": "digest-1",
++     "digest": "digest-0",
+      "id": "m1",
+      "kind": "message",
+      "namespace": "conversation",
+-     "revision": "v1",
++     "revision": "v0",
+    },
++   "status": "proposed",
++   "updatedAt": "2026-01-01T00:00:00.000Z",
+  }
+
+- Expected  - 4
++ Received  + 12
+
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/domains/goals/test/goals.test.ts:443:17)
+(fail) distinct operations preserve proposal text, priority and source versions [6.35ms]
+(pass) operationKey makes adopt and propose idempotent per principal and scope [7.15ms]
+(pass) transaction rollback leaves the ledger, history and epoch unchanged [8.01ms]
+(pass) inputs are bounded and rejected rather than truncated [9.03ms]
+(pass) goals survive restart [10.79ms]
+
+api/domains/world/test/extraction-held.test.ts:
+25 |   let life = await ready();
+26 |   let entities: unknown[] = [];
+27 |   try {
+28 |     const rig = rigFor(life, aliasOutput, { entities: () => entities });
+29 |     expect(await drain(rig)).toHaveLength(1);
+30 |     expect(rig.reports.at(-1)).toMatchObject({ disposition: "not_adopted", accepted: 0, held: 1, reasons: ["EXTRACTION_CONTEXT_HELD"] });
+                                    ^
+error: expect(received).toMatchObject(expected)
+
+  {
+    "accepted": 0,
+-   "disposition": "not_adopted",
++   "disposition": "adopted",
++   "events": 1,
+    "held": 1,
++   "jobId": "job-1",
+    "reasons": [
+-     "EXTRACTION_CONTEXT_HELD",
++     "SUBJECT_UNRESOLVED",
+    ],
++   "rejected": 0,
+  }
+
+- Expected  - 2
++ Received  + 5
+
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/domains/world/test/extraction-held.test.ts:30:32)
+(fail) held extraction remains received across polls and restart, then applies once with new entities [45.93ms]
+
+ 15 pass
+ 2 fail
+ 205 expect() calls
+Ran 17 tests across 2 files. [403.00ms]

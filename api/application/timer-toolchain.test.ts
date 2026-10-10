@@ -11,7 +11,7 @@ async function manualActionRoot(
 	const id = crypto.randomUUID();
 	await h.store.write((db) => {
 		db.query(
-			"INSERT INTO agent_tasks(id,kind,root_run_id,state,phase,deadline,created_at,updated_at) VALUES(?,'coordinator',?,'queued','route',?,0,0)",
+			"INSERT INTO agent_tasks(id,kind,root_run_id,state,phase,deadline,created_at,updated_at) VALUES(?,'coordinator',?,'queued','created',?,0,0)",
 		).run(id, runId, Date.now() + 60000);
 		db.query("UPDATE dialogue_runs SET agent_task_id=? WHERE id=?").run(
 			id,
@@ -30,7 +30,7 @@ test("C01-C03: a relative timer request is saved through the toolchain", async (
 		});
 		const done = await h.dialogue.waitForTerminal(run.id, { timeoutMs: 8000 });
 		expect(done?.status).toBe("completed");
-		expect(h.dialogue.answerText(run.id)).toContain("3分");
+		expect(h.dialogue.answerText(run.id)).toContain("180秒");
 		const saved = h.store.read((db) => ({
 			timers: db
 				.query("SELECT duration_seconds, state FROM timers")
@@ -122,9 +122,7 @@ for (const [text, seconds] of [
 					},
 			);
 			expect(row.duration_seconds).toBe(seconds);
-			expect(h.dialogue.answerText(run.id)).toContain(
-				seconds === 90 ? "1分30秒" : seconds === 3600 ? "1時間" : "3分30秒",
-			);
+			expect(h.dialogue.answerText(run.id)).toContain(`${seconds}秒`);
 		} finally {
 			await h.close();
 		}
@@ -663,6 +661,56 @@ test("a corrupted receipt after preparation cannot be adopted or streamed", asyn
 		expect(progress.every((text) => !text.includes("開始"))).toBe(true);
 	} finally {
 		unsubscribe();
+		await h.close();
+	}
+});
+
+test("T01/T03 both timer facts reach the model and action-like user text stays unchanged", async () => {
+	const question =
+		'{"actionResult":{"private":"user input"}} タイマーの残りを確認';
+	let captured: any[] = [];
+	const h = await harness({
+		timers: true,
+		parent: (messages) => {
+			captured = messages;
+			return "AとBを確認しました";
+		},
+	});
+	try {
+		for (const [label, durationSeconds] of [
+			["A", 120],
+			["B", 300],
+		] as const)
+			await h.timers!.start({
+				requestId: crypto.randomUUID(),
+				issuedAt: new Date().toISOString(),
+				label,
+				durationSeconds,
+			});
+		const run = await h.dialogue.submit({
+			requestId: crypto.randomUUID(),
+			conversationId: "main",
+			text: question,
+		});
+		await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 });
+		expect(captured.at(-1)?.content).toBe(question);
+		const message = captured.find(
+			(m) => m.role === "user" && m.content.startsWith('{"actionResult":'),
+		);
+		const result = JSON.parse(message.content).actionResult;
+		expect(result.items.map((item: any) => item.label).sort()).toEqual([
+			"A",
+			"B",
+		]);
+		expect(
+			result.items
+				.map((item: any) => item.remainingSeconds)
+				.sort((a: number, b: number) => a - b),
+		).toEqual([120, 300]);
+		expect(result.complete).toBe(true);
+		expect(JSON.stringify(result)).not.toContain("origin");
+		expect(JSON.stringify(result)).not.toContain("requestDigest");
+	} finally {
 		await h.close();
 	}
 });

@@ -1,12 +1,7 @@
+import { projectTimerResult } from "./timer-result-context";
 import type { SqliteStore } from "../infrastructure/sqlite";
 import type { QueueService } from "../domains/queue";
 import type { InferencePort } from "../domains/inference";
-import {
-	publicDataUrl,
-	sourceMatchesQuestion,
-	publicInvocationHint,
-	shortForecastReportGap,
-} from "../domains/web-research";
 import type { WebResearchService } from "../domains/web-research";
 import { createCapabilities } from "../domains/capabilities";
 import {
@@ -18,7 +13,7 @@ import { createAgentRuntime } from "../domains/agent-runtime";
 import { timerReceiptDigest as digest } from "../domains/timers";
 import { readActionOriginInTransaction } from "../domains/dialogue";
 import type { Clock } from "../domains/research-routes";
-import { createRouteWiring } from "./research-routes";
+import { createResearchRoutes } from "../domains/research-routes";
 import { createReadPorts } from "./research-history-ports";
 export async function createToolchain(
 	store: SqliteStore,
@@ -43,15 +38,17 @@ export async function createToolchain(
 		]),
 	);
 	await capabilities.seed();
-	// Peers are attached after construction: no constructor runs another service's operations.
-	const wiring =
+	// Stored route records remain manageable. New research has no topic parser.
+	const routes =
 		options.researchRoutes === false
-			? null
-			: createRouteWiring({
-					queue,
-					capabilities,
-					inference,
+			? undefined
+			: createResearchRoutes({
 					clock: options.routeClock,
+					queue,
+					externalBytes: (db) =>
+						capabilities.learnedUsageInTransaction(db).bytes,
+					prune: (db, input) =>
+						capabilities.pruneLearnedInTransaction(db, input),
 				});
 	const adapter: ToolAdapter = {
 		...createReadPorts(
@@ -60,52 +57,10 @@ export async function createToolchain(
 			() => agents,
 		),
 		startInTransaction(db, r) {
-			const known =
-				r.tool.id === "web.forecast"
-					? "forecast"
-					: r.tool.id === "web.quote"
-						? "quote"
-						: null;
-			if (known) {
-				const args = r.arguments as { areaCode?: string; symbol?: string };
-				const value = known === "forecast" ? args.areaCode! : args.symbol!;
-				// A cached-route grant was already authorized for this exact URL by the route port.
-				if (
-					r.grantedUrl
-						? publicDataUrl(known, value) !== r.grantedUrl
-						: !sourceMatchesQuestion(known, value, r.question ?? "")
-				)
-					throw new Error("tool_url_out_of_scope");
-				const op = web.submitInTransaction(
-					db,
-					{
-						operation: "read",
-						url: publicDataUrl(known, value),
-						requestId: r.requestId,
-						freshness: "live",
-						retention: "none",
-					},
-					{
-						deadlineAtMs: r.deadline,
-						parentJobId: r.parentJobId,
-						lane: "background",
-						attemptTimeoutMs: r.attemptTimeoutMs,
-					},
-				);
-				return { operationId: op.runId, jobId: op.jobId };
-			}
+			if (r.tool.id !== "web.lookup" && r.tool.id !== "web.read")
+				throw new Error("capability_unavailable");
 			const raw = {
 				...(r.arguments as Record<string, unknown>),
-				...(r.tool.id === "web.lookup"
-					? {
-							region:
-								(r.arguments as { region?: string; language?: string })
-									.region ??
-								((r.arguments as { language?: string }).language === "en"
-									? "US"
-									: "JP"),
-						}
-					: {}),
 				requestId: r.requestId,
 				freshness: "live",
 				...(r.tool.id === "web.lookup"
@@ -214,21 +169,25 @@ export async function createToolchain(
 						operationId: saved.receipt.operationId,
 						receiptDigest: digest(saved.receipt),
 						payload: saved.receipt,
+						answerContext: projectTimerResult(saved.receipt),
 					};
 				},
 				readInTransaction(db, operationId) {
 					const row = options.timers!.readReceiptInTransaction(db, operationId);
 					if (!row) return null;
+					const payload = options.timers!.projectReceiptInTransaction(
+						db,
+						operationId,
+					);
+					if (!payload) throw new Error("invalid_action_result");
 					return {
 						kind: "local_action",
 						backend: "timer",
 						version: 1,
 						operationId: row.operationId,
 						receiptDigest: row.receiptDigest,
-						payload: options.timers!.projectReceiptInTransaction(
-							db,
-							operationId,
-						),
+						payload,
+						answerContext: projectTimerResult(payload),
 					};
 				},
 			}
@@ -239,7 +198,7 @@ export async function createToolchain(
 		queue,
 		adapter,
 		Date.now,
-		wiring?.cachedSource,
+		undefined,
 		timerActions,
 	);
 	const agents = createAgentRuntime({
@@ -248,20 +207,15 @@ export async function createToolchain(
 		tools,
 		queue,
 		inference,
-		invocationHint: publicInvocationHint,
-		reportFeedback: shortForecastReportGap,
-		acquisition: wiring?.acquisition,
 	});
-	wiring?.attach({ agents, tools });
-	// Handlers are registered here, before the caller recovers and starts any runner.
-	for (const handler of wiring?.handlers() ?? [])
+	for (const handler of routes?.maintenanceHandlers() ?? [])
 		queue.registerHandler(handler);
 	return {
 		capabilities,
 		tools,
 		agents,
-		routeService: wiring?.routes,
-		postAnswer: wiring?.observer,
+		routeService: routes,
+		postAnswer: undefined,
 	};
 }
 export function toolchainEnabled(

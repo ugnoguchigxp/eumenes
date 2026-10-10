@@ -29,19 +29,29 @@ export const reportSchema = z
 		limitations: z.array(z.string().max(300)).max(8),
 	})
 	.strict();
-export type Report = z.infer<typeof reportSchema> & {
+type ReportBase = z.infer<typeof reportSchema> & {
 	sources: SourceMetadata[];
 	coverage: "complete" | "partial";
 	verification: "evidence_linked";
-	version?: 2;
-	outcome?:
-		| "answered"
-		| "partial"
-		| "not_found"
-		| "clarification_required"
-		| "failed";
 	exploration?: string[];
 };
+type ReportOutcome =
+	| "answered"
+	| "partial"
+	| "not_found"
+	| "clarification_required"
+	| "failed";
+export type Report = ReportBase &
+	(
+		| { version?: undefined; outcome?: ReportOutcome }
+		| { version: 2; outcome: ReportOutcome }
+		| {
+				version: 3;
+				outcome: ReportOutcome;
+				requirements: import("./requirements").ReportRequirements;
+		  }
+	);
+export * from "./requirements";
 const excerptEvidenceSchema = z
 	.object({
 		sourceId: z.string(),
@@ -205,6 +215,8 @@ export type AnswerTicket = {
 	reportTaskId: string | null;
 	reportEpoch: number | null;
 	reportDigest: string | null;
+	requirementContractDigest?: string | null;
+	requirementVerificationDigest?: string | null;
 	projection: string | null;
 	failureCode: string | null;
 	/** Digest of the host-verified safe projection, when the report came through an acquisition port. */
@@ -297,7 +309,6 @@ export type AcquisitionObservationInput = {
 		superseded?: boolean;
 	}[];
 	report: Report;
-	facts: unknown;
 };
 export type AcquisitionObservationResult =
 	| {

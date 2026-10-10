@@ -1,0 +1,20 @@
+$ oxfmt --check
+Checking formatting...
+
+spec/verification/llm-native-2026-10-10/live-saved-settings/results.json (0ms)
+spec/verification/llm-native-remaining-domains-2026-10-10/baseline.json (0ms)
+spec/verification/llm-native-remaining-domains-2026-10-10/domain-results.json (0ms)
+spec/verification/llm-native-remaining-domains-2026-10-10/verify-coding-report.json (0ms)
+spec/verification/llm-native-remaining-domains-2026-10-10/verify-coding-supervision-report.json (0ms)
+spec/verification/llm-native-remaining-domains-2026-10-10/verify-continuity-report.json (0ms)
+spec/verification/llm-native-remaining-domains-2026-10-10/verify-dialogue-report.json (0ms)
+spec/verification/llm-native-remaining-domains-2026-10-10/verify-goals-report.json (0ms)
+spec/verification/llm-native-remaining-domains-2026-10-10/verify-inference-report.json (0ms)
+spec/verification/llm-native-remaining-domains-2026-10-10/verify-memory-report.json (0ms)
+spec/verification/llm-native-remaining-domains-2026-10-10/verify-task-reports-report.json (0ms)
+spec/verification/llm-native-remaining-domains-2026-10-10/verify-tasks-report.json (0ms)
+spec/verification/llm-native-remaining-domains-2026-10-10/verify-world-report.json (0ms)
+
+Format issues found in above 13 files. Run without `--check` to fix.
+Finished in 132ms on 856 files using 10 threads.
+error: script "format:check" exited with code 1

@@ -1,0 +1,34 @@
+{
+	"selected": ["coding"],
+	"revision": "fdaa7f3e82faa57f6afc33d9e88279dc1fdfeba2bf1e0491da6809aad6713732",
+	"steps": [
+		{
+			"name": "size-budget",
+			"ms": 122,
+			"result": "pass"
+		},
+		{
+			"name": "format",
+			"ms": 125,
+			"result": "pass"
+		},
+		{
+			"name": "lint",
+			"ms": 53,
+			"result": "pass"
+		},
+		{
+			"name": "typecheck",
+			"ms": 918,
+			"result": "pass"
+		},
+		{
+			"name": "domain tests",
+			"ms": 65555,
+			"result": "pass"
+		}
+	],
+	"totalMs": 67261,
+	"result": "fail",
+	"error": "Error: source changed during verification"
+}

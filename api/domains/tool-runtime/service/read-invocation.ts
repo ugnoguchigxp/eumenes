@@ -12,7 +12,7 @@ import {
 	validationIssues,
 } from "../../../infrastructure/validation-log";
 import type { Invocation, ToolAdapter, AdapterOperation } from "../contracts";
-import { get, hasReadMetadata } from "../repository";
+import { get, hasReadMetadata, hasSupersededColumn } from "../repository";
 import { operationFingerprint } from "./source-results";
 export type ReadReference = {
 	owner: Owner;
@@ -58,6 +58,7 @@ export function createReadInvocation({
 		parentJobId: string,
 		allowedUrls: string[],
 		question?: string,
+		allowNew = true,
 	) {
 		const old = db
 			.query("SELECT * FROM tool_invocations WHERE step_id=?")
@@ -119,6 +120,12 @@ export function createReadInvocation({
 			throw new Error("tool_url_out_of_scope");
 		if (old) {
 			if (
+				old.superseded ||
+				old.deadline <= now() ||
+				(old.cancel_epoch ?? 0) !== owner.cancelEpoch
+			)
+				throw new Error("tool_ref_invalid");
+			if (
 				old.owner_task_id !== owner.taskId ||
 				old.root_run_id !== owner.rootRunId ||
 				old.tool_revision_id !== ref.tool.revisionId ||
@@ -138,7 +145,7 @@ export function createReadInvocation({
 			}) ?? operationFingerprint(ref.tool.id, parsed.data);
 		const successful = db
 			.query(
-				`SELECT id,tool_revision_id,args_json,${hasReadMetadata(db) ? "operation_fingerprint" : "NULL AS operation_fingerprint"} FROM tool_invocations WHERE owner_task_id=? AND state IN ('succeeded','partial')`,
+				`SELECT id,tool_revision_id,args_json,${hasReadMetadata(db) ? "operation_fingerprint" : "NULL AS operation_fingerprint"} FROM tool_invocations WHERE owner_task_id=? AND state IN ('succeeded','partial')${hasSupersededColumn(db) ? " AND superseded=0" : ""}`,
 			)
 			.all(owner.taskId) as Array<{
 			id: string;
@@ -148,12 +155,14 @@ export function createReadInvocation({
 		}>;
 		const replay = successful.find(
 			(i) =>
-				i.operation_fingerprint === fingerprint ||
-				(i.args_json &&
-					operationFingerprint(
-						i.tool_revision_id.split(":").slice(1).join(":").split("@")[0]!,
-						JSON.parse(i.args_json),
-					) === fingerprint),
+				i.tool_revision_id === ref.tool.revisionId &&
+				(i.operation_fingerprint
+					? i.operation_fingerprint === fingerprint
+					: i.args_json &&
+						operationFingerprint(
+							i.tool_revision_id.split(":").slice(1).join(":").split("@")[0]!,
+							JSON.parse(i.args_json),
+						) === fingerprint),
 		);
 		if (replay) {
 			const existing = get(db, replay.id)!;
@@ -164,6 +173,7 @@ export function createReadInvocation({
 				throw new Error("tool_ref_invalid");
 			return existing;
 		}
+		if (!allowNew) throw new Error("agent_budget_exhausted");
 		const isLocal = [
 			"web.find",
 			"web.read_saved",

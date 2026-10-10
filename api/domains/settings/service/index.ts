@@ -36,7 +36,7 @@ export function defaults(env: Record<string, string | undefined>): Settings {
 	return settingsSchema.parse({
 		revision: 0,
 		larm: {
-			baseUrl: env.LARM_BASE_URL ?? null,
+			baseUrl: null,
 			profile: env.LARM_PROFILE ?? "SAAA-gemma4-26b",
 			audience: env.LARM_AUDIENCE ?? "saaa-desktop",
 			voice: env.EUMENES_TTS_VOICE ?? "",

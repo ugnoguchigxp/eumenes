@@ -1,3 +1,4 @@
+import { fixtureResearchOutput, fixtureVerification } from "./research-fixture";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -21,6 +22,7 @@ import {
 } from "../../tool-runtime";
 import {
 	acquisitionMigration,
+	requirementsMigration,
 	createAgentRuntime,
 	migration as agentMigration,
 	type AcquisitionBindResult,
@@ -56,16 +58,16 @@ export const learnedPair = (): Definition[] => [
 		discoveryMode: "route-only",
 		dependencies: [
 			"profile:web.research@1",
-			"skill:web.research@2",
+			"skill:web.research@5",
 			`skill:${learnedId}@1`,
 			"tool:web.read@1",
 		],
 		profileRevisionId: "profile:web.research@1",
-		requiredSkillRevisionIds: ["skill:web.research@2", `skill:${learnedId}@1`],
+		requiredSkillRevisionIds: ["skill:web.research@5", `skill:${learnedId}@1`],
 		toolRevisionIds: ["tool:web.read@1"],
 	},
 ];
-export const coldPackage = "package:web.research@7";
+export const coldPackage = "package:web.research@8";
 export const directBind = (token = "tok-direct"): AcquisitionBindResult => ({
 	kind: "bound",
 	bindingToken: token,
@@ -90,7 +92,7 @@ export const searchBind = (token = "tok-search"): AcquisitionBindResult => ({
 	},
 });
 
-export async function harness(now = Date.now) {
+export async function harness(now = Date.now, luna = false) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-route-"));
 	const store = openStore(join(dir, "db"), [
 		capMigration,
@@ -102,15 +104,10 @@ export async function harness(now = Date.now) {
 		readMetadataMigration,
 		agentMigration,
 		acquisitionMigration,
+		requirementsMigration,
 	]);
 	const caps = createCapabilities(store);
 	await caps.seed();
-	// Archived acquisition fixtures keep the pre-view contract; replay tests cover the new revision.
-	await store.write((db) =>
-		db
-			.query("UPDATE capability_items SET active_revision_id=? WHERE key=?")
-			.run(coldPackage, "package:web.research"),
-	);
 	await store.write((db) => {
 		for (const d of learnedPair()) caps.registerLearnedInTransaction(db, d);
 	});
@@ -177,18 +174,17 @@ export async function harness(now = Date.now) {
 			return { status: "allowed" };
 		},
 	};
-	const tools = createToolRuntime(
-		store,
-		caps,
-		queue,
-		adapter,
-		Date.now,
-		cachedPort,
-	);
+	const tools = createToolRuntime(store, caps, queue, adapter, now, cachedPort);
 	const captures: string[] = [];
+	const engines: Array<string | undefined> = [];
 	const inference = {
-		captureControlInTransaction: (_db: unknown, i: { subject: string }) => {
+		codexResearchAvailable: () => luna,
+		captureControlInTransaction: (
+			_db: unknown,
+			i: { subject: string; engine?: string },
+		) => {
 			captures.push(i.subject);
+			engines.push(i.engine);
 			return `req-${captures.length}`;
 		},
 		executeControl: async () => ({}),
@@ -238,9 +234,12 @@ export async function harness(now = Date.now) {
 			}
 			return bound;
 		},
-		validateInTransaction: () => ({ kind: "allowed" }),
+		validateInTransaction: (_db, i) =>
+			ledger.has(i.bindingToken)
+				? { kind: "allowed" }
+				: { kind: "rejected", code: "revoked" },
 		recordObservationInTransaction: (_db, i) => {
-			portCalls.push(`observe:${JSON.stringify(i.facts)}`);
+			portCalls.push("observe:report");
 			const patch = (
 				observation as {
 					canonicalReportPatch?: {
@@ -275,25 +274,25 @@ export async function harness(now = Date.now) {
 		queue,
 		acquisition: port,
 		now,
-		invocationHint: () => ({
-			toolId: "web.forecast",
-			arguments: { areaCode: "140000" },
-		}),
 	});
 	const task = (id: string) =>
 		store.read(
 			(db) => db.query("SELECT * FROM agent_tasks WHERE id=?").get(id) as Task,
 		);
-	const start = (runId: string, question = "天気予報 鎌倉") =>
+	const start = (
+		runId: string,
+		question = "天気予報 鎌倉",
+		researcher?: "codex_luna",
+	) =>
 		store.write((db) =>
 			agents.startInTransaction(db, {
 				rootRunId: runId,
-				input: { question },
+				input: { kind: "web", question, researcher },
 				deadline: Date.now() + 120_000,
 			}),
 		);
 	/** Prepare + settle the worker's queued model step with a fabricated model answer. */
-	async function runModelStep(
+	async function runRawModelStep(
 		taskId: string,
 		action: unknown,
 		afterPrepare?: () => void,
@@ -314,39 +313,58 @@ export async function harness(now = Date.now) {
 			agents.handler.prepareInTransaction(db, claim as never),
 		);
 		if (prep.status !== "ready") return { prep, applied: null };
-		// The model quotes the real visible source id.
-		const supplied = action as any;
-		const data = JSON.parse(prep.input.messages[1]!.content);
-		const real =
-			supplied.action === "finish"
-				? {
-						action: "finish",
-						report: {
-							outcome: supplied.report.outcome ?? "answered",
-							summary: supplied.report.summary,
-							claims: supplied.report.claims.map((c: any) => ({
-								...c,
-								evidence: c.evidence.map((e: any) =>
-									typeof e === "string"
-										? e
-										: (data.evidence.find((r: any) =>
-												r.preview.includes(e.quote.slice(0, 12)),
-											)?.reference ?? "e999"),
-								),
-							})),
-							limitations: supplied.report.limitations,
-						},
-					}
-				: supplied;
 
 		afterPrepare?.();
 		const applied = await store.write((db) =>
 			agents.handler.settleInTransaction(db, claim as never, prep.input, {
 				type: "success",
-				result: { receipt: {} as never, invalid: false, action: real },
+				result: { receipt: {} as never, invalid: false, action },
 			} as never),
 		);
 		return { prep, applied };
+	}
+	async function runModelStep(
+		taskId: string,
+		action: unknown,
+		afterPrepare?: () => void,
+	) {
+		const frozen = store.read((db) =>
+			db
+				.query(
+					"SELECT contract_json FROM agent_requirement_contracts WHERE task_id=?",
+				)
+				.get(taskId),
+		) as { contract_json: string } | null;
+		const t = task(taskId),
+			data = {
+				task: JSON.parse(t.input_json!),
+				originalRequest:
+					JSON.parse(t.input_json!).originalRequest ??
+					JSON.parse(t.input_json!).question,
+				requirementContract: frozen ? JSON.parse(frozen.contract_json) : null,
+			};
+		const result = await runRawModelStep(
+			taskId,
+			JSON.parse(fixtureResearchOutput(data, JSON.stringify(action))),
+			afterPrepare,
+		);
+		if (
+			task(taskId).phase === "verify_requirements" &&
+			task(taskId).state === "queued"
+		) {
+			const row = store.read((db) =>
+				db
+					.query(
+						"SELECT draft_json FROM agent_requirement_drafts WHERE task_id=?",
+					)
+					.get(taskId),
+			) as { draft_json: string };
+			await runRawModelStep(
+				taskId,
+				fixtureVerification(JSON.parse(row.draft_json)),
+			);
+		}
+		return result;
 	}
 	const doc = (text: string, url = URL_A): AdapterOperation => ({
 		state: "succeeded",
@@ -375,12 +393,14 @@ export async function harness(now = Date.now) {
 		results,
 		ledger,
 		captures,
+		engines,
 		proposals,
 		binds,
 		portCalls,
 		task,
 		start,
 		runModelStep,
+		runRawModelStep,
 		doc,
 		setObservation: (o: typeof observation) => (observation = o),
 		async close() {

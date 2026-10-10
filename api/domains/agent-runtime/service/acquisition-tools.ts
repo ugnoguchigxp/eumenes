@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import { explorationBudget, RESEARCH_BUDGET } from "./exploration";
 import {
 	hash,
 	type Capabilities,
@@ -19,7 +20,6 @@ export const siteFailureCodes = new Set([
 	"web_timeout",
 	"web_acquisition_failed",
 	"web_result_too_large",
-	"web_quote_symbol_mismatch",
 	"result_expired",
 	// Codes the real acquisition path emits (web_${LlmFetchError.code}): HTTP errors, a changed
 	// page shape, and provider throttling all justify one fresh search; guard/unsafe/cancel never do.
@@ -108,6 +108,22 @@ export function createAcquisitionTools(ctx: AcquisitionToolsContext) {
 	) {
 		const owner = ctx.owner(child);
 		const action = binding.initialAction;
+		const budget = explorationBudget(
+			child,
+			p,
+			tools.invocationsInTransaction(db, child.id),
+			now(),
+		);
+		if (
+			!budget.canOperate ||
+			budget.externalCalls >= RESEARCH_BUDGET.externalCalls ||
+			(action.kind === "direct-invoke"
+				? budget.reads >= RESEARCH_BUDGET.reads
+				: budget.searches >= RESEARCH_BUDGET.searches)
+		) {
+			ctx.next(db, child, parentJobId || undefined, "agent_budget_exhausted");
+			return;
+		}
 		const invoke = (ref: string, args: unknown, phase: string) => {
 			const inv = tools.invokeInTransaction(
 				db,
@@ -286,21 +302,7 @@ export function createAcquisitionTools(ctx: AcquisitionToolsContext) {
 			ctx.releaseBinding(db, child, reason);
 			ctx.releaseTokens.add(old.bindingToken);
 			// 2. Old observations never feed the new plan.
-			const supersede = (
-				tools as unknown as {
-					supersedeInvocationsInTransaction?: (
-						db: Database,
-						taskId: string,
-					) => void;
-				}
-			).supersedeInvocationsInTransaction;
-			if (supersede) supersede(db, child.id);
-			else if (
-				tools
-					.observationsInTransaction(db, child.id)
-					.some((o) => "sources" in o && o.sources.length)
-			)
-				throw new Error("replacement_unavailable");
+			tools.supersedeInvocationsInTransaction(db, child.id);
 			// 3. The route port re-resolves under the same request binding (disqualified route → search).
 			const next = acquisition.resolveInTransaction(db, {
 				rootRunId: root.root_run_id,

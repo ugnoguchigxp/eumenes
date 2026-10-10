@@ -340,3 +340,111 @@ builtins.push(
 			],
 		})),
 );
+
+// New runs use only generic Web operations. Historical revisions are immutable.
+const genericSkill = readFileSync(
+	new URL("./web-research/SKILL.v7.md", import.meta.url),
+	"utf8",
+);
+builtins.push({
+	...base,
+	kind: "skill",
+	id: "web.research",
+	revision: 7,
+	title: "公開資料の汎用調査",
+	summary: "資料の選択・解釈・報告を調査担当が行う",
+	dependencies: [],
+	body: genericSkill,
+});
+
+builtins.push(
+	...builtins
+		.filter(
+			(d) =>
+				d.kind === "package" &&
+				((["web.research", "web.lookup"].includes(d.id) && d.revision === 7) ||
+					(d.id === "web.read" && d.revision === 6)),
+		)
+		.map((d) => ({
+			...d,
+			revision: d.revision + 1,
+			summary: "公開資料の検索・読取り・比較と根拠付き報告",
+			aliases:
+				d.id === "web.read"
+					? ["URL", "読取"]
+					: ["検索", "調査", "search", "research"],
+			tags: ["research"],
+			useWhen: ["公開資料を確認し、依頼に必要な事実を整理する"],
+			dependencies: [
+				"profile:web.research@2",
+				"skill:web.research@7",
+				"tool:web.lookup@1",
+				"tool:web.read@1",
+				"tool:web.find@1",
+				"tool:web.read_saved@1",
+			],
+			requiredSkillRevisionIds: ["skill:web.research@7"],
+			toolRevisionIds: [
+				"tool:web.lookup@1",
+				"tool:web.read@1",
+				"tool:web.find@1",
+				"tool:web.read_saved@1",
+			],
+		})),
+);
+
+builtins.push({
+	...base,
+	kind: "skill",
+	id: "web.research",
+	revision: 8,
+	title: "要件を保持する公開資料調査",
+	summary: "要件凍結と報告候補の意味検証",
+	dependencies: [],
+	body: readFileSync(
+		new URL("./web-research/SKILL.v8.md", import.meta.url),
+		"utf8",
+	),
+});
+const previous = builtins.find(
+	(d) => d.kind === "package" && d.id === "web.research" && d.revision === 8,
+)!;
+builtins.push({
+	...previous,
+	revision: 9,
+	dependencies: previous.dependencies.map((id) =>
+		id === "skill:web.research@7" ? "skill:web.research@8" : id,
+	),
+	requiredSkillRevisionIds: ["skill:web.research@8"],
+});
+
+builtins.push(
+	{
+		...base,
+		kind: "profile",
+		id: "web.quick",
+		title: "簡単なWeb確認の担当",
+		summary: "語句や短い最新情報を確認する",
+		dependencies: [],
+		body: "語句の意味や短い最新情報を確認します。必要な検索または指定URLの取得を、提示された予算内で選びます。長文の探索・複数資料の比較は担当しません。根拠が足りなければ不足を明記して終了します。資料を解釈し、現在の依頼の条件に答える簡潔な報告を返します。",
+	},
+	{
+		...previous,
+		id: "web.quick",
+		revision: 1,
+		title: "簡単なWeb確認",
+		summary: "語句や短い最新情報の検索とページ取得",
+		aliases: [],
+		useWhen: ["語句確認や短い最新情報の確認"],
+		avoidWhen: ["長文調査", "複数資料の整理・比較"],
+		profileRevisionId: "profile:web.quick@1",
+		dependencies: [
+			"profile:web.quick@1",
+			"skill:web.research@8",
+			"tool:web.lookup@1",
+			"tool:web.read@1",
+		],
+		requiredSkillRevisionIds: ["skill:web.research@8"],
+		toolRevisionIds: ["tool:web.lookup@1", "tool:web.read@1"],
+	},
+);

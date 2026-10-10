@@ -103,6 +103,10 @@ export function update(
 
 /** Named migrations of this domain; the SQL above is frozen once deployed. */
 export const explorationMigration = `ALTER TABLE agent_tasks ADD COLUMN exploration_json TEXT;`;
+export const requirementsMigration = `
+CREATE TABLE agent_requirement_contracts(task_id TEXT PRIMARY KEY,version INTEGER NOT NULL,contract_json TEXT NOT NULL,contract_digest TEXT NOT NULL,created_at INTEGER NOT NULL);
+CREATE TABLE agent_requirement_drafts(task_id TEXT PRIMARY KEY,contract_digest TEXT NOT NULL,draft_json TEXT NOT NULL,draft_digest TEXT NOT NULL,state TEXT NOT NULL,verification_json TEXT,verification_digest TEXT,created_at INTEGER NOT NULL);
+`;
 export const migrations: readonly Migration[] = [
 	{ id: "agent-runtime/0001-init", sql: migration },
 	{ id: "agent-runtime/0002-acquisition", sql: acquisitionMigration },
@@ -111,5 +115,10 @@ export const migrations: readonly Migration[] = [
 		id: "agent-runtime/0004-exploration",
 		sql: explorationMigration,
 		after: ["agent-runtime/0003-action-result"],
+	},
+	{
+		id: "agent-runtime/0005-requirements",
+		sql: requirementsMigration,
+		after: ["agent-runtime/0004-exploration"],
 	},
 ];

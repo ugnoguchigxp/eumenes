@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
 	taskDtoSchema,
 	reportSchema,
+	reportRequirements,
 } from "../api/domains/agent-runtime/contracts";
 import { publicUrl } from "../api/domains/capabilities/contracts";
 import type { Transport } from "./transport";
@@ -41,41 +42,43 @@ const sourceV2 = z.object({
 	digest: z.string().optional(),
 	scopeRef: z.string().optional(),
 });
-const canonicalV2 = z
-	.object({
-		version: z.literal(2),
-		outcome: z.enum([
-			"answered",
-			"partial",
-			"not_found",
-			"clarification_required",
-			"failed",
-		]),
-		summary: z.string(),
-		claims: z.array(
-			z.object({
-				text: z.string(),
-				evidence: z.array(
-					z.object({
-						sourceId: z.string(),
-						quote: z.string(),
-						viewId: z.string().optional(),
-					}),
-				),
-			}),
-		),
-		limitations: z.array(z.string()),
-		exploration: z.array(z.string()),
-		coverage: z.enum(["complete", "partial"]),
-		verification: z.literal("evidence_linked"),
-		sources: z.array(sourceV2),
-	})
-	.refine((v) =>
-		["answered", "partial"].includes(v.outcome)
-			? v.claims.length > 0
-			: v.claims.length === 0,
-	);
-const report = z.union([canonicalV2, legacyReport]);
+const canonicalBase = z.object({
+	version: z.literal(2),
+	outcome: z.enum([
+		"answered",
+		"partial",
+		"not_found",
+		"clarification_required",
+		"failed",
+	]),
+	summary: z.string(),
+	claims: z.array(
+		z.object({
+			text: z.string(),
+			evidence: z.array(
+				z.object({
+					sourceId: z.string(),
+					quote: z.string(),
+					viewId: z.string().optional(),
+				}),
+			),
+		}),
+	),
+	limitations: z.array(z.string()),
+	exploration: z.array(z.string()),
+	coverage: z.enum(["complete", "partial"]),
+	verification: z.literal("evidence_linked"),
+	sources: z.array(sourceV2),
+});
+const consistent = (v: { outcome: string; claims: unknown[] }) =>
+	["answered", "partial"].includes(v.outcome)
+		? v.claims.length > 0
+		: v.claims.length === 0;
+const canonicalV2 = canonicalBase.refine(consistent);
+const canonicalV3 = canonicalBase
+	.extend({ version: z.literal(3), requirements: reportRequirements })
+	.refine(consistent);
+const report = z.union([canonicalV3, canonicalV2, legacyReport]);
 const catalog = z.object({
 	items: z.array(
 		z.object({ id: z.string(), title: z.string(), summary: z.string() }),

@@ -1,9 +1,8 @@
-/** Explicit live evaluation. Never opens a product database or saves conversation text. */
-import { createLarm } from "../api/domains/larm";
+/** Backend live evaluation reads only the saved connection; conversation text is never saved. */
+import { createLiveLarm } from "./live-larm";
 import { chooseSpeechDelivery } from "../api/domains/delivery";
 import { deliveryCases } from "../api/domains/delivery/test/cases";
 import { validationCases } from "../api/domains/delivery/test/validation-cases";
-import { resolveLarmToken } from "../api/infrastructure/auth-config";
 const repeats = Number(process.env.EUMENES_DELIVERY_EVAL_REPEATS ?? 3);
 const suite = process.env.EUMENES_DELIVERY_EVAL_SUITE ?? "development";
 if (!["development", "validation"].includes(suite))
@@ -11,12 +10,7 @@ if (!["development", "validation"].includes(suite))
 const cases = suite === "validation" ? validationCases : deliveryCases;
 if (!Number.isInteger(repeats) || repeats < 1 || repeats > 5)
 	throw new Error("invalid_repeats");
-const port = createLarm({
-	token: resolveLarmToken(process.env),
-	baseUrl: process.env.LARM_BASE_URL,
-	profile: process.env.LARM_PROFILE,
-	client: "eumenes-emotion-evaluation",
-});
+const port = createLiveLarm();
 let hits = 0,
 	expressiveHits = 0,
 	expressive = 0,

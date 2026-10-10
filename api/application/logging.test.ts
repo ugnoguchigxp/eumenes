@@ -23,7 +23,6 @@ test("real backend persists startup, correlated job failure and final shutdown w
 			EUMENES_LOG_LEVEL: "info",
 			LARM_API_TOKEN: "",
 			LARM_CONTROL_TOKEN: "",
-			LARM_BASE_URL: "http://127.0.0.1:1",
 		},
 	});
 	const stderr = new Response(child.stderr).text();
@@ -88,7 +87,7 @@ test("real backend persists startup, correlated job failure and final shutdown w
 			runId: run.id,
 			subjectId: run.id,
 			jobId: run.jobId,
-			reason: "larm_unconfigured",
+			reason: "larm_base_url_unconfigured",
 		});
 		expect(
 			records.find(
