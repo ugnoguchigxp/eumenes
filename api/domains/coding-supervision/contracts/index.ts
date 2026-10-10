@@ -22,6 +22,9 @@ export const actions = [
 	"finish_candidate",
 	"fail_candidate",
 ] as const;
+/** The approval prompt shows the whole instruction; keep it within the question budget. */
+export const INSTRUCTION_MAX_BYTES = 5000;
+const byteLength = (s: string) => new TextEncoder().encode(s).length;
 export const decisionSchema = z
 	.strictObject({
 		action: z.enum(actions),
@@ -35,7 +38,18 @@ export const decisionSchema = z
 			!["answer_question", "request_change"].includes(v.action) ||
 			v.instruction !== null,
 	)
-	.refine((v) => v.action !== "answer_question" || v.questionId !== null);
+	.refine((v) => v.action !== "answer_question" || v.questionId !== null)
+	.refine(
+		(v) =>
+			v.instruction === null ||
+			byteLength(v.instruction) <= INSTRUCTION_MAX_BYTES,
+	)
+	// Only approval-gated actions may carry an instruction.
+	.refine(
+		(v) =>
+			["answer_question", "request_change"].includes(v.action) ||
+			v.instruction === null,
+	);
 export type Decision = z.infer<typeof decisionSchema>;
 /** Execution facts kept apart: speech, turn terminal, process, capture and report limits. */
 export const executionObservationSchema = z.strictObject({

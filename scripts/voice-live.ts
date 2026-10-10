@@ -7,10 +7,10 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { createClient } from "../client";
 import {
-	resolveApiToken,
+	readApiToken,
 	resolveLarmToken,
 } from "../api/infrastructure/auth-config";
 
@@ -40,7 +40,10 @@ const backend = Bun.spawn([process.execPath, "api/application/server.ts"], {
 });
 const client = createClient(
 	`http://127.0.0.1:${port}`,
-	resolveApiToken(process.env),
+	readApiToken(
+		process.env,
+		resolve(import.meta.dir, "../data/eumenes.sqlite3"),
+	),
 );
 const output = "verification-reports/voice-live";
 mkdirSync(output, { recursive: true });

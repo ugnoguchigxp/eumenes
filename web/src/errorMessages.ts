@@ -14,12 +14,16 @@ const messages: Record<string, string> = {
 	payload_too_large: "送信するデータが大きすぎます。",
 	env_ref_not_allowed: "この環境変数は認証情報として使用できません。",
 	invalid_env_ref: "この環境変数は認証情報として指定できません。",
+	invalid_larm_origin_unconfirmed:
+		"LARM の接続先の変更が確認されませんでした。",
 	voice_session_inactive:
 		"音声セッションが終了しています。もう一度開始してください。",
 	voice_sequence_out_of_order:
 		"音声の順序が合わなくなりました。もう一度話してください。",
 	voice_sequence_invalid:
 		"音声の順序が正しくありません。もう一度話してください。",
+	voice_audio_capacity:
+		"再生待ちの音声が多すぎます。再生が終わってから話してください。",
 	voice_preview_busy: "試聴中です。終わってからもう一度お試しください。",
 	stale_voice_generation: "音声セッションが切り替わりました。",
 	stale_voice_preview: "試聴の内容が古くなりました。もう一度お試しください。",

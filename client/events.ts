@@ -99,11 +99,17 @@ export function eventsClient(
 							const line = buffer.slice(0, end).replace(/\r$/, "");
 							buffer = buffer.slice(end + 1);
 							if (!line) {
-								if (event === "reset" || event === "change") {
+								if (
+									event === "reset" ||
+									event === "change" ||
+									event === "resumed"
+								) {
 									if (id) lastId = id;
 									failures = 0;
 									setState("connected");
-									notify(event === "reset" ? "reset" : "change");
+									// "resumed" proves nothing was missed: no invalidation.
+									if (event !== "resumed")
+										notify(event === "reset" ? "reset" : "change");
 								}
 								event = "";
 								id = "";
@@ -148,7 +154,8 @@ export function eventsClient(
 				stateListeners.delete(listener);
 			};
 		},
-		reconnectChanges() {
+		reconnectChanges(options?: { force?: boolean }) {
+			if (!options?.force && state === "connected") return;
 			connection?.abort();
 			connection = undefined;
 			if (listeners.size) {

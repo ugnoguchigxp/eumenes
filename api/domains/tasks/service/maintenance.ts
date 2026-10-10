@@ -1,8 +1,16 @@
 import type { Database } from "bun:sqlite";
+import { getLogger } from "../../../infrastructure/logger";
 import * as repo from "../repository";
 import type { TaskCore } from "./core";
 import { syncHook } from "./helpers";
 import type { createTaskLifecycle } from "./lifecycle";
+
+const log = getLogger("tasks");
+/** Rows are deleted this long after finishing; metadata expires at 30 days. */
+const PURGE_AFTER_MS = 90 * 86_400_000;
+const PURGE_BATCH = 50;
+/** A task whose purge failed is skipped this long, so it cannot starve newer ones. */
+const PURGE_RETRY_MS = 3_600_000;
 
 /** Expiry, cleanup and restart recovery. */
 export function createTaskMaintenance(
@@ -10,6 +18,9 @@ export function createTaskMaintenance(
 	lifecycle: ReturnType<typeof createTaskLifecycle>,
 ) {
 	const { now, kindFor, record } = core;
+	const { purgeInTransaction } = core.options;
+	/** Per process: task id -> earliest time to retry a failed purge. */
+	const purgeRetryAt = new Map<string, number>();
 	const { stopTask, settleStopInTransaction } = lifecycle;
 	function cleanupInTransaction(tx: Database) {
 		let expired = 0;
@@ -25,6 +36,32 @@ export function createTaskMaintenance(
 			t.metadataExpired = true;
 			record(tx, t, "metadata_expired");
 			repo.clearRuntimeHistory(tx, t);
+		}
+		for (const [id, at] of purgeRetryAt)
+			if (at <= now()) purgeRetryAt.delete(id);
+		for (const t of repo.purgeCandidates(
+			tx,
+			now() - PURGE_AFTER_MS,
+			PURGE_BATCH,
+			[...purgeRetryAt.keys()],
+		)) {
+			tx.exec("SAVEPOINT task_purge");
+			try {
+				syncHook(purgeInTransaction?.(tx, t));
+				syncHook(kindFor(t)?.purgeInTransaction?.(tx, t));
+				repo.purgeTask(tx, t.id);
+				tx.exec("RELEASE task_purge");
+				purgeRetryAt.delete(t.id);
+			} catch (error) {
+				purgeRetryAt.set(t.id, now() + PURGE_RETRY_MS);
+				tx.exec("ROLLBACK TO task_purge");
+				tx.exec("RELEASE task_purge");
+				log.warn(
+					"tasks.purge_failed",
+					{ reason: "purge_failed", taskId: t.id },
+					error,
+				);
+			}
 		}
 		return expired;
 	}

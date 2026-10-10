@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { Hono } from "hono";
 import type { VoiceDialogueService } from "..";
 import { registerVoiceDialogue } from "../controller";
+import { configureLogging } from "../../../infrastructure/logger";
 
 const sessionId = "4f996733-ddda-4b2f-85fb-173a61159e80";
 const utteranceId = "7cd03a9c-af76-4506-9bd6-d536574ac83f";
@@ -73,4 +74,34 @@ test("valid bounded WAV reaches voice service once", async () => {
 	});
 	expect(response.status).toBe(202);
 	expect(accepted).toBe(1);
+});
+
+test("replay failure logs and returns a code, never the raw message", async () => {
+	const lines: string[] = [];
+	configureLogging({
+		level: "debug",
+		destination: { write: (line) => void lines.push(line) },
+	});
+	try {
+		const app = new Hono();
+		registerVoiceDialogue(app, {
+			replaySpeech: async () => {
+				throw new Error("http://192.168.0.2/secret failed");
+			},
+		} as unknown as VoiceDialogueService);
+		const response = await app.request("/api/voice/replay/audio", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ text: "よかったですね。" }),
+		});
+		expect(response.status).toBe(502);
+		expect(await response.json()).toEqual({ error: "replay_failed" });
+		const entry = lines
+			.map((line) => JSON.parse(line))
+			.find((e) => e.event === "voice.replay_failed");
+		expect(entry?.reason).toBe("replay_failed");
+		expect(lines.join("\n")).not.toContain("192.168.0.2");
+	} finally {
+		configureLogging({ level: "silent" });
+	}
 });

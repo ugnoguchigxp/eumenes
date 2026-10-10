@@ -219,3 +219,32 @@ test("H4/H7: correction, append, retraction, TTL and restart invalidate cursors/
 		await h.close();
 	}
 });
+test("one owner cannot use the whole search-session capacity; its oldest search is dropped", async () => {
+	const h = await fixture();
+	try {
+		await h.store.write((db) => {
+			for (let i = 0; i < 1200; i++)
+				h.conversation.appendInTransaction(db, {
+					id: `m${i}`,
+					conversationId: "main",
+					role: "user",
+					text: "記録",
+					createdAt: "2026-10-09T23:00:00Z",
+					runId: null,
+				});
+		});
+		await h.append("current", "確認");
+		const api = { ...h.owner, key: "api:local:owner" };
+		const first = h.search({ query: "存在しない" }, api);
+		expect(first.cursor).not.toBeNull();
+		for (let i = 0; i < 8; i++) h.search({ query: "存在しない" }, api);
+		expect(() =>
+			h.search({ query: "存在しない", cursor: first.cursor }, api),
+		).toThrow("history_ref_invalid");
+		expect(
+			h.search({ query: "記録" }, h.owner).candidates.length,
+		).toBeGreaterThan(0);
+	} finally {
+		await h.close();
+	}
+});

@@ -1,5 +1,5 @@
 import type { Database } from "bun:sqlite";
-import type { Owner, FixedDefinition, Prepared } from "../../capabilities";
+import type { Owner, FixedDefinition } from "../../capabilities";
 export type ToolResult = {
 	observedAt: string;
 	readings?: Source[];
@@ -102,7 +102,7 @@ export interface ToolAdapter {
 		tx: Database,
 		invocation: Invocation,
 		result: ToolResult,
-	): Source[] | undefined;
+	): { sources: Source[]; failures?: ToolResult["failures"] } | undefined;
 	validateEvidenceInTransaction?(
 		tx: Database,
 		owner: Owner,
@@ -130,51 +130,6 @@ export interface ToolAdapter {
 	get(operationId: string): AdapterOperation | null;
 	cancelInTransaction(tx: Database, operationId: string): string[];
 }
-/**
- * Owned by tool-runtime, implemented by the application on top of the route ledger.
- * Called when a cached grant/candidate import is issued and again on every use, so
- * clear/disable/rediscover/disqualification take effect without tool-runtime knowing keys.
- */
-export type CachedSourceDecision =
-	| { status: "allowed" }
-	| { status: "rejected"; code: string };
-export interface CachedSourceAuthorizationPort {
-	validateInTransaction(
-		tx: Database,
-		input: {
-			owner: Owner;
-			bindingToken: string;
-			packageHash: string;
-			exactUrl: string;
-		},
-	): CachedSourceDecision;
-}
-export type CachedRouteGrantInput = {
-	owner: Owner;
-	prepared: Prepared;
-	/** Opaque host-issued binding token; checked by the port, never minted by the model. */
-	bindingToken: string;
-	toolId: "web.read" | "web.forecast" | "web.quote";
-	/** Fixed recipe arguments; the invocation must match them exactly. */
-	arguments: unknown;
-	exactUrl: string;
-	deadline: number;
-	attemptTimeoutMs?: number;
-};
-export type CandidateImportInput = {
-	owner: Owner;
-	/** Child's prepared fallback/cold package; its web.lookup tool carries the observation. */
-	prepared: Prepared;
-	bindingToken: string;
-	stepId: string;
-	deadline: number;
-	/** Original normalized query of the cached search (provenance, not a new lookup). */
-	query: string;
-	searchedAt: string;
-	/** Host digest of the stored candidate (kept for audit in args). */
-	provenanceDigest: string;
-	hits: Array<{ url: string; title: string; snippet: string }>;
-};
 export type Invocation = {
 	args_json?: string | null;
 	operation_fingerprint?: string | null;

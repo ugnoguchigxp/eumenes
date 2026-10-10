@@ -141,3 +141,26 @@ test("find normalization preserves grapheme positions; result counts and encoded
 		/(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])/u,
 	);
 });
+test("AG-6: a task's cursor quota evicts only its own oldest cursor and never blocks another task", () => {
+	const h = setup("abcdef");
+	const a = h.preview()[0]!;
+	const other = { ...owner, taskId: "other-child" };
+	const b = h.saved.issue("op", other, 901000, 81000)[0]!;
+	const found = h.saved.find(owner, { sourceRef: a.sourceRef, query: "abc" });
+	const first = found.matches[0]!.cursor;
+	for (let i = 0; i < 1024; i++)
+		h.saved.find(owner, { sourceRef: a.sourceRef, query: "abc" });
+	expect(() =>
+		h.saved.read(owner, { sourceRef: a.sourceRef, cursor: first }),
+	).toThrow("source_cursor_invalid");
+	const latest = h.saved.find(owner, { sourceRef: a.sourceRef, query: "abc" });
+	expect(
+		h.saved.read(owner, {
+			sourceRef: a.sourceRef,
+			cursor: latest.matches[0]!.cursor,
+		}).body,
+	).toBe("abcdef");
+	expect(
+		h.saved.find(other, { sourceRef: b.sourceRef, query: "abc" }).matches,
+	).toHaveLength(1);
+});

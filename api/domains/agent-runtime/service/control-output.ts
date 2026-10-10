@@ -32,10 +32,13 @@ export function parseControlOutput(value: unknown): {
 			},
 		};
 	const text = value.trim();
+	// Drop one complete leading reasoning block only; never search prose for JSON.
+	const thought = /^<think>[\s\S]*?<\/think>\s*/i.exec(text);
+	const body = thought ? text.slice(thought[0].length) : text;
 	// Decode a whole JSON code block only. Never search prose for a plausible action.
-	const wrapped = /^```(?:json)?[ \t]*\r?\n([\s\S]*?)\r?\n```$/i.exec(text);
+	const wrapped = /^```(?:json)?[ \t]*\r?\n([\s\S]*?)\r?\n```$/i.exec(body);
 	try {
-		const action: unknown = JSON.parse(wrapped?.[1] ?? text);
+		const action: unknown = JSON.parse(wrapped?.[1] ?? body);
 		if (action && typeof action === "object" && "action" in action) {
 			diagnostic.controlAction =
 				typeof action.action === "string" &&
@@ -68,9 +71,9 @@ export function parseControlOutput(value: unknown): {
 			diagnostic: {
 				...diagnostic,
 				validationCode,
-				reason: !text
+				reason: !body
 					? "control_empty_output"
-					: text.startsWith("```")
+					: body.startsWith("```")
 						? "control_markdown_fence"
 						: "control_json_syntax",
 				...(offset === undefined ? {} : { jsonOffset: Number(offset) }),

@@ -1,6 +1,6 @@
 const SAFE_PROTOCOL = /^(?:https?:|mailto:)/i;
 const INLINE_TOKEN =
-	/`([^`\n]+)`|\[([^\]\n]{1,1024})\]\(([^)\s]{1,2048})\)|\*\*([^*\n]+)\*\*|\*([^*\n]+)\*|~~([^~\n]+)~~/g;
+	/`([^`\n]+)`|\[([^\]\n]{1,1024})\]\(((?:[^()\s]|\([^()\s]*\)){1,2048})\)|\*\*([^*\n]+)\*\*|\*([^*\n]+)\*|~~([^~\n]+)~~/g;
 
 function escapeHtml(value: string): string {
 	return value
@@ -21,7 +21,23 @@ function hiddenHost(label: string, href: string): string | null {
 	} catch {
 		return null;
 	}
-	if (!host || label.toLowerCase().includes(host.toLowerCase())) return null;
+	if (!host) return null;
+	const shown = label
+		.trim()
+		.toLowerCase()
+		.replace(/^https?:\/\//, "")
+		.replace(/\/$/, "");
+	const h = host.toLowerCase();
+	const withoutWww = h.replace(/^www\./, "");
+	if (
+		shown === h ||
+		shown === withoutWww ||
+		shown.startsWith(`${h}/`) ||
+		shown.startsWith(`${withoutWww}/`) ||
+		shown.replace(/^www\./, "") === withoutWww ||
+		shown.replace(/^www\./, "").startsWith(`${withoutWww}/`)
+	)
+		return null;
 	return host;
 }
 
@@ -99,7 +115,7 @@ export function renderSafeMarkdown(content: string): string {
 			const renderedFence = `<pre data-lang="${escapeHtml(languageName)}"><code${language}>${source}</code></pre>`;
 			blocks.push(
 				languageName === "mermaid"
-					? `<div class="mermaid-block">${renderedFence}<div class="mermaid-source" hidden>${source}</div></div>`
+					? `<div class="mermaid-block">${renderedFence}</div>`
 					: renderedFence,
 			);
 			continue;

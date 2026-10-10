@@ -271,7 +271,10 @@ function Workspace({
 			if (document.visibilityState !== "visible") return;
 			clearTimeout(pending);
 			pending = setTimeout(() => {
-				// Queries refetch through refetchOnWindowFocus; only the stream needs a nudge.
+				// Queries refetch through refetchOnWindowFocus; only a stream that is not
+				// live needs a nudge. A live stream already delivers changes, and
+				// reconnecting would force a full reset.
+				if (client.changesState() === "connected") return;
 				client.reconnectChanges();
 			}, 100);
 		};

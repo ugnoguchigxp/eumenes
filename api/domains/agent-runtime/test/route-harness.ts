@@ -17,7 +17,6 @@ import {
 	supersedeMigration,
 	readMetadataMigration,
 	type AdapterOperation,
-	type CachedSourceAuthorizationPort,
 	type ToolAdapter,
 } from "../../tool-runtime";
 import {
@@ -25,18 +24,13 @@ import {
 	requirementsMigration,
 	createAgentRuntime,
 	migration as agentMigration,
-	type AcquisitionBindResult,
-	type AcquisitionPlanPort,
-	type AcquisitionProposal,
 	type Task,
 } from "..";
 
-export const URL_A = "https://weather.example.com/kamakura";
-export const URL_B = "https://weather.example.org/kamakura";
-export const learnedId = `learned.web.${(1).toString(16).padStart(32, "0")}`;
-export const learnedPackage = `package:${learnedId}@1`;
+const URL_A = "https://weather.example.com/kamakura";
+const learnedId = `learned.web.${(1).toString(16).padStart(32, "0")}`;
 const base = { revision: 1, aliases: [], tags: [], useWhen: [], avoidWhen: [] };
-export const learnedPair = (): Definition[] => [
+const learnedPair = (): Definition[] => [
 	{
 		...base,
 		kind: "skill",
@@ -67,31 +61,6 @@ export const learnedPair = (): Definition[] => [
 		toolRevisionIds: ["tool:web.read@1"],
 	},
 ];
-export const coldPackage = "package:web.research@8";
-export const directBind = (token = "tok-direct"): AcquisitionBindResult => ({
-	kind: "bound",
-	bindingToken: token,
-	packageRevisionId: learnedPackage,
-	initialAction: {
-		kind: "direct-invoke",
-		toolId: "web.read",
-		arguments: { url: URL_A },
-		exactUrl: URL_A,
-		attemptTimeoutMs: 5000,
-	},
-});
-export const searchBind = (token = "tok-search"): AcquisitionBindResult => ({
-	kind: "bound",
-	bindingToken: token,
-	packageRevisionId: coldPackage,
-	initialAction: {
-		kind: "host-lookup",
-		query: "天気予報 鎌倉",
-		language: "ja",
-		region: "JP",
-	},
-});
-
 export async function harness(now = Date.now, luna = false) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-route-"));
 	const store = openStore(join(dir, "db"), [
@@ -120,8 +89,8 @@ export async function harness(now = Date.now, luna = false) {
 	}> = [];
 	const results = new Map<string, AdapterOperation>();
 	const adapter: ToolAdapter = {
-		prepareSourcesInTransaction: (_db, _inv, result) =>
-			result.readings ?? [
+		prepareSourcesInTransaction: (_db, _inv, result) => ({
+			sources: result.readings ?? [
 				...result.hits.map((h) => ({
 					sourceId: crypto.randomUUID(),
 					viewId: crypto.randomUUID(),
@@ -143,6 +112,7 @@ export async function harness(now = Date.now, luna = false) {
 					truncated: d.truncated,
 				})),
 			],
+		}),
 		validateEvidenceInTransaction: () => true,
 		startInTransaction: (db, r) => {
 			started.push({
@@ -165,16 +135,7 @@ export async function harness(now = Date.now, luna = false) {
 		get: (id) => results.get(id) ?? { state: "pending" },
 		cancelInTransaction: () => [],
 	};
-	const ledger = new Map<string, { urls: Set<string>; owner: string }>();
-	const cachedPort: CachedSourceAuthorizationPort = {
-		validateInTransaction: (_db, i) => {
-			const g = ledger.get(i.bindingToken);
-			if (!g || g.owner !== i.owner.taskId || !g.urls.has(i.exactUrl))
-				return { status: "rejected", code: "revoked" };
-			return { status: "allowed" };
-		},
-	};
-	const tools = createToolRuntime(store, caps, queue, adapter, now, cachedPort);
+	const tools = createToolRuntime(store, caps, queue, adapter, now);
 	const captures: string[] = [];
 	const engines: Array<string | undefined> = [];
 	const inference = {
@@ -191,88 +152,12 @@ export async function harness(now = Date.now, luna = false) {
 		acceptInTransaction: () => true,
 		rejectControlInTransaction: () => {},
 	};
-	const proposals: AcquisitionProposal[] = [];
-	const binds = new Map<string, AcquisitionBindResult>();
-	const portCalls: string[] = [];
-	let observation: ReturnType<
-		AcquisitionPlanPort["recordObservationInTransaction"]
-	> = {
-		kind: "valid",
-		proofId: "proof-1",
-		canonicalReportPatch: {
-			summary: "27",
-			claims: [
-				{
-					text: "27",
-					evidence: [{ sourceId: "", quote: "SENTINEL_TARGET 27" }],
-				},
-			],
-			limitations: [],
-		},
-		safeProjection: {
-			summary: "値は27",
-			claims: [{ text: "27", sourceIds: [] }],
-			limitations: [],
-		},
-		projectionDigest: "d".repeat(64),
-	};
-	const port: AcquisitionPlanPort = {
-		resolveInTransaction: () => {
-			portCalls.push("resolve");
-			const next = proposals.length > 1 ? proposals.shift()! : proposals[0]!;
-			return next;
-		},
-		bindInTransaction: (_db, i) => {
-			const bound = binds.get(i.proposalToken) ?? {
-				kind: "rejected" as const,
-				code: "unknown_token",
-			};
-			portCalls.push(`bind:${i.proposalToken}`);
-			if (bound.kind === "bound") {
-				const urls = new Set<string>([URL_A]);
-				ledger.set(bound.bindingToken, { urls, owner: i.childOwner.taskId });
-			}
-			return bound;
-		},
-		validateInTransaction: (_db, i) =>
-			ledger.has(i.bindingToken)
-				? { kind: "allowed" }
-				: { kind: "rejected", code: "revoked" },
-		recordObservationInTransaction: (_db, i) => {
-			portCalls.push("observe:report");
-			const patch = (
-				observation as {
-					canonicalReportPatch?: {
-						claims: { evidence: { sourceId: string }[] }[];
-					};
-				}
-			).canonicalReportPatch;
-			const sid = i.visibleSources[0]?.sourceId;
-			if (patch && sid)
-				for (const c of patch.claims)
-					for (const e of c.evidence) e.sourceId = sid;
-			const proj = (
-				observation as {
-					safeProjection?: { claims: { sourceIds: string[] }[] };
-				}
-			).safeProjection;
-			if (proj && sid) for (const c of proj.claims) c.sourceIds = [sid];
-			return observation;
-		},
-		validateAdoptionInTransaction: () => ({ kind: "allowed" }),
-		releaseInTransaction: (_db, i) => {
-			portCalls.push(`release:${i.bindingToken}`);
-			ledger.delete(i.bindingToken);
-			return { kind: "released" };
-		},
-	};
 	const agents = createAgentRuntime({
 		store,
 		capabilities: caps,
 		tools,
 		inference: inference as never,
 		queue,
-		acquisition: port,
 		now,
 	});
 	const task = (id: string) =>
@@ -391,18 +276,13 @@ export async function harness(now = Date.now, luna = false) {
 		queue,
 		started,
 		results,
-		ledger,
 		captures,
 		engines,
-		proposals,
-		binds,
-		portCalls,
 		task,
 		start,
 		runModelStep,
 		runRawModelStep,
 		doc,
-		setObservation: (o: typeof observation) => (observation = o),
 		async close() {
 			await agents.close();
 			rmSync(dir, { recursive: true, force: true });

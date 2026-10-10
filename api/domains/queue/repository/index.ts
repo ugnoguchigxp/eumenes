@@ -411,7 +411,48 @@ export function nextEventAt(db: Database, now: number): number | null {
 	return row.t;
 }
 
+const SETTLED = "('completed','failed','cancelled','expired','interrupted')";
+
+/**
+ * Deletes finished jobs (and their attempts) older than the cutoffs, oldest
+ * first. `outcome_unknown` is kept longer (`unknownBefore`): operators inspect
+ * it, and deleting it frees its dedupe key. A parent with surviving children and
+ * the row with the highest `created_seq` (the next seq is MAX+1) are kept.
+ */
+export function pruneTerminal(
+	db: Database,
+	before: number,
+	unknownBefore: number,
+	limit: number,
+): number {
+	const ids = (
+		db
+			.query(
+				`SELECT j.id FROM queue_jobs j
+ WHERE j.finished_at_ms IS NOT NULL
+   AND ((j.state IN ${SETTLED} AND j.finished_at_ms<=?) OR (j.state='outcome_unknown' AND j.finished_at_ms<=?))
+   AND NOT EXISTS (SELECT 1 FROM queue_jobs c WHERE c.parent_job_id=j.id)
+   AND j.created_seq < (SELECT MAX(created_seq) FROM queue_jobs)
+ ORDER BY j.finished_at_ms LIMIT ?`,
+			)
+			.all(before, unknownBefore, limit) as { id: string }[]
+	).map((r) => r.id);
+	for (const id of ids) {
+		db.query("DELETE FROM queue_attempts WHERE job_id=?").run(id);
+		db.query("DELETE FROM queue_jobs WHERE id=?").run(id);
+	}
+	return ids.length;
+}
+
 /** Named migrations of this domain; the SQL above is frozen once deployed. */
 export const migrations: readonly Migration[] = [
 	{ id: "queue/0001-init", sql: migration },
+	{
+		id: "queue/0002-retention-indexes",
+		after: ["queue/0001-init"],
+		sql: `
+CREATE INDEX queue_jobs_finished ON queue_jobs(finished_at_ms) WHERE finished_at_ms IS NOT NULL;
+CREATE INDEX queue_jobs_parent ON queue_jobs(parent_job_id) WHERE parent_job_id IS NOT NULL;
+`,
+	},
 ];

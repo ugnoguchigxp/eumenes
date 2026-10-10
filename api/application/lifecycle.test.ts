@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import {
 	createLifecycleRunner,
+	createProcessGuard,
 	createTerminator,
 	intervalLifecycle,
 	type Lifecycle,
@@ -302,4 +303,66 @@ test("terminator: the 30 s process deadline exits 1 when shutdown never finishes
 	hung.timers.fire();
 	expect(hung.exits).toEqual([1]);
 	expect(hung.logs).toEqual(["server.shutdown_timeout:shutdown_timeout"]);
+});
+
+function guardHarness(maxRejections?: number) {
+	let clock = 0;
+	const logs: Array<{ event: string; fields: Record<string, unknown> }> = [];
+	let terminated: unknown[][] = [];
+	const guard = createProcessGuard({
+		log: { error: (event, fields) => logs.push({ event, fields }) },
+		terminate: (...args: unknown[]) => {
+			terminated.push(args);
+		},
+		now: () => clock,
+		maxRejections,
+	});
+	return {
+		guard,
+		logs,
+		terminated: () => terminated,
+		advance: (ms: number) => {
+			clock += ms;
+		},
+	};
+}
+
+test("process guard: one rejection is logged and tolerated", () => {
+	const h = guardHarness();
+	h.guard.onRejection(new Error("x"));
+	expect(h.logs).toHaveLength(1);
+	expect(h.logs[0]!.event).toBe("process.unhandled_rejection");
+	expect(h.logs[0]!.fields.reason).toBe("unhandled_rejection");
+	expect(h.terminated()).toHaveLength(0);
+});
+
+test("process guard: more than 20 rejections in one window terminate; spread-out ones do not", () => {
+	const burst = guardHarness();
+	for (let i = 0; i < 20; i++) burst.guard.onRejection(new Error("x"));
+	expect(burst.terminated()).toHaveLength(0);
+	burst.guard.onRejection(new Error("x"));
+	expect(burst.terminated()).toHaveLength(1);
+
+	const spread = guardHarness();
+	for (let i = 0; i < 40; i++) {
+		spread.guard.onRejection(new Error("x"));
+		spread.advance(10_000);
+	}
+	expect(spread.terminated()).toHaveLength(0);
+});
+
+test("process guard: an uncaught exception always terminates, without arguments", () => {
+	const h = guardHarness();
+	h.guard.onException(new Error("boom"));
+	expect(h.terminated()).toEqual([[]]);
+	expect(h.logs[0]!.event).toBe("process.uncaught_exception");
+});
+
+test("process guard: log fields never carry the error text", () => {
+	const h = guardHarness();
+	h.guard.onRejection(new Error("secret-text"));
+	h.guard.onException(new Error("secret-text"));
+	expect(JSON.stringify(h.logs.map((l) => l.fields))).not.toContain(
+		"secret-text",
+	);
 });

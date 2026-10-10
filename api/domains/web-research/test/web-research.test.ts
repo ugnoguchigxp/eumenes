@@ -16,7 +16,7 @@ import {
 	registerWebResearch,
 	type AcquisitionPort,
 } from "..";
-import { freshnessDeadline } from "../adapters/llm-fetch";
+import { createWebAcquisition, freshnessDeadline } from "../adapters/llm-fetch";
 import {
 	submitResearchSchema,
 	type ResearchRequest,
@@ -670,4 +670,49 @@ test("an acquisition cleanup error does not prevent the cache writer from closin
 	expect(() => cacheStore.read((db) => db.query("SELECT 1").get())).toThrow(
 		"database_closing",
 	);
+});
+
+test("lookup drops hits with invalid URLs instead of failing", async () => {
+	const hit = (url: string, rank: number) => ({
+		trust: "untrusted" as const,
+		tainted: true as const,
+		provider: "fake",
+		rank,
+		title: "t",
+		snippet: "s",
+		url,
+	});
+	const run = async (urls: string[]) => {
+		const acquisition = createWebAcquisition({
+			search: {
+				name: "fake",
+				search: async () => urls.map((url, i) => hit(url, i + 1)),
+			},
+		});
+		const out = await acquisition.execute(
+			submitResearchSchema.parse({
+				requestId: crypto.randomUUID(),
+				operation: "lookup",
+				query: "q",
+				readPages: 0,
+			}),
+			new AbortController().signal,
+		);
+		await acquisition.close?.();
+		return out.result;
+	};
+	const mixed = await run([
+		"https://example.com/a",
+		"https://user:pw@example.com/",
+		"https://example.com/b",
+		`https://example.com/${"x".repeat(2040)}`,
+		"https://example.com/c",
+	]);
+	expect(mixed.hits.map((h) => h.url)).toEqual([
+		"https://example.com/a",
+		"https://example.com/b",
+		"https://example.com/c",
+	]);
+	expect((await run(["https://u:p@example.com/"])).hits).toEqual([]);
+	expect((await run(["ftp://example.com/"])).hits).toEqual([]);
 });

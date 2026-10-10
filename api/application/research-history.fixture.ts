@@ -1,5 +1,5 @@
 import { expect } from "bun:test";
-import { harness } from "./toolchain.fixture";
+import { harness, workerPacket } from "./toolchain.fixture";
 import type { Messages } from "../domains/inference/contracts";
 import type { AcquisitionPort } from "../domains/web-research";
 export type ReplayData = {
@@ -42,7 +42,7 @@ export async function replay(
 		...options,
 		async control(messages) {
 			const system = messages[0]!.content;
-			const data = JSON.parse(messages.find((m) => m.role === "user")!.content);
+			const data = workerPacket(messages);
 			if (system.includes("TOOLS=")) {
 				const step = steps[position++];
 				if (!step) throw new Error("replay_extra_model_call");

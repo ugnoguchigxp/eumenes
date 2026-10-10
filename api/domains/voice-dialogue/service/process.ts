@@ -1,3 +1,4 @@
+import type { Database } from "bun:sqlite";
 import type { SpeechPreparation } from "../../delivery";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { DialogueService } from "../../dialogue";
@@ -5,6 +6,7 @@ import type { InferencePort, Receipt } from "../../inference";
 import type { VoiceTurn } from "../contracts";
 import { get } from "../repository";
 import { withLogContext, getLogger } from "../../../infrastructure/logger";
+import { toErrorCode } from "../../../infrastructure/error-code";
 import { spokenText } from "./spoken-text";
 import {
 	transcriptLanguageMessages,
@@ -29,6 +31,7 @@ export function createVoiceProcessor({
 	controllers,
 	audio,
 	languageRequests,
+	linkRunInTransaction,
 }: {
 	store: SqliteStore;
 	dialogue: DialogueService;
@@ -43,6 +46,7 @@ export function createVoiceProcessor({
 	controllers: Map<string, AbortController>;
 	audio: Map<string, Speech>;
 	languageRequests: Map<string, string>;
+	linkRunInTransaction: (db: Database, id: string, runId: string) => void;
 }) {
 	return async function process(
 		turn: VoiceTurn,
@@ -148,21 +152,28 @@ export function createVoiceProcessor({
 					controller.signal.throwIfAborted();
 					if (!larm.validRequest?.(asrId!) || !larm.validRequest?.(languageId))
 						throw new Error("permission_revoked");
-					const submit = (input: Parameters<typeof dialogue.submit>[0]) =>
-						dialogue.submitVoice(input, turn.utteranceId, {
-							validationRequestIds: [languageId],
-						});
-					const run = await submit({
-						requestId: turn.utteranceId,
-						utteranceId: turn.utteranceId,
-						conversationId: "main",
-						text,
-					});
-					if (
-						!(await advance(turn.utteranceId, "responding", { runId: run.id }))
-					) {
-						await dialogue.cancel(run.id);
-						return;
+					let run: Awaited<ReturnType<DialogueService["submitVoice"]>>;
+					try {
+						run = await dialogue.submitVoice(
+							{
+								requestId: turn.utteranceId,
+								utteranceId: turn.utteranceId,
+								conversationId: "main",
+								text,
+							},
+							turn.utteranceId,
+							{ validationRequestIds: [languageId] },
+							(db, accepted) =>
+								linkRunInTransaction(db, turn.utteranceId, accepted.id),
+						);
+					} catch (error) {
+						// Cancelled meanwhile: the run was rolled back with the link.
+						if (
+							error instanceof Error &&
+							error.message === "voice_turn_inactive"
+						)
+							return;
+						throw error;
 					}
 
 					const snapshot = store.read((db) =>
@@ -224,49 +235,70 @@ export function createVoiceProcessor({
 						runId: run.id,
 						count: speech!.chunks.size,
 					});
+					if (speech!.skipped > 0)
+						log.warn("voice.speech_truncated", {
+							runId: run.id,
+							count: speech!.skipped,
+						});
 					await advance(
 						turn.utteranceId,
 						speech!.chunks.size ? "ready" : "played",
 					);
 					if (!speech!.chunks.size) audio.delete(turn.utteranceId);
 				} catch (error) {
-					if (!controller.signal.aborted)
+					const code = toErrorCode(error, "voice_failed");
+					if (!controller.signal.aborted) {
+						let current: VoiceTurn | null = null;
+						try {
+							current = store.read((db) => get(db, turn.utteranceId));
+						} catch {
+							/* The store may be closing; the log still records the code. */
+						}
 						log.error(
 							"voice.processing_failed",
 							{
-								runId:
-									store.read((db) => get(db, turn.utteranceId))?.runId ??
-									undefined,
-								phase: store.read((db) => get(db, turn.utteranceId))?.status,
-								reason:
-									error instanceof Error &&
-									/^[a-z][a-z0-9_]{0,79}$/.test(error.message)
-										? error.message
-										: "voice_failed",
+								runId: current?.runId ?? undefined,
+								phase: current?.status,
+								reason: code,
 							},
 							error,
 						);
+					}
 					audio.delete(turn.utteranceId);
 					if (!controller.signal.aborted)
-						await advance(turn.utteranceId, "failed", {
-							error: error instanceof Error ? error.message : "voice_failed",
-						}).catch(() => {});
+						await advance(turn.utteranceId, "failed", { error: code }).catch(
+							() => {},
+						);
 				} finally {
-					log.info("voice.processing_ended", {
-						status: store.read((db) => get(db, turn.utteranceId))?.status,
-						durationMs: Math.round(performance.now() - started),
-					});
 					controller.abort();
 					if (controller.signal.aborted) audio.get(turn.utteranceId)?.wake();
 					const languageId = languageRequests.get(turn.utteranceId);
-					if (languageId) {
-						await store.write((db) =>
-							larm.cancelRequestsInTransaction?.(db, [languageId]),
-						);
-						larm.flushCancelledRequests?.([languageId]);
-						languageRequests.delete(turn.utteranceId);
-					}
+					languageRequests.delete(turn.utteranceId);
 					controllers.delete(turn.utteranceId);
+					let status: VoiceTurn["status"] | undefined;
+					try {
+						status = store.read((db) => get(db, turn.utteranceId))?.status;
+					} catch {
+						/* The store may be closing. */
+					}
+					log.info("voice.processing_ended", {
+						status,
+						durationMs: Math.round(performance.now() - started),
+					});
+					if (languageId) {
+						try {
+							await store.write((db) =>
+								larm.cancelRequestsInTransaction?.(db, [languageId]),
+							);
+						} catch (error) {
+							log.warn(
+								"voice.cleanup_failed",
+								{ reason: toErrorCode(error, "cleanup_failed") },
+								error,
+							);
+						}
+						larm.flushCancelledRequests?.([languageId]);
+					}
 				}
 			},
 		);

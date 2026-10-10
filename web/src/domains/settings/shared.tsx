@@ -64,13 +64,17 @@ export function SamplePlayer({
 }) {
 	const [state, setState] = useState<"idle" | "loading" | "playing">("idle");
 	const [error, setError] = useState<string | null>(null);
-	const run = useRef<{ abort: AbortController; audio?: HTMLAudioElement }>(
-		null,
-	);
+	const run = useRef<{
+		abort: AbortController;
+		audio?: HTMLAudioElement;
+		url?: string;
+	}>(null);
 	const stop = useCallback(() => {
-		run.current?.abort.abort();
-		run.current?.audio?.pause();
+		const current = run.current;
 		run.current = null;
+		current?.abort.abort();
+		current?.audio?.pause();
+		if (current?.url) URL.revokeObjectURL(current.url);
 		setState("idle");
 	}, []);
 	useEffect(() => stop, [stop]);
@@ -80,6 +84,7 @@ export function SamplePlayer({
 		const mine = { abort: new AbortController() } as {
 			abort: AbortController;
 			audio?: HTMLAudioElement;
+			url?: string;
 		};
 		run.current = mine;
 		setState("loading");
@@ -89,6 +94,7 @@ export function SamplePlayer({
 			const url = URL.createObjectURL(
 				new Blob([new Uint8Array(bytes)], { type: "audio/wav" }),
 			);
+			mine.url = url;
 			const audio = new Audio(url);
 			mine.audio = audio;
 			const finish = () => {

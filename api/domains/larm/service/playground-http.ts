@@ -2,6 +2,11 @@ import { readBounded } from "../../../infrastructure/bounded-read";
 import { setTimeout as delay } from "node:timers/promises";
 export const pause = (ms: number, signal: AbortSignal) =>
 	delay(ms, undefined, { signal });
+export const post = (body: unknown): RequestInit => ({
+	method: "POST",
+	headers: { "Content-Type": "application/json" },
+	body: JSON.stringify(body),
+});
 export function object(value: unknown): Record<string, unknown> {
 	if (!value || typeof value !== "object" || Array.isArray(value))
 		throw new Error("invalid_provider_response");

@@ -913,3 +913,107 @@ test("the final probe status survives a momentarily full writer queue", async ()
 		spy.mockRestore();
 	}
 });
+
+test("a non-network TypeError from the larm adapter does not fall back to cloud", async () => {
+	const h = await setup({
+		local: async () => {
+			throw new TypeError("Cannot read properties of undefined (reading 'x')");
+		},
+	});
+	await expect(
+		h.inference.answer(messages, new AbortController().signal),
+	).rejects.toThrow("inference_failed");
+	expect(h.calls).toHaveLength(0);
+});
+
+test("transport-level TypeErrors from the larm adapter still fall back to cloud", async () => {
+	const errors = [
+		Object.assign(new TypeError("Unable to connect"), {
+			code: "ConnectionRefused",
+		}),
+		Object.assign(
+			new TypeError("The socket connection was closed unexpectedly."),
+			{ code: "ECONNRESET" },
+		),
+		new TypeError("terminated"),
+	];
+	for (const error of errors) {
+		const h = await setup({
+			local: async () => {
+				throw error;
+			},
+		});
+		expect(
+			await h.inference.answer(messages, new AbortController().signal),
+		).toBe("cloud-answer");
+		expect(h.calls).toHaveLength(1);
+	}
+});
+
+test("a speech chunk gets its own short deadline when the turn's deadline is nearly over", async () => {
+	const h = await setup();
+	const before = Date.now();
+	const chunkId = await h.store.write((db) => {
+		h.inference.captureInTransaction(db, "voice-1", "tts", Date.now() + 1000);
+		return h.inference.captureSpeechChunkInTransaction(db, "voice-1", 0);
+	});
+	const row = h.store.read(
+		(db) =>
+			db
+				.query("SELECT deadline FROM inference_requests WHERE id=?")
+				.get(chunkId) as { deadline: number },
+	);
+	expect(row.deadline).toBeGreaterThanOrEqual(before + 60_000);
+});
+
+test("streaming checks authority once per commit generation, not once per delta", async () => {
+	let valid = () => 0;
+	let during = 0;
+	const h = await setup({
+		localStream: async (_messages, _signal, delta) => {
+			const before = valid();
+			for (let i = 0; i < 10; i++) delta(`d${i}`);
+			during = valid() - before;
+			return "d0d1d2d3d4d5d6d7d8d9";
+		},
+	});
+	const spy = spyOn(h.settings, "valid");
+	valid = () => spy.mock.calls.length;
+	const parts: string[] = [];
+	await h.inference.answerStream(messages, new AbortController().signal, (x) =>
+		parts.push(x),
+	);
+	expect(parts).toHaveLength(10);
+	expect(during).toBe(1);
+});
+
+test("a request revoked mid-stream stops delivering deltas at the next delta", async () => {
+	let gate: () => void = () => {};
+	let reached: () => void = () => {};
+	const waiting = new Promise<void>((resolve) => {
+		reached = resolve;
+	});
+	const h = await setup({
+		localStream: async (_messages, _signal, delta) => {
+			for (let i = 0; i < 5; i++) delta(`d${i}`);
+			reached();
+			await new Promise<void>((resolve) => {
+				gate = resolve;
+			});
+			for (let i = 5; i < 10; i++) delta(`d${i}`);
+			return "unused";
+		},
+	});
+	const parts: string[] = [];
+	const work = h.inference
+		.answerStream(messages, new AbortController().signal, (x) => parts.push(x))
+		.catch((error: Error) => error);
+	await waiting;
+	await h.store.write((db) => {
+		db.query("UPDATE inference_requests SET status='cancelled'").run();
+	});
+	gate();
+	const result = await work;
+	expect(result).toBeInstanceOf(Error);
+	expect(parts).toEqual(["d0", "d1", "d2", "d3", "d4"]);
+});

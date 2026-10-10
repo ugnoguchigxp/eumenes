@@ -207,3 +207,52 @@ export function createTerminator(options: TerminatorOptions): () => void {
 		);
 	};
 }
+
+export type ProcessGuardOptions = {
+	log: {
+		error: (
+			event: string,
+			fields: Record<string, unknown>,
+			error?: unknown,
+		) => void;
+	};
+	/** Graceful process stop; the exit code is decided by the shutdown result. */
+	terminate: () => void;
+	now?: () => number;
+	/** Rejections tolerated per window before the process is considered unhealthy. */
+	maxRejections?: number;
+	windowMs?: number;
+};
+
+/**
+ * Last line of defence for fire-and-forget promises. A lone rejection is
+ * logged and tolerated; a burst, or any uncaught exception, stops the process
+ * gracefully. The error message is never put in the log fields.
+ */
+export function createProcessGuard(options: ProcessGuardOptions) {
+	const now = options.now ?? Date.now;
+	const max = options.maxRejections ?? 20;
+	const windowMs = options.windowMs ?? 60_000;
+	let times: number[] = [];
+	return {
+		onRejection(reason: unknown) {
+			const at = now();
+			times = times.filter((t) => at - t < windowMs);
+			times.push(at);
+			options.log.error(
+				"process.unhandled_rejection",
+				{ reason: "unhandled_rejection", count: times.length },
+				reason,
+			);
+			if (times.length > max) options.terminate();
+		},
+		onException(error: unknown) {
+			options.log.error(
+				"process.uncaught_exception",
+				{ reason: "uncaught_exception" },
+				error,
+			);
+			options.terminate();
+		},
+	};
+}

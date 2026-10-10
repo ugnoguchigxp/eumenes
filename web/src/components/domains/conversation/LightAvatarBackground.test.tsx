@@ -105,3 +105,91 @@ test("hiding the tab pauses playback without rebuilding the model", async () => 
 	view.unmount();
 	expect(dispose).toHaveBeenCalledTimes(1);
 });
+
+function lostFixture() {
+	supportReducedMotion();
+	const create = vi.mocked(createLightAvatar);
+	create.mockReset();
+	const canvases: HTMLCanvasElement[] = [];
+	create.mockImplementation(() => {
+		const canvas = document.createElement("canvas");
+		canvases.push(canvas);
+		return {
+			canvas,
+			beginMotion: vi.fn(),
+			resize: vi.fn(),
+			render: vi.fn(),
+			dispose: vi.fn(),
+			stats: () => ({ armCount: 0, points: 0, triangles: 0, drawCalls: 0 }),
+		};
+	});
+	vi.stubGlobal(
+		"ResizeObserver",
+		class {
+			observe() {}
+			disconnect() {}
+		},
+	);
+	return { create, canvases };
+}
+const lose = (canvas: HTMLCanvasElement) =>
+	act(() => {
+		canvas.dispatchEvent(new Event("webglcontextlost", { cancelable: true }));
+	});
+const advance = (ms: number) =>
+	act(async () => {
+		await vi.advanceTimersByTimeAsync(ms);
+	});
+
+test("a lost WebGL context is rebuilt after a delay", async () => {
+	vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+	try {
+		const { create, canvases } = lostFixture();
+		const view = render(<LightAvatarBackground active />);
+		const state = () =>
+			view.container.firstElementChild?.getAttribute("data-avatar-state");
+		await advance(10);
+		expect(state()).toBe("ready");
+		lose(canvases[0]!);
+		expect(state()).toBe("context-lost");
+		await advance(2000);
+		expect(create).toHaveBeenCalledTimes(2);
+		expect(state()).toBe("ready");
+	} finally {
+		vi.useRealTimers();
+	}
+});
+
+test("rebuilding stops after three restarts", async () => {
+	vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+	try {
+		const { create, canvases } = lostFixture();
+		const view = render(<LightAvatarBackground active />);
+		await advance(10);
+		for (let i = 0; i < 4; i += 1) {
+			lose(canvases[i]!);
+			await advance(20_000);
+		}
+		expect(create).toHaveBeenCalledTimes(4);
+		expect(
+			view.container.firstElementChild?.getAttribute("data-avatar-state"),
+		).toBe("context-lost");
+	} finally {
+		vi.useRealTimers();
+	}
+});
+
+test("unmounting while a rebuild is pending cancels it", async () => {
+	vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+	try {
+		const { create, canvases } = lostFixture();
+		const view = render(<LightAvatarBackground active />);
+		await advance(10);
+		lose(canvases[0]!);
+		view.unmount();
+		await advance(10_000);
+		expect(create).toHaveBeenCalledTimes(1);
+	} finally {
+		vi.useRealTimers();
+	}
+});

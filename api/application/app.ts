@@ -8,9 +8,16 @@ const digest = (value: string) => createHash("sha256").update(value).digest();
 const safeEqual = (a: string, b: string) =>
 	timingSafeEqual(digest(a), digest(b));
 const maxJsonBytes = 1024 * 1024;
-// Audio uploads are bounded by their own streaming reader (4MB).
-const isAudioUpload = (path: string) =>
-	path === "/api/voice/turns" || path === "/api/voice/preview";
+/**
+ * Routes that read their body through their own bounded streaming reader
+ * (`readBounded`, 4MB). The global Content-Length cap must not pre-empt them.
+ * Exact path match only; never a prefix.
+ */
+const streamBoundedRoutes = new Set([
+	"/api/voice/turns",
+	"/api/voice/preview",
+	"/api/service-tests/uploads",
+]);
 
 export type AppOptions = {
 	token: string;
@@ -33,7 +40,11 @@ export function createApp(options: AppOptions | LegacyAppOptions) {
 		c.header("X-Content-Type-Options", "nosniff");
 		c.header("Referrer-Policy", "no-referrer");
 		c.header("X-Frame-Options", "DENY");
-		c.header("Content-Security-Policy", "frame-ancestors 'none'");
+		// API responses are never rendered as documents, so allow nothing.
+		c.header(
+			"Content-Security-Policy",
+			"default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
+		);
 	});
 	app.use("/api/*", async (c, next) => {
 		const requestId = crypto.randomUUID();
@@ -84,7 +95,7 @@ export function createApp(options: AppOptions | LegacyAppOptions) {
 		if (
 			c.req.method !== "GET" &&
 			c.req.method !== "HEAD" &&
-			!isAudioUpload(c.req.path)
+			!streamBoundedRoutes.has(c.req.path)
 		) {
 			const length = c.req.header("content-length");
 			if (length === undefined) {

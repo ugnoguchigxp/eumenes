@@ -48,6 +48,8 @@ export const voiceTurnSchema = z.object({
 		)
 		.optional(),
 	audioComplete: z.boolean().optional(),
+	/** Clauses that could not be spoken and were skipped. */
+	audioSkipped: z.number().int().nonnegative().optional(),
 	/** P3-08: from the run (explicit): World was read, or World blocked the run. */
 	worldUsed: z.boolean().optional(),
 	worldBlocked: z.boolean().optional(),
@@ -68,4 +70,6 @@ export const errorStatus = {
 	voice_utterance_conflict: 409,
 	voice_preview_busy: 409,
 	voice_sequence_invalid: 400,
+	voice_turn_inactive: 409,
+	voice_audio_capacity: 503,
 } as const satisfies Record<string, HttpErrorStatus>;

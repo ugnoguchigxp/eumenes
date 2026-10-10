@@ -75,6 +75,7 @@ const schema = z.object({
 	EUMENES_WORLD: worldMode,
 	EUMENES_WORLD_POLL_MS: integer(),
 	EUMENES_WORLD_CURSOR_SECRET: text,
+	EUMENES_LARM_PROVIDER_HOSTS: text,
 	EUMENES_TOOLCHAIN_ENABLED: flag(true),
 	EUMENES_HISTORY_TOOLS_ENABLED: flag(true),
 	EUMENES_WEB_RESEARCH_TOOLS_ENABLED: flag(true),
@@ -103,6 +104,8 @@ export type Config = {
 	/** Already clamped to the 1000 ms floor. */
 	worldPollMs: number | undefined;
 	worldCursorSecret: string | undefined;
+	/** Extra hosts that may receive LARM provider credentials; undefined when unset or empty. */
+	larmProviderHosts: readonly string[] | undefined;
 	toolchainEnabled: boolean;
 	historyToolsEnabled: boolean;
 	webResearchToolsEnabled: boolean;
@@ -117,6 +120,21 @@ export function parseWorldMode(raw: string | undefined): WorldMode {
 	);
 	if (!parsed.success) throw new Error("world_mode_invalid");
 	return parsed.data;
+}
+
+/** Comma-separated host list: lower-cased, trimmed, de-duplicated; empty becomes undefined. */
+export function parseHostList(
+	raw: string | undefined,
+): readonly string[] | undefined {
+	const hosts = [
+		...new Set(
+			(raw ?? "")
+				.split(",")
+				.map((host) => host.trim().toLowerCase())
+				.filter(Boolean),
+		),
+	];
+	return hosts.length ? hosts : undefined;
 }
 
 export function loadConfig(env: Record<string, string | undefined>): Config {
@@ -159,6 +177,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
 				? undefined
 				: Math.max(1000, v.EUMENES_WORLD_POLL_MS),
 		worldCursorSecret: v.EUMENES_WORLD_CURSOR_SECRET,
+		larmProviderHosts: parseHostList(v.EUMENES_LARM_PROVIDER_HOSTS),
 		toolchainEnabled: v.EUMENES_TOOLCHAIN_ENABLED,
 		historyToolsEnabled: v.EUMENES_HISTORY_TOOLS_ENABLED,
 		webResearchToolsEnabled: v.EUMENES_WEB_RESEARCH_TOOLS_ENABLED,

@@ -29,6 +29,8 @@ import { probeWav } from "./wav";
 import { finishProbe, openProbe } from "./probe";
 import { safeError } from "./errors";
 import { validateReceipt as checkReceipt } from "./receipt-authority";
+/** Each clause gets its own short deadline; the turn's authority is still enforced through `parents`. */
+const SPEECH_CHUNK_DEADLINE_MS = 60_000;
 type UsageRow = {
 	id: string;
 	requestId: string;
@@ -100,6 +102,7 @@ export function createInference(
 				createLarm({
 					baseUrl: s.larm.baseUrl ?? undefined,
 					token: options.token,
+					providerHosts: options.providerHosts,
 					profile: s.larm.profile,
 					audience: s.larm.audience,
 					voice: s.larm.voice || undefined,
@@ -160,6 +163,10 @@ export function createInference(
 		).run(id, subject, purpose, JSON.stringify(snapshot), deadline);
 		return id;
 	}
+	let commitGeneration = 0;
+	const stopCommits = store.onCommit(() => {
+		commitGeneration++;
+	});
 	const env: Env = {
 		store,
 		settings,
@@ -172,6 +179,7 @@ export function createInference(
 		allowed,
 		prune,
 		isClosed: () => closed,
+		commitGeneration: () => commitGeneration,
 		touch: () => {
 			for (const listener of activityListeners) {
 				try {
@@ -523,7 +531,7 @@ export function createInference(
 				db,
 				`${voiceSubject}:speech:${index}`,
 				"tts",
-				original.deadline,
+				Math.max(original.deadline, Date.now() + SPEECH_CHUNK_DEADLINE_MS),
 				original.snapshot,
 			);
 			db.query("UPDATE inference_requests SET parents=? WHERE id=?").run(
@@ -774,6 +782,7 @@ export function createInference(
 			collectionAdoptions.clear();
 			closed = true;
 			unsubscribe();
+			stopCommits();
 			for (const stop of statusSubscriptions.values()) stop();
 			statusSubscriptions.clear();
 			listeners.clear();

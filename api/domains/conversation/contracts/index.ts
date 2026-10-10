@@ -15,6 +15,7 @@ export const conversationSchema = z.object({
 	id: z.string(),
 	revision: z.number().int(),
 	messages: z.array(messageSchema),
+	hasMore: z.boolean().optional(),
 });
 export type Conversation = z.infer<typeof conversationSchema>;
 

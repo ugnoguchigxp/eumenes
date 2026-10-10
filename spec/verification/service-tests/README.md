@@ -15,7 +15,7 @@
 - 入力とプレビューはメモリ上で最大 30 分。プレビューは最大 16 件・合計 256 MB。履歴は概要のみ直近 50 件。通常会話やメモリーへは追加しない。
 - LARM credential と成果物の直接 URL は backend に留める。ブラウザへは Eumenes API のみを公開する。成果物は origin・path・MIME・ファイルの識別子を検証する。
 
-現在の LARM はサービスの一覧名と実行モデル名が異なる。画像は `qwen-image-2.1` に対して `Qwen/Qwen-Image-2.1`、楽曲は `ace-step-1.5` に対して `acestep-v15-turbo` が返った。生成先と要求モデルを固定したまま、成果物の実行モデル名を別項目で表示する。Warm の claim では引き続き catalog・作成応答・claim の model と protocol の一致を要求する。
+2026-10-09の確認では、LARMのサービス一覧名と実行モデル名が異なった。画像は `qwen-image-2.1` に対して `Qwen/Qwen-Image-2.1`、楽曲は `ace-step-1.5` に対して `acestep-v15-turbo` が返った。生成先と要求モデルを固定したまま、成果物の実行モデル名を別項目で表示する。Warm の claim では引き続き catalog・作成応答・claim の model と protocol の一致を要求する。画像の現行モデルと利用手順は [LARMの画像生成](../../../docs/larm.md#画像生成) を参照。
 
 OpenAI 形式の claim に endpoint フィールドはないため、検証済み configuration.fields.baseURL と既知の操作から URL を組み立てる。埋め込み・判断に endpoint がある場合は組み立て結果との一致も検査する。声一覧は control origin の API と control credential を使い、合成には claim の credential を使う。
 
@@ -57,3 +57,14 @@ domain 試験は、起動を伴わない一覧取得、7 用途の adapter、Hea
 ## 拡張の範囲
 
 OCR と OpenCV はまだ接続先がないため動く項目として追加していない。未知サービスは一覧表示に留め、LARM の契約が決まり次第、入力 schema・adapter・結果 renderer を追加する。対応していない任意 HTTP 呼び出しや script の実行を許可する汎用コンソールにはしていない。
+
+## 2026-10-10：Turboの利用契約反映
+
+画像生成の基本をQwen-Image 2.1 Turbo（AD-Q4_K）、Profile `SAAA-w-Image`、モデル `qwen-image-2.1-turbo` として手順・作業指示・Codexの永続記憶に反映した。モデルIDは引き続きカタログから取得する。生成先は `services[].url` があれば優先し、Controlと同一originであることを検査する。現行v3カタログは `url` を含まないため、そこで返された `endpoint` をControlのURLに解決する。
+
+試用APIと画面は幅・高さを各100〜1280の整数で別々に指定できる。初期値は512×512・WebP、seed省略時0。寸法の丸めと縮小はサービスに任せ、利用側では行わない。stepsはサービス既定の8を使うため送信しない。意味判断の専用分岐は追加していない。
+
+- Fixture：`bun run verify -- --domain larm` 通過（65件）、`bun run verify -- --domain service-tests` 通過（API 8件・画面5件）。1200×777の要求、各辺の境界・整数制約、省略値、発見URLの優先利用、別originへの認証情報送信防止、両方のartifact応答形式を確認。`git diff --check` も通過。
+- 横断検証：`bun run verify:all` はサイズ・SQL境界・domain文書の確認を通過後、既存の `spec/verification/llm-native-code-review-2026-10-10/final-full-report.json` の書式不一致で停止。全体合格とはしない。
+- Live：backendのsettings domainの読み取り専用操作で保存済み接続設定を取得し、本番カタログの `qwen-image-2.1-turbo` と利用説明を確認。今回の作業では生成POSTや新しい成果物の取得は実施していない。所要時間は利用者提供の実測目安であり、今回の測定値ではない。
+- 実機器受入：今回の対象外。音声MVPの受入状況を変更しない。

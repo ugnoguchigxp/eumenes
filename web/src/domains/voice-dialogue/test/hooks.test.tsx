@@ -842,15 +842,22 @@ test("stopping during the upload retry delay prevents a stale retry", async () =
 		() => useVoiceDialogue(client, createAudioStore(), createAudio),
 		{ wrapper },
 	);
+	vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
 	try {
 		await act(async () => hook.result.current.start());
 		act(() => segment(new Uint8Array(44)));
-		await waitFor(() => expect(voiceSend).toHaveBeenCalledTimes(1));
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(0);
+		});
+		expect(voiceSend).toHaveBeenCalledTimes(1);
 		await act(async () => hook.result.current.stop());
-		await act(async () => new Promise((resolve) => setTimeout(resolve, 300)));
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(300);
+		});
 		expect(voiceSend).toHaveBeenCalledTimes(1);
 		expect(hook.result.current.error).toBeNull();
 	} finally {
+		vi.useRealTimers();
 		hook.unmount();
 		query.clear();
 	}

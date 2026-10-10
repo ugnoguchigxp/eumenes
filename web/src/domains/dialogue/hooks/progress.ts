@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { DialogueClient } from "../../../../../client/dialogue";
 import type { RunProgress } from "../../../../../api/domains/dialogue/contracts";
+import { ApiError } from "../../../../../client/transport";
 import { invalidateDialogueViews } from "./index";
 export function useRunProgress(client: DialogueClient, runId?: string) {
 	const [value, setValue] = useState<RunProgress | null>(null);
@@ -10,20 +11,35 @@ export function useRunProgress(client: DialogueClient, runId?: string) {
 		if (!runId) return;
 		const controller = new AbortController();
 		void (async () => {
-			for (
-				let attempt = 0;
-				attempt < 5 && !controller.signal.aborted;
-				attempt++
-			) {
+			let attempt = 0;
+			let terminal = false;
+			while (!controller.signal.aborted && !terminal) {
 				try {
 					await client.watchRun(runId, controller.signal, (next) => {
-						if (!controller.signal.aborted) setValue(next);
+						if (controller.signal.aborted) return;
+						attempt = 0;
+						if (
+							next.status === "completed" ||
+							next.status === "failed" ||
+							next.status === "cancelled"
+						)
+							terminal = true;
+						setValue(next);
 					});
 					invalidateDialogueViews(cache, client.identity, "main");
 					return;
-				} catch {
+				} catch (error) {
 					if (controller.signal.aborted) return;
 					invalidateDialogueViews(cache, client.identity, "main");
+					// The run is gone or access is denied: retrying cannot help.
+					if (
+						error instanceof ApiError &&
+						(error.status === 401 ||
+							error.status === 403 ||
+							error.status === 404)
+					)
+						return;
+					if (terminal) return;
 					await new Promise<void>((resolve) => {
 						const finish = () => {
 							clearTimeout(timer);
@@ -32,10 +48,11 @@ export function useRunProgress(client: DialogueClient, runId?: string) {
 						};
 						const timer = setTimeout(
 							finish,
-							Math.min(250 * 2 ** attempt, 3000),
+							Math.min(250 * 2 ** attempt, 10_000),
 						);
 						controller.signal.addEventListener("abort", finish, { once: true });
 					});
+					attempt++;
 				}
 			}
 		})();

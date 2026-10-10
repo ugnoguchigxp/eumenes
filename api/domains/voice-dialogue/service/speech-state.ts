@@ -7,6 +7,9 @@ export type Chunk = {
 	delivery?: SpeechDelivery;
 };
 export type Speech = {
+	createdAtMs: number;
+	/** Clauses given up on after retries. */
+	skipped: number;
 	chunks: Map<number, Chunk>;
 	finished: boolean;
 	append: (text: string, final?: boolean) => void;

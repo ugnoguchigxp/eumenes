@@ -16,7 +16,7 @@ import {
 	type LarmTestTarget,
 } from "../../larm";
 import { createServiceTests, migration, registerServiceTests } from "..";
-import type { StartTest } from "../contracts";
+import { inputSchema, type StartTest } from "../contracts";
 const cleanup: Array<() => Promise<void>> = [];
 afterEach(async () => {
 	for (const c of cleanup.splice(0)) await c();
@@ -254,4 +254,24 @@ test("crash recovery resumes a known music job without resubmitting POST", async
 	await h.service.recover();
 	expect((await settled(h, "recover")).status).toBe("succeeded");
 	expect(resumes).toBe(1);
+});
+
+test("image inputs accept arbitrary integer dimensions and reject values outside the service contract", () => {
+	for (const size of [100, 777, 1200, 1280])
+		expect(
+			inputSchema.safeParse({
+				text: "写真",
+				width: size,
+				height: size,
+				seed: 42,
+			}).success,
+		).toBe(true);
+	for (const size of [99, 1281, 777.5]) {
+		expect(inputSchema.safeParse({ text: "写真", width: size }).success).toBe(
+			false,
+		);
+		expect(inputSchema.safeParse({ text: "写真", height: size }).success).toBe(
+			false,
+		);
+	}
 });

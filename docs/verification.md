@@ -12,4 +12,6 @@ README の「検証」の詳細です。
 
 実マイク・ヘッドホンでの3往復と再生中割込みの受入、機器ごとの権限・echo、CLI の中断のプロセス試験を残しています。接続不能と引数不正はfixtureのプロセス試験で確認済みです。発話ごとの音声は最大4 MB に制限し、backend は受信 stream を読みながら上限を検査します。sequence と発話 ID で順序・再送を検査します。録音中の逐次 ASR は未実装です。LARM の実接続は合成音声を入力として個別操作を確認しました。受入項目は [docs/acceptance.md](acceptance.md)、SAAA 参照元と教訓は [docs/saaa-provenance.md](saaa-provenance.md) に記録しています。
 
+ASR 言語判定は LLM による補助判定で、発話内容による誘導を完全には防げない。迂回された場合も発話は通常の会話入力として扱われ、権限は増えない(受容リスク、2026-10-10)。
+
 RAG、経験再利用、Tauri、native AEC は後続構想です。[SAAA 全体コンセプト](https://chatgpt.com/space/page_9fc5877949748191b556705128f6a2f5) を継承先として扱い、この初版では先行実装していません。

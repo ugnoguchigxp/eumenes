@@ -61,6 +61,8 @@ export function createDelegatedTasks(input: {
 	execution?: TaskExecutionPort;
 	now?: () => number;
 	changedInTransaction?: (tx: Database, task: WorkTask) => void;
+	/** Removes upper-domain rows that reference a task before tasks deletes it. */
+	purgeInTransaction?: (tx: Database, task: WorkTask) => void;
 }) {
 	const { store, queue, scheduler, execution } = input;
 	const now = input.now ?? Date.now;
@@ -117,6 +119,7 @@ export function createDelegatedTasks(input: {
 	const tasks = createTasks(store, {
 		now,
 		changedInTransaction: input.changedInTransaction,
+		purgeInTransaction: input.purgeInTransaction,
 		kinds: [
 			{
 				kind: "coding",

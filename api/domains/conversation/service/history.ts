@@ -23,6 +23,7 @@ const sha = (v: unknown) =>
 		.update(typeof v === "string" ? v : JSON.stringify(v))
 		.digest("hex");
 const byteSize = (v: unknown) => Buffer.byteLength(JSON.stringify(v));
+const PER_OWNER_SESSIONS = 8;
 type Conditions = ReturnType<typeof historySearchInput.parse>;
 type Session = {
 	owner: HistoryOwner;
@@ -152,6 +153,17 @@ export function createHistory(now: () => number, outbox: OutboxOptions) {
 				throw new Error("history_cursor_conditions");
 		} else {
 			prune();
+			const own = [...sessions.entries()].filter(
+				([, session]) => session.owner.key === owner.key,
+			);
+			if (own.length >= PER_OWNER_SESSIONS) {
+				// The owner's oldest search is dropped; its cursor then reports history_ref_invalid.
+				const [oldestId] = own.reduce((a, b) =>
+					a[1].expires <= b[1].expires ? a : b,
+				);
+				sessions.delete(oldestId);
+				prune();
+			}
 			if (sessions.size >= 64) throw new Error("history_capacity");
 			sessionId = crypto.randomUUID();
 			const expires = Math.min(now() + 900000, owner.deadline);

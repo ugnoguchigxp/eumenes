@@ -27,6 +27,8 @@ export type InferenceOptions = {
 	/** Must use the selected model's tokenizer, including message framing. */
 	countControlTokens?: (messages: Messages) => number | null;
 	token?: string;
+	/** Extra hosts that may receive provider credentials (from Config). */
+	providerHosts?: readonly string[];
 	fetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 	larmFactory?: (s: Settings) => LarmPort;
 	localMs?: number;
@@ -63,6 +65,8 @@ export type Env = {
 	allowed(db: Database, row: RequestRow, connection?: Connection): boolean;
 	prune(): void;
 	isClosed(): boolean;
+	/** Counts store commits; streaming re-checks authority only when it changes. */
+	commitGeneration(): number;
 	/** Tells the activity listeners that a request started or ended running. */
 	touch?(): void;
 };
@@ -390,11 +394,17 @@ async function attempt(r: Request, source: Source): Promise<Receipt> {
 	);
 	const attemptSignal = AbortSignal.any([r.signal, abort.signal]);
 	const decide = decider(r, attemptSignal);
+	let checkedAt = -1;
 	const delta = r.onDelta
 		? (text: string) => {
 				attemptSignal.throwIfAborted();
-				if (!env.store.read((db) => env.allowed(db, row, connection)))
-					throw new Error("permission_revoked");
+				if (row.deadline <= Date.now()) throw new Error("permission_revoked");
+				const generation = env.commitGeneration();
+				if (generation !== checkedAt) {
+					if (!env.store.read((db) => env.allowed(db, row, connection)))
+						throw new Error("permission_revoked");
+					checkedAt = generation;
+				}
 				if (text) {
 					r.published = true;
 					r.onDelta!(text);

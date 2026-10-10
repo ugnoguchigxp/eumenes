@@ -484,7 +484,7 @@ test("responses carry anti-framing security headers", async () => {
 		expect(response.headers.get("x-content-type-options")).toBe("nosniff");
 		expect(response.headers.get("referrer-policy")).toBe("no-referrer");
 		expect(response.headers.get("x-frame-options")).toBe("DENY");
-		expect(response.headers.get("content-security-policy")).toBe(
+		expect(response.headers.get("content-security-policy")).toContain(
 			"frame-ancestors 'none'",
 		);
 	}
@@ -627,5 +627,58 @@ test("CORS preflight allows every method the API serves", async () => {
 	expect(response.status).toBe(204);
 	expect(response.headers.get("Access-Control-Allow-Methods")).toBe(
 		"GET, POST, PUT, PATCH, DELETE, OPTIONS",
+	);
+});
+
+test("stream-bounded upload routes skip the 1MiB JSON cap by exact path only", async () => {
+	const app = createApp({
+		token,
+		origin: "http://127.0.0.1:5173",
+		modules: [
+			{
+				mount: (a) => {
+					a.post("/api/service-tests/uploads", (c) =>
+						c.json({ ok: true }, 201),
+					);
+					a.post("/api/service-tests/uploads/x", (c) =>
+						c.json({ ok: true }, 201),
+					);
+					a.post("/api/runs", (c) => c.json({ ok: true }, 201));
+				},
+			},
+		],
+	});
+	const post = (path: string) =>
+		app.request(path, {
+			method: "POST",
+			headers: { ...auth, "content-length": "2000000" },
+			body: "{}",
+		});
+	expect((await post("/api/service-tests/uploads")).status).toBe(201);
+	expect((await post("/api/runs")).status).toBe(413);
+	expect((await post("/api/service-tests/uploads/x")).status).toBe(413);
+});
+
+test("malformed percent-encoding in a path parameter does not return 500", async () => {
+	const app = createApp({
+		token,
+		origin: "http://127.0.0.1:5173",
+		modules: [
+			{
+				mount: (a) => {
+					a.get("/api/test/:id", (c) => c.json({ id: c.req.param("id") }));
+				},
+			},
+		],
+	});
+	const response = await app.request("/api/test/%E0%A4%A", { headers: auth });
+	expect(response.status).not.toBe(500);
+});
+
+test("API responses carry a deny-all Content-Security-Policy", async () => {
+	const h = setup();
+	const response = await h.call("/api/status");
+	expect(response.headers.get("content-security-policy")).toContain(
+		"default-src 'none'",
 	);
 });

@@ -1,0 +1,16 @@
+{
+	"name": "eumenes-dots-mvp",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"test": "bun test",
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@modelcontextprotocol/server": "2.3.1",
+		"@modelcontextprotocol/core": "2.3.1",
+		"standardwebhooks": "1.1.1",
+		"llm-fetch": "0.1.2",
+		"zod": "4.4.3"
+	}
+}

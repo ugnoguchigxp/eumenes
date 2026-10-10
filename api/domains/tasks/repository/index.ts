@@ -39,6 +39,55 @@ CREATE TABLE work_task_runtime (
  task_id TEXT PRIMARY KEY REFERENCES work_tasks(id), data_json TEXT NOT NULL
 );
 `;
+/** Adds a trigger-maintained byte total plus indexes for retention (frozen once deployed). */
+export const retentionMigration = `
+CREATE TABLE work_task_storage (id INTEGER PRIMARY KEY CHECK(id=1), bytes INTEGER NOT NULL);
+INSERT INTO work_task_storage(id,bytes) VALUES(1,
+ (SELECT coalesce(sum(length(CAST(data_json AS BLOB))),0) FROM work_tasks) +
+ (SELECT coalesce(sum(length(CAST(data_json AS BLOB))),0) FROM work_task_questions) +
+ (SELECT coalesce(sum(length(CAST(data_json AS BLOB))+length(CAST(origin_json AS BLOB))),0) FROM work_task_grants) +
+ (SELECT coalesce(sum(length(CAST(data_json AS BLOB))),0) FROM work_task_events) +
+ (SELECT coalesce(sum(length(CAST(receipt_json AS BLOB))+length(input_digest)),0) FROM work_task_commands) +
+ (SELECT coalesce(sum(length(CAST(data_json AS BLOB))),0) FROM work_task_runtime));
+CREATE TRIGGER work_tasks_storage_ins AFTER INSERT ON work_tasks BEGIN
+ UPDATE work_task_storage SET bytes=bytes+length(CAST(NEW.data_json AS BLOB)) WHERE id=1; END;
+CREATE TRIGGER work_tasks_storage_upd AFTER UPDATE OF data_json ON work_tasks BEGIN
+ UPDATE work_task_storage SET bytes=bytes-length(CAST(OLD.data_json AS BLOB))+length(CAST(NEW.data_json AS BLOB)) WHERE id=1; END;
+CREATE TRIGGER work_tasks_storage_del AFTER DELETE ON work_tasks BEGIN
+ UPDATE work_task_storage SET bytes=bytes-length(CAST(OLD.data_json AS BLOB)) WHERE id=1; END;
+CREATE TRIGGER work_task_questions_storage_ins AFTER INSERT ON work_task_questions BEGIN
+ UPDATE work_task_storage SET bytes=bytes+length(CAST(NEW.data_json AS BLOB)) WHERE id=1; END;
+CREATE TRIGGER work_task_questions_storage_upd AFTER UPDATE ON work_task_questions BEGIN
+ UPDATE work_task_storage SET bytes=bytes-length(CAST(OLD.data_json AS BLOB))+length(CAST(NEW.data_json AS BLOB)) WHERE id=1; END;
+CREATE TRIGGER work_task_questions_storage_del AFTER DELETE ON work_task_questions BEGIN
+ UPDATE work_task_storage SET bytes=bytes-length(CAST(OLD.data_json AS BLOB)) WHERE id=1; END;
+CREATE TRIGGER work_task_grants_storage_ins AFTER INSERT ON work_task_grants BEGIN
+ UPDATE work_task_storage SET bytes=bytes+length(CAST(NEW.data_json AS BLOB))+length(CAST(NEW.origin_json AS BLOB)) WHERE id=1; END;
+CREATE TRIGGER work_task_grants_storage_upd AFTER UPDATE ON work_task_grants BEGIN
+ UPDATE work_task_storage SET bytes=bytes-(length(CAST(OLD.data_json AS BLOB))+length(CAST(OLD.origin_json AS BLOB)))+(length(CAST(NEW.data_json AS BLOB))+length(CAST(NEW.origin_json AS BLOB))) WHERE id=1; END;
+CREATE TRIGGER work_task_grants_storage_del AFTER DELETE ON work_task_grants BEGIN
+ UPDATE work_task_storage SET bytes=bytes-(length(CAST(OLD.data_json AS BLOB))+length(CAST(OLD.origin_json AS BLOB))) WHERE id=1; END;
+CREATE TRIGGER work_task_events_storage_ins AFTER INSERT ON work_task_events BEGIN
+ UPDATE work_task_storage SET bytes=bytes+length(CAST(NEW.data_json AS BLOB)) WHERE id=1; END;
+CREATE TRIGGER work_task_events_storage_upd AFTER UPDATE ON work_task_events BEGIN
+ UPDATE work_task_storage SET bytes=bytes-length(CAST(OLD.data_json AS BLOB))+length(CAST(NEW.data_json AS BLOB)) WHERE id=1; END;
+CREATE TRIGGER work_task_events_storage_del AFTER DELETE ON work_task_events BEGIN
+ UPDATE work_task_storage SET bytes=bytes-length(CAST(OLD.data_json AS BLOB)) WHERE id=1; END;
+CREATE TRIGGER work_task_commands_storage_ins AFTER INSERT ON work_task_commands BEGIN
+ UPDATE work_task_storage SET bytes=bytes+length(CAST(NEW.receipt_json AS BLOB))+length(NEW.input_digest) WHERE id=1; END;
+CREATE TRIGGER work_task_commands_storage_upd AFTER UPDATE ON work_task_commands BEGIN
+ UPDATE work_task_storage SET bytes=bytes-(length(CAST(OLD.receipt_json AS BLOB))+length(OLD.input_digest))+(length(CAST(NEW.receipt_json AS BLOB))+length(NEW.input_digest)) WHERE id=1; END;
+CREATE TRIGGER work_task_commands_storage_del AFTER DELETE ON work_task_commands BEGIN
+ UPDATE work_task_storage SET bytes=bytes-(length(CAST(OLD.receipt_json AS BLOB))+length(OLD.input_digest)) WHERE id=1; END;
+CREATE TRIGGER work_task_runtime_storage_ins AFTER INSERT ON work_task_runtime BEGIN
+ UPDATE work_task_storage SET bytes=bytes+length(CAST(NEW.data_json AS BLOB)) WHERE id=1; END;
+CREATE TRIGGER work_task_runtime_storage_upd AFTER UPDATE ON work_task_runtime BEGIN
+ UPDATE work_task_storage SET bytes=bytes-length(CAST(OLD.data_json AS BLOB))+length(CAST(NEW.data_json AS BLOB)) WHERE id=1; END;
+CREATE TRIGGER work_task_runtime_storage_del AFTER DELETE ON work_task_runtime BEGIN
+ UPDATE work_task_storage SET bytes=bytes-length(CAST(OLD.data_json AS BLOB)) WHERE id=1; END;
+CREATE INDEX work_tasks_metadata_expiry ON work_tasks(json_extract(data_json,'$.metadataExpired'), finished_ms);
+CREATE INDEX work_tasks_finished ON work_tasks(finished_ms) WHERE finished_ms IS NOT NULL;
+`;
 type TaskRow = { seq: number; data_json: string };
 const task = (row: TaskRow | null): WorkTask | null =>
 	row ? JSON.parse(row.data_json) : null;
@@ -72,18 +121,18 @@ export function insert(
 	);
 }
 export function put(db: Database, value: WorkTask) {
-	const result = db
-		.query(
-			"UPDATE work_tasks SET state=?,data_json=?,finished_ms=?,body_expired=? WHERE id=?",
-		)
-		.run(
-			value.state,
-			JSON.stringify(value),
-			value.finishedAt === null ? null : Date.parse(value.finishedAt),
-			Number(value.bodyExpired),
-			value.id,
-		);
-	if (result.changes !== 1) throw new Error("task_not_found");
+	db.query(
+		"UPDATE work_tasks SET state=?,data_json=?,finished_ms=?,body_expired=? WHERE id=?",
+	).run(
+		value.state,
+		JSON.stringify(value),
+		value.finishedAt === null ? null : Date.parse(value.finishedAt),
+		Number(value.bodyExpired),
+		value.id,
+	);
+	// Bun's `changes` also counts trigger writes, so ask SQLite for this statement only.
+	const { n } = db.query("SELECT changes() AS n").get() as { n: number };
+	if (n !== 1) throw new Error("task_not_found");
 }
 export function grant(db: Database, value: WorkTask, origin: TaskOrigin) {
 	db.query(
@@ -203,13 +252,8 @@ export function live(db: Database): WorkTask[] {
 }
 export function capacity(db: Database) {
 	return db
-		.query(`SELECT count(*) AS total, sum(finished_ms IS NULL) AS live,
- coalesce(sum(length(CAST(data_json AS BLOB))),0) +
- (SELECT coalesce(sum(length(CAST(data_json AS BLOB))),0) FROM work_task_questions) +
- (SELECT coalesce(sum(length(CAST(data_json AS BLOB))+length(CAST(origin_json AS BLOB))),0) FROM work_task_grants) +
- (SELECT coalesce(sum(length(CAST(data_json AS BLOB))),0) FROM work_task_events) +
- (SELECT coalesce(sum(length(CAST(receipt_json AS BLOB))+length(input_digest)),0) FROM work_task_commands) +
- (SELECT coalesce(sum(length(CAST(data_json AS BLOB))),0) FROM work_task_runtime) AS bytes FROM work_tasks`)
+		.query(`SELECT count(*) AS total, coalesce(sum(finished_ms IS NULL),0) AS live,
+ (SELECT bytes FROM work_task_storage WHERE id=1) AS bytes FROM work_tasks`)
 		.get() as { total: number; live: number; bytes: number };
 }
 export function expiredBodies(
@@ -261,6 +305,32 @@ export function expiredMetadata(db: Database, before: number): WorkTask[] {
 			.all(before) as TaskRow[]
 	).map((r) => task(r)!);
 }
+export function purgeCandidates(
+	db: Database,
+	before: number,
+	limit: number,
+	exclude: readonly string[] = [],
+): WorkTask[] {
+	return (
+		db
+			.query(`SELECT data_json FROM work_tasks
+ WHERE finished_ms<=? AND json_extract(data_json,'$.metadataExpired')=1
+ AND id NOT IN (SELECT value FROM json_each(?))
+ ORDER BY finished_ms, id LIMIT ?`)
+			.all(before, JSON.stringify(exclude), limit) as TaskRow[]
+	).map((r) => task(r)!);
+}
+export function purgeTask(db: Database, id: string) {
+	for (const table of [
+		"work_task_runtime",
+		"work_task_events",
+		"work_task_questions",
+		"work_task_grants",
+		"work_task_commands",
+	])
+		db.query(`DELETE FROM ${table} WHERE task_id=?`).run(id);
+	db.query("DELETE FROM work_tasks WHERE id=?").run(id);
+}
 export function clearRuntimeHistory(db: Database, t: WorkTask) {
 	db.query("DELETE FROM work_task_runtime WHERE task_id=?").run(t.id);
 	db.query("DELETE FROM work_task_events WHERE task_id=? AND seq<?").run(
@@ -272,4 +342,9 @@ export function clearRuntimeHistory(db: Database, t: WorkTask) {
 /** Named migrations of this domain; the SQL above is frozen once deployed. */
 export const migrations: readonly Migration[] = [
 	{ id: "tasks/0001-init", sql: migration },
+	{
+		id: "tasks/0002-retention",
+		after: ["tasks/0001-init"],
+		sql: retentionMigration,
+	},
 ];

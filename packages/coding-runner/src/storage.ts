@@ -133,3 +133,27 @@ export function totalSize(root: string): number {
 		return sum + (stat.isDirectory() ? totalSize(path) : stat.size);
 	}, 0);
 }
+/** Throws runner_spool_symlink if anything under root is a symlink. */
+export function assertNoSymlinks(root: string): void {
+	totalSize(root);
+}
+const sizes = new Map<string, { at: number; bytes: number }>();
+/** Spool bytes, re-walked at most once per ttl; own writes are added incrementally. */
+export function spoolSize(
+	root: string,
+	now = Date.now(),
+	ttlMs = 60_000,
+): number {
+	const hit = sizes.get(root);
+	if (hit && now - hit.at < ttlMs) return hit.bytes;
+	const bytes = totalSize(root);
+	sizes.set(root, { at: now, bytes });
+	return bytes;
+}
+export function addSpoolBytes(root: string, bytes: number): void {
+	const hit = sizes.get(root);
+	if (hit) hit.bytes += bytes;
+}
+export function invalidateSpoolSize(root: string): void {
+	sizes.delete(root);
+}

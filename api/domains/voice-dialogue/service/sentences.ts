@@ -1,6 +1,8 @@
 /** VOICEVOX fails on clauses with no phoneme (e.g. "。", "…", "！？"). */
 const speakable = (text: string) => /[\p{L}\p{N}]/u.test(text);
 
+const MAX_CLAUSE = 240;
+
 /** Incremental speech clauses, independent of provider token boundaries. */
 export class SpeechSentences {
 	private buffer = "";
@@ -14,7 +16,7 @@ export class SpeechSentences {
 		const chunks: string[] = [];
 		for (;;) {
 			let boundary = 0;
-			for (let i = 0; i < this.buffer.length; i++) {
+			for (let i = 0; i < Math.min(this.buffer.length, MAX_CLAUSE); i++) {
 				const char = this.buffer[i] ?? "";
 				if (!/[。！？、!?.,;\n]/.test(char)) continue;
 				const before = this.buffer.slice(0, i + 1);
@@ -30,8 +32,8 @@ export class SpeechSentences {
 				boundary = i + 1;
 				break;
 			}
-			if (!boundary && this.buffer.length >= 240) {
-				boundary = 240;
+			if (!boundary && this.buffer.length >= MAX_CLAUSE) {
+				boundary = MAX_CLAUSE;
 				while (
 					boundary > 120 &&
 					/[a-zA-Z0-9]/.test(this.buffer[boundary - 1] ?? "") &&

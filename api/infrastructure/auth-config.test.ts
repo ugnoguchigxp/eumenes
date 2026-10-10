@@ -1,17 +1,26 @@
 import { afterEach, expect, test } from "bun:test";
 import {
+	chmodSync,
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
 	readdirSync,
+	renameSync,
 	rmSync,
 	statSync,
+	utimesSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { resolveApiToken, resolveLarmToken } from "./auth-config";
+import * as nodeFs from "node:fs";
+import {
+	readApiToken,
+	resolveApiToken,
+	resolveLarmToken,
+	type TokenFs,
+} from "./auth-config";
 
 const dirs: string[] = [];
 const dbEnv = () => {
@@ -151,3 +160,144 @@ process.stdout.write(resolveApiToken({ EUMENES_DB: ${JSON.stringify(join(dir, "d
 	expect(runs[0]!.out).toMatch(/^[0-9a-f]{64}$/);
 	expect(readdirSync(join(dir, "keys"))).toEqual(["api.token"]);
 });
+
+const keysFile = (dir: string, content: string, mode = 0o600) => {
+	const keys = join(dir, "keys");
+	mkdirSync(keys, { recursive: true });
+	const path = join(keys, "api.token");
+	writeFileSync(path, content);
+	chmodSync(path, mode);
+	return path;
+};
+const age = (path: string, ms: number) => {
+	const t = (Date.now() - ms) / 1000;
+	utimesSync(path, t, t);
+};
+
+test("readApiToken never creates the token file or directory", () => {
+	const { dir, env } = dbEnv();
+	expect(() => readApiToken(env)).toThrow("api_token_not_found:");
+	expect(existsSync(join(dir, "keys"))).toBe(false);
+});
+
+test("readApiToken reads an existing file and follows EUMENES_KEY_DIR", () => {
+	const { dir, env } = dbEnv();
+	const stored = "cd".repeat(32);
+	keysFile(dir, stored);
+	expect(readApiToken(env)).toBe(stored);
+	const other = mkdtempSync(join(tmpdir(), "eumenes-auth-key-"));
+	dirs.push(other);
+	writeFileSync(join(other, "api.token"), "ef".repeat(32));
+	expect(readApiToken({ ...env, EUMENES_KEY_DIR: other })).toBe(
+		"ef".repeat(32),
+	);
+});
+
+test("a loose keys directory is tightened to 0700", () => {
+	const { dir, env } = dbEnv();
+	mkdirSync(join(dir, "keys"), { mode: 0o755 });
+	chmodSync(join(dir, "keys"), 0o755);
+	resolveApiToken(env);
+	expect(statSync(join(dir, "keys")).mode & 0o777).toBe(0o700);
+});
+
+test("a loose token file is tightened to 0600 and keeps its value", () => {
+	const { dir, env } = dbEnv();
+	const stored = "ab".repeat(32);
+	const path = keysFile(dir, stored, 0o644);
+	expect(resolveApiToken(env)).toBe(stored);
+	expect(statSync(path).mode & 0o777).toBe(0o600);
+});
+
+test("a stale empty token file is recreated", () => {
+	const { dir, env } = dbEnv();
+	const path = keysFile(dir, "");
+	age(path, 60_000);
+	const token = resolveApiToken(env);
+	expect(token).toMatch(/^[0-9a-f]{64}$/);
+	expect(readFileSync(path, "utf8").trim()).toBe(token);
+});
+
+test("a fresh empty token file is not recovered", () => {
+	const { dir, env } = dbEnv();
+	keysFile(dir, "");
+	expect(() => resolveApiToken(env)).toThrow("api_token_file_invalid");
+});
+
+test("a non-hex token file is never deleted even when old", () => {
+	const { dir, env } = dbEnv();
+	const path = keysFile(dir, "not-a-token");
+	age(path, 60_000);
+	expect(() => resolveApiToken(env)).toThrow("api_token_file_invalid");
+	expect(readFileSync(path, "utf8")).toBe("not-a-token");
+});
+
+test("readApiToken has no side effects on loose or partial files", () => {
+	const loose = dbEnv();
+	const stored = "ab".repeat(32);
+	const looseFile = keysFile(loose.dir, stored, 0o644);
+	expect(readApiToken(loose.env)).toBe(stored);
+	expect(statSync(looseFile).mode & 0o777).toBe(0o644);
+	expect(readFileSync(looseFile, "utf8")).toBe(stored);
+
+	const partial = dbEnv();
+	const partialFile = keysFile(partial.dir, "", 0o644);
+	age(partialFile, 60_000);
+	expect(() => readApiToken(partial.env)).toThrow("api_token_file_invalid");
+	expect(existsSync(partialFile)).toBe(true);
+	expect(statSync(partialFile).mode & 0o777).toBe(0o644);
+	expect(readFileSync(partialFile, "utf8")).toBe("");
+});
+
+const realFs: TokenFs = nodeFs;
+
+test("a valid token that replaced a stale partial file between inspection and deletion is kept", () => {
+	const { dir, env } = dbEnv();
+	const path = keysFile(dir, "");
+	age(path, 60_000);
+	const winner = "ab".repeat(32);
+	let stats = 0;
+	const token = resolveApiToken(env, {
+		...realFs,
+		statSync: ((p: string, ...rest: never[]) => {
+			// 1st call is the recovery's inspection; swap the file in before the re-check.
+			if (p === path && ++stats === 1) {
+				const result = realFs.statSync(p, ...rest);
+				writeFileSync(`${path}.winner`, winner, { mode: 0o600 });
+				renameSync(`${path}.winner`, path);
+				return result;
+			}
+			return realFs.statSync(p, ...rest);
+		}) as TokenFs["statSync"],
+	});
+	expect(token).toBe(winner);
+	expect(readFileSync(path, "utf8").trim()).toBe(winner);
+});
+
+for (const [name, linkError] of [
+	["hard link", undefined],
+	["exclusive create fallback", "EPERM"],
+] as const)
+	test(`a stale partial file that appears before the ${name} is recovered, not thrown`, () => {
+		const { dir, env } = dbEnv();
+		let planted = false;
+		const plant = () => {
+			if (planted) return;
+			planted = true;
+			const path = keysFile(dir, "");
+			age(path, 60_000);
+		};
+		const token = resolveApiToken(env, {
+			...realFs,
+			linkSync: ((from: string, to: string) => {
+				plant();
+				if (linkError)
+					throw Object.assign(new Error(linkError), { code: linkError });
+				return realFs.linkSync(from, to);
+			}) as TokenFs["linkSync"],
+		});
+		expect(token).toMatch(/^[0-9a-f]{64}$/);
+		const path = join(dir, "keys", "api.token");
+		expect(readFileSync(path, "utf8").trim()).toBe(token);
+		expect(readdirSync(join(dir, "keys"))).toEqual(["api.token"]);
+	});

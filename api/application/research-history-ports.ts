@@ -222,12 +222,18 @@ export function createReadPorts(
 					truncated: true,
 					acquisitionTruncated: d.truncated,
 				}));
-			if (unavailable.length)
-				result.failures = [
-					...result.failures,
-					...unavailable.map((s) => ({ url: s.url, code: "body_unavailable" })),
-				];
-			return [...snippets, ...pages, ...unavailable];
+			return {
+				sources: [...snippets, ...pages, ...unavailable],
+				failures: unavailable.length
+					? [
+							...result.failures,
+							...unavailable.map((s) => ({
+								url: s.url,
+								code: "body_unavailable",
+							})),
+						]
+					: undefined,
+			};
 		},
 		validateEvidenceInTransaction(db, owner, sources, proofs) {
 			try {

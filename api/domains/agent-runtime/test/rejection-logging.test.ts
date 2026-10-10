@@ -16,7 +16,6 @@ test("rolled-back and stale rejections are not logged as committed failures", as
 	});
 	const h = await harness();
 	try {
-		h.proposals.push({ kind: "unmatched" });
 		const _root = await h.start("root");
 
 		const t = h.task(

@@ -286,7 +286,7 @@ test("retry only for allowed transient failures, with finite attempts and backof
 });
 
 test("unregistered kind and unsupported version fail explicitly", async () => {
-	const h = setup();
+	const h = setup({ handlerGraceMs: 0 });
 	const c = control();
 	h.queue.registerHandler(fakeHandler(h.store, c));
 	const a = await enqueue(h, "a");
@@ -304,6 +304,69 @@ test("unregistered kind and unsupported version fail explicitly", async () => {
 	expect(h.queue.get(a.job.id)?.errorCode).toBe("unsupported_payload_version");
 	expect(h.queue.get(b.job.id)?.errorCode).toBe("handler_not_registered");
 	expect(c.executed).toBe(0);
+});
+
+test("a job of an unregistered kind waits through the handler grace, then fails", async () => {
+	const h = setup();
+	const c = control();
+	h.queue.registerHandler(fakeHandler(h.store, c));
+	const a = await enqueue(h, "a");
+	await h.store.write((db) =>
+		db.query("UPDATE queue_jobs SET kind='gone.kind' WHERE id=?").run(a.job.id),
+	);
+	await h.queue.tick();
+	h.clock.t += 599_999;
+	await h.queue.tick();
+	expect(h.queue.get(a.job.id)?.state).toBe("queued");
+	expect(h.queue.get(a.job.id)?.waitReason).toBe("handler_unavailable");
+	h.clock.t += 1;
+	await h.queue.tick();
+	expect(h.queue.get(a.job.id)?.state).toBe("failed");
+	expect(h.queue.get(a.job.id)?.errorCode).toBe("handler_not_registered");
+});
+
+test("a runner recreated with the handler runs a job that waited through the grace", async () => {
+	const h = setup();
+	const c = control();
+	h.queue.registerHandler(fakeHandler(h.store, c));
+	const a = await enqueue(h, "a");
+	await h.store.write((db) =>
+		db.query("UPDATE queue_jobs SET kind='late.kind' WHERE id=?").run(a.job.id),
+	);
+	await h.queue.tick();
+	expect(h.queue.get(a.job.id)?.waitReason).toBe("handler_unavailable");
+	const second = createQueue(h.store, {
+		now: () => h.clock.t,
+		id: () => crypto.randomUUID(),
+		sleep: () => new Promise(() => {}),
+		random: () => 0,
+	});
+	second.registerHandler({ ...fakeHandler(h.store, c), kind: "late.kind" });
+	await second.tick();
+	await until(() => c.gates.has("a"));
+	expect(second.get(a.job.id)?.state).toBe("running");
+	expect(second.get(a.job.id)?.waitReason).toBeNull();
+	c.gates.get("a")?.resolve("ok");
+	await until(() => second.get(a.job.id)?.state === "completed");
+	await second.close(1000);
+});
+
+test("jobs waiting for a missing handler do not starve other kinds", async () => {
+	const h = setup({
+		limits: { total: 5000, background: 5000, scope: 5000 },
+	});
+	const c = control();
+	h.queue.registerHandler(fakeHandler(h.store, c));
+	const ids: string[] = [];
+	for (let i = 0; i < 1000; i++) ids.push((await enqueue(h, `w${i}`)).job.id);
+	await h.store.write((db) =>
+		db.query("UPDATE queue_jobs SET kind='gone.kind'").run(),
+	);
+	const live = await enqueue(h, "live");
+	await h.queue.tick();
+	await until(() => c.gates.has("live"));
+	expect(h.queue.get(live.job.id)?.state).toBe("running");
+	expect(h.queue.get(ids[999]!)?.waitReason).toBe("handler_unavailable");
 });
 
 test("cancel of running job rejects late result and keeps the slot until the handler stops", async () => {

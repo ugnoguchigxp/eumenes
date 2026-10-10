@@ -117,14 +117,29 @@ export function SettingsPage({
 			setMessage(validated.error.issues.map((i) => i.message).join(" / "));
 			return;
 		}
+		const originOf = (v: string | null | undefined) =>
+			v && URL.canParse(v) ? new URL(v).origin : null;
+		const savedOrigin = originOf(query.data?.larm.baseUrl);
+		const nextOrigin = originOf(value.larm.baseUrl);
+		let confirmLarmOrigin: string | undefined;
+		if (!retry && savedOrigin && nextOrigin && savedOrigin !== nextOrigin) {
+			if (
+				!window.confirm(
+					`LARM の接続先を ${nextOrigin} に変更します。LARM の認証情報はこの接続先へ送られます。変更しますか？`,
+				)
+			)
+				return;
+			confirmLarmOrigin = nextOrigin;
+		}
 		setBusy(true);
 		setMessage("");
 		try {
-			const input = retry ?? {
+			const input: ApplySettings = retry ?? {
 				requestId: crypto.randomUUID(),
 				expectedRevision: value.revision,
 				settings: value,
 				keys,
+				...(confirmLarmOrigin ? { confirmLarmOrigin } : {}),
 			};
 			setRetry(input);
 			const saved = await client.applySettings(input);

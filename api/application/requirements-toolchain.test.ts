@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
+import { workerPacket } from "./toolchain.fixture";
 import { loadEvaluationCases } from "./llm-native-evaluation.fixture";
 import { evaluateRequirements } from "./llm-native-runner.fixture";
 import { fixtureVerification } from "../domains/agent-runtime/test/research-fixture";
@@ -40,9 +41,7 @@ for (const c of cases)
 						return "";
 					}
 					if (messages[0]!.content.includes("TOOLS=")) {
-						const data = JSON.parse(
-							messages.find((m) => m.role === "user")!.content,
-						);
+						const data = workerPacket(messages);
 						if (data.draftReport)
 							return JSON.stringify(fixtureVerification(data.draftReport));
 						if (!data.requirementContract)

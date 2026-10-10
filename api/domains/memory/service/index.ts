@@ -47,6 +47,8 @@ import {
 	insertUsage,
 	pruneUsage,
 	readSettings,
+	sameFactItemIds,
+	stateItemIdentity,
 	writeSettings,
 } from "../repository";
 import { appendJournal, readJournal } from "./journal";
@@ -618,26 +620,20 @@ export function createMemoryService(
 			return store
 				.write((db) => {
 					if (!healthy) reject("memory_unavailable");
-					const listed = listState(db, {
-						...scoped(db, "memory.forget"),
-						includeInactive: true,
-					});
-					// Note: the library caps one listing at 1000 rows, newest first.
-					const target =
-						listed.status === "ok"
-							? listed.items.find((item) => item.itemId === itemId)
-							: undefined;
-					if (!listed || listed.status !== "ok" || !target)
+					const identity = stateItemIdentity(db, itemId);
+					if (
+						!identity ||
+						identity.principal !== PRINCIPAL ||
+						identity.scope_key !== PROFILE_SCOPE
+					)
 						return reject("invalid_memory_item");
 					// Earlier versions of the same fact (superseded / stopped) carry the old value too.
-					const ids = listed.items
-						.filter(
-							(item) =>
-								item.kind === target.kind &&
-								item.subject === target.subject &&
-								item.semanticKey === target.semanticKey,
-						)
-						.map((item) => item.itemId);
+					// An empty semantic key identifies no fact, so only the item itself is forgotten.
+					const ids =
+						identity.semantic_key === ""
+							? [itemId]
+							: sameFactItemIds(db, identity);
+					if (!ids.includes(itemId)) return reject("invalid_memory_item");
 					let forgetId = "";
 					let completed = true;
 					for (const id of ids) {

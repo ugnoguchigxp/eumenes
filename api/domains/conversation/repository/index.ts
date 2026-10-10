@@ -1,6 +1,7 @@
 import type { Database } from "bun:sqlite";
 import type { Migration } from "../../../infrastructure/sqlite";
 import { createHash } from "node:crypto";
+import { getLogger } from "../../../infrastructure/logger";
 import {
 	speechDeliverySchema,
 	type SpeechDelivery,
@@ -396,22 +397,36 @@ export function appendMessage(
 		});
 	return bumpRevision(db, message.conversationId);
 }
-export function listMessages(db: Database, id: string): Message[] {
-	const rows = db
-		.query(
-			`SELECT m.id, m.conversation_id, m.role, m.text, m.created_at, m.run_id, a.motion, d.delivery FROM messages m LEFT JOIN answer_avatar_motions a ON a.run_id = m.run_id AND a.conversation_id = m.conversation_id AND m.role = 'assistant' LEFT JOIN answer_deliveries d ON d.run_id = m.run_id AND d.conversation_id = m.conversation_id AND m.role = 'assistant' WHERE m.conversation_id = ?${liveOnly(db, "m")} ORDER BY m.rowid`,
-		)
-		.all(id) as Array<{
-		id: string;
-		conversation_id: string;
-		role: "user" | "assistant";
-		text: string;
-		created_at: string;
-		run_id: string | null;
-		motion: AvatarMotion | null;
-		delivery: string | null;
-	}>;
-	return rows.map((row) => ({
+type MessageRow = {
+	id: string;
+	conversation_id: string;
+	role: "user" | "assistant";
+	text: string;
+	created_at: string;
+	run_id: string | null;
+	motion: AvatarMotion | null;
+	delivery: string | null;
+};
+const messageSelect = (db: Database, where: string): string =>
+	`SELECT m.id, m.conversation_id, m.role, m.text, m.created_at, m.run_id, a.motion, d.delivery FROM messages m LEFT JOIN answer_avatar_motions a ON a.run_id = m.run_id AND a.conversation_id = m.conversation_id AND m.role = 'assistant' LEFT JOIN answer_deliveries d ON d.run_id = m.run_id AND d.conversation_id = m.conversation_id AND m.role = 'assistant' WHERE ${where}${liveOnly(db, "m")}`;
+/** A stored delivery that no longer matches the schema is dropped, not fatal. */
+function safeDelivery(row: MessageRow): SpeechDelivery | undefined {
+	if (!row.delivery) return undefined;
+	try {
+		const parsed = speechDeliverySchema.safeParse(JSON.parse(row.delivery));
+		if (parsed.success) return parsed.data;
+	} catch {
+		// fall through to the warning below
+	}
+	getLogger("conversation").warn("conversation.delivery_invalid", {
+		reason: "delivery_invalid",
+		...(row.run_id ? { runId: row.run_id } : {}),
+	});
+	return undefined;
+}
+function toMessage(row: MessageRow): Message {
+	const delivery = safeDelivery(row);
+	return {
 		id: row.id,
 		conversationId: row.conversation_id,
 		role: row.role,
@@ -419,10 +434,52 @@ export function listMessages(db: Database, id: string): Message[] {
 		createdAt: row.created_at,
 		runId: row.run_id,
 		...(row.motion ? { avatarMotion: row.motion } : {}),
-		...(row.delivery
-			? { delivery: speechDeliverySchema.parse(JSON.parse(row.delivery)) }
-			: {}),
-	}));
+		...(delivery ? { delivery } : {}),
+	};
+}
+export function listMessages(db: Database, id: string): Message[] {
+	const rows = db
+		.query(`${messageSelect(db, "m.conversation_id = ?")} ORDER BY m.rowid`)
+		.all(id) as MessageRow[];
+	return rows.map(toMessage);
+}
+/** The last `limit` messages of a conversation in acceptance order. */
+export function tailMessages(
+	db: Database,
+	id: string,
+	limit: number,
+): { messages: Message[]; hasMore: boolean } {
+	const rows = db
+		.query(
+			`${messageSelect(db, "m.conversation_id = ?")} ORDER BY m.rowid DESC LIMIT ?`,
+		)
+		.all(id, limit + 1) as MessageRow[];
+	const hasMore = rows.length > limit;
+	return {
+		messages: rows.slice(0, limit).reverse().map(toMessage),
+		hasMore,
+	};
+}
+/** One message with its motion and delivery, regardless of conversation. */
+export function messageWithDelivery(db: Database, id: string): Message | null {
+	const row = db
+		.query(messageSelect(db, "m.id = ?"))
+		.get(id) as MessageRow | null;
+	return row ? toMessage(row) : null;
+}
+/** Up to `limit` messages of a conversation before `beforeOrdinal`, ascending. */
+export function messagesBefore(
+	db: Database,
+	conversationId: string,
+	beforeOrdinal: number,
+	limit: number,
+): Message[] {
+	const rows = db
+		.query(
+			`${messageSelect(db, "m.conversation_id = ? AND m.rowid < ?")} ORDER BY m.rowid DESC LIMIT ?`,
+		)
+		.all(conversationId, beforeOrdinal, limit) as MessageRow[];
+	return rows.reverse().map(toMessage);
 }
 export function revision(db: Database, id: string): number {
 	return (

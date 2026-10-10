@@ -4,7 +4,6 @@ import { harness } from "./route-harness";
 test("Luna uses the common Web worker and retains the selected engine across steps", async () => {
 	const h = await harness(Date.now, true);
 	try {
-		h.proposals.push({ kind: "unmatched" });
 		await h.start("luna", "複数資料を比較して詳しく説明", "codex_luna");
 		const child = h.agents.list("luna").find((t) => t.kind === "worker")!;
 		expect(child.packageRevisionId).toBe("package:web.research@9");

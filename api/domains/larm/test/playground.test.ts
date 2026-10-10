@@ -20,10 +20,12 @@ function fixture(
 	change?: (
 		path: string,
 		init: RequestInit,
+		url: URL,
 	) => Response | Promise<Response> | undefined,
 ) {
 	const calls: {
 		path: string;
+		url: string;
 		method: string;
 		body: unknown;
 		auth: string | null;
@@ -44,11 +46,12 @@ function fixture(
 			typeof init.body === "string" ? JSON.parse(init.body) : init.body;
 		calls.push({
 			path,
+			url: u.href,
 			method: init.method ?? "GET",
 			body,
 			auth: headers.get("authorization"),
 		});
-		const override = await change?.(path, init);
+		const override = await change?.(path, init, u);
 		if (override) return override;
 		if (path === "/v3/agent-profiles") {
 			const selector = u.searchParams.get("profile");
@@ -483,4 +486,97 @@ test("a missing baseUrl leaves the playground unconfigured", async () => {
 	expect(JSON.stringify(catalog.errors)).toContain(
 		"larm_base_url_unconfigured",
 	);
+});
+
+test("image uses the discovered service URL and preserves arbitrary dimensions and seed", async () => {
+	const serviceUrl = "http://127.0.0.1:9999/discovered-image-api";
+	const h = fixture((path, _init, url) => {
+		if (
+			path === "/v3/agent-profiles" &&
+			url.searchParams.get("profile") === "SAAA-w-Image"
+		)
+			return Response.json({
+				contractVersion: "agent-connection.v3",
+				catalogRevision: revision,
+				requestedProfile: "SAAA-w-Image",
+				profiles: [
+					{
+						id: "profile",
+						providers: [],
+						services: [
+							{
+								name: "image",
+								model: "qwen-image-2.1-turbo",
+								protocol: "larm.image-generation.v1",
+								capability: "media.image.generate",
+								endpoint: "/v1/images/generations",
+								url: serviceUrl,
+								startupPolicy: { minWarmInstances: 0 },
+							},
+						],
+					},
+				],
+			});
+		if (path === "/discovered-image-api")
+			return Response.json({
+				status: "succeeded",
+				artifacts: [
+					{
+						id: "image-1",
+						contentUrl: "/v1/image-artifacts/image-1/content",
+						mimeType: "image/png",
+					},
+				],
+			});
+	});
+	const target = (
+		await h.gateway.catalog(AbortSignal.timeout(1000))
+	).targets.find((t) => t.kind === "image")!;
+	await h.gateway.execute(
+		target,
+		{ text: "写真", width: 1200, height: 777, seed: 42, format: "png" },
+		AbortSignal.timeout(1000),
+		async () => {},
+	);
+	expect(h.calls.find((c) => c.url === serviceUrl)?.body).toEqual({
+		model: "qwen-image-2.1-turbo",
+		prompt: "写真",
+		width: 1200,
+		height: 777,
+		seed: 42,
+		format: "png",
+	});
+	expect(h.calls.some((c) => c.path === "/v1/agent-connections")).toBe(false);
+	await expect(
+		h.gateway.execute(
+			{ ...target, endpoint: "http://192.168.0.99:9810/foreign" },
+			{ text: "写真" },
+			AbortSignal.timeout(1000),
+			async () => {},
+		),
+	).rejects.toThrow("invalid_larm_url");
+	expect(h.calls.some((c) => c.url.includes("192.168.0.99"))).toBe(false);
+});
+
+test("image defaults an omitted edge to 512, format to webp and seed to zero", async () => {
+	const h = fixture();
+	const target = (
+		await h.gateway.catalog(AbortSignal.timeout(1000))
+	).targets.find((t) => t.kind === "image")!;
+	await h.gateway.execute(
+		target,
+		{ text: "写真", width: 100 },
+		AbortSignal.timeout(1000),
+		async () => {},
+	);
+	expect(
+		h.calls.find((c) => c.path === "/v1/images/generations")?.body,
+	).toEqual({
+		model: "model-image",
+		prompt: "写真",
+		width: 100,
+		height: 512,
+		seed: 0,
+		format: "webp",
+	});
 });

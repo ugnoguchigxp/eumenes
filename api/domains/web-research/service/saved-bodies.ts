@@ -98,12 +98,32 @@ export function createSavedBodies(
 		if (!b) throw new Error("body_unavailable");
 		return { g, b };
 	}
+	function taskOf(sourceRef: string) {
+		return grants.get(sourceRef)?.owner.taskId;
+	}
+	function taskCount(
+		map: Map<string, { sourceRef: string }>,
+		taskId: string | undefined,
+	) {
+		let n = 0;
+		for (const v of map.values()) if (taskOf(v.sourceRef) === taskId) n++;
+		return n;
+	}
 	function cursor(
 		sourceRef: string,
 		position: number,
 		purpose: "read" | "find",
 		query?: string,
 	) {
+		const taskId = taskOf(sourceRef);
+		if (taskCount(cursors, taskId) >= 1024) {
+			// Evict only this task's oldest cursor; other tasks are unaffected.
+			for (const [id, v] of cursors)
+				if (taskOf(v.sourceRef) === taskId) {
+					cursors.delete(id);
+					break;
+				}
+		}
 		if (cursors.size >= 4096) throw new Error("reference_capacity");
 		const ref = crypto.randomUUID();
 		cursors.set(ref, { sourceRef, position, purpose, query });
@@ -137,7 +157,8 @@ export function createSavedBodies(
 			body = candidate;
 			end++;
 		}
-		if (views.size >= 4096) throw new Error("reference_capacity");
+		if (taskCount(views, g.owner.taskId) >= 1024 || views.size >= 4096)
+			throw new Error("reference_capacity");
 		const viewId = crypto.randomUUID(),
 			viewDigest = sha(body);
 		views.set(viewId, {

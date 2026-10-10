@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { harness } from "./toolchain.fixture";
+import { harness, workerPacket } from "./toolchain.fixture";
 
 const open: Array<() => Promise<void>> = [];
 afterEach(async () => {
@@ -16,9 +16,7 @@ test("weather, term lookup and detailed research follow the model's operations w
 		const h = await harness({
 			control(messages) {
 				if (!messages[0]?.content.includes("TOOLS=")) return;
-				const data = JSON.parse(
-					messages.find((m) => m.role === "user")!.content,
-				);
+				const data = workerPacket(messages);
 				const page = data.observations.find(
 					(o: { basis: string }) => o.basis === "page",
 				);

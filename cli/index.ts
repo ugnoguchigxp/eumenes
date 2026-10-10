@@ -1,6 +1,7 @@
+import { resolve } from "node:path";
 import { ApiError, ApiConnectionError, createClient } from "../client";
 import { submitSchema } from "../api/domains/dialogue/contracts";
-import { resolveApiToken } from "../api/infrastructure/auth-config";
+import { readApiToken } from "../api/infrastructure/auth-config";
 import { commands } from "./commands";
 import { USAGE, type CliArgs, type CliIo } from "./commands/types";
 
@@ -109,11 +110,18 @@ if (command !== "web" && (fresh || stable || readPages)) {
 const url = process.env.EUMENES_URL ?? "http://127.0.0.1:8787";
 let client: ReturnType<typeof createClient>;
 try {
-	client = createClient(url, resolveApiToken(process.env));
+	client = createClient(
+		url,
+		readApiToken(
+			process.env,
+			resolve(import.meta.dir, "../data/eumenes.sqlite3"),
+		),
+	);
 } catch (error) {
 	console.error(
 		error instanceof Error ? error.message : "API auth is not configured",
 	);
+	console.error("Start the backend once to create the API token.");
 	process.exit(2);
 }
 function show(value: unknown) {

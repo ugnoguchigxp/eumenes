@@ -24,7 +24,7 @@
 		"decision:bench": "python3 -B scripts/decision-bench/bench.py",
 		"decision:bench:check": "python3 -B scripts/decision-bench/bench.py self-test",
 		"build:design-system": "cd packages/design-system && bun run build",
-		"postinstall": "bun run build:design-system",
+		"postinstall": "bun scripts/build-design-system.ts",
 		"build:web": "bun run build:design-system && vite build",
 		"typecheck": "tsc --noEmit",
 		"deadcode": "knip --include exports,types"

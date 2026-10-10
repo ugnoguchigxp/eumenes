@@ -260,3 +260,40 @@ test("following logs survives rotation without duplicates and retries an incompl
 		await read;
 	}
 }, 15000);
+
+test("file output resumes after a transient failure with one notice per outage", () => {
+	const dir = temp();
+	const file = join(dir, "logs/api.jsonl");
+	writeFileSync(join(dir, "logs"), "blocker");
+	let clock = 0;
+	const events: string[] = [];
+	const original = process.stderr.write;
+	process.stderr.write = ((chunk: string | Uint8Array) => {
+		events.push(JSON.parse(String(chunk)).event);
+		return true;
+	}) as typeof process.stderr.write;
+	try {
+		const sink = rotatingLogFile(file, 1024, 2, { now: () => clock });
+		sink.write('{"n":1}\n');
+		clock = 500;
+		sink.write('{"n":2}\n');
+		expect(events).toEqual(["logging.file_unavailable"]);
+		rmSync(join(dir, "logs"));
+		sink.write('{"n":3}\n');
+		expect(() => readFileSync(file, "utf8")).toThrow();
+		clock = 1_000;
+		sink.write('{"n":4}\n');
+		expect(readFileSync(file, "utf8")).toBe('{"n":4}\n');
+		expect(events).toEqual([
+			"logging.file_unavailable",
+			"logging.file_recovered",
+		]);
+		rmSync(join(dir, "logs"), { recursive: true, force: true });
+		writeFileSync(join(dir, "logs"), "blocker");
+		sink.write('{"n":5}\n');
+		expect(events.at(-1)).toBe("logging.file_unavailable");
+		expect(events).toHaveLength(3);
+	} finally {
+		process.stderr.write = original;
+	}
+});

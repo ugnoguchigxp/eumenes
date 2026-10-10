@@ -22,7 +22,10 @@ import {
 import type { TimerDeps } from "./deps";
 import { toDto } from "./dto";
 import { createExpiry, notificationDto } from "./expiry";
-import { maintenanceInTransaction } from "./maintenance";
+import {
+	maintenanceInTransaction as runMaintenance,
+	type MaintenanceState,
+} from "./maintenance";
 import {
 	ackInTransaction,
 	claimInTransaction,
@@ -62,6 +65,11 @@ export function createTimers(
 		log,
 	};
 	const scope = options.scope ?? DEFAULT_TIMER_SCOPE;
+	const maintenanceState: MaintenanceState = {
+		lastPruneAt: Number.NEGATIVE_INFINITY,
+	};
+	const maintenanceInTransaction = (tx: Database, d: TimerDeps) =>
+		runMaintenance(tx, d, maintenanceState);
 	const expiry = createExpiry(deps);
 	ports.scheduler.registerTarget(expiry.target);
 	ports.queue.registerHandler(expiry.handler);

@@ -826,3 +826,39 @@ test("output preparation resumes an existing context that is waiting for a gestu
 	await output.stop();
 	expect(close).toHaveBeenCalledOnce();
 });
+
+import {
+	createIncrementalEncoder,
+	encodeRecording,
+	partialInterval,
+} from "../controller";
+
+function toneFrames(lengths: number[]): Float32Array[] {
+	let n = 0;
+	return lengths.map((length) =>
+		new Float32Array(length).map(
+			() => Math.sin(n++ * 0.05) * 0.4 + ((n % 7) - 3) * 0.01,
+		),
+	);
+}
+
+for (const rate of [48000, 44100, 16000]) {
+	test(`incremental encoder matches encodeRecording at ${rate} Hz`, () => {
+		const frames = toneFrames([2048, 2048, 2048, 2048, 1317, 91, 2048, 3]);
+		const total = frames.reduce((sum, f) => sum + f.length, 0);
+		const encoder = createIncrementalEncoder(rate);
+		for (const frame of frames) {
+			encoder.push(frame);
+			const so_far = frames.slice(0, frames.indexOf(frame) + 1);
+			const count = so_far.reduce((sum, f) => sum + f.length, 0);
+			expect(encoder.wav()).toEqual(encodeRecording(so_far, count, rate));
+		}
+		expect(encoder.wav()).toEqual(encodeRecording(frames, total, rate));
+	});
+}
+
+test("partial interval grows with utterance length and is capped", () => {
+	expect(partialInterval(0)).toBe(0.6);
+	expect(partialInterval(10)).toBeCloseTo(1.6);
+	expect(partialInterval(60)).toBe(2);
+});

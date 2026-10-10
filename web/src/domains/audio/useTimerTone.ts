@@ -12,7 +12,12 @@ export function useTimerTone(
 	sessionAudio?: () => Pick<AudioController, "play" | "stopPlayback"> | null,
 	speech?: (text: string, signal: AbortSignal) => Promise<Uint8Array>,
 ) {
-	const [ready, setReady] = useState(false);
+	const [ready, setReadyState] = useState(false);
+	const readyRef = useRef(false);
+	const setReady = useCallback((value: boolean) => {
+		readyRef.current = value;
+		setReadyState(value);
+	}, []);
 	const latest = useRef({ settings, sessionAudio, speech });
 	useEffect(() => {
 		latest.current = { settings, sessionAudio, speech };
@@ -26,21 +31,26 @@ export function useTimerTone(
 		void owned?.audio.stop();
 	}, []);
 	useEffect(() => () => release(), [release]);
-	const ensureOutput = useCallback((outputDevice: string) => {
-		if (output.current?.device !== outputDevice) {
-			void output.current?.audio.stop();
-			output.current = {
-				device: outputDevice,
-				audio: createAudioController(
-					() => {},
-					() => {},
-					() => {},
-					{ outputDevice, keepAlive: false },
-				),
-			};
-		}
-		return output.current!;
-	}, []);
+	const ensureOutput = useCallback(
+		(outputDevice: string) => {
+			if (output.current?.device !== outputDevice) {
+				// A changed device needs a fresh preparation on the next gesture.
+				if (output.current) setReady(false);
+				void output.current?.audio.stop();
+				output.current = {
+					device: outputDevice,
+					audio: createAudioController(
+						() => {},
+						() => {},
+						() => {},
+						{ outputDevice, keepAlive: false },
+					),
+				};
+			}
+			return output.current!;
+		},
+		[setReady],
+	);
 	const prepare = useCallback(async () => {
 		const { settings: audio, sessionAudio: session } = latest.current;
 		if ((audio.outputVolume ?? 1) <= 0) return;
@@ -59,12 +69,18 @@ export function useTimerTone(
 			}
 			throw error;
 		}
-	}, [ensureOutput, release]);
+	}, [ensureOutput, release, setReady]);
 	useEffect(() => {
 		// Finish the gesture before hiding the preparation card. Preparing on pointerdown
 		// can remove a pressed button before its click and send the click to another card.
+		let lastFailure = Number.NEGATIVE_INFINITY;
 		const unlock = () => {
-			void prepare().catch(() => {});
+			if (readyRef.current) return;
+			// A rejecting output must not be rebuilt on every key press.
+			if (Date.now() - lastFailure < 5_000) return;
+			void prepare().catch(() => {
+				lastFailure = Date.now();
+			});
 		};
 		window.addEventListener("click", unlock, { capture: true });
 		window.addEventListener("keyup", unlock, { capture: true });

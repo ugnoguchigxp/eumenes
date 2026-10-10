@@ -2,6 +2,7 @@ import type { Database } from "bun:sqlite";
 import type { TasksService, WorkTask } from "../../tasks";
 import {
 	approvalChoices,
+	INSTRUCTION_MAX_BYTES,
 	instructionApprovalRequired,
 	type Decision,
 	type Supervisor,
@@ -25,14 +26,14 @@ function clip(text: string, bytes: number) {
 }
 /** The question text is the task record the user reviews before approving. */
 export function approvalPrompt(d: Decision) {
-	const body = clip(d.instruction ?? "", 5500);
+	const body = clip(d.instruction ?? "", INSTRUCTION_MAX_BYTES);
+	if (body.clipped) throw new Error("supervision_instruction_too_long");
 	return [
 		`監督AIが実装用CLIへの指示を生成しました(${instructionApprovalRequired})。「${approvalChoices.approve}」を選ぶとこの指示を実行します。`,
 		`操作: ${d.action === "request_change" ? "修正の依頼" : "質問への回答"}`,
 		`理由: ${d.reason}`,
 		"--- 指示 ---",
 		body.text,
-		...(body.clipped ? ["(長いため途中まで表示しています)"] : []),
 	].join("\n");
 }
 export function approvalView(s: Supervisor) {
@@ -69,9 +70,23 @@ export function createApproval(input: {
 		/** Same waiting state as escalate, but the user only approves or rejects the stored instruction. */
 		request(db: Database, t: WorkTask, s: Supervisor, d: Decision) {
 			const questionId = `supervision:${t.id}:${crypto.randomUUID()}`;
+			let prompt: string;
+			try {
+				prompt = approvalPrompt(d);
+			} catch (error) {
+				// A decision saved before the byte limit existed must never be approved half-read.
+				if (
+					error instanceof Error &&
+					error.message === "supervision_instruction_too_long"
+				) {
+					escalate(db, t, s, "指示が長すぎるため承認を求められません。");
+					return;
+				}
+				throw error;
+			}
 			tasks().askInTransaction(db, fence(t), {
 				questionId,
-				prompt: approvalPrompt(d),
+				prompt,
 				answerType: "choice",
 				choices: [approvalChoices.approve, approvalChoices.reject],
 			});

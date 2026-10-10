@@ -1788,33 +1788,47 @@ test("a provider on a different private host is rejected before any token is sen
 		await larm.close();
 	}
 });
-test("EUMENES_LARM_PROVIDER_HOSTS or the providerHosts config allow another host", async () => {
+test("the providerHosts config allows another host and the environment is not read", async () => {
 	const fake = fixture();
 	const configured = createLarm({
 		baseUrl: "http://127.0.0.1:9810",
 		profile: "SAAA",
 		token: "control",
-		providerHosts: ["10.9.9.9"],
+		providerHosts: ["10.9.9.9", "Other.LOCAL"],
 		fetch: claimAt(fake.fetcher, "http://10.9.9.9"),
 	});
+	const second = createLarm({
+		baseUrl: "http://127.0.0.1:9810",
+		profile: "SAAA",
+		token: "control",
+		providerHosts: ["10.9.9.9", "Other.LOCAL"],
+		fetch: claimAt(fake.fetcher, "http://other.local"),
+	});
 	const previous = process.env.EUMENES_LARM_PROVIDER_HOSTS;
-	process.env.EUMENES_LARM_PROVIDER_HOSTS = " 10.9.9.9 , Other.LOCAL ";
+	process.env.EUMENES_LARM_PROVIDER_HOSTS = "10.8.8.8";
 	try {
-		const fromEnv = makeLarm(claimAt(fake.fetcher, "http://other.local"));
-		const second = makeLarm(claimAt(fake.fetcher, "http://10.9.9.9"));
-		delete process.env.EUMENES_LARM_PROVIDER_HOSTS;
-		// The environment is read once when the port is created.
-		expect(await fromEnv.answer(question, freshSignal())).toBe("承知しました");
-		expect(await second.answer(question, freshSignal())).toBe("承知しました");
+		const ignoredEnv = createLarm({
+			baseUrl: "http://127.0.0.1:9810",
+			profile: "SAAA",
+			token: "control",
+			fetch: claimAt(fake.fetcher, "http://10.8.8.8"),
+		});
+		try {
+			await expect(
+				ignoredEnv.answer(question, freshSignal()),
+			).rejects.toThrow();
+		} finally {
+			await ignoredEnv.close();
+		}
 		expect(await configured.answer(question, freshSignal())).toBe(
 			"承知しました",
 		);
-		await fromEnv.close();
-		await second.close();
+		expect(await second.answer(question, freshSignal())).toBe("承知しました");
 	} finally {
 		if (previous === undefined) delete process.env.EUMENES_LARM_PROVIDER_HOSTS;
 		else process.env.EUMENES_LARM_PROVIDER_HOSTS = previous;
 		await configured.close();
+		await second.close();
 	}
 });
 test("a .local provider is accepted only when the LARM base itself is .local", async () => {
@@ -1828,6 +1842,28 @@ test("a .local provider is accepted only when the LARM base itself is .local", a
 	try {
 		expect(await larm.answer(question, freshSignal())).toBe("承知しました");
 	} finally {
+		await larm.close();
+	}
+});
+
+test("a failed connect exposes only a machine-readable error code", async () => {
+	for (const [failure, expected] of [
+		[new Error("socket hang up at 192.168.0.9"), "larm_failed"],
+		[
+			Object.assign(new TypeError("x"), { code: "ConnectionRefused" }),
+			"larm_connection_failed",
+		],
+	] as const) {
+		const larm = createLarm({
+			baseUrl: "http://127.0.0.1:9810",
+			profile: "SAAA",
+			token: "control",
+			fetch: async () => {
+				throw failure;
+			},
+		});
+		await expect(larm.connect()).rejects.toBeDefined();
+		expect(larm.status().error).toBe(expected);
 		await larm.close();
 	}
 });

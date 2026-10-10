@@ -1,6 +1,7 @@
 import { createServer } from "node:net";
 import { resolve } from "node:path";
 import { resolveApiToken } from "../api/infrastructure/auth-config";
+import { PROCESS_SHUTDOWN_DEADLINE_MS } from "../api/infrastructure/shutdown";
 
 const root = resolve(import.meta.dir, "..");
 // Vite needs no provider credentials (LARM token etc.); pass only this allowlist.
@@ -26,6 +27,12 @@ function viteEnv(source: Record<string, string | undefined>, apiToken: string) {
 	return { ...picked, EUMENES_API_TOKEN: apiToken };
 }
 type Child = ReturnType<typeof Bun.spawn>;
+const API_KILL_GRACE_MS = PROCESS_SHUTDOWN_DEADLINE_MS + 1_000;
+const WEB_KILL_GRACE_MS = 12_000;
+type Managed = { child: Child; graceMs: number };
+
+/** Same rule as config.ts: empty or whitespace-only means unset. */
+const envValue = (name: string) => process.env[name]?.trim() || undefined;
 
 async function available(host: string, port: number) {
 	const probe = createServer();
@@ -56,22 +63,25 @@ async function ready(url: string, token: string, signal: AbortSignal) {
 	throw new Error("API startup timed out");
 }
 
-async function stop(children: Child[]) {
-	const kill = (signal: "SIGTERM" | "SIGKILL") => {
-		for (const child of children)
-			if (child.exitCode === null) child.kill(signal);
-	};
-	kill("SIGTERM");
-	const timeout = setTimeout(() => kill("SIGKILL"), 12_000);
+async function stop(children: Managed[]) {
+	const timers: ReturnType<typeof setTimeout>[] = [];
+	for (const { child, graceMs } of children) {
+		if (child.exitCode === null) child.kill("SIGTERM");
+		timers.push(
+			setTimeout(() => {
+				if (child.exitCode === null) child.kill("SIGKILL");
+			}, graceMs),
+		);
+	}
 	try {
-		await Promise.all(children.map((child) => child.exited));
+		await Promise.all(children.map(({ child }) => child.exited));
 	} finally {
-		clearTimeout(timeout);
+		for (const timer of timers) clearTimeout(timer);
 	}
 }
 
 async function main() {
-	const children: Child[] = [];
+	const children: Managed[] = [];
 	const lifetime = new AbortController();
 	const cancel = () => lifetime.abort();
 	process.on("SIGINT", cancel);
@@ -102,11 +112,11 @@ async function main() {
 		const env = {
 			...process.env,
 			EUMENES_ORIGIN:
-				process.env.EUMENES_ORIGIN ?? `http://${webHost}:${webPort}`,
+				envValue("EUMENES_ORIGIN") ?? `http://${webHost}:${webPort}`,
 		};
 		const token = resolveApiToken(process.env);
-		const host = process.env.EUMENES_HOST ?? "127.0.0.1";
-		const port = Number(process.env.EUMENES_PORT ?? 8787);
+		const host = envValue("EUMENES_HOST") ?? "127.0.0.1";
+		const port = Number(envValue("EUMENES_PORT") ?? 8787);
 		if (!["127.0.0.1", "localhost"].includes(host))
 			throw new Error("loopback_host_required");
 		if (!Number.isInteger(port) || port < 1 || port > 65535)
@@ -127,7 +137,7 @@ async function main() {
 			stdout: "inherit",
 			stderr: "inherit",
 		});
-		children.push(api);
+		children.push({ child: api, graceMs: API_KILL_GRACE_MS });
 		await Promise.race([
 			ready(url, token, lifetime.signal),
 			api.exited.then((code) => {
@@ -154,7 +164,7 @@ async function main() {
 				stderr: "inherit",
 			},
 		);
-		children.push(web);
+		children.push({ child: web, graceMs: WEB_KILL_GRACE_MS });
 		const exited = await Promise.race([
 			cancelled.then(() => null),
 			api.exited.then((code) => ({ name: "API", code })),

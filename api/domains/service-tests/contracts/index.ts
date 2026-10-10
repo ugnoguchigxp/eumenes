@@ -31,13 +31,10 @@ export const inputSchema = z
 			.default("こんにちは。短い挨拶をお願いします。"),
 		comparison: z.string().trim().max(4096).optional(),
 		voice: z.string().trim().max(128).optional(),
-		width: z
-			.union([z.literal(512), z.literal(768), z.literal(1024)])
-			.optional(),
-		height: z
-			.union([z.literal(512), z.literal(768), z.literal(1024)])
-			.optional(),
+		width: z.number().int().min(100).max(1280).optional(),
+		height: z.number().int().min(100).max(1280).optional(),
 		format: z.enum(["png", "webp"]).optional(),
+		seed: z.number().int().safe().optional(),
 		durationSeconds: z.number().int().min(1).max(30).optional(),
 		uploadId: z.string().uuid().optional(),
 	})

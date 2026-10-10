@@ -1,7 +1,15 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+	waitFor,
+} from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import type { Settings } from "../../../../../api/domains/settings/contracts";
 import { settingsFixture } from "./fixture";
+import { SettingsPage } from "../SettingsPage";
 import { LarmConnectionCard } from "./larm-connection";
 
 afterEach(cleanup);
@@ -103,4 +111,73 @@ test("clearing the URL field stores null so the backend default is used", () => 
 		target: { value: "" },
 	});
 	expect(draft.larm.baseUrl).toBeNull();
+});
+
+async function applyWithUrl(confirmAnswer: boolean, savedUrl: string | null) {
+	const saved = settingsFixture();
+	saved.larm.baseUrl = savedUrl;
+	const client = {
+		identity: "larm-origin-test",
+		settings: vi.fn(async () => saved),
+		settingsDiagnostics: vi.fn(async () => {
+			throw new Error("not_needed");
+		}),
+		inferenceUsage: vi.fn(async () => []),
+		inferenceProbes: vi.fn(async () => []),
+		larmDetails: vi.fn(async () => {
+			throw new Error("not_needed");
+		}),
+		applySettings: vi.fn(async (input: { settings: Settings }) => ({
+			...input.settings,
+			revision: input.settings.revision + 1,
+		})),
+	};
+	const confirm = vi.spyOn(window, "confirm").mockReturnValue(confirmAnswer);
+	const cache = new QueryClient({
+		defaultOptions: { queries: { retry: false } },
+	});
+	render(
+		<QueryClientProvider client={cache}>
+			<SettingsPage
+				client={client as never}
+				onDirty={vi.fn()}
+				onSaved={vi.fn()}
+			/>
+		</QueryClientProvider>,
+	);
+	fireEvent.click(await screen.findByRole("button", { name: "接続先" }));
+	fireEvent.change(await screen.findByLabelText("LARMのURL"), {
+		target: { value: "http://127.0.0.1:9999/path" },
+	});
+	fireEvent.click(screen.getByRole("button", { name: "変更を適用" }));
+	return { client, confirm };
+}
+
+test("changing the LARM origin asks first and cancelling does not save", async () => {
+	const { client, confirm } = await applyWithUrl(
+		false,
+		"http://127.0.0.1:8080",
+	);
+	await waitFor(() => expect(confirm).toHaveBeenCalled());
+	expect(confirm.mock.calls[0]![0]).toContain("http://127.0.0.1:9999");
+	expect(client.applySettings).not.toHaveBeenCalled();
+	confirm.mockRestore();
+});
+
+test("confirming sends confirmLarmOrigin; a first-time URL needs no confirmation", async () => {
+	const changed = await applyWithUrl(true, "http://127.0.0.1:8080");
+	await waitFor(() => expect(changed.client.applySettings).toHaveBeenCalled());
+	expect(changed.client.applySettings.mock.calls[0]![0]).toMatchObject({
+		confirmLarmOrigin: "http://127.0.0.1:9999",
+	});
+	changed.confirm.mockRestore();
+	cleanup();
+
+	const first = await applyWithUrl(true, null);
+	await waitFor(() => expect(first.client.applySettings).toHaveBeenCalled());
+	expect(first.confirm).not.toHaveBeenCalled();
+	expect(first.client.applySettings.mock.calls[0]![0]).not.toHaveProperty(
+		"confirmLarmOrigin",
+	);
+	first.confirm.mockRestore();
 });

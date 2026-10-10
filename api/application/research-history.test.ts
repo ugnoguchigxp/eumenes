@@ -653,3 +653,42 @@ test("H7: one stale-history retry uses the original budget and adopts only the f
 		await h.close();
 	}
 });
+test("AG-5: preparing sources never mutates the result, so a re-settle after rollback yields one body_unavailable", async () => {
+	const { createReadPorts } = await import("./research-history-ports");
+	const web = { savedBodies: { issue: () => [] } };
+	const runtime = {
+		usesViewEvidenceInTransaction: () => true,
+		authorizeReadOwnerInTransaction: () => ({ deadline: 1 }),
+	};
+	const ports = createReadPorts(
+		web as never,
+		undefined,
+		() => runtime as never,
+	);
+	const result = {
+		hits: [],
+		documents: [
+			{ url, title: "t", text: "body", fetchedAt: 1, truncated: false },
+		],
+		failures: [] as Array<{ url: string; code: string }>,
+		observedAt: 1,
+	};
+	const inv = {
+		operation_id: "op-1",
+		root_run_id: "root",
+		owner_task_id: "task",
+		cancel_epoch: 0,
+		deadline: 2,
+	};
+	const settle = () =>
+		ports.prepareSourcesInTransaction!(
+			{} as never,
+			inv as never,
+			result as never,
+		);
+	const first = settle();
+	const second = settle();
+	expect(result.failures).toEqual([]);
+	expect(first!.failures).toEqual([{ url, code: "body_unavailable" }]);
+	expect(second!.failures).toEqual([{ url, code: "body_unavailable" }]);
+});

@@ -709,6 +709,7 @@ test("text and browser audio complete through real services with fixture provide
 test("settings save, reload, theme and automatic fallback use backend credentials", async ({
 	page,
 }) => {
+	page.on("dialog", (dialog) => void dialog.accept());
 	await page.setViewportSize({ width: 1440, height: 1000 });
 	await page.goto(`http://127.0.0.1:${webPort}/#settings`);
 	await expect(

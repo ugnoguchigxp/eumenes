@@ -46,3 +46,14 @@ test("one whole JSON fence decodes without accepting surrounding prose, multiple
 	])
 		expect(parseControlOutput(text).invalid).toBe(true);
 });
+
+test("only one complete leading think block is removed", () => {
+	const json = '{"action":"finish","report":{"claims":[]}}';
+	expect(parseControlOutput("<think>考える</think>\n" + json)).toMatchObject({
+		invalid: false,
+		action: { action: "finish" },
+	});
+	expect(parseControlOutput("<think>未完了 " + json).invalid).toBe(true);
+	expect(parseControlOutput("前置き\n" + json).invalid).toBe(true);
+	expect(parseControlOutput(json + "\n<think>x</think>").invalid).toBe(true);
+});

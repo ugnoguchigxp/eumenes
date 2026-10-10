@@ -2,6 +2,7 @@ import type { Database } from "bun:sqlite";
 import type { Task } from "../contracts";
 import {
 	timerCommand,
+	toolRuntimeOf,
 	type Capabilities,
 	type Prepared,
 	type Owner,
@@ -76,13 +77,12 @@ export function createTimerOperation({
 		);
 		prepared.set(t.id, preparedTimer);
 		const bound = tools.bind(owner(t), preparedTimer, t.deadline);
-		const toolId =
-			parsed.data.operation === "start"
-				? "timer.start"
-				: parsed.data.operation === "cancel"
-					? "timer.cancel"
-					: "timer.list";
-		const picked = bound.find((item) => item.tool.id === toolId);
+		const picked = bound.find((item) => {
+			const action = toolRuntimeOf(item.tool.revisionId)?.localAction;
+			return (
+				action?.backend === "timer" && action.verb === parsed.data.operation
+			);
+		});
 		if (!picked) throw new Error("capability_unavailable");
 		const command = parsed.data;
 		const args =

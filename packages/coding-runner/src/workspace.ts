@@ -13,7 +13,7 @@ import {
 	fstatSync,
 	readSync,
 } from "node:fs";
-import { dirname, join, sep } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 import type { RunnerConfig } from "./config";
 import { atomicWrite, canonical, digest, optionalJson } from "./storage";
@@ -110,9 +110,63 @@ function currentIntegrity(w: RunnerConfig["workspaces"][number]): GitIntegrity {
 		config: fileDigest(join(w.commonGitDir, "config")),
 		worktreeGitDir,
 		worktreeConfig: worktreeGitDir
-			? fileDigest(join(worktreeGitDir, "config.worktree"))
+			? fileDigest(
+					join(resolveGitDir(w.path, worktreeGitDir), "config.worktree"),
+				)
 			: null,
 		hooks,
+	};
+}
+/** A relative `gitdir:` in a worktree's .git file is relative to the worktree, not to this process. */
+function resolveGitDir(worktreePath: string, value: string) {
+	const absolute = resolve(worktreePath, value);
+	try {
+		return realpathSync(absolute);
+	} catch {
+		return absolute;
+	}
+}
+export type IntegrityChange = {
+	recorded: boolean;
+	config: "changed" | "same";
+	worktreeConfig: "changed" | "same";
+	hooks: { added: string[]; removed: string[]; changed: string[] };
+};
+/** What differs between the recorded and the current git state; digests themselves are not returned. */
+export function describeIntegrityChange(
+	config: RunnerConfig,
+	workspaceId: string,
+): IntegrityChange {
+	const w = config.workspaces.find((x) => x.id === workspaceId);
+	if (!w) throw new Error("runner_workspace_unregistered");
+	const recorded = optionalJson<GitIntegrity>(
+		integrityPath(config, workspaceId),
+	);
+	const now = currentIntegrity(w);
+	if (!recorded)
+		return {
+			recorded: false,
+			config: "same",
+			worktreeConfig: "same",
+			hooks: { added: [], removed: [], changed: [] },
+		};
+	const before = new Map(recorded.hooks.map((h) => [h.name, h.digest]));
+	const after = new Map(now.hooks.map((h) => [h.name, h.digest]));
+	return {
+		recorded: true,
+		config: recorded.config === now.config ? "same" : "changed",
+		worktreeConfig:
+			recorded.worktreeConfig === now.worktreeConfig &&
+			recorded.worktreeGitDir === now.worktreeGitDir
+				? "same"
+				: "changed",
+		hooks: {
+			added: [...after.keys()].filter((n) => !before.has(n)),
+			removed: [...before.keys()].filter((n) => !after.has(n)),
+			changed: [...after.keys()].filter(
+				(n) => before.has(n) && before.get(n) !== after.get(n),
+			),
+		},
 	};
 }
 // A clean or smudge filter would make host `git add` execute configured commands.
@@ -137,6 +191,13 @@ export function recordGitIntegrity(config: RunnerConfig, workspaceId: string) {
 		mode: 0o700,
 	});
 	atomicWrite(integrityPath(config, workspaceId), currentIntegrity(w));
+}
+/** Throws runner_git_filter_forbidden when a filter attribute is configured. */
+export function assertNoGitFilters(config: RunnerConfig, workspaceId: string) {
+	const w = config.workspaces.find((x) => x.id === workspaceId);
+	if (!w) throw new Error("runner_workspace_unregistered");
+	forbidFilters(join(w.path, ".gitattributes"));
+	forbidFilters(join(w.commonGitDir, "info", "attributes"));
 }
 /** Fails closed when the sandboxed agent changed .git/config or hooks, or added a filter attribute. */
 export function verifyGitIntegrity(config: RunnerConfig, workspaceId: string) {

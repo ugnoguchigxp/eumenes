@@ -280,6 +280,8 @@ export const applySchema = z
 					.strict(),
 			)
 			.max(32),
+		/** Required only when the saved LARM origin changes; must equal the new origin. */
+		confirmLarmOrigin: z.string().max(2048).optional(),
 	})
 	.strict()
 	.superRefine((input, ctx) => {

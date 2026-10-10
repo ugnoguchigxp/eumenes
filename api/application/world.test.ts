@@ -141,6 +141,36 @@ test("cursor secret: host-owned file (dir 0700, file 0600), created once, stable
 	expect(readFileSync(file, "utf8")).toBe("short");
 });
 
+test("cursor secret: keyDir moves the key out of the db dir and keeps the old key's value", () => {
+	const dir = tempDir();
+	const dbPath = join(dir, "data", "db.sqlite3");
+	const legacy = join(dir, "data", "keys", "world-cursor.key");
+	const keyDir = join(dir, "elsewhere");
+	// (a) A fresh install with keyDir creates the key there and not beside the db.
+	const created = resolveWorldCursorSecret({ dbPath, keyDir, env: {} });
+	expect(existsSync(join(keyDir, "world-cursor.key"))).toBe(true);
+	expect(existsSync(legacy)).toBe(false);
+	expect(statSync(join(keyDir, "world-cursor.key")).mode & 0o777).toBe(0o600);
+	expect(resolveWorldCursorSecret({ dbPath, keyDir, env: {} })).toBe(created);
+	// (b) An existing key beside the db is copied (not moved) so stored cursors stay valid.
+	const dir2 = tempDir();
+	const dbPath2 = join(dir2, "data", "db.sqlite3");
+	const legacy2 = join(dir2, "data", "keys", "world-cursor.key");
+	const old = resolveWorldCursorSecret({ dbPath: dbPath2, env: {} });
+	const keyDir2 = join(dir2, "moved");
+	expect(
+		resolveWorldCursorSecret({ dbPath: dbPath2, keyDir: keyDir2, env: {} }),
+	).toBe(old);
+	expect(readFileSync(join(keyDir2, "world-cursor.key"), "utf8")).toBe(old);
+	expect(statSync(join(keyDir2, "world-cursor.key")).mode & 0o777).toBe(0o600);
+	expect(readFileSync(legacy2, "utf8")).toBe(old);
+	// (c) A blank keyDir behaves as before.
+	expect(
+		resolveWorldCursorSecret({ dbPath: dbPath2, keyDir: "  ", env: {} }),
+	).toBe(old);
+	expect(resolveWorldCursorSecret({ dbPath: dbPath2, env: {} })).toBe(old);
+});
+
 test("journal path sits next to the Memory journal", () => {
 	expect(defaultWorldJournalPath("/data/x/memory-forget-journal.jsonl")).toBe(
 		"/data/x/world-forget-journal.jsonl",

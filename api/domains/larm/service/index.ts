@@ -1,5 +1,9 @@
 import { chatRequest } from "./chat-request";
 import { readBounded } from "../../../infrastructure/bounded-read";
+import {
+	isNetworkError,
+	toErrorCode,
+} from "../../../infrastructure/error-code";
 import { getLogger } from "../../../infrastructure/logger";
 const log = getLogger("larm");
 import {
@@ -30,7 +34,6 @@ import {
 } from "./connect";
 import {
 	localEndpoint,
-	parseProviderHosts,
 	readJson,
 	record,
 	string,
@@ -48,7 +51,7 @@ const callerAborted = (error: unknown, signal?: AbortSignal) =>
 export function createLarm(config: {
 	/** LARM control origin. There is no default: without it the port stays unconfigured. */
 	baseUrl?: string;
-	/** Extra hosts that may receive provider credentials; defaults to EUMENES_LARM_PROVIDER_HOSTS (read once). */
+	/** Extra hosts that may receive provider credentials; supplied by the composition root from Config (EUMENES_LARM_PROVIDER_HOSTS). */
 	providerHosts?: readonly string[];
 	token?: string;
 	profile?: string;
@@ -68,8 +71,7 @@ export function createLarm(config: {
 		? localEndpoint(baseText, [new URL(baseText).hostname])
 		: undefined;
 	const providerHosts =
-		config.providerHosts?.map((host) => host.toLowerCase()) ??
-		parseProviderHosts(process.env.EUMENES_LARM_PROVIDER_HOSTS);
+		config.providerHosts?.map((host) => host.toLowerCase()) ?? [];
 	const token = config.token?.trim();
 	const request = config.fetch ?? fetch;
 	const profile = config.profile?.trim() || gemmaProfile;
@@ -477,7 +479,9 @@ export function createLarm(config: {
 					{ durationMs: Math.round(performance.now() - connectStarted) },
 					error,
 				);
-				lastError = error instanceof Error ? error.message : "larm_failed";
+				lastError = isNetworkError(error)
+					? "larm_connection_failed"
+					: toErrorCode(error, "larm_failed");
 			}
 			throw error;
 		} finally {

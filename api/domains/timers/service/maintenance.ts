@@ -4,6 +4,8 @@ import {
 	attachExpiryJob,
 	findDueActive,
 	getTimer,
+	insertNotificationIfAbsent,
+	markDispatchExhausted,
 	pruneBatch,
 } from "../repository";
 import type { TimerDeps } from "./deps";
@@ -11,7 +13,13 @@ import { isOpenJob } from "./expiry";
 import { releaseExpiredClaims } from "./notifications";
 import { TIMER_POLICY } from "./policy";
 
-export function maintenanceInTransaction(tx: Database, deps: TimerDeps) {
+export type MaintenanceState = { lastPruneAt: number };
+
+export function maintenanceInTransaction(
+	tx: Database,
+	deps: TimerDeps,
+	state: MaintenanceState = { lastPruneAt: Number.NEGATIVE_INFINITY },
+) {
 	const at = deps.now();
 	for (const timer of findDueActive(tx, at, TIMER_POLICY.batchSize)) {
 		const current = getTimer(tx, timer.id) ?? timer;
@@ -19,6 +27,42 @@ export function maintenanceInTransaction(tx: Database, deps: TimerDeps) {
 			? deps.queue.getInTransaction(tx, current.expiryJobId)
 			: null;
 		if (job && isOpenJob(job.state)) continue;
+		if (job && job.finishedAtMs !== null) {
+			const n = current.dispatchGeneration;
+			if (n >= TIMER_POLICY.redispatchMax) {
+				if (
+					markDispatchExhausted(
+						tx,
+						current.id,
+						current.cancelEpoch,
+						current.dispatchGeneration,
+						at,
+					)
+				) {
+					const stale = at - current.dueAtMs > TIMER_POLICY.soundFreshMs;
+					insertNotificationIfAbsent(tx, {
+						id: deps.id(),
+						timerId: current.id,
+						scope: current.scope,
+						generation: current.cancelEpoch,
+						dueAtMs: current.dueAtMs,
+						status: stale ? "silent" : "pending",
+						reason: stale ? "stale" : null,
+						at,
+					});
+					deps.log.warn("timer.expiry_exhausted", {
+						timerId: current.id,
+						reason: "timer_dispatch_exhausted",
+					});
+				}
+				continue;
+			}
+			const wait = Math.min(
+				TIMER_POLICY.redispatchCapMs,
+				TIMER_POLICY.redispatchBaseMs * 2 ** n,
+			);
+			if (at < job.finishedAtMs + wait) continue;
+		}
 		const schedule = current.scheduleId
 			? deps.scheduler.getInTransaction(tx, current.scheduleId)
 			: null;
@@ -68,6 +112,9 @@ export function maintenanceInTransaction(tx: Database, deps: TimerDeps) {
 		}
 	}
 	releaseExpiredClaims(tx, deps);
+	if (at - state.lastPruneAt < TIMER_POLICY.pruneEveryMs)
+		return { operations: 0, timers: 0, deleted: 0 };
+	state.lastPruneAt = at;
 	const protectedIds = deps.protectedIds?.(tx) ?? [];
 	return pruneBatch(
 		tx,
@@ -76,5 +123,6 @@ export function maintenanceInTransaction(tx: Database, deps: TimerDeps) {
 		TIMER_POLICY.tombstoneMs,
 		TIMER_POLICY.batchSize,
 		protectedIds,
+		TIMER_POLICY.listRetentionMs,
 	);
 }

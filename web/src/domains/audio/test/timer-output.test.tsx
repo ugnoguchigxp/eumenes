@@ -210,3 +210,29 @@ test("repeating alarms play only beeps and stop promptly without requesting spee
 		vi.useRealTimers();
 	}
 });
+
+test("keyup after a successful preparation does not start the output again", async () => {
+	const hook = renderHook(() => useTimerTone({ outputVolume: 1 }));
+	fireEvent.click(window);
+	await waitFor(() => expect(hook.result.current.ready).toBe(true));
+	for (let i = 0; i < 10; i++) fireEvent.keyUp(window, { key: "a" });
+	expect(fake.output.startOutput).toHaveBeenCalledOnce();
+});
+
+test("a rejecting output is retried at most once every five seconds", async () => {
+	vi.useFakeTimers();
+	try {
+		fake.output.startOutput.mockRejectedValue(new Error("blocked"));
+		renderHook(() => useTimerTone({ outputVolume: 1 }));
+		fireEvent.keyUp(window, { key: "a" });
+		await vi.advanceTimersByTimeAsync(0);
+		for (let i = 0; i < 10; i++) fireEvent.keyUp(window, { key: "a" });
+		expect(fake.output.startOutput).toHaveBeenCalledOnce();
+		await vi.advanceTimersByTimeAsync(5_000);
+		fireEvent.keyUp(window, { key: "a" });
+		await vi.advanceTimersByTimeAsync(0);
+		expect(fake.output.startOutput).toHaveBeenCalledTimes(2);
+	} finally {
+		vi.useRealTimers();
+	}
+});

@@ -298,5 +298,6 @@ export const errorStatus = {
 	timer_limit_reached: 429,
 	timer_storage_full: 429,
 	operation_capacity: 429,
+	list_capacity: 429,
 	timer_unavailable: 503,
 } as const satisfies Record<string, HttpErrorStatus>;

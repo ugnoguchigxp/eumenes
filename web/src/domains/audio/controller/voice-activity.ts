@@ -11,6 +11,16 @@ type VoiceActivityDetectorOptions = {
 	candidateResetMs?: number;
 };
 
+/** Exponential moving average of RMS outside speech; threshold never drops below the base. */
+export function adaptiveThreshold(
+	noiseFloor: number,
+	rms: number,
+	base: number,
+) {
+	const next = 0.95 * noiseFloor + 0.05 * rms;
+	return { noiseFloor: next, threshold: Math.max(base, next * 3) };
+}
+
 export type VoiceActivityObservation = {
 	hasSpeech: boolean;
 	shouldFinalize: boolean;
@@ -22,6 +32,7 @@ export class VoiceActivityDetector {
 	private readonly requiredSpeechSamples: number;
 	private readonly silenceTimeoutSamples: number;
 	private readonly candidateResetSamples: number;
+	private noiseFloor = 0;
 	private speechSamples = 0;
 	private candidateSilenceSamples = 0;
 	private silenceSamples = 0;
@@ -64,7 +75,21 @@ export class VoiceActivityDetector {
 			return { hasSpeech: this.speechDetected, shouldFinalize: false, rms };
 		}
 
-		const voiced = rms >= this.speechThresholdRms;
+		const threshold = adaptiveThreshold(
+			this.noiseFloor,
+			rms,
+			this.speechThresholdRms,
+		).threshold;
+		const voiced = rms >= threshold;
+		// Once speech is confirmed only non-voiced frames feed the noise floor, so speech
+		// cannot raise its own threshold. Before that, steady noise above the base must
+		// still be able to raise it (otherwise it would never be learned).
+		if (!voiced || !this.speechDetected)
+			this.noiseFloor = adaptiveThreshold(
+				this.noiseFloor,
+				rms,
+				this.speechThresholdRms,
+			).noiseFloor;
 		if (!this.speechDetected) {
 			if (voiced) {
 				this.speechSamples += frame.length;

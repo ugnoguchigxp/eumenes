@@ -266,10 +266,10 @@ export function createMonitor(
 		},
 		async maintenance() {
 			await store.write((db) => {
-				for (const s of repo.all(db)) {
-					const t = tasks().getInTransaction(db, s.taskId);
+				for (const t of tasks().liveInTransaction(db)) {
+					const s = repo.get(db, t.id);
+					if (!s) continue;
 					if (
-						t &&
 						live(t, now()) &&
 						(s.lastObservedAt !== null
 							? now() - s.lastObservedAt >= 150_000

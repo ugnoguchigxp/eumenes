@@ -1,4 +1,7 @@
-import { runSchema, type Submit } from "../api/domains/dialogue/contracts";
+import {
+	runSchema,
+	type PublicSubmit,
+} from "../api/domains/dialogue/contracts";
 import type { Transport } from "./transport";
 import { json } from "./transport";
 import { watchRun } from "./run-stream";
@@ -21,7 +24,7 @@ export function dialogueClient(transport: Transport) {
 						)
 					).json(),
 				),
-		submit: async (input: Submit) =>
+		submit: async (input: PublicSubmit) =>
 			runSchema.parse(
 				await (await transport.call("/api/runs", json(input))).json(),
 			),

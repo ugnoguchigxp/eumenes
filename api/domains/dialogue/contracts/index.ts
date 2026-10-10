@@ -7,6 +7,11 @@ export const submitSchema = z.object({
 	utteranceId: z.string().min(1).max(120).optional(),
 });
 export type Submit = z.infer<typeof submitSchema>;
+/** Public HTTP input: voice runs are created only by voice-dialogue, never by clients. */
+export const publicSubmitSchema = submitSchema
+	.omit({ utteranceId: true })
+	.strict();
+export type PublicSubmit = z.infer<typeof publicSubmitSchema>;
 export const runSchema = z.object({
 	id: z.string(),
 	agentTaskId: z.string().nullable().optional(),

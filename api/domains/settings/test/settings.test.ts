@@ -565,3 +565,100 @@ test("keyDir option and EUMENES_KEY_DIR relocate the master key", async () => {
 	expect(statSync(join(keys, "b/settings.key")).size).toBe(32);
 	expect(existsSync(join(dir, "keys"))).toBe(false);
 });
+
+test("a changed LARM origin needs an explicit confirmation; same origin or first setup does not", async () => {
+	const h = await setup();
+	const s = h.settings.get();
+	s.larm.audience = "saaa-desktop";
+	const save = (
+		settings: Settings,
+		extra: { confirmLarmOrigin?: string } = {},
+	) =>
+		h.settings.apply({
+			requestId: crypto.randomUUID(),
+			expectedRevision: h.settings.get().revision,
+			settings,
+			keys: [],
+			...extra,
+		});
+	s.larm.baseUrl = "http://192.168.0.10:9810";
+	let saved = await save(s); // (d) first setup
+	const moved = structuredClone(saved);
+	moved.larm.baseUrl = "http://192.168.0.20:9810";
+	await expect(save(moved)).rejects.toThrow("invalid_larm_origin_unconfirmed"); // (a)
+	await expect(
+		save(moved, { confirmLarmOrigin: "http://192.168.0.30:9810" }),
+	).rejects.toThrow("invalid_larm_origin_unconfirmed");
+	saved = await save(moved, { confirmLarmOrigin: "http://192.168.0.20:9810" }); // (b)
+	const pathOnly = structuredClone(saved);
+	pathOnly.larm.baseUrl = "http://192.168.0.20:9810/base";
+	await save(pathOnly); // (c)
+});
+test("an Azure key is bound to one single-label host and one host per key", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "eumenes-settings-"));
+	const dbPath = join(dir, "test.db");
+	const store = openStore(dbPath, [migration, epochsMigration]);
+	const settings = await createSettings(store, {
+		dbPath,
+		env: { AZURE_OPENAI_API_KEY: "x" },
+	});
+	cleanup.push(async () => {
+		await store.close();
+		rmSync(dir, { recursive: true, force: true });
+	});
+	const s = settings.get();
+	cloud(s);
+	cloud(s);
+	for (const c of s.connections) c.envRef = "AZURE_OPENAI_API_KEY";
+	const apply = (value: Settings) =>
+		settings.apply({
+			requestId: crypto.randomUUID(),
+			expectedRevision: 0,
+			settings: value,
+			keys: [],
+		});
+	s.connections[0]!.baseUrl = "https://evil.x.openai.azure.com/v1";
+	s.connections[1]!.baseUrl = "https://b.openai.azure.com/v1";
+	await expect(apply(s)).rejects.toThrow("invalid_env_ref");
+	s.connections[0]!.baseUrl = "https://a.openai.azure.com/v1";
+	await expect(apply(s)).rejects.toThrow("invalid_env_ref_host_conflict");
+	s.connections.pop();
+	s.resources.pop();
+	s.routes.llm.fallbackId = s.resources[0]!.id;
+	await apply(s);
+});
+test("settings_requests keeps only the newest 64 requests", async () => {
+	const h = await setup();
+	const first = crypto.randomUUID();
+	let current = h.settings.get();
+	const firstInput = {
+		requestId: first,
+		expectedRevision: 0,
+		settings: structuredClone(current),
+		keys: [],
+	};
+	current = await h.settings.apply(firstInput);
+	let lastInput = firstInput;
+	for (let i = 0; i < 69; i++) {
+		lastInput = {
+			requestId: crypto.randomUUID(),
+			expectedRevision: current.revision,
+			settings: structuredClone(current),
+			keys: [],
+		};
+		current = await h.settings.apply(lastInput);
+	}
+	const count = h.store.read(
+		(db) =>
+			(
+				db.query("SELECT count(*) AS n FROM settings_requests").get() as {
+					n: number;
+				}
+			).n,
+	);
+	expect(await count).toBe(64);
+	expect(await h.settings.apply(lastInput)).toEqual(current);
+	await expect(h.settings.apply(firstInput)).rejects.toThrow(
+		"revision_conflict",
+	);
+});

@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import {
+	existsSync,
 	appendFileSync,
 	chmodSync,
 	mkdirSync,
@@ -7,11 +8,11 @@ import {
 	rmSync,
 	writeFileSync,
 } from "node:fs";
-import { join } from "node:path";
+import { join, relative as relativePath } from "node:path";
 import { createRunner, publishSpec } from "../src/core";
 import { git, recordGitIntegrity, snapshot } from "../src/workspace";
 import { executeGit, publishGitSpec } from "../src/git-operations";
-import { atomicWrite } from "../src/storage";
+import { atomicWrite, canonical, digest, lock } from "../src/storage";
 import { fixture, until } from "./support";
 import type { GitSpec } from "../src/contracts";
 
@@ -253,3 +254,238 @@ test("files hidden through .git/info/exclude fail the snapshot, while .gitignore
 		f.close();
 	}
 });
+
+const admin = (...args: string[]) => {
+	const r = Bun.spawnSync(
+		[process.execPath, join(import.meta.dir, "../src/admin.ts"), ...args],
+		{ env: { PATH: "/usr/bin:/bin" } },
+	);
+	return { code: r.exitCode, out: r.stdout.toString() };
+};
+
+test("a relative gitdir in the worktree .git file still lets config.worktree be watched", async () => {
+	const { f } = await setup();
+	try {
+		const gitdir = git(f.workspace, ["rev-parse", "--absolute-git-dir"]).trim();
+		const relative = relativePath(f.workspace, gitdir);
+		writeFileSync(join(f.workspace, ".git"), `gitdir: ${relative}\n`);
+		// The test process cwd is unrelated to the worktree.
+		recordGitIntegrity(f.config, "fixture");
+		writeFileSync(join(gitdir, "config.worktree"), "[user]\n\tname = x\n");
+		expect(() => snapshot(f.config, "fixture")).toThrow(
+			"runner_git_config_tampered",
+		);
+	} finally {
+		f.close();
+	}
+});
+
+test("admin git-integrity shows the change and rebaselines only on request", async () => {
+	const { f } = await setup();
+	try {
+		git(f.source, ["config", "user.name", "x"]);
+		expect(() => snapshot(f.config, "fixture")).toThrow(
+			"runner_git_config_tampered",
+		);
+		const shown = admin(
+			"git-integrity",
+			f.configPath,
+			"fixture",
+			"--fixture",
+			"--json",
+		);
+		expect(shown.code).toBe(0);
+		expect(JSON.parse(shown.out).change.config).toBe("changed");
+		expect(() => snapshot(f.config, "fixture")).toThrow(
+			"runner_git_config_tampered",
+		);
+		const done = admin(
+			"git-integrity",
+			f.configPath,
+			"fixture",
+			"--fixture",
+			"--rebaseline",
+		);
+		expect(done.code).toBe(0);
+		expect(done.out).toContain("変更あり");
+		expect(() => snapshot(f.config, "fixture")).not.toThrow();
+	} finally {
+		f.close();
+	}
+});
+
+test("admin refuses to rebaseline while a reservation is active or a filter is configured", async () => {
+	const { f } = await setup();
+	try {
+		git(f.source, ["config", "user.name", "x"]);
+		const reservation = join(f.config.spoolRoot, "workspaces", "fixture.json");
+		const prior = readFileSync(reservation, "utf8");
+		atomicWrite(reservation, { executionId: crypto.randomUUID() });
+		const busy = admin(
+			"git-integrity",
+			f.configPath,
+			"fixture",
+			"--fixture",
+			"--rebaseline",
+		);
+		expect(busy.code).toBe(3);
+		atomicWrite(reservation, prior);
+		mkdirSync(join(f.source, ".git/info"), { recursive: true });
+		writeFileSync(
+			join(f.source, ".git/info/attributes"),
+			"*.txt filter=evil\n",
+		);
+		const filtered = admin(
+			"git-integrity",
+			f.configPath,
+			"fixture",
+			"--fixture",
+			"--rebaseline",
+		);
+		expect(filtered.code).toBe(4);
+		expect(() => snapshot(f.config, "fixture")).toThrow(
+			"runner_git_config_tampered",
+		);
+	} finally {
+		f.close();
+	}
+});
+
+test("a refusal before any Git effect leaves no receipt or owner record", async () => {
+	const { f, commit } = await setup();
+	try {
+		writeFileSync(join(f.workspace, "source.txt"), "change\n");
+		const stale = commit();
+		publishGitSpec(f.config, "stale", stale);
+		writeFileSync(join(f.workspace, "source.txt"), "another\n");
+		expect(() => executeGit(f.config, "stale", stale.operationId)).toThrow(
+			"runner_snapshot_changed",
+		);
+		expect(
+			existsSync(
+				join(f.config.spoolRoot, "operations", `git-${stale.operationId}.json`),
+			),
+		).toBe(false);
+		expect(
+			existsSync(join(f.config.spoolRoot, "workspaces", "fixture.git.json")),
+		).toBe(false);
+	} finally {
+		f.close();
+	}
+}, 15000);
+test("a spool interrupted after the in_progress record is resolved from Git evidence", async () => {
+	const { f, commit } = await setup();
+	try {
+		const owner = join(f.config.spoolRoot, "workspaces", "fixture.git.json");
+		writeFileSync(join(f.workspace, "source.txt"), "change\n");
+		const spec = commit();
+		publishGitSpec(f.config, "commit", spec);
+		const done = executeGit(f.config, "commit", spec.operationId);
+		const record = join(
+			f.config.spoolRoot,
+			"operations",
+			`git-${spec.operationId}.json`,
+		);
+		// Crash right after stage 1: in_progress receipt and owner exist, the commit already landed.
+		atomicWrite(record, { ...done, state: "in_progress", commitSha: null });
+		atomicWrite(owner, { operationId: spec.operationId });
+		const resolved = executeGit(f.config, "commit", spec.operationId);
+		expect(resolved.state).toBe("confirmed");
+		expect(existsSync(owner)).toBe(false);
+		// Crash right after stage 1 with no Git effect: unconfirmed, never re-run.
+		writeFileSync(join(f.workspace, "source.txt"), "second\n");
+		const next = commit();
+		publishGitSpec(f.config, "next", next);
+		atomicWrite(
+			join(f.config.spoolRoot, "operations", `git-${next.operationId}.json`),
+			{
+				...done,
+				operationId: next.operationId,
+				digest: digest(canonical(next)),
+				state: "in_progress",
+				commitSha: null,
+				treeSha: null,
+			},
+		);
+		atomicWrite(owner, { operationId: next.operationId });
+		const unknown = executeGit(f.config, "next", next.operationId);
+		expect(unknown.state).toBe("outcome_unknown");
+		expect(git(f.workspace, ["rev-list", "--count", "HEAD"]).trim()).toBe("2");
+	} finally {
+		f.close();
+	}
+}, 15000);
+test("operations.lock is free while Git runs, and the same workspace stays guarded", async () => {
+	const { f, commit, spec: execution } = await setup();
+	try {
+		const remotePath = join(f.root, "remote.git");
+		mkdirSync(remotePath);
+		git(remotePath, ["init", "--bare", "-q"]);
+		const fifo = join(f.root, "gate");
+		const started = join(f.root, "started");
+		expect(Bun.spawnSync(["mkfifo", fifo]).exitCode).toBe(0);
+		// The remote's receive-pack blocks on the FIFO, which pauses the real push.
+		const gate = join(f.root, "receive-pack.sh");
+		writeFileSync(
+			gate,
+			`#!/bin/sh\n: > '${started}'\nread x < '${fifo}'\nexec /usr/bin/git receive-pack "$@"\n`,
+		);
+		chmodSync(gate, 0o700);
+		git(f.workspace, ["remote", "add", "fixture-remote", remotePath]);
+		git(f.workspace, ["config", "remote.fixture-remote.receivepack", gate]);
+		recordGitIntegrity(f.config, "fixture");
+		f.config.workspaces[0]!.remotes = [
+			{ id: "fixture-remote", name: "fixture-remote", url: remotePath },
+		];
+		writeFileSync(join(f.workspace, "source.txt"), "change\n");
+		const c = commit();
+		publishGitSpec(f.config, "commit", c);
+		const committed = executeGit(f.config, "commit", c.operationId);
+		const push: GitSpec = {
+			version: "eumenes-coding/2",
+			kind: "push",
+			operationId: crypto.randomUUID(),
+			executionId: execution.executionId,
+			generation: 1,
+			remoteId: "fixture-remote",
+			commitSha: committed.commitSha!,
+			expectedRemoteSha: null,
+		};
+		publishGitSpec(f.config, "push", push);
+		// executeGit is synchronous, so the push runs in its own process.
+		const child = Bun.spawn(
+			[
+				process.execPath,
+				"-e",
+				`import { executeGit } from ${JSON.stringify(join(import.meta.dir, "../src/git-operations"))};
+const r = executeGit(JSON.parse(process.env.CFG), "push", process.env.OP);
+console.log(JSON.stringify(r));`,
+			],
+			{
+				env: {
+					...process.env,
+					CFG: JSON.stringify(f.config),
+					OP: push.operationId,
+				},
+				stdout: "pipe",
+				stderr: "pipe",
+			},
+		);
+		await until(
+			() => existsSync(started),
+			(ok) => ok,
+			10000,
+		);
+		const release = lock(join(f.config.spoolRoot, "operations.lock"));
+		release();
+		expect(() => executeGit(f.config, "push", push.operationId)).toThrow(
+			"runner_busy",
+		);
+		writeFileSync(fifo, "go\n");
+		const out = JSON.parse(await new Response(child.stdout).text());
+		expect(await child.exited).toBe(0);
+		expect(out.state).toBe("confirmed");
+	} finally {
+		f.close();
+	}
+}, 30000);

@@ -37,6 +37,20 @@ export const byRoot = (db: Database, id: string) =>
 			"SELECT * FROM agent_tasks WHERE root_run_id=? AND kind='coordinator'",
 		)
 		.get(id) as Task | null;
+/** Coordinators that are not yet in a terminal state. */
+export const activeCoordinators = (db: Database) =>
+	db
+		.query(
+			"SELECT * FROM agent_tasks WHERE kind='coordinator' AND state NOT IN ('completed','failed','cancelled','interrupted')",
+		)
+		.all() as Task[];
+/** Removes the stored reports of every task of one root run. */
+export const deleteReports = (db: Database, rootRunId: string) =>
+	db
+		.query(
+			"DELETE FROM agent_reports WHERE task_id IN (SELECT id FROM agent_tasks WHERE root_run_id=?)",
+		)
+		.run(rootRunId);
 function acquisitionMode(t: Task): AcquisitionMode | null {
 	try {
 		if (t.acquisition_binding_json) {

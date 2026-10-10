@@ -12,6 +12,8 @@ import type {
 	ResearchDocument,
 } from "../contracts";
 
+import { getLogger } from "../../../infrastructure/logger";
+import { isPublicHttpUrl } from "../contracts";
 import type { AcquiredBody } from "../service/saved-bodies";
 export interface Acquisition {
 	bodies?: AcquiredBody[];
@@ -88,8 +90,9 @@ export function freshnessDeadline(
 	);
 	return duration > 0 ? now + duration : null;
 }
+const log = getLogger("web-research");
 function limited(text: string, characters: number) {
-	const value = text.slice(0, characters);
+	const value = String(text ?? "").slice(0, characters);
 	return /[\uD800-\uDBFF]$/u.test(value) ? value.slice(0, -1) : value;
 }
 export function acquisitionError(error: unknown): string {
@@ -132,7 +135,24 @@ export function createWebAcquisition(
 	} = {},
 ): AcquisitionPort {
 	const now = options.now ?? Date.now;
-	const search = options.search ?? duckDuckGo({ timeoutMs: 5000 });
+	const baseSearch = options.search ?? duckDuckGo({ timeoutMs: 5000 });
+	// llm-fetch rejects the whole provider response on one invalid hit
+	// (PARSE_CHANGED), so drop unusable hits before it validates them.
+	const search: SearchProvider = {
+		name: baseSearch.name,
+		async search(input) {
+			const raw = await baseSearch.search(input);
+			if (!Array.isArray(raw)) return raw;
+			const valid = raw.filter(
+				(hit) => typeof hit?.url === "string" && isPublicHttpUrl(hit.url),
+			);
+			if (valid.length < raw.length)
+				log.info("web_research.hits_filtered", {
+					count: raw.length - valid.length,
+				});
+			return valid;
+		},
+	};
 	const hitsClient = createLlmFetch({
 		search,
 		cache: { enabled: false },
@@ -270,7 +290,14 @@ export function createWebAcquisition(
 				timeRange: request.timeRange,
 				signal,
 			});
-			result.hits = hits.slice(0, 5).map((hit) => ({
+			const valid = hits.filter(
+				(hit) => typeof hit.url === "string" && isPublicHttpUrl(hit.url),
+			);
+			if (valid.length < hits.length)
+				log.info("web_research.hits_filtered", {
+					count: hits.length - valid.length,
+				});
+			result.hits = valid.slice(0, 5).map((hit) => ({
 				url: hit.url,
 				title: limited(hit.title, 300),
 				snippet: limited(hit.snippet, 500),

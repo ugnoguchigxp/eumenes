@@ -15,6 +15,8 @@ export interface TaskKindDefinition {
 	amendInTransaction?(tx: Database, previous: WorkTask, task: WorkTask): void;
 	answerInTransaction?(tx: Database, task: WorkTask, questionId: string): void;
 	terminalInTransaction?(tx: Database, task: WorkTask): void;
+	/** Removes this kind's rows that reference the task, before tasks deletes the task row. */
+	purgeInTransaction?(tx: Database, task: WorkTask): void;
 }
 export interface TaskFence {
 	taskId: string;
@@ -31,5 +33,11 @@ export interface TasksOptions {
 	maxTasks?: number;
 	maxStorageBytes?: number;
 	kinds?: TaskKindDefinition[];
+	/**
+	 * Kind-independent purge hook: removes other domains' rows that reference the
+	 * task, in the same writer transaction, before the task row is deleted. Runs
+	 * for every purged task, including kinds that are not registered in this process.
+	 */
+	purgeInTransaction?: (tx: Database, task: WorkTask) => void;
 }
 export type TrustedTaskContext = { origin: TaskOrigin };

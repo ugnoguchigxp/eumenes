@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import {
@@ -23,7 +23,9 @@ import {
 	privateDirectory,
 	readPrivate,
 	runPath,
-	totalSize,
+	spoolSize,
+	invalidateSpoolSize,
+	assertNoSymlinks,
 } from "./storage";
 import { assertContinuable } from "./continuation";
 import { initialObservation } from "./observation";
@@ -51,6 +53,17 @@ export function publishSpec(
 		if (previous && canonical(previous) !== canonical(spec))
 			throw new Error("runner_operation_conflict");
 		if (!previous) atomicWrite(path, spec);
+		// Lets stop find its spec without parsing every file in specs/.
+		atomicWrite(
+			join(
+				config.spoolRoot,
+				"specs",
+				`exec-${id.parse(spec.executionId)}.json`,
+			),
+			{
+				specRef,
+			},
+		);
 	} finally {
 		release();
 	}
@@ -79,6 +92,137 @@ export function readReceipt(
 			childrenStopped: false,
 		};
 	return saved;
+}
+
+function findStoredSpec(
+	config: RunnerConfig,
+	executionId: string,
+): StoredSpec | undefined {
+	const dir = join(config.spoolRoot, "specs");
+	const index = optionalJson<{ specRef: string }>(
+		join(dir, `exec-${id.parse(executionId)}.json`),
+	);
+	if (index) {
+		const spec = storedSpecSchema.parse(
+			JSON.parse(readPrivate(join(dir, `${id.parse(index.specRef)}.json`))),
+		);
+		return spec.executionId === executionId ? spec : undefined;
+	}
+	// Old spool without an index: scan, but a broken unrelated spec must not block this stop.
+	for (const n of readdirSync(dir)) {
+		if (!n.endsWith(".json") || n.startsWith("git-") || n.startsWith("exec-"))
+			continue;
+		try {
+			const spec = storedSpecSchema.parse(
+				JSON.parse(readPrivate(join(dir, n))),
+			);
+			if (spec.executionId === executionId) return spec;
+		} catch {
+			/* skip unreadable spec */
+		}
+	}
+	return undefined;
+}
+const retentionMs = 86_400_000;
+const pruneBatch = 100;
+function noSymlink(path: string) {
+	if (lstatSync(path).isSymbolicLink()) throw new Error("runner_spool_symlink");
+}
+function jsonFiles(dir: string, accept: (name: string) => boolean) {
+	return readdirSync(dir).filter((n) => n.endsWith(".json") && accept(n));
+}
+function executionOf(path: string): string | null {
+	try {
+		const v = JSON.parse(readPrivate(path)) as { executionId?: unknown };
+		return typeof v.executionId === "string" ? v.executionId : null;
+	} catch {
+		return null;
+	}
+}
+/** Removes finished runs more than a day past their deadline, with their specs and operation records. */
+export function pruneSpool(
+	config: RunnerConfig,
+	now: number,
+	holdsOperationsLock = false,
+): number {
+	const releases: Array<() => void> = [];
+	try {
+		if (!holdsOperationsLock)
+			releases.push(lock(join(config.spoolRoot, "operations.lock")));
+		releases.push(lock(join(config.spoolRoot, "specs.lock")));
+		return pruneLocked(config, now);
+	} finally {
+		for (const r of releases.reverse()) r();
+	}
+}
+function pruneLocked(config: RunnerConfig, now: number): number {
+	const root = config.spoolRoot;
+	const runs = join(root, "runs");
+	const specs = join(root, "specs");
+	const operations = join(root, "operations");
+	const workspaces = join(root, "workspaces");
+	const held = new Set<string>();
+	for (const n of jsonFiles(workspaces, () => true)) {
+		const e = executionOf(join(workspaces, n));
+		if (e) held.add(e);
+	}
+	const doomed: string[] = [];
+	for (const name of readdirSync(runs)) {
+		if (doomed.length >= pruneBatch) break;
+		if (held.has(name)) continue;
+		const dir = join(runs, name);
+		noSymlink(dir);
+		let eligible = false;
+		try {
+			const receipt = readReceipt(config, name);
+			const spec = executionSpecSchema.parse(
+				JSON.parse(readPrivate(join(dir, "spec.json"))),
+			);
+			eligible =
+				["stopped", "exited", "outcome_unknown"].includes(receipt.state) &&
+				spec.deadlineAt <= now - retentionMs;
+		} catch (error) {
+			if (error instanceof Error && error.message === "runner_spool_symlink")
+				throw error;
+		}
+		if (eligible) doomed.push(name);
+	}
+	if (doomed.length === 0) return 0;
+	const gone = new Set(doomed);
+	const remove: string[] = [];
+	for (const name of doomed) {
+		// Walks the run directory; a symlink anywhere inside aborts the prune.
+		assertNoSymlinks(join(runs, name));
+		remove.push(join(runs, name));
+		const index = join(specs, `exec-${name}.json`);
+		if (existsSync(index)) {
+			noSymlink(index);
+			const ref = optionalJson<{ specRef: string }>(index)?.specRef;
+			if (ref && /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,99}$/.test(ref)) {
+				const p = join(specs, `${ref}.json`);
+				if (existsSync(p)) {
+					noSymlink(p);
+					remove.push(p);
+				}
+			}
+			remove.push(index);
+		}
+	}
+	// Specs from an older spool (no index), git specs and every operation record name their execution.
+	for (const [dir, accept] of [
+		[specs, (n: string) => !n.startsWith("exec-")],
+		[operations, () => true],
+	] as const) {
+		for (const n of jsonFiles(dir, accept)) {
+			const path = join(dir, n);
+			noSymlink(path);
+			const e = executionOf(path);
+			if (e && gone.has(e) && !remove.includes(path)) remove.push(path);
+		}
+	}
+	for (const path of remove) rmSync(path, { recursive: true, force: true });
+	invalidateSpoolSize(root);
+	return doomed.length;
 }
 export function createRunner(configPath: string, fixtureAllowed = false) {
 	const config = loadConfig(configPath, fixtureAllowed);
@@ -172,9 +316,10 @@ export function createRunner(configPath: string, fixtureAllowed = false) {
 					);
 				} else if (spec.sessionId !== null || spec.previousExecutionId !== null)
 					throw new Error("runner_session_invalid");
+				pruneSpool(config, Date.now(), true);
 				if (
 					readdirSync(join(config.spoolRoot, "runs")).length >= 1000 ||
-					totalSize(config.spoolRoot) > 190 * 1024 * 1024
+					spoolSize(config.spoolRoot) > 190 * 1024 * 1024
 				)
 					throw new Error("runner_storage_full");
 				const reservation = join(
@@ -351,14 +496,7 @@ export function createRunner(configPath: string, fixtureAllowed = false) {
 				if (oldCommand && canonical(oldCommand) !== canonical(command))
 					throw new Error("runner_operation_conflict");
 				if (!existsSync(runPath(config.spoolRoot, executionId))) {
-					const specs = readdirSync(join(config.spoolRoot, "specs"))
-						.filter((n) => n.endsWith(".json") && !n.startsWith("git-"))
-						.map((n) =>
-							storedSpecSchema.parse(
-								JSON.parse(readPrivate(join(config.spoolRoot, "specs", n))),
-							),
-						);
-					const spec = specs.find((s) => s.executionId === executionId);
+					const spec = findStoredSpec(config, executionId);
 					if (!spec || spec.generation !== generation)
 						throw new Error("runner_intent_not_found");
 					const operationPath = join(

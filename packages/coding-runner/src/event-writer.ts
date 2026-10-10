@@ -4,7 +4,14 @@ import type { CodingEvent, ExecutionReceipt, ExecutionSpec } from "./contracts";
 import type { RunnerConfig } from "./config";
 import { addCaptureIssue, observeTerminal } from "./observation";
 import type { MessageMetadata } from "./observation";
-import { atomicWrite, canonical, digest, lock, totalSize } from "./storage";
+import {
+	atomicWrite,
+	canonical,
+	digest,
+	lock,
+	spoolSize,
+	addSpoolBytes,
+} from "./storage";
 
 /** Persists body and metadata first; only then does the receipt seq (and terminal fact) advance. */
 export function createEventWriter(input: {
@@ -46,7 +53,7 @@ export function createEventWriter(input: {
 			if (
 				!essential &&
 				(used + size > maxRunBytes ||
-					totalSize(config.spoolRoot) + size > 200 * 1024 * 1024)
+					spoolSize(config.spoolRoot) + size > 200 * 1024 * 1024)
 			) {
 				input.overLimit();
 				return;
@@ -54,6 +61,7 @@ export function createEventWriter(input: {
 			atomicWrite(join(path, "evidence", `${payloadRef}.txt`), text);
 			atomicWrite(join(path, "events", `${metadata.seq}.json`), metadata);
 			used += size;
+			addSpoolBytes(config.spoolRoot, size);
 			receipt.seq = metadata.seq;
 			if (extra.turnOutcome) {
 				observeTerminal(receipt.observation, extra.turnOutcome, metadata.seq);

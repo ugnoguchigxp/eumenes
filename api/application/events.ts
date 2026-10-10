@@ -26,7 +26,7 @@ export function createChanges(
 			}, options.debounceMs ?? 100);
 			pending.unref?.();
 		},
-		open(signal: AbortSignal): Response {
+		open(signal: AbortSignal, lastEventId?: string): Response {
 			if (closed || clients.size >= (options.maxClients ?? 32))
 				return Response.json(
 					{ error: "event_stream_unavailable" },
@@ -68,7 +68,9 @@ export function createChanges(
 						clients.add(client);
 						signal.addEventListener("abort", client.close, { once: true });
 						if (signal.aborted) client.close();
-						// Always resnapshot on connect, including a missed range or server restart.
+						// Resnapshot unless the client proves it saw this session's latest revision.
+						else if (lastEventId === `${session}:${revision}`)
+							client.send(frame("resumed"));
 						else client.send(frame("reset"));
 					},
 					cancel() {

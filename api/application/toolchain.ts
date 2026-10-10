@@ -2,8 +2,11 @@ import { projectTimerResult } from "./timer-result-context";
 import type { SqliteStore } from "../infrastructure/sqlite";
 import type { QueueService } from "../domains/queue";
 import type { InferencePort } from "../domains/inference";
-import type { WebResearchService } from "../domains/web-research";
-import { createCapabilities } from "../domains/capabilities";
+import {
+	webToolArguments,
+	type WebResearchService,
+} from "../domains/web-research";
+import { createCapabilities, toolRuntimeOf } from "../domains/capabilities";
 import {
 	createToolRuntime,
 	type ActionAdapter,
@@ -27,6 +30,8 @@ export async function createToolchain(
 		webResearch?: boolean;
 		conversation?: import("../domains/conversation").ConversationService;
 		timers?: import("../domains/timers").TimersService;
+		/** Tests that observe a pass immediately after a commit set 0. */
+		reconcileThrottleMs?: number;
 	} = {},
 ) {
 	const capabilities = createCapabilities(
@@ -57,16 +62,11 @@ export async function createToolchain(
 			() => agents,
 		),
 		startInTransaction(db, r) {
-			if (r.tool.id !== "web.lookup" && r.tool.id !== "web.read")
-				throw new Error("capability_unavailable");
-			const raw = {
-				...(r.arguments as Record<string, unknown>),
-				requestId: r.requestId,
-				freshness: "live",
-				...(r.tool.id === "web.lookup"
-					? { operation: "lookup", readPages: 0 }
-					: { operation: "read", retention: "none" }),
-			};
+			const raw = webToolArguments(
+				r.tool.id,
+				r.arguments as Record<string, unknown>,
+				r.requestId,
+			);
 			const op = web.submitInTransaction(db, raw, {
 				deadlineAtMs: r.deadline,
 				parentJobId: r.parentJobId,
@@ -125,8 +125,10 @@ export async function createToolchain(
 						messageId: source.messageId,
 						originKey: `${request.owner.rootRunId}:timer:0`,
 					};
+					const verb = toolRuntimeOf(request.tool.revisionId)?.localAction
+						?.verb;
 					const saved =
-						request.tool.id === "timer.start"
+						verb === "start"
 							? timers.startInTransaction(
 									db,
 									{
@@ -137,7 +139,7 @@ export async function createToolchain(
 									},
 									origin,
 								)
-							: request.tool.id === "timer.cancel"
+							: verb === "cancel"
 								? timers.cancelInTransaction(
 										db,
 										{
@@ -148,7 +150,7 @@ export async function createToolchain(
 										"default",
 										args.timerId ?? "",
 									)
-								: request.tool.id === "timer.list"
+								: verb === "list"
 									? timers.recordListOperationInTransaction(
 											db,
 											{
@@ -198,7 +200,6 @@ export async function createToolchain(
 		queue,
 		adapter,
 		Date.now,
-		undefined,
 		timerActions,
 	);
 	const agents = createAgentRuntime({
@@ -207,6 +208,9 @@ export async function createToolchain(
 		tools,
 		queue,
 		inference,
+		...(options.reconcileThrottleMs === undefined
+			? {}
+			: { reconcileThrottleMs: options.reconcileThrottleMs }),
 	});
 	for (const handler of routes?.maintenanceHandlers() ?? [])
 		queue.registerHandler(handler);
@@ -217,11 +221,4 @@ export async function createToolchain(
 		routeService: routes,
 		postAnswer: undefined,
 	};
-}
-export function toolchainEnabled(
-	value = process.env.EUMENES_TOOLCHAIN_ENABLED,
-) {
-	if (value === undefined || value === "1") return true;
-	if (value === "0") return false;
-	throw new Error("invalid_toolchain_enabled");
 }

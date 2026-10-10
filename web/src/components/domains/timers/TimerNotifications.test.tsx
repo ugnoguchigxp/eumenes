@@ -431,3 +431,79 @@ test("a finished timer is announced as an alert inside a polite status region", 
 	expect(alert.textContent).toContain("3分のタイマーが終了しました。");
 	expect(region.contains(alert)).toBe(true);
 });
+
+test("a failing claim is retried with exponential backoff instead of at network speed", async () => {
+	vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+	try {
+		const h = fixture();
+		h.api.claimTimerNotification.mockRejectedValue(new Error("http_500"));
+		const tone = vi.fn(async () => {});
+		h.show(tone);
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(0);
+		});
+		for (let second = 0; second < 10; second += 1) {
+			await act(async () => {
+				await vi.advanceTimersByTimeAsync(1000);
+			});
+		}
+		expect(h.api.claimTimerNotification.mock.calls.length).toBeGreaterThan(1);
+		expect(h.api.claimTimerNotification.mock.calls.length).toBeLessThanOrEqual(
+			5,
+		);
+		expect(tone).not.toHaveBeenCalled();
+	} finally {
+		vi.useRealTimers();
+	}
+});
+
+test("a notice that already sounded is acknowledged without ringing again when it returns pending", async () => {
+	vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+	try {
+		const h = fixture();
+		h.api.ackTimerNotification.mockRejectedValueOnce(new Error("http_500"));
+		h.api.ackTimerNotification.mockRejectedValueOnce(new Error("http_500"));
+		const tone = vi.fn(
+			async (_signal: AbortSignal, _message?: string, done?: () => void) => {
+				done?.();
+			},
+		);
+		h.show(tone);
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(0);
+		});
+		expect(tone).toHaveBeenCalledOnce();
+		expect(h.api.ackTimerNotification).toHaveBeenCalledTimes(2);
+		// The server lost the ack: the lease expired and the notice is pending again.
+		h.api.timerNotifications.mockImplementation((async () => ({
+			serverNow: NOW,
+			nextCursor: null,
+			items: [
+				{
+					id: "notice",
+					timerId: "timer",
+					revision: 3,
+					status: "pending",
+					dueAt: NOW,
+					reason: null,
+					generation: 1,
+					message: "3分のタイマーが終了しました。",
+				},
+			],
+		})) as never);
+		await h.refresh();
+		for (let second = 0; second < 5; second += 1) {
+			await act(async () => {
+				await vi.advanceTimersByTimeAsync(1000);
+			});
+		}
+		expect(tone).toHaveBeenCalledOnce();
+		expect(h.api.claimTimerNotification.mock.calls.length).toBeGreaterThan(1);
+		expect(h.api.ackTimerNotification).toHaveBeenLastCalledWith(
+			"notice",
+			expect.objectContaining({ outcome: "played" }),
+		);
+	} finally {
+		vi.useRealTimers();
+	}
+});

@@ -29,6 +29,7 @@ export interface TestInput {
 	width?: number;
 	height?: number;
 	format?: "png" | "webp";
+	seed?: number;
 	durationSeconds?: number;
 	audio?: Uint8Array;
 }

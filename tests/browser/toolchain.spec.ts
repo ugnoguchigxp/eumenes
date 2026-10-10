@@ -1,58 +1,32 @@
 import { test, expect } from "@playwright/test";
-import { spawn, type ChildProcess } from "node:child_process";
-import { createServer, type AddressInfo } from "node:net";
-async function port() {
-	const s = createServer();
-	await new Promise<void>((r) => s.listen(0, "127.0.0.1", r));
-	const p = (s.address() as AddressInfo).port;
-	await new Promise<void>((r) => s.close(() => r()));
-	return p;
-}
+import { mkdirSync } from "node:fs";
+import { createFixture } from "./fixture";
+import { evidencePath } from "./evidence";
+
 test.setTimeout(60000);
-let apiPort: number, webPort: number;
-const processes: ChildProcess[] = [];
+const fixture = createFixture();
+let webPort: number;
 test.beforeAll(async () => {
-	apiPort = await port();
-	webPort = await port();
-	const api = spawn(
-		process.execPath.includes("node") ? "bun" : process.execPath,
+	const [apiPort, web] = (await fixture.ports(2)) as [number, number];
+	webPort = web;
+	await fixture.launch(
 		["scripts/toolchain-fixture-server.ts"],
 		{
-			env: {
-				...process.env,
-				EUMENES_PORT: String(apiPort),
-				EUMENES_ORIGIN: `http://127.0.0.1:${webPort}`,
-			},
-			stdio: "ignore",
-		},
-	);
-	processes.push(api);
-	const web = spawn("bun", ["run", "dev:web", "--port", String(webPort)], {
-		env: {
-			...process.env,
-			EUMENES_PROXY_URL: `http://127.0.0.1:${apiPort}`,
-			EUMENES_API_TOKEN: "fixture-token-for-toolchain-browser",
+			EUMENES_PORT: String(apiPort),
 			EUMENES_ORIGIN: `http://127.0.0.1:${webPort}`,
-			EUMENES_VITE_CACHE_DIR: `/tmp/eumenes-toolchain-vite-${webPort}`,
-			LARM_API_TOKEN: "",
 		},
-		stdio: "ignore",
+		{ ports: [apiPort] },
+	);
+	await fixture.ready(`http://127.0.0.1:${apiPort}/api/status`);
+	await fixture.launchWeb({
+		webPort,
+		apiPort,
+		token: "fixture-token-for-toolchain-browser",
+		cacheDir: `/tmp/eumenes-toolchain-vite-${webPort}`,
 	});
-	processes.push(web);
-	for (let i = 0; i < 100; i++) {
-		try {
-			const r = await fetch(`http://127.0.0.1:${webPort}`);
-			if (r.ok) return;
-		} catch {}
-		await new Promise((r) => setTimeout(r, 100));
-	}
-	throw new Error("fixture_not_ready");
+	await fixture.ready(`http://127.0.0.1:${webPort}`);
 });
-test.afterAll(async () => {
-	for (const p of processes) p.kill("SIGTERM");
-	await new Promise((r) => setTimeout(r, 200));
-	for (const p of processes) if (p.exitCode === null) p.kill("SIGKILL");
-});
+test.afterAll(() => fixture.stopAll());
 for (const [question, answer] of [
 	["東京の天気を調べて", "26度"],
 	["AAPLの株価を調べて", "250.12"],
@@ -101,8 +75,9 @@ for (const [question, answer] of [
 		await expect(card).toContainText(answer!, { timeout: 20000 });
 		await expect(card.locator("details")).toHaveAttribute("open", "");
 		if (question === "東京の天気を調べて") {
+			mkdirSync(evidencePath("research-activity"), { recursive: true });
 			await page.screenshot({
-				path: "spec/verification/research-activity/desktop.png",
+				path: evidencePath("research-activity/desktop.png"),
 			});
 			await page.setViewportSize({ width: 390, height: 844 });
 			await expect(card).toBeVisible();
@@ -110,7 +85,7 @@ for (const [question, answer] of [
 				await card.evaluate((el) => el.getBoundingClientRect().right),
 			).toBeLessThanOrEqual(390);
 			await page.screenshot({
-				path: "spec/verification/research-activity/mobile.png",
+				path: evidencePath("research-activity/mobile.png"),
 			});
 		}
 	});

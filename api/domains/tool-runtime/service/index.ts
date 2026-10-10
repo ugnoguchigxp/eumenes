@@ -19,9 +19,6 @@ import type {
 	Invocation,
 	Source,
 	ToolResult,
-	CachedSourceAuthorizationPort,
-	CachedRouteGrantInput,
-	CandidateImportInput,
 	ActionAdapter,
 	ActionEnvelope,
 } from "../contracts";
@@ -33,7 +30,6 @@ export function createToolRuntime(
 	queue: QueueService,
 	adapter: ToolAdapter,
 	now = Date.now,
-	cachedSource?: CachedSourceAuthorizationPort,
 	actions?: ActionAdapter,
 ) {
 	const localOperations = new Map<
@@ -78,90 +74,12 @@ export function createToolRuntime(
 				return { executionRef, tool };
 			});
 	}
-	function authorize(
-		db: Database,
-		owner: Owner,
-		prepared: Prepared,
-		bindingToken: string,
-		exactUrl: string,
-	) {
-		const decision = cachedSource?.validateInTransaction(db, {
-			owner,
-			bindingToken,
-			packageHash: prepared.package.hash,
-			exactUrl,
-		});
-		if (!decision) throw new Error("cached_source_unavailable");
-		if (decision.status !== "allowed")
-			throw new Error("cached_source_rejected");
-	}
-	/**
-	 * Host-only: a fresh reference for ONE recipe tool, bound to this owner, binding token and
-	 * exact URL. Never copies another owner's reference; the port is re-checked on every use.
-	 */
-	function issueCachedGrantInTransaction(
-		db: Database,
-		input: CachedRouteGrantInput,
-	) {
-		if (input.deadline <= now()) throw new Error("tool_ref_invalid");
-		capabilities.validateInTransaction(db, input.prepared);
-		authorize(
-			db,
-			input.owner,
-			input.prepared,
-			input.bindingToken,
-			input.exactUrl,
-		);
-		const allowed = new Set(input.prepared.package.toolRevisionIds);
-		const tool = input.prepared.dependencies.find(
-			(d) =>
-				d.kind === "tool" && d.id === input.toolId && allowed.has(d.revisionId),
-		);
-		if (!tool?.schemaKey) throw new Error("invalid_tool_schema");
-		const parsed = validators[tool.schemaKey].safeParse(input.arguments);
-		if (!parsed.success)
-			throw new ValidationFailure(
-				"invalid_tool_input",
-				validationIssues(parsed.error, input.arguments, ["arguments"]),
-				parsed.error.issues.length,
-			);
-		if (
-			input.toolId === "web.read" &&
-			(parsed.data as { url: string }).url !== input.exactUrl
-		)
-			throw new Error("tool_url_out_of_scope");
-		reserve(input.owner);
-		const executionRef = crypto.randomUUID();
-		refs.set(executionRef, {
-			owner: input.owner,
-			tool,
-			prepared: input.prepared,
-			expires: Math.min(now() + 300000, input.deadline),
-			grant: {
-				bindingToken: input.bindingToken,
-				exactUrl: input.exactUrl,
-				argsDigest: hash(parsed.data),
-				attemptTimeoutMs: input.attemptTimeoutMs,
-			},
-		});
-		return { executionRef, tool };
-	}
-	function releaseBinding(bindingToken: string) {
-		let n = 0;
-		for (const [key, ref] of refs)
-			if (ref.grant?.bindingToken === bindingToken) {
-				refs.delete(key);
-				n++;
-			}
-		return n;
-	}
 	const invokeInTransaction = createReadInvocation({
 		refs,
 		localOperations,
 		now,
 		capabilities,
 		adapter,
-		authorize,
 	});
 	function resolve(db: Database, ref: string, taskId: string) {
 		const entry = vault.get(ref);
@@ -240,17 +158,22 @@ export function createToolRuntime(
 						vault.delete(key);
 				}
 				const result = operation.result;
-				const sources =
-					adapter.prepareSourcesInTransaction?.(db, inv, result) ??
-					resultSources(result);
+				const prepared = adapter.prepareSourcesInTransaction?.(db, inv, result);
+				const sources = prepared?.sources ?? resultSources(result);
+				const failures = prepared?.failures ?? result.failures;
 				const size = bytes({
 					sources,
-					failures: result.failures,
+					failures,
 					notes: result.notes,
 				});
+				const mine = [...vault.values()].filter(
+					(e) => e.ownerTaskId === inv.owner_task_id,
+				);
 				if (
 					size > 32768 ||
 					vault.size >= 64 ||
+					mine.length >= 16 ||
+					mine.reduce((a, e) => a + e.bytes, 0) + size > 524288 ||
 					[...vault.values()].reduce((a, e) => a + e.bytes, 0) + size > 2097152
 				) {
 					state = "failed";
@@ -259,7 +182,7 @@ export function createToolRuntime(
 					ref = crypto.randomUUID();
 					digest = hash({
 						sources,
-						failures: result.failures,
+						failures,
 						notes: result.notes,
 					});
 					vault.set(ref, {
@@ -267,7 +190,7 @@ export function createToolRuntime(
 						ownerTaskId: inv.owner_task_id,
 						digest,
 						sources,
-						failures: result.failures,
+						failures,
 						notes: result.notes,
 						bytes: size,
 						expires: now() + 900000,
@@ -334,72 +257,6 @@ export function createToolRuntime(
 			"UPDATE tool_invocations SET state='cancelled',error_code='cancel_requested',finished_at=? WHERE owner_task_id=? AND state='pending'",
 		).run(now(), taskId);
 		return jobs;
-	}
-	/**
-	 * Host-only: turn a stored search candidate into an observation owned by THIS owner
-	 * (origin candidate-cache, no queue job, no inference/HTTP). It counts as one lookup
-	 * allowance through countInTransaction but is excluded from countRealInTransaction.
-	 */
-	function importSearchCandidatesInTransaction(
-		db: Database,
-		input: CandidateImportInput,
-	) {
-		if (input.hits.length < 1 || input.hits.length > 5)
-			throw new Error("invalid_candidate_import");
-		if (input.deadline <= now()) throw new Error("tool_ref_invalid");
-		capabilities.validateInTransaction(db, input.prepared);
-		const allowed = new Set(input.prepared.package.toolRevisionIds);
-		const lookup = input.prepared.dependencies.find(
-			(d) =>
-				d.kind === "tool" && d.id === "web.lookup" && allowed.has(d.revisionId),
-		);
-		if (!lookup) throw new Error("invalid_tool_schema");
-		const old = db
-			.query("SELECT * FROM tool_invocations WHERE step_id=?")
-			.get(input.stepId) as Invocation | null;
-		if (old) {
-			if (
-				old.owner_task_id !== input.owner.taskId ||
-				old.root_run_id !== input.owner.rootRunId ||
-				old.origin !== "candidate-cache"
-			)
-				throw new Error("idempotency_conflict");
-			return old;
-		}
-		for (const hit of input.hits)
-			authorize(db, input.owner, input.prepared, input.bindingToken, hit.url);
-		const id = crypto.randomUUID();
-		const args = {
-			query: input.query,
-			provenanceDigest: input.provenanceDigest,
-		};
-		db.query(
-			"INSERT INTO tool_invocations(id,owner_task_id,root_run_id,tool_revision_id,step_id,request_id,args_json,args_digest,operation_id,job_id,state,deadline,created_at,origin) VALUES(?,?,?,?,?,?,?,?,?,?,'pending',?,?,'candidate-cache')",
-		).run(
-			id,
-			input.owner.taskId,
-			input.owner.rootRunId,
-			lookup.revisionId,
-			input.stepId,
-			crypto.randomUUID(),
-			JSON.stringify(args),
-			hash(args),
-			`candidate-cache:${id}`,
-			"candidate-cache",
-			input.deadline,
-			now(),
-		);
-		const inv = get(db, id)!;
-		settleInTransaction(db, inv, {
-			state: "succeeded",
-			result: {
-				observedAt: input.searchedAt,
-				hits: input.hits,
-				documents: [],
-				failures: [],
-			},
-		});
-		return get(db, id)!;
 	}
 	function release(taskId: string) {
 		adapter.releaseTask?.(taskId);
@@ -481,9 +338,6 @@ export function createToolRuntime(
 			}>;
 		},
 		bind,
-		issueCachedGrantInTransaction,
-		importSearchCandidatesInTransaction,
-		releaseBinding,
 		invokeInTransaction,
 		observationsInTransaction: observations,
 		settleInTransaction,

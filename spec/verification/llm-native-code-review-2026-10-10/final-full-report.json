@@ -1,165 +1,165 @@
 {
-  "selected": [
-    "task-reports",
-    "coding-supervision",
-    "coding",
-    "artifact",
-    "tasks",
-    "capabilities",
-    "tool-runtime",
-    "agent-runtime",
-    "research-routes",
-    "web-research",
-    "attitude-dataset",
-    "service-tests",
-    "delivery",
-    "avatar",
-    "settings",
-    "inference",
-    "tts-dictionary",
-    "conversation",
-    "continuity",
-    "goals",
-    "world",
-    "memory",
-    "larm",
-    "audio",
-    "queue",
-    "scheduler",
-    "timers",
-    "dialogue",
-    "voice-dialogue"
-  ],
-  "dependencySet": [
-    "tasks",
-    "task-reports",
-    "coding",
-    "delivery",
-    "attitude-dataset",
-    "larm",
-    "settings",
-    "inference",
-    "queue",
-    "coding-supervision",
-    "artifact",
-    "avatar",
-    "conversation",
-    "capabilities",
-    "tool-runtime",
-    "agent-runtime",
-    "research-routes",
-    "web-research",
-    "service-tests",
-    "tts-dictionary",
-    "continuity",
-    "goals",
-    "world",
-    "memory",
-    "audio",
-    "scheduler",
-    "timers",
-    "dialogue",
-    "voice-dialogue"
-  ],
-  "testDependencySet": [
-    "tasks",
-    "task-reports",
-    "coding",
-    "delivery",
-    "attitude-dataset",
-    "larm",
-    "tts-dictionary",
-    "settings",
-    "inference",
-    "queue",
-    "coding-supervision",
-    "avatar",
-    "conversation",
-    "artifact",
-    "capabilities",
-    "tool-runtime",
-    "agent-runtime",
-    "research-routes",
-    "web-research",
-    "service-tests",
-    "continuity",
-    "goals",
-    "memory",
-    "world",
-    "audio",
-    "scheduler",
-    "timers",
-    "dialogue",
-    "voice-dialogue"
-  ],
-  "revision": "65fcd8050bc1af666f2ad825d6e772720aa2bd1bd733bb45abeeea365538e088",
-  "steps": [
-    {
-      "name": "size-budget",
-      "ms": 385,
-      "result": "pass"
-    },
-    {
-      "name": "sql-boundaries",
-      "ms": 546,
-      "result": "pass"
-    },
-    {
-      "name": "domain-docs",
-      "ms": 14,
-      "result": "pass"
-    },
-    {
-      "name": "format",
-      "ms": 212,
-      "result": "pass"
-    },
-    {
-      "name": "lint",
-      "ms": 145,
-      "result": "pass"
-    },
-    {
-      "name": "typecheck",
-      "ms": 4827,
-      "result": "pass"
-    },
-    {
-      "name": "tests",
-      "ms": 145094,
-      "result": "pass"
-    },
-    {
-      "name": "web tests",
-      "ms": 8494,
-      "result": "pass"
-    },
-    {
-      "name": "client tests",
-      "ms": 1242,
-      "result": "pass"
-    },
-    {
-      "name": "design-system typecheck",
-      "ms": 1180,
-      "result": "pass"
-    },
-    {
-      "name": "design-system tests",
-      "ms": 11654,
-      "result": "pass"
-    },
-    {
-      "name": "web build",
-      "ms": 6186,
-      "result": "pass"
-    },
-    {
-      "name": "browser fixture",
-      "ms": 223144,
-      "result": "pass"
-    }
-  ],
-  "totalMs": 403853,
-  "result": "pass"
+	"selected": [
+		"task-reports",
+		"coding-supervision",
+		"coding",
+		"artifact",
+		"tasks",
+		"capabilities",
+		"tool-runtime",
+		"agent-runtime",
+		"research-routes",
+		"web-research",
+		"attitude-dataset",
+		"service-tests",
+		"delivery",
+		"avatar",
+		"settings",
+		"inference",
+		"tts-dictionary",
+		"conversation",
+		"continuity",
+		"goals",
+		"world",
+		"memory",
+		"larm",
+		"audio",
+		"queue",
+		"scheduler",
+		"timers",
+		"dialogue",
+		"voice-dialogue"
+	],
+	"dependencySet": [
+		"tasks",
+		"task-reports",
+		"coding",
+		"delivery",
+		"attitude-dataset",
+		"larm",
+		"settings",
+		"inference",
+		"queue",
+		"coding-supervision",
+		"artifact",
+		"avatar",
+		"conversation",
+		"capabilities",
+		"tool-runtime",
+		"agent-runtime",
+		"research-routes",
+		"web-research",
+		"service-tests",
+		"tts-dictionary",
+		"continuity",
+		"goals",
+		"world",
+		"memory",
+		"audio",
+		"scheduler",
+		"timers",
+		"dialogue",
+		"voice-dialogue"
+	],
+	"testDependencySet": [
+		"tasks",
+		"task-reports",
+		"coding",
+		"delivery",
+		"attitude-dataset",
+		"larm",
+		"tts-dictionary",
+		"settings",
+		"inference",
+		"queue",
+		"coding-supervision",
+		"avatar",
+		"conversation",
+		"artifact",
+		"capabilities",
+		"tool-runtime",
+		"agent-runtime",
+		"research-routes",
+		"web-research",
+		"service-tests",
+		"continuity",
+		"goals",
+		"memory",
+		"world",
+		"audio",
+		"scheduler",
+		"timers",
+		"dialogue",
+		"voice-dialogue"
+	],
+	"revision": "65fcd8050bc1af666f2ad825d6e772720aa2bd1bd733bb45abeeea365538e088",
+	"steps": [
+		{
+			"name": "size-budget",
+			"ms": 385,
+			"result": "pass"
+		},
+		{
+			"name": "sql-boundaries",
+			"ms": 546,
+			"result": "pass"
+		},
+		{
+			"name": "domain-docs",
+			"ms": 14,
+			"result": "pass"
+		},
+		{
+			"name": "format",
+			"ms": 212,
+			"result": "pass"
+		},
+		{
+			"name": "lint",
+			"ms": 145,
+			"result": "pass"
+		},
+		{
+			"name": "typecheck",
+			"ms": 4827,
+			"result": "pass"
+		},
+		{
+			"name": "tests",
+			"ms": 145094,
+			"result": "pass"
+		},
+		{
+			"name": "web tests",
+			"ms": 8494,
+			"result": "pass"
+		},
+		{
+			"name": "client tests",
+			"ms": 1242,
+			"result": "pass"
+		},
+		{
+			"name": "design-system typecheck",
+			"ms": 1180,
+			"result": "pass"
+		},
+		{
+			"name": "design-system tests",
+			"ms": 11654,
+			"result": "pass"
+		},
+		{
+			"name": "web build",
+			"ms": 6186,
+			"result": "pass"
+		},
+		{
+			"name": "browser fixture",
+			"ms": 223144,
+			"result": "pass"
+		}
+	],
+	"totalMs": 403853,
+	"result": "pass"
 }

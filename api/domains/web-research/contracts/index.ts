@@ -4,18 +4,24 @@ const common = {
 	requestId: z.string().uuid(),
 	freshness: z.enum(["live", "normal"]).default("live"),
 };
-const publicUrl = z
-	.string()
-	.url()
-	.max(2048)
-	.refine((value) => {
+export function isPublicHttpUrl(value: string): boolean {
+	if (value.length > 2048) return false;
+	try {
 		const url = new URL(value);
 		return (
 			["http:", "https:"].includes(url.protocol) &&
 			!url.username &&
 			!url.password
 		);
-	});
+	} catch {
+		return false;
+	}
+}
+const publicUrl = z
+	.string()
+	.url()
+	.max(2048)
+	.refine((value) => isPublicHttpUrl(value));
 export const submitResearchSchema = z.discriminatedUnion("operation", [
 	z
 		.object({

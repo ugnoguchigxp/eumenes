@@ -51,6 +51,13 @@ export function TimerNotifications({
 	const [stoppingIds, setStoppingIds] = useState<string[]>([]);
 	const [ringingId, setRingingId] = useState<string | null>(null);
 	const alarm = useRef<AbortController | null>(null);
+	const failures = useRef(new Map<string, { count: number; until: number }>());
+	const delivered = useRef(new Set<string>());
+	const retryTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+		undefined,
+	);
+	const [tick, setTick] = useState(0);
+	useEffect(() => () => clearTimeout(retryTimer.current), []);
 	const query = useQuery({
 		queryKey: [queryRoots.timers, "notifications"],
 		queryFn: async ({ signal }) => {
@@ -118,9 +125,11 @@ export function TimerNotifications({
 			!query.data
 		)
 			return;
+		const now = Date.now();
 		const note = query.data.items.find(
 			(item) =>
 				item.status === "pending" &&
+				(failures.current.get(item.id)?.until ?? 0) <= now &&
 				Date.parse(query.data!.serverNow) - Date.parse(item.dueAt) <= 300_000,
 		);
 		if (!note) return;
@@ -139,6 +148,7 @@ export function TimerNotifications({
 						expectedRevision: note.revision,
 						reason: "muted",
 					});
+					failures.current.delete(note.id);
 					return;
 				}
 				const claimed = await client.claimTimerNotification(note.id, {
@@ -165,6 +175,17 @@ export function TimerNotifications({
 					Math.min(available, 10_000),
 				);
 				attempt.controller.signal.throwIfAborted();
+				if (delivered.current.has(note.id)) {
+					// Already sounded: confirm it with the server without ringing again.
+					attempt.delivered = true;
+					await client.ackTimerNotification(note.id, {
+						clientId: clientId.current,
+						claimId,
+						outcome: "played",
+					});
+					failures.current.delete(note.id);
+					return;
+				}
 				if (latest.current.busy || latest.current.inputBusy?.()) {
 					attempt.deferred = true;
 					return;
@@ -175,6 +196,7 @@ export function TimerNotifications({
 					note.message,
 					() => {
 						attempt.delivered = true;
+						delivered.current.add(note.id);
 					},
 				);
 				attempt.controller.signal.throwIfAborted();
@@ -183,8 +205,17 @@ export function TimerNotifications({
 					claimId,
 					outcome: "played",
 				});
+				failures.current.delete(note.id);
 				if (repeatTone) setRingingId(note.id);
 			} catch {
+				const previous = failures.current.get(note.id)?.count ?? 0;
+				const until = Date.now() + Math.min(30_000, 1000 * 2 ** previous);
+				failures.current.set(note.id, { count: previous + 1, until });
+				clearTimeout(retryTimer.current);
+				retryTimer.current = setTimeout(
+					() => setTick((value) => value + 1),
+					Math.max(0, until - Date.now()),
+				);
 				if (
 					claimId &&
 					(attempt.delivered || !attempt.deferred || latest.current.muted)
@@ -199,6 +230,7 @@ export function TimerNotifications({
 									? "muted"
 									: "blocked",
 						});
+						if (attempt.delivered) failures.current.delete(note.id);
 						if (attempt.delivered && repeatTone) setRingingId(note.id);
 					} catch {
 						/* A cancelled or expired claim must not be adopted. */
@@ -221,6 +253,7 @@ export function TimerNotifications({
 		muted,
 		audioReady,
 		repeatTone,
+		tick,
 	]);
 	const canRing =
 		!busy &&

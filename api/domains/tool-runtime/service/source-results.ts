@@ -23,10 +23,15 @@ export function resultSources(result: ToolResult): Source[] {
 		]
 	);
 }
-export function operationFingerprint(toolId: string, args: unknown) {
+/** `normalizeText` folds case and whitespace of string arguments (search queries). */
+export function operationFingerprint(
+	toolId: string,
+	args: unknown,
+	normalizeText = false,
+) {
 	function canonical(v: unknown): unknown {
 		if (typeof v === "string")
-			return toolId === "web.lookup"
+			return normalizeText
 				? v
 						.normalize("NFKC")
 						.toLowerCase()

@@ -8,7 +8,12 @@ import {
 	migration as capMigration,
 } from "../../capabilities";
 import { createQueue, migration as queueMigration } from "../../queue";
-import { createToolRuntime, migration, type ToolAdapter } from "..";
+import {
+	createToolRuntime,
+	migration,
+	supersedeMigration,
+	type ToolAdapter,
+} from "..";
 test("gateway refuses foreign refs and unselected URLs; idempotent invocation and rolled-back result is not exposed", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-tools-"));
 	const store = openStore(join(dir, "db"), [
@@ -169,6 +174,106 @@ test("gateway refuses foreign refs and unselected URLs; idempotent invocation an
 		expect(() =>
 			store.read((db) => tools.observationsInTransaction(db, owner.taskId)),
 		).toThrow("result_expired");
+	} finally {
+		tools.close();
+		await queue.close(100);
+		await store.close();
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("superseded invocations leave observations but stay in the budget and the invocation list", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "eumenes-tools-"));
+	const store = openStore(join(dir, "db"), [
+		capMigration,
+		queueMigration,
+		migration,
+		supersedeMigration,
+	]);
+	const caps = createCapabilities(store),
+		queue = createQueue(store);
+	let started = 0;
+	const adapter: ToolAdapter = {
+		startInTransaction: () => {
+			started++;
+			return { operationId: `op${started}`, jobId: `job${started}` };
+		},
+		get: () => ({
+			state: "succeeded",
+			result: {
+				observedAt: new Date().toISOString(),
+				hits: [
+					{ url: "https://example.com", title: "result", snippet: "fact" },
+				],
+				documents: [],
+				failures: [],
+			},
+		}),
+		cancelInTransaction: () => [],
+	};
+	const tools = createToolRuntime(store, caps, queue, adapter, Date.now);
+	try {
+		await caps.seed();
+		const owner = { rootRunId: "root", taskId: "child", cancelEpoch: 0 };
+		const refs = await store.write((db) =>
+			tools.bind(
+				owner,
+				caps.prepareActiveByIdInTransaction(
+					db,
+					owner,
+					"package:web.research@9",
+					{ question: "天気" },
+				),
+				Date.now() + 100000,
+			),
+		);
+		const lookup = refs.find((r) => r.tool.id === "web.lookup")!;
+		const invokeLookup = (query: string, stepId: string) =>
+			store.write((db) =>
+				tools.invokeInTransaction(
+					db,
+					owner,
+					lookup.executionRef,
+					{ query },
+					stepId,
+					Date.now() + 100000,
+					"parent",
+					[],
+				),
+			);
+		const first = await invokeLookup("天気", "step-1");
+		await invokeLookup("天気予報", "step-2");
+		await store.write((db) =>
+			tools.settleInTransaction(db, first, adapter.get("op1")),
+		);
+		expect(
+			store.read((db) => tools.observationsInTransaction(db, owner.taskId)),
+		).toHaveLength(2);
+		expect(
+			await store.write((db) =>
+				tools.supersedeInvocationsInTransaction(db, owner.taskId),
+			),
+		).toBe(2);
+		expect(
+			store.read((db) => tools.observationsInTransaction(db, owner.taskId)),
+		).toHaveLength(0);
+		expect(
+			store.read((db) =>
+				tools.countInTransaction(db, owner.taskId, lookup.tool.revisionId),
+			),
+		).toBe(2);
+		const list = store.read((db) =>
+			tools.invocationsInTransaction(db, owner.taskId),
+		);
+		expect(list.map((i) => [i.stepId, i.superseded]).sort()).toEqual([
+			["step-1", true],
+			["step-2", true],
+		]);
+		expect(
+			await store.write((db) =>
+				tools.supersedeInvocationsInTransaction(db, owner.taskId),
+			),
+		).toBe(0);
 	} finally {
 		tools.close();
 		await queue.close(100);

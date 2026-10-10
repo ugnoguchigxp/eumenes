@@ -14,7 +14,9 @@ import {
 import {
 	attachSchedule,
 	countActive,
+	countListOperations,
 	countOperations,
+	deleteExpiredListOperations,
 	countTimers,
 	getOperationByRequest,
 	getStartReceiptByOrigin,
@@ -300,8 +302,15 @@ export function recordListOperationInTransaction(
 	const replay = replayOf(tx, scope, command.requestId, inputDigest);
 	if (replay) return replay;
 	const issuedAtMs = assertIssuedAt(command.issuedAt, deps.now());
-	if (countOperations(tx, scope) >= TIMER_POLICY.maxOperations)
-		throw new Error("operation_capacity");
+	if (countListOperations(tx, scope) >= TIMER_POLICY.maxListOperations) {
+		deleteExpiredListOperations(
+			tx,
+			deps.now() - TIMER_POLICY.listRetentionMs,
+			100,
+		);
+		if (countListOperations(tx, scope) >= TIMER_POLICY.maxListOperations)
+			throw new Error("list_capacity");
+	}
 	const at = deps.now();
 	const listed = page(
 		tx,

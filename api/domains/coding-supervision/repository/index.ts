@@ -101,4 +101,13 @@ export function purge(db: Database, id: string) {
 /** Named migrations of this domain; the SQL above is frozen once deployed. */
 export const migrations: readonly Migration[] = [
 	{ id: "coding-supervision/0001-init", sql: migration },
+	{
+		id: "coding-supervision/0002-indexes",
+		after: ["coding-supervision/0001-init"],
+		sql: `
+CREATE INDEX coding_observations_task_created ON coding_observations(task_id, created_ms);
+CREATE INDEX coding_decisions_task ON coding_decisions(task_id);
+CREATE INDEX coding_steps_task ON coding_steps(task_id);
+`,
+	},
 ];

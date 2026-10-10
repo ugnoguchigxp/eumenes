@@ -100,7 +100,9 @@ export function appModules(services: AppServices): AppModule[] {
 	const modules: Array<AppModule | undefined> = [
 		s.changes && {
 			mount: (app) =>
-				app.get("/api/events", (c) => s.changes!.open(c.req.raw.signal)),
+				app.get("/api/events", (c) =>
+					s.changes!.open(c.req.raw.signal, c.req.header("last-event-id")),
+				),
 		},
 		s.capabilities && {
 			mount: (app) => registerCapabilities(app, s.capabilities!),

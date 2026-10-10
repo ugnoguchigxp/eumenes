@@ -20,6 +20,7 @@
 		"coverage/**",
 		"data/**",
 		"verification-reports/**",
+		"spec/verification/**",
 		"test-results/**",
 		"playwright-report/**",
 		".serena/**",

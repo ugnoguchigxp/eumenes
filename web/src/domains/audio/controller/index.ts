@@ -31,7 +31,7 @@ function wav(samples: Float32Array, rate: number): Uint8Array {
 		);
 	return bytes;
 }
-function encodeRecording(
+export function encodeRecording(
 	frames: readonly Float32Array[],
 	sampleCount: number,
 	rate: number,
@@ -54,6 +54,60 @@ function encodeRecording(
 	}
 	return wav(downsampled, 16000);
 }
+/**
+ * Appends frames while downsampling to 16 kHz so partial results only pay for the
+ * header and PCM conversion. Window boundaries match encodeRecording exactly.
+ */
+export function createIncrementalEncoder(rate: number) {
+	const ratio = rate / 16000;
+	const passthrough = rate <= 16000;
+	let out = new Float32Array(16_384);
+	let outLength = 0;
+	// Input samples not yet consumed by a complete window, starting at absolute `tailStart`.
+	let tail = new Float32Array(0);
+	let tailStart = 0;
+	const append = (value: number) => {
+		if (outLength === out.length) {
+			const grown = new Float32Array(out.length * 2);
+			grown.set(out);
+			out = grown;
+		}
+		out[outLength++] = value;
+	};
+	return {
+		push(frame: Float32Array) {
+			if (passthrough) {
+				for (const sample of frame) append(sample);
+				return;
+			}
+			const joined = new Float32Array(tail.length + frame.length);
+			joined.set(tail);
+			joined.set(frame, tail.length);
+			const total = tailStart + joined.length;
+			let index = outLength;
+			let begin = Math.floor(index * ratio);
+			let end = Math.floor((index + 1) * ratio);
+			while (index < Math.floor(total / ratio)) {
+				let sum = 0;
+				for (let n = begin; n < end; n++) sum += joined[n - tailStart] ?? 0;
+				append(sum / Math.max(1, end - begin));
+				index++;
+				begin = end;
+				end = Math.floor((index + 1) * ratio);
+			}
+			tail = joined.slice(begin - tailStart);
+			tailStart = begin;
+		},
+		wav(): Uint8Array {
+			return wav(out.subarray(0, outLength), passthrough ? rate : 16000);
+		},
+	};
+}
+export type IncrementalEncoder = ReturnType<typeof createIncrementalEncoder>;
+/** Seconds between partial results grows with the utterance so total work stays near-linear. */
+export const partialInterval = (seconds: number) =>
+	Math.min(2, 0.6 + 0.1 * seconds);
+
 import recorderWorkletUrl from "../worklet/recorder.worklet.ts?worker&url";
 
 /** Samples per frame handed to the voice detector (same as the old ScriptProcessor size). */
@@ -159,7 +213,8 @@ export function createAudioController(
 	let detector: VoiceActivityDetector | undefined;
 	let candidateFrames: Float32Array[] = [];
 	let candidateSamples = 0;
-	let frames: Float32Array[] = [];
+	let encoder: IncrementalEncoder | undefined;
+	let lastFrame: Float32Array | undefined;
 	let sampleCount = 0;
 	let lastLevel = 0;
 	let nextPartialAt = 0;
@@ -287,16 +342,27 @@ export function createAudioController(
 		}
 	}
 
+	function pushFrame(frame: Float32Array) {
+		encoder ??= createIncrementalEncoder(context!.sampleRate);
+		encoder.push(frame);
+		lastFrame = frame;
+		sampleCount += frame.length;
+	}
+	function resetRecording() {
+		encoder = undefined;
+		lastFrame = undefined;
+		sampleCount = 0;
+	}
 	function encodeFrames(): Uint8Array {
-		return encodeRecording(frames, sampleCount, context!.sampleRate);
+		encoder ??= createIncrementalEncoder(context!.sampleRate);
+		return encoder.wav();
 	}
 	function flush() {
 		const segment =
 			context && sampleCount >= context.sampleRate * 0.25
 				? encodeFrames()
 				: undefined;
-		frames = [];
-		sampleCount = 0;
+		resetRecording();
 		nextPartialAt = 0;
 		// A consumer may pause capture synchronously when its upload queue fills.
 		if (segment) onSegment(segment);
@@ -323,8 +389,7 @@ export function createAudioController(
 		source = undefined;
 		detector = undefined;
 		if (shouldFlush) flush();
-		frames = [];
-		sampleCount = 0;
+		resetRecording();
 		candidateFrames = [];
 		candidateSamples = 0;
 		lastLevel = 0;
@@ -396,8 +461,7 @@ export function createAudioController(
 						frame.fill(0);
 						if (!wasGated) {
 							speaking = false;
-							frames = [];
-							sampleCount = 0;
+							resetRecording();
 							candidateFrames = [];
 							candidateSamples = 0;
 							detector = new VoiceActivityDetector({
@@ -423,24 +487,25 @@ export function createAudioController(
 						if (observation?.hasSpeech) {
 							speaking = true;
 							nextPartialAt = context.sampleRate * 1.8;
-							frames = candidateFrames;
-							sampleCount = candidateSamples;
+							resetRecording();
+							for (const candidate of candidateFrames) pushFrame(candidate);
 							candidateFrames = [];
 							candidateSamples = 0;
 							onSpeech();
 						}
 					}
 					if (speaking) {
-						if (!observation?.hasSpeech || frames.at(-1) !== frame) {
-							frames.push(frame);
-							sampleCount += frame.length;
-						}
+						if (!observation?.hasSpeech || lastFrame !== frame)
+							pushFrame(frame);
 						if (
 							options.onPartial &&
 							!observation?.shouldFinalize &&
 							sampleCount >= nextPartialAt
 						) {
-							nextPartialAt = sampleCount + context.sampleRate * 0.6;
+							nextPartialAt =
+								sampleCount +
+								context.sampleRate *
+									partialInterval(sampleCount / context.sampleRate);
 							options.onPartial(encodeFrames());
 						}
 						if (sampleCount >= context.sampleRate * MAX_RECORDING_SECONDS) {
@@ -638,8 +703,7 @@ export function createAudioController(
 			source = undefined;
 			stream = undefined;
 			context = undefined;
-			frames = [];
-			sampleCount = 0;
+			resetRecording();
 			candidateFrames = [];
 			candidateSamples = 0;
 			detector = undefined;

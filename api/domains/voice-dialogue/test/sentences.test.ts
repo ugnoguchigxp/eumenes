@@ -28,3 +28,13 @@ test("long unpunctuated output is bounded and conflicting final text is rejected
 		"speech_stream_diverged",
 	);
 });
+test("no clause exceeds 240 characters even when the first boundary is far away", () => {
+	const long = "あ".repeat(500) + "。";
+	const chunks = new SpeechSentences().append(long, true);
+	expect(chunks.every((c) => c.length <= 240)).toBe(true);
+	expect(chunks.join("")).toBe(long);
+	const url = "https://example.com/a,b,c " + "x".repeat(300) + ".";
+	const urlChunks = new SpeechSentences().append(url, true);
+	expect(urlChunks.length).toBeGreaterThan(1);
+	expect(urlChunks.every((c) => c.length <= 240)).toBe(true);
+});

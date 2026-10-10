@@ -17,4 +17,11 @@ export const TIMER_POLICY = {
 	requestFutureToleranceMs: 30_000,
 	retentionMs: 30 * 86_400_000,
 	tombstoneMs: 30 * 86_400_000,
+	pruneEveryMs: 60_000,
+	// requestMaxAgeMs + 1h: older list replays are rejected by assertIssuedAt anyway
+	listRetentionMs: 86_400_000 + 3_600_000,
+	maxListOperations: 4096,
+	redispatchMax: 6,
+	redispatchBaseMs: 2_000,
+	redispatchCapMs: 300_000,
 } as const;

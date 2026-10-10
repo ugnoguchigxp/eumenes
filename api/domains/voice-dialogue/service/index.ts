@@ -1,7 +1,9 @@
+import type { Database } from "bun:sqlite";
 import { createVoiceProcessor } from "./process";
 import type { Speech } from "./speech-state";
 import type { SpeechPreparation } from "../../delivery";
 import { getLogger } from "../../../infrastructure/logger";
+import { toErrorCode } from "../../../infrastructure/error-code";
 const log = getLogger("voice-dialogue");
 import { SpeechSentences } from "./sentences";
 import { spokenText } from "./spoken-text";
@@ -36,6 +38,10 @@ export function createVoiceDialogue(
 		{ sessionId: string; controller: AbortController }
 	>();
 	const warming = new Map<string, AbortController>();
+	const sessionUsed = new Map<string, number>();
+	const MAX_AUDIO = 8;
+	const AUDIO_STALE_MS = 600_000;
+	const SESSION_IDLE_MS = 1_800_000;
 	function canSpeak(id: string, runId: string, signal: AbortSignal) {
 		if (signal.aborted) return false;
 		const turn = store.read((db) => get(db, id));
@@ -59,30 +65,73 @@ export function createVoiceDialogue(
 				(larm.liveRequest?.(refs.llm) ?? larm.validRequest?.(refs.llm)))
 		);
 	}
+	const LIVE_STATUSES = ["responding", "synthesizing", "ready"];
+	/** Frees one audio slot: a finished entry first, then a stale waiting one; else refuses. */
+	function makeRoomForSpeech() {
+		if (audio.size < MAX_AUDIO) return;
+		const nowMs = Date.parse(clock());
+		let finished: string | undefined;
+		let stale: string | undefined;
+		for (const [key, entry] of audio) {
+			const turn = store.read((db) => get(db, key));
+			if (!turn || !LIVE_STATUSES.includes(turn.status)) {
+				finished = key;
+				break;
+			}
+			if (!stale && nowMs - entry.createdAtMs >= AUDIO_STALE_MS) stale = key;
+		}
+		if (finished) {
+			audio.delete(finished);
+			return;
+		}
+		if (!stale) throw new Error("voice_audio_capacity");
+		const victim = stale;
+		audio.delete(victim);
+		void store
+			.write((db) => {
+				const turn = get(db, victim);
+				if (turn)
+					update(db, victim, turn.revision, "failed", clock(), {
+						error: "audio_evicted",
+					});
+			})
+			.then(() => {
+				const runId = store.read((db) => get(db, victim))?.runId;
+				if (runId) return dialogue.cancel(runId);
+			})
+			.catch((error) =>
+				log.warn(
+					"voice.evict_failed",
+					{ reason: toErrorCode(error, "evict_failed") },
+					error,
+				),
+			);
+		controllers.get(victim)?.abort();
+	}
+	function touchSession(sessionId: string) {
+		const now = Date.parse(clock());
+		sessionUsed.set(sessionId, now);
+		for (const [id, usedAt] of sessionUsed) {
+			if (id === sessionId || now - usedAt < SESSION_IDLE_MS) continue;
+			const generation = sessions.get(id);
+			if (
+				generation !== undefined &&
+				store.read((db) => activeIds(db, id, generation)).length
+			)
+				continue;
+			sessions.delete(id);
+			sessionUsed.delete(id);
+			warming.get(id)?.abort();
+			warming.delete(id);
+		}
+	}
 	function createSpeech(
 		id: string,
 		runId: string,
 		controller: AbortController,
 		preparation: SpeechPreparation = {},
 	): Speech {
-		if (audio.size >= 8) {
-			const oldest = audio.keys().next().value;
-			if (oldest) {
-				audio.delete(oldest);
-				void store
-					.write((db) => {
-						const turn = get(db, oldest);
-						if (turn)
-							update(db, oldest, turn.revision, "failed", clock(), {
-								error: "audio_evicted",
-							});
-					})
-					.catch(() => {});
-				controllers.get(oldest)?.abort();
-				const runId = store.read((db) => get(db, oldest))?.runId;
-				if (runId) void dialogue.cancel(runId).catch(() => {});
-			}
-		}
+		makeRoomForSpeech();
 		const pending: string[] = [];
 		const sentences = new SpeechSentences();
 		let inputDone = false,
@@ -95,6 +144,8 @@ export function createVoiceDialogue(
 			wakes.clear();
 		};
 		const state: Speech = {
+			createdAtMs: Date.parse(clock()),
+			skipped: 0,
 			chunks: new Map(),
 			finished: false,
 			wake,
@@ -170,6 +221,7 @@ export function createVoiceDialogue(
 					if (!synthesized) {
 						// The turn fails only if no clause could be spoken at all.
 						skipError ??= lastError;
+						state.skipped++;
 						log.warn("voice.chunk_skipped", { utteranceId: id, runId });
 						continue;
 					}
@@ -307,6 +359,18 @@ export function createVoiceDialogue(
 		else log.debug("voice.transition_skipped", { utteranceId: id, status });
 		return result;
 	}
+	function linkRunInTransaction(db: Database, id: string, runId: string) {
+		const current = get(db, id);
+		if (
+			!current ||
+			current.status !== "responding" ||
+			sessions.get(current.sessionId) !== current.generation
+		)
+			throw new Error("voice_turn_inactive");
+		if (current.runId === runId) return;
+		if (!update(db, id, current.revision, "responding", clock(), { runId }))
+			throw new Error("voice_turn_inactive");
+	}
 	const process = createVoiceProcessor({
 		store,
 		dialogue,
@@ -316,6 +380,7 @@ export function createVoiceDialogue(
 		controllers,
 		audio,
 		languageRequests,
+		linkRunInTransaction,
 	});
 	return {
 		/** Splits finished answer text into speakable clauses for replay. */
@@ -394,7 +459,9 @@ export function createVoiceDialogue(
 			const previous = sessions.get(sessionId) ?? 0;
 			if (generation <= previous) throw new Error("stale_voice_generation");
 			sessions.set(sessionId, generation);
+			touchSession(sessionId);
 			log.info("voice.session_started", { sessionId, generation });
+			warming.get(sessionId)?.abort();
 			const warm = new AbortController();
 			warming.set(sessionId, warm);
 			void larm
@@ -412,6 +479,7 @@ export function createVoiceDialogue(
 			utteranceId: string,
 			wav: Uint8Array,
 		): Promise<VoiceTurn> {
+			touchSession(sessionId);
 			if (sessions.get(sessionId) !== generation)
 				throw new Error("voice_session_inactive");
 			if (!Number.isSafeInteger(sequence) || sequence <= 0)
@@ -465,7 +533,13 @@ export function createVoiceDialogue(
 				previews.get(utteranceId)?.controller.abort();
 				const controller = new AbortController();
 				controllers.set(utteranceId, controller);
-				void process(turn, wav, controller);
+				void process(turn, wav, controller).catch((error) =>
+					log.error(
+						"voice.processing_crashed",
+						{ reason: toErrorCode(error, "voice_failed") },
+						error,
+					),
+				);
 			}
 			return turn;
 		},
@@ -476,6 +550,7 @@ export function createVoiceDialogue(
 			id: string,
 			wav: Uint8Array,
 		) {
+			touchSession(sessionId);
 			if (sessions.get(sessionId) !== generation)
 				throw new Error("voice_session_inactive");
 			if (store.read((db) => get(db, id)))
@@ -519,6 +594,7 @@ export function createVoiceDialogue(
 					...(c.delivery ? { delivery: c.delivery } : {}),
 				})),
 				audioComplete: state?.finished ?? false,
+				audioSkipped: state?.skipped ?? 0,
 			};
 		},
 		takeAudio(id: string, index = 0) {
@@ -568,9 +644,10 @@ export function createVoiceDialogue(
 		},
 		async cancel(id: string) {
 			previews.get(id)?.controller.abort();
-			const turn = store.read((db) => get(db, id));
-			if (!turn) return null;
+			if (!store.read((db) => get(db, id))) return null;
 			await advance(id, "cancelled", { error: "cancel_requested" });
+			// Read after the cancel commits: a run linked by an earlier queued write is visible.
+			const latest = store.read((db) => get(db, id));
 			controllers.get(id)?.abort();
 			previews.get(id)?.controller.abort();
 			audio.get(id)?.wake();
@@ -583,13 +660,14 @@ export function createVoiceDialogue(
 			}
 			await larm.cancelSubject?.(id);
 			audio.delete(id);
-			if (turn.runId) await dialogue.cancel(turn.runId);
+			if (latest?.runId) await dialogue.cancel(latest.runId);
 			return this.get(id);
 		},
 		async stop(sessionId: string, generation: number) {
 			if (sessions.get(sessionId) !== generation) return;
 			log.info("voice.session_stopping", { sessionId, generation });
 			sessions.delete(sessionId);
+			sessionUsed.delete(sessionId);
 			warming.get(sessionId)?.abort();
 			for (const p of previews.values())
 				if (p.sessionId === sessionId) p.controller.abort();
@@ -614,6 +692,7 @@ export function createVoiceDialogue(
 			warming.clear();
 			for (const a of audio.values()) a.wake();
 			sessions.clear();
+			sessionUsed.clear();
 			audio.clear();
 		},
 	};

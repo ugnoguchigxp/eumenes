@@ -117,17 +117,18 @@ export function rotatingLogFile(
 	path: string,
 	maxBytes = 10 * 1024 * 1024,
 	backups = 4,
+	options?: { now?: () => number },
 ): DestinationStream {
-	let failed = false;
+	let retryAt = 0; // 0 = healthy
+	let backoffMs = 1_000;
 	let size = 0;
-	function warning() {
-		if (failed) return;
-		failed = true;
+	const now = options?.now ?? Date.now;
+	function notice(level: string, event: string) {
 		process.stderr.write(
 			JSON.stringify({
 				time: new Date().toISOString(),
-				level: "error",
-				event: "logging.file_unavailable",
+				level,
+				event,
 				component: "logger",
 				service: "eumenes",
 				pid: process.pid,
@@ -136,18 +137,32 @@ export function rotatingLogFile(
 			}) + "\n",
 		);
 	}
-	try {
+	function fail() {
+		if (retryAt === 0) notice("error", "logging.file_unavailable");
+		retryAt = now() + backoffMs;
+		backoffMs = Math.min(backoffMs * 2, 60_000);
+	}
+	function recovered() {
+		if (retryAt !== 0) notice("info", "logging.file_recovered");
+		retryAt = 0;
+		backoffMs = 1_000;
+	}
+	function prepare() {
 		mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
 		appendFileSync(path, "", { mode: 0o600 });
 		chmodSync(path, 0o600);
 		size = statSync(path).size;
+	}
+	try {
+		prepare();
 	} catch {
-		warning();
+		fail();
 	}
 	return {
 		write(line) {
-			if (failed) return;
+			if (retryAt !== 0 && now() < retryAt) return;
 			try {
+				if (retryAt !== 0) prepare();
 				const bytes = Buffer.byteLength(line);
 				if (size && size + bytes > maxBytes) {
 					rmSync(`${path}.${backups}`, { force: true });
@@ -159,8 +174,9 @@ export function rotatingLogFile(
 				}
 				appendFileSync(path, line, { mode: 0o600 });
 				size += bytes;
+				recovered();
 			} catch {
-				warning();
+				fail();
 			}
 		},
 	};

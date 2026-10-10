@@ -1,3 +1,6 @@
+import type { Database } from "bun:sqlite";
+import type { TaskReports } from "../domains/task-reports";
+import { purgeCodingSupervision } from "../domains/coding-supervision";
 import type { SqliteStore } from "../infrastructure/sqlite";
 import type { CodingService } from "../domains/coding";
 import type { TasksService } from "../domains/tasks";
@@ -10,6 +13,19 @@ import {
 	codingObservationReader,
 	observationFailure,
 } from "./coding-observation";
+/**
+ * Task purge hook for the FK children owned by task-reports and coding-supervision.
+ * It needs no runner, workflow or supervision instance: those tables can hold rows
+ * from an earlier configuration, and a purge must not depend on optional services.
+ */
+export function purgeTaskDependents(
+	reports: Pick<TaskReports, "purgeInTransaction">,
+): (db: Database, task: { id: string }) => void {
+	return (db, task) => {
+		purgeCodingSupervision(db, task.id);
+		reports.purgeInTransaction(db, task.id);
+	};
+}
 /** Read-only fallback. Registered checks/review/Git need the isolated operation worker from plan02 C6. */
 export function unavailableCodingWorkflow(
 	store: SqliteStore,

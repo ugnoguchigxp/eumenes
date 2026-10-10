@@ -1,6 +1,6 @@
 import type { Hono } from "hono";
 import type { DialogueService } from "..";
-import { submitSchema, type RunProgress } from "../contracts";
+import { publicSubmitSchema, type RunProgress } from "../contracts";
 import { parseJsonBody } from "../../../infrastructure/http";
 import { snapshotStream } from "../../../infrastructure/snapshot-stream";
 export function registerDialogue(app: Hono, service: DialogueService) {
@@ -25,7 +25,7 @@ export function registerDialogue(app: Hono, service: DialogueService) {
 		c.json(service.list(c.req.param("id"))),
 	);
 	app.post("/api/runs", async (c) => {
-		const parsed = await parseJsonBody(c, submitSchema);
+		const parsed = await parseJsonBody(c, publicSubmitSchema);
 		if (!parsed.ok) return parsed.response;
 		return c.json(await service.submit(parsed.data), 202);
 	});

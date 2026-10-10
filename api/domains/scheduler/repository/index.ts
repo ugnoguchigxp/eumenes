@@ -310,7 +310,70 @@ export function listOccurrences(
 	}));
 }
 
+/**
+ * Deletes old occurrences, keeping each schedule's latest dispatched one (it
+ * feeds the overlap check) and the row with the highest `seq` (next is MAX+1).
+ */
+export function pruneOccurrences(
+	db: Database,
+	before: number,
+	limit: number,
+): number {
+	return db
+		.query(
+			`DELETE FROM scheduler_occurrences WHERE id IN (
+ SELECT o.id FROM scheduler_occurrences o WHERE o.created_at_ms<=?
+   AND o.seq < (SELECT MAX(seq) FROM scheduler_occurrences)
+   AND o.id != coalesce((SELECT d.id FROM scheduler_occurrences d
+     WHERE d.schedule_id=o.schedule_id AND d.state='dispatched' ORDER BY d.seq DESC LIMIT 1),'')
+ ORDER BY o.created_at_ms LIMIT ?)`,
+		)
+		.run(before, limit).changes;
+}
+
+/** Deletes cancelled/completed schedules with their occurrences, except the one with the highest `created_seq`. */
+export function pruneSchedules(
+	db: Database,
+	before: number,
+	limit: number,
+): number {
+	const ids = (
+		db
+			.query(
+				`SELECT id FROM scheduler_schedules
+ WHERE state IN ('cancelled','completed') AND updated_at_ms<=?
+   AND created_seq < (SELECT MAX(created_seq) FROM scheduler_schedules)
+ ORDER BY updated_at_ms LIMIT ?`,
+			)
+			.all(before, limit) as { id: string }[]
+	).map((r) => r.id);
+	for (const id of ids) {
+		db.query("DELETE FROM scheduler_occurrences WHERE schedule_id=?").run(id);
+		db.query("DELETE FROM scheduler_schedules WHERE id=?").run(id);
+	}
+	return ids.length;
+}
+
+/** Prunes occurrences and finished schedules past their retention (see pruneOccurrences/pruneSchedules). */
+export function pruneExpired(
+	db: Database,
+	at: number,
+	retention: { occurrenceMs: number; scheduleMs: number },
+): void {
+	pruneOccurrences(db, at - retention.occurrenceMs, 500);
+	pruneSchedules(db, at - retention.scheduleMs, 100);
+}
+
 /** Named migrations of this domain; the SQL above is frozen once deployed. */
 export const migrations: readonly Migration[] = [
 	{ id: "scheduler/0001-init", sql: migration },
+	{
+		id: "scheduler/0002-retention-indexes",
+		after: ["scheduler/0001-init"],
+		sql: `
+CREATE INDEX scheduler_occurrences_dispatched ON scheduler_occurrences(schedule_id, state, seq);
+CREATE INDEX scheduler_occurrences_created ON scheduler_occurrences(created_at_ms);
+CREATE INDEX scheduler_schedules_finished ON scheduler_schedules(state, updated_at_ms);
+`,
+	},
 ];

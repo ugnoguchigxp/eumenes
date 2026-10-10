@@ -43,6 +43,19 @@ pushは登録済みremoteのfetch/push URL、固定branch、commit SHA、期待r
 
 引数とJSONLは [公式non-interactive仕様](https://developers.openai.com/codex/noninteractive/) とinstalled CLI 0.155.1のhelpを照合した。実CLI実行に成功したとは扱わない。
 
+## 正当な `.git` 変更からの復旧（git整合性の再基準化）
+
+host gitは最初の呼出しで `.git/config`・`config.worktree`・hooksのdigestを記録し、以後に違いがあれば `runner_git_config_tampered` で止まる。利用者が `git config`、`git remote add`、husky等のhook導入を行った場合も同様に止まるため、管理者用CLIで差分を確認して再記録する。MCP toolには出さない（サンドボックス内のagentから呼べない）。
+
+```
+bun packages/coding-runner/src/admin.ts git-integrity <config.json> <workspaceId>             # 差分を表示するだけ
+bun packages/coding-runner/src/admin.ts git-integrity <config.json> <workspaceId> --rebaseline  # 表示後に再記録
+```
+
+`--json` で機械可読。終了コードは 0 成功、1 失敗、2 使い方の誤り、3 実行中のexecutionあり（`runner_workspace_busy`）、4 filter属性あり（`runner_git_filter_forbidden`）。再基準化の前に、予約がなく前回executionが終了していること、`.gitattributes` と `.git/info/attributes` にfilterがないことを確認する。差分の内容が意図した変更であることは、実行前に人が確認する。
+
+worktreeの `.git` ファイルが相対 `gitdir:` でも、worktreeを基準に解決して `config.worktree` を監視する。
+
 ## API・検証
 
 共通clientから認証済み `GET /api/coding/workspaces`、`GET /api/coding/executions/:id`、`GET /api/coding/executions/:id/events?after=0&limit=100` を読む。一般viewにはsession、PID、nonce、instruction、workspaceの絶対pathを含めない。操作はtasks公開操作を通し、読取APIで権限を変更しない。

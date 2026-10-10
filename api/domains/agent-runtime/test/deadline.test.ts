@@ -4,7 +4,6 @@ test("an operation granted with 70 seconds remains valid after the model spends 
 	let now = Date.now();
 	const h = await harness(() => now);
 	try {
-		h.proposals.push({ kind: "unmatched" });
 		await h.start("time-boundary", "公開情報を調べて");
 		const child = h.agents
 			.list("time-boundary")
@@ -64,24 +63,6 @@ test("a failed model-selected read retains the deadline and reserves finish plus
 	let now = Date.now();
 	const h = await harness(() => now);
 	try {
-		const { learnedPackage, directBind, searchBind } =
-			await import("./route-harness");
-		h.proposals.push(
-			{
-				kind: "direct",
-				proposalToken: "direct",
-				packageRevisionId: learnedPackage,
-			},
-			{
-				kind: "search-first",
-				proposalToken: "search",
-				query: "公開情報",
-				language: "ja",
-				region: "JP",
-			},
-		);
-		h.binds.set("direct", directBind("old"));
-		h.binds.set("search", searchBind("new"));
 		await h.start("late-replacement");
 		const child = h.agents
 			.list("late-replacement")

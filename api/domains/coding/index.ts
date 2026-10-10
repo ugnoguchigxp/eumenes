@@ -6,5 +6,5 @@ export {
 } from "./service";
 export type { ObservationSnapshot } from "./contracts";
 export { registerCoding } from "./controller";
-export { migration } from "./repository";
+export { migration, migrations } from "./repository";
 export { connectRunner } from "./adapters";

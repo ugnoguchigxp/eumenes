@@ -35,3 +35,30 @@ test("link text that hides the destination host gets the hostname appended", () 
 		renderSafeMarkdown("[https://a.example](https://a.example)"),
 	).not.toContain("link-host");
 });
+
+test("a label that merely contains the host does not suppress host disclosure", () => {
+	expect(renderSafeMarkdown("[Google.com](https://e.co/)")).toContain(
+		'<span class="link-host">(e.co)</span>',
+	);
+	expect(
+		renderSafeMarkdown("[example.com](https://example.com/path)"),
+	).not.toContain("link-host");
+	expect(
+		renderSafeMarkdown("[www.example.com](https://example.com)"),
+	).not.toContain("link-host");
+});
+
+test("urls with one level of parentheses stay intact", () => {
+	const html = renderSafeMarkdown(
+		"[Wiki](https://en.wikipedia.org/wiki/Foo_(bar))",
+	);
+	expect(html).toContain('href="https://en.wikipedia.org/wiki/Foo_(bar)"');
+	expect(html).not.toContain("</a>)");
+	expect(renderSafeMarkdown("[x](javascript:alert(1))")).not.toContain("<a ");
+});
+
+test("mermaid fences do not emit a duplicate hidden source", () => {
+	const html = renderSafeMarkdown("```mermaid\ngraph TD;A-->B\n```");
+	expect(html).toContain("mermaid-block");
+	expect(html).not.toContain("mermaid-source");
+});

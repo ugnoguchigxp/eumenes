@@ -73,3 +73,39 @@ export function getUsage(db: Database, runId: string): UsageReceipt | null {
 export const migrations: readonly Migration[] = [
 	{ id: "memory/0001-init", sql: migration },
 ];
+
+export interface StateItemIdentity {
+	principal: string;
+	scope_key: string;
+	subject: string;
+	kind: string;
+	semantic_key: string;
+}
+/** Identity of a not-yet-forgotten state item; the library's listing caps at 1000 rows, so look it up directly. */
+export function stateItemIdentity(
+	db: Database,
+	itemId: string,
+): StateItemIdentity | null {
+	return db
+		.query(
+			`SELECT principal, scope_key, subject, kind, semantic_key FROM memory_state_item
+    WHERE item_id=? AND status!='forgotten'`,
+		)
+		.get(itemId) as StateItemIdentity | null;
+}
+/** Every live version (any status but forgotten) of the same fact, oldest first. */
+export function sameFactItemIds(db: Database, k: StateItemIdentity): string[] {
+	return (
+		db
+			.query(
+				`SELECT i.item_id FROM memory_state_item i
+    WHERE i.principal=? AND i.scope_key=? AND i.subject=? AND i.kind=? AND i.semantic_key=?
+      AND i.status!='forgotten'
+      AND NOT EXISTS (SELECT 1 FROM memory_tombstone t WHERE t.target_type='state_item' AND t.target_id=i.item_id)
+    ORDER BY i.created_seq`,
+			)
+			.all(k.principal, k.scope_key, k.subject, k.kind, k.semantic_key) as {
+			item_id: string;
+		}[]
+	).map((r) => r.item_id);
+}

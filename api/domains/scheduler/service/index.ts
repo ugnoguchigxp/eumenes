@@ -16,6 +16,7 @@ import {
 	listOccurrences,
 	listSchedules,
 	nextDueAt,
+	pruneExpired,
 	type OccurrenceRecord,
 	type ScheduleRecord,
 	setDeferReason,
@@ -30,6 +31,14 @@ const code = (error: unknown) =>
 		? error.message
 		: "scheduler_failed";
 const iso = (ms: number) => new Date(ms).toISOString();
+export const SCHEDULER_RETENTION = {
+	occurrenceMs: 14 * 86_400_000,
+	scheduleMs: 30 * 86_400_000,
+};
+const dtoOrNull = (s: ScheduleRecord | null) => (s ? toDto(s) : null);
+/** Prunes occurrences older than 14 days (the latest dispatched one per schedule stays) and schedules cancelled/completed over 30 days ago. */
+const pruneInTransaction = (db: Tx, at: number) =>
+	pruneExpired(db, at, SCHEDULER_RETENTION);
 const OPEN_JOB = ["queued", "running", "retry_wait", "cancel_requested"];
 const MAX_ABS_MS = 8.64e15 / 2;
 
@@ -406,14 +415,14 @@ export function createScheduler(
 			targets.set(definition.kind, definition as TargetDefinition<unknown>);
 		},
 		createInTransaction,
+		pruneInTransaction,
 		async create(input: CreateSchedule): Promise<ScheduleDto> {
 			const created = await store.write((db) => createInTransaction(db, input));
 			wake();
 			return created;
 		},
 		getInTransaction(db: Tx, id: string): ScheduleDto | null {
-			const s = getSchedule(db, id);
-			return s ? toDto(s) : null;
+			return dtoOrNull(getSchedule(db, id));
 		},
 		cancelInTransaction(db: Tx, id: string, expectedRevision: number) {
 			const s = getSchedule(db, id);

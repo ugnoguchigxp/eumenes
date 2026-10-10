@@ -16,6 +16,9 @@ import {
 	ensureConversation,
 	getMessage,
 	listMessages,
+	messageWithDelivery,
+	messagesBefore,
+	tailMessages,
 	listOutbox,
 	outboxReady,
 	retractionReady,
@@ -29,6 +32,9 @@ import {
 
 import { createHistory } from "./history";
 import type { HistoryOwner } from "../contracts/history";
+
+/** Upper bound of messages returned by `get` (newest kept). */
+const GET_MESSAGE_LIMIT = 2000;
 
 export type ConversationServiceOptions = {
 	/** Principal / scope recorded on outbox events and source states. */
@@ -136,11 +142,29 @@ export function createConversationService(
 			return recordAnswerDelivery(db, runId, conversationId, delivery);
 		},
 		get(id: string): Conversation {
-			return store.read((db) => ({
-				id,
-				revision: revision(db, id),
-				messages: listMessages(db, id),
-			}));
+			return store.read((db) => {
+				const { messages, hasMore } = tailMessages(db, id, GET_MESSAGE_LIMIT);
+				return {
+					id,
+					revision: revision(db, id),
+					messages,
+					...(hasMore ? { hasMore: true } : {}),
+				};
+			});
+		},
+		message(id: string): Message | null {
+			return store.read((db) => messageWithDelivery(db, id));
+		},
+		/** Up to `limit` messages accepted before `messageId`, oldest first. */
+		turnsBefore(
+			conversationId: string,
+			messageId: string,
+			limit: number,
+		): Message[] {
+			return store.read((db) => {
+				const at = getMessage(db, messageId);
+				return at ? messagesBefore(db, conversationId, at.ordinal, limit) : [];
+			});
 		},
 		messagesInTransaction(db: Database, id: string): Message[] {
 			return listMessages(db, id);

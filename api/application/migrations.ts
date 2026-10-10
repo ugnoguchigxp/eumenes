@@ -2,7 +2,7 @@ import type { Migration } from "../infrastructure/sqlite";
 import { orderMigrations } from "../infrastructure/sqlite";
 import { migrations as agentRuntimeMigrations } from "../domains/agent-runtime";
 import { migrations as capabilitiesMigrations } from "../domains/capabilities";
-import { migration as codingMigration } from "../domains/coding";
+import { migrations as codingMigrations } from "../domains/coding";
 import { migrations as supervisionMigrations } from "../domains/coding-supervision";
 import { migrations as continuityMigrations } from "../domains/continuity";
 import { migrations as conversationMigrations } from "../domains/conversation";
@@ -149,8 +149,7 @@ const catalog: readonly Migration[] = [
 	...packageMigrations("world-package", worldPackageSql),
 	...worldMigrations,
 	...timersMigrations,
-	// coding/index.ts has no `migrations` re-export yet (it was being edited when ARC-8 landed).
-	{ id: "coding/0001-init", sql: codingMigration },
+	...codingMigrations,
 	...taskReportsMigrations,
 	...supervisionMigrations,
 ];

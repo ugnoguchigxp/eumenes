@@ -213,10 +213,19 @@ export function append(db: Database, event: CodingEvent) {
 		event.executionId,
 	);
 }
+/** Every non-terminal execution state; enumerated so `coding_executions_state` can serve `live()`. */
+export const LIVE_STATES = [
+	"intent",
+	"accepted",
+	"reserved",
+	"running",
+	"stopping",
+	"outcome_unknown",
+] as const;
 export function live(db: Database) {
 	return db
 		.query(
-			"SELECT * FROM coding_executions WHERE state NOT IN ('stopped','exited')",
+			`SELECT * FROM coding_executions WHERE state IN (${LIVE_STATES.map((s) => `'${s}'`).join(",")})`,
 		)
 		.all() as ExecutionRow[];
 }
@@ -224,4 +233,13 @@ export function live(db: Database) {
 /** Named migrations of this domain; the SQL above is frozen once deployed. */
 export const migrations: readonly Migration[] = [
 	{ id: "coding/0001-init", sql: migration },
+	{
+		id: "coding/0002-indexes",
+		after: ["coding/0001-init"],
+		sql: `
+CREATE INDEX coding_operations_execution ON coding_operations(execution_id);
+CREATE INDEX coding_executions_state ON coding_executions(state);
+CREATE INDEX coding_evidence_kind ON coding_evidence(execution_id, json_extract(data_json,'$.kind'), seq);
+`,
+	},
 ];

@@ -1,6 +1,7 @@
 import type { Database } from "bun:sqlite";
 import {
 	hash,
+	toolRuntimeOf,
 	validators,
 	type Owner,
 	type Prepared,
@@ -19,12 +20,6 @@ export type ReadReference = {
 	tool: FixedDefinition;
 	prepared: Prepared;
 	expires: number;
-	grant?: {
-		bindingToken: string;
-		exactUrl: string;
-		argsDigest: string;
-		attemptTimeoutMs?: number;
-	};
 };
 const ownerKey = (o: Owner) => JSON.stringify(o);
 export function createReadInvocation({
@@ -33,20 +28,12 @@ export function createReadInvocation({
 	now,
 	capabilities,
 	adapter,
-	authorize,
 }: {
 	refs: Map<string, ReadReference>;
 	localOperations: Map<string, AdapterOperation>;
 	now: () => number;
 	capabilities: Capabilities;
 	adapter: ToolAdapter;
-	authorize: (
-		db: Database,
-		owner: Owner,
-		prepared: Prepared,
-		bindingToken: string,
-		exactUrl: string,
-	) => void;
 }) {
 	function invokeInTransaction(
 		db: Database,
@@ -73,14 +60,6 @@ export function createReadInvocation({
 		)
 			throw new Error("tool_ref_invalid");
 		capabilities.validateInTransaction(db, ref.prepared);
-		if (ref.grant)
-			authorize(
-				db,
-				owner,
-				ref.prepared,
-				ref.grant.bindingToken,
-				ref.grant.exactUrl,
-			);
 		if (!ref.tool.schemaKey) throw new Error("invalid_tool_schema");
 		const parsed = validators[ref.tool.schemaKey].safeParse(args);
 		if (!parsed.success) {
@@ -106,15 +85,8 @@ export function createReadInvocation({
 				parsed.error.issues.length,
 			);
 		}
-		if (ref.grant) {
-			if (hash(parsed.data) !== ref.grant.argsDigest)
-				throw new Error(
-					ref.tool.id === "web.read"
-						? "tool_url_out_of_scope"
-						: "invalid_tool_input",
-				);
-		} else if (
-			ref.tool.id === "web.read" &&
+		if (
+			toolRuntimeOf(ref.tool.revisionId)?.urlScope === "request_or_observed" &&
 			!allowedUrls.includes((parsed.data as { url: string }).url)
 		)
 			throw new Error("tool_url_out_of_scope");
@@ -137,12 +109,13 @@ export function createReadInvocation({
 		const invocationId = crypto.randomUUID();
 		const requestId = crypto.randomUUID();
 		const digest = hash(parsed.data);
+		const isSearch = toolRuntimeOf(ref.tool.revisionId)?.operation === "search";
 		const fingerprint =
 			adapter.operationFingerprintInTransaction?.(db, {
 				tool: ref.tool,
 				arguments: parsed.data,
 				owner,
-			}) ?? operationFingerprint(ref.tool.id, parsed.data);
+			}) ?? operationFingerprint(ref.tool.id, parsed.data, isSearch);
 		const successful = db
 			.query(
 				`SELECT id,tool_revision_id,args_json,${hasReadMetadata(db) ? "operation_fingerprint" : "NULL AS operation_fingerprint"} FROM tool_invocations WHERE owner_task_id=? AND state IN ('succeeded','partial')${hasSupersededColumn(db) ? " AND superseded=0" : ""}`,
@@ -160,8 +133,9 @@ export function createReadInvocation({
 					? i.operation_fingerprint === fingerprint
 					: i.args_json &&
 						operationFingerprint(
-							i.tool_revision_id.split(":").slice(1).join(":").split("@")[0]!,
+							ref.tool.id,
 							JSON.parse(i.args_json),
+							isSearch,
 						) === fingerprint),
 		);
 		if (replay) {
@@ -174,12 +148,8 @@ export function createReadInvocation({
 			return existing;
 		}
 		if (!allowNew) throw new Error("agent_budget_exhausted");
-		const isLocal = [
-			"web.find",
-			"web.read_saved",
-			"history.search",
-			"history.read",
-		].includes(ref.tool.id);
+		const localKind = toolRuntimeOf(ref.tool.revisionId)?.operation;
+		const isLocal = localKind === "saved_read" || localKind === "history";
 		const localId = crypto.randomUUID();
 		const operation = isLocal
 			? { operationId: `local:${localId}`, jobId: parentJobId }
@@ -191,12 +161,6 @@ export function createReadInvocation({
 					deadline,
 					parentJobId,
 					question,
-					...(ref.grant
-						? {
-								grantedUrl: ref.grant.exactUrl,
-								attemptTimeoutMs: ref.grant.attemptTimeoutMs,
-							}
-						: {}),
 				});
 		if (isLocal) {
 			if (!adapter.localInTransaction)

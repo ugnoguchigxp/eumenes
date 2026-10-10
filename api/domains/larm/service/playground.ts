@@ -17,6 +17,7 @@ import {
 	localUrl,
 	object,
 	pause,
+	post,
 	silentWav,
 	str,
 } from "./playground-http";
@@ -107,11 +108,6 @@ export function createLarmPlayground(config: {
 		}
 		return r;
 	}
-	const post = (body: unknown): RequestInit => ({
-		method: "POST",
-		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify(body),
-	});
 	async function catalog(signal: AbortSignal) {
 		const targets = new Map<string, LarmTestTarget>();
 		const errors: string[] = [];
@@ -171,7 +167,10 @@ export function createLarmPlayground(config: {
 								protocol,
 								kind: paths[kind] === endpoint ? kind : "unsupported",
 								mode,
-								endpoint,
+								endpoint:
+									mode === "service"
+										? publicUrl(str(item.url ?? endpoint)).pathname
+										: endpoint,
 								profile,
 								selector: previous?.selector ?? (selector || undefined),
 								revision: rev,
@@ -484,7 +483,8 @@ export function createLarmPlayground(config: {
 								model: target.model,
 								width: input.width ?? 512,
 								height: input.height ?? 512,
-								format: input.format ?? "png",
+								format: input.format ?? "webp",
+								seed: input.seed ?? 0,
 							}),
 						),
 					);

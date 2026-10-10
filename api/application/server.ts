@@ -5,6 +5,7 @@ import { createTaskReports } from "../domains/task-reports";
 import {
 	unavailableCodingWorkflow,
 	superviseCodingExecution,
+	purgeTaskDependents,
 } from "./coding-supervision";
 import { createToolchain } from "./toolchain";
 import { createOperations } from "../domains/research-routes";
@@ -39,6 +40,7 @@ import { createApp } from "./app";
 import { appModules } from "./app-modules";
 import {
 	createLifecycleRunner,
+	createProcessGuard,
 	createTerminator,
 	intervalLifecycle,
 	type Lifecycle,
@@ -54,10 +56,13 @@ import {
 	resolveWorldCursorSecret,
 } from "./world";
 import { createWorldForeground } from "./world-foreground";
+import {
+	PROCESS_SHUTDOWN_DEADLINE_MS,
+	SHUTDOWN_DEADLINE_MS,
+	createStartupGate,
+} from "../infrastructure/shutdown";
 
 const log = getLogger("server");
-/** Longest the whole shutdown may take before the process gives up and exits 1. */
-const SHUTDOWN_DEADLINE_MS = 30_000;
 
 /**
  * Constructs every service. Nothing is recovered, started or listening yet, and
@@ -82,6 +87,7 @@ export async function buildServices(config: Config) {
 			? createCodexResearch(config.env, config.researchCodexExecutable)
 			: undefined,
 		token: config.larmToken,
+		providerHosts: config.larmProviderHosts,
 		speechText: ttsDictionary.apply,
 		attitudeDataset,
 	});
@@ -149,6 +155,7 @@ export async function buildServices(config: Config) {
 		execution: supervisedExecution,
 		changedInTransaction: (db, t) =>
 			supervision?.taskChangedInTransaction(db, t),
+		purgeInTransaction: purgeTaskDependents(taskReports),
 	});
 	const supervision = workflow
 		? createCodingSupervision({
@@ -189,6 +196,7 @@ export async function buildServices(config: Config) {
 					),
 					cursorSecret: resolveWorldCursorSecret({
 						dbPath,
+						keyDir: config.env.EUMENES_KEY_DIR,
 						env: { EUMENES_WORLD_CURSOR_SECRET: config.worldCursorSecret },
 					}),
 					// Local extraction exists only with World ON (P4-02).
@@ -314,7 +322,8 @@ function appServices(s: Services) {
  * it, queue before the tasks it carries), start order (runners after every
  * recovery), and bring-up order for resources, which `closeAll` walks in
  * reverse so the shutdown order is exactly: commit/status subscriptions,
- * change stream, HTTP, timers, coding, in-flight maintenance, world,
+ * change stream, HTTP, timers, coding, in-flight maintenance (tasks, store retention,
+ * timers), world,
  * supervision, delegated, scheduler, service tests, voice, agents, queue,
  * web research, dialogue, inference, datasets, store.
  */
@@ -360,6 +369,22 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 					),
 				),
 		]),
+	);
+	// Bounded deletes (queue 500, occurrences 500, schedules 100) keep the writer free.
+	const storeRetention = intervalLifecycle("store_retention", 3_600_000, () =>
+		s.store
+			.write((db) => {
+				const at = Date.now();
+				s.queue.pruneInTransaction(db, at);
+				s.scheduler.pruneInTransaction(db, at);
+			})
+			.catch((error) =>
+				log.warn(
+					"store.retention_failed",
+					{ reason: "retention_failed" },
+					error,
+				),
+			),
 	);
 	const codingHeartbeat = intervalLifecycle(
 		"coding_heartbeat",
@@ -444,6 +469,7 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		{ name: "web_research_start", start: () => s.webResearch.start() },
 		{ name: "scheduler_start", start: () => s.scheduler.start() },
 		{ name: "task_maintenance_start", start: () => taskMaintenance.start?.() },
+		{ name: "store_retention_start", start: () => storeRetention.start?.() },
 		{ name: "coding_heartbeat_start", start: () => codingHeartbeat.start?.() },
 		{
 			name: "timer_maintenance_start",
@@ -471,6 +497,7 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		// World consumers stop before anything closes the store.
 		{ name: "world", close: () => s.world?.close() },
 		{ name: "task_maintenance", close: () => taskMaintenance.idle() },
+		{ name: "store_retention", close: () => storeRetention.idle() },
 		{ name: "timer_maintenance", close: () => timerMaintenance.idle() },
 		// Worker lease also expires independently if shutdown cannot deliver a stop.
 		{ name: "coding", close: () => s.codingComposition?.coding.close() },
@@ -479,6 +506,7 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 			name: "timers",
 			close: () => {
 				taskMaintenance.stop();
+				storeRetention.stop();
 				codingHeartbeat.stop();
 				timerMaintenance.stop();
 				routeSweep?.stop();
@@ -491,95 +519,141 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 	];
 }
 
+// Resources that `buildServices` created before it threw are not registered
+// with the runner, so they cannot be closed here; the process exit releases the
+// flock and the files.
 async function main() {
 	const config = loadProcessConfig();
 	configureLogging({ file: config.logFile, level: config.logLevel });
-	log.info("server.starting");
-	if (config.host !== "127.0.0.1" && config.host !== "localhost")
-		throw new Error("loopback_host_required");
-	const token = resolveApiToken({
-		EUMENES_API_TOKEN: config.apiToken,
-		EUMENES_DB: config.dbPath,
-		EUMENES_KEY_DIR: config.env.EUMENES_KEY_DIR,
-	});
-	const services = await buildServices(config);
+	// Resolved lazily: the guard is armed before the terminator exists.
+	let terminate: () => void = () => process.exit(1);
+	const guard = createProcessGuard({ log, terminate: () => terminate() });
+	process.on("unhandledRejection", guard.onRejection);
+	process.on("uncaughtException", guard.onException);
+	let runner: ReturnType<typeof createLifecycleRunner> | undefined;
 	let server: ReturnType<typeof Bun.serve> | undefined;
-	const runner = createLifecycleRunner(
-		createLifecycles(services, {
-			name: "http",
-			close: () => server?.stop(true),
-		}),
-	);
-	log.info("server.recovery_started");
-	await runner.recoverAll();
-	log.info("server.recovery_completed");
-	runner.startAll();
-	const app = createApp({
-		token,
-		origin: config.origin,
-		modules: appModules(appServices(services)),
-	});
-	server = Bun.serve({
-		hostname: config.host,
-		port: config.port,
-		idleTimeout: 60,
-		fetch: app.fetch,
-	});
-	log.info("server.listening", { port: server.port });
-	// Probe once so the UI reports a real result before the first message.
-	void services.inference.connect().then(
-		() =>
-			log.info("larm.probe_completed", {
-				status: services.inference.status().state,
-			}),
-		(error) =>
-			log.warn(
-				"larm.probe_failed",
-				{ status: services.inference.status().state },
-				error,
-			),
-	);
 	// Resolves to true when every step succeeded. A failing step never skips the later ones.
 	let stopping: Promise<boolean> | null = null;
+	const gate = createStartupGate();
 	const shutdown = () =>
 		(stopping ??= (async () => {
 			log.info("server.shutdown_started");
-			const ok = await runner.closeAll(SHUTDOWN_DEADLINE_MS);
+			// Let the startup step in flight finish before anything closes.
+			await gate.settled();
+			const ok = runner ? await runner.closeAll(SHUTDOWN_DEADLINE_MS) : true;
 			log.info("server.shutdown_completed", { reason: ok ? "ok" : "failed" });
 			return ok;
 		})());
 	// The process-level deadline backs up the runner's own, which normally fires first.
-	const terminate = createTerminator({
+	terminate = createTerminator({
 		shutdown,
 		exit: (code) => process.exit(code),
 		log,
-		deadlineMs: SHUTDOWN_DEADLINE_MS + 5_000,
+		deadlineMs: PROCESS_SHUTDOWN_DEADLINE_MS,
 	});
-	process.on("SIGINT", terminate);
-	process.on("SIGTERM", terminate);
+	for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const)
+		process.on(signal, () => terminate());
+	log.info("server.starting");
+	try {
+		if (config.host !== "127.0.0.1" && config.host !== "localhost")
+			throw new Error("loopback_host_required");
+		const token = resolveApiToken({
+			EUMENES_API_TOKEN: config.apiToken,
+			EUMENES_DB: config.dbPath,
+			EUMENES_KEY_DIR: config.env.EUMENES_KEY_DIR,
+		});
+		const services = await gate.step(async () => {
+			const built = await buildServices(config);
+			runner = createLifecycleRunner(
+				createLifecycles(built, {
+					name: "http",
+					close: () => server?.stop(true),
+				}),
+			);
+			return built;
+		});
+		if (stopping) return;
+		const active = runner as ReturnType<typeof createLifecycleRunner>;
+		log.info("server.recovery_started");
+		await gate.step(() => active.recoverAll());
+		if (stopping) return;
+		log.info("server.recovery_completed");
+		await gate.step(() => active.startAll());
+		if (stopping) return;
+		const app = createApp({
+			token,
+			origin: config.origin,
+			modules: appModules(appServices(services)),
+		});
+		await gate.step(() => {
+			try {
+				server = Bun.serve({
+					hostname: config.host,
+					port: config.port,
+					idleTimeout: 60,
+					fetch: app.fetch,
+				});
+			} catch (error) {
+				if ((error as { code?: unknown } | null)?.code === "EADDRINUSE")
+					throw new Error("port_in_use");
+				throw error;
+			}
+		});
+		if (stopping || !server) return;
+		log.info("server.listening", { port: (server as { port: number }).port });
+		// Probe once so the UI reports a real result before the first message.
+		void services.inference.connect().then(
+			() =>
+				log.info("larm.probe_completed", {
+					status: services.inference.status().state,
+				}),
+			(error) =>
+				log.warn(
+					"larm.probe_failed",
+					{ status: services.inference.status().state },
+					error,
+				),
+		);
+	} catch (error) {
+		// A failure caused by an in-progress shutdown is left to the terminator.
+		if (stopping) return;
+		await shutdown();
+		throw error;
+	}
 }
+
+/**
+ * Startup failure messages that are stable codes and carry no secret. Anything
+ * else (OS errors, paths, provider text) collapses to `startup_failed`.
+ */
+const SAFE_STARTUP_CODES = [
+	/^config_invalid:[A-Z0-9_]+$/,
+	/^migration_[a-z_]+:[A-Za-z0-9/._-]{1,120}$/,
+	/^migration_[a-z_]+$/,
+	/^(database_writer_owned|world_cursor_secret_invalid|api_token_file_invalid|loopback_host_required|port_in_use)$/,
+	/^secret_key_[a-z_]+$/,
+];
 
 /** The stable, non-sensitive reason code of a startup failure. */
 export function startupFailureReason(error: unknown): string {
 	const message = error instanceof Error ? error.message : undefined;
-	if (message && /^config_invalid:[A-Z0-9_]+$/.test(message)) return message;
-	return message === "api_token_file_invalid"
-		? "api_token_file_invalid"
-		: message === "EUMENES_API_TOKEN must be at least 24 characters"
-			? "api_token_too_short"
-			: message === "loopback_host_required"
-				? "loopback_host_required"
-				: "startup_failed";
+	if (message === "EUMENES_API_TOKEN must be at least 24 characters")
+		return "api_token_too_short";
+	if (
+		message &&
+		!message.includes("..") &&
+		SAFE_STARTUP_CODES.some((p) => p.test(message))
+	)
+		return message;
+	return "startup_failed";
 }
 
 // Importing this module only defines functions; the process starts when it is the entry point.
 if (import.meta.main) {
 	await main().catch((error) => {
-		log.error(
-			"server.startup_failed",
-			{ reason: startupFailureReason(error) },
-			error,
-		);
+		const reason = startupFailureReason(error);
+		log.error("server.startup_failed", { reason }, error);
+		process.stderr.write(`[eumenes] startup failed: ${reason}\n`);
 		process.exit(1);
 	});
 }

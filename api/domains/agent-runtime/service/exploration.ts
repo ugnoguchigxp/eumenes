@@ -1,4 +1,9 @@
-import type { Prepared } from "../../capabilities";
+import {
+	packageRuntimeOf,
+	toolRuntimeOf,
+	type Prepared,
+	type ToolRuntimeMeta,
+} from "../../capabilities";
 import type { Task } from "../contracts";
 export const RESEARCH_BUDGET = Object.freeze({
 	rootMilliseconds: 180000,
@@ -16,7 +21,7 @@ export const RESEARCH_BUDGET = Object.freeze({
 export const isHistory = (p: Prepared | undefined) =>
 	p?.package.backend === "history";
 export const isQuickWeb = (p: Prepared | undefined) =>
-	p?.package.id === "web.quick";
+	!!p && packageRuntimeOf(p.package.id)?.budget === "quick";
 const QUICK_WEB_BUDGET = Object.freeze({
 	modelCalls: 5,
 	localCalls: 0,
@@ -32,8 +37,14 @@ export const modelLimit = (p: Prepared | undefined) =>
 		: isQuickWeb(p)
 			? QUICK_WEB_BUDGET.modelCalls
 			: RESEARCH_BUDGET.webModelCalls;
-export const localTool = (id: string) =>
-	["web.find", "web.read_saved", "history.search", "history.read"].includes(id);
+/** Reads that stay inside the host (saved bodies, history) and use the local-call budget. */
+export const localTool = (meta: ToolRuntimeMeta | undefined) =>
+	meta?.operation === "saved_read" || meta?.operation === "history";
+export const isSearch = (meta: ToolRuntimeMeta | undefined) =>
+	meta?.operation === "search";
+/** A read of a URL-addressed page: the only reads that use the per-task read limit. */
+export const isPageRead = (meta: ToolRuntimeMeta | undefined) =>
+	meta?.operation === "read" && !!meta.urlScope;
 export function workerDeadline(parentDeadline: number, now: number) {
 	const deadline = Math.min(
 		now + RESEARCH_BUDGET.workerMilliseconds,
@@ -52,16 +63,14 @@ export function explorationBudget(
 	now: number,
 ) {
 	const local = operations.filter((i) =>
-			localTool(i.toolRevisionId.slice(5).split("@")[0]!),
+			localTool(toolRuntimeOf(i.toolRevisionId)),
 		).length,
 		external = operations.length - local;
-	const reads = operations.filter((i) =>
-		["web.read", "web.forecast", "web.quote"].includes(
-			i.toolRevisionId.slice(5).split("@")[0]!,
-		),
+	const reads = operations.filter(
+		(i) => toolRuntimeOf(i.toolRevisionId)?.operation === "read",
 	).length;
 	const searches = operations.filter((i) =>
-		i.toolRevisionId.startsWith("tool:web.lookup@"),
+		isSearch(toolRuntimeOf(i.toolRevisionId)),
 	).length;
 	return {
 		localCalls: local,

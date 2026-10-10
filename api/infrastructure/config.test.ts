@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { loadConfig, parseWorldMode } from "./config";
+import { parseProviderHosts } from "../domains/larm/service/guards";
 
 test("defaults are the values the server used before the config was centralised", () => {
 	const config = loadConfig({});
@@ -20,6 +21,7 @@ test("defaults are the values the server used before the config was centralised"
 		worldMode: "off",
 		worldPollMs: undefined,
 		worldCursorSecret: undefined,
+		larmProviderHosts: undefined,
 		toolchainEnabled: true,
 		historyToolsEnabled: true,
 		webResearchToolsEnabled: true,
@@ -211,4 +213,20 @@ test("numbers are strict decimal: hex, exponent, signs and fractions are rejecte
 			"config_invalid:EUMENES_WORLD_POLL_MS",
 		);
 	expect(loadConfig({ EUMENES_PORT: "007" }).port).toBe(7);
+});
+
+test("EUMENES_LARM_PROVIDER_HOSTS is trimmed, lower-cased and de-duplicated like the larm parser", () => {
+	const raw = " 10.9.9.9 , Other.LOCAL ,other.local";
+	const hosts = loadConfig({
+		EUMENES_LARM_PROVIDER_HOSTS: raw,
+	}).larmProviderHosts;
+	expect(hosts).toEqual(["10.9.9.9", "other.local"]);
+	expect(hosts).toEqual(parseProviderHosts(raw));
+	expect(
+		loadConfig({ EUMENES_LARM_PROVIDER_HOSTS: "" }).larmProviderHosts,
+	).toBeUndefined();
+	expect(loadConfig({}).larmProviderHosts).toBeUndefined();
+	expect(
+		loadConfig({ EUMENES_LARM_PROVIDER_HOSTS: " , ," }).larmProviderHosts,
+	).toBeUndefined();
 });

@@ -8,7 +8,11 @@ import {
 	hash,
 } from "./fixture";
 import type { Observation } from "../contracts";
-import { approvalChoices } from "../contracts";
+import {
+	approvalChoices,
+	decisionSchema,
+	INSTRUCTION_MAX_BYTES,
+} from "../contracts";
 import { fence } from "../service/policy";
 import { instructionFrame } from "../service/approval";
 
@@ -212,17 +216,47 @@ test("an approved instruction is dropped when the observation changed meanwhile"
 	expect(changes(h)).toHaveLength(0);
 });
 
-test("a long multi-byte instruction still fits the task question", async () => {
+test("a long multi-byte instruction at the limit is shown in full and executed byte for byte", async () => {
 	const h = await setup({ approveInstructions: true });
 	await failChecks(h);
-	const long = "修".repeat(4000);
+	const long = "修".repeat(1600);
+	expect(new TextEncoder().encode(long).length).toBeLessThanOrEqual(
+		INSTRUCTION_MAX_BYTES,
+	);
 	h.decision(proposal("request_change", long));
 	await h.observe();
 	await h.drain();
 	const prompt = h.tasks.get(h.taskId).question!.prompt;
 	expect(new TextEncoder().encode(prompt).length).toBeLessThanOrEqual(8192);
-	// The user can still read the full text through the supervisor view.
+	expect(prompt).toContain(long);
+	expect(prompt).not.toContain("途中まで");
 	expect(h.supervision.get(h.taskId)?.pendingApproval?.instruction).toBe(long);
+	await answer(h, approvalChoices.approve);
+	await h.observe();
+	await h.drain();
+	expect(changes(h)[0]!.instruction).toBe(`${instructionFrame}${long}`);
+});
+
+test("an instruction over the byte limit saved before the limit existed is escalated, not approved", async () => {
+	const h = await setup({ approveInstructions: true });
+	await failChecks(h);
+	h.decision(proposal("request_change", "修".repeat(2000)));
+	await h.observe();
+	await h.drain();
+	const { question } = h.tasks.get(h.taskId);
+	expect(question?.prompt ?? "").not.toContain("instruction_approval_required");
+	expect(h.supervision.get(h.taskId)?.pendingApproval ?? null).toBeNull();
+	expect(changes(h)).toHaveLength(0);
+});
+
+test("decisionSchema bounds the instruction in bytes and only for approval-gated actions", () => {
+	const base = { reason: "根拠", evidenceRefs: [], questionId: null };
+	const parse = (instruction: string | null, action = "request_change") =>
+		decisionSchema.safeParse({ ...base, action, instruction }).success;
+	expect(parse("修".repeat(2000))).toBe(false);
+	expect(parse("修".repeat(1600))).toBe(true);
+	expect(parse("fix", "run_checks")).toBe(false);
+	expect(parse(null, "run_checks")).toBe(true);
 });
 
 test("a host diagnostic read that only adds excerpt and coverage keeps the approval alive and the approved instruction runs", async () => {

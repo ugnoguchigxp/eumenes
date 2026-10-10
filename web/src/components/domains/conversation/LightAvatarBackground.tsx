@@ -68,6 +68,8 @@ export function LightAvatarBackground({
 		let model: LightAvatar | undefined;
 		let observer: ResizeObserver | undefined;
 		let failed = false;
+		let restarts = 0;
+		let restartTimer: ReturnType<typeof setTimeout> | undefined;
 		const disposePlayback = () => {
 			playback.current?.dispose();
 			playback.current = null;
@@ -85,6 +87,19 @@ export function LightAvatarBackground({
 			element.dataset.avatarState = "context-lost";
 			failed = true;
 			release();
+			// A lost context never restores on a released canvas: rebuild, bounded.
+			if (restarts < 3) {
+				restartTimer = setTimeout(
+					() => {
+						if (cancelled) return;
+						restarts += 1;
+						failed = false;
+						element.dataset.avatarState = "loading";
+						start();
+					},
+					2000 * 2 ** restarts,
+				);
+			}
 		};
 		// Pause/reduced changes only rebuild the cheap playback; the model and shaders stay.
 		const sync = () => {
@@ -147,6 +162,7 @@ export function LightAvatarBackground({
 			: scheduleIdle(start);
 		return () => {
 			cancelled = true;
+			clearTimeout(restartTimer);
 			cancelIdle();
 			release();
 		};

@@ -9,6 +9,7 @@ import {
 	listJobs,
 	openCounts,
 	openTotal,
+	pruneTerminal,
 	requestCancel,
 	finishJob,
 	endAttempt,
@@ -18,12 +19,15 @@ import type {
 	EnqueueInput,
 	HandlerDefinition,
 	JobRecord,
-	QueueOptions,
 	Tx,
 } from "../types";
 import { createRegistry } from "./registry";
-import { createRunner, resolveOptions } from "./runner";
+import { createRunner, resolveOptions, type RunnerOptions } from "./runner";
 
+export const QUEUE_RETENTION = {
+	settledMs: 14 * 86_400_000,
+	unknownMs: 90 * 86_400_000,
+};
 const MAX_PAYLOAD_BYTES = 16 * 1024;
 const iso = (ms: number) => new Date(ms).toISOString();
 
@@ -65,7 +69,7 @@ const canonical = (value: unknown) =>
 
 export function createQueue(
 	store: SqliteStore,
-	options: QueueOptions & {
+	options: RunnerOptions & {
 		limits?: { total: number; background: number; scope: number };
 	} = {},
 ) {
@@ -185,6 +189,14 @@ export function createQueue(
 			return result;
 		},
 		getInTransaction: (tx: Tx, id: string) => getJob(tx, id),
+		/** Deletes settled jobs older than 14 days and outcome_unknown ones older than 90; their dedupe keys become reusable. */
+		pruneInTransaction: (tx: Tx, at: number, limit = 500) =>
+			pruneTerminal(
+				tx,
+				at - QUEUE_RETENTION.settledMs,
+				at - QUEUE_RETENTION.unknownMs,
+				limit,
+			),
 		get: (id: string) => store.read((db) => getJob(db, id)),
 		getDto(id: string): JobDto | null {
 			const job = store.read((db) => getJob(db, id));

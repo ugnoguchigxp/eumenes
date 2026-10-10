@@ -2,6 +2,7 @@ import { readBounded } from "../../../infrastructure/bounded-read";
 import type { Hono, Context } from "hono";
 import type { VoiceDialogueService } from "..";
 import { parseJsonBody } from "../../../infrastructure/http";
+import { toErrorCode } from "../../../infrastructure/error-code";
 import { getLogger } from "../../../infrastructure/logger";
 import {
 	replayInputSchema,
@@ -107,16 +108,13 @@ export function registerVoiceDialogue(
 			});
 		} catch (error) {
 			// Only machine-readable codes (e.g. larm_inference_401) reach the client.
-			const code = error instanceof Error ? error.message : "";
+			const code = toErrorCode(error, "replay_failed");
 			log.error(
 				"voice.replay_failed",
-				{ route: "/api/voice/replay/audio", reason: code || "unknown" },
+				{ route: "/api/voice/replay/audio", reason: code },
 				error,
 			);
-			return c.json(
-				{ error: /^[a-z][a-z0-9_]{0,63}$/.test(code) ? code : "replay_failed" },
-				502,
-			);
+			return c.json({ error: code.length <= 64 ? code : "replay_failed" }, 502);
 		}
 	});
 	app.post("/api/voice/sample", async (c) => {
@@ -132,16 +130,13 @@ export function registerVoiceDialogue(
 				"Cache-Control": "no-store",
 			});
 		} catch (error) {
-			const code = error instanceof Error ? error.message : "";
+			const code = toErrorCode(error, "sample_failed");
 			log.error(
 				"voice.sample_failed",
-				{ route: "/api/voice/sample", reason: code || "unknown" },
+				{ route: "/api/voice/sample", reason: code },
 				error,
 			);
-			return c.json(
-				{ error: /^[a-z][a-z0-9_]{0,63}$/.test(code) ? code : "sample_failed" },
-				502,
-			);
+			return c.json({ error: code.length <= 64 ? code : "sample_failed" }, 502);
 		}
 	});
 	app.post("/api/voice/turns", receive(false));

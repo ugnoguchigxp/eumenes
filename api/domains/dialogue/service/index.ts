@@ -1,102 +1,37 @@
-import { researchResultContext } from "./research-result-context";
-import { operationRejection } from "./operation-authority";
-import {
-	RESEARCH_BUDGET,
-	type AgentRuntime,
-	type AnswerTicket,
-} from "../../agent-runtime";
-import { getLogger, withLogContext } from "../../../infrastructure/logger";
-const log = getLogger("dialogue");
-/** The World pre-send check could not run (busy or closing writer): the queue may retry. */
-class WorldContextRetry extends Error {}
-import { z } from "zod";
-import { type ConversationOperation } from "./conversation-tools";
-import type { NativeTool } from "../../../infrastructure/chat-stream";
-import {
-	delegateConversation,
-	prepareConversation,
-} from "./delegate-conversation";
-import { generateConversation } from "./conversation-generation";
-import { researchCitations } from "./research-citations";
 import type { Database } from "bun:sqlite";
+import { getLogger } from "../../../infrastructure/logger";
+import { type AgentRuntime } from "../../agent-runtime";
 import {
 	acceptedAvatarMotion,
-	type SpeechDelivery,
 	type DeliveryContext,
+	type SpeechDelivery,
 } from "../../delivery";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { ConversationService } from "../../conversation";
-import type { InferencePort, Receipt } from "../../inference";
-import type { HandlerDefinition, QueueService, Tx } from "../../queue";
-import type { TargetDefinition } from "../../scheduler";
+import type { InferencePort } from "../../inference";
+import type { QueueService } from "../../queue";
 import type { MemoryService } from "../../memory";
-import {
-	type PostAnswerObserverPort,
-	type PromptTarget,
-	promptTargetSchema,
-	type Run,
-	type RunProgress,
-	type Submit,
-	type WorldContextPort,
-	type WorldContextSettleInput,
+import type {
+	PostAnswerObserverPort,
+	Run,
+	WorldContextPort,
 } from "../contracts";
+import { byId, interruptUnfinished, listRuns, transition } from "../repository";
+import { createAgentSync } from "./agent-sync";
 import {
-	unfinishedAgentRuns,
-	linkAnswer,
-	byId,
-	byRequest,
-	byUtterance,
-	insert,
-	interruptUnfinished,
-	listRuns,
-	markWorld,
-	transition,
-} from "../repository";
+	DEFAULT_DEADLINE_MS,
+	GENERATE_KIND,
+	PROMPT_TARGET_KIND,
+	TERMINAL,
+	type DialogueDeps,
+} from "./context";
+import { createGenerationHandler } from "./generation-handler";
+import { createIntake } from "./intake";
+import { createProgress } from "./progress";
+const log = getLogger("dialogue");
 
-export const GENERATE_KIND = "dialogue.generate";
-export const PROMPT_TARGET_KIND = "dialogue.prompt";
-const DEFAULT_DEADLINE_MS = RESEARCH_BUDGET.rootMilliseconds;
+export { GENERATE_KIND, PROMPT_TARGET_KIND };
 export { buildSystemPrompt } from "./system-prompt";
-import { historyFor } from "./conversation-history";
-const TERMINAL = ["completed", "failed", "cancelled", "interrupted"];
-
-type ChatMessage = {
-	role: "system" | "user" | "assistant";
-	content: string;
-};
-interface GenerateInput {
-	tools?: NativeTool[];
-	actionSnapshot?: unknown;
-	actionResultIndex?: number;
-	requirementCatalog?: import("../../capabilities").RequirementCatalog;
-	timerCapability?: ReturnType<
-		AgentRuntime["conversationContextInTransaction"]
-	>["timerCapability"];
-	authorizedUrls?: string[];
-	runId: string;
-	revision: number;
-	messages: ChatMessage[];
-	requestId?: string;
-	/** The memory view fixed at prepare time; re-checked in the adoption transaction. */
-	memory?: { view: unknown };
-	/** The World context fixed at prepare time (opaque here); re-checked before sending and at adoption. */
-	world?: { context: unknown };
-	/** World was read for this run (this or an earlier attempt): its body is held until adoption. */
-	worldUsed?: boolean;
-	agent?: AnswerTicket;
-}
-interface Accept {
-	requestId: string;
-	conversationId: string;
-	text: string;
-	utteranceId?: string;
-	sourceKind: Run["sourceKind"];
-	scheduleId?: string;
-	occurrenceId?: string;
-	deadlineMs?: number;
-	voiceSubject?: string;
-	validationRequestIds?: string[];
-}
 
 export function createDialogueService({
 	store,
@@ -121,889 +56,31 @@ export function createDialogueService({
 	postAnswer?: PostAnswerObserverPort;
 	worldContext?: WorldContextPort;
 }) {
-	/** Optional learning runs in its own SAVEPOINT: any failure rolls back only that part. */
-	function observeAnswer(tx: Tx, runId: string, ticket?: AnswerTicket) {
-		if (!postAnswer || !ticket || ticket.reportEpoch === null) return;
-		const name = "dialogue_post_answer";
-		tx.exec(`SAVEPOINT ${name}`);
-		try {
-			const result = postAnswer.recordInTransaction(tx, {
-				runId,
-				ticketId: ticket.eventId,
-				reportEpoch: ticket.reportEpoch,
-			});
-			if (result.status !== "recorded") {
-				tx.exec(`ROLLBACK TO ${name}`);
-				log.info("dialogue.post_answer_skipped", { reason: result.code });
-			}
-		} catch {
-			tx.exec(`ROLLBACK TO ${name}`);
-			log.warn("dialogue.post_answer_skipped", { reason: "observer_error" });
-		}
-		tx.exec(`RELEASE ${name}`);
-	}
-	const partials = new Map<string, string>();
-	const watchers = new Map<string, Set<(value: RunProgress) => void>>();
-	const watchedStatuses = new Map<string, string>();
-	function progress(runId: string): RunProgress | null {
-		const run = store.read((db) => byId(db, runId));
-		if (!run) return null;
-		// The one place body text leaves this domain (SSE, subscribers, voice).
-		// The adoption receipt is the completed run with its answer message,
-		// written in the settle transaction; nothing else releases a body.
-		const answer =
-			run.status === "completed" && run.answerMessageId
-				? conversation
-						.get(run.conversationId)
-						.messages.find((m) => m.id === run.answerMessageId)?.text
-				: null;
-		// A World-using run has no pre-adoption body, whatever was generated.
-		const live =
-			run.status === "running" && !run.worldUsed
-				? (partials.get(runId) ?? "")
-				: "";
-		return {
-			runId,
-			status: run.status,
-			text: answer ?? live,
-			worldUsed: run.worldUsed ?? false,
-			worldBlocked: run.worldBlocked ?? false,
-			error: run.status === "failed" ? run.error : null,
-		};
-	}
-	function publish(runId: string) {
-		const value = progress(runId);
-		if (!value) return;
-		watchedStatuses.set(runId, value.status);
-		for (const listener of watchers.get(runId) ?? []) {
-			try {
-				listener(value);
-			} catch {
-				/* Isolated observers. */
-			}
-		}
-	}
-	const stopCommits = store.onCommit(() => {
-		for (const id of watchers.keys()) {
-			const status = store.read((db) => byId(db, id))?.status;
-			if (status !== watchedStatuses.get(id)) publish(id);
-		}
-		for (const id of partials.keys()) {
-			const status = store.read((db) => byId(db, id))?.status;
-			if (!status || TERMINAL.includes(status)) partials.delete(id);
-		}
-	});
-
-	const handler: HandlerDefinition<
-		{ runId: string },
-		GenerateInput,
-		{ text: string; receipt?: Receipt; operation?: ConversationOperation }
-	> = {
-		kind: GENERATE_KIND,
-		payloadVersions: [1],
-		schema: z.object({ runId: z.string() }),
-		recovery: "interrupt",
-		resourceKey: "inference.llm",
-		prepareInTransaction(tx, claim) {
-			const run = byId(tx, claim.payload.runId);
-			if (!run || run.status !== "queued" || run.jobId !== claim.jobId)
-				return { status: "stale", reason: "run_not_queued" };
-			let agent: AnswerTicket | undefined;
-			if (run.agentTaskId && agents) {
-				try {
-					agent = agents.prepareAnswerInTransaction(tx, run.id);
-				} catch {
-					transition(
-						tx,
-						run.id,
-						run.revision,
-						"failed",
-						clock(),
-						"report_invalidated",
-					);
-					agents.failAnswerInTransaction(tx, run.id, "report_invalidated");
-					return { status: "stale", reason: "report_invalidated" };
-				}
-			}
-			if (!transition(tx, run.id, run.revision, "running", clock()))
-				return { status: "stale", reason: "run_changed" };
-			const current = byId(tx, run.id) as Run;
-			const recalled = memory?.prepareInTransaction(tx, run.conversationId);
-			if (recalled?.status === "blocked") {
-				if (run.agentTaskId)
-					agents?.failAnswerInTransaction(
-						tx,
-						run.id,
-						`memory_${recalled.reason}`,
-					);
-				// Never silently drop memory and continue; end the run with the reason.
-				transition(
-					tx,
-					run.id,
-					current.revision,
-					"failed",
-					clock(),
-					`memory_${recalled.reason}`,
-				);
-				return { status: "stale", reason: `memory_${recalled.reason}` };
-			}
-			// World reads in the SAME transaction as Memory's recall and shares its budget.
-			const world =
-				worldContext && !agent?.failureCode && !agent?.actionPayload
-					? worldContext.prepareInTransaction(tx, {
-							runId: run.id,
-							conversationId: run.conversationId,
-							jobId: claim.jobId,
-							attempt: claim.attempt,
-							generation: claim.generation,
-							reservedBytes:
-								recalled?.status === "ready"
-									? new TextEncoder().encode(recalled.block).length
-									: 0,
-							nowMs: Date.parse(clock()),
-						})
-					: undefined;
-			if (world?.status === "blocked") {
-				// Blocked is its own outcome: the run reports World as used+blocked.
-				markWorld(tx, run.id, "blocked");
-				if (run.agentTaskId)
-					agents?.failAnswerInTransaction(tx, run.id, world.reason);
-				// Never silently run without the World context; end the run with the reason.
-				transition(
-					tx,
-					run.id,
-					current.revision,
-					"failed",
-					clock(),
-					world.reason,
-				);
-				return { status: "stale", reason: world.reason };
-			}
-			if (world?.status === "ready") {
-				markWorld(tx, run.id, "used");
-				// Whatever an earlier World-less attempt streamed is withdrawn.
-				partials.delete(run.id);
-			}
-			const referenceBlocks = [
-				...(recalled?.status === "ready" ? [recalled.block] : []),
-				...(world?.status === "ready" ? [world.block] : []),
-			];
-			if (larm.captureInTransaction && !larm.requestFor?.(tx, run.id, "llm")) {
-				const snapshot = larm.snapshotInTransaction?.(tx);
-				if (snapshot) {
-					for (const p of ["llm", "asr", "tts"] as const) {
-						snapshot.routes[p].mode = "larm-only";
-						snapshot.routes[p].cloudAllowed = false;
-					}
-					larm.captureInTransaction(
-						tx,
-						run.id,
-						"llm",
-						claim.deadlineAtMs ?? Date.now() + DEFAULT_DEADLINE_MS,
-						snapshot,
-					);
-				}
-			}
-			let messages = historyFor(
-				tx,
-				current,
-				referenceBlocks,
-				conversation,
-				larm.snapshotInTransaction?.(tx).general,
-			);
-			if (agent?.projection || agent?.failureCode) {
-				messages = researchResultContext(
-					messages,
-					referenceBlocks,
-					agent.projection ?? undefined,
-					agent.failureCode,
-				);
-				const requestId = larm.requestFor?.(tx, run.id, "llm");
-				if (requestId)
-					larm.setContextPolicyInTransaction?.(tx, requestId, "exact");
-			}
-			let actionResultIndex: number | undefined;
-			if (agent?.actionPayload) {
-				const operation = JSON.parse(agent.actionPayload);
-				actionResultIndex = messages.length - 1;
-				messages[0]!.content +=
-					"\n操作は既に終了しています。操作結果の事実を、あなた自身の言葉と指定の口調で短く伝えてください。操作をやり直したり、結果にない成功や時間を作ったりしません。全itemsの状態を必要に応じて説明し、complete=falseなら一覧が部分的であることを伝えます。";
-				messages.splice(messages.length - 1, 0, {
-					role: "user",
-					content: JSON.stringify({ actionResult: operation }),
-				});
-				const requestId = larm.requestFor?.(tx, run.id, "llm");
-				if (requestId)
-					larm.setContextPolicyInTransaction?.(tx, requestId, "exact");
-			}
-			return {
-				status: "ready",
-				input: {
-					runId: run.id,
-					revision: current.revision,
-					messages,
-					actionResultIndex,
-					...prepareConversation(tx, agents, run, messages),
-					agent,
-					...(recalled?.status === "ready"
-						? { memory: { view: recalled.view } }
-						: {}),
-					...(world?.status === "ready"
-						? { world: { context: world.context } }
-						: {}),
-					...(world?.status === "ready" || run.worldUsed
-						? { worldUsed: true }
-						: {}),
-					requestId: larm.requestFor?.(tx, run.id, "llm") ?? undefined,
-				},
-			};
-		},
-		async execute(input, { signal, jobId, attempt, generation }) {
-			const run = store.read((db) => byId(db, input.runId));
-			return withLogContext(
-				{
-					runId: input.runId,
-					requestId: run?.requestId,
-					utteranceId: run?.utteranceId ?? undefined,
-				},
-				async () => {
-					log.info("dialogue.generation_started");
-					if (input.agent?.actionPayload && agents) {
-						// Refresh time/state before phrasing, without repeating the operation.
-						// A later change still rejects this generated answer at adoption.
-						const refreshed = await store.write((tx) => {
-							const ticket = agents.prepareAnswerInTransaction(tx, input.runId);
-							if (
-								ticket.revision !== input.agent!.revision ||
-								ticket.dataEpoch !== input.agent!.dataEpoch ||
-								!ticket.actionPayload ||
-								!agents.validAnswerInTransaction(tx, ticket)
-							)
-								throw new Error("report_invalidated");
-							return {
-								ticket,
-								operation: JSON.parse(ticket.actionPayload),
-							};
-						});
-						input.agent = refreshed.ticket;
-						if (input.actionResultIndex === undefined)
-							throw new Error("invalid_action_result");
-						input.messages[input.actionResultIndex] = {
-							role: "user",
-							content: JSON.stringify({ actionResult: refreshed.operation }),
-						};
-						signal.throwIfAborted();
-					}
-					const holdBody = !!(
-						input.memory ||
-						input.world ||
-						input.worldUsed ||
-						input.agent?.projection ||
-						input.agent?.actionPayload
-					);
-					if (input.world && worldContext) {
-						// The last gate before the model. A source, policy or forget change makes
-						// the context stale; a stopped run or a replaced attempt must not send either.
-						// All of it is checked last, right before the send. Anything sent after this
-						// cannot be recalled: later changes can only stop the adoption.
-						const verdict = await worldContext.checkBeforeSend(
-							input.world.context,
-						);
-						if (!verdict.ok)
-							throw verdict.retryable
-								? new WorldContextRetry(verdict.reason)
-								: new Error(verdict.reason);
-						signal.throwIfAborted();
-						const now = store.read((db) => byId(db, input.runId));
-						if (now?.status !== "running" || now.revision !== input.revision)
-							throw new Error("cancelled");
-						const job = queue.get(jobId);
-						if (
-							job?.state !== "running" ||
-							job.attempt !== attempt ||
-							job.generation !== generation
-						)
-							throw new Error("attempt_changed");
-					}
-					let held = 0;
-					const delta = (text: string) => {
-						signal.throwIfAborted();
-						const current = store.read((db) => byId(db, input.runId));
-						if (
-							current?.status !== "running" ||
-							current.revision !== input.revision
-						)
-							throw new Error("cancelled");
-						if (holdBody) {
-							// Memory/World-backed text is not shown or spoken before the adoption check passes.
-							held += text.length;
-							if (held > 65536) throw new Error("chat_output_too_large");
-							return;
-						}
-						const next = (partials.get(input.runId) ?? "") + text;
-						if (next.length > 65536) throw new Error("chat_output_too_large");
-						partials.set(input.runId, next);
-						publish(input.runId);
-					};
-					// An unadopted World-backed body must not be collected as an attitude
-					// sample (its text would persist before adoption): no collection identity.
-					// Speech collects the adopted answer later, from the voice side.
-					const preparation =
-						run && !(input.world || input.worldUsed)
-							? {
-									collection: {
-										conversationId: run.conversationId,
-										turnId: run.id,
-										granularity: "answer" as const,
-										chunkOrder: null,
-									},
-								}
-							: undefined;
-					const generated = await generateConversation({
-						inference: larm,
-						requestId: input.requestId,
-						messages: input.messages,
-						signal,
-						delta,
-						preparation,
-						tools: input.agent ? undefined : input.tools,
-						repair: () => {
-							partials.delete(input.runId);
-							held = 0;
-							publish(input.runId);
-						},
-					});
-					let { text } = generated;
-					const { receipt } = generated;
-					if (generated.operation) {
-						if (!agents || input.agent)
-							throw new Error("invalid_conversation_operation");
-						partials.delete(input.runId);
-						return generated;
-					}
-					const prefix = partials.get(input.runId) ?? "";
-					if (!text.startsWith(prefix)) throw new Error("chat_stream_diverged");
-					if (holdBody) {
-						// Held text was already counted while streaming; check the final length directly.
-						if (text.length > 65536) throw new Error("chat_output_too_large");
-					} else if (text.length > prefix.length)
-						delta(text.slice(prefix.length));
-					log.info("dialogue.generation_completed");
-					if (input.agent?.projection || input.agent?.failureCode)
-						text = researchCitations(text, input.agent.projection);
-					return { text, receipt };
-				},
-			);
-		},
-		classify: (error) =>
-			error instanceof WorldContextRetry ? "retry" : "fail",
-		settleInTransaction(tx, claim, input, outcome) {
-			const run = byId(tx, claim.payload.runId);
-			if (!run) return "stale";
-			if (outcome.type === "success") {
-				const answerText = outcome.result.text;
-				if (
-					!input ||
-					run.status !== "running" ||
-					run.revision !== input.revision
-				) {
-					// The result is not adopted: nothing it stood on stays registered.
-					if (input?.world && run.status !== "completed")
-						worldContext?.releaseInTransaction(tx, run.id, run.conversationId);
-					return "stale";
-				}
-				if (outcome.result.operation && agents) {
-					const rejected = operationRejection(tx, {
-						inference: larm,
-						receipt: outcome.result.receipt,
-						memory,
-						memoryView: input.memory,
-						world: worldContext,
-						worldView: input.world,
-						settle: {
-							runId: run.id,
-							conversationId: run.conversationId,
-							jobId: claim.jobId,
-							attempt: claim.attempt,
-							generation: claim.generation,
-							inference: outcome.result.receipt
-								? {
-										requestId: outcome.result.receipt.requestId,
-										attemptId: outcome.result.receipt.attemptId,
-									}
-								: null,
-							nowMs: Date.parse(clock()),
-						},
-					});
-					if (rejected) {
-						if (input.world)
-							worldContext?.releaseInTransaction(
-								tx,
-								run.id,
-								run.conversationId,
-							);
-						transition(tx, run.id, run.revision, "failed", clock(), rejected);
-						return { status: "failed", errorCode: rejected };
-					}
-					// The initial receipt stays pending; the final answer is a later attempt
-					// on the same policy request. No control text is adopted or collected.
-					if (input.world)
-						worldContext?.releaseInTransaction(tx, run.id, run.conversationId);
-					delegateConversation(
-						tx,
-						agents,
-						conversation,
-						run,
-						outcome.result.operation,
-						{
-							parentJobId: claim.jobId,
-							authorizedUrls: input.authorizedUrls,
-							actionSnapshot: input.actionSnapshot,
-							timerCapability: input.timerCapability,
-							requirementCatalog: input.requirementCatalog,
-						},
-					);
-					transition(tx, run.id, run.revision, "queued", clock());
-					partials.delete(run.id);
-					return "applied";
-				}
-				if (
-					input.agent &&
-					agents &&
-					!agents.validAnswerInTransaction(tx, input.agent)
-				) {
-					transition(
-						tx,
-						run.id,
-						run.revision,
-						"failed",
-						clock(),
-						"report_invalidated",
-					);
-					agents.failAnswerInTransaction(tx, run.id, "report_invalidated");
-					// Not adopted: the World context's input dependencies go.
-					if (input.world)
-						worldContext?.releaseInTransaction(tx, run.id, run.conversationId);
-					return { status: "failed", errorCode: "report_invalidated" };
-				}
-				const worldSettle: WorldContextSettleInput | null =
-					input.world && worldContext
-						? {
-								runId: run.id,
-								conversationId: run.conversationId,
-								jobId: claim.jobId,
-								attempt: claim.attempt,
-								generation: claim.generation,
-								inference: outcome.result.receipt
-									? {
-											requestId: outcome.result.receipt.requestId,
-											attemptId: outcome.result.receipt.attemptId,
-										}
-									: null,
-								nowMs: Date.parse(clock()),
-							}
-						: null;
-				if (input.world && worldContext && worldSettle) {
-					// Read-only, before anything is written: a stale World context adopts
-					// neither the answer nor a usage record.
-					const verdict = worldContext.validateInTransaction(
-						tx,
-						worldSettle,
-						input.world.context,
-					);
-					if (!verdict.ok) {
-						worldContext.releaseInTransaction(tx, run.id, run.conversationId);
-						if (run.agentTaskId)
-							agents?.failAnswerInTransaction(tx, run.id, verdict.reason);
-						transition(
-							tx,
-							run.id,
-							run.revision,
-							"failed",
-							clock(),
-							verdict.reason,
-						);
-						return { status: "failed", errorCode: verdict.reason };
-					}
-				}
-				if (input.memory && memory) {
-					const adopted = memory.settleInTransaction(
-						tx,
-						run.id,
-						run.conversationId,
-						input.memory.view,
-					);
-					if (!adopted.ok) {
-						// Not adopted: the World context's input dependencies go.
-						if (input.world)
-							worldContext?.releaseInTransaction(
-								tx,
-								run.id,
-								run.conversationId,
-							);
-						if (run.agentTaskId)
-							agents?.failAnswerInTransaction(tx, run.id, adopted.reason);
-						transition(
-							tx,
-							run.id,
-							run.revision,
-							"failed",
-							clock(),
-							adopted.reason,
-						);
-						return { status: "failed", errorCode: adopted.reason };
-					}
-				}
-				if (
-					outcome.result.receipt &&
-					!larm.acceptInTransaction?.(tx, outcome.result.receipt)
-				) {
-					memory?.discardUsageInTransaction(tx, run.id);
-					if (run.agentTaskId)
-						agents?.failAnswerInTransaction(tx, run.id, "permission_revoked");
-					transition(
-						tx,
-						run.id,
-						run.revision,
-						"failed",
-						clock(),
-						"permission_revoked",
-					);
-					if (input.world)
-						worldContext?.releaseInTransaction(tx, run.id, run.conversationId);
-					return { status: "failed", errorCode: "permission_revoked" };
-				}
-				// The usage record and the answer are written together, after every check.
-				if (input.world && worldContext && worldSettle)
-					worldContext.recordUsageInTransaction(
-						tx,
-						worldSettle,
-						input.world.context,
-					);
-				if (input.agent && agents)
-					agents.completeAnswerInTransaction(tx, input.agent);
-				const messageId = id();
-				conversation.appendInTransaction(tx, {
-					id: messageId,
-					conversationId: run.conversationId,
-					role: "assistant",
-					text: answerText,
-					createdAt: clock(),
-					runId: run.id,
-				});
-				if (outcome.result.receipt?.delivery?.version === 2)
-					conversation.recordAnswerDeliveryInTransaction(
-						tx,
-						run.id,
-						run.conversationId,
-						outcome.result.receipt.delivery,
-					);
-				const done = transition(
-					tx,
-					run.id,
-					run.revision,
-					"completed",
-					clock(),
-					null,
-					messageId,
-				);
-				if (done) observeAnswer(tx, run.id, input.agent);
-				else if (input.world)
-					worldContext?.releaseInTransaction(tx, run.id, run.conversationId);
-				return done ? "applied" : "stale";
-			}
-			// A run that is already terminal (e.g. cancelled) keeps its state.
-			if (run.status !== "queued" && run.status !== "running") return "applied";
-			// Not adopted (failed, retried, expired, interrupted): drop the input dependencies.
-			worldContext?.releaseInTransaction(tx, run.id, run.conversationId);
-			const next: [Run["status"], string | null] =
-				outcome.type === "retry"
-					? ["queued", outcome.errorCode]
-					: outcome.type === "failed"
-						? ["failed", outcome.errorCode]
-						: outcome.type === "expired"
-							? ["failed", "deadline_exceeded"]
-							: ["interrupted", outcome.errorCode];
-			if (run.agentTaskId)
-				agents?.failAnswerInTransaction(tx, run.id, next[1] ?? "answer_failed");
-			return transition(tx, run.id, run.revision, next[0], clock(), next[1])
-				? "applied"
-				: "stale";
-		},
-		cancelInTransaction(tx, job) {
-			const run = byId(tx, job.payload.runId);
-			if (run && (run.status === "queued" || run.status === "running")) {
-				transition(
-					tx,
-					run.id,
-					run.revision,
-					"cancelled",
-					clock(),
-					"cancel_requested",
-				);
-				// A late result is rejected by the queue; what the run registered is released.
-				worldContext?.releaseInTransaction(tx, run.id, run.conversationId);
-			}
-		},
+	const deps: DialogueDeps = {
+		store,
+		conversation,
+		larm,
+		queue,
+		clock,
+		id,
+		memory,
+		agents,
+		postAnswer,
+		worldContext,
 	};
-	queue.registerHandler(handler);
-
-	/** One transaction: user message + run + queue job. Throws (rolling all back) when the queue is full. */
-	function acceptInTransaction(
-		db: Tx,
-		input: Accept,
-	): { run: Run; fresh: boolean } {
-		const existing =
-			byRequest(db, input.requestId) ??
-			(input.utteranceId ? byUtterance(db, input.utteranceId) : null);
-		if (existing) {
-			const original = conversation
-				.messagesInTransaction(db, existing.conversationId)
-				.find((message) => message.id === existing.inputMessageId);
-			if (
-				existing.conversationId !== input.conversationId ||
-				original?.text !== input.text ||
-				existing.utteranceId !== (input.utteranceId ?? null)
-			)
-				throw new Error("request_conflict");
-			return { run: existing, fresh: false };
-		}
-		const now = clock();
-		const runId = id();
-		const messageId = id();
-		conversation.appendInTransaction(db, {
-			id: messageId,
-			conversationId: input.conversationId,
-			role: "user",
-			text: input.text,
-			createdAt: now,
-			runId,
-		});
-		const deadlineAtMs =
-			Date.parse(now) + (input.deadlineMs ?? DEFAULT_DEADLINE_MS);
-		const generated = queue.enqueueInTransaction(db, {
-			// Scheduled runs get their own scope so background work cannot exhaust interactive acceptance.
-			scope: input.sourceKind === "schedule" ? "dialogue.schedule" : "dialogue",
-			kind: GENERATE_KIND,
-			dedupeKey: runId,
-			payload: { runId },
-			subjectRef: runId,
-			lane: input.sourceKind === "schedule" ? "background" : "interactive",
-			resourceKey: "inference.llm",
-			maxAttempts: 1,
-			concurrencyKey: `conversation:${input.conversationId}`,
-			deadlineAtMs,
-		});
-		const run: Run = {
-			id: runId,
-			requestId: input.requestId,
-			conversationId: input.conversationId,
-			utteranceId: input.utteranceId ?? null,
-			status: "queued",
-			revision: 0,
-			inputMessageId: messageId,
-			answerMessageId: null,
-			error: null,
-			jobId: generated.job.id,
-			deadlineAt: new Date(deadlineAtMs).toISOString(),
-			sourceKind: input.sourceKind,
-			scheduleId: input.scheduleId ?? null,
-			occurrenceId: input.occurrenceId ?? null,
-			worldUsed: false,
-			worldBlocked: false,
-			createdAt: now,
-			updatedAt: now,
-		};
-		if (input.voiceSubject && larm.bindInTransaction)
-			larm.bindInTransaction(db, input.voiceSubject, runId, deadlineAtMs, {
-				validationRequestIds: input.validationRequestIds ?? [],
-			});
-		else larm.captureInTransaction?.(db, runId, "llm", deadlineAtMs);
-		insert(db, run);
-		return { run, fresh: true };
-	}
-
-	const promptTarget: TargetDefinition<PromptTarget> = {
-		kind: PROMPT_TARGET_KIND,
-		version: 1,
-		schema: promptTargetSchema,
-		materializeInTransaction(tx, occurrence) {
-			const { run } = acceptInTransaction(tx, {
-				requestId: `schedule:${occurrence.occurrenceId}`,
-				conversationId: occurrence.payload.conversationId,
-				text: occurrence.payload.text,
-				sourceKind: "schedule",
-				scheduleId: occurrence.scheduleId,
-				occurrenceId: occurrence.occurrenceId,
-				deadlineMs: occurrence.payload.deadlineMs,
-			});
-			return { jobId: run.jobId as string, subjectRef: run.id };
-		},
-	};
-
-	let stopped = false,
-		pending = false,
-		reconciling: Promise<void> | null = null,
-		retryTimer: ReturnType<typeof setTimeout> | null = null;
-	function scheduleAgents() {
-		if (!agents || stopped) return;
-		pending = true;
-		if (!reconciling)
-			queueMicrotask(() => {
-				if (!reconciling && !stopped) void reconcileAgents();
-			});
-	}
-	async function reconcileAgents() {
-		if (reconciling) return reconciling;
-		reconciling = (async () => {
-			while (pending && !stopped) {
-				pending = false;
-				for (const event of agents?.pendingEvents() ?? []) {
-					try {
-						await store.write((db) => {
-							const run = byId(db, event.root_run_id);
-							if (!run || TERMINAL.includes(run.status)) return;
-							const root = agents!.byRootInTransaction(db, run.id);
-							if (root?.state !== "ready_for_answer") return;
-							if (root.deadline <= Date.now()) {
-								transition(
-									db,
-									run.id,
-									run.revision,
-									"failed",
-									clock(),
-									"deadline_exceeded",
-								);
-								agents!.failAnswerInTransaction(
-									db,
-									run.id,
-									"deadline_exceeded",
-								);
-								return;
-							}
-							const { job } = queue.enqueueInTransaction(db, {
-								scope: "dialogue",
-								kind: GENERATE_KIND,
-								dedupeKey: `answer:${run.id}:${event.id}`,
-								payload: { runId: run.id },
-								subjectRef: run.id,
-								lane: "interactive",
-								resourceKey: "inference.llm",
-								maxAttempts: 1,
-								concurrencyKey: `conversation:${run.conversationId}`,
-								deadlineAtMs: root.deadline,
-							});
-							linkAnswer(db, run.id, job.id);
-							agents!.reserveAnswerInTransaction(db, event.id, job.id);
-						});
-					} catch {
-						if (!retryTimer) {
-							retryTimer = setTimeout(() => {
-								retryTimer = null;
-								scheduleAgents();
-							}, 250);
-							retryTimer.unref();
-						}
-					}
-				}
-				for (const run of store.read((db) => unfinishedAgentRuns(db))) {
-					if (!run.agentTaskId || TERMINAL.includes(run.status)) continue;
-					const root = store.read((db) =>
-						agents!.byRootInTransaction(db, run.id),
-					);
-					if (
-						root &&
-						["failed", "cancelled", "interrupted"].includes(root.state)
-					)
-						await store.write((db) => {
-							const current = byId(db, run.id);
-							if (current && !TERMINAL.includes(current.status))
-								transition(
-									db,
-									run.id,
-									current.revision,
-									root.state as Run["status"],
-									clock(),
-									root.error_code,
-								);
-						});
-				}
-			}
-		})().finally(() => {
-			reconciling = null;
-			if (pending && !stopped) scheduleAgents();
-		});
-		return reconciling;
-	}
-	const stopAgentCommits = store.onCommit(scheduleAgents);
+	const progress = createProgress(deps);
+	queue.registerHandler(createGenerationHandler(deps, progress));
+	const intake = createIntake(deps);
+	const agentSync = createAgentSync(deps);
 	const service = {
-		promptTarget,
-		progress,
-		subscribeProgress(runId: string, listener: (value: RunProgress) => void) {
-			let set = watchers.get(runId);
-			if (!set) {
-				set = new Set();
-				watchers.set(runId, set);
-			}
-			set.add(listener);
-			const value = progress(runId);
-			if (value) {
-				watchedStatuses.set(runId, value.status);
-				listener(value);
-			}
-			return () => {
-				set!.delete(listener);
-				if (!set!.size) {
-					watchers.delete(runId);
-					watchedStatuses.delete(runId);
-				}
-			};
-		},
+		promptTarget: intake.promptTarget,
+		progress: progress.progress,
+		subscribeProgress: progress.subscribeProgress,
+		submitVoice: intake.submitVoice,
+		submit: intake.submit,
 		async recover() {
 			// Runs without a queue job predate the queue and are interrupted as before.
 			await store.write((db) => interruptUnfinished(db, clock()));
-		},
-		async submitVoice(
-			input: Submit,
-			voiceSubject: string,
-			validation: { validationRequestIds: string[] },
-		): Promise<Run> {
-			if (!larm.bindInTransaction || !validation?.validationRequestIds.length)
-				throw new Error("invalid_voice_inference");
-			const accepted = await store.write((db) =>
-				acceptInTransaction(db, {
-					...input,
-					voiceSubject,
-					validationRequestIds: validation.validationRequestIds,
-					sourceKind: "voice",
-				}),
-			);
-			log.info(accepted.fresh ? "dialogue.accepted" : "dialogue.reused", {
-				requestId: accepted.run.requestId,
-				runId: accepted.run.id,
-				jobId: accepted.run.jobId ?? undefined,
-				utteranceId: accepted.run.utteranceId ?? undefined,
-				status: accepted.run.status,
-			});
-			if (accepted.fresh) queue.wake();
-			return accepted.run;
-		},
-		async submit(input: Submit): Promise<Run> {
-			const accepted = await store.write((db) =>
-				acceptInTransaction(db, {
-					...input,
-					sourceKind: input.utteranceId ? "voice" : "manual",
-				}),
-			);
-			log.info(accepted.fresh ? "dialogue.accepted" : "dialogue.reused", {
-				requestId: accepted.run.requestId,
-				runId: accepted.run.id,
-				jobId: accepted.run.jobId ?? undefined,
-				utteranceId: accepted.run.utteranceId ?? undefined,
-				status: accepted.run.status,
-			});
-			if (accepted.fresh) queue.wake();
-			return accepted.run;
 		},
 		get(runId: string) {
 			return store.read((db) => byId(db, runId));
@@ -1075,38 +152,32 @@ export function createDialogueService({
 		answerContext(runId: string): DeliveryContext | null {
 			const run = store.read((db) => byId(db, runId));
 			if (run?.status !== "completed" || !run.answerMessageId) return null;
-			const messages = conversation.get(run.conversationId).messages;
-			const answerAt = messages.findIndex(
-				(message) => message.id === run.answerMessageId,
-			);
-			if (answerAt < 0) return null;
-			const inputAt = messages.findIndex(
-				(message) => message.id === run.inputMessageId,
-			);
+			const answer = conversation.message(run.answerMessageId);
+			if (!answer) return null;
 			// Later queued user messages must not leak into this answer's decision.
+			const input = conversation.message(run.inputMessageId);
+			const before = conversation.turnsBefore(
+				run.conversationId,
+				run.inputMessageId,
+				3,
+			);
 			return {
-				answer: messages[answerAt]!.text,
-				turns: messages
-					.slice(0, inputAt + 1)
-					.slice(-4)
-					.map(({ role, text }) => ({ role, text })),
+				answer: answer.text,
+				turns: (input ? [...before, input] : before).map(({ role, text }) => ({
+					role,
+					text,
+				})),
 			};
 		},
 		answerDelivery(runId: string): SpeechDelivery | undefined {
 			const run = store.read((db) => byId(db, runId));
 			if (run?.status !== "completed" || !run.answerMessageId) return undefined;
-			return conversation
-				.get(run.conversationId)
-				.messages.find((message) => message.id === run.answerMessageId)
-				?.delivery;
+			return conversation.message(run.answerMessageId)?.delivery;
 		},
 		answerText(runId: string): string | null {
 			const run = store.read((db) => byId(db, runId));
 			return run?.answerMessageId
-				? (conversation
-						.get(run.conversationId)
-						.messages.find((message) => message.id === run.answerMessageId)
-						?.text ?? null)
+				? (conversation.message(run.answerMessageId)?.text ?? null)
 				: null;
 		},
 		list(conversationId: string) {
@@ -1162,14 +233,8 @@ export function createDialogueService({
 		},
 		/** Runs are stopped by the queue's own shutdown; nothing is owned here. */
 		async close() {
-			stopped = true;
-			stopAgentCommits();
-			if (retryTimer) clearTimeout(retryTimer);
-			await reconciling;
-			stopCommits();
-			partials.clear();
-			watchers.clear();
-			watchedStatuses.clear();
+			await agentSync.close();
+			progress.close();
 		},
 	};
 	return service;

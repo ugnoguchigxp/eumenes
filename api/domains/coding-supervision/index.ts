@@ -1,5 +1,6 @@
 export { migration } from "./repository";
 export { createCodingSupervision, type CodingSupervision } from "./service";
+export { purge as purgeCodingSupervision } from "./repository";
 export { registerCodingSupervision } from "./controller";
 export type {
 	WorkflowPort,

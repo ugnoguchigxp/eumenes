@@ -248,7 +248,12 @@ export function countActive(db: Database, scope: string): number {
 	).n;
 }
 
-export { countTimers, countOperations } from "./counts";
+export { countTimers, countOperations, countListOperations } from "./counts";
+export {
+	markDispatchExhausted,
+	pruneBatch,
+	deleteExpiredListOperations,
+} from "./retention";
 
 export function insertTimer(
 	db: Database,
@@ -764,92 +769,18 @@ export function stalePending(
 	return rows.map(mapNotification);
 }
 
-export function pruneBatch(
-	db: Database,
-	now: number,
-	retentionMs: number,
-	tombstoneMs: number,
-	limit: number,
-	protectedIds: readonly string[],
-): { operations: number; timers: number; deleted: number } {
-	const cutoff = now - retentionMs;
-	const tombCutoff = now - tombstoneMs;
-	const protectedJson = JSON.stringify(protectedIds);
-	const operations = db
-		.query(
-			`UPDATE timer_operations
-       SET receipt_json=NULL, expired_at_ms=?
-       WHERE id IN (
-         SELECT id FROM timer_operations
-         WHERE receipt_json IS NOT NULL AND created_at_ms<=?
-           AND id NOT IN (SELECT value FROM json_each(?))
-         ORDER BY created_at_ms ASC, id ASC LIMIT ?
-       )`,
-		)
-		.run(now, cutoff, protectedJson, limit).changes;
-	const timers = db
-		.query(
-			`UPDATE timers
-       SET label='', conversation_id=NULL, origin_run_id=NULL, origin_message_id=NULL,
-           origin_key=NULL, body_expired=1, updated_at_ms=?
-       WHERE id IN (
-         SELECT t.id FROM timers t
-         WHERE t.state!='active' AND t.body_expired=0 AND t.updated_at_ms<=?
-           AND NOT EXISTS (
-             SELECT 1 FROM timer_notifications n
-             WHERE n.timer_id=t.id AND n.status!='dismissed'
-           )
-           AND NOT EXISTS (
-             SELECT 1 FROM timer_operations o
-             WHERE o.timer_id=t.id AND o.id IN (SELECT value FROM json_each(?))
-           )
-         ORDER BY t.updated_at_ms ASC, t.id ASC LIMIT ?
-       )`,
-		)
-		.run(now, cutoff, protectedJson, limit).changes;
-	db.query(
-		`DELETE FROM timer_notifications
-     WHERE status IN ('played','dismissed') AND timer_id IN (
-       SELECT t.id FROM timers t
-       WHERE t.body_expired=1 AND t.state!='active' AND t.updated_at_ms<=?
-         AND NOT EXISTS (
-           SELECT 1 FROM timer_notifications n
-           WHERE n.timer_id=t.id AND n.status IN ('pending','claimed','silent')
-         )
-     )`,
-	).run(tombCutoff);
-	const deletedOps = db
-		.query(
-			`DELETE FROM timer_operations
-       WHERE id IN (
-         SELECT id FROM timer_operations
-         WHERE expired_at_ms IS NOT NULL AND expired_at_ms<=?
-           AND id NOT IN (SELECT value FROM json_each(?))
-         ORDER BY expired_at_ms ASC, id ASC LIMIT ?
-       )`,
-		)
-		.run(tombCutoff, protectedJson, limit).changes;
-	const deletedTimers = db
-		.query(
-			`DELETE FROM timers
-       WHERE id IN (
-         SELECT t.id FROM timers t
-         WHERE t.body_expired=1 AND t.state!='active' AND t.updated_at_ms<=?
-           AND NOT EXISTS (
-             SELECT 1 FROM timer_notifications n
-             WHERE n.timer_id=t.id AND n.status IN ('pending','claimed','silent')
-           )
-           AND NOT EXISTS (
-             SELECT 1 FROM timer_operations o WHERE o.timer_id=t.id
-           )
-         ORDER BY t.updated_at_ms ASC, t.id ASC LIMIT ?
-       )`,
-		)
-		.run(tombCutoff, limit).changes;
-	return { operations, timers, deleted: deletedOps + deletedTimers };
-}
-
 /** Named migrations of this domain; the SQL above is frozen once deployed. */
 export const migrations: readonly Migration[] = [
 	{ id: "timers/0001-init", sql: migration },
+	{
+		id: "timers/0002-retention-indexes",
+		after: ["timers/0001-init"],
+		sql: `
+CREATE INDEX timer_operations_live ON timer_operations(created_at_ms, id) WHERE receipt_json IS NOT NULL;
+CREATE INDEX timer_operations_expired ON timer_operations(expired_at_ms, id) WHERE expired_at_ms IS NOT NULL;
+CREATE INDEX timer_operations_timer ON timer_operations(timer_id) WHERE timer_id IS NOT NULL;
+CREATE INDEX timer_operations_scope_kind ON timer_operations(scope, operation);
+CREATE INDEX timers_retention ON timers(body_expired, updated_at_ms, id) WHERE state!='active';
+`,
+	},
 ];

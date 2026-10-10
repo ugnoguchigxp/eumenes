@@ -1,7 +1,5 @@
-import type { Database } from "bun:sqlite";
 import { z } from "zod";
 import type { SourceMetadata } from "../../tool-runtime";
-import { type Owner } from "../../capabilities/contracts";
 export const reportSchema = z
 	.object({
 		summary: z.string().min(1).max(2000),
@@ -221,152 +219,11 @@ export type AnswerTicket = {
 	failureCode: string | null;
 	/** Digest of the host-verified safe projection, when the report came through an acquisition port. */
 	projectionDigest?: string | null;
-	/** Binding token of the child that produced the report (cached-authority recheck at adoption). */
-	acquisitionBindingToken?: string | null;
 	/** Saved timer receipt, when this answer is an action rather than research. */
 	actionPayload?: string | null;
 	actionFailure?: boolean;
 };
 
-// ---------- generic acquisition plan port (owned here; implemented by application) ----------
-export type AcquisitionSource = {
-	sourceId: string;
-	url: string;
-	body: string;
-	basis: string;
-	fetchedAt: string;
-	truncated: boolean;
-};
-export type AcquisitionLookupProvenance = {
-	origin: "lookup" | "candidate-cache";
-	runId: string;
-	stepId: string;
-	query: string;
-	searchedAt: number;
-	provider: string;
-	digest: string;
-} | null;
-export type AcquisitionInitialAction =
-	| { kind: "host-lookup"; query: string; language: string; region: string }
-	| {
-			kind: "candidate-import";
-			/** Original normalized query / time of the cached search (provenance, not a new lookup). */
-			query: string;
-			searchedAt: number;
-			provenanceDigest: string;
-			hits: Array<{ url: string; title: string; snippet: string }>;
-			/** Provenance of the ORIGINAL lookup that produced these hits. */
-			provenance: NonNullable<AcquisitionLookupProvenance>;
-	  }
-	| {
-			kind: "direct-invoke";
-			toolId: "web.read" | "web.forecast" | "web.quote";
-			/** Fixed recipe arguments; the invocation must match exactly. */
-			arguments: unknown;
-			exactUrl: string;
-			attemptTimeoutMs?: number;
-	  };
-export type AcquisitionResolveInput = {
-	rootRunId: string;
-	coordinatorTaskId: string;
-	question: string;
-	requestAtMs: number;
-	/** Set only when replacing a failed plan: the answer must be a normal search even if the route stays healthy. */
-	replaceReason?: string;
-};
-export type AcquisitionProposal =
-	| { kind: "unmatched" }
-	| { kind: "clarification"; question: string }
-	| {
-			kind: "search-first";
-			proposalToken: string;
-			query: string;
-			language: string;
-			region: string;
-	  }
-	| { kind: "candidate"; proposalToken: string }
-	| { kind: "direct"; proposalToken: string; packageRevisionId: string }
-	| { kind: "unavailable"; code: string };
-export type AcquisitionBindResult =
-	| {
-			kind: "bound";
-			bindingToken: string;
-			packageRevisionId: string;
-			initialAction: AcquisitionInitialAction;
-	  }
-	| { kind: "rejected"; code: string };
-export type AcquisitionObservationInput = {
-	bindingToken: string;
-	owner: Owner;
-	visibleSources: AcquisitionSource[];
-	lookupProvenance: AcquisitionLookupProvenance;
-	tools: {
-		toolId: string;
-		stepId: string;
-		argsDigest: string;
-		state: string;
-		origin?: string;
-		superseded?: boolean;
-	}[];
-	report: Report;
-};
-export type AcquisitionObservationResult =
-	| {
-			kind: "valid";
-			proofId: string | null;
-			canonicalReportPatch: {
-				summary: string;
-				claims: {
-					text: string;
-					evidence: { sourceId: string; quote: string }[];
-				}[];
-				limitations: string[];
-			};
-			safeProjection: {
-				summary: string;
-				claims: { text: string; sourceIds: string[] }[];
-				limitations: string[];
-			};
-			projectionDigest: string;
-	  }
-	| { kind: "source_unusable"; code: string }
-	| { kind: "report_invalid"; code: string }
-	| { kind: "policy_unavailable"; code: string };
-export interface AcquisitionPlanPort {
-	resolveInTransaction(
-		db: Database,
-		input: AcquisitionResolveInput,
-	): AcquisitionProposal;
-	bindInTransaction(
-		db: Database,
-		input: { proposalToken: string; childOwner: Owner; deadline: number },
-	): AcquisitionBindResult;
-	validateInTransaction(
-		db: Database,
-		input: { bindingToken: string; owner: Owner; stage: "prepare" | "finish" },
-	): { kind: "allowed" } | { kind: "rejected"; code: string };
-	recordObservationInTransaction(
-		db: Database,
-		input: AcquisitionObservationInput,
-	): AcquisitionObservationResult;
-	validateAdoptionInTransaction(
-		db: Database,
-		input: { bindingToken: string; owner: Owner; projectionDigest: string },
-	): { kind: "allowed" } | { kind: "rejected"; code: string };
-	releaseInTransaction(
-		db: Database,
-		input: { bindingToken: string; owner: Owner; reason?: string },
-	): { kind: "released" } | { kind: "stale" };
-}
-/** Persisted on the child task (agent_tasks.acquisition_binding_json). */
-export type StoredBinding = {
-	bindingToken: string;
-	packageRevisionId: string;
-	initialAction: AcquisitionInitialAction;
-	lookupProvenance: AcquisitionLookupProvenance;
-	/** Number of times this child's plan was replaced by a normal search plan (max 1). */
-	replacements?: number;
-};
 /** Host-only evidence that an answer was adopted; no conversation text. */
 export type AdoptedEvidence = {
 	rootRunId: string;

@@ -863,3 +863,25 @@ test("CLI rejects unknown commands with usage and exit code 2", async () => {
 	const inherited = await cli(["constructor", "--json"], "http://127.0.0.1:1");
 	expect(inherited.code).toBe(2);
 });
+
+test("CLI without a token file exits 2 and creates no keys directory", async () => {
+	const dir = mkdtempSync(join(scratch, "notoken-"));
+	const child = Bun.spawn([process.execPath, "cli/index.ts", "status"], {
+		cwd: root,
+		env: {
+			PATH: process.env.PATH,
+			EUMENES_DB: join(dir, "eumenes.sqlite3"),
+			EUMENES_URL: "http://127.0.0.1:9",
+		},
+		stdin: "ignore",
+		stdout: "pipe",
+		stderr: "pipe",
+	});
+	const [code, stderr] = await Promise.all([
+		child.exited,
+		new Response(child.stderr).text(),
+	]);
+	expect(code).toBe(2);
+	expect(stderr).toContain("api_token_not_found");
+	expect(readdirSync(dir)).toEqual([]);
+});

@@ -1,3 +1,4 @@
+import type { Database } from "bun:sqlite";
 import { createApproval } from "./approval";
 import { createApplier } from "./apply";
 import { createContext, type CodingSupervisionInput } from "./context";
@@ -8,6 +9,7 @@ import { createLifecycle } from "./lifecycle";
 import { createMonitor } from "./monitor";
 import { createQueries } from "./queries";
 import { createSteps } from "./steps";
+import * as repo from "../repository";
 
 export function createCodingSupervision(input: CodingSupervisionInput) {
 	const ctx = createContext(input),
@@ -52,6 +54,11 @@ export function createCodingSupervision(input: CodingSupervisionInput) {
 	return {
 		...monitor,
 		...createQueries(ctx),
+		/** Safety net for tasks deleting their row; a no-op when already purged. */
+		purgeInTransaction(db: Database, taskId: string) {
+			repo.purge(db, taskId);
+			ctx.reports.purgeInTransaction(db, taskId);
+		},
 		close() {
 			if (ctx.state.closed) return;
 			ctx.state.closed = true;

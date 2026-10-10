@@ -81,3 +81,54 @@ test("dialogue controller validates requests and delegates one run", async () =>
 		rmSync(dir, { recursive: true, force: true });
 	}
 });
+
+test("the public runs API rejects utteranceId and unknown keys but accepts the shape web and CLI send", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "eumenes-controller-public-"));
+	const larm: LarmPort = {
+		status: () => ({ state: "ready", capabilities: ["llm"] }),
+		connect: async () => {},
+		answer: async () => "回答",
+		transcribe: async () => "",
+		speak: async () => new Uint8Array(),
+		close: async () => {},
+	};
+	try {
+		const store = openStore(join(dir, "db.sqlite3"), [
+			conversationMigration,
+			conversationAvatarMotionMigration,
+			conversationAnswerDeliveryMigration,
+			migration,
+			queueMigration,
+			queueLinkMigration,
+		]);
+		const conversation = createConversationService(store);
+		const queue = createQueue(store);
+		queue.start();
+		const dialogue = createDialogueService({
+			store,
+			conversation,
+			larm,
+			queue,
+		});
+		const app = new Hono();
+		registerDialogue(app, dialogue);
+		const post = (body: unknown) =>
+			app.request("/api/runs", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify(body),
+			});
+		const base = {
+			requestId: crypto.randomUUID(),
+			conversationId: "main",
+			text: "こんにちは",
+		};
+		expect((await post({ ...base, utteranceId: "voice-1" })).status).toBe(400);
+		expect((await post({ ...base, extra: 1 })).status).toBe(400);
+		expect((await post(base)).status).toBe(202);
+		await queue.close(100);
+		await store.close();
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});

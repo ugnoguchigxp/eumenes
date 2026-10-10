@@ -18,7 +18,7 @@ function setup(stale = false, disabled = false) {
 				id: "image",
 				name: "image",
 				kind: "image",
-				model: "qwen-image",
+				model: "qwen-image-2.1-turbo",
 				capability: "media.image.generate",
 				protocol: "larm.image-generation.v1",
 				source: "larm",
@@ -72,7 +72,7 @@ test("selecting services does not execute and sample image has small bounded def
 	expect(c.startServiceTest.mock.calls[0]?.[0]).toMatchObject({
 		targetId: "image",
 		revision: 2,
-		input: { width: 512, height: 512, format: "png" },
+		input: { width: 512, height: 512, format: "webp" },
 	});
 });
 test("diagnosis is explicit and separate from generation", async () => {
@@ -104,4 +104,26 @@ test("ASR explains the silent quick sample and accepts an explicit WAV file", as
 	expect(c.startServiceTest.mock.calls[0]?.[0]).toMatchObject({
 		targetId: "asr",
 	});
+});
+
+test("image accepts separate dimensions and blocks invalid sizes", async () => {
+	const c = setup();
+	const go = await screen.findByRole("button", { name: "▶ 画像を生成" });
+	fireEvent.change(screen.getByRole("spinbutton", { name: "幅（px）" }), {
+		target: { value: "1200" },
+	});
+	fireEvent.change(screen.getByRole("spinbutton", { name: "高さ（px）" }), {
+		target: { value: "777" },
+	});
+	fireEvent.click(go);
+	await waitFor(() => expect(c.startServiceTest).toHaveBeenCalledTimes(1));
+	expect(c.startServiceTest.mock.calls[0]?.[0]).toMatchObject({
+		input: { width: 1200, height: 777, format: "webp" },
+	});
+	fireEvent.change(screen.getByRole("spinbutton", { name: "幅（px）" }), {
+		target: { value: "1281" },
+	});
+	expect((go as HTMLButtonElement).disabled).toBe(true);
+	fireEvent.click(go);
+	expect(c.startServiceTest).toHaveBeenCalledTimes(1);
 });

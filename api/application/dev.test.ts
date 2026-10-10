@@ -198,3 +198,62 @@ test("Vite port failure stops the API instead of silently moving Web to another 
 		await owner.stop(true);
 	}
 }, 15000);
+
+test("empty EUMENES_HOST, EUMENES_PORT and EUMENES_ORIGIN are treated as unset", async () => {
+	const owner = Bun.serve({
+		hostname: "127.0.0.1",
+		port: 0,
+		fetch: () => new Response("existing Web"),
+	});
+	const dir = mkdtempSync(join(tmpdir(), "eumenes-dev-"));
+	const child = spawn(
+		process.execPath,
+		["scripts/dev.ts", "--port", String(owner.port)],
+		{
+			cwd: root,
+			detached: true,
+			stdio: ["ignore", "pipe", "pipe"],
+			env: {
+				PATH: process.env.PATH,
+				EUMENES_API_TOKEN: "fixture-api-token-long-enough",
+				EUMENES_DB: join(dir, "db.sqlite3"),
+				EUMENES_HOST: "",
+				EUMENES_PORT: "  ",
+				EUMENES_ORIGIN: "",
+				EUMENES_SECRET_KEY: "",
+				LARM_API_TOKEN: "",
+				LARM_CONTROL_TOKEN: "",
+			},
+		},
+	);
+	let output = "";
+	child.stdout.on("data", (bytes) => {
+		output += String(bytes);
+	});
+	child.stderr.on("data", (bytes) => {
+		output += String(bytes);
+	});
+	const exited = new Promise<void>((resolve) =>
+		child.once("close", () => resolve()),
+	);
+	try {
+		await Promise.race([exited, Bun.sleep(12000)]);
+		expect(output).not.toContain("loopback_host_required");
+		expect(output).not.toContain("must be between");
+	} finally {
+		try {
+			process.kill(-child.pid!, "SIGTERM");
+		} catch {
+			// Already stopped.
+		}
+		await Promise.race([exited, Bun.sleep(5000)]);
+		await owner.stop(true);
+		rmSync(dir, { recursive: true, force: true });
+	}
+}, 25000);
+
+test("dev.ts gives the API a kill grace longer than its own shutdown deadline", async () => {
+	const source = await Bun.file(join(root, "scripts/dev.ts")).text();
+	expect(source).toContain("PROCESS_SHUTDOWN_DEADLINE_MS + 1_000");
+	expect(source).toContain("graceMs: API_KILL_GRACE_MS");
+});

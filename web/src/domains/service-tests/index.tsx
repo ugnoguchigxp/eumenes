@@ -138,8 +138,9 @@ function TestForm({
 	const [text, setText] = useState(samples[target.kind] ?? "");
 	const [comparison, setComparison] = useState("窓のそばで猫が寝ています。");
 	const [voice, setVoice] = useState("");
-	const [size, setSize] = useState<512 | 768 | 1024>(512);
-	const [format, setFormat] = useState<"png" | "webp">("png");
+	const [width, setWidth] = useState(512);
+	const [height, setHeight] = useState(512);
+	const [format, setFormat] = useState<"png" | "webp">("webp");
 	const [duration, setDuration] = useState(10);
 	const [upload, setUpload] = useState<{ id: string; name: string }>();
 	const [uploading, setUploading] = useState(false);
@@ -155,7 +156,7 @@ function TestForm({
 		text,
 		...(target.kind === "embedding" ? { comparison } : {}),
 		...(target.kind === "tts" && voice ? { voice } : {}),
-		...(target.kind === "image" ? { width: size, height: size, format } : {}),
+		...(target.kind === "image" ? { width, height, format } : {}),
 		...(target.kind === "music" ? { durationSeconds: duration } : {}),
 		...(target.kind === "asr" && upload ? { uploadId: upload.id } : {}),
 	});
@@ -258,22 +259,23 @@ function TestForm({
 			)}
 			{target.kind === "image" && (
 				<div className="test-options">
-					<label>
-						画像サイズ
-						<select
-							value={size}
-							disabled={disabled}
-							onChange={(e) =>
-								setSize(Number(e.target.value) as 512 | 768 | 1024)
-							}
-						>
-							{[512, 768, 1024].map((n) => (
-								<option key={n} value={n}>
-									{n} × {n}
-								</option>
-							))}
-						</select>
-					</label>
+					{[
+						{ label: "幅（px）", value: width, set: setWidth },
+						{ label: "高さ（px）", value: height, set: setHeight },
+					].map(({ label, value, set }) => (
+						<label key={label}>
+							{label}
+							<input
+								type="number"
+								min={100}
+								max={1280}
+								step={1}
+								value={value}
+								disabled={disabled}
+								onChange={(e) => set(Number(e.target.value))}
+							/>
+						</label>
+					))}
 					<label>
 						形式
 						<select
@@ -314,7 +316,16 @@ function TestForm({
 				{target.onDemand ? " · 実行時に起動します。" : ""}
 			</p>
 			<Button
-				disabled={disabled || uploading || !text.trim() || !target.testable}
+				disabled={
+					disabled ||
+					uploading ||
+					!text.trim() ||
+					!target.testable ||
+					(target.kind === "image" &&
+						![width, height].every(
+							(n) => Number.isInteger(n) && n >= 100 && n <= 1280,
+						))
+				}
 				onClick={() =>
 					void onStart({
 						targetId: target.id,

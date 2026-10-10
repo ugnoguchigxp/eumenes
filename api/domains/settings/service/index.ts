@@ -74,7 +74,8 @@ const providerKeyHosts: Record<string, (host: string) => boolean> = {
 	ANTHROPIC_API_KEY: (h) => h === "api.anthropic.com",
 	GEMINI_API_KEY: (h) => h === "generativelanguage.googleapis.com",
 	GOOGLE_API_KEY: (h) => h === "generativelanguage.googleapis.com",
-	AZURE_OPENAI_API_KEY: (h) => h.endsWith(".openai.azure.com"),
+	AZURE_OPENAI_API_KEY: (h) =>
+		/^[a-z0-9][a-z0-9-]{0,62}\.openai\.azure\.com$/.test(h),
 	GROQ_API_KEY: (h) => h === "api.groq.com",
 	MISTRAL_API_KEY: (h) => h === "api.mistral.ai",
 	DEEPSEEK_API_KEY: (h) => h === "api.deepseek.com",
@@ -268,6 +269,7 @@ export async function createSettings(
 				return false;
 			return true;
 		},
+		/** Idempotent replay is guaranteed only for the newest 64 requests. */
 		async apply(raw: ApplySettings) {
 			const input = applySchema.parse(raw);
 			if (input.keys.some((k) => k.value) && !key)
@@ -292,6 +294,28 @@ export async function createSettings(
 					throw new Error("revision_conflict");
 				const next = structuredClone(input.settings);
 				next.revision = old.revision + 1;
+				// A changed LARM origin receives the LARM token, so it needs explicit confirmation.
+				const originOf = (value: string | null | undefined) =>
+					value && URL.canParse(value) ? new URL(value).origin : null;
+				const oldLarm = originOf(old.larm.baseUrl);
+				const nextLarm = originOf(next.larm.baseUrl);
+				if (
+					oldLarm &&
+					nextLarm &&
+					oldLarm !== nextLarm &&
+					input.confirmLarmOrigin !== nextLarm
+				)
+					throw new Error("invalid_larm_origin_unconfirmed");
+				// One provider key may only be bound to a single host across all connections.
+				const envHosts = new Map<string, string>();
+				for (const c of next.connections) {
+					if (!c.envRef || !Object.hasOwn(providerKeyHosts, c.envRef)) continue;
+					const host = new URL(c.baseUrl).hostname;
+					const bound = envHosts.get(c.envRef);
+					if (bound && bound !== host)
+						throw new Error("invalid_env_ref_host_conflict");
+					envHosts.set(c.envRef, host);
+				}
 				if (
 					new Set(input.keys.map((k) => k.connectionId)).size !==
 					input.keys.length
@@ -390,6 +414,9 @@ export async function createSettings(
 					digest,
 					JSON.stringify(next),
 				);
+				db.query(
+					"DELETE FROM settings_requests WHERE rowid <= (SELECT max(rowid) FROM settings_requests) - 64",
+				).run();
 				return next;
 			});
 			for (const fn of listeners) fn();

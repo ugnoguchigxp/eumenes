@@ -8,10 +8,13 @@ archive の基準: 本文の実施記録や完了記述で全項目が完了と�
 
 | 文書 | 状態 |
 | --- | --- |
+| [dots-toolchain-agent-skill-implementation-plan-2026-10-10.md](dots-toolchain-agent-skill-implementation-plan-2026-10-10.md) | dots を統括担当にする製品統合計画。Session 委任、ブロッカー・再開・完了報告、担当／Skill 設定、次作業リマインドを設計。製品統合は未実装 |
+| [dots-script-mvp-implementation-plan-2026-10-10.md](dots-script-mvp-implementation-plan-2026-10-10.md) | 独立 MVP 実装済み。実 dots→回答保存→CLI 受信に成功。OAuth・恒久接続・製品統合は未実装。第18章と受入記録参照 |
 | [llm-native-remaining-domains-implementation-plan-2026-10-10.md](llm-native-remaining-domains-implementation-plan-2026-10-10.md) | Goals内容同一視の撤去とWorld保留入力保持を実装。Memoryは接続前条件の文書化のみ。fixture実施、live・実機器未達 |
 | [llm-native-implementation-plan-2026-10-10.md](llm-native-implementation-plan-2026-10-10.md) | LLM-Native設計への移行。要件データ・共通検証・残存5件の撤去を、契約・変更箇所・移行・受入まで定めたSol実装用計画。実装前 |
 | [conversation-and-research-simplification-plan-2026-10-10.md](conversation-and-research-simplification-plan-2026-10-10.md) | 会話と調査の構造整理。残す機能・削除対象・移行・受入条件をまとめた実装前レビュー案 |
-| [improvement-plan-2026-10-10.md](improvement-plan-2026-10-10.md) | 改善実装手順書(2026-10-10)。全 WP の完了後に archive |
+| [improvement-plan-2026-10-10-r2.md](improvement-plan-2026-10-10-r2.md) | 改善実装手順書 第2版(2026-10-10 再評価)。全改善点 77 WP(AP/AG/VO/DT/FE)と旧計画の延期項目。実装前 |
+| [improvement-plan-2026-10-10.md](improvement-plan-2026-10-10.md) | 改善実装手順書(2026-10-10)。延期項目は第2版へ移管。第2版と同時に archive |
 | [research-and-history-tools-implementation-plan-2026-10-10.md](research-and-history-tools-implementation-plan-2026-10-10.md) | 調査・履歴ツールの実装計画。別セッションで作業中 |
 | [delegated-coding-implementation-2026-10-09/](delegated-coding-implementation-2026-10-09/README.md) | 委任コーディングの実装計画(01〜06)。06 は作業中 |
 | [web-research-cache-implementation-plan-2026-10-09.md](web-research-cache-implementation-plan-2026-10-09.md) | Web 取得・調査・キャッシュ。初期実装済み、実装記録は第15章 |

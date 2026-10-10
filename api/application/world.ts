@@ -2,6 +2,8 @@ import type { Database } from "bun:sqlite";
 import { randomBytes } from "node:crypto";
 import {
 	chmodSync,
+	constants,
+	copyFileSync,
 	existsSync,
 	mkdirSync,
 	readFileSync,
@@ -97,14 +99,19 @@ const MIN_SECRET_CHARS = 32;
  * The stable host-owned secret that masks and authenticates the conversation
  * change cursor. It is NOT derived from any product database content:
  *   1. `EUMENES_WORLD_CURSOR_SECRET` (at least 32 characters), if set;
- *   2. else the file `<db dir>/keys/world-cursor.key` (hex text of 32 random
- *      bytes, directory 0700, file 0600), created once with the exclusive-create
+ *   2. else the file `world-cursor.key` in `EUMENES_KEY_DIR` (`keyDir`), or
+ *      `<db dir>/keys` when that is unset (hex text of 32 random bytes,
+ *      directory 0700, file 0600), created once with the exclusive-create
  *      flag. A short or damaged file fails startup instead of being replaced:
- *      a new secret invalidates every stored cursor.
+ *      a new secret invalidates every stored cursor. When `keyDir` is set and
+ *      holds no key yet, an existing `<db dir>/keys/world-cursor.key` is copied
+ *      there (the old file is kept) so stored cursors stay valid.
  * Nothing here is ever logged.
  */
 export function resolveWorldCursorSecret(options: {
 	dbPath: string;
+	/** `EUMENES_KEY_DIR`; blank falls back to `<db dir>/keys`. */
+	keyDir?: string;
 	env?: Record<string, string | undefined>;
 }): string {
 	const fromEnv = options.env?.["EUMENES_WORLD_CURSOR_SECRET"];
@@ -113,15 +120,23 @@ export function resolveWorldCursorSecret(options: {
 			throw new Error("world_cursor_secret_invalid");
 		return fromEnv;
 	}
-	const path = join(dirname(options.dbPath), "keys", "world-cursor.key");
+	const legacy = join(dirname(options.dbPath), "keys", "world-cursor.key");
+	const path = options.keyDir?.trim()
+		? join(options.keyDir.trim(), "world-cursor.key")
+		: legacy;
 	if (!existsSync(path)) {
 		mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
 		chmodSync(dirname(path), 0o700);
 		try {
-			writeFileSync(path, randomBytes(32).toString("hex"), {
-				mode: 0o600,
-				flag: "wx",
-			});
+			// Moving the key directory must not void stored cursors: copy the old key.
+			if (path !== legacy && existsSync(legacy)) {
+				copyFileSync(legacy, path, constants.COPYFILE_EXCL);
+				chmodSync(path, 0o600);
+			} else
+				writeFileSync(path, randomBytes(32).toString("hex"), {
+					mode: 0o600,
+					flag: "wx",
+				});
 		} catch (error) {
 			// A concurrent creator won the race: read what it wrote.
 			if ((error as { code?: string }).code !== "EEXIST") throw error;

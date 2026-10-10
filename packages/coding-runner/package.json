@@ -10,6 +10,7 @@
 	},
 	"scripts": {
 		"start": "bun src/server.ts",
+		"admin": "bun src/admin.ts",
 		"test": "bun test test"
 	},
 	"dependencies": {

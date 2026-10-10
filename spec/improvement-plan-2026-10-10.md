@@ -1803,6 +1803,8 @@
 
 ### 2026-10-10 実施結果(コミットなし)
 
-- 実装済み(対象別の試験で確認): RT-3〜7, 9〜12 / SEC-1〜7, 9〜14 / WEB-1〜5, 7〜9, 11〜13 / TST-1〜8(TST-2 の toolchain.spec 除く), TST-9(macOS では skip、Linux CI 未確認) / ARC-1, 3, 5(a)(b)(c), 6〜13, 15, 16, 19, 20 / ARC-17, 18 は一部 / DOC-1〜5。
-- 未実施(別セッションの未コミット変更と衝突するため延期): RT-1, RT-2, RT-13, SEC-8, ARC-2, ARC-4, ARC-14, WEB-6, WEB-10, TST-2/5 の toolchain.spec 変換、ARC-12 の toolchain.ts、ARC-10 の保留 errorStatus、ARC-9 の capabilities contracts。
+- 実装済み(対象別の試験で確認): RT-3〜7, 9〜12 / SEC-1〜7, 9〜14 / WEB-1〜5, 7〜9, 11〜13 / WEB-6(start() の catch で pauseInput、capture.test.ts:124 で確認) / TST-1〜8(TST-2 の toolchain.spec 除く), TST-9(Linux CI run 38035750864 で成功、macOS は skip) / ARC-1, 3, 5(a)(b)(c), 6〜13, 15, 16, 19, 20 / ARC-17, 18 は一部 / DOC-1〜5。
+- 未実施(別セッションの未コミット変更と衝突するため延期): RT-1, RT-2, RT-13, SEC-8, ARC-2, ARC-4, ARC-14, WEB-10, TST-2/5 の toolchain.spec 変換、ARC-12 の toolchain.ts、ARC-10 の保留 errorStatus、ARC-9 の capabilities contracts。
+- r2 へ移管: RT-1, RT-2, RT-13, SEC-8, ARC-2, ARC-4, ARC-14, WEB-10, TST-2/5 の toolchain.spec(improvement-plan-2026-10-10-r2 へ移管)。
+- RT-1 の repairFeedback 部分は対象コードが無く陳腐化(`grep -ri repairFeedback api packages` が 0 件、修理の状態は `json_repairs` 列)。残りは improvement-plan-2026-10-10-r2 の AG 章へ移管。
 - `bun run verify:all`: size-budget / domain-docs / lint / tsc / bun test 1174 pass / vitest / ブラウザ試験 42 pass・1 skip まで全て成功。ただし最後の「検証中にソースが変わった」判定で 2 回失敗(別セッションが agent-runtime を編集中のため)。fixture・live・実機器の受入は未実施。

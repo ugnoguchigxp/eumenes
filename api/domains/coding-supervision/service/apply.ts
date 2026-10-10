@@ -104,7 +104,10 @@ export function createApplier(
 			implementationSessionId: s.observation!.sessionId,
 			observationDigest: semanticObservationDigest(s.observation),
 			instruction:
-				d.instruction === null ? null : frameInstruction(d.instruction),
+				(kind === "request_change" || kind === "answer_question") &&
+				d.instruction !== null
+					? frameInstruction(d.instruction)
+					: null,
 			questionId: d.questionId,
 			deadline: Math.min(
 				Date.parse(t.grant.expiresAt),

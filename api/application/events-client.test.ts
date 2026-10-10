@@ -197,3 +197,42 @@ test("update transport failure is observable even when other API reads still suc
 		stopState();
 	}
 });
+
+test("reconnectChanges is a no-op while connected unless forced", async () => {
+	const f = fixture();
+	const client = eventsClient(f.transport, { retryMs: 5 });
+	const stop = client.subscribeChanges(() => {});
+	try {
+		f.send(0, "id: s:1\nevent: reset\ndata: {}\n\n");
+		await until(() => client.changesState() === "connected");
+		client.reconnectChanges();
+		await Bun.sleep(10);
+		expect(f.requests.length).toBe(1);
+		client.reconnectChanges({ force: true });
+		await until(() => f.requests.length === 2);
+	} finally {
+		stop();
+	}
+});
+
+test("a resumed frame establishes the connection without invalidating and keeps the cursor", async () => {
+	const f = fixture();
+	const client = eventsClient(f.transport, { retryMs: 5 });
+	let notified = 0;
+	const stop = client.subscribeChanges(() => {
+		notified++;
+	});
+	try {
+		f.send(0, "id: s:3\nevent: resumed\ndata: {}\n\n");
+		await until(() => client.changesState() === "connected");
+		expect(notified).toBe(0);
+		client.reconnectChanges({ force: true });
+		await until(() => f.requests.length === 2);
+		expect(new Headers(f.requests[1]!.headers).get("last-event-id")).toBe(
+			"s:3",
+		);
+		expect(notified).toBe(0);
+	} finally {
+		stop();
+	}
+});
