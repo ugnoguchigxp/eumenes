@@ -11,13 +11,18 @@
 		"types": ["bun", "vite/client"],
 		"allowImportingTsExtensions": true,
 		"resolveJsonModule": true,
-		"noUncheckedIndexedAccess": true
+		"noUncheckedIndexedAccess": true,
+		"allowJs": true,
+		"checkJs": false
 	},
 	"include": [
 		"api",
 		"client",
 		"cli",
 		"web",
+		"packages/artifact-ui/src",
+		"packages/coding-runner/src",
+		"packages/coding-runner/test",
 		"scripts",
 		"tests",
 		"vite.config.ts",

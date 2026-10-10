@@ -12,3 +12,4 @@ export {
 	sourceMatchesQuestion,
 	publicInvocationHint,
 } from "./service/sources";
+export { migrations } from "./repository";

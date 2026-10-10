@@ -1,4 +1,5 @@
 import { afterEach } from "bun:test";
+export { instructionFrame } from "../service/approval";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -120,6 +121,8 @@ export function receipt(
 export async function setup(
 	options: {
 		maxDecisions?: number;
+		/** Existing scenarios run without the approval gate; pass true to exercise it. */
+		approveInstructions?: boolean;
 		tokenCount?: number | null;
 		operations?: Array<
 			"read" | "edit" | "check" | "review" | "commit" | "push"
@@ -179,6 +182,7 @@ export async function setup(
 		resources: { "inference.llm": 1 },
 		resourceAliases: { "larm.llm": "inference.llm" },
 	});
+	let approve = options.approveInstructions ?? false;
 	const steps: StepIntent[] = [];
 	let observed = observation(),
 		execute: (i: StepIntent, s: AbortSignal) => Promise<StepReceipt> = async (
@@ -215,6 +219,7 @@ export async function setup(
 					available: () => true,
 					startInTransaction: () => {},
 					stopInTransaction: () => {},
+					answerInTransaction: () => {},
 				},
 			],
 			changedInTransaction: (db, t) =>
@@ -232,6 +237,7 @@ export async function setup(
 		inference,
 		reports,
 		workflow,
+		approveInstructions: () => approve,
 		now: () => time,
 	});
 	const t = await tasks.create({
@@ -300,6 +306,9 @@ export async function setup(
 		steps,
 		observe,
 		drain,
+		setApproveInstructions: (on: boolean) => {
+			approve = on;
+		},
 		calls: () => calls,
 		messages: () => lastMessages,
 		decision: (d: Decision) => {

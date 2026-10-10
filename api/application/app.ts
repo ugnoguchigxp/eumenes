@@ -1,65 +1,9 @@
-import {
-	registerCodingSupervision,
-	type CodingSupervision,
-} from "../domains/coding-supervision";
-import { registerTaskReports, type TaskReports } from "../domains/task-reports";
-import {
-	registerCapabilities,
-	type Capabilities,
-} from "../domains/capabilities";
-import {
-	registerAgentRuntime,
-	type AgentRuntime,
-} from "../domains/agent-runtime";
-import {
-	registerAttitudeDataset,
-	type AttitudeDataset,
-} from "../domains/attitude-dataset";
 import { getLogger, withLogContext } from "../infrastructure/logger";
+import { limitConcurrency } from "../infrastructure/concurrency";
 import { Hono } from "hono";
-import {
-	type ConversationService,
-	registerConversation,
-} from "../domains/conversation";
-import { type DialogueService, registerDialogue } from "../domains/dialogue";
-import { type LarmPort, registerLarmStatus } from "../domains/larm";
-import { type QueueService, registerQueue } from "../domains/queue";
-import { registerMemory, type MemoryService } from "../domains/memory";
-import {
-	registerWebResearch,
-	type WebResearchService,
-} from "../domains/web-research";
-import {
-	registerContinuity,
-	type ContinuityService,
-} from "../domains/continuity";
-import { registerScheduler, type SchedulerService } from "../domains/scheduler";
-import { registerTimers, type TimersService } from "../domains/timers";
-import {
-	registerVoiceDialogue,
-	type VoiceDialogueService,
-} from "../domains/voice-dialogue";
-import { registerSettings, type SettingsService } from "../domains/settings";
-import { registerInference, type InferenceService } from "../domains/inference";
-import {
-	registerTtsDictionary,
-	type TtsDictionaryService,
-} from "../domains/tts-dictionary";
-import type { Changes } from "./events";
 import { statusForError } from "./error-status";
-import { registerTasks, type TasksService } from "../domains/tasks";
-import { registerCoding, type CodingService } from "../domains/coding";
-import {
-	registerResearchRoutes,
-	type RouteOperations,
-} from "../domains/research-routes";
-import { registerWorldClaims } from "../domains/world";
-import type { WorldClaims, WorldClaimsContext } from "../domains/world";
 import { createHash, timingSafeEqual } from "node:crypto";
-import {
-	registerServiceTests,
-	type ServiceTests,
-} from "../domains/service-tests";
+import { appModules, type AppModule, type AppServices } from "./app-modules";
 const digest = (value: string) => createHash("sha256").update(value).digest();
 const safeEqual = (a: string, b: string) =>
 	timingSafeEqual(digest(a), digest(b));
@@ -68,37 +12,29 @@ const maxJsonBytes = 1024 * 1024;
 const isAudioUpload = (path: string) =>
 	path === "/api/voice/turns" || path === "/api/voice/preview";
 
-export function createApp(deps: {
-	capabilities?: Capabilities;
-	agents?: AgentRuntime;
-	attitudeDataset?: AttitudeDataset;
+export type AppOptions = {
 	token: string;
 	origin: string;
-	conversation: ConversationService;
-	dialogue: DialogueService;
-	voice: VoiceDialogueService;
-	larm: Pick<LarmPort, "status" | "connect"> & Partial<LarmPort>;
-	queue: QueueService;
-	scheduler: SchedulerService;
-	settings?: SettingsService;
-	inference?: InferenceService;
-	ttsDictionary?: TtsDictionaryService;
-	memory?: MemoryService;
-	webResearch?: WebResearchService;
-	continuity?: ContinuityService;
-	changes?: Changes;
-	serviceTests?: ServiceTests;
-	tasks?: TasksService;
-	coding?: CodingService;
-	codingSupervision?: CodingSupervision;
-	taskReports?: TaskReports;
-	researchRoutes?: RouteOperations;
-	timers?: TimersService;
-	/** World claim list and corrections (P5-02). Absent with World OFF: the routes do not exist. */
-	worldClaims?: { claims: WorldClaims; context: () => WorldClaimsContext };
-}) {
+	/** Route groups, mounted in order after the shared middleware. */
+	modules: readonly AppModule[];
+};
+/**
+ * @deprecated Older compositions pass the services directly; they are turned
+ * into modules with `appModules`. New code passes `modules`.
+ */
+type LegacyAppOptions = Omit<AppOptions, "modules"> & AppServices;
+
+export function createApp(options: AppOptions | LegacyAppOptions) {
+	const modules = "modules" in options ? options.modules : appModules(options);
 	const app = new Hono();
 	const log = getLogger("http");
+	app.use("*", async (c, next) => {
+		await next();
+		c.header("X-Content-Type-Options", "nosniff");
+		c.header("Referrer-Policy", "no-referrer");
+		c.header("X-Frame-Options", "DENY");
+		c.header("Content-Security-Policy", "frame-ancestors 'none'");
+	});
 	app.use("/api/*", async (c, next) => {
 		const requestId = crypto.randomUUID();
 		const started = performance.now();
@@ -120,7 +56,7 @@ export function createApp(deps: {
 	});
 	app.use("/api/*", async (c, next) => {
 		const origin = c.req.header("origin");
-		if (origin && origin !== deps.origin)
+		if (origin && origin !== options.origin)
 			return c.json({ error: "origin_forbidden" }, 403);
 		if (origin) {
 			c.header("Access-Control-Allow-Origin", origin);
@@ -130,11 +66,21 @@ export function createApp(deps: {
 				"Access-Control-Allow-Headers",
 				"Authorization, Content-Type, Last-Event-ID, X-Session-Id, X-Generation, X-Sequence, X-Utterance-Id",
 			);
-			c.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+			c.header(
+				"Access-Control-Allow-Methods",
+				"GET, POST, PUT, PATCH, DELETE, OPTIONS",
+			);
 		}
 		if (c.req.method === "OPTIONS") return c.body(null, 204);
-		if (!safeEqual(c.req.header("authorization") ?? "", `Bearer ${deps.token}`))
+		if (
+			!safeEqual(c.req.header("authorization") ?? "", `Bearer ${options.token}`)
+		)
 			return c.json({ error: "unauthorized" }, 401);
+		if (
+			c.req.header("content-length") !== undefined &&
+			c.req.header("transfer-encoding") !== undefined
+		)
+			return c.json({ error: "invalid_framing" }, 400);
 		if (
 			c.req.method !== "GET" &&
 			c.req.method !== "HEAD" &&
@@ -149,33 +95,26 @@ export function createApp(deps: {
 		}
 		await next();
 	});
-	if (deps.changes)
-		app.get("/api/events", (c) => deps.changes!.open(c.req.raw.signal));
-	if (deps.capabilities) registerCapabilities(app, deps.capabilities);
-	if (deps.agents) registerAgentRuntime(app, deps.agents, deps.dialogue.cancel);
-	if (deps.attitudeDataset) registerAttitudeDataset(app, deps.attitudeDataset);
-	registerLarmStatus(app, deps.larm);
-	if (deps.settings) registerSettings(app, deps.settings);
-	if (deps.inference) registerInference(app, deps.inference);
-	if (deps.serviceTests) registerServiceTests(app, deps.serviceTests);
-	if (deps.tasks) registerTasks(app, deps.tasks);
-	if (deps.coding) registerCoding(app, deps.coding);
-	if (deps.codingSupervision)
-		registerCodingSupervision(app, deps.codingSupervision);
-	if (deps.taskReports) registerTaskReports(app, deps.taskReports);
-	if (deps.researchRoutes) registerResearchRoutes(app, deps.researchRoutes);
-	if (deps.ttsDictionary) registerTtsDictionary(app, deps.ttsDictionary);
-	if (deps.memory) registerMemory(app, deps.memory);
-	if (deps.webResearch) registerWebResearch(app, deps.webResearch);
-	if (deps.continuity) registerContinuity(app, deps.continuity);
-	registerConversation(app, deps.conversation);
-	registerDialogue(app, deps.dialogue);
-	registerVoiceDialogue(app, deps.voice);
-	registerQueue(app, deps.queue);
-	registerScheduler(app, deps.scheduler);
-	if (deps.timers) registerTimers(app, deps.timers);
-	if (deps.worldClaims)
-		registerWorldClaims(app, deps.worldClaims.claims, deps.worldClaims.context);
+	// Cost guards for endpoints that fan out to providers; never for long-lived streams.
+	// Only the slow endpoints share the budget: cancel and retry-artifact must stay
+	// reachable while runs are in flight.
+	app.on(
+		"POST",
+		[
+			"/api/service-tests/catalog/refresh",
+			"/api/service-tests/diagnose",
+			"/api/service-tests/runs",
+			"/api/service-tests/uploads",
+		],
+		limitConcurrency(2),
+	);
+	app.on(
+		"POST",
+		["/api/voice/replay/audio", "/api/voice/sample"],
+		limitConcurrency(2),
+	);
+	app.on("POST", "/api/inference/probes", limitConcurrency(1));
+	for (const module of modules) module.mount(app);
 	app.onError((error, c) => {
 		const message = error instanceof Error ? error.message : "internal_error";
 		const status = statusForError(message);

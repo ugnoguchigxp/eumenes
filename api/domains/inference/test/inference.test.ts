@@ -4,11 +4,11 @@ import {
 	type Sample,
 } from "../../attitude-dataset";
 import { RURI_MODEL, emotionSchema } from "../../delivery";
-import { afterEach, expect, test } from "bun:test";
+import { afterEach, expect, spyOn, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { openStore } from "../../../infrastructure/sqlite";
+import { openStore, WriterBusyError } from "../../../infrastructure/sqlite";
 import {
 	createSettings,
 	migration as settingsMigration,
@@ -848,4 +848,60 @@ test("control calls preserve exact context, stay local, skip emotion judgement, 
 			db.query("SELECT status,mode FROM inference_requests WHERE id=?").get(id),
 		),
 	).toEqual({ status: "rejected", mode: "control" });
+});
+
+// RT-12: a probe row must never stay "running" and block new probes.
+const probeRow = (
+	store: Awaited<ReturnType<typeof setup>>["store"],
+	id: string,
+) =>
+	store.read(
+		(db) =>
+			db
+				.query("SELECT status,error FROM inference_probes WHERE id=?")
+				.get(id) as { status: string; error: string | null } | null,
+	);
+test("a probe stuck running for over 10 minutes is marked probe_stale and a new probe starts", async () => {
+	const { store, inference, settings } = await setup();
+	await store.write((db) =>
+		db
+			.query("INSERT INTO inference_probes VALUES(?,?,'running',NULL,?,?)")
+			.run("old", "larm", settings.get().revision, Date.now() - 11 * 60_000),
+	);
+	const { id } = await inference.startProbe("larm");
+	expect(probeRow(store, "old")).toEqual({
+		status: "failed",
+		error: "probe_stale",
+	});
+	await until(() => probeRow(store, id)?.status === "succeeded");
+});
+test("a recent running probe still blocks a new one", async () => {
+	const { store, inference, settings } = await setup();
+	await store.write((db) =>
+		db
+			.query("INSERT INTO inference_probes VALUES(?,?,'running',NULL,?,?)")
+			.run("recent", "larm", settings.get().revision, Date.now() - 60_000),
+	);
+	await expect(inference.startProbe("larm")).rejects.toThrow(
+		"invalid_probe_busy",
+	);
+	expect(probeRow(store, "recent")?.status).toBe("running");
+});
+test("the final probe status survives a momentarily full writer queue", async () => {
+	const { store, inference } = await setup();
+	const write = store.write.bind(store);
+	let writes = 0;
+	const spy = spyOn(store, "write").mockImplementation(((
+		operation: Parameters<typeof write>[0],
+	) =>
+		writes++ === 1
+			? Promise.reject(new WriterBusyError())
+			: write(operation)) as typeof store.write);
+	try {
+		const { id } = await inference.startProbe("larm");
+		await until(() => probeRow(store, id)?.status === "succeeded");
+		expect(writes).toBeGreaterThanOrEqual(3);
+	} finally {
+		spy.mockRestore();
+	}
 });

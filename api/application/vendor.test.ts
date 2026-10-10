@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import pkg from "eumenes-memory/package.json";
+import worldPkg from "eumenes-world-model/package.json";
 
 const root = join(import.meta.dir, "../..");
 const read = (path: string) => readFileSync(join(root, path));
@@ -24,6 +25,32 @@ test("the vendored memory package matches its manifest, package.json, the lockfi
 	const integrity = `sha512-${createHash("sha512").update(artifact).digest("base64")}`;
 	expect(lock).toContain(
 		`eumenes-memory@vendor/eumenes-memory/${manifest.artifact}`,
+	);
+	expect(lock).toContain(integrity);
+});
+
+const worldManifest = JSON.parse(read("vendor/world/manifest.json").toString());
+
+test("the vendored world-model package matches its manifest, package.json, the lockfile and the installed copy", () => {
+	const artifact = read(`vendor/world/${worldManifest.artifact}`);
+	expect(worldManifest.package).toBe("eumenes-world-model");
+	expect(createHash("sha256").update(artifact).digest("hex")).toBe(
+		worldManifest.sha256,
+	);
+	expect(
+		read(`vendor/world/${worldManifest.artifact}.sha256`)
+			.toString()
+			.split(/\s+/)[0],
+	).toBe(worldManifest.sha256);
+	const dependency = JSON.parse(read("package.json").toString()).dependencies[
+		worldManifest.package
+	];
+	expect(dependency).toBe(`file:vendor/world/${worldManifest.artifact}`);
+	expect(worldPkg.version).toBe(worldManifest.version);
+	const lock = read("bun.lock").toString();
+	const integrity = `sha512-${createHash("sha512").update(artifact).digest("base64")}`;
+	expect(lock).toContain(
+		`${worldManifest.package}@vendor/world/${worldManifest.artifact}`,
 	);
 	expect(lock).toContain(integrity);
 });

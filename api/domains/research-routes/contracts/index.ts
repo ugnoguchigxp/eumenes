@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+	canonicalJson as canonicalJsonOf,
+	sha256Hex,
+} from "../../../infrastructure/digest";
 
 /** Frozen limits from the research-route learning plan (2026-10-09). */
 export const limits = {
@@ -441,21 +445,12 @@ export const bytesOf = (v: unknown) =>
 	new TextEncoder().encode(typeof v === "string" ? v : JSON.stringify(v))
 		.length;
 export const sha256 = (v: unknown) =>
-	new Bun.CryptoHasher("sha256")
-		.update(typeof v === "string" ? v : JSON.stringify(v))
-		.digest("hex");
+	sha256Hex(typeof v === "string" ? v : JSON.stringify(v));
 /** Canonical JSON: all object keys sorted, array order preserved. */
 export function canonicalJson(value: unknown): string {
-	const norm = (v: unknown): unknown =>
-		Array.isArray(v)
-			? v.map(norm)
-			: v && typeof v === "object"
-				? Object.fromEntries(
-						Object.entries(v as Record<string, unknown>)
-							.filter(([, x]) => x !== undefined)
-							.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-							.map(([k, x]) => [k, norm(x)]),
-					)
-				: v;
-	return JSON.stringify(norm(value));
+	return canonicalJsonOf(value, {
+		omitUndefined: true,
+		keyOrder: "codeUnit",
+		integerKeysFirst: true,
+	});
 }

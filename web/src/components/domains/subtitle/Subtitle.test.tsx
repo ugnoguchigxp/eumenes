@@ -10,3 +10,10 @@ test("renders text with style and size data attributes", () => {
 	expect(html).toContain('data-size="xlarge"');
 	expect(html).toContain("こんにちは");
 });
+
+test("is hidden from assistive technology because the same words are spoken", () => {
+	const html = renderToStaticMarkup(
+		<Subtitle text="こんにちは" style="prime" size="xlarge" />,
+	);
+	expect(html).toContain('aria-hidden="true"');
+});

@@ -9,7 +9,7 @@ import {
 	type CorrectClaim,
 	type ForgetClaim,
 	type RetractClaim,
-} from "../api/domains/world/contracts";
+} from "../api/domains/world/contracts/view";
 import { json, type Transport } from "./transport";
 
 export function worldClient(t: Transport) {

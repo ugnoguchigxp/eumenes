@@ -1,5 +1,5 @@
 import type { Database } from "bun:sqlite";
-import { createHash } from "node:crypto";
+import { sha256Hex } from "../../../infrastructure/digest";
 import {
 	CONTRACT_VERSIONS,
 	MemoryContractError,
@@ -48,8 +48,6 @@ const REJECTION: Record<string, WorldHostReasonCode> = {
 	SCOPE_NOT_PERMITTED: "MEMORY_SCOPE_NOT_PERMITTED",
 };
 
-const sha256 = (text: string) =>
-	createHash("sha256").update(text).digest("hex");
 const utf8 = (text: string) => new TextEncoder().encode(text).length;
 
 /**
@@ -65,7 +63,7 @@ export function externalIdOf(
 	key: readonly (string | number)[],
 	part: number,
 ): string {
-	const digest = sha256(
+	const digest = sha256Hex(
 		JSON.stringify(["world.v1", tag, principal, scopeKey, key]),
 	);
 	return `w1${tag}-${digest.slice(0, 40)}-${part}`;

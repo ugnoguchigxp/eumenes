@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import type { Migration } from "../../../infrastructure/sqlite";
 
 /**
  * Research-route ledger. Deletion order: draft -> proof -> health -> version -> candidate -> key.
@@ -722,3 +723,8 @@ export function deleteKeyTree(db: Database, incarnation: string) {
 	run("DELETE FROM research_route_keys WHERE incarnation=?");
 	return { rows, packageIds };
 }
+
+/** Named migrations of this domain; the SQL above is frozen once deployed. */
+export const migrations: readonly Migration[] = [
+	{ id: "research-routes/0001-init", sql: migration },
+];

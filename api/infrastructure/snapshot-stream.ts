@@ -47,22 +47,32 @@ export function snapshotStream<T>(
 		{
 			start(next) {
 				controller = next;
-				signal.addEventListener("abort", abort, { once: true });
-				stop = subscribe((value) => {
-					if (closed) return;
-					pending = encoder.encode(`data: ${JSON.stringify(value)}\n\n`);
-					final = terminal(value);
-					flush();
-				});
-				if (closed) {
-					stop();
-					return;
+				try {
+					signal.addEventListener("abort", abort, { once: true });
+					stop = subscribe((value) => {
+						if (closed) return;
+						pending = encoder.encode(`data: ${JSON.stringify(value)}\n\n`);
+						final = terminal(value);
+						flush();
+					});
+					if (closed) {
+						stop();
+						return;
+					}
+					heartbeat = setInterval(() => {
+						if (!closed && !pending && (controller.desiredSize ?? 0) > 0)
+							controller.enqueue(encoder.encode(": heartbeat\n\n"));
+					}, 15000);
+					(heartbeat as { unref?: () => void }).unref?.();
+					if (signal.aborted) abort();
+				} catch (error) {
+					cleanup();
+					try {
+						controller.error(error);
+					} catch {
+						/* already closed */
+					}
 				}
-				heartbeat = setInterval(() => {
-					if (!closed && !pending && (controller.desiredSize ?? 0) > 0)
-						controller.enqueue(encoder.encode(": heartbeat\n\n"));
-				}, 15000);
-				if (signal.aborted) abort();
 			},
 			pull: flush,
 			cancel: cleanup,

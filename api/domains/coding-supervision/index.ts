@@ -8,3 +8,4 @@ export type {
 	StepIntent,
 	StepReceipt,
 } from "./contracts";
+export { migrations } from "./repository";

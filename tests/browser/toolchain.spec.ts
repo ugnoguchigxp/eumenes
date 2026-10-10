@@ -77,8 +77,7 @@ for (const [question, answer] of [
 		await expect(page.locator(".message .research-activity")).toHaveCount(0);
 		await expect(card.locator(".message-author")).toHaveCount(0);
 		await expect(card).not.toContainText(question!);
-		await expect(card.locator("details")).not.toHaveAttribute("open", "");
-		await card.getByText("調査の詳細・出典", { exact: true }).click();
+		await expect(card.locator("details")).toHaveAttribute("open", "");
 		await expect(card).toContainText(answer!, { timeout: 20000 });
 		await expect(card.getByRole("link", { name: "一次資料" })).toHaveAttribute(
 			"href",
@@ -87,11 +86,20 @@ for (const [question, answer] of [
 		await expect(page.locator(".message-assistant").last()).toContainText(
 			answer!,
 		);
+
+		const answerBubble = page.locator(".message-assistant").last();
+		const sourceLink = answerBubble.getByRole("link", { name: "example.com" });
+		await expect(sourceLink).toHaveAttribute("target", "_blank");
+		await expect(sourceLink).toHaveAttribute("href", /https:\/\/example.com\//);
+		if (question === "東京の天気を調べて") {
+			await expect(answerBubble).toContainText("最低17度");
+			await expect(answerBubble).toContainText("降水確率0％");
+		}
 		await expect(page.locator("body")).not.toContainText("INJECTION_SENTINEL");
 		await page.reload();
 		await expect(page.getByText(/接続済み/)).toBeVisible({ timeout: 20000 });
 		await expect(card).toContainText(answer!, { timeout: 20000 });
-		await expect(card.locator("details")).not.toHaveAttribute("open", "");
+		await expect(card.locator("details")).toHaveAttribute("open", "");
 		if (question === "東京の天気を調べて") {
 			await page.screenshot({
 				path: "spec/verification/research-activity/desktop.png",

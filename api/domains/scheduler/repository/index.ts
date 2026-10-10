@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import type { Migration } from "../../../infrastructure/sqlite";
 
 export const migration = `
 CREATE TABLE scheduler_schedules (
@@ -308,3 +309,8 @@ export function listOccurrences(
 		seq: r.seq as number,
 	}));
 }
+
+/** Named migrations of this domain; the SQL above is frozen once deployed. */
+export const migrations: readonly Migration[] = [
+	{ id: "scheduler/0001-init", sql: migration },
+];

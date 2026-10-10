@@ -1,5 +1,4 @@
 import type { Database } from "bun:sqlite";
-import { createHash } from "node:crypto";
 import {
 	CONTRACT_VERSIONS,
 	buildMemoryViewV2,
@@ -31,6 +30,7 @@ import {
 } from "eumenes-memory/sqlite";
 import type { HostSourceState, StateItem } from "eumenes-memory/sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
+import { sha256Hex } from "../../../infrastructure/digest";
 import type { ConversationService } from "../../conversation";
 import type { ContinuityService } from "../../continuity";
 import {
@@ -61,7 +61,7 @@ const PART_VIEW_BYTES = MAX_VIEW_BYTES / 2;
 /** Active State items kept in the shared profile. Keeps the fixed view inside its byte budget. */
 const MAX_ACTIVE_ITEMS = 100;
 const STATE_ID = /^state:[0-9a-f]{64}$/;
-const sha = (text: string) => createHash("sha256").update(text).digest("hex");
+const sha = (text: string) => sha256Hex(text);
 const LABELS: Record<string, string> = {
 	preference: "好み",
 	personal_fact: "本人の事実",

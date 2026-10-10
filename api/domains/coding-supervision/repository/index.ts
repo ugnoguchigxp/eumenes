@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import type { Migration } from "../../../infrastructure/sqlite";
 import type { Supervisor, StepIntent, Decision } from "../contracts";
 import type { TaskFence } from "../../tasks";
 export const migration = `
@@ -96,3 +97,8 @@ export function purge(db: Database, id: string) {
 	])
 		db.query(`DELETE FROM ${table} WHERE task_id=?`).run(id);
 }
+
+/** Named migrations of this domain; the SQL above is frozen once deployed. */
+export const migrations: readonly Migration[] = [
+	{ id: "coding-supervision/0001-init", sql: migration },
+];

@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import type { Migration } from "../../../infrastructure/sqlite";
 import { createHash } from "node:crypto";
 import {
 	speechDeliverySchema,
@@ -463,3 +464,12 @@ export function getMessage(
 		},
 	};
 }
+
+/** Named migrations of this domain; the SQL above is frozen once deployed. */
+export const migrations: readonly Migration[] = [
+	{ id: "conversation/0001-init", sql: migration },
+	{ id: "conversation/0002-avatar-motion", sql: avatarMotionMigration },
+	{ id: "conversation/0003-answer-delivery", sql: answerDeliveryMigration },
+	{ id: "conversation/0004-outbox", sql: outboxMigration },
+	{ id: "conversation/0005-retraction", sql: retractionMigration },
+];

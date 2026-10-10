@@ -33,6 +33,14 @@ export type Report = z.infer<typeof reportSchema> & {
 	sources: SourceMetadata[];
 	coverage: "complete" | "partial";
 	verification: "evidence_linked";
+	version?: 2;
+	outcome?:
+		| "answered"
+		| "partial"
+		| "not_found"
+		| "clarification_required"
+		| "failed";
+	exploration?: string[];
 };
 const excerptEvidenceSchema = z
 	.object({
@@ -54,7 +62,7 @@ export const referencedReportSchema = reportSchema.extend({
 		.min(1)
 		.max(8),
 });
-const workerReportSchema = reportSchema.extend({
+export const legacyWorkerReportSchema = reportSchema.extend({
 	claims: z
 		.array(
 			reportSchema.shape.claims.element.extend({
@@ -72,6 +80,59 @@ const workerReportSchema = reportSchema.extend({
 		.min(1)
 		.max(8),
 });
+const viewEvidenceSchema = z
+	.object({
+		sourceId: z.string(),
+		viewId: z.string().uuid(),
+		excerptId: z
+			.string()
+			.regex(/^e[0-9]+$/)
+			.max(12),
+	})
+	.strict();
+export const reportV2Schema = z
+	.object({
+		version: z.literal(2),
+		outcome: z.enum([
+			"answered",
+			"partial",
+			"not_found",
+			"clarification_required",
+			"failed",
+		]),
+		summary: z.string().min(1).max(2000),
+		claims: z
+			.array(
+				z
+					.object({
+						text: z.string().min(1).max(500),
+						evidence: z.array(viewEvidenceSchema).min(1).max(3),
+					})
+					.strict(),
+			)
+			.max(8),
+		limitations: z.array(z.string().max(300)).max(8),
+		exploration: z.array(z.string().max(300)).min(1).max(8),
+	})
+	.strict()
+	.refine((v) =>
+		["answered", "partial"].includes(v.outcome)
+			? v.claims.length > 0
+			: v.claims.length === 0,
+	);
+export const needsSchema = z
+	.array(
+		z
+			.object({
+				id: z.string().min(1).max(32),
+				item: z.string().min(1).max(200),
+				requestQuote: z.string().min(1).max(300),
+				status: z.enum(["missing", "confirmed", "mismatch"]),
+			})
+			.strict(),
+	)
+	.min(1)
+	.max(8);
 export const routeSchema = z.discriminatedUnion("action", [
 	z.object({ action: z.literal("respond") }).strict(),
 	z
@@ -125,16 +186,22 @@ export const workerSchema = z.discriminatedUnion("action", [
 			// remain accepted, but only the runtime can resolve either form.
 			executionRef: z.string().min(1).max(128),
 			arguments: z.unknown(),
+			needs: needsSchema.optional(),
 		})
 		.strict(),
 	z
 		.object({
 			action: z.literal("finish"),
-			report: workerReportSchema,
+			report: z.union([reportV2Schema, legacyWorkerReportSchema]),
+			needs: needsSchema.optional(),
 			// Opaque to the runtime: only an acquisition port may interpret it.
 			facts: z.unknown().optional(),
 		})
 		.strict(),
+]);
+export const readWorkerSchema = z.discriminatedUnion("action", [
+	workerSchema.options[0],
+	workerSchema.options[1].extend({ report: reportV2Schema }),
 ]);
 export type Task = {
 	id: string;
@@ -162,6 +229,7 @@ export type Task = {
 	created_at: number;
 	updated_at: number;
 	// Added by acquisitionMigration; absent/null on pre-port rows.
+	exploration_json?: string | null;
 	acquisition_plan_json?: string | null;
 	acquisition_binding_json?: string | null;
 };

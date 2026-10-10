@@ -1,63 +1,41 @@
 import { test, expect } from "@playwright/test";
-import { spawn, type ChildProcess } from "node:child_process";
-import { createServer, type AddressInfo } from "node:net";
+import { createFixture } from "./fixture";
 const TOKEN = "fixture-token-for-research-routes-browser";
 const QUESTION = "天気予報 鎌倉 明日 最高気温";
-async function port() {
-	const s = createServer();
-	await new Promise<void>((r) => s.listen(0, "127.0.0.1", r));
-	const p = (s.address() as AddressInfo).port;
-	await new Promise<void>((r) => s.close(() => r()));
-	return p;
-}
 test.setTimeout(120000);
 let apiPort: number, webPort: number;
-const processes: ChildProcess[] = [];
+const fixture = createFixture();
 test.beforeAll(async () => {
-	apiPort = await port();
-	webPort = await port();
-	processes.push(
-		spawn("bun", ["scripts/research-routes-fixture-server.ts"], {
-			env: {
-				...process.env,
-				EUMENES_PORT: String(apiPort),
-				EUMENES_ORIGIN: `http://127.0.0.1:${webPort}`,
-			},
-			stdio: "ignore",
-		}),
+	apiPort = await fixture.port();
+	webPort = await fixture.port();
+	await fixture.launch(
+		["scripts/research-routes-fixture-server.ts"],
+		{
+			EUMENES_PORT: String(apiPort),
+			EUMENES_ORIGIN: `http://127.0.0.1:${webPort}`,
+		},
+		{ ports: [apiPort] },
 	);
-	processes.push(
-		spawn("bun", ["run", "dev:web", "--port", String(webPort)], {
-			env: {
-				...process.env,
-				EUMENES_PROXY_URL: `http://127.0.0.1:${apiPort}`,
-				EUMENES_API_TOKEN: TOKEN,
-				EUMENES_ORIGIN: `http://127.0.0.1:${webPort}`,
-				EUMENES_VITE_CACHE_DIR: `/tmp/eumenes-routes-vite-${webPort}`,
-				LARM_API_TOKEN: "",
-			},
-			stdio: "ignore",
-		}),
-	);
-	for (let i = 0; i < 150; i++) {
-		try {
+	await fixture.launchWeb({
+		webPort,
+		apiPort,
+		token: TOKEN,
+		cacheDir: `/tmp/eumenes-routes-vite-${webPort}`,
+	});
+	await fixture.waitUntil(
+		async () => {
 			const web = await fetch(`http://127.0.0.1:${webPort}`);
 			const api = await fetch(
 				`http://127.0.0.1:${apiPort}/api/research-routes`,
-				{
-					headers: { authorization: `Bearer ${TOKEN}` },
-				},
+				{ headers: { authorization: `Bearer ${TOKEN}` } },
 			);
-			if (web.ok && api.ok) return;
-		} catch {}
-		await new Promise((r) => setTimeout(r, 100));
-	}
-	throw new Error("fixture_not_ready");
+			return web.ok && api.ok;
+		},
+		{ attempts: 150, message: "fixture_not_ready" },
+	);
 });
 test.afterAll(async () => {
-	for (const p of processes) p.kill("SIGTERM");
-	await new Promise((r) => setTimeout(r, 200));
-	for (const p of processes) if (p.exitCode === null) p.kill("SIGKILL");
+	await fixture.stopAll();
 });
 
 test("cold run registers a route; the settings panel reads, edits, stops, rediscovers and clears it", async ({

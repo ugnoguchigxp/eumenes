@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { sha256Hex } from "../../../infrastructure/digest";
 import {
 	closeSync,
 	existsSync,
@@ -54,12 +54,9 @@ export class WorldJournalCorruptError extends Error {
 	}
 }
 
-const sha256 = (text: string) =>
-	createHash("sha256").update(text).digest("hex");
-
 /** Hash over every field except the hash itself, in a fixed order. */
 export function hashEntry(entry: Omit<WorldJournalEntry, "hash">): string {
-	return sha256(
+	return sha256Hex(
 		JSON.stringify([
 			entry.journalFormat,
 			entry.seq,

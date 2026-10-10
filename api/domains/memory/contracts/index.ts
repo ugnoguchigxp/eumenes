@@ -1,5 +1,7 @@
 import { z } from "zod";
-export const PRINCIPAL = "local:owner";
+import { CONVERSATION_DEFAULT_PRINCIPAL } from "../../conversation/contracts";
+/** The owner principal; defined once in conversation (the lower domain). */
+export const PRINCIPAL = CONVERSATION_DEFAULT_PRINCIPAL;
 /** The shared profile scope. Per-conversation continuity is composed into it for the active conversation. */
 export const PROFILE_SCOPE = "profile:owner";
 export const stateKinds = [

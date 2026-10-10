@@ -1,4 +1,5 @@
 import type { SqliteStore } from "../../../infrastructure/sqlite";
+import { canonicalJson, sha256Hex } from "../../../infrastructure/digest";
 import type { AttemptDto, JobDto, JobList, QueueStatus } from "../contracts";
 import {
 	findByDedupe,
@@ -59,16 +60,8 @@ function attemptDto(a: AttemptRecord): AttemptDto {
 		errorCode: a.errorCode,
 	};
 }
-function canonical(value: unknown): string {
-	if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
-	if (value && typeof value === "object")
-		return `{${Object.entries(value as Record<string, unknown>)
-			.filter(([, v]) => v !== undefined)
-			.sort(([a], [b]) => (a < b ? -1 : 1))
-			.map(([k, v]) => `${JSON.stringify(k)}:${canonical(v)}`)
-			.join(",")}}`;
-	return JSON.stringify(value) ?? "null";
-}
+const canonical = (value: unknown) =>
+	canonicalJson(value, { omitUndefined: true, keyOrder: "codeUnit" });
 
 export function createQueue(
 	store: SqliteStore,
@@ -97,20 +90,18 @@ export function createQueue(
 			throw new Error("invalid_job_payload_too_large");
 		const resourceKey = input.resourceKey ?? handler.resourceKey ?? null;
 		const maxAttempts = Math.min(3, Math.max(1, input.maxAttempts ?? 1));
-		const digest = new Bun.CryptoHasher("sha256")
-			.update(
-				canonical({
-					version,
-					payload: parsed.data,
-					subjectRef: input.subjectRef ?? null,
-					parent: input.parentJobId ?? null,
-					lane: input.lane,
-					resourceKey,
-					concurrencyKey: input.concurrencyKey ?? null,
-					maxAttempts,
-				}),
-			)
-			.digest("hex");
+		const digest = sha256Hex(
+			canonical({
+				version,
+				payload: parsed.data,
+				subjectRef: input.subjectRef ?? null,
+				parent: input.parentJobId ?? null,
+				lane: input.lane,
+				resourceKey,
+				concurrencyKey: input.concurrencyKey ?? null,
+				maxAttempts,
+			}),
+		);
 		const existing = findByDedupe(tx, input.scope, input.kind, input.dedupeKey);
 		if (existing) {
 			if (existing.inputDigest !== digest) throw new Error("request_conflict");

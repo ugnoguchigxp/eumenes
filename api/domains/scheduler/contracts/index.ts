@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { HttpErrorStatus } from "../../../infrastructure/http";
 
 export const MIN_INTERVAL_MS = 60_000;
 export const MAX_INTERVAL_MS = 365 * 24 * 60 * 60 * 1000;
@@ -79,3 +80,9 @@ export const occurrenceListSchema = z.object({
 	items: z.array(occurrenceSchema),
 	nextCursor: z.string().nullable(),
 });
+
+/** HTTP status of each error code this domain throws; merged by `api/application/error-status.ts`. */
+export const errorStatus = {
+	schedule_state_conflict: 409,
+	schedule_limit_reached: 503,
+} as const satisfies Record<string, HttpErrorStatus>;

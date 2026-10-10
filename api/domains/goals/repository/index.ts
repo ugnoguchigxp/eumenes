@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import type { Migration } from "../../../infrastructure/sqlite";
 import type { Goal, GoalSource, GoalStatus } from "../contracts";
 
 export const migration = `
@@ -234,3 +235,9 @@ export function goalHistory(
 		source: JSON.parse(row.source_json as string) as GoalSource,
 	}));
 }
+
+/** Named migrations of this domain; the SQL above is frozen once deployed. */
+export const migrations: readonly Migration[] = [
+	{ id: "goals/0001-init", sql: migration },
+	{ id: "goals/0002-operation", sql: operationMigration },
+];

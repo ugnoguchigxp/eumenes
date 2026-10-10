@@ -61,3 +61,16 @@ Git対象外の `verification-reports/toolchain/` に、改修前の `search-bef
 この試験は実LARMと公開Webを使う隔離backendのAPI試験である。実マイク・スピーカーの3往復受入を実施したとは扱わない。
 
 今回の設計コンテキスト作業は `context_compile` 1回、`compile_eval` 1回。runIdは `00000000-0000-0000-18dc-ff66bada849b`。
+
+## 既存DBでの起動障害修正（2026-10-10）
+
+09:20 JSTの開発サーバー起動は、保存済みの `skill:web.research@3` とソースの内容が一致せず、`capability_revision_conflict` で失敗した。新規DBのlive試験では再現しない。保存済み第3版を持つ一時DBでも、修正前のseedが同じエラーを返すことを確認した。
+
+第3版ファイルはリポジトリの公開済み内容へ戻し、回答範囲の変更を `skill:web.research@4` として追加した。対応packageは `web.research/web.lookup @5`、`web.read @4`。通常検索経路も `package:web.research@5` を使う。導入時期により保存済み旧版の内容が異なるため、seedは既存の旧版を再登録せず、その内容とhashを保持する。最新の版と明示的な登録の内容衝突は引き続き拒否する。衝突ログには固定理由と組込み版のIDだけを残す。
+
+- fixture: capabilities gateは10件成功。旧版を持つDBへの更新・DB再オープン・旧hash保持、新版の内容衝突拒否を含む。利用側agent-runtime gateも成功。
+- 起動確認: 既存DBを使った `bun run dev` でAPIとViteの起動、LARMのready、正常終了を確認。以降の稼働中サーバーも公開APIでreadyを確認した。
+- live: 稼働中backendで合成した試験音声71,724 bytesをASRへ送り、認識成功を確認。ユーザーの録音や会話本文は試験へコピーしていない。結果は `verification-reports/startup-repair-live.json`。
+- 全体: backendは975件成功・1件skip、Web単体は201件成功、画面ビルド成功。ブラウザfixtureの最終結果は `verification-reports/startup-repair-all.log` を参照する。
+
+音声の実マイク・スピーカー3往復受入とは区別する。直前のASR停止はLARM接続作成の409による別の障害で、その詳細原因をこの修正で確定したとは扱わない。

@@ -26,7 +26,7 @@
 
 画像・楽曲は `minWarmInstances: 0`、`idleTtlSeconds: 0`。公開契約では生成要求に応じて起動し、成果物を保存して worker を停止する。「静的に登録されている」と「常時起動している」は別属性として扱う。`/v1/services` は現状 ASR 用の ServiceHarness schema であり、汎用サービス一覧の代わりにはならない。
 
-参照: [既存設定計画](settings-screen-implementation-plan.md)、[SAAA の参照用契約](/Users/y.noguchi/Code/SAAA/docs/larm-agent-connection-provide.md)。SAAA 文書にある 10 月 1 日の画像 API 未定義・404 は過去の検証結果であり、現在の契約に転記しない。今回の GET 成功も、生成成功の証拠にはしない。
+参照: [既存設定計画](.archived/settings-screen-implementation-plan.md)、[SAAA の参照用契約](/Users/y.noguchi/Code/SAAA/docs/larm-agent-connection-provide.md)。SAAA 文書にある 10 月 1 日の画像 API 未定義・404 は過去の検証結果であり、現在の契約に転記しない。今回の GET 成功も、生成成功の証拠にはしない。
 
 ## 画面と操作
 

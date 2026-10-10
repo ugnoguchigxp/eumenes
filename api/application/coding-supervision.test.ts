@@ -5,6 +5,7 @@ import {
 	observation,
 	proposal,
 	receipt,
+	instructionFrame,
 } from "../domains/coding-supervision/test/fixture";
 import {
 	createScheduler,
@@ -12,6 +13,12 @@ import {
 } from "../domains/scheduler";
 import { createDelegatedTasks } from "./delegated-tasks";
 import { superviseCodingExecution } from "./coding-supervision";
+import { createCodingTaskExecution } from "./coding-tasks";
+import {
+	createCoding,
+	migration as codingMigration,
+} from "../domains/coding";
+import { approvalChoices } from "../domains/coding-supervision/contracts";
 import { createApp } from "./app";
 import { createClient } from "../../client";
 import {
@@ -227,6 +234,159 @@ test("HTTP/client authenticate report and supervisor reads and omit private CLI 
 		server.stop(true);
 		await voice.close();
 		await dialogue.close();
+		await scheduler.close();
+	}
+});
+
+test("the answer to a supervision approval question is never dispatched to the CLI", async () => {
+	const sent: string[] = [];
+	const execution = superviseCodingExecution({
+		store: {} as never,
+		tasks: () => ({}) as never,
+		workflow: {} as never,
+		supervision: () =>
+			({
+				isApprovalAnswer: (_task: string, questionId: string) =>
+					questionId === "approval-question",
+			}) as never,
+		base: {
+			available: () => true,
+			dispatch: async (_t, c) => {
+				sent.push(c.answer?.text ?? "start");
+				return { accepted: true };
+			},
+			observe: async () => {},
+			stop: async () => ({ stopped: true }),
+		},
+	});
+	const task = { id: "task-1" } as never;
+	const signal = new AbortController().signal;
+	expect(
+		await execution.dispatch(task, {
+			signal,
+			commandId: "c1",
+			answer: { questionId: "approval-question", text: "承認する" },
+		}),
+	).toEqual({ accepted: true });
+	expect(sent).toEqual([]);
+	await execution.dispatch(task, {
+		signal,
+		commandId: "c2",
+		answer: { questionId: "escalate-question", text: "この方針で進めて" },
+	});
+	await execution.dispatch(task, { signal, commandId: "c3" });
+	expect(sent).toEqual(["この方針で進めて", "start"]);
+});
+
+test("answering an approval question prepares no coding execution and applies the approved instruction", async () => {
+	let delegated!: ReturnType<typeof createDelegatedTasks>,
+		scheduler!: ReturnType<typeof createScheduler>;
+	const h = await setup({
+		approveInstructions: true,
+		migrations: [codingMigration, schedulerMigration],
+		tasksFactory: (c) => {
+			scheduler = createScheduler(c.store, c.queue, { now: c.now });
+			// Real coding service: only the runner (never reached by prepare) is absent.
+			const coding = createCoding({
+				store: c.store,
+				runner: {} as never,
+				publishSpec: () => {},
+			});
+			const real = createCodingTaskExecution({
+				store: c.store,
+				coding,
+				tasks: () => delegated.tasks,
+				available: true,
+			}).execution;
+			delegated = createDelegatedTasks({
+				store: c.store,
+				queue: c.queue,
+				scheduler,
+				enabled: true,
+				now: c.now,
+				changedInTransaction: c.changed,
+				execution: superviseCodingExecution({
+					store: c.store,
+					tasks: () => delegated.tasks,
+					supervision: c.supervision,
+					workflow: c.workflow,
+					base: {
+						...real,
+						prepareInTransaction(db, t, ctx) {
+							coding.registerWorkspaceInTransaction(db, {
+								id: t.grant.workspaceId,
+								branch: t.grant.branch ?? "codex/task",
+								available: true,
+								reason: null,
+							});
+							real.prepareInTransaction?.(db, t, ctx);
+						},
+						// Dispatching would need a runner; the supervisor wrapper must not reach it for approval answers anyway.
+						dispatch: async () => ({ accepted: true }),
+					},
+				}),
+			});
+			return delegated.tasks;
+		},
+	});
+	try {
+		const executions = () =>
+			h.store.read(
+				(db) =>
+					(
+						db.query("SELECT count(*) AS n FROM coding_executions").get() as {
+							n: number;
+						}
+					).n,
+			);
+		// The task creation committed the one implementation intent.
+		expect(executions()).toBe(1);
+		await h.drain();
+		h.execute(async (i) =>
+			receipt(
+				i,
+				i.kind === "run_checks"
+					? {
+							checks: {
+								digest: "a".repeat(64),
+								results: [
+									{ id: "typecheck", passed: false },
+									{ id: "tests", passed: true },
+								],
+							},
+						}
+					: {},
+			),
+		);
+		h.decision(proposal("run_checks"));
+		await h.observe();
+		await h.drain();
+		h.decision(proposal("request_change", "型エラーを修正する"));
+		await h.observe();
+		await h.drain();
+		const { task, question } = h.tasks.get(h.taskId);
+		expect(task.state).toBe("waiting_user");
+		expect(h.supervision.get(h.taskId)?.pendingApproval).not.toBeNull();
+		await h.tasks.answer(h.taskId, {
+			requestId: crypto.randomUUID(),
+			expectedRevision: task.revision,
+			questionId: question!.id,
+			answer: approvalChoices.approve,
+		});
+		await h.drain();
+		// No phantom execution/reservation, and the task is no longer stuck waiting.
+		expect(executions()).toBe(1);
+		expect(h.tasks.get(h.taskId).task.state).toBe("active");
+		await h.observe();
+		await h.drain();
+		const changes = h.steps.filter((s) => s.kind === "request_change");
+		expect(changes).toHaveLength(1);
+		expect(changes[0]!.instruction).toBe(
+			`${instructionFrame}型エラーを修正する`,
+		);
+		expect(executions()).toBe(1);
+	} finally {
+		delegated.close();
 		await scheduler.close();
 	}
 });

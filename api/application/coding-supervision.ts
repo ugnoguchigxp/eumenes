@@ -52,9 +52,27 @@ export function superviseCodingExecution(input: {
 		available: base.available,
 		prepareInTransaction(db, t, c) {
 			input.supervision().initializeInTransaction(db, t);
+			// The answer to an approval question is a decision, not a CLI turn: prepare no
+			// coding execution (it would never start and would hold the workspace).
+			if (
+				c.answerQuestionId &&
+				input
+					.supervision()
+					.isApprovalAnswerInTransaction(db, t.id, c.answerQuestionId)
+			)
+				return;
 			return base.prepareInTransaction?.(db, t, c);
 		},
-		dispatch: base.dispatch,
+		dispatch(t, context) {
+			// The answer to an approval question is a decision, not text for the CLI.
+			// Approved instructions are launched by supervision as a verified step.
+			if (
+				context.answer &&
+				input.supervision().isApprovalAnswer(t.id, context.answer.questionId)
+			)
+				return Promise.resolve({ accepted: true });
+			return base.dispatch(t, context);
+		},
 		stop: base.stop,
 		async observe(t, signal) {
 			try {

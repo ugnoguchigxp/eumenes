@@ -25,6 +25,26 @@ describe("coding runner", () => {
 			f.close();
 		}
 	});
+	test("a spec that requests the registered network is refused before the CLI starts", async () => {
+		const f = fixture();
+		const runner = createRunner(f.configPath, true);
+		const spec = { ...f.spec(), network: "registered" as const };
+		publishSpec(f.config, "spec", spec);
+		try {
+			await runner.start("spec", spec.operationId, spec.executionId, false);
+			const r = await until(
+				() => runner.inspect(spec.executionId, 0, 100, false),
+				(r) => r.receipt.childrenStopped,
+			);
+			expect(r.receipt.reason).toBe("runner_network_policy_unsupported");
+			expect(r.receipt.evidenceComplete).toBe(false);
+			expect(
+				readdirSync(runPath(f.config.spoolRoot, spec.executionId)),
+			).not.toContain("cli-spawn-intent.json");
+		} finally {
+			f.close();
+		}
+	});
 	test("backend credentials and SSH agent are absent from the CLI environment", async () => {
 		const f = fixture();
 		const runner = createRunner(f.configPath, true);

@@ -54,7 +54,56 @@ export const quoteInput = z
 			),
 	})
 	.strict();
+export const savedFindInput = z
+	.object({
+		sourceRef: z.string().uuid(),
+		query: z.string().trim().min(1).max(200),
+		cursor: z.string().uuid().optional(),
+	})
+	.strict();
+export const savedReadInput = z
+	.object({
+		sourceRef: z.string().uuid(),
+		cursor: z.string().uuid().optional(),
+		start: z.literal("head").optional(),
+		characters: z.number().int().min(1).max(2400).default(2400),
+	})
+	.strict()
+	.refine((v) => !(v.cursor && v.start));
+export const historyInput = z
+	.object({
+		question: z.string().min(1).max(8000),
+		detail: z.enum(["brief", "normal"]).default("normal"),
+	})
+	.strict();
+export const historySearch = z
+	.object({
+		query: z.string().trim().max(200).default(""),
+		from: z.string().datetime({ offset: true }).optional(),
+		until: z.string().datetime({ offset: true }).optional(),
+		speaker: z.enum(["user", "assistant"]).optional(),
+		cursor: z.string().uuid().optional(),
+		limit: z.number().int().min(1).max(20).default(10),
+	})
+	.strict()
+	.refine(
+		(v) => !v.from || !v.until || Date.parse(v.from) < Date.parse(v.until),
+	);
+export const historyRead = z
+	.object({
+		messageRef: z.string().uuid(),
+		before: z.number().int().min(0).max(9).default(2),
+		after: z.number().int().min(0).max(9).default(2),
+		cursor: z.string().uuid().optional(),
+	})
+	.strict()
+	.refine((v) => v.before + v.after < 10);
 export const validators = {
+	find: savedFindInput,
+	readSaved: savedReadInput,
+	history: historyInput,
+	historySearch,
+	historyRead,
 	forecast: forecastInput,
 	quote: quoteInput,
 	research: researchInput,
@@ -90,7 +139,7 @@ export type Definition = {
 };
 export const learnedIdPattern = /^learned\.web\.[0-9a-f]{32}$/;
 export const learnedMaxBytes = 16384;
-export const commonSkillRevisionId = "skill:web.research@2";
+export const commonSkillRevisionId = "skill:web.research@5";
 export const commonProfileRevisionId = "profile:web.research@1";
 export type FixedDefinition = Definition & {
 	revisionId: string;

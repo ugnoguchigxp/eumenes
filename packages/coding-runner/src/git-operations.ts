@@ -18,7 +18,13 @@ import {
 	runPath,
 } from "./storage";
 import { readReceipt } from "./core";
-import { git, gitBytes, snapshot, workspace } from "./workspace";
+import {
+	git,
+	gitBytes,
+	snapshot,
+	verifyGitIntegrity,
+	workspace,
+} from "./workspace";
 
 type GitReceipt = ReturnType<typeof gitReceiptSchema.parse>;
 export function publishGitSpec(
@@ -246,6 +252,7 @@ export function executeGit(
 				atomicWrite(recordPath, receipt);
 				atomicWrite(ownerPath, { operationId });
 				try {
+					verifyGitIntegrity(config, w.id);
 					git(w.path, ["add", "--", ...files]);
 					const afterStage = snapshot(config, w.id);
 					if (
@@ -275,6 +282,7 @@ export function executeGit(
 						if (digest(blob) !== file.digest)
 							throw new Error("runner_index_changed");
 					}
+					verifyGitIntegrity(config, w.id);
 					git(
 						w.path,
 						[
@@ -336,6 +344,7 @@ export function executeGit(
 				if (!approvedCommit) throw new Error("runner_commit_not_approved");
 				atomicWrite(recordPath, receipt);
 				atomicWrite(ownerPath, { operationId });
+				verifyGitIntegrity(config, w.id);
 				try {
 					// Fixed source SHA/ref; no force, mirror, tag or caller-selected destination.
 					git(w.path, [

@@ -13,7 +13,7 @@ import type {
 	ClaimDetail,
 	ClaimRow,
 	ForgetView,
-} from "../../../../../api/domains/world/contracts";
+} from "../../../../../api/domains/world/contracts/view";
 import { WorldPanel } from "./WorldPanel";
 
 const caches: QueryClient[] = [];

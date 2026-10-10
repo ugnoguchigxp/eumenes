@@ -1,4 +1,5 @@
 import type { Hono } from "hono";
+import { parseJsonBody } from "../../../infrastructure/http";
 import { createScheduleSchema, scheduleOperationSchema } from "../contracts";
 import type { SchedulerService } from "../service";
 
@@ -8,10 +9,8 @@ export function registerScheduler(app: Hono, service: SchedulerService) {
 		return Number.isInteger(limit) && limit >= 1 && limit <= 100 ? limit : null;
 	};
 	app.post("/api/schedules", async (c) => {
-		const parsed = createScheduleSchema.safeParse(
-			await c.req.json().catch(() => null),
-		);
-		if (!parsed.success) return c.json({ error: "invalid_input" }, 400);
+		const parsed = await parseJsonBody(c, createScheduleSchema);
+		if (!parsed.ok) return parsed.response;
 		return c.json(await service.create(parsed.data), 201);
 	});
 	app.get("/api/schedules", (c) => {
@@ -40,10 +39,8 @@ export function registerScheduler(app: Hono, service: SchedulerService) {
 	});
 	for (const operation of ["pause", "resume", "cancel"] as const)
 		app.post(`/api/schedules/:id/${operation}`, async (c) => {
-			const body = scheduleOperationSchema.safeParse(
-				await c.req.json().catch(() => null),
-			);
-			if (!body.success) return c.json({ error: "invalid_input" }, 400);
+			const body = await parseJsonBody(c, scheduleOperationSchema);
+			if (!body.ok) return body.response;
 			const schedule = await service[operation](
 				c.req.param("id"),
 				body.data.expectedRevision,

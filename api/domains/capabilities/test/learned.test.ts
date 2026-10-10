@@ -186,7 +186,7 @@ test("C01 5000 learned definitions never enter FTS/alias/list and do not displac
 	}
 }, 60000);
 
-test("seed adds web.research skill@2 and package@3 without touching old revisions", async () => {
+test("seed adds newer research rules and packages without touching old revisions", async () => {
 	const { store, done } = await setup();
 	try {
 		const ids = store.read((db) =>
@@ -203,9 +203,23 @@ test("seed adds web.research skill@2 and package@3 without touching old revision
 			"package:web.research@3",
 			"package:web.lookup@3",
 			"package:web.read@2",
+			"skill:web.research@3",
+			"package:web.research@4",
+			"package:web.lookup@4",
+			"package:web.read@3",
+			"skill:web.research@4",
+			"package:web.research@5",
+			"package:web.lookup@5",
+			"package:web.read@4",
+			"skill:web.research@5",
+			"package:web.research@6",
+			"package:web.lookup@6",
+			"package:web.read@5",
 		])
 			expect(ids).toContain(id);
-		expect(ids).not.toContain("package:web.read@3");
+		expect(ids).toContain("package:web.read@6");
+		expect(ids).toContain("package:web.research@7");
+		expect(ids).toContain("skill:web.research@6");
 		const v1 = builtins.find((d) => d.kind === "skill" && d.revision === 1)!;
 		expect(v1.body).not.toContain("実Web検索とする");
 		const v2 = builtins.find((d) => d.kind === "skill" && d.revision === 2)!;

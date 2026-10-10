@@ -1,7 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useMemo, useRef, useState } from "react";
 import type { EumenesClient } from "../../../../../client";
-import type { ClaimRow } from "../../../../../api/domains/world/contracts";
+import type { ClaimRow } from "../../../../../api/domains/world/contracts/view";
 import { Button } from "../../../design-system";
 import { useConversation } from "../../../domains/conversation";
 import {

@@ -1,3 +1,5 @@
+import landscape from "../../../public/showcase/landscape.svg?raw";
+const landscapeUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(landscape)}`;
 import type {
 	ArtifactEvent,
 	ArtifactRequest,
@@ -143,7 +145,7 @@ export function createShowcaseFixture() {
 					log("取消後の古い画像を無視");
 					return;
 				}
-				image("succeeded", "/showcase/landscape.svg");
+				image("succeeded", landscapeUrl);
 				log("画像の完成を受信");
 			}, state.delayMs);
 		},
@@ -156,8 +158,8 @@ export function createShowcaseFixture() {
 				status,
 				status === "succeeded"
 					? broken
-						? "/showcase/missing.svg"
-						: "/showcase/landscape.svg"
+						? "data:image/svg+xml;charset=utf-8,broken"
+						: landscapeUrl
 					: undefined,
 			);
 			log(`画像: ${broken ? "読込失敗" : status}`);

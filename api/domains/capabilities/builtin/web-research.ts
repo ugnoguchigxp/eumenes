@@ -11,6 +11,14 @@ const skillV3 = readFileSync(
 	new URL("./web-research/SKILL.v3.md", import.meta.url),
 	"utf8",
 );
+const skillV4 = readFileSync(
+	new URL("./web-research/SKILL.v4.md", import.meta.url),
+	"utf8",
+);
+const skillV5 = readFileSync(
+	new URL("./web-research/SKILL.v5.md", import.meta.url),
+	"utf8",
+);
 import type { Definition } from "../contracts";
 const base = { revision: 1, aliases: [], tags: [], useWhen: [], avoidWhen: [] };
 export const builtins: Definition[] = [
@@ -171,17 +179,164 @@ export const builtins: Definition[] = [
 
 // New immutable revisions: existing installations keep their previous fingerprints.
 builtins.push(
-    {
-        ...base, revision: 3, kind: "skill", id: "web.research",
-        title: "公開資料の調査", summary: "質問に必要な事実と前後情報を根拠付きで整理。未登録の依頼は検索から開始",
-        dependencies: [], body: skillV3,
-    },
-    ...builtins.filter((d) => d.kind === "package" && (
-        ((d.id === "web.research" || d.id === "web.lookup") && d.revision === 3) ||
-        (d.id === "web.read" && d.revision === 2)
-    )).map((d) => ({
-        ...d, revision: d.revision + 1,
-        dependencies: d.dependencies.map((id) => id.startsWith("skill:web.research@") ? "skill:web.research@3" : id),
-        requiredSkillRevisionIds: ["skill:web.research@3"],
-    })),
+	{
+		...base,
+		revision: 3,
+		kind: "skill",
+		id: "web.research",
+		title: "公開資料の調査",
+		summary:
+			"質問に必要な事実と前後情報を根拠付きで整理。未登録の依頼は検索から開始",
+		dependencies: [],
+		body: skillV3,
+	},
+	...builtins
+		.filter(
+			(d) =>
+				d.kind === "package" &&
+				(((d.id === "web.research" || d.id === "web.lookup") &&
+					d.revision === 3) ||
+					(d.id === "web.read" && d.revision === 2)),
+		)
+		.map((d) => ({
+			...d,
+			revision: d.revision + 1,
+			dependencies: d.dependencies.map((id) =>
+				id.startsWith("skill:web.research@") ? "skill:web.research@3" : id,
+			),
+			requiredSkillRevisionIds: ["skill:web.research@3"],
+		})),
+);
+
+// Published skill bodies are immutable; rule changes also version their packages.
+builtins.push(
+	{
+		...base,
+		revision: 4,
+		kind: "skill",
+		id: "web.research",
+		title: "公開資料の調査",
+		summary:
+			"質問に必要な事実と前後情報を根拠付きで整理。未登録の依頼は検索から開始",
+		dependencies: [],
+		body: skillV4,
+	},
+	...builtins
+		.filter(
+			(d) =>
+				d.kind === "package" &&
+				(((d.id === "web.research" || d.id === "web.lookup") &&
+					d.revision === 4) ||
+					(d.id === "web.read" && d.revision === 3)),
+		)
+		.map((d) => ({
+			...d,
+			revision: d.revision + 1,
+			dependencies: d.dependencies.map((id) =>
+				id.startsWith("skill:web.research@") ? "skill:web.research@4" : id,
+			),
+			requiredSkillRevisionIds: ["skill:web.research@4"],
+		})),
+);
+
+// Generic research instructions supersede topic-specific rules without changing history.
+builtins.push(
+	{
+		...base,
+		revision: 5,
+		kind: "skill",
+		id: "web.research",
+		title: "公開資料の調査",
+		summary: "汎用Web検索で質問に必要な情報と確認済み出典を整理",
+		dependencies: [],
+		body: skillV5,
+	},
+	...builtins
+		.filter(
+			(d) =>
+				d.kind === "package" &&
+				(((d.id === "web.research" || d.id === "web.lookup") &&
+					d.revision === 5) ||
+					(d.id === "web.read" && d.revision === 4)),
+		)
+		.map((d) => ({
+			...d,
+			revision: d.revision + 1,
+			summary: "公開資料を検索・確認し、質問への答えと根拠付き要約を返す",
+			dependencies: d.dependencies.map((id) =>
+				id.startsWith("skill:web.research@") ? "skill:web.research@5" : id,
+			),
+			requiredSkillRevisionIds: ["skill:web.research@5"],
+		})),
+);
+
+const skillV6 = readFileSync(
+	new URL("./web-research/SKILL.v6.md", import.meta.url),
+	"utf8",
+);
+builtins.push(
+	{
+		...base,
+		kind: "skill",
+		id: "web.research",
+		revision: 6,
+		title: "保存本文と有限探索",
+		summary: "必要箇所の再読取りと版付き根拠",
+		dependencies: [],
+		body: skillV6,
+	},
+	{
+		...base,
+		kind: "profile",
+		id: "web.research",
+		revision: 2,
+		title: "調査担当",
+		summary: "公開資料を有限の予算で確認",
+		dependencies: [],
+		body: "公開資料を調べます。プレビューに必要項目がなければ保存本文を検索・範囲読取りします。資料が違えば別候補・不足項目の再検索に進みます。現在の依頼に必要な根拠と不足を返します。",
+	},
+	...[
+		{ id: "web.find", schemaKey: "find" as const, title: "保存本文内検索" },
+		{
+			id: "web.read_saved",
+			schemaKey: "readSaved" as const,
+			title: "保存本文の範囲読取り",
+		},
+	].map((t) => ({
+		...base,
+		...t,
+		kind: "tool" as const,
+		backend: "web",
+		summary: t.title,
+		dependencies: [],
+	})),
+	...builtins
+		.filter(
+			(d) =>
+				d.kind === "package" &&
+				((["web.research", "web.lookup"].includes(d.id) && d.revision === 6) ||
+					(d.id === "web.read" && d.revision === 5)),
+		)
+		.map((d) => ({
+			...d,
+			revision: d.revision + 1,
+			dependencies: [
+				...d.dependencies.map((id) =>
+					id.startsWith("skill:web.research@")
+						? "skill:web.research@6"
+						: id.startsWith("profile:web.research@")
+							? "profile:web.research@2"
+							: id,
+				),
+				"tool:web.find@1",
+				"tool:web.read_saved@1",
+			],
+			profileRevisionId: "profile:web.research@2",
+			requiredSkillRevisionIds: ["skill:web.research@6"],
+			toolRevisionIds: [
+				...d.toolRevisionIds!,
+				"tool:web.find@1",
+				"tool:web.read_saved@1",
+			],
+		})),
 );

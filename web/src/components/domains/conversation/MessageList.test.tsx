@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, test } from "vitest";
 import type { SpeechDelivery } from "../../../../../api/domains/delivery/contracts";
 import { MessageList } from "./MessageList";
@@ -135,4 +135,56 @@ test("Ruri emotion is displayed and attributed to Ruri", () => {
 	expect(
 		view.container.querySelector('[data-emotion-source="ruri"]'),
 	).not.toBeNull();
+});
+
+const convo = (...messages: Array<[string, "user" | "assistant", string]>) => ({
+	id: "main",
+	revision: 1,
+	messages: messages.map(([id, role, text]) => ({ ...base, id, role, text })),
+});
+const live = (container: HTMLElement) =>
+	container.querySelector("output[aria-live]")?.textContent;
+
+test("history on first render is not announced; new answers are, even with identical text", () => {
+	const long = "あ".repeat(100);
+	const { container, rerender } = render(
+		<MessageList conversation={convo(["a1", "assistant", "古い回答"])} />,
+	);
+	expect(live(container)).toBe("");
+	rerender(
+		<MessageList
+			conversation={convo(
+				["a1", "assistant", "古い回答"],
+				["a2", "assistant", long],
+			)}
+		/>,
+	);
+	expect(live(container)).toBe(long.slice(0, 80));
+	const first = container.querySelector("output[aria-live]");
+	rerender(
+		<MessageList
+			conversation={convo(
+				["a1", "assistant", "古い回答"],
+				["a2", "assistant", long],
+				["a3", "assistant", long],
+			)}
+		/>,
+	);
+	expect(live(container)).toBe(long.slice(0, 80));
+	expect(container.querySelector("output[aria-live]")).not.toBe(first);
+});
+
+test("only the latest 200 messages render until older ones are requested", () => {
+	const many = Array.from(
+		{ length: 205 },
+		(_, i): ["user" | "assistant", string] => ["user", `発言${i}`],
+	).map(([role, text], i): [string, "user" | "assistant", string] => [
+		`m${i}`,
+		role,
+		text,
+	]);
+	const { container } = render(<MessageList conversation={convo(...many)} />);
+	expect(container.querySelectorAll("article").length).toBe(200);
+	fireEvent.click(screen.getByRole("button", { name: "以前の会話を表示" }));
+	expect(container.querySelectorAll("article").length).toBe(205);
 });

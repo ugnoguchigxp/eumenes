@@ -13,3 +13,4 @@ export type {
 	SettleResult,
 	Tx,
 } from "./types";
+export { migrations } from "./repository";

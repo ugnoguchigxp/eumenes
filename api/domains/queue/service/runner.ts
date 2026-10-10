@@ -2,8 +2,11 @@ import { getLogger, withLogContext } from "../../../infrastructure/logger";
 const log = getLogger("queue");
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import {
+	type CandidateCursor,
 	candidates,
+	candidatesAfter,
 	claimJob,
+	cursorOf,
 	endAttempt,
 	expiredQueued,
 	finishJob,
@@ -26,6 +29,9 @@ import type {
 	Tx,
 } from "../types";
 import { type Registry, sync } from "./registry";
+
+const SCAN_PAGE = 256;
+const SCAN_MAX = 4096;
 
 export interface Resolved {
 	now: () => number;
@@ -92,6 +98,20 @@ export function toErrorCode(e: unknown): string {
 	return /^[a-z][a-z0-9_:]{0,100}$/.test(e.message)
 		? e.message
 		: "handler_failed";
+}
+
+/** Pages through ready jobs so a wall of blocked ones cannot hide runnable ones behind it. */
+function* scanCandidates(db: Tx, now: number): Generator<JobRecord> {
+	let after: CandidateCursor | null = null;
+	let scanned = 0;
+	while (scanned < SCAN_MAX) {
+		const page = candidatesAfter(db, now, SCAN_PAGE, after);
+		for (const job of page) yield job;
+		scanned += page.length;
+		const last = page[page.length - 1];
+		if (page.length < SCAN_PAGE || !last) return;
+		after = cursorOf(last);
+	}
 }
 
 function claimOf(job: JobRecord): JobClaim {
@@ -248,20 +268,18 @@ export function createRunner(
 		}
 	}
 	const pendingHooks: Array<() => void> = [];
-	function flushHooks() {
-		const hooks = pendingHooks.splice(0, pendingHooks.length);
-		runHooks(hooks);
-	}
 	async function writeAndFlush<T>(fn: (db: Tx) => T): Promise<T> {
-		pendingHooks.length = 0;
-		try {
-			const result = await store.write(fn);
-			flushHooks();
-			return result;
-		} catch (error) {
-			pendingHooks.length = 0;
-			throw error;
-		}
+		let hooks: Array<() => void> = [];
+		const result = await store.write((db) => {
+			const start = pendingHooks.length;
+			try {
+				return fn(db);
+			} finally {
+				hooks = pendingHooks.splice(start);
+			}
+		});
+		runHooks(hooks);
+		return result;
 	}
 	/** Resolve a running job whose execution cannot be trusted (lease lost, restart, forced shutdown). */
 	function recoverRunning(
@@ -336,7 +354,7 @@ export function createRunner(
 		const reserved = new Set<string>();
 		for (const a of active.values())
 			if (a.concurrencyKey) reserved.add(a.concurrencyKey);
-		for (const job of candidates(db, now, 256)) {
+		for (const job of scanCandidates(db, now)) {
 			const handler = registry.get(job.kind);
 			const originalResource = job.resourceKey ?? handler?.resourceKey ?? null;
 			const resource = originalResource
@@ -354,7 +372,7 @@ export function createRunner(
 			)
 				reason = "conversation_order";
 			if (reason) {
-				setWaitReason(db, job.id, reason, now);
+				if (job.waitReason !== reason) setWaitReason(db, job.id, reason, now);
 				continue;
 			}
 			if (!handler || !handler.payloadVersions.includes(job.payloadVersion)) {
@@ -642,6 +660,7 @@ export function createRunner(
 	}
 
 	async function loop() {
+		let tickFailures = 0;
 		while (!closing) {
 			const mine = deferred;
 			let delay = opts.pollMs;
@@ -650,10 +669,16 @@ export function createRunner(
 				const next = store.read((db) => nextEventAt(db, opts.now()));
 				if (next !== null)
 					delay = Math.max(10, Math.min(opts.pollMs, next - opts.now()));
-			} catch {
-				log.warn("queue.tick_failed");
+				tickFailures = 0;
+			} catch (error) {
+				log.warn("queue.tick_failed", { reason: toErrorCode(error) }, error);
 				// Writer full or closing: back off and re-check; do not fake progress.
-				delay = Math.min(opts.pollMs, opts.backoff.baseMs);
+				delay =
+					Math.min(
+						opts.pollMs * 8,
+						opts.backoff.baseMs * 2 ** Math.min(tickFailures, 16),
+					) + Math.floor(Math.random() * opts.backoff.baseMs);
+				tickFailures++;
 			}
 			if (closing) break;
 			const timer = new AbortController();

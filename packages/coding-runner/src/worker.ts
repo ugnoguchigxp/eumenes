@@ -181,6 +181,15 @@ export async function runWorker(
 	);
 	let ticker: ReturnType<typeof setInterval> | undefined;
 	try {
+		if (spec.network === "registered") {
+			// No isolation layer provides network control yet, so a network grant can never be honoured.
+			receipt.state = "stopped";
+			receipt.childrenStopped = true;
+			receipt.evidenceComplete = false;
+			receipt.reason = "runner_network_policy_unsupported";
+			save();
+			return;
+		}
 		if (config.mode !== "fixture")
 			throw new Error("runner_isolation_unavailable");
 		validateExecutable(config);

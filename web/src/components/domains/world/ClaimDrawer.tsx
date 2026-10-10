@@ -5,7 +5,7 @@ import type {
 	ClaimChange,
 	ClaimRow,
 	ForgetAccepted,
-} from "../../../../../api/domains/world/contracts";
+} from "../../../../../api/domains/world/contracts/view";
 import { Button } from "../../../design-system";
 import { useWorldClaim, worldKey } from "../../../domains/world/hooks";
 import {

@@ -2,6 +2,7 @@ import type { SpeechPreparation } from "../../delivery";
 import { getLogger, withLogContext } from "../../../infrastructure/logger";
 const log = getLogger("voice-dialogue");
 import { SpeechSentences } from "./sentences";
+import { spokenText } from "./spoken-text";
 import { transcriptAllowed } from "./asr-language";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { DialogueService } from "../../dialogue";
@@ -429,7 +430,7 @@ export function createVoiceDialogue(
 						context: dialogue.answerContext?.(run.id) ?? { answer, turns: [] },
 						delivery: dialogue.answerDelivery?.(run.id),
 					});
-					speech.append(answer, true);
+					speech.append(spokenText(answer), true);
 					await speech!.work;
 					if (controller.signal.aborted) return;
 					if (speech!.error) throw speech!.error;
@@ -479,7 +480,7 @@ export function createVoiceDialogue(
 	return {
 		/** Splits finished answer text into speakable clauses for replay. */
 		replaySentences(text: string) {
-			return new SpeechSentences().append(text, true);
+			return new SpeechSentences().append(spokenText(text), true);
 		},
 		/** Synthesizes one clause on demand; it is not tied to any voice turn. */
 		async replayAudio(text: string, signal: AbortSignal) {
@@ -495,7 +496,7 @@ export function createVoiceDialogue(
 				if (
 					run?.status !== "completed" ||
 					!new SpeechSentences()
-						.append(dialogue.answerText(runId) ?? "", true)
+						.append(spokenText(dialogue.answerText(runId) ?? ""), true)
 						.includes(text)
 				)
 					throw new Error("replay_text_invalid");

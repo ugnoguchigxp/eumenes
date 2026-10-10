@@ -48,7 +48,7 @@ const isRef = (value: unknown): value is SourceRef => {
 const refs = (values: unknown[]): SourceRef[] => values.filter(isRef);
 
 /** First occurrence wins, keyed by source identity. */
-export function uniqueByIdentity(values: readonly SourceRef[]): SourceRef[] {
+function uniqueByIdentity(values: readonly SourceRef[]): SourceRef[] {
 	const seen = new Set<string>();
 	const out: SourceRef[] = [];
 	for (const ref of values) {

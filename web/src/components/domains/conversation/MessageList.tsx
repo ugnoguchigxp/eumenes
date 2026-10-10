@@ -6,9 +6,19 @@ import {
 	acceptedEmotion,
 	type SpeechDelivery,
 } from "../../../../../api/domains/delivery/contracts";
-import { type ReactNode, Fragment, memo, useMemo } from "react";
+import {
+	type ReactNode,
+	Fragment,
+	memo,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import { emotionEmoji } from "./emotionEmoji";
 import { renderSafeMarkdown } from "./markdownRenderer";
+const VISIBLE_LIMIT = 200;
+
 export const MessageList = memo(function MessageList({
 	conversation,
 	streaming,
@@ -25,20 +35,56 @@ export const MessageList = memo(function MessageList({
 	renderFollowingMessage?: (message: Message) => ReactNode;
 }) {
 	const assistantLabel = agentName || "Eumenes";
-	// Streaming text is not announced; the settled answer is, once.
+	// Streaming text is not announced; a settled answer is, once per message id.
+	// Messages present on first load are history and stay silent.
 	const lastAssistant = conversation?.messages
 		.filter((message) => message.role === "assistant")
 		.at(-1);
-	const announcement = streaming
-		? ""
-		: (lastAssistant?.text.slice(0, 80) ?? "");
+	const lastAssistantId = lastAssistant?.id ?? null;
+	const lastAssistantText = lastAssistant?.text ?? "";
+	const announced = useRef<string | null | undefined>(undefined);
+	const [announcement, setAnnouncement] = useState<{
+		id: string;
+		text: string;
+	} | null>(null);
+	useEffect(() => {
+		if (!conversation) return;
+		if (announced.current === undefined) {
+			announced.current = lastAssistantId;
+			return;
+		}
+		if (streaming || !lastAssistantId || lastAssistantId === announced.current)
+			return;
+		announced.current = lastAssistantId;
+		setAnnouncement({
+			id: lastAssistantId,
+			text: lastAssistantText.slice(0, 80),
+		});
+	}, [conversation, lastAssistantId, lastAssistantText, streaming]);
+	const [showAll, setShowAll] = useState(false);
+	const all = conversation?.messages ?? [];
+	const hidden = showAll ? 0 : Math.max(0, all.length - VISIBLE_LIMIT);
+	const visibleMessages = hidden ? all.slice(hidden) : all;
 	return (
 		<div className="messages">
-			<output className="visually-hidden" aria-live="polite">
-				{announcement}
+			<output
+				key={announcement?.id}
+				className="visually-hidden"
+				aria-live="polite"
+			>
+				{announcement?.text}
 			</output>
-			{conversation?.messages.length ? (
-				conversation.messages.map((message) => (
+			{hidden > 0 && (
+				<button
+					type="button"
+					className="messages-older"
+					onClick={() => setShowAll(true)}
+				>
+					以前の会話を表示
+				</button>
+			)}
+			{all.length ? (
+				visibleMessages.map((message) => (
 					<Fragment key={message.id}>
 						<article className={`message message-${message.role}`}>
 							<small className="message-author">

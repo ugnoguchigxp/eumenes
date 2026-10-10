@@ -1,77 +1,64 @@
 import { test, expect } from "@playwright/test";
-import { spawn, type ChildProcess } from "node:child_process";
-import { createServer, type AddressInfo } from "node:net";
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
+import { evidencePath } from "./evidence";
+import { createFixture } from "./fixture";
 
 const TOKEN = "fixture-token-for-toolchain-browser";
 
-async function port() {
-	const s = createServer();
-	await new Promise<void>((r) => s.listen(0, "127.0.0.1", r));
-	const p = (s.address() as AddressInfo).port;
-	await new Promise<void>((r) => s.close(() => r()));
-	return p;
-}
-
 test.setTimeout(60000);
 let apiPort: number, webPort: number;
-const processes: ChildProcess[] = [];
+const fixture = createFixture();
 
 test.beforeAll(async () => {
-	apiPort = await port();
-	webPort = await port();
-	processes.push(
-		spawn("bun", ["scripts/toolchain-fixture-server.ts"], {
-			env: {
-				...process.env,
-				EUMENES_PORT: String(apiPort),
-				EUMENES_ORIGIN: `http://127.0.0.1:${webPort}`,
-				EUMENES_FIXTURE_TIMERS: "1",
-			},
-			stdio: "ignore",
-		}),
+	apiPort = await fixture.port();
+	webPort = await fixture.port();
+	await fixture.launch(
+		["scripts/toolchain-fixture-server.ts"],
+		{
+			EUMENES_PORT: String(apiPort),
+			EUMENES_ORIGIN: `http://127.0.0.1:${webPort}`,
+			EUMENES_FIXTURE_TIMERS: "1",
+		},
+		{ ports: [apiPort] },
 	);
-	processes.push(
-		spawn("bun", ["run", "dev:web", "--port", String(webPort)], {
-			env: {
-				...process.env,
-				EUMENES_PROXY_URL: `http://127.0.0.1:${apiPort}`,
-				EUMENES_API_TOKEN: TOKEN,
-				EUMENES_ORIGIN: `http://127.0.0.1:${webPort}`,
-				EUMENES_VITE_CACHE_DIR: `/tmp/eumenes-timers-vite-${webPort}`,
-				LARM_API_TOKEN: "",
-			},
-			stdio: "ignore",
-		}),
-	);
-	for (let i = 0; i < 100; i++) {
-		try {
+	await fixture.launchWeb({
+		webPort,
+		apiPort,
+		token: TOKEN,
+		cacheDir: `/tmp/eumenes-timers-vite-${webPort}`,
+	});
+	await fixture.waitUntil(
+		async () => {
 			const web = await fetch(`http://127.0.0.1:${webPort}`);
 			const api = await fetch(`http://127.0.0.1:${apiPort}/api/timers`, {
 				headers: { authorization: `Bearer ${TOKEN}` },
 			});
-			if (web.ok && api.ok) return;
-		} catch {}
-		await new Promise((r) => setTimeout(r, 100));
-	}
-	throw new Error("fixture_not_ready");
+			return web.ok && api.ok;
+		},
+		{ message: "fixture_not_ready" },
+	);
 });
 
 test.afterAll(async () => {
-	for (const p of processes) p.kill("SIGTERM");
-	await new Promise((r) => setTimeout(r, 200));
-	for (const p of processes) if (p.exitCode === null) p.kill("SIGKILL");
+	await fixture.stopAll();
 });
 
-test("a 90-second request opens the saved timer", async ({ page }) => {
+test("a 90-second request opens the saved timer", async ({ page, request }) => {
 	await page.goto(`http://127.0.0.1:${webPort}`);
 	await expect(page.getByText(/接続済み/)).toBeVisible({ timeout: 20000 });
+	// Measure clock accuracy after first-load shader work has settled, so its
+	// main-thread pause does not become part of the HTTP clock sample.
+	await expect(page.locator(".light-avatar-background")).toHaveAttribute(
+		"data-avatar-state",
+		/^(ready|unsupported|load-failed|render-failed|resize-failed|context-lost)$/,
+		{ timeout: 20000 },
+	);
 	await page.getByRole("textbox").fill("90秒タイマー測って");
 	const receiptPending = page.waitForResponse(
 		(response) =>
 			response.url().includes("/api/timer-actions/by-run/") && response.ok(),
-		{ timeout: 20000 },
+		{ timeout: 30000 },
 	);
 	await page.getByRole("button", { name: "送信", exact: true }).click();
 	const receipt = await receiptPending;
@@ -91,7 +78,7 @@ test("a 90-second request opens the saved timer", async ({ page }) => {
 		}),
 	).toBeVisible({ timeout: 20000 });
 	const clock = page.getByRole("timer");
-	await expect(clock).toBeVisible();
+	await expect(clock).toBeVisible({ timeout: 20000 });
 	await expect(clock).toHaveText(/^0[01]:[0-5]\d$/);
 	await expect
 		.poll(async () => {
@@ -105,6 +92,19 @@ test("a 90-second request opens the saved timer", async ({ page }) => {
 			return Math.abs(minutes! * 60 + seconds! - expected);
 		})
 		.toBeLessThanOrEqual(2);
+	// Later tests share this backend: an expiring 90s timer must not ring during them.
+	const cancelled = await request.post(
+		`http://127.0.0.1:${apiPort}/api/timers/${body.receipt!.timer.id}/cancel`,
+		{
+			headers: { authorization: `Bearer ${TOKEN}` },
+			data: {
+				requestId: crypto.randomUUID(),
+				issuedAt: new Date().toISOString(),
+				expectedRevision: 0,
+			},
+		},
+	);
+	expect(cancelled.ok()).toBe(true);
 });
 
 test("the 24-hour clock fits a narrow artifact and is restored after reload", async ({
@@ -166,7 +166,7 @@ test("a persisted timer expires and its notice survives closing the clock", asyn
 		.getByRole("button", { name: "終了通知の検証を閉じる", exact: true })
 		.click();
 	const notice = page
-		.getByRole("region", { name: "タイマーの終了" })
+		.getByRole("status", { name: "タイマーの終了" })
 		.locator(".timer-notification")
 		.filter({ hasText: "終了通知の検証" });
 	await expect
@@ -183,7 +183,9 @@ test("a persisted timer expires and its notice survives closing the clock", asyn
 			{ timeout: 30000 },
 		)
 		.toBe("elapsed");
-	await expect(notice.getByText(/終了しました/)).toBeVisible({
+	await expect(
+		notice.getByRole("heading", { name: "タイマーが終了しました" }),
+	).toBeVisible({
 		timeout: 20000,
 	});
 	const stopped = page.waitForResponse(
@@ -223,7 +225,7 @@ test("the timer has usable controls and fits both themes and a narrow screen", a
 		await page.emulateMedia({ colorScheme: theme });
 		await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
 		if (process.env.EUMENES_TIMER_SCREENSHOTS === "1") {
-			const directory = resolve("spec/verification/timers");
+			const directory = evidencePath("timers");
 			await mkdir(directory, { recursive: true });
 			await panel.screenshot({ path: resolve(directory, `ui-${theme}.png`) });
 		}
@@ -237,7 +239,7 @@ test("the timer has usable controls and fits both themes and a narrow screen", a
 	).toBe(true);
 	if (process.env.EUMENES_TIMER_SCREENSHOTS === "1") {
 		await panel.screenshot({
-			path: resolve("spec/verification/timers/ui-mobile.png"),
+			path: evidencePath("timers/ui-mobile.png"),
 		});
 	}
 	await cancel.click();
@@ -279,7 +281,7 @@ test("expiry plays one real beep and posts an assistant message even after the a
 		.click();
 	await expect(
 		page
-			.getByRole("article")
+			.getByRole("alert")
 			.getByText("3秒のタイマーが終了しました。", { exact: true }),
 	).toBeVisible({ timeout: 20000 });
 	await speech;
@@ -293,7 +295,7 @@ test("expiry plays one real beep and posts an assistant message even after the a
 	await page.reload();
 	await expect(
 		page
-			.getByRole("article")
+			.getByRole("alert")
 			.getByText("3秒のタイマーが終了しました。", { exact: true }),
 	).toBeVisible({ timeout: 20000 });
 	expect(
@@ -333,7 +335,7 @@ test("top-right banners and notification drawer fit desktop and mobile in both t
 	);
 	await page.goto(`http://127.0.0.1:${webPort}`);
 	await expect(page.getByText(/接続済み/)).toBeVisible({ timeout: 20000 });
-	const notice = page.getByRole("region", { name: "タイマーの終了" });
+	const notice = page.getByRole("status", { name: "タイマーの終了" });
 	await expect(notice).toBeVisible({ timeout: 10000 });
 	await page
 		.getByRole("button", { name: "UIショーケース", exact: true })
@@ -385,7 +387,7 @@ test("top-right banners and notification drawer fit desktop and mobile in both t
 		if (width > 900) expect(geometry.aligned).toBe(true);
 		else expect(geometry.artifactBelow).toBe(true);
 	}
-	const directory = resolve("spec/verification/timers");
+	const directory = evidencePath("timers");
 	await mkdir(directory, { recursive: true });
 	for (const theme of ["dark", "light"] as const) {
 		await page.emulateMedia({ colorScheme: theme });
@@ -457,8 +459,33 @@ test("a restored alarm waits for audio activation and then beeps and requests TT
 	expect(started.ok()).toBe(true);
 	const { timer } = await started.json();
 	await page.addInitScript(() => {
-		const counter = window as unknown as { timerBeeps: number };
+		const counter = window as unknown as {
+			timerBeeps: number;
+			pendingRepeatTimers: () => number;
+		};
 		counter.timerBeeps = 0;
+		// Track the repeat loop's 2.5s wait so the test can observe it being cleared.
+		const pending = new Set<unknown>();
+		const nativeSet = window.setTimeout.bind(window);
+		const nativeClear = window.clearTimeout.bind(window);
+		window.setTimeout = ((
+			fn: TimerHandler,
+			ms?: number,
+			...args: unknown[]
+		) => {
+			if (ms !== 2500) return nativeSet(fn, ms, ...args);
+			const id: unknown = nativeSet(() => {
+				pending.delete(id);
+				if (typeof fn === "function") fn(...args);
+			}, ms);
+			pending.add(id);
+			return id as number;
+		}) as typeof window.setTimeout;
+		window.clearTimeout = ((id?: number) => {
+			pending.delete(id);
+			nativeClear(id);
+		}) as typeof window.clearTimeout;
+		counter.pendingRepeatTimers = () => pending.size;
 		const create = AudioContext.prototype.createBufferSource;
 		AudioContext.prototype.createBufferSource = function () {
 			const source = create.call(this);
@@ -474,7 +501,7 @@ test("a restored alarm waits for audio activation and then beeps and requests TT
 	await page.goto(`http://127.0.0.1:${webPort}`);
 	const message = "「音声再開の確認」のタイマー（15秒）が終了しました。";
 	await expect(
-		page.getByRole("region", { name: "タイマーの終了" }).getByText(message),
+		page.getByRole("status", { name: "タイマーの終了" }).getByText(message),
 	).toBeVisible({ timeout: 20000 });
 	const getNote = async () =>
 		(
@@ -515,12 +542,15 @@ test("a restored alarm waits for audio activation and then beeps and requests TT
 			),
 		)
 		.toBeGreaterThanOrEqual(2);
-	await mkdir(resolve("spec/verification/timers"), { recursive: true });
+	await mkdir(evidencePath("timers"), { recursive: true });
 	await page
-		.getByRole("region", { name: "タイマーの終了" })
-		.screenshot({ path: resolve("spec/verification/timers/audio-repeat.png") });
+		.getByRole("status", { name: "タイマーの終了" })
+		.screenshot({ path: evidencePath("timers/audio-repeat.png") });
+	// Earlier tests leave their own notices in this shared backend; stop only ours.
 	await page
-		.getByRole("region", { name: "タイマーの終了" })
+		.getByRole("status", { name: "タイマーの終了" })
+		.locator(".timer-notification")
+		.filter({ hasText: message })
 		.getByRole("button", { name: "通知を停止" })
 		.click();
 	await expect
@@ -538,7 +568,17 @@ test("a restored alarm waits for audio activation and then beeps and requests TT
 			{ timeout: 4000 },
 		)
 		.toBe(stoppedAt);
-	await page.waitForTimeout(3500);
+	// The repeat loop waits 2.5s between beeps in a page timer. Stopping must clear
+	// it, so no further beep can be scheduled; no need to sit through the interval.
+	await expect
+		.poll(() =>
+			page.evaluate(() =>
+				(
+					window as unknown as { pendingRepeatTimers: () => number }
+				).pendingRepeatTimers(),
+			),
+		)
+		.toBe(0);
 	expect(
 		await page.evaluate(
 			() => (window as unknown as { timerBeeps: number }).timerBeeps,

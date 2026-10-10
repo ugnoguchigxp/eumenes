@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite";
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
+import { sha256Hex } from "../../../infrastructure/digest";
 import type { AccessContext, SourceRef } from "eumenes-memory";
 import type { CanonicalHasher, ScopeRef } from "eumenes-world-model";
 import {
@@ -94,8 +95,7 @@ export type WorldServiceOptions = {
 	gate?: WorldHostGate;
 };
 
-const defaultHasher: CanonicalHasher = (bytes) =>
-	createHash("sha256").update(bytes).digest("hex");
+const defaultHasher: CanonicalHasher = (bytes) => sha256Hex(bytes);
 const defaultToken = (prefix: "restore" | "forget") =>
 	`${prefix}-${randomUUID()}`;
 

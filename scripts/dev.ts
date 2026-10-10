@@ -3,6 +3,28 @@ import { resolve } from "node:path";
 import { resolveApiToken } from "../api/infrastructure/auth-config";
 
 const root = resolve(import.meta.dir, "..");
+// Vite needs no provider credentials (LARM token etc.); pass only this allowlist.
+const viteEnvKeys = [
+	"PATH",
+	"HOME",
+	"TMPDIR",
+	"LANG",
+	"TERM",
+	"NODE_ENV",
+	"EUMENES_ORIGIN",
+	"EUMENES_PROXY_URL",
+	"EUMENES_DB",
+	"EUMENES_KEY_DIR",
+	"EUMENES_VITE_CACHE_DIR",
+] as const;
+function viteEnv(source: Record<string, string | undefined>, apiToken: string) {
+	const picked: Record<string, string> = {};
+	for (const key of viteEnvKeys) {
+		const value = source[key];
+		if (value !== undefined) picked[key] = value;
+	}
+	return { ...picked, EUMENES_API_TOKEN: apiToken };
+}
 type Child = ReturnType<typeof Bun.spawn>;
 
 async function available(host: string, port: number) {
@@ -126,7 +148,7 @@ async function main() {
 			],
 			{
 				cwd: root,
-				env: { ...env, EUMENES_PROXY_URL: url },
+				env: viteEnv({ ...env, EUMENES_PROXY_URL: url }, token),
 				stdin: "inherit",
 				stdout: "inherit",
 				stderr: "inherit",

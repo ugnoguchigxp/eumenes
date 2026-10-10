@@ -15,3 +15,4 @@ export type {
 	GoalSource,
 	GoalStatus,
 } from "./contracts";
+export { migrations } from "./repository";

@@ -23,9 +23,11 @@ export const CONVERSATION_SOURCE_NAMESPACE = "conversation";
 export const CONVERSATION_SOURCE_KIND = "message";
 export const CONVERSATION_SOURCE_REPRESENTATION = "text";
 /**
- * Default principal / scope of conversation sources. These deliberately duplicate
- * memory's PRINCIPAL / PROFILE_SCOPE (conversation must not depend on memory); the
- * world domain tests assert they stay equal. The host may inject other values.
+ * Default principal of conversation sources and the single definition of the
+ * owner principal: memory (a higher domain) re-exports it as its PRINCIPAL. The
+ * scope below still duplicates memory's PROFILE_SCOPE (conversation must not
+ * depend on memory); the world domain tests assert both stay equal. The host may
+ * inject other values.
  */
 export const CONVERSATION_DEFAULT_PRINCIPAL = "local:owner";
 export const CONVERSATION_DEFAULT_SCOPE = "profile:owner";
@@ -95,3 +97,5 @@ export type ChangeResult =
 	| { status: "not_found" }
 	/** The message was retracted earlier and can no longer be corrected. */
 	| { status: "retracted" };
+
+export * from "./history";

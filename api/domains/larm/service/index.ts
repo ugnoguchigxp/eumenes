@@ -26,6 +26,7 @@ import {
 } from "./connect";
 import {
 	localEndpoint,
+	parseProviderHosts,
 	readJson,
 	record,
 	string,
@@ -36,8 +37,15 @@ import { LarmInferenceError, providerError } from "./inference-error";
 import { ttsVoicesSchema } from "../contracts";
 import type { TtsVoices } from "../contracts";
 
+/** True when the caller's own signal cancelled the request (not a timeout or a LARM fault). */
+const callerAborted = (error: unknown, signal?: AbortSignal) =>
+	signal?.aborted === true && (error as Error)?.name === "AbortError";
+
 export function createLarm(config: {
+	/** LARM control origin. There is no default: without it the port stays unconfigured. */
 	baseUrl?: string;
+	/** Extra hosts that may receive provider credentials; defaults to EUMENES_LARM_PROVIDER_HOSTS (read once). */
+	providerHosts?: readonly string[];
 	token?: string;
 	profile?: string;
 	audience?: string;
@@ -51,9 +59,13 @@ export function createLarm(config: {
 	/** Internal timing seam; production follows LARM's 300-second foreground idle policy. */
 	idleTimeoutMs?: number;
 }): LarmPort {
-	const base = localEndpoint(
-		config.baseUrl?.trim() || "http://192.168.0.130:9810",
-	);
+	const baseText = config.baseUrl?.trim();
+	const base = baseText
+		? localEndpoint(baseText, [new URL(baseText).hostname])
+		: undefined;
+	const providerHosts =
+		config.providerHosts?.map((host) => host.toLowerCase()) ??
+		parseProviderHosts(process.env.EUMENES_LARM_PROVIDER_HOSTS);
 	const token = config.token?.trim();
 	const request = config.fetch ?? fetch;
 	const profile = config.profile?.trim() || gemmaProfile;
@@ -87,6 +99,10 @@ export function createLarm(config: {
 	)
 		throw new Error("larm_tts_intonation_invalid");
 	const idleTimeoutMs = config.idleTimeoutMs ?? 300_000;
+	const hostsFor = () => {
+		if (!base) throw new Error("larm_base_url_unconfigured");
+		return { base, extra: providerHosts };
+	};
 	const lifetime = new AbortController();
 	const voiceCatalogs = new WeakMap<Provider, TtsVoices>();
 	let lease: Lease | undefined;
@@ -97,21 +113,26 @@ export function createLarm(config: {
 	const listeners = new Set<() => void>();
 	function status(): LarmStatus {
 		return {
-			state: !token
-				? "unconfigured"
-				: connecting
-					? "connecting"
-					: lastError
-						? "failed"
-						: lease
-							? "ready"
-							: "idle",
+			state:
+				!token || !base
+					? "unconfigured"
+					: connecting
+						? "connecting"
+						: lastError
+							? "failed"
+							: lease
+								? "ready"
+								: "idle",
 			capabilities: lease
 				? [...lease.providers.keys()].filter(
 						(name): name is Capability => name !== "system-one",
 					)
 				: [],
-			...(lastError ? { error: lastError } : {}),
+			...(!base
+				? { error: "larm_base_url_unconfigured" }
+				: lastError
+					? { error: lastError }
+					: {}),
 		};
 	}
 	let previousStatus = JSON.stringify(status());
@@ -132,7 +153,8 @@ export function createLarm(config: {
 		init: RequestInit,
 		accepted: number[],
 	): Promise<Response> {
-		if (!base || !token) throw new Error("larm_unconfigured");
+		if (!base) throw new Error("larm_base_url_unconfigured");
+		if (!token) throw new Error("larm_unconfigured");
 		const url = new URL(path, base);
 		if (url.origin !== base.origin)
 			throw new Error("larm_control_origin_mismatch");
@@ -145,7 +167,13 @@ export function createLarm(config: {
 					? AbortSignal.timeout(15_000)
 					: AbortSignal.any([
 							lifetime.signal,
-							AbortSignal.timeout(init.signal ? 3_000 : 15_000),
+							// Only read-only status checks are short; POSTs (create, claim,
+							// renew) may legitimately wait for LARM and must not be cut early.
+							AbortSignal.timeout(
+								(!init.method || init.method === "GET") && init.signal
+									? 3_000
+									: 15_000,
+							),
 							...(init.signal ? [init.signal] : []),
 						]),
 		});
@@ -161,11 +189,11 @@ export function createLarm(config: {
 		}
 		return response;
 	}
-	async function release(current: Lease) {
+	async function release(current: Lease, force = false) {
 		current.closing = true;
 		if (current.renewTimer) clearTimeout(current.renewTimer);
 		clearTimeout(current.idleTimer);
-		if (current.useCount > 0) return;
+		if (current.useCount > 0 && !force) return;
 		if (lease === current) lease = undefined;
 		notify();
 		try {
@@ -251,6 +279,7 @@ export function createLarm(config: {
 			const { providers: next, expiresAt: nextExpiry } = await renewProviders(
 				scopedControl,
 				current,
+				hostsFor(),
 			);
 			if (current.closing || lease !== current)
 				throw new Error("larm_connection_released");
@@ -259,6 +288,8 @@ export function createLarm(config: {
 			scheduleRenew(current);
 			return true;
 		} catch (error) {
+			// The caller's cancellation says nothing about the shared lease.
+			if (callerAborted(error, signal)) throw error;
 			await release(current);
 			throw error;
 		}
@@ -280,7 +311,8 @@ export function createLarm(config: {
 				signal ? AbortSignal.any([signal, lifetime.signal]) : lifetime.signal,
 			);
 		if (closed) throw new Error("larm_closed");
-		if (!base || !token) throw new Error("larm_unconfigured");
+		if (!base) throw new Error("larm_base_url_unconfigured");
+		if (!token) throw new Error("larm_unconfigured");
 		if (lease && !lease.useCount && lease.idleAt <= Date.now()) discard(lease);
 		if (
 			!force &&
@@ -291,6 +323,15 @@ export function createLarm(config: {
 		)
 			return lease;
 		if (connecting) {
+			// A renewal in flight must not stop new work on a lease that is still valid.
+			if (
+				!force &&
+				lease &&
+				!lease.closing &&
+				lease.expiresAt - Date.now() > 30_000 &&
+				required.every((name) => lease!.providers.has(name))
+			)
+				return lease;
 			try {
 				await untilAborted(connecting, signal ?? lifetime.signal);
 			} catch (error) {
@@ -308,6 +349,8 @@ export function createLarm(config: {
 			return connect(required, signal, force);
 		}
 		const connectStarted = performance.now();
+		// One key per connect(): every attempt to create this connection reuses it.
+		const idempotencyKey = crypto.randomUUID();
 		log.info("larm.connection_started", { count: required.length });
 		connecting = (async () => {
 			if (lease && !lease.closing) {
@@ -342,13 +385,29 @@ export function createLarm(config: {
 			const { catalogRevision, catalogProfile, catalogProviders } =
 				await fetchCatalog(scopedControl, profile, required);
 			const fullProfile = required.some((name) => name !== "llm");
-			const { id, created } = await createConnection(scopedControl, {
+			const creation = {
 				profile,
 				client,
 				audience,
 				fullProfile,
 				catalogRevision,
-			});
+				idempotencyKey,
+			};
+			let creationResult: Awaited<ReturnType<typeof createConnection>>;
+			try {
+				creationResult = await createConnection(scopedControl, creation);
+			} catch (error) {
+				// A timed-out POST may still have created the connection; the same
+				// Idempotency-Key makes one retry return it instead of a duplicate.
+				if (
+					!(error instanceof DOMException && error.name === "TimeoutError") ||
+					signal?.aborted ||
+					lifetime.signal.aborted
+				)
+					throw error;
+				creationResult = await createConnection(scopedControl, creation);
+			}
+			const { id, created } = creationResult;
 			try {
 				const ready = await awaitReady(scopedControl, pause, {
 					id,
@@ -364,6 +423,7 @@ export function createLarm(config: {
 					profile,
 					catalogProviders,
 					fullProfile,
+					hosts: hostsFor(),
 				});
 				const current: Lease = {
 					id,
@@ -401,12 +461,20 @@ export function createLarm(config: {
 			});
 			return connected;
 		} catch (error) {
-			log.warn(
-				"larm.connection_failed",
-				{ durationMs: Math.round(performance.now() - connectStarted) },
-				error,
-			);
-			lastError = error instanceof Error ? error.message : "larm_failed";
+			if (callerAborted(error, signal))
+				// The caller gave up; LARM did not fail, so the status stays as it was.
+				log.info("larm.connection_failed", {
+					reason: "caller_aborted",
+					durationMs: Math.round(performance.now() - connectStarted),
+				});
+			else {
+				log.warn(
+					"larm.connection_failed",
+					{ durationMs: Math.round(performance.now() - connectStarted) },
+					error,
+				);
+				lastError = error instanceof Error ? error.message : "larm_failed";
+			}
 			throw error;
 		} finally {
 			connecting = undefined;
@@ -515,7 +583,8 @@ export function createLarm(config: {
 			response = await request(url, {
 				...init,
 				headers: { Authorization: `Bearer ${provider.token}`, ...init.headers },
-				signal: AbortSignal.any([signal, AbortSignal.timeout(120_000)]),
+				// The caller owns the deadline (LLM calls run up to 180 s); this only bounds a stuck stream.
+				signal: AbortSignal.any([signal, AbortSignal.timeout(300_000)]),
 				redirect: "error",
 			});
 		} catch (error) {
@@ -907,7 +976,18 @@ export function createLarm(config: {
 			closed = true;
 			lifetime.abort(new Error("larm_closed"));
 			if (connecting) await connecting.catch(() => {});
-			if (lease) await release(lease);
+			if (lease) {
+				const current = lease;
+				// Let in-flight work finish (up to 5 s) so the DELETE is not skipped.
+				const idle = new AbortController().signal;
+				for (
+					let waited = 0;
+					current.useCount > 0 && waited < 5_000;
+					waited += 100
+				)
+					await wait(100, idle);
+				await release(current, true);
+			}
 			listeners.clear();
 		},
 	};

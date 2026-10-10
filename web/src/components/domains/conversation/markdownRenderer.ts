@@ -11,6 +11,20 @@ function escapeHtml(value: string): string {
 		.replace(/'/g, "&#39;");
 }
 
+/** Hostname to disclose after link text that does not already show it (http/https only). */
+function hiddenHost(label: string, href: string): string | null {
+	let host: string;
+	try {
+		const url = new URL(href);
+		if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+		host = url.hostname;
+	} catch {
+		return null;
+	}
+	if (!host || label.toLowerCase().includes(host.toLowerCase())) return null;
+	return host;
+}
+
 function renderInline(value: string): string {
 	let output = "";
 	let cursor = 0;
@@ -20,8 +34,9 @@ function renderInline(value: string): string {
 		if (match[1] !== undefined) {
 			output += `<code>${escapeHtml(match[1])}</code>`;
 		} else if (match[2] !== undefined && match[3] !== undefined) {
+			const host = hiddenHost(match[2], match[3]);
 			output += SAFE_PROTOCOL.test(match[3])
-				? `<a href="${escapeHtml(match[3])}" rel="noreferrer noopener" target="_blank">${renderInline(match[2])}</a>`
+				? `<a href="${escapeHtml(match[3])}" rel="noreferrer noopener" target="_blank">${renderInline(match[2])}${host ? `<span class="link-host">(${escapeHtml(host)})</span>` : ""}</a>`
 				: escapeHtml(match[0]);
 		} else if (match[4] !== undefined) {
 			output += `<strong>${renderInline(match[4])}</strong>`;

@@ -1,9 +1,9 @@
 import { test, expect, type Page } from "@playwright/test";
-import { spawn, type ChildProcess } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
-import { createServer, type AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createFixture } from "./fixture";
 
 /**
  * P5-02 / A48 in a browser, against the hermetic World fixture backend
@@ -11,53 +11,37 @@ import { join } from "node:path";
  * model, no network). It is NOT the product database and not a real model.
  */
 const TOKEN = "fixture-token-for-world-browser";
-async function port() {
-	const s = createServer();
-	await new Promise<void>((r) => s.listen(0, "127.0.0.1", r));
-	const p = (s.address() as AddressInfo).port;
-	await new Promise<void>((r) => s.close(() => r()));
-	return p;
-}
 test.setTimeout(180000);
 test.describe.configure({ mode: "serial" });
 let apiPort: number;
 let webPort: number;
 let dir: string;
+const fixture = createFixture();
 let api: ChildProcess | undefined;
-let web: ChildProcess | undefined;
 
-function startApi(stall: boolean) {
-	return spawn("bun", ["scripts/world-fixture-server.ts"], {
-		env: {
-			...process.env,
+async function startApi(stall: boolean) {
+	return fixture.launch(
+		["scripts/world-fixture-server.ts"],
+		{
 			EUMENES_PORT: String(apiPort),
 			EUMENES_ORIGIN: `http://127.0.0.1:${webPort}`,
 			WORLD_FIXTURE_DIR: dir,
 			WORLD_FIXTURE_STALL: stall ? "1" : "0",
 			WORLD_FIXTURE_POLL_MS: "1000",
 		},
-		stdio: "ignore",
-	});
+		{ ports: [apiPort] },
+	);
 }
-async function stop(child: ChildProcess | undefined) {
-	if (!child) return;
-	child.kill("SIGTERM");
-	for (let i = 0; i < 100 && child.exitCode === null; i++)
-		await new Promise((r) => setTimeout(r, 50));
-	if (child.exitCode === null) child.kill("SIGKILL");
-}
-async function waitApi() {
-	for (let i = 0; i < 150; i++) {
-		try {
-			const res = await fetch(`http://127.0.0.1:${apiPort}/api/world/status`, {
-				headers: { authorization: `Bearer ${TOKEN}` },
-			});
-			if (res.ok) return;
-		} catch {}
-		await new Promise((r) => setTimeout(r, 100));
-	}
-	throw new Error("fixture_not_ready");
-}
+const waitApi = () =>
+	fixture.waitUntil(
+		async () =>
+			(
+				await fetch(`http://127.0.0.1:${apiPort}/api/world/status`, {
+					headers: { authorization: `Bearer ${TOKEN}` },
+				})
+			).ok,
+		{ attempts: 150, message: "fixture_not_ready" },
+	);
 const call = (path: string, init: RequestInit = {}) =>
 	fetch(`http://127.0.0.1:${apiPort}${path}`, {
 		...init,
@@ -69,33 +53,24 @@ const call = (path: string, init: RequestInit = {}) =>
 	});
 
 test.beforeAll(async () => {
-	apiPort = await port();
-	webPort = await port();
+	apiPort = await fixture.port();
+	webPort = await fixture.port();
 	dir = mkdtempSync(join(tmpdir(), "eumenes-world-browser-"));
-	api = startApi(true);
-	web = spawn("bun", ["run", "dev:web", "--port", String(webPort)], {
-		env: {
-			...process.env,
-			EUMENES_PROXY_URL: `http://127.0.0.1:${apiPort}`,
-			EUMENES_API_TOKEN: TOKEN,
-			EUMENES_ORIGIN: `http://127.0.0.1:${webPort}`,
-			EUMENES_VITE_CACHE_DIR: `/tmp/eumenes-world-vite-${webPort}`,
-			LARM_API_TOKEN: "",
-		},
-		stdio: "ignore",
+	api = await startApi(true);
+	await fixture.launchWeb({
+		webPort,
+		apiPort,
+		token: TOKEN,
+		cacheDir: `/tmp/eumenes-world-vite-${webPort}`,
 	});
 	await waitApi();
-	for (let i = 0; i < 150; i++) {
-		try {
-			if ((await fetch(`http://127.0.0.1:${webPort}`)).ok) return;
-		} catch {}
-		await new Promise((r) => setTimeout(r, 100));
-	}
-	throw new Error("web_not_ready");
+	await fixture.waitUntil(
+		async () => (await fetch(`http://127.0.0.1:${webPort}`)).ok,
+		{ attempts: 150, message: "web_not_ready" },
+	);
 });
 test.afterAll(async () => {
-	await stop(api);
-	await stop(web);
+	await fixture.stopAll();
 	rmSync(dir, { recursive: true, force: true });
 });
 
@@ -233,8 +208,8 @@ test("the list separates the axes and never styles hypothesis or measurement as 
 
 	// Restart the backend on the same database (without the stall): the unfinished
 	// forget is picked up again and only then reads as complete.
-	await stop(api);
-	api = startApi(false);
+	await fixture.stop(api);
+	api = await startApi(false);
 	await waitApi();
 	await page.reload();
 	// The settings hash survives the reload; only the category is back to its default.

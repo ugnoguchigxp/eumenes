@@ -4,7 +4,7 @@ import {
 	CLAIM_TONES,
 	FORGET_DISPLAYS,
 	claimTone,
-} from "../../../../../api/domains/world/contracts";
+} from "../../../../../api/domains/world/contracts/view";
 import { contentText, failureOf, forgetLabels, toneLabels } from "../present";
 
 test("only an adopted report or document has the confirmed tone", () => {

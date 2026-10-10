@@ -17,7 +17,11 @@ export function list(value: unknown): Record<string, unknown>[] {
 		throw new Error("invalid_provider_response");
 	return value.map(object);
 }
-export function localUrl(value: string): URL {
+/** `.local` names pass only when listed in `allowLocal` (the LARM base host or an explicit provider host). */
+export function localUrl(
+	value: string,
+	allowLocal: readonly string[] = [],
+): URL {
 	const u = new URL(value);
 	if (
 		!["http:", "https:"].includes(u.protocol) ||
@@ -27,7 +31,7 @@ export function localUrl(value: string): URL {
 		u.search ||
 		!(
 			u.hostname === "localhost" ||
-			u.hostname.endsWith(".local") ||
+			(u.hostname.endsWith(".local") && allowLocal.includes(u.hostname)) ||
 			(/^(?:\d{1,3}\.){3}\d{1,3}$/.test(u.hostname) &&
 				u.hostname.split(".").every((p) => Number(p) <= 255) &&
 				/^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(u.hostname))
@@ -57,7 +61,7 @@ export function code(error: unknown): string {
 		return "deadline_exceeded";
 	if (error instanceof TypeError) return "network_unavailable";
 	const message = error instanceof Error ? error.message : "provider_failed";
-	return /^(larm_http_\d{3}|invalid_[a-z_]+|provider_[a-z_]+|stale_catalog|response_too_large|deadline_exceeded|network_unavailable|generation_unknown|cancel_unconfirmed|result_fetch_failed|larm_unconfigured)$/.test(
+	return /^(larm_http_\d{3}|invalid_[a-z_]+|provider_[a-z_]+|stale_catalog|response_too_large|deadline_exceeded|network_unavailable|generation_unknown|cancel_unconfirmed|result_fetch_failed|larm_unconfigured|larm_base_url_unconfigured|larm_provider_host_mismatch)$/.test(
 		message,
 	)
 		? message

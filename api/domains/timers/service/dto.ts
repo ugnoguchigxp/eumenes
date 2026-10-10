@@ -3,7 +3,7 @@ import type { TimerRow } from "../repository";
 import { iso } from "./canonical";
 
 /** Remaining time is derived from the deadline, never by subtracting one each tick. */
-export function remainingSeconds(row: TimerRow, nowMs: number): number {
+function remainingSeconds(row: TimerRow, nowMs: number): number {
 	if (row.state === "elapsed") return 0;
 	const basis =
 		row.state === "cancelled" ? (row.cancelledAtMs ?? nowMs) : nowMs;

@@ -289,7 +289,12 @@ export function useVoiceDialogue(
 		}
 	}, [turn.data, client, cache, turnId, machine, cancelPlayback]);
 	async function start() {
+		if (machine.get().phase === "active" && machine.get().session?.failed) {
+			await stop();
+			return start();
+		}
 		if (machine.get().phase !== "idle") {
+			if ((machine.get().session?.pending ?? 0) >= 2) return;
 			if (
 				machine.get().phase === "active" &&
 				!active &&
@@ -297,6 +302,7 @@ export function useVoiceDialogue(
 			) {
 				inputEnabled.current = true;
 				setActive(true);
+				setError(null);
 				try {
 					await controller.current.start();
 				} catch (error) {
@@ -355,10 +361,7 @@ export function useVoiceDialogue(
 				(wav) => {
 					const active = machine.get().session;
 					if (!inputLive() || !active || active.failed) return;
-					if (active.pending >= 2) {
-						setError("音声の送信待ちが上限に達しました");
-						return;
-					}
+					const pauseAfterUpload = active.pending >= 2;
 					const old = machine.get().current;
 					const pending = candidate.current;
 					if (pending) {
@@ -420,6 +423,7 @@ export function useVoiceDialogue(
 								sessionToken,
 								previous: old,
 							});
+							suspendInput();
 							setRecognitionId(old);
 							cancelPlayback();
 							if (old)
@@ -430,6 +434,13 @@ export function useVoiceDialogue(
 						.finally(() => {
 							machine.dispatch({ type: "upload_settled", sessionToken });
 						});
+					if (pauseAfterUpload) {
+						// Retain this final segment, then prevent more recording from piling up.
+						suspendInput();
+						setError(
+							"録音を送信待ちに追加しました。送信が進んだらマイクを再開してください。",
+						);
+					}
 				},
 				{
 					...options.current,
@@ -444,7 +455,13 @@ export function useVoiceDialogue(
 						setError(describeError(reason));
 					},
 					onNotice: (reason) => {
-						if (live()) setError(describeError(reason));
+						if (!live()) return;
+						if (reason === "recording_limit") {
+							suspendInput();
+							setError(
+								"録音が60秒に達したため送信し、マイクを停止しました。続きはマイクを再開して話してください。",
+							);
+						} else setError(describeError(reason));
 					},
 				},
 			);
@@ -454,22 +471,17 @@ export function useVoiceDialogue(
 			} catch (error) {
 				if (cancelled()) return;
 				await stop();
-				setError(
-					error instanceof Error ? error.message : "マイクを開始できません",
-				);
+				setError(describeError(error));
 			}
 		} catch (error) {
 			const report = !cancelled();
 			if (live()) await stop();
-			if (report)
-				setError(
-					error instanceof Error ? error.message : "音声を開始できません",
-				);
+			if (report) setError(describeError(error));
 		} finally {
 			if (machine.get().startToken === startToken) {
 				setActive(
 					!!machine.dispatch({ type: "start_settled", token: startToken })
-						.session,
+						.session && inputEnabled.current,
 				);
 			}
 		}
@@ -504,6 +516,16 @@ export function useVoiceDialogue(
 		audio.pauseInput();
 		inputEnabled.current = false;
 		setActive(false);
+		candidate.current?.controller?.abort();
+		candidate.current = null;
+		setPreviewText(null);
+	}
+	// Used only after a final segment or failure. Keep the accepted reply alive,
+	// including for injected controllers that do not expose a microphone pause.
+	function suspendInput() {
+		inputEnabled.current = false;
+		setActive(false);
+		controller.current?.pauseInput?.();
 		candidate.current?.controller?.abort();
 		candidate.current = null;
 		setPreviewText(null);

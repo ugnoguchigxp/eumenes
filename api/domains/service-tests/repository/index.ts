@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import type { Migration } from "../../../infrastructure/sqlite";
 import type { ServiceRun } from "../contracts";
 import type { LarmTestTarget, TestArtifact } from "../../larm";
 export const migration = `CREATE TABLE service_test_runs(id TEXT PRIMARY KEY,request_key TEXT NOT NULL UNIQUE,input_hash TEXT NOT NULL,created INTEGER NOT NULL,data TEXT NOT NULL);`;
@@ -35,3 +36,8 @@ export function updateRun(
 	);
 	return next;
 }
+
+/** Named migrations of this domain; the SQL above is frozen once deployed. */
+export const migrations: readonly Migration[] = [
+	{ id: "service-tests/0001-init", sql: migration },
+];

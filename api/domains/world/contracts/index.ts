@@ -163,4 +163,4 @@ export type {
 	WorldQueryRequest,
 	WorldQueryResult,
 } from "./query";
-export * from "./claims";
+export * from "./view";

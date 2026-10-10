@@ -19,6 +19,7 @@ import { timerReceiptDigest as digest } from "../domains/timers";
 import { readActionOriginInTransaction } from "../domains/dialogue";
 import type { Clock } from "../domains/research-routes";
 import { createRouteWiring } from "./research-routes";
+import { createReadPorts } from "./research-history-ports";
 export async function createToolchain(
 	store: SqliteStore,
 	queue: QueueService,
@@ -27,12 +28,19 @@ export async function createToolchain(
 	options: {
 		researchRoutes?: boolean;
 		routeClock?: Clock;
+		history?: boolean;
+		webResearch?: boolean;
+		conversation?: import("../domains/conversation").ConversationService;
 		timers?: import("../domains/timers").TimersService;
 	} = {},
 ) {
 	const capabilities = createCapabilities(
 		store,
-		options.timers ? new Set(["web", "timer"]) : new Set(["web"]),
+		new Set([
+			...(options.webResearch !== false ? ["web"] : []),
+			...(options.timers ? ["timer"] : []),
+			...(options.conversation && options.history !== false ? ["history"] : []),
+		]),
 	);
 	await capabilities.seed();
 	// Peers are attached after construction: no constructor runs another service's operations.
@@ -46,6 +54,11 @@ export async function createToolchain(
 					clock: options.routeClock,
 				});
 	const adapter: ToolAdapter = {
+		...createReadPorts(
+			web,
+			options.history === false ? undefined : options.conversation,
+			() => agents,
+		),
 		startInTransaction(db, r) {
 			const known =
 				r.tool.id === "web.forecast"

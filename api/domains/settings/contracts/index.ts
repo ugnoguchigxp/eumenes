@@ -28,8 +28,7 @@ const privateHost = (host: string) => {
 		a === 127 ||
 		a === 10 ||
 		(a === 172 && b >= 16 && b <= 31) ||
-		(a === 192 && b === 168) ||
-		(a === 169 && b === 254)
+		(a === 192 && b === 168)
 	);
 };
 // Bearer credentials may only travel over plain http on private networks.
@@ -198,6 +197,13 @@ export const settingsSchema = z
 				subtitles: subtitleSchema.default(defaultSubtitles),
 			})
 			.strict(),
+		codingSupervision: z
+			.object({
+				/** Supervisor-generated instructions wait for user approval before reaching the CLI. */
+				approveInstructions: z.boolean().default(true),
+			})
+			.strict()
+			.default({ approveInstructions: true }),
 	})
 	.strict()
 	.superRefine((s, ctx) => {

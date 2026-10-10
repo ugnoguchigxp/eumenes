@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import type { Migration } from "../../../infrastructure/sqlite";
 import type { ContinuityItem } from "../contracts";
 export const migration = `
 CREATE TABLE continuity_items (
@@ -93,3 +94,8 @@ export function conversationRevision(
 		)?.revision ?? 0
 	);
 }
+
+/** Named migrations of this domain; the SQL above is frozen once deployed. */
+export const migrations: readonly Migration[] = [
+	{ id: "continuity/0001-init", sql: migration },
+];

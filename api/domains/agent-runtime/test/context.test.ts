@@ -20,6 +20,12 @@ async function builtinPrepared() {
 	const caps = createCapabilities(store);
 	try {
 		await caps.seed();
+		// These cases exercise the archived renderer; v6 saved views have separate tests.
+		await store.write((db) =>
+			db
+				.query("UPDATE capability_items SET active_revision_id=? WHERE key=?")
+				.run("package:web.research@6", "package:web.research"),
+		);
 		const owner = { taskId: "worker", rootRunId: "root", cancelEpoch: 0 };
 		return await store.write((db) => {
 			const candidates = caps.searchInTransaction(
@@ -117,6 +123,11 @@ test("only the selected profile and required skills become instructions; hints c
 	});
 	expect(context.messages[0]!.content).toContain("公開情報の調査を担当");
 	expect(context.messages[0]!.content).toContain("公開資料を調べて要約");
+	// The selected research instructions remain generic even for a weather task.
+	for (const topic of ["天気", "最高気温", "降水確率", "紫外線", "株価"])
+		expect(context.messages[0]!.content).not.toContain(topic);
+	expect(context.messages[0]!.content).toContain("質問への直接の答え");
+	expect(context.messages[0]!.content).toContain("実際に取得した資料のURL");
 	expect(context.messages[0]!.content).not.toContain("UNSELECTED_ROLE_CHANGE");
 	expect(JSON.parse(context.messages[1]!.content).nextInvocation).toBeNull();
 	const calendar = JSON.parse(context.messages[1]!.content);

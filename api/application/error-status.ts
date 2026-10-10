@@ -1,23 +1,34 @@
-export type ErrorStatus = 400 | 404 | 409 | 410 | 411 | 413 | 429 | 503;
+import type { HttpErrorStatus } from "../infrastructure/http";
+import { errorStatus as coding } from "../domains/coding/contracts";
+import { errorStatus as larm } from "../domains/larm/contracts";
+import { errorStatus as scheduler } from "../domains/scheduler/contracts";
+import { errorStatus as taskReports } from "../domains/task-reports/contracts";
+import { errorStatus as tasks } from "../domains/tasks/contracts";
+import { errorStatus as timers } from "../domains/timers/contracts";
+import { errorStatus as voiceDialogue } from "../domains/voice-dialogue/contracts";
 
-const statusByCode: Record<string, ErrorStatus> = {
-	coding_execution_not_found: 404,
-	coding_invalid_cursor: 400,
-	coding_workspace_unavailable: 503,
-	coding_workspace_busy: 409,
-	coding_branch_conflict: 409,
-	coding_authority_stale: 409,
-	coding_operation_conflict: 409,
-	task_not_found: 404,
-	task_history_expired: 410,
-	task_execution_unavailable: 503,
-	task_grant_expired: 409,
-	task_runtime_expired: 409,
-	task_state_conflict: 409,
-	task_fence_conflict: 409,
-	task_origin_conflict: 409,
-	task_question_conflict: 409,
-	task_capacity: 429,
+export type ErrorStatus = HttpErrorStatus;
+
+/**
+ * Codes thrown by several domains or by infrastructure, which therefore belong to no single
+ * domain. A domain's own codes live in its `contracts` as `errorStatus`.
+ */
+const shared = {
+	request_conflict: 409,
+	revision_conflict: 409,
+	queue_full: 503,
+	payload_too_large: 413,
+	length_required: 411,
+	database_writer_queue_full: 503,
+	stream_capacity: 503,
+} as const satisfies Record<string, ErrorStatus>;
+
+/**
+ * Codes of domains whose contracts are not yet migrated to `errorStatus` (agent-runtime,
+ * capabilities, tool-runtime, memory, settings, web-research). Move each entry into its domain's
+ * contracts when that domain is next edited.
+ */
+const pending = {
 	report_not_ready: 409,
 	report_deleted: 410,
 	capability_ref_invalid: 409,
@@ -26,34 +37,41 @@ const statusByCode: Record<string, ErrorStatus> = {
 	reference_capacity: 429,
 	capability_unavailable: 503,
 	control_unavailable: 503,
-	request_conflict: 409,
-	timer_not_found: 404,
-	notification_not_found: 404,
-	notification_claimed: 409,
-	claim_invalid: 409,
-	operation_expired: 410,
-	timer_limit_reached: 429,
-	timer_storage_full: 429,
-	operation_capacity: 429,
-	timer_unavailable: 503,
-	revision_conflict: 409,
-	voice_sequence_out_of_order: 409,
-	voice_utterance_conflict: 409,
-	schedule_state_conflict: 409,
 	memory_unavailable: 409,
-	voice_preview_busy: 409,
-	voice_sequence_invalid: 400,
 	env_ref_not_allowed: 400,
-	payload_too_large: 413,
-	length_required: 411,
-	database_writer_queue_full: 503,
-	queue_full: 503,
-	schedule_limit_reached: 503,
-	stream_capacity: 503,
 	web_research_unavailable: 503,
 	web_cache_unavailable: 503,
 	web_cache_clear_blocked: 409,
-};
+} as const satisfies Record<string, ErrorStatus>;
+
+/**
+ * Merges status tables. The same code may appear in several tables only with the same status;
+ * a disagreement is a programming error and fails at module load.
+ */
+export function mergeErrorStatus(
+	...tables: Array<Readonly<Record<string, ErrorStatus>>>
+): Record<string, ErrorStatus> {
+	const merged: Record<string, ErrorStatus> = {};
+	for (const table of tables)
+		for (const [code, status] of Object.entries(table)) {
+			if (merged[code] !== undefined && merged[code] !== status)
+				throw new Error(`error_status_conflict:${code}`);
+			merged[code] = status;
+		}
+	return merged;
+}
+
+const statusByCode = mergeErrorStatus(
+	shared,
+	pending,
+	coding,
+	larm,
+	scheduler,
+	taskReports,
+	tasks,
+	timers,
+	voiceDialogue,
+);
 
 const statusByPrefix: Array<[prefix: string, status: ErrorStatus]> = [
 	["invalid_", 400],
@@ -63,7 +81,9 @@ const statusByPrefix: Array<[prefix: string, status: ErrorStatus]> = [
 
 /** Maps a thrown error message to its HTTP status; unknown codes are 500. */
 export function statusForError(message: string): ErrorStatus | 500 {
-	const exact = statusByCode[message];
+	const exact = Object.hasOwn(statusByCode, message)
+		? statusByCode[message]
+		: undefined;
 	if (exact) return exact;
 	for (const [prefix, status] of statusByPrefix)
 		if (message.startsWith(prefix)) return status;

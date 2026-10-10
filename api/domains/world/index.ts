@@ -116,6 +116,7 @@ export type {
 	WorldServiceOptions,
 } from "./service";
 export { registerWorldClaims, registerWorldQuery } from "./controller";
+export { migrations } from "./repository/migrations";
 export { gapTaskMigration } from "./repository/gap-task";
 export {
 	INITIAL_FORGET_EPOCH,

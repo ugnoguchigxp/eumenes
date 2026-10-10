@@ -1,5 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
+import { createCipheriv, randomBytes } from "node:crypto";
 import {
+	existsSync,
 	mkdtempSync,
 	rmSync,
 	readFileSync,
@@ -13,6 +15,20 @@ import { createSettings, migration, epochsMigration } from "..";
 import type { Settings } from "../contracts";
 import { applySchema, cloudEndpoint, settingsSchema } from "../contracts";
 const cleanup: Array<() => Promise<void>> = [];
+test("new voice settings wait for a conversational pause and retain a saved custom interval", async () => {
+	const h = await setup();
+	const s = h.settings.get();
+	expect(s.voice.silenceMs).toBe(1500);
+	s.voice.silenceMs = 700;
+	await h.settings.apply({
+		requestId: crypto.randomUUID(),
+		expectedRevision: s.revision,
+		settings: s,
+		keys: [],
+	});
+	const reopened = await createSettings(h.store, { dbPath: h.dbPath, env: {} });
+	expect(reopened.get().voice.silenceMs).toBe(700);
+});
 test("old settings retain normal playback; speech adjustments validate and persist", async () => {
 	const h = await setup();
 	const old = JSON.parse(JSON.stringify(h.settings.get()));
@@ -55,6 +71,33 @@ test("old settings retain normal playback; speech adjustments validate and persi
 });
 afterEach(async () => {
 	for (const close of cleanup.splice(0)) await close();
+});
+test("coding supervision instruction approval defaults to on, including for saved documents without it", async () => {
+	const h = await setup();
+	expect(h.settings.get().codingSupervision.approveInstructions).toBe(true);
+	// A document saved before this setting existed still loads, with approval on.
+	const legacy = JSON.parse(JSON.stringify(h.settings.get()));
+	delete legacy.codingSupervision;
+	await h.store.write((db) => {
+		db.query("UPDATE settings_document SET document=? WHERE id=1").run(
+			JSON.stringify(legacy),
+		);
+	});
+	const reopened = await createSettings(h.store, { dbPath: h.dbPath, env: {} });
+	expect(reopened.get().codingSupervision.approveInstructions).toBe(true);
+	const s = reopened.get();
+	s.codingSupervision.approveInstructions = false;
+	await reopened.apply({
+		requestId: crypto.randomUUID(),
+		expectedRevision: s.revision,
+		settings: s,
+		keys: [],
+	});
+	const again = await createSettings(h.store, { dbPath: h.dbPath, env: {} });
+	expect(again.get().codingSupervision.approveInstructions).toBe(false);
+	expect(
+		settingsSchema.safeParse({ ...s, codingSupervision: { extra: 1 } }).success,
+	).toBe(false);
 });
 async function setup() {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-settings-"));
@@ -295,11 +338,21 @@ test("key replacement, key deletion and connection deletion discard obsolete cip
 
 test("envRef must be allowlisted when saved and when resolved", async () => {
 	const { isAllowedEnvRef } = await import("../service");
-	expect(isAllowedEnvRef("EUMENES_CLOUD_KEY", [])).toBe(true);
-	expect(isAllowedEnvRef("OPENAI_API_KEY", [])).toBe(true);
-	expect(isAllowedEnvRef("MY_KEY", ["MY_KEY"])).toBe(true);
-	expect(isAllowedEnvRef("PATH", [])).toBe(false);
-	expect(isAllowedEnvRef("AWS_SECRET_ACCESS_KEY", [])).toBe(false);
+	const openai = "https://api.openai.com/v1";
+	expect(isAllowedEnvRef("EUMENES_CLOUD_KEY", [], "https://evil.example")).toBe(
+		true,
+	);
+	expect(isAllowedEnvRef("OPENAI_API_KEY", [], openai)).toBe(true);
+	expect(isAllowedEnvRef("OPENAI_API_KEY", [], "https://evil.example")).toBe(
+		false,
+	);
+	expect(isAllowedEnvRef("OPENAI_API_KEY", [], "not a url")).toBe(false);
+	expect(isAllowedEnvRef("MY_KEY", ["MY_KEY"], "https://evil.example")).toBe(
+		true,
+	);
+	expect(isAllowedEnvRef("PATH", [], openai)).toBe(false);
+	expect(isAllowedEnvRef("AWS_SECRET_ACCESS_KEY", [], openai)).toBe(false);
+	expect(isAllowedEnvRef("toString", [], openai)).toBe(false);
 
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-settings-"));
 	const dbPath = join(dir, "test.db");
@@ -324,6 +377,16 @@ test("envRef must be allowlisted when saved and when resolved", async () => {
 		}),
 	).rejects.toThrow("invalid_env_ref");
 	s.connections[0]!.envRef = "OPENAI_API_KEY";
+	// A provider key cannot be pointed at a host that is not the provider's.
+	await expect(
+		settings.apply({
+			requestId: crypto.randomUUID(),
+			expectedRevision: 0,
+			settings: s,
+			keys: [],
+		}),
+	).rejects.toThrow("invalid_env_ref");
+	s.connections[0]!.baseUrl = "https://api.openai.com/v1";
 	const saved = await settings.apply({
 		requestId: crypto.randomUUID(),
 		expectedRevision: 0,
@@ -334,6 +397,13 @@ test("envRef must be allowlisted when saved and when resolved", async () => {
 	expect(String(saved.connections[0]!.id)).toBe(String(c));
 	expect(() =>
 		settings.credential({ ...saved.connections[0]!, envRef: "PATH" }),
+	).toThrow("env_ref_not_allowed");
+	// A saved connection whose host no longer matches fails on use.
+	expect(() =>
+		settings.credential({
+			...saved.connections[0]!,
+			baseUrl: "https://evil.example/v1",
+		}),
 	).toThrow("env_ref_not_allowed");
 });
 
@@ -346,6 +416,7 @@ test("cloud connections require https outside private networks", () => {
 	expect(ok("https://example.com")).toBe(true);
 	expect(ok("http://example.com")).toBe(false);
 	expect(ok("http://172.32.0.1")).toBe(false);
+	expect(ok("http://169.254.169.254")).toBe(false);
 });
 
 test("a saved http cloud URL still loads, but applying it is rejected", async () => {
@@ -362,4 +433,98 @@ test("a saved http cloud URL still loads, but applying it is rejected", async ()
 			keys: [],
 		}).success,
 	).toBe(false);
+});
+
+function credentialRows(h: Awaited<ReturnType<typeof setup>>) {
+	return h.store.read(
+		(db) =>
+			db.query("SELECT id, encrypted FROM settings_credentials").all() as {
+				id: string;
+				encrypted: string;
+			}[],
+	);
+}
+test("credential ciphertext is bound to its row", async () => {
+	const h = await setup();
+	const s = h.settings.get();
+	const c = cloud(s);
+	const other = crypto.randomUUID();
+	const saved = await h.settings.apply({
+		requestId: crypto.randomUUID(),
+		expectedRevision: 0,
+		settings: s,
+		keys: [{ connectionId: c, value: "fixture-key" }],
+	});
+	const [row] = credentialRows(h);
+	expect(row!.encrypted.startsWith("v2.")).toBe(true);
+	// Copy the ciphertext under another row id: it must not decrypt there.
+	await h.store.write((db) =>
+		db
+			.query("INSERT INTO settings_credentials VALUES(?,?)")
+			.run(`${other}:0`, row!.encrypted),
+	);
+	expect(() =>
+		h.settings.credential({ ...saved.connections[0]!, id: other, epoch: 0 }),
+	).toThrow();
+	const reopened = await createSettings(h.store, { dbPath: h.dbPath, env: {} });
+	expect(reopened.diagnostics().keyError).toBe("secret_key_unavailable");
+});
+
+test("v1 ciphertext is upgraded to v2 on startup and survives restart", async () => {
+	const h = await setup();
+	const s = h.settings.get();
+	const c = cloud(s);
+	const saved = await h.settings.apply({
+		requestId: crypto.randomUUID(),
+		expectedRevision: 0,
+		settings: s,
+		keys: [{ connectionId: c, value: "fixture-key" }],
+	});
+	const id = `${saved.connections[0]!.id}:${saved.connections[0]!.epoch}`;
+	// Re-encrypt in the legacy (no AAD) format.
+	const key = readFileSync(join(h.dir, "keys/settings.key"));
+	const iv = randomBytes(12);
+	const cipher = createCipheriv("aes-256-gcm", key, iv);
+	const bytes = Buffer.concat([
+		cipher.update("fixture-key", "utf8"),
+		cipher.final(),
+	]);
+	const v1 = [iv, cipher.getAuthTag(), bytes]
+		.map((b) => b.toString("base64"))
+		.join(".");
+	await h.store.write((db) =>
+		db
+			.query("UPDATE settings_credentials SET encrypted=? WHERE id=?")
+			.run(v1, id),
+	);
+	const upgraded = await createSettings(h.store, { dbPath: h.dbPath, env: {} });
+	expect(upgraded.diagnostics().keyError).toBeNull();
+	expect(upgraded.credential(saved.connections[0]!)).toBe("fixture-key");
+	expect(credentialRows(h)[0]!.encrypted.startsWith("v2.")).toBe(true);
+	const again = await createSettings(h.store, { dbPath: h.dbPath, env: {} });
+	expect(again.diagnostics().keyError).toBeNull();
+	expect(again.credential(saved.connections[0]!)).toBe("fixture-key");
+});
+
+test("keyDir option and EUMENES_KEY_DIR relocate the master key", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "eumenes-settings-"));
+	const keys = mkdtempSync(join(tmpdir(), "eumenes-keys-"));
+	const store = openStore(join(dir, "test.db"), [migration, epochsMigration]);
+	cleanup.push(async () => {
+		await store.close();
+		rmSync(dir, { recursive: true, force: true });
+		rmSync(keys, { recursive: true, force: true });
+	});
+	await createSettings(store, {
+		dbPath: join(dir, "test.db"),
+		env: {},
+		keyDir: join(keys, "a"),
+	});
+	expect(statSync(join(keys, "a/settings.key")).mode & 0o777).toBe(0o600);
+	await createSettings(store, {
+		dbPath: join(dir, "test.db"),
+		env: { EUMENES_KEY_DIR: join(keys, "b") },
+	});
+	expect(statSync(join(keys, "b/settings.key")).size).toBe(32);
+	expect(existsSync(join(dir, "keys"))).toBe(false);
 });

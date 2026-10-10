@@ -251,7 +251,8 @@ export function getLogger(component: string) {
 		});
 	}
 	return {
-		debug: (event: string, fields?: LogFields) => log("debug", event, fields),
+		debug: (event: string, fields?: LogFields, error?: unknown) =>
+			log("debug", event, fields, error),
 		info: (event: string, fields?: LogFields) => log("info", event, fields),
 		warn: (event: string, fields?: LogFields, error?: unknown) =>
 			log("warn", event, fields, error),

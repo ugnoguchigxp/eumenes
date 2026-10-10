@@ -44,9 +44,9 @@ test("deleted reports disappear even when a previous response remains in the que
 		);
 		await screen.findByText("OLD_REPORT");
 		const details = screen.getByText("OLD_REPORT").closest("details")!;
-		expect(details.open).toBe(false);
-		fireEvent.click(screen.getByText("調査の詳細・出典"));
 		expect(details.open).toBe(true);
+		fireEvent.click(screen.getByText("調査の詳細・出典"));
+		expect(details.open).toBe(false);
 		current = { ...root, reportState: "deleted" };
 		await cache.invalidateQueries({ queryKey: [queryRoots.agentTasks] });
 		await vi.waitFor(() => expect(screen.queryByText("OLD_REPORT")).toBeNull());
@@ -126,7 +126,7 @@ test("the card shows the acquisition mode taken from the persisted task state", 
 		expect(screen.getByText("資料を確認中")).toBeTruthy();
 		expect(screen.queryByText("鎌倉の天気")).toBeNull();
 		expect(screen.getByText("登録サイトを確認").closest("details")?.open).toBe(
-			false,
+			true,
 		);
 	} finally {
 		cache.clear();

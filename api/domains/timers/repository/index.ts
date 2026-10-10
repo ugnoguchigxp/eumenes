@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import type { Migration } from "../../../infrastructure/sqlite";
 import type {
 	NotificationReason,
 	NotificationStatus,
@@ -247,21 +248,7 @@ export function countActive(db: Database, scope: string): number {
 	).n;
 }
 
-export function countTimers(db: Database, scope: string): number {
-	return (
-		db.query("SELECT COUNT(*) AS n FROM timers WHERE scope=?").get(scope) as {
-			n: number;
-		}
-	).n;
-}
-
-export function countOperations(db: Database, scope: string): number {
-	return (
-		db
-			.query("SELECT COUNT(*) AS n FROM timer_operations WHERE scope=?")
-			.get(scope) as { n: number }
-	).n;
-}
+export { countTimers, countOperations } from "./counts";
 
 export function insertTimer(
 	db: Database,
@@ -861,3 +848,8 @@ export function pruneBatch(
 		.run(tombCutoff, limit).changes;
 	return { operations, timers, deleted: deletedOps + deletedTimers };
 }
+
+/** Named migrations of this domain; the SQL above is frozen once deployed. */
+export const migrations: readonly Migration[] = [
+	{ id: "timers/0001-init", sql: migration },
+];

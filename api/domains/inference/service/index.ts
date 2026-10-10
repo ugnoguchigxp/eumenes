@@ -24,6 +24,7 @@ import {
 	type Running,
 } from "./execute";
 import { probeWav } from "./wav";
+import { finishProbe, openProbe } from "./probe";
 import { safeError } from "./errors";
 type UsageRow = {
 	id: string;
@@ -722,17 +723,7 @@ export function createInference(
 			const id = crypto.randomUUID();
 			const controller = new AbortController();
 
-			await store.write((db) => {
-				if (
-					db
-						.query("SELECT id FROM inference_probes WHERE status='running'")
-						.get()
-				)
-					throw new Error("invalid_probe_busy");
-				return db
-					.query("INSERT INTO inference_probes VALUES(?,?,'running',NULL,?,?)")
-					.run(id, target, current.revision, Date.now());
-			});
+			await store.write((db) => openProbe(db, id, target, current.revision));
 			probeControllers.set(id, controller);
 			const task = (async () => {
 				try {
@@ -769,25 +760,19 @@ export function createInference(
 							throw new Error("permission_revoked");
 					}
 					controller.signal.throwIfAborted();
-					await store.write((db) =>
-						db
-							.query("UPDATE inference_probes SET status=? WHERE id=?")
-							.run(
-								settings.get().revision === current.revision
-									? "succeeded"
-									: "stale",
-								id,
-							),
+					await finishProbe(
+						store,
+						id,
+						settings.get().revision === current.revision
+							? "succeeded"
+							: "stale",
 					);
 				} catch (error) {
-					await store.write((db) =>
-						db
-							.query("UPDATE inference_probes SET status=?,error=? WHERE id=?")
-							.run(
-								controller.signal.aborted ? "cancelled" : "failed",
-								safeError(error, controller.signal),
-								id,
-							),
+					await finishProbe(
+						store,
+						id,
+						controller.signal.aborted ? "cancelled" : "failed",
+						safeError(error, controller.signal),
 					);
 				} finally {
 					probeControllers.delete(id);

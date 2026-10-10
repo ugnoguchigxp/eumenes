@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import type { Migration } from "../../../infrastructure/sqlite";
 import type { AcquisitionMode, Task, TaskDto } from "../contracts";
 export const migration = `
 CREATE TABLE agent_tasks(id TEXT PRIMARY KEY,kind TEXT NOT NULL,root_run_id TEXT NOT NULL,parent_task_id TEXT,package_revision_id TEXT,input_json TEXT,state TEXT NOT NULL,phase TEXT NOT NULL,revision INTEGER NOT NULL DEFAULT 0,cancel_epoch INTEGER NOT NULL DEFAULT 0,data_epoch INTEGER NOT NULL DEFAULT 0,report_state TEXT NOT NULL DEFAULT 'none',report_task_id TEXT,current_step INTEGER NOT NULL DEFAULT 0,deadline INTEGER NOT NULL,model_calls INTEGER NOT NULL DEFAULT 0,tool_calls INTEGER NOT NULL DEFAULT 0,json_repairs INTEGER NOT NULL DEFAULT 0,refinements INTEGER NOT NULL DEFAULT 0,job_id TEXT,invocation_id TEXT,error_code TEXT,created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL);
@@ -99,3 +100,16 @@ export function update(
 		throw new Error("task_changed");
 	return get(db, t.id)!;
 }
+
+/** Named migrations of this domain; the SQL above is frozen once deployed. */
+export const explorationMigration = `ALTER TABLE agent_tasks ADD COLUMN exploration_json TEXT;`;
+export const migrations: readonly Migration[] = [
+	{ id: "agent-runtime/0001-init", sql: migration },
+	{ id: "agent-runtime/0002-acquisition", sql: acquisitionMigration },
+	{ id: "agent-runtime/0003-action-result", sql: actionResultMigration },
+	{
+		id: "agent-runtime/0004-exploration",
+		sql: explorationMigration,
+		after: ["agent-runtime/0003-action-result"],
+	},
+];

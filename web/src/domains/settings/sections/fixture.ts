@@ -31,7 +31,7 @@ export function settingsFixture(): Settings {
 			inputDevice: "",
 			outputDevice: "",
 			threshold: 0.008,
-			silenceMs: 700,
+			silenceMs: 1500,
 			echoCancellation: true,
 			noiseSuppression: true,
 			autoGainControl: true,

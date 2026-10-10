@@ -53,7 +53,14 @@ export function string(value: unknown): string {
 		throw new Error("larm_invalid_contract");
 	return value;
 }
-export function localEndpoint(value: string): URL {
+/**
+ * Accepts loopback / private-LAN URLs. A `.local` name is accepted only when
+ * listed in `allowLocal` (the LARM base host itself or an explicit provider host).
+ */
+export function localEndpoint(
+	value: string,
+	allowLocal: readonly string[] = [],
+): URL {
 	const url = new URL(value);
 	if (
 		!(
@@ -63,7 +70,8 @@ export function localEndpoint(value: string): URL {
 			!url.search &&
 			!url.hash &&
 			(url.hostname === "localhost" ||
-				url.hostname.endsWith(".local") ||
+				(url.hostname.endsWith(".local") &&
+					allowLocal.includes(url.hostname)) ||
 				(/^(?:\d{1,3}\.){3}\d{1,3}$/.test(url.hostname) &&
 					url.hostname.split(".").every((part) => Number(part) <= 255) &&
 					/^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(
@@ -72,5 +80,36 @@ export function localEndpoint(value: string): URL {
 		)
 	)
 		throw new Error("larm_nonlocal_endpoint");
+	return url;
+}
+/** Parses the comma-separated EUMENES_LARM_PROVIDER_HOSTS value (lower-cased, deduplicated). */
+export function parseProviderHosts(raw: string | undefined): string[] {
+	return [
+		...new Set(
+			(raw ?? "")
+				.split(",")
+				.map((host) => host.trim().toLowerCase())
+				.filter(Boolean),
+		),
+	];
+}
+/** A provider may receive credentials only at the LARM host or an explicitly listed host. */
+export function providerHostAllowed(
+	url: URL,
+	larmBase: URL,
+	extra: readonly string[],
+): boolean {
+	const host = url.hostname.toLowerCase();
+	return host === larmBase.hostname.toLowerCase() || extra.includes(host);
+}
+/** Provider URL (baseURL / daemonURL) that is local and bound to an allowed host. */
+export function providerEndpoint(
+	value: string,
+	larmBase: URL,
+	extra: readonly string[],
+): URL {
+	const url = localEndpoint(value, [new URL(value).hostname]);
+	if (!providerHostAllowed(url, larmBase, extra))
+		throw new Error("larm_provider_host_mismatch");
 	return url;
 }

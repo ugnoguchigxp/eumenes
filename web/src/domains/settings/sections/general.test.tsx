@@ -13,3 +13,17 @@ test("general section renders the conversation fields and reports edits", () => 
 	});
 	expect(change).toHaveBeenCalledOnce();
 });
+
+test("the supervision approval toggle is on by default and reports edits", () => {
+	const change = vi.fn();
+	render(<GeneralSection value={settingsFixture()} change={change} />);
+	const toggle = screen.getByLabelText(
+		/監督AIの指示を実行前に確認する/,
+	) as HTMLInputElement;
+	expect(toggle.checked).toBe(true);
+	fireEvent.click(toggle);
+	expect(change).toHaveBeenCalledOnce();
+	const draft = settingsFixture();
+	change.mock.calls[0]![0](draft);
+	expect(draft.codingSupervision.approveInstructions).toBe(false);
+});

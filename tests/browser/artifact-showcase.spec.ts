@@ -1,60 +1,38 @@
 import { test, expect } from "@playwright/test";
-import { spawn, type ChildProcess } from "node:child_process";
-import { createServer, type AddressInfo } from "node:net";
 import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
+import { evidencePath } from "./evidence";
+import { createFixture } from "./fixture";
 
 let webPort: number;
-const processes: ChildProcess[] = [];
+const fixture = createFixture();
 let dir: string;
-async function port() {
-	const server = createServer();
-	await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
-	const result = (server.address() as AddressInfo).port;
-	await new Promise<void>((r) => server.close(() => r()));
-	return result;
-}
 test.beforeAll(async () => {
-	const apiPort = await port();
-	webPort = await port();
+	const apiPort = await fixture.port();
+	webPort = await fixture.port();
 	dir = mkdtempSync(join(tmpdir(), "eumenes-artifact-"));
-	processes.push(
-		spawn("bun", ["scripts/toolchain-fixture-server.ts"], {
-			env: {
-				...process.env,
-				EUMENES_PORT: String(apiPort),
-				EUMENES_ORIGIN: `http://127.0.0.1:${webPort}`,
-			},
-			stdio: "ignore",
-		}),
+	await fixture.launch(
+		["scripts/toolchain-fixture-server.ts"],
+		{
+			EUMENES_PORT: String(apiPort),
+			EUMENES_ORIGIN: `http://127.0.0.1:${webPort}`,
+		},
+		{ ports: [apiPort] },
 	);
-	processes.push(
-		spawn("bun", ["run", "dev:web", "--port", String(webPort)], {
-			env: {
-				...process.env,
-				EUMENES_PROXY_URL: `http://127.0.0.1:${apiPort}`,
-				EUMENES_API_TOKEN: "fixture-token-for-toolchain-browser",
-				EUMENES_ORIGIN: `http://127.0.0.1:${webPort}`,
-				EUMENES_VITE_CACHE_DIR: join(dir, "vite-cache"),
-				LARM_API_TOKEN: "",
-			},
-			stdio: "ignore",
-		}),
+	await fixture.launchWeb({
+		webPort,
+		apiPort,
+		token: "fixture-token-for-toolchain-browser",
+		cacheDir: join(dir, "vite-cache"),
+	});
+	await fixture.waitUntil(
+		async () => (await fetch(`http://127.0.0.1:${webPort}`)).ok,
+		{ message: "showcase fixture unavailable" },
 	);
-	for (let i = 0; i < 100; i++) {
-		try {
-			if ((await fetch(`http://127.0.0.1:${webPort}`)).ok) return;
-		} catch {}
-		await new Promise((r) => setTimeout(r, 100));
-	}
-	throw new Error("showcase fixture unavailable");
 });
 test.afterAll(async () => {
-	for (const process of processes) process.kill("SIGTERM");
-	await new Promise((r) => setTimeout(r, 200));
-	for (const process of processes)
-		if (process.exitCode === null) process.kill("SIGKILL");
+	await fixture.stopAll();
 	rmSync(dir, { recursive: true, force: true });
 });
 test.beforeEach(async ({ page }, testInfo) => {
@@ -185,7 +163,7 @@ test("workspace boundary resizes with drag and keyboard, preserves drafts and di
 	await page.mouse.move(1280, edge.y + edge.height / 2);
 	await page.mouse.up();
 	await expect(handle).toHaveAttribute("aria-valuenow", "75");
-	const screenshotDir = resolve("spec/verification/openui-artifact");
+	const screenshotDir = evidencePath("openui-artifact");
 	await page.screenshot({
 		path: join(screenshotDir, "resizable-workspace-desktop.png"),
 	});
@@ -243,9 +221,7 @@ test("stacked boundary adjusts height and retains independent widths across view
 	expect(geometry.bottom).toBeLessThanOrEqual(geometry.height);
 	expect(geometry.overflow).toBe(false);
 	await page.screenshot({
-		path: resolve(
-			"spec/verification/openui-artifact/resizable-workspace-mobile.png",
-		),
+		path: evidencePath("openui-artifact/resizable-workspace-mobile.png"),
 	});
 	await page.setViewportSize({ width: 1280, height: 900 });
 	await expect(handle).toHaveAttribute("aria-valuenow", "60");
@@ -468,7 +444,7 @@ test("radio answers have full-row targets, native keyboard selection and retain 
 	await s.getByRole("button", { name: "定義を表示", exact: true }).click();
 	await radios.nth(1).check();
 	await s.getByText("開発用の確認", { exact: true }).click();
-	const screenshotDir = resolve("spec/verification/openui-artifact");
+	const screenshotDir = evidencePath("openui-artifact");
 	for (const theme of ["dark", "light"]) {
 		await s.getByLabel("プレビューのテーマ").selectOption(theme);
 		await s.locator(".aui-preview").screenshot({
@@ -606,9 +582,7 @@ test("settings theme shares the width and density toolbar and matches the visibl
 	await expect.poll(brightness).toBeLessThan(60);
 	await s.getByText("開発用の確認", { exact: true }).click();
 	await s.screenshot({
-		path: resolve(
-			"spec/verification/openui-artifact/settings-controls-dark.png",
-		),
+		path: evidencePath("openui-artifact/settings-controls-dark.png"),
 		animations: "disabled",
 	});
 	await s
@@ -620,9 +594,7 @@ test("settings theme shares the width and density toolbar and matches the visibl
 	await theme.selectOption("light");
 	await expect.poll(brightness).toBeGreaterThan(200);
 	await s.screenshot({
-		path: resolve(
-			"spec/verification/openui-artifact/settings-controls-light.png",
-		),
+		path: evidencePath("openui-artifact/settings-controls-light.png"),
 		animations: "disabled",
 	});
 	await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
@@ -635,9 +607,7 @@ test("settings theme shares the width and density toolbar and matches the visibl
 	for (const box of mobileBoxes)
 		expect(box!.y).toBeCloseTo(mobileBoxes[0]!.y, 0);
 	await controls.screenshot({
-		path: resolve(
-			"spec/verification/openui-artifact/settings-controls-mobile.png",
-		),
+		path: evidencePath("openui-artifact/settings-controls-mobile.png"),
 		animations: "disabled",
 	});
 });
@@ -674,7 +644,7 @@ test("memory correction and settings save affect only fixture state; theme, resp
 	await s.getByLabel("表示の密度", { exact: true }).selectOption("compact");
 	await expect(s.locator(".aui-preview")).toHaveAttribute("data-theme", "dark");
 	await page.setViewportSize({ width: 1280, height: 1000 });
-	const screenshotDir = resolve("spec/verification/openui-artifact");
+	const screenshotDir = evidencePath("openui-artifact");
 	mkdirSync(screenshotDir, { recursive: true });
 	await page
 		.locator(".artifact-panel-body")
@@ -889,7 +859,7 @@ test("tabs fit the pane without horizontal scrolling and clearly distinguish sel
 	await expect(
 		s.getByRole("region", { name: "受け取った内容", exact: true }),
 	).toContainText("入力した内容を確認できます");
-	const screenshotDir = resolve("spec/verification/openui-artifact");
+	const screenshotDir = evidencePath("openui-artifact");
 	for (const [width, name] of [
 		[1840, "desktop"],
 		[390, "mobile"],
@@ -1128,7 +1098,7 @@ test("design token controls and long token names fit a mobile panel without hori
 		el.scrollTop = 0;
 	});
 	await page.locator(".artifact-panel").screenshot({
-		path: resolve("spec/verification/openui-artifact/design-tokens-mobile.png"),
+		path: evidencePath("openui-artifact/design-tokens-mobile.png"),
 		animations: "disabled",
 	});
 	await page.setViewportSize({ width: 1280, height: 1100 });
@@ -1138,9 +1108,7 @@ test("design token controls and long token names fit a mobile panel without hori
 		el.scrollTop = 0;
 	});
 	await page.locator(".artifact-panel").screenshot({
-		path: resolve(
-			"spec/verification/openui-artifact/design-tokens-desktop.png",
-		),
+		path: evidencePath("openui-artifact/design-tokens-desktop.png"),
 		animations: "disabled",
 	});
 });

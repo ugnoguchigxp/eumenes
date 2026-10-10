@@ -2,6 +2,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { EumenesClient } from "../../../../client";
 import { queryRoots } from "../../queryKeys";
+import { useDeadline } from "./deadline";
+import { activeTimersQuery } from "./queries";
 
 type Ref = { kind: "timer"; version: 1; timerId: string };
 /** Application supplies the workspace port; this hook owns API discovery and deduplication. */
@@ -22,15 +24,19 @@ export function useTimerArtifacts(
 				: [...current, { id, until: performance.now() + 180000 }].slice(-8),
 		);
 	}, []);
-	const active = useQuery({
-		queryKey: [queryRoots.timers, "workspace"],
-		queryFn: ({ signal }) =>
-			client.timers({ state: "active", limit: 100 }, signal),
-		refetchInterval: (query) =>
-			query.state.data?.items.some((item) => item.state === "active")
-				? 5000
-				: false,
-	});
+	const active = useQuery(activeTimersQuery(client));
+	// SSE reports server changes; only an expiring timer needs its own wake-up.
+	useDeadline(
+		(active.data?.items ?? [])
+			.filter((item) => item.state === "active")
+			.map((item) => item.dueAt),
+		active.data?.serverNow,
+		active.data?.sentAt ?? 0,
+		() =>
+			void cache.invalidateQueries({
+				queryKey: [queryRoots.timers, "workspace"],
+			}),
+	);
 	useEffect(() => {
 		if (!runs?.length) return;
 		// Voice results can reach the conversation before the local turn callback.
@@ -49,7 +55,6 @@ export function useTimerArtifacts(
 					...(await client.timerReceiptByRun(run.id, signal)),
 				})),
 			),
-		refetchInterval: 2000,
 	});
 	useEffect(() => {
 		const show = (ref: Ref, title: string) => {

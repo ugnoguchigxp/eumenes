@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import type { Migration } from "../../../infrastructure/sqlite";
 export const migration = `
 CREATE TABLE memory_host_settings (id INTEGER PRIMARY KEY CHECK(id = 1), enabled INTEGER NOT NULL, revision INTEGER NOT NULL);
 INSERT INTO memory_host_settings (id, enabled, revision) VALUES (1, 1, 1);
@@ -67,3 +68,8 @@ export function getUsage(db: Database, runId: string): UsageReceipt | null {
 		createdAt: row.created_at as string,
 	};
 }
+
+/** Named migrations of this domain; the SQL above is frozen once deployed. */
+export const migrations: readonly Migration[] = [
+	{ id: "memory/0001-init", sql: migration },
+];

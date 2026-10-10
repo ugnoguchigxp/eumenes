@@ -225,6 +225,7 @@ test("three capture cycles release tracks and ignore late callbacks", async () =
 			},
 			() => speech++,
 			() => segments++,
+			{ silenceMs: 700 },
 		);
 		await audio.start();
 		const processor = processors[cycle];
@@ -540,7 +541,7 @@ test.each(["half-duplex", "timer-tone"])(
 			() => {},
 			() => speech++,
 			() => segments++,
-			{ keepAlive: false, halfDuplex: () => half },
+			{ keepAlive: false, halfDuplex: () => half, silenceMs: 700 },
 		);
 		await audio.start();
 		const feed = (value: number) =>

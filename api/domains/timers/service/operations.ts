@@ -114,11 +114,11 @@ function saveOperation(
 	});
 }
 
-export function encodeCreatedCursor(createdAtMs: number, id: string) {
+function encodeCreatedCursor(createdAtMs: number, id: string) {
 	return Buffer.from(JSON.stringify({ createdAtMs, id })).toString("base64url");
 }
 
-export function decodeCreatedCursor(cursor: string | undefined) {
+function decodeCreatedCursor(cursor: string | undefined) {
 	if (!cursor) return null;
 	try {
 		const parsed = createdCursor.safeParse(

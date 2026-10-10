@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { HttpErrorStatus } from "../../../infrastructure/http";
 
 export const timerStates = ["active", "elapsed", "cancelled"] as const;
 export type TimerState = (typeof timerStates)[number];
@@ -286,3 +287,16 @@ export const timerClaimResponseSchema = z
 export const DEFAULT_TIMER_SCOPE = "default";
 export const DEFAULT_TIMER_LABEL = "タイマー";
 export const TIMER_EXPIRE_KIND = "timer.expire";
+
+/** HTTP status of each error code this domain throws; merged by `api/application/error-status.ts`. */
+export const errorStatus = {
+	timer_not_found: 404,
+	notification_not_found: 404,
+	notification_claimed: 409,
+	claim_invalid: 409,
+	operation_expired: 410,
+	timer_limit_reached: 429,
+	timer_storage_full: 429,
+	operation_capacity: 429,
+	timer_unavailable: 503,
+} as const satisfies Record<string, HttpErrorStatus>;

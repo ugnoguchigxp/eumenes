@@ -1,0 +1,29 @@
+{
+	"$schema": "https://unpkg.com/knip@6/schema.json",
+	"ignoreWorkspaces": ["packages/design-system"],
+	"workspaces": {
+		".": {
+			"entry": [
+				"scripts/*.ts",
+				"**/*.test.{ts,tsx}",
+				"**/*.fixture.ts",
+				"tests/browser/**/*.ts"
+			],
+			"project": [
+				"api/**",
+				"web/src/**",
+				"client/**",
+				"cli/**",
+				"scripts/**",
+				"tests/**"
+			]
+		},
+		"packages/artifact-ui": {
+			"project": ["src/**"]
+		},
+		"packages/coding-runner": {
+			"entry": ["test/**/*.ts"],
+			"project": ["src/**", "test/**"]
+		}
+	}
+}

@@ -14,7 +14,7 @@ import {
 import type { ForgetJournalEntry } from "eumenes-memory/sqlite";
 
 /** Thrown for an unreadable journal; callers treat it as "memory unusable" (fail closed). */
-export class JournalCorruptError extends Error {
+class JournalCorruptError extends Error {
 	constructor() {
 		super("journal_corrupt");
 	}

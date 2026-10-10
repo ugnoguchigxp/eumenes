@@ -6,3 +6,6 @@ export {
 	actionMigration,
 } from "./repository";
 export * from "./contracts";
+export { migrations } from "./repository";
+
+export { readMetadataMigration } from "./repository";

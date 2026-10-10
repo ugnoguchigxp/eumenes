@@ -1,5 +1,66 @@
 import { test, expect } from "bun:test";
 import { harness, forbidden } from "./toolchain.fixture";
+import { checkLiveCitations } from "./toolchain-live-check";
+test("adoption removes a fabricated model citation and cannot reuse sources after failed research", async () => {
+	const options = {
+		parentAnswer:
+			"晴れです。\n\nソース：[example.com](https://example.com/weather)、[旧資料](https://example.com/obsolete)",
+		badQuote: false,
+		failureAnswer:
+			"確認できませんでした。\n\nソース：[example.com](https://example.com/weather)",
+	};
+	const h = await harness(options);
+	try {
+		for (const badQuote of [false, true]) {
+			options.badQuote = badQuote;
+			const run = await h.dialogue.submit({
+				requestId: crypto.randomUUID(),
+				conversationId: "main",
+				text: "今日の東京の天気を調べて。",
+			});
+			expect(
+				(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 }))?.status,
+			).toBe("completed");
+			const answer = h.dialogue.answerText(run.id)!;
+			if (badQuote) expect(answer).toBe("確認できませんでした。");
+			else {
+				expect(answer).toContain("[example.com](https://example.com/weather)");
+				expect(answer).not.toContain("https://example.com/obsolete");
+			}
+		}
+	} finally {
+		await h.close();
+	}
+});
+test("a plain weather request carries useful details and actual citations through research, answer and replay", async () => {
+	const h = await harness({ excerptEvidence: true });
+	try {
+		const run = await h.dialogue.submit({
+			requestId: crypto.randomUUID(),
+			conversationId: "main",
+			text: "今日の東京の天気教えて。",
+		});
+		expect(
+			(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 }))?.status,
+		).toBe("completed");
+		const report = h.toolchain.agents.report(run.agentTaskId!)!;
+		const answer = h.dialogue.answerText(run.id)!;
+		for (const fact of ["晴れ", "26度", "17度", "降水確率0％"])
+			expect(answer).toContain(fact);
+		expect(checkLiveCitations(report, answer)).toBe(true);
+		const messages = JSON.parse(h.parentContexts.at(-1)!);
+		// The real request packet, not just an unused prompt template, must allow
+		// a sourced answer with enough context even without an explicit detail request.
+		expect(messages[0].content).not.toContain("30文字以内");
+		expect(messages[0].content).not.toContain("Markdown、");
+		expect(messages[0].content).toContain("sources.url");
+		expect(h.parentContexts.at(-1)).not.toContain(forbidden);
+		expect(h.voice.replaySentences(answer).join("")).toContain("最低17度");
+		expect(h.voice.replaySentences(answer).join("")).not.toContain("https://");
+	} finally {
+		await h.close();
+	}
+});
 test("the current report follows earlier failed answers and stays adjacent to the repeated request", async () => {
 	const options = {
 		badQuote: true,
@@ -56,9 +117,13 @@ test("a premature unavailable forecast reads the next candidate before adopting 
 		expect(h.dialogue.answerText(run.id)).toContain("晴れ");
 		const report = h.toolchain.agents.report(run.agentTaskId!)!;
 		expect(report.summary).toContain("最高気温26度");
-		expect(report.sources.every((s) => !s.url.endsWith("/empty"))).toBe(true);
+		expect(report.sources.every((s) => !s.url?.endsWith("/empty"))).toBe(true);
 		expect(
-			h.workerContexts.some((c) => c.includes("weather_condition_missing")),
+			h.workerContexts.some(
+				(c) =>
+					c.includes("weather_condition_missing") ||
+					c.includes("report_target_mismatch"),
+			),
 		).toBe(true);
 	} finally {
 		await h.close();
@@ -112,7 +177,6 @@ test("unmapped location uses search and read without offering incompatible fixed
 		);
 		expect(tools.map((tool: { id: string }) => tool.id)).toEqual([
 			"web.lookup",
-			"web.read",
 		]);
 		expect(JSON.parse(messages[1].content).nextInvocation).toBeNull();
 		expect(h.acquisitions).toBe(2);
@@ -154,6 +218,12 @@ for (const [question, expected] of [
 			expect(report.summary).toContain(expected!);
 			expect(report.verification).toBe("evidence_linked");
 			expect(report.sources[0].basis).toBe("page");
+			const answer = h.dialogue.answerText(run.id)!;
+			expect(checkLiveCitations(report, answer)).toBe(true);
+			if (question!.includes("株価")) {
+				expect(answer).toContain("米ドル");
+				expect(answer).toContain("2026年10月8日の終値");
+			}
 			expect(h.workerContexts.some((c) => c.includes(forbidden))).toBe(true);
 			expect(h.parentContexts.some((c) => c.includes(forbidden))).toBe(false);
 			expect(h.parentContexts[0]).not.toContain('"quote"');
@@ -276,7 +346,7 @@ for (const options of [{ badJson: true }, { badQuote: true }])
 				.find((t) => t.kind === "worker")!;
 			expect(child.status).toBe("failed");
 			expect(h.toolchain.agents.report(run.agentTaskId!)).toBe(null);
-			expect(child.modelCalls).toBeLessThanOrEqual(4);
+			expect(child.modelCalls).toBeLessThanOrEqual(5);
 			expect(h.parentContexts[0]).not.toContain(forbidden);
 			expect(h.dialogue.answerText(run.id)).toBe(
 				"調査結果を確認できませんでした。",

@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import type { Migration } from "../../../infrastructure/sqlite";
 import type { Entry } from "../contracts";
 export const migration = `
 CREATE TABLE tts_dictionary (written TEXT PRIMARY KEY, spoken TEXT NOT NULL, updated_at INTEGER NOT NULL);
@@ -22,3 +23,8 @@ export function upsert(db: Database, entry: Entry, now: number) {
 export function remove(db: Database, written: string) {
 	db.query("DELETE FROM tts_dictionary WHERE written=?").run(written);
 }
+
+/** Named migrations of this domain; the SQL above is frozen once deployed. */
+export const migrations: readonly Migration[] = [
+	{ id: "tts-dictionary/0001-init", sql: migration },
+];

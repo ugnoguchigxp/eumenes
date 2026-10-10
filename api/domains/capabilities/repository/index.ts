@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import type { Migration } from "../../../infrastructure/sqlite";
 import type { Definition, FixedDefinition } from "../contracts";
 export const migration = `
 CREATE TABLE capability_items (key TEXT PRIMARY KEY,id TEXT NOT NULL,kind TEXT NOT NULL,active_revision_id TEXT NOT NULL,enabled INTEGER NOT NULL DEFAULT 1,generation INTEGER NOT NULL DEFAULT 0,UNIQUE(kind,id));
@@ -32,3 +33,9 @@ export function get(db: Database, revisionId: string): FixedDefinition | null {
 		generation: row.generation,
 	};
 }
+
+/** Named migrations of this domain; the SQL above is frozen once deployed. */
+export const migrations: readonly Migration[] = [
+	{ id: "capabilities/0001-init", sql: migration },
+	{ id: "capabilities/0002-learned", sql: learnedMigration },
+];

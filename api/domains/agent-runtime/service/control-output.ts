@@ -1,6 +1,12 @@
 import type { LogFields } from "../../../infrastructure/logger";
 import { valueType } from "../../../infrastructure/validation-log";
 import { bytes } from "../../capabilities";
+export const codeOf = (code: string, fallback: string) =>
+	/^[a-z_]{1,80}$/.test(code) ? code : fallback;
+export const safeCode = (e: unknown) =>
+	e instanceof Error && /^[a-z_]{1,80}$/.test(e.message)
+		? e.message
+		: "agent_failed";
 export function parseControlOutput(value: unknown): {
 	action: unknown;
 	invalid: boolean;

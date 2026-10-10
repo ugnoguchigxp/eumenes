@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { HttpErrorStatus } from "../../../infrastructure/http";
 export const reportKinds = [
 	"progress",
 	"blocker",
@@ -59,3 +60,8 @@ export const reportListSchema = z.object({
 	items: z.array(taskReportSchema),
 	nextCursor: z.number().int().nullable(),
 });
+
+/** HTTP status of each error code this domain throws; merged by `api/application/error-status.ts`. */
+export const errorStatus = {
+	task_history_expired: 410,
+} as const satisfies Record<string, HttpErrorStatus>;

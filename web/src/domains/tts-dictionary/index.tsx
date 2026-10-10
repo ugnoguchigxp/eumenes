@@ -3,6 +3,7 @@ import { type FocusEvent, useEffect, useRef, useState } from "react";
 import type { Entry } from "../../../../api/domains/tts-dictionary/contracts";
 import type { EumenesClient } from "../../../../client";
 import { ApiError } from "../../../../client";
+import { describeError } from "../../errorMessages";
 import { queryRoots } from "../../queryKeys";
 
 type Draft = Entry & { original: string | null; expectedSpoken: string | null };
@@ -20,7 +21,7 @@ const message = (cause: unknown) =>
 		? "辞書が別の場所で変更されています。最新の登録を読み込みました。"
 		: cause instanceof ApiError && cause.status === 400
 			? "文字または読み方が不正です（前後の空白・制御文字、句読点や . , ; ! ? を含む文字は使えません）。"
-			: "辞書を更新できません。APIの接続を確認してください。";
+			: describeError(cause);
 
 export function TtsDictionaryPanel({ client }: { client: EumenesClient }) {
 	const cache = useQueryClient();

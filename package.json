@@ -16,14 +16,18 @@
 		"format": "oxfmt --write",
 		"format:check": "oxfmt --check",
 		"verify": "bun scripts/verify.ts",
+		"size:check": "bun scripts/size-budget.ts",
+		"docs:domains": "bun scripts/domain-docs.ts",
 		"test:domain": "bun scripts/test-domain.ts",
 		"verify:all": "bun scripts/verify.ts --all",
 		"verify:live": "bun scripts/verify-live.ts",
 		"decision:bench": "python3 -B scripts/decision-bench/bench.py",
 		"decision:bench:check": "python3 -B scripts/decision-bench/bench.py self-test",
 		"build:design-system": "cd packages/design-system && bun run build",
+		"postinstall": "bun run build:design-system",
 		"build:web": "bun run build:design-system && vite build",
-		"typecheck": "tsc --noEmit"
+		"typecheck": "tsc --noEmit",
+		"deadcode": "knip --include exports,types"
 	},
 	"dependencies": {
 		"@eumenes/design-system": "workspace:*",
@@ -51,6 +55,7 @@
 		"@types/react-dom": "19.2.3",
 		"@vitejs/plugin-react": "6.0.2",
 		"jsdom": "29.1.1",
+		"knip": "6.38.0",
 		"oxfmt": "0.71.0",
 		"oxlint": "1.86.0",
 		"typescript": "5.9.3",

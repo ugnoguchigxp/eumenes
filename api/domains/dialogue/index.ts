@@ -18,3 +18,4 @@ export type {
 	WorldContextSettleInput,
 	WorldContextVerdict,
 } from "./contracts";
+export { migrations } from "./repository";

@@ -1,6 +1,10 @@
 import { bytes } from "../../capabilities";
 import type { Source } from "../../tool-runtime";
-import { workerSchema, type Report } from "../contracts";
+import {
+	reportV2Schema,
+	legacyWorkerReportSchema,
+	type Report,
+} from "../contracts";
 import { evidenceExcerpts } from "./evidence-excerpts";
 import {
 	ValidationFailure,
@@ -10,20 +14,32 @@ export function verifyReport(
 	raw: unknown,
 	visible: Source[],
 	hasFailures: boolean,
+	requireViews = false,
 ): Report {
-	const result = workerSchema.options[1].shape.report.safeParse(raw);
+	const result = (
+		raw && typeof raw === "object" && "version" in raw
+			? reportV2Schema
+			: legacyWorkerReportSchema
+	).safeParse(raw);
 	if (!result.success)
 		throw new ValidationFailure(
 			"invalid_report",
 			validationIssues(result.error, raw, ["report"]),
 			result.error.issues.length,
 		);
-	const sources = new Map(visible.map((s) => [s.sourceId, s]));
+	if (requireViews && !("version" in result.data))
+		throw new Error("invalid_report");
+	const sources = new Map(
+		visible.map((s) => [s.sourceId + ":" + (s.viewId ?? ""), s]),
+	);
 	const used = new Set<string>();
 	const claims = result.data.claims.map((claim, claimIndex) => ({
 		...claim,
 		evidence: claim.evidence.map((evidence, evidenceIndex) => {
-			const source = sources.get(evidence.sourceId);
+			const viewId = "viewId" in evidence ? evidence.viewId : undefined;
+			const source = viewId
+				? sources.get(evidence.sourceId + ":" + viewId)
+				: visible.find((s) => s.sourceId === evidence.sourceId);
 			const referenced = "excerptId" in evidence;
 			const quote = referenced
 				? source &&
@@ -34,16 +50,22 @@ export function verifyReport(
 			if (!source || !quote || !source.body.includes(quote))
 				throw new ValidationFailure("invalid_evidence", [
 					{
-						validationPath: `report.claims.${claimIndex}.evidence.${evidenceIndex}.${source ? (referenced ? "excerptId" : "quote") : "sourceId"}`,
+						validationPath: `report.claims.${claimIndex}.evidence.${evidenceIndex}.${source ? (referenced ? "excerptId" : "quote") : viewId ? "viewId" : "sourceId"}`,
 						validationCode: source
 							? referenced
 								? "unknown_excerpt"
 								: "quote_mismatch"
-							: "unknown_source",
+							: viewId
+								? "unknown_view"
+								: "unknown_source",
 					},
 				]);
-			used.add(source.sourceId);
-			return { sourceId: source.sourceId, quote };
+			used.add(source.sourceId + ":" + (source.viewId ?? ""));
+			return {
+				sourceId: source.sourceId,
+				quote: source.kind === "conversation_source" ? "" : quote,
+				...(viewId ? { viewId } : {}),
+			};
 		}),
 	}));
 	const metadata = [...used].map((id) => {
@@ -55,7 +77,14 @@ export function verifyReport(
 		claims,
 		sources: metadata,
 		coverage:
-			hasFailures || metadata.some((s) => s.basis === "snippet" || s.truncated)
+			hasFailures ||
+			("outcome" in result.data && result.data.outcome !== "answered") ||
+			metadata.some(
+				(s) =>
+					s.basis === "snippet" ||
+					s.acquisitionTruncated ||
+					(!s.viewId && s.truncated),
+			)
 				? "partial"
 				: "complete",
 		verification: "evidence_linked",
@@ -67,6 +96,13 @@ export function verifyReport(
 export function parentProjection(report: Report) {
 	return {
 		summary: report.summary,
+		...(report.version
+			? {
+					version: report.version,
+					outcome: report.outcome,
+					exploration: report.exploration,
+				}
+			: {}),
 		claims: report.claims.map((c) => ({
 			text: c.text,
 			sourceIds: c.evidence.map((e) => e.sourceId),
@@ -74,11 +110,22 @@ export function parentProjection(report: Report) {
 		limitations: report.limitations,
 		coverage: report.coverage,
 		verification: report.verification,
-		sources: report.sources.map((s) => ({
-			sourceId: s.sourceId,
-			url: s.url,
-			basis: s.basis,
-			fetchedAt: s.fetchedAt,
-		})),
+		sources: report.sources.map((s) =>
+			s.kind === "conversation_source"
+				? {
+						sourceId: s.sourceId,
+						kind: s.kind,
+						messageId: s.messageId,
+						speaker: s.speaker,
+						createdAt: s.createdAt,
+						revision: s.revision,
+					}
+				: {
+						sourceId: s.sourceId,
+						url: s.url,
+						basis: s.basis,
+						fetchedAt: s.fetchedAt,
+					},
+		),
 	};
 }

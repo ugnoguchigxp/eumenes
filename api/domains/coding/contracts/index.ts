@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { HttpErrorStatus } from "../../../infrastructure/http";
 import {
 	eventSchema,
 	receiptSchema,
@@ -43,3 +44,14 @@ export const codingExecutionEventsSchema = z.strictObject({
 	execution: executionViewSchema,
 	events: z.array(eventSchema),
 });
+
+/** HTTP status of each error code this domain throws; merged by `api/application/error-status.ts`. */
+export const errorStatus = {
+	coding_execution_not_found: 404,
+	coding_invalid_cursor: 400,
+	coding_workspace_unavailable: 503,
+	coding_workspace_busy: 409,
+	coding_branch_conflict: 409,
+	coding_authority_stale: 409,
+	coding_operation_conflict: 409,
+} as const satisfies Record<string, HttpErrorStatus>;

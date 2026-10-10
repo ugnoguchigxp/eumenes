@@ -1,4 +1,6 @@
+import { getLogger } from "../../../infrastructure/logger";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
+import { canonicalJson, sha256Hex } from "../../../infrastructure/digest";
 import type { QueueService, Tx } from "../../queue";
 import type { CreateSchedule, OccurrenceDto, ScheduleDto } from "../contracts";
 import {
@@ -22,6 +24,11 @@ import {
 import type { SchedulerOptions, TargetDefinition } from "../types";
 import { firstBoundaryAfter, firstBoundaryAtOrAfter, planFire } from "./clock";
 
+const log = getLogger("scheduler");
+const code = (error: unknown) =>
+	error instanceof Error && /^[a-z_]{1,80}$/.test(error.message)
+		? error.message
+		: "scheduler_failed";
 const iso = (ms: number) => new Date(ms).toISOString();
 const OPEN_JOB = ["queued", "running", "retry_wait", "cancel_requested"];
 const MAX_ABS_MS = 8.64e15 / 2;
@@ -48,16 +55,8 @@ function toDto(s: ScheduleRecord): ScheduleDto {
 		updatedAt: iso(s.updatedAtMs),
 	};
 }
-function canonical(value: unknown): string {
-	if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
-	if (value && typeof value === "object")
-		return `{${Object.entries(value as Record<string, unknown>)
-			.filter(([, v]) => v !== undefined)
-			.sort(([a], [b]) => (a < b ? -1 : 1))
-			.map(([k, v]) => `${JSON.stringify(k)}:${canonical(v)}`)
-			.join(",")}}`;
-	return JSON.stringify(value) ?? "null";
-}
+const canonical = (value: unknown) =>
+	canonicalJson(value, { omitUndefined: true, keyOrder: "codeUnit" });
 function cursorOf(value: string | null): number | null {
 	if (value === null) return null;
 	const n = Number(value);
@@ -66,6 +65,19 @@ function cursorOf(value: string | null): number | null {
 }
 
 type FireResult = "none" | "dispatched" | "skipped" | "deferred";
+function defaultSleep(ms: number, signal?: AbortSignal) {
+	return new Promise<void>((resolve) => {
+		const timer = setTimeout(resolve, ms);
+		signal?.addEventListener(
+			"abort",
+			() => {
+				clearTimeout(timer);
+				resolve();
+			},
+			{ once: true },
+		);
+	});
+}
 
 export function createScheduler(
 	store: SqliteStore,
@@ -78,22 +90,10 @@ export function createScheduler(
 	const tickLimit = options.tickLimit ?? 32;
 	const maxSchedules = options.maxSchedules ?? 256;
 	const deferMs = options.capacityBackoffMs ?? 2000;
-	const sleep =
-		options.sleep ??
-		((ms: number, signal?: AbortSignal) =>
-			new Promise<void>((resolve) => {
-				const timer = setTimeout(resolve, ms);
-				signal?.addEventListener(
-					"abort",
-					() => {
-						clearTimeout(timer);
-						resolve();
-					},
-					{ once: true },
-				);
-			}));
+	const sleep = options.sleep ?? defaultSleep;
 	const targets = new Map<string, TargetDefinition<unknown>>();
 	const retryAfter = new Map<string, number>();
+	const failures = new Map<string, number>();
 	let closing = false;
 	let loopPromise: Promise<void> | null = null;
 	let deferred = defer();
@@ -207,6 +207,7 @@ export function createScheduler(
 			);
 			if (result === "deferred") retryAfter.set(id, at + deferMs);
 			else retryAfter.delete(id);
+			failures.delete(id);
 			return result;
 		} catch (error) {
 			if (error instanceof CapacityDeferred || isBusy(error)) {
@@ -225,7 +226,14 @@ export function createScheduler(
 				return "deferred";
 			}
 			// Unexpected failure: do not let one schedule starve the others.
-			retryAfter.set(id, at + deferMs);
+			log.warn("scheduler.fire_failed", { reason: code(error) }, error);
+			const n = failures.get(id) ?? 0;
+			failures.set(id, n + 1);
+			const jitter = Math.floor(Math.random() * deferMs);
+			retryAfter.set(id, at + Math.min(300_000, deferMs * 2 ** n) + jitter);
+			await store
+				.write((db) => setDeferReason(db, id, "unexpected_failure", at))
+				.catch(() => {});
 			return "deferred";
 		}
 	}
@@ -237,8 +245,14 @@ export function createScheduler(
 
 	async function tickInner() {
 		const at = now();
-		const due = store
-			.read((db) => dueSchedules(db, at, Math.max(countActive(db), tickLimit)))
+		const allDue = store.read((db) =>
+			dueSchedules(db, at, Math.max(countActive(db), tickLimit)),
+		);
+		const dueIds = new Set(allDue.map((d) => d.id));
+		for (const id of retryAfter.keys())
+			if (!dueIds.has(id)) retryAfter.delete(id);
+		for (const id of failures.keys()) if (!dueIds.has(id)) failures.delete(id);
+		const due = allDue
 			.filter((d) => (retryAfter.get(d.id) ?? 0) <= at)
 			.slice(0, tickLimit);
 		let dispatched = 0;
@@ -259,18 +273,25 @@ export function createScheduler(
 			const mine = deferred;
 			let delay = pollMs;
 			try {
-				await tick();
+				const fired = await tick();
 				const next = store.read((db) => nextDueAt(db));
 				if (next !== null) {
 					const at = now();
 					// Due-but-deferred schedules wait for their retry time instead of spinning.
+					const future = [...retryAfter.values()].filter((t) => t > at);
 					const wait =
-						next <= at && retryAfter.size > 0
-							? Math.min(...retryAfter.values()) - at
+						next <= at
+							? future.length
+								? Math.min(...future) - at
+								: pollMs
 							: next - at;
 					delay = Math.max(10, Math.min(pollMs, wait));
+					// A full batch means more due schedules are likely waiting: keep
+					// draining at once. pollMs stays for due-but-not-fireable ones.
+					if (fired >= tickLimit && next <= at) delay = 10;
 				}
-			} catch {
+			} catch (error) {
+				log.warn("scheduler.tick_failed", { reason: code(error) }, error);
 				delay = Math.min(pollMs, deferMs);
 			}
 			if (closing) break;
@@ -330,20 +351,18 @@ export function createScheduler(
 			throw new Error("invalid_schedule_time");
 		const intervalMs =
 			input.schedule.type === "interval" ? input.schedule.intervalMs : null;
-		const digest = new Bun.CryptoHasher("sha256")
-			.update(
-				canonical({
-					kind: target.kind,
-					version: target.version,
-					payload: payload.data,
-					mode,
-					first,
-					intervalMs,
-					misfire: input.misfirePolicy,
-					grace: input.graceMs,
-				}),
-			)
-			.digest("hex");
+		const digest = sha256Hex(
+			canonical({
+				kind: target.kind,
+				version: target.version,
+				payload: payload.data,
+				mode,
+				first,
+				intervalMs,
+				misfire: input.misfirePolicy,
+				grace: input.graceMs,
+			}),
+		);
 		const existing = getByRequest(db, input.requestId);
 		if (existing) {
 			if (existing.inputDigest !== digest) throw new Error("request_conflict");

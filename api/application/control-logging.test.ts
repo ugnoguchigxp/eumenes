@@ -101,7 +101,7 @@ test("search timeout, successful retry and malformed report are correlated and s
 		const rejected = rows.filter(
 			(entry) => entry.event === "agent.control_rejected",
 		);
-		expect(rejected).toHaveLength(2);
+		expect(rejected).toHaveLength(3);
 		expect(rejected[0]).toMatchObject({
 			runId: r.id,
 			taskId: failed.taskId,
@@ -111,9 +111,9 @@ test("search timeout, successful retry and malformed report are correlated and s
 			repairAttempt: 0,
 			status: "repair_scheduled",
 		});
-		expect(rejected[1]).toMatchObject({
+		expect(rejected[2]).toMatchObject({
 			reason: "control_json_syntax",
-			repairAttempt: 1,
+			repairAttempt: 2,
 			status: "failed",
 		});
 		for (const row of rejected) {
@@ -140,10 +140,19 @@ test("valid JSON with a missing report field records the field and expected type
 		workerOutput: JSON.stringify({
 			action: "finish",
 			report: {
+				version: 2,
+				outcome: "answered",
+				exploration: ["fixture scope"],
 				claims: [
 					{
 						text: "PRIVATE_CLAIM",
-						evidence: [{ sourceId: "PRIVATE_SOURCE", quote: "PRIVATE_QUOTE" }],
+						evidence: [
+							{
+								sourceId: "PRIVATE_SOURCE",
+								viewId: "00000000-0000-4000-8000-000000000000",
+								excerptId: "e0",
+							},
+						],
 					},
 				],
 				limitations: [],
@@ -174,7 +183,7 @@ test("valid JSON with a missing report field records the field and expected type
 			output
 				.entries()
 				.filter((entry) => entry.event === "agent.control_rejected"),
-		).toHaveLength(2);
+		).toHaveLength(3);
 		expect(output.lines.join("")).not.toContain("PRIVATE");
 		const feedback = JSON.parse(h.workerContexts[1]!).find(
 			(message: { content: string }) => message.content.includes("DIAGNOSTIC="),
@@ -204,8 +213,8 @@ for (const options of [{ badToolArgs: true }, { badQuote: true }])
 								entry.validationPath === "arguments.url" &&
 								entry.expectedType === "string"
 							: entry.reason === "invalid_evidence" &&
-								entry.validationPath === "report.claims.0.evidence.0.quote" &&
-								entry.validationCode === "quote_mismatch"),
+								entry.validationPath === "report.claims.0.evidence.0.viewId" &&
+								entry.validationCode === "unknown_view"),
 				),
 			).toBe(true);
 			expect(output.lines.join("")).not.toContain(forbidden);
@@ -213,7 +222,7 @@ for (const options of [{ badToolArgs: true }, { badQuote: true }])
 				context.includes("DIAGNOSTIC="),
 			);
 			expect(repair).toContain(
-				options.badToolArgs ? "arguments.url" : "quote_mismatch",
+				options.badToolArgs ? "arguments.url" : "unknown_view",
 			);
 		} finally {
 			await h.close();

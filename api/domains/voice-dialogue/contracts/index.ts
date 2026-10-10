@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { HttpErrorStatus } from "../../../infrastructure/http";
 import { speechDeliverySchema } from "../../delivery";
 export const voiceStartSchema = z.object({
 	sessionId: z.uuid(),
@@ -60,3 +61,11 @@ export const previewResultSchema = z.object({
 export const replaySentencesSchema = z.object({
 	sentences: z.array(z.string()),
 });
+
+/** HTTP status of each error code this domain throws; merged by `api/application/error-status.ts`. */
+export const errorStatus = {
+	voice_sequence_out_of_order: 409,
+	voice_utterance_conflict: 409,
+	voice_preview_busy: 409,
+	voice_sequence_invalid: 400,
+} as const satisfies Record<string, HttpErrorStatus>;

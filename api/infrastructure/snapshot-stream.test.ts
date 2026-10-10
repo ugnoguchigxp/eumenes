@@ -52,3 +52,17 @@ test("a slow reader has bounded snapshots and still receives the final state", a
 	expect(frames.length).toBeLessThanOrEqual(5);
 	expect(frames.at(-1)).toContain("99");
 });
+test("a subscribe failure releases its slot so capacity is never exhausted", async () => {
+	for (let i = 0; i < 33; i++) {
+		const stream = snapshotStream<string>(
+			() => {
+				throw new Error("subscribe_failed");
+			},
+			() => true,
+			new AbortController().signal,
+		);
+		await expect(new Response(stream).text()).rejects.toThrow(
+			"subscribe_failed",
+		);
+	}
+});

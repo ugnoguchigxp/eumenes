@@ -1,3 +1,4 @@
+import { researchHistoryLiveCases } from "./research-history-live-cases";
 import {
 	mkdtempSync,
 	rmSync,
@@ -12,6 +13,7 @@ import { createClient } from "../client";
 import {
 	checkLiveResearch,
 	checkLiveForecastDate,
+	checkLiveCitations,
 } from "../api/application/toolchain-live-check";
 import {
 	resolveApiToken,
@@ -19,9 +21,10 @@ import {
 } from "../api/infrastructure/auth-config";
 if (
 	process.env.EUMENES_LIVE_TOOLCHAIN !== "1" ||
-	!resolveLarmToken(process.env)
+	!resolveLarmToken(process.env) ||
+	!process.env.LARM_BASE_URL?.trim()
 )
-	throw new Error("live_toolchain_requires_explicit_flag_and_larm_token");
+	throw new Error("live_toolchain_requires_explicit_flag_larm_url_and_token");
 // Always spawn an isolated real backend. Never copy or open the user's product database.
 const dir = mkdtempSync(join(tmpdir(), "eumenes-live-toolchain-"));
 const reservation = Bun.serve({
@@ -32,11 +35,12 @@ const reservation = Bun.serve({
 const port = reservation.port;
 reservation.stop(true);
 const base = `http://127.0.0.1:${port}`;
-const token = resolveApiToken(process.env);
+const token = resolveApiToken({ EUMENES_DB: join(dir, "db.sqlite3") });
 const backend = Bun.spawn([process.execPath, "api/application/server.ts"], {
 	env: {
 		...process.env,
 		EUMENES_DB: join(dir, "db.sqlite3"),
+		EUMENES_API_TOKEN: token,
 		EUMENES_ATTITUDE_DATASET: join(dir, "attitude.sqlite3"),
 		EUMENES_MEMORY_JOURNAL: join(dir, "journal.jsonl"),
 		EUMENES_LOG_FILE: join(dir, "api.jsonl"),
@@ -68,43 +72,76 @@ try {
 	const connection = await client.connectLarm();
 	if (connection.larm.state !== "ready")
 		throw new Error("isolated_larm_not_ready");
-	const searchSuite = process.argv.includes("search");
-	const cases = searchSuite
-		? [
-				{
-					name: "kamakura-today",
-					kind: "weather" as const,
-					question:
-						"今日の鎌倉の天気と最高気温をWeb検索で調べてください。予報対象日も確認してください。",
-				},
-				{
-					name: "kamakura-tomorrow",
-					kind: "weather" as const,
-					question:
-						"明日の鎌倉の天気と最高気温をWeb検索で調べてください。予報対象日も確認してください。",
-				},
-				{
-					name: "bun-docs",
-					kind: "general" as const,
-					question:
-						"Bunの公式ドキュメントをWeb検索し、テストを実行するコマンドを確認してください。",
-				},
-			]
-		: [
-				{
-					name: "weather",
-					kind: "weather" as const,
-					question:
-						"東京都千代田区の明日の天気と最高気温を調べてください。予報対象日時も確認してください。",
-				},
-				{
-					name: "stock",
-					kind: "stock" as const,
-					question:
-						"Apple (NASDAQ: AAPL) の最新の株価を調べてください。価格、通貨、価格の時点を確認してください。",
-				},
-			];
-	for (const item of cases) {
+	const researchHistorySuite = process.argv.includes("research-history");
+	const answerSuite = process.argv.includes("answers");
+	if (researchHistorySuite)
+		results.push(...(await researchHistoryLiveCases(client)));
+	const weatherOnly = process.argv.includes("weather-only");
+	const searchSuite = process.argv.includes("search") || answerSuite;
+	if (answerSuite) {
+		const settings = await client.settings();
+		settings.general.persona = "strategist";
+		await client.applySettings({
+			requestId: crypto.randomUUID(),
+			expectedRevision: settings.revision,
+			settings,
+			keys: [],
+		});
+	}
+	const cases = researchHistorySuite
+		? []
+		: answerSuite
+			? [
+					{
+						name: "kamakura-today",
+						kind: "weather" as const,
+						question: "今日の鎌倉の天気教えて。",
+					},
+					{
+						name: "bun-docs",
+						kind: "general" as const,
+						question:
+							"Bunの公式ドキュメントをWeb検索し、テストを実行するコマンドを確認してください。",
+					},
+				]
+			: searchSuite
+				? [
+						{
+							name: "kamakura-today",
+							kind: "weather" as const,
+							question:
+								"今日の鎌倉の天気と最高気温をWeb検索で調べてください。予報対象日も確認してください。",
+						},
+						{
+							name: "kamakura-tomorrow",
+							kind: "weather" as const,
+							question:
+								"明日の鎌倉の天気と最高気温をWeb検索で調べてください。予報対象日も確認してください。",
+						},
+						{
+							name: "bun-docs",
+							kind: "general" as const,
+							question:
+								"Bunの公式ドキュメントをWeb検索し、テストを実行するコマンドを確認してください。",
+						},
+					]
+				: [
+						{
+							name: "weather",
+							kind: "weather" as const,
+							question:
+								"東京都千代田区の明日の天気と最高気温を調べてください。予報対象日時も確認してください。",
+						},
+						{
+							name: "stock",
+							kind: "stock" as const,
+							question:
+								"Apple (NASDAQ: AAPL) の最新の株価を調べてください。価格、通貨、価格の時点を確認してください。",
+						},
+					];
+	for (const item of cases.filter(
+		(item) => !weatherOnly || item.kind === "weather",
+	)) {
 		const started = performance.now();
 		const requestedDate = new Intl.DateTimeFormat("en-CA", {
 			timeZone: "Asia/Tokyo",
@@ -155,10 +192,10 @@ try {
 											(s) =>
 												s.sourceId === e.sourceId &&
 												(/^(?:www\.)?bun\.(?:sh|com)$/.test(
-													new URL(s.url).hostname,
+													new URL(s.url!).hostname,
 												) ||
-													(new URL(s.url).hostname === "github.com" &&
-														new URL(s.url).pathname.startsWith(
+													(new URL(s.url!).hostname === "github.com" &&
+														new URL(s.url!).pathname.startsWith(
 															"/oven-sh/bun/",
 														))),
 										),
@@ -166,9 +203,9 @@ try {
 							),
 						priceTimeVerified: !!report?.sources.some(
 							(s) =>
-								/^(?:www\.)?bun\.(?:sh|com)$/.test(new URL(s.url).hostname) ||
-								(new URL(s.url).hostname === "github.com" &&
-									new URL(s.url).pathname.startsWith("/oven-sh/bun/")),
+								/^(?:www\.)?bun\.(?:sh|com)$/.test(new URL(s.url!).hostname) ||
+								(new URL(s.url!).hostname === "github.com" &&
+									new URL(s.url!).pathname.startsWith("/oven-sh/bun/")),
 						),
 					}
 				: checkLiveResearch(item.kind, report, answer);
@@ -187,6 +224,17 @@ try {
 		const acquisitionVerified =
 			!searchSuite ||
 			(searchVerified && (item.kind === "general" || fullTextVerified));
+		const citationsVerified = checkLiveCitations(report, answer);
+		const answerHasContext =
+			!answerSuite ||
+			item.kind !== "weather" ||
+			(!!answer &&
+				/最高/.test(answer) &&
+				/最低/.test(answer) &&
+				/降水確率/.test(answer));
+		const factualReporting =
+			!answerSuite ||
+			!/と見ます|結論から|紫外線|お出かけ指数|洗濯|星空/.test(answer ?? "");
 		const ok =
 			current.status === "completed" &&
 			child?.status === "completed" &&
@@ -196,9 +244,15 @@ try {
 			valuesMatch &&
 			priceTimeVerified &&
 			targetDateVerified &&
-			acquisitionVerified;
+			acquisitionVerified &&
+			citationsVerified &&
+			answerHasContext &&
+			factualReporting;
 		const result = {
 			case: item.name,
+			citationsVerified,
+			answerHasContext,
+			factualReporting,
 			requestedDate,
 			numeric,
 			valuesMatch,
@@ -211,6 +265,7 @@ try {
 			errorCode: current.error,
 			rootError: tasks.find((t) => t.kind === "coordinator")?.errorCode,
 			childStatus: child?.status,
+			packageRevisionId: child?.packageRevisionId,
 			childError: child?.errorCode,
 			modelCalls: tasks.reduce((s, t) => s + t.modelCalls, 0),
 			toolCalls: child?.toolCalls,
@@ -230,7 +285,16 @@ try {
 	const path = "verification-reports/toolchain";
 	mkdirSync(path, { recursive: true });
 	writeFileSync(
-		join(path, searchSuite ? "search-live.json" : "live.json"),
+		join(
+			path,
+			researchHistorySuite
+				? "research-history-live.json"
+				: answerSuite
+					? "answer-live.json"
+					: searchSuite
+						? "search-live.json"
+						: "live.json",
+		),
 		JSON.stringify(
 			{
 				at: new Date().toISOString(),

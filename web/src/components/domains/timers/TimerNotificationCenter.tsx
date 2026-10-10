@@ -64,9 +64,11 @@ export function TimerNotificationCenter({
 			}
 		/>
 	);
-	const card = (item: TimerNotificationDto) => (
+	// The expiry itself is announced assertively; the drawer list is read on demand.
+	const card = (item: TimerNotificationDto, announce = false) => (
 		<NotificationCard
 			key={item.id}
+			role={announce ? "alert" : undefined}
 			className="timer-notification"
 			appName="Eumenes"
 			title="タイマーが終了しました"
@@ -138,7 +140,7 @@ export function TimerNotificationCenter({
 			>
 				<div className="notification-center-list" aria-label="通知一覧">
 					{audioPrompt}
-					{sorted.map(card)}
+					{sorted.map((item) => card(item))}
 					{!notices.length && (
 						<div className="notification-center-empty">
 							<NotificationIcon />
@@ -154,14 +156,14 @@ export function TimerNotificationCenter({
 				</div>
 			</Drawer>
 			{!open && (notices.length > 0 || audioPrompt || error) && (
-				<section
+				<output
 					className="timer-notifications"
 					aria-label="タイマーの終了"
 					aria-live="polite"
 					aria-relevant="additions"
 				>
 					{audioPrompt}
-					{sorted.slice(0, 3).map(card)}
+					{sorted.slice(0, 3).map((item) => card(item, true))}
 					{notices.length > 3 && (
 						<Button
 							variant="secondary"
@@ -176,7 +178,7 @@ export function TimerNotificationCenter({
 							{error}
 						</p>
 					)}
-				</section>
+				</output>
 			)}
 		</>
 	);

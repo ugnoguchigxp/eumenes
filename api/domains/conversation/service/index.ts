@@ -27,6 +27,9 @@ import {
 	type OutboxOptions,
 } from "../repository";
 
+import { createHistory } from "./history";
+import type { HistoryOwner } from "../contracts/history";
+
 export type ConversationServiceOptions = {
 	/** Principal / scope recorded on outbox events and source states. */
 	principal?: string;
@@ -46,6 +49,12 @@ export function createConversationService(
 		required: serviceOptions.requireOutbox ?? false,
 	};
 	const clock = serviceOptions.clock ?? (() => new Date().toISOString());
+	const history = createHistory(() => Date.parse(clock()), outbox);
+	const apiOwner = (conversationId: string): HistoryOwner => ({
+		key: "api:local:owner",
+		conversationId,
+		deadline: Date.parse(clock()) + 900000,
+	});
 	const correctInTransaction = (
 		db: Database,
 		input: { messageId: string; text: string; at?: string },
@@ -65,6 +74,17 @@ export function createConversationService(
 			outbox,
 		);
 	return {
+		historyFingerprintInTransaction: history.fingerprint,
+		historySearchInTransaction: history.search,
+		historyReadInTransaction: history.read,
+		validateHistoryInTransaction: history.validate,
+		releaseHistory: history.release,
+		searchHistory(id: string, raw: unknown) {
+			return store.readSnapshot((db) => history.search(db, apiOwner(id), raw));
+		},
+		readHistory(id: string, raw: unknown) {
+			return store.readSnapshot((db) => history.read(db, apiOwner(id), raw));
+		},
 		/** True when the outbox migration is applied to this connection. */
 		outboxReadyInTransaction(db: Database): boolean {
 			return outboxReady(db);

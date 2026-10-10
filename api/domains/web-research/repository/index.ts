@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import type { Migration } from "../../../infrastructure/sqlite";
 import type { ResearchRequest, ResearchState } from "../contracts";
 
 export const migration = `
@@ -98,3 +99,9 @@ export function sweepRuns(db: Database, now: number) {
 		"DELETE FROM web_research_runs WHERE id IN (SELECT id FROM web_research_runs WHERE finished_at_ms<=? LIMIT 100)",
 	).run(now - 30 * 86400000);
 }
+
+/** Named migrations of this domain; the SQL above is frozen once deployed. */
+export const migrations: readonly Migration[] = [
+	{ id: "web-research/0001-init", sql: migration },
+	{ id: "web-research/0002-attempt-timeout", sql: attemptTimeoutMigration },
+];

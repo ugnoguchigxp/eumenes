@@ -214,6 +214,10 @@ select:focus-visible {
 	font-size: 0.87rem;
 	line-height: 1.6;
 }
+.markdown-content .link-host {
+	color: var(--muted-foreground);
+	font-size: 0.85em;
+}
 .markdown-content > :first-child {
 	margin-top: 5px;
 }

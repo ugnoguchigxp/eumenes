@@ -5,14 +5,6 @@ import type { QueueService, HandlerDefinition } from "../domains/queue";
 import type { SchedulerService } from "../domains/scheduler";
 import type { SqliteStore } from "../infrastructure/sqlite";
 
-export function delegatedTasksEnabled(
-	env: Record<string, string | undefined> = process.env,
-) {
-	const value = env.EUMENES_DELEGATED_TASKS_ENABLED ?? "0";
-	if (value !== "0" && value !== "1")
-		throw new Error("invalid_delegated_tasks_flag");
-	return value === "1";
-}
 /** Future coding/runner wiring must provide confirmed receipts, never arbitrary shell text. */
 export interface TaskExecutionPort {
 	available(): boolean;
@@ -75,7 +67,11 @@ export function createDelegatedTasks(input: {
 	const aborted = new Set<string>();
 	const registeringMonitor = new Set<string>();
 	const available = () => input.enabled && execution?.available() === true;
-	function cancelRuntime(tx: Database, t: WorkTask, exceptJobId?: string) {
+	function cancelRuntime(
+		tx: Database,
+		t: WorkTask,
+		exceptJobId?: string,
+	) {
 		const refs = tasks.runtimeInTransaction(tx, t.id);
 		if (refs.scheduleId) {
 			const s = scheduler.getInTransaction(tx, refs.scheduleId);

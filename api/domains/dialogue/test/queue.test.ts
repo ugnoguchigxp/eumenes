@@ -34,9 +34,9 @@ const migrations = [
 	queueLinkMigration,
 ];
 async function until(cond: () => boolean) {
-	for (let i = 0; i < 300; i++) {
+	for (let i = 0; i < 3000; i++) {
 		if (cond()) return;
-		await new Promise((r) => setTimeout(r, 5));
+		await new Promise((r) => setImmediate(r));
 	}
 	throw new Error("condition not reached");
 }
@@ -143,7 +143,8 @@ test("restart: queued runs continue, a running run is interrupted, late result f
 	queue2.start();
 	await until(() => h.calls.length === 2);
 	h.calls[0]?.resolve("old answer");
-	await new Promise((r) => setTimeout(r, 30));
+	// let the late result be (wrongly) processed, if it were going to be
+	for (let i = 0; i < 20; i++) await new Promise((r) => setImmediate(r));
 	expect(dialogue2.get(a.id)?.status).toBe("interrupted");
 	h.calls[1]?.resolve("ansB");
 	await until(() => dialogue2.get(b.id)?.status === "completed");

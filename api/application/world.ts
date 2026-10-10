@@ -10,6 +10,7 @@ import {
 } from "node:fs";
 import { dirname, join } from "node:path";
 import type { ScopeRef } from "eumenes-world-model";
+import { parseWorldMode, type WorldMode } from "../infrastructure/config";
 import { getLogger } from "../infrastructure/logger";
 import type { SqliteStore } from "../infrastructure/sqlite";
 import {
@@ -65,17 +66,12 @@ import {
  * read as "no forgetting".
  */
 export const WORLD_ENV = "EUMENES_WORLD";
-export type WorldMode = "off" | "protect" | "on";
+export type { WorldMode };
 
 export function worldModeFromEnv(
-	env: Record<string, string | undefined> = process.env,
+	env: Record<string, string | undefined>,
 ): WorldMode {
-	const raw = (env[WORLD_ENV] ?? "").trim().toLowerCase();
-	if (raw === "" || raw === "off" || raw === "0" || raw === "false")
-		return "off";
-	if (raw === "protect") return "protect";
-	if (raw === "on" || raw === "1" || raw === "true") return "on";
-	throw new Error("world_mode_invalid");
+	return parseWorldMode(env[WORLD_ENV]);
 }
 
 /** AccessContext purposes the conversation SourceAdapter allows (deny by default). */
@@ -111,8 +107,7 @@ export function resolveWorldCursorSecret(options: {
 	dbPath: string;
 	env?: Record<string, string | undefined>;
 }): string {
-	const env = options.env ?? process.env;
-	const fromEnv = env["EUMENES_WORLD_CURSOR_SECRET"];
+	const fromEnv = options.env?.["EUMENES_WORLD_CURSOR_SECRET"];
 	if (fromEnv !== undefined && fromEnv !== "") {
 		if (fromEnv.length < MIN_SECRET_CHARS)
 			throw new Error("world_cursor_secret_invalid");

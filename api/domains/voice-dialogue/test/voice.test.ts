@@ -297,6 +297,17 @@ test("replay splits finished text into clauses and synthesizes on demand", async
 			"今日は晴れです。",
 			"明日は雨です。",
 		]);
+		expect(
+			voice.replaySentences(
+				"調べました。晴れ、最高26度、最低17度、降水確率0％です。\n\nソース：[tenki.jp](https://tenki.jp/forecast/3/17/4610/14204/)",
+			),
+		).toEqual([
+			"調べました。",
+			"晴れ、",
+			"最高26度、",
+			"最低17度、",
+			"降水確率0％です。",
+		]);
 		await voice.replayAudio("今日は晴れです。", new AbortController().signal);
 		expect(spoken).toEqual(["今日は晴れです。"]);
 		await expect(

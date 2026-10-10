@@ -189,6 +189,7 @@ export async function routeHarness(options: Options = {}) {
 				) as {
 					observations: {
 						sourceId: string;
+						viewId?: string;
 						basis: string;
 						url: string;
 						body: string;
@@ -201,6 +202,44 @@ export async function routeHarness(options: Options = {}) {
 				const tools = JSON.parse(
 					system.split("TOOLS=")[1]!.split("\nOUTPUT_SCHEMA=")[0]!,
 				) as { executionRef: string; id: string }[];
+				const respond = (value: any) => {
+					if (system.includes("version:2")) {
+						value.needs = [
+							{
+								id: "answer",
+								item: data.task.question.slice(0, 200),
+								requestQuote: data.task.question.slice(0, 300),
+								status: value.report ? "confirmed" : "missing",
+							},
+						];
+						if (value.report)
+							value.report = {
+								...value.report,
+								version: 2,
+								outcome: "answered",
+								exploration: ["fixture公開資料"],
+								claims: value.report.claims.map((c: any) => ({
+									...c,
+									evidence: c.evidence.map((e: any) => {
+										const source = data.observations.find(
+											(s) => s.sourceId === e.sourceId,
+										)!;
+										return {
+											sourceId: e.sourceId,
+											viewId: source.viewId,
+											excerptId:
+												source.excerpts.find(
+													(x) =>
+														x.quote.includes(e.quote) ||
+														e.quote.includes(x.quote),
+												)?.excerptId ?? source.excerpts[0]!.excerptId,
+										};
+									}),
+								})),
+							};
+					}
+					return JSON.stringify(value);
+				};
 				const page = data.observations.find((o) => o.basis === "page");
 				if (page && page.body.includes('"regularMarketPrice"')) {
 					const line = page.body.split("\n")[1]!;
@@ -212,7 +251,7 @@ export async function routeHarness(options: Options = {}) {
 						market: string;
 						priceTimeUtc: string;
 					};
-					return JSON.stringify({
+					return respond({
 						action: "finish",
 						report: {
 							summary: line,
@@ -246,7 +285,7 @@ export async function routeHarness(options: Options = {}) {
 						/^(\S+) (\d{4}-\d{2}-\d{2}) 天気 (\S+) 最高気温 (-?\d+) 発表 (\S+)$/.exec(
 							line,
 						)!;
-					return JSON.stringify({
+					return respond({
 						action: "finish",
 						report: {
 							summary: line,
@@ -276,7 +315,7 @@ export async function routeHarness(options: Options = {}) {
 					});
 				}
 				const hit = data.observations[0];
-				return JSON.stringify({
+				return respond({
 					action: "invoke",
 					executionRef: tools.find(
 						(t) =>

@@ -114,13 +114,45 @@ export function parseDefinition(input: string): ArtifactRequest {
 	return parseRequest(JSON.parse(input));
 }
 
+const SAFE_DATA_IMAGE = /^data:image\/(?:png|jpeg|webp|svg\+xml);/i;
+/** Only https:, blob: and a short list of raster/SVG data: URLs may be shown as an image. */
+export function isSafeImageUrl(value: string): boolean {
+	return /^(?:https:|blob:)/i.test(value) || SAFE_DATA_IMAGE.test(value);
+}
+export const imageUrlSchema = z.string().refine(isSafeImageUrl, {
+	message: "unsafe_image_url",
+});
 export type ImageResource = {
 	kind: "generated-image";
 	revision: number;
 	status: "queued" | "running" | "succeeded" | "failed" | "cancelled";
 	url?: string;
+	mimeType?: string;
 	alt: string;
 };
+const IMAGE_EXTENSIONS: Record<string, string> = {
+	"image/png": "png",
+	"image/jpeg": "jpg",
+	"image/jpg": "jpg",
+	"image/webp": "webp",
+	"image/svg+xml": "svg",
+};
+/** Download name derived from the mime type, else the data: header or URL extension. */
+export function imageDownloadName(image: {
+	url?: string;
+	mimeType?: string;
+}): string {
+	const mime = (
+		image.mimeType ?? /^data:([^;,]+)/i.exec(image.url ?? "")?.[1]
+	)?.toLowerCase();
+	let ext = mime ? IMAGE_EXTENSIONS[mime] : undefined;
+	if (!ext && image.url && !image.url.startsWith("data:")) {
+		const path = image.url.split(/[?#]/)[0] ?? "";
+		const found = /\.(png|jpe?g|webp|svg)$/i.exec(path)?.[1]?.toLowerCase();
+		ext = found === "jpeg" ? "jpg" : found;
+	}
+	return ext ? `generated-image.${ext}` : "generated-image";
+}
 export type QuestionResource = {
 	kind: "question";
 	revision: number;

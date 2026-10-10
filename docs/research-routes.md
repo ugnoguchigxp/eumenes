@@ -26,3 +26,7 @@ bun run cli research-routes clear <expectedEpoch>
 ## 運用
 
 ログは `docs/logging.md` の「取得先学習」を参照。実LARM・実Webの受入は `EUMENES_LIVE_RESEARCH_ROUTES=1 bun run verify:live -- --domain research-routes`。
+
+## 概要(README から移設)
+
+初回の「天気予報 鎌倉」「株価 AAPL」のような依頼はWeb検索で取得先を探し、回答後に成功した1サイトの取得手順を登録します。同じキーワードの次回は登録サイトを直接確認し、値は毎回取得し直します。サイト故障時は再検索して新しい取得先に更新します。操作は設定の「取得先と手順」またはCLI（`bun run cli research-routes list|show|edit|disable|rediscover|clear`）で、どちらもAPIだけを使います。静岡市のlive対応は未確認で、実機器の音声3往復も未実施です（[検証記録](../spec/verification/research-routes/README.md)）。

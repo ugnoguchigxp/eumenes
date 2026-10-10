@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { HttpErrorStatus } from "../../../infrastructure/http";
 export type Capability = "llm" | "asr" | "tts";
 export type LarmExchange = {
 	connectionId: string;
@@ -94,3 +95,9 @@ export const statusResponseSchema = z.object({
 	larm: larmStatusSchema,
 });
 export type StatusResponse = z.infer<typeof statusResponseSchema>;
+
+/** HTTP status of each error code this domain throws; merged by `api/application/error-status.ts`. */
+export const errorStatus = {
+	larm_base_url_unconfigured: 409,
+	larm_provider_host_mismatch: 502,
+} as const satisfies Record<string, HttpErrorStatus>;

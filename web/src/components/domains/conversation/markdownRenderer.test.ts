@@ -25,3 +25,13 @@ test("an empty list entry does not hide the following answer or bypass escaping"
 		"<ul><li>最初</li><li></li><li>&lt;script&gt;次&lt;/script&gt;</li></ul><p>続き</p>",
 	);
 });
+
+test("link text that hides the destination host gets the hostname appended", () => {
+	const hidden = renderSafeMarkdown("[公式サイト](https://phish.example/)");
+	expect(hidden).toContain(
+		'公式サイト<span class="link-host">(phish.example)</span></a>',
+	);
+	expect(
+		renderSafeMarkdown("[https://a.example](https://a.example)"),
+	).not.toContain("link-host");
+});

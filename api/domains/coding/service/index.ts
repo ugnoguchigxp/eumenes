@@ -1,6 +1,6 @@
 import type { Database } from "bun:sqlite";
-import { createHash } from "node:crypto";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
+import { sha256Hex } from "../../../infrastructure/digest";
 import {
 	executionSpecSchema,
 	canonicalJSON,
@@ -13,8 +13,7 @@ import {
 import { type CodingExecutionView } from "../contracts";
 import * as repo from "../repository";
 
-const hash = (value: unknown) =>
-	createHash("sha256").update(canonicalJSON(value)).digest("hex");
+const hash = (value: unknown) => sha256Hex(canonicalJSON(value));
 export interface CodingAuthority {
 	taskId: string;
 	generation: number;
@@ -175,8 +174,7 @@ export function createCoding(input: {
 		if (
 			r.operationId !== spec.operationId ||
 			r.generation !== spec.generation ||
-			r.specDigest !==
-				createHash("sha256").update(canonicalJSON(spec)).digest("hex")
+			r.specDigest !== sha256Hex(canonicalJSON(spec))
 		)
 			throw new Error("coding_receipt_conflict");
 		const previous = row.receipt_json

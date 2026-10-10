@@ -1,3 +1,7 @@
+// @ts-check
+// "three" is intentionally untyped here (see three.d.ts); these aliases document intent.
+/** @typedef {any} ThreeColor A color accepted by THREE.Color. */
+/** @typedef {any} ThreeObject A THREE.Object3D / Vector3 / Curve instance. */
 import * as THREE from "three";
 import { sampleMotion, blendPose } from "./motion.js";
 import { sampleIdlePose } from "./idle.ts";
@@ -22,6 +26,7 @@ float hash(vec3 p){p=fract(p*.3183099+vec3(.1,.2,.3));p*=17.0;return fract(p.x*p
 float noise(vec3 p){vec3 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(mix(hash(i),hash(i+vec3(1,0,0)),f.x),mix(hash(i+vec3(0,1,0)),hash(i+vec3(1,1,0)),f.x),f.y),mix(mix(hash(i+vec3(0,0,1)),hash(i+vec3(1,0,1)),f.x),mix(hash(i+vec3(0,1,1)),hash(i+vec3(1,1,1)),f.x),f.y),f.z);}
 float fbm(vec3 p){return .55*noise(p)+.28*noise(p*2.07)+.14*noise(p*4.17);}
 `;
+/** @param {HTMLElement} host */
 export function createLightAvatar(host) {
 	const renderer = new THREE.WebGLRenderer({
 		antialias: true,
@@ -30,11 +35,20 @@ export function createLightAvatar(host) {
 		powerPreference: "low-power",
 	});
 
+	/** @type {Set<{ dispose(): void }>} */
 	const resources = new Set();
+	/**
+	 * @template T
+	 * @param {T} resource
+	 * @returns {T}
+	 */
 	const own = (resource) => {
-		resources.add(resource);
+		resources.add(
+			/** @type {{ dispose(): void }} */ (/** @type {unknown} */ (resource)),
+		);
 		return resource;
 	};
+	/** @param {any} resource */
 	const release = (resource) => {
 		if (resources.delete(resource)) resource.dispose();
 	};
@@ -50,7 +64,12 @@ export function createLightAvatar(host) {
 	}
 	try {
 		renderer.info.autoReset = false;
-		renderer.debug.onShaderError = (gl, program, vs, fs) => {
+		renderer.debug.onShaderError = (
+			/** @type {any} */ gl,
+			/** @type {any} */ _program,
+			/** @type {any} */ vs,
+			/** @type {any} */ fs,
+		) => {
 			throw new Error(
 				"3D shader: " + gl.getShaderInfoLog(vs) + " " + gl.getShaderInfoLog(fs),
 			);
@@ -99,7 +118,9 @@ export function createLightAvatar(host) {
 		const lightCanvas = document.createElement("canvas");
 		lightCanvas.width = 64;
 		lightCanvas.height = 128;
-		const lightContext = lightCanvas.getContext("2d"),
+		const lightContext = /** @type {CanvasRenderingContext2D} */ (
+				lightCanvas.getContext("2d")
+			),
 			gradient = lightContext.createRadialGradient(32, 64, 5, 32, 64, 66);
 		gradient.addColorStop(0, "white");
 		gradient.addColorStop(0.62, "#aaaaaa");
@@ -107,7 +128,11 @@ export function createLightAvatar(host) {
 		lightContext.fillStyle = gradient;
 		lightContext.fillRect(0, 0, 64, 128);
 		const studioTexture = own(new THREE.CanvasTexture(lightCanvas));
-		for (const [position, size, color] of [
+		for (const [
+			position,
+			size,
+			color,
+		] of /** @type {[number[], number[], number[]][]} */ ([
 			[
 				[-3, 1, 3],
 				[1.1, 5.8],
@@ -128,19 +153,19 @@ export function createLightAvatar(host) {
 				[0.8, 5],
 				[1.9, 1.5, 1.8],
 			],
-		]) {
+		])) {
 			const card = new THREE.Mesh(
-				own(new THREE.PlaneGeometry(...size)),
+				own(new THREE.PlaneGeometry(size[0], size[1])),
 				own(
 					new THREE.MeshBasicMaterial({
 						map: studioTexture,
-						color: new THREE.Color(...color),
+						color: new THREE.Color(color[0], color[1], color[2]),
 						side: THREE.DoubleSide,
 						toneMapped: false,
 					}),
 				),
 			);
-			card.position.set(...position);
+			card.position.set(position[0] ?? 0, position[1] ?? 0, position[2] ?? 0);
 			card.lookAt(0, 0.4, 0);
 			studio.add(card);
 		}
@@ -154,7 +179,7 @@ export function createLightAvatar(host) {
 		scene.environment = environment.texture;
 		release(environmentCube);
 		release(pmrem);
-		studio.traverse((o) => {
+		studio.traverse((/** @type {any} */ o) => {
 			release(o.geometry);
 			release(o.material);
 		});
@@ -190,7 +215,7 @@ export function createLightAvatar(host) {
 					side: THREE.DoubleSide,
 				}),
 			);
-			m.onBeforeCompile = (shader) => {
+			m.onBeforeCompile = (/** @type {any} */ shader) => {
 				if (!rigged) return;
 				Object.assign(shader.uniforms, uniforms);
 				shader.vertexShader = commonDeform + shader.vertexShader;
@@ -211,7 +236,7 @@ export function createLightAvatar(host) {
 			foldGlass = pearlMaterial(true),
 			armGlass = pearlMaterial(true, false);
 		const baseSpiritCompile = spiritGlass.onBeforeCompile;
-		spiritGlass.onBeforeCompile = (shader) => {
+		spiritGlass.onBeforeCompile = (/** @type {any} */ shader) => {
 			baseSpiritCompile(shader);
 			shader.vertexShader =
 				"varying float vTorsoHeight;\n" + shader.vertexShader;
@@ -227,6 +252,7 @@ export function createLightAvatar(host) {
 			);
 		};
 		spiritGlass.customProgramCacheKey = () => "saaa-pearl-torso";
+		/** @param {ThreeColor} color */
 		const surfaceMaterial = (
 			color,
 			opacity = 0.28,
@@ -257,6 +283,7 @@ export function createLightAvatar(host) {
 			materials.push(m);
 			return m;
 		};
+		/** @param {ThreeColor} color */
 		const lineMaterial = (color, opacity = 0.3, rigged = true) => {
 			const m = own(
 				new THREE.ShaderMaterial({
@@ -279,6 +306,7 @@ export function createLightAvatar(host) {
 			materials.push(m);
 			return m;
 		};
+		/** @param {ThreeColor} color */
 		const pointMaterial = (color, size = 1, alpha = 0.65, cloud = false) => {
 			const m = own(
 				new THREE.ShaderMaterial({
@@ -306,6 +334,10 @@ export function createLightAvatar(host) {
 			materials.push(m);
 			return m;
 		};
+		/**
+		 * @param {number[][]} list
+		 * @param {ThreeColor} color
+		 */
 		function makePoints(list, color, size = 1, alpha = 0.65, cloud = false) {
 			const geo = own(new THREE.BufferGeometry());
 			geo.setAttribute(
@@ -322,6 +354,7 @@ export function createLightAvatar(host) {
 			geo.setAttribute("aPhase", new THREE.Float32BufferAttribute(phases, 1));
 			return new THREE.Points(geo, pointMaterial(color, size, alpha, cloud));
 		}
+		/** @param {ThreeColor} color */
 		function glow(color, size = 1) {
 			const mat = own(
 				new THREE.ShaderMaterial({
@@ -339,6 +372,7 @@ export function createLightAvatar(host) {
 			g.scale.setScalar(size);
 			return g;
 		}
+		/** @type {Record<string, [number, number, number, number][]>} */
 		const profiles = {
 			b: [
 				[0, -1.96, 0, 0.008],
@@ -359,18 +393,29 @@ export function createLightAvatar(host) {
 				[1, 2.14, -0.15, 0.003],
 			],
 		};
+		/**
+		 * @param {number} u
+		 * @param {string} kind
+		 * @returns {[number, number, number]}
+		 */
 		function profile(u, kind) {
-			const p = profiles[kind];
+			const p = /** @type {[number, number, number, number][]} */ (
+				profiles[kind]
+			);
+			/** @param {number} row @returns {[number, number, number, number]} */
+			const at = (row) =>
+				/** @type {[number, number, number, number]} */ (p[row]);
 			let i = 0;
-			while (i < p.length - 2 && u > p[i + 1][0]) i++;
-			const a = p[i],
-				b = p[i + 1],
+			while (i < p.length - 2 && u > at(i + 1)[0]) i++;
+			const a = at(i),
+				b = at(i + 1),
 				t = clamp((u - a[0]) / (b[0] - a[0]), 0, 1);
 			const smooth = t * t * (3 - 2 * t);
 			if (kind === "b") {
-				const prev = p[Math.max(0, i - 1)],
-					next = p[Math.min(p.length - 1, i + 2)],
+				const prev = at(Math.max(0, i - 1)),
+					next = at(Math.min(p.length - 1, i + 2)),
 					span = b[0] - a[0];
+				/** @param {1 | 2 | 3} column */
 				const hermite = (column) => {
 					const ma = (b[column] - prev[column]) / (b[0] - prev[0]),
 						mb = (next[column] - a[column]) / (next[0] - a[0]);
@@ -389,6 +434,10 @@ export function createLightAvatar(host) {
 				THREE.MathUtils.lerp(a[3], b[3], smooth),
 			];
 		}
+		/**
+		 * @param {number} u
+		 * @param {number} phi
+		 */
 		const shellPoint = (u, phi, kind = "b", scale = 1) => {
 			const [y, cx, r] = profile(u, kind),
 				fold = 1 + 0.008 * Math.cos(phi * 4);
@@ -399,6 +448,7 @@ export function createLightAvatar(host) {
 			);
 		};
 
+		/** @param {string} kind */
 		function shellGeometry(kind) {
 			const positions = [],
 				uvs = [],
@@ -440,8 +490,13 @@ export function createLightAvatar(host) {
 			geo.computeVertexNormals();
 			return geo;
 		}
+		/**
+		 * @param {ThreeObject} group
+		 * @param {string} _kind
+		 */
 		function addReferenceEyes(group, _kind) {
 			group.userData.eyes = [];
+			/** @type {[number, number, number][]} */
 			const eyes = [
 				[-0.21, 1.4, 0.55],
 				[0.21, 1.4, 0.55],
@@ -465,6 +520,7 @@ export function createLightAvatar(host) {
 				group.userData.eyes.push(eye, g);
 			}
 		}
+		/** @param {string} kind */
 		function makeFlame(kind) {
 			const group = new THREE.Group();
 			const body = new THREE.Mesh(shellGeometry(kind), spiritGlass);
@@ -573,6 +629,10 @@ export function createLightAvatar(host) {
 			return group;
 		}
 
+		/**
+		 * @param {ThreeObject} curve
+		 * @param {number} width
+		 */
 		function ribbonGeometry(curve, width, twist = 0, rootWidth = 0) {
 			const positions = [],
 				uvs = [],
@@ -628,6 +688,7 @@ export function createLightAvatar(host) {
 		}
 		const armBendGLSL = `uniform float uArmSwing;uniform float uArmReach;
  vec3 bendArm(vec3 p,float u){float w=smoothstep(0.,1.,u),a=uArmSwing*w,b=uArmReach*w;vec3 q=vec3(cos(a)*p.x-sin(a)*p.y,sin(a)*p.x+cos(a)*p.y,p.z);return vec3(q.x,cos(b)*q.y-sin(b)*q.z,sin(b)*q.y+cos(b)*q.z);}`;
+		/** @param {ThreeObject} group */
 		function addArms(group) {
 			const arms = [];
 			for (const layer of ["outer", "inner"])
@@ -657,7 +718,7 @@ export function createLightAvatar(host) {
 						bend = { uArmSwing: { value: 0 }, uArmReach: { value: 0 } };
 					arm.userData = { side, layer, bend };
 					const glass = own(armGlass.clone());
-					glass.onBeforeCompile = (shader) => {
+					glass.onBeforeCompile = (/** @type {any} */ shader) => {
 						Object.assign(shader.uniforms, bend);
 						shader.vertexShader = armBendGLSL + "\n" + shader.vertexShader;
 						shader.vertexShader = shader.vertexShader.replace(
@@ -788,6 +849,10 @@ export function createLightAvatar(host) {
 					}
 				}
 		}
+		/**
+		 * @param {ThreeObject} group
+		 * @param {ThreeObject} center
+		 */
 		function addCoreParticles(group, center) {
 			const list = [];
 			for (let n = 0; n < 2000; n++) {
@@ -838,6 +903,7 @@ export function createLightAvatar(host) {
 				);
 			}
 		}
+		/** @type {Record<string, any>} */
 		const models = { b: makeFlame("b") };
 		for (const [id, m] of Object.entries(models)) {
 			m.visible = id === "b";
@@ -913,6 +979,7 @@ export function createLightAvatar(host) {
 			ping.setSize(Math.round((w * d) / 2), Math.round((h * d) / 2));
 			pong.setSize(Math.round((w * d) / 2), Math.round((h * d) / 2));
 		}
+		/** @type {string | null} */
 		let activeMode = null,
 			activeSpeaking = false,
 			idleGestureWeight = 1,
@@ -924,6 +991,12 @@ export function createLightAvatar(host) {
 			headCamera = new THREE.Vector3(),
 			headNormal = new THREE.Vector3(),
 			eyeQuaternion = new THREE.Quaternion();
+		/**
+		 * @param {number} [time]
+		 * @param {import("./model.js").AvatarMotion} [mode]
+		 * @param {number} [elapsed]
+		 * @param {boolean} [speaking]
+		 */
 		function render(time = 0, mode = "neutral", elapsed = 0, speaking = false) {
 			renderer.info.reset();
 			uniforms.uTime.value = time;
@@ -945,7 +1018,7 @@ export function createLightAvatar(host) {
 			lastIdleTime = time;
 			const idle = sampleIdlePose(time, idleGestureWeight);
 			const p = { ...acting };
-			for (const part of [
+			for (const part of /** @type {(keyof import("./motion.js").Pose)[]} */ ([
 				"lift",
 				"bx",
 				"by",
@@ -958,8 +1031,8 @@ export function createLightAvatar(host) {
 				"leftInner",
 				"rightInner",
 				"energy",
-			])
-				p[part] += idle[part];
+			]))
+				p[part] += /** @type {Record<string, number>} */ (idle)[part] ?? 0;
 			if (mode === "neutral" && !speaking) p.open *= idle.open;
 			uniforms.uEnergy.value = p.energy;
 			uniforms.uThinking.value = mode === "thinking" ? 1 : 0;
@@ -978,7 +1051,7 @@ export function createLightAvatar(host) {
 			headRotation.setFromEuler(headEuler);
 			uniforms.uHead.value.makeRotationFromQuaternion(headRotation);
 			if (m.userData.arms)
-				m.userData.arms.forEach((arm) => {
+				m.userData.arms.forEach((/** @type {any} */ arm) => {
 					const d = arm.userData,
 						swing =
 							d.layer === "outer"
@@ -1017,7 +1090,7 @@ export function createLightAvatar(host) {
 				localCamera.clone().sub(pivot).normalize(),
 			);
 			if (m.userData.eyes)
-				m.userData.eyes.forEach((eye) => {
+				m.userData.eyes.forEach((/** @type {any} */ eye) => {
 					const rest = eye.userData.rest,
 						weight = THREE.MathUtils.smoothstep(
 							rest.y,
@@ -1078,7 +1151,9 @@ export function createLightAvatar(host) {
 					armCount: models[current].userData.arms?.length || 0,
 					armSwings:
 						models[current].userData.arms
-							?.map((a) => Number(a.userData.bend.uArmSwing.value.toFixed(3)))
+							?.map((/** @type {any} */ a) =>
+								Number(a.userData.bend.uArmSwing.value.toFixed(3)),
+							)
 							.join(",") || "",
 					coreParticles: models[current].userData.coreParticles || 0,
 					motion: activeMode,

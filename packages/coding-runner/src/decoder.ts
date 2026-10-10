@@ -1,8 +1,7 @@
-/* eslint-disable no-control-regex -- Deliberately remove ANSI and control bytes from terminal output. */
 import { z } from "zod";
 import type { CodingEvent } from "./contracts";
 
-export function sanitize(text: string) {
+function sanitize(text: string) {
 	// eslint-disable-next-line no-control-regex -- ANSI and control bytes are untrusted terminal output.
 	return text
 		.replace(

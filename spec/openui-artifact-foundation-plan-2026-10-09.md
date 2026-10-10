@@ -35,7 +35,7 @@ OpenUI をアーティファクト内の対話 UI の共通描画基盤として
 | `world` | service、SourceAdapter、利用検査、Memory 依存登録、fixture | server/API 接続と忘却・復旧の運用接続。利用可能判定を先行 |
 | `settings` | 全設定と expectedRevision/requestId による適用、独立した Web draft | 部分編集の公開操作と既存 draft との競合処理 |
 
-関連計画: [タイマー](timer-artifact-implementation-plan-2026-10-09.md)、[外部アプリ成果物](external-apps-artifacts-implementation-plan-2026-10-09.md)、[設定](settings-screen-implementation-plan.md)、[委任タスク](../docs/delegated-tasks.md)。Artifact の型・migration・会話参照はこれらと一本化する。timer や外部文書の正本を本基盤へ移さない。
+関連計画: [タイマー](timer-artifact-implementation-plan-2026-10-09.md)、[外部アプリ成果物](external-apps-artifacts-implementation-plan-2026-10-09.md)、[設定](.archived/settings-screen-implementation-plan.md)、[委任タスク](../docs/delegated-tasks.md)。Artifact の型・migration・会話参照はこれらと一本化する。timer や外部文書の正本を本基盤へ移さない。
 
 ## 3 LLM が生成する小さな JSON
 

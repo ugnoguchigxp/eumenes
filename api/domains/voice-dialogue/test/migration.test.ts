@@ -98,7 +98,9 @@ test("a database with only the original three migrations (plus later ones) upgra
 			),
 		).toBe(3);
 		expect(
-			upgraded.read((db) => db.query("SELECT id FROM schema_migrations").all()),
+			upgraded.read((db) =>
+				db.query("SELECT id FROM schema_migrations_v2").all(),
+			),
 		).toHaveLength(9);
 		await upgraded.close();
 		// second start is a no-op
@@ -112,7 +114,7 @@ test("a database with only the original three migrations (plus later ones) upgra
 			conversationAnswerDeliveryMigration,
 		]);
 		expect(
-			again.read((db) => db.query("SELECT id FROM schema_migrations").all()),
+			again.read((db) => db.query("SELECT id FROM schema_migrations_v2").all()),
 		).toHaveLength(9);
 		await again.close();
 	} finally {

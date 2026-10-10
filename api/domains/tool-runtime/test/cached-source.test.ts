@@ -275,6 +275,9 @@ test("superseded invocations leave observations but stay in the budget and the i
 	);
 	expect(list).toEqual([
 		{
+			id: expect.any(String),
+			arguments: expect.any(Object),
+			operationFingerprint: null,
 			toolRevisionId: lookupId,
 			stepId: "imp",
 			argsDigest: expect.any(String),

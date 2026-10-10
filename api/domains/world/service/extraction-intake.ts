@@ -1,5 +1,5 @@
 import type { Database } from "bun:sqlite";
-import { createHash } from "node:crypto";
+import { sha256Hex } from "../../../infrastructure/digest";
 import type { ScopeRef } from "eumenes-world-model";
 import type {
 	SourceChange,
@@ -28,9 +28,6 @@ export const SKIP_REASONS = [
 ] as const;
 export type SkipReason = (typeof SKIP_REASONS)[number];
 
-const sha256 = (text: string) =>
-	createHash("sha256").update(text).digest("hex");
-
 /**
  * Stable event identity of one source change: the same message revision
  * delivered again (a resend, a resync after a restore, a wider Scope set)
@@ -40,7 +37,7 @@ export function extractEventId(
 	scope: ScopeRef,
 	change: Pick<SourceChange, "source" | "revision" | "digest">,
 ): string {
-	return `sx-${sha256(
+	return `sx-${sha256Hex(
 		JSON.stringify([
 			scope.principal,
 			scope.scopeKey,
@@ -143,7 +140,7 @@ export function receiveSourceChanges(
 		const result = ctx.worldOp(
 			db,
 			scope,
-			`rx-${eventId}-${sha256(feed.restoreEpoch).slice(0, 12)}`,
+			`rx-${eventId}-${sha256Hex(feed.restoreEpoch).slice(0, 12)}`,
 			{
 				kind: "inbox.receive",
 				feed: {

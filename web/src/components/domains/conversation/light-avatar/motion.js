@@ -1,3 +1,6 @@
+// @ts-check
+/** @typedef {import("./motion.js").Pose} Pose */
+/** @typedef {import("./model.js").AvatarMotion} AvatarMotion */
 // Eight-second acting phrases: anticipation, action, hold, and recovery.
 // Head angles are radians. No whole-body stretching is used.
 export const motionNames = {
@@ -33,7 +36,13 @@ export const neutral = {
 	energy: 0.05,
 	open: 1,
 };
+/**
+ * @param {number} t
+ * @param {Partial<Pose>} [values]
+ * @returns {[number, Pose]}
+ */
 const key = (t, values = {}) => [t, { ...neutral, ...values }];
+/** @type {Record<string, [number, Pose][]>} */
 const phrases = {
 	listening: [
 		key(0),
@@ -278,28 +287,53 @@ const phrases = {
 		key(8, { open: 0.8 }),
 	],
 };
+/** @param {number} t */
 const ease = (t) => t * t * (3 - 2 * t);
+/**
+ * @param {Pose} a
+ * @param {Pose} b
+ * @param {number} t
+ * @returns {Pose}
+ */
 export function blendPose(a, b, t) {
-	const p = {};
+	const p = /** @type {Pose} */ ({});
 	t = ease(Math.max(0, Math.min(1, t)));
-	for (const k of Object.keys(neutral)) p[k] = a[k] + (b[k] - a[k]) * t;
+	for (const k of /** @type {(keyof Pose)[]} */ (Object.keys(neutral)))
+		p[k] = a[k] + (b[k] - a[k]) * t;
 	return p;
 }
+/**
+ * @param {number} t
+ * @param {number} at
+ * @param {number} [duration]
+ */
 function blinkPulse(t, at, duration = 0.3) {
 	const d = t - at;
 	if (d < 0 || d > duration) return 0;
 	const peak = duration * 0.38;
 	return d < peak ? ease(d / peak) : 1 - ease((d - peak) / (duration - peak));
 }
+/**
+ * @param {AvatarMotion} mode
+ * @param {number} time
+ * @returns {Pose}
+ */
 export function sampleMotion(mode, time) {
 	if (mode === "neutral") return { ...neutral };
-	const frames = phrases[mode] || phrases.listening,
+	const frames = /** @type {[number, Pose][]} */ (
+			phrases[mode] || phrases.listening
+		),
 		t = Math.max(0, Math.min(time, 8));
 	let i = 0;
-	while (i < frames.length - 2 && t > frames[i + 1][0]) i++;
-	const [a, pa] = frames[i],
-		[b, pb] = frames[i + 1];
+	while (
+		i < frames.length - 2 &&
+		t > /** @type {[number, Pose]} */ (frames[i + 1])[0]
+	)
+		i++;
+	const [a, pa] = /** @type {[number, Pose]} */ (frames[i]),
+		[b, pb] = /** @type {[number, Pose]} */ (frames[i + 1]);
 	const p = blendPose(pa, pb, (t - a) / (b - a));
+	/** @type {[number, number][]} */
 	const blinks =
 		mode === "sleepy"
 			? [

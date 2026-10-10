@@ -8,3 +8,4 @@ export {
 } from "./repository";
 export { registerInference } from "./controller";
 export type { InferencePort, Receipt, SpeechOverride } from "./contracts";
+export { migrations } from "./repository";

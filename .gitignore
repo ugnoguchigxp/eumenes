@@ -12,3 +12,4 @@ playwright-report/
 *.tsbuildinfo
 .DS_Store
 *-E
+packages/design-system/dist/

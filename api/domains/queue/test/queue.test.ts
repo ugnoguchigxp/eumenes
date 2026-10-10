@@ -29,13 +29,39 @@ function setup(options: Parameters<typeof createQueue>[1] = {}) {
 	});
 	return { dir, file, store, queue, clock };
 }
-const flush = () => new Promise((r) => setTimeout(r, 15));
+// Macrotask yields (no wall-clock wait) let queued microtasks and writer flushes settle.
+const yieldTurn = () => new Promise((r) => setImmediate(r));
+const flush = async () => {
+	for (let i = 0; i < 20; i++) await yieldTurn();
+};
 async function until(cond: () => boolean) {
-	for (let i = 0; i < 200; i++) {
+	for (let i = 0; i < 2000; i++) {
 		if (cond()) return;
-		await new Promise((r) => setTimeout(r, 5));
+		await yieldTurn();
 	}
 	throw new Error("condition not reached");
+}
+/** Injected `sleep`: waits until the test fires it (by duration), or the signal aborts. */
+function manualSleep() {
+	const waiters = new Set<{ ms: number; done: () => void }>();
+	return {
+		sleep: (ms: number, signal?: AbortSignal) =>
+			new Promise<void>((resolve) => {
+				const waiter = {
+					ms,
+					done: () => {
+						waiters.delete(waiter);
+						resolve();
+					},
+				};
+				waiters.add(waiter);
+				signal?.addEventListener("abort", waiter.done, { once: true });
+			}),
+		waiting: (ms: number) => [...waiters].some((w) => w.ms === ms),
+		fire(ms: number) {
+			for (const w of waiters) if (w.ms === ms) w.done();
+		},
+	};
 }
 
 interface Control {
@@ -403,25 +429,24 @@ test("recover: queued continue, running follows policy, cancel_requested becomes
 });
 
 test("lost wake-up: the loop still finds committed work within the poll interval; idle never calls handlers", async () => {
+	const poll = manualSleep();
 	const h = setup({
 		pollMs: 20,
-		sleep: (ms, signal) =>
-			new Promise((resolve) => {
-				const t = setTimeout(resolve, ms);
-				signal?.addEventListener("abort", () => {
-					clearTimeout(t);
-					resolve();
-				});
-			}),
+		sleep: poll.sleep,
 	});
 	const c = control();
 	h.queue.registerHandler(fakeHandler(h.store, c));
 	h.queue.start();
 	h.queue.start();
-	await new Promise((r) => setTimeout(r, 60));
+	for (let i = 0; i < 3; i++) {
+		await until(() => poll.waiting(20));
+		poll.fire(20); // three idle poll intervals elapse
+	}
+	await until(() => poll.waiting(20));
 	expect(c.calls).toEqual([]);
-	// commit without wake()
+	// commit without wake(); the next poll interval finds it
 	await enqueue(h, "a");
+	poll.fire(20);
 	await until(() => c.gates.has("a"));
 	c.gates.get("a")?.resolve("x");
 	await until(() => item(h.store, "a").state === "done");
@@ -429,16 +454,10 @@ test("lost wake-up: the loop still finds committed work within the poll interval
 });
 
 test("close aborts running handlers, settles them interrupted, and blocks late writes", async () => {
+	const poll = manualSleep();
 	const h = setup({
 		pollMs: 20,
-		sleep: (ms, signal) =>
-			new Promise((resolve) => {
-				const t = setTimeout(resolve, ms);
-				signal?.addEventListener("abort", () => {
-					clearTimeout(t);
-					resolve();
-				});
-			}),
+		sleep: poll.sleep,
 	});
 	const c = control();
 	c.ignoreSignal = true;
@@ -446,7 +465,10 @@ test("close aborts running handlers, settles them interrupted, and blocks late w
 	h.queue.start();
 	const a = await enqueue(h, "a");
 	await until(() => c.gates.has("a"));
-	await h.queue.close(30);
+	const closing = h.queue.close(30);
+	await until(() => poll.waiting(30));
+	poll.fire(30); // the 30 ms drain deadline elapses with the handler still running
+	await closing;
 	expect(h.queue.get(a.job.id)?.state).toBe("interrupted");
 	expect(h.queue.get(a.job.id)?.errorCode).toBe("shutdown_timeout");
 	c.gates.get("a")?.resolve("late");
@@ -529,4 +551,58 @@ test("resource aliases make persisted old jobs and new jobs share the same concu
 	expect([...c.calls].sort()).toEqual(["prepare:new", "prepare:old"]);
 	c.gates.get(c.calls[1]!.replace("prepare:", ""))!.resolve("second");
 	await flush();
+});
+
+test("afterCommit hooks of concurrent settlements are not lost", async () => {
+	const h = setup({ resources: { "fake.res": 2 } });
+	const c = control();
+	const committed: string[] = [];
+	h.queue.registerHandler(
+		fakeHandler(h.store, c, {
+			settleInTransaction(tx, claim, _input, outcome) {
+				tx.query("UPDATE fake_items SET state=?, result=? WHERE id=?").run(
+					"done",
+					outcome.type === "success" ? outcome.result : null,
+					claim.payload.id,
+				);
+				committed.push(claim.payload.id);
+				// A second settlement starts while this transaction is still open.
+				if (claim.payload.id === "a") c.gates.get("b")?.resolve("y");
+				return "applied";
+			},
+			afterCommit: () => {
+				committed.push("hook");
+			},
+		}),
+	);
+	await enqueue(h, "a");
+	await enqueue(h, "b");
+	await h.queue.tick();
+	await until(() => c.gates.has("a") && c.gates.has("b"));
+	c.gates.get("a")?.resolve("x");
+	await until(() => committed.filter((x) => x === "hook").length >= 2);
+	expect(committed.filter((x) => x === "hook")).toHaveLength(2);
+});
+
+test("a runnable job behind more than one page of blocked jobs is still claimed", async () => {
+	const h = setup({ limits: { total: 1000, background: 1000, scope: 1000 } });
+	const c = control();
+	h.queue.registerHandler(fakeHandler(h.store, c));
+	await enqueue(h, "first", { lane: "background" });
+	await h.queue.tick();
+	await until(() => c.gates.has("first")); // holds fake.res
+	for (let i = 0; i < 300; i++)
+		await enqueue(h, `blocked-${i}`, { lane: "background" });
+	await enqueue(h, "other", { lane: "background", resourceKey: "other.res" });
+	await h.queue.tick();
+	await until(() => c.gates.has("other"));
+	expect(c.gates.has("blocked-0")).toBe(false);
+	expect(
+		h.store.read(
+			(db) =>
+				db
+					.query("SELECT COUNT(*) AS n FROM queue_jobs WHERE state='queued'")
+					.get() as { n: number },
+		).n,
+	).toBe(300);
 });

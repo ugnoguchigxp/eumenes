@@ -16,7 +16,13 @@ afterEach(async () => {
 const MIN = 60_000;
 const T0 = Date.parse("2026-01-01T00:00:00Z");
 
-function setup(options: { maxSchedules?: number; queueLimit?: number } = {}) {
+function setup(
+	options: {
+		maxSchedules?: number;
+		queueLimit?: number;
+		sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
+	} = {},
+) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-scheduler-"));
 	dirs.push(dir);
 	const store = openStore(join(dir, "db.sqlite3"), [queueMigration, migration]);
@@ -65,7 +71,7 @@ function setup(options: { maxSchedules?: number; queueLimit?: number } = {}) {
 	};
 	const scheduler = createScheduler(store, queue, {
 		now: () => clock.t,
-		sleep: () => new Promise(() => {}),
+		sleep: options.sleep ?? (() => new Promise(() => {})),
 		maxSchedules: options.maxSchedules,
 	});
 	scheduler.registerTarget(target);
@@ -382,4 +388,94 @@ test("deferred schedules cannot hide later due schedules beyond one candidate pa
 	for (let i = 0; i < 5; i++) await h.scheduler.tick();
 	expect(h.scheduler.get(later.id)?.state).toBe("completed");
 	expect(jobs(h)).toHaveLength(1);
+});
+
+// A schedule's second fire consults the previous job; making that throw is the
+// way to reach the "unexpected failure" path (materialize errors are skips).
+async function breakSecondFire(h: ReturnType<typeof setup>, count: number) {
+	const schedules = [];
+	for (let i = 0; i < count; i++)
+		schedules.push(
+			await create(h, { type: "interval", anchor: iso(T0), intervalMs: MIN }),
+		);
+	await h.scheduler.tick(); // first fire dispatches
+	expect(jobs(h)).toHaveLength(count);
+	h.queue.getInTransaction = () => {
+		throw new Error("boom");
+	};
+	h.clock.t += MIN;
+	return schedules;
+}
+
+test("a paused schedule's stale retry time does not spin the loop", async () => {
+	const delays: number[] = [];
+	const h = setup({
+		sleep: (ms) => {
+			delays.push(ms);
+			return delays.length < 6 ? Promise.resolve() : new Promise(() => {});
+		},
+	});
+	const [a] = await breakSecondFire(h, 2);
+	await h.scheduler.tick(); // both fail and get a retry time
+	h.clock.t += 10 * MIN; // those retry times are now in the past
+	const paused = await h.scheduler.pause(
+		a?.id as string,
+		h.scheduler.get(a?.id as string)?.revision as number,
+	);
+	expect(paused?.state).toBe("paused");
+	h.scheduler.start();
+	for (let i = 0; i < 50 && delays.length < 6; i++) await Bun.sleep(0);
+	await h.scheduler.close();
+	expect(delays.length).toBeGreaterThan(0);
+	// Without the fix the stale past retry time yields a 10ms spin.
+	for (const d of delays) expect(d).toBeGreaterThanOrEqual(1000);
+});
+
+test("a due backlog larger than the tick limit drains without waiting pollMs per batch", async () => {
+	const delays: number[] = [];
+	const h = setup({
+		queueLimit: 1000,
+		maxSchedules: 256,
+		sleep: (ms) => {
+			delays.push(ms);
+			return delays.length < 10 ? Promise.resolve() : new Promise(() => {});
+		},
+	});
+	for (let i = 0; i < 100; i++) await create(h, { type: "once", at: iso(T0) });
+	h.scheduler.start();
+	for (let i = 0; i < 200 && delays.length < 10; i++) await Bun.sleep(0);
+	await h.scheduler.close();
+	expect(
+		h.store.read(
+			(db) =>
+				(db.query("SELECT COUNT(*) n FROM queue_jobs").get() as { n: number })
+					.n,
+		),
+	).toBe(100);
+	// 100 due with a tick limit of 32: batches 1-3 are full and re-run after 10 ms.
+	expect(delays.slice(0, 3)).toEqual([10, 10, 10]);
+	// Total time to drain is far below one poll interval per batch.
+	expect(delays.slice(0, 3).reduce((a, b) => a + b, 0)).toBeLessThan(1000);
+});
+
+test("unexpected failures back off exponentially", async () => {
+	const h = setup();
+	const [s] = await breakSecondFire(h, 1);
+	const attempts: number[] = [];
+	let last = -1;
+	for (let i = 0; i < 300 && attempts.length < 3; i++) {
+		await h.scheduler.tick();
+		const updated = h.scheduler.get(s?.id as string);
+		const stamp = Date.parse(updated?.updatedAt ?? "");
+		if (stamp !== last && stamp === h.clock.t) attempts.push(h.clock.t);
+		last = stamp;
+		h.clock.t += 100;
+	}
+	expect(attempts).toHaveLength(3);
+	expect(h.scheduler.get(s?.id as string)?.deferReason).toBe(
+		"unexpected_failure",
+	);
+	const first = (attempts[1] as number) - (attempts[0] as number);
+	const second = (attempts[2] as number) - (attempts[1] as number);
+	expect(second).toBeGreaterThan(first);
 });

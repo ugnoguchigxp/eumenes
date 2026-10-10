@@ -1,5 +1,5 @@
 import type { Database } from "bun:sqlite";
-import type { Definition } from "../../capabilities";
+import { commonSkillRevisionId, type Definition } from "../../capabilities";
 import {
 	type CanonicalReportPatch,
 	type LookupProvenance,
@@ -552,12 +552,12 @@ export function createRegistration(
 			schemaKey,
 			dependencies: [
 				"profile:web.research@1",
-				"skill:web.research@2",
+				commonSkillRevisionId,
 				own,
 				toolRev,
 			],
 			profileRevisionId: "profile:web.research@1",
-			requiredSkillRevisionIds: ["skill:web.research@2", own],
+			requiredSkillRevisionIds: [commonSkillRevisionId, own],
 			toolRevisionIds: [toolRev],
 		};
 		return savepoint<ActivateResult>(

@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import type { Migration } from "../../../infrastructure/sqlite";
 import type { VoiceTurn } from "../contracts";
 export const migration = `
 CREATE TABLE voice_turns (utterance_id TEXT PRIMARY KEY,session_id TEXT NOT NULL,generation INTEGER NOT NULL,status TEXT NOT NULL,text TEXT,run_id TEXT,error TEXT,revision INTEGER NOT NULL DEFAULT 0,created_at TEXT NOT NULL,updated_at TEXT NOT NULL);
@@ -108,3 +109,9 @@ export function activeRunIds(db: Database): string[] {
 			.all() as Array<{ run_id: string }>
 	).map((row) => row.run_id);
 }
+
+/** Named migrations of this domain; the SQL above is frozen once deployed. */
+export const migrations: readonly Migration[] = [
+	{ id: "voice-dialogue/0001-init", sql: migration },
+	{ id: "voice-dialogue/0002-sequence", sql: sequenceMigration },
+];

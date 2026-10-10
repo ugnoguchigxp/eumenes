@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import type { EumenesClient } from "../../../../../client";
 import { queryRoots } from "../../../queryKeys";
 import type { TimerNotificationDto } from "../../../../../api/domains/timers/contracts";
+import { useDeadline } from "../../../domains/timers/deadline";
+import { activeTimersQuery } from "../../../domains/timers/queries";
 import { TimerNotificationCenter } from "./TimerNotificationCenter";
 
 type Attempt = {
@@ -13,7 +15,7 @@ type Attempt = {
 	delivered?: boolean;
 };
 
-/** Scope-wide notices survive panel changes and normal polling during a claim. */
+/** Scope-wide notices survive panel changes and refreshes during a claim. */
 export function TimerNotifications({
 	client,
 	playTone,
@@ -67,14 +69,20 @@ export function TimerNotifications({
 				items,
 			};
 		},
-		refetchInterval: (query) =>
-			(query.state.data?.activeTimers ?? 0) > 0 ||
-			query.state.data?.items.some(
-				(item) => item.status === "pending" || item.status === "claimed",
-			)
-				? 1000
-				: false,
 	});
+	// SSE reports changes; the only moment without an event is a timer expiring.
+	const activeTimers = useQuery(activeTimersQuery(client));
+	useDeadline(
+		(activeTimers.data?.items ?? [])
+			.filter((item) => item.state === "active")
+			.map((item) => item.dueAt),
+		activeTimers.data?.serverNow,
+		activeTimers.data?.sentAt ?? 0,
+		() =>
+			void cache.invalidateQueries({
+				queryKey: [queryRoots.timers, "notifications"],
+			}),
+	);
 	const refresh = () =>
 		cache.invalidateQueries({ queryKey: [queryRoots.timers] });
 	useEffect(() => {

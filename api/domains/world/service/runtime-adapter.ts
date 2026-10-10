@@ -1,5 +1,5 @@
 import type { Database } from "bun:sqlite";
-import { createHash } from "node:crypto";
+import { sha256Hex } from "../../../infrastructure/digest";
 import type { SourceRef } from "eumenes-memory";
 import {
 	assessOutcome,
@@ -156,9 +156,7 @@ export type ReconcileReport = {
 	pending: number;
 };
 
-const sha256 = (text: string) =>
-	createHash("sha256").update(text).digest("hex");
-const short = (text: string) => sha256(text).slice(0, 24);
+const short = (text: string) => sha256Hex(text).slice(0, 24);
 const MAX_SWEEP = 500;
 
 const present = (value: unknown): value is string =>

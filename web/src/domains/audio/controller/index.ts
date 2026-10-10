@@ -31,10 +31,35 @@ function wav(samples: Float32Array, rate: number): Uint8Array {
 		);
 	return bytes;
 }
+function encodeRecording(
+	frames: readonly Float32Array[],
+	sampleCount: number,
+	rate: number,
+): Uint8Array {
+	const joined = new Float32Array(sampleCount);
+	let offset = 0;
+	for (const frame of frames) {
+		joined.set(frame, offset);
+		offset += frame.length;
+	}
+	if (rate <= 16000) return wav(joined, rate);
+	const ratio = rate / 16000;
+	const downsampled = new Float32Array(Math.floor(joined.length / ratio));
+	for (let i = 0; i < downsampled.length; i++) {
+		const begin = Math.floor(i * ratio),
+			end = Math.floor((i + 1) * ratio);
+		let sum = 0;
+		for (let n = begin; n < end; n++) sum += joined[n] ?? 0;
+		downsampled[i] = sum / Math.max(1, end - begin);
+	}
+	return wav(downsampled, 16000);
+}
 import recorderWorkletUrl from "../worklet/recorder.worklet.ts?worker&url";
 
 /** Samples per frame handed to the voice detector (same as the old ScriptProcessor size). */
 const FRAME_SAMPLES = 2048;
+// 16 kHz PCM stays below the API's 4 MB limit without splitting a question.
+const MAX_RECORDING_SECONDS = 60;
 
 /**
  * Captures microphone frames with an AudioWorklet (off the main thread), falling
@@ -45,8 +70,8 @@ async function openRecorderNode(
 	onFrame: (frame: Float32Array) => void,
 	onFailure: () => void,
 ): Promise<
-	| { kind: "worklet"; node: AudioWorkletNode }
-	| { kind: "script"; node: ScriptProcessorNode }
+	| { kind: "worklet"; node: AudioWorkletNode; drain: () => void }
+	| { kind: "script"; node: ScriptProcessorNode; drain: () => void }
 > {
 	if (typeof ctx.audioWorklet?.addModule === "function") {
 		try {
@@ -58,10 +83,8 @@ async function openRecorderNode(
 			});
 			let pending: Float32Array[] = [];
 			let pendingSamples = 0;
-			node.port.onmessage = (event: MessageEvent<Float32Array>) => {
-				pending.push(event.data);
-				pendingSamples += event.data.length;
-				if (pendingSamples < FRAME_SAMPLES) return;
+			const drain = () => {
+				if (!pendingSamples) return;
 				const frame = new Float32Array(pendingSamples);
 				let offset = 0;
 				for (const part of pending) {
@@ -72,8 +95,13 @@ async function openRecorderNode(
 				pendingSamples = 0;
 				onFrame(frame);
 			};
+			node.port.onmessage = (event: MessageEvent<Float32Array>) => {
+				pending.push(event.data);
+				pendingSamples += event.data.length;
+				if (pendingSamples >= FRAME_SAMPLES) drain();
+			};
 			node.onprocessorerror = () => onFailure();
-			return { kind: "worklet", node };
+			return { kind: "worklet", node, drain };
 		} catch {
 			// Fall through to the main-thread processor.
 		}
@@ -81,7 +109,7 @@ async function openRecorderNode(
 	const node = ctx.createScriptProcessor(FRAME_SAMPLES, 1, 1);
 	node.onaudioprocess = (event) =>
 		onFrame(new Float32Array(event.inputBuffer.getChannelData(0)));
-	return { kind: "script", node };
+	return { kind: "script", node, drain: () => {} };
 }
 /** Output-to-ear latency allowance after playback ends (Bluetooth can add ~300 ms). */
 const OUTPUT_TAIL_MS = 500;
@@ -108,14 +136,14 @@ export function createAudioController(
 		keepAlive?: boolean;
 		/** The microphone or audio output went away; the session cannot continue. */
 		onLost?: (reason: "mic_lost" | "audio_context_lost") => void;
-		/** The saved input device was missing and the default one is used instead. */
-		onNotice?: (reason: "saved_device_missing") => void;
+		onNotice?: (reason: "saved_device_missing" | "recording_limit") => void;
 	} = {},
 ) {
 	let context: AudioContext | undefined;
 	let stream: MediaStream | undefined;
 	let processor: ScriptProcessorNode | undefined;
 	let worklet: AudioWorkletNode | undefined;
+	let drainRecorder: (() => void) | undefined;
 	let source: MediaStreamAudioSourceNode | undefined;
 	let playback: AudioBufferSourceNode | undefined;
 	let playbackGain: GainNode | undefined;
@@ -260,31 +288,47 @@ export function createAudioController(
 	}
 
 	function encodeFrames(): Uint8Array {
-		const joined = new Float32Array(sampleCount);
-		let offset = 0;
-		for (const frame of frames) {
-			joined.set(frame, offset);
-			offset += frame.length;
-		}
-		const rate = context!.sampleRate;
-		if (rate <= 16000) return wav(joined, rate);
-		const ratio = rate / 16000;
-		const downsampled = new Float32Array(Math.floor(joined.length / ratio));
-		for (let i = 0; i < downsampled.length; i++) {
-			const begin = Math.floor(i * ratio),
-				end = Math.floor((i + 1) * ratio);
-			let sum = 0;
-			for (let n = begin; n < end; n++) sum += joined[n] ?? 0;
-			downsampled[i] = sum / Math.max(1, end - begin);
-		}
-		return wav(downsampled, 16000);
+		return encodeRecording(frames, sampleCount, context!.sampleRate);
 	}
 	function flush() {
-		if (context && sampleCount >= context.sampleRate * 0.25)
-			onSegment(encodeFrames());
+		const segment =
+			context && sampleCount >= context.sampleRate * 0.25
+				? encodeFrames()
+				: undefined;
 		frames = [];
 		sampleCount = 0;
 		nextPartialAt = 0;
+		// A consumer may pause capture synchronously when its upload queue fills.
+		if (segment) onSegment(segment);
+	}
+	function pauseInput() {
+		// Include samples received since the last complete detector frame.
+		const drain = drainRecorder;
+		drainRecorder = undefined;
+		drain?.();
+		const shouldFlush = speaking;
+		speaking = false;
+		inputPaused = true;
+		inputEpoch++;
+		releaseWatchers();
+		processor?.disconnect();
+		if (processor) processor.onaudioprocess = null;
+		if (worklet) worklet.port.onmessage = null;
+		worklet?.disconnect();
+		source?.disconnect();
+		stream?.getTracks().forEach((track) => track.stop());
+		stream = undefined;
+		processor = undefined;
+		worklet = undefined;
+		source = undefined;
+		detector = undefined;
+		if (shouldFlush) flush();
+		frames = [];
+		sampleCount = 0;
+		candidateFrames = [];
+		candidateSamples = 0;
+		lastLevel = 0;
+		emit(playback ? "playing" : "idle");
 	}
 
 	return {
@@ -329,7 +373,8 @@ export function createAudioController(
 				watchDevices(startedContext, stream);
 				detector = new VoiceActivityDetector({
 					sampleRate: context.sampleRate,
-					silenceTimeoutMs: options.silenceMs ?? 700,
+					silenceTimeoutMs:
+						options.silenceMs ?? DEFAULT_VOICE_SILENCE_TIMEOUT_MS,
 					speechThresholdRms: options.threshold ?? 0.008,
 				});
 				source = context.createMediaStreamSource(stream);
@@ -357,7 +402,8 @@ export function createAudioController(
 							candidateSamples = 0;
 							detector = new VoiceActivityDetector({
 								sampleRate: context.sampleRate,
-								silenceTimeoutMs: options.silenceMs ?? 700,
+								silenceTimeoutMs:
+									options.silenceMs ?? DEFAULT_VOICE_SILENCE_TIMEOUT_MS,
 								speechThresholdRms: options.threshold ?? 0.008,
 							});
 						}
@@ -397,14 +443,17 @@ export function createAudioController(
 							nextPartialAt = sampleCount + context.sampleRate * 0.6;
 							options.onPartial(encodeFrames());
 						}
-						if (
-							observation?.shouldFinalize ||
-							sampleCount > context.sampleRate * 10
-						) {
+						if (sampleCount >= context.sampleRate * MAX_RECORDING_SECONDS) {
+							pauseInput();
+							options.onNotice?.("recording_limit");
+							return;
+						}
+						if (observation?.shouldFinalize) {
 							speaking = false;
 							detector = new VoiceActivityDetector({
 								sampleRate: context.sampleRate,
-								silenceTimeoutMs: options.silenceMs ?? 700,
+								silenceTimeoutMs:
+									options.silenceMs ?? DEFAULT_VOICE_SILENCE_TIMEOUT_MS,
 								speechThresholdRms: options.threshold ?? 0.008,
 							});
 							flush();
@@ -431,13 +480,15 @@ export function createAudioController(
 				}
 				if (recorder.kind === "worklet") worklet = recorder.node;
 				else processor = recorder.node;
+				drainRecorder = recorder.drain;
 				const input = worklet ?? processor;
 				if (!input) return;
 				source.connect(input);
 				input.connect(context.destination);
 				emit("listening");
 			} catch (error) {
-				if (disposed) return;
+				if (disposed || recordingEpoch !== inputEpoch) return;
+				pauseInput();
 				emit(
 					"error",
 					error instanceof Error ? error.message : "microphone_unavailable",
@@ -563,6 +614,7 @@ export function createAudioController(
 		},
 		async stop() {
 			disposed = true;
+			drainRecorder = undefined;
 			lastLevel = 0;
 			releaseWatchers();
 			this.stopPlayback();
@@ -594,30 +646,7 @@ export function createAudioController(
 			emit("idle");
 		},
 		/** Stop recording while keeping the accepted answer's output context alive. */
-		pauseInput() {
-			if (speaking) flush();
-			inputPaused = true;
-			inputEpoch++;
-			releaseWatchers();
-			processor?.disconnect();
-			if (processor) processor.onaudioprocess = null;
-			if (worklet) worklet.port.onmessage = null;
-			worklet?.disconnect();
-			source?.disconnect();
-			stream?.getTracks().forEach((track) => track.stop());
-			stream = undefined;
-			processor = undefined;
-			worklet = undefined;
-			source = undefined;
-			detector = undefined;
-			speaking = false;
-			frames = [];
-			sampleCount = 0;
-			candidateFrames = [];
-			candidateSamples = 0;
-			lastLevel = 0;
-			emit(playback ? "playing" : "idle");
-		},
+		pauseInput,
 	};
 }
 type Controller = ReturnType<typeof createAudioController>;
@@ -634,4 +663,7 @@ export type OutputController = Pick<
 export type CreateAudio = (
 	...args: Parameters<typeof createAudioController>
 ) => AudioController;
-import { VoiceActivityDetector } from "./voice-activity";
+import {
+	DEFAULT_VOICE_SILENCE_TIMEOUT_MS,
+	VoiceActivityDetector,
+} from "./voice-activity";

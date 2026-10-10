@@ -381,7 +381,7 @@ test("notification center remains available when there are no notices", async ()
 	const h = fixture("dismissed");
 	h.show(async () => {});
 	await h.refresh();
-	expect(screen.queryByRole("region", { name: "タイマーの終了" })).toBeNull();
+	expect(screen.queryByRole("status", { name: "タイマーの終了" })).toBeNull();
 	fireEvent.click(screen.getByRole("button", { name: "通知センター" }));
 	await screen.findByRole("dialog", { name: "通知センター" });
 	expect(screen.getByText("通知はありません")).toBeTruthy();
@@ -420,4 +420,14 @@ test("banners show the newest three while the drawer contains the entire notific
 		"終了したタイマー 3",
 		"終了したタイマー 4",
 	]);
+});
+
+test("a finished timer is announced as an alert inside a polite status region", async () => {
+	const h = fixture("played");
+	h.show(async () => {});
+	const region = await screen.findByRole("status", { name: "タイマーの終了" });
+	expect(region.getAttribute("aria-live")).toBe("polite");
+	const alert = await screen.findByRole("alert");
+	expect(alert.textContent).toContain("3分のタイマーが終了しました。");
+	expect(region.contains(alert)).toBe(true);
 });

@@ -52,7 +52,7 @@ export function defaults(env: Record<string, string | undefined>): Settings {
 			inputDevice: "",
 			outputDevice: "",
 			threshold: 0.008,
-			silenceMs: 700,
+			silenceMs: 1500,
 			echoCancellation: true,
 			noiseSuppression: true,
 			autoGainControl: true,
@@ -65,41 +65,59 @@ export function defaults(env: Record<string, string | undefined>): Settings {
 			theme: "system",
 			subtitles: defaultSubtitles,
 		},
+		codingSupervision: { approveInstructions: true },
 	});
 }
-const knownProviderKeys = [
-	"OPENAI_API_KEY",
-	"ANTHROPIC_API_KEY",
-	"GEMINI_API_KEY",
-	"GOOGLE_API_KEY",
-	"AZURE_OPENAI_API_KEY",
-	"GROQ_API_KEY",
-	"MISTRAL_API_KEY",
-	"DEEPSEEK_API_KEY",
-];
-/** A connection may only name an environment variable meant for cloud credentials. */
+/** Official API hosts a provider key may be sent to; any other host needs an explicit allowlist. */
+const providerKeyHosts: Record<string, (host: string) => boolean> = {
+	OPENAI_API_KEY: (h) => h === "api.openai.com",
+	ANTHROPIC_API_KEY: (h) => h === "api.anthropic.com",
+	GEMINI_API_KEY: (h) => h === "generativelanguage.googleapis.com",
+	GOOGLE_API_KEY: (h) => h === "generativelanguage.googleapis.com",
+	AZURE_OPENAI_API_KEY: (h) => h.endsWith(".openai.azure.com"),
+	GROQ_API_KEY: (h) => h === "api.groq.com",
+	MISTRAL_API_KEY: (h) => h === "api.mistral.ai",
+	DEEPSEEK_API_KEY: (h) => h === "api.deepseek.com",
+};
+/** A connection may only name an environment variable meant for cloud credentials, bound to its host. */
 export function isAllowedEnvRef(
 	name: string,
 	allowlist: readonly string[],
+	baseUrl: string,
 ): boolean {
-	return (
-		name.startsWith("EUMENES_CLOUD_") ||
-		knownProviderKeys.includes(name) ||
-		allowlist.includes(name)
-	);
+	if (name.startsWith("EUMENES_CLOUD_") || allowlist.includes(name))
+		return true;
+	const hostRule = Object.hasOwn(providerKeyHosts, name)
+		? providerKeyHosts[name]
+		: undefined;
+	if (!hostRule) return false;
+	try {
+		return hostRule(new URL(baseUrl).hostname);
+	} catch {
+		return false;
+	}
 }
 export async function createSettings(
 	store: SqliteStore,
-	options: { dbPath: string; env?: Record<string, string | undefined> },
+	options: {
+		dbPath: string;
+		env?: Record<string, string | undefined>;
+		/** Directory holding the master key. Defaults to EUMENES_KEY_DIR, then <dbDir>/keys. */
+		keyDir?: string;
+	},
 ) {
-	const env = options.env ?? process.env;
+	const env = options.env ?? {};
 	const envRefAllowlist = (env.EUMENES_ENV_REF_ALLOWLIST ?? "")
 		.split(",")
 		.map((v) => v.trim())
 		.filter(Boolean);
 	let key: Buffer | null = null;
 	let keyError: string | null = null;
-	const path = join(dirname(options.dbPath), "keys", "settings.key");
+	const keyDir =
+		options.keyDir ||
+		env.EUMENES_KEY_DIR?.trim() ||
+		join(dirname(options.dbPath), "keys");
+	const path = join(keyDir, "settings.key");
 	try {
 		if (env.EUMENES_SECRET_KEY)
 			key = Buffer.from(env.EUMENES_SECRET_KEY, "base64");
@@ -123,33 +141,52 @@ export async function createSettings(
 		}
 		if (key.length !== 32) throw new Error("secret_key_invalid");
 		// Verify existing ciphertext before accepting a replacement master key.
+		const upgraded: { id: string; encrypted: string }[] = [];
 		for (const row of store.read(
 			(db) =>
-				db.query("SELECT encrypted FROM settings_credentials").all() as {
+				db.query("SELECT id, encrypted FROM settings_credentials").all() as {
+					id: string;
 					encrypted: string;
 				}[],
-		))
-			decrypt(row.encrypted);
+		)) {
+			const plain = decrypt(row.encrypted, row.id);
+			// v1 ciphertext has no AAD; rebind it to its row in one transaction.
+			if (!row.encrypted.startsWith("v2."))
+				upgraded.push({ id: row.id, encrypted: encrypt(plain, row.id) });
+		}
+		if (upgraded.length)
+			await store.write((db) => {
+				for (const row of upgraded)
+					db.query(
+						"UPDATE settings_credentials SET encrypted=? WHERE id=?",
+					).run(row.encrypted, row.id);
+			});
 	} catch {
 		key = null;
 		keyError = "secret_key_unavailable";
 	}
-	function encrypt(value: string) {
+	/** v2.<iv>.<tag>.<bytes>, authenticated against the credential row it belongs to. */
+	function encrypt(value: string, rowKey: string) {
 		if (!key) throw new Error("invalid_secret_key_unavailable");
 		const iv = randomBytes(12);
 		const c = createCipheriv("aes-256-gcm", key, iv);
+		c.setAAD(Buffer.from(`eumenes:settings:v2:${rowKey}`));
 		const bytes = Buffer.concat([c.update(value, "utf8"), c.final()]);
-		return [iv, c.getAuthTag(), bytes]
-			.map((b) => b.toString("base64"))
-			.join(".");
+		return [
+			"v2",
+			...[iv, c.getAuthTag(), bytes].map((b) => b.toString("base64")),
+		].join(".");
 	}
-	function decrypt(value: string) {
+	function decrypt(value: string, rowKey: string) {
 		if (!key) throw new Error("secret_key_unavailable");
-		const [iv, tag, bytes] = value
-			.split(".")
-			.map((s) => Buffer.from(s, "base64"));
+		const parts = value.split(".");
+		const v2 = parts[0] === "v2";
+		const [iv, tag, bytes] = (v2 ? parts.slice(1) : parts).map((s) =>
+			Buffer.from(s, "base64"),
+		);
 		if (!iv || !tag || !bytes) throw new Error("secret_invalid");
 		const c = createDecipheriv("aes-256-gcm", key, iv);
+		if (v2) c.setAAD(Buffer.from(`eumenes:settings:v2:${rowKey}`));
 		c.setAuthTag(tag);
 		return Buffer.concat([c.update(bytes), c.final()]).toString("utf8");
 	}
@@ -160,7 +197,7 @@ export async function createSettings(
 	const listeners = new Set<() => void>();
 	function credential(db: Database, c: Connection): string | null {
 		if (c.envRef) {
-			if (!isAllowedEnvRef(c.envRef, envRefAllowlist))
+			if (!isAllowedEnvRef(c.envRef, envRefAllowlist, c.baseUrl))
 				throw new Error("env_ref_not_allowed");
 			return env[c.envRef]?.trim() || null;
 		}
@@ -168,7 +205,7 @@ export async function createSettings(
 		const row = db
 			.query("SELECT encrypted FROM settings_credentials WHERE id=?")
 			.get(`${c.id}:${c.epoch}`) as { encrypted: string } | null;
-		return row ? decrypt(row.encrypted) : null;
+		return row ? decrypt(row.encrypted, `${c.id}:${c.epoch}`) : null;
 	}
 	return {
 		get: () => store.read(read),
@@ -274,8 +311,8 @@ export async function createSettings(
 					// A previously saved ref stays untouched (it fails on use instead).
 					if (
 						c.envRef &&
-						c.envRef !== prior?.envRef &&
-						!isAllowedEnvRef(c.envRef, envRefAllowlist)
+						(c.envRef !== prior?.envRef || c.baseUrl !== prior.baseUrl) &&
+						!isAllowedEnvRef(c.envRef, envRefAllowlist, c.baseUrl)
 					)
 						throw new Error("invalid_env_ref");
 					const originChanged =
@@ -307,7 +344,7 @@ export async function createSettings(
 					if (mutation?.value)
 						db.query("INSERT INTO settings_credentials VALUES(?,?)").run(
 							`${c.id}:${c.epoch}`,
-							encrypt(mutation.value),
+							encrypt(mutation.value, `${c.id}:${c.epoch}`),
 						);
 					else if (
 						prior &&
@@ -325,7 +362,7 @@ export async function createSettings(
 						if (value)
 							db.query("INSERT INTO settings_credentials VALUES(?,?)").run(
 								`${c.id}:${c.epoch}`,
-								encrypt(value),
+								encrypt(value, `${c.id}:${c.epoch}`),
 							);
 					}
 				}

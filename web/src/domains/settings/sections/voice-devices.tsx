@@ -135,7 +135,10 @@ export function VoiceDevices({
 						}
 					/>
 				</Field>
-				<Field label="発話を確定する無音時間（ミリ秒）">
+				<Field
+					label="発話を確定する無音時間（ミリ秒）"
+					hint="文の途中で切れる場合は長めにします。標準は1500ミリ秒（1.5秒）です。"
+				>
 					<Input
 						type="number"
 						min={300}

@@ -2,21 +2,23 @@ import { expect, test } from "bun:test";
 import { closure, domains } from "../../../../scripts/domains";
 
 test("queue and scheduler declare only their real dependencies", () => {
-	expect(domains.queue.depends).toEqual([]);
-	expect(domains.scheduler.depends).toEqual(["queue"]);
+	expect(domains.queue.depends).toEqual({ api: [], web: [], test: [] });
+	expect(domains.scheduler.depends.api).toEqual(["queue"]);
 	expect(closure("queue")).toEqual(["queue"]);
 	expect(closure("scheduler")).toEqual(["queue", "scheduler"]);
-	expect(domains.dialogue.depends).toContain("queue");
-	expect(domains.dialogue.depends).toContain("scheduler");
+	expect(domains.dialogue.depends.api).toContain("queue");
+	expect(domains.dialogue.depends.api).toContain("scheduler");
 	expect(closure("voice-dialogue")).toContain("queue");
 });
 
 test("a dependency cycle stops with an explicit error", () => {
 	const cyclic = {
-		queue: { depends: ["scheduler"] },
-		scheduler: { depends: ["queue"] },
+		queue: { depends: { api: ["scheduler"], web: [], test: [] } },
+		scheduler: { depends: { api: ["queue"], web: [], test: [] } },
 	};
-	expect(() => closure("queue", cyclic)).toThrow("domain_dependency_cycle");
+	expect(() => closure("queue", "api", cyclic)).toThrow(
+		"domain_dependency_cycle",
+	);
 });
 
 import { checkSource } from "../../../../scripts/boundaries";

@@ -2,6 +2,26 @@ import { useEffect, useRef, useState } from "react";
 import type { LightAvatar } from "./light-avatar/model.js";
 import { createAvatarPlayback, type AvatarCue } from "../../../domains/avatar";
 
+type ModelModule = typeof import("./light-avatar/model.js");
+let modulePromise: Promise<ModelModule> | null = null;
+const loadModule = () => {
+	modulePromise ??= import("./light-avatar/model.js").catch(
+		(error: unknown) => {
+			modulePromise = null;
+			throw error;
+		},
+	);
+	return modulePromise;
+};
+function scheduleIdle(callback: () => void): () => void {
+	if (typeof window.requestIdleCallback === "function") {
+		const id = window.requestIdleCallback(callback, { timeout: 300 });
+		return () => window.cancelIdleCallback(id);
+	}
+	const id = window.setTimeout(callback, 1500);
+	return () => window.clearTimeout(id);
+}
+
 export function LightAvatarBackground({
 	active,
 	cue = null,
@@ -31,11 +51,15 @@ export function LightAvatarBackground({
 			media.removeEventListener("change", reducedChanged);
 		};
 	}, []);
+	const reducedRef = useRef(reduced);
+	const visibleRef = useRef(visible);
+	// Set by the lifecycle effect so the pause effect can rebuild only the playback.
+	const resync = useRef<(() => void) | null>(null);
 	useEffect(() => {
 		const element = host.current;
 		if (!element) return;
-		element.dataset.avatarState = !active || !visible ? "inactive" : "loading";
-		if (!active || !visible) return;
+		element.dataset.avatarState = !active ? "inactive" : "loading";
+		if (!active) return;
 		if (!window.WebGL2RenderingContext) {
 			element.dataset.avatarState = "unsupported";
 			return;
@@ -43,10 +67,15 @@ export function LightAvatarBackground({
 		let cancelled = false;
 		let model: LightAvatar | undefined;
 		let observer: ResizeObserver | undefined;
-		const release = () => {
-			observer?.disconnect();
+		let failed = false;
+		const disposePlayback = () => {
 			playback.current?.dispose();
 			playback.current = null;
+		};
+		const release = () => {
+			resync.current = null;
+			observer?.disconnect();
+			disposePlayback();
 			model?.canvas.removeEventListener("webglcontextlost", contextLost);
 			model?.dispose();
 			model = undefined;
@@ -54,53 +83,79 @@ export function LightAvatarBackground({
 		const contextLost = (event: Event) => {
 			event.preventDefault();
 			element.dataset.avatarState = "context-lost";
+			failed = true;
 			release();
 		};
-		void import("./light-avatar/model.js")
-			.then(({ createLightAvatar }) => {
-				if (cancelled) return;
-				model = createLightAvatar(element);
-				const controller = createAvatarPlayback(model, {
-					reduced,
-					onError: () => {
-						element.dataset.avatarState = "render-failed";
-						release();
-					},
-				});
-				if (!model) {
-					controller.dispose();
-					return;
-				}
-				playback.current = controller;
-				element.dataset.avatarState = "ready";
-				playback.current.setCue(latest.current);
-				if (!model) return;
-				model.canvas.addEventListener("webglcontextlost", contextLost);
-				observer = new ResizeObserver(() => {
-					if (!model || !element.clientWidth || !element.clientHeight) return;
-					try {
-						model.resize();
-						playback.current?.redraw();
-					} catch {
-						element.dataset.avatarState = "resize-failed";
-						release();
-					}
-				});
-				observer.observe(element);
-			})
-			.catch((error: unknown) => {
-				if (cancelled) return;
-				element.dataset.avatarState = "load-failed";
-				console.warn("Light avatar initialization failed", {
-					kind: error instanceof Error ? error.name : "unknown",
-				});
-				release();
+		// Pause/reduced changes only rebuild the cheap playback; the model and shaders stay.
+		const sync = () => {
+			if (!model || cancelled) return;
+			disposePlayback();
+			if (!visibleRef.current) {
+				element.dataset.avatarState = "paused";
+				return;
+			}
+			const controller = createAvatarPlayback(model, {
+				reduced: reducedRef.current,
+				onError: () => {
+					element.dataset.avatarState = "render-failed";
+					failed = true;
+					release();
+				},
 			});
+			if (failed || !model) {
+				controller.dispose();
+				return;
+			}
+			playback.current = controller;
+			element.dataset.avatarState = "ready";
+			controller.setCue(latest.current);
+		};
+		const start = () => {
+			void loadModule()
+				.then(({ createLightAvatar }) => {
+					if (cancelled) return;
+					model = createLightAvatar(element);
+					if (!model) return;
+					model.canvas.addEventListener("webglcontextlost", contextLost);
+					resync.current = sync;
+					sync();
+					if (failed || !model) return;
+					observer = new ResizeObserver(() => {
+						if (!model || !element.clientWidth || !element.clientHeight) return;
+						try {
+							model.resize();
+							playback.current?.redraw();
+						} catch {
+							element.dataset.avatarState = "resize-failed";
+							release();
+						}
+					});
+					observer.observe(element);
+				})
+				.catch((error: unknown) => {
+					if (cancelled) return;
+					element.dataset.avatarState = "load-failed";
+					console.warn("Light avatar initialization failed", {
+						kind: error instanceof Error ? error.name : "unknown",
+					});
+					release();
+				});
+		};
+		// The three.js chunk is large: first load waits until the main thread is idle.
+		const cancelIdle = modulePromise
+			? (start(), () => {})
+			: scheduleIdle(start);
 		return () => {
 			cancelled = true;
+			cancelIdle();
 			release();
 		};
-	}, [active, visible, reduced]);
+	}, [active]);
+	useEffect(() => {
+		reducedRef.current = reduced;
+		visibleRef.current = visible;
+		resync.current?.();
+	}, [visible, reduced]);
 	useEffect(() => {
 		latest.current =
 			cue ??

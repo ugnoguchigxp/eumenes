@@ -2,6 +2,7 @@ import { test, expect } from "bun:test";
 import {
 	checkLiveResearch,
 	checkLiveForecastDate,
+	checkLiveCitations,
 } from "./toolchain-live-check";
 test("live date checking accepts forecast month/day notation and rejects another day", () => {
 	const report = {
@@ -24,6 +25,21 @@ test("live date checking accepts forecast month/day notation and rejects another
 		}),
 	).toBe(false);
 	expect(checkLiveForecastDate("2026-10-10", null)).toBe(false);
+});
+
+test("answer links point to acquired pages, not invented paths or home pages", () => {
+	const url = "https://tenki.jp/forecast/3/17/4610/14204/";
+	const report = { sources: [{ url }] };
+	expect(checkLiveCitations(report, `ソース：[tenki.jp](${url})`)).toBe(true);
+	for (const answer of [
+		"晴れです。",
+		"ソース：[tenki.jp](https://tenki.jp/)",
+		"ソース：[tenki.jp](https://tenki.jp/forecast/invented)",
+		`[tenki.jp](${url}) [別の資料](https://example.com)`,
+		"ソース：[出典](javascript:alert(1))",
+	])
+		expect(checkLiveCitations(report, answer)).toBe(false);
+	expect(checkLiveCitations(null, `[tenki.jp](${url})`)).toBe(false);
 });
 const stock = {
 	claims: [

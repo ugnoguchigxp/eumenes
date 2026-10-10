@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import type { Migration } from "../../../infrastructure/sqlite";
 import type {
 	CodingEvent,
 	ExecutionReceipt,
@@ -191,3 +192,8 @@ export function live(db: Database) {
 		)
 		.all() as ExecutionRow[];
 }
+
+/** Named migrations of this domain; the SQL above is frozen once deployed. */
+export const migrations: readonly Migration[] = [
+	{ id: "coding/0001-init", sql: migration },
+];

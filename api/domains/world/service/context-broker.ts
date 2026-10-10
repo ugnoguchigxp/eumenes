@@ -1,5 +1,5 @@
 import type { Database } from "bun:sqlite";
-import { createHash } from "node:crypto";
+import { sha256Hex } from "../../../infrastructure/digest";
 import { CONTRACT_VERSIONS, type SourceRef } from "eumenes-memory";
 import { unregisterExternalDependents } from "eumenes-memory/sqlite";
 import {
@@ -144,8 +144,7 @@ export type ContextBrokerOptions = {
 	keepUsagePerScope?: number;
 };
 
-const defaultHasher: CanonicalHasher = (bytes) =>
-	createHash("sha256").update(bytes).digest("hex");
+const defaultHasher: CanonicalHasher = (bytes) => sha256Hex(bytes);
 /** A content-free machine code the queue may persist (`^[a-z][a-z0-9_:]*$`). */
 const reasonOf = (code: string) =>
 	`world_${code.toLowerCase().replace(/^world_/, "")}`;

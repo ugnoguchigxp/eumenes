@@ -133,7 +133,3 @@ export function totalSize(root: string): number {
 		return sum + (stat.isDirectory() ? totalSize(path) : stat.size);
 	}, 0);
 }
-export function removeOwned(path: string, value: string) {
-	if (optionalJson<{ executionId: string }>(path)?.executionId === value)
-		unlinkSync(path);
-}

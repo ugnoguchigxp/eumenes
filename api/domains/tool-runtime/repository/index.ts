@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import type { Migration } from "../../../infrastructure/sqlite";
 import type { Invocation } from "../contracts";
 export const migration = `
 CREATE TABLE tool_invocations(id TEXT PRIMARY KEY,owner_task_id TEXT NOT NULL,root_run_id TEXT NOT NULL,tool_revision_id TEXT NOT NULL,step_id TEXT NOT NULL,request_id TEXT NOT NULL UNIQUE,args_json TEXT,args_digest TEXT NOT NULL,operation_id TEXT NOT NULL,job_id TEXT NOT NULL,state TEXT NOT NULL,result_ref TEXT,result_digest TEXT,error_code TEXT,deadline INTEGER NOT NULL,created_at INTEGER NOT NULL,finished_at INTEGER,UNIQUE(step_id));
@@ -47,3 +48,31 @@ export function hasSupersededColumn(db: Database) {
 	}
 	return v;
 }
+
+export const readMetadataMigration = `
+ALTER TABLE tool_invocations ADD COLUMN cancel_epoch INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE tool_invocations ADD COLUMN operation_fingerprint TEXT;
+CREATE TABLE tool_views(view_id TEXT PRIMARY KEY,invocation_id TEXT NOT NULL REFERENCES tool_invocations(id) ON DELETE CASCADE,metadata_json TEXT NOT NULL);
+CREATE TABLE tool_read_proofs(invocation_id TEXT NOT NULL REFERENCES tool_invocations(id) ON DELETE CASCADE,proof_json TEXT NOT NULL);
+`;
+const readColumns = new WeakMap<Database, boolean>();
+export function hasReadMetadata(db: Database) {
+	let v = readColumns.get(db);
+	if (v === undefined) {
+		v = !!db.query("SELECT 1 FROM sqlite_master WHERE name='tool_views'").get();
+		readColumns.set(db, v);
+	}
+	return v;
+}
+/** Named migrations of this domain; the SQL above is frozen once deployed. */
+export const migrations: readonly Migration[] = [
+	{ id: "tool-runtime/0001-init", sql: migration },
+	{ id: "tool-runtime/0002-route-grant", sql: routeGrantMigration },
+	{ id: "tool-runtime/0003-supersede", sql: supersedeMigration },
+	{ id: "tool-runtime/0004-action", sql: actionMigration },
+	{
+		id: "tool-runtime/0005-read-metadata",
+		sql: readMetadataMigration,
+		after: ["tool-runtime/0004-action"],
+	},
+];

@@ -1,4 +1,4 @@
-import type { ClaimRow } from "../../../../../api/domains/world/contracts";
+import type { ClaimRow } from "../../../../../api/domains/world/contracts/view";
 import {
 	adoptionLabels,
 	contentText,

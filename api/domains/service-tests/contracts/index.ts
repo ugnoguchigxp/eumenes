@@ -129,6 +129,8 @@ export function testErrorLabel(code: string) {
 		invalid_upload: "音声ファイルの有効期限または形式を確認してください。",
 		invalid_permission: "接続と送信許可を確認してください。",
 		larm_unconfigured: "LARMの認証設定がありません。",
+		larm_base_url_unconfigured: "LARMの接続先URLが設定されていません。",
+		larm_provider_host_mismatch: "LARMが示した接続先が許可されていません。",
 		larm_http_401: "認証に失敗しました。",
 		larm_http_403: "利用が許可されていません。",
 		larm_http_409: "ほかの処理が使用中です。時間をおいて試してください。",

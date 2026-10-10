@@ -1,4 +1,4 @@
-import { type ChildProcess, spawn, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import {
 	existsSync,
 	mkdirSync,
@@ -7,104 +7,41 @@ import {
 	rmSync,
 	writeFileSync,
 } from "node:fs";
-import { type AddressInfo, createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { expect, test } from "@playwright/test";
-import { resolveApiToken } from "../../api/infrastructure/auth-config";
+import { expect, type Page, test } from "@playwright/test";
+import { evidencePath } from "./evidence";
+import { createFixture } from "./fixture";
 
+const TOKEN = "fixture-api-token-0123456789abcdef";
 const root = process.cwd();
-const processes: ChildProcess[] = [];
+const fixture = createFixture();
 let dir: string;
 let apiPort: number, webPort: number, larmPort: number;
-async function fixturePorts() {
-	const servers = [createServer(), createServer(), createServer()];
-	try {
-		await Promise.all(
-			servers.map(
-				(server) =>
-					new Promise<void>((resolve, reject) => {
-						server.once("error", reject);
-						server.listen(0, "127.0.0.1", resolve);
-					}),
-			),
-		);
-		return servers.map((server) => (server.address() as AddressInfo).port) as [
-			number,
-			number,
-			number,
-		];
-	} finally {
-		await Promise.all(
-			servers.map(
-				(server) =>
-					new Promise<void>((resolve) => server.close(() => resolve())),
-			),
-		);
-	}
-}
-async function ready(url: string) {
-	for (let i = 0; i < 100; i++) {
-		try {
-			const response = await fetch(url);
-			if (response.status < 500) return;
-		} catch {}
-		await new Promise((resolve) => setTimeout(resolve, 100));
-	}
-	throw new Error(`server unavailable: ${url}`);
-}
-function launch(args: string[], env: Record<string, string> = {}) {
-	const child = spawn("bun", args, {
-		cwd: root,
-		env: { ...process.env, ...env },
-		stdio: "ignore",
+// Node has no Sec-Fetch-Site, so the Vite dev proxy rightly refuses to authorize it:
+// fixture-side API calls go straight to the backend with the explicit token.
+const apiFetch = (input: string, init: RequestInit = {}) =>
+	fetch(input.replace(`:${webPort}/`, `:${apiPort}/`), {
+		...init,
+		headers: { Authorization: `Bearer ${TOKEN}`, ...init.headers },
 	});
-	processes.push(child);
-	return child;
-}
+/** Waits for the page to present `count` animation frames, not for wall-clock time. */
+const animationFrames = (page: Page, count: number) =>
+	page.evaluate(
+		(frames) =>
+			new Promise<void>((resolve) => {
+				const step = (left: number) =>
+					left <= 0 ? resolve() : requestAnimationFrame(() => step(left - 1));
+				step(frames);
+			}),
+		count,
+	);
 test.beforeAll(async () => {
-	[apiPort, webPort, larmPort] = await fixturePorts();
 	dir = mkdtempSync(join(tmpdir(), "eumenes-browser-"));
-	launch(["scripts/larm-fixture-server.ts"], {
-		LARM_FIXTURE_PORT: String(larmPort),
-	});
-	await ready(`http://127.0.0.1:${larmPort}/v3/agent-profiles`);
-	launch(["api/application/server.ts"], {
-		EUMENES_DB: join(dir, "test.sqlite3"),
-		EUMENES_TOOLCHAIN_ENABLED: "0",
-		EUMENES_LOG_FILE: join(dir, "logs/api.jsonl"),
-		EUMENES_LOG_LEVEL: "debug",
-		EUMENES_API_TOKEN: "",
-		EUMENES_PORT: String(apiPort),
-		EUMENES_ORIGIN: `http://127.0.0.1:${webPort}`,
-		LARM_BASE_URL: `http://127.0.0.1:${larmPort}`,
-		LARM_API_TOKEN: "fixture-control",
-		LARM_CONTROL_TOKEN: "",
-	});
-	await ready(`http://127.0.0.1:${apiPort}/api/status`);
-	await expect
-		.poll(
-			async () => {
-				const response = await fetch(`http://127.0.0.1:${apiPort}/api/status`, {
-					headers: {
-						Authorization: `Bearer ${resolveApiToken({ LARM_API_TOKEN: "fixture-control" })}`,
-					},
-				});
-				if (!response.ok) return response.status;
-				return (await response.json()).larm.state;
-			},
-			{ timeout: 15000 },
-		)
-		.toBe("ready");
-	launch(["x", "vite", "--host", "127.0.0.1", "--port", String(webPort)], {
-		EUMENES_VITE_CACHE_DIR: join(dir, "vite-cache"),
-		EUMENES_PROXY_URL: `http://127.0.0.1:${apiPort}`,
-		EUMENES_API_TOKEN: "",
-		LARM_API_TOKEN: "fixture-control",
-		LARM_CONTROL_TOKEN: "",
-		EUMENES_ORIGIN: `http://127.0.0.1:${webPort}`,
-	});
-	await ready(`http://127.0.0.1:${webPort}/`);
+	({ apiPort, webPort, larmPort } = await fixture.startVoiceStack({
+		dir,
+		token: TOKEN,
+	}));
 });
 // Preserve operational evidence before fixture teardown removes its temporary DB.
 test.afterEach(async ({ page: _page }, testInfo) => {
@@ -121,10 +58,7 @@ test.afterEach(async ({ page: _page }, testInfo) => {
 });
 
 test.afterAll(async () => {
-	for (const child of processes) child.kill("SIGTERM");
-	await new Promise((resolve) => setTimeout(resolve, 200));
-	for (const child of processes)
-		if (child.exitCode === null) child.kill("SIGKILL");
+	await fixture.stopAll();
 	rmSync(dir, { recursive: true, force: true });
 });
 test.beforeEach(async ({ page }) => {
@@ -153,7 +87,14 @@ test.describe("light avatar rendering", () => {
 			await page.setViewportSize({ width: 390, height: 844 });
 			await page.goto(url);
 			const canvas = page.locator(".light-avatar-background canvas");
-			await expect(canvas).toHaveCount(1);
+			const avatar = page.locator(".light-avatar-background");
+			// The three.js chunk is imported when the main thread is idle (up to ~1.5s), then
+			// software GL builds the model: allow for both before the first canvas.
+			await expect(avatar).toHaveAttribute("data-avatar-state", "ready", {
+				timeout: 30000,
+			});
+			await expect(avatar).toHaveAttribute("data-avatar-motion", "static");
+			await expect(canvas).toHaveCount(1, { timeout: 30000 });
 			await expect(canvas).toBeVisible();
 			expect(
 				await canvas.evaluate((element) => {
@@ -166,23 +107,53 @@ test.describe("light avatar rendering", () => {
 				"rgba(0, 0, 0, 0)",
 			);
 			const still = await canvas.screenshot();
-			await page.waitForTimeout(250);
+			// Let the page present a run of animation frames: with reduced motion none may differ.
+			await animationFrames(page, 15);
 			expect((await canvas.screenshot()).equals(still)).toBe(true);
 			const stillCanvas = await canvas.elementHandle();
 			await page.emulateMedia({ reducedMotion: "no-preference" });
-			await expect
-				.poll(() => stillCanvas!.evaluate((node) => node.isConnected))
-				.toBe(false);
+			// A motion preference change keeps the canvas: only the playback is switched.
+			await expect(avatar).toHaveAttribute("data-avatar-motion", "animated");
+			await expect(avatar).toHaveAttribute("data-avatar-state", "ready");
+			expect(await stillCanvas!.evaluate((node) => node.isConnected)).toBe(
+				true,
+			);
 			await expect(canvas).toHaveCount(1);
 			const breathing = await canvas.screenshot();
-			await page.waitForTimeout(600);
-			expect((await canvas.screenshot()).equals(breathing)).toBe(false);
+			await expect
+				.poll(async () => (await canvas.screenshot()).equals(breathing))
+				.toBe(false);
 			const movingCanvas = await canvas.elementHandle();
 			await page.emulateMedia({ reducedMotion: "reduce" });
-			await expect
-				.poll(() => movingCanvas!.evaluate((node) => node.isConnected))
-				.toBe(false);
+			await expect(avatar).toHaveAttribute("data-avatar-motion", "static");
+			expect(await movingCanvas!.evaluate((node) => node.isConnected)).toBe(
+				true,
+			);
 			await expect(canvas).toHaveCount(1);
+			await animationFrames(page, 15);
+			const paused = await canvas.screenshot();
+			await animationFrames(page, 15);
+			expect((await canvas.screenshot()).equals(paused)).toBe(true);
+			// Hiding the tab pauses the playback without rebuilding the canvas.
+			const setVisibility = (state: "hidden" | "visible") =>
+				page.evaluate((next) => {
+					Object.defineProperty(document, "visibilityState", {
+						configurable: true,
+						get: () => next,
+					});
+					document.dispatchEvent(new Event("visibilitychange"));
+				}, state);
+			await setVisibility("hidden");
+			await expect(avatar).toHaveAttribute("data-avatar-state", "paused");
+			expect(await movingCanvas!.evaluate((node) => node.isConnected)).toBe(
+				true,
+			);
+			await expect(canvas).toHaveCount(1);
+			await setVisibility("visible");
+			await expect(avatar).toHaveAttribute("data-avatar-state", "ready");
+			expect(await movingCanvas!.evaluate((node) => node.isConnected)).toBe(
+				true,
+			);
 			await page
 				.getByRole("textbox", { name: "メッセージ" })
 				.fill("配置の確認");
@@ -252,7 +223,7 @@ test("avatar voice controls save and survive a settings reload", async ({
 	page,
 }) => {
 	const url = `http://127.0.0.1:${webPort}`;
-	const original = await (await fetch(`${url}/api/settings`)).json();
+	const original = await (await apiFetch(`${url}/api/settings`)).json();
 	try {
 		await page.goto(url);
 		await page.getByRole("button", { name: "設定", exact: true }).click();
@@ -301,7 +272,7 @@ test("avatar voice controls save and survive a settings reload", async ({
 		await expect(
 			page.getByRole("status").filter({ hasText: "変更を適用しました" }),
 		).toBeVisible();
-		const saved = await (await fetch(`${url}/api/settings`)).json();
+		const saved = await (await apiFetch(`${url}/api/settings`)).json();
 		expect(saved.larm).toMatchObject({
 			voice: "fixture-voice",
 			speed: 1.4,
@@ -337,12 +308,12 @@ test("avatar voice controls save and survive a settings reload", async ({
 		const bytes = new Uint8Array(44);
 		bytes.set(new TextEncoder().encode("RIFF"));
 		bytes.set(new TextEncoder().encode("WAVE"), 8);
-		await fetch(`${url}/api/voice/sessions`, {
+		await apiFetch(`${url}/api/voice/sessions`, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ sessionId, generation: 1 }),
 		});
-		await fetch(`${url}/api/voice/turns`, {
+		await apiFetch(`${url}/api/voice/turns`, {
 			method: "POST",
 			headers: {
 				"Content-Type": "audio/wav",
@@ -356,8 +327,11 @@ test("avatar voice controls save and survive a settings reload", async ({
 		await expect
 			.poll(
 				async () =>
-					(await (await fetch(`${url}/api/voice/turns/${utteranceId}`)).json())
-						.status,
+					(
+						await (
+							await apiFetch(`${url}/api/voice/turns/${utteranceId}`)
+						).json()
+					).status,
 			)
 			.toBe("ready");
 		const observations = await (
@@ -374,7 +348,7 @@ test("avatar voice controls save and survive a settings reload", async ({
 			intonation_scale: 1.15,
 			response_format: "wav",
 		});
-		const usage = await (await fetch(`${url}/api/inference/usage`)).json();
+		const usage = await (await apiFetch(`${url}/api/inference/usage`)).json();
 		expect(
 			usage
 				.find(
@@ -386,14 +360,14 @@ test("avatar voice controls save and survive a settings reload", async ({
 			speechVoice: "fixture-voice",
 			speechCredit: "VOICEVOX:テスト話者A",
 		});
-		await fetch(`${url}/api/voice/sessions/stop`, {
+		await apiFetch(`${url}/api/voice/sessions/stop`, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ sessionId, generation: 1 }),
 		});
 	} finally {
-		const current = await (await fetch(`${url}/api/settings`)).json();
-		await fetch(`${url}/api/settings/apply`, {
+		const current = await (await apiFetch(`${url}/api/settings`)).json();
+		await apiFetch(`${url}/api/settings/apply`, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
@@ -409,7 +383,7 @@ test("missing catalog or character preserves saved controls until an explicit de
 	page,
 }) => {
 	const url = `http://127.0.0.1:${webPort}`;
-	const original = await (await fetch(`${url}/api/settings`)).json();
+	const original = await (await apiFetch(`${url}/api/settings`)).json();
 	const selected = {
 		...original,
 		larm: {
@@ -422,8 +396,8 @@ test("missing catalog or character preserves saved controls until an explicit de
 		},
 	};
 	const save = async (settings: typeof selected) => {
-		const current = await (await fetch(`${url}/api/settings`)).json();
-		return fetch(`${url}/api/settings/apply`, {
+		const current = await (await apiFetch(`${url}/api/settings`)).json();
+		return apiFetch(`${url}/api/settings/apply`, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
@@ -443,7 +417,13 @@ test("missing catalog or character preserves saved controls until an explicit de
 				body: JSON.stringify({ error: "unavailable" }),
 			});
 		if (mode === "normal") return route.continue();
-		const response = await route.fetch();
+		const response = await route.fetch({
+			url: route.request().url().replace(`:${webPort}/`, `:${apiPort}/`),
+			headers: {
+				...route.request().headers(),
+				authorization: `Bearer ${TOKEN}`,
+			},
+		});
 		const catalog = await response.json();
 		catalog.default_voice = "fixture-voice-soft";
 		catalog.voices = catalog.voices.filter(
@@ -464,7 +444,7 @@ test("missing catalog or character preserves saved controls until an explicit de
 		await expect(page.getByLabel("キャラクター", { exact: true })).toHaveValue(
 			"fixture-voice",
 		);
-		expect((await (await fetch(`${url}/api/settings`)).json()).larm).toEqual(
+		expect((await (await apiFetch(`${url}/api/settings`)).json()).larm).toEqual(
 			selected.larm,
 		);
 		mode = "missing";
@@ -474,7 +454,7 @@ test("missing catalog or character preserves saved controls until an explicit de
 		await expect(page.getByRole("alert")).toContainText(
 			"保存したキャラクターが一覧にありません",
 		);
-		expect((await (await fetch(`${url}/api/settings`)).json()).larm).toEqual(
+		expect((await (await apiFetch(`${url}/api/settings`)).json()).larm).toEqual(
 			selected.larm,
 		);
 		mode = "normal";
@@ -501,7 +481,7 @@ test("missing catalog or character preserves saved controls until an explicit de
 			page.getByRole("status").filter({ hasText: "変更を適用しました" }),
 		).toBeVisible();
 		expect(
-			(await (await fetch(`${url}/api/settings`)).json()).larm,
+			(await (await apiFetch(`${url}/api/settings`)).json()).larm,
 		).toMatchObject({ voice: "", style: "normal", pitchScale: 0.02 });
 	} finally {
 		await save(original);
@@ -535,7 +515,7 @@ test("exported LARM token connects the UI and CLI without browser credentials", 
 		env: {
 			...process.env,
 			EUMENES_URL: `http://127.0.0.1:${apiPort}`,
-			EUMENES_API_TOKEN: "",
+			EUMENES_API_TOKEN: TOKEN,
 			LARM_API_TOKEN: "fixture-control",
 			LARM_CONTROL_TOKEN: "",
 		},
@@ -564,6 +544,9 @@ test("a backend outage does not poll snapshots and explicit reconnect reloads th
 			});
 		else await route.continue();
 	});
+	// Page timers run on a clock the test advances, so "nothing is polled" is checked
+	// against every timer that would fire in the window instead of a real sleep.
+	await page.clock.install();
 	await page.goto(`http://127.0.0.1:${webPort}/`);
 	await expect(
 		page.getByRole("button", { name: "接続を再確認" }),
@@ -575,14 +558,14 @@ test("a backend outage does not poll snapshots and explicit reconnect reloads th
 		page.getByText("会話履歴を取得できませんでした。"),
 	).toBeVisible();
 	// StrictMode can mount twice; compare after initial errors have settled.
-	await page.waitForTimeout(100);
+	await page.clock.runFor(100);
 	const watched = [
 		"/api/conversations/main/runs",
 		"/api/conversations/main",
 		"/api/status",
 	];
 	const initial = watched.map((path) => counts.get(path));
-	await page.waitForTimeout(2000);
+	await page.clock.runFor(2000);
 	expect(watched.map((path) => counts.get(path))).toEqual(initial);
 	await page.getByRole("button", { name: "接続を再確認" }).click();
 	await expect(page.locator(".connection-health .health-state")).toHaveText(
@@ -649,7 +632,7 @@ test("text and browser audio complete through real services with fixture provide
 			env: {
 				...process.env,
 				EUMENES_URL: `http://127.0.0.1:${apiPort}`,
-				EUMENES_API_TOKEN: "",
+				EUMENES_API_TOKEN: TOKEN,
 				LARM_API_TOKEN: "fixture-control",
 				LARM_CONTROL_TOKEN: "",
 			},
@@ -845,15 +828,21 @@ test("settings save, reload, theme and automatic fallback use backend credential
 	).toBeVisible();
 	// Restore the fixture connection after deliberately exercising an offline URL.
 	// Later tests must not inherit its asynchronous connection preparation.
-	const restored = await fetch(`http://127.0.0.1:${webPort}/api/larm/connect`, {
-		method: "POST",
-	});
+	const restored = await apiFetch(
+		`http://127.0.0.1:${webPort}/api/larm/connect`,
+		{
+			method: "POST",
+		},
+	);
 	expect(restored.ok).toBe(true);
 	await expect
 		.poll(
 			async () =>
-				(await (await fetch(`http://127.0.0.1:${webPort}/api/status`)).json())
-					.larm.state,
+				(
+					await (
+						await apiFetch(`http://127.0.0.1:${webPort}/api/status`)
+					).json()
+				).larm.state,
 			{ timeout: 15000 },
 		)
 		.toBe("ready");
@@ -863,8 +852,8 @@ test("memory connection settings persist across reload and preserve saved items"
 	page,
 }, testInfo) => {
 	const url = `http://127.0.0.1:${webPort}`;
-	const original = await (await fetch(`${url}/api/memory/status`)).json();
-	const items = await (await fetch(`${url}/api/memory/items?all=1`)).json();
+	const original = await (await apiFetch(`${url}/api/memory/status`)).json();
+	const items = await (await apiFetch(`${url}/api/memory/items?all=1`)).json();
 	try {
 		await page.goto(`${url}/#settings`);
 		await page.getByRole("button", { name: "メモリー", exact: true }).click();
@@ -875,7 +864,7 @@ test("memory connection settings persist across reload and preserve saved items"
 		await page.getByRole("button", { name: "メモリーを切断" }).click();
 		await expect(page.getByText("非接続", { exact: true })).toBeVisible();
 		expect(
-			(await (await fetch(`${url}/api/memory/status`)).json()).enabled,
+			(await (await apiFetch(`${url}/api/memory/status`)).json()).enabled,
 		).toBe(false);
 		await page.reload();
 		await page.getByRole("button", { name: "メモリー", exact: true }).click();
@@ -886,13 +875,13 @@ test("memory connection settings persist across reload and preserve saved items"
 		await page.getByRole("button", { name: "メモリーを接続" }).click();
 		await expect(page.getByText("接続中", { exact: true })).toBeVisible();
 		expect(
-			(await (await fetch(`${url}/api/memory/status`)).json()).enabled,
+			(await (await apiFetch(`${url}/api/memory/status`)).json()).enabled,
 		).toBe(true);
-		expect(await (await fetch(`${url}/api/memory/items?all=1`)).json()).toEqual(
-			items,
-		);
+		expect(
+			await (await apiFetch(`${url}/api/memory/items?all=1`)).json(),
+		).toEqual(items);
 	} finally {
-		await fetch(`${url}/api/memory/settings`, {
+		await apiFetch(`${url}/api/memory/settings`, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ enabled: original.enabled }),
@@ -958,17 +947,18 @@ test("idle views keep one SSE stream without periodic snapshot requests", async 
 	};
 	page.on("requestfinished", end);
 	page.on("requestfailed", end);
+	await page.clock.install();
 	await page.goto(`http://127.0.0.1:${webPort}/`);
 	await expect(page.locator(".connection-health .health-state")).toHaveText(
 		/^(接続済み|待機中)$/,
 		{ timeout: 15000 },
 	);
 	await expect.poll(() => counts.get("/api/events") ?? 0).toBeGreaterThan(0);
-	await page.waitForTimeout(600);
+	await page.clock.runFor(600);
 	// Development StrictMode remounts once; the settled page must share one stream.
 	maxStreams = activeStreams;
 	const before = Object.fromEntries(counts);
-	await page.waitForTimeout(6200);
+	await page.clock.runFor(6200);
 	expect(Object.fromEntries(counts)).toEqual(before);
 	expect(activeStreams).toBe(1);
 	expect(maxStreams).toBe(1);
@@ -980,6 +970,23 @@ test("failed notifications are visible while API works; returning to the page re
 	page,
 }) => {
 	let notificationsUnavailable = true;
+	// Keep a known old snapshot during the simulated outage. Initial query
+	// completion or focus from another browser must not reveal the new run early.
+	const snapshot = await (
+		await apiFetch(`http://127.0.0.1:${webPort}/api/conversations/main`)
+	).text();
+	await page.route(
+		`http://127.0.0.1:${webPort}/api/conversations/main`,
+		async (route) => {
+			if (notificationsUnavailable)
+				await route.fulfill({
+					status: 200,
+					contentType: "application/json",
+					body: snapshot,
+				});
+			else await route.continue();
+		},
+	);
 	await page.route(`http://127.0.0.1:${webPort}/api/events`, async (route) => {
 		if (notificationsUnavailable)
 			await route.fulfill({
@@ -1000,7 +1007,7 @@ test("failed notifications are visible while API works; returning to the page re
 		page.getByRole("button", { name: "接続を再確認", exact: true }),
 	).toBeVisible();
 	const prompt = "画面を戻した時の通知復旧を確認";
-	const accepted = await fetch(`http://127.0.0.1:${webPort}/api/runs`, {
+	const accepted = await apiFetch(`http://127.0.0.1:${webPort}/api/runs`, {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
 		body: JSON.stringify({
@@ -1016,7 +1023,7 @@ test("failed notifications are visible while API works; returning to the page re
 			async () =>
 				(
 					(await (
-						await fetch(`http://127.0.0.1:${webPort}/api/runs/${run.id}`)
+						await apiFetch(`http://127.0.0.1:${webPort}/api/runs/${run.id}`)
 					).json()) as { status: string }
 				).status,
 		)
@@ -1228,7 +1235,7 @@ test("answer emotions sit beside Eumenes, neutral and legacy motions stay hidden
 test("settings playground exercises image, music and provider health through the API", async ({
 	page,
 }) => {
-	mkdirSync("spec/verification/service-tests", { recursive: true });
+	mkdirSync(evidencePath("service-tests"), { recursive: true });
 	await page.setViewportSize({ width: 1600, height: 1100 });
 	await page.goto(`http://127.0.0.1:${webPort}`);
 	await page.getByRole("button", { name: "設定", exact: true }).click();
@@ -1240,7 +1247,7 @@ test("settings playground exercises image, music and provider health through the
 	await expect(page.getByAltText("生成した画像")).toBeVisible();
 	await expect(page.getByText("成功", { exact: true }).first()).toBeVisible();
 	await page.screenshot({
-		path: "spec/verification/service-tests/desktop.png",
+		path: evidencePath("service-tests/desktop.png"),
 		fullPage: true,
 	});
 	await page.getByRole("button", { name: /楽曲生成.*fixture-music/ }).click();
@@ -1263,7 +1270,59 @@ test("settings playground exercises image, music and provider health through the
 		),
 	).toBe(true);
 	await page.screenshot({
-		path: "spec/verification/service-tests/mobile.png",
+		path: evidencePath("service-tests/mobile.png"),
 		fullPage: true,
 	});
+});
+
+test("a long question with a one-second pause is sent once after final silence", async ({
+	page,
+}) => {
+	const uploads: number[] = [];
+	page.on("request", (request) => {
+		if (
+			request.method() === "POST" &&
+			new URL(request.url()).pathname === "/api/voice/turns"
+		)
+			uploads.push(Number(request.headers()["x-sequence"]));
+	});
+	await page.addInitScript(() => {
+		Object.defineProperty(navigator.mediaDevices, "getUserMedia", {
+			configurable: true,
+			value: async () => {
+				const context = new AudioContext(),
+					output = context.createMediaStreamDestination();
+				setTimeout(() => {
+					const oscillator = context.createOscillator(),
+						gain = context.createGain();
+					gain.gain.value = 0.2;
+					oscillator.connect(gain);
+					gain.connect(output);
+					oscillator.start();
+					Reflect.set(window, "captureStartedAt", performance.now());
+					setTimeout(() => {
+						gain.gain.value = 0;
+					}, 4000);
+					setTimeout(() => {
+						gain.gain.value = 0.2;
+					}, 5000);
+					setTimeout(() => oscillator.stop(), 12000);
+				}, 400);
+				return output.stream;
+			},
+		});
+	});
+	await page.goto(`http://127.0.0.1:${webPort}/#conversation`);
+	await page.getByRole("button", { name: "音声を開始" }).click();
+	await page.waitForFunction(() => {
+		const started = Reflect.get(window, "captureStartedAt");
+		return typeof started === "number" && performance.now() - started >= 11000;
+	});
+	expect(uploads).toEqual([]);
+	await expect.poll(() => uploads, { timeout: 5000 }).toEqual([1]);
+	await expect(page.getByRole("textbox", { name: "メッセージ" })).toHaveValue(
+		"こんにちは",
+	);
+	await page.getByRole("button", { name: "マイクを停止" }).click();
+	expect(uploads).toEqual([1]);
 });

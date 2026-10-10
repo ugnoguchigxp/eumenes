@@ -412,3 +412,75 @@ test("malformed local hostnames cannot receive credentials", () => {
 		}),
 	).toThrow("invalid_larm_url");
 });
+
+function hostClaim(origin: string) {
+	const expiresAt = new Date(Date.now() + 300_000).toISOString();
+	return Response.json({
+		id: "test",
+		status: "ready",
+		expiresAt,
+		providers: [
+			{
+				name: "llm",
+				protocol: "openai.chat-completions.v1",
+				endpoint: undefined,
+				model: "model-llm",
+				baseUrl: `${origin}/llm/v1`,
+				credential: { type: "bearer", token: "short-lived", expiresAt },
+				configuration: {
+					fields: { baseURL: `${origin}/llm/v1`, model: "model-llm" },
+				},
+			},
+		],
+	});
+}
+async function executeLlm(origin: string, hosts?: string) {
+	const previous = process.env.EUMENES_LARM_PROVIDER_HOSTS;
+	if (hosts === undefined) delete process.env.EUMENES_LARM_PROVIDER_HOSTS;
+	else process.env.EUMENES_LARM_PROVIDER_HOSTS = hosts;
+	try {
+		const h = fixture((path) =>
+			path.endsWith("/claim") ? hostClaim(origin) : undefined,
+		);
+		const c = await h.gateway.catalog(AbortSignal.timeout(1000));
+		const target = c.targets.find(
+			(t) => t.kind === "llm" && t.mode === "provider",
+		)!;
+		return await h.gateway.execute(
+			target,
+			{ text: "こんにちは" },
+			AbortSignal.timeout(1000),
+			async () => {},
+		);
+	} finally {
+		if (previous === undefined) delete process.env.EUMENES_LARM_PROVIDER_HOSTS;
+		else process.env.EUMENES_LARM_PROVIDER_HOSTS = previous;
+	}
+}
+test("playground claims on the LARM host, another port included, are accepted", async () => {
+	expect((await executeLlm("http://127.0.0.1:8080")).text).toBeTruthy();
+});
+test("playground claims on another private host are refused unless listed", async () => {
+	await expect(executeLlm("http://10.9.9.9")).rejects.toThrow(
+		"larm_provider_host_mismatch",
+	);
+	await expect(executeLlm("http://other.local")).rejects.toThrow(
+		"larm_provider_host_mismatch",
+	);
+	expect((await executeLlm("http://10.9.9.9", "10.9.9.9")).text).toBeTruthy();
+});
+test("a missing baseUrl leaves the playground unconfigured", async () => {
+	const gateway = createLarmPlayground({
+		token: "control-secret",
+		profile: "SAAA",
+		audience: "saaa-desktop",
+		fetch: (async () => {
+			throw new Error("must_not_contact");
+		}) as unknown as typeof fetch,
+	});
+	const catalog = await gateway.catalog(AbortSignal.timeout(1000));
+	expect(catalog.targets).toEqual([]);
+	expect(JSON.stringify(catalog.errors)).toContain(
+		"larm_base_url_unconfigured",
+	);
+});

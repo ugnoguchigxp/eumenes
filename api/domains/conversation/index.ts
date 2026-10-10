@@ -24,3 +24,10 @@ export type {
 	ConversationServiceOptions,
 } from "./service";
 export { createConversationService } from "./service";
+export { migrations } from "./repository";
+
+export type {
+	HistoryOwner,
+	HistoryView,
+	HistoryScope,
+} from "./contracts/history";

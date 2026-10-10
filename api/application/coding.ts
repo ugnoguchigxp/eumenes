@@ -1,7 +1,6 @@
 import { join } from "node:path";
 import type { SqliteStore } from "../infrastructure/sqlite";
-import { createCoding } from "../domains/coding";
-import { connectRunner } from "../domains/coding/adapters";
+import { connectRunner, createCoding } from "../domains/coding";
 import {
 	loadConfig,
 	publishSpec,

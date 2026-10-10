@@ -5,7 +5,7 @@ import { id, digestSchema } from "./contracts";
 import { digest, readPrivate } from "./storage";
 
 const absolute = z.string().refine(isAbsolute);
-export const configSchema = z.strictObject({
+const configSchema = z.strictObject({
 	spoolRoot: absolute,
 	codexExecutable: absolute,
 	codexDigest: digestSchema,

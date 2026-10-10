@@ -8,3 +8,4 @@ export {
 	type Identity,
 	type VoiceAdoption,
 } from "./contracts";
+export { migrations } from "./repository";

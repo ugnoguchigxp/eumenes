@@ -64,7 +64,7 @@ export const learnedPair = (): Definition[] => [
 		toolRevisionIds: ["tool:web.read@1"],
 	},
 ];
-export const coldPackage = "package:web.research@3";
+export const coldPackage = "package:web.research@6";
 export const directBind = (token = "tok-direct"): AcquisitionBindResult => ({
 	kind: "bound",
 	bindingToken: token,
@@ -103,6 +103,12 @@ export async function harness() {
 	]);
 	const caps = createCapabilities(store);
 	await caps.seed();
+	// Archived acquisition fixtures keep the pre-view contract; replay tests cover the new revision.
+	await store.write((db) =>
+		db
+			.query("UPDATE capability_items SET active_revision_id=? WHERE key=?")
+			.run(coldPackage, "package:web.research"),
+	);
 	await store.write((db) => {
 		for (const d of learnedPair()) caps.registerLearnedInTransaction(db, d);
 	});

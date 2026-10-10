@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { HttpErrorStatus } from "../../../infrastructure/http";
 
 const bytes = (limit: number) =>
 	z
@@ -227,3 +228,16 @@ export const taskListQuerySchema = z.strictObject({
 		.optional(),
 	limit: z.coerce.number().int().min(1).max(100).default(50),
 });
+
+/** HTTP status of each error code this domain throws; merged by `api/application/error-status.ts`. */
+export const errorStatus = {
+	task_not_found: 404,
+	task_execution_unavailable: 503,
+	task_grant_expired: 409,
+	task_runtime_expired: 409,
+	task_state_conflict: 409,
+	task_fence_conflict: 409,
+	task_origin_conflict: 409,
+	task_question_conflict: 409,
+	task_capacity: 429,
+} as const satisfies Record<string, HttpErrorStatus>;

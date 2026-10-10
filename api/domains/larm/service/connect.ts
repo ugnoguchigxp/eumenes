@@ -1,5 +1,5 @@
 import type { Capability } from "../contracts";
-import { localEndpoint, readJson, record, string } from "./guards";
+import { providerEndpoint, readJson, record, string } from "./guards";
 import {
 	endpoints,
 	gemmaAgentProfile,
@@ -17,6 +17,8 @@ export type Control = (
 	accepted: number[],
 ) => Promise<Response>;
 type Rec = Record<string, unknown>;
+/** Hosts that may receive provider credentials: the LARM base host plus explicit extras. */
+export type ProviderHosts = { base: URL; extra: readonly string[] };
 
 const terminalStatuses = ["failed", "expired", "released"];
 const providersOf = (value: Rec): Rec[] =>
@@ -82,6 +84,8 @@ export async function createConnection(
 		audience: string;
 		fullProfile: boolean;
 		catalogRevision: string;
+		/** Reused for every creation attempt of one connect() so a retry cannot duplicate the connection. */
+		idempotencyKey: string;
 	},
 ): Promise<{ id: string; created: Rec }> {
 	const response = await control(
@@ -90,7 +94,7 @@ export async function createConnection(
 			method: "POST",
 			headers: {
 				"content-type": "application/json",
-				"Idempotency-Key": crypto.randomUUID(),
+				"Idempotency-Key": input.idempotencyKey,
 				Prefer: "wait=1",
 			},
 			body: JSON.stringify({
@@ -186,9 +190,10 @@ export async function claimProviders(
 		profile: string;
 		catalogProviders: Rec[];
 		fullProfile: boolean;
+		hosts: ProviderHosts;
 	},
 ): Promise<{ expiresAt: number; providers: Map<ProviderName, Provider> }> {
-	const { id, created, required, profile, catalogProviders } = input;
+	const { id, created, required, profile, catalogProviders, hosts } = input;
 	const claimed = record(
 		await readJson(
 			await control(
@@ -223,9 +228,9 @@ export async function claimProviders(
 			info.model !== declared?.model
 		)
 			throw new Error("larm_claim_mismatch");
-		providers.set(name, speechProvider(name, info, profile));
+		providers.set(name, speechProvider(name, info, profile, hosts));
 	}
-	const decision = decisionProvider(claimed, created, catalogProviders);
+	const decision = decisionProvider(claimed, created, catalogProviders, hosts);
 	if (input.fullProfile && decision) providers.set("system-one", decision);
 	return { expiresAt, providers };
 }
@@ -234,11 +239,12 @@ function speechProvider(
 	name: Capability,
 	info: Rec,
 	profile: string,
+	hosts: ProviderHosts,
 ): Provider {
 	const credential = record(info.credential);
 	const configuration = record(record(info.configuration).fields);
 	const baseUrl = string(configuration.baseURL);
-	localEndpoint(baseUrl);
+	providerEndpoint(baseUrl, hosts.base, hosts.extra);
 	if (configuration.baseURL !== baseUrl || configuration.model !== info.model)
 		throw new Error("larm_claim_configuration_mismatch");
 	const contextWindow = name === "llm" ? record(info.contextWindow) : undefined;
@@ -275,6 +281,7 @@ function decisionProvider(
 	claimed: Rec,
 	created: Rec,
 	catalogProviders: Rec[],
+	hosts: ProviderHosts,
 ): Provider | undefined {
 	const declared = catalogProviders.find((p) => p.name === "system-one");
 	if (
@@ -295,7 +302,7 @@ function decisionProvider(
 		) {
 			const fields = record(record(info.configuration).fields);
 			const baseUrl = string(fields.daemonURL);
-			localEndpoint(baseUrl);
+			providerEndpoint(baseUrl, hosts.base, hosts.extra);
 			if (baseUrl === info.baseUrl && fields.model === info.model)
 				return {
 					name: "system-one",
@@ -315,6 +322,7 @@ function decisionProvider(
 export async function renewProviders(
 	control: Control,
 	current: { id: string; providers: Map<ProviderName, Provider> },
+	hosts: ProviderHosts,
 ): Promise<{ expiresAt: number; providers: Map<ProviderName, Provider> }> {
 	const renewed = record(
 		await readJson(
@@ -367,7 +375,7 @@ export async function renewProviders(
 				) {
 					const fields = record(record(info.configuration).fields);
 					const baseUrl = string(fields.daemonURL);
-					localEndpoint(baseUrl);
+					providerEndpoint(baseUrl, hosts.base, hosts.extra);
 					if (baseUrl === info.baseUrl && fields.model === previous.model)
 						next.set(name, {
 							...previous,
@@ -388,7 +396,7 @@ export async function renewProviders(
 			throw new Error("larm_renew_claim_mismatch");
 		const fields = record(record(info.configuration).fields);
 		const baseUrl = string(fields.baseURL);
-		localEndpoint(baseUrl);
+		providerEndpoint(baseUrl, hosts.base, hosts.extra);
 		if (baseUrl !== info.baseUrl || fields.model !== previous.model)
 			throw new Error("larm_renew_claim_mismatch");
 		const contextWindow =

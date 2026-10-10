@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import type { Migration } from "../../../infrastructure/sqlite";
 import type { Run } from "../contracts";
 export const migration = `
 CREATE TABLE dialogue_runs (
@@ -177,3 +178,11 @@ export function unfinishedAgentRuns(db: Database): Run[] {
 			.all() as Record<string, unknown>[]
 	).map(map);
 }
+
+/** Named migrations of this domain; the SQL above is frozen once deployed. */
+export const migrations: readonly Migration[] = [
+	{ id: "dialogue/0001-init", sql: migration },
+	{ id: "dialogue/0002-queue-link", sql: queueLinkMigration },
+	{ id: "dialogue/0003-agent-link", sql: agentLinkMigration },
+	{ id: "dialogue/0004-world-state", sql: worldStateMigration },
+];

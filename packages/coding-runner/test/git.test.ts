@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import {
+	appendFileSync,
 	chmodSync,
 	mkdirSync,
 	readFileSync,
@@ -8,7 +9,7 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { createRunner, publishSpec } from "../src/core";
-import { git, snapshot } from "../src/workspace";
+import { git, recordGitIntegrity, snapshot } from "../src/workspace";
 import { executeGit, publishGitSpec } from "../src/git-operations";
 import { atomicWrite } from "../src/storage";
 import { fixture, until } from "./support";
@@ -67,8 +68,8 @@ test("snapshot includes untracked, deletion, binary bytes and mode; explicit com
 	} finally {
 		f.close();
 	}
-});
-test("review snapshot change invalidates commit; hooks remain enabled and modifications are unconfirmed", async () => {
+}, 15000);
+test("review snapshot change invalidates commit; a hook added by the agent is detected as tampering and never runs", async () => {
 	const { f, commit } = await setup();
 	try {
 		writeFileSync(join(f.workspace, "source.txt"), "change\n");
@@ -78,15 +79,15 @@ test("review snapshot change invalidates commit; hooks remain enabled and modifi
 		expect(() => executeGit(f.config, "stale", stale.operationId)).toThrow(
 			"runner_snapshot_changed",
 		);
+		const spec = commit();
+		publishGitSpec(f.config, "hook", spec);
 		const hook = join(f.source, ".git/hooks/pre-commit");
 		writeFileSync(hook, '#!/bin/sh\nprintf "hook\\n" >> source.txt\n');
 		chmodSync(hook, 0o700);
-		const spec = commit();
-		publishGitSpec(f.config, "hook", spec);
-		expect(executeGit(f.config, "hook", spec.operationId).state).toBe(
-			"outcome_unknown",
+		expect(() => executeGit(f.config, "hook", spec.operationId)).toThrow(
+			"runner_git_config_tampered",
 		);
-		expect(readFileSync(join(f.workspace, "source.txt"), "utf8")).toContain(
+		expect(readFileSync(join(f.workspace, "source.txt"), "utf8")).not.toContain(
 			"hook",
 		);
 	} finally {
@@ -120,6 +121,8 @@ test("push uses fixed branch/remote/SHA; lost receipt is reconciled and a change
 		mkdirSync(remotePath);
 		git(remotePath, ["init", "--bare", "-q"]);
 		git(f.workspace, ["remote", "add", "fixture-remote", remotePath]);
+		// The trusted host registers the remote, then re-records the config it relies on.
+		recordGitIntegrity(f.config, "fixture");
 		f.config.workspaces[0]!.remotes = [
 			{ id: "fixture-remote", name: "fixture-remote", url: remotePath },
 		];
@@ -140,6 +143,8 @@ test("push uses fixed branch/remote/SHA; lost receipt is reconciled and a change
 		git(f.workspace, ["tag", "-am", "unapproved tag", "fixture-tag"]);
 		git(f.workspace, ["config", "push.followTags", "true"]);
 		git(f.workspace, ["config", "remote.fixture-remote.mirror", "true"]);
+		// Hostile push settings recorded as trusted: the fixed push options must still override them.
+		recordGitIntegrity(f.config, "fixture");
 		publishGitSpec(f.config, "push", push);
 		const result = executeGit(f.config, "push", push.operationId);
 		expect(result.state).toBe("confirmed");
@@ -166,7 +171,7 @@ test("push uses fixed branch/remote/SHA; lost receipt is reconciled and a change
 	} finally {
 		f.close();
 	}
-});
+}, 15000);
 
 test("explicit staging treats wildcard characters as literal filenames", async () => {
 	const { f, commit } = await setup();
@@ -186,6 +191,64 @@ test("explicit staging treats wildcard characters as literal filenames", async (
 				"[x].txt",
 			]).trim(),
 		).toBe("[x].txt");
+	} finally {
+		f.close();
+	}
+});
+
+test("a changed .git/config is refused before the next host git operation", async () => {
+	const { f, commit } = await setup();
+	try {
+		writeFileSync(join(f.workspace, "source.txt"), "change\n");
+		const spec = commit();
+		publishGitSpec(f.config, "config", spec);
+		appendFileSync(
+			join(f.source, ".git/config"),
+			'[core]\n\tsshCommand = "touch /tmp/pwned"\n',
+		);
+		expect(() => snapshot(f.config, "fixture")).toThrow(
+			"runner_git_config_tampered",
+		);
+		expect(() => executeGit(f.config, "config", spec.operationId)).toThrow(
+			"runner_git_config_tampered",
+		);
+	} finally {
+		f.close();
+	}
+});
+
+test("a clean or smudge filter attribute is forbidden", async () => {
+	const { f } = await setup();
+	try {
+		writeFileSync(join(f.workspace, ".gitattributes"), "*.txt filter=evil\n");
+		expect(() => snapshot(f.config, "fixture")).toThrow(
+			"runner_git_filter_forbidden",
+		);
+		rmSync(join(f.workspace, ".gitattributes"));
+		mkdirSync(join(f.workspace, "nested"));
+		writeFileSync(
+			join(f.workspace, "nested/.gitattributes"),
+			"*.txt filter=evil\n",
+		);
+		expect(() => snapshot(f.config, "fixture")).toThrow(
+			"runner_git_filter_forbidden",
+		);
+	} finally {
+		f.close();
+	}
+});
+
+test("files hidden through .git/info/exclude fail the snapshot, while .gitignore ones do not", async () => {
+	const { f } = await setup();
+	try {
+		writeFileSync(join(f.workspace, ".gitignore"), "ignored.txt\n");
+		writeFileSync(join(f.workspace, "ignored.txt"), "by gitignore\n");
+		expect(
+			snapshot(f.config, "fixture").files.some((x) => x.path === "ignored.txt"),
+		).toBe(false);
+		writeFileSync(join(f.workspace, "secret.txt"), "hidden\n");
+		appendFileSync(join(f.source, ".git/info/exclude"), "secret.txt\n");
+		expect(() => snapshot(f.config, "fixture")).toThrow("runner_hidden_files");
 	} finally {
 		f.close();
 	}

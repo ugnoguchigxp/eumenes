@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, jest, spyOn, test } from "bun:test";
 import { createLarm } from "..";
 
 const names = ["llm", "asr", "tts"] as const;
@@ -405,6 +405,14 @@ test("a refused VOICEVOX catalog does not block synthesis of a chosen voice", as
 test("a caller's deadline that aborts a shared connection attempt does not fail other callers", async () => {
 	const fake = fixture();
 	let slow = true;
+	let releaseSlow = () => {};
+	const slowGate = new Promise<void>((resolve) => {
+		releaseSlow = resolve;
+	});
+	let slowEntered = () => {};
+	const slowStarted = new Promise<void>((resolve) => {
+		slowEntered = resolve;
+	});
 	const larm = createLarm({
 		baseUrl: "http://127.0.0.1:9810",
 		profile: "SAAA",
@@ -419,14 +427,12 @@ test("a caller's deadline that aborts a shared connection attempt does not fail 
 				return new Response(wav);
 			}
 			if (slow && String(input).includes("/v3/")) {
+				slowEntered();
 				await new Promise<void>((resolve, reject) => {
-					const timer = setTimeout(resolve, 150);
+					void slowGate.then(resolve);
 					init?.signal?.addEventListener(
 						"abort",
-						() => {
-							clearTimeout(timer);
-							reject(init.signal?.reason);
-						},
+						() => reject(init.signal?.reason),
 						{ once: true },
 					);
 				});
@@ -434,14 +440,17 @@ test("a caller's deadline that aborts a shared connection attempt does not fail 
 			return fake.fetcher(input, init);
 		},
 	});
-	const first = larm.speak("a", AbortSignal.timeout(40)).then(
+	const deadline = new AbortController();
+	const first = larm.speak("a", deadline.signal).then(
 		() => "ok",
 		() => "aborted",
 	);
-	await new Promise((resolve) => setTimeout(resolve, 5));
+	await slowStarted;
 	const second = larm.speak("b", new AbortController().signal);
+	deadline.abort(new DOMException("deadline", "TimeoutError"));
 	expect(await first).toBe("aborted");
 	slow = false;
+	releaseSlow();
 	expect((await second).length).toBeGreaterThanOrEqual(44);
 	await larm.close();
 });
@@ -527,6 +536,7 @@ test("oversized inference response is rejected while streaming", async () => {
 	await larm.close();
 });
 test("simultaneous capability upgrades share one replacement connection", async () => {
+	jest.useFakeTimers();
 	const fake = fixture();
 	const larm = createLarm({
 		baseUrl: "http://127.0.0.1:9810",
@@ -535,15 +545,22 @@ test("simultaneous capability upgrades share one replacement connection", async 
 		fetch: fake.fetcher,
 	});
 	const signal = new AbortController().signal;
-	await Promise.all([
-		larm.answer([{ role: "user", content: "質問" }], signal),
-		larm.speak("回答 1", signal),
-		larm.speak("回答 2", signal),
-	]);
-	expect(
-		fake.calls.filter((call) => call === "POST /v1/agent-connections"),
-	).toHaveLength(2);
-	await larm.close();
+	try {
+		await driveFakeTimers(
+			Promise.all([
+				larm.answer([{ role: "user", content: "質問" }], signal),
+				larm.speak("回答 1", signal),
+				larm.speak("回答 2", signal),
+			]),
+			1000,
+		);
+		expect(
+			fake.calls.filter((call) => call === "POST /v1/agent-connections"),
+		).toHaveLength(2);
+	} finally {
+		jest.useRealTimers();
+		await larm.close();
+	}
 });
 test("Gemma requests the live profile and renews by reclaiming the rotated token", async () => {
 	const fake = fixture(false, "SAAA-gemma4-26b", 60_000);
@@ -623,10 +640,11 @@ test("an expired connection stops polling and is released", async () => {
 	).toBe(true);
 });
 
-test("exported token alone connects to the documented default URL", async () => {
+test("an explicit baseUrl is the only control origin the token is sent to", async () => {
 	const fake = fixture(false, "SAAA-gemma4-26b");
 	const origins: string[] = [];
 	const larm = createLarm({
+		baseUrl: "http://127.0.0.1:9810",
 		token: "control",
 		profile: "",
 		audience: "",
@@ -638,10 +656,38 @@ test("exported token alone connects to the documented default URL", async () => 
 	expect(larm.status().state).toBe("idle");
 	await larm.connect();
 	expect(larm.status()).toEqual({ state: "ready", capabilities: ["llm"] });
-	expect(
-		origins.every((origin) => origin === "http://192.168.0.130:9810"),
-	).toBe(true);
+	expect(origins.every((origin) => origin === "http://127.0.0.1:9810")).toBe(
+		true,
+	);
 	await larm.close();
+});
+
+test("without a baseUrl LARM stays unconfigured and never contacts any host", async () => {
+	let contacted = 0;
+	for (const baseUrl of [undefined, "", "  "]) {
+		const larm = createLarm({
+			baseUrl,
+			token: "control",
+			fetch: async () => {
+				contacted++;
+				return result({});
+			},
+		});
+		expect(larm.status()).toEqual({
+			state: "unconfigured",
+			capabilities: [],
+			error: "larm_base_url_unconfigured",
+		});
+		await expect(larm.connect()).rejects.toThrow("larm_base_url_unconfigured");
+		await expect(
+			larm.answer(
+				[{ role: "user", content: "x" }],
+				new AbortController().signal,
+			),
+		).rejects.toThrow("larm_base_url_unconfigured");
+		await larm.close();
+	}
+	expect(contacted).toBe(0);
 });
 
 test("missing claim voice discovers and caches the advertised default with the control credential", async () => {
@@ -724,8 +770,13 @@ test("an unadvertised default voice is rejected before speech inference", async 
 test("cancelling a caller returns promptly during allocation and close stops polling", async () => {
 	const fake = fixture(false, "SAAA-gemma4-26b");
 	let allocated = false;
+	let onAllocated = () => {};
+	const allocatedSeen = new Promise<void>((resolve) => {
+		onAllocated = resolve;
+	});
 	let observedSignal: AbortSignal | null | undefined;
 	const larm = createLarm({
+		baseUrl: "http://127.0.0.1:9810",
 		token: "control",
 		fetch: async (input, init) => {
 			const response = await fake.fetcher(input, init);
@@ -734,6 +785,7 @@ test("cancelling a caller returns promptly during allocation and close stops pol
 				init?.method === "POST"
 			) {
 				allocated = true;
+				onAllocated();
 				observedSignal = init.signal;
 				return result({ id: "connection1", status: "pending" }, 202);
 			}
@@ -745,7 +797,7 @@ test("cancelling a caller returns promptly during allocation and close stops pol
 		[{ role: "user", content: "test" }],
 		controller.signal,
 	);
-	for (let i = 0; i < 20 && !allocated; i++) await Bun.sleep(5);
+	await allocatedSeen;
 	expect(allocated).toBe(true);
 	controller.abort(new Error("cancelled"));
 	await expect(answer).rejects.toThrow("cancelled");
@@ -833,6 +885,24 @@ function makeLarm(
 	});
 }
 
+/** Drives fake timers in `stepMs` steps until `work` settles (service poll/pause timers). */
+async function driveFakeTimers<T>(work: Promise<T>, stepMs: number) {
+	let settled = false;
+	void work.then(
+		() => {
+			settled = true;
+		},
+		() => {
+			settled = true;
+		},
+	);
+	for (let i = 0; !settled && i < 200; i++) {
+		await new Promise((resolve) => setImmediate(resolve));
+		if (!settled) jest.advanceTimersByTime(stepMs);
+	}
+	return work;
+}
+
 test("idle-released JSON before SSE recreates and claims once; both exchanges survive", async () => {
 	const fake = lifecycleFixture();
 	let calls = 0;
@@ -874,12 +944,13 @@ test("idle-released JSON before SSE recreates and claims once; both exchanges su
 });
 
 test("local idle expires a still-valid lease without requests; next voice use requests the profile again", async () => {
+	jest.useFakeTimers();
 	const fake = lifecycleFixture();
 	const larm = makeLarm(fake.fetcher, 35);
 	try {
 		await larm.prepareVoice!(freshSignal());
 		const count = fake.calls.length;
-		await Bun.sleep(55);
+		jest.advanceTimersByTime(55);
 		expect(larm.status()).toMatchObject({ state: "idle", capabilities: [] });
 		expect(larm.inspect?.().connectionId).toBeUndefined();
 		expect(fake.calls).toHaveLength(count);
@@ -891,11 +962,13 @@ test("local idle expires a still-valid lease without requests; next voice use re
 			profile: "SAAA",
 		});
 	} finally {
+		jest.useRealTimers();
 		await larm.close();
 	}
 });
 
 test("an active inference pauses the local idle timer and completion starts a new idle interval", async () => {
+	jest.useFakeTimers();
 	const fake = lifecycleFixture();
 	let ready: () => void = () => {};
 	const entered = new Promise<void>((resolve) => {
@@ -915,14 +988,15 @@ test("an active inference pauses the local idle timer and completion starts a ne
 	try {
 		const work = larm.answer(question, freshSignal());
 		await entered;
-		await Bun.sleep(65);
+		jest.advanceTimersByTime(65);
 		expect(larm.status().state).toBe("ready");
 		complete();
 		await work;
 		expect(larm.status().state).toBe("ready");
-		await Bun.sleep(60);
+		jest.advanceTimersByTime(60);
 		expect(larm.status().state).toBe("idle");
 	} finally {
+		jest.useRealTimers();
 		complete();
 		await larm.close();
 	}
@@ -1039,6 +1113,7 @@ test("manual connection check follows released state even with unexpired credent
 });
 
 test("renew rotates every claimed provider while leaving the idle deadline unchanged", async () => {
+	jest.useFakeTimers();
 	const fake = lifecycleFixture(60000);
 	const tokens: string[] = [];
 	const larm = makeLarm(async (input, init) => {
@@ -1058,12 +1133,13 @@ test("renew rotates every claimed provider while leaving the idle deadline uncha
 			"Bearer secret-tts-2",
 		]);
 		const before = fake.calls.length;
-		await Bun.sleep(70);
+		jest.advanceTimersByTime(70);
 		await larm.connect();
-		await Bun.sleep(70);
+		jest.advanceTimersByTime(70);
 		expect(larm.status().state).toBe("idle");
 		expect(fake.calls.length).toBe(before + 1); // health check only; no idle keepalive
 	} finally {
+		jest.useRealTimers();
 		await larm.close();
 	}
 });
@@ -1090,6 +1166,7 @@ test("published SSE prefix errors never reconnect or replay inference", async ()
 });
 
 test("idle expiry during a health check cannot revive the released local lease", async () => {
+	jest.useFakeTimers();
 	const fake = lifecycleFixture();
 	let checking = false;
 	const larm = makeLarm(async (input, init) => {
@@ -1098,7 +1175,7 @@ test("idle expiry during a health check cannot revive the released local lease",
 			new URL(String(input)).pathname === "/v1/agent-connections/connection1" &&
 			init?.method === "GET"
 		)
-			await Bun.sleep(65);
+			jest.advanceTimersByTime(65); // the check outlives the idle deadline
 		return fake.fetcher(input, init);
 	}, 40);
 	try {
@@ -1108,6 +1185,7 @@ test("idle expiry during a health check cannot revive the released local lease",
 		expect(larm.inspect?.().connectionId).toBe("connection2");
 		expect(larm.status().state).toBe("ready");
 	} finally {
+		jest.useRealTimers();
 		await larm.close();
 	}
 });
@@ -1143,6 +1221,7 @@ test("invalid reclaim after renew discards every old credential before another r
 });
 
 test("a ready connection waits for requested providers to become claimable before claim", async () => {
+	jest.useFakeTimers();
 	const fake = lifecycleFixture();
 	let checks = 0;
 	const larm = makeLarm(async (input, init) => {
@@ -1168,11 +1247,12 @@ test("a ready connection waits for requested providers to become claimable befor
 		return response;
 	});
 	try {
-		await larm.connect();
+		await driveFakeTimers(larm.connect(), 1000);
 		expect(checks).toBe(1);
 		expect(larm.status().state).toBe("ready");
 		expect(fake.calls.filter((c) => c.endsWith("/claim"))).toHaveLength(1);
 	} finally {
+		jest.useRealTimers();
 		await larm.close();
 	}
 });
@@ -1360,6 +1440,7 @@ test("caller cancellation is logged separately from a provider network failure",
 			});
 			const controller = new AbortController();
 			const larm = createLarm({
+				baseUrl: "http://127.0.0.1:9810",
 				token: "control",
 				profile: "SAAA",
 				fetch: async (input, init) => {
@@ -1392,7 +1473,7 @@ test("caller cancellation is logged separately from a provider network failure",
 					i < 20 && !lines.some((line) => JSON.parse(line).event === event);
 					i++
 				)
-					await Bun.sleep(1);
+					await new Promise((resolve) => setImmediate(resolve));
 				const entry = lines
 					.map((line) => JSON.parse(line))
 					.find((line) => line.event === event);
@@ -1493,6 +1574,259 @@ test("Ruri uses claimed model/token and current chunk only; rejects unsupported 
 				),
 			).rejects.toThrow("larm_invalid_ruri_question");
 		expect(calls).toBe(2);
+	} finally {
+		await larm.close();
+	}
+});
+
+// RT-11: control timeouts, idempotency, caller abort, close, renewal.
+test("control POSTs keep the 15 s budget while status GETs with a caller signal use 3 s", async () => {
+	const fake = fixture();
+	const timeouts: number[] = [];
+	const spy = spyOn(AbortSignal, "timeout");
+	const seen: Array<[string, string, number | undefined]> = [];
+	const larm = makeLarm(async (input, init) => {
+		const timeout = spy.mock.calls.at(-1)?.[0];
+		timeouts.push(Number(timeout));
+		seen.push([
+			init?.method ?? "GET",
+			new URL(String(input)).pathname,
+			timeout,
+		]);
+		return fake.fetcher(input, init);
+	});
+	try {
+		await larm.probe!(freshSignal());
+		const timeoutOf = (method: string, path: string) =>
+			seen.find(([m, p]) => m === method && p === path)?.[2];
+		expect(timeoutOf("POST", "/v1/agent-connections")).toBe(15_000);
+		expect(timeoutOf("POST", "/v1/agent-connections/connection1/claim")).toBe(
+			15_000,
+		);
+		expect(timeoutOf("GET", "/v3/agent-profiles")).toBe(3_000);
+	} finally {
+		spy.mockRestore();
+		await larm.close();
+	}
+});
+
+test("a timed-out connection POST is retried with the same Idempotency-Key", async () => {
+	const fake = fixture();
+	const keys: Array<string | null> = [];
+	let failed = false;
+	const larm = makeLarm(async (input, init) => {
+		const url = new URL(String(input));
+		if (url.pathname === "/v1/agent-connections" && init?.method === "POST") {
+			keys.push(new Headers(init.headers).get("Idempotency-Key"));
+			if (!failed) {
+				failed = true;
+				throw new DOMException("timed out", "TimeoutError");
+			}
+		}
+		return fake.fetcher(input, init);
+	});
+	try {
+		await larm.connect();
+		expect(keys).toHaveLength(2);
+		expect(keys[0]).toBeTruthy();
+		expect(keys[1]).toBe(keys[0]);
+		expect(larm.status().state).toBe("ready");
+	} finally {
+		await larm.close();
+	}
+});
+
+test("a caller abort during renewal neither fails the status nor releases the shared lease", async () => {
+	const fake = fixture(false, "SAAA", 185_000);
+	const controller = new AbortController();
+	let skew = 0;
+	const realNow = Date.now.bind(Date);
+	const clock = spyOn(Date, "now").mockImplementation(() => realNow() + skew);
+	const larm = makeLarm(async (input, init) => {
+		if (new URL(String(input)).pathname.endsWith("/renew")) {
+			controller.abort();
+			throw controller.signal.reason;
+		}
+		return fake.fetcher(input, init);
+	});
+	try {
+		await larm.probe!(freshSignal());
+		// Move past the 180 s renewal margin without waiting; the renew timer is real.
+		skew = 20_000;
+		await expect(larm.probe!(controller.signal)).rejects.toThrow();
+		expect(larm.status()).toEqual({ state: "ready", capabilities: ["llm"] });
+		expect(larm.inspect?.().connectionId).toBe("connection1");
+		expect(fake.calls.some((call) => call.startsWith("DELETE"))).toBe(false);
+	} finally {
+		clock.mockRestore();
+		await larm.close();
+	}
+});
+
+test("close waits for in-use leases before sending DELETE", async () => {
+	jest.useFakeTimers();
+	const fake = fixture();
+	const order: string[] = [];
+	let entered: () => void = () => {};
+	const started = new Promise<void>((resolve) => {
+		entered = resolve;
+	});
+	let complete: () => void = () => {};
+	const gate = new Promise<void>((resolve) => {
+		complete = resolve;
+	});
+	const larm = makeLarm(async (input, init) => {
+		if (init?.method === "DELETE") order.push("delete");
+		if (String(input).endsWith("chat/completions")) {
+			entered();
+			await gate;
+		}
+		return fake.fetcher(input, init);
+	});
+	const work = larm.answer(question, freshSignal()).then((text) => {
+		order.push("answered");
+		return text;
+	});
+	await started;
+	const closing = larm.close();
+	for (let i = 0; i < 25; i++)
+		await new Promise((resolve) => setImmediate(resolve));
+	expect(order).toEqual([]);
+	complete();
+	try {
+		expect(await work).toBe("承知しました");
+		await driveFakeTimers(closing, 100);
+		expect(order).toEqual(["answered", "delete"]);
+	} finally {
+		jest.useRealTimers();
+	}
+});
+
+test("a valid lease serves new inference while a renewal is still waiting", async () => {
+	const fake = fixture(false, "SAAA", 120_000);
+	let renewing: () => void = () => {};
+	const renewStarted = new Promise<void>((resolve) => {
+		renewing = resolve;
+	});
+	let finishRenewal: () => void = () => {};
+	const renewGate = new Promise<void>((resolve) => {
+		finishRenewal = resolve;
+	});
+	const larm = makeLarm(async (input, init) => {
+		if (new URL(String(input)).pathname.endsWith("/renew")) {
+			renewing();
+			await renewGate;
+		}
+		return fake.fetcher(input, init);
+	});
+	try {
+		await larm.probe!(freshSignal());
+		await renewStarted;
+		expect(larm.status().state).toBe("connecting");
+		// a blocked answer hangs here and fails through the test timeout
+		expect(await larm.answer(question, freshSignal())).toBe("承知しました");
+	} finally {
+		finishRenewal();
+		await larm.close();
+	}
+});
+
+// SEC-4: provider hosts are pinned to the LARM host or an explicit allow-list.
+function claimAt(
+	fetcher: ReturnType<typeof fixture>["fetcher"],
+	origin: string,
+) {
+	return async (input: RequestInfo | URL, init?: RequestInit) => {
+		const response = await fetcher(input, init);
+		if (!new URL(String(input)).pathname.endsWith("/claim")) return response;
+		const text = (await response.text()).replaceAll(
+			"http://127.0.0.1/",
+			`${origin}/`,
+		);
+		return new Response(text, { status: response.status });
+	};
+}
+test("a provider on the LARM host with another port is accepted", async () => {
+	const fake = fixture();
+	const larm = makeLarm(claimAt(fake.fetcher, "http://127.0.0.1:8080"));
+	try {
+		expect(await larm.answer(question, freshSignal())).toBe("承知しました");
+		expect(larm.inspect?.().providers[0]?.baseUrl).toBe(
+			"http://127.0.0.1:8080/llm/v1",
+		);
+	} finally {
+		await larm.close();
+	}
+});
+test("a provider on a different private host is rejected before any token is sent", async () => {
+	const fake = fixture();
+	const inferred: string[] = [];
+	const larm = makeLarm(
+		claimAt(async (input, init) => {
+			if (new URL(String(input)).pathname.startsWith("/llm/"))
+				inferred.push(String(input));
+			return fake.fetcher(input, init);
+		}, "http://10.9.9.9"),
+	);
+	try {
+		for (const host of ["http://10.9.9.9", "http://other.local"]) {
+			const mismatched = makeLarm(claimAt(fake.fetcher, host));
+			await expect(mismatched.answer(question, freshSignal())).rejects.toThrow(
+				"larm_provider_host_mismatch",
+			);
+			expect(mismatched.status()).toMatchObject({
+				state: "failed",
+				error: "larm_provider_host_mismatch",
+			});
+			await mismatched.close();
+		}
+		await expect(larm.answer(question, freshSignal())).rejects.toThrow(
+			"larm_provider_host_mismatch",
+		);
+		expect(inferred).toEqual([]);
+	} finally {
+		await larm.close();
+	}
+});
+test("EUMENES_LARM_PROVIDER_HOSTS or the providerHosts config allow another host", async () => {
+	const fake = fixture();
+	const configured = createLarm({
+		baseUrl: "http://127.0.0.1:9810",
+		profile: "SAAA",
+		token: "control",
+		providerHosts: ["10.9.9.9"],
+		fetch: claimAt(fake.fetcher, "http://10.9.9.9"),
+	});
+	const previous = process.env.EUMENES_LARM_PROVIDER_HOSTS;
+	process.env.EUMENES_LARM_PROVIDER_HOSTS = " 10.9.9.9 , Other.LOCAL ";
+	try {
+		const fromEnv = makeLarm(claimAt(fake.fetcher, "http://other.local"));
+		const second = makeLarm(claimAt(fake.fetcher, "http://10.9.9.9"));
+		delete process.env.EUMENES_LARM_PROVIDER_HOSTS;
+		// The environment is read once when the port is created.
+		expect(await fromEnv.answer(question, freshSignal())).toBe("承知しました");
+		expect(await second.answer(question, freshSignal())).toBe("承知しました");
+		expect(await configured.answer(question, freshSignal())).toBe(
+			"承知しました",
+		);
+		await fromEnv.close();
+		await second.close();
+	} finally {
+		if (previous === undefined) delete process.env.EUMENES_LARM_PROVIDER_HOSTS;
+		else process.env.EUMENES_LARM_PROVIDER_HOSTS = previous;
+		await configured.close();
+	}
+});
+test("a .local provider is accepted only when the LARM base itself is .local", async () => {
+	const fake = fixture();
+	const larm = createLarm({
+		baseUrl: "http://larm.local:9810",
+		profile: "SAAA",
+		token: "control",
+		fetch: claimAt(fake.fetcher, "http://larm.local:8080"),
+	});
+	try {
+		expect(await larm.answer(question, freshSignal())).toBe("承知しました");
 	} finally {
 		await larm.close();
 	}

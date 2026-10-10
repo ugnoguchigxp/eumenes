@@ -7,3 +7,4 @@ export type {
 	TargetDefinition,
 	TargetOccurrence,
 } from "./types";
+export { migrations } from "./repository";

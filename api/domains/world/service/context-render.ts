@@ -37,7 +37,7 @@ export const goalRenderedBytes = (goal: RenderGoal): number =>
 	1;
 
 /** The delimited data document for one slice (and the adopted goals, when any). */
-export function renderWorldData(
+function renderWorldData(
 	slice: WorldSlice,
 	goals: readonly RenderGoal[],
 ): string {

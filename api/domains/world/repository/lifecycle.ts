@@ -371,17 +371,6 @@ export function setBlockedReason(
 	).run(reason, now, forgetId);
 }
 
-export function setMemoryFinal(
-	db: Database,
-	forgetId: string,
-	final: boolean,
-): void {
-	requireTransaction(db);
-	db.query(
-		"UPDATE world_host_forget_intake SET memory_final = ? WHERE forget_id = ?",
-	).run(final ? 1 : 0, forgetId);
-}
-
 // --- confirmations ------------------------------------------------------------
 
 export type ConfirmationState =

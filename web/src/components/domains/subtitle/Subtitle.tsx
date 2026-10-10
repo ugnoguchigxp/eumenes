@@ -17,6 +17,8 @@ export function Subtitle({
 			data-style={style}
 			data-size={size}
 			data-testid="subtitle"
+			// The same words are spoken aloud; reading them again would double up.
+			aria-hidden="true"
 		>
 			<p>{text}</p>
 		</div>

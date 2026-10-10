@@ -46,7 +46,9 @@ export function checkLiveResearch(
 ) {
 	const claims = report?.claims ?? [];
 	const relevant =
-		kind === "weather" ? claims.filter((c) => c.text.includes("最高")) : claims;
+		kind === "weather"
+			? claims.filter((c) => /最高|最低/.test(c.text))
+			: claims;
 	const quotes = relevant
 		.flatMap((c) => c.evidence.map((e) => e.quote))
 		.join("\n");
@@ -78,4 +80,14 @@ export function checkLiveResearch(
 					`(?:${stockDate[0]}|${stockDate[0]!.slice(2)})年(?:${stockDate[1]}|${Number(stockDate[1])})月(?:${stockDate[2]}|${Number(stockDate[2])})日`,
 				).test(answer)));
 	return { numeric: claimed.length > 0, valuesMatch, priceTimeVerified };
+}
+
+/** Every displayed citation must preserve an actual acquired source URL. */
+export function checkLiveCitations(
+	report: { sources: Array<{ url?: string }> } | null,
+	answer: string | undefined,
+) {
+	const links = [...(answer ?? "").matchAll(/\[[^\]\n]+\]\(([^)\s]+)\)/g)];
+	const urls = new Set(report?.sources.map((source) => source.url));
+	return links.length > 0 && links.every((link) => urls.has(link[1]!));
 }

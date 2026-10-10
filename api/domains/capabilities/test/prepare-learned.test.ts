@@ -53,10 +53,10 @@ test("C02 prepare by ID keeps shared checks; independent registration does not d
 				caps.prepareActiveByIdInTransaction(
 					db,
 					owner,
-					"package:web.research@3",
+					"package:web.research@7",
 					input,
 				).package.revision,
-			).toBe(3);
+			).toBe(7);
 			expect(() =>
 				caps.prepareActiveByIdInTransaction(
 					db,
@@ -95,7 +95,7 @@ test("C02 prepare by ID keeps shared checks; independent registration does not d
 		// GC: protected closure and builtins survive
 		await store.write((db) => {
 			const r = caps.pruneLearnedInTransaction(db, {
-				remove: [pk(1), pk(2), "package:web.research@3"],
+				remove: [pk(1), pk(2), "package:web.research@7"],
 				protect: [pk(1)],
 			});
 			expect(r.removed).toBe(2); // package 2 + its skill
@@ -106,7 +106,7 @@ test("C02 prepare by ID keeps shared checks; independent registration does not d
 			caps.prepareActiveByIdInTransaction(
 				db,
 				owner,
-				"package:web.research@3",
+				"package:web.research@7",
 				input,
 			);
 			expect(
@@ -120,7 +120,7 @@ test("C02 prepare by ID keeps shared checks; independent registration does not d
 			caps.prepareActiveByIdInTransaction(
 				db,
 				owner,
-				"package:web.research@3",
+				"package:web.research@7",
 				input,
 			);
 		});

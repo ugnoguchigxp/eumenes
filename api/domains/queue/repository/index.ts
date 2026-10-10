@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import type { Migration } from "../../../infrastructure/sqlite";
 import type { JobState } from "../contracts";
 import type { AttemptRecord, JobRecord } from "../types";
 
@@ -154,6 +155,40 @@ export function candidates(
 				`SELECT ${columns} FROM queue_jobs WHERE state IN ('queued','retry_wait') AND available_at_ms <= ? ORDER BY CASE lane WHEN 'interactive' THEN 0 ELSE 1 END, available_at_ms, created_seq LIMIT ?`,
 			)
 			.all(now, limit) as Row[]
+	).map(map);
+}
+const LANE_RANK = "CASE lane WHEN 'interactive' THEN 0 ELSE 1 END";
+export interface CandidateCursor {
+	laneRank: number;
+	availableAtMs: number;
+	createdSeq: number;
+}
+export function cursorOf(job: JobRecord): CandidateCursor {
+	return {
+		laneRank: job.lane === "interactive" ? 0 : 1,
+		availableAtMs: job.availableAtMs,
+		createdSeq: job.createdSeq,
+	};
+}
+/** Keyset page of `candidates`: same order, strictly after `after`. */
+export function candidatesAfter(
+	db: Database,
+	now: number,
+	limit: number,
+	after: CandidateCursor | null,
+): JobRecord[] {
+	const cursor = after
+		? ` AND (${LANE_RANK}, available_at_ms, created_seq) > (?, ?, ?)`
+		: "";
+	const params = after
+		? [now, after.laneRank, after.availableAtMs, after.createdSeq, limit]
+		: [now, limit];
+	return (
+		db
+			.query(
+				`SELECT ${columns} FROM queue_jobs WHERE state IN ('queued','retry_wait') AND available_at_ms <= ?${cursor} ORDER BY ${LANE_RANK}, available_at_ms, created_seq LIMIT ?`,
+			)
+			.all(...(params as never[])) as Row[]
 	).map(map);
 }
 export function earlierOpenSameKey(db: Database, job: JobRecord): boolean {
@@ -375,3 +410,8 @@ export function nextEventAt(db: Database, now: number): number | null {
 		.get(now) as { t: number | null };
 	return row.t;
 }
+
+/** Named migrations of this domain; the SQL above is frozen once deployed. */
+export const migrations: readonly Migration[] = [
+	{ id: "queue/0001-init", sql: migration },
+];

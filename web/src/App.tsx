@@ -8,15 +8,17 @@ import {
 } from "@tanstack/react-query";
 import {
 	type FormEvent,
+	lazy,
+	Suspense,
 	useCallback,
 	useEffect,
-	useMemo,
 	useRef,
 	useState,
 	useSyncExternalStore,
 } from "react";
 import { useStore } from "zustand";
 import { createClient, type EumenesClient } from "../../client";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { MessageList } from "./components/domains/conversation/MessageList";
 import { LightAvatarBackground } from "./components/domains/conversation/LightAvatarBackground";
 import { Button, Textarea } from "./design-system";
@@ -37,17 +39,80 @@ import {
 	useRunProgress,
 } from "./domains/dialogue";
 import { useReplay, useVoiceDialogue } from "./domains/voice-dialogue";
-import { ServiceTestsPanel } from "./domains/service-tests";
-import { ResearchRoutesPanel } from "./domains/research-routes";
-import { WorldPanel } from "./domains/world";
 import { createUnsavedFlags } from "./unsavedFlags";
-import { SettingsPage, useSettings, useVoiceMute } from "./domains/settings";
-import { changeRoots, queryRoots } from "./queryKeys";
+import { useSettings, useVoiceMute } from "./domains/settings";
+import { changeRoots, invalidateAllButLive, queryRoots } from "./queryKeys";
 import {
 	describeConnectionState,
 	describeError,
 	describeTurnStatus,
 } from "./errorMessages";
+
+// Settings and its panels load on demand so the conversation screen stays small.
+const SettingsPage = lazy(() =>
+	import("./domains/settings/SettingsPage").then((m) => ({
+		default: m.SettingsPage,
+	})),
+);
+const ServiceTestsPanel = lazy(() =>
+	import("./domains/service-tests").then((m) => ({
+		default: m.ServiceTestsPanel,
+	})),
+);
+const ResearchRoutesPanel = lazy(() =>
+	import("./domains/research-routes").then((m) => ({
+		default: m.ResearchRoutesPanel,
+	})),
+);
+const WorldPanel = lazy(() =>
+	import("./components/domains/world/WorldPanel").then((m) => ({
+		default: m.WorldPanel,
+	})),
+);
+const loadingFallback = <output>読み込み中…</output>;
+
+function SettingsContent({
+	client,
+	onDirty,
+	onRoutesDirty,
+	onSaved,
+}: {
+	client: EumenesClient;
+	onDirty: (dirty: boolean) => void;
+	onRoutesDirty: (dirty: boolean) => void;
+	onSaved: () => void;
+}) {
+	return (
+		<Suspense fallback={loadingFallback}>
+			<SettingsPage
+				renderServiceTests={(disabled) => (
+					<Suspense fallback={loadingFallback}>
+						<ServiceTestsPanel client={client} disabled={disabled} />
+					</Suspense>
+				)}
+				renderWorld={() => (
+					<ErrorBoundary label="world">
+						<Suspense fallback={loadingFallback}>
+							<WorldPanel client={client} />
+						</Suspense>
+					</ErrorBoundary>
+				)}
+				renderResearchRoutes={(disabled) => (
+					<Suspense fallback={loadingFallback}>
+						<ResearchRoutesPanel
+							client={client}
+							disabled={disabled}
+							onDirty={onRoutesDirty}
+						/>
+					</Suspense>
+				)}
+				client={client}
+				onDirty={onDirty}
+				onSaved={onSaved}
+			/>
+		</Suspense>
+	);
+}
 
 function MicLevelMeter({ store }: { store: AudioStore }) {
 	const level = useStore(store, (state) => state.level);
@@ -222,7 +287,7 @@ function Workspace({
 		() =>
 			client.subscribeChanges((kind) => {
 				if (kind === "reset") {
-					void cache.invalidateQueries();
+					void invalidateAllButLive(cache);
 					return;
 				}
 				for (const root of changeRoots)
@@ -241,7 +306,7 @@ function Workspace({
 		onSuccess: (data) => {
 			cache.setQueryData([queryRoots.larm, client.identity], data);
 			client.reconnectChanges();
-			void cache.invalidateQueries();
+			void invalidateAllButLive(cache);
 		},
 	});
 	const connectionError = status.data?.larm.error;
@@ -346,24 +411,16 @@ function Workspace({
 				}
 			/>
 			{settingsOpen && (
-				<SettingsPage
-					renderServiceTests={(disabled) => (
-						<ServiceTestsPanel client={client} disabled={disabled} />
-					)}
-					renderWorld={() => <WorldPanel client={client} />}
-					renderResearchRoutes={(disabled) => (
-						<ResearchRoutesPanel
-							client={client}
-							disabled={disabled}
-							onDirty={onRoutesDirty}
-						/>
-					)}
-					client={client}
-					onDirty={onDirty}
-					onSaved={() => {
-						void cache.invalidateQueries();
-					}}
-				/>
+				<ErrorBoundary label="settings">
+					<SettingsContent
+						client={client}
+						onDirty={onDirty}
+						onRoutesDirty={onRoutesDirty}
+						onSaved={() => {
+							void invalidateAllButLive(cache);
+						}}
+					/>
+				</ErrorBoundary>
 			)}
 			{settings.data?.general.subtitles.enabled &&
 				!settingsOpen &&
@@ -382,15 +439,17 @@ function Workspace({
 				hidden={settingsOpen}
 				artifact={
 					artifacts.tabs.length > 0 ? (
-						<ArtifactPanel
-							tabs={artifacts.tabs}
-							activeTabId={artifacts.activeTabId}
-							onSelect={artifacts.select}
-							onClose={artifacts.close}
-							renderTimer={(timerId) => (
-								<TimerArtifact client={client} timerId={timerId} />
-							)}
-						/>
+						<ErrorBoundary label="artifact">
+							<ArtifactPanel
+								tabs={artifacts.tabs}
+								activeTabId={artifacts.activeTabId}
+								onSelect={artifacts.select}
+								onClose={artifacts.close}
+								renderTimer={(timerId) => (
+									<TimerArtifact client={client} timerId={timerId} />
+								)}
+							/>
+						</ErrorBoundary>
 					) : null
 				}
 			>
@@ -673,15 +732,16 @@ function Workspace({
 }
 
 export function App() {
-	const queryClient = useMemo(
+	const [queryClient] = useState(
 		() =>
 			new QueryClient({
-				defaultOptions: { queries: { refetchOnWindowFocus: true } },
+				defaultOptions: {
+					queries: { refetchOnWindowFocus: true, staleTime: 2_000 },
+				},
 			}),
-		[],
 	);
-	const store = useMemo(() => createAudioStore(), []);
-	const client = useMemo(() => createClient(window.location.origin), []);
+	const [store] = useState(() => createAudioStore());
+	const [client] = useState(() => createClient(window.location.origin));
 	return (
 		<QueryClientProvider client={queryClient}>
 			<Workspace client={client} store={store} />

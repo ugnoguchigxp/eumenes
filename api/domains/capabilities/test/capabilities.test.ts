@@ -254,14 +254,19 @@ test("builtin bundle upgrade preserves revision 1 fingerprints and activates a n
 		await store.write((db) => {
 			// Only the originally deployed definitions (revision 3 packages / skill 2 are newer).
 			for (const definition of builtins.filter(
-				(d) => d.revision < 3 && !(d.kind === "skill" && d.revision === 2),
+				(d) =>
+					d.revision < 3 &&
+					!(d.kind === "skill" && d.revision === 2) &&
+					!(d.kind === "profile" && d.revision === 2),
 			))
 				caps.registerBuiltinInTransaction(db, { ...definition, revision: 1 });
 			// Represent the previously deployed 2,000-character schema fingerprint.
 			const oldSchema = zSchema("research");
 			(oldSchema.properties!.question as { maxLength: number }).maxLength =
 				2000;
-			for (const definition of builtins.filter((d) => d.kind === "package")) {
+			for (const definition of builtins.filter(
+				(d) => d.kind === "package" && d.revision === 2,
+			)) {
 				const legacy = {
 					...definition,
 					revision: 1,
@@ -305,10 +310,132 @@ test("builtin bundle upgrade preserves revision 1 fingerprints and activates a n
 			const prepared = caps.prepareInTransaction(db, owner, card.candidateRef, {
 				question: "東京の天気".repeat(500),
 			});
-			expect(prepared.package.revision).toBe(3);
+			expect(prepared.package.revision).toBe(7);
 		});
 	} finally {
 		caps.close();
+		await store.close();
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("deployed research skill v3 upgrades without a revision conflict and restart preserves hashes", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "eumenes-capabilities-v3-upgrade-"));
+	let store = openStore(join(dir, "db"), [migration]);
+	let caps = createCapabilities(store);
+	try {
+		const v3 = builtins.find((d) => d.kind === "skill" && d.revision === 3)!;
+		// Fingerprint of the published definition, independent of the current file contents.
+		expect(hash(v3)).toBe(
+			"587d033849b45dcf4a13a26c7131ebe9ff93c26cd2cb959b2b7155b7962630b0",
+		);
+		await store.write((db) => {
+			for (const d of builtins.filter((d) =>
+				d.kind === "package"
+					? d.revision <= (d.id === "web.read" ? 3 : 4)
+					: d.revision <= 3,
+			))
+				caps.registerBuiltinInTransaction(
+					db,
+					d === v3
+						? { ...d, body: "以前の導入時に保存されたWeb調査ルール" }
+						: d,
+				);
+		});
+		const old = store.read((db) =>
+			db
+				.query(
+					"SELECT id,definition_hash FROM capability_revisions ORDER BY id",
+				)
+				.all(),
+		);
+		await caps.seed();
+		caps.close();
+		await store.close();
+		store = openStore(join(dir, "db"), [migration]);
+		caps = createCapabilities(store);
+		await caps.seed();
+		for (const row of old as { id: string; definition_hash: string }[])
+			expect(
+				store.read((db) => caps.getDefinitionInTransaction(db, row.id)?.hash),
+			).toBe(row.definition_hash);
+		await store.write((db) => {
+			const owner = { rootRunId: "root", taskId: "task", cancelEpoch: 0 };
+			const card = caps.searchInTransaction(
+				db,
+				owner,
+				"天気",
+				["天気"],
+				Date.now() + 10000,
+			)[0]!;
+			const prepared = caps.prepareInTransaction(db, owner, card.candidateRef, {
+				question: "東京の天気",
+			});
+			expect(prepared.package.revision).toBe(7);
+			expect(prepared.package.requiredSkillRevisionIds).toEqual([
+				"skill:web.research@6",
+			]);
+			expect(
+				caps.getDefinitionInTransaction(db, "skill:web.research@6")?.body,
+			).toContain("不足項目");
+		});
+	} finally {
+		caps.close();
+		await store.close();
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("seed still rejects a changed newest builtin revision", async () => {
+	const dir = mkdtempSync(
+		join(tmpdir(), "eumenes-capabilities-newest-conflict-"),
+	);
+	const store = openStore(join(dir, "db"), [migration]);
+	const caps = createCapabilities(store);
+	try {
+		const latest = builtins.find(
+			(d) => d.kind === "skill" && d.revision === 6,
+		)!;
+		await store.write((db) =>
+			caps.registerBuiltinInTransaction(db, { ...latest, body: "別の内容" }),
+		);
+		await expect(caps.seed()).rejects.toThrow("capability_revision_conflict");
+	} finally {
+		caps.close();
+		await store.close();
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("history and web catalogue selection can be enabled independently without editing archived revisions", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "eumenes-history-rollout-")),
+		store = openStore(join(dir, "db"), [migration]);
+	const web = createCapabilities(store, new Set(["web", "history"]));
+	try {
+		await web.seed();
+		expect(web.list().items.some((p) => p.id === "history.research")).toBe(
+			true,
+		);
+		web.close();
+		const history = createCapabilities(store, new Set(["history"]));
+		await history.seed();
+		expect(history.list().items.some((p) => p.id === "history.research")).toBe(
+			true,
+		);
+		expect(history.list().items.some((p) => p.id.startsWith("web."))).toBe(
+			false,
+		);
+		history.close();
+		const onlyWeb = createCapabilities(store, new Set(["web"]));
+		await onlyWeb.seed();
+		expect(onlyWeb.list().items.some((p) => p.id === "history.research")).toBe(
+			false,
+		);
+		expect(onlyWeb.list().items.some((p) => p.id === "web.research")).toBe(
+			true,
+		);
+		onlyWeb.close();
+	} finally {
 		await store.close();
 		rmSync(dir, { recursive: true, force: true });
 	}

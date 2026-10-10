@@ -1,5 +1,6 @@
 import type { Hono } from "hono";
 import { z } from "zod";
+import { parseJsonBody } from "../../../infrastructure/http";
 import {
 	DEFAULT_TIMER_SCOPE,
 	ackNotificationSchema,
@@ -19,10 +20,10 @@ const limitOf = (value: string | undefined) => {
 
 export function registerTimers(app: Hono, service: TimersService) {
 	app.post("/api/timers", async (c) => {
-		const parsed = startTimerSchema.safeParse(
-			await c.req.json().catch(() => null),
-		);
-		if (!parsed.success) return c.json({ error: "invalid_timer_input" }, 400);
+		const parsed = await parseJsonBody(c, startTimerSchema, {
+			code: "invalid_timer_input",
+		});
+		if (!parsed.ok) return parsed.response;
 		const saved = await service.start(parsed.data);
 		return c.json(saved.receipt, saved.replay ? 200 : 201);
 	});
@@ -51,10 +52,10 @@ export function registerTimers(app: Hono, service: TimersService) {
 		return c.json(service.receiptByRun(runId, DEFAULT_TIMER_SCOPE));
 	});
 	app.post("/api/timers/:id/cancel", async (c) => {
-		const parsed = cancelTimerSchema.safeParse(
-			await c.req.json().catch(() => null),
-		);
-		if (!parsed.success) return c.json({ error: "invalid_timer_input" }, 400);
+		const parsed = await parseJsonBody(c, cancelTimerSchema, {
+			code: "invalid_timer_input",
+		});
+		if (!parsed.ok) return parsed.response;
 		const saved = await service.cancel(c.req.param("id"), parsed.data);
 		return c.json(saved.receipt);
 	});
@@ -75,24 +76,24 @@ export function registerTimers(app: Hono, service: TimersService) {
 		);
 	});
 	app.post("/api/timer-notifications/:id/claim", async (c) => {
-		const parsed = claimNotificationSchema.safeParse(
-			await c.req.json().catch(() => null),
-		);
-		if (!parsed.success) return c.json({ error: "invalid_timer_input" }, 400);
+		const parsed = await parseJsonBody(c, claimNotificationSchema, {
+			code: "invalid_timer_input",
+		});
+		if (!parsed.ok) return parsed.response;
 		return c.json(await service.claim(c.req.param("id"), parsed.data));
 	});
 	app.post("/api/timer-notifications/:id/ack", async (c) => {
-		const parsed = ackNotificationSchema.safeParse(
-			await c.req.json().catch(() => null),
-		);
-		if (!parsed.success) return c.json({ error: "invalid_timer_input" }, 400);
+		const parsed = await parseJsonBody(c, ackNotificationSchema, {
+			code: "invalid_timer_input",
+		});
+		if (!parsed.ok) return parsed.response;
 		return c.json(await service.ack(c.req.param("id"), parsed.data));
 	});
 	app.post("/api/timer-notifications/:id/silence", async (c) => {
-		const parsed = silenceNotificationSchema.safeParse(
-			await c.req.json().catch(() => null),
-		);
-		if (!parsed.success) return c.json({ error: "invalid_timer_input" }, 400);
+		const parsed = await parseJsonBody(c, silenceNotificationSchema, {
+			code: "invalid_timer_input",
+		});
+		if (!parsed.ok) return parsed.response;
 		return c.json(await service.silence(c.req.param("id"), parsed.data));
 	});
 }

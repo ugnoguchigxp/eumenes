@@ -7,7 +7,7 @@ import type {
 	ClaimOrigin,
 	ClaimTone,
 	ForgetDisplay,
-} from "../../../../api/domains/world/contracts";
+} from "../../../../api/domains/world/contracts/view";
 
 /**
  * Words for the World screen. Each axis (adoption, evidence, origin,

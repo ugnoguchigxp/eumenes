@@ -1,6 +1,7 @@
 import { readBounded } from "../../../infrastructure/bounded-read";
 import type { Hono, Context } from "hono";
 import type { VoiceDialogueService } from "..";
+import { parseJsonBody } from "../../../infrastructure/http";
 import { getLogger } from "../../../infrastructure/logger";
 import {
 	replayInputSchema,
@@ -29,20 +30,16 @@ export function registerVoiceDialogue(
 	service: VoiceDialogueService,
 ) {
 	app.post("/api/voice/sessions", async (c) => {
-		const parsed = voiceStartSchema.safeParse(
-			await c.req.json().catch(() => null),
-		);
-		if (!parsed.success) return c.json({ error: "invalid_input" }, 400);
+		const parsed = await parseJsonBody(c, voiceStartSchema);
+		if (!parsed.ok) return parsed.response;
 		return c.json(
 			service.start(parsed.data.sessionId, parsed.data.generation),
 			201,
 		);
 	});
 	app.post("/api/voice/sessions/stop", async (c) => {
-		const parsed = voiceStartSchema.safeParse(
-			await c.req.json().catch(() => null),
-		);
-		if (!parsed.success) return c.json({ error: "invalid_input" }, 400);
+		const parsed = await parseJsonBody(c, voiceStartSchema);
+		if (!parsed.ok) return parsed.response;
 		await service.stop(parsed.data.sessionId, parsed.data.generation);
 		return c.json({ stopped: true });
 	});
@@ -86,17 +83,14 @@ export function registerVoiceDialogue(
 		);
 	};
 	app.post("/api/voice/replay/sentences", async (c) => {
-		const parsed = replayInputSchema.safeParse(
-			await c.req.json().catch(() => null),
-		);
-		if (!parsed.success) return c.json({ error: "invalid_input" }, 400);
+		const parsed = await parseJsonBody(c, replayInputSchema);
+		if (!parsed.ok) return parsed.response;
 		return c.json({ sentences: service.replaySentences(parsed.data.text) });
 	});
 	app.post("/api/voice/replay/audio", async (c) => {
-		const parsed = replayInputSchema.safeParse(
-			await c.req.json().catch(() => null),
-		);
-		if (!parsed.success || parsed.data.text.length > 400)
+		const parsed = await parseJsonBody(c, replayInputSchema);
+		if (!parsed.ok) return parsed.response;
+		if (parsed.data.text.length > 400)
 			return c.json({ error: "invalid_input" }, 400);
 		try {
 			const speech = await service.replaySpeech(
@@ -126,10 +120,8 @@ export function registerVoiceDialogue(
 		}
 	});
 	app.post("/api/voice/sample", async (c) => {
-		const parsed = sampleInputSchema.safeParse(
-			await c.req.json().catch(() => null),
-		);
-		if (!parsed.success) return c.json({ error: "invalid_input" }, 400);
+		const parsed = await parseJsonBody(c, sampleInputSchema);
+		if (!parsed.ok) return parsed.response;
 		try {
 			const wav = await service.sampleAudio(
 				parsed.data,

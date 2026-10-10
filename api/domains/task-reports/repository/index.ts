@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import type { Migration } from "../../../infrastructure/sqlite";
 import type { TaskReport } from "../contracts";
 export const migration = `
 CREATE TABLE task_reports (id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES work_tasks(id), sequence INTEGER NOT NULL, dedupe_key TEXT NOT NULL, data_json TEXT NOT NULL, UNIQUE(task_id,sequence), UNIQUE(task_id,dedupe_key));
@@ -74,3 +75,8 @@ export function purge(db: Database, taskId: string) {
 	db.query("DELETE FROM task_report_outbox WHERE task_id=?").run(taskId);
 	db.query("DELETE FROM task_reports WHERE task_id=?").run(taskId);
 }
+
+/** Named migrations of this domain; the SQL above is frozen once deployed. */
+export const migrations: readonly Migration[] = [
+	{ id: "task-reports/0001-init", sql: migration },
+];

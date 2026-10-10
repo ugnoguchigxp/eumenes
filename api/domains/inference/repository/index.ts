@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import type { Migration } from "../../../infrastructure/sqlite";
 import type { Purpose, Settings } from "../../settings/contracts";
 export const migration = `
 CREATE TABLE inference_requests (id TEXT PRIMARY KEY,subject TEXT NOT NULL,purpose TEXT NOT NULL,snapshot TEXT NOT NULL,deadline INTEGER NOT NULL,status TEXT NOT NULL DEFAULT 'pending',UNIQUE(subject,purpose));
@@ -49,3 +50,12 @@ export function get(db: Database, id: string): RequestRow | null {
 			}
 		: null;
 }
+
+/** Named migrations of this domain; the SQL above is frozen once deployed. */
+export const migrations: readonly Migration[] = [
+	{ id: "inference/0001-init", sql: migration },
+	{ id: "inference/0002-parents", sql: parentsMigration },
+	{ id: "inference/0003-diagnostics", sql: diagnosticsMigration },
+	{ id: "inference/0004-control", sql: controlMigration },
+	{ id: "inference/0005-background-control", sql: backgroundControlMigration },
+];

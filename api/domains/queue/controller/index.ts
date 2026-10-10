@@ -1,4 +1,5 @@
 import type { Hono } from "hono";
+import { parseJsonBody } from "../../../infrastructure/http";
 import { cancelBodySchema } from "../contracts";
 import type { QueueService } from "../service";
 import { toDto } from "../service";
@@ -33,10 +34,9 @@ export function registerQueue(app: Hono, service: QueueService) {
 		return c.json(service.listAttempts(c.req.param("id")));
 	});
 	app.post("/api/jobs/:id/cancel", async (c) => {
-		const body = cancelBodySchema.safeParse(
-			await c.req.json().catch(() => ({})),
-		);
-		if (!body.success) return c.json({ error: "invalid_input" }, 400);
+		// An empty body is a valid cancel without a reason.
+		const body = await parseJsonBody(c, cancelBodySchema, { emptyAs: {} });
+		if (!body.ok) return body.response;
 		const job = await service.cancel(
 			c.req.param("id"),
 			body.data.reason ?? "cancel_requested",

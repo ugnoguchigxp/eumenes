@@ -1,3 +1,4 @@
+import { createDeliveryBuffer, boundResult } from "./delivery-buffer";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
@@ -5,10 +6,8 @@ import type { HandlerDefinition, QueueService } from "../../queue";
 import { getLogger } from "../../../infrastructure/logger";
 import {
 	submitResearchSchema,
-	resultSchema,
 	type ResearchRequest,
 	type ResearchRun,
-	type ResearchResult,
 } from "../contracts";
 import {
 	byId,
@@ -27,6 +26,7 @@ import {
 } from "../adapters/llm-fetch";
 import { cacheKey, type WebCache, type CacheHit } from "./cache";
 
+import { createSavedBodies } from "./saved-bodies";
 const KIND = "web-research.acquire";
 const log = getLogger("web-research");
 interface Prepared {
@@ -43,34 +43,15 @@ const digest = (request: ResearchRequest) => {
 	const { requestId: _id, ...input } = request;
 	return createHash("sha256").update(JSON.stringify(input)).digest("hex");
 };
-function boundResult(result: ResearchResult): ResearchResult {
-	const parsed = resultSchema.parse(result);
-	const documents = parsed.documents.map((doc) => ({ ...doc, text: "" }));
-	let rawRemaining = 24000;
-	let encodedRemaining =
-		32 * 1024 - Buffer.byteLength(JSON.stringify({ ...parsed, documents }));
-	if (encodedRemaining < 0) throw new Error("web_result_too_large");
-	for (let i = 0; i < documents.length; i++) {
-		const original = parsed.documents[i]!;
-		const chunks: string[] = [];
-		for (const character of original.text) {
-			const bytes = Buffer.byteLength(character),
-				encoded = Buffer.byteLength(JSON.stringify(character)) - 2;
-			if (bytes > rawRemaining || encoded > encodedRemaining) break;
-			chunks.push(character);
-			rawRemaining -= bytes;
-			encodedRemaining -= encoded;
-		}
-		const text = chunks.join("");
-		documents[i] = {
-			...original,
-			text,
-			truncated: original.truncated || text !== original.text,
-		};
-	}
-	return { ...parsed, documents };
-}
 
+function validateTimeout(acquisitionTimeoutMs: number) {
+	if (
+		!Number.isSafeInteger(acquisitionTimeoutMs) ||
+		acquisitionTimeoutMs < 1 ||
+		acquisitionTimeoutMs > 30000
+	)
+		throw new Error("invalid_web_timeout");
+}
 export function createWebResearch({
 	store,
 	queue,
@@ -97,14 +78,10 @@ export function createWebResearch({
 		clear(handle: unknown): void;
 	};
 }) {
-	if (
-		!Number.isSafeInteger(acquisitionTimeoutMs) ||
-		acquisitionTimeoutMs < 1 ||
-		acquisitionTimeoutMs > 30000
-	)
-		throw new Error("invalid_web_timeout");
+	validateTimeout(acquisitionTimeoutMs);
 	// Delivery buffer, not a persistent search cache. Completed results expire after 15 minutes.
-	const results = new Map<string, { value: ResearchResult; expires: number }>();
+	const savedBodies = createSavedBodies(now);
+	const delivery = createDeliveryBuffer(savedBodies, now);
 	const rejectionReasons = new Map<string, string[]>();
 	const shares = new Map<
 		string,
@@ -119,11 +96,6 @@ export function createWebResearch({
 		timer: ReturnType<typeof setInterval> | undefined,
 		sweeping: Promise<void> | null = null,
 		closeTask: Promise<void> | null = null;
-	function prune() {
-		for (const [key, value] of results)
-			if (value.expires <= now()) results.delete(key);
-		while (results.size > 64) results.delete(results.keys().next().value!);
-	}
 	function rememberWrite(task: Promise<unknown>) {
 		writes.add(task);
 		void task.finally(() => writes.delete(task)).catch(() => {});
@@ -324,11 +296,18 @@ export function createWebResearch({
 							queue.get(claim.jobId)?.state !== "completed"
 						)
 							return;
-						results.set(runId, {
-							value: boundResult(value.result),
-							expires: now() + 15 * 60000,
-						});
-						prune();
+						savedBodies.stage(
+							runId,
+							value.bodies ??
+								value.result.documents.map((d) => ({
+									url: d.url,
+									title: d.title,
+									text: d.text,
+									fetchedAt: d.fetchedAt,
+									acquisitionTruncated: d.truncated,
+								})),
+						);
+						delivery.remember(runId, value);
 						log.info("web.completed", {
 							runId,
 							jobId: claim.jobId,
@@ -401,11 +380,11 @@ export function createWebResearch({
 	queue.registerHandler(handler);
 	const byIdRead = (runId: string) => store.read((db) => byId(db, runId));
 	function get(runId: string): ResearchRun | null {
-		prune();
+		delivery.prune();
 		const row = byIdRead(runId);
 		if (!row) return null;
 		const value = ["completed", "partial"].includes(row.status)
-			? (results.get(runId)?.value ?? null)
+			? delivery.get(runId)
 			: null;
 		return {
 			id: row.id,
@@ -427,7 +406,7 @@ export function createWebResearch({
 	async function sweep() {
 		if (sweeping) return sweeping;
 		sweeping = (async () => {
-			prune();
+			delivery.prune();
 			await store.write((db) => sweepRuns(db, now()));
 			try {
 				await cache?.sweep();
@@ -510,6 +489,7 @@ export function createWebResearch({
 		return [run.job_id];
 	}
 	return {
+		savedBodies,
 		submitInTransaction,
 		cancelInTransaction,
 		async submit(raw: unknown) {
@@ -580,7 +560,8 @@ export function createWebResearch({
 			closeTask = (async () => {
 				await Promise.allSettled([sweeping]);
 				await Promise.allSettled(writes);
-				results.clear();
+				delivery.close();
+				savedBodies.close();
 				rejectionReasons.clear();
 				const closed = await Promise.allSettled([
 					Promise.resolve().then(() => acquisition.close()),

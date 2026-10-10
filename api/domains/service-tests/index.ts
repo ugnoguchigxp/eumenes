@@ -8,3 +8,4 @@ export type {
 	StartTest,
 	HealthRow,
 } from "./contracts";
+export { migrations } from "./repository";

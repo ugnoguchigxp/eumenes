@@ -31,6 +31,7 @@ import {
 	type WebResearchService,
 } from "../domains/web-research";
 import { createApp } from "./app";
+import { appModules } from "./app-modules";
 import { createChanges, type Changes } from "./events";
 
 const webServices: WebResearchService[] = [];
@@ -100,15 +101,17 @@ function setup() {
 	webServices.push(webResearch);
 	const app = createApp({
 		token,
-		changes,
 		origin: "http://127.0.0.1:5173",
-		conversation,
-		dialogue,
-		voice,
-		larm,
-		queue,
-		scheduler,
-		webResearch,
+		modules: appModules({
+			changes,
+			conversation,
+			dialogue,
+			voice,
+			larm,
+			queue,
+			scheduler,
+			webResearch,
+		}),
 	});
 	const call = (
 		path: string,
@@ -361,22 +364,24 @@ test("full queue is reported as 503 for submissions", async () => {
 	const app = createApp({
 		token,
 		origin: "http://127.0.0.1:5173",
-		conversation: createConversationService(store),
-		dialogue,
-		voice: createVoiceDialogue(store, dialogue, {
-			status: () => ({ state: "ready", capabilities: [] }),
-			connect: async () => {},
-			answer: async () => "",
-			transcribe: async () => "",
-			speak: async () => new Uint8Array(),
-			close: async () => {},
+		modules: appModules({
+			conversation: createConversationService(store),
+			dialogue,
+			voice: createVoiceDialogue(store, dialogue, {
+				status: () => ({ state: "ready", capabilities: [] }),
+				connect: async () => {},
+				answer: async () => "",
+				transcribe: async () => "",
+				speak: async () => new Uint8Array(),
+				close: async () => {},
+			}),
+			larm: {
+				status: () => ({ state: "ready", capabilities: [] }),
+				connect: async () => {},
+			},
+			queue: small,
+			scheduler: h.scheduler,
 		}),
-		larm: {
-			status: () => ({ state: "ready", capabilities: [] }),
-			connect: async () => {},
-		},
-		queue: small,
-		scheduler: h.scheduler,
 	});
 	const response = await app.request("/api/runs", {
 		method: "POST",
@@ -470,6 +475,36 @@ test("oversized JSON bodies are rejected with 413 and normal requests pass", asy
 	expect((await h.call("/api/queue/status")).status).toBe(200);
 });
 
+test("responses carry anti-framing security headers", async () => {
+	const h = setup();
+	for (const response of [
+		await h.call("/api/status"),
+		await h.call("/api/status", undefined, {}),
+	]) {
+		expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+		expect(response.headers.get("referrer-policy")).toBe("no-referrer");
+		expect(response.headers.get("x-frame-options")).toBe("DENY");
+		expect(response.headers.get("content-security-policy")).toBe(
+			"frame-ancestors 'none'",
+		);
+	}
+});
+
+test("requests with both Content-Length and Transfer-Encoding are rejected", async () => {
+	const h = setup();
+	const response = await h.app.request("/api/conversations", {
+		method: "POST",
+		headers: {
+			...auth,
+			"content-length": "10",
+			"transfer-encoding": "chunked",
+		},
+		body: "{}",
+	});
+	expect(response.status).toBe(400);
+	expect(await response.json()).toEqual({ error: "invalid_framing" });
+});
+
 test("error codes map to HTTP statuses through the table", async () => {
 	const { statusForError } = await import("./error-status");
 	expect(statusForError("request_conflict")).toBe(409);
@@ -508,4 +543,89 @@ test("Web research is authenticated, validates malformed JSON, and does not clai
 		).status,
 	).toBe(400);
 	expect((await h.call("/api/web-research/cache/status")).status).toBe(200);
+});
+
+test("modules mount in order behind the shared auth and origin checks", async () => {
+	const app = createApp({
+		token,
+		origin: "http://127.0.0.1:5173",
+		modules: [
+			{ mount: (a) => void a.get("/api/probe", (c) => c.text("first")) },
+			{ mount: (a) => void a.get("/api/probe", (c) => c.text("second")) },
+		],
+	});
+	const response = await app.request("/api/probe", { headers: auth });
+	expect(await response.text()).toBe("first");
+	expect((await app.request("/api/probe")).status).toBe(401);
+	const foreign = await app.request("/api/probe", {
+		headers: { ...auth, origin: "http://evil.example" },
+	});
+	expect(foreign.status).toBe(403);
+});
+
+test("service-test concurrency limits cover the slow endpoints but not cancel or retry", async () => {
+	let release: () => void = () => {};
+	const gate = new Promise<void>((resolve) => {
+		release = resolve;
+	});
+	const app = createApp({
+		token,
+		origin: "http://127.0.0.1:5173",
+		modules: [
+			{
+				mount(a) {
+					for (const path of [
+						"/api/service-tests/runs",
+						"/api/service-tests/diagnose",
+						"/api/service-tests/uploads",
+						"/api/service-tests/catalog/refresh",
+					])
+						a.post(path, async (c) => {
+							await gate;
+							return c.json({ ok: true });
+						});
+					a.post("/api/service-tests/runs/:id/cancel", (c) =>
+						c.json({ ok: 1 }),
+					);
+					a.post("/api/service-tests/runs/:id/retry-artifact", (c) =>
+						c.json({ ok: 1 }),
+					);
+				},
+			},
+		],
+	});
+	const post = (path: string) =>
+		app.request(path, { method: "POST", headers: auth });
+	const held = [
+		post("/api/service-tests/runs"),
+		post("/api/service-tests/diagnose"),
+	];
+	await new Promise((resolve) => setTimeout(resolve, 10));
+	// The budget of 2 is shared by all slow endpoints.
+	expect((await post("/api/service-tests/uploads")).status).toBe(429);
+	expect((await post("/api/service-tests/catalog/refresh")).status).toBe(429);
+	expect((await post("/api/service-tests/runs/r1/cancel")).status).toBe(200);
+	expect((await post("/api/service-tests/runs/r1/retry-artifact")).status).toBe(
+		200,
+	);
+	release();
+	for (const response of await Promise.all(held))
+		expect(response.status).toBe(200);
+	expect((await post("/api/service-tests/uploads")).status).toBe(200);
+});
+
+test("CORS preflight allows every method the API serves", async () => {
+	const app = createApp({
+		token,
+		origin: "http://127.0.0.1:5173",
+		modules: [],
+	});
+	const response = await app.request("/api/anything", {
+		method: "OPTIONS",
+		headers: { origin: "http://127.0.0.1:5173" },
+	});
+	expect(response.status).toBe(204);
+	expect(response.headers.get("Access-Control-Allow-Methods")).toBe(
+		"GET, POST, PUT, PATCH, DELETE, OPTIONS",
+	);
 });

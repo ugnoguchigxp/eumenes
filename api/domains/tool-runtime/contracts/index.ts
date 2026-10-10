@@ -2,6 +2,9 @@ import type { Database } from "bun:sqlite";
 import type { Owner, FixedDefinition, Prepared } from "../../capabilities";
 export type ToolResult = {
 	observedAt: string;
+	readings?: Source[];
+	notes?: unknown;
+	proofs?: Array<{ kind: "conversation_source"; scopeRef: string }>;
 	hits: Array<{ url: string; title: string; snippet: string }>;
 	documents: Array<{
 		url: string;
@@ -13,10 +16,29 @@ export type ToolResult = {
 	failures: Array<{ url: string; code: string }>;
 };
 export type Source = {
+	kind?: "web_source" | "conversation_source";
+	sourceRef?: string;
+	sourceRevision?: string;
+	viewId?: string;
+	viewDigest?: string;
+	start?: number;
+	end?: number;
+	nextCursor?: string | null;
+	previousCursor?: string | null;
+	acquisitionTruncated?: boolean;
+	previewTruncated?: boolean;
+	messageRef?: string;
+	messageId?: string;
+	conversationId?: string;
+	speaker?: "user" | "assistant";
+	createdAt?: string;
+	revision?: string;
+	digest?: string;
+	scopeRef?: string;
 	sourceId: string;
-	url: string;
+	url?: string;
 	title: string;
-	basis: "page" | "snippet";
+	basis: "page" | "snippet" | "conversation";
 	fetchedAt: string;
 	truncated: boolean;
 	body: string;
@@ -62,6 +84,32 @@ export interface ActionAdapter {
 	): ActionEnvelope | null;
 }
 export interface ToolAdapter {
+	operationFingerprintInTransaction?(
+		tx: Database,
+		request: { tool: FixedDefinition; arguments: unknown; owner: Owner },
+	): string | undefined;
+	localInTransaction?(
+		tx: Database,
+		request: {
+			tool: FixedDefinition;
+			arguments: unknown;
+			owner: Owner;
+			deadline: number;
+		},
+	): AdapterOperation;
+	prepareSourcesInTransaction?(
+		tx: Database,
+		invocation: Invocation,
+		result: ToolResult,
+	): Source[] | undefined;
+	validateEvidenceInTransaction?(
+		tx: Database,
+		owner: Owner,
+		sources: SourceMetadata[],
+		proofs: Array<{ kind: "conversation_source"; scopeRef: string }>,
+	): boolean;
+	releaseTask?(taskId: string): void;
+	releaseRoot?(rootRunId: string): void;
 	startInTransaction(
 		tx: Database,
 		request: {
@@ -127,6 +175,8 @@ export type CandidateImportInput = {
 	hits: Array<{ url: string; title: string; snippet: string }>;
 };
 export type Invocation = {
+	args_json?: string | null;
+	operation_fingerprint?: string | null;
 	id: string;
 	owner_task_id: string;
 	root_run_id: string;
@@ -140,5 +190,6 @@ export type Invocation = {
 	result_digest: string | null;
 	error_code: string | null;
 	deadline: number /** 'tool' for real executions, 'candidate-cache' for imported observations (needs routeGrantMigration). */;
+	cancel_epoch?: number;
 	origin?: "tool" | "candidate-cache";
 };

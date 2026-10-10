@@ -8,6 +8,7 @@ import type {
 	TestArtifact,
 	TestKind,
 } from "../contracts/playground";
+import { parseProviderHosts, providerHostAllowed } from "./guards";
 import {
 	bytes,
 	code,
@@ -39,7 +40,10 @@ const paths: Record<string, string> = {
 	music: "/v1/music/generations",
 };
 export function createLarmPlayground(config: {
+	/** LARM control origin. There is no default: without it every operation reports larm_base_url_unconfigured. */
 	baseUrl?: string;
+	/** Extra hosts that may receive provider credentials; defaults to EUMENES_LARM_PROVIDER_HOSTS (read once). */
+	providerHosts?: readonly string[];
 	token?: string;
 	profile: string;
 	audience: string;
@@ -47,9 +51,27 @@ export function createLarmPlayground(config: {
 	fetch?: typeof fetch;
 	pollMs?: number;
 }) {
-	const base = localUrl(config.baseUrl || "http://192.168.0.130:9810");
+	const baseText = config.baseUrl?.trim();
+	const configuredBase = baseText
+		? localUrl(baseText, [new URL(baseText).hostname])
+		: undefined;
+	const providerHosts =
+		config.providerHosts?.map((host) => host.toLowerCase()) ??
+		parseProviderHosts(process.env.EUMENES_LARM_PROVIDER_HOSTS);
+	const larmBase = () => {
+		if (!configuredBase) throw new Error("larm_base_url_unconfigured");
+		return configuredBase;
+	};
+	/** Provider URLs must be local and on the LARM host (or an explicit extra host). */
+	const providerUrl = (value: string) => {
+		const url = localUrl(value, [new URL(value).hostname]);
+		if (!providerHostAllowed(url, larmBase(), providerHosts))
+			throw new Error("larm_provider_host_mismatch");
+		return url;
+	};
 	const request = config.fetch ?? fetch;
 	function publicUrl(path: string) {
+		const base = larmBase();
 		const url = new URL(path, base);
 		if (
 			url.origin !== base.origin ||
@@ -67,6 +89,7 @@ export function createLarmPlayground(config: {
 		init: RequestInit = {},
 		accepted = [200],
 	) {
+		const base = larmBase();
 		if (!config.token) throw new Error("larm_unconfigured");
 		signal.throwIfAborted();
 		const url = new URL(path, base);
@@ -128,7 +151,7 @@ export function createLarmPlayground(config: {
 							const id = createHash("sha256")
 								.update(
 									JSON.stringify([
-										base.origin,
+										larmBase().origin,
 										mode,
 										profile,
 										name,
@@ -173,7 +196,7 @@ export function createLarmPlayground(config: {
 		if (!target.selector) throw new Error("invalid_profile_selector");
 		if (
 			config.audience === "same-host" &&
-			!["localhost", "127.0.0.1"].includes(base.hostname)
+			!["localhost", "127.0.0.1"].includes(larmBase().hostname)
 		)
 			throw new Error("invalid_larm_audience");
 		let id: string | undefined;
@@ -548,8 +571,8 @@ export function createLarmPlayground(config: {
 				!(Date.parse(str(credential.expiresAt)) > Date.now() + 10_000)
 			)
 				throw new Error("invalid_claim_configuration");
-			const providerBase = localUrl(str(fields.baseURL ?? fields.daemonURL));
-			if (providerBase.href !== localUrl(str(p.baseUrl)).href)
+			const providerBase = providerUrl(str(fields.baseURL ?? fields.daemonURL));
+			if (providerBase.href !== providerUrl(str(p.baseUrl)).href)
 				throw new Error("invalid_claim_configuration");
 			const endpoint = new URL(
 				target.endpoint.replace(/^\/v1\//, ""),
@@ -557,7 +580,7 @@ export function createLarmPlayground(config: {
 			);
 			if (
 				p.endpoint !== undefined &&
-				localUrl(str(p.endpoint)).href !== endpoint.href
+				providerUrl(str(p.endpoint)).href !== endpoint.href
 			)
 				throw new Error("invalid_claim_endpoint");
 			const infer = (init: RequestInit) =>

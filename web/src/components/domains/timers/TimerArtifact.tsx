@@ -8,6 +8,7 @@ import {
 	displayRemainingSeconds,
 	estimatedServerNow,
 } from "../../../domains/timers/clock";
+import { useDeadline } from "../../../domains/timers/deadline";
 import "./TimerArtifact.css";
 
 function durationLabel(seconds: number) {
@@ -43,17 +44,27 @@ export function TimerArtifact({
 		queryKey: [queryRoots.timers, "item", timerId],
 		queryFn: async ({ signal }) => {
 			const sent = performance.now();
+			const sentAt = Date.now();
 			const result = await client.timer(timerId, signal);
 			return {
 				...result,
+				sentAt,
 				clock: bindServerClock(result.serverNow, sent, performance.now()),
 			};
 		},
-		refetchInterval: (q) =>
-			q.state.data?.timer.state === "active" ? 5000 : false,
 		refetchOnWindowFocus: "always",
 		refetchOnReconnect: "always",
 	});
+	// SSE reports changes; the expiry itself is the only event the server cannot push.
+	useDeadline(
+		query.data?.timer.state === "active" ? [query.data.timer.dueAt] : [],
+		query.data?.serverNow,
+		query.data?.sentAt ?? 0,
+		() =>
+			void cache.invalidateQueries({
+				queryKey: [queryRoots.timers, "item", timerId],
+			}),
+	);
 	const [monoNow, refreshClock] = useState(() => performance.now());
 	useEffect(() => {
 		if (query.data?.timer.state !== "active" || query.data.timer.bodyExpired)

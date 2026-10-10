@@ -15,7 +15,7 @@ import { Button } from "../../design-system";
 import { queryRoots } from "../../queryKeys";
 import "./style.css";
 
-export const stateLabels: Record<RouteState, string> = {
+const stateLabels: Record<RouteState, string> = {
 	unregistered: "未登録",
 	preparing: "準備中",
 	active: "利用中",
@@ -23,7 +23,7 @@ export const stateLabels: Record<RouteState, string> = {
 	expired: "期限切れ（次回は検索から）",
 	disabled: "停止",
 };
-export const draftLabels: Record<DraftState, string> = {
+const draftLabels: Record<DraftState, string> = {
 	queued: "登録待ち",
 	authoring: "手順を作成中",
 	reviewing: "内容を確認中",

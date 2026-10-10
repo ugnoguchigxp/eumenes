@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
+import { getLogger } from "../../../infrastructure/logger";
 import {
 	bytes,
 	hash,
@@ -16,6 +17,7 @@ import {
 } from "../contracts";
 import { get } from "../repository";
 import { builtins } from "../builtin/web-research";
+import { historyBuiltins } from "../builtin/history";
 import { timerBuiltins } from "../builtin/timers";
 const learnedColumns = new WeakMap<Database, boolean>();
 /** The learned-attributes migration is appended; older fixtures may lack it. */
@@ -30,6 +32,12 @@ function hasLearned(db: Database) {
 		learnedColumns.set(db, v);
 	}
 	return v;
+}
+function isSupersededBuiltin(d: (typeof builtins)[number]) {
+	return builtins.some(
+		(next) =>
+			next.kind === d.kind && next.id === d.id && next.revision > d.revision,
+	);
 }
 export function createCapabilities(
 	store: SqliteStore,
@@ -101,8 +109,14 @@ export function createCapabilities(
 			.query("SELECT definition_hash FROM capability_revisions WHERE id=?")
 			.get(rev) as { definition_hash: string } | null;
 		if (old) {
-			if (old.definition_hash !== digest)
+			if (old.definition_hash !== digest) {
+				if (origin === "builtin")
+					getLogger("capabilities").warn("capability.revision_conflict", {
+						subjectId: rev,
+						reason: "capability_revision_conflict",
+					});
 				throw new Error("capability_revision_conflict");
+			}
 			return;
 		}
 		const dependencies = d.dependencies.flatMap((id) => closure(db, id));
@@ -300,18 +314,22 @@ export function createCapabilities(
 		} else {
 			const own = `skill:${d.id}@1`;
 			const required = d.requiredSkillRevisionIds ?? [];
+			// Keep previously persisted bundles valid; new routes use the generic skill.
+			const sharedSkill = [commonSkillRevisionId, "skill:web.research@2"].find(
+				(id) => required.includes(id),
+			);
 			if (
 				!d.schemaKey ||
 				d.profileRevisionId !== commonProfileRevisionId ||
 				required.length !== 2 ||
-				!required.includes(commonSkillRevisionId) ||
+				!sharedSkill ||
 				!required.includes(own) ||
 				d.toolRevisionIds?.length !== 1 ||
 				d.dependencies.length !== 4 ||
 				new Set(d.dependencies).size !== 4 ||
 				![
 					commonProfileRevisionId,
-					commonSkillRevisionId,
+					sharedSkill,
 					own,
 					d.toolRevisionIds[0],
 				].every((x) => d.dependencies.includes(x!))
@@ -454,7 +472,22 @@ export function createCapabilities(
 		prepareInTransaction: prepare,
 		seed: () =>
 			store.write((db) => {
-				for (const d of builtins) registerBuiltinInTransaction(db, d);
+				for (const d of builtins) {
+					if (d.backend && !backends.has(d.backend)) continue;
+					// Keep the exact archived definition from this installation. Only
+					// the newest revision is authoritative for the current seed.
+					const superseded = isSupersededBuiltin(d);
+					if (
+						superseded &&
+						db
+							.query("SELECT 1 FROM capability_revisions WHERE id=?")
+							.get(`${d.kind}:${d.id}@${d.revision}`)
+					)
+						continue;
+					registerBuiltinInTransaction(db, d);
+				}
+				if (backends.has("history"))
+					for (const d of historyBuiltins) registerBuiltinInTransaction(db, d);
 				if (backends.has("timer"))
 					for (const d of timerBuiltins) registerBuiltinInTransaction(db, d);
 			}),

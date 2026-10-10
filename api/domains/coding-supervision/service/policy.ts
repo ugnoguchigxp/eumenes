@@ -1,3 +1,5 @@
+import { sha256Hex } from "../../../infrastructure/digest";
+import { canonicalJSON } from "../../../../packages/coding-runner/src/contracts";
 import type { WorkTask, TaskFence } from "../../tasks";
 import type {
 	Supervisor,
@@ -23,11 +25,7 @@ export const stopped = (s: Supervisor) =>
 	s.observation.evidenceComplete;
 export const blockerKey = (s: Supervisor) => {
 	const q = s.observation?.question;
-	return q
-		? new Bun.CryptoHasher("sha256")
-				.update(JSON.stringify([q.kind, q.summary]))
-				.digest("hex")
-		: "none";
+	return q ? sha256Hex(JSON.stringify([q.kind, q.summary])) : "none";
 };
 export function checked(s: Supervisor) {
 	return (
@@ -149,3 +147,4 @@ export function validateReceipt(intent: StepIntent, r: StepReceipt) {
 	)
 		throw new Error("supervision_push_unconfirmed");
 }
+export const digest = (v: unknown) => sha256Hex(canonicalJSON(v));

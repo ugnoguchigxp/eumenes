@@ -14,3 +14,4 @@ export type {
 	TaskOrigin,
 	TaskQuestion,
 } from "./contracts";
+export { migrations } from "./repository";

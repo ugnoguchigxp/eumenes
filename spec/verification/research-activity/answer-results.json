@@ -1,0 +1,43 @@
+{
+	"date": "2026-10-10",
+	"change": "調査詳細は初期展開。Web調査は分野別の回答テンプレートを持たず、質問に必要な情報・前後情報と確認済み出典を整理。メインは要点を回答し実際の出典URLをリンクする。",
+	"activeResearchSkill": "skill:web.research@5",
+	"activeResearchPackage": "package:web.research@6",
+	"topicSpecificReportFilter": "removed",
+	"detailsInitiallyOpen": true,
+	"citationTarget": "_blank",
+	"spokenCitations": "URLと独立した出典行は読み上げず、表示には残す",
+	"fixture": {
+		"focused": { "pass": 104, "fail": 0 },
+		"backendAll": { "pass": 973, "skip": 1, "fail": 0 },
+		"webUnitAll": { "pass": 201, "fail": 0 },
+		"format": "pass",
+		"lint": "pass",
+		"typecheck": "pass",
+		"webBuild": "pass",
+		"browserAll": {
+			"pass": 36,
+			"fail": 5,
+			"failures": [
+				"research-routes: 再探索後のSSEによる利用中表示の更新待ち",
+				"timers: 狭い画面の時計",
+				"timers: 終了通知のlocatorが見出しと本文の2要素に一致",
+				"timers: 完了文のlocatorが通知と会話の2要素に一致",
+				"voice: light avatarテストの実行時間超過"
+			],
+			"researchAnswerCases": "天気・株価の2件は通過。必要情報と実際のURL、別タブ、初期展開を確認"
+		},
+		"researchRoutesIsolatedRerun": { "pass": 1, "fail": 0 },
+		"verifyAll": "fail_browser_fixture"
+	},
+	"live": {
+		"mode": "real_larm_and_real_web_isolated_backend",
+		"generalSearch": "pass: Bunのコマンド、前後情報、取得済みURLの引用を確認",
+		"weather": "fail: unknown_source。モデルが未取得のsourceIdを指定し、1回の修正後も拒否。回答品質の成功確認とは扱わない",
+		"record": "verification-reports/toolchain/answer-live.json"
+	},
+	"deviceAcceptance": "not_run",
+	"backendRestartRequired": true,
+	"contextToolsForGenericRefinement": { "compile": 1, "eval": 1 },
+	"screenshots": ["desktop.png", "mobile.png"]
+}

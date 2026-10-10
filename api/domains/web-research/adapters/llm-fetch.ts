@@ -14,7 +14,9 @@ import type {
 	ResearchDocument,
 } from "../contracts";
 
+import type { AcquiredBody } from "../service/saved-bodies";
 export interface Acquisition {
+	bodies?: AcquiredBody[];
 	result: ResearchResult;
 	/** Only guarded stable pages, with a host-reviewed HTTP retention policy. */
 	freshUntilMs: number | null;
@@ -149,7 +151,11 @@ export function createWebAcquisition(
 	async function read(
 		url: string,
 		signal: AbortSignal,
-	): Promise<{ document: ResearchDocument; deadline: number | null }> {
+	): Promise<{
+		document: ResearchDocument;
+		body: AcquiredBody;
+		deadline: number | null;
+	}> {
 		const transport =
 			options.fetcher ??
 			(isPublicJsonSource(url)
@@ -199,29 +205,38 @@ export function createWebAcquisition(
 		try {
 			const doc = await client.read({
 				url,
-				maxCharacters: 12000,
+				maxCharacters: 64000,
 				render: "never",
 				requestedUse: "answer_with_citation",
 				signal,
 			});
-			if (
-				doc.security.decision !== "allow" &&
-				doc.security.decision !== "allow_with_warning"
-			)
+			if (doc.security.decision !== "allow")
 				throw new LlmFetchError("GUARD_DENIED", "Guard refused", {
-					guardDecision: doc.security.decision,
+					// A warning is not an approval: report it as a plain denial.
+					guardDecision:
+						doc.security.decision === "allow_with_warning"
+							? "deny"
+							: doc.security.decision,
 					guardReasonCodes: doc.security.reasonCodes,
 				});
 			const requested = new URL(url),
 				final = new URL(doc.finalUrl);
 			requested.hash = final.hash = "";
+			const text = sourceText(url, doc.text).replaceAll("\r\n", "\n");
 			return {
+				body: {
+					url: doc.finalUrl,
+					title: limited(doc.title, 500),
+					text,
+					fetchedAt: doc.fetchedAt,
+					acquisitionTruncated: doc.truncated || status === 206,
+				},
 				document: {
 					url: doc.finalUrl,
 					title: limited(doc.title, 500),
-					text: sourceText(url, doc.text),
+					text: limited(text, 12000),
 					fetchedAt: doc.fetchedAt,
-					truncated: doc.truncated || status === 206,
+					truncated: doc.truncated || status === 206 || text.length > 12000,
 					trust: "untrusted",
 					tainted: true,
 					verification: "source_read",
@@ -240,6 +255,7 @@ export function createWebAcquisition(
 	}
 	return {
 		async execute(request, signal) {
+			const bodies: AcquiredBody[] = [];
 			const result: ResearchResult = {
 				provider: "llm-fetch@0.1.2",
 				observedAt: new Date(now()).toISOString(),
@@ -251,8 +267,10 @@ export function createWebAcquisition(
 			if (request.operation === "read") {
 				const value = await read(request.url, signal);
 				result.documents.push(value.document);
+				bodies.push(value.body);
 				return {
 					result,
+					bodies,
 					freshUntilMs: request.retention === "stable" ? value.deadline : null,
 				};
 			}
@@ -276,7 +294,9 @@ export function createWebAcquisition(
 			for (const hit of result.hits.slice(0, request.readPages)) {
 				signal.throwIfAborted();
 				try {
-					result.documents.push((await read(hit.url, signal)).document);
+					const value = await read(hit.url, signal);
+					result.documents.push(value.document);
+					bodies.push(value.body);
 				} catch (error) {
 					signal.throwIfAborted();
 					result.failures.push({
@@ -293,7 +313,7 @@ export function createWebAcquisition(
 					});
 				}
 			}
-			return { result, freshUntilMs: null };
+			return { result, bodies, freshUntilMs: null };
 		},
 		close: () => hitsClient.close(),
 	};

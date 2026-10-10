@@ -11,11 +11,12 @@ import { createVoiceDialogue } from "../domains/voice-dialogue";
 import type { LarmPort } from "../domains/larm";
 import { createTaskSchema } from "../domains/tasks/contracts";
 import { createClient, ApiError } from "../../client";
+import { loadConfig } from "../infrastructure/config";
 import { createApp } from "./app";
+import { appModules } from "./app-modules";
 import { migrations } from "./migrations";
 import {
 	createDelegatedTasks,
-	delegatedTasksEnabled,
 	type TaskExecutionPort,
 } from "./delegated-tasks";
 
@@ -120,13 +121,15 @@ function setup(
 	const app = createApp({
 		token,
 		origin: "http://127.0.0.1:5173",
-		queue,
-		scheduler,
-		conversation,
-		dialogue,
-		voice,
-		larm,
-		tasks: delegated.tasks,
+		modules: appModules({
+			queue,
+			scheduler,
+			conversation,
+			dialogue,
+			voice,
+			larm,
+			tasks: delegated.tasks,
+		}),
 	});
 	cleanup.push(async () => {
 		release();
@@ -659,13 +662,11 @@ test("API client and CLI register, read and cancel through authenticated HTTP; u
 	expect((await cli(["start", receipt.taskId, "-1"])).code).toBe(2);
 });
 test("delegated feature flag is strict, and disabled execution still permits registration", async () => {
-	expect(delegatedTasksEnabled({})).toBe(false);
-	expect(delegatedTasksEnabled({ EUMENES_DELEGATED_TASKS_ENABLED: "1" })).toBe(
-		true,
-	);
+	// The flag itself (default off, strict values) is covered by infrastructure/config.test.ts.
+	expect(loadConfig({}).delegatedTasksEnabled).toBe(false);
 	expect(() =>
-		delegatedTasksEnabled({ EUMENES_DELEGATED_TASKS_ENABLED: "true" }),
-	).toThrow("invalid_delegated_tasks_flag");
+		loadConfig({ EUMENES_DELEGATED_TASKS_ENABLED: "maybe" }),
+	).toThrow("config_invalid:EUMENES_DELEGATED_TASKS_ENABLED");
 	const h = setup({ disabled: true });
 	const r = await h.tasks.create(input("register_only"));
 	await expect(h.tasks.start(r.taskId, cmd(r.revision))).rejects.toThrow(

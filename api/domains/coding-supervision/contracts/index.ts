@@ -143,6 +143,21 @@ export interface WorkflowPort {
 	/** Persisted operation ID must be enforced by the worker; never replay an unknown write. */
 	execute(intent: StepIntent, signal: AbortSignal): Promise<StepReceipt>;
 }
+/** Reason code shown to the user while a supervisor instruction awaits approval. */
+export const instructionApprovalRequired = "instruction_approval_required";
+/** Answer values of the approval question; any other answer is treated as a rejection. */
+export const approvalChoices = {
+	approve: "承認する",
+	reject: "却下する",
+} as const;
+export interface PendingApproval {
+	/** Task question that carries the approval prompt. */
+	questionId: string;
+	/** The exact decision to replay once approved; its instruction is the stored text. */
+	decision: Decision;
+	observationDigest: string;
+	resolution: "pending" | "approved" | "rejected" | "expired";
+}
 export interface Supervisor {
 	taskId: string;
 	generation: number;
@@ -167,6 +182,8 @@ export interface Supervisor {
 	lastReportAt: number | null;
 	lastReportFingerprint: string | null;
 	holdReason: string | null;
+	/** Absent in rows saved before the approval gate existed. */
+	pendingApproval?: PendingApproval | null;
 }
 
 export const supervisorViewSchema = z.object({
@@ -188,4 +205,13 @@ export const supervisorViewSchema = z.object({
 	lastReportAt: z.number().nullable(),
 	lastReportFingerprint: z.string().nullable(),
 	holdReason: z.string().nullable(),
+	pendingApproval: z
+		.object({
+			reasonCode: z.literal(instructionApprovalRequired),
+			questionId: z.string(),
+			action: z.enum(["request_change", "answer_question"]),
+			reason: z.string(),
+			instruction: z.string(),
+		})
+		.nullable(),
 });

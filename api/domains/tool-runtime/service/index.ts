@@ -1,3 +1,4 @@
+import { createReadInvocation, type ReadReference } from "./read-invocation";
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import {
@@ -10,7 +11,6 @@ import {
 	validators,
 	type Capabilities,
 	type Owner,
-	type FixedDefinition,
 	type Prepared,
 } from "../../capabilities";
 import type { QueueService } from "../../queue";
@@ -25,7 +25,8 @@ import type {
 	ActionAdapter,
 	ActionEnvelope,
 } from "../contracts";
-import { get, hasSupersededColumn } from "../repository";
+import { resultSources } from "./source-results";
+import { get, hasReadMetadata, hasSupersededColumn } from "../repository";
 export function createToolRuntime(
 	store: SqliteStore,
 	capabilities: Capabilities,
@@ -35,22 +36,11 @@ export function createToolRuntime(
 	cachedSource?: CachedSourceAuthorizationPort,
 	actions?: ActionAdapter,
 ) {
-	type Grant = {
-		bindingToken: string;
-		exactUrl: string;
-		argsDigest: string;
-		attemptTimeoutMs?: number;
-	};
-	const refs = new Map<
+	const localOperations = new Map<
 		string,
-		{
-			owner: Owner;
-			tool: FixedDefinition;
-			prepared: Prepared;
-			expires: number;
-			grant?: Grant;
-		}
+		import("../contracts").AdapterOperation
 	>();
+	const refs = new Map<string, ReadReference>();
 	const vault = new Map<
 		string,
 		{
@@ -59,6 +49,7 @@ export function createToolRuntime(
 			digest: string;
 			sources: Source[];
 			failures: ToolResult["failures"];
+			notes?: unknown;
 			bytes: number;
 			expires: number;
 		}
@@ -165,106 +156,14 @@ export function createToolRuntime(
 			}
 		return n;
 	}
-	function invokeInTransaction(
-		db: Database,
-		owner: Owner,
-		executionRef: string,
-		args: unknown,
-		stepId: string,
-		deadline: number,
-		parentJobId: string,
-		allowedUrls: string[],
-		question?: string,
-	) {
-		const old = db
-			.query("SELECT * FROM tool_invocations WHERE step_id=?")
-			.get(stepId) as Invocation | null;
-
-		const ref = refs.get(executionRef);
-		if (
-			!ref ||
-			ref.expires <= now() ||
-			ownerKey(ref.owner) !== ownerKey(owner) ||
-			deadline <= now()
-		)
-			throw new Error("tool_ref_invalid");
-		capabilities.validateInTransaction(db, ref.prepared);
-		if (ref.grant)
-			authorize(
-				db,
-				owner,
-				ref.prepared,
-				ref.grant.bindingToken,
-				ref.grant.exactUrl,
-			);
-		if (!ref.tool.schemaKey) throw new Error("invalid_tool_schema");
-		const parsed = validators[ref.tool.schemaKey].safeParse(args);
-		if (!parsed.success)
-			throw new ValidationFailure(
-				"invalid_tool_input",
-				validationIssues(parsed.error, args, ["arguments"]),
-				parsed.error.issues.length,
-			);
-		if (ref.grant) {
-			if (hash(parsed.data) !== ref.grant.argsDigest)
-				throw new Error(
-					ref.tool.id === "web.read"
-						? "tool_url_out_of_scope"
-						: "invalid_tool_input",
-				);
-		} else if (
-			ref.tool.id === "web.read" &&
-			!allowedUrls.includes((parsed.data as { url: string }).url)
-		)
-			throw new Error("tool_url_out_of_scope");
-		if (old) {
-			if (
-				old.owner_task_id !== owner.taskId ||
-				old.root_run_id !== owner.rootRunId ||
-				old.tool_revision_id !== ref.tool.revisionId ||
-				old.args_digest !== hash(parsed.data)
-			)
-				throw new Error("idempotency_conflict");
-			return old;
-		}
-		const invocationId = crypto.randomUUID();
-		const requestId = crypto.randomUUID();
-		const digest = hash(parsed.data);
-		const operation = adapter.startInTransaction(db, {
-			requestId,
-			tool: ref.tool,
-			arguments: parsed.data,
-			owner,
-			deadline,
-			parentJobId,
-			question,
-			...(ref.grant
-				? {
-						grantedUrl: ref.grant.exactUrl,
-						attemptTimeoutMs: ref.grant.attemptTimeoutMs,
-					}
-				: {}),
-		});
-		if (!operation?.operationId || !operation.jobId)
-			throw new Error("operation_missing");
-		db.query(
-			"INSERT INTO tool_invocations(id,owner_task_id,root_run_id,tool_revision_id,step_id,request_id,args_json,args_digest,operation_id,job_id,state,deadline,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,'pending',?,?)",
-		).run(
-			invocationId,
-			owner.taskId,
-			owner.rootRunId,
-			ref.tool.revisionId,
-			stepId,
-			requestId,
-			JSON.stringify(parsed.data),
-			digest,
-			operation.operationId,
-			operation.jobId,
-			deadline,
-			now(),
-		);
-		return get(db, invocationId)!;
-	}
+	const invokeInTransaction = createReadInvocation({
+		refs,
+		localOperations,
+		now,
+		capabilities,
+		adapter,
+		authorize,
+	});
 	function resolve(db: Database, ref: string, taskId: string) {
 		const entry = vault.get(ref);
 		if (!entry || entry.expires <= now()) throw new Error("result_expired");
@@ -341,27 +240,14 @@ export function createToolRuntime(
 						vault.delete(key);
 				}
 				const result = operation.result;
-				const sources: Source[] = [
-					...result.hits.map((h) => ({
-						sourceId: crypto.randomUUID(),
-						url: h.url,
-						title: h.title,
-						basis: "snippet" as const,
-						fetchedAt: result.observedAt,
-						truncated: true,
-						body: h.snippet.replaceAll("\r\n", "\n"),
-					})),
-					...result.documents.map((d) => ({
-						sourceId: crypto.randomUUID(),
-						url: d.url,
-						title: d.title,
-						basis: "page" as const,
-						fetchedAt: d.fetchedAt,
-						truncated: d.truncated,
-						body: d.text.replaceAll("\r\n", "\n"),
-					})),
-				];
-				const size = bytes({ sources, failures: result.failures });
+				const sources =
+					adapter.prepareSourcesInTransaction?.(db, inv, result) ??
+					resultSources(result);
+				const size = bytes({
+					sources,
+					failures: result.failures,
+					notes: result.notes,
+				});
 				if (
 					size > 32768 ||
 					vault.size >= 64 ||
@@ -371,22 +257,43 @@ export function createToolRuntime(
 					code = "result_capacity";
 				} else {
 					ref = crypto.randomUUID();
-					digest = hash({ sources, failures: result.failures });
+					digest = hash({
+						sources,
+						failures: result.failures,
+						notes: result.notes,
+					});
 					vault.set(ref, {
 						invocationId: inv.id,
 						ownerTaskId: inv.owner_task_id,
 						digest,
 						sources,
 						failures: result.failures,
+						notes: result.notes,
 						bytes: size,
 						expires: now() + 900000,
 					});
-					for (const source of sources)
-						db.query("INSERT INTO tool_sources VALUES(?,?,?,?,?,?,?,?,?)").run(
+					if (hasReadMetadata(db)) {
+						for (const proof of result.proofs ?? [])
+							db.query(
+								"INSERT INTO tool_read_proofs(invocation_id,proof_json) VALUES(?,?)",
+							).run(inv.id, JSON.stringify(proof));
+						for (const source of sources.filter((s) => s.viewId)) {
+							const { body: _body, ...metadata } = source;
+							db.query(
+								"INSERT INTO tool_views(view_id,invocation_id,metadata_json) VALUES(?,?,?)",
+							).run(source.viewId!, inv.id, JSON.stringify(metadata));
+						}
+					}
+					for (const source of sources.filter(
+						(s) => s.kind !== "conversation_source",
+					))
+						db.query(
+							"INSERT OR IGNORE INTO tool_sources VALUES(?,?,?,?,?,?,?,?,?)",
+						).run(
 							source.sourceId,
 							inv.id,
 							inv.owner_task_id,
-							source.url,
+							source.url ?? "",
 							source.title,
 							source.basis,
 							source.fetchedAt,
@@ -404,6 +311,12 @@ export function createToolRuntime(
 				.run(state, code, ref, digest, now(), inv.id).changes !== 1
 		)
 			throw new Error("invocation_changed");
+		void Promise.resolve()
+			.then(() => {
+				const row = store.read((db) => get(db, inv.id));
+				if (row?.state !== "pending") localOperations.delete(inv.operation_id);
+			})
+			.catch(() => {});
 		return true;
 	}
 	function cancelInTransaction(db: Database, taskId: string) {
@@ -413,7 +326,9 @@ export function createToolRuntime(
 			)
 			.all(taskId) as Invocation[];
 		const jobs = pending.flatMap((inv) =>
-			adapter.cancelInTransaction(db, inv.operation_id),
+			inv.operation_id.startsWith("local:")
+				? []
+				: adapter.cancelInTransaction(db, inv.operation_id),
 		);
 		db.query(
 			"UPDATE tool_invocations SET state='cancelled',error_code='cancel_requested',finished_at=? WHERE owner_task_id=? AND state='pending'",
@@ -487,12 +402,72 @@ export function createToolRuntime(
 		return get(db, id)!;
 	}
 	function release(taskId: string) {
+		adapter.releaseTask?.(taskId);
 		for (const [key, ref] of refs)
 			if (ref.owner.taskId === taskId) refs.delete(key);
 		for (const [key, result] of vault)
 			if (result.ownerTaskId === taskId) vault.delete(key);
 	}
 	return {
+		validateEvidenceInTransaction(
+			db: Database,
+			owner: Owner,
+			sources: import("../contracts").SourceMetadata[],
+		) {
+			const proofs = hasReadMetadata(db)
+				? (
+						db
+							.query(
+								"SELECT p.proof_json FROM tool_read_proofs p JOIN tool_invocations i ON i.id=p.invocation_id WHERE i.owner_task_id=? AND i.state IN ('succeeded','partial') AND i.cancel_epoch=? ORDER BY i.created_at,i.rowid",
+							)
+							.all(owner.taskId, owner.cancelEpoch) as Array<{
+							proof_json: string;
+						}>
+					).map(
+						(p) =>
+							JSON.parse(p.proof_json) as {
+								kind: "conversation_source";
+								scopeRef: string;
+							},
+					)
+				: [];
+			const scopes = new Set(
+				sources
+					.filter((s) => s.kind === "conversation_source")
+					.map((s) => s.scopeRef),
+			);
+			const selectedProofs = scopes.size
+				? proofs.filter((p) => scopes.has(p.scopeRef))
+				: proofs.slice(-1);
+			if (!sources.some((s) => s.viewId) && !selectedProofs.length) return true;
+			if (
+				!hasReadMetadata(db) ||
+				sources
+					.filter((s) => s.viewId)
+					.some(
+						(s) =>
+							!db
+								.query(
+									"SELECT 1 FROM tool_views v JOIN tool_invocations i ON i.id=v.invocation_id WHERE v.view_id=? AND i.owner_task_id=? AND i.root_run_id=? AND i.cancel_epoch=? AND i.state IN ('succeeded','partial')",
+								)
+								.get(
+									s.viewId!,
+									owner.taskId,
+									owner.rootRunId,
+									owner.cancelEpoch,
+								),
+					)
+			)
+				return false;
+			return (
+				adapter.validateEvidenceInTransaction?.(
+					db,
+					owner,
+					sources,
+					selectedProofs,
+				) ?? false
+			);
+		},
 		summaryInTransaction(db: Database, taskId: string) {
 			return db
 				.query(
@@ -548,6 +523,11 @@ export function createToolRuntime(
 					)
 					.all(taskId) as Array<Invocation & { superseded?: number }>
 			).map((r) => ({
+				id: r.id,
+				arguments: r.args_json
+					? (JSON.parse(r.args_json) as unknown)
+					: undefined,
+				operationFingerprint: r.operation_fingerprint ?? null,
 				toolRevisionId: r.tool_revision_id,
 				stepId: r.step_id,
 				argsDigest: r.args_digest,
@@ -577,7 +557,10 @@ export function createToolRuntime(
 						)
 						.all(cursor, Math.min(100, Math.max(1, limit))) as Invocation[],
 			),
-		inspect: (inv: Invocation) => adapter.get(inv.operation_id),
+		inspect: (inv: Invocation) =>
+			inv.operation_id.startsWith("local:")
+				? (localOperations.get(inv.operation_id) ?? null)
+				: adapter.get(inv.operation_id),
 		getInTransaction: get,
 		purgeMetadataInTransaction(db: Database, rootRunId: string) {
 			db.query(
@@ -588,6 +571,18 @@ export function createToolRuntime(
 			);
 		},
 		deleteDataInTransaction(db: Database, rootRunId: string) {
+			void Promise.resolve()
+				.then(() => {
+					const retained = store.read((db) =>
+						db
+							.query(
+								"SELECT COUNT(*) AS n FROM tool_invocations WHERE root_run_id=? AND (args_json IS NOT NULL OR result_ref IS NOT NULL)",
+							)
+							.get(rootRunId),
+					) as { n: number };
+					if (!retained.n) adapter.releaseRoot?.(rootRunId);
+				})
+				.catch(() => {});
 			db.query(
 				"UPDATE tool_invocations SET args_json=NULL,result_ref=NULL WHERE root_run_id=?",
 			).run(rootRunId);
@@ -595,6 +590,7 @@ export function createToolRuntime(
 		close() {
 			refs.clear();
 			vault.clear();
+			localOperations.clear();
 		},
 		actionsEnabled: () => !!actions,
 		actionContextInTransaction: (db: Database, owner: Owner) =>

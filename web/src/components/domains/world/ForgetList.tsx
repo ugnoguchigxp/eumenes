@@ -1,4 +1,4 @@
-import type { ForgetView } from "../../../../../api/domains/world/contracts";
+import type { ForgetView } from "../../../../../api/domains/world/contracts/view";
 import { forgetLabels } from "../../../domains/world/present";
 
 /**

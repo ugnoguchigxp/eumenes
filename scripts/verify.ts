@@ -1,4 +1,3 @@
-import { dlopen, FFIType } from "bun:ffi";
 import {
 	closeSync,
 	constants,
@@ -11,7 +10,12 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { join, resolve } from "node:path";
-import { checkBoundaries } from "./boundaries";
+import { flock } from "../api/infrastructure/flock";
+import {
+	allSourceFiles,
+	checkBoundaries,
+	unusedDependencies,
+} from "./boundaries";
 import { closure, type Domain, domains, isDomain, ownedPaths } from "./domains";
 
 const args = process.argv.slice(2).filter((x) => x !== "--");
@@ -32,15 +36,12 @@ const selected = all
 const root = resolve(import.meta.dir, "..");
 const reports = join(root, "verification-reports");
 mkdirSync(reports, { recursive: true });
-const libc = dlopen("/usr/lib/libSystem.B.dylib", {
-	flock: { args: [FFIType.i32, FFIType.i32], returns: FFIType.i32 },
-});
 const fd = openSync(
 	join(reports, "verify.lock"),
 	constants.O_CREAT | constants.O_RDWR,
 	0o600,
 );
-if (libc.symbols.flock(fd, 6) !== 0) {
+if (flock(fd, 6) !== 0) {
 	console.error("Another verification is running");
 	closeSync(fd);
 	process.exit(3);
@@ -127,14 +128,42 @@ try {
 			.filter((file) => /\.tsx?$/.test(file))
 			.map((file) => file.slice(root.length + 1)),
 	);
+	if (all) {
+		// Declared-but-unused dependencies need the whole tree to be decidable.
+		errors.push(...unusedDependencies(allSourceFiles()));
+	}
 	if (errors.length) throw new Error(errors.join("\n"));
-	const dependencySet = [...new Set(selected.flatMap((d) => closure(d)))];
+	// Typecheck needs the production closure (api + web); tests add the test-only edges.
+	const dependencySet = [
+		...new Set(
+			selected.flatMap((d) => [...closure(d, "api"), ...closure(d, "web")]),
+		),
+	];
+	const testDependencySet = [
+		...new Set(selected.flatMap((d) => closure(d, "test"))),
+	];
 	console.log(
-		`[verify] selected=${selected.join(",")} dependencyClosure=${dependencySet.join(",")}`,
+		`[verify] selected=${selected.join(",")} dependencyClosure=${dependencySet.join(",")} testClosure=${testDependencySet.join(",")}`,
 	);
 	const checkPaths = all
 		? ["."]
 		: paths.map((path) => path.slice(root.length + 1));
+	await run("size-budget", [
+		process.execPath,
+		"scripts/size-budget.ts",
+		...(all ? [] : checkPaths),
+	]);
+	if (all)
+		await run("sql-boundaries", [
+			process.execPath,
+			"scripts/sql-boundaries.ts",
+		]);
+	if (all)
+		await run("domain-docs", [
+			process.execPath,
+			"scripts/domain-docs.ts",
+			"--check",
+		]);
 	await run("format", [process.execPath, "run", "format:check", ...checkPaths]);
 	await run("lint", [process.execPath, "run", "lint", ...checkPaths]);
 	if (all) await run("typecheck", [process.execPath, "run", "typecheck"]);
@@ -175,8 +204,30 @@ try {
 			"test",
 			"api",
 			"packages/coding-runner/test",
+			"scripts",
 		]);
 		await run("web tests", [process.execPath, "x", "vitest", "run", "web"]);
+		await run("client tests", [
+			process.execPath,
+			"x",
+			"vitest",
+			"run",
+			"client",
+		]);
+		await run("design-system typecheck", [
+			process.execPath,
+			"run",
+			"--cwd",
+			"packages/design-system",
+			"typecheck",
+		]);
+		await run("design-system tests", [
+			process.execPath,
+			"run",
+			"--cwd",
+			"packages/design-system",
+			"test",
+		]);
 		await run("web build", [process.execPath, "run", "build:web"]);
 		await run("browser fixture", [process.execPath, "x", "playwright", "test"]);
 	} else
@@ -192,6 +243,7 @@ try {
 	const report = {
 		selected,
 		dependencySet,
+		testDependencySet,
 		revision: startHash,
 		steps,
 		totalMs: Math.round(performance.now() - started),
@@ -212,6 +264,6 @@ try {
 	console.error(error);
 	process.exitCode = 1;
 } finally {
-	libc.symbols.flock(fd, 8);
+	flock(fd, 8);
 	closeSync(fd);
 }

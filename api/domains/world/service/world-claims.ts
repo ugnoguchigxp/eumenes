@@ -1,5 +1,5 @@
 import type { Database } from "bun:sqlite";
-import { createHash } from "node:crypto";
+import { sha256Hex } from "../../../infrastructure/digest";
 import type { SourceRef } from "eumenes-memory";
 import {
 	buildProjection,
@@ -88,8 +88,7 @@ class Abort extends Error {
 	}
 }
 
-const defaultHasher: CanonicalHasher = (bytes) =>
-	createHash("sha256").update(bytes).digest("hex");
+const defaultHasher: CanonicalHasher = (bytes) => sha256Hex(bytes);
 /** Condition freshness policy of this surface: no observations are supplied. */
 const CONDITION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const FORGET_LIMIT = 50;
@@ -669,7 +668,7 @@ export function createWorldClaims(options: WorldClaimsOptions) {
 			if (!reason) return fail("reason_source_unavailable");
 			const scope = { principal: ctx.principal, scopeKey };
 			const next = body.expectedRevision + 1;
-			const rootId = `ui-root-${createHash("sha256").update(`${reason.id}`).digest("hex").slice(0, 32)}`;
+			const rootId = `ui-root-${sha256Hex(`${reason.id}`).slice(0, 32)}`;
 			const replacement = {
 				id: entry.id,
 				revision: next,

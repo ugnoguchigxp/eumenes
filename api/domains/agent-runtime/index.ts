@@ -6,3 +6,4 @@ export {
 } from "./repository";
 export * from "./contracts";
 export { registerAgentRuntime } from "./controller";
+export { migrations } from "./repository";

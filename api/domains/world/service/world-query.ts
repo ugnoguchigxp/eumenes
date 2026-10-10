@@ -1,5 +1,5 @@
 import type { Database } from "bun:sqlite";
-import { createHash } from "node:crypto";
+import { sha256Hex } from "../../../infrastructure/digest";
 import {
 	buildProjection,
 	checkDependencies,
@@ -56,8 +56,7 @@ export type WorldQueryOptions = {
 	gapTasks?: GapTaskPort;
 };
 
-const defaultHasher: CanonicalHasher = (bytes) =>
-	createHash("sha256").update(bytes).digest("hex");
+const defaultHasher: CanonicalHasher = (bytes) => sha256Hex(bytes);
 
 /**
  * Stable per (principal, scope, Gap): the same Gap is the same key for ever, so
@@ -67,11 +66,9 @@ export function gapTaskKey(
 	scope: { principal: string; scopeKey: string },
 	gapKey: string,
 ): string {
-	return `gap:${createHash("sha256")
-		.update(
-			JSON.stringify(["world-gap/1", scope.principal, scope.scopeKey, gapKey]),
-		)
-		.digest("hex")}`;
+	return `gap:${sha256Hex(
+		JSON.stringify(["world-gap/1", scope.principal, scope.scopeKey, gapKey]),
+	)}`;
 }
 
 /**
@@ -79,7 +76,7 @@ export function gapTaskKey(
  * request id: the same key always yields the same id.
  */
 export function gapTaskRequestId(dedupeKey: string): string {
-	const hex = createHash("sha256").update(dedupeKey).digest("hex");
+	const hex = sha256Hex(dedupeKey);
 	const variant = ((Number.parseInt(hex[16] ?? "0", 16) & 0x3) | 0x8).toString(
 		16,
 	);

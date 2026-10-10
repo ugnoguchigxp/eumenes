@@ -8,7 +8,7 @@ import {
 } from "./contracts";
 import { artifactLibrary } from "./library";
 
-export function checkSource(request: ArtifactRequest, snapshot: Snapshot) {
+function checkSource(request: ArtifactRequest, snapshot: Snapshot) {
 	if (request.source && snapshot[request.source]?.kind !== request.view)
 		throw new Error("この表示では参照できない source です");
 }

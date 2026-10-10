@@ -31,3 +31,4 @@ export {
 	timerReceiptSchema,
 	timerRunReceiptSchema,
 } from "./contracts";
+export { migrations } from "./repository";

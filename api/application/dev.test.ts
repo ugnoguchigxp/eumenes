@@ -90,7 +90,11 @@ function launch(
 	};
 }
 async function get(url: string) {
-	return fetch(url, { signal: AbortSignal.timeout(500) }).catch(() => null);
+	// Stand in for the SPA: the dev proxy only authorizes same-origin browser requests.
+	return fetch(url, {
+		headers: { "sec-fetch-site": "same-origin" },
+		signal: AbortSignal.timeout(500),
+	}).catch(() => null);
 }
 
 test.each(["127.0.0.1", "localhost"])(

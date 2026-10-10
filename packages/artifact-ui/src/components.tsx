@@ -21,6 +21,7 @@ import type {
 	QuestionResource,
 	SettingsResource,
 } from "./contracts";
+import { imageDownloadName, isSafeImageUrl } from "./contracts";
 import { useArtifactRuntime } from "./runtime";
 
 function useAction(request: ArtifactRequest) {
@@ -136,7 +137,13 @@ export function ComponentsView({ request }: { request: ArtifactRequest }) {
 }
 export function ImageFrame({ request }: { request: ArtifactRequest }) {
 	const { snapshot } = useArtifactRuntime();
-	const image = snapshot[request.source!] as ImageResource;
+	const resource = snapshot[request.source!] as ImageResource;
+	// A URL outside the allowed schemes is treated as no image at all.
+	const image: ImageResource = {
+		...resource,
+		url:
+			resource.url && isSafeImageUrl(resource.url) ? resource.url : undefined,
+	};
 	const [open, setOpen] = useState(false);
 	const [brokenUrl, setBrokenUrl] = useState<string>();
 	const ready =
@@ -188,7 +195,7 @@ export function ImageFrame({ request }: { request: ArtifactRequest }) {
 					<a
 						className="aui-download"
 						href={image.url}
-						download="generated-image.svg"
+						download={imageDownloadName(image)}
 					>
 						画像をダウンロード
 					</a>

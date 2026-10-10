@@ -28,6 +28,9 @@ const messages: Record<string, string> = {
 	audio_invalid_wav: "音声データを読み取れませんでした。",
 	asr_language_not_allowed: "設定で許可されていない言語です。",
 	larm_unconfigured: "LARMが設定されていません。",
+	larm_base_url_unconfigured: "LARMの接続先URLが設定されていません。",
+	larm_provider_host_mismatch:
+		"LARMが示した接続先が許可されていないため中止しました。",
 	permission_revoked: "接続の権限が取り消されました。",
 	timeout: "応答がタイムアウトしました。",
 	replay_failed: "読み上げに失敗しました。",
@@ -60,25 +63,43 @@ const connectionStates: Record<string, string> = {
 	idle: "待機中",
 };
 
+const domExceptionMessages: Record<string, string> = {
+	NotAllowedError:
+		"マイクの使用が許可されていません。ブラウザの設定を確認してください。",
+	NotFoundError: "マイクが見つかりません。",
+	NotReadableError: "マイクを他のアプリが使用中です。",
+	OverconstrainedError: "選択したマイクが使えません。",
+	AbortError: "操作が中断されました。",
+};
+
+const SNAKE_CASE_CODE = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$/;
+/** Only machine codes are shown; English exception text never reaches the UI. */
+const unknownError = (text: string) =>
+	SNAKE_CASE_CODE.test(text)
+		? `エラーが発生しました(コード: ${text})`
+		: "エラーが発生しました。";
+
 const code = (value: string) => value.replace(/^(?:\w*Error:\s*)/, "").trim();
 
 /** Maps any thrown value to a Japanese sentence; raw codes never reach the UI alone. */
 export function describeError(e: unknown): string {
+	if (e instanceof Error || e instanceof DOMException) {
+		const byName = domExceptionMessages[e.name];
+		if (byName && !(e instanceof ApiError)) return byName;
+	}
 	if (e instanceof ApiConnectionError) return messages.api_connection_failed!;
 	if (e instanceof ApiError) {
 		const known = messages[e.message];
 		if (known) return known;
 		if (e.status === 401 || e.status === 403) return messages.unauthorized!;
 		if (e.status === 413) return messages.payload_too_large!;
-		return `エラーが発生しました(${e.message || e.status})`;
+		return unknownError(e.message);
 	}
 	const raw = e instanceof Error ? e.message : typeof e === "string" ? e : "";
 	const text = code(raw);
 	const known = messages[text];
 	if (known) return known;
-	return text
-		? `エラーが発生しました(${text.slice(0, 80)})`
-		: "エラーが発生しました。";
+	return unknownError(text);
 }
 
 export const describeTurnStatus = (status: string) =>
