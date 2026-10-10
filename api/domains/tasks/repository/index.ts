@@ -348,3 +348,25 @@ export const migrations: readonly Migration[] = [
 		sql: retentionMigration,
 	},
 ];
+
+export function conversation(db: Database, id: string, limit: number) {
+	return (
+		db
+			.query(
+				"SELECT seq,data_json FROM work_tasks WHERE conversation_id=? ORDER BY seq DESC LIMIT ?",
+			)
+			.all(id, Math.min(50, Math.max(1, limit))) as TaskRow[]
+	).map((r) => task(r)!);
+}
+
+/** Terminal state does not discard a retained orchestration request's owner binding. */
+export function hasConnectionHistory(
+	db: Database,
+	connectionRef: string,
+): boolean {
+	return !!db
+		.query(
+			"SELECT 1 FROM work_tasks WHERE body_expired=0 AND json_extract(data_json,'$.kind')='orchestration' AND json_extract(data_json,'$.grant.connectionRef')=? LIMIT 1",
+		)
+		.get(connectionRef);
+}

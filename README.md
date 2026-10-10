@@ -34,7 +34,7 @@ bun cli/index.ts web clear --json
 
 `send` は標準入力も読めます。応答が不明な送信には、表示された request ID を `--request-id <UUID>` に指定して同じ要求を照会・再試行できます。`--json` の結果は stdout、診断は stderr です。終了コードは成功 `0`、引数・認証 `2`、処理失敗 `3`、取消・待機結果不明 `4`、接続不能 `5` です。
 
-Web 取得の詳細は [docs/web-research.md](docs/web-research.md)、会話からの調査は [docs/toolchain.md](docs/toolchain.md)、取得先と手順の学習は [docs/research-routes.md](docs/research-routes.md) を参照してください。
+Web 取得の詳細は [docs/web-research.md](docs/web-research.md)、会話からの調査は [docs/toolchain.md](docs/toolchain.md)、取得先と手順の学習は [docs/research-routes.md](docs/research-routes.md)、Codex／dots への作業委任は [docs/dots.md](docs/dots.md) を参照してください。
 
 ## 検証
 

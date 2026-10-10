@@ -84,16 +84,60 @@ export const taskGrantSchema = z
 	);
 export type TaskGrant = z.infer<typeof taskGrantSchema>;
 
-export const createTaskSchema = z.strictObject({
+const createTaskFields = {
 	requestId: z.uuid(),
-	kind: z.literal("coding"),
 	version: z.literal(1),
 	title: z.string().trim().min(1).max(120),
 	request: bytes(32 * 1024),
 	completionConditions: z.array(bytes(1024)).min(1).max(20),
 	startMode: z.enum(["register_only", "start"]),
+};
+export const orchestrationGrantSchema = z.strictObject({
+	connectionRef: identifier,
+	projectRef: identifier,
+	sessionRefs: z.array(identifier).max(20).default([]),
+	maxSessions: z.number().int().min(1).max(20).default(1),
+	operations: z
+		.array(
+			z.enum([
+				"read",
+				"create_session",
+				"continue_session",
+				"edit",
+				"check",
+				"commit",
+				"push",
+				"publish",
+				"send",
+			]),
+		)
+		.min(1)
+		.max(9)
+		.refine((v) => new Set(v).size === v.length),
+	expiresAt: z.iso.datetime({ offset: true }),
+	maxRuntimeMs: z.number().int().min(60_000).max(7_200_000).default(7_200_000),
+	progressIntervalMs: z
+		.number()
+		.int()
+		.min(60_000)
+		.max(3_600_000)
+		.default(300_000),
+});
+export const codingCreateTaskSchema = z.strictObject({
+	...createTaskFields,
+	kind: z.literal("coding"),
 	grant: taskGrantSchema,
 });
+export const orchestrationCreateTaskSchema = z.strictObject({
+	...createTaskFields,
+	kind: z.literal("orchestration"),
+	grant: orchestrationGrantSchema,
+});
+export const createTaskSchema = z.discriminatedUnion("kind", [
+	codingCreateTaskSchema,
+	orchestrationCreateTaskSchema,
+]);
+export type OrchestrationGrant = z.infer<typeof orchestrationGrantSchema>;
 export type CreateTask = z.input<typeof createTaskSchema>;
 export type TaskGrantInput = z.input<typeof taskGrantSchema>;
 export const taskCommandSchema = z.strictObject({
@@ -101,7 +145,7 @@ export const taskCommandSchema = z.strictObject({
 	expectedRevision: z.number().int().min(0),
 });
 export const amendTaskSchema = taskCommandSchema.extend({
-	grant: taskGrantSchema,
+	grant: z.union([taskGrantSchema, orchestrationGrantSchema]),
 });
 export const stopTaskSchema = taskCommandSchema.extend({
 	intent: z.enum(["pause", "cancel"]),
@@ -135,9 +179,8 @@ export const taskResultSchema = z.strictObject({
 	conditionsMet: z.array(z.boolean()).max(20),
 });
 export type TaskResult = z.infer<typeof taskResultSchema>;
-export const workTaskSchema = z.object({
+const workTaskFields = {
 	id: z.string(),
-	kind: z.literal("coding"),
 	version: z.literal(1),
 	title: z.string(),
 	request: z.string().nullable(),
@@ -149,7 +192,6 @@ export const workTaskSchema = z.object({
 	authorityEpoch: z.number().int(),
 	executionGeneration: z.number().int(),
 	eventSeq: z.number().int(),
-	grant: taskGrantSchema,
 	stopIntent: z.enum(["pause", "cancel"]).nullable(),
 	result: taskResultSchema.nullable(),
 	bodyExpired: z.boolean(),
@@ -159,7 +201,23 @@ export const workTaskSchema = z.object({
 	createdAt: z.string(),
 	updatedAt: z.string(),
 	finishedAt: z.string().nullable(),
+};
+export const codingWorkTaskSchema = z.object({
+	...workTaskFields,
+	kind: z.literal("coding"),
+	grant: taskGrantSchema,
 });
+export const orchestrationWorkTaskSchema = z.object({
+	...workTaskFields,
+	kind: z.literal("orchestration"),
+	grant: orchestrationGrantSchema,
+});
+export const workTaskSchema = z.discriminatedUnion("kind", [
+	codingWorkTaskSchema,
+	orchestrationWorkTaskSchema,
+]);
+export type CodingWorkTask = z.infer<typeof codingWorkTaskSchema>;
+export type OrchestrationWorkTask = z.infer<typeof orchestrationWorkTaskSchema>;
 export type WorkTask = z.infer<typeof workTaskSchema>;
 export const taskQuestionInputSchema = z
 	.strictObject({

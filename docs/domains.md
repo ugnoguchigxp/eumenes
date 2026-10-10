@@ -7,6 +7,7 @@
 <!-- domains:start -->
 | Domain | Backend 入口 | Web 入口 | Components | 依存 (api) | 依存 (web) | 依存 (試験のみ) |
 | --- | --- | --- | --- | --- | --- | --- |
+| `dots` | `api/domains/dots/index.ts` | `web/src/domains/dots/index.tsx` | なし | `queue` | `tasks` | なし |
 | `task-reports` | `api/domains/task-reports/index.ts` | なし | なし | `tasks` | なし | なし |
 | `coding-supervision` | `api/domains/coding-supervision/index.ts` | なし | なし | `coding`、`inference`、`queue`、`task-reports`、`tasks` | なし | なし |
 | `coding` | `api/domains/coding/index.ts` | なし | なし | なし | なし | なし |
@@ -21,7 +22,7 @@
 | `service-tests` | `api/domains/service-tests/index.ts` | `web/src/domains/service-tests/index.tsx` | なし | `inference`、`larm`、`settings` | なし | なし |
 | `delivery` | `api/domains/delivery/index.ts` | なし | なし | なし | なし | なし |
 | `avatar` | なし | `web/src/domains/avatar/index.ts` | なし | なし | `delivery` | なし |
-| `settings` | `api/domains/settings/index.ts` | `web/src/domains/settings/index.tsx` | なし | なし | `tts-dictionary` | なし |
+| `settings` | `api/domains/settings/index.ts` | `web/src/domains/settings/index.tsx` | なし | なし | `tts-dictionary`、`dots` | なし |
 | `inference` | `api/domains/inference/index.ts` | なし | なし | `attitude-dataset`、`delivery`、`larm`、`settings` | なし | なし |
 | `tts-dictionary` | `api/domains/tts-dictionary/index.ts` | `web/src/domains/tts-dictionary/index.tsx` | なし | なし | なし | なし |
 | `conversation` | `api/domains/conversation/index.ts` | `web/src/domains/conversation/index.ts` | `web/src/components/domains/conversation/index.ts` | `delivery` | `avatar`、`delivery` | なし |

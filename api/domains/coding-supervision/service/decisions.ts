@@ -58,6 +58,7 @@ export function createDecisions(
 		repair = 0,
 		deadline?: number,
 	) {
+		if (t.kind !== "coding") throw new Error("invalid_coding_task");
 		if (s.decisionsUsed >= t.grant.maxDecisions) {
 			escalate(
 				db,

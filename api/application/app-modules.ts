@@ -63,6 +63,7 @@ export type AppModule = { mount(app: Hono): void };
 
 /** The services a production or test composition may route to. Only the core five are mandatory. */
 export type AppServices = {
+	dotsModule?: AppModule;
 	capabilities?: Capabilities;
 	agents?: AgentRuntime;
 	attitudeDataset?: AttitudeDataset;
@@ -104,6 +105,7 @@ export function appModules(services: AppServices): AppModule[] {
 					s.changes!.open(c.req.raw.signal, c.req.header("last-event-id")),
 				),
 		},
+		s.dotsModule,
 		s.capabilities && {
 			mount: (app) => registerCapabilities(app, s.capabilities!),
 		},

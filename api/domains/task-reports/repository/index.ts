@@ -80,3 +80,18 @@ export function purge(db: Database, taskId: string) {
 export const migrations: readonly Migration[] = [
 	{ id: "task-reports/0001-init", sql: migration },
 ];
+
+export function pending(db: Database, limit = 50): TaskReport[] {
+	return (
+		db
+			.query(
+				"SELECT r.data_json FROM task_report_outbox o JOIN task_reports r ON r.id=o.report_id WHERE o.state='pending' AND json_extract(r.data_json,'$.originConversationId') IS NOT NULL ORDER BY r.rowid LIMIT ?",
+			)
+			.all(limit) as { data_json: string }[]
+	).map((r) => JSON.parse(r.data_json));
+}
+export function delivered(db: Database, id: string) {
+	db.query(
+		"UPDATE task_report_outbox SET state='delivered' WHERE report_id=? AND state='pending'",
+	).run(id);
+}

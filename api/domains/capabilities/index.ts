@@ -8,3 +8,5 @@ export {
 	validateRequirementSchema,
 	requirementValueMatches,
 } from "./service/requirement-schema";
+
+export { coordinatorSkill } from "./builtin/dots";

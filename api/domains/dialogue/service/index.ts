@@ -43,6 +43,7 @@ export function createDialogueService({
 	memory,
 	agents,
 	postAnswer,
+	delegation,
 	worldContext,
 }: {
 	store: SqliteStore;
@@ -54,6 +55,7 @@ export function createDialogueService({
 	memory?: MemoryService;
 	agents?: AgentRuntime;
 	postAnswer?: PostAnswerObserverPort;
+	delegation?: import("../contracts/delegation").DelegationPort;
 	worldContext?: WorldContextPort;
 }) {
 	const deps: DialogueDeps = {
@@ -66,6 +68,7 @@ export function createDialogueService({
 		memory,
 		agents,
 		postAnswer,
+		delegation,
 		worldContext,
 	};
 	const progress = createProgress(deps);

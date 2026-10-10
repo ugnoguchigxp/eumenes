@@ -3,9 +3,8 @@ import type { AnswerTicket } from "../../agent-runtime";
 import { getLogger, withLogContext } from "../../../infrastructure/logger";
 import type { Receipt } from "../../inference";
 import type { HandlerDefinition, Tx } from "../../queue";
-import { operationRejection } from "./operation-authority";
+import { settleConversationOperation } from "./generation-operation";
 import type { ConversationOperation } from "./conversation-tools";
-import { delegateConversation } from "./delegate-conversation";
 import { generateConversation } from "./conversation-generation";
 import { researchCitations } from "./research-citations";
 import { type Run, type WorldContextSettleInput } from "../contracts";
@@ -189,7 +188,7 @@ export function createGenerationHandler(
 					let { text } = generated;
 					const { receipt } = generated;
 					if (generated.operation) {
-						if (!agents || input.agent)
+						if ((!agents && !deps.delegation) || input.agent)
 							throw new Error("invalid_conversation_operation");
 						partials.delete(input.runId);
 						return generated;
@@ -225,61 +224,19 @@ export function createGenerationHandler(
 						worldContext?.releaseInTransaction(tx, run.id, run.conversationId);
 					return "stale";
 				}
-				if (outcome.result.operation && agents) {
-					const rejected = operationRejection(tx, {
-						inference: larm,
-						receipt: outcome.result.receipt,
-						memory,
-						memoryView: input.memory,
-						world: worldContext,
-						worldView: input.world,
-						settle: {
-							runId: run.id,
-							conversationId: run.conversationId,
-							jobId: claim.jobId,
-							attempt: claim.attempt,
-							generation: claim.generation,
-							inference: outcome.result.receipt
-								? {
-										requestId: outcome.result.receipt.requestId,
-										attemptId: outcome.result.receipt.attemptId,
-									}
-								: null,
-							nowMs: Date.parse(clock()),
-						},
-					});
-					if (rejected) {
-						if (input.world)
-							worldContext?.releaseInTransaction(
-								tx,
-								run.id,
-								run.conversationId,
-							);
-						transition(tx, run.id, run.revision, "failed", clock(), rejected);
-						return { status: "failed", errorCode: rejected };
-					}
-					// The initial receipt stays pending; the final answer is a later attempt
-					// on the same policy request. No control text is adopted or collected.
-					if (input.world)
-						worldContext?.releaseInTransaction(tx, run.id, run.conversationId);
-					delegateConversation(
+				if (outcome.result.operation && (agents || deps.delegation))
+					return settleConversationOperation(
+						deps,
+						partials,
 						tx,
-						agents,
-						conversation,
+						claim,
 						run,
-						outcome.result.operation,
+						input,
 						{
-							parentJobId: claim.jobId,
-							authorizedUrls: input.authorizedUrls,
-							actionSnapshot: input.actionSnapshot,
-							timerCapability: input.timerCapability,
-							requirementCatalog: input.requirementCatalog,
+							operation: outcome.result.operation,
+							receipt: outcome.result.receipt,
 						},
 					);
-					transition(tx, run.id, run.revision, "queued", clock());
-					partials.delete(run.id);
-					return "applied";
-				}
 				if (
 					input.agent &&
 					agents &&

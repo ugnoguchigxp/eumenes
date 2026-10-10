@@ -32,10 +32,21 @@ export function createTaskGrants(
 				revision(t, parsed.data.expectedRevision);
 				if (terminal(t.state) || ["stopping", "reconciling"].includes(t.state))
 					throw new Error("task_state_conflict");
+				if ((t.kind === "coding") !== "workspaceId" in parsed.data.grant)
+					throw new Error("invalid_task_input");
+				if (
+					t.kind === "orchestration" &&
+					"connectionRef" in parsed.data.grant &&
+					(t.grant.connectionRef !== parsed.data.grant.connectionRef ||
+						t.grant.projectRef !== parsed.data.grant.projectRef)
+				)
+					throw new Error("invalid_task_input");
 				const previous = structuredClone(t);
 				const before = t.grant,
 					after = parsed.data.grant;
 				restriction =
+					"workspaceId" in before &&
+					"workspaceId" in after &&
 					after.workspaceId === before.workspaceId &&
 					after.branch === before.branch &&
 					after.remote === before.remote &&
@@ -57,7 +68,10 @@ export function createTaskGrants(
 						deadline + parsed.data.grant.maxRuntimeMs - t.grant.maxRuntimeMs,
 					);
 				}
-				t.grant = parsed.data.grant;
+				if (t.kind === "coding" && "workspaceId" in after) t.grant = after;
+				else if (t.kind === "orchestration" && "connectionRef" in after)
+					t.grant = after;
+				else throw new Error("invalid_task_input");
 				if (Date.parse(t.grant.expiresAt) <= now())
 					throw new Error("task_grant_expired");
 				const budgetExpired =

@@ -11,19 +11,22 @@ export function createCodingTaskExecution(input: {
 	available: boolean;
 }) {
 	const { store, coding } = input;
-	const authority = (t: WorkTask): CodingAuthority => ({
-		taskId: t.id,
-		generation: t.executionGeneration,
-		authorityEpoch: t.authorityEpoch,
-		workspaceId: t.grant.workspaceId,
-		branch: t.grant.branch,
-		operations: t.grant.operations,
-		network: t.grant.network,
-		deadlineAt: Math.min(
-			Date.parse(t.grant.expiresAt),
-			Date.parse(t.executionDeadlineAt ?? t.grant.expiresAt),
-		),
-	});
+	const authority = (t: WorkTask): CodingAuthority => {
+		if (t.kind !== "coding") throw new Error("invalid_coding_task");
+		return {
+			taskId: t.id,
+			generation: t.executionGeneration,
+			authorityEpoch: t.authorityEpoch,
+			workspaceId: t.grant.workspaceId,
+			branch: t.grant.branch,
+			operations: t.grant.operations,
+			network: t.grant.network,
+			deadlineAt: Math.min(
+				Date.parse(t.grant.expiresAt),
+				Date.parse(t.executionDeadlineAt ?? t.grant.expiresAt),
+			),
+		};
+	};
 	const fence = (t: WorkTask) => ({
 		taskId: t.id,
 		expectedRevision: t.revision,

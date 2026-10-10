@@ -92,6 +92,14 @@ export function createTasks(store: SqliteStore, options: TasksOptions = {}) {
 			store.write((tx) => forgetInTransaction(tx, taskId, input)),
 		...createTaskQueries(store, core),
 		liveInTransaction: repo.live,
+		hasConnectionHistoryInTransaction: repo.hasConnectionHistory,
+		conversationInTransaction(
+			db: Database,
+			conversationId: string,
+			limit = 50,
+		) {
+			return repo.conversation(db, conversationId, limit);
+		},
 		runtimeInTransaction: repo.runtime,
 		setRuntimeInTransaction(
 			tx: Database,

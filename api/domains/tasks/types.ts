@@ -3,7 +3,7 @@ import type { WorkTask, TaskOrigin } from "./contracts";
 
 /** Only trusted application wiring provides origins and transaction callbacks. */
 export interface TaskKindDefinition {
-	kind: "coding";
+	kind: WorkTask["kind"];
 	version: 1;
 	available(): boolean;
 	startInTransaction(tx: Database, task: WorkTask): void;

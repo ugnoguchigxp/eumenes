@@ -1,3 +1,5 @@
+import { seedBuiltins } from "./builtin-seed";
+import { createDotsPackages } from "./dots-packages";
 import { registerRevision } from "./registry";
 import { zSchema } from "./schema";
 import { createRequirements } from "./requirements";
@@ -18,9 +20,6 @@ import {
 	commonProfileRevisionId,
 } from "../contracts";
 import { get } from "../repository";
-import { builtins } from "../builtin/web-research";
-import { historyBuiltins } from "../builtin/history";
-import { timerBuiltins } from "../builtin/timers";
 const learnedColumns = new WeakMap<Database, boolean>();
 /** The learned-attributes migration is appended; older fixtures may lack it. */
 function hasLearned(db: Database) {
@@ -34,12 +33,6 @@ function hasLearned(db: Database) {
 		learnedColumns.set(db, v);
 	}
 	return v;
-}
-function isSupersededBuiltin(d: (typeof builtins)[number]) {
-	return builtins.some(
-		(next) =>
-			next.kind === d.kind && next.id === d.id && next.revision > d.revision,
-	);
 }
 export function createCapabilities(
 	store: SqliteStore,
@@ -376,6 +369,7 @@ export function createCapabilities(
 	}
 	return {
 		...createRequirements(store, register),
+		...createDotsPackages(store, register),
 		getDefinitionInTransaction,
 		registerBuiltinInTransaction,
 		registerLearnedInTransaction,
@@ -386,26 +380,9 @@ export function createCapabilities(
 		searchInTransaction: search,
 		prepareInTransaction: prepare,
 		seed: () =>
-			store.write((db) => {
-				for (const d of builtins) {
-					if (d.backend && !backends.has(d.backend)) continue;
-					// Keep the exact archived definition from this installation. Only
-					// the newest revision is authoritative for the current seed.
-					const superseded = isSupersededBuiltin(d);
-					if (
-						superseded &&
-						db
-							.query("SELECT 1 FROM capability_revisions WHERE id=?")
-							.get(`${d.kind}:${d.id}@${d.revision}`)
-					)
-						continue;
-					registerBuiltinInTransaction(db, d);
-				}
-				if (backends.has("history"))
-					for (const d of historyBuiltins) registerBuiltinInTransaction(db, d);
-				if (backends.has("timer"))
-					for (const d of timerBuiltins) registerBuiltinInTransaction(db, d);
-			}),
+			store.write((db) =>
+				seedBuiltins(db, backends, registerBuiltinInTransaction),
+			),
 		list(cursor = "", limit = 50) {
 			return store.read((db) => {
 				const rows = db

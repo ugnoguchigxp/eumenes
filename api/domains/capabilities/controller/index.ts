@@ -1,3 +1,4 @@
+import { dotsPackageInput } from "../contracts/dots";
 import { z } from "zod";
 import { bodyLimit } from "hono/body-limit";
 import { parseJsonBody } from "../../../infrastructure/http";
@@ -5,6 +6,23 @@ import { requirementProfileData } from "../contracts";
 import type { Hono } from "hono";
 import type { Capabilities } from "../service";
 export function registerCapabilities(app: Hono, service: Capabilities) {
+	app.get("/api/capabilities/dots-packages", (c) =>
+		c.json(service.listDotsPackages()),
+	);
+	app.use(
+		"/api/capabilities/dots-packages",
+		bodyLimit({
+			maxSize: 32768,
+			onError: (c) => c.json({ error: "payload_too_large" }, 413),
+		}),
+	);
+	app.put("/api/capabilities/dots-packages", async (c) => {
+		const b = await parseJsonBody(c, dotsPackageInput, {
+			code: "invalid_capability",
+		});
+		return b.ok ? c.json(await service.putDotsPackage(b.data)) : b.response;
+	});
+
 	app.use(
 		"/api/capabilities/requirements/*",
 		bodyLimit({

@@ -1,6 +1,7 @@
 import type { Database } from "bun:sqlite";
 import {
 	createTaskSchema,
+	workTaskSchema,
 	stopTaskSchema,
 	taskCommandSchema,
 	taskOriginSchema,
@@ -37,7 +38,7 @@ export function createTaskLifecycle(core: TaskCore) {
 		t.executionDeadlineAt ??= iso(now() + t.grant.maxRuntimeMs);
 		t.state = "queued";
 		t.stopIntent = null;
-		t.phase ??= "preparing";
+		if (t.kind === "coding") t.phase ??= "preparing";
 		record(tx, t, "start_requested");
 		syncHook(kind.startInTransaction(tx, t));
 		return t;
@@ -77,7 +78,7 @@ export function createTaskLifecycle(core: TaskCore) {
 				)
 					throw new Error("task_capacity");
 				const at = iso(now());
-				const t: WorkTask = {
+				const t = workTaskSchema.parse({
 					id: id(),
 					kind: data.kind,
 					version: data.version,
@@ -101,7 +102,7 @@ export function createTaskLifecycle(core: TaskCore) {
 					createdAt: at,
 					updatedAt: at,
 					finishedAt: null,
-				};
+				});
 				currentGrant(t);
 				repo.insert(tx, t, key);
 				repo.grant(tx, t, origin.data);

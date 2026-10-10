@@ -1,3 +1,4 @@
+import { dotsClient } from "./dots";
 import { requirementsClient } from "./requirements";
 import { codingSupervisionClient } from "./coding-supervision";
 import { agentRuntimeClient } from "./agent-runtime";
@@ -26,6 +27,7 @@ export function createClient(baseUrl: string, token?: string) {
 	const transport = createTransport(baseUrl, token);
 	return {
 		...requirementsClient(transport),
+		...dotsClient(transport),
 		...attitudeDatasetClient(transport),
 		...eventsClient(transport),
 		...conversationClient(transport),

@@ -5,7 +5,7 @@
 		"api/domains/world/service/world-claims.ts": 837
 	},
 	"functions": {
-		"api/application/delegated-tasks.ts#createDelegatedTasks": 398,
+		"api/application/delegated-tasks.ts#createDelegatedTasks": 400,
 		"api/application/world.ts#createWorldAssembly": 326,
 		"api/domains/attitude-dataset/service/index.ts#createAttitudeDataset": 623,
 		"api/domains/capabilities/service/index.ts#createCapabilities": 410,

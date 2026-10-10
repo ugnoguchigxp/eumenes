@@ -92,6 +92,7 @@ export const historyRead = z
 	.strict()
 	.refine((v) => v.before + v.after < 10);
 export const validators = {
+	dotsDelegation: z.strictObject({}),
 	find: savedFindInput,
 	readSaved: savedReadInput,
 	history: historyInput,
@@ -163,3 +164,5 @@ export const hash = (v: unknown) =>
 
 export * from "./requirements";
 export * from "./runtime-meta";
+
+export { dotsPackageInput } from "./dots";

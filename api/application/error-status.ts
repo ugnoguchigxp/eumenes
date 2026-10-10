@@ -4,6 +4,7 @@ import { errorStatus as coding } from "../domains/coding/contracts";
 import { errorStatus as larm } from "../domains/larm/contracts";
 import { errorStatus as scheduler } from "../domains/scheduler/contracts";
 import { errorStatus as taskReports } from "../domains/task-reports/contracts";
+import { errorStatus as dots } from "../domains/dots/contracts";
 import { errorStatus as tasks } from "../domains/tasks/contracts";
 import { errorStatus as timers } from "../domains/timers/contracts";
 import { errorStatus as voiceDialogue } from "../domains/voice-dialogue/contracts";
@@ -64,6 +65,7 @@ export function mergeErrorStatus(
 
 const statusByCode = mergeErrorStatus(
 	capabilities,
+	dots,
 	shared,
 	pending,
 	coding,

@@ -80,6 +80,7 @@ test("the shutdown order is fixed, and a freshly built set of services closes cl
 		"coding",
 		"timer_maintenance",
 		"store_retention",
+		"task_report_delivery",
 		"task_maintenance",
 		"world",
 		"world_foreground",

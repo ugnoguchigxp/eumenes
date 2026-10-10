@@ -16,6 +16,7 @@ import { migrations as schedulerMigrations } from "../domains/scheduler";
 import { migrations as serviceTestsMigrations } from "../domains/service-tests";
 import { migrations as settingsMigrations } from "../domains/settings";
 import { migrations as taskReportsMigrations } from "../domains/task-reports";
+import { migrations as dotsMigrations } from "../domains/dots";
 import { migrations as tasksMigrations } from "../domains/tasks";
 import { migrations as timersMigrations } from "../domains/timers";
 import { migrations as toolRuntimeMigrations } from "../domains/tool-runtime";
@@ -145,6 +146,7 @@ const catalog: readonly Migration[] = [
 	...agentRuntimeMigrations,
 	...goalsMigrations,
 	...tasksMigrations,
+	...dotsMigrations,
 	...researchRoutesMigrations,
 	...packageMigrations("world-package", worldPackageSql),
 	...worldMigrations,

@@ -1,3 +1,8 @@
+import { createTaskReportDelivery } from "./task-report-delivery";
+import { createDotsDialogue } from "./dots-dialogue";
+import { createDotsTasks } from "./dots-tasks";
+import { registerDots } from "./dots-http";
+import { createEvents, createSecretBox } from "../domains/dots";
 import type { Database } from "bun:sqlite";
 import { createCodingSupervision } from "../domains/coding-supervision";
 import { codingObservationReader } from "./coding-observation";
@@ -133,6 +138,18 @@ export async function buildServices(config: Config) {
 		store,
 		tasks: () => delegated.tasks,
 	});
+	const dotsSecretBox = createSecretBox(
+		config.env.EUMENES_KEY_DIR ?? join(dirname(dbPath), "keys"),
+	);
+	const dotsEvents = createEvents({ store, queue, ...dotsSecretBox });
+	const dots = createDotsTasks({
+		store,
+		conversation,
+		tasks: () => delegated.tasks,
+		reports: taskReports,
+		capabilities: () => toolchain.capabilities,
+		commandPrepared: dotsEvents.enqueueInTransaction,
+	});
 	const workflow = codingComposition
 		? unavailableCodingWorkflow(store, codingComposition.coding)
 		: undefined;
@@ -153,10 +170,21 @@ export async function buildServices(config: Config) {
 		scheduler,
 		enabled: config.delegatedTasksEnabled,
 		execution: supervisedExecution,
-		changedInTransaction: (db, t) =>
-			supervision?.taskChangedInTransaction(db, t),
-		purgeInTransaction: purgeTaskDependents(taskReports),
+		additionalKinds: [dots.kind],
+		changedInTransaction: (db, t) => {
+			if (t.kind === "coding") supervision?.taskChangedInTransaction(db, t);
+			else dots.redactInTransaction(db, t);
+		},
+		purgeInTransaction: (db, t) => {
+			purgeTaskDependents(taskReports)(db, t);
+			dots.purgeInTransaction(db, t.id);
+		},
 	});
+	const deliverTaskReports = createTaskReportDelivery(
+		taskReports,
+		delegated.tasks,
+		conversation,
+	);
 	const supervision = workflow
 		? createCodingSupervision({
 				store,
@@ -222,6 +250,7 @@ export async function buildServices(config: Config) {
 			timers,
 			conversation,
 			history: config.historyToolsEnabled,
+			dots: true,
 			webResearch: config.webResearchToolsEnabled,
 		},
 	);
@@ -234,6 +263,12 @@ export async function buildServices(config: Config) {
 		memory,
 		agents: enabled ? toolchain.agents : undefined,
 		postAnswer: enabled ? toolchain.postAnswer : undefined,
+		delegation: createDotsDialogue({
+			store,
+			tasks: delegated.tasks,
+			conversation,
+			capabilities: toolchain.capabilities,
+		}),
 		...(world ? { worldContext: world.context } : {}),
 	});
 	const voice = createVoiceDialogue(store, dialogue, inference);
@@ -265,6 +300,9 @@ export async function buildServices(config: Config) {
 		codingExecution,
 		taskReports,
 		delegated,
+		dots,
+		dotsEvents,
+		deliverTaskReports,
 		supervision,
 		continuity,
 		memory,
@@ -279,7 +317,7 @@ export async function buildServices(config: Config) {
 }
 export type Services = Awaited<ReturnType<typeof buildServices>>;
 
-function appServices(s: Services) {
+export function appServices(s: Services) {
 	return {
 		capabilities: s.toolchain.capabilities,
 		agents: s.toolchain.agents,
@@ -302,6 +340,10 @@ function appServices(s: Services) {
 		coding: s.codingComposition?.coding,
 		codingSupervision: s.supervision,
 		taskReports: s.taskReports,
+		dotsModule: {
+			mount: (app: import("hono").Hono) =>
+				registerDots(app, s.dots, s.dotsEvents, s.delegated.tasks),
+		},
 		researchRoutes: s.researchRoutes,
 		timers: s.timers,
 		// With World OFF nothing is assembled and the routes do not exist.
@@ -348,8 +390,29 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 				{ exclusive: false },
 			)
 		: undefined;
+	const reportDelivery = intervalLifecycle("task_report_delivery", 1000, () =>
+		s.store.write(s.deliverTaskReports),
+	);
 	const taskMaintenance = intervalLifecycle("task_maintenance", 60_000, () =>
 		Promise.allSettled([
+			s.dots
+				.maintenance()
+				.catch((error) =>
+					log.warn(
+						"dots.maintenance_failed",
+						{ reason: "maintenance_failed" },
+						error,
+					),
+				),
+			s.dotsEvents
+				.maintenance()
+				.catch((error) =>
+					log.warn(
+						"dots.events_maintenance_failed",
+						{ reason: "maintenance_failed" },
+						error,
+					),
+				),
 			s.supervision
 				?.maintenance()
 				.catch((error) =>
@@ -432,6 +495,11 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		{ name: "web_research_recovery", recover: () => s.webResearch.recover() },
 		{ name: "queue_recovery", recover: () => s.queue.recover() },
 		{ name: "delegated_recovery", recover: () => s.delegated.recover() },
+		{ name: "dots_recovery", recover: () => s.dots.recover() },
+		{
+			name: "task_report_recovery",
+			recover: () => s.store.write(s.deliverTaskReports),
+		},
 		{
 			name: "coding_recovery",
 			recover: async () => {
@@ -465,6 +533,10 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 			: []),
 		{ name: "agents_start", start: () => s.toolchain.agents.start() },
 		{ name: "queue_start", start: () => s.queue.start() },
+		{
+			name: "task_report_delivery_start",
+			start: () => reportDelivery.start?.(),
+		},
 		{ name: "world_start", start: () => s.world?.start() },
 		{ name: "web_research_start", start: () => s.webResearch.start() },
 		{ name: "scheduler_start", start: () => s.scheduler.start() },
@@ -497,6 +569,7 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		// World consumers stop before anything closes the store.
 		{ name: "world", close: () => s.world?.close() },
 		{ name: "task_maintenance", close: () => taskMaintenance.idle() },
+		{ name: "task_report_delivery", close: () => reportDelivery.idle() },
 		{ name: "store_retention", close: () => storeRetention.idle() },
 		{ name: "timer_maintenance", close: () => timerMaintenance.idle() },
 		// Worker lease also expires independently if shutdown cannot deliver a stop.
@@ -505,6 +578,7 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		{
 			name: "timers",
 			close: () => {
+				reportDelivery.stop();
 				taskMaintenance.stop();
 				storeRetention.stop();
 				codingHeartbeat.stop();

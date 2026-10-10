@@ -8,6 +8,8 @@ export const reportKinds = [
 	"cancelled",
 	"paused",
 	"monitoring_issue",
+	"no_next_work",
+	"reminder",
 ] as const;
 const ref = z
 	.string()

@@ -1,6 +1,6 @@
 import { sha256Hex } from "../../../infrastructure/digest";
 import { canonicalJSON } from "../../../../packages/coding-runner/src/contracts";
-import type { WorkTask, TaskFence } from "../../tasks";
+import type { WorkTask, CodingWorkTask, TaskFence } from "../../tasks";
 import type {
 	Observation,
 	Supervisor,
@@ -15,6 +15,7 @@ export const fence = (t: WorkTask): TaskFence => ({
 	executionGeneration: t.executionGeneration,
 });
 export const live = (t: WorkTask, at: number) =>
+	t.kind === "coding" &&
 	["queued", "active", "waiting_user", "reconciling"].includes(t.state) &&
 	!t.bodyExpired &&
 	Date.parse(t.grant.expiresAt) > at &&
@@ -46,6 +47,7 @@ export function reviewed(s: Supervisor) {
 	);
 }
 export function allowedActions(t: WorkTask, s: Supervisor): string[] {
+	if (t.kind !== "coding") return [];
 	if (s.holdReason || s.monitorHealth !== "healthy" || s.stepId || !stopped(s))
 		return ["wait", "inspect_more"];
 	const actions = ["wait", "inspect_more", "escalate"];
@@ -85,7 +87,7 @@ export function allowedActions(t: WorkTask, s: Supervisor): string[] {
 }
 export const operationFor: Record<
 	StepKind,
-	WorkTask["grant"]["operations"][number]
+	CodingWorkTask["grant"]["operations"][number]
 > = {
 	inspect_more: "read",
 	answer_question: "edit",

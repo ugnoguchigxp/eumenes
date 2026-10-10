@@ -1,6 +1,11 @@
 import type { Database } from "bun:sqlite";
 import { z } from "zod";
-import { createTasks, type TaskFence, type WorkTask } from "../domains/tasks";
+import {
+	createTasks,
+	type TaskFence,
+	type WorkTask,
+	type TaskKindDefinition,
+} from "../domains/tasks";
 import type { QueueService, HandlerDefinition } from "../domains/queue";
 import type { SchedulerService } from "../domains/scheduler";
 import type { SqliteStore } from "../infrastructure/sqlite";
@@ -59,6 +64,7 @@ export function createDelegatedTasks(input: {
 	scheduler: SchedulerService;
 	enabled: boolean;
 	execution?: TaskExecutionPort;
+	additionalKinds?: TaskKindDefinition[];
 	now?: () => number;
 	changedInTransaction?: (tx: Database, task: WorkTask) => void;
 	/** Removes upper-domain rows that reference a task before tasks deletes it. */
@@ -121,6 +127,7 @@ export function createDelegatedTasks(input: {
 		changedInTransaction: input.changedInTransaction,
 		purgeInTransaction: input.purgeInTransaction,
 		kinds: [
+			...(input.additionalKinds ?? []),
 			{
 				kind: "coding",
 				version: 1,

@@ -105,6 +105,7 @@ export function createDiagnostics(
 		`${executionId}:${s.generation}:${s.authorityEpoch}`;
 	/** Stops automatic diagnosis once the process is confirmed stopped; otherwise keeps watching. */
 	function finalize(db: Database, t: WorkTask, s: Supervisor, code: string) {
+		if (t.kind !== "coding") throw new Error("invalid_coding_task");
 		const o = s.observation;
 		if (!o || s.diagnostics?.blocked) return;
 		if (!o.childrenStopped) {

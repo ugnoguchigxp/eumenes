@@ -22,6 +22,8 @@
 		"web",
 		"packages/artifact-ui/src",
 		"packages/coding-runner/src",
+		"packages/dots-mcp/src",
+		"packages/dots-mcp/test",
 		"packages/coding-runner/test",
 		"scripts",
 		"tests",

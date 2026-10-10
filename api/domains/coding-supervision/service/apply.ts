@@ -74,6 +74,7 @@ export function createApplier(
 		kind: StepKind,
 		policy: ReturnType<WorkflowPort["policy"]>,
 	) {
+		if (t.kind !== "coding") throw new Error("invalid_coding_task");
 		if (
 			!policy.checkIds.length ||
 			policy.checkIds.length > 20 ||
@@ -199,6 +200,7 @@ export function createApplier(
 		}
 		const kind = d.action as StepKind;
 		if (
+			t.kind !== "coding" ||
 			!stepKinds.includes(kind) ||
 			!t.grant.operations.includes(operationFor[kind])
 		) {

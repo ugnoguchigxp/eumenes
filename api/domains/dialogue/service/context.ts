@@ -29,6 +29,7 @@ export type ChatMessage = {
 };
 export interface GenerateInput {
 	tools?: NativeTool[];
+	delegationSnapshot?: unknown;
 	actionSnapshot?: unknown;
 	actionResultIndex?: number;
 	requirementCatalog?: import("../../capabilities").RequirementCatalog;
@@ -71,6 +72,7 @@ export type DialogueDeps = {
 	id: () => string;
 	memory?: MemoryService;
 	agents?: AgentRuntime;
+	delegation?: import("../contracts/delegation").DelegationPort;
 	postAnswer?: PostAnswerObserverPort;
 	worldContext?: WorldContextPort;
 };

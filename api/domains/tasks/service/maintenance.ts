@@ -100,6 +100,7 @@ export function createTaskMaintenance(
 		// Without a runner receipt, previously started work is unknown, never replayed.
 		for (const t of repo.live(tx))
 			if (["queued", "active", "waiting_user"].includes(t.state)) {
+				if (t.kind === "orchestration" && t.state === "waiting_user") continue;
 				t.state = "reconciling";
 				const q = repo.openQuestion(tx, t.id);
 				if (q) repo.putQuestion(tx, { ...q, state: "superseded" });

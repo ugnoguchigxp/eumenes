@@ -19,3 +19,9 @@ export type {
 	WorldContextVerdict,
 } from "./contracts";
 export { migrations } from "./repository";
+
+export {
+	delegationCommand,
+	type DelegationPort,
+	type DelegationCommand,
+} from "./contracts/delegation";

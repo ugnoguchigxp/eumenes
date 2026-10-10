@@ -14,6 +14,9 @@ export type {
 } from "./types";
 export type {
 	WorkTask,
+	CodingWorkTask,
+	OrchestrationWorkTask,
+	OrchestrationGrant,
 	TaskReceipt,
 	TaskGrant,
 	TaskOrigin,

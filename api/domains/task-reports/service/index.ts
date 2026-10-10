@@ -85,6 +85,8 @@ export function createTaskReports(input: {
 				priority: data.kind === "progress" ? "normal" : "high",
 			});
 		},
+		pendingInTransaction: repo.pending,
+		deliveredInTransaction: repo.delivered,
 		supersedeQuestionsInTransaction: repo.supersedeQuestions,
 		purgeInTransaction: repo.purge,
 		list(taskId: string, after = 0, limit = 50) {

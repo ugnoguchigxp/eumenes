@@ -582,6 +582,7 @@ test("API client and CLI register, read and cancel through authenticated HTTP; u
 	const url = `http://127.0.0.1:${server.port}`,
 		client = createClient(url, token);
 	const data = input("register_only");
+	if (data.kind !== "coding") throw new Error("invalid_test_task");
 	const created = await client.createTask({
 		...data,
 		grant: {

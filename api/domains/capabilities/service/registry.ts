@@ -96,7 +96,7 @@ export function registerRevision(
 			rev,
 			dependency,
 		);
-	if (origin === "learned" || origin === "user") return;
+	if (origin === "learned" || d.kind === "requirement") return;
 	db.query("DELETE FROM capability_search WHERE key=?").run(key);
 	db.query("INSERT INTO capability_search(key,content) VALUES(?,?)").run(
 		key,

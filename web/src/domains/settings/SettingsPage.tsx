@@ -1,3 +1,4 @@
+import { DotsPanel } from "../dots";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import type { EumenesClient } from "../../../../client";
@@ -26,6 +27,7 @@ const categories = [
 	{ id: "ai", label: "AIの使い方" },
 	{ id: "connections", label: "接続先" },
 	{ id: "services", label: "サービスを試す" },
+	{ id: "dots", label: "Codexへの委任" },
 	{ id: "routes", label: "取得先と手順" },
 	{ id: "voice", label: "音声" },
 	{ id: "data", label: "データと利用記録" },
@@ -313,22 +315,9 @@ export function SettingsPage({
 				<header>
 					<span className="section-kicker">SETTINGS</span>
 					<h2>{categories.find((c) => c.id === category)?.label}</h2>
-					<p className="hint">
-						{category === "services"
-							? "プロバイダを選んで、入力と結果を確認できます。"
-							: category === "routes"
-								? "検索で見つけた取得先と、その手順を確認・編集できます。値は毎回取得し直します。"
-								: category === "memory"
-									? "保存した記憶を会話で使うかを切り替えます。変更はすぐに保存されます。"
-									: category === "world"
-										? "Worldが覚えている主張と、その根拠・条件を確認し、明示的に訂正・撤回・忘却できます。この画面は読み上げません。"
-										: category === "dictionary"
-											? "読み上げの直前に、登録した文字を読み方へ置き換えます（長い登録が優先）。会話の表示は変わりません。変更は行ごとにすぐ保存されます。"
-											: category === "general"
-												? "AIの名前・あなたの名前・話し方を設定します。次の返答から反映されます。"
-												: "普段はLARMを使い、必要なときに登録済みのクラウドへ切り替えます。"}
-					</p>
+					<p className="hint">{categoryHelp(category)}</p>
 				</header>
+				{category === "dots" && <DotsPanel client={client} />}
 				{category === "services" && renderServiceTests?.(dirty)}
 				{category === "world" && renderWorld?.()}
 				{routesOpened && (
@@ -391,45 +380,62 @@ export function SettingsPage({
 				{category === "appearance" && (
 					<AppearanceSection value={value} change={change} />
 				)}
-				{category !== "dictionary" &&
-					category !== "memory" &&
-					category !== "services" &&
-					category !== "routes" && (
-						<footer className="settings-footer">
-							<output>
-								{message && dirty && message === "変更を適用しました"
-									? "送信した変更を適用しました。追加の変更は未適用です。"
-									: message ||
-										(dirty
-											? "変更はまだ保存されていません"
-											: "すべての変更を保存済み")}
-							</output>
-							<div className="settings-actions">
-								<Button
-									variant="secondary"
-									disabled={busy}
-									onClick={() => {
-										setDraft(null);
-										setKeys([]);
-										setRetry(null);
-										setAdding(false);
-										setNewCloud((n) => ({ ...n, key: "" }));
-										setMessage("");
-										void query.refetch();
-									}}
-								>
-									最新の設定を読み直す
-								</Button>
-								<Button
-									disabled={!dirty || adding || busy}
-									onClick={() => void apply()}
-								>
-									{busy ? "適用中…" : "変更を適用"}
-								</Button>
-							</div>
-						</footer>
-					)}
+				{!["dots", "dictionary", "memory", "services", "routes"].includes(
+					category,
+				) && (
+					<footer className="settings-footer">
+						<output>
+							{message && dirty && message === "変更を適用しました"
+								? "送信した変更を適用しました。追加の変更は未適用です。"
+								: message ||
+									(dirty
+										? "変更はまだ保存されていません"
+										: "すべての変更を保存済み")}
+						</output>
+						<div className="settings-actions">
+							<Button
+								variant="secondary"
+								disabled={busy}
+								onClick={() => {
+									setDraft(null);
+									setKeys([]);
+									setRetry(null);
+									setAdding(false);
+									setNewCloud((n) => ({ ...n, key: "" }));
+									setMessage("");
+									void query.refetch();
+								}}
+							>
+								最新の設定を読み直す
+							</Button>
+							<Button
+								disabled={!dirty || adding || busy}
+								onClick={() => void apply()}
+							>
+								{busy ? "適用中…" : "変更を適用"}
+							</Button>
+						</div>
+					</footer>
+				)}
 			</section>
 		</div>
 	);
+}
+
+function categoryHelp(category: string) {
+	return category === "dots"
+		? "dotsとの接続、作業するプロジェクト、担当とSkillを設定します。変更は各欄で保存します。"
+		: category === "services"
+			? "プロバイダを選んで、入力と結果を確認できます。"
+			: category === "routes"
+				? "検索で見つけた取得先と、その手順を確認・編集できます。値は毎回取得し直します。"
+				: category === "memory"
+					? "保存した記憶を会話で使うかを切り替えます。変更はすぐに保存されます。"
+					: category === "world"
+						? "Worldが覚えている主張と、その根拠・条件を確認し、明示的に訂正・撤回・忘却できます。この画面は読み上げません。"
+						: category === "dictionary"
+							? "読み上げの直前に、登録した文字を読み方へ置き換えます（長い登録が優先）。会話の表示は変わりません。変更は行ごとにすぐ保存されます。"
+							: category === "general"
+								? "AIの名前・あなたの名前・話し方を設定します。次の返答から反映されます。"
+								: "普段はLARMを使い、必要なときに登録済みのクラウドへ切り替えます。";
 }

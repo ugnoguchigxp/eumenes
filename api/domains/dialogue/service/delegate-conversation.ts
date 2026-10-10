@@ -17,7 +17,7 @@ export function delegateConversation(
 	agents: AgentRuntime,
 	conversation: ConversationService,
 	run: Run,
-	selected: ConversationOperation,
+	selected: Exclude<ConversationOperation, { kind: "delegation" }>,
 	context: {
 		parentJobId: string;
 		requirementCatalog?: RequirementCatalog;

@@ -66,7 +66,9 @@ export function tasksClient(transport: Transport) {
 			input: {
 				requestId: string;
 				expectedRevision: number;
-				grant: TaskGrantInput;
+				grant:
+					| TaskGrantInput
+					| import("../api/domains/tasks/contracts").OrchestrationGrant;
 			},
 		) => post(`${path(id)}/amend`, input),
 		answerTask: (

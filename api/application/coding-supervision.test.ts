@@ -310,6 +310,7 @@ test("answering an approval question prepares no coding execution and applies th
 					base: {
 						...real,
 						prepareInTransaction(db, t, ctx) {
+							if (t.kind !== "coding") throw new Error("invalid_coding_task");
 							coding.registerWorkspaceInTransaction(db, {
 								id: t.grant.workspaceId,
 								branch: t.grant.branch ?? "codex/task",

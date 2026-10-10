@@ -1,4 +1,10 @@
 export const domains = {
+	dots: {
+		backend: "api/domains/dots",
+		web: "web/src/domains/dots",
+		components: null,
+		depends: { api: ["queue"], web: ["tasks"], test: [] },
+	},
 	"task-reports": {
 		backend: "api/domains/task-reports",
 		web: null,
@@ -95,7 +101,7 @@ export const domains = {
 		backend: "api/domains/settings",
 		web: "web/src/domains/settings",
 		components: null,
-		depends: { api: [], web: ["tts-dictionary"], test: [] },
+		depends: { api: [], web: ["tts-dictionary", "dots"], test: [] },
 	},
 	inference: {
 		backend: "api/domains/inference",

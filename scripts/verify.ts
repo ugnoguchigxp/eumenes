@@ -183,6 +183,7 @@ try {
 			"test",
 			"api",
 			"packages/coding-runner/test",
+			"packages/dots-mcp/test",
 			"scripts",
 		]);
 		await run("web tests", [process.execPath, "x", "vitest", "run", "web"]);
