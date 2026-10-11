@@ -16,7 +16,13 @@ import type {
 	Run,
 	WorldContextPort,
 } from "../contracts";
-import { byId, interruptUnfinished, listRuns, transition } from "../repository";
+import {
+	byId,
+	interruptUnfinished,
+	listRuns,
+	transition,
+	linkAnswer,
+} from "../repository";
 import { createAgentSync } from "./agent-sync";
 import {
 	DEFAULT_DEADLINE_MS,
@@ -44,6 +50,7 @@ export function createDialogueService({
 	agents,
 	postAnswer,
 	delegation,
+	music,
 	worldContext,
 }: {
 	store: SqliteStore;
@@ -55,6 +62,7 @@ export function createDialogueService({
 	memory?: MemoryService;
 	agents?: AgentRuntime;
 	postAnswer?: PostAnswerObserverPort;
+	music?: import("../contracts/music").MusicPort;
 	delegation?: import("../contracts/delegation").DelegationPort;
 	worldContext?: WorldContextPort;
 }) {
@@ -69,6 +77,7 @@ export function createDialogueService({
 		agents,
 		postAnswer,
 		delegation,
+		music,
 		worldContext,
 	};
 	const progress = createProgress(deps);
@@ -76,6 +85,37 @@ export function createDialogueService({
 	const intake = createIntake(deps);
 	const agentSync = createAgentSync(deps);
 	const service = {
+		linkOperationJobInTransaction(db: Database, runId: string, jobId: string) {
+			linkAnswer(db, runId, jobId);
+		},
+		finishOperationInTransaction(db: Database, runId: string) {
+			const run = byId(db, runId);
+			if (!run || !["queued", "running"].includes(run.status)) return;
+			if (Date.parse(run.deadlineAt!) <= Date.parse(clock())) {
+				transition(
+					db,
+					run.id,
+					run.revision,
+					"failed",
+					clock(),
+					"deadline_exceeded",
+				);
+				return;
+			}
+			const { job } = queue.enqueueInTransaction(db, {
+				scope: "dialogue",
+				kind: GENERATE_KIND,
+				dedupeKey: `operation-answer:${run.id}`,
+				payload: { runId },
+				subjectRef: runId,
+				lane: "interactive",
+				resourceKey: "inference.llm",
+				maxAttempts: 1,
+				concurrencyKey: `conversation:${run.conversationId}`,
+				deadlineAtMs: Date.parse(run.deadlineAt!),
+			});
+			linkAnswer(db, runId, job.id);
+		},
 		promptTarget: intake.promptTarget,
 		progress: progress.progress,
 		subscribeProgress: progress.subscribeProgress,

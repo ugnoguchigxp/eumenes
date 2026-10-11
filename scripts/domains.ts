@@ -1,4 +1,14 @@
 export const domains = {
+	music: {
+		backend: "api/domains/music",
+		web: "web/src/domains/music",
+		components: "web/src/components/domains/music",
+		depends: {
+			api: ["capabilities", "inference", "larm", "queue"],
+			web: [],
+			test: [],
+		},
+	},
 	dots: {
 		backend: "api/domains/dots",
 		web: "web/src/domains/dots",

@@ -172,6 +172,25 @@ export function createPrepare(
 				content: JSON.stringify({ delegationCatalog: delegated.catalog }),
 			});
 		}
+		const musicResult = deps.music?.resultInTransaction(tx, run.id);
+		const musicTools =
+			deps.music &&
+			!run.agentTaskId &&
+			run.sourceKind !== "schedule" &&
+			!delegated?.receipt;
+		if (musicResult) {
+			messages[0]!.content +=
+				"\n楽曲制作は終了しています。musicResultは操作結果のデータです。completedなら曲名と制作意図を短く伝え、Artifactで再生できると案内します。failedまたはcancelledなら失敗・取消を正しく伝えます。音声を聴いた評価や未実行の操作を作らず、新しい生成をしません。";
+			messages.splice(messages.length - 1, 0, {
+				role: "user",
+				content: JSON.stringify({ musicResult }),
+			});
+			const requestId = larm.requestFor?.(tx, run.id, "llm");
+			if (requestId)
+				larm.setContextPolicyInTransaction?.(tx, requestId, "exact");
+		} else if (musicTools)
+			messages[0]!.content +=
+				"\n楽曲制作の依頼にはcreate_musicを一度呼びます。ユーザーのテーマと秒数を保持し、装飾は楽曲担当に任せます。通常会話や楽曲についての説明だけなら呼びません。生成結果を受け取ってから完成を伝えます。";
 		return {
 			status: "ready",
 			input: {
@@ -193,6 +212,23 @@ export function createPrepare(
 									],
 						}
 					: {}),
+				...(musicResult
+					? { tools: undefined }
+					: musicTools
+						? {
+								tools: [
+									...(base.tools ?? []),
+									...(delegated && delegated.available !== false
+										? conversationTools(false, false, true).filter(
+												(t) => t.function.name === "delegate_task",
+											)
+										: []),
+									...conversationTools(false, false, false, true).filter(
+										(t) => t.function.name === "create_music",
+									),
+								],
+							}
+						: {}),
 				agent,
 				...(recalled?.status === "ready"
 					? { memory: { view: recalled.view } }

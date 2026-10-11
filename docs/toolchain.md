@@ -1,5 +1,7 @@
 # 会話からの調査(toolchain)
 
+追加の種類ごとの変更箇所と最小例は[ツールチェーンの登録と拡張](toolchain-extension.md)、確認段階と過去の実績は[検証手順と基準記録](toolchain-extension-verification.md)を参照してください。
+
 通常の会話入力からWeb検索・読取りを選べます。`EUMENES_TOOLCHAIN_ENABLED` は既定 `1`、`0` なら従来の会話生成へ戻ります。会話LLMが現在の調査担当（LARM）またはCodex Lunaを選びます。内部JSONを読み上げや態度収集へ渡しません。子の待機中は推論枠を解放します。
 
 | 会話ツール | package | 担当 | 検索 | 読取り | 保存本文 | モデル呼出し | 報告 |

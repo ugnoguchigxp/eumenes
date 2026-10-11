@@ -1,0 +1,12 @@
+bun test v1.4.2 (744846f84)
+
+api/application/music-e2e.test.ts:
+(pass) music pipeline success: conversation, worker, API, result, audio [93.59ms]
+(pass) music pipeline failure: conversation, worker, API, result, audio [63.93ms]
+(pass) music pipeline invalid-plan: conversation, worker, API, result, audio [57.13ms]
+(pass) cancel music while the provider is running, send DELETE and never adopt audio [56.09ms]
+
+ 4 pass
+ 0 fail
+ 31 expect() calls
+Ran 4 tests across 1 file. [505.00ms]

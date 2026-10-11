@@ -10,3 +10,5 @@ export {
 } from "./service/requirement-schema";
 
 export { coordinatorSkill } from "./builtin/dots";
+
+export { musicBuiltins } from "./builtin/music";

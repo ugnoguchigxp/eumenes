@@ -1,4 +1,6 @@
 import { z } from "zod";
+import type { MusicResource, GenerationResource } from "./media-contracts";
+export type { MusicResource, GenerationResource } from "./media-contracts";
 
 const title = z.string().max(120).optional();
 const source = z.string().regex(/^[a-z][a-z0-9-]{0,63}$/);
@@ -19,6 +21,25 @@ const question = z.strictObject({
 	options: z.array(z.string().min(1).max(120)).min(1).max(8).optional(),
 });
 export const viewRegistry = {
+	"music-player": {
+		name: "MusicPlayer",
+		label: "音楽プレイヤー",
+		schema: z.strictObject({ view: z.literal("music-player"), source, title }),
+	},
+	playlist: {
+		name: "Playlist",
+		label: "プレイリスト",
+		schema: z.strictObject({ view: z.literal("playlist"), source, title }),
+	},
+	"generation-status": {
+		name: "GenerationStatus",
+		label: "生成の状態",
+		schema: z.strictObject({
+			view: z.literal("generation-status"),
+			source,
+			title,
+		}),
+	},
 	components: {
 		name: "Components",
 		label: "基本コンポーネント",
@@ -108,10 +129,40 @@ export function parseRequest(value: unknown): ArtifactRequest {
 		throw new Error("未登録の表示です");
 	return viewRegistry[value.view as View].schema.parse(value);
 }
-export function parseDefinition(input: string): ArtifactRequest {
+export const layoutSchema = z.strictObject({
+	view: z.literal("layout"),
+	direction: z.enum(["stack", "grid"]).default("stack"),
+	title,
+	children: z
+		.array(z.union(Object.values(viewRegistry).map((v) => v.schema)))
+		.min(1)
+		.max(12),
+});
+export type ArtifactDefinition = ArtifactRequest | z.infer<typeof layoutSchema>;
+export function parseDocument(value: unknown): ArtifactDefinition {
+	if (
+		value &&
+		typeof value === "object" &&
+		"view" in value &&
+		value.view === "layout"
+	)
+		return layoutSchema.parse(value);
+	return parseRequest(value);
+}
+export function definitionRequests(
+	definition: ArtifactDefinition,
+): ArtifactRequest[] {
+	return definition.view === "layout" ? definition.children : [definition];
+}
+export function definitionName(definition: ArtifactDefinition): string {
+	return definition.view === "layout"
+		? "Composition"
+		: viewRegistry[definition.view].name;
+}
+export function parseDefinition(input: string): ArtifactDefinition {
 	if (new TextEncoder().encode(input).length > maxDefinitionBytes)
 		throw new Error("定義が大きすぎます（16KBまで）");
-	return parseRequest(JSON.parse(input));
+	return parseDocument(JSON.parse(input));
 }
 
 const SAFE_DATA_IMAGE = /^data:image\/(?:png|jpeg|webp|svg\+xml);/i;
@@ -180,6 +231,8 @@ export type SettingsResource = {
 	volume: number;
 };
 export type Resource =
+	| MusicResource
+	| GenerationResource
 	| ImageResource
 	| QuestionResource
 	| FormResource
@@ -197,7 +250,10 @@ export type ArtifactEvent = {
 		| "memory-correct"
 		| "memory-select"
 		| "settings-save"
-		| "demo-click";
+		| "demo-click"
+		| "music-select"
+		| "generation-cancel"
+		| "generation-retry";
 	values: Record<string, string | boolean>;
 };
 export type Receipt = {

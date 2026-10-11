@@ -2,8 +2,9 @@ import {
 	ArtifactRenderer,
 	compileArtifact,
 	compileLang,
+	definitionRequests,
 	viewRegistry,
-	type View,
+	type View as RegisteredView,
 } from "@eumenes/artifact-ui";
 import "@eumenes/artifact-ui/styles";
 import {
@@ -34,6 +35,10 @@ import {
 	type DesignTokenOverrides,
 } from "../../../domains/artifact/designTokens";
 
+type View = Exclude<
+	RegisteredView,
+	"music-player" | "playlist" | "generation-status"
+>;
 const sources: Record<View, string> = {
 	components: "c1",
 	"generated-image": "g1",
@@ -75,6 +80,9 @@ const actionLabels = {
 	"memory-correct": "情報の訂正",
 	"memory-select": "情報の選択",
 	"settings-save": "試用設定の保存",
+	"music-select": "楽曲の選択",
+	"generation-cancel": "生成の取消",
+	"generation-retry": "生成の再試行",
 };
 const statusLabels = {
 	pending: "処理中",
@@ -83,6 +91,24 @@ const statusLabels = {
 	conflict: "再確認が必要",
 	duplicate: "受付済み",
 };
+function SampleTabs() {
+	return (
+		<TabsList aria-label="表示サンプル" className="aui-sample-tabs">
+			{Object.entries(viewRegistry)
+				.filter(([key]) => key in sources)
+				.map(([view, entry]) => (
+					<TabsTrigger
+						key={view}
+						value={view}
+						aria-label={entry.label}
+						title={entry.label}
+					>
+						{entry.label}
+					</TabsTrigger>
+				))}
+		</TabsList>
+	);
+}
 export function ArtifactShowcase() {
 	const [fixture] = useState(createShowcaseFixture);
 	const prefix = useId();
@@ -120,7 +146,8 @@ export function ArtifactShowcase() {
 	const currentRadius = tokenValues["--radius"]!;
 	const [resetKey, setResetKey] = useState(0);
 	const view = compiled.request.view;
-	const source = compiled.request.source ?? `inline-${view}`;
+	const source =
+		definitionRequests(compiled.request)[0]?.source ?? `inline-${view}`;
 	const operations = state.operations.filter(
 		(operation) => operation.source === source,
 	);
@@ -132,7 +159,9 @@ export function ArtifactShowcase() {
 				inputMode === "json"
 					? compileArtifact(input, state.resources)
 					: compileLang(input, state.resources);
-			fixture.ensureInline(result.request);
+			definitionRequests(result.request).forEach((request) =>
+				fixture.ensureInline(request),
+			);
 			setCompiled(result);
 			setError("");
 		} catch {
@@ -158,19 +187,11 @@ export function ArtifactShowcase() {
 					<h2>UIショーケース</h2>
 					<span className="aui-showcase-note">この画面だけの試用</span>
 				</header>
-				<TabsList aria-label="表示サンプル" className="aui-sample-tabs">
-					{Object.entries(viewRegistry).map(([view, entry]) => (
-						<TabsTrigger
-							key={view}
-							value={view}
-							aria-label={entry.label}
-							title={entry.label}
-						>
-							{entry.label}
-						</TabsTrigger>
-					))}
-				</TabsList>
-				<p className="aui-description">{examples[view].description}</p>
+				<SampleTabs />
+				<p className="aui-description">
+					{examples[view as View]?.description ??
+						"登録済みの表示を組み合わせて確認できます。"}
+				</p>
 				<div className="aui-row aui-controls">
 					<label>
 						表示テーマ

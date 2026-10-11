@@ -1,16 +1,25 @@
 import { createParser } from "./sdk";
 import {
-	type ArtifactRequest,
+	type ArtifactDefinition,
+	definitionRequests,
+	definitionName,
 	type Snapshot,
 	parseDefinition,
-	parseRequest,
-	viewRegistry,
+	parseDocument,
 } from "./contracts";
 import { artifactLibrary } from "./library";
 
-function checkSource(request: ArtifactRequest, snapshot: Snapshot) {
-	if (request.source && snapshot[request.source]?.kind !== request.view)
-		throw new Error("この表示では参照できない source です");
+function checkSource(definition: ArtifactDefinition, snapshot: Snapshot) {
+	for (const request of definitionRequests(definition)) {
+		const kind =
+			request.view === "music-player" || request.view === "playlist"
+				? "music"
+				: request.view === "generation-status"
+					? "generation"
+					: request.view;
+		if (request.source && snapshot[request.source]?.kind !== kind)
+			throw new Error("この表示では参照できない source です");
+	}
 }
 function serialize(value: unknown) {
 	return JSON.stringify(value)
@@ -20,16 +29,16 @@ function serialize(value: unknown) {
 export function compileArtifact(input: string, snapshot: Snapshot) {
 	const request = parseDefinition(input);
 	checkSource(request, snapshot);
-	const lang = `root = ${viewRegistry[request.view].name}(${serialize(request)})`;
+	const lang = `root = ${definitionName(request)}(${serialize(request)})`;
 	validateParsed(lang, request);
 	return { request, lang };
 }
-function validateParsed(lang: string, request: ArtifactRequest) {
+function validateParsed(lang: string, request: ArtifactDefinition) {
 	const parsed = createParser(artifactLibrary.toJSONSchema()).parse(lang);
 	if (
 		!parsed.root ||
 		parsed.root.partial ||
-		parsed.root.typeName !== viewRegistry[request.view].name ||
+		parsed.root.typeName !== definitionName(request) ||
 		parsed.meta.incomplete ||
 		parsed.meta.errors.length ||
 		parsed.meta.unresolved.length ||
@@ -40,7 +49,7 @@ function validateParsed(lang: string, request: ArtifactRequest) {
 		Object.keys(parsed.stateDeclarations).length
 	)
 		throw new Error("OpenUI の定義を検証できませんでした");
-	parseRequest(parsed.root.props.request);
+	parseDocument(parsed.root.props.request);
 }
 /** Showcase accepts only literal, registered view calls; never arbitrary Lang programs. */
 export function compileLang(input: string, snapshot: Snapshot) {
@@ -49,8 +58,8 @@ export function compileLang(input: string, snapshot: Snapshot) {
 	const match = /^\s*root\s*=\s*([A-Za-z]+)\((\{[\s\S]*\})\)\s*$/.exec(input);
 	if (!match)
 		throw new Error("root = 登録コンポーネント(JSON) の形式で指定してください");
-	const request = parseRequest(JSON.parse(match[2]!));
-	if (match[1] !== viewRegistry[request.view].name)
+	const request = parseDocument(JSON.parse(match[2]!));
+	if (match[1] !== definitionName(request))
 		throw new Error("コンポーネントと view が一致しません");
 	return compileArtifact(serialize(request), snapshot);
 }

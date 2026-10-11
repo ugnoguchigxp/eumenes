@@ -1,0 +1,47 @@
+.generation-status {
+	color: var(--foreground);
+	background: var(--card);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	padding: var(--ui-card-padding);
+	min-width: 0;
+}
+.generation-status {
+	display: grid;
+	gap: 1rem;
+}
+.generation-status-heading {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+}
+.generation-status-heading h3 {
+	margin: 0;
+	font-size: 1rem;
+	font-weight: 600;
+}
+.generation-status p {
+	margin: 0;
+	color: var(--muted-foreground);
+}
+.generation-status progress {
+	width: 100%;
+	accent-color: var(--primary);
+}
+.generation-status-mark {
+	color: var(--primary);
+	flex-shrink: 0;
+}
+.generation-status-mark[data-busy="true"] {
+	animation: generation-breathe 1.8s ease-in-out infinite;
+}
+@keyframes generation-breathe {
+	50% {
+		opacity: 0.35;
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.generation-status-mark[data-busy="true"] {
+		animation: none;
+	}
+}

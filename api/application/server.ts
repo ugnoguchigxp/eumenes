@@ -12,6 +12,8 @@ import {
 	superviseCodingExecution,
 	purgeTaskDependents,
 } from "./coding-supervision";
+import { createMusic } from "../domains/music";
+import { createLarmPlayground } from "../domains/larm";
 import { createToolchain } from "./toolchain";
 import { createOperations } from "../domains/research-routes";
 import {
@@ -251,11 +253,32 @@ export async function buildServices(config: Config) {
 			conversation,
 			history: config.historyToolsEnabled,
 			dots: true,
+			music: true,
 			webResearch: config.webResearchToolsEnabled,
 		},
 	);
 	const enabled = config.toolchainEnabled;
+	const music = createMusic({
+		store,
+		queue,
+		inference,
+		capabilities: toolchain.capabilities,
+		gateway: () => {
+			const s = settings.get();
+			return createLarmPlayground({
+				baseUrl: s.larm.baseUrl ?? undefined,
+				token: config.larmToken,
+				profile: s.larm.profile,
+				audience: s.larm.audience,
+				providerHosts: config.larmProviderHosts,
+			});
+		},
+		onJob: (db, runId, jobId) =>
+			dialogue.linkOperationJobInTransaction(db, runId, jobId),
+		onFinished: (db, runId) => dialogue.finishOperationInTransaction(db, runId),
+	});
 	const dialogue = createDialogueService({
+		music: enabled ? music : undefined,
 		store,
 		conversation,
 		larm: inference,
@@ -292,6 +315,7 @@ export async function buildServices(config: Config) {
 		attitudeDataset,
 		inference,
 		serviceTests,
+		music,
 		queue,
 		webResearch,
 		scheduler,
@@ -336,6 +360,7 @@ export function appServices(s: Services) {
 		webResearch: s.webResearch,
 		changes: s.changes,
 		serviceTests: s.serviceTests,
+		music: s.music,
 		tasks: s.delegated.tasks,
 		coding: s.codingComposition?.coding,
 		codingSupervision: s.supervision,

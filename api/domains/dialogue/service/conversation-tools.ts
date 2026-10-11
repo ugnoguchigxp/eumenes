@@ -3,7 +3,7 @@ import {
 	type DelegationCommand,
 } from "../contracts/delegation";
 import { z } from "zod";
-import { timerCommand } from "../../capabilities";
+import { musicRequest, timerCommand } from "../../capabilities";
 import type {
 	NativeTool,
 	NativeToolCall,
@@ -28,6 +28,7 @@ const historyRequest = z
 	})
 	.strict();
 export type ConversationOperation =
+	| { kind: "music"; question: string }
 	| { kind: "web"; question: string; researcher?: "codex_luna" }
 	| { kind: "history"; question: string; requirementProfiles?: string[] }
 	| { kind: "delegation"; command: DelegationCommand }
@@ -41,8 +42,25 @@ export function conversationTools(
 	timers: boolean,
 	luna = false,
 	dots = false,
+	music = false,
 ): NativeTool[] {
 	return [
+		...(music
+			? [
+					{
+						type: "function" as const,
+						function: {
+							name: "create_music",
+							description:
+								"ユーザーが指定したテーマで楽曲を生成し、Artifactで再生できるようにする。テーマと時間などの条件をquestionに保持する。曲調の装飾は楽曲担当が行う。検索やCodexプロジェクトへの委任は不要。",
+							parameters: z.toJSONSchema(musicRequest) as Record<
+								string,
+								unknown
+							>,
+						},
+					},
+				]
+			: []),
 		...(dots
 			? [
 					{
@@ -107,6 +125,7 @@ export function conversationTools(
 	];
 }
 const toolNames = new Set([
+	"create_music",
 	"delegate_task",
 	"research",
 	"research_web_luna",
@@ -158,6 +177,8 @@ export function operation(
 	} catch {
 		throw operationRejection("arguments_not_json", call);
 	}
+	if (call.name === "create_music")
+		return { kind: "music", ...parsed(musicRequest, args, call) };
 	if (call.name === "delegate_task")
 		return {
 			kind: "delegation",

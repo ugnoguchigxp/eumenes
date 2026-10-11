@@ -52,12 +52,14 @@ export function ArtifactPanel({
 	onSelect,
 	onClose,
 	renderTimer,
+	renderOpenUI,
 }: {
 	tabs: ArtifactTab[];
 	activeTabId: string | null;
 	onSelect: (tabId: string) => void;
 	onClose: (tabId: string) => void;
 	renderTimer?: (timerId: string) => ReactNode;
+	renderOpenUI?: (definition: string) => ReactNode;
 }) {
 	const active = tabs.find((tab) => tab.id === activeTabId);
 	const panel = useRef<HTMLElement>(null);
@@ -112,6 +114,11 @@ export function ArtifactPanel({
 								__html: renderSafeMarkdown(active.content),
 							}}
 						/>
+					</TabsContent>
+				)}
+				{active?.kind === "openui" && (
+					<TabsContent value={active.id} className="artifact-panel-body">
+						{renderOpenUI?.(active.definition)}
 					</TabsContent>
 				)}
 				{active?.kind === "timer" && (

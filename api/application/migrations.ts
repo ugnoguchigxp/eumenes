@@ -1,3 +1,4 @@
+import { migrations as musicMigrations } from "../domains/music";
 import type { Migration } from "../infrastructure/sqlite";
 import { orderMigrations } from "../infrastructure/sqlite";
 import { migrations as agentRuntimeMigrations } from "../domains/agent-runtime";
@@ -140,6 +141,7 @@ const catalog: readonly Migration[] = [
 	...memoryMigrations,
 	...packageMigrations("memory-package", memoryPackageSql),
 	...serviceTestsMigrations,
+	...musicMigrations,
 	...webResearchMigrations,
 	...capabilitiesMigrations,
 	...toolRuntimeMigrations,

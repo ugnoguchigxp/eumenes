@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { musicRequest, musicPlan } from "./music";
+export { musicRequest, musicPlan };
 import { timerCancel, timerCommand, timerList, timerStart } from "./timers";
 export { timerCancel, timerCommand, timerList, timerStart };
 export { timerResultContext, type TimerResultContext } from "./timers";
@@ -92,6 +94,8 @@ export const historyRead = z
 	.strict()
 	.refine((v) => v.before + v.after < 10);
 export const validators = {
+	musicRequest,
+	musicPlan,
 	dotsDelegation: z.strictObject({}),
 	find: savedFindInput,
 	readSaved: savedReadInput,

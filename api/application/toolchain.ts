@@ -26,6 +26,7 @@ export async function createToolchain(
 	options: {
 		researchRoutes?: boolean;
 		dots?: boolean;
+		music?: boolean;
 		routeClock?: Clock;
 		history?: boolean;
 		webResearch?: boolean;
@@ -41,6 +42,7 @@ export async function createToolchain(
 			...(options.webResearch !== false ? ["web"] : []),
 			...(options.timers ? ["timer"] : []),
 			...(options.dots ? ["dots"] : []),
+			...(options.music ? ["music"] : []),
 			...(options.conversation && options.history !== false ? ["history"] : []),
 		]),
 	);

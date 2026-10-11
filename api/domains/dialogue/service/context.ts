@@ -72,6 +72,7 @@ export type DialogueDeps = {
 	id: () => string;
 	memory?: MemoryService;
 	agents?: AgentRuntime;
+	music?: import("../contracts/music").MusicPort;
 	delegation?: import("../contracts/delegation").DelegationPort;
 	postAnswer?: PostAnswerObserverPort;
 	worldContext?: WorldContextPort;

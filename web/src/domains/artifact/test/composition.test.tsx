@@ -1,0 +1,130 @@
+import {
+	ArtifactRenderer,
+	compileArtifact,
+	compileLang,
+	type Snapshot,
+} from "@eumenes/artifact-ui";
+import {
+	cleanup,
+	render,
+	screen,
+	fireEvent,
+	waitFor,
+} from "@testing-library/react";
+import { afterEach, expect, test, vi } from "vitest";
+const snapshot: Snapshot = {
+	m: {
+		kind: "music",
+		revision: 1,
+		currentId: "a",
+		tracks: [
+			{ id: "a", title: "曲A", url: "blob:audio" },
+			{ id: "b", title: "曲B" },
+		],
+	},
+	g: {
+		kind: "generation",
+		revision: 1,
+		status: "running",
+		title: "画像を生成しています",
+	},
+	c: { kind: "components", revision: 1 },
+};
+const definition = JSON.stringify({
+	view: "layout",
+	direction: "grid",
+	children: [
+		{ view: "music-player", source: "m" },
+		{ view: "playlist", source: "m" },
+		{ view: "generation-status", source: "g" },
+		{ view: "components", source: "c" },
+	],
+});
+afterEach(() => {
+	cleanup();
+	vi.restoreAllMocks();
+});
+test("JSON composes registered views through OpenUI, preserves media during other source updates", async () => {
+	vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
+	const dispatch = vi.fn(async () => ({
+		status: "accepted" as const,
+		message: "選択済み",
+	}));
+	const compiled = compileArtifact(definition, snapshot);
+	expect(compileLang(compiled.lang, snapshot)).toEqual(compiled);
+	const result = render(
+		<ArtifactRenderer
+			definition={definition}
+			runtime={{ snapshot, dispatch }}
+		/>,
+	);
+	const audio = result.container.querySelector("audio");
+	expect(audio?.src).toBe("blob:audio");
+	await screen.findByText("画像を生成しています");
+	fireEvent.click(screen.getByRole("button", { name: "曲B" }));
+	await waitFor(() =>
+		expect(dispatch).toHaveBeenCalledWith(
+			expect.objectContaining({
+				source: "m",
+				revision: 1,
+				action: "music-select",
+				values: { id: "b" },
+			}),
+		),
+	);
+	result.rerender(
+		<ArtifactRenderer
+			definition={definition}
+			runtime={{
+				snapshot: {
+					...snapshot,
+					g: {
+						kind: "generation",
+						revision: 2,
+						status: "completed",
+						title: "完了",
+						hidden: true,
+					},
+				},
+				dispatch,
+			}}
+		/>,
+	);
+	expect(result.container.querySelector("audio")).toBe(audio);
+	expect(screen.queryByText("画像を生成しています")).toBeNull();
+});
+for (const children of [
+	[{ view: "music-player", source: "g" }],
+	[{ view: "playlist", source: "secret" }],
+	[
+		{
+			view: "music-player",
+			source: "m",
+			url: "https://untrusted.example/audio",
+		},
+	],
+	[{ view: "layout", children: [] }],
+	Array.from({ length: 13 }, () => ({ view: "playlist", source: "m" })),
+])
+	test("composition rejects invalid nested source, arbitrary props and unbounded layouts", () => {
+		expect(() =>
+			compileArtifact(JSON.stringify({ view: "layout", children }), snapshot),
+		).toThrow();
+	});
+test("unsafe host media URL is never rendered as audio or download", () => {
+	const bad: Snapshot = {
+		m: {
+			kind: "music",
+			revision: 1,
+			currentId: "a",
+			tracks: [{ id: "a", title: "bad", url: "javascript:alert(1)" }],
+		},
+	};
+	const result = render(
+		<ArtifactRenderer
+			definition='{"view":"music-player","source":"m"}'
+			runtime={{ snapshot: bad, dispatch: vi.fn() }}
+		/>,
+	);
+	expect(result.container.querySelector("audio,a")).toBeNull();
+});

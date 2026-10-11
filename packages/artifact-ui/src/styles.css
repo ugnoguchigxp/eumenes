@@ -343,3 +343,13 @@
 .aui-token-field label {
 	font-size: 0.8125rem;
 }
+
+.aui-composition {
+	display: grid;
+	gap: 1rem;
+	min-width: 0;
+}
+.aui-composition-grid {
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+	align-items: start;
+}

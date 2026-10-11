@@ -1,6 +1,7 @@
 import { Renderer } from "./sdk";
 import { Component, useMemo, type ReactNode } from "react";
-import { compileLang } from "./compiler";
+import { definitionRequests } from "./contracts";
+import { compileLang, compileArtifact } from "./compiler";
 import { artifactLibrary } from "./library";
 import { ArtifactRuntimeContext, type ArtifactRuntime } from "./runtime";
 export { compileArtifact, compileLang } from "./compiler";
@@ -38,28 +39,32 @@ class ArtifactBoundary extends Component<
 /** Host supplies validated Lang and authorized data. No SDK toolProvider is installed. */
 export function ArtifactRenderer({
 	lang,
+	definition,
 	runtime,
 }: {
-	lang: string;
+	lang?: string;
+	definition?: string;
 	runtime: ArtifactRuntime;
 }) {
 	const validated = useMemo(() => {
 		try {
-			return compileLang(lang, runtime.snapshot);
+			return definition !== undefined
+				? compileArtifact(definition, runtime.snapshot)
+				: compileLang(lang ?? "", runtime.snapshot);
 		} catch {
 			return null;
 		}
-	}, [lang, runtime.snapshot]);
+	}, [lang, definition, runtime.snapshot]);
 	if (!validated)
 		return (
 			<p role="alert">この表示の定義または参照データを確認してください。</p>
 		);
-	const source = validated.request.source ?? `inline-${validated.request.view}`;
+	const revisions = definitionRequests(validated.request)
+		.map((r) => runtime.snapshot[r.source ?? ""]?.revision ?? 0)
+		.join(":");
 	return (
 		<ArtifactRuntimeContext.Provider value={runtime}>
-			<ArtifactBoundary
-				resetKey={`${validated.lang}:${runtime.snapshot[source]?.revision ?? 0}`}
-			>
+			<ArtifactBoundary resetKey={`${validated.lang}:${revisions}`}>
 				<div className="artifact-ui">
 					<Renderer
 						response={validated.lang}

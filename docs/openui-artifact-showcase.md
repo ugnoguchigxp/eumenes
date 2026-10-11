@@ -74,7 +74,7 @@ Showcase と SDK は必要になった時に読み込む。既存の会話開始
 
 試用アダプターも操作前に source の種別と現在の版、質問の期限、入力を検査する。処理待ち中の同じ ID を予約し、二重受付を防ぐ。画像生成の世代を別に管理し、取消や初期化の前の完了を採用しない。
 
-Lang の編集モードも登録部品へのリテラル JSON 呼び出しだけを受け付ける。追加文、リアクティブ状態、Query / Mutation、未知の部品は拒否する。SDK に toolProvider は渡さない。ユーザーが入力した文字列は React のテキストとして描画する。
+Lang の編集モードも登録部品へのリテラル JSON 呼び出しだけを受け付ける。追加文、リアクティブ状態、Query / Mutation、未知の部品は拒否する。登録済みのCompositionは、JSON内の検証済みchildrenを並べる。SDK に toolProvider は渡さない。ユーザーが入力した文字列は React のテキストとして描画する。
 
 ## 次の機能を追加する順序
 
@@ -105,3 +105,31 @@ SystemContext には表示の利用場所、短い JSON の原則、権限と完
 - 定義、参照データ、操作履歴、内部イベントは初期状態で折りたたむ。操作履歴は現在の source への送信のみを対象に、処理中・完了・失敗・再確認を日本語で示す。操作がない場合は説明を表示する。入力値は履歴へ複製しない。
 - アプリの基本文字設定は CSS の base layer に置き、共通部品の選択状態や文字サイズを上書きしない。
 - タイマー通知は会話欄の子要素に置く。分割画面の直下へ3つ目の要素を追加して、アーティファクトを次の行へ押し出さない。
+
+
+## 音楽と生成状態の組合せ（2026-10-11）
+
+DesignSystemのMusicPlayer・Playlist・GenerationStatusをOpenUIに登録した。既存の単一view形式を維持し、次のJSONで他の登録済みviewと組み合わせる。layoutはstack/grid、childrenは1〜12個の登録済みview。ネストしたlayout、任意URL・関数・未知のpropsは受け付けない。
+
+```json
+{
+  "view": "layout",
+  "direction": "grid",
+  "title": "楽曲とプレイリスト",
+  "children": [
+    { "view": "generation-status", "source": "generation-saved-a" },
+    { "view": "music-player", "source": "music-saved-a" },
+    { "view": "playlist", "source": "music-saved-a" }
+  ]
+}
+```
+
+music-playerとplaylistはkind=musicのsourceを共有する。generation-statusはkind=generationを参照する。各sourceはホストの許可済みsnapshotに存在する必要があり、JSONを作っただけでは取得権限を得ない。Compositionも実際のOpenUI parser/Rendererを通り、子は登録済み表示へ接続する。
+
+Artifactのタブはkind=openuiとdefinition（JSON文字列）を保持する。専用のkind=musicとrenderMusicは廃止。MusicArtifactは表示実装ではなく、認証済みmusicList/audioからruntimeを組み立てるホストになった。表示はArtifactRendererへdefinitionとruntimeを渡す。音声・Blob URL・関数は保存JSONに含めない。現行のタブ保持はインメモリーであり、再読込時は楽曲一覧から構成を作る。新たな永続化DBは追加していない。
+
+ホストは表示のsourceを許可済み会話の楽曲一覧と照合し、選択した完了曲だけ音声を取得する。選曲イベントはsource・revision・曲IDと再生可否を検査する。取得中の取消とURLの解放を行い、前の楽曲の取得結果を新しい選択へ採用しない。再生・一時停止・シーク・10秒移動はプレイヤー内、選曲はホスト状態。曲変更で新しい音声を取得した後は再生ボタンで開始する。
+
+生成状態は同じJSONのままsource更新で反映する。音声取得まで待機表示、取得後はプレイヤーとPlaylistを表示する。実測進捗だけを表示し、音楽APIに取消・再試行の接続がないこの画面では、それらのボタンを公開しない。汎用generation sourceはホストがcanCancel/canRetryを許可した場合だけdispatchへ接続できる。
+
+部分・結合確認と保存済みMP3によるブラウザ確認は [検証記録](../spec/verification/music-openui-2026-10-11/README.md) を参照する。曲切替の2曲目は同じ保存済み音声を使う試験用メタデータであり、別の楽曲を生成したものではない。

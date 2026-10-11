@@ -1,0 +1,112 @@
+.music-player {
+	color: var(--foreground);
+	background: var(--card);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	padding: var(--ui-card-padding);
+	min-width: 0;
+}
+.music-player {
+	display: grid;
+	gap: 1.25rem;
+}
+.music-player-art {
+	display: grid;
+	place-items: center;
+	aspect-ratio: 1;
+	width: min(100%, 12rem);
+	margin: auto;
+	border-radius: var(--radius);
+	background: var(--muted);
+	color: var(--muted-foreground);
+}
+.music-player-art svg {
+	width: 3rem;
+	height: 3rem;
+}
+.music-player-heading {
+	text-align: center;
+	overflow-wrap: anywhere;
+}
+.music-player-heading h3 {
+	margin: 0;
+	font-size: 1.25rem;
+	font-weight: 600;
+}
+.music-player-heading p {
+	color: var(--muted-foreground);
+	margin: 0.25rem 0 0;
+}
+.music-player-timeline input,
+.music-player-volume input {
+	width: 100%;
+	min-width: 0;
+	accent-color: var(--primary);
+	min-height: 1.5rem;
+	cursor: pointer;
+}
+.music-player-timeline input:disabled {
+	cursor: default;
+	opacity: 0.5;
+}
+.music-player-timeline > div {
+	display: flex;
+	justify-content: space-between;
+	color: var(--muted-foreground);
+	font-size: 0.875rem;
+	font-variant-numeric: tabular-nums;
+}
+.music-player-controls {
+	display: flex;
+	align-items: center;
+	justify-content: space-evenly;
+	gap: 0.25rem;
+}
+.music-player-controls button {
+	flex-shrink: 0;
+	min-width: 2.75rem;
+	min-height: 2.75rem;
+}
+.music-player-controls .music-player-toggle {
+	border-radius: 50%;
+	width: 3.5rem;
+	height: 3.5rem;
+}
+.music-player-skip {
+	display: grid;
+	justify-items: center;
+	position: relative;
+}
+.music-player-skip svg {
+	width: 1.6rem;
+	height: 1.6rem;
+}
+.music-player-skip small {
+	font-size: 0.55rem;
+	position: absolute;
+	top: 0.5rem;
+}
+.music-player-volume {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	color: var(--muted-foreground);
+	max-width: 14rem;
+	width: 100%;
+	margin: auto;
+}
+.music-player-volume svg {
+	flex-shrink: 0;
+	width: 1.25rem;
+}
+
+.music-player input:focus-visible {
+	outline: 2px solid var(--ring);
+	outline-offset: 3px;
+}
+.music-player-controls {
+	border: 0;
+	padding: 0;
+	margin: 0;
+	min-width: 0;
+}

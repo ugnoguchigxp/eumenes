@@ -8,9 +8,19 @@ import {
 	SettingsForm,
 	SmallForm,
 } from "./components";
-import { parseRequest, viewRegistry } from "./contracts";
+import {
+	layoutSchema,
+	parseRequest,
+	viewRegistry,
+	type ArtifactRequest,
+} from "./contracts";
+
+import { MusicView, PlaylistView, GenerationView } from "./media-components";
 
 const renderers = {
+	"music-player": MusicView,
+	playlist: PlaylistView,
+	"generation-status": GenerationView,
 	components: ComponentsView,
 	"generated-image": ImageFrame,
 	question: QuestionView,
@@ -18,23 +28,43 @@ const renderers = {
 	memory: MemoryReview,
 	settings: SettingsForm,
 };
+function RegisteredView({ request }: { request: ArtifactRequest }) {
+	const Component = renderers[request.view];
+	return <Component request={request} />;
+}
 export const artifactLibrary = createLibrary({
 	id: "eumenes-artifact-v1",
-	components: Object.values(viewRegistry).map((definition) =>
+	components: [
+		...Object.values(viewRegistry).map((definition) =>
+			defineComponent({
+				name: definition.name,
+				description: definition.label,
+				props: z.object({ request: definition.schema }),
+				component: ({ props }) => (
+					<RegisteredView request={parseRequest(props.request)} />
+				),
+			}),
+		),
 		defineComponent({
-			name: definition.name,
-			description: definition.label,
-			props: z.object({ request: definition.schema }),
+			name: "Composition",
+			description: "登録済みの表示を並べる",
+			props: z.object({ request: layoutSchema }),
 			component: ({ props }) => {
-				const request = parseRequest(props.request);
-				const Component = renderers[request.view];
+				const request = layoutSchema.parse(props.request);
 				return (
-					<Component
-						key={`${request.view}:${request.source ?? "inline"}`}
-						request={request}
-					/>
+					<section
+						aria-label={request.title ?? "組合せ表示"}
+						className={`aui-composition aui-composition-${request.direction}`}
+					>
+						{request.children.map((child, index) => (
+							<RegisteredView
+								key={`${index}:${child.view}:${child.source ?? "inline"}`}
+								request={child}
+							/>
+						))}
+					</section>
 				);
 			},
 		}),
-	),
+	],
 });

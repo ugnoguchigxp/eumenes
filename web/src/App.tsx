@@ -1,3 +1,6 @@
+import { musicArtifactDefinition } from "./domains/music/artifact-definition";
+import { useMusicArtifacts } from "./domains/music";
+import { MusicArtifact } from "./components/domains/music/MusicArtifact";
 import { ResearchTaskCard } from "./domains/agent-runtime";
 import {
 	QueryClient,
@@ -127,6 +130,32 @@ function MicLevelMeter({ store }: { store: AudioStore }) {
 	);
 }
 
+function useOpenMusic(open: ReturnType<typeof useArtifactWorkspace>["open"]) {
+	return useCallback(
+		(musicId: string, title: string) =>
+			open({
+				id: `music:${musicId}`,
+				kind: "openui",
+				definition: musicArtifactDefinition(musicId),
+				title,
+			}),
+		[open],
+	);
+}
+function useOpenTimer(open: ReturnType<typeof useArtifactWorkspace>["open"]) {
+	return useCallback(
+		(ref: { timerId: string }, title: string) => {
+			open({
+				id: `timer:${ref.timerId}`,
+				kind: "timer",
+				title,
+				timerId: ref.timerId,
+			});
+		},
+		[open],
+	);
+}
+
 function Workspace({
 	client,
 	store,
@@ -156,17 +185,8 @@ function Workspace({
 		return () => window.removeEventListener("beforeunload", prevent);
 	}, []);
 	const artifacts = useArtifactWorkspace();
-	const openTimer = useCallback(
-		(ref: { timerId: string }, title: string) => {
-			artifacts.open({
-				id: `timer:${ref.timerId}`,
-				kind: "timer",
-				title,
-				timerId: ref.timerId,
-			});
-		},
-		[artifacts],
-	);
+	useMusicArtifacts(client, "main", useOpenMusic(artifacts.open));
+	const openTimer = useOpenTimer(artifacts.open);
 	const settings = useSettings(client);
 	const usage = useQuery({
 		queryKey: [queryRoots.inferenceUsage, client.identity],
@@ -448,6 +468,13 @@ function Workspace({
 								activeTabId={artifacts.activeTabId}
 								onSelect={artifacts.select}
 								onClose={artifacts.close}
+								renderOpenUI={(definition) => (
+									<MusicArtifact
+										key={definition}
+										client={client}
+										definition={definition}
+									/>
+								)}
 								renderTimer={(timerId) => (
 									<TimerArtifact client={client} timerId={timerId} />
 								)}

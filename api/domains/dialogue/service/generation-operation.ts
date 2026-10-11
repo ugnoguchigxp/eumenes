@@ -51,7 +51,20 @@ export function settleConversationOperation(
 	// on the same policy request. No control text is adopted or collected.
 	if (input.world)
 		worldContext?.releaseInTransaction(tx, run.id, run.conversationId);
-	if (result.operation.kind === "delegation") {
+	if (result.operation.kind === "music") {
+		if (!deps.music) throw new Error("music_unavailable");
+		const original = conversation
+			.messagesInTransaction(tx, run.conversationId)
+			.find((m) => m.id === run.inputMessageId)!.text;
+		const saved = deps.music.startInTransaction(tx, {
+			runId: run.id,
+			conversationId: run.conversationId,
+			question: result.operation.question,
+			originalRequest: original,
+			deadline: Date.parse(run.deadlineAt!),
+		});
+		linkAnswer(tx, run.id, saved.jobId);
+	} else if (result.operation.kind === "delegation") {
 		if (!deps.delegation) throw new Error("dots_unavailable");
 		deps.delegation.invokeInTransaction(
 			tx,

@@ -1,3 +1,4 @@
+import { musicClient } from "./music";
 import { dotsClient } from "./dots";
 import { requirementsClient } from "./requirements";
 import { codingSupervisionClient } from "./coding-supervision";
@@ -26,6 +27,7 @@ export { ApiError, ApiConnectionError } from "./transport";
 export function createClient(baseUrl: string, token?: string) {
 	const transport = createTransport(baseUrl, token);
 	return {
+		...musicClient(transport),
 		...requirementsClient(transport),
 		...dotsClient(transport),
 		...attitudeDatasetClient(transport),

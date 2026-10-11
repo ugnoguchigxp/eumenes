@@ -1,3 +1,4 @@
+import { registerMusic, type MusicService } from "../domains/music";
 import {
 	registerCodingSupervision,
 	type CodingSupervision,
@@ -81,6 +82,7 @@ export type AppServices = {
 	continuity?: ContinuityService;
 	changes?: Changes;
 	serviceTests?: ServiceTests;
+	music?: MusicService;
 	tasks?: TasksService;
 	coding?: CodingService;
 	codingSupervision?: CodingSupervision;
@@ -106,6 +108,7 @@ export function appModules(services: AppServices): AppModule[] {
 				),
 		},
 		s.dotsModule,
+		s.music && { mount: (app) => registerMusic(app, s.music!) },
 		s.capabilities && {
 			mount: (app) => registerCapabilities(app, s.capabilities!),
 		},

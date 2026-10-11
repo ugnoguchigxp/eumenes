@@ -1,3 +1,5 @@
+import { createMusic } from "../domains/music";
+import type { LarmPlayground } from "../domains/larm";
 import {
 	fixtureResearchOutput,
 	fixtureVerification,
@@ -48,6 +50,7 @@ const stock = "AAPLの株価は250.12 USD、2026-10-08終値です。";
 export async function harness(
 	options: {
 		model?: LarmPort;
+		musicGateway?: () => LarmPlayground;
 		codexResearch?: {
 			model: string;
 			execute: (
@@ -433,8 +436,23 @@ export async function harness(
 		timers,
 		conversation: options.history ? conversation : undefined,
 		reconcileThrottleMs: 0,
+		music: !!options.musicGateway,
 	});
+	const music = options.musicGateway
+		? createMusic({
+				store,
+				queue,
+				inference,
+				capabilities: toolchain.capabilities,
+				gateway: options.musicGateway,
+				onJob: (db, runId, jobId) =>
+					dialogue.linkOperationJobInTransaction(db, runId, jobId),
+				onFinished: (db, runId) =>
+					dialogue.finishOperationInTransaction(db, runId),
+			})
+		: undefined;
 	const dialogue = createDialogueService({
+		music,
 		store,
 		conversation,
 		larm: inference,
@@ -455,6 +473,7 @@ export async function harness(
 		token: "fixture-token-for-toolchain-browser",
 		origin: process.env.EUMENES_ORIGIN ?? "http://localhost",
 		changes,
+		music,
 		settings,
 		conversation,
 		dialogue,
@@ -480,6 +499,7 @@ export async function harness(
 		});
 	return {
 		dir,
+		music,
 		app,
 		store,
 		dialogue,

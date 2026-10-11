@@ -91,3 +91,7 @@ export { DEFAULT_THEME, THEME_COLORS, THEME_CONSTANTS } from "./styles/themes";
 // Utils
 // ============================================
 export { cn } from "./utils/cn";
+
+export * from "./components/MusicPlayer";
+export * from "./components/Playlist";
+export * from "./components/GenerationStatus";

@@ -1,0 +1,26 @@
+$ bun scripts/verify.ts --domain artifact
+[verify] selected=artifact dependencyClosure=artifact,delivery,avatar,conversation testClosure=delivery,avatar,conversation,artifact
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts web/src/domains/artifact web/src/components/domains/artifact packages/artifact-ui/src
+size-budget ok (19 files)
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check web/src/domains/artifact web/src/components/domains/artifact packages/artifact-ui/src
+$ oxfmt --check web/src/domains/artifact web/src/components/domains/artifact packages/artifact-ui/src
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 6ms on 28 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint web/src/domains/artifact web/src/components/domains/artifact packages/artifact-ui/src
+$ oxlint --deny-warnings web/src/domains/artifact web/src/components/domains/artifact packages/artifact-ui/src
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun x tsc -p /Users/y.noguchi/Code/eumenes/verification-reports/tsconfig.selected.json
+[verify] TypeScript workspace closure: 30 files; web/src/domains, packages/artifact-ui/src, packages/design-system/dist, packages/design-system/src, web/src/components
+[verify] domain tests: /Users/y.noguchi/.bun/bin/bun run test:domain -- artifact
+$ bun scripts/test-domain.ts artifact
+
+ RUN  v4.1.8 /Users/y.noguchi/Code/eumenes
+
+
+ Test Files  7 passed (7)
+      Tests  47 passed (47)
+   Start at  18:35:30
+   Duration  2.87s (transform 535ms, setup 0ms, import 1.97s, tests 592ms, environment 13.66s)
+
+[verify] passed 6572 ms

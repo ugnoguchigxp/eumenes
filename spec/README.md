@@ -47,6 +47,7 @@ archive の基準: 本文の実施記録や完了記述で全項目が完了と�
 
 | 場所 | 内容 |
 | --- | --- |
+| [music-toolchain-work-record-2026-10-11.md](music-toolchain-work-record-2026-10-11.md) | 楽曲生成と再生の着手記録。既存API・会話・Artifactの調査、未決事項、Skill化に向けた手順候補。製品実装・楽曲生成・試験は未実施 |
 | [verification/llm-native-remaining-domains-2026-10-10/](verification/llm-native-remaining-domains-2026-10-10/README.md) | Goalsの内容同一視撤去・World保留入力修正の実施記録。Memoryは接続前条件の文書化のみ、live・実機器未実施 |
 | [reviews/llm-native-remaining-domains-2026-10-10/](reviews/llm-native-remaining-domains-2026-10-10/README.md) | Memory・World・coding系と隣接domainのLLM-Native監査。到達性・反証・再現・fixture420件、live未実施 |
 | [verification/](verification/) | 機能ごとの検証記録(fixture、live、実機器を分けて記録)と画面キャプチャ |

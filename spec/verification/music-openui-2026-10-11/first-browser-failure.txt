@@ -1,0 +1,6 @@
+Error: click: Error: strict mode violation: getByRole('button', { name: /\u4FDD\u5B58\u6E08\u307F\u97F3\u58F0\u30FB\u9078\u66F2\u8A66\u9A13\u7528\u30B3\u30D4\u30FC/ }) resolved to 2 elements:
+    1) <button type="button" class="ds-tabs-close" aria-label="保存済み音声・選曲試験用コピーを閉じる">…</button> aka getByRole('button', { name: '保存済み音声・選曲試験用コピーを閉じる' })
+    2) <button type="button" class="music-playlist-row">…</button> aka getByRole('button', { name: '保存済み音声・選曲試験用コピー 保存済みの30' })
+
+Call log:
+[2m  - waiting for getByRole('button', { name: /\u4FDD\u5B58\u6E08\u307F\u97F3\u58F0\u30FB\u9078\u66F2\u8A66\u9A13\u7528\u30B3\u30D4\u30FC/ })[22m

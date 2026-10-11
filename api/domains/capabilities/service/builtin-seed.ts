@@ -1,3 +1,4 @@
+import { musicBuiltins } from "../builtin/music";
 import type { Database } from "bun:sqlite";
 import type { Definition } from "../contracts";
 import { builtins } from "../builtin/web-research";
@@ -29,6 +30,8 @@ export function seedBuiltins(
 			continue;
 		registerBuiltinInTransaction(db, d);
 	}
+	if (backends.has("music"))
+		for (const d of musicBuiltins) registerBuiltinInTransaction(db, d);
 	if (backends.has("dots"))
 		for (const d of dotsBuiltins) registerBuiltinInTransaction(db, d);
 	if (backends.has("history"))

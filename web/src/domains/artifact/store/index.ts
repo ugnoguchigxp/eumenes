@@ -5,7 +5,8 @@ export type ArtifactTab =
 			kind: "markdown" | "showcase";
 			content: string;
 	  }
-	| { id: string; kind: "timer"; title: string; timerId: string };
+	| { id: string; kind: "timer"; title: string; timerId: string }
+	| { id: string; kind: "openui"; title: string; definition: string };
 
 export type ArtifactWorkspaceState = {
 	tabs: ArtifactTab[];

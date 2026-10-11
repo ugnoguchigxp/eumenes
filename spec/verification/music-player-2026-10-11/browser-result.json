@@ -1,0 +1,23 @@
+{
+  "result": "passed",
+  "media": {
+    "time": 0.663218,
+    "duration": 30,
+    "paused": true
+  },
+  "checks": [
+    "play",
+    "pause",
+    "seek keyboard",
+    "+10s",
+    "-10s",
+    "next",
+    "previous",
+    "playlist selection",
+    "playing track transition",
+    "360px no overflow",
+    "indeterminate generation",
+    "measured generation progress"
+  ],
+  "errors": []
+}
