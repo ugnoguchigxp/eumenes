@@ -261,3 +261,17 @@ test("cancellation returns even when the child never closes its streams", async 
 		await f.close();
 	}
 });
+
+test("a completed turn without a final-response file is an empty answer", async () => {
+	const f = await fixture(
+		'console.log(JSON.stringify({ type: "turn.completed" }));',
+	);
+	try {
+		const adapter = createCodexResearch({ HOME: f.dir, PATH: "" }, f.command)!;
+		await expect(
+			adapter.execute(messages, AbortSignal.timeout(3000), control),
+		).rejects.toThrow("codex_research_empty_output");
+	} finally {
+		await f.close();
+	}
+});

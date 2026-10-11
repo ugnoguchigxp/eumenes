@@ -547,3 +547,85 @@ test("every route carries the shared rules, and the step contract is also return
 		);
 	}
 });
+
+test("a view returned by several operations is presented once and never overflows the step", () => {
+	const catalog = new EvidenceCatalog();
+	const hit = (i: number) => ({
+		...source(`検索抜粋${i}の本文。`.repeat(60)),
+		sourceId: `hit${i}`,
+		viewId: undefined,
+	});
+	const sources: Source[] = [];
+	for (let step = 0; step < 12; step++) {
+		// Each lookup returns two new hits and repeats the earlier ones.
+		sources.push(hit(step * 2), hit(step * 2 + 1), ...sources.slice(0, 4));
+		const context = workerContext(task, prepared, [], sources, [], catalog, 0);
+		const materials = JSON.parse(
+			context.messages[2]!.content.slice(
+				context.messages[2]!.content.indexOf("=") + 1,
+			),
+		);
+		const refs = materials.observations.flatMap((o: any) =>
+			o.excerpts.map((e: any) => e.reference),
+		);
+		expect(new Set(refs).size).toBe(refs.length);
+	}
+	expect(catalog.full).toBe(true);
+});
+
+test("a large frozen request and question still leave a full catalog presentable", () => {
+	const catalog = new EvidenceCatalog();
+	const long = "条件を満たす資料を確認してください。".repeat(440);
+	const big = {
+		...task,
+		input_json: JSON.stringify({ originalRequest: long }),
+	} as Task;
+	const p = { ...prepared, input: { question: long } } as Prepared;
+	const sources = Array.from({ length: 30 }, (_, i) => ({
+		...source(`資料${i}の本文です。`.repeat(150)),
+		sourceId: `s${i}`,
+		viewId: `v${i}`,
+		title: "長い見出し".repeat(60),
+	}));
+	for (let i = 1; i <= sources.length; i += 5) {
+		const context = workerContext(
+			big,
+			p,
+			[],
+			sources.slice(0, i),
+			[],
+			catalog,
+			0,
+		);
+		expect(
+			Buffer.byteLength(JSON.stringify(context.messages)),
+		).toBeLessThanOrEqual(65536);
+	}
+	expect(catalog.full).toBe(true);
+});
+
+test("an empty page keeps its cursor metadata visible", () => {
+	const empty = {
+		...source(""),
+		sourceId: "empty",
+		viewId: "v-empty",
+		nextCursor: "c2",
+	};
+	const context = workerContext(
+		task,
+		prepared,
+		[],
+		[empty],
+		[],
+		new EvidenceCatalog(),
+		0,
+	);
+	const materials = JSON.parse(
+		context.messages[2]!.content.slice(
+			context.messages[2]!.content.indexOf("=") + 1,
+		),
+	);
+	expect(materials.observations).toEqual([
+		expect.objectContaining({ nextCursor: "c2", excerpts: [] }),
+	]);
+});
