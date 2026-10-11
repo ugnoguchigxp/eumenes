@@ -1,0 +1,40 @@
+bun test v1.4.2 (744846f84)
+
+api/application/music-e2e.test.ts:
+(pass) music pipeline success: conversation, worker, API, result, audio [77.92ms]
+(pass) music pipeline failure: conversation, worker, API, result, audio [56.03ms]
+(pass) music pipeline invalid-plan: conversation, worker, API, result, audio [61.19ms]
+(pass) cancel music while the provider is running, send DELETE and never adopt audio [57.85ms]
+
+api/domains/music/test/music.test.ts:
+(pass) music context carries the original theme as data and the registered skill as instructions [0.16ms]
+
+api/domains/larm/test/playground.test.ts:
+(pass) catalog merges selector-only cold services without starting anything [0.42ms]
+(pass) every warm provider executes independently, validates claim and releases [0.99ms]
+(pass) semantic health is distinct from catalog presence, and cold diagnosis does not generate [0.27ms]
+(pass) image and music fetch artifacts without making a warm connection [0.23ms]
+(pass) music requests Opus once and fetches Ogg Opus with Control authentication after completion [1.57ms]
+(pass) music rejects invalid Opus result: not-ogg [0.27ms]
+(pass) music rejects invalid Opus result: vorbis [0.18ms]
+(pass) music rejects invalid Opus result: truncated [0.18ms]
+(pass) music rejects invalid Opus result: mime-mismatch [0.16ms]
+(pass) music rejects invalid Opus result: unknown-format [0.16ms]
+(pass) music still accepts an existing wav result [0.20ms]
+(pass) music still accepts an existing flac result [0.10ms]
+(pass) image POST failures are not retried and late cancellation is reported unknown [0.13ms]
+(pass) artifact origin mismatch never forwards control credential [0.12ms]
+(pass) music cancellation collects a late job and confirms remote cancellation [0.13ms]
+(pass) invalid claim cannot run inference and still releases connection [0.16ms]
+(pass) direct service runtime model IDs are returned separately from catalog IDs [0.11ms]
+(pass) malformed local hostnames cannot receive credentials [0.01ms]
+(pass) playground claims on the LARM host, another port included, are accepted [0.18ms]
+(pass) playground claims on another private host are refused unless listed [0.35ms]
+(pass) a missing baseUrl leaves the playground unconfigured [0.07ms]
+(pass) image uses the discovered service URL and preserves arbitrary dimensions and seed [0.20ms]
+(pass) image defaults an omitted edge to 512, format to webp and seed to zero [0.11ms]
+
+ 28 pass
+ 0 fail
+ 105 expect() calls
+Ran 28 tests across 3 files. [512.00ms]

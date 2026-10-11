@@ -1,0 +1,77 @@
+{
+  "visualizerContained": true,
+  "sideBySide": true,
+  "noVerticalScroll": true,
+  "noHorizontalScroll": true,
+  "bottom": 1000,
+  "panelBottom": 1000,
+  "parents": [
+    {
+      "tag": "DIV",
+      "class": "aui-music-workspace",
+      "height": 958,
+      "display": "flex"
+    },
+    {
+      "tag": "DIV",
+      "class": "",
+      "height": 958,
+      "display": "flex"
+    },
+    {
+      "tag": "DIV",
+      "class": "",
+      "height": 958,
+      "display": "flex"
+    },
+    {
+      "tag": "DIV",
+      "class": "artifact-ui",
+      "height": 958,
+      "display": "flex"
+    },
+    {
+      "tag": "DIV",
+      "class": "ds-tabs-content artifact-panel-body",
+      "height": 958,
+      "display": "block"
+    },
+    {
+      "tag": "ASIDE",
+      "class": "artifact-panel",
+      "height": 1000,
+      "display": "grid"
+    },
+    {
+      "tag": "DIV",
+      "class": "workspace-layout workspace-layout-split",
+      "height": 1000,
+      "display": "grid"
+    },
+    {
+      "tag": "MAIN",
+      "class": "app-shell",
+      "height": 1000,
+      "display": "flex"
+    },
+    {
+      "tag": "DIV",
+      "class": "",
+      "height": 1000,
+      "display": "block"
+    },
+    {
+      "tag": "BODY",
+      "class": "",
+      "height": 1000,
+      "display": "block"
+    },
+    {
+      "tag": "HTML",
+      "class": "",
+      "height": 1000,
+      "display": "block"
+    }
+  ],
+  "playerBottom": 999
+}

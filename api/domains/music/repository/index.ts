@@ -14,6 +14,18 @@ CREATE TABLE music_generations (
 CREATE INDEX music_conversation ON music_generations(conversation_id);
 `,
 	},
+	{
+		id: "music/0002-playlists",
+		after: ["music/0001-init"],
+		sql: `
+CREATE TABLE music_playlists (
+ id TEXT PRIMARY KEY, run_id TEXT NOT NULL UNIQUE, conversation_id TEXT NOT NULL,
+ record_json TEXT NOT NULL, request_json TEXT NOT NULL, bindings_json TEXT NOT NULL,
+ deadline INTEGER NOT NULL, queue_job_id TEXT
+);
+CREATE INDEX music_playlist_conversation ON music_playlists(conversation_id);
+`,
+	},
 ];
 export type Row = {
 	id: string;

@@ -50,6 +50,24 @@ const manifests = (life: Life) =>
 		db.query("SELECT manifest_id, status FROM world_input_manifest").all(),
 	) as { manifest_id: string; status: string }[];
 
+test("model JSON syntax is corrected before World candidate and source validation", async () => {
+	const life = await ready();
+	try {
+		const rig = rigFor(life, (call) => {
+			const output = modelOutput(candidate(TEXT, utteranceId(call)));
+			return output.slice(0, -1) + ",}";
+		});
+		await drain(rig);
+		expect(lastReport(rig)).toMatchObject({
+			disposition: "adopted",
+			accepted: 1,
+		});
+		expect(assertionRows(life)).toHaveLength(1);
+	} finally {
+		await life.cleanup();
+	}
+});
+
 test("A19 a valid candidate becomes a CANDIDATE claim with host-assigned ids, a manifest and Memory dependents", async () => {
 	const life = await ready();
 	try {

@@ -1,9 +1,9 @@
 import { Music2, Volume2 } from "lucide-react";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { cn } from "../../utils/cn";
 import { formatClockSeconds } from "../DigitalClock/format";
 import { PlaybackControls } from "./PlaybackControls";
-import type { MusicTrack } from "./types";
+import type { MusicTrack, MusicPlaybackState } from "./types";
 import { usePlayback } from "./usePlayback";
 import "./MusicPlayer.css";
 
@@ -14,19 +14,32 @@ export type MusicPlayerProps = {
 	/** Host chooses whether reaching the end should advance the playlist. */
 	onEnded?: () => void;
 	className?: string;
+	compact?: boolean;
+	/** A selected track is being loaded; retain the preceding playback intent. */
+	loading?: boolean;
+	onPlaybackChange?: (state: MusicPlaybackState) => void;
 };
 
 export function MusicPlayer(props: MusicPlayerProps) {
 	const resume = useRef(false);
 	if (!props.track) {
-		resume.current = false;
+		if (!props.loading) resume.current = false;
 		return (
 			<section
-				className={cn("music-player", props.className)}
+				className={cn(
+					"music-player",
+					"music-player-empty",
+					props.compact && "music-player-compact",
+					props.className,
+				)}
 				aria-label="音楽プレイヤー"
 			>
 				<Music2 aria-hidden="true" />
-				<p>楽曲を選択してください。</p>
+				<p>
+					{props.loading
+						? "楽曲を読み込んでいます。"
+						: "楽曲を選択してください。"}
+				</p>
 			</section>
 		);
 	}
@@ -49,6 +62,8 @@ function Player({
 	onNext,
 	onEnded,
 	className,
+	compact,
+	onPlaybackChange,
 	autoPlay,
 	onPlayingChange,
 }: MusicPlayerProps & {
@@ -56,18 +71,43 @@ function Player({
 	autoPlay: boolean;
 	onPlayingChange: (playing: boolean) => void;
 }) {
-	const playback = usePlayback(autoPlay);
+	const playback = usePlayback(autoPlay, !!onPlaybackChange);
+	useEffect(() => {
+		onPlaybackChange?.({
+			id: track.id,
+			playing: playback.playing,
+			position: playback.position,
+			duration: playback.duration,
+			analyser: playback.analyser,
+			analysisError: playback.analysisError,
+		});
+	}, [
+		track.id,
+		onPlaybackChange,
+		playback.playing,
+		playback.position,
+		playback.duration,
+		playback.analyser,
+		playback.analysisError,
+	]);
 	return (
 		<section
-			className={cn("music-player", className)}
+			className={cn(
+				"music-player",
+				compact && "music-player-compact",
+				className,
+			)}
 			aria-label="音楽プレイヤー"
 		>
-			<div className="music-player-art" aria-hidden="true">
+			<div
+				className={cn("music-player-art", compact && "sr-only")}
+				aria-hidden="true"
+			>
 				<Music2 />
 			</div>
 			<div className="music-player-heading">
 				<h3>{track.title}</h3>
-				{track.subtitle && <p>{track.subtitle}</p>}
+				{!compact && track.subtitle && <p>{track.subtitle}</p>}
 			</div>
 			{/* Audio-only generated music; no video caption track. */}
 			{/* oxlint-disable-next-line jsx-a11y/media-has-caption */}

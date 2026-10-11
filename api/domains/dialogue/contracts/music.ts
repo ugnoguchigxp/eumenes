@@ -10,5 +10,6 @@ export interface MusicPort {
 			deadline: number;
 		},
 	): { id: string; jobId: string };
+	startPlaybackInTransaction: MusicPort["startInTransaction"];
 	resultInTransaction(db: Database, runId: string): unknown | null;
 }

@@ -1,0 +1,54 @@
+{
+  "result": "passed",
+  "input": "verification-reports/music/2026-10-11T10-57-39.206Z/track.opus",
+  "mime": "audio/ogg",
+  "secondTrack": "same saved audio, fixture metadata copy",
+  "media": {
+    "duration": 30.0065,
+    "paused": true,
+    "readyState": 4
+  },
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/api/music"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/saved-a/audio"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/saved-a/audio"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/saved-b/audio"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/saved-a/audio"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/saved-b/audio"
+    }
+  ],
+  "errors": []
+}

@@ -1,0 +1,35 @@
+$ bun scripts/verify.ts --domain music
+[verify] selected=music dependencyClosure=capabilities,delivery,attitude-dataset,larm,settings,inference,queue,music testClosure=capabilities,delivery,attitude-dataset,larm,tts-dictionary,queue,tasks,dots,settings,inference,music
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts api/domains/music web/src/domains/music web/src/components/domains/music
+size-budget ok (16 files)
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check api/domains/music web/src/domains/music web/src/components/domains/music
+$ oxfmt --check api/domains/music web/src/domains/music web/src/components/domains/music
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 4ms on 19 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint api/domains/music web/src/domains/music web/src/components/domains/music
+$ oxlint --deny-warnings api/domains/music web/src/domains/music web/src/components/domains/music
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun x tsc -p /Users/y.noguchi/Code/eumenes/verification-reports/tsconfig.selected.json
+[verify] TypeScript workspace closure: 177 files; api/infrastructure/http.ts, api/infrastructure/chat-stream.ts, api/domains/larm, api/domains/music, api/infrastructure/flock.ts, api/infrastructure/logger.ts, api/infrastructure/sqlite, api/domains/capabilities, api/infrastructure/ignore-error.ts, api/infrastructure/bounded-read.ts, api/infrastructure/error-code.ts, api/domains/settings, api/domains/inference, api/domains/delivery, api/domains/attitude-dataset, api/domains/queue, api/infrastructure/digest.ts, client/transport.ts, client/music.ts, api/domains/dots, client/dots.ts, client/requirements.ts, packages/coding-runner/src, api/domains/coding-supervision, api/domains/task-reports, client/coding-supervision.ts, api/infrastructure/validation-log.ts, api/domains/tool-runtime, api/domains/agent-runtime, client/agent-runtime.ts, client/attitude-dataset.ts, api/domains/conversation, client/conversation.ts, api/domains/dialogue, client/run-stream.ts, client/dialogue.ts, client/events.ts, client/larm.ts, api/domains/memory, client/memory.ts, client/queue.ts, api/domains/research-routes, client/research-routes.ts, api/domains/scheduler, client/scheduler.ts, client/settings.ts, api/domains/service-tests, client/service-tests.ts, api/domains/tts-dictionary, client/tts-dictionary.ts, api/domains/tasks, client/tasks.ts, api/domains/coding, client/coding.ts, api/domains/timers, client/timers.ts, api/domains/voice-dialogue, client/voice-dialogue.ts, api/domains/web-research, client/web-research.ts, api/domains/world, client/world.ts, client/index.ts, packages/artifact-ui/src, web/src/queryKeys.ts, web/src/domains, packages/design-system/dist, web/src/components
+[verify] domain tests: /Users/y.noguchi/.bun/bin/bun run test:domain -- music
+$ bun scripts/test-domain.ts music
+bun test v1.4.2 (744846f84)
+
+api/domains/music/test/music.test.ts:
+(pass) music context carries the original theme as data and the registered skill as instructions [0.68ms]
+
+ 1 pass
+ 0 fail
+ 5 expect() calls
+Ran 1 test across 1 file. [69.00ms]
+
+ RUN  v4.1.8 /Users/y.noguchi/Code/eumenes
+
+
+ Test Files  2 passed (2)
+      Tests  9 passed (9)
+   Start at  20:45:09
+   Duration  1.21s (transform 337ms, setup 0ms, import 797ms, tests 498ms, environment 751ms)
+
+[verify] passed 4167 ms

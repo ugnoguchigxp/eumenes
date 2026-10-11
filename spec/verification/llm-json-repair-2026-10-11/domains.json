@@ -1,0 +1,40 @@
+{
+  "verificationKind": "fixture",
+  "domains": [
+    {
+      "domain": "agent-runtime",
+      "result": "pass",
+      "durationMs": 5085
+    },
+    {
+      "domain": "dialogue",
+      "result": "pass",
+      "durationMs": 12964
+    },
+    {
+      "domain": "music",
+      "result": "pass",
+      "durationMs": 8001
+    },
+    {
+      "domain": "inference",
+      "result": "pass",
+      "durationMs": 12488
+    },
+    {
+      "domain": "coding-supervision",
+      "result": "pass",
+      "durationMs": 4989
+    },
+    {
+      "domain": "voice-dialogue",
+      "result": "pass",
+      "durationMs": 14222
+    },
+    {
+      "domain": "world",
+      "result": "pass",
+      "durationMs": 22480
+    }
+  ]
+}

@@ -3,6 +3,7 @@ export class ApiError extends Error {
 		public status: number,
 		message: string,
 		public requestId?: string,
+		public detail?: string,
 	) {
 		super(message);
 	}
@@ -42,11 +43,13 @@ export function createTransport(baseUrl: string, token?: string) {
 					.json()
 					.catch(() => ({ error: `HTTP ${response.status}` }))) as {
 					error?: string;
+					message?: string;
 				};
 				throw new ApiError(
 					response.status,
 					error.error ?? `HTTP ${response.status}`,
 					response.headers.get("X-Request-Id") ?? undefined,
+					error.message,
 				);
 			}
 			return response;

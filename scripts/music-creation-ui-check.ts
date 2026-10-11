@@ -1,0 +1,251 @@
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { chromium, expect as baseExpect } from "@playwright/test";
+import { harness } from "../api/application/toolchain.fixture";
+import { musicFixture, musicTestPlan } from "../api/application/music.fixture";
+import { createFixture } from "../tests/browser/fixture";
+const expect = baseExpect.configure({ timeout: 20000 });
+const out = resolve("verification-reports/music-creation-ui");
+mkdirSync(out, { recursive: true });
+const f = createFixture();
+const webPort = await f.port();
+const origin = `http://127.0.0.1:${webPort}`;
+process.env.EUMENES_ORIGIN = origin;
+const token = "fixture-token-for-toolchain-browser";
+const audio = readFileSync(
+	"spec/verification/music-opus-2026-10-11/track.opus",
+);
+const lyrics = "[Verse]\n朝の光が窓を照らす\n新しい一日が始まる";
+const plan = {
+	...musicTestPlan,
+	title: "朝のオーケストラ",
+	prompt: "Orchestral pop with soft clear female vocals and piano",
+	instrumental: false,
+	lyrics,
+	language: "ja",
+};
+const fast = musicFixture("success", { plan });
+const slow = musicFixture("cancel", { plan });
+let hold = false;
+const h = await harness({
+	model: fast.model,
+	musicGateway: () => (hold ? slow.gateway() : fast.gateway()),
+});
+const requests: { path: string; method: string; body?: unknown }[] = [];
+const server = Bun.serve({
+	hostname: "127.0.0.1",
+	port: 0,
+	idleTimeout: 60,
+	fetch: async (request) => {
+		const path = new URL(request.url).pathname;
+		requests.push({
+			path,
+			method: request.method,
+			body:
+				request.method === "POST" ? await request.clone().json() : undefined,
+		});
+		if (
+			path.startsWith("/api/music/") &&
+			path.endsWith("/audio") &&
+			request.headers.get("authorization") === `Bearer ${token}`
+		)
+			return new Response(audio, { headers: { "Content-Type": "audio/ogg" } });
+		return h.app.fetch(request);
+	},
+});
+let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
+try {
+	const initial = await (
+		await h.request("/api/runs", {
+			requestId: crypto.randomUUID(),
+			conversationId: "main",
+			text: "オーケストラの曲を30秒作って",
+		})
+	).json();
+	await h.dialogue.waitForTerminal(initial.id, { timeoutMs: 5000 });
+	await f.launchWeb({
+		webPort,
+		apiPort: server.port!,
+		token,
+		cacheDir: `/tmp/eumenes-music-creation-${webPort}`,
+	});
+	await f.ready(origin);
+	browser = await chromium.launch({ headless: true });
+	const page = await browser.newPage({
+		viewport: { width: 1840, height: 1100 },
+		colorScheme: "dark",
+	});
+	const errors: string[] = [];
+	page.on("pageerror", (error) => errors.push(error.message));
+	await page.goto(origin);
+	const splitter = page.getByRole("separator", {
+		name: "会話とアーティファクトのサイズを調整",
+	});
+	await splitter.focus();
+	await page.keyboard.press("Home");
+	const workspace = page.getByRole("region", {
+		name: "音楽ワークスペース",
+		exact: true,
+	});
+	const prompt = page.getByRole("textbox", { name: "音楽作成プロンプト" });
+	await expect(
+		page.getByRole("button", { name: "イメージを作成", exact: true }),
+	).toBeDisabled();
+	await expect(
+		page.getByRole("img", { name: "楽曲イメージのモック" }),
+	).toBeVisible();
+	// Basic choices must fit the initial viewport, even with all 60 genres open.
+	const basicChoicesVisible = async () => {
+		const area = await page.locator(".music-creation-scroll").boundingBox();
+		const targets = [
+			page.getByRole("combobox", { name: "テンポ", exact: true }),
+			page.getByRole("combobox", { name: "長さ", exact: true }),
+			page.getByRole("group", { name: "雰囲気", exact: true }),
+			page.getByRole("group", { name: "楽器", exact: true }),
+		];
+		if (!area) return false;
+		for (const target of targets) {
+			const box = await target.boundingBox();
+			if (!box || box.y < area.y || box.y + box.height > area.y + area.height)
+				return false;
+		}
+		return true;
+	};
+	await expect.poll(basicChoicesVisible).toBe(true);
+	await page
+		.getByRole("combobox", { name: "テンポ", exact: true })
+		.selectOption("ゆったり");
+	await page
+		.getByRole("group", { name: "雰囲気", exact: true })
+		.getByRole("checkbox", { name: "落ち着いた", exact: true })
+		.check();
+	await expect(prompt).toHaveValue(/テンポ：ゆったり/);
+	await expect(prompt).toHaveValue(/雰囲気：落ち着いた/);
+	await workspace.screenshot({ path: `${out}/overview.png` });
+	await page
+		.getByRole("textbox", { name: "ジャンルを探す" })
+		.fill("オーケストラ");
+	await page
+		.getByRole("checkbox", { name: "オーケストラ", exact: true })
+		.check();
+	await expect(prompt).toHaveValue(/ジャンル：オーケストラ/);
+	await page.getByRole("textbox", { name: "ジャンルを探す" }).fill("");
+	await page.getByRole("checkbox", { name: "歌声を入れる" }).check();
+	await page
+		.getByRole("combobox", { name: "ボーカル", exact: true })
+		.selectOption("女性ボーカル");
+	await page
+		.getByRole("group", { name: "声質", exact: true })
+		.getByRole("checkbox", { name: "柔らかい", exact: true })
+		.check();
+	await page.getByRole("textbox", { name: "歌詞（任意）" }).fill(lyrics);
+	await expect(prompt).toHaveValue(/女性ボーカル/);
+	expect(await prompt.inputValue()).toContain(lyrics);
+	await page.screenshot({ path: `${out}/desktop.png`, fullPage: true });
+	await page.locator(".music-creation-scroll").evaluate((node) => {
+		node.scrollTop = 0;
+	});
+	await workspace.screenshot({ path: `${out}/genres.png` });
+	const written =
+		(await prompt.inputValue()) + "\n自由記述：静かな朝の曲にしたい。";
+	await prompt.fill(written);
+	await page.getByRole("checkbox", { name: "Ambient", exact: true }).check();
+	await expect(prompt).toHaveValue(written);
+	await expect(
+		page.getByRole("button", { name: "楽曲を生成", exact: true }),
+	).toBeDisabled();
+	await page
+		.getByRole("button", { name: "編集内容を使う", exact: true })
+		.click();
+	hold = true;
+	await page.getByRole("button", { name: "楽曲を生成", exact: true }).click();
+	await expect(
+		page.getByRole("button", { name: "生成を取り消す", exact: true }),
+	).toBeVisible();
+	await page.screenshot({ path: `${out}/generating.png`, fullPage: true });
+	await page
+		.getByRole("button", { name: "生成を取り消す", exact: true })
+		.click();
+	await expect(
+		page.getByText("楽曲の制作を取り消しました", { exact: true }),
+	).toBeVisible();
+	expect(
+		requests.filter(
+			(request) => request.path === "/api/runs" && request.method === "POST",
+		),
+	).toHaveLength(1);
+	expect(
+		requests.find(
+			(request) => request.path === "/api/runs" && request.method === "POST",
+		)?.body,
+	).toMatchObject({ text: expect.stringContaining(written) });
+	expect(requests.some((request) => request.path.endsWith("/cancel"))).toBe(
+		true,
+	);
+	hold = false;
+	await page.getByRole("button", { name: "楽曲を生成", exact: true }).click();
+	await expect(
+		page.getByRole("button", { name: "再生", exact: true }),
+	).toBeEnabled();
+	await page.getByRole("button", { name: "Visualizer", exact: true }).click();
+	await page.getByRole("button", { name: "再生", exact: true }).click();
+	await expect
+		.poll(() =>
+			page
+				.locator("audio")
+				.evaluate((element: HTMLAudioElement) => element.currentTime),
+		)
+		.toBeGreaterThan(0.3);
+	await page.getByRole("button", { name: "一時停止", exact: true }).click();
+	await page.getByRole("button", { name: "生成履歴", exact: true }).click();
+	await expect(
+		workspace.getByRole("region", { name: "楽曲生成", exact: true }),
+	).toBeVisible();
+	await page
+		.getByRole("button", { name: "この曲のプロンプトを使う", exact: true })
+		.click();
+	await expect(prompt).toHaveValue(plan.prompt);
+	await page.setViewportSize({ width: 390, height: 844 });
+	await splitter.focus();
+	await page.keyboard.press("Home");
+	await page
+		.getByRole("button", { name: "楽曲を生成", exact: true })
+		.scrollIntoViewIfNeeded();
+	await expect(
+		page.getByRole("button", { name: "楽曲を生成", exact: true }),
+	).toBeVisible();
+	expect(
+		await page.evaluate(
+			() => document.documentElement.scrollWidth <= window.innerWidth,
+		),
+	).toBe(true);
+	await page.screenshot({ path: `${out}/narrow.png`, fullPage: true });
+	expect(requests.some((request) => request.path.includes("/images/"))).toBe(
+		false,
+	);
+	expect(
+		[...fast.requests, ...slow.requests].some((request) =>
+			request.path.includes("/images/"),
+		),
+	).toBe(false);
+	expect(errors).toEqual([]);
+	writeFileSync(
+		`${out}/result.json`,
+		JSON.stringify(
+			{
+				requests,
+				errors,
+				fixture: true,
+				liveGeneration: false,
+				imageGeneration: false,
+			},
+			null,
+			2,
+		),
+	);
+} finally {
+	await browser?.close();
+	server.stop(true);
+	await f.stopAll();
+	await h.close();
+}

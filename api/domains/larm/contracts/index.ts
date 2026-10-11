@@ -107,3 +107,14 @@ export const errorStatus = {
 	larm_base_url_unconfigured: 409,
 	larm_provider_host_mismatch: 502,
 } as const satisfies Record<string, HttpErrorStatus>;
+
+export {
+	trackId,
+	trackQuery,
+	trackQueryParams,
+	musicTrack,
+	musicTracks,
+	musicTags,
+	type TrackQuery,
+	type MusicTrack,
+} from "./music-library";

@@ -1,0 +1,67 @@
+[
+  {
+    "path": "/v1/music/tracks",
+    "range": null,
+    "status": 200
+  },
+  {
+    "path": "/v1/music/tags",
+    "range": null,
+    "status": 200
+  },
+  {
+    "path": "/v1/music/tracks",
+    "range": null,
+    "status": 200
+  },
+  {
+    "path": "/v1/music/tracks",
+    "range": null,
+    "status": 200
+  },
+  {
+    "path": "/v1/music/tracks",
+    "range": null,
+    "status": 200
+  },
+  {
+    "path": "/v1/music/tracks",
+    "range": null,
+    "status": 200
+  },
+  {
+    "path": "/v1/music/tracks",
+    "range": null,
+    "status": 200
+  },
+  {
+    "path": "/v1/music/tracks",
+    "range": null,
+    "status": 200
+  },
+  {
+    "path": "/v1/music/tags",
+    "range": null,
+    "status": 200
+  },
+  {
+    "path": "/v1/music/tracks",
+    "range": null,
+    "status": 200
+  },
+  {
+    "path": "/v1/music/tracks",
+    "range": null,
+    "status": 200
+  },
+  {
+    "path": "/v1/music/tags",
+    "range": null,
+    "status": 200
+  },
+  {
+    "path": "/v1/music/tracks/music_a74ea9cb-06e5-40a4-98b7-285cf3dcf7f0",
+    "range": null,
+    "status": 200
+  }
+]

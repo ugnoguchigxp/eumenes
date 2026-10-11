@@ -1,0 +1,375 @@
+.music-workspace {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	min-height: 0;
+	color: var(--foreground);
+	background: var(--card);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	overflow: hidden;
+	min-width: 0;
+	container-type: inline-size;
+}
+.music-workspace-body {
+	flex: 1;
+	min-height: 0;
+	overflow: auto;
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+.music-workspace-visual {
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	padding: 1rem;
+	border-right: 1px solid var(--border);
+	background: var(--background);
+}
+.music-workspace-visual-toolbar {
+	display: flex;
+	gap: 0.5rem;
+	align-items: center;
+	flex-wrap: wrap;
+}
+.music-workspace-display {
+	display: flex;
+	border-radius: var(--radius);
+	background: var(--muted);
+	padding: 0.15rem;
+}
+.music-workspace-display button {
+	font-size: 0.8rem;
+	padding: 0.3rem 0.5rem;
+	height: 2rem;
+}
+.music-workspace-visual-toolbar select {
+	margin-left: auto;
+	font-size: 0.75rem;
+	min-width: 0;
+	max-width: 100%;
+	color: var(--foreground);
+	background: var(--card);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	padding: 0.35rem;
+}
+.music-workspace-stage {
+	position: relative;
+	min-height: 0;
+	flex: 1 1 17rem;
+	display: grid;
+	place-items: center;
+	padding: 1rem 0;
+}
+.music-workspace-stage [hidden] {
+	display: none;
+}
+.music-workspace-visualizer {
+	position: absolute;
+	inset: 1rem 0;
+	width: 100%;
+}
+.music-workspace-canvas {
+	position: absolute;
+	inset: 0;
+	display: block;
+	width: 100%;
+	height: 100%;
+	color: var(--primary);
+}
+.music-workspace-visualizer p {
+	position: absolute;
+	inset: 0;
+	display: grid;
+	place-items: center;
+	color: var(--muted-foreground);
+	font-size: 0.875rem;
+	text-align: center;
+	padding: 1rem;
+}
+.music-workspace-stage > img {
+	width: min(100%, 17rem);
+	height: 100%;
+	min-height: 0;
+	aspect-ratio: 1;
+	object-fit: contain;
+	border-radius: var(--radius);
+}
+.music-workspace-no-image {
+	display: grid;
+	justify-items: center;
+	gap: 0.75rem;
+	color: var(--muted-foreground);
+	font-size: 0.875rem;
+	text-align: center;
+}
+.music-workspace-no-image svg {
+	width: 2rem;
+	height: 2rem;
+}
+.music-workspace-current {
+	margin-top: auto;
+}
+.music-workspace-status {
+	font-size: 0.75rem;
+	color: var(--muted-foreground);
+}
+.music-workspace-title {
+	display: flex;
+	align-items: start;
+	gap: 0.5rem;
+	margin: 0.4rem 0;
+}
+.music-workspace-title h3 {
+	margin: 0;
+	font-size: 1rem;
+	font-weight: 500;
+	min-width: 0;
+	overflow-wrap: anywhere;
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	overflow: hidden;
+}
+.music-workspace-favorite {
+	flex-shrink: 0;
+	width: 2rem;
+	height: 2rem;
+	color: var(--muted-foreground);
+}
+.music-workspace-favorite[aria-pressed="true"] {
+	color: var(--primary);
+}
+.music-workspace-current-meta {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+	font-size: 0.75rem;
+	font-variant-numeric: tabular-nums;
+	color: var(--muted-foreground);
+}
+.music-workspace-library {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	padding: 0.8rem 1rem;
+}
+.music-workspace-list-heading {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 3rem 3rem;
+	gap: 0.5rem;
+	font-size: 0.75rem;
+	color: var(--muted-foreground);
+	border-bottom: 1px solid var(--border);
+	padding: 0.5rem 0.5rem 0.4rem 2rem;
+}
+.music-workspace-pagination {
+	margin-top: auto;
+	display: flex;
+	align-items: center;
+	justify-content: end;
+	gap: 0.5rem;
+	font-size: 0.75rem;
+	padding-top: 0.5rem;
+}
+.music-track-details h3 {
+	margin-top: 0;
+	overflow-wrap: anywhere;
+}
+.music-track-details dl {
+	display: grid;
+	grid-template-columns: 4rem minmax(0, 1fr);
+	gap: 0.6rem 1rem;
+	font-size: 0.875rem;
+}
+.music-track-details dt {
+	color: var(--muted-foreground);
+}
+.music-track-details dd {
+	margin: 0;
+	overflow-wrap: anywhere;
+	white-space: pre-wrap;
+}
+.music-track-details-actions {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	padding-top: 1rem;
+}
+@container (max-width: 560px) {
+	.music-workspace-body {
+		display: flex;
+		flex-direction: column;
+	}
+	.music-workspace-visual {
+		flex-shrink: 0;
+		border-right: 0;
+		border-bottom: 1px solid var(--border);
+	}
+	.music-workspace-library {
+		flex-shrink: 0;
+	}
+	.music-workspace-stage {
+		min-height: 9rem;
+		flex-basis: 9rem;
+	}
+	.music-workspace-stage > img {
+		width: 9rem;
+	}
+	.music-workspace .music-player-compact {
+		grid-template-columns: minmax(0, 1fr) 6rem;
+	}
+	.music-workspace .music-player-compact .music-player-heading {
+		grid-column: 1;
+		grid-row: 1;
+	}
+	.music-workspace .music-player-compact .music-player-volume {
+		grid-column: 2;
+		grid-row: 1;
+	}
+	.music-workspace .music-player-compact .music-player-controls {
+		grid-column: 1 / -1;
+		grid-row: 2;
+	}
+	.music-workspace .music-player-compact .music-player-timeline {
+		grid-column: 1 / -1;
+		grid-row: 3;
+	}
+}
+.music-workspace > .music-player {
+	flex-shrink: 0;
+}
+.music-workspace-history {
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	min-height: 0;
+}
+.music-workspace
+	:is(.music-workspace-history, .music-workspace-composer)[hidden] {
+	display: none;
+}
+.music-workspace-creation .music-workspace-body {
+	grid-template-columns: minmax(0, 0.42fr) minmax(0, 0.58fr);
+	overflow: hidden;
+}
+.music-workspace-creation .music-workspace-library {
+	min-height: 0;
+}
+.music-workspace-creation-tabs {
+	display: flex;
+	border-bottom: 1px solid var(--border);
+	margin: -0.4rem 0 0.8rem;
+	gap: 0.8rem;
+	flex-shrink: 0;
+}
+.music-workspace-creation-tabs button {
+	border-radius: 0;
+	border-bottom: 2px solid transparent;
+}
+.music-workspace-creation-tabs button[aria-pressed="true"] {
+	border-bottom-color: var(--primary);
+	color: var(--foreground);
+}
+.music-workspace-composer {
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	flex: 1;
+	gap: 0.6rem;
+}
+.music-workspace-creation .music-workspace-history {
+	overflow: auto;
+}
+.music-workspace-artwork-mock {
+	aspect-ratio: 1;
+	width: min(100%, 30rem);
+	max-height: 100%;
+	border-radius: var(--radius);
+	border: 1px solid var(--border);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-direction: column;
+	gap: 0.6rem;
+	color: var(--foreground);
+	background:
+		radial-gradient(
+			ellipse at 20% 20%,
+			color-mix(in srgb, var(--primary) 30%, transparent),
+			transparent 65%
+		),
+		radial-gradient(
+			ellipse at 90% 90%,
+			color-mix(in srgb, var(--primary) 15%, transparent),
+			transparent 65%
+		),
+		var(--background);
+	overflow: hidden;
+}
+.music-workspace-mock-disc {
+	width: 45%;
+	aspect-ratio: 1;
+	border: 1px solid color-mix(in srgb, var(--primary) 50%, var(--border));
+	border-radius: 50%;
+	display: grid;
+	place-items: center;
+	box-shadow:
+		0 0 0 1.5rem color-mix(in srgb, var(--primary) 4%, transparent),
+		0 0 0 3rem color-mix(in srgb, var(--primary) 3%, transparent);
+	margin-bottom: 1rem;
+}
+.music-workspace-mock-disc svg {
+	color: var(--primary);
+	width: 35%;
+	height: 35%;
+}
+.music-workspace-artwork-mock > span {
+	font-size: 0.6rem;
+	letter-spacing: 0.25em;
+	color: var(--muted-foreground);
+}
+.music-workspace-artwork-mock > strong {
+	font-size: 1rem;
+	font-weight: 500;
+}
+.music-workspace-artwork-mock > small {
+	color: var(--muted-foreground);
+	font-size: 0.7rem;
+}
+.music-workspace-mock-note {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+	margin-bottom: 1rem;
+	font-size: 0.7rem;
+	color: var(--muted-foreground);
+}
+@container (max-width: 560px) {
+	.music-workspace-creation .music-workspace-body {
+		grid-template-columns: minmax(0, 1fr);
+		overflow: auto;
+	}
+	.music-workspace-creation .music-workspace-library {
+		min-height: 36rem;
+	}
+	.music-workspace-creation .music-workspace-stage {
+		flex-basis: auto;
+	}
+	.music-workspace-artwork-mock {
+		width: 12rem;
+		min-height: 12rem;
+	}
+	.music-workspace-mock-disc {
+		width: 35%;
+		margin-bottom: 0.5rem;
+	}
+	.music-workspace-creation .music-workspace-history {
+		overflow: visible;
+	}
+}

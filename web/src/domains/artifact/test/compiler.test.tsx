@@ -79,7 +79,7 @@ test("quoted instructions remain inert text in the SDK renderer", () => {
 	);
 	expect(document.querySelector(".text-2xl")?.textContent).toBe(title);
 	expect(document.querySelector("script")).toBeNull();
-	expect(Object.keys(artifactLibrary.components)).toHaveLength(10);
+	expect(Object.keys(artifactLibrary.components)).toHaveLength(12);
 });
 test("actual renderer preserves dirty form input when resource snapshot changes", () => {
 	const lang = compileArtifact(

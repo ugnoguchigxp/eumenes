@@ -1,3 +1,4 @@
+import { parseLlmJson } from "../../../infrastructure/llm-json";
 import type { Database } from "bun:sqlite";
 import type { HandlerDefinition } from "../../queue";
 import type { Receipt } from "../../inference/contracts";
@@ -191,7 +192,7 @@ export function createDecisions(
 					typeof receipt.value === "string" &&
 					new TextEncoder().encode(receipt.value).length <= 16384
 				)
-					parsed = JSON.parse(receipt.value);
+					parsed = parseLlmJson(receipt.value, 16384);
 			} catch {}
 			const d = decisionSchema.safeParse(parsed);
 			return {

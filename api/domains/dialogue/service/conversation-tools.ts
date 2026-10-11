@@ -1,3 +1,4 @@
+import { LlmJsonError, parseLlmJson } from "../../../infrastructure/llm-json";
 import {
 	delegationCommand,
 	type DelegationCommand,
@@ -28,7 +29,7 @@ const historyRequest = z
 	})
 	.strict();
 export type ConversationOperation =
-	| { kind: "music"; question: string }
+	| { kind: "music" | "music-playback"; question: string }
 	| { kind: "web"; question: string; researcher?: "codex_luna" }
 	| { kind: "history"; question: string; requirementProfiles?: string[] }
 	| { kind: "delegation"; command: DelegationCommand }
@@ -53,6 +54,18 @@ export function conversationTools(
 							name: "create_music",
 							description:
 								"ユーザーが指定したテーマで楽曲を生成し、Artifactで再生できるようにする。テーマと時間などの条件をquestionに保持する。曲調の装飾は楽曲担当が行う。検索やCodexプロジェクトへの委任は不要。",
+							parameters: z.toJSONSchema(musicRequest) as Record<
+								string,
+								unknown
+							>,
+						},
+					},
+					{
+						type: "function" as const,
+						function: {
+							name: "open_music_library",
+							description:
+								"LARMに保存済みの曲を探し、プレイリストArtifactとプレイヤーを開く。検索条件、タグ、並び順、お気に入りなど現在の依頼をquestionに保持する。新しい曲は生成しない。",
 							parameters: z.toJSONSchema(musicRequest) as Record<
 								string,
 								unknown
@@ -126,6 +139,7 @@ export function conversationTools(
 }
 const toolNames = new Set([
 	"create_music",
+	"open_music_library",
 	"delegate_task",
 	"research",
 	"research_web_luna",
@@ -173,10 +187,18 @@ export function operation(
 		throw operationRejection("tool_not_offered", call);
 	let args: unknown;
 	try {
-		args = JSON.parse(call.arguments);
-	} catch {
-		throw operationRejection("arguments_not_json", call);
+		args = parseLlmJson(call.arguments);
+	} catch (error) {
+		throw operationRejection(
+			"arguments_not_json",
+			call,
+			error instanceof LlmJsonError
+				? [{ validationPath: "arguments", validationCode: error.code }]
+				: [],
+		);
 	}
+	if (call.name === "open_music_library")
+		return { kind: "music-playback", ...parsed(musicRequest, args, call) };
 	if (call.name === "create_music")
 		return { kind: "music", ...parsed(musicRequest, args, call) };
 	if (call.name === "delegate_task")

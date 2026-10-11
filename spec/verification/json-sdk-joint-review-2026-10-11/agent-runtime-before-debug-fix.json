@@ -1,0 +1,36 @@
+{
+  "selected": [
+    "agent-runtime"
+  ],
+  "revision": "05b1f6b7ee01dae54aebbe7238d60fdf1234e0ac37024eb37472000c83f42439",
+  "steps": [
+    {
+      "name": "size-budget",
+      "ms": 142,
+      "result": "pass"
+    },
+    {
+      "name": "format",
+      "ms": 102,
+      "result": "pass"
+    },
+    {
+      "name": "lint",
+      "ms": 58,
+      "result": "pass"
+    },
+    {
+      "name": "typecheck",
+      "ms": 1810,
+      "result": "pass"
+    },
+    {
+      "name": "domain tests",
+      "ms": 668,
+      "result": "exit 1"
+    }
+  ],
+  "totalMs": 3375,
+  "result": "fail",
+  "error": "Error: domain tests failed (1)"
+}

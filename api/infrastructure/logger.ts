@@ -60,6 +60,8 @@ export interface LogFields {
 	attempt?: number;
 	generation?: number;
 	port?: number;
+	exitCode?: number;
+	processSignal?: string;
 }
 const keys = new Set<keyof LogFields>([
 	"httpRequestId",
@@ -108,6 +110,8 @@ const keys = new Set<keyof LogFields>([
 	"attempt",
 	"generation",
 	"port",
+	"exitCode",
+	"processSignal",
 ]);
 const scope = new AsyncLocalStorage<LogFields>();
 const bootId = crypto.randomUUID();

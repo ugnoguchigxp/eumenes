@@ -1,0 +1,23 @@
+Use case: ui-mockup
+Asset type: high fidelity desktop application UI concept, landscape image approximately 1600x1100, straight-on pixel crisp full screen, no device frame.
+Primary request: Design a polished Japanese music generation workspace reusing the visual language and basic layout of the attached Eumenes music playlist screenshot. Image 1 is a STYLE AND LAYOUT REFERENCE, not an edit target. Preserve the restrained dark charcoal background, thin grey borders, blue buttons, Japanese sans-serif text, segmented controls and full width bottom music transport. This is a UI concept for instrumental music creation.
+Composition: top app tab header titled "楽曲生成" with a small close icon and simple conversation/settings icons at right. Below header use two columns: 42% width left preview, 58% width right music creation form. Bottom full width player stays attached to bottom, approx 90px high. Maximize readable form density without oversized blank space. Borders square-ish with 8px radius.
+Left: top segmented selector "楽曲イメージ" (active) and "Visualizer". Large square cover artwork of a calm night city reflected in rain, subdued navy with warm amber lights, tasteful cinematic photography. Label below art "イメージ例" so it does not imply existing feature completion. Small outlined "イメージを作成" button. Below show "プレビュー" and song title "雨上がりの夜、静かな街" with muted small "Lo-fi · Ambient · Piano · 30秒". Small waveform preview ribbon under title. No fake generation progress.
+Right: upper tabs "曲づくり" active blue underline and "生成履歴" inactive. Section heading "どんな楽曲にしますか？". Right upper small text button "リセット".
+Section "ジャンル" with a small search field placeholder "ジャンルを探す". Beneath it use compact clear square CHECKBOXES in four columns; do not use only pill chips. 24 genre choices grouped with muted tiny headers:
+"ポップ・ロック": ポップ, ロック, インディー, ファンク.
+"エレクトロニック": Lo-fi (checked blue), Ambient (checked blue), House, Techno, EDM, Synthwave, Drum & Bass, Chiptune.
+"ジャズ・アコースティック": ジャズ, ボサノバ, R&B, ソウル, アコースティック, フォーク, ブルース, ゴスペル.
+"クラシック・映像": クラシック, オーケストラ, シネマティック, ゲーム音楽.
+Selected summary row blue tinted pills "Lo-fi ×" "Ambient ×".
+Next compact section "雰囲気" checkbox row "落ち着いた" checked, "温かい" checked, "明るい", "切ない", "幻想的", "力強い".
+Next section "楽器" checkbox row "ピアノ" checked, "シンセ", "ギター", "ストリングス", "ドラム".
+Next row two controls: "テンポ" dropdown "ゆったり" and "長さ" dropdown "30秒". Muted brief label "インストゥルメンタル（歌声なし）".
+Bottom right bordered prompt area label "音楽作成プロンプト" with small "選択内容を反映". A multi-line textarea displaying exact readable Japanese text:
+"ジャンル：Lo-fi、Ambient
+雰囲気：落ち着いた、温かい
+楽器：ピアノ　テンポ：ゆったり　長さ：30秒
+雨上がりの夜をイメージした、柔らかいピアノと控えめなビート。作業中に流せる穏やかな曲にしたい。"
+Below textarea tiny helper "自由に編集できます". Bottom aligned to right blue primary button with simple sparkle icon "楽曲を生成". Keep prompt and generation button visible without scrolling in this desktop concept.
+Full width bottom player: left miniature artwork thumbnail and title "雨上がりの夜、静かな街"; center previous, backward 10, blue round play, forward 10, next controls and seek bar; text "00:00 / 00:30"; right speaker and volume slider.
+Style: practical desktop productivity interface, premium but familiar to screenshot, uniform restrained text sizing, realistic checkbox hit areas, clear section hierarchy, no gradients in UI panels, no massive typography, no purple accents. Artwork can be atmospheric. Japanese labels must be legible. Do not show marketing copy, logos, browser chrome, watermark, technical implementation jargon, vocals toggle, video output options.

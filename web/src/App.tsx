@@ -1,5 +1,8 @@
-import { musicArtifactDefinition } from "./domains/music/artifact-definition";
-import { useMusicArtifacts } from "./domains/music";
+import {
+	musicArtifactDefinition,
+	playlistArtifactDefinition,
+} from "./domains/music/artifact-definition";
+import { useMusicArtifacts, usePlaylistArtifacts } from "./domains/music";
 import { MusicArtifact } from "./components/domains/music/MusicArtifact";
 import { ResearchTaskCard } from "./domains/agent-runtime";
 import {
@@ -142,6 +145,20 @@ function useOpenMusic(open: ReturnType<typeof useArtifactWorkspace>["open"]) {
 		[open],
 	);
 }
+function useOpenPlaylist(
+	open: ReturnType<typeof useArtifactWorkspace>["open"],
+) {
+	return useCallback(
+		(id: string, title: string) =>
+			open({
+				id: `playlist:${id}`,
+				kind: "openui",
+				definition: playlistArtifactDefinition(id),
+				title,
+			}),
+		[open],
+	);
+}
 function useOpenTimer(open: ReturnType<typeof useArtifactWorkspace>["open"]) {
 	return useCallback(
 		(ref: { timerId: string }, title: string) => {
@@ -186,6 +203,7 @@ function Workspace({
 	}, []);
 	const artifacts = useArtifactWorkspace();
 	useMusicArtifacts(client, "main", useOpenMusic(artifacts.open));
+	usePlaylistArtifacts(client, "main", useOpenPlaylist(artifacts.open));
 	const openTimer = useOpenTimer(artifacts.open);
 	const settings = useSettings(client);
 	const usage = useQuery({

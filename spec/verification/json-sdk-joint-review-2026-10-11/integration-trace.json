@@ -1,0 +1,35 @@
+{
+  "common": [
+    {
+      "event": "llm_json.rejected",
+      "reason": "llm_json_duplicate_key",
+      "jobId": "36195a34-0ed4-4450-9d4f-b6d5d3842ff8",
+      "bytes": 96
+    },
+    {
+      "event": "llm_json.rejected",
+      "reason": "llm_json_duplicate_key",
+      "jobId": "72febc33-4757-411c-b6ee-ef75f895eb6c",
+      "bytes": 96
+    }
+  ],
+  "host": [
+    {
+      "event": "agent.control_rejected",
+      "validationCode": "llm_json_duplicate_key",
+      "jobId": "36195a34-0ed4-4450-9d4f-b6d5d3842ff8",
+      "runId": "152fcf5e-c9ac-4ba1-b2c7-62d0050be825",
+      "taskId": "72ad53fb-b416-44fa-abdd-e8871f6074cf"
+    },
+    {
+      "event": "agent.control_rejected",
+      "validationCode": "llm_json_duplicate_key",
+      "jobId": "72febc33-4757-411c-b6ee-ef75f895eb6c",
+      "runId": "152fcf5e-c9ac-4ba1-b2c7-62d0050be825",
+      "taskId": "72ad53fb-b416-44fa-abdd-e8871f6074cf"
+    }
+  ],
+  "webOperations": 0,
+  "matched": true,
+  "rawOutputLogged": false
+}

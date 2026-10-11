@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
+import { useAudioAnalysis } from "./useAudioAnalysis";
 
-export function usePlayback(autoPlay: boolean) {
+export function usePlayback(autoPlay: boolean, analyse = false) {
 	const ref = useRef<HTMLAudioElement>(null);
+	const analysis = useAudioAnalysis(ref, analyse);
 	const [playing, setPlaying] = useState(false);
 	const [position, setPosition] = useState(0);
 	const [duration, setDuration] = useState(0);
@@ -29,6 +31,7 @@ export function usePlayback(autoPlay: boolean) {
 		if (!audio.paused) audio.pause();
 		else {
 			try {
+				await analysis.activate();
 				await audio.play();
 			} catch {
 				if (ref.current === audio) setError(true);
@@ -42,6 +45,8 @@ export function usePlayback(autoPlay: boolean) {
 		duration,
 		volume,
 		error,
+		analyser: analysis.analyser,
+		analysisError: analysis.error,
 		seek,
 		toggle,
 		setVolume: (value: number) => {
@@ -49,7 +54,10 @@ export function usePlayback(autoPlay: boolean) {
 			setVolume(value);
 		},
 		events: {
-			onPlay: () => setPlaying(true),
+			onPlay: () => {
+				setPlaying(true);
+				void analysis.activate();
+			},
 			onPause: () => setPlaying(false),
 			onTimeUpdate: () => setPosition(ref.current?.currentTime ?? 0),
 			onDurationChange: () => {

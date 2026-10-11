@@ -1,0 +1,110 @@
+[
+  {
+    "stage": "contract",
+    "status": 200,
+    "tracks": true,
+    "tags": true
+  },
+  {
+    "stage": "library",
+    "total": 2,
+    "ids": [
+      "music_a74ea9cb-06e5-40a4-98b7-285cf3dcf7f0",
+      "music_943c1fa4-3ea0-4ddc-9219-940eb738f60a"
+    ],
+    "tags": [
+      {
+        "tag": "インストゥルメンタル",
+        "count": 2
+      },
+      {
+        "tag": "電子音楽",
+        "count": 2
+      },
+      {
+        "tag": "アップテンポ",
+        "count": 1
+      },
+      {
+        "tag": "ピアノ",
+        "count": 1
+      },
+      {
+        "tag": "明るい",
+        "count": 1
+      },
+      {
+        "tag": "落ち着いた",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "stage": "tag-search",
+    "tag": "インストゥルメンタル",
+    "total": 2
+  },
+  {
+    "stage": "search",
+    "q": "piano",
+    "total": 1
+  },
+  {
+    "stage": "search",
+    "q": "ピアノ",
+    "total": 1
+  },
+  {
+    "stage": "search",
+    "q": "bright",
+    "total": 0
+  },
+  {
+    "stage": "search",
+    "q": "明るい",
+    "total": 1
+  },
+  {
+    "stage": "and-search",
+    "tags": [
+      "落ち着いた",
+      "電子音楽"
+    ],
+    "total": 1
+  },
+  {
+    "stage": "conversation",
+    "runId": "eea60d32-7716-4a64-80e9-86072445c199",
+    "status": "completed",
+    "playlists": [
+      {
+        "kind": "playlist",
+        "id": "f6221ba4-65e3-4332-b408-1538f1674f18",
+        "runId": "eea60d32-7716-4a64-80e9-86072445c199",
+        "conversationId": "main",
+        "state": "completed",
+        "title": "新しい順のライブラリ",
+        "query": {
+          "q": "",
+          "tags": [],
+          "sort": "createdAt",
+          "order": "desc",
+          "limit": 50
+        },
+        "trackIds": [
+          "music_a74ea9cb-06e5-40a4-98b7-285cf3dcf7f0",
+          "music_943c1fa4-3ea0-4ddc-9219-940eb738f60a"
+        ],
+        "currentId": "music_a74ea9cb-06e5-40a4-98b7-285cf3dcf7f0",
+        "errorCode": null,
+        "createdAt": 1791718585308,
+        "updatedAt": 1791718589181
+      }
+    ],
+    "answer": "「新しい順のライブラリ」の作成が完了いたしました。\nArtifactにて、保存されている楽曲の選曲および再生が可能でございます。"
+  },
+  {
+    "stage": "failed",
+    "error": "expect(locator).toHaveCount(expected) failed\n\nLocator:  locator('section[aria-label=\\'音楽プレイヤー\\'] audio')\nExpected: 1\nReceived: 0\nTimeout:  5000ms\n\nCall log:\n  - Expect \"to.have.count\" with timeout 5000ms\n  - waiting for locator('section[aria-label=\\'音楽プレイヤー\\'] audio')\n    3 × locator resolved to 0 elements\n      - unexpected value \"0\"\n"
+  }
+]

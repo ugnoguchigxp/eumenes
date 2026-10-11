@@ -10,6 +10,8 @@ import { verifyReport } from "../service/verify-report";
 import type { Prepared } from "../../capabilities";
 import type { Source } from "../../tool-runtime";
 import type { Task } from "../contracts";
+import { controlInstructions } from "../../inference";
+import { searchAction } from "../service/research-contract";
 import { researchReport } from "../service/research-contract";
 import { z } from "zod";
 const prepared = {
@@ -541,10 +543,28 @@ test("every route carries the shared rules, and the step contract is also return
 		);
 		const system = context.messages[0]!.content;
 		expect(system).toContain(commonRules);
-		expect(context.control.instructions).toBe(system);
-		expect(context.control.outputSchema).toEqual(
-			JSON.parse(system.slice(system.lastIndexOf("OUTPUT_SCHEMA=") + 14)),
-		);
+		expect(system).toBe(controlInstructions(context.control));
+		expect(context.control.instructions).not.toContain("\nOUTPUT_SCHEMA=");
+		if (id) {
+			expect(system).not.toContain("\nOUTPUT_SCHEMA=");
+			const examples = JSON.parse(system.split("\nOUTPUT_FORMAT=")[1]!);
+			expect(examples).toHaveLength(2);
+			for (const example of examples)
+				expect(searchAction.safeParse(example).success).toBe(true);
+			expect(Object.keys(examples[0])).toEqual(["action", "tool", "arguments"]);
+			expect(Object.keys(examples[1])).toEqual(["action", "report"]);
+			expect(Object.keys(examples[1].report)).toEqual([
+				"outcome",
+				"summary",
+				"claims",
+				"limitations",
+			]);
+			expect(JSON.stringify(examples).length).toBeLessThan(300);
+		} else {
+			expect(context.control.outputSchema).toEqual(
+				JSON.parse(system.split("\nOUTPUT_SCHEMA=")[1]!),
+			);
+		}
 	}
 });
 

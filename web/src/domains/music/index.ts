@@ -20,3 +20,22 @@ export function useMusicArtifacts(
 		}
 	}, [query.data, open]);
 }
+
+export function usePlaylistArtifacts(
+	client: EumenesClient,
+	conversationId: string,
+	open: (id: string, title: string) => void,
+) {
+	const opened = useRef(new Set<string>());
+	const query = useQuery({
+		queryKey: ["music", "playlists", conversationId],
+		queryFn: ({ signal }) => client.musicPlaylists(conversationId, signal),
+	});
+	useEffect(() => {
+		for (const item of [...(query.data ?? [])].reverse()) {
+			if (opened.current.has(item.id)) continue;
+			opened.current.add(item.id);
+			open(item.id, item.title);
+		}
+	}, [query.data, open]);
+}

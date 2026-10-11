@@ -1,0 +1,13 @@
+bun test v1.4.2 (744846f84)
+
+api/domains/agent-runtime/test/control-output.test.ts:
+(pass) control diagnostics distinguish non-text, empty, fenced, oversized and malformed output without retaining the response [2.73ms]
+(pass) one whole JSON fence decodes without accepting surrounding prose, multiple blocks or malformed JSON [0.33ms]
+(pass) only one complete leading think block is removed [0.21ms]
+(pass) control syntax is corrected once without inventing a report [1.65ms]
+(pass) common repair refusals take precedence over an unrelated native syntax error [0.70ms]
+
+ 5 pass
+ 0 fail
+ 43 expect() calls
+Ran 5 tests across 1 file. [227.00ms]

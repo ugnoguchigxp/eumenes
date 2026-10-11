@@ -180,7 +180,7 @@ export function createPrepare(
 			!delegated?.receipt;
 		if (musicResult) {
 			messages[0]!.content +=
-				"\n楽曲制作は終了しています。musicResultは操作結果のデータです。completedなら曲名と制作意図を短く伝え、Artifactで再生できると案内します。failedまたはcancelledなら失敗・取消を正しく伝えます。音声を聴いた評価や未実行の操作を作らず、新しい生成をしません。";
+				"\n音楽担当の操作は終了しています。musicResultは操作結果のデータです。kind=playlistなら保存曲の検索結果であり、新しく制作した曲ではありません。completedでプレイヤーやプレイリストを開く依頼なら、「プレイヤーを開きました。どうぞ」程度の短い案内だけを指定の口調で返します。曲名・検索条件・件数・曲IDの一覧や、Artifactという内部名称・操作説明は付けません。過去の回答に一覧があっても繰り返さず、今回の表示完了だけを案内します。trackIdsは再生用の参照IDであり曲名ではありません。曲の説明を求められたときは確認できる情報で答え、IDから曲名や内容を推測しません。trackIdsが空なら、該当する曲が見つからなかったことを短く伝えます。楽曲生成のcompletedなら制作完了を短く伝えます。failedまたはcancelledなら失敗・取消を正しく伝え、開いた・再生したと断定しません。エラーコードは読み上げず、意味を自然な言葉で伝えます。音声を聴いた評価や未実行の再生を作らず、新しい生成をしません。";
 			messages.splice(messages.length - 1, 0, {
 				role: "user",
 				content: JSON.stringify({ musicResult }),
@@ -190,7 +190,7 @@ export function createPrepare(
 				larm.setContextPolicyInTransaction?.(tx, requestId, "exact");
 		} else if (musicTools)
 			messages[0]!.content +=
-				"\n楽曲制作の依頼にはcreate_musicを一度呼びます。ユーザーのテーマと秒数を保持し、装飾は楽曲担当に任せます。通常会話や楽曲についての説明だけなら呼びません。生成結果を受け取ってから完成を伝えます。";
+				"\n楽曲制作の依頼にはcreate_musicを一度呼びます。ユーザーのテーマと秒数を保持し、装飾は楽曲担当に任せます。通常会話や楽曲についての説明だけなら呼びません。生成結果を受け取ってから完成を伝えます。保存済みの曲を探す・聴く・ライブラリやお気に入りを開く依頼にはopen_music_libraryを一度呼びます。生成と保存曲の再生を依頼の意味から区別します。";
 		return {
 			status: "ready",
 			input: {
@@ -223,8 +223,10 @@ export function createPrepare(
 												(t) => t.function.name === "delegate_task",
 											)
 										: []),
-									...conversationTools(false, false, false, true).filter(
-										(t) => t.function.name === "create_music",
+									...conversationTools(false, false, false, true).filter((t) =>
+										["create_music", "open_music_library"].includes(
+											t.function.name,
+										),
 									),
 								],
 							}

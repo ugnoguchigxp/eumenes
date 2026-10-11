@@ -1,0 +1,42 @@
+[
+  {
+    "name": "reported-request",
+    "answer": "プレイヤーを開きました。どうぞ。",
+    "pass": true
+  },
+  {
+    "name": "paraphrase",
+    "answer": "プレイヤーを開きました。どうぞ。",
+    "pass": true
+  },
+  {
+    "name": "maid-persona",
+    "answer": "プレイヤーを開きました。どうぞ。",
+    "pass": true
+  },
+  {
+    "name": "previous-id-reading",
+    "answer": "プレイヤーを開きました。どうぞ。",
+    "pass": true
+  },
+  {
+    "name": "details-requested",
+    "answer": "申し訳ございませんが、該当する曲の情報が見つかりませんでした。",
+    "pass": true
+  },
+  {
+    "name": "empty-playlist",
+    "answer": "該当する曲が見つかりませんでした。",
+    "pass": true
+  },
+  {
+    "name": "failed",
+    "answer": "プレイリストの作成に失敗いたしました。",
+    "pass": true
+  },
+  {
+    "name": "cancelled",
+    "answer": "再生のキャンセルがリクエストされましたため、プレイリストは開けませんでした。",
+    "pass": true
+  }
+]

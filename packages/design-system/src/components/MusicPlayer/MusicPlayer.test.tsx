@@ -6,7 +6,7 @@ import {
 	waitFor,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MusicPlayer } from "./MusicPlayer";
+import { MusicPlayer, type MusicPlayerProps } from "./MusicPlayer";
 
 const track = { id: "one", title: "試験曲", src: "blob:one" };
 beforeEach(() => {
@@ -27,9 +27,10 @@ beforeEach(() => {
 afterEach(() => {
 	cleanup();
 	vi.restoreAllMocks();
+	vi.unstubAllGlobals();
 });
-function setup() {
-	const result = render(<MusicPlayer track={track} />);
+function setup(props: Partial<MusicPlayerProps> = {}) {
+	const result = render(<MusicPlayer track={track} {...props} />);
 	const audio = result.container.querySelector("audio");
 	if (!audio) throw new Error("audio missing");
 	Object.defineProperty(audio, "duration", { configurable: true, value: 30 });
@@ -101,5 +102,53 @@ describe("MusicPlayer", () => {
 			"再生できません",
 		);
 		expect(screen.getByRole("button", { name: "再生" })).toBeEnabled();
+	});
+	it("retains playback intent while the host loads the next selected track", async () => {
+		const { container, rerender } = setup();
+		fireEvent.click(screen.getByRole("button", { name: "再生" }));
+		await screen.findByRole("button", { name: "一時停止" });
+		rerender(<MusicPlayer track={null} loading />);
+		expect(container.querySelector("audio")).toBeNull();
+		rerender(<MusicPlayer track={{ ...track, id: "two", src: "blob:two" }} />);
+		await waitFor(() =>
+			expect(container.querySelector("audio")?.paused).toBe(false),
+		);
+	});
+	it("keeps native playback available when audio analysis is unsupported", async () => {
+		vi.stubGlobal("AudioContext", undefined);
+		const changed = vi.fn();
+		const { audio } = setup({ onPlaybackChange: changed });
+		fireEvent.click(screen.getByRole("button", { name: "再生" }));
+		await waitFor(() =>
+			expect(changed).toHaveBeenCalledWith(
+				expect.objectContaining({
+					playing: true,
+					analysisError: true,
+					analyser: null,
+				}),
+			),
+		);
+		expect(audio.paused).toBe(false);
+	});
+	it("does not route media into a context that fails to resume", async () => {
+		const source = vi.fn();
+		const close = vi.fn(async () => {});
+		vi.stubGlobal(
+			"AudioContext",
+			class {
+				state = "suspended";
+				resume = vi.fn(async () => {
+					throw new Error("blocked");
+				});
+				close = close;
+				createMediaElementSource = source;
+			},
+		);
+		const { audio } = setup({ onPlaybackChange: vi.fn() });
+		fireEvent.click(screen.getByRole("button", { name: "再生" }));
+		await screen.findByRole("button", { name: "一時停止" });
+		expect(audio.paused).toBe(false);
+		expect(source).not.toHaveBeenCalled();
+		expect(close).toHaveBeenCalled();
 	});
 });

@@ -1,0 +1,22 @@
+bun test v1.4.2 (744846f84)
+
+api/domains/agent-runtime/test/rejection-logging.test.ts:
+58 | 				);
+59 | 				throw new Error("rollback");
+60 | 			}),
+61 | 		).rejects.toThrow("rollback");
+62 | 		await Bun.sleep(0);
+63 | 		expect(lines).toHaveLength(0);
+                     ^
+error: expect(received).toHaveLength(expected)
+
+Expected length: 0
+Received length: 1
+
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/domains/agent-runtime/test/rejection-logging.test.ts:63:17)
+(fail) rolled-back and stale rejections are not logged as committed failures [53.27ms]
+
+ 0 pass
+ 1 fail
+ 2 expect() calls
+Ran 1 test across 1 file. [206.00ms]

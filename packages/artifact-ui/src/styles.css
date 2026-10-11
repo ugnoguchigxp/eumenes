@@ -353,3 +353,9 @@
 	grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
 	align-items: start;
 }
+.aui-music-workspace {
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	min-height: 0;
+}

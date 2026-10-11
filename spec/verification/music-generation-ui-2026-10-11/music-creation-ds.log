@@ -1,0 +1,557 @@
+$ tsc --noEmit
+src/components/MusicWorkspace/MusicCreationForm.test.tsx(20,50): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+  Overload 2 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+src/components/MusicWorkspace/MusicCreationForm.test.tsx(23,51): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+  Overload 2 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+src/components/MusicWorkspace/MusicCreationForm.test.tsx(42,47): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+  Overload 2 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+src/components/MusicWorkspace/MusicCreationForm.test.tsx(49,47): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+  Overload 2 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+src/components/MusicWorkspace/MusicCreationForm.test.tsx(60,48): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+  Overload 2 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+src/components/MusicWorkspace/MusicCreationForm.test.tsx(83,50): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement | null', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+  Overload 2 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement | null', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+$ vitest run --project unit
+│ ┌────────────────────────────────────────────────────────────────────────────┐
+│ │  Info: Found a setup file with "setProjectAnnotations".                    │
+│ │  Skipping automatic provisioning of preview annotations to avoid           │
+│ │  conflicts. Since Storybook 10.3, "@storybook/addon-vitest" applies these  │
+│ │   automatically.                                                           │
+│ │  You can safely remove the "setProjectAnnotations" call from your setup    │
+│ │  file, or remove the file entirely if you don't have custom code there.    │
+│ └────────────────────────────────────────────────────────────────────────────┘
+
+ RUN  v4.0.16 /Users/y.noguchi/Code/eumenes/packages/design-system
+
+stdout | src/components/Modal/Modal.test.tsx
+Test setup running...
+
+stdout | src/components/Modal/Modal.test.tsx
+Test setup running...
+
+stdout | src/components/MusicPlayer/MusicPlayer.test.tsx
+Test setup running...
+
+stdout | src/components/MusicPlayer/MusicPlayer.test.tsx
+Test setup running...
+
+stdout | src/components/LanguageSelector/LanguageSelector.test.tsx
+Test setup running...
+
+stdout | src/components/LanguageSelector/LanguageSelector.test.tsx
+Test setup running...
+
+stdout | src/components/MusicWorkspace/MusicCreationForm.test.tsx
+Test setup running...
+
+stdout | src/components/Select/Select.test.tsx
+Test setup running...
+
+stdout | src/components/DropdownMenu/DropdownMenu.test.tsx
+Test setup running...
+
+stdout | src/components/MusicWorkspace/MusicCreationForm.test.tsx
+Test setup running...
+
+stdout | src/components/DropdownMenu/DropdownMenu.test.tsx
+Test setup running...
+
+stdout | src/components/Select/Select.test.tsx
+Test setup running...
+
+stdout | src/components/KeypadModal/KeypadModal.test.tsx
+Test setup running...
+
+stdout | src/components/KeypadModal/KeypadModal.test.tsx
+Test setup running...
+
+stdout | src/components/Calculator/Calculator.test.tsx
+Test setup running...
+
+stdout | src/components/Tabs/Tabs.test.tsx
+Test setup running...
+
+stdout | src/components/Calculator/Calculator.test.tsx
+Test setup running...
+
+stdout | src/components/Tabs/Tabs.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/Tabs/Tabs.test.tsx (12 tests) 932ms
+     ✓ renders with default value  421ms
+ ✓ |unit| src/components/DropdownMenu/DropdownMenu.test.tsx (19 tests) 1304ms
+     ✓ renders trigger  314ms
+ ✓ |unit| src/components/MusicPlayer/MusicPlayer.test.tsx (8 tests) 1206ms
+     ✓ plays, pauses and changes actual media volume  592ms
+ ✓ |unit| src/components/KeypadModal/KeypadModal.test.tsx (22 tests) 1693ms
+       ✓ renders with default props  433ms
+ ✓ |unit| src/components/LanguageSelector/LanguageSelector.test.tsx (8 tests) 1652ms
+     ✓ renders current language (default Japanese)  446ms
+     ✓ opens menu on click  478ms
+ ✓ |unit| src/components/Modal/Modal.test.tsx (36 tests) 1797ms
+       ✓ renders modal when open  318ms
+ ✓ |unit| src/components/Select/Select.test.tsx (23 tests) 2776ms
+     ✓ renders correctly  480ms
+       ✓ selects an item and updates value  306ms
+stdout | src/components/Checkbox/Checkbox.test.tsx
+Test setup running...
+
+stdout | src/components/Checkbox/Checkbox.test.tsx
+Test setup running...
+
+stdout | src/components/MusicWorkspace/MusicWorkspace.test.tsx
+Test setup running...
+
+stdout | src/components/MusicWorkspace/MusicWorkspace.test.tsx
+Test setup running...
+
+stdout | src/components/Form/Form.test.tsx
+Test setup running...
+
+stdout | src/components/Form/Form.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/Calculator/Calculator.test.tsx (12 tests) 4007ms
+     ✓ performs basic addition  639ms
+     ✓ performs multiplication with precedence  326ms
+     ✓ calls onResult callback  377ms
+     ✓ resets error state on new input  389ms
+     ✓ handles invalid expressions  962ms
+stdout | src/components/OptionButtonGroup/OptionButtonGroup.test.tsx
+Test setup running...
+
+stdout | src/components/OptionButtonGroup/OptionButtonGroup.test.tsx
+Test setup running...
+
+stdout | src/components/TreeMenu/TreeMenu.test.tsx
+Test setup running...
+
+stdout | src/components/TreeMenu/TreeMenu.test.tsx
+Test setup running...
+
+stdout | src/components/ContentHeader/ContentHeader.test.tsx
+Test setup running...
+
+stdout | src/components/ContentHeader/ContentHeader.test.tsx
+Test setup running...
+
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+ ✓ |unit| src/components/MusicWorkspace/MusicCreationForm.test.tsx (4 tests) 5018ms
+   ✓ selects multiple genres including orchestra, filters the catalogue and removes only the chosen genre  1576ms
+   ✓ preserves a hand-written prompt, requires a decision on changed choices and allows restoring overwritten text  1175ms
+   ✓ reflects vocal characteristics and exact lyric line breaks, and removes them when vocals are turned off  1989ms
+ ✓ |unit| src/components/Form/Form.test.tsx (5 tests) 777ms
+     ✓ submits form data  507ms
+ ✓ |unit| src/components/OptionButtonGroup/OptionButtonGroup.test.tsx (10 tests) 742ms
+ ✓ |unit| src/components/Checkbox/Checkbox.test.tsx (34 tests) 997ms
+       ✓ renders correctly with default variant  420ms
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+stdout | src/components/Skeleton/Skeleton.test.tsx
+Test setup running...
+
+stdout | src/components/Skeleton/Skeleton.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/TreeMenu/TreeMenu.test.tsx (7 tests) 873ms
+     ✓ expands node on click  431ms
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+ ✓ |unit| src/components/ContentHeader/ContentHeader.test.tsx (36 tests) 1072ms
+       ✓ renders header with patient name  515ms
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+ ✓ |unit| src/components/Skeleton/Skeleton.test.tsx (38 tests) 744ms
+       ✓ shows spinner when showSpinner is true  334ms
+stdout | src/components/ErrorState/ErrorState.test.tsx
+Test setup running...
+
+stdout | src/components/ErrorState/ErrorState.test.tsx
+Test setup running...
+
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+stdout | src/components/ActionButton/ActionButton.test.tsx
+Test setup running...
+
+stdout | src/components/ActionButton/ActionButton.test.tsx
+Test setup running...
+
+stdout | src/components/CopyClipButton/CopyClipButton.test.tsx
+Test setup running...
+
+stdout | src/components/CopyClipButton/CopyClipButton.test.tsx
+Test setup running...
+
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+ ✓ |unit| src/components/MusicWorkspace/MusicWorkspace.test.tsx (5 tests) 2665ms
+   ✓ switches left display without replacing the shared audio, and reports missing artwork  860ms
+   ✓ shows details for another track without selecting it and hides metadata from the list  303ms
+   ✓ shows supplied artwork and paginates many tracks without adding another player  424ms
+   ✓ reuses the player for creation and history, shows a disabled artwork mock, and reuses a saved prompt without interpreting it  864ms
+ ✓ |unit| src/components/ErrorState/ErrorState.test.tsx (39 tests) 778ms
+       ✓ renders with retry button when onRetry is provided  425ms
+stdout | src/components/NotificationToast/NotificationToast.test.tsx
+Test setup running...
+
+stdout | src/components/NotificationToast/NotificationToast.test.tsx
+Test setup running...
+
+stdout | src/components/Button/Button.test.tsx
+Test setup running...
+
+stdout | src/components/Button/Button.test.tsx
+Test setup running...
+
+stdout | src/components/MenuButtonGroup/MenuButtonGroup.test.tsx
+Test setup running...
+
+stdout | src/components/MenuButtonGroup/MenuButtonGroup.test.tsx
+Test setup running...
+
+stdout | src/components/Label/Label.test.tsx
+Test setup running...
+
+stdout | src/components/Label/Label.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/ActionButton/ActionButton.test.tsx (40 tests) 478ms
+ ✓ |unit| src/components/CopyClipButton/CopyClipButton.test.tsx (24 tests) 438ms
+ ✓ |unit| src/components/NotificationToast/NotificationToast.test.tsx (14 tests) 384ms
+ ✓ |unit| src/components/Label/Label.test.tsx (21 tests) 212ms
+ ✓ |unit| src/components/MenuButtonGroup/MenuButtonGroup.test.tsx (34 tests) 287ms
+ ✓ |unit| src/components/Button/Button.test.tsx (37 tests) 474ms
+stdout | src/components/AdaptiveText/AdaptiveText.test.tsx
+Test setup running...
+
+stdout | src/components/AdaptiveText/AdaptiveText.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/AdaptiveText/AdaptiveText.test.tsx (13 tests) 349ms
+stdout | src/components/ProgressBar/ProgressBar.test.tsx
+Test setup running...
+
+stdout | src/components/ProgressBar/ProgressBar.test.tsx
+Test setup running...
+
+stdout | src/components/MenuBar/MenuBar.test.tsx
+Test setup running...
+
+stdout | src/components/MenuBar/MenuBar.test.tsx
+Test setup running...
+
+stdout | src/components/EditableSelect/EditableSelect.test.tsx
+Test setup running...
+
+stdout | src/components/EditableSelect/EditableSelect.test.tsx
+Test setup running...
+
+stdout | src/components/RadioButtonGroup/RadioButtonGroup.test.tsx
+Test setup running...
+
+stdout | src/components/RadioButtonGroup/RadioButtonGroup.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/ProgressBar/ProgressBar.test.tsx (11 tests) 438ms
+ ✓ |unit| src/components/MenuBar/MenuBar.test.tsx (21 tests) 363ms
+stdout | src/components/Spinner/Spinner.test.tsx
+Test setup running...
+
+stdout | src/components/Spinner/Spinner.test.tsx
+Test setup running...
+
+stdout | src/components/Separator/Separator.test.tsx
+Test setup running...
+
+stdout | src/components/Separator/Separator.test.tsx
+Test setup running...
+
+stdout | src/components/TextInput/TextInput.test.tsx
+Test setup running...
+
+stdout | src/components/TextInput/TextInput.test.tsx
+Test setup running...
+
+stdout | src/components/Input/Input.test.tsx
+Test setup running...
+
+stdout | src/components/Input/Input.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/EditableSelect/EditableSelect.test.tsx (8 tests) 418ms
+       ✓ renders with initial value  325ms
+ ✓ |unit| src/components/RadioButtonGroup/RadioButtonGroup.test.tsx (2 tests) 417ms
+     ✓ selects from the entire label and keeps separately named groups independent  390ms
+ ✓ |unit| src/components/Separator/Separator.test.tsx (34 tests) 285ms
+ ✓ |unit| src/components/Spinner/Spinner.test.tsx (32 tests) 472ms
+ ✓ |unit| src/components/TextInput/TextInput.test.tsx (8 tests) 438ms
+stdout | src/components/AsyncDataWrapper/AsyncDataWrapper.test.tsx
+Test setup running...
+
+stdout | src/components/AsyncDataWrapper/AsyncDataWrapper.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/Input/Input.test.tsx (53 tests) 489ms
+stdout | src/components/SearchableSelect/SearchableSelect.test.tsx
+Test setup running...
+
+stdout | src/components/SearchableSelect/SearchableSelect.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/AsyncDataWrapper/AsyncDataWrapper.test.tsx (29 tests) 533ms
+       ✓ preserves children structure  323ms
+stdout | src/components/NavigationStepper/NavigationStepper.test.tsx
+Test setup running...
+
+stdout | src/components/NavigationStepper/NavigationStepper.test.tsx
+Test setup running...
+
+stdout | src/components/ConfirmModal/ConfirmModal.test.tsx
+Test setup running...
+
+stdout | src/components/ConfirmModal/ConfirmModal.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/SearchableSelect/SearchableSelect.test.tsx (16 tests) 385ms
+stdout | src/components/ChatDock/ChatDock.test.tsx
+Test setup running...
+
+stdout | src/components/ChatDock/ChatDock.test.tsx
+Test setup running...
+
+stdout | src/components/MiniTable/MiniTable.test.tsx
+Test setup running...
+
+stdout | src/components/MiniTable/MiniTable.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/ConfirmModal/ConfirmModal.test.tsx (28 tests) 332ms
+ ✓ |unit| src/components/NavigationStepper/NavigationStepper.test.tsx (8 tests) 397ms
+ ✓ |unit| src/components/MiniTable/MiniTable.test.tsx (4 tests) 135ms
+stdout | src/components/MusicLibraryControls/MusicLibraryControls.test.tsx
+Test setup running...
+
+stdout | src/components/MusicLibraryControls/MusicLibraryControls.test.tsx
+Test setup running...
+
+stdout | src/components/Textarea/Textarea.test.tsx
+Test setup running...
+
+stdout | src/components/Textarea/Textarea.test.tsx
+Test setup running...
+
+stdout | src/components/ImageViewer/ImageViewer.test.tsx
+Test setup running...
+
+stdout | src/components/ImageViewer/ImageViewer.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/ChatDock/ChatDock.test.tsx (7 tests) 371ms
+ ✓ |unit| src/components/Textarea/Textarea.test.tsx (3 tests) 272ms
+ ✓ |unit| src/components/ImageViewer/ImageViewer.test.tsx (7 tests) 302ms
+ ✓ |unit| src/components/MusicLibraryControls/MusicLibraryControls.test.tsx (2 tests) 372ms
+   ✓ dynamic multiple tags, ordering, favorites and query are submitted together  310ms
+stdout | src/components/ActionButton/CreateButton.test.tsx
+Test setup running...
+
+stdout | src/components/ActionButton/CreateButton.test.tsx
+Test setup running...
+
+stdout | src/components/ScaleInput/ScaleInput.test.tsx
+Test setup running...
+
+stdout | src/components/ScaleInput/ScaleInput.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/ActionButton/CreateButton.test.tsx (26 tests) 422ms
+stdout | src/components/InfiniteListMenu/InfiniteListMenu.test.tsx
+Test setup running...
+
+stdout | src/components/InfiniteListMenu/InfiniteListMenu.test.tsx
+Test setup running...
+
+stdout | src/components/Drawer/Drawer.test.tsx
+Test setup running...
+
+stdout | src/components/Drawer/Drawer.test.tsx
+Test setup running...
+
+stdout | src/components/GenerationStatus/GenerationStatus.test.tsx
+Test setup running...
+
+stdout | src/components/GenerationStatus/GenerationStatus.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/ScaleInput/ScaleInput.test.tsx (8 tests) 618ms
+       ✓ renders with default range 0-10  336ms
+stdout | src/components/ScrollArea/ScrollArea.test.tsx
+Test setup running...
+
+stdout | src/components/ScrollArea/ScrollArea.test.tsx
+Test setup running...
+
+stdout | src/components/SelectableTextInput/SelectableTextInput.test.tsx
+Test setup running...
+
+stdout | src/components/SelectableTextInput/SelectableTextInput.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/InfiniteListMenu/InfiniteListMenu.test.tsx (9 tests) 914ms
+     ✓ renders empty state  388ms
+     ✓ selects item on click and returns object  333ms
+ ✓ |unit| src/components/GenerationStatus/GenerationStatus.test.tsx (2 tests) 859ms
+   ✓ does not invent a percentage and delegates cancellation  793ms
+stdout | src/components/Playlist/Playlist.test.tsx
+Test setup running...
+
+stdout | src/components/Playlist/Playlist.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/Drawer/Drawer.test.tsx (9 tests) 807ms
+       ✓ applies custom width  352ms
+stdout | src/components/SimpleSearchInput/SimpleSearchInput.test.tsx
+Test setup running...
+
+stdout | src/components/SimpleSearchInput/SimpleSearchInput.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/ScrollArea/ScrollArea.test.tsx (29 tests) 448ms
+ ✓ |unit| src/components/SelectableTextInput/SelectableTextInput.test.tsx (3 tests) 405ms
+     ✓ renders select with options and input  333ms
+ ✓ |unit| src/components/Playlist/Playlist.test.tsx (2 tests) 362ms
+   ✓ exposes selection, emits IDs and disables unavailable tracks  353ms
+ ✓ |unit| src/components/SimpleSearchInput/SimpleSearchInput.test.tsx (5 tests) 419ms
+stdout | src/components/Avatar/Avatar.test.tsx
+Test setup running...
+
+stdout | src/components/Avatar/Avatar.test.tsx
+Test setup running...
+
+stdout | src/components/DateFormat/DateFormat.test.tsx
+Test setup running...
+
+stdout | src/components/DateFormat/DateFormat.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/Avatar/Avatar.test.tsx (40 tests) 245ms
+ ✓ |unit| src/components/DateFormat/DateFormat.test.tsx (32 tests) 302ms
+stdout | src/components/DateDisplay/DateDisplay.test.tsx
+Test setup running...
+
+stdout | src/components/DateDisplay/DateDisplay.test.tsx
+Test setup running...
+
+stdout | src/components/Card/Card.test.tsx
+Test setup running...
+
+stdout | src/components/Card/Card.test.tsx
+Test setup running...
+
+stdout | src/components/Collapsible/Collapsible.test.tsx
+Test setup running...
+
+stdout | src/components/Collapsible/Collapsible.test.tsx
+Test setup running...
+
+stdout | src/components/Tooltip/Tooltip.test.tsx
+Test setup running...
+
+stdout | src/components/Tooltip/Tooltip.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/DateDisplay/DateDisplay.test.tsx (13 tests) 135ms
+stdout | src/components/Badge/Badge.test.tsx
+Test setup running...
+
+stdout | src/components/Badge/Badge.test.tsx
+Test setup running...
+
+stdout | src/components/NumberFormat/NumberFormat.test.tsx
+Test setup running...
+
+stdout | src/components/NumberFormat/NumberFormat.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/Card/Card.test.tsx (42 tests) 285ms
+stderr | src/components/Collapsible/Collapsible.test.tsx > Collapsible Components > Integration with Radix UI > handles Radix UI specific props
+React does not recognize the `asChild` prop on a DOM element. If you intentionally want it to appear in the DOM as a custom attribute, spell it as lowercase `aschild` instead. If you accidentally passed it from a parent component, remove it from the DOM element.
+React does not recognize the `forceMount` prop on a DOM element. If you intentionally want it to appear in the DOM as a custom attribute, spell it as lowercase `forcemount` instead. If you accidentally passed it from a parent component, remove it from the DOM element.
+React does not recognize the `defaultOpen` prop on a DOM element. If you intentionally want it to appear in the DOM as a custom attribute, spell it as lowercase `defaultopen` instead. If you accidentally passed it from a parent component, remove it from the DOM element.
+
+ ✓ |unit| src/components/Collapsible/Collapsible.test.tsx (27 tests) 183ms
+stdout | src/components/ViewSwitcher/ViewSwitcher.test.tsx
+Test setup running...
+
+stdout | src/components/ViewSwitcher/ViewSwitcher.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/Badge/Badge.test.tsx (22 tests) 151ms
+ ✓ |unit| src/components/Tooltip/Tooltip.test.tsx (18 tests) 222ms
+ ✓ |unit| src/components/ViewSwitcher/ViewSwitcher.test.tsx (4 tests) 103ms
+ ✓ |unit| src/components/NumberFormat/NumberFormat.test.tsx (16 tests) 166ms
+stdout | src/components/Pagination/Pagination.test.tsx
+Test setup running...
+
+stdout | src/components/Pagination/Pagination.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/Pagination/Pagination.test.tsx (7 tests) 102ms
+stdout | src/contexts/CalendarContext.test.tsx
+Test setup running...
+
+stdout | src/contexts/CalendarContext.test.tsx
+Test setup running...
+
+ ✓ |unit| src/contexts/CalendarContext.test.tsx (5 tests) 46ms
+stdout | src/components/Switch/Switch.test.tsx
+Test setup running...
+
+stdout | src/components/Switch/Switch.test.tsx
+Test setup running...
+
+stdout | src/hooks/useMobile.test.ts
+Test setup running...
+
+stdout | src/hooks/useMobile.test.ts
+Test setup running...
+
+ ✓ |unit| src/components/Switch/Switch.test.tsx (9 tests) 57ms
+ ✓ |unit| src/hooks/useMobile.test.ts (4 tests) 33ms
+stdout | src/utils/cn.test.ts
+Test setup running...
+
+stdout | src/utils/cn.test.ts
+Test setup running...
+
+ ✓ |unit| src/utils/cn.test.ts (2 tests) 8ms
+stdout | src/components/DigitalClock/DigitalClock.test.tsx
+Test setup running...
+
+stdout | src/components/DigitalClock/DigitalClock.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/DigitalClock/DigitalClock.test.tsx (1 test) 4ms
+
+ Test Files  65 passed (65)
+      Tests  1109 passed (1109)
+   Start at  22:30:43
+   Duration  22.33s (transform 2.87s, setup 14.48s, import 15.43s, tests 45.37s, environment 106.78s)
+

@@ -1,14 +1,17 @@
 import { useState } from "react";
 import {
 	MusicPlayer,
+	MusicLibraryControls,
 	Playlist,
 	GenerationStatus,
+	MusicWorkspace,
 } from "@eumenes/design-system";
 import type {
 	ArtifactEvent,
 	ArtifactRequest,
 	MusicResource,
 } from "./contracts";
+import { isSafeImageUrl } from "./contracts";
 import { isSafeAudioUrl } from "./media-contracts";
 import { useArtifactRuntime } from "./runtime";
 
@@ -73,7 +76,7 @@ export function MusicView({ request }: { request: ArtifactRequest }) {
 	);
 }
 export function PlaylistView({ request }: { request: ArtifactRequest }) {
-	const { data, send, error } = useMedia(request);
+	const { data, send, error, pending } = useMedia(request);
 	if (data?.kind !== "music") return null;
 	return (
 		<div className="aui-stack">
@@ -81,6 +84,21 @@ export function PlaylistView({ request }: { request: ArtifactRequest }) {
 				title={request.title}
 				tracks={data.tracks}
 				currentTrackId={data.currentId}
+				busy={pending || data.library?.loading}
+				onFavorite={
+					data.library
+						? (id, favorite) => {
+								void send("music-favorite", { id, favorite });
+							}
+						: undefined
+				}
+				onDelete={
+					data.library
+						? (id) => {
+								void send("music-delete", { id });
+							}
+						: undefined
+				}
 				onSelect={(id) => {
 					void send("music-select", { id });
 				}}
@@ -116,6 +134,117 @@ export function GenerationView({ request }: { request: ArtifactRequest }) {
 				}
 			/>
 			{error && <p role="alert">{error}</p>}
+		</div>
+	);
+}
+
+export function MusicLibraryView({ request }: { request: ArtifactRequest }) {
+	const { data, send, error } = useMedia(request);
+	if (data?.kind !== "music" || !data.library) return null;
+	const l = data.library;
+	return (
+		<MusicLibraryControls
+			{...l}
+			error={error || l.error}
+			onSearch={(filter) => {
+				void send("music-search", { filter: JSON.stringify(filter) });
+			}}
+			onMore={() => {
+				void send("music-more");
+			}}
+			onRefresh={() => {
+				void send("music-refresh");
+			}}
+		/>
+	);
+}
+
+export function MusicWorkspaceView({ request }: { request: ArtifactRequest }) {
+	const { data, send, error, pending } = useMedia(request);
+	if (data?.kind !== "music") return null;
+	if (!data.library && !data.creation && data.tracks.every((t) => t.disabled))
+		return null;
+	const tracks = data.tracks.map((t) => ({
+		...t,
+		artworkUrl:
+			t.artworkUrl && isSafeImageUrl(t.artworkUrl) ? t.artworkUrl : undefined,
+	}));
+	const current = tracks.find((t) => t.id === data.currentId && !t.disabled);
+	const library = data.library;
+	return (
+		<div className="aui-music-workspace">
+			<MusicWorkspace
+				tracks={tracks}
+				currentTrackId={data.currentId}
+				track={
+					current?.url && isSafeAudioUrl(current.url)
+						? { ...current, src: current.url }
+						: null
+				}
+				title={request.title}
+				downloadName={current?.downloadName}
+				busy={pending || library?.loading}
+				creation={
+					data.creation
+						? {
+								busy: data.creation.busy,
+								onGenerate: (prompt) => {
+									void send("music-generate", { prompt });
+								},
+								status:
+									data.creation.status && data.creation.title
+										? {
+												status: data.creation.status,
+												title: data.creation.title,
+												description: data.creation.description,
+												cancelling: pending,
+												onCancel: data.creation.canCancel
+													? () => {
+															void send("music-cancel");
+														}
+													: undefined,
+											}
+										: undefined,
+							}
+						: undefined
+				}
+				onSelect={(id) => {
+					void send("music-select", { id });
+				}}
+				onFavorite={
+					library
+						? (id, favorite) => {
+								void send("music-favorite", { id, favorite });
+							}
+						: undefined
+				}
+				onDelete={
+					library
+						? (id) => {
+								void send("music-delete", { id });
+							}
+						: undefined
+				}
+				controls={
+					library && (
+						<MusicLibraryControls
+							{...library}
+							compact
+							error={error || library.error}
+							onSearch={(filter) => {
+								void send("music-search", { filter: JSON.stringify(filter) });
+							}}
+							onMore={() => {
+								void send("music-more");
+							}}
+							onRefresh={() => {
+								void send("music-refresh");
+							}}
+						/>
+					)
+				}
+			/>
+			{error && !library && <p role="alert">{error}</p>}
 		</div>
 	);
 }

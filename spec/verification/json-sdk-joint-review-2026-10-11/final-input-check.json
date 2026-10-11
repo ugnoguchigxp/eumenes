@@ -1,0 +1,8 @@
+{
+  "sourceDrift": [
+    "packages/design-system/src/components/MusicWorkspace/MusicCreationForm.css",
+    "packages/design-system/src/components/MusicWorkspace/MusicCreationForm.tsx",
+    "scripts/music-creation-ui-check.ts"
+  ],
+  "verificationSnapshotDrift": []
+}

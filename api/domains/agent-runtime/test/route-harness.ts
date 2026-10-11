@@ -1,4 +1,5 @@
 import { fixtureResearchOutput, fixtureVerification } from "./research-fixture";
+import { parseControlOutput } from "../service/control-output";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -193,6 +194,7 @@ export async function harness(now = Date.now, luna = false) {
 		taskId: string,
 		action: unknown,
 		afterPrepare?: () => void,
+		outputText?: string,
 	) {
 		const t = task(taskId);
 		const step = store.read(
@@ -215,7 +217,12 @@ export async function harness(now = Date.now, luna = false) {
 		const applied = await store.write((db) =>
 			agents.handler.settleInTransaction(db, claim as never, prep.input, {
 				type: "success",
-				result: { receipt: {} as never, invalid: false, action },
+				result: {
+					receipt: {} as never,
+					...(outputText === undefined
+						? { invalid: false, action }
+						: parseControlOutput(outputText)),
+				},
 			} as never),
 		);
 		return { prep, applied };

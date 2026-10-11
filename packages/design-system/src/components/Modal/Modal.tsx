@@ -13,6 +13,9 @@ interface IModalProps
 	className?: string;
 	contentClassName?: string;
 	onClose?: () => void;
+	onCloseAutoFocus?: React.ComponentPropsWithoutRef<
+		typeof DialogPrimitive.Content
+	>["onCloseAutoFocus"];
 	noHeader?: boolean;
 	noPadding?: boolean;
 	draggable?: boolean;
@@ -36,6 +39,7 @@ const Modal = React.memo(
 				open,
 				onOpenChange,
 				onClose,
+				onCloseAutoFocus,
 				defaultOpen,
 				draggable = true,
 				...props
@@ -207,6 +211,7 @@ const Modal = React.memo(
 						<DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
 						<DialogPrimitive.Content
 							ref={ref}
+							onCloseAutoFocus={onCloseAutoFocus}
 							aria-describedby={descriptionId}
 							className={cn(
 								"fixed z-50 flex flex-col gap-0 bg-background",

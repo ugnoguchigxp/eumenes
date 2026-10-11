@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import { createLarmPlayground, silentWav, type TestProgress } from "..";
 const revision = "a".repeat(64);
 const names = ["llm", "asr", "tts", "embedding", "system-one"];
@@ -293,6 +294,165 @@ test("image and music fetch artifacts without making a warm connection", async (
 	}
 	expect(h.calls.some((c) => c.path === "/v1/agent-connections")).toBe(false);
 });
+test("music requests Opus once and fetches Ogg Opus with Control authentication after completion", async () => {
+	const audio = new Uint8Array(
+		readFileSync(
+			new URL(
+				"../../../../tests/browser/fixtures/silence.opus",
+				import.meta.url,
+			),
+		),
+	);
+	let polls = 0;
+	const h = fixture((path) => {
+		if (path === "/v1/music/generations/music-1") {
+			polls++;
+			return Response.json({
+				jobId: "music-1",
+				status: polls === 1 ? "encoding" : "completed",
+				...(polls === 1
+					? {}
+					: {
+							result: {
+								id: "music-1",
+								model: "model-music",
+								format: "opus",
+								audioUrl: "/v1/music/generations/music-1/audio",
+								metadataUrl: "/v1/music/generations/music-1/metadata",
+							},
+						}),
+			});
+		}
+		if (path.endsWith("/audio")) {
+			expect(polls).toBe(2);
+			return new Response(audio, {
+				headers: { "content-type": "audio/ogg; codecs=opus" },
+			});
+		}
+	});
+	const target = (
+		await h.gateway.catalog(AbortSignal.timeout(1000))
+	).targets.find((t) => t.kind === "music")!;
+	const progress: TestProgress[] = [];
+	const result = await h.gateway.execute(
+		target,
+		{ text: "test", durationSeconds: 30 },
+		AbortSignal.timeout(1000),
+		async (p) => {
+			progress.push(p);
+		},
+	);
+	expect(result.mime).toBe("audio/ogg");
+	expect(result.bytes).toEqual(audio);
+	expect(progress.map((p) => p.phase)).toEqual([
+		"generating",
+		"queued",
+		"encoding",
+		"completed",
+		"fetching-result",
+	]);
+	const posts = h.calls.filter((c) => c.method === "POST");
+	expect(posts).toHaveLength(1);
+	expect(posts[0]!.body).toMatchObject({
+		model: "model-music",
+		outputFormat: "opus",
+		durationSeconds: 30,
+	});
+	expect(h.calls.every((c) => c.auth === "Bearer control-secret")).toBe(true);
+	expect(h.calls.some((c) => c.path.includes("/claim"))).toBe(false);
+});
+for (const invalid of [
+	"not-ogg",
+	"vorbis",
+	"truncated",
+	"mime-mismatch",
+	"unknown-format",
+])
+	test(`music rejects invalid Opus result: ${invalid}`, async () => {
+		const audio = new Uint8Array(
+			readFileSync(
+				new URL(
+					"../../../../tests/browser/fixtures/silence.opus",
+					import.meta.url,
+				),
+			),
+		);
+		if (invalid === "not-ogg") audio[0] = 0;
+		if (invalid === "vorbis") audio[28] = 0;
+		const h = fixture((path) => {
+			if (path === "/v1/music/generations/music-1")
+				return Response.json({
+					jobId: "music-1",
+					status: "completed",
+					result: {
+						id: "music-1",
+						model: "model-music",
+						format: invalid === "unknown-format" ? "aac" : "opus",
+						audioUrl: "/v1/music/generations/music-1/audio",
+						metadataUrl: "/v1/music/generations/music-1/metadata",
+					},
+				});
+			if (path.endsWith("/audio"))
+				return new Response(
+					invalid === "truncated" ? audio.slice(0, 32) : audio,
+					{
+						headers: {
+							"content-type":
+								invalid === "mime-mismatch" ? "audio/wav" : "audio/ogg",
+						},
+					},
+				);
+		});
+		const target = (
+			await h.gateway.catalog(AbortSignal.timeout(1000))
+		).targets.find((t) => t.kind === "music")!;
+		await expect(
+			h.gateway.execute(
+				target,
+				{ text: "test" },
+				AbortSignal.timeout(1000),
+				async () => {},
+			),
+		).rejects.toThrow(
+			invalid === "mime-mismatch" || invalid === "unknown-format"
+				? "invalid_artifact_type"
+				: "invalid_artifact_content",
+		);
+		expect(h.calls.filter((c) => c.method === "POST")).toHaveLength(1);
+	});
+for (const format of ["wav", "flac"] as const)
+	test(`music still accepts an existing ${format} result`, async () => {
+		const audio =
+			format === "wav" ? silentWav() : new TextEncoder().encode("fLaC");
+		const mime = format === "wav" ? "audio/wav" : "audio/flac";
+		const h = fixture((path) => {
+			if (path === "/v1/music/generations/music-1")
+				return Response.json({
+					jobId: "music-1",
+					status: "completed",
+					result: {
+						id: "music-1",
+						model: "model-music",
+						format,
+						audioUrl: "/v1/music/generations/music-1/audio",
+						metadataUrl: "/v1/music/generations/music-1/metadata",
+					},
+				});
+			if (path.endsWith("/audio"))
+				return new Response(audio, { headers: { "content-type": mime } });
+		});
+		const target = (
+			await h.gateway.catalog(AbortSignal.timeout(1000))
+		).targets.find((t) => t.kind === "music")!;
+		const result = await h.gateway.execute(
+			target,
+			{ text: "test" },
+			AbortSignal.timeout(1000),
+			async () => {},
+		);
+		expect(result.mime).toBe(mime);
+		expect(result.bytes).toEqual(audio);
+	});
 test("image POST failures are not retried and late cancellation is reported unknown", async () => {
 	let post = 0;
 	const h = fixture((path) => {

@@ -232,9 +232,7 @@ test("new research may search after a specified URL is mismatched, using only it
 			(data, messages) => {
 				expect(data.task).toMatchObject({ urls: [url] });
 				const contracts = JSON.parse(
-					messages[0]!.content
-						.split("TOOLS=")[1]!
-						.split("\nOUTPUT_SCHEMA=")[0]!,
+					messages[0]!.content.split("TOOLS=")[1]!.split("\n")[0]!,
 				);
 				expect(
 					contracts.some((t: { id: string }) =>
@@ -245,9 +243,7 @@ test("new research may search after a specified URL is mismatched, using only it
 			},
 			(_data, messages) => {
 				const contracts = JSON.parse(
-					messages[0]!.content
-						.split("TOOLS=")[1]!
-						.split("\nOUTPUT_SCHEMA=")[0]!,
+					messages[0]!.content.split("TOOLS=")[1]!.split("\n")[0]!,
 				);
 				expect(
 					contracts.some((t: { id: string }) => t.id === "web.lookup"),

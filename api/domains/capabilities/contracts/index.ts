@@ -1,6 +1,11 @@
 import { z } from "zod";
-import { musicRequest, musicPlan } from "./music";
-export { musicRequest, musicPlan };
+import {
+	musicRequest,
+	musicPlan,
+	musicPlanV2,
+	musicPlaybackPlan,
+} from "./music";
+export { musicRequest, musicPlan, musicPlanV2, musicPlaybackPlan };
 import { timerCancel, timerCommand, timerList, timerStart } from "./timers";
 export { timerCancel, timerCommand, timerList, timerStart };
 export { timerResultContext, type TimerResultContext } from "./timers";
@@ -96,6 +101,8 @@ export const historyRead = z
 export const validators = {
 	musicRequest,
 	musicPlan,
+	musicPlanV2,
+	musicPlaybackPlan,
 	dotsDelegation: z.strictObject({}),
 	find: savedFindInput,
 	readSaved: savedReadInput,

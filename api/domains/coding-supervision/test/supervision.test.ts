@@ -107,6 +107,16 @@ test("invalid JSON is repaired once within the original deadline", async () => {
 	) as { deadline: number }[];
 	expect(rows[0]?.deadline).toBe(rows[1]?.deadline);
 });
+test("supervision corrects JSON syntax before spending its one model repair", async () => {
+	const h = await setup({
+		model: async () => JSON.stringify(proposal("wait")).slice(0, -1) + ",}",
+	});
+	await h.observe();
+	await h.drain();
+	expect(h.calls()).toBe(1);
+	expect(h.supervision.get(h.taskId)?.decisionsUsed).toBe(1);
+	expect(h.tasks.get(h.taskId).task.state).toBe("active");
+});
 test("input token limits require the model tokenizer and reject oversized context", async () => {
 	for (const tokenCount of [null, 12001]) {
 		const h = await setup({ tokenCount });

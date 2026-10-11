@@ -31,7 +31,22 @@ export const searchReport = z.discriminatedUnion("outcome", [
 		claims: findings.shape.claims.max(0),
 	}),
 ]);
-export const searchAction = z.discriminatedUnion("action", [
-	invoke,
-	z.object({ action: z.literal("finish"), report: searchReport }).strict(),
-]);
+export const searchAction = z
+	.discriminatedUnion("action", [
+		invoke,
+		z.object({ action: z.literal("finish"), report: searchReport }).strict(),
+	])
+	.meta({
+		examples: [
+			{ action: "invoke", tool: "TOOLSのid", arguments: {} },
+			{
+				action: "finish",
+				report: {
+					outcome: "answered",
+					summary: "調査結果の要約",
+					claims: [{ text: "確認した事実", evidence: ["e1"] }],
+					limitations: [],
+				},
+			},
+		],
+	});

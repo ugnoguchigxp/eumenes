@@ -15,3 +15,4 @@ export type {
 } from "./contracts";
 export { migrations } from "./repository";
 export { createCodexResearch } from "./adapters/codex-research";
+export { controlInstructions, type ControlContract } from "./contracts";

@@ -1,6 +1,46 @@
 import { expect, test } from "bun:test";
 import { harness } from "./route-harness";
 
+test("worker syntax correction completes without consuming its one model repair", async () => {
+	const h = await harness();
+	try {
+		await h.start("corrected-worker");
+		const child = h.agents
+			.list("corrected-worker")
+			.find((t) => t.kind === "worker")!;
+		await h.runRawModelStep(
+			child.id,
+			null,
+			undefined,
+			"{action:'finish',report:{outcome:'not_found',summary:'情報なし',claims:[],limitations:[],},}",
+		);
+		expect(h.task(child.id).state).toBe("completed");
+		expect(h.task(child.id).json_repairs).toBe(0);
+		expect(h.task(child.id).model_calls).toBe(1);
+	} finally {
+		await h.close();
+	}
+});
+test("worker contract failure after syntax correction retries once and then stops", async () => {
+	const h = await harness();
+	try {
+		await h.start("invalid-corrected-worker");
+		const child = h.agents
+			.list("invalid-corrected-worker")
+			.find((t) => t.kind === "worker")!;
+		const invalid = "{action:'finish',report:{summary:42,},}";
+		await h.runRawModelStep(child.id, null, undefined, invalid);
+		expect(h.task(child.id).json_repairs).toBe(1);
+		expect(h.task(child.id).state).toBe("queued");
+		await h.runRawModelStep(child.id, null, undefined, invalid);
+		expect(h.task(child.id).state).toBe("failed");
+		expect(h.task(child.id).json_repairs).toBe(1);
+		expect(h.task(child.id).model_calls).toBe(2);
+	} finally {
+		await h.close();
+	}
+});
+
 test("Luna uses the common Web worker and retains the selected engine across steps", async () => {
 	const h = await harness(Date.now, true);
 	try {

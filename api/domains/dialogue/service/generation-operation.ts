@@ -51,12 +51,19 @@ export function settleConversationOperation(
 	// on the same policy request. No control text is adopted or collected.
 	if (input.world)
 		worldContext?.releaseInTransaction(tx, run.id, run.conversationId);
-	if (result.operation.kind === "music") {
+	if (
+		result.operation.kind === "music" ||
+		result.operation.kind === "music-playback"
+	) {
 		if (!deps.music) throw new Error("music_unavailable");
 		const original = conversation
 			.messagesInTransaction(tx, run.conversationId)
 			.find((m) => m.id === run.inputMessageId)!.text;
-		const saved = deps.music.startInTransaction(tx, {
+		const saved = (
+			result.operation.kind === "music"
+				? deps.music.startInTransaction
+				: deps.music.startPlaybackInTransaction
+		)(tx, {
 			runId: run.id,
 			conversationId: run.conversationId,
 			question: result.operation.question,

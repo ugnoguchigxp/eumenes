@@ -5,7 +5,7 @@ import {
 	validationIssues,
 } from "../../../infrastructure/validation-log";
 import { researchInput, toolRuntimeOf } from "../../capabilities";
-import type { Receipt } from "../../inference";
+import type { Receipt, ControlContract } from "../../inference";
 import type { HandlerDefinition } from "../../queue";
 import type { Source } from "../../tool-runtime";
 import type { Task } from "../contracts";
@@ -42,7 +42,7 @@ export type StepInput = {
 	revision: number;
 	requestId: string;
 	messages: Array<{ role: "system" | "user" | "assistant"; content: string }>;
-	control?: { instructions: string; outputSchema: unknown };
+	control?: ControlContract;
 	visible: Source[];
 	manifestDigest: string;
 	grants: Array<{ id: string; executionRef: string; replayOnly?: boolean }>;
@@ -94,7 +94,13 @@ export function createStepActions(ctx: RuntimeContext, ops: TaskOps) {
 		const issues =
 			!outcome.result.invalid && !parsed.success
 				? validationIssues(parsed.error, outcome.result.action)
-				: [];
+				: [
+						{
+							validationCode:
+								outcome.result.diagnostic?.validationCode ??
+								"invalid_json_syntax",
+						},
+					];
 		if (!parsed.success)
 			for (const issue of parsed.error.issues) {
 				if (issue.code === "unrecognized_keys")

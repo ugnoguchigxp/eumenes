@@ -21,6 +21,20 @@ const question = z.strictObject({
 	options: z.array(z.string().min(1).max(120)).min(1).max(8).optional(),
 });
 export const viewRegistry = {
+	"music-workspace": {
+		name: "MusicWorkspace",
+		label: "Visualizer・楽曲一覧・共通プレイヤー",
+		schema: z.strictObject({
+			view: z.literal("music-workspace"),
+			source,
+			title,
+		}),
+	},
+	"music-library": {
+		name: "MusicLibraryControls",
+		label: "楽曲ライブラリ検索",
+		schema: z.strictObject({ view: z.literal("music-library"), source, title }),
+	},
 	"music-player": {
 		name: "MusicPlayer",
 		label: "音楽プレイヤー",
@@ -252,6 +266,13 @@ export type ArtifactEvent = {
 		| "settings-save"
 		| "demo-click"
 		| "music-select"
+		| "music-generate"
+		| "music-cancel"
+		| "music-search"
+		| "music-more"
+		| "music-refresh"
+		| "music-favorite"
+		| "music-delete"
 		| "generation-cancel"
 		| "generation-retry";
 	values: Record<string, string | boolean>;

@@ -1,3 +1,4 @@
+import { createPlayback } from "./playback";
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import { musicRequest, type Capabilities } from "../../capabilities";
@@ -60,7 +61,11 @@ export function createMusic(deps: {
 		});
 	}
 	registerMusicHandlers({ ...deps, enqueue, fail, cancel });
+	const playback = createPlayback(deps);
 	return {
+		playback,
+		library: () => deps.gateway().library,
+		startPlaybackInTransaction: playback.startInTransaction,
 		startInTransaction(
 			db: Database,
 			input: {
@@ -78,7 +83,7 @@ export function createMusic(deps: {
 			const prepared = capabilities.prepareActiveByIdInTransaction(
 				db,
 				{ rootRunId: input.runId, taskId: id, cancelEpoch: 0 },
-				"package:music.create@1",
+				"package:music.create@2",
 				request,
 			);
 			const now = Date.now();
@@ -117,7 +122,7 @@ export function createMusic(deps: {
 		},
 		resultInTransaction(db: Database, runId: string) {
 			const r = byRun(db, runId);
-			return r ? record(r) : null;
+			return r ? record(r) : playback.resultInTransaction(db, runId);
 		},
 		get: (id: string) =>
 			store.read((db) => {

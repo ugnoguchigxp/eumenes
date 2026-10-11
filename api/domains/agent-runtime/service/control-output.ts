@@ -1,6 +1,7 @@
 import type { LogFields } from "../../../infrastructure/logger";
 import { valueType } from "../../../infrastructure/validation-log";
 import { bytes } from "../../capabilities";
+import { LlmJsonError, parseLlmJson } from "../../../infrastructure/llm-json";
 export const codeOf = (code: string, fallback: string) =>
 	/^[a-z_]{1,80}$/.test(code) ? code : fallback;
 export const safeCode = (e: unknown) =>
@@ -32,13 +33,9 @@ export function parseControlOutput(value: unknown): {
 			},
 		};
 	const text = value.trim();
-	// Drop one complete leading reasoning block only; never search prose for JSON.
-	const thought = /^<think>[\s\S]*?<\/think>\s*/i.exec(text);
-	const body = thought ? text.slice(thought[0].length) : text;
-	// Decode a whole JSON code block only. Never search prose for a plausible action.
-	const wrapped = /^```(?:json)?[ \t]*\r?\n([\s\S]*?)\r?\n```$/i.exec(body);
+	const body = text;
 	try {
-		const action: unknown = JSON.parse(wrapped?.[1] ?? body);
+		const action = parseLlmJson(body, 32768);
 		if (action && typeof action === "object" && "action" in action) {
 			diagnostic.controlAction =
 				typeof action.action === "string" &&
@@ -48,23 +45,41 @@ export function parseControlOutput(value: unknown): {
 		}
 		return { action, invalid: false, diagnostic };
 	} catch (error) {
+		const repairCode =
+			error instanceof LlmJsonError &&
+			!["llm_json_invalid_syntax", "llm_json_incomplete"].includes(error.code)
+				? error.code
+				: undefined;
+		// Retain the existing safe native-parser classification after correction
+		// fails. The native message is examined locally and never logged.
+		let parserError = error;
+		try {
+			JSON.parse(body);
+		} catch (nativeError) {
+			parserError = nativeError;
+		}
 		// Extract only a numeric parser offset, never the parser's quoted input.
 		const offset =
-			error instanceof SyntaxError
-				? /\bposition (\d+)\b/.exec(error.message)?.[1]
+			!repairCode && parserError instanceof SyntaxError
+				? /\bposition (\d+)\b/.exec(parserError.message)?.[1]
 				: undefined;
-		const message = error instanceof SyntaxError ? error.message : "";
-		const validationCode = /Unexpected (?:EOF|end)/i.test(message)
-			? "unexpected_end"
-			: /Expected '\}'/.test(message)
-				? "expected_object_end"
-				: /Expected '\]'/.test(message)
-					? "expected_array_end"
-					: /Property name must/.test(message)
-						? "expected_property_name"
-						: /Unexpected identifier/.test(message)
-							? "unexpected_identifier"
-							: "invalid_json_syntax";
+		const message =
+			parserError instanceof SyntaxError ? parserError.message : "";
+		const validationCode =
+			repairCode ??
+			(/Unexpected (?:EOF|end)/i.test(message)
+				? "unexpected_end"
+				: /Expected '\}'/.test(message)
+					? "expected_object_end"
+					: /Expected '\]'/.test(message)
+						? "expected_array_end"
+						: /Property name must/.test(message)
+							? "expected_property_name"
+							: /Unexpected identifier/.test(message)
+								? "unexpected_identifier"
+								: error instanceof LlmJsonError
+									? error.code
+									: "invalid_json_syntax");
 		return {
 			action: undefined,
 			invalid: true,

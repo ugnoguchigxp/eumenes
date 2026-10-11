@@ -12,7 +12,10 @@ import { artifactLibrary } from "./library";
 function checkSource(definition: ArtifactDefinition, snapshot: Snapshot) {
 	for (const request of definitionRequests(definition)) {
 		const kind =
-			request.view === "music-player" || request.view === "playlist"
+			request.view === "music-workspace" ||
+			request.view === "music-player" ||
+			request.view === "playlist" ||
+			request.view === "music-library"
 				? "music"
 				: request.view === "generation-status"
 					? "generation"

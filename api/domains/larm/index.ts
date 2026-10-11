@@ -20,3 +20,15 @@ export type {
 	TestArtifact,
 } from "./contracts/playground";
 export { silentWav, code as playgroundError } from "./service/playground-http";
+
+export {
+	trackId,
+	trackQuery,
+	trackQueryParams,
+	musicTrack,
+	musicTracks,
+	musicTags,
+	type TrackQuery,
+	type MusicTrack,
+} from "./contracts/music-library";
+export { MusicLibraryError } from "./service/music-library";

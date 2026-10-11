@@ -85,9 +85,7 @@ function observeContext(
 	);
 	if (!system) return;
 	const data = JSON.parse(messages.find((m) => m.role === "user")!.content);
-	const listed = JSON.parse(
-		system.content.split("TOOLS=")[1]!.split("\nOUTPUT_SCHEMA=")[0]!,
-	);
+	const listed = JSON.parse(system.content.split("TOOLS=")[1]!.split("\n")[0]!);
 	record({
 		stage: "worker_context",
 		engine,
@@ -199,7 +197,7 @@ const h = await harness({
 						.map((m) => m.content)
 						.join("\n");
 					const listed = JSON.parse(
-						system.split("TOOLS=")[1]!.split("\nOUTPUT_SCHEMA=")[0]!,
+						system.split("\nTOOLS=")[1]!.split("\n")[0]!,
 					);
 					console.log(
 						JSON.stringify({

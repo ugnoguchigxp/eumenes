@@ -6,9 +6,21 @@ export type Messages = Array<{
 	role: "system" | "user" | "assistant";
 	content: string;
 }>;
-/** Fixed instructions and output schema of one control step, passed as values to
- * engines that accept them separately from the conversation (Codex). */
-export type ControlContract = { instructions: string; outputSchema: unknown };
+/** Instruction body excludes the output schema, which is rendered from its value. */
+export type ControlContract = {
+	instructions: string;
+	outputSchema: unknown;
+};
+export function controlInstructions(control: ControlContract) {
+	const examples = (control.outputSchema as { examples?: unknown[] } | null)
+		?.examples;
+	return (
+		control.instructions +
+		(examples?.length
+			? "\nOUTPUT_FORMAT=" + JSON.stringify(examples)
+			: "\nOUTPUT_SCHEMA=" + JSON.stringify(control.outputSchema))
+	);
+}
 /** One-off voice settings for a sample; never persisted. */
 export type SpeechOverride = Partial<
 	Pick<

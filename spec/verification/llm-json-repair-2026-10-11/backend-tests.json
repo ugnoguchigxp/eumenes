@@ -1,0 +1,20 @@
+{
+  "snapshotRevision": "9d264f7f5d8679a5ff7daf74c3f97ce2895a4e48c0a85d75a5a4ede51cd17203",
+  "initialRun": {
+    "pass": 1526,
+    "skip": 1,
+    "fail": 1,
+    "errors": 1,
+    "files": 200,
+    "elapsedMs": 217580,
+    "failure": "scripts/dots-oauth/provider.test.mjs import: oidc-provider not installed in isolated environment"
+  },
+  "dependencyRecovery": {
+    "install": "npm ci --ignore-scripts in scripts/dots-oauth",
+    "providerTest": {
+      "pass": 3,
+      "fail": 0
+    }
+  },
+  "changedImplementationFilesSinceSnapshot": []
+}

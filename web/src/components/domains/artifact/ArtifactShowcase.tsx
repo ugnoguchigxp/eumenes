@@ -37,7 +37,11 @@ import {
 
 type View = Exclude<
 	RegisteredView,
-	"music-player" | "playlist" | "generation-status"
+	| "music-player"
+	| "playlist"
+	| "generation-status"
+	| "music-library"
+	| "music-workspace"
 >;
 const sources: Record<View, string> = {
 	components: "c1",
@@ -81,6 +85,13 @@ const actionLabels = {
 	"memory-select": "情報の選択",
 	"settings-save": "試用設定の保存",
 	"music-select": "楽曲の選択",
+	"music-generate": "楽曲の生成",
+	"music-cancel": "楽曲生成の取消",
+	"music-search": "楽曲の検索",
+	"music-more": "次の曲の取得",
+	"music-refresh": "ライブラリの更新",
+	"music-favorite": "お気に入りの変更",
+	"music-delete": "楽曲の削除",
 	"generation-cancel": "生成の取消",
 	"generation-retry": "生成の再試行",
 };

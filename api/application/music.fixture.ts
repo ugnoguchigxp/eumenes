@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { createLarmPlayground, type LarmPort } from "../domains/larm";
 export const musicQuestion = "Tetrisをテーマにした30秒の楽曲を作って";
 export const musicTestPlan = {
@@ -6,28 +7,24 @@ export const musicTestPlan = {
 	prompt:
 		"An instrumental chiptune inspired by falling blocks, bright square wave melody, lively arpeggios and a clear ending.",
 	durationSeconds: 30,
+	instrumental: true,
 };
 export function musicFixture(
-	mode: "success" | "failure" | "cancel" | "invalid-plan" = "success",
+	mode:
+		| "success"
+		| "failure"
+		| "cancel"
+		| "invalid-plan"
+		| "correctable-plan" = "success",
+	fixtureOptions: { plan?: Record<string, unknown>; question?: string } = {},
 ) {
 	const requests: Array<{ method: string; path: string; body: unknown }> = [];
 	const stages: string[] = [];
-	const audio = new Uint8Array(44 + 8000 * 2 * 30);
-	const v = new DataView(audio.buffer);
-	const text = (s: string, n: number) =>
-		audio.set(new TextEncoder().encode(s), n);
-	text("RIFF", 0);
-	v.setUint32(4, audio.length - 8, true);
-	text("WAVEfmt ", 8);
-	v.setUint32(16, 16, true);
-	v.setUint16(20, 1, true);
-	v.setUint16(22, 1, true);
-	v.setUint32(24, 8000, true);
-	v.setUint32(28, 16000, true);
-	v.setUint16(32, 2, true);
-	v.setUint16(34, 16, true);
-	text("data", 36);
-	v.setUint32(40, audio.length - 44, true);
+	const audio = new Uint8Array(
+		readFileSync(
+			new URL("../../tests/browser/fixtures/silence.opus", import.meta.url),
+		),
+	);
 	const gateway = () =>
 		createLarmPlayground({
 			baseUrl: "http://127.0.0.1:9999",
@@ -94,7 +91,7 @@ export function musicFixture(
 						result: {
 							id: "track",
 							model: "fixture-music",
-							format: "wav",
+							format: "opus",
 							audioUrl: "/v1/music/generations/track/audio",
 							metadataUrl: "/v1/music/generations/track/metadata",
 						},
@@ -103,7 +100,7 @@ export function musicFixture(
 				if (path.endsWith("/metadata")) return Response.json({ id: "track" });
 				if (path.endsWith("/audio"))
 					return new Response(audio, {
-						headers: { "content-type": "audio/wav" },
+						headers: { "content-type": "audio/ogg; codecs=opus" },
 					});
 				throw new Error("unexpected_fixture_request");
 			}) as typeof fetch,
@@ -121,14 +118,18 @@ export function musicFixture(
 					{
 						id: "music",
 						name: "create_music",
-						arguments: JSON.stringify({ question: musicQuestion }),
+						arguments: JSON.stringify({
+							question: fixtureOptions.question ?? musicQuestion,
+						}),
 					},
 				]);
 				return "";
 			}
 			if (messages[0]!.content.includes("OUTPUT_SCHEMA=")) {
 				stages.push("plan");
-				return mode === "invalid-plan" ? "{}" : JSON.stringify(musicTestPlan);
+				if (mode === "invalid-plan") return "{}";
+				const plan = JSON.stringify(fixtureOptions.plan ?? musicTestPlan);
+				return mode === "correctable-plan" ? plan.slice(0, -1) + ",}" : plan;
 			}
 			stages.push("answer");
 			const result = messages.find((m) => m.content.includes('"musicResult":'));

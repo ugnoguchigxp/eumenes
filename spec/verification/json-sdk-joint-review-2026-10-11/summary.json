@@ -1,0 +1,31 @@
+{
+  "review": "completed",
+  "relatedDomains": "7 passed",
+  "sdkFixtureIntegration": {
+    "pass": 15,
+    "fail": 0
+  },
+  "afterRollbackFix": {
+    "pass": 53,
+    "fail": 0
+  },
+  "fullVerification": {
+    "result": "failed outside review scope",
+    "backend": {
+      "pass": 1539,
+      "skip": 1,
+      "fail": 0
+    },
+    "web": {
+      "pass": 304
+    },
+    "client": {
+      "pass": 329
+    },
+    "blockedStep": "design-system typecheck",
+    "cause": "MusicCreationForm.test.tsx ByRoleOptions.exact: six TS2769 errors",
+    "laterSteps": "not run"
+  },
+  "live": "no fresh provider or device acceptance in this review",
+  "unrelatedChangesPreserved": true
+}

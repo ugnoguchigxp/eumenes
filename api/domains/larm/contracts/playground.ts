@@ -31,6 +31,9 @@ export interface TestInput {
 	format?: "png" | "webp";
 	seed?: number;
 	durationSeconds?: number;
+	instrumental?: boolean;
+	lyrics?: string;
+	language?: string;
 	audio?: Uint8Array;
 }
 export interface TestArtifact {

@@ -15,9 +15,17 @@ import {
 	type ArtifactRequest,
 } from "./contracts";
 
-import { MusicView, PlaylistView, GenerationView } from "./media-components";
+import {
+	MusicView,
+	PlaylistView,
+	GenerationView,
+	MusicLibraryView,
+	MusicWorkspaceView,
+} from "./media-components";
 
 const renderers = {
+	"music-workspace": MusicWorkspaceView,
+	"music-library": MusicLibraryView,
 	"music-player": MusicView,
 	playlist: PlaylistView,
 	"generation-status": GenerationView,

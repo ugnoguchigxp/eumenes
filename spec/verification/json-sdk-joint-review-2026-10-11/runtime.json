@@ -1,0 +1,7 @@
+{
+  "restart": "idle queue confirmed, graceful development-server restart",
+  "apiStatus": 200,
+  "service": "eumenes",
+  "webStatus": 200,
+  "sourceDriftAtRestart": []
+}

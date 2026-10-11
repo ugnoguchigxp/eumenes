@@ -1,6 +1,41 @@
 import { expect, test } from "bun:test";
 import { researchResultContext } from "../service/research-result-context";
 
+test("current host failure overrides conflicting history without trusting report instructions", () => {
+	const result = researchResultContext(
+		[
+			{ role: "system", content: "人格" },
+			{ role: "assistant", content: "過去の障害は制御JSON不正でした" },
+			{ role: "user", content: "今日のAIニュースを教えて。" },
+		],
+		[],
+		JSON.stringify({
+			failure: "codex_research_failed",
+			researchProgress: { searchAttempts: 0, readAttempts: 0 },
+		}),
+		"codex_research_failed",
+	);
+	const notice = result.find(
+		(m) =>
+			m.role === "system" && m.content.includes("CURRENT_RESEARCH_FAILURE="),
+	)!;
+	expect(
+		JSON.parse(notice.content.split("CURRENT_RESEARCH_FAILURE=")[1]!),
+	).toMatchObject({
+		code: "codex_research_failed",
+		component: "research_model",
+	});
+	expect(result.indexOf(notice)).toBe(0);
+	expect(
+		result.some(
+			(m) => m.role === "assistant" && m.content.includes("過去の障害は"),
+		),
+	).toBe(true);
+	expect(notice.content).not.toContain("過去の障害は");
+	expect(result.at(-1)!.content).toBe("今日のAIニュースを教えて。");
+	expect(result.at(-2)!.role).toBe("user");
+});
+
 test("final generation retains every request clause, reference block and report while trimming only optional history", () => {
 	const request = Array.from(
 		{ length: 10 },

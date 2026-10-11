@@ -1,6 +1,8 @@
+import { registerLibrary } from "./library";
 import type { Hono } from "hono";
 import type { MusicService } from "../service";
 export function registerMusic(app: Hono, s: MusicService) {
+	registerLibrary(app, s);
 	app.get("/api/music", (c) =>
 		c.json(s.list(c.req.query("conversationId") ?? "main")),
 	);

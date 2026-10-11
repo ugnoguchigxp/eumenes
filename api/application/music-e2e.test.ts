@@ -1,7 +1,12 @@
 import { expect, test } from "bun:test";
 import { harness } from "./toolchain.fixture";
 import { musicFixture, musicQuestion, musicTestPlan } from "./music.fixture";
-for (const mode of ["success", "failure", "invalid-plan"] as const)
+for (const mode of [
+	"success",
+	"failure",
+	"invalid-plan",
+	"correctable-plan",
+] as const)
 	test(`music pipeline ${mode}: conversation, worker, API, result, audio`, async () => {
 		const f = musicFixture(mode);
 		const h = await harness({ model: f.model, musicGateway: f.gateway });
@@ -22,18 +27,23 @@ for (const mode of ["success", "failure", "invalid-plan"] as const)
 			).json();
 			expect(records).toHaveLength(1);
 			const music = records[0];
-			expect(music.state).toBe(mode === "success" ? "completed" : "failed");
+			const success = mode === "success" || mode === "correctable-plan";
+			expect(music.state).toBe(success ? "completed" : "failed");
 			const posts = f.requests.filter((r) => r.method === "POST");
 			expect(posts).toHaveLength(mode === "invalid-plan" ? 0 : 1);
 			expect(f.stages).toEqual(["route", "plan", "answer"]);
 			const response = await h.request(`/api/music/${music.id}/audio`);
-			if (mode === "success") {
+			if (success) {
 				expect(posts[0]!.body).toMatchObject({
 					prompt: musicTestPlan.prompt,
 					durationSeconds: 30,
 					instrumental: true,
+					outputFormat: "opus",
 				});
+				expect(music.mime).toBe("audio/ogg");
+				expect(music.jobId).toBe("track");
 				expect(response.status).toBe(200);
+				expect(response.headers.get("content-type")).toBe("audio/ogg");
 				expect(new Uint8Array(await response.arrayBuffer())).toEqual(f.audio);
 				expect(h.dialogue.answerText(submitted.id)).toContain("Artifact");
 			} else {
@@ -73,6 +83,58 @@ test("cancel music while the provider is running, send DELETE and never adopt au
 		expect(h.music!.list("main")[0]?.state).toBe("cancelled");
 		expect(h.dialogue.get(r.id)?.status).toBe("cancelled");
 		expect(f.stages).toEqual(["route", "plan"]);
+	} finally {
+		await h.close();
+	}
+});
+test("vocal orchestral music forwards the worker's voice description, exact lyrics and language through the authenticated API", async () => {
+	const lyrics = "[Verse]\n朝の光が窓を照らす\n新しい一日が始まる";
+	const question =
+		"オーケストラ、柔らかい女性ボーカル、歌声あり、30秒。歌詞：\n" + lyrics;
+	const plan = {
+		...musicTestPlan,
+		prompt:
+			"Orchestral pop with soft clear female vocals, expressive strings and piano",
+		instrumental: false,
+		lyrics,
+		language: "ja",
+	};
+	const f = musicFixture("success", { plan, question });
+	const h = await harness({ model: f.model, musicGateway: f.gateway });
+	try {
+		const submitted = await (
+			await h.request("/api/runs", {
+				requestId: crypto.randomUUID(),
+				conversationId: "main",
+				text: question,
+			})
+		).json();
+		await h.dialogue.waitForTerminal(submitted.id, { timeoutMs: 5000 });
+		const music = h.music!.list("main")[0]!;
+		expect(music.state).toBe("completed");
+		expect(music).toMatchObject({
+			instrumental: false,
+			lyrics,
+			language: "ja",
+		});
+		const posts = f.requests.filter(
+			(request) =>
+				request.path === "/v1/music/generations" && request.method === "POST",
+		);
+		expect(posts).toHaveLength(1);
+		expect(posts[0]!.body).toMatchObject({
+			prompt: plan.prompt,
+			instrumental: false,
+			lyrics,
+			language: "ja",
+			durationSeconds: 30,
+			outputFormat: "opus",
+		});
+		expect(Object.keys(posts[0]!.body as object)).not.toContain("gender");
+		expect(Object.keys(posts[0]!.body as object)).not.toContain("voice");
+		expect(
+			f.requests.some((request) => request.path.includes("/images/")),
+		).toBe(false);
 	} finally {
 		await h.close();
 	}

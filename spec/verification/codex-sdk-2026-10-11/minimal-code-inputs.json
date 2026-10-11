@@ -1,0 +1,104 @@
+[
+  {
+    "path": "api/domains/inference/contracts/index.ts",
+    "sha256": "d5e463a0c8ab53f8eff9bf6890e99313e6151ec7e38d82d8933326076371d576",
+    "isolatedSha256": "d5e463a0c8ab53f8eff9bf6890e99313e6151ec7e38d82d8933326076371d576",
+    "equal": true
+  },
+  {
+    "path": "api/domains/inference/adapters/codex-research.ts",
+    "sha256": "0219d075f6ef15e0e81a65676d32b99ce6d24ade53ed97688438bb1cffe8af34",
+    "isolatedSha256": "0219d075f6ef15e0e81a65676d32b99ce6d24ade53ed97688438bb1cffe8af34",
+    "equal": true
+  },
+  {
+    "path": "api/domains/inference/test/codex-adapter.test.ts",
+    "sha256": "72f6338065a476c86c34ca7aefe5168b1ca16b5dceed6cb39f6f4d76d4273377",
+    "isolatedSha256": "72f6338065a476c86c34ca7aefe5168b1ca16b5dceed6cb39f6f4d76d4273377",
+    "equal": true
+  },
+  {
+    "path": "api/domains/agent-runtime/service/research-contract.ts",
+    "sha256": "ac88ecff6477c8ccd6409d085c18d8b0d0c9a9a83c36947080b35c159ed204e9",
+    "isolatedSha256": "ac88ecff6477c8ccd6409d085c18d8b0d0c9a9a83c36947080b35c159ed204e9",
+    "equal": true
+  },
+  {
+    "path": "api/domains/agent-runtime/service/context.ts",
+    "sha256": "7546d25896358a5ea54f03e0f28974902d07d115d4fa9fdac60059fcbaf43018",
+    "isolatedSha256": "7546d25896358a5ea54f03e0f28974902d07d115d4fa9fdac60059fcbaf43018",
+    "equal": true
+  },
+  {
+    "path": "api/domains/agent-runtime/test/context.test.ts",
+    "sha256": "febbdbead6a2c09f07eb480ef22f0d6b8d8168fc250cef9f52dfb073a4c2aacd",
+    "isolatedSha256": "febbdbead6a2c09f07eb480ef22f0d6b8d8168fc250cef9f52dfb073a4c2aacd",
+    "equal": true
+  },
+  {
+    "path": "api/application/codex-research-failure.test.ts",
+    "sha256": "07ec3c661770d4d17913b4a7998072cb92f94219a3ff70a7a044ddbdf22cc165",
+    "isolatedSha256": "07ec3c661770d4d17913b4a7998072cb92f94219a3ff70a7a044ddbdf22cc165",
+    "equal": true
+  },
+  {
+    "path": "scripts/search-agents-live.ts",
+    "sha256": "ba64ce49e13f23bca8299330f5f4a9dba9c2e8a8f157c96d897b6599abe0d6c4",
+    "isolatedSha256": "ba64ce49e13f23bca8299330f5f4a9dba9c2e8a8f157c96d897b6599abe0d6c4",
+    "equal": true
+  },
+  {
+    "path": "api/application/toolchain.fixture.ts",
+    "sha256": "897555c340775d9a5f2183ff78ccfd5d1c76a9a3aafb66e0b66842b89260b114",
+    "isolatedSha256": "897555c340775d9a5f2183ff78ccfd5d1c76a9a3aafb66e0b66842b89260b114",
+    "equal": true
+  },
+  {
+    "path": "api/application/toolchain.test.ts",
+    "sha256": "1d6b0d3b0bcaa336518a1c723ff55a478fdcfbb205045a5a19e88183cf5098b6",
+    "isolatedSha256": "1d6b0d3b0bcaa336518a1c723ff55a478fdcfbb205045a5a19e88183cf5098b6",
+    "equal": true
+  },
+  {
+    "path": "api/application/research-history.test.ts",
+    "sha256": "ca0881928e9b64d600cb030cf2f11d4d328cfb8e33a9d782d0cc7d01089c871e",
+    "isolatedSha256": "ca0881928e9b64d600cb030cf2f11d4d328cfb8e33a9d782d0cc7d01089c871e",
+    "equal": true
+  },
+  {
+    "path": "api/domains/agent-runtime/service/control-output.ts",
+    "sha256": "ca462dc6e15ed4ddfc3b6e3748bdbefd8b6bcf02baacc5a33cc8218994747524",
+    "isolatedSha256": "ca462dc6e15ed4ddfc3b6e3748bdbefd8b6bcf02baacc5a33cc8218994747524",
+    "equal": true
+  },
+  {
+    "path": "api/domains/agent-runtime/test/control-output.test.ts",
+    "sha256": "d5b40c53bc7c09d52fc2fba3c2bd85b54a1d994905e358de832fa2e7a32f4cd6",
+    "isolatedSha256": "d5b40c53bc7c09d52fc2fba3c2bd85b54a1d994905e358de832fa2e7a32f4cd6",
+    "equal": true
+  },
+  {
+    "path": "api/domains/agent-runtime/test/research-engine.test.ts",
+    "sha256": "991d0b0aa48df0bab1616567e17d0cb4d71145088844431cccd1fb3e67252f4b",
+    "isolatedSha256": "991d0b0aa48df0bab1616567e17d0cb4d71145088844431cccd1fb3e67252f4b",
+    "equal": true
+  },
+  {
+    "path": "api/domains/agent-runtime/test/route-harness.ts",
+    "sha256": "4c5a68b68e159023dda367fad13b9dcde2d1be47e0bab6b3b593adf570e03f04",
+    "isolatedSha256": "4c5a68b68e159023dda367fad13b9dcde2d1be47e0bab6b3b593adf570e03f04",
+    "equal": true
+  },
+  {
+    "path": "api/infrastructure/llm-json.ts",
+    "sha256": "5a6fcc970fa9c6a9cb02fd4358a407209216be44f0d6ce357d078ac760413473",
+    "isolatedSha256": "5a6fcc970fa9c6a9cb02fd4358a407209216be44f0d6ce357d078ac760413473",
+    "equal": true
+  },
+  {
+    "path": "api/infrastructure/llm-json.test.ts",
+    "sha256": "e62456c8aac7de28b90b8b25706ec2a4e99bc3b047bcfb3fe920e11d4f913b10",
+    "isolatedSha256": "e62456c8aac7de28b90b8b25706ec2a4e99bc3b047bcfb3fe920e11d4f913b10",
+    "equal": true
+  }
+]

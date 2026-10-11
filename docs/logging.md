@@ -100,3 +100,16 @@ Toolchainのlive検証も、一時DBを削除する前に運用ログを `verifi
 `EUMENES_LIVE_VOICE=1 bun scripts/voice-live.ts` は、一時DBの隔離backendで実TTSの試験入力→実ASR→検索・本文取得→実LLM回答→実TTSを確認します。最終回答と読上げ文の一致・音声の取得も合格条件です。運用ログは `verification-reports/voice-live/backend.jsonl`、試験の入力・回答・出典は `result.json`（双方0600）へ別々に保存します。試験結果は会話本文を除外した運用ログとは区別し、実マイク・スピーカーの受入試験とも区別します。
 
 `api/infrastructure/logger.test.ts` はJSON形式、並行処理のID分離、秘密の除外、世代管理、書込み失敗時の継続、HTTPの相関ID、閲覧時の絞込みを確認します。`api/application/logging.test.ts` は一時DBとLARM未設定のbackendを実際に起動し、入力受付→ジョブ→推論失敗→終了のログを確認します。これらはfixture試験であり、liveのProvider疎通や実マイク・再生の受入ではありません。
+
+## Codex SDKによる調査の失敗
+
+LunaのSDK呼出しでは `inference.attempt_failed` に `phase=sdk_start/sdk_turn/sdk_output` と安全な分類を残します。`codex_research_process_exit` はCLIランタイムの異常終了、`codex_research_http_401` などは外部応答のHTTP状態、`codex_research_invalid_json_schema` などは許可したProviderコード、`codex_research_invalid_event` はSDKイベントの不正です。最終応答のJSON・契約違反は共通workerの `agent.control_rejected` に記録し、構文違反・schema違反・不正な根拠を区別します。未分類は `codex_research_failed` とし、原因を推測しません。
+
+利用可能な場合だけ `exitCode`、許可した `processSignal`、HTTPの `status`、許可したProviderコードの `validationCode` を追加します。SDKイベントと例外の生メッセージはメモリー内で分類し、通常ログ・会話・DBへ保存しません。`inferenceId/attemptId/jobId/subjectId` からagentの `runId/taskId` を辿ります。`queue.settled.reason` とtask APIのerrorCodeにも分類を保持し、会話のcompletedを調査成功とは扱いません。
+
+
+## LLM生成JSONの補正と拒否
+
+`llm_json.rejected` は共通JSON処理が補正を採用できなかった理由をdebugで記録します。`reason` は `llm_json_duplicate_key`（重複キー）、`llm_json_unsafe_repair`（値・構造の変更が必要）、`llm_json_incomplete`（途中切断）、`llm_json_too_deep`（深さ超過）、`llm_json_too_large`（容量超過）、`llm_json_invalid_syntax` 等の固定コードです。容量と、その処理のrunId/jobId等の実行コンテキストを記録し、キー名・値・生応答は含めません。補正成功はdebugの `llm_json.corrected` で区別します。これは保存前の構文観測であり、取消・古い結果・rollbackを確定した処理失敗として扱いません。処理の拒否は各domainの採用判定後の既存warnログが正本です。
+
+workerは共通補正の拒否分類を `agent.control_rejected.validationCode` と修正通知に保持し、元のJSON.parseの別の構文エラーで上書きしません。途中切断・通常の構文不正は従来の安全な詳細分類も使用します。会話function引数でも同じ固定コードと `validationPath=arguments` を修正資料に渡します。補正で正常なJSONになった後の型・ツール権限・根拠の違反は、各domainの既存検証と分類が正本です。

@@ -174,7 +174,7 @@ test("general research exposes available tools without a host invocation recomme
 		).toBe("completed");
 		const messages = JSON.parse(h.workerContexts[0]!);
 		const tools = JSON.parse(
-			messages[0].content.split("TOOLS=")[1].split("\nOUTPUT_SCHEMA=")[0],
+			messages[0].content.split("TOOLS=")[1].split("\n")[0],
 		);
 		expect(tools.map((tool: { id: string }) => tool.id)).toEqual([
 			"web.lookup",

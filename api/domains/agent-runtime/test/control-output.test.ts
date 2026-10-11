@@ -56,4 +56,34 @@ test("only one complete leading think block is removed", () => {
 	expect(parseControlOutput("<think>未完了 " + json).invalid).toBe(true);
 	expect(parseControlOutput("前置き\n" + json).invalid).toBe(true);
 	expect(parseControlOutput(json + "\n<think>x</think>").invalid).toBe(true);
+	expect(
+		parseControlOutput("<think>a</think><think>b</think>" + json).invalid,
+	).toBe(true);
+});
+test("control syntax is corrected once without inventing a report", () => {
+	expect(
+		parseControlOutput("{action:'finish',report:{claims:[],},}"),
+	).toMatchObject({
+		invalid: false,
+		action: { action: "finish", report: { claims: [] } },
+	});
+	for (const value of [
+		'{action:"invoke",arguments:{durationSeconds:}',
+		'{action:"finish",action:"invoke"}',
+		'{action:"finish"',
+	])
+		expect(parseControlOutput(value).invalid).toBe(true);
+});
+
+test("common repair refusals take precedence over an unrelated native syntax error", () => {
+	for (const [text, code] of [
+		["{action:'finish',action:'invoke',}", "llm_json_duplicate_key"],
+		["{action:'invoke',arguments:{query:}}", "llm_json_unsafe_repair"],
+		["{".repeat(65), "llm_json_too_deep"],
+	] as const) {
+		expect(parseControlOutput(text)).toMatchObject({
+			invalid: true,
+			diagnostic: { reason: "control_json_syntax", validationCode: code },
+		});
+	}
 });

@@ -1,0 +1,213 @@
+[
+  {
+    "stage": "contract",
+    "status": 200,
+    "tracks": true,
+    "tags": true
+  },
+  {
+    "stage": "library",
+    "total": 2,
+    "ids": [
+      "music_a74ea9cb-06e5-40a4-98b7-285cf3dcf7f0",
+      "music_943c1fa4-3ea0-4ddc-9219-940eb738f60a"
+    ],
+    "tags": [
+      {
+        "tag": "インストゥルメンタル",
+        "count": 2
+      },
+      {
+        "tag": "電子音楽",
+        "count": 2
+      },
+      {
+        "tag": "アップテンポ",
+        "count": 1
+      },
+      {
+        "tag": "ピアノ",
+        "count": 1
+      },
+      {
+        "tag": "明るい",
+        "count": 1
+      },
+      {
+        "tag": "落ち着いた",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "stage": "tag-search",
+    "tag": "インストゥルメンタル",
+    "total": 2
+  },
+  {
+    "stage": "search",
+    "q": "piano",
+    "total": 1
+  },
+  {
+    "stage": "search",
+    "q": "ピアノ",
+    "total": 1
+  },
+  {
+    "stage": "search",
+    "q": "bright",
+    "total": 0
+  },
+  {
+    "stage": "search",
+    "q": "明るい",
+    "total": 1
+  },
+  {
+    "stage": "and-search",
+    "tags": [
+      "落ち着いた",
+      "電子音楽"
+    ],
+    "total": 1
+  },
+  {
+    "stage": "mode",
+    "planning": "fixture"
+  },
+  {
+    "stage": "conversation",
+    "runId": "9189d729-6e7f-4a60-bb4b-60211cc74133",
+    "status": "completed",
+    "playlists": [
+      {
+        "kind": "playlist",
+        "id": "a9215e11-0382-417a-a7a7-67f75e0229ab",
+        "runId": "9189d729-6e7f-4a60-bb4b-60211cc74133",
+        "conversationId": "main",
+        "state": "completed",
+        "title": "保存曲ライブラリ",
+        "query": {
+          "q": "",
+          "tags": [],
+          "sort": "createdAt",
+          "order": "desc",
+          "limit": 50
+        },
+        "trackIds": [
+          "music_a74ea9cb-06e5-40a4-98b7-285cf3dcf7f0",
+          "music_943c1fa4-3ea0-4ddc-9219-940eb738f60a"
+        ],
+        "currentId": "music_a74ea9cb-06e5-40a4-98b7-285cf3dcf7f0",
+        "errorCode": null,
+        "createdAt": 1791718786487,
+        "updatedAt": 1791718786515
+      }
+    ],
+    "answer": "保存曲のプレイリストを開きました。"
+  },
+  {
+    "stage": "api-response",
+    "path": "/api/music",
+    "status": 200
+  },
+  {
+    "stage": "api-response",
+    "path": "/api/music/playlists",
+    "status": 200
+  },
+  {
+    "stage": "request-failed",
+    "path": "/api/music",
+    "failure": {
+      "errorText": "net::ERR_ABORTED"
+    }
+  },
+  {
+    "stage": "request-failed",
+    "path": "/api/music/playlists",
+    "failure": {
+      "errorText": "net::ERR_ABORTED"
+    }
+  },
+  {
+    "stage": "api-response",
+    "path": "/api/music",
+    "status": 200
+  },
+  {
+    "stage": "api-response",
+    "path": "/api/music/playlists",
+    "status": 200
+  },
+  {
+    "stage": "page-state",
+    "text": "LARM\n接続済み\nUIショーケース\nSAAA-gemma4-26b\nあなた\n\nLARMに保存してある楽曲を新しい順のライブラリで聴きたい。プレイリストを開いて。\n\nEumenes\n\n保存曲のプレイリストを開きました。\n\nマイク\n→\n音声認識\n→\n回答\n→\n音声再生\n音声を開始\n送信\n待機中\n⌘/Ctrl + Enter で送信\n保存曲ライブラリ\n検索\n表示\nライブラリ\nお気に入り\nお気に入り以外\n並び順\n新しい順\n古い順\n一致度順\nタグ（すべて一致）\n件数はライブラリ全体の曲数です。\n検索する\n更新\n楽曲を取得中です。\nプレイリスト\n\n楽曲はまだありません。",
+    "errors": []
+  },
+  {
+    "stage": "request-failed",
+    "path": "/api/music/tracks",
+    "failure": {
+      "errorText": "net::ERR_ABORTED"
+    }
+  },
+  {
+    "stage": "request-failed",
+    "path": "/api/music/tags",
+    "failure": {
+      "errorText": "net::ERR_ABORTED"
+    }
+  },
+  {
+    "stage": "request-failed",
+    "path": "/api/music/tracks/music_a74ea9cb-06e5-40a4-98b7-285cf3dcf7f0",
+    "failure": {
+      "errorText": "net::ERR_ABORTED"
+    }
+  },
+  {
+    "stage": "api-response",
+    "path": "/api/music/tags",
+    "status": 200
+  },
+  {
+    "stage": "api-response",
+    "path": "/api/music/tracks",
+    "status": 200
+  },
+  {
+    "stage": "api-response",
+    "path": "/api/music/tracks/music_a74ea9cb-06e5-40a4-98b7-285cf3dcf7f0",
+    "status": 200
+  },
+  {
+    "stage": "api-response",
+    "path": "/api/music/tracks/music_a74ea9cb-06e5-40a4-98b7-285cf3dcf7f0/audio",
+    "status": 206
+  },
+  {
+    "stage": "browser-playback",
+    "media": {
+      "time": 5,
+      "duration": 10.0065,
+      "paused": true,
+      "src": "/api/music/tracks/music_a74ea9cb-06e5-40a4-98b7-285cf3dcf7f0/audio"
+    },
+    "errors": []
+  },
+  {
+    "stage": "api-response",
+    "path": "/api/music/tracks/music_a74ea9cb-06e5-40a4-98b7-285cf3dcf7f0/audio",
+    "status": 206
+  },
+  {
+    "stage": "browser-range",
+    "status": 206,
+    "contentRange": "bytes 64-127/81094",
+    "acceptRanges": "bytes",
+    "contentType": "audio/ogg",
+    "bytes": 64
+  }
+]

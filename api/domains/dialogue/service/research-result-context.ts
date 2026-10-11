@@ -5,6 +5,8 @@ const requiredRules =
 const presentation =
 	"表現: 結果をそのまま返さず、質問に答える要点を自分の言葉で短くまとめます。複数のトピックは受け取った順序と区切りを保ち、1トピック1項目の箇条書きにします。各項目はTTSで聞いて理解しやすい短い自然な文にし、指定された口調を使います。回答に影響しない一般的な断り書きは加えません。表現の指示は上の規則を弱めません。";
 const policy = requiredRules + "\n" + presentation;
+const failureRules =
+	"今回の回答は、既に調査担当へ渡した依頼の実行結果を説明する回答です。失敗説明はCURRENT_RESEARCH_FAILUREを正本とし、失敗した処理と、分かっている原因または詳細不明を短い自然な言葉で伝えます。過去の会話にある障害説明を流用しません。モデル実行の失敗、検索・読取りの失敗、出力形式の拒否を区別します。モデル呼出しが失敗しただけなら制御JSON不正・検索失敗と断定しません。システム障害を利用者のキーワード不足に置き換えて追加指定を求めません。内部の形式名やコードは回答に出しません。";
 
 /** Keep the current request and report required; remove only optional earlier turns. */
 export function researchResultContext(
@@ -21,7 +23,25 @@ export function researchResultContext(
 	const history = messages.slice(1 + references.length, -1);
 	const system: Message = {
 		...messages[0]!,
-		content: messages[0]!.content + "\n" + policy,
+		content:
+			messages[0]!.content +
+			"\n" +
+			policy +
+			(failureCode
+				? "\n" +
+					failureRules +
+					"\nCURRENT_RESEARCH_FAILURE=" +
+					JSON.stringify({
+						code: failureCode,
+						...(failureCode.startsWith("codex_research_")
+							? {
+									component: "research_model",
+									detail:
+										"調査モデルの処理で失敗しました。code以上の詳細原因は記録されていません。",
+								}
+							: {}),
+					})
+				: ""),
 	};
 	const result: Message = {
 		role: "user",
@@ -32,6 +52,8 @@ export function researchResultContext(
 			failure: failureCode ?? undefined,
 		}),
 	};
+	// Put host failure authority in the first system message, including for models
+	// that give later system messages less weight. Acquired reports stay user data.
 	const assemble = () => [system, ...references, ...history, result, input];
 	while (
 		history.length &&

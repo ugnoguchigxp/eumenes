@@ -128,3 +128,55 @@ test("unsafe host media URL is never rendered as audio or download", () => {
 	);
 	expect(result.container.querySelector("audio,a")).toBeNull();
 });
+test("registered library controls share the music source and reject a wrong resource kind", () => {
+	const json = JSON.stringify({
+		view: "layout",
+		children: [
+			{ view: "music-library", source: "m" },
+			{ view: "music-player", source: "m" },
+			{ view: "playlist", source: "m" },
+		],
+	});
+	expect(compileArtifact(json, snapshot).lang).toContain("music-library");
+	expect(() => compileArtifact(json, { m: snapshot.g! })).toThrow("source");
+});
+test("workspace is registered, composes with other views, and rejects unsafe host artwork", () => {
+	vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
+	const json = JSON.stringify({
+		view: "layout",
+		children: [
+			{ view: "music-workspace", source: "m" },
+			{ view: "components", source: "c" },
+		],
+	});
+	expect(compileArtifact(json, snapshot).lang).toContain("music-workspace");
+	expect(() => compileArtifact(json, { ...snapshot, m: snapshot.g! })).toThrow(
+		"source",
+	);
+	const result = render(
+		<ArtifactRenderer
+			definition={json}
+			runtime={{
+				snapshot: {
+					...snapshot,
+					m: {
+						kind: "music",
+						revision: 1,
+						currentId: "a",
+						tracks: [
+							{
+								id: "a",
+								title: "unsafe",
+								url: "javascript:alert(1)",
+								artworkUrl: "javascript:alert(1)",
+							},
+						],
+					},
+				},
+				dispatch: vi.fn(),
+			}}
+		/>,
+	);
+	fireEvent.click(screen.getByRole("button", { name: "楽曲イメージ" }));
+	expect(result.container.querySelector("audio,img")).toBeNull();
+});

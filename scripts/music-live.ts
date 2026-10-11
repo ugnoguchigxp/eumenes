@@ -70,6 +70,38 @@ const model: LarmPort = {
 		: {}),
 };
 const saved = liveLarmSettings();
+async function removeTestTrack(jobId: string) {
+	try {
+		const path = `/v1/music/tracks/${encodeURIComponent(jobId)}`;
+		const init = {
+			headers: { Authorization: `Bearer ${resolveLarmToken(process.env)}` },
+			redirect: "error" as const,
+			signal: AbortSignal.timeout(15000),
+		};
+		const removed = await fetch(new URL(path, saved.baseUrl!), {
+			...init,
+			method: "DELETE",
+		});
+		if (removed.status !== 204)
+			throw new Error(`music_cleanup_http_${removed.status}`);
+		const absent = await fetch(new URL(path, saved.baseUrl!), init);
+		await absent.body?.cancel();
+		if (absent.status !== 404) throw new Error("music_cleanup_unconfirmed");
+		record({
+			stage: "test_track_removed",
+			jobId,
+			status: removed.status,
+			confirmedStatus: absent.status,
+		});
+	} catch (error) {
+		record({
+			stage: "cleanup_failed",
+			jobId,
+			reason: error instanceof Error ? error.message : "unknown",
+		});
+		process.exitCode = 1;
+	}
+}
 const gateway = () =>
 	createLarmPlayground({
 		...saved,
@@ -152,7 +184,7 @@ try {
 		throw new Error(music?.errorCode ?? run?.error ?? "music_not_completed");
 	const audio = await h.request(`/api/music/${music.id}/audio`);
 	if (!audio.ok) throw new Error("music_audio_unavailable");
-	const filename = `${out}/track.${music.mime === "audio/mpeg" ? "mp3" : music.mime === "audio/flac" ? "flac" : "wav"}`;
+	const filename = `${out}/track.${music.mime === "audio/ogg" ? "opus" : music.mime === "audio/mpeg" ? "mp3" : music.mime === "audio/flac" ? "flac" : "wav"}`;
 	writeFileSync(filename, new Uint8Array(await audio.arrayBuffer()), {
 		mode: 0o600,
 	});
@@ -169,10 +201,16 @@ try {
 	if (probe.exitCode !== 0) throw new Error("music_audio_decode_failed");
 	const media = JSON.parse(new TextDecoder().decode(probe.stdout));
 	record({ stage: "audio_probe", ...media });
+	if (
+		music.mime !== "audio/ogg" ||
+		media.streams[0]?.codec_name !== "opus" ||
+		media.streams[0]?.sample_rate !== "48000"
+	)
+		throw new Error("music_opus_mismatch");
 	if (Math.abs(Number(media.format.duration) - 30) > 1)
 		throw new Error("music_duration_mismatch");
-	const player = page.locator('section[aria-label="楽曲プレイヤー"] audio');
-	await player.waitFor({ timeout: 15000 });
+	const player = page.locator('section[aria-label="音楽プレイヤー"] audio');
+	await player.waitFor({ state: "attached", timeout: 15000 });
 	const played = await player.evaluate(async (node) => {
 		const audio = node as HTMLAudioElement;
 		await audio.play();
@@ -200,6 +238,10 @@ try {
 	process.exitCode = 1;
 } finally {
 	unsubscribe();
+	// This harness has a fresh isolated DB: only its newly completed test track is removed.
+	const music = h.music!.list("main")[0];
+	if (music?.state === "completed" && music.jobId)
+		await removeTestTrack(music.jobId);
 	await browser?.close();
 	await fixture.stopAll();
 	await server.stop(true);

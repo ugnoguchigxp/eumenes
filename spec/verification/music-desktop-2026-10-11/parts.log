@@ -1,0 +1,52 @@
+│ ┌────────────────────────────────────────────────────────────────────────────┐
+│ │  Info: Found a setup file with "setProjectAnnotations".                    │
+│ │  Skipping automatic provisioning of preview annotations to avoid           │
+│ │  conflicts. Since Storybook 10.3, "@storybook/addon-vitest" applies these  │
+│ │   automatically.                                                           │
+│ │  You can safely remove the "setProjectAnnotations" call from your setup    │
+│ │  file, or remove the file entirely if you don't have custom code there.    │
+│ └────────────────────────────────────────────────────────────────────────────┘
+
+ RUN  v4.0.16 /Users/y.noguchi/Code/eumenes/packages/design-system
+
+stdout | src/components/MusicWorkspace/MusicWorkspace.test.tsx
+Test setup running...
+
+stdout | src/components/Playlist/Playlist.test.tsx
+Test setup running...
+
+stdout | src/components/MusicLibraryControls/MusicLibraryControls.test.tsx
+Test setup running...
+
+stdout | src/components/MusicPlayer/MusicPlayer.test.tsx
+Test setup running...
+
+stdout | src/components/MusicLibraryControls/MusicLibraryControls.test.tsx
+Test setup running...
+
+stdout | src/components/MusicPlayer/MusicPlayer.test.tsx
+Test setup running...
+
+stdout | src/components/MusicWorkspace/MusicWorkspace.test.tsx
+Test setup running...
+
+stdout | src/components/Playlist/Playlist.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/Playlist/Playlist.test.tsx (2 tests) 101ms
+ ✓ |unit| src/components/MusicLibraryControls/MusicLibraryControls.test.tsx (2 tests) 132ms
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+ ✓ |unit| src/components/MusicPlayer/MusicPlayer.test.tsx (8 tests) 281ms
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+ ✓ |unit| src/components/MusicWorkspace/MusicWorkspace.test.tsx (4 tests) 288ms
+
+ Test Files  4 passed (4)
+      Tests  16 passed (16)
+   Start at  21:54:43
+   Duration  1.51s (transform 355ms, setup 446ms, import 727ms, tests 801ms, environment 2.96s)
+

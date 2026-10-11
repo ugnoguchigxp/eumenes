@@ -214,7 +214,7 @@ export async function harness(
 				if (options.badJson) return "```json\n{}\n```";
 
 				const available = JSON.parse(
-					system.split("TOOLS=")[1]!.split("\nOUTPUT_SCHEMA=")[0]!,
+					system.split("TOOLS=")[1]!.split("\n")[0]!,
 				);
 				const page = data.observations.find(
 					(o: any) =>

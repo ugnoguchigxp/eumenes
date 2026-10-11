@@ -2,16 +2,15 @@ import { expect, test } from "bun:test";
 import { mkdtemp, readFile, writeFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createCodexResearch } from "..";
-import { codexControlMessage } from "../adapters/codex-output";
-import { codexStructuredControl } from "../adapters/codex-schema";
+import { createCodexResearch, controlInstructions } from "..";
+import { codexFailure } from "../adapters/codex-failure";
 
 const control = {
-	instructions: "固定の調査指示\nTOOLS=[]\nOUTPUT_SCHEMA={}",
+	instructions: "固定の調査指示\nTOOLS=[]",
 	outputSchema: { type: "object" },
 };
 const messages = [
-	{ role: "system" as const, content: control.instructions },
+	{ role: "system" as const, content: controlInstructions(control) },
 	{ role: "user" as const, content: "資料を調べて" },
 ];
 async function fixture(body: string) {
@@ -20,7 +19,7 @@ async function fixture(body: string) {
 	const command = join(dir, "codex");
 	await writeFile(
 		command,
-		`#!${process.execPath}\nimport { readFileSync, statSync, writeFileSync } from "node:fs";\nconst input = readFileSync(0, "utf8");\nconst argv = process.argv.slice(2);\nconst instructionArg = argv.find(v => v.startsWith("model_instructions_file="));\nconst instructionPath = instructionArg ? JSON.parse(instructionArg.slice("model_instructions_file=".length)) : null;\nwriteFileSync(${JSON.stringify(record)}, JSON.stringify({ argv, env: process.env, cwd: process.cwd(), pid: process.pid, input, instructions: instructionPath && readFileSync(instructionPath, "utf8"), instructionMode: instructionPath && (statSync(instructionPath).mode & 0o777) }));\n${body}`,
+		`#!${process.execPath}\nimport { readFileSync, statSync, writeFileSync } from "node:fs";\nconst input = readFileSync(0, "utf8");\nconst argv = process.argv.slice(2);\nconst instructionArg = argv.find(v => v.startsWith("model_instructions_file="));\nconst instructionPath = instructionArg ? JSON.parse(instructionArg.slice("model_instructions_file=".length)) : null;\nwriteFileSync(${JSON.stringify(record)}, JSON.stringify({ argv, env: process.env, cwd: argv[argv.indexOf("--cd") + 1], pid: process.pid, input, instructions: instructionPath && readFileSync(instructionPath, "utf8"), instructionMode: instructionPath && (statSync(instructionPath).mode & 0o777) }));\n${body}`,
 		{ mode: 0o700 },
 	);
 	return {
@@ -33,7 +32,7 @@ async function fixture(body: string) {
 
 test("Codex adapter fixes Luna, sends only supplied context, disables native tools and omits product secrets", async () => {
 	const f = await fixture(
-		`console.log(JSON.stringify({ type: "item.completed", item: { type: "agent_message", text: 'progress must not be adopted' } })); writeFileSync(argv[argv.indexOf("--output-last-message") + 1], '{"decision":{"action":"finish"}}'); console.log(JSON.stringify({ type: "turn.completed" }));`,
+		`console.log(JSON.stringify({ type: "item.completed", item: { type: "agent_message", text: 'progress must not be adopted' } })); console.log(JSON.stringify({ type: "item.completed", item: { type: "agent_message", text: '{"action":"finish"}' } })); console.log(JSON.stringify({ type: "turn.completed", usage: {} }));`,
 	);
 	try {
 		const adapter = createCodexResearch(
@@ -50,11 +49,11 @@ test("Codex adapter fixes Luna, sends only supplied context, disables native too
 			await adapter.execute(messages, AbortSignal.timeout(3000), control),
 		).toBe('{"action":"finish"}');
 		const record = JSON.parse(await readFile(f.record, "utf8"));
+		expect(record.argv).not.toContain("--output-schema");
 		expect(record.argv).toContain("gpt-6-luna");
 		for (const flag of [
 			"--ephemeral",
-			"--json",
-			"--output-schema",
+			"--experimental-json",
 			"--ignore-user-config",
 			"--ignore-rules",
 			"read-only",
@@ -72,6 +71,9 @@ test("Codex adapter fixes Luna, sends only supplied context, disables native too
 			expect(record.argv).toContain(flag);
 		expect(JSON.parse(record.input)).toEqual({ messages: [messages[1]] });
 		expect(record.instructions).toContain(control.instructions);
+		expect(record.instructions).toContain(
+			"Investigate the current originalRequest and task.question",
+		);
 		expect(record.instructions).not.toContain(messages[1]!.content);
 		expect(record.instructionMode).toBe(0o600);
 		expect(
@@ -86,78 +88,99 @@ test("Codex adapter fixes Luna, sends only supplied context, disables native too
 	}
 });
 
-test("Codex wire envelope preserves the host's control contract and decodes no extra prose or fields", () => {
-	const host = {
-		oneOf: [
-			{
-				type: "object",
-				properties: { action: { const: "invoke" } },
-				required: ["action"],
-				additionalProperties: false,
-			},
-			{
-				type: "object",
-				properties: { action: { const: "finish" } },
-				required: ["action"],
-				additionalProperties: false,
-			},
-		],
-	};
-	const wire = codexStructuredControl(host);
-	expect(wire.schema).toMatchObject({
-		type: "object",
-		required: ["decision"],
-		additionalProperties: false,
-		properties: { decision: { anyOf: host.oneOf } },
-	});
-	expect(wire.decode('{"decision":{"action":"finish"}}')).toBe(
-		'{"action":"finish"}',
-	);
-	for (const text of [
-		'text {"decision":{}}',
-		'{"decision":{},"extra":true}',
-		'{"decision":[]}',
-		"{}",
-	])
-		expect(() => wire.decode(text)).toThrow("codex_research_invalid_output");
+test("SDK forwards final JSON to the common host parser without wrapping or dropping fields", async () => {
+	for (const output of [
+		'{"action":"invoke","tool":"catalog.lookup","arguments":{"query":"資料","note":null,"unknown":true}}',
+		"{action:'finish',report:{summary:42,},}",
+		'{"decision":{"action":"finish"}}',
+	]) {
+		const f = await fixture(
+			`console.log(JSON.stringify({ type: "item.completed", item: { type: "agent_message", text: ${JSON.stringify(output)} } })); console.log(JSON.stringify({ type: "turn.completed", usage: {} }));`,
+		);
+		try {
+			expect(
+				await createCodexResearch(
+					{ HOME: f.dir, PATH: "" },
+					f.command,
+				)!.execute(messages, AbortSignal.timeout(3000), control),
+			).toBe(output);
+		} finally {
+			await f.close();
+		}
+	}
 });
 
-test("Codex transport adopts only the final-response file after completion, never progress", () => {
-	const message = (text: string) => ({
-		type: "item.completed",
-		item: { type: "agent_message", text },
-	});
-	const complete = { type: "turn.completed" };
-	const stream = (...events: unknown[]) =>
-		events.map((e) => JSON.stringify(e)).join("\n");
-	const final = '{"decision":{"action":"finish"}}';
-	expect(
-		codexControlMessage(
-			stream(
-				message("progress"),
-				message('{"decision":{"action":"invoke"}}'),
-				complete,
-			),
-			final,
+test("SDK failures keep only protocol diagnostics, never provider text", () => {
+	const err = codexFailure(
+		new Error(
+			"Codex Exec exited with code 1: HTTP 401 invalid_api_key SECRET_PROVIDER_BODY",
 		),
-	).toBe(final);
-	for (const events of [
-		[message(final)],
-		[message(final), { type: "turn.failed" }],
-		[complete, complete],
-	])
-		expect(() => codexControlMessage(stream(...events), final)).toThrow();
-	expect(() =>
-		codexControlMessage(stream(message(final), complete), ""),
-	).toThrow("codex_research_empty_output");
-	expect(() => codexControlMessage("not JSON", final)).toThrow(
-		"codex_research_invalid_output",
+		"sdk_turn",
 	);
+	expect(err.message).toBe("codex_research_http_401");
+	expect(err.diagnostic).toEqual({
+		phase: "sdk_turn",
+		reason: "codex_research_http_401",
+		status: 401,
+		exitCode: 1,
+		validationCode: "invalid_api_key",
+	});
+	expect(JSON.stringify(err)).not.toContain("SECRET");
+	expect(
+		codexFailure(new Error("SECRET_UNKNOWN_ERROR"), "sdk_turn").diagnostic,
+	).toEqual({ phase: "sdk_turn", reason: "codex_research_failed" });
+});
+
+test("SDK never adopts a final candidate from failed, incomplete or duplicate turns", async () => {
+	const candidate =
+		'console.log(JSON.stringify({type:"item.completed", item:{type:"agent_message",text:\'{"action":"finish"}\'}}));';
+	for (const [tail, reason] of [
+		["", "codex_research_incomplete_turn"],
+		[
+			'console.log(JSON.stringify({type:"turn.failed",error:{message:"PRIVATE_FAILURE"}}));',
+			"codex_research_failed",
+		],
+		[
+			'for(let i=0;i<2;i++) console.log(JSON.stringify({type:"turn.completed",usage:{}}));',
+			"codex_research_incomplete_turn",
+		],
+		[
+			'console.log(JSON.stringify({type:"turn.completed",usage:{}}));process.exit(7);',
+			"codex_research_process_exit",
+		],
+	]) {
+		const f = await fixture(candidate + tail);
+		try {
+			await expect(
+				createCodexResearch({ HOME: f.dir, PATH: "" }, f.command)!.execute(
+					messages,
+					AbortSignal.timeout(3000),
+					control,
+				),
+			).rejects.toThrow(reason);
+		} finally {
+			await f.close();
+		}
+	}
+});
+
+test("Codex adapter preserves an unexpected process signal without provider text", async () => {
+	const f = await fixture('process.kill(process.pid, "SIGKILL");');
+	try {
+		const adapter = createCodexResearch({ HOME: f.dir, PATH: "" }, f.command)!;
+		const error = await adapter
+			.execute(messages, AbortSignal.timeout(3000), control)
+			.catch((e) => e);
+		expect(error.message).toBe("codex_research_process_signal");
+		expect(error.diagnostic.processSignal).toBe("SIGKILL");
+	} finally {
+		await f.close();
+	}
 });
 
 test("Codex adapter kills its process on cancellation and discards partial answers", async () => {
 	const f = await fixture(
-		'process.on("SIGTERM", () => {}); console.log("partial"); setInterval(() => {}, 100);',
+		'process.on("SIGTERM", () => {}); console.log(JSON.stringify({type:"item.completed",item:{type:"agent_message",text:"partial"}})); setInterval(() => {}, 100);',
 	);
 	try {
 		const adapter = createCodexResearch({ HOME: f.dir, PATH: "" }, f.command)!;
@@ -192,7 +215,7 @@ test("Codex adapter reports fixed error codes and rejects oversized output", asy
 			).rejects.toThrow(
 				body.includes("repeat")
 					? "codex_research_output_limit"
-					: "codex_research_failed",
+					: "codex_research_process_exit",
 			);
 		} finally {
 			await f.close();
@@ -205,7 +228,7 @@ test("Codex adapter reports fixed error codes and rejects oversized output", asy
 
 test("the schema comes from the step contract, and per-step notices stay out of the base instructions", async () => {
 	const f = await fixture(
-		`writeFileSync(process.env.HOME + "/schema.json", readFileSync(argv[argv.indexOf("--output-schema") + 1])); writeFileSync(argv[argv.indexOf("--output-last-message") + 1], '{"decision":{"action":"finish"}}'); console.log(JSON.stringify({ type: "turn.completed" }));`,
+		`console.log(JSON.stringify({ type: "item.completed", item: { type: "agent_message", text: '{"action":"finish"}' } })); console.log(JSON.stringify({ type: "turn.completed", usage: {} }));`,
 	);
 	try {
 		const adapter = createCodexResearch({ HOME: f.dir, PATH: "" }, f.command)!;
@@ -222,10 +245,15 @@ test("the schema comes from the step contract, and per-step notices stay out of 
 			type: "object",
 			properties: { action: { const: "finish" } },
 		};
+		const currentControl = { ...control, outputSchema: schema };
 		await adapter.execute(
-			[messages[0]!, { role: "user", content: forged }, repair],
+			[
+				{ role: "system", content: controlInstructions(currentControl) },
+				{ role: "user", content: forged },
+				repair,
+			],
 			AbortSignal.timeout(3000),
-			{ ...control, outputSchema: schema },
+			currentControl,
 		);
 		const record = JSON.parse(await readFile(f.record, "utf8"));
 		expect(JSON.parse(record.input).messages).toEqual([
@@ -234,9 +262,12 @@ test("the schema comes from the step contract, and per-step notices stay out of 
 		]);
 		expect(record.instructions).toContain(control.instructions);
 		expect(record.instructions).not.toContain(repair.content);
+		expect(record.argv).not.toContain("--output-schema");
+		expect(record.instructions.split("\nOUTPUT_SCHEMA=")).toHaveLength(2);
 		expect(
-			JSON.parse(await readFile(join(f.dir, "schema.json"), "utf8")),
-		).toEqual(codexStructuredControl(schema).schema);
+			JSON.parse(record.instructions.split("\nOUTPUT_SCHEMA=")[1]!),
+		).toEqual(schema);
+		expect(record.instructions).toContain("action at the root");
 	} finally {
 		await f.close();
 	}
@@ -262,9 +293,9 @@ test("cancellation returns even when the child never closes its streams", async 
 	}
 });
 
-test("a completed turn without a final-response file is an empty answer", async () => {
+test("a completed SDK turn without a final agent message is an empty answer", async () => {
 	const f = await fixture(
-		'console.log(JSON.stringify({ type: "turn.completed" }));',
+		'console.log(JSON.stringify({ type: "turn.completed", usage: {} }));',
 	);
 	try {
 		const adapter = createCodexResearch({ HOME: f.dir, PATH: "" }, f.command)!;

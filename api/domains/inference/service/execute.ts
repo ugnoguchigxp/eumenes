@@ -16,6 +16,7 @@ import type { ControlContract, Messages, Receipt } from "../contracts";
 import { get, type RequestRow } from "../repository";
 import { cloudRequest } from "./cloud";
 import { fallbackErrors, safeError } from "./errors";
+import { CodexResearchFailure } from "../adapters/codex-failure";
 
 const log = getLogger("inference");
 
@@ -509,6 +510,7 @@ async function attempt(r: Request, source: Source): Promise<Receipt> {
 			"inference.attempt_failed",
 			{
 				...logFields,
+				...(error instanceof CodexResearchFailure ? error.diagnostic : {}),
 				reason: code,
 				durationMs: Math.round(performance.now() - started),
 			},

@@ -1,0 +1,76 @@
+{
+  "selected": [
+    "music",
+    "dots",
+    "task-reports",
+    "coding-supervision",
+    "coding",
+    "artifact",
+    "tasks",
+    "capabilities",
+    "tool-runtime",
+    "agent-runtime",
+    "research-routes",
+    "web-research",
+    "attitude-dataset",
+    "service-tests",
+    "delivery",
+    "avatar",
+    "settings",
+    "inference",
+    "tts-dictionary",
+    "conversation",
+    "continuity",
+    "goals",
+    "world",
+    "memory",
+    "larm",
+    "audio",
+    "queue",
+    "scheduler",
+    "timers",
+    "dialogue",
+    "voice-dialogue"
+  ],
+  "revision": "27b7a493cddd62dc60f895f841ee82309f6c0acb8951c516cccb467c9ba87e4e",
+  "steps": [
+    {
+      "name": "size-budget",
+      "ms": 831,
+      "result": "pass"
+    },
+    {
+      "name": "sql-boundaries",
+      "ms": 949,
+      "result": "pass"
+    },
+    {
+      "name": "domain-docs",
+      "ms": 17,
+      "result": "pass"
+    },
+    {
+      "name": "format",
+      "ms": 306,
+      "result": "pass"
+    },
+    {
+      "name": "lint",
+      "ms": 193,
+      "result": "pass"
+    },
+    {
+      "name": "typecheck",
+      "ms": 6945,
+      "result": "pass"
+    },
+    {
+      "name": "tests",
+      "ms": 205177,
+      "result": "exit 1"
+    }
+  ],
+  "totalMs": 215199,
+  "result": "fail",
+  "error": "Error: tests failed (1)"
+}

@@ -1,0 +1,91 @@
+{
+  "selected": [
+    "music",
+    "dots",
+    "task-reports",
+    "coding-supervision",
+    "coding",
+    "artifact",
+    "tasks",
+    "capabilities",
+    "tool-runtime",
+    "agent-runtime",
+    "research-routes",
+    "web-research",
+    "attitude-dataset",
+    "service-tests",
+    "delivery",
+    "avatar",
+    "settings",
+    "inference",
+    "tts-dictionary",
+    "conversation",
+    "continuity",
+    "goals",
+    "world",
+    "memory",
+    "larm",
+    "audio",
+    "queue",
+    "scheduler",
+    "timers",
+    "dialogue",
+    "voice-dialogue"
+  ],
+  "revision": "cd4cbb248df73543e3128a6a2c03c6e753539d34fd1eaa92f6463d590f39f4dd",
+  "steps": [
+    {
+      "name": "size-budget",
+      "ms": 436,
+      "result": "pass"
+    },
+    {
+      "name": "sql-boundaries",
+      "ms": 613,
+      "result": "pass"
+    },
+    {
+      "name": "domain-docs",
+      "ms": 13,
+      "result": "pass"
+    },
+    {
+      "name": "format",
+      "ms": 260,
+      "result": "pass"
+    },
+    {
+      "name": "lint",
+      "ms": 136,
+      "result": "pass"
+    },
+    {
+      "name": "typecheck",
+      "ms": 5733,
+      "result": "pass"
+    },
+    {
+      "name": "tests",
+      "ms": 196327,
+      "result": "pass"
+    },
+    {
+      "name": "web tests",
+      "ms": 13805,
+      "result": "pass"
+    },
+    {
+      "name": "client tests",
+      "ms": 1789,
+      "result": "pass"
+    },
+    {
+      "name": "design-system typecheck",
+      "ms": 4239,
+      "result": "exit 2"
+    }
+  ],
+  "totalMs": 224102,
+  "result": "fail",
+  "error": "Error: design-system typecheck failed (2)"
+}

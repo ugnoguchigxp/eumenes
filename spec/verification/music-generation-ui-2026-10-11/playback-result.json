@@ -1,0 +1,329 @@
+{
+  "result": "passed",
+  "input": "spec/verification/music-opus-2026-10-11/track.opus",
+  "mime": "audio/ogg",
+  "secondTrack": "same saved audio, fixture metadata copy",
+  "media": {
+    "duration": 30.0065,
+    "paused": true,
+    "readyState": 4
+  },
+  "geometry": {
+    "visualizerContained": true,
+    "sideBySide": true,
+    "noVerticalScroll": true,
+    "noHorizontalScroll": true,
+    "bottom": 1000,
+    "panelBottom": 1000,
+    "parents": [
+      {
+        "tag": "DIV",
+        "class": "aui-music-workspace",
+        "height": 958,
+        "display": "flex"
+      },
+      {
+        "tag": "DIV",
+        "class": "",
+        "height": 958,
+        "display": "flex"
+      },
+      {
+        "tag": "DIV",
+        "class": "",
+        "height": 958,
+        "display": "flex"
+      },
+      {
+        "tag": "DIV",
+        "class": "artifact-ui",
+        "height": 958,
+        "display": "flex"
+      },
+      {
+        "tag": "DIV",
+        "class": "ds-tabs-content artifact-panel-body",
+        "height": 958,
+        "display": "block"
+      },
+      {
+        "tag": "ASIDE",
+        "class": "artifact-panel",
+        "height": 1000,
+        "display": "grid"
+      },
+      {
+        "tag": "DIV",
+        "class": "workspace-layout workspace-layout-split",
+        "height": 1000,
+        "display": "grid"
+      },
+      {
+        "tag": "MAIN",
+        "class": "app-shell",
+        "height": 1000,
+        "display": "flex"
+      },
+      {
+        "tag": "DIV",
+        "class": "",
+        "height": 1000,
+        "display": "block"
+      },
+      {
+        "tag": "BODY",
+        "class": "",
+        "height": 1000,
+        "display": "block"
+      },
+      {
+        "tag": "HTML",
+        "class": "",
+        "height": 1000,
+        "display": "block"
+      }
+    ],
+    "playerBottom": 999
+  },
+  "analysis": {
+    "reads": 29,
+    "peak": 255,
+    "waveReads": 60,
+    "closed": 2
+  },
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/api/music"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/playlists"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/playlists"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/playlists"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/playlists"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/playlists"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/saved-a/audio"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/saved-a/audio"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/saved-b/audio"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/saved-a/audio"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/saved-b/audio"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/playlists"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/playlists"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/playlists"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/tracks"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/tags"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/tracks/saved-1"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/tracks"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/tags"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/tracks/saved-1"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/tracks/saved-1/audio"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/music/tracks/saved-1/favorite"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/tracks"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/tags"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/tracks/saved-1"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/playlists"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/tracks"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/tags"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/tracks/saved-1"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/playlists"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/playlists"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/tracks"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/tags"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/tracks/saved-1"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/tracks"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/tags"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/tracks/saved-1"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/tracks/saved-1/audio"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/music/tracks/saved-1/favorite"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/tracks"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/tags"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/tracks/saved-1"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/music/playlists/11111111-1111-4111-8111-111111111111"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/tracks/saved-2"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/tracks/saved-2/audio"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/music/playlists/11111111-1111-4111-8111-111111111111"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/tracks/saved-1/audio"
+    },
+    {
+      "method": "GET",
+      "path": "/api/music/tracks/saved-1"
+    }
+  ],
+  "errors": []
+}

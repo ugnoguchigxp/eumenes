@@ -1,0 +1,164 @@
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { afterEach, expect, test, vi } from "vitest";
+import type { ReactNode } from "react";
+import type {
+	ArtifactEvent,
+	MusicResource,
+} from "@eumenes/artifact-ui/contracts";
+import { musicArtifactDefinition } from "./artifact-definition";
+import { useMusicRuntime } from "./use-music-runtime";
+afterEach(() => {
+	cleanup();
+	vi.restoreAllMocks();
+});
+function setup(state = "completed") {
+	vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:audio");
+	vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+	const items = [
+		{
+			id: "a",
+			runId: "original-run",
+			state,
+			title: "曲",
+			description: "制作意図",
+			durationSeconds: 30,
+			mime: "audio/ogg",
+			createdAt: 1,
+			updatedAt: 1,
+		},
+	];
+	const run = { id: "new-run", status: "queued", revision: 1 };
+	const api = {
+		musicList: vi.fn(async () => items),
+		musicAudio: vi.fn(async () => new Blob(["fixture"])),
+		submit: vi.fn(
+			async (_input: {
+				requestId: string;
+				conversationId: string;
+				text: string;
+			}) => ({ ...run }),
+		),
+		run: vi.fn(async () => ({ ...run })),
+		cancel: vi.fn(async (_id: string) => {
+			Object.assign(run, { status: "cancelled", revision: 2 });
+			return { ...run };
+		}),
+	};
+	const cache = new QueryClient({
+		defaultOptions: { queries: { retry: false } },
+	});
+	const result = renderHook(
+		() => useMusicRuntime(api as never, "main", musicArtifactDefinition("a")),
+		{
+			wrapper: ({ children }: { children: ReactNode }) => (
+				<QueryClientProvider client={cache}>{children}</QueryClientProvider>
+			),
+		},
+	);
+	const resource = () =>
+		result.result.current.runtime.snapshot["music-a"] as MusicResource;
+	const event = (
+		action: ArtifactEvent["action"],
+		values: ArtifactEvent["values"] = {},
+	): ArtifactEvent => ({
+		id: crypto.randomUUID(),
+		source: "music-a",
+		revision: resource().revision,
+		action,
+		values,
+	});
+	const dispatch = async (value: ArtifactEvent) => {
+		let receipt;
+		await act(async () => {
+			receipt = await result.result.current.runtime.dispatch(value);
+		});
+		return receipt;
+	};
+	return { ...result, api, cache, resource, event, dispatch };
+}
+test("authorized creation sends the exact editable prompt through the normal API and cancels the accepted run", async () => {
+	const r = setup();
+	await waitFor(() => expect(r.resource()).toBeTruthy());
+	const prompt = "オーケストラ、柔らかい女性ボーカル。歌詞：[Verse]\n朝の光";
+	expect(await r.dispatch(r.event("music-generate", { prompt }))).toMatchObject(
+		{ status: "accepted" },
+	);
+	expect(r.api.submit).toHaveBeenCalledTimes(1);
+	expect(r.api.submit.mock.calls[0]![0]).toMatchObject({
+		conversationId: "main",
+		text: expect.stringContaining(prompt),
+	});
+	await waitFor(() => expect(r.resource().creation?.canCancel).toBe(true));
+	expect(r.resource().creation?.busy).toBe(true);
+	expect(await r.dispatch(r.event("music-generate", { prompt }))).toMatchObject(
+		{ status: "rejected" },
+	);
+	expect(await r.dispatch(r.event("music-cancel"))).toMatchObject({
+		status: "accepted",
+	});
+	expect(r.api.cancel).toHaveBeenCalledWith("new-run");
+	await waitFor(() => expect(r.resource().creation?.status).toBe("cancelled"));
+});
+test("unknown source, stale revision, unsupported action and invalid prompt never create a run", async () => {
+	const r = setup();
+	await waitFor(() => expect(r.resource()).toBeTruthy());
+	for (const value of [
+		{ ...r.event("music-generate", { prompt: "曲" }), source: "music-other" },
+		{ ...r.event("music-generate", { prompt: "曲" }), revision: -1 },
+		r.event("music-delete", { id: "a" }),
+		r.event("music-generate", { prompt: false }),
+		r.event("music-generate", { prompt: " " }),
+		r.event("music-generate", { prompt: "あ".repeat(7601) }),
+	])
+		expect(await r.dispatch(value)).not.toMatchObject({ status: "accepted" });
+	expect(r.api.submit).not.toHaveBeenCalled();
+});
+test("an uncertain acknowledgement is retried only on user action with the same request ID", async () => {
+	const r = setup();
+	await waitFor(() => expect(r.resource()).toBeTruthy());
+	r.api.submit.mockRejectedValueOnce(new Error("network lost"));
+	expect(
+		await r.dispatch(
+			r.event("music-generate", { prompt: "暖かい男性声のジャズ" }),
+		),
+	).toMatchObject({ status: "rejected" });
+	expect(r.api.submit).toHaveBeenCalledTimes(1);
+	expect(
+		await r.dispatch(
+			r.event("music-generate", { prompt: "暖かい男性声のジャズ" }),
+		),
+	).toMatchObject({ status: "accepted" });
+	expect(r.api.submit.mock.calls[0]![0].requestId).toBe(
+		r.api.submit.mock.calls[1]![0].requestId,
+	);
+});
+test("duplicate and simultaneous dispatches cannot create a second request", async () => {
+	const r = setup();
+	await waitFor(() => expect(r.resource()).toBeTruthy());
+	let finish!: (value: {
+		id: string;
+		status: string;
+		revision: number;
+	}) => void;
+	r.api.submit.mockImplementationOnce(
+		() =>
+			new Promise((resolve) => {
+				finish = resolve;
+			}),
+	);
+	const event = r.event("music-generate", { prompt: "明るい曲" });
+	let first!: Promise<unknown>;
+	act(() => {
+		first = r.result.current.runtime.dispatch(event);
+	});
+	expect(await r.dispatch(event)).toMatchObject({ status: "duplicate" });
+	expect(
+		await r.dispatch(r.event("music-generate", { prompt: "別の曲" })),
+	).toMatchObject({ status: "rejected" });
+	await act(async () => {
+		finish({ id: "new-run", status: "queued", revision: 1 });
+		await first;
+	});
+	expect(r.api.submit).toHaveBeenCalledTimes(1);
+});

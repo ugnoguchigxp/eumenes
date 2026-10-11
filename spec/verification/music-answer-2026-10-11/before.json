@@ -1,0 +1,37 @@
+[
+  {
+    "name": "reported-request",
+    "answer": "「明るいピアノ」というタイトルのプレイリストの作成が完了いたしました。Artifactにて選曲および再生が可能です。",
+    "pass": false
+  },
+  {
+    "name": "paraphrase",
+    "answer": "「明るいピアノ」というプレイリストに保存された曲の再生画面を表示いたします。Artifactにて選曲および再生が可能です。",
+    "pass": false
+  },
+  {
+    "name": "previous-id-reading",
+    "answer": "「明るいピアノ」というプレイリストでございます。music_943c1fa4-3ea0-4ddc-9219-940eb738f60a、music_a74ea9cb-06e5-40a4-98b7-285cf3dcf7f0の2曲が含まれております。Artifactにて選曲および再生が可能です。",
+    "pass": false
+  },
+  {
+    "name": "details-requested",
+    "answer": "「明るいピアノ」というタイトルのプレイリストの作成が完了いたしました。\n\n中身を確認いたしましたところ、「music_943c1fa4-3ea0-4ddc-9219-940eb738f60a」と「music_a74ea9cb-06e5-40a4-98b7-285cf3dcf7f0」の2曲が保存されております。\n\nArtifactにて選曲および再生が可能でございます。",
+    "pass": false
+  },
+  {
+    "name": "empty-playlist",
+    "answer": "「明るいピアノ」というタイトルのプレイリストの作成が完了いたしました。Artifactにて選曲および再生が可能です。",
+    "pass": false
+  },
+  {
+    "name": "failed",
+    "answer": "「明るいピアノ」というタイトルのプレイリストを作成しようと試みましたが、エラーにより失敗してしまいました。ご希望のプレイリストをお見せすることができず、申し訳ございません。\n\n改めて作成いたしましょうか？",
+    "pass": true
+  },
+  {
+    "name": "cancelled",
+    "answer": "「明るいピアノ」のプレイリスト作成は、キャンセルにより完了しておりません。",
+    "pass": true
+  }
+]

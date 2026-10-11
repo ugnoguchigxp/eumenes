@@ -1,3 +1,4 @@
+import { parseLlmJson } from "../../../infrastructure/llm-json";
 import { z } from "zod";
 import { readFileSync } from "node:fs";
 import { asrLanguages, type AsrLanguage } from "../../settings/contracts";
@@ -48,7 +49,7 @@ export function parseTranscriptLanguage(
 	if (typeof value !== "string" || Buffer.byteLength(value) > 4096)
 		throw new Error("asr_language_unverified");
 	try {
-		return transcriptLanguageResult.parse(JSON.parse(value));
+		return transcriptLanguageResult.parse(parseLlmJson(value, 4096));
 	} catch {
 		throw new Error("asr_language_unverified");
 	}

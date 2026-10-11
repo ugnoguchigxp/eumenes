@@ -1,3 +1,4 @@
+import { createMusicLibrary } from "./music-library";
 import { createHash } from "node:crypto";
 import type {
 	LarmTestTarget,
@@ -9,6 +10,11 @@ import type {
 	TestKind,
 } from "../contracts/playground";
 import { parseProviderHosts, providerHostAllowed } from "./guards";
+import {
+	artifactMimes,
+	assertArtifactContent,
+	musicMime,
+} from "./playground-media";
 import {
 	bytes,
 	code,
@@ -343,17 +349,7 @@ export function createLarmPlayground(config: {
 			throw new Error("invalid_artifact_path");
 		const r = await control(url.pathname, signal);
 		const mime = r.headers.get("content-type")?.split(";")[0] ?? "";
-		if (
-			![
-				"image/png",
-				"image/webp",
-				"audio/mpeg",
-				"audio/wav",
-				"audio/x-wav",
-				"audio/flac",
-			].includes(mime) ||
-			(ref.mime && mime !== ref.mime)
-		) {
+		if (!artifactMimes.includes(mime) || (ref.mime && mime !== ref.mime)) {
 			await r.body?.cancel();
 			throw new Error("invalid_artifact_type");
 		}
@@ -361,22 +357,7 @@ export function createLarmPlayground(config: {
 			r,
 			mime.startsWith("image/") ? 32_000_000 : 128_000_000,
 		);
-		if (!content.length) throw new Error("invalid_artifact_empty");
-		const tag = (start: number, end: number) =>
-			new TextDecoder().decode(content.slice(start, end));
-		if (
-			(mime === "image/png" &&
-				![137, 80, 78, 71, 13, 10, 26, 10].every((n, i) => content[i] === n)) ||
-			(mime === "image/webp" &&
-				(tag(0, 4) !== "RIFF" || tag(8, 12) !== "WEBP")) ||
-			(["audio/wav", "audio/x-wav"].includes(mime) &&
-				(tag(0, 4) !== "RIFF" || tag(8, 12) !== "WAVE")) ||
-			(mime === "audio/flac" && tag(0, 4) !== "fLaC") ||
-			(mime === "audio/mpeg" &&
-				tag(0, 3) !== "ID3" &&
-				!(content[0] === 255 && ((content[1] ?? 0) & 224) === 224))
-		)
-			throw new Error("invalid_artifact_content");
+		assertArtifactContent(content, mime);
 		return {
 			bytes: content,
 			mime,
@@ -432,12 +413,7 @@ export function createLarmPlayground(config: {
 					const ref = {
 						id: str(result.id),
 						path: str(result.audioUrl),
-						mime:
-							result.format === "mp3"
-								? "audio/mpeg"
-								: result.format === "flac"
-									? "audio/flac"
-									: "audio/wav",
+						mime: musicMime(result.format),
 						actualModel,
 					};
 					if (publicUrl(ref.path).pathname !== `${path}/audio`)
@@ -526,8 +502,14 @@ export function createLarmPlayground(config: {
 							prompt: input.text,
 							model: target.model,
 							durationSeconds: input.durationSeconds ?? 10,
-							instrumental: true,
-							outputFormat: "mp3",
+							instrumental: input.instrumental ?? true,
+							...(input.instrumental === false && input.lyrics !== undefined
+								? { lyrics: input.lyrics }
+								: {}),
+							...(input.instrumental === false && input.language
+								? { language: input.language }
+								: {}),
+							outputFormat: "opus",
 							quality: "balanced",
 						}),
 						[202],
@@ -725,6 +707,7 @@ export function createLarmPlayground(config: {
 		});
 	}
 	return {
+		library: createMusicLibrary(control, publicUrl),
 		catalog,
 		health,
 		execute,

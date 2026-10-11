@@ -9,15 +9,24 @@ import {
 	type Receipt,
 } from "@eumenes/artifact-ui/contracts";
 import { queryRoots } from "../../queryKeys";
+import { useMusicCreation } from "./use-music-creation";
 
 export function useMusicRuntime(
 	client: EumenesClient,
 	conversationId: string,
 	definition: string,
 ) {
+	const waitingForCreation = useRef(false);
 	const query = useQuery({
 		queryKey: [queryRoots.music, "list", conversationId],
 		queryFn: ({ signal }) => client.musicList(conversationId, signal),
+		refetchInterval: (query) =>
+			waitingForCreation.current ||
+			query.state.data?.some(
+				(item) => item.state === "planning" || item.state === "generating",
+			)
+				? 1000
+				: false,
 	});
 	const items = query.data ?? [];
 	const sources = (() => {
@@ -33,11 +42,20 @@ export function useMusicRuntime(
 		(item) =>
 			sources.has(`music-${item.id}`) || sources.has(`generation-${item.id}`),
 	);
+	const creation = useMusicCreation(client, conversationId, items, initial);
+	useEffect(() => {
+		waitingForCreation.current = creation.busy;
+	}, [creation.busy]);
 	const [selected, setSelected] = useState<string>();
-	const selectedItem = items.find((item) => item.id === selected) ?? initial;
+	const selectedItem = initial
+		? (items.find((item) => item.id === selected) ??
+			creation.submitted ??
+			initial)
+		: undefined;
 	const [audio, setAudio] = useState<{ id: string; url: string }>();
 	const [audioError, setAudioError] = useState<string>();
 	const seen = useRef(new Set<string>());
+	const operation = useRef(false);
 	const id = selectedItem?.id;
 	const ready = selectedItem?.state === "completed";
 	useEffect(() => {
@@ -62,20 +80,34 @@ export function useMusicRuntime(
 	}, [client, id, ready]);
 	const snapshot: Record<string, Snapshot[string]> = {};
 	if (initial && selectedItem) {
-		const revision = selectedItem.updatedAt;
+		const revision =
+			Math.max(...items.map((item) => item.updatedAt)) + creation.revision;
 		const url = audio && audio.id === id ? audio.url : undefined;
 		snapshot[`music-${initial.id}`] = {
 			kind: "music",
 			revision,
 			currentId: selectedItem.id,
+			creation:
+				audioError === id
+					? {
+							...creation.creation,
+							status: "failed",
+							title: "音声を取得できませんでした",
+						}
+					: creation.creation,
 			tracks: items.map((item) => ({
 				id: item.id,
 				title: item.title,
 				subtitle: item.description,
+				prompt: item.prompt ?? undefined,
+				model: item.actualModel ?? undefined,
+				lyrics: item.lyrics,
+				instrumental: item.instrumental,
+				createdAt: new Date(item.createdAt).toISOString(),
 				durationSeconds: item.durationSeconds ?? undefined,
 				disabled: item.state !== "completed",
 				url: item.id === id ? url : undefined,
-				downloadName: `${item.title}.${item.mime === "audio/mpeg" ? "mp3" : item.mime === "audio/flac" ? "flac" : "wav"}`,
+				downloadName: `${item.title}.${item.mime === "audio/ogg" ? "opus" : item.mime === "audio/mpeg" ? "mp3" : item.mime === "audio/flac" ? "flac" : "wav"}`,
 			})),
 		};
 		snapshot[`generation-${initial.id}`] = {
@@ -116,13 +148,49 @@ export function useMusicRuntime(
 			!initial ||
 			event.source !== `music-${initial.id}` ||
 			resource?.kind !== "music" ||
-			event.action !== "music-select"
+			!["music-select", "music-generate", "music-cancel"].includes(event.action)
 		)
 			return { status: "rejected", message: "許可されていない操作です。" };
 		if (event.revision !== resource.revision)
 			return { status: "conflict", message: "楽曲一覧を更新してください。" };
 		if (seen.current.has(event.id))
 			return { status: "duplicate", message: "選択済みです。" };
+		if (event.action !== "music-select") {
+			if (operation.current)
+				return { status: "rejected", message: "操作の受付を待っています。" };
+			if (
+				event.action === "music-generate" &&
+				(creation.busy ||
+					typeof event.values.prompt !== "string" ||
+					!event.values.prompt.trim() ||
+					event.values.prompt.length > 7600)
+			)
+				return {
+					status: "rejected",
+					message: "プロンプトと生成状態を確認してください。",
+				};
+			if (event.action === "music-cancel" && !resource.creation?.canCancel)
+				return { status: "rejected", message: "取消できる生成がありません。" };
+			seen.current.add(event.id);
+			operation.current = true;
+			try {
+				if (event.action === "music-generate") {
+					await creation.generate(String(event.values.prompt));
+					setSelected(undefined);
+				} else await creation.cancel();
+				return { status: "accepted", message: "操作を受け付けました。" };
+			} catch {
+				return {
+					status: "rejected",
+					message:
+						event.action === "music-generate"
+							? "受付を確認できませんでした。同じ内容で再試行できます。"
+							: "取消を確認できませんでした。状態を更新して再試行してください。",
+				};
+			} finally {
+				operation.current = false;
+			}
+		}
 		const target = items.find(
 			(item) => item.id === event.values.id && item.state === "completed",
 		);

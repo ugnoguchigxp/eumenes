@@ -1,4 +1,5 @@
 import type { SourceState } from "eumenes-memory";
+import { parseLlmJson } from "../../../infrastructure/llm-json";
 import {
 	validateCandidates,
 	type Assertion,
@@ -154,6 +155,12 @@ export function createSettle(
 			if (!inference.validateReceiptInTransaction(db, receipt))
 				return notAdopted("inference_not_accepted", true);
 
+			let modelOutput: unknown;
+			try {
+				modelOutput = parseLlmJson(text);
+			} catch {
+				// Leave malformed output rejected by the vendor's existing validator.
+			}
 			const base = {
 				contractVersion: 1,
 				scope,
@@ -170,7 +177,7 @@ export function createSettle(
 						evidenceId: `ex-${input.windowId}-${i}`,
 					})),
 				},
-				modelOutput: text,
+				modelOutput,
 			};
 			const first = validateCandidates(base, hasher);
 			if (!first.ok) {

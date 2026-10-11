@@ -1000,6 +1000,31 @@ select:focus-visible {
 	scrollbar-width: thin;
 	scrollbar-color: var(--border) transparent;
 }
+.artifact-panel-body:has(.music-workspace) {
+	padding: 0;
+	overflow: hidden;
+}
+.artifact-panel-body:has(.music-workspace) .artifact-ui {
+	height: 100%;
+	display: flex;
+	flex-direction: column;
+}
+.artifact-panel-body .artifact-ui div:has(.music-workspace) {
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	min-height: 0;
+}
+.artifact-panel-body:has(.music-workspace) .aui-composition {
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	min-height: 0;
+	gap: 0.5rem;
+}
+.artifact-panel-body:has(.music-workspace) .music-workspace {
+	border-radius: 0;
+}
 
 .message {
 	position: relative;

@@ -1,6 +1,7 @@
+import { parseLlmJson } from "../../../infrastructure/llm-json";
 import type { Database } from "bun:sqlite";
 import { z } from "zod";
-import { musicPlan, type Prepared } from "../../capabilities";
+import { musicPlan, musicPlanV2, type Prepared } from "../../capabilities";
 import type { Receipt } from "../../inference";
 import type { HandlerDefinition } from "../../queue";
 import type { TestOutput } from "../../larm";
@@ -38,7 +39,7 @@ export function registerMusicHandlers(
 	const planHandler: HandlerDefinition<
 		{ id: string },
 		PlanInput,
-		{ receipt: Receipt; plan: z.infer<typeof musicPlan> }
+		{ receipt: Receipt; plan: z.infer<typeof musicPlanV2> }
 	> = {
 		kind: "music.plan",
 		payloadVersions: [1],
@@ -57,7 +58,7 @@ export function registerMusicHandlers(
 				subject: `music:${r.id}:plan`,
 				policySubject: r.run_id,
 				deadline: Math.min(r.deadline - 15000, Date.now() + 45000),
-				maxOutputTokens: 2048,
+				maxOutputTokens: prepared.package.revision >= 2 ? 4096 : 2048,
 			});
 			return {
 				status: "ready",
@@ -78,13 +79,15 @@ export function registerMusicHandlers(
 			);
 			let value: unknown;
 			try {
-				value = JSON.parse(String(receipt.value));
+				value = parseLlmJson(receipt.value);
 			} catch {
 				throw new Error("music_plan_invalid_json");
 			}
-			const parsed = musicPlan.safeParse(value);
+			const schema =
+				input.prepared.package.revision >= 2 ? musicPlanV2 : musicPlan;
+			const parsed = schema.safeParse(value);
 			if (!parsed.success) throw new Error("music_plan_invalid_contract");
-			return { receipt, plan: parsed.data };
+			return { receipt, plan: { instrumental: true, ...parsed.data } };
 		},
 		classify: () => "fail",
 		settleInTransaction(db, claim, input, outcome) {
@@ -121,7 +124,7 @@ export function registerMusicHandlers(
 	};
 	type GenerateInput = {
 		id: string;
-		plan: z.infer<typeof musicPlan>;
+		plan: z.infer<typeof musicPlanV2>;
 		prepared: Prepared;
 	};
 	const generateHandler: HandlerDefinition<
@@ -144,7 +147,12 @@ export function registerMusicHandlers(
 				status: "ready",
 				input: {
 					id: r.id,
-					plan: musicPlan.parse(JSON.parse(r.plan_json)),
+					plan: {
+						instrumental: true,
+						...(prepared.package.revision >= 2 ? musicPlanV2 : musicPlan).parse(
+							JSON.parse(r.plan_json),
+						),
+					},
 					prepared,
 				},
 			};
@@ -162,6 +170,9 @@ export function registerMusicHandlers(
 					{
 						text: input.plan.prompt,
 						durationSeconds: input.plan.durationSeconds,
+						instrumental: input.plan.instrumental,
+						lyrics: input.plan.instrumental ? undefined : input.plan.lyrics,
+						language: input.plan.instrumental ? undefined : input.plan.language,
 					},
 					signal,
 					async (p) => {

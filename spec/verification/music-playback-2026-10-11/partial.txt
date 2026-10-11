@@ -1,0 +1,26 @@
+bun test v1.4.2 (744846f84)
+
+api/application/music-e2e.test.ts:
+(pass) music pipeline success: conversation, worker, API, result, audio [89.50ms]
+(pass) music pipeline failure: conversation, worker, API, result, audio [67.89ms]
+(pass) music pipeline invalid-plan: conversation, worker, API, result, audio [58.76ms]
+(pass) cancel music while the provider is running, send DELETE and never adopt audio [56.49ms]
+
+api/application/music-library.test.ts:
+(pass) playback package routes through planning, saved references, parent answer and authenticated Range relay [61.48ms]
+(pass) library pagination retains AND tags and sort; favorite, removal, global tags and contract errors are distinct [50.24ms]
+(pass) cancelled playback never adopts a late library response [90.02ms]
+(pass) Bun streaming relay remains valid through Node HTTP proxies [55.70ms]
+
+api/domains/larm/test/music-library.test.ts:
+(pass) Unicode query and cursor are encoded without changing conditions [0.19ms]
+(pass) track references cannot send Control authentication to another origin [0.21ms]
+
+api/domains/dialogue/test/music-routing.test.ts:
+(pass) music can only be selected when its tool is offered [0.26ms]
+(pass) saved music has its own offered tool and never routes to generation [0.09ms]
+
+ 12 pass
+ 0 fail
+ 85 expect() calls
+Ran 12 tests across 4 files. [798.00ms]

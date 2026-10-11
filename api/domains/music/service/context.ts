@@ -1,6 +1,10 @@
-import { musicPlan, type Prepared } from "../../capabilities";
+import { musicPlan, musicPlanV2, type Prepared } from "../../capabilities";
 import { z } from "zod";
-export function musicContext(prepared: Prepared, request: unknown) {
+export function musicContext(
+	prepared: Prepared,
+	request: unknown,
+	schema: z.ZodType = prepared.package.revision >= 2 ? musicPlanV2 : musicPlan,
+) {
 	const required = [
 		prepared.package.profileRevisionId,
 		...(prepared.package.requiredSkillRevisionIds ?? []),
@@ -10,7 +14,7 @@ export function musicContext(prepared: Prepared, request: unknown) {
 	);
 	if (guidance.some((body) => !body?.trim()))
 		throw new Error("required_context_missing");
-	const outputSchema = z.toJSONSchema(musicPlan);
+	const outputSchema = z.toJSONSchema(schema);
 	const instructions =
 		guidance.join("\n\n") + "\nOUTPUT_SCHEMA=" + JSON.stringify(outputSchema);
 	return {

@@ -1,0 +1,25 @@
+$ vitest run --project unit src/components/MusicLibraryControls/MusicLibraryControls.test.tsx
+│ ┌────────────────────────────────────────────────────────────────────────────┐
+│ │  Info: Found a setup file with "setProjectAnnotations".                    │
+│ │  Skipping automatic provisioning of preview annotations to avoid           │
+│ │  conflicts. Since Storybook 10.3, "@storybook/addon-vitest" applies these  │
+│ │   automatically.                                                           │
+│ │  You can safely remove the "setProjectAnnotations" call from your setup    │
+│ │  file, or remove the file entirely if you don't have custom code there.    │
+│ └────────────────────────────────────────────────────────────────────────────┘
+
+ RUN  v4.0.16 /Users/y.noguchi/Code/eumenes/packages/design-system
+
+stdout | src/components/MusicLibraryControls/MusicLibraryControls.test.tsx
+Test setup running...
+
+stdout | src/components/MusicLibraryControls/MusicLibraryControls.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/MusicLibraryControls/MusicLibraryControls.test.tsx (2 tests) 74ms
+
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+   Start at  20:30:25
+   Duration  662ms (transform 56ms, setup 69ms, import 100ms, tests 74ms, environment 345ms)
+
