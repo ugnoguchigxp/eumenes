@@ -180,7 +180,10 @@ for (const [label, outputs, expected] of [
 ] as const)
 	test(`a rejected operation logs only its safe classification: ${label}`, async () => {
 		const rejected = captureLog();
-		const h = fixture([...outputs, ...outputs] as unknown as Partial<Receipt>[]);
+		const h = fixture([
+			...outputs,
+			...outputs,
+		] as unknown as Partial<Receipt>[]);
 		await expect(h.run()).rejects.toThrow("invalid_conversation_operation");
 		// The existing single repair is unchanged: two calls, one repair.
 		expect(h.seen).toHaveLength(2);

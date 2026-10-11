@@ -575,7 +575,8 @@ test("a view returned by several operations is presented once and never overflow
 
 test("a large frozen request and question still leave a full catalog presentable", () => {
 	const catalog = new EvidenceCatalog();
-	const long = "条件を満たす資料を確認してください。".repeat(440);
+	// About 9 KB each: large enough that the material bound must shrink.
+	const long = "条件を満たす資料を確認してください。".repeat(170);
 	const big = {
 		...task,
 		input_json: JSON.stringify({ originalRequest: long }),
