@@ -27,7 +27,7 @@ export const dotsBuiltins: Definition[] = [
 		id: "dots.orchestrate",
 		title: "dots連携手順",
 		summary: "受領・Session紐付け・質問・結果・停止の報告",
-		body: coordinatorSkill,
+		body: readFileSync(new URL("./dots/SKILL.v1.md", import.meta.url), "utf8"),
 	},
 	{
 		...common,
@@ -56,3 +56,15 @@ export const dotsBuiltins: Definition[] = [
 		],
 	},
 ];
+
+const previousSkill = dotsBuiltins.find((d) => d.kind === "skill")!;
+dotsBuiltins.push({ ...previousSkill, revision: 2, body: coordinatorSkill });
+const previousPackage = dotsBuiltins.find((d) => d.kind === "package")!;
+dotsBuiltins.push({
+	...previousPackage,
+	revision: 2,
+	requiredSkillRevisionIds: ["skill:dots.orchestrate@2"],
+	dependencies: previousPackage.dependencies.map((id) =>
+		id === "skill:dots.orchestrate@1" ? "skill:dots.orchestrate@2" : id,
+	),
+});

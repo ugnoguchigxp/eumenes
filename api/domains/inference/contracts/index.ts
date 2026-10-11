@@ -6,6 +6,9 @@ export type Messages = Array<{
 	role: "system" | "user" | "assistant";
 	content: string;
 }>;
+/** Fixed instructions and output schema of one control step, passed as values to
+ * engines that accept them separately from the conversation (Codex). */
+export type ControlContract = { instructions: string; outputSchema: unknown };
 /** One-off voice settings for a sample; never persisted. */
 export type SpeechOverride = Partial<
 	Pick<
@@ -55,6 +58,7 @@ export interface InferencePort {
 		requestId: string,
 		messages: Messages,
 		signal: AbortSignal,
+		control?: ControlContract,
 	): Promise<Receipt>;
 	rejectControlInTransaction?(
 		db: Database,

@@ -35,7 +35,7 @@ export const submitResearchSchema = z.discriminatedUnion("operation", [
 			region: z
 				.string()
 				.regex(/^[A-Z]{2}$/)
-				.default("JP"),
+				.optional(),
 			timeRange: z.enum(["day", "week", "month", "year"]).optional(),
 			readPages: z.number().int().min(0).max(3).default(0),
 		})

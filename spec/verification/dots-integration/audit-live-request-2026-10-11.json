@@ -1,0 +1,39 @@
+{
+  "checkedAt": "2026-10-10T23:03:40.528Z",
+  "dispatch": "Eumenes API → MCP Events only",
+  "browserMessagesSent": 0,
+  "input": {
+    "requestId": "e460695d-c724-4f01-b069-ba759f6146cd",
+    "version": 1,
+    "kind": "orchestration",
+    "title": "MCP Events監査試験：秋の朝と計算・Session1件",
+    "request": "監査試験です。秋の朝の様子を日本語で2文書き、その後に37×24の計算結果を添えてください。登録済みプロジェクトで新規Session1件だけを使い、回答全文と実在するSession参照をEumenesへ返してください。\nこのdotsの会話に、依頼ID・依頼全文・完了条件・対象プロジェクト・許可範囲、子Sessionに渡す指示、実在するSessionの添付またはリンク、進捗・回答全文・ブロッカーを表示してください。SessionはActivityで確認できる形にしてください。\n既存のチャットは続行せず、ファイル編集、commit、push、公開、外部への連絡は行わないでください。権限や監査表示を確認できない場合は、作業前に同じブロッカーをこの会話とMCPで報告してください。試験1件の終了後は追加作業を始めず、購読を維持してイベント待ちに戻ってください。定期ポーリングや新しいスケジュールは作らないでください。",
+    "completionConditions": [
+      "秋の朝を描写する日本語2文と37×24の計算結果の回答全文がMCPでEumenesへ返る",
+      "登録プロジェクトに作成した新規Session1件の実在するthreadId・projectId・hostIdがEumenesに記録される",
+      "dotsの会話に依頼全文・許可範囲・委任指示・Session参照・結果が表示され、SessionをActivityから人間が確認できる"
+    ],
+    "startMode": "start",
+    "grant": {
+      "connectionRef": "dots-live-20261011",
+      "projectRef": "eumenes-dots-live",
+      "sessionRefs": [],
+      "maxSessions": 1,
+      "operations": [
+        "read",
+        "create_session",
+        "check"
+      ],
+      "expiresAt": "2026-10-10T23:20:00.000Z",
+      "maxRuntimeMs": 900000,
+      "progressIntervalMs": 300000
+    }
+  },
+  "receipt": {
+    "taskId": "63d832db-17ca-4f94-8a9d-bb11c8279083",
+    "state": "queued",
+    "revision": 2,
+    "authorityEpoch": 1,
+    "executionGeneration": 1
+  }
+}

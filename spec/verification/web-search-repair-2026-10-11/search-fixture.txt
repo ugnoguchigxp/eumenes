@@ -1,0 +1,38 @@
+bun test v1.4.2 (744846f84)
+
+api/application/search-agents-e2e.test.ts:
+(pass) search API E2E fixture: quick, success [86.28ms]
+(pass) search API E2E fixture: quick, timeout [60.82ms]
+(pass) search API E2E fixture: quick, repair [63.08ms]
+(pass) search API E2E fixture: luna, success [80.86ms]
+(pass) search API E2E fixture: luna, timeout [160.78ms]
+(pass) search API E2E fixture: luna, repair [66.19ms]
+(pass) search API E2E fixture: stock, success [65.52ms]
+(pass) search API E2E fixture: stock, timeout [59.58ms]
+(pass) search API E2E fixture: stock, repair [61.58ms]
+(pass) search API E2E fixture: weather, success [57.43ms]
+(pass) search API E2E fixture: weather, timeout [57.82ms]
+(pass) search API E2E fixture: weather, repair [61.51ms]
+(pass) five long snippets allow one quick read before the API answer [67.01ms]
+(pass) five long snippets allow three Luna reads before the API answer [79.50ms]
+
+api/application/search-agents-check.test.ts:
+(pass) accepts one search and a cited three-topic bullet report [1.08ms]
+(pass) a completed failure explanation is not a successful search: invalid_requirement_schema [0.03ms]
+(pass) a completed failure explanation is not a successful search: codex_research_failed
+(pass) rejects wrong agent [0.01ms]
+(pass) rejects search without AI subject
+(pass) rejects repeated search
+(pass) rejects lost topics
+(pass) rejects lost bullet list
+(pass) rejects unacquired citation
+(pass) stock acceptance needs a price, currency, timestamp, and price query [0.05ms]
+
+api/application/search-results.test.ts:
+(pass) Luna returns linked search snippets without requirement extraction or a grading call: 公開イベントのニュース [62.77ms]
+(pass) Luna returns linked search snippets without requirement extraction or a grading call: 製品の更新情報 [60.54ms]
+
+ 26 pass
+ 0 fail
+ 298 expect() calls
+Ran 26 tests across 3 files. [1391.00ms]

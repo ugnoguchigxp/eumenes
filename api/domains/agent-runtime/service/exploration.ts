@@ -22,6 +22,8 @@ export const isHistory = (p: Prepared | undefined) =>
 	p?.package.backend === "history";
 export const isQuickWeb = (p: Prepared | undefined) =>
 	!!p && packageRuntimeOf(p.package.id)?.budget === "quick";
+export const returnsSearchResults = (p: Prepared | undefined) =>
+	!!p && packageRuntimeOf(p.package.id)?.report === "search";
 const QUICK_WEB_BUDGET = Object.freeze({
 	modelCalls: 5,
 	localCalls: 0,
@@ -29,8 +31,13 @@ const QUICK_WEB_BUDGET = Object.freeze({
 	searches: 1,
 	reads: 1,
 });
+const SEARCH_BUDGET = Object.freeze({ ...RESEARCH_BUDGET, searches: 1 });
 export const operationLimits = (p: Prepared | undefined) =>
-	isQuickWeb(p) ? QUICK_WEB_BUDGET : RESEARCH_BUDGET;
+	isQuickWeb(p)
+		? QUICK_WEB_BUDGET
+		: returnsSearchResults(p)
+			? SEARCH_BUDGET
+			: RESEARCH_BUDGET;
 export const modelLimit = (p: Prepared | undefined) =>
 	isHistory(p)
 		? RESEARCH_BUDGET.historyModelCalls
@@ -83,7 +90,7 @@ export function explorationBudget(
 		maxReads: operationLimits(p).reads,
 		maxModelCalls: modelLimit(p),
 		canOperate:
-			t.model_calls < modelLimit(p) - 2 &&
+			t.model_calls < modelLimit(p) - (returnsSearchResults(p) ? 1 : 2) &&
 			t.deadline - now > RESEARCH_BUDGET.operationReserveMilliseconds,
 	};
 }

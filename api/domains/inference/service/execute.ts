@@ -12,7 +12,7 @@ import type {
 } from "../../delivery/contracts";
 import type { Connection, Resource, Settings } from "../../settings";
 import type { SettingsService } from "../../settings";
-import type { Messages, Receipt } from "../contracts";
+import type { ControlContract, Messages, Receipt } from "../contracts";
 import { get, type RequestRow } from "../repository";
 import { cloudRequest } from "./cloud";
 import { fallbackErrors, safeError } from "./errors";
@@ -22,7 +22,11 @@ const log = getLogger("inference");
 export type InferenceOptions = {
 	codexResearch?: {
 		model: string;
-		execute(messages: Messages, signal: AbortSignal): Promise<string>;
+		execute(
+			messages: Messages,
+			signal: AbortSignal,
+			control?: ControlContract,
+		): Promise<string>;
 	};
 	/** Must use the selected model's tokenizer, including message framing. */
 	countControlTokens?: (messages: Messages) => number | null;
@@ -87,6 +91,7 @@ type Request = {
 	running: Running;
 	onDelta?: (text: string) => void;
 	preparation?: SpeechPreparation;
+	control?: ControlContract;
 	/** Why the previous attempt was abandoned (recorded on the next attempt). */
 	reason: string | null;
 	/** True once any answer text reached the caller: no silent fallback after that. */
@@ -273,6 +278,7 @@ function startWork(
 		return env.options.codexResearch!.execute(
 			r.input as Messages,
 			args.attemptSignal,
+			r.control,
 		);
 	if (args.source === "cloud")
 		return cloudRequest(
@@ -571,6 +577,7 @@ export async function executeRequest(
 	onDelta?: (text: string) => void,
 	preparation?: SpeechPreparation,
 	tools?: import("../../../infrastructure/chat-stream").NativeTool[],
+	control?: ControlContract,
 ): Promise<Receipt> {
 	caller.throwIfAborted();
 	if (env.isClosed()) throw new Error("inference_closed");
@@ -623,6 +630,7 @@ export async function executeRequest(
 		onDelta,
 		preparation,
 		tools,
+		control,
 		reason: null,
 		published: false,
 	};

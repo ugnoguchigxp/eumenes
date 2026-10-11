@@ -4,7 +4,7 @@
 
 Eumenes は依頼、許可する範囲、質問、結果を保存する。dots はその依頼を受け取り、登録した Codex プロジェクトの Session を調整する。文章・資料・調査・実装を同じ契約で扱い、依頼の意味と委任先の選択は会話の LLM に委ねる。
 
-製品側の処理と隔離試験を実装した。**製品接続での実 dots の受入は未実施**。以前の [単体 MVP](../spec/verification/dots-mvp/acceptance-2026-10-10.md) の成功と、今回の製品統合の検証は区別する。
+製品側の処理と隔離試験を実装した。実 dots で公開 HTTPS・OAuth・Events・依頼取得・進捗とブロッカーの返却を確認した。**新規 Session と成果返却の受入は未完了**。詳細は [実接続の検証記録](../spec/verification/dots-integration/live-acceptance-2026-10-11.md)。以前の [単体 MVP](../spec/verification/dots-mvp/acceptance-2026-10-10.md) の成功と、今回の製品統合の検証は区別する。
 
 ## 設定して使う
 
@@ -59,7 +59,21 @@ bun scripts/dots-gateway.ts <接続ID>
 
 gateway は保存済み接続設定を API から取得し、既定で `127.0.0.1:8799` に待ち受ける。既存の TLS リバースプロキシをこの入口へ接続する。MCP とメタデータの2つのパスだけを転送し、`/api` や Cookie は転送しない。転送済みの印を必ず付けるため、ローカル専用トークンを公開接続に流用できない。`EUMENES_URL` と `EUMENES_DOTS_GATEWAY_PORT` でローカルの転送先とポートを指定できる。
 
-HTTPS 証明書、公開 DNS、OAuth サービスの配備は今回の実装に含めていない。単体 MVP の一時公開接続に製品 DB・設定・秘密を接続しない。
+恒久運用の HTTPS 証明書、公開 DNS、OAuth サービスの配備は今回の実装に含めていない。単体 MVP の一時公開接続に製品 DB・設定・秘密を接続しない。
+
+この PC での実 dots 受入には、[試験用 OAuth の手順](../scripts/dots-oauth/README.md)を用意した。標準の OAuth 処理は `oidc-provider` に委ね、所有者の承認は非公開の loopback API で行う。専用の HTTPS 経路に必要な認証エンドポイントと一つの MCP 接続だけを公開し、認証サービスは2時間で停止する。鍵・認証状態は永続化しないため、恒久運用には使わない。
+
+### dots 側での監査と購読維持
+
+標準担当の版2 (`package:dots.orchestrate@2`) は、取得した依頼全文・許可範囲、子 Session に渡す指示、実在する Session 参照、追加依頼・再試行の理由、進捗・結果・ブロッカーを dots の会話にも表示する。子作業は人間が Activity または接続先の Codex で開ける native task を使用する。MCP 報告だけを監査表示の成功とは扱わない。権限制約を強制できない場合の停止条件は変更していない。
+
+個々の依頼が終わっても購読は維持する。待機中に dots の定期推論や一覧ポーリングを作らず、通知を受けたとき・明示的な復旧時だけ pending 参照を取得する。更新は ChatGPT 側の `events/subscribe` による refresh を使い、認証と購読の期限は引き続き守る。取消する作業と停止する購読は別である。常時購読の方針によって、試験用認証の2時間期限が延びることはない。
+
+**初回の購読を画面操作なしで開始する公式APIは確認できていない。** 仕様では ChatGPT／dots 側が監視指示を受け、通知先と署名鍵を発行して `events/subscribe` を呼ぶ。Eumenes の MCP に同名の入口があることは、Eumenes から dots の購読を作成できることを意味しない。未登録の通知先を作ったり、停止した購読を送信側だけで復活させたりしない。
+
+既存のプロジェクトは担当版を自動変更しない。新しい担当を使う場合は、backend の起動時 seed 後、設定 API で対象プロジェクトの `capabilityRevisionId` を版2へ変更する。進行中のタスクには元の固定版が残り、設定変更では既存の停止・失効処理が働く。旧版の本文は `SKILL.v1.md` として保持する。
+
+実装・fixture 検証と、実 dots での未完了の受入は [監査試験の記録](../spec/verification/dots-integration/audit-acceptance-2026-10-11.md)に分けて記録する。
 
 ## 会話と実行契約
 

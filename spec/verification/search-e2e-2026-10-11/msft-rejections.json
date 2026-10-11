@@ -1,0 +1,40 @@
+[
+  {
+    "time": "2026-10-11T02:34:39.304Z",
+    "runId": "58ebf574-b95e-4bf1-8c54-6e755acf9296",
+    "taskId": "7d826cfc-5930-468f-98b7-e0870985013d",
+    "repairAttempt": 0,
+    "status": "repair_scheduled",
+    "controlAction": "invoke",
+    "reason": "invalid_requirement_schema",
+    "errorFrames": [
+      "/Users/y.noguchi/Code/eumenes/api/domains/capabilities/service/requirement-schema.ts:22:12",
+      "/Users/y.noguchi/Code/eumenes/api/domains/capabilities/service/requirement-schema.ts:80:5",
+      "/Users/y.noguchi/Code/eumenes/api/domains/capabilities/service/requirement-schema.ts:122:4",
+      "/Users/y.noguchi/Code/eumenes/api/domains/capabilities/service/requirement-schema.ts:112:33",
+      "/Users/y.noguchi/Code/eumenes/api/domains/capabilities/service/requirement-schema.ts:145:2",
+      "/Users/y.noguchi/Code/eumenes/api/domains/agent-runtime/service/requirements.ts:42:3",
+      "/Users/y.noguchi/Code/eumenes/api/domains/agent-runtime/service/requirements.ts:39:11",
+      "/Users/y.noguchi/Code/eumenes/api/domains/agent-runtime/service/step-actions.ts:163:5"
+    ]
+  },
+  {
+    "time": "2026-10-11T02:34:46.691Z",
+    "runId": "58ebf574-b95e-4bf1-8c54-6e755acf9296",
+    "taskId": "7d826cfc-5930-468f-98b7-e0870985013d",
+    "repairAttempt": 1,
+    "status": "failed",
+    "controlAction": "invoke",
+    "reason": "invalid_requirement_schema",
+    "errorFrames": [
+      "/Users/y.noguchi/Code/eumenes/api/domains/capabilities/service/requirement-schema.ts:22:12",
+      "/Users/y.noguchi/Code/eumenes/api/domains/capabilities/service/requirement-schema.ts:80:5",
+      "/Users/y.noguchi/Code/eumenes/api/domains/capabilities/service/requirement-schema.ts:122:4",
+      "/Users/y.noguchi/Code/eumenes/api/domains/capabilities/service/requirement-schema.ts:112:33",
+      "/Users/y.noguchi/Code/eumenes/api/domains/capabilities/service/requirement-schema.ts:145:2",
+      "/Users/y.noguchi/Code/eumenes/api/domains/agent-runtime/service/requirements.ts:42:3",
+      "/Users/y.noguchi/Code/eumenes/api/domains/agent-runtime/service/requirements.ts:39:11",
+      "/Users/y.noguchi/Code/eumenes/api/domains/agent-runtime/service/step-actions.ts:163:5"
+    ]
+  }
+]

@@ -19,6 +19,8 @@
 		"size:check": "bun scripts/size-budget.ts",
 		"docs:domains": "bun scripts/domain-docs.ts",
 		"test:domain": "bun scripts/test-domain.ts",
+		"test:search": "bun test api/domains/dialogue/test/research-routing.test.ts api/domains/agent-runtime/test/context.test.ts api/application/search-agents-check.test.ts api/application/search-agents-e2e.test.ts",
+		"test:search:live": "bun scripts/search-agents-live.ts --run",
 		"verify:all": "bun scripts/verify.ts --all",
 		"verify:live": "bun scripts/verify-live.ts",
 		"decision:bench": "python3 -B scripts/decision-bench/bench.py",

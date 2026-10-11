@@ -1,0 +1,78 @@
+$ bun scripts/verify.ts --domain web-research
+[verify] selected=web-research dependencyClosure=queue,web-research testClosure=queue,web-research
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts api/domains/web-research
+size-budget ok (11 files)
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check api/domains/web-research
+$ oxfmt --check api/domains/web-research
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 4ms on 16 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint api/domains/web-research
+$ oxlint --deny-warnings api/domains/web-research
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun x tsc -p /Users/y.noguchi/Code/eumenes/verification-reports/tsconfig.selected.json
+[verify] TypeScript workspace closure: 29 files; api/infrastructure/flock.ts, api/infrastructure/logger.ts, api/infrastructure/sqlite, api/domains/web-research, api/infrastructure/http.ts, api/domains/queue, api/infrastructure/digest.ts
+[verify] domain tests: /Users/y.noguchi/.bun/bin/bun run test:domain -- web-research
+$ bun scripts/test-domain.ts web-research
+bun test v1.4.2 (744846f84)
+
+api/domains/web-research/test/acquisition.test.ts:
+(pass) R2/R8: isolated llm-fetch permits guarded >12000 text while denying a hidden attack after the preview [23.19ms]
+(pass) large ordinary pages are fully inspected and hidden instructions beyond the old segment budget are denied [11.33ms]
+(pass) astral Unicode titles respect the contract's UTF-16 limit without splitting a surrogate pair [2.90ms]
+(pass) unverified redirect cache policy and partial HTTP content are never retained [0.81ms]
+(pass) JSON is read as untrusted data and still passes the unchanged context guard [1.26ms]
+(pass) weather, market and technology JSON retain the original fields without host interpretation [0.84ms]
+(pass) pages the guard only allows with a warning are refused [0.48ms]
+
+api/domains/web-research/test/search-locale.test.ts:
+(pass) omitted regions use the provider's language default; explicit regions survive: ja/omitted [1.13ms]
+(pass) omitted regions use the provider's language default; explicit regions survive: en/omitted [0.08ms]
+(pass) omitted regions use the provider's language default; explicit regions survive: fr/omitted [0.07ms]
+(pass) omitted regions use the provider's language default; explicit regions survive: en/GB [0.07ms]
+
+api/domains/web-research/test/attempt-timeout.test.ts:
+(pass) W01 attempt timer starts at execute, not while the job waits in Queue [26.22ms]
+(pass) W01 attempt timeout is web_attempt_timeout, single HTTP attempt, and success after a slow-but-in-time fetch is not expired [21.16ms]
+(pass) W01 a shared fetch survives when only one consumer times out; last consumer leaving aborts it [27.64ms]
+(pass) W01 cancellation stays web_cancelled and invalid timeouts are rejected; default timeout path is unchanged [12.59ms]
+
+api/domains/web-research/test/web-research.test.ts:
+(pass) API idempotency, validation, run polling and cancellation are backed by Queue [31.09ms]
+(pass) stable document hits reuse; live and lookup bypass persistent cache; GET expires without a new search [42.30ms]
+(pass) fresh deadline does not extend on access; idle expiry sweeps bodies and cache mappings [20.61ms]
+(pass) LRU capacity and clear generation refuse late repopulation [27.83ms]
+(pass) inflight sharing respects cancellation of individual subscribers [32.35ms]
+(pass) clear during acquisition rejects old result and does not write a completed cache [34.25ms]
+(pass) main settle failure never exposes a result or writes the cache [29.69ms]
+(pass) guard refusal is a finite error, never stored as provider text or retried [35.24ms]
+(pass) HTTP retention honors no-store, revalidation, age, expires, variation and personalization [0.17ms]
+(pass) refreshing an existing key at capacity preserves other pages and prunes the previous body [26.10ms]
+(pass) clearing the document cache does not invalidate an unrelated live lookup [31.86ms]
+(pass) a successful fresh response that disallows retention invalidates the previous saved body [35.66ms]
+(pass) JSON escaping truncates large successful results rather than turning them into acquisition failures [32.16ms]
+(pass) same-clock admissions evict the previous page rather than the newly fetched page [31.27ms]
+(pass) a rolled-back Queue settlement does not publish a result or evict a successful delivery [85.33ms]
+(pass) Expires freshness subtracts upstream Age, using the server Date rather than the local clock [0.12ms]
+(pass) the acquisition deadline releases Queue resources even when the adapter ignores abort [37.51ms]
+(pass) same URL cacheable acquisitions are serialized, including live bypasses [39.74ms]
+(pass) network delay and local guard time consume HTTP freshness without extending max-age [0.10ms]
+(pass) cache shutdown waits for a concurrent clear and refuses later admissions [23.56ms]
+(pass) cache keys reuse the same HTTP resource across URL fragment variants [22.19ms]
+(pass) freshness header names are case insensitive and conflicting values are not reused [0.08ms]
+(pass) clear reports protected cache sources instead of claiming all data was deleted [24.26ms]
+(pass) an acquisition cleanup error does not prevent the cache writer from closing [22.44ms]
+(pass) lookup drops hits with invalid URLs instead of failing [0.65ms]
+
+api/domains/web-research/test/saved-bodies.test.ts:
+(pass) R1/R2/R3: middle and >12000 positions are reached without fetch; raw normalized quote and cursors stay bound to a revision [21.16ms]
+(pass) R7/R8: refetch gets a new immutable revision; foreign owner/cursor/epoch, expiry and restart refuse reads [5.19ms]
+(pass) capacity never evicts active references and shared bodies survive another owner's release [0.11ms]
+(pass) find normalization preserves grapheme positions; result counts and encoded read sizes are bounded [16.76ms]
+(pass) AG-6: a task's cursor quota evicts only its own oldest cursor and never blocks another task [21.49ms]
+
+ 45 pass
+ 0 fail
+ 191 expect() calls
+Ran 45 tests across 5 files. [1001.00ms]
+[verify] passed 2852 ms

@@ -1,0 +1,16 @@
+bun test v1.4.2 (744846f84)
+
+api/application/search-agents-e2e.test.ts:
+(pass) search API E2E fixture: quick, report reaches conversation [98.98ms]
+(pass) search API E2E fixture: quick, failure is returned without success [63.03ms]
+(pass) search API E2E fixture: luna, report reaches conversation [67.25ms]
+(pass) search API E2E fixture: luna, failure is returned without success [58.54ms]
+(pass) search API E2E fixture: stock, report reaches conversation [63.91ms]
+(pass) search API E2E fixture: stock, failure is returned without success [56.31ms]
+(pass) search API E2E fixture: weather, report reaches conversation [63.26ms]
+(pass) search API E2E fixture: weather, failure is returned without success [57.52ms]
+
+ 8 pass
+ 0 fail
+ 88 expect() calls
+Ran 8 tests across 1 file. [760.00ms]

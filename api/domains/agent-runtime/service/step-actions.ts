@@ -15,7 +15,12 @@ import { safeCode } from "./control-output";
 import type { EvidenceCatalog } from "./evidence-catalog";
 import { isHistory, isSearch, modelLimit } from "./exploration";
 import { logRejection } from "./rejection-log";
-import { researchAction, firstResearchAction } from "./research-contract";
+import {
+	researchAction,
+	firstResearchAction,
+	searchAction,
+} from "./research-contract";
+import { saveSearchReport } from "./search-report";
 import {
 	freezeRequirements,
 	readRequirements,
@@ -30,12 +35,14 @@ import type { TaskOps } from "./task-ops";
 export type StepInput = {
 	catalog: EvidenceCatalog;
 	mode: "research" | "verify_requirements";
+	search: boolean;
 	first: boolean;
 	taskId: string;
 	stepId: string;
 	revision: number;
 	requestId: string;
 	messages: Array<{ role: "system" | "user" | "assistant"; content: string }>;
+	control?: { instructions: string; outputSchema: unknown };
 	visible: Source[];
 	manifestDigest: string;
 	grants: Array<{ id: string; executionRef: string; replayOnly?: boolean }>;
@@ -56,7 +63,22 @@ export type Claim = Parameters<StepHandler["settleInTransaction"]>[1];
 type ControlAction =
 	| z.infer<typeof requirementVerification>
 	| z.infer<typeof firstResearchAction>
+	| z.infer<typeof searchAction>
 	| z.infer<typeof researchAction>;
+/** Keeps one entry per path/code; only sanitized diagnostics are stored. */
+function saveRepair(db: Tx, taskId: string, issues: LogFields[]) {
+	const seen = new Set<string>();
+	const unique = issues.filter((issue) => {
+		const key = `${issue.validationPath ?? ""}:${issue.validationCode ?? ""}`;
+		if (seen.has(key)) return false;
+		seen.add(key);
+		return true;
+	});
+	db.query("UPDATE agent_tasks SET control_repair_json=? WHERE id=?").run(
+		JSON.stringify(unique),
+		taskId,
+	);
+}
 export function createStepActions(ctx: RuntimeContext, ops: TaskOps) {
 	const { store, capabilities, tools, inference, now } = ctx.deps;
 	const { prepared, catalogs, bindings, releases } = ctx.state;
@@ -73,6 +95,27 @@ export function createStepActions(ctx: RuntimeContext, ops: TaskOps) {
 			!outcome.result.invalid && !parsed.success
 				? validationIssues(parsed.error, outcome.result.action)
 				: [];
+		if (!parsed.success)
+			for (const issue of parsed.error.issues) {
+				if (issue.code === "unrecognized_keys")
+					for (const key of issue.keys) {
+						if (
+							[
+								"requirements",
+								"checks",
+								"externalRules",
+								"report",
+								"arguments",
+								"tool",
+							].includes(key)
+						)
+							issues.push({
+								validationPath: key,
+								validationCode: "unrecognized_keys",
+							});
+					}
+			}
+		saveRepair(db, t.id, issues);
 		logRejection(
 			store,
 			t,
@@ -146,9 +189,13 @@ export function createStepActions(ctx: RuntimeContext, ops: TaskOps) {
 			releases.add(t.id);
 		} else {
 			const research = (
-				input.first ? firstResearchAction : researchAction
+				input.search
+					? searchAction
+					: input.first
+						? firstResearchAction
+						: researchAction
 			).parse(parsed.data);
-			if (input.first)
+			if (!input.search && input.first)
 				freezeRequirements(
 					db,
 					t,
@@ -156,8 +203,10 @@ export function createStepActions(ctx: RuntimeContext, ops: TaskOps) {
 					capabilities,
 					now(),
 				);
-			const frozen = readRequirements(db, t, capabilities);
-			if (!frozen) throw new Error("required_context_missing");
+			const frozen = input.search
+				? null
+				: readRequirements(db, t, capabilities);
+			if (!input.search && !frozen) throw new Error("required_context_missing");
 			const action = research;
 			if (action.action === "invoke") {
 				// Authority at prepare is immutable for this step. Cancellation,
@@ -210,8 +259,16 @@ export function createStepActions(ctx: RuntimeContext, ops: TaskOps) {
 						"waiting_tool",
 						isSearch(toolRuntimeOf(tool.tool.revisionId)) ? "search" : "read",
 					);
+			} else if (input.search) {
+				saveSearchReport(db, t, action.report, input.catalog, tools, now());
+				db.query(
+					"UPDATE agent_tasks SET report_state='available' WHERE id=?",
+				).run(t.id);
+				update(db, get(db, t.id)!, "completed", "completed");
+				ready(db, root, null, t.id);
+				releases.add(t.id);
 			} else if (action.action === "finish") {
-				const draft = validateDraft(action.report, frozen.contract);
+				const draft = validateDraft(action.report, frozen!.contract);
 				const catalog = catalogs.get(t.id)!;
 				catalog.verificationEvidence(draftReferences(draft));
 				if (
@@ -224,12 +281,15 @@ export function createStepActions(ctx: RuntimeContext, ops: TaskOps) {
 					throw new Error("evidence_invalidated");
 				if (t.model_calls >= modelLimit(p) || t.deadline <= now())
 					throw new Error("requirement_verification_unavailable");
-				saveDraft(db, t, frozen.digest, draft, now());
+				saveDraft(db, t, frozen!.digest, draft, now());
 				update(db, get(db, t.id)!, "queued", "verify_requirements");
 				enqueue(db, get(db, t.id)!, claim.jobId);
 			}
 		}
 
+		db.query("UPDATE agent_tasks SET control_repair_json=NULL WHERE id=?").run(
+			t.id,
+		);
 		if (!inference.acceptInTransaction?.(db, outcome.result.receipt))
 			throw new Error("permission_revoked");
 		db.query(
@@ -250,6 +310,11 @@ export function createStepActions(ctx: RuntimeContext, ops: TaskOps) {
 		e: unknown,
 	) {
 		const code = safeCode(e);
+		saveRepair(
+			db,
+			t.id,
+			e instanceof ValidationFailure ? e.issues : [{ validationCode: code }],
+		);
 		logRejection(
 			store,
 			t,

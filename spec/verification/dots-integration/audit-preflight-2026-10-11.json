@@ -1,0 +1,12 @@
+{
+  "checkedAt": "2026-10-10T22:07:10.657Z",
+  "browserInstructionsSent": 0,
+  "newLiveTaskSent": false,
+  "connectionRef": "dots-live-20261011",
+  "subscription": {
+    "connectionRef": "dots-live-20261011",
+    "subscribed": false,
+    "expiresAt": 1791669028834
+  },
+  "reason": "No active dots-issued callback; no callable external subscription creation capability was found."
+}

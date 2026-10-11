@@ -1,7 +1,15 @@
 import type { InferencePort, Receipt } from "../../inference";
 import type { SpeechPreparation } from "../../delivery";
 import type { NativeTool } from "../../../infrastructure/chat-stream";
-import { operation, type ConversationOperation } from "./conversation-tools";
+import { getLogger } from "../../../infrastructure/logger";
+import { ValidationFailure } from "../../../infrastructure/validation-log";
+import {
+	operation,
+	operationRejection,
+	type ConversationOperation,
+} from "./conversation-tools";
+
+const log = getLogger("dialogue");
 
 type Messages = Parameters<InferencePort["answer"]>[0];
 
@@ -49,14 +57,27 @@ export async function generateConversation(input: {
 				: await inference.answer(messages, signal);
 		if (!receipt?.toolCalls?.length) return { text, receipt };
 		try {
-			if (!input.tools || text.trim())
-				throw new Error("invalid_conversation_operation");
+			if (!input.tools)
+				throw operationRejection("tools_not_offered_in_request");
+			if (text.trim()) throw operationRejection("text_with_operation");
 			return {
 				text: "",
 				receipt,
 				operation: operation(receipt.toolCalls, input.tools),
 			};
-		} catch {
+		} catch (error) {
+			// Classification, public tool name, call count and validation path/code
+			// only; arguments, text and provider output stay out of the log.
+			const issues =
+				error instanceof ValidationFailure
+					? error.issues
+					: [{ reason: "unclassified" }];
+			for (const issue of issues)
+				log.warn("dialogue.operation_rejected", {
+					...issue,
+					repairAttempt: attempt,
+					issueCount: issues.length,
+				});
 			if (attempt === 1) throw new Error("invalid_conversation_operation");
 			input.repair();
 			messages = [

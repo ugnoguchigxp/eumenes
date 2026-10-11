@@ -4,6 +4,13 @@ import type { Source } from "../../tool-runtime";
 import { evidenceExcerpts } from "./evidence-excerpts";
 import type { z } from "zod";
 import type { researchReport } from "./research-contract";
+const EVIDENCE_LIST_BYTES = 8192;
+/** Upper bound of the presented materials (evidence list and observations).
+ * Registration measures the same packet, including titles and URLs, so a
+ * registered reference can always be presented again in later steps. */
+export const MATERIAL_BYTES = 32768;
+// Room kept for the packet keys and message framing.
+const MATERIAL_RESERVE_BYTES = 512;
 /** Task-scoped immutable references. Bodies remain in the tool vault; no durable copy. */
 export class EvidenceCatalog {
 	private documents = new Map<string, string>();
@@ -27,14 +34,15 @@ export class EvidenceCatalog {
 		const current = new Set(
 			sources.map((s) => `${s.sourceId}:${s.viewId ?? ""}`),
 		);
-		this.unavailable = new Set(
-			[...this.entries]
+		this.unavailable = new Set([
+			...this.unavailable,
+			...[...this.entries]
 				.filter(
 					([, e]) =>
 						!current.has(`${e.source.sourceId}:${e.source.viewId ?? ""}`),
 				)
 				.map(([ref]) => ref),
-		);
+		]);
 	}
 	document(reference: string) {
 		const known = [...this.documents].find(([, alias]) => alias === reference);
@@ -50,44 +58,18 @@ export class EvidenceCatalog {
 			args.messageRef = this.document(args.messageRef);
 		return args;
 	}
-	observe(sources: Source[]) {
-		const observations: unknown[] = [];
-		for (const [sourceIndex, source] of sources.entries()) {
-			const key = source.sourceRef ?? source.messageRef ?? source.sourceId;
-			let document = this.documents.get(key);
-			if (!document) {
-				document = `d${this.documents.size + 1}`;
-				this.documents.set(key, document);
-			}
-			const excerpts = [];
-			for (const excerpt of evidenceExcerpts(source.body)) {
-				const identity = `${source.sourceId}:${source.viewId ?? ""}:${excerpt.excerptId}`;
-				let reference = this.identities.get(identity);
-				if (reference && sourceIndex !== sources.length - 1) continue;
-				if (bytes(observations) + bytes(excerpts) + bytes(excerpt) > 11000) {
-					break;
-				}
-				if (!reference) {
-					if (this.entries.size >= 64) {
-						this.full = true;
-						break;
-					}
-					reference = `e${this.entries.size + 1}`;
-					this.entries.set(reference, {
-						source,
-						excerptId: excerpt.excerptId,
-						quote: excerpt.quote,
-						document,
-					});
-					if (bytes(this.list()) > 8192) {
-						this.entries.delete(reference);
-						this.full = true;
-						break;
-					}
-					this.identities.set(identity, reference);
-				}
-				excerpts.push({ reference, quote: excerpt.quote });
-			}
+	observe(sources: Source[], limit = MATERIAL_BYTES) {
+		const budget = limit - MATERIAL_RESERVE_BYTES;
+		const observations: Array<{ excerpts: unknown[] }> = [];
+		const added: Array<{ reference: string; identity: string }> = [];
+		// The same view can arrive from several operations; present it once, at
+		// its latest position, so duplicates never consume the material bound.
+		const last = new Map(
+			sources.map((s, i) => [`${s.sourceId}:${s.viewId ?? ""}`, i]),
+		);
+		for (const [index, source] of sources.entries()) {
+			if (last.get(`${source.sourceId}:${source.viewId ?? ""}`) !== index)
+				continue;
 			const metadata = {
 				title: source.title,
 				url: source.url,
@@ -101,15 +83,88 @@ export class EvidenceCatalog {
 				end: source.end,
 				nextCursor: source.nextCursor,
 			};
-			observations.push({
+			const key = source.sourceRef ?? source.messageRef ?? source.sourceId;
+			let document = this.documents.get(key);
+			if (!document) {
+				document = `d${this.documents.size + 1}`;
+				this.documents.set(key, document);
+			}
+			const excerpts: Array<{ reference: string; quote: string }> = [];
+			const observation = () => ({
 				...metadata,
 				document,
 				sourceRef: source.sourceRef ? document : undefined,
 				messageRef: source.messageRef ? document : undefined,
 				excerpts,
 			});
+			const all = evidenceExcerpts(source.body);
+			for (const excerpt of all) {
+				const identity = `${source.sourceId}:${source.viewId ?? ""}:${excerpt.excerptId}`;
+				let reference = this.identities.get(identity);
+				if (!reference) {
+					// Once capacity is reached no later excerpt is registered, so every
+					// step re-presents exactly the references the model has already seen.
+					if (this.full || this.entries.size >= 64) {
+						this.full = true;
+						break;
+					}
+					reference = `e${this.entries.size + 1}`;
+					this.entries.set(reference, {
+						source,
+						excerptId: excerpt.excerptId,
+						quote: excerpt.quote,
+						document,
+					});
+					excerpts.push({ reference, quote: excerpt.quote });
+					if (
+						bytes(this.list()) > EVIDENCE_LIST_BYTES ||
+						bytes({
+							evidence: this.list(),
+							observations: [...observations, observation()],
+						}) > budget
+					) {
+						excerpts.pop();
+						this.entries.delete(reference);
+						this.full = true;
+						break;
+					}
+					this.identities.set(identity, reference);
+					added.push({ reference, identity });
+					continue;
+				}
+				excerpts.push({ reference, quote: this.entries.get(reference)!.quote });
+			}
+			// A source without any excerpt (an empty page with a cursor) still
+			// shows its metadata; one whose excerpts did not fit is withheld.
+			if (
+				excerpts.length ||
+				(!all.length &&
+					bytes({
+						evidence: this.list(),
+						observations: [...observations, observation()],
+					}) <= budget)
+			)
+				observations.push(observation());
 		}
-		return observations;
+		// A replayed observation may follow this step's new excerpts. Withdraw the
+		// newest unpresented registrations until the whole packet fits.
+		const packet = () => bytes({ evidence: this.list(), observations });
+		while (added.length && packet() > budget) {
+			const { reference, identity } = added.pop()!;
+			this.entries.delete(reference);
+			this.identities.delete(identity);
+			this.full = true;
+			for (const [index, o] of observations.entries()) {
+				const at = o.excerpts.findIndex(
+					(e) => (e as { reference: string }).reference === reference,
+				);
+				if (at < 0) continue;
+				o.excerpts.splice(at, 1);
+				if (!o.excerpts.length) observations.splice(index, 1);
+				break;
+			}
+		}
+		return observations as unknown[];
 	}
 	project(value: unknown): unknown {
 		if (typeof value === "string") return this.documents.get(value) ?? value;
@@ -138,7 +193,6 @@ export class EvidenceCatalog {
 		return [...this.entries].map(([reference, e]) => ({
 			reference,
 			document: e.document,
-			preview: e.quote.slice(0, 24),
 			...(this.unavailable.has(reference) ? { available: false } : {}),
 		}));
 	}

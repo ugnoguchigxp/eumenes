@@ -1,0 +1,58 @@
+[
+  {
+    "at": "2026-10-11T02:41:41.693Z",
+    "action": "invoke",
+    "tool": "web.lookup",
+    "query": "Microsoft stock price",
+    "schemaSummary": [
+      {
+        "type": "object",
+        "keys": [
+          "type",
+          "properties",
+          "required",
+          "additionalProperties"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "stock_price": {
+            "type": "number",
+            "keys": [
+              "type"
+            ]
+          },
+          "currency": {
+            "type": "string",
+            "keys": [
+              "type"
+            ]
+          },
+          "timestamp": {
+            "type": "string",
+            "keys": [
+              "type",
+              "format"
+            ]
+          }
+        }
+      }
+    ],
+    "parsedJson": true
+  },
+  {
+    "at": "2026-10-11T02:41:54.390Z",
+    "action": "invoke",
+    "tool": "web.lookup",
+    "query": "Microsoft stock price MSFT",
+    "schemaSummary": [
+      null
+    ],
+    "parsedJson": true
+  },
+  {
+    "at": "2026-10-11T02:42:01.688Z",
+    "action": "invoke",
+    "tool": "web.lookup@1",
+    "parsedJson": true
+  }
+]

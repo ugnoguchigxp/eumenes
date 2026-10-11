@@ -1,0 +1,47 @@
+[
+  {
+    "question": "マイクロソフトの最新の株価を教えて",
+    "expectedPackage": "package:web.quick@2",
+    "operations": [],
+    "runId": "dcc4c5b6-a531-4955-ab40-aaf131f90683",
+    "status": "failed",
+    "error": "invalid_conversation_operation",
+    "milliseconds": 5756,
+    "tasks": [],
+    "report": null,
+    "verifierCalls": null,
+    "controlDiagnostics": null,
+    "totalModelCalls": 2,
+    "stages": {
+      "conversation": {
+        "calls": 2,
+        "milliseconds": 5730
+      },
+      "research": {
+        "calls": 0,
+        "milliseconds": 0
+      },
+      "answer": {
+        "calls": 0,
+        "milliseconds": 0
+      }
+    },
+    "models": [
+      "larm:gemma4-26b-a4b",
+      "aconn_epoch-e40e8711-2758-49a1-9d6f-6d5ab2221416_39178acb-2fd0-4d72-99a8-a70d299dcf31:gemma4-26b-a4b"
+    ],
+    "ok": false,
+    "checks": {
+      "correctAgent": false,
+      "completed": false,
+      "searchedOnce": false,
+      "reportReturned": false,
+      "citationsReturned": false,
+      "queryTargetsRequest": false,
+      "stockQuote": false,
+      "requestedResult": false,
+      "bulletList": true,
+      "noGrading": false
+    }
+  }
+]

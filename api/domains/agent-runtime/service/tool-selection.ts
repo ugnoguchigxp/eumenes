@@ -52,6 +52,15 @@ export function createToolSelection({
 		return (bindings.get(t.id) ?? []).flatMap((b) => {
 			const meta = toolRuntimeOf(b.tool.revisionId);
 			if (meta?.requiresSavedBody && !hasSavedBody) return [];
+			// Do not offer a URL read when neither the request nor acquired sources authorize a URL.
+			if (
+				meta?.urlScope &&
+				!(p?.input as { urls?: string[] })?.urls?.length &&
+				!tools
+					.observationsInTransaction(db, t.id)
+					.some((o) => o.sources.some((s) => s.url))
+			)
+				return [];
 			const replayOnly =
 				(localTool(meta)
 					? budget.localCalls >= budget.maxLocalCalls

@@ -18,14 +18,26 @@ export async function evaluateRequirements(
 			signal: AbortSignal,
 		) => Promise<string>;
 	},
+	historyFixture = false,
 ) {
 	const started = performance.now();
 	const h = await harness({
 		model,
+		history: historyFixture,
 		codexResearch,
 		acquire: fixedAcquisition(c.sources),
 	});
 	try {
+		if (historyFixture)
+			for (const source of c.sources)
+				await h.conversation.append({
+					id: crypto.randomUUID(),
+					conversationId: "evaluation",
+					role: "user",
+					text: source.body,
+					createdAt: source.fetchedAt,
+					runId: null,
+				});
 		const registered = new Map<string, string>();
 		for (const p of c.profiles) {
 			const response = await h.app.request(

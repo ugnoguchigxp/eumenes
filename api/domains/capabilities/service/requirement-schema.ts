@@ -118,9 +118,13 @@ export function validateRequirementSchema(schema: JsonSchema) {
 			visit(s.items, depth + 1);
 		}
 		if (t === "string") {
-			bound("minLength", 2000);
-			bound("maxLength", 2000, true);
-			if (Number(s.minLength ?? 0) > Number(s.maxLength)) fail();
+			bound("minLength");
+			bound("maxLength");
+			if (
+				s.maxLength !== undefined &&
+				Number(s.minLength ?? 0) > Number(s.maxLength)
+			)
+				fail();
 			if (
 				s.format !== undefined &&
 				!["date", "date-time", "uri"].includes(String(s.format))

@@ -1,0 +1,71 @@
+[
+  {
+    "question": "マイクロソフトの最新の株価を教えて",
+    "expectedPackage": "package:web.quick@1",
+    "operations": [],
+    "runId": "58ebf574-b95e-4bf1-8c54-6e755acf9296",
+    "status": "completed",
+    "error": null,
+    "milliseconds": 27160,
+    "tasks": [
+      {
+        "id": "7d826cfc-5930-468f-98b7-e0870985013d",
+        "kind": "worker",
+        "rootRunId": "58ebf574-b95e-4bf1-8c54-6e755acf9296",
+        "parentTaskId": "f78fe4e7-3c27-4b5f-91fc-443ed78029c3",
+        "packageRevisionId": "package:web.quick@1",
+        "status": "failed",
+        "phase": "failed",
+        "modelCalls": 2,
+        "toolCalls": 0,
+        "errorCode": "invalid_requirement_schema",
+        "createdAt": "2026-10-11T02:34:27.333Z",
+        "deadlineAt": "2026-10-11T02:36:53.792Z",
+        "reportState": "none",
+        "acquisitionMode": null,
+        "toolOutcomes": []
+      },
+      {
+        "id": "f78fe4e7-3c27-4b5f-91fc-443ed78029c3",
+        "kind": "coordinator",
+        "rootRunId": "58ebf574-b95e-4bf1-8c54-6e755acf9296",
+        "parentTaskId": null,
+        "packageRevisionId": null,
+        "status": "completed",
+        "phase": "completed",
+        "modelCalls": 0,
+        "toolCalls": 0,
+        "errorCode": "invalid_requirement_schema",
+        "createdAt": "2026-10-11T02:34:27.333Z",
+        "deadlineAt": "2026-10-11T02:37:23.792Z",
+        "reportState": "none",
+        "acquisitionMode": null,
+        "toolOutcomes": []
+      }
+    ],
+    "report": null,
+    "answer": "申し訳ございません。マイクロソフトの最新の株価に関する情報を取得することができませんでした。",
+    "verifierCalls": {
+      "n": 0
+    },
+    "totalModelCalls": 4,
+    "stages": {
+      "conversation": {
+        "calls": 1,
+        "milliseconds": 3523
+      },
+      "research": {
+        "calls": 2,
+        "milliseconds": 19315
+      },
+      "answer": {
+        "calls": 1,
+        "milliseconds": 4238
+      }
+    },
+    "models": [
+      "larm:gemma4-26b-a4b",
+      "aconn_epoch-e40e8711-2758-49a1-9d6f-6d5ab2221416_b9660136-328d-424b-b2f3-dc88bd724267:gemma4-26b-a4b"
+    ]
+  }
+]

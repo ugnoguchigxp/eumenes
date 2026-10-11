@@ -26,7 +26,8 @@
 | 文書 | 内容 |
 | --- | --- |
 | [toolchain.md](toolchain.md) | 会話からの調査(capabilities・tool-runtime・agent-runtime) |
-| [web-research.md](web-research.md) | llm-fetch による Web 取得、保存と期限 |
+| [web-research.md](web-research.md) | llm-fetch による Web 取得、保存と期限、検索地域 |
+| [Web検索 実装目標](../spec/web-search-target-2026-10-11.md) | Web検索経路の目標仕様と現行との差分(計画) |
 | [research-routes.md](research-routes.md) | 取得先と手順の学習・画面・CLI |
 
 ## 委任タスクとコーディング

@@ -14,8 +14,9 @@ const responses = JSON.parse(
 );
 for (const c of cases)
 	if (c.suite === "requirements")
-		test(`data-only requirement host fixture: ${c.id}`, async () => {
+		test(`data-only report host fixture: ${c.id}`, async () => {
 			const canned = responses[c.id];
+			const search = c.engine === "codex_luna";
 			let calls = 0;
 			const model: LarmPort = {
 				status: () => ({ state: "ready", capabilities: ["llm"] }),
@@ -32,9 +33,15 @@ for (const c of cases)
 								name:
 									c.engine === "codex_luna" ? "research_web_luna" : "research",
 								arguments: JSON.stringify({
-									...(c.engine === "default" ? { kind: "web" } : {}),
+									...(c.engine === "default" ? { kind: "history" } : {}),
 									question: c.request,
-									requirementProfiles: c.profiles.map((_, i) => `p${i + 1}`),
+									...(search
+										? {}
+										: {
+												requirementProfiles: c.profiles.map(
+													(_, i) => `p${i + 1}`,
+												),
+											}),
 								}),
 							},
 						]);
@@ -44,6 +51,24 @@ for (const c of cases)
 						const data = workerPacket(messages);
 						if (data.draftReport)
 							return JSON.stringify(fixtureVerification(data.draftReport));
+						if (search)
+							return JSON.stringify(
+								data.observations.length
+									? {
+											action: "finish",
+											report: {
+												outcome: canned.outcome,
+												summary: canned.summary,
+												claims: canned.claims,
+												limitations: canned.limitations,
+											},
+										}
+									: {
+											action: "invoke",
+											tool: "web.read",
+											arguments: { url: c.sources[0]!.url },
+										},
+							);
 						if (!data.requirementContract)
 							return JSON.stringify({
 								action: "invoke",
@@ -55,8 +80,8 @@ for (const c of cases)
 										valueSchema: { type: "string", maxLength: 2000 },
 									},
 								],
-								tool: "web.read",
-								arguments: { url: c.sources[0]!.url },
+								tool: "history.search",
+								arguments: { query: "", limit: 5 },
 							});
 						return JSON.stringify({
 							action: "finish",
@@ -106,10 +131,23 @@ for (const c of cases)
 							execute: (messages, signal) => model.answer(messages, signal),
 						}
 					: undefined,
+				!search,
 			);
-			expect(result.structureMatched).toBe(true);
-			expect(result.counts.worker).toBe(3);
-			expect(calls).toBe(5);
+			if (search) {
+				expect(result.engine).toBe("codex_luna");
+				expect(result.report).toMatchObject({
+					version: 2,
+					outcome: canned.outcome,
+					summary: canned.summary,
+				});
+				expect(result.report!.claims.map((c) => c.text)).toEqual(
+					canned.claims.map((c: { text: string }) => c.text),
+				);
+				expect("requirements" in result.report!).toBe(false);
+				expect(result.counts.verify).toEqual({ n: 0 });
+			} else expect(result.structureMatched).toBe(true);
+			expect(result.counts.worker).toBe(search ? 2 : 3);
+			expect(calls).toBe(search ? 4 : 5);
 			expect(result.semanticChecks.every((v) => v.status === "unchecked")).toBe(
 				true,
 			);

@@ -53,6 +53,7 @@ export async function harness(
 			execute: (
 				messages: import("../domains/inference/contracts").Messages,
 				signal: AbortSignal,
+				control?: import("../domains/inference/contracts").ControlContract,
 			) => Promise<string>;
 		};
 		gate?: Promise<void>;

@@ -1,0 +1,226 @@
+{
+  "label": "routing-final",
+  "lane": "live_model_routing_only",
+  "results": [
+    {
+      "caseId": "morning-news",
+      "repeat": 1,
+      "expected": "luna",
+      "selected": "luna",
+      "passed": true,
+      "durationMs": 4726,
+      "model": "gemma4-26b-a4b",
+      "toolCalls": 1,
+      "textCharacters": 0
+    },
+    {
+      "caseId": "morning-news",
+      "repeat": 2,
+      "expected": "luna",
+      "selected": "luna",
+      "passed": true,
+      "durationMs": 2651,
+      "model": "gemma4-26b-a4b",
+      "toolCalls": 1,
+      "textCharacters": 0
+    },
+    {
+      "caseId": "ai-news",
+      "repeat": 1,
+      "expected": "luna",
+      "selected": "luna",
+      "passed": true,
+      "durationMs": 3076,
+      "model": "gemma4-26b-a4b",
+      "toolCalls": 1,
+      "textCharacters": 0
+    },
+    {
+      "caseId": "ai-news",
+      "repeat": 2,
+      "expected": "luna",
+      "selected": "luna",
+      "passed": true,
+      "durationMs": 2908,
+      "model": "gemma4-26b-a4b",
+      "toolCalls": 1,
+      "textCharacters": 0
+    },
+    {
+      "caseId": "news-short-with-history",
+      "repeat": 1,
+      "expected": "luna",
+      "selected": "luna",
+      "passed": true,
+      "durationMs": 4687,
+      "model": "gemma4-26b-a4b",
+      "toolCalls": 1,
+      "textCharacters": 0
+    },
+    {
+      "caseId": "news-short-with-history",
+      "repeat": 2,
+      "expected": "luna",
+      "selected": "luna",
+      "passed": true,
+      "durationMs": 3136,
+      "model": "gemma4-26b-a4b",
+      "toolCalls": 1,
+      "textCharacters": 0
+    },
+    {
+      "caseId": "news-after-denial",
+      "repeat": 1,
+      "expected": "luna",
+      "selected": "luna",
+      "passed": true,
+      "durationMs": 3469,
+      "model": "gemma4-26b-a4b",
+      "toolCalls": 1,
+      "textCharacters": 0
+    },
+    {
+      "caseId": "news-after-denial",
+      "repeat": 2,
+      "expected": "luna",
+      "selected": "luna",
+      "passed": true,
+      "durationMs": 2432,
+      "model": "gemma4-26b-a4b",
+      "toolCalls": 1,
+      "textCharacters": 0
+    },
+    {
+      "caseId": "weather",
+      "repeat": 1,
+      "expected": "quick",
+      "selected": "quick",
+      "passed": true,
+      "durationMs": 2995,
+      "model": "gemma4-26b-a4b",
+      "toolCalls": 1,
+      "textCharacters": 0
+    },
+    {
+      "caseId": "weather",
+      "repeat": 2,
+      "expected": "quick",
+      "selected": "quick",
+      "passed": true,
+      "durationMs": 2223,
+      "model": "gemma4-26b-a4b",
+      "toolCalls": 1,
+      "textCharacters": 0
+    },
+    {
+      "caseId": "stock",
+      "repeat": 1,
+      "expected": "quick",
+      "selected": "quick",
+      "passed": true,
+      "durationMs": 2385,
+      "model": "gemma4-26b-a4b",
+      "toolCalls": 1,
+      "textCharacters": 0
+    },
+    {
+      "caseId": "stock",
+      "repeat": 2,
+      "expected": "quick",
+      "selected": "quick",
+      "passed": true,
+      "durationMs": 2222,
+      "model": "gemma4-26b-a4b",
+      "toolCalls": 1,
+      "textCharacters": 0
+    },
+    {
+      "caseId": "single-fact",
+      "repeat": 1,
+      "expected": "quick",
+      "selected": "quick",
+      "passed": true,
+      "durationMs": 2389,
+      "model": "gemma4-26b-a4b",
+      "toolCalls": 1,
+      "textCharacters": 0
+    },
+    {
+      "caseId": "single-fact",
+      "repeat": 2,
+      "expected": "quick",
+      "selected": "quick",
+      "passed": true,
+      "durationMs": 2202,
+      "model": "gemma4-26b-a4b",
+      "toolCalls": 1,
+      "textCharacters": 0
+    },
+    {
+      "caseId": "weather-comparison",
+      "repeat": 1,
+      "expected": "luna",
+      "selected": "luna",
+      "passed": true,
+      "durationMs": 2648,
+      "model": "gemma4-26b-a4b",
+      "toolCalls": 1,
+      "textCharacters": 0
+    },
+    {
+      "caseId": "weather-comparison",
+      "repeat": 2,
+      "expected": "luna",
+      "selected": "luna",
+      "passed": true,
+      "durationMs": 2692,
+      "model": "gemma4-26b-a4b",
+      "toolCalls": 1,
+      "textCharacters": 0
+    },
+    {
+      "caseId": "stock-analysis",
+      "repeat": 1,
+      "expected": "luna",
+      "selected": "luna",
+      "passed": true,
+      "durationMs": 2438,
+      "model": "gemma4-26b-a4b",
+      "toolCalls": 1,
+      "textCharacters": 0
+    },
+    {
+      "caseId": "stock-analysis",
+      "repeat": 2,
+      "expected": "luna",
+      "selected": "luna",
+      "passed": true,
+      "durationMs": 2539,
+      "model": "gemma4-26b-a4b",
+      "toolCalls": 1,
+      "textCharacters": 0
+    },
+    {
+      "caseId": "ordinary",
+      "repeat": 1,
+      "expected": "answer",
+      "selected": "answer",
+      "passed": true,
+      "durationMs": 1679,
+      "model": "gemma4-26b-a4b",
+      "toolCalls": 0,
+      "textCharacters": 10
+    },
+    {
+      "caseId": "ordinary",
+      "repeat": 2,
+      "expected": "answer",
+      "selected": "answer",
+      "passed": true,
+      "durationMs": 1478,
+      "model": "gemma4-26b-a4b",
+      "toolCalls": 0,
+      "textCharacters": 10
+    }
+  ]
+}

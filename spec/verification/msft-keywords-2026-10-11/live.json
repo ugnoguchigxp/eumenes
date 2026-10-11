@@ -1,0 +1,85 @@
+[
+  {
+    "question": "マイクロソフトの最新の株価を教えて",
+    "expectedPackage": "package:web.quick@1",
+    "operations": [
+      {
+        "operation": "lookup",
+        "query": "Microsoft stock price",
+        "language": "en",
+        "readPages": 0
+      }
+    ],
+    "runId": "67b052e6-f640-4fa3-a62b-e2d6e6612ce0",
+    "status": "completed",
+    "error": null,
+    "milliseconds": 39960,
+    "tasks": [
+      {
+        "id": "2cdb8d6d-b0bd-4cd8-917c-35f28d3b2745",
+        "kind": "worker",
+        "rootRunId": "67b052e6-f640-4fa3-a62b-e2d6e6612ce0",
+        "parentTaskId": "6a88d2b0-f988-45ea-9bb1-227779cc18bb",
+        "packageRevisionId": "package:web.quick@1",
+        "status": "failed",
+        "phase": "failed",
+        "modelCalls": 3,
+        "toolCalls": 1,
+        "errorCode": "invalid_tool_input",
+        "createdAt": "2026-10-11T02:41:29.732Z",
+        "deadlineAt": "2026-10-11T02:43:55.998Z",
+        "reportState": "none",
+        "acquisitionMode": null,
+        "toolOutcomes": [
+          {
+            "toolRevisionId": "tool:web.lookup@1",
+            "state": "failed",
+            "errorCode": "web_timeout",
+            "sourceCount": 0
+          }
+        ]
+      },
+      {
+        "id": "6a88d2b0-f988-45ea-9bb1-227779cc18bb",
+        "kind": "coordinator",
+        "rootRunId": "67b052e6-f640-4fa3-a62b-e2d6e6612ce0",
+        "parentTaskId": null,
+        "packageRevisionId": null,
+        "status": "completed",
+        "phase": "completed",
+        "modelCalls": 0,
+        "toolCalls": 0,
+        "errorCode": "invalid_tool_input",
+        "createdAt": "2026-10-11T02:41:29.732Z",
+        "deadlineAt": "2026-10-11T02:44:25.998Z",
+        "reportState": "none",
+        "acquisitionMode": null,
+        "toolOutcomes": []
+      }
+    ],
+    "report": null,
+    "answer": "申し訳ございません。情報の取得に失敗いたしました。マイクロソフトの最新の株価に関するデータにアクセスすることができませんでした。",
+    "verifierCalls": {
+      "n": 0
+    },
+    "totalModelCalls": 5,
+    "stages": {
+      "conversation": {
+        "calls": 1,
+        "milliseconds": 3717
+      },
+      "research": {
+        "calls": 3,
+        "milliseconds": 26902
+      },
+      "answer": {
+        "calls": 1,
+        "milliseconds": 4235
+      }
+    },
+    "models": [
+      "larm:gemma4-26b-a4b",
+      "aconn_epoch-e40e8711-2758-49a1-9d6f-6d5ab2221416_75ca78c3-32e2-4e90-a235-23e3de5150d9:gemma4-26b-a4b"
+    ]
+  }
+]

@@ -71,6 +71,9 @@ const fields = new Set([
 	"limitationsConsistent",
 	"supported",
 	"index",
+	"kind",
+	"requirementProfiles",
+	"researcher",
 ]);
 const types = new Set([
 	"string",

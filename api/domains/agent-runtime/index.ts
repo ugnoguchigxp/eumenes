@@ -4,6 +4,7 @@ export {
 	acquisitionMigration,
 	actionResultMigration,
 	requirementsMigration,
+	controlRepairMigration,
 } from "./repository";
 export * from "./contracts";
 export { registerAgentRuntime } from "./controller";

@@ -28,11 +28,16 @@ const draft = {
 test("unsupported extracted schema uses the shared single repair and cannot freeze or execute", async () => {
 	const h = await harness();
 	try {
-		await h.start("schema-repair", "調査");
+		await h.startHistory("schema-repair", "調査");
 		const c = h.agents.list("schema-repair").find((t) => t.kind === "worker")!;
 		await h.runRawModelStep(c.id, {
 			action: "finish",
-			requirements: [{ ...requirements[0], valueSchema: { type: "string" } }],
+			requirements: [
+				{
+					...requirements[0],
+					valueSchema: { type: "string", pattern: "unsupported" },
+				},
+			],
 			report: draft,
 		});
 		expect(h.task(c.id).json_repairs).toBe(1);
@@ -64,7 +69,7 @@ for (const field of [
 	test(`semantic rejection ${field} never adopts a pending draft or retries`, async () => {
 		const h = await harness();
 		try {
-			await h.start(field, "調査");
+			await h.startHistory(field, "調査");
 			const c = h.agents.list(field).find((t) => t.kind === "worker")!;
 			await h.runRawModelStep(c.id, {
 				action: "finish",
@@ -106,7 +111,7 @@ for (const field of [
 test("a structurally invalid first action rolls back frozen requirements with zero tool execution", async () => {
 	const h = await harness();
 	try {
-		await h.start("rollback", "調査");
+		await h.startHistory("rollback", "調査");
 		const c = h.agents.list("rollback").find((t) => t.kind === "worker")!;
 		await h.runRawModelStep(c.id, {
 			action: "invoke",
@@ -143,7 +148,7 @@ test("a structurally invalid first action rolls back frozen requirements with ze
 test("a pending draft is accepted only after one complete verification", async () => {
 	const h = await harness();
 	try {
-		await h.start("accept", "調査");
+		await h.startHistory("accept", "調査");
 		const c = h.agents.list("accept").find((t) => t.kind === "worker")!;
 		await h.runRawModelStep(c.id, {
 			action: "finish",
@@ -168,24 +173,25 @@ test("a pending draft is accepted only after one complete verification", async (
 test("R13 a valid deadline value backed by an opening-time excerpt is rejected by semantic verification", async () => {
 	const h = await harness();
 	try {
-		await h.start(
+		await h.startHistory(
 			"wrong-deadline",
 			"調査 https://example.org/fixtures/opening-time",
 		);
 		const c = h.agents.list("wrong-deadline").find((t) => t.kind === "worker")!;
-		await h.runRawModelStep(c.id, {
-			action: "invoke",
-			requirements,
-			tool: "web.read",
-			arguments: { url: "https://example.org/fixtures/opening-time" },
-		});
 		h.results.set(
-			"op1",
+			"history",
 			h.doc(
 				"受付開始は2026年10月12日09:00 JST。申込締切ではありません。",
 				"https://example.org/fixtures/opening-time",
 			),
 		);
+		await h.runRawModelStep(c.id, {
+			action: "invoke",
+			requirements,
+			tool: "history.search",
+			arguments: { query: "受付開始" },
+		});
+
 		await h.agents.reconcile();
 		const candidate = {
 			outcome: "answered" as const,

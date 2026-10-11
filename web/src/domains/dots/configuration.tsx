@@ -133,7 +133,7 @@ export function ProjectEditor({
 		[environment, setEnvironment] = useState(value?.environment ?? "local"),
 		[enabled, setEnabled] = useState(value?.enabled ?? true),
 		[capability, setCapability] = useState(
-			value?.capabilityRevisionId ?? "package:dots.orchestrate@1",
+			value?.capabilityRevisionId ?? "package:dots.orchestrate@2",
 		);
 	const [ops, setOps] = useState<Project["allowedOperations"]>(
 		value?.allowedOperations ?? ["read", "create_session", "edit", "check"],
@@ -188,7 +188,12 @@ export function ProjectEditor({
 					value={capability}
 					onChange={(e) => setCapability(e.target.value)}
 				>
-					<option value="package:dots.orchestrate@1">標準の調整担当</option>
+					<option value="package:dots.orchestrate@2">標準の調整担当</option>
+					{capability === "package:dots.orchestrate@1" && (
+						<option value="package:dots.orchestrate@1">
+							以前の調整担当（版1）
+						</option>
+					)}
 					{packages
 						.filter((p) => p.enabled)
 						.map((p) => (

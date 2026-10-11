@@ -1,0 +1,8 @@
+[
+  {
+    "operation": "lookup",
+    "query": "Microsoft stock price",
+    "language": "en",
+    "readPages": 0
+  }
+]

@@ -133,7 +133,8 @@ test("an out-of-scope model URL is rejected before fetching; a finite repair can
 			.list(run.id)
 			.find((t) => t.kind === "worker")!;
 		expect(child.status).toBe("completed");
-		expect(child.modelCalls).toBe(4);
+		// Search results return directly after repair, without a grading call.
+		expect(child.modelCalls).toBe(3);
 		expect(child.toolCalls).toBe(1);
 	} finally {
 		await h.close();
@@ -218,7 +219,7 @@ test("cursor/start conflict is refused with a precise, private repair hint, then
 			.list(run.id)
 			.find((t) => t.kind === "worker")!;
 		expect(child.toolCalls).toBe(4);
-		expect(child.modelCalls).toBe(7);
+		expect(child.modelCalls).toBe(6);
 	} finally {
 		await h.close();
 	}
@@ -390,7 +391,7 @@ test("R1/R2/R3: fetch once then find/read_saved obtains middle evidence and pare
 		await h.close();
 	}
 });
-test("R4/R5: mismatched first page advances to another candidate and a changed lookup within the original budget", async () => {
+test("R4/R5: mismatched first page cannot repeat the search beyond the current budget", async () => {
 	let lookups = 0;
 	const a = "https://example.com/wrong",
 		b = "https://example.com/right",
@@ -409,10 +410,11 @@ test("R4/R5: mismatched first page advances to another candidate and a changed l
 			() => invoke("web.lookup", { query: "集合時刻" }),
 			() => invoke("web.read", { url: a }),
 			() => invoke("web.lookup", { query: "大阪 10月10日 集合時刻" }),
-			() => invoke("web.read", { url: b }),
-			(d) => finish(d, keyword),
 		],
-		{ acquire, parent: () => keyword },
+		{
+			acquire,
+			parent: () => "取得した資料は対象と異なり、再検索予算がありません。",
+		},
 	);
 	try {
 		const run = await h.dialogue.submit({
@@ -424,12 +426,16 @@ test("R4/R5: mismatched first page advances to another candidate and a changed l
 			(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 }))?.status,
 		).toBe("completed");
 		h.assertConsumed();
-		expect(h.acquisitions).toBe(4);
-		expect(
-			h.toolchain.agents
-				.report(h.dialogue.get(run.id)!.agentTaskId!)!
-				.sources.map((s) => s.url),
-		).toEqual([b]);
+		expect(h.acquisitions).toBe(2);
+		const worker = h.toolchain.agents
+			.list(run.id)
+			.find((t) => t.kind === "worker")!;
+		expect(worker).toMatchObject({
+			status: "failed",
+			errorCode: "agent_budget_exhausted",
+			modelCalls: 3,
+		});
+		expect(h.dialogue.answerText(run.id)).not.toContain(keyword);
 	} finally {
 		await h.close();
 	}

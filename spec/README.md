@@ -8,6 +8,7 @@ archive の基準: 本文の実施記録や完了記述で全項目が完了と�
 
 | 文書 | 状態 |
 | --- | --- |
+| [web-search-target-2026-10-11.md](web-search-target-2026-10-11.md) | Web検索(web.quick@2・Luna web.search@1)の実装目標の正本。SystemContextの層構成、会話方針と公開ツールの一致、結果返却の必須規則、現行との差分G1〜G12と受入。計画・未着手 |
 | [dots-toolchain-agent-skill-implementation-plan-2026-10-10.md](dots-toolchain-agent-skill-implementation-plan-2026-10-10.md) | dots を統括担当にする製品統合計画。Session 委任、ブロッカー・再開・完了報告、担当／Skill 設定、次作業リマインドを設計。製品統合は未実装 |
 | [dots-script-mvp-implementation-plan-2026-10-10.md](dots-script-mvp-implementation-plan-2026-10-10.md) | 独立 MVP 実装済み。実 dots→回答保存→CLI 受信に成功。OAuth・恒久接続・製品統合は未実装。第18章と受入記録参照 |
 | [llm-native-remaining-domains-implementation-plan-2026-10-10.md](llm-native-remaining-domains-implementation-plan-2026-10-10.md) | Goals内容同一視の撤去とWorld保留入力保持を実装。Memoryは接続前条件の文書化のみ。fixture実施、live・実機器未達 |

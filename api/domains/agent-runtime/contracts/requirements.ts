@@ -11,7 +11,9 @@ export const requestRequirement = z
 		id: z.string().regex(/^r[1-9][0-9]*$/),
 		statement: z.string().min(1).max(500),
 		requestQuote: z.string().min(1).max(512),
-		valueSchema: jsonSchema,
+		valueSchema: jsonSchema.describe(
+			"requirementsの限定JSON Schemaに従う。stringのminLength/maxLengthは必要な長さの条件がある場合だけ指定する非負整数、arrayのmaxItemsは必須、objectのadditionalPropertiesはfalse。入れ子にも適用。",
+		),
 	})
 	.strict();
 export type RequestRequirement = z.infer<typeof requestRequirement>;

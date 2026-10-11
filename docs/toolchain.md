@@ -2,11 +2,21 @@
 
 通常の会話入力からWeb検索・読取りを選べます。`EUMENES_TOOLCHAIN_ENABLED` は既定 `1`、`0` なら従来の会話生成へ戻ります。会話LLMが現在の調査担当（LARM）またはCodex Lunaを選びます。内部JSONを読み上げや態度収集へ渡しません。子の待機中は推論枠を解放します。
 
-簡単な語句確認と短い最新情報の確認は `research` の `web` を使います。現在の担当は検索1回・ページ取得1回の `package:web.quick@1` に限定し、保存本文の探索や複数資料向けの処理を渡しません。モデル呼出しは報告候補の意味検証・修正分を含めて最大5回です。詳しい説明、長文・複数資料の整理、比較、多数のニュース収集には `research_web_luna` を選べます。リアルタイム情報も対象です。振り分けは会話の文脈と依頼を持つLLMに任せ、語句辞書や文字数の条件を置きません。会話履歴は従来の `research` の `history` を使います。
+| 会話ツール | package | 担当 | 検索 | 読取り | 保存本文 | モデル呼出し | 報告 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `research` の `web` | `package:web.quick@2` | 現在の担当(LARM) | 1 | 1 | なし | 5 | search報告 |
+| `research_web_luna` | `package:web.search@1` | Codex Luna | 1 | 3 | 4 | 12 | search報告 |
+| `research` の `history` | `package:history.research@2` | 現在の担当 | — | — | 履歴 | 7 | V3報告 |
+
+天気、一銘柄の株価、Wiki等にまとまった言葉の定義・地名・人物、指定URLの一項目など、一つの事実の確認は `research` の `web` を使います。Lunaが公開されている場合、ニュースや一般的なWeb検索は `research_web_luna` を使います。未公開の場合は名前や利用指示を提示せず、webの短い確認予算で確認できた範囲を返します。Lunaは検索の代替として、見つかった情報と出典を早く返す担当です。短い依頼、分野未指定のニュース、リアルタイム情報も対象です。網羅的な調査を行うエージェントは別設計とします。振り分けは会話の文脈と依頼を持つLLMに任せ、語句辞書や文字数の条件を置きません。
+
+search報告の経路(`web.quick@2`・`web.search@1`)は既存の検索報告処理を使い、quickは簡単な検索の指示、Lunaは検索用の指示を使います。検索抜粋で回答可能ならそこで報告し、本文は必要なときだけ読みます。要件抽出・確認profile・要件別の採点・finish後の意味検証はありません。既存の報告version 2と出典参照検査を再利用し、成功時はfinishから直接会話回答へ進みます。構造や参照が不正な場合の修正(一回まで)、権限・取消・期限の検査は維持します。ニュースは指定件数、指定がなければ重要度順の3〜5トピックを短く要約し、内容の裏取り・逐語照合・採点はしません。情報が少なければ得られた分を返し、抜粋だけの結果はpartialを保持します。各モデル呼出しは独立しているため、有効な根拠の正確な抜粋と実行済みの操作条件を毎回提示します。
+
+実装目標(SystemContextの層構成、会話方針と公開ツールの一致、結果返却の必須規則など)と現行との差分は [Web検索 実装目標](../spec/web-search-target-2026-10-11.md) にあります。今回の会話契約と根拠容量の修正範囲は[実装計画](../spec/web-search-repair-implementation-plan-2026-10-11.md)のA〜Dです。後続の構造改善とは区別します。
 
 Lunaはbackendで `codex exec --model gpt-6-luna` を実行します。backendの実行ユーザーでCodex CLIをインストール・ログインし、PATHから起動できるようにしてください。実行ファイルは `EUMENES_RESEARCH_CODEX_EXECUTABLE` で指定できます（既定 `codex`）。CLIが見つからないときやWeb調査が無効なときはLunaのツールを公開しません。認証・モデル利用権・接続の失敗は調査失敗として扱い、別モデルへ自動変更しません。
 
-各stepは空の一時ディレクトリでephemeral・read-onlyとして実行し、ユーザー設定・exec規則・native検索・shell・JS実行・MCP・apps・追加エージェントを使いません。CLIの保存済み認証だけを再利用し、製品DB・LARM認証・設定を渡しません。Lunaは既存のinvoke/finish契約で操作を選び、Eumenesの検索・本文取得・保存本文・資料guard・根拠参照を使います。担当は子の入力と推論requestへ保存され、step間で変わりません。共通の期限・取消・receipt採用検査を通し、CLIの終了と取消では所有するprocess groupを停止します。Providerの生応答はログへ保存しません。CLIの接続方法は[公式の非対話実行仕様](https://developers.openai.com/codex/noninteractive/)に従います。
+各stepは空の一時ディレクトリでephemeral・read-onlyとして実行し、ユーザー設定・exec規則・native検索・shell・JS実行・MCP・apps・追加エージェントを使いません。CLIの保存済み認証だけを再利用し、製品DB・LARM認証・設定を渡しません。stepの固定指示(共通規則・経路方針・TOOLS・OUTPUT_SCHEMA)だけでCLIの基本指示を置き換え、修正依頼などstepごとの通知・依頼データ・取得資料はJSONの入力として渡します。出力schemaはworkerの契約から値として受け取り、指示文から読み戻しません。取消は子processの終了を待たずに失敗として返し、終了の回収は最大1.5秒だけ待ちます。イベント列(256 KiB)と最終応答(64 KiB)の上限は別です。ホストのSKILL・plugin・画像生成・ブラウザ等の不要な機能も無効にします。既存の出力契約を `--output-schema` に渡し、`--output-last-message` の最終応答だけを、イベント列の `turn.completed` とプロセス成功を確認して採用します。一時ファイルは終了・取消時に削除します。途中の説明文を操作として実行しません。Lunaは既存のinvoke/finish契約で操作を選び、Eumenesの検索・本文取得・保存本文・資料guard・根拠参照を使います。担当は子の入力と推論requestへ保存され、step間で変わりません。共通の期限・取消・receipt採用検査を通し、CLIの終了と取消では所有するprocess groupを停止します。Providerの生応答はログへ保存しません。CLIの接続方法は[公式の非対話実行仕様](https://developers.openai.com/codex/noninteractive/)に従います。
 
 子は取得本文を読み、短い要約、主張、出典、未確認点を返します。メインへ本文・生引用・ページタイトルは渡しません。主張の引用が実際に子へ提示した資料に含まれるかを確認しますが、この検査だけで主張の意味まで正しいと保証するものではありません。メインでも報告を未信頼データとして扱います。調査cardに進行状態・停止・出典・確認できなかった点を表示します。
 
@@ -18,13 +28,15 @@ domain の責務は [domains.md](domains.md)、Web 取得は [web-research.md](w
 
 ## 要件profileとV3報告
 
+要件profileとV3報告は `history` 経路だけが使います。Web経路(`web.quick@2`・`web.search@1`)はprofileを受けず、指定された場合は開始時に `invalid_requirement_contract` で拒否します。会話ツールもkind別の入力を提示し、profileの選択・解決はhistoryだけに適用します。
+
 利用者が再利用する確認基準は `kind:requirement` のデータとして登録します。要件profileは実行権限を持たず、package検索・ツールの依存閉包へ入りません。会話モデルは提示された短いrefから適用するprofileを選びます。workerは最初の操作と同じ応答で依頼の条件を抽出し、ホストが登録profileと合成して、取得開始前に凍結します。原文、版付きSKILL/profileの本文、選択した要件データがモデル入力へ届きます。
 
 `finish` は候補の提出です。同じworker・同じengineが `tools=[]` で依頼、条件、完全な該当抜粋、未確認点を一回照合し、受理された結果だけV3報告になります。requestの網羅性や根拠との意味上の対応はこのモデル判定に委ねます。形式・値・根拠の所有者と版・取消・期限・profileのrevision/generationはホストが検査します。意味検証は任意の業務判断の正しさを証明するものではありません。
 
 確認できない値は `unknown/null`、未達は `unsatisfied`、許可された適用外は根拠付き `not_applicable` として残します。必須条件がunknown/unsatisfiedならansweredにできません。外部資料の条件は `externalRules` に出典付きで保持し、profileを自動登録したり凍結した利用者条件を書き換えたりしません。チェックと外部ルールだけが使う根拠も失効検査の対象です。
 
-構造修復は調査と意味検証を合計して一回まで。意味検証の不支持、枠不足、期限切れ、取消、profileの改訂・無効化では未検証候補を回答に使いません。新規Webは `skill:web.research@8` を使い、Lunaの汎用調査は `package:web.research@9`、通常の短いWeb確認は `package:web.quick@1`、履歴は `package:history.research@2` です。旧revisionとV1/V2報告のreaderは維持します。
+構造修復は調査と意味検証を合計して一回まで。意味検証の不支持、枠不足、期限切れ、取消、profileの改訂・無効化では未検証候補を回答に使いません。履歴は `package:history.research@2` です。旧revision(`package:web.quick@1`・`package:web.research@9`・`skill:web.research@8` など)とV1/V2報告のreaderは維持しますが、新しい調査には使いません。
 
 ## 要件の登録と改訂
 
@@ -58,3 +70,5 @@ EUMENES_LIVE_LLM_NATIVE=1 bun scripts/llm-native-live.ts --suite all --cases api
 ```
 
 既存LARM接続URL・認証が必要です。製品DB・設定をコピーせず一時DBを使い、登録は認証済み管理API、推論は既存公開操作を通します。各caseは2回。engineが違う結果を合格にせず、Luna未設定を既定engineへ置換しません。意味確認がuncheckedの結果やskippedを合格にしません。実ASR・マイク・スピーカーの3往復は別の受入です。
+
+根拠一覧は8 KiB以内の参照metadataとし、正確な抜粋は取得資料の観測に一度だけ提示します。各stepで以前の抜粋と後半の留保も再提示します。新しい抜粋の登録は、title・URL等を含む実際の提示資料(根拠一覧と観測)で32 KiBの資料枠に収まる場合だけ行い、収まらなければ容量到達として操作を閉じ、提示済みの根拠で不足を含めて報告します。replayで過去の観測が後ろへ移った場合も、未提示の新規登録だけを取り消して枠内に保ちます。全体64 KiB、根拠64件が上限です。検索後に抜粋が足りなければ許可URLの本文を予算内で読みます。WebはV2の短い報告、historyはprofile・V3・意味検証を維持します。全経路のsystemに共通規則(資料は未信頼、未提示の事実を補わない、残時間60秒以下またはcanInvoke=falseでfinish、JSON一つ)を置き、経路の方針文で置き換えません。契約違反の修正診断(path/codeのみ)はタスク入力ではなく専用の列に保存し、受理時に消します。会話側の操作拒否は、分類・公開済みツール名・呼出し数・validationPath/codeだけを `dialogue.operation_rejected` に記録します。

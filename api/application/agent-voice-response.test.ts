@@ -40,7 +40,7 @@ test("silence completes without creating a dialogue, cancelling another run or s
 for (const options of [
 	{ badJson: true },
 	{ badQuote: true },
-	{ lookupTimeoutOnce: true, workerReportOutput: '{"action":' },
+	{ workerReportOutput: '{"action":' },
 ])
 	test(`failed research generates and adopts the agent's response before TTS: ${JSON.stringify(options)}`, async () => {
 		const lines: string[] = [];
@@ -88,9 +88,10 @@ for (const options of [
 				dataMessage.content.slice(dataMessage.content.indexOf("{")),
 			);
 			expect(data.report.researchProgress.verifiedReport).toBe(false);
-			if (options.lookupTimeoutOnce) {
+			if (options.workerReportOutput) {
+				// One search within budget, then the malformed report fails twice.
 				expect(data.report.researchProgress).toMatchObject({
-					searchAttempts: 2,
+					searchAttempts: 1,
 					searchesSucceeded: 1,
 					readAttempts: 1,
 					readsSucceeded: 1,

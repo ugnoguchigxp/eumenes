@@ -1,0 +1,40 @@
+[
+  {
+    "action": "invoke",
+    "tool": "web.lookup",
+    "schemaSummary": [
+      {
+        "type": "object",
+        "keys": [
+          "type",
+          "properties",
+          "required",
+          "additionalProperties"
+        ],
+        "maxLengthPresent": false,
+        "maxItemsPresent": false,
+        "additionalProperties": false
+      }
+    ],
+    "parsedJson": true
+  },
+  {
+    "action": "invoke",
+    "tool": "web.lookup",
+    "schemaSummary": [
+      {
+        "type": "object",
+        "keys": [
+          "type",
+          "properties",
+          "required",
+          "additionalProperties"
+        ],
+        "maxLengthPresent": false,
+        "maxItemsPresent": false,
+        "additionalProperties": false
+      }
+    ],
+    "parsedJson": true
+  }
+]

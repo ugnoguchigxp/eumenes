@@ -7,8 +7,12 @@ import { get, update } from "../repository";
 import { workerContext } from "./context";
 import { parseControlOutput, safeCode } from "./control-output";
 import { EvidenceCatalog } from "./evidence-catalog";
-import { modelLimit } from "./exploration";
-import { researchAction, firstResearchAction } from "./research-contract";
+import { modelLimit, returnsSearchResults } from "./exploration";
+import {
+	researchAction,
+	firstResearchAction,
+	searchAction,
+} from "./research-contract";
 import { readRequirements } from "./requirements";
 import { prepareRequirementVerification } from "./requirement-verification";
 import { STEP_KIND, active, type RuntimeContext } from "./runtime-context";
@@ -72,6 +76,7 @@ export function createStepHandler(ctx: RuntimeContext, ops: TaskOps) {
 					throw new Error("capability_ref_invalid");
 				capabilities.validateInTransaction(db, p);
 				const obs = tools.observationsInTransaction(db, t.id);
+				const invocations = tools.invocationsInTransaction(db, t.id);
 				// A replay must present the requested result again, even if newer results exist.
 				const latest = obs.findIndex((o) => o.invocationId === t.invocation_id);
 				if (latest >= 0) obs.push(...obs.splice(latest, 1));
@@ -80,7 +85,8 @@ export function createStepHandler(ctx: RuntimeContext, ops: TaskOps) {
 					t.phase === "verify_requirements"
 						? "verify_requirements"
 						: "research";
-				const frozen = readRequirements(db, t, capabilities);
+				const search = returnsSearchResults(p);
+				const frozen = search ? null : readRequirements(db, t, capabilities);
 				const profiles = (JSON.parse(t.input_json ?? "{}")
 					.requirementProfiles ?? []) as ProfileSnapshot[];
 				capabilities.validateRequirementProfilesInTransaction(db, profiles);
@@ -100,9 +106,12 @@ export function createStepHandler(ctx: RuntimeContext, ops: TaskOps) {
 								catalog.full ? [] : usableTools(db, t, true),
 								obs.flatMap((o) => o.sources),
 								obs.map((o) => ({
-									tool: tools
-										.invocationsInTransaction(db, t.id)
-										.find((i) => i.id === o.invocationId)?.toolRevisionId,
+									tool: invocations
+										.find((i) => i.id === o.invocationId)
+										?.toolRevisionId.replace(/^tool:/, "")
+										.replace(/@\d+$/, ""),
+									arguments: invocations.find((i) => i.id === o.invocationId)
+										?.arguments,
 									state: o.state,
 									errorCode: "errorCode" in o ? o.errorCode : null,
 									failures: o.failures,
@@ -131,12 +140,14 @@ export function createStepHandler(ctx: RuntimeContext, ops: TaskOps) {
 					input: {
 						catalog,
 						mode,
+						search,
 						first: !frozen,
 						taskId: t.id,
 						stepId: claim.payload.stepId,
 						revision: current.revision,
 						requestId,
 						messages: context.messages,
+						control: "control" in context ? context.control : undefined,
 						visible: context.visible ?? [],
 						manifestDigest: context.manifestDigest,
 						grants: context.grants,
@@ -152,6 +163,7 @@ export function createStepHandler(ctx: RuntimeContext, ops: TaskOps) {
 				input.requestId,
 				input.messages,
 				signal,
+				input.control,
 			);
 			return { receipt, ...parseControlOutput(receipt.value) };
 		},
@@ -201,9 +213,11 @@ export function createStepHandler(ctx: RuntimeContext, ops: TaskOps) {
 			const parsed = (
 				input.mode === "verify_requirements"
 					? requirementVerification
-					: input.first
-						? firstResearchAction
-						: researchAction
+					: input.search
+						? searchAction
+						: input.first
+							? firstResearchAction
+							: researchAction
 			).safeParse(outcome.result.action);
 			if (outcome.result.invalid || !parsed.success) {
 				rejectInvalidControl(db, t, claim, input, outcome, parsed);

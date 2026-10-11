@@ -1,0 +1,75 @@
+[
+  {
+    "time": "2026-10-11T02:41:46.719Z",
+    "durationMs": 5003,
+    "event": "queue.execution_failed",
+    "errorFrames": [
+      "/Users/y.noguchi/Code/eumenes/api/domains/web-research/service/index.ts:259:15",
+      "/Users/y.noguchi/Code/eumenes/api/domains/queue/service/runner.ts:486:28"
+    ]
+  },
+  {
+    "time": "2026-10-11T02:41:46.720Z",
+    "runId": "35242abe-9bac-4cf8-a7a4-40b66e95cecc",
+    "status": "failed",
+    "reason": "web_timeout",
+    "event": "web.failed"
+  },
+  {
+    "time": "2026-10-11T02:41:46.721Z",
+    "runId": "67b052e6-f640-4fa3-a62b-e2d6e6612ce0",
+    "taskId": "2cdb8d6d-b0bd-4cd8-917c-35f28d3b2745",
+    "status": "failed",
+    "reason": "web_timeout",
+    "event": "agent.tool_failed"
+  },
+  {
+    "time": "2026-10-11T02:41:54.397Z",
+    "runId": "67b052e6-f640-4fa3-a62b-e2d6e6612ce0",
+    "taskId": "2cdb8d6d-b0bd-4cd8-917c-35f28d3b2745",
+    "repairAttempt": 0,
+    "status": "repair_scheduled",
+    "reason": "control_schema_invalid",
+    "event": "agent.control_rejected"
+  },
+  {
+    "time": "2026-10-11T02:41:54.397Z",
+    "runId": "67b052e6-f640-4fa3-a62b-e2d6e6612ce0",
+    "taskId": "2cdb8d6d-b0bd-4cd8-917c-35f28d3b2745",
+    "repairAttempt": 0,
+    "status": "repair_scheduled",
+    "reason": "control_schema_invalid",
+    "validationPath": "$",
+    "validationCode": "unrecognized_keys",
+    "event": "agent.control_validation_issue"
+  },
+  {
+    "time": "2026-10-11T02:42:01.696Z",
+    "runId": "67b052e6-f640-4fa3-a62b-e2d6e6612ce0",
+    "taskId": "2cdb8d6d-b0bd-4cd8-917c-35f28d3b2745",
+    "repairAttempt": 1,
+    "status": "failed",
+    "reason": "invalid_tool_input",
+    "event": "agent.control_rejected",
+    "errorFrames": [
+      "/Users/y.noguchi/Code/eumenes/api/domains/agent-runtime/service/step-actions.ts:183:16",
+      "/Users/y.noguchi/Code/eumenes/api/domains/agent-runtime/service/step-handler.ts:225:5",
+      "/Users/y.noguchi/Code/eumenes/api/domains/queue/service/runner.ts:236:13",
+      "/Users/y.noguchi/Code/eumenes/api/domains/queue/service/runner.ts:554:5",
+      "/Users/y.noguchi/Code/eumenes/api/domains/queue/service/runner.ts:288:12",
+      "/Users/y.noguchi/Code/eumenes/api/infrastructure/sqlite/index.ts:308:20",
+      "/Users/y.noguchi/Code/eumenes/api/infrastructure/sqlite/index.ts:314:6"
+    ]
+  },
+  {
+    "time": "2026-10-11T02:42:01.696Z",
+    "runId": "67b052e6-f640-4fa3-a62b-e2d6e6612ce0",
+    "taskId": "2cdb8d6d-b0bd-4cd8-917c-35f28d3b2745",
+    "repairAttempt": 1,
+    "status": "failed",
+    "reason": "invalid_tool_input",
+    "validationPath": "tool",
+    "validationCode": "unknown_tool",
+    "event": "agent.control_validation_issue"
+  }
+]

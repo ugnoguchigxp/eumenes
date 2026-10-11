@@ -1,11 +1,19 @@
-valueSchemaは限定したJSON Schemaです。各nodeのtypeはobject/array/string/number/integer/boolean/nullの単一文字列にします。共通keywordはtype、description（500文字以内）、primitiveのenum（同じ型の値1〜32件）だけです。
-- object: properties（最大32件）、required（propertiesに存在する重複なしの名前）、additionalProperties:false。property名は1〜64文字。__proto__/prototype/constructorは使いません。
-- array: itemsとmaxItems（0〜32）が必須、minItemsは任意でmaxItems以下。
-- string: maxLength（0〜2000）が必須、minLengthは任意でmaxLength以下。formatはdate/date-time/uriだけ。日時はtype:stringにformat:date-timeを付け、UTCのZ表記を使います。
-- number/integer: 任意のminimum/maximumは有限数でminimum<=maximum。
-- boolean/null: type以外は共通keywordだけ。
-pattern、$ref、const、anyOf、oneOf、型の配列など、上記以外のkeywordは使いません。schema全体は4096 bytes以内、深さ6以下、node128以下です。
+初回のrequirementsには原文の依頼要件だけを抽出し、登録profileを複製しません。requestQuoteはoriginalRequestの連続する本文をそのまま引用します。依頼要件と全profile要件の合計は12件以内。初回からfinishする場合、依頼要件のr1、r2…に加え、revisionId昇順のprofileをp1、p2…としてp1.<localId>形式の全IDにcheckを返します。凍結後はrequirementContract.requirementsの全IDを使います。
 
-初回のrequirementsは原文から抽出する依頼要件だけで、登録profileの要件を複製しません。requestQuoteはoriginalRequestから連続する本文をそのまま引用します。依頼要件と全profile要件の合計は12件以内。依頼要件はr1から連番。profile要件はrevisionId昇順のprofileにp1、p2…を割り当て、IDをp1.<localId>の形式にします。初回からfinishする場合も、この全IDにcheckが必要です。凍結後はrequirementContract.requirementsにある全IDを正確に使います。
+valueSchemaは値を表す最小の型と必要な制約だけにします。以下の限定JSON Schemaを入れ子にも適用し、列挙外のkeywordは使いません。全体4096 bytes・深さ6・128 node以内です。
 
-finishのchecksは契約の全要件に一件ずつ、重複・欠落なしで返します。valueはその要件のvalueSchemaを満たすJSON値であり、説明文章やschemaそのものではありません。satisfiedは根拠が必須。unsatisfiedも根拠が必要で、valueはschemaに合う値かnull。unknownはvalue:null、確認できない理由を記します。not_applicableはallowNotApplicable:trueの要件だけに使い、value:nullと根拠を返します。requiredのunknown/unsatisfiedがある場合はansweredにしません。任意要件のunknown/unsatisfiedもlimitationsで説明します。値や根拠を補って成功扱いにしません。
+- type: object/array/string/number/integer/boolean/nullのいずれかの単一文字列。任意のdescriptionは500文字以内、enumはobject/array以外で同じ型の値1〜32件。
+- object: properties（最大32件）とadditionalProperties:falseが必須。requiredは任意で、propertiesにある名前を重複なく指定。property名は1〜64文字で、__proto__/prototype/constructorは禁止。
+- array: itemsとmaxItems（0〜32の整数）が必須。minItemsは任意の非負整数でmaxItems以下。
+- string: minLength/maxLengthは依頼に長さの条件がある場合だけ指定する非負整数で、下限は上限以下。任意のformatはdate/date-time/uri。日時はstringのdate-timeでUTCのZ表記。
+- number/integer: 任意のminimum/maximumは有限数で、下限は上限以下。
+- boolean/null: type、description、enumのみ。
+
+finishのchecksは全要件に一件ずつ返し、valueにはschemaではなく取得した値を入れます。
+
+- satisfied: 条件を満たす根拠と、valueSchemaに合う値。
+- unsatisfied: 条件を満たさない根拠と、valueSchemaに合う値またはnull。
+- unknown: 判断する情報が不足。value:nullと不足の理由。
+- not_applicable: allowNotApplicable:trueで適用外と確認できる場合だけ。value:nullと根拠。
+
+unknown/unsatisfiedは任意要件もlimitationsで説明し、必須要件に残ればansweredにしません。値や根拠を補って成功扱いにしません。

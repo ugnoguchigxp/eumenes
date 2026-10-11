@@ -1,6 +1,7 @@
 import type { DraftReport } from "../contracts/requirements";
 /** Test-only model stub. It exercises host contracts, not semantic accuracy. */
 export function fixtureResearchOutput(data: any, raw: string) {
+	if (data.reportMode === "search") return raw;
 	let action: any;
 	try {
 		action = JSON.parse(raw);

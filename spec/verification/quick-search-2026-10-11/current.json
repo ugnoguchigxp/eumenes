@@ -1,0 +1,6 @@
+{
+  "caseIndex": 1,
+  "question": "マイクロソフトの最新の株価を教えて",
+  "expectedPackage": "package:web.quick@2",
+  "runId": "6648fec4-6afd-46ff-a549-7193e49877c7"
+}

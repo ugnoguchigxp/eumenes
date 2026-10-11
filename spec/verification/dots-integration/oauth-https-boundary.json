@@ -1,0 +1,37 @@
+{
+  "checkedAt": "2026-10-10T21:47:13.801Z",
+  "connectionRef": "dots-live-20261011",
+  "expiresAt": "2026-10-10T23:27:35.712Z",
+  "checks": [
+    {
+      "path": "/.well-known/oauth-authorization-server",
+      "status": 200,
+      "challenge": false
+    },
+    {
+      "path": "/.well-known/oauth-protected-resource/mcp/dots/dots-live-20261011",
+      "status": 200,
+      "challenge": false
+    },
+    {
+      "path": "/mcp/dots/dots-live-20261011",
+      "status": 401,
+      "challenge": true
+    },
+    {
+      "path": "/api/dots/configuration",
+      "status": 404,
+      "challenge": false
+    },
+    {
+      "path": "/pending",
+      "status": 404,
+      "challenge": false
+    },
+    {
+      "path": "/approve",
+      "status": 404,
+      "challenge": false
+    }
+  ]
+}

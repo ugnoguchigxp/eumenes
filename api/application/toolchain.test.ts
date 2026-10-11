@@ -178,7 +178,6 @@ test("general research exposes available tools without a host invocation recomme
 		);
 		expect(tools.map((tool: { id: string }) => tool.id)).toEqual([
 			"web.lookup",
-			"web.read",
 		]);
 		expect(JSON.parse(messages[1].content).nextInvocation).toBeUndefined();
 		expect(h.acquisitions).toBe(2);
@@ -387,7 +386,7 @@ test("invalid tool arguments are repaired once; no acquisition occurs until the 
 			.find((t) => t.kind === "worker")!;
 		expect(child.status).toBe("completed");
 		expect(child.toolCalls).toBe(2);
-		expect(child.modelCalls).toBe(5);
+		expect(child.modelCalls).toBe(4);
 		expect(h.acquisitions).toBe(2);
 	} finally {
 		await h.close();
@@ -632,8 +631,12 @@ test("CLI reads catalogue, task and summary through the authenticated API", asyn
 			const text = await new Response(proc.stdout).text();
 			expect(await proc.exited).toBe(0);
 			const value = JSON.parse(text);
-			if (args[0] === "capabilities") expect(value.items).toHaveLength(4);
-			else if (args[0] === "task-report")
+			if (args[0] === "capabilities") {
+				expect(value.items).toHaveLength(5);
+				expect(
+					value.items.some((v: { id: string }) => v.id === "web.search"),
+				).toBe(true);
+			} else if (args[0] === "task-report")
 				expect(value.summary).toContain("250.12");
 			else expect(value.status).toBe("completed");
 		}
@@ -677,7 +680,7 @@ test("a mismatched quote is rejected and repaired once using the same observatio
 			.list(run.id)
 			.find((t) => t.kind === "worker")!;
 		expect(child.status).toBe("completed");
-		expect(child.modelCalls).toBe(5);
+		expect(child.modelCalls).toBe(4);
 		expect(h.acquisitions).toBe(2);
 		expect(h.dialogue.answerText(run.id)).toContain("26度");
 		expect(

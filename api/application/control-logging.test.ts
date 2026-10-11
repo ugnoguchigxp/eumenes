@@ -59,13 +59,9 @@ test("an unknown tool name invokes nothing and receives one bounded correction",
 	}
 });
 
-test("search timeout, successful retry and malformed report are correlated and separately diagnosed", async () => {
+test("a search timeout is correlated across agent, web and queue and is not searched again", async () => {
 	const output = capture();
-	const h = await harness({
-		fullResearch: true,
-		lookupTimeoutOnce: true,
-		workerReportOutput: '{"action":',
-	});
+	const h = await harness({ fullResearch: true, lookupTimeoutOnce: true });
 	try {
 		const r = await run(h);
 		const rows = output.entries();
@@ -87,6 +83,32 @@ test("search timeout, successful retry and malformed report are correlated and s
 					entry.event === "queue.settled" && entry.jobId === failed.jobId,
 			),
 		).toMatchObject({ reason: "web_timeout", status: "failed" });
+		// The search budget is one call; a failed search is reported, not repeated.
+		expect(h.acquisitions).toBe(1);
+		expect(rows.some((entry) => entry.event === "agent.tool_completed")).toBe(
+			false,
+		);
+		const text = output.lines.join("");
+		for (const secret of [
+			forbidden,
+			"PRIVATE_REQUEST",
+			"fixture-token-for-toolchain",
+		])
+			expect(text).not.toContain(secret);
+	} finally {
+		await h.close();
+	}
+});
+
+test("a malformed report after a successful read is diagnosed once per attempt without private text", async () => {
+	const output = capture();
+	const h = await harness({
+		fullResearch: true,
+		workerReportOutput: '{"action":',
+	});
+	try {
+		const r = await run(h);
+		const rows = output.entries();
 		const completed = rows.find(
 			(entry) =>
 				entry.event === "agent.tool_completed" &&
@@ -105,7 +127,7 @@ test("search timeout, successful retry and malformed report are correlated and s
 		expect(rejected).toHaveLength(2);
 		expect(rejected[0]).toMatchObject({
 			runId: r.id,
-			taskId: failed.taskId,
+			taskId: completed.taskId,
 			controlSchema: "worker",
 			reason: "control_json_syntax",
 			validationCode: "unexpected_end",
@@ -160,17 +182,17 @@ test("valid JSON with a missing report field records the field and expected type
 			.find(
 				(entry) =>
 					entry.event === "agent.control_validation_issue" &&
-					entry.validationPath === "requirements",
+					entry.validationPath === "report.summary",
 			);
 		expect(issue).toMatchObject({
 			runId: r.id,
 			reason: "control_schema_invalid",
 			validationCode: "invalid_type",
-			expectedType: "array",
+			expectedType: "string",
 			actualType: "undefined",
 			controlAction: "finish",
-			issueCount: 5,
-			reportedIssueCount: 5,
+			issueCount: 2,
+			reportedIssueCount: 2,
 		});
 		expect(
 			output
@@ -207,7 +229,7 @@ for (const options of [{ badToolArgs: true }, { badQuote: true }])
 								entry.validationPath === "arguments.query" &&
 								entry.expectedType === "string"
 							: entry.reason === "invalid_evidence" &&
-								entry.validationPath === "report.evidence" &&
+								entry.validationPath === "report.claims.0.evidence.0" &&
 								entry.validationCode === "unknown_evidence"),
 				),
 			).toBe(true);

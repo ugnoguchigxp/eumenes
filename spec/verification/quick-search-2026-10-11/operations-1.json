@@ -1,0 +1,9 @@
+[
+  {
+    "operation": "lookup",
+    "query": "Microsoft stock price MSFT",
+    "language": "en",
+    "region": "US",
+    "readPages": 0
+  }
+]

@@ -22,6 +22,7 @@ import {
 import {
 	acquisitionMigration,
 	requirementsMigration,
+	controlRepairMigration,
 	createAgentRuntime,
 	migration as agentMigration,
 	type Task,
@@ -74,8 +75,9 @@ export async function harness(now = Date.now, luna = false) {
 		agentMigration,
 		acquisitionMigration,
 		requirementsMigration,
+		controlRepairMigration,
 	]);
-	const caps = createCapabilities(store);
+	const caps = createCapabilities(store, new Set(["web", "history"]));
 	await caps.seed();
 	await store.write((db) => {
 		for (const d of learnedPair()) caps.registerLearnedInTransaction(db, d);
@@ -89,6 +91,15 @@ export async function harness(now = Date.now, luna = false) {
 	}> = [];
 	const results = new Map<string, AdapterOperation>();
 	const adapter: ToolAdapter = {
+		localInTransaction: (_db, r) => {
+			started.push({ toolId: r.tool.id, args: r.arguments });
+			return (
+				results.get("history") ?? {
+					state: "failed",
+					errorCode: "fixture_history_missing",
+				}
+			);
+		},
 		prepareSourcesInTransaction: (_db, _inv, result) => ({
 			sources: result.readings ?? [
 				...result.hits.map((h) => ({
@@ -168,11 +179,12 @@ export async function harness(now = Date.now, luna = false) {
 		runId: string,
 		question = "天気予報 鎌倉",
 		researcher?: "codex_luna",
+		kind: "web" | "history" = "web",
 	) =>
 		store.write((db) =>
 			agents.startInTransaction(db, {
 				rootRunId: runId,
-				input: { kind: "web", question, researcher },
+				input: { kind, question, researcher },
 				deadline: Date.now() + 120_000,
 			}),
 		);
@@ -222,6 +234,11 @@ export async function harness(now = Date.now, luna = false) {
 		) as { contract_json: string } | null;
 		const t = task(taskId),
 			data = {
+				reportMode: ["package:web.quick@2", "package:web.search@1"].includes(
+					t.package_revision_id ?? "",
+				)
+					? "search"
+					: undefined,
 				task: JSON.parse(t.input_json!),
 				originalRequest:
 					JSON.parse(t.input_json!).originalRequest ??
@@ -280,6 +297,8 @@ export async function harness(now = Date.now, luna = false) {
 		engines,
 		task,
 		start,
+		startHistory: (runId: string, question: string) =>
+			start(runId, question, undefined, "history"),
 		runModelStep,
 		runRawModelStep,
 		doc,

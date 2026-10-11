@@ -56,6 +56,8 @@ export function createStartTask(ctx: RuntimeContext, ops: TaskOps) {
 					!inference.codexResearchAvailable?.())
 			)
 				throw new Error("codex_research_unavailable");
+			if (request.kind === "web" && input.requirementProfiles?.length)
+				throw new Error("invalid_requirement_contract");
 			const root = insertTask(
 				db,
 				"coordinator",
@@ -88,8 +90,8 @@ export function createStartTask(ctx: RuntimeContext, ops: TaskOps) {
 				request.kind === "history"
 					? "package:history.research@2"
 					: request.researcher === "codex_luna"
-						? "package:web.research@9"
-						: "package:web.quick@1";
+						? "package:web.search@1"
+						: "package:web.quick@2";
 			const workerInput = {
 				question: request.question,
 				detail: "normal",

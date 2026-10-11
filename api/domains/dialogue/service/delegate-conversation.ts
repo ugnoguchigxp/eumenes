@@ -44,7 +44,7 @@ export function delegateConversation(
 		actionSnapshot: context.actionSnapshot,
 		timerCapability: context.timerCapability,
 		requirementProfiles:
-			selected.kind === "timer"
+			selected.kind !== "history"
 				? []
 				: agents.resolveRequirementProfilesInTransaction(
 						db,
@@ -71,7 +71,7 @@ export function prepareConversation(
 		timerCapability: undefined,
 		requirementCatalog: { items: [], snapshots: {} },
 	};
-	appendConversationPolicy(messages, context.timers);
+	appendConversationPolicy(messages, context.timers, context.lunaEnabled);
 	if (context.requirementCatalog?.items.length)
 		messages.splice(messages.length - 1, 0, {
 			role: "user",

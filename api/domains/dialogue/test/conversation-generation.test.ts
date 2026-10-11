@@ -1,4 +1,5 @@
-import { expect, test } from "bun:test";
+import { afterEach, expect, test } from "bun:test";
+import { configureLogging } from "../../../infrastructure/logger";
 import type { InferencePort, Receipt } from "../../inference";
 import { generateConversation } from "../service/conversation-generation";
 import { conversationTools } from "../service/conversation-tools";
@@ -113,4 +114,107 @@ test("aborted generation never starts a correction", async () => {
 		}),
 	).rejects.toThrow("cancelled");
 	expect(repair).toBe(0);
+});
+
+afterEach(() => configureLogging({ level: "silent" }));
+function captureLog() {
+	const lines: string[] = [];
+	configureLogging({
+		level: "info",
+		destination: { write: (line) => void lines.push(line) },
+	});
+	return () =>
+		lines
+			.map((line) => JSON.parse(line))
+			.filter((e) => e.event === "dialogue.operation_rejected");
+}
+const call = (name: string, args: unknown) => ({
+	id: "c",
+	name,
+	arguments: typeof args === "string" ? args : JSON.stringify(args),
+});
+for (const [label, outputs, expected] of [
+	[
+		"argument violation",
+		[
+			{
+				toolCalls: [
+					call("research", { kind: "web", question: "", PRIVATE_KEY: 1 }),
+				],
+			},
+		],
+		{ reason: "arguments_invalid", controlAction: "research" },
+	],
+	[
+		"two calls",
+		[
+			{
+				toolCalls: [
+					call("research", { kind: "web", question: "a" }),
+					call("research", { kind: "web", question: "b" }),
+				],
+			},
+		],
+		{ reason: "call_count", count: 2 },
+	],
+	[
+		"unoffered tool",
+		[{ toolCalls: [call("PRIVATE_TOOL_NAME", {})] }],
+		{ reason: "tool_not_offered", controlAction: "unknown" },
+	],
+	[
+		"arguments that are not JSON",
+		[{ toolCalls: [call("research", "{PRIVATE_ARGUMENT")] }],
+		{ reason: "arguments_not_json", controlAction: "research" },
+	],
+	[
+		"text mixed with an operation",
+		[
+			{
+				value: "PRIVATE_BODY",
+				toolCalls: [call("research", { kind: "web", question: "a" })],
+			},
+		],
+		{ reason: "text_with_operation" },
+	],
+] as const)
+	test(`a rejected operation logs only its safe classification: ${label}`, async () => {
+		const rejected = captureLog();
+		const h = fixture([...outputs, ...outputs] as unknown as Partial<Receipt>[]);
+		await expect(h.run()).rejects.toThrow("invalid_conversation_operation");
+		// The existing single repair is unchanged: two calls, one repair.
+		expect(h.seen).toHaveLength(2);
+		expect(h.repairs()).toBe(1);
+		const rows = rejected();
+		expect(rows.map((r) => r.repairAttempt)).toContain(0);
+		expect(rows.map((r) => r.repairAttempt)).toContain(1);
+		for (const row of rows) expect(row).toMatchObject(expected);
+		const text = JSON.stringify(rows);
+		for (const secret of ["PRIVATE", "鎌倉", "明日"])
+			expect(text).not.toContain(secret);
+	});
+test("an argument violation records the contract path and code", async () => {
+	const rejected = captureLog();
+	const h = fixture([
+		{
+			toolCalls: [
+				call("research", {
+					kind: "web",
+					question: "株価",
+					requirementProfiles: ["p1"],
+				}),
+			],
+		},
+		{ value: "かしこまりました。" },
+	]);
+	await h.run();
+	expect(rejected()).toContainEqual(
+		expect.objectContaining({
+			reason: "arguments_invalid",
+			controlAction: "research",
+			validationCode: expect.any(String),
+			validationPath: expect.any(String),
+			repairAttempt: 0,
+		}),
+	);
 });

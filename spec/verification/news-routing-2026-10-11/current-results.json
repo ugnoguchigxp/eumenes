@@ -1,0 +1,198 @@
+{
+  "complete": false,
+  "scope": "quick_web_and_codex_luna_only",
+  "runs": [
+    {
+      "runId": "94b202f2-7752-4df5-93e7-936fa52182a3",
+      "durationMs": 12077,
+      "runStatus": "completed",
+      "reportOutcome": null,
+      "reportAccepted": false,
+      "claims": 0,
+      "modelCalls": 1,
+      "stages": {
+        "conversation": {
+          "calls": 1,
+          "milliseconds": 11240
+        },
+        "research": {
+          "calls": 0,
+          "milliseconds": 0
+        },
+        "answer": {
+          "calls": 0,
+          "milliseconds": 0
+        }
+      },
+      "tasks": []
+    },
+    {
+      "runId": "66de65dc-d4f3-44c7-ad1c-9ce035a78463",
+      "durationMs": 62193,
+      "runStatus": "completed",
+      "reportOutcome": "partial",
+      "reportAccepted": true,
+      "claims": 2,
+      "modelCalls": 5,
+      "stages": {
+        "conversation": {
+          "calls": 1,
+          "milliseconds": 8530
+        },
+        "research": {
+          "calls": 3,
+          "milliseconds": 39009
+        },
+        "answer": {
+          "calls": 1,
+          "milliseconds": 13894
+        }
+      },
+      "tasks": [
+        {
+          "kind": "coordinator",
+          "status": "completed",
+          "modelCalls": 0,
+          "toolCalls": 0,
+          "errorCode": null,
+          "toolOutcomes": []
+        },
+        {
+          "kind": "worker",
+          "status": "completed",
+          "modelCalls": 3,
+          "toolCalls": 1,
+          "errorCode": null,
+          "toolOutcomes": [
+            {
+              "toolRevisionId": "tool:web.read@1",
+              "state": "succeeded",
+              "errorCode": null,
+              "sourceCount": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "runId": "a03a5c3d-2ab8-4f46-aca3-d9a3bf48a9fa",
+      "durationMs": 6034,
+      "runStatus": "completed",
+      "reportOutcome": null,
+      "reportAccepted": false,
+      "claims": 0,
+      "modelCalls": 1,
+      "stages": {
+        "conversation": {
+          "calls": 1,
+          "milliseconds": 5241
+        },
+        "research": {
+          "calls": 0,
+          "milliseconds": 0
+        },
+        "answer": {
+          "calls": 0,
+          "milliseconds": 0
+        }
+      },
+      "tasks": []
+    },
+    {
+      "runId": "0e8ae839-b6b4-4ab7-bdd6-9705552edad8",
+      "durationMs": 68293,
+      "runStatus": "completed",
+      "reportOutcome": "failed",
+      "reportAccepted": true,
+      "claims": 0,
+      "modelCalls": 6,
+      "stages": {
+        "conversation": {
+          "calls": 1,
+          "milliseconds": 4267
+        },
+        "research": {
+          "calls": 4,
+          "milliseconds": 47651
+        },
+        "answer": {
+          "calls": 1,
+          "milliseconds": 11108
+        }
+      },
+      "tasks": [
+        {
+          "kind": "worker",
+          "status": "completed",
+          "modelCalls": 4,
+          "toolCalls": 1,
+          "errorCode": null,
+          "toolOutcomes": [
+            {
+              "toolRevisionId": "tool:web.lookup@1",
+              "state": "failed",
+              "errorCode": "web_timeout",
+              "sourceCount": 0
+            }
+          ]
+        },
+        {
+          "kind": "coordinator",
+          "status": "completed",
+          "modelCalls": 0,
+          "toolCalls": 0,
+          "errorCode": null,
+          "toolOutcomes": []
+        }
+      ]
+    },
+    {
+      "runId": "63b751a5-d693-4e7e-8f3b-b1a418f87dfe",
+      "durationMs": 58328,
+      "runStatus": "completed",
+      "reportOutcome": null,
+      "reportAccepted": false,
+      "claims": 0,
+      "modelCalls": 6,
+      "stages": {
+        "conversation": {
+          "calls": 1,
+          "milliseconds": 9366
+        },
+        "research": {
+          "calls": 4,
+          "milliseconds": 42272
+        },
+        "answer": {
+          "calls": 1,
+          "milliseconds": 5762
+        }
+      },
+      "tasks": [
+        {
+          "kind": "coordinator",
+          "status": "completed",
+          "modelCalls": 0,
+          "toolCalls": 0,
+          "errorCode": "requirement_verification_failed",
+          "toolOutcomes": []
+        },
+        {
+          "kind": "worker",
+          "status": "failed",
+          "modelCalls": 4,
+          "toolCalls": 1,
+          "errorCode": "requirement_verification_failed",
+          "toolOutcomes": [
+            {
+              "toolRevisionId": "tool:web.read@1",
+              "state": "succeeded",
+              "errorCode": null,
+              "sourceCount": 1
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

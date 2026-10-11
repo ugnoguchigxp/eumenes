@@ -12,6 +12,7 @@ import type {
 } from "../../settings";
 import type {
 	InferencePort,
+	ControlContract,
 	Messages,
 	Receipt,
 	SpeechOverride,
@@ -47,6 +48,11 @@ type UsageRow = {
 	outputTokens: number | null;
 	providerDetails: string;
 };
+type RequestArgs =
+	Parameters<typeof runRequest> extends [unknown, ...infer R] ? R : never;
+type ControlArgs = [string, Messages, AbortSignal, ControlContract?];
+const runControl = (env: Env, ...[id, m, s, c]: ControlArgs) =>
+	runRequest(env, id, m, s, undefined, undefined, undefined, c);
 export function createInference(
 	store: SqliteStore,
 	settings: SettingsService,
@@ -190,14 +196,7 @@ export function createInference(
 			}
 		},
 	};
-	const executeRequest = (
-		requestId: string,
-		input: Messages | string | Uint8Array,
-		caller: AbortSignal,
-		onDelta?: (text: string) => void,
-		preparation?: SpeechPreparation,
-		tools?: import("../../../infrastructure/chat-stream").NativeTool[],
-	) => runRequest(env, requestId, input, caller, onDelta, preparation, tools);
+	const executeRequest = (...args: RequestArgs) => runRequest(env, ...args);
 	function validateReceipt(db: Database, receipt: Receipt) {
 		const captured = get(db, receipt.requestId);
 		if (captured?.controlPolicyRequestId) {
@@ -442,10 +441,10 @@ export function createInference(
 			).run(Math.min(2048, Math.max(1, input.maxOutputTokens)), requestId);
 			return requestId;
 		},
-		executeControl(requestId: string, messages: Messages, signal: AbortSignal) {
-			if (store.read((db) => get(db, requestId))?.mode !== "control")
+		executeControl(...[id, messages, signal, control]: ControlArgs) {
+			if (store.read((db) => get(db, id))?.mode !== "control")
 				throw new Error("invalid_control_request");
-			return executeRequest(requestId, messages, signal);
+			return runControl(env, id, messages, signal, control);
 		},
 		codexResearchAvailable: () => !!options.codexResearch,
 		rejectControlInTransaction(db: Database, receipt: Receipt, _code: string) {

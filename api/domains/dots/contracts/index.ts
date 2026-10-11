@@ -42,7 +42,7 @@ export const projectInput = z.strictObject({
 	capabilityRevisionId: z
 		.string()
 		.regex(/^package:[a-z][a-z0-9._-]{0,100}@[1-9][0-9]*$/)
-		.default("package:dots.orchestrate@1"),
+		.default("package:dots.orchestrate@2"),
 	allowedOperations: z
 		.array(
 			z.enum([

@@ -1,0 +1,23 @@
+[
+  {
+    "time": "2026-10-11T04:52:35.099Z",
+    "runId": "6648fec4-6afd-46ff-a549-7193e49877c7",
+    "taskId": "b5e20901-464c-45a3-b695-36530f3a81f4",
+    "repairAttempt": 0,
+    "status": "repair_scheduled",
+    "reason": "control_schema_invalid",
+    "event": "agent.control_rejected"
+  },
+  {
+    "time": "2026-10-11T04:52:35.099Z",
+    "runId": "6648fec4-6afd-46ff-a549-7193e49877c7",
+    "taskId": "b5e20901-464c-45a3-b695-36530f3a81f4",
+    "repairAttempt": 0,
+    "status": "repair_scheduled",
+    "reason": "control_schema_invalid",
+    "validationPath": "report.claims",
+    "validationCode": "too_small",
+    "limit": 1,
+    "event": "agent.control_validation_issue"
+  }
+]

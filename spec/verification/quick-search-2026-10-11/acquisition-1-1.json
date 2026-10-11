@@ -1,0 +1,27 @@
+{
+  "operation": "lookup",
+  "hits": [
+    {
+      "title": "Microsoft Corporation (MSFT) Stock Price, News, Quote & History - Yahoo ...",
+      "url": "https://finance.yahoo.com/quote/MSFT"
+    },
+    {
+      "title": "Microsoft (MSFT) Stock Price & Overview",
+      "url": "https://stockanalysis.com/stocks/msft"
+    },
+    {
+      "title": "MSFT Stock Price History & Chart Since 1986",
+      "url": "https://wallstreetnumbers.com/stocks/msft/price"
+    },
+    {
+      "title": "Microsoft (MSFT) Stock Price, News & Analysis - MarketBeat",
+      "url": "https://www.marketbeat.com/stocks/NASDAQ/MSFT"
+    },
+    {
+      "title": "MICROSOFT CORPORATION (MSFT) Stock, Price, News, Quotes, Forecast and ...",
+      "url": "https://www.msn.com/en-us/money/stockdetails/nas-msft/fi-a1xzim"
+    }
+  ],
+  "documents": [],
+  "failures": []
+}

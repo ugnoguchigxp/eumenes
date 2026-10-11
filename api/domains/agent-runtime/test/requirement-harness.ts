@@ -37,7 +37,7 @@ export async function requirementHarness() {
 	const root = await h.store.write((db) =>
 		h.agents.startInTransaction(db, {
 			rootRunId: "requirements",
-			input: { kind: "web", question: "条件を確認" },
+			input: { kind: "history", question: "条件を確認" },
 			deadline: Date.now() + 120000,
 			requirementProfiles: snapshots,
 		}),

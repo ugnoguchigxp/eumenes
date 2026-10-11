@@ -80,3 +80,32 @@ test("R05 standard schema conversion is strict and does not coerce, default or i
 		false,
 	);
 });
+
+test("optional string bounds preserve explicit constraints and the overall value capacity", () => {
+	const schema = {
+		type: "object",
+		properties: { label: { type: "string" } },
+		required: ["label"],
+		additionalProperties: false,
+	};
+	expect(requirementValueMatches(schema, { label: "a".repeat(2500) })).toBe(
+		true,
+	);
+	expect(requirementValueMatches(schema, { label: "a".repeat(5000) })).toBe(
+		false,
+	);
+	expect(schema.properties.label).toEqual({ type: "string" });
+	expect(
+		requirementValueMatches(
+			{ type: "string", enum: ["a".repeat(5000)] },
+			"a".repeat(5000),
+		),
+	).toBe(false);
+	for (const maxLength of [-1, 1.5, "2000", null])
+		expect(() =>
+			validateRequirementSchema({ type: "string", maxLength }),
+		).toThrow("invalid_requirement_schema");
+	expect(() =>
+		validateRequirementSchema({ type: "string", minLength: 4, maxLength: 3 }),
+	).toThrow("invalid_requirement_schema");
+});

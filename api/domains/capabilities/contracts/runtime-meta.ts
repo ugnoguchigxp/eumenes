@@ -24,7 +24,9 @@ export type ToolRuntimeMeta = {
 };
 export type PackageRuntimeMeta = {
 	/** quick: the small web budget (one search, one read, fewer model calls). */
-	budget: "quick";
+	budget?: "quick";
+	/** Return source-linked findings directly, without requirement extraction or grading. */
+	report?: "search";
 };
 
 const tools: Readonly<Record<string, ToolRuntimeMeta>> = {
@@ -50,7 +52,8 @@ const tools: Readonly<Record<string, ToolRuntimeMeta>> = {
 	},
 };
 const packages: Readonly<Record<string, PackageRuntimeMeta>> = {
-	"web.quick": { budget: "quick" },
+	"web.quick": { budget: "quick", report: "search" },
+	"web.search": { report: "search" },
 };
 const toolRevisionPattern = /^tool:([^@]+)@\d+$/;
 /** Metadata of the tool a revision id (`tool:<id>@<n>`) names; undefined for unknown tools. */

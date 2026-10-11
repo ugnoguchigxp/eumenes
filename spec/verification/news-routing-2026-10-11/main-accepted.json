@@ -1,0 +1,70 @@
+{
+  "runId": "857ffc52-176d-4e60-8382-1239cb05ae6b",
+  "status": "completed",
+  "ms": 127454,
+  "totalModelCalls": 11,
+  "stages": {
+    "conversation": {
+      "calls": 1,
+      "milliseconds": 3816
+    },
+    "research": {
+      "calls": 9,
+      "milliseconds": 108153
+    },
+    "answer": {
+      "calls": 1,
+      "milliseconds": 10091
+    }
+  },
+  "lane": "existing_conversation_real_models_real_web",
+  "researchModel": "gpt-6-luna",
+  "conversationModel": "gemma4-26b-a4b",
+  "claims": 5,
+  "reportOutcome": "answered",
+  "semanticVerification": "model_checked",
+  "workerStatus": "completed",
+  "toolOutcomes": [
+    {
+      "toolRevisionId": "tool:web.lookup@1",
+      "state": "succeeded",
+      "errorCode": null,
+      "sourceCount": 5
+    },
+    {
+      "toolRevisionId": "tool:web.read@1",
+      "state": "succeeded",
+      "errorCode": null,
+      "sourceCount": 1
+    },
+    {
+      "toolRevisionId": "tool:web.read_saved@1",
+      "state": "succeeded",
+      "errorCode": null,
+      "sourceCount": 0
+    },
+    {
+      "toolRevisionId": "tool:web.read_saved@1",
+      "state": "succeeded",
+      "errorCode": null,
+      "sourceCount": 0
+    },
+    {
+      "toolRevisionId": "tool:web.read_saved@1",
+      "state": "succeeded",
+      "errorCode": null,
+      "sourceCount": 0
+    },
+    {
+      "toolRevisionId": "tool:web.read_saved@1",
+      "state": "succeeded",
+      "errorCode": null,
+      "sourceCount": 0
+    }
+  ],
+  "sourceUrls": [
+    "https://www.theheadline.jp/paper/20261011?edition=morning"
+  ],
+  "answerPresent": true,
+  "answerHasSource": true
+}

@@ -1,0 +1,113 @@
+[
+  {
+    "question": "マイクロソフトの最新の株価を教えて",
+    "expectedPackage": "package:web.quick@2",
+    "operations": [
+      {
+        "operation": "lookup",
+        "query": "Microsoft stock price MSFT",
+        "language": "en",
+        "region": "US",
+        "readPages": 0
+      }
+    ],
+    "runId": "6648fec4-6afd-46ff-a549-7193e49877c7",
+    "status": "completed",
+    "error": null,
+    "milliseconds": 28151,
+    "tasks": [
+      {
+        "id": "10844cdb-71cd-4dfb-abf4-6a89e73d530b",
+        "kind": "coordinator",
+        "rootRunId": "6648fec4-6afd-46ff-a549-7193e49877c7",
+        "parentTaskId": null,
+        "packageRevisionId": null,
+        "status": "completed",
+        "phase": "completed",
+        "modelCalls": 0,
+        "toolCalls": 0,
+        "errorCode": null,
+        "createdAt": "2026-10-11T04:52:20.903Z",
+        "deadlineAt": "2026-10-11T04:55:17.049Z",
+        "reportState": "available",
+        "acquisitionMode": null,
+        "toolOutcomes": []
+      },
+      {
+        "id": "b5e20901-464c-45a3-b695-36530f3a81f4",
+        "kind": "worker",
+        "rootRunId": "6648fec4-6afd-46ff-a549-7193e49877c7",
+        "parentTaskId": "10844cdb-71cd-4dfb-abf4-6a89e73d530b",
+        "packageRevisionId": "package:web.quick@2",
+        "status": "completed",
+        "phase": "completed",
+        "modelCalls": 3,
+        "toolCalls": 1,
+        "errorCode": null,
+        "createdAt": "2026-10-11T04:52:20.903Z",
+        "deadlineAt": "2026-10-11T04:54:47.049Z",
+        "reportState": "available",
+        "acquisitionMode": null,
+        "toolOutcomes": [
+          {
+            "toolRevisionId": "tool:web.lookup@1",
+            "state": "succeeded",
+            "errorCode": null,
+            "sourceCount": 5
+          }
+        ]
+      }
+    ],
+    "report": {
+      "version": 2,
+      "outcome": "not_found",
+      "summary": "検索結果にはマイクロソフト（MSFT）の株価に関するサイトのリストは含まれていますが、具体的な最新の株価（数値）は記載されていませんでした。",
+      "claims": [],
+      "limitations": [
+        "検索結果は各金融サイトの概要（スニペット）のみであり、具体的な数値データが含まれていないため、最新の株価を特定できませんでした。"
+      ],
+      "exploration": [
+        "確認した操作1件。"
+      ],
+      "sources": [],
+      "coverage": "partial",
+      "verification": "evidence_linked"
+    },
+    "answer": "申し訳ございません。検索結果にはマイクロソフトの株価に関するサイトのリストは含まれておりますが、具体的な最新の株価（数値）は記載されておりませんでした。",
+    "verifierCalls": {
+      "n": 0
+    },
+    "totalModelCalls": 5,
+    "stages": {
+      "conversation": {
+        "calls": 1,
+        "milliseconds": 3842
+      },
+      "research": {
+        "calls": 3,
+        "milliseconds": 18132
+      },
+      "answer": {
+        "calls": 1,
+        "milliseconds": 4537
+      }
+    },
+    "models": [
+      "larm:gemma4-26b-a4b",
+      "aconn_epoch-e40e8711-2758-49a1-9d6f-6d5ab2221416_8b600746-6131-4155-80f7-866b45c6e8d4:gemma4-26b-a4b"
+    ],
+    "ok": false,
+    "checks": {
+      "correctAgent": true,
+      "completed": true,
+      "searchedOnce": true,
+      "reportReturned": false,
+      "citationsReturned": false,
+      "queryTargetsRequest": true,
+      "stockQuote": false,
+      "requestedResult": false,
+      "bulletList": true,
+      "noGrading": true
+    }
+  }
+]

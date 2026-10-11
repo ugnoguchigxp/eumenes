@@ -1,0 +1,86 @@
+[
+  {
+    "at": "2026-10-11T04:52:17.055Z",
+    "stage": "accepted",
+    "case": "stock",
+    "runId": "6648fec4-6afd-46ff-a549-7193e49877c7"
+  },
+  {
+    "at": "2026-10-11T04:52:26.149Z",
+    "stage": "worker",
+    "engine": "larm",
+    "parsedJson": true,
+    "action": "invoke",
+    "tool": "web.lookup",
+    "query": "Microsoft stock price MSFT",
+    "fields": [
+      "action",
+      "tool",
+      "arguments"
+    ]
+  },
+  {
+    "at": "2026-10-11T04:52:26.176Z",
+    "stage": "acquisition_started",
+    "operation": "lookup",
+    "query": "Microsoft stock price MSFT",
+    "language": "en",
+    "region": "US",
+    "readPages": 0
+  },
+  {
+    "at": "2026-10-11T04:52:27.726Z",
+    "stage": "acquisition_completed",
+    "operation": "lookup",
+    "hits": [
+      {
+        "title": "Microsoft Corporation (MSFT) Stock Price, News, Quote & History - Yahoo ...",
+        "url": "https://finance.yahoo.com/quote/MSFT"
+      },
+      {
+        "title": "Microsoft (MSFT) Stock Price & Overview",
+        "url": "https://stockanalysis.com/stocks/msft"
+      },
+      {
+        "title": "MSFT Stock Price History & Chart Since 1986",
+        "url": "https://wallstreetnumbers.com/stocks/msft/price"
+      },
+      {
+        "title": "Microsoft (MSFT) Stock Price, News & Analysis - MarketBeat",
+        "url": "https://www.marketbeat.com/stocks/NASDAQ/MSFT"
+      },
+      {
+        "title": "MICROSOFT CORPORATION (MSFT) Stock, Price, News, Quotes, Forecast and ...",
+        "url": "https://www.msn.com/en-us/money/stockdetails/nas-msft/fi-a1xzim"
+      }
+    ],
+    "documents": [],
+    "failures": []
+  },
+  {
+    "at": "2026-10-11T04:52:35.092Z",
+    "stage": "worker",
+    "engine": "larm",
+    "parsedJson": true,
+    "action": "finish",
+    "fields": [
+      "action",
+      "report"
+    ],
+    "outcome": "partial",
+    "claims": 0
+  },
+  {
+    "at": "2026-10-11T04:52:40.639Z",
+    "stage": "worker",
+    "engine": "larm",
+    "parsedJson": true,
+    "action": "finish",
+    "fields": [
+      "action",
+      "report"
+    ],
+    "outcome": "not_found",
+    "claims": 0
+  }
+]
