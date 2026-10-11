@@ -25,6 +25,10 @@ export const voiceTurnSchema = z.object({
 	sequence: z.number().int().positive(),
 	status: z.enum([
 		"recognizing",
+		"awaiting_input",
+		"input_ready",
+		"draft",
+		"merged",
 		"responding",
 		"synthesizing",
 		"ready",
@@ -71,5 +75,11 @@ export const errorStatus = {
 	voice_preview_busy: 409,
 	voice_sequence_invalid: 400,
 	voice_turn_inactive: 409,
+	voice_input_stale: 409,
+	voice_input_not_ready: 409,
 	voice_audio_capacity: 503,
 } as const satisfies Record<string, HttpErrorStatus>;
+
+export const inputCommitSchema = z
+	.object({ revision: z.number().int().nonnegative() })
+	.strict();

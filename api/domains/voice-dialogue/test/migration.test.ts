@@ -17,6 +17,7 @@ import {
 import { createQueue, migration as queueMigration } from "../../queue";
 import { migration as voiceMigration, sequenceMigration } from "..";
 import { migration as schedulerMigration } from "../../scheduler";
+import { inputMigration, readInput, saveInput } from "../repository/input";
 
 test("a database with only the original three migrations (plus later ones) upgrades in place and keeps history", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-mig-"));
@@ -47,6 +48,7 @@ test("a database with only the original three migrations (plus later ones) upgra
 			sequenceMigration,
 			conversationAvatarMotionMigration,
 			conversationAnswerDeliveryMigration,
+			inputMigration,
 		]);
 		const rows = upgraded.read((db) =>
 			db
@@ -101,7 +103,20 @@ test("a database with only the original three migrations (plus later ones) upgra
 			upgraded.read((db) =>
 				db.query("SELECT id FROM schema_migrations_v2").all(),
 			),
-		).toHaveLength(9);
+		).toHaveLength(10);
+		await upgraded.write((db) => {
+			db.query(
+				"INSERT INTO voice_turns (utterance_id,session_id,generation,status,revision,created_at,updated_at,sequence) VALUES ('input','session',1,'awaiting_input',0,?,?,1)",
+			).run(now, now);
+			saveInput(db, {
+				utteranceId: "input",
+				rawText: "unfinished",
+				sources: ["input"],
+				asrRequests: ["asr"],
+				languageRequest: "language",
+				readiness: "waiting",
+			});
+		});
 		await upgraded.close();
 		// second start is a no-op
 		const again = openStore(file, [
@@ -112,10 +127,14 @@ test("a database with only the original three migrations (plus later ones) upgra
 			sequenceMigration,
 			conversationAvatarMotionMigration,
 			conversationAnswerDeliveryMigration,
+			inputMigration,
 		]);
 		expect(
 			again.read((db) => db.query("SELECT id FROM schema_migrations_v2").all()),
-		).toHaveLength(9);
+		).toHaveLength(10);
+		expect(again.read((db) => readInput(db, "input"))?.rawText).toBe(
+			"unfinished",
+		);
 		await again.close();
 	} finally {
 		rmSync(dir, { recursive: true, force: true });

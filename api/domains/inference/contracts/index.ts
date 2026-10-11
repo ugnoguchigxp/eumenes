@@ -122,7 +122,10 @@ export interface InferencePort {
 		voiceSubject: string,
 		runSubject: string,
 		deadline?: number,
-		validation?: { validationRequestIds: string[] },
+		validation?: {
+			validationRequestIds: string[];
+			transcriptionRequestIds?: string[];
+		},
 	): void;
 	cancelSubject?(subject: string): Promise<void>;
 	snapshotInTransaction?(db: Database): Settings;

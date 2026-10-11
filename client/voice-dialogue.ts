@@ -29,6 +29,7 @@ export function voiceDialogueClient(transport: Transport) {
 			sequence: number,
 			utteranceId: string,
 			wav: Uint8Array,
+			deferred = false,
 		) => {
 			return voiceTurnSchema.parse(
 				await (
@@ -40,6 +41,7 @@ export function voiceDialogueClient(transport: Transport) {
 							"X-Generation": String(generation),
 							"X-Sequence": String(sequence),
 							"X-Utterance-Id": utteranceId,
+							...(deferred ? { "X-Voice-Deferred": "1" } : {}),
 						},
 						body: new Uint8Array(wav),
 					})
@@ -67,6 +69,15 @@ export function voiceDialogueClient(transport: Transport) {
 			});
 			return previewResultSchema.parse(await response.json());
 		},
+		voiceCommit: async (id: string, revision: number) =>
+			voiceTurnSchema.parse(
+				await (
+					await transport.call(
+						`/api/voice/turns/${encodeURIComponent(id)}/commit`,
+						json({ revision }),
+					)
+				).json(),
+			),
 		voiceTurn: async (id: string) =>
 			voiceTurnSchema.parse(
 				await (

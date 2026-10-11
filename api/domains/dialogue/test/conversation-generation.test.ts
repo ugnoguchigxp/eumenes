@@ -4,7 +4,10 @@ import type { InferencePort, Receipt } from "../../inference";
 import { generateConversation } from "../service/conversation-generation";
 import { conversationTools } from "../service/conversation-tools";
 
-function fixture(outputs: Partial<Receipt>[]) {
+function fixture(
+	outputs: Partial<Receipt>[],
+	tools = conversationTools(false),
+) {
 	const seen: Parameters<InferencePort["answer"]>[0][] = [];
 	const inference = {
 		executeRequest: async () => {
@@ -19,7 +22,8 @@ function fixture(outputs: Partial<Receipt>[]) {
 			seen.push(messages);
 			const output = outputs.shift();
 			if (!output) throw new Error("extra_call");
-			if (output.value) delta(output.value as string);
+			if (output.value)
+				for (const character of output.value as string) delta(character);
 			return {
 				requestId: "request",
 				attemptId: String(seen.length),
@@ -44,7 +48,7 @@ function fixture(outputs: Partial<Receipt>[]) {
 				],
 				signal: AbortSignal.timeout(1000),
 				delta: (s) => deltas.push(s),
-				tools: conversationTools(false),
+				tools,
 				repair: () => repairs++,
 			}),
 	};
@@ -54,7 +58,7 @@ test("ordinary dialogue streams one call and keeps preceding conversational cont
 	const result = await h.run();
 	expect(h.seen).toHaveLength(1);
 	expect(h.seen[0]![0]!.content).toBe("鎌倉の話です。");
-	expect(h.deltas).toEqual([result.text]);
+	expect(h.deltas.join("")).toBe(result.text);
 	expect(result.operation).toBeUndefined();
 });
 test("one native research operation publishes no control text", async () => {
@@ -78,6 +82,62 @@ test("one native research operation publishes no control text", async () => {
 	});
 	expect(h.seen).toHaveLength(1);
 	expect(h.deltas).toEqual([]);
+});
+const controlText =
+	'create_music{question:<|"|>夜にふさわしい、しっとりとした落ち着いた雰囲気の楽曲。2分間。<|"|>}';
+test("a control expression in text is repaired through the model, never decoded into an operation", async () => {
+	const h = fixture(
+		[
+			{ value: controlText },
+			{
+				toolCalls: [
+					{
+						id: "music",
+						name: "create_music",
+						arguments: JSON.stringify({ question: "夜に合う楽曲を2分間" }),
+					},
+				],
+			},
+		],
+		conversationTools(false, false, false, true),
+	);
+	expect((await h.run()).operation).toEqual({
+		kind: "music",
+		question: "夜に合う楽曲を2分間",
+	});
+	expect(h.deltas).toEqual([]);
+	expect(h.repairs()).toBe(1);
+	expect(h.seen).toHaveLength(2);
+	const feedback = h.seen[1]!.find((m) =>
+		m.content.startsWith("UNTRUSTED_REJECTED_OUTPUT="),
+	)!;
+	expect(feedback.role).toBe("user");
+	expect(JSON.parse(feedback.content.split("=", 2)[1]!).textPreview).toBe(
+		controlText,
+	);
+});
+test("an offered tool is not required to reject control text and return a natural clarification", async () => {
+	const h = fixture(
+		[{ value: controlText }, { value: "どんな曲を作りましょうか。" }],
+		[],
+	);
+	expect((await h.run()).operation).toBeUndefined();
+	expect(h.deltas.join("")).toBe("どんな曲を作りましょうか。");
+	expect(h.repairs()).toBe(1);
+});
+test("repeated control text fails after one correction without publishing it", async () => {
+	const rejected = captureLog();
+	const h = fixture([{ value: controlText }, { value: controlText }]);
+	await expect(h.run()).rejects.toThrow("invalid_conversation_operation");
+	expect(h.deltas).toEqual([]);
+	expect(h.repairs()).toBe(1);
+	expect(h.seen).toHaveLength(2);
+	expect(rejected()).toHaveLength(2);
+	expect(rejected().every((row) => row.reason === "control_text_in_body")).toBe(
+		true,
+	);
+	expect(JSON.stringify(rejected())).not.toContain("夜に");
+	expect(JSON.stringify(rejected())).not.toContain("create_music{");
 });
 test("malformed native arguments get exactly one structural correction", async () => {
 	const bad = { toolCalls: [{ id: "call", name: "research", arguments: "{" }] };
@@ -223,6 +283,38 @@ test("aborted generation never starts a correction", async () => {
 		}),
 	).rejects.toThrow("cancelled");
 	expect(repair).toBe(0);
+});
+test("cancellation after the provider returns prevents control repair and pending text release", async () => {
+	const controller = new AbortController();
+	const published: string[] = [];
+	let repairs = 0;
+	const inference = {
+		executeRequest: async () => {
+			throw new Error("unexpected");
+		},
+		executeStream: async (
+			_id: string,
+			_messages: unknown,
+			_signal: AbortSignal,
+			delta: (s: string) => void,
+		) => {
+			delta("research");
+			controller.abort();
+			return { requestId: "r", attemptId: "a", value: "research" };
+		},
+	} as unknown as InferencePort;
+	await expect(
+		generateConversation({
+			inference,
+			requestId: "r",
+			messages: [],
+			signal: controller.signal,
+			delta: (s) => published.push(s),
+			repair: () => repairs++,
+		}),
+	).rejects.toThrow();
+	expect(published).toEqual([]);
+	expect(repairs).toBe(0);
 });
 
 afterEach(() => configureLogging({ level: "silent" }));

@@ -1,3 +1,6 @@
+import { createVoiceIntake } from "./intake";
+import { createVoiceResponder } from "./respond";
+import { createInputCollector } from "./input";
 import type { Database } from "bun:sqlite";
 import { createVoiceProcessor } from "./process";
 import type { Speech } from "./speech-state";
@@ -12,15 +15,7 @@ import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { DialogueService } from "../../dialogue";
 import type { InferencePort, Receipt, SpeechOverride } from "../../inference";
 import type { VoiceTurn } from "../contracts";
-import {
-	activeIds,
-	activeRunIds,
-	get,
-	insert,
-	interrupt,
-	lastSequence,
-	update,
-} from "../repository";
+import { activeIds, activeRunIds, get, interrupt, update } from "../repository";
 
 export function createVoiceDialogue(
 	store: SqliteStore,
@@ -340,6 +335,7 @@ export function createVoiceDialogue(
 						"failed",
 						"played",
 						"completed",
+						"merged",
 					].includes(current.status) ||
 					!larm.acceptInTransaction?.(db, receipt))
 			)
@@ -382,7 +378,26 @@ export function createVoiceDialogue(
 		languageRequests,
 		linkRunInTransaction,
 	});
+	const input = createInputCollector({
+		store,
+		dialogue,
+		larm,
+		sessions,
+		languageRequests,
+		controllers,
+		respond: createVoiceResponder({
+			store,
+			dialogue,
+			larm,
+			advance,
+			createSpeech,
+			audio,
+			linkRunInTransaction,
+		}),
+		clock,
+	});
 	return {
+		commit: input.commit,
 		/** Splits finished answer text into speakable clauses for replay. */
 		replaySentences(text: string) {
 			return new SpeechSentences().append(spokenText(text), true);
@@ -472,77 +487,27 @@ export function createVoiceDialogue(
 				});
 			return { sessionId, generation };
 		},
-		async accept(
-			sessionId: string,
-			generation: number,
-			sequence: number,
-			utteranceId: string,
-			wav: Uint8Array,
-		): Promise<VoiceTurn> {
-			touchSession(sessionId);
-			if (sessions.get(sessionId) !== generation)
-				throw new Error("voice_session_inactive");
-			if (!Number.isSafeInteger(sequence) || sequence <= 0)
-				throw new Error("voice_sequence_invalid");
-			if (
-				wav.length < 44 ||
-				wav.length > 4_000_000 ||
-				new TextDecoder().decode(wav.subarray(0, 4)) !== "RIFF" ||
-				new TextDecoder().decode(wav.subarray(8, 12)) !== "WAVE"
-			)
-				throw new Error("invalid_wav");
-			const { turn, fresh } = await store.write((db) => {
-				if (sessions.get(sessionId) !== generation)
-					throw new Error("voice_session_inactive");
-				const existing = get(db, utteranceId);
-				if (existing) {
-					if (
-						existing.sessionId !== sessionId ||
-						existing.generation !== generation ||
-						existing.sequence !== sequence
-					)
-						throw new Error("voice_utterance_conflict");
-					return { turn: existing, fresh: false };
-				}
-				if (sequence !== lastSequence(db, sessionId, generation) + 1)
-					throw new Error("voice_sequence_out_of_order");
-				const turn: VoiceTurn = {
-					utteranceId,
-					sessionId,
-					generation,
-					sequence,
-					status: "recognizing",
-					text: null,
-					runId: null,
-					error: null,
-					revision: 0,
-				};
-				insert(db, turn, clock());
-				const snapshot = larm.snapshotInTransaction?.(db);
-				for (const purpose of ["asr", "llm", "tts"] as const)
-					larm.captureInTransaction?.(
-						db,
-						utteranceId,
-						purpose,
-						Date.now() + 270_000,
-						snapshot,
-					);
-				return { turn, fresh: true };
-			});
-			if (fresh) {
-				previews.get(utteranceId)?.controller.abort();
+		accept: createVoiceIntake({
+			store,
+			larm,
+			sessions,
+			touchSession,
+			clock,
+			dispatch: (turn, wav, deferred) => {
+				previews.get(turn.utteranceId)?.controller.abort();
 				const controller = new AbortController();
-				controllers.set(utteranceId, controller);
-				void process(turn, wav, controller).catch((error) =>
-					log.error(
-						"voice.processing_crashed",
-						{ reason: toErrorCode(error, "voice_failed") },
-						error,
-					),
-				);
-			}
-			return turn;
-		},
+				controllers.set(turn.utteranceId, controller);
+				if (deferred) input.accept(turn, wav, controller);
+				else
+					void process(turn, wav, controller).catch((error) =>
+						log.error(
+							"voice.processing_crashed",
+							{ reason: toErrorCode(error, "voice_failed") },
+							error,
+						),
+					);
+			},
+		}),
 
 		async preview(
 			sessionId: string,

@@ -89,6 +89,7 @@ export function createIntake(deps: DialogueDeps) {
 		if (input.voiceSubject && larm.bindInTransaction)
 			larm.bindInTransaction(db, input.voiceSubject, runId, deadlineAtMs, {
 				validationRequestIds: input.validationRequestIds ?? [],
+				transcriptionRequestIds: input.transcriptionRequestIds,
 			});
 		else larm.captureInTransaction?.(db, runId, "llm", deadlineAtMs);
 		insert(db, run);
@@ -118,7 +119,10 @@ export function createIntake(deps: DialogueDeps) {
 		async submitVoice(
 			input: Submit,
 			voiceSubject: string,
-			validation: { validationRequestIds: string[] },
+			validation: {
+				validationRequestIds: string[];
+				transcriptionRequestIds?: string[];
+			},
 			/** Runs in the same writer transaction as acceptance; throw to roll the run back. */
 			link: (db: Tx, run: Run) => void,
 		): Promise<Run> {
@@ -129,6 +133,7 @@ export function createIntake(deps: DialogueDeps) {
 					...input,
 					voiceSubject,
 					validationRequestIds: validation.validationRequestIds,
+					transcriptionRequestIds: validation.transcriptionRequestIds,
 					sourceKind: "voice",
 				});
 				link(db, result.run);

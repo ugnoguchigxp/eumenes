@@ -1,0 +1,113 @@
+{
+  "date": "2026-10-11",
+  "baseCommit": "8803046",
+  "scope": "会話本文の内部ツール呼出し表現を画面・音声・履歴に採用しない",
+  "baseline": {
+    "productionRuns": 2,
+    "result": "completed",
+    "musicGenerationCalls": 0,
+    "wire": {
+      "nativeToolCalls": 0,
+      "finishReason": "stop",
+      "controlSyntaxInContent": true
+    },
+    "replay": {
+      "result": "completed",
+      "musicRecords": 0,
+      "generationPosts": 0
+    }
+  },
+  "implementation": {
+    "files": [
+      "api/domains/dialogue/service/conversation-output.ts",
+      "api/domains/dialogue/service/conversation-generation.ts",
+      "api/domains/dialogue/service/conversation-tools.ts",
+      "api/domains/dialogue/service/system-prompt.ts"
+    ],
+    "contract": "登録済み・提示済みfunction名に続く括弧とProvider制御区切りを本文の契約違反として拒否。分割chunkの候補末尾を保留し、通常本文はstreamを維持する。意味判断と操作はモデルに委ねる。",
+    "recovery": "既存の一回限りのモデル修正。本文から操作を復元・実行せず、再違反は失敗にする。",
+    "limits": "修正資料の本文と各引数抜粋は4096文字。stream容量65536文字。生本文・引数を運用ログへ渡さない。",
+    "exceptionEvidence": "本文として返された関数名・内部区切りがUI/TTSへ露出した再現可能な失敗に対する出力契約の強制。ユーザー発話や業務判断の正規表現分類は追加しない。"
+  },
+  "verification": {
+    "unit": {
+      "conversationOutput": 25,
+      "status": "passed"
+    },
+    "targetedIntegration": {
+      "tests": 35,
+      "status": "passed"
+    },
+    "dialogueDomain": {
+      "backendTests": 155,
+      "webTests": 6,
+      "status": "passed",
+      "note": "取消後の末尾公開拒否テスト1件を後から追加し、結合と全体で再確認。"
+    },
+    "voiceDomain": {
+      "status": "passed",
+      "backendTests": 53,
+      "webTests": 32
+    },
+    "full": {
+      "command": "bun run verify:all",
+      "inputRevision": "8f2f7371f9295d460b816a29db14f45e7418820c2dbca0cacf99dae62563cd66",
+      "durationMs": 213245,
+      "staticChecks": "passed",
+      "backend": {
+        "passed": 1570,
+        "skipped": 1,
+        "failed": 0
+      },
+      "web": {
+        "passed": 304
+      },
+      "client": {
+        "passed": 329
+      },
+      "status": "blocked_by_unmodified_design_system_test",
+      "failure": {
+        "file": "packages/design-system/src/components/MusicWorkspace/MusicCreationForm.test.tsx",
+        "lines": [
+          20,
+          23,
+          42,
+          49,
+          60,
+          83
+        ],
+        "code": "TS2769",
+        "reason": "ByRoleOptionsにexactが存在しない。対象ファイルはgit diffで変更がないことを確認。"
+      },
+      "notRun": [
+        "design-system tests",
+        "web build",
+        "browser fixture"
+      ]
+    },
+    "live": {
+      "status": "not_verified",
+      "reason": "製品backendが停止し実履歴の再取得がConnectionRefused。別の隔離接続によるモデル修正確認も45秒TimeoutErrorで停止。再生成・実機器受入は実施していない。"
+    },
+    "finalIntegration": {
+      "status": "passed",
+      "files": [
+        "api/application/conversation-output.test.ts",
+        "api/application/agent-voice-response.test.ts"
+      ],
+      "note": "検証後、担当外のvoice-dialogueファイルに他の作業による変更が現れたため、画面・保存・音声の結合を再確認。"
+    }
+  },
+  "remaining": [
+    "担当外のDesignSystem試験の型エラーが解消した後に全体検証の残りを確認",
+    "LARM接続が復旧した後に実モデルの修正成功を確認"
+  ],
+  "diffReview": {
+    "unrelatedChanges": true,
+    "userPhraseBranches": false,
+    "controlTextExecuted": false,
+    "authorizationRelaxed": false,
+    "unrelatedChangeOwnership": "voice-dialogueのprocess.ts/transcript-language.ts/prompts/transcript-assessment.md/recognize.ts/respond.tsは作業中に現れた他の変更。今回の修正として扱わず、変更・整形・取り消しをしていない。",
+    "finalOwnDiffCheck": "passed"
+  }
+}

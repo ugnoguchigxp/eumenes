@@ -1,0 +1,145 @@
+{
+  "voiceDialogue": {
+    "result": "pass",
+    "backend": 62,
+    "web": 34
+  },
+  "inference": {
+    "result": "pass",
+    "backend": 45
+  },
+  "dialogue": {
+    "result": "pass",
+    "backend": 156,
+    "web": 6
+  },
+  "threeFragmentsBrowser": {
+    "result": "pass",
+    "commit": 1,
+    "userMessages": 1,
+    "assistantMessages": 1
+  },
+  "full": {
+    "selected": [
+      "music",
+      "dots",
+      "task-reports",
+      "coding-supervision",
+      "coding",
+      "artifact",
+      "tasks",
+      "capabilities",
+      "tool-runtime",
+      "agent-runtime",
+      "research-routes",
+      "web-research",
+      "attitude-dataset",
+      "service-tests",
+      "delivery",
+      "avatar",
+      "settings",
+      "inference",
+      "tts-dictionary",
+      "conversation",
+      "continuity",
+      "goals",
+      "world",
+      "memory",
+      "larm",
+      "audio",
+      "queue",
+      "scheduler",
+      "timers",
+      "dialogue",
+      "voice-dialogue"
+    ],
+    "revision": "e56100a2356062de625dd07c281deef1b0b2769ad1ce4bd460961b94d1ecfbf6",
+    "steps": [
+      {
+        "name": "size-budget",
+        "ms": 430,
+        "result": "pass"
+      },
+      {
+        "name": "sql-boundaries",
+        "ms": 579,
+        "result": "pass"
+      },
+      {
+        "name": "domain-docs",
+        "ms": 14,
+        "result": "pass"
+      },
+      {
+        "name": "format",
+        "ms": 212,
+        "result": "pass"
+      },
+      {
+        "name": "lint",
+        "ms": 141,
+        "result": "pass"
+      },
+      {
+        "name": "typecheck",
+        "ms": 5491,
+        "result": "pass"
+      },
+      {
+        "name": "tests",
+        "ms": 191214,
+        "result": "pass"
+      },
+      {
+        "name": "web tests",
+        "ms": 9453,
+        "result": "pass"
+      },
+      {
+        "name": "client tests",
+        "ms": 1172,
+        "result": "pass"
+      },
+      {
+        "name": "design-system typecheck",
+        "ms": 1194,
+        "result": "exit 1"
+      }
+    ],
+    "totalMs": 210615,
+    "result": "fail",
+    "error": "Error: design-system typecheck failed (1)"
+  },
+  "counts": {
+    "backendPass": 1579,
+    "backendSkip": 1,
+    "webPass": 306,
+    "clientPass": 329
+  },
+  "webBuild": "pass",
+  "live": {
+    "result": "unverified",
+    "reason": "saved_control_connection_timeout",
+    "connectionTimeoutMs": 15000,
+    "healthTimeoutMs": 5000
+  },
+  "physicalDevice": "not_run",
+  "designSystemTests": {
+    "result": "pass",
+    "tests": 1109
+  },
+  "browserAll": {
+    "passed": 44,
+    "failed": 1,
+    "skipped": 1,
+    "failure": "Artifact touch-resize beforeEach root empty for 20s; cause unverified",
+    "voiceTests": "pass",
+    "failedTestDiagnosticRerun": {
+      "passed": 1,
+      "ms": 2000,
+      "changes": "none"
+    }
+  },
+  "finalRevision": "e56100a2356062de625dd07c281deef1b0b2769ad1ce4bd460961b94d1ecfbf6",
+  "unchangedDuringValidation": true
+}

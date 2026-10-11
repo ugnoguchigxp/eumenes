@@ -1,3 +1,5 @@
+import { requestPreview, type RecognitionCandidate } from "./preview";
+import { commitIdleInput } from "./input-commit";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { VoiceDialogueClient } from "../../../../../client/voice-dialogue";
@@ -37,13 +39,9 @@ export function useVoiceDialogue(
 		tail: Promise<void>;
 		finish?: () => void;
 	} | null>(null);
-	const candidate = useRef<{
-		id: string;
-		finalized: boolean;
-		busy: boolean;
-		controller?: AbortController;
-		latest?: Uint8Array;
-	} | null>(null);
+	const candidate = useRef<RecognitionCandidate | null>(null);
+	const committing = useRef(new Set<string>());
+	const [inputVersion, setInputVersion] = useState(0);
 	const [previewText, setPreviewText] = useState<string | null>(null);
 	const [avatarCue, setAvatarCue] = useState<AvatarCue | null>(null);
 	const [subtitle, setSubtitle] = useState<{
@@ -59,41 +57,7 @@ export function useVoiceDialogue(
 		setAvatarCue(null);
 	}, [machine]);
 	function partial(wav: Uint8Array) {
-		const active = machine.get().session,
-			u = candidate.current;
-		if (!active || !u || u.finalized || active.failed) return;
-		if (u.busy) {
-			u.latest = wav;
-			return;
-		}
-		u.busy = true;
-		u.controller = new AbortController();
-		void client
-			.voicePreview(
-				active.id,
-				active.generation,
-				u.id,
-				wav,
-				u.controller.signal,
-			)
-			.then((value) => {
-				if (
-					isCurrent(machine.get(), active.token) &&
-					candidate.current === u &&
-					!u.finalized &&
-					value.text
-				)
-					setPreviewText(value.text);
-			})
-			.catch(() => {
-				/* Provisional decoding never blocks the final request. */
-			})
-			.finally(() => {
-				u.busy = false;
-				const latest = u.latest;
-				u.latest = undefined;
-				if (latest && candidate.current === u && !u.finalized) partial(latest);
-			});
+		requestPreview(client, machine, candidate, setPreviewText, wav);
 	}
 	const [turnId, setTurnId] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
@@ -146,7 +110,8 @@ export function useVoiceDialogue(
 				return;
 			}
 		}
-		if (value.text) invalidateDialogueViews(cache, client.identity, "main");
+		if (value.runId && value.text)
+			invalidateDialogueViews(cache, client.identity, "main");
 		const active = machine.get().session;
 		const valid = () =>
 			!!active && isCurrent(machine.get(), active.token, value.utteranceId);
@@ -288,6 +253,36 @@ export function useVoiceDialogue(
 				.catch((e) => setError(describeError(e)));
 		}
 	}, [turn.data, client, cache, turnId, machine, cancelPlayback]);
+	useEffect(() => {
+		const value = turn.data;
+		if (
+			!value ||
+			value.utteranceId !== recognitionId ||
+			!["input_ready", "awaiting_input", "draft"].includes(value.status)
+		)
+			return;
+		if (value.status !== "input_ready") {
+			// A bounded notice leaves the transcript editable after pausing the microphone.
+			const timer = setTimeout(() => {
+				if (!candidate.current && turnId === value.utteranceId)
+					setError(
+						"発話の続き待ちです。マイクを停止すると、文字起こしを編集して送信できます。",
+					);
+			}, 6000);
+			return () => clearTimeout(timer);
+		}
+		commitIdleInput(
+			value,
+			client,
+			cache,
+			machine,
+			inputEnabled.current,
+			candidate.current,
+			controller.current,
+			committing.current,
+			setError,
+		);
+	}, [turn.data, recognitionId, inputVersion, turnId, client, cache, machine]);
 	async function start() {
 		if (machine.get().phase === "active" && machine.get().session?.failed) {
 			await stop();
@@ -302,6 +297,7 @@ export function useVoiceDialogue(
 			) {
 				inputEnabled.current = true;
 				setActive(true);
+				setInputVersion((v) => v + 1);
 				setError(null);
 				try {
 					await controller.current.start();
@@ -315,6 +311,7 @@ export function useVoiceDialogue(
 		}
 		inputEnabled.current = true;
 		replacement.current = null;
+		committing.current.clear();
 		setError(null);
 		setRecognitionId(null);
 		setPreviewText(null);
@@ -353,6 +350,7 @@ export function useVoiceDialogue(
 						busy: false,
 					};
 					candidate.current = nextCandidate;
+					setInputVersion((v) => v + 1);
 					setRecognitionId(nextCandidate.id);
 					setPreviewText(null);
 					// Energy alone cannot distinguish speech from noise. Keep the answer
@@ -370,6 +368,7 @@ export function useVoiceDialogue(
 						pending.latest = undefined;
 					}
 					candidate.current = null;
+					setInputVersion((v) => v + 1);
 					setPreviewText(null);
 					const id = pending?.id ?? crypto.randomUUID();
 					setRecognitionId(id);
@@ -391,6 +390,7 @@ export function useVoiceDialogue(
 									sequence,
 									id,
 									wav,
+									true,
 								);
 							} catch (error) {
 								if (!(error instanceof TypeError) || !live()) throw error;
@@ -402,6 +402,7 @@ export function useVoiceDialogue(
 									sequence,
 									id,
 									wav,
+									true,
 								);
 							}
 							if (!live()) return;
@@ -433,6 +434,7 @@ export function useVoiceDialogue(
 						})
 						.finally(() => {
 							machine.dispatch({ type: "upload_settled", sessionToken });
+							if (live()) setInputVersion((v) => v + 1);
 						});
 					if (pauseAfterUpload) {
 						// Retain this final segment, then prevent more recording from piling up.
@@ -459,7 +461,7 @@ export function useVoiceDialogue(
 						if (reason === "recording_limit") {
 							suspendInput();
 							setError(
-								"録音が60秒に達したため送信し、マイクを停止しました。続きはマイクを再開して話してください。",
+								"録音が60秒に達したため文字起こしを保存し、マイクを停止しました。続きはマイクを再開して話してください。",
 							);
 						} else setError(describeError(reason));
 					},
@@ -512,13 +514,12 @@ export function useVoiceDialogue(
 	function pause() {
 		const audio = controller.current;
 		if (!audio?.pauseInput) return stop();
-		// The controller flushes a final spoken segment before detaching the mic.
+		// The controller stages the last spoken segment before detaching the mic.
 		audio.pauseInput();
 		inputEnabled.current = false;
 		setActive(false);
 		candidate.current?.controller?.abort();
 		candidate.current = null;
-		setPreviewText(null);
 	}
 	// Used only after a final segment or failure. Keep the accepted reply alive,
 	// including for injected controllers that do not expose a microphone pause.

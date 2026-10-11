@@ -137,7 +137,7 @@ export function conversationTools(
 			: []),
 	];
 }
-const toolNames = new Set([
+export const conversationToolNames = new Set([
 	"create_music",
 	"open_music_library",
 	"delegate_task",
@@ -158,7 +158,9 @@ export function operationRejection(
 			reason,
 			...(call
 				? {
-						controlAction: toolNames.has(call.name) ? call.name : "unknown",
+						controlAction: conversationToolNames.has(call.name)
+							? call.name
+							: "unknown",
 					}
 				: {}),
 			...(count === undefined ? {} : { count }),

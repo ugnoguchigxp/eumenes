@@ -1,3 +1,4 @@
+import { inputMigration } from "./input";
 import type { Database } from "bun:sqlite";
 import type { Migration } from "../../../infrastructure/sqlite";
 import type { VoiceTurn } from "../contracts";
@@ -69,7 +70,7 @@ export function update(
 	return (
 		db
 			.query(
-				"UPDATE voice_turns SET status=?,text=COALESCE(?,text),run_id=COALESCE(?,run_id),error=COALESCE(?,error),revision=revision+1,updated_at=? WHERE utterance_id=? AND revision=? AND status NOT IN ('cancelled','failed','interrupted','played','completed')",
+				"UPDATE voice_turns SET status=?,text=COALESCE(?,text),run_id=COALESCE(?,run_id),error=COALESCE(?,error),revision=revision+1,updated_at=? WHERE utterance_id=? AND revision=? AND status NOT IN ('cancelled','failed','interrupted','played','completed','merged')",
 			)
 			.run(
 				status,
@@ -84,7 +85,7 @@ export function update(
 }
 export function interrupt(db: Database, now: string) {
 	db.query(
-		"UPDATE voice_turns SET status='interrupted',error='backend_restarted',revision=revision+1,updated_at=? WHERE status IN ('recognizing','responding','synthesizing','ready')",
+		"UPDATE voice_turns SET status='interrupted',error='backend_restarted',revision=revision+1,updated_at=? WHERE status IN ('recognizing','responding','synthesizing','ready','awaiting_input','input_ready')",
 	).run(now);
 }
 export function activeIds(
@@ -95,7 +96,7 @@ export function activeIds(
 	return (
 		db
 			.query(
-				"SELECT utterance_id FROM voice_turns WHERE session_id=? AND generation=? AND status IN ('recognizing','responding','synthesizing','ready')",
+				"SELECT utterance_id FROM voice_turns WHERE session_id=? AND generation=? AND status IN ('recognizing','responding','synthesizing','ready','awaiting_input','input_ready')",
 			)
 			.all(sessionId, generation) as { utterance_id: string }[]
 	).map((x) => x.utterance_id);
@@ -104,7 +105,7 @@ export function activeRunIds(db: Database): string[] {
 	return (
 		db
 			.query(
-				"SELECT run_id FROM voice_turns WHERE run_id IS NOT NULL AND status IN ('recognizing','responding','synthesizing','ready')",
+				"SELECT run_id FROM voice_turns WHERE run_id IS NOT NULL AND status IN ('recognizing','responding','synthesizing','ready','awaiting_input','input_ready')",
 			)
 			.all() as Array<{ run_id: string }>
 	).map((row) => row.run_id);
@@ -114,4 +115,9 @@ export function activeRunIds(db: Database): string[] {
 export const migrations: readonly Migration[] = [
 	{ id: "voice-dialogue/0001-init", sql: migration },
 	{ id: "voice-dialogue/0002-sequence", sql: sequenceMigration },
+	{
+		id: "voice-dialogue/0003-input",
+		sql: inputMigration,
+		after: ["voice-dialogue/0002-sequence"],
+	},
 ];

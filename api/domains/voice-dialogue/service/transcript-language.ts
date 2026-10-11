@@ -24,22 +24,57 @@ export const transcriptLanguageResult = z.discriminatedUnion("status", [
 		.strict(),
 ]);
 export type TranscriptLanguageResult = z.infer<typeof transcriptLanguageResult>;
+const endpointFields = {
+	relation: z.enum(["continuation", "independent", "uncertain"]),
+	readiness: z.enum(["ready", "waiting", "uncertain"]),
+	relationConfidence: z.number().min(0).max(1),
+	readinessConfidence: z.number().min(0).max(1),
+};
+export const transcriptAssessmentResult = z.discriminatedUnion("status", [
+	transcriptLanguageResult.options[0].extend(endpointFields),
+	transcriptLanguageResult.options[1].extend(endpointFields),
+]);
+export type TranscriptContext = {
+	previousText: string;
+	conversation: Array<{ role: string; text: string }>;
+};
+const assessmentPolicy = readFileSync(
+	new URL("../prompts/transcript-assessment.md", import.meta.url),
+	"utf8",
+);
+export function parseTranscriptAssessment(value: unknown) {
+	if (typeof value !== "string" || Buffer.byteLength(value) > 4096)
+		throw new Error("asr_language_unverified");
+	try {
+		return transcriptAssessmentResult.parse(parseLlmJson(value, 4096));
+	} catch {
+		throw new Error("asr_language_unverified");
+	}
+}
 const policy = readFileSync(
 	new URL("../prompts/transcript-language.md", import.meta.url),
 	"utf8",
 );
-export function transcriptLanguageMessages(text: string) {
+export function transcriptLanguageMessages(
+	text: string,
+	context?: TranscriptContext,
+) {
 	return [
 		{
 			role: "system" as const,
 			content:
 				policy +
+				(context ? "\n" + assessmentPolicy : "") +
 				"\nOUTPUT_SCHEMA=" +
-				JSON.stringify(z.toJSONSchema(transcriptLanguageResult)),
+				JSON.stringify(
+					z.toJSONSchema(
+						context ? transcriptAssessmentResult : transcriptLanguageResult,
+					),
+				),
 		},
 		{
 			role: "user" as const,
-			content: JSON.stringify({ languageCodes: codes, text }),
+			content: JSON.stringify({ languageCodes: codes, text, ...context }),
 		},
 	];
 }

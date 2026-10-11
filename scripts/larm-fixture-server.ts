@@ -7,6 +7,9 @@ const releaseStreams = new Set<() => void>();
 const ttsInputs: string[] = [];
 const ttsParameters: Array<Record<string, unknown>> = [];
 const asrInputs: Array<{ rate: number; bytes: number }> = [];
+let voiceInputs: Array<{ text: string; relation: string; readiness: string }> =
+	[];
+const assessments: Array<{ relation: string; readiness: string }> = [];
 const profile = "SAAA-gemma4-26b";
 const agentProfile = "saaa-conversation-gemma4-26b-voice";
 const names = ["llm", "asr", "tts"] as const;
@@ -89,6 +92,11 @@ const server = Bun.serve({
 		)
 			return Response.json({ error: "unauthorized" }, { status: 401 });
 		if (path === "/health") return Response.json({ status: "ok" });
+		if (path === "/fixture/voice-inputs") {
+			voiceInputs = (await request.json()) as typeof voiceInputs;
+			assessments.length = 0;
+			return Response.json({ ok: true });
+		}
 		const healthMatch = path.match(
 			/^\/v1\/agent-connections\/([\w-]+)\/providers\/([\w-]+)\/health$/,
 		);
@@ -301,7 +309,9 @@ const server = Bun.serve({
 				rate: new DataView(bytes).getUint32(24, true),
 				bytes: bytes.byteLength,
 			});
-			return Response.json({ text: "こんにちは" });
+			const scripted = voiceInputs.shift();
+			if (scripted) assessments.push(scripted);
+			return Response.json({ text: scripted?.text ?? "こんにちは" });
 		}
 		if (path === "/llm/v1/chat/completions") {
 			const body = (await request.json()) as {
@@ -309,7 +319,9 @@ const server = Bun.serve({
 				messages?: Array<{ role: string; content: string }>;
 			};
 			// Synthetic language-control response; fixture data, not production classification.
-			if (body.messages?.[0]?.content.includes("転記された発話の主要な言語"))
+			if (body.messages?.[0]?.content.includes("転記された発話の主要な言語")) {
+				const staged = body.messages[0].content.includes("音声の無音区間");
+				const assessment = staged ? assessments.shift() : undefined;
 				return Response.json({
 					choices: [
 						{
@@ -318,11 +330,20 @@ const server = Bun.serve({
 									status: "identified",
 									languages: ["ja"],
 									confidence: 0.99,
+									...(staged
+										? {
+												relation: assessment?.relation ?? "independent",
+												readiness: assessment?.readiness ?? "ready",
+												relationConfidence: 0.99,
+												readinessConfidence: 0.99,
+											}
+										: {}),
 								}),
 							},
 						},
 					],
 				});
+			}
 			const text = "承知しました。先ほどの話を覚えています。";
 			if (!body.stream)
 				return Response.json({ choices: [{ message: { content: text } }] });

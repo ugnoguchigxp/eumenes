@@ -8,6 +8,7 @@ import {
 	replayInputSchema,
 	sampleInputSchema,
 	voiceStartSchema,
+	inputCommitSchema,
 } from "../contracts";
 
 const log = getLogger("voice");
@@ -79,10 +80,25 @@ export function registerVoiceDialogue(
 				await service.preview(sessionId, generation, utteranceId, wav),
 			);
 		return c.json(
-			await service.accept(sessionId, generation, sequence, utteranceId, wav),
+			await service.accept(
+				sessionId,
+				generation,
+				sequence,
+				utteranceId,
+				wav,
+				c.req.header("x-voice-deferred") === "1",
+			),
 			202,
 		);
 	};
+	app.post("/api/voice/turns/:id/commit", async (c) => {
+		const parsed = await parseJsonBody(c, inputCommitSchema);
+		if (!parsed.ok) return parsed.response;
+		return c.json(
+			await service.commit(c.req.param("id"), parsed.data.revision),
+			202,
+		);
+	});
 	app.post("/api/voice/replay/sentences", async (c) => {
 		const parsed = await parseJsonBody(c, replayInputSchema);
 		if (!parsed.ok) return parsed.response;

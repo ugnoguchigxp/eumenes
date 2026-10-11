@@ -11,7 +11,10 @@ export function createVoiceBinding(
 		voiceSubject: string,
 		runSubject: string,
 		deadline?: number,
-		validation?: { validationRequestIds: string[] },
+		validation?: {
+			validationRequestIds: string[];
+			transcriptionRequestIds?: string[];
+		},
 	) {
 		const transcription = db
 			.query(
@@ -35,10 +38,29 @@ export function createVoiceBinding(
 			validation?.validationRequestIds ?? [],
 			valid,
 		);
-		if (transcription || extra.length) {
+		const transcriptions = validation?.transcriptionRequestIds ?? [];
+		if (
+			transcriptions.length > 32 ||
+			new Set(transcriptions).size !== transcriptions.length
+		)
+			throw new Error("invalid_voice_inference");
+		for (const id of transcriptions) {
+			const r = get(db, id);
+			if (
+				!r ||
+				r.purpose !== "asr" ||
+				r.status !== "accepted" ||
+				!valid(db, id)
+			)
+				throw new Error("permission_revoked");
+		}
+		if (transcription || extra.length || transcriptions.length) {
 			db.query("UPDATE inference_requests SET parents=? WHERE id=?").run(
 				JSON.stringify([
-					...(transcription ? [transcription.id] : []),
+					...new Set([
+						...(transcription ? [transcription.id] : []),
+						...transcriptions,
+					]),
 					...extra,
 				]),
 				row.id,
@@ -47,7 +69,10 @@ export function createVoiceBinding(
 				"UPDATE inference_requests SET parents=? WHERE subject=? AND purpose='tts'",
 			).run(
 				JSON.stringify([
-					...(transcription ? [transcription.id] : []),
+					...new Set([
+						...(transcription ? [transcription.id] : []),
+						...transcriptions,
+					]),
 					row.id,
 					...extra,
 				]),

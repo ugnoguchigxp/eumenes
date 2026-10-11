@@ -60,6 +60,7 @@ export interface Accept {
 	deadlineMs?: number;
 	voiceSubject?: string;
 	validationRequestIds?: string[];
+	transcriptionRequestIds?: string[];
 }
 
 /** Everything the dialogue service parts share: the injected ports. */
