@@ -23,7 +23,10 @@ const record = (id: string, state = "completed") => ({
 	updatedAt: 1,
 	createdAt: 1,
 });
-function setup(items = [record("a"), record("b")]) {
+function setup(
+	items = [record("a"), record("b")],
+	definition = musicArtifactDefinition("a"),
+) {
 	vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
 	const revoke = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
 	let count = 0;
@@ -40,10 +43,7 @@ function setup(items = [record("a"), record("b")]) {
 	const cache = new QueryClient();
 	const view = render(
 		<QueryClientProvider client={cache}>
-			<MusicArtifact
-				client={api as never}
-				definition={musicArtifactDefinition("a")}
-			/>
+			<MusicArtifact client={api as never} definition={definition} />
 		</QueryClientProvider>,
 	);
 	return { ...view, api, cache, revoke };
@@ -72,6 +72,32 @@ test("JSON composition loads authenticated audio, selects playlist tracks, and r
 	expect(result.revoke).toHaveBeenCalledWith("blob:music-1");
 	result.unmount();
 	expect(result.revoke).toHaveBeenCalledWith("blob:music-2");
+});
+test("an empty shared studio renders the creation form without requesting audio", async () => {
+	const r = setup([], musicArtifactDefinition());
+	await screen.findByRole("textbox", { name: "音楽作成プロンプト" });
+	expect(
+		screen.getByRole("button", { name: "楽曲を生成" }).hasAttribute("disabled"),
+	).toBe(false);
+	expect(r.api.musicAudio).not.toHaveBeenCalled();
+});
+test("a newer song updates the shared studio while preserving the same editable creation form", async () => {
+	const r = setup([record("a")], musicArtifactDefinition());
+	const draft = await screen.findByRole("textbox", {
+		name: "音楽作成プロンプト",
+	});
+	fireEvent.change(draft, { target: { value: "この制作プロンプトを残す" } });
+	r.cache.setQueryData(
+		["music", "list", "main"],
+		[{ ...record("b"), createdAt: 2, updatedAt: 2 }, record("a")],
+	);
+	await waitFor(() =>
+		expect(r.api.musicAudio).toHaveBeenCalledWith("b", expect.any(AbortSignal)),
+	);
+	expect(screen.getByRole("textbox", { name: "音楽作成プロンプト" })).toBe(
+		draft,
+	);
+	expect((draft as HTMLTextAreaElement).value).toBe("この制作プロンプトを残す");
 });
 test("same JSON transitions from generating to playable when authorized data updates", async () => {
 	const result = setup([record("a", "generating")]);

@@ -176,7 +176,9 @@ test("general research exposes available tools without a host invocation recomme
 		const tools = JSON.parse(
 			messages[0].content.split("TOOLS=")[1].split("\n")[0],
 		);
+		// web_search offers its saved-procedure lookup with the search on the first step.
 		expect(tools.map((tool: { id: string }) => tool.id)).toEqual([
+			"recipe.find",
 			"web.lookup",
 		]);
 		expect(JSON.parse(messages[1].content).nextInvocation).toBeUndefined();
@@ -632,7 +634,8 @@ test("CLI reads catalogue, task and summary through the authenticated API", asyn
 			expect(await proc.exited).toBe(0);
 			const value = JSON.parse(text);
 			if (args[0] === "capabilities") {
-				expect(value.items).toHaveLength(5);
+				// The web.recipe package of the web_search toolchain is listed too.
+				expect(value.items).toHaveLength(6);
 				expect(
 					value.items.some((v: { id: string }) => v.id === "web.search"),
 				).toBe(true);

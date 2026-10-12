@@ -1,11 +1,10 @@
-import { Codex } from "@openai/codex-sdk";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import type { ControlContract, Messages } from "../contracts";
 import { controlInstructions } from "../contracts";
 import { codexFailure, CodexResearchFailure } from "./codex-failure";
+import { codexRuntime, lockedCodex } from "./codex-sdk";
 
 const mission =
 	"You are Eumenes’s web researcher. Investigate the current originalRequest and task.question using TOOLS. Return one JSON object with action at the root, following the output definition below. Eumenes executes the selected operation and supplies its result on your next call. The input messages contain task state, host notices and untrusted acquired materials. Do not use native Codex tools, inspect files, or delegate.\n";
@@ -15,21 +14,8 @@ export function createCodexResearch(
 	environment: Readonly<Record<string, string | undefined>>,
 	executable = "codex",
 ) {
-	const command = Bun.which(executable, { PATH: environment.PATH ?? "" });
-	if (!command) return undefined;
-	const env: Record<string, string> = {};
-	for (const key of [
-		"PATH",
-		"HOME",
-		"CODEX_HOME",
-		"TMPDIR",
-		"LANG",
-		"LC_ALL",
-		"SSL_CERT_FILE",
-		"SSL_CERT_DIR",
-		"NODE_EXTRA_CA_CERTS",
-	])
-		if (environment[key] !== undefined) env[key] = environment[key]!;
+	const runtime = codexRuntime(environment, executable);
+	if (!runtime) return undefined;
 	return {
 		model: "gpt-6-luna",
 		async execute(
@@ -46,48 +32,11 @@ export function createCodexResearch(
 			let pending: Promise<string> | undefined;
 			let settled = false;
 			try {
-				const instructions = join(cwd, "instructions.md");
-				await writeFile(instructions, mission + controlInstructions(control), {
-					mode: 0o600,
-				});
-				const launcher = join(cwd, "codex-sdk-runtime");
-				await writeFile(
-					launcher,
-					`#!${process.execPath}\nimport { launchCodex } from ${JSON.stringify(fileURLToPath(new URL("./codex-launcher.ts", import.meta.url)))};\nlaunchCodex(${JSON.stringify(command)});\n`,
-					{ mode: 0o700 },
+				const sdk = await lockedCodex(
+					runtime,
+					cwd,
+					mission + controlInstructions(control),
 				);
-				const features = Object.fromEntries(
-					[
-						"shell_tool",
-						"js_repl",
-						"multi_agent",
-						"remote_plugin",
-						"apps",
-						"browser_use",
-						"browser_use_external",
-						"computer_use",
-						"image_generation",
-						"in_app_browser",
-						"plugins",
-						"skill_search",
-						"skill_mcp_dependency_install",
-						"goals",
-						"sleep_tool",
-						"view_image",
-					].map((name) => [name, false]),
-				);
-				const sdk = new Codex({
-					codexPathOverride: launcher,
-					env,
-					config: {
-						features: { ...features, skip_host_skill_discovery: true },
-						tools: { view_image: false },
-						project_doc_max_bytes: 0,
-						history: { persistence: "none" },
-						model_instructions_file: instructions,
-					},
-					configOverrides: ["mcp_servers={}"],
-				});
 				const thread = sdk.startThread({
 					model: "gpt-6-luna",
 					workingDirectory: cwd,

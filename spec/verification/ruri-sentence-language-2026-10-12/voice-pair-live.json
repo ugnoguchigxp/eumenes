@@ -1,0 +1,157 @@
+{
+  "date": "2026-10-12T11:08:50.101Z",
+  "samples": [
+    {
+      "japaneseVoice": "Shikoku_Metan",
+      "presentation": "feminine",
+      "englishVoice": "Rosie",
+      "model": "kitten-tts-nano-0.8-fp32",
+      "accepted": 1,
+      "bytes": 236044,
+      "exchanges": [
+        {
+          "connectionId": "aconn_epoch-09680c28-92db-4388-ab05-a473587ab9b3_d3698fdb-1a15-4ed9-92f5-424e9c4ac520",
+          "model": "ruri-v3-30m-sentence-language",
+          "started": 1791803330146,
+          "httpStatus": 200,
+          "operation": "systemone"
+        },
+        {
+          "connectionId": "aconn_epoch-09680c28-92db-4388-ab05-a473587ab9b3_d3698fdb-1a15-4ed9-92f5-424e9c4ac520",
+          "model": "kitten-tts-nano-0.8-fp32",
+          "started": 1791803330207,
+          "httpStatus": 200,
+          "operation": "audio/speech",
+          "speechVoice": "Rosie"
+        }
+      ]
+    },
+    {
+      "japaneseVoice": "Zundamon",
+      "presentation": "androgynous",
+      "englishVoice": "Rosie",
+      "model": "kitten-tts-nano-0.8-fp32",
+      "accepted": 1,
+      "bytes": 236044,
+      "exchanges": [
+        {
+          "connectionId": "aconn_epoch-09680c28-92db-4388-ab05-a473587ab9b3_9a6b420a-32c7-47ee-a958-f8e4638e415d",
+          "model": "ruri-v3-30m-sentence-language",
+          "started": 1791803330491,
+          "httpStatus": 200,
+          "operation": "systemone"
+        },
+        {
+          "connectionId": "aconn_epoch-09680c28-92db-4388-ab05-a473587ab9b3_9a6b420a-32c7-47ee-a958-f8e4638e415d",
+          "model": "kitten-tts-nano-0.8-fp32",
+          "started": 1791803330528,
+          "httpStatus": 200,
+          "operation": "audio/speech",
+          "speechVoice": "Rosie"
+        }
+      ]
+    },
+    {
+      "japaneseVoice": "Kasukabe_Tsumugi",
+      "presentation": "feminine",
+      "englishVoice": "Rosie",
+      "model": "kitten-tts-nano-0.8-fp32",
+      "accepted": 1,
+      "bytes": 236044,
+      "exchanges": [
+        {
+          "connectionId": "aconn_epoch-09680c28-92db-4388-ab05-a473587ab9b3_edbdbd8d-c266-4138-92b3-ea9249126274",
+          "model": "ruri-v3-30m-sentence-language",
+          "started": 1791803330734,
+          "httpStatus": 200,
+          "operation": "systemone"
+        },
+        {
+          "connectionId": "aconn_epoch-09680c28-92db-4388-ab05-a473587ab9b3_edbdbd8d-c266-4138-92b3-ea9249126274",
+          "model": "kitten-tts-nano-0.8-fp32",
+          "started": 1791803330778,
+          "httpStatus": 200,
+          "operation": "audio/speech",
+          "speechVoice": "Rosie"
+        }
+      ]
+    },
+    {
+      "japaneseVoice": "Amehare_Hau",
+      "presentation": "feminine",
+      "englishVoice": "Rosie",
+      "model": "kitten-tts-nano-0.8-fp32",
+      "accepted": 1,
+      "bytes": 236044,
+      "exchanges": [
+        {
+          "connectionId": "aconn_epoch-09680c28-92db-4388-ab05-a473587ab9b3_adbbd9b0-07ef-4430-a1ce-5e430a17793c",
+          "model": "ruri-v3-30m-sentence-language",
+          "started": 1791803330987,
+          "httpStatus": 200,
+          "operation": "systemone"
+        },
+        {
+          "connectionId": "aconn_epoch-09680c28-92db-4388-ab05-a473587ab9b3_adbbd9b0-07ef-4430-a1ce-5e430a17793c",
+          "model": "kitten-tts-nano-0.8-fp32",
+          "started": 1791803331025,
+          "httpStatus": 200,
+          "operation": "audio/speech",
+          "speechVoice": "Rosie"
+        }
+      ]
+    },
+    {
+      "japaneseVoice": "Kurono_Takehiro",
+      "presentation": "masculine",
+      "englishVoice": "Jasper",
+      "model": "kitten-tts-nano-0.8-fp32",
+      "accepted": 1,
+      "bytes": 214444,
+      "exchanges": [
+        {
+          "connectionId": "aconn_epoch-09680c28-92db-4388-ab05-a473587ab9b3_4f70f792-6a25-4aa0-9b47-4b35bb35934f",
+          "model": "ruri-v3-30m-sentence-language",
+          "started": 1791803331246,
+          "httpStatus": 200,
+          "operation": "systemone"
+        },
+        {
+          "connectionId": "aconn_epoch-09680c28-92db-4388-ab05-a473587ab9b3_4f70f792-6a25-4aa0-9b47-4b35bb35934f",
+          "model": "kitten-tts-nano-0.8-fp32",
+          "started": 1791803331283,
+          "httpStatus": 200,
+          "operation": "audio/speech",
+          "speechVoice": "Jasper"
+        }
+      ]
+    },
+    {
+      "japaneseVoice": "Kenzaki_Mesuo",
+      "presentation": "masculine",
+      "englishVoice": "Jasper",
+      "model": "kitten-tts-nano-0.8-fp32",
+      "accepted": 1,
+      "bytes": 214444,
+      "exchanges": [
+        {
+          "connectionId": "aconn_epoch-09680c28-92db-4388-ab05-a473587ab9b3_b96b6083-27f2-4fc7-8fba-a9e29cef1ebc",
+          "model": "ruri-v3-30m-sentence-language",
+          "started": 1791803331492,
+          "httpStatus": 200,
+          "operation": "systemone"
+        },
+        {
+          "connectionId": "aconn_epoch-09680c28-92db-4388-ab05-a473587ab9b3_b96b6083-27f2-4fc7-8fba-a9e29cef1ebc",
+          "model": "kitten-tts-nano-0.8-fp32",
+          "started": 1791803331531,
+          "httpStatus": 200,
+          "operation": "audio/speech",
+          "speechVoice": "Jasper"
+        }
+      ]
+    }
+  ],
+  "result": "passed",
+  "restored": true
+}

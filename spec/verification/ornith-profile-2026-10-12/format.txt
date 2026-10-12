@@ -1,0 +1,5 @@
+$ oxfmt --check scripts/ornith-profile-live.ts client/test/settings-tasks.test.ts
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 1ms on 2 files using 10 threads.

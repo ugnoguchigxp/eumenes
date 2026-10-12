@@ -1,3 +1,4 @@
+import { createToolchainCommandHandler } from "./toolchain-command";
 import type { Database } from "bun:sqlite";
 import { getLogger } from "../../../infrastructure/logger";
 import { type AgentRuntime } from "../../agent-runtime";
@@ -52,6 +53,7 @@ export function createDialogueService({
 	delegation,
 	music,
 	worldContext,
+	toolchains,
 }: {
 	store: SqliteStore;
 	conversation: ConversationService;
@@ -65,6 +67,7 @@ export function createDialogueService({
 	music?: import("../contracts/music").MusicPort;
 	delegation?: import("../contracts/delegation").DelegationPort;
 	worldContext?: WorldContextPort;
+	toolchains?: import("../contracts/toolchains").ToolchainRoutingPort;
 }) {
 	const deps: DialogueDeps = {
 		store,
@@ -79,9 +82,11 @@ export function createDialogueService({
 		delegation,
 		music,
 		worldContext,
+		toolchains,
 	};
 	const progress = createProgress(deps);
 	queue.registerHandler(createGenerationHandler(deps, progress));
+	queue.registerHandler(createToolchainCommandHandler(deps));
 	const intake = createIntake(deps);
 	const agentSync = createAgentSync(deps);
 	const service = {

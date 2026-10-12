@@ -1,0 +1,283 @@
+import type { Database } from "bun:sqlite";
+import { zSchema } from "./schema";
+import {
+	hash,
+	type FixedDefinition,
+	type ToolchainCard,
+	type VectorSpace,
+} from "../contracts";
+
+const RRF_K = 60;
+const MAX_GRAMS = 48;
+
+/** Stable key of a vector space; vectors of different spaces are never compared. */
+export function vectorSpaceKey(space: VectorSpace) {
+	return hash([
+		space.modelId,
+		space.revision,
+		space.artifactDigest,
+		space.dimension,
+	]).slice(0, 32);
+}
+export function packVector(values: number[]) {
+	return new Uint8Array(new Float32Array(values).buffer);
+}
+export function unpackVector(blob: Uint8Array) {
+	const copy = new Uint8Array(blob);
+	return new Float32Array(copy.buffer, 0, copy.byteLength / 4);
+}
+export function dot(a: ArrayLike<number>, b: ArrayLike<number>) {
+	let sum = 0;
+	for (let i = 0; i < a.length; i++) sum += a[i]! * b[i]!;
+	return sum;
+}
+/** The passages a toolchain is found by: its purpose, use cases and example requests. */
+export function toolchainPassages(d: FixedDefinition) {
+	return [`${d.title}: ${d.summary}`, ...d.useWhen, ...(d.examples ?? [])];
+}
+/** Character trigrams of the request, for the trigram FTS index (no word dictionary). */
+function trigrams(text: string) {
+	const chars = [...text.normalize("NFKC").replace(/\s+/g, " ").trim()];
+	const grams = new Set<string>();
+	for (let i = 0; i + 3 <= chars.length && grams.size < MAX_GRAMS; i++) {
+		const gram = chars.slice(i, i + 3).join("");
+		if (gram.trim().length === 3) grams.add(gram);
+	}
+	return [...grams];
+}
+
+export function createToolchains(
+	closure: (db: Database, revisionId: string) => FixedDefinition[],
+) {
+	function activeInTransaction(db: Database) {
+		const rows = db
+			.query(
+				"SELECT active_revision_id FROM capability_items WHERE kind='toolchain' AND enabled=1 ORDER BY key",
+			)
+			.all() as { active_revision_id: string }[];
+		return rows.flatMap((r) => {
+			try {
+				// The whole package (and its backend) must still be available.
+				return [closure(db, r.active_revision_id)[0]!];
+			} catch {
+				return [];
+			}
+		});
+	}
+	function pendingVectorsInTransaction(db: Database, space: VectorSpace) {
+		const key = vectorSpaceKey(space);
+		return activeInTransaction(db).flatMap((d) =>
+			toolchainPassages(d).flatMap((text, item) => {
+				const row = db
+					.query(
+						"SELECT text_digest FROM capability_toolchain_vectors WHERE revision_id=? AND item=? AND space=?",
+					)
+					.get(d.revisionId, item, key) as { text_digest: string } | null;
+				return row?.text_digest === hash(text)
+					? []
+					: [{ revisionId: d.revisionId, item, text }];
+			}),
+		);
+	}
+	function saveVectorsInTransaction(
+		db: Database,
+		space: VectorSpace,
+		rows: Array<{
+			revisionId: string;
+			item: number;
+			text: string;
+			vector: number[];
+		}>,
+	) {
+		const key = vectorSpaceKey(space);
+		const active = new Map(
+			activeInTransaction(db).map((d) => [d.revisionId, d] as const),
+		);
+		for (const row of rows) {
+			const d = active.get(row.revisionId);
+			// A changed or retired definition is simply not stored; the next refresh recomputes it.
+			if (!d || toolchainPassages(d)[row.item] !== row.text) continue;
+			if (row.vector.length !== space.dimension)
+				throw new Error("invalid_embedding_result");
+			db.query(
+				"INSERT INTO capability_toolchain_vectors(revision_id,item,space,text_digest,vector) VALUES(?,?,?,?,?) ON CONFLICT(revision_id,item,space) DO UPDATE SET text_digest=excluded.text_digest,vector=excluded.vector",
+			).run(
+				row.revisionId,
+				row.item,
+				key,
+				hash(row.text),
+				packVector(row.vector),
+			);
+		}
+	}
+	/**
+	 * Rank the available toolchains for a request: trigram FTS, vector similarity and toolchains
+	 * chosen before for similar requests, merged with reciprocal rank fusion. Retrieval only:
+	 * the conversation model makes the choice.
+	 */
+	function candidatesInTransaction(
+		db: Database,
+		input: {
+			text: string;
+			vector?: { space: VectorSpace; values: number[] };
+			available: (toolchainId: string) => boolean;
+			fromHistory?: string[];
+			limit?: number;
+		},
+	): ToolchainCard[] {
+		const active = activeInTransaction(db).filter((d) => input.available(d.id));
+		const byRevision = new Map(active.map((d) => [d.revisionId, d]));
+		const ftsRank = new Map<string, number>();
+		const grams = trigrams(input.text);
+		if (grams.length)
+			(
+				db
+					.query(
+						"SELECT key,bm25(capability_search) AS rank FROM capability_search WHERE capability_search MATCH ? AND key LIKE 'toolchain:%' ORDER BY rank LIMIT 32",
+					)
+					.all(
+						grams.map((g) => '"' + g.replaceAll('"', '""') + '"').join(" OR "),
+					) as { key: string }[]
+			).forEach((row) => {
+				const d = active.find((x) => `toolchain:${x.id}` === row.key);
+				if (d && !ftsRank.has(d.revisionId))
+					ftsRank.set(d.revisionId, ftsRank.size + 1);
+			});
+		const similarity = new Map<string, number>();
+		if (input.vector) {
+			const key = vectorSpaceKey(input.vector.space);
+			for (const row of db
+				.query(
+					"SELECT revision_id,vector FROM capability_toolchain_vectors WHERE space=?",
+				)
+				.all(key) as { revision_id: string; vector: Uint8Array }[]) {
+				if (!byRevision.has(row.revision_id)) continue;
+				const values = unpackVector(row.vector);
+				if (values.length !== input.vector.values.length) continue;
+				const score = dot(values, input.vector.values);
+				if (score > (similarity.get(row.revision_id) ?? -Infinity))
+					similarity.set(row.revision_id, score);
+			}
+		}
+		const vectorRank = new Map(
+			[...similarity.entries()]
+				.sort((a, b) => b[1] - a[1])
+				.map(([id], i) => [id, i + 1] as const),
+		);
+		const historyRank = new Map<string, number>();
+		for (const id of input.fromHistory ?? []) {
+			const d = active.find((x) => x.id === id);
+			if (d && !historyRank.has(d.revisionId))
+				historyRank.set(d.revisionId, historyRank.size + 1);
+		}
+		const ranked = active
+			.map((d) => {
+				const ranks = [
+					ftsRank.get(d.revisionId),
+					vectorRank.get(d.revisionId),
+					historyRank.get(d.revisionId),
+				].filter((r): r is number => r !== undefined);
+				return {
+					d,
+					score: ranks.reduce((s, r) => s + 1 / (RRF_K + r), 0),
+					signals: ranks.length,
+				};
+			})
+			.sort((a, b) => b.score - a.score || a.d.id.localeCompare(b.d.id));
+		// Narrowing needs the semantic signal. Without a query vector (provider unavailable or
+		// vectors not yet computed) every available toolchain is offered, ranked by the other
+		// signals, so a missing index never hides a capability.
+		const fused =
+			similarity.size > 0
+				? ranked
+						.filter((x) => x.signals > 0)
+						.slice(0, Math.min(8, Math.max(1, input.limit ?? 4)))
+				: ranked.slice(0, 8);
+		const functionOf = new Map(active.map((d) => [d.id, d.functionName!]));
+		return fused.map(({ d }, i) => ({
+			revisionId: d.revisionId,
+			id: d.id,
+			functionName: d.functionName!,
+			title: d.title,
+			summary: d.summary,
+			useWhen: d.useWhen,
+			redirects: (d.redirects ?? []).flatMap((r) =>
+				functionOf.has(r.toolchainId)
+					? [
+							{
+								when: r.when,
+								toolchainId: r.toolchainId,
+								functionName: functionOf.get(r.toolchainId)!,
+							},
+						]
+					: [],
+			),
+			score: {
+				rank: i + 1,
+				ftsRank: ftsRank.get(d.revisionId) ?? null,
+				similarity: similarity.has(d.revisionId)
+					? Number(similarity.get(d.revisionId)!.toFixed(4))
+					: null,
+				fromHistory: historyRank.has(d.revisionId),
+			},
+		}));
+	}
+	/** The exact active toolchain revision and its package, or an error code. */
+	function resolveInTransaction(db: Database, revisionId: string) {
+		const d = activeInTransaction(db).find((x) => x.revisionId === revisionId);
+		if (!d) throw new Error("toolchain_unavailable");
+		return { toolchain: d, packageRevisionId: d.packageRevisionId! };
+	}
+	/**
+	 * The fixed set a sub-agent loads: the package's profile (SystemContext), SKILL bodies and
+	 * tool details (id, summary, input schema), resolved from the exact active revision.
+	 */
+	function setInTransaction(db: Database, revisionId: string) {
+		const { toolchain, packageRevisionId } = resolveInTransaction(
+			db,
+			revisionId,
+		);
+		const all = closure(db, packageRevisionId);
+		const pack = all[0]!;
+		const byId = new Map(all.map((d) => [d.revisionId, d]));
+		const profile = byId.get(pack.profileRevisionId ?? "")?.body?.trim();
+		const skills = (pack.requiredSkillRevisionIds ?? []).map((id) =>
+			byId.get(id)?.body?.trim(),
+		);
+		if (!profile || skills.some((b) => !b))
+			throw new Error("required_context_missing");
+		return {
+			toolchain,
+			package: pack,
+			profile,
+			skills: skills as string[],
+			tools: (pack.toolRevisionIds ?? []).map((id) => {
+				const tool = byId.get(id);
+				if (!tool) throw new Error("required_context_missing");
+				return {
+					id: tool.id,
+					revisionId: tool.revisionId,
+					summary: tool.summary,
+					schema: tool.schemaKey ? zSchema(tool.schemaKey) : null,
+				};
+			}),
+		};
+	}
+	/** Every active toolchain's examples, for routing evaluation. */
+	function examplesInTransaction(db: Database) {
+		return activeInTransaction(db).map((d) => ({
+			id: d.id,
+			functionName: d.functionName!,
+			examples: d.examples ?? [],
+		}));
+	}
+	return {
+		toolchainsInTransaction: activeInTransaction,
+		pendingToolchainVectorsInTransaction: pendingVectorsInTransaction,
+		saveToolchainVectorsInTransaction: saveVectorsInTransaction,
+		toolchainCandidatesInTransaction: candidatesInTransaction,
+		resolveToolchainInTransaction: resolveInTransaction,
+		toolchainSetInTransaction: setInTransaction,
+		toolchainExamplesInTransaction: examplesInTransaction,
+	};
+}

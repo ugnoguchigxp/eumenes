@@ -3,6 +3,7 @@ import { createDotsPackages } from "./dots-packages";
 import { registerRevision } from "./registry";
 import { zSchema } from "./schema";
 import { createRequirements } from "./requirements";
+import { createToolchains } from "./toolchains";
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import {
@@ -370,6 +371,7 @@ export function createCapabilities(
 	return {
 		...createRequirements(store, register),
 		...createDotsPackages(store, register),
+		...createToolchains(closure),
 		getDefinitionInTransaction,
 		registerBuiltinInTransaction,
 		registerLearnedInTransaction,

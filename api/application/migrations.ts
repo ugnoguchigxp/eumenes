@@ -12,7 +12,8 @@ import { migrations as goalsMigrations } from "../domains/goals";
 import { migrations as inferenceMigrations } from "../domains/inference";
 import { migrations as memoryMigrations } from "../domains/memory";
 import { migrations as queueMigrations } from "../domains/queue";
-import { migrations as researchRoutesMigrations } from "../domains/research-routes";
+import { retiredResearchRoutesMigrations } from "./retired-migrations";
+import { migrations as toolchainHistoryMigrations } from "../domains/toolchain-history";
 import { migrations as schedulerMigrations } from "../domains/scheduler";
 import { migrations as serviceTestsMigrations } from "../domains/service-tests";
 import { migrations as settingsMigrations } from "../domains/settings";
@@ -149,7 +150,8 @@ const catalog: readonly Migration[] = [
 	...goalsMigrations,
 	...tasksMigrations,
 	...dotsMigrations,
-	...researchRoutesMigrations,
+	...retiredResearchRoutesMigrations,
+	...toolchainHistoryMigrations,
 	...packageMigrations("world-package", worldPackageSql),
 	...worldMigrations,
 	...timersMigrations,

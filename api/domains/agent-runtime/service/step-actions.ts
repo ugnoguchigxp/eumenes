@@ -201,14 +201,17 @@ export function createStepActions(ctx: RuntimeContext, ops: TaskOps) {
 						? firstResearchAction
 						: researchAction
 			).parse(parsed.data);
-			if (!input.search && input.first)
+			if (!input.search && input.first) {
+				const first = firstResearchAction.parse(parsed.data);
 				freezeRequirements(
 					db,
 					t,
-					firstResearchAction.parse(parsed.data).requirements,
+					first.requirements,
 					capabilities,
 					now(),
+					first.requirementProfiles ?? [],
 				);
+			}
 			const frozen = input.search
 				? null
 				: readRequirements(db, t, capabilities);
@@ -266,7 +269,10 @@ export function createStepActions(ctx: RuntimeContext, ops: TaskOps) {
 						isSearch(toolRuntimeOf(tool.tool.revisionId)) ? "search" : "read",
 					);
 			} else if (input.search) {
-				saveSearchReport(db, t, action.report, input.catalog, tools, now());
+				saveSearchReport(db, t, action.report, input.catalog, tools, now(), {
+					hook: ctx.deps.onSearchReport,
+					packageId: prepared.get(t.id)?.package.id,
+				});
 				db.query(
 					"UPDATE agent_tasks SET report_state='available' WHERE id=?",
 				).run(t.id);

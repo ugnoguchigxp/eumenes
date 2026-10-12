@@ -1,0 +1,29 @@
+.music-library-artifact {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	min-height: 0;
+}
+.music-library-artifact > .artifact-ui {
+	flex: 1;
+	min-height: 0;
+}
+.music-library-playlist-picker {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	flex-shrink: 0;
+	padding: 0.6rem 1rem;
+	border-bottom: 1px solid var(--border);
+	font-size: 0.8rem;
+}
+.music-library-playlist-picker select {
+	max-width: 100%;
+	min-width: 0;
+	padding: 0.4rem;
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	background: var(--background);
+	color: var(--foreground);
+}

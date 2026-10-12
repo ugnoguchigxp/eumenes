@@ -1,0 +1,1 @@
+$ oxlint --deny-warnings scripts/ornith-profile-live.ts api/domains/larm/service/connect.ts api/domains/larm/service/index.ts api/domains/larm/test/ornith-foreground.test.ts api/domains/larm/test/ornith-sessions.test.ts

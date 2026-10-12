@@ -386,7 +386,9 @@ export function SmallForm({ request }: { request: ArtifactRequest }) {
 					))}
 					<div className="aui-row">
 						<Button type="submit" disabled={action.pending}>
-							{action.pending ? "送信中" : "フォームを送信"}
+							{action.pending
+								? "送信中"
+								: (data.submitLabel ?? "フォームを送信")}
 						</Button>
 						<Button
 							type="button"

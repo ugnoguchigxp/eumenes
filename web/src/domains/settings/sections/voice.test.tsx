@@ -34,5 +34,9 @@ test("voice section renders the speech and device cards", async () => {
 	);
 	expect(screen.getByText("アバターの読み上げ音声")).toBeTruthy();
 	expect(screen.getByText("声での会話")).toBeTruthy();
+	expect(screen.queryByLabelText("言語判定の接続先")).toBeNull();
+	expect(screen.queryByLabelText("英語の声")).toBeNull();
+	expect(screen.queryByLabelText("英語の男性の声")).toBeNull();
+	expect(screen.queryByRole("slider", { name: /英語の速さ/ })).toBeNull();
 	cache.clear();
 });

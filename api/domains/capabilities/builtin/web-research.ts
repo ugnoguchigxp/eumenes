@@ -499,3 +499,64 @@ builtins.push({
 	),
 	requiredSkillRevisionIds: ["skill:web.search@1"],
 });
+
+// The web_search toolchain: a saved fetch procedure first, then one search and one read.
+builtins.push(
+	{
+		...base,
+		kind: "tool",
+		id: "recipe.find",
+		title: "保存済みの取得手順",
+		summary:
+			"同じ要求の保存済み取得手順の候補を返す。titleは手順の要約、urlは取得し直すページ",
+		dependencies: [],
+		backend: "web",
+		schemaKey: "recipeFind",
+	},
+	{
+		...base,
+		kind: "profile",
+		id: "web.recipe",
+		title: "一つの事実を確認する担当",
+		summary: "保存済みの取得先か検索で一つの事実を確認し、出典付きで返す",
+		dependencies: [],
+		body: "あなたはEumenesのWeb検索ツールチェーンの担当です。天気・一銘柄の株価・言葉の定義・地名・人物・指定URLの一項目など、一つの事実を確認し、出典付きで会話担当へ返します。下の手順に従い、提示された予算の中で一手ずつ進めます。",
+	},
+	{
+		...base,
+		kind: "skill",
+		id: "web.recipe",
+		title: "手順キャッシュ付きの短い確認",
+		summary: "保存済み手順の確認、固定URLの再取得、検索、手順の保存候補の報告",
+		dependencies: [],
+		body: readFileSync(
+			new URL("./web-recipe/SKILL.md", import.meta.url),
+			"utf8",
+		),
+	},
+	{
+		...base,
+		kind: "package",
+		id: "web.recipe",
+		title: "Web検索(手順キャッシュ付き)",
+		summary: "一つの事実を、保存済みの取得先か検索で短く確認する",
+		useWhen: ["天気・株価・言葉の定義・地名・人物など一つの事実の確認"],
+		avoidWhen: ["ニュースの整理", "複数資料の比較"],
+		backend: "web",
+		schemaKey: "research",
+		dependencies: [
+			"profile:web.recipe@1",
+			"skill:web.recipe@1",
+			"tool:recipe.find@1",
+			"tool:web.lookup@1",
+			"tool:web.read@1",
+		],
+		profileRevisionId: "profile:web.recipe@1",
+		requiredSkillRevisionIds: ["skill:web.recipe@1"],
+		toolRevisionIds: [
+			"tool:recipe.find@1",
+			"tool:web.lookup@1",
+			"tool:web.read@1",
+		],
+	},
+);

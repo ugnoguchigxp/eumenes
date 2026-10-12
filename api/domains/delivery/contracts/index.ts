@@ -37,6 +37,8 @@ export type DeliveryContext = {
 };
 /** Internal preparation; a reused delivery must come from an adopted receipt. */
 export type SpeechPreparation = {
+	/** Complete spoken source, before language-specific dictionary rewrites. */
+	languageSource?: { text: string; scope: string };
 	context?: DeliveryContext;
 	collection?: {
 		conversationId: string;
@@ -47,6 +49,7 @@ export type SpeechPreparation = {
 	};
 	delivery?: SpeechDelivery;
 };
+export { SpeechLanguageError } from "./sentence-language";
 export const speechDeliverySchema = z.object({
 	id: z.uuid(),
 	version: z.literal(2).optional(),

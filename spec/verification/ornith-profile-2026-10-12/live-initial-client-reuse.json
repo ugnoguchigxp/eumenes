@@ -1,0 +1,32 @@
+{
+  "date": "2026-10-12T11:56:47.701Z",
+  "savedSettingsPreserved": true,
+  "events": [
+    {
+      "id": "aconn_epoch-18d96c1a-f9b9-407f-b818-e9cdcb538b2f_48662ce4-7296-445d-a46d-9665a07ae77e",
+      "profile": "ornith1.5Strix",
+      "status": "pending",
+      "phase": "deploying",
+      "http": 202
+    },
+    {
+      "id": "aconn_epoch-18d96c1a-f9b9-407f-b818-e9cdcb538b2f_48662ce4-7296-445d-a46d-9665a07ae77e",
+      "profile": "ornith1.5Strix",
+      "status": "ready",
+      "phase": "ready",
+      "http": 200
+    },
+    {
+      "id": "aconn_epoch-18d96c1a-f9b9-407f-b818-e9cdcb538b2f_ab402d86-bac2-4e70-8d64-21c0d6b3ff0b",
+      "profile": "ornith1.5Strix-64k",
+      "status": "ready",
+      "phase": "ready",
+      "http": 201
+    }
+  ],
+  "providers": [],
+  "result": "failed",
+  "error": "live_session_layout_mismatch",
+  "createdConnections": 2,
+  "releasedConnections": 2
+}

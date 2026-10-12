@@ -10,7 +10,7 @@ import { eventsClient } from "./events";
 import { larmClient } from "./larm";
 import { memoryClient } from "./memory";
 import { queueClient } from "./queue";
-import { researchRoutesClient } from "./research-routes";
+import { toolchainHistoryClient } from "./toolchain-history";
 import { schedulerClient } from "./scheduler";
 import { settingsClient } from "./settings";
 import { serviceTestsClient } from "./service-tests";
@@ -47,7 +47,7 @@ export function createClient(baseUrl: string, token?: string) {
 		...tasksClient(transport),
 		...codingClient(transport),
 		...codingSupervisionClient(transport),
-		...researchRoutesClient(transport),
+		...toolchainHistoryClient(transport),
 		...timersClient(transport),
 		...worldClient(transport),
 	};

@@ -10,6 +10,7 @@ import {
 } from "@eumenes/artifact-ui/contracts";
 import { queryRoots } from "../../queryKeys";
 import { useMusicCreation } from "./use-music-creation";
+import { musicStudioSource } from "./artifact-definition";
 
 export function useMusicRuntime(
 	client: EumenesClient,
@@ -38,17 +39,30 @@ export function useMusicRuntime(
 			return new Set<string>();
 		}
 	})();
-	const initial = items.find(
+	const legacy = items.find(
 		(item) =>
 			sources.has(`music-${item.id}`) || sources.has(`generation-${item.id}`),
 	);
+	const studio = sources.has(musicStudioSource);
+	const authorized = studio || !!legacy;
+	const initial = studio
+		? items.reduce<(typeof items)[number] | undefined>(
+				(latest, item) =>
+					!latest || item.createdAt > latest.createdAt ? item : latest,
+				undefined,
+			)
+		: legacy;
+	const source = studio ? musicStudioSource : `music-${legacy?.id}`;
 	const creation = useMusicCreation(client, conversationId, items, initial);
 	useEffect(() => {
 		waitingForCreation.current = creation.busy;
 	}, [creation.busy]);
-	const [selected, setSelected] = useState<string>();
-	const selectedItem = initial
-		? (items.find((item) => item.id === selected) ??
+	const [selected, setSelected] = useState<{ id: string; latestId?: string }>();
+	const selectedItem = authorized
+		? (items.find(
+				(item) =>
+					selected?.latestId === initial?.id && item.id === selected?.id,
+			) ??
 			creation.submitted ??
 			initial)
 		: undefined;
@@ -79,16 +93,16 @@ export function useMusicRuntime(
 		};
 	}, [client, id, ready]);
 	const snapshot: Record<string, Snapshot[string]> = {};
-	if (initial && selectedItem) {
+	if (authorized) {
 		const revision =
-			Math.max(...items.map((item) => item.updatedAt)) + creation.revision;
+			Math.max(0, ...items.map((item) => item.updatedAt)) + creation.revision;
 		const url = audio && audio.id === id ? audio.url : undefined;
-		snapshot[`music-${initial.id}`] = {
+		snapshot[source] = {
 			kind: "music",
 			revision,
-			currentId: selectedItem.id,
+			currentId: selectedItem?.id ?? "",
 			creation:
-				audioError === id
+				audioError && audioError === id
 					? {
 							...creation.creation,
 							status: "failed",
@@ -110,43 +124,44 @@ export function useMusicRuntime(
 				downloadName: `${item.title}.${item.mime === "audio/ogg" ? "opus" : item.mime === "audio/mpeg" ? "mp3" : item.mime === "audio/flac" ? "flac" : "wav"}`,
 			})),
 		};
-		snapshot[`generation-${initial.id}`] = {
-			kind: "generation",
-			revision,
-			status:
-				audioError === id
-					? "failed"
-					: ready
-						? url
-							? "completed"
-							: "running"
-						: selectedItem.state === "planning"
-							? "pending"
-							: selectedItem.state === "generating"
-								? "running"
-								: selectedItem.state,
-			hidden: ready && !!url,
-			title:
-				audioError === id
-					? "音声を取得できませんでした"
-					: ready
-						? "音声を読み込み中です"
-						: selectedItem.state === "failed"
-							? "楽曲を作成できませんでした"
-							: selectedItem.state === "cancelled"
-								? "楽曲の制作を取り消しました"
-								: "楽曲を生成しています",
-			description:
-				!ready && selectedItem.state === "planning"
-					? "テーマから曲調を考えています。"
-					: undefined,
-		};
+		if (legacy && selectedItem)
+			snapshot[`generation-${legacy.id}`] = {
+				kind: "generation",
+				revision,
+				status:
+					audioError === id
+						? "failed"
+						: ready
+							? url
+								? "completed"
+								: "running"
+							: selectedItem.state === "planning"
+								? "pending"
+								: selectedItem.state === "generating"
+									? "running"
+									: selectedItem.state,
+				hidden: ready && !!url,
+				title:
+					audioError === id
+						? "音声を取得できませんでした"
+						: ready
+							? "音声を読み込み中です"
+							: selectedItem.state === "failed"
+								? "楽曲を作成できませんでした"
+								: selectedItem.state === "cancelled"
+									? "楽曲の制作を取り消しました"
+									: "楽曲を生成しています",
+				description:
+					!ready && selectedItem.state === "planning"
+						? "テーマから曲調を考えています。"
+						: undefined,
+			};
 	}
 	const dispatch = async (event: ArtifactEvent): Promise<Receipt> => {
 		const resource = snapshot[event.source];
 		if (
-			!initial ||
-			event.source !== `music-${initial.id}` ||
+			!authorized ||
+			event.source !== source ||
 			resource?.kind !== "music" ||
 			!["music-select", "music-generate", "music-cancel"].includes(event.action)
 		)
@@ -197,12 +212,16 @@ export function useMusicRuntime(
 		if (!target)
 			return { status: "rejected", message: "この楽曲は再生できません。" };
 		seen.current.add(event.id);
-		setSelected(target.id);
+		setSelected({ id: target.id, latestId: initial?.id });
 		return { status: "accepted", message: "楽曲を選択しました。" };
 	};
 	return {
 		runtime: { snapshot, dispatch },
 		loading: query.isPending,
-		error: query.error,
+		error:
+			query.error ??
+			(!query.isPending && !authorized
+				? new Error("unauthorized_source")
+				: null),
 	};
 }

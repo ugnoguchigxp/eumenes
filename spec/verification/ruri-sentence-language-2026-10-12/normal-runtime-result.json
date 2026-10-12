@@ -1,0 +1,29 @@
+{
+  "date": "2026-10-12T09:33:25.524Z",
+  "revision": 18,
+  "enabled": true,
+  "provider": "sentence-language",
+  "samples": [
+    {
+      "language": "ja",
+      "bytes": 109612,
+      "ms": 2900.830958,
+      "model": "voicevox-core",
+      "accepted": 1,
+      "connections": [
+        "aconn_epoch-09680c28-92db-4388-ab05-a473587ab9b3_3f16f297-38c1-4ccd-b936-757f8fed36a0"
+      ]
+    },
+    {
+      "language": "en",
+      "bytes": 196444,
+      "ms": 2125.8046660000005,
+      "model": "kitten-tts-nano-0.8-fp32",
+      "accepted": 1,
+      "connections": [
+        "aconn_epoch-09680c28-92db-4388-ab05-a473587ab9b3_3f16f297-38c1-4ccd-b936-757f8fed36a0"
+      ]
+    }
+  ],
+  "result": "normal_runtime_routing_passed"
+}

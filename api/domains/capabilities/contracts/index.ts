@@ -10,6 +10,7 @@ import { timerCancel, timerCommand, timerList, timerStart } from "./timers";
 export { timerCancel, timerCommand, timerList, timerStart };
 export { timerResultContext, type TimerResultContext } from "./timers";
 import { publicUrl } from "./public-url";
+import { toolchainRequest } from "./toolchains";
 export { publicUrl };
 export const researchInput = z
 	.object({
@@ -98,6 +99,17 @@ export const historyRead = z
 	})
 	.strict()
 	.refine((v) => v.before + v.after < 10);
+/** Saved fetch procedures of the current toolchain; the sub-agent judges whether one matches. */
+export const recipeFindInput = z
+	.object({
+		query: z
+			.string()
+			.trim()
+			.min(1)
+			.max(200)
+			.describe("現在の依頼を対象と知りたい内容で短く表した文。"),
+	})
+	.strict();
 export const validators = {
 	musicRequest,
 	musicPlan,
@@ -114,6 +126,8 @@ export const validators = {
 	research: researchInput,
 	lookup: lookupInput,
 	read: readInput,
+	recipeFind: recipeFindInput,
+	toolchainRequest,
 	timerStart,
 	timerList,
 	timerCancel,
@@ -122,7 +136,7 @@ export const validators = {
 export type SchemaKey = keyof typeof validators;
 export type Owner = { rootRunId: string; taskId: string; cancelEpoch: number };
 export type Definition = {
-	kind: "package" | "profile" | "skill" | "tool" | "requirement";
+	kind: "package" | "profile" | "skill" | "tool" | "requirement" | "toolchain";
 	requirementData?: import("./requirements").RequirementProfileData;
 	id: string;
 	revision: number;
@@ -142,6 +156,16 @@ export type Definition = {
 	profileRevisionId?: string;
 	/** Learned definitions are route-only: never indexed, never listed, prepared by exact ID. */
 	discoveryMode?: "catalog" | "route-only";
+	/** Toolchain only: the function the conversation model calls. */
+	functionName?: string;
+	/** Toolchain only: representative requests; indexed and used as the routing evaluation set. */
+	examples?: string[];
+	/** Toolchain only: the one package (profile, SKILL, tools) its sub-agent runs. */
+	packageRevisionId?: string;
+	/** Toolchain only: the result display. */
+	artifact?: import("./toolchains").ToolchainArtifact;
+	/** Toolchain only: which other toolchain to use instead, and when. */
+	redirects?: import("./toolchains").ToolchainRedirect[];
 };
 export const learnedIdPattern = /^learned\.web\.[0-9a-f]{32}$/;
 export const learnedMaxBytes = 16384;
@@ -175,5 +199,6 @@ export const hash = (v: unknown) =>
 
 export * from "./requirements";
 export * from "./runtime-meta";
+export * from "./toolchains";
 
 export { dotsPackageInput } from "./dots";

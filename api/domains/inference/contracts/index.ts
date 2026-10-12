@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Database } from "bun:sqlite";
 import type { Settings, Purpose } from "../../settings/contracts";
+import type { SentenceLanguageDecision } from "../../larm";
 import type { SpeechDelivery, SpeechPreparation } from "../../delivery";
 export type Messages = Array<{
 	role: "system" | "user" | "assistant";
@@ -33,6 +34,7 @@ import type {
 	NativeToolCall,
 } from "../../../infrastructure/chat-stream";
 export interface Receipt {
+	language?: SentenceLanguageDecision;
 	toolCalls?: NativeToolCall[];
 	requestId: string;
 	attemptId: string;
@@ -165,6 +167,7 @@ const exchangeSchema = z.object({
 	httpStatus: z.number().optional(),
 	errorCode: z.string().optional(),
 	errorMessage: z.string().optional(),
+	operation: z.string().optional(),
 	speechVoice: z.string().optional(),
 	speechCredit: z.string().optional(),
 });
@@ -207,4 +210,8 @@ export const larmDetailsSchema = z.object({
 	),
 });
 export type LarmDetails = z.infer<typeof larmDetailsSchema>;
+export const larmProfilesSchema = z.array(
+	z.object({ profile: z.string(), model: z.string().nullable() }),
+);
+export type LarmProfiles = z.infer<typeof larmProfilesSchema>;
 export const startedProbeSchema = z.object({ id: z.string() });

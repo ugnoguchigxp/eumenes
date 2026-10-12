@@ -7,7 +7,7 @@
       "dependencies": {
         "@modelcontextprotocol/core": "2.3.1",
         "@modelcontextprotocol/server": "2.3.1",
-        "llm-fetch": "0.1.2",
+        "llm-fetch": "0.1.3",
         "standardwebhooks": "1.1.1",
         "zod": "4.4.3",
       },
@@ -50,7 +50,7 @@
 
     "iconv-lite": ["iconv-lite@0.6.3", "", { "dependencies": { "safer-buffer": ">= 2.1.2 < 3.0.0" } }, "sha512-4fCk79wshMdzMp2rH06qWrJE4iolqLhCUH+OiuIgU++RB0+94NlDL81atO7GX55uUKueo0txHNtvEyI6D7WdMw=="],
 
-    "llm-fetch": ["llm-fetch@0.1.2", "", { "dependencies": { "@types/node": "^24.13.4", "cheerio": "^1.2.0" }, "peerDependencies": { "playwright-core": "^1.62.0" }, "optionalPeers": ["playwright-core"] }, "sha512-S63T9Iw0oDIchHKU1QLBGEUkzOqL+fLdtba8z7wT7doO6QcFKHRIkcJ0o0i3FZfyLIN0vpmbz6oEGBIVLtn7Sg=="],
+    "llm-fetch": ["llm-fetch@0.1.3", "", { "dependencies": { "@types/node": "^24.13.4", "cheerio": "^1.2.0" }, "peerDependencies": { "playwright-core": "^1.62.0" }, "optionalPeers": ["playwright-core"] }, "sha512-goA2aQOOBsJiawVqggnAoOCCZ/9DwpJnTSHN2yjPwM3t1PKhHzckBUsIBuSD+1oSSP1347we8JPfoGx1ko0ofg=="],
 
     "nth-check": ["nth-check@2.1.1", "", { "dependencies": { "boolbase": "^1.0.0" } }, "sha512-lqjrjmaOoAnWfMmBPL+XNnynZh2+swxiX3WUE0s4yEHI6m+AwrK2UZOimIRl3X/4QctVqS8AiZjFqyOGrMXb/w=="],
 

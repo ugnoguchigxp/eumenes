@@ -1,7 +1,27 @@
 import { z } from "zod";
+import type {
+	SentenceLanguage,
+	SentenceLanguageDecision,
+} from "./sentence-language";
+export {
+	sentenceLanguageDecisionSchema,
+	sentenceLanguageSchema,
+} from "./sentence-language";
+export type {
+	SentenceLanguage,
+	SentenceLanguageDecision,
+} from "./sentence-language";
+export const speechRoutingSchema = z.object({
+	englishTts: z.boolean(),
+	languageProviders: z
+		.array(z.object({ name: z.string(), model: z.string() }))
+		.max(100),
+});
+export type SpeechRouting = z.infer<typeof speechRoutingSchema>;
 import type { HttpErrorStatus } from "../../../infrastructure/http";
 export type Capability = "llm" | "asr" | "tts";
 export type LarmExchange = {
+	operation?: string;
 	connectionId: string;
 	model: string;
 	started: number;
@@ -16,6 +36,9 @@ import type {
 	NativeToolCall,
 } from "../../../infrastructure/chat-stream";
 export type LarmCallOptions = {
+	/** Explicit execution role; helper calls use independent, short-lived 64K connections. */
+	sessionRole?: "main" | "auxiliary";
+	speechLanguage?: SentenceLanguage;
 	tools?: NativeTool[];
 	onToolCalls?: (calls: NativeToolCall[]) => void;
 	maxOutputTokens?: number;
@@ -41,6 +64,12 @@ export {
 	type TtsRange,
 } from "./voices";
 export interface LarmPort {
+	classifySentenceLanguage?(
+		text: string,
+		signal: AbortSignal,
+		options?: LarmCallOptions,
+	): Promise<SentenceLanguageDecision>;
+	speechRouting?(signal: AbortSignal): Promise<SpeechRouting>;
 	decisionModel?(): string | null;
 	judge?(
 		state: Record<string, string>,
@@ -50,7 +79,7 @@ export interface LarmPort {
 		>,
 		signal: AbortSignal,
 	): Promise<unknown>;
-	voices?(signal: AbortSignal): Promise<TtsVoices>;
+	voices?(signal: AbortSignal, language?: SentenceLanguage): Promise<TtsVoices>;
 	status(): LarmStatus;
 	onChange?(listener: () => void): () => void;
 	inspect?(): {
@@ -58,13 +87,17 @@ export interface LarmPort {
 		decisionModel?: string | null;
 		connectionId?: string;
 		providers: Array<{
-			name: Capability;
+			name: Capability | "tts-english";
 			model: string;
 			baseUrl: string;
 			protocol: string;
 		}>;
 	};
 	probe?(signal: AbortSignal): Promise<void>;
+	/** Read-only: the LLM model each selectable conversation profile publishes in the catalog. */
+	conversationProfiles?(
+		signal: AbortSignal,
+	): Promise<Array<{ profile: string; model: string | null }>>;
 	connect(): Promise<void>;
 	prepareVoice?(signal: AbortSignal): Promise<void>;
 	answerStream?(

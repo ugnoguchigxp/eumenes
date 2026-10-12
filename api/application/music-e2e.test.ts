@@ -1,6 +1,77 @@
 import { expect, test } from "bun:test";
 import { harness } from "./toolchain.fixture";
 import { musicFixture, musicQuestion, musicTestPlan } from "./music.fixture";
+
+test("completed vocal music answers and repairs without re-offering entry operations", async () => {
+	const question =
+		"休日の朝に聞く目覚めのテーマ。クラシック、落ち着いたピアノ、90秒、透明感のある女性ソロ、日本語の歌詞をテーマに合わせて作成。";
+	const f = musicFixture("success", {
+		question,
+		plan: {
+			...musicTestPlan,
+			durationSeconds: 90,
+			instrumental: false,
+			lyrics: "[Verse]\n朝の光で目を覚ます",
+			language: "ja",
+		},
+	});
+	const answers: Parameters<typeof f.model.answer>[0][] = [];
+	const model = {
+		...f.model,
+		answer: async (...args: Parameters<typeof f.model.answer>) => {
+			const [messages, , options] = args;
+			if (messages.some((m) => m.content.includes('"musicResult":'))) {
+				expect(options?.tools).toBeUndefined();
+				answers.push(messages);
+				return answers.length === 1
+					? 'create_music{question:<|"|>休日の朝の楽曲<|"|>}'
+					: "楽曲が完成しました。どうぞお楽しみください。";
+			}
+			return f.model.answer(...args);
+		},
+	};
+	const h = await harness({ model, musicGateway: f.gateway });
+	try {
+		const submitted = await (
+			await h.request("/api/runs", {
+				requestId: crypto.randomUUID(),
+				conversationId: "main",
+				text: question,
+			})
+		).json();
+		const run = await h.dialogue.waitForTerminal(submitted.id, {
+			timeoutMs: 5000,
+		});
+		expect(run?.status).toBe("completed");
+		expect(h.music!.list("main")[0]!.state).toBe("completed");
+		expect(f.requests.filter((r) => r.method === "POST")).toHaveLength(1);
+		expect(answers).toHaveLength(2);
+		for (const messages of answers) {
+			expect(
+				messages.some(
+					(m) =>
+						m.role === "system" &&
+						m.content.includes("最も合うfunctionを一つ呼びます"),
+				),
+			).toBe(false);
+			expect(
+				messages.some((m) => m.role === "user" && m.content === question),
+			).toBe(true);
+			const result = JSON.parse(
+				messages.find((m) => m.content.startsWith('{"musicResult":'))!.content,
+			).musicResult;
+			expect(result.state).toBe("completed");
+			expect(result.durationSeconds).toBe(90);
+		}
+		expect(answers[1]![0]!.role).toBe("system");
+		expect(answers[1]![0]!.content).toContain("自然な回答本文だけ");
+		expect(h.dialogue.answerText(submitted.id)).toBe(
+			"楽曲が完成しました。どうぞお楽しみください。",
+		);
+	} finally {
+		await h.close();
+	}
+});
 for (const mode of [
 	"success",
 	"failure",

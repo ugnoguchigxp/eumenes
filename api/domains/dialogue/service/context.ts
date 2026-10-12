@@ -16,6 +16,10 @@ import type {
 } from "../contracts";
 
 export const GENERATE_KIND = "dialogue.generate";
+/** A toolchain's command sub-agent: one typed operation from the conversation's request. */
+export const COMMAND_KIND = "dialogue.toolchain_command";
+/** The generation job; a command sub-agent's clarifying question travels as data. */
+export type GeneratePayload = { runId: string; commandNote?: string };
 export const PROMPT_TARGET_KIND = "dialogue.prompt";
 export const DEFAULT_DEADLINE_MS = RESEARCH_BUDGET.rootMilliseconds;
 export const TERMINAL = ["completed", "failed", "cancelled", "interrupted"];
@@ -29,13 +33,20 @@ export type ChatMessage = {
 };
 export interface GenerateInput {
 	tools?: NativeTool[];
-	delegationSnapshot?: unknown;
-	actionSnapshot?: unknown;
+	/**
+	 * A new conversation decision: the execute phase retrieves candidate toolchains for this
+	 * request and offers them as functions. Absent while phrasing an operation's result.
+	 */
+	routing?: {
+		/** The current utterance with a short excerpt of the preceding turns. */
+		query: string;
+		/** Toolchains whose runtime is available on this host now. */
+		available: string[];
+		conversationId: string;
+		utteranceId: string | null;
+		requestId: string | null;
+	};
 	actionResultIndex?: number;
-	requirementCatalog?: import("../../capabilities").RequirementCatalog;
-	timerCapability?: ReturnType<
-		AgentRuntime["conversationContextInTransaction"]
-	>["timerCapability"];
 	authorizedUrls?: string[];
 	runId: string;
 	revision: number;
@@ -75,6 +86,7 @@ export type DialogueDeps = {
 	agents?: AgentRuntime;
 	music?: import("../contracts/music").MusicPort;
 	delegation?: import("../contracts/delegation").DelegationPort;
+	toolchains?: import("../contracts/toolchains").ToolchainRoutingPort;
 	postAnswer?: PostAnswerObserverPort;
 	worldContext?: WorldContextPort;
 };

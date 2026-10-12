@@ -3,15 +3,18 @@ import type { InferencePort, Receipt } from "../domains/inference";
 import { createDialogueService } from "../domains/dialogue";
 import { createDotsDialogue } from "./dots-dialogue";
 import { dotsFixture } from "./dots-fixture";
+import { createToolchainHistory } from "../domains/toolchain-history";
+import { createToolchainRouting } from "./toolchain-routing";
 const clean: Array<() => Promise<void>> = [];
 afterEach(async () => {
 	for (const f of clean.splice(0).reverse()) await f();
 });
-test("conversation uses the LLM operation and phrases its saved receipt without starting another delegation", async () => {
+test("conversation hands the request to the delegation toolchain, whose sub-agent builds the command", async () => {
 	const f = await dotsFixture();
 	clean.push(f.close);
 	let calls = 0;
 	const messages: Array<Parameters<InferencePort["answer"]>[0]> = [];
+	const commandMessages: Array<Parameters<InferencePort["answer"]>[0]> = [];
 	const larm = {
 		status: () => ({ state: "connected" }),
 		captureInTransaction: () => {},
@@ -35,18 +38,15 @@ test("conversation uses the LLM operation and phrases its saved receipt without 
 				value: "",
 			};
 			if (calls === 1) {
-				expect(JSON.stringify(tools)).toContain("delegate_task");
+				expect(JSON.stringify(tools)).toContain("delegate_project");
+				// The conversation passes only the request; no operation fields.
+				expect(JSON.stringify(tools)).not.toContain("projectRef");
 				r.toolCalls = [
 					{
 						id: "call",
-						name: "delegate_task",
+						name: "delegate_project",
 						arguments: JSON.stringify({
-							operation: "start",
-							projectRef: "project",
-							title: "implement",
-							request: "Keep every requested condition",
-							completionConditions: ["tests pass"],
-							operations: ["read", "create_session", "edit", "check"],
+							request: "プロジェクトの変更を実装。tests passで完了",
 						}),
 					},
 				];
@@ -57,6 +57,28 @@ test("conversation uses the LLM operation and phrases its saved receipt without 
 			}
 			return r;
 		},
+		captureControlInTransaction: () => "control",
+		executeControl: async (
+			requestId: string,
+			prompt: Parameters<InferencePort["answer"]>[0],
+		) => {
+			commandMessages.push(prompt);
+			return {
+				requestId,
+				attemptId: "command",
+				value: JSON.stringify({
+					action: "invoke",
+					tool: "dots.start",
+					arguments: {
+						projectRef: "project",
+						title: "implement",
+						request: "Keep every requested condition",
+						completionConditions: ["tests pass"],
+						operations: ["read", "create_session", "edit", "check"],
+					},
+				}),
+			};
+		},
 		acceptInTransaction: () => true,
 		validateReceiptInTransaction: () => true,
 	} as unknown as InferencePort;
@@ -66,6 +88,11 @@ test("conversation uses the LLM operation and phrases its saved receipt without 
 		larm,
 		queue: f.queue,
 		delegation: createDotsDialogue({ ...f }),
+		toolchains: createToolchainRouting(
+			f.capabilities,
+			createToolchainHistory(f.store),
+			async () => undefined,
+		),
 	});
 	clean.push(dialogue.close);
 	const run = await dialogue.submit({
@@ -78,6 +105,10 @@ test("conversation uses the LLM operation and phrases its saved receipt without 
 	expect(done).toMatchObject({ status: "completed" });
 	expect(calls).toBe(2);
 	expect(JSON.stringify(messages[1])).toContain("delegationResult");
+	// The sub-agent loaded the toolchain's set and the catalog; the conversation did not.
+	expect(commandMessages).toHaveLength(1);
+	expect(JSON.stringify(commandMessages[0])).toContain("dots.start");
+	expect(JSON.stringify(messages[0])).not.toContain("delegationCatalog");
 	const work = f.tasks.list({ conversationId: "conversation", limit: 50 });
 	expect(work.items).toHaveLength(1);
 	expect(work.items[0]!.state).toBe("queued");

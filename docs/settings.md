@@ -6,11 +6,25 @@
 
 ## 設定画面
 
+「表示」の「会話の背景」では、光の妖精とSpatialを選び、「変更を適用」で保存できます。Spatialは現在、CPU・Memory・SSD・Networkの仮モデルを未確認状態で表示します。実測・Provider healthの接続は後続です。モデルの組込みは [背景とSpatial](backgrounds.md) を参照してください。
+
 右上の「設定」から、AIの使い方、接続先、音声、データと利用記録、予約、表示を変更できます。LARMを優先し、接続不能・混雑・時間切れの場合は用途ごとに登録したクラウドへ自動で切り替えます。クラウドの送信許可と自動切替は初期値で有効ですが、代替先が未登録ならクラウドには送信しません。認証エラーや契約不一致、取消では自動切替しません。
 
 クラウドはOpenAI互換のChat Completions、multipart音声認識、WAV音声合成に対応します。ベースURLは、ループバック・プライベートLAN（10/172.16-31/192.168）・`.local`・リンクローカル以外では `https` が必要です。環境変数名で指定できるのは `EUMENES_CLOUD_` で始まる名前、主要プロバイダの標準キー名（`OPENAI_API_KEY`、`ANTHROPIC_API_KEY`、`GEMINI_API_KEY`、`GOOGLE_API_KEY`、`AZURE_OPENAI_API_KEY`、`GROQ_API_KEY`、`MISTRAL_API_KEY`、`DEEPSEEK_API_KEY`）、およびbackendの `EUMENES_ENV_REF_ALLOWLIST`（カンマ区切り）に載せた名前だけです。それ以外を指す既存設定は保存したままですが、利用時に `env_ref_not_allowed` で失敗します。接続名、ベースURL、モデルとAPIキーまたは環境変数名を登録し、「AIの使い方」で用途に割り当てて「変更を適用」を押します。一つの接続に複数の用途のモデルを追加できます。接続確認と少量の生成テストは保存済み設定を使い、サービスの利用が発生します。
 
-LARMのURL・Profile・audience・voiceは初回起動時に環境変数から取り込み、以降は設定画面に保存した値を使います。URLが空欄の間は未設定扱いで、LARMには接続しません。LARM認証とクラウドキーの環境変数はbackendだけで読みます。環境変数を変更した場合はbackendを再起動してください。
+### エージェントSDKの接続（会話用途のみ）
+
+クラウドAPIの登録で「接続の種類」を選ぶと、OpenAI互換API以外に Codex SDK・Claude Agent SDK・Claude Managed Agents を会話（`llm`）の代替先・クラウド専用先として使えます。会話担当もサブエージェント（研究worker・操作担当など）も同じ `llm` 経路を通るため、両方に適用されます。聞き取り・読み上げには割り当てられません。
+
+| 種類 | 実行 | 認証 | 会話のツール呼び出し |
+| --- | --- | --- | --- |
+| Codex SDK | Codex CLI（ネイティブツール・プラグイン・MCP・履歴を無効化、一時ディレクトリで読み取り専用） | APIキー（`OPENAI_API_KEY`等）またはCodex CLIのログイン | 出力schemaで「返答」か「関数呼び出し」を選ばせる |
+| Claude Agent SDK | Claude Code組込みツールを無効化し、設定ファイル・セッション保存なしで1ターン | APIキー（`ANTHROPIC_API_KEY`）またはClaude Codeのログイン | 会話の関数をin-process MCPツールとして渡し、呼び出された時点でターンを終了 |
+| Claude Managed Agents | 保存済みのエージェントID・環境IDからターンごとにセッションを作成し、終了後に削除 | APIキー必須 | セッションのoverrideでツールを会話の関数（custom tool）だけに置換 |
+
+関数の実行はどの種類でもEumenesが行い、エージェント側では実行しません。過去の会話は先頭のsystemメッセージを指示、残りをJSONの履歴として1つのプロンプトに渡します。Managed Agentsはセッション作成を伴うため応答開始が遅く、既定のクラウド試行時間（会話60秒）を超える場合があります。
+
+LARMのURL・Profile・audience・voiceは初回起動時に環境変数から取り込み、以降は設定画面に保存した値を使います。Profile未指定時は `ornith1.5Strix` を選び、保存済みの明示的な選択は保持します。Gemma4の `SAAA-gemma4-26b` も引き続き選べます。URLが空欄の間は未設定扱いで、LARMには接続しません。LARM認証とクラウドキーの環境変数はbackendだけで読みます。環境変数を変更した場合はbackendを再起動してください。
 
 APIキーはAES-256-GCMで暗号化します。暗号鍵は32バイトをBase64にした `EUMENES_SECRET_KEY`、またはデータベースの隣の `keys/settings.key` を使います。未指定ならファイルを自動生成します。データベースと暗号鍵を一緒にバックアップしてください。既存の暗号文があるのに鍵が見つからない場合は再生成せず、保存済みキーによるクラウド利用を停止します。APIキーは設定取得や診断データに含めません。
 

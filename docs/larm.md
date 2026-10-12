@@ -1,6 +1,14 @@
 # LARM の接続・予算・session 構成
 
-LARM 接続では毎回接続状態を API で確認し、claim が返した `configuration.fields.baseURL`、`configuration.fields.model`、`credential.token` を使用します。LLM のみなら `providers: ["llm"]`、音声を使う場合は `providers` を省略して Profile 全体を要求します。期限前の renew 後は再claimで token を更新し、終了時に接続を解放します。メインの入力予算は 256072 token、出力上限は 4096 token です。4 セッション構成の目標は、同じ 512K のランタイムを共有するメイン 256K × 1 と補助 64K × 3 です。補助の入力予算は各 59464 token とし、利用側でセッション数と予算を管理します。補助 selector `SAAA-gemma4-26b-64k` は 2026-10-08 時点で catalog が 404 を返すため、コードからも接続を禁止しています。配備後に catalog を確認し、補助の管理処理を実装してから有効化します。
+新規設定とProfile未指定時の基本selectorは `ornith1.5Strix` です。保存済みの明示的な選択と初回の `LARM_PROFILE` 指定は維持します。`SAAA-gemma4-26b` は新規保存では選べません（保存済みの文書は読み込めます）。
+
+主会話は `ornith1.5Strix`（256K × 1）、補助のcontrol要求は `ornith1.5Strix-64k`（64K × 最大3）を使います。両方の公開LLMモデル名は `ornith-1.5-strix-lean`。LARM側で同じOrnithランタイムと512Kの共有KV領域へ割り当てます。主会話の同一接続上の推論は順番に実行し、補助要求はそれぞれ独立したConnectionと履歴を使い、終了・取消時に解放します。補助の実行中は主接続を保持し、5つ目はLARMの `pending / waiting-capacity` を同じConnectionで追跡します。readyとProviderのclaimableを確認するまでclaim・推論を始めません。待機は呼出元の期限・取消とLARMのConnection lifecycleに従います。
+
+`GET /v3/agent-profiles?profile=...` から構成と `catalogRevision` を取得し、作成時に `expectedCatalogRevision` を指定します。同じclientとProfileの要求ではLARMが既存Connectionを再利用するため、各sessionに固有のclient識別子を使い、renew・再接続では同じ識別子を維持します。主・補助の入力予算はclaimのcontext windowから求め、現在は256072 / 59464 token、出力予約4096 tokenです。旧補助selector `SAAA-gemma4-26b-64k` の利用禁止は維持します。
+
+LLMのみの要求は `providers: ["llm"]`、音声の要求は `providers` を省略して選択Profile全体を取得します。不要なProviderを事前予約しません。Providerの接続先・model・tokenはclaimの `configuration.fields.baseURL` / `daemonURL`、`configuration.fields.model`、`credential.token` を使い、公開endpointとの整合性を確認します。ASR、日英TTS、Ruriの態度・文章言語判定とembeddingは新Profileのcatalogから発見する既存経路を使います。期限前のrenew後は再claimでtokenを更新し、終了時に解放し、失効時は既存の再接続処理を使います。
+
+2026-10-12の実接続で主1＋補助3の同時応答、履歴分離、5つ目の待機と解放後の利用、ASR、日英TTS、Ruri両Provider、384次元embeddingを確認しました。設定の初期選択・保存済み選択の維持、renew・再claim・再接続・取消は固定試験でも検証しています。詳細は [検証記録](../spec/verification/ornith-profile-2026-10-12/README.md)。音声ファイルの取得は実機器の3往復受入に数えません。
 
 設定は [setup.md](setup.md)(環境変数)と [settings.md](settings.md)(画面)を参照してください。
 
@@ -56,3 +64,19 @@ music domainのプレイリストは会話/run・検索条件・曲IDを保存�
 `/api/music/tracks` はq/tags/favorite/sort/order/limit/cursor、`/api/music/tags` は全体タグ件数を返す。お気に入りPUT/DELETEと曲DELETEは別操作。507では不要曲の削除を案内する。検索変更でcursorを破棄し、検索条件ごとの取消可能な取得で古い検索応答を採用しない。
 
 読取り専用の実接続確認は `bun scripts/music-playback-live.ts --run`。保存済み曲だけを検索・再生し、生成・変更・削除は許可しない。固定試験とは区別して記録する。
+
+## 文章言語による読み上げの振分け（試用）
+
+本文を採用してから、読み上げ対象の全文を一度 `ja` / `en` に分類する。`ja` は既存の日本語TTS、`en` はcatalogの `speech.tts.english` capabilityを持つProviderへ渡す。回答LLMの出力形式は変更しない。句読点で分割した区間は同じラベルを共有し、合成を最大3区間まで先行させ、再生は前の区間終了後に進める。生成中の逐次発声と日英混在文の区間分割は今回の対象外。
+
+[全体コンセプト](https://chatgpt.com/space/page_9fab9c53bce8819181c9c8256a3b303a)の原則に従い、公開Profileを正本とする。実験モデルの名前・ローカル保存先・起動済みポートから接続先を推測しない。保存済みsettingsからProfileを発見し、確保・ready・claim・専用認証・renew後の再claim・解放を共通機構で扱う。英語TTSも態度判定も分類器も、独立したProviderの認証を使う。
+
+接続の内部設定は `larm.sentenceLanguageEnabled`（省略時無効）、`sentenceLanguageProvider`（分類用Provider名。省略時は `decision.sentence-language` の唯一の候補を自動選択）。通常環境は有効化済み。2026-10-12のユーザー指定で、Webの分類・英語声・英語速度の設定欄を削除した。英語の声は日本語の公開 `voice_presentation` が女性・中性ならRosie、男性ならJasperへ固定し、速度は常に1.0。旧 `englishVoice` / `englishMasculineVoice` / `englishSpeed` は保存文書の互換読取り用に受理するが実行には使わない。日本語の声・style・pitch・intonation・速度を英語へ流用せず、日本語の読み辞書も適用しない。接続確認API `/api/inference/speech-routing` と `/api/inference/voices?language=en` は維持し、言語の任意指定を通常回答の合成APIには公開しない。
+
+分類のadapterは既存 `larm.system-one.v1` / `/v1/systemone` のchoice契約に対応する。catalogの `decision.sentence-language` を発見し、選択したProviderのclaim endpoint・model・専用tokenを使ってHTTP要求を送る。文字列の `state` に全文を入れ、`questions.language` の `ja/en` choiceを要求する。応答の `answers.language.type=choice` / `choice=ja|en` を検証する。返されたmodelがclaimと異なる場合、切詰め・入力tokenの破棄が報告された場合は拒否する。態度用 `system-one` Providerには送らない。別protocolで公開された場合はその契約の確認とadapter追加が必要。
+
+共有結果はbackendのメモリ内、64件・10分まで。同一回答・本文・設定で再利用し、失敗や取消中の遅着結果は保持しない。初回の接続準備は既存TTS期限内で行い、その後の分類に暫定2秒の上限を置く。この上限は待ち続けないための期限であり、通常の処理時間ではない。分類の不足・不正・失敗・timeoutと選択先TTS不在は読み上げの失敗として扱い、区間ごとの再試行や別TTSへの推測転送を行わない。本文は残す。
+
+2026-10-12夕方の配備後、`SAAA-gemma4-26b` の `sentence-language` / `ruri-v3-30m-sentence-language` と既存態度用 `system-one` の共存を確認した。接続を保持し、分類のHTTP要求ごとにモデルを初期化しない。分類結果を使った日英両TTSと、Eumenes公開APIからの音声取得・receipt採用が成功した。実機器3往復は未実施。
+
+再確認は `bun scripts/sentence-language-live.ts --run`。保存済みbackend設定と公開接続だけを使い、既知の日英文で両TTSの通信とWAV取得を確認する。保存されたProvider、またはcapabilityに合う唯一の候補を使って二分類を確認する。`--benchmark` を付けると日本語・英語・態度との同時要求を各200回測る。このPCでの通常分類P95は日本語27.36ms・英語52.68ms。同時要求の両方完了までのP95は107.82ms、失敗0/600、同じConnectionを使用した。LARMホスト内の測定とネットワークを含むこの測定を区別する。公開API経路は `bun scripts/sentence-language-api-live.ts --run` で隔離backendの設定API・分類・合成・receipt採用を確認する。結果は `verification-reports/sentence-language-live/`、実施記録は [検証記録](../spec/verification/ruri-sentence-language-2026-10-12/README.md)。合成音声の取得はスピーカー再生の実機器受入に数えない。

@@ -9,6 +9,7 @@ export const queryRoots = {
 	dialogue: "dialogue",
 	larm: "larm",
 	larmDetails: "larm-details",
+	larmProfiles: "larm-profiles",
 	larmVoices: "larm-voices",
 	settings: "settings",
 	settingsSchedules: "settings-schedules",
@@ -21,7 +22,7 @@ export const queryRoots = {
 	serviceCatalog: "service-catalog",
 	serviceRuns: "service-runs",
 	voiceDialogue: "voice-dialogue",
-	researchRoutes: "research-routes",
+	toolchainHistory: "toolchain-history",
 	timers: "timers",
 	world: "world",
 } as const;
@@ -48,7 +49,7 @@ export const changeRoots = [
 	queryRoots.serviceCatalog,
 	queryRoots.serviceRuns,
 	queryRoots.voiceDialogue,
-	queryRoots.researchRoutes,
+	queryRoots.toolchainHistory,
 	queryRoots.timers,
 	queryRoots.world,
 ] as const;

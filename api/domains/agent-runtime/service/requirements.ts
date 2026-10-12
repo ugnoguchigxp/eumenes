@@ -7,6 +7,7 @@ import {
 	requirementValueMatches,
 	type ProfileSnapshot,
 	type Capabilities,
+	type RequirementCatalog,
 } from "../../capabilities";
 import {
 	requirementContract,
@@ -22,9 +23,26 @@ export function freezeRequirements(
 	requests: RequestRequirement[],
 	capabilities: Capabilities,
 	now: number,
+	chosenProfiles: string[] = [],
 ) {
 	const input = JSON.parse(task.input_json ?? "{}");
-	const profiles = (input.requirementProfiles ?? []) as ProfileSnapshot[];
+	// Profiles fixed at start (earlier releases) or chosen by the sub-agent from the catalog
+	// snapshot taken when the task was created. Either way they are frozen into the contract.
+	const fixed = (input.requirementProfiles ?? []) as ProfileSnapshot[];
+	const catalog = input.requirementCatalog as RequirementCatalog | undefined;
+	const profiles = fixed.length
+		? fixed
+		: chosenProfiles.length
+			? catalog
+				? capabilities.resolveRequirementProfilesInTransaction(
+						db,
+						catalog,
+						chosenProfiles,
+					)
+				: (() => {
+						throw new Error("requirement_profile_invalidated");
+					})()
+			: [];
 	capabilities.validateRequirementProfilesInTransaction(db, profiles);
 	profiles.sort((a, b) => a.revisionId.localeCompare(b.revisionId));
 	const originalRequest = input.originalRequest ?? input.question,

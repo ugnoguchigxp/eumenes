@@ -4,6 +4,7 @@ import { chromium, expect as baseExpect } from "@playwright/test";
 import { musicFixture } from "../api/application/music.fixture";
 import { harness } from "../api/application/toolchain.fixture";
 import { createFixture } from "../tests/browser/fixture";
+import { openFromLauncher } from "../tests/browser/artifact-launcher";
 const expect = baseExpect.configure({ timeout: 20000 });
 
 // Replay saved audio; library mutations below affect only in-memory fixture data.
@@ -185,12 +186,14 @@ try {
 		};
 	});
 	await page.goto(origin);
+	await openFromLauncher(page, "楽曲生成");
 	await expect(
 		page.getByText("楽曲を生成しています", { exact: true }),
 	).toBeVisible();
 	await page.screenshot({ path: `${out}/generating.png`, fullPage: true });
 	phase = "completed";
 	await page.reload();
+	await openFromLauncher(page, "楽曲生成");
 	const player = page.locator("audio");
 	await expect(player).toHaveCount(1);
 	await expect(page.getByRole("slider", { name: "再生位置" })).toBeEnabled();
@@ -271,6 +274,7 @@ try {
 	await page.screenshot({ path: `${out}/completed.png`, fullPage: true });
 	libraryMode = true;
 	await page.reload();
+	await openFromLauncher(page, "音楽プレイリスト");
 	const workspace = page.getByRole("region", {
 		name: "音楽ワークスペース",
 		exact: true,
@@ -286,6 +290,7 @@ try {
 	await star.click();
 	await expect(star).toHaveAttribute("aria-pressed", "true");
 	await page.reload();
+	await openFromLauncher(page, "音楽プレイリスト");
 	await expect(star).toHaveAttribute("aria-pressed", "true");
 	await star.click();
 	await expect(star).toHaveAttribute("aria-pressed", "false");

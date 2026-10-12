@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { openFromLauncher } from "./artifact-launcher";
 import { evidencePath } from "./evidence";
 import { createFixture } from "./fixture";
 
@@ -53,9 +54,7 @@ test.beforeEach(async ({ page }, testInfo) => {
 		});
 	expect(startupErrors).toEqual([]);
 	if (testInfo.tags.includes("@load-failure")) return;
-	await page
-		.getByRole("button", { name: "UIショーケース", exact: true })
-		.click();
+	await openFromLauncher(page, "UIショーケース");
 	await expect(
 		page.getByRole("region", { name: "UIショーケース", exact: true }),
 	).toBeVisible();
@@ -83,9 +82,7 @@ test(
 		const moduleUrl =
 			"**/src/components/domains/artifact/ArtifactShowcase.tsx*";
 		await page.route(moduleUrl, (route) => route.abort());
-		await page
-			.getByRole("button", { name: "UIショーケース", exact: true })
-			.click();
+		await openFromLauncher(page, "UIショーケース");
 		const artifact = page.getByRole("complementary", {
 			name: "アーティファクト",
 			exact: true,
@@ -99,9 +96,7 @@ test(
 		await artifact
 			.getByRole("button", { name: "画面を再読み込み", exact: true })
 			.click();
-		await page
-			.getByRole("button", { name: "UIショーケース", exact: true })
-			.click();
+		await openFromLauncher(page, "UIショーケース");
 		await expect(
 			page.getByRole("region", { name: "UIショーケース", exact: true }),
 		).toContainText("入力と操作の見本");
@@ -173,9 +168,7 @@ test("workspace boundary resizes with drag and keyboard, preserves drafts and di
 	await expect(handle).toHaveCount(0);
 	expect((await chat.boundingBox())!.width).toBe(1280);
 	await expect(input).toHaveValue("サイズ変更中も残す下書き");
-	await page
-		.getByRole("button", { name: "UIショーケース", exact: true })
-		.click();
+	await openFromLauncher(page, "UIショーケース");
 	await expect(handle).toHaveAttribute("aria-valuenow", "75");
 });
 

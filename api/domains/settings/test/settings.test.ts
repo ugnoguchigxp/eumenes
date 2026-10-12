@@ -16,6 +16,76 @@ import { defaults } from "../service";
 import type { Settings } from "../contracts";
 import { applySchema, cloudEndpoint, settingsSchema } from "../contracts";
 const cleanup: Array<() => Promise<void>> = [];
+test("background selection persists without changing inference permissions; old documents remain valid", async () => {
+	const h = await setup();
+	const original = h.settings.get();
+	expect(original.general.background).toBe("light-fairy");
+	const legacy = structuredClone(original);
+	delete legacy.general.background;
+	expect(settingsSchema.parse(legacy).general.background).toBeUndefined();
+	for (const background of ["spatial", "light-fairy"] as const) {
+		const settings = h.settings.get();
+		settings.general.background = background;
+		await h.settings.apply({
+			requestId: crypto.randomUUID(),
+			expectedRevision: settings.revision,
+			settings,
+			keys: [],
+		});
+		const reopened = await createSettings(h.store, {
+			dbPath: h.dbPath,
+			env: {},
+		});
+		expect(reopened.get().general.background).toBe(background);
+		expect(reopened.get().routes).toEqual(original.routes);
+		expect(reopened.get().larm).toEqual(original.larm);
+	}
+	expect(
+		settingsSchema.safeParse({
+			...original,
+			general: { ...original.general, background: "unknown-background" },
+		}).success,
+	).toBe(false);
+});
+test("new or missing profile selects Ornith while explicit saved choices survive reopening", async () => {
+	expect(defaults({}).larm.profile).toBe("ornith1.5Strix");
+	expect(defaults({ LARM_PROFILE: " " }).larm.profile).toBe("ornith1.5Strix");
+	expect(defaults({ LARM_PROFILE: "SAAA-gemma4-26b" }).larm.profile).toBe(
+		"SAAA-gemma4-26b",
+	);
+	const h = await setup();
+	expect(h.settings.get().larm.profile).toBe("ornith1.5Strix");
+	const missing = structuredClone(h.settings.get()) as {
+		larm: { profile?: string };
+	};
+	delete missing.larm.profile;
+	expect(settingsSchema.parse(missing).larm.profile).toBe("ornith1.5Strix");
+	const retired = h.settings.get();
+	retired.larm.profile = "SAAA-gemma4-26b";
+	await expect(
+		h.settings.apply({
+			requestId: crypto.randomUUID(),
+			expectedRevision: retired.revision,
+			settings: retired,
+			keys: [],
+		}),
+	).rejects.toThrow();
+	for (const profile of ["ornith1.5Strix", "ornith1.5Strix-64k"]) {
+		const s = h.settings.get();
+		s.larm.profile = profile;
+		await h.settings.apply({
+			requestId: crypto.randomUUID(),
+			expectedRevision: s.revision,
+			settings: s,
+			keys: [],
+		});
+		const reopened = await createSettings(h.store, {
+			dbPath: h.dbPath,
+			env: { LARM_PROFILE: "different-env-profile" },
+		});
+		expect(reopened.get().larm.profile).toBe(profile);
+	}
+});
 test("same-host can start unconfigured while configured URLs still require loopback", () => {
 	const settings = defaults({ LARM_AUDIENCE: "same-host" });
 	expect(settings.larm.baseUrl).toBeNull();
@@ -661,4 +731,47 @@ test("settings_requests keeps only the newest 64 requests", async () => {
 	await expect(h.settings.apply(firstInput)).rejects.toThrow(
 		"revision_conflict",
 	);
+});
+
+test("old settings keep sentence routing disabled and English settings persist independently", async () => {
+	const h = await setup();
+	const value = h.settings.get();
+	expect(value.larm.sentenceLanguageEnabled ?? false).toBe(false);
+	const japanese = {
+		voice: value.larm.voice,
+		style: value.larm.style,
+		speed: value.larm.speed,
+	};
+	Object.assign(value.larm, {
+		sentenceLanguageEnabled: true,
+		sentenceLanguageProvider: "catalog-language",
+		englishVoice: "Rosie",
+		englishMasculineVoice: "Jasper",
+		englishSpeed: 1.2,
+	});
+	await h.settings.apply({
+		requestId: crypto.randomUUID(),
+		expectedRevision: value.revision,
+		settings: value,
+		keys: [],
+	});
+	const reopened = await createSettings(h.store, { dbPath: h.dbPath, env: {} });
+	expect(readStoredLarm(h.dbPath)).toEqual(reopened.get().larm);
+	expect(reopened.get().larm.voice).toBe(japanese.voice);
+	expect(reopened.get().larm.style).toBe(japanese.style);
+	expect(reopened.get().larm.speed).toBe(japanese.speed);
+	expect(reopened.get().larm).toMatchObject({
+		sentenceLanguageEnabled: true,
+		sentenceLanguageProvider: "catalog-language",
+		englishVoice: "Rosie",
+		englishMasculineVoice: "Jasper",
+		englishSpeed: 1.2,
+	});
+	for (const englishSpeed of [0, 3, Infinity])
+		expect(
+			settingsSchema.safeParse({
+				...value,
+				larm: { ...value.larm, englishSpeed },
+			}).success,
+		).toBe(false);
 });

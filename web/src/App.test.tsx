@@ -33,6 +33,7 @@ function mockClient() {
 		settingsDiagnostics: async () => ({}),
 		inferenceProbes: async () => [],
 		larmDetails: async () => null,
+		larmProfiles: async () => [],
 		memoryStatus: async () => ({ enabled: false }),
 	};
 	return new Proxy(known, {

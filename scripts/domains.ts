@@ -1,4 +1,10 @@
 export const domains = {
+	background: {
+		backend: null,
+		web: "web/src/domains/background",
+		components: null,
+		depends: { api: [], web: [], test: [] },
+	},
 	music: {
 		backend: "api/domains/music",
 		web: "web/src/domains/music",
@@ -71,11 +77,11 @@ export const domains = {
 			test: [],
 		},
 	},
-	"research-routes": {
-		backend: "api/domains/research-routes",
-		web: "web/src/domains/research-routes",
+	"toolchain-history": {
+		backend: "api/domains/toolchain-history",
+		web: "web/src/domains/toolchain-history",
 		components: null,
-		depends: { api: ["queue"], web: [], test: [] },
+		depends: { api: ["capabilities"], web: [], test: [] },
 	},
 	"web-research": {
 		backend: "api/domains/web-research",
@@ -207,6 +213,7 @@ export const domains = {
 				"memory",
 				"queue",
 				"scheduler",
+				"toolchain-history",
 			],
 			web: ["conversation"],
 			test: ["world"],

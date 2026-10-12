@@ -1,16 +1,19 @@
 /** Persist only the display definition; the host resolves these sources from its authorized list. */
-export function musicArtifactDefinition(id: string) {
+export const musicStudioSource = "music-studio";
+export const playlistStudioSource = "library-studio";
+
+export function musicArtifactDefinition(id?: string) {
 	return JSON.stringify({
 		view: "music-workspace",
-		source: `music-${id}`,
+		source: id === undefined ? musicStudioSource : `music-${id}`,
 		title: "楽曲生成",
 	});
 }
 
-export function playlistArtifactDefinition(id: string) {
+export function playlistArtifactDefinition(id?: string) {
 	return JSON.stringify({
 		view: "music-workspace",
-		source: `library-${id}`,
-		title: "プレイリスト",
+		source: id === undefined ? playlistStudioSource : `library-${id}`,
+		title: "音楽プレイリスト",
 	});
 }

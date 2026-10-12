@@ -1,6 +1,10 @@
-import { ttsVoicesSchema } from "../api/domains/larm/contracts";
+import {
+	speechRoutingSchema,
+	ttsVoicesSchema,
+} from "../api/domains/larm/contracts";
 import {
 	larmDetailsSchema,
+	larmProfilesSchema,
 	probeSchema,
 	startedProbeSchema,
 	usageSchema,
@@ -13,6 +17,7 @@ import {
 import { json, type Transport } from "./transport";
 export type {
 	LarmDetails,
+	LarmProfiles,
 	Usage,
 	Probe,
 } from "../api/domains/inference/contracts";
@@ -20,9 +25,20 @@ export type { Diagnostics } from "../api/domains/settings/contracts";
 
 export function settingsClient(t: Transport) {
 	return {
-		larmVoices: async (signal?: AbortSignal) =>
+		speechRouting: async (signal?: AbortSignal) =>
+			speechRoutingSchema.parse(
+				await (
+					await t.call("/api/inference/speech-routing", { signal })
+				).json(),
+			),
+		larmVoices: async (signal?: AbortSignal, language?: "ja" | "en") =>
 			ttsVoicesSchema.parse(
-				await (await t.call("/api/inference/voices", { signal })).json(),
+				await (
+					await t.call(
+						`/api/inference/voices${language ? `?language=${language}` : ""}`,
+						{ signal },
+					)
+				).json(),
 			),
 		settings: async () =>
 			settingsSchema.parse(await (await t.call("/api/settings")).json()),
@@ -41,6 +57,10 @@ export function settingsClient(t: Transport) {
 		larmDetails: async () =>
 			larmDetailsSchema.parse(
 				await (await t.call("/api/inference/larm")).json(),
+			),
+		larmProfiles: async () =>
+			larmProfilesSchema.parse(
+				await (await t.call("/api/inference/larm/profiles")).json(),
 			),
 		inferenceProbes: async () =>
 			probeSchema

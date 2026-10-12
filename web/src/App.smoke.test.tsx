@@ -39,6 +39,7 @@ function mockClient() {
 		settingsDiagnostics: async () => ({}),
 		inferenceProbes: async () => [],
 		larmDetails: async () => null,
+		larmProfiles: async () => [],
 		memoryStatus: async () => ({ enabled: false }),
 	};
 	return new Proxy(known, {
@@ -77,6 +78,11 @@ afterEach(() => {
 test("A01 boot: the conversation screen renders and the settings button switches screens", async () => {
 	render(<App />);
 	expect(await screen.findByRole("region", { name: "会話" })).toBeTruthy();
+	expect(
+		screen.queryByRole("separator", {
+			name: "会話とアーティファクトのサイズを調整",
+		}),
+	).toBeNull();
 	expect(
 		(screen.getByRole("textbox", { name: "メッセージ" }) as HTMLTextAreaElement)
 			.disabled,

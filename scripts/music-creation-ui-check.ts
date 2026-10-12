@@ -4,6 +4,7 @@ import { chromium, expect as baseExpect } from "@playwright/test";
 import { harness } from "../api/application/toolchain.fixture";
 import { musicFixture, musicTestPlan } from "../api/application/music.fixture";
 import { createFixture } from "../tests/browser/fixture";
+import { openFromLauncher } from "../tests/browser/artifact-launcher";
 const expect = baseExpect.configure({ timeout: 20000 });
 const out = resolve("verification-reports/music-creation-ui");
 mkdirSync(out, { recursive: true });
@@ -32,6 +33,40 @@ const h = await harness({
 	musicGateway: () => (hold ? slow.gateway() : fast.gateway()),
 });
 const requests: { path: string; method: string; body?: unknown }[] = [];
+const savedTracks = [1, 2].map((n) => ({
+	id: `saved-${n}`,
+	title: `保存曲${n}`,
+	prompt: "piano",
+	tags: [],
+	favorite: false,
+	instrumental: true,
+	model: "saved-recording",
+	audioUrl: `/api/music/tracks/saved-${n}/audio`,
+	metadataUrl: `/api/music/tracks/saved-${n}/metadata`,
+	format: "opus",
+	durationSeconds: 30,
+	createdAt: "2026-10-12T00:00:00Z",
+}));
+const savedPlaylists = [1, 2].map((n) => ({
+	kind: "playlist",
+	id: `00000000-0000-4000-8000-00000000000${n}`,
+	runId: `saved-${n}`,
+	conversationId: "main",
+	title: `保存した選曲${n}`,
+	state: "completed",
+	query: {
+		q: n === 2 ? "ピアノ" : "",
+		tags: [],
+		sort: "createdAt",
+		order: "desc",
+		limit: 50,
+	},
+	trackIds: [`saved-${n}`],
+	currentId: `saved-${n}`,
+	errorCode: null,
+	createdAt: n,
+	updatedAt: n,
+}));
 const server = Bun.serve({
 	hostname: "127.0.0.1",
 	port: 0,
@@ -44,6 +79,27 @@ const server = Bun.serve({
 			body:
 				request.method === "POST" ? await request.clone().json() : undefined,
 		});
+		if (request.headers.get("authorization") === `Bearer ${token}`) {
+			if (path === "/api/music/playlists") return Response.json(savedPlaylists);
+			if (
+				path.startsWith("/api/music/playlists/") &&
+				request.method === "PUT"
+			) {
+				const saved = savedPlaylists.find((p) => path.endsWith(p.id));
+				if (!saved) return new Response(null, { status: 404 });
+				Object.assign(saved, await request.json(), { updatedAt: Date.now() });
+				return Response.json(saved);
+			}
+			if (path === "/api/music/tags") return Response.json({ tags: [] });
+			if (path === "/api/music/tracks")
+				return Response.json({ tracks: savedTracks, total: 2 });
+			if (path.startsWith("/api/music/tracks/") && !path.endsWith("/audio")) {
+				const saved = savedTracks.find((t) => path.endsWith(t.id));
+				return saved
+					? Response.json(saved)
+					: new Response(null, { status: 404 });
+			}
+		}
 		if (
 			path.startsWith("/api/music/") &&
 			path.endsWith("/audio") &&
@@ -55,14 +111,6 @@ const server = Bun.serve({
 });
 let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
 try {
-	const initial = await (
-		await h.request("/api/runs", {
-			requestId: crypto.randomUUID(),
-			conversationId: "main",
-			text: "オーケストラの曲を30秒作って",
-		})
-	).json();
-	await h.dialogue.waitForTerminal(initial.id, { timeoutMs: 5000 });
 	await f.launchWeb({
 		webPort,
 		apiPort: server.port!,
@@ -78,6 +126,20 @@ try {
 	const errors: string[] = [];
 	page.on("pageerror", (error) => errors.push(error.message));
 	await page.goto(origin);
+	await page
+		.getByRole("button", { name: "アーティファクトを開く", exact: true })
+		.click();
+	await expect(
+		page.getByRole("menuitem", { name: "楽曲生成", exact: true }),
+	).toHaveCount(1);
+	await expect(
+		page.getByRole("menuitem", { name: "音楽プレイリスト", exact: true }),
+	).toHaveCount(1);
+	await expect(
+		page.getByRole("menuitem", { name: /^音楽:|^プレイリスト:/ }),
+	).toHaveCount(0);
+	await page.screenshot({ path: `${out}/launcher.png`, fullPage: true });
+	await page.getByRole("menuitem", { name: "楽曲生成", exact: true }).click();
 	const splitter = page.getByRole("separator", {
 		name: "会話とアーティファクトのサイズを調整",
 	});
@@ -159,6 +221,7 @@ try {
 		.click();
 	hold = true;
 	await page.getByRole("button", { name: "楽曲を生成", exact: true }).click();
+	await expect(prompt).toHaveValue(written);
 	await expect(
 		page.getByRole("button", { name: "生成を取り消す", exact: true }),
 	).toBeVisible();
@@ -187,6 +250,10 @@ try {
 	await expect(
 		page.getByRole("button", { name: "再生", exact: true }),
 	).toBeEnabled();
+	await expect(
+		page.getByRole("tab", { name: "楽曲生成", exact: true }),
+	).toHaveCount(1);
+	await expect(prompt).toHaveValue(written);
 	await page.getByRole("button", { name: "Visualizer", exact: true }).click();
 	await page.getByRole("button", { name: "再生", exact: true }).click();
 	await expect
@@ -205,6 +272,34 @@ try {
 		.getByRole("button", { name: "この曲のプロンプトを使う", exact: true })
 		.click();
 	await expect(prompt).toHaveValue(plan.prompt);
+	await openFromLauncher(page, "音楽プレイリスト");
+	await expect(
+		page.getByRole("tab", { name: "楽曲生成", exact: true }),
+	).toHaveCount(1);
+	await expect(
+		page.getByRole("tab", { name: "音楽プレイリスト", exact: true }),
+	).toHaveCount(1);
+	await expect(
+		page.getByRole("combobox", { name: "保存したプレイリスト", exact: true }),
+	).toHaveValue(savedPlaylists[1]!.id);
+	await expect(
+		page.getByRole("textbox", { name: "検索", exact: true }),
+	).toHaveValue("ピアノ");
+	await page
+		.getByRole("combobox", { name: "保存したプレイリスト", exact: true })
+		.selectOption(savedPlaylists[0]!.id);
+	await expect(
+		page.getByRole("textbox", { name: "検索", exact: true }),
+	).toHaveValue("");
+	await expect(page.locator("audio")).toHaveAttribute(
+		"src",
+		"/api/music/tracks/saved-1/audio",
+	);
+	await page.screenshot({ path: `${out}/playlist.png`, fullPage: true });
+	await openFromLauncher(page, "楽曲生成");
+	await expect(
+		page.getByRole("tab", { name: "楽曲生成", exact: true }),
+	).toHaveCount(1);
 	await page.setViewportSize({ width: 390, height: 844 });
 	await splitter.focus();
 	await page.keyboard.press("Home");

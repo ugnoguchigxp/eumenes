@@ -322,11 +322,8 @@ async function setup(
 					toolCalls: [
 						{
 							id: "call",
-							name: "research",
-							arguments: JSON.stringify({
-								kind: "web",
-								question: "提供時期を確認する",
-							}),
+							name: "web_search",
+							arguments: JSON.stringify({ request: "提供時期を確認する" }),
 						},
 					],
 				};
@@ -408,6 +405,7 @@ async function setup(
 							throw new Error("unexpected_delegation");
 						},
 					} as unknown as import("../../agent-runtime").AgentRuntime,
+					toolchains: stubToolchains(),
 				}
 			: {}),
 		...(memory ? { memory } : {}),
@@ -856,3 +854,33 @@ test("a later forget in the Scope removes the usage receipts of answers that sto
 	// The answer itself is a conversation message and is not this feature's to retract.
 	expect(h.answers()).toEqual([ANSWER]);
 });
+
+/** One offered toolchain and no history: the World checks stop it before the sub-agent starts. */
+function stubToolchains(): import("../contracts/toolchains").ToolchainRoutingPort {
+	const card = {
+		revisionId: "toolchain:web.search@1",
+		id: "web.search",
+		functionName: "web_search",
+		title: "Web検索",
+		summary: "公開情報の確認",
+		useWhen: ["確認"],
+		redirects: [],
+		score: { rank: 1, ftsRank: null, similarity: null, fromHistory: false },
+	};
+	return {
+		embedQuery: async () => undefined,
+		routeInTransaction: () => ({ cards: [card], past: [], retrieval: "none" }),
+		resolveInTransaction: () => ({
+			toolchain: {} as never,
+			packageRevisionId: "package:web.recipe@1",
+			runtime: { execution: "research", route: "web" },
+		}),
+		commandSetInTransaction: () => {
+			throw new Error("unexpected_command");
+		},
+		recordSelectionInTransaction: () => "selection",
+		linkTaskInTransaction: () => {},
+		settleSelectionInTransaction: () => {},
+		requestOfRunInTransaction: () => undefined,
+	};
+}

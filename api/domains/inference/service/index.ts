@@ -1,3 +1,5 @@
+import { createVoiceAccess } from "./voice-access";
+import { createSpeechLanguageCache } from "./speech-language";
 import { createVoiceBinding } from "./voice-binding";
 import { bindControlPolicy } from "./control-policy";
 import type { Database } from "bun:sqlite";
@@ -59,6 +61,7 @@ export function createInference(
 	options: InferenceOptions = {},
 ) {
 	const ports = new Map<string, LarmPort>();
+	const speechLanguages = createSpeechLanguageCache();
 	const collectionAdoptions = new Map<string, CollectionAdoption>();
 	const unsubscribeCollection = options.attitudeDataset
 		? store.onCommit(() => {
@@ -116,6 +119,7 @@ export function createInference(
 					style: s.larm.style,
 					pitchScale: s.larm.pitchScale,
 					intonationScale: s.larm.intonationScale,
+					sentenceLanguageProvider: s.larm.sentenceLanguageProvider,
 				});
 			ports.set(key, p);
 			const unsubscribeStatus = p.onChange?.(() => {
@@ -147,6 +151,7 @@ export function createInference(
 		);
 	}
 	const unsubscribe = settings.onChange(() => {
+		speechLanguages.clear();
 		prune();
 		for (const a of active.values())
 			if (!store.read((db) => allowed(db, a.row, a.connection)))
@@ -180,6 +185,7 @@ export function createInference(
 		active,
 		cooldown,
 		collectionAdoptions,
+		speechLanguages,
 		port,
 		resolve,
 		allowed,
@@ -601,14 +607,9 @@ export function createInference(
 				profile: settings.get().larm.profile,
 				providers: [],
 			},
-		voices: async (signal: AbortSignal) => {
-			const snapshot = settings.get();
-			const result = await port(snapshot).voices?.(signal);
-			if (!result) throw new Error("larm_voice_discovery_unsupported");
-			if (JSON.stringify(snapshot.larm) !== JSON.stringify(settings.get().larm))
-				throw new Error("stale_voice_settings");
-			return result;
-		},
+		larmProfiles: async (signal: AbortSignal) =>
+			(await port(settings.get()).conversationProfiles?.(signal)) ?? [],
+		...createVoiceAccess({ settings, port, standalone, standaloneReceipt }),
 		answer: (messages: Messages, signal: AbortSignal) =>
 			standalone("llm", messages, signal) as Promise<string>,
 		answerStream: (
@@ -618,29 +619,6 @@ export function createInference(
 		) => standalone("llm", messages, signal, onDelta) as Promise<string>,
 		transcribe: (wav: Uint8Array, signal: AbortSignal) =>
 			standalone("asr", wav, signal) as Promise<string>,
-		speak: (text: string, signal: AbortSignal, override?: SpeechOverride) =>
-			standalone(
-				"tts",
-				text,
-				signal,
-				undefined,
-				override,
-			) as Promise<Uint8Array>,
-		speakWithDelivery: async (
-			text: string,
-			signal: AbortSignal,
-			preparation?: SpeechPreparation,
-		) => {
-			const receipt = await standaloneReceipt(
-				"tts",
-				text,
-				signal,
-				undefined,
-				undefined,
-				preparation,
-			);
-			return { wav: receipt.value as Uint8Array, delivery: receipt.delivery };
-		},
 		usage: () =>
 			store.read((db) =>
 				db
@@ -777,6 +755,7 @@ export function createInference(
 			});
 		},
 		async close() {
+			speechLanguages.clear();
 			unsubscribeCollection();
 			collectionAdoptions.clear();
 			closed = true;

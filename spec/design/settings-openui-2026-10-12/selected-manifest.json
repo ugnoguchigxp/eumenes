@@ -1,0 +1,266 @@
+{
+	"status": "design-only",
+	"updated": "2026-10-12",
+	"page_id": "page_4df1f952cea88191b54f5efa31c0d0aa",
+	"detail_page_id": "page_2755c0e6251c8191ac67f819f021177c",
+	"selected": [
+		{
+			"id": "conversation",
+			"file": "/Users/y.noguchi/Code/eumenes/spec/design/settings-openui-2026-10-12/conversation-v2.png",
+			"generator": "image_gen",
+			"source": "/Users/y.noguchi/.codex/generated_images/01a12df3-cdb6-7642-853c-3a8ae29eb486/exec-b43f8fd2-d9e8-4dba-8dda-9067365a66dd.png",
+			"prompt_status": "最初の生成指示全文はこのmanifestに未保存。生成元と画像を保存。"
+		},
+		{
+			"id": "appearance",
+			"file": "/Users/y.noguchi/Code/eumenes/spec/design/settings-openui-2026-10-12/appearance-v2.png",
+			"source": "/Users/y.noguchi/.codex/generated_images/01a12df3-cdb6-7642-853c-3a8ae29eb486/exec-7657ffa8-7c68-47ff-95db-a19b8c07f84b.png",
+			"generator": "image_gen",
+			"prompt": "Use case: ui-mockup. Create ONE polished high-fidelity flat screenshot-style UI artifact panel for the Japanese Eumenes assistant, landscape 4:3. The panel fills most of the image with a thin outer dark margin. Design system: charcoal #181a20 background, #20242d card surface, fine #373d48 borders, white Japanese sans-serif text, subdued gray hints, restrained blue #5279ee primary actions. Match the clean conversation settings mockup previously created: a simple title bar with title at upper left and close X upper right, spacious readable form, aligned short labels, modest rectangular inputs, a clear scoped footer. No full settings sidebar, no conversation column, no unrelated cards, no repeated filler lists, no marketing, no gradient, no illustrations. Render readable Japanese exactly. Do not invent controls beyond the description. For a launcher, use only its specified compact list. For management screens, use only scoped operation buttons and no settings apply footer. Screen: Artifact title 表示. Theme control テーマ with 端末に合わせる, ライト, ダーク. Two modest background choice tiles 会話の背景 with 光の妖精 and Spatial; use abstract neutral miniature swatches, no new illustration. Toggle 読み上げ字幕を表示 on. Below show 字幕のデザイン selection ガラス and 字幕の大きさ selection 中. A compact preview panel containing これは字幕のプレビューです. Bottom 未適用の変更 and 変更一覧を開く. No unsupported color palette or uploads."
+		},
+		{
+			"id": "voice-input",
+			"file": "/Users/y.noguchi/Code/eumenes/spec/design/settings-openui-2026-10-12/voice-input-v2.png",
+			"source": "/Users/y.noguchi/.codex/generated_images/01a12df3-cdb6-7642-853c-3a8ae29eb486/exec-2eadf142-ce22-427d-812c-671b7d3b47ed.png",
+			"generator": "image_gen",
+			"prompt": "Use case: ui-mockup. Create ONE polished high-fidelity flat screenshot-style UI artifact panel for the Japanese Eumenes assistant, landscape 4:3. The panel fills most of the image with a thin outer dark margin. Design system: charcoal #181a20 background, #20242d card surface, fine #373d48 borders, white Japanese sans-serif text, subdued gray hints, restrained blue #5279ee primary actions. Match the clean conversation settings mockup previously created: a simple title bar with title at upper left and close X upper right, spacious readable form, aligned short labels, modest rectangular inputs, a clear scoped footer. No full settings sidebar, no conversation column, no unrelated cards, no repeated filler lists, no marketing, no gradient, no illustrations. Render readable Japanese exactly. Do not invent controls beyond the description. For a launcher, use only its specified compact list. For management screens, use only scoped operation buttons and no settings apply footer. Screen: Artifact title 音声と入力. Three subtabs 読み上げ, 聞き取り, 機器, with 読み上げ selected. Toggle 回答を読み上げる, slider 読み上げ音量 80%, toggle 話し始めたら止める. Read-only summary 利用先 LARM and text link 利用先を変更. Voice dropdown 声 春日部つむぎ and standard speed slider 速さ 1.0. Two compact actions 試聴 and 詳細設定. One unobtrusive hint 英語の声は自動で切り替わります. No English voice selector or English speed control. Bottom 未適用の変更, 変更一覧を開く."
+		},
+		{
+			"id": "ai-connections",
+			"file": "/Users/y.noguchi/Code/eumenes/spec/design/settings-openui-2026-10-12/ai-connections-v2.png",
+			"source": "/Users/y.noguchi/.codex/generated_images/01a12df3-cdb6-7642-853c-3a8ae29eb486/exec-a142d25e-2b8a-40c5-9830-f8e7ba87e7e5.png",
+			"generator": "image_gen",
+			"prompt": "Use case: ui-mockup. Create ONE polished high-fidelity flat screenshot-style UI artifact panel for the Japanese Eumenes assistant, landscape 4:3. The panel fills most of the image with a thin outer dark margin. Design system: charcoal #181a20 background, #20242d card surface, fine #373d48 borders, white Japanese sans-serif text, subdued gray hints, restrained blue #5279ee primary actions. Match the clean conversation settings mockup previously created: a simple title bar with title at upper left and close X upper right, spacious readable form, aligned short labels, modest rectangular inputs, a clear scoped footer. No full settings sidebar, no conversation column, no unrelated cards, no repeated filler lists, no marketing, no gradient, no illustrations. Render readable Japanese exactly. Do not invent controls beyond the description. For a launcher, use only its specified compact list. For management screens, use only scoped operation buttons and no settings apply footer. Screen: Artifact title AIと接続. Subtabs 利用するAI and 登録した接続. 利用するAI selected. Three tidy stacked rows 会話, 聞き取り, 読み上げ. Each has a mode selector LARMを優先, cloud target selector 未登録, and toggle クラウドへの送信を許可. Under rows a summary LARM / SAAA-gemma4-26b, secondary 接続を追加. Show guidance 未登録の用途はクラウドへ送信しません. Bottom 未適用の変更 and 変更一覧を開く. Do not put any voice controls here. Make each purpose a clearly labeled card or row and distinguish mode dropdown from cloud-model dropdown. Do not show credentials or voice parameters."
+		},
+		{
+			"id": "memory",
+			"file": "/Users/y.noguchi/Code/eumenes/spec/design/settings-openui-2026-10-12/memory-v2.png",
+			"source": "/Users/y.noguchi/.codex/generated_images/01a12df3-cdb6-7642-853c-3a8ae29eb486/exec-6fc2e613-b00f-47e3-9541-952c3d309d1d.png",
+			"generator": "image_gen",
+			"prompt": "Use case: ui-mockup. Create ONE polished high-fidelity flat screenshot-style UI artifact panel for the Japanese Eumenes assistant, landscape 4:3. The panel fills most of the image with a thin outer dark margin. Design system: charcoal #181a20 background, #20242d card surface, fine #373d48 borders, white Japanese sans-serif text, subdued gray hints, restrained blue #5279ee primary actions. Match the clean conversation settings mockup previously created: a simple title bar with title at upper left and close X upper right, spacious readable form, aligned short labels, modest rectangular inputs, a clear scoped footer. No full settings sidebar, no conversation column, no unrelated cards, no repeated filler lists, no marketing, no gradient, no illustrations. Render readable Japanese exactly. Do not invent controls beyond the description. For a launcher, use only its specified compact list. For management screens, use only scoped operation buttons and no settings apply footer. Screen: Artifact title 記憶. Subtabs 会話で使う記憶 and 覚えている事実. First selected. One clean status card 会話への接続, state 接続中, hint 保存した情報を回答の参考にします. Buttons メモリーを切断 and 接続状態を読み直す. Secondary plain note 切断しても記憶は残ります. A separate navigation card 覚えている事実 with small preview list 好み / 根拠・履歴 and 開く. No all-memory delete, no World enable toggle, no global apply. Small status 切替はすぐに反映."
+		},
+		{
+			"id": "records",
+			"file": "/Users/y.noguchi/Code/eumenes/spec/design/settings-openui-2026-10-12/records-v2.png",
+			"source": "/Users/y.noguchi/.codex/generated_images/01a12df3-cdb6-7642-853c-3a8ae29eb486/exec-3dbc7647-e959-4a1e-a3f4-b794133eb565.png",
+			"generator": "image_gen",
+			"prompt": "Use case: ui-mockup. Create ONE polished high-fidelity flat screenshot-style UI artifact panel for the Japanese Eumenes assistant, landscape 4:3. The panel fills most of the image with a thin outer dark margin. Design system: charcoal #181a20 background, #20242d card surface, fine #373d48 borders, white Japanese sans-serif text, subdued gray hints, restrained blue #5279ee primary actions. Match the clean conversation settings mockup previously created: a simple title bar with title at upper left and close X upper right, spacious readable form, aligned short labels, modest rectangular inputs, a clear scoped footer. No full settings sidebar, no conversation column, no unrelated cards, no repeated filler lists, no marketing, no gradient, no illustrations. Render readable Japanese exactly. Do not invent controls beyond the description. For a launcher, use only its specified compact list. For management screens, use only scoped operation buttons and no settings apply footer. Screen: Artifact title 記録. Tabs AIの利用, 作業の選択記録, 取得手順. AIの利用 selected. Table columns 用途, 利用先, 結果, 切替理由, トークン. Rows 会話 LARM 採用済み — 不明; 読み上げ LARM 採用済み — 不明; 聞き取り LARM 採用済み — 不明. Compact secondary 診断データを保存. Collapsed 保存と送信. Hint 直近100件. No cost forecast, billing figures, invented charts, or global apply."
+		},
+		{
+			"id": "changes",
+			"file": "/Users/y.noguchi/Code/eumenes/spec/design/settings-openui-2026-10-12/changes-v2.png",
+			"source": "/Users/y.noguchi/.codex/generated_images/01a12df3-cdb6-7642-853c-3a8ae29eb486/exec-a7df9930-28dc-410d-985b-d2ce8dfa7967.png",
+			"generator": "image_gen",
+			"prompt": "Use case: ui-mockup. Create ONE polished high-fidelity flat screenshot-style UI artifact panel for the Japanese Eumenes assistant, landscape 4:3. The panel fills most of the image with a thin outer dark margin. Design system: charcoal #181a20 background, #20242d card surface, fine #373d48 borders, white Japanese sans-serif text, subdued gray hints, restrained blue #5279ee primary actions. Match the clean conversation settings mockup previously created: a simple title bar with title at upper left and close X upper right, spacious readable form, aligned short labels, modest rectangular inputs, a clear scoped footer. No full settings sidebar, no conversation column, no unrelated cards, no repeated filler lists, no marketing, no gradient, no illustrations. Render readable Japanese exactly. Do not invent controls beyond the description. For a launcher, use only its specified compact list. For management screens, use only scoped operation buttons and no settings apply footer. Screen: Artifact title 設定の変更一覧. Heading 未適用の変更 3件. Three grouped diff rows 会話 / 口調 執事 → 参謀; 表示 / 背景 光の妖精 → Spatial; AIと接続 / 認証情報 キーを更新予定. Each has 戻って編集. Never show a key value. Explain この一覧の設定変更をまとめて適用します. Scoped primary 設定の変更をすべて適用 and secondary 未適用の設定変更をすべて破棄. Small note 予約や辞書の保存は含みません. No arbitrary JSON or SQL. Use precisely these 3 pending changes only; clearly distinguish all settings apply from scoped domain operations."
+		},
+		{
+			"id": "settings-hub",
+			"file": "/Users/y.noguchi/Code/eumenes/spec/design/settings-openui-2026-10-12/settings-hub-v3.png",
+			"source": "/Users/y.noguchi/.codex/generated_images/01a12df3-cdb6-7642-853c-3a8ae29eb486/exec-1a60c37a-6d2e-4618-85d3-2613dc8d7d0c.png",
+			"generator": "image_gen",
+			"prompt": "Edit this existing Japanese dark settings launcher image. Preserve its colors, typography, single centered panel, search box, two group columns and footer. In the right column 管理と確認 REMOVE the entire rows 予約 and 委任した作業 including icons and chevrons, then redistribute four remaining rows 記憶, 読み方辞書, 動作確認, 記録 with even spacing. No project or delegation or schedule UI anywhere. Left column preserve 会話, 音声と入力, 表示, AIと接続, 外部作業. Footer keep 会話 LARM, 読み上げ LARM, 未適用の変更 3件. Accurate Japanese. This is a layout image only. Do not add new controls."
+		}
+	],
+	"rejected_or_deferred": [
+		{
+			"id": "settings-hub",
+			"file": "/Users/y.noguchi/Code/eumenes/spec/design/settings-openui-2026-10-12/settings-hub-v2.png",
+			"source": "/Users/y.noguchi/.codex/generated_images/01a12df3-cdb6-7642-853c-3a8ae29eb486/exec-d8db45c5-97e1-4810-83ec-f70b10e392de.png",
+			"generator": "image_gen",
+			"prompt": "Use case: ui-mockup. Create ONE polished high-fidelity flat screenshot-style UI artifact panel for the Japanese Eumenes assistant, landscape 4:3. The panel fills most of the image with a thin outer dark margin. Design system: charcoal #181a20 background, #20242d card surface, fine #373d48 borders, white Japanese sans-serif text, subdued gray hints, restrained blue #5279ee primary actions. Match the clean conversation settings mockup previously created: a simple title bar with title at upper left and close X upper right, spacious readable form, aligned short labels, modest rectangular inputs, a clear scoped footer. No full settings sidebar, no conversation column, no unrelated cards, no repeated filler lists, no marketing, no gradient, no illustrations. Render readable Japanese exactly. Do not invent controls beyond the description. For a launcher, use only its specified compact list. For management screens, use only scoped operation buttons and no settings apply footer. Screen: Show a small settings launcher panel over a calm conversation workspace, not a full page. Title 設定, a search box 設定項目を探す. Two groups: 使い方を変える with 会話, 音声と入力, 表示, AIと接続, 外部作業; 管理と確認 with 記憶, 読み方辞書, 予約, 委任した作業, 動作確認, 記録. Small summary 会話 LARM / 読み上げ LARM, and subtle bottom link 未適用の変更 3件. No editable values in this launcher. This asset is ONLY the compact launcher panel centered on plain charcoal, no other panel or background conversation. Two columns for the two groups, clear compact text list, no editable form."
+		},
+		{
+			"id": "external-work",
+			"file": "/Users/y.noguchi/Code/eumenes/spec/design/settings-openui-2026-10-12/external-work-v3.png",
+			"source": "/Users/y.noguchi/.codex/generated_images/01a12df3-cdb6-7642-853c-3a8ae29eb486/exec-ed41554a-63ed-4324-9eb9-55666643d995.png",
+			"generator": "image_gen",
+			"prompt": "Use case: ui-mockup. Create ONE polished high-fidelity flat screenshot-style UI artifact panel for the Japanese Eumenes assistant, landscape 4:3. The panel fills most of the image with a thin outer dark margin. Design system: charcoal #181a20 background, #20242d card surface, fine #373d48 borders, white Japanese sans-serif text, subdued gray hints, restrained blue #5279ee primary actions. Match the clean conversation settings mockup previously created: a simple title bar with title at upper left and close X upper right, spacious readable form, aligned short labels, modest rectangular inputs, a clear scoped footer. No full settings sidebar, no conversation column, no unrelated cards, no repeated filler lists, no marketing, no gradient, no illustrations. Render readable Japanese exactly. Do not invent controls beyond the description. For a launcher, use only its specified compact list. For management screens, use only scoped operation buttons and no settings apply footer. Screen: Artifact title 作業するプロジェクト. Scoped individual editor with project chooser サンプルプロジェクト. Fields 名前, 接続 dots, 担当 標準の調整担当, 実行場所 ローカル, toggle 利用する. Section 任せてよい操作 with checkbox rows 参照, 新しい作業, 続行, 編集, 検証, コミット, プッシュ, 公開, 外部への送信; only first five checked. Collapsed 詳細設定. A scoped primary action このプロジェクトを保存, small label プロジェクトごとに保存. No global apply button, no key values.",
+			"editPrompt": "Edit this Japanese UI mockup precisely. Change ONLY the 接続 field: it is a connection SELECTOR, not a password input. Replace the row of bullet dots with the literal plain text 「dots」 and a small dropdown chevron. Preserve the rest of the screen exactly, including all title, fields, checkboxes, labels, spacing, colors, and the scoped このプロジェクトを保存 button. Do not add or remove other controls."
+		},
+		{
+			"id": "dictionary",
+			"file": "/Users/y.noguchi/Code/eumenes/spec/design/settings-openui-2026-10-12/dictionary-v2.png",
+			"source": "/Users/y.noguchi/.codex/generated_images/01a12df3-cdb6-7642-853c-3a8ae29eb486/exec-becc7a00-5377-4870-8d8b-7456473f3083.png",
+			"generator": "image_gen",
+			"prompt": "Use case: ui-mockup. Create ONE polished high-fidelity flat screenshot-style UI artifact panel for the Japanese Eumenes assistant, landscape 4:3. The panel fills most of the image with a thin outer dark margin. Design system: charcoal #181a20 background, #20242d card surface, fine #373d48 borders, white Japanese sans-serif text, subdued gray hints, restrained blue #5279ee primary actions. Match the clean conversation settings mockup previously created: a simple title bar with title at upper left and close X upper right, spacious readable form, aligned short labels, modest rectangular inputs, a clear scoped footer. No full settings sidebar, no conversation column, no unrelated cards, no repeated filler lists, no marketing, no gradient, no illustrations. Render readable Japanese exactly. Do not invent controls beyond the description. For a launcher, use only its specified compact list. For management screens, use only scoped operation buttons and no settings apply footer. Screen: Artifact title 読み方辞書. Search 辞書を検索. A compact editable table with columns 文字, 読み方, 操作. Three sample rows Eumenes / ユーメネス, LARM / ラーム, API / エーピーアイ, each with small 保存 and 削除. One blank new row with 追加. Pagination 前へ, 1 / 1, 次へ at bottom. Visible hint 行ごとに保存します. No global apply, no language classification controls. Ensure each entry has two independent text cells and clearly scoped save/delete controls, all Japanese example readings correct."
+		},
+		{
+			"id": "schedule",
+			"file": "/Users/y.noguchi/Code/eumenes/spec/design/settings-openui-2026-10-12/schedule-v3.png",
+			"source": "/Users/y.noguchi/.codex/generated_images/01a12df3-cdb6-7642-853c-3a8ae29eb486/exec-1d468ae3-3a41-4e29-93d5-4d7e19cf9fae.png",
+			"generator": "image_gen",
+			"prompt": "Use case: ui-mockup. Create ONE polished high-fidelity flat screenshot-style UI artifact panel for the Japanese Eumenes assistant, landscape 4:3. The panel fills most of the image with a thin outer dark margin. Design system: charcoal #181a20 background, #20242d card surface, fine #373d48 borders, white Japanese sans-serif text, subdued gray hints, restrained blue #5279ee primary actions. Match the clean conversation settings mockup previously created: a simple title bar with title at upper left and close X upper right, spacious readable form, aligned short labels, modest rectangular inputs, a clear scoped footer. No full settings sidebar, no conversation column, no unrelated cards, no repeated filler lists, no marketing, no gradient, no illustrations. Render readable Japanese exactly. Do not invent controls beyond the description. For a launcher, use only its specified compact list. For management screens, use only scoped operation buttons and no settings apply footer. Screen: Artifact title 予約. List-first layout. Top right primary 予約を追加. Two neutral example cards 毎朝の予定確認 with state 有効 and next time 明日 9:00, 読書の振り返り with state 一時停止. Each row shows one-time or interval info and scoped actions 一時停止 or 再開, 今後の予約を取消, 実行履歴. Bottom hint Eumenesが起動している間に実行します. No calendar grid, no monthly scheduling, no global apply button. The future cancellation action must be labeled 今後の予約を取消, not an action to stop a currently running conversation.",
+			"editPrompt": "Edit this Japanese UI mockup precisely. Change ONLY the recurrence text in the second 読書の振り返り card: replace 「毎週日曜日 20:00」 with 「7日ごと」. This app supports fixed intervals, not weekday schedules. Preserve the rest exactly, all layout, colors, titles, controls, first card, buttons and footer. Do not add any new controls."
+		},
+		{
+			"id": "delegated-tasks",
+			"file": "/Users/y.noguchi/Code/eumenes/spec/design/settings-openui-2026-10-12/delegated-tasks-v2.png",
+			"source": "/Users/y.noguchi/.codex/generated_images/01a12df3-cdb6-7642-853c-3a8ae29eb486/exec-c637f926-0319-464a-8afc-af2e9f40131d.png",
+			"generator": "image_gen",
+			"prompt": "Use case: ui-mockup. Create ONE polished high-fidelity flat screenshot-style UI artifact panel for the Japanese Eumenes assistant, landscape 4:3. The panel fills most of the image with a thin outer dark margin. Design system: charcoal #181a20 background, #20242d card surface, fine #373d48 borders, white Japanese sans-serif text, subdued gray hints, restrained blue #5279ee primary actions. Match the clean conversation settings mockup previously created: a simple title bar with title at upper left and close X upper right, spacious readable form, aligned short labels, modest rectangular inputs, a clear scoped footer. No full settings sidebar, no conversation column, no unrelated cards, no repeated filler lists, no marketing, no gradient, no illustrations. Render readable Japanese exactly. Do not invent controls beyond the description. For a launcher, use only its specified compact list. For management screens, use only scoped operation buttons and no settings apply footer. Screen: Artifact title 委任した作業. List on the left inside artifact with two neutral sample tasks 表示の調整 state 回答待ち and 設定の確認 state 作業中. Selected task detail on right, heading 表示の調整, simple project summary サンプルプロジェクト. Question box 希望する表示を教えてください, textarea, primary 回答して続行. Secondary 一時停止 and 取消. Collapsed Sessionと根拠. Top action 作業を依頼. No shared settings save controls or fabricated progress percentages. The project summary is text, not a password field. Do not invent charts or hidden extra actions."
+		}
+	],
+	"page_references": [
+		{
+			"id": "service-tests-current",
+			"page_id": "page_4df1f952cea88191b54f5efa31c0d0aa",
+			"reference": "library-file:fde1_bGliZmlsZV9oYkxSWVcyb1JtOERXRU1UMkVIdlJB_FileDrive_4c1c044e1e1c8191b470d5c08e8819bd",
+			"file_name": "service-tests-current-24f2cb2989c54387b94b276c0aca0b93.png",
+			"mime_type": "image/jpeg",
+			"byte_size": 71208,
+			"sha256": "7b553d35c54189067cc45bd387f335fdd84d332a816dd0d7308a7193df23b3c2",
+			"file_access_confirmed": true,
+			"is_image": true,
+			"markdown": "![service-tests-current](library-file:fde1_bGliZmlsZV9oYkxSWVcyb1JtOERXRU1UMkVIdlJB_FileDrive_4c1c044e1e1c8191b470d5c08e8819bd)",
+			"inserted": false,
+			"next_step": "Read the Page and use edit_page with its fresh guards to insert markdown."
+		},
+		{
+			"id": "service-tests-detail-current",
+			"page_id": "page_4df1f952cea88191b54f5efa31c0d0aa",
+			"reference": "library-file:fde1_bGliZmlsZV9JRC05WlZJLVRNRDlmTUw4Zk1yOVh3_FileDrive_4c1c044e1e1c8191b470d5c08e8819bd",
+			"file_name": "service-tests-detail-current-a8245541d75f47d4b61a30e2e95070be.png",
+			"mime_type": "image/jpeg",
+			"byte_size": 60091,
+			"sha256": "f60faacf8ec243b2e3daf58803484561387040bfc6a404047bdde8f3848e620a",
+			"file_access_confirmed": true,
+			"is_image": true,
+			"markdown": "![service-tests-detail-current](library-file:fde1_bGliZmlsZV9JRC05WlZJLVRNRDlmTUw4Zk1yOVh3_FileDrive_4c1c044e1e1c8191b470d5c08e8819bd)",
+			"inserted": false,
+			"next_step": "Read the Page and use edit_page with its fresh guards to insert markdown."
+		},
+		{
+			"id": "conversation",
+			"page_id": "page_4df1f952cea88191b54f5efa31c0d0aa",
+			"reference": "library-file:fde1_bGliZmlsZV9QQ2wtRGFJNDJyNHE3MzVMbGZMU0xn_FileDrive_4c1c044e1e1c8191b470d5c08e8819bd",
+			"file_name": "conversation-v2-6275df8ca5ee4691afe1eb79d9a19f86.png",
+			"mime_type": "image/png",
+			"byte_size": 1235078,
+			"sha256": "60cd62b04e258d2db365f4f5443e5f208caf6538fd71226988f323905e8f6703",
+			"file_access_confirmed": true,
+			"is_image": true,
+			"markdown": "![conversation](library-file:fde1_bGliZmlsZV9QQ2wtRGFJNDJyNHE3MzVMbGZMU0xn_FileDrive_4c1c044e1e1c8191b470d5c08e8819bd)",
+			"inserted": false,
+			"next_step": "Read the Page and use edit_page with its fresh guards to insert markdown."
+		},
+		{
+			"id": "appearance",
+			"page_id": "page_4df1f952cea88191b54f5efa31c0d0aa",
+			"reference": "library-file:fde1_bGliZmlsZV9jZTN2TVRVb3FoUmpmenJnWjJuV0N3_FileDrive_4c1c044e1e1c8191b470d5c08e8819bd",
+			"file_name": "appearance-v2-5182044fe51440c2b497549f30e16a92.png",
+			"mime_type": "image/png",
+			"byte_size": 1337856,
+			"sha256": "48f38efb2eb7c2d753569bdbc951050566f56dfbb686bdc69262308aec5efbb7",
+			"file_access_confirmed": true,
+			"is_image": true,
+			"markdown": "![appearance](library-file:fde1_bGliZmlsZV9jZTN2TVRVb3FoUmpmenJnWjJuV0N3_FileDrive_4c1c044e1e1c8191b470d5c08e8819bd)",
+			"inserted": false,
+			"next_step": "Read the Page and use edit_page with its fresh guards to insert markdown."
+		},
+		{
+			"id": "voice-input",
+			"page_id": "page_4df1f952cea88191b54f5efa31c0d0aa",
+			"reference": "library-file:fde1_bGliZmlsZV83S2tzVlNTbFl3MnRfZmdOUDkxUHR3_FileDrive_4c1c044e1e1c8191b470d5c08e8819bd",
+			"file_name": "voice-input-v2-a071fcd236584deaa9671d19b2530cd5.png",
+			"mime_type": "image/png",
+			"byte_size": 1298103,
+			"sha256": "519f91e2d769d8d01cacdb039fe79e301c6efc76b916c3a55db6aa037b219dd2",
+			"file_access_confirmed": true,
+			"is_image": true,
+			"markdown": "![voice-input](library-file:fde1_bGliZmlsZV83S2tzVlNTbFl3MnRfZmdOUDkxUHR3_FileDrive_4c1c044e1e1c8191b470d5c08e8819bd)",
+			"inserted": false,
+			"next_step": "Read the Page and use edit_page with its fresh guards to insert markdown."
+		},
+		{
+			"id": "ai-connections",
+			"page_id": "page_4df1f952cea88191b54f5efa31c0d0aa",
+			"reference": "library-file:fde1_bGliZmlsZV9oR0kzcWtQZm9LUlc0TnBPOFdnTkFn_FileDrive_4c1c044e1e1c8191b470d5c08e8819bd",
+			"file_name": "ai-connections-v2-5a7be237ac204736b3b87e2b3d286442.png",
+			"mime_type": "image/png",
+			"byte_size": 1391938,
+			"sha256": "d5e11ed3c0740e952eb94940b4cf788b09a1d69da1e178e27b684a15e839122f",
+			"file_access_confirmed": true,
+			"is_image": true,
+			"markdown": "![ai-connections](library-file:fde1_bGliZmlsZV9oR0kzcWtQZm9LUlc0TnBPOFdnTkFn_FileDrive_4c1c044e1e1c8191b470d5c08e8819bd)",
+			"inserted": false,
+			"next_step": "Read the Page and use edit_page with its fresh guards to insert markdown."
+		},
+		{
+			"id": "memory",
+			"page_id": "page_4df1f952cea88191b54f5efa31c0d0aa",
+			"reference": "library-file:fde1_bGliZmlsZV9pU2VpeHlRempybmw0WnBiVFFDel9R_FileDrive_4c1c044e1e1c8191b470d5c08e8819bd",
+			"file_name": "memory-v2-934e121cc00f459895f45aa5e9bbb58d.png",
+			"mime_type": "image/png",
+			"byte_size": 1323344,
+			"sha256": "c0694f76a5898a454f28200083cbac670bea66ebb4f5ccc504eb750e30398ae2",
+			"file_access_confirmed": true,
+			"is_image": true,
+			"markdown": "![memory](library-file:fde1_bGliZmlsZV9pU2VpeHlRempybmw0WnBiVFFDel9R_FileDrive_4c1c044e1e1c8191b470d5c08e8819bd)",
+			"inserted": false,
+			"next_step": "Read the Page and use edit_page with its fresh guards to insert markdown."
+		},
+		{
+			"id": "records",
+			"page_id": "page_4df1f952cea88191b54f5efa31c0d0aa",
+			"reference": "library-file:fde1_bGliZmlsZV9WWUoxc1hPSjZBVTI1VVNuS0Q2MEhn_FileDrive_4c1c044e1e1c8191b470d5c08e8819bd",
+			"file_name": "records-v2-d26382a7ec794dc6b7455668b6297d43.png",
+			"mime_type": "image/png",
+			"byte_size": 1258209,
+			"sha256": "9ebbc44855f1478e1a7528c8ee80ce6062dc8711fc4d89c083290915918b2caa",
+			"file_access_confirmed": true,
+			"is_image": true,
+			"markdown": "![records](library-file:fde1_bGliZmlsZV9WWUoxc1hPSjZBVTI1VVNuS0Q2MEhn_FileDrive_4c1c044e1e1c8191b470d5c08e8819bd)",
+			"inserted": false,
+			"next_step": "Read the Page and use edit_page with its fresh guards to insert markdown."
+		},
+		{
+			"id": "changes",
+			"page_id": "page_4df1f952cea88191b54f5efa31c0d0aa",
+			"reference": "library-file:fde1_bGliZmlsZV9VYUU2N1lWVHQ5RTI1RDVEVlFXcjh3_FileDrive_4c1c044e1e1c8191b470d5c08e8819bd",
+			"file_name": "changes-v2-ae7de98fb1b44ede957eddc2262e9fdb.png",
+			"mime_type": "image/png",
+			"byte_size": 1355146,
+			"sha256": "86d2544eab12e97e48645cd53e752a33e37d514de313c1470a2883f164188895",
+			"file_access_confirmed": true,
+			"is_image": true,
+			"markdown": "![changes](library-file:fde1_bGliZmlsZV9VYUU2N1lWVHQ5RTI1RDVEVlFXcjh3_FileDrive_4c1c044e1e1c8191b470d5c08e8819bd)",
+			"inserted": false,
+			"next_step": "Read the Page and use edit_page with its fresh guards to insert markdown."
+		},
+		{
+			"id": "settings-hub",
+			"page_id": "page_4df1f952cea88191b54f5efa31c0d0aa",
+			"reference": "library-file:fde1_bGliZmlsZV9idDE0cHBzNEc5S2hhMlB5b1YwbWpB_FileDrive_4c1c044e1e1c8191b470d5c08e8819bd",
+			"file_name": "settings-hub-v3-a05201c8ef35472fb7cabc863d12e561.png",
+			"mime_type": "image/png",
+			"byte_size": 1506901,
+			"sha256": "6a523b5b031ad244c50b5b09427da723bacc7cf9da236bfe51eeba32eb5213c8",
+			"file_access_confirmed": true,
+			"is_image": true,
+			"markdown": "![薄い設定入口・対象整理後](library-file:fde1_bGliZmlsZV9idDE0cHBzNEc5S2hhMlB5b1YwbWpB_FileDrive_4c1c044e1e1c8191b470d5c08e8819bd)",
+			"inserted": false,
+			"next_step": "Read the Page and use edit_page with its fresh guards to insert markdown."
+		},
+		{
+			"id": "dictionary-current",
+			"page_id": "page_4df1f952cea88191b54f5efa31c0d0aa",
+			"reference": "library-file:fde1_bGliZmlsZV9HUDI2RXRtczhhTTM1Y0FWZnFDaEJn_FileDrive_4c1c044e1e1c8191b470d5c08e8819bd",
+			"file_name": "dictionary-current-fb5740fdb3154b979bb69d73423d13ad.png",
+			"mime_type": "image/jpeg",
+			"byte_size": 66816,
+			"sha256": "6d1d00fffbd72ead72ad48ed0ff11f5a5e955bd2cbee196d2275a6ed15eb1c78",
+			"file_access_confirmed": true,
+			"is_image": true,
+			"markdown": "![読み方辞書・現行画面](library-file:fde1_bGliZmlsZV9HUDI2RXRtczhhTTM1Y0FWZnFDaEJn_FileDrive_4c1c044e1e1c8191b470d5c08e8819bd)",
+			"inserted": false,
+			"next_step": "Read the Page and use edit_page with its fresh guards to insert markdown."
+		}
+	],
+	"commonPrompt": "Use case: ui-mockup. Create ONE polished high-fidelity flat screenshot-style UI artifact panel for the Japanese Eumenes assistant, landscape 4:3. The panel fills most of the image with a thin outer dark margin. Design system: charcoal #181a20 background, #20242d card surface, fine #373d48 borders, white Japanese sans-serif text, subdued gray hints, restrained blue #5279ee primary actions. Match the clean conversation settings mockup previously created: a simple title bar with title at upper left and close X upper right, spacious readable form, aligned short labels, modest rectangular inputs, a clear scoped footer. No full settings sidebar, no conversation column, no unrelated cards, no repeated filler lists, no marketing, no gradient, no illustrations. Render readable Japanese exactly. Do not invent controls beyond the description. For a launcher, use only its specified compact list. For management screens, use only scoped operation buttons and no settings apply footer. Screen: ",
+	"capture_files": [
+		"/Users/y.noguchi/Code/eumenes/spec/design/settings-openui-2026-10-12/dictionary-current.jpg",
+		"/Users/y.noguchi/Code/eumenes/spec/design/settings-openui-2026-10-12/service-tests-current.jpg",
+		"/Users/y.noguchi/Code/eumenes/spec/design/settings-openui-2026-10-12/service-tests-detail-current.jpg"
+	],
+	"upload_receipt_note": "inserted=falseはアップロード時の応答。後続edit_pageで挿入し読戻し確認済み。"
+}

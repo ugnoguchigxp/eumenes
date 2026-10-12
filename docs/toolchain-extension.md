@@ -1,8 +1,27 @@
 # ツールチェーンの登録と拡張
 
-更新日: 2026年10月11日。現行コードの登録先・接続先と、追加の種類ごとの最小例をまとめる。
+更新日: 2026年10月12日。現行コードの登録先・接続先と、追加の種類ごとの最小例をまとめる。
 
-**登録APIで追加できるのは、現在は要件profileとdotsの担当package。任意のツール・backendを取り込む汎用登録APIはない。** 組込みpackageは定義を登録しただけでは会話に公開されず、会話の操作から起動先への接続も必要になる。
+**登録APIで追加できるのは、現在は要件profileとdotsの担当package。任意のツール・backendを取り込む汎用登録APIはない。** 組込みpackageは定義を登録しただけでは会話に公開されない。会話へ出すには、packageを[ツールチェーン(定形セット)](#0-ツールチェーン定形セットとして会話へ公開する)として登録する。
+
+## 0. ツールチェーン(定形セット)として会話へ公開する
+
+ツールチェーンは「サブエージェント・SystemContext・SKILL・ツールの使い方・ツール詳細・Artifact」を一組にした登録単位である(`kind:"toolchain"`、設計は[spec](../spec/toolchain-set-routing-design-2026-10-12.md))。簡単な処理でも原則この構造で実行し、会話担当のタスクを増やさない。
+
+- 会話担当には、候補検索で選ばれたツールチェーンが一つずつ関数として見える。引数は全ツールチェーン共通の `{ request: string }` だけで、ツールチェーンごとの引数・判別子(`kind`など)・`oneOf`/`anyOf` は作らない。役割が違えば別のツールチェーンにする。
+- 関数の説明はツールチェーン定義の `summary`・`useWhen`・`redirects` から生成する。`api/domains/dialogue/service/conversation-tools.ts` に個別の関数や方針文を書き足さない。
+- 経路・ツール・引数の判断はツールチェーン内のサブエージェントが行う。実行方式は `runtime-meta.ts` の `toolchainRuntimeOf` で決まる(`research`: agent-runtimeのworker、`command`: 操作担当が型付き操作を一つ作る、`music-create`/`music-playback`: 音楽domainの計画担当)。
+
+| 順序 | 変更先 | 追加・確認する内容 |
+| --- | --- | --- |
+| 1 | package一式(下のB・C) | profile・SKILL・ツールを持つpackage。ツールの入力schemaは平坦なobject |
+| 2 | `api/domains/capabilities/builtin/toolchains.ts` | `kind:"toolchain"`、`functionName`、`summary`、`useWhen`(1件以上)、`examples`(3件以上、候補検索の索引と評価に使う)、`redirects`、`packageRevisionId`(依存はこのpackage一つ)、`artifact`(表示しない場合も`{kind:"none"}`を明示) |
+| 3 | `api/domains/capabilities/contracts/runtime-meta.ts` の toolchains | 実行方式、必要なruntime(`luna`・`timers`・`music`・`dots`)、研究経路なら`route` |
+| 4 | 実行方式が既存にない場合だけ | `dialogue/service/generation-operation.ts` と実行先の接続 |
+
+登録時に、必須要素の欠落・関数名の重複・平坦でないツールschemaは拒否される(`invalid_toolchain`、`toolchain_function_conflict`、`invalid_toolchain_tool_schema`)。packageが登録されていないホストではツールチェーンも登録しない。
+
+候補検索は、toolchainの`title`・`summary`・`useWhen`・`examples`に対するFTS(trigram)と、LARMのembedding(`examples`等をpassageとして保存)、似た依頼での過去の選択をRRFで統合する。embeddingを利用できないときは、全ての利用可能なツールチェーンを提示する。選択の記録と保存済みの取得手順は `toolchain-history` domain(`/api/toolchain-history/*`、`bun run cli -- toolchain-history ...`、設定「ツールチェーンの記録」)で確認する。
 
 [作業規則](../AGENTS.md)を守り、意味理解や担当選択はLLMに任せる。コードで追加する分岐は、公開操作・登録IDと実行先の接続に限る。発話の語句・企業名・地域による振り分けを追加しない。A〜Dのコードは登録方法を説明する未登録の例。Eの音楽UI・生成中表示は実装済みの登録例であり、新しい部品への適用手順と区別して示す。
 
@@ -93,8 +112,8 @@ profile・skill・packageの生成とrevision更新はAPIが行う。skillsは1�
 | 2 | `api/domains/capabilities/service/builtin-seed.ts` | 新しい定義配列ならimportし、対応backendが有効なとき登録する。既存配列へ追加する場合は追加配線不要 |
 | 3 | `api/domains/capabilities/contracts/runtime-meta.ts` | 新package IDの予算・報告方式。既存IDの新revisionは同じ設定を引き継ぐ |
 | 4 | `api/domains/agent-runtime/service/start-task.ts` | 新しい実行で起動する正確な`package:<id>@<revision>` |
-| 5 | `api/domains/dialogue/service/conversation-tools.ts` | 新経路なら公開schema、説明、operationの解析、方針を一緒に追加 |
-| 6 | `api/domains/agent-runtime/service/queries.ts`、`api/domains/dialogue/service/delegate-conversation.ts` | 新経路の利用可否を提示し、選択結果を開始処理へ渡す。既存経路の版更新だけなら通常変更不要 |
+| 5 | `api/domains/capabilities/builtin/toolchains.ts` | 会話へ出す新経路なら[0章](#0-ツールチェーン定形セットとして会話へ公開する)のツールチェーンを追加し、`packageRevisionId`で版を指す。会話の関数・方針は手で書かない |
+| 6 | `api/domains/dialogue/service/delegate-conversation.ts` | 新しいruntime条件が必要な場合だけ`prepareRouting`の利用可否へ追加する。既存経路の版更新なら変更不要 |
 | 7 | 所有domainのtest、`api/application/`の該当結合試験 | 登録、選択、起動したpackageの版、報告方式、会話への返却 |
 
 登録順は依存が先、packageが最後。`dependencies`は依存閉包を作る一覧、`profileRevisionId`・`requiredSkillRevisionIds`・`toolRevisionIds`はその中で実際に使う役割指定なので、両方を揃える。profileとskillには空でないbody、toolにはschemaKeyが必要。packageにも入力に合うschemaKeyを指定する。
@@ -122,24 +141,22 @@ builtins.push(briefSkill, {
 });
 ```
 
-この例では`start-task.ts`の既定quick起動先も`package:web.quick@3`へ変更する。旧`@2`は削除しない。metadataはpackage IDの`web.quick`に紐づくため変更不要。会話ツール、tool schema、外部adapter、inferenceには変更不要。報告契約と共通方針はそのまま使い、Skillで上位の権限・予算を変えない。
+この例ではツールチェーン`web.search`の`packageRevisionId`を新しい版へ向ける(ツールチェーンも新revisionにする)。`start-task.ts`はツールチェーンが指すpackageを起動するので変更不要。旧`@2`は削除しない。metadataはpackage IDの`web.quick`に紐づくため変更不要。会話ツール、tool schema、外部adapter、inferenceには変更不要。報告契約と共通方針はそのまま使い、Skillで上位の権限・予算を変えない。
 
 ### 新しいpackage IDを並行して追加する場合
 
 上の例でpackageを`id: "web.brief", revision: 1`にすれば別IDの定義になる。ただし、次も必要になる。
 
 - `runtime-meta.ts`のpackagesへ `"web.brief": { budget: "quick", report: "search" }` を追加する。
-- 既存quickと併存させる場合、会話に別の選択肢を公開し、その選択結果から`package:web.brief@1`へ接続する。`aliases`や`useWhen`だけを追加しても起動先は変わらない。
+- 既存quickと併存させる場合、`package:web.brief@1`を指す別のツールチェーン(例 `functionName:"web_brief"`)を登録する。`aliases`や`useWhen`だけを追加しても起動先は変わらない。
 - 既存経路を置き換える場合は、起動先と説明を更新する。どちらの用途かを先に決め、併存の依頼で既定経路を勝手に置き換えない。
 
-併存の配線例は次の対応を一組として実装する。これは未実装の例であり、現在の会話schemaにこの操作はない。
+併存の配線例は次の対応を一組として実装する。これは未実装の例である。
 
 | 接続 | 例で追加する内容 |
 | --- | --- |
-| `conversation-tools.ts` | `research_brief`、引数`{question:string}`を公開。厳密なschemaとoperation分岐を追加し、`ConversationOperation`に`{kind:"brief_web";question:string}`を加える |
-| 会話方針・公開条件 | 既存quickとの使い分けをLLMへ説明。利用不可時はツールと説明を両方非公開にする |
-| `delegate-conversation.ts` | `brief_web`にも現在の依頼の許可URLを渡す。既存の`selected.kind === "web"`だけの条件に取り残さない。要件profileはhistoryだけに維持 |
-| `start-task.ts` | 入力kindへ`brief_web`を加え、`brief_web → package:web.brief@1`を明示。Web系へのprofile拒否も適用。新しいkindを既定quickへ落とさない |
+| `builtin/toolchains.ts` | `web.brief`ツールチェーン。`useWhen`・`examples`・既存`web.search`との`redirects`を双方に書く。会話の引数は共通の`{request}`のまま |
+| `runtime-meta.ts` | toolchainsへ`"web.brief": { execution: "research", route: "web" }` |
 | 結合fixture | 呼出しから開始したpackageRevisionIdまで確認。会話の選択と起動先が一致することを試す |
 
 `web.brief`というIDや上の分岐を共通機構へ追加するのは、利用者がこの独立経路を必要としている場合だけ。単に短く答えたい場合は先の既存package改訂で足りる。
@@ -272,7 +289,7 @@ export const archiveBuiltins: Definition[] = [
 | 確認 | 成功条件 | 参照する既存試験・入口 |
 | --- | --- | --- |
 | seed・依存・入力 | fresh/upgrade両方で登録でき、必要な依存とschemaが解決する | `api/domains/capabilities/test/capabilities.test.ts` |
-| 公開・選択・開始 | 利用可能時だけ説明とschemaを提示し、選択したpackageの正確な版が起動する | `api/domains/dialogue/test/research-routing.test.ts`、`api/application/toolchain.test.ts` |
+| 公開・選択・開始 | 利用可能時だけ関数を提示し、選択したツールチェーンのpackageの正確な版が起動する。関数の引数は平坦な`{request}` | `api/domains/dialogue/test/toolchain-tools.test.ts`、`api/application/toolchain.test.ts` |
 | 実行先・予算 | 提示tool IDが正しいadapterへ届き、実行分類と上限が一致する | `api/domains/tool-runtime/test/invoke.test.ts`、`api/domains/agent-runtime/test/context.test.ts` |
 | 結果の返却 | 成功・不足・失敗が報告と会話へ戻り、外部結果を命令にしない | `api/application/search-results.test.ts`。新機能のfixtureは同じapplication層へ置く |
 | 成果物UI | DesignSystemの操作、JSON契約、認証済みsource、他のUIとの合成が動く | [Eの手順](#10-e-designsystemopenuiartifactを追加する)と[UI検証](toolchain-extension-verification.md#uiを追加変更した場合) |
@@ -289,7 +306,7 @@ domain確認は `bun run verify -- --domain <所有domain>`、横断変更は利
 | 症状・code | 最初に確認する場所 | 対応 |
 | --- | --- | --- |
 | 一覧に出ない | seed配列、backend有効集合、enabled、discoveryMode、一覧ページング | 登録漏れと非公開条件を区別する |
-| 一覧にはあるが会話から呼べない | conversation-tools、公開条件、start-task | 登録と会話の接続を揃える。aliasesだけで直そうとしない |
+| 一覧にはあるが会話から呼べない | ツールチェーン定義、`toolchain.registration_failed`ログ、`toolchainRuntimeOf`の公開条件、候補検索(`dialogue.candidates_selected`) | ツールチェーンとして登録する。aliasesだけで直そうとしない |
 | `capability_revision_conflict` | 旧定義の本文/schemaHash、同一revisionの差分 | 旧版を保存し新版を追加。API更新なら現行tokenも確認 |
 | `invalid_capability_bundle` | dependenciesとprofile/skill/toolRevisionIds | 依存を先に登録し、body/schemaKeyと正確な版を揃える |
 | `capability_unavailable` | backend有効集合、依存、adapterの許可ID | 定義があることと実行できることを分けて確認 |

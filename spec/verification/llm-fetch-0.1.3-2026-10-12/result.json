@@ -1,0 +1,104 @@
+{
+  "dependency": {
+    "from": "0.1.2",
+    "to": "0.1.3",
+    "source": "npm",
+    "integrity": "sha512-goA2aQOOBsJiawVqggnAoOCCZ/9DwpJnTSHN2yjPwM3t1PKhHzckBUsIBuSD+1oSSP1347we8JPfoGx1ko0ofg=="
+  },
+  "changes": [
+    "Root, dots-mcp, and standalone dots-mvp manifests and locks updated",
+    "Provider literal, User-Agent, cache key, fixtures, and current documentation aligned",
+    "Warning rejection fixture uses an explicit citation-suppression instruction; library warning decision and host denial both asserted"
+  ],
+  "fixture": {
+    "baseline": {
+      "pass": 46,
+      "fail": 0
+    },
+    "web_research_domain": {
+      "command": "bun run verify -- --domain web-research",
+      "result": "pass",
+      "tests": 45
+    },
+    "dots_domain": {
+      "command": "bun run verify -- --domain dots",
+      "result": "pass",
+      "tests": 2
+    },
+    "webhook": {
+      "result": "pass",
+      "tests": 6
+    },
+    "search_and_history_integration": {
+      "result": "pass",
+      "tests": 31
+    },
+    "verify_all": {
+      "command": "bun run verify:all",
+      "result": "fail",
+      "backend_pass": 1613,
+      "backend_skip": 1,
+      "web_pass": 308,
+      "client_pass": 314,
+      "blocked_step": "design-system typecheck",
+      "failure": "6 TS2769 errors: exact is not a ByRoleOptions property",
+      "file": "packages/design-system/src/components/MusicWorkspace/MusicCreationForm.test.tsx",
+      "lines": [
+        20,
+        23,
+        42,
+        49,
+        60,
+        83
+      ]
+    },
+    "remaining_design_system_tests": {
+      "result": "pass",
+      "tests": 1109
+    },
+    "remaining_web_build": {
+      "result": "pass"
+    },
+    "remaining_browser_tests": {
+      "command": "bun x playwright test",
+      "pass": 43,
+      "fail": 1,
+      "skip": 1,
+      "failure": "stacked boundary viewport transition expected aria-valuenow 60, received 50",
+      "file": "tests/browser/artifact-showcase.spec.ts",
+      "line": 230
+    }
+  },
+  "live": {
+    "reads": [
+      {
+        "url": "https://example.com/",
+        "result": "success",
+        "provider": "llm-fetch@0.1.3",
+        "guard": "allow"
+      },
+      {
+        "url": "https://bun.sh/docs/test",
+        "result": "GUARD_DENIED",
+        "guard": "require_approval"
+      }
+    ],
+    "search": "not run"
+  },
+  "device_acceptance": "not run: no device or audio implementation changed",
+  "scope_review": "Only version strings/integrity and the warning fixture changed relative to the task baseline. No new semantic branches or production guard exceptions. Unrelated design-system and browser failures were not modified.",
+  "mcp_calls": {
+    "context_compile": 1,
+    "compile_eval": 1
+  },
+  "runningBackendVerification": {
+    "checkedAt": "2026-10-12T11:00:42.631Z",
+    "runId": "74f64d98-3b55-43b1-a94a-e33913fe306e",
+    "status": "completed",
+    "provider": "llm-fetch@0.1.3",
+    "url": "https://example.com/",
+    "documents": 1,
+    "processId": 31464,
+    "note": "Backend was already restarted at verification time; no further restart was necessary."
+  }
+}

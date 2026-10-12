@@ -1004,3 +1004,90 @@ test("independent input keeps an unfinished prior utterance as a draft and answe
 		"東京の人口を教えて",
 	);
 });
+
+test("adopted full answer is classified once and clause synthesis stays bounded until playback acknowledgements", async () => {
+	const source = "One. Two. Three. Four. Five. Six.";
+	const classified: string[] = [],
+		spoken: string[] = [];
+	const h = await setup(undefined, {
+		status: () => ({ state: "ready", capabilities: ["llm", "asr", "tts"] }),
+		transcribe: async () => "質問",
+		answer: async () => source,
+		classifySentenceLanguage: async (text) => {
+			classified.push(text);
+			expect(
+				h.conversation.get("main").messages.some((m) => m.text === source),
+			).toBe(true);
+			return { language: "en", model: "fixture-language", latencyMs: 1 };
+		},
+		speak: async (text, _signal, options) => {
+			expect(options?.speechLanguage).toBe("en");
+			spoken.push(text);
+			return wav();
+		},
+	});
+	const value = h.settings.get();
+	value.larm.sentenceLanguageEnabled = true;
+	value.larm.sentenceLanguageProvider = "fixture-language";
+	for (const p of ["llm", "asr", "tts"] as const)
+		value.routes[p].mode = "larm-only";
+	await h.settings.apply({
+		requestId: crypto.randomUUID(),
+		expectedRevision: value.revision,
+		settings: value,
+		keys: [],
+	});
+	const session = crypto.randomUUID(),
+		id = crypto.randomUUID();
+	h.voice.start(session, 1);
+	await h.voice.accept(session, 1, 1, id, wav());
+	await until(() => h.voice.get(id)?.audioChunks.length === 3);
+	expect(classified).toEqual([source]);
+	expect(spoken).toEqual(["One.", "Two.", "Three."]);
+	for (let index = 0; index < 6; index++) {
+		await until(() => !!h.voice.takeAudio(id, index));
+		await h.voice.played(id, index);
+	}
+	await until(() => h.voice.get(id)?.status === "played");
+	expect(spoken).toEqual(["One.", "Two.", "Three.", "Four.", "Five.", "Six."]);
+	const run = h.dialogue.list("main")[0]!;
+	await h.voice.replaySpeech("One.", new AbortController().signal, run.id);
+	expect(classified).toEqual([source]);
+});
+
+test("an unavailable sentence classifier fails speech without skipping clauses or replacing the adopted answer", async () => {
+	let classifications = 0,
+		synthesized = 0;
+	const source = "First. Second. Third.";
+	const h = await setup(undefined, {
+		status: () => ({ state: "ready", capabilities: ["llm", "asr", "tts"] }),
+		transcribe: async () => "質問",
+		answer: async () => source,
+		classifySentenceLanguage: async () => {
+			classifications++;
+			throw new Error("speech_language_unavailable");
+		},
+		speak: async () => {
+			synthesized++;
+			return wav();
+		},
+	});
+	const value = h.settings.get();
+	value.larm.sentenceLanguageEnabled = true;
+	value.larm.sentenceLanguageProvider = "fixture-language";
+	await h.settings.apply({
+		requestId: crypto.randomUUID(),
+		expectedRevision: value.revision,
+		settings: value,
+		keys: [],
+	});
+	const session = crypto.randomUUID(),
+		id = crypto.randomUUID();
+	h.voice.start(session, 1);
+	await h.voice.accept(session, 1, 1, id, wav());
+	await until(() => h.voice.get(id)?.status === "failed");
+	expect(classifications).toBe(1);
+	expect(synthesized).toBe(0);
+	expect(h.voice.takeAudio(id)).toBeNull();
+	expect(h.conversation.get("main").messages.at(-1)?.text).toBe(source);
+});

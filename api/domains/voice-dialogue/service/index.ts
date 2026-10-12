@@ -4,7 +4,7 @@ import { createInputCollector } from "./input";
 import type { Database } from "bun:sqlite";
 import { createVoiceProcessor } from "./process";
 import type { Speech } from "./speech-state";
-import type { SpeechPreparation } from "../../delivery";
+import { SpeechLanguageError, type SpeechPreparation } from "../../delivery";
 import { getLogger } from "../../../infrastructure/logger";
 import { toErrorCode } from "../../../infrastructure/error-code";
 const log = getLogger("voice-dialogue");
@@ -194,6 +194,9 @@ export function createVoiceDialogue(
 							synthesized = { n, requestId, receipt, wav };
 						} catch (error) {
 							if (
+								error instanceof SpeechLanguageError ||
+								(error instanceof Error &&
+									error.message === "speech_tts_target_unavailable") ||
 								controller.signal.aborted ||
 								(error instanceof Error &&
 									error.message === "permission_revoked")
@@ -425,6 +428,14 @@ export function createVoiceDialogue(
 			const previous = runId ? dialogue.answerDelivery?.(runId) : undefined;
 			const replayRun = runId ? dialogue.get(runId) : undefined;
 			const preparation: SpeechPreparation = {
+				...(runId
+					? {
+							languageSource: {
+								text: spokenText(dialogue.answerText(runId) ?? ""),
+								scope: `answer:${runId}`,
+							},
+						}
+					: {}),
 				...(replayRun
 					? {
 							collection: {

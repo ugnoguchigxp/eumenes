@@ -199,7 +199,7 @@ export function fixedAcquisition(
 			freshUntilMs: null,
 			bodies,
 			result: {
-				provider: "llm-fetch@0.1.2",
+				provider: "llm-fetch@0.1.3",
 				observedAt,
 				cache: "bypass",
 				hits:

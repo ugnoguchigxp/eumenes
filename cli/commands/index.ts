@@ -5,7 +5,7 @@ import { run as capabilities } from "./capabilities";
 import { run as collection } from "./collection";
 import { run as history } from "./history";
 import { run as memory } from "./memory";
-import { run as researchRoutes } from "./research-routes";
+import { run as toolchainHistory } from "./toolchain-history";
 import { run as runCommand } from "./run";
 import { run as send } from "./send";
 import { run as status } from "./status";
@@ -24,7 +24,6 @@ export const commands: Readonly<Record<string, CommandRun>> = {
 	"history-search": history,
 	"history-read": history,
 	memory,
-	"research-routes": researchRoutes,
 	run: runCommand,
 	send,
 	status,
@@ -33,5 +32,6 @@ export const commands: Readonly<Record<string, CommandRun>> = {
 	"task-report": task,
 	tasks,
 	timer,
+	"toolchain-history": toolchainHistory,
 	web,
 };

@@ -1,0 +1,411 @@
+{
+  "requests": [
+    {
+      "path": "/api/timer-notifications",
+      "method": "GET"
+    },
+    {
+      "path": "/api/timers",
+      "method": "GET"
+    },
+    {
+      "path": "/api/music",
+      "method": "GET"
+    },
+    {
+      "path": "/api/music/playlists",
+      "method": "GET"
+    },
+    {
+      "path": "/api/settings",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inference/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/conversations/main",
+      "method": "GET"
+    },
+    {
+      "path": "/api/conversations/main/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/events",
+      "method": "GET"
+    },
+    {
+      "path": "/api/status",
+      "method": "GET"
+    },
+    {
+      "path": "/api/timer-notifications",
+      "method": "GET"
+    },
+    {
+      "path": "/api/timers",
+      "method": "GET"
+    },
+    {
+      "path": "/api/music",
+      "method": "GET"
+    },
+    {
+      "path": "/api/music/playlists",
+      "method": "GET"
+    },
+    {
+      "path": "/api/conversations/main",
+      "method": "GET"
+    },
+    {
+      "path": "/api/conversations/main/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/timer-notifications",
+      "method": "GET"
+    },
+    {
+      "path": "/api/timers",
+      "method": "GET"
+    },
+    {
+      "path": "/api/timer-notifications",
+      "method": "GET"
+    },
+    {
+      "path": "/api/timers",
+      "method": "GET"
+    },
+    {
+      "path": "/api/music",
+      "method": "GET"
+    },
+    {
+      "path": "/api/timer-notifications",
+      "method": "GET"
+    },
+    {
+      "path": "/api/timers",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "POST",
+      "body": {
+        "requestId": "6de94413-9748-4f48-909f-bf920bf75323",
+        "conversationId": "main",
+        "text": "次の制作プロンプトで楽曲を1曲作成してください。\n\nジャンル：オーケストラ\n雰囲気：落ち着いた\nテンポ：ゆったり\n長さ：30秒\n歌声：あり\nボーカル：女性ボーカル\n声の高さ：おまかせ\n声質：柔らかい\n歌い方：ソロ\n歌詞の言語：日本語\n歌詞：\n[Verse]\n朝の光が窓を照らす\n新しい一日が始まる\n自由記述：静かな朝の曲にしたい。"
+      }
+    },
+    {
+      "path": "/api/music",
+      "method": "GET"
+    },
+    {
+      "path": "/api/music/playlists",
+      "method": "GET"
+    },
+    {
+      "path": "/api/conversations/main",
+      "method": "GET"
+    },
+    {
+      "path": "/api/conversations/main/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/status",
+      "method": "GET"
+    },
+    {
+      "path": "/api/settings",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inference/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/timers",
+      "method": "GET"
+    },
+    {
+      "path": "/api/timer-notifications",
+      "method": "GET"
+    },
+    {
+      "path": "/api/music",
+      "method": "GET"
+    },
+    {
+      "path": "/api/music/playlists",
+      "method": "GET"
+    },
+    {
+      "path": "/api/conversations/main/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/conversations/main",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/c06e4c4d-f3e8-49a0-9894-37e943d0c922",
+      "method": "GET"
+    },
+    {
+      "path": "/api/music",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/c06e4c4d-f3e8-49a0-9894-37e943d0c922/stream",
+      "method": "GET"
+    },
+    {
+      "path": "/api/music",
+      "method": "GET"
+    },
+    {
+      "path": "/api/timers",
+      "method": "GET"
+    },
+    {
+      "path": "/api/timer-notifications",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/c06e4c4d-f3e8-49a0-9894-37e943d0c922",
+      "method": "GET"
+    },
+    {
+      "path": "/api/music",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/c06e4c4d-f3e8-49a0-9894-37e943d0c922/cancel",
+      "method": "POST",
+      "body": {}
+    },
+    {
+      "path": "/api/conversations/main",
+      "method": "GET"
+    },
+    {
+      "path": "/api/conversations/main/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/music",
+      "method": "GET"
+    },
+    {
+      "path": "/api/music/playlists",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/c06e4c4d-f3e8-49a0-9894-37e943d0c922",
+      "method": "GET"
+    },
+    {
+      "path": "/api/conversations/main",
+      "method": "GET"
+    },
+    {
+      "path": "/api/conversations/main/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/status",
+      "method": "GET"
+    },
+    {
+      "path": "/api/settings",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inference/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/music",
+      "method": "GET"
+    },
+    {
+      "path": "/api/music/playlists",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/c06e4c4d-f3e8-49a0-9894-37e943d0c922",
+      "method": "GET"
+    },
+    {
+      "path": "/api/conversations/main/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/conversations/main",
+      "method": "GET"
+    },
+    {
+      "path": "/api/music",
+      "method": "GET"
+    },
+    {
+      "path": "/api/timers",
+      "method": "GET"
+    },
+    {
+      "path": "/api/timer-notifications",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "POST",
+      "body": {
+        "requestId": "f62b12ba-88e5-49b9-8f8a-ae0d35209baa",
+        "conversationId": "main",
+        "text": "次の制作プロンプトで楽曲を1曲作成してください。\n\nジャンル：オーケストラ\n雰囲気：落ち着いた\nテンポ：ゆったり\n長さ：30秒\n歌声：あり\nボーカル：女性ボーカル\n声の高さ：おまかせ\n声質：柔らかい\n歌い方：ソロ\n歌詞の言語：日本語\n歌詞：\n[Verse]\n朝の光が窓を照らす\n新しい一日が始まる\n自由記述：静かな朝の曲にしたい。"
+      }
+    },
+    {
+      "path": "/api/music",
+      "method": "GET"
+    },
+    {
+      "path": "/api/music/playlists",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/c06e4c4d-f3e8-49a0-9894-37e943d0c922",
+      "method": "GET"
+    },
+    {
+      "path": "/api/conversations/main",
+      "method": "GET"
+    },
+    {
+      "path": "/api/conversations/main/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/status",
+      "method": "GET"
+    },
+    {
+      "path": "/api/settings",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inference/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/music",
+      "method": "GET"
+    },
+    {
+      "path": "/api/music/playlists",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/c06e4c4d-f3e8-49a0-9894-37e943d0c922",
+      "method": "GET"
+    },
+    {
+      "path": "/api/conversations/main/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/conversations/main",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/9709994a-b672-4b33-b6b1-a866274a0e17",
+      "method": "GET"
+    },
+    {
+      "path": "/api/music",
+      "method": "GET"
+    },
+    {
+      "path": "/api/music",
+      "method": "GET"
+    },
+    {
+      "path": "/api/music/960b6515-f782-4524-9d80-4882ecb3130e/audio",
+      "method": "GET"
+    },
+    {
+      "path": "/api/timers",
+      "method": "GET"
+    },
+    {
+      "path": "/api/timer-notifications",
+      "method": "GET"
+    },
+    {
+      "path": "/api/music/playlists",
+      "method": "GET"
+    },
+    {
+      "path": "/api/music/tracks",
+      "method": "GET"
+    },
+    {
+      "path": "/api/music/tags",
+      "method": "GET"
+    },
+    {
+      "path": "/api/music/tags",
+      "method": "GET"
+    },
+    {
+      "path": "/api/music/tracks/saved-2",
+      "method": "GET"
+    },
+    {
+      "path": "/api/music/tracks",
+      "method": "GET"
+    },
+    {
+      "path": "/api/music/tracks/saved-2",
+      "method": "GET"
+    },
+    {
+      "path": "/api/music/tracks/saved-2/audio",
+      "method": "GET"
+    },
+    {
+      "path": "/api/music/tracks",
+      "method": "GET"
+    },
+    {
+      "path": "/api/music/tracks/saved-1",
+      "method": "GET"
+    },
+    {
+      "path": "/api/music/tracks/saved-1/audio",
+      "method": "GET"
+    },
+    {
+      "path": "/api/music",
+      "method": "GET"
+    },
+    {
+      "path": "/api/music/960b6515-f782-4524-9d80-4882ecb3130e/audio",
+      "method": "GET"
+    },
+    {
+      "path": "/api/music/960b6515-f782-4524-9d80-4882ecb3130e/audio",
+      "method": "GET"
+    }
+  ],
+  "errors": [],
+  "fixture": true,
+  "liveGeneration": false,
+  "imageGeneration": false
+}

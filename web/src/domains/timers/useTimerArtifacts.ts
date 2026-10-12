@@ -14,6 +14,7 @@ export function useTimerArtifacts(
 ) {
 	const cache = useQueryClient();
 	const opened = useRef(new Set<string>());
+	const seeded = useRef(false);
 	const [watched, setWatched] = useState<Array<{ id: string; until: number }>>(
 		[],
 	);
@@ -62,6 +63,11 @@ export function useTimerArtifacts(
 			opened.current.add(ref.timerId);
 			open(ref, title);
 		};
+		// Timers running before this page loaded stay closed; the launcher reopens them.
+		if (active.data && !seeded.current) {
+			seeded.current = true;
+			for (const timer of active.data.items) opened.current.add(timer.id);
+		}
 		for (const timer of [...(active.data?.items ?? [])].reverse())
 			show({ kind: "timer", version: 1, timerId: timer.id }, timer.label);
 		const finished = new Set<string>();

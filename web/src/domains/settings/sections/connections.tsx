@@ -20,7 +20,14 @@ import {
 	CardHeader,
 	CardTitle,
 } from "../../../design-system";
-import { Field, Toggle, purposes, type Change, type NewCloud } from "../shared";
+import {
+	Field,
+	Toggle,
+	connectionKindLabels,
+	purposes,
+	type Change,
+	type NewCloud,
+} from "../shared";
 
 type ConnectionsSectionProps = {
 	client: EumenesClient;
@@ -40,6 +47,37 @@ type ConnectionsSectionProps = {
 	setNewCloud: React.Dispatch<React.SetStateAction<NewCloud>>;
 	addCloud: () => void;
 };
+function ManagedAgentFields({
+	id,
+	value,
+	change,
+}: {
+	id: string;
+	value: Settings;
+	change: Change;
+}) {
+	const c = value.connections.find((x) => x.id === id);
+	const set = (key: "agentId" | "environmentId", text: string) =>
+		change((s) => {
+			s.connections.find((x) => x.id === id)![key] = text || null;
+		});
+	return (
+		<>
+			<Field label="エージェントID">
+				<Input
+					value={c?.agentId ?? ""}
+					onChange={(e) => set("agentId", e.target.value)}
+				/>
+			</Field>
+			<Field label="環境ID">
+				<Input
+					value={c?.environmentId ?? ""}
+					onChange={(e) => set("environmentId", e.target.value)}
+				/>
+			</Field>
+		</>
+	);
+}
 export function ConnectionsSection({
 	client,
 	value,
@@ -73,6 +111,12 @@ export function ConnectionsSection({
 						<CardTitle>{c.name}</CardTitle>
 					</CardHeader>
 					<CardContent>
+						<p className="hint">
+							種類: {connectionKindLabels[c.kind ?? "openai-compatible"]}
+						</p>
+						{c.kind === "claude-managed-agents" && (
+							<ManagedAgentFields id={c.id} value={value} change={change} />
+						)}
 						<Field label="接続名">
 							<Input
 								value={c.name}
@@ -142,7 +186,9 @@ export function ConnectionsSection({
 							{diagnostics.data?.connections.find((x) => x.id === c.id)
 								?.credentialAvailable
 								? "登録済み"
-								: "未登録"}
+								: c.kind === "codex-sdk" || c.kind === "claude-agent-sdk"
+									? "未登録（CLIのログインを使用）"
+									: "未登録"}
 							{c.envRef && `（環境変数 ${c.envRef}）`}
 						</p>
 						<div className="settings-actions">
@@ -190,6 +236,7 @@ export function ConnectionsSection({
 									<Field label="用途">
 										<select
 											value={r.purpose}
+											disabled={!!c.kind && c.kind !== "openai-compatible"}
 											onChange={(e) =>
 												change((s) => {
 													const resource = s.resources.find(

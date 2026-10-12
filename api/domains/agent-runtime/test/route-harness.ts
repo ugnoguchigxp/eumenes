@@ -241,9 +241,11 @@ export async function harness(now = Date.now, luna = false) {
 		) as { contract_json: string } | null;
 		const t = task(taskId),
 			data = {
-				reportMode: ["package:web.quick@2", "package:web.search@1"].includes(
-					t.package_revision_id ?? "",
-				)
+				reportMode: [
+					"package:web.quick@2",
+					"package:web.recipe@1",
+					"package:web.search@1",
+				].includes(t.package_revision_id ?? "")
 					? "search"
 					: undefined,
 				task: JSON.parse(t.input_json!),

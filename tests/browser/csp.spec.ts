@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { openFromLauncher } from "./artifact-launcher";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -59,15 +60,13 @@ test("the SPA policy is sent and the main screens raise no CSP violation", async
 	expect(csp).toContain("frame-ancestors 'none'");
 	await expect(page.locator("#root")).not.toBeEmpty();
 	// Conversation (initial screen), the artifact showcase, then settings.
-	await page
-		.getByRole("button", { name: "UIショーケース", exact: true })
-		.click();
+	await openFromLauncher(page, "UIショーケース");
 	await expect(
 		page.getByRole("region", { name: "UIショーケース", exact: true }),
 	).toBeVisible();
 	await page.getByRole("button", { name: "設定", exact: true }).click();
 	await expect(
-		page.getByRole("button", { name: "取得先と手順" }),
+		page.getByRole("button", { name: "ツールチェーンの記録" }),
 	).toBeVisible();
 	const violations = await page.evaluate(() => window.__cspViolations);
 	// zod 4 probes `new Function("")` once and swallows the CSP failure (it only

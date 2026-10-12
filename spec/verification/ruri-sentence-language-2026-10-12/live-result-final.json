@@ -1,0 +1,45 @@
+{
+  "date": "2026-10-12T06:07:18.608Z",
+  "profile": "SAAA-gemma4-26b",
+  "classifier": "selected_provider_not_published",
+  "samples": [
+    {
+      "language": "ja",
+      "status": "wav_received",
+      "bytes": 107564,
+      "ms": 6758,
+      "exchanges": [
+        {
+          "connectionId": "aconn_epoch-9713f666-ce0c-4635-b795-d6818ce1c9ae_9ee41e81-80cf-4dbd-908f-f9a86511621b",
+          "model": "voicevox-core",
+          "operation": "audio/speech",
+          "started": 1791785245431,
+          "httpStatus": 200,
+          "speechVoice": "Kenzaki_Mesuo",
+          "speechCredit": "VOICEVOX:剣崎雌雄"
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "status": "wav_received",
+      "bytes": 196444,
+      "ms": 188,
+      "exchanges": [
+        {
+          "connectionId": "aconn_epoch-9713f666-ce0c-4635-b795-d6818ce1c9ae_9ee41e81-80cf-4dbd-908f-f9a86511621b",
+          "model": "kitten-tts-nano-0.8-fp32",
+          "operation": "audio/speech",
+          "started": 1791785245640,
+          "httpStatus": 200,
+          "speechVoice": "Rosie"
+        }
+      ]
+    }
+  ],
+  "discovery": {
+    "englishTts": true,
+    "languageProviders": []
+  },
+  "result": "tts_passed_classifier_pending"
+}

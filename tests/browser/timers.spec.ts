@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
+import { openFromLauncher } from "./artifact-launcher";
 import { evidencePath } from "./evidence";
 import { createFixture } from "./fixture";
 
@@ -42,6 +43,49 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
 	await fixture.stopAll();
+});
+
+test("the timer launcher works before any timer exists and starts a saved clock", async ({
+	page,
+	request,
+}) => {
+	await page.goto(`http://127.0.0.1:${webPort}`);
+	await openFromLauncher(page, "タイマー");
+	await expect(page.getByText("タイマーを開始", { exact: true })).toBeVisible();
+	await page.getByLabel("分", { exact: true }).fill("1");
+	await page.getByLabel("秒", { exact: true }).fill("30");
+	await page.getByLabel("名前（任意）").fill("画面から開始");
+	const receiptPending = page.waitForResponse(
+		(response) =>
+			response.request().method() === "POST" &&
+			response.url().endsWith("/api/timers"),
+	);
+	await page.getByRole("button", { name: "開始する", exact: true }).click();
+	const response = await receiptPending;
+	expect(response.ok()).toBe(true);
+	const receipt = await response.json();
+	expect(receipt.timer.durationSeconds).toBe(90);
+	await expect(page.getByRole("timer")).toBeVisible();
+	await expect(
+		page.getByRole("heading", { name: "画面から開始" }),
+	).toBeVisible();
+	await page
+		.getByRole("button", { name: "画面から開始を閉じる", exact: true })
+		.click();
+	await openFromLauncher(page, "タイマー: 画面から開始");
+	await expect(page.getByRole("timer")).toBeVisible();
+	await page.getByRole("button", { name: "取り消す", exact: true }).click();
+	await expect(page.getByText("取消済み", { exact: true })).toBeVisible();
+	const saved = await request.get(
+		`http://127.0.0.1:${apiPort}/api/timers/${receipt.timer.id}`,
+		{ headers: { authorization: `Bearer ${TOKEN}` } },
+	);
+	expect((await saved.json()).timer.state).toBe("cancelled");
+	await openFromLauncher(page, "タイマー");
+	await expect(page.getByText("タイマーを開始", { exact: true })).toBeVisible();
+	expect(
+		await page.getByRole("tab", { name: "タイマー", exact: true }).count(),
+	).toBe(1);
 });
 
 test("a 90-second request opens the saved timer", async ({ page, request }) => {
@@ -107,7 +151,7 @@ test("a 90-second request opens the saved timer", async ({ page, request }) => {
 	expect(cancelled.ok()).toBe(true);
 });
 
-test("the 24-hour clock fits a narrow artifact and is restored after reload", async ({
+test("the 24-hour clock fits a narrow artifact and reopens from the launcher after reload", async ({
 	page,
 	request,
 }) => {
@@ -123,6 +167,7 @@ test("the 24-hour clock fits a narrow artifact and is restored after reload", as
 	expect(started.ok()).toBe(true);
 	await page.setViewportSize({ width: 375, height: 812 });
 	await page.goto(`http://127.0.0.1:${webPort}`);
+	await openFromLauncher(page, "タイマー: 24時間の時計");
 	await expect(
 		page.getByText("24時間の時計", { exact: true }).last(),
 	).toBeVisible({ timeout: 20000 });
@@ -134,6 +179,8 @@ test("the 24-hour clock fits a narrow artifact and is restored after reload", as
 	expect(fits).toBe(true);
 	await page.reload();
 	await expect(page.getByText(/接続済み/)).toBeVisible({ timeout: 20000 });
+	await expect(page.getByRole("timer")).toHaveCount(0);
+	await openFromLauncher(page, "タイマー: 24時間の時計");
 	await expect(
 		page.getByText("24時間の時計", { exact: true }).last(),
 	).toBeVisible({ timeout: 20000 });
@@ -159,6 +206,7 @@ test("a persisted timer expires and its notice survives closing the clock", asyn
 	const { timer } = await started.json();
 	await page.goto(`http://127.0.0.1:${webPort}`);
 	await expect(page.getByText(/接続済み/)).toBeVisible({ timeout: 20000 });
+	await openFromLauncher(page, "タイマー: 終了通知の検証");
 	await expect(
 		page.getByText("終了通知の検証", { exact: true }).last(),
 	).toBeVisible();
@@ -214,6 +262,7 @@ test("the timer has usable controls and fits both themes and a narrow screen", a
 	expect(started.ok()).toBe(true);
 	await page.setViewportSize({ width: 1440, height: 900 });
 	await page.goto(`http://127.0.0.1:${webPort}`);
+	await openFromLauncher(page, "タイマー: タイマー");
 	await expect(
 		page.getByRole("heading", { name: "3分のタイマー" }),
 	).toBeVisible({ timeout: 20000 });
@@ -337,9 +386,7 @@ test("top-right banners and notification drawer fit desktop and mobile in both t
 	await expect(page.getByText(/接続済み/)).toBeVisible({ timeout: 20000 });
 	const notice = page.getByRole("status", { name: "タイマーの終了" });
 	await expect(notice).toBeVisible({ timeout: 10000 });
-	await page
-		.getByRole("button", { name: "UIショーケース", exact: true })
-		.click();
+	await openFromLauncher(page, "UIショーケース");
 	for (const width of [1840, 1280, 790, 390]) {
 		await page.setViewportSize({ width, height: 1000 });
 		const geometry = await page

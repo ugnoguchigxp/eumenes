@@ -40,8 +40,8 @@ test("SDK process failure reaches correlated logs and current answer context wit
 				options.onToolCalls!([
 					{
 						id: "research",
-						name: "research_web_luna",
-						arguments: JSON.stringify({ question }),
+						name: "web_research",
+						arguments: JSON.stringify({ request: question }),
 					},
 				]);
 				return "";

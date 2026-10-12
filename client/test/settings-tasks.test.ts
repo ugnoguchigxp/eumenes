@@ -156,6 +156,15 @@ contracts("settings client", [
 	},
 ]);
 
+it.each(["ornith1.5Strix", "ornith1.5Strix-64k", "SAAA-gemma4-26b"])(
+	"settings client accepts and preserves profile %s",
+	async (profile) => {
+		const selected = { ...settings, larm: { ...settings.larm, profile } };
+		stubFetch(() => Response.json(selected));
+		expect((await newClient().settings()).larm.profile).toBe(profile);
+	},
+);
+
 const target = {
 	id: "t1",
 	name: "n",

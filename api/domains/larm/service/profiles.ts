@@ -1,9 +1,17 @@
 import type { Capability } from "../contracts";
 
-export type ProviderName = Capability | "system-one";
+export type ProviderName =
+	| Capability
+	| "system-one"
+	| "tts-english"
+	| "sentence-language";
 export type Provider = {
+	/** External catalog name, retained across renewal when the internal role differs. */
+	claimName?: string;
 	name: ProviderName;
 	baseUrl: string;
+	/** Exact inference URL verified from the optional Provider claim. */
+	endpoint?: string;
 	model: string;
 	protocol: string;
 	token: string;
@@ -26,7 +34,9 @@ export type Lease = {
 	idleAt: number;
 };
 export const gemmaProfile = "SAAA-gemma4-26b";
-export const auxiliaryProfile = "SAAA-gemma4-26b-64k";
+export const defaultProfile = "ornith1.5Strix";
+export const auxiliaryProfile = "ornith1.5Strix-64k";
+export const unavailableAuxiliaryProfile = "SAAA-gemma4-26b-64k";
 export const gemmaAgentProfile = "saaa-conversation-gemma4-26b-voice";
 export const gemmaContext = {
 	maxTokens: 262144,
@@ -38,12 +48,16 @@ export const protocols: Record<ProviderName, string> = {
 	asr: "openai.audio-transcriptions.v1",
 	tts: "openai.audio-speech.v1",
 	"system-one": "larm.system-one.v1",
+	"sentence-language": "larm.system-one.v1",
+	"tts-english": "openai.audio-speech.v1",
 };
 export const endpoints: Record<ProviderName, string> = {
 	llm: "/v1/chat/completions",
 	asr: "/v1/audio/transcriptions",
 	tts: "/v1/audio/speech",
 	"system-one": "/v1/systemone",
+	"sentence-language": "/v1/systemone",
+	"tts-english": "/v1/audio/speech",
 };
 export type Fetcher = (
 	input: RequestInfo | URL,

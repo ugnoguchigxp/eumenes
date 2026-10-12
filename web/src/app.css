@@ -164,6 +164,23 @@ select:focus-visible {
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
+.model-select {
+	padding: 0 18px 0 4px;
+	border: 1px solid transparent;
+	border-radius: 6px;
+	color: inherit;
+	background: transparent;
+	font: inherit;
+	cursor: pointer;
+}
+.model-select:hover,
+.model-select:focus-visible {
+	border-color: var(--border);
+}
+.model-select option {
+	color: var(--foreground);
+	background: var(--card);
+}
 .chat-history {
 	flex: 1;
 	min-height: 0;
@@ -988,6 +1005,12 @@ select:focus-visible {
 }
 .artifact-panel-header {
 	min-width: 0;
+}
+@media (min-width: 701px) {
+	/* Keep tabs clear of the fixed launcher, notification and settings buttons. */
+	.artifact-panel-header .ds-tabs-list {
+		padding-right: calc(148px + env(safe-area-inset-right, 0px));
+	}
 }
 .artifact-panel-header .ds-tabs-list {
 	width: 100%;

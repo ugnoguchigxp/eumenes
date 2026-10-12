@@ -1,0 +1,130 @@
+{
+  "checkedAt": "2026-10-12T10:58:19.289Z",
+  "purpose": "Real web_search retrieval and answer generation for Tokyo weather and Microsoft MSFT stock",
+  "productCodeChanges": false,
+  "liveCases": [
+    {
+      "case": "weather",
+      "runtime": "fresh live harness with llm-fetch 0.1.3 and real saved LARM connection",
+      "question": "今日の東京の天気を教えて",
+      "runId": "a1dac3dd-269e-485f-9018-03daee4a8584",
+      "status": "completed",
+      "milliseconds": 41320,
+      "operations": [
+        {
+          "operation": "lookup",
+          "query": "今日の東京の天気 2026年10月12日",
+          "language": "ja",
+          "region": "JP",
+          "readPages": 0
+        },
+        {
+          "operation": "read",
+          "url": "https://chottoiiseikatsu.com/2026/10/11/weather-2026-10-12"
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://chottoiiseikatsu.com/2026/10/11/weather-2026-10-12",
+          "basis": "page"
+        }
+      ],
+      "answer": "2026年10月12日の東京の天気についてお伝えいたします。\n\n* 日中は晴れる時間帯もありますが、全体的に雲の多い空模様となる見込みでございます。\n* 最高気温は18℃前後、最低気温は15℃前後となる予報でございます。\n* 12時から15時は晴れ、15時から21時は快晴となる見込みでございます。\n\nなお、こちらは個人のブログ記事に基づく情報であり、公式な予報とは異なる可能性がございますのでご注意ください。",
+      "automatedAcceptancePassed": false,
+      "checks": {
+        "correctAgent": true,
+        "completed": true,
+        "searchedOnce": true,
+        "reportReturned": true,
+        "citationsReturned": false,
+        "queryTargetsRequest": true,
+        "stockQuote": true,
+        "requestedResult": true,
+        "bulletList": true,
+        "noGrading": true
+      },
+      "evidenceDirectory": "/Users/y.noguchi/Code/eumenes/verification-reports/search-agents/2026-10-12T10-56-48.353Z"
+    },
+    {
+      "case": "stock",
+      "runtime": "fresh live harness with llm-fetch 0.1.3 and real saved LARM connection",
+      "question": "マイクロソフトの最新の株価を教えて",
+      "runId": "13ecb2e7-f740-4eef-a465-564f3ee2411f",
+      "status": "completed",
+      "milliseconds": 31472,
+      "operations": [
+        {
+          "operation": "lookup",
+          "query": "マイクロソフト 株価",
+          "language": "ja",
+          "readPages": 0
+        },
+        {
+          "operation": "read",
+          "url": "https://finance.yahoo.co.jp/quote/MSFT"
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://finance.yahoo.co.jp/quote/MSFT",
+          "basis": "page"
+        }
+      ],
+      "answer": "マイクロソフトの株価について、以下の通りご報告いたします。\n\n* 2026年10月9日時点の終値は、535.07ドルでございます。\n\nなお、こちらは直近の終値であり、リアルタイムの株価ではございませんのでご注意ください。",
+      "automatedAcceptancePassed": false,
+      "checks": {
+        "correctAgent": true,
+        "completed": true,
+        "searchedOnce": true,
+        "reportReturned": true,
+        "citationsReturned": false,
+        "queryTargetsRequest": true,
+        "stockQuote": true,
+        "requestedResult": false,
+        "bulletList": true,
+        "noGrading": true
+      },
+      "evidenceDirectory": "/Users/y.noguchi/Code/eumenes/verification-reports/search-agents/2026-10-12T10-57-51.624Z"
+    }
+  ],
+  "directWeatherReads": [
+    {
+      "url": "https://weather.yahoo.co.jp/weather/jp/13/4410.html",
+      "provider": "llm-fetch@0.1.3",
+      "result": "success",
+      "characters": 2766,
+      "guard": "allow",
+      "fetchedAt": "2026-10-12T10:57:59.239Z"
+    },
+    {
+      "url": "https://weathernews.jp/onebox/tenki/tokyo/13100",
+      "provider": "llm-fetch@0.1.3",
+      "result": "success",
+      "characters": 4885,
+      "guard": "allow",
+      "fetchedAt": "2026-10-12T10:57:59.426Z"
+    },
+    {
+      "url": "https://tenki.jp/forecast/3/16/4410/13101/",
+      "provider": "llm-fetch@0.1.3",
+      "result": "success",
+      "characters": 2813,
+      "guard": "allow",
+      "fetchedAt": "2026-10-12T10:57:59.823Z"
+    }
+  ],
+  "findings": [
+    "Both 0.1.3 live cases completed one search and one page read, with real LARM answer generation.",
+    "Both final answers omitted links although accepted reports carried URLs.",
+    "Weather selected a personal blog and returned a forecast of high 18 C/low 15 C. Yahoo Weather primary forecast read returned high 27 C/low 18 C for Tokyo; tenki.jp Chiyoda read returned high 26 C/low 17 C. Source choice materially affects correctness.",
+    "Weathernews HTTP read included observation data and unresolved dynamic template fields, so success does not establish complete forecast retrieval.",
+    "Stock returned 535.07 dollars with 2026-10-09 close date. The test requestedResult pattern misses the plain ドル unit; stockQuote check passes. Its citation check still fails.",
+    "Already running production backend reports llm-fetch@0.1.2; it needs a restart to load the updated dependency. Its weather read-pages lookup timed out; stock returned partial with one Yahoo Finance document and two upstream HTTP failures."
+  ],
+  "fixture": "not rerun: no implementation changes",
+  "deviceAcceptance": "not run: text/web live verification only",
+  "mcpCallsThisTask": {
+    "context_compile": 0,
+    "compile_eval": 0
+  }
+}

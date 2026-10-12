@@ -35,7 +35,7 @@ for (const topic of ["公開イベントのニュース", "製品の更新情報
 			acquire: async () => ({
 				freshUntilMs: null,
 				result: {
-					provider: "llm-fetch@0.1.2",
+					provider: "llm-fetch@0.1.3",
 					cache: "miss",
 					observedAt: new Date().toISOString(),
 					hits: [

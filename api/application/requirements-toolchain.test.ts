@@ -31,18 +31,11 @@ for (const c of cases)
 							{
 								id: crypto.randomUUID(),
 								name:
-									c.engine === "codex_luna" ? "research_web_luna" : "research",
-								arguments: JSON.stringify({
-									...(c.engine === "default" ? { kind: "history" } : {}),
-									question: c.request,
-									...(search
-										? {}
-										: {
-												requirementProfiles: c.profiles.map(
-													(_, i) => `p${i + 1}`,
-												),
-											}),
-								}),
+									c.engine === "codex_luna"
+										? "web_research"
+										: "conversation_history",
+								// The conversation hands over the request only.
+								arguments: JSON.stringify({ request: c.request }),
 							},
 						]);
 						return "";
@@ -72,6 +65,8 @@ for (const c of cases)
 						if (!data.requirementContract)
 							return JSON.stringify({
 								action: "invoke",
+								// The history sub-agent applies the registered profiles itself.
+								requirementProfiles: c.profiles.map((_, i) => `p${i + 1}`),
 								requirements: [
 									{
 										id: "r1",

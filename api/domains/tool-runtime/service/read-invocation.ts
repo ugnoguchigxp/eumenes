@@ -149,7 +149,10 @@ export function createReadInvocation({
 		}
 		if (!allowNew) throw new Error("agent_budget_exhausted");
 		const localKind = toolRuntimeOf(ref.tool.revisionId)?.operation;
-		const isLocal = localKind === "saved_read" || localKind === "history";
+		const isLocal =
+			localKind === "saved_read" ||
+			localKind === "history" ||
+			localKind === "recipe";
 		const localId = crypto.randomUUID();
 		const operation = isLocal
 			? { operationId: `local:${localId}`, jobId: parentJobId }

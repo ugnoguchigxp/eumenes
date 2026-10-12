@@ -274,6 +274,8 @@ test("builtin bundle upgrade preserves revision 1 fingerprints and activates a n
 			for (const definition of builtins.filter(
 				(d) =>
 					d.id != "web.quick" &&
+					d.id != "web.recipe" &&
+					d.id != "recipe.find" &&
 					d.revision < 3 &&
 					!(d.kind === "skill" && d.revision === 2) &&
 					!(d.kind === "profile" && d.revision === 2),
@@ -312,7 +314,7 @@ test("builtin bundle upgrade preserves revision 1 fingerprints and activates a n
 			store.read((db) =>
 				db
 					.query(
-						"SELECT id,definition_hash FROM capability_revisions WHERE item_key LIKE 'package:%' AND revision=1 AND item_key != 'package:web.quick' ORDER BY id",
+						"SELECT id,definition_hash FROM capability_revisions WHERE item_key LIKE 'package:%' AND revision=1 AND item_key NOT IN ('package:web.quick','package:web.recipe') ORDER BY id",
 					)
 					.all(),
 			),
@@ -348,6 +350,8 @@ test("deployed research skill v3 upgrades without a revision conflict and restar
 			for (const d of builtins.filter(
 				(d) =>
 					d.id !== "web.quick" &&
+					d.id !== "web.recipe" &&
+					d.id !== "recipe.find" &&
 					(d.kind === "package"
 						? d.revision <= (d.id === "web.read" ? 3 : 4)
 						: d.revision <= 3),

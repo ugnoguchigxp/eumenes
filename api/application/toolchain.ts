@@ -15,20 +15,21 @@ import {
 import { createAgentRuntime } from "../domains/agent-runtime";
 import { timerReceiptDigest as digest } from "../domains/timers";
 import { readActionOriginInTransaction } from "../domains/dialogue";
-import type { Clock } from "../domains/research-routes";
-import { createResearchRoutes } from "../domains/research-routes";
 import { createReadPorts } from "./research-history-ports";
+import { createToolchainHistory } from "../domains/toolchain-history";
+import { createRecipePorts } from "./toolchain-recipes";
+import { createVectorRefresh, type Embed } from "./toolchain-vectors";
 export async function createToolchain(
 	store: SqliteStore,
 	queue: QueueService,
 	inference: InferencePort,
 	web: WebResearchService,
 	options: {
-		researchRoutes?: boolean;
 		dots?: boolean;
 		music?: boolean;
-		routeClock?: Clock;
 		history?: boolean;
+		/** LARM embedding provider; without it retrieval uses full-text search only. */
+		embed?: Embed;
 		webResearch?: boolean;
 		conversation?: import("../domains/conversation").ConversationService;
 		timers?: import("../domains/timers").TimersService;
@@ -47,24 +48,24 @@ export async function createToolchain(
 		]),
 	);
 	await capabilities.seed();
-	// Stored route records remain manageable. New research has no topic parser.
-	const routes =
-		options.researchRoutes === false
-			? undefined
-			: createResearchRoutes({
-					clock: options.routeClock,
-					queue,
-					externalBytes: (db) =>
-						capabilities.learnedUsageInTransaction(db).bytes,
-					prune: (db, input) =>
-						capabilities.pruneLearnedInTransaction(db, input),
-				});
+	const history = createToolchainHistory(store);
+	const reads = createReadPorts(
+		web,
+		options.history === false ? undefined : options.conversation,
+		() => agents,
+	);
+	const recipes = createRecipePorts(
+		history,
+		() => agents,
+		() => tools,
+	);
 	const adapter: ToolAdapter = {
-		...createReadPorts(
-			web,
-			options.history === false ? undefined : options.conversation,
-			() => agents,
-		),
+		...reads,
+		localInTransaction(db, r) {
+			return r.tool.id === "recipe.find"
+				? recipes.findInTransaction(db, r)
+				: reads.localInTransaction!(db, r);
+		},
 		startInTransaction(db, r) {
 			const raw = webToolArguments(
 				r.tool.id,
@@ -215,14 +216,23 @@ export async function createToolchain(
 		...(options.reconcileThrottleMs === undefined
 			? {}
 			: { reconcileThrottleMs: options.reconcileThrottleMs }),
+		onSearchReport: recipes.onSearchReport,
 	});
-	for (const handler of routes?.maintenanceHandlers() ?? [])
-		queue.registerHandler(handler);
+	const vectors = createVectorRefresh(
+		store,
+		capabilities,
+		history,
+		options.embed,
+	);
 	return {
 		capabilities,
 		tools,
 		agents,
-		routeService: routes,
+		history,
+		/** Embed passages that have no vector in the provider's current space. */
+		refreshVectors: vectors.refresh,
+		/** Embed one request for retrieval; undefined when embedding is unavailable or slow. */
+		embedQuery: vectors.embedQuery,
 		postAnswer: undefined,
 	};
 }

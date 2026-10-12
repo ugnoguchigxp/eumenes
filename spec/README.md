@@ -8,6 +8,10 @@ archive の基準: 本文の実施記録や完了記述で全項目が完了と�
 
 | 文書 | 状態 |
 | --- | --- |
+| [settings-openui-definition-storage-2026-10-12.md](settings-openui-definition-storage-2026-10-12.md) | 設定項目の軽量登録と保存先の詳細設計。実テーブル・列・JSONパス、管理操作と読取のbinding、型と保存範囲、追加手順と受入を定義。設計案・未実装 |
+| [settings-openui-redesign-2026-10-12.md](settings-openui-redesign-2026-10-12.md) | Astraレビューに基づく薄い設定入口と目的別OpenUIアーティファクトの全体設計。現行全項目の編集先、共同下書き、個別保存、タブの寿命、秘密入力、段階移行と受入を整理。設計案・未実装 |
+| [ruri-sentence-language-tts-implementation-plan-2026-10-12.md](ruri-sentence-language-tts-implementation-plan-2026-10-12.md) | Ruriの文章全体ja/en二分類とVOICEVOX・KittenTTS振分け。内部契約・固定試験の先行、LARM公開契約への依存、取消・採用、回帰・live・実機器受入を定めた実装計画。常駐分類Providerと両TTSを公開接続し試用有効化済み。全体gate・実機器受入は未完了 |
+| [toolchain-set-routing-design-2026-10-12.md](toolchain-set-routing-design-2026-10-12.md) | ツールチェーンを定形セット(ツール・SystemContext・SKILL・実行metadata)として登録し、候補検索→会話担当の選択→調査担当の実行へ統一する設計。`kind` 欠落障害の原因記録、`web_search` の手順キャッシュ、選択トレース(新domain toolchain-history)、research-routes廃止。P0〜P4実装済み・未検証 |
 | [web-search-target-2026-10-11.md](web-search-target-2026-10-11.md) | Web検索(web.quick@2・Luna web.search@1)の実装目標の正本。SystemContextの層構成、会話方針と公開ツールの一致、結果返却の必須規則、現行との差分G1〜G12と受入。計画・未着手 |
 | [dots-toolchain-agent-skill-implementation-plan-2026-10-10.md](dots-toolchain-agent-skill-implementation-plan-2026-10-10.md) | dots を統括担当にする製品統合計画。Session 委任、ブロッカー・再開・完了報告、担当／Skill 設定、次作業リマインドを設計。製品統合は未実装 |
 | [dots-script-mvp-implementation-plan-2026-10-10.md](dots-script-mvp-implementation-plan-2026-10-10.md) | 独立 MVP 実装済み。実 dots→回答保存→CLI 受信に成功。OAuth・恒久接続・製品統合は未実装。第18章と受入記録参照 |
@@ -50,6 +54,7 @@ archive の基準: 本文の実施記録や完了記述で全項目が完了と�
 | [music-toolchain-work-record-2026-10-11.md](music-toolchain-work-record-2026-10-11.md) | 楽曲生成と再生の着手記録。既存API・会話・Artifactの調査、未決事項、Skill化に向けた手順候補。製品実装・楽曲生成・試験は未実施 |
 | [verification/llm-native-remaining-domains-2026-10-10/](verification/llm-native-remaining-domains-2026-10-10/README.md) | Goalsの内容同一視撤去・World保留入力修正の実施記録。Memoryは接続前条件の文書化のみ、live・実機器未実施 |
 | [reviews/llm-native-remaining-domains-2026-10-10/](reviews/llm-native-remaining-domains-2026-10-10/README.md) | Memory・World・coding系と隣接domainのLLM-Native監査。到達性・反証・再現・fixture420件、live未実施 |
+| [verification/ruri-sentence-language-2026-10-12/](verification/ruri-sentence-language-2026-10-12/README.md) | 常駐文章二分類・両TTS・通常APIの接続記録。試用有効、通信込みのP95測定、全体gate・実機器の残作業 |
 | [verification/](verification/) | 機能ごとの検証記録(fixture、live、実機器を分けて記録)と画面キャプチャ |
 | [reviews/](reviews/) | コードレビューの記録(2026-10-07、2026-10-08、follow-up) |
 | [design/](design/) | 設計画像 |

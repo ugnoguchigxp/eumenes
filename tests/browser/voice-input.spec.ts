@@ -84,6 +84,9 @@ test("three paused ASR fragments create one conversation request and one answer"
 		).json();
 	await page.goto(`http://127.0.0.1:${webPort}/`);
 	await page.getByRole("button", { name: "音声を開始" }).click();
+	await page.waitForFunction(
+		() => typeof Reflect.get(window, "triggerSpeech") === "function",
+	);
 	for (let i = 0; i < 3; i++) {
 		await page.evaluate(() => Reflect.get(window, "triggerSpeech")());
 		await expect.poll(() => ids.length).toBe(i + 1);

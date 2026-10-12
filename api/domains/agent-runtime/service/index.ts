@@ -10,7 +10,11 @@ import { createLifecycle } from "./lifecycle";
 import { createMaintenance } from "./maintenance";
 import { createQueries } from "./queries";
 import { createReconcile } from "./reconcile";
-import { createRuntimeState, STEP_KIND } from "./runtime-context";
+import {
+	createRuntimeState,
+	STEP_KIND,
+	type SearchReportHook,
+} from "./runtime-context";
 import { createStartTask } from "./start-task";
 import { createStepHandler } from "./step-handler";
 import { createTaskOps } from "./task-ops";
@@ -26,6 +30,7 @@ export function createAgentRuntime({
 	now = Date.now,
 	reconcileThrottleMs = 25,
 	timers = { setTimeout, clearTimeout },
+	onSearchReport,
 }: {
 	store: SqliteStore;
 	capabilities: Capabilities;
@@ -40,6 +45,7 @@ export function createAgentRuntime({
 		setTimeout: typeof setTimeout;
 		clearTimeout: typeof clearTimeout;
 	};
+	onSearchReport?: SearchReportHook;
 }) {
 	const ctx = {
 		state: createRuntimeState(),
@@ -53,6 +59,7 @@ export function createAgentRuntime({
 			reconcileThrottleMs,
 			timers,
 			log: getLogger("agent-runtime"),
+			onSearchReport,
 		},
 	};
 	const ops = createTaskOps(ctx);

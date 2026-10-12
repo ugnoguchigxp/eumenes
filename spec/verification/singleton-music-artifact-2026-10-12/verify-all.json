@@ -1,0 +1,62 @@
+{
+  "selected": [
+    "background",
+    "music",
+    "dots",
+    "task-reports",
+    "coding-supervision",
+    "coding",
+    "artifact",
+    "tasks",
+    "capabilities",
+    "tool-runtime",
+    "agent-runtime",
+    "toolchain-history",
+    "web-research",
+    "attitude-dataset",
+    "service-tests",
+    "delivery",
+    "avatar",
+    "settings",
+    "inference",
+    "tts-dictionary",
+    "conversation",
+    "continuity",
+    "goals",
+    "world",
+    "memory",
+    "larm",
+    "audio",
+    "queue",
+    "scheduler",
+    "timers",
+    "dialogue",
+    "voice-dialogue"
+  ],
+  "revision": "55d029e62d5a7d708bac6b1428081029d2946fdaca3d5a7ec8a64ee78df9d49b",
+  "steps": [
+    {
+      "name": "size-budget",
+      "ms": 460,
+      "result": "pass"
+    },
+    {
+      "name": "sql-boundaries",
+      "ms": 705,
+      "result": "pass"
+    },
+    {
+      "name": "domain-docs",
+      "ms": 15,
+      "result": "pass"
+    },
+    {
+      "name": "format",
+      "ms": 263,
+      "result": "exit 1"
+    }
+  ],
+  "totalMs": 2325,
+  "result": "fail",
+  "error": "Error: format failed (1)"
+}

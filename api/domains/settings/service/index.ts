@@ -1,3 +1,4 @@
+import { validSettings } from "./valid";
 import {
 	createCipheriv,
 	createDecipheriv,
@@ -18,11 +19,11 @@ import type { SqliteStore } from "../../../infrastructure/sqlite";
 import {
 	applySchema,
 	defaultSubtitles,
+	isAgentConnection,
 	purposeSchema,
 	settingsSchema,
 	type ApplySettings,
 	type Connection,
-	type Purpose,
 	type Settings,
 } from "../contracts";
 import { read, save } from "../repository";
@@ -37,7 +38,7 @@ export function defaults(env: Record<string, string | undefined>): Settings {
 		revision: 0,
 		larm: {
 			baseUrl: null,
-			profile: env.LARM_PROFILE ?? "SAAA-gemma4-26b",
+			profile: env.LARM_PROFILE?.trim() || "ornith1.5Strix",
 			audience: env.LARM_AUDIENCE ?? "saaa-desktop",
 			voice: env.EUMENES_TTS_VOICE ?? "",
 			speed: 1,
@@ -63,6 +64,7 @@ export function defaults(env: Record<string, string | undefined>): Settings {
 			persona: "butler",
 			asrLanguages: ["ja", "en"],
 			theme: "system",
+			background: "light-fairy",
 			subtitles: defaultSubtitles,
 		},
 		codingSupervision: { approveInstructions: true },
@@ -246,29 +248,7 @@ export async function createSettings(
 				listeners.delete(fn);
 			};
 		},
-		valid(
-			db: Database,
-			snapshot: Settings,
-			purpose: Purpose,
-			connection?: Connection,
-		) {
-			const current = read(db);
-			const before = snapshot.routes[purpose];
-			const after = current.routes[purpose];
-			if (
-				connection &&
-				(!after.cloudAllowed ||
-					after.epoch !== before.epoch ||
-					!current.connections.some(
-						(c) =>
-							c.id === connection.id &&
-							c.enabled &&
-							c.epoch === connection.epoch,
-					))
-			)
-				return false;
-			return true;
-		},
+		valid: validSettings,
 		/** Idempotent replay is guaranteed only for the newest 64 requests. */
 		async apply(raw: ApplySettings) {
 			const input = applySchema.parse(raw);
@@ -342,9 +322,18 @@ export async function createSettings(
 					const originChanged =
 						prior &&
 						new URL(prior.baseUrl).origin !== new URL(c.baseUrl).origin;
+					// A login-based agent connection (no key, no env ref) has nothing to rebind.
+					const keyless =
+						isAgentConnection(c) &&
+						!c.envRef &&
+						!prior?.envRef &&
+						!db
+							.query("SELECT 1 FROM settings_credentials WHERE id=?")
+							.get(`${c.id}:${prior?.epoch}`);
 					if (
 						originChanged &&
 						!mutation &&
+						!keyless &&
 						(!c.envRef || c.envRef === prior?.envRef)
 					)
 						throw new Error("invalid_origin_requires_new_key");

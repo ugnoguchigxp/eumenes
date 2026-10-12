@@ -23,7 +23,7 @@ import { createDialogueService } from "../domains/dialogue";
 import { createVoiceDialogue } from "../domains/voice-dialogue";
 import { createToolchain } from "./toolchain";
 import { createTimers } from "../domains/timers";
-import { createOperations } from "../domains/research-routes";
+import { createToolchainRouting } from "./toolchain-routing";
 import { createTimerAnnouncements } from "./timer-announcements";
 import { createApp } from "./app";
 import type { LarmPort } from "../domains/larm";
@@ -104,7 +104,8 @@ export async function harness(
 		settings = await createSettings(store, { dbPath: join(dir, "db") });
 	const parentContexts: string[] = [],
 		workerContexts: string[] = [],
-		routeContexts: string[] = [];
+		routeContexts: string[] = [],
+		commandContexts: string[] = [];
 	const spoken: string[] = [];
 	let calls = 0,
 		acquisitions = 0;
@@ -148,56 +149,59 @@ export async function harness(
 					]);
 					return "";
 				};
-				if (options.timers && /タイマー/.test(question)) {
-					const snapshotMessage = messages.find((m) =>
-						m.content.startsWith("現在のタイマーのsnapshot"),
-					);
-					const snapshot = snapshotMessage
-						? JSON.parse(snapshotMessage.content.split("=")[1]!)
-						: null;
-					if (/確認|残り/.test(question))
-						return send("timer", { operation: "list" });
-					if (/取消|止め/.test(question)) {
-						const targets =
-							snapshot?.items?.filter(
-								(item: { state: string }) => item.state === "active",
-							) ?? [];
-						if (targets.length !== 1) return "どのタイマーを止めますか？";
-						return send("timer", {
-							operation: "cancel",
-							timerId: targets[0].id,
-							expectedRevision: targets[0].revision,
-						});
-					}
-					const seconds = /^(\d+)秒/.exec(question);
-					const durationSeconds = seconds
-						? Number(seconds[1])
-						: /1時間/.test(question)
-							? 3600
-							: /3分30秒/.test(question)
-								? 210
-								: 180;
-					return send("timer", {
-						operation: "start",
-						durationSeconds,
-						...(options.timerExtra ? { scope: "other" } : {}),
-					});
-				}
+				// The conversation only hands the request to a toolchain; its sub-agent decides the rest.
+				if (options.timers && /タイマー/.test(question))
+					return send("timer", { request: question });
 				if (
 					options.history ||
 					/天気|株価|weather|stock|調べ|検索|https?:|確認/.test(question)
 				)
 					return send(
-						options.fullResearch && !options.history
-							? "research_web_luna"
-							: "research",
-						{
-							...(!(options.fullResearch && !options.history)
-								? { kind: options.history ? "history" : "web" }
-								: {}),
-							question,
-						},
+						options.history
+							? "conversation_history"
+							: options.fullResearch
+								? "web_research"
+								: "web_search",
+						{ request: question },
 					);
+			}
+			if (system.includes("あなたはこのツールチェーンの操作担当です")) {
+				commandContexts.push(JSON.stringify(messages));
+				const data = JSON.parse(question) as {
+					request: string;
+					snapshot?: {
+						items?: Array<{ id: string; state: string; revision: number }>;
+					} | null;
+				};
+				const invoke = (tool: string, args: unknown) =>
+					JSON.stringify({ action: "invoke", tool, arguments: args });
+				if (/確認|残り/.test(data.request)) return invoke("timer.list", {});
+				if (/取消|止め/.test(data.request)) {
+					const targets =
+						data.snapshot?.items?.filter((item) => item.state === "active") ??
+						[];
+					if (targets.length !== 1)
+						return JSON.stringify({
+							action: "clarify",
+							question: "どのタイマーを止めますか？",
+						});
+					return invoke("timer.cancel", {
+						timerId: targets[0]!.id,
+						expectedRevision: targets[0]!.revision,
+					});
+				}
+				const seconds = /^(\d+)秒/.exec(data.request);
+				const durationSeconds = seconds
+					? Number(seconds[1])
+					: /1時間/.test(data.request)
+						? 3600
+						: /3分30秒/.test(data.request)
+							? 210
+							: 180;
+				return invoke("timer.start", {
+					durationSeconds,
+					...(options.timerExtra ? { scope: "other" } : {}),
+				});
 			}
 			if (system.includes("TOOLS=")) {
 				const data = workerPacket(messages);
@@ -367,7 +371,7 @@ export async function harness(
 			return {
 				freshUntilMs: null,
 				result: {
-					provider: "llm-fetch@0.1.2",
+					provider: "llm-fetch@0.1.3",
 					observedAt,
 					cache: "bypass",
 					hits:
@@ -459,16 +463,13 @@ export async function harness(
 		queue,
 		agents: toolchain.agents,
 		postAnswer: toolchain.postAnswer,
+		toolchains: createToolchainRouting(
+			toolchain.capabilities,
+			toolchain.history,
+			toolchain.embedQuery,
+		),
 	});
 	const voice = createVoiceDialogue(store, dialogue, inference);
-	const researchRoutes = toolchain.routeService
-		? createOperations({
-				routes: toolchain.routeService,
-				store,
-				skills: (db, id) =>
-					toolchain.capabilities.getDefinitionInTransaction(db, id),
-			})
-		: undefined;
 	const app = createApp({
 		token: "fixture-token-for-toolchain-browser",
 		origin: process.env.EUMENES_ORIGIN ?? "http://localhost",
@@ -483,7 +484,7 @@ export async function harness(
 		scheduler,
 		inference,
 		timers,
-		researchRoutes,
+		toolchainHistory: toolchain.history,
 		...toolchain,
 	});
 	toolchain.agents.start();
@@ -516,6 +517,7 @@ export async function harness(
 		spoken,
 		workerContexts,
 		routeContexts,
+		commandContexts,
 		get acquisitions() {
 			return acquisitions;
 		},

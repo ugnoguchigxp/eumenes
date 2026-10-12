@@ -1,26 +1,34 @@
-import type { RequirementCatalog } from "../../capabilities";
 import type { Database } from "bun:sqlite";
 import type { AgentRuntime } from "../../agent-runtime";
 import type { ConversationService } from "../../conversation";
+import { toolchainRuntimeOf, toolchainBuiltins } from "../../capabilities";
 import type { Run } from "../contracts";
 import { linkAgent } from "../repository";
-import {
-	appendConversationPolicy,
-	conversationTools,
-} from "./conversation-tools";
 import { conversationUrls } from "./conversation-urls";
-import type { ConversationOperation } from "./conversation-tools";
+import type { DialogueDeps } from "./context";
 
-/** Establish the saved human origin before a local action runs, in the same transaction. */
+/** How much of the preceding conversation joins the current utterance as the retrieval query. */
+const QUERY_CONTEXT_BYTES = 1024;
+const QUERY_CONTEXT_TURNS = 4;
+
+/**
+ * Start the research sub-agent of a toolchain. The saved human origin is established in the
+ * same transaction; the toolchain's package fixes the profile, SKILL and tools.
+ */
 export function delegateConversation(
 	db: Database,
 	agents: AgentRuntime,
 	conversation: ConversationService,
 	run: Run,
-	selected: Exclude<ConversationOperation, { kind: "delegation" | "music" }>,
+	selected: {
+		route: "web" | "history" | "timer";
+		request: string;
+		packageRevisionId?: string;
+		researcher?: "codex_luna";
+		command?: unknown;
+	},
 	context: {
 		parentJobId: string;
-		requirementCatalog?: RequirementCatalog;
 		authorizedUrls?: string[];
 		actionSnapshot?: unknown;
 		timerCapability?: ReturnType<
@@ -34,58 +42,78 @@ export function delegateConversation(
 	const root = agents.startInTransaction(db, {
 		rootRunId: run.id,
 		input: {
-			...selected,
-			question: "question" in selected ? selected.question : original,
+			kind: selected.route,
+			question: selected.request,
 			originalRequest: original,
-			urls: selected.kind === "web" ? context.authorizedUrls : undefined,
+			...(selected.packageRevisionId
+				? { packageRevisionId: selected.packageRevisionId }
+				: {}),
+			...(selected.researcher ? { researcher: selected.researcher } : {}),
+			...(selected.command ? { command: selected.command } : {}),
+			urls: selected.route === "web" ? context.authorizedUrls : undefined,
 		},
 		deadline: Date.parse(run.deadlineAt!),
 		parentJobId: context.parentJobId,
 		actionSnapshot: context.actionSnapshot,
 		timerCapability: context.timerCapability,
-		requirementProfiles:
-			selected.kind !== "history"
-				? []
-				: agents.resolveRequirementProfilesInTransaction(
-						db,
-						context.requirementCatalog ?? { items: [], snapshots: {} },
-						selected.requirementProfiles ?? [],
-					),
+		// Requirement profiles are chosen inside the history toolchain, never by the conversation.
+		requirementProfiles: [],
 		onCreated: (taskId) => linkAgent(db, run.id, taskId, context.parentJobId),
 	});
 	linkAgent(db, run.id, root.taskId, root.jobId);
 	return root;
 }
 
-export function prepareConversation(
+/**
+ * The routing input of a new conversation decision: the request text for retrieval and the
+ * toolchains whose runtime is available now. Nothing is offered to scheduled prompts or while
+ * an agent task already belongs to the run.
+ */
+export function prepareRouting(
 	db: Database,
-	agents: AgentRuntime | undefined,
+	deps: DialogueDeps,
 	run: Run,
-	messages: Parameters<typeof appendConversationPolicy>[0],
+	messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
+	available: { dots: boolean },
 ) {
-	if (!agents || run.agentTaskId || run.sourceKind === "schedule") return {};
-	const context = agents.conversationContextInTransaction?.(db, run.id) ?? {
-		timersEnabled: false,
-		lunaEnabled: false,
-		timers: null,
-		timerCapability: undefined,
-		requirementCatalog: { items: [], snapshots: {} },
-	};
-	appendConversationPolicy(messages, context.timers, context.lunaEnabled);
-	if (context.requirementCatalog?.items.length)
-		messages.splice(messages.length - 1, 0, {
-			role: "user",
-			content: JSON.stringify({
-				requirementCatalog: context.requirementCatalog.items,
-			}),
+	const { agents, toolchains } = deps;
+	if (!toolchains || run.agentTaskId || run.sourceKind === "schedule")
+		return undefined;
+	const context = agents?.conversationContextInTransaction?.(db, run.id);
+	const ready = (requires: string | undefined) =>
+		requires === undefined
+			? !!agents
+			: requires === "luna"
+				? !!context?.lunaEnabled
+				: requires === "timers"
+					? !!context?.timersEnabled
+					: requires === "music"
+						? !!deps.music
+						: requires === "dots"
+							? available.dots
+							: false;
+	const ids = toolchainBuiltins
+		.map((d) => d.id)
+		.filter((id) => {
+			const runtime = toolchainRuntimeOf(id);
+			return !!runtime && ready(runtime.requires);
 		});
+	const turns = messages.filter((m) => m.role !== "system");
+	const current = turns.at(-1)?.content ?? "";
+	let before = "";
+	for (const m of turns.slice(0, -1).slice(-QUERY_CONTEXT_TURNS).reverse()) {
+		const next = `${m.content}\n${before}`;
+		if (new TextEncoder().encode(next).length > QUERY_CONTEXT_BYTES) break;
+		before = next;
+	}
 	return {
-		tools: conversationTools(context.timersEnabled, context.lunaEnabled),
-		actionSnapshot: context.timers,
-		timerCapability: context.timerCapability,
-		requirementCatalog: context.requirementCatalog,
-		authorizedUrls: conversationUrls(
-			messages.filter((m) => m.role !== "system").map((m) => m.content),
-		),
+		routing: {
+			query: (before ? before + "\n" : "") + current,
+			available: ids,
+			conversationId: run.conversationId,
+			utteranceId: run.utteranceId ?? null,
+			requestId: run.requestId ?? null,
+		},
+		authorizedUrls: conversationUrls(turns.map((m) => m.content)),
 	};
 }

@@ -3,6 +3,7 @@ import { getLogger } from "../../../infrastructure/logger";
 import {
 	bytes,
 	hash,
+	toolchainFunctionPattern,
 	validators,
 	type Definition,
 	type FixedDefinition,
@@ -67,6 +68,15 @@ export function registerRevision(
 		)
 			throw new Error("invalid_capability_bundle");
 	}
+	if (d.kind === "toolchain") validateToolchain(db, d, dependencies);
+	else if (
+		d.functionName !== undefined ||
+		d.examples !== undefined ||
+		d.packageRevisionId !== undefined ||
+		d.artifact !== undefined ||
+		d.redirects !== undefined
+	)
+		throw new Error("invalid_capability");
 	db.query("INSERT INTO capability_revisions VALUES(?,?,?,?,?,?)").run(
 		rev,
 		key,
@@ -100,6 +110,63 @@ export function registerRevision(
 	db.query("DELETE FROM capability_search WHERE key=?").run(key);
 	db.query("INSERT INTO capability_search(key,content) VALUES(?,?)").run(
 		key,
-		[d.id, d.title, d.summary, ...d.aliases, ...d.tags, ...d.useWhen].join(" "),
+		[
+			d.id,
+			d.title,
+			d.summary,
+			...d.aliases,
+			...d.tags,
+			...d.useWhen,
+			...(d.examples ?? []),
+		].join(" "),
+	);
+}
+/**
+ * A toolchain is a fixed set: exactly one complete package (profile, SKILL, tools), a unique
+ * function, how the conversation finds it, and an explicit result display.
+ */
+function validateToolchain(
+	db: Database,
+	d: Definition,
+	dependencies: FixedDefinition[],
+) {
+	const pack = dependencies[0];
+	if (
+		!d.functionName ||
+		!toolchainFunctionPattern.test(d.functionName) ||
+		!d.packageRevisionId ||
+		d.dependencies.length !== 1 ||
+		d.dependencies[0] !== d.packageRevisionId ||
+		pack?.revisionId !== d.packageRevisionId ||
+		pack.kind !== "package" ||
+		!pack.profileRevisionId ||
+		!pack.requiredSkillRevisionIds?.length ||
+		!pack.toolRevisionIds?.length ||
+		!d.useWhen.length ||
+		(d.examples?.length ?? 0) < 3 ||
+		d.examples!.some((e) => !e.trim() || e.length > 200) ||
+		!d.artifact ||
+		(d.artifact.kind === "component" && !d.artifact.component.trim()) ||
+		(d.redirects ?? []).some((r) => !r.when.trim() || r.toolchainId === d.id)
+	)
+		throw new Error("invalid_toolchain");
+	// Tools offered to a model take one flat object; a discriminator or union is never allowed.
+	for (const tool of dependencies.filter((x) => x.kind === "tool"))
+		if (tool.schemaKey && !flatObjectSchema(zSchema(tool.schemaKey)))
+			throw new Error("invalid_toolchain_tool_schema");
+	const taken = db
+		.query(
+			"SELECT i.id FROM capability_items i JOIN capability_revisions r ON r.id=i.active_revision_id WHERE i.kind='toolchain' AND i.id<>? AND json_extract(r.definition_json,'$.functionName')=?",
+		)
+		.get(d.id, d.functionName);
+	if (taken) throw new Error("toolchain_function_conflict");
+}
+/** A JSON Schema a model can fill directly: an object without top-level unions. */
+export function flatObjectSchema(schema: Record<string, unknown>) {
+	return (
+		schema.type === "object" &&
+		!("oneOf" in schema) &&
+		!("anyOf" in schema) &&
+		!("allOf" in schema)
 	);
 }

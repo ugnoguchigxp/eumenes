@@ -1,10 +1,16 @@
 import type { Capability } from "../contracts";
+import {
+	optionalSpeechProviders,
+	claimedSpeechProvider,
+} from "./speech-providers";
 import { providerEndpoint, readJson, record, string } from "./guards";
 import {
 	endpoints,
 	gemmaAgentProfile,
 	gemmaContext,
 	gemmaProfile,
+	defaultProfile,
+	auxiliaryProfile,
 	protocols,
 	type Provider,
 	type ProviderName,
@@ -51,6 +57,15 @@ export async function fetchCatalog(
 	if (profile === gemmaProfile && catalogProfile.id !== gemmaAgentProfile)
 		throw new Error("larm_gemma_agent_profile_mismatch");
 	const catalogProviders = providersOf(catalogProfile);
+	if (profile === defaultProfile || profile === auxiliaryProfile) {
+		const llm = catalogProviders.find((p) => p.name === "llm");
+		const context = record(llm?.contextWindow);
+		if (
+			llm?.model !== "ornith-1.5-strix-lean" ||
+			context.maxTokens !== (profile === defaultProfile ? 262144 : 65536)
+		)
+			throw new Error("larm_ornith_contract_mismatch");
+	}
 	for (const name of required) {
 		const provider = catalogProviders.find((item) => item.name === name);
 		if (
@@ -144,12 +159,9 @@ export async function awaitReady(
 			);
 		});
 	};
-	for (
-		let attempt = 0;
-		created.status !== "ready" || providersPending();
-		attempt++
-	) {
-		if (attempt >= 60) throw new Error("larm_capacity_timeout");
+	// Capacity waiting is owned by LARM and the caller's cancellation/deadline.
+	// Never claim or infer before the connection and its providers are ready.
+	while (created.status !== "ready" || providersPending()) {
 		await pause(1000);
 		created = record(
 			await readJson(
@@ -191,6 +203,7 @@ export async function claimProviders(
 		catalogProviders: Rec[];
 		fullProfile: boolean;
 		hosts: ProviderHosts;
+		languageProvider?: string;
 	},
 ): Promise<{ expiresAt: number; providers: Map<ProviderName, Provider> }> {
 	const { id, created, required, profile, catalogProviders, hosts } = input;
@@ -223,15 +236,32 @@ export async function claimProviders(
 		const declared = catalogProviders.find((p) => p.name === name);
 		if (
 			!info ||
+			!declared ||
 			info.protocol !== protocols[name] ||
 			info.model !== announced?.model ||
 			info.model !== declared?.model
 		)
 			throw new Error("larm_claim_mismatch");
+		if (
+			name === "llm" &&
+			Object.entries(record(declared.contextWindow)).some(
+				([key, value]) => record(info.contextWindow)[key] !== value,
+			)
+		)
+			throw new Error("larm_claim_context_mismatch");
 		providers.set(name, speechProvider(name, info, profile, hosts));
 	}
 	const decision = decisionProvider(claimed, created, catalogProviders, hosts);
 	if (input.fullProfile && decision) providers.set("system-one", decision);
+	if (input.fullProfile)
+		for (const [role, provider] of optionalSpeechProviders(
+			claimed,
+			created,
+			catalogProviders,
+			hosts,
+			input.languageProvider,
+		))
+			providers.set(role, provider);
 	return { expiresAt, providers };
 }
 
@@ -245,6 +275,7 @@ function speechProvider(
 	const configuration = record(record(info.configuration).fields);
 	const baseUrl = string(configuration.baseURL);
 	providerEndpoint(baseUrl, hosts.base, hosts.extra);
+	const endpoint = claimedEndpoint(info, baseUrl, name, hosts);
 	if (configuration.baseURL !== baseUrl || configuration.model !== info.model)
 		throw new Error("larm_claim_configuration_mismatch");
 	const contextWindow = name === "llm" ? record(info.contextWindow) : undefined;
@@ -267,6 +298,7 @@ function speechProvider(
 	return {
 		name,
 		baseUrl,
+		endpoint,
 		model: string(info.model),
 		protocol: string(info.protocol),
 		token: string(credential.token),
@@ -274,6 +306,27 @@ function speechProvider(
 		voice:
 			typeof configuration.voice === "string" ? configuration.voice : undefined,
 	};
+}
+
+function claimedEndpoint(
+	info: Rec,
+	baseUrl: string,
+	name: ProviderName,
+	hosts: ProviderHosts,
+) {
+	if (info.endpoint === undefined) return undefined;
+	const endpoint = providerEndpoint(
+		string(info.endpoint),
+		hosts.base,
+		hosts.extra,
+	);
+	const expected = new URL(
+		endpoints[name].replace(/^\/v1\//, ""),
+		`${baseUrl.replace(/\/$/, "")}/`,
+	);
+	if (endpoint.href !== expected.href)
+		throw new Error("larm_claim_endpoint_mismatch");
+	return endpoint.href;
 }
 
 /** Optional decisions never make the speech providers unusable. */
@@ -307,6 +360,7 @@ function decisionProvider(
 				return {
 					name: "system-one",
 					baseUrl,
+					endpoint: claimedEndpoint(info, baseUrl, "system-one", hosts),
 					model: string(info.model),
 					protocol: string(info.protocol),
 					token: string(record(info.credential).token),
@@ -366,7 +420,23 @@ export async function renewProviders(
 		throw new Error("larm_renew_expired");
 	const next = new Map<ProviderName, Provider>();
 	for (const [name, previous] of current.providers) {
-		const info = claimed.providers.map(record).find((p) => p.name === name);
+		const info = claimed.providers
+			.map(record)
+			.find((p) => p.name === (previous.claimName ?? name));
+		if (name === "tts-english" || name === "sentence-language") {
+			if (
+				!info ||
+				info.model !== previous.model ||
+				info.protocol !== previous.protocol
+			)
+				continue;
+			try {
+				next.set(name, claimedSpeechProvider(name, info, hosts));
+			} catch {
+				/* Invalid optional bindings discard old tokens; selecting them fails. */
+			}
+			continue;
+		}
 		if (name === "system-one") {
 			try {
 				if (
@@ -380,6 +450,7 @@ export async function renewProviders(
 						next.set(name, {
 							...previous,
 							baseUrl,
+							endpoint: claimedEndpoint(info, baseUrl, name, hosts),
 							token: string(record(info.credential).token),
 						});
 				}
@@ -411,6 +482,7 @@ export async function renewProviders(
 		next.set(name, {
 			...previous,
 			baseUrl,
+			endpoint: claimedEndpoint(info, baseUrl, name, hosts),
 			token: string(record(info.credential).token),
 		});
 	}

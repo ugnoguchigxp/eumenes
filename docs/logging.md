@@ -85,11 +85,13 @@ bun run logs -- --since 2026-10-08T10:00:00+09:00 --component inference --json
 
 会話本文、認識結果、音声バイナリ、HTTPヘッダー・query・body、設定、認証情報、Providerの生応答は出力しません。loggerは許可した運用項目だけを通します。IDやエラー発生箇所には運用上の情報があるため、外部へ共有する前には確認してください。ログはローカルの障害調査用で、改ざん防止や永続的な監査証跡を保証するものではありません。長期保存が必要な記録は世代削除前に別途保管します。
 
-## 取得先学習（research-routes）のログ
+## ツールチェーンの選択と手順キャッシュのログ
 
-出せるのは固定イベント名、`runId`、`jobId`、`reason`（固定の理由code。例: `queue_full`、`stale`、`proof_unavailable`）、`status`、`bytes`、`durationMs` だけです。経路は検索キーワードそのものではなく、必要ならキーのdigestで識別します。調査は通常どおり `bun run logs -- --level warn` から始め、`research_routes.learning_skipped`（回答後の学習がskipされた理由）と、author/review jobの `queue.settled` を jobId で追います。
+会話の判断は `dialogue.candidates_selected`(`candidateCount`・`retrieval`=fts/embedding/hybrid/none・`durationMs`)と `toolchain.selection_recorded`(`selectionId`・`runId`・`decision`・`toolchainId`)、終了は `toolchain.selection_settled`(`runId`・`outcome`・`reason`)に出ます。`web_search` の手順キャッシュは `recipe.saved`・`recipe.suspended`(`recipeId`・`toolchainId`)です。embeddingの失敗は `toolchain.query_embedding_failed`・`toolchain.vectors_refresh_failed`(1分に1回まで)で、その間は全ツールチェーンを提示して会話を続けます。登録できなかったツールチェーンは `toolchain.registration_failed`(`subjectId`・`reason`)です。
 
-出さないもの: 検索キーワード・地点・銘柄、SKILL/Context本文、ページ本文・引用、facts、編集指示、Providerの生応答、認証情報、設定。回答後の学習が失敗しても元の回答は保持されるため、skip理由はここだけで確認します。
+出さないもの: 発話・依頼文・候補の説明、手順のsignature・URL・読む箇所、取得本文。これらは `GET /api/toolchain-history/selections?runId=<runId>` と `bun run cli -- toolchain-history show <runId>` で確認します。調査は `bun run logs -- --level warn` で runId を得てから、選択の記録を引きます。
+
+旧「取得先学習(research-routes)」は2026-10-12に廃止しました。`research_routes.*` のイベントは出ません。
 
 ## 検証
 

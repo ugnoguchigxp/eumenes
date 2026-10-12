@@ -1,4 +1,4 @@
-import { useRef, useState, useLayoutEffect } from "react";
+import { useRef, useState, useLayoutEffect, useMemo } from "react";
 import {
 	useQuery,
 	useInfiniteQuery,
@@ -14,6 +14,7 @@ import {
 	type Receipt,
 	type Snapshot,
 } from "@eumenes/artifact-ui/contracts";
+import { playlistStudioSource } from "./artifact-definition";
 function message(error: unknown) {
 	if (error instanceof ApiError) {
 		if (error.status === 507 || error.message === "music_storage_full")
@@ -44,10 +45,34 @@ export function useLibraryRuntime(
 		queryKey: ["music", "playlists", conversationId],
 		queryFn: ({ signal }) => client.musicPlaylists(conversationId, signal),
 	});
-	const initial = saved.data?.find((p) => sources.has(`library-${p.id}`));
-	const [filter, setFilter] = useState<ReturnType<typeof trackQuery.parse>>();
-	const query = filter ?? initial?.query ?? trackQuery.parse({});
-	const enabled = initial?.state === "completed";
+	const studio = sources.has(playlistStudioSource);
+	const latest = saved.data?.reduce<
+		NonNullable<typeof saved.data>[number] | undefined
+	>(
+		(result, item) =>
+			!result || item.createdAt > result.createdAt ? item : result,
+		undefined,
+	);
+	const [choice, setChoice] = useState<{ id: string; latestId?: string }>();
+	const initial = studio
+		? choice && choice.latestId === latest?.id
+			? saved.data?.find((p) => p.id === choice.id)
+			: latest
+		: saved.data?.find((p) => sources.has(`library-${p.id}`));
+	const source = studio ? playlistStudioSource : `library-${initial?.id}`;
+	const authorized = studio || !!initial;
+	const defaults = useMemo(() => trackQuery.parse({}), []);
+	const [filter, setFilter] = useState<{
+		playlistId?: string;
+		value: ReturnType<typeof trackQuery.parse>;
+	}>();
+	const query =
+		filter && filter.playlistId === initial?.id
+			? filter.value
+			: (initial?.query ?? defaults);
+	const enabled =
+		!saved.isPending &&
+		(initial?.state === "completed" || (studio && !initial));
 	const tracks = useInfiniteQuery({
 		queryKey: ["music-library", "tracks", initial?.id, query],
 		enabled,
@@ -66,13 +91,18 @@ export function useLibraryRuntime(
 		queryFn: ({ signal }) => client.musicTags(signal),
 		retry: false,
 	});
-	const [selected, setSelected] = useState<string | null | undefined>();
+	const [selected, setSelected] = useState<{
+		playlistId?: string;
+		id: string | null;
+	}>();
 	const allItems = tracks.data?.pages.flatMap((p) => p.tracks) ?? [];
 	const items = allItems.filter(
 		(t, i) => allItems.findIndex((other) => other.id === t.id) === i,
 	);
 	const id =
-		selected === undefined ? (initial?.currentId ?? items[0]?.id) : selected;
+		selected && selected.playlistId === initial?.id
+			? selected.id
+			: (initial?.currentId ?? items[0]?.id);
 	const detail = useQuery({
 		queryKey: ["music-library", "detail", id],
 		enabled: enabled && !!id,
@@ -86,6 +116,7 @@ export function useLibraryRuntime(
 		seen = useRef(new Set<string>());
 	const currentRevision = useRef(0);
 	const signature = JSON.stringify([
+		initial?.id,
 		initial?.updatedAt,
 		query,
 		id,
@@ -156,7 +187,7 @@ export function useLibraryRuntime(
 		await cache.invalidateQueries({ queryKey: ["music-library"] });
 	}
 	const dispatch = async (event: ArtifactEvent): Promise<Receipt> => {
-		if (!initial || event.source !== `library-${initial.id}` || !enabled)
+		if (!authorized || event.source !== source || !enabled)
 			return {
 				status: "rejected",
 				message: "このプレイリストは操作できません。",
@@ -183,12 +214,13 @@ export function useLibraryRuntime(
 						JSON.parse(String(event.values.filter)),
 					);
 					const { cursor: _, ...reset } = next;
-					await client.updateMusicPlaylist(initial.id, { query: reset });
-					const key = ["music-library", "tracks", initial.id, reset];
+					if (initial)
+						await client.updateMusicPlaylist(initial.id, { query: reset });
+					const key = ["music-library", "tracks", initial?.id, reset];
 					await cache.cancelQueries({ queryKey: key, exact: true });
 					cache.removeQueries({ queryKey: key, exact: true });
-					setSelected(null);
-					setFilter(reset);
+					setSelected({ playlistId: initial?.id, id: null });
+					setFilter({ playlistId: initial?.id, value: reset });
 					break;
 				}
 				case "music-more":
@@ -203,10 +235,11 @@ export function useLibraryRuntime(
 						resource.kind === "music" &&
 						resource.tracks.find((t) => t.id === event.values.id);
 					if (!target) throw new Error("invalid_track_reference");
-					await client.updateMusicPlaylist(initial.id, {
-						currentId: target.id,
-					});
-					setSelected(target.id);
+					if (initial)
+						await client.updateMusicPlaylist(initial.id, {
+							currentId: target.id,
+						});
+					setSelected({ playlistId: initial?.id, id: target.id });
 					break;
 				}
 				case "music-favorite":
@@ -218,8 +251,11 @@ export function useLibraryRuntime(
 					if (event.action === "music-delete") {
 						await client.deleteMusicTrack(target.id);
 						if (id === target.id) {
-							setSelected(null);
-							await client.updateMusicPlaylist(initial.id, { currentId: null });
+							setSelected({ playlistId: initial?.id, id: null });
+							if (initial)
+								await client.updateMusicPlaylist(initial.id, {
+									currentId: null,
+								});
 						}
 					} else {
 						if (typeof event.values.favorite !== "boolean")
@@ -230,8 +266,11 @@ export function useLibraryRuntime(
 							event.values.favorite !== query.favorite &&
 							id === target.id
 						) {
-							setSelected(null);
-							await client.updateMusicPlaylist(initial.id, { currentId: null });
+							setSelected({ playlistId: initial?.id, id: null });
+							if (initial)
+								await client.updateMusicPlaylist(initial.id, {
+									currentId: null,
+								});
 						}
 					}
 					await refresh();
@@ -251,15 +290,28 @@ export function useLibraryRuntime(
 			setBusy(false);
 		}
 	};
-	const snapshot: Snapshot = initial
-		? { [`library-${initial.id}`]: resource }
-		: {};
+	const snapshot: Snapshot = authorized ? { [source]: resource } : {};
 	return {
+		playlists: studio ? (saved.data ?? []) : [],
+		playlistId: initial?.id ?? "",
+		selectPlaylist: (next: string) => {
+			if (
+				!studio ||
+				lock.current ||
+				(next && !saved.data?.some((p) => p.id === next))
+			)
+				return;
+			setChoice({ id: next, latestId: latest?.id });
+			setFilter(undefined);
+			setSelected(undefined);
+			setOperationError(undefined);
+		},
+		busy,
 		runtime: { snapshot, dispatch },
 		loading: saved.isPending || initial?.state === "planning",
 		error:
 			saved.error ??
-			(!initial && !saved.isPending
+			(!authorized && !saved.isPending
 				? new Error("unauthorized_source")
 				: initial?.state === "cancelled"
 					? new Error("playlist_cancelled")

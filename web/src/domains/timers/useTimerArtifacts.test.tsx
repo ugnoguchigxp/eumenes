@@ -30,19 +30,16 @@ function fixture(items: Array<{ id: string; label: string }> = []) {
 	);
 	return { api, cache, open, hook };
 }
-test("saved active timers reopen after reload and polling does not reopen closed tabs", async () => {
+test("timers saved before reload stay closed and polling does not open them", async () => {
 	const h = fixture([{ id: "restored", label: "保存したタイマー" }]);
-	await waitFor(() => expect(h.open).toHaveBeenCalledOnce());
-	expect(h.open).toHaveBeenCalledWith(
-		{ kind: "timer", version: 1, timerId: "restored" },
-		"保存したタイマー",
-	);
+	await waitFor(() => expect(h.api.timers).toHaveBeenCalledOnce());
 	await act(async () => {
 		await h.cache.invalidateQueries({
 			queryKey: [queryRoots.timers, "workspace"],
 		});
 	});
-	expect(h.open).toHaveBeenCalledOnce();
+	expect(h.api.timers).toHaveBeenCalledTimes(2);
+	expect(h.open).not.toHaveBeenCalled();
 });
 test("a new conversation result discovers a timer without a local run callback or change event", async () => {
 	const h = fixture();

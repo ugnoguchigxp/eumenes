@@ -62,8 +62,22 @@ export interface LogFields {
 	port?: number;
 	exitCode?: number;
 	processSignal?: string;
+	selectionId?: string;
+	toolchainId?: string;
+	recipeId?: string;
+	decision?: string;
+	outcome?: string;
+	retrieval?: string;
+	candidateCount?: number;
 }
 const keys = new Set<keyof LogFields>([
+	"selectionId",
+	"toolchainId",
+	"recipeId",
+	"decision",
+	"outcome",
+	"retrieval",
+	"candidateCount",
 	"httpRequestId",
 	"requestId",
 	"runId",

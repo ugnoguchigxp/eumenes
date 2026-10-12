@@ -6,28 +6,36 @@ import type {
 	ArtifactEvent,
 	MusicResource,
 } from "@eumenes/artifact-ui/contracts";
-import { musicArtifactDefinition } from "./artifact-definition";
+import {
+	musicArtifactDefinition,
+	musicStudioSource,
+} from "./artifact-definition";
 import { useMusicRuntime } from "./use-music-runtime";
 afterEach(() => {
 	cleanup();
 	vi.restoreAllMocks();
 });
-function setup(state = "completed") {
+function setup(
+	state = "completed",
+	options: { studio?: boolean; empty?: boolean } = {},
+) {
 	vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:audio");
 	vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
-	const items = [
-		{
-			id: "a",
-			runId: "original-run",
-			state,
-			title: "曲",
-			description: "制作意図",
-			durationSeconds: 30,
-			mime: "audio/ogg",
-			createdAt: 1,
-			updatedAt: 1,
-		},
-	];
+	const items = options.empty
+		? []
+		: [
+				{
+					id: "a",
+					runId: "original-run",
+					state,
+					title: "曲",
+					description: "制作意図",
+					durationSeconds: 30,
+					mime: "audio/ogg",
+					createdAt: 1,
+					updatedAt: 1,
+				},
+			];
 	const run = { id: "new-run", status: "queued", revision: 1 };
 	const api = {
 		musicList: vi.fn(async () => items),
@@ -49,21 +57,27 @@ function setup(state = "completed") {
 		defaultOptions: { queries: { retry: false } },
 	});
 	const result = renderHook(
-		() => useMusicRuntime(api as never, "main", musicArtifactDefinition("a")),
+		() =>
+			useMusicRuntime(
+				api as never,
+				"main",
+				musicArtifactDefinition(options.studio ? undefined : "a"),
+			),
 		{
 			wrapper: ({ children }: { children: ReactNode }) => (
 				<QueryClientProvider client={cache}>{children}</QueryClientProvider>
 			),
 		},
 	);
+	const source = options.studio ? musicStudioSource : "music-a";
 	const resource = () =>
-		result.result.current.runtime.snapshot["music-a"] as MusicResource;
+		result.result.current.runtime.snapshot[source] as MusicResource;
 	const event = (
 		action: ArtifactEvent["action"],
 		values: ArtifactEvent["values"] = {},
 	): ArtifactEvent => ({
 		id: crypto.randomUUID(),
-		source: "music-a",
+		source,
 		revision: resource().revision,
 		action,
 		values,
@@ -99,6 +113,27 @@ test("authorized creation sends the exact editable prompt through the normal API
 	});
 	expect(r.api.cancel).toHaveBeenCalledWith("new-run");
 	await waitFor(() => expect(r.resource().creation?.status).toBe("cancelled"));
+});
+test("the shared generation screen accepts the first creation with no previous music and keeps source validation", async () => {
+	const r = setup("completed", { studio: true, empty: true });
+	await waitFor(() => expect(r.result.current.loading).toBe(false));
+	expect(r.resource().tracks).toEqual([]);
+	expect(r.resource().creation?.busy).toBe(false);
+	expect(r.api.musicAudio).not.toHaveBeenCalled();
+	expect(
+		await r.dispatch({
+			...r.event("music-generate", { prompt: "静かな曲" }),
+			source: "music-other",
+		}),
+	).toMatchObject({ status: "rejected" });
+	expect(
+		await r.dispatch(r.event("music-generate", { prompt: "静かな曲" })),
+	).toMatchObject({ status: "accepted" });
+	expect(r.api.submit).toHaveBeenCalledTimes(1);
+	await waitFor(() => expect(r.resource().creation?.canCancel).toBe(true));
+	expect(await r.dispatch(r.event("music-cancel"))).toMatchObject({
+		status: "accepted",
+	});
 });
 test("unknown source, stale revision, unsupported action and invalid prompt never create a run", async () => {
 	const r = setup();

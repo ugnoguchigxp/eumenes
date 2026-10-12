@@ -28,7 +28,7 @@ const categories = [
 	{ id: "connections", label: "接続先" },
 	{ id: "services", label: "サービスを試す" },
 	{ id: "dots", label: "Codexへの委任" },
-	{ id: "routes", label: "取得先と手順" },
+	{ id: "toolchains", label: "ツールチェーンの記録" },
 	{ id: "voice", label: "音声" },
 	{ id: "data", label: "データと利用記録" },
 	{ id: "schedule", label: "予約" },
@@ -39,7 +39,7 @@ const categories = [
 ] as const;
 export function SettingsPage({
 	renderServiceTests,
-	renderResearchRoutes,
+	renderToolchainHistory,
 	renderWorld,
 	client,
 	onDirty,
@@ -49,7 +49,7 @@ export function SettingsPage({
 	onDirty: (dirty: boolean) => void;
 	onSaved: (value: Settings) => void;
 	renderServiceTests?: (disabled: boolean) => React.ReactNode;
-	renderResearchRoutes?: (disabled: boolean) => React.ReactNode;
+	renderToolchainHistory?: () => React.ReactNode;
 	renderWorld?: () => React.ReactNode;
 }) {
 	const query = useSettings(client);
@@ -58,9 +58,6 @@ export function SettingsPage({
 	const [keys, setKeys] = useState<ApplySettings["keys"]>([]);
 	const [category, setCategory] =
 		useState<(typeof categories)[number]["id"]>("general");
-	// Once opened, the routes panel stays mounted (hidden) so an unsent edit survives category changes.
-	const [routesOpened, setRoutesOpened] = useState(false);
-	if (category === "routes" && !routesOpened) setRoutesOpened(true);
 	const [message, setMessage] = useState("");
 	const [busy, setBusy] = useState(false);
 	const [retry, setRetry] = useState<ApplySettings | null>(null);
@@ -192,8 +189,17 @@ export function SettingsPage({
 		const connectionId = crypto.randomUUID();
 		const resourceId = crypto.randomUUID();
 		const next = structuredClone(value);
+		const agent = newCloud.kind !== "openai-compatible";
+		const managed = newCloud.kind === "claude-managed-agents";
 		next.connections.push({
 			id: connectionId,
+			...(agent ? { kind: newCloud.kind } : {}),
+			...(managed
+				? {
+						agentId: newCloud.agentId.trim() || null,
+						environmentId: newCloud.environmentId.trim() || null,
+					}
+				: {}),
 			name: newCloud.name,
 			baseUrl: newCloud.url,
 			enabled: true,
@@ -215,7 +221,8 @@ export function SettingsPage({
 			setMessage(parsed.error.issues.map((i) => i.message).join(" / "));
 			return;
 		}
-		if (!newCloud.key && !newCloud.envRef) {
+		// Codex and Claude Agent SDK may use their CLI login instead of a key.
+		if (!newCloud.key && !newCloud.envRef && (!agent || managed)) {
 			setMessage("APIキーか環境変数名を指定してください");
 			return;
 		}
@@ -320,11 +327,7 @@ export function SettingsPage({
 				{category === "dots" && <DotsPanel client={client} />}
 				{category === "services" && renderServiceTests?.(dirty)}
 				{category === "world" && renderWorld?.()}
-				{routesOpened && (
-					<div hidden={category !== "routes"}>
-						{renderResearchRoutes?.(false)}
-					</div>
-				)}
+				{category === "toolchains" && renderToolchainHistory?.()}
 				{category === "general" && (
 					<GeneralSection value={value} change={change} />
 				)}
@@ -380,7 +383,7 @@ export function SettingsPage({
 				{category === "appearance" && (
 					<AppearanceSection value={value} change={change} />
 				)}
-				{!["dots", "dictionary", "memory", "services", "routes"].includes(
+				{!["dots", "dictionary", "memory", "services", "toolchains"].includes(
 					category,
 				) && (
 					<footer className="settings-footer">
@@ -427,8 +430,8 @@ function categoryHelp(category: string) {
 		? "dotsとの接続、作業するプロジェクト、担当とSkillを設定します。変更は各欄で保存します。"
 		: category === "services"
 			? "プロバイダを選んで、入力と結果を確認できます。"
-			: category === "routes"
-				? "検索で見つけた取得先と、その手順を確認・編集できます。値は毎回取得し直します。"
+			: category === "toolchains"
+				? "会話がどのツールチェーンを選んだかの記録と、Web検索の保存済み取得手順を確認できます。"
 				: category === "memory"
 					? "保存した記憶を会話で使うかを切り替えます。変更はすぐに保存されます。"
 					: category === "world"

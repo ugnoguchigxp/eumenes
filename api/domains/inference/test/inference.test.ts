@@ -38,12 +38,34 @@ const messages = [
 	{ role: "system" as const, content: "system" },
 	{ role: "user" as const, content: "hello" },
 ];
+test("answer requests use the main connection and control requests request independent auxiliary sessions", async () => {
+	const roles: unknown[] = [];
+	const h = await setup({
+		local: async (_messages, _signal, options) => {
+			roles.push(options?.sessionRole);
+			return "{}";
+		},
+	});
+	await h.inference.answer(messages, new AbortController().signal);
+	const id = await h.store.write((db) =>
+		h.inference.captureMaintenanceControlInTransaction(db, {
+			subject: "independent-helper",
+			deadline: Date.now() + 30000,
+			maxOutputTokens: 512,
+		}),
+	);
+	await h.inference.executeControl(id, messages, new AbortController().signal);
+	expect(roles).toEqual(["main", "auxiliary"]);
+});
 async function setup(
 	options: {
 		local?: LarmPort["answer"];
 		localStream?: LarmPort["answerStream"];
 		localSpeech?: LarmPort["speak"];
 		judge?: LarmPort["judge"];
+		sentenceLanguage?: LarmPort["classifySentenceLanguage"];
+		sentenceLanguageMs?: number;
+		prepareVoice?: LarmPort["prepareVoice"];
 		decisionMs?: number;
 		dataset?: boolean;
 		speechText?: (text: string) => string;
@@ -96,9 +118,11 @@ async function setup(
 	const payloads: unknown[] = [];
 	const port: LarmPort = {
 		decisionModel: () => (options.dataset ? RURI_MODEL : null),
+		prepareVoice: options.prepareVoice,
 		status: () => ({ state: "unconfigured", capabilities: [] }),
 		answerStream: options.localStream,
 		judge: options.judge,
+		classifySentenceLanguage: options.sentenceLanguage,
 		connect: async () => {},
 		answer:
 			options.local ??
@@ -145,6 +169,7 @@ async function setup(
 		localMs: options.localMs,
 		cloudMs: 1000,
 		decisionMs: options.decisionMs,
+		sentenceLanguageMs: options.sentenceLanguageMs,
 		speechText: options.speechText,
 	});
 	cleanup.push(async () => {
@@ -1016,4 +1041,242 @@ test("a request revoked mid-stream stops delivering deltas at the next delta", a
 	const result = await work;
 	expect(result).toBeInstanceOf(Error);
 	expect(parts).toEqual(["d0", "d1", "d2", "d3", "d4"]);
+});
+
+async function enableSentenceLanguage(
+	h: Awaited<ReturnType<typeof setup>>,
+	localOnly = false,
+) {
+	const s = h.settings.get();
+	s.larm.sentenceLanguageEnabled = true;
+	s.larm.sentenceLanguageProvider = "language-fixture";
+	if (localOnly) s.routes.tts.mode = "larm-only";
+	await h.settings.apply({
+		requestId: crypto.randomUUID(),
+		expectedRevision: s.revision,
+		settings: s,
+		keys: [],
+	});
+}
+
+test("whole spoken source is classified once across clauses and retries; English bypasses the Japanese dictionary", async () => {
+	const sources: string[] = [];
+	const spoken: string[] = [];
+	let rewrites = 0;
+	let speechCalls = 0;
+	const h = await setup({
+		sentenceLanguage: async (text) => {
+			sources.push(text);
+			return { language: "en", model: "fixture-language", latencyMs: 1 };
+		},
+		speechText: (text) => {
+			rewrites++;
+			return `日本語置換${text}`;
+		},
+		localSpeech: async (text, _signal, options) => {
+			expect(options?.speechLanguage).toBe("en");
+			speechCalls++;
+			if (speechCalls === 1) throw new Error("larm_inference_503");
+			spoken.push(text);
+			return wav();
+		},
+	});
+	await enableSentenceLanguage(h, true);
+	const preparation = {
+		languageSource: {
+			text: "Open the settings. Click Save.",
+			scope: "answer:one",
+		},
+	};
+	await expect(
+		h.inference.speakWithDelivery(
+			"Open the settings.",
+			freshSignal(),
+			preparation,
+		),
+	).rejects.toThrow();
+	await h.inference.speakWithDelivery(
+		"Open the settings.",
+		freshSignal(),
+		preparation,
+	);
+	await h.inference.speakWithDelivery(
+		"Click Save.",
+		freshSignal(),
+		preparation,
+	);
+	expect(sources).toEqual([preparation.languageSource.text]);
+	expect(spoken).toEqual(["Open the settings.", "Click Save."]);
+	expect(rewrites).toBe(0);
+	expect(
+		h.inference.usage().filter((r) => r.purpose === "tts" && r.accepted).length,
+	).toBe(2);
+});
+
+for (const invalid of ["missing", "bad-output", "network"] as const)
+	test(`classification ${invalid} never synthesizes or falls back to cloud`, async () => {
+		let speech = 0;
+		const h = await setup({
+			sentenceLanguage:
+				invalid === "missing"
+					? undefined
+					: async () => {
+							if (invalid === "network") throw new TypeError("Failed to fetch");
+							return { language: "fr", model: "wrong", latencyMs: 1 } as never;
+						},
+			localSpeech: async () => {
+				speech++;
+				return wav();
+			},
+		});
+		await enableSentenceLanguage(h);
+		await expect(h.inference.speak("Hello.", freshSignal())).rejects.toThrow(
+			"speech_language_",
+		);
+		expect(speech).toBe(0);
+		expect(h.calls).toEqual([]);
+		expect(h.inference.usage().some((r) => r.accepted)).toBe(false);
+	});
+
+test("routing settings changed during classification reject late audio", async () => {
+	let entered = false;
+	let release!: (v: {
+		language: "ja";
+		model: string;
+		latencyMs: number;
+	}) => void;
+	let speech = 0;
+	const h = await setup({
+		sentenceLanguage: async () => {
+			entered = true;
+			return new Promise((resolve) => {
+				release = resolve;
+			});
+		},
+		localSpeech: async () => {
+			speech++;
+			return wav();
+		},
+	});
+	await enableSentenceLanguage(h);
+	const pending = h.inference
+		.speak("こんにちは。", freshSignal())
+		.catch((e) => e);
+	await until(() => entered);
+	const newer = h.settings.get();
+	newer.larm.englishVoice = "new-voice";
+	await h.settings.apply({
+		requestId: crypto.randomUUID(),
+		expectedRevision: newer.revision,
+		settings: newer,
+		keys: [],
+	});
+	release({ language: "ja", model: "fixture-language", latencyMs: 1 });
+	expect(await pending).toBeInstanceOf(Error);
+	expect(speech).toBe(0);
+	expect(h.inference.usage().some((r) => r.accepted)).toBe(false);
+});
+
+test("Japanese language selection precedes pronunciation rewriting; disabling routing skips classification", async () => {
+	const classified: string[] = [],
+		spoken: Array<[string, string | undefined]> = [];
+	const h = await setup({
+		sentenceLanguage: async (text) => {
+			classified.push(text);
+			return { language: "ja", model: "fixture-language", latencyMs: 1 };
+		},
+		speechText: (text) => text.replace("API", "エーピーアイ"),
+		localSpeech: async (text, _signal, options) => {
+			spoken.push([text, options?.speechLanguage]);
+			return wav();
+		},
+	});
+	await enableSentenceLanguage(h, true);
+	await h.inference.speak("APIを確認します。", freshSignal());
+	const value = h.settings.get();
+	value.larm.sentenceLanguageEnabled = false;
+	await h.settings.apply({
+		requestId: crypto.randomUUID(),
+		expectedRevision: value.revision,
+		settings: value,
+		keys: [],
+	});
+	await h.inference.speak("APIを確認します。", freshSignal());
+	expect(classified).toEqual(["APIを確認します。"]);
+	expect(spoken).toEqual([
+		["エーピーアイを確認します。", "ja"],
+		["エーピーアイを確認します。", undefined],
+	]);
+});
+
+test("classification deadline fences adapters that ignore abort and does not synthesize or fallback", async () => {
+	let resolve!: (value: {
+		language: "en";
+		model: string;
+		latencyMs: number;
+	}) => void;
+	let synthesized = 0;
+	const h = await setup({
+		sentenceLanguageMs: 10,
+		sentenceLanguage: () =>
+			new Promise((r) => {
+				resolve = r;
+			}),
+		localSpeech: async () => {
+			synthesized++;
+			return wav();
+		},
+	});
+	await enableSentenceLanguage(h);
+	await expect(
+		h.inference.speak("Late answer.", freshSignal()),
+	).rejects.toThrow("speech_language_timeout");
+	resolve({ language: "en", model: "fixture-language", latencyMs: 20 });
+	await Bun.sleep(10);
+	expect(synthesized).toBe(0);
+	expect(h.calls).toHaveLength(0);
+});
+
+test("cold voice admission precedes the short classification budget", async () => {
+	let ready = false;
+	const h = await setup({
+		sentenceLanguageMs: 10,
+		prepareVoice: async () => {
+			await Bun.sleep(30);
+			ready = true;
+		},
+		sentenceLanguage: async () => {
+			expect(ready).toBe(true);
+			return { language: "en", model: "fixture-language", latencyMs: 1 };
+		},
+		localSpeech: async () => wav(),
+	});
+	await enableSentenceLanguage(h, true);
+	expect(await h.inference.speak("Prepared English.", freshSignal())).toEqual(
+		wav(),
+	);
+});
+
+test("a shorter TTS attempt deadline during classification cannot silently switch to cloud", async () => {
+	let synthesized = 0;
+	const h = await setup({
+		localMs: 10,
+		sentenceLanguageMs: 1000,
+		sentenceLanguage: async (_text, signal) =>
+			new Promise((_, reject) => {
+				signal.addEventListener("abort", () => reject(signal.reason), {
+					once: true,
+				});
+			}),
+		localSpeech: async () => {
+			synthesized++;
+			return wav();
+		},
+	});
+	await enableSentenceLanguage(h);
+	await expect(
+		h.inference.speak("English answer.", freshSignal()),
+	).rejects.toThrow("speech_language_timeout");
+	expect(synthesized).toBe(0);
+	expect(h.calls).toHaveLength(0);
 });

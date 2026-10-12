@@ -24,21 +24,26 @@ const track = (id: string) => ({
 	favorite: false,
 	format: "opus",
 });
-function setup() {
+function setup(definition = playlistArtifactDefinition("one"), saved = true) {
 	vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
 	const query = trackQuery.parse({});
 	const api = {
-		musicPlaylists: vi.fn(async () => [
-			{
-				id: "one",
-				kind: "playlist",
-				state: "completed",
-				title: "保存曲",
-				query,
-				currentId: "a",
-				updatedAt: 1,
-			},
-		]),
+		musicPlaylists: vi.fn(async () =>
+			saved
+				? [
+						{
+							id: "one",
+							kind: "playlist",
+							state: "completed",
+							title: "保存曲",
+							query,
+							currentId: "a",
+							updatedAt: 1,
+							createdAt: 1,
+						},
+					]
+				: [],
+		),
 		musicTags: vi.fn(async () => ({
 			tags: [
 				{ tag: "明るい", count: 5 },
@@ -65,10 +70,7 @@ function setup() {
 	});
 	const view = render(
 		<QueryClientProvider client={cache}>
-			<MusicArtifact
-				client={api as never}
-				definition={playlistArtifactDefinition("one")}
-			/>
+			<MusicArtifact client={api as never} definition={definition} />
 		</QueryClientProvider>,
 	);
 	return { ...view, api, cache };
@@ -111,6 +113,60 @@ test("shared JSON composes controls, playlist and same-origin authenticated stre
 			expect.any(AbortSignal),
 		),
 	);
+});
+test("the shared playlist screen can search the authorized library without saved selections", async () => {
+	const r = setup(playlistArtifactDefinition(), false);
+	await screen.findByRole("button", { name: "再生" });
+	fireEvent.change(screen.getByLabelText("検索"), { target: { value: "b" } });
+	fireEvent.click(screen.getByRole("button", { name: "検索する" }));
+	await screen.findByRole("button", { name: /保存曲b.*0:30/ });
+	expect(r.api.updateMusicPlaylist).not.toHaveBeenCalled();
+});
+test("saved playlists switch inside one shared screen and retain separate filters and selections", async () => {
+	const r = setup(playlistArtifactDefinition());
+	await screen.findByRole("button", { name: "再生" });
+	const original = (await r.api.musicPlaylists())[0]!;
+	r.cache.setQueryData(
+		["music", "playlists", "main"],
+		[
+			{
+				...original,
+				id: "two",
+				title: "2つ目",
+				createdAt: 2,
+				updatedAt: 2,
+				query: trackQuery.parse({ q: "b" }),
+				currentId: "b",
+			},
+			original,
+		],
+	);
+	await waitFor(() =>
+		expect((screen.getByLabelText("検索") as HTMLInputElement).value).toBe("b"),
+	);
+	await waitFor(() =>
+		expect(r.container.querySelector("audio")?.getAttribute("src")).toBe(
+			"/api/music/tracks/b/audio",
+		),
+	);
+	fireEvent.change(screen.getByLabelText("保存したプレイリスト"), {
+		target: { value: "one" },
+	});
+	await waitFor(() =>
+		expect((screen.getByLabelText("検索") as HTMLInputElement).value).toBe(""),
+	);
+	await waitFor(() =>
+		expect(r.container.querySelector("audio")?.getAttribute("src")).toBe(
+			"/api/music/tracks/a/audio",
+		),
+	);
+	expect(r.container.querySelectorAll(".music-workspace")).toHaveLength(1);
+});
+test("an unknown persisted playlist never loads the track library", async () => {
+	const r = setup(playlistArtifactDefinition("missing"));
+	await screen.findByRole("alert");
+	expect(r.api.musicTracks).not.toHaveBeenCalled();
+	expect(r.api.musicTrack).not.toHaveBeenCalled();
 });
 test("favorite and destructive delete have separate actions and refresh tags", async () => {
 	const r = setup();

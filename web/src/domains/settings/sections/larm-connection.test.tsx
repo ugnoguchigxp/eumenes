@@ -55,6 +55,30 @@ test("while the provider details are unknown, only the form and the check button
 	).toBe(false);
 });
 
+test.each(["ornith1.5Strix", "ornith1.5Strix-64k", "SAAA-gemma4-26b"])(
+	"profile input accepts %s without replacing the selected value",
+	(profile) => {
+		setup({
+			mutate: (s) => {
+				s.larm.profile = profile;
+			},
+		});
+		expect((screen.getByLabelText("Profile") as HTMLInputElement).value).toBe(
+			profile,
+		);
+		cleanup();
+		const { draft } = setup({
+			mutate: (s) => {
+				s.larm.profile = "original-profile";
+			},
+		});
+		fireEvent.change(screen.getByLabelText("Profile"), {
+			target: { value: profile },
+		});
+		expect(draft.larm.profile).toBe(profile);
+	},
+);
+
 test("the configured URL and each provider the LARM reports are listed", () => {
 	setup({
 		mutate: (s) => {

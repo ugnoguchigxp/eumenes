@@ -16,11 +16,34 @@ const finish = z
 	.object({ action: z.literal("finish"), report: researchReport })
 	.strict();
 export const researchAction = z.discriminatedUnion("action", [invoke, finish]);
+/** Refs of the requirement catalog the sub-agent applies; chosen once, at the first step. */
+const profileRefs = z
+	.array(z.string().regex(/^p[1-9][0-9]*$/))
+	.max(4)
+	.optional();
 export const firstResearchAction = z.discriminatedUnion("action", [
-	invoke.extend({ requirements: z.array(requestRequirement).min(1).max(12) }),
-	finish.extend({ requirements: z.array(requestRequirement).min(1).max(12) }),
+	invoke.extend({
+		requirements: z.array(requestRequirement).min(1).max(12),
+		requirementProfiles: profileRefs,
+	}),
+	finish.extend({
+		requirements: z.array(requestRequirement).min(1).max(12),
+		requirementProfiles: profileRefs,
+	}),
 ]);
-const findings = draftReportBase.omit({ checks: true, externalRules: true });
+const findings = draftReportBase
+	.omit({ checks: true, externalRules: true })
+	.extend({
+		/** Optional: a fetch procedure worth keeping, judged by the host before it is saved. */
+		recipe: z
+			.object({
+				signature: z.string().trim().min(1).max(200),
+				url: z.string().max(2048),
+				readHint: z.string().trim().min(1).max(200),
+			})
+			.strict()
+			.optional(),
+	});
 export const searchReport = z.discriminatedUnion("outcome", [
 	findings.extend({
 		outcome: z.enum(["answered", "partial"]),

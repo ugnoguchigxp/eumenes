@@ -319,9 +319,10 @@ export const DropdownMenu: React.FC<IDropdownMenuProps> = React.memo(
 							className="rounded-md border border-border bg-background shadow-lg"
 						>
 							<div className="py-[var(--ui-component-padding-y)]">
-								{items.map((item) => (
+								{items.map((item, index) => (
 									<button
-										key={item.label}
+										// Labels may repeat, so the position keeps keys unique.
+										key={`${index}:${item.label}`}
 										type="button"
 										role="menuitem"
 										onClick={() => handleItemClick(item)}

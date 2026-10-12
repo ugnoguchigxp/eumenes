@@ -5,6 +5,8 @@ import { builtins } from "../builtin/web-research";
 import { dotsBuiltins } from "../builtin/dots";
 import { historyBuiltins } from "../builtin/history";
 import { timerBuiltins } from "../builtin/timers";
+import { toolchainBuiltins } from "../builtin/toolchains";
+import { getLogger } from "../../../infrastructure/logger";
 function isSupersededBuiltin(d: (typeof builtins)[number]) {
 	return builtins.some(
 		(next) =>
@@ -38,4 +40,26 @@ export function seedBuiltins(
 		for (const d of historyBuiltins) registerBuiltinInTransaction(db, d);
 	if (backends.has("timer"))
 		for (const d of timerBuiltins) registerBuiltinInTransaction(db, d);
+	// A toolchain is offered only when its whole package is registered on this host.
+	for (const d of toolchainBuiltins) {
+		if (
+			!db
+				.query("SELECT 1 FROM capability_revisions WHERE id=?")
+				.get(d.packageRevisionId!)
+		)
+			continue;
+		const name = "capabilities_toolchain";
+		db.exec(`SAVEPOINT ${name}`);
+		try {
+			registerBuiltinInTransaction(db, d);
+			db.exec(`RELEASE ${name}`);
+		} catch (e) {
+			db.exec(`ROLLBACK TO ${name}`);
+			db.exec(`RELEASE ${name}`);
+			getLogger("capabilities").warn("toolchain.registration_failed", {
+				subjectId: `toolchain:${d.id}@${d.revision}`,
+				reason: e instanceof Error ? e.message : "unknown",
+			});
+		}
+	}
 }

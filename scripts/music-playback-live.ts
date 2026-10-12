@@ -122,8 +122,8 @@ const model: LarmPort = process.argv.includes("--fixture-planning")
 					options.onToolCalls!([
 						{
 							id: "playback",
-							name: "open_music_library",
-							arguments: JSON.stringify({ question: "保存曲のライブラリ" }),
+							name: "music_library",
+							arguments: JSON.stringify({ request: "保存曲のライブラリ" }),
 						},
 					]);
 					return "";

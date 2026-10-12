@@ -1,0 +1,141 @@
+{
+  "date": "2026-10-12T11:59:32.755Z",
+  "savedSettingsPreserved": true,
+  "events": [
+    {
+      "id": "aconn_epoch-18d96c1a-f9b9-407f-b818-e9cdcb538b2f_8e981dcb-9866-48df-b136-91d36abe4ce3",
+      "profile": "ornith1.5Strix",
+      "status": "pending",
+      "phase": "deploying",
+      "http": 202
+    },
+    {
+      "id": "aconn_epoch-18d96c1a-f9b9-407f-b818-e9cdcb538b2f_8e981dcb-9866-48df-b136-91d36abe4ce3",
+      "profile": "ornith1.5Strix",
+      "status": "probing",
+      "phase": "probing",
+      "http": 200
+    },
+    {
+      "id": "aconn_epoch-18d96c1a-f9b9-407f-b818-e9cdcb538b2f_8e981dcb-9866-48df-b136-91d36abe4ce3",
+      "profile": "ornith1.5Strix",
+      "status": "ready",
+      "phase": "ready",
+      "http": 200
+    },
+    {
+      "id": "aconn_epoch-18d96c1a-f9b9-407f-b818-e9cdcb538b2f_ae56f365-bc2b-41f1-a992-1fd1a6112767",
+      "profile": "ornith1.5Strix-64k",
+      "status": "ready",
+      "phase": "ready",
+      "http": 201
+    },
+    {
+      "id": "aconn_epoch-18d96c1a-f9b9-407f-b818-e9cdcb538b2f_87fe0cb8-b844-43a7-80f1-547146412f73",
+      "profile": "ornith1.5Strix-64k",
+      "status": "ready",
+      "phase": "ready",
+      "http": 201
+    },
+    {
+      "id": "aconn_epoch-18d96c1a-f9b9-407f-b818-e9cdcb538b2f_53756d3b-7fd3-4780-bff2-8eb85c837f8c",
+      "profile": "ornith1.5Strix-64k",
+      "status": "ready",
+      "phase": "ready",
+      "http": 201
+    },
+    {
+      "id": "aconn_epoch-18d96c1a-f9b9-407f-b818-e9cdcb538b2f_194c7877-8f37-4850-9971-ba3294de2319",
+      "profile": "ornith1.5Strix-64k",
+      "status": "pending",
+      "phase": "waiting-capacity",
+      "http": 202
+    },
+    {
+      "id": "aconn_epoch-18d96c1a-f9b9-407f-b818-e9cdcb538b2f_194c7877-8f37-4850-9971-ba3294de2319",
+      "profile": "ornith1.5Strix-64k",
+      "status": "ready",
+      "phase": "ready",
+      "http": 200
+    },
+    {
+      "id": "aconn_epoch-18d96c1a-f9b9-407f-b818-e9cdcb538b2f_c3780e28-0669-402e-b86b-018115539bd0",
+      "profile": "ornith1.5Strix",
+      "status": "ready",
+      "phase": "ready",
+      "http": 201
+    }
+  ],
+  "providers": [
+    {
+      "name": "llm",
+      "model": "ornith-1.5-strix-lean",
+      "connected": true
+    },
+    {
+      "name": "asr",
+      "model": "granite-speech-4.1-2b",
+      "connected": true
+    },
+    {
+      "name": "tts",
+      "model": "voicevox-core",
+      "connected": true
+    },
+    {
+      "name": "tts-english",
+      "model": "kitten-tts-nano-0.8-fp32",
+      "connected": true
+    },
+    {
+      "language": "ja",
+      "bytes": 79404,
+      "classified": true
+    },
+    {
+      "language": "en",
+      "bytes": 170044,
+      "classified": true
+    }
+  ],
+  "responses": [
+    {
+      "index": 3,
+      "model": "ornith-1.5-strix-lean",
+      "finishReason": "stop",
+      "characters": 9
+    },
+    {
+      "index": 1,
+      "model": "ornith-1.5-strix-lean",
+      "finishReason": "stop",
+      "characters": 9
+    },
+    {
+      "index": 0,
+      "model": "ornith-1.5-strix-lean",
+      "finishReason": "stop",
+      "characters": 9
+    },
+    {
+      "index": 2,
+      "model": "ornith-1.5-strix-lean",
+      "finishReason": "stop",
+      "characters": 9
+    },
+    {
+      "index": 4,
+      "model": "ornith-1.5-strix-lean",
+      "finishReason": "stop",
+      "characters": 8
+    }
+  ],
+  "fifthWaitedWithoutInference": true,
+  "fourConcurrentResponses": true,
+  "fifthUsedReleasedSlot": true,
+  "historiesIsolated": true,
+  "result": "failed",
+  "error": "larm_inference_422",
+  "createdConnections": 6,
+  "releasedConnections": 6
+}

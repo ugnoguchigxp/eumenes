@@ -1,7 +1,13 @@
 import { readChatResponse } from "../../../infrastructure/chat-stream";
 import { readBounded } from "../../../infrastructure/bounded-read";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
-import type { SettingsService, Connection, Resource } from "../../settings";
+import {
+	isAgentConnection,
+	type SettingsService,
+	type Connection,
+	type Resource,
+} from "../../settings";
+import type { CloudAgentKind, CloudAgents } from "../adapters/cloud-agents";
 import type { Messages } from "../contracts";
 import type { RequestRow } from "../repository";
 
@@ -9,6 +15,7 @@ export type CloudEnv = {
 	store: SqliteStore;
 	settings: Pick<SettingsService, "credential">;
 	fetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+	agents?: CloudAgents;
 };
 
 function bounded(response: Response, limit: number) {
@@ -17,6 +24,78 @@ function bounded(response: Response, limit: number) {
 		tooLarge: "response_too_large",
 		missing: "invalid_response",
 	});
+}
+
+/** Drops the oldest turns (after the first message) until the estimate fits the window. */
+function fitMessages(row: RequestRow, resource: Resource, input: Messages) {
+	const messages = [...input];
+	const reserve = Math.min(4096, Math.floor((resource.contextWindow ?? 0) / 4));
+	const budget = (resource.contextWindow ?? 0) - reserve - 512;
+	const estimate = () =>
+		new TextEncoder().encode(JSON.stringify(messages)).length +
+		messages.length * 16;
+	while (
+		row.contextPolicy !== "exact" &&
+		messages.length > 2 &&
+		estimate() > budget
+	)
+		messages.splice(1, Math.min(2, messages.length - 2));
+	if (estimate() > budget) throw new Error("context_window_exceeded");
+	return { messages, reserve };
+}
+
+async function recordUsage(
+	env: CloudEnv,
+	attemptId: string,
+	input: unknown,
+	output: unknown,
+) {
+	const count = (v: unknown) =>
+		typeof v === "number" && Number.isSafeInteger(v) && v >= 0 ? v : null;
+	await env.store.write((db) =>
+		db
+			.query(
+				"UPDATE inference_attempts SET input_tokens=?,output_tokens=? WHERE id=?",
+			)
+			.run(count(input), count(output), attemptId),
+	);
+}
+
+/** An agent SDK connection (Codex / Claude Agent SDK / Managed Agents) answering one LLM turn. */
+async function agentRequest(
+	env: CloudEnv,
+	row: RequestRow,
+	input: Messages,
+	connection: Connection,
+	resource: Resource,
+	credential: string | null,
+	signal: AbortSignal,
+	attemptId: string,
+	onDelta?: (text: string) => void,
+	options?: import("../../larm").LarmCallOptions,
+) {
+	if (row.purpose !== "llm") throw new Error("cloud_agent_purpose_unsupported");
+	if (!env.agents) throw new Error("cloud_agent_unavailable");
+	const result = await env.agents.run({
+		kind: connection.kind as CloudAgentKind,
+		model: resource.model,
+		baseUrl: connection.baseUrl,
+		credential,
+		agentId: connection.agentId,
+		environmentId: connection.environmentId,
+		messages: fitMessages(row, resource, input).messages,
+		tools: options?.tools,
+		signal,
+		onDelta,
+	});
+	signal.throwIfAborted();
+	if (result.toolCalls?.length) {
+		if (!options?.tools?.length || !options.onToolCalls)
+			throw new Error("chat_tool_calls_unexpected");
+		options.onToolCalls(result.toolCalls);
+	}
+	await recordUsage(env, attemptId, result.inputTokens, result.outputTokens);
+	return result.text;
 }
 
 /** One cloud provider call (LLM/ASR/TTS); usage is recorded on the attempt. */
@@ -32,6 +111,19 @@ export async function cloudRequest(
 	options?: import("../../larm").LarmCallOptions,
 ) {
 	const credential = env.settings.credential(connection);
+	if (isAgentConnection(connection))
+		return agentRequest(
+			env,
+			row,
+			input as Messages,
+			connection,
+			resource,
+			credential,
+			signal,
+			attemptId,
+			onDelta,
+			options,
+		);
 	if (!credential) throw new Error("cloud_credential_unavailable");
 	const base = new URL(
 		connection.baseUrl.endsWith("/")
@@ -65,22 +157,11 @@ export async function cloudRequest(
 				response_format: "wav",
 			};
 		else {
-			const messages = [...(input as Messages)];
-			const reserve = Math.min(
-				4096,
-				Math.floor((resource.contextWindow ?? 0) / 4),
+			const { messages, reserve } = fitMessages(
+				row,
+				resource,
+				input as Messages,
 			);
-			const budget = (resource.contextWindow ?? 0) - reserve - 512;
-			const estimate = () =>
-				new TextEncoder().encode(JSON.stringify(messages)).length +
-				messages.length * 16;
-			while (
-				row.contextPolicy !== "exact" &&
-				messages.length > 2 &&
-				estimate() > budget
-			)
-				messages.splice(1, Math.min(2, messages.length - 2));
-			if (estimate() > budget) throw new Error("context_window_exceeded");
 			body = {
 				model: resource.model,
 				messages,
@@ -116,19 +197,12 @@ export async function cloudRequest(
 				throw new Error("chat_tool_calls_unexpected");
 			options.onToolCalls(result.toolCalls);
 		}
-		const count = (v: unknown) =>
-			typeof v === "number" && Number.isSafeInteger(v) && v >= 0 ? v : null;
 		signal.throwIfAborted();
-		await env.store.write((db) =>
-			db
-				.query(
-					"UPDATE inference_attempts SET input_tokens=?,output_tokens=? WHERE id=?",
-				)
-				.run(
-					count(result.usage?.prompt_tokens),
-					count(result.usage?.completion_tokens),
-					attemptId,
-				),
+		await recordUsage(
+			env,
+			attemptId,
+			result.usage?.prompt_tokens,
+			result.usage?.completion_tokens,
 		);
 		return result.text;
 	}
@@ -171,18 +245,11 @@ export async function cloudRequest(
 		| { prompt_tokens?: unknown; completion_tokens?: unknown }
 		| undefined;
 	signal.throwIfAborted();
-	const count = (v: unknown) =>
-		typeof v === "number" && Number.isSafeInteger(v) && v >= 0 ? v : null;
-	await env.store.write((db) =>
-		db
-			.query(
-				"UPDATE inference_attempts SET input_tokens=?,output_tokens=? WHERE id=?",
-			)
-			.run(
-				count(usage?.prompt_tokens),
-				count(usage?.completion_tokens),
-				attemptId,
-			),
+	await recordUsage(
+		env,
+		attemptId,
+		usage?.prompt_tokens,
+		usage?.completion_tokens,
 	);
 	return value;
 }

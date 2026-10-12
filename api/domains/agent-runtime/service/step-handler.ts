@@ -87,8 +87,10 @@ export function createStepHandler(ctx: RuntimeContext, ops: TaskOps) {
 						: "research";
 				const search = returnsSearchResults(p);
 				const frozen = search ? null : readRequirements(db, t, capabilities);
-				const profiles = (JSON.parse(t.input_json ?? "{}")
-					.requirementProfiles ?? []) as ProfileSnapshot[];
+				// After the first step the contract holds the profiles the sub-agent chose.
+				const profiles = (frozen?.contract.profiles ??
+					JSON.parse(t.input_json ?? "{}").requirementProfiles ??
+					[]) as ProfileSnapshot[];
 				capabilities.validateRequirementProfilesInTransaction(db, profiles);
 				const context =
 					mode === "verify_requirements"

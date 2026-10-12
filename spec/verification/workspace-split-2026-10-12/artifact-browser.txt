@@ -1,0 +1,9 @@
+
+Running 2 tests using 1 worker
+
+(node:80601) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 tests/browser/artifact-showcase.spec.ts:106:1 › workspace boundary resizes with drag and keyboard, preserves drafts and disappears with the last artifact (2.4s)
+  ✓  2 tests/browser/artifact-showcase.spec.ts:673:1 › tabs use keyboard navigation; only the body has p-2 and closing the last tab removes the pane (1.5s)
+
+  2 passed (5.5s)

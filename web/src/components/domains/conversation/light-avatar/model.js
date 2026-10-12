@@ -1,5 +1,5 @@
 // @ts-check
-// "three" is intentionally untyped here (see three.d.ts); these aliases document intent.
+// Model-local aliases remain loose; Three.js itself uses its published type definitions.
 /** @typedef {any} ThreeColor A color accepted by THREE.Color. */
 /** @typedef {any} ThreeObject A THREE.Object3D / Vector3 / Curve instance. */
 import * as THREE from "three";
@@ -132,7 +132,7 @@ export function createLightAvatar(host) {
 			position,
 			size,
 			color,
-		] of /** @type {[number[], number[], number[]][]} */ ([
+		] of /** @type {[[number, number, number], [number, number], [number, number, number]][]} */ ([
 			[
 				[-3, 1, 3],
 				[1.1, 5.8],
@@ -236,8 +236,8 @@ export function createLightAvatar(host) {
 			foldGlass = pearlMaterial(true),
 			armGlass = pearlMaterial(true, false);
 		const baseSpiritCompile = spiritGlass.onBeforeCompile;
-		spiritGlass.onBeforeCompile = (/** @type {any} */ shader) => {
-			baseSpiritCompile(shader);
+		spiritGlass.onBeforeCompile = (/** @type {any} */ shader, renderer) => {
+			baseSpiritCompile(shader, renderer);
 			shader.vertexShader =
 				"varying float vTorsoHeight;\n" + shader.vertexShader;
 			shader.vertexShader = shader.vertexShader.replace(
@@ -711,7 +711,7 @@ export function createLightAvatar(host) {
 								[side * 0.59, 1.14, 0.44],
 							];
 					const vectors = points.map((p) => new THREE.Vector3(...p)),
-						shoulder = vectors[0].clone();
+						shoulder = /** @type {THREE.Vector3} */ (vectors[0]).clone();
 					arm.position.copy(shoulder);
 					vectors.forEach((p) => p.sub(shoulder));
 					const curve = new THREE.CatmullRomCurve3(vectors),
@@ -791,7 +791,7 @@ export function createLightAvatar(host) {
 						);
 					arm.add(dust);
 					const tip = glow(palettes.gold, isOuter ? 0.135 : 0.105);
-					tip.position.copy(vectors.at(-1));
+					tip.position.copy(/** @type {THREE.Vector3} */ (vectors.at(-1)));
 					arm.add(tip);
 					arm.userData.tip = tip;
 					arm.userData.tipRest = tip.position.clone();
@@ -866,7 +866,10 @@ export function createLightAvatar(host) {
 					Math.sin(angle) * r * 0.68,
 					gaussian() * 0.018,
 				);
-				p.applyAxisAngle(new THREE.Vector3(1, 0, 0), [0.45, -0.65, 1.2][lane]);
+				p.applyAxisAngle(
+					new THREE.Vector3(1, 0, 0),
+					/** @type {number} */ ([0.45, -0.65, 1.2][lane]),
+				);
 				p.applyAxisAngle(new THREE.Vector3(0, 0, 1), lane * 0.75);
 				p.add(center);
 				list.push([p.x, p.y, p.z]);
@@ -889,7 +892,7 @@ export function createLightAvatar(host) {
 						p = new THREE.Vector3(Math.cos(a) * r, Math.sin(a) * r * 0.66, 0);
 					p.applyAxisAngle(
 						new THREE.Vector3(1, 0, 0),
-						[0.45, -0.65, 1.2][lane],
+						/** @type {number} */ ([0.45, -0.65, 1.2][lane]),
 					);
 					p.applyAxisAngle(new THREE.Vector3(0, 0, 1), lane * 0.75);
 					p.add(center);
@@ -937,13 +940,14 @@ export function createLightAvatar(host) {
 			quadCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1),
 			quad = new THREE.Mesh(own(new THREE.PlaneGeometry(2, 2)));
 		quadScene.add(quad);
+		const blurUniforms = {
+			uTexture: { value: /** @type {THREE.Texture | null} */ (null) },
+			uDirection: { value: new THREE.Vector2(1, 0) },
+			uThreshold: { value: 0 },
+		};
 		const blur = own(
 			new THREE.ShaderMaterial({
-				uniforms: {
-					uTexture: { value: null },
-					uDirection: { value: new THREE.Vector2(1, 0) },
-					uThreshold: { value: 0 },
-				},
+				uniforms: blurUniforms,
 				vertexShader: `varying vec2 vUv;void main(){vUv=uv;gl_Position=vec4(position.xy,0.,1.);}`,
 				fragmentShader: `uniform sampler2D uTexture;uniform vec2 uDirection;uniform float uThreshold;varying vec2 vUv;vec3 read(vec2 uv){vec3 c=texture2D(uTexture,uv).rgb;return max(vec3(0.),c-vec3(uThreshold));}void main(){vec3 c=read(vUv)*.227027;c+=read(vUv+uDirection*1.384615)*.316216;c+=read(vUv-uDirection*1.384615)*.316216;c+=read(vUv+uDirection*3.230769)*.07027;c+=read(vUv-uDirection*3.230769)*.07027;gl_FragColor=vec4(c,1.);}`,
 			}),
@@ -1122,14 +1126,14 @@ export function createLightAvatar(host) {
 			renderer.setRenderTarget(base);
 			renderer.render(scene, camera);
 			quad.material = blur;
-			blur.uniforms.uTexture.value = base.texture;
-			blur.uniforms.uDirection.value.set(2.2 / ping.width, 0);
-			blur.uniforms.uThreshold.value = 0.24;
+			blurUniforms.uTexture.value = base.texture;
+			blurUniforms.uDirection.value.set(2.2 / ping.width, 0);
+			blurUniforms.uThreshold.value = 0.24;
 			renderer.setRenderTarget(ping);
 			renderer.render(quadScene, quadCamera);
-			blur.uniforms.uTexture.value = ping.texture;
-			blur.uniforms.uDirection.value.set(0, 2.2 / pong.height);
-			blur.uniforms.uThreshold.value = 0;
+			blurUniforms.uTexture.value = ping.texture;
+			blurUniforms.uDirection.value.set(0, 2.2 / pong.height);
+			blurUniforms.uThreshold.value = 0;
 			renderer.setRenderTarget(pong);
 			renderer.render(quadScene, quadCamera);
 			quad.material = combine;

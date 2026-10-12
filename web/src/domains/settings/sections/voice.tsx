@@ -1,3 +1,4 @@
+import { updateVoiceCharacter } from "./voice-character";
 import { VoiceDevices } from "./voice-devices";
 import type { UseQueryResult } from "@tanstack/react-query";
 import type { Usage } from "../../../../../client/settings";
@@ -64,29 +65,8 @@ export function VoiceSection({
 		(v) => v.id === (value.larm.voice || voiceCatalog.default_voice),
 	);
 	const voicevox = voiceCatalog?.model === "voicevox-core";
-	function selectCharacter(id: string) {
-		const selected = voiceCatalog?.voices.find(
-			(v) => v.id === (id || voiceCatalog.default_voice),
-		);
-		change((s) => {
-			s.larm.voice = id;
-			s.larm.style = selected?.default_style;
-			for (const [field, capability] of [
-				["speed", "speed"],
-				["pitchScale", "pitch_scale"],
-				["intonationScale", "intonation_scale"],
-			] as const) {
-				const range = selected?.capabilities[capability];
-				const current = s.larm[field];
-				if (
-					range &&
-					current !== undefined &&
-					(current < range.minimum || current > range.maximum)
-				)
-					s.larm[field] = range.default;
-			}
-		});
-	}
+	const selectCharacter = (id: string) =>
+		updateVoiceCharacter(id, voiceCatalog, change);
 	const speechCredit =
 		usage.data
 			?.filter((u) => u.purpose === "tts" && u.accepted && u.source === "larm")

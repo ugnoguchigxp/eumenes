@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { conversationOutput } from "../service/conversation-output";
-import { conversationTools } from "../service/conversation-tools";
+import { toolchainTools } from "../service/conversation-tools";
 
 const leaked =
 	'create_music{question:<|"|>夜にふさわしい、しっとりとした落ち着いた雰囲気の楽曲。2分間。<|"|>}';
@@ -25,8 +25,18 @@ for (const text of [
 		});
 
 test("offered function names are checked without adding a scenario or name-specific rule", () => {
-	const tools = conversationTools(false);
-	tools[0]!.function.name = "another_action";
+	const tools = toolchainTools([
+		{
+			revisionId: "toolchain:custom@1",
+			id: "custom",
+			functionName: "another_action",
+			title: "custom",
+			summary: "custom",
+			useWhen: ["custom"],
+			redirects: [],
+			score: { rank: 1, ftsRank: null, similarity: null, fromHistory: false },
+		},
+	]);
 	const visible: string[] = [];
 	const output = conversationOutput((s) => visible.push(s), tools);
 	for (const c of 'another_action {"value":"x"}') output.delta(c);

@@ -1,0 +1,62 @@
+[
+	{
+		"id": "settings-hub",
+		"title": "薄い設定入口",
+		"description": "Show a small settings launcher panel over a calm conversation workspace, not a full page. Title 設定, a search box 設定項目を探す. Two groups: 使い方を変える with 会話, 音声と入力, 表示, AIと接続, 外部作業; 管理と確認 with 記憶, 読み方辞書, 予約, 委任した作業, 動作確認, 記録. Small summary 会話 LARM / 読み上げ LARM, and subtle bottom link 未適用の変更 3件. No editable values in this launcher."
+	},
+	{
+		"id": "conversation",
+		"title": "会話",
+		"description": "Artifact title 会話. One clean section 名前と口調, three labeled controls AIの名前, あなたの名前, 口調. Blank names with placeholders 未設定, dropdown selected 参謀 and a short hint 次の返答から反映. Generous quiet space beneath the three fields. Bottom subtle status 未適用の変更 and a secondary button 変更一覧を開く. No language selector, no models, no API credentials."
+	},
+	{
+		"id": "appearance",
+		"title": "表示",
+		"description": "Artifact title 表示. Theme control テーマ with 端末に合わせる, ライト, ダーク. Two modest background choice tiles 会話の背景 with 光の妖精 and Spatial; use abstract neutral miniature swatches, no new illustration. Toggle 読み上げ字幕を表示 on. Below show 字幕のデザイン selection ガラス and 字幕の大きさ selection 中. A compact preview panel containing これは字幕のプレビューです. Bottom 未適用の変更 and 変更一覧を開く. No unsupported color palette or uploads."
+	},
+	{
+		"id": "voice-input",
+		"title": "音声と入力",
+		"description": "Artifact title 音声と入力. Three subtabs 読み上げ, 聞き取り, 機器, with 読み上げ selected. Toggle 回答を読み上げる, slider 読み上げ音量 80%, toggle 話し始めたら止める. Read-only summary 利用先 LARM and text link 利用先を変更. Voice dropdown 声 春日部つむぎ and standard speed slider 速さ 1.0. Two compact actions 試聴 and 詳細設定. One unobtrusive hint 英語の声は自動で切り替わります. No English voice selector or English speed control. Bottom 未適用の変更, 変更一覧を開く."
+	},
+	{
+		"id": "ai-connections",
+		"title": "AIと接続",
+		"description": "Artifact title AIと接続. Subtabs 利用するAI and 登録した接続. 利用するAI selected. Three tidy stacked rows 会話, 聞き取り, 読み上げ. Each has a mode selector LARMを優先, cloud target selector 未登録, and toggle クラウドへの送信を許可. Under rows a summary LARM / SAAA-gemma4-26b, secondary 接続を追加. Show guidance 未登録の用途はクラウドへ送信しません. Bottom 未適用の変更 and 変更一覧を開く. Do not put any voice controls here."
+	},
+	{
+		"id": "external-work",
+		"title": "外部作業の設定",
+		"description": "Artifact title 作業するプロジェクト. Scoped individual editor with project chooser サンプルプロジェクト. Fields 名前, 接続 dots, 担当 標準の調整担当, 実行場所 ローカル, toggle 利用する. Section 任せてよい操作 with checkbox rows 参照, 新しい作業, 続行, 編集, 検証, コミット, プッシュ, 公開, 外部への送信; only first five checked. Collapsed 詳細設定. A scoped primary action このプロジェクトを保存, small label プロジェクトごとに保存. No global apply button, no key values."
+	},
+	{
+		"id": "memory",
+		"title": "記憶",
+		"description": "Artifact title 記憶. Subtabs 会話で使う記憶 and 覚えている事実. First selected. One clean status card 会話への接続, state 接続中, hint 保存した情報を回答の参考にします. Buttons メモリーを切断 and 接続状態を読み直す. Secondary plain note 切断しても記憶は残ります. A separate navigation card 覚えている事実 with small preview list 好み / 根拠・履歴 and 開く. No all-memory delete, no World enable toggle, no global apply. Small status 切替はすぐに反映."
+	},
+	{
+		"id": "dictionary",
+		"title": "読み方辞書",
+		"description": "Artifact title 読み方辞書. Search 辞書を検索. A compact editable table with columns 文字, 読み方, 操作. Three sample rows Eumenes / ユーメネス, LARM / ラーム, API / エーピーアイ, each with small 保存 and 削除. One blank new row with 追加. Pagination 前へ, 1 / 1, 次へ at bottom. Visible hint 行ごとに保存します. No global apply, no language classification controls."
+	},
+	{
+		"id": "schedule",
+		"title": "予約",
+		"description": "Artifact title 予約. List-first layout. Top right primary 予約を追加. Two neutral example cards 毎朝の予定確認 with state 有効 and next time 明日 9:00, 読書の振り返り with state 一時停止. Each row shows one-time or interval info and scoped actions 一時停止 or 再開, 今後の予約を取消, 実行履歴. Bottom hint Eumenesが起動している間に実行します. No calendar grid, no monthly scheduling, no global apply button."
+	},
+	{
+		"id": "delegated-tasks",
+		"title": "委任した作業",
+		"description": "Artifact title 委任した作業. List on the left inside artifact with two neutral sample tasks 表示の調整 state 回答待ち and 設定の確認 state 作業中. Selected task detail on right, heading 表示の調整, simple project summary サンプルプロジェクト. Question box 希望する表示を教えてください, textarea, primary 回答して続行. Secondary 一時停止 and 取消. Collapsed Sessionと根拠. Top action 作業を依頼. No shared settings save controls or fabricated progress percentages."
+	},
+	{
+		"id": "records",
+		"title": "記録",
+		"description": "Artifact title 記録. Tabs AIの利用, 作業の選択記録, 取得手順. AIの利用 selected. Table columns 用途, 利用先, 結果, 切替理由, トークン. Rows 会話 LARM 採用済み — 不明; 読み上げ LARM 採用済み — 不明; 聞き取り LARM 採用済み — 不明. Compact secondary 診断データを保存. Collapsed 保存と送信. Hint 直近100件. No cost forecast, billing figures, invented charts, or global apply."
+	},
+	{
+		"id": "changes",
+		"title": "設定の変更一覧",
+		"description": "Artifact title 設定の変更一覧. Heading 未適用の変更 3件. Three grouped diff rows 会話 / 口調 執事 → 参謀; 表示 / 背景 光の妖精 → Spatial; AIと接続 / 認証情報 キーを更新予定. Each has 戻って編集. Never show a key value. Explain この一覧の設定変更をまとめて適用します. Scoped primary 設定の変更をすべて適用 and secondary 未適用の設定変更をすべて破棄. Small note 予約や辞書の保存は含みません. No arbitrary JSON or SQL."
+	}
+]

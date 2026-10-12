@@ -3,7 +3,6 @@ import { createDotsDialogue } from "./dots-dialogue";
 import { createDotsTasks } from "./dots-tasks";
 import { registerDots } from "./dots-http";
 import { createEvents, createSecretBox } from "../domains/dots";
-import type { Database } from "bun:sqlite";
 import { createCodingSupervision } from "../domains/coding-supervision";
 import { codingObservationReader } from "./coding-observation";
 import { createTaskReports } from "../domains/task-reports";
@@ -14,8 +13,9 @@ import {
 } from "./coding-supervision";
 import { createMusic } from "../domains/music";
 import { createLarmPlayground } from "../domains/larm";
+import { larmEmbedder } from "./larm-embedder";
+import { createToolchainRouting } from "./toolchain-routing";
 import { createToolchain } from "./toolchain";
-import { createOperations } from "../domains/research-routes";
 import {
 	createAttitudeDataset,
 	openAttitudeStore,
@@ -25,7 +25,11 @@ import { configureLogging, getLogger } from "../infrastructure/logger";
 import { createConversationService } from "../domains/conversation";
 import { createDialogueService } from "../domains/dialogue";
 import { createSettings } from "../domains/settings";
-import { createInference, createCodexResearch } from "../domains/inference";
+import {
+	createInference,
+	createCodexResearch,
+	createCloudAgents,
+} from "../domains/inference";
 import { createQueue } from "../domains/queue";
 import { createScheduler } from "../domains/scheduler";
 import { createTimers } from "../domains/timers";
@@ -93,6 +97,9 @@ export async function buildServices(config: Config) {
 		codexResearch: config.webResearchToolsEnabled
 			? createCodexResearch(config.env, config.researchCodexExecutable)
 			: undefined,
+		cloudAgents: createCloudAgents(config.env, {
+			codexExecutable: config.researchCodexExecutable,
+		}),
 		token: config.larmToken,
 		providerHosts: config.larmProviderHosts,
 		speechText: ttsDictionary.apply,
@@ -255,6 +262,26 @@ export async function buildServices(config: Config) {
 			dots: true,
 			music: true,
 			webResearch: config.webResearchToolsEnabled,
+			embed: larmEmbedder(
+				() => {
+					const s = settings.get();
+					return createLarmPlayground({
+						baseUrl: s.larm.baseUrl ?? undefined,
+						token: config.larmToken,
+						profile: s.larm.profile,
+						audience: s.larm.audience,
+						providerHosts: config.larmProviderHosts,
+					});
+				},
+				() => {
+					const s = settings.get();
+					return JSON.stringify([
+						s.larm.baseUrl,
+						s.larm.profile,
+						s.larm.audience,
+					]);
+				},
+			),
 		},
 	);
 	const enabled = config.toolchainEnabled;
@@ -293,17 +320,16 @@ export async function buildServices(config: Config) {
 			capabilities: toolchain.capabilities,
 		}),
 		...(world ? { worldContext: world.context } : {}),
+		toolchains: enabled
+			? createToolchainRouting(
+					toolchain.capabilities,
+					toolchain.history,
+					toolchain.embedQuery,
+				)
+			: undefined,
 	});
 	const voice = createVoiceDialogue(store, dialogue, inference);
 	scheduler.registerTarget(dialogue.promptTarget);
-	const researchRoutes = toolchain.routeService
-		? createOperations({
-				routes: toolchain.routeService,
-				store,
-				skills: (db, id) =>
-					toolchain.capabilities.getDefinitionInTransaction(db, id),
-			})
-		: undefined;
 	return {
 		store,
 		changes,
@@ -336,7 +362,6 @@ export async function buildServices(config: Config) {
 		toolchain,
 		dialogue,
 		voice,
-		researchRoutes,
 	};
 }
 export type Services = Awaited<ReturnType<typeof buildServices>>;
@@ -369,7 +394,7 @@ export function appServices(s: Services) {
 			mount: (app: import("hono").Hono) =>
 				registerDots(app, s.dots, s.dotsEvents, s.delegated.tasks),
 		},
-		researchRoutes: s.researchRoutes,
+		toolchainHistory: s.toolchain.history,
 		timers: s.timers,
 		// With World OFF nothing is assembled and the routes do not exist.
 		...(s.world
@@ -395,26 +420,14 @@ export function appServices(s: Services) {
  * web research, dialogue, inference, datasets, store.
  */
 export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
-	const routes = s.toolchain.routeService;
-	const enqueueRouteSweep = (db: Database) =>
-		void routes?.enqueueSweepInTransaction(db, { mode: "ttl" });
-	const routeSweep = routes
-		? intervalLifecycle(
-				"route_sweep",
-				3_600_000,
-				() =>
-					s.store
-						.write((db) => enqueueRouteSweep(db))
-						.catch((error) =>
-							log.warn(
-								"research_routes.sweep_enqueue_failed",
-								{ reason: "enqueue_failed" },
-								error,
-							),
-						),
-				{ exclusive: false },
-			)
-		: undefined;
+	// Toolchain and procedure passages are embedded in the background; retrieval falls back
+	// to full-text search while a vector is missing.
+	const vectorRefresh = intervalLifecycle(
+		"toolchain_vectors",
+		600_000,
+		() => s.toolchain.refreshVectors(),
+		{ exclusive: true },
+	);
 	const reportDelivery = intervalLifecycle("task_report_delivery", 1000, () =>
 		s.store.write(s.deliverTaskReports),
 	);
@@ -539,23 +552,14 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		},
 		{ name: "timers_recovery", recover: () => s.timers.recover() },
 		{ name: "scheduler_recovery", recover: () => s.scheduler.recover() },
-		// Route recovery (interrupt unfinished author/review drafts) precedes every runner.
-		...(routes
-			? [
-					{
-						name: "research_routes_recovery",
-						recover: () =>
-							s.store.write((db) => {
-								routes.recoverInTransaction(db);
-								enqueueRouteSweep(db);
-							}),
-					},
-				]
-			: []),
 		// Start order. Change-feed/forget consumers: commit notification plus a modest poll; they never create inference jobs.
-		...(routeSweep
-			? [{ name: "route_sweep_start", start: () => routeSweep.start?.() }]
-			: []),
+		{
+			name: "toolchain_vectors_start",
+			start: () => {
+				vectorRefresh.start?.();
+				void s.toolchain.refreshVectors();
+			},
+		},
 		{ name: "agents_start", start: () => s.toolchain.agents.start() },
 		{ name: "queue_start", start: () => s.queue.start() },
 		{
@@ -608,7 +612,7 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 				storeRetention.stop();
 				codingHeartbeat.stop();
 				timerMaintenance.stop();
-				routeSweep?.stop();
+				vectorRefresh.stop();
 			},
 		},
 		http,

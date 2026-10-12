@@ -1,0 +1,132 @@
+[
+  {
+    "id": "26a5eea8-b1f2-427b-bf16-f41d58eaa666",
+    "model": "kitten-tts-nano-0.8-fp32",
+    "accepted": 1,
+    "status": "succeeded",
+    "providerDetails": [
+      {
+        "connectionId": "aconn_epoch-09680c28-92db-4388-ab05-a473587ab9b3_c12beec4-b971-413a-9bb5-f38290783e03",
+        "model": "kitten-tts-nano-0.8-fp32",
+        "started": 1791799918707,
+        "httpStatus": 200,
+        "operation": "audio/speech",
+        "speechVoice": "Rosie"
+      }
+    ]
+  },
+  {
+    "id": "95d609c8-1be8-4fe3-9f35-e0c5e39252ac",
+    "model": "kitten-tts-nano-0.8-fp32",
+    "accepted": 1,
+    "status": "succeeded",
+    "providerDetails": [
+      {
+        "connectionId": "aconn_epoch-09680c28-92db-4388-ab05-a473587ab9b3_c12beec4-b971-413a-9bb5-f38290783e03",
+        "model": "kitten-tts-nano-0.8-fp32",
+        "started": 1791799915133,
+        "httpStatus": 200,
+        "operation": "audio/speech",
+        "speechVoice": "Rosie"
+      }
+    ]
+  },
+  {
+    "id": "afc773c4-d3e7-414c-8f54-bf91af65160b",
+    "model": "kitten-tts-nano-0.8-fp32",
+    "accepted": 1,
+    "status": "succeeded",
+    "providerDetails": [
+      {
+        "connectionId": "aconn_epoch-09680c28-92db-4388-ab05-a473587ab9b3_c12beec4-b971-413a-9bb5-f38290783e03",
+        "model": "ruri-v3-30m-sentence-language",
+        "started": 1791799914776,
+        "httpStatus": 200,
+        "operation": "systemone"
+      },
+      {
+        "connectionId": "aconn_epoch-09680c28-92db-4388-ab05-a473587ab9b3_c12beec4-b971-413a-9bb5-f38290783e03",
+        "model": "kitten-tts-nano-0.8-fp32",
+        "started": 1791799914924,
+        "httpStatus": 200,
+        "operation": "audio/speech",
+        "speechVoice": "Rosie"
+      }
+    ]
+  },
+  {
+    "id": "ca82eb97-2efc-429f-8a97-687133c32227",
+    "model": "voicevox-core",
+    "accepted": 1,
+    "status": "succeeded",
+    "providerDetails": [
+      {
+        "connectionId": "aconn_epoch-09680c28-92db-4388-ab05-a473587ab9b3_c12beec4-b971-413a-9bb5-f38290783e03",
+        "model": "voicevox-core",
+        "started": 1791799870152,
+        "httpStatus": 200,
+        "operation": "audio/speech",
+        "speechVoice": "Kenzaki_Mesuo",
+        "speechCredit": "VOICEVOX:剣崎雌雄"
+      }
+    ]
+  },
+  {
+    "id": "f9192ee5-9c09-48c7-96dc-7d58a81f2562",
+    "model": "voicevox-core",
+    "accepted": 1,
+    "status": "succeeded",
+    "providerDetails": [
+      {
+        "connectionId": "aconn_epoch-09680c28-92db-4388-ab05-a473587ab9b3_c12beec4-b971-413a-9bb5-f38290783e03",
+        "model": "voicevox-core",
+        "started": 1791799868841,
+        "httpStatus": 200,
+        "operation": "audio/speech",
+        "speechVoice": "Kenzaki_Mesuo",
+        "speechCredit": "VOICEVOX:剣崎雌雄"
+      }
+    ]
+  },
+  {
+    "id": "784b7c35-658c-4538-b7a9-e0eb5a363d7e",
+    "model": "voicevox-core",
+    "accepted": 1,
+    "status": "succeeded",
+    "providerDetails": [
+      {
+        "connectionId": "aconn_epoch-09680c28-92db-4388-ab05-a473587ab9b3_c12beec4-b971-413a-9bb5-f38290783e03",
+        "model": "voicevox-core",
+        "started": 1791799866994,
+        "httpStatus": 200,
+        "operation": "audio/speech",
+        "speechVoice": "Kenzaki_Mesuo",
+        "speechCredit": "VOICEVOX:剣崎雌雄"
+      }
+    ]
+  },
+  {
+    "id": "68cf08d0-87d8-4a8e-a933-92199dc55df6",
+    "model": "voicevox-core",
+    "accepted": 1,
+    "status": "succeeded",
+    "providerDetails": [
+      {
+        "connectionId": "aconn_epoch-09680c28-92db-4388-ab05-a473587ab9b3_c12beec4-b971-413a-9bb5-f38290783e03",
+        "model": "ruri-v3-30m-sentence-language",
+        "started": 1791799866522,
+        "httpStatus": 200,
+        "operation": "systemone"
+      },
+      {
+        "connectionId": "aconn_epoch-09680c28-92db-4388-ab05-a473587ab9b3_c12beec4-b971-413a-9bb5-f38290783e03",
+        "model": "voicevox-core",
+        "started": 1791799866709,
+        "httpStatus": 200,
+        "operation": "audio/speech",
+        "speechVoice": "Kenzaki_Mesuo",
+        "speechCredit": "VOICEVOX:剣崎雌雄"
+      }
+    ]
+  }
+]

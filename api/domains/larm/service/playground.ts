@@ -1,4 +1,5 @@
 import { createMusicLibrary } from "./music-library";
+import { createProviderAccess } from "./playground-provider";
 import { createHash } from "node:crypto";
 import type {
 	LarmTestTarget,
@@ -274,6 +275,14 @@ export function createLarmPlayground(config: {
 				});
 		}
 	}
+	const { claimed, embed } = createProviderAccess({
+		control,
+		connection,
+		providerUrl,
+		request,
+		profile: config.profile,
+		embeddingPath: paths.embedding ?? "/v1/embed",
+	});
 	async function health(
 		target: LarmTestTarget,
 		signal: AbortSignal,
@@ -524,57 +533,7 @@ export function createLarmPlayground(config: {
 			return musicJob(target, jobId, signal, progress);
 		}
 		return connection(target, signal, async (id) => {
-			const claim = await json(
-				await control(
-					`/v1/agent-connections/${encodeURIComponent(id)}/claim`,
-					signal,
-					post({
-						format:
-							target.kind === "embedding"
-								? "larm-embedding-provider-v1"
-								: "openai-provider-v1",
-					}),
-				),
-			);
-			if (
-				claim.id !== id ||
-				claim.status !== "ready" ||
-				Date.parse(str(claim.expiresAt)) < Date.now() + 10_000
-			)
-				throw new Error("invalid_claim");
-			const p = list(claim.providers).find((x) => x.name === target.name);
-			if (!p || p.model !== target.model || p.protocol !== target.protocol)
-				throw new Error("invalid_claim_binding");
-			const fields = object(object(p.configuration).fields),
-				credential = object(p.credential);
-			if (
-				fields.model !== target.model ||
-				credential.type !== "bearer" ||
-				!(Date.parse(str(credential.expiresAt)) > Date.now() + 10_000)
-			)
-				throw new Error("invalid_claim_configuration");
-			const providerBase = providerUrl(str(fields.baseURL ?? fields.daemonURL));
-			if (providerBase.href !== providerUrl(str(p.baseUrl)).href)
-				throw new Error("invalid_claim_configuration");
-			const endpoint = new URL(
-				target.endpoint.replace(/^\/v1\//, ""),
-				`${providerBase.href.replace(/\/$/, "")}/`,
-			);
-			if (
-				p.endpoint !== undefined &&
-				providerUrl(str(p.endpoint)).href !== endpoint.href
-			)
-				throw new Error("invalid_claim_endpoint");
-			const infer = (init: RequestInit) =>
-				request(endpoint, {
-					...init,
-					redirect: "error",
-					signal,
-					headers: {
-						...init.headers,
-						Authorization: `Bearer ${str(credential.token)}`,
-					},
-				});
+			const { infer, fields } = await claimed(target, id, signal);
 			let body: unknown;
 			switch (target.kind) {
 				case "llm":
@@ -708,6 +667,7 @@ export function createLarmPlayground(config: {
 	}
 	return {
 		library: createMusicLibrary(control, publicUrl),
+		embed,
 		catalog,
 		health,
 		execute,

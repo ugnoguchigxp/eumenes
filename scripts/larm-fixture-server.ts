@@ -1,7 +1,7 @@
 export {};
 
 const port = Number(process.env.LARM_FIXTURE_PORT ?? 9822);
-const claimed = new Map<string, string[]>();
+const claimed = new Map<string, { profile: string; providers: string[] }>();
 let holdNext = false;
 const releaseStreams = new Set<() => void>();
 const ttsInputs: string[] = [];
@@ -12,6 +12,24 @@ let voiceInputs: Array<{ text: string; relation: string; readiness: string }> =
 const assessments: Array<{ relation: string; readiness: string }> = [];
 const profile = "SAAA-gemma4-26b";
 const agentProfile = "saaa-conversation-gemma4-26b-voice";
+const profileBindings: Record<
+	string,
+	{ agentProfile: string; model: string; maxTokens: number }
+> = {
+	[profile]: { agentProfile, model: "gemma4-26b-a4b", maxTokens: 262144 },
+	"ornith1.5Strix": {
+		agentProfile: "ornith1.5Strix",
+		model: "ornith-1.5-strix-lean",
+		maxTokens: 262144,
+	},
+	"ornith1.5Strix-64k": {
+		agentProfile: "ornith1.5Strix-64k",
+		model: "ornith-1.5-strix-lean",
+		maxTokens: 65536,
+	},
+};
+const binding = (selected: string) =>
+	profileBindings[selected] ?? profileBindings[profile]!;
 const names = ["llm", "asr", "tts"] as const;
 const protocol = {
 	llm: "openai.chat-completions.v1",
@@ -24,9 +42,9 @@ const endpoint = {
 	tts: "/v1/audio/speech",
 };
 const origin = `http://127.0.0.1:${port}`;
-const model = (name: string) =>
+const model = (name: string, selected = profile) =>
 	name === "llm"
-		? "gemma4-26b-a4b"
+		? binding(selected).model
 		: name === "tts"
 			? "voicevox-core"
 			: `model-${name}`;
@@ -165,30 +183,39 @@ const server = Bun.serve({
 				return Response.json({ error: "unauthorized" }, { status: 401 });
 			return Response.json(voiceCatalog);
 		}
-		if (path === "/v3/agent-profiles")
+		if (path === "/v3/agent-profiles") {
+			const selected = url.searchParams.get("profile") ?? profile;
+			const serviceProfile =
+				selected === "SAAA-w-Image" || selected === "SAAA-w-music";
 			return Response.json({
 				contractVersion: "agent-connection.v3",
 				catalogRevision: "fixture1",
 				requestedProfile: url.searchParams.get("profile") ?? undefined,
 				profiles: [
 					{
-						id: agentProfile,
-						providers: names.map((name) => ({
-							name,
-							capability: name,
-							protocol: protocol[name],
-							endpoint: endpoint[name],
-							model: model(name),
-							...(name === "llm"
-								? {
-										contextWindow: {
-											maxTokens: 262144,
-											outputReserveTokens: 4096,
-											safetyMarginTokens: 1976,
-										},
-									}
-								: {}),
-						})),
+						id: binding(selected).agentProfile,
+						providers: names
+							.filter(
+								(name) =>
+									!serviceProfile &&
+									(selected !== "ornith1.5Strix-64k" || name === "llm"),
+							)
+							.map((name) => ({
+								name,
+								capability: name,
+								protocol: protocol[name],
+								endpoint: endpoint[name],
+								model: model(name, selected),
+								...(name === "llm"
+									? {
+											contextWindow: {
+												maxTokens: binding(selected).maxTokens,
+												outputReserveTokens: 4096,
+												safetyMarginTokens: 1976,
+											},
+										}
+									: {}),
+							})),
 						services: /SAAA-w-(Image|music)/.test(
 							url.searchParams.get("profile") ?? "",
 						)
@@ -221,23 +248,30 @@ const server = Bun.serve({
 					},
 				],
 			});
+		}
 		if (path === "/v1/agent-connections" && request.method === "POST") {
-			const body = (await request.json()) as { providers?: string[] };
+			const body = (await request.json()) as {
+				profile: string;
+				providers?: string[];
+			};
+			const selected = body.profile;
 			const id = crypto.randomUUID();
-			const requested = body.providers ?? [...names];
-			claimed.set(id, requested);
+			const requested =
+				body.providers ??
+				(selected === "ornith1.5Strix-64k" ? ["llm"] : [...names]);
+			claimed.set(id, { profile: selected, providers: requested });
 			return Response.json(
 				{
 					id,
-					profile,
-					agentProfile,
+					profile: selected,
+					agentProfile: binding(selected).agentProfile,
 					catalogRevision: "fixture1",
 					status: "ready",
 					providers: requested.map((name) => ({
 						name,
 						protocol: protocol[name as keyof typeof protocol],
 						endpoint: endpoint[name as keyof typeof endpoint],
-						model: model(name),
+						model: model(name, selected),
 						readiness: "ready",
 						claimable: true,
 					})),
@@ -250,9 +284,10 @@ const server = Bun.serve({
 		if (match) {
 			const id = match[1];
 			if (!id) return Response.json({ error: "invalid_id" }, { status: 400 });
-			const requested = claimed.get(id);
-			if (!requested)
+			const connection = claimed.get(id);
+			if (!connection)
 				return Response.json({ error: "missing" }, { status: 404 });
+			const { profile: selected, providers: requested } = connection;
 			if (request.method === "DELETE") {
 				claimed.delete(id);
 				return new Response(null, { status: 204 });
@@ -260,8 +295,8 @@ const server = Bun.serve({
 			if (request.method === "GET")
 				return Response.json({
 					id,
-					profile,
-					agentProfile,
+					profile: selected,
+					agentProfile: binding(selected).agentProfile,
 					status: "ready",
 					expiresAt: new Date(Date.now() + 900000).toISOString(),
 				});
@@ -275,7 +310,7 @@ const server = Bun.serve({
 						name,
 						protocol: protocol[name as keyof typeof protocol],
 						baseUrl: `${origin}/${name}/v1`,
-						model: model(name),
+						model: model(name, selected),
 						credential: {
 							type: "bearer",
 							token: `fixture-${name}`,
@@ -285,14 +320,14 @@ const server = Bun.serve({
 						configuration: {
 							fields: {
 								baseURL: `${origin}/${name}/v1`,
-								model: model(name),
+								model: model(name, selected),
 								...(name === "tts" ? { voice: "fixture-voice" } : {}),
 							},
 						},
 						contextWindow:
 							name === "llm"
 								? {
-										maxTokens: 262144,
+										maxTokens: binding(selected).maxTokens,
 										outputReserveTokens: 4096,
 										safetyMarginTokens: 1976,
 									}

@@ -29,7 +29,7 @@ afterEach(async () => {
 });
 function response(): ResearchResult {
 	return {
-		provider: "llm-fetch@0.1.2",
+		provider: "llm-fetch@0.1.3",
 		observedAt: new Date(1000000).toISOString(),
 		cache: "bypass",
 		hits: [],

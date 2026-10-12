@@ -1,0 +1,8 @@
+
+Running 1 test using 1 worker
+
+(node:86162) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 tests/browser/voice.spec.ts:1236:1 › settings playground exercises image, music and provider health through the API (2.1s)
+
+  1 passed (3.7s)

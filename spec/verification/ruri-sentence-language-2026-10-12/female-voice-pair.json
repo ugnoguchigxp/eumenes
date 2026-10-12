@@ -1,0 +1,60 @@
+{
+  "date": "2026-10-12T10:47:57.736Z",
+  "results": [
+    {
+      "bytes": 92716
+    },
+    {
+      "bytes": 192844
+    }
+  ],
+  "attempts": [
+    {
+      "id": "2b5e9aa0-81a7-4e17-8948-6c3a718a9a7c",
+      "model": "kitten-tts-nano-0.8-fp32",
+      "status": "succeeded",
+      "accepted": 1,
+      "providerDetails": [
+        {
+          "connectionId": "aconn_epoch-09680c28-92db-4388-ab05-a473587ab9b3_b48c1bcf-2da5-48a3-aa43-63cb98e73ee1",
+          "model": "ruri-v3-30m-sentence-language",
+          "started": 1791802077509,
+          "httpStatus": 200,
+          "operation": "systemone"
+        },
+        {
+          "connectionId": "aconn_epoch-09680c28-92db-4388-ab05-a473587ab9b3_b48c1bcf-2da5-48a3-aa43-63cb98e73ee1",
+          "model": "kitten-tts-nano-0.8-fp32",
+          "started": 1791802077536,
+          "httpStatus": 200,
+          "operation": "audio/speech",
+          "speechVoice": "Rosie"
+        }
+      ]
+    },
+    {
+      "id": "61b284bf-fdc0-4226-b39b-dc4e9aed2718",
+      "model": "voicevox-core",
+      "status": "succeeded",
+      "accepted": 1,
+      "providerDetails": [
+        {
+          "connectionId": "aconn_epoch-09680c28-92db-4388-ab05-a473587ab9b3_b48c1bcf-2da5-48a3-aa43-63cb98e73ee1",
+          "model": "ruri-v3-30m-sentence-language",
+          "started": 1791802077099,
+          "httpStatus": 200,
+          "operation": "systemone"
+        },
+        {
+          "connectionId": "aconn_epoch-09680c28-92db-4388-ab05-a473587ab9b3_b48c1bcf-2da5-48a3-aa43-63cb98e73ee1",
+          "model": "voicevox-core",
+          "started": 1791802077166,
+          "httpStatus": 200,
+          "operation": "audio/speech",
+          "speechVoice": "Kasukabe_Tsumugi",
+          "speechCredit": "VOICEVOX:春日部つむぎ"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,128 @@
+[
+  {
+    "timestamp": "2026-10-12T10:11:06.988Z",
+    "event": "started",
+    "epoch": 1,
+    "at": 35337.89999985695,
+    "contextTime": 0.5398639455782313,
+    "duration": 1.8346485260770975,
+    "volume": 1,
+    "contextState": "running",
+    "configuredSink": false
+  },
+  {
+    "timestamp": "2026-10-12T10:11:08.828Z",
+    "event": "ended",
+    "epoch": 1,
+    "at": 37176.200000047684,
+    "contextTime": 2.380045351473923
+  },
+  {
+    "timestamp": "2026-10-12T10:11:08.891Z",
+    "event": "started",
+    "epoch": 2,
+    "at": 37240.89999985695,
+    "contextTime": 2.4439002267573695,
+    "duration": 1.2479818594104308,
+    "volume": 1,
+    "contextState": "running",
+    "configuredSink": false
+  },
+  {
+    "timestamp": "2026-10-12T10:11:10.139Z",
+    "event": "ended",
+    "epoch": 2,
+    "at": 38487.89999985695,
+    "contextTime": 3.6919727891156464
+  },
+  {
+    "timestamp": "2026-10-12T10:11:10.202Z",
+    "event": "started",
+    "epoch": 3,
+    "at": 38551.39999985695,
+    "contextTime": 3.7500226757369615,
+    "duration": 1.0666439909297052,
+    "volume": 1,
+    "contextState": "running",
+    "configuredSink": false
+  },
+  {
+    "timestamp": "2026-10-12T10:11:11.266Z",
+    "event": "ended",
+    "epoch": 3,
+    "at": 39614.09999990463,
+    "contextTime": 4.818140589569161
+  },
+  {
+    "timestamp": "2026-10-12T10:11:11.311Z",
+    "event": "started",
+    "epoch": 4,
+    "at": 39660.89999985695,
+    "contextTime": 4.864580498866213,
+    "duration": 1.8666439909297052,
+    "volume": 1,
+    "contextState": "running",
+    "configuredSink": false
+  },
+  {
+    "timestamp": "2026-10-12T10:11:13.181Z",
+    "event": "ended",
+    "epoch": 4,
+    "at": 41529.700000047684,
+    "contextTime": 6.733786848072563
+  },
+  {
+    "timestamp": "2026-10-12T10:11:55.130Z",
+    "event": "started",
+    "epoch": 5,
+    "at": 83479.5,
+    "contextTime": 48.68063492063492,
+    "duration": 3.4166666666666665,
+    "volume": 1,
+    "contextState": "running",
+    "configuredSink": false
+  },
+  {
+    "timestamp": "2026-10-12T10:11:58.699Z",
+    "event": "ended",
+    "epoch": 5,
+    "at": 87048.20000004768,
+    "contextTime": 52.099773242630384
+  },
+  {
+    "timestamp": "2026-10-12T10:11:58.743Z",
+    "event": "started",
+    "epoch": 6,
+    "at": 87092.39999985695,
+    "contextTime": 52.140408163265306,
+    "duration": 4.566643990929705,
+    "volume": 1,
+    "contextState": "running",
+    "configuredSink": false
+  },
+  {
+    "timestamp": "2026-10-12T10:12:03.309Z",
+    "event": "ended",
+    "epoch": 6,
+    "at": 91657.29999995232,
+    "contextTime": 56.708934240362815
+  },
+  {
+    "timestamp": "2026-10-12T10:12:03.371Z",
+    "event": "started",
+    "epoch": 7,
+    "at": 91720.5,
+    "contextTime": 56.76698412698413,
+    "duration": 3.9916553287981857,
+    "volume": 1,
+    "contextState": "running",
+    "configuredSink": false
+  },
+  {
+    "timestamp": "2026-10-12T10:12:07.360Z",
+    "event": "ended",
+    "epoch": 7,
+    "at": 95709,
+    "contextTime": 60.76081632653061
+  }
+]

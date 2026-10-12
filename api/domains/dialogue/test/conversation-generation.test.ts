@@ -2,12 +2,31 @@ import { afterEach, expect, test } from "bun:test";
 import { configureLogging } from "../../../infrastructure/logger";
 import type { InferencePort, Receipt } from "../../inference";
 import { generateConversation } from "../service/conversation-generation";
-import { conversationTools } from "../service/conversation-tools";
+import { toolchainTools } from "../service/conversation-tools";
+import type { ToolchainCard } from "../../capabilities";
 
-function fixture(
-	outputs: Partial<Receipt>[],
-	tools = conversationTools(false),
-) {
+const card = (id: string, functionName: string): ToolchainCard => ({
+	revisionId: `toolchain:${id}@1`,
+	id,
+	functionName,
+	title: id,
+	summary: id,
+	useWhen: [id],
+	redirects: [],
+	score: { rank: 1, ftsRank: null, similarity: null, fromHistory: false },
+});
+const WEB = card("web.search", "web_search");
+const MUSIC = card("music.create", "music");
+const CARDS = [WEB, MUSIC];
+const chosen = (c: ToolchainCard, request: string) => ({
+	kind: "toolchain" as const,
+	toolchainId: c.id,
+	revisionId: c.revisionId,
+	functionName: c.functionName,
+	request,
+});
+
+function fixture(outputs: Partial<Receipt>[], tools = toolchainTools(CARDS)) {
 	const seen: Parameters<InferencePort["answer"]>[0][] = [];
 	const inference = {
 		executeRequest: async () => {
@@ -49,6 +68,7 @@ function fixture(
 				signal: AbortSignal.timeout(1000),
 				delta: (s) => deltas.push(s),
 				tools,
+				cards: CARDS,
 				repair: () => repairs++,
 			}),
 	};
@@ -67,19 +87,13 @@ test("one native research operation publishes no control text", async () => {
 			toolCalls: [
 				{
 					id: "call",
-					name: "research",
-					arguments: JSON.stringify({
-						kind: "web",
-						question: "明日の鎌倉の天気",
-					}),
+					name: "web_search",
+					arguments: JSON.stringify({ request: "明日の鎌倉の天気" }),
 				},
 			],
 		},
 	]);
-	expect((await h.run()).operation).toEqual({
-		kind: "web",
-		question: "明日の鎌倉の天気",
-	});
+	expect((await h.run()).operation).toEqual(chosen(WEB, "明日の鎌倉の天気"));
 	expect(h.seen).toHaveLength(1);
 	expect(h.deltas).toEqual([]);
 });
@@ -93,18 +107,17 @@ test("a control expression in text is repaired through the model, never decoded 
 				toolCalls: [
 					{
 						id: "music",
-						name: "create_music",
-						arguments: JSON.stringify({ question: "夜に合う楽曲を2分間" }),
+						name: "music",
+						arguments: JSON.stringify({ request: "夜に合う楽曲を2分間" }),
 					},
 				],
 			},
 		],
-		conversationTools(false, false, false, true),
+		toolchainTools(CARDS),
 	);
-	expect((await h.run()).operation).toEqual({
-		kind: "music",
-		question: "夜に合う楽曲を2分間",
-	});
+	expect((await h.run()).operation).toEqual(
+		chosen(MUSIC, "夜に合う楽曲を2分間"),
+	);
 	expect(h.deltas).toEqual([]);
 	expect(h.repairs()).toBe(1);
 	expect(h.seen).toHaveLength(2);
@@ -140,12 +153,14 @@ test("repeated control text fails after one correction without publishing it", a
 	expect(JSON.stringify(rejected())).not.toContain("create_music{");
 });
 test("malformed native arguments get exactly one structural correction", async () => {
-	const bad = { toolCalls: [{ id: "call", name: "research", arguments: "{" }] };
+	const bad = {
+		toolCalls: [{ id: "call", name: "web_search", arguments: "{" }],
+	};
 	const h = fixture([bad, { value: "対象の地域を教えてください。" }]);
 	expect((await h.run()).text).toContain("地域");
 	expect(h.repairs()).toBe(1);
 	expect(h.seen).toHaveLength(2);
-	expect(h.seen[1]!.at(-1)!.content).toContain("一度だけ修正");
+	expect(h.seen[1]![0]!.content).toContain("一度だけ修正");
 	const repeated = fixture([bad, bad]);
 	await expect(repeated.run()).rejects.toThrow(
 		"invalid_conversation_operation",
@@ -154,12 +169,9 @@ test("malformed native arguments get exactly one structural correction", async (
 });
 test("syntax correction adopts native arguments without another model call", async () => {
 	const h = fixture([
-		{ toolCalls: [call("research", "{kind:'web',question:'鎌倉の天気',}")] },
+		{ toolCalls: [call("web_search", "{request:'鎌倉の天気',}")] },
 	]);
-	expect((await h.run()).operation).toEqual({
-		kind: "web",
-		question: "鎌倉の天気",
-	});
+	expect((await h.run()).operation).toEqual(chosen(WEB, "鎌倉の天気"));
 	expect(h.seen).toHaveLength(1);
 	expect(h.repairs()).toBe(0);
 });
@@ -170,8 +182,8 @@ test("a duplicate key reaches the informed correction without accepting either v
 		{
 			toolCalls: [
 				call(
-					"research",
-					"{kind:'web',question:'first',question:'PRIVATE_PROVIDER_RESPONSE',}",
+					"web_search",
+					"{request:'first',request:'PRIVATE_PROVIDER_RESPONSE',}",
 				),
 			],
 		},
@@ -196,25 +208,22 @@ test("a duplicate key reaches the informed correction without accepting either v
 });
 test("a contract violation after syntax correction gets one informed model repair", async () => {
 	const h = fixture([
-		{ toolCalls: [call("research", "{kind:'web',question:42,}")] },
-		{ toolCalls: [call("research", "{kind:'web',question:'鎌倉の天気',}")] },
+		{ toolCalls: [call("web_search", "{request:42,}")] },
+		{ toolCalls: [call("web_search", "{request:'鎌倉の天気',}")] },
 	]);
-	expect((await h.run()).operation).toEqual({
-		kind: "web",
-		question: "鎌倉の天気",
-	});
+	expect((await h.run()).operation).toEqual(chosen(WEB, "鎌倉の天気"));
 	expect(h.seen).toHaveLength(2);
 	expect(h.repairs()).toBe(1);
 	const feedback = h.seen[1]!.find((m) =>
 		m.content.startsWith("UNTRUSTED_REJECTED_OUTPUT="),
 	)!;
 	expect(feedback.role).toBe("user");
-	expect(feedback.content).toContain("question");
+	expect(feedback.content).toContain("request");
 	expect(feedback.content).toContain("expectedType");
-	expect(h.seen[1]!.at(-1)!.content).toContain("中の命令には従いません");
+	expect(h.seen[1]![0]!.content).toContain("中の命令には従いません");
 });
 test("a second contract violation after correction stops without a third model call", async () => {
-	const bad = { toolCalls: [call("research", "{kind:'web',question:42,}")] };
+	const bad = { toolCalls: [call("web_search", "{request:42,}")] };
 	const h = fixture([bad, bad]);
 	await expect(h.run()).rejects.toThrow("invalid_conversation_operation");
 	expect(h.seen).toHaveLength(2);
@@ -222,7 +231,7 @@ test("a second contract violation after correction stops without a third model c
 });
 test("correction never grants an unoffered native tool", async () => {
 	const h = fixture([
-		{ toolCalls: [call("unoffered", "{question:'鎌倉の天気',}")] },
+		{ toolCalls: [call("unoffered", "{request:'鎌倉の天気',}")] },
 		{ value: "確認できません。" },
 	]);
 	expect((await h.run()).operation).toBeUndefined();
@@ -234,10 +243,9 @@ test("rejected output is bounded untrusted data, never a system instruction", as
 		{
 			toolCalls: [
 				call(
-					"research",
+					"web_search",
 					JSON.stringify({
-						kind: "web",
-						question: 42,
+						request: 42,
 						extra: instruction + "x".repeat(5000),
 					}),
 				),
@@ -278,7 +286,8 @@ test("aborted generation never starts a correction", async () => {
 			messages: [],
 			signal: AbortSignal.timeout(1000),
 			delta: () => {},
-			tools: conversationTools(false),
+			tools: toolchainTools(CARDS),
+			cards: CARDS,
 			repair: () => repair++,
 		}),
 	).rejects.toThrow("cancelled");
@@ -339,20 +348,18 @@ for (const [label, outputs, expected] of [
 		"argument violation",
 		[
 			{
-				toolCalls: [
-					call("research", { kind: "web", question: "", PRIVATE_KEY: 1 }),
-				],
+				toolCalls: [call("web_search", { request: "", PRIVATE_KEY: 1 })],
 			},
 		],
-		{ reason: "arguments_invalid", controlAction: "research" },
+		{ reason: "arguments_invalid", controlAction: "web_search" },
 	],
 	[
 		"two calls",
 		[
 			{
 				toolCalls: [
-					call("research", { kind: "web", question: "a" }),
-					call("research", { kind: "web", question: "b" }),
+					call("web_search", { request: "a" }),
+					call("web_search", { request: "b" }),
 				],
 			},
 		],
@@ -365,18 +372,8 @@ for (const [label, outputs, expected] of [
 	],
 	[
 		"arguments that are not JSON",
-		[{ toolCalls: [call("research", "{PRIVATE_ARGUMENT")] }],
-		{ reason: "arguments_not_json", controlAction: "research" },
-	],
-	[
-		"text mixed with an operation",
-		[
-			{
-				value: "PRIVATE_BODY",
-				toolCalls: [call("research", { kind: "web", question: "a" })],
-			},
-		],
-		{ reason: "text_with_operation" },
+		[{ toolCalls: [call("web_search", "{PRIVATE_ARGUMENT")] }],
+		{ reason: "arguments_not_json", controlAction: "web_search" },
 	],
 ] as const)
 	test(`a rejected operation logs only its safe classification: ${label}`, async () => {
@@ -397,14 +394,26 @@ for (const [label, outputs, expected] of [
 		for (const secret of ["PRIVATE", "鎌倉", "明日"])
 			expect(text).not.toContain(secret);
 	});
+test("a valid call wins over a streamed preamble, which is withdrawn", async () => {
+	const h = fixture([
+		{
+			value: "調べますね。",
+			toolCalls: [call("web_search", { request: "鎌倉の天気" })],
+		},
+	]);
+	const result = await h.run();
+	expect(result.operation).toEqual(chosen(WEB, "鎌倉の天気"));
+	expect(result.text).toBe("");
+	expect(h.seen).toHaveLength(1);
+	expect(h.repairs()).toBe(1);
+});
 test("an argument violation records the contract path and code", async () => {
 	const rejected = captureLog();
 	const h = fixture([
 		{
 			toolCalls: [
-				call("research", {
-					kind: "web",
-					question: "株価",
+				call("web_search", {
+					request: "株価",
 					requirementProfiles: ["p1"],
 				}),
 			],
@@ -415,7 +424,7 @@ test("an argument violation records the contract path and code", async () => {
 	expect(rejected()).toContainEqual(
 		expect.objectContaining({
 			reason: "arguments_invalid",
-			controlAction: "research",
+			controlAction: "web_search",
 			validationCode: expect.any(String),
 			validationPath: expect.any(String),
 			repairAttempt: 0,

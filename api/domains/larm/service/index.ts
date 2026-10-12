@@ -1,5 +1,6 @@
+import { createSpeechSynthesizer } from "./speech";
+import { createSentenceLanguageOperations } from "./sentence-language";
 import { chatRequest } from "./chat-request";
-import { readBounded } from "../../../infrastructure/bounded-read";
 import {
 	isNetworkError,
 	toErrorCode,
@@ -18,7 +19,8 @@ import type {
 } from "../contracts";
 import {
 	auxiliaryProfile,
-	gemmaProfile,
+	defaultProfile,
+	unavailableAuxiliaryProfile,
 	type Fetcher,
 	type Lease,
 	type Provider,
@@ -58,6 +60,7 @@ export function createLarm(config: {
 	audience?: string;
 	client?: string;
 	voice?: string;
+	sentenceLanguageProvider?: string;
 	fetch?: Fetcher;
 	speed?: number;
 	style?: string;
@@ -74,10 +77,13 @@ export function createLarm(config: {
 		config.providerHosts?.map((host) => host.toLowerCase()) ?? [];
 	const token = config.token?.trim();
 	const request = config.fetch ?? fetch;
-	const profile = config.profile?.trim() || gemmaProfile;
-	if (profile === auxiliaryProfile) throw new Error("larm_aux_not_enabled");
+	const profile = config.profile?.trim() || defaultProfile;
+	if (profile === unavailableAuxiliaryProfile)
+		throw new Error("larm_aux_not_enabled");
 	const audience = config.audience?.trim() || "saaa-desktop";
-	const client = config.client ?? "gemma-client";
+	// LARM reuses a live connection for the same client/profile binding.
+	// Each port owns an independent session identity, retained across renew/reconnect.
+	const client = config.client ?? `eumenes-client-${crypto.randomUUID()}`;
 	if (audience !== "saaa-desktop" && audience !== "same-host")
 		throw new Error("larm_invalid_audience");
 	if (
@@ -110,6 +116,8 @@ export function createLarm(config: {
 		return { base, extra: providerHosts };
 	};
 	const lifetime = new AbortController();
+	const auxiliarySessions = new Set<LarmPort>();
+	let mainAnswer = Promise.resolve();
 	const voiceCatalogs = new WeakMap<Provider, TtsVoices>();
 	let lease: Lease | undefined;
 	let connecting: Promise<Lease> | undefined;
@@ -131,7 +139,8 @@ export function createLarm(config: {
 								: "idle",
 			capabilities: lease
 				? [...lease.providers.keys()].filter(
-						(name): name is Capability => name !== "system-one",
+						(name): name is Capability =>
+							name === "llm" || name === "asr" || name === "tts",
 					)
 				: [],
 			...(!base
@@ -429,6 +438,7 @@ export function createLarm(config: {
 					profile,
 					catalogProviders,
 					fullProfile,
+					languageProvider: config.sentenceLanguageProvider,
 					hosts: hostsFor(),
 				});
 				const current: Lease = {
@@ -518,8 +528,23 @@ export function createLarm(config: {
 			name === "llm" ? ["llm"] : ["llm", "asr", "tts"];
 		for (let attempt = 0; ; attempt++) {
 			signal.throwIfAborted();
-			const current = await untilAborted(connect(required, signal), signal);
-			const provider = current.providers.get(name);
+			let current = await untilAborted(connect(required, signal), signal);
+			let provider = current.providers.get(name);
+			if (
+				(name === "sentence-language" || name === "tts-english") &&
+				!provider
+			) {
+				// A pre-deployment voice lease may lack the newly published role.
+				// Check its current control state before treating the role as absent.
+				current = await untilAborted(connect(required, signal, true), signal);
+				provider = current.providers.get(name);
+			}
+			if ((name === "sentence-language" || name === "tts-english") && !provider)
+				throw new Error(
+					name === "sentence-language"
+						? "speech_language_unavailable"
+						: "speech_tts_target_unavailable",
+				);
 			if (name === "system-one" && !provider)
 				throw new Error("larm_system_one_unavailable");
 			if (
@@ -582,7 +607,9 @@ export function createLarm(config: {
 				? provider.baseUrl
 				: `${provider.baseUrl}/`,
 		);
-		const url = new URL(operation, endpoint);
+		const url = provider.endpoint
+			? new URL(provider.endpoint)
+			: new URL(operation, endpoint);
 		if (url.origin !== endpoint.origin)
 			throw new Error("larm_endpoint_mismatch");
 		const started = Date.now();
@@ -615,6 +642,7 @@ export function createLarm(config: {
 			await options?.onExchange?.({
 				connectionId,
 				model: provider.model,
+				operation,
 				started,
 			});
 			throw error;
@@ -633,6 +661,7 @@ export function createLarm(config: {
 			await options?.onExchange?.({
 				connectionId,
 				model: provider.model,
+				operation,
 				started,
 				httpStatus: response.status,
 				...details,
@@ -647,8 +676,10 @@ export function createLarm(config: {
 			await options?.onExchange?.({
 				connectionId,
 				model: provider.model,
+				operation,
 				started,
 				httpStatus: response.status,
+				speechVoice: options?.speechVoice,
 				...(speechCredit
 					? { speechCredit, speechVoice: options?.speechVoice }
 					: {}),
@@ -659,7 +690,7 @@ export function createLarm(config: {
 		}
 		return response;
 	}
-	async function answer(
+	async function inferAnswer(
 		messages: Parameters<LarmPort["answer"]>[0],
 		signal: AbortSignal,
 		onDelta?: (text: string) => void,
@@ -690,6 +721,49 @@ export function createLarm(config: {
 			return result.text;
 		});
 	}
+	async function answer(
+		messages: Parameters<LarmPort["answer"]>[0],
+		signal: AbortSignal,
+		onDelta?: (text: string) => void,
+		options?: LarmCallOptions,
+	) {
+		if (profile !== defaultProfile)
+			return inferAnswer(messages, signal, onDelta, options);
+		const scoped = AbortSignal.any([signal, lifetime.signal]);
+		if (profile === defaultProfile && options?.sessionRole === "auxiliary") {
+			// Pin the main slot while helpers run. LARM admits three 64K slots and
+			// leaves further connections in waiting-capacity until a helper releases.
+			return withProvider("llm", scoped, async () => {
+				const helper = createLarm({
+					...config,
+					profile: auxiliaryProfile,
+					client: `eumenes-helper-${crypto.randomUUID()}`,
+				});
+				auxiliarySessions.add(helper);
+				try {
+					return onDelta
+						? await helper.answerStream!(messages, scoped, onDelta, options)
+						: await helper.answer(messages, scoped, options);
+				} finally {
+					await helper.close();
+					auxiliarySessions.delete(helper);
+				}
+			});
+		}
+		// One foreground conversation may infer on its connection at a time.
+		const previous = mainAnswer;
+		let finish!: () => void;
+		mainAnswer = new Promise<void>((resolve) => {
+			finish = resolve;
+		});
+		try {
+			await untilAborted(previous, scoped);
+			return await inferAnswer(messages, scoped, onDelta, options);
+		} finally {
+			// A cancelled queued call must not let a later call overtake the active one.
+			void previous.finally(finish);
+		}
+	}
 	async function readVoices(
 		p: Provider,
 		signal: AbortSignal,
@@ -714,6 +788,17 @@ export function createLarm(config: {
 	}
 
 	return {
+		...createSentenceLanguageOperations({
+			withProvider,
+			infer,
+			catalog: (signal) =>
+				fetchCatalog(
+					(path, init, statuses) =>
+						control(path, { ...init, signal }, statuses),
+					profile,
+					[],
+				),
+		}),
 		decisionModel: () => lease?.providers.get("system-one")?.model ?? null,
 		async judge(state, questions, signal) {
 			if (judging) throw new Error("larm_decision_busy");
@@ -762,11 +847,45 @@ export function createLarm(config: {
 				judging = false;
 			}
 		},
-		async voices(signal) {
-			return withProvider("tts", signal, (p) => readVoices(p, signal));
+		async voices(signal, language) {
+			return withProvider(
+				language === "en" ? "tts-english" : "tts",
+				signal,
+				(p) => readVoices(p, signal),
+			);
 		},
 		async connect() {
 			await connect(["llm"], undefined, true);
+		},
+		async conversationProfiles(signal) {
+			// A profile LARM does not publish stays listed without a model, so the saved choice remains visible.
+			return Promise.all(
+				[defaultProfile].map(async (selector) => {
+					try {
+						const catalog = record(
+							await readJson(
+								await control(
+									`/v3/agent-profiles?profile=${encodeURIComponent(selector)}`,
+									{ method: "GET", signal },
+									[200],
+								),
+							),
+						);
+						const entry = Array.isArray(catalog.profiles)
+							? record(catalog.profiles[0])
+							: {};
+						const llm = (
+							Array.isArray(entry.providers) ? entry.providers.map(record) : []
+						).find((p) => p.name === "llm");
+						return {
+							profile: selector,
+							model: typeof llm?.model === "string" ? llm.model : null,
+						};
+					} catch {
+						return { profile: selector, model: null };
+					}
+				}),
+			);
 		},
 		inspect() {
 			return {
@@ -776,8 +895,11 @@ export function createLarm(config: {
 				providers: lease
 					? [...lease.providers.values()]
 							.filter(
-								(p): p is Provider & { name: Capability } =>
-									p.name !== "system-one",
+								(p): p is Provider & { name: Capability | "tts-english" } =>
+									p.name === "llm" ||
+									p.name === "asr" ||
+									p.name === "tts" ||
+									p.name === "tts-english",
 							)
 							.map((p) => ({
 								name: p.name,
@@ -830,150 +952,18 @@ export function createLarm(config: {
 				return text;
 			});
 		},
-		speak(text, signal, options) {
-			return withProvider("tts", signal, async (p, connectionId) => {
-				if (!text.trim() || text.length > 4096)
-					throw new Error("larm_tts_input_invalid");
-				let selectedVoice = voice ?? p.voice;
-				const voicevox = p.model === "voicevox-core";
-				let catalog: TtsVoices | undefined;
-				if (voicevox || !selectedVoice) {
-					try {
-						catalog = voiceCatalogs.get(p) ?? (await readVoices(p, signal));
-					} catch (error) {
-						// The catalog only validates and clamps; a voice that is already
-						// chosen can still be synthesized when the catalog is refused.
-						signal.throwIfAborted();
-						log.warn(
-							"larm.voice_catalog_unavailable",
-							{
-								reason: "voice_catalog_unavailable",
-								kind: selectedVoice
-									? "continue_with_selected_voice"
-									: "no_voice",
-							},
-							error,
-						);
-						if (!selectedVoice) throw error;
-					}
-				}
-				const catalogUnavailable = (voicevox || !selectedVoice) && !catalog;
-				if (!voice && voicevox)
-					selectedVoice = catalog?.default_voice ?? selectedVoice;
-				if (!selectedVoice) selectedVoice = p.voice = catalog?.default_voice;
-				if (!selectedVoice) throw new Error("larm_tts_voice_unconfigured");
-				const speaker = catalog?.voices.find((v) => v.id === selectedVoice);
-				if (voicevox && !catalogUnavailable && !speaker) {
-					log.warn("larm.tts_voice_missing", {
-						kind: selectedVoice,
-						count: catalog?.voices.length,
-						reason: `catalog: ${(catalog?.voices ?? [])
-							.slice(0, 12)
-							.map((v) => v.id)
-							.join(",")}`.slice(0, 250),
-					});
-					throw new Error("larm_tts_voice_missing");
-				}
-				if (
-					voicevox &&
-					!catalogUnavailable &&
-					config.style &&
-					!speaker?.styles.some((s) => s.id === config.style)
-				)
-					throw new Error("larm_tts_voice_style_invalid");
-				let intonationScale = config.intonationScale;
-				const selectedSpeed =
-					voicevox && options?.speed !== undefined
-						? options.speed
-						: config.speed;
-				const selectedPitch =
-					voicevox && options?.pitchScale !== undefined
-						? options.pitchScale
-						: config.pitchScale;
-				const boundedParameter = (
-					value: number | undefined,
-					key: "speed" | "pitch_scale",
-					override: boolean,
-				) => {
-					if (value === undefined || !override) return value;
-					const range = speaker?.capabilities[key];
-					return range
-						? Math.max(range.minimum, Math.min(range.maximum, value))
-						: value;
-				};
-				const speechSpeed = boundedParameter(
-					selectedSpeed,
-					"speed",
-					voicevox && options?.speed !== undefined,
-				);
-				const speechPitch = boundedParameter(
-					selectedPitch,
-					"pitch_scale",
-					voicevox && options?.pitchScale !== undefined,
-				);
-				if (options?.intonationScale !== undefined) {
-					const range = speaker?.capabilities.intonation_scale;
-					intonationScale = Math.max(
-						range?.minimum ?? 0,
-						Math.min(range?.maximum ?? 2, options.intonationScale),
-					);
-				}
-				for (const [key, value] of [
-					["speed", speechSpeed],
-					["pitch_scale", speechPitch],
-					["intonation_scale", intonationScale],
-				] as const) {
-					if (voicevox && value !== undefined) {
-						const range = speaker?.capabilities[key];
-						if (
-							!Number.isFinite(value) ||
-							(range && (value < range.minimum || value > range.maximum))
-						)
-							throw new Error("larm_tts_parameter_invalid");
-					}
-				}
-				const response = await infer(
-					p,
-					"audio/speech",
-					{
-						method: "POST",
-						headers: { "content-type": "application/json" },
-						body: JSON.stringify({
-							model: p.model,
-							input: text,
-							voice: selectedVoice,
-							...(speechSpeed !== undefined ? { speed: speechSpeed } : {}),
-							...(voicevox && config.style ? { style: config.style } : {}),
-							...(voicevox && speechPitch !== undefined
-								? { pitch_scale: speechPitch }
-								: {}),
-							...(voicevox && intonationScale !== undefined
-								? { intonation_scale: intonationScale }
-								: {}),
-							response_format: "wav",
-						}),
-					},
-					signal,
-					connectionId,
-					{ ...options, speechVoice: selectedVoice },
-				);
-				const bytes = await readBounded(response.body, {
-					limit: 16_000_000,
-					tooLarge: "larm_response_too_large",
-					missing: "larm_empty_response",
-				});
-				if (
-					bytes.length < 44 ||
-					String.fromCharCode(...bytes.subarray(0, 4)) !== "RIFF" ||
-					String.fromCharCode(...bytes.subarray(8, 12)) !== "WAVE"
-				)
-					throw new Error("tts_audio_invalid");
-				return bytes;
-			});
-		},
+		speak: createSpeechSynthesizer({
+			withProvider,
+			infer,
+			readVoices,
+			voiceCatalogs,
+			config,
+			voice,
+		}),
 		async close() {
 			closed = true;
 			lifetime.abort(new Error("larm_closed"));
+			await Promise.all([...auxiliarySessions].map((helper) => helper.close()));
 			if (connecting) await connecting.catch(() => {});
 			if (lease) {
 				const current = lease;

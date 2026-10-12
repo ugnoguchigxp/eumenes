@@ -152,15 +152,13 @@ export function musicLibraryFixture(correctablePlan = false) {
 		answer: async (messages, _signal, options) => {
 			if (options?.tools?.length) {
 				stages.push("route");
-				if (
-					!options.tools.some((t) => t.function.name === "open_music_library")
-				)
+				if (!options.tools.some((t) => t.function.name === "music_library"))
 					throw new Error("playback_not_offered");
 				options.onToolCalls!([
 					{
 						id: "playback",
-						name: "open_music_library",
-						arguments: JSON.stringify({ question: playbackQuestion }),
+						name: "music_library",
+						arguments: JSON.stringify({ request: playbackQuestion }),
 					},
 				]);
 				return "";

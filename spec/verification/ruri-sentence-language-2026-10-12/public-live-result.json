@@ -1,0 +1,115 @@
+{
+  "date": "2026-10-12T09:11:13.406Z",
+  "profile": "SAAA-gemma4-26b",
+  "classifier": "labels_passed",
+  "samples": [
+    {
+      "language": "ja",
+      "status": "classified",
+      "decision": {
+        "language": "ja",
+        "model": "ruri-v3-30m-sentence-language",
+        "latencyMs": 28.65000000000009
+      }
+    },
+    {
+      "language": "ja",
+      "status": "wav_received",
+      "bytes": 107564,
+      "ms": 225,
+      "exchanges": [
+        {
+          "connectionId": "aconn_epoch-09680c28-92db-4388-ab05-a473587ab9b3_6986f07f-e9c9-4465-8a17-e1d487055f12",
+          "model": "ruri-v3-30m-sentence-language",
+          "operation": "systemone",
+          "started": 1791796274765,
+          "httpStatus": 200
+        },
+        {
+          "connectionId": "aconn_epoch-09680c28-92db-4388-ab05-a473587ab9b3_6986f07f-e9c9-4465-8a17-e1d487055f12",
+          "model": "voicevox-core",
+          "operation": "audio/speech",
+          "started": 1791796274806,
+          "httpStatus": 200,
+          "speechVoice": "Kenzaki_Mesuo",
+          "speechCredit": "VOICEVOX:剣崎雌雄"
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "status": "classified",
+      "decision": {
+        "language": "en",
+        "model": "ruri-v3-30m-sentence-language",
+        "latencyMs": 18.13145899999995
+      }
+    },
+    {
+      "language": "en",
+      "status": "wav_received",
+      "bytes": 196444,
+      "ms": 193,
+      "exchanges": [
+        {
+          "connectionId": "aconn_epoch-09680c28-92db-4388-ab05-a473587ab9b3_6986f07f-e9c9-4465-8a17-e1d487055f12",
+          "model": "ruri-v3-30m-sentence-language",
+          "operation": "systemone",
+          "started": 1791796275019,
+          "httpStatus": 200
+        },
+        {
+          "connectionId": "aconn_epoch-09680c28-92db-4388-ab05-a473587ab9b3_6986f07f-e9c9-4465-8a17-e1d487055f12",
+          "model": "kitten-tts-nano-0.8-fp32",
+          "operation": "audio/speech",
+          "started": 1791796275047,
+          "httpStatus": 200,
+          "speechVoice": "Rosie"
+        }
+      ]
+    }
+  ],
+  "discovery": {
+    "englishTts": true,
+    "languageProviders": [
+      {
+        "name": "sentence-language",
+        "model": "ruri-v3-30m-sentence-language"
+      }
+    ]
+  },
+  "admissionMs": 1033.316583,
+  "benchmark": {
+    "conditions": {
+      "ja": {
+        "planned": 200,
+        "completed": 200,
+        "failed": 0,
+        "p50Ms": 12.252833999999893,
+        "p95Ms": 27.355041999999685,
+        "maxMs": 47.21141699999998
+      },
+      "en": {
+        "planned": 200,
+        "completed": 200,
+        "failed": 0,
+        "p50Ms": 19.61700000000019,
+        "p95Ms": 52.679166999999325,
+        "maxMs": 131.07233299999916
+      },
+      "parallel-attitude": {
+        "planned": 200,
+        "completed": 200,
+        "failed": 0,
+        "p50Ms": 36.32733299999927,
+        "p95Ms": 107.81683399999929,
+        "maxMs": 326.55787500000224
+      }
+    },
+    "connectionCount": 1,
+    "connections": [
+      "aconn_epoch-09680c28-92db-4388-ab05-a473587ab9b3_6986f07f-e9c9-4465-8a17-e1d487055f12"
+    ]
+  },
+  "result": "public_transport_passed"
+}

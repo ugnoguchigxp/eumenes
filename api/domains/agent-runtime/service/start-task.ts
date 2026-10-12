@@ -48,7 +48,16 @@ export function createStartTask(ctx: RuntimeContext, ops: TaskOps) {
 				urls?: string[];
 				command?: unknown;
 				researcher?: "codex_luna";
+				/** The package of the toolchain the conversation chose. */
+				packageRevisionId?: string;
 			};
+			if (
+				request.packageRevisionId !== undefined &&
+				!/^package:[a-z][a-z0-9._-]{0,100}@[1-9][0-9]*$/.test(
+					request.packageRevisionId,
+				)
+			)
+				throw new Error("capability_unavailable");
 			if (
 				request.researcher &&
 				(request.kind !== "web" ||
@@ -87,11 +96,12 @@ export function createStartTask(ctx: RuntimeContext, ops: TaskOps) {
 				return { taskId: root.id, jobId: input.parentJobId ?? root.id };
 			}
 			const packageId =
-				request.kind === "history"
+				request.packageRevisionId ??
+				(request.kind === "history"
 					? "package:history.research@2"
 					: request.researcher === "codex_luna"
 						? "package:web.search@1"
-						: "package:web.quick@2";
+						: "package:web.quick@2");
 			const workerInput = {
 				question: request.question,
 				detail: "normal",
@@ -120,6 +130,13 @@ export function createStartTask(ctx: RuntimeContext, ops: TaskOps) {
 						...workerInput,
 						originalRequest: request.originalRequest ?? request.question,
 						requirementProfiles: input.requirementProfiles ?? [],
+						// The history sub-agent chooses applicable profiles from this snapshot.
+						...(request.kind === "history" && !input.requirementProfiles?.length
+							? {
+									requirementCatalog:
+										capabilities.requirementCatalogInTransaction(db),
+								}
+							: {}),
 						researcher: request.researcher,
 					},
 					workerDeadline(root.deadline, now()),

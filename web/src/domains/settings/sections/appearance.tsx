@@ -16,6 +16,21 @@ export function AppearanceSection({ value, change }: AppearanceSectionProps) {
 				<CardTitle>表示</CardTitle>
 			</CardHeader>
 			<CardContent>
+				<Field label="会話の背景">
+					<select
+						value={value.general.background ?? "light-fairy"}
+						onChange={(e) =>
+							change((s) => {
+								s.general.background = e.target.value as NonNullable<
+									Settings["general"]["background"]
+								>;
+							})
+						}
+					>
+						<option value="light-fairy">光の妖精</option>
+						<option value="spatial">Spatial</option>
+					</select>
+				</Field>
 				<Field label="テーマ">
 					<select
 						value={value.general.theme}

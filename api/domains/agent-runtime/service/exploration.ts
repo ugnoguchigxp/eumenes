@@ -20,8 +20,12 @@ export const RESEARCH_BUDGET = Object.freeze({
 });
 export const isHistory = (p: Prepared | undefined) =>
 	p?.package.backend === "history";
+const isRecipeWeb = (p: Prepared | undefined) =>
+	!!p && packageRuntimeOf(p.package.id)?.budget === "recipe";
+/** The short web confirmation routes: the quick budget, with or without saved procedures. */
 export const isQuickWeb = (p: Prepared | undefined) =>
-	!!p && packageRuntimeOf(p.package.id)?.budget === "quick";
+	!!p &&
+	["quick", "recipe"].includes(packageRuntimeOf(p.package.id)?.budget ?? "");
 export const returnsSearchResults = (p: Prepared | undefined) =>
 	!!p && packageRuntimeOf(p.package.id)?.report === "search";
 const QUICK_WEB_BUDGET = Object.freeze({
@@ -31,13 +35,22 @@ const QUICK_WEB_BUDGET = Object.freeze({
 	searches: 1,
 	reads: 1,
 });
+/** One saved-procedure lookup, and one extra read when a saved URL fails. */
+const RECIPE_WEB_BUDGET = Object.freeze({
+	...QUICK_WEB_BUDGET,
+	localCalls: 1,
+	externalCalls: 3,
+	reads: 2,
+});
 const SEARCH_BUDGET = Object.freeze({ ...RESEARCH_BUDGET, searches: 1 });
 export const operationLimits = (p: Prepared | undefined) =>
-	isQuickWeb(p)
-		? QUICK_WEB_BUDGET
-		: returnsSearchResults(p)
-			? SEARCH_BUDGET
-			: RESEARCH_BUDGET;
+	isRecipeWeb(p)
+		? RECIPE_WEB_BUDGET
+		: isQuickWeb(p)
+			? QUICK_WEB_BUDGET
+			: returnsSearchResults(p)
+				? SEARCH_BUDGET
+				: RESEARCH_BUDGET;
 export const modelLimit = (p: Prepared | undefined) =>
 	isHistory(p)
 		? RESEARCH_BUDGET.historyModelCalls
@@ -46,7 +59,9 @@ export const modelLimit = (p: Prepared | undefined) =>
 			: RESEARCH_BUDGET.webModelCalls;
 /** Reads that stay inside the host (saved bodies, history) and use the local-call budget. */
 export const localTool = (meta: ToolRuntimeMeta | undefined) =>
-	meta?.operation === "saved_read" || meta?.operation === "history";
+	meta?.operation === "saved_read" ||
+	meta?.operation === "history" ||
+	meta?.operation === "recipe";
 export const isSearch = (meta: ToolRuntimeMeta | undefined) =>
 	meta?.operation === "search";
 /** A read of a URL-addressed page: the only reads that use the per-task read limit. */

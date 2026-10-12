@@ -7,6 +7,15 @@ export type TestKind =
 	| "image"
 	| "music"
 	| "unsupported";
+/** The vector space an embedding provider declares; vectors from different spaces never mix. */
+export interface EmbeddingSpace {
+	modelId: string;
+	revision: string;
+	artifactDigest: string;
+	dimension: number;
+	queryPrefix: string;
+	passagePrefix: string;
+}
 export interface LarmTestTarget {
 	id: string;
 	name: string;

@@ -3,7 +3,7 @@ import type { Run } from "../contracts";
 import type { Receipt } from "../../inference";
 import type { ConversationOperation } from "./conversation-tools";
 import type { DialogueDeps, GenerateInput } from "./context";
-import { GENERATE_KIND } from "./context";
+import { COMMAND_KIND } from "./context";
 import { transition, linkAnswer } from "../repository";
 import { delegateConversation } from "./delegate-conversation";
 import { operationRejection } from "./operation-authority";
@@ -51,39 +51,58 @@ export function settleConversationOperation(
 	// on the same policy request. No control text is adopted or collected.
 	if (input.world)
 		worldContext?.releaseInTransaction(tx, run.id, run.conversationId);
+	const chosen = result.operation;
+	let resolved: ReturnType<
+		NonNullable<DialogueDeps["toolchains"]>["resolveInTransaction"]
+	>;
+	try {
+		if (!deps.toolchains) throw new Error("toolchain_unavailable");
+		// The exact revision offered must still be active (and its package available).
+		resolved = deps.toolchains.resolveInTransaction(tx, chosen.revisionId);
+	} catch {
+		transition(
+			tx,
+			run.id,
+			run.revision,
+			"failed",
+			clock(),
+			"toolchain_unavailable",
+		);
+		deps.toolchains?.settleSelectionInTransaction(tx, run.id, {
+			outcome: "failed",
+			code: "toolchain_unavailable",
+		});
+		return { status: "failed", errorCode: "toolchain_unavailable" };
+	}
+	const { runtime, packageRevisionId } = resolved;
 	if (
-		result.operation.kind === "music" ||
-		result.operation.kind === "music-playback"
+		runtime.execution === "music-create" ||
+		runtime.execution === "music-playback"
 	) {
 		if (!deps.music) throw new Error("music_unavailable");
 		const original = conversation
 			.messagesInTransaction(tx, run.conversationId)
 			.find((m) => m.id === run.inputMessageId)!.text;
+		// The music domain's planner is this toolchain's sub-agent (profile, SKILL, tools).
 		const saved = (
-			result.operation.kind === "music"
+			runtime.execution === "music-create"
 				? deps.music.startInTransaction
 				: deps.music.startPlaybackInTransaction
 		)(tx, {
 			runId: run.id,
 			conversationId: run.conversationId,
-			question: result.operation.question,
+			question: chosen.request,
 			originalRequest: original,
 			deadline: Date.parse(run.deadlineAt!),
 		});
 		linkAnswer(tx, run.id, saved.jobId);
-	} else if (result.operation.kind === "delegation") {
-		if (!deps.delegation) throw new Error("dots_unavailable");
-		deps.delegation.invokeInTransaction(
-			tx,
-			run,
-			result.operation.command,
-			input.delegationSnapshot,
-		);
+	} else if (runtime.execution === "command") {
+		// A command sub-agent turns the request into one typed operation of the package.
 		const { job } = queue.enqueueInTransaction(tx, {
 			scope: "dialogue",
-			kind: GENERATE_KIND,
-			dedupeKey: `delegation-answer:${run.id}`,
-			payload: { runId: run.id },
+			kind: COMMAND_KIND,
+			dedupeKey: `toolchain-command:${run.id}`,
+			payload: { runId: run.id, toolchainRevisionId: chosen.revisionId },
 			subjectRef: run.id,
 			lane: "interactive",
 			resourceKey: "inference.llm",
@@ -93,14 +112,25 @@ export function settleConversationOperation(
 		});
 		linkAnswer(tx, run.id, job.id);
 	} else {
-		if (!agents) throw new Error("invalid_conversation_operation");
-		delegateConversation(tx, agents, conversation, run, result.operation, {
-			parentJobId: claim.jobId,
-			authorizedUrls: input.authorizedUrls,
-			actionSnapshot: input.actionSnapshot,
-			timerCapability: input.timerCapability,
-			requirementCatalog: input.requirementCatalog,
-		});
+		if (!agents || !runtime.route)
+			throw new Error("invalid_conversation_operation");
+		const root = delegateConversation(
+			tx,
+			agents,
+			conversation,
+			run,
+			{
+				route: runtime.route,
+				request: chosen.request,
+				packageRevisionId,
+				researcher: runtime.researcher,
+			},
+			{
+				parentJobId: claim.jobId,
+				authorizedUrls: input.authorizedUrls,
+			},
+		);
+		deps.toolchains!.linkTaskInTransaction(tx, run.id, root.taskId);
 	}
 	transition(tx, run.id, run.revision, "queued", clock());
 	partials.delete(run.id);

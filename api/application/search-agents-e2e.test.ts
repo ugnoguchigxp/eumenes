@@ -30,11 +30,8 @@ for (const c of searchAgentCases)
 						options.onToolCalls!([
 							{
 								id: "selected",
-								name: luna ? "research_web_luna" : "research",
-								arguments: JSON.stringify({
-									...(luna ? {} : { kind: "web" }),
-									question: c.question,
-								}),
+								name: luna ? "web_research" : "web_search",
+								arguments: JSON.stringify({ request: c.question }),
 							},
 						]);
 						return "";
@@ -78,7 +75,8 @@ for (const c of searchAgentCases)
 							return JSON.stringify(action);
 						}
 						if (fail) {
-							expect(data.budget.canInvoke).toBe(false);
+							// web_search keeps its one saved-procedure lookup after a failed search.
+							expect(data.budget.canInvoke).toBe(!luna);
 							expect(data.operations[0]).toMatchObject({
 								tool: "web.lookup",
 								state: "failed",
@@ -154,7 +152,7 @@ for (const c of searchAgentCases)
 					return {
 						freshUntilMs: null,
 						result: {
-							provider: "llm-fetch@0.1.2",
+							provider: "llm-fetch@0.1.3",
 							cache: "miss",
 							observedAt: new Date().toISOString(),
 							hits: facts.map((snippet, i) => ({
@@ -256,11 +254,8 @@ for (const luna of [false, true])
 					options.onToolCalls!([
 						{
 							id: "route",
-							name: luna ? "research_web_luna" : "research",
-							arguments: JSON.stringify({
-								...(luna ? {} : { kind: "web" }),
-								question: c.question,
-							}),
+							name: luna ? "web_research" : "web_search",
+							arguments: JSON.stringify({ request: c.question }),
 						},
 					]);
 					return "";
@@ -342,7 +337,7 @@ for (const luna of [false, true])
 				return {
 					freshUntilMs: null,
 					result: {
-						provider: "llm-fetch@0.1.2",
+						provider: "llm-fetch@0.1.3",
 						cache: "miss",
 						observedAt: new Date().toISOString(),
 						hits:

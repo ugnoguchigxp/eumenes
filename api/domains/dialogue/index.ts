@@ -25,3 +25,8 @@ export {
 	type DelegationPort,
 	type DelegationCommand,
 } from "./contracts/delegation";
+export type {
+	ToolchainRoutingPort,
+	ToolchainRoute,
+	QueryVector,
+} from "./contracts/toolchains";

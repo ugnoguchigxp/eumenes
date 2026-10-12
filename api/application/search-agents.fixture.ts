@@ -5,7 +5,7 @@ export const searchAgentCases = [
 	{
 		id: "quick",
 		question: "仙台市が何県にあるか、Webで調べて教えて",
-		expectedPackage: "package:web.quick@2",
+		expectedPackage: "package:web.recipe@1",
 		query: "仙台市 都道府県",
 		queryPattern: /仙台|sendai/i,
 		facts: ["仙台市は宮城県にあります。"],
@@ -27,7 +27,7 @@ export const searchAgentCases = [
 	{
 		id: "stock",
 		question: "マイクロソフトの最新の株価を教えて",
-		expectedPackage: "package:web.quick@2",
+		expectedPackage: "package:web.recipe@1",
 		query: "Microsoft MSFT stock price",
 		queryPattern: /マイクロソフト|microsoft|\bMSFT\b/i,
 		// Deliberately synthetic price/date; never a live quote.
@@ -37,7 +37,7 @@ export const searchAgentCases = [
 	{
 		id: "weather",
 		question: "今日の東京の天気を教えて",
-		expectedPackage: "package:web.quick@2",
+		expectedPackage: "package:web.recipe@1",
 		query: "東京 今日 天気",
 		queryPattern: /東京|tokyo/i,
 		facts: ["テスト用の東京の予報は2026年10月11日、晴れ、最高気温25度です。"],

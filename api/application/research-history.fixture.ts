@@ -108,7 +108,7 @@ export const syntheticAcquisition =
 			freshUntilMs: null,
 			bodies: docs,
 			result: {
-				provider: "llm-fetch@0.1.2",
+				provider: "llm-fetch@0.1.3",
 				observedAt,
 				cache: "bypass",
 				hits:

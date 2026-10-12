@@ -34,8 +34,21 @@ export function get(db: Database, revisionId: string): FixedDefinition | null {
 	};
 }
 
+/** Passage embeddings of toolchains, per vector space. Appended migration. */
+export const toolchainVectorsMigration = `
+CREATE TABLE capability_toolchain_vectors(
+ revision_id TEXT NOT NULL,item INTEGER NOT NULL,space TEXT NOT NULL,
+ text_digest TEXT NOT NULL,vector BLOB NOT NULL,
+ PRIMARY KEY(revision_id,item,space));
+CREATE INDEX capability_toolchain_vectors_space ON capability_toolchain_vectors(space);
+`;
 /** Named migrations of this domain; the SQL above is frozen once deployed. */
 export const migrations: readonly Migration[] = [
 	{ id: "capabilities/0001-init", sql: migration },
 	{ id: "capabilities/0002-learned", sql: learnedMigration },
+	{
+		id: "capabilities/0003-toolchain-vectors",
+		sql: toolchainVectorsMigration,
+		after: ["capabilities/0002-learned"],
+	},
 ];

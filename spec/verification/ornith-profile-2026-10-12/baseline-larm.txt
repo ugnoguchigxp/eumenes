@@ -1,0 +1,143 @@
+$ bun scripts/verify.ts --domain larm
+[verify] selected=larm dependencyClosure=larm testClosure=larm
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts api/domains/larm
+size-budget ok (23 files)
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check api/domains/larm
+$ oxfmt --check api/domains/larm
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 10ms on 29 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint api/domains/larm
+$ oxlint --deny-warnings api/domains/larm
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun x tsc -p /Users/y.noguchi/Code/eumenes/verification-reports/tsconfig.selected.json
+[verify] TypeScript workspace closure: 35 files; api/domains/larm, api/infrastructure/http.ts, api/infrastructure/chat-stream.ts, api/infrastructure/logger.ts, api/infrastructure/ignore-error.ts, api/infrastructure/bounded-read.ts, api/infrastructure/error-code.ts
+[verify] domain tests: /Users/y.noguchi/.bun/bin/bun run test:domain -- larm
+$ bun scripts/test-domain.ts larm
+bun test v1.4.2 (744846f84)
+
+api/domains/larm/test/context-exact.test.ts:
+(pass) required control and summary segments are never silently truncated [0.26ms]
+
+api/domains/larm/test/playground.test.ts:
+(pass) catalog merges selector-only cold services without starting anything [1.17ms]
+(pass) every warm provider executes independently, validates claim and releases [2.92ms]
+(pass) semantic health is distinct from catalog presence, and cold diagnosis does not generate [0.36ms]
+(pass) image and music fetch artifacts without making a warm connection [0.54ms]
+(pass) music requests Opus once and fetches Ogg Opus with Control authentication after completion [2.37ms]
+(pass) music rejects invalid Opus result: not-ogg [0.43ms]
+(pass) music rejects invalid Opus result: vorbis [0.20ms]
+(pass) music rejects invalid Opus result: truncated [0.17ms]
+(pass) music rejects invalid Opus result: mime-mismatch [0.56ms]
+(pass) music rejects invalid Opus result: unknown-format [0.16ms]
+(pass) music still accepts an existing wav result [0.17ms]
+(pass) music still accepts an existing flac result [0.09ms]
+(pass) image POST failures are not retried and late cancellation is reported unknown [0.70ms]
+(pass) artifact origin mismatch never forwards control credential [0.16ms]
+(pass) music cancellation collects a late job and confirms remote cancellation [0.16ms]
+(pass) invalid claim cannot run inference and still releases connection [0.18ms]
+(pass) direct service runtime model IDs are returned separately from catalog IDs [0.14ms]
+(pass) malformed local hostnames cannot receive credentials [0.01ms]
+(pass) playground claims on the LARM host, another port included, are accepted [0.57ms]
+(pass) playground claims on another private host are refused unless listed [0.41ms]
+(pass) a missing baseUrl leaves the playground unconfigured [0.25ms]
+(pass) image uses the discovered service URL and preserves arbitrary dimensions and seed [0.23ms]
+(pass) image defaults an omitted edge to 512, format to webp and seed to zero [0.69ms]
+
+api/domains/larm/test/inference-error.test.ts:
+(pass) provider diagnostics retain the code and meaningful message, redact credentials and bound input [0.35ms]
+(pass) cancelled error-body read cannot trigger recovery [0.07ms]
+
+api/domains/larm/test/speech-voice-pair.test.ts:
+(pass) Japanese metadata voice-a selects the common English voice Rosie [0.48ms]
+(pass) Japanese metadata voice-b selects the common English voice Rosie [0.02ms]
+(pass) Japanese metadata voice-c selects the common English voice Rosie [0.02ms]
+(pass) Japanese metadata voice-d selects the common English voice Rosie [0.03ms]
+(pass) Japanese metadata voice-e selects the common English voice Jasper [0.01ms]
+(pass) Japanese metadata voice-f selects the common English voice Jasper [0.02ms]
+(pass) Japanese metadata %s selects the common English voice Rosie [0.02ms]
+(pass) catalogs are reused across clauses and Japanese synthesis keeps its own voice [0.09ms]
+(pass) unknown presentation unknown cannot silently select a different voice [0.03ms]
+(pass) unknown presentation absent cannot silently select a different voice
+(pass) Jasper must actually be declared masculine [0.06ms]
+(pass) legacy English overrides cannot change the fixed voice or speed [0.05ms]
+(pass) cancellation during catalog discovery cannot reach speech inference [0.03ms]
+
+api/domains/larm/test/music-library.test.ts:
+(pass) Unicode query and cursor are encoded without changing conditions [0.46ms]
+(pass) track references cannot send Control authentication to another origin [0.63ms]
+
+api/domains/larm/test/larm.test.ts:
+(pass) control JSON generation is opt-in and ordinary answers keep provider defaults [2.14ms]
+(pass) catalog, claim, ASR/LLM/TTS and release use public contract [1.14ms]
+(pass) ASR accepts empty silence but rejects missing, nontext or oversized transcripts [0.67ms]
+(pass) voice menu uses claimed provider auth and TTS sends selected voice and speed [0.34ms]
+(pass) VOICEVOX catalog labels, style, inclusive numeric bounds and decoded credits reach phrase synthesis [1.38ms]
+(pass) a refused VOICEVOX catalog does not block synthesis of a chosen voice [0.43ms]
+(pass) a caller's deadline that aborts a shared connection attempt does not fail other callers [0.35ms]
+(pass) other models omit VOICEVOX fields and busy responses never replay or replace the connection [0.44ms]
+(pass) mismatched claim is rejected before inference and lease is released [0.70ms]
+(pass) oversized inference response is rejected while streaming [0.17ms]
+(pass) simultaneous capability upgrades share one replacement connection [0.79ms]
+(pass) Gemma requests the live profile and renews by reclaiming the rotated token [0.48ms]
+(pass) voice requests every provider in the Gemma profile [0.13ms]
+(pass) an expired connection stops polling and is released [0.14ms]
+(pass) an explicit baseUrl is the only control origin the token is sent to [0.12ms]
+(pass) without a baseUrl LARM stays unconfigured and never contacts any host [0.11ms]
+(pass) missing claim voice discovers and caches the advertised default with the control credential [0.70ms]
+(pass) an unadvertised default voice is rejected before speech inference [0.32ms]
+(pass) cancelling a caller returns promptly during allocation and close stops polling [0.17ms]
+(pass) runtime changes notify connecting and ready/failed without exposing credentials [0.23ms]
+(pass) idle-released JSON before SSE recreates and claims once; both exchanges survive [0.39ms]
+(pass) local idle expires a still-valid lease without requests; next voice use requests the profile again [0.24ms]
+(pass) an active inference pauses the local idle timer and completion starts a new idle interval [0.62ms]
+(pass) only the explicit idle-released 409 can replay, and recovery is bounded at one replacement [0.49ms]
+(pass) cancellation after the 409 diagnostic prevents replacement and replay [0.12ms]
+(pass) a late concurrent rejection cannot discard the replacement lease [0.72ms]
+(pass) manual connection check follows released state even with unexpired credentials [0.19ms]
+(pass) renew rotates every claimed provider while leaving the idle deadline unchanged [0.31ms]
+(pass) published SSE prefix errors never reconnect or replay inference [0.17ms]
+(pass) idle expiry during a health check cannot revive the released local lease [0.60ms]
+(pass) invalid reclaim after renew discards every old credential before another request [0.44ms]
+(pass) a ready connection waits for requested providers to become claimable before claim [0.22ms]
+(pass) unauthorized can recover only when control confirms the old connection is released [0.41ms]
+(pass) context trimming retains the current input after an unanswered prior turn [0.76ms]
+(pass) native decision shares the voice lease, uses its own auth, and rotates credentials [0.46ms]
+(pass) absent or invalid optional decision never breaks ordinary voice providers [0.38ms]
+(pass) caller cancellation is logged separately from a provider network failure [0.90ms]
+(pass) Ruri uses claimed model/token and current chunk only; rejects unsupported questions before provider request [0.77ms]
+(pass) control POSTs keep the 15 s budget while status GETs with a caller signal use 3 s [0.23ms]
+(pass) a timed-out connection POST is retried with the same Idempotency-Key [0.13ms]
+(pass) a caller abort during renewal neither fails the status nor releases the shared lease [0.19ms]
+(pass) close waits for in-use leases before sending DELETE [0.22ms]
+(pass) a valid lease serves new inference while a renewal is still waiting [1.21ms]
+(pass) a provider on the LARM host with another port is accepted [0.13ms]
+(pass) a provider on a different private host is rejected before any token is sent [0.74ms]
+(pass) the providerHosts config allows another host and the environment is not read [0.29ms]
+(pass) a .local provider is accepted only when the LARM base itself is .local [0.09ms]
+(pass) a failed connect exposes only a machine-readable error code [0.12ms]
+(pass) language and English speech bind catalog models, dedicated credentials and renewed claims (model-tts-english) [1.03ms]
+(pass) language and English speech bind catalog models, dedicated credentials and renewed claims (voicevox-core) [0.96ms]
+(pass) sentence language rejects invalid or shortened System One results [0.23ms]
+(pass) sentence language rejects invalid or shortened System One results [0.19ms]
+(pass) sentence language rejects invalid or shortened System One results [0.12ms]
+(pass) sentence language rejects invalid or shortened System One results [0.09ms]
+(pass) sentence language rejects invalid or shortened System One results [0.75ms]
+(pass) sentence language rejects invalid or shortened System One results [0.16ms]
+(pass) sentence language rejects invalid or shortened System One results [0.11ms]
+(pass) missing classifier and English providers never reuse attitude or Japanese synthesis [0.20ms]
+(pass) invalid optional speech bindings (model) are discarded without breaking Japanese speech [0.28ms]
+(pass) invalid optional speech bindings (host) are discarded without breaking Japanese speech [0.17ms]
+(pass) invalid optional speech bindings (renew) are discarded without breaking Japanese speech [0.73ms]
+(pass) sentence capability discovery binds the shared voice profile without a fixed model selector [0.26ms]
+(pass) invalid claimed sentence endpoint (missing) never receives a credential [0.17ms]
+(pass) invalid claimed sentence endpoint (foreign) never receives a credential [0.08ms]
+(pass) invalid claimed sentence endpoint (mismatched) never receives a credential [0.07ms]
+(pass) daemon epoch loss discards the old sentence credential and claims a new connection once [0.97ms]
+(pass) a cached pre-deployment voice lease reclaims the added sentence provider after epoch loss [0.38ms]
+
+ 108 pass
+ 0 fail
+ 770 expect() calls
+Ran 108 tests across 6 files. [152.00ms]
+[verify] passed 1904 ms

@@ -83,8 +83,11 @@ test("C01-C03: a relative timer request is saved through the toolchain", async (
 			saved.actions[0]?.receipt_digest,
 		);
 		expect(h.workerContexts).toHaveLength(0);
-		expect(h.routeContexts[0]).toContain("現在のタイマーのsnapshot");
+		// The conversation only hands the request over; the timer sub-agent sees the snapshot.
+		expect(h.routeContexts[0]).not.toContain("snapshot");
 		expect(h.routeContexts[0]).toContain("3分タイマー測って");
+		expect(h.commandContexts[0]).toContain("snapshot");
+		expect(h.commandContexts[0]).toContain("timer.start");
 		const origin = h.store.read((db) =>
 			db.query("SELECT conversation_id, origin_message_id FROM timers").get(),
 		);
@@ -93,7 +96,8 @@ test("C01-C03: a relative timer request is saved through the toolchain", async (
 			origin_message_id: run.inputMessageId,
 		});
 		expect(h.acquisitions).toBe(0);
-		expect(h.calls).toBe(2);
+		// Conversation, the timer sub-agent, and the answer.
+		expect(h.calls).toBe(3);
 	} finally {
 		await h.close();
 	}
@@ -539,11 +543,11 @@ test("real dialogue list and cancel select an authoritative timer snapshot", asy
 		await ask("90秒タイマー");
 		expect(await ask("タイマーの残りを確認して")).toContain("残り");
 		const timer = h.timers!.list().items[0]!;
-		expect(h.routeContexts[1]).toContain(timer.id);
-		expect(h.routeContexts[1]).toContain("revision");
+		expect(h.commandContexts[1]).toContain(timer.id);
+		expect(h.commandContexts[1]).toContain("revision");
 		expect(await ask("タイマーを止めて")).toContain("取り消");
 		expect(h.timers!.get(timer.id)?.timer.state).toBe("cancelled");
-		expect(h.calls).toBe(6);
+		expect(h.calls).toBe(9);
 	} finally {
 		await h.close();
 	}
@@ -616,7 +620,7 @@ test("cancellation after preparation refreshes the result before the agent phras
 		expect(changed).toBe(true);
 		expect(h.dialogue.answerText(run.id)).toContain("取り消");
 		expect(h.dialogue.answerText(run.id)).not.toContain("開始");
-		expect(h.calls).toBe(2);
+		expect(h.calls).toBe(3);
 	} finally {
 		unsubscribe();
 		await h.close();

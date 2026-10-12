@@ -36,9 +36,29 @@ export const cloudEndpoint = endpoint.refine((value) => {
 	const u = new URL(value);
 	return u.protocol === "https:" || privateHost(u.hostname);
 }, "外部ホストには https が必要です");
+/** How a cloud connection is driven: an OpenAI-compatible HTTP API or an agent SDK (LLM only). */
+export const connectionKinds = [
+	"openai-compatible",
+	"codex-sdk",
+	"claude-agent-sdk",
+	"claude-managed-agents",
+] as const;
+export type ConnectionKind = (typeof connectionKinds)[number];
+export const isAgentConnection = (c: { kind?: ConnectionKind }) =>
+	!!c.kind && c.kind !== "openai-compatible";
+const managedAgentsId = z
+	.string()
+	.trim()
+	.regex(/^[A-Za-z0-9_-]{1,128}$/, "IDの形式が正しくありません");
 export const connectionSchema = z
 	.object({
 		id: z.uuid(),
+		/** Absent: openai-compatible (settings saved before agent connections). */
+		kind: z.enum(connectionKinds).optional(),
+		/** Managed Agents only: the stored agent each session starts from. */
+		agentId: managedAgentsId.nullable().optional(),
+		/** Managed Agents only: the environment each session runs in. */
+		environmentId: managedAgentsId.nullable().optional(),
 		name: z.string().trim().min(1).max(80),
 		// Read path stays lenient so settings saved before the https rule still load;
 		// applySchema enforces cloudEndpoint on input.
@@ -145,15 +165,24 @@ const asrLanguageCodes = asrLanguages.map(([code]) => code) as [
 ];
 export const personas = ["butler", "maid", "strategist", "sage"] as const;
 export type Persona = (typeof personas)[number];
+export const backgroundSchema = z.enum(["light-fairy", "spatial"]);
+export type BackgroundKind = z.infer<typeof backgroundSchema>;
 export const settingsSchema = z
 	.object({
 		revision: z.number().int().nonnegative(),
 		larm: z
 			.object({
 				baseUrl: endpoint.nullable(),
-				profile: z.string().trim().min(1).max(200),
+				profile: z.string().trim().min(1).max(200).default("ornith1.5Strix"),
 				audience: z.enum(["saaa-desktop", "same-host"]),
 				voice: z.string().max(200),
+				sentenceLanguageEnabled: z.boolean().optional(),
+				/** Provider selector within the saved Agent Profile; no model or URL is stored. */
+				sentenceLanguageProvider: z.string().trim().max(200).optional(),
+				/** Legacy fields accepted for stored documents; English voices and speed are fixed. */
+				englishVoice: z.string().trim().max(200).optional(),
+				englishMasculineVoice: z.string().trim().max(200).optional(),
+				englishSpeed: z.number().min(0.5).max(2).optional(),
 				speed: z.number().min(0.5).max(2).optional(),
 				style: z.string().trim().min(1).max(200).optional(),
 				pitchScale: z.number().min(-0.15).max(0.15).optional(),
@@ -194,6 +223,7 @@ export const settingsSchema = z
 					.refine((v) => new Set(v).size === v.length, "言語が重複しています")
 					.default(["ja", "en"]),
 				theme: z.enum(["system", "light", "dark"]),
+				background: backgroundSchema.optional(),
 				subtitles: subtitleSchema.default(defaultSubtitles),
 			})
 			.strict(),
@@ -237,6 +267,24 @@ export const settingsSchema = z
 		for (const r of s.resources)
 			if (!ids.has(r.connectionId))
 				ctx.addIssue({ code: "custom", message: "接続先がありません" });
+		for (const c of s.connections) {
+			if (
+				isAgentConnection(c) &&
+				s.resources.some((r) => r.connectionId === c.id && r.purpose !== "llm")
+			)
+				ctx.addIssue({
+					code: "custom",
+					message: "エージェントSDKの接続は会話用途にだけ使えます",
+				});
+			if (
+				c.kind === "claude-managed-agents" &&
+				(!c.agentId || !c.environmentId)
+			)
+				ctx.addIssue({
+					code: "custom",
+					message: "Managed AgentsにはエージェントIDと環境IDが必要です",
+				});
+		}
 		for (const p of purposeSchema.options) {
 			const route = s.routes[p];
 			if (
@@ -285,6 +333,14 @@ export const applySchema = z
 	})
 	.strict()
 	.superRefine((input, ctx) => {
+		// Read path stays lenient so a stored Gemma selection still loads; new saves cannot choose it.
+		if (input.settings.larm.profile === "SAAA-gemma4-26b")
+			ctx.addIssue({
+				code: "custom",
+				message:
+					"Gemma 4 のProfileは廃止しました。ornith1.5Strix を指定してください",
+				path: ["settings", "larm", "profile"],
+			});
 		input.settings.connections.forEach((connection, index) => {
 			if (!cloudEndpoint.safeParse(connection.baseUrl).success)
 				ctx.addIssue({

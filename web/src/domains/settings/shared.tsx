@@ -9,6 +9,7 @@ import {
 } from "react";
 import { type EumenesClient } from "../../../../client";
 import type {
+	ConnectionKind,
 	Purpose,
 	Settings,
 } from "../../../../api/domains/settings/contracts";
@@ -24,6 +25,60 @@ export const purposes: Record<Purpose, string> = {
 	llm: "会話",
 	asr: "聞き取り",
 	tts: "読み上げ",
+};
+export const connectionKindLabels: Record<ConnectionKind, string> = {
+	"openai-compatible": "OpenAI互換API",
+	"codex-sdk": "Codex SDK",
+	"claude-agent-sdk": "Claude Agent SDK",
+	"claude-managed-agents": "Claude Managed Agents",
+};
+/** Prefilled values when a kind is chosen; all stay editable. */
+export const connectionKindDefaults: Record<
+	ConnectionKind,
+	{ url: string; model: string; context: number }
+> = {
+	"openai-compatible": { url: "", model: "", context: 8192 },
+	"codex-sdk": {
+		url: "https://api.openai.com/v1",
+		model: "gpt-6-luna",
+		context: 200_000,
+	},
+	"claude-agent-sdk": {
+		url: "https://api.anthropic.com",
+		model: "claude-opus-5-5",
+		context: 1_000_000,
+	},
+	"claude-managed-agents": {
+		url: "https://api.anthropic.com",
+		model: "claude-opus-5-5",
+		context: 1_000_000,
+	},
+};
+/**
+ * Models offered in the conversation model picker for CLI-login SDK connections.
+ * Fable and Astra are left out on purpose: their usage cost is too high for casual switching.
+ */
+export type CatalogKind = "codex-sdk" | "claude-agent-sdk";
+export const agentModelCatalog: Record<
+	CatalogKind,
+	readonly { model: string; context: number }[]
+> = {
+	"codex-sdk": [
+		{ model: "gpt-6.1-sol", context: 500_000 },
+		{ model: "gpt-6-sol", context: 272_000 },
+		{ model: "gpt-6-luna", context: 272_000 },
+		{ model: "gpt-5.6-sol", context: 272_000 },
+		{ model: "gpt-5.6-terra", context: 272_000 },
+		{ model: "gpt-5.6-luna", context: 272_000 },
+		{ model: "gpt-daybreak-blue-latest", context: 272_000 },
+	],
+	"claude-agent-sdk": [
+		{ model: "claude-opus-5-5", context: 1_000_000 },
+		{ model: "claude-sonnet-5-5", context: 1_000_000 },
+		{ model: "claude-haiku-5-5", context: 1_000_000 },
+		{ model: "claude-opus-5", context: 1_000_000 },
+		{ model: "claude-sonnet-5", context: 1_000_000 },
+	],
 };
 export function Field({
 	label,
@@ -199,14 +254,16 @@ export function SpeechSpeed({
 	value,
 	onChange,
 	range,
+	label = "話す速さ",
 }: {
 	value: number;
 	onChange: (v: number) => void;
 	range?: TtsRange;
+	label?: string;
 }) {
 	return (
 		<Field
-			label={`話す速さ（${value.toFixed(1)}倍）`}
+			label={`${label}（${value.toFixed(1)}倍）`}
 			hint="1.0倍が標準です。音声サービスの対応範囲で反映されます。"
 		>
 			<input
@@ -223,6 +280,9 @@ export function SpeechSpeed({
 
 export type Change = (fn: (s: Settings) => void) => void;
 export type NewCloud = {
+	kind: ConnectionKind;
+	agentId: string;
+	environmentId: string;
 	name: string;
 	url: string;
 	key: string;
@@ -234,6 +294,9 @@ export type NewCloud = {
 	assign: boolean;
 };
 export const emptyCloud: NewCloud = {
+	kind: "openai-compatible",
+	agentId: "",
+	environmentId: "",
 	name: "",
 	url: "",
 	key: "",

@@ -228,6 +228,7 @@ export type QuestionResource = {
 export type FormResource = {
 	kind: "form";
 	revision: number;
+	submitLabel?: string;
 	fields: Field[];
 	defaults: Record<string, string | boolean>;
 	submitted?: Record<string, string | boolean>;

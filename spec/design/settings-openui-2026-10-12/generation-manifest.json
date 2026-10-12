@@ -1,0 +1,83 @@
+[
+	{
+		"id": "settings-hub",
+		"title": "薄い設定入口",
+		"requestKey": "59f0c2c5-1a29-4cb6-95e4-058a6e086705",
+		"status": "saved",
+		"runId": "aec61510-f8e4-4a9c-aedc-23269cce3899",
+		"model": "AtomicChat/Qwen-Image-2.1-Turbo-GGUF",
+		"file": "/Users/y.noguchi/Code/eumenes/spec/design/settings-openui-2026-10-12/settings-hub.png"
+	},
+	{
+		"id": "conversation",
+		"title": "会話",
+		"requestKey": "799412a3-7697-4558-893a-d3149a030692",
+		"status": "saved",
+		"runId": "cc15aaab-72cb-460b-b86f-b280662c1b0f",
+		"model": "AtomicChat/Qwen-Image-2.1-Turbo-GGUF",
+		"file": "/Users/y.noguchi/Code/eumenes/spec/design/settings-openui-2026-10-12/conversation.png"
+	},
+	{
+		"id": "appearance",
+		"title": "表示",
+		"requestKey": "401bda15-0073-4f6e-b26e-856c3dbf7444",
+		"status": "saved",
+		"runId": "0e5e0581-2504-4727-b3df-f92802e0f4da",
+		"model": "AtomicChat/Qwen-Image-2.1-Turbo-GGUF",
+		"file": "/Users/y.noguchi/Code/eumenes/spec/design/settings-openui-2026-10-12/appearance.png"
+	},
+	{
+		"id": "voice-input",
+		"title": "音声と入力",
+		"requestKey": "b7a4819b-57a5-4a09-9c4f-c1fe960f50cf",
+		"status": "saved",
+		"runId": "423edcaa-98af-4955-ac2e-c35b814e7227",
+		"model": "AtomicChat/Qwen-Image-2.1-Turbo-GGUF",
+		"file": "/Users/y.noguchi/Code/eumenes/spec/design/settings-openui-2026-10-12/voice-input.png"
+	},
+	{
+		"id": "ai-connections",
+		"title": "AIと接続",
+		"requestKey": "10250dc6-6a09-4c9f-827a-43dd654a2a0e",
+		"status": "saved",
+		"runId": "bd3782eb-6db4-4f92-a5fc-2cc0c6b28ae1",
+		"model": "AtomicChat/Qwen-Image-2.1-Turbo-GGUF",
+		"file": "/Users/y.noguchi/Code/eumenes/spec/design/settings-openui-2026-10-12/ai-connections.png"
+	},
+	{
+		"id": "external-work",
+		"title": "外部作業の設定",
+		"requestKey": "d8d9c57a-f8fa-499a-99ad-b2541e8b6a91",
+		"status": "saved",
+		"runId": "4d6ec393-3e13-4563-8155-0fe91f65135f",
+		"model": "AtomicChat/Qwen-Image-2.1-Turbo-GGUF",
+		"file": "/Users/y.noguchi/Code/eumenes/spec/design/settings-openui-2026-10-12/external-work.png"
+	},
+	{
+		"id": "memory",
+		"title": "記憶",
+		"requestKey": "7a1f03a7-95bf-4889-9857-4da7c3b5a49c",
+		"status": "saved",
+		"runId": "6067cb82-6918-456b-8c34-58a533f02a72",
+		"model": "AtomicChat/Qwen-Image-2.1-Turbo-GGUF",
+		"file": "/Users/y.noguchi/Code/eumenes/spec/design/settings-openui-2026-10-12/memory.png"
+	},
+	{
+		"id": "dictionary",
+		"title": "読み方辞書",
+		"requestKey": "ea311050-224d-4d90-b4e2-8a88a5e9860e",
+		"status": "saved",
+		"runId": "fb1e8fc1-0c19-4fca-8ee2-9092b0305a8b",
+		"model": "AtomicChat/Qwen-Image-2.1-Turbo-GGUF",
+		"file": "/Users/y.noguchi/Code/eumenes/spec/design/settings-openui-2026-10-12/dictionary.png"
+	},
+	{
+		"id": "schedule",
+		"title": "予約",
+		"requestKey": "a929bd23-8877-4aed-a47a-917cc2453373",
+		"status": "unknown",
+		"runId": "8e09cc9e-db63-4dba-b6b6-6ce50d08763b",
+		"model": "qwen-image-2.1-turbo",
+		"error": "generation_unknown"
+	}
+]

@@ -5,6 +5,17 @@ import type { Receipt } from "../../inference";
 import type { HandlerDefinition, Tx } from "../../queue";
 import { settleConversationOperation } from "./generation-operation";
 import type { ConversationOperation } from "./conversation-tools";
+import {
+	agentOutcome,
+	chosen,
+	failedAnswer,
+	prepareDecision,
+	recordRejected,
+	traceFailure,
+	traceOutcome,
+	traceSelection,
+	type SelectionDraft,
+} from "./selection-trace";
 import { generateConversation } from "./conversation-generation";
 import { researchCitations } from "./research-citations";
 import { type Run, type WorldContextSettleInput } from "../contracts";
@@ -14,6 +25,7 @@ import {
 	WorldContextRetry,
 	type DialogueDeps,
 	type GenerateInput,
+	type GeneratePayload,
 } from "./context";
 import { createPrepare } from "./generation-prepare";
 import type { Progress } from "./progress";
@@ -59,13 +71,22 @@ export function createGenerationHandler(
 	}
 
 	const handler: HandlerDefinition<
-		{ runId: string },
+		GeneratePayload,
 		GenerateInput,
-		{ text: string; receipt?: Receipt; operation?: ConversationOperation }
+		{
+			text: string;
+			receipt?: Receipt;
+			operation?: ConversationOperation;
+			/** The decision this attempt made, recorded with its adoption. */
+			selection?: SelectionDraft;
+		}
 	> = {
 		kind: GENERATE_KIND,
 		payloadVersions: [1],
-		schema: z.object({ runId: z.string() }),
+		schema: z.object({
+			runId: z.string(),
+			commandNote: z.string().max(500).optional(),
+		}),
 		recovery: "interrupt",
 		resourceKey: "inference.llm",
 		prepareInTransaction: createPrepare(deps, { partials }),
@@ -171,28 +192,43 @@ export function createGenerationHandler(
 									},
 								}
 							: undefined;
-					const generated = await generateConversation({
-						inference: larm,
-						requestId: input.requestId,
-						messages: input.messages,
-						signal,
-						delta,
-						preparation,
-						tools: input.agent ? undefined : input.tools,
-						repair: () => {
-							partials.delete(input.runId);
-							held = 0;
-							publish(input.runId);
-						},
-					});
+					const decision = await prepareDecision(deps, input, signal);
+					let generated: Awaited<ReturnType<typeof generateConversation>>;
+					try {
+						generated = await generateConversation({
+							inference: larm,
+							requestId: input.requestId,
+							messages: decision.messages,
+							signal,
+							delta,
+							preparation,
+							tools: decision.tools,
+							cards: decision.cards,
+							repair: () => {
+								partials.delete(input.runId);
+								held = 0;
+								publish(input.runId);
+							},
+						});
+					} catch (error) {
+						if (
+							error instanceof Error &&
+							error.message === "invalid_conversation_operation"
+						)
+							await recordRejected(deps, input.runId, decision.draft);
+						throw error;
+					}
 					let { text } = generated;
 					const { receipt } = generated;
 					if (generated.operation) {
-						if ((!agents && !deps.delegation) || input.agent)
+						if ((!agents && !deps.delegation && !deps.music) || input.agent)
 							throw new Error("invalid_conversation_operation");
 						partials.delete(input.runId);
-						return generated;
+						return { ...generated, selection: chosen(decision, generated) };
 					}
+					const answered = decision.draft("answer", {
+						repaired: generated.repaired,
+					});
 					const prefix = partials.get(input.runId) ?? "";
 					if (!text.startsWith(prefix)) throw new Error("chat_stream_diverged");
 					if (holdBody) {
@@ -203,7 +239,7 @@ export function createGenerationHandler(
 					log.info("dialogue.generation_completed");
 					if (input.agent?.projection || input.agent?.failureCode)
 						text = researchCitations(text, input.agent.projection);
-					return { text, receipt };
+					return { text, receipt, selection: answered };
 				},
 			);
 		},
@@ -224,7 +260,8 @@ export function createGenerationHandler(
 						worldContext?.releaseInTransaction(tx, run.id, run.conversationId);
 					return "stale";
 				}
-				if (outcome.result.operation && (agents || deps.delegation))
+				traceSelection(deps, tx, run.id, outcome.result.selection);
+				if (outcome.result.operation)
 					return settleConversationOperation(
 						deps,
 						partials,
@@ -254,7 +291,7 @@ export function createGenerationHandler(
 					// Not adopted: the World context's input dependencies go.
 					if (input.world)
 						worldContext?.releaseInTransaction(tx, run.id, run.conversationId);
-					return { status: "failed", errorCode: "report_invalidated" };
+					return failedAnswer(deps, tx, run.id, "report_invalidated");
 				}
 				const worldSettle: WorldContextSettleInput | null =
 					input.world && worldContext
@@ -293,7 +330,7 @@ export function createGenerationHandler(
 							clock(),
 							verdict.reason,
 						);
-						return { status: "failed", errorCode: verdict.reason };
+						return failedAnswer(deps, tx, run.id, verdict.reason);
 					}
 				}
 				if (input.memory && memory) {
@@ -321,7 +358,7 @@ export function createGenerationHandler(
 							clock(),
 							adopted.reason,
 						);
-						return { status: "failed", errorCode: adopted.reason };
+						return failedAnswer(deps, tx, run.id, adopted.reason);
 					}
 				}
 				if (
@@ -341,7 +378,7 @@ export function createGenerationHandler(
 					);
 					if (input.world)
 						worldContext?.releaseInTransaction(tx, run.id, run.conversationId);
-					return { status: "failed", errorCode: "permission_revoked" };
+					return failedAnswer(deps, tx, run.id, "permission_revoked");
 				}
 				// The usage record and the answer are written together, after every check.
 				if (input.world && worldContext && worldSettle)
@@ -378,6 +415,7 @@ export function createGenerationHandler(
 					messageId,
 				);
 				if (done) observeAnswer(tx, run.id, input.agent);
+				if (done) traceOutcome(deps, tx, run.id, agentOutcome(input.agent));
 				else if (input.world)
 					worldContext?.releaseInTransaction(tx, run.id, run.conversationId);
 				return done ? "applied" : "stale";
@@ -396,6 +434,8 @@ export function createGenerationHandler(
 							: ["interrupted", outcome.errorCode];
 			if (run.agentTaskId)
 				agents?.failAnswerInTransaction(tx, run.id, next[1] ?? "answer_failed");
+			if (next[0] !== "queued")
+				traceFailure(deps, tx, run.id, outcome.type, next[1]);
 			return transition(tx, run.id, run.revision, next[0], clock(), next[1])
 				? "applied"
 				: "stale";
@@ -413,6 +453,7 @@ export function createGenerationHandler(
 				);
 				// A late result is rejected by the queue; what the run registered is released.
 				worldContext?.releaseInTransaction(tx, run.id, run.conversationId);
+				traceFailure(deps, tx, run.id, "cancelled", "cancel_requested");
 			}
 		},
 	};

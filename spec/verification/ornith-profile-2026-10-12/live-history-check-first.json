@@ -1,0 +1,63 @@
+{
+  "date": "2026-10-12T11:58:17.928Z",
+  "savedSettingsPreserved": true,
+  "events": [
+    {
+      "id": "aconn_epoch-18d96c1a-f9b9-407f-b818-e9cdcb538b2f_ae43e0d8-16c9-4a3f-8d65-3e71f47cf140",
+      "profile": "ornith1.5Strix",
+      "status": "pending",
+      "phase": "deploying",
+      "http": 202
+    },
+    {
+      "id": "aconn_epoch-18d96c1a-f9b9-407f-b818-e9cdcb538b2f_ae43e0d8-16c9-4a3f-8d65-3e71f47cf140",
+      "profile": "ornith1.5Strix",
+      "status": "ready",
+      "phase": "ready",
+      "http": 200
+    },
+    {
+      "id": "aconn_epoch-18d96c1a-f9b9-407f-b818-e9cdcb538b2f_fdadfc65-912d-4c8c-9160-43afd258455a",
+      "profile": "ornith1.5Strix-64k",
+      "status": "ready",
+      "phase": "ready",
+      "http": 201
+    },
+    {
+      "id": "aconn_epoch-18d96c1a-f9b9-407f-b818-e9cdcb538b2f_c5a0d7ce-9777-43d6-804d-1f19de2fb6d7",
+      "profile": "ornith1.5Strix-64k",
+      "status": "ready",
+      "phase": "ready",
+      "http": 201
+    },
+    {
+      "id": "aconn_epoch-18d96c1a-f9b9-407f-b818-e9cdcb538b2f_208a6d1a-7f68-4d18-a4c1-131bb046b84a",
+      "profile": "ornith1.5Strix-64k",
+      "status": "ready",
+      "phase": "ready",
+      "http": 201
+    },
+    {
+      "id": "aconn_epoch-18d96c1a-f9b9-407f-b818-e9cdcb538b2f_17be54af-0769-467d-b37e-a3ec15535c61",
+      "profile": "ornith1.5Strix-64k",
+      "status": "pending",
+      "phase": "waiting-capacity",
+      "http": 202
+    },
+    {
+      "id": "aconn_epoch-18d96c1a-f9b9-407f-b818-e9cdcb538b2f_17be54af-0769-467d-b37e-a3ec15535c61",
+      "profile": "ornith1.5Strix-64k",
+      "status": "ready",
+      "phase": "ready",
+      "http": 200
+    }
+  ],
+  "providers": [],
+  "fifthWaitedWithoutInference": true,
+  "fourConcurrentResponses": true,
+  "fifthUsedReleasedSlot": true,
+  "result": "failed",
+  "error": "live_history_isolation_failed",
+  "createdConnections": 5,
+  "releasedConnections": 5
+}

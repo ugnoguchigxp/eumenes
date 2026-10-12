@@ -1,0 +1,157 @@
+{
+  "date": "2026-10-12T12:09:53.016Z",
+  "savedSettingsPreserved": true,
+  "events": [
+    {
+      "id": "aconn_epoch-18d96c1a-f9b9-407f-b818-e9cdcb538b2f_e40c3764-076e-4684-86e5-af2594f5a7d8",
+      "profile": "ornith1.5Strix",
+      "status": "pending",
+      "phase": "deploying",
+      "http": 202
+    },
+    {
+      "id": "aconn_epoch-18d96c1a-f9b9-407f-b818-e9cdcb538b2f_e40c3764-076e-4684-86e5-af2594f5a7d8",
+      "profile": "ornith1.5Strix",
+      "status": "probing",
+      "phase": "probing",
+      "http": 200
+    },
+    {
+      "id": "aconn_epoch-18d96c1a-f9b9-407f-b818-e9cdcb538b2f_e40c3764-076e-4684-86e5-af2594f5a7d8",
+      "profile": "ornith1.5Strix",
+      "status": "ready",
+      "phase": "ready",
+      "http": 200
+    },
+    {
+      "id": "aconn_epoch-18d96c1a-f9b9-407f-b818-e9cdcb538b2f_d1571236-4a28-49a1-bfd3-8444a3d5dc7c",
+      "profile": "ornith1.5Strix-64k",
+      "status": "ready",
+      "phase": "ready",
+      "http": 201
+    },
+    {
+      "id": "aconn_epoch-18d96c1a-f9b9-407f-b818-e9cdcb538b2f_6ed09b77-35db-4fc2-bdbe-ca0eacd539f1",
+      "profile": "ornith1.5Strix-64k",
+      "status": "ready",
+      "phase": "ready",
+      "http": 201
+    },
+    {
+      "id": "aconn_epoch-18d96c1a-f9b9-407f-b818-e9cdcb538b2f_06a5823c-b8b7-436f-bdb9-1669d971e8f9",
+      "profile": "ornith1.5Strix-64k",
+      "status": "ready",
+      "phase": "ready",
+      "http": 201
+    },
+    {
+      "id": "aconn_epoch-18d96c1a-f9b9-407f-b818-e9cdcb538b2f_74bc0b6c-255a-4ab2-ad5c-9955b3cc5cbf",
+      "profile": "ornith1.5Strix-64k",
+      "status": "pending",
+      "phase": "waiting-capacity",
+      "http": 202
+    },
+    {
+      "id": "aconn_epoch-18d96c1a-f9b9-407f-b818-e9cdcb538b2f_74bc0b6c-255a-4ab2-ad5c-9955b3cc5cbf",
+      "profile": "ornith1.5Strix-64k",
+      "status": "ready",
+      "phase": "ready",
+      "http": 200
+    },
+    {
+      "id": "aconn_epoch-18d96c1a-f9b9-407f-b818-e9cdcb538b2f_a4e87966-fe0e-4d9c-a0ee-a00981b332c5",
+      "profile": "ornith1.5Strix",
+      "status": "ready",
+      "phase": "ready",
+      "http": 201
+    },
+    {
+      "id": "aconn_epoch-18d96c1a-f9b9-407f-b818-e9cdcb538b2f_d45019a8-dbcd-4824-a3f8-ca5dcd53e4c8",
+      "profile": "ornith1.5Strix",
+      "status": "ready",
+      "phase": "ready",
+      "http": 201
+    }
+  ],
+  "providers": [
+    {
+      "name": "llm",
+      "model": "ornith-1.5-strix-lean",
+      "connected": true
+    },
+    {
+      "name": "asr",
+      "model": "granite-speech-4.1-2b",
+      "connected": true
+    },
+    {
+      "name": "tts",
+      "model": "voicevox-core",
+      "connected": true
+    },
+    {
+      "name": "tts-english",
+      "model": "kitten-tts-nano-0.8-fp32",
+      "connected": true
+    },
+    {
+      "language": "ja",
+      "bytes": 79404,
+      "classified": true
+    },
+    {
+      "language": "en",
+      "bytes": 170044,
+      "classified": true
+    },
+    {
+      "name": "system-one",
+      "model": "ruri-v3-30m-speaking-attitude",
+      "inferred": true
+    },
+    {
+      "name": "embedding",
+      "dimensions": 384,
+      "space": "intfloat/multilingual-e5-small"
+    }
+  ],
+  "responses": [
+    {
+      "index": 1,
+      "model": "ornith-1.5-strix-lean",
+      "finishReason": "stop",
+      "characters": 41
+    },
+    {
+      "index": 0,
+      "model": "ornith-1.5-strix-lean",
+      "finishReason": "stop",
+      "characters": 41
+    },
+    {
+      "index": 3,
+      "model": "ornith-1.5-strix-lean",
+      "finishReason": "stop",
+      "characters": 41
+    },
+    {
+      "index": 2,
+      "model": "ornith-1.5-strix-lean",
+      "finishReason": "stop",
+      "characters": 41
+    },
+    {
+      "index": 4,
+      "model": "ornith-1.5-strix-lean",
+      "finishReason": "stop",
+      "characters": 41
+    }
+  ],
+  "fifthWaitedWithoutInference": true,
+  "fourConcurrentResponses": true,
+  "fifthUsedReleasedSlot": true,
+  "historiesIsolated": true,
+  "result": "passed",
+  "createdConnections": 7,
+  "releasedConnections": 7
+}

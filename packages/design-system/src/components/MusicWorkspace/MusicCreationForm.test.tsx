@@ -17,10 +17,10 @@ it("selects multiple genres including orchestra, filters the catalogue and remov
 	render(<MusicCreationForm onGenerate={generate} />);
 	expect(screen.getAllByRole("checkbox").length).toBeGreaterThan(60);
 	fireEvent.click(
-		screen.getByRole("checkbox", { name: "オーケストラ", exact: true }),
+		screen.getByRole("checkbox", { name: "オーケストラ" }),
 	);
 	fireEvent.click(
-		screen.getByRole("checkbox", { name: "Ambient", exact: true }),
+		screen.getByRole("checkbox", { name: "Ambient" }),
 	);
 	expect(prompt().value).toContain("オーケストラ、Ambient");
 	fireEvent.change(screen.getByRole("textbox", { name: "ジャンルを探す" }), {
@@ -39,14 +39,14 @@ it("preserves a hand-written prompt, requires a decision on changed choices and 
 	render(<MusicCreationForm onGenerate={vi.fn()} />);
 	fireEvent.change(prompt(), { target: { value: "手書きの曲の希望を残す" } });
 	fireEvent.click(
-		screen.getByRole("checkbox", { name: "ロック", exact: true }),
+		screen.getByRole("checkbox", { name: "ロック" }),
 	);
 	expect(prompt().value).toBe("手書きの曲の希望を残す");
 	expect(screen.getByRole("button", { name: "楽曲を生成" })).toBeDisabled();
 	fireEvent.click(screen.getByRole("button", { name: "編集内容を使う" }));
 	expect(prompt().value).toBe("手書きの曲の希望を残す");
 	fireEvent.click(
-		screen.getByRole("checkbox", { name: "ポップ", exact: true }),
+		screen.getByRole("checkbox", { name: "ポップ" }),
 	);
 	fireEvent.click(screen.getByRole("button", { name: "選択内容を反映" }));
 	expect(prompt().value).toContain("ロック、ポップ");
@@ -57,7 +57,7 @@ it("reflects vocal characteristics and exact lyric line breaks, and removes them
 	render(<MusicCreationForm onGenerate={vi.fn()} />);
 	fireEvent.click(screen.getByRole("checkbox", { name: "歌声を入れる" }));
 	fireEvent.change(
-		screen.getByRole("combobox", { name: "ボーカル", exact: true }),
+		screen.getByRole("combobox", { name: "ボーカル" }),
 		{ target: { value: "女性ボーカル" } },
 	);
 	fireEvent.change(screen.getByRole("combobox", { name: "声の高さ" }), {
@@ -80,7 +80,7 @@ it("reflects vocal characteristics and exact lyric line breaks, and removes them
 	expect(prompt().value).toContain("歌声：なし");
 	expect(prompt().value).not.toContain(lyrics);
 	expect(
-		screen.queryByRole("combobox", { name: "ボーカル", exact: true }),
+		screen.queryByRole("combobox", { name: "ボーカル" }),
 	).not.toBeInTheDocument();
 });
 it("does not submit a blank or busy draft", () => {

@@ -105,122 +105,33 @@ describe("history client details", () => {
 	});
 });
 
-const summary = {
-	key: "a".repeat(64),
-	keywords: "weather tokyo",
-	target: { name: "Tokyo", prefecture: "Tokyo", granularity: "city" },
-	state: "active",
-	stateToken: "b".repeat(64),
-	activeVersionId: "v1",
-	sourceUrl: "https://example.com/w",
-	lastSuccessAt: 1,
-	draftStatus: null,
-};
-const detail = { ...summary, skillRevision: null, contextProjection: null };
-const keyed = `/api/research-routes/${summary.key}`;
-const control = { requestId: uuid1, expectedStateToken: "b".repeat(64) };
-
-// Research-route responses are handed through without a zod parse.
-contracts("research-routes client", [
-	{
-		name: "researchRoutes",
-		call: (c) => c.researchRoutes(),
-		method: "GET",
-		path: "/api/research-routes",
-		response: { items: [summary], nextCursor: null, epoch: 0 },
-		parsed: false,
-	},
-	{
-		name: "researchRoutes with cursor and limit",
-		call: (c) => c.researchRoutes({ cursor: "cur sor", limit: 20 }),
-		method: "GET",
-		path: "/api/research-routes?cursor=cur+sor&limit=20",
-		response: { items: [], nextCursor: "next", epoch: 2 },
-		parsed: false,
-	},
-	{
-		name: "researchRoute",
-		call: (c) => c.researchRoute(summary.key),
-		method: "GET",
-		path: keyed,
-		response: detail,
-		parsed: false,
-	},
-	{
-		name: "editResearchRoute",
-		call: (c) =>
-			c.editResearchRoute(summary.key, { ...control, instruction: "use NHK" }),
-		method: "POST",
-		path: `${keyed}/edits`,
-		body: { ...control, instruction: "use NHK" },
-		response: { draftId: uuid2 },
-		parsed: false,
-	},
-	{
-		name: "disableResearchRoute",
-		call: (c) => c.disableResearchRoute(summary.key, control),
-		method: "POST",
-		path: `${keyed}/disable`,
-		body: control,
-		response: { ...detail, state: "disabled" },
-		parsed: false,
-	},
-	{
-		name: "rediscoverResearchRoute",
-		call: (c) => c.rediscoverResearchRoute(summary.key, control),
-		method: "POST",
-		path: `${keyed}/rediscover`,
-		body: control,
-		response: { ...detail, state: "preparing" },
-		parsed: false,
-	},
-	{
-		name: "clearResearchRoutes",
-		call: (c) => c.clearResearchRoutes({ requestId: uuid1, expectedEpoch: 4 }),
-		method: "POST",
-		path: "/api/research-routes/clear",
-		body: { requestId: uuid1, expectedEpoch: 4 },
-		response: { epoch: 5, deletedKeys: 3 },
-		parsed: false,
-	},
-]);
-
-describe("research-routes client details", () => {
-	it("encodes the key into the path segment", async () => {
-		const seen = stubFetch(() => Response.json(detail));
-		await newClient().researchRoute("a/b?c");
-		expect(seen[0]?.path).toBe("/api/research-routes/a%2Fb%3Fc");
-	});
-	it("posts JSON content type and omits empty query parameters", async () => {
-		const seen = stubFetch(() => Response.json({ epoch: 1, deletedKeys: 0 }));
-		await newClient().clearResearchRoutes({
-			requestId: uuid1,
-			expectedEpoch: 0,
-		});
-		expect(seen[0]?.headers["content-type"]).toBe("application/json");
-		stubFetch(() => Response.json({ items: [], nextCursor: null, epoch: 0 }));
-		const list = stubFetch(() =>
-			Response.json({ items: [], nextCursor: null, epoch: 0 }),
+describe("toolchain-history client", () => {
+	it("lists selections with only the given filters", async () => {
+		const seen = stubFetch(() =>
+			Response.json({ items: [], nextCursor: null }),
 		);
-		await newClient().researchRoutes({ limit: 0 });
-		expect(list[0]?.path).toBe("/api/research-routes?limit=0");
+		await newClient().toolchainSelections({ runId: "r 1", limit: 20 });
+		expect(seen[0]?.path).toBe(
+			"/api/toolchain-history/selections?runId=r+1&limit=20",
+		);
+		await newClient().toolchainSelections();
+		expect(seen[1]?.path).toBe("/api/toolchain-history/selections");
+	});
+	it("encodes ids into the path and posts recipe state as JSON", async () => {
+		const seen = stubFetch(() => Response.json({ ok: true }));
+		await newClient().toolchainSelection("a/b");
+		expect(seen[0]?.path).toBe("/api/toolchain-history/selections/a%2Fb");
+		await newClient().setToolchainRecipeState("x/y", "disabled");
+		expect(seen[1]?.path).toBe("/api/toolchain-history/recipes/x%2Fy/state");
+		expect(seen[1]?.headers["content-type"]).toBe("application/json");
 	});
 	it("combines the caller's signal with a timeout", async () => {
-		const signals = stubSignals(() => Response.json(detail));
+		const signals = stubSignals(() => Response.json({ items: [] }));
 		const controller = new AbortController();
-		await newClient().researchRoute(summary.key, controller.signal);
-		await newClient().researchRoute(summary.key);
+		await newClient().toolchainRecipes(undefined, controller.signal);
 		expect(signals[0]).not.toBe(controller.signal);
 		controller.abort();
 		expect(signals[0]?.aborted).toBe(true);
-		expect(signals[1]?.aborted).toBe(false);
-	});
-	it("maps a non-JSON error body to an HTTP status message", async () => {
-		stubFetch(() => new Response("boom", { status: 502 }));
-		await expect(newClient().researchRoutes()).rejects.toMatchObject({
-			status: 502,
-			message: "HTTP 502",
-		});
 	});
 });
 

@@ -7,6 +7,7 @@
 <!-- domains:start -->
 | Domain | Backend 入口 | Web 入口 | Components | 依存 (api) | 依存 (web) | 依存 (試験のみ) |
 | --- | --- | --- | --- | --- | --- | --- |
+| `background` | なし | `web/src/domains/background/index.ts` | なし | なし | なし | なし |
 | `music` | `api/domains/music/index.ts` | `web/src/domains/music/index.ts` | `web/src/components/domains/music/` | `capabilities`、`inference`、`larm`、`queue` | なし | なし |
 | `dots` | `api/domains/dots/index.ts` | `web/src/domains/dots/index.tsx` | なし | `queue` | `tasks` | なし |
 | `task-reports` | `api/domains/task-reports/index.ts` | なし | なし | `tasks` | なし | なし |
@@ -17,7 +18,7 @@
 | `capabilities` | `api/domains/capabilities/index.ts` | なし | なし | なし | なし | なし |
 | `tool-runtime` | `api/domains/tool-runtime/index.ts` | なし | なし | `capabilities`、`queue` | なし | なし |
 | `agent-runtime` | `api/domains/agent-runtime/index.ts` | `web/src/domains/agent-runtime/index.ts` | なし | `capabilities`、`inference`、`queue`、`tool-runtime` | なし | なし |
-| `research-routes` | `api/domains/research-routes/index.ts` | `web/src/domains/research-routes/index.tsx` | なし | `queue` | なし | なし |
+| `toolchain-history` | `api/domains/toolchain-history/index.ts` | `web/src/domains/toolchain-history/index.tsx` | なし | `capabilities` | なし | なし |
 | `web-research` | `api/domains/web-research/index.ts` | なし | なし | `queue` | なし | なし |
 | `attitude-dataset` | `api/domains/attitude-dataset/index.ts` | なし | なし | `delivery` | なし | なし |
 | `service-tests` | `api/domains/service-tests/index.ts` | `web/src/domains/service-tests/index.tsx` | なし | `inference`、`larm`、`settings` | なし | なし |
@@ -36,7 +37,7 @@
 | `queue` | `api/domains/queue/index.ts` | なし | なし | なし | なし | なし |
 | `scheduler` | `api/domains/scheduler/index.ts` | なし | なし | `queue` | なし | なし |
 | `timers` | `api/domains/timers/index.ts` | `web/src/domains/timers/` | `web/src/components/domains/timers/` | `queue`、`scheduler` | なし | なし |
-| `dialogue` | `api/domains/dialogue/index.ts` | `web/src/domains/dialogue/index.ts` | なし | `agent-runtime`、`capabilities`、`conversation`、`delivery`、`inference`、`memory`、`queue`、`scheduler` | `conversation` | `world` |
+| `dialogue` | `api/domains/dialogue/index.ts` | `web/src/domains/dialogue/index.ts` | なし | `agent-runtime`、`capabilities`、`conversation`、`delivery`、`inference`、`memory`、`queue`、`scheduler`、`toolchain-history` | `conversation` | `world` |
 | `voice-dialogue` | `api/domains/voice-dialogue/index.ts` | `web/src/domains/voice-dialogue/index.ts` | なし | `delivery`、`dialogue`、`inference`、`settings` | `audio`、`avatar`、`dialogue`、`settings` | なし |
 <!-- domains:end -->
 
@@ -60,7 +61,7 @@
 | capabilities | `api/domains/capabilities/index.ts` | CLI/API | `api/domains/capabilities/test/` |
 | tool-runtime | `api/domains/tool-runtime/index.ts` | なし | `api/domains/tool-runtime/test/` |
 | agent-runtime | `api/domains/agent-runtime/index.ts` | `web/src/domains/agent-runtime/index.ts` | `api/domains/agent-runtime/test/`、`api/application/toolchain.test.ts`、`tests/browser/toolchain.spec.ts` |
-| research-routes | `api/domains/research-routes/index.ts` | `web/src/domains/research-routes/index.tsx`（設定の「取得先と手順」） / CLI/API（`docs/research-routes.md`） | `api/domains/research-routes/test/`、結合試験 `api/application/research-routes.test.ts` |
+| toolchain-history | `api/domains/toolchain-history/index.ts` | `web/src/domains/toolchain-history/index.tsx`（設定の「ツールチェーンの記録」） / CLI/API（`docs/toolchain.md`） | `api/domains/toolchain-history/test/`、結合試験 `api/application/toolchain-history.test.ts`・`toolchain-recipe-e2e.test.ts` |
 | web-research | `api/domains/web-research/index.ts` | CLI/API | `api/domains/web-research/test/` |
 | memory | `api/domains/memory/index.ts` | なし | `api/domains/memory/test/` |
 | larm | `api/domains/larm/index.ts` | なし | `api/domains/larm/test/` |

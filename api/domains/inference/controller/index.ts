@@ -3,13 +3,31 @@ import type { InferenceService } from "../service";
 export function registerInference(app: Hono, service: InferenceService) {
 	app.get("/api/inference/status", (c) => c.json(service.status()));
 	app.get("/api/inference/larm", (c) => c.json(service.inspect()));
-	app.get("/api/inference/voices", async (c) =>
+	app.get("/api/inference/larm/profiles", async (c) =>
 		c.json(
-			await service.voices(
+			await service.larmProfiles(
 				AbortSignal.any([c.req.raw.signal, AbortSignal.timeout(15_000)]),
 			),
 		),
 	);
+	app.get("/api/inference/speech-routing", async (c) =>
+		c.json(
+			await service.speechRouting(
+				AbortSignal.any([c.req.raw.signal, AbortSignal.timeout(15_000)]),
+			),
+		),
+	);
+	app.get("/api/inference/voices", async (c) => {
+		const language = c.req.query("language");
+		if (language !== undefined && language !== "ja" && language !== "en")
+			return c.json({ error: "invalid_language" }, 400);
+		return c.json(
+			await service.voices(
+				AbortSignal.any([c.req.raw.signal, AbortSignal.timeout(15_000)]),
+				language,
+			),
+		);
+	});
 	app.get("/api/inference/usage", (c) => c.json(service.usage()));
 	app.get("/api/inference/probes", (c) => c.json(service.probes()));
 	app.post("/api/inference/probes", async (c) => {

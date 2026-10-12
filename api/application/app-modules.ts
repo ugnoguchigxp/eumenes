@@ -49,9 +49,9 @@ import type { Changes } from "./events";
 import { registerTasks, type TasksService } from "../domains/tasks";
 import { registerCoding, type CodingService } from "../domains/coding";
 import {
-	registerResearchRoutes,
-	type RouteOperations,
-} from "../domains/research-routes";
+	registerToolchainHistory,
+	type ToolchainHistory,
+} from "../domains/toolchain-history";
 import { registerWorldClaims } from "../domains/world";
 import type { WorldClaims, WorldClaimsContext } from "../domains/world";
 import {
@@ -87,7 +87,7 @@ export type AppServices = {
 	coding?: CodingService;
 	codingSupervision?: CodingSupervision;
 	taskReports?: TaskReports;
-	researchRoutes?: RouteOperations;
+	toolchainHistory?: ToolchainHistory;
 	timers?: TimersService;
 	/** World claim list and corrections (P5-02). Absent with World OFF: the routes do not exist. */
 	worldClaims?: { claims: WorldClaims; context: () => WorldClaimsContext };
@@ -132,8 +132,8 @@ export function appModules(services: AppServices): AppModule[] {
 		s.taskReports && {
 			mount: (app) => registerTaskReports(app, s.taskReports!),
 		},
-		s.researchRoutes && {
-			mount: (app) => registerResearchRoutes(app, s.researchRoutes!),
+		s.toolchainHistory && {
+			mount: (app) => registerToolchainHistory(app, s.toolchainHistory!),
 		},
 		s.ttsDictionary && {
 			mount: (app) => registerTtsDictionary(app, s.ttsDictionary!),

@@ -117,9 +117,9 @@ export function musicFixture(
 				options.onToolCalls!([
 					{
 						id: "music",
-						name: "create_music",
+						name: "music",
 						arguments: JSON.stringify({
-							question: fixtureOptions.question ?? musicQuestion,
+							request: fixtureOptions.question ?? musicQuestion,
 						}),
 					},
 				]);
