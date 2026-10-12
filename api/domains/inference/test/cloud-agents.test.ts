@@ -1,7 +1,11 @@
 import { expect, test } from "bun:test";
 import { defaults } from "../../settings";
 import { settingsSchema, type Connection } from "../../settings/contracts";
-import type { CloudAgentCall, CloudAgents } from "../adapters/cloud-agents";
+import {
+	codexReplyPrefix,
+	type CloudAgentCall,
+	type CloudAgents,
+} from "../adapters/cloud-agents";
 import { cloudRequest, type CloudEnv } from "../service/cloud";
 import type { RequestRow } from "../repository";
 
@@ -181,4 +185,21 @@ test("agent tool calls are forwarded to the conversation", async () => {
 	expect(received).toEqual([
 		{ id: "c1", name: "web_search", arguments: '{"request":"x"}' },
 	]);
+});
+
+test("a Codex choice streams only its decoded reply, growing monotonically", () => {
+	const reply = 'こんにちは\n"引用" 😀 end';
+	const full = JSON.stringify({ reply, tool: null });
+	let previous = "";
+	for (let i = 0; i <= full.length; i++) {
+		const visible = codexReplyPrefix(full.slice(0, i));
+		expect(visible.startsWith(previous)).toBe(true);
+		previous = visible;
+	}
+	expect(previous).toBe(reply);
+	expect(
+		codexReplyPrefix(
+			JSON.stringify({ reply: null, tool: { name: "x", arguments: "{}" } }),
+		),
+	).toBe("");
 });

@@ -217,6 +217,22 @@ export function createStepActions(ctx: RuntimeContext, ops: TaskOps) {
 				: readRequirements(db, t, capabilities);
 			if (!input.search && !frozen) throw new Error("required_context_missing");
 			const action = research;
+			// Giving up before any acquisition while a tool is still invocable is a
+			// contract violation, not a result: the model gets its one repair to invoke.
+			if (
+				action.action === "finish" &&
+				["failed", "not_found"].includes(
+					(action.report as { outcome?: string }).outcome ?? "",
+				) &&
+				input.grants.some((g) => !g.replayOnly) &&
+				!tools.invocationsInTransaction(db, t.id).length
+			)
+				throw new ValidationFailure("invalid_report", [
+					{
+						validationPath: "action",
+						validationCode: "invoke_required_before_finish",
+					},
+				]);
 			if (action.action === "invoke") {
 				// Authority at prepare is immutable for this step. Cancellation,
 				// registry revision and the hard deadline are still checked at invoke.

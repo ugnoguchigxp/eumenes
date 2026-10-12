@@ -4,7 +4,6 @@ import {
 	compileLang,
 	definitionRequests,
 	viewRegistry,
-	type View as RegisteredView,
 } from "@eumenes/artifact-ui";
 import "@eumenes/artifact-ui/styles";
 import {
@@ -35,14 +34,13 @@ import {
 	type DesignTokenOverrides,
 } from "../../../domains/artifact/designTokens";
 
-type View = Exclude<
-	RegisteredView,
-	| "music-player"
-	| "playlist"
-	| "generation-status"
-	| "music-library"
-	| "music-workspace"
->;
+type View =
+	| "components"
+	| "generated-image"
+	| "question"
+	| "form"
+	| "memory"
+	| "settings";
 const sources: Record<View, string> = {
 	components: "c1",
 	"generated-image": "g1",
@@ -77,7 +75,9 @@ const examples: Record<View, { description: string }> = {
 			"選んだテーマをプレビューで確認し、設定値の保存を試せます。アプリの表示や音声は変更しません。",
 	},
 };
-const actionLabels = {
+const actionLabels: Partial<
+	Record<import("@eumenes/artifact-ui").ArtifactEvent["action"], string>
+> = {
 	"demo-click": "入力の確認",
 	answer: "回答の送信",
 	submit: "フォームの送信",
@@ -506,7 +506,9 @@ export function ArtifactShowcase() {
 							<ol className="aui-events" aria-label="操作イベント">
 								{operations.map((operation) => (
 									<li key={operation.id} data-status={operation.status}>
-										<strong>{actionLabels[operation.action]}</strong>
+										<strong>
+											{actionLabels[operation.action] ?? operation.action}
+										</strong>
 										<span>{statusLabels[operation.status]}</span>
 										<p>{operation.message}</p>
 									</li>

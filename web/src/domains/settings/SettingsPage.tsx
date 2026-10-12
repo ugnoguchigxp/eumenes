@@ -1,17 +1,15 @@
 import { DotsPanel } from "../dots";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import type { EumenesClient } from "../../../../client";
 import {
 	settingsSchema,
 	type Settings,
-	type Purpose,
-	type ApplySettings,
 } from "../../../../api/domains/settings/contracts";
 import { queryRoots } from "../../queryKeys";
 import { describeError } from "../../errorMessages";
 import { TtsDictionaryPanel } from "../tts-dictionary";
-import { emptyCloud, purposes, type NewCloud } from "./shared";
+import { emptyCloud } from "./shared";
 import { AiSection } from "./sections/ai";
 import { AppearanceSection } from "./sections/appearance";
 import { ConnectionsSection } from "./sections/connections";
@@ -21,7 +19,11 @@ import { SchedulePanel as ScheduleSection } from "./sections/schedule";
 import { VoiceSection } from "./sections/voice";
 import { MemoryConnectionPanel } from "./MemoryConnectionPanel";
 import { Button } from "../../design-system";
-import { useSettings } from "./index";
+import {
+	SettingsDraftProvider,
+	useSettingsDraft,
+	useOptionalSettingsDraft,
+} from "./SettingsDraftHost";
 const categories = [
 	{ id: "general", label: "全般" },
 	{ id: "ai", label: "AIの使い方" },
@@ -37,7 +39,7 @@ const categories = [
 	{ id: "memory", label: "メモリー" },
 	{ id: "world", label: "World" },
 ] as const;
-export function SettingsPage({
+function SettingsPageBody({
 	renderServiceTests,
 	renderToolchainHistory,
 	renderWorld,
@@ -52,19 +54,26 @@ export function SettingsPage({
 	renderToolchainHistory?: () => React.ReactNode;
 	renderWorld?: () => React.ReactNode;
 }) {
-	const query = useSettings(client);
-	const cache = useQueryClient();
-	const [draft, setDraft] = useState<Settings | null>(null);
-	const [keys, setKeys] = useState<ApplySettings["keys"]>([]);
+	const host = useSettingsDraft();
+	const {
+		query,
+		value,
+		dirty,
+		keys,
+		setKeys,
+		setDraft,
+		setRetry,
+		setMessage,
+		adding,
+		setAdding,
+		newCloud,
+		setNewCloud,
+		change,
+	} = host;
 	const [category, setCategory] =
 		useState<(typeof categories)[number]["id"]>("general");
-	const [message, setMessage] = useState("");
-	const [busy, setBusy] = useState(false);
-	const [retry, setRetry] = useState<ApplySettings | null>(null);
 	const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
 	const [deviceError, setDeviceError] = useState("");
-	const [adding, setAdding] = useState(false);
-	const [newCloud, setNewCloud] = useState<NewCloud>(emptyCloud);
 	const diagnostics = useQuery({
 		queryKey: [queryRoots.settingsDiagnostics, client.identity],
 		queryFn: () => client.settingsDiagnostics(),
@@ -85,8 +94,6 @@ export function SettingsPage({
 		queryFn: () => client.larmDetails(),
 		retry: 0,
 	});
-	const value = draft ?? query.data;
-	const dirty = !!draft || keys.length > 0 || adding;
 	const larmChanged =
 		!!value &&
 		!!query.data &&
@@ -101,88 +108,9 @@ export function SettingsPage({
 		window.addEventListener("beforeunload", prevent);
 		return () => window.removeEventListener("beforeunload", prevent);
 	}, [dirty, onDirty]);
-	function change(fn: (s: Settings) => void) {
-		if (!value) return;
-		const next = structuredClone(value);
-		fn(next);
-		setDraft(next);
-		setRetry(null);
-		setMessage("");
-	}
 	async function apply() {
-		if (!value || busy) return;
-		const validated = settingsSchema.safeParse(value);
-		if (!validated.success) {
-			setMessage(validated.error.issues.map((i) => i.message).join(" / "));
-			return;
-		}
-		const originOf = (v: string | null | undefined) =>
-			v && URL.canParse(v) ? new URL(v).origin : null;
-		const savedOrigin = originOf(query.data?.larm.baseUrl);
-		const nextOrigin = originOf(value.larm.baseUrl);
-		let confirmLarmOrigin: string | undefined;
-		if (!retry && savedOrigin && nextOrigin && savedOrigin !== nextOrigin) {
-			if (
-				!window.confirm(
-					`LARM の接続先を ${nextOrigin} に変更します。LARM の認証情報はこの接続先へ送られます。変更しますか？`,
-				)
-			)
-				return;
-			confirmLarmOrigin = nextOrigin;
-		}
-		setBusy(true);
-		setMessage("");
-		try {
-			const input: ApplySettings = retry ?? {
-				requestId: crypto.randomUUID(),
-				expectedRevision: value.revision,
-				settings: value,
-				keys,
-				...(confirmLarmOrigin ? { confirmLarmOrigin } : {}),
-			};
-			setRetry(input);
-			const saved = await client.applySettings(input);
-			cache.setQueryData([queryRoots.settings, client.identity], saved);
-			setDraft((current) => {
-				if (!current || current === input.settings) return null;
-				const next = structuredClone(current);
-				next.revision = saved.revision;
-				for (const p of Object.keys(purposes) as Purpose[])
-					next.routes[p].epoch = saved.routes[p].epoch;
-				for (const c of next.connections) {
-					const normalized = saved.connections.find((x) => x.id === c.id);
-					const submitted = input.settings.connections.find(
-						(x) => x.id === c.id,
-					);
-					if (normalized) {
-						c.epoch = normalized.epoch;
-						if (submitted?.envRef === c.envRef) c.envRef = normalized.envRef;
-					}
-				}
-				return next;
-			});
-			setKeys((current) =>
-				current.filter(
-					(k) =>
-						!input.keys.some(
-							(sent) =>
-								sent.connectionId === k.connectionId && sent.value === k.value,
-						),
-				),
-			);
-			setRetry(null);
-			onSaved(saved);
-			setMessage("変更を適用しました");
-			void diagnostics.refetch();
-		} catch (e) {
-			setMessage(
-				e instanceof Error && e.message === "revision_conflict"
-					? "別の画面で設定が変更されました。最新の設定を読み直してから適用してください。"
-					: `適用できませんでした: ${describeError(e)}`,
-			);
-		} finally {
-			setBusy(false);
-		}
+		const saved = await host.apply();
+		if (saved) onSaved(saved);
 	}
 	function addCloud() {
 		if (!value) return;
@@ -385,43 +313,40 @@ export function SettingsPage({
 				)}
 				{!["dots", "dictionary", "memory", "services", "toolchains"].includes(
 					category,
-				) && (
-					<footer className="settings-footer">
-						<output>
-							{message && dirty && message === "変更を適用しました"
-								? "送信した変更を適用しました。追加の変更は未適用です。"
-								: message ||
-									(dirty
-										? "変更はまだ保存されていません"
-										: "すべての変更を保存済み")}
-						</output>
-						<div className="settings-actions">
-							<Button
-								variant="secondary"
-								disabled={busy}
-								onClick={() => {
-									setDraft(null);
-									setKeys([]);
-									setRetry(null);
-									setAdding(false);
-									setNewCloud((n) => ({ ...n, key: "" }));
-									setMessage("");
-									void query.refetch();
-								}}
-							>
-								最新の設定を読み直す
-							</Button>
-							<Button
-								disabled={!dirty || adding || busy}
-								onClick={() => void apply()}
-							>
-								{busy ? "適用中…" : "変更を適用"}
-							</Button>
-						</div>
-					</footer>
-				)}
+				) && <SettingsFooter host={host} onApply={apply} />}
 			</section>
 		</div>
+	);
+}
+
+function SettingsFooter({
+	host,
+	onApply,
+}: {
+	host: ReturnType<typeof useSettingsDraft>;
+	onApply: () => Promise<void>;
+}) {
+	const { dirty, message, busy, adding } = host;
+	return (
+		<footer className="settings-footer">
+			<output>
+				{message && dirty && message === "変更を適用しました"
+					? "送信した変更を適用しました。追加の変更は未適用です。"
+					: message ||
+						(dirty ? "変更はまだ保存されていません" : "すべての変更を保存済み")}
+			</output>
+			<div className="settings-actions">
+				<Button variant="secondary" disabled={busy} onClick={host.discard}>
+					最新の設定を読み直す
+				</Button>
+				<Button
+					disabled={!dirty || adding || busy}
+					onClick={() => void onApply()}
+				>
+					{busy ? "適用中…" : "変更を適用"}
+				</Button>
+			</div>
+		</footer>
 	);
 }
 
@@ -441,4 +366,15 @@ function categoryHelp(category: string) {
 							: category === "general"
 								? "AIの名前・あなたの名前・話し方を設定します。次の返答から反映されます。"
 								: "普段はLARMを使い、必要なときに登録済みのクラウドへ切り替えます。";
+}
+
+export function SettingsPage(props: Parameters<typeof SettingsPageBody>[0]) {
+	const host = useOptionalSettingsDraft();
+	return host ? (
+		<SettingsPageBody {...props} />
+	) : (
+		<SettingsDraftProvider key={props.client.identity} client={props.client}>
+			<SettingsPageBody {...props} />
+		</SettingsDraftProvider>
+	);
 }

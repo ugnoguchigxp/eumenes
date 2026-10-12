@@ -4,7 +4,7 @@ import {
 	compileArtifact,
 	compileLang,
 } from "@eumenes/artifact-ui";
-import { parseDefinition } from "@eumenes/artifact-ui/contracts";
+import { parseDefinition, viewRegistry } from "@eumenes/artifact-ui/contracts";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { afterEach, expect, test } from "vitest";
 import { createShowcaseFixture } from "..";
@@ -79,7 +79,12 @@ test("quoted instructions remain inert text in the SDK renderer", () => {
 	);
 	expect(document.querySelector(".text-2xl")?.textContent).toBe(title);
 	expect(document.querySelector("script")).toBeNull();
-	expect(Object.keys(artifactLibrary.components)).toHaveLength(12);
+	expect(Object.keys(artifactLibrary.components).sort()).toEqual(
+		[
+			...Object.values(viewRegistry).map((view) => view.name),
+			"Composition",
+		].sort(),
+	);
 });
 test("actual renderer preserves dirty form input when resource snapshot changes", () => {
 	const lang = compileArtifact(

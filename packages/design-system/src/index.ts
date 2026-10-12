@@ -97,3 +97,5 @@ export * from "./components/MusicWorkspace";
 export * from "./components/Playlist";
 export * from "./components/GenerationStatus";
 export * from "./components/MusicLibraryControls";
+export * from "./components/SettingsPanels";
+export * from "./components/TimerWorkspace";

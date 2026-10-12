@@ -1,3 +1,10 @@
+import { SettingsArtifact } from "../domains/settings/SettingsArtifact";
+import {
+	isSettingsArtifactDefinition,
+	settingsArtifacts,
+	settingsArtifactDefinition,
+	type SettingsArtifactId,
+} from "../domains/settings/artifact-definition";
 import { useCallback } from "react";
 import type { EumenesClient } from "../../../client";
 import {
@@ -10,7 +17,29 @@ import { ArtifactPanel } from "../components/domains/artifact/ArtifactPanel";
 import { MusicArtifact } from "../components/domains/music/MusicArtifact";
 import { TimerArtifact } from "../components/domains/timers/TimerArtifact";
 import { TimerSetupArtifact } from "../components/domains/timers/TimerSetupArtifact";
-import { timerSetupDefinition } from "../domains/timers/artifact-definition";
+import {
+	timerSetupDefinition,
+	timerDefinition,
+	timerArtifactSource,
+	timerSetupSource,
+} from "../domains/timers/artifact-definition";
+
+export function useOpenSettings(
+	open: ReturnType<typeof useArtifactWorkspace>["open"],
+) {
+	return useCallback(
+		(id: SettingsArtifactId = "hub") => {
+			const entry = settingsArtifacts[id];
+			open({
+				id: entry.id,
+				title: entry.title,
+				kind: "openui",
+				definition: settingsArtifactDefinition(id),
+			});
+		},
+		[open],
+	);
+}
 
 export function useOpenMusic(
 	open: ReturnType<typeof useArtifactWorkspace>["open"],
@@ -45,21 +74,12 @@ export function useOpenTimer(
 ) {
 	return useCallback(
 		(ref?: { timerId: string }, title = "タイマー") => {
-			open(
-				ref
-					? {
-							id: "timer",
-							kind: "timer",
-							title,
-							timerId: ref.timerId,
-						}
-					: {
-							id: "timer",
-							kind: "openui",
-							title,
-							definition: timerSetupDefinition(),
-						},
-			);
+			open({
+				id: "timer",
+				kind: "openui",
+				title,
+				definition: ref ? timerDefinition(ref.timerId) : timerSetupDefinition(),
+			});
 		},
 		[open],
 	);
@@ -72,6 +92,8 @@ export function WorkspaceArtifacts({
 	client: EumenesClient;
 	artifacts: ReturnType<typeof useArtifactWorkspace>;
 }) {
+	const openTimer = useOpenTimer(artifacts.open);
+	const openSettings = useOpenSettings(artifacts.open);
 	return artifacts.tabs.length > 0 ? (
 		<ErrorBoundary label="artifact">
 			<ArtifactPanel
@@ -80,18 +102,21 @@ export function WorkspaceArtifacts({
 				onSelect={artifacts.select}
 				onClose={artifacts.close}
 				renderOpenUI={(definition) =>
-					definition === timerSetupDefinition() ? (
+					isSettingsArtifactDefinition(definition) ? (
+						<SettingsArtifact definition={definition} onOpen={openSettings} />
+					) : timerArtifactSource(definition) === timerSetupSource ? (
 						<TimerSetupArtifact
 							client={client}
 							definition={definition}
-							onStarted={(ref, title) =>
-								artifacts.open({
-									id: "timer",
-									kind: "timer",
-									timerId: ref.timerId,
-									title,
-								})
-							}
+							onStarted={openTimer}
+						/>
+					) : timerArtifactSource(definition) ? (
+						<TimerArtifact
+							key={definition}
+							client={client}
+							timerId={timerArtifactSource(definition)!.slice(6)}
+							definition={definition}
+							onNewTimer={() => openTimer()}
 						/>
 					) : (
 						<MusicArtifact
@@ -102,7 +127,12 @@ export function WorkspaceArtifacts({
 					)
 				}
 				renderTimer={(timerId) => (
-					<TimerArtifact key={timerId} client={client} timerId={timerId} />
+					<TimerArtifact
+						key={timerId}
+						client={client}
+						timerId={timerId}
+						onNewTimer={() => openTimer()}
+					/>
 				)}
 			/>
 		</ErrorBoundary>

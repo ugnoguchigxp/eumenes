@@ -52,6 +52,37 @@ test("the timer launcher works before any timer exists and starts a saved clock"
 	await page.goto(`http://127.0.0.1:${webPort}`);
 	await openFromLauncher(page, "タイマー");
 	await expect(page.getByText("タイマーを開始", { exact: true })).toBeVisible();
+	if (process.env.EUMENES_TIMER_SCREENSHOTS === "1") {
+		const directory = evidencePath("timer-ui-redesign");
+		await mkdir(directory, { recursive: true });
+		for (const theme of ["light", "dark"] as const) {
+			await page.setViewportSize({ width: 1440, height: 1000 });
+			await page.emulateMedia({ colorScheme: theme });
+			await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+			await page.locator(".timer-workspace").screenshot({
+				path: resolve(directory, `setup-${theme}.png`),
+				animations: "disabled",
+			});
+		}
+		await page.setViewportSize({ width: 375, height: 1100 });
+		await page
+			.getByRole("separator", { name: "会話とアーティファクトのサイズを調整" })
+			.focus();
+		await page.keyboard.press("Home");
+		await expect(page.locator(".timer-workspace")).toBeVisible();
+		expect(
+			await page
+				.locator(".timer-workspace")
+				.evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
+		).toBe(true);
+		await page.locator(".timer-workspace").screenshot({
+			path: resolve(directory, "setup-mobile.png"),
+			animations: "disabled",
+		});
+		await page.setViewportSize({ width: 1440, height: 1000 });
+	}
+	await page.getByRole("button", { name: "5分", exact: true }).click();
+	await expect(page.getByLabel("分", { exact: true })).toHaveValue("05");
 	await page.getByLabel("分", { exact: true }).fill("1");
 	await page.getByLabel("秒", { exact: true }).fill("30");
 	await page.getByLabel("名前（任意）").fill("画面から開始");
@@ -69,6 +100,12 @@ test("the timer launcher works before any timer exists and starts a saved clock"
 	await expect(
 		page.getByRole("heading", { name: "画面から開始" }),
 	).toBeVisible();
+	if (process.env.EUMENES_TIMER_SCREENSHOTS === "1") {
+		await page.locator(".timer-workspace").screenshot({
+			path: evidencePath("timer-ui-redesign/running-dark.png"),
+			animations: "disabled",
+		});
+	}
 	await page
 		.getByRole("button", { name: "画面から開始を閉じる", exact: true })
 		.click();
@@ -81,7 +118,9 @@ test("the timer launcher works before any timer exists and starts a saved clock"
 		{ headers: { authorization: `Bearer ${TOKEN}` } },
 	);
 	expect((await saved.json()).timer.state).toBe("cancelled");
-	await openFromLauncher(page, "タイマー");
+	await page
+		.getByRole("button", { name: "新しいタイマー", exact: true })
+		.click();
 	await expect(page.getByText("タイマーを開始", { exact: true })).toBeVisible();
 	expect(
 		await page.getByRole("tab", { name: "タイマー", exact: true }).count(),
@@ -276,7 +315,10 @@ test("the timer has usable controls and fits both themes and a narrow screen", a
 		if (process.env.EUMENES_TIMER_SCREENSHOTS === "1") {
 			const directory = evidencePath("timers");
 			await mkdir(directory, { recursive: true });
-			await panel.screenshot({ path: resolve(directory, `ui-${theme}.png`) });
+			await panel.screenshot({
+				path: resolve(directory, `ui-${theme}.png`),
+				animations: "disabled",
+			});
 		}
 	}
 	await page.setViewportSize({ width: 375, height: 812 });

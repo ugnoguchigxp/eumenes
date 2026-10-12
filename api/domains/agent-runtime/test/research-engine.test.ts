@@ -200,3 +200,27 @@ test("search failures return without creating requirement contracts or drafts", 
 		await h.close();
 	}
 });
+test("a worker cannot give up before invoking an available tool: one repair, then failure", async () => {
+	const h = await harness(Date.now, true);
+	try {
+		await h.start("give-up", "最新のニュースを調べて", "codex_luna");
+		const child = h.agents.list("give-up").find((t) => t.kind === "worker")!;
+		const giveUp = {
+			action: "finish",
+			report: {
+				outcome: "failed",
+				summary: "検索ツールを利用できませんでした。",
+				claims: [],
+				limitations: ["ツールがありません。"],
+			},
+		};
+		await h.runRawModelStep(child.id, giveUp);
+		expect(h.task(child.id).state).toBe("queued");
+		expect(h.task(child.id).json_repairs).toBe(1);
+		await h.runRawModelStep(child.id, giveUp);
+		expect(h.task(child.id).state).toBe("failed");
+		expect(h.started).toEqual([]);
+	} finally {
+		await h.close();
+	}
+});

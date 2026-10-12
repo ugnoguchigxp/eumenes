@@ -5,8 +5,34 @@ import {
 	useOpenMusic,
 	useOpenPlaylist,
 	useOpenTimer,
+	useOpenSettings,
 } from "./WorkspaceArtifacts";
 afterEach(cleanup);
+test("settings launchers retain stable OpenUI identities across closing and reopening", () => {
+	const hook = renderHook(() => {
+		const workspace = useArtifactWorkspace();
+		return { workspace, open: useOpenSettings(workspace.open) };
+	});
+	act(() => {
+		hook.result.current.open();
+		hook.result.current.open("conversation");
+		hook.result.current.open("changes");
+		hook.result.current.open("conversation");
+	});
+	expect(hook.result.current.workspace.tabs.map((tab) => tab.id)).toEqual([
+		"settings",
+		"settings-conversation",
+		"settings-changes",
+	]);
+	expect(
+		hook.result.current.workspace.tabs.every((tab) => tab.kind === "openui"),
+	).toBe(true);
+	act(() => {
+		hook.result.current.workspace.close("settings-conversation");
+		hook.result.current.open("conversation");
+	});
+	expect(hook.result.current.workspace.tabs).toHaveLength(3);
+});
 test("generation and playlist each keep one stable screen with separate identities", () => {
 	const view = renderHook(() => {
 		const workspace = useArtifactWorkspace();
@@ -52,8 +78,11 @@ test("timer setup and saved clocks share one tab, including after closing", () =
 	act(() => view.result.current.timer({ timerId: "saved" }, "休憩"));
 	expect(view.result.current.workspace.tabs).toHaveLength(1);
 	expect(view.result.current.workspace.tabs[0]).toMatchObject({
-		kind: "timer",
-		timerId: "saved",
+		kind: "openui",
+		definition: JSON.stringify({
+			view: "timer-workspace",
+			source: "timer-saved",
+		}),
 	});
 	act(() => view.result.current.workspace.close("timer"));
 	act(() => view.result.current.timer());

@@ -6,7 +6,7 @@ import { startTimerSchema } from "../../../../../api/domains/timers/contracts";
 import { timerSetupSource } from "../../../domains/timers/artifact-definition";
 import { queryRoots } from "../../../queryKeys";
 
-/** The shared OpenUI form sends a typed operation to the existing timer API. */
+/** The OpenUI clock sends a typed operation to the existing timer API. */
 export function TimerSetupArtifact({
 	client,
 	definition,
@@ -20,25 +20,23 @@ export function TimerSetupArtifact({
 	const runtime: ArtifactRuntime = {
 		snapshot: {
 			[timerSetupSource]: {
-				kind: "form",
+				kind: "timer-workspace",
 				revision: 0,
-				fields: [
-					{ id: "minutes", label: "分", type: "number" },
-					{ id: "seconds", label: "秒", type: "number" },
-					{ id: "label", label: "名前（任意）", type: "text" },
-				],
-				defaults: { minutes: "3", seconds: "0", label: "" },
-				submitLabel: "開始する",
+				state: "setup",
 			},
 		},
 		dispatch: async (event) => {
 			if (
 				event.source !== timerSetupSource ||
-				event.action !== "submit" ||
+				event.action !== "timer-start" ||
 				event.revision !== 0
 			)
 				return { status: "rejected", message: "この操作は利用できません" };
-			const parts = [event.values.minutes, event.values.seconds];
+			const parts = [
+				event.values.hours,
+				event.values.minutes,
+				event.values.seconds,
+			];
 			if (
 				parts.some(
 					(value) =>
@@ -49,12 +47,13 @@ export function TimerSetupArtifact({
 			)
 				return {
 					status: "rejected",
-					message: "分と秒は0以上の整数で入力してください",
+					message: "時間・分・秒は0以上の整数で入力してください",
 				};
 			const input = startTimerSchema.safeParse({
 				requestId: event.id,
 				issuedAt: new Date().toISOString(),
-				durationSeconds: Number(parts[0]) * 60 + Number(parts[1]),
+				durationSeconds:
+					Number(parts[0]) * 3600 + Number(parts[1]) * 60 + Number(parts[2]),
 				...(event.values.label ? { label: event.values.label } : {}),
 			});
 			if (!input.success)

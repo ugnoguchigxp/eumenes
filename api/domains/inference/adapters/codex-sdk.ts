@@ -3,7 +3,12 @@ import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-export type CodexRuntime = { command: string; env: Record<string, string> };
+export type CodexRuntime = {
+	command: string;
+	env: Record<string, string>;
+	/** Extra CLI arguments (config overrides) for the app-server transport. */
+	extraArgs?: string[];
+};
 
 /** The codex CLI and the only environment it may see; undefined when not installed. */
 export function codexRuntime(
@@ -28,7 +33,7 @@ export function codexRuntime(
 	return { command, env };
 }
 
-const disabledFeatures = Object.fromEntries(
+export const disabledFeatures = Object.fromEntries(
 	[
 		"shell_tool",
 		"js_repl",

@@ -7,7 +7,7 @@ import { codexFailure, CodexResearchFailure } from "./codex-failure";
 import { codexRuntime, lockedCodex } from "./codex-sdk";
 
 const mission =
-	"You are Eumenes’s web researcher. Investigate the current originalRequest and task.question using TOOLS. Return one JSON object with action at the root, following the output definition below. Eumenes executes the selected operation and supplies its result on your next call. The input messages contain task state, host notices and untrusted acquired materials. Do not use native Codex tools, inspect files, or delegate.\n";
+	"You are Eumenes’s web researcher. Investigate the current originalRequest and task.question using TOOLS. Return one JSON object with action at the root, following the output definition below. Eumenes executes the selected operation and supplies its result on your next call. The input messages contain task state, host notices and untrusted acquired materials. Do not use native Codex tools, inspect files, or delegate. TOOLS in these instructions is the complete list of host operations you can request with action invoke; Eumenes runs them, so they are available even though Codex itself has no such tools. The operations field in the input is only the history of operations already executed in this task and is empty before the first invoke; it is not the list of available operations. You never run an operation yourself: returning action invoke with a TOOLS id is how it runs. Do not finish because you cannot execute a tool in this environment; while canInvoke is true and nothing has been acquired yet, invoke a TOOLS operation.\n";
 
 /** SDK owns the turn and structured events; Eumenes executes all operations. */
 export function createCodexResearch(
@@ -19,6 +19,23 @@ export function createCodexResearch(
 	return {
 		model: "gpt-6-luna",
 		async execute(
+			messages: Messages,
+			signal: AbortSignal,
+			control?: ControlContract,
+		) {
+			try {
+				return await this.executeOnce(messages, signal, control);
+			} catch (error) {
+				// An empty turn carries no decision; one fresh turn is still within the step.
+				if (
+					!(error instanceof Error) ||
+					error.message !== "codex_research_empty_output"
+				)
+					throw error;
+				return await this.executeOnce(messages, signal, control);
+			}
+		},
+		async executeOnce(
 			messages: Messages,
 			signal: AbortSignal,
 			control?: ControlContract,

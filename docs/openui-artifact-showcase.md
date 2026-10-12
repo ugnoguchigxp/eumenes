@@ -44,6 +44,7 @@ root = GeneratedImage({"view":"generated-image","source":"g1"})
 | form | f1 | 必須 / 選択 / 真偽 / テキスト入力、送信、リセット、エラーと再試行 |
 | memory | m1 | 内容の訂正、会話へ渡す情報の選択 |
 | settings | s1 | テーマ、読み上げ、音量の編集 |
+| timer-workspace | timer-setup / timer-保存ID | 円形時計、時間の直接入力とプリセット、保存確認後の計測・取消・新規設定 |
 
 `title` は省略可能。質問は `source` の代わりに短い `question` を指定できる。
 

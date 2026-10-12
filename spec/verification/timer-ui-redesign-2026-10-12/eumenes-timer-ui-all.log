@@ -1,0 +1,15 @@
+$ bun scripts/verify.ts --all
+[verify] selected=background,music,dots,task-reports,coding-supervision,coding,artifact,tasks,capabilities,tool-runtime,agent-runtime,toolchain-history,web-research,attitude-dataset,service-tests,delivery,avatar,settings,inference,tts-dictionary,conversation,continuity,goals,world,memory,larm,audio,queue,scheduler,timers,dialogue,voice-dialogue dependencyClosure=background,capabilities,delivery,attitude-dataset,larm,settings,inference,queue,music,dots,tasks,task-reports,coding,coding-supervision,artifact,avatar,conversation,tool-runtime,agent-runtime,toolchain-history,web-research,service-tests,tts-dictionary,continuity,goals,world,memory,audio,scheduler,timers,dialogue,voice-dialogue testClosure=background,capabilities,delivery,attitude-dataset,larm,tts-dictionary,queue,tasks,dots,settings,inference,music,task-reports,coding,coding-supervision,avatar,conversation,artifact,tool-runtime,agent-runtime,toolchain-history,web-research,service-tests,continuity,goals,memory,world,audio,scheduler,timers,dialogue,voice-dialogue
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts
+size-budget: new function over 300 lines: api/domains/agent-runtime/service/step-actions.ts#createStepActions (306)
+83 | 	steps.push({
+84 | 		name,
+85 | 		ms: Math.round(performance.now() - start),
+86 | 		result: code === 0 ? "pass" : `exit ${code}`,
+87 | 	});
+88 | 	if (code !== 0) throw new Error(`${name} failed (${code})`);
+                                ^
+error: size-budget failed (1)
+      at run (/Users/y.noguchi/Code/eumenes/scripts/verify.ts:88:28)
+
+error: script "verify:all" exited with code 1

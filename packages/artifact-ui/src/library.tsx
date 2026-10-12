@@ -1,4 +1,9 @@
 import { createLibrary, defineComponent } from "./sdk";
+import {
+	SettingsSectionView,
+	SettingsNavigationView,
+	SettingsChangesView,
+} from "./settings-components";
 import { z } from "zod";
 import {
 	ComponentsView,
@@ -22,8 +27,13 @@ import {
 	MusicLibraryView,
 	MusicWorkspaceView,
 } from "./media-components";
+import { TimerWorkspaceView } from "./timer-components";
 
 const renderers = {
+	"settings-section": SettingsSectionView,
+	"settings-navigation": SettingsNavigationView,
+	"settings-changes": SettingsChangesView,
+	"timer-workspace": TimerWorkspaceView,
 	"music-workspace": MusicWorkspaceView,
 	"music-library": MusicLibraryView,
 	"music-player": MusicView,

@@ -1,5 +1,10 @@
 import { z } from "zod";
 import type { MusicResource, GenerationResource } from "./media-contracts";
+import type {
+	SettingsSectionResource,
+	SettingsNavigationResource,
+	SettingsChangesResource,
+} from "./settings-contracts";
 export type { MusicResource, GenerationResource } from "./media-contracts";
 
 const title = z.string().max(120).optional();
@@ -21,6 +26,42 @@ const question = z.strictObject({
 	options: z.array(z.string().min(1).max(120)).min(1).max(8).optional(),
 });
 export const viewRegistry = {
+	"settings-section": {
+		name: "SettingsSectionView",
+		label: "設定の編集",
+		schema: z.strictObject({
+			view: z.literal("settings-section"),
+			source,
+			title,
+		}),
+	},
+	"settings-navigation": {
+		name: "SettingsNavigationView",
+		label: "設定の入口",
+		schema: z.strictObject({
+			view: z.literal("settings-navigation"),
+			source,
+			title,
+		}),
+	},
+	"settings-changes": {
+		name: "SettingsChangesView",
+		label: "設定の変更一覧",
+		schema: z.strictObject({
+			view: z.literal("settings-changes"),
+			source,
+			title,
+		}),
+	},
+	"timer-workspace": {
+		name: "TimerWorkspace",
+		label: "タイマーの設定と円形時計",
+		schema: z.strictObject({
+			view: z.literal("timer-workspace"),
+			source,
+			title,
+		}),
+	},
 	"music-workspace": {
 		name: "MusicWorkspace",
 		label: "Visualizer・楽曲一覧・共通プレイヤー",
@@ -246,6 +287,21 @@ export type SettingsResource = {
 	volume: number;
 };
 export type Resource =
+	| SettingsSectionResource
+	| SettingsNavigationResource
+	| SettingsChangesResource
+	| {
+			kind: "timer-workspace";
+			revision: number;
+			state: "setup" | "active" | "confirming" | "elapsed" | "cancelled";
+			durationSeconds?: number;
+			remainingSeconds?: number;
+			title?: string;
+			dueAt?: string;
+			finishLabel?: string;
+			durationLabel?: string;
+			canCreate?: boolean;
+	  }
 	| MusicResource
 	| GenerationResource
 	| ImageResource
@@ -260,6 +316,14 @@ export type ArtifactEvent = {
 	source: string;
 	revision: number;
 	action:
+		| "settings-edit"
+		| "settings-open"
+		| "settings-review"
+		| "settings-apply"
+		| "settings-discard"
+		| "timer-start"
+		| "timer-cancel"
+		| "timer-new"
 		| "answer"
 		| "submit"
 		| "memory-correct"

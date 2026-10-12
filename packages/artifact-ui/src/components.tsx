@@ -24,7 +24,7 @@ import type {
 import { imageDownloadName, isSafeImageUrl } from "./contracts";
 import { useArtifactRuntime } from "./runtime";
 
-function useAction(request: ArtifactRequest) {
+export function useAction(request: ArtifactRequest) {
 	const runtime = useArtifactRuntime();
 	const lock = useRef(false);
 	const [pending, setPending] = useState(false);

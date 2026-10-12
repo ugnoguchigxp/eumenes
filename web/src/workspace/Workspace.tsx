@@ -1,3 +1,4 @@
+import { SettingsDraftProvider } from "../domains/settings/SettingsDraftHost";
 import type { EumenesClient } from "../../../client";
 import type { AudioStore } from "../domains/audio";
 import { Button } from "../design-system";
@@ -12,7 +13,7 @@ import { WorkspaceArtifacts } from "./WorkspaceArtifacts";
 import { ConversationPanel } from "./ConversationPanel";
 import { useWorkspace } from "./useWorkspace";
 
-export function Workspace({
+function WorkspaceContent({
 	client,
 	store,
 }: {
@@ -23,6 +24,7 @@ export function Workspace({
 	const {
 		settingsOpen,
 		activeTimers,
+		openSettings,
 		openMusic,
 		openPlaylist,
 		openTimer,
@@ -74,6 +76,7 @@ export function Workspace({
 			{!settingsOpen && (
 				<ArtifactLauncher
 					entries={[
+						{ label: "設定", onSelect: () => openSettings() },
 						{ label: "楽曲生成", onSelect: openMusic },
 						{ label: "音楽プレイリスト", onSelect: openPlaylist },
 						{ label: "タイマー", onSelect: () => openTimer() },
@@ -139,5 +142,13 @@ export function Workspace({
 				<ConversationPanel client={client} store={store} state={state} />
 			</ResizableWorkspace>
 		</main>
+	);
+}
+
+export function Workspace(props: Parameters<typeof WorkspaceContent>[0]) {
+	return (
+		<SettingsDraftProvider key={props.client.identity} client={props.client}>
+			<WorkspaceContent {...props} />
+		</SettingsDraftProvider>
 	);
 }

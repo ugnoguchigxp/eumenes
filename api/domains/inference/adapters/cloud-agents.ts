@@ -17,7 +17,8 @@ import type {
 import type { ConnectionKind } from "../../settings/contracts";
 import { getLogger } from "../../../infrastructure/logger";
 import type { Messages } from "../contracts";
-import { codexRuntime, lockedCodex, type CodexRuntime } from "./codex-sdk";
+import { runCodexTurn } from "./codex-app-server";
+import { codexRuntime, type CodexRuntime } from "./codex-sdk";
 
 export type CloudAgentKind = Exclude<ConnectionKind, "openai-compatible">;
 export type CloudAgentCall = {
@@ -147,78 +148,114 @@ function codexChoice(final: string, tools: NativeTool[]): CloudAgentResult {
 		throw fail("empty_output");
 	return { text: value.reply };
 }
+const jsonEscapes: Record<string, string> = {
+	'"': '"',
+	"\\": "\\",
+	"/": "/",
+	b: "\b",
+	f: "\f",
+	n: "\n",
+	r: "\r",
+	t: "\t",
+};
+/**
+ * The decoded part of `reply` that a partial `{"reply": "...` choice already fixes,
+ * so a reply streams while the call path stays silent. Stops before an incomplete escape.
+ */
+export function codexReplyPrefix(partial: string): string {
+	const head = /^\s*\{\s*"reply"\s*:\s*"/.exec(partial);
+	if (!head) return "";
+	let out = "";
+	for (let i = head[0].length; i < partial.length;) {
+		const c = partial[i]!;
+		if (c === '"') break;
+		if (c !== "\\") {
+			out += c;
+			i++;
+			continue;
+		}
+		const e = partial[i + 1];
+		if (e === undefined) break;
+		if (e !== "u") {
+			const decoded = jsonEscapes[e];
+			if (decoded === undefined) break;
+			out += decoded;
+			i += 2;
+			continue;
+		}
+		const hex = partial.slice(i + 2, i + 6);
+		if (!/^[0-9a-fA-F]{4}$/.test(hex)) break;
+		const code = parseInt(hex, 16);
+		if (code >= 0xd800 && code <= 0xdbff) {
+			// Emit a surrogate pair only when its low half has arrived.
+			const low = /^\\u([dD][c-fC-F][0-9a-fA-F]{2})/.exec(
+				partial.slice(i + 6, i + 12),
+			);
+			if (!low) break;
+			out += String.fromCharCode(code, parseInt(low[1]!, 16));
+			i += 12;
+			continue;
+		}
+		out += String.fromCharCode(code);
+		i += 6;
+	}
+	return out;
+}
 
 async function runCodex(
 	runtime: CodexRuntime,
 	call: CloudAgentCall,
 ): Promise<CloudAgentResult> {
 	const cwd = await mkdtemp(join(tmpdir(), "eumenes-agent-"));
-	const abort = new AbortController();
-	const onAbort = () => abort.abort();
-	call.signal.addEventListener("abort", onAbort, { once: true });
 	try {
 		const { system, prompt } = promptParts(call.messages);
 		const tools = call.tools?.length ? call.tools : undefined;
-		const sdk = await lockedCodex(
-			runtime,
-			cwd,
-			system + (tools ? codexFunctions(tools) : ""),
-			// Without a key the CLI keeps its own login; a key binds the saved API host.
-			call.credential
-				? { apiKey: call.credential, baseUrl: call.baseUrl }
-				: undefined,
-		);
-		const thread = sdk.startThread({
-			model: call.model,
-			workingDirectory: cwd,
-			sandboxMode: "read-only",
-			skipGitRepoCheck: true,
-			approvalPolicy: "never",
-			webSearchMode: "disabled",
-		});
-		const { events } = await thread.runStreamed(prompt, {
-			signal: abort.signal,
-			...(tools ? { outputSchema: codexChoiceSchema(tools) } : {}),
-		});
-		let final = "";
-		let streamed = "";
-		let usage: { input_tokens: number; output_tokens: number } | undefined;
-		let completed = 0;
-		for await (const event of events) {
-			if (event.type === "error" || event.type === "turn.failed")
-				throw fail("codex_turn_failed");
-			if (
-				(event.type === "item.updated" || event.type === "item.completed") &&
-				event.item.type === "agent_message"
-			) {
-				final = checkedText(event.item.text);
-				// Text is cumulative; forward only what extends what was already sent.
-				if (!tools && call.onDelta && final.startsWith(streamed)) {
-					const delta = final.slice(streamed.length);
-					if (delta) call.onDelta(delta);
-					streamed = final;
+		// Without a key the CLI keeps its own login; a key binds the saved API host.
+		const keyed: CodexRuntime = call.credential
+			? {
+					command: runtime.command,
+					env: { ...runtime.env, CODEX_API_KEY: call.credential },
+					extraArgs: ["-c", `openai_base_url=${JSON.stringify(call.baseUrl)}`],
 				}
-			}
-			if (event.type === "turn.completed") {
-				usage = event.usage;
-				completed++;
-			}
-		}
+			: runtime;
+		let streamed = "";
+		const result = await runCodexTurn(
+			keyed,
+			{
+				cwd,
+				model: call.model,
+				instructions: system + (tools ? codexFunctions(tools) : ""),
+				prompt,
+				...(tools ? { outputSchema: codexChoiceSchema(tools) } : {}),
+				signal: call.signal,
+				onMessage: (text) => {
+					// With tools the turn is a JSON choice: only its reply text streams.
+					const visible = tools ? codexReplyPrefix(checkedText(text)) : text;
+					if (!call.onDelta || !visible.startsWith(streamed)) return;
+					const delta = visible.slice(streamed.length);
+					if (delta) call.onDelta(delta);
+					streamed = visible;
+				},
+			},
+			fail,
+		);
 		call.signal.throwIfAborted();
-		if (completed !== 1) throw fail("incomplete_turn");
-		const result = tools ? codexChoice(final, tools) : { text: final };
-		if (!result.toolCalls && !result.text.trim()) throw fail("empty_output");
-		if (!tools && call.onDelta && !streamed) call.onDelta(result.text);
+		const final = checkedText(result.text);
+		const choice = tools ? codexChoice(final, tools) : { text: final };
+		if (!choice.toolCalls && !choice.text.trim()) throw fail("empty_output");
+		// Deliver whatever the stream did not cover (no deltas, or a final tail).
+		if (
+			call.onDelta &&
+			choice.text.startsWith(streamed) &&
+			choice.text.length > streamed.length
+		)
+			call.onDelta(choice.text.slice(streamed.length));
 		return {
-			...result,
-			inputTokens: usage?.input_tokens ?? null,
-			outputTokens: usage?.output_tokens ?? null,
+			...choice,
+			inputTokens: result.inputTokens,
+			outputTokens: result.outputTokens,
 		};
 	} finally {
-		// No abort here: once the event stream ends the SDK has already removed its
-		// child listeners and killed the process, so a late abort would make the
-		// spawned child emit an unhandled "error" and crash the backend.
-		call.signal.removeEventListener("abort", onAbort);
 		await rm(cwd, { recursive: true, force: true });
 	}
 }
@@ -314,7 +351,9 @@ async function runClaudeAgent(
 		env.ANTHROPIC_API_KEY = call.credential;
 		env.ANTHROPIC_BASE_URL = anthropicBase(call.baseUrl);
 	}
-	const stream = !!call.onDelta && !tools.length;
+	// Text streams with or without tools; a captured call ends the turn and the
+	// caller withdraws any text that preceded it.
+	const stream = !!call.onDelta;
 	const cwd = await mkdtemp(join(tmpdir(), "eumenes-agent-"));
 	const onAbort = () => abortController.abort();
 	call.signal.addEventListener("abort", onAbort, { once: true });

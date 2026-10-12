@@ -23,9 +23,11 @@ import {
 } from "../domains/dialogue";
 import { useReplay, useVoiceDialogue } from "../domains/voice-dialogue";
 import { useSettings, useVoiceMute } from "../domains/settings";
+import { useSettingsDraft } from "../domains/settings/SettingsDraftHost";
 import { createUnsavedFlags } from "../unsavedFlags";
 import { changeRoots, invalidateAllButLive, queryRoots } from "../queryKeys";
 import {
+	useOpenSettings,
 	useOpenMusic,
 	useOpenPlaylist,
 	useOpenTimer,
@@ -56,7 +58,12 @@ export function useWorkspace({
 		window.addEventListener("beforeunload", prevent);
 		return () => window.removeEventListener("beforeunload", prevent);
 	}, []);
+	const settingsDraft = useSettingsDraft();
+	useEffect(() => {
+		onDirty(settingsDraft.dirty);
+	}, [onDirty, settingsDraft.dirty]);
 	const artifacts = useArtifactWorkspace();
+	const openSettings = useOpenSettings(artifacts.open);
 	// Music generation and playback each own a stable screen, independent of record IDs.
 	const openMusic = useOpenMusic(artifacts.open);
 	const openPlaylist = useOpenPlaylist(artifacts.open);
@@ -98,15 +105,6 @@ export function useWorkspace({
 	useEffect(() => {
 		const navigate = () => {
 			const open = window.location.hash.startsWith("#settings");
-			if (
-				!open &&
-				unsaved.current.any() &&
-				!window.confirm("設定の未保存の変更を破棄して会話に戻りますか？")
-			) {
-				window.history.replaceState(null, "", "#settings");
-				return;
-			}
-			unsaved.current.reset();
 			setSettingsOpen(open);
 		};
 		window.addEventListener("hashchange", navigate);
@@ -273,6 +271,7 @@ export function useWorkspace({
 		settingsOpen,
 		onDirty,
 		artifacts,
+		openSettings,
 		openMusic,
 		openPlaylist,
 		openTimer,

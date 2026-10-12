@@ -1,0 +1,300 @@
+.timer-workspace {
+	--timer-ink: var(--foreground);
+	--timer-accent: var(--primary);
+	container-type: inline-size;
+	min-width: 0;
+	padding: clamp(24px, 5%, 48px) 16px 28px;
+	color: var(--timer-ink);
+	background: radial-gradient(
+		ellipse at 50% 30%,
+		color-mix(in srgb, var(--timer-accent) 4%, transparent),
+		transparent 65%
+	);
+}
+.timer-workspace[data-state="elapsed"] {
+	--timer-accent: var(--success);
+}
+.timer-workspace[data-state="cancelled"] {
+	--timer-accent: var(--muted-foreground);
+}
+.timer-workspace-inner {
+	width: 100%;
+	max-width: 370px;
+	margin: 0 auto;
+}
+.timer-workspace-header {
+	text-align: center;
+}
+.timer-workspace-brand {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	gap: 7px;
+	color: var(--muted-foreground);
+	font-size: 10px;
+	font-weight: 600;
+	letter-spacing: 0.18em;
+}
+.timer-workspace-header h2 {
+	margin: 14px 0 6px;
+	font-size: 23px;
+	font-weight: 500;
+	letter-spacing: -0.035em;
+	line-height: 1.45;
+	overflow-wrap: anywhere;
+}
+.timer-workspace-header p {
+	margin: 0;
+	min-height: 20px;
+	color: var(--muted-foreground);
+	font-size: 12px;
+	line-height: 1.6;
+}
+.timer-workspace-dial {
+	position: relative;
+	width: min(100%, 320px);
+	aspect-ratio: 1;
+	margin: 26px auto 24px;
+}
+.timer-workspace-face {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	overflow: visible;
+}
+.timer-tick {
+	stroke: color-mix(in srgb, var(--muted-foreground) 30%, transparent);
+	stroke-width: 1;
+}
+.timer-tick-major {
+	stroke: color-mix(in srgb, var(--foreground) 55%, transparent);
+	stroke-width: 1.5;
+}
+.timer-workspace-track {
+	stroke: color-mix(in srgb, var(--muted-foreground) 12%, transparent);
+	stroke-width: 3;
+}
+.timer-workspace-ring {
+	stroke: var(--timer-accent);
+	stroke-width: 3;
+	stroke-linecap: round;
+	transition: stroke-dasharray 250ms linear;
+}
+.timer-workspace-hand {
+	fill: var(--timer-accent);
+	stroke: var(--background);
+	stroke-width: 2;
+	transition: transform 250ms linear;
+}
+.timer-workspace-dial-content {
+	position: absolute;
+	inset: 17% 12%;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+}
+.timer-workspace-caption {
+	color: var(--muted-foreground);
+	font-size: 11px;
+	letter-spacing: 0.09em;
+	margin-bottom: 16px;
+}
+.timer-workspace-time-inputs {
+	display: flex;
+	width: 100%;
+	justify-content: center;
+}
+.timer-workspace-time-part {
+	position: relative;
+	flex: 1;
+	min-width: 0;
+}
+.timer-workspace-time-part label {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 5px;
+}
+.timer-workspace-time-part input {
+	display: block;
+	width: 100%;
+	min-width: 0;
+	height: 56px;
+	padding: 0 2px;
+	border: 0;
+	border-radius: 10px;
+	background: transparent;
+	color: var(--timer-ink);
+	text-align: center;
+	font-size: clamp(26px, 9cqw, 44px);
+	font-weight: 350;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+	font-variant-numeric: tabular-nums;
+	letter-spacing: -0.04em;
+	appearance: textfield;
+	transition: background 150ms;
+}
+.timer-workspace-time-part input::-webkit-inner-spin-button,
+.timer-workspace-time-part input::-webkit-outer-spin-button {
+	-webkit-appearance: none;
+	margin: 0;
+}
+.timer-workspace-time-part input:hover {
+	background: color-mix(in srgb, var(--timer-accent) 5%, transparent);
+}
+.timer-workspace-time-part input:focus-visible {
+	outline: 2px solid var(--ring);
+	outline-offset: 2px;
+	background: color-mix(in srgb, var(--timer-accent) 7%, transparent);
+}
+.timer-workspace-time-part label > span {
+	color: var(--muted-foreground);
+	font-size: 10px;
+}
+.timer-workspace-colon {
+	position: absolute;
+	left: -3px;
+	top: 6px;
+	color: color-mix(in srgb, var(--muted-foreground) 65%, transparent);
+	font-size: 32px;
+	font-weight: 300;
+}
+.timer-workspace-dial-hint {
+	margin-top: 18px;
+	color: var(--muted-foreground);
+	font-size: 10px;
+}
+.timer-workspace .timer-workspace-clock {
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+	font-weight: 350;
+	letter-spacing: -0.055em;
+}
+.timer-workspace-clock .digital-clock-digits {
+	min-width: 0;
+	font-size: clamp(32px, 26cqw, 72px);
+}
+.timer-workspace-clock-long .digital-clock-digits {
+	font-size: clamp(26px, 17cqw, 52px);
+}
+.timer-workspace-status {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin-top: 18px;
+	font-size: 11px;
+	color: var(--timer-accent);
+}
+.timer-workspace-status > span {
+	width: 5px;
+	height: 5px;
+	border-radius: 50%;
+	background: currentColor;
+}
+.timer-workspace-presets {
+	display: grid;
+	grid-template-columns: repeat(5, minmax(0, 1fr));
+	gap: 8px;
+	margin-bottom: 26px;
+}
+.timer-workspace-presets button {
+	gap: 3px;
+	height: 44px;
+	padding: 0 4px;
+	border: 1px solid var(--border);
+	border-radius: 12px;
+	background: var(--background);
+	font-size: 14px;
+	font-variant-numeric: tabular-nums;
+	color: var(--foreground);
+}
+.timer-workspace-presets button > span {
+	font-size: 10px;
+	opacity: 0.6;
+}
+.timer-workspace-presets button[aria-pressed="true"] {
+	color: var(--timer-accent);
+	border-color: color-mix(in srgb, var(--timer-accent) 50%, var(--border));
+	background: color-mix(in srgb, var(--timer-accent) 7%, var(--background));
+	box-shadow: inset 0 0 0 1px
+		color-mix(in srgb, var(--timer-accent) 8%, transparent);
+}
+.timer-workspace-name {
+	display: block;
+	margin-bottom: 20px;
+}
+.timer-workspace-name > span {
+	display: flex;
+	gap: 6px;
+	align-items: center;
+	font-size: 11px;
+	margin-bottom: 8px;
+}
+.timer-workspace-name > span > span {
+	font-size: 10px;
+	color: var(--muted-foreground);
+}
+.timer-workspace-name input {
+	height: 44px;
+	border-radius: 10px;
+	font-size: 13px;
+	background: color-mix(in srgb, var(--background) 92%, var(--muted));
+}
+.timer-workspace .timer-workspace-primary {
+	width: 100%;
+	min-height: 52px;
+	height: 52px;
+	gap: 10px;
+	border-radius: 14px;
+	font-size: 14px;
+	font-weight: 500;
+}
+.timer-workspace-note {
+	margin: 14px 0 0;
+	text-align: center;
+	font-size: 10px;
+	color: var(--muted-foreground);
+	line-height: 1.6;
+}
+.timer-workspace-primary > span,
+.timer-workspace-new > span {
+	gap: 9px;
+}
+.timer-workspace-finish {
+	display: flex;
+	gap: 10px;
+	align-items: center;
+	justify-content: center;
+	margin: 0 0 24px;
+	font-size: 12px;
+	color: var(--muted-foreground);
+}
+.timer-workspace-finish time {
+	color: var(--foreground);
+	font-variant-numeric: tabular-nums;
+}
+.timer-workspace .timer-workspace-stop {
+	background: var(--background);
+}
+.timer-workspace .timer-workspace-new {
+	display: flex;
+	gap: 8px;
+	margin: 14px auto 0;
+	height: 44px;
+	font-size: 12px;
+	color: var(--muted-foreground);
+}
+.timer-workspace-error {
+	margin: 16px 0 0;
+	font-size: 12px;
+	line-height: 1.6;
+	color: var(--destructive);
+	text-align: center;
+}
+@media (prefers-reduced-motion: reduce) {
+	.timer-workspace-ring,
+	.timer-workspace-hand {
+		transition: none;
+	}
+}

@@ -1,0 +1,26 @@
+$ bun scripts/verify.ts --domain artifact
+[verify] selected=artifact dependencyClosure=artifact,delivery,avatar,conversation testClosure=delivery,avatar,conversation,artifact
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts web/src/domains/artifact web/src/components/domains/artifact packages/artifact-ui/src
+size-budget ok (23 files)
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check web/src/domains/artifact web/src/components/domains/artifact packages/artifact-ui/src
+$ oxfmt --check web/src/domains/artifact web/src/components/domains/artifact packages/artifact-ui/src
+Checking formatting...
+
+packages/artifact-ui/src/settings-components.tsx (0ms)
+packages/artifact-ui/src/settings-contracts.ts (0ms)
+web/src/components/domains/artifact/ArtifactShowcase.tsx (1ms)
+
+Format issues found in above 3 files. Run without `--check` to fix.
+Finished in 8ms on 33 files using 10 threads.
+error: script "format:check" exited with code 1
+83 | 	steps.push({
+84 | 		name,
+85 | 		ms: Math.round(performance.now() - start),
+86 | 		result: code === 0 ? "pass" : `exit ${code}`,
+87 | 	});
+88 | 	if (code !== 0) throw new Error(`${name} failed (${code})`);
+                                ^
+error: format failed (1)
+      at run (/Users/y.noguchi/Code/eumenes/scripts/verify.ts:88:28)
+
+error: script "verify" exited with code 1

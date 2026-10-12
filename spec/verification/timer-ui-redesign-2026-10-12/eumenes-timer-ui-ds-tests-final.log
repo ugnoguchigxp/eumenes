@@ -1,0 +1,25 @@
+$ vitest run --project unit src/components/TimerWorkspace/TimerWorkspace.test.tsx
+│ ┌────────────────────────────────────────────────────────────────────────────┐
+│ │  Info: Found a setup file with "setProjectAnnotations".                    │
+│ │  Skipping automatic provisioning of preview annotations to avoid           │
+│ │  conflicts. Since Storybook 10.3, "@storybook/addon-vitest" applies these  │
+│ │   automatically.                                                           │
+│ │  You can safely remove the "setProjectAnnotations" call from your setup    │
+│ │  file, or remove the file entirely if you don't have custom code there.    │
+│ └────────────────────────────────────────────────────────────────────────────┘
+
+ RUN  v4.0.16 /Users/y.noguchi/Code/eumenes/packages/design-system
+
+stdout | src/components/TimerWorkspace/TimerWorkspace.test.tsx
+Test setup running...
+
+stdout | src/components/TimerWorkspace/TimerWorkspace.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/TimerWorkspace/TimerWorkspace.test.tsx (3 tests) 115ms
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  23:13:21
+   Duration  829ms (transform 99ms, setup 85ms, import 161ms, tests 115ms, environment 387ms)
+

@@ -1,0 +1,83 @@
+.ds-settings-panel {
+	min-width: 0;
+}
+.ds-settings-fields {
+	display: grid;
+	gap: 1.6rem;
+	padding-top: 1.5rem;
+}
+.ds-settings-field {
+	display: grid;
+	gap: 0.55rem;
+}
+.ds-settings-field select {
+	width: 100%;
+	min-height: 2.7rem;
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius);
+	padding: 0.5rem 0.75rem;
+	background: var(--color-background);
+	color: var(--color-foreground);
+}
+.ds-settings-hint {
+	color: var(--color-muted-foreground);
+	font-size: 0.875rem;
+	line-height: 1.6;
+}
+.ds-settings-footer {
+	display: flex;
+	gap: 1rem;
+	align-items: center;
+	flex-wrap: wrap;
+	margin-top: 1.5rem;
+	border-top: 1px solid var(--color-border);
+	padding-top: 1.25rem;
+}
+.ds-settings-footer output {
+	flex: 1;
+	font-size: 0.875rem;
+	color: var(--color-muted-foreground);
+}
+.ds-settings-groups {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+	gap: 1.5rem;
+	margin-top: 1.5rem;
+}
+.ds-settings-groups section {
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius);
+	padding: 1rem;
+}
+.ds-settings-groups h3 {
+	margin-bottom: 0.75rem;
+	color: var(--color-muted-foreground);
+}
+.ds-settings-link {
+	width: 100%;
+	justify-content: space-between;
+	min-height: 3rem;
+}
+.ds-settings-link span {
+	color: var(--color-muted-foreground);
+	font-size: 0.8125rem;
+}
+.ds-settings-changes {
+	display: grid;
+	gap: 1rem;
+	padding-top: 1.5rem;
+}
+.ds-settings-changes > div {
+	border-bottom: 1px solid var(--color-border);
+	padding-bottom: 1rem;
+}
+.ds-settings-changes dt {
+	font-weight: 600;
+	margin-bottom: 0.5rem;
+}
+.ds-settings-changes dd {
+	overflow-wrap: anywhere;
+}
+.ds-settings-changes dd > span:first-child {
+	color: var(--color-muted-foreground);
+}

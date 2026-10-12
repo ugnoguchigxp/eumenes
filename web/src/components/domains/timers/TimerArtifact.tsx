@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, DigitalClock } from "../../../design-system";
+import { ArtifactRenderer, type ArtifactRuntime } from "@eumenes/artifact-ui";
+import "@eumenes/artifact-ui/styles";
+import { timerDefinition } from "../../../domains/timers/artifact-definition";
 import { useEffect, useState } from "react";
 import type { EumenesClient } from "../../../../../client";
 import { queryRoots } from "../../../queryKeys";
@@ -35,9 +37,13 @@ function TimerMessage({ children }: { children: string }) {
 export function TimerArtifact({
 	client,
 	timerId,
+	onNewTimer,
+	definition: storedDefinition,
 }: {
 	client: EumenesClient;
 	timerId: string;
+	onNewTimer?: () => void;
+	definition?: string;
 }) {
 	const cache = useQueryClient();
 	const query = useQuery({
@@ -118,104 +124,39 @@ export function TimerArtifact({
 	);
 	const confirming = timer.state === "active" && seconds === 0;
 	const duration = durationLabel(timer.durationSeconds);
-	const remaining = Math.min(
-		100,
-		Math.max(0, (seconds / timer.durationSeconds) * 100),
-	);
-	const status =
-		timer.state === "cancelled"
-			? "取消済み"
-			: timer.state === "elapsed"
-				? "時間になりました"
-				: confirming
-					? "終了を確認中"
-					: "計測中";
-	return (
-		<section
-			className="timer-artifact"
-			aria-label={timer.label}
-			data-state={timer.state}
-		>
-			<div className="timer-artifact-content">
-				<header className="timer-artifact-heading">
-					<span className="timer-artifact-icon" aria-hidden="true">
-						<svg
-							width="24"
-							height="24"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							strokeWidth="1.5"
-							strokeLinecap="round"
-							strokeLinejoin="round"
-						>
-							<path d="M9 2h6M12 2v3m6 1 1.5-1.5" />
-							<circle cx="12" cy="14" r="8" />
-							<path d="M12 10v4l2.5 1.5" />
-						</svg>
-					</span>
-					<h2>
-						{timer.label === "タイマー" ? `${duration}のタイマー` : timer.label}
-					</h2>
-					{timer.label !== "タイマー" && (
-						<p className="timer-artifact-duration">{duration}</p>
-					)}
-				</header>
-				<output className="timer-artifact-status">
-					<span className="timer-artifact-status-dot" aria-hidden="true" />
-					{status}
-				</output>
-				<DigitalClock
-					seconds={seconds}
-					format={timer.durationSeconds >= 3600 ? "hh:mm:ss" : "mm:ss"}
-					className={
-						timer.durationSeconds >= 3600
-							? "timer-artifact-clock timer-artifact-clock-long"
-							: "timer-artifact-clock"
-					}
-					size="hero"
-					tone={
-						timer.state === "cancelled"
-							? "muted"
-							: timer.state === "elapsed"
-								? "finished"
-								: "default"
-					}
-				/>
-				<div className="timer-artifact-progress" aria-hidden="true">
-					<div style={{ width: `${remaining}%` }} />
-				</div>
-				<p className="timer-artifact-finish">
-					{timer.state === "cancelled" ? (
-						"タイマーを取り消しました"
-					) : (
-						<>
-							<span>{timer.state === "elapsed" ? "終了時刻" : "終了予定"}</span>
-							<time dateTime={timer.dueAt}>
-								{finishLabel(timer.dueAt, query.data.serverNow)}
-							</time>
-						</>
-					)}
-				</p>
-				<div className="timer-artifact-actions">
-					{timer.state === "active" && (
-						<Button
-							type="button"
-							variant="outline"
-							className="timer-artifact-cancel"
-							loading={cancel.isPending}
-							onClick={() => cancel.mutate()}
-						>
-							取り消す
-						</Button>
-					)}
-					{cancel.isError && (
-						<p className="timer-artifact-error" role="alert">
-							取消に失敗しました。もう一度試してください。
-						</p>
-					)}
-				</div>
-			</div>
-		</section>
-	);
+	const definition = storedDefinition ?? timerDefinition(timerId);
+	const source = `timer-${timerId}`;
+	const runtime: ArtifactRuntime = {
+		snapshot: {
+			[source]: {
+				kind: "timer-workspace",
+				revision: timer.revision,
+				state: confirming ? "confirming" : timer.state,
+				title:
+					timer.label === "タイマー" ? `${duration}のタイマー` : timer.label,
+				durationSeconds: timer.durationSeconds,
+				remainingSeconds: seconds,
+				durationLabel: duration,
+				dueAt: timer.state === "cancelled" ? undefined : timer.dueAt,
+				finishLabel: finishLabel(timer.dueAt, query.data.serverNow),
+				canCreate: !!onNewTimer,
+			},
+		},
+		dispatch: async (event) => {
+			if (event.source !== source || event.revision !== timer.revision)
+				return {
+					status: "conflict",
+					message: "タイマーの状態が変わりました。もう一度お試しください。",
+				};
+			if (event.action === "timer-new" && onNewTimer) {
+				onNewTimer();
+				return { status: "accepted", message: "" };
+			}
+			if (event.action !== "timer-cancel" || timer.state !== "active")
+				return { status: "rejected", message: "この操作は利用できません" };
+			await cancel.mutateAsync();
+			return { status: "accepted", message: "" };
+		},
+	};
+	return <ArtifactRenderer definition={definition} runtime={runtime} />;
 }
