@@ -23,6 +23,35 @@ export function forwardToolCalls(
 }
 export type TextDelta = (text: string) => void;
 
+/** Allowlisted provider-reported counters, never the provider payload itself. */
+export type ProviderTimings = Partial<
+	Record<
+		| "providerPromptMs"
+		| "providerDecodeMs"
+		| "providerPromptTokens"
+		| "providerCachedTokens"
+		| "providerOutputTokens",
+		number
+	>
+>;
+function providerTimings(value: unknown): ProviderTimings | undefined {
+	if (!value || typeof value !== "object" || Array.isArray(value)) return;
+	const source = value as Record<string, unknown>;
+	const result: ProviderTimings = {};
+	for (const [key, field] of [
+		["prompt_ms", "providerPromptMs"],
+		["predicted_ms", "providerDecodeMs"],
+		["prompt_n", "providerPromptTokens"],
+		["cache_n", "providerCachedTokens"],
+		["predicted_n", "providerOutputTokens"],
+	] as const) {
+		const n = source[key];
+		if (typeof n === "number" && Number.isFinite(n) && n >= 0)
+			result[field] = n;
+	}
+	return Object.keys(result).length ? result : undefined;
+}
+
 /** Consume provider bytes as they arrive; only answer content is projected. */
 export async function readChatResponse(
 	response: Response,
@@ -31,6 +60,7 @@ export async function readChatResponse(
 ): Promise<{
 	text: string;
 	usage?: Record<string, unknown>;
+	providerTimings?: ProviderTimings;
 	toolCalls?: NativeToolCall[];
 }> {
 	const reader = response.body?.getReader();
@@ -45,6 +75,7 @@ export async function readChatResponse(
 		bytes = 0,
 		done = false;
 	let usage: Record<string, unknown> | undefined;
+	let measured: ProviderTimings | undefined;
 	const calls = new Map<number, NativeToolCall>();
 	let truncated = false;
 	function toolCalls(value: unknown) {
@@ -101,6 +132,7 @@ export async function readChatResponse(
 		const item = JSON.parse(raw) as {
 			error?: unknown;
 			usage?: Record<string, unknown>;
+			timings?: unknown;
 			choices?: Array<{
 				index?: number;
 				delta?: { content?: unknown; tool_calls?: unknown };
@@ -110,6 +142,8 @@ export async function readChatResponse(
 		};
 		if (item.error) throw new Error("chat_stream_error");
 		usage = item.usage ?? usage;
+		const counters = providerTimings(item.timings);
+		if (counters) measured = { ...measured, ...counters };
 		const choice = item.choices?.find(
 			(c) => c.index === 0 || c.index === undefined,
 		);
@@ -158,7 +192,12 @@ export async function readChatResponse(
 			.map(([, call]) => call);
 		if (native.some((call) => !call.id || !call.name || !call.arguments))
 			throw new Error("chat_tool_calls_invalid");
-		return { text, usage, ...(native.length ? { toolCalls: native } : {}) };
+		return {
+			text,
+			usage,
+			...(measured ? { providerTimings: measured } : {}),
+			...(native.length ? { toolCalls: native } : {}),
+		};
 	} finally {
 		signal.removeEventListener("abort", cancel);
 		await reader.cancel().catch(() => {});

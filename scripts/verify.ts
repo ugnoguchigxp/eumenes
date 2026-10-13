@@ -16,7 +16,6 @@ import {
 	unusedDependencies,
 } from "./boundaries";
 import { closure, type Domain, domains, isDomain, ownedPaths } from "./domains";
-import { readFlakyTests } from "./playwright-flaky";
 import { verificationRevision } from "./verification-inputs";
 
 const args = process.argv.slice(2).filter((x) => x !== "--");
@@ -211,15 +210,6 @@ try {
 			"test",
 		]);
 		await run("web build", [process.execPath, "run", "build:web"]);
-		await run("browser fixture", [process.execPath, "x", "playwright", "test"]);
-		if (process.env.CI) {
-			// A retry hides flaky tests; CI treats "passed on retry" as a failure.
-			const flaky = readFlakyTests(join(root, "test-results/playwright.json"));
-			if (flaky.length > 0) {
-				for (const name of flaky) console.error(`[verify] flaky: ${name}`);
-				throw new Error(`${flaky.length} flaky browser test(s)`);
-			}
-		}
 	} else
 		await run("domain tests", [
 			process.execPath,

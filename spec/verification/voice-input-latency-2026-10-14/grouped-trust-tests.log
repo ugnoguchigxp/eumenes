@@ -1,0 +1,94 @@
+bun test v1.4.3 (c6da4a4d3)
+
+api/domains/voice-dialogue/test/spoken-text.test.ts:
+(pass) displayed citations stay out of speech while inline labels and surrounding facts survive [0.62ms]
+
+api/domains/voice-dialogue/test/world-release.test.ts:
+(pass) A41 invalidation by correction mid-generation: 0 body events, 0 TTS calls, also after reconnect [521.90ms]
+(pass) A41 invalidation by forget mid-generation: 0 body events, 0 TTS calls, also after reconnect [489.44ms]
+(pass) A41 invalidation by policy mid-generation: 0 body events, 0 TTS calls, also after reconnect [498.29ms]
+(pass) A41 invalidation by goal mid-generation: 0 body events, 0 TTS calls, also after reconnect [488.07ms]
+(pass) A41 cancel mid-generation drops the unpublished body: 0 body events, 0 TTS calls [361.54ms]
+(pass) A41 adoption: nothing before it, the complete body once after it, speech once, reconnect repeats no speech [566.40ms]
+(pass) A41 a blocked World run is reported as blocked (worldUsed), never as a World-less success [283.70ms]
+(pass) general conversation is unchanged: live partial text, speech only after completion, worldUsed false [325.82ms]
+
+api/domains/voice-dialogue/test/sentences.test.ts:
+(pass) punctuation clauses and decimal numbers survive every token split without repeated tails [0.66ms]
+(pass) long unpunctuated output is bounded and conflicting final text is rejected [0.19ms]
+(pass) no clause exceeds 240 characters even when the first boundary is far away [0.28ms]
+
+api/domains/voice-dialogue/test/upload.test.ts:
+(pass) bounded audio stream rejects oversized upload before ASR [1.56ms]
+(pass) valid bounded WAV reaches voice service once [0.47ms]
+(pass) replay failure logs and returns a code, never the raw message [1.73ms]
+
+api/domains/voice-dialogue/test/migration.test.ts:
+(pass) a database with only the original three migrations (plus later ones) upgrades in place and keeps history [33.95ms]
+
+api/domains/voice-dialogue/test/transcript-language.test.ts:
+(pass) V01/V02/V03 host applies the allowlist to model languages rather than scripts [0.07ms]
+(pass) assessment preserves every decision and confidence through transport decoding [1.03ms]
+(pass) assessment rejects malformed tuples and applies the unchanged language invariants [1.28ms]
+(pass) assessment keeps current, previous and conversation text as untrusted JSON data [0.29ms]
+(pass) V04 ambiguous, invalid and uncertain languages remain unverified [0.44ms]
+(pass) V-inj the utterance is passed as JSON data and the policy forbids following classification instructions inside it [0.07ms]
+(pass) language JSON is corrected before the unchanged confidence and allowlist checks [1.10ms]
+
+api/domains/voice-dialogue/test/settings-integration.test.ts:
+(pass) one voice turn uses fallback in all three stages, adopts one answer, and does not repeat duplicate upload [40.02ms]
+(pass) autoSpeak false is captured at voice acceptance and ends successfully without TTS [24.85ms]
+(pass) cancellation during cloud ASR cannot create a dialogue run even with late HTTP completion [52.70ms]
+(pass) queued snapshots survive recovery without re-running an attempted provider [17.69ms]
+(pass) revoking a cloud answer aborts downstream TTS and never publishes late audio [46.90ms]
+(pass) streaming text is visible but speech waits for completion; cancellation prevents partial-answer emotion [43.74ms]
+(pass) render ahead is bounded at three clauses and playback releases the next clause [63.58ms]
+(pass) final recognition preempts a slow prefix and never submits a late hypothesis [34.34ms]
+(pass) accepted audio chunks publish Laya delivery and cancellation removes the plan with the audio [31.32ms]
+(pass) replaying an answer persists its native motion, rejects unrelated text and ignores cancelled synthesis [27.37ms]
+(pass) one adopted full-answer emotion works with audio off and is reused for all clauses and replay [29.47ms]
+(pass) automatic three-clause speech shares the adopted full-answer decision [25.34ms]
+(pass) cancelling during final Laya classification rejects late emotion and assistant text [45.12ms]
+(pass) V05 cancelling during language control rejects the late receipt before dialogue or speech [55.41ms]
+(pass) V02/V04 asr_language_not_allowed prevents dialogue and TTS through real inference receipts [23.39ms]
+(pass) V02/V04 asr_language_unverified prevents dialogue and TTS through real inference receipts [23.14ms]
+(pass) V06 empty final ASR performs zero language control and creates no dialogue [28.17ms]
+(pass) cancelled source cannot be resurrected by a late continuation decision [33.90ms]
+(pass) ASR permission revocation after staging rejects commit [38.60ms]
+(pass) an answered input forms a boundary before an abandoned draft [44.85ms]
+(pass) three paused clauses use one language/endpoint control per fragment and create one answer after commit [40.69ms]
+(pass) a later accepted fragment blocks an older ready input, including while its ASR is delayed [35.78ms]
+(pass) uncertain, malformed and incomplete input never starts an answer: {"relation":["uncertain",0.99],"readiness":["ready",0.99],"language":["identified",["ja"],0.99]} [22.70ms]
+(pass) uncertain, malformed and incomplete input never starts an answer: {} [23.00ms]
+(pass) uncertain, malformed and incomplete input never starts an answer: {"relation":["independent",0.99],"readiness":["waiting",0.99],"language":["identified",["ja"],0.99]} [22.28ms]
+(pass) uncertain, malformed and incomplete input never starts an answer: {"relation":["independent",0.79],"readiness":["ready",1],"language":["identified",["ja"],1]} [25.07ms]
+(pass) uncertain, malformed and incomplete input never starts an answer: {"relation":["independent",1],"readiness":["ready",0.79],"language":["identified",["ja"],1]} [24.62ms]
+(pass) uncertain, malformed and incomplete input never starts an answer: {"relation":["independent",1],"readiness":["ready",1],"language":["identified",["ja"],0.79]} [22.22ms]
+(pass) uncertain, malformed and incomplete input never starts an answer: {"relation":["independent",1],"readiness":["ready",1],"language":["identified",["fr"],1]} [20.43ms]
+(pass) independent input keeps an unfinished prior utterance as a draft and answers only the new request [33.59ms]
+(pass) adopted full answer is classified once and clause synthesis stays bounded until playback acknowledgements [41.44ms]
+(pass) an unavailable sentence classifier fails speech without skipping clauses or replacing the adopted answer [26.70ms]
+(pass) sample HTTP route executes inference with sentence-language and draft voice without persisting it [21.47ms]
+
+api/domains/voice-dialogue/test/voice.test.ts:
+(pass) voice capture to ASR, dialogue, TTS; duplicate utterance is ignored [18.27ms]
+(pass) restart cancels the run of a stale voice turn so no old answer is spoken [25.21ms]
+(pass) a waiting ready turn is never evicted; the ninth is refused [117.82ms]
+(pass) a waiting turn older than ten minutes is evicted to make room [118.72ms]
+(pass) a fully played turn frees its slot without failing any turn [117.50ms]
+(pass) a session idle for over 30 minutes is dropped on the next session start [9.78ms]
+(pass) restarting a session aborts the previous warm-up [8.18ms]
+(pass) stopping a session fences acceptance waiting in the writer queue [9.87ms]
+(pass) replay splits finished text into clauses and synthesizes on demand [8.59ms]
+(pass) replay HTTP returns the adopted Laya motion with the same audio and supports legacy adapters [8.86ms]
+(pass) a clause that keeps failing is skipped and the rest is still spoken [31.65ms]
+(pass) clauses without any phoneme are never sent to TTS [0.07ms]
+(pass) a failed turn stores only a machine-readable error code [63.51ms]
+(pass) cancelling while the language check resolves leaves no running dialogue run [13.94ms]
+(pass) linking a run to a cancelled turn rolls the run back [76.30ms]
+(pass) a failing cleanup write neither rejects unhandled nor breaks close [78.66ms]
+
+ 72 pass
+ 0 fail
+ 476 expect() calls
+Ran 72 tests across 8 files. [5.88s]

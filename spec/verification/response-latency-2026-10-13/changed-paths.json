@@ -1,0 +1,30 @@
+{
+  "note": "Instrumentation-owned paths. Shared dialogue files also contain concurrent changes not owned by this task. Hashes describe the final observation, not the exact live startup tree.",
+  "baseCommit": "0cacd23ac164170c2fa3ff2aae70dc78d6beeb6c",
+  "paths": {
+    "api/infrastructure/performance.ts": "93ab61952bd4795ec7d035dfe142bd2d05644536087e6ebe4f19a63ae6f506a8",
+    "api/infrastructure/performance.test.ts": "483bcbf715667ab11703547dfeb31bd566e65628762d8137cfbfb6b856608c47",
+    "api/infrastructure/logger.ts": "0191bf07bb32b13f10c845a93136468f9972d90e0478ea0effdb243961ed8a1a",
+    "api/domains/larm/service/answer-request.ts": "be743e72c8684eef71348c056e240375222bce701d33fc6699e954bf95211356",
+    "api/domains/larm/service/llm-timing.ts": "5ad3aba099b6ea4384ad191da217e96f8379d80ed8f3f8d94c8f7cca31ed6866",
+    "api/domains/larm/service/provider-request.ts": "2c48fab6fbcdcc66a53cf007741282ef12a1412c2a74387bdef34a87691585e0",
+    "api/domains/larm/service/index.ts": "b48fbc1f988aa6d746443af4fc10c6b2da1fb757f93e5913af124b0dad0e2de6",
+    "api/domains/larm/test/llm-timing.test.ts": "befddfcb544bf0b108fc47bb30914d0f6bbae50f53b866953140cf6500ea6ccf",
+    "api/domains/inference/service/execute.ts": "5027c760f34b7f9cac7e0e5857af67fdb786d1a8fa7162fe6bac1029ed945ec2",
+    "api/domains/dialogue/service/generation-timing.ts": "dee71b9011e7257abed3cbc31408baaa2cc508117bcd4d773be8329499761984",
+    "api/domains/dialogue/service/generation-handler.ts": "317607235209e1a104194b06b8751768d0d9e996365446adfc95e353279cf5f4",
+    "api/domains/dialogue/service/selection-trace.ts": "84abf4502f0ad2e6bf087d68f43e2c1df72844ff88db1130b560a05b8b30739a",
+    "api/domains/voice-dialogue/service/recognize.ts": "3279f5807f383b492dba6ab499ffbb9171bfa7c1ffd3742e44499797302db179",
+    "api/domains/voice-dialogue/service/index.ts": "39fb2ca7b23b6d153584ce4a5be0d205d9bfa23b04180b93289fb5eb2fcc4f21",
+    "web/src/performance.ts": "3a7e9c67cf08a9c9839c0ab85e079d4e2ab43b5b225ba27f7a8a26fdc3bf239a",
+    "web/src/domains/dialogue/hooks/progress.ts": "35f2c9966ca8a56bcc2e5499c247080dd7d61d299e8b1f2007b4ea22933f1303",
+    "web/src/domains/audio/controller/index.ts": "0d1582ebf330ee7274ed72df3751f1471a36bea8c156e892dd4e4cbe41be4c7d",
+    "web/src/domains/audio/test/performance.test.ts": "7b02cad41cf7ca1a1b92c6c6cdc5ad59b2076a7d156e744c17f25e9c28413c77",
+    "web/src/domains/voice-dialogue/hooks/index.ts": "83d4d872454f4f2cf6b77e465ceeb6e0e1392f9fd26cd6df637e91bf115e4d2f",
+    "web/src/domains/voice-dialogue/hooks/audio-timing.ts": "d74ebc5e10fe04b852555ca74181ea692b16e547a0de5a8a216d38423de7fa87",
+    "web/src/domains/voice-dialogue/hooks/replay.ts": "8f699335bad98f4b9bc31212f900773e4d565b1c85e7d094cfdc4395f6edcd6c",
+    "scripts/response-latency-live.ts": "b4db9f65a4d553466bb0400c046b88b1a7ea669961b96a60f983feb06c52ea33",
+    "scripts/response-latency-api-live.ts": "44ed19d1111c1d703dd6eec0e25c0bda96846a53cb4eca6a2ddbc9f6910ce329",
+    "docs/logging.md": "457231f121f8243a91bc8ccdb9bf4e52430886e22e52978059826f25a63f7686"
+  }
+}

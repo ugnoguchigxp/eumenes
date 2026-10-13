@@ -24,6 +24,7 @@ import { createLarmPlayground } from "../domains/larm";
 import { larmEmbedder } from "./larm-embedder";
 import { createToolchainRouting } from "./toolchain-routing";
 import { createToolchain } from "./toolchain";
+import { questionReader, toolchainMaintenance } from "./toolchain-adapters";
 import {
 	createAttitudeDataset,
 	openAttitudeStore,
@@ -280,6 +281,9 @@ export async function buildServices(config: Config) {
 						: {}),
 					...(config.worldPollMs ? { pollMs: config.worldPollMs } : {}),
 				});
+	let dialogueInteractions:
+		| ReturnType<typeof createDialogueService>["interactions"]
+		| undefined;
 	const toolchain = await createToolchain(
 		store,
 		queue,
@@ -288,6 +292,8 @@ export async function buildServices(config: Config) {
 		{
 			timers,
 			conversation,
+			// The dialogue service is assembled after the toolchain; its questions are read lazily.
+			interactions: questionReader(() => dialogueInteractions),
 			history: config.historyToolsEnabled,
 			dots: true,
 			music: true,
@@ -384,9 +390,12 @@ export async function buildServices(config: Config) {
 					toolchain.capabilities,
 					toolchain.history,
 					toolchain.embedQuery,
+					toolchain.registry,
+					toolchain.schemas,
 				)
 			: undefined,
 	});
+	dialogueInteractions = dialogue.interactions;
 	const voice = createVoiceDialogue(store, dialogue, inference);
 	scheduler.registerTarget(dialogue.promptTarget);
 	return {
@@ -463,6 +472,7 @@ export function appServices(s: Services) {
 		},
 		toolchainHistory: s.toolchain.history,
 		timers: s.timers,
+		toolchainActions: s.toolchain.actionRequests,
 		// With World OFF nothing is assembled and the routes do not exist.
 		...(s.world
 			? {
@@ -536,6 +546,7 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 						error,
 					),
 				),
+			...toolchainMaintenance(s, log),
 		]),
 	);
 	// Bounded deletes (queue 500, occurrences 500, schedules 100) keep the writer free.

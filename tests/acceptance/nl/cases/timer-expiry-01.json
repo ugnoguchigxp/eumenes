@@ -1,0 +1,24 @@
+{
+	"caseId": "timer-expiry-01",
+	"version": 2,
+	"goal": "10秒のタイマーを作り、時間が来て終わったことを画面で確認してください。",
+	"initialStateRef": "fixture:empty-timers@1",
+	"allowedSurface": "isolated-eumenes-artifacts",
+	"criteriaRef": "criteria:timer-expiry-01@1",
+	"budget": {
+		"wallSeconds": 180,
+		"maxActions": 30,
+		"maxModelCalls": 25,
+		"maxCostUSD": 1.5
+	},
+	"evidence": [
+		"screenshots",
+		"observations",
+		"actions",
+		"readonly-host-state",
+		"receipt-refs"
+	],
+	"requires": {
+		"productLlm": false
+	}
+}

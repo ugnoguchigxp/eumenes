@@ -31,7 +31,11 @@ import {
 	type ConversationService,
 	registerConversation,
 } from "../domains/conversation";
-import { type DialogueService, registerDialogue } from "../domains/dialogue";
+import {
+	type DialogueService,
+	registerCommandInteractions,
+	registerDialogue,
+} from "../domains/dialogue";
 import { type LarmPort, registerLarmStatus } from "../domains/larm";
 import { type QueueService, registerQueue } from "../domains/queue";
 import { registerMemory, type MemoryService } from "../domains/memory";
@@ -45,6 +49,10 @@ import {
 } from "../domains/continuity";
 import { registerScheduler, type SchedulerService } from "../domains/scheduler";
 import { registerTimers, type TimersService } from "../domains/timers";
+import {
+	registerToolchainActions,
+	type ActionRequests,
+} from "../domains/tool-runtime";
 import {
 	registerVoiceDialogue,
 	type VoiceDialogueService,
@@ -103,6 +111,8 @@ export type AppServices = {
 	taskReports?: TaskReports;
 	toolchainHistory?: ToolchainHistory;
 	timers?: TimersService;
+	/** UI actions and artifact registrations of bound toolchains. */
+	toolchainActions?: ActionRequests;
 	/** World claim list and corrections (P5-02). Absent with World OFF: the routes do not exist. */
 	worldClaims?: { claims: WorldClaims; context: () => WorldClaimsContext };
 };
@@ -185,10 +195,14 @@ export function appModules(services: AppServices): AppModule[] {
 		},
 		{ mount: (app) => registerConversation(app, s.conversation) },
 		{ mount: (app) => registerDialogue(app, s.dialogue) },
+		{ mount: (app) => registerCommandInteractions(app, s.dialogue) },
 		{ mount: (app) => registerVoiceDialogue(app, s.voice) },
 		{ mount: (app) => registerQueue(app, s.queue) },
 		{ mount: (app) => registerScheduler(app, s.scheduler) },
 		s.timers && { mount: (app) => registerTimers(app, s.timers!) },
+		s.toolchainActions && {
+			mount: (app) => registerToolchainActions(app, s.toolchainActions!),
+		},
 		s.worldClaims && {
 			mount: (app) =>
 				registerWorldClaims(app, s.worldClaims!.claims, s.worldClaims!.context),

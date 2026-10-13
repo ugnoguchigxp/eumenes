@@ -1,0 +1,130 @@
+$ bun scripts/verify.ts --domain voice-dialogue
+[verify] selected=voice-dialogue dependencyClosure=delivery,capabilities,attitude-dataset,larm,settings,inference,queue,tool-runtime,agent-runtime,conversation,continuity,memory,scheduler,toolchain-history,dialogue,voice-dialogue,audio,avatar,tts-dictionary,tasks,dots testClosure=delivery,capabilities,attitude-dataset,larm,tts-dictionary,queue,tasks,dots,continuity,avatar,conversation,memory,settings,inference,tool-runtime,agent-runtime,scheduler,toolchain-history,goals,world,dialogue,audio,voice-dialogue
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts api/domains/voice-dialogue web/src/domains/voice-dialogue
+size-budget ok (23 files)
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check api/domains/voice-dialogue web/src/domains/voice-dialogue
+$ oxfmt --check api/domains/voice-dialogue web/src/domains/voice-dialogue
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 13ms on 38 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint api/domains/voice-dialogue web/src/domains/voice-dialogue
+$ oxlint --deny-warnings api/domains/voice-dialogue web/src/domains/voice-dialogue
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun check -p /Users/y.noguchi/Code/eumenes/verification-reports/tsconfig.selected.json
+✓ No type errors in 606 files [645.35ms]
+[verify] TypeScript workspace closure: 542 files; api/domains/voice-dialogue, api/infrastructure/flock.ts, api/infrastructure/logger.ts, api/infrastructure/sqlite, api/infrastructure/http.ts, api/domains/delivery, api/domains/settings, api/domains/larm, api/infrastructure/chat-stream.ts, api/infrastructure/ignore-error.ts, api/infrastructure/performance.ts, api/infrastructure/bounded-read.ts, api/infrastructure/error-code.ts, api/domains/inference, api/infrastructure/auth-config.ts, api/domains/attitude-dataset, api/domains/excalidraw, api/infrastructure/llm-json.ts, api/domains/capabilities, api/infrastructure/digest.ts, api/infrastructure/vector.ts, api/domains/queue, api/domains/object-recognition, api/domains/image, api/domains/music, api/infrastructure/validation-log.ts, api/domains/tool-runtime, api/domains/agent-runtime, packages/coding-runner/src, api/domains/coding, api/domains/coding-supervision, api/domains/tasks, api/domains/task-reports, api/domains/continuity, api/infrastructure/concurrency.ts, api/domains/conversation, api/domains/dialogue, api/infrastructure/snapshot-stream.ts, api/domains/memory, api/domains/toolchain-history, api/domains/scheduler, api/domains/goals, api/application/retired-migrations.ts, api/domains/service-tests, api/domains/dots, packages/dots-mcp/src, api/domains/timers, api/domains/tts-dictionary, api/domains/web-research, api/domains/world, api/application/migrations.ts, api/application/error-status.ts, api/application/events.ts, api/application/app-modules.ts, api/application/app.ts, client/transport.ts, client/voice-dialogue.ts, web/src/performance.ts, web/src/domains, web/src/errorMessages.ts, web/src/queryKeys.ts, client/run-stream.ts, client/dialogue.ts, client/conversation.ts
+[verify] domain tests: /Users/y.noguchi/.bun/bin/bun run test:domain -- voice-dialogue
+$ bun scripts/test-domain.ts voice-dialogue
+bun test v1.4.3 (c6da4a4d3)
+
+api/domains/voice-dialogue/test/spoken-text.test.ts:
+(pass) displayed citations stay out of speech while inline labels and surrounding facts survive [0.45ms]
+
+api/domains/voice-dialogue/test/world-release.test.ts:
+(pass) A41 invalidation by correction mid-generation: 0 body events, 0 TTS calls, also after reconnect [567.51ms]
+(pass) A41 invalidation by forget mid-generation: 0 body events, 0 TTS calls, also after reconnect [528.43ms]
+(pass) A41 invalidation by policy mid-generation: 0 body events, 0 TTS calls, also after reconnect [508.14ms]
+(pass) A41 invalidation by goal mid-generation: 0 body events, 0 TTS calls, also after reconnect [506.61ms]
+(pass) A41 cancel mid-generation drops the unpublished body: 0 body events, 0 TTS calls [393.77ms]
+(pass) A41 adoption: nothing before it, the complete body once after it, speech once, reconnect repeats no speech [567.81ms]
+(pass) A41 a blocked World run is reported as blocked (worldUsed), never as a World-less success [306.52ms]
+(pass) general conversation is unchanged: live partial text, speech only after completion, worldUsed false [347.79ms]
+
+api/domains/voice-dialogue/test/sentences.test.ts:
+(pass) punctuation clauses and decimal numbers survive every token split without repeated tails [0.58ms]
+(pass) long unpunctuated output is bounded and conflicting final text is rejected [0.15ms]
+(pass) no clause exceeds 240 characters even when the first boundary is far away [0.25ms]
+
+api/domains/voice-dialogue/test/upload.test.ts:
+(pass) bounded audio stream rejects oversized upload before ASR [1.89ms]
+(pass) valid bounded WAV reaches voice service once [1.02ms]
+(pass) replay failure logs and returns a code, never the raw message [2.12ms]
+
+api/domains/voice-dialogue/test/migration.test.ts:
+(pass) a database with only the original three migrations (plus later ones) upgrades in place and keeps history [32.80ms]
+
+api/domains/voice-dialogue/test/transcript-language.test.ts:
+(pass) V01/V02/V03 host applies the allowlist to model languages rather than scripts [0.06ms]
+(pass) assessment preserves decisions and confidence; host still rejects unsafe values [2.49ms]
+(pass) assessment keeps current, previous and conversation text as untrusted JSON data [0.27ms]
+(pass) V04 ambiguous, invalid and uncertain languages remain unverified [0.47ms]
+(pass) V-inj the utterance is passed as JSON data and the policy forbids following classification instructions inside it [0.08ms]
+(pass) language JSON is corrected before the unchanged confidence and allowlist checks [1.54ms]
+
+api/domains/voice-dialogue/test/settings-integration.test.ts:
+(pass) one voice turn uses fallback in all three stages, adopts one answer, and does not repeat duplicate upload [40.48ms]
+(pass) autoSpeak false is captured at voice acceptance and ends successfully without TTS [28.65ms]
+(pass) cancellation during cloud ASR cannot create a dialogue run even with late HTTP completion [56.72ms]
+(pass) queued snapshots survive recovery without re-running an attempted provider [18.90ms]
+(pass) revoking a cloud answer aborts downstream TTS and never publishes late audio [46.42ms]
+(pass) streaming text is visible but speech waits for completion; cancellation prevents partial-answer emotion [37.59ms]
+(pass) render ahead is bounded at three clauses and playback releases the next clause [69.44ms]
+(pass) final recognition preempts a slow prefix and never submits a late hypothesis [37.73ms]
+(pass) accepted audio chunks publish Laya delivery and cancellation removes the plan with the audio [33.02ms]
+(pass) replaying an answer persists its native motion, rejects unrelated text and ignores cancelled synthesis [26.12ms]
+(pass) one adopted full-answer emotion works with audio off and is reused for all clauses and replay [30.02ms]
+(pass) automatic three-clause speech shares the adopted full-answer decision [30.04ms]
+(pass) cancelling during final Laya classification rejects late emotion and assistant text [45.27ms]
+(pass) V05 cancelling during language control rejects the late receipt before dialogue or speech [56.70ms]
+(pass) V02/V04 asr_language_not_allowed prevents dialogue and TTS through real inference receipts [24.36ms]
+(pass) V02/V04 asr_language_unverified prevents dialogue and TTS through real inference receipts [24.07ms]
+(pass) V06 empty final ASR performs zero language control and creates no dialogue [27.46ms]
+(pass) cancelled source cannot be resurrected by a late continuation decision [36.86ms]
+(pass) ASR permission revocation after staging rejects commit [25.84ms]
+(pass) an answered input forms a boundary before an abandoned draft [49.40ms]
+(pass) three paused clauses use one language/endpoint control per fragment and create one answer after commit [47.32ms]
+(pass) a later accepted fragment blocks an older ready input, including while its ASR is delayed [39.43ms]
+(pass) uncertain, malformed and incomplete input never starts an answer: {"status":"identified","languages":["ja"],"confidence":0.99,"relation":"uncertain","readiness":"ready","relationConfidence":0.99,"readinessConfidence":0.99} [28.98ms]
+(pass) uncertain, malformed and incomplete input never starts an answer: {} [26.72ms]
+(pass) uncertain, malformed and incomplete input never starts an answer: {"status":"identified","languages":["ja"],"confidence":0.99,"relation":"independent","readiness":"waiting","relationConfidence":0.99,"readinessConfidence":0.99} [26.32ms]
+(pass) uncertain, malformed and incomplete input never starts an answer: {"status":"identified","languages":["ja"],"confidence":1,"relation":"independent","readiness":"ready","relationConfidence":0.79,"readinessConfidence":1} [24.06ms]
+(pass) uncertain, malformed and incomplete input never starts an answer: {"status":"identified","languages":["ja"],"confidence":1,"relation":"independent","readiness":"ready","relationConfidence":1,"readinessConfidence":0.79} [25.82ms]
+(pass) uncertain, malformed and incomplete input never starts an answer: {"status":"identified","languages":["ja"],"confidence":0.79,"relation":"independent","readiness":"ready","relationConfidence":1,"readinessConfidence":1} [26.90ms]
+(pass) uncertain, malformed and incomplete input never starts an answer: {"status":"identified","languages":["fr"],"confidence":1,"relation":"independent","readiness":"ready","relationConfidence":1,"readinessConfidence":1} [27.01ms]
+(pass) independent input keeps an unfinished prior utterance as a draft and answers only the new request [36.68ms]
+(pass) adopted full answer is classified once and clause synthesis stays bounded until playback acknowledgements [43.06ms]
+(pass) an unavailable sentence classifier fails speech without skipping clauses or replacing the adopted answer [32.55ms]
+(pass) sample HTTP route executes inference with sentence-language and draft voice without persisting it [27.20ms]
+
+api/domains/voice-dialogue/test/voice.test.ts:
+(pass) voice capture to ASR, dialogue, TTS; duplicate utterance is ignored [17.79ms]
+(pass) restart cancels the run of a stale voice turn so no old answer is spoken [24.73ms]
+(pass) a waiting ready turn is never evicted; the ninth is refused [111.48ms]
+(pass) a waiting turn older than ten minutes is evicted to make room [106.78ms]
+(pass) a fully played turn frees its slot without failing any turn [111.23ms]
+(pass) a session idle for over 30 minutes is dropped on the next session start [10.55ms]
+(pass) restarting a session aborts the previous warm-up [11.19ms]
+(pass) stopping a session fences acceptance waiting in the writer queue [10.02ms]
+(pass) replay splits finished text into clauses and synthesizes on demand [7.75ms]
+(pass) replay HTTP returns the adopted Laya motion with the same audio and supports legacy adapters [10.60ms]
+(pass) a clause that keeps failing is skipped and the rest is still spoken [31.79ms]
+(pass) clauses without any phoneme are never sent to TTS [0.12ms]
+(pass) a failed turn stores only a machine-readable error code [65.45ms]
+(pass) cancelling while the language check resolves leaves no running dialogue run [13.66ms]
+(pass) linking a run to a cancelled turn rolls the run back [78.52ms]
+(pass) a failing cleanup write neither rejects unhandled nor breaks close [79.97ms]
+
+ 71 pass
+ 0 fail
+ 473 expect() calls
+Ran 71 tests across 8 files. [6.32s]
+
+ RUN  v4.1.8 /Users/y.noguchi/Code/eumenes
+
+
+ Test Files  6 passed (6)
+      Tests  42 passed (42)
+   Start at  06:54:04
+   Duration  3.13s (transform 724ms, setup 0ms, import 2.16s, tests 2.46s, environment 6.26s)
+
+227 | 			"test:domain",
+228 | 			"--",
+229 | 			selected[0] ?? "",
+230 | 		]);
+231 | 	if (verificationRevision(root) !== startHash)
+232 | 		throw new Error("source changed during verification");
+                  ^
+error: source changed during verification
+      at /Users/y.noguchi/Code/eumenes/scripts/verify.ts:232:13
+
+error: script "verify" exited with code 1

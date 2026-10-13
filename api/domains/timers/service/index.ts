@@ -96,12 +96,25 @@ export function createTimers(
 					before,
 			};
 		});
-		if (wake && changed) {
-			ports.scheduler.wake();
-			ports.queue.wake();
-			options.publish?.();
-		}
+		if (wake && changed) notifyChanged();
 		return result;
+	}
+	function notifyChanged() {
+		ports.scheduler.wake();
+		ports.queue.wake();
+		options.publish?.();
+	}
+
+	function viewInTransaction(tx: Database, timerId: string) {
+		const at = deps.now();
+		const timer = getInTransaction(tx, timerId, scope, at);
+		if (!timer) return null;
+		const note = latestOpenNotification(tx, timerId);
+		return {
+			serverNow: iso(at),
+			timer,
+			notification: note ? notificationDto(note, tx) : null,
+		};
 	}
 
 	return {
@@ -159,6 +172,23 @@ export function createTimers(
 			listScope: string,
 			timerId: string,
 		) => cancelInTransaction(tx, deps, command, listScope, timerId),
+		pauseInTransaction: (
+			tx: Database,
+			command: unknown,
+			listScope: string,
+			timerId: string,
+		) => controlInTransaction(tx, deps, command, listScope, timerId, "pause"),
+		resumeInTransaction: (
+			tx: Database,
+			command: unknown,
+			listScope: string,
+			timerId: string,
+		) => controlInTransaction(tx, deps, command, listScope, timerId, "resume"),
+		/** After a caller's own writer transaction changed timers: wake expiry and publish. */
+		notifyChanged,
+		/** The current timer with its server time, as `GET /api/timers/:id` returns it. */
+		viewInTransaction,
+		scope,
 		getInTransaction: (tx: Database, timerId: string, listScope = scope) =>
 			getInTransaction(tx, timerId, listScope, deps.now()),
 		maintenanceInTransaction: (tx: Database) =>
@@ -191,17 +221,7 @@ export function createTimers(
 			return store.read((tx) => listInTransaction(tx, deps, query, scope));
 		},
 		get(timerId: string) {
-			return store.read((tx) => {
-				const at = deps.now();
-				const timer = getInTransaction(tx, timerId, scope, at);
-				if (!timer) return null;
-				const note = latestOpenNotification(tx, timerId);
-				return {
-					serverNow: iso(at),
-					timer,
-					notification: note ? notificationDto(note, tx) : null,
-				};
-			});
+			return store.read((tx) => viewInTransaction(tx, timerId));
 		},
 		readReceiptInTransaction(db: Database, operationId: string) {
 			const row = getOperation(db, operationId);

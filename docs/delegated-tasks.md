@@ -86,6 +86,6 @@ forgetはこれを待たずに本文・タイトル・質問回答・会話と�
 
 ## 検証
 
-タスク単体は `bun run verify -- --domain tasks`、Scheduler公開操作の変更は `--domain scheduler`、利用するQueueは `--domain queue` を確認する。結合試験は `bun test api/application/delegated-tasks.test.ts`。横断の最終確認は `bun run verify:all`。
+タスク単体は `bun run verify -- --domain tasks`、Scheduler公開操作の変更は `--domain scheduler`、利用するQueueは `--domain queue` を確認する。結合試験は `bun test api/application/delegated-tasks.test.ts`。横断変更は影響のある利用側domainも選んでverifyする。
 
 [検証記録](../spec/verification/delegated-coding/README.md)でfixture、live、実機器を分ける。現在のfixture成功を、CLI実行・監督・音声の製品受入とは扱わない。

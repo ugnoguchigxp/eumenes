@@ -115,3 +115,41 @@ LunaのSDK呼出しでは `inference.attempt_failed` に `phase=sdk_start/sdk_tu
 `llm_json.rejected` は共通JSON処理が補正を採用できなかった理由をdebugで記録します。`reason` は `llm_json_duplicate_key`（重複キー）、`llm_json_unsafe_repair`（値・構造の変更が必要）、`llm_json_incomplete`（途中切断）、`llm_json_too_deep`（深さ超過）、`llm_json_too_large`（容量超過）、`llm_json_invalid_syntax` 等の固定コードです。容量と、その処理のrunId/jobId等の実行コンテキストを記録し、キー名・値・生応答は含めません。補正成功はdebugの `llm_json.corrected` で区別します。これは保存前の構文観測であり、取消・古い結果・rollbackを確定した処理失敗として扱いません。処理の拒否は各domainの採用判定後の既存warnログが正本です。
 
 workerは共通補正の拒否分類を `agent.control_rejected.validationCode` と修正通知に保持し、元のJSON.parseの別の構文エラーで上書きしません。途中切断・通常の構文不正は従来の安全な詳細分類も使用します。会話function引数でも同じ固定コードと `validationPath=arguments` を修正資料に渡します。補正で正常なJSONになった後の型・ツール権限・根拠の違反は、各domainの既存検証と分類が正本です。
+
+## 応答開始までの時間を調べる（2026-10-14追加）
+
+`performance.stage` は `performance.now()` による区間時間です。既存の `runId` / `utteranceId` に加え、推論のProvider呼出しと回答後の態度判定では `inferenceId` / `attemptId` を下位のLARMログにも引き継ぎます。本文、音声、URL、設定やProvider応答は追加しません。`outcome=ok` はその処理から返ったという意味で、採用済みを意味しません。`error` には取消も含み、理由は既存の推論終了ログを参照します。
+
+| component / phase・event | 区間と用途 |
+| --- | --- |
+| `dialogue / query_embedding` | 候補選択のquery embedding待ち。既存 `dialogue.candidates_selected` はrecall等も含む |
+| `larm / main_connection_wait` | 同じ主会話接続の先行要求待ち |
+| `larm / provider_ready` | 接続・claim・必要なrenew等が返るまで。`kind` がProviderの役割。再利用ならほぼ0 |
+| `larm / token_count` | 正式token計数とその契約検査。計数不要のProviderでは即時に返る |
+| `larm / response_headers` | HTTP要求開始からヘッダー到着まで。body受信完了・純粋なモデル計算時間ではない。`kind` は操作名 |
+| `inference / provider` | ASR/LLM/TTSのadapter呼出し全体。接続・計数・受信も含む |
+| `inference / answer_delivery` | 回答生成後の態度判定の実際の待ち時間。接続準備・収集処理を含みうる |
+| `voice-dialogue / asr` | 音声認識要求から結果が返るまで |
+| `voice-dialogue / input_control` | ASR後の言語・継続関係・入力完了判定。ASR自体と区別する |
+| `inference.prepared` | 推論試行開始からProvider呼出し直前まで。TTSでは言語分類・態度準備等を含む |
+| `dialogue.body_policy` | 今回の生成が `held`（採用待ち）か `streamed` か。内容や保持理由の詳細は出さない |
+| `dialogue.first_delta` | 生成処理開始から最初の非空本文を受け取るまで。`held` は公開していない。修正を挟む場合もその生成処理の最初の一回 |
+| `voice.first_chunk_ready` | 合成処理作成から、最初の音声チャンクを採用・公開するまで。最初の試行が失敗しても最初に成功したチャンクで一回 |
+
+`larm.llm_timing.ttftMs` は従来どおり、接続確保後の計数等を含む最初の非空本文までの時間です。追加した `providerTtftMs` は計数完了後、生成要求の送信直前から最初の非空本文まで。通信、Provider内部待ち、応答ヘッダー後のexchange記録待ちを含むため、純粋なprefill時間ではありません。非streamのcontrol要求には本文TTFTを付けません。`totalMs` も単調増加時計に変更しています。
+
+これらの区間は**入れ子**です。`provider` に `provider_ready`・`token_count`・`response_headers` が含まれるため、全行の `durationMs` を合計しないでください。`inference.delivery_selected.durationMs` は採用するdelivery内の値で、既存deliveryをTTSで再利用した場合は過去の判定時間です。新しい待ち時間として重複加算しません。
+
+ブラウザではUser Timingに次のイベントを残します。外部送信はせず、各名前につき最大64件、上限到達時にその名前の古い記録をクリアします。`detail` はrunIdまたはutteranceIdとchunkIndexだけです。
+
+- `eumenes.text_received`：SSEで最初の表示可能な本文を受け取った時点。
+- `eumenes.text_committed`：その本文のReact commit後のeffectまで。ピクセルの描画時刻とは区別する。
+- `eumenes.audio_fetch`：live音声チャンク取得時間。
+- `eumenes.audio_decode`：音声decode時間。
+- `eumenes.playback_scheduled`：AudioBufferSourceのstart呼出し時点。Bluetooth・機器バッファ・WAV先頭の無音を含む可聴音の時刻ではない。
+
+ブラウザConsoleで `performance.getEntriesByType('measure').filter(x => x.name.startsWith('eumenes.'))` を確認できます。サーバーとブラウザの単調時計の値を直接引き算せず、IDで対応させ、それぞれの区間を比較します。実際の初回描画・発話終了・最初の可聴音は実機器受入で別に確認します。
+
+再計測は `bun scripts/response-latency-live.ts --run`（adapter経路、各3回）と `bun scripts/response-latency-api-live.ts --run`（一時DBの会話API、文字3回・合成音声入力3回）です。保存済み接続はsettings domainの読み取り専用操作で取得し、API試験では一時backendの設定APIに保存します。後者はtools無効・新規会話であり、通常の個人履歴付き会話の代表値ではありません。音声API試験は最初のチャンク取得後に停止します。両方とも本文と音声ファイルをレポートに保存せず、機器の録音・再生やOpenAI/Claude比較は行いません。結果は `verification-reports/response-latency{-api}-live/`。同じ入力・prompt・出力制約ではない二経路の値を引き算してアプリの追加遅延としないでください。
+
+LARMが`timings`を返す場合、`larm.llm_timing`に`providerPromptMs`（入力処理）、`providerDecodeMs`（生成）、`providerPromptTokens`（処理した入力）、`providerCachedTokens`（再利用した入力）、`providerOutputTokens`（生成token数）を追加します。これはProvider報告値です。5項目の有限・非負の数値だけを抽出し、未知項目・文字列・生応答を記録しません。未提供は不明として省略し、0で埋めません。`promptTokens`はusageの入力全体、`providerPromptTokens`はtimingsの処理済み入力であり、同じ値とは限りません。クライアントの`totalMs`との差には計数・通信・Provider内部の待機などが含まれ得るため、その差をqueue時間と断定しません。

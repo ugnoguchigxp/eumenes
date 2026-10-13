@@ -1,5 +1,13 @@
 # Excalidraw連携 作業記録
 
+## 並行差分を含むmainの全体受入
+
+2026年10月14日、利用者がsettings→memory依存違反の修正と、並行差分を反映したmainでの全体検証・正式接続通し確認を依頼した。今回の検証対象は古いmainの固定版ではなく、現在のmainの作業ツリーとする。最初のinitial_instructionsは再実行しない。
+
+修正方針: MemoryItemsPanelの試験型を既存の公開client/画面props契約から導出し、memory domainの直接参照と試験依存の例外宣言を除去する。発話判断・LLM選択・UI業務判断・検証期待値は変更しない。共有client契約が並行差分で公開されていることを再確認し、必要な統合修正は原因を特定してから行う。
+
+依存順と完了条件: settingsの部分gate → Excalidraw/API/共有clientの結合 → 影響のあるdomainのverifyと必要なbuild → 現在のmainから起動したbackend/Webで正式cold起動、編集保存再表示、自然停止と再接続、backend再起動復帰、実LLM/Artifactの通し確認 → 差分点検と証拠保存。各段階で入力変更を検知した結果は合格としない。正常な長時間停止待ちは中断しない。三ラウンドまたは停滞時には根拠と計画を見直す。Linux配備・credential・製品DBのコピーは行わない。
+
 ## mainでの最終受入再開
 
 利用者が実装と検証の完遂を依頼したため中断を解除する。initial_instructionsは開始時の一回を維持。既存の担当定義・公開drawing_editorツール・暗号化設定・scene保存・Artifactの接続を再利用する。新しいブランチは作らない。

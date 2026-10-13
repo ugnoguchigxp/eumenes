@@ -1,0 +1,1672 @@
+{
+  "lane": "live_control_adapter_synthetic_inputs",
+  "startedAt": "2026-10-13T23:17:52.156Z",
+  "updatedAt": "2026-10-13T23:22:35.022Z",
+  "timeoutMs": 8000,
+  "repetitions": 1,
+  "selected": [
+    "baseline",
+    "schema",
+    "examples",
+    "budget128"
+  ],
+  "requestHash": "ac023f7ced261cc1a2d2925491b6f18f49f2c6621099a38ae3d91eb3b26ea686",
+  "stopReason": "completed",
+  "samples": [
+    {
+      "sampleId": "c125ed38-6a11-4254-ac62-b7c095805a65",
+      "id": "standalone",
+      "repetition": 0,
+      "variant": "baseline",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4545.384540999999,
+      "responseBytes": 187,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.99,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.99,
+        "readinessConfidence": 0.99
+      },
+      "languageStatus": "allowed",
+      "accepted": true,
+      "expectedAccepted": true,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": true
+    },
+    {
+      "sampleId": "fbec46dc-79b7-45b5-b86d-e71c1cca025f",
+      "id": "standalone",
+      "repetition": 0,
+      "variant": "schema",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 3941.1302910000004,
+      "responseBytes": 187,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.99,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.99,
+        "readinessConfidence": 0.99
+      },
+      "languageStatus": "allowed",
+      "accepted": true,
+      "expectedAccepted": true,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": true
+    },
+    {
+      "sampleId": "015b327e-bae3-4dfc-9f56-ae59e487afb7",
+      "id": "standalone",
+      "repetition": 0,
+      "variant": "examples",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4755.5197499999995,
+      "responseBytes": 187,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.98,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.98,
+        "readinessConfidence": 0.98
+      },
+      "languageStatus": "allowed",
+      "accepted": true,
+      "expectedAccepted": true,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": true
+    },
+    {
+      "sampleId": "20665b22-8ccd-40db-b85e-679bdbd33a52",
+      "id": "standalone",
+      "repetition": 0,
+      "variant": "budget128",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4438.832542,
+      "responseBytes": 187,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.99,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.99,
+        "readinessConfidence": 0.99
+      },
+      "languageStatus": "allowed",
+      "accepted": true,
+      "expectedAccepted": true,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": true
+    },
+    {
+      "sampleId": "fb8a00dc-d972-430d-8619-485bc8c26d70",
+      "id": "fragment-1",
+      "repetition": 0,
+      "variant": "schema",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4148.197249999997,
+      "responseBytes": 196,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.98,
+        "relation": "independent",
+        "readiness": "waiting",
+        "relationConfidence": 0.9,
+        "readinessConfidence": 0.85
+      },
+      "languageStatus": "allowed",
+      "accepted": false,
+      "expectedAccepted": false,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": true
+    },
+    {
+      "sampleId": "85a228e8-0830-4b76-a255-1b2503e60911",
+      "id": "fragment-1",
+      "repetition": 0,
+      "variant": "examples",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4238.153375000002,
+      "responseBytes": 159,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.95,
+        "relation": "independent",
+        "readiness": "waiting",
+        "relationConfidence": 0.95,
+        "readinessConfidence": 0.9
+      },
+      "languageStatus": "allowed",
+      "accepted": false,
+      "expectedAccepted": false,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": true
+    },
+    {
+      "sampleId": "ae425f77-0ae4-4e03-ac5c-b3bc3d74d1c4",
+      "id": "fragment-1",
+      "repetition": 0,
+      "variant": "budget128",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4258.299292000003,
+      "responseBytes": 188,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.98,
+        "relation": "independent",
+        "readiness": "waiting",
+        "relationConfidence": 0.9,
+        "readinessConfidence": 0.85
+      },
+      "languageStatus": "allowed",
+      "accepted": false,
+      "expectedAccepted": false,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": true
+    },
+    {
+      "sampleId": "b0a91bd3-8f19-4715-bd44-a8106689b80c",
+      "id": "fragment-1",
+      "repetition": 0,
+      "variant": "baseline",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4382.0822919999955,
+      "responseBytes": 195,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.98,
+        "relation": "independent",
+        "readiness": "waiting",
+        "relationConfidence": 0.9,
+        "readinessConfidence": 0.7
+      },
+      "languageStatus": "allowed",
+      "accepted": false,
+      "expectedAccepted": false,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": false
+    },
+    {
+      "sampleId": "acf726dd-bf8d-458a-87c3-e8c6e307b3d7",
+      "id": "fragment-2",
+      "repetition": 0,
+      "variant": "examples",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4327.486958000001,
+      "responseBytes": 158,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.9,
+        "relation": "continuation",
+        "readiness": "waiting",
+        "relationConfidence": 0.8,
+        "readinessConfidence": 0.7
+      },
+      "languageStatus": "allowed",
+      "accepted": false,
+      "expectedAccepted": false,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": false
+    },
+    {
+      "sampleId": "7b848033-fa21-4ca3-a000-ecf09d9c474f",
+      "id": "fragment-2",
+      "repetition": 0,
+      "variant": "budget128",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4596.913957999997,
+      "responseBytes": 195,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.9,
+        "relation": "continuation",
+        "readiness": "waiting",
+        "relationConfidence": 0.7,
+        "readinessConfidence": 0.6
+      },
+      "languageStatus": "allowed",
+      "accepted": false,
+      "expectedAccepted": false,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": false
+    },
+    {
+      "sampleId": "bae1ba4b-edcd-488f-b98e-6bf91bc03502",
+      "id": "fragment-2",
+      "repetition": 0,
+      "variant": "baseline",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4220.2902079999985,
+      "responseBytes": 187,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.9,
+        "relation": "continuation",
+        "readiness": "waiting",
+        "relationConfidence": 0.7,
+        "readinessConfidence": 0.6
+      },
+      "languageStatus": "allowed",
+      "accepted": false,
+      "expectedAccepted": false,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": false
+    },
+    {
+      "sampleId": "599629de-be2d-4f6c-87c9-3f4e7283de1d",
+      "id": "fragment-2",
+      "repetition": 0,
+      "variant": "schema",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4228.039750000004,
+      "responseBytes": 183,
+      "assessment": {
+        "status": "undetermined",
+        "languages": [],
+        "confidence": 0,
+        "relation": "continuation",
+        "readiness": "waiting",
+        "relationConfidence": 0.5,
+        "readinessConfidence": 0.3
+      },
+      "languageStatus": "unverified",
+      "accepted": false,
+      "expectedAccepted": false,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": false
+    },
+    {
+      "sampleId": "cb72dd34-3f16-42d0-87e9-f17915c2af3c",
+      "id": "fragment-3",
+      "repetition": 0,
+      "variant": "budget128",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4622.325916000002,
+      "responseBytes": 186,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.98,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.9,
+        "readinessConfidence": 0.95
+      },
+      "languageStatus": "allowed",
+      "accepted": true,
+      "expectedAccepted": true,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": false
+    },
+    {
+      "sampleId": "6836f55c-dfbb-45fc-a2c4-c21b975e4de8",
+      "id": "fragment-3",
+      "repetition": 0,
+      "variant": "baseline",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4437.162250000001,
+      "responseBytes": 186,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.98,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.9,
+        "readinessConfidence": 0.95
+      },
+      "languageStatus": "allowed",
+      "accepted": true,
+      "expectedAccepted": true,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": false
+    },
+    {
+      "sampleId": "8067521c-b1b4-4403-983d-8fc87ca4aa69",
+      "id": "fragment-3",
+      "repetition": 0,
+      "variant": "schema",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4167.926499999994,
+      "responseBytes": 187,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.97,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.88,
+        "readinessConfidence": 0.95
+      },
+      "languageStatus": "allowed",
+      "accepted": true,
+      "expectedAccepted": true,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": false
+    },
+    {
+      "sampleId": "206f6fc0-80c5-41e3-8757-2511a38f30aa",
+      "id": "fragment-3",
+      "repetition": 0,
+      "variant": "examples",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4193.5845839999965,
+      "responseBytes": 157,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.95,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.9,
+        "readinessConfidence": 0.95
+      },
+      "languageStatus": "allowed",
+      "accepted": true,
+      "expectedAccepted": true,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": false
+    },
+    {
+      "sampleId": "42e3391d-b2aa-4783-ae1c-da5a22928446",
+      "id": "topic-switch",
+      "repetition": 0,
+      "variant": "budget128",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4143.648583000002,
+      "responseBytes": 189,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.98,
+        "relation": "continuation",
+        "readiness": "waiting",
+        "relationConfidence": 0.92,
+        "readinessConfidence": 0.9
+      },
+      "languageStatus": "allowed",
+      "accepted": false,
+      "expectedAccepted": true,
+      "falseAccept": false,
+      "falseReject": true,
+      "pass": false
+    },
+    {
+      "sampleId": "34b4b077-91de-4ced-9e74-7ee011a10e8c",
+      "id": "topic-switch",
+      "repetition": 0,
+      "variant": "examples",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4052.749291999993,
+      "responseBytes": 161,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.95,
+        "relation": "continuation",
+        "readiness": "waiting",
+        "relationConfidence": 0.95,
+        "readinessConfidence": 0.95
+      },
+      "languageStatus": "allowed",
+      "accepted": false,
+      "expectedAccepted": true,
+      "falseAccept": false,
+      "falseReject": true,
+      "pass": false
+    },
+    {
+      "sampleId": "3228315a-73f0-4994-aad1-ca058504dd13",
+      "id": "topic-switch",
+      "repetition": 0,
+      "variant": "schema",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4249.101416000005,
+      "responseBytes": 189,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.97,
+        "relation": "continuation",
+        "readiness": "waiting",
+        "relationConfidence": 0.92,
+        "readinessConfidence": 0.9
+      },
+      "languageStatus": "allowed",
+      "accepted": false,
+      "expectedAccepted": true,
+      "falseAccept": false,
+      "falseReject": true,
+      "pass": false
+    },
+    {
+      "sampleId": "c44a4acf-cefa-4fc1-80ad-30cab5ecf533",
+      "id": "topic-switch",
+      "repetition": 0,
+      "variant": "baseline",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4104.323207999987,
+      "responseBytes": 188,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.98,
+        "relation": "continuation",
+        "readiness": "waiting",
+        "relationConfidence": 0.9,
+        "readinessConfidence": 0.9
+      },
+      "languageStatus": "allowed",
+      "accepted": false,
+      "expectedAccepted": true,
+      "falseAccept": false,
+      "falseReject": true,
+      "pass": false
+    },
+    {
+      "sampleId": "46307862-6c06-41d5-9b13-2428a6491845",
+      "id": "short-answer",
+      "repetition": 0,
+      "variant": "baseline",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4203.792916999999,
+      "responseBytes": 186,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.98,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.9,
+        "readinessConfidence": 0.95
+      },
+      "languageStatus": "allowed",
+      "accepted": true,
+      "expectedAccepted": true,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": true
+    },
+    {
+      "sampleId": "9383045d-e8e0-422e-9702-8050034f4b71",
+      "id": "short-answer",
+      "repetition": 0,
+      "variant": "budget128",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4435.383291999999,
+      "responseBytes": 186,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.98,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.9,
+        "readinessConfidence": 0.95
+      },
+      "languageStatus": "allowed",
+      "accepted": true,
+      "expectedAccepted": true,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": true
+    },
+    {
+      "sampleId": "76a9f34a-4264-43e4-990c-dc07477fe1b9",
+      "id": "short-answer",
+      "repetition": 0,
+      "variant": "examples",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4588.640333999996,
+      "responseBytes": 158,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.95,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.95,
+        "readinessConfidence": 0.95
+      },
+      "languageStatus": "allowed",
+      "accepted": true,
+      "expectedAccepted": true,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": true
+    },
+    {
+      "sampleId": "379e23d1-8b76-43ab-945e-cc48f80b7f91",
+      "id": "short-answer",
+      "repetition": 0,
+      "variant": "schema",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4465.602249999996,
+      "responseBytes": 186,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.98,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.9,
+        "readinessConfidence": 0.95
+      },
+      "languageStatus": "allowed",
+      "accepted": true,
+      "expectedAccepted": true,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": true
+    },
+    {
+      "sampleId": "c8b6b48d-f91a-44cb-980a-1ec0387e0bc9",
+      "id": "acronyms",
+      "repetition": 0,
+      "variant": "schema",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4557.039042000004,
+      "responseBytes": 187,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.98,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.99,
+        "readinessConfidence": 0.97
+      },
+      "languageStatus": "allowed",
+      "accepted": true,
+      "expectedAccepted": true,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": true
+    },
+    {
+      "sampleId": "5038042b-5736-4b40-b07e-f8c2af95b8e5",
+      "id": "acronyms",
+      "repetition": 0,
+      "variant": "baseline",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4150.704874999996,
+      "responseBytes": 187,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.98,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.95,
+        "readinessConfidence": 0.97
+      },
+      "languageStatus": "allowed",
+      "accepted": true,
+      "expectedAccepted": true,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": true
+    },
+    {
+      "sampleId": "4fde08b3-ddc7-4143-b756-9434593823d3",
+      "id": "acronyms",
+      "repetition": 0,
+      "variant": "budget128",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4216.767999999996,
+      "responseBytes": 187,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.98,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.99,
+        "readinessConfidence": 0.97
+      },
+      "languageStatus": "allowed",
+      "accepted": true,
+      "expectedAccepted": true,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": true
+    },
+    {
+      "sampleId": "0c68ad03-5b3c-4604-b9e0-7bcd43994245",
+      "id": "acronyms",
+      "repetition": 0,
+      "variant": "examples",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4584.053,
+      "responseBytes": 158,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.95,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.95,
+        "readinessConfidence": 0.95
+      },
+      "languageStatus": "allowed",
+      "accepted": true,
+      "expectedAccepted": true,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": true
+    },
+    {
+      "sampleId": "6ca4ab25-4024-49d0-8bd7-5d2d363b6990",
+      "id": "foreign",
+      "repetition": 0,
+      "variant": "examples",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4910.285625000004,
+      "responseBytes": 187,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "fr"
+        ],
+        "confidence": 0.98,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.98,
+        "readinessConfidence": 0.98
+      },
+      "languageStatus": "not_allowed",
+      "accepted": false,
+      "expectedAccepted": false,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": true
+    },
+    {
+      "sampleId": "c124eafb-fe8b-4443-87fb-ee28bdd54ea7",
+      "id": "foreign",
+      "repetition": 0,
+      "variant": "schema",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4175.94658399999,
+      "responseBytes": 187,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "fr"
+        ],
+        "confidence": 0.99,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.99,
+        "readinessConfidence": 0.99
+      },
+      "languageStatus": "not_allowed",
+      "accepted": false,
+      "expectedAccepted": false,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": true
+    },
+    {
+      "sampleId": "802da738-c661-45f1-b95f-f92c06694cf2",
+      "id": "foreign",
+      "repetition": 0,
+      "variant": "baseline",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4329.9547909999965,
+      "responseBytes": 187,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "fr"
+        ],
+        "confidence": 0.99,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.99,
+        "readinessConfidence": 0.99
+      },
+      "languageStatus": "not_allowed",
+      "accepted": false,
+      "expectedAccepted": false,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": true
+    },
+    {
+      "sampleId": "1ddf76ff-3e9a-4ff6-a110-039013ce55bc",
+      "id": "foreign",
+      "repetition": 0,
+      "variant": "budget128",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4005.4314169999852,
+      "responseBytes": 187,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "fr"
+        ],
+        "confidence": 0.99,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.99,
+        "readinessConfidence": 0.99
+      },
+      "languageStatus": "not_allowed",
+      "accepted": false,
+      "expectedAccepted": false,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": true
+    },
+    {
+      "sampleId": "6de74200-939f-4ee0-8306-639020639b6b",
+      "id": "mixed",
+      "repetition": 0,
+      "variant": "baseline",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4541.389708999981,
+      "responseBytes": 193,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja",
+          "en"
+        ],
+        "confidence": 0.98,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.99,
+        "readinessConfidence": 0.99
+      },
+      "languageStatus": "not_allowed",
+      "accepted": false,
+      "expectedAccepted": false,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": true
+    },
+    {
+      "sampleId": "2f11cea2-55b6-40ca-b720-7994c959b947",
+      "id": "mixed",
+      "repetition": 0,
+      "variant": "schema",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4674.583207999996,
+      "responseBytes": 192,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja",
+          "en"
+        ],
+        "confidence": 0.95,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.9,
+        "readinessConfidence": 0.95
+      },
+      "languageStatus": "not_allowed",
+      "accepted": false,
+      "expectedAccepted": false,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": true
+    },
+    {
+      "sampleId": "5a4dc694-b82d-42fa-a2b4-8e13198a2ab2",
+      "id": "mixed",
+      "repetition": 0,
+      "variant": "examples",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4881.068250000011,
+      "responseBytes": 193,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja",
+          "en"
+        ],
+        "confidence": 0.95,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.95,
+        "readinessConfidence": 0.95
+      },
+      "languageStatus": "not_allowed",
+      "accepted": false,
+      "expectedAccepted": false,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": true
+    },
+    {
+      "sampleId": "ce0d2f6b-b423-4f53-bb0f-0c7f2755d8a1",
+      "id": "mixed",
+      "repetition": 0,
+      "variant": "budget128",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4378.3887920000125,
+      "responseBytes": 192,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja",
+          "en"
+        ],
+        "confidence": 0.98,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.95,
+        "readinessConfidence": 0.9
+      },
+      "languageStatus": "not_allowed",
+      "accepted": false,
+      "expectedAccepted": false,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": true
+    },
+    {
+      "sampleId": "08e15b29-e080-4f01-92b6-920e1606d28d",
+      "id": "ambiguous",
+      "repetition": 0,
+      "variant": "schema",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4182.142040999985,
+      "responseBytes": 180,
+      "assessment": {
+        "status": "undetermined",
+        "languages": [],
+        "confidence": 0,
+        "relation": "independent",
+        "readiness": "uncertain",
+        "relationConfidence": 0,
+        "readinessConfidence": 0
+      },
+      "languageStatus": "unverified",
+      "accepted": false,
+      "expectedAccepted": false,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": false
+    },
+    {
+      "sampleId": "404dec5d-8fd9-4023-b505-88809bd741d1",
+      "id": "ambiguous",
+      "repetition": 0,
+      "variant": "examples",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4441.201082999993,
+      "responseBytes": 183,
+      "assessment": {
+        "status": "undetermined",
+        "languages": [],
+        "confidence": 0,
+        "relation": "independent",
+        "readiness": "uncertain",
+        "relationConfidence": 0.95,
+        "readinessConfidence": 0
+      },
+      "languageStatus": "unverified",
+      "accepted": false,
+      "expectedAccepted": false,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": true
+    },
+    {
+      "sampleId": "9558815b-9b58-4bde-8fa6-d0f14700fe6d",
+      "id": "ambiguous",
+      "repetition": 0,
+      "variant": "budget128",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 3890.8544589999947,
+      "responseBytes": 180,
+      "assessment": {
+        "status": "undetermined",
+        "languages": [],
+        "confidence": 0,
+        "relation": "independent",
+        "readiness": "uncertain",
+        "relationConfidence": 0,
+        "readinessConfidence": 0
+      },
+      "languageStatus": "unverified",
+      "accepted": false,
+      "expectedAccepted": false,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": false
+    },
+    {
+      "sampleId": "3d17383e-3c93-408d-b15a-bbb2b02e5815",
+      "id": "ambiguous",
+      "repetition": 0,
+      "variant": "baseline",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4097.903167000011,
+      "responseBytes": 180,
+      "assessment": {
+        "status": "undetermined",
+        "languages": [],
+        "confidence": 0,
+        "relation": "independent",
+        "readiness": "uncertain",
+        "relationConfidence": 0,
+        "readinessConfidence": 0
+      },
+      "languageStatus": "unverified",
+      "accepted": false,
+      "expectedAccepted": false,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": false
+    },
+    {
+      "sampleId": "a9b97c1d-1a73-4e4b-92ca-8945186c797a",
+      "id": "text-injection",
+      "repetition": 0,
+      "variant": "examples",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4782.824625000008,
+      "responseBytes": 203,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja",
+          "en"
+        ],
+        "confidence": 0.9,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.9,
+        "readinessConfidence": 0.85
+      },
+      "languageStatus": "not_allowed",
+      "accepted": false,
+      "expectedAccepted": true,
+      "falseAccept": false,
+      "falseReject": true,
+      "pass": false
+    },
+    {
+      "sampleId": "b7284e1b-4786-42f2-b53e-b789a730bffb",
+      "id": "text-injection",
+      "repetition": 0,
+      "variant": "budget128",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4102.134375000023,
+      "responseBytes": 185,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.98,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.9,
+        "readinessConfidence": 0.9
+      },
+      "languageStatus": "allowed",
+      "accepted": true,
+      "expectedAccepted": true,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": true
+    },
+    {
+      "sampleId": "979a70ab-bddb-49fb-b6bf-1106a7c1a00e",
+      "id": "text-injection",
+      "repetition": 0,
+      "variant": "baseline",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4646.734334000008,
+      "responseBytes": 195,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.99,
+        "relation": "independent",
+        "readiness": "waiting",
+        "relationConfidence": 0.9,
+        "readinessConfidence": 0.7
+      },
+      "languageStatus": "allowed",
+      "accepted": false,
+      "expectedAccepted": true,
+      "falseAccept": false,
+      "falseReject": true,
+      "pass": false
+    },
+    {
+      "sampleId": "47d21c3e-efa4-44bc-a1b5-9a5b7e897dd2",
+      "id": "text-injection",
+      "repetition": 0,
+      "variant": "schema",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4269.771708999993,
+      "responseBytes": 184,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.9,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.9,
+        "readinessConfidence": 0.8
+      },
+      "languageStatus": "allowed",
+      "accepted": true,
+      "expectedAccepted": true,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": true
+    },
+    {
+      "sampleId": "e8e3222d-7e26-402a-b169-26f016460aff",
+      "id": "context-injection",
+      "repetition": 0,
+      "variant": "budget128",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4328.157750000013,
+      "responseBytes": 194,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.9,
+        "relation": "independent",
+        "readiness": "waiting",
+        "relationConfidence": 0.9,
+        "readinessConfidence": 0.8
+      },
+      "languageStatus": "allowed",
+      "accepted": false,
+      "expectedAccepted": false,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": true
+    },
+    {
+      "sampleId": "cdb8a2d4-187a-4cdb-8bd4-2fe230726c4e",
+      "id": "context-injection",
+      "repetition": 0,
+      "variant": "baseline",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4357.922375000024,
+      "responseBytes": 188,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.95,
+        "relation": "independent",
+        "readiness": "waiting",
+        "relationConfidence": 0.9,
+        "readinessConfidence": 0.85
+      },
+      "languageStatus": "allowed",
+      "accepted": false,
+      "expectedAccepted": false,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": true
+    },
+    {
+      "sampleId": "2c1895e9-3433-4ace-9fb4-20eb04930c7f",
+      "id": "context-injection",
+      "repetition": 0,
+      "variant": "schema",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4175.1757919999945,
+      "responseBytes": 194,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.9,
+        "relation": "independent",
+        "readiness": "waiting",
+        "relationConfidence": 0.8,
+        "readinessConfidence": 0.7
+      },
+      "languageStatus": "allowed",
+      "accepted": false,
+      "expectedAccepted": false,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": false
+    },
+    {
+      "sampleId": "afd3af8f-2990-4721-bd67-13b2ba243825",
+      "id": "context-injection",
+      "repetition": 0,
+      "variant": "examples",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4568.6670420000155,
+      "responseBytes": 189,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.95,
+        "relation": "independent",
+        "readiness": "waiting",
+        "relationConfidence": 0.95,
+        "readinessConfidence": 0.95
+      },
+      "languageStatus": "allowed",
+      "accepted": false,
+      "expectedAccepted": false,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": true
+    },
+    {
+      "sampleId": "748060a2-97bb-4a44-9107-8ad37a4156b9",
+      "id": "heldout-context-injection",
+      "repetition": 0,
+      "variant": "budget128",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4401.774208999996,
+      "responseBytes": 184,
+      "assessment": {
+        "status": "undetermined",
+        "languages": [],
+        "confidence": 0.3,
+        "relation": "independent",
+        "readiness": "waiting",
+        "relationConfidence": 0.6,
+        "readinessConfidence": 0.7
+      },
+      "languageStatus": "unverified",
+      "accepted": false,
+      "expectedAccepted": false,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": false
+    },
+    {
+      "sampleId": "54b5daad-3a54-4fd0-b0e4-0f56857a63b9",
+      "id": "heldout-context-injection",
+      "repetition": 0,
+      "variant": "examples",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4599.7025419999845,
+      "responseBytes": 159,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.95,
+        "relation": "independent",
+        "readiness": "waiting",
+        "relationConfidence": 0.95,
+        "readinessConfidence": 0.9
+      },
+      "languageStatus": "allowed",
+      "accepted": false,
+      "expectedAccepted": false,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": true
+    },
+    {
+      "sampleId": "fef541fd-eaef-4b82-87f9-498c61eb2fe6",
+      "id": "heldout-context-injection",
+      "repetition": 0,
+      "variant": "schema",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4767.486291999987,
+      "responseBytes": 196,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.95,
+        "relation": "independent",
+        "readiness": "waiting",
+        "relationConfidence": 0.9,
+        "readinessConfidence": 0.85
+      },
+      "languageStatus": "allowed",
+      "accepted": false,
+      "expectedAccepted": false,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": true
+    },
+    {
+      "sampleId": "c8fbff32-e32e-4228-ac99-d5a0c7613ef1",
+      "id": "heldout-context-injection",
+      "repetition": 0,
+      "variant": "baseline",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4327.514208999986,
+      "responseBytes": 184,
+      "assessment": {
+        "status": "undetermined",
+        "languages": [],
+        "confidence": 0.3,
+        "relation": "independent",
+        "readiness": "waiting",
+        "relationConfidence": 0.6,
+        "readinessConfidence": 0.7
+      },
+      "languageStatus": "unverified",
+      "accepted": false,
+      "expectedAccepted": false,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": false
+    },
+    {
+      "sampleId": "2b60df5e-692c-4206-ab2c-c757715c77fb",
+      "id": "heldout-short-answer",
+      "repetition": 0,
+      "variant": "baseline",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4708.112416999997,
+      "responseBytes": 196,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.98,
+        "relation": "continuation",
+        "readiness": "ready",
+        "relationConfidence": 0.95,
+        "readinessConfidence": 0.95
+      },
+      "languageStatus": "allowed",
+      "accepted": true,
+      "expectedAccepted": true,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": false
+    },
+    {
+      "sampleId": "31530d2d-8da6-41ee-87fc-ffc8c888b4ee",
+      "id": "heldout-short-answer",
+      "repetition": 0,
+      "variant": "budget128",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4616.082916999992,
+      "responseBytes": 194,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.98,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.9,
+        "readinessConfidence": 0.95
+      },
+      "languageStatus": "allowed",
+      "accepted": true,
+      "expectedAccepted": true,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": true
+    },
+    {
+      "sampleId": "4cbca45c-854b-4fe7-aad2-4dca2df49353",
+      "id": "heldout-short-answer",
+      "repetition": 0,
+      "variant": "examples",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4539.280083999998,
+      "responseBytes": 158,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.95,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.95,
+        "readinessConfidence": 0.95
+      },
+      "languageStatus": "allowed",
+      "accepted": true,
+      "expectedAccepted": true,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": true
+    },
+    {
+      "sampleId": "9b65b734-4463-4a02-8a35-63a033e28f3f",
+      "id": "heldout-short-answer",
+      "repetition": 0,
+      "variant": "schema",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4285.036208000005,
+      "responseBytes": 186,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.97,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.9,
+        "readinessConfidence": 0.95
+      },
+      "languageStatus": "allowed",
+      "accepted": true,
+      "expectedAccepted": true,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": true
+    },
+    {
+      "sampleId": "df5e3797-0818-4469-8707-c7421eaf85ed",
+      "id": "heldout-topic-switch",
+      "repetition": 0,
+      "variant": "schema",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4227.051499999972,
+      "responseBytes": 188,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.98,
+        "relation": "continuation",
+        "readiness": "waiting",
+        "relationConfidence": 0.9,
+        "readinessConfidence": 0.9
+      },
+      "languageStatus": "allowed",
+      "accepted": false,
+      "expectedAccepted": true,
+      "falseAccept": false,
+      "falseReject": true,
+      "pass": false
+    },
+    {
+      "sampleId": "f57b9c7f-5e5a-4e34-92a0-0f6800808fae",
+      "id": "heldout-topic-switch",
+      "repetition": 0,
+      "variant": "baseline",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4349.815124999994,
+      "responseBytes": 189,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.98,
+        "relation": "continuation",
+        "readiness": "waiting",
+        "relationConfidence": 0.9,
+        "readinessConfidence": 0.85
+      },
+      "languageStatus": "allowed",
+      "accepted": false,
+      "expectedAccepted": true,
+      "falseAccept": false,
+      "falseReject": true,
+      "pass": false
+    },
+    {
+      "sampleId": "9eed008e-a2d2-41fc-a09d-a99b702da6a1",
+      "id": "heldout-topic-switch",
+      "repetition": 0,
+      "variant": "budget128",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4328.7432499999995,
+      "responseBytes": 189,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.98,
+        "relation": "continuation",
+        "readiness": "waiting",
+        "relationConfidence": 0.9,
+        "readinessConfidence": 0.85
+      },
+      "languageStatus": "allowed",
+      "accepted": false,
+      "expectedAccepted": true,
+      "falseAccept": false,
+      "falseReject": true,
+      "pass": false
+    },
+    {
+      "sampleId": "f3c23034-6843-4a00-88a6-6c86e6fbd6d0",
+      "id": "heldout-topic-switch",
+      "repetition": 0,
+      "variant": "examples",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4517.269959000027,
+      "responseBytes": 159,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.95,
+        "relation": "continuation",
+        "readiness": "waiting",
+        "relationConfidence": 0.9,
+        "readinessConfidence": 0.9
+      },
+      "languageStatus": "allowed",
+      "accepted": false,
+      "expectedAccepted": true,
+      "falseAccept": false,
+      "falseReject": true,
+      "pass": false
+    },
+    {
+      "sampleId": "b29837f2-e637-4602-82f1-2adc29503e91",
+      "id": "heldout-foreign",
+      "repetition": 0,
+      "variant": "examples",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4883.526000000013,
+      "responseBytes": 158,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "zh"
+        ],
+        "confidence": 0.98,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.98,
+        "readinessConfidence": 0.98
+      },
+      "languageStatus": "not_allowed",
+      "accepted": false,
+      "expectedAccepted": false,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": true
+    },
+    {
+      "sampleId": "f29e4e65-bafa-4918-9c6b-bbb7864d9e30",
+      "id": "heldout-foreign",
+      "repetition": 0,
+      "variant": "schema",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4540.8687079999945,
+      "responseBytes": 187,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "zh"
+        ],
+        "confidence": 0.98,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.95,
+        "readinessConfidence": 0.95
+      },
+      "languageStatus": "not_allowed",
+      "accepted": false,
+      "expectedAccepted": false,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": true
+    },
+    {
+      "sampleId": "98a60e38-23da-4e86-8e42-0674ba6b08b7",
+      "id": "heldout-foreign",
+      "repetition": 0,
+      "variant": "baseline",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4600.831624999992,
+      "responseBytes": 187,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "zh"
+        ],
+        "confidence": 0.98,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.95,
+        "readinessConfidence": 0.95
+      },
+      "languageStatus": "not_allowed",
+      "accepted": false,
+      "expectedAccepted": false,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": true
+    },
+    {
+      "sampleId": "1a69b42f-c458-4eb1-aa16-178c29765185",
+      "id": "heldout-foreign",
+      "repetition": 0,
+      "variant": "budget128",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4759.692125000001,
+      "responseBytes": 187,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "zh"
+        ],
+        "confidence": 0.98,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.95,
+        "readinessConfidence": 0.97
+      },
+      "languageStatus": "not_allowed",
+      "accepted": false,
+      "expectedAccepted": false,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": true
+    }
+  ]
+}

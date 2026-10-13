@@ -4,17 +4,18 @@ import { registerRevision } from "./registry";
 import { zSchema } from "./schema";
 import { createRequirements } from "./requirements";
 import { createToolchains } from "./toolchains";
+import { createBound, finishPrepare } from "./bound";
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import {
 	bytes,
 	hash,
-	validators,
 	type Definition,
 	type Owner,
 	type Candidate,
 	type Prepared,
 	type FixedDefinition,
+	type BundleHost,
 	learnedIdPattern,
 	learnedMaxBytes,
 	commonSkillRevisionId,
@@ -38,8 +39,13 @@ function hasLearned(db: Database) {
 export function createCapabilities(
 	store: SqliteStore,
 	backends = new Set(["web"]),
-	now = Date.now,
+	options: {
+		/** What this host can execute; bundles that need more are not registered. */
+		bundleHost?: () => BundleHost;
+		now?: () => number;
+	} = {},
 ) {
+	const now = options.now ?? Date.now;
 	const refs = new Map<
 		string,
 		{ owner: Owner; expires: number; revisionId: string; bundleDigest: string }
@@ -189,23 +195,6 @@ export function createCapabilities(
 			throw new Error("capability_ref_invalid");
 		return finishPrepare(all, input);
 	}
-	function finishPrepare(all: FixedDefinition[], input: unknown): Prepared {
-		const pack = all[0]!;
-		if (pack.kind !== "package" || !pack.schemaKey)
-			throw new Error("invalid_capability");
-		const parsed = validators[pack.schemaKey].safeParse(input);
-		if (!parsed.success) throw new Error("invalid_capability_input");
-		const dependencies = all.slice(1);
-		const required = dependencies.map(
-			(d) => d.body ?? (d.schemaKey ? zSchema(d.schemaKey) : ""),
-		);
-		if (
-			dependencies.filter((d) => d.kind === "skill").length > 4 ||
-			bytes(required) > 16384
-		)
-			throw new Error("required_context_overflow");
-		return { package: pack, dependencies, input: parsed.data };
-	}
 	/** Learned definitions: host namespace `learned.web.<32hex>`, revision 1, route-only. */
 	function registerLearnedInTransaction(db: Database, d: Definition) {
 		if (
@@ -256,32 +245,6 @@ export function createCapabilities(
 				throw new Error("invalid_capability_bundle");
 		}
 		register(db, d, "learned");
-	}
-	/** Prepare an exact active package revision without candidate search. Same checks as prepare. */
-	function prepareActiveByIdInTransaction(
-		db: Database,
-		owner: Owner,
-		revisionId: string,
-		input: unknown,
-		expect?: { hash?: string; generation?: number },
-	): Prepared {
-		if (!owner?.taskId || !owner.rootRunId)
-			throw new Error("capability_ref_invalid");
-		const item = db
-			.query(
-				"SELECT i.active_revision_id FROM capability_revisions r JOIN capability_items i ON i.key=r.item_key WHERE r.id=?",
-			)
-			.get(revisionId) as { active_revision_id: string } | null;
-		if (!item || item.active_revision_id !== revisionId)
-			throw new Error("capability_unavailable");
-		const all = closure(db, revisionId);
-		if (
-			(expect?.hash !== undefined && all[0]!.hash !== expect.hash) ||
-			(expect?.generation !== undefined &&
-				all[0]!.generation !== expect.generation)
-		)
-			throw new Error("capability_revoked");
-		return finishPrepare(all, input);
 	}
 	/**
 	 * Delete learned route-only packages (and their learned skills) named in `remove`,
@@ -368,6 +331,11 @@ export function createCapabilities(
 			body: d.kind === "skill" ? (d.body ?? null) : null,
 		};
 	}
+	const bound = createBound({
+		closure,
+		register: registerBuiltinInTransaction,
+		now,
+	});
 	return {
 		...createRequirements(store, register),
 		...createDotsPackages(store, register),
@@ -375,16 +343,17 @@ export function createCapabilities(
 		getDefinitionInTransaction,
 		registerBuiltinInTransaction,
 		registerLearnedInTransaction,
-		prepareActiveByIdInTransaction,
+		...bound.api,
 		pruneLearnedInTransaction,
 		learnedUsageInTransaction,
 		validateInTransaction: validate,
 		searchInTransaction: search,
 		prepareInTransaction: prepare,
 		seed: () =>
-			store.write((db) =>
-				seedBuiltins(db, backends, registerBuiltinInTransaction),
-			),
+			store.write((db) => {
+				seedBuiltins(db, backends, registerBuiltinInTransaction);
+				bound.seedBundlesInTransaction(db, options.bundleHost?.());
+			}),
 		list(cursor = "", limit = 50) {
 			return store.read((db) => {
 				const rows = db

@@ -1,0 +1,15 @@
+{
+  "outcome": "ok",
+  "records": [
+    {
+      "hasTimings": true,
+      "timing": {
+        "cache_n": 0,
+        "prompt_n": 970,
+        "prompt_ms": 989.937,
+        "predicted_n": 80,
+        "predicted_ms": 1185.374
+      }
+    }
+  ]
+}

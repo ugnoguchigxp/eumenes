@@ -1,4 +1,5 @@
 import { createToolchainCommandHandler } from "./toolchain-command";
+import { createCommandInteractions } from "./command-interactions";
 import type { Database } from "bun:sqlite";
 import { getLogger } from "../../../infrastructure/logger";
 import { type AgentRuntime } from "../../agent-runtime";
@@ -94,9 +95,15 @@ export function createDialogueService({
 		toolchains,
 	};
 	const progress = createProgress(deps);
+	const intake = createIntake(deps);
+	// Handlers read `deps.interactions`, so it exists before any is registered.
+	const interactions = createCommandInteractions(
+		deps,
+		intake.acceptInTransaction,
+	);
+	deps.interactions = interactions;
 	queue.registerHandler(createGenerationHandler(deps, progress));
 	queue.registerHandler(createToolchainCommandHandler(deps));
-	const intake = createIntake(deps);
 	const agentSync = createAgentSync(deps);
 	const service = {
 		linkOperationJobInTransaction(db: Database, runId: string, jobId: string) {
@@ -130,6 +137,7 @@ export function createDialogueService({
 			});
 			linkAnswer(db, runId, job.id);
 		},
+		interactions,
 		promptTarget: intake.promptTarget,
 		progress: progress.progress,
 		subscribeProgress: progress.subscribeProgress,
@@ -138,6 +146,8 @@ export function createDialogueService({
 		async recover() {
 			// Runs without a queue job predate the queue and are interrupted as before.
 			await store.write((db) => interruptUnfinished(db, clock()));
+			// Questions past their time and interactions whose run ended are closed after a restart.
+			if (toolchains?.bound) await interactions.maintenance();
 		},
 		get(runId: string) {
 			return store.read((db) => byId(db, runId));

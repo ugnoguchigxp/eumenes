@@ -1,0 +1,24 @@
+{
+	"caseId": "timer-conversation-start-01",
+	"version": 1,
+	"goal": "チャットで2分のタイマーを頼み、タイマーが動き始めたことを画面で確認してください。",
+	"initialStateRef": "fixture:empty-timers-product@1",
+	"allowedSurface": "isolated-eumenes-browser",
+	"criteriaRef": "criteria:timer-conversation-start-01@1",
+	"budget": {
+		"wallSeconds": 300,
+		"maxActions": 40,
+		"maxModelCalls": 30,
+		"maxCostUSD": 2
+	},
+	"evidence": [
+		"screenshots",
+		"observations",
+		"actions",
+		"readonly-host-state",
+		"receipt-refs"
+	],
+	"requires": {
+		"productLlm": true
+	}
+}

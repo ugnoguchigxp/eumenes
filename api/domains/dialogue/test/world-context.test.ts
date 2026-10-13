@@ -932,6 +932,13 @@ function stubToolchains(): import("../contracts/toolchains").ToolchainRoutingPor
 	return {
 		embedQuery: async () => undefined,
 		routeInTransaction: () => ({ cards: [card], past: [], retrieval: "none" }),
+		catalogInTransaction: () => [
+			{
+				id: "web.search",
+				revisionId: "toolchain:web.search@1",
+				runtime: { execution: "research", route: "web" },
+			},
+		],
 		resolveInTransaction: () => ({
 			toolchain: {} as never,
 			packageRevisionId: "package:web.recipe@1",

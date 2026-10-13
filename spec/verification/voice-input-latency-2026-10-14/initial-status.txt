@@ -1,0 +1,159 @@
+ M api/application/app-modules.ts
+ M api/application/dots-dialogue.test.ts
+ M api/application/server.test.ts
+ M api/application/server.ts
+ M api/application/timer-toolchain.test.ts
+ M api/application/toolchain-history.test.ts
+ M api/application/toolchain-routing.ts
+ M api/application/toolchain.fixture.ts
+ M api/application/toolchain.ts
+ M api/domains/agent-runtime/contracts/index.ts
+RM api/domains/agent-runtime/service/timer-operation.ts -> api/domains/agent-runtime/service/action-operation.ts
+ M api/domains/agent-runtime/service/answer.ts
+ M api/domains/agent-runtime/service/queries.ts
+ M api/domains/agent-runtime/service/start-task.ts
+ M api/domains/agent-runtime/service/task-ops.ts
+ M api/domains/agent-runtime/test/rejection-logging.test.ts
+ M api/domains/agent-runtime/test/route-harness.ts
+ M api/domains/capabilities/builtin/toolchains.ts
+ M api/domains/capabilities/contracts/index.ts
+ M api/domains/capabilities/contracts/runtime-meta.ts
+ M api/domains/capabilities/contracts/timers.ts
+ M api/domains/capabilities/contracts/toolchains.ts
+ M api/domains/capabilities/index.ts
+ M api/domains/capabilities/repository/index.ts
+ M api/domains/capabilities/service/index.ts
+ M api/domains/capabilities/service/registry.ts
+ M api/domains/capabilities/service/toolchains.ts
+ M api/domains/capabilities/test/timer-compatibility.test.ts
+ M api/domains/dialogue/contracts/index.ts
+ M api/domains/dialogue/contracts/toolchains.ts
+ M api/domains/dialogue/controller/index.ts
+ M api/domains/dialogue/index.ts
+ M api/domains/dialogue/repository/index.ts
+ M api/domains/dialogue/service/context.ts
+ M api/domains/dialogue/service/conversation-generation.ts
+ M api/domains/dialogue/service/conversation-tools.ts
+ M api/domains/dialogue/service/delegate-conversation.ts
+ M api/domains/dialogue/service/generation-handler.ts
+ M api/domains/dialogue/service/generation-operation.ts
+ M api/domains/dialogue/service/generation-prepare.ts
+ M api/domains/dialogue/service/index.ts
+ M api/domains/dialogue/service/intake.ts
+ M api/domains/dialogue/service/selection-trace.ts
+ M api/domains/dialogue/service/toolchain-command.ts
+ M api/domains/dialogue/test/memory-recall.test.ts
+ M api/domains/dialogue/test/world-context.test.ts
+ M api/domains/inference/service/execute.ts
+ M api/domains/larm/service/answer-request.ts
+ M api/domains/larm/service/index.ts
+ M api/domains/larm/service/llm-timing.ts
+ M api/domains/larm/test/llm-timing.test.ts
+ M api/domains/timers/service/index.ts
+ M api/domains/tool-runtime/contracts/index.ts
+ M api/domains/tool-runtime/index.ts
+ M api/domains/tool-runtime/repository/index.ts
+ M api/domains/tool-runtime/service/index.ts
+ M api/domains/voice-dialogue/service/index.ts
+ M api/domains/voice-dialogue/service/recognize.ts
+ M api/infrastructure/logger.ts
+ M client/index.ts
+ M client/transport.ts
+ M docs/domains.md
+ M docs/logging.md
+ M docs/toolchain-extension.md
+ M docs/toolchain.md
+ M package.json
+ M packages/artifact-ui/src/components.tsx
+ M packages/artifact-ui/src/contracts.ts
+ M packages/artifact-ui/src/runtime.tsx
+ M packages/artifact-ui/src/timer-components.tsx
+ M scripts/domains.ts
+ M scripts/size-budget.json
+ M scripts/toolchain-routing-eval.ts
+ M spec/excalidraw-work-record-2026-10-13.md
+ M spec/verification/excalidraw-2026-10-13/editor.png
+ M tests/browser/excalidraw-live.spec.ts
+ M tests/browser/timers.spec.ts
+ M web/src/App.tsx
+ M web/src/components/domains/artifact/ArtifactPanel.tsx
+ M web/src/components/domains/artifact/ArtifactShowcase.tsx
+D  web/src/components/domains/timers/TimerArtifact.test.tsx
+D  web/src/components/domains/timers/TimerArtifact.tsx
+RM web/src/components/domains/timers/TimerArtifact.css -> web/src/components/domains/timers/TimerPicker.css
+ M web/src/components/domains/timers/TimerPicker.tsx
+D  web/src/components/domains/timers/TimerSetupArtifact.test.tsx
+D  web/src/components/domains/timers/TimerSetupArtifact.tsx
+ M web/src/domains/artifact/hooks/index.ts
+ M web/src/domains/artifact/store/index.ts
+ M web/src/domains/audio/controller/index.ts
+ M web/src/domains/dialogue/hooks/progress.ts
+D  web/src/domains/timers/artifact-definition.test.tsx
+D  web/src/domains/timers/artifact-definition.ts
+ M web/src/domains/voice-dialogue/hooks/index.ts
+ M web/src/domains/voice-dialogue/hooks/replay.ts
+ M web/src/queryKeys.ts
+ M web/src/workspace/Workspace.tsx
+ M web/src/workspace/WorkspaceArtifacts.test.tsx
+ M web/src/workspace/WorkspaceArtifacts.tsx
+ M web/src/workspace/useWorkspace.ts
+?? api/application/timer-adapter.ts
+?? api/application/timer-question.test.ts
+?? api/application/toolchain-adapters.ts
+?? api/domains/agent-runtime/test/action-route.test.ts
+?? api/domains/capabilities/bundles/
+?? api/domains/capabilities/contracts/bindings.ts
+?? api/domains/capabilities/contracts/inputs.ts
+?? api/domains/capabilities/service/bound.ts
+?? api/domains/capabilities/service/bundle-files.ts
+?? api/domains/capabilities/service/bundles.ts
+?? api/domains/capabilities/service/documents.ts
+?? api/domains/capabilities/service/json-schema-subset.ts
+?? api/domains/capabilities/test/bundles.test.ts
+?? api/domains/capabilities/test/json-schema-subset.test.ts
+?? api/domains/dialogue/contracts/command-interactions.ts
+?? api/domains/dialogue/controller/interactions.ts
+?? api/domains/dialogue/repository/interactions.ts
+?? api/domains/dialogue/service/command-apply.ts
+?? api/domains/dialogue/service/command-interactions.ts
+?? api/domains/dialogue/service/command-source.ts
+?? api/domains/dialogue/service/generation-timing.ts
+?? api/domains/dialogue/service/interaction-answers.ts
+?? api/domains/dialogue/service/interaction-core.ts
+?? api/domains/dialogue/service/interaction-runs.ts
+?? api/domains/dialogue/test/command-interactions.test.ts
+?? api/domains/larm/service/provider-request.ts
+?? api/domains/tool-runtime/contracts/adapters.ts
+?? api/domains/tool-runtime/controller/
+?? api/domains/tool-runtime/service/action-artifacts.ts
+?? api/domains/tool-runtime/service/action-invocation.ts
+?? api/domains/tool-runtime/service/action-ledger.ts
+?? api/domains/tool-runtime/service/action-requests.ts
+?? api/domains/tool-runtime/service/action-types.ts
+?? api/domains/tool-runtime/service/http-json.ts
+?? api/domains/tool-runtime/test/action-controller.test.ts
+?? api/domains/tool-runtime/test/action-fixture.ts
+?? api/domains/tool-runtime/test/action-invoke.test.ts
+?? api/domains/tool-runtime/test/action-requests.test.ts
+?? api/domains/tool-runtime/test/http-json.test.ts
+?? api/infrastructure/performance.test.ts
+?? api/infrastructure/performance.ts
+?? client/test/toolchain-actions.test.ts
+?? client/toolchain-actions.ts
+?? docs/nl-acceptance.md
+?? scripts/nl-acceptance.ts
+?? scripts/nl-acceptance/
+?? scripts/response-latency-api-live.ts
+?? scripts/response-latency-live.ts
+?? spec/timer-data-driven-implementation-contracts-2026-10-13.md
+?? spec/verification/response-latency-2026-10-13/
+?? spec/verification/voice-input-latency-2026-10-14/
+?? tests/acceptance/
+?? web/src/domains/audio/test/performance.test.ts
+?? web/src/domains/timers/timer-resource.ts
+?? web/src/domains/timers/toolchain-adapter.test.tsx
+?? web/src/domains/timers/toolchain-adapter.tsx
+?? web/src/domains/toolchain-artifacts/
+?? web/src/domains/voice-dialogue/hooks/audio-timing.ts
+?? web/src/performance.ts
+?? web/src/workspace/toolchain-adapters.ts

@@ -1,5 +1,11 @@
 import type { Database } from "bun:sqlite";
+import { get } from "../repository";
 import { zSchema } from "./schema";
+import { indexSearch, validateToolchain } from "./registry";
+import {
+	artifactInTransaction,
+	commandBindingInTransaction,
+} from "./documents";
 import {
 	dot,
 	packVector,
@@ -9,6 +15,8 @@ import {
 import {
 	hash,
 	type FixedDefinition,
+	type FixedDocument,
+	type CommandBindingV1,
 	type ToolchainCard,
 	type VectorSpace,
 } from "../contracts";
@@ -232,9 +240,14 @@ export function createToolchains(
 		);
 		if (!profile || skills.some((b) => !b))
 			throw new Error("required_context_missing");
+		const binding = toolchain.bindingRevisionId
+			? commandBindingInTransaction(db, toolchain.bindingRevisionId)
+			: undefined;
+		if (binding === null) throw new Error("required_context_missing");
 		return {
 			toolchain,
 			package: pack,
+			binding: binding as FixedDocument<CommandBindingV1> | undefined,
 			profile,
 			skills: skills as string[],
 			tools: (pack.toolRevisionIds ?? []).map((id) => {
@@ -248,6 +261,55 @@ export function createToolchains(
 				};
 			}),
 		};
+	}
+	/** The binding and artifact registration a bound toolchain revision names. */
+	function bindingInTransaction(db: Database, toolchainRevisionId: string) {
+		const d = get(db, toolchainRevisionId);
+		if (d?.kind !== "toolchain" || !d.bindingRevisionId) return null;
+		const binding = commandBindingInTransaction(db, d.bindingRevisionId);
+		const artifact = d.artifactRevisionId
+			? artifactInTransaction(db, d.artifactRevisionId)
+			: null;
+		return binding && artifact ? { binding, artifact } : null;
+	}
+	/** The artifacts of the active bound toolchains: one launcher entry each. */
+	function artifactsInTransaction(db: Database) {
+		return activeInTransaction(db).flatMap((d) => {
+			const found = bindingInTransaction(db, d.revisionId);
+			return found
+				? [
+						{
+							toolchainId: d.id,
+							toolchainRevisionId: d.revisionId,
+							artifactRevisionId: found.artifact.revisionId,
+							title: found.artifact.document.title,
+							adapterRef: found.binding.document.adapterRef,
+						},
+					]
+				: [];
+		});
+	}
+	/**
+	 * Make an existing revision of a toolchain the published one (also the way back to an
+	 * earlier revision). Nothing is written unless the revision is complete and valid now.
+	 */
+	function publishRevisionInTransaction(
+		db: Database,
+		toolchainId: string,
+		revisionId: string,
+	) {
+		const key = `toolchain:${toolchainId}`;
+		const row = db
+			.query("SELECT 1 FROM capability_revisions WHERE id=? AND item_key=?")
+			.get(revisionId, key);
+		if (!row) throw new Error("capability_not_found");
+		const all = closure(db, revisionId);
+		const d = get(db, revisionId)!;
+		validateToolchain(db, d, all.slice(1));
+		db.query(
+			"UPDATE capability_items SET active_revision_id=?,generation=generation+1 WHERE key=?",
+		).run(revisionId, key);
+		indexSearch(db, d);
 	}
 	/** Every active toolchain's examples, for routing evaluation. */
 	function examplesInTransaction(db: Database) {
@@ -264,6 +326,9 @@ export function createToolchains(
 		toolchainCandidatesInTransaction: candidatesInTransaction,
 		resolveToolchainInTransaction: resolveInTransaction,
 		toolchainSetInTransaction: setInTransaction,
+		toolchainBindingInTransaction: bindingInTransaction,
+		artifactsInTransaction,
+		publishToolchainRevisionInTransaction: publishRevisionInTransaction,
 		toolchainExamplesInTransaction: examplesInTransaction,
 	};
 }

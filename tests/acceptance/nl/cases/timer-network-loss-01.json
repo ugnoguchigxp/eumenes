@@ -1,0 +1,24 @@
+{
+	"caseId": "timer-network-loss-01",
+	"version": 2,
+	"goal": "3分のタイマーを作ってください。通信が不安定になることがあります。画面の案内を読み、タイマーがちょうど一つだけ正しく作られた状態にしてください。",
+	"initialStateRef": "fixture:empty-timers-lost-response@1",
+	"allowedSurface": "isolated-eumenes-artifacts",
+	"criteriaRef": "criteria:timer-network-loss-01@1",
+	"budget": {
+		"wallSeconds": 300,
+		"maxActions": 40,
+		"maxModelCalls": 30,
+		"maxCostUSD": 2
+	},
+	"evidence": [
+		"screenshots",
+		"observations",
+		"actions",
+		"readonly-host-state",
+		"receipt-refs"
+	],
+	"requires": {
+		"productLlm": false
+	}
+}

@@ -129,6 +129,7 @@ export function createVoiceDialogue(
 		makeRoomForSpeech();
 		const pending: string[] = [];
 		const sentences = new SpeechSentences();
+		const synthesisStarted = performance.now();
 		let inputDone = false,
 			spoken = false,
 			skipError: unknown,
@@ -256,6 +257,13 @@ export function createVoiceDialogue(
 						return;
 					}
 					if (receipt?.delivery) preparation.delivery = receipt.delivery;
+					if (!spoken)
+						log.info("voice.first_chunk_ready", {
+							utteranceId: id,
+							runId,
+							inferenceId: requestId,
+							durationMs: performance.now() - synthesisStarted,
+						});
 					spoken = true;
 					log.debug("voice.chunk_ready", {
 						utteranceId: id,

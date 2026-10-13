@@ -6,6 +6,8 @@ import { harness } from "./route-harness";
 afterEach(() => configureLogging({ level: "silent" }));
 test("rolled-back and stale rejections are not logged as committed failures", async () => {
 	const lines: string[] = [];
+	// Seeding the harness may log (e.g. a skipped bundle); only the rejections below are observed.
+	const h = await harness();
 	configureLogging({
 		level: "info",
 		destination: {
@@ -14,7 +16,6 @@ test("rolled-back and stale rejections are not logged as committed failures", as
 			},
 		},
 	});
-	const h = await harness();
 	try {
 		const _root = await h.start("root");
 

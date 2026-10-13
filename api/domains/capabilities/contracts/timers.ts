@@ -29,6 +29,18 @@ export const timerCommand = z.discriminatedUnion("operation", [
 	timerCancel.extend({ operation: z.literal("cancel") }),
 ]);
 
+/** Answers to the questions of a timer command, and the raw h/m/s of the timer form. */
+export const timerDurationAnswer = z.strictObject({
+	durationSeconds: z.number().int().min(1).max(86400),
+});
+export const timerTargetAnswer = z.strictObject({ timerId: z.uuid() });
+const clockDigits = z.string().regex(/^\d{1,5}$/);
+export const timerHms = z.strictObject({
+	hours: clockDigits,
+	minutes: clockDigits,
+	seconds: clockDigits,
+});
+
 export const timerResultContext = z
 	.object({
 		version: z.literal(1),

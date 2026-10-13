@@ -1,0 +1,108 @@
+{
+  "stopReason": "completed",
+  "models": [
+    "ornith-1.5-strix-lean"
+  ],
+  "variants": [
+    {
+      "variant": "baseline",
+      "attempts": 16,
+      "responses": 16,
+      "failures": 0,
+      "strictPass": 9,
+      "falseAccept": [],
+      "falseReject": [
+        "topic-switch",
+        "heldout-topic-switch"
+      ],
+      "acceptedWrongRelation": [
+        "fragment-3",
+        "heldout-short-answer"
+      ],
+      "medianMs": 4366.103354500003,
+      "p90Ms": 4732.287083000003,
+      "firstDeltaMs": null,
+      "firstDeltaToCompleteMs": null,
+      "promptTokens": 973,
+      "completionTokens": 80,
+      "cachedTokens": 0,
+      "providerReadyMs": 44.4771255000087,
+      "tokenCountMs": 40.339104500008034,
+      "providerHeadersMs": 4117.160541500001,
+      "providerTtftMs": null,
+      "pairs": 0,
+      "pairedMedianSavingMs": null,
+      "pairedMedianBootstrap95CI": null,
+      "fasterPairs": 0
+    },
+    {
+      "variant": "schema",
+      "attempts": 16,
+      "responses": 16,
+      "failures": 0,
+      "strictPass": 10,
+      "falseAccept": [],
+      "falseReject": [
+        "topic-switch"
+      ],
+      "acceptedWrongRelation": [
+        "fragment-3",
+        "heldout-short-answer"
+      ],
+      "medianMs": 4313.810146,
+      "p90Ms": 4810.428708000007,
+      "firstDeltaMs": null,
+      "firstDeltaToCompleteMs": null,
+      "promptTokens": 973,
+      "completionTokens": 80,
+      "cachedTokens": 0,
+      "providerReadyMs": 98.79643699999042,
+      "tokenCountMs": 44.781270999998014,
+      "providerHeadersMs": 4127.555375000004,
+      "providerTtftMs": null,
+      "pairs": 16,
+      "pairedMedianSavingMs": -8.216207999994367,
+      "pairedMedianBootstrap95CI": [
+        -193.51124999999956,
+        156.57627149999098
+      ],
+      "fasterPairs": 8
+    },
+    {
+      "variant": "short-schema",
+      "attempts": 16,
+      "responses": 16,
+      "failures": 0,
+      "strictPass": 6,
+      "falseAccept": [],
+      "falseReject": [
+        "topic-switch",
+        "short-answer",
+        "text-injection",
+        "heldout-topic-switch"
+      ],
+      "acceptedWrongRelation": [
+        "fragment-3",
+        "heldout-short-answer"
+      ],
+      "medianMs": 3980.474645500003,
+      "p90Ms": 4360.509791500002,
+      "firstDeltaMs": null,
+      "firstDeltaToCompleteMs": null,
+      "promptTokens": 597,
+      "completionTokens": 78.5,
+      "cachedTokens": 0,
+      "providerReadyMs": 67.83341599999403,
+      "tokenCountMs": 36.37991650000549,
+      "providerHeadersMs": 3665.2288960000005,
+      "providerTtftMs": null,
+      "pairs": 16,
+      "pairedMedianSavingMs": 596.0580625000016,
+      "pairedMedianBootstrap95CI": [
+        226.71079199999804,
+        670.2342500000086
+      ],
+      "fasterPairs": 13
+    }
+  ]
+}

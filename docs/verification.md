@@ -4,7 +4,11 @@ README の「検証」の詳細です。
 
 運用ログは Pino の JSONL 形式で `data/logs/api.jsonl` に保存します。`bun run logs -- --level warn` で警告・エラー、`bun run logs -- --id <run-id> --json` で処理ごとの記録、`bun run logs -- --follow` で追加分を確認できます。正常系は主要処理の開始・終了だけを残し、成功したGETや音声の細かな経過は `EUMENES_LOG_LEVEL=debug` で出します。保存先・世代管理・相関IDの使い方は [ログの確認](logging.md) を参照してください。
 
-`verify` は対象 domain と型依存閉包を表示し、format、lint、型、境界、domain 試験を実行します。`verify:all` は全 TypeScript、保存・画面 build、ブラウザ fixture を含みます。`verify:live` は明示した LARM への ASR・LLM・TTS 個別疎通であり、ブラウザと実機器を使う循環受入ではありません。検証結果と入力 hash は `verification-reports/latest.json` に出力されます。
+`verify` は対象 domain と型依存閉包を表示し、format、lint、型、境界、domain 試験を実行します。変更したdomainと影響のある利用側domainを選んで確認します。横断変更を理由に `verify:all` を必須とはしません。`verify:all` は全体の境界・文書整合・型・単体／API結合試験、DesignSystem、Web buildを実行し、ブラウザE2Eを含みません。検証結果と入力 hash は `verification-reports/latest.json` に出力されます。
+
+ブラウザE2Eは、対象domainの試験ファイルを明示して個別に実行します。たとえばExcalidrawは `bunx playwright test tests/browser/excalidraw.spec.ts` です。複数domainに関係する変更は、影響のあるdomainのファイルを選びます。試験ファイルを指定しない全件実行は通常の検証手順に含めません。`CI=1` で実行する場合は `--fail-on-flaky-tests` も指定し、再試行でのみ成功した試験を合格にしません。
+
+`verify:live` は明示した LARM への ASR・LLM・TTS 個別疎通であり、ブラウザと実機器を使う循環受入ではありません。
 
 型チェックは Bun 1.4.3 の `bun check` を使います。root、DesignSystem、dots MVP と domain ごとの検査は、従来と同じ tsconfig・対象範囲で実行します。DesignSystem の build 前検査も `bun check -p tsconfig.build.json` です。Bun は型宣言を出力しないため、`vite-plugin-dts` による `.d.ts` 生成と、それが使う TypeScript 依存を残します。root の TypeScript 依存も境界・SQL・サイズ検査の Compiler API に必要です。`@types/bun` などの型定義も引き続き必要です。
 

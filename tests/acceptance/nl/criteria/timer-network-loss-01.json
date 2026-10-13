@@ -1,0 +1,65 @@
+{
+	"criteriaId": "timer-network-loss-01",
+	"version": 1,
+	"caseId": "timer-network-loss-01",
+	"hostReads": ["timers"],
+	"successMarkers": [
+		"開始しました",
+		"スタートしました",
+		"started",
+		"作成しました",
+		"セットしました"
+	],
+	"items": [
+		{
+			"id": "C0",
+			"statement": "応答欠落がharnessによって実際に起きた（起きなければrunは無効）",
+			"check": "fault-triggered",
+			"params": {
+				"kind": "drop-response"
+			},
+			"required": true
+		},
+		{
+			"id": "C1",
+			"statement": "3分（180秒）のtimerがちょうど一件だけ作られた（新IDでの再送による二重作成がない）",
+			"check": "new-timers",
+			"params": {
+				"count": 1,
+				"durationSeconds": 180
+			},
+			"required": true
+		},
+		{
+			"id": "C2",
+			"statement": "余計な副作用がない",
+			"check": "no-extra-side-effects",
+			"params": {
+				"maxNewTimers": 1,
+				"maxStarted": 1,
+				"allowedReceiptActions": [
+					"started",
+					"paused",
+					"resumed",
+					"unchanged",
+					"listed"
+				]
+			},
+			"required": true
+		},
+		{
+			"id": "C3",
+			"statement": "画面が通信の不確かさを示す文言を出している（助言。独立reviewerが画面で確認する）",
+			"check": "screen-mentions",
+			"params": {
+				"sets": [
+					{
+						"id": "uncertain",
+						"patterns": ["確認|未確定|通信|もう一度|再試行|失敗"]
+					}
+				]
+			},
+			"required": false
+		}
+	]
+}

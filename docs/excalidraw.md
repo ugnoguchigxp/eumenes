@@ -34,7 +34,7 @@ ready URLはEumenesのWeb originにある`/#drawing/{referenceId}?revision={revi
 
 ## 検証と配備状況
 
-`bun test api/domains/excalidraw/test/excalidraw.test.ts api/application/excalidraw-e2e.test.ts`、`bun run verify -- --domain excalidraw`、利用側domainと`bun run verify:all`を使う。ブラウザfixtureは`bunx playwright test tests/browser/excalidraw.spec.ts`。fixtureは実サービスの応答形状（保存応答はmetadata、sceneは別GET）に合わせ、LARM/backend保存先は隔離する。
+`bun test api/domains/excalidraw/test/excalidraw.test.ts api/application/excalidraw-e2e.test.ts`、`bun run verify -- --domain excalidraw`、影響のある利用側domainのverifyを使う。ブラウザfixtureは`bunx playwright test tests/browser/excalidraw.spec.ts`。fixtureは実サービスの応答形状（保存応答はmetadata、sceneは別GET）に合わせ、LARM/backend保存先は隔離する。
 
 `bun scripts/excalidraw-live.ts --check`はbackend settingsの読み取り専用操作で保存済みLARM入口と専用接続の有無を確認する。consumer未設定時にLLM/admin tokenでlease要求はしない。
 
@@ -61,7 +61,7 @@ bun scripts/excalidraw/configure-live.ts /absolute/private/connection.json --app
 
 1. `bun run verify -- --domain excalidraw`とsettings/client関連試験で、会話付きURL、履歴復帰、下書き領域の障害、取消後の解放を確認する。
 2. application結合試験と`bunx playwright test tests/browser/excalidraw.spec.ts`で、既存の作成・描画・保存・下書き復元・再表示を確認する。
-3. 利用側domain、型検査、buildと`bun run verify:all`を実施する。以前の全体gate停止地点（settings→memoryの境界違反）は、その時点の状態を再確認する。
+3. 影響のある利用側domainをverifyし、変更範囲に応じて型検査・buildを確認する。全件ブラウザE2Eは実行しない。以前の境界違反は、その時点の状態を再確認する。
 4. LARMの専用登録・MacBook backend用経路・Eumenes設定が揃い、他consumerがworkerを利用していない状態で、以下の正式接続ブラウザ試験を明示的に有効化する。
 
 ```sh

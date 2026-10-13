@@ -1,0 +1,62 @@
+{
+	"criteriaId": "timer-expiry-01",
+	"version": 1,
+	"caseId": "timer-expiry-01",
+	"hostReads": ["timers"],
+	"successMarkers": [
+		"開始しました",
+		"スタートしました",
+		"started",
+		"作成しました",
+		"セットしました"
+	],
+	"items": [
+		{
+			"id": "C1",
+			"statement": "10秒のtimerが一件だけ作られた",
+			"check": "new-timers",
+			"params": {
+				"count": 1,
+				"durationSeconds": 10,
+				"requireStartedReceipt": true
+			},
+			"required": true
+		},
+		{
+			"id": "C2",
+			"statement": "hostでelapsedになった",
+			"check": "timer-final-state",
+			"params": {
+				"target": "new",
+				"state": "elapsed",
+				"durationSeconds": 10
+			},
+			"required": true
+		},
+		{
+			"id": "C3",
+			"statement": "画面が終了を示している（実際に音が鳴ったことは証明しない）",
+			"check": "screen-mentions",
+			"params": {
+				"sets": [
+					{
+						"id": "elapsed",
+						"patterns": ["終了|時間です|完了|経過|0:00|00:00|elapsed"]
+					}
+				]
+			},
+			"required": true
+		},
+		{
+			"id": "C4",
+			"statement": "余計な副作用がない",
+			"check": "no-extra-side-effects",
+			"params": {
+				"maxNewTimers": 1,
+				"maxStarted": 1,
+				"allowedReceiptActions": ["started", "dismissed", "unchanged", "listed"]
+			},
+			"required": true
+		}
+	]
+}

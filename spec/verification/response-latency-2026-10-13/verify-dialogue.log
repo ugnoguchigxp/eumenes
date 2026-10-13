@@ -1,0 +1,16 @@
+$ bun scripts/verify.ts --domain dialogue
+[verify] selected=dialogue dependencyClosure=capabilities,delivery,attitude-dataset,larm,settings,inference,queue,tool-runtime,agent-runtime,conversation,continuity,memory,scheduler,toolchain-history,dialogue,avatar testClosure=capabilities,delivery,attitude-dataset,larm,tts-dictionary,queue,tasks,dots,settings,inference,tool-runtime,agent-runtime,avatar,conversation,continuity,memory,scheduler,toolchain-history,goals,world,dialogue
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts api/domains/dialogue web/src/domains/dialogue
+size-budget: new function over 300 lines: api/domains/dialogue/service/command-interactions.ts#createCommandInteractions (698)
+size-budget: new function over 300 lines: api/domains/dialogue/service/toolchain-command.ts#createToolchainCommandHandler (383)
+83 | 	steps.push({
+84 | 		name,
+85 | 		ms: Math.round(performance.now() - start),
+86 | 		result: code === 0 ? "pass" : `exit ${code}`,
+87 | 	});
+88 | 	if (code !== 0) throw new Error(`${name} failed (${code})`);
+                                ^
+error: size-budget failed (1)
+      at run (/Users/y.noguchi/Code/eumenes/scripts/verify.ts:88:28)
+
+error: script "verify" exited with code 1

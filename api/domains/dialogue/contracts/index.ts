@@ -151,3 +151,5 @@ export interface WorldContextPort {
 		conversationId: string,
 	): void;
 }
+
+export * from "./command-interactions";

@@ -25,7 +25,19 @@ export function chatRequest(
 			return { ...m, content };
 		}),
 		...(options?.jsonOutput
-			? { temperature: 0, response_format: { type: "json_object" } }
+			? {
+					temperature: 0,
+					response_format: options.jsonSchema
+						? {
+								type: "json_schema",
+								json_schema: {
+									name: "control",
+									strict: true,
+									schema: options.jsonSchema,
+								},
+							}
+						: { type: "json_object" },
+				}
 			: {}),
 		...nativeToolOptions(options?.tools),
 		stream,

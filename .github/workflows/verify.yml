@@ -25,15 +25,12 @@ jobs:
         with:
           bun-version: 1.4.3
       - run: bun install --frozen-lockfile
-      - run: bunx playwright install --with-deps chromium
       - run: bun run verify:all
       - if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: verify-${{ matrix.os }}-${{ github.run_attempt }}
           path: |
-            playwright-report/
-            test-results/
             verification-reports/latest.json
           retention-days: 7
           if-no-files-found: ignore

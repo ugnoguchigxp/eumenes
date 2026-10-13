@@ -1,6 +1,6 @@
 # ツールチェーンの登録と拡張
 
-更新日: 2026年10月12日。現行コードの登録先・接続先と、追加の種類ごとの最小例をまとめる。
+更新日: 2026年10月14日。現行コードの登録先・接続先と、追加の種類ごとの最小例をまとめる。
 
 **登録APIで追加できるのは、現在は要件profileとdotsの担当package。任意のツール・backendを取り込む汎用登録APIはない。** 組込みpackageは定義を登録しただけでは会話に公開されない。会話へ出すには、packageを[ツールチェーン(定形セット)](#0-ツールチェーン定形セットとして会話へ公開する)として登録する。
 
@@ -10,7 +10,7 @@
 
 - 会話担当には、候補検索で選ばれたツールチェーンが一つずつ関数として見える。引数は全ツールチェーン共通の `{ request: string }` だけで、ツールチェーンごとの引数・判別子(`kind`など)・`oneOf`/`anyOf` は作らない。役割が違えば別のツールチェーンにする。
 - 関数の説明はツールチェーン定義の `summary`・`useWhen`・`redirects` から生成する。`api/domains/dialogue/service/conversation-tools.ts` に個別の関数や方針文を書き足さない。
-- 経路・ツール・引数の判断はツールチェーン内のサブエージェントが行う。実行方式は `runtime-meta.ts` の `toolchainRuntimeOf` で決まる(`research`: agent-runtimeのworker、`command`: 操作担当が型付き操作を一つ作る、`music-create`/`music-playback`: 音楽domainの計画担当)。
+- 経路・ツール・引数の判断はツールチェーン内のサブエージェントが行う。bindingを持つrevisionは[0.1](#01-データ定義bundleと登録adapterで公開する)のadapterで実行する。それ以外の実行方式は `runtime-meta.ts` の `toolchainRuntimeOf` で決まる(`research`: agent-runtimeのworker、`command`: 操作担当が型付き操作を一つ作る、`music-create`/`music-playback`: 音楽domainの計画担当)。
 
 | 順序 | 変更先 | 追加・確認する内容 |
 | --- | --- | --- |
@@ -26,6 +26,24 @@
 [作業規則](../AGENTS.md)を守り、意味理解や担当選択はLLMに任せる。コードで追加する分岐は、公開操作・登録IDと実行先の接続に限る。発話の語句・企業名・地域による振り分けを追加しない。A〜Dのコードは登録方法を説明する未登録の例。Eの音楽UI・生成中表示は実装済みの登録例であり、新しい部品への適用手順と区別して示す。
 
 画像の登録例は `builtin/image.ts`・`builtin/image/SKILL.md`、実行先はimage domainです。同一の `image-workspace` viewで選択式のプロンプト作成とLARM画像一覧をアーティファクト枠内で切り替えます。通常の表示定義は `presentation: "embedded"` を指定します。API・保存先・検証入口は[画像生成](images.md)を参照してください。
+
+## 0.1 データ定義（bundle）と登録adapterで公開する
+
+タイマーはこの形式へ移行済み（設計: [spec](../spec/timer-data-driven-ui-acceptance-design-2026-10-13.md)、実装契約: [spec](../spec/timer-data-driven-implementation-contracts-2026-10-13.md)）。既存の型付きadapterで済む追加は、会話dispatcher・専用React host・UI操作の分岐を編集せずにデータだけで登録する。
+
+| 単位 | 置き場所・正本 | 内容 |
+| --- | --- | --- |
+| bundle | `api/domains/capabilities/bundles/<名前>.bundle.json`（`CapabilityBundleV1`） | 依存revisionのpin（revision ID＋digest）、definitions（toolchain新revisionなど）、bindings、artifacts、schemas。コード・URLは実行しない |
+| binding | bundle の `bindings[]`（`CommandBindingV1`） | package の各toolを登録adapterの操作名と入力schema参照（`builtin:`/`domain:`/`schema:`）へ結ぶ。`adapterRef`・`availabilityRef`・`resultProjectionRef`・`artifactRevisionId` |
+| artifact | bundle の `artifacts[]`（`ArtifactDefinitionV1`） | OpenUI定義のvariants（質問表示用 `questionDefinition` 付き）、sourceBindings（adapterの登録query）、actionBindings（既存event名→操作・回答・ローカル） |
+| adapter | `api/application/<domain>-adapter.ts`（`DomainAdapter`）と `toolchain.ts` の registry | 操作・query・入力変換・projection の実装。新しい domain を足すときだけ追加する |
+| Web adapter | `web/src/domains/<domain>/toolchain-adapter.tsx` と `web/src/workspace/toolchain-adapters.ts` の一行 | source の表示用snapshot、時計などのローカル操作、receipt の反映 |
+
+- 起動時に capabilities が builtin の後で bundle を検査・登録する。host に無い adapter・操作・query・入力変換を参照する bundle は登録しない（`capability.bundle_skipped`）。`importBundleInTransaction(db, bundle, host, { dryRun: true })` は未知参照・digest不一致・循環・未登録adapter・重複関数・非対応schemaを一覧で返す。
+- 会話の候補は「有効catalog ∩ host対応adapter ∩ 現在の可用性」。command担当は binding の tools だけを見て一操作を返し、agent-runtime の `action` 経路 → tool-runtime → registry → adapter で実行する。値が足りなければ質問を `command_interactions` に保存し、UI（`POST /api/toolchain-interactions/:id/answers`）または会話の次の発話で回答して再開する。
+- UI は `GET /api/toolchain-artifacts` の入口一件から共通hostで開き、書込み操作は `POST /api/toolchain-actions` が受付・domain実行・receipt参照を一つのtransactionで保存する。
+- 切戻しは `publishToolchainRevisionInTransaction` で公開ポインタを binding を持つ以前のrevisionへ戻す。binding の無い旧revision（`timers.manage@1`）は固定runtimeを削除済みなので、戻すとその能力は提供されなくなる。保存済みのdomain状態・receiptは巻き戻さない。
+- 同じadapterを使う別profile/SKILL/package/表示variantは、bundle（新revision）だけで追加できる。
 
 ## 1. 最初に追加の種類を選ぶ
 
@@ -301,7 +319,7 @@ export const archiveBuiltins: Definition[] = [
 
 登録状態の確認は `bun run cli -- capabilities --json` または認証済みの `GET /api/capabilities` を使う。一覧は有効なpackageの発見用であり、内部toolの登録や会話への公開を保証しない。Aのデータ登録はそれぞれの専用GETで確認する。
 
-domain確認は `bun run verify -- --domain <所有domain>`、横断変更は利用側domainと`bun run verify:all`を使う。domain指定はapplicationの結合試験を自動選択しない。実LLM・実機器は別段階とし、回数と停止条件を先に決める。詳細とコマンド例は[検証手順](toolchain-extension-verification.md)を参照する。
+domain確認は `bun run verify -- --domain <所有domain>` を使い、影響のある利用側domainも選んで確認する。domain指定はapplicationの結合試験を自動選択しない。ブラウザE2Eは対象domainの試験ファイルを明示して個別に実行する。実LLM・実機器は別段階とし、回数と停止条件を先に決める。詳細とコマンド例は[検証手順](toolchain-extension-verification.md)を参照する。
 
 ## 8. 登録時によく止まる場所
 

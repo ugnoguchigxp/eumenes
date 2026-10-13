@@ -150,6 +150,7 @@ export function useReplay(
 						signal.addEventListener("abort", finish, { once: true });
 						target
 							.play(speech.wav, finish, {
+								timing: { runId: runId ?? undefined, chunkIndex: i },
 								volume,
 								shouldPlay: valid,
 								onInterrupted: () => {

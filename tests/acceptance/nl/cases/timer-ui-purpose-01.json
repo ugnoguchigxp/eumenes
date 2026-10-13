@@ -1,0 +1,24 @@
+{
+	"caseId": "timer-ui-purpose-01",
+	"version": 2,
+	"goal": "3分のタイマーを作ってください。残り時間が減ることを確かめ、一時停止してから再開してください。",
+	"initialStateRef": "fixture:empty-timers@1",
+	"allowedSurface": "isolated-eumenes-artifacts",
+	"criteriaRef": "criteria:timer-ui-purpose-01@1",
+	"budget": {
+		"wallSeconds": 300,
+		"maxActions": 40,
+		"maxModelCalls": 30,
+		"maxCostUSD": 2
+	},
+	"evidence": [
+		"screenshots",
+		"observations",
+		"actions",
+		"readonly-host-state",
+		"receipt-refs"
+	],
+	"requires": {
+		"productLlm": false
+	}
+}

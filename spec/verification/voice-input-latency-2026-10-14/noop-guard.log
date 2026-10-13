@@ -1,0 +1,11 @@
+62 | 	const original = baseline.find((b) => b.id === c.id);
+63 | 	if (!original || original.messages[1]?.content !== c.messages[1]?.content)
+64 | 		throw new Error("benchmark_input_mismatch");
+65 | }
+66 | if (!baselineOnly && hash(baseline) === hash(snapshot))
+67 | 	throw new Error("candidate_identical_to_baseline");
+                ^
+error: candidate_identical_to_baseline
+      at /Users/y.noguchi/Code/eumenes/scripts/voice-assessment-latency-live.ts:67:12
+
+Bun v1.4.3 (macOS arm64)

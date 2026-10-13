@@ -91,7 +91,7 @@ export function createAnswer(ctx: RuntimeContext, ops: TaskOps) {
 			actionPayload: currentActionPayload(db, root),
 			actionFailure:
 				!!root.error_code &&
-				JSON.parse(root.input_json ?? "{}").timerRequested === true,
+				JSON.parse(root.input_json ?? "{}").actionRequested === true,
 			taskId: root.id,
 			eventId: event.id,
 			revision: root.revision,

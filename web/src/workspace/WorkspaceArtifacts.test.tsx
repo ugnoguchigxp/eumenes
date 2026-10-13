@@ -4,7 +4,6 @@ import { useArtifactWorkspace } from "../domains/artifact";
 import {
 	useOpenMusic,
 	useOpenPlaylist,
-	useOpenTimer,
 	useOpenSettings,
 } from "./WorkspaceArtifacts";
 afterEach(cleanup);
@@ -64,30 +63,4 @@ test("generation and playlist each keep one stable screen with separate identiti
 	act(() => view.result.current.workspace.close("music-generation"));
 	act(() => view.result.current.music());
 	expect(view.result.current.workspace.tabs).toHaveLength(2);
-});
-
-test("timer setup and saved clocks share one tab, including after closing", () => {
-	const view = renderHook(() => {
-		const workspace = useArtifactWorkspace();
-		return { workspace, timer: useOpenTimer(workspace.open) };
-	});
-	act(() => view.result.current.timer());
-	expect(view.result.current.workspace.tabs[0]).toMatchObject({
-		id: "timer",
-		kind: "openui",
-		title: "タイマー",
-	});
-	act(() => view.result.current.timer({ timerId: "saved" }, "休憩"));
-	expect(view.result.current.workspace.tabs).toHaveLength(1);
-	expect(view.result.current.workspace.tabs[0]).toMatchObject({
-		kind: "openui",
-		definition: JSON.stringify({
-			view: "timer-workspace",
-			source: "timer-saved",
-		}),
-	});
-	act(() => view.result.current.workspace.close("timer"));
-	act(() => view.result.current.timer());
-	expect(view.result.current.workspace.tabs).toHaveLength(1);
-	expect(view.result.current.workspace.tabs[0]?.kind).toBe("openui");
 });

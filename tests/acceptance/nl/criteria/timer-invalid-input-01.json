@@ -1,0 +1,59 @@
+{
+	"criteriaId": "timer-invalid-input-01",
+	"version": 1,
+	"caseId": "timer-invalid-input-01",
+	"hostReads": ["timers"],
+	"successMarkers": [
+		"開始しました",
+		"スタートしました",
+		"started",
+		"作成しました",
+		"セットしました"
+	],
+	"items": [
+		{
+			"id": "C1",
+			"statement": "不正な入力では何も保存されず、修正後に1分（60秒）のtimerが一件だけ作られた",
+			"check": "new-timers",
+			"params": {
+				"count": 1,
+				"durationSeconds": 60,
+				"requireStartedReceipt": true
+			},
+			"required": true
+		},
+		{
+			"id": "C2",
+			"statement": "作れない理由が画面の文言で分かる",
+			"check": "screen-mentions",
+			"params": {
+				"sets": [
+					{
+						"id": "reason",
+						"patterns": [
+							"1秒以上|0秒|正しい|無効|範囲|入力してください|できません|エラー|24時間|上限"
+						]
+					}
+				]
+			},
+			"required": true
+		},
+		{
+			"id": "C3",
+			"statement": "余計な副作用がない",
+			"check": "no-extra-side-effects",
+			"params": {
+				"maxNewTimers": 1,
+				"maxStarted": 1,
+				"allowedReceiptActions": [
+					"started",
+					"paused",
+					"resumed",
+					"unchanged",
+					"listed"
+				]
+			},
+			"required": true
+		}
+	]
+}

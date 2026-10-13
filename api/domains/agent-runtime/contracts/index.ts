@@ -221,7 +221,7 @@ export type AnswerTicket = {
 	failureCode: string | null;
 	/** Digest of the host-verified safe projection, when the report came through an acquisition port. */
 	projectionDigest?: string | null;
-	/** Saved timer receipt, when this answer is an action rather than research. */
+	/** The adapter's projection of the saved operation, when this answer is an action rather than research. */
 	actionPayload?: string | null;
 	actionFailure?: boolean;
 };

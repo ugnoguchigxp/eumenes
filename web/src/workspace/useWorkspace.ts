@@ -16,7 +16,9 @@ import type { EumenesClient } from "../../../client";
 import { useImageArtifacts } from "../domains/image";
 import { useMusicArtifacts, usePlaylistArtifacts } from "../domains/music";
 import { activeTimersQuery } from "../domains/timers/queries";
+import { TIMER_ADAPTER_REF } from "../domains/timers/toolchain-adapter";
 import { useTimerArtifacts } from "../domains/timers/useTimerArtifacts";
+import { useToolchainArtifacts } from "../domains/toolchain-artifacts";
 import { useTimerTone, type AudioStore } from "../domains/audio";
 import { useArtifactWorkspace } from "../domains/artifact";
 import { useConversation } from "../domains/conversation";
@@ -41,7 +43,6 @@ import {
 	useOpenRecognition,
 	useOpenMusic,
 	useOpenPlaylist,
-	useOpenTimer,
 } from "./WorkspaceArtifacts";
 
 export function useWorkspace({
@@ -85,7 +86,14 @@ export function useWorkspace({
 	useImageArtifacts(client, "main", openImage);
 	const openMusic = useOpenMusic(artifacts.open);
 	const openPlaylist = useOpenPlaylist(artifacts.open);
-	const openTimer = useOpenTimer(artifacts.open);
+	// One launcher entry per registered artifact; the saved timer is chosen inside the screen.
+	const toolchain = useToolchainArtifacts(client, artifacts.open);
+	const { openByAdapter } = toolchain;
+	const openTimer = useCallback(
+		(ref?: { timerId: string }) =>
+			void openByAdapter(TIMER_ADAPTER_REF, ref?.timerId),
+		[openByAdapter],
+	);
 	useMusicArtifacts(client, "main", openMusic);
 	usePlaylistArtifacts(client, "main", openPlaylist);
 	const activeTimers = useQuery(activeTimersQuery(client));
@@ -302,7 +310,7 @@ export function useWorkspace({
 		openRecognition,
 		openMusic,
 		openPlaylist,
-		openTimer,
+		toolchain,
 		activeTimers,
 		openShowcase,
 		settings,

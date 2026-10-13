@@ -8,9 +8,13 @@ import {
 	within,
 } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
-import type { MemoryItemDto } from "../../../../api/domains/memory/contracts";
+import type { ComponentProps } from "react";
 import { ApiError } from "../../../../client/transport";
 import { MemoryItemsPanel } from "./MemoryItemsPanel";
+
+type MemoryItemDto = Awaited<
+	ReturnType<ComponentProps<typeof MemoryItemsPanel>["client"]["memoryItems"]>
+>[number];
 
 const caches: QueryClient[] = [];
 afterEach(() => {

@@ -1,6 +1,6 @@
 # 音声 MVP 受入記録
 
-ブラウザ試験の証跡画像は既定で `test-results/evidence` に出力する。`spec/verification` へ記録し直すときだけ `EUMENES_RECORD_EVIDENCE=1 bunx playwright test` を実行する。
+ブラウザ試験の証跡画像は既定で `test-results/evidence` に出力する。`spec/verification` へ記録し直すときだけ `EUMENES_RECORD_EVIDENCE=1 bunx playwright test tests/browser/<対象>.spec.ts` を実行する。
 
 ## 現在の状態
 

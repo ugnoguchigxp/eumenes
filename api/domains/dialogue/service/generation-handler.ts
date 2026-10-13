@@ -1,3 +1,4 @@
+import { generationTiming } from "./generation-timing";
 import { observeAnswer } from "./post-answer";
 import {
 	resolveAttachmentContext,
@@ -85,6 +86,7 @@ export function createGenerationHandler(
 				},
 				async () => {
 					log.info("dialogue.generation_started");
+					const timing = generationTiming();
 					resolveAttachmentContext(deps, input, run!.conversationId);
 					if (input.agent?.actionPayload && agents) {
 						// Refresh time/state before phrasing, without repeating the operation.
@@ -153,6 +155,7 @@ export function createGenerationHandler(
 							current.revision !== input.revision
 						)
 							throw new Error("cancelled");
+						timing.firstDelta(text, holdBody);
 						if (holdBody) {
 							// Memory/World-backed text is not shown or spoken before the adoption check passes.
 							held += text.length;
@@ -181,6 +184,7 @@ export function createGenerationHandler(
 					const decision = await prepareDecision(deps, input, signal);
 					const { recallPins } = decision;
 					holdBody ||= recallPins.length > 0; // recalled exchanges are memory text
+					timing.policy(holdBody);
 					let generated: Awaited<ReturnType<typeof generateConversation>>;
 					try {
 						generated = await generateConversation({
@@ -192,6 +196,7 @@ export function createGenerationHandler(
 							preparation,
 							tools: decision.tools,
 							cards: decision.cards,
+							openQuestions: decision.openQuestions,
 							repair: () => {
 								partials.delete(input.runId);
 								held = 0;

@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite";
 import type { AgentRuntime } from "../../agent-runtime";
+import type { Prepared } from "../../capabilities";
 import type { ConversationService } from "../../conversation";
-import { toolchainRuntimeOf, toolchainBuiltins } from "../../capabilities";
 import type { Run } from "../contracts";
 import { linkAgent } from "../repository";
 import type { DialogueDeps } from "./context";
@@ -20,7 +20,7 @@ export function delegateConversation(
 	conversation: ConversationService,
 	run: Run,
 	selected: {
-		route: "web" | "history" | "timer";
+		route: "web" | "history" | "action";
 		request: string;
 		packageRevisionId?: string;
 		researcher?: "codex_luna";
@@ -28,10 +28,8 @@ export function delegateConversation(
 	},
 	context: {
 		parentJobId: string;
-		actionSnapshot?: unknown;
-		timerCapability?: ReturnType<
-			AgentRuntime["conversationContextInTransaction"]
-		>["timerCapability"];
+		/** The frozen package capability a bound operation runs with (route "action"). */
+		actionCapability?: Prepared;
 	},
 ) {
 	const original = conversation
@@ -51,8 +49,7 @@ export function delegateConversation(
 		},
 		deadline: Date.parse(run.deadlineAt!),
 		parentJobId: context.parentJobId,
-		actionSnapshot: context.actionSnapshot,
-		timerCapability: context.timerCapability,
+		actionCapability: context.actionCapability,
 		// Requirement profiles are chosen inside the history toolchain, never by the conversation.
 		requirementProfiles: [],
 		onCreated: (taskId) => linkAgent(db, run.id, taskId, context.parentJobId),
@@ -76,31 +73,30 @@ export function prepareRouting(
 	const { agents, toolchains } = deps;
 	if (!toolchains || run.agentTaskId || run.sourceKind === "schedule")
 		return undefined;
-	const context = agents?.conversationContextInTransaction?.(db, run.id);
+	const context = agents?.conversationContextInTransaction?.(db);
 	const ready = (requires: string | undefined) =>
 		requires === undefined
 			? !!agents
 			: requires === "luna"
 				? !!context?.lunaEnabled
-				: requires === "timers"
-					? !!context?.timersEnabled
-					: requires === "excalidraw"
-						? !!deps.excalidraw
-						: requires === "object-recognition"
-							? !!deps.objectRecognition
-							: requires === "image"
-								? !!deps.image
-								: requires === "music"
-									? !!deps.music
-									: requires === "dots"
-										? available.dots
-										: false;
-	const ids = toolchainBuiltins
-		.map((d) => d.id)
-		.filter((id) => {
-			const runtime = toolchainRuntimeOf(id);
-			return !!runtime && ready(runtime.requires);
-		});
+				: requires === "excalidraw"
+					? !!deps.excalidraw
+					: requires === "object-recognition"
+						? !!deps.objectRecognition
+						: requires === "image"
+							? !!deps.image
+							: requires === "music"
+								? !!deps.music
+								: requires === "dots"
+									? available.dots
+									: false;
+	// Bound chains are offered while their adapter is available; the others by host capability.
+	const ids = toolchains
+		.catalogInTransaction(db)
+		.filter(({ runtime }) =>
+			runtime.binding ? runtime.binding.available : ready(runtime.requires),
+		)
+		.map((entry) => entry.id);
 	const turns = messages.filter((m) => m.role !== "system");
 	const current = turns.at(-1)?.content ?? "";
 	let before = "";
@@ -116,6 +112,12 @@ export function prepareRouting(
 			conversationId: run.conversationId,
 			utteranceId: run.utteranceId ?? null,
 			requestId: run.requestId ?? null,
+			openQuestions: toolchains.bound
+				? (deps.interactions?.openQuestionsInTransaction(
+						db,
+						run.conversationId,
+					) ?? [])
+				: [],
 		},
 	};
 }

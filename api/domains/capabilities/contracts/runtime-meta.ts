@@ -27,7 +27,6 @@ export type ToolRuntimeMeta = {
 	requiresSavedBody?: boolean;
 	/** Cursor-paged search: repeated stale cursors end the task instead of retrying. */
 	cursorPaging?: boolean;
-	localAction?: { backend: "timer"; verb: "start" | "cancel" | "list" };
 };
 export type PackageRuntimeMeta = {
 	/**
@@ -54,18 +53,9 @@ const tools: Readonly<Record<string, ToolRuntimeMeta>> = {
 	"web.read_saved": { operation: "saved_read", requiresSavedBody: true },
 	"history.search": { operation: "history", cursorPaging: true },
 	"history.read": { operation: "history" },
-	"timer.start": {
-		operation: "local_action",
-		localAction: { backend: "timer", verb: "start" },
-	},
-	"timer.cancel": {
-		operation: "local_action",
-		localAction: { backend: "timer", verb: "cancel" },
-	},
-	"timer.list": {
-		operation: "local_action",
-		localAction: { backend: "timer", verb: "list" },
-	},
+	"timer.start": { operation: "local_action" },
+	"timer.cancel": { operation: "local_action" },
+	"timer.list": { operation: "local_action" },
 };
 const packages: Readonly<Record<string, PackageRuntimeMeta>> = {
 	"web.quick": { budget: "quick", report: "search" },
@@ -83,7 +73,6 @@ const toolchains: Readonly<
 		researcher: "codex_luna",
 	},
 	"history.research": { execution: "research", route: "history" },
-	"timers.manage": { execution: "command", requires: "timers" },
 	"excalidraw.edit": { execution: "excalidraw", requires: "excalidraw" },
 	"object-recognition.manage": {
 		execution: "command",

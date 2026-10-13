@@ -4,6 +4,8 @@ export class ApiError extends Error {
 		message: string,
 		public requestId?: string,
 		public detail?: string,
+		/** The parsed JSON error body, for contracts that carry data (e.g. field errors). */
+		public body?: unknown,
 	) {
 		super(message);
 	}
@@ -39,9 +41,10 @@ export function createTransport(baseUrl: string, token?: string) {
 				throw error;
 			});
 			if (!response.ok) {
-				const error = (await response
+				const body: unknown = await response
 					.json()
-					.catch(() => ({ error: `HTTP ${response.status}` }))) as {
+					.catch(() => ({ error: `HTTP ${response.status}` }));
+				const error = (body && typeof body === "object" ? body : {}) as {
 					error?: string;
 					message?: string;
 				};
@@ -50,6 +53,7 @@ export function createTransport(baseUrl: string, token?: string) {
 					error.error ?? `HTTP ${response.status}`,
 					response.headers.get("X-Request-Id") ?? undefined,
 					error.message,
+					body,
 				);
 			}
 			return response;

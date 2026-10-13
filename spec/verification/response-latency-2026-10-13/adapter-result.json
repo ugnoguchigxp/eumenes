@@ -1,0 +1,81 @@
+{
+  "at": "2026-10-13T14:57:23.185Z",
+  "lane": "live_adapter_synthetic_audio_no_devices",
+  "samples": [
+    {
+      "sampleId": "a37c43b3-51c2-4a5e-9b3e-ab3c01a30ede",
+      "phase": "tts",
+      "repetition": 0,
+      "outcome": "ok",
+      "durationMs": 989.0338750000001,
+      "outputSize": 106028
+    },
+    {
+      "sampleId": "68741880-04d6-4e16-b096-5090f04e7a0d",
+      "phase": "asr",
+      "repetition": 0,
+      "outcome": "ok",
+      "durationMs": 332.8299999999999,
+      "outputSize": 17
+    },
+    {
+      "sampleId": "cd2ac147-ced7-4523-a230-c69ad4b58291",
+      "phase": "llm",
+      "repetition": 0,
+      "outcome": "ok",
+      "durationMs": 1546.891625,
+      "firstDeltaMs": 1474.7773330000002,
+      "outputSize": 11
+    },
+    {
+      "sampleId": "d46b2079-d989-44c5-9a42-134dacfc462b",
+      "phase": "tts",
+      "repetition": 1,
+      "outcome": "ok",
+      "durationMs": 204.52745800000002,
+      "outputSize": 106028
+    },
+    {
+      "sampleId": "f8776a88-ed8f-4137-b710-f28defe23068",
+      "phase": "asr",
+      "repetition": 1,
+      "outcome": "ok",
+      "durationMs": 285.0929589999996,
+      "outputSize": 17
+    },
+    {
+      "sampleId": "72ae9d0e-a852-4f6a-ade0-db28567cfdd6",
+      "phase": "llm",
+      "repetition": 1,
+      "outcome": "ok",
+      "durationMs": 1251.648792,
+      "firstDeltaMs": 1170.2223750000003,
+      "outputSize": 11
+    },
+    {
+      "sampleId": "331a0f61-12ed-451a-bcd8-511efba806a2",
+      "phase": "tts",
+      "repetition": 2,
+      "outcome": "ok",
+      "durationMs": 233.40449999999964,
+      "outputSize": 106028
+    },
+    {
+      "sampleId": "ba03b36a-0117-436e-8996-13eaf79acf93",
+      "phase": "asr",
+      "repetition": 2,
+      "outcome": "ok",
+      "durationMs": 286.5887079999993,
+      "outputSize": 17
+    },
+    {
+      "sampleId": "6181ef7a-53d4-4f2d-804d-026b42171bd7",
+      "phase": "llm",
+      "repetition": 2,
+      "outcome": "ok",
+      "durationMs": 1239.9923330000001,
+      "firstDeltaMs": 1162.8631249999999,
+      "outputSize": 11
+    }
+  ]
+}

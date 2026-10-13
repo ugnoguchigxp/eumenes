@@ -1,3 +1,4 @@
+import { measureStage } from "../../../infrastructure/performance";
 import type { Database } from "bun:sqlite";
 import { getLogger } from "../../../infrastructure/logger";
 import {
@@ -18,6 +19,7 @@ import {
 	appendConversationPolicy,
 	toolchainTools,
 	type ConversationOperation,
+	type OpenQuestion,
 } from "./conversation-tools";
 
 const log = getLogger("dialogue");
@@ -70,9 +72,12 @@ export async function prepareDecision(
 	let route: ToolchainRoute | undefined;
 	let query: QueryVector | undefined;
 	let recallPins: TurnRecall["pins"] = [];
+	let openQuestions: OpenQuestion[] = [];
 	if (input.routing && deps.toolchains && !input.agent) {
 		const routing = input.routing;
-		query = await deps.toolchains.embedQuery(routing.query, signal);
+		query = await measureStage("dialogue", "query_embedding", () =>
+			deps.toolchains!.embedQuery(routing.query, signal),
+		);
 		signal.throwIfAborted();
 		route = deps.store.read((db) =>
 			deps.toolchains!.routeInTransaction(db, {
@@ -92,6 +97,10 @@ export async function prepareDecision(
 			});
 			recallPins = recalled.pins;
 		}
+		// A question is answerable only through a function that is offered now.
+		openQuestions = routing.openQuestions.filter((q) =>
+			route!.cards.some((c) => c.functionName === q.functionName),
+		);
 		appendConversationPolicy(
 			messages,
 			route.cards.length > 0,
@@ -100,8 +109,11 @@ export async function prepareDecision(
 				functionName,
 				outcome,
 			})),
+			openQuestions,
 		);
-		tools = route.cards.length ? toolchainTools(route.cards) : undefined;
+		tools = route.cards.length
+			? toolchainTools(route.cards, openQuestions)
+			: undefined;
 		log.info("dialogue.candidates_selected", {
 			candidateCount: route.cards.length,
 			retrieval: route.retrieval,
@@ -132,7 +144,14 @@ export async function prepareDecision(
 					...extra,
 				}
 			: undefined;
-	return { messages, tools, cards: route?.cards, draft, recallPins };
+	return {
+		messages,
+		tools,
+		cards: route?.cards,
+		openQuestions,
+		draft,
+		recallPins,
+	};
 }
 /** The exchanges before the verbatim window that resemble the request; null when there are none or recall is unavailable. */
 function recallFor(

@@ -48,6 +48,8 @@ export interface GenerateInput {
 		conversationId: string;
 		utteranceId: string | null;
 		requestId: string | null;
+		/** Questions a toolchain's command sub-agent asked and the user has not answered yet. */
+		openQuestions: import("./conversation-tools").OpenQuestion[];
 	};
 	actionResultIndex?: number;
 	runId: string;
@@ -82,6 +84,11 @@ export interface Accept {
 	voiceSubject?: string;
 	validationRequestIds?: string[];
 	transcriptionRequestIds?: string[];
+	/**
+	 * The run resumes an interaction's command sub-agent: its job is the command job, not a
+	 * conversation decision (the toolchain was already chosen when the question was asked).
+	 */
+	resume?: { interactionId: string; toolchainRevisionId: string };
 }
 
 /** Everything the dialogue service parts share: the injected ports. */
@@ -102,4 +109,6 @@ export type DialogueDeps = {
 	toolchains?: import("../contracts/toolchains").ToolchainRoutingPort;
 	postAnswer?: PostAnswerObserverPort;
 	worldContext?: WorldContextPort;
+	/** Set by `createDialogueService` once intake exists (it accepts the resumed runs). */
+	interactions?: import("./command-interactions").CommandInteractions;
 };

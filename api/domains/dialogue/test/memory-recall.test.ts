@@ -98,6 +98,7 @@ function routing(
 			past: [],
 			retrieval: "none",
 		}),
+		catalogInTransaction: () => [],
 		resolveInTransaction: () => {
 			throw new Error("unexpected_resolve");
 		},

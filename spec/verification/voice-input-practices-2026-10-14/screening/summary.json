@@ -1,0 +1,140 @@
+{
+  "stopReason": "completed",
+  "models": [
+    "ornith-1.5-strix-lean"
+  ],
+  "variants": [
+    {
+      "variant": "baseline",
+      "attempts": 16,
+      "responses": 16,
+      "failures": 0,
+      "strictPass": 7,
+      "falseAccept": [],
+      "falseReject": [
+        "topic-switch",
+        "text-injection",
+        "heldout-topic-switch"
+      ],
+      "acceptedWrongRelation": [
+        "fragment-3",
+        "heldout-short-answer"
+      ],
+      "medianMs": 4353.868750000009,
+      "p90Ms": 4623.7829795,
+      "firstDeltaMs": null,
+      "firstDeltaToCompleteMs": null,
+      "promptTokens": 973,
+      "completionTokens": 79.5,
+      "cachedTokens": 0,
+      "providerReadyMs": 92.65554150000389,
+      "tokenCountMs": 38.873312499999884,
+      "providerHeadersMs": 4103.021208500002,
+      "providerTtftMs": null,
+      "pairs": 0,
+      "pairedMedianSavingMs": null,
+      "pairedMedianBootstrap95CI": null,
+      "fasterPairs": 0
+    },
+    {
+      "variant": "schema",
+      "attempts": 16,
+      "responses": 16,
+      "failures": 0,
+      "strictPass": 10,
+      "falseAccept": [],
+      "falseReject": [
+        "topic-switch",
+        "heldout-topic-switch"
+      ],
+      "acceptedWrongRelation": [
+        "fragment-3"
+      ],
+      "medianMs": 4238.570583000004,
+      "p90Ms": 4615.811125,
+      "firstDeltaMs": null,
+      "firstDeltaToCompleteMs": null,
+      "promptTokens": 973,
+      "completionTokens": 80,
+      "cachedTokens": 0,
+      "providerReadyMs": 34.182437500000106,
+      "tokenCountMs": 29.340353499996127,
+      "providerHeadersMs": 4167.010187499996,
+      "providerTtftMs": null,
+      "pairs": 16,
+      "pairedMedianSavingMs": 91.36327100000926,
+      "pairedMedianBootstrap95CI": [
+        -133.19349900001544,
+        233.88504199999807
+      ],
+      "fasterPairs": 9
+    },
+    {
+      "variant": "examples",
+      "attempts": 16,
+      "responses": 16,
+      "failures": 0,
+      "strictPass": 11,
+      "falseAccept": [],
+      "falseReject": [
+        "topic-switch",
+        "text-injection",
+        "heldout-topic-switch"
+      ],
+      "acceptedWrongRelation": [
+        "fragment-3"
+      ],
+      "medianMs": 4576.360021000008,
+      "p90Ms": 4882.297125000012,
+      "firstDeltaMs": null,
+      "firstDeltaToCompleteMs": null,
+      "promptTokens": 1380,
+      "completionTokens": 51,
+      "cachedTokens": 0,
+      "providerReadyMs": 36.3178125000004,
+      "tokenCountMs": 31.523333499993896,
+      "providerHeadersMs": 4481.289333500012,
+      "providerTtftMs": null,
+      "pairs": 16,
+      "pairedMedianSavingMs": -210.4399379999959,
+      "pairedMedianBootstrap95CI": [
+        -339.67854100003024,
+        -79.28064650000306
+      ],
+      "fasterPairs": 4
+    },
+    {
+      "variant": "budget128",
+      "attempts": 16,
+      "responses": 16,
+      "failures": 0,
+      "strictPass": 10,
+      "falseAccept": [],
+      "falseReject": [
+        "topic-switch",
+        "heldout-topic-switch"
+      ],
+      "acceptedWrongRelation": [
+        "fragment-3"
+      ],
+      "medianMs": 4353.566021000006,
+      "p90Ms": 4619.204416499997,
+      "firstDeltaMs": null,
+      "firstDeltaToCompleteMs": null,
+      "promptTokens": 973,
+      "completionTokens": 79.5,
+      "cachedTokens": 0,
+      "providerReadyMs": 93.7704165000032,
+      "tokenCountMs": 42.81406250001146,
+      "providerHeadersMs": 4134.495749999995,
+      "providerTtftMs": null,
+      "pairs": 16,
+      "pairedMedianSavingMs": 25.418250000002445,
+      "pairedMedianBootstrap95CI": [
+        -99.42172707501211,
+        123.78299999999217
+      ],
+      "fasterPairs": 9
+    }
+  ]
+}

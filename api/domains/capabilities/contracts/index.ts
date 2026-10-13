@@ -12,8 +12,26 @@ import {
 	musicPlaybackPlan,
 } from "./music";
 export { musicRequest, musicPlan, musicPlanV2, musicPlaybackPlan };
-import { timerCancel, timerCommand, timerList, timerStart } from "./timers";
-export { timerCancel, timerCommand, timerList, timerStart };
+import {
+	timerCancel,
+	timerCommand,
+	timerDurationAnswer,
+	timerHms,
+	timerList,
+	timerStart,
+	timerTargetAnswer,
+} from "./timers";
+export {
+	timerCancel,
+	timerCommand,
+	timerDurationAnswer,
+	timerHms,
+	timerList,
+	timerStart,
+	timerTargetAnswer,
+};
+import { answerText, emptyInput } from "./inputs";
+export { answerText, emptyInput };
 export { timerResultContext, type TimerResultContext } from "./timers";
 import { publicUrl } from "./public-url";
 import { toolchainRequest } from "./toolchains";
@@ -143,6 +161,11 @@ export const validators = {
 	timerList,
 	timerCancel,
 	timerCommand,
+	answerText,
+	timerDurationAnswer,
+	timerTargetAnswer,
+	timerHms,
+	emptyInput,
 };
 export type SchemaKey = keyof typeof validators;
 export type Owner = { rootRunId: string; taskId: string; cancelEpoch: number };
@@ -177,6 +200,13 @@ export type Definition = {
 	artifact?: import("./toolchains").ToolchainArtifact;
 	/** Toolchain only: which other toolchain to use instead, and when. */
 	redirects?: import("./toolchains").ToolchainRedirect[];
+	/**
+	 * Toolchain only, new revisions only (absent from the JSON of earlier ones): the stored
+	 * binding that connects the package's tools to a host adapter, and the stored artifact
+	 * registration that presents it. Both are set together.
+	 */
+	bindingRevisionId?: string;
+	artifactRevisionId?: string;
 };
 export const learnedIdPattern = /^learned\.web\.[0-9a-f]{32}$/;
 export const learnedMaxBytes = 16384;
@@ -208,6 +238,7 @@ export const hash = (v: unknown) =>
 		.update(typeof v === "string" ? v : JSON.stringify(v))
 		.digest("hex");
 
+export * from "./bindings";
 export * from "./requirements";
 export * from "./runtime-meta";
 export * from "./toolchains";

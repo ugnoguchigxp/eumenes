@@ -1,3 +1,4 @@
+import { measureStage } from "../../../infrastructure/performance";
 import type { LarmCallOptions, LarmPort } from "../contracts";
 import type { Fetcher, Provider } from "./profiles";
 import { startLlmTiming } from "./llm-timing";
@@ -36,9 +37,12 @@ export async function answerRequest(
 		);
 		if (p.chatInput)
 			timing.setRequestBytes(Buffer.byteLength(serialized, "utf8"));
-		await countChatBody(p, body, serialized, count, signal, deps.request);
+		await measureStage("larm", "token_count", () =>
+			countChatBody(p, body, serialized, count, signal, deps.request),
+		);
 		if (!deps.sameClaim()) throw new Error("chat_input_contract_unavailable");
 		signal.throwIfAborted();
+		timing.sent();
 		const response = await deps.send({
 			method: "POST",
 			headers: { "content-type": "application/json" },

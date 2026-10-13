@@ -1,0 +1,25 @@
+$ bun check
+api/application/toolchain-adapters.ts(5,7): error TS2305: Module '"../domains/capabilities"' has no exported member 'BundleHost'.
+api/application/toolchain-adapters.ts(68,32): error TS2551: Property 'schemaInTransaction' does not exist on type '{ listDotsPackages(): { items: { id: string; revision: number; revisionId: string; stateToken: string; title: string; summary: string; enabled: boolean; profile: string; skills: { title: string; body: string; }[]; }[]; }; ... 28 more ...; close: () => void; }'. Did you mean 'searchInTransaction'?
+api/application/toolchain-routing.ts(35,30): error TS2551: Property 'toolchainBindingInTransaction' does not exist on type '{ listDotsPackages(): { items: { id: string; revision: number; revisionId: string; stateToken: string; title: string; summary: string; enabled: boolean; profile: string; skills: { title: string; body: string; }[]; }[]; }; ... 28 more ...; close: () => void; }'. Did you mean 'toolchainsInTransaction'?
+api/application/toolchain-routing.ts(49,28): error TS2339: Property 'documentInTransaction' does not exist on type '{ listDotsPackages(): { items: { id: string; revision: number; revisionId: string; stateToken: string; title: string; summary: string; enabled: boolean; profile: string; skills: { title: string; body: string; }[]; }[]; }; ... 28 more ...; close: () => void; }'.
+api/application/toolchain-routing.ts(87,24): error TS2551: Property 'prepareBoundInTransaction' does not exist on type '{ listDotsPackages(): { items: { id: string; revision: number; revisionId: string; stateToken: string; title: string; summary: string; enabled: boolean; profile: string; skills: { title: string; body: string; }[]; }[]; }; ... 28 more ...; close: () => void; }'. Did you mean 'prepareInTransaction'?
+api/application/toolchain-routing.ts(156,12): error TS2339: Property 'binding' does not exist on type '{ toolchain: FixedDefinition; package: FixedDefinition; profile: string; skills: string[]; tools: { id: string; revisionId: string; summary: string; schema: ZodStandardJSONSchemaPayload<...> | null; }[]; }'.
+api/application/toolchain-routing.ts(157,21): error TS2339: Property 'binding' does not exist on type '{ toolchain: FixedDefinition; package: FixedDefinition; profile: string; skills: string[]; tools: { id: string; revisionId: string; summary: string; schema: ZodStandardJSONSchemaPayload<...> | null; }[]; }'.
+api/application/toolchain-routing.ts(159,29): error TS2339: Property 'binding' does not exist on type '{ toolchain: FixedDefinition; package: FixedDefinition; profile: string; skills: string[]; tools: { id: string; revisionId: string; summary: string; schema: ZodStandardJSONSchemaPayload<...> | null; }[]; }'.
+api/application/toolchain-routing.ts(163,28): error TS7006: Parameter 't' implicitly has an 'any' type.
+api/application/toolchain.ts(72,5): error TS2353: Object literal may only specify known properties, and 'bundleHost' does not exist in type '() => number'.
+api/domains/dialogue/test/memory-recall.test.ts(94,2): error TS2741: Property 'catalogInTransaction' is missing in type '{ embedQuery: () => Promise<QueryVector | undefined>; routeInTransaction: () => { cards: { revisionId: string; id: string; functionName: string; title: string; summary: string; useWhen: string[]; redirects: never[]; score: { rank: number; ftsRank: null; similarity: null; fromHistory: boolean; }; }[]; past: never[]; ...' but required in type 'ToolchainRoutingPort'.
+api/domains/dialogue/test/world-context.test.ts(932,2): error TS2741: Property 'catalogInTransaction' is missing in type '{ embedQuery: () => Promise<undefined>; routeInTransaction: () => { cards: { revisionId: string; id: string; functionName: string; title: string; summary: string; useWhen: string[]; redirects: never[]; score: { rank: number; ftsRank: null; similarity: null; fromHistory: boolean; }; }[]; past: never[]; retrieval: "no...' but required in type 'ToolchainRoutingPort'.
+api/domains/tool-runtime/service/index.ts(471,28): error TS2554: Expected 4 arguments, but got 3.
+api/domains/tool-runtime/service/index.ts(525,27): error TS2554: Expected 4 arguments, but got 3.
+api/domains/tool-runtime/service/index.ts(532,54): error TS2739: Type '{ requestId: `${string}-${string}-${string}-${string}-${string}`; issuedAt: string; tool: FixedDefinition; arguments: Record<string, never> | { action: "generate" | "library" | "studio"; ... 6 more ...; seed: number; } | ... 17 more ... | { ...; }; owner: Owner; originToken: string; }' is missing the following properties from type '{ requestId: string; issuedAt: string; tool: FixedDefinition; arguments: unknown; owner: Owner; originToken: string; adapterRef: string; operationName: string; }': adapterRef, operationName
+Found 15 errors in 6 files, checked 1,261 files [417.59ms]
+
+  2  api/application/toolchain-adapters.ts:5
+  7  api/application/toolchain-routing.ts:35
+  1  api/application/toolchain.ts:72
+  1  api/domains/dialogue/test/memory-recall.test.ts:94
+  1  api/domains/dialogue/test/world-context.test.ts:932
+  3  api/domains/tool-runtime/service/index.ts:471
+error: script "typecheck" exited with code 1

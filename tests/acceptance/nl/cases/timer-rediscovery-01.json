@@ -1,0 +1,24 @@
+{
+	"caseId": "timer-rediscovery-01",
+	"version": 2,
+	"goal": "すでに動いている「お茶」のタイマーがあります。画面を読み込み直したあと、同じタイマーをもう一度開いて残り時間を確認してください。新しいタイマーは作らないでください。",
+	"initialStateRef": "fixture:one-active-timer@1",
+	"allowedSurface": "isolated-eumenes-artifacts",
+	"criteriaRef": "criteria:timer-rediscovery-01@1",
+	"budget": {
+		"wallSeconds": 300,
+		"maxActions": 40,
+		"maxModelCalls": 30,
+		"maxCostUSD": 2
+	},
+	"evidence": [
+		"screenshots",
+		"observations",
+		"actions",
+		"readonly-host-state",
+		"receipt-refs"
+	],
+	"requires": {
+		"productLlm": false
+	}
+}

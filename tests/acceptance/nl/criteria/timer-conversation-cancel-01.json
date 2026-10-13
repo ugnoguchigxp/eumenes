@@ -1,0 +1,56 @@
+{
+	"criteriaId": "timer-conversation-cancel-01",
+	"version": 1,
+	"caseId": "timer-conversation-cancel-01",
+	"hostReads": ["timers"],
+	"successMarkers": [
+		"開始しました",
+		"スタートしました",
+		"started",
+		"作成しました",
+		"セットしました"
+	],
+	"items": [
+		{
+			"id": "C1",
+			"statement": "「お茶」のtimerがcancelledになった（pausedは取消成功にしない）",
+			"check": "timer-final-state",
+			"params": {
+				"target": "seeded:お茶",
+				"state": "cancelled"
+			},
+			"required": true
+		},
+		{
+			"id": "C2",
+			"statement": "新しいtimerが作られず、取消対象以外が変わらない",
+			"check": "no-extra-side-effects",
+			"params": {
+				"maxNewTimers": 0,
+				"maxStarted": 0,
+				"allowedReceiptActions": [
+					"cancelled",
+					"dismissed",
+					"unchanged",
+					"listed"
+				],
+				"mayChange": ["お茶"]
+			},
+			"required": true
+		},
+		{
+			"id": "C3",
+			"statement": "返答または画面が取消を伝えている",
+			"check": "screen-mentions",
+			"params": {
+				"sets": [
+					{
+						"id": "cancelled",
+						"patterns": ["取り消|取消|キャンセル|cancel"]
+					}
+				]
+			},
+			"required": true
+		}
+	]
+}

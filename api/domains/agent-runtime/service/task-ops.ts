@@ -1,5 +1,4 @@
 import type { Database } from "bun:sqlite";
-import { timerResultContext } from "../../capabilities";
 import type { Task } from "../contracts";
 import { get, update } from "../repository";
 import { stepDeadline } from "./exploration";
@@ -10,6 +9,9 @@ import {
 	owner,
 	type RuntimeContext,
 } from "./runtime-context";
+
+/** Upper bound of one operation result handed to the answer. */
+const MAX_ACTION_CONTEXT_BYTES = 32_768;
 
 function actionInvocation(db: Database, taskId: string) {
 	const table = db
@@ -26,27 +28,36 @@ function actionInvocation(db: Database, taskId: string) {
 export function createTaskOps(ctx: RuntimeContext) {
 	const { tools, inference, queue, now } = ctx.deps;
 	const { traceIds, abortJobs, abortRequests, releases } = ctx.state;
+	/** The adapter's short projection of a saved operation, or the refusal of one that failed. */
 	function currentActionPayload(db: Database, task: Task) {
 		const invocation = actionInvocation(db, task.id);
 		if (!invocation) {
-			if (JSON.parse(task.input_json ?? "{}").timerRequested && task.error_code)
-				return JSON.stringify(
-					timerResultContext.parse({
-						version: 1,
-						kind: "timer_action",
-						action: "failed",
-						observedAt: new Date(now()).toISOString(),
-						items: [],
-						complete: false,
-						errorCode: task.error_code,
-					}),
-				);
+			if (
+				JSON.parse(task.input_json ?? "{}").actionRequested &&
+				task.error_code
+			)
+				return JSON.stringify({
+					version: 1,
+					kind: "action_result",
+					action: "failed",
+					observedAt: new Date(now()).toISOString(),
+					errorCode: task.error_code,
+				});
 			return null;
 		}
 		const envelope = tools.readActionInTransaction(db, owner(task), invocation);
-		const parsed = timerResultContext.safeParse(envelope.answerContext);
-		if (!parsed.success) throw new Error("invalid_action_result");
-		return JSON.stringify(parsed.data);
+		const context = envelope.answerContext;
+		const json =
+			context && typeof context === "object" && !Array.isArray(context)
+				? JSON.stringify(context)
+				: null;
+		// The adapter's projection is the only thing the answer sees; it must be a bounded object.
+		if (
+			!json ||
+			new TextEncoder().encode(json).length > MAX_ACTION_CONTEXT_BYTES
+		)
+			throw new Error("invalid_action_result");
+		return json;
 	}
 	function enqueue(db: Database, t: Task, parentJobId?: string) {
 		traceIds.add(t.id);

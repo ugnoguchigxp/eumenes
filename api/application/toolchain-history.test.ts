@@ -4,7 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore } from "../infrastructure/sqlite";
 import { migrations } from "./migrations";
+import { offlineBundleHost } from "./toolchain-adapters";
 import {
+	builtinToolchainFunctions,
 	createCapabilities,
 	toolchainBuiltins,
 	toolchainPassages,
@@ -23,7 +25,10 @@ async function setup(backends = ["web", "history", "timer", "music", "dots"]) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-toolchains-"));
 	dirs.push(dir);
 	const store = openStore(join(dir, "db"), migrations);
-	const capabilities = createCapabilities(store, new Set(backends));
+	const capabilities = createCapabilities(store, new Set(backends), {
+		// Bundled toolchains (the timer) register as this host would register them.
+		bundleHost: offlineBundleHost,
+	});
 	await capabilities.seed();
 	return { store, capabilities, history: createToolchainHistory(store) };
 }
@@ -36,11 +41,20 @@ const space: VectorSpace = {
 const oneHot = (i: number) =>
 	Array.from({ length: space.dimension }, (_, j) => (j === i ? 1 : 0));
 
-test("every builtin toolchain registers as a complete set with flat tool schemas", async () => {
-	const { store, capabilities } = await setup();
+test("every builtin and bundled toolchain registers as a complete set with flat tool schemas", async () => {
+	const { store, capabilities } = await setup([
+		"web",
+		"history",
+		"timer",
+		"music",
+		"dots",
+		"image",
+		"excalidraw",
+		"object-recognition",
+	]);
 	const active = store.read((db) => capabilities.toolchainsInTransaction(db));
 	expect(active.map((d) => d.functionName).sort()).toEqual(
-		toolchainBuiltins.map((d) => d.functionName!).sort(),
+		[...builtinToolchainFunctions].sort(),
 	);
 	for (const d of active) {
 		const set = store.read((db) =>
@@ -113,8 +127,16 @@ test("without vectors every available toolchain is offered; with vectors the top
 		}),
 	);
 	expect(all.map((c) => c.id)).not.toContain("web.research.luna");
-	expect(all.length).toBe(
-		toolchainBuiltins.filter((d) => available(d.id)).length,
+	expect(all.map((c) => c.id).sort()).toEqual(
+		[...toolchainBuiltins.map((d) => d.id), "timers.manage"]
+			.filter(
+				(id) =>
+					available(id) &&
+					store
+						.read((db) => capabilities.toolchainsInTransaction(db))
+						.some((d) => d.id === id),
+			)
+			.sort(),
 	);
 	// Toolchain i's passages point in direction i; the query points at web.search.
 	const active = store.read((db) => capabilities.toolchainsInTransaction(db));

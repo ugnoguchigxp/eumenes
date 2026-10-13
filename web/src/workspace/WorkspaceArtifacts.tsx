@@ -29,16 +29,8 @@ import { useArtifactWorkspace } from "../domains/artifact";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import { ArtifactPanel } from "../components/domains/artifact/ArtifactPanel";
 import { MusicArtifact } from "../components/domains/music/MusicArtifact";
-import { TimerArtifact } from "../components/domains/timers/TimerArtifact";
-import { TimerSetupArtifact } from "../components/domains/timers/TimerSetupArtifact";
-import { TimerPicker } from "../components/domains/timers/TimerPicker";
-import {
-	timerSetupDefinition,
-	timerDefinition,
-	timerArtifactSource,
-	timerSetupSource,
-} from "../domains/timers/artifact-definition";
-import { useClockWorkspace } from "../domains/timers/clock-runtime";
+import { ToolchainArtifactHost } from "../domains/toolchain-artifacts";
+import { toolchainWebAdapters } from "./toolchain-adapters";
 
 export function useOpenSettings(
 	open: ReturnType<typeof useArtifactWorkspace>["open"],
@@ -128,22 +120,6 @@ export function useOpenPlaylist(
 		[open],
 	);
 }
-export function useOpenTimer(
-	open: ReturnType<typeof useArtifactWorkspace>["open"],
-) {
-	return useCallback(
-		(ref?: { timerId: string }, title = "タイマー") => {
-			open({
-				id: "timer",
-				kind: "openui",
-				title,
-				definition: ref ? timerDefinition(ref.timerId) : timerSetupDefinition(),
-			});
-		},
-		[open],
-	);
-}
-
 export function WorkspaceArtifacts({
 	client,
 	artifacts,
@@ -151,17 +127,7 @@ export function WorkspaceArtifacts({
 	client: EumenesClient;
 	artifacts: ReturnType<typeof useArtifactWorkspace>;
 }) {
-	const openTimer = useOpenTimer(artifacts.open);
 	const openSettings = useOpenSettings(artifacts.open);
-	const clockTab = artifacts.tabs.find((tab) => tab.id === "timer");
-	const clock = useClockWorkspace({
-		source: clockTab
-			? clockTab.kind === "openui"
-				? timerArtifactSource(clockTab.definition)
-				: "timer-legacy"
-			: null,
-		visible: artifacts.activeTabId === "timer",
-	});
 	return artifacts.tabs.length > 0 ? (
 		<ErrorBoundary label="artifact">
 			<ArtifactPanel
@@ -169,31 +135,24 @@ export function WorkspaceArtifacts({
 				activeTabId={artifacts.activeTabId}
 				onSelect={artifacts.select}
 				onClose={artifacts.close}
+				renderToolchain={(tab, visible) => (
+					<ToolchainArtifactHost
+						client={client}
+						adapters={toolchainWebAdapters}
+						artifactRevisionId={tab.artifactRevisionId}
+						artifactId={tab.id}
+						variantId={tab.variantId}
+						targetRef={tab.targetRef}
+						visible={visible}
+						onTargetChange={(ref) => artifacts.setTarget(tab.id, ref)}
+					/>
+				)}
 				renderOpenUI={(definition) => (
 					<>
-						{timerArtifactSource(definition) && (
-							<TimerPicker client={client} onSelect={openTimer} />
-						)}
 						{JSON.parse(definition).view === "drawing-workspace" ? (
 							<DrawingArtifact client={client} definition={definition} />
 						) : isSettingsArtifactDefinition(definition) ? (
 							<SettingsArtifact definition={definition} onOpen={openSettings} />
-						) : timerArtifactSource(definition) === timerSetupSource ? (
-							<TimerSetupArtifact
-								client={client}
-								definition={definition}
-								onStarted={openTimer}
-								clock={clock}
-							/>
-						) : timerArtifactSource(definition) ? (
-							<TimerArtifact
-								key={definition}
-								client={client}
-								timerId={timerArtifactSource(definition)!.slice(6)}
-								definition={definition}
-								onNewTimer={() => openTimer()}
-								clock={clock}
-							/>
 						) : isRecognitionDefinition(definition) ? (
 							<ObjectRecognitionArtifact
 								client={client}
@@ -212,18 +171,6 @@ export function WorkspaceArtifacts({
 								definition={definition}
 							/>
 						)}
-					</>
-				)}
-				renderTimer={(timerId) => (
-					<>
-						<TimerPicker client={client} onSelect={openTimer} />
-						<TimerArtifact
-							key={timerId}
-							client={client}
-							timerId={timerId}
-							onNewTimer={() => openTimer()}
-							clock={clock}
-						/>
 					</>
 				)}
 			/>

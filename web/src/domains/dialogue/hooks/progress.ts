@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { browserTiming } from "../../../performance";
+import { useEffect, useState, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { DialogueClient } from "../../../../../client/dialogue";
 import type { RunProgress } from "../../../../../api/domains/dialogue/contracts";
@@ -7,8 +8,26 @@ import { invalidateDialogueViews } from "./index";
 export function useRunProgress(client: DialogueClient, runId?: string) {
 	const [value, setValue] = useState<RunProgress | null>(null);
 	const cache = useQueryClient();
+	const timing = useRef<{ id: string; received?: number; committed?: boolean }>(
+		{ id: "" },
+	);
+	useEffect(() => {
+		if (
+			value?.runId === runId &&
+			value?.text &&
+			(value.status === "completed" ||
+				(value.status === "running" && !value.worldUsed)) &&
+			timing.current.id === runId &&
+			timing.current.received !== undefined &&
+			!timing.current.committed
+		) {
+			timing.current.committed = true;
+			browserTiming("text_committed", { runId }, timing.current.received);
+		}
+	}, [value, runId]);
 	useEffect(() => {
 		if (!runId) return;
+		timing.current = { id: runId };
 		const controller = new AbortController();
 		void (async () => {
 			let attempt = 0;
@@ -24,6 +43,16 @@ export function useRunProgress(client: DialogueClient, runId?: string) {
 							next.status === "cancelled"
 						)
 							terminal = true;
+						if (
+							next.runId === runId &&
+							next.text &&
+							(next.status === "completed" ||
+								(next.status === "running" && !next.worldUsed)) &&
+							timing.current.received === undefined
+						) {
+							timing.current.received = performance.now();
+							browserTiming("text_received", { runId });
+						}
 						setValue(next);
 					});
 					invalidateDialogueViews(cache, client.identity, "main");

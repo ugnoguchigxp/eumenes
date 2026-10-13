@@ -1,0 +1,16 @@
+{
+	"fixtureId": "empty-timers-lost-response",
+	"version": 1,
+	"description": "隔離したfixture backend。最初の書込みPOSTはserverへ届くが、ブラウザは応答を受け取れない（応答欠落）。",
+	"stack": "fixture",
+	"seedTimers": [],
+	"faults": [
+		{
+			"kind": "drop-response",
+			"method": "POST",
+			"pathPattern": "^/api/(timers|toolchain-actions)$",
+			"nth": 1
+		}
+	],
+	"expectedInitial": { "timers": 0 }
+}

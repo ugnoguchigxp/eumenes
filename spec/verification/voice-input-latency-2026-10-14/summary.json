@@ -1,0 +1,231 @@
+{
+  "tuple": {
+    "before": {
+      "n": 24,
+      "completed": 17,
+      "errors": 7,
+      "strictEvalPass": 11,
+      "medianMs": 4072.98,
+      "meanMs": 4461.12,
+      "promptTokensMedian": 972,
+      "completionTokensMedian": 80,
+      "prematureReadyCases": []
+    },
+    "after": {
+      "n": 24,
+      "completed": 23,
+      "errors": 1,
+      "strictEvalPass": 10,
+      "medianMs": 3296.11,
+      "meanMs": 4193.37,
+      "promptTokensMedian": 811,
+      "completionTokensMedian": 29,
+      "prematureReadyCases": [
+        {
+          "id": "fragment-1",
+          "repetition": 0
+        },
+        {
+          "id": "context-injection",
+          "repetition": 0
+        },
+        {
+          "id": "context-injection",
+          "repetition": 1
+        }
+      ]
+    },
+    "paired": {
+      "n": 16,
+      "medianSavedMs": 843.01,
+      "fasterPairs": 13,
+      "bootstrapMedianSaved95CI": [
+        575.97,
+        972.15
+      ]
+    }
+  },
+  "schema": {
+    "before": {
+      "n": 24,
+      "completed": 19,
+      "errors": 5,
+      "strictEvalPass": 9,
+      "medianMs": 4015.66,
+      "meanMs": 4365.65,
+      "promptTokensMedian": 971,
+      "completionTokensMedian": 79,
+      "prematureReadyCases": []
+    },
+    "after": {
+      "n": 24,
+      "completed": 23,
+      "errors": 1,
+      "strictEvalPass": 14,
+      "medianMs": 3948.52,
+      "meanMs": 4525.19,
+      "promptTokensMedian": 810,
+      "completionTokensMedian": 79,
+      "prematureReadyCases": []
+    },
+    "paired": {
+      "n": 18,
+      "medianSavedMs": 189.27,
+      "fasterPairs": 11,
+      "bootstrapMedianSaved95CI": [
+        -394.14,
+        475.08
+      ]
+    }
+  },
+  "groupedPilot": {
+    "before": {
+      "n": 10,
+      "completed": 8,
+      "errors": 2,
+      "strictEvalPass": 5,
+      "medianMs": 4567.44,
+      "meanMs": 5193.76,
+      "promptTokensMedian": 971.5,
+      "completionTokensMedian": 80.0,
+      "prematureReadyCases": []
+    },
+    "after": {
+      "n": 10,
+      "completed": 7,
+      "errors": 3,
+      "strictEvalPass": 5,
+      "medianMs": 4244.33,
+      "meanMs": 5560.34,
+      "promptTokensMedian": 842,
+      "completionTokensMedian": 55,
+      "prematureReadyCases": []
+    },
+    "paired": {
+      "n": 6,
+      "medianSavedMs": -1076.07,
+      "fasterPairs": 3,
+      "bootstrapMedianSaved95CI": [
+        -3519.5,
+        3735.24
+      ]
+    }
+  },
+  "grouped": {
+    "before": {
+      "n": 24,
+      "completed": 22,
+      "errors": 2,
+      "strictEvalPass": 14,
+      "medianMs": 4079.16,
+      "meanMs": 4138.3,
+      "promptTokensMedian": 972.0,
+      "completionTokensMedian": 79.0,
+      "prematureReadyCases": []
+    },
+    "after": {
+      "n": 24,
+      "completed": 22,
+      "errors": 2,
+      "strictEvalPass": 14,
+      "medianMs": 3689.18,
+      "meanMs": 4055.57,
+      "promptTokensMedian": 842.5,
+      "completionTokensMedian": 55.0,
+      "prematureReadyCases": [
+        {
+          "id": "context-injection",
+          "repetition": 0
+        },
+        {
+          "id": "context-injection",
+          "repetition": 1
+        }
+      ]
+    },
+    "paired": {
+      "n": 20,
+      "medianSavedMs": 318.56,
+      "fasterPairs": 16,
+      "bootstrapMedianSaved95CI": [
+        149.04,
+        496.69
+      ]
+    }
+  },
+  "trustPilot": {
+    "before": {
+      "n": 12,
+      "completed": 8,
+      "errors": 4,
+      "strictEvalPass": 5,
+      "medianMs": 4408.55,
+      "meanMs": 4361.29,
+      "promptTokensMedian": 976.0,
+      "completionTokensMedian": 79.0,
+      "prematureReadyCases": []
+    },
+    "after": {
+      "n": 12,
+      "completed": 11,
+      "errors": 1,
+      "strictEvalPass": 7,
+      "medianMs": 3964.48,
+      "meanMs": 4465.55,
+      "promptTokensMedian": 910,
+      "completionTokensMedian": 54,
+      "prematureReadyCases": []
+    },
+    "paired": {
+      "n": 7,
+      "medianSavedMs": 362.48,
+      "fasterPairs": 6,
+      "bootstrapMedianSaved95CI": [
+        39.9,
+        481.46
+      ]
+    }
+  },
+  "trustFinal": {
+    "before": {
+      "n": 32,
+      "completed": 21,
+      "errors": 11,
+      "strictEvalPass": 10,
+      "medianMs": 4441.77,
+      "meanMs": 4935.52,
+      "promptTokensMedian": 976,
+      "completionTokensMedian": 79,
+      "prematureReadyCases": []
+    },
+    "after": {
+      "n": 32,
+      "completed": 25,
+      "errors": 7,
+      "strictEvalPass": 18,
+      "medianMs": 4072.43,
+      "meanMs": 4623.45,
+      "promptTokensMedian": 910,
+      "completionTokensMedian": 54,
+      "prematureReadyCases": [
+        {
+          "id": "ambiguous",
+          "repetition": 0
+        },
+        {
+          "id": "context-injection",
+          "repetition": 0
+        }
+      ]
+    },
+    "paired": {
+      "n": 14,
+      "medianSavedMs": 336.2,
+      "fasterPairs": 10,
+      "bootstrapMedianSaved95CI": [
+        -493.37,
+        887.13
+      ]
+    }
+  }
+}

@@ -1,0 +1,24 @@
+{
+	"caseId": "timer-invalid-input-01",
+	"version": 2,
+	"goal": "画面から、まず0秒のタイマーを作ろうとして、作れない理由が画面で分かることを確認してください。そのあと1分のタイマーを作ってください。",
+	"initialStateRef": "fixture:empty-timers@1",
+	"allowedSurface": "isolated-eumenes-artifacts",
+	"criteriaRef": "criteria:timer-invalid-input-01@1",
+	"budget": {
+		"wallSeconds": 300,
+		"maxActions": 40,
+		"maxModelCalls": 30,
+		"maxCostUSD": 2
+	},
+	"evidence": [
+		"screenshots",
+		"observations",
+		"actions",
+		"readonly-host-state",
+		"receipt-refs"
+	],
+	"requires": {
+		"productLlm": false
+	}
+}

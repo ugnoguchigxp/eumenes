@@ -1,0 +1,241 @@
+import { z } from "zod";
+import { artifactDefinitionV1 } from "../api/domains/capabilities/contracts";
+import {
+	interactionAnswer,
+	interactionCancel,
+	interactionQuestion,
+	interactionStatuses,
+	type InteractionAnswer,
+	type InteractionView,
+} from "../api/domains/dialogue/contracts";
+import {
+	toolchainActionEventV1,
+	type ActionRequestView,
+	type ExecutionResultV1,
+	type ToolchainActionEventV1,
+} from "../api/domains/tool-runtime/contracts";
+import type { Transport } from "./transport";
+import { json } from "./transport";
+
+const iso = z.iso.datetime({ offset: true });
+const receiptRef = z.strictObject({
+	owner: z.string(),
+	operationId: z.string(),
+	digest: z.string(),
+});
+const executionResult = z.looseObject({
+	version: z.literal(1),
+	executionId: z.string(),
+	artifactRevisionId: z.string(),
+	outcome: z.enum([
+		"completed",
+		"needs_input",
+		"failed",
+		"cancelled",
+		"expired",
+		"indeterminate",
+	]),
+	receiptRef: receiptRef.optional(),
+	resultRefs: z.array(z.looseObject({ owner: z.string(), id: z.string() })),
+	artifactRefs: z.array(z.looseObject({ artifactRevisionId: z.string() })),
+	error: z
+		.strictObject({
+			code: z.string(),
+			retry: z.enum(["never", "reconcile", "user_resubmit"]),
+		})
+		.optional(),
+	receipt: z.unknown().optional(),
+});
+const fieldErrors = z.array(
+	z.strictObject({ field: z.string(), message: z.string() }),
+);
+const actionRequestView = z.looseObject({
+	eventId: z.uuid(),
+	status: z.enum(["accepted", "rejected", "pending", "indeterminate"]),
+	errorCode: z.string().optional(),
+	fieldErrors: fieldErrors.optional(),
+	result: executionResult.optional(),
+	createdAt: iso,
+	settledAt: iso.optional(),
+});
+/** The common envelope wraps the domain receipt; the receipt body is the domain's own contract. */
+function asView(value: z.infer<typeof actionRequestView>): ActionRequestView {
+	return value as unknown as ActionRequestView;
+}
+export type { ExecutionResultV1 };
+
+/** A list answer is a bare array or `{ items }`; both carry the same rows. */
+/** A list response `{ <key>: item[] }` as the backend sends it. */
+const listOf = <K extends string, T extends z.ZodType>(key: K, item: T) =>
+	z
+		.looseObject({ [key]: z.array(item) } as Record<K, z.ZodArray<T>>)
+		.transform((value) => value[key] as z.infer<T>[]);
+
+const launcherEntry = z.looseObject({
+	toolchainId: z.string(),
+	toolchainRevisionId: z.string(),
+	artifactRevisionId: z.string(),
+	title: z.string().min(1),
+	adapterRef: z.string(),
+});
+export type ToolchainArtifactEntry = z.infer<typeof launcherEntry>;
+
+const artifactResponse = z.looseObject({
+	artifact: artifactDefinitionV1,
+	artifactRevisionId: z.string(),
+	digest: z.string(),
+	scopeRef: z.string(),
+});
+const sourceResponse = z.looseObject({
+	revision: z.number().int().min(0),
+	data: z.unknown(),
+});
+export type ToolchainArtifactSource = z.infer<typeof sourceResponse>;
+
+const interactionView = z.looseObject({
+	id: z.string(),
+	conversationId: z.string(),
+	status: z.enum(interactionStatuses),
+	revision: z.number().int().min(0),
+	chainRevisionId: z.string(),
+	artifactRevisionId: z.string().nullable(),
+	question: interactionQuestion.nullable(),
+	questionCount: z.number().int().min(0),
+	receiptRef: receiptRef.nullable(),
+	expiresAt: iso,
+	createdAt: iso,
+	updatedAt: iso,
+});
+const answerResult = z.looseObject({
+	interaction: interactionView,
+	runId: z.string(),
+	replay: z.boolean(),
+});
+
+/** The submit answer: 200 is settled, 202 is accepted for later settlement. */
+export type SubmittedAction = { httpStatus: number; view: ActionRequestView };
+
+export function toolchainActionsClient(transport: Transport) {
+	return {
+		/** `POST /api/toolchain-actions`; a non-2xx answer throws ApiError (message = error code). */
+		submitToolchainAction: async (
+			event: ToolchainActionEventV1,
+			signal?: AbortSignal,
+		): Promise<SubmittedAction> => {
+			const response = await transport.call("/api/toolchain-actions", {
+				...json(toolchainActionEventV1.parse(event)),
+				signal,
+			});
+			return {
+				httpStatus: response.status,
+				view: asView(actionRequestView.parse(await response.json())),
+			};
+		},
+		toolchainAction: async (eventId: string, signal?: AbortSignal) =>
+			asView(
+				actionRequestView.parse(
+					await (
+						await transport.call(
+							`/api/toolchain-actions/${encodeURIComponent(eventId)}`,
+							{ signal },
+						)
+					).json(),
+				),
+			),
+		unsettledToolchainActions: async (signal?: AbortSignal) =>
+			listOf("requests", actionRequestView)
+				.parse(
+					await (
+						await transport.call("/api/toolchain-actions?status=unsettled", {
+							signal,
+						})
+					).json(),
+				)
+				.map(asView),
+		toolchainArtifacts: async (signal?: AbortSignal) =>
+			listOf("artifacts", launcherEntry).parse(
+				await (
+					await transport.call("/api/toolchain-artifacts", { signal })
+				).json(),
+			),
+		toolchainArtifact: async (
+			artifactRevisionId: string,
+			signal?: AbortSignal,
+		) =>
+			artifactResponse.parse(
+				await (
+					await transport.call(
+						`/api/toolchain-artifacts/${encodeURIComponent(artifactRevisionId)}`,
+						{ signal },
+					)
+				).json(),
+			),
+		toolchainArtifactSource: async (
+			artifactRevisionId: string,
+			source: string,
+			targetRef?: string,
+			signal?: AbortSignal,
+		) =>
+			sourceResponse.parse(
+				await (
+					await transport.call(
+						`/api/toolchain-artifacts/${encodeURIComponent(artifactRevisionId)}/sources/${encodeURIComponent(source)}${
+							targetRef ? `?target=${encodeURIComponent(targetRef)}` : ""
+						}`,
+						{ signal },
+					)
+				).json(),
+			),
+		toolchainInteractions: async (
+			query: { conversationId: string; status?: string },
+			signal?: AbortSignal,
+		) => {
+			const params = new URLSearchParams({
+				conversationId: query.conversationId,
+			});
+			if (query.status) params.set("status", query.status);
+			return z.array(interactionView).parse(
+				await (
+					await transport.call(`/api/toolchain-interactions?${params}`, {
+						signal,
+					})
+				).json(),
+			) as InteractionView[];
+		},
+		toolchainInteraction: async (id: string, signal?: AbortSignal) =>
+			interactionView.parse(
+				await (
+					await transport.call(
+						`/api/toolchain-interactions/${encodeURIComponent(id)}`,
+						{ signal },
+					)
+				).json(),
+			) as InteractionView,
+		answerToolchainInteraction: async (
+			id: string,
+			input: InteractionAnswer,
+			signal?: AbortSignal,
+		) =>
+			answerResult.parse(
+				await (
+					await transport.call(
+						`/api/toolchain-interactions/${encodeURIComponent(id)}/answers`,
+						{ ...json(interactionAnswer.parse(input)), signal },
+					)
+				).json(),
+			) as { interaction: InteractionView; runId: string; replay: boolean },
+		cancelToolchainInteraction: async (
+			id: string,
+			input: z.infer<typeof interactionCancel>,
+			signal?: AbortSignal,
+		) =>
+			interactionView.parse(
+				await (
+					await transport.call(
+						`/api/toolchain-interactions/${encodeURIComponent(id)}/cancel`,
+						{ ...json(interactionCancel.parse(input)), signal },
+					)
+				).json(),
+			) as InteractionView,
+	};
+}

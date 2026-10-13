@@ -1,3 +1,8 @@
+import {
+	browserTiming,
+	timedAudioDecode,
+	type TimingIdentity,
+} from "../../../performance";
 export type AudioState = {
 	phase: "idle" | "listening" | "playing" | "error";
 	error?: string;
@@ -597,6 +602,7 @@ export function createAudioController(
 				shouldPlay?: () => boolean;
 				volume?: number;
 				onStarted?: () => void;
+				timing?: TimingIdentity;
 				/** Alarm tones never become microphone input, including their output tail. */
 				suppressInput?: boolean;
 				/** Called when this playback is cut off by another one or by stopPlayback(). */
@@ -614,9 +620,7 @@ export function createAudioController(
 			if (!context || disposed) throw new Error("audio_not_started");
 			this.stopPlayback();
 			const epoch = playbackEpoch;
-			const buffer = await context.decodeAudioData(
-				new Uint8Array(bytes).buffer,
-			);
+			const buffer = await timedAudioDecode(context, bytes, playOptions.timing);
 			if (
 				disposed ||
 				epoch !== playbackEpoch ||
@@ -655,6 +659,7 @@ export function createAudioController(
 				}
 			};
 			next.start();
+			browserTiming("playback_scheduled", playOptions.timing ?? {});
 			playOptions.onStarted?.();
 			emit("playing");
 		},

@@ -5,6 +5,8 @@ import { createDotsDialogue } from "./dots-dialogue";
 import { dotsFixture } from "./dots-fixture";
 import { createToolchainHistory } from "../domains/toolchain-history";
 import { createToolchainRouting } from "./toolchain-routing";
+import { createAdapterRegistry } from "../domains/tool-runtime";
+import { createSchemaProvider } from "./toolchain-adapters";
 const clean: Array<() => Promise<void>> = [];
 afterEach(async () => {
 	for (const f of clean.splice(0).reverse()) await f();
@@ -92,6 +94,8 @@ test("conversation hands the request to the delegation toolchain, whose sub-agen
 			f.capabilities,
 			createToolchainHistory(f.store),
 			async () => undefined,
+			createAdapterRegistry([]),
+			createSchemaProvider(f.capabilities),
 		),
 	});
 	clean.push(dialogue.close);

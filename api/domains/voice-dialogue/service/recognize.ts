@@ -1,3 +1,4 @@
+import { measureStage } from "../../../infrastructure/performance";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { InferencePort, Receipt } from "../../inference";
 import type { VoiceTurn } from "../contracts";
@@ -34,7 +35,12 @@ export async function recognizeInput({
 	);
 	const asrReceipt =
 		asrId && larm.executeRequest
-			? await larm.executeRequest(asrId, wav, controller.signal)
+			? await measureStage(
+					"voice-dialogue",
+					"asr",
+					() => larm.executeRequest!(asrId, wav, controller.signal),
+					{ utteranceId: turn.utteranceId },
+				)
 			: undefined;
 	const text = asrReceipt
 		? (asrReceipt.value as string)
@@ -64,10 +70,16 @@ export async function recognizeInput({
 	const signal = AbortSignal.any([controller.signal, timeout.signal]);
 	let languageReceipt: Receipt;
 	try {
-		languageReceipt = await larm.executeControl(
-			languageId,
-			transcriptLanguageMessages(text, context?.(text)),
-			signal,
+		languageReceipt = await measureStage(
+			"voice-dialogue",
+			"input_control",
+			() =>
+				larm.executeControl!(
+					languageId,
+					transcriptLanguageMessages(text, context?.(text)),
+					signal,
+				),
+			{ utteranceId: turn.utteranceId },
 		);
 		signal.throwIfAborted();
 	} catch {

@@ -1,0 +1,9 @@
+{
+	"fixtureId": "one-active-timer",
+	"version": 1,
+	"description": "隔離したfixture backend。ラベル「お茶」の900秒timerが動作中で一件ある（hostが開始前に作成）。",
+	"stack": "fixture",
+	"seedTimers": [{ "label": "お茶", "durationSeconds": 900 }],
+	"faults": [],
+	"expectedInitial": { "timers": 1 }
+}

@@ -9,6 +9,7 @@ import {
 	operation,
 	operationRejection,
 	type ConversationOperation,
+	type OpenQuestion,
 } from "./conversation-tools";
 
 const log = getLogger("dialogue");
@@ -26,6 +27,8 @@ export async function generateConversation(input: {
 	tools?: NativeTool[];
 	/** The toolchains behind `tools`; a call resolves to exactly one of them. */
 	cards?: ToolchainCard[];
+	/** Open questions a call may answer by `questionRef` (offered to the model with `tools`). */
+	openQuestions?: OpenQuestion[];
 	repair: () => void;
 }): Promise<{
 	text: string;
@@ -86,7 +89,12 @@ export async function generateConversation(input: {
 			const result = {
 				text: "",
 				receipt,
-				operation: operation(receipt.toolCalls, input.tools, input.cards ?? []),
+				operation: operation(
+					receipt.toolCalls,
+					input.tools,
+					input.cards ?? [],
+					input.openQuestions ?? [],
+				),
 				repaired: attempt > 0,
 			};
 			// Some models announce the call first ("調べますね"). A valid call wins; the

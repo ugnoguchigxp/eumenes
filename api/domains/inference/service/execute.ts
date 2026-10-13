@@ -1,3 +1,4 @@
+import { measureStage } from "../../../infrastructure/performance";
 import type { Database } from "bun:sqlite";
 import type { AttitudeDataset, VoiceAdoption } from "../../attitude-dataset";
 import { getLogger } from "../../../infrastructure/logger";
@@ -546,16 +547,26 @@ async function attempt(r: Request, source: Source): Promise<Receipt> {
 				attemptSignal,
 				connection,
 			});
-		const value = await fenced(
-			startWork(r, {
-				source,
-				sent,
-				attemptSignal,
-				attemptId,
-				callOptions,
-				delta,
-			}),
-			attemptSignal,
+		log.info("inference.prepared", {
+			...logFields,
+			durationMs: performance.now() - started,
+		});
+		const value = await measureStage(
+			"inference",
+			"provider",
+			() =>
+				fenced(
+					startWork(r, {
+						source,
+						sent,
+						attemptSignal,
+						attemptId,
+						callOptions,
+						delta,
+					}),
+					attemptSignal,
+				),
+			logFields,
 		);
 		if (
 			row.purpose === "llm" &&
@@ -563,7 +574,12 @@ async function attempt(r: Request, source: Source): Promise<Receipt> {
 			!r.toolCalls?.length &&
 			typeof value === "string"
 		)
-			delivery = await chooseLlmDelivery(r, decide, value);
+			delivery = await measureStage(
+				"inference",
+				"answer_delivery",
+				() => chooseLlmDelivery(r, decide, value),
+				logFields,
+			);
 		if (
 			attemptSignal.aborted ||
 			!env.store.read((db) => env.allowed(db, row, connection))

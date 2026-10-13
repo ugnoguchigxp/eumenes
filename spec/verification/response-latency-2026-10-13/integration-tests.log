@@ -1,0 +1,77 @@
+bun test v1.4.3 (c6da4a4d3)
+
+api/infrastructure/performance.test.ts:
+(pass) timings preserve nested request identity across concurrent work and never record values [12.38ms]
+(pass) failure is timed once and the original error survives a broken logging sink [0.82ms]
+
+api/infrastructure/logger.test.ts:
+(pass) JSONL records isolate concurrent context and exclude raw payloads and error messages [2.83ms]
+(pass) file output rotates with bounded retention and private permissions [7.39ms]
+{"time":"2026-10-13T15:09:03.098Z","level":"error","event":"logging.file_unavailable","component":"logger","service":"eumenes","pid":23395,"bootId":"e938e3d4-0bef-4e4a-b672-b30656aee225","schemaVersion":1}
+(pass) unwritable file leaves structured stderr destination working [0.81ms]
+(pass) HTTP response IDs correlate auth failures and errors without URL or body secrets [4.01ms]
+(pass) log reader searches backups, matches exact IDs and skips malformed and partial records [20.14ms]
+(pass) following logs survives rotation without duplicates and retries an incomplete final line [4038.99ms]
+(pass) file output resumes after a transient failure with one notice per outage [5.26ms]
+
+api/domains/dialogue/test/memory-recall.test.ts:
+(pass) an exchange outside the verbatim window is recalled by this turn's vector, before the policy and the input (without stored memory) [210.84ms]
+(pass) an exchange outside the verbatim window is recalled by this turn's vector, before the policy and the input (with stored memory) [214.97ms]
+(pass) a vector of another space, no vector for the request, or memory off recalls nothing [242.09ms]
+(pass) a recalled message whose text changes during the generation expires the run [207.02ms]
+(pass) the prefetch and this turn's recall never carry the same message, and a changed prefetch message expires the run [216.66ms]
+(pass) the recall starts before the oldest exchange actually sent: runs the size limit cut from the window are searched too [186.07ms]
+(pass) a prefetch standing on exchanges already sent verbatim is left out for the turn, and its messages are not checked [195.28ms]
+(pass) quiet window: no recall means no check, no receipt and a streamed body; a recall means a check, a receipt and a held body [852.64ms]
+(pass) a toolchain operation is checked against the recalled messages even when the window is quiet [223.66ms]
+(pass) World is told to leave the whole prefetch-and-recall budget, not only the current prefetch [32.06ms]
+
+api/domains/dialogue/test/research-hold.test.ts:
+(pass) a failed research answer streams no partial text and its final text carries no ungranted URL [16.82ms]
+
+api/domains/dialogue/test/world-context.test.ts:
+(pass) native delegation rejects correction changed after generation without starting a child [97.26ms]
+(pass) native delegation rejects policy changed after generation without starting a child [88.00ms]
+(pass) native delegation rejects receipt changed after generation without starting a child [90.33ms]
+(pass) valid path: one answer and ONE receipt tying slice digest, versions, package, run, attempt and provider [90.61ms]
+(pass) prompt injection: the claim text reaches the model only as escaped data inside the delimiters [89.03ms]
+(pass) A40: correction injected after_prepare leaves no answer and no usage record [141.61ms]
+(pass) A40: refutation injected after_prepare leaves no answer and no usage record [144.60ms]
+(pass) A40: forget injected after_prepare leaves no answer and no usage record [146.13ms]
+(pass) A40: policy injected after_prepare leaves no answer and no usage record [145.61ms]
+(pass) A40: goal injected after_prepare leaves no answer and no usage record [144.05ms]
+(pass) A40: attempt injected after_prepare leaves no answer and no usage record [289.49ms]
+(pass) A40: cancel injected after_prepare leaves no answer and no usage record [157.53ms]
+(pass) A40: correction injected before_send leaves no answer and no usage record [147.64ms]
+(pass) A40: refutation injected before_send leaves no answer and no usage record [146.09ms]
+(pass) A40: forget injected before_send leaves no answer and no usage record [148.53ms]
+(pass) A40: policy injected before_send leaves no answer and no usage record [147.77ms]
+(pass) A40: goal injected before_send leaves no answer and no usage record [149.38ms]
+(pass) A40: attempt injected before_send leaves no answer and no usage record [288.69ms]
+(pass) A40: cancel injected before_send leaves no answer and no usage record [146.29ms]
+(pass) A40: correction injected during_generation leaves no answer and no usage record [139.71ms]
+(pass) A40: refutation injected during_generation leaves no answer and no usage record [143.30ms]
+(pass) A40: forget injected during_generation leaves no answer and no usage record [142.30ms]
+(pass) A40: policy injected during_generation leaves no answer and no usage record [142.15ms]
+(pass) A40: goal injected during_generation leaves no answer and no usage record [141.57ms]
+(pass) A40: attempt injected during_generation leaves no answer and no usage record [297.24ms]
+(pass) A40: cancel injected during_generation leaves no answer and no usage record [154.16ms]
+(pass) A40: correction injected before_settle leaves no answer and no usage record [143.08ms]
+(pass) A40: refutation injected before_settle leaves no answer and no usage record [143.95ms]
+(pass) A40: forget injected before_settle leaves no answer and no usage record [143.56ms]
+(pass) A40: policy injected before_settle leaves no answer and no usage record [143.50ms]
+(pass) A40: goal injected before_settle leaves no answer and no usage record [142.01ms]
+(pass) A40: attempt injected before_settle leaves no answer and no usage record [298.92ms]
+(pass) A40: cancel injected before_settle leaves no answer and no usage record [153.35ms]
+(pass) cancel is not recall: a late result after cancel is rejected, but what was already sent stays sent [242.46ms]
+(pass) a refused inference receipt adopts neither the answer nor a usage record [92.43ms]
+(pass) blocked is never turned into a World-less success: no budget ends the run with a reason [95.30ms]
+(pass) World OFF is unchanged: no World message, no usage, no registration; the answer streams as before [179.27ms]
+(pass) Memory and World are read in one prepare transaction and share one budget; both receipts are stored with the answer [108.65ms]
+(pass) the prompt order with every layer present: persona, long-term, short-term, history, notice, World, input [118.68ms]
+(pass) a later forget in the Scope removes the usage receipts of answers that stood on it [93.23ms]
+
+ 60 pass
+ 0 fail
+ 453 expect() calls
+Ran 60 tests across 5 files. [13.23s]

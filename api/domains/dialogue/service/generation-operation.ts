@@ -7,6 +7,43 @@ import { COMMAND_KIND } from "./context";
 import { transition, linkAnswer } from "../repository";
 import { delegateConversation } from "./delegate-conversation";
 import { operationRejection } from "./operation-authority";
+
+/** Accept the natural-language answer atomically with the rest of the run's settlement. */
+function acceptAnswer(
+	deps: DialogueDeps,
+	tx: Database,
+	run: Run,
+	chosen: ConversationOperation,
+	bound: boolean,
+): { ok: true; interactionId: string } | { ok: false; code: string } {
+	if (!bound || !deps.interactions || !chosen.questionRef)
+		return { ok: false, code: "question_not_open" };
+	tx.exec("SAVEPOINT dialogue_nl_answer");
+	try {
+		const accepted = deps.interactions.acceptNaturalLanguageInTransaction(
+			tx,
+			run,
+			{
+				questionRef: chosen.questionRef,
+				functionName: chosen.functionName,
+				revisionId: chosen.revisionId,
+				request: chosen.request,
+			},
+		);
+		tx.exec("RELEASE dialogue_nl_answer");
+		return accepted;
+	} catch (e) {
+		tx.exec("ROLLBACK TO dialogue_nl_answer");
+		tx.exec("RELEASE dialogue_nl_answer");
+		return {
+			ok: false,
+			code:
+				e instanceof Error && /^[a-z_]+$/.test(e.message)
+					? e.message
+					: "answer_failed",
+		};
+	}
+}
 export function settleConversationOperation(
 	deps: DialogueDeps,
 	partials: Map<string, string>,
@@ -129,12 +166,31 @@ export function settleConversationOperation(
 		});
 		linkAnswer(tx, run.id, saved.jobId);
 	} else if (runtime.execution === "command") {
+		// The utterance may answer a question this toolchain's sub-agent asked earlier: the host
+		// checks the target and accepts it once, then this run resumes that interaction.
+		let interactionId: string | undefined;
+		if (chosen.questionRef) {
+			const answered = acceptAnswer(deps, tx, run, chosen, !!runtime.binding);
+			if (!answered.ok) {
+				transition(tx, run.id, run.revision, "failed", clock(), answered.code);
+				deps.toolchains?.settleSelectionInTransaction(tx, run.id, {
+					outcome: "failed",
+					code: answered.code,
+				});
+				return { status: "failed", errorCode: answered.code };
+			}
+			interactionId = answered.interactionId;
+		}
 		// A command sub-agent turns the request into one typed operation of the package.
 		const { job } = queue.enqueueInTransaction(tx, {
 			scope: "dialogue",
 			kind: COMMAND_KIND,
 			dedupeKey: `toolchain-command:${run.id}`,
-			payload: { runId: run.id, toolchainRevisionId: chosen.revisionId },
+			payload: {
+				runId: run.id,
+				toolchainRevisionId: chosen.revisionId,
+				...(interactionId ? { interactionId } : {}),
+			},
 			subjectRef: run.id,
 			lane: "interactive",
 			resourceKey: "inference.llm",

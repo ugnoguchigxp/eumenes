@@ -6,8 +6,7 @@ import { join } from "node:path";
 import { openStore } from "../../../infrastructure/sqlite";
 import {
 	createCapabilities,
-	learnedMigration,
-	migration as capMigration,
+	migrations as capabilityMigrations,
 	type Definition,
 } from "../../capabilities";
 import { createQueue, migration as queueMigration } from "../../queue";
@@ -17,11 +16,15 @@ import {
 	routeGrantMigration,
 	supersedeMigration,
 	readMetadataMigration,
+	actionMigration,
+	actionAdapterMigration,
+	type ActionAdapter,
 	type AdapterOperation,
 	type ToolAdapter,
 } from "../../tool-runtime";
 import {
 	acquisitionMigration,
+	actionResultMigration,
 	requirementsMigration,
 	controlRepairMigration,
 	createAgentRuntime,
@@ -63,22 +66,32 @@ const learnedPair = (): Definition[] => [
 		toolRevisionIds: ["tool:web.read@1"],
 	},
 ];
-export async function harness(now = Date.now, luna = false) {
+export async function harness(
+	now = Date.now,
+	luna = false,
+	/** A registered domain adapter for bound operations; also seeds the package that uses one. */
+	actions?: ActionAdapter,
+) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-route-"));
 	const store = openStore(join(dir, "db"), [
-		capMigration,
-		learnedMigration,
+		...capabilityMigrations,
 		queueMigration,
 		toolMigration,
 		routeGrantMigration,
 		supersedeMigration,
 		readMetadataMigration,
+		actionMigration,
+		actionAdapterMigration,
 		agentMigration,
 		acquisitionMigration,
+		actionResultMigration,
 		requirementsMigration,
 		controlRepairMigration,
 	]);
-	const caps = createCapabilities(store, new Set(["web", "history"]));
+	const caps = createCapabilities(
+		store,
+		new Set(actions ? ["web", "history", "timer"] : ["web", "history"]),
+	);
 	await caps.seed();
 	await store.write((db) => {
 		for (const d of learnedPair()) caps.registerLearnedInTransaction(db, d);
@@ -147,7 +160,7 @@ export async function harness(now = Date.now, luna = false) {
 		get: (id) => results.get(id) ?? { state: "pending" },
 		cancelInTransaction: () => [],
 	};
-	const tools = createToolRuntime(store, caps, queue, adapter, now);
+	const tools = createToolRuntime(store, caps, queue, adapter, now, actions);
 	const captures: string[] = [];
 	const engines: Array<string | undefined> = [];
 	const inference = {

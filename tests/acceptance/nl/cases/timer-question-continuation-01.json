@@ -1,0 +1,24 @@
+{
+	"caseId": "timer-question-continuation-01",
+	"version": 1,
+	"goal": "チャットで「タイマーを開始して」とだけ頼んでください。時間を聞かれたら3分と答えます。質問が出ている間に画面を再読み込みしても、そのあと答えれば続けられることを確認してください。",
+	"initialStateRef": "fixture:empty-timers-product@1",
+	"allowedSurface": "isolated-eumenes-browser",
+	"criteriaRef": "criteria:timer-question-continuation-01@1",
+	"budget": {
+		"wallSeconds": 420,
+		"maxActions": 50,
+		"maxModelCalls": 40,
+		"maxCostUSD": 2
+	},
+	"evidence": [
+		"screenshots",
+		"observations",
+		"actions",
+		"readonly-host-state",
+		"receipt-refs"
+	],
+	"requires": {
+		"productLlm": true
+	}
+}

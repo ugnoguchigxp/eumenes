@@ -1,0 +1,38 @@
+{
+  "stopReason": "completed",
+  "models": [
+    "ornith-1.5-strix-lean"
+  ],
+  "variants": [
+    {
+      "variant": "baseline",
+      "attempts": 3,
+      "responses": 3,
+      "failures": 0,
+      "strictPass": 1,
+      "falseAccept": [],
+      "falseReject": [],
+      "acceptedWrongRelation": [],
+      "medianMs": 4310.832375,
+      "p90Ms": 4774.0624414,
+      "firstDeltaMs": null,
+      "firstDeltaToCompleteMs": null,
+      "promptTokens": 970,
+      "completionTokens": 80,
+      "cachedTokens": 0,
+      "providerReadyMs": 223.27787499999977,
+      "tokenCountMs": 88.36362499999996,
+      "providerHeadersMs": 4050.448125000001,
+      "providerTtftMs": null,
+      "providerPromptMs": 1107.484,
+      "providerDecodeMs": 1175.928,
+      "providerPromptTokens": 970,
+      "providerCachedTokens": 0,
+      "providerOutputTokens": 80,
+      "pairs": 0,
+      "pairedMedianSavingMs": null,
+      "pairedMedianBootstrap95CI": null,
+      "fasterPairs": 0
+    }
+  ]
+}

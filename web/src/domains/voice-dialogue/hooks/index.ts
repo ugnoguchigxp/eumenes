@@ -1,3 +1,4 @@
+import { chunkTiming, timedVoiceAudio } from "./audio-timing";
 import { requestPreview, type RecognitionCandidate } from "./preview";
 import { commitIdleInput } from "./input-commit";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -150,9 +151,9 @@ export function useVoiceDialogue(
 				chunkQueue.tail = chunkQueue.tail
 					.then(async () => {
 						if (!canPlay() || !queued()) return;
-						const bytes = await client.voiceAudio(
-							value.utteranceId,
-							chunk.index,
+						const bytes = await timedVoiceAudio(
+							client,
+							chunkTiming(value.utteranceId, chunk.index),
 						);
 						if (!canPlay() || !queued()) return;
 						await new Promise<void>((resolve, reject) => {
@@ -181,6 +182,7 @@ export function useVoiceDialogue(
 							void controller.current
 								?.play(bytes, ended, {
 									waitForPrevious: true,
+									timing: chunkTiming(value.utteranceId, chunk.index),
 									volume: options.current?.outputVolume,
 									shouldPlay: () => canPlay() && queued(),
 									onStarted: () => {

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { hash, timerResultContext } from "../contracts";
+import { hash, timerResultContext, validators } from "../contracts";
 import { zSchema } from "../service/schema";
 
 test("timer UI pausing keeps the deployed version 1 input schemas and accepts paused result state", () => {
@@ -30,4 +30,49 @@ test("timer UI pausing keeps the deployed version 1 input schemas and accepts pa
 		errorCode: null,
 	});
 	expect(context.items[0]?.state).toBe("paused");
+});
+
+test("the bound-command inputs accept exactly the shapes the UI and the questions send", () => {
+	expect(
+		validators.timerHms.safeParse({ hours: "0", minutes: "03", seconds: "00" })
+			.success,
+	).toBe(true);
+	for (const bad of [
+		{ hours: 0, minutes: "3", seconds: "0" },
+		{ hours: "1.5", minutes: "3", seconds: "0" },
+		{ hours: "123456", minutes: "3", seconds: "0" },
+		{ hours: "", minutes: "3", seconds: "0" },
+		{ hours: "0", minutes: "3" },
+		{ hours: "0", minutes: "3", seconds: "0", label: "x" },
+	])
+		expect(validators.timerHms.safeParse(bad).success).toBe(false);
+	expect(
+		validators.timerDurationAnswer.safeParse({ durationSeconds: 180 }).success,
+	).toBe(true);
+	expect(
+		validators.timerDurationAnswer.safeParse({ durationSeconds: 0 }).success,
+	).toBe(false);
+	expect(
+		validators.timerDurationAnswer.safeParse({ durationSeconds: 86401 })
+			.success,
+	).toBe(false);
+	expect(
+		validators.timerDurationAnswer.safeParse({ durationSeconds: 1.5 }).success,
+	).toBe(false);
+	expect(
+		validators.timerTargetAnswer.safeParse({ timerId: crypto.randomUUID() })
+			.success,
+	).toBe(true);
+	expect(validators.timerTargetAnswer.safeParse({ timerId: "x" }).success).toBe(
+		false,
+	);
+	expect(validators.answerText.safeParse({ text: "  3分  " }).data).toEqual({
+		text: "3分",
+	});
+	expect(validators.answerText.safeParse({ text: " " }).success).toBe(false);
+	expect(
+		validators.answerText.safeParse({ text: "a".repeat(501) }).success,
+	).toBe(false);
+	expect(validators.emptyInput.safeParse({}).success).toBe(true);
+	expect(validators.emptyInput.safeParse({ a: 1 }).success).toBe(false);
 });

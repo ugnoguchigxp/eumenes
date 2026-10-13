@@ -1,0 +1,70 @@
+{
+  "stopReason": "completed",
+  "models": [
+    "ornith-1.5-strix-lean"
+  ],
+  "variants": [
+    {
+      "variant": "stream",
+      "attempts": 16,
+      "responses": 16,
+      "failures": 0,
+      "strictPass": 11,
+      "falseAccept": [],
+      "falseReject": [],
+      "acceptedWrongRelation": [
+        "fragment-3",
+        "topic-switch"
+      ],
+      "medianMs": 4283.2435829999995,
+      "p90Ms": 4589.069125000002,
+      "firstDeltaMs": 3129.662791499999,
+      "firstDeltaToCompleteMs": 1149.0986040000025,
+      "promptTokens": null,
+      "completionTokens": null,
+      "cachedTokens": null,
+      "providerReadyMs": 193.62627100000827,
+      "tokenCountMs": 44.465603999997256,
+      "providerHeadersMs": 2901.4131040000066,
+      "providerTtftMs": 2919.7890625000073,
+      "pairs": 16,
+      "pairedMedianSavingMs": 75.70195849999982,
+      "pairedMedianBootstrap95CI": [
+        -115.38258399999904,
+        270.41362500000105
+      ],
+      "fasterPairs": 10
+    },
+    {
+      "variant": "baseline",
+      "attempts": 16,
+      "responses": 16,
+      "failures": 0,
+      "strictPass": 8,
+      "falseAccept": [],
+      "falseReject": [
+        "topic-switch",
+        "text-injection",
+        "heldout-topic-switch"
+      ],
+      "acceptedWrongRelation": [
+        "fragment-3"
+      ],
+      "medianMs": 4319.401374999998,
+      "p90Ms": 4766.9833125000005,
+      "firstDeltaMs": null,
+      "firstDeltaToCompleteMs": null,
+      "promptTokens": 973,
+      "completionTokens": 79,
+      "cachedTokens": 0,
+      "providerReadyMs": 63.153479000000516,
+      "tokenCountMs": 43.151250000001255,
+      "providerHeadersMs": 4229.361687500004,
+      "providerTtftMs": null,
+      "pairs": 0,
+      "pairedMedianSavingMs": null,
+      "pairedMedianBootstrap95CI": null,
+      "fasterPairs": 0
+    }
+  ]
+}

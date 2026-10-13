@@ -1,0 +1,1 @@
+判定順序はrelation、readiness、languageです。出力JSONはrelation:[関係,relationConfidence]、readiness:[回答可能性,readinessConfidence]、language:[status,languages,confidence]の3項目です。各confidenceは0〜1の数値。statusはidentifiedまたはundetermined。identifiedのlanguagesはlanguageCodesから重複なしの1〜4言語、undeterminedなら空配列です。

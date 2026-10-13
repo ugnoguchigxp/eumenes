@@ -71,6 +71,12 @@ export interface LogFields {
 	candidateCount?: number;
 	profile?: string;
 	ttftMs?: number;
+	providerTtftMs?: number;
+	providerPromptMs?: number;
+	providerDecodeMs?: number;
+	providerPromptTokens?: number;
+	providerCachedTokens?: number;
+	providerOutputTokens?: number;
 	totalMs?: number;
 	requestBytes?: number;
 	droppedMessages?: number;
@@ -86,6 +92,12 @@ export interface LogFields {
 const keys = new Set<keyof LogFields>([
 	"profile",
 	"ttftMs",
+	"providerTtftMs",
+	"providerPromptMs",
+	"providerDecodeMs",
+	"providerPromptTokens",
+	"providerCachedTokens",
+	"providerOutputTokens",
 	"totalMs",
 	"requestBytes",
 	"droppedMessages",

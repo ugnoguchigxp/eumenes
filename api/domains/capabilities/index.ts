@@ -7,6 +7,10 @@ export {
 	toolchainPassages,
 } from "./service/toolchains";
 export { flatObjectSchema } from "./service/registry";
+export {
+	compileJsonSchemaSubset,
+	UnsupportedSchema,
+} from "./service/json-schema-subset";
 export { migration, learnedMigration } from "./repository";
 export * from "./contracts";
 export { registerCapabilities } from "./controller";
@@ -24,8 +28,14 @@ export { musicBuiltins } from "./builtin/music";
 
 export { toolchainBuiltins } from "./builtin/toolchains";
 import { toolchainBuiltins as registeredToolchains } from "./builtin/toolchains";
-/** Function names of the builtin toolchains (for detecting call syntax written as text). */
-export const builtinToolchainFunctions: readonly string[] =
-	registeredToolchains.map((d) => d.functionName!);
+import { bundleToolchainFunctions } from "./service/bundle-files";
+/**
+ * Function names of the builtin toolchains and of those shipped in bundles (for detecting
+ * call syntax written as text).
+ */
+export const builtinToolchainFunctions: readonly string[] = [
+	...registeredToolchains.map((d) => d.functionName!),
+	...bundleToolchainFunctions(),
+];
 
 export { drawingRequest, drawingPlan } from "./contracts/excalidraw";

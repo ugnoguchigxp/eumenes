@@ -1,0 +1,7 @@
+{"phase":"text_api","repetition":0,"runId":"ba97c8d3-fdae-477f-ad43-720aa5c86a60","status":"completed","firstTextMs":2708.664958,"totalMs":5707.7771250000005}
+{"phase":"text_api","repetition":1,"runId":"be2200d1-0a21-44aa-bc20-d1d30a4389ae","status":"completed","firstTextMs":2490.3407500000003,"totalMs":5753.985916999999}
+{"phase":"text_api","repetition":2,"runId":"a0c416f9-efbb-4745-a0ca-de729d26631c","status":"completed","firstTextMs":2908.887417,"totalMs":6176.7784169999995}
+{"phase":"voice_api","repetition":0,"utteranceId":"5fd8d8e8-2102-4242-9028-3ae7b8511600","runId":"30a7bab1-7dbc-4d1c-a00e-e7542dd56ed3","status":"ready","readyMs":10964.484958000001,"audioReceivedMs":10966.101583,"bytes":90668}
+{"phase":"voice_api","repetition":1,"utteranceId":"44e21e25-de60-4c68-b896-a9a1486b7336","runId":"05a1d324-ef58-43d1-9abd-4947b0d75765","status":"ready","readyMs":10710.388959000004,"audioReceivedMs":10711.021584000002,"bytes":90668}
+{"phase":"voice_api","repetition":2,"utteranceId":"bccfe8a2-6891-4bd4-9c38-6610bbdcdf15","runId":"04daf355-9004-4bfd-ba2b-30ca429d8a79","status":"ready","readyMs":10991.085082999998,"audioReceivedMs":10991.646999999997,"bytes":90668}
+{"outcome":"ok"}

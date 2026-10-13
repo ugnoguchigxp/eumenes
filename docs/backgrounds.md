@@ -49,6 +49,6 @@ export function createCpuModel(): SpatialModel {
 
 部分試験は `bun run test:domain -- background` と `bun run test:domain -- settings`。切替の結合試験は `bun x vitest run web/src/components/ConversationBackground.test.tsx`、ブラウザのWebGL・保存・往復切替は `bun x playwright test tests/browser/backgrounds.spec.ts`。
 
-変更domainと利用側のverifyを通し、横断検証は `bun run verify:all` で行う。実測・Provider接続や実マイク・スピーカーの受入は、これらのfixture試験とは分ける。
+変更domainと影響のある利用側のverifyを通し、ブラウザE2Eは上記の対象ファイルを指定して個別に行う。実測・Provider接続や実マイク・スピーカーの受入は、これらのfixture試験とは分ける。
 
 参照：[移植元のSpatial全体コンセプト](https://github.com/ugnoguchigxp/hono-standard/blob/9534a74cf14dd323890a69063f113293dfefbacf/docs/dashboard-overlay/11-spatial-observability-concept.md)、[採用構想Page](https://chatgpt.com/space/page_0c01338cc47481919b83c6b400117239)。

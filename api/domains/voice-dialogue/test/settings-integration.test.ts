@@ -953,6 +953,23 @@ for (const result of [
 	assessment("uncertain", "ready"),
 	"{}",
 	assessment("independent", "waiting"),
+	...[
+		{ relationConfidence: 0.79 },
+		{ readinessConfidence: 0.79 },
+		{ confidence: 0.79 },
+		{ languages: ["fr"] },
+	].map((patch) =>
+		JSON.stringify({
+			status: "identified",
+			languages: ["ja"],
+			confidence: 1,
+			relation: "independent",
+			readiness: "ready",
+			relationConfidence: 1,
+			readinessConfidence: 1,
+			...patch,
+		}),
+	),
 ])
 	test(`uncertain, malformed and incomplete input never starts an answer: ${result}`, async () => {
 		const h = await setup(

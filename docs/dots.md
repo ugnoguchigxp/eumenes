@@ -154,7 +154,6 @@ Queue が満杯でもコマンドを保存し、60秒ごとの maintenance で�
 
 ```sh
 bun run verify -- --domain dots
-bun run verify:all
 bun test api/domains/dots api/application/dots-tasks.test.ts api/application/dots-review.test.ts api/application/dots-dialogue.test.ts api/application/dots-http.test.ts scripts/dots-gateway.test.ts packages/dots-mcp/test
 bun x playwright test tests/browser/dots.spec.ts
 ```

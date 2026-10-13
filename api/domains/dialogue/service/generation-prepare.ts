@@ -156,7 +156,7 @@ export function createPrepare(
 			const operation = JSON.parse(agent.actionPayload);
 			actionResultIndex = messages.length - 1;
 			messages[0]!.content +=
-				"\n操作は既に終了しています。操作結果の事実を、あなた自身の言葉と指定の口調で短く伝えてください。操作をやり直したり、結果にない成功や時間を作ったりしません。全itemsの状態を必要に応じて説明し、complete=falseなら一覧が部分的であることを伝えます。";
+				"\n操作は既に終了しています。操作結果の事実を、あなた自身の言葉と指定の口調で短く伝えてください。操作をやり直したり、結果にない成功や時間を作ったりしません。結果にitemsがあればその状態を必要に応じて説明し、complete=falseなら一覧が部分的であることを伝えます。actionがfailedなら失敗だけを伝え、成功を作りません。";
 			messages.splice(messages.length - 1, 0, {
 				role: "user",
 				content: JSON.stringify({ actionResult: operation }),

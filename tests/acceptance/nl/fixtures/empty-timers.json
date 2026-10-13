@@ -1,0 +1,9 @@
+{
+	"fixtureId": "empty-timers",
+	"version": 1,
+	"description": "隔離したfixture backend。timerは一件もない。",
+	"stack": "fixture",
+	"seedTimers": [],
+	"faults": [],
+	"expectedInitial": { "timers": 0 }
+}

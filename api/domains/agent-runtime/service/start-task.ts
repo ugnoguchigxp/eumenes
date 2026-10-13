@@ -6,13 +6,13 @@ import { requestUrls } from "./request-urls";
 import { workerDeadline } from "./exploration";
 import { owner, type RuntimeContext } from "./runtime-context";
 import type { TaskOps } from "./task-ops";
-import { createTimerOperation } from "./timer-operation";
+import { createActionOperation } from "./action-operation";
 
 export function createStartTask(ctx: RuntimeContext, ops: TaskOps) {
 	const { capabilities, tools, inference, now } = ctx.deps;
 	const { prepared, actionPrepared, bindings } = ctx.state;
 	const { enqueue, insertTask, ready, fail } = ops;
-	const runTimer = createTimerOperation({
+	const runAction = createActionOperation({
 		tools,
 		capabilities,
 		actionPrepared,
@@ -29,8 +29,8 @@ export function createStartTask(ctx: RuntimeContext, ops: TaskOps) {
 				input: unknown;
 				deadline: number;
 				parentJobId?: string;
-				actionSnapshot?: unknown;
-				timerCapability?: Prepared;
+				/** The frozen package capability a bound operation runs with (kind "action"). */
+				actionCapability?: Prepared;
 				requirementProfiles?: ProfileSnapshot[];
 				onCreated?: (taskId: string) => void;
 			},
@@ -42,7 +42,7 @@ export function createStartTask(ctx: RuntimeContext, ops: TaskOps) {
 					jobId: existing.job_id ?? input.parentJobId ?? existing.id,
 				};
 			const request = input.input as {
-				kind?: "web" | "history" | "timer";
+				kind?: "web" | "history" | "action";
 				question: string;
 				originalRequest?: string;
 				urls?: string[];
@@ -75,19 +75,18 @@ export function createStartTask(ctx: RuntimeContext, ops: TaskOps) {
 				input.deadline,
 			);
 			input.onCreated?.(root.id);
-			if (request.kind === "timer") {
-				const p = input.timerCapability;
+			if (request.kind === "action") {
+				const p = input.actionCapability;
 				if (p) actionPrepared.set(root.id, p);
 				db.query("UPDATE agent_tasks SET input_json=? WHERE id=?").run(
-					JSON.stringify({ ...request, timerRequested: true }),
+					JSON.stringify({ ...request, actionRequested: true }),
 					root.id,
 				);
 				try {
-					runTimer(
+					runAction(
 						db,
 						get(db, root.id)!,
 						request.command,
-						input.actionSnapshot,
 						crypto.randomUUID(),
 					);
 				} catch (e) {

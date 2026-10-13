@@ -1,0 +1,9 @@
+{
+	"pilotId": "timer-ui-pilot-01",
+	"version": 1,
+	"caseId": "timer-ui-purpose-01",
+	"groups": ["baseline", "standard", "variant-a", "variant-b"],
+	"runsPerGroup": 3,
+	"totalCapUSD": 30,
+	"autoRepeatUntilPass": false
+}

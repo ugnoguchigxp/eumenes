@@ -3,6 +3,7 @@ import type { DialogueService } from "..";
 import { publicSubmitSchema, type RunProgress } from "../contracts";
 import { parseJsonBody } from "../../../infrastructure/http";
 import { snapshotStream } from "../../../infrastructure/snapshot-stream";
+export { registerCommandInteractions } from "./interactions";
 export function registerDialogue(app: Hono, service: DialogueService) {
 	app.get("/api/runs/:id/stream", (c) => {
 		const id = c.req.param("id");

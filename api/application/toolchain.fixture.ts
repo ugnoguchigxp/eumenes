@@ -534,6 +534,8 @@ export async function harness(
 			toolchain.capabilities,
 			toolchain.history,
 			toolchain.embedQuery,
+			toolchain.registry,
+			toolchain.schemas,
 		),
 	});
 	const voice = createVoiceDialogue(store, dialogue, inference);
@@ -556,6 +558,7 @@ export async function harness(
 		inference,
 		timers,
 		toolchainHistory: toolchain.history,
+		toolchainActions: toolchain.actionRequests,
 		...toolchain,
 	});
 	toolchain.agents.start();

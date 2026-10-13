@@ -1,0 +1,27 @@
+{
+	"lockVersion": 1,
+	"files": {
+		"cases/timer-conversation-cancel-01.json": "790e0b73ec0cb9f7f74f2ddcb33be92fc8dd47bc6185ab57bc220eeace990ea4",
+		"cases/timer-conversation-start-01.json": "925229781730a37a86540b48dc7c03cca013a81501182b542dde86013bbe40bc",
+		"cases/timer-expiry-01.json": "bb1333074c188de6799c9fbdbfecff236e258d7945caa5336af1a929a2d0b388",
+		"cases/timer-invalid-input-01.json": "21d25398b11730ead35ded9f09694bc25838ef8b0c1d4dad8eed567c7fd26760",
+		"cases/timer-network-loss-01.json": "ff4d47006aaacf17e2534c62c853a3e5654e57bf785cf0d56ae20e767004b08b",
+		"cases/timer-question-continuation-01.json": "30d3fa204260684046c14f1114cb5358c13a75ff3b7075601b1243c6d5903ea9",
+		"cases/timer-rediscovery-01.json": "e7a94a139f408cc47c1473fe23915c89dbc73ea074494efd0e4934fb479daeaf",
+		"cases/timer-ui-purpose-01.json": "82967fc19e414ab9e2fa0d00a48d38b95d873651cdbe4a6e35fd70ea5d587843",
+		"criteria/timer-conversation-cancel-01.json": "5055de98d6ad4761778418cdbc51339674b81bff5e24936327c77ebb0d495a6d",
+		"criteria/timer-conversation-start-01.json": "e131ba381280c30d42240c3fe3336b154960cc5dc69d55f90c5b07fb11257e31",
+		"criteria/timer-expiry-01.json": "9a22c76700bb51b8f903650742e82cfcb8d9bd9994a15e6b520205ec5a6a8169",
+		"criteria/timer-invalid-input-01.json": "1246da27518a556c741f52277e7543da8030e6a4f5e3489dea2b75e0e6ddb370",
+		"criteria/timer-network-loss-01.json": "195d670df774bd81244fe120767b27ce9e5df63511af068ce47bfb5e3086e5ae",
+		"criteria/timer-question-continuation-01.json": "155d6fdc679eb8abd897b958df1458e2698e297f711bb49c03fe05eb5bbf3891",
+		"criteria/timer-rediscovery-01.json": "2f8ebd3d5b84a2131010b2d4849a5f3a3b7b306916a1e59031f20860a2160e97",
+		"criteria/timer-ui-purpose-01.json": "2718b2309107cd2ceba38f0ec1a9ec6c8ef82e2b5a39e1bf80bc32faf30e04d7",
+		"fixtures/empty-timers-lost-response.json": "608dbe68a999109990bddedfaacef5d6dbd7ffcee3feefce89e87b3361d14188",
+		"fixtures/empty-timers-product.json": "0b65347155fa77bf1a126cb1c30cbdd933095ebf43250e91281cd2d5dced9a6d",
+		"fixtures/empty-timers.json": "d7c5e97d860dc3c08abc46a3e5f16d644337b7b18a4841036324eb87bec0db19",
+		"fixtures/one-active-timer-product.json": "b987d7acccef594c6abd3ebcee2dff74d15a6802ba384f02799cf457c44e9c21",
+		"fixtures/one-active-timer.json": "ff828a1f58ebb7651e0ca3f23e0bb1274e5c2c08ef9736803369a02f6237523c",
+		"pilot.json": "a9fe159bf9800286962a7d5ce5cbacac96385a05e1fa0b5697ab36beac55cc65"
+	}
+}

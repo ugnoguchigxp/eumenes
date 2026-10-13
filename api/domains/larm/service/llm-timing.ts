@@ -1,4 +1,7 @@
-import { readChatResponse } from "../../../infrastructure/chat-stream";
+import {
+	readChatResponse,
+	type ProviderTimings,
+} from "../../../infrastructure/chat-stream";
 import { getLogger } from "../../../infrastructure/logger";
 import type { LarmCallOptions, LarmPort } from "../contracts";
 import { type Provider } from "./profiles";
@@ -44,12 +47,14 @@ export function startLlmTiming(
 		: fitContext(messages, window, options?.contextPolicy === "exact");
 	const selected = fitted.messages;
 	let requestBytes = fitted.bytes;
-	const started = Date.now();
+	const started = performance.now();
+	let sentAt: number | undefined;
 	let firstDeltaAt: number | undefined;
 	let logged = false;
 	function emit(
 		outcome: "ok" | "error" | "aborted",
 		usage?: Record<string, unknown>,
+		providerTimings?: ProviderTimings,
 	) {
 		if (logged) return;
 		logged = true;
@@ -60,10 +65,14 @@ export function startLlmTiming(
 				...(firstDeltaAt === undefined
 					? {}
 					: { ttftMs: firstDeltaAt - started }),
-				totalMs: Date.now() - started,
+				totalMs: performance.now() - started,
+				...(firstDeltaAt !== undefined && sentAt !== undefined
+					? { providerTtftMs: firstDeltaAt - sentAt }
+					: {}),
 				requestBytes,
 				droppedMessages: messages.length - selected.length,
 				...usageCounts(usage),
+				...providerTimings,
 			};
 			if (outcome === "error") log.warn("larm.llm_timing", fields);
 			else log.info("larm.llm_timing", fields);
@@ -73,6 +82,9 @@ export function startLlmTiming(
 	}
 	return {
 		selected,
+		sent() {
+			sentAt = performance.now();
+		},
 		setRequestBytes(value: number) {
 			requestBytes = value;
 		},
@@ -89,7 +101,7 @@ export function startLlmTiming(
 					signal,
 					onDelta
 						? (text) => {
-								firstDeltaAt ??= Date.now();
+								if (text) firstDeltaAt ??= performance.now();
 								onDelta(text);
 							}
 						: undefined,
@@ -98,7 +110,7 @@ export function startLlmTiming(
 				emit(signal.aborted ? "aborted" : "error");
 				throw error;
 			}
-			emit("ok", result.usage);
+			emit("ok", result.usage, result.providerTimings);
 			return result;
 		},
 	};

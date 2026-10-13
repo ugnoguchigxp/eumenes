@@ -86,6 +86,8 @@ profileは最大12要件・16 KiB、同時選択は4profile、合成後は12要�
 
 ## タイマーと音声
 
+タイマーは bundle 登録の `toolchain:timers.manage@2`（「タイマー（データドリブン）」）で、binding `binding:timers.command@1` と artifact `artifact:timers.workspace@1` を通じて登録 adapter `adapter:timers@1` が実行します（[登録手順](toolchain-extension.md#01-データ定義bundleと登録adapterで公開する)）。
+
 タイマーは権限・操作receiptを再検査したうえで、label、状態、残時間、期限を含む全itemsを回答モデルへ渡します。ページングされた一覧は `complete:false`、失敗は固定codeを含む構造化結果です。回答直前に状態をrefreshし、ユーザー本文を位置・内容検索で書き換えません。操作の再実行やホストでの定型文章化は行いません。
 
 非空の本入力のASR後、既定controlモデルが主要言語を一回判定します。8秒・256 tokenが上限で、判定結果の全言語が許可リストにありconfidenceが0.8以上の場合だけ進みます。判定不能・不正・不在は `asr_language_unverified`、許可外は `asr_language_not_allowed`。previewと空ASRは言語判定を呼びません。ASRと言語判定のreceiptを同一transactionで受理し、回答・操作・TTSの検証parentにも言語判定を結びます。Web用Luna権限は流用しません。

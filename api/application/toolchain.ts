@@ -1,4 +1,3 @@
-import { projectTimerResult } from "./timer-result-context";
 import type { SqliteStore } from "../infrastructure/sqlite";
 import type { QueueService } from "../domains/queue";
 import type { InferencePort } from "../domains/inference";
@@ -6,15 +5,21 @@ import {
 	webToolArguments,
 	type WebResearchService,
 } from "../domains/web-research";
-import { createCapabilities, toolRuntimeOf } from "../domains/capabilities";
+import { createCapabilities } from "../domains/capabilities";
 import {
+	createActionRequests,
+	createAdapterRegistry,
 	createToolRuntime,
-	type ActionAdapter,
 	type ToolAdapter,
 } from "../domains/tool-runtime";
+import { DEFAULT_TIMER_SCOPE } from "../domains/timers";
 import { createAgentRuntime } from "../domains/agent-runtime";
-import { timerReceiptDigest as digest } from "../domains/timers";
-import { readActionOriginInTransaction } from "../domains/dialogue";
+import { createTimerAdapter } from "./timer-adapter";
+import {
+	bundleHostOf,
+	createRegistryActions,
+	createSchemaProvider,
+} from "./toolchain-adapters";
 import { createReadPorts } from "./research-history-ports";
 import { createToolchainHistory } from "../domains/toolchain-history";
 import { createRecipePorts } from "./toolchain-recipes";
@@ -38,8 +43,22 @@ export async function createToolchain(
 		timers?: import("../domains/timers").TimersService;
 		/** Tests that observe a pass immediately after a commit set 0. */
 		reconcileThrottleMs?: number;
+		/** Open toolchain interactions for the timer question source (dialogue, created later). */
+		interactions?: NonNullable<
+			Parameters<typeof createTimerAdapter>[1]
+		>["interactions"];
 	} = {},
 ) {
+	// Typed domain adapters this host offers; bundles naming any other adapter are not registered.
+	const registry = createAdapterRegistry(
+		options.timers
+			? [
+					createTimerAdapter(options.timers, {
+						interactions: options.interactions,
+					}),
+				]
+			: [],
+	);
 	const capabilities = createCapabilities(
 		store,
 		new Set([
@@ -52,6 +71,7 @@ export async function createToolchain(
 			...(options.excalidraw ? ["excalidraw"] : []),
 			...(options.conversation && options.history !== false ? ["history"] : []),
 		]),
+		{ bundleHost: () => bundleHostOf(registry) },
 	);
 	await capabilities.seed();
 	const history = createToolchainHistory(store);
@@ -105,105 +125,8 @@ export async function createToolchain(
 		cancelInTransaction: (db, id) =>
 			web.cancelInTransaction(db, id, "cancel_requested"),
 	};
-	const timerActions: ActionAdapter | undefined = options.timers
-		? {
-				contextInTransaction(db) {
-					return options.timers!.routeSnapshotInTransaction(db);
-				},
-				executeInTransaction(db, request) {
-					const timers = options.timers!;
-					agents.validateActionOwnerInTransaction(db, request.owner);
-					const [runId, epoch] = request.originToken.split(":");
-					if (
-						runId !== request.owner.rootRunId ||
-						Number(epoch) !== request.owner.cancelEpoch
-					)
-						throw new Error("origin_invalid");
-					const source = readActionOriginInTransaction(db, runId!);
-					if (!source || source.taskId !== request.owner.taskId)
-						throw new Error("origin_invalid");
-					const args = request.arguments as {
-						durationSeconds?: number;
-						label?: string;
-						timerId?: string;
-						state?: "active" | "elapsed" | "cancelled";
-						expectedRevision?: number;
-					};
-					const origin = {
-						scope: "default" as const,
-						conversationId: source.conversationId,
-						runId: request.owner.rootRunId,
-						messageId: source.messageId,
-						originKey: `${request.owner.rootRunId}:timer:0`,
-					};
-					const verb = toolRuntimeOf(request.tool.revisionId)?.localAction
-						?.verb;
-					const saved =
-						verb === "start"
-							? timers.startInTransaction(
-									db,
-									{
-										requestId: request.requestId,
-										issuedAt: request.issuedAt,
-										durationSeconds: args.durationSeconds ?? 0,
-										...(args.label ? { label: args.label } : {}),
-									},
-									origin,
-								)
-							: verb === "cancel"
-								? timers.cancelInTransaction(
-										db,
-										{
-											requestId: request.requestId,
-											issuedAt: request.issuedAt,
-											expectedRevision: args.expectedRevision ?? 0,
-										},
-										"default",
-										args.timerId ?? "",
-									)
-								: verb === "list"
-									? timers.recordListOperationInTransaction(
-											db,
-											{
-												requestId: request.requestId,
-												issuedAt: request.issuedAt,
-												...(args.timerId ? { timerId: args.timerId } : {}),
-												...(args.state ? { state: args.state } : {}),
-											},
-											"default",
-										)
-									: (() => {
-											throw new Error("capability_unavailable");
-										})();
-					return {
-						kind: "local_action",
-						backend: "timer",
-						version: 1,
-						operationId: saved.receipt.operationId,
-						receiptDigest: digest(saved.receipt),
-						payload: saved.receipt,
-						answerContext: projectTimerResult(saved.receipt),
-					};
-				},
-				readInTransaction(db, operationId) {
-					const row = options.timers!.readReceiptInTransaction(db, operationId);
-					if (!row) return null;
-					const payload = options.timers!.projectReceiptInTransaction(
-						db,
-						operationId,
-					);
-					if (!payload) throw new Error("invalid_action_result");
-					return {
-						kind: "local_action",
-						backend: "timer",
-						version: 1,
-						operationId: row.operationId,
-						receiptDigest: row.receiptDigest,
-						payload,
-						answerContext: projectTimerResult(payload),
-					};
-				},
-			}
+	const actions = registry.all().length
+		? createRegistryActions(registry, () => agents)
 		: undefined;
 	const tools = createToolRuntime(
 		store,
@@ -211,7 +134,7 @@ export async function createToolchain(
 		queue,
 		adapter,
 		Date.now,
-		timerActions,
+		actions,
 	);
 	const agents = createAgentRuntime({
 		store,
@@ -232,6 +155,19 @@ export async function createToolchain(
 	);
 	return {
 		capabilities,
+		registry,
+		/** UI actions of registered artifacts: acceptance, execution and receipt in one write. */
+		actionRequests: createActionRequests({
+			store,
+			capabilities,
+			registry,
+			// The only host scope until per-user scopes exist (design §8).
+			scope: options.timers?.scope ?? DEFAULT_TIMER_SCOPE,
+			// `authority_epoch` of an acceptance row is the host's authority epoch. The host has a
+			// single owner and no revocation yet, so the ledger's default (0) is the whole truth;
+			// a per-user scope would pass its own `authorityEpoch` here.
+		}),
+		schemas: createSchemaProvider(capabilities),
 		tools,
 		agents,
 		history,

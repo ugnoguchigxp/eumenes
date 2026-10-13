@@ -57,12 +57,14 @@ export type AdapterOperation = {
 };
 export type ActionEnvelope = {
 	kind: "local_action";
-	backend: "timer";
+	/** The registered domain adapter that executed the operation (`adapter:timers@1`). */
+	adapterRef: string;
 	version: 1;
 	operationId: string;
 	receiptDigest: string;
 	payload: unknown;
-	answerContext?: import("../../capabilities").TimerResultContext;
+	/** The adapter's short projection for the conversation answer. */
+	answerContext?: unknown;
 };
 export interface ActionAdapter {
 	/** Host snapshots for route selection; no model-generated identifiers. */
@@ -76,12 +78,16 @@ export interface ActionAdapter {
 			arguments: unknown;
 			owner: Owner;
 			originToken: string;
+			/** From the toolchain binding: which adapter and registered operation run the tool. */
+			adapterRef: string;
+			operationName: string;
 		},
 	): ActionEnvelope;
 	readInTransaction(
 		tx: Database,
 		operationId: string,
 		owner: Owner,
+		adapterRef: string,
 	): ActionEnvelope | null;
 }
 export interface ToolAdapter {
@@ -150,3 +156,5 @@ export type Invocation = {
 	cancel_epoch?: number;
 	origin?: "tool" | "candidate-cache";
 };
+
+export * from "./adapters";

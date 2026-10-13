@@ -64,6 +64,56 @@ export function hasReadMetadata(db: Database) {
 	}
 	return v;
 }
+/** Appended: which registered adapter and operation executed an agent action (spec §5.3). */
+export const actionAdapterMigration = `
+ALTER TABLE tool_action_invocations ADD COLUMN adapter_ref TEXT NOT NULL DEFAULT 'adapter:timers@1';
+ALTER TABLE tool_action_invocations ADD COLUMN operation_name TEXT;
+`;
+/**
+ * Appended: the acceptance ledger of UI actions (spec §6.4). One row per eventId, written in
+ * the same writer transaction as the domain execution. Bodies (canonical_input_json,
+ * result_json) are deleted after settlement; the row stays as a tombstone for a while so a
+ * late resend of the same eventId never turns into a new execution.
+ */
+export const actionRequestsMigration = `
+CREATE TABLE tool_action_requests(
+  event_id TEXT PRIMARY KEY,
+  scope TEXT NOT NULL,
+  owner_kind TEXT NOT NULL CHECK(owner_kind='ui'),
+  artifact_revision_id TEXT NOT NULL,
+  source TEXT NOT NULL,
+  source_revision INTEGER NOT NULL,
+  target_ref TEXT,
+  action_id TEXT NOT NULL,
+  adapter_ref TEXT NOT NULL,
+  operation_name TEXT NOT NULL,
+  request_id TEXT NOT NULL UNIQUE,
+  issued_at TEXT NOT NULL,
+  canonical_input_json TEXT,
+  input_digest TEXT NOT NULL,
+  binding_digest TEXT NOT NULL,
+  event_created_at TEXT NOT NULL,
+  event_expires_at TEXT NOT NULL,
+  authority_epoch INTEGER NOT NULL,
+  status TEXT NOT NULL CHECK(status IN ('pending','accepted','rejected','indeterminate')),
+  error_code TEXT,
+  receipt_owner TEXT,
+  receipt_operation_id TEXT,
+  receipt_digest TEXT,
+  result_json TEXT,
+  created_at INTEGER NOT NULL,
+  settled_at INTEGER,
+  body_deleted_at INTEGER
+);
+CREATE INDEX tool_action_requests_unsettled ON tool_action_requests(scope,created_at) WHERE status IN ('pending','indeterminate');
+CREATE INDEX tool_action_requests_settled ON tool_action_requests(settled_at) WHERE settled_at IS NOT NULL;
+CREATE TABLE tool_action_request_conflicts(
+  event_id TEXT NOT NULL,
+  input_digest TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY(event_id,input_digest)
+);
+`;
 /** Named migrations of this domain; the SQL above is frozen once deployed. */
 export const migrations: readonly Migration[] = [
 	{ id: "tool-runtime/0001-init", sql: migration },
@@ -74,5 +124,15 @@ export const migrations: readonly Migration[] = [
 		id: "tool-runtime/0005-read-metadata",
 		sql: readMetadataMigration,
 		after: ["tool-runtime/0004-action"],
+	},
+	{
+		id: "tool-runtime/0006-action-adapter",
+		sql: actionAdapterMigration,
+		after: ["tool-runtime/0005-read-metadata"],
+	},
+	{
+		id: "tool-runtime/0007-action-requests",
+		sql: actionRequestsMigration,
+		after: ["tool-runtime/0006-action-adapter"],
 	},
 ];

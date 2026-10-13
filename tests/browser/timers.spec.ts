@@ -6,13 +6,16 @@ import { evidencePath } from "./evidence";
 import { createFixture } from "./fixture";
 
 const TOKEN = "fixture-token-for-toolchain-browser";
+/** The single launcher entry and tab title of the registered (data-driven) timer screen. */
+const TITLE = "タイマー（データドリブン）";
+const ACTIONS = "/api/toolchain-actions";
 
 async function openSavedTimer(
 	page: Page,
 	label: string,
 	durationSeconds?: number,
 ) {
-	await openFromLauncher(page, "タイマー");
+	await openFromLauncher(page, TITLE);
 	await page.getByRole("button", { name: "保存済みタイマーを選ぶ" }).click();
 	await page
 		.getByRole("menuitem")
@@ -83,7 +86,7 @@ test("one timer launcher reopens multiple saved timers with the same name", asyn
 	}
 	let browserStarts = 0;
 	page.on("request", (request) => {
-		if (request.method() === "POST" && request.url().endsWith("/api/timers"))
+		if (request.method() === "POST" && request.url().endsWith(ACTIONS))
 			browserStarts++;
 	});
 	await page.goto(`http://127.0.0.1:${webPort}`);
@@ -91,7 +94,7 @@ test("one timer launcher reopens multiple saved timers with the same name", asyn
 	await expect(page.getByRole("menuitem", { name: /^タイマー/ })).toHaveCount(
 		1,
 	);
-	await page.getByRole("menuitem", { name: "タイマー", exact: true }).click();
+	await page.getByRole("menuitem", { name: TITLE, exact: true }).click();
 	await page.getByRole("button", { name: "保存済みタイマーを選ぶ" }).click();
 	await page.getByRole("menuitem", { name: /^タイマー（1800秒・/ }).click();
 	await expect(page.getByText("30分のタイマー", { exact: true })).toBeVisible();
@@ -129,7 +132,7 @@ test("the timer launcher works before any timer exists and starts a saved clock"
 	// Capturing three layouts plus a full reload adds a second cold WebGL start.
 	if (process.env.EUMENES_TIMER_SCREENSHOTS === "1") test.setTimeout(90000);
 	await page.goto(`http://127.0.0.1:${webPort}`);
-	await openFromLauncher(page, "タイマー");
+	await openFromLauncher(page, TITLE);
 	await expect(
 		page
 			.locator(".timer-workspace")
@@ -224,12 +227,15 @@ test("the timer launcher works before any timer exists and starts a saved clock"
 	const receiptPending = page.waitForResponse(
 		(response) =>
 			response.request().method() === "POST" &&
-			response.url().endsWith("/api/timers"),
+			response.url().endsWith(ACTIONS),
 	);
 	await page.getByRole("button", { name: "開始する", exact: true }).click();
 	const response = await receiptPending;
 	expect(response.ok()).toBe(true);
-	const receipt = await response.json();
+	// The common action host settles with the timers domain's own receipt inside its result.
+	const settled = await response.json();
+	expect(settled.status).toBe("accepted");
+	const receipt = settled.result.receipt;
 	expect(receipt.timer.durationSeconds).toBe(90);
 	await expect(
 		workspace.getByRole("button", { name: "停止する", exact: true }),
@@ -257,7 +263,7 @@ test("the timer launcher works before any timer exists and starts a saved clock"
 		});
 	}
 	await page
-		.getByRole("button", { name: "タイマーを閉じる", exact: true })
+		.getByRole("button", { name: `${TITLE}を閉じる`, exact: true })
 		.click();
 	await openSavedTimer(page, "タイマー");
 	await expect(page.getByRole("timer")).toBeVisible();
@@ -289,11 +295,12 @@ test("the timer launcher works before any timer exists and starts a saved clock"
 	}
 	const resumedResponse = page.waitForResponse(
 		(response) =>
-			response.url().endsWith(`/api/timers/${receipt.timer.id}/resume`) &&
+			response.request().method() === "POST" &&
+			response.url().endsWith(ACTIONS) &&
 			response.ok(),
 	);
 	await page.getByRole("button", { name: "再開する", exact: true }).click();
-	const resumed = await (await resumedResponse).json();
+	const resumed = (await (await resumedResponse).json()).result.receipt;
 	expect(resumed.timer.id).toBe(receipt.timer.id);
 	expect(resumed.timer.startedAt).toBe(receipt.timer.startedAt);
 	expect(resumed.timer.remainingSeconds).toBe(paused.remainingSeconds);
@@ -330,7 +337,7 @@ test("the timer launcher works before any timer exists and starts a saved clock"
 	expect(
 		await page
 			.getByRole("tablist", { name: "アーティファクトのタブ" })
-			.getByRole("tab", { name: "タイマー", exact: true })
+			.getByRole("tab", { name: TITLE, exact: true })
 			.count(),
 	).toBe(1);
 });
@@ -339,7 +346,7 @@ test("stopwatch continues across clock and artifact tabs, stops, resumes, resets
 	page,
 }) => {
 	await page.goto(`http://127.0.0.1:${webPort}`);
-	await openFromLauncher(page, "タイマー");
+	await openFromLauncher(page, TITLE);
 	const clock = page.locator(".timer-workspace");
 	const modes = clock.getByRole("group", { name: "時計の種類" });
 	await page.clock.install();
@@ -379,7 +386,7 @@ test("stopwatch continues across clock and artifact tabs, stops, resumes, resets
 	await page.clock.runFor(2000);
 	await page
 		.getByRole("tablist", { name: "アーティファクトのタブ" })
-		.getByRole("tab", { name: "タイマー", exact: true })
+		.getByRole("tab", { name: TITLE, exact: true })
 		.click();
 	await expect(
 		modes.getByRole("button", { name: "ストップウォッチ" }),
@@ -414,9 +421,9 @@ test("stopwatch continues across clock and artifact tabs, stops, resumes, resets
 		".00",
 	);
 	await page
-		.getByRole("button", { name: "タイマーを閉じる", exact: true })
+		.getByRole("button", { name: `${TITLE}を閉じる`, exact: true })
 		.click();
-	await openFromLauncher(page, "タイマー");
+	await openFromLauncher(page, TITLE);
 	await modes
 		.getByRole("button", { name: "ストップウォッチ", exact: true })
 		.click();
@@ -550,7 +557,7 @@ test("a persisted timer expires and its notice survives closing the clock", asyn
 		page.getByText("終了通知の検証", { exact: true }).last(),
 	).toBeVisible();
 	await page
-		.getByRole("button", { name: "終了通知の検証を閉じる", exact: true })
+		.getByRole("button", { name: `${TITLE}を閉じる`, exact: true })
 		.click();
 	const notice = page
 		.getByRole("status", { name: "タイマーの終了" })
@@ -667,7 +674,7 @@ test("expiry plays one real beep and posts an assistant message even after the a
 	await page.getByRole("button", { name: "送信", exact: true }).click();
 	await expect(page.getByRole("timer")).toBeVisible({ timeout: 20000 });
 	await page
-		.getByRole("button", { name: "タイマーを閉じる", exact: true })
+		.getByRole("button", { name: `${TITLE}を閉じる`, exact: true })
 		.last()
 		.click();
 	await expect(

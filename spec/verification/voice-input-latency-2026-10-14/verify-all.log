@@ -1,0 +1,28 @@
+$ bun scripts/verify.ts --all
+[verify] selected=excalidraw,object-recognition,background,image,music,dots,task-reports,coding-supervision,coding,artifact,tasks,capabilities,tool-runtime,agent-runtime,toolchain-history,web-research,attitude-dataset,service-tests,delivery,avatar,settings,inference,tts-dictionary,conversation,continuity,goals,world,memory,larm,audio,queue,scheduler,timers,dialogue,voice-dialogue dependencyClosure=capabilities,delivery,attitude-dataset,larm,settings,inference,queue,excalidraw,object-recognition,background,image,music,dots,tasks,task-reports,coding,coding-supervision,artifact,avatar,conversation,tool-runtime,agent-runtime,toolchain-history,web-research,service-tests,tts-dictionary,continuity,goals,world,memory,audio,scheduler,timers,dialogue,voice-dialogue testClosure=capabilities,delivery,attitude-dataset,larm,tts-dictionary,queue,tasks,dots,continuity,avatar,conversation,memory,settings,inference,excalidraw,object-recognition,background,image,music,task-reports,coding,coding-supervision,artifact,tool-runtime,agent-runtime,toolchain-history,web-research,service-tests,goals,world,audio,scheduler,timers,dialogue,voice-dialogue
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts
+size-budget ok (1017 files)
+[verify] sql-boundaries: /Users/y.noguchi/.bun/bin/bun scripts/sql-boundaries.ts
+[sql-boundaries] ok: 195 tables, 0 allowed cross-domain accesses
+[verify] domain-docs: /Users/y.noguchi/.bun/bin/bun scripts/domain-docs.ts --check
+docs/domains.md: domain 表は最新です
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check .
+$ oxfmt --check .
+Checking formatting...
+
+scripts/nl-acceptance/run.ts (0ms)
+
+Format issues found in above 1 files. Run without `--check` to fix.
+Finished in 238ms on 1361 files using 10 threads.
+error: script "format:check" exited with code 1
+83 | 	steps.push({
+84 | 		name,
+85 | 		ms: Math.round(performance.now() - start),
+86 | 		result: code === 0 ? "pass" : `exit ${code}`,
+87 | 	});
+88 | 	if (code !== 0) throw new Error(`${name} failed (${code})`);
+                                ^
+error: format failed (1)
+      at run (/Users/y.noguchi/Code/eumenes/scripts/verify.ts:88:28)
+
+error: script "verify:all" exited with code 1

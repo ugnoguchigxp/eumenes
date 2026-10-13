@@ -1,0 +1,1262 @@
+[
+  {
+    "phase": "text_api",
+    "repetition": 0,
+    "runId": "ba97c8d3-fdae-477f-ad43-720aa5c86a60",
+    "status": "completed",
+    "firstTextMs": 2708.664958,
+    "totalMs": 5707.7771250000005,
+    "metrics": [
+      {
+        "time": "2026-10-13T15:01:05.624Z",
+        "kind": "streamed",
+        "component": "dialogue",
+        "event": "dialogue.body_policy"
+      },
+      {
+        "time": "2026-10-13T15:01:05.629Z",
+        "purpose": "llm",
+        "durationMs": 0.962833000000046,
+        "component": "inference",
+        "event": "inference.prepared"
+      },
+      {
+        "time": "2026-10-13T15:01:05.634Z",
+        "purpose": "llm",
+        "phase": "main_connection_wait",
+        "outcome": "ok",
+        "durationMs": 4.052291999999966,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:05.911Z",
+        "purpose": "llm",
+        "kind": "llm",
+        "phase": "provider_ready",
+        "outcome": "ok",
+        "durationMs": 276.5180419999999,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:05.934Z",
+        "purpose": "llm",
+        "phase": "token_count",
+        "outcome": "ok",
+        "durationMs": 21.023624999999925,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:08.314Z",
+        "purpose": "llm",
+        "kind": "chat/completions",
+        "phase": "response_headers",
+        "outcome": "ok",
+        "durationMs": 2378.6471250000004,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:08.319Z",
+        "purpose": "llm",
+        "kind": "streamed",
+        "durationMs": 2695.168541,
+        "component": "dialogue",
+        "event": "dialogue.first_delta"
+      },
+      {
+        "time": "2026-10-13T15:01:09.886Z",
+        "purpose": "llm",
+        "outcome": "ok",
+        "ttftMs": 2404.689458,
+        "totalMs": 3972.7008750000005,
+        "providerTtftMs": 2382.8416669999997,
+        "component": "larm",
+        "event": "larm.llm_timing"
+      },
+      {
+        "time": "2026-10-13T15:01:09.887Z",
+        "purpose": "llm",
+        "phase": "provider",
+        "outcome": "ok",
+        "durationMs": 4256.932042,
+        "component": "inference",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:11.263Z",
+        "purpose": "llm",
+        "kind": "system-one",
+        "phase": "provider_ready",
+        "outcome": "ok",
+        "durationMs": 1372.9033749999999,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:11.302Z",
+        "purpose": "llm",
+        "kind": "systemone",
+        "phase": "response_headers",
+        "outcome": "ok",
+        "durationMs": 38.30041600000004,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:11.306Z",
+        "purpose": "llm",
+        "phase": "answer_delivery",
+        "outcome": "ok",
+        "durationMs": 1418.7168339999998,
+        "component": "inference",
+        "event": "performance.stage"
+      }
+    ]
+  },
+  {
+    "phase": "text_api",
+    "repetition": 1,
+    "runId": "be2200d1-0a21-44aa-bc20-d1d30a4389ae",
+    "status": "completed",
+    "firstTextMs": 2490.3407500000003,
+    "totalMs": 5753.985916999999,
+    "metrics": [
+      {
+        "time": "2026-10-13T15:01:11.327Z",
+        "kind": "streamed",
+        "component": "dialogue",
+        "event": "dialogue.body_policy"
+      },
+      {
+        "time": "2026-10-13T15:01:11.331Z",
+        "purpose": "llm",
+        "durationMs": 0.7380000000002838,
+        "component": "inference",
+        "event": "inference.prepared"
+      },
+      {
+        "time": "2026-10-13T15:01:11.332Z",
+        "purpose": "llm",
+        "phase": "main_connection_wait",
+        "outcome": "ok",
+        "durationMs": 0.9574579999998605,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:11.333Z",
+        "purpose": "llm",
+        "kind": "llm",
+        "phase": "provider_ready",
+        "outcome": "ok",
+        "durationMs": 0.3682920000001104,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:11.358Z",
+        "purpose": "llm",
+        "phase": "token_count",
+        "outcome": "ok",
+        "durationMs": 25.016458000000057,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:13.810Z",
+        "purpose": "llm",
+        "kind": "chat/completions",
+        "phase": "response_headers",
+        "outcome": "ok",
+        "durationMs": 2451.162124999999,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:13.811Z",
+        "purpose": "llm",
+        "kind": "streamed",
+        "durationMs": 2484.4148749999995,
+        "component": "dialogue",
+        "event": "dialogue.first_delta"
+      },
+      {
+        "time": "2026-10-13T15:01:17.038Z",
+        "purpose": "llm",
+        "outcome": "ok",
+        "ttftMs": 2477.4378750000005,
+        "totalMs": 5704.4855,
+        "providerTtftMs": 2452.0867080000007,
+        "component": "larm",
+        "event": "larm.llm_timing"
+      },
+      {
+        "time": "2026-10-13T15:01:17.039Z",
+        "purpose": "llm",
+        "phase": "provider",
+        "outcome": "ok",
+        "durationMs": 5707.5403750000005,
+        "component": "inference",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:17.041Z",
+        "purpose": "llm",
+        "kind": "system-one",
+        "phase": "provider_ready",
+        "outcome": "ok",
+        "durationMs": 0.043000000001484295,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:17.065Z",
+        "purpose": "llm",
+        "kind": "systemone",
+        "phase": "response_headers",
+        "outcome": "ok",
+        "durationMs": 23.702374999998938,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:17.067Z",
+        "purpose": "llm",
+        "phase": "answer_delivery",
+        "outcome": "ok",
+        "durationMs": 26.68279199999961,
+        "component": "inference",
+        "event": "performance.stage"
+      }
+    ]
+  },
+  {
+    "phase": "text_api",
+    "repetition": 2,
+    "runId": "a0c416f9-efbb-4745-a0ca-de729d26631c",
+    "status": "completed",
+    "firstTextMs": 2908.887417,
+    "totalMs": 6176.7784169999995,
+    "metrics": [
+      {
+        "time": "2026-10-13T15:01:17.086Z",
+        "kind": "streamed",
+        "component": "dialogue",
+        "event": "dialogue.body_policy"
+      },
+      {
+        "time": "2026-10-13T15:01:17.088Z",
+        "purpose": "llm",
+        "durationMs": 1.0087499999990541,
+        "component": "inference",
+        "event": "inference.prepared"
+      },
+      {
+        "time": "2026-10-13T15:01:17.089Z",
+        "purpose": "llm",
+        "phase": "main_connection_wait",
+        "outcome": "ok",
+        "durationMs": 0.4539999999997235,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:17.090Z",
+        "purpose": "llm",
+        "kind": "llm",
+        "phase": "provider_ready",
+        "outcome": "ok",
+        "durationMs": 0.10087500000008731,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:17.133Z",
+        "purpose": "llm",
+        "phase": "token_count",
+        "outcome": "ok",
+        "durationMs": 42.16683399999965,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:19.982Z",
+        "purpose": "llm",
+        "kind": "chat/completions",
+        "phase": "response_headers",
+        "outcome": "ok",
+        "durationMs": 2848.6100829999996,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:19.983Z",
+        "purpose": "llm",
+        "kind": "streamed",
+        "durationMs": 2897.8898329999993,
+        "component": "dialogue",
+        "event": "dialogue.first_delta"
+      },
+      {
+        "time": "2026-10-13T15:01:23.218Z",
+        "purpose": "llm",
+        "outcome": "ok",
+        "ttftMs": 2892.5801659999997,
+        "totalMs": 6127.247208000001,
+        "providerTtftMs": 2849.9188749999994,
+        "component": "larm",
+        "event": "larm.llm_timing"
+      },
+      {
+        "time": "2026-10-13T15:01:23.218Z",
+        "purpose": "llm",
+        "phase": "provider",
+        "outcome": "ok",
+        "durationMs": 6129.364207999999,
+        "component": "inference",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:23.220Z",
+        "purpose": "llm",
+        "kind": "system-one",
+        "phase": "provider_ready",
+        "outcome": "ok",
+        "durationMs": 0.0384169999997539,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:23.243Z",
+        "purpose": "llm",
+        "kind": "systemone",
+        "phase": "response_headers",
+        "outcome": "ok",
+        "durationMs": 22.49962500000038,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:23.244Z",
+        "purpose": "llm",
+        "phase": "answer_delivery",
+        "outcome": "ok",
+        "durationMs": 24.89916699999958,
+        "component": "inference",
+        "event": "performance.stage"
+      }
+    ]
+  },
+  {
+    "phase": "voice_api",
+    "repetition": 0,
+    "utteranceId": "5fd8d8e8-2102-4242-9028-3ae7b8511600",
+    "runId": "30a7bab1-7dbc-4d1c-a00e-e7542dd56ed3",
+    "status": "ready",
+    "readyMs": 10964.484958000001,
+    "audioReceivedMs": 10966.101583,
+    "bytes": 90668,
+    "metrics": [
+      {
+        "time": "2026-10-13T15:01:23.712Z",
+        "purpose": "asr",
+        "durationMs": 1.0282090000000608,
+        "component": "inference",
+        "event": "inference.prepared"
+      },
+      {
+        "time": "2026-10-13T15:01:23.712Z",
+        "purpose": "asr",
+        "kind": "asr",
+        "phase": "provider_ready",
+        "outcome": "ok",
+        "durationMs": 0.10812499999883585,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:24.068Z",
+        "purpose": "asr",
+        "kind": "audio/transcriptions",
+        "phase": "response_headers",
+        "outcome": "ok",
+        "durationMs": 353.81333299999824,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:24.069Z",
+        "purpose": "asr",
+        "phase": "provider",
+        "outcome": "ok",
+        "durationMs": 356.5170419999995,
+        "component": "inference",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:24.070Z",
+        "phase": "asr",
+        "outcome": "ok",
+        "durationMs": 359.6254169999993,
+        "component": "voice-dialogue",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:24.072Z",
+        "purpose": "llm",
+        "durationMs": 0.40033300000141026,
+        "component": "inference",
+        "event": "inference.prepared"
+      },
+      {
+        "time": "2026-10-13T15:01:24.073Z",
+        "purpose": "llm",
+        "kind": "llm",
+        "phase": "provider_ready",
+        "outcome": "ok",
+        "durationMs": 0.09424999999828287,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:24.074Z",
+        "purpose": "llm",
+        "phase": "main_connection_wait",
+        "outcome": "ok",
+        "durationMs": 0.007874999999330612,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:24.101Z",
+        "purpose": "llm",
+        "kind": "llm",
+        "phase": "provider_ready",
+        "outcome": "ok",
+        "durationMs": 27.086834000001545,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:24.141Z",
+        "purpose": "llm",
+        "phase": "token_count",
+        "outcome": "ok",
+        "durationMs": 38.408957999999984,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:29.827Z",
+        "purpose": "llm",
+        "kind": "chat/completions",
+        "phase": "response_headers",
+        "outcome": "ok",
+        "durationMs": 5686.212041999999,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:29.828Z",
+        "purpose": "llm",
+        "outcome": "ok",
+        "totalMs": 5726.091207999998,
+        "component": "larm",
+        "event": "larm.llm_timing"
+      },
+      {
+        "time": "2026-10-13T15:01:29.834Z",
+        "purpose": "llm",
+        "phase": "provider",
+        "outcome": "ok",
+        "durationMs": 5761.504083,
+        "component": "inference",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:29.836Z",
+        "phase": "input_control",
+        "outcome": "ok",
+        "durationMs": 5764.468041,
+        "component": "voice-dialogue",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:29.854Z",
+        "kind": "streamed",
+        "component": "dialogue",
+        "event": "dialogue.body_policy"
+      },
+      {
+        "time": "2026-10-13T15:01:29.857Z",
+        "purpose": "llm",
+        "durationMs": 0.5363330000000133,
+        "component": "inference",
+        "event": "inference.prepared"
+      },
+      {
+        "time": "2026-10-13T15:01:29.859Z",
+        "purpose": "llm",
+        "phase": "main_connection_wait",
+        "outcome": "ok",
+        "durationMs": 1.253207999998267,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:29.860Z",
+        "purpose": "llm",
+        "kind": "llm",
+        "phase": "provider_ready",
+        "outcome": "ok",
+        "durationMs": 0.5135410000002594,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:29.904Z",
+        "purpose": "llm",
+        "phase": "token_count",
+        "outcome": "ok",
+        "durationMs": 42.66125000000102,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:32.552Z",
+        "purpose": "llm",
+        "kind": "chat/completions",
+        "phase": "response_headers",
+        "outcome": "ok",
+        "durationMs": 2647.918625000002,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:32.554Z",
+        "purpose": "llm",
+        "kind": "streamed",
+        "durationMs": 2699.580833,
+        "component": "dialogue",
+        "event": "dialogue.first_delta"
+      },
+      {
+        "time": "2026-10-13T15:01:34.279Z",
+        "purpose": "llm",
+        "outcome": "ok",
+        "ttftMs": 2692.4354999999996,
+        "totalMs": 4417.8085420000025,
+        "providerTtftMs": 2649.365665999998,
+        "component": "larm",
+        "event": "larm.llm_timing"
+      },
+      {
+        "time": "2026-10-13T15:01:34.279Z",
+        "purpose": "llm",
+        "phase": "provider",
+        "outcome": "ok",
+        "durationMs": 4421.6028750000005,
+        "component": "inference",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:34.281Z",
+        "purpose": "llm",
+        "kind": "system-one",
+        "phase": "provider_ready",
+        "outcome": "ok",
+        "durationMs": 0.03637499999967986,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:34.308Z",
+        "purpose": "llm",
+        "kind": "systemone",
+        "phase": "response_headers",
+        "outcome": "ok",
+        "durationMs": 26.69520900000134,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:34.312Z",
+        "purpose": "llm",
+        "phase": "answer_delivery",
+        "outcome": "ok",
+        "durationMs": 31.906041999998706,
+        "component": "inference",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:34.328Z",
+        "kind": "sentence-language",
+        "phase": "provider_ready",
+        "outcome": "ok",
+        "durationMs": 0.09341700000004494,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:34.347Z",
+        "kind": "systemone",
+        "phase": "response_headers",
+        "outcome": "ok",
+        "durationMs": 18.503333999997267,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:34.353Z",
+        "purpose": "tts",
+        "durationMs": 25.820583000000624,
+        "component": "inference",
+        "event": "inference.prepared"
+      },
+      {
+        "time": "2026-10-13T15:01:34.353Z",
+        "purpose": "tts",
+        "kind": "tts",
+        "phase": "provider_ready",
+        "outcome": "ok",
+        "durationMs": 0.03783399999883841,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:34.650Z",
+        "purpose": "tts",
+        "kind": "audio/speech",
+        "phase": "response_headers",
+        "outcome": "ok",
+        "durationMs": 295.5030829999996,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:34.663Z",
+        "purpose": "tts",
+        "phase": "provider",
+        "outcome": "ok",
+        "durationMs": 309.8173339999994,
+        "component": "inference",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:34.669Z",
+        "durationMs": 345.4300839999996,
+        "component": "voice-dialogue",
+        "event": "voice.first_chunk_ready"
+      }
+    ]
+  },
+  {
+    "phase": "voice_api",
+    "repetition": 1,
+    "utteranceId": "44e21e25-de60-4c68-b896-a9a1486b7336",
+    "runId": "05a1d324-ef58-43d1-9abd-4947b0d75765",
+    "status": "ready",
+    "readyMs": 10710.388959000004,
+    "audioReceivedMs": 10711.021584000002,
+    "bytes": 90668,
+    "metrics": [
+      {
+        "time": "2026-10-13T15:01:34.685Z",
+        "purpose": "asr",
+        "durationMs": 1.4083339999997406,
+        "component": "inference",
+        "event": "inference.prepared"
+      },
+      {
+        "time": "2026-10-13T15:01:34.686Z",
+        "purpose": "asr",
+        "kind": "asr",
+        "phase": "provider_ready",
+        "outcome": "ok",
+        "durationMs": 0.1740830000017013,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:35.027Z",
+        "purpose": "asr",
+        "kind": "audio/transcriptions",
+        "phase": "response_headers",
+        "outcome": "ok",
+        "durationMs": 340.148416,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:35.029Z",
+        "purpose": "asr",
+        "phase": "provider",
+        "outcome": "ok",
+        "durationMs": 342.9917919999971,
+        "component": "inference",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:35.031Z",
+        "phase": "asr",
+        "outcome": "ok",
+        "durationMs": 347.7380840000005,
+        "component": "voice-dialogue",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:35.035Z",
+        "purpose": "llm",
+        "durationMs": 1.0134580000012647,
+        "component": "inference",
+        "event": "inference.prepared"
+      },
+      {
+        "time": "2026-10-13T15:01:35.036Z",
+        "purpose": "llm",
+        "kind": "llm",
+        "phase": "provider_ready",
+        "outcome": "ok",
+        "durationMs": 0.24195800000234158,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:35.037Z",
+        "purpose": "llm",
+        "phase": "main_connection_wait",
+        "outcome": "ok",
+        "durationMs": 0.010915999999269843,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:35.071Z",
+        "purpose": "llm",
+        "kind": "llm",
+        "phase": "provider_ready",
+        "outcome": "ok",
+        "durationMs": 33.77495799999815,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:35.113Z",
+        "purpose": "llm",
+        "phase": "token_count",
+        "outcome": "ok",
+        "durationMs": 40.14724999999817,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:40.727Z",
+        "purpose": "llm",
+        "kind": "chat/completions",
+        "phase": "response_headers",
+        "outcome": "ok",
+        "durationMs": 5614.124625,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:40.730Z",
+        "purpose": "llm",
+        "outcome": "ok",
+        "totalMs": 5657.586584000001,
+        "component": "larm",
+        "event": "larm.llm_timing"
+      },
+      {
+        "time": "2026-10-13T15:01:40.739Z",
+        "purpose": "llm",
+        "phase": "provider",
+        "outcome": "ok",
+        "durationMs": 5702.661,
+        "component": "inference",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:40.743Z",
+        "phase": "input_control",
+        "outcome": "ok",
+        "durationMs": 5709.612834000003,
+        "component": "voice-dialogue",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:40.768Z",
+        "kind": "streamed",
+        "component": "dialogue",
+        "event": "dialogue.body_policy"
+      },
+      {
+        "time": "2026-10-13T15:01:40.773Z",
+        "purpose": "llm",
+        "durationMs": 1.0794170000008307,
+        "component": "inference",
+        "event": "inference.prepared"
+      },
+      {
+        "time": "2026-10-13T15:01:40.777Z",
+        "purpose": "llm",
+        "phase": "main_connection_wait",
+        "outcome": "ok",
+        "durationMs": 1.5626669999983278,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:40.779Z",
+        "purpose": "llm",
+        "kind": "llm",
+        "phase": "provider_ready",
+        "outcome": "ok",
+        "durationMs": 1.0789999999979045,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:40.821Z",
+        "purpose": "llm",
+        "phase": "token_count",
+        "outcome": "ok",
+        "durationMs": 41.2298329999976,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:43.261Z",
+        "purpose": "llm",
+        "kind": "chat/completions",
+        "phase": "response_headers",
+        "outcome": "ok",
+        "durationMs": 2438.9944590000014,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:43.264Z",
+        "purpose": "llm",
+        "kind": "streamed",
+        "durationMs": 2496.1589999999997,
+        "component": "dialogue",
+        "event": "dialogue.first_delta"
+      },
+      {
+        "time": "2026-10-13T15:01:45.004Z",
+        "purpose": "llm",
+        "outcome": "ok",
+        "ttftMs": 2482.8651670000036,
+        "totalMs": 4224.015958000004,
+        "providerTtftMs": 2440.9694170000002,
+        "component": "larm",
+        "event": "larm.llm_timing"
+      },
+      {
+        "time": "2026-10-13T15:01:45.005Z",
+        "purpose": "llm",
+        "phase": "provider",
+        "outcome": "ok",
+        "durationMs": 4229.547083999998,
+        "component": "inference",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:45.008Z",
+        "purpose": "llm",
+        "kind": "system-one",
+        "phase": "provider_ready",
+        "outcome": "ok",
+        "durationMs": 0.04741700000158744,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:45.032Z",
+        "purpose": "llm",
+        "kind": "systemone",
+        "phase": "response_headers",
+        "outcome": "ok",
+        "durationMs": 22.735290999997233,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:45.037Z",
+        "purpose": "llm",
+        "phase": "answer_delivery",
+        "outcome": "ok",
+        "durationMs": 29.566083999998227,
+        "component": "inference",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:45.058Z",
+        "kind": "sentence-language",
+        "phase": "provider_ready",
+        "outcome": "ok",
+        "durationMs": 0.0733330000002752,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:45.076Z",
+        "kind": "systemone",
+        "phase": "response_headers",
+        "outcome": "ok",
+        "durationMs": 15.567125000001397,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:45.085Z",
+        "purpose": "tts",
+        "durationMs": 29.692041000002064,
+        "component": "inference",
+        "event": "inference.prepared"
+      },
+      {
+        "time": "2026-10-13T15:01:45.087Z",
+        "purpose": "tts",
+        "kind": "tts",
+        "phase": "provider_ready",
+        "outcome": "ok",
+        "durationMs": 0.04925000000366708,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:45.359Z",
+        "purpose": "tts",
+        "kind": "audio/speech",
+        "phase": "response_headers",
+        "outcome": "ok",
+        "durationMs": 271.34020800000144,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:45.373Z",
+        "purpose": "tts",
+        "phase": "provider",
+        "outcome": "ok",
+        "durationMs": 286.3313330000019,
+        "component": "inference",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:45.379Z",
+        "durationMs": 325.37512499999866,
+        "component": "voice-dialogue",
+        "event": "voice.first_chunk_ready"
+      }
+    ]
+  },
+  {
+    "phase": "voice_api",
+    "repetition": 2,
+    "utteranceId": "bccfe8a2-6891-4bd4-9c38-6610bbdcdf15",
+    "runId": "04daf355-9004-4bfd-ba2b-30ca429d8a79",
+    "status": "ready",
+    "readyMs": 10991.085082999998,
+    "audioReceivedMs": 10991.646999999997,
+    "bytes": 90668,
+    "metrics": [
+      {
+        "time": "2026-10-13T15:01:45.405Z",
+        "purpose": "asr",
+        "durationMs": 4.24529099999927,
+        "component": "inference",
+        "event": "inference.prepared"
+      },
+      {
+        "time": "2026-10-13T15:01:45.407Z",
+        "purpose": "asr",
+        "kind": "asr",
+        "phase": "provider_ready",
+        "outcome": "ok",
+        "durationMs": 0.05308399999921676,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:45.733Z",
+        "purpose": "asr",
+        "kind": "audio/transcriptions",
+        "phase": "response_headers",
+        "outcome": "ok",
+        "durationMs": 325.17404199999874,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:45.735Z",
+        "purpose": "asr",
+        "phase": "provider",
+        "outcome": "ok",
+        "durationMs": 328.9444579999981,
+        "component": "inference",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:45.737Z",
+        "phase": "asr",
+        "outcome": "ok",
+        "durationMs": 336.3914170000062,
+        "component": "voice-dialogue",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:45.741Z",
+        "purpose": "llm",
+        "durationMs": 0.7509999999965657,
+        "component": "inference",
+        "event": "inference.prepared"
+      },
+      {
+        "time": "2026-10-13T15:01:45.742Z",
+        "purpose": "llm",
+        "kind": "llm",
+        "phase": "provider_ready",
+        "outcome": "ok",
+        "durationMs": 0.1860000000015134,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:45.742Z",
+        "purpose": "llm",
+        "phase": "main_connection_wait",
+        "outcome": "ok",
+        "durationMs": 0.01374999999825377,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:45.764Z",
+        "purpose": "llm",
+        "kind": "llm",
+        "phase": "provider_ready",
+        "outcome": "ok",
+        "durationMs": 21.22345800000039,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:45.805Z",
+        "purpose": "llm",
+        "phase": "token_count",
+        "outcome": "ok",
+        "durationMs": 39.5827500000014,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:51.536Z",
+        "purpose": "llm",
+        "kind": "chat/completions",
+        "phase": "response_headers",
+        "outcome": "ok",
+        "durationMs": 5730.768582999997,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:51.539Z",
+        "purpose": "llm",
+        "outcome": "ok",
+        "totalMs": 5773.5616669999945,
+        "component": "larm",
+        "event": "larm.llm_timing"
+      },
+      {
+        "time": "2026-10-13T15:01:51.549Z",
+        "purpose": "llm",
+        "phase": "provider",
+        "outcome": "ok",
+        "durationMs": 5807.611582999998,
+        "component": "inference",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:51.554Z",
+        "phase": "input_control",
+        "outcome": "ok",
+        "durationMs": 5814.487709000001,
+        "component": "voice-dialogue",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:51.573Z",
+        "kind": "streamed",
+        "component": "dialogue",
+        "event": "dialogue.body_policy"
+      },
+      {
+        "time": "2026-10-13T15:01:51.580Z",
+        "purpose": "llm",
+        "durationMs": 1.9174159999965923,
+        "component": "inference",
+        "event": "inference.prepared"
+      },
+      {
+        "time": "2026-10-13T15:01:51.584Z",
+        "purpose": "llm",
+        "phase": "main_connection_wait",
+        "outcome": "ok",
+        "durationMs": 3.0488750000004075,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:51.587Z",
+        "purpose": "llm",
+        "kind": "llm",
+        "phase": "provider_ready",
+        "outcome": "ok",
+        "durationMs": 1.515665999999328,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:51.624Z",
+        "purpose": "llm",
+        "phase": "token_count",
+        "outcome": "ok",
+        "durationMs": 35.33420800000022,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:54.231Z",
+        "purpose": "llm",
+        "kind": "chat/completions",
+        "phase": "response_headers",
+        "outcome": "ok",
+        "durationMs": 2603.1716250000027,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:54.233Z",
+        "purpose": "llm",
+        "kind": "streamed",
+        "durationMs": 2660.198749999996,
+        "component": "dialogue",
+        "event": "dialogue.first_delta"
+      },
+      {
+        "time": "2026-10-13T15:01:55.963Z",
+        "purpose": "llm",
+        "outcome": "ok",
+        "ttftMs": 2643.413124999999,
+        "totalMs": 4374.428666,
+        "providerTtftMs": 2604.6945840000044,
+        "component": "larm",
+        "event": "larm.llm_timing"
+      },
+      {
+        "time": "2026-10-13T15:01:55.964Z",
+        "purpose": "llm",
+        "phase": "provider",
+        "outcome": "ok",
+        "durationMs": 4382.669709000002,
+        "component": "inference",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:55.965Z",
+        "purpose": "llm",
+        "kind": "system-one",
+        "phase": "provider_ready",
+        "outcome": "ok",
+        "durationMs": 0.04899999999906868,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:55.991Z",
+        "purpose": "llm",
+        "kind": "systemone",
+        "phase": "response_headers",
+        "outcome": "ok",
+        "durationMs": 25.03595800000039,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:55.993Z",
+        "purpose": "llm",
+        "phase": "answer_delivery",
+        "outcome": "ok",
+        "durationMs": 28.073584000005212,
+        "component": "inference",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:56.011Z",
+        "kind": "sentence-language",
+        "phase": "provider_ready",
+        "outcome": "ok",
+        "durationMs": 0.18720899999607354,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:56.028Z",
+        "kind": "systemone",
+        "phase": "response_headers",
+        "outcome": "ok",
+        "durationMs": 15.314874999996391,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:56.032Z",
+        "purpose": "tts",
+        "durationMs": 23.20916700000089,
+        "component": "inference",
+        "event": "inference.prepared"
+      },
+      {
+        "time": "2026-10-13T15:01:56.032Z",
+        "purpose": "tts",
+        "kind": "tts",
+        "phase": "provider_ready",
+        "outcome": "ok",
+        "durationMs": 0.03204199999890989,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:56.371Z",
+        "purpose": "tts",
+        "kind": "audio/speech",
+        "phase": "response_headers",
+        "outcome": "ok",
+        "durationMs": 338.2168329999986,
+        "component": "larm",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:56.387Z",
+        "purpose": "tts",
+        "phase": "provider",
+        "outcome": "ok",
+        "durationMs": 354.8117920000004,
+        "component": "inference",
+        "event": "performance.stage"
+      },
+      {
+        "time": "2026-10-13T15:01:56.389Z",
+        "durationMs": 384.874625000004,
+        "component": "voice-dialogue",
+        "event": "voice.first_chunk_ready"
+      }
+    ]
+  }
+]

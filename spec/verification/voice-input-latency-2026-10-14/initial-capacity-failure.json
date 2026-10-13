@@ -1,0 +1,24 @@
+{
+  "lane": "live_control_adapter_synthetic_inputs",
+  "at": "2026-10-13T21:37:15.918Z",
+  "options": {
+    "maxOutputTokens": 512,
+    "jsonOutput": true,
+    "contextPolicy": "exact",
+    "sessionRole": "auxiliary"
+  },
+  "timeoutMs": 8000,
+  "baselineHash": "70e3ee80b18899488a76b953fded8c2d4022bdbd5ef00f47b95174cf59176bb6",
+  "candidateHash": "70e3ee80b18899488a76b953fded8c2d4022bdbd5ef00f47b95174cf59176bb6",
+  "samples": [
+    {
+      "sampleId": "d4bc6ac7-00eb-44f3-8da3-aea0d2d954d0",
+      "id": "standalone",
+      "variant": "before",
+      "repetition": 0,
+      "durationMs": 8089.339958,
+      "pass": false,
+      "error": "control_failed"
+    }
+  ]
+}

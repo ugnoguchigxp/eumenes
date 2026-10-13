@@ -49,6 +49,13 @@ export interface ToolchainRoutingPort {
 		packageRevisionId: string;
 		runtime: ToolchainRuntimeMeta;
 	};
+	/**
+	 * Every active toolchain with its host runtime: the fixed map for unbound chains, the binding
+	 * and adapter availability for bound ones. Replaces the builtin array as the offer source.
+	 */
+	catalogInTransaction(
+		db: Database,
+	): Array<{ id: string; revisionId: string; runtime: ToolchainRuntimeMeta }>;
 	/** The fixed set a command sub-agent loads (profile, SKILL, tool details). */
 	commandSetInTransaction(
 		db: Database,
@@ -63,7 +70,11 @@ export interface ToolchainRoutingPort {
 			summary: string;
 			schema: Record<string, unknown> | null;
 		}>;
+		/** Present for bound command toolchains: tools map to adapter operations. */
+		binding?: BoundCommandSet;
 	};
+	/** Host services of bound command toolchains (adapter snapshot, input checks, preparation). */
+	bound?: BoundCommandPort;
 	recordSelectionInTransaction(
 		db: Database,
 		input: {
@@ -92,4 +103,68 @@ export interface ToolchainRoutingPort {
 	): void;
 	/** The request text the conversation handed to the toolchain of a run. */
 	requestOfRunInTransaction(db: Database, runId: string): string | undefined;
+}
+
+/** A bound command toolchain's tools as the command sub-agent is offered them. */
+export type BoundCommandSet = {
+	bindingRevisionId: string;
+	adapterRef: string;
+	artifactRevisionId: string;
+	packageRevisionId: string;
+	tools: Array<{
+		/** Tool definition id (e.g. `timer.start`) the model names. */
+		id: string;
+		toolRevisionId: string;
+		operationName: string;
+		inputSchemaRef: string;
+		summary: string;
+		/** Flat JSON Schema projected from inputSchemaRef. */
+		schema: Record<string, unknown>;
+	}>;
+};
+
+/**
+ * Application-implemented services for bound command toolchains. Dialogue never names a domain:
+ * it asks the binding's adapter for its snapshot and validates through registered schemas.
+ */
+export interface BoundCommandPort {
+	/** Host data the command sub-agent may refer to (e.g. current timers). */
+	snapshotInTransaction(db: Database, bindingRevisionId: string): unknown;
+	/** Validate the model's arguments for one tool of the binding against its schema. */
+	parseInvocation(
+		set: BoundCommandSet,
+		toolId: string,
+		args: unknown,
+	):
+		| {
+				ok: true;
+				toolRevisionId: string;
+				operationName: string;
+				input: Record<string, unknown>;
+		  }
+		| { ok: false; code: string };
+	/**
+	 * Host-issued choices of a question schema for this binding's adapter (at most 20; empty when
+	 * none are available now). Never model text.
+	 */
+	questionChoicesInTransaction(
+		db: Database,
+		bindingRevisionId: string,
+		inputSchemaRef: string,
+	): Array<{ ref: string; label: string }>;
+	/** Validate an interaction answer against a registered question schema. */
+	parseAnswer(
+		inputSchemaRef: string,
+		input: unknown,
+	): { ok: true; value: unknown } | { ok: false; code: string };
+	/**
+	 * The frozen package capability the agent runtime executes the operation with (opaque to
+	 * dialogue). Throws `capability_unavailable` when the package or adapter is unavailable.
+	 */
+	prepareInTransaction(
+		db: Database,
+		runId: string,
+		set: BoundCommandSet,
+		invocation: { toolRevisionId: string; input: Record<string, unknown> },
+	): unknown;
 }

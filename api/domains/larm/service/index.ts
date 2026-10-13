@@ -1,3 +1,5 @@
+import { providerRequest } from "./provider-request";
+import { measureStage } from "../../../infrastructure/performance";
 import { createSpeechSynthesizer } from "./speech";
 import { createSentenceLanguageOperations } from "./sentence-language";
 import { answerRequest } from "./answer-request";
@@ -531,7 +533,12 @@ export function createLarm(config: {
 			name === "llm" ? ["llm"] : ["llm", "asr", "tts"];
 		for (let attempt = 0; ; attempt++) {
 			signal.throwIfAborted();
-			let current = await untilAborted(connect(required, signal), signal);
+			let current = await measureStage(
+				"larm",
+				"provider_ready",
+				() => untilAborted(connect(required, signal), signal),
+				{ kind: name },
+			);
 			let provider = current.providers.get(name);
 			if (
 				(name === "sentence-language" || name === "tts-english") &&
@@ -618,13 +625,14 @@ export function createLarm(config: {
 		const started = Date.now();
 		let response: Response;
 		try {
-			response = await request(url, {
-				...init,
-				headers: { Authorization: `Bearer ${provider.token}`, ...init.headers },
-				// The caller owns the deadline (LLM calls run up to 180 s); this only bounds a stuck stream.
-				signal: AbortSignal.any([signal, AbortSignal.timeout(300_000)]),
-				redirect: "error",
-			});
+			response = await providerRequest(
+				request,
+				url,
+				provider,
+				init,
+				signal,
+				operation,
+			);
 		} catch (error) {
 			if (signal.aborted)
 				log.info("larm.inference_cancelled", {
@@ -750,7 +758,9 @@ export function createLarm(config: {
 			finish = resolve;
 		});
 		try {
-			await untilAborted(previous, scoped);
+			await measureStage("larm", "main_connection_wait", () =>
+				untilAborted(previous, scoped),
+			);
 			return await inferAnswer(messages, scoped, onDelta, options);
 		} finally {
 			// A cancelled queued call must not let a later call overtake the active one.

@@ -3,12 +3,18 @@ import { getLogger } from "../../../infrastructure/logger";
 import {
 	bytes,
 	hash,
+	artifactRevisionIdPattern,
+	bindingRevisionIdPattern,
 	toolchainFunctionPattern,
 	validators,
 	type Definition,
 	type FixedDefinition,
 } from "../contracts";
 import { zSchema } from "./schema";
+import {
+	artifactInTransaction,
+	commandBindingInTransaction,
+} from "./documents";
 export function registerRevision(
 	db: Database,
 	d: Definition,
@@ -74,7 +80,9 @@ export function registerRevision(
 		d.examples !== undefined ||
 		d.packageRevisionId !== undefined ||
 		d.artifact !== undefined ||
-		d.redirects !== undefined
+		d.redirects !== undefined ||
+		d.bindingRevisionId !== undefined ||
+		d.artifactRevisionId !== undefined
 	)
 		throw new Error("invalid_capability");
 	db.query("INSERT INTO capability_revisions VALUES(?,?,?,?,?,?)").run(
@@ -107,6 +115,11 @@ export function registerRevision(
 			dependency,
 		);
 	if (origin === "learned" || d.kind === "requirement") return;
+	indexSearch(db, d);
+}
+/** Replace the full-text entry of an item with the content of this revision. */
+export function indexSearch(db: Database, d: Definition) {
+	const key = `${d.kind}:${d.id}`;
 	db.query("DELETE FROM capability_search WHERE key=?").run(key);
 	db.query("INSERT INTO capability_search(key,content) VALUES(?,?)").run(
 		key,
@@ -125,7 +138,7 @@ export function registerRevision(
  * A toolchain is a fixed set: exactly one complete package (profile, SKILL, tools), a unique
  * function, how the conversation finds it, and an explicit result display.
  */
-function validateToolchain(
+export function validateToolchain(
 	db: Database,
 	d: Definition,
 	dependencies: FixedDefinition[],
@@ -154,12 +167,53 @@ function validateToolchain(
 	for (const tool of dependencies.filter((x) => x.kind === "tool"))
 		if (tool.schemaKey && !flatObjectSchema(zSchema(tool.schemaKey)))
 			throw new Error("invalid_toolchain_tool_schema");
+	validateBinding(db, d, dependencies);
 	const taken = db
 		.query(
 			"SELECT i.id FROM capability_items i JOIN capability_revisions r ON r.id=i.active_revision_id WHERE i.kind='toolchain' AND i.id<>? AND json_extract(r.definition_json,'$.functionName')=?",
 		)
 		.get(d.id, d.functionName);
 	if (taken) throw new Error("toolchain_function_conflict");
+}
+/**
+ * A bound toolchain names a stored command binding and the artifact it presents. Every tool
+ * the binding connects must belong to the frozen package, with the binding's input schema equal
+ * to the tool's own, so the model, the host and the UI validate the same shape.
+ */
+function validateBinding(
+	db: Database,
+	d: Definition,
+	dependencies: FixedDefinition[],
+) {
+	if (d.bindingRevisionId === undefined && d.artifactRevisionId === undefined)
+		return;
+	if (
+		d.bindingRevisionId === undefined ||
+		d.artifactRevisionId === undefined ||
+		!bindingRevisionIdPattern.test(d.bindingRevisionId) ||
+		!artifactRevisionIdPattern.test(d.artifactRevisionId)
+	)
+		throw new Error("invalid_toolchain");
+	const binding = commandBindingInTransaction(db, d.bindingRevisionId);
+	const pack = dependencies[0]!;
+	if (
+		!binding ||
+		binding.document.artifactRevisionId !== d.artifactRevisionId ||
+		!artifactInTransaction(db, d.artifactRevisionId)
+	)
+		throw new Error("invalid_toolchain");
+	const tools = new Set(pack.toolRevisionIds);
+	for (const tool of binding.document.tools) {
+		const fixed = dependencies.find(
+			(x) => x.kind === "tool" && x.revisionId === tool.toolRevisionId,
+		);
+		if (
+			!tools.has(tool.toolRevisionId) ||
+			!fixed?.schemaKey ||
+			tool.inputSchemaRef !== `builtin:${fixed.schemaKey}`
+		)
+			throw new Error("invalid_toolchain");
+	}
 }
 /** A JSON Schema a model can fill directly: an object without top-level unions. */
 export function flatObjectSchema(schema: Record<string, unknown>) {

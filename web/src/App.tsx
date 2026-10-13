@@ -26,7 +26,7 @@ export function App() {
 	const [client] = useState(() => createClient(window.location.origin));
 	return (
 		<QueryClientProvider client={queryClient}>
-			<Suspense fallback={<p role="status">編集画面を読み込み中です。</p>}>
+			<Suspense fallback={<output>編集画面を読み込み中です。</output>}>
 				{drawing ? (
 					<DrawingEditor
 						key={hash}

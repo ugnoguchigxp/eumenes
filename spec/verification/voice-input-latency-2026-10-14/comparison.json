@@ -1,0 +1,1077 @@
+{
+  "lane": "live_control_adapter_synthetic_inputs",
+  "at": "2026-10-13T21:48:19.253Z",
+  "options": {
+    "maxOutputTokens": 512,
+    "jsonOutput": true,
+    "contextPolicy": "exact",
+    "sessionRole": "main"
+  },
+  "timeoutMs": 8000,
+  "baselineHash": "70e3ee80b18899488a76b953fded8c2d4022bdbd5ef00f47b95174cf59176bb6",
+  "candidateHash": "2cc9779ed5efe5447cc68cd0ea9007bbdf4bbdd749d55fef87588f4163c3115e",
+  "samples": [
+    {
+      "sampleId": "f29aed2b-88f3-4b64-98ac-a867fd2bca39",
+      "id": "standalone",
+      "variant": "before",
+      "repetition": 0,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4355.356334,
+      "messageHash": "ade5fb9a2d2115cb8312f278000601ebfaf5c49db60e754cf592a5b7c7559135",
+      "requestBytes": 4646,
+      "responseBytes": 187,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.98,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.97,
+        "readinessConfidence": 0.95
+      },
+      "languageStatus": "allowed",
+      "pass": true
+    },
+    {
+      "sampleId": "48f74eed-5367-4f8b-812c-f6bd4a738205",
+      "id": "standalone",
+      "variant": "after",
+      "repetition": 0,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 3838.5121659999995,
+      "messageHash": "c6fe484b81b96f1ed0fff6f1b55ff323a7f87d699104cc07e4f7abe62e1769bc",
+      "requestBytes": 3941,
+      "responseBytes": 187,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.98,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.95,
+        "readinessConfidence": 0.95
+      },
+      "languageStatus": "allowed",
+      "pass": true
+    },
+    {
+      "sampleId": "5e2f6472-6fc1-4ab4-8457-d5c82a4eb35e",
+      "id": "fragment-1",
+      "variant": "after",
+      "repetition": 0,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 3657.932666999999,
+      "messageHash": "b194dea4c93ed609295f9215143cbd60caa5b2856f1ee229dde32259312d5653",
+      "requestBytes": 3911,
+      "responseBytes": 186,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.9,
+        "relation": "independent",
+        "readiness": "waiting",
+        "relationConfidence": 0.8,
+        "readinessConfidence": 0.7
+      },
+      "languageStatus": "allowed",
+      "pass": false
+    },
+    {
+      "sampleId": "aaf9faf4-e8fb-420a-b7d4-8bafdf97ed8f",
+      "id": "fragment-1",
+      "variant": "before",
+      "repetition": 0,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4405.469666000001,
+      "messageHash": "ed636cf5dfbfed373f9c1d40330254be93260dfb77d6f06035a93e6bb4f6dee8",
+      "requestBytes": 4616,
+      "responseBytes": 187,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.98,
+        "relation": "independent",
+        "readiness": "waiting",
+        "relationConfidence": 0.9,
+        "readinessConfidence": 0.7
+      },
+      "languageStatus": "allowed",
+      "pass": false
+    },
+    {
+      "sampleId": "09fe4883-54da-4a69-ab49-6580f422144b",
+      "id": "fragment-2",
+      "variant": "before",
+      "repetition": 0,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4009.3324159999975,
+      "messageHash": "aecdeb6aee6b1515900492efc419de7ab7d99c5ae573f57249cbd645523eabca",
+      "requestBytes": 4634,
+      "responseBytes": 187,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.9,
+        "relation": "continuation",
+        "readiness": "waiting",
+        "relationConfidence": 0.7,
+        "readinessConfidence": 0.7
+      },
+      "languageStatus": "allowed",
+      "pass": false
+    },
+    {
+      "sampleId": "77fd36e6-1689-4d61-b43c-d2db3f8d287d",
+      "id": "fragment-2",
+      "variant": "after",
+      "repetition": 0,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 3814.8836669999982,
+      "messageHash": "be2d25fc702d091194d25b20d2b569d19d216bea3e8c809fe909198439812ae5",
+      "requestBytes": 3929,
+      "responseBytes": 188,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.98,
+        "relation": "continuation",
+        "readiness": "waiting",
+        "relationConfidence": 0.7,
+        "readinessConfidence": 0.7
+      },
+      "languageStatus": "allowed",
+      "pass": false
+    },
+    {
+      "sampleId": "e6daa075-6461-4100-9858-3ae76ab65a63",
+      "id": "fragment-3",
+      "variant": "after",
+      "repetition": 0,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 3948.523624999998,
+      "messageHash": "9aa03319341294c069c9438bf4a2b2a64cbb66443b91ce14b415c7ef5dfe61fd",
+      "requestBytes": 3980,
+      "responseBytes": 186,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.98,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.9,
+        "readinessConfidence": 0.95
+      },
+      "languageStatus": "allowed",
+      "pass": false
+    },
+    {
+      "sampleId": "6ba0ca55-ee28-4614-bcce-36d530d1d184",
+      "id": "fragment-3",
+      "variant": "before",
+      "repetition": 0,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 3856.6657909999994,
+      "messageHash": "d3dbf76fe26d5ed0c34985f5862865980391aa838db5ad4de6a425b88510a18b",
+      "requestBytes": 4685,
+      "responseBytes": 186,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.98,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.9,
+        "readinessConfidence": 0.95
+      },
+      "languageStatus": "allowed",
+      "pass": false
+    },
+    {
+      "sampleId": "e05bdc95-8b2e-4379-9c32-0949e47bc358",
+      "id": "topic-switch",
+      "variant": "before",
+      "repetition": 0,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 3913.9587919999976,
+      "messageHash": "b2c6b5f642c60c5b70ee6a47243a038fc8ffc38dd565e70aacfa4634bfc0d20a",
+      "requestBytes": 4661,
+      "responseBytes": 187,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.98,
+        "relation": "continuation",
+        "readiness": "ready",
+        "relationConfidence": 0.92,
+        "readinessConfidence": 0.9
+      },
+      "languageStatus": "allowed",
+      "pass": false
+    },
+    {
+      "sampleId": "b6517121-325c-4c82-b94b-2a9d259f8d4e",
+      "id": "topic-switch",
+      "variant": "after",
+      "repetition": 0,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4350.270667000004,
+      "messageHash": "9db2afa0fb6443762cb87418e1d29388d2047a2a575c6b75b0d14cbe41596c5a",
+      "requestBytes": 3956,
+      "responseBytes": 186,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.97,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.9,
+        "readinessConfidence": 0.95
+      },
+      "languageStatus": "allowed",
+      "pass": true
+    },
+    {
+      "sampleId": "93960654-bb89-4eb5-a8eb-7a161796f902",
+      "id": "short-answer",
+      "variant": "after",
+      "repetition": 0,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 3731.7501669999983,
+      "messageHash": "a1e5a8b31b13a28bb438dcb008b7a306c9f0694d2c2b2303499b31200e67eed3",
+      "requestBytes": 3985,
+      "responseBytes": 186,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.98,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.9,
+        "readinessConfidence": 0.95
+      },
+      "languageStatus": "allowed",
+      "pass": true
+    },
+    {
+      "sampleId": "aaf79b3d-91de-4d2f-842d-55ea30733e16",
+      "id": "short-answer",
+      "variant": "before",
+      "repetition": 0,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 3915.8503340000025,
+      "messageHash": "86caf86ed6ee6accdfc96b11826f4da4adbc6b87563007fc77f1f0cd58643350",
+      "requestBytes": 4690,
+      "responseBytes": 186,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.98,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.9,
+        "readinessConfidence": 0.95
+      },
+      "languageStatus": "allowed",
+      "pass": true
+    },
+    {
+      "sampleId": "5e95908c-2399-40a6-8e8b-8330f9b66a25",
+      "id": "acronyms",
+      "variant": "before",
+      "repetition": 0,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4262.482041000003,
+      "messageHash": "acbd73c08b7ff28baa823e801b24eac40ac161edcd9afd2f97fcdd4d02a832f3",
+      "requestBytes": 4652,
+      "responseBytes": 187,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.98,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.95,
+        "readinessConfidence": 0.97
+      },
+      "languageStatus": "allowed",
+      "pass": true
+    },
+    {
+      "sampleId": "2a76b6f0-b53d-425d-b67f-1e2a2d1fea5c",
+      "id": "acronyms",
+      "variant": "after",
+      "repetition": 0,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 3913.022208999995,
+      "messageHash": "c0c29b4b5d5ba34c021bc64c686ca840b06b81993a706e3e7f788be5211a0a43",
+      "requestBytes": 3947,
+      "responseBytes": 187,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.98,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.99,
+        "readinessConfidence": 0.97
+      },
+      "languageStatus": "allowed",
+      "pass": true
+    },
+    {
+      "sampleId": "9e11997b-083f-437a-8ca4-698528d8dba3",
+      "id": "foreign",
+      "variant": "after",
+      "repetition": 0,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 7551.581292000003,
+      "messageHash": "f3e164bbb66937659970084cfc28bf124e05a33f6300676041cbd8578a29cc0b",
+      "requestBytes": 3942,
+      "responseBytes": 187,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "fr"
+        ],
+        "confidence": 0.98,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.99,
+        "readinessConfidence": 0.95
+      },
+      "languageStatus": "not_allowed",
+      "pass": true
+    },
+    {
+      "sampleId": "2c5e735b-90b9-43d0-8886-a491528b80e6",
+      "id": "foreign",
+      "variant": "before",
+      "repetition": 0,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4631.32383400001,
+      "messageHash": "ec0fbe1f768c40df728c6cd0f879aafc958bf2c7aafd6d6ae271e46eb5ba4018",
+      "requestBytes": 4647,
+      "responseBytes": 186,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "fr"
+        ],
+        "confidence": 0.97,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.95,
+        "readinessConfidence": 0.9
+      },
+      "languageStatus": "not_allowed",
+      "pass": true
+    },
+    {
+      "sampleId": "c12a46fc-c6c2-490e-a6e6-f8b6cde15ca8",
+      "id": "mixed",
+      "variant": "before",
+      "repetition": 0,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 7548.982208000001,
+      "messageHash": "91b44b489dcf7da0fbd57acdadb1297caa58be92ec170797284856b519cfba91",
+      "requestBytes": 4683,
+      "responseBytes": 192,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja",
+          "en"
+        ],
+        "confidence": 0.98,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.95,
+        "readinessConfidence": 0.9
+      },
+      "languageStatus": "not_allowed",
+      "pass": true
+    },
+    {
+      "sampleId": "a6198b08-d66c-45f5-92e5-6f68952ac2a4",
+      "id": "mixed",
+      "variant": "after",
+      "repetition": 0,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4101.135209,
+      "messageHash": "9a816cab6c06dcf369282af408246bb973e8e53d046a1cbed8aed6b1e3a4cde5",
+      "requestBytes": 3978,
+      "responseBytes": 193,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja",
+          "en"
+        ],
+        "confidence": 0.98,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.99,
+        "readinessConfidence": 0.95
+      },
+      "languageStatus": "not_allowed",
+      "pass": true
+    },
+    {
+      "sampleId": "e81f8ee3-7c92-4f57-a59f-2bad300201c4",
+      "id": "ambiguous",
+      "variant": "after",
+      "repetition": 0,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 7196.090291,
+      "messageHash": "8f3c0d0b72488c5b3a317fa2ac08984cbfcaf7d157c6fd68251267f3cbac812e",
+      "requestBytes": 3893,
+      "responseBytes": 180,
+      "assessment": {
+        "status": "undetermined",
+        "languages": [],
+        "confidence": 0,
+        "relation": "independent",
+        "readiness": "uncertain",
+        "relationConfidence": 0,
+        "readinessConfidence": 0
+      },
+      "languageStatus": "unverified",
+      "pass": false
+    },
+    {
+      "sampleId": "a8867879-ec08-4d88-97e1-645d2ba5b351",
+      "id": "ambiguous",
+      "variant": "before",
+      "repetition": 0,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 3979.411625000008,
+      "messageHash": "c8355376d51073ddf063d72cf4cd102bcece832d4204bbea49237f20cedff115",
+      "requestBytes": 4598,
+      "responseBytes": 180,
+      "assessment": {
+        "status": "undetermined",
+        "languages": [],
+        "confidence": 0,
+        "relation": "independent",
+        "readiness": "uncertain",
+        "relationConfidence": 0,
+        "readinessConfidence": 0
+      },
+      "languageStatus": "unverified",
+      "pass": false
+    },
+    {
+      "sampleId": "b70dd5e6-f284-4d69-9e86-6100f49424f9",
+      "id": "text-injection",
+      "variant": "before",
+      "repetition": 0,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 8010.0740420000075,
+      "pass": false,
+      "error": "control_failed"
+    },
+    {
+      "sampleId": "34055774-6c40-4ddf-8804-1b74d4f52c75",
+      "id": "text-injection",
+      "variant": "after",
+      "repetition": 0,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 5098.537125000003,
+      "messageHash": "2a53092daffee2ed584f6f5f38a535e72e95e1c20774b5224555eba5c528025a",
+      "requestBytes": 3988,
+      "responseBytes": 185,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.98,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.9,
+        "readinessConfidence": 0.9
+      },
+      "languageStatus": "allowed",
+      "pass": true
+    },
+    {
+      "sampleId": "10206fc5-4047-4218-a933-b60d4904e53a",
+      "id": "context-injection",
+      "variant": "after",
+      "repetition": 0,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 3677.116750000001,
+      "messageHash": "40879a51cea52208a73bedb75a2a6a9af2028c4d7c00d58585d22868f98b659c",
+      "requestBytes": 4082,
+      "responseBytes": 186,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.9,
+        "relation": "independent",
+        "readiness": "waiting",
+        "relationConfidence": 0.9,
+        "readinessConfidence": 0.8
+      },
+      "languageStatus": "allowed",
+      "pass": true
+    },
+    {
+      "sampleId": "f66e756a-0ac8-4913-a41b-17fcf4a81a83",
+      "id": "context-injection",
+      "variant": "before",
+      "repetition": 0,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 8003.730666999996,
+      "pass": false,
+      "error": "control_failed"
+    },
+    {
+      "sampleId": "90452aa5-7238-49f7-82cc-c65c583e9e23",
+      "id": "standalone",
+      "variant": "after",
+      "repetition": 1,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4651.6738329999935,
+      "messageHash": "c6fe484b81b96f1ed0fff6f1b55ff323a7f87d699104cc07e4f7abe62e1769bc",
+      "requestBytes": 3941,
+      "responseBytes": 187,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.98,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.98,
+        "readinessConfidence": 0.95
+      },
+      "languageStatus": "allowed",
+      "pass": true
+    },
+    {
+      "sampleId": "76c1e608-08b4-45cf-b175-4fc9c339959d",
+      "id": "standalone",
+      "variant": "before",
+      "repetition": 1,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 3836.543915999995,
+      "messageHash": "ade5fb9a2d2115cb8312f278000601ebfaf5c49db60e754cf592a5b7c7559135",
+      "requestBytes": 4646,
+      "responseBytes": 187,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.99,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.99,
+        "readinessConfidence": 0.99
+      },
+      "languageStatus": "allowed",
+      "pass": true
+    },
+    {
+      "sampleId": "5bffee9e-1f55-45a1-8b78-8197d1b2c9c4",
+      "id": "fragment-1",
+      "variant": "before",
+      "repetition": 1,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4015.6642909999937,
+      "messageHash": "ed636cf5dfbfed373f9c1d40330254be93260dfb77d6f06035a93e6bb4f6dee8",
+      "requestBytes": 4616,
+      "responseBytes": 195,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.95,
+        "relation": "independent",
+        "readiness": "waiting",
+        "relationConfidence": 0.9,
+        "readinessConfidence": 0.7
+      },
+      "languageStatus": "allowed",
+      "pass": false
+    },
+    {
+      "sampleId": "80f0ee39-846c-49e3-871f-eaec18c8df1a",
+      "id": "fragment-1",
+      "variant": "after",
+      "repetition": 1,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 8003.857082999995,
+      "pass": false,
+      "error": "control_failed"
+    },
+    {
+      "sampleId": "48f88e26-c506-45ab-b74a-c1ed59712440",
+      "id": "fragment-2",
+      "variant": "after",
+      "repetition": 1,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4221.330667000002,
+      "messageHash": "be2d25fc702d091194d25b20d2b569d19d216bea3e8c809fe909198439812ae5",
+      "requestBytes": 3929,
+      "responseBytes": 188,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.98,
+        "relation": "continuation",
+        "readiness": "waiting",
+        "relationConfidence": 0.7,
+        "readinessConfidence": 0.7
+      },
+      "languageStatus": "allowed",
+      "pass": false
+    },
+    {
+      "sampleId": "bfc45094-bfec-4eda-a117-cbeb4a8e3015",
+      "id": "fragment-2",
+      "variant": "before",
+      "repetition": 1,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 8005.039749999996,
+      "pass": false,
+      "error": "control_failed"
+    },
+    {
+      "sampleId": "c13a1e8a-23e8-413a-b941-eaf4ad1f6d21",
+      "id": "fragment-3",
+      "variant": "before",
+      "repetition": 1,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 5570.539000000019,
+      "messageHash": "d3dbf76fe26d5ed0c34985f5862865980391aa838db5ad4de6a425b88510a18b",
+      "requestBytes": 4685,
+      "responseBytes": 187,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.97,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.88,
+        "readinessConfidence": 0.95
+      },
+      "languageStatus": "allowed",
+      "pass": false
+    },
+    {
+      "sampleId": "cd6ef2b1-4d33-4e76-bd9b-bc24f4eb8773",
+      "id": "fragment-3",
+      "variant": "after",
+      "repetition": 1,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4098.8842920000025,
+      "messageHash": "9aa03319341294c069c9438bf4a2b2a64cbb66443b91ce14b415c7ef5dfe61fd",
+      "requestBytes": 3980,
+      "responseBytes": 186,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.98,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.9,
+        "readinessConfidence": 0.95
+      },
+      "languageStatus": "allowed",
+      "pass": false
+    },
+    {
+      "sampleId": "24af7afc-1f99-4db6-8cdb-cc2530e72f1c",
+      "id": "topic-switch",
+      "variant": "after",
+      "repetition": 1,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 7991.510125000001,
+      "messageHash": "9db2afa0fb6443762cb87418e1d29388d2047a2a575c6b75b0d14cbe41596c5a",
+      "requestBytes": 3956,
+      "responseBytes": 187,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.98,
+        "relation": "continuation",
+        "readiness": "ready",
+        "relationConfidence": 0.9,
+        "readinessConfidence": 0.95
+      },
+      "languageStatus": "allowed",
+      "pass": false
+    },
+    {
+      "sampleId": "e3345cd5-8692-4d30-b4ee-2660c4e6578d",
+      "id": "topic-switch",
+      "variant": "before",
+      "repetition": 1,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4104.179042000003,
+      "messageHash": "b2c6b5f642c60c5b70ee6a47243a038fc8ffc38dd565e70aacfa4634bfc0d20a",
+      "requestBytes": 4661,
+      "responseBytes": 188,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.98,
+        "relation": "continuation",
+        "readiness": "waiting",
+        "relationConfidence": 0.9,
+        "readinessConfidence": 0.9
+      },
+      "languageStatus": "allowed",
+      "pass": false
+    },
+    {
+      "sampleId": "b99537b9-975b-46b6-a523-c5b1473e8b4c",
+      "id": "short-answer",
+      "variant": "before",
+      "repetition": 1,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 8005.096290999994,
+      "pass": false,
+      "error": "control_failed"
+    },
+    {
+      "sampleId": "40e1c0ed-b81b-4101-84ef-94b7a3ac5293",
+      "id": "short-answer",
+      "variant": "after",
+      "repetition": 1,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 5104.35954200002,
+      "messageHash": "a1e5a8b31b13a28bb438dcb008b7a306c9f0694d2c2b2303499b31200e67eed3",
+      "requestBytes": 3985,
+      "responseBytes": 186,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.98,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.9,
+        "readinessConfidence": 0.95
+      },
+      "languageStatus": "allowed",
+      "pass": true
+    },
+    {
+      "sampleId": "eed9d843-7162-4340-9361-296e7e6d9ad6",
+      "id": "acronyms",
+      "variant": "after",
+      "repetition": 1,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 3824.5856669999775,
+      "messageHash": "c0c29b4b5d5ba34c021bc64c686ca840b06b81993a706e3e7f788be5211a0a43",
+      "requestBytes": 3947,
+      "responseBytes": 187,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.99,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.99,
+        "readinessConfidence": 0.95
+      },
+      "languageStatus": "allowed",
+      "pass": true
+    },
+    {
+      "sampleId": "8a65f7c6-e86b-487a-959f-4eab5e1095de",
+      "id": "acronyms",
+      "variant": "before",
+      "repetition": 1,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 8003.599958000006,
+      "pass": false,
+      "error": "control_failed"
+    },
+    {
+      "sampleId": "67d6e596-16de-4b75-9ceb-c8b0d55690f3",
+      "id": "foreign",
+      "variant": "before",
+      "repetition": 1,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4569.342874999973,
+      "messageHash": "ec0fbe1f768c40df728c6cd0f879aafc958bf2c7aafd6d6ae271e46eb5ba4018",
+      "requestBytes": 4647,
+      "responseBytes": 187,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "fr"
+        ],
+        "confidence": 0.98,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.98,
+        "readinessConfidence": 0.95
+      },
+      "languageStatus": "not_allowed",
+      "pass": true
+    },
+    {
+      "sampleId": "1be79e38-8f2b-4965-b35e-d72b78535a11",
+      "id": "foreign",
+      "variant": "after",
+      "repetition": 1,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 3744.348417000001,
+      "messageHash": "f3e164bbb66937659970084cfc28bf124e05a33f6300676041cbd8578a29cc0b",
+      "requestBytes": 3942,
+      "responseBytes": 187,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "fr"
+        ],
+        "confidence": 0.98,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.98,
+        "readinessConfidence": 0.95
+      },
+      "languageStatus": "not_allowed",
+      "pass": true
+    },
+    {
+      "sampleId": "40dfa1d6-b07a-490c-b61f-e7274ff8dfbb",
+      "id": "mixed",
+      "variant": "after",
+      "repetition": 1,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 3899.7862500000047,
+      "messageHash": "9a816cab6c06dcf369282af408246bb973e8e53d046a1cbed8aed6b1e3a4cde5",
+      "requestBytes": 3978,
+      "responseBytes": 193,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja",
+          "en"
+        ],
+        "confidence": 0.98,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.99,
+        "readinessConfidence": 0.95
+      },
+      "languageStatus": "not_allowed",
+      "pass": true
+    },
+    {
+      "sampleId": "de475947-9c13-4d03-b719-484b8b0adacf",
+      "id": "mixed",
+      "variant": "before",
+      "repetition": 1,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4333.104665999999,
+      "messageHash": "91b44b489dcf7da0fbd57acdadb1297caa58be92ec170797284856b519cfba91",
+      "requestBytes": 4683,
+      "responseBytes": 193,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja",
+          "en"
+        ],
+        "confidence": 0.98,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.99,
+        "readinessConfidence": 0.95
+      },
+      "languageStatus": "not_allowed",
+      "pass": true
+    },
+    {
+      "sampleId": "85543b9e-1e2e-439d-89e2-86cf946e9a07",
+      "id": "ambiguous",
+      "variant": "before",
+      "repetition": 1,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 3803.511582999985,
+      "messageHash": "c8355376d51073ddf063d72cf4cd102bcece832d4204bbea49237f20cedff115",
+      "requestBytes": 4598,
+      "responseBytes": 180,
+      "assessment": {
+        "status": "undetermined",
+        "languages": [],
+        "confidence": 0,
+        "relation": "independent",
+        "readiness": "uncertain",
+        "relationConfidence": 0,
+        "readinessConfidence": 0
+      },
+      "languageStatus": "unverified",
+      "pass": false
+    },
+    {
+      "sampleId": "0a12877a-83a3-499c-bc46-c1a5df9cc6cc",
+      "id": "ambiguous",
+      "variant": "after",
+      "repetition": 1,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 3587.6002499999886,
+      "messageHash": "8f3c0d0b72488c5b3a317fa2ac08984cbfcaf7d157c6fd68251267f3cbac812e",
+      "requestBytes": 3893,
+      "responseBytes": 180,
+      "assessment": {
+        "status": "undetermined",
+        "languages": [],
+        "confidence": 0,
+        "relation": "independent",
+        "readiness": "uncertain",
+        "relationConfidence": 0,
+        "readinessConfidence": 0
+      },
+      "languageStatus": "unverified",
+      "pass": false
+    },
+    {
+      "sampleId": "42d8a0a2-6540-4801-a9a1-acda6253ed6f",
+      "id": "text-injection",
+      "variant": "after",
+      "repetition": 1,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 3872.0462920000136,
+      "messageHash": "2a53092daffee2ed584f6f5f38a535e72e95e1c20774b5224555eba5c528025a",
+      "requestBytes": 3988,
+      "responseBytes": 182,
+      "assessment": {
+        "status": "undetermined",
+        "languages": [],
+        "confidence": 0,
+        "relation": "independent",
+        "readiness": "waiting",
+        "relationConfidence": 0.5,
+        "readinessConfidence": 0.5
+      },
+      "languageStatus": "unverified",
+      "pass": false
+    },
+    {
+      "sampleId": "9d81c4b8-8b48-4f42-b8bc-34e5c2f2f13e",
+      "id": "text-injection",
+      "variant": "before",
+      "repetition": 1,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 3983.623749999999,
+      "messageHash": "3669468a94becd04e6472d6ded8f9ad46f4756ab9ab3fe92f144ed3aa4431d66",
+      "requestBytes": 4693,
+      "responseBytes": 192,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.9,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.9,
+        "readinessConfidence": 0.9
+      },
+      "languageStatus": "allowed",
+      "pass": true
+    },
+    {
+      "sampleId": "bfe87055-a60c-4d00-9d7a-6655cf204441",
+      "id": "context-injection",
+      "variant": "before",
+      "repetition": 1,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 3851.949416999996,
+      "messageHash": "80e13b0499e1f1c282d882482e65e10aa72afa959faa90c44b739fdde868def7",
+      "requestBytes": 4787,
+      "responseBytes": 186,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.9,
+        "relation": "independent",
+        "readiness": "waiting",
+        "relationConfidence": 0.8,
+        "readinessConfidence": 0.7
+      },
+      "languageStatus": "allowed",
+      "pass": false
+    },
+    {
+      "sampleId": "b73e827d-991f-4ee7-8f4b-779f21ef1a10",
+      "id": "context-injection",
+      "variant": "after",
+      "repetition": 1,
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4203.920500000007,
+      "messageHash": "40879a51cea52208a73bedb75a2a6a9af2028c4d7c00d58585d22868f98b659c",
+      "requestBytes": 4082,
+      "responseBytes": 186,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.9,
+        "relation": "independent",
+        "readiness": "waiting",
+        "relationConfidence": 0.9,
+        "readinessConfidence": 0.8
+      },
+      "languageStatus": "allowed",
+      "pass": true
+    }
+  ]
+}

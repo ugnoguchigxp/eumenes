@@ -1,0 +1,3 @@
+$ bun scripts/verify.ts --domain larm
+Another verification is running
+error: script "verify" exited with code 3

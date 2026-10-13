@@ -101,6 +101,7 @@ const statusLabels = {
 	rejected: "失敗",
 	conflict: "再確認が必要",
 	duplicate: "受付済み",
+	indeterminate: "結果を確認中",
 };
 function SampleTabs() {
 	return (

@@ -51,14 +51,18 @@ export function ArtifactPanel({
 	activeTabId,
 	onSelect,
 	onClose,
-	renderTimer,
+	renderToolchain,
 	renderOpenUI,
 }: {
 	tabs: ArtifactTab[];
 	activeTabId: string | null;
 	onSelect: (tabId: string) => void;
 	onClose: (tabId: string) => void;
-	renderTimer?: (timerId: string) => ReactNode;
+	/** Registered (data-driven) artifacts stay mounted while hidden, like their clocks. */
+	renderToolchain?: (
+		tab: Extract<ArtifactTab, { kind: "toolchain" }>,
+		visible: boolean,
+	) => ReactNode;
 	renderOpenUI?: (definition: string) => ReactNode;
 }) {
 	const active = tabs.find((tab) => tab.id === activeTabId);
@@ -105,6 +109,19 @@ export function ArtifactPanel({
 							</ShowcaseBoundary>
 						</TabsContent>
 					))}
+				{tabs.map((tab) =>
+					tab.kind === "toolchain" ? (
+						<TabsContent
+							key={tab.id}
+							value={tab.id}
+							forceMount
+							className="artifact-panel-body"
+							hidden={tab.id !== activeTabId}
+						>
+							{renderToolchain?.(tab, tab.id === activeTabId)}
+						</TabsContent>
+					) : null,
+				)}
 				{active?.kind === "markdown" && (
 					<TabsContent value={active.id} className="artifact-panel-body">
 						<div
@@ -119,11 +136,6 @@ export function ArtifactPanel({
 				{active?.kind === "openui" && (
 					<TabsContent value={active.id} className="artifact-panel-body">
 						{renderOpenUI?.(active.definition)}
-					</TabsContent>
-				)}
-				{active?.kind === "timer" && (
-					<TabsContent value={active.id} className="artifact-panel-body">
-						{renderTimer?.(active.timerId)}
 					</TabsContent>
 				)}
 			</aside>

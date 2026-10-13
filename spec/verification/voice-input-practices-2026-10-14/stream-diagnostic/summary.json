@@ -1,0 +1,70 @@
+{
+  "stopReason": "completed",
+  "models": [
+    "ornith-1.5-strix-lean"
+  ],
+  "variants": [
+    {
+      "variant": "baseline",
+      "attempts": 16,
+      "responses": 16,
+      "failures": 0,
+      "strictPass": 9,
+      "falseAccept": [],
+      "falseReject": [
+        "topic-switch",
+        "heldout-topic-switch"
+      ],
+      "acceptedWrongRelation": [
+        "fragment-3"
+      ],
+      "medianMs": 4391.183104499996,
+      "p90Ms": 4690.403249500001,
+      "firstDeltaMs": null,
+      "firstDeltaToCompleteMs": null,
+      "promptTokens": 973,
+      "completionTokens": 79,
+      "cachedTokens": 0,
+      "providerReadyMs": 141.43718800000352,
+      "tokenCountMs": 41.92827099999886,
+      "providerHeadersMs": 4158.910249999992,
+      "providerTtftMs": null,
+      "pairs": 0,
+      "pairedMedianSavingMs": null,
+      "pairedMedianBootstrap95CI": null,
+      "fasterPairs": 0
+    },
+    {
+      "variant": "stream",
+      "attempts": 16,
+      "responses": 16,
+      "failures": 0,
+      "strictPass": 11,
+      "falseAccept": [],
+      "falseReject": [
+        "topic-switch"
+      ],
+      "acceptedWrongRelation": [
+        "fragment-3"
+      ],
+      "medianMs": 4115.218812500005,
+      "p90Ms": 4477.175333500003,
+      "firstDeltaMs": 2948.563833500004,
+      "firstDeltaToCompleteMs": 1154.4610004999995,
+      "promptTokens": null,
+      "completionTokens": null,
+      "cachedTokens": null,
+      "providerReadyMs": 30.968437500008804,
+      "tokenCountMs": 38.484770499999286,
+      "providerHeadersMs": 2826.4327084999823,
+      "providerTtftMs": 2834.704958000002,
+      "pairs": 16,
+      "pairedMedianSavingMs": 225.60758350000106,
+      "pairedMedianBootstrap95CI": [
+        73.26766700000007,
+        378.7144169999956
+      ],
+      "fasterPairs": 13
+    }
+  ]
+}

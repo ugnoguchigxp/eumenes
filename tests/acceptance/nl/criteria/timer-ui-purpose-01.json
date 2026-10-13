@@ -1,0 +1,83 @@
+{
+	"criteriaId": "timer-ui-purpose-01",
+	"version": 1,
+	"caseId": "timer-ui-purpose-01",
+	"hostReads": ["timers"],
+	"successMarkers": [
+		"開始しました",
+		"スタートしました",
+		"started",
+		"作成しました",
+		"セットしました"
+	],
+	"items": [
+		{
+			"id": "C1",
+			"statement": "3分のtimerを一つ開始できた（hostにdurationSeconds=180の新timerが一件、started receiptが一件。既存timerと混ぜない）",
+			"check": "new-timers",
+			"params": {
+				"count": 1,
+				"durationSeconds": 180,
+				"requireStartedReceipt": true
+			},
+			"required": true
+		},
+		{
+			"id": "C2",
+			"statement": "動作中の残時間が減る（画面の別時刻の観測が減少し、hostのserverNowとdueAtから算出した値との誤差が2秒以内）",
+			"check": "remaining-decreases",
+			"params": {
+				"target": "new",
+				"minSeparationSeconds": 2,
+				"minDropSeconds": 1,
+				"toleranceSeconds": 2,
+				"screenRequired": true,
+				"screenMinSeparationSeconds": 5,
+				"screenMinDropSeconds": 1
+			},
+			"required": true
+		},
+		{
+			"id": "C3",
+			"statement": "一時停止で残時間が保たれる（hostがpaused、2秒以上離した二観測で残時間が変わらず、画面も同じ値を示す）",
+			"check": "paused-remaining-stable",
+			"params": {
+				"target": "new",
+				"minSeparationSeconds": 2,
+				"toleranceSeconds": 2,
+				"screenRequired": true,
+				"screenStableDeltaSeconds": 1
+			},
+			"required": true
+		},
+		{
+			"id": "C4",
+			"statement": "再開で同じtimerが動く（timerIdが同じでstate=active、revisionが進み、残時間の減少が再開する）",
+			"check": "resumed-same-timer",
+			"params": {
+				"target": "new",
+				"minSeparationSeconds": 2,
+				"minDropSeconds": 1,
+				"toleranceSeconds": 2
+			},
+			"required": true
+		},
+		{
+			"id": "C5",
+			"statement": "余計な副作用がない（作成数・receipt列が目的に対応し、別timerの変更や暗黙の再開始がない）",
+			"check": "no-extra-side-effects",
+			"params": {
+				"maxNewTimers": 1,
+				"maxStarted": 1,
+				"allowedReceiptActions": [
+					"started",
+					"paused",
+					"resumed",
+					"unchanged",
+					"listed"
+				]
+			},
+			"required": true
+		}
+	]
+}

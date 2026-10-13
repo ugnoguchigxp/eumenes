@@ -1,0 +1,3 @@
+{"id":"standalone","variant":"baseline","repetition":0,"durationMs":4889.869958,"pass":true,"falseAccept":false}
+{"id":"fragment-1","variant":"baseline","repetition":0,"durationMs":4295.38975,"pass":false,"falseAccept":false}
+{"id":"fragment-2","variant":"baseline","repetition":0,"durationMs":4310.832375,"pass":false,"falseAccept":false}

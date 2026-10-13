@@ -1,6 +1,10 @@
 import type { Database } from "bun:sqlite";
 import type { Migration } from "../../../infrastructure/sqlite";
 import type { Run } from "../contracts";
+import {
+	commandInteractionsMigration,
+	questionChoicesMigration,
+} from "./interactions";
 export const migration = `
 CREATE TABLE dialogue_runs (
  id TEXT PRIMARY KEY, request_id TEXT NOT NULL UNIQUE, conversation_id TEXT NOT NULL REFERENCES conversations(id),
@@ -187,4 +191,14 @@ export const migrations: readonly Migration[] = [
 	{ id: "dialogue/0002-queue-link", sql: queueLinkMigration },
 	{ id: "dialogue/0003-agent-link", sql: agentLinkMigration },
 	{ id: "dialogue/0004-world-state", sql: worldStateMigration },
+	{
+		id: "dialogue/0005-command-interactions",
+		sql: commandInteractionsMigration,
+		after: ["dialogue/0004-world-state"],
+	},
+	{
+		id: "dialogue/0006-interaction-choices",
+		sql: questionChoicesMigration,
+		after: ["dialogue/0005-command-interactions"],
+	},
 ];

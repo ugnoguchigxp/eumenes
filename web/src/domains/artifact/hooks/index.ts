@@ -22,6 +22,11 @@ export function useArtifactWorkspace() {
 			(tabId: string) => dispatch({ type: "select", tabId }),
 			[],
 		),
+		setTarget: useCallback(
+			(tabId: string, targetRef: string | undefined) =>
+				dispatch({ type: "set-target", tabId, targetRef }),
+			[],
+		),
 		close: useCallback(
 			(tabId: string) => dispatch({ type: "close", tabId }),
 			[],

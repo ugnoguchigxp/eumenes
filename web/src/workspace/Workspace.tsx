@@ -29,7 +29,7 @@ function WorkspaceContent({
 		openRecognition,
 		openMusic,
 		openPlaylist,
-		openTimer,
+		toolchain,
 		openShowcase,
 		timerAudio,
 		voice,
@@ -84,7 +84,10 @@ function WorkspaceContent({
 						{ label: "映っている物を調べる", onSelect: openRecognition },
 						{ label: "楽曲生成", onSelect: openMusic },
 						{ label: "音楽プレイリスト", onSelect: openPlaylist },
-						{ label: "タイマー", onSelect: () => openTimer() },
+						...toolchain.entries.map((entry) => ({
+							label: entry.title,
+							onSelect: () => toolchain.openEntry(entry),
+						})),
 						{ label: "UIショーケース", onSelect: openShowcase },
 					]}
 				/>

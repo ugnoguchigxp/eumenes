@@ -48,6 +48,13 @@ test("formal counting uses the complete identical request, images, tools, output
 			(x) => deltas.push(x),
 			{
 				maxOutputTokens: 128,
+				jsonOutput: true,
+				jsonSchema: {
+					type: "object",
+					properties: { answer: { type: "string" } },
+					required: ["answer"],
+					additionalProperties: false,
+				},
 				contextPolicy: "exact",
 				tools: [
 					{
@@ -70,6 +77,20 @@ test("formal counting uses the complete identical request, images, tools, output
 			"data:image/png;base64,",
 		);
 		expect(sent.max_tokens).toBe(128);
+		expect(sent.response_format).toEqual({
+			type: "json_schema",
+			json_schema: {
+				name: "control",
+				strict: true,
+				schema: {
+					type: "object",
+					properties: { answer: { type: "string" } },
+					required: ["answer"],
+					additionalProperties: false,
+				},
+			},
+		});
+		expect(sent.temperature).toBe(0);
 		expect(sent.tools[0].function.name).toBe("observe");
 		expect(sent.stream).toBe(true);
 		expect(deltas.join("")).toBe("画像を確認しました。");

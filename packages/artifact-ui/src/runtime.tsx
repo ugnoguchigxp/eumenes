@@ -6,6 +6,11 @@ export type ArtifactRuntime = {
 	/** Transient File bridge for host-owned uploads; never serialized into saved JSON. */
 	uploadFile?: (source: string, file: File) => Promise<Receipt>;
 	dispatch: (event: ArtifactEvent) => Promise<Receipt>;
+	/**
+	 * Advances when the host settles an earlier unsettled operation in the background. A
+	 * pending/indeterminate message shown for an older epoch no longer applies.
+	 */
+	settledEpoch?: number;
 	/** Theme controlled by the host's preview toolbar, when present. */
 	previewTheme?: "light" | "dark";
 };

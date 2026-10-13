@@ -73,7 +73,8 @@ bun run cli -- timer list --json
 | `bun run verify -- --domain dialogue` | 対象domainと型依存範囲のサイズ・整形・lint・型チェック、対象domainの試験 |
 | `bun run test:domain -- conversation` | 指定domainが所有するAPI・Webの試験 |
 | `bun run test:search` | 検索担当・文脈・API結合の固定試験 |
-| `bun run verify:all` | 全体の境界・文書整合・型・試験、DesignSystem、Web build、Chromiumのブラウザfixture |
+| `bun run verify:all` | 全体の境界・文書整合・型・単体／API結合試験、DesignSystem、Web build（ブラウザE2Eは別実行） |
+| `bunx playwright test tests/browser/excalidraw.spec.ts` | 指定domainのブラウザE2E（例: Excalidraw） |
 | `bun run build:web` | DesignSystemとWebをビルドし、画面の成果物を`dist-web/`へ出力 |
 
 実LARMへのASR・LLM・TTS疎通は、保存済み接続と音声ファイルを用意して実行します。

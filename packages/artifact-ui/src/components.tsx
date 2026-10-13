@@ -19,6 +19,7 @@ import type {
 	ImageResource,
 	MemoryResource,
 	QuestionResource,
+	Receipt,
 	SettingsResource,
 } from "./contracts";
 import { imageDownloadName, isSafeImageUrl } from "./contracts";
@@ -28,8 +29,28 @@ export function useAction(request: ArtifactRequest) {
 	const runtime = useArtifactRuntime();
 	const lock = useRef(false);
 	const [pending, setPending] = useState(false);
-	const [message, setMessage] = useState("");
 	const source = request.source ?? `inline-${request.view}`;
+	// Where the screen stood when the last receipt arrived: an unsettled message is stale once
+	// the source moved on or the host reported the settlement.
+	const here = {
+		revision: runtime.snapshot[source]?.revision ?? 0,
+		epoch: runtime.settledEpoch ?? 0,
+	};
+	const [last, setLast] = useState<{
+		receipt: Receipt;
+		revision: number;
+		epoch: number;
+	}>({
+		receipt: { status: "accepted", message: "" },
+		...here,
+	});
+	const unsettled =
+		last.receipt.status === "pending" ||
+		last.receipt.status === "indeterminate";
+	const result: Receipt =
+		unsettled && (last.revision !== here.revision || last.epoch !== here.epoch)
+			? { status: "accepted", message: "" }
+			: last.receipt;
 	async function send(
 		action: ArtifactEvent["action"],
 		values: ArtifactEvent["values"],
@@ -45,9 +66,15 @@ export function useAction(request: ArtifactRequest) {
 				action,
 				values,
 			});
-			setMessage(receipt.message);
+			setLast({ receipt, ...here });
 		} catch {
-			setMessage("操作に失敗しました。もう一度お試しください");
+			setLast({
+				receipt: {
+					status: "rejected",
+					message: "操作に失敗しました。もう一度お試しください",
+				},
+				...here,
+			});
 		} finally {
 			lock.current = false;
 			setPending(false);
@@ -56,12 +83,14 @@ export function useAction(request: ArtifactRequest) {
 	return {
 		send,
 		pending,
-		message: pending ? "処理中です" : message,
+		message: pending ? "処理中です" : result.message,
+		/** The last receipt's status; `pending` while a dispatch is in flight. */
+		status: pending ? ("pending" as const) : result.status,
 		source,
 		resource: runtime.snapshot[source],
 	};
 }
-function Feedback({ message }: { message: string }) {
+export function Feedback({ message }: { message: string }) {
 	return message ? (
 		<output className="aui-feedback" aria-live="polite">
 			{message}

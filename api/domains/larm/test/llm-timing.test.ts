@@ -32,6 +32,79 @@ const sse = (...frames: string[]) =>
 
 afterEach(() => configureLogging({ level: "silent" }));
 
+for (const stream of [false, true])
+	test(`provider timings are numeric-only diagnostics (${stream ? "SSE" : "JSON"})`, async () => {
+		const lines = capture();
+		const timing = startLlmTiming(
+			"SAAA",
+			messages,
+			window,
+			undefined,
+			stream ? () => {} : undefined,
+		);
+		const frame = JSON.stringify({
+			choices: [
+				{
+					[stream ? "delta" : "message"]: { content: "private-answer" },
+					finish_reason: "stop",
+				},
+			],
+			timings: {
+				prompt_ms: 123.5,
+				predicted_ms: 45,
+				prompt_n: 99,
+				cache_n: 0,
+				predicted_n: 3,
+				prompt: "private-input",
+				credential: "private-token",
+			},
+		});
+		const response = stream
+			? sse(frame, "[DONE]")
+			: new Response(frame, {
+					headers: { "content-type": "application/json" },
+				});
+		expect(
+			(await timing.read(response, new AbortController().signal)).text,
+		).toBe("private-answer");
+		expect(timings(lines)[0]).toMatchObject({
+			outcome: "ok",
+			providerPromptMs: 123.5,
+			providerDecodeMs: 45,
+			providerPromptTokens: 99,
+			providerCachedTokens: 0,
+			providerOutputTokens: 3,
+		});
+		for (const secret of [
+			"private-answer",
+			"private-input",
+			"private-token",
+			"secret-policy",
+			"secret-question",
+		])
+			expect(JSON.stringify(lines)).not.toContain(secret);
+	});
+
+test("invalid optional provider timings are omitted without changing the answer", async () => {
+	const lines = capture();
+	const timing = startLlmTiming("SAAA", messages, window, undefined, undefined);
+	const response = new Response(
+		'{"choices":[{"message":{"content":"ok"}}],"timings":{"prompt_ms":"12","predicted_ms":-1,"prompt_n":null,"cache_n":1e999,"predicted_n":{"secret":"private-token"}}}',
+	);
+	expect((await timing.read(response, new AbortController().signal)).text).toBe(
+		"ok",
+	);
+	for (const field of [
+		"providerPromptMs",
+		"providerDecodeMs",
+		"providerPromptTokens",
+		"providerCachedTokens",
+		"providerOutputTokens",
+	])
+		expect(timings(lines)[0]?.[field]).toBeUndefined();
+	expect(JSON.stringify(lines)).not.toContain("private-token");
+});
+
 test("the fit check reports the byte size of the returned messages without extra serialization", () => {
 	const stringify = spyOn(JSON, "stringify");
 	let fitted: ReturnType<typeof fitContext>;
@@ -189,5 +262,38 @@ test("a logging failure never replaces the inference result or error", async () 
 	} finally {
 		warn.mockRestore();
 		info.mockRestore();
+	}
+});
+
+test("monotonic TTFT separates pre-send preparation and first nonempty content", async () => {
+	const lines = capture();
+	let clock = 100;
+	const now = spyOn(performance, "now").mockImplementation(() => clock);
+	try {
+		const timing = startLlmTiming(
+			"SAAA",
+			messages,
+			window,
+			undefined,
+			() => {},
+		);
+		clock = 400;
+		timing.sent();
+		clock = 450;
+		await timing.read(
+			sse(
+				'{"choices":[{"delta":{"content":""}}]}',
+				'{"choices":[{"delta":{"content":"answer"}}]}',
+				"[DONE]",
+			),
+			new AbortController().signal,
+		);
+		expect(timings(lines)[0]).toMatchObject({
+			ttftMs: 350,
+			providerTtftMs: 50,
+			totalMs: 350,
+		});
+	} finally {
+		now.mockRestore();
 	}
 });

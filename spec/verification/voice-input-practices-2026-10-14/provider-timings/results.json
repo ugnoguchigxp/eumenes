@@ -1,0 +1,92 @@
+{
+  "lane": "live_control_adapter_synthetic_inputs",
+  "startedAt": "2026-10-13T23:37:29.242Z",
+  "updatedAt": "2026-10-13T23:37:43.173Z",
+  "timeoutMs": 8000,
+  "repetitions": 1,
+  "selected": [
+    "baseline"
+  ],
+  "requestHash": "9fb3d8c1e59b6bd0a7546f131ce3f189c6f6e6da0dc80e8cc7bdc7034b98142b",
+  "stopReason": "completed",
+  "samples": [
+    {
+      "sampleId": "a02fb057-85f9-426d-9e92-d96c24f90c46",
+      "id": "standalone",
+      "repetition": 0,
+      "variant": "baseline",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4889.869958,
+      "responseBytes": 187,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.98,
+        "relation": "independent",
+        "readiness": "ready",
+        "relationConfidence": 0.97,
+        "readinessConfidence": 0.95
+      },
+      "languageStatus": "allowed",
+      "accepted": true,
+      "expectedAccepted": true,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": true
+    },
+    {
+      "sampleId": "7efc5d37-2015-400a-b3d7-10684bf65bb3",
+      "id": "fragment-1",
+      "repetition": 0,
+      "variant": "baseline",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4295.38975,
+      "responseBytes": 187,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.98,
+        "relation": "independent",
+        "readiness": "waiting",
+        "relationConfidence": 0.9,
+        "readinessConfidence": 0.7
+      },
+      "languageStatus": "allowed",
+      "accepted": false,
+      "expectedAccepted": false,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": false
+    },
+    {
+      "sampleId": "976f1924-c453-41ce-b413-1e4db2247c87",
+      "id": "fragment-2",
+      "repetition": 0,
+      "variant": "baseline",
+      "model": "ornith-1.5-strix-lean",
+      "durationMs": 4310.832375,
+      "responseBytes": 196,
+      "assessment": {
+        "status": "identified",
+        "languages": [
+          "ja"
+        ],
+        "confidence": 0.98,
+        "relation": "continuation",
+        "readiness": "waiting",
+        "relationConfidence": 0.7,
+        "readinessConfidence": 0.7
+      },
+      "languageStatus": "allowed",
+      "accepted": false,
+      "expectedAccepted": false,
+      "falseAccept": false,
+      "falseReject": false,
+      "pass": false
+    }
+  ]
+}

@@ -59,6 +59,17 @@ export type ToolchainRuntimeMeta = {
 	researcher?: "codex_luna";
 	/** The research route the agent runtime keeps for its existing contracts. */
 	route?: "web" | "history";
+	/**
+	 * Bound command toolchains (spec 2026-10-13 §5): resolved from the toolchain revision's
+	 * versioned binding and the host adapter registry, never from the fixed runtime map.
+	 * `available` is the adapter's availability on this host now.
+	 */
+	binding?: {
+		bindingRevisionId: string;
+		adapterRef: string;
+		artifactRevisionId: string;
+		available: boolean;
+	};
 };
 
 /** One candidate toolchain offered to the conversation model. */

@@ -64,6 +64,8 @@ export type LarmCallOptions = {
 	maxOutputTokens?: number;
 	/** Internal control calls only: JSON-object generation at temperature zero. */
 	jsonOutput?: boolean;
+	/** Optional schema constraint for internal JSON control calls; host validation remains required. */
+	jsonSchema?: Record<string, unknown>;
 	contextPolicy?: "exact";
 	onExchange?: (exchange: LarmExchange) => Promise<void>;
 	speechVoice?: string;

@@ -1,0 +1,38 @@
+bun test v1.4.3 (c6da4a4d3)
+
+scripts/voice-assessment-practices.test.ts:
+(pass) experiments preserve the same input, host schema and safety thresholds [8.61ms]
+
+api/infrastructure/chat-stream.test.ts:
+(pass) provider UTF-8 splits publish answer text before completion and exclude reasoning fields [1.54ms]
+(pass) a disconnected stream is not adopted as a complete answer [0.08ms]
+(pass) cancellation closes a blocked reader and prevents late content [0.06ms]
+(pass) native tool calls survive split SSE arguments without publishing control data [0.09ms]
+(pass) truncated native control is rejected before any operation can be adopted [0.04ms]
+
+api/infrastructure/logger.test.ts:
+(pass) JSONL records isolate concurrent context and exclude raw payloads and error messages [2.56ms]
+(pass) file output rotates with bounded retention and private permissions [9.40ms]
+{"time":"2026-10-13T23:37:16.661Z","level":"error","event":"logging.file_unavailable","component":"logger","service":"eumenes","pid":27068,"bootId":"359fe839-9cc2-4ed2-b2ae-20bbeed74828","schemaVersion":1}
+(pass) unwritable file leaves structured stderr destination working [0.96ms]
+(pass) HTTP response IDs correlate auth failures and errors without URL or body secrets [2.83ms]
+(pass) log reader searches backups, matches exact IDs and skips malformed and partial records [26.68ms]
+(pass) following logs survives rotation without duplicates and retries an incomplete final line [4036.52ms]
+(pass) file output resumes after a transient failure with one notice per outage [4.98ms]
+
+api/domains/larm/test/llm-timing.test.ts:
+(pass) provider timings are numeric-only diagnostics (JSON) [1.14ms]
+(pass) provider timings are numeric-only diagnostics (SSE) [0.35ms]
+(pass) invalid optional provider timings are omitted without changing the answer [0.34ms]
+(pass) the fit check reports the byte size of the returned messages without extra serialization [0.32ms]
+(pass) the timing log reuses the fit estimate instead of serializing the messages again [0.33ms]
+(pass) a failed read logs outcome=error with known timings, usage only when present, and no text [0.37ms]
+(pass) a failure before any response is logged once; abort is distinguished from error [0.27ms]
+(pass) an abort while streaming logs outcome=aborted and rethrows the original error [0.48ms]
+(pass) a logging failure never replaces the inference result or error [0.66ms]
+(pass) monotonic TTFT separates pre-send preparation and first nonempty content [0.43ms]
+
+ 23 pass
+ 0 fail
+ 498 expect() calls
+Ran 23 tests across 4 files. [4.46s]

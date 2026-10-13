@@ -2,6 +2,16 @@ import { expect, test } from "bun:test";
 import type { Database } from "bun:sqlite";
 import { harness } from "./toolchain.fixture";
 
+/** The bound timer toolchain's adapter operation for a timer tool. */
+const timerBinding = (toolId: string) => ({
+	adapterRef: "adapter:timers@1",
+	operationName: {
+		"timer.start": "timers.start",
+		"timer.list": "timers.list-with-receipt",
+		"timer.cancel": "timers.cancel",
+	}[toolId]!,
+});
+
 async function manualActionRoot(
 	h: Awaited<ReturnType<typeof harness>>,
 	runId: string,
@@ -244,6 +254,7 @@ test("C04: another owner or extra arguments are refused before a timer is saved"
 					crypto.randomUUID(),
 					deadline,
 					`${owner.rootRunId}:0`,
+					timerBinding(start.tool.id),
 				);
 			}),
 		).rejects.toThrow("tool_ref_invalid");
@@ -267,6 +278,7 @@ test("C04: another owner or extra arguments are refused before a timer is saved"
 					crypto.randomUUID(),
 					deadline,
 					`${owner.rootRunId}:0`,
+					timerBinding(start.tool.id),
 				);
 			}),
 		).rejects.toThrow("invalid_tool_input");
@@ -325,6 +337,7 @@ test("C05: a failure before the action result rolls the timer back, and the same
 					stepId,
 					deadline,
 					`${owner.rootRunId}:0`,
+					timerBinding(start.tool.id),
 				);
 				throw new Error("injected_before_action_result");
 			}),
@@ -345,6 +358,7 @@ test("C05: a failure before the action result rolls the timer back, and the same
 				stepId,
 				deadline,
 				`${owner.rootRunId}:0`,
+				timerBinding(start.tool.id),
 			);
 			db.query(
 				`INSERT INTO agent_action_results(task_id,invocation_id,operation_id,receipt_digest,payload_json,created_at)
@@ -460,6 +474,7 @@ test("C07: list and cancel stay on one operation when the same step runs again",
 					stepId,
 					deadline,
 					`${actionRun.id}:${root.cancel_epoch}`,
+					timerBinding(tool.tool.id),
 				);
 				h.toolchain.tools.invokeActionInTransaction(
 					db,
@@ -469,6 +484,7 @@ test("C07: list and cancel stay on one operation when the same step runs again",
 					stepId,
 					deadline,
 					`${actionRun.id}:${root.cancel_epoch}`,
+					timerBinding(tool.tool.id),
 				);
 			});
 		};
@@ -580,6 +596,7 @@ test("a made-up origin cannot authorize a timer through a valid capability refer
 					crypto.randomUUID(),
 					Date.now() + 60000,
 					`${owner.rootRunId}:0`,
+					timerBinding(tool.tool.id),
 				);
 			}),
 		).rejects.toThrow("origin_invalid");

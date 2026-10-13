@@ -10,6 +10,7 @@ import {
 import { byRequest, byUtterance, insert } from "../repository";
 import {
 	DEFAULT_DEADLINE_MS,
+	COMMAND_KIND,
 	GENERATE_KIND,
 	PROMPT_TARGET_KIND,
 	type Accept,
@@ -67,9 +68,15 @@ export function createIntake(deps: DialogueDeps) {
 		const generated = queue.enqueueInTransaction(db, {
 			// Scheduled runs get their own scope so background work cannot exhaust interactive acceptance.
 			scope: input.sourceKind === "schedule" ? "dialogue.schedule" : "dialogue",
-			kind: GENERATE_KIND,
-			dedupeKey: runId,
-			payload: { runId },
+			kind: input.resume ? COMMAND_KIND : GENERATE_KIND,
+			dedupeKey: input.resume ? `toolchain-command:${runId}` : runId,
+			payload: input.resume
+				? {
+						runId,
+						toolchainRevisionId: input.resume.toolchainRevisionId,
+						interactionId: input.resume.interactionId,
+					}
+				: { runId },
 			subjectRef: runId,
 			lane: input.sourceKind === "schedule" ? "background" : "interactive",
 			resourceKey: "inference.llm",
