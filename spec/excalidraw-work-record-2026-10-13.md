@@ -67,3 +67,23 @@ MCP: initial_instructions 1回、context_compile 1回、compile_eval 1回（runI
 依存順: 延期した部分試験 → 結合 → 接続設定保存・到達確認 → MacBookでcold起動と編集保存再表示 → 正式の無操作実停止と次回復帰 → Eumenes backend再起動と同じ図の保存 → 全体gate/差分点検/証拠保存。完了条件は実sceneの保存版と形状を再取得し、worker PIDの停止・変更とbackend再起動を観測すること。
 
 初回domain検証は復帰hookのReact refs/immutability違反で停止。refの更新を所有hookへ戻し、利用側からは更新callbackとsignal取得操作を呼ぶ形に修正する。未検証の差分に対する失敗であり、以前の合格結果を適用しない。
+
+## mainマージ時の到達点と残作業
+
+利用者は検証を中断し、タスク未完了の状態でも現在のブランチをmainへマージするよう依頼した。機能の検証完了は宣言せず、再接続の修正と回帰試験を含めて保存する。ブラウザを起動する検証は再開しない。
+
+正式接続の実施結果: LARM側が `eumenes-excalidraw` consumerを登録し、許可サービスがexcalidraw-hostだけであることを確認した。LARM側が用意した専用consumer/API資格情報をメモリ内で受け取り、既存の認証済みsettings APIへ暗号化保存した（設定revision 1）。資格情報はチャット・モデル・URL・Gitへ出していない。MacBookの127.0.0.1:18790からLinuxの正式gatewayへ接続するSSH経路を用意した。Linux配備やsudo登録は変更していない。
+
+MacBookでの実操作: cold起動、Chromiumでの描画・版3保存・再表示、自然停止後の同じ図の復帰を確認した。worker PIDは2077267から2087020へ変わった。停止待ち中に追加の編集session起動が入り、自動ブラウザ試験は360秒の待機上限で失敗した。その後、最後の追加起動要求（2026-10-13T14:02:34.921Z）から約308秒後の自然停止（14:07:43.400Z）をLARMのsystemd状態とイベントで観測した。強制停止やidle設定の短縮は行っていない。
+
+Eumenes再起動と保存: backendを再起動して暗号化接続設定と図参照の保持を確認した。開いていたブラウザで編集内容は版6まで保存されたが、固定の版5を待つ補助スクリプトは不一致で失敗した。この補助スクリプトは合格として扱わない。MacBookのBraveで同じ図を再表示し、名前の編集・版7保存・再読込み、矩形の追加・版8保存・再読込みを実操作で確認した。保存した図の参照IDは5ed3ee5b-ad09-4c10-8d9d-a99d13e94ff0。受入用の図は上流scene APIに保持される。
+
+中断前に見つけた不具合と修正: 無操作解放後の再接続ボタン操作が、グローバルなpointerdownのactivity通知と競合した。再接続時にMap上の同じsession IDへ新しい接続が入っても、古い失敗処理が新しいleaseまで解放する問題があった。activity通知をExcalidraw内の実操作に限定し、失敗時は捕捉した古い接続だけを解放するよう修正した。発話の意味判定や個別依頼の専用分岐は追加していない。
+
+修正後の固定検証: Excalidraw domain（backend 7試験・Web 9試験）、backend/settings/application結合34試験、全体型検査、保存失敗・下書き復元・無操作解放・再接続を含むブラウザfixtureを合格した。LARM 146試験、capabilities 24試験、artifact Web 49試験も実施した。Web buildは成功した。実サービスの最終再接続確認は利用者の再起動・中断依頼で未完了。実LLMによる会話からの起動の受入も未完了。
+
+全体検証: verify:allは既存のweb/src/domains/settings/MemoryItemsPanel.test.tsxにあるsettings→memoryの依存違反で停止した。今回追加したclientの非公開contracts参照違反は公開contracts経由へ修正済み。既存のmemory境界違反を勝手に修正したり、期待値を緩めたりしていない。
+
+再開条件: 実接続で修正後の「無操作解放→再接続→追加編集→保存→再表示」を最終確認し、独立した通し試験と実LLM経路を確認する。全体gateは既存境界違反の解消後に実施する。現在のmainマージはこの残作業を受け入れたcheckpointであり、機能全体の検証完了を意味しない。
+
+Brave自動起動: 別のchrome-devtools-mcp起動ラッパーが接続時に専用Braveを自動起動していた。ラッパーを既存ブラウザの確認だけに変更し、接続プロセスを停止。2回の起動確認でBraveを開かないことを確認した。この修正はEumenesリポジトリの外にあり、今回のmainマージには含まれない。

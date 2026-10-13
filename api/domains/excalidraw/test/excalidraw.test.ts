@@ -268,3 +268,34 @@ test("browser entry retains the owning conversation and can reopen its version w
 		await h.close();
 	}
 });
+
+test("a cancelled activity acquisition cannot release the replacement reconnect lease under the same session ID", async () => {
+	const f = drawingFixture();
+	const { drawingConnection } = await import("../service/connection");
+	const c = drawingConnection(f.connection, { fetch: f.fetcher, pollMs: 1 });
+	let continueEnsure!: () => void;
+	f.delay(
+		new Promise<void>((resolve) => {
+			continueEnsure = resolve;
+		}),
+	);
+	try {
+		const old = c
+			.ready("same-session", AbortSignal.timeout(1000))
+			.catch((error) => error);
+		await c.reset("same-session");
+		const replacement = c.ready("same-session", AbortSignal.timeout(1000));
+		continueEnsure();
+		expect((await old).message).toBe("excalidraw_connection_invalidated");
+		const ready = await replacement;
+		expect(ready.status).toBe("ready");
+		expect(
+			[...f.leases.values()]
+				.filter((lease) => lease.status === "ready")
+				.map((lease) => lease.id),
+		).toEqual([ready.id]);
+	} finally {
+		continueEnsure();
+		await c.close();
+	}
+});

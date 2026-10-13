@@ -29,13 +29,15 @@ export function drawingConnection(
 	const clock = options.clock ?? Date.now,
 		uses = new Map<string, Use>();
 	const idleMs = options.idleMs ?? 30000;
-	async function release(id: string) {
-		const use = uses.get(id);
-		if (!use) return;
+	async function releaseUse(use: Use) {
 		use.epoch++;
 		const lease = use.lease;
 		use.lease = undefined;
 		if (lease) await use.config.client.release(lease.id).catch(() => {});
+	}
+	async function release(id: string) {
+		const use = uses.get(id);
+		if (use) await releaseUse(use);
 	}
 	async function ready(
 		id: string,
@@ -121,7 +123,8 @@ export function drawingConnection(
 		try {
 			return await task;
 		} catch (e) {
-			await release(id);
+			// A reset may already have installed a new use under this session ID.
+			await releaseUse(selected);
 			throw e;
 		} finally {
 			selected.pending = undefined;

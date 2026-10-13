@@ -30,7 +30,7 @@ ready URLはEumenesのWeb originにある`/#drawing/{referenceId}?revision={revi
 
 図はExcalidraw scene APIへ保存し、Eumenesには参照と操作状態をSQLiteに保持する。保存応答のID・版と保存後のsceneを確認したときだけ保存済みとする。保存失敗時は同じkey/expectedRevisionで再送する。失敗した保存候補と、その後の編集は別々にブラウザ下書きへ残し、再読込み後に「下書きを復元」できる。保存未確定の画面は閉じる操作とbeforeunloadで保護し、下書きのダウンロードも提供する。
 
-最後の実操作から30秒でEumenesのleaseを解放する。HTTP処理中・起動待ちは解放しない。Linux側gatewayは自身のleaseを30秒で解放し、service側の60秒idle確認後に停止する。実際の停止はLARMの正式設定に依存する。監視GETで常駐させず、次の編集・保存・再表示でensureする。bindingのgeneration/bootEpoch/revisionを確認し、取消・設定変更後の遅い応答は採用しない。backend再起動後は古いsessionをidleへ戻し、参照から新しいleaseで復帰する。
+最後の実操作から30秒でEumenesのleaseを解放する。HTTP処理中・起動待ちは解放しない。Linux側の正式gatewayは最後の業務要求から180秒で自身のleaseを解放し、service側の120秒idle確認後に停止する。実際の停止はLARMの正式設定に依存する。監視GETで常駐させず、次の編集・保存・再表示でensureする。bindingのgeneration/bootEpoch/revisionを確認し、取消・設定変更後の遅い応答は採用しない。backend再起動後は古いsessionをidleへ戻し、参照から新しいleaseで復帰する。
 
 ## 検証と配備状況
 
@@ -71,3 +71,9 @@ EUMENES_EXCALIDRAW_LIVE=1 bunx playwright test tests/browser/excalidraw-live.spe
 正式接続試験は稼働中のEumenes Web/APIを使い、cold起動→ブラウザ描画→版2/3保存→sceneの再取得→無操作解放→systemd workerの実停止→再起動と再表示を確認する。通常の試験実行ではskipする。workerの強制停止は行わず、受入用の新規図を作成し、証拠として残す。SSHはsystemdのPIDを読み取るだけで、配備や管理者操作は行わない。Web originは`EUMENES_EXCALIDRAW_WEB_ORIGIN`、観測用SSHホストは`EUMENES_EXCALIDRAW_SSH_HOST`で指定可能（既定5173/gnosis）。
 
 証拠は`spec/verification/excalidraw-live/`へ保存する。Eumenes backend自体の再起動後の復帰、実LLMによる会話からの起動、保存応答喪失や版競合のlive確認は別に実施し、このブラウザ試験だけで合格としない。
+
+## 現在の受入状況
+
+LARMの専用consumer `eumenes-excalidraw`と正式gatewayに接続設定済み。MacBookのBraveで図の編集、版8までの保存、同じURLからの再表示を確認した。正式workerの自然停止と次回起動、Eumenes backend再起動後の図と設定の保持も観測した。
+
+無操作解放後の再接続操作で発見した競合は修正し、固定試験とブラウザfixtureで確認済み。ただし、修正後の実サービスでの最終再接続確認と実LLM経路の受入は中断中。正式接続の自動通し試験は待機中の追加起動で完走しておらず、実画面・scene API・systemdの観測結果と区別する。verify:allも既存のsettings→memory依存違反で未完了。途中の状態でmainへマージするが、全検証済みとは扱わない。詳細はspec/excalidraw-work-record-2026-10-13.mdに記録する。

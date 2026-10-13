@@ -50,6 +50,11 @@ test("MacBook browser fixture: launch, edit, save, reopen, preserve failed draft
 	expect(url).toContain(`${origin}/#drawing/`);
 	expect(url).not.toMatch(/18790|token|consumer|business/);
 	const editor = await context.newPage();
+	let gestures = 0;
+	editor.on("request", (request) => {
+		if (request.method() === "POST" && request.url().endsWith("/activity"))
+			gestures++;
+	});
 	editor.on("response", async (r) => {
 		if (r.url().includes("/api/excalidraw/") && r.status() >= 400)
 			console.log(
@@ -118,6 +123,12 @@ test("MacBook browser fixture: launch, edit, save, reopen, preserve failed draft
 		"無操作のため接続を解放",
 		{ timeout: 10000 },
 	);
+	const beforeReconnect = gestures;
+	await editor.getByRole("button", { name: "再接続", exact: true }).click();
+	await expect(editor.getByRole("status").first()).toContainText(
+		"保存済み（版 4）",
+	);
+	expect(gestures).toBe(beforeReconnect);
 	await request.get(`${api}/fixture/restart`, {
 		headers: { authorization: "Bearer fixture-token-for-toolchain-browser" },
 	});

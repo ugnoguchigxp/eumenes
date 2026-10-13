@@ -20,8 +20,13 @@ export default function DrawingEditor({
 	const e = useDrawingEditor(client, referenceId, revision, conversationId);
 	const activity = e.activity;
 	useEffect(() => {
-		const operation = () => {
-			void activity();
+		const operation = (event: Event) => {
+			// Frame commands already own their connection operation; only canvas gestures renew here.
+			if (
+				event.target instanceof Element &&
+				event.target.closest(".excalidraw")
+			)
+				void activity();
 		};
 		const events = ["pointerdown", "keydown", "wheel"] as const;
 		for (const event of events)
