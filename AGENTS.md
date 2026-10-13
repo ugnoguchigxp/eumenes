@@ -1,6 +1,7 @@
 # Eumenes 作業規則
 
 - 作業開始時に `initial_instructions` MCP ツールを一度だけ実行する。個別タスクごとに再実行しない。
+- ユーザーが明示的に依頼した場合を除き、新しい作業ブランチを作成せず、mainで作業する。
 - ユーザーの明示依頼なしに、別の Codex チャットへメッセージを送らない。SAAA と `hono-standard` は参照専用とし、製品 DB・設定・秘密をコピーしない。
 - domain の業務判断・SQL・試験を各 domain に置く。下位 domain は上位 domain を参照しない。複数 domain の保存は単一 writer の transaction と公開操作で行う。
 - ツールチェーンの追加・改訂は[登録と拡張の手順](docs/toolchain-extension.md)と[検証手順](docs/toolchain-extension-verification.md)に従う。UIが必要な場合は、登録手順のDesignSystem・OpenUI・Artifactの追加手順も参照する。
