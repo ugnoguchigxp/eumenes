@@ -1,0 +1,9 @@
+
+Running 2 tests using 1 worker
+
+(node:38238) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 tests/browser/timers.spec.ts:48:1 › the timer launcher works before any timer exists and starts a saved clock (43.8s)
+  ✓  2 tests/browser/timers.spec.ts:261:1 › stopwatch continues across clock and artifact tabs, stops, resumes, resets and closes (14.0s)
+
+  2 passed (59.0s)

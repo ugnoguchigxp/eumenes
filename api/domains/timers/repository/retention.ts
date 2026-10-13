@@ -58,7 +58,7 @@ export function pruneBatch(
            origin_key=NULL, body_expired=1, updated_at_ms=?
        WHERE id IN (
          SELECT t.id FROM timers t
-         WHERE t.state!='active' AND t.body_expired=0 AND t.updated_at_ms<=?
+         WHERE t.state IN ('elapsed','cancelled') AND t.body_expired=0 AND t.updated_at_ms<=?
            AND NOT EXISTS (
              SELECT 1 FROM timer_notifications n
              WHERE n.timer_id=t.id AND n.status!='dismissed'
@@ -75,7 +75,7 @@ export function pruneBatch(
 		`DELETE FROM timer_notifications
      WHERE status IN ('played','dismissed') AND timer_id IN (
        SELECT t.id FROM timers t
-       WHERE t.body_expired=1 AND t.state!='active' AND t.updated_at_ms<=?
+       WHERE t.body_expired=1 AND t.state IN ('elapsed','cancelled') AND t.updated_at_ms<=?
          AND NOT EXISTS (
            SELECT 1 FROM timer_notifications n
            WHERE n.timer_id=t.id AND n.status IN ('pending','claimed','silent')
@@ -98,7 +98,7 @@ export function pruneBatch(
 			`DELETE FROM timers
        WHERE id IN (
          SELECT t.id FROM timers t
-         WHERE t.body_expired=1 AND t.state!='active' AND t.updated_at_ms<=?
+         WHERE t.body_expired=1 AND t.state IN ('elapsed','cancelled') AND t.updated_at_ms<=?
            AND NOT EXISTS (
              SELECT 1 FROM timer_notifications n
              WHERE n.timer_id=t.id AND n.status IN ('pending','claimed','silent')

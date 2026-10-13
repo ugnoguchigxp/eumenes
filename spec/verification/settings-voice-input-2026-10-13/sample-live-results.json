@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-12T22:40:25.872Z",
+  "profile": "ornith1.5Strix",
+  "lane": "isolated-api-real-larm",
+  "results": [
+    {
+      "pass": false,
+      "phase": "catalog",
+      "error": "internal_error"
+    }
+  ]
+}

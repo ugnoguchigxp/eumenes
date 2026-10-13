@@ -49,11 +49,17 @@ test("the timer launcher works before any timer exists and starts a saved clock"
 	page,
 	request,
 }) => {
+	// Capturing three layouts plus a full reload adds a second cold WebGL start.
+	if (process.env.EUMENES_TIMER_SCREENSHOTS === "1") test.setTimeout(90000);
 	await page.goto(`http://127.0.0.1:${webPort}`);
 	await openFromLauncher(page, "タイマー");
-	await expect(page.getByText("タイマーを開始", { exact: true })).toBeVisible();
+	await expect(
+		page
+			.locator(".timer-workspace")
+			.getByRole("heading", { name: "タイマー", exact: true }),
+	).toBeVisible();
 	if (process.env.EUMENES_TIMER_SCREENSHOTS === "1") {
-		const directory = evidencePath("timer-ui-redesign");
+		const directory = evidencePath("clock-fixed-layout-2026-10-13");
 		await mkdir(directory, { recursive: true });
 		for (const theme of ["light", "dark"] as const) {
 			await page.setViewportSize({ width: 1440, height: 1000 });
@@ -80,12 +86,64 @@ test("the timer launcher works before any timer exists and starts a saved clock"
 			animations: "disabled",
 		});
 		await page.setViewportSize({ width: 1440, height: 1000 });
+		await expect(
+			page.getByRole("separator", {
+				name: "会話とアーティファクトのサイズを調整",
+			}),
+		).toHaveAttribute("aria-orientation", "vertical");
 	}
+	const workspace = page.locator(".timer-workspace");
+	const fixedLayout = () =>
+		workspace.evaluate((element) => {
+			const box = element.getBoundingClientRect();
+			return [
+				".timer-workspace-dial",
+				".timer-workspace-time-inputs",
+				".timer-workspace-presets",
+				".timer-workspace-actions",
+			].map((selector) => {
+				const rect = element.querySelector(selector)!.getBoundingClientRect();
+				return [
+					rect.left - box.left,
+					rect.top - box.top,
+					rect.width,
+					rect.height,
+				];
+			});
+		});
+	const setupLayout = await fixedLayout();
+	const geometry = await workspace.evaluate((element) => {
+		const box = element.getBoundingClientRect();
+		const title = element.querySelector("h2")!.getBoundingClientRect();
+		const dial = element
+			.querySelector(".timer-workspace-dial")!
+			.getBoundingClientRect();
+		const presets = Array.from(
+			element.querySelectorAll(".timer-workspace-presets button"),
+		).map((button) => button.getBoundingClientRect());
+		return {
+			height: box.height,
+			titleOffset: title.left - box.left,
+			dialGap: dial.top - title.bottom,
+			dialRight: dial.right,
+			presetRightInset: box.right - presets[0]!.right,
+			presets: presets.map((button) => ({ x: button.x, y: button.y })),
+		};
+	});
+	expect(geometry.height).toBeLessThan(500);
+	expect(geometry.titleOffset).toBeLessThanOrEqual(20);
+	expect(geometry.dialGap).toBeLessThan(30);
+	expect(geometry.presetRightInset).toBeCloseTo(16, 0);
+	expect(
+		geometry.presets.every((button) => button.x >= geometry.dialRight),
+	).toBe(true);
+	expect(new Set(geometry.presets.map((button) => button.x)).size).toBe(1);
+	expect(geometry.presets[4]!.y).toBeGreaterThan(geometry.presets[0]!.y);
 	await page.getByRole("button", { name: "5分", exact: true }).click();
 	await expect(page.getByLabel("分", { exact: true })).toHaveValue("05");
 	await page.getByLabel("分", { exact: true }).fill("1");
 	await page.getByLabel("秒", { exact: true }).fill("30");
-	await page.getByLabel("名前（任意）").fill("画面から開始");
+	await expect(page.getByLabel("名前（任意）")).toHaveCount(0);
 	const receiptPending = page.waitForResponse(
 		(response) =>
 			response.request().method() === "POST" &&
@@ -96,35 +154,199 @@ test("the timer launcher works before any timer exists and starts a saved clock"
 	expect(response.ok()).toBe(true);
 	const receipt = await response.json();
 	expect(receipt.timer.durationSeconds).toBe(90);
+	await expect(
+		workspace.getByRole("button", { name: "停止する", exact: true }),
+	).toBeEnabled();
+	const runningLayout = await fixedLayout();
+	for (const [i, box] of setupLayout.entries()) {
+		for (const [axis, value] of box.entries())
+			expect(runningLayout[i]![axis]).toBeCloseTo(value, 0);
+	}
+	await expect(page.getByLabel("分", { exact: true })).toHaveAttribute(
+		"readonly",
+		"",
+	);
+	await expect(
+		workspace.getByRole("button", { name: "10分", exact: true }),
+	).toBeDisabled();
 	await expect(page.getByRole("timer")).toBeVisible();
 	await expect(
-		page.getByRole("heading", { name: "画面から開始" }),
+		page.getByText("1分30秒のタイマー", { exact: true }),
 	).toBeVisible();
 	if (process.env.EUMENES_TIMER_SCREENSHOTS === "1") {
 		await page.locator(".timer-workspace").screenshot({
-			path: evidencePath("timer-ui-redesign/running-dark.png"),
+			path: evidencePath("clock-fixed-layout-2026-10-13/running-dark.png"),
 			animations: "disabled",
 		});
 	}
 	await page
-		.getByRole("button", { name: "画面から開始を閉じる", exact: true })
+		.getByRole("button", { name: "タイマーを閉じる", exact: true })
 		.click();
-	await openFromLauncher(page, "タイマー: 画面から開始");
+	await openFromLauncher(page, "タイマー: タイマー");
 	await expect(page.getByRole("timer")).toBeVisible();
-	await page.getByRole("button", { name: "取り消す", exact: true }).click();
-	await expect(page.getByText("取消済み", { exact: true })).toBeVisible();
+	await page.getByRole("button", { name: "停止する", exact: true }).click();
+	await expect(page.getByText("停止中", { exact: true })).toBeVisible();
+	const pausedLayout = await fixedLayout();
+	for (const [i, box] of setupLayout.entries()) {
+		for (const [axis, value] of box.entries())
+			expect(pausedLayout[i]![axis]).toBeCloseTo(value, 0);
+	}
 	const saved = await request.get(
 		`http://127.0.0.1:${apiPort}/api/timers/${receipt.timer.id}`,
 		{ headers: { authorization: `Bearer ${TOKEN}` } },
 	);
-	expect((await saved.json()).timer.state).toBe("cancelled");
+	const paused = (await saved.json()).timer;
+	expect(paused.state).toBe("paused");
+	const frozen = await page.getByRole("timer").innerText();
+	await page.reload();
+	await openFromLauncher(page, "タイマー: タイマー");
+	await expect(page.getByText("停止中", { exact: true })).toBeVisible();
+	await expect(page.getByRole("timer")).toHaveText(frozen);
+	await expect(page.locator(".timer-workspace time")).toHaveCount(0);
+	if (process.env.EUMENES_TIMER_SCREENSHOTS === "1") {
+		await page.emulateMedia({ colorScheme: "dark" });
+		await page.locator(".timer-workspace").screenshot({
+			path: evidencePath("clock-fixed-layout-2026-10-13/paused-dark.png"),
+			animations: "disabled",
+		});
+	}
+	const resumedResponse = page.waitForResponse(
+		(response) =>
+			response.url().endsWith(`/api/timers/${receipt.timer.id}/resume`) &&
+			response.ok(),
+	);
+	await page.getByRole("button", { name: "再開する", exact: true }).click();
+	const resumed = await (await resumedResponse).json();
+	expect(resumed.timer.id).toBe(receipt.timer.id);
+	expect(resumed.timer.startedAt).toBe(receipt.timer.startedAt);
+	expect(resumed.timer.remainingSeconds).toBe(paused.remainingSeconds);
+	await expect(page.getByText("計測中", { exact: true })).toBeVisible();
+	await expect
+		.poll(async () => {
+			return (await page.getByRole("timer").innerText())
+				.split(":")
+				.map(Number)
+				.reduce((total, part) => total * 60 + part, 0);
+		})
+		.toBeLessThan(paused.remainingSeconds);
+	// Terminal cleanup avoids another default-label timer in later launcher tests.
+	const cleanup = await request.post(
+		`http://127.0.0.1:${apiPort}/api/timers/${receipt.timer.id}/cancel`,
+		{
+			headers: { authorization: `Bearer ${TOKEN}` },
+			data: {
+				requestId: crypto.randomUUID(),
+				issuedAt: new Date().toISOString(),
+				expectedRevision: resumed.timer.revision,
+			},
+		},
+	);
+	expect(cleanup.ok()).toBe(true);
 	await page
 		.getByRole("button", { name: "新しいタイマー", exact: true })
 		.click();
-	await expect(page.getByText("タイマーを開始", { exact: true })).toBeVisible();
+	await expect(
+		page
+			.locator(".timer-workspace")
+			.getByRole("heading", { name: "タイマー", exact: true }),
+	).toBeVisible();
 	expect(
-		await page.getByRole("tab", { name: "タイマー", exact: true }).count(),
+		await page
+			.getByRole("tablist", { name: "アーティファクトのタブ" })
+			.getByRole("tab", { name: "タイマー", exact: true })
+			.count(),
 	).toBe(1);
+});
+
+test("stopwatch continues across clock and artifact tabs, stops, resumes, resets and closes", async ({
+	page,
+}) => {
+	await page.goto(`http://127.0.0.1:${webPort}`);
+	await openFromLauncher(page, "タイマー");
+	const clock = page.locator(".timer-workspace");
+	const modes = clock.getByRole("group", { name: "時計の種類" });
+	await page.clock.install();
+	await modes
+		.getByRole("button", { name: "ストップウォッチ", exact: true })
+		.click();
+	await clock.getByRole("button", { name: "開始する", exact: true }).click();
+	await page.clock.runFor(1500);
+	const digits = clock.getByRole("timer", {
+		name: "ストップウォッチの経過時間",
+	});
+	await expect(digits).not.toHaveText("00:00");
+	await expect(
+		clock.getByRole("button", { name: "リセット", exact: true }),
+	).toBeDisabled();
+	await clock.getByRole("button", { name: "停止する", exact: true }).click();
+	const stopped =
+		(await digits.innerText()) +
+		(await clock.locator(".stopwatch-workspace-fraction").innerText());
+	await page.clock.runFor(3000);
+	expect(
+		(await digits.innerText()) +
+			(await clock.locator(".stopwatch-workspace-fraction").innerText()),
+	).toBe(stopped);
+	await clock.getByRole("button", { name: "再開する", exact: true }).click();
+	await modes.getByRole("button", { name: "タイマー", exact: true }).click();
+	await page.clock.runFor(2200);
+	await modes
+		.getByRole("button", { name: "ストップウォッチ", exact: true })
+		.click();
+	const seconds = async () => {
+		const parts = (await digits.innerText()).split(":").map(Number);
+		return parts[0]! * 60 + parts[1]!;
+	};
+	await expect.poll(seconds).toBeGreaterThanOrEqual(3);
+	await openFromLauncher(page, "UIショーケース");
+	await page.clock.runFor(2000);
+	await page
+		.getByRole("tablist", { name: "アーティファクトのタブ" })
+		.getByRole("tab", { name: "タイマー", exact: true })
+		.click();
+	await expect(
+		modes.getByRole("button", { name: "ストップウォッチ" }),
+	).toHaveAttribute("aria-pressed", "true");
+	await expect.poll(seconds).toBeGreaterThanOrEqual(5);
+	await clock.getByRole("button", { name: "停止する", exact: true }).click();
+	if (process.env.EUMENES_TIMER_SCREENSHOTS === "1") {
+		const directory = evidencePath("clock-fixed-layout-2026-10-13");
+		await mkdir(directory, { recursive: true });
+		await page.setViewportSize({ width: 1440, height: 900 });
+		await page.emulateMedia({ colorScheme: "dark" });
+		await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+		await clock.screenshot({
+			path: resolve(directory, "stopwatch-dark.png"),
+			animations: "disabled",
+		});
+		await page.setViewportSize({ width: 375, height: 1000 });
+		await expect(
+			clock.getByRole("button", { name: "再開する", exact: true }),
+		).toBeInViewport();
+		await expect(
+			clock.getByRole("button", { name: "リセット", exact: true }),
+		).toBeInViewport();
+		await clock.screenshot({
+			path: resolve(directory, "stopwatch-mobile.png"),
+			animations: "disabled",
+		});
+	}
+	await clock.getByRole("button", { name: "リセット", exact: true }).click();
+	await expect(digits).toHaveText("00:00");
+	await expect(clock.locator(".stopwatch-workspace-fraction")).toHaveText(
+		".00",
+	);
+	await page
+		.getByRole("button", { name: "タイマーを閉じる", exact: true })
+		.click();
+	await openFromLauncher(page, "タイマー");
+	await modes
+		.getByRole("button", { name: "ストップウォッチ", exact: true })
+		.click();
+	await expect(digits).toHaveText("00:00");
+	await expect(
+		clock.getByRole("button", { name: "開始する", exact: true }),
+	).toBeVisible();
 });
 
 test("a 90-second request opens the saved timer", async ({ page, request }) => {
@@ -162,17 +384,18 @@ test("a 90-second request opens the saved timer", async ({ page, request }) => {
 	).toBeVisible({ timeout: 20000 });
 	const clock = page.getByRole("timer");
 	await expect(clock).toBeVisible({ timeout: 20000 });
-	await expect(clock).toHaveText(/^0[01]:[0-5]\d$/);
+	await expect(clock).toHaveText(/^00:0[01]:[0-5]\d$/);
 	await expect
 		.poll(async () => {
-			const [minutes, seconds] = (await clock.innerText())
+			const actual = (await clock.innerText())
 				.split(":")
-				.map(Number);
+				.map(Number)
+				.reduce((total, part) => total * 60 + part, 0);
 			const expected = Math.max(
 				0,
 				Math.ceil((Date.parse(body.receipt!.timer.dueAt) - Date.now()) / 1000),
 			);
-			return Math.abs(minutes! * 60 + seconds! - expected);
+			return Math.abs(actual - expected);
 		})
 		.toBeLessThanOrEqual(2);
 	// Later tests share this backend: an expiring 90s timer must not ring during them.
@@ -224,8 +447,8 @@ test("the 24-hour clock fits a narrow artifact and reopens from the launcher aft
 		page.getByText("24時間の時計", { exact: true }).last(),
 	).toBeVisible({ timeout: 20000 });
 	await expect(page.getByRole("timer")).toHaveText(/24:00:00|23:59:\d\d/);
-	await page.getByRole("button", { name: "取り消す", exact: true }).click();
-	await expect(page.getByText("取消済み", { exact: true })).toBeVisible();
+	await page.getByRole("button", { name: "停止する", exact: true }).click();
+	await expect(page.getByText("停止中", { exact: true })).toBeVisible();
 });
 
 test("a persisted timer expires and its notice survives closing the clock", async ({
@@ -302,11 +525,11 @@ test("the timer has usable controls and fits both themes and a narrow screen", a
 	await page.setViewportSize({ width: 1440, height: 900 });
 	await page.goto(`http://127.0.0.1:${webPort}`);
 	await openFromLauncher(page, "タイマー: タイマー");
-	await expect(
-		page.getByRole("heading", { name: "3分のタイマー" }),
-	).toBeVisible({ timeout: 20000 });
+	await expect(page.getByText("3分のタイマー", { exact: true })).toBeVisible({
+		timeout: 20000,
+	});
 	const panel = page.getByRole("complementary", { name: "アーティファクト" });
-	const cancel = panel.getByRole("button", { name: "取り消す", exact: true });
+	const cancel = panel.getByRole("button", { name: "停止する", exact: true });
 	expect((await cancel.boundingBox())!.height).toBeGreaterThanOrEqual(44);
 	await expect(panel.locator("time")).toHaveText(/^\d{1,2}:\d{2}$/);
 	for (const theme of ["dark", "light"] as const) {
@@ -334,7 +557,7 @@ test("the timer has usable controls and fits both themes and a narrow screen", a
 		});
 	}
 	await cancel.click();
-	await expect(panel.getByText("取消済み", { exact: true })).toBeVisible();
+	await expect(panel.getByText("停止中", { exact: true })).toBeVisible();
 });
 
 test("expiry plays one real beep and posts an assistant message even after the artifact closes", async ({

@@ -220,6 +220,65 @@ test("registered sources compose and reject wrong kind, arbitrary paths, invalid
 	expect(f.apply).not.toHaveBeenCalled();
 });
 
+test("conversation saves in place and retains the draft and retry ID after a failed save", async () => {
+	const f = fixture();
+	const open = vi.fn();
+	render(
+		<SettingsArtifact
+			definition={settingsArtifactDefinition("conversation")}
+			onOpen={open}
+		/>,
+		{ wrapper: f.wrapper },
+	);
+	const save = screen.getByRole("button", { name: "設定の変更をすべて保存" });
+	expect(save).toHaveProperty("disabled", true);
+	fireEvent.change(screen.getByLabelText("AIの名前"), {
+		target: { value: "保存する名前" },
+	});
+	fireEvent.change(screen.getByLabelText("あなたの名前"), {
+		target: { value: "呼び名" },
+	});
+	fireEvent.change(screen.getByLabelText("口調"), {
+		target: { value: "sage" },
+	});
+	let reject!: (error: Error) => void;
+	f.apply.mockImplementationOnce(
+		() =>
+			new Promise((_resolve, fail) => {
+				reject = fail;
+			}),
+	);
+	fireEvent.submit(screen.getByLabelText("AIの名前").closest("form")!);
+	await waitFor(() => expect(f.apply).toHaveBeenCalledOnce());
+	expect(screen.getByRole("button", { name: "保存中…" })).toHaveProperty(
+		"disabled",
+		true,
+	);
+	await act(async () => reject(new Error("network_error")));
+	await screen.findByText(/適用できませんでした:/);
+	expect(screen.getByLabelText("AIの名前")).toHaveProperty(
+		"value",
+		"保存する名前",
+	);
+	const requestId = f.apply.mock.calls[0]![0].requestId;
+	fireEvent.click(
+		screen.getByRole("button", { name: "設定の変更をすべて保存" }),
+	);
+	await screen.findByText("変更を適用しました");
+	expect(f.apply).toHaveBeenCalledTimes(2);
+	expect(f.apply.mock.calls[1]![0].requestId).toBe(requestId);
+	expect((await f.client.settings()).general).toMatchObject({
+		agentName: "保存する名前",
+		userName: "呼び名",
+		persona: "sage",
+	});
+	expect(
+		screen.getByRole("button", { name: "設定の変更をすべて保存" }),
+	).toHaveProperty("disabled", true);
+	expect(screen.getByLabelText("AIの名前")).toBeTruthy();
+	expect(open).not.toHaveBeenCalled();
+});
+
 test("apply preserves edits made while saving, revision conflicts and stable retry request IDs", async () => {
 	const f = fixture();
 	const hook = renderHook(() => useSettingsDraft(), { wrapper: f.wrapper });

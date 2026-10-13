@@ -4,6 +4,7 @@ import type {
 	SettingsSectionResource,
 	SettingsNavigationResource,
 	SettingsChangesResource,
+	SubtitlePreviewResource,
 } from "./settings-contracts";
 export type { MusicResource, GenerationResource } from "./media-contracts";
 
@@ -26,6 +27,15 @@ const question = z.strictObject({
 	options: z.array(z.string().min(1).max(120)).min(1).max(8).optional(),
 });
 export const viewRegistry = {
+	"subtitle-preview": {
+		name: "SubtitlePreview",
+		label: "字幕の見本",
+		schema: z.strictObject({
+			view: z.literal("subtitle-preview"),
+			source,
+			title,
+		}),
+	},
 	"settings-section": {
 		name: "SettingsSectionView",
 		label: "設定の編集",
@@ -287,13 +297,20 @@ export type SettingsResource = {
 	volume: number;
 };
 export type Resource =
+	| SubtitlePreviewResource
 	| SettingsSectionResource
 	| SettingsNavigationResource
 	| SettingsChangesResource
 	| {
 			kind: "timer-workspace";
 			revision: number;
-			state: "setup" | "active" | "confirming" | "elapsed" | "cancelled";
+			state:
+				| "setup"
+				| "active"
+				| "paused"
+				| "confirming"
+				| "elapsed"
+				| "cancelled";
 			durationSeconds?: number;
 			remainingSeconds?: number;
 			title?: string;
@@ -301,6 +318,8 @@ export type Resource =
 			finishLabel?: string;
 			durationLabel?: string;
 			canCreate?: boolean;
+			mode?: "timer" | "stopwatch";
+			stopwatch?: { elapsedMs: number; running: boolean };
 	  }
 	| MusicResource
 	| GenerationResource
@@ -317,13 +336,20 @@ export type ArtifactEvent = {
 	revision: number;
 	action:
 		| "settings-edit"
+		| "settings-action"
 		| "settings-open"
 		| "settings-review"
 		| "settings-apply"
 		| "settings-discard"
 		| "timer-start"
 		| "timer-cancel"
+		| "timer-pause"
+		| "timer-resume"
 		| "timer-new"
+		| "clock-mode"
+		| "stopwatch-start"
+		| "stopwatch-stop"
+		| "stopwatch-reset"
 		| "answer"
 		| "submit"
 		| "memory-correct"

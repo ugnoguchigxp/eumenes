@@ -12,6 +12,10 @@ import {
 } from "../../../domains/timers/clock";
 import { useDeadline } from "../../../domains/timers/deadline";
 import "./TimerArtifact.css";
+import {
+	withClockControls,
+	type ClockControls,
+} from "../../../domains/timers/clock-runtime";
 
 function durationLabel(seconds: number) {
 	const hours = Math.floor(seconds / 3600);
@@ -39,11 +43,13 @@ export function TimerArtifact({
 	timerId,
 	onNewTimer,
 	definition: storedDefinition,
+	clock,
 }: {
 	client: EumenesClient;
 	timerId: string;
 	onNewTimer?: () => void;
 	definition?: string;
+	clock?: ClockControls;
 }) {
 	const cache = useQueryClient();
 	const query = useQuery({
@@ -78,11 +84,17 @@ export function TimerArtifact({
 		const id = window.setInterval(() => refreshClock(performance.now()), 250);
 		return () => window.clearInterval(id);
 	}, [query.data]);
-	const cancel = useMutation({
-		mutationFn: () => {
+	const control = useMutation({
+		mutationFn: (operation: "pause" | "resume" | "cancel") => {
 			const timer = query.data?.timer;
 			if (!timer) throw new Error("timer_not_found");
-			return client.cancelTimer(timer.id, {
+			return client[
+				operation === "pause"
+					? "pauseTimer"
+					: operation === "resume"
+						? "resumeTimer"
+						: "cancelTimer"
+			](timer.id, {
 				requestId: crypto.randomUUID(),
 				issuedAt: new Date(
 					estimatedServerNow(query.data!.clock, performance.now()),
@@ -116,6 +128,8 @@ export function TimerArtifact({
 			serverNow: query.data.serverNow,
 			state: timer.state,
 			cancelledAt: timer.cancelledAt,
+			pausedAt: timer.pausedAt,
+			remainingSeconds: timer.remainingSeconds,
 		},
 		estimatedServerNow(
 			query.data.clock,
@@ -137,7 +151,10 @@ export function TimerArtifact({
 				durationSeconds: timer.durationSeconds,
 				remainingSeconds: seconds,
 				durationLabel: duration,
-				dueAt: timer.state === "cancelled" ? undefined : timer.dueAt,
+				dueAt:
+					timer.state === "cancelled" || timer.state === "paused"
+						? undefined
+						: timer.dueAt,
 				finishLabel: finishLabel(timer.dueAt, query.data.serverNow),
 				canCreate: !!onNewTimer,
 			},
@@ -152,11 +169,24 @@ export function TimerArtifact({
 				onNewTimer();
 				return { status: "accepted", message: "" };
 			}
-			if (event.action !== "timer-cancel" || timer.state !== "active")
+			const operation =
+				event.action === "timer-pause"
+					? "pause"
+					: event.action === "timer-resume"
+						? "resume"
+						: event.action === "timer-cancel"
+							? "cancel"
+							: null;
+			if (!operation)
 				return { status: "rejected", message: "この操作は利用できません" };
-			await cancel.mutateAsync();
+			await control.mutateAsync(operation);
 			return { status: "accepted", message: "" };
 		},
 	};
-	return <ArtifactRenderer definition={definition} runtime={runtime} />;
+	return (
+		<ArtifactRenderer
+			definition={definition}
+			runtime={withClockControls(runtime, clock)}
+		/>
+	);
 }

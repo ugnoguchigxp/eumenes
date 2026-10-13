@@ -44,7 +44,7 @@ root = GeneratedImage({"view":"generated-image","source":"g1"})
 | form | f1 | 必須 / 選択 / 真偽 / テキスト入力、送信、リセット、エラーと再試行 |
 | memory | m1 | 内容の訂正、会話へ渡す情報の選択 |
 | settings | s1 | テーマ、読み上げ、音量の編集 |
-| timer-workspace | timer-setup / timer-保存ID | 円形時計、時間の直接入力とプリセット、保存確認後の計測・取消・新規設定 |
+| timer-workspace | timer-setup / timer-保存ID | 時計の切替ボタン、開始前後で固定した時計・時間設定、右端の縦プリセット、保存確認後の計測・停止・同じIDの再開・新規設定、ストップウォッチ開始・停止・再開・リセット |
 
 `title` は省略可能。質問は `source` の代わりに短い `question` を指定できる。
 
@@ -134,3 +134,19 @@ Artifactのタブはkind=openuiとdefinition（JSON文字列）を保持する�
 生成状態は同じJSONのままsource更新で反映する。音声取得まで待機表示、取得後はプレイヤーとPlaylistを表示する。実測進捗だけを表示し、音楽APIに取消・再試行の接続がないこの画面では、それらのボタンを公開しない。汎用generation sourceはホストがcanCancel/canRetryを許可した場合だけdispatchへ接続できる。
 
 部分・結合確認と保存済みMP3によるブラウザ確認は [検証記録](../spec/verification/music-openui-2026-10-11/README.md) を参照する。曲切替の2曲目は同じ保存済み音声を使う試験用メタデータであり、別の楽曲を生成したものではない。
+
+## 本番の設定フォーム
+
+`settings-navigation`から会話・音声と入力・表示を開く。各`settings-section`内の保存ボタン、または`settings-changes`から共同下書きを適用する。試用専用の`settings` viewとは保存契約が異なる。sourceはsettings所有ホストが組み立て、秘密・物理保存先・任意APIを渡さない。
+
+SettingsSectionはtext/select/toggle/range/number/multiple、区分、詳細欄、検索可能な候補、許可操作に対応する。イベント値は既存string契約のまま、数値・真偽値・配列は文字列表現を所有bindingで変換し、既存Zod schemaを検証する。複数選択はJSON配列文字列。表現部品で型を確定したとみなさず、範囲・許可候補・source・revisionをホストで再確認する。
+
+音声と入力の登録sourceは`settings-voice-input`。TTS能力は認証済みlarmVoices API、試聴は既存voiceSample APIを使う。クラウドTTSの任意カタログAPIは未対応で、現行OpenAI互換adapterの音声IDと速度を扱う。試聴・機器確認は`settings-action`の許可IDで実行し、閉鎖・対象変更時に取消と解放を行う。声の編集対象の選択は用途割当を変更しない。
+
+表示は次の登録viewをJSONで組み合わせる。`settings-display`は5項目の編集・共通保存、`settings-display-preview`はkind=`subtitle-preview`の読み取り専用source。プレビュー単体でも同じsettingsホストへ接続でき、操作イベントは受け付けない。新しいArtifact種別や専用renderは追加しない。
+
+```json
+{"view":"layout","direction":"stack","title":"表示の設定","children":[{"view":"settings-section","source":"settings-display","title":"表示"},{"view":"subtitle-preview","source":"settings-display-preview"}]}
+```
+
+DesignSystemに`Subtitle`と`SubtitlePreview`を追加し、既存の字幕描画・CSSを共有した。API・認証は持たず、text/style/size/enabledをpropsで受ける。`subtitle-preview`をOpenUIへ登録し、通常のparser・Rendererを通す。会話の読み上げ字幕と旧表示フォームも同じ`Subtitle`を使い、既存4デザイン・3サイズを維持する。

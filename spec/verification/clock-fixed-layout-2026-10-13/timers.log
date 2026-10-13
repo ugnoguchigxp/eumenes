@@ -1,0 +1,57 @@
+$ bun scripts/verify.ts --domain timers
+[verify] selected=timers dependencyClosure=queue,scheduler,timers testClosure=queue,scheduler,timers
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts api/domains/timers web/src/domains/timers web/src/components/domains/timers
+size-budget ok (30 files)
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check api/domains/timers web/src/domains/timers web/src/components/domains/timers
+$ oxfmt --check api/domains/timers web/src/domains/timers web/src/components/domains/timers
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 5ms on 43 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint api/domains/timers web/src/domains/timers web/src/components/domains/timers
+$ oxlint --deny-warnings api/domains/timers web/src/domains/timers web/src/components/domains/timers
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun x tsc -p /Users/y.noguchi/Code/eumenes/verification-reports/tsconfig.selected.json
+[verify] TypeScript workspace closure: 192 files; api/domains/timers, api/infrastructure/flock.ts, api/infrastructure/logger.ts, api/infrastructure/sqlite, api/infrastructure/http.ts, api/domains/queue, api/infrastructure/digest.ts, api/domains/scheduler, api/domains/larm, api/infrastructure/chat-stream.ts, api/domains/music, client/transport.ts, client/music.ts, api/domains/dots, api/domains/capabilities, client/dots.ts, client/requirements.ts, packages/coding-runner/src, api/domains/coding-supervision, api/domains/task-reports, client/coding-supervision.ts, api/infrastructure/validation-log.ts, api/domains/tool-runtime, api/domains/agent-runtime, client/agent-runtime.ts, client/attitude-dataset.ts, api/domains/delivery, api/domains/conversation, client/conversation.ts, api/domains/dialogue, client/run-stream.ts, client/dialogue.ts, client/events.ts, client/larm.ts, api/domains/memory, client/memory.ts, client/queue.ts, api/domains/toolchain-history, client/toolchain-history.ts, client/scheduler.ts, api/domains/settings, api/infrastructure/ignore-error.ts, api/infrastructure/bounded-read.ts, api/infrastructure/error-code.ts, api/domains/inference, client/settings.ts, api/domains/service-tests, client/service-tests.ts, api/domains/tts-dictionary, client/tts-dictionary.ts, api/domains/tasks, client/tasks.ts, api/domains/coding, client/coding.ts, client/timers.ts, api/domains/voice-dialogue, client/voice-dialogue.ts, api/domains/web-research, client/web-research.ts, api/domains/world, client/world.ts, client/index.ts, web/src/queryKeys.ts, web/src/domains, packages/artifact-ui/src, packages/design-system/dist, web/src/components, web/src/design-system
+[verify] domain tests: /Users/y.noguchi/.bun/bin/bun run test:domain -- timers
+$ bun scripts/test-domain.ts timers
+bun test v1.4.2 (744846f84)
+
+api/domains/timers/test/maintenance.test.ts:
+(pass) a deterministically failing expiry backs off, stops at redispatchMax and notifies once [63.01ms]
+(pass) prune runs about once per pruneEveryMs while maintenance runs every second [16.62ms]
+(pass) list operations do not consume start capacity and expire after listRetentionMs [244.92ms]
+(pass) prune queries use the retention indexes [12.88ms]
+
+api/domains/timers/test/controls.test.ts:
+(pass) duration bounds reject 0, 86401, fractions and NaN; 1 and 86400 pass [0.55ms]
+(pass) 180 second start fixes dueAt, replays the same receipt, and rolls back with the schedule [14.15ms]
+(pass) a scheduler rejection rolls the timer and the operation back together [13.02ms]
+(pass) cancel of an active timer invalidates the schedule and a later expiry does not adopt it [13.06ms]
+(pass) due boundary: 179999 stays active, 180000 elapses with one notification [35.74ms]
+(pass) a fresh claim lease lasts 15s and a second client is rejected [36.21ms]
+(pass) origin retry keeps one timer and a different duration conflicts [11.73ms]
+(pass) a replayed live claim becomes silent when it crosses the five minute freshness boundary [32.95ms]
+(pass) acknowledgement replay belongs to the same client as the claim [34.15ms]
+(pass) a full expiry queue defers one timer without blocking recovery of an expired claim [57.45ms]
+(pass) pause freezes milliseconds past the original due time, resumes the same ID and fences old jobs [12.94ms]
+(pass) pause/resume validate revisions, scope, limits and rollback a rejected new schedule [11.90ms]
+(pass) the schema upgrade preserves notifications, original receipt digests and foreign keys [2.67ms]
+(pass) paused clocks survive reopening the store, repeated pauses and terminal retention [22.01ms]
+(pass) paused clocks count toward capacity and old cancelled clocks resume only with time left [23.58ms]
+
+api/domains/timers/test/timers.test.ts:
+
+ 19 pass
+ 0 fail
+ 117 expect() calls
+Ran 19 tests across 3 files. [743.00ms]
+
+ RUN  v4.1.8 /Users/y.noguchi/Code/eumenes
+
+
+ Test Files  8 passed (8)
+      Tests  38 passed (38)
+   Start at  09:00:51
+   Duration  2.36s (transform 645ms, setup 0ms, import 2.65s, tests 1.48s, environment 7.26s)
+
+[verify] passed 6680 ms

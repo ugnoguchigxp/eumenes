@@ -1,0 +1,60 @@
+
+Running 9 tests using 1 worker
+
+(node:31030) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  1 tests/browser/timers.spec.ts:48:1 › the timer launcher works before any timer exists and starts a saved clock (1.0m)
+(node:31755) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  2 tests/browser/timers.spec.ts:205:1 › stopwatch continues across clock and artifact tabs, stops, resumes, resets and closes (55.7s)
+  ✓  3 tests/browser/timers.spec.ts:290:1 › a 90-second request opens the saved timer (15.1s)
+  ✓  4 tests/browser/timers.spec.ts:353:1 › the 24-hour clock fits a narrow artifact and reopens from the launcher after reload (14.9s)
+  ✓  5 tests/browser/timers.spec.ts:391:1 › a persisted timer expires and its notice survives closing the clock (24.8s)
+  ✓  6 tests/browser/timers.spec.ts:448:1 › the timer has usable controls and fits both themes and a narrow screen (16.7s)
+  ✘  7 tests/browser/timers.spec.ts:500:1 › expiry plays one real beep and posts an assistant message even after the artifact closes (20.5s)
+(node:32904) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  8 tests/browser/timers.spec.ts:559:1 › top-right banners and notification drawer fit desktop and mobile in both themes (21.3s)
+  ✓  9 tests/browser/timers.spec.ts:695:1 › a restored alarm waits for audio activation and then beeps and requests TTS (31.0s)
+
+
+  1) tests/browser/timers.spec.ts:48:1 › the timer launcher works before any timer exists and starts a saved clock 
+
+    Test timeout of 60000ms exceeded.
+
+    Error: response.json: Test timeout of 60000ms exceeded.
+
+      165 | 	);
+      166 | 	await page.getByRole("button", { name: "再開する", exact: true }).click();
+    > 167 | 	const resumed = await (await resumedResponse).json();
+          | 	                                              ^
+      168 | 	expect(resumed.timer.id).toBe(receipt.timer.id);
+      169 | 	expect(resumed.timer.startedAt).toBe(receipt.timer.startedAt);
+      170 | 	expect(resumed.timer.remainingSeconds).toBe(paused.remainingSeconds);
+        at /Users/y.noguchi/Code/eumenes/tests/browser/timers.spec.ts:167:48
+
+    Error Context: test-results/timers-the-timer-launcher--d8cff-ts-and-starts-a-saved-clock/error-context.md
+
+    Error Context: test-results/timers-the-timer-launcher--d8cff-ts-and-starts-a-saved-clock/error-context.md
+
+  2) tests/browser/timers.spec.ts:500:1 › expiry plays one real beep and posts an assistant message even after the artifact closes 
+
+    TimeoutError: page.waitForRequest: Timeout 20000ms exceeded while waiting for event "request"
+
+      519 | 	await expect(page.getByText(/接続済み/)).toBeVisible({ timeout: 20000 });
+      520 | 	await page.getByRole("textbox").fill("3秒タイマー測って");
+    > 521 | 	const speech = page.waitForRequest(
+          | 	                    ^
+      522 | 		(request) =>
+      523 | 			request.url().endsWith("/api/voice/replay/audio") &&
+      524 | 			request.postDataJSON()?.text === "3秒のタイマーが終了しました。",
+        at /Users/y.noguchi/Code/eumenes/tests/browser/timers.spec.ts:521:22
+
+    Error Context: test-results/timers-expiry-plays-one-re-a8cdd-n-after-the-artifact-closes/error-context.md
+
+    Error Context: test-results/timers-expiry-plays-one-re-a8cdd-n-after-the-artifact-closes/error-context.md
+
+  2 failed
+    tests/browser/timers.spec.ts:48:1 › the timer launcher works before any timer exists and starts a saved clock 
+    tests/browser/timers.spec.ts:500:1 › expiry plays one real beep and posts an assistant message even after the artifact closes 
+  7 passed (4.4m)

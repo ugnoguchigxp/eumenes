@@ -135,7 +135,7 @@ export function createWebAcquisition(
 	} = {},
 ): AcquisitionPort {
 	const now = options.now ?? Date.now;
-	const baseSearch = options.search ?? duckDuckGo({ timeoutMs: 5000 });
+	const baseSearch = options.search ?? duckDuckGo({ timeoutMs: 10000 });
 	// llm-fetch rejects the whole provider response on one invalid hit
 	// (PARSE_CHANGED), so drop unusable hits before it validates them.
 	const search: SearchProvider = {
@@ -156,7 +156,7 @@ export function createWebAcquisition(
 	const hitsClient = createLlmFetch({
 		search,
 		cache: { enabled: false },
-		searchTimeoutMs: 8000,
+		searchTimeoutMs: 10000,
 	});
 	async function read(
 		url: string,

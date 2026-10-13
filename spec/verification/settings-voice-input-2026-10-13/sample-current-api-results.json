@@ -1,0 +1,56 @@
+{
+  "date": "2026-10-12T22:47:55.520Z",
+  "lane": "current-api-real-larm",
+  "classifier": true,
+  "unchanged": true,
+  "results": [
+    {
+      "voice": "Shikoku_Metan",
+      "style": "normal",
+      "speed": 1.1,
+      "bytes": 123436,
+      "elapsedMs": 278,
+      "pass": true
+    },
+    {
+      "voice": "Zundamon",
+      "style": "normal",
+      "speed": 1.1,
+      "bytes": 142380,
+      "elapsedMs": 278,
+      "pass": true
+    },
+    {
+      "voice": "Kasukabe_Tsumugi",
+      "style": "normal",
+      "speed": 1.1,
+      "bytes": 124460,
+      "elapsedMs": 224,
+      "pass": true
+    },
+    {
+      "voice": "Amehare_Hau",
+      "style": "normal",
+      "speed": 1.1,
+      "bytes": 131628,
+      "elapsedMs": 283,
+      "pass": true
+    },
+    {
+      "voice": "Kurono_Takehiro",
+      "style": "normal",
+      "speed": 1.1,
+      "bytes": 118828,
+      "elapsedMs": 254,
+      "pass": true
+    },
+    {
+      "voice": "Kenzaki_Mesuo",
+      "style": "normal",
+      "speed": 1.1,
+      "bytes": 131116,
+      "elapsedMs": 240,
+      "pass": true
+    }
+  ]
+}

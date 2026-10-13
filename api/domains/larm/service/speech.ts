@@ -45,7 +45,13 @@ export function createSpeechSynthesizer({
 				if (!text.trim() || text.length > 4096)
 					throw new Error("larm_tts_input_invalid");
 				const english = options?.speechLanguage === "en";
-				let selectedVoice = voice ?? p.voice;
+				const synthesis = { ...config, ...options?.speechOverride };
+				const requestedVoice =
+					options?.speechOverride &&
+					Object.hasOwn(options.speechOverride, "voice")
+						? options.speechOverride.voice || undefined
+						: voice;
+				let selectedVoice = requestedVoice ?? p.voice;
 				const voicevox = !english && p.model === "voicevox-core";
 				if (english) {
 					const japanese = await withProvider("tts", signal, (jp) =>
@@ -53,7 +59,11 @@ export function createSpeechSynthesizer({
 					);
 					const englishCatalog =
 						voiceCatalogs.get(p) ?? (await readVoices(p, signal));
-					selectedVoice = pairedEnglishVoice(japanese, englishCatalog, voice);
+					selectedVoice = pairedEnglishVoice(
+						japanese,
+						englishCatalog,
+						requestedVoice,
+					);
 					signal.throwIfAborted();
 				}
 				let catalog: TtsVoices | undefined;
@@ -78,7 +88,7 @@ export function createSpeechSynthesizer({
 					}
 				}
 				const catalogUnavailable = (voicevox || !selectedVoice) && !catalog;
-				if (!voice && voicevox && !english)
+				if (!requestedVoice && voicevox && !english)
 					selectedVoice = catalog?.default_voice ?? selectedVoice;
 				if (!selectedVoice) selectedVoice = p.voice = catalog?.default_voice;
 				if (!selectedVoice) throw new Error("larm_tts_voice_unconfigured");
@@ -97,21 +107,21 @@ export function createSpeechSynthesizer({
 				if (
 					voicevox &&
 					!catalogUnavailable &&
-					config.style &&
-					!speaker?.styles.some((s) => s.id === config.style)
+					synthesis.style &&
+					!speaker?.styles.some((s) => s.id === synthesis.style)
 				)
 					throw new Error("larm_tts_voice_style_invalid");
-				let intonationScale = config.intonationScale;
+				let intonationScale = synthesis.intonationScale;
 				const selectedSpeed =
 					voicevox && options?.speed !== undefined
 						? options.speed
 						: english
 							? 1
-							: config.speed;
+							: synthesis.speed;
 				const selectedPitch =
 					voicevox && options?.pitchScale !== undefined
 						? options.pitchScale
-						: config.pitchScale;
+						: synthesis.pitchScale;
 				const boundedParameter = (
 					value: number | undefined,
 					key: "speed" | "pitch_scale",
@@ -165,7 +175,9 @@ export function createSpeechSynthesizer({
 							input: text,
 							voice: selectedVoice,
 							...(speechSpeed !== undefined ? { speed: speechSpeed } : {}),
-							...(voicevox && config.style ? { style: config.style } : {}),
+							...(voicevox && synthesis.style
+								? { style: synthesis.style }
+								: {}),
 							...(voicevox && speechPitch !== undefined
 								? { pitch_scale: speechPitch }
 								: {}),

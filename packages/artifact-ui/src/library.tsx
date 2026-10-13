@@ -28,8 +28,10 @@ import {
 	MusicWorkspaceView,
 } from "./media-components";
 import { TimerWorkspaceView } from "./timer-components";
+import { SubtitlePreviewView } from "./subtitle-components";
 
 const renderers = {
+	"subtitle-preview": SubtitlePreviewView,
 	"settings-section": SettingsSectionView,
 	"settings-navigation": SettingsNavigationView,
 	"settings-changes": SettingsChangesView,

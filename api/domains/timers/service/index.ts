@@ -40,6 +40,7 @@ import {
 	startInTransaction,
 } from "./operations";
 import { iso, digest } from "./canonical";
+import { controlInTransaction } from "./controls";
 
 export function createTimers(
 	store: SqliteStore,
@@ -114,10 +115,17 @@ export function createTimers(
 				{ state: "active", limit: 100 },
 				scope,
 			);
+			const paused = listInTransaction(
+				tx,
+				deps,
+				{ state: "paused", limit: 100 },
+				scope,
+			);
 			return {
 				serverNow: iso(at),
 				items: [
 					...active.items,
+					...paused.items,
 					...recentNotifiedTimers(tx, scope, 8).map((row) => toDto(row, at)),
 				].map(({ id, revision, state, label, remainingSeconds }) => ({
 					id,
@@ -250,6 +258,18 @@ export function createTimers(
 		async cancel(timerId: string, input: CancelTimerInput) {
 			return commit(
 				(tx) => cancelInTransaction(tx, deps, input, scope, timerId),
+				true,
+			);
+		},
+		async pause(timerId: string, input: CancelTimerInput) {
+			return commit(
+				(tx) => controlInTransaction(tx, deps, input, scope, timerId, "pause"),
+				true,
+			);
+		},
+		async resume(timerId: string, input: CancelTimerInput) {
+			return commit(
+				(tx) => controlInTransaction(tx, deps, input, scope, timerId, "resume"),
 				true,
 			);
 		},

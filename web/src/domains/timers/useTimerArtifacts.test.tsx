@@ -7,7 +7,9 @@ import { queryRoots } from "../../queryKeys";
 afterEach(cleanup);
 function fixture(items: Array<{ id: string; label: string }> = []) {
 	const api = {
-		timers: vi.fn(async () => ({ items })),
+		timers: vi.fn(async (query: { state?: string }) => ({
+			items: query.state === "paused" ? [] : items,
+		})),
 		timerReceiptByRun: vi.fn(async (id: string) => ({
 			receipt: {
 				action: "started",
@@ -32,22 +34,25 @@ function fixture(items: Array<{ id: string; label: string }> = []) {
 }
 test("timers saved before reload stay closed and polling does not open them", async () => {
 	const h = fixture([{ id: "restored", label: "保存したタイマー" }]);
-	await waitFor(() => expect(h.api.timers).toHaveBeenCalledOnce());
+	await waitFor(() => expect(h.api.timers).toHaveBeenCalledTimes(2));
 	await act(async () => {
 		await h.cache.invalidateQueries({
 			queryKey: [queryRoots.timers, "workspace"],
 		});
 	});
-	expect(h.api.timers).toHaveBeenCalledTimes(2);
+	expect(h.api.timers).toHaveBeenCalledTimes(4);
 	expect(h.open).not.toHaveBeenCalled();
 });
 test("a new conversation result discovers a timer without a local run callback or change event", async () => {
 	const h = fixture();
-	await waitFor(() => expect(h.api.timers).toHaveBeenCalledOnce());
+	await waitFor(() => expect(h.api.timers).toHaveBeenCalledTimes(2));
 	expect(h.open).not.toHaveBeenCalled();
-	h.api.timers.mockResolvedValue({
-		items: [{ id: "voice-timer", label: "音声のタイマー" }],
-	});
+	h.api.timers.mockImplementation(async (query) => ({
+		items:
+			query.state === "paused"
+				? []
+				: [{ id: "voice-timer", label: "音声のタイマー" }],
+	}));
 	h.hook.rerender({ runs: [{ id: "voice-run", status: "completed" }] });
 	await waitFor(() =>
 		expect(h.open).toHaveBeenCalledWith(

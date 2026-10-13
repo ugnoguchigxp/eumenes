@@ -59,6 +59,8 @@ export function VoiceSection({
 		queryFn: ({ signal }) => client.larmVoices(signal),
 		enabled: !!value && !larmChanged,
 		retry: 0,
+		staleTime: Infinity,
+		refetchOnWindowFocus: false,
 	});
 	const voiceCatalog = larmChanged ? undefined : voices.data;
 	const character = voiceCatalog?.voices.find(
@@ -176,8 +178,8 @@ export function VoiceSection({
 								client={client}
 								disabled={larmChanged}
 								voice={{
-									voice: value.larm.voice || undefined,
-									style: value.larm.style,
+									voice: value.larm.voice,
+									style: value.larm.style ?? null,
 									speed: value.larm.speed,
 									pitchScale: value.larm.pitchScale,
 									intonationScale: value.larm.intonationScale,

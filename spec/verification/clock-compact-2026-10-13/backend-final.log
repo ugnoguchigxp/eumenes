@@ -1,0 +1,89 @@
+bun test v1.4.2 (744846f84)
+
+api/application/timer-announcements.test.ts:
+(pass) a three-minute tool request posts one assistant completion at the deadline and survives recovery [136.08ms]
+(pass) cancelling before the deadline creates neither an assistant completion nor an audible notice [63.75ms]
+(pass) the announcement participates in the caller transaction and replays without a duplicate [62.31ms]
+
+api/application/timer-toolchain.test.ts:
+(pass) C01-C03: a relative timer request is saved through the toolchain [82.46ms]
+(pass) relative duration 90秒タイマー is stored as 90 seconds [78.69ms]
+(pass) relative duration 1時間のタイマー is stored as 3600 seconds [78.77ms]
+(pass) relative duration 3分30秒のタイマー is stored as 210 seconds [80.12ms]
+(pass) C06: cancelling the dialogue run leaves the committed timer active [85.35ms]
+(pass) C04: a revoked skill or a strict-invalid command does not start a timer [155.49ms]
+(pass) C04: another owner or extra arguments are refused before a timer is saved [64.19ms]
+(pass) C05: a failure before the action result rolls the timer back, and the same step then saves one [81.04ms]
+(pass) C07: list and cancel stay on one operation when the same step runs again [92.88ms]
+(pass) C08: without timer ports a timer request does not invent a start [73.92ms]
+(pass) real dialogue list and cancel select an authoritative timer snapshot [103.00ms]
+(pass) a made-up origin cannot authorize a timer through a valid capability reference [78.41ms]
+(pass) cancellation after preparation refreshes the result before the agent phrases it [79.46ms]
+(pass) a corrupted receipt after preparation cannot be adopted or streamed [76.67ms]
+(pass) T01/T03 both timer facts reach the model and action-like user text stays unchanged [80.00ms]
+
+api/domains/capabilities/test/prepare-learned.test.ts:
+(pass) C01 learned registration rejects conflicts, bad bundles and oversize; builtin hashes unchanged [12.66ms]
+(pass) C01 5000 learned definitions never enter FTS/alias/list and do not displace builtins [306.75ms]
+(pass) seed adds newer research rules and packages without touching old revisions [15.43ms]
+(pass) new research packages expose generic acquisition without topic-specific tools or skills [12.62ms]
+(pass) C02 prepare by ID keeps shared checks; independent registration does not disturb A; GC spares builtins/protected [14.60ms]
+
+api/domains/capabilities/test/requirement-schema.test.ts:
+(pass) enum values must also satisfy bounds and formats at every nested node [2.84ms]
+(pass) R04 unsupported keywords, incompatible keywords and resource limits reject before conversion [0.12ms]
+(pass) R05 standard schema conversion is strict and does not coerce, default or ignore fields [0.85ms]
+(pass) optional string bounds preserve explicit constraints and the overall value capacity [0.15ms]
+
+api/domains/capabilities/test/capabilities.test.ts:
+(pass) quick Web capability grants only lookup and read and preserves Luna tools [0.16ms]
+(pass) 5000 capability catalogue: bounded discovery, exact aliases, immutable revisions and owner isolation [6013.41ms]
+(pass) builtin SKILL is mandatory; disabling survives seed and dependency failure hides package [15.24ms]
+(pass) revoking a dependency permanently invalidates already issued candidates, even after re-enabling [13.70ms]
+(pass) builtin bundle upgrade preserves revision 1 fingerprints and activates a new revision for the larger input contract [14.64ms]
+(pass) deployed research skill v3 upgrades without a revision conflict and restart preserves hashes [21.69ms]
+(pass) seed still rejects a changed newest builtin revision [9.47ms]
+(pass) history and web catalogue selection can be enabled independently without editing archived revisions [17.52ms]
+
+api/domains/capabilities/test/music-versions.test.ts:
+(pass) installed V1 music definitions survive the V2 upgrade and repeated seeding [14.05ms]
+(pass) V1 keeps its schema while V2 enforces the verified integer duration and vocal fields [0.49ms]
+
+api/domains/capabilities/test/requirements.test.ts:
+(pass) profile validity compares instants with mixed fractional-second precision [0.69ms]
+(pass) R02/R03/R06 immutable profile revisions, CAS, independent catalogs and invalidation [12.77ms]
+
+api/domains/capabilities/test/learned.test.ts:
+
+api/domains/capabilities/test/requirement-controller.test.ts:
+(pass) management API validates bodies, exposes CAS state and keeps requirement profiles out of executable catalog [9.22ms]
+
+api/domains/timers/test/maintenance.test.ts:
+(pass) a deterministically failing expiry backs off, stops at redispatchMax and notifies once [51.99ms]
+(pass) prune runs about once per pruneEveryMs while maintenance runs every second [14.43ms]
+(pass) list operations do not consume start capacity and expire after listRetentionMs [200.49ms]
+(pass) prune queries use the retention indexes [12.17ms]
+
+api/domains/timers/test/controls.test.ts:
+(pass) duration bounds reject 0, 86401, fractions and NaN; 1 and 86400 pass [0.30ms]
+(pass) 180 second start fixes dueAt, replays the same receipt, and rolls back with the schedule [11.82ms]
+(pass) a scheduler rejection rolls the timer and the operation back together [13.29ms]
+(pass) cancel of an active timer invalidates the schedule and a later expiry does not adopt it [11.04ms]
+(pass) due boundary: 179999 stays active, 180000 elapses with one notification [34.73ms]
+(pass) a fresh claim lease lasts 15s and a second client is rejected [35.44ms]
+(pass) origin retry keeps one timer and a different duration conflicts [10.58ms]
+(pass) a replayed live claim becomes silent when it crosses the five minute freshness boundary [34.93ms]
+(pass) acknowledgement replay belongs to the same client as the claim [38.67ms]
+(pass) a full expiry queue defers one timer without blocking recovery of an expired claim [62.84ms]
+(pass) pause freezes milliseconds past the original due time, resumes the same ID and fences old jobs [25.34ms]
+(pass) pause/resume validate revisions, scope, limits and rollback a rejected new schedule [21.33ms]
+(pass) the schema upgrade preserves notifications, original receipt digests and foreign keys [1.86ms]
+(pass) paused clocks survive reopening the store, repeated pauses and terminal retention [35.25ms]
+(pass) paused clocks count toward capacity and old cancelled clocks resume only with time left [32.43ms]
+
+api/domains/timers/test/timers.test.ts:
+
+ 59 pass
+ 0 fail
+ 582 expect() calls
+Ran 59 tests across 12 files. [9.09s]

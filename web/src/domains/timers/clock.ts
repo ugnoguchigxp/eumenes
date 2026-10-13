@@ -1,8 +1,10 @@
 export type ClockSnapshot = {
 	dueAt: string;
 	serverNow: string;
-	state: "active" | "elapsed" | "cancelled";
+	state: "active" | "paused" | "elapsed" | "cancelled";
 	cancelledAt: string | null;
+	pausedAt?: string | null;
+	remainingSeconds?: number;
 };
 
 /** Estimated server time from one snapshot. Display ticks must not call the API. */
@@ -28,10 +30,17 @@ export function displayRemainingSeconds(
 	estimatedNow: number,
 ): number {
 	if (snapshot.state === "elapsed") return 0;
+	if (
+		(snapshot.state === "paused" || snapshot.state === "cancelled") &&
+		snapshot.remainingSeconds !== undefined
+	)
+		return snapshot.remainingSeconds;
 	const basis =
-		snapshot.state === "cancelled"
-			? Date.parse(snapshot.cancelledAt ?? snapshot.serverNow)
-			: estimatedNow;
+		snapshot.state === "paused"
+			? Date.parse(snapshot.pausedAt ?? snapshot.serverNow)
+			: snapshot.state === "cancelled"
+				? Date.parse(snapshot.cancelledAt ?? snapshot.serverNow)
+				: estimatedNow;
 	const due = Date.parse(snapshot.dueAt);
 	if (!Number.isFinite(due) || !Number.isFinite(basis)) return 0;
 	return Math.max(0, Math.ceil((due - basis) / 1000));

@@ -1,4 +1,7 @@
 import type { Database } from "bun:sqlite";
+import { pauseResumeMigration } from "./pause-migration";
+export { pauseResumeMigration } from "./pause-migration";
+export { countLive, markPaused, markResumed } from "./controls";
 import type { Migration } from "../../../infrastructure/sqlite";
 import type {
 	NotificationReason,
@@ -89,6 +92,9 @@ export type TimerRow = {
 	startedAtMs: number;
 	dueAtMs: number;
 	cancelledAtMs: number | null;
+	pausedAtMs: number | null;
+	pausedRemainingMs: number | null;
+	pausedTotalMs: number;
 	terminalAtMs: number | null;
 	state: TimerState;
 	revision: number;
@@ -108,7 +114,7 @@ export type OperationRow = {
 	requestId: string;
 	issuedAtMs: number;
 	inputDigest: string;
-	operation: "start" | "list" | "cancel";
+	operation: "start" | "list" | "cancel" | "pause" | "resume";
 	timerId: string | null;
 	originKey: string | null;
 	receiptJson: string | null;
@@ -151,6 +157,9 @@ function mapTimer(row: SqlTimer): TimerRow {
 		startedAtMs: row.started_at_ms as number,
 		dueAtMs: row.due_at_ms as number,
 		cancelledAtMs: (row.cancelled_at_ms as number | null) ?? null,
+		pausedAtMs: (row.paused_at_ms as number | null) ?? null,
+		pausedRemainingMs: (row.paused_remaining_ms as number | null) ?? null,
+		pausedTotalMs: (row.paused_total_ms as number) ?? 0,
 		terminalAtMs: (row.terminal_at_ms as number | null) ?? null,
 		state: row.state as TimerState,
 		revision: row.revision as number,
@@ -334,9 +343,9 @@ export function markCancelled(
 	return changed(
 		db
 			.query(
-				`UPDATE timers SET state='cancelled', cancelled_at_ms=?, terminal_at_ms=?,
+				`UPDATE timers SET state='cancelled', paused_at_ms=NULL, cancelled_at_ms=?, terminal_at_ms=?,
          revision=revision+1, cancel_epoch=cancel_epoch+1, updated_at_ms=?
-         WHERE id=? AND scope=? AND state='active' AND revision=?`,
+				WHERE id=? AND scope=? AND state IN ('active','paused') AND revision=?`,
 			)
 			.run(at, at, at, id, scope, expectedRevision),
 	);
@@ -452,7 +461,7 @@ export function insertOperation(
 		requestId: string;
 		issuedAtMs: number;
 		inputDigest: string;
-		operation: "start" | "list" | "cancel";
+		operation: OperationRow["operation"];
 		timerId: string | null;
 		originKey: string | null;
 		receiptJson: string;
@@ -782,5 +791,10 @@ CREATE INDEX timer_operations_timer ON timer_operations(timer_id) WHERE timer_id
 CREATE INDEX timer_operations_scope_kind ON timer_operations(scope, operation);
 CREATE INDEX timers_retention ON timers(body_expired, updated_at_ms, id) WHERE state!='active';
 `,
+	},
+	{
+		id: "timers/0003-pause-resume",
+		after: ["timers/0002-retention-indexes"],
+		sql: pauseResumeMigration,
 	},
 ];

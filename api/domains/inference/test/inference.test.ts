@@ -179,7 +179,7 @@ async function setup(
 		await store.close();
 		rmSync(dir, { recursive: true, force: true });
 	});
-	return { store, settings, inference, calls, payloads, seen, dataset };
+	return { store, settings, inference, calls, payloads, seen, dataset, port };
 }
 function wav() {
 	const b = new Uint8Array(48);
@@ -742,19 +742,116 @@ test("speech text is rewritten for the local provider and for the cloud fallback
 });
 
 test("speak with an override synthesizes with unsaved voice settings without changing saved ones", async () => {
-	const h = await setup({ localSpeech: async () => wav() });
+	let observed: import("../../larm").LarmCallOptions | undefined;
+	const h = await setup({
+		localSpeech: async (_text, _signal, options) => {
+			observed = options;
+			return wav();
+		},
+	});
 	const before = h.settings.get().larm;
 	await h.inference.speak("サンプル", new AbortController().signal, {
 		voice: "Zundamon",
 		style: "normal",
 		speed: 1.4,
 	});
-	expect(h.seen.at(-1)).toMatchObject({
+	expect(observed?.speechOverride).toMatchObject({
 		voice: "Zundamon",
 		style: "normal",
 		speed: 1.4,
 	});
 	expect(h.settings.get().larm).toEqual(before);
+});
+
+test("sample voice overrides remain usable with sentence-language enabled; authority uses saved settings", async () => {
+	let observed: import("../../larm").LarmCallOptions | undefined;
+	const h = await setup({
+		localSpeech: async (_text, _signal, options) => {
+			observed = options;
+			return wav();
+		},
+		sentenceLanguage: async () => ({
+			language: "ja",
+			model: "fixture-language",
+			latencyMs: 1,
+		}),
+	});
+	await enableSentenceLanguage(h);
+	const before = h.settings.get();
+	expect(
+		await h.inference.speak("試聴です。", freshSignal(), {
+			voice: "Zundamon",
+			style: "normal",
+			speed: 1.4,
+			pitchScale: 0.03,
+			intonationScale: 1.2,
+		}),
+	).toEqual(wav());
+	expect(observed?.speechOverride).toMatchObject({
+		voice: "Zundamon",
+		style: "normal",
+		speed: 1.4,
+		pitchScale: 0.03,
+		intonationScale: 1.2,
+	});
+	expect(h.settings.get()).toEqual(before);
+	expect(h.seen).toHaveLength(1);
+	expect(
+		h.inference.usage().some((r) => r.purpose === "tts" && r.accepted),
+	).toBe(true);
+});
+
+test("a sample shares the existing port through unrelated saves and rejects revoked late synthesis", async () => {
+	let finish!: (bytes: Uint8Array) => void;
+	let entered = false;
+	const h = await setup({
+		sentenceLanguage: async () => ({
+			language: "ja",
+			model: "fixture-language",
+			latencyMs: 1,
+		}),
+		localSpeech: async () => {
+			entered = true;
+			return new Promise((resolve) => {
+				finish = resolve;
+			});
+		},
+	});
+	await enableSentenceLanguage(h, true);
+	const close = spyOn(h.port, "close");
+	const sample = h.inference
+		.speak("試聴です。", freshSignal(), { voice: "Zundamon", speed: 1.1 })
+		.catch((e) => e);
+	await until(() => entered);
+	const unrelated = h.settings.get();
+	unrelated.general.agentName = "changed-name";
+	await h.settings.apply({
+		requestId: crypto.randomUUID(),
+		expectedRevision: unrelated.revision,
+		settings: unrelated,
+		keys: [],
+	});
+	expect(close).not.toHaveBeenCalled();
+	finish(wav());
+	expect(await sample).toEqual(wav());
+	entered = false;
+	const stale = h.inference
+		.speak("古い試聴です。", freshSignal(), { voice: "Zundamon", speed: 1.1 })
+		.catch((e) => e);
+	await until(() => entered);
+	const revoked = h.settings.get();
+	revoked.larm.voice = "new-saved-voice";
+	await h.settings.apply({
+		requestId: crypto.randomUUID(),
+		expectedRevision: revoked.revision,
+		settings: revoked,
+		keys: [],
+	});
+	finish(wav());
+	expect(await stale).toBeInstanceOf(Error);
+	expect(
+		h.inference.usage().filter((r) => r.purpose === "tts" && r.accepted),
+	).toHaveLength(1);
 });
 
 test("Ruri dataset captures real-turn receipt adoption once; a technical collection request does not delay answer or TTS", async () => {

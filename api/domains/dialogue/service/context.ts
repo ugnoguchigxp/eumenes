@@ -47,7 +47,6 @@ export interface GenerateInput {
 		requestId: string | null;
 	};
 	actionResultIndex?: number;
-	authorizedUrls?: string[];
 	runId: string;
 	revision: number;
 	messages: ChatMessage[];

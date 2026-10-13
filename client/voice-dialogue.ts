@@ -136,7 +136,7 @@ export function voiceDialogueClient(transport: Transport) {
 		voiceSample: async (
 			voice: {
 				voice?: string;
-				style?: string;
+				style?: string | null;
 				speed?: number;
 				pitchScale?: number;
 				intonationScale?: number;

@@ -16,7 +16,12 @@ import type {
 } from "../../delivery/contracts";
 import type { Connection, Resource, Settings } from "../../settings";
 import type { SettingsService } from "../../settings";
-import type { ControlContract, Messages, Receipt } from "../contracts";
+import type {
+	ControlContract,
+	Messages,
+	Receipt,
+	SpeechOverride,
+} from "../contracts";
 import { createSpeechLanguageCache } from "./speech-language";
 import type { SentenceLanguageDecision } from "../../larm";
 import { get, type RequestRow } from "../repository";
@@ -91,6 +96,7 @@ type Input = Messages | string | Uint8Array;
 type Source = "larm" | "cloud" | "codex";
 /** Per-request state shared by the larm attempt and a cloud fallback attempt. */
 type Request = {
+	voiceOverride?: SpeechOverride;
 	tools?: import("../../../infrastructure/chat-stream").NativeTool[];
 	toolCalls?: import("../../../infrastructure/chat-stream").NativeToolCall[];
 	env: Env;
@@ -162,6 +168,7 @@ async function recordAttemptStart(r: Request, source: Source) {
 function callOptionsFor(r: Request, attemptId: string): LarmCallOptions {
 	const exchanges: LarmExchange[] = [];
 	return {
+		...(r.voiceOverride ? { speechOverride: r.voiceOverride } : {}),
 		...(r.tools?.length
 			? {
 					tools: r.tools,
@@ -274,7 +281,10 @@ async function chooseTtsDelivery(
 	if (delivery.source !== "fallback" && r.row.snapshot.larm.autoIntonation)
 		Object.assign(
 			args.callOptions,
-			speechParameters(delivery, r.row.snapshot.larm),
+			speechParameters(delivery, {
+				...r.row.snapshot.larm,
+				...r.voiceOverride,
+			}),
 		);
 	return delivery;
 }
@@ -688,12 +698,15 @@ export async function executeRequest(
 	preparation?: SpeechPreparation,
 	tools?: import("../../../infrastructure/chat-stream").NativeTool[],
 	control?: ControlContract,
+	voiceOverride?: SpeechOverride,
 ): Promise<Receipt> {
 	caller.throwIfAborted();
 	if (env.isClosed()) throw new Error("inference_closed");
 	const found = env.store.read((db) => get(db, requestId));
 	if (!found) throw new Error("inference_request_missing");
 	const row: RequestRow = found;
+	if (voiceOverride && row.purpose !== "tts")
+		throw new Error("invalid_voice_override");
 	if (
 		row.purpose === "asr" &&
 		(!(input instanceof Uint8Array) ||
@@ -729,6 +742,7 @@ export async function executeRequest(
 	env.active.set(row.id, running);
 	env.touch?.();
 	const request: Request = {
+		voiceOverride,
 		env,
 		row,
 		input,

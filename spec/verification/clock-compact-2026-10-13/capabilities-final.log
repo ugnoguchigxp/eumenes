@@ -1,0 +1,72 @@
+$ bun scripts/verify.ts --domain capabilities
+[verify] selected=capabilities dependencyClosure=capabilities testClosure=capabilities
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts api/domains/capabilities
+size-budget ok (25 files)
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check api/domains/capabilities
+$ oxfmt --check api/domains/capabilities
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 24ms on 33 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint api/domains/capabilities
+$ oxlint --deny-warnings api/domains/capabilities
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun x tsc -p /Users/y.noguchi/Code/eumenes/verification-reports/tsconfig.selected.json
+[verify] TypeScript workspace closure: 37 files; api/infrastructure/flock.ts, api/infrastructure/logger.ts, api/infrastructure/sqlite, api/domains/capabilities, api/infrastructure/http.ts
+[verify] domain tests: /Users/y.noguchi/.bun/bin/bun run test:domain -- capabilities
+$ bun scripts/test-domain.ts capabilities
+bun test v1.4.2 (744846f84)
+
+api/domains/capabilities/test/prepare-learned.test.ts:
+(pass) C01 learned registration rejects conflicts, bad bundles and oversize; builtin hashes unchanged [23.03ms]
+(pass) C01 5000 learned definitions never enter FTS/alias/list and do not displace builtins [290.15ms]
+(pass) seed adds newer research rules and packages without touching old revisions [14.06ms]
+(pass) new research packages expose generic acquisition without topic-specific tools or skills [13.40ms]
+(pass) C02 prepare by ID keeps shared checks; independent registration does not disturb A; GC spares builtins/protected [12.62ms]
+
+api/domains/capabilities/test/requirement-schema.test.ts:
+(pass) enum values must also satisfy bounds and formats at every nested node [2.49ms]
+(pass) R04 unsupported keywords, incompatible keywords and resource limits reject before conversion [0.12ms]
+(pass) R05 standard schema conversion is strict and does not coerce, default or ignore fields [1.32ms]
+(pass) optional string bounds preserve explicit constraints and the overall value capacity [0.42ms]
+
+api/domains/capabilities/test/capabilities.test.ts:
+(pass) quick Web capability grants only lookup and read and preserves Luna tools [0.09ms]
+(pass) 5000 capability catalogue: bounded discovery, exact aliases, immutable revisions and owner isolation [6092.73ms]
+(pass) builtin SKILL is mandatory; disabling survives seed and dependency failure hides package [20.89ms]
+(pass) revoking a dependency permanently invalidates already issued candidates, even after re-enabling [11.43ms]
+(pass) builtin bundle upgrade preserves revision 1 fingerprints and activates a new revision for the larger input contract [24.34ms]
+(pass) deployed research skill v3 upgrades without a revision conflict and restart preserves hashes [31.54ms]
+(pass) seed still rejects a changed newest builtin revision [16.75ms]
+(pass) history and web catalogue selection can be enabled independently without editing archived revisions [21.60ms]
+
+api/domains/capabilities/test/timer-compatibility.test.ts:
+(pass) timer UI pausing keeps the deployed version 1 input schemas and accepts paused result state [1.37ms]
+
+api/domains/capabilities/test/music-versions.test.ts:
+(pass) installed V1 music definitions survive the V2 upgrade and repeated seeding [13.56ms]
+(pass) V1 keeps its schema while V2 enforces the verified integer duration and vocal fields [0.66ms]
+
+api/domains/capabilities/test/requirements.test.ts:
+(pass) profile validity compares instants with mixed fractional-second precision [2.59ms]
+(pass) R02/R03/R06 immutable profile revisions, CAS, independent catalogs and invalidation [18.41ms]
+
+api/domains/capabilities/test/learned.test.ts:
+
+api/domains/capabilities/test/requirement-controller.test.ts:
+(pass) management API validates bodies, exposes CAS state and keeps requirement profiles out of executable catalog [10.06ms]
+
+ 23 pass
+ 0 fail
+ 382 expect() calls
+Ran 23 tests across 8 files. [6.72s]
+225 | 			"test:domain",
+226 | 			"--",
+227 | 			selected[0] ?? "",
+228 | 		]);
+229 | 	if (verificationRevision(root) !== startHash)
+230 | 		throw new Error("source changed during verification");
+                  ^
+error: source changed during verification
+      at /Users/y.noguchi/Code/eumenes/scripts/verify.ts:230:13
+
+error: script "verify" exited with code 1

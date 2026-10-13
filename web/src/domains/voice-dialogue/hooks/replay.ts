@@ -7,7 +7,7 @@ import {
 } from "../../audio";
 import type { AvatarCue } from "../../avatar";
 
-type Run = { abort: AbortController };
+type Run = { abort: AbortController; automatic: boolean };
 export type ReplayAudioSettings = {
 	outputVolume?: number;
 	outputDevice?: string;
@@ -63,6 +63,9 @@ export function useReplay(
 		setSubtitle(null);
 		setAvatarCue(null);
 	}, []);
+	const stopAutomatic = useCallback(() => {
+		if (run.current?.automatic) stop();
+	}, [stop]);
 	useEffect(
 		() => () => {
 			stop();
@@ -70,36 +73,54 @@ export function useReplay(
 		},
 		[stop, releaseOutput],
 	);
+	// Unlock output from a user gesture before the asynchronous answer arrives.
+	const prepare = useCallback(async () => {
+		const { settings: audio, deps: live } = latest.current;
+		const session = live.sessionAudio?.();
+		if (session) return session;
+		const device = audio.outputDevice ?? "";
+		if (output.current?.device !== device) {
+			releaseOutput();
+			output.current = {
+				device,
+				audio: (live.createOutput ?? defaultOutput)(device),
+			};
+		}
+		const owned = output.current;
+		try {
+			await owned.audio.startOutput();
+			return owned.audio;
+		} catch (error) {
+			if (output.current === owned) releaseOutput();
+			throw error;
+		}
+	}, [releaseOutput]);
 	const play = useCallback(
-		async (id: string, text: string, runId?: string | null) => {
+		async (
+			id: string,
+			text: string,
+			runId?: string | null,
+			options: { automatic?: boolean } = {},
+		) => {
 			stop();
 			setError(null);
-			const mine: Run = { abort: new AbortController() };
+			const mine: Run = {
+				abort: new AbortController(),
+				automatic: options.automatic ?? false,
+			};
 			run.current = mine;
 			setPlayingId(id);
 			const { signal } = mine.abort;
 			const valid = () => !signal.aborted && run.current === mine;
 			const playbackKey = crypto.randomUUID();
 			try {
-				const { deps: live, settings: audio } = latest.current;
+				const { deps: live } = latest.current;
 				// A new playback interrupts the live reply, like barge-in does.
-				live.interruptLive?.();
-				const session = live.sessionAudio?.() ?? null;
-				let target: Pick<AudioController, "play" | "stopPlayback">;
-				if (session) target = session;
-				else {
-					const device = audio.outputDevice ?? "";
-					if (output.current?.device !== device) {
-						releaseOutput();
-						const created = (live.createOutput ?? defaultOutput)(device);
-						output.current = { device, audio: created };
-						await created.startOutput();
-					}
-					const owned = output.current;
-					if (!valid() || !owned) return;
-					target = owned.audio;
-				}
+				if (!options.automatic) live.interruptLive?.();
+				const target = await prepare();
+				if (!valid()) return;
 				const sentences = await client.replaySentences(text);
+				if (!valid()) return;
 				const fetchAt = (i: number) =>
 					sentences[i] === undefined
 						? undefined
@@ -158,9 +179,11 @@ export function useReplay(
 			} catch (e) {
 				if (!signal.aborted)
 					setError(
-						`読み上げ直しに失敗しました（${e instanceof Error ? e.message : "不明なエラー"}）`,
+						`読み上げに失敗しました（${e instanceof Error ? e.message : "不明なエラー"}）`,
 					);
 			} finally {
+				// A microphone interruption may leave the next clause's synthesis in flight.
+				mine.abort.abort();
 				if (run.current === mine) {
 					run.current = null;
 					setPlayingId(null);
@@ -169,7 +192,16 @@ export function useReplay(
 				}
 			}
 		},
-		[client, stop, releaseOutput],
+		[client, stop, prepare],
 	);
-	return { playingId, error, subtitle, avatarCue, play, stop };
+	return {
+		playingId,
+		error,
+		subtitle,
+		avatarCue,
+		play,
+		stop,
+		stopAutomatic,
+		prepare,
+	};
 }

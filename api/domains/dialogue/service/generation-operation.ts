@@ -127,7 +127,6 @@ export function settleConversationOperation(
 			},
 			{
 				parentJobId: claim.jobId,
-				authorizedUrls: input.authorizedUrls,
 			},
 		);
 		deps.toolchains!.linkTaskInTransaction(tx, run.id, root.taskId);

@@ -21,7 +21,11 @@ import {
 	useSubmit,
 	useRunProgress,
 } from "../domains/dialogue";
-import { useReplay, useVoiceDialogue } from "../domains/voice-dialogue";
+import {
+	useAutomaticSpeech,
+	useReplay,
+	useVoiceDialogue,
+} from "../domains/voice-dialogue";
 import { useSettings, useVoiceMute } from "../domains/settings";
 import { useSettingsDraft } from "../domains/settings/SettingsDraftHost";
 import { createUnsavedFlags } from "../unsavedFlags";
@@ -133,6 +137,16 @@ export function useWorkspace({
 		sessionAudio: voice.audio,
 		interruptLive: voice.interrupt,
 	});
+	useAutomaticSpeech({
+		runs: runs.data,
+		messages: conversation.data?.messages,
+		enabled: settings.data?.voice.autoSpeak,
+		player: replay,
+		ownsSpeech: voice.ownsSpeech,
+		blocked:
+			!!voice.turn?.runId &&
+			["responding", "synthesizing", "ready"].includes(voice.turn.status),
+	});
 	const mute = useVoiceMute(client);
 	const automaticInput = input.dictated && voice.active;
 	const recognitionId = voice.recognitionId;
@@ -162,8 +176,11 @@ export function useWorkspace({
 				const n = next.connections.find((n) => n.id === c.id);
 				return !n || n.epoch !== c.epoch || (c.enabled && !n.enabled);
 			});
-		if (revoked) void voice.stop();
-	}, [settings.data, voice]);
+		if (revoked) {
+			replay.stop();
+			void voice.stop();
+		}
+	}, [settings.data, voice, replay]);
 	const phase = useStore(store, (state) => state.phase);
 	const audioError = useStore(store, (state) => state.error);
 	const cache = useQueryClient();

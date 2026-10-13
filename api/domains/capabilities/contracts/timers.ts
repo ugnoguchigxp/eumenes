@@ -1,7 +1,9 @@
 import { z } from "zod";
 
 const label = z.string().trim().min(1).max(80);
+// Frozen inputs of timers.manage@1 keep their persisted schema hashes.
 export const timerStates = ["active", "elapsed", "cancelled"] as const;
+const timerResultStates = [...timerStates, "paused"] as const;
 
 export const timerStart = z
 	.object({
@@ -47,7 +49,7 @@ export const timerResultContext = z
 						id: z.uuid(),
 						revision: z.number().int().nonnegative(),
 						label: z.string().max(80),
-						state: z.enum(timerStates),
+						state: z.enum(timerResultStates),
 						durationSeconds: z.number().int().min(1).max(86400),
 						remainingSeconds: z.number().int().min(0).max(86400),
 						dueAt: z.iso.datetime({ offset: true }),

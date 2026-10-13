@@ -531,10 +531,9 @@ export function useVoiceDialogue(
 		candidate.current = null;
 		setPreviewText(null);
 	}
-	const autoSpeak = settings?.autoSpeak;
 	useEffect(() => {
 		// Muting takes effect now: drop what is playing and release the turn.
-		if (autoSpeak !== false) return;
+		if (settings?.autoSpeak !== false) return;
 		controller.current?.stopPlayback();
 		// oxlint-disable-next-line react/set-state-in-effect
 		cancelPlayback();
@@ -542,7 +541,7 @@ export function useVoiceDialogue(
 		if (!id) return;
 		machine.dispatch({ type: "turn_released" });
 		void client.voiceCancel(id).catch(() => {});
-	}, [autoSpeak, client, machine, cancelPlayback]);
+	}, [settings?.autoSpeak, client, machine, cancelPlayback]);
 	useEffect(
 		() => () => {
 			void controller.current?.stop();
@@ -560,6 +559,7 @@ export function useVoiceDialogue(
 		previewText ||
 		(turn.data?.utteranceId === recognitionId ? turn.data.text : null);
 	return {
+		ownsSpeech: machine.ownsSpeech,
 		start,
 		stop,
 		pause,

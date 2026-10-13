@@ -6,14 +6,17 @@ import {
 import type { SettingsInputField } from "@eumenes/design-system";
 import type { z } from "zod";
 
-type Binding = {
+export type Binding = {
 	id: string;
+	storagePath: string;
 	descriptor: Omit<SettingsInputField, "id" | "value">;
 	read: (settings: Settings) => string;
 	edit: (settings: Settings, value: unknown) => void;
+	restore: (settings: Settings, saved: Settings) => void;
 };
-function field<T extends string>(input: {
+export function field<T extends string>(input: {
 	id: string;
+	storagePath: string;
 	descriptor: Binding["descriptor"];
 	schema: z.ZodType<T>;
 	read: (settings: Settings) => T;
@@ -21,8 +24,10 @@ function field<T extends string>(input: {
 }): Binding {
 	return {
 		id: input.id,
+		storagePath: input.storagePath,
 		descriptor: input.descriptor,
 		read: input.read,
+		restore: (s, saved) => input.write(s, input.read(saved)),
 		edit: (settings, value) => {
 			input.schema.parse(value);
 			input.write(settings, value as T);
@@ -33,6 +38,7 @@ const general = settingsSchema.shape.general.shape;
 export const conversationFields = [
 	field({
 		id: "conversation.agent-name",
+		storagePath: "$.general.agentName",
 		descriptor: {
 			label: "AIの名前",
 			help: "空欄の場合は名前を設定しません。",
@@ -47,6 +53,7 @@ export const conversationFields = [
 	}),
 	field({
 		id: "conversation.user-name",
+		storagePath: "$.general.userName",
 		descriptor: {
 			label: "あなたの名前",
 			help: "空欄の場合は名前で呼びません。",
@@ -61,6 +68,7 @@ export const conversationFields = [
 	}),
 	field({
 		id: "conversation.persona",
+		storagePath: "$.general.persona",
 		descriptor: {
 			label: "口調",
 			help: "次の返答から反映されます。",
@@ -93,6 +101,18 @@ export const settingsArtifacts = {
 		source: "settings-conversation",
 		view: "settings-section",
 	},
+	voice: {
+		id: "settings-voice-input",
+		title: "音声と入力",
+		source: "settings-voice-input",
+		view: "settings-section",
+	},
+	display: {
+		id: "settings-display",
+		title: "表示",
+		source: "settings-display",
+		view: "settings-section",
+	},
 	changes: {
 		id: "settings-changes",
 		title: "設定の変更一覧",
@@ -103,6 +123,16 @@ export const settingsArtifacts = {
 export type SettingsArtifactId = keyof typeof settingsArtifacts;
 export function settingsArtifactDefinition(id: SettingsArtifactId) {
 	const artifact = settingsArtifacts[id];
+	if (id === "display")
+		return JSON.stringify({
+			view: "layout",
+			direction: "stack",
+			title: "表示の設定",
+			children: [
+				{ view: artifact.view, source: artifact.source, title: artifact.title },
+				{ view: "subtitle-preview", source: "settings-display-preview" },
+			],
+		});
 	return JSON.stringify({
 		view: artifact.view,
 		source: artifact.source,
@@ -112,6 +142,8 @@ export function settingsArtifactDefinition(id: SettingsArtifactId) {
 const sources = new Set<string>(
 	Object.values(settingsArtifacts).map((artifact) => artifact.source),
 );
+// The read-only preview can also be composed without its editing form.
+sources.add("settings-display-preview");
 export function isSettingsArtifactDefinition(definition: string) {
 	try {
 		return definitionRequests(parseDefinition(definition)).some(

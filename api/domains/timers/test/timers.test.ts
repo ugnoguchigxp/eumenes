@@ -10,7 +10,7 @@ import {
 } from "../../scheduler";
 import {
 	createTimers,
-	migration as timerMigration,
+	migrations as timerMigrations,
 	startTimerSchema,
 	type TimersService,
 } from "..";
@@ -29,7 +29,7 @@ export async function openTimers(options?: {
 	const store = openStore(join(dir, "db.sqlite3"), [
 		queueMigration,
 		schedulerMigration,
-		timerMigration,
+		...timerMigrations.map((migration) => migration.sql),
 	]);
 	const queue = createQueue(store, {
 		now: () => clock(),
@@ -146,7 +146,7 @@ test("a scheduler rejection rolls the timer and the operation back together", as
 	const store = openStore(join(dir, "db.sqlite3"), [
 		queueMigration,
 		schedulerMigration,
-		timerMigration,
+		...timerMigrations.map((migration) => migration.sql),
 	]);
 	const queue = createQueue(store, { now: () => T0 });
 	const scheduler = createScheduler(store, queue, { now: () => T0 });

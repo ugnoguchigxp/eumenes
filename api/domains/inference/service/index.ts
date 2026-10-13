@@ -236,9 +236,7 @@ export function createInference(
 				crypto.randomUUID(),
 				purpose,
 				Date.now() + (purpose === "llm" ? 180_000 : 45_000),
-				override
-					? { ...current, larm: { ...current.larm, ...override } }
-					: current,
+				current,
 			);
 		});
 		const receipt = await executeRequest(
@@ -247,6 +245,9 @@ export function createInference(
 			signal,
 			onDelta,
 			preparation,
+			undefined,
+			undefined,
+			override,
 		);
 		if (!(await store.write((db) => accept(db, receipt))))
 			throw new Error("permission_revoked");

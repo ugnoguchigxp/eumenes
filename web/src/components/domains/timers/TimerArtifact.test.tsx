@@ -34,7 +34,7 @@ test("clock binding measures the real request round trip before rendering", asyn
 		</QueryClientProvider>,
 	);
 	await waitFor(() =>
-		expect(screen.getByRole("timer").textContent).toBe("00:02"),
+		expect(screen.getByRole("timer").textContent).toBe("00:00:02"),
 	);
 	expect(api.timer.mock.calls[0]).toHaveLength(2);
 });

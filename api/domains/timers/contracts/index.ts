@@ -1,7 +1,12 @@
 import { z } from "zod";
 import type { HttpErrorStatus } from "../../../infrastructure/http";
 
-export const timerStates = ["active", "elapsed", "cancelled"] as const;
+export const timerStates = [
+	"active",
+	"paused",
+	"elapsed",
+	"cancelled",
+] as const;
 export type TimerState = (typeof timerStates)[number];
 export const notificationStatuses = [
 	"pending",
@@ -109,6 +114,7 @@ export type TimerDto = {
 	startedAt: string;
 	dueAt: string;
 	cancelledAt: string | null;
+	pausedAt?: string | null;
 	remainingSeconds: number;
 	conversationId: string | null;
 	originRunId: string | null;
@@ -157,7 +163,7 @@ export type TimerReceipt =
 	  }
 	| {
 			kind: "timer_action";
-			action: "cancelled" | "dismissed" | "unchanged";
+			action: "cancelled" | "dismissed" | "unchanged" | "paused" | "resumed";
 			operationId: string;
 			serverNow: string;
 			timer: TimerDto;
@@ -181,6 +187,7 @@ const timerDtoSchema = z
 		startedAt: offsetTime,
 		dueAt: offsetTime,
 		cancelledAt: offsetTime.nullable(),
+		pausedAt: offsetTime.nullable().optional(),
 		remainingSeconds: z.number().int().min(0),
 		conversationId: z.string().nullable(),
 		originRunId: z.string().nullable(),
@@ -235,7 +242,13 @@ export const timerReceiptSchema = z.discriminatedUnion("action", [
 	z
 		.object({
 			kind: z.literal("timer_action"),
-			action: z.enum(["cancelled", "dismissed", "unchanged"]),
+			action: z.enum([
+				"cancelled",
+				"dismissed",
+				"unchanged",
+				"paused",
+				"resumed",
+			]),
 			operationId: z.uuid(),
 			serverNow: offsetTime,
 			timer: timerDtoSchema,
@@ -291,6 +304,7 @@ export const TIMER_EXPIRE_KIND = "timer.expire";
 /** HTTP status of each error code this domain throws; merged by `api/application/error-status.ts`. */
 export const errorStatus = {
 	timer_not_found: 404,
+	timer_not_resumable: 409,
 	notification_not_found: 404,
 	notification_claimed: 409,
 	claim_invalid: 409,

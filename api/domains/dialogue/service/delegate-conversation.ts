@@ -4,7 +4,6 @@ import type { ConversationService } from "../../conversation";
 import { toolchainRuntimeOf, toolchainBuiltins } from "../../capabilities";
 import type { Run } from "../contracts";
 import { linkAgent } from "../repository";
-import { conversationUrls } from "./conversation-urls";
 import type { DialogueDeps } from "./context";
 
 /** How much of the preceding conversation joins the current utterance as the retrieval query. */
@@ -29,7 +28,6 @@ export function delegateConversation(
 	},
 	context: {
 		parentJobId: string;
-		authorizedUrls?: string[];
 		actionSnapshot?: unknown;
 		timerCapability?: ReturnType<
 			AgentRuntime["conversationContextInTransaction"]
@@ -50,7 +48,6 @@ export function delegateConversation(
 				: {}),
 			...(selected.researcher ? { researcher: selected.researcher } : {}),
 			...(selected.command ? { command: selected.command } : {}),
-			urls: selected.route === "web" ? context.authorizedUrls : undefined,
 		},
 		deadline: Date.parse(run.deadlineAt!),
 		parentJobId: context.parentJobId,
@@ -114,6 +111,5 @@ export function prepareRouting(
 			utteranceId: run.utteranceId ?? null,
 			requestId: run.requestId ?? null,
 		},
-		authorizedUrls: conversationUrls(turns.map((m) => m.content)),
 	};
 }

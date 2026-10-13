@@ -13,7 +13,7 @@ import {
 } from "../contracts";
 import {
 	attachSchedule,
-	countActive,
+	countLive,
 	countListOperations,
 	countOperations,
 	deleteExpiredListOperations,
@@ -44,13 +44,13 @@ const createdCursor = z
 
 export type SavedReceipt = { receipt: TimerReceipt; replay: boolean };
 
-function parseInput<T>(schema: z.ZodType<T>, value: unknown): T {
+export function parseInput<T>(schema: z.ZodType<T>, value: unknown): T {
 	const parsed = schema.safeParse(value);
 	if (!parsed.success) throw new Error("invalid_timer_input");
 	return parsed.data;
 }
 
-function assertIssuedAt(issuedAt: string, nowMs: number) {
+export function assertIssuedAt(issuedAt: string, nowMs: number) {
 	const issued = Date.parse(issuedAt);
 	if (!Number.isFinite(issued)) throw new Error("invalid_timer_input");
 	if (nowMs - issued > TIMER_POLICY.requestMaxAgeMs)
@@ -66,7 +66,7 @@ function readReceipt(row: OperationRow): TimerReceipt {
 	return JSON.parse(row.receiptJson) as TimerReceipt;
 }
 
-function replayOf(
+export function replayOf(
 	tx: Database,
 	scope: string,
 	requestId: string,
@@ -79,7 +79,7 @@ function replayOf(
 	return { receipt: readReceipt(existing), replay: true };
 }
 
-function saveOperation(
+export function saveOperation(
 	tx: Database,
 	deps: TimerDeps,
 	row: {
@@ -87,7 +87,7 @@ function saveOperation(
 		requestId: string;
 		issuedAtMs: number;
 		inputDigest: string;
-		operation: "start" | "list" | "cancel";
+		operation: OperationRow["operation"];
 		timerId: string | null;
 		originKey: string | null;
 		receipt: TimerReceipt;
@@ -207,7 +207,7 @@ export function startInTransaction(
 			return { receipt: readReceipt(stored), replay: true };
 		}
 	}
-	if (countActive(tx, origin.scope) >= TIMER_POLICY.maxActive)
+	if (countLive(tx, origin.scope) >= TIMER_POLICY.maxActive)
 		throw new Error("timer_limit_reached");
 	if (countTimers(tx, origin.scope) >= TIMER_POLICY.maxRows)
 		throw new Error("timer_storage_full");
@@ -364,7 +364,7 @@ export function cancelInTransaction(
 		throw new Error("revision_conflict");
 	const issuedAtMs = assertIssuedAt(input.issuedAt, deps.now());
 	const at = deps.now();
-	if (timer.state === "active") {
+	if (timer.state === "active" || timer.state === "paused") {
 		assertCancelCapacity(tx, scope);
 		cancelScheduleAndJob(tx, deps, timer);
 		dismissNotifications(tx, timer.id, at);
@@ -419,7 +419,12 @@ function assertCancelCapacity(tx: Database, scope: string) {
 		throw new Error("operation_capacity");
 }
 
-function cancelScheduleAndJob(tx: Database, deps: TimerDeps, timer: TimerRow) {
+export function cancelScheduleAndJob(
+	tx: Database,
+	deps: TimerDeps,
+	timer: TimerRow,
+	reason = "timer_cancelled",
+) {
 	if (timer.scheduleId) {
 		const schedule = deps.scheduler.getInTransaction(tx, timer.scheduleId);
 		if (
@@ -431,7 +436,7 @@ function cancelScheduleAndJob(tx: Database, deps: TimerDeps, timer: TimerRow) {
 	if (timer.expiryJobId) {
 		const job = deps.queue.getInTransaction(tx, timer.expiryJobId);
 		if (job && isOpenJob(job.state))
-			deps.queue.cancelInTransaction(tx, job.id, "timer_cancelled");
+			deps.queue.cancelInTransaction(tx, job.id, reason);
 	}
 }
 

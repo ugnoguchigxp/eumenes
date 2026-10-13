@@ -8,10 +8,29 @@ export type SettingsInputField = {
 	id: string;
 	label: string;
 	help?: string;
-	control: "text" | "select";
+	control: "text" | "select" | "toggle" | "range" | "number" | "multiple";
 	value: string;
+	defaultValue?: string;
 	maxLength?: number;
+	minimum?: number;
+	maximum?: number;
+	step?: number;
 	options?: { value: string; label: string }[];
+	group?: string;
+	detail?: boolean;
+	disabled?: boolean;
+	searchable?: boolean;
+};
+export type SettingsFieldGroup = {
+	id: string;
+	label: string;
+	description?: string;
+};
+export type SettingsPanelAction = {
+	id: string;
+	label: string;
+	group?: string;
+	disabled?: boolean;
 };
 export type SettingsLink = {
 	id: string;
@@ -33,17 +52,39 @@ export function SettingsSection({
 	description,
 	fields,
 	dirty,
+	groups = [],
+	actions = [],
+	busy = false,
+	blocked = false,
+	message,
 	onChange,
 	onReview,
+	onAction,
+	onApply,
 }: {
 	title: string;
 	description?: string;
 	fields: SettingsInputField[];
 	dirty: boolean;
+	groups?: SettingsFieldGroup[];
+	actions?: SettingsPanelAction[];
+	busy?: boolean;
+	blocked?: boolean;
+	message?: string;
 	onChange: (id: string, value: string) => void;
 	onReview: () => void;
+	onAction?: (id: string) => void;
+	onApply?: () => void;
 }) {
-	const prefix = useId();
+	const [selected, setSelected] = useState<string>();
+	const active = groups.find((g) => g.id === selected) ?? groups[0];
+	const visible = fields.filter((f) => !active || f.group === active.id);
+	const renderFields = (detail: boolean) =>
+		visible
+			.filter((f) => !!f.detail === detail)
+			.map((field) => (
+				<SettingsField key={field.id} field={field} onChange={onChange} />
+			));
 	return (
 		<Card className="ds-settings-panel">
 			<CardHeader>
@@ -51,63 +92,185 @@ export function SettingsSection({
 			</CardHeader>
 			<CardContent>
 				{description && <p className="ds-settings-hint">{description}</p>}
+				{groups.length > 0 && (
+					<nav aria-label="設定の区分" className="ds-settings-sections">
+						{groups.map((group) => (
+							<Button
+								key={group.id}
+								variant={active?.id === group.id ? "secondary" : "ghost"}
+								aria-pressed={active?.id === group.id}
+								onClick={() => setSelected(group.id)}
+							>
+								{group.label}
+							</Button>
+						))}
+					</nav>
+				)}
+				{active?.description && (
+					<p className="ds-settings-hint ds-settings-summary">
+						{active.description}
+					</p>
+				)}
 				<form
 					className="ds-settings-fields"
-					onSubmit={(event) => {
-						event.preventDefault();
-						onReview();
+					onSubmit={(e) => {
+						e.preventDefault();
+						if (onApply) {
+							if (dirty && !busy && !blocked) onApply();
+						} else onReview();
 					}}
 				>
-					{fields.map((field) => (
-						<div key={field.id} className="ds-settings-field">
-							<label htmlFor={prefix + field.id}>{field.label}</label>
-							{field.control === "select" ? (
-								<select
-									id={prefix + field.id}
-									value={field.value}
-									onChange={(event) => onChange(field.id, event.target.value)}
-									aria-describedby={
-										field.help ? prefix + field.id + "-help" : undefined
-									}
-								>
-									{field.options?.map((option) => (
-										<option key={option.value} value={option.value}>
-											{option.label}
-										</option>
-									))}
-								</select>
-							) : (
-								<Input
-									id={prefix + field.id}
-									value={field.value}
-									maxLength={field.maxLength}
-									onChange={(event) => onChange(field.id, event.target.value)}
-									aria-describedby={
-										field.help ? prefix + field.id + "-help" : undefined
-									}
-								/>
-							)}
-							{field.help && (
-								<small
-									id={prefix + field.id + "-help"}
-									className="ds-settings-hint"
-								>
-									{field.help}
-								</small>
-							)}
+					{renderFields(false)}
+					{visible.some((f) => f.detail) && (
+						<details className="ds-settings-details">
+							<summary>詳細設定</summary>
+							<div className="ds-settings-fields">{renderFields(true)}</div>
+						</details>
+					)}
+					{actions.some((a) => !active || a.group === active.id) && (
+						<div className="ds-settings-actions">
+							{actions
+								.filter((a) => !active || a.group === active.id)
+								.map((action) => (
+									<Button
+										key={action.id}
+										type="button"
+										variant="secondary"
+										disabled={action.disabled}
+										onClick={() => onAction?.(action.id)}
+									>
+										{action.label}
+									</Button>
+								))}
 						</div>
-					))}
+					)}
 					<footer className="ds-settings-footer">
 						<output>
 							{dirty ? "未適用の変更があります" : "すべての変更を保存済み"}
 						</output>
-						<Button type="submit" variant="secondary">
+						{onApply && (
+							<Button type="submit" disabled={!dirty || busy || blocked}>
+								{busy ? "保存中…" : "設定の変更をすべて保存"}
+							</Button>
+						)}
+						<Button type="button" variant="secondary" onClick={onReview}>
 							変更一覧を開く
 						</Button>
 					</footer>
 				</form>
+				{message && <output aria-live="polite">{message}</output>}
 			</CardContent>
 		</Card>
+	);
+}
+function SettingsField({
+	field,
+	onChange,
+}: {
+	field: SettingsInputField;
+	onChange: (id: string, value: string) => void;
+}) {
+	const prefix = useId();
+	const [search, setSearch] = useState("");
+	const value = field.value || field.defaultValue || "";
+	const props = {
+		id: prefix,
+		disabled: field.disabled,
+		"aria-describedby": field.help ? prefix + "-help" : undefined,
+	};
+	const change = (value: string) => onChange(field.id, value);
+	const options = field.options?.filter(
+		(o) =>
+			o.value === value ||
+			o.label.toLocaleLowerCase().includes(search.toLocaleLowerCase()),
+	);
+	return (
+		<div className="ds-settings-field">
+			{field.control === "multiple" ? (
+				<fieldset disabled={field.disabled}>
+					<legend>{field.label}</legend>
+					<div className="ds-settings-options">
+						{field.options?.map((option) => {
+							const selected = JSON.parse(field.value) as string[];
+							return (
+								<label key={option.value}>
+									<input
+										type="checkbox"
+										checked={selected.includes(option.value)}
+										onChange={(e) =>
+											change(
+												JSON.stringify(
+													e.target.checked
+														? [...selected, option.value]
+														: selected.filter((v) => v !== option.value),
+												),
+											)
+										}
+									/>
+									{option.label}
+								</label>
+							);
+						})}
+					</div>
+					{field.help && (
+						<small className="ds-settings-hint">{field.help}</small>
+					)}
+				</fieldset>
+			) : (
+				<>
+					<label htmlFor={prefix}>
+						{field.label}
+						{field.control === "range" && (
+							<span className="ds-settings-value">{value}</span>
+						)}
+					</label>
+					{field.searchable && (
+						<Input
+							aria-label={field.label + "を探す"}
+							placeholder="候補を探す"
+							value={search}
+							onChange={(e) => setSearch(e.target.value)}
+						/>
+					)}
+					{field.control === "select" ? (
+						<select
+							{...props}
+							value={value}
+							onChange={(e) => change(e.target.value)}
+						>
+							{options?.map((o) => (
+								<option key={o.value} value={o.value}>
+									{o.label}
+								</option>
+							))}
+						</select>
+					) : field.control === "toggle" ? (
+						<input
+							{...props}
+							type="checkbox"
+							checked={value === "true"}
+							onChange={(e) => change(String(e.target.checked))}
+						/>
+					) : (
+						<Input
+							{...props}
+							type={field.control === "text" ? "text" : field.control}
+							value={value}
+							maxLength={field.maxLength}
+							min={field.minimum}
+							max={field.maximum}
+							step={field.step}
+							onChange={(e) => change(e.target.value)}
+						/>
+					)}
+					{field.help && (
+						<small id={prefix + "-help"} className="ds-settings-hint">
+							{field.help}
+						</small>
+					)}
+				</>
+			)}
+		</div>
 	);
 }
 

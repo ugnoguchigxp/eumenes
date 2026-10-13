@@ -1,0 +1,37 @@
+
+Running 2 tests using 1 worker
+
+(node:33580) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 tests/browser/timers.spec.ts:48:1 › the timer launcher works before any timer exists and starts a saved clock (1.1m)
+  ✘  2 tests/browser/timers.spec.ts:502:1 › expiry plays one real beep and posts an assistant message even after the artifact closes (21.1s)
+
+
+  1) tests/browser/timers.spec.ts:502:1 › expiry plays one real beep and posts an assistant message even after the artifact closes 
+
+    TimeoutError: page.waitForRequest: Timeout 20000ms exceeded while waiting for event "request"
+
+      521 | 	await expect(page.getByText(/接続済み/)).toBeVisible({ timeout: 20000 });
+      522 | 	await page.getByRole("textbox").fill("3秒タイマー測って");
+    > 523 | 	const speech = page.waitForRequest(
+          | 	                    ^
+      524 | 		(request) =>
+      525 | 			request.url().endsWith("/api/voice/replay/audio") &&
+      526 | 			request.postDataJSON()?.text === "3秒のタイマーが終了しました。",
+        at /Users/y.noguchi/Code/eumenes/tests/browser/timers.spec.ts:523:22
+
+    Error Context: test-results/timers-expiry-plays-one-re-a8cdd-n-after-the-artifact-closes/error-context.md
+
+    Error Context: test-results/timers-expiry-plays-one-re-a8cdd-n-after-the-artifact-closes/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/timers-expiry-plays-one-re-a8cdd-n-after-the-artifact-closes/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/timers-expiry-plays-one-re-a8cdd-n-after-the-artifact-closes/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    tests/browser/timers.spec.ts:502:1 › expiry plays one real beep and posts an assistant message even after the artifact closes 
+  1 passed (1.5m)

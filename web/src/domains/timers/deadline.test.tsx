@@ -25,19 +25,22 @@ test("msUntilNextDeadline ignores deadlines the server already passed and adds a
 	).toBe(8_250);
 });
 
-test("active timers cause one fetch in 10 seconds and one more once they expire", async () => {
+test("live clocks cause one pair of list requests in 10 seconds and one more pair once they expire", async () => {
 	vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
 	vi.setSystemTime(new Date("2026-10-10T00:00:00.000Z"));
-	const timers = vi.fn(async () => ({
+	const timers = vi.fn(async (query: { state: string }) => ({
 		serverNow: new Date().toISOString(),
-		items: [
-			{
-				id: "t1",
-				label: "x",
-				state: "active",
-				dueAt: "2026-10-10T00:00:30.000Z",
-			},
-		],
+		items:
+			query.state === "paused"
+				? []
+				: [
+						{
+							id: "t1",
+							label: "x",
+							state: "active",
+							dueAt: "2026-10-10T00:00:30.000Z",
+						},
+					],
 	}));
 	const cache = new QueryClient({
 		defaultOptions: { queries: { retry: false } },
@@ -54,26 +57,29 @@ test("active timers cause one fetch in 10 seconds and one more once they expire"
 	await act(async () => {
 		await vi.advanceTimersByTimeAsync(10_000);
 	});
-	expect(timers).toHaveBeenCalledTimes(1);
+	expect(timers).toHaveBeenCalledTimes(2);
 	await act(async () => {
 		await vi.advanceTimersByTimeAsync(20_300);
 	});
-	expect(timers).toHaveBeenCalledTimes(2);
+	expect(timers).toHaveBeenCalledTimes(4);
 });
 
 test("a timer the server still lists after its deadline is looked at again with growing gaps, then left to the change stream", async () => {
 	vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
 	vi.setSystemTime(new Date("2026-10-10T00:00:00.000Z"));
-	const timers = vi.fn(async () => ({
+	const timers = vi.fn(async (query: { state: string }) => ({
 		serverNow: new Date().toISOString(),
-		items: [
-			{
-				id: "t1",
-				label: "x",
-				state: "active",
-				dueAt: "2026-10-10T00:00:05.000Z",
-			},
-		],
+		items:
+			query.state === "paused"
+				? []
+				: [
+						{
+							id: "t1",
+							label: "x",
+							state: "active",
+							dueAt: "2026-10-10T00:00:05.000Z",
+						},
+					],
 	}));
 	const cache = new QueryClient({
 		defaultOptions: { queries: { retry: false } },
@@ -92,14 +98,14 @@ test("a timer the server still lists after its deadline is looked at again with 
 			await vi.advanceTimersByTimeAsync(ms);
 		});
 	await advance(5_300);
-	expect(timers).toHaveBeenCalledTimes(2);
-	await advance(1_000);
-	expect(timers).toHaveBeenCalledTimes(3);
-	await advance(2_000);
 	expect(timers).toHaveBeenCalledTimes(4);
+	await advance(1_000);
+	expect(timers).toHaveBeenCalledTimes(6);
+	await advance(2_000);
+	expect(timers).toHaveBeenCalledTimes(8);
 	await advance(4_000);
 	await advance(8_000);
-	expect(timers).toHaveBeenCalledTimes(6);
+	expect(timers).toHaveBeenCalledTimes(12);
 	await advance(60_000);
-	expect(timers).toHaveBeenCalledTimes(6);
+	expect(timers).toHaveBeenCalledTimes(12);
 });

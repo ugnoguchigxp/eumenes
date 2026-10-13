@@ -1,0 +1,46 @@
+[
+  {
+    "level": "warn",
+    "time": "2026-10-12T22:40:10.820Z",
+    "event": "toolchain.vectors_refresh_failed",
+    "reason": "larm_base_url_unconfigured",
+    "errorFrames": [
+      "/Users/y.noguchi/Code/eumenes/api/domains/larm/service/playground.ts:70:34",
+      "/Users/y.noguchi/Code/eumenes/api/domains/larm/service/playground.ts:100:16",
+      "/Users/y.noguchi/Code/eumenes/api/domains/larm/service/playground-provider.ts:99:10",
+      "/Users/y.noguchi/Code/eumenes/api/domains/larm/service/playground-provider.ts:164:35",
+      "/Users/y.noguchi/Code/eumenes/api/application/toolchain-vectors.ts:62:23",
+      "/Users/y.noguchi/Code/eumenes/api/application/toolchain-vectors.ts:101:16",
+      "/Users/y.noguchi/Code/eumenes/api/application/server.ts:560:22",
+      "/Users/y.noguchi/Code/eumenes/api/application/lifecycle.ts:48:35"
+    ]
+  },
+  {
+    "level": "warn",
+    "time": "2026-10-12T22:40:10.821Z",
+    "event": "larm.probe_failed",
+    "status": "unconfigured",
+    "errorFrames": [
+      "/Users/y.noguchi/Code/eumenes/api/domains/larm/service/index.ts:329:24",
+      "/Users/y.noguchi/Code/eumenes/api/domains/larm/service/index.ts:858:10",
+      "/Users/y.noguchi/Code/eumenes/api/application/server.ts:708:27"
+    ]
+  },
+  {
+    "level": "error",
+    "time": "2026-10-12T22:40:25.870Z",
+    "event": "http.failed",
+    "httpRequestId": "d727f734-1a90-46e5-86e7-5056e95ba4e7",
+    "status": 500,
+    "reason": "internal_error",
+    "errorFrames": []
+  },
+  {
+    "level": "error",
+    "time": "2026-10-12T22:40:25.871Z",
+    "event": "http.completed",
+    "httpRequestId": "d727f734-1a90-46e5-86e7-5056e95ba4e7",
+    "route": "/api/inference/voices",
+    "status": 500
+  }
+]

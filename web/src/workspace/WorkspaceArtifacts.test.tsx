@@ -17,12 +17,14 @@ test("settings launchers retain stable OpenUI identities across closing and reop
 		hook.result.current.open();
 		hook.result.current.open("conversation");
 		hook.result.current.open("changes");
+		hook.result.current.open("display");
 		hook.result.current.open("conversation");
 	});
 	expect(hook.result.current.workspace.tabs.map((tab) => tab.id)).toEqual([
 		"settings",
 		"settings-conversation",
 		"settings-changes",
+		"settings-display",
 	]);
 	expect(
 		hook.result.current.workspace.tabs.every((tab) => tab.kind === "openui"),
@@ -31,7 +33,7 @@ test("settings launchers retain stable OpenUI identities across closing and reop
 		hook.result.current.workspace.close("settings-conversation");
 		hook.result.current.open("conversation");
 	});
-	expect(hook.result.current.workspace.tabs).toHaveLength(3);
+	expect(hook.result.current.workspace.tabs).toHaveLength(4);
 });
 test("generation and playlist each keep one stable screen with separate identities", () => {
 	const view = renderHook(() => {

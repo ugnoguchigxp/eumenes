@@ -1,0 +1,92 @@
+{
+  "at": "2026-10-12T22:45:06.119Z",
+  "implementation": "adopted_answer_auto_speech_with_existing_tts_and_player",
+  "fixture": {
+    "voiceDialogue": {
+      "backend": 65,
+      "web": 42,
+      "result": "pass"
+    },
+    "audio": {
+      "web": 45,
+      "result": "pass"
+    },
+    "browser": {
+      "tests": 6,
+      "result": "pass",
+      "cases": [
+        "typed_answer_mic_off",
+        "typed_answer_mic_on",
+        "external_api_answer_mic_on",
+        "auto_speak_disabled",
+        "native_three_fragment_input",
+        "native_partial_answer_waits_for_adoption"
+      ]
+    },
+    "before": {
+      "typedAnswerMicOn": {
+        "autoSpeak": true,
+        "ttsRequests": 0
+      }
+    },
+    "after": {
+      "typedAnswerMicOff": {
+        "ttsRequests": 2,
+        "audioEnded": 2
+      },
+      "typedAnswerMicOn": {
+        "ttsRequests": 2,
+        "audioEnded": 2,
+        "microphoneStillActive": true
+      },
+      "externalAnswerMicOn": {
+        "ttsRequests": 2,
+        "audioEnded": 2,
+        "microphoneStillActive": true
+      }
+    },
+    "webSuite": {
+      "files": 70,
+      "tests": 357,
+      "result": "pass"
+    }
+  },
+  "fullGate": {
+    "status": "blocked_outside_scope",
+    "command": "bun run verify:all",
+    "reason": "size-budget: api/domains/agent-runtime/service/step-actions.ts#createStepActions is 306 lines (limit 300)",
+    "modifiedByThisTask": false
+  },
+  "live": {
+    "status": "not_run",
+    "reason": "Changes use the existing provider contracts; this run verifies Web adoption and playback wiring with isolated fixtures."
+  },
+  "deviceAcceptance": {
+    "status": "not_run"
+  },
+  "sourceHashes": {
+    "web/src/domains/voice-dialogue/hooks/automatic.ts": "e11ec1603d5b9ffb252f7ea058e09cc66a1d43ea3f3666bd2c913a4587328458",
+    "web/src/domains/voice-dialogue/hooks/index.ts": "0c7ff2b90b337ada4250ce2d0e95976a6fdc7bafa79d92ab4b9f20935c49e977",
+    "web/src/domains/voice-dialogue/hooks/machine.ts": "70801c8b09aeae96e0bae051a4ab6584dcdf682ab15c046fead52733342fecb9",
+    "web/src/domains/voice-dialogue/hooks/replay.ts": "13dfdcd372eb5d85932e3e769d1887a6e1ca683404def38fa21155470ccebe47",
+    "web/src/domains/voice-dialogue/index.ts": "daa10a83854f3ad2fca4d0eb57b25a29544ce8d0a5925c1d88d8cec3a4df7239",
+    "web/src/domains/voice-dialogue/test/automatic.test.tsx": "b576cd586fc70f9ac8842301f7b3d8062fc9ea1272794cbe5f8fd4dc72796b5d",
+    "web/src/domains/voice-dialogue/test/replay.test.tsx": "1ddc9b624bcccb7b370729b061f6befb0174aba02ac67acc0ca4ce02d603925c",
+    "web/src/workspace/useWorkspace.ts": "acc9c5194b1bf11184eb2042c178f49834e6a9612f96693e92afa53fc6b1c73a",
+    "tests/browser/automatic-speech.spec.ts": "b40bce44f5a2c70cba9939f98411df1a6afaf96134fd535d93324e732c3f12cf",
+    "docs/settings.md": "38cd9cea89f46dd06495a7b8c74d02f8f2bbb9cd8af57db7056322a697e27e63"
+  },
+  "typecheck": {
+    "command": "bun x tsc --noEmit",
+    "result": "pass"
+  },
+  "build": {
+    "command": "bun run build:web",
+    "result": "pass"
+  },
+  "review": {
+    "sourceHashesMatched": 10,
+    "exampleSpecificSemanticBranchesAdded": false,
+    "existingUnrelatedChangesPreserved": true
+  }
+}

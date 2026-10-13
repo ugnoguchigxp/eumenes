@@ -44,11 +44,18 @@ export function SettingsSectionView({ request }: { request: ArtifactRequest }) {
 				title={request.title ?? "設定"}
 				description={resource.description}
 				fields={resource.fields}
+				groups={resource.groups}
+				actions={resource.actions}
+				onAction={(id) => action.send("settings-action", { id })}
 				dirty={resource.dirty}
+				busy={resource.busy}
+				blocked={resource.blocked}
+				message={resource.message}
 				onChange={(id, value) =>
 					action.send("settings-edit", { fieldId: id, value })
 				}
 				onReview={() => action.send("settings-review")}
+				onApply={() => action.send("settings-apply")}
 			/>
 			<output>{action.message}</output>
 		</>

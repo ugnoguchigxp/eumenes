@@ -1,3 +1,5 @@
+import { createApp } from "../../../application/app";
+import { registerVoiceDialogue } from "..";
 import { inputMigration } from "../repository/input";
 import { afterEach, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -1090,4 +1092,51 @@ test("an unavailable sentence classifier fails speech without skipping clauses o
 	expect(synthesized).toBe(0);
 	expect(h.voice.takeAudio(id)).toBeNull();
 	expect(h.conversation.get("main").messages.at(-1)?.text).toBe(source);
+});
+
+test("sample HTTP route executes inference with sentence-language and draft voice without persisting it", async () => {
+	const h = await setup(undefined, {
+		classifySentenceLanguage: async () => ({
+			language: "ja",
+			model: "fixture-language",
+			latencyMs: 1,
+		}),
+		speak: async () => wav(),
+	});
+	const settings = h.settings.get();
+	settings.larm.sentenceLanguageEnabled = true;
+	settings.larm.sentenceLanguageProvider = "language-fixture";
+	settings.routes.tts.mode = "larm-only";
+	await h.settings.apply({
+		requestId: crypto.randomUUID(),
+		expectedRevision: settings.revision,
+		settings,
+		keys: [],
+	});
+	const before = h.settings.get();
+	const token = "sample-http-fixture-token-32-bytes";
+	const app = createApp({
+		token,
+		origin: "http://127.0.0.1:5173",
+		modules: [{ mount: (app) => registerVoiceDialogue(app, h.voice) }],
+	});
+	const response = await app.request("/api/voice/sample", {
+		method: "POST",
+		headers: {
+			Authorization: "Bearer " + token,
+			"Content-Type": "application/json",
+		},
+		body: JSON.stringify({
+			voice: "unsaved-voice",
+			speed: 1.1,
+			style: "draft-style",
+		}),
+	});
+	expect(response.status).toBe(200);
+	expect(response.headers.get("Content-Type")).toBe("audio/wav");
+	expect(new Uint8Array(await response.arrayBuffer())).toEqual(wav());
+	expect(h.settings.get()).toEqual(before);
+	expect(
+		h.inference.usage().some((r) => r.purpose === "tts" && r.accepted),
+	).toBe(true);
 });

@@ -155,3 +155,12 @@ test("cancellation during catalog discovery cannot reach speech inference", asyn
 	).rejects.toThrow();
 	expect(h.requests).toHaveLength(0);
 });
+
+test("one-off voice uses the avatar gender while English speed remains fixed", async () => {
+	const h = setup("voice-a");
+	await h.speak("Sample.", new AbortController().signal, {
+		speechLanguage: "en",
+		speechOverride: { voice: "voice-e", speed: 1.9, pitchScale: 0.1 },
+	});
+	expect(h.requests[0]).toMatchObject({ voice: "Jasper", speed: 1 });
+});

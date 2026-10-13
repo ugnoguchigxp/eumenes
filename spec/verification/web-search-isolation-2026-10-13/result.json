@@ -1,0 +1,74 @@
+{
+  "date": "2026-10-13",
+  "scope": [
+    "Search provider and enclosing search deadline: 10000 ms",
+    "Delete historical conversation URL collection and delegation wiring",
+    "Keep keyword selection in the research worker for the current request"
+  ],
+  "verification": {
+    "fixture": {
+      "verify_web_research": {
+        "status": "passed",
+        "tests": 47,
+        "slow_response_success_ms": 8208.63,
+        "timeout_ms": 10002.72
+      },
+      "verify_dialogue": {
+        "status": "passed",
+        "backend_tests": 153,
+        "web_tests": 6
+      },
+      "application_search_and_isolation": {
+        "status": "passed",
+        "tests": 39,
+        "cases": [
+          "Previous Iran report is absent from worker input",
+          "Current explicit URL remains available",
+          "Search, read, report, answer and citations"
+        ]
+      },
+      "typecheck": {
+        "status": "passed"
+      },
+      "runtime_tests": {
+        "passed": 58,
+        "failed": 7,
+        "same_failures_at_HEAD": true,
+        "unchanged_failures": [
+          "R19 profile revision invalidates accepted verification authority",
+          "a pending draft is accepted only after one complete verification",
+          "semantic rejection limitationsConsistent never adopts a pending draft or retries",
+          "semantic rejection requestCovered never adopts a pending draft or retries",
+          "semantic rejection summarySupported never adopts a pending draft or retries",
+          "unsupported extracted schema uses the shared single repair and cannot freeze or execute",
+          "worker syntax correction completes without consuming its one model repair"
+        ]
+      },
+      "verify_agent_runtime": {
+        "status": "blocked",
+        "reason": "Unmodified createStepActions function has 306 lines; limit is 300"
+      },
+      "verify_all": {
+        "status": "blocked",
+        "reason": "Same unmodified size-budget violation; subsequent all-gate steps were not run"
+      },
+      "diff_check": {
+        "status": "passed"
+      }
+    },
+    "live": {
+      "status": "not_run",
+      "reason": "The two network trials were completed during investigation; this change was verified with deterministic delayed upstream and full conversation fixtures"
+    },
+    "device_acceptance": {
+      "status": "not_run",
+      "reason": "No audio or device behavior changed"
+    }
+  },
+  "review": {
+    "meaning_selection_remains_with_LLM": true,
+    "scenario_specific_product_branches_added": false,
+    "unrelated_workspace_changes_preserved": true,
+    "running_backend_requires_restart": true
+  }
+}

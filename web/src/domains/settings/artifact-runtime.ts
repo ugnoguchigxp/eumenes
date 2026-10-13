@@ -10,14 +10,36 @@ import {
 	settingsArtifacts,
 	type SettingsArtifactId,
 } from "./artifact-definition";
-import type { Settings } from "../../../../api/domains/settings/contracts";
+import { allVoiceFields } from "./voice-bindings";
+import { displayFields } from "./display-bindings";
+import type { VoiceTools } from "./voice-presentation";
+import {
+	defaultSubtitles,
+	type Settings,
+} from "../../../../api/domains/settings/contracts";
 
 const empty = z.strictObject({});
 const edit = z.strictObject({ fieldId: z.string(), value: z.string() });
-const open = z.strictObject({ id: z.literal("conversation") });
+const open = z.strictObject({
+	id: z.enum(["conversation", "voice", "display"]),
+});
 const accepted = (): Receipt => ({ status: "accepted", message: "" });
 
 function labelValue(field: (typeof conversationFields)[number], value: string) {
+	if (!value && field.descriptor.defaultValue)
+		return (
+			field.descriptor.options?.find(
+				(o) => o.value === field.descriptor.defaultValue,
+			)?.label ?? "サービスの標準"
+		);
+	if (field.descriptor.control === "toggle")
+		return value === "true" ? "オン" : "オフ";
+	if (field.descriptor.control === "multiple")
+		return (JSON.parse(value) as string[])
+			.map(
+				(v) => field.descriptor.options?.find((o) => o.value === v)?.label ?? v,
+			)
+			.join("、");
 	return (
 		field.descriptor.options?.find((option) => option.value === value)?.label ??
 		value
@@ -27,17 +49,36 @@ function rows(host: SettingsDraftHost) {
 	const saved = host.query.data;
 	const value = host.value;
 	if (!saved || !value) return [];
-	const changes = conversationFields
+	const fields = [
+		...conversationFields,
+		...displayFields,
+		...allVoiceFields(value),
+	];
+	const changes = fields
+		.filter(
+			(field) =>
+				!field.id.startsWith("speech.cloud.") ||
+				saved.resources.some((r) => field.id.includes(r.id)),
+		)
 		.filter((field) => field.read(saved) !== field.read(value))
 		.map((field) => ({
 			id: field.id,
-			label: "会話 / " + field.descriptor.label,
+			label:
+				(conversationFields.includes(field)
+					? "会話 / "
+					: displayFields.includes(field)
+						? "表示 / "
+						: "音声と入力 / ") + field.descriptor.label,
 			before: labelValue(field, field.read(saved)),
 			after: labelValue(field, field.read(value)),
 		}));
 	const remaining: Settings = structuredClone(value);
-	for (const field of conversationFields)
-		field.edit(remaining, field.read(saved));
+	for (const field of fields)
+		if (
+			!field.id.startsWith("speech.cloud.") ||
+			saved.resources.some((r) => field.id.includes(r.id))
+		)
+			field.restore(remaining, saved);
 	if (JSON.stringify(remaining) !== JSON.stringify(saved))
 		changes.push({
 			id: "legacy",
@@ -66,6 +107,7 @@ function rows(host: SettingsDraftHost) {
 export function settingsArtifactRuntime(
 	host: SettingsDraftHost,
 	onOpen: (id: SettingsArtifactId) => void,
+	voice?: VoiceTools,
 ): ArtifactRuntime {
 	const revision = host.revision;
 	return {
@@ -82,7 +124,21 @@ export function settingsArtifactRuntime(
 						group: "使い方を変える",
 						enabled: true,
 					},
-					...["音声と入力", "表示", "AIと接続", "外部作業"].map((label) => ({
+					{
+						id: "voice",
+						label: "音声と入力",
+						description: "読み上げ 聞き取り 機器",
+						group: "使い方を変える",
+						enabled: true,
+					},
+					{
+						id: "display",
+						label: "表示",
+						description: "背景 テーマ 字幕",
+						group: "使い方を変える",
+						enabled: true,
+					},
+					...["AIと接続", "外部作業"].map((label) => ({
 						id: label,
 						label,
 						group: "使い方を変える",
@@ -100,6 +156,9 @@ export function settingsArtifactRuntime(
 				kind: "settings-section",
 				revision,
 				dirty: host.dirty,
+				busy: host.busy,
+				blocked: host.adding,
+				message: host.message,
 				description:
 					"名前と口調を設定します。変更は適用後、次の返答から反映されます。",
 				fields: host.value
@@ -109,6 +168,41 @@ export function settingsArtifactRuntime(
 							value: field.read(host.value!),
 						}))
 					: [],
+			},
+			"settings-voice-input": {
+				kind: "settings-section",
+				revision,
+				dirty: host.dirty,
+				busy: host.busy,
+				blocked: host.adding,
+				message: host.message,
+				description: "声と音声入力を設定します。",
+				fields: voice?.fields ?? [],
+				groups: voice?.groups,
+				actions: voice?.actions,
+			},
+			"settings-display": {
+				kind: "settings-section",
+				revision,
+				dirty: host.dirty,
+				busy: host.busy,
+				blocked: host.adding,
+				message: host.message,
+				description:
+					"会話の背景、テーマ、読み上げ字幕を設定します。背景とテーマは保存後に反映します。字幕の見本は編集中の値を表示します。",
+				fields: host.value
+					? displayFields.map((field) => ({
+							...field.descriptor,
+							id: field.id,
+							value: field.read(host.value!),
+						}))
+					: [],
+			},
+			"settings-display-preview": {
+				kind: "subtitle-preview",
+				revision,
+				text: "これは字幕のプレビューです。",
+				...(host.value?.general.subtitles ?? defaultSubtitles),
 			},
 			"settings-changes": {
 				kind: "settings-changes",
@@ -137,15 +231,36 @@ export function settingsArtifactRuntime(
 			try {
 				if (
 					event.action === "settings-edit" &&
-					known === settingsArtifacts.conversation
+					(known === settingsArtifacts.conversation ||
+						known === settingsArtifacts.display)
 				) {
 					const input = edit.parse(event.values);
-					const field = conversationFields.find(
-						(field) => field.id === input.fieldId,
-					);
+					const field = (
+						known === settingsArtifacts.display
+							? displayFields
+							: conversationFields
+					).find((field) => field.id === input.fieldId);
 					if (!field)
 						return { status: "rejected", message: "未登録の設定項目です" };
 					host.change((settings) => field.edit(settings, input.value));
+				} else if (
+					known === settingsArtifacts.voice &&
+					voice &&
+					event.action === "settings-edit"
+				) {
+					const input = edit.parse(event.values);
+					if (!voice.edit(input.fieldId, input.value))
+						return {
+							status: "rejected",
+							message: "この設定項目は操作できません",
+						};
+				} else if (
+					known === settingsArtifacts.voice &&
+					voice &&
+					event.action === "settings-action"
+				) {
+					const input = z.strictObject({ id: z.string() }).parse(event.values);
+					voice.action(input.id);
 				} else if (
 					event.action === "settings-open" &&
 					known === settingsArtifacts.hub
@@ -159,7 +274,10 @@ export function settingsArtifactRuntime(
 					onOpen("changes");
 				} else if (
 					event.action === "settings-apply" &&
-					known === settingsArtifacts.changes
+					(known === settingsArtifacts.changes ||
+						known === settingsArtifacts.conversation ||
+						known === settingsArtifacts.display ||
+						known === settingsArtifacts.voice)
 				) {
 					empty.parse(event.values);
 					if (host.busy || host.adding || !host.dirty)

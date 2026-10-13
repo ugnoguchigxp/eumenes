@@ -5,6 +5,11 @@ import { iso } from "./canonical";
 /** Remaining time is derived from the deadline, never by subtracting one each tick. */
 function remainingSeconds(row: TimerRow, nowMs: number): number {
 	if (row.state === "elapsed") return 0;
+	if (
+		(row.state === "paused" || row.state === "cancelled") &&
+		row.pausedRemainingMs !== null
+	)
+		return Math.ceil(row.pausedRemainingMs / 1000);
 	const basis =
 		row.state === "cancelled" ? (row.cancelledAtMs ?? nowMs) : nowMs;
 	return Math.max(0, Math.ceil((row.dueAtMs - basis) / 1000));
@@ -20,6 +25,7 @@ export function toDto(row: TimerRow, nowMs: number): TimerDto {
 		startedAt: iso(row.startedAtMs),
 		dueAt: iso(row.dueAtMs),
 		cancelledAt: row.cancelledAtMs === null ? null : iso(row.cancelledAtMs),
+		pausedAt: row.pausedAtMs === null ? null : iso(row.pausedAtMs),
 		remainingSeconds: remainingSeconds(row, nowMs),
 		conversationId: row.conversationId,
 		originRunId: row.originRunId,

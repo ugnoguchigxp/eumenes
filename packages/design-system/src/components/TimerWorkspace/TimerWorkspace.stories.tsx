@@ -8,7 +8,9 @@ const meta: Meta<typeof TimerWorkspace> = {
 };
 export default meta;
 type Story = StoryObj<typeof TimerWorkspace>;
-export const Setup: Story = { args: { state: "setup" } };
+export const Setup: Story = {
+	args: { state: "setup", stopwatch: { elapsedMs: 0, running: false } },
+};
 export const Running: Story = {
 	args: {
 		state: "active",
@@ -19,11 +21,16 @@ export const Running: Story = {
 		dueAt: "2026-10-12T10:03:00Z",
 		finishLabel: "19:03",
 		onCancel: () => {},
+		onPause: () => {},
+		onResume: () => {},
 		onNew: () => {},
 	},
 };
 export const Finished: Story = {
 	args: { ...Running.args, state: "elapsed", remainingSeconds: 0 },
+};
+export const Paused: Story = {
+	args: { ...Running.args, state: "paused", dueAt: undefined },
 };
 export const Cancelled: Story = {
 	args: { ...Running.args, state: "cancelled", dueAt: undefined },
@@ -43,4 +50,14 @@ export const Narrow: Story = {
 			</div>
 		),
 	],
+};
+export const Stopwatch: Story = {
+	args: {
+		state: "setup",
+		mode: "stopwatch",
+		stopwatch: { elapsedMs: 62345, running: true },
+	},
+};
+export const StopwatchStopped: Story = {
+	args: { ...Stopwatch.args, stopwatch: { elapsedMs: 62345, running: false } },
 };

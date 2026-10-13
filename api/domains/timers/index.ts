@@ -1,5 +1,5 @@
 export { registerTimers } from "./controller";
-export { migration } from "./repository";
+export { migration, pauseResumeMigration } from "./repository";
 export type { TimersService } from "./service";
 export { createTimers } from "./service";
 export { TIMER_POLICY } from "./service/policy";

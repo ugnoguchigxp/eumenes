@@ -5,6 +5,20 @@ const due = "2026-10-09T00:03:00.000Z";
 const serverNow = "2026-10-09T00:00:00.000Z";
 
 describe("displayRemainingSeconds", () => {
+	it("keeps paused and formerly cancelled clocks fixed even after the old deadline", () => {
+		for (const state of ["paused", "cancelled"] as const) {
+			const snapshot = {
+				dueAt: due,
+				serverNow,
+				state,
+				cancelledAt: null,
+				remainingSeconds: 65,
+			};
+			expect(
+				displayRemainingSeconds(snapshot, Date.parse(due) + 86400000),
+			).toBe(65);
+		}
+	});
 	it("follows the deadline instead of subtracting one each tick", () => {
 		const clock = bindServerClock(serverNow, 0, 0);
 		const snapshot = {

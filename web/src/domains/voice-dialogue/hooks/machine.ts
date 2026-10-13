@@ -36,6 +36,8 @@ export type VoiceState = {
 	/** The utterance being awaited or played. */
 	current: string | null;
 	delivered: ReadonlySet<string>;
+	/** Local playback ownership survives replacement inputs and delayed run refreshes. */
+	ownedSpeech: ReadonlySet<string>;
 	player: { id: string; epoch: number } | null;
 	/** Bumps whenever the player is replaced or cancelled. */
 	epoch: number;
@@ -66,6 +68,7 @@ export const initialVoiceState: VoiceState = {
 	session: null,
 	current: null,
 	delivered: new Set(),
+	ownedSpeech: new Set(),
 	player: null,
 	epoch: 0,
 };
@@ -113,6 +116,7 @@ export function reduce(state: VoiceState, event: VoiceEvent): VoiceState {
 			if (!state.session) return state;
 			return {
 				...state,
+				ownedSpeech: new Set(state.ownedSpeech).add(event.utteranceId),
 				session: {
 					...state.session,
 					sequence: state.session.sequence + 1,
@@ -169,6 +173,8 @@ export function createVoiceMachine() {
 	let state = initialVoiceState;
 	return {
 		get: () => state,
+		ownsSpeech: (utteranceId: string | null) =>
+			!!utteranceId && state.ownedSpeech.has(utteranceId),
 		dispatch(event: VoiceEvent): VoiceState {
 			state = reduce(state, event);
 			return state;

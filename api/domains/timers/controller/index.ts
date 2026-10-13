@@ -59,6 +59,16 @@ export function registerTimers(app: Hono, service: TimersService) {
 		const saved = await service.cancel(c.req.param("id"), parsed.data);
 		return c.json(saved.receipt);
 	});
+	for (const operation of ["pause", "resume"] as const) {
+		app.post(`/api/timers/:id/${operation}`, async (c) => {
+			const parsed = await parseJsonBody(c, cancelTimerSchema, {
+				code: "invalid_timer_input",
+			});
+			if (!parsed.ok) return parsed.response;
+			const saved = await service[operation](c.req.param("id"), parsed.data);
+			return c.json(saved.receipt);
+		});
+	}
 	app.get("/api/timer-notifications", (c) => {
 		const limit = limitOf(c.req.query("limit"));
 		if (Number.isNaN(limit))

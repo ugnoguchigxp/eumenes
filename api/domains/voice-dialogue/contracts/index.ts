@@ -8,7 +8,10 @@ export const voiceStartSchema = z.object({
 export const sampleInputSchema = z
 	.object({
 		voice: z.string().trim().max(200).optional(),
-		style: z.string().trim().min(1).max(200).optional(),
+		style: z.preprocess(
+			(value) => (value === null ? undefined : value),
+			z.string().trim().min(1).max(200).optional(),
+		),
 		speed: z.number().min(0.5).max(2).optional(),
 		pitchScale: z.number().min(-0.15).max(0.15).optional(),
 		intonationScale: z.number().min(0).max(2).optional(),

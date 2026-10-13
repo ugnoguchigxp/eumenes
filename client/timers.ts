@@ -62,6 +62,24 @@ export function timersClient(transport: Transport) {
 					)
 				).json(),
 			),
+		pauseTimer: async (id: string, input: CancelTimerInput) =>
+			timerReceiptSchema.parse(
+				await (
+					await transport.call(
+						`/api/timers/${encodeURIComponent(id)}/pause`,
+						json(input),
+					)
+				).json(),
+			),
+		resumeTimer: async (id: string, input: CancelTimerInput) =>
+			timerReceiptSchema.parse(
+				await (
+					await transport.call(
+						`/api/timers/${encodeURIComponent(id)}/resume`,
+						json(input),
+					)
+				).json(),
+			),
 		timerNotifications: async (
 			query: { cursor?: string; limit?: number } = {},
 			signal?: AbortSignal,

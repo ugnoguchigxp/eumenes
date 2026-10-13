@@ -156,3 +156,52 @@ test("replay transport accepts the motion header and safely falls back on unknow
 		expect((await client.replaySpeech("句。")).motion).toBe(expected);
 	}
 });
+
+test("automatic speech shares microphone output without cancelling the live session and rejects late audio on mute", async () => {
+	const fake = fakeOutput();
+	const interruptLive = vi.fn();
+	let resolveSpeech!: (value: { wav: Uint8Array; motion: "neutral" }) => void;
+	let signal!: AbortSignal;
+	const client = {
+		replaySentences: async () => ["句。"],
+		replaySpeech: vi.fn((_text: string, abort: AbortSignal) => {
+			signal = abort;
+			return new Promise((resolve) => {
+				resolveSpeech = resolve;
+			});
+		}),
+	} as unknown as VoiceDialogueClient;
+	const hook = renderHook(() =>
+		useReplay(client, {}, { sessionAudio: () => fake.output, interruptLive }),
+	);
+	let done!: Promise<void>;
+	act(() => {
+		done = hook.result.current.play("one", "句。", "run-one", {
+			automatic: true,
+		});
+	});
+	await waitFor(() => expect(client.replaySpeech).toHaveBeenCalledOnce());
+	expect(interruptLive).not.toHaveBeenCalled();
+	act(() => hook.result.current.stopAutomatic());
+	expect(signal.aborted).toBe(true);
+	await act(async () => {
+		resolveSpeech({ wav: new Uint8Array(44), motion: "neutral" });
+		await done;
+	});
+	expect(fake.output.play).not.toHaveBeenCalled();
+});
+
+test("automatic mute leaves explicitly requested replay playing", async () => {
+	const { hook, played } = fixture();
+	let done!: Promise<void>;
+	act(() => {
+		done = hook.result.current.play("one", "一。");
+	});
+	await waitFor(() => expect(played).toHaveLength(1));
+	act(() => hook.result.current.stopAutomatic());
+	expect(hook.result.current.playingId).toBe("one");
+	await act(async () => {
+		played[0]!.onEnded();
+		await done;
+	});
+});

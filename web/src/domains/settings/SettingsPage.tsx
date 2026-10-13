@@ -70,8 +70,11 @@ function SettingsPageBody({
 		setNewCloud,
 		change,
 	} = host;
-	const [category, setCategory] =
-		useState<(typeof categories)[number]["id"]>("general");
+	const [category, setCategory] = useState<(typeof categories)[number]["id"]>(
+		() =>
+			categories.find((c) => c.id === window.location.hash.split("/")[1])?.id ??
+			"general",
+	);
 	const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
 	const [deviceError, setDeviceError] = useState("");
 	const diagnostics = useQuery({

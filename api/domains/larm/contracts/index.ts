@@ -36,6 +36,14 @@ import type {
 	NativeToolCall,
 } from "../../../infrastructure/chat-stream";
 export type LarmCallOptions = {
+	/** One-off synthesis values; reuse the claimed connection. Undefined style explicitly resets it. */
+	speechOverride?: {
+		voice?: string;
+		style?: string;
+		speed?: number;
+		pitchScale?: number;
+		intonationScale?: number;
+	};
 	/** Explicit execution role; helper calls use independent, short-lived 64K connections. */
 	sessionRole?: "main" | "auxiliary";
 	speechLanguage?: SentenceLanguage;

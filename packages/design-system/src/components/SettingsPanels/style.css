@@ -81,3 +81,49 @@
 .ds-settings-changes dd > span:first-child {
 	color: var(--color-muted-foreground);
 }
+
+.ds-settings-sections,
+.ds-settings-actions {
+	display: flex;
+	gap: 0.5rem;
+	flex-wrap: wrap;
+	margin-top: 1rem;
+}
+.ds-settings-summary {
+	margin-top: 1rem;
+	white-space: pre-line;
+	overflow-wrap: anywhere;
+}
+.ds-settings-value {
+	float: right;
+	color: var(--color-muted-foreground);
+}
+.ds-settings-details summary {
+	cursor: pointer;
+	font-weight: 600;
+}
+.ds-settings-options {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+	gap: 0.8rem;
+	margin: 1rem 0;
+}
+.ds-settings-options label {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+.ds-settings-field input[type="checkbox"] {
+	width: 1.25rem;
+	height: 1.25rem;
+}
+.ds-settings-field input[type="range"] {
+	padding: 0;
+}
+.ds-settings-field:has(> input[type="checkbox"]) {
+	grid-template-columns: 1fr auto;
+	align-items: center;
+}
+.ds-settings-field:has(> input[type="checkbox"]) > small {
+	grid-column: 1 / -1;
+}

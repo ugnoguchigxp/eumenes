@@ -33,7 +33,7 @@ test("timer workspace composes with a question and rejects a source of the wrong
 			}}
 		/>,
 	);
-	expect(screen.getByRole("heading", { name: "タイマーを開始" })).toBeDefined();
+	expect(screen.getByRole("heading", { name: "タイマー" })).toBeDefined();
 	expect(screen.getByText("休憩しますか？")).toBeDefined();
 	expect(() => compileArtifact(definition, {})).toThrow();
 	expect(() =>

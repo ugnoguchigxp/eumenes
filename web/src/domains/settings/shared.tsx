@@ -1,12 +1,4 @@
-import {
-	cloneElement,
-	isValidElement,
-	useCallback,
-	useId,
-	useEffect,
-	useRef,
-	useState,
-} from "react";
+import { cloneElement, isValidElement, useId } from "react";
 import { type EumenesClient } from "../../../../client";
 import type {
 	ConnectionKind,
@@ -14,6 +6,7 @@ import type {
 	Settings,
 } from "../../../../api/domains/settings/contracts";
 import { Button } from "../../design-system";
+import { useVoiceSample } from "./useVoiceSample";
 import { knownLarmVoices } from "./larm-voices";
 
 export type TtsRange = NonNullable<
@@ -117,64 +110,7 @@ export function SamplePlayer({
 	voice: Parameters<EumenesClient["voiceSample"]>[0];
 	disabled?: boolean;
 }) {
-	const [state, setState] = useState<"idle" | "loading" | "playing">("idle");
-	const [error, setError] = useState<string | null>(null);
-	const run = useRef<{
-		abort: AbortController;
-		audio?: HTMLAudioElement;
-		url?: string;
-	}>(null);
-	const stop = useCallback(() => {
-		const current = run.current;
-		run.current = null;
-		current?.abort.abort();
-		current?.audio?.pause();
-		if (current?.url) URL.revokeObjectURL(current.url);
-		setState("idle");
-	}, []);
-	useEffect(() => stop, [stop]);
-	async function play() {
-		stop();
-		setError(null);
-		const mine = { abort: new AbortController() } as {
-			abort: AbortController;
-			audio?: HTMLAudioElement;
-			url?: string;
-		};
-		run.current = mine;
-		setState("loading");
-		try {
-			const bytes = await client.voiceSample(voice, mine.abort.signal);
-			if (run.current !== mine) return;
-			const url = URL.createObjectURL(
-				new Blob([new Uint8Array(bytes)], { type: "audio/wav" }),
-			);
-			mine.url = url;
-			const audio = new Audio(url);
-			mine.audio = audio;
-			const finish = () => {
-				URL.revokeObjectURL(url);
-				if (run.current === mine) {
-					run.current = null;
-					setState("idle");
-				}
-			};
-			audio.onended = finish;
-			audio.onerror = () => {
-				finish();
-				setError("サンプルを再生できませんでした。");
-			};
-			setState("playing");
-			await audio.play();
-		} catch (e) {
-			if (mine.abort.signal.aborted) return;
-			run.current = null;
-			setState("idle");
-			setError(
-				`サンプルを作れませんでした（${e instanceof Error ? e.message : "不明なエラー"}）`,
-			);
-		}
-	}
+	const { state, error, play, stop } = useVoiceSample(client, voice, disabled);
 	return (
 		<>
 			<Button

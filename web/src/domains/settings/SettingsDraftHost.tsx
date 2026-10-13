@@ -207,6 +207,7 @@ function useDraftHost(client: EumenesClient) {
 	const dirty = !!state.draft || state.keys.length > 0 || state.adding;
 	return {
 		...state,
+		client,
 		query,
 		value,
 		dirty,

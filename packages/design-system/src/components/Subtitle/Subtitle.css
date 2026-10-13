@@ -1,0 +1,99 @@
+/* Read-aloud subtitles (Netflix / Prime Video inspired) */
+.subtitle {
+	position: fixed;
+	z-index: 9;
+	top: 50%;
+	left: 50%;
+	width: min(86vw, 1100px);
+	transform: translate(-50%, -50%);
+	pointer-events: none;
+	text-align: center;
+	line-height: 1.45;
+	--subtitle-size: 2rem;
+}
+.subtitle[data-size="medium"] {
+	--subtitle-size: 1.5rem;
+}
+.subtitle[data-size="large"] {
+	--subtitle-size: 2.25rem;
+}
+.subtitle[data-size="xlarge"] {
+	--subtitle-size: 3rem;
+}
+.subtitle p {
+	display: inline-block;
+	margin: 0;
+	font-size: var(--subtitle-size);
+	font-weight: 600;
+	color: #fff;
+	text-wrap: balance;
+	overflow-wrap: anywhere;
+}
+/* Netflix: bold white text with a soft drop shadow, no box */
+.subtitle[data-style="netflix"] p {
+	text-shadow:
+		0 0 4px rgb(0 0 0 / 0.9),
+		0 2px 6px rgb(0 0 0 / 0.85),
+		0 0 14px rgb(0 0 0 / 0.6);
+}
+/* Prime Video: white text on a translucent black box */
+.subtitle[data-style="prime"] p {
+	padding: 0.15em 0.6em;
+	border-radius: 4px;
+	background: rgb(0 0 0 / 0.72);
+	font-weight: 500;
+}
+/* Classic broadcast: yellow text with a hard black outline */
+.subtitle[data-style="classic"] p {
+	color: #ffe45c;
+	font-weight: 700;
+	text-shadow:
+		-2px -2px 0 #000,
+		2px -2px 0 #000,
+		-2px 2px 0 #000,
+		2px 2px 0 #000,
+		0 0 6px #000;
+}
+.subtitle[data-style="glass"] p {
+	padding: 0.3em 0.9em;
+	border: 1px solid rgb(255 255 255 / 0.18);
+	border-radius: 14px;
+	background: rgb(15 20 28 / 0.45);
+	backdrop-filter: blur(12px);
+}
+.subtitle-preview-stage {
+	margin-top: 12px;
+	padding: 28px 12px;
+	border-radius: 8px;
+	background: linear-gradient(135deg, #2b3a4a, #101820 60%, #3a2b45);
+}
+.subtitle-inline {
+	position: static;
+	width: 100%;
+	transform: none;
+}
+.subtitle-inline p {
+	--subtitle-size: 1.4rem;
+}
+.subtitle-inline[data-size="large"] p {
+	font-size: 1.8rem;
+}
+.subtitle-inline[data-size="xlarge"] p {
+	font-size: 2.2rem;
+}
+@media (prefers-reduced-motion: no-preference) {
+	.subtitle:not(.subtitle-inline) p {
+		animation: subtitle-in 160ms ease-out;
+	}
+}
+@keyframes subtitle-in {
+	from {
+		opacity: 0;
+	}
+}
+
+.ds-subtitle-preview-hint {
+	color: var(--color-muted-foreground);
+	font-size: 0.875rem;
+	line-height: 1.6;
+}

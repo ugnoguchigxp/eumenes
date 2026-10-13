@@ -23,6 +23,7 @@ import {
 	timerArtifactSource,
 	timerSetupSource,
 } from "../domains/timers/artifact-definition";
+import { useClockWorkspace } from "../domains/timers/clock-runtime";
 
 export function useOpenSettings(
 	open: ReturnType<typeof useArtifactWorkspace>["open"],
@@ -94,6 +95,15 @@ export function WorkspaceArtifacts({
 }) {
 	const openTimer = useOpenTimer(artifacts.open);
 	const openSettings = useOpenSettings(artifacts.open);
+	const clockTab = artifacts.tabs.find((tab) => tab.id === "timer");
+	const clock = useClockWorkspace({
+		source: clockTab
+			? clockTab.kind === "openui"
+				? timerArtifactSource(clockTab.definition)
+				: "timer-legacy"
+			: null,
+		visible: artifacts.activeTabId === "timer",
+	});
 	return artifacts.tabs.length > 0 ? (
 		<ErrorBoundary label="artifact">
 			<ArtifactPanel
@@ -109,6 +119,7 @@ export function WorkspaceArtifacts({
 							client={client}
 							definition={definition}
 							onStarted={openTimer}
+							clock={clock}
 						/>
 					) : timerArtifactSource(definition) ? (
 						<TimerArtifact
@@ -117,6 +128,7 @@ export function WorkspaceArtifacts({
 							timerId={timerArtifactSource(definition)!.slice(6)}
 							definition={definition}
 							onNewTimer={() => openTimer()}
+							clock={clock}
 						/>
 					) : (
 						<MusicArtifact
@@ -132,6 +144,7 @@ export function WorkspaceArtifacts({
 						client={client}
 						timerId={timerId}
 						onNewTimer={() => openTimer()}
+						clock={clock}
 					/>
 				)}
 			/>
