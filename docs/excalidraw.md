@@ -26,7 +26,7 @@ Linux上のloopback入口をMacBookから直接使わない。MacBook上のbacke
 | GET `/api/excalidraw/references` | 保存済み図ID・版・名前・作成元会話の参照。sceneの二重正本を作らない |
 | GET `/api/excalidraw/operations` | 会話担当のplanning/starting/completed/failed/cancelled。モデルへ渡す結果とOpenUIの入口 |
 
-ready URLはEumenesのWeb originにある`/#drawing/{referenceId}?revision={revision}`。URLにcredentialを含めない。歴史版も取得できるが、保存には現在版との一致が必要で、競合時に上書きはしない。版指定を省いた再表示は上流の最新版から復帰する。
+ready URLはEumenesのWeb originにある`/#drawing/{referenceId}?revision={revision}`。main以外の会話では`conversationId`もURLへ付け、編集画面の再表示要求へ渡す。会話と参照の一致はbackendで引き続き検査する。URLにcredentialを含めない。歴史版も取得できるが、保存には現在版との一致が必要で、競合時に上書きはしない。版指定を省いた再表示は上流の最新版から復帰する。
 
 図はExcalidraw scene APIへ保存し、Eumenesには参照と操作状態をSQLiteに保持する。保存応答のID・版と保存後のsceneを確認したときだけ保存済みとする。保存失敗時は同じkey/expectedRevisionで再送する。失敗した保存候補と、その後の編集は別々にブラウザ下書きへ残し、再読込み後に「下書きを復元」できる。保存未確定の画面は閉じる操作とbeforeunloadで保護し、下書きのダウンロードも提供する。
 
@@ -38,4 +38,36 @@ ready URLはEumenesのWeb originにある`/#drawing/{referenceId}?revision={revi
 
 `bun scripts/excalidraw-live.ts --check`はbackend settingsの読み取り専用操作で保存済みLARM入口と専用接続の有無を確認する。consumer未設定時にLLM/admin tokenでlease要求はしない。
 
-調査時点のgnosisはLocal Servicesが無効、`/etc/larm/local-services/consumers.json`なし、Excalidrawの正式systemd unitとgateway設定なし。正式配備・専用consumer登録・MacBook backendから到達するgateway経路が揃うまで、正式環境でのcold起動/編集/保存/idle停止のlive受入は未実施。fixtureの成功を正式配備済みとは扱わない。
+初回調査ではLocal Servicesと正式サービスが未配備だった。2026年10月13日22:28 JSTの再確認では正式gatewayがactive/enabled、worker unitは登録済み/inactive、Local Servicesは有効。現行consumerに`eumenes-hosted-apps`があるが、LLM tokenと分離されたExcalidraw専用Eumenes consumerの登録完了は未確認。正式配備と専用登録は利用者からLARM側へ依頼済み。こちらからLinux設定を変更しない。正式環境の編集・保存・停止・復帰は未検証。
+
+## LARM側の準備後に行う接続設定
+
+LARM側から、backendから到達する`gatewayUrl`、gatewayの元originである`gatewayOrigin`、ready leaseに返る`leaseEndpoint`、Eumenes専用の`consumerToken`と`appToken`を受け取る。credentialの引渡し方法はLARM側と合わせ、チャット本文やリポジトリに保存しない。SSHの固定パスから既存秘密を取り出す処理や、暫定sudo登録スクリプトは使用しない。
+
+接続情報をMacBookのリポジトリ外に、現在の利用者だけが読める通常ファイル（0600、最大16KiB）として準備できる場合、以下の受入処理を使う。JSONのキーは上記の5つ。`gatewayOrigin`は省略可能。consumer/appの双方が必要で、役割間やLLM credentialとの流用は拒否する。API認証トークンは既存のbackend用読取処理で取得する。
+
+```sh
+bun scripts/excalidraw/configure-live.ts /absolute/private/connection.json
+bun scripts/excalidraw/configure-live.ts /absolute/private/connection.json --apply
+```
+
+1行目は入力を確認するだけで、通信・設定保存を行わない。2行目は稼働中のEumenes backendから設定revisionを取得し、既存の認証済み設定APIへ暗号化保存を依頼する。接続先のprobe、lease確保、描画は行わず、保存成功を実接続成功と表示しない。backend APIの既定入口は127.0.0.1:8787。異なる場合だけ`EUMENES_API_URL`で指定し、既存clientのloopback検査を適用する。
+
+## 編集画面の復帰と保護
+
+ブラウザ履歴から編集画面が復元された場合は、pagehideで解放したsessionを再利用せず、新しいsessionを取得する。編集中のscene・タイトル・未確定の保存候補は保持する。再接続中に画面を閉じた場合は結果の採用を取り消し、遅れて返ったsessionも解放する。ブラウザの保存領域へのアクセスが拒否されても編集画面は開ける。上流保存成功後に下書きの削除だけ失敗した場合は、保存済みと削除失敗を分けて表示する。
+
+## 次回の検証順序（今回は未実行）
+
+1. `bun run verify -- --domain excalidraw`とsettings/client関連試験で、会話付きURL、履歴復帰、下書き領域の障害、取消後の解放を確認する。
+2. application結合試験と`bunx playwright test tests/browser/excalidraw.spec.ts`で、既存の作成・描画・保存・下書き復元・再表示を確認する。
+3. 利用側domain、型検査、buildと`bun run verify:all`を実施する。以前の全体gate停止地点（settings→memoryの境界違反）は、その時点の状態を再確認する。
+4. LARMの専用登録・MacBook backend用経路・Eumenes設定が揃い、他consumerがworkerを利用していない状態で、以下の正式接続ブラウザ試験を明示的に有効化する。
+
+```sh
+EUMENES_EXCALIDRAW_LIVE=1 bunx playwright test tests/browser/excalidraw-live.spec.ts
+```
+
+正式接続試験は稼働中のEumenes Web/APIを使い、cold起動→ブラウザ描画→版2/3保存→sceneの再取得→無操作解放→systemd workerの実停止→再起動と再表示を確認する。通常の試験実行ではskipする。workerの強制停止は行わず、受入用の新規図を作成し、証拠として残す。SSHはsystemdのPIDを読み取るだけで、配備や管理者操作は行わない。Web originは`EUMENES_EXCALIDRAW_WEB_ORIGIN`、観測用SSHホストは`EUMENES_EXCALIDRAW_SSH_HOST`で指定可能（既定5173/gnosis）。
+
+証拠は`spec/verification/excalidraw-live/`へ保存する。Eumenes backend自体の再起動後の復帰、実LLMによる会話からの起動、保存応答喪失や版競合のlive確認は別に実施し、このブラウザ試験だけで合格としない。

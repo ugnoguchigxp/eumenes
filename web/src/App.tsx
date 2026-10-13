@@ -3,6 +3,7 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { createClient } from "../../client";
 import { createAudioStore } from "./domains/audio";
 import { Workspace } from "./workspace/Workspace";
+import { drawingLocation } from "./domains/excalidraw/location";
 
 const DrawingEditor = lazy(() => import("./domains/excalidraw/DrawingEditor"));
 export function App() {
@@ -12,7 +13,7 @@ export function App() {
 		window.addEventListener("hashchange", change);
 		return () => window.removeEventListener("hashchange", change);
 	}, []);
-	const drawing = /^#drawing\/([a-f0-9-]{36})(?:\?revision=(\d+))?$/.exec(hash);
+	const drawing = drawingLocation(hash);
 	const [queryClient] = useState(
 		() =>
 			new QueryClient({
@@ -28,10 +29,11 @@ export function App() {
 			<Suspense fallback={<p role="status">編集画面を読み込み中です。</p>}>
 				{drawing ? (
 					<DrawingEditor
-						key={drawing[0]}
+						key={hash}
 						client={client}
-						referenceId={drawing[1]!}
-						revision={drawing[2] ? Number(drawing[2]) : undefined}
+						referenceId={drawing.referenceId}
+						revision={drawing.revision}
+						conversationId={drawing.conversationId}
 					/>
 				) : (
 					<Workspace client={client} store={store} />

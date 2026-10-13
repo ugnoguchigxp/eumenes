@@ -1,53 +1,20 @@
+import { useDrawingEditorLifecycle } from "./useDrawingEditorLifecycle";
+import { reconnectDrawingSession, downloadScene } from "./editor-session";
 import { useDrawingSessionStatus } from "./useDrawingSessionStatus";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { EumenesClient } from "../../../../client";
 import type {
 	Drawing,
 	Scene,
 	DrawingSession,
 } from "../../../../api/domains/excalidraw/contracts";
-import { drawingDrafts, makeDrawingDraft, type DrawingDraft } from "./drafts";
-async function wait(
-	client: EumenesClient,
-	s: DrawingSession,
-	signal: AbortSignal,
-) {
-	while (s.state === "starting") {
-		signal.throwIfAborted();
-		await new Promise((resolve) => setTimeout(resolve, 250));
-		s = await client.drawingSession(s.id, signal);
-	}
-	if (s.state !== "ready")
-		throw new Error(
-			"Excalidrawを起動できませんでした。接続設定を確認して再接続してください。",
-		);
-	return s;
-}
-function downloadScene(value: { scene: Scene } | null) {
-	if (!value) return;
-	const url = URL.createObjectURL(
-		new Blob(
-			[
-				JSON.stringify({
-					type: "excalidraw",
-					version: 2,
-					source: "eumenes-draft",
-					...value.scene,
-				}),
-			],
-			{ type: "application/json" },
-		),
-	);
-	const a = document.createElement("a");
-	a.href = url;
-	a.download = "drawing.excalidraw";
-	a.click();
-	setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
+import type { DrawingDraft } from "./drafts";
+import { useDrawingDraftProtection } from "./useDrawingDraftProtection";
 export function useDrawingEditor(
 	client: EumenesClient,
 	referenceId: string,
 	revision?: number,
+	conversationId = "main",
 ) {
 	const [drawing, setDrawing] = useState<Drawing | null>(null),
 		[session, setSession] = useState<DrawingSession | null>(null);
@@ -55,7 +22,6 @@ export function useDrawingEditor(
 		[status, setStatus] = useState("Excalidrawを準備中です。"),
 		[error, setError] = useState("");
 	const [busy, setBusy] = useState(true),
-		[hasDraft, setHasDraft] = useState(false),
 		[canvasEpoch, setCanvasEpoch] = useState(0);
 	const current = useRef<Drawing | null>(null),
 		selected = useRef<DrawingSession | null>(null),
@@ -64,104 +30,70 @@ export function useDrawingEditor(
 	const pending = useRef<DrawingDraft | null>(null),
 		latest = useRef<{ title: string; scene: Scene } | null>(null),
 		timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-	const drafts = useRef(drawingDrafts(sessionStorage)),
-		activityAt = useRef(0),
+	const activityAt = useRef(0),
 		initializing = useRef(true);
-	const protect = useCallback(() => {
-		if (!current.current || !latest.current) return false;
-		try {
-			drafts.current.write(
-				makeDrawingDraft(
-					referenceId,
-					current.current.revision,
-					latest.current,
-					pending.current,
-				),
-			);
-			setHasDraft(true);
-			return true;
-		} catch {
-			setError(
-				"下書きをブラウザに保持できません。保存が完了するまで画面を閉じず、編集中の図をダウンロードしてください。",
-			);
-			return false;
-		}
-	}, [referenceId]);
+	const drafts = useDrawingDraftProtection(
+		referenceId,
+		current,
+		latest,
+		pending,
+		setError,
+	);
+	const { hasDraft, protect, check } = drafts;
 
 	const apply = useCallback(
 		(doc: Drawing) => {
+			initializing.current = true;
 			current.current = doc;
 			latest.current = { title: doc.title, scene: doc.scene };
 			setDrawing(doc);
 			setTitle(doc.title);
 			setCanvasEpoch((v) => v + 1);
-			try {
-				setHasDraft(!!drafts.current.read(referenceId));
-			} catch {
-				setError(
-					"下書きを読み込めませんでした。保存が完了するまで画面を閉じないでください。",
-				);
-			}
+			check();
 			setStatus(`保存済み（版 ${doc.revision}）`);
 		},
-		[referenceId],
+		[check],
 	);
-	useEffect(() => {
-		const abort = new AbortController();
-		let owned: string | null = null;
-		void (async () => {
-			try {
-				const s = await client.openDrawing(
-					{
-						requestId: crypto.randomUUID(),
-						referenceId,
-						...(revision ? { revision } : {}),
-					},
-					abort.signal,
-				);
-				owned = s.id;
-				if (abort.signal.aborted) {
-					await client.releaseDrawing(s.id);
-					return;
-				}
-				const ready = await wait(client, s, abort.signal);
-				selected.current = ready;
-				setSession(ready);
-				const doc = await client.drawingDocument(s.id, abort.signal);
-				if (!abort.signal.aborted) {
-					apply(doc);
-					setBusy(false);
-				}
-			} catch (e) {
-				if (!abort.signal.aborted) {
-					setError(e instanceof Error ? e.message : "接続できませんでした。");
-					setStatus("起動失敗");
-					setBusy(false);
-				}
+	const lifecycle = useDrawingEditorLifecycle({
+		client,
+		referenceId,
+		revision,
+		conversationId,
+		onReady: (ready, doc) => {
+			selected.current = ready;
+			setSession(ready);
+			apply(doc);
+			setBusy(false);
+		},
+		onError: (message) => {
+			setError(message);
+			setStatus("起動失敗");
+			setBusy(false);
+		},
+		beforeLeave: () => {
+			const unsaved = !!(dirty.current || pending.current || saving.current);
+			if (unsaved) protect();
+			return unsaved;
+		},
+		onHide: () => {
+			if (timer.current) {
+				clearTimeout(timer.current);
+				timer.current = null;
 			}
-		})();
-		const before = (e: BeforeUnloadEvent) => {
-			if (dirty.current || pending.current || saving.current) {
-				protect();
-				e.preventDefault();
-				e.returnValue = "";
-			}
-		};
-		const hide = () => {
-			if (dirty.current || pending.current) protect();
-			if (owned) void client.releaseDrawing(owned).catch(() => {});
-		};
-		window.addEventListener("pagehide", hide);
-		window.addEventListener("beforeunload", before);
-		return () => {
-			abort.abort();
+			if (selected.current)
+				selected.current = { ...selected.current, state: "closed" };
+		},
+		onResume: reconnect,
+		onDispose: () => {
 			if (timer.current) clearTimeout(timer.current);
-			window.removeEventListener("pagehide", hide);
-			window.removeEventListener("beforeunload", before);
-			if (owned) void client.releaseDrawing(owned).catch(() => {});
-		};
-	}, [client, referenceId, revision, apply, protect]);
+		},
+	});
 	const receiveStatus = useCallback((value: DrawingSession) => {
+		if (
+			selected.current?.id !== value.id ||
+			selected.current.state === "closed"
+		)
+			return;
 		selected.current = value;
 		if (value.state === "idle" && !dirty.current && !saving.current)
 			setStatus("無操作のため接続を解放しました。次の操作で復帰します。");
@@ -225,14 +157,13 @@ export function useDrawingEditor(
 				JSON.stringify({ title: candidate.title, scene: candidate.scene });
 			if (dirty.current) {
 				protect();
+				setError("");
 				setStatus("未保存の変更があります。");
 				timer.current = setTimeout(() => void save(), 1000);
 			} else {
-				drafts.current.remove(referenceId);
-				setHasDraft(false);
+				drafts.clearSaved();
 				setStatus(`保存済み（版 ${doc.revision}）`);
 			}
-			setError("");
 		} catch {
 			const preserved = protect();
 			setError(
@@ -271,6 +202,10 @@ export function useDrawingEditor(
 		if (!pending.current) timer.current = setTimeout(() => void save(), 1000);
 	}
 	async function reconnect() {
+		const signal = AbortSignal.any([
+			lifecycle.signal(),
+			AbortSignal.timeout(180000),
+		]);
 		setBusy(true);
 		setError("");
 		setStatus("再接続中です。");
@@ -279,18 +214,26 @@ export function useDrawingEditor(
 				window.location.reload();
 				return;
 			}
-			const s = await wait(
+			const s = await reconnectDrawingSession(
 				client,
-				await client.reconnectDrawing(selected.current.id),
-				AbortSignal.timeout(180000),
+				selected.current,
+				{
+					referenceId,
+					conversationId,
+					revision: current.current?.revision ?? revision,
+				},
+				signal,
+				lifecycle.accept,
 			);
 			selected.current = s;
 			setSession(s);
 			// Reconnection must never overwrite the unsaved scene in the canvas.
-			if (!dirty.current && !pending.current)
-				apply(await client.drawingDocument(s.id));
-			else setStatus("再接続しました。未保存の図を保存できます。");
+			if (!dirty.current && !pending.current) {
+				const doc = await client.drawingDocument(s.id, signal);
+				if (!signal.aborted) apply(doc);
+			} else setStatus("再接続しました。未保存の図を保存できます。");
 		} catch {
+			if (signal.aborted) return;
 			setError(
 				"再接続できませんでした。画面を閉じず、編集中の内容を保存またはダウンロードしてください。",
 			);
@@ -299,7 +242,7 @@ export function useDrawingEditor(
 		}
 	}
 	function restore() {
-		const value = drafts.current.read(referenceId);
+		const value = drafts.read();
 		if (!value || !current.current) return;
 		initializing.current = true;
 		pending.current = value.pending ? { ...value.pending, referenceId } : value;

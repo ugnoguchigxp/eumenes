@@ -1,15 +1,5 @@
-import { z } from "zod";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
-import { cloudEndpoint } from "../contracts";
-const origin = cloudEndpoint.refine((v) => new URL(v).pathname === "/");
-export const excalidrawConnectionInput = z.strictObject({
-	expectedRevision: z.number().int().nonnegative(),
-	gatewayUrl: origin,
-	gatewayOrigin: origin.optional(),
-	leaseEndpoint: origin,
-	consumerToken: z.string().min(32).max(4096).optional(),
-	appToken: z.string().min(32).max(4096).optional(),
-});
+import { excalidrawConnectionInput } from "../contracts/local-services";
 type Row = {
 	revision: number;
 	gateway_url: string;

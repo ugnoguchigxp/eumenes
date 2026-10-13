@@ -50,8 +50,11 @@ export function excalidrawClient(t: Transport) {
 			id: string,
 			signal?: AbortSignal,
 		): Promise<DrawingSession> => (await t.call(path(id), { signal })).json(),
-		reconnectDrawing: async (id: string): Promise<DrawingSession> =>
-			(await t.call(`${path(id)}/reconnect`, json({}))).json(),
+		reconnectDrawing: async (
+			id: string,
+			signal?: AbortSignal,
+		): Promise<DrawingSession> =>
+			(await t.call(`${path(id)}/reconnect`, { ...json({}), signal })).json(),
 		drawingDocument: async (
 			id: string,
 			signal?: AbortSignal,

@@ -34,7 +34,12 @@ export function createExcalidraw(deps: {
 		...s,
 		url:
 			s.state === "ready" && s.referenceId
-				? `${deps.webOrigin}/#drawing/${s.referenceId}${s.revision ? `?revision=${s.revision}` : ""}`
+				? `${deps.webOrigin}/#drawing/${s.referenceId}?${new URLSearchParams({
+						...(s.revision ? { revision: String(s.revision) } : {}),
+						...(s.conversationId !== "main"
+							? { conversationId: s.conversationId }
+							: {}),
+					})}`
 				: null,
 	});
 	async function connect(id: string) {

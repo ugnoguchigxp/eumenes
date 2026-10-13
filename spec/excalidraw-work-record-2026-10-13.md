@@ -35,3 +35,35 @@
 証拠: spec/verification/excalidraw-2026-10-13/。使用手順・APIはdocs/excalidraw.md。
 
 MCP: initial_instructions 1回、context_compile 1回、compile_eval 1回（runId: 00000000-0000-0000-18de-05293fe30240）。
+
+## Eumenes側の追加整備（検証延期）
+
+最新の利用者指示: Linuxの正式配備・専用consumer登録はLARMへ依頼済み。こちらはEumenes側の実装を進め、検証は後で実施する。管理者操作の依頼、Linux設定変更、実接続検証は今回行わない。
+
+範囲と順序: 別会話の図の再表示契約 → 編集画面の履歴復帰と下書き保護 → 正式接続情報の受入スクリプト → 回帰試験と受入手順の準備 → 差分点検。既存LLMルーティング、図参照の会話境界、API認証と暗号化設定を再利用する。担当外の会話画像等の差分は保持する。
+
+根拠: 編集URLは会話IDを持たず、編集画面のPOSTはmainを既定とするため、main以外の図を会話所有境界の検査で開けない。pagehideでsessionをclosedにする一方、ブラウザ履歴から画面が復元される場合のsession再作成がない。sessionStorageへの初回アクセスが失敗すると編集画面自体が描画できない。上流保存成功後の下書き削除例外を保存APIの失敗と同じcatchで扱っている。
+
+完了条件: 上記の処理を実装し、後で行う回帰試験を追加、配備依存と延期した検証を記録する。検証済みとは報告しない。
+
+実装追加: main以外の会話をURLと編集sessionの作成へ渡し、backendの会話境界を維持。ブラウザ履歴復帰時のsession再作成、編集内容の保持、再接続取消時の遅いsession解放を接続。下書きストレージへのアクセスを遅延して例外を扱い、上流保存成功と下書き削除失敗を分離。編集ライフサイクル・下書き保護・session補助を分け、既存の保存契約と状態は維持した。
+
+接続準備: 接続入力schemaをsettingsのcontractsへ移し、clientの公開設定操作を追加。LARM側と合意した接続情報を受け取るスクリプトは、専用のprivate JSONから入力確認または既存設定API経由の保存だけを行う。SSH固定hand-off依存と暫定Linux登録スクリプトはローカル実装から撤去。前回Linuxへ置いた未実行の暫定スクリプトを正式手順として使わない。
+
+正式配備の観測更新: 2026年10月13日22:28 JSTではLocal Servicesが有効、gateway unitがactive/enabled、worker unitが登録済み/inactive。稼働consumer一覧はeumenes-hosted-appsとgateway用consumerを含む。専用Eumenes consumerとEumenes暗号化設定への登録は未実行。gateway180秒/worker120秒の現行値との差はLARMへの依頼事項。初回の「未配備」は当時の観測で、現在の状態ではない。
+
+回帰試験の準備: 非main会話の版付き再表示・既存の所有境界、URL入力不正、保存領域拒否、削除だけの失敗、履歴復帰と未保存内容、取消後の遅いsession解放を追加。正式接続ブラウザ試験は明示有効化時だけ実行し、scene再取得とsystemd workerの実停止・次回起動を別の証拠にする。
+
+今回の検証状態: 利用者の指定でテスト、lint、型検査、build、fixture/liveブラウザ試験は未実行。書式整備と差分の読取り点検のみ実施。以前の試験結果は以前の実装に対する結果で、今回の差分には適用しない。会話画像等の担当外変更は保持し、発話による専用分岐やLLM判断の代替は追加していない。
+
+次回残作業: docs/excalidraw.mdの部分→結合→全体→正式接続の順で実施する。LARM側の完了報告と経路・資格情報の安全な引渡しを受けてから製品設定を保存し、MacBookでの実編集・保存・再表示、停止と復帰、backend再起動、実LLMを確認する。
+
+今回のContextStill: context_compile 1回、compile_eval 1回（runId: 00000000-0000-0000-18de-1a40f6af45fe）。initial_instructionsは開始時の1回を再利用し、再実行しない。
+
+## 正式接続受入の再開
+
+利用者がLARM側の準備完了を連絡し、接続確認・MacBookブラウザ編集保存再表示・無操作停止・再起動復帰を依頼。既存の専用consumer登録と分離credentialを使用する。Linux配備やsudo登録は変更しない。初期観測ではEumenes専用設定は未登録、正式gatewayはactive、consumer `eumenes-excalidraw`を確認。正式gateway180秒/worker120秒は現在Pageの仕様であり、30秒/60秒へ勝手に短縮しない。
+
+依存順: 延期した部分試験 → 結合 → 接続設定保存・到達確認 → MacBookでcold起動と編集保存再表示 → 正式の無操作実停止と次回復帰 → Eumenes backend再起動と同じ図の保存 → 全体gate/差分点検/証拠保存。完了条件は実sceneの保存版と形状を再取得し、worker PIDの停止・変更とbackend再起動を観測すること。
+
+初回domain検証は復帰hookのReact refs/immutability違反で停止。refの更新を所有hookへ戻し、利用側からは更新callbackとsignal取得操作を呼ぶ形に修正する。未検証の差分に対する失敗であり、以前の合格結果を適用しない。

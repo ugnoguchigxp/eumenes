@@ -10,12 +10,14 @@ export default function DrawingEditor({
 	client,
 	referenceId,
 	revision,
+	conversationId = "main",
 }: {
 	client: EumenesClient;
 	referenceId: string;
 	revision?: number;
+	conversationId?: string;
 }) {
-	const e = useDrawingEditor(client, referenceId, revision);
+	const e = useDrawingEditor(client, referenceId, revision, conversationId);
 	const activity = e.activity;
 	useEffect(() => {
 		const operation = () => {

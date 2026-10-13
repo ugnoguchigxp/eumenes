@@ -1,3 +1,9 @@
+.timer-picker {
+	display: flex;
+	justify-content: flex-end;
+	padding: 8px 16px 0;
+}
+
 .timer-artifact-message {
 	display: grid;
 	place-items: center;

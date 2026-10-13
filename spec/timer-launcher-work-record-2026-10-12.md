@@ -32,3 +32,30 @@
 Context Still: context_compile 1回 / compile_eval 1回。runId: `00000000-0000-0000-18dd-cb1bdc090c5d`。
 
 残作業: なし。
+
+
+## 2026-10-13: 一覧のタイマー入口を一つに整理
+
+目的: アーティファクト一覧の「タイマー」「タイマー: タイマー」の重複を解消し、新版の実装前に入口を一つにする。これから実装する新版の表示名を「タイマー（データドリブン）」と設計に指定する。
+
+範囲・依存順: 既存ランチャーの保存済み項目追加を除去 → activeTimersQueryとuseOpenTimerを使い同じタイマー画面内へ保存済み選択を移す → 再表示の既存ブラウザ操作を更新 → 新版の設計へ入口・タブの名称を反映。完了条件は、保存済みタイマーが複数あっても入口とタブが一つで、開始・停止・再開・再読込み後の再表示が維持されること。今回はデータドリブン版本体の実装段階ではない。
+
+実装済み: 一覧は常設「タイマー」だけを表示する。既存DesignSystemのDropdownMenuによる「保存済みタイマーを選ぶ」を画面内へ配置し、設定時間と開始時刻を添えて同名タイマーを区別する。保存済み状態は既存APIと共有query cacheから読む。既存タイマーの削除やDB変更は行っていない。新版が有効になったら一つの入口とタブを「タイマー（データドリブン）」へ切り替える方針を移行設計に明記した。
+
+検証結果:
+
+- 変更前・変更後の部分試験: WorkspaceArtifactsとTimerSetupArtifactの計10件がそれぞれ成功。
+- timers gate: backend19件、Web39件成功。artifact gate: Web49件成功。
+- root型検査: 1,249ファイル成功。変更したコードのlint・formatと差分検査も成功。
+- ブラウザfixture: 10件中9件成功。同名の保存済み2件でもランチャー項目とタブは各一つ、画面内で個別に再表示でき、再読込み後も新規開始を発生させず既存状態を読めることを追加検証。既存の開始・停止・再開・24時間表示・狭幅・通知表示・復元アラームも成功。
+- 既存の「expiry plays one real beep and posts an assistant message even after the artifact closes」は、終了時のTTS要求を20秒待ってタイムアウト。単独再実行でも再現。過去のclock-compact検証のbrowser-final.log / browser-recheck.logにも同じ待機の失敗が記録されている。今回この試験の期待値・音声処理は変更せず、原因は未確定として残す。
+- 横断gateは境界検査で停止。担当外のweb/src/domains/settings/MemoryItemsPanel.test.tsxのsettings→memory依存と、client/settings.tsのcontracts/local-services直接importを指摘。無関係の既存・並行変更は修正していない。全体成功とはしない。
+- 起動中の実画面: 一覧のタイマー入口が一つであることを確認しlauncher.jpgを保存。保存済み選択の受入は上記fixture結果。実LLM・実機器はUI入口整理のみのため未実施。
+
+差分点検: 今回の製品変更はWorkspace.tsx、WorkspaceArtifacts.tsx、TimerPicker.tsxとTimerArtifact.cssに限定。タイマーのLLM指示・ツール定義・意味判断・操作API・DBは再利用し、語句や個別発話への専用処理を追加していない。他の未コミット変更は担当外として保持。
+
+証拠: [検証ログと一覧画像](verification/timer-single-entry-2026-10-13/)。
+
+残事項: 入口整理と名称の設計反映は実施済み。音声通知の待機失敗の原因確認と担当外の境界エラーの修正が全体検証成功の条件。新版本体は移行設計に従う別段階。
+
+Context Still: context_compile 1回 / compile_eval 1回。runId: `00000000-0000-0000-18de-1accbe0289ef`。

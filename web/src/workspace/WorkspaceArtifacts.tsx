@@ -31,6 +31,7 @@ import { ArtifactPanel } from "../components/domains/artifact/ArtifactPanel";
 import { MusicArtifact } from "../components/domains/music/MusicArtifact";
 import { TimerArtifact } from "../components/domains/timers/TimerArtifact";
 import { TimerSetupArtifact } from "../components/domains/timers/TimerSetupArtifact";
+import { TimerPicker } from "../components/domains/timers/TimerPicker";
 import {
 	timerSetupDefinition,
 	timerDefinition,
@@ -168,54 +169,62 @@ export function WorkspaceArtifacts({
 				activeTabId={artifacts.activeTabId}
 				onSelect={artifacts.select}
 				onClose={artifacts.close}
-				renderOpenUI={(definition) =>
-					JSON.parse(definition).view === "drawing-workspace" ? (
-						<DrawingArtifact client={client} definition={definition} />
-					) : isSettingsArtifactDefinition(definition) ? (
-						<SettingsArtifact definition={definition} onOpen={openSettings} />
-					) : timerArtifactSource(definition) === timerSetupSource ? (
-						<TimerSetupArtifact
-							client={client}
-							definition={definition}
-							onStarted={openTimer}
-							clock={clock}
-						/>
-					) : timerArtifactSource(definition) ? (
+				renderOpenUI={(definition) => (
+					<>
+						{timerArtifactSource(definition) && (
+							<TimerPicker client={client} onSelect={openTimer} />
+						)}
+						{JSON.parse(definition).view === "drawing-workspace" ? (
+							<DrawingArtifact client={client} definition={definition} />
+						) : isSettingsArtifactDefinition(definition) ? (
+							<SettingsArtifact definition={definition} onOpen={openSettings} />
+						) : timerArtifactSource(definition) === timerSetupSource ? (
+							<TimerSetupArtifact
+								client={client}
+								definition={definition}
+								onStarted={openTimer}
+								clock={clock}
+							/>
+						) : timerArtifactSource(definition) ? (
+							<TimerArtifact
+								key={definition}
+								client={client}
+								timerId={timerArtifactSource(definition)!.slice(6)}
+								definition={definition}
+								onNewTimer={() => openTimer()}
+								clock={clock}
+							/>
+						) : isRecognitionDefinition(definition) ? (
+							<ObjectRecognitionArtifact
+								client={client}
+								definition={definition}
+							/>
+						) : isImageArtifactDefinition(definition) ? (
+							<ImageArtifact
+								client={client}
+								definition={definition}
+								onClose={() => artifacts.close(artifacts.activeTabId!)}
+							/>
+						) : (
+							<MusicArtifact
+								key={definition}
+								client={client}
+								definition={definition}
+							/>
+						)}
+					</>
+				)}
+				renderTimer={(timerId) => (
+					<>
+						<TimerPicker client={client} onSelect={openTimer} />
 						<TimerArtifact
-							key={definition}
+							key={timerId}
 							client={client}
-							timerId={timerArtifactSource(definition)!.slice(6)}
-							definition={definition}
+							timerId={timerId}
 							onNewTimer={() => openTimer()}
 							clock={clock}
 						/>
-					) : isRecognitionDefinition(definition) ? (
-						<ObjectRecognitionArtifact
-							client={client}
-							definition={definition}
-						/>
-					) : isImageArtifactDefinition(definition) ? (
-						<ImageArtifact
-							client={client}
-							definition={definition}
-							onClose={() => artifacts.close(artifacts.activeTabId!)}
-						/>
-					) : (
-						<MusicArtifact
-							key={definition}
-							client={client}
-							definition={definition}
-						/>
-					)
-				}
-				renderTimer={(timerId) => (
-					<TimerArtifact
-						key={timerId}
-						client={client}
-						timerId={timerId}
-						onNewTimer={() => openTimer()}
-						clock={clock}
-					/>
+					</>
 				)}
 			/>
 		</ErrorBoundary>

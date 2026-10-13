@@ -1,0 +1,2 @@
+$ bun check
+✓ No type errors in 1,249 files [442.38ms]

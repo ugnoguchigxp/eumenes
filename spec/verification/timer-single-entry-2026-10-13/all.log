@@ -1,0 +1,13 @@
+$ bun scripts/verify.ts --all
+109 | 	);
+110 | 	if (all) {
+111 | 		// Declared-but-unused dependencies need the whole tree to be decidable.
+112 | 		errors.push(...unusedDependencies(allSourceFiles()));
+113 | 	}
+114 | 	if (errors.length) throw new Error(errors.join("\n"));
+                                    ^
+error: web/src/domains/settings/MemoryItemsPanel.test.tsx: forbidden dependency settings -> memory
+client/settings.ts: client import ../api/domains/settings/contracts/local-services must use api/domains/<domain>/contracts
+      at /Users/y.noguchi/Code/eumenes/scripts/verify.ts:114:31
+
+error: script "verify:all" exited with code 1

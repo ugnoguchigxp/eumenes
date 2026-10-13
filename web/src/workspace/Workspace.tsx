@@ -23,7 +23,6 @@ function WorkspaceContent({
 	const state = useWorkspace({ client, store });
 	const {
 		settingsOpen,
-		activeTimers,
 		openSettings,
 		openDrawing,
 		openImage,
@@ -86,10 +85,6 @@ function WorkspaceContent({
 						{ label: "楽曲生成", onSelect: openMusic },
 						{ label: "音楽プレイリスト", onSelect: openPlaylist },
 						{ label: "タイマー", onSelect: () => openTimer() },
-						...(activeTimers.data?.items ?? []).map((timer) => ({
-							label: `タイマー: ${timer.label}`,
-							onSelect: () => openTimer({ timerId: timer.id }, timer.label),
-						})),
 						{ label: "UIショーケース", onSelect: openShowcase },
 					]}
 				/>

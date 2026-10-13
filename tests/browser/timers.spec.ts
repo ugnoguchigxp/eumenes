@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { openFromLauncher } from "./artifact-launcher";
@@ -6,6 +6,21 @@ import { evidencePath } from "./evidence";
 import { createFixture } from "./fixture";
 
 const TOKEN = "fixture-token-for-toolchain-browser";
+
+async function openSavedTimer(
+	page: Page,
+	label: string,
+	durationSeconds?: number,
+) {
+	await openFromLauncher(page, "タイマー");
+	await page.getByRole("button", { name: "保存済みタイマーを選ぶ" }).click();
+	await page
+		.getByRole("menuitem")
+		.filter({
+			hasText: `${label}（${durationSeconds === undefined ? "" : `${durationSeconds}秒・`}`,
+		})
+		.click();
+}
 
 test.setTimeout(60000);
 let apiPort: number, webPort: number;
@@ -43,6 +58,68 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
 	await fixture.stopAll();
+});
+
+test("one timer launcher reopens multiple saved timers with the same name", async ({
+	page,
+	request,
+}) => {
+	const saved = [];
+	for (const durationSeconds of [1800, 3600]) {
+		const response = await request.post(
+			`http://127.0.0.1:${apiPort}/api/timers`,
+			{
+				headers: { authorization: `Bearer ${TOKEN}` },
+				data: {
+					requestId: crypto.randomUUID(),
+					issuedAt: new Date().toISOString(),
+					durationSeconds,
+					label: "タイマー",
+				},
+			},
+		);
+		expect(response.ok()).toBe(true);
+		saved.push((await response.json()).timer);
+	}
+	let browserStarts = 0;
+	page.on("request", (request) => {
+		if (request.method() === "POST" && request.url().endsWith("/api/timers"))
+			browserStarts++;
+	});
+	await page.goto(`http://127.0.0.1:${webPort}`);
+	await page.getByRole("button", { name: "アーティファクトを開く" }).click();
+	await expect(page.getByRole("menuitem", { name: /^タイマー/ })).toHaveCount(
+		1,
+	);
+	await page.getByRole("menuitem", { name: "タイマー", exact: true }).click();
+	await page.getByRole("button", { name: "保存済みタイマーを選ぶ" }).click();
+	await page.getByRole("menuitem", { name: /^タイマー（1800秒・/ }).click();
+	await expect(page.getByText("30分のタイマー", { exact: true })).toBeVisible();
+	await page.reload();
+	await openSavedTimer(page, "タイマー", 3600);
+	await expect(
+		page.getByText("1時間のタイマー", { exact: true }),
+	).toBeVisible();
+	await expect(
+		page
+			.getByRole("tablist", { name: "アーティファクトのタブ" })
+			.getByRole("tab"),
+	).toHaveCount(1);
+	expect(browserStarts).toBe(0);
+	for (const timer of saved) {
+		const cancelled = await request.post(
+			`http://127.0.0.1:${apiPort}/api/timers/${timer.id}/cancel`,
+			{
+				headers: { authorization: `Bearer ${TOKEN}` },
+				data: {
+					requestId: crypto.randomUUID(),
+					issuedAt: new Date().toISOString(),
+					expectedRevision: timer.revision,
+				},
+			},
+		);
+		expect(cancelled.ok()).toBe(true);
+	}
 });
 
 test("the timer launcher works before any timer exists and starts a saved clock", async ({
@@ -182,7 +259,7 @@ test("the timer launcher works before any timer exists and starts a saved clock"
 	await page
 		.getByRole("button", { name: "タイマーを閉じる", exact: true })
 		.click();
-	await openFromLauncher(page, "タイマー: タイマー");
+	await openSavedTimer(page, "タイマー");
 	await expect(page.getByRole("timer")).toBeVisible();
 	await page.getByRole("button", { name: "停止する", exact: true }).click();
 	await expect(page.getByText("停止中", { exact: true })).toBeVisible();
@@ -199,7 +276,7 @@ test("the timer launcher works before any timer exists and starts a saved clock"
 	expect(paused.state).toBe("paused");
 	const frozen = await page.getByRole("timer").innerText();
 	await page.reload();
-	await openFromLauncher(page, "タイマー: タイマー");
+	await openSavedTimer(page, "タイマー");
 	await expect(page.getByText("停止中", { exact: true })).toBeVisible();
 	await expect(page.getByRole("timer")).toHaveText(frozen);
 	await expect(page.locator(".timer-workspace time")).toHaveCount(0);
@@ -429,7 +506,7 @@ test("the 24-hour clock fits a narrow artifact and reopens from the launcher aft
 	expect(started.ok()).toBe(true);
 	await page.setViewportSize({ width: 375, height: 812 });
 	await page.goto(`http://127.0.0.1:${webPort}`);
-	await openFromLauncher(page, "タイマー: 24時間の時計");
+	await openSavedTimer(page, "24時間の時計");
 	await expect(
 		page.getByText("24時間の時計", { exact: true }).last(),
 	).toBeVisible({ timeout: 20000 });
@@ -442,7 +519,7 @@ test("the 24-hour clock fits a narrow artifact and reopens from the launcher aft
 	await page.reload();
 	await expect(page.getByText(/接続済み/)).toBeVisible({ timeout: 20000 });
 	await expect(page.getByRole("timer")).toHaveCount(0);
-	await openFromLauncher(page, "タイマー: 24時間の時計");
+	await openSavedTimer(page, "24時間の時計");
 	await expect(
 		page.getByText("24時間の時計", { exact: true }).last(),
 	).toBeVisible({ timeout: 20000 });
@@ -468,7 +545,7 @@ test("a persisted timer expires and its notice survives closing the clock", asyn
 	const { timer } = await started.json();
 	await page.goto(`http://127.0.0.1:${webPort}`);
 	await expect(page.getByText(/接続済み/)).toBeVisible({ timeout: 20000 });
-	await openFromLauncher(page, "タイマー: 終了通知の検証");
+	await openSavedTimer(page, "終了通知の検証");
 	await expect(
 		page.getByText("終了通知の検証", { exact: true }).last(),
 	).toBeVisible();
@@ -524,7 +601,7 @@ test("the timer has usable controls and fits both themes and a narrow screen", a
 	expect(started.ok()).toBe(true);
 	await page.setViewportSize({ width: 1440, height: 900 });
 	await page.goto(`http://127.0.0.1:${webPort}`);
-	await openFromLauncher(page, "タイマー: タイマー");
+	await openSavedTimer(page, "タイマー");
 	await expect(page.getByText("3分のタイマー", { exact: true })).toBeVisible({
 		timeout: 20000,
 	});

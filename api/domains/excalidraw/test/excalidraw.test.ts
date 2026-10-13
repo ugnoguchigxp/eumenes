@@ -238,3 +238,33 @@ test("a real HTTP relay preserves the native gateway Host across a different Mac
 		await relay.stop(true);
 	}
 });
+
+test("browser entry retains the owning conversation and can reopen its version without weakening reference boundaries", async () => {
+	const h = await setup();
+	try {
+		const conversationId = "design / 構成 & review";
+		const opening = await h.service.session({
+			requestId: crypto.randomUUID(),
+			conversationId,
+		});
+		const ready = (await h.service.wait(opening.id))!;
+		const hash = new URL(ready.url!).hash;
+		const query = new URLSearchParams(hash.slice(hash.indexOf("?") + 1));
+		expect(query.get("conversationId")).toBe(conversationId);
+		const reopened = await h.service.session({
+			requestId: crypto.randomUUID(),
+			conversationId: query.get("conversationId"),
+			referenceId: ready.referenceId,
+			revision: Number(query.get("revision")),
+		});
+		expect((await h.service.wait(reopened.id))?.state).toBe("ready");
+		await expect(
+			h.service.session({
+				requestId: crypto.randomUUID(),
+				referenceId: ready.referenceId,
+			}),
+		).rejects.toThrow("excalidraw_reference_not_found");
+	} finally {
+		await h.close();
+	}
+});

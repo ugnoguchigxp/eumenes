@@ -8,6 +8,7 @@ archive の基準: 本文の実施記録や完了記述で全項目が完了と�
 
 | 文書 | 状態 |
 | --- | --- |
+| [timer-data-driven-ui-acceptance-design-2026-10-13.md](timer-data-driven-ui-acceptance-design-2026-10-13.md) | Astraによるタイマーの定義登録・共通実行・OpenUI・質問継続の移行設計。既存Playwright回帰を維持し、自然言語目的によるAI自律UI受入を追加。設計案・未実装・試験未実行 |
 | [settings-openui-definition-storage-2026-10-12.md](settings-openui-definition-storage-2026-10-12.md) | 設定項目の軽量登録と保存先の詳細設計。実テーブル・列・JSONパス、管理操作と読取のbinding、型と保存範囲、追加手順と受入を定義。設計案・未実装 |
 | [settings-openui-redesign-2026-10-12.md](settings-openui-redesign-2026-10-12.md) | Astraレビューに基づく薄い設定入口と目的別OpenUIアーティファクトの全体設計。現行全項目の編集先、共同下書き、個別保存、タブの寿命、秘密入力、段階移行と受入を整理。設計案・未実装 |
 | [ruri-sentence-language-tts-implementation-plan-2026-10-12.md](ruri-sentence-language-tts-implementation-plan-2026-10-12.md) | Ruriの文章全体ja/en二分類とVOICEVOX・KittenTTS振分け。内部契約・固定試験の先行、LARM公開契約への依存、取消・採用、回帰・live・実機器受入を定めた実装計画。常駐分類Providerと両TTSを公開接続し試用有効化済み。全体gate・実機器受入は未完了 |

@@ -1,0 +1,18 @@
+{
+  "checkedAt": "2026-10-13T14:11:53.328Z",
+  "mode": "formal-live-observed",
+  "url": "http://127.0.0.1:5173/#drawing/5ed3ee5b-ad09-4c10-8d9d-a99d13e94ff0",
+  "revision": 3,
+  "sceneElements": 1,
+  "startedPid": 2077267,
+  "physicalIdleStop": true,
+  "browserEdited": true,
+  "saveAndReopen": true,
+  "automatedBrowserTest": "failed_at_360s_idle_wait",
+  "serviceReadyAt": "2026-10-13T14:00:11.087Z",
+  "additionalOpenRequestAt": "2026-10-13T14:02:34.921Z",
+  "serviceStoppedAt": "2026-10-13T14:07:43.400Z",
+  "secondsFromAdditionalOpenToStop": 308.479,
+  "workerRestartRecovered": "pending",
+  "backendRestartRecovered": "pending"
+}

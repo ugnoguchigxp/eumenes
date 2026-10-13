@@ -1,0 +1,57 @@
+
+Running 10 tests using 1 worker
+
+(node:3796) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 tests/browser/timers.spec.ts:63:1 › one timer launcher reopens multiple saved timers with the same name (17.3s)
+  ✓   2 tests/browser/timers.spec.ts:125:1 › the timer launcher works before any timer exists and starts a saved clock (25.6s)
+  ✓   3 tests/browser/timers.spec.ts:338:1 › stopwatch continues across clock and artifact tabs, stops, resumes, resets and closes (34.7s)
+  ✓   4 tests/browser/timers.spec.ts:429:1 › a 90-second request opens the saved timer (10.9s)
+  ✓   5 tests/browser/timers.spec.ts:493:1 › the 24-hour clock fits a narrow artifact and reopens from the launcher after reload (14.5s)
+  ✓   6 tests/browser/timers.spec.ts:531:1 › a persisted timer expires and its notice survives closing the clock (25.5s)
+  ✓   7 tests/browser/timers.spec.ts:588:1 › the timer has usable controls and fits both themes and a narrow screen (13.9s)
+  ✘   8 tests/browser/timers.spec.ts:640:1 › expiry plays one real beep and posts an assistant message even after the artifact closes (20.4s)
+(node:5713) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   9 tests/browser/timers.spec.ts:699:1 › top-right banners and notification drawer fit desktop and mobile in both themes (23.3s)
+  ✓  10 tests/browser/timers.spec.ts:835:1 › a restored alarm waits for audio activation and then beeps and requests TTS (28.2s)
+
+
+  1) tests/browser/timers.spec.ts:640:1 › expiry plays one real beep and posts an assistant message even after the artifact closes
+
+    TimeoutError: page.waitForRequest: Timeout 20000ms exceeded while waiting for event "request"
+
+      659 | 	await expect(page.getByText(/接続済み/)).toBeVisible({ timeout: 20000 });
+      660 | 	await page.getByRole("textbox").fill("3秒タイマー測って");
+    > 661 | 	const speech = page.waitForRequest(
+          | 	                    ^
+      662 | 		(request) =>
+      663 | 			request.url().endsWith("/api/voice/replay/audio") &&
+      664 | 			request.postDataJSON()?.text === "3秒のタイマーが終了しました。",
+        at /Users/y.noguchi/Code/eumenes/tests/browser/timers.spec.ts:661:22
+
+    Error: locator.click: Test ended.
+    Call log:
+      - waiting for getByRole('button', { name: 'タイマーを閉じる', exact: true }).last()
+        - locator resolved to <button type="button" class="ds-tabs-close" aria-label="タイマーを閉じる">…</button>
+      - attempting click action
+        - waiting for element to be visible, enabled and stable
+      - element was detached from the DOM, retrying
+
+
+      670 | 		.getByRole("button", { name: "タイマーを閉じる", exact: true })
+      671 | 		.last()
+    > 672 | 		.click();
+          | 		 ^
+      673 | 	await expect(
+      674 | 		page
+      675 | 			.getByRole("alert")
+        at /Users/y.noguchi/Code/eumenes/tests/browser/timers.spec.ts:672:4
+
+    Error Context: test-results/timers-expiry-plays-one-re-a8cdd-n-after-the-artifact-closes/error-context.md
+
+    Error Context: test-results/timers-expiry-plays-one-re-a8cdd-n-after-the-artifact-closes/error-context.md
+
+  1 failed
+    tests/browser/timers.spec.ts:640:1 › expiry plays one real beep and posts an assistant message even after the artifact closes
+  9 passed (3.7m)
