@@ -1,0 +1,334 @@
+{
+  "dateJst": "2026-10-14",
+  "mode": "formal-service-and-native-MacBook-Brave",
+  "runtimeCommit": "0cacd23ac164170c2fa3ff2aae70dc78d6beeb6c",
+  "runtimeSourcesFrozen": true,
+  "productDatabaseCopied": false,
+  "consumerId": "eumenes-excalidraw",
+  "allowedServices": [
+    "excalidraw-host"
+  ],
+  "distinctCredentialRoles": true,
+  "url": "http://127.0.0.1:5173/#drawing/c20b6255-38da-4851-a76f-ac2ca964d22f?conversationId=excalidraw-acceptance-2d1cdc8d-fedc-41cc-b218-13bb6a72df5d",
+  "nativeEditingSavedReopened": true,
+  "backendRestartRecovered": true,
+  "backendPids": [
+    74677,
+    78215
+  ],
+  "backendRestartPreservedElementDigest": true,
+  "workerPids": [
+    2279353,
+    0,
+    2286656
+  ],
+  "physicalIdleStop": {
+    "physicalIdleStop": true,
+    "observations": [
+      {
+        "at": "2026-10-13T21:44:47.492Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:44:52.860Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:44:58.191Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:45:03.480Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:45:08.793Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:45:14.167Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:45:19.644Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:45:24.959Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:45:30.252Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:45:35.551Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:45:40.873Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:45:46.219Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:45:51.513Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:45:56.864Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:46:02.198Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:46:07.517Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:46:12.806Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:46:18.160Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:46:23.970Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:46:29.283Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:46:34.865Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:46:40.162Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:46:45.421Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:46:50.722Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:46:56.049Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:47:01.387Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:47:06.705Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:47:12.034Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:47:17.394Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:47:22.710Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:47:28.208Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:47:33.552Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:47:38.920Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:47:44.223Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:47:49.608Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:47:54.949Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:48:00.213Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:48:05.585Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:48:10.952Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:48:16.266Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:48:21.518Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:48:26.838Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:48:32.395Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:48:37.690Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:48:42.989Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:48:48.248Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:48:53.562Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:48:58.882Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:49:04.211Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:49:09.556Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:49:14.864Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:49:20.202Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:49:25.536Z",
+        "pid": 2279353
+      },
+      {
+        "at": "2026-10-13T21:49:30.839Z",
+        "pid": 0
+      }
+    ]
+  },
+  "idleReconnectEditedSavedReopened": true,
+  "documents": {
+    "beforeBackendRestart": {
+      "checkedAt": "2026-10-13T21:42:30.278Z",
+      "referenceId": "c20b6255-38da-4851-a76f-ac2ca964d22f",
+      "title": "MacBook 最終受入",
+      "revision": 2,
+      "count": 1,
+      "types": [
+        "rectangle"
+      ],
+      "elementDigest": "71d523bdeb8a27ef4d6657afad7f9e78ab27d59cb2cb6a153293c7f372e69131",
+      "configuration": {
+        "revision": 1,
+        "gatewayUrl": "http://127.0.0.1:18790",
+        "gatewayOrigin": "http://127.0.0.1:18790",
+        "leaseEndpoint": "http://127.0.0.1:18791",
+        "consumerConfigured": true,
+        "appConfigured": true
+      }
+    },
+    "afterBackendRestart": {
+      "checkedAt": "2026-10-13T21:43:13.714Z",
+      "referenceId": "c20b6255-38da-4851-a76f-ac2ca964d22f",
+      "title": "MacBook 最終受入",
+      "revision": 2,
+      "count": 1,
+      "types": [
+        "rectangle"
+      ],
+      "elementDigest": "71d523bdeb8a27ef4d6657afad7f9e78ab27d59cb2cb6a153293c7f372e69131",
+      "configuration": {
+        "revision": 1,
+        "gatewayUrl": "http://127.0.0.1:18790",
+        "gatewayOrigin": "http://127.0.0.1:18790",
+        "leaseEndpoint": "http://127.0.0.1:18791",
+        "consumerConfigured": true,
+        "appConfigured": true
+      }
+    },
+    "editedAfterBackendRestart": {
+      "checkedAt": "2026-10-13T21:44:18.257Z",
+      "referenceId": "c20b6255-38da-4851-a76f-ac2ca964d22f",
+      "title": "MacBook 最終受入",
+      "revision": 3,
+      "count": 2,
+      "types": [
+        "rectangle",
+        "rectangle"
+      ],
+      "elementDigest": "4d6e01d2af2e0d47a1fc1cb425f143084587ef6430a9687afeeddca752cc5a17",
+      "configuration": {
+        "revision": 1,
+        "gatewayUrl": "http://127.0.0.1:18790",
+        "gatewayOrigin": "http://127.0.0.1:18790",
+        "leaseEndpoint": "http://127.0.0.1:18791",
+        "consumerConfigured": true,
+        "appConfigured": true
+      }
+    },
+    "editedAfterPhysicalIdleReconnect": {
+      "checkedAt": "2026-10-13T21:50:16.062Z",
+      "referenceId": "c20b6255-38da-4851-a76f-ac2ca964d22f",
+      "title": "MacBook 最終受入",
+      "revision": 4,
+      "count": 3,
+      "types": [
+        "rectangle",
+        "rectangle",
+        "rectangle"
+      ],
+      "elementDigest": "9e4fddefb751ee5d2b829d4eefd0ef0850306d74a31c9dc41919842cbf7b10c0",
+      "configuration": {
+        "revision": 1,
+        "gatewayUrl": "http://127.0.0.1:18790",
+        "gatewayOrigin": "http://127.0.0.1:18790",
+        "leaseEndpoint": "http://127.0.0.1:18791",
+        "consumerConfigured": true,
+        "appConfigured": true
+      }
+    }
+  },
+  "automatedFormalE2e": "failed_browser_closed_after_physical_idle_stop",
+  "realLlmRouting": "passed",
+  "artifactUi": "passed_main_conversation_answer_list_ready_link_and_editor",
+  "wholeProjectGate": "blocked_existing_settings_to_memory_test_dependency",
+  "mainConversationRunId": "80ce13e5-2e79-4910-8d11-6223c3c11aed",
+  "mainArtifactReferenceId": "c71e63d7-b2a4-4fa7-9274-ddd96d838078"
+}

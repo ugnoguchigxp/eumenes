@@ -1,5 +1,13 @@
 # Excalidraw連携 作業記録
 
+## mainでの最終受入再開
+
+利用者が実装と検証の完遂を依頼したため中断を解除する。initial_instructionsは開始時の一回を維持。既存の担当定義・公開drawing_editorツール・暗号化設定・scene保存・Artifactの接続を再利用する。新しいブランチは作らない。
+
+残作業と依存順: 部分domain gate → settings/client/application結合とブラウザfixture → 利用側・verify:all/build → 正式接続のcold起動、編集保存再表示、自然停止、再接続ボタンからの追加編集保存再表示 → backend再起動復帰 → 実LLMの担当選択と会話・Artifact・URL確認 → 差分点検と結果整理。正式接続試験に再接続ボタンと追加保存版4/形状2の確認を追加する。待機上限や正式idle設定は緩めない。
+
+完了条件: 各結果を固定/正式接続/MacBook実画面で分け、保存版・形状とworker PIDの停止/変更、backend再起動後の保持、実LLM runと採用operationを記録する。失敗はwarnログと相関IDから調査し、原因が確定した担当範囲だけを修正する。Linux配備・consumer登録、既存memory境界違反は調査のみ。根拠なしの同じ失敗は繰り返さない。
+
 目的: Eumenesの認証済みブラウザ入口から図の編集、scene APIによる保存、図IDと版からの再表示、無操作lease解放と再接続を提供する。
 
 範囲: Excalidraw domain、LARM Local Servicesアダプター、backend設定、会話ツールチェーン、DesignSystem/OpenUI、Web/client、固定試験と実接続確認。Linux製品の配備・consumer登録・製品DB変更は担当外。既存の未コミット変更は保持する。
@@ -87,3 +95,25 @@ Eumenes再起動と保存: backendを再起動して暗号化接続設定と図�
 再開条件: 実接続で修正後の「無操作解放→再接続→追加編集→保存→再表示」を最終確認し、独立した通し試験と実LLM経路を確認する。全体gateは既存境界違反の解消後に実施する。現在のmainマージはこの残作業を受け入れたcheckpointであり、機能全体の検証完了を意味しない。
 
 Brave自動起動: 別のchrome-devtools-mcp起動ラッパーが接続時に専用Braveを自動起動していた。ラッパーを既存ブラウザの確認だけに変更し、接続プロセスを停止。2回の起動確認でBraveを開かないことを確認した。この修正はEumenesリポジトリの外にあり、今回のmainマージには含まれない。
+
+## 2026年10月14日の受入結果
+
+変更: Excalidraw製品コードへの追加は不要だった。mainへ入れた再接続競合の修正を実接続で確認した。正式接続のブラウザ試験を、reloadによる復帰だけでなく再接続ボタン、追加編集、版4/形状2の再取得まで拡張した。矩形ツールは同梱の日本語定義と実画面で名称「矩形」を確認し、操作待ちに20秒の上限を設定した。正式idle値、停止待ち360秒、保存版・形状の期待値は緩めていない。
+
+固定検証: Excalidraw domainはbackend 7/Web 9、settings/application結合27、client Vitest 336、capabilities 24、LARM 146、Artifact Web 49、ブラウザfixture 1を合格。型検査とWeb buildは成功（既存の大きなchunk警告あり）。更新後の作業ツリーでもExcalidraw domainとapplication結合4を再確認して合格した。clientを誤ってBunで実行した試行はrunnerの不一致による失敗であり、正しいVitestの結果と区別する。verifyコマンドを並列起動した際のロック拒否も試験失敗と混同せず、settings gateは順番に再実行した。
+
+全体gate: settings domainとverify:allはweb/src/domains/settings/MemoryItemsPanel.test.tsxのsettings→memory依存違反で停止。期待値・依存規則を弱めず、担当外として修正していない。並行作業のclient/toolchain-actions.tsがdialogue/contractsから存在しないinteractionAnswerをimportしているため、作業ツリーのclient読み込みも失敗した。この共有契約の改修は本タスクへ取り込んでいない。
+
+俯瞰評価と方針変更: 最初の正式試験では共有ファイル更新によるHMRと、こちらが追加した英語ツール名の誤りを検出。次の試行も要素名を確定する前に始めたため中断した。再試行前に進め方を評価し、同梱localeと実画面の名称を根拠に修正し、mainのソースとworkspaceパッケージを固定した検証へ切り替えた。ブランチは作らずgit archiveの0cacd23から検証用ソースだけを用意し、製品DB・設定・credentialはコピーせず、backendが既存の保存先と暗号化設定を使用した。固定ソース1510ファイルは検証前後で変更なし。三つ目の自動試験ではcold起動・版3保存再表示・無操作解放・worker実停止まで確認したが、再接続操作の直前にブラウザが閉じられて失敗。終了原因は未確定。同じ自動試験は繰り返さず、MacBookの既存Braveでの実操作へ方針変更した。自動試験の完走は宣言しない。
+
+実LLM: 非main会話のrun add3e339-e56c-4acd-a370-08fd877737bbとmain会話のrun 80ce13e5-2e79-4910-8d11-6223c3c11aedで、excalidraw.edit@1の選択、plan/openジョブ、completed操作、回答のブラウザURLを確認した。非main操作の確認スクリプトが既定mainの一覧を見て失敗した際は、再生成せず作成元conversationId付きの公開APIで同じ操作を確認した。mainの実画面では会話回答のURL、Artifactの保存済み図一覧、準備中→利用可能、Excalidrawを開くリンクから編集画面への移動まで確認。図を描いた・保存したことを発話の専用処理で補っていない。
+
+MacBook実画面: 非mainの図参照c20b6255-38da-4851-a76f-ac2ca964d22fをBraveで開き、矩形1個を版2で保存・再読込みした。backend PID 74677を正常終了して78215で再起動し、版2のsceneのハッシュと設定revision 1が保持されたことをAPIと画面で確認。さらに矩形を追加し版3/2個を保存・再表示した。クリック位置がtoolbarに入った操作は描画成功と扱わず、画面上のcanvasへ描いて保存結果を確認した。
+
+自然停止と最終復帰: 表示したまま無操作解放を確認し、SSHの読み取り専用systemd観測で2026-10-13T21:49:30.839Zにworker PID 2279353→0を記録した（systemd停止イベントは21:49:29Z）。最後のscene確認から約311秒で、gateway180秒/worker120秒を短縮せず停止した。Braveの再接続ボタンでworker PID 2286656へ起動し、版3が復帰。矩形を追加し版4/3個で保存、同じURLからの再表示とscene APIの再取得を合格した。取消後の古いleaseが新しいleaseを解放する競合は、この実接続操作では再発しなかった。
+
+証拠: spec/verification/excalidraw-live/native-acceptance-2026-10-14.jsonに図の版・形状・ハッシュ、設定の公開情報、worker停止時系列とbackend再起動を記録。real-llm-2026-10-14.jsonとreal-llm-main-2026-10-14.jsonに今回の合成依頼、run、採用操作、回答を記録。source-stability-2026-10-14.jsonは固定ソースの確認結果。credentialやProvider生応答は保存していない。本人の別ブラウザタブ・会話履歴を含むnativeスクリーンショットはGitへ追加しない。
+
+到達点と残作業: Excalidraw要求の実接続・MacBook操作・実LLM/Artifactの受入は確認済み。全体gateと並行改修を含む作業ツリー全体の受入は未完了。続行条件は既存memory境界違反と共有client契約の担当側での整合後に、現在の作業ツリーで全体gateとWeb通し確認を実施すること。本タスクの差分は試験・文書・検証証拠だけで、発話の意味判断の代替や担当外の修正は追加していない。
+
+今回のContextStill: context_compile 1回、compile_eval 1回（runId: 00000000-0000-0000-18de-1debfb717569）。initial_instructionsは開始時の1回を再利用した。

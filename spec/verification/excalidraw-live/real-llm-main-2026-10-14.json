@@ -1,0 +1,106 @@
+{
+  "checkedAt": "2026-10-13T21:51:54.530Z",
+  "input": "Excalidrawで新しい図を作りたいです。図の名前は「MacBook Artifact最終受入」にして、ブラウザで編集できる画面を開いてください。",
+  "run": {
+    "id": "80ce13e5-2e79-4910-8d11-6223c3c11aed",
+    "agentTaskId": null,
+    "requestId": "dd8f8cb8-64c1-4e0d-8a7d-8852b70a5919",
+    "conversationId": "main",
+    "utteranceId": null,
+    "status": "completed",
+    "revision": 4,
+    "inputMessageId": "3d898807-886c-4e45-9ba9-d08b721bd5be",
+    "answerMessageId": "9dc9f1a4-019f-4db6-ad4b-0a05644dc585",
+    "error": null,
+    "jobId": "2cbe92e3-b3d7-47b7-b2dc-c34df0738c7c",
+    "deadlineAt": "2026-10-13T21:54:20.704Z",
+    "sourceKind": "manual",
+    "scheduleId": null,
+    "occurrenceId": null,
+    "worldUsed": false,
+    "worldBlocked": false,
+    "createdAt": "2026-10-13T21:51:20.704Z",
+    "updatedAt": "2026-10-13T21:51:54.198Z"
+  },
+  "selections": [
+    {
+      "id": "66884387-1ea5-451f-a717-8b45a7776e6c",
+      "runId": "80ce13e5-2e79-4910-8d11-6223c3c11aed",
+      "conversationId": "main",
+      "utteranceId": null,
+      "requestId": "dd8f8cb8-64c1-4e0d-8a7d-8852b70a5919",
+      "retrieval": "embedding",
+      "candidates": [
+        {
+          "toolchainId": "web.search",
+          "revisionId": "toolchain:web.search@1",
+          "functionName": "web_search",
+          "rank": 1,
+          "ftsRank": null,
+          "similarity": 0.895,
+          "fromHistory": true
+        },
+        {
+          "toolchainId": "excalidraw.edit",
+          "revisionId": "toolchain:excalidraw.edit@1",
+          "functionName": "drawing_editor",
+          "rank": 2,
+          "ftsRank": null,
+          "similarity": 0.8826,
+          "fromHistory": true
+        },
+        {
+          "toolchainId": "web.research.luna",
+          "revisionId": "toolchain:web.research.luna@1",
+          "functionName": "web_research",
+          "rank": 3,
+          "ftsRank": null,
+          "similarity": 0.8438,
+          "fromHistory": true
+        },
+        {
+          "toolchainId": "image.create",
+          "revisionId": "toolchain:image.create@1",
+          "functionName": "image",
+          "rank": 4,
+          "ftsRank": null,
+          "similarity": 0.8682,
+          "fromHistory": false
+        }
+      ],
+      "historyRefs": [
+        "73435f12-d53f-4c84-afd5-cafd6fb51a52",
+        "8f19e103-afcc-4691-a033-fd595c567b12",
+        "6f9139f9-6055-415a-8121-f1ff49706865"
+      ],
+      "decision": "toolchain",
+      "toolchainId": "excalidraw.edit",
+      "toolchainRevisionId": "toolchain:excalidraw.edit@1",
+      "functionName": "drawing_editor",
+      "request": "「MacBook Artifact最終受入」という名前の新しい図を作成し、ブラウザで編集できる画面を開いてください。",
+      "repaired": false,
+      "taskId": null,
+      "outcome": "completed",
+      "outcomeCode": null,
+      "recipe": null,
+      "durationMs": 15146,
+      "createdAt": 1791928295903,
+      "settledAt": 1791928314198
+    }
+  ],
+  "operations": [
+    {
+      "id": "4c9dd67c-cbb9-412f-befc-cfca756f87b7",
+      "runId": "80ce13e5-2e79-4910-8d11-6223c3c11aed",
+      "conversationId": "main",
+      "state": "completed",
+      "sessionId": "c14488a5-25ae-40b8-baae-650317161581",
+      "referenceId": "c71e63d7-b2a4-4fa7-9274-ddd96d838078",
+      "action": "create",
+      "title": "MacBook Artifact最終受入",
+      "url": "http://127.0.0.1:5173/#drawing/c71e63d7-b2a4-4fa7-9274-ddd96d838078?revision=1",
+      "errorCode": null
+    }
+  ],
+  "answer": "新しい図「MacBook Artifact最終受入」を作成し、編集画面を開きました。ブラウザで表示できます。\n\n編集画面：[http://127.0.0.1:5173/#drawing/c71e63d7-b2a4-4fa7-9274-ddd96d838078?revision=1](http://127.0.0.1:5173/#drawing/c71e63d7-b2a4-4fa7-9274-ddd96d838078?revision=1)"
+}

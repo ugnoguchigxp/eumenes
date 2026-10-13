@@ -1,6 +1,6 @@
 # Excalidrawの図を描く・編集する
 
-2026年10月13日。Eumenesのアーティファクトメニュー「図を描く・編集する」または会話から編集画面を準備する。新しい図を作成し、利用可能になってから「Excalidrawを開く」で別のブラウザタブへ移動する。保存済みの図は一覧から再表示できる。
+2026年10月14日。Eumenesのアーティファクトメニュー「図を描く・編集する」または会話から編集画面を準備する。新しい図を作成し、利用可能になってから「Excalidrawを開く」で別のブラウザタブへ移動する。保存済みの図は一覧から再表示できる。
 
 ## 接続と認証
 
@@ -38,7 +38,7 @@ ready URLはEumenesのWeb originにある`/#drawing/{referenceId}?revision={revi
 
 `bun scripts/excalidraw-live.ts --check`はbackend settingsの読み取り専用操作で保存済みLARM入口と専用接続の有無を確認する。consumer未設定時にLLM/admin tokenでlease要求はしない。
 
-初回調査ではLocal Servicesと正式サービスが未配備だった。2026年10月13日22:28 JSTの再確認では正式gatewayがactive/enabled、worker unitは登録済み/inactive、Local Servicesは有効。現行consumerに`eumenes-hosted-apps`があるが、LLM tokenと分離されたExcalidraw専用Eumenes consumerの登録完了は未確認。正式配備と専用登録は利用者からLARM側へ依頼済み。こちらからLinux設定を変更しない。正式環境の編集・保存・停止・復帰は未検証。
+正式gatewayはactive/enabled、workerはオンデマンド起動する。専用consumer `eumenes-excalidraw`は登録済みで、許可サービスが`excalidraw-host`だけであること、consumer用と図保存API用の資格情報が別であることを確認した。Eumenesの暗号化設定revision 1とMacBookのSSH中継を使い、正式環境の編集・保存・停止・復帰を実接続で確認した。Linux側の配備・登録は変更していない。
 
 ## LARM側の準備後に行う接続設定
 
@@ -57,7 +57,7 @@ bun scripts/excalidraw/configure-live.ts /absolute/private/connection.json --app
 
 ブラウザ履歴から編集画面が復元された場合は、pagehideで解放したsessionを再利用せず、新しいsessionを取得する。編集中のscene・タイトル・未確定の保存候補は保持する。再接続中に画面を閉じた場合は結果の採用を取り消し、遅れて返ったsessionも解放する。ブラウザの保存領域へのアクセスが拒否されても編集画面は開ける。上流保存成功後に下書きの削除だけ失敗した場合は、保存済みと削除失敗を分けて表示する。
 
-## 次回の検証順序（今回は未実行）
+## 検証順序
 
 1. `bun run verify -- --domain excalidraw`とsettings/client関連試験で、会話付きURL、履歴復帰、下書き領域の障害、取消後の解放を確認する。
 2. application結合試験と`bunx playwright test tests/browser/excalidraw.spec.ts`で、既存の作成・描画・保存・下書き復元・再表示を確認する。
@@ -70,10 +70,10 @@ EUMENES_EXCALIDRAW_LIVE=1 bunx playwright test tests/browser/excalidraw-live.spe
 
 正式接続試験は稼働中のEumenes Web/APIを使い、cold起動→ブラウザ描画→版2/3保存→sceneの再取得→無操作解放→systemd workerの実停止→再起動と再表示を確認する。通常の試験実行ではskipする。workerの強制停止は行わず、受入用の新規図を作成し、証拠として残す。SSHはsystemdのPIDを読み取るだけで、配備や管理者操作は行わない。Web originは`EUMENES_EXCALIDRAW_WEB_ORIGIN`、観測用SSHホストは`EUMENES_EXCALIDRAW_SSH_HOST`で指定可能（既定5173/gnosis）。
 
-証拠は`spec/verification/excalidraw-live/`へ保存する。Eumenes backend自体の再起動後の復帰、実LLMによる会話からの起動、保存応答喪失や版競合のlive確認は別に実施し、このブラウザ試験だけで合格としない。
+証拠は`spec/verification/excalidraw-live/`へ保存する。Eumenes backend自体の再起動後の復帰、実LLMによる会話からの起動は別に確認する。保存応答喪失・版競合・下書き保護は固定試験で確認しており、liveで障害を発生させた結果とは区別する。
 
 ## 現在の受入状況
 
-LARMの専用consumer `eumenes-excalidraw`と正式gatewayに接続設定済み。MacBookのBraveで図の編集、版8までの保存、同じURLからの再表示を確認した。正式workerの自然停止と次回起動、Eumenes backend再起動後の図と設定の保持も観測した。
+2026年10月14日、mainの固定版（0cacd23、Excalidraw製品コードは現在の作業ツリーと同一）で実接続受入を実施した。MacBookのBraveで、実LLMが返したURLから描画・版2保存・再表示、backend再起動後の同じsceneと設定の保持、追加編集・版3保存を確認した。ブラウザを表示したままworkerがPID 0へ自然停止し、「再接続」から別PIDで復帰した後、矩形3個を版4で保存・再表示できた。実LLMによるmain会話の担当選択、回答リンク、Artifactの一覧・準備中・利用可能・編集画面への移動も確認済み。
 
-無操作解放後の再接続操作で発見した競合は修正し、固定試験とブラウザfixtureで確認済み。ただし、修正後の実サービスでの最終再接続確認と実LLM経路の受入は中断中。正式接続の自動通し試験は待機中の追加起動で完走しておらず、実画面・scene API・systemdの観測結果と区別する。verify:allも既存のsettings→memory依存違反で未完了。途中の状態でmainへマージするが、全検証済みとは扱わない。詳細はspec/excalidraw-work-record-2026-10-13.mdに記録する。
+固定の部分試験・API結合・ブラウザfixtureは成功。正式接続の自動通し試験は、自然停止後にブラウザが閉じられたため未完走であり、MacBook実画面による受入とは分ける。verify:allは既存のsettings→memory試験依存違反で未完了。並行改修中の作業ツリーには共有clientの契約不整合もあり、その差分は実接続受入に含めていない。全体gateの成功は宣言しない。証拠は`spec/verification/excalidraw-live/native-acceptance-2026-10-14.json`、詳細は`spec/excalidraw-work-record-2026-10-13.md`に記録する。

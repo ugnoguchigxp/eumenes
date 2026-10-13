@@ -12,6 +12,7 @@ test.skip(
 	"Explicitly enable only after formal LARM consumer and Eumenes connection setup.",
 );
 test.setTimeout(600000);
+test.use({ actionTimeout: 20000 });
 async function workerPid() {
 	const result = await execute(
 		"ssh",
@@ -100,7 +101,7 @@ test("formal connection: cold start, MacBook drawing/save/reopen, physical idle 
 	);
 	await expect.poll(workerPid, { timeout: 360000, intervals: [5000] }).toBe(0);
 	loaded = undefined;
-	await editor.reload();
+	await editor.getByRole("button", { name: "再接続", exact: true }).click();
 	await expect(editor.getByLabel("図の名前")).toHaveValue(title, {
 		timeout: 180000,
 	});
@@ -108,6 +109,18 @@ test("formal connection: cold start, MacBook drawing/save/reopen, physical idle 
 	const restartedPid = await workerPid();
 	expect(restartedPid).toBeGreaterThan(0);
 	expect(restartedPid).not.toBe(startedPid);
+	await editor.getByRole("radio", { name: /矩形/ }).click();
+	await editor.mouse.move(box.x + 600, box.y + 420);
+	await editor.mouse.down();
+	await editor.mouse.move(box.x + 760, box.y + 550);
+	await editor.mouse.up();
+	await expect(editor.getByRole("status").first()).toContainText(
+		"保存済み（版 4）",
+	);
+	loaded = undefined;
+	await editor.goto(latestUrl);
+	await expect(editor.getByLabel("図の名前")).toHaveValue(title);
+	await expect.poll(() => loaded).toEqual({ revision: 4, count: 2 });
 	expect(errors).toEqual([]);
 	const directory = "spec/verification/excalidraw-live";
 	mkdirSync(directory, { recursive: true });
@@ -127,6 +140,7 @@ test("formal connection: cold start, MacBook drawing/save/reopen, physical idle 
 				browserEdited: true,
 				saveAndReopen: true,
 				workerRestartRecovered: true,
+				reconnectEditedSavedReopened: true,
 				backendRestartRecovered: "not_checked",
 				realLlmRouting: "not_checked",
 			},
