@@ -69,6 +69,9 @@ describe("statusForError", () => {
 		expect(statusForError("stale_thing")).toBe(400);
 		expect(statusForError("something_unknown")).toBe(500);
 	});
+	it("maps an incomplete memory forget to a conflict", () => {
+		expect(statusForError("memory_forget_incomplete")).toBe(409);
+	});
 	it("maps the LARM configuration errors", () => {
 		expect(statusForError("larm_base_url_unconfigured")).toBe(409);
 		expect(statusForError("larm_provider_host_mismatch")).toBe(502);

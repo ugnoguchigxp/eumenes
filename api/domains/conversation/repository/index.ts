@@ -407,8 +407,8 @@ type MessageRow = {
 	motion: AvatarMotion | null;
 	delivery: string | null;
 };
-const messageSelect = (db: Database, where: string): string =>
-	`SELECT m.id, m.conversation_id, m.role, m.text, m.created_at, m.run_id, a.motion, d.delivery FROM messages m LEFT JOIN answer_avatar_motions a ON a.run_id = m.run_id AND a.conversation_id = m.conversation_id AND m.role = 'assistant' LEFT JOIN answer_deliveries d ON d.run_id = m.run_id AND d.conversation_id = m.conversation_id AND m.role = 'assistant' WHERE ${where}${liveOnly(db, "m")}`;
+const messageSelect = (db: Database, where: string, columns = ""): string =>
+	`SELECT ${columns}m.id, m.conversation_id, m.role, m.text, m.created_at, m.run_id, a.motion, d.delivery FROM messages m LEFT JOIN answer_avatar_motions a ON a.run_id = m.run_id AND a.conversation_id = m.conversation_id AND m.role = 'assistant' LEFT JOIN answer_deliveries d ON d.run_id = m.run_id AND d.conversation_id = m.conversation_id AND m.role = 'assistant' WHERE ${where}${liveOnly(db, "m")}`;
 /** A stored delivery that no longer matches the schema is dropped, not fatal. */
 function safeDelivery(row: MessageRow): SpeechDelivery | undefined {
 	if (!row.delivery) return undefined;
@@ -459,6 +459,64 @@ export function tailMessages(
 		messages: rows.slice(0, limit).reverse().map(toMessage),
 		hasMore,
 	};
+}
+/** Up to `limit` messages of a conversation accepted after `afterOrdinal`, ascending, each with its ordinal (rowid). */
+export function messagesAfter(
+	db: Database,
+	conversationId: string,
+	afterOrdinal: number,
+	limit: number,
+): Array<{ message: Message; ordinal: number }> {
+	const rows = db
+		.query(
+			`${messageSelect(db, "m.conversation_id = ? AND m.rowid > ?", "m.rowid AS ordinal, ")} ORDER BY m.rowid LIMIT ?`,
+		)
+		.all(conversationId, afterOrdinal, limit) as Array<
+		MessageRow & { ordinal: number }
+	>;
+	return rows.map((row) => ({ message: toMessage(row), ordinal: row.ordinal }));
+}
+/** The live messages one run produced (its input and its adopted answer), oldest first, with their ordinals. */
+export function messagesOfRun(
+	db: Database,
+	conversationId: string,
+	runId: string,
+): Array<{ message: Message; ordinal: number }> {
+	const rows = db
+		.query(
+			`${messageSelect(db, "m.conversation_id = ? AND m.run_id = ?", "m.rowid AS ordinal, ")} ORDER BY m.rowid`,
+		)
+		.all(conversationId, runId) as Array<MessageRow & { ordinal: number }>;
+	return rows.map((row) => ({ message: toMessage(row), ordinal: row.ordinal }));
+}
+/** The ordinal (rowid) of the conversation's newest live message; 0 when it has none. */
+export function latestOrdinal(db: Database, conversationId: string): number {
+	return (
+		(
+			db
+				.query(
+					`SELECT MAX(m.rowid) AS ordinal FROM messages m WHERE m.conversation_id = ?${liveOnly(db, "m")}`,
+				)
+				.get(conversationId) as { ordinal: number | null }
+		).ordinal ?? 0
+	);
+}
+/** The ordinal of the n-th newest live user message (1 = newest); 0 when there are fewer than n. */
+export function nthLatestUserOrdinal(
+	db: Database,
+	conversationId: string,
+	n: number,
+): number {
+	if (!Number.isSafeInteger(n) || n < 1) return 0;
+	return (
+		(
+			db
+				.query(
+					`SELECT m.rowid AS ordinal FROM messages m WHERE m.conversation_id = ? AND m.role = 'user'${liveOnly(db, "m")} ORDER BY m.rowid DESC LIMIT 1 OFFSET ?`,
+				)
+				.get(conversationId, n - 1) as { ordinal: number } | null
+		)?.ordinal ?? 0
+	);
 }
 /** One message with its motion and delivery, regardless of conversation. */
 export function messageWithDelivery(db: Database, id: string): Message | null {

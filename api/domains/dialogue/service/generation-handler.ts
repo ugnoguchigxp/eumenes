@@ -28,6 +28,7 @@ import {
 	type GeneratePayload,
 } from "./context";
 import { createPrepare } from "./generation-prepare";
+import { adoptMemoryWindow, clearShownNotices } from "./memory-window";
 import type { Progress } from "./progress";
 const log = getLogger("dialogue");
 
@@ -79,6 +80,7 @@ export function createGenerationHandler(
 			operation?: ConversationOperation;
 			/** The decision this attempt made, recorded with its adoption. */
 			selection?: SelectionDraft;
+			recallPins?: Array<{ messageId: string; digest: string }>;
 		}
 	> = {
 		kind: GENERATE_KIND,
@@ -126,8 +128,8 @@ export function createGenerationHandler(
 						};
 						signal.throwIfAborted();
 					}
-					const holdBody = !!(
-						input.memory ||
+					let holdBody = !!(
+						(input.memory && !input.memory.quiet) ||
 						input.world ||
 						input.worldUsed ||
 						input.agent?.projection ||
@@ -193,6 +195,8 @@ export function createGenerationHandler(
 								}
 							: undefined;
 					const decision = await prepareDecision(deps, input, signal);
+					const { recallPins } = decision;
+					holdBody ||= recallPins.length > 0; // recalled exchanges are memory text
 					let generated: Awaited<ReturnType<typeof generateConversation>>;
 					try {
 						generated = await generateConversation({
@@ -221,10 +225,14 @@ export function createGenerationHandler(
 					let { text } = generated;
 					const { receipt } = generated;
 					if (generated.operation) {
-						if ((!agents && !deps.delegation && !deps.music) || input.agent)
+						if (!deps.toolchains || input.agent)
 							throw new Error("invalid_conversation_operation");
 						partials.delete(input.runId);
-						return { ...generated, selection: chosen(decision, generated) };
+						return {
+							...generated,
+							selection: chosen(decision, generated),
+							recallPins,
+						};
 					}
 					const answered = decision.draft("answer", {
 						repaired: generated.repaired,
@@ -239,7 +247,7 @@ export function createGenerationHandler(
 					log.info("dialogue.generation_completed");
 					if (input.agent?.projection || input.agent?.failureCode)
 						text = researchCitations(text, input.agent.projection);
-					return { text, receipt, selection: answered };
+					return { text, receipt, selection: answered, recallPins };
 				},
 			);
 		},
@@ -269,10 +277,7 @@ export function createGenerationHandler(
 						claim,
 						run,
 						input,
-						{
-							operation: outcome.result.operation,
-							receipt: outcome.result.receipt,
-						},
+						{ ...outcome.result, operation: outcome.result.operation },
 					);
 				if (
 					input.agent &&
@@ -334,11 +339,12 @@ export function createGenerationHandler(
 					}
 				}
 				if (input.memory && memory) {
-					const adopted = memory.settleInTransaction(
+					const adopted = adoptMemoryWindow(
+						memory,
 						tx,
-						run.id,
-						run.conversationId,
-						input.memory.view,
+						run,
+						input.memory,
+						outcome.result.recallPins,
 					);
 					if (!adopted.ok) {
 						// Not adopted: the World context's input dependencies go.
@@ -398,6 +404,9 @@ export function createGenerationHandler(
 					createdAt: clock(),
 					runId: run.id,
 				});
+				// The notices this answer carried are shown once: only an adopted answer clears them.
+				if (input.memory && memory)
+					clearShownNotices(memory, tx, run, input.memory);
 				if (outcome.result.receipt?.delivery?.version === 2)
 					conversation.recordAnswerDeliveryInTransaction(
 						tx,
@@ -414,6 +423,9 @@ export function createGenerationHandler(
 					null,
 					messageId,
 				);
+				// The answer joins the conversation the memory agent is reading (scheduled runs have no user words).
+				if (done && run.sourceKind !== "schedule")
+					memory?.scheduleAgentInTransaction(tx, run.conversationId);
 				if (done) observeAnswer(tx, run.id, input.agent);
 				if (done) traceOutcome(deps, tx, run.id, agentOutcome(input.agent));
 				else if (input.world)

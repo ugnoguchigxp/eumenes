@@ -24,7 +24,7 @@ import {
 import { createContinuityService } from "../../continuity";
 import { createGoalsService, type Goal } from "../../goals";
 import type { InferencePort, Receipt } from "../../inference";
-import { createMemoryService } from "../../memory";
+import { PREFETCH_BYTES, createMemoryService } from "../../memory";
 import { createQueue } from "../../queue";
 import {
 	WORLD_BLOCK_CLOSE,
@@ -816,20 +816,82 @@ test("Memory and World are read in one prepare transaction and share one budget;
 	expect((await h.finish(run.id)).status).toBe("completed");
 	const sent = h.seen.at(-1)!;
 	const roles = sent.map((m) => m.role);
-	// persona, Memory recall, World reference, history..., current input.
-	expect(roles.slice(0, 3)).toEqual(["system", "system", "system"]);
-	expect(sent[1]!.content).toContain("保存された参照情報");
-	expect(sent[2]!.content).toContain(WORLD_BLOCK_OPEN);
-	// The Broker was told how much of the shared budget Memory already used.
+	// persona, Memory window (a fresh fact sits in the short-term layer), history..., World reference, current input.
+	expect(roles[0]).toBe("system");
+	expect(roles[1]).toBe("system");
+	expect(roles.at(-1)).toBe("user");
+	expect(sent[1]!.content).toContain("辛いものが好き");
+	expect(sent.at(-2)!.role).toBe("system");
+	expect(sent.at(-2)!.content).toContain(WORLD_BLOCK_OPEN);
+	expect(sent.filter((m) => m.content.includes(WORLD_BLOCK_OPEN))).toHaveLength(
+		1,
+	);
+	// The Broker was told how much of the shared budget Memory already used: its layers plus the whole
+	// prefetch-and-recall share (reserved in full, whatever this turn recalls).
 	expect(h.prepared).toHaveLength(1);
 	expect(h.prepared[0]!.reservedBytes).toBe(
-		new TextEncoder().encode(sent[1]!.content).length,
+		new TextEncoder().encode(sent[1]!.content).length + PREFETCH_BYTES,
 	);
 	expect(h.prepared[0]!.attempt).toBe(1);
 	expect(h.memory!.usage(run.id)).not.toBeNull();
 	expect(h.usage(run.id)).not.toBeNull();
 	// Memory's receipt and World's receipt both exist for exactly this answer.
 	expect(h.answers().at(-1)).toBe(ANSWER);
+});
+
+test("the prompt order with every layer present: persona, long-term, short-term, history, notice, World, input", async () => {
+	const h = await setup({ memory: true });
+	const first = await h.ask("私は辛いものが好きです。猫も好きです");
+	await h.finish(first.id);
+	const message = h.conversation
+		.get("main")
+		.messages.find((m) => m.id === first.inputMessageId)!;
+	const remember = (quote: string, key: string) =>
+		h.memory!.remember({
+			conversationId: "main",
+			messageId: message.id,
+			quote,
+			kind: "preference",
+			semanticKey: key,
+			text: quote,
+			polarity: "affirmed",
+		});
+	await remember("辛いものが好き", "food");
+	// Toggling the setting republishes the long-term layer with the first fact.
+	await h.memory!.setEnabled(false);
+	await h.memory!.setEnabled(true);
+	await h.finish((await h.ask()).id);
+	await remember("猫も好き", "pet");
+	await h.store.write((db) => {
+		h.memory!.windows.rebuildInTransaction(db, "main", {
+			refreshLongTerm: false,
+			addNotices: ["保存できませんでした"],
+		});
+	});
+	h.prepared.length = 0;
+	const run = await h.ask();
+	expect((await h.finish(run.id)).status).toBe("completed");
+	const sent = h.seen.at(-1)!;
+	expect(sent[0]!.content).not.toContain("参照情報です");
+	expect(sent[1]!.content).toContain("保存された参照情報");
+	expect(sent[1]!.content).toContain("- 好み: 辛いものが好き");
+	expect(sent[2]!.content).toContain("直近の状況についての参照情報");
+	expect(sent[2]!.content).toContain("猫も好き");
+	const tail = sent.slice(-3);
+	expect(tail[0]!.role).toBe("system");
+	expect(tail[0]!.content).toContain("記憶の担当からの連絡です");
+	expect(tail[1]!.role).toBe("system");
+	expect(tail[1]!.content).toContain(WORLD_BLOCK_OPEN);
+	expect(tail[2]!.role).toBe("user");
+	// History sits between the layers and the notice.
+	expect(sent.slice(3, -3).every((m) => m.role !== "system")).toBe(true);
+	// The reservation covers both layers and the notice, plus the whole prefetch-and-recall share.
+	expect(h.prepared[0]!.reservedBytes).toBe(
+		[sent[1]!, sent[2]!, tail[0]!].reduce(
+			(sum, m) => sum + new TextEncoder().encode(m.content).length,
+			PREFETCH_BYTES,
+		),
+	);
 });
 
 test("a later forget in the Scope removes the usage receipts of answers that stood on it", async () => {

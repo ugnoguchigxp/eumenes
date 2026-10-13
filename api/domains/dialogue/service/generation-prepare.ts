@@ -1,6 +1,11 @@
 import type { AnswerTicket } from "../../agent-runtime";
+import { PREFETCH_BYTES } from "../../memory";
 import type { HandlerDefinition } from "../../queue";
-import { historyFor } from "./conversation-history";
+import {
+	compileContext,
+	noticeMessage,
+	windowIsEmpty,
+} from "./context-compiler";
 import { prepareRouting } from "./delegate-conversation";
 import { researchResultContext } from "./research-result-context";
 import { markWorld, byId, transition } from "../repository";
@@ -47,14 +52,17 @@ export function createPrepare(
 		if (!transition(tx, run.id, run.revision, "running", clock()))
 			return { status: "stale", reason: "run_changed" };
 		const current = byId(tx, run.id) as Run;
-		const recalled = memory?.prepareInTransaction(tx, run.conversationId);
-		if (recalled?.status === "blocked") {
+		let window: ReturnType<
+			NonNullable<typeof memory>["windowForRunInTransaction"]
+		> = null;
+		try {
+			window =
+				memory?.windowForRunInTransaction(tx, run.conversationId) ?? null;
+		} catch (error) {
+			if (!(error instanceof Error) || error.message !== "memory_blocked")
+				throw error;
 			if (run.agentTaskId)
-				agents?.failAnswerInTransaction(
-					tx,
-					run.id,
-					`memory_${recalled.reason}`,
-				);
+				agents?.failAnswerInTransaction(tx, run.id, "memory_blocked");
 			// Never silently drop memory and continue; end the run with the reason.
 			transition(
 				tx,
@@ -62,9 +70,9 @@ export function createPrepare(
 				current.revision,
 				"failed",
 				clock(),
-				`memory_${recalled.reason}`,
+				"memory_blocked",
 			);
-			return { status: "stale", reason: `memory_${recalled.reason}` };
+			return { status: "stale", reason: "memory_blocked" };
 		}
 		// World reads in the SAME transaction as Memory's recall and shares its budget.
 		const world =
@@ -75,10 +83,13 @@ export function createPrepare(
 						jobId: claim.jobId,
 						attempt: claim.attempt,
 						generation: claim.generation,
-						reservedBytes:
-							recalled?.status === "ready"
-								? new TextEncoder().encode(recalled.block).length
-								: 0,
+						reservedBytes: window
+							? // The prefetch and this turn's recall share PREFETCH_BYTES: all of it is reserved.
+								window.longTerm.bytes +
+								window.shortTerm.bytes +
+								PREFETCH_BYTES +
+								Buffer.byteLength(noticeMessage(window)?.content ?? "", "utf8")
+							: 0,
 						nowMs: Date.parse(clock()),
 					})
 				: undefined;
@@ -96,10 +107,6 @@ export function createPrepare(
 			// Whatever an earlier World-less attempt streamed is withdrawn.
 			partials.delete(run.id);
 		}
-		const referenceBlocks = [
-			...(recalled?.status === "ready" ? [recalled.block] : []),
-			...(world?.status === "ready" ? [world.block] : []),
-		];
 		if (larm.captureInTransaction && !larm.requestFor?.(tx, run.id, "llm")) {
 			const snapshot = larm.snapshotInTransaction?.(tx);
 			if (snapshot) {
@@ -116,24 +123,34 @@ export function createPrepare(
 				);
 			}
 		}
-		let messages = historyFor(
+		const compiled = compileContext(
 			tx,
 			current,
-			referenceBlocks,
 			conversation,
 			larm.snapshotInTransaction?.(tx).general,
+			window,
 		);
-		if (agent?.projection || agent?.failureCode) {
+		let messages = compiled.messages;
+		if (agent?.projection || agent?.failureCode)
 			messages = researchResultContext(
 				messages,
-				referenceBlocks,
+				compiled.references,
 				agent.projection ?? undefined,
 				agent.failureCode,
 			);
-			const requestId = larm.requestFor?.(tx, run.id, "llm");
-			if (requestId)
-				larm.setContextPolicyInTransaction?.(tx, requestId, "exact");
-		}
+		// Notices, prefetched exchanges and World come last, right before the current input; the
+		// operation results and the policy added below then land between them and the input.
+		messages.splice(
+			messages.length - 1,
+			0,
+			...compiled.tail,
+			...(world?.status === "ready"
+				? [{ role: "system" as const, content: world.block }]
+				: []),
+		);
+		// This run's context is fixed by the host: the server must neither trim nor reorder it.
+		const requestId = larm.requestFor?.(tx, run.id, "llm");
+		if (requestId) larm.setContextPolicyInTransaction?.(tx, requestId, "exact");
 		let actionResultIndex: number | undefined;
 		if (agent?.actionPayload) {
 			const operation = JSON.parse(agent.actionPayload);
@@ -144,9 +161,6 @@ export function createPrepare(
 				role: "user",
 				content: JSON.stringify({ actionResult: operation }),
 			});
-			const requestId = larm.requestFor?.(tx, run.id, "llm");
-			if (requestId)
-				larm.setContextPolicyInTransaction?.(tx, requestId, "exact");
 		}
 
 		const delegated =
@@ -161,9 +175,6 @@ export function createPrepare(
 				role: "user",
 				content: JSON.stringify({ delegationResult: delegated.receipt }),
 			});
-			const requestId = larm.requestFor?.(tx, run.id, "llm");
-			if (requestId)
-				larm.setContextPolicyInTransaction?.(tx, requestId, "exact");
 		}
 		if (musicResult) {
 			messages[0]!.content +=
@@ -172,9 +183,6 @@ export function createPrepare(
 				role: "user",
 				content: JSON.stringify({ musicResult }),
 			});
-			const requestId = larm.requestFor?.(tx, run.id, "llm");
-			if (requestId)
-				larm.setContextPolicyInTransaction?.(tx, requestId, "exact");
 		}
 		const note = claim.payload.commandNote;
 		if (note) {
@@ -193,6 +201,11 @@ export function createPrepare(
 						dots: !!delegated && delegated.available !== false,
 					})
 				: undefined;
+		// A prefetch left out of this turn is neither sent nor checked at adoption.
+		const prepared =
+			window && compiled.prefetchDropped
+				? { ...window, prefetch: { text: "", pins: [], bytes: 0 } }
+				: window;
 		return {
 			status: "ready",
 			input: {
@@ -202,8 +215,17 @@ export function createPrepare(
 				actionResultIndex,
 				...routing,
 				agent,
-				...(recalled?.status === "ready"
-					? { memory: { view: recalled.view } }
+				// An empty window still travels: the exchanges recalled for this turn are checked against it.
+				...(prepared
+					? {
+							memory: {
+								window: memory!.preparedWindow(
+									prepared,
+									compiled.windowStartOrdinal,
+								),
+								...(windowIsEmpty(prepared) ? { quiet: true as const } : {}),
+							},
+						}
 					: {}),
 				...(world?.status === "ready"
 					? { world: { context: world.context } }

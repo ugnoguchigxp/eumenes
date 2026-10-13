@@ -114,6 +114,34 @@ const memoryItem = {
 	sourceMessageIds: ["m1"],
 	validFromMs: null,
 	validUntilMs: null,
+	evidence: [],
+	validity: null,
+	capturedBy: "manual",
+};
+const continuityNote = {
+	id: "n1",
+	conversationId: "main",
+	kind: "activity",
+	text: "Rust移行の調査",
+	status: "active",
+	revision: 2,
+	createdAt: "2026-10-13T00:00:00.000Z",
+	updatedAt: "2026-10-13T01:00:00.000Z",
+	origin: "agent",
+	sourceMessageId: "m1",
+	expiresAt: "2026-10-27T01:00:00.000Z",
+};
+const tendency = {
+	id: "t1",
+	text: "朝型",
+	revision: 1,
+	updatedAt: "2026-10-13T01:00:00.000Z",
+};
+const memoryContext = {
+	version: 3,
+	longTerm: { text: "以下は…", bytes: 9, limit: 16384 },
+	shortTerm: { text: "", bytes: 0, limit: 8192, pendingAdditions: 0 },
+	notices: 1,
 };
 contracts("memory client", [
 	{
@@ -171,6 +199,45 @@ contracts("memory client", [
 		response: { ...memoryItem, status: "stopped", revision: 4 },
 	},
 	{
+		name: "memoryShortTerm",
+		call: (c) => c.memoryShortTerm("main/1"),
+		method: "GET",
+		path: "/api/memory/short-term?conversationId=main%2F1",
+		response: { items: [continuityNote] },
+		result: [continuityNote],
+	},
+	{
+		name: "memoryTendencies",
+		call: (c) => c.memoryTendencies(),
+		method: "GET",
+		path: "/api/memory/tendencies",
+		response: { items: [tendency] },
+		result: [tendency],
+	},
+	{
+		name: "memoryContext",
+		call: (c) => c.memoryContext("main"),
+		method: "GET",
+		path: "/api/memory/context?conversationId=main",
+		response: memoryContext,
+	},
+	{
+		name: "memoryContext (off)",
+		call: (c) => c.memoryContext("main"),
+		method: "GET",
+		path: "/api/memory/context?conversationId=main",
+		response: { disabled: true },
+		parsed: false,
+	},
+	{
+		name: "continuityTransition",
+		call: (c) => c.continuityTransition("n/1", "resolved", 2),
+		method: "POST",
+		path: "/api/continuity/n%2F1/transition",
+		body: { expectedRevision: 2, status: "resolved" },
+		response: { ...continuityNote, status: "resolved", revision: 3 },
+	},
+	{
 		name: "forgetItem",
 		call: (c) => c.forgetItem("mem1"),
 		method: "POST",
@@ -179,6 +246,34 @@ contracts("memory client", [
 		response: { forgetId: "f1", completed: true },
 	},
 ]);
+
+describe("memory client: deleteTendency", () => {
+	it("sends DELETE with the bearer token and returns the parsed answer", async () => {
+		const seen = stubFetch(() => Response.json({ ok: true }));
+		expect(await newClient().deleteTendency("t/1")).toEqual({ ok: true });
+		expect(seen).toHaveLength(1);
+		expect(seen[0]).toMatchObject({
+			method: "DELETE",
+			path: "/api/memory/tendencies/t%2F1",
+		});
+		expect(seen[0]?.headers.authorization).toBe("Bearer test-token");
+	});
+	it("rejects an answer that violates the schema", async () => {
+		stubFetch(() => Response.json("not-the-contract"));
+		await expect(newClient().deleteTendency("t1")).rejects.toMatchObject({
+			name: "ZodError",
+		});
+	});
+	it("surfaces a 4xx {error} as ApiError", async () => {
+		stubFetch(() =>
+			Response.json({ error: "invalid_memory_item" }, { status: 400 }),
+		);
+		await expect(newClient().deleteTendency("t1")).rejects.toMatchObject({
+			status: 400,
+			message: "invalid_memory_item",
+		});
+	});
+});
 
 const entry = { written: "NASA", spoken: "ナサ" };
 const dictionaryAnswer = { entries: [entry] };

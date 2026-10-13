@@ -1,6 +1,12 @@
 import type { Database } from "bun:sqlite";
 import { zSchema } from "./schema";
 import {
+	dot,
+	packVector,
+	unpackVector,
+	vectorSpaceKey,
+} from "../../../infrastructure/vector";
+import {
 	hash,
 	type FixedDefinition,
 	type ToolchainCard,
@@ -10,27 +16,7 @@ import {
 const RRF_K = 60;
 const MAX_GRAMS = 48;
 
-/** Stable key of a vector space; vectors of different spaces are never compared. */
-export function vectorSpaceKey(space: VectorSpace) {
-	return hash([
-		space.modelId,
-		space.revision,
-		space.artifactDigest,
-		space.dimension,
-	]).slice(0, 32);
-}
-export function packVector(values: number[]) {
-	return new Uint8Array(new Float32Array(values).buffer);
-}
-export function unpackVector(blob: Uint8Array) {
-	const copy = new Uint8Array(blob);
-	return new Float32Array(copy.buffer, 0, copy.byteLength / 4);
-}
-export function dot(a: ArrayLike<number>, b: ArrayLike<number>) {
-	let sum = 0;
-	for (let i = 0; i < a.length; i++) sum += a[i]! * b[i]!;
-	return sum;
-}
+export { dot, packVector, unpackVector, vectorSpaceKey };
 /** The passages a toolchain is found by: its purpose, use cases and example requests. */
 export function toolchainPassages(d: FixedDefinition) {
 	return [`${d.title}: ${d.summary}`, ...d.useWhen, ...(d.examples ?? [])];

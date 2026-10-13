@@ -14,7 +14,12 @@ export function settleConversationOperation(
 	claim: { jobId: string; attempt: number; generation: number },
 	run: Run,
 	input: GenerateInput,
-	result: { operation: ConversationOperation; receipt?: Receipt },
+	result: {
+		operation: ConversationOperation;
+		receipt?: Receipt;
+		/** Messages the exchanges recalled into the deciding prompt stand on. */
+		recallPins?: Array<{ messageId: string; digest: string }>;
+	},
 ): "applied" | { status: "failed"; errorCode: string } {
 	const { larm, memory, worldContext, clock, agents, conversation, queue } =
 		deps;
@@ -23,7 +28,8 @@ export function settleConversationOperation(
 		inference: larm,
 		receipt: result.receipt,
 		memory,
-		memoryView: input.memory,
+		memoryWindow: input.memory,
+		recallPins: result.recallPins,
 		world: worldContext,
 		worldView: input.world,
 		settle: {

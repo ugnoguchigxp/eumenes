@@ -15,9 +15,13 @@ import {
 	correctMessage,
 	ensureConversation,
 	getMessage,
+	latestOrdinal,
 	listMessages,
 	messageWithDelivery,
+	messagesAfter,
+	messagesOfRun,
 	messagesBefore,
+	nthLatestUserOrdinal,
 	tailMessages,
 	listOutbox,
 	outboxReady,
@@ -70,15 +74,19 @@ export function createConversationService(
 			{ messageId: input.messageId, text: input.text, at: input.at ?? clock() },
 			outbox,
 		);
+	/** Called inside every retraction, before the message is tombstoned (a higher domain drops what it derived from it). */
+	let retractHook: ((db: Database, messageId: string) => void) | undefined;
 	const retractInTransaction = (
 		db: Database,
 		input: { messageId: string; at?: string },
-	): ChangeResult =>
-		retractMessage(
+	): ChangeResult => {
+		retractHook?.(db, input.messageId);
+		return retractMessage(
 			db,
 			{ messageId: input.messageId, at: input.at ?? clock() },
 			outbox,
 		);
+	};
 	return {
 		historyFingerprintInTransaction: history.fingerprint,
 		historySearchInTransaction: history.search,
@@ -103,6 +111,13 @@ export function createConversationService(
 			at?: string;
 		}): Promise<ChangeResult> {
 			return store.write((db) => correctInTransaction(db, input));
+		},
+		/**
+		 * Registers the function run in the transaction of every retraction, while the message can still be read.
+		 * Conversation imports nothing of its users: they inject what must follow a retraction.
+		 */
+		setRetractHook(hook: (db: Database, messageId: string) => void) {
+			retractHook = hook;
 		},
 		/** True when the retraction tombstone column exists on this connection. */
 		retractionReadyInTransaction(db: Database): boolean {
@@ -171,6 +186,35 @@ export function createConversationService(
 		},
 		messageInTransaction(db: Database, id: string) {
 			return getMessage(db, id);
+		},
+		/** Live messages accepted after `afterOrdinal`, oldest first, with their ordinals (the memory agent's cursor). */
+		messagesAfterInTransaction(
+			db: Database,
+			conversationId: string,
+			afterOrdinal: number,
+			limit: number,
+		) {
+			return messagesAfter(db, conversationId, afterOrdinal, limit);
+		},
+		/** The live messages one run produced (input and adopted answer), oldest first, with their ordinals. */
+		messagesOfRunInTransaction(
+			db: Database,
+			conversationId: string,
+			runId: string,
+		) {
+			return messagesOfRun(db, conversationId, runId);
+		},
+		/** The ordinal of the conversation's newest live message; 0 when it has none. */
+		latestOrdinalInTransaction(db: Database, conversationId: string): number {
+			return latestOrdinal(db, conversationId);
+		},
+		/** The ordinal of the n-th newest live user message (1 = newest); 0 when there are fewer. */
+		nthLatestUserOrdinalInTransaction(
+			db: Database,
+			conversationId: string,
+			n: number,
+		): number {
+			return nthLatestUserOrdinal(db, conversationId, n);
 		},
 		appendInTransaction(db: Database, message: Message): number {
 			ensureConversation(db, message.conversationId, message.createdAt);

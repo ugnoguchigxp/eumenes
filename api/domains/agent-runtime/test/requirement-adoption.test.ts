@@ -3,7 +3,7 @@ import { requirementHarness, requests } from "./requirement-harness";
 import { fixtureVerification } from "./research-fixture";
 import { validateRequirementAdoption } from "../service/requirement-verification";
 const draft = {
-	outcome: "not_found",
+	outcome: "clarification_required",
 	summary: "条件不明",
 	claims: [],
 	limitations: ["資料なし"],

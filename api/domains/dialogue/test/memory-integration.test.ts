@@ -22,6 +22,7 @@ import {
 import {
 	createContinuityService,
 	migration as continuityMigration,
+	shortTermMigration,
 } from "../../continuity";
 import {
 	createDialogueService,
@@ -33,6 +34,9 @@ import { createQueue, migration as queueMigration } from "../../queue";
 import {
 	createMemoryService,
 	migration as memoryMigration,
+	contextWindowMigration,
+	agentHardeningMigration,
+	turnVectorsMigration,
 } from "../../memory";
 
 const MIGRATIONS = [
@@ -43,7 +47,11 @@ const MIGRATIONS = [
 	queueMigration,
 	queueLinkMigration,
 	continuityMigration,
+	shortTermMigration,
 	memoryMigration,
+	contextWindowMigration,
+	agentHardeningMigration,
+	turnVectorsMigration,
 	...memoryPackageMigrations,
 ];
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -54,8 +62,15 @@ async function until(check: () => boolean) {
 	}
 	throw new Error("timeout");
 }
-const recalledBlock = (seen: { role: string; content: string }[][]) =>
-	seen.at(-1)?.find((m) => m.content.includes("保存された参照情報"));
+/** The memory layers (long-term and short-term) of the last request, as one block. */
+const isMemoryLayer = (m: { role: string; content: string }, at: number) =>
+	at > 0 && m.role === "system" && m.content.includes("参照情報です");
+const recalledBlock = (seen: { role: string; content: string }[][]) => {
+	const layers = seen.at(-1)?.filter((m, at) => isMemoryLayer(m, at)) ?? [];
+	return layers.length
+		? { role: "system", content: layers.map((m) => m.content).join("\n") }
+		: undefined;
+};
 type Harness = Awaited<ReturnType<typeof setup>>;
 const open: Array<() => Promise<void>> = [];
 afterEach(async () => {
@@ -69,6 +84,8 @@ async function setup(
 		keepJournal?: boolean;
 		stream?: boolean;
 		streamText?: string;
+		/** Records the context policy set on the run's LLM request. */
+		policies?: string[];
 	} = {},
 ) {
 	const dir = options.dir ?? mkdtempSync(join(tmpdir(), "eumenes-memory-"));
@@ -78,6 +95,16 @@ async function setup(
 	const larm: LarmPort = {
 		status: () => ({ state: "ready", capabilities: ["llm"] }),
 		connect: async () => {},
+		...(options.policies
+			? {
+					requestFor: () => "request-1",
+					setContextPolicyInTransaction: (
+						_db: unknown,
+						requestId: string,
+						policy: string,
+					) => void options.policies!.push(`${requestId}:${policy}`),
+				}
+			: {}),
 		...(options.stream
 			? {
 					answerStream: async (
@@ -188,20 +215,21 @@ test("a remembered fact is recalled in the next answer with a usage receipt, and
 	expect(item).toMatchObject({ kind: "preference", status: "active" });
 	const run = await h.ask("おすすめの料理は？");
 	expect(run.status).toBe("completed");
+	// System order: persona (L0), then the memory layers; the fresh fact is in the short-term layer.
 	const last = h.seen.at(-1)!;
-	const block = last.find((m) => m.content.includes("保存された参照情報"));
-	expect(block?.role).toBe("system");
+	const block = recalledBlock(h.seen);
+	expect(last[0]?.role).toBe("system");
+	expect(last[1]).toEqual(block);
 	expect(block?.content).toContain("辛いものが好き");
 	const receipt = h.memory.usage(run.id);
-	expect(receipt).toMatchObject({ viewSchema: 2, packageVersion: pkg.version });
+	expect(receipt).toMatchObject({ viewSchema: 3, packageVersion: pkg.version });
 	expect(receipt?.itemIds).toContain(item.id);
+	expect(receipt?.viewDigest).toMatch(/^window:\d+:/);
 
 	await h.memory.setEnabled(false);
 	const off = await h.ask("もう一度");
 	expect(off.status).toBe("completed");
-	expect(
-		h.seen.at(-1)!.some((m) => m.content.includes("保存された参照情報")),
-	).toBe(false);
+	expect(recalledBlock(h.seen)).toBeUndefined();
 	expect(h.memory.usage(off.id)).toBeNull();
 	expect(h.memory.list().map((saved) => saved.id)).toContain(item.id);
 	await h.memory.setEnabled(true);
@@ -209,6 +237,51 @@ test("a remembered fact is recalled in the next answer with a usage receipt, and
 	expect(reconnected.status).toBe("completed");
 	expect(recalledBlock(h.seen)?.content).toContain("辛いものが好き");
 	expect(h.memory.usage(reconnected.id)?.itemIds).toContain(item.id);
+
+	// Toggling the setting republished the long-term layer: it now carries the fact and its instructions.
+	const longTerm = h.seen.at(-1)![1]!;
+	expect(longTerm.content).toContain("保存された参照情報");
+	expect(longTerm.content).toContain("- 好み: 辛いものが好き");
+});
+
+test("only the latest ten exchanges are sent; system layers precede them and the notice and World sit right before the input", async () => {
+	const h = await setup();
+	for (let i = 1; i <= 11; i++) await h.ask(`質問${i}`);
+	await h.store.write((db) => {
+		h.memory.windows.rebuildInTransaction(db, "main", {
+			refreshLongTerm: false,
+			addNotices: ["保存できませんでした"],
+		});
+	});
+	const run = await h.ask("質問12");
+	expect(run.status).toBe("completed");
+	const sent = h.seen.at(-1)!;
+	const texts = sent.map((m) => m.content);
+	// The ten latest earlier exchanges (question + answer) are the verbatim window: only 質問1 is out.
+	expect(h.seen.at(-2)!.map((m) => m.content)).toContain("質問1");
+	expect(texts).not.toContain("質問1");
+	expect(texts).toContain("質問2");
+	expect(sent.filter((m) => m.role === "assistant")).toHaveLength(10);
+	// Order: L0 system, then history, then the notice, then the current input.
+	expect(sent[0]!.role).toBe("system");
+	expect(sent[1]!.content).toBe("質問2");
+	expect(sent.at(-1)!.content).toBe("質問12");
+	const notice = sent.at(-2)!;
+	expect(notice.role).toBe("system");
+	expect(notice.content).toContain("記憶の担当からの連絡です");
+	expect(notice.content).toContain("- 保存できませんでした");
+	// Shown once: an adopted answer clears it.
+	await h.ask("質問13");
+	expect(
+		h.seen.at(-1)!.some((m) => m.content.includes("記憶の担当からの連絡です")),
+	).toBe(false);
+});
+
+test("the request's context policy is exact for every memory-enabled turn", async () => {
+	const policies: string[] = [];
+	const h = await setup({ policies });
+	await h.ask("こんにちは");
+	expect(policies).toEqual(["request-1:exact"]);
 });
 
 for (const reconnect of [false, true]) {
@@ -221,9 +294,7 @@ for (const reconnect of [false, true]) {
 		const h = await setup({
 			answer: (messages) => {
 				if (
-					!messages.some((message) =>
-						message.content.includes("保存された参照情報"),
-					)
+					!messages.some((message) => message.content.includes("参照情報です"))
 				)
 					return Promise.resolve("先行");
 				started();
@@ -262,7 +333,7 @@ test("continuity (goal / open question) is part of the recalled context", async 
 	await h.continuity.add("main", { kind: "goal", text: "Rustへ移行する" });
 	await h.ask("続きを");
 	const block = h.seen.at(-1)!.find((m) => m.content.includes("参照情報"));
-	expect(block?.content).toContain("目的: Rustへ移行する");
+	expect(block?.content).toContain("目的\n- Rustへ移行する");
 });
 
 test("a correction during generation prevents adopting the answer", async () => {
@@ -271,7 +342,7 @@ test("a correction during generation prevents adopting the answer", async () => 
 	const startedPromise = new Promise<void>((resolve) => (started = resolve));
 	const h = await setup({
 		answer: (messages) => {
-			if (!messages.some((m) => m.content.includes("保存された参照情報")))
+			if (!messages.some((m) => m.content.includes("参照情報です")))
 				return Promise.resolve("先行");
 			started();
 			return new Promise((resolve) => (release = resolve));
@@ -292,6 +363,49 @@ test("a correction during generation prevents adopting the answer", async () => 
 		h.conversation.get("main").messages.some((m) => m.text === "辛い料理を"),
 	).toBe(false);
 	expect(h.memory.usage(pending.id)).toBeNull();
+});
+
+test("an addition during generation does not expire the answer, but stopping an item does", async () => {
+	for (const change of ["add", "stop"] as const) {
+		let release: (text: string) => void = () => {};
+		let started: () => void = () => {};
+		const startedPromise = new Promise<void>((resolve) => (started = resolve));
+		const h = await setup({
+			answer: (messages) => {
+				if (!messages.some((m) => m.content.includes("参照情報です")))
+					return Promise.resolve("先行");
+				started();
+				return new Promise((resolve) => (release = resolve));
+			},
+		});
+		const item = await seedFact(h);
+		const pending = await h.dialogue.submit({
+			requestId: crypto.randomUUID(),
+			conversationId: "main",
+			text: "好みを踏まえて",
+		});
+		await startedPromise;
+		if (change === "add")
+			await h.memory.remember({
+				conversationId: "main",
+				messageId: h.conversation.get("main").messages[0]!.id,
+				quote: "辛いものが好き",
+				kind: "preference",
+				semanticKey: "other",
+				text: "追加の好み",
+				polarity: "affirmed",
+			});
+		else await h.memory.stop(item.id, item.revision);
+		release("回答");
+		const expected = change === "add" ? "completed" : "failed";
+		await until(() => h.dialogue.get(pending.id)?.status === expected);
+		expect(h.dialogue.get(pending.id)?.error ?? null).toBe(
+			change === "add" ? null : "memory_stale",
+		);
+		expect(h.memory.usage(pending.id) !== null).toBe(change === "add");
+		await h.close();
+		open.pop();
+	}
 });
 
 test("forgetting erases the value, survives restart, and is re-applied on a restored old database", async () => {
@@ -362,7 +476,7 @@ test("a tampered journal makes memory unavailable (fail closed) instead of being
 	const run = await broken.ask("質問");
 	expect(run.status).toBe("completed");
 	expect(
-		broken.seen.at(-1)!.some((m) => m.content.includes("保存された参照情報")),
+		broken.seen.at(-1)!.some((m) => m.content.includes("参照情報です")),
 	).toBe(false);
 	rmSync(dir, { recursive: true, force: true });
 	void appendFileSync;
@@ -456,9 +570,7 @@ test("a period that has not started yet is not current understanding; a month-pr
 	});
 	expect(zed.validFromMs).toBe(Date.UTC(2020, 8, 1));
 	await h.ask("今の環境は？");
-	const block = h.seen
-		.at(-1)!
-		.find((m) => m.content.includes("保存された参照情報"));
+	const block = h.seen.at(-1)!.find((m) => m.content.includes("参照情報です"));
 	expect(block?.content).toContain("Zedを使っている");
 	expect(block?.content).not.toContain("Rustを使っている");
 });
@@ -602,15 +714,13 @@ test("a reference text with newlines cannot forge extra lines in the reference b
 		polarity: "affirmed",
 	});
 	await h.ask("続き");
-	const block = h.seen
-		.at(-1)!
-		.find((m) => m.content.includes("保存された参照情報"))!;
+	const block = h.seen.at(-1)!.find((m) => m.content.includes("参照情報です"))!;
 	expect(
 		block.content.split("\n").filter((l) => l.startsWith("- ")),
 	).toHaveLength(1);
 });
 
-test("the recalled context stays inside its byte budget: writes that would overflow are refused, runs keep working", async () => {
+test("the item count caps the profile; the long-term layer is trimmed to its budget and runs keep working", async () => {
 	const h = await setup();
 	const first = await h.ask("私は辛いものが好きです");
 	const message = h.conversation
@@ -618,7 +728,7 @@ test("the recalled context stays inside its byte budget: writes that would overf
 		.messages.find((m) => m.id === first.inputMessageId)!;
 	let accepted = 0;
 	let refused: string | null = null;
-	for (let i = 0; i < 60 && refused === null; i++) {
+	for (let i = 0; i < 110 && refused === null; i++) {
 		try {
 			await h.memory.remember({
 				conversationId: "main",
@@ -626,7 +736,7 @@ test("the recalled context stays inside its byte budget: writes that would overf
 				quote: "辛いものが好き",
 				kind: "preference",
 				semanticKey: `k${i}`,
-				text: "あ".repeat(400),
+				text: `${i}-` + "あ".repeat(400),
 				polarity: "affirmed",
 			});
 			accepted++;
@@ -635,10 +745,14 @@ test("the recalled context stays inside its byte budget: writes that would overf
 		}
 	}
 	expect(refused).toBe("invalid_memory_limit");
-	expect(accepted).toBeGreaterThan(5);
+	expect(accepted).toBe(100);
 	expect(h.memory.list()).toHaveLength(accepted);
 	const run = await h.ask("確認");
 	expect(run.status).toBe("completed");
+	// 100 values of ~1.2 KB do not fit: the layer is trimmed, never refused.
+	const layer = h.seen.at(-1)![1]!;
+	expect(Buffer.byteLength(layer.content)).toBeLessThanOrEqual(16 * 1024);
+	expect(layer.content).toContain("参照情報です");
 
 	// A continuity addition that would overflow its part is refused and rolled back.
 	const before = h.continuity.list("main").length;
@@ -751,7 +865,7 @@ test("resuming an item whose fact was re-stated is a client error, not a revisio
 	);
 });
 
-test("future-dated items count against the budget too, so they cannot make runs fail when they start", async () => {
+test("future-dated items count toward the item limit but are not shown before they start", async () => {
 	const h = await setup();
 	const first = await h.ask("私は辛いものが好きです");
 	const message = h.conversation
@@ -760,7 +874,7 @@ test("future-dated items count against the budget too, so they cannot make runs 
 	const tomorrow = Date.now() + 86_400_000;
 	let refused = "";
 	let accepted = 0;
-	for (let i = 0; i < 60 && refused === ""; i++) {
+	for (let i = 0; i < 110 && refused === ""; i++) {
 		try {
 			await h.memory.remember({
 				conversationId: "main",
@@ -778,7 +892,10 @@ test("future-dated items count against the budget too, so they cannot make runs 
 		}
 	}
 	expect(refused).toBe("invalid_memory_limit");
-	expect(accepted).toBeGreaterThan(5);
+	expect(accepted).toBe(100);
+	// The run starts normally and the future values stay out of the prompt.
+	expect((await h.ask("確認")).status).toBe("completed");
+	expect(recalledBlock(h.seen)).toBeUndefined();
 });
 
 test("a long streamed answer is not double counted for memory-backed runs", async () => {
@@ -820,7 +937,7 @@ test("a long multibyte conversation id works for continuity and runs", async () 
 		text: "こんにちは",
 	});
 	await until(() => h.dialogue.get(run.id)?.status === "completed");
-	expect(h.seen.at(-1)!.some((m) => m.content.includes("目的: 目的"))).toBe(
+	expect(h.seen.at(-1)!.some((m) => m.content.includes("目的\n- 目的"))).toBe(
 		true,
 	);
 });

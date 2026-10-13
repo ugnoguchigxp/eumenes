@@ -2,7 +2,7 @@ import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { ConversationService } from "../../conversation";
 import type { InferencePort } from "../../inference";
 import type { QueueService } from "../../queue";
-import type { MemoryService } from "../../memory";
+import type { MemoryService, PreparedWindow } from "../../memory";
 import type { NativeTool } from "../../../infrastructure/chat-stream";
 import {
 	RESEARCH_BUDGET,
@@ -51,8 +51,15 @@ export interface GenerateInput {
 	revision: number;
 	messages: ChatMessage[];
 	requestId?: string;
-	/** The memory view fixed at prepare time; re-checked in the adoption transaction. */
-	memory?: { view: unknown };
+	/** The memory window fixed at prepare time; re-checked in the adoption transaction. */
+	memory?: {
+		window: PreparedWindow;
+		/**
+		 * The window adds nothing to the prompt (no layer text, no notice): its body is shown as it streams and
+		 * the window is checked at adoption only when a recalled exchange stands on it.
+		 */
+		quiet?: true;
+	};
 	/** The World context fixed at prepare time (opaque here); re-checked before sending and at adoption. */
 	world?: { context: unknown };
 	/** World was read for this run (this or an earlier attempt): its body is held until adoption. */

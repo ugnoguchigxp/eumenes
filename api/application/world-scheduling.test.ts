@@ -165,7 +165,7 @@ async function boot(
 	});
 	const queue = createQueue(store, {
 		resourceAliases: { "larm.llm": "inference.llm" },
-		resources: { "inference.llm": 1, "web.fetch": 2 },
+		resources: { "inference.llm": 1, "inference.aux": 2, "web.fetch": 2 },
 		backoff: { baseMs: 10, maxMs: 20 },
 		pollMs: 20,
 	});

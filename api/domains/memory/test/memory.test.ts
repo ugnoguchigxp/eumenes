@@ -15,8 +15,16 @@ import {
 import {
 	createContinuityService,
 	migration as continuityMigration,
+	shortTermMigration,
 } from "../../continuity";
-import { createMemoryService, migration, registerMemory } from "..";
+import {
+	contextWindowMigration,
+	agentHardeningMigration,
+	turnVectorsMigration,
+	createMemoryService,
+	migration,
+	registerMemory,
+} from "..";
 
 test("remember, stop, retract and forget work end to end over HTTP without dialogue; memory is shared across conversations", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-memory-unit-"));
@@ -26,7 +34,11 @@ test("remember, stop, retract and forget work end to end over HTTP without dialo
 			avatarMotionMigration,
 			answerDeliveryMigration,
 			continuityMigration,
+			shortTermMigration,
 			migration,
+			contextWindowMigration,
+			agentHardeningMigration,
+			turnVectorsMigration,
 			...memoryPackageMigrations,
 		]);
 		const conversation = createConversationService(store);
@@ -66,11 +78,16 @@ test("remember, stop, retract and forget work end to end over HTTP without dialo
 		expect(created.status).toBe(201);
 		const item = (await created.json()) as { id: string; revision: number };
 		// Profile memory is not tied to the conversation it came from.
-		const block = store.read((db) => memory.prepareInTransaction(db, "c2"));
-		expect(block.status === "ready" && block.block).toContain("コーヒーが好き");
-		if (block.status !== "ready") throw new Error("fixture_not_ready");
+		const window = await store.write((db) =>
+			memory.windowForRunInTransaction(db, "c2"),
+		);
+		expect(window?.longTerm.text).toContain("コーヒーが好き");
+		if (!window) throw new Error("fixture_not_ready");
+		const prepared = memory.preparedWindow(window);
 		expect(
-			store.read((db) => memory.validateInTransaction(db, "c2", block.view)),
+			store.read((db) =>
+				memory.validateWindowInTransaction(db, "r1", prepared),
+			),
 		).toEqual({ ok: true });
 		expect(
 			store.read((db) =>
@@ -84,7 +101,9 @@ test("remember, stop, retract and forget work end to end over HTTP without dialo
 			"inactive",
 		);
 		expect(
-			store.read((db) => memory.validateInTransaction(db, "c2", block.view)),
+			store.read((db) =>
+				memory.validateWindowInTransaction(db, "r1", prepared),
+			),
 		).toEqual({ ok: false, reason: "memory_stale" });
 		expect(
 			(
@@ -110,7 +129,11 @@ test("policyRevisionInTransaction is the revision memory's access() uses and mov
 			avatarMotionMigration,
 			answerDeliveryMigration,
 			continuityMigration,
+			shortTermMigration,
 			migration,
+			contextWindowMigration,
+			agentHardeningMigration,
+			turnVectorsMigration,
 			...memoryPackageMigrations,
 		]);
 		const memory = createMemoryService(

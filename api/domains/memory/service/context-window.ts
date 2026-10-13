@@ -1,0 +1,404 @@
+import type { Database } from "bun:sqlite";
+import { classifyValidity, periodFromStateMs } from "eumenes-memory";
+import { latestMemoryChangeSeq, listState } from "eumenes-memory/sqlite";
+import type { ContinuityService } from "../../continuity";
+import { PRINCIPAL, PROFILE_SCOPE } from "../contracts";
+import {
+	activeTendencies,
+	foreignImmediateSince,
+	insertImmediate,
+	maxImmediateSeq,
+	purgeWindows,
+	readSettings,
+	readWindowKey,
+	readWindowRow,
+	tendencyRevision,
+	writeWindowRow,
+} from "../repository";
+import {
+	PENDING_LIMIT,
+	formatPeriod,
+	noteLines,
+	renderLongTerm,
+	renderShortTerm,
+	type StateLine,
+	type TendencyLine,
+} from "./context-render";
+
+export type ImmediateKind =
+	| "state_stop"
+	| "state_retract"
+	| "state_forget"
+	| "state_replace"
+	| "settings"
+	| "continuity_close"
+	| "tendency_delete";
+
+/** The versions of everything a window was built from. */
+export type WindowInputs = {
+	immediateSeq: number;
+	stateChangeSeq: number;
+	continuityRevision: number;
+	tendencyRevision: number;
+	policyRevision: string;
+};
+export type WindowPrefetch = {
+	text: string;
+	pins: { messageId: string; digest: string }[];
+	bytes: number;
+};
+export type WindowSnapshot = {
+	conversationId: string;
+	version: number;
+	buildId: string;
+	inputs: WindowInputs;
+	longTerm: {
+		text: string;
+		manifest: { itemId: string; revision: string }[];
+		/** Items the budget left out of `text` (not shown as "recently remembered" either). */
+		omitted: { itemId: string; revision: string }[];
+		publishedOn: string;
+		bytes: number;
+	};
+	shortTerm: {
+		text: string;
+		bytes: number;
+		pendingAdditions: number;
+		/** The State items behind "recently remembered": a usage receipt must name them too (forgetting purges by item). */
+		recentItemIds?: string[];
+	};
+	prefetch: WindowPrefetch;
+	notices: { id: string; text: string }[];
+	/** The earliest validFrom/validUntil of an active State item after the build time: crossing it changes what is current. */
+	nextBoundaryMs?: number | null;
+	/** The earliest expiry of a short-term note shown in `shortTerm`: after it the text is out of date. */
+	nextExpiryMs?: number | null;
+};
+
+const EMPTY_PREFETCH: WindowPrefetch = { text: "", pins: [], bytes: 0 };
+const MAX_NOTICES = 5;
+/** A notice is one short sentence; longer text is cut so it cannot crowd out World. */
+export const MAX_NOTICE_CHARS = 200;
+const CONTRACT_VERSION = 1 as const;
+
+const pad = (n: number) => String(n).padStart(2, "0");
+/** The host's local date, `YYYY-MM-DD`. */
+function localDate(iso: string): string {
+	const date = new Date(iso);
+	return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/** The package's change counter for the shared profile: it moves whenever State there changes. */
+function latestStateChange(db: Database, policyRevision: string): number {
+	const changes = latestMemoryChangeSeq(db, {
+		contractVersion: CONTRACT_VERSION,
+		access: {
+			principal: PRINCIPAL,
+			scopeKeys: [PROFILE_SCOPE],
+			purpose: "dialogue.read",
+			policyRevision,
+		},
+		scopeKeys: [PROFILE_SCOPE],
+	});
+	if (changes.status !== "ok") throw new Error("memory_blocked");
+	return changes.seq;
+}
+
+export function createContextWindowStore(deps: {
+	continuity: ContinuityService;
+	clock: () => string;
+	id: () => string;
+}) {
+	const { continuity, clock, id } = deps;
+	/** A performance copy only: correctness is the (version, buildId) match against the database row. */
+	const cache = new Map<string, WindowSnapshot>();
+
+	function readInputs(db: Database, conversationId: string): WindowInputs {
+		const policyRevision = String(readSettings(db).revision);
+		return {
+			immediateSeq: maxImmediateSeq(db),
+			stateChangeSeq: latestStateChange(db, policyRevision),
+			continuityRevision: continuity.revisionInTransaction(db, conversationId),
+			tendencyRevision: tendencyRevision(db),
+			policyRevision,
+		};
+	}
+
+	/** The stored window: the in-process copy when it is exactly the committed row, else the row. */
+	function current(
+		db: Database,
+		conversationId: string,
+	): WindowSnapshot | null {
+		const key = readWindowKey(db, conversationId);
+		if (!key) return null;
+		const cached = cache.get(conversationId);
+		if (
+			cached &&
+			cached.version === key.version &&
+			cached.buildId === key.buildId
+		)
+			return cached;
+		const row = readWindowRow(db, conversationId);
+		if (!row) return null;
+		const parsed = JSON.parse(row.snapshot) as WindowSnapshot;
+		cache.set(conversationId, parsed);
+		return parsed;
+	}
+
+	function currentState(db: Database, policyRevision: string, nowMs: number) {
+		const listed = listState(db, {
+			contractVersion: CONTRACT_VERSION,
+			access: {
+				principal: PRINCIPAL,
+				scopeKeys: [PROFILE_SCOPE],
+				purpose: "dialogue.read",
+				policyRevision,
+			},
+			scopeKey: PROFILE_SCOPE,
+		});
+		if (listed.status !== "ok") throw new Error("memory_blocked");
+		let nextBoundaryMs: number | null = null;
+		for (const item of listed.items)
+			for (const at of [item.validFromMs, item.validUntilMs])
+				if (
+					at !== null &&
+					at > nowMs &&
+					(nextBoundaryMs === null || at < nextBoundaryMs)
+				)
+					nextBoundaryMs = at;
+		const lines = listed.items
+			.filter((item) => {
+				if (item.subject !== "self") return false;
+				const validity = classifyValidity(
+					periodFromStateMs(item.validFromMs, item.validUntilMs),
+					nowMs,
+				);
+				return validity === "current" || validity === "unknown";
+			})
+			.map((item): StateLine => ({
+				itemId: item.itemId,
+				revision: item.revision,
+				kind: item.kind,
+				text: item.value.text,
+				negated: item.value.polarity === "negated",
+				period: formatPeriod(item),
+				order: item.updatedSeq,
+			}));
+		return { lines, nextBoundaryMs };
+	}
+
+	function rebuildInTransaction(
+		db: Database,
+		conversationId: string,
+		opts: {
+			refreshLongTerm: boolean;
+			prefetch?: WindowPrefetch;
+			addNotices?: string[];
+			clearNoticeIds?: string[];
+		},
+	): WindowSnapshot {
+		const previous = current(db, conversationId);
+		const refresh = opts.refreshLongTerm || !previous;
+		const inputs = readInputs(db, conversationId);
+		const now = clock();
+		const { lines: states, nextBoundaryMs } = currentState(
+			db,
+			inputs.policyRevision,
+			Date.parse(now),
+		);
+		let longTerm: WindowSnapshot["longTerm"];
+		if (refresh || !previous) {
+			const tendencies: TendencyLine[] = activeTendencies(db).map((row) => ({
+				id: row.id,
+				revision: row.revision,
+				text: row.text,
+				order: row.updatedAt,
+			}));
+			const rendered = renderLongTerm(states, tendencies);
+			longTerm = {
+				text: rendered.text,
+				manifest: rendered.manifest,
+				omitted: rendered.omitted,
+				publishedOn: localDate(now),
+				bytes: rendered.bytes,
+			};
+		} else
+			longTerm = {
+				...previous.longTerm,
+				omitted: previous.longTerm.omitted ?? [],
+			};
+		const known = new Map(
+			[...longTerm.manifest, ...longTerm.omitted].map((entry) => [
+				entry.itemId,
+				entry.revision,
+			]),
+		);
+		const recent = states.filter(
+			(line) => known.get(line.itemId) !== String(line.revision),
+		);
+		const notes = continuity.snapshotInTransaction(db, conversationId).items;
+		const shortTerm = renderShortTerm(recent, noteLines(notes));
+		let nextExpiryMs: number | null = null;
+		for (const note of notes) {
+			const at = note.expiresAt === null ? null : Date.parse(note.expiresAt);
+			if (at !== null && (nextExpiryMs === null || at < nextExpiryMs))
+				nextExpiryMs = at;
+		}
+		const cleared = new Set(opts.clearNoticeIds ?? []);
+		const notices = [
+			...(previous?.notices ?? []).filter((notice) => !cleared.has(notice.id)),
+			...(opts.addNotices ?? []).map((text) => ({
+				id: id(),
+				text: [...text].slice(0, MAX_NOTICE_CHARS).join(""),
+			})),
+		].slice(-MAX_NOTICES);
+		const snapshot: WindowSnapshot = {
+			conversationId,
+			version: (readWindowKey(db, conversationId)?.version ?? 0) + 1,
+			buildId: id(),
+			// L1 keeps the versions it was built from: a change not yet in it must stay visible to the next read.
+			inputs:
+				refresh || !previous
+					? inputs
+					: {
+							...inputs,
+							immediateSeq: previous.inputs.immediateSeq,
+							policyRevision: previous.inputs.policyRevision,
+						},
+			longTerm,
+			shortTerm: {
+				text: shortTerm.text,
+				bytes: shortTerm.bytes,
+				pendingAdditions: shortTerm.pendingAdditions,
+				recentItemIds: recent.map((line) => line.itemId),
+			},
+			prefetch: opts.prefetch ?? previous?.prefetch ?? EMPTY_PREFETCH,
+			notices,
+			nextExpiryMs,
+			// L1 is not re-rendered here, so its boundary stays the one it was built with.
+			nextBoundaryMs:
+				refresh || !previous
+					? nextBoundaryMs
+					: (previous.nextBoundaryMs ?? null),
+		};
+		writeWindowRow(
+			db,
+			conversationId,
+			{
+				version: snapshot.version,
+				buildId: snapshot.buildId,
+				snapshot: JSON.stringify(snapshot),
+			},
+			now,
+		);
+		// A rolled-back transaction leaves the row behind this copy; the next read notices by buildId.
+		cache.set(conversationId, snapshot);
+		return snapshot;
+	}
+
+	return {
+		/** Prepare-time read (write transaction). Rebuilds and stores when an input moved. */
+		readForRunInTransaction(
+			db: Database,
+			conversationId: string,
+		): WindowSnapshot {
+			let snapshot = current(db, conversationId);
+			if (!snapshot)
+				return rebuildInTransaction(db, conversationId, {
+					refreshLongTerm: true,
+				});
+			const inputs = readInputs(db, conversationId);
+			const was = snapshot.inputs;
+			let refreshed = false;
+			if (
+				inputs.immediateSeq !== was.immediateSeq ||
+				inputs.policyRevision !== was.policyRevision
+			) {
+				snapshot = rebuildInTransaction(db, conversationId, {
+					refreshLongTerm: true,
+				});
+				refreshed = true;
+			} else if (
+				inputs.stateChangeSeq !== was.stateChangeSeq ||
+				inputs.continuityRevision !== was.continuityRevision ||
+				inputs.tendencyRevision !== was.tendencyRevision
+			)
+				snapshot = rebuildInTransaction(db, conversationId, {
+					refreshLongTerm: false,
+				});
+			// A note that has expired since the layer was rendered must leave it.
+			const expiry = snapshot.nextExpiryMs ?? null;
+			if (!refreshed && expiry !== null && Date.parse(clock()) >= expiry)
+				snapshot = rebuildInTransaction(db, conversationId, {
+					refreshLongTerm: false,
+				});
+			const boundary = snapshot.nextBoundaryMs ?? null;
+			if (
+				!refreshed &&
+				(snapshot.longTerm.publishedOn !== localDate(clock()) ||
+					snapshot.shortTerm.pendingAdditions >= PENDING_LIMIT ||
+					(boundary !== null && Date.parse(clock()) >= boundary))
+			)
+				snapshot = rebuildInTransaction(db, conversationId, {
+					refreshLongTerm: true,
+				});
+			return snapshot;
+		},
+		rebuildInTransaction,
+		/**
+		 * Drops shown notices without re-rendering anything (it runs after the answer is saved and must not fail
+		 * on memory state). No stored window, or none of the ids present, is a no-op.
+		 */
+		clearNoticesInTransaction(
+			db: Database,
+			conversationId: string,
+			noticeIds: readonly string[],
+		) {
+			const previous = current(db, conversationId);
+			if (!previous) return;
+			const cleared = new Set(noticeIds);
+			const notices = previous.notices.filter(
+				(notice) => !cleared.has(notice.id),
+			);
+			if (notices.length === previous.notices.length) return;
+			const snapshot: WindowSnapshot = {
+				...previous,
+				version: (readWindowKey(db, conversationId)?.version ?? 0) + 1,
+				buildId: id(),
+				notices,
+			};
+			writeWindowRow(
+				db,
+				conversationId,
+				{
+					version: snapshot.version,
+					buildId: snapshot.buildId,
+					snapshot: JSON.stringify(snapshot),
+				},
+				clock(),
+			);
+			cache.set(conversationId, snapshot);
+		},
+		/**
+		 * Removes every stored window (all conversations) and the in-process copies. Rendered memory text
+		 * lives in them, so forgetting must not leave it behind; the next read builds again from State.
+		 */
+		purgeInTransaction(db: Database) {
+			purgeWindows(db);
+			cache.clear();
+		},
+		/** Same transaction as the change itself: a run in flight that predates it is expired. */
+		recordImmediateInTransaction(
+			db: Database,
+			kind: ImmediateKind,
+			sourceRunId: string | null,
+		) {
+			insertImmediate(db, kind, sourceRunId, clock());
+		},
+		/** True when something other than `runId` changed immediately after `seq`. */
+		changedSinceInTransaction(db: Database, seq: number, runId: string) {
+			return foreignImmediateSince(db, seq, runId);
+		},
+	};
+}
+export type ContextWindowStore = ReturnType<typeof createContextWindowStore>;

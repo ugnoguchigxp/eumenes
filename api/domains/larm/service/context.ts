@@ -3,7 +3,7 @@ import type { Provider } from "./profiles";
 
 type Messages = Parameters<LarmPort["answer"]>[0];
 
-/** Drops the oldest turns (keeping the first and last) until the request fits the model. */
+/** Drops the oldest turns until the request fits the model. The leading system run (policy, memory and reference blocks) and the last message are never dropped. */
 export function fitContext(
 	messages: Messages,
 	window: NonNullable<Provider["contextWindow"]>,
@@ -15,8 +15,10 @@ export function fitContext(
 	const selected = [...messages];
 	const estimate = (items: Messages) =>
 		new TextEncoder().encode(JSON.stringify(items)).length;
-	while (!exact && selected.length > 2 && estimate(selected) > budget)
-		selected.splice(1, Math.min(2, selected.length - 2));
+	let kept = 0;
+	while (kept < selected.length && selected[kept]?.role === "system") kept++;
+	while (!exact && selected.length - kept > 1 && estimate(selected) > budget)
+		selected.splice(kept, Math.min(2, selected.length - kept - 1));
 	if (estimate(selected) > budget) throw new Error("context_window_exceeded");
 	return selected;
 }

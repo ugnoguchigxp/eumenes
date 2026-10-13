@@ -7,10 +7,7 @@ import {
 } from "../../../infrastructure/error-code";
 import { getLogger } from "../../../infrastructure/logger";
 const log = getLogger("larm");
-import {
-	readChatResponse,
-	forwardToolCalls,
-} from "../../../infrastructure/chat-stream";
+import { forwardToolCalls } from "../../../infrastructure/chat-stream";
 import type {
 	Capability,
 	LarmPort,
@@ -26,7 +23,8 @@ import {
 	type Provider,
 	type ProviderName,
 } from "./profiles";
-import { assertRuriQuestions, decodeSpeechCredit, fitContext } from "./context";
+import { assertRuriQuestions, decodeSpeechCredit } from "./context";
+import { startLlmTiming } from "./llm-timing";
 import {
 	awaitReady,
 	renewProviders,
@@ -699,10 +697,12 @@ export function createLarm(config: {
 		return withProvider("llm", signal, async (p, connectionId) => {
 			const window = p.contextWindow;
 			if (!window) throw new Error("larm_missing_context_window");
-			const selected = fitContext(
+			const timing = startLlmTiming(
+				profile,
 				messages,
 				window,
-				options?.contextPolicy === "exact",
+				options,
+				onDelta,
 			);
 			const response = await infer(
 				p,
@@ -710,13 +710,15 @@ export function createLarm(config: {
 				{
 					method: "POST",
 					headers: { "content-type": "application/json" },
-					body: JSON.stringify(chatRequest(p, selected, !!onDelta, options)),
+					body: JSON.stringify(
+						chatRequest(p, timing.selected, !!onDelta, options),
+					),
 				},
 				signal,
 				connectionId,
 				options,
 			);
-			const result = await readChatResponse(response, signal, onDelta);
+			const result = await timing.read(response, signal);
 			forwardToolCalls(result, options?.tools, options?.onToolCalls);
 			return result.text;
 		});

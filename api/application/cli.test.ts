@@ -645,6 +645,9 @@ const memoryItem = (over: Record<string, unknown> = {}) => ({
 	sourceMessageIds: ["m1"],
 	validFromMs: null,
 	validUntilMs: null,
+	evidence: [{ messageId: "m1", quote: null }],
+	validity: null,
+	capturedBy: "request",
 	...over,
 });
 

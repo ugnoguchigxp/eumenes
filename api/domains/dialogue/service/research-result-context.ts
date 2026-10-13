@@ -11,12 +11,12 @@ const failureRules =
 /** Keep the current request and report required; remove only optional earlier turns. */
 export function researchResultContext(
 	messages: Message[],
-	referenceBlocks: readonly string[],
+	referenceTexts: readonly string[],
 	projection: string | undefined,
 	failureCode?: string | null,
 ) {
 	const input = messages.at(-1)!;
-	const references = referenceBlocks.map((content): Message => ({
+	const references = referenceTexts.map((content): Message => ({
 		role: "system",
 		content,
 	}));

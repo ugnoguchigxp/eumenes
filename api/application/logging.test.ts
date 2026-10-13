@@ -82,7 +82,12 @@ test("real backend persists startup, correlated job failure and final shutdown w
 			records.find((entry) => entry.event === "dialogue.generation_started"),
 		).toMatchObject({ requestId, runId: run.id, jobId: run.jobId });
 		expect(
-			records.find((entry) => entry.event === "inference.attempt_failed"),
+			// The memory agent's background job also fails on the unconfigured LARM; select the run's own job.
+			records.find(
+				(entry) =>
+					entry.event === "inference.attempt_failed" &&
+					entry.jobId === run.jobId,
+			),
 		).toMatchObject({
 			runId: run.id,
 			subjectId: run.id,

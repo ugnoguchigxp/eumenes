@@ -111,7 +111,7 @@ export async function buildServices(config: Config) {
 	});
 	const queue = createQueue(store, {
 		resourceAliases: { "larm.llm": "inference.llm" },
-		resources: { "inference.llm": 1, "web.fetch": 2 },
+		resources: { "inference.llm": 1, "inference.aux": 2, "web.fetch": 2 },
 	});
 	const cachePath = resolve(
 		join(dirname(dbPath), "cache/web-research.sqlite3"),
@@ -209,11 +209,33 @@ export async function buildServices(config: Config) {
 					settings.get().codingSupervision.approveInstructions,
 			})
 		: undefined;
+	// One embedder on the saved LARM connection serves both the toolchain routing and the memory agent's turn vectors.
+	const embedder = larmEmbedder(
+		() => {
+			const s = settings.get();
+			return createLarmPlayground({
+				baseUrl: s.larm.baseUrl ?? undefined,
+				token: config.larmToken,
+				profile: s.larm.profile,
+				audience: s.larm.audience,
+				providerHosts: config.larmProviderHosts,
+			});
+		},
+		() => {
+			const s = settings.get();
+			return JSON.stringify([s.larm.baseUrl, s.larm.profile, s.larm.audience]);
+		},
+	);
 	const continuity = createContinuityService(store);
 	const memoryJournalPath = resolve(config.memoryJournalPath);
 	const memory = createMemoryService(store, conversation, continuity, {
 		journalPath: memoryJournalPath,
+		queue,
+		inference,
+		embed: () => embedder,
 	});
+	// The memory agent infers on the auxiliary connections (`inference.aux`), never on the answer's connection.
+	queue.registerHandler(memory.agentHandler());
 	// Foreground priority of Local extraction (P4-03): only with World ON.
 	const worldForeground =
 		config.worldMode === "on"
@@ -262,26 +284,7 @@ export async function buildServices(config: Config) {
 			dots: true,
 			music: true,
 			webResearch: config.webResearchToolsEnabled,
-			embed: larmEmbedder(
-				() => {
-					const s = settings.get();
-					return createLarmPlayground({
-						baseUrl: s.larm.baseUrl ?? undefined,
-						token: config.larmToken,
-						profile: s.larm.profile,
-						audience: s.larm.audience,
-						providerHosts: config.larmProviderHosts,
-					});
-				},
-				() => {
-					const s = settings.get();
-					return JSON.stringify([
-						s.larm.baseUrl,
-						s.larm.profile,
-						s.larm.audience,
-					]);
-				},
-			),
+			embed: embedder,
 		},
 	);
 	const enabled = config.toolchainEnabled;

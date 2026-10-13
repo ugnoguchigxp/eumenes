@@ -1,6 +1,6 @@
 import type { Database } from "bun:sqlite";
 import type { InferencePort, Receipt } from "../../inference";
-import type { MemoryService } from "../../memory";
+import type { MemoryService, PreparedWindow } from "../../memory";
 import type { WorldContextPort, WorldContextSettleInput } from "../contracts";
 
 /** Control may start an operation only while every input authority is current. */
@@ -10,7 +10,9 @@ export function operationRejection(
 		inference: InferencePort;
 		receipt?: Receipt;
 		memory?: MemoryService;
-		memoryView?: { view: unknown };
+		memoryWindow?: { window: PreparedWindow; quiet?: true };
+		/** Messages recalled exchanges stand on; a quiet window is checked only when there are some. */
+		recallPins?: ReadonlyArray<{ messageId: string; digest: string }>;
 		world?: WorldContextPort;
 		worldView?: { context: unknown };
 		settle: WorldContextSettleInput;
@@ -21,11 +23,16 @@ export function operationRejection(
 		!input.inference.validateReceiptInTransaction?.(db, input.receipt)
 	)
 		return "permission_revoked";
-	if (input.memoryView && input.memory) {
-		const verdict = input.memory.validateInTransaction(
+	if (
+		input.memoryWindow &&
+		input.memory &&
+		(!input.memoryWindow.quiet || (input.recallPins?.length ?? 0) > 0)
+	) {
+		const verdict = input.memory.validateWindowInTransaction(
 			db,
-			input.settle.conversationId,
-			input.memoryView.view,
+			input.settle.runId,
+			input.memoryWindow.window,
+			input.recallPins,
 		);
 		if (!verdict.ok) return verdict.reason;
 	}

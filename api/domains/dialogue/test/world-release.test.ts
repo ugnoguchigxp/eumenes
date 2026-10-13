@@ -115,16 +115,36 @@ function setup(
 		byRootInTransaction: () => null,
 	} as unknown as AgentRuntime;
 	const memory = {
-		prepareInTransaction: () => ({
-			status: "ready",
-			block: "memory-block",
-			view: {},
+		windowForRunInTransaction: () => ({
+			conversationId: "main",
+			version: 1,
+			buildId: "build-1",
+			inputs: { immediateSeq: 0, policyRevision: "1" },
+			longTerm: { text: "memory-block", manifest: [], bytes: 12 },
+			shortTerm: { text: "", bytes: 0, pendingAdditions: 0 },
+			prefetch: { text: "", pins: [], bytes: 0 },
+			notices: [],
 		}),
-		settleInTransaction: () =>
+		preparedWindow: () => ({
+			conversationId: "main",
+			version: 1,
+			buildId: "build-1",
+			immediateSeq: 0,
+			policyRevision: "1",
+			manifest: [],
+			pins: [],
+			noticeIds: [],
+			windowStartOrdinal: 0,
+		}),
+		validateWindowInTransaction: () =>
 			options.memoryAdopts === false
 				? { ok: false, reason: "memory_stale" }
 				: { ok: true },
+		recordUsageInTransaction: () => {},
+		clearNoticesInTransaction: () => {},
 		discardUsageInTransaction: () => {},
+		scheduleAgentInTransaction: () => {},
+		excludeMessageInTransaction: () => {},
 	} as unknown as MemoryService;
 	const released: string[] = [];
 	const recorded: string[] = [];

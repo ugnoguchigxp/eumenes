@@ -1,5 +1,11 @@
 import type { Database } from "bun:sqlite";
 import { getLogger } from "../../../infrastructure/logger";
+import {
+	PREFETCH_BYTES,
+	RECALL_LIMIT,
+	RECALL_MIN_SCORE,
+	type TurnRecall,
+} from "../../memory";
 import type { AnswerTicket } from "../../agent-runtime";
 import type { SelectionOutcome } from "../../toolchain-history";
 import type {
@@ -63,6 +69,7 @@ export async function prepareDecision(
 	let tools = input.agent ? undefined : input.tools;
 	let route: ToolchainRoute | undefined;
 	let query: QueryVector | undefined;
+	let recallPins: TurnRecall["pins"] = [];
 	if (input.routing && deps.toolchains && !input.agent) {
 		const routing = input.routing;
 		query = await deps.toolchains.embedQuery(routing.query, signal);
@@ -76,6 +83,15 @@ export async function prepareDecision(
 			}),
 		);
 		messages = [...input.messages];
+		// Earlier exchanges that left the verbatim window, found by this turn's own vector (no model round trip).
+		const recalled = recallFor(deps, input, query);
+		if (recalled) {
+			messages.splice(messages.length - 1, 0, {
+				role: "system",
+				content: recalled.text,
+			});
+			recallPins = recalled.pins;
+		}
 		appendConversationPolicy(
 			messages,
 			route.cards.length > 0,
@@ -116,7 +132,35 @@ export async function prepareDecision(
 					...extra,
 				}
 			: undefined;
-	return { messages, tools, cards: route?.cards, draft };
+	return { messages, tools, cards: route?.cards, draft, recallPins };
+}
+/** The exchanges before the verbatim window that resemble the request; null when there are none or recall is unavailable. */
+function recallFor(
+	deps: DialogueDeps,
+	input: GenerateInput,
+	query: QueryVector | undefined,
+): TurnRecall | null {
+	const window = input.memory?.window;
+	if (!deps.memory || !window || !query) return null;
+	try {
+		return deps.store.read((db) =>
+			deps.memory!.recallTurnsInRead(db, {
+				conversationId: window.conversationId,
+				space: query.space,
+				vector: query.vector,
+				beforeOrdinal: window.windowStartOrdinal,
+				limit: RECALL_LIMIT,
+				minScore: RECALL_MIN_SCORE,
+				// What the prefetch already uses comes off the same budget.
+				maxBytes: PREFETCH_BYTES - window.prefetchBytes,
+				excludeMessageIds: window.pins.map((pin) => pin.messageId),
+			}),
+		);
+	} catch (error) {
+		// Recall is an aid: the answer goes on without it.
+		log.warn("dialogue.recall_failed", { reason: "recall_failed" }, error);
+		return null;
+	}
 }
 /** A decision whose output broke the contract twice is traced as rejected and failed. */
 export async function recordRejected(

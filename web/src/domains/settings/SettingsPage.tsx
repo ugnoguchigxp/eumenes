@@ -18,6 +18,7 @@ import { GeneralSection } from "./sections/general";
 import { SchedulePanel as ScheduleSection } from "./sections/schedule";
 import { VoiceSection } from "./sections/voice";
 import { MemoryConnectionPanel } from "./MemoryConnectionPanel";
+import { MemoryItemsPanel } from "./MemoryItemsPanel";
 import { Button } from "../../design-system";
 import {
 	SettingsDraftProvider,
@@ -44,10 +45,13 @@ function SettingsPageBody({
 	renderToolchainHistory,
 	renderWorld,
 	client,
+	conversationId = "main",
 	onDirty,
 	onSaved,
 }: {
 	client: EumenesClient;
+	/** The conversation whose short-term notes and context the memory screen shows. */
+	conversationId?: string;
 	onDirty: (dirty: boolean) => void;
 	onSaved: (value: Settings) => void;
 	renderServiceTests?: (disabled: boolean) => React.ReactNode;
@@ -309,7 +313,14 @@ function SettingsPageBody({
 				{category === "schedule" && <ScheduleSection client={client} />}
 				{category === "dictionary" && <TtsDictionaryPanel client={client} />}
 				{category === "memory" && (
-					<MemoryConnectionPanel key={client.identity} client={client} />
+					<>
+						<MemoryConnectionPanel key={client.identity} client={client} />
+						<MemoryItemsPanel
+							key={`items:${client.identity}`}
+							client={client}
+							conversationId={conversationId}
+						/>
+					</>
 				)}
 				{category === "appearance" && (
 					<AppearanceSection value={value} change={change} />

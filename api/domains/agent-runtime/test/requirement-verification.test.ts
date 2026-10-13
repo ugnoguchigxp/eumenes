@@ -10,7 +10,7 @@ const requirements = [
 	},
 ];
 const draft = {
-	outcome: "not_found",
+	outcome: "clarification_required",
 	summary: "資料がありません",
 	claims: [],
 	limitations: ["条件は確認できない"],

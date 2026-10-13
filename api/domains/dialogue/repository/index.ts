@@ -158,15 +158,17 @@ export function interruptUnfinished(db: Database, now: string) {
 		"UPDATE dialogue_runs SET status='interrupted',revision=revision+1,updated_at=?,error='backend_restarted' WHERE status IN ('queued','running') AND job_id IS NULL",
 	).run(now);
 }
-/** Runs accepted before `run`, in acceptance order (the model-visible history boundary). */
-export function priorRuns(db: Database, run: Run): Run[] {
+/** The newest `limit` runs accepted before `run`, oldest first (the verbatim part of the model-visible history). */
+export function recentPriorRuns(db: Database, run: Run, limit: number): Run[] {
 	return (
 		db
 			.query(
-				`SELECT ${columns} FROM dialogue_runs WHERE conversation_id = ? AND seq < (SELECT seq FROM dialogue_runs WHERE id = ?) ORDER BY seq`,
+				`SELECT ${columns} FROM dialogue_runs WHERE conversation_id = ? AND seq < (SELECT seq FROM dialogue_runs WHERE id = ?) ORDER BY seq DESC LIMIT ?`,
 			)
-			.all(run.conversationId, run.id) as Record<string, unknown>[]
-	).map(map);
+			.all(run.conversationId, run.id, limit) as Record<string, unknown>[]
+	)
+		.map(map)
+		.reverse();
 }
 
 export function unfinishedAgentRuns(db: Database): Run[] {

@@ -1,5 +1,8 @@
 import type { Database } from "bun:sqlite";
 import type { Migration } from "../../../infrastructure/sqlite";
+export * from "./window";
+export * from "./agent";
+export * from "./turn-vector";
 export const migration = `
 CREATE TABLE memory_host_settings (id INTEGER PRIMARY KEY CHECK(id = 1), enabled INTEGER NOT NULL, revision INTEGER NOT NULL);
 INSERT INTO memory_host_settings (id, enabled, revision) VALUES (1, 1, 1);
@@ -69,43 +72,76 @@ export function getUsage(db: Database, runId: string): UsageReceipt | null {
 	};
 }
 
+/**
+ * ContextWindow: the per-conversation snapshot, the immediate-change log that expires runs in flight,
+ * and the host tables the memory agent (S2) writes. Frozen once deployed.
+ */
+export const contextWindowMigration = `
+CREATE TABLE memory_context_window (
+ conversation_id TEXT PRIMARY KEY,
+ version INTEGER NOT NULL,
+ build_id TEXT NOT NULL,
+ snapshot TEXT NOT NULL,
+ updated_at TEXT NOT NULL
+);
+CREATE TABLE memory_immediate_change (
+ seq INTEGER PRIMARY KEY AUTOINCREMENT,
+ kind TEXT NOT NULL,
+ source_run_id TEXT,
+ created_at TEXT NOT NULL
+);
+CREATE TABLE memory_tendency_revision (id INTEGER PRIMARY KEY CHECK(id = 1), revision INTEGER NOT NULL);
+INSERT INTO memory_tendency_revision (id, revision) VALUES (1, 0);
+CREATE TABLE memory_item_provenance (
+ item_id TEXT PRIMARY KEY, run_id TEXT,
+ mode TEXT NOT NULL CHECK(mode IN ('request','agent','manual')), created_at TEXT NOT NULL
+);
+CREATE TABLE memory_tendency (
+ id TEXT PRIMARY KEY, text TEXT NOT NULL,
+ evidence TEXT NOT NULL,
+ status TEXT NOT NULL CHECK(status IN ('active','retired')), revision INTEGER NOT NULL,
+ created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+CREATE TABLE memory_agent_cursor (
+ conversation_id TEXT PRIMARY KEY, last_ordinal INTEGER NOT NULL
+);
+`;
+
+/**
+ * Hardening of the memory agent: the messages it must not learn from, the control request of each job
+ * (so a lost job can still release it), and a failure count on the read cursor.
+ */
+export const agentHardeningMigration = `
+ALTER TABLE memory_agent_cursor ADD COLUMN failures INTEGER NOT NULL DEFAULT 0;
+CREATE TABLE memory_agent_excluded_message (message_id TEXT PRIMARY KEY);
+CREATE TABLE memory_agent_request (job_id TEXT PRIMARY KEY, request_id TEXT NOT NULL);
+`;
+
+/** The embedding of each message (user and assistant), for finding exchanges that left the verbatim window. */
+export const turnVectorsMigration = `
+CREATE TABLE memory_turn_vector (
+ message_id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL, ordinal INTEGER NOT NULL,
+ space TEXT NOT NULL, vector BLOB NOT NULL, digest TEXT NOT NULL, created_at TEXT NOT NULL
+);
+CREATE INDEX memory_turn_vector_conversation ON memory_turn_vector(conversation_id, space, ordinal);
+`;
+
 /** Named migrations of this domain; the SQL above is frozen once deployed. */
 export const migrations: readonly Migration[] = [
 	{ id: "memory/0001-init", sql: migration },
+	{
+		id: "memory/0002-context-window",
+		sql: contextWindowMigration,
+		after: ["memory/0001-init"],
+	},
+	{
+		id: "memory/0003-agent-hardening",
+		sql: agentHardeningMigration,
+		after: ["memory/0002-context-window"],
+	},
+	{
+		id: "memory/0004-turn-vectors",
+		sql: turnVectorsMigration,
+		after: ["memory/0003-agent-hardening"],
+	},
 ];
-
-export interface StateItemIdentity {
-	principal: string;
-	scope_key: string;
-	subject: string;
-	kind: string;
-	semantic_key: string;
-}
-/** Identity of a not-yet-forgotten state item; the library's listing caps at 1000 rows, so look it up directly. */
-export function stateItemIdentity(
-	db: Database,
-	itemId: string,
-): StateItemIdentity | null {
-	return db
-		.query(
-			`SELECT principal, scope_key, subject, kind, semantic_key FROM memory_state_item
-    WHERE item_id=? AND status!='forgotten'`,
-		)
-		.get(itemId) as StateItemIdentity | null;
-}
-/** Every live version (any status but forgotten) of the same fact, oldest first. */
-export function sameFactItemIds(db: Database, k: StateItemIdentity): string[] {
-	return (
-		db
-			.query(
-				`SELECT i.item_id FROM memory_state_item i
-    WHERE i.principal=? AND i.scope_key=? AND i.subject=? AND i.kind=? AND i.semantic_key=?
-      AND i.status!='forgotten'
-      AND NOT EXISTS (SELECT 1 FROM memory_tombstone t WHERE t.target_type='state_item' AND t.target_id=i.item_id)
-    ORDER BY i.created_seq`,
-			)
-			.all(k.principal, k.scope_key, k.subject, k.kind, k.semantic_key) as {
-			item_id: string;
-		}[]
-	).map((r) => r.item_id);
-}

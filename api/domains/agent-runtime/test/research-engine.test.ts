@@ -12,7 +12,7 @@ test("worker syntax correction completes without consuming its one model repair"
 			child.id,
 			null,
 			undefined,
-			"{action:'finish',report:{outcome:'not_found',summary:'情報なし',claims:[],limitations:[],},}",
+			"{action:'finish',report:{outcome:'clarification_required',summary:'情報なし',claims:[],limitations:[],},}",
 		);
 		expect(h.task(child.id).state).toBe("completed");
 		expect(h.task(child.id).json_repairs).toBe(0);

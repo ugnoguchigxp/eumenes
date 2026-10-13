@@ -11,7 +11,7 @@
         "@eumenes/design-system": "workspace:*",
         "@openai/codex-sdk": "0.160.0",
         "@tanstack/react-query": "5.101.0",
-        "eumenes-memory": "file:vendor/eumenes-memory/eumenes-memory-0.3.6.tgz",
+        "eumenes-memory": "file:vendor/eumenes-memory/eumenes-memory-0.3.7.tgz",
         "eumenes-world-model": "file:vendor/world/eumenes-world-model-0.0.0.tgz",
         "hono": "4.12.34",
         "jsonrepair": "3.15.0",
@@ -1039,7 +1039,7 @@
 
     "etag": ["etag@1.8.1", "", {}, "sha512-aIL5Fx7mawVa300al2BnEE4iNvo1qETxLrPI/o05L7z6go7fCw1J6EQmbK4FmJ2AS7kgVF/KEZWufBfdClMcPg=="],
 
-    "eumenes-memory": ["eumenes-memory@vendor/eumenes-memory/eumenes-memory-0.3.6.tgz", {}, "sha512-DLj/6t/wieykggFLbevKQAbgosFGJCFyyN/PF5T9IQohTQ+ILZcj8ziKh1ulQ47/NdVS3N76hT7uvlmmjEOBLA=="],
+    "eumenes-memory": ["eumenes-memory@vendor/eumenes-memory/eumenes-memory-0.3.7.tgz", {}, "sha512-b/0pkiTLotNyYn14rv2q2v7gsLu89h/zzsp9aK1IlkYi0gMdYrnvMQlkAdi8FMw4cRFzdtygknqXCL/W6Hflpw=="],
 
     "eumenes-world-model": ["eumenes-world-model@vendor/world/eumenes-world-model-0.0.0.tgz", {}, "sha512-fJVMhP5/h3xBDJ0s8TniXUxCDWxGT/j4O3Em0kIFpJfc3D8kTcZQt7e63b27SCjseawzGHpaT7Qa/RNGLEdCAA=="],
 

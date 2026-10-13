@@ -8,6 +8,8 @@ import {
 	migration,
 	avatarMotionMigration,
 	answerDeliveryMigration,
+	outboxMigration,
+	retractionMigration,
 } from "..";
 
 test("conversation saves and survives reopen; second writer is refused", async () => {
@@ -180,6 +182,143 @@ test("answer-wide delivery persists provenance, upgrades fallback, and keeps an 
 		).toEqual(plain);
 	} finally {
 		await store.close();
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("ordinal reads: messages after a cursor, the newest ordinal and the n-th newest user message skip retracted rows", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "eumenes-conversation-ordinals-"));
+	try {
+		const store = openStore(join(dir, "test.sqlite3"), [
+			migration,
+			avatarMotionMigration,
+			answerDeliveryMigration,
+			outboxMigration,
+			retractionMigration,
+		]);
+		const service = createConversationService(store);
+		const add = (
+			id: string,
+			role: "user" | "assistant",
+			conversationId = "c1",
+		) =>
+			service.append({
+				id,
+				conversationId,
+				role,
+				text: `text-${id}`,
+				createdAt: "2026-01-01T00:00:00Z",
+				runId: role === "user" ? `run-${id}` : null,
+			});
+		const read = <T>(
+			fn: (db: Parameters<Parameters<typeof store.read>[0]>[0]) => T,
+		) => store.read(fn);
+		expect(read((db) => service.latestOrdinalInTransaction(db, "c1"))).toBe(0);
+		expect(
+			read((db) => service.nthLatestUserOrdinalInTransaction(db, "c1", 1)),
+		).toBe(0);
+		await add("u1", "user");
+		await add("other", "user", "c2");
+		await add("a1", "assistant");
+		await add("u2", "user");
+		await add("a2", "assistant");
+		await add("u3", "user");
+		const after = (cursor: number, limit = 10) =>
+			read((db) =>
+				service.messagesAfterInTransaction(db, "c1", cursor, limit),
+			).map((entry) => [entry.message.id, entry.ordinal] as const);
+		// Only this conversation, ascending, with the run link kept. Ordinals are shared across conversations.
+		expect(after(0).map(([id]) => id)).toEqual(["u1", "a1", "u2", "a2", "u3"]);
+		const ordinal = Object.fromEntries(after(0)) as Record<string, number>;
+		const [o1, o2, o3, o4, o5] = [
+			ordinal.u1!,
+			ordinal.a1!,
+			ordinal.u2!,
+			ordinal.a2!,
+			ordinal.u3!,
+		];
+		expect(o2).toBeGreaterThan(o1 + 1);
+		expect(after(0)[0]?.[1]).toBe(o1);
+		expect(
+			read((db) => service.messagesAfterInTransaction(db, "c1", 0, 1))[0]
+				?.message.runId,
+		).toBe("run-u1");
+		expect(after(o2).map(([id]) => id)).toEqual(["u2", "a2", "u3"]);
+		expect(after(o5)).toEqual([]);
+		expect(after(0, 2).map(([id]) => id)).toEqual(["u1", "a1"]);
+		expect(read((db) => service.latestOrdinalInTransaction(db, "c1"))).toBe(o5);
+		const nth = (n: number) =>
+			read((db) => service.nthLatestUserOrdinalInTransaction(db, "c1", n));
+		expect([nth(1), nth(2), nth(3), nth(4), nth(0)]).toEqual([
+			o5,
+			o3,
+			o1,
+			0,
+			0,
+		]);
+		// A retracted message is gone from all three.
+		await service.retract({ messageId: "u3" });
+		expect(after(0).map(([id]) => id)).toEqual(["u1", "a1", "u2", "a2"]);
+		expect(read((db) => service.latestOrdinalInTransaction(db, "c1"))).toBe(o4);
+		expect([nth(1), nth(2), nth(3)]).toEqual([o3, o1, 0]);
+		await store.close();
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("the retract hook runs inside the retraction while the message is still readable, and also for a missing message", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "eumenes-conversation-hook-"));
+	try {
+		const store = openStore(join(dir, "test.sqlite3"), [
+			migration,
+			avatarMotionMigration,
+			answerDeliveryMigration,
+			outboxMigration,
+			retractionMigration,
+		]);
+		const service = createConversationService(store);
+		const seen: Array<{ id: string; text: string | undefined; run: string[] }> =
+			[];
+		service.setRetractHook((db, messageId) => {
+			const found = service.messageInTransaction(db, messageId);
+			seen.push({
+				id: messageId,
+				text: found?.message.text,
+				run: found?.message.runId
+					? service
+							.messagesOfRunInTransaction(
+								db,
+								found.message.conversationId,
+								found.message.runId,
+							)
+							.map(({ message }) => message.id)
+					: [],
+			});
+		});
+		const add = (id: string, role: "user" | "assistant", runId: string) =>
+			service.append({
+				id,
+				conversationId: "c1",
+				role,
+				text: `text-${id}`,
+				createdAt: "2026-01-01T00:00:00Z",
+				runId,
+			});
+		await add("u1", "user", "r1");
+		await add("a1", "assistant", "r1");
+		await service.retract({ messageId: "u1" });
+		expect(seen).toEqual([{ id: "u1", text: "text-u1", run: ["u1", "a1"] }]);
+		// Afterwards the retracted message is gone from the run's live messages.
+		expect(
+			store
+				.read((db) => service.messagesOfRunInTransaction(db, "c1", "r1"))
+				.map(({ message }) => message.id),
+		).toEqual(["a1"]);
+		await service.retract({ messageId: "nope" });
+		expect(seen.at(-1)).toEqual({ id: "nope", text: undefined, run: [] });
+		await store.close();
+	} finally {
 		rmSync(dir, { recursive: true, force: true });
 	}
 });

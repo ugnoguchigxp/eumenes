@@ -69,8 +69,34 @@ export interface LogFields {
 	outcome?: string;
 	retrieval?: string;
 	candidateCount?: number;
+	profile?: string;
+	ttftMs?: number;
+	totalMs?: number;
+	requestBytes?: number;
+	droppedMessages?: number;
+	promptTokens?: number;
+	completionTokens?: number;
+	cachedTokens?: number;
+	omitted?: number;
+	messageCount?: number;
+	applied?: number;
+	rejected?: number;
+	requestedRejected?: number;
 }
 const keys = new Set<keyof LogFields>([
+	"profile",
+	"ttftMs",
+	"totalMs",
+	"requestBytes",
+	"droppedMessages",
+	"promptTokens",
+	"completionTokens",
+	"cachedTokens",
+	"omitted",
+	"messageCount",
+	"applied",
+	"rejected",
+	"requestedRejected",
 	"selectionId",
 	"toolchainId",
 	"recipeId",

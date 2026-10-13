@@ -79,9 +79,72 @@ function saveRepair(db: Tx, taskId: string, issues: LogFields[]) {
 		taskId,
 	);
 }
+/** Invokes the granted tool for this step; authority was fixed at prepare. */
+function invokeStepTool(
+	ctx: RuntimeContext,
+	ops: TaskOps,
+	db: Tx,
+	t: Task,
+	claim: Claim,
+	input: StepInput,
+	p: NonNullable<ReturnType<RuntimeContext["state"]["prepared"]["get"]>>,
+	action: Extract<ControlAction, { action: "invoke" }>,
+) {
+	const { tools } = ctx.deps;
+	const { catalogs, bindings } = ctx.state;
+	const { next } = ops;
+	// Authority at prepare is immutable for this step. Cancellation,
+	// registry revision and the hard deadline are still checked at invoke.
+	const grant = input.grants.find((g) => g.id === action.tool);
+	const tool = (bindings.get(t.id) ?? []).find(
+		(b) => b.executionRef === grant?.executionRef,
+	);
+	if (!tool)
+		throw new ValidationFailure("invalid_tool_input", [
+			{ validationPath: "tool", validationCode: "unknown_tool" },
+		]);
+	if (isHistory(p) && toolRuntimeOf(tool.tool.revisionId)?.cursorPaging) {
+		const stale = tools
+			.observationsInTransaction(db, t.id)
+			.filter(
+				(o) => "errorCode" in o && o.errorCode === "history_cursor_stale",
+			).length;
+		if (stale > 1) throw new Error("agent_budget_exhausted");
+	}
+	const taskInput = researchInput.parse(p.input);
+	const obs = tools.observationsInTransaction(db, t.id);
+	const urls = [
+		...(taskInput.urls ?? []),
+		...obs.flatMap((o) => o.sources.flatMap((s) => (s.url ? [s.url] : []))),
+	];
+	const inv = tools.invokeInTransaction(
+		db,
+		owner(t),
+		tool.executionRef,
+		catalogs.get(t.id)!.arguments(action.arguments),
+		input.stepId,
+		t.deadline,
+		claim.jobId,
+		urls,
+		taskInput.question,
+		!grant?.replayOnly,
+	);
+	db.query(
+		"UPDATE agent_tasks SET tool_calls=?,invocation_id=? WHERE id=?",
+	).run(tools.invocationsInTransaction(db, t.id).length, inv.id, t.id);
+	if (inv.state !== "pending") {
+		next(db, get(db, t.id)!, claim.jobId, "research_no_progress");
+	} else
+		update(
+			db,
+			get(db, t.id)!,
+			"waiting_tool",
+			isSearch(toolRuntimeOf(tool.tool.revisionId)) ? "search" : "read",
+		);
+}
 export function createStepActions(ctx: RuntimeContext, ops: TaskOps) {
 	const { store, capabilities, tools, inference, now } = ctx.deps;
-	const { prepared, catalogs, bindings, releases } = ctx.state;
+	const { prepared, catalogs, releases } = ctx.state;
 	const { enqueue, ready, fail, next } = ops;
 	function rejectInvalidControl(
 		db: Tx,
@@ -234,56 +297,7 @@ export function createStepActions(ctx: RuntimeContext, ops: TaskOps) {
 					},
 				]);
 			if (action.action === "invoke") {
-				// Authority at prepare is immutable for this step. Cancellation,
-				// registry revision and the hard deadline are still checked at invoke.
-				const grant = input.grants.find((g) => g.id === action.tool);
-				const tool = (bindings.get(t.id) ?? []).find(
-					(b) => b.executionRef === grant?.executionRef,
-				);
-				if (!tool)
-					throw new ValidationFailure("invalid_tool_input", [
-						{ validationPath: "tool", validationCode: "unknown_tool" },
-					]);
-				if (isHistory(p) && toolRuntimeOf(tool.tool.revisionId)?.cursorPaging) {
-					const stale = tools
-						.observationsInTransaction(db, t.id)
-						.filter(
-							(o) => "errorCode" in o && o.errorCode === "history_cursor_stale",
-						).length;
-					if (stale > 1) throw new Error("agent_budget_exhausted");
-				}
-				const taskInput = researchInput.parse(p.input);
-				const obs = tools.observationsInTransaction(db, t.id);
-				const urls = [
-					...(taskInput.urls ?? []),
-					...obs.flatMap((o) =>
-						o.sources.flatMap((s) => (s.url ? [s.url] : [])),
-					),
-				];
-				const inv = tools.invokeInTransaction(
-					db,
-					owner(t),
-					tool.executionRef,
-					catalogs.get(t.id)!.arguments(action.arguments),
-					input.stepId,
-					t.deadline,
-					claim.jobId,
-					urls,
-					taskInput.question,
-					!grant?.replayOnly,
-				);
-				db.query(
-					"UPDATE agent_tasks SET tool_calls=?,invocation_id=? WHERE id=?",
-				).run(tools.invocationsInTransaction(db, t.id).length, inv.id, t.id);
-				if (inv.state !== "pending") {
-					next(db, get(db, t.id)!, claim.jobId, "research_no_progress");
-				} else
-					update(
-						db,
-						get(db, t.id)!,
-						"waiting_tool",
-						isSearch(toolRuntimeOf(tool.tool.revisionId)) ? "search" : "read",
-					);
+				invokeStepTool(ctx, ops, db, t, claim, input, p, action);
 			} else if (input.search) {
 				saveSearchReport(db, t, action.report, input.catalog, tools, now(), {
 					hook: ctx.deps.onSearchReport,

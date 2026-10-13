@@ -1447,6 +1447,67 @@ test("absent or invalid optional decision never breaks ordinary voice providers"
 	}
 });
 
+test("inference timing and token usage are logged without prompt or answer text", async () => {
+	const { configureLogging } = await import("../../../infrastructure/logger");
+	const lines: string[] = [];
+	configureLogging({
+		level: "info",
+		destination: {
+			write: (line) => {
+				lines.push(line);
+			},
+		},
+	});
+	const fake = fixture();
+	const larm = createLarm({
+		baseUrl: "http://127.0.0.1:9810",
+		token: "control",
+		profile: "SAAA",
+		fetch: async (input, init) =>
+			new URL(String(input)).pathname === "/llm/v1/chat/completions"
+				? new Response(
+						'data: {"choices":[{"delta":{"content":"secret-answer"}}]}\n\n' +
+							'data: {"usage":{"prompt_tokens":120,"completion_tokens":7,"prompt_tokens_details":{"cached_tokens":100},"total_tokens":"n/a"}}\n\n' +
+							"data: [DONE]\n\n",
+						{ headers: { "content-type": "text/event-stream" } },
+					)
+				: fake.fetcher(input, init),
+	});
+	try {
+		const deltas: string[] = [];
+		await larm.answerStream!(
+			[
+				{ role: "system", content: "secret-policy" },
+				{ role: "user", content: "secret-question" },
+			],
+			new AbortController().signal,
+			(text) => deltas.push(text),
+		);
+		expect(deltas.join("")).toBe("secret-answer");
+		const entries = lines
+			.map((line) => JSON.parse(line))
+			.filter((line) => line.event === "larm.llm_timing");
+		const entry = entries.at(-1);
+		expect(entry).toMatchObject({
+			level: "info",
+			profile: "main",
+			droppedMessages: 0,
+			promptTokens: 120,
+			completionTokens: 7,
+			cachedTokens: 100,
+		});
+		expect(entry.requestBytes).toBeGreaterThan(0);
+		expect(entry.totalMs).toBeGreaterThanOrEqual(0);
+		expect(entry.ttftMs).toBeGreaterThanOrEqual(0);
+		expect(entry.totalMs).toBeGreaterThanOrEqual(entry.ttftMs);
+		expect(entry.total_tokens).toBeUndefined();
+		for (const text of ["secret-answer", "secret-policy", "secret-question"])
+			expect(lines.join("\n")).not.toContain(text);
+	} finally {
+		await larm.close();
+	}
+});
+
 test("caller cancellation is logged separately from a provider network failure", async () => {
 	const { configureLogging } = await import("../../../infrastructure/logger");
 	const lines: string[] = [];

@@ -40,6 +40,7 @@ const pending = {
 	capability_unavailable: 503,
 	control_unavailable: 503,
 	memory_unavailable: 409,
+	memory_forget_incomplete: 409,
 	env_ref_not_allowed: 400,
 	web_research_unavailable: 503,
 	web_cache_unavailable: 503,

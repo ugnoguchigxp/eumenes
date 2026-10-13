@@ -19,7 +19,7 @@ const log = getLogger("dialogue");
 
 /** Input acceptance: idempotent run creation, manual/voice submit and the schedule target. */
 export function createIntake(deps: DialogueDeps) {
-	const { store, conversation, larm, queue, clock, id } = deps;
+	const { store, conversation, larm, queue, memory, clock, id } = deps;
 	/** One transaction: user message + run + queue job. Throws (rolling all back) when the queue is full. */
 	function acceptInTransaction(
 		db: Tx,
@@ -93,6 +93,11 @@ export function createIntake(deps: DialogueDeps) {
 			});
 		else larm.captureInTransaction?.(db, runId, "llm", deadlineAtMs);
 		insert(db, run);
+		// The memory agent reads the user's words alongside the answer's generation. A scheduled prompt is
+		// stored as a user message but is the system's: it is never learned from, and starts nothing.
+		if (input.sourceKind === "schedule")
+			memory?.excludeMessageInTransaction(db, messageId);
+		else memory?.scheduleAgentInTransaction(db, input.conversationId);
 		return { run, fresh: true };
 	}
 

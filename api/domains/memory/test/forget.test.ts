@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { migrations as memoryPackageMigrations } from "eumenes-memory/sqlite";
@@ -13,8 +13,15 @@ import {
 import {
 	createContinuityService,
 	migration as continuityMigration,
+	shortTermMigration,
 } from "../../continuity";
-import { createMemoryService, migration } from "..";
+import {
+	agentHardeningMigration,
+	turnVectorsMigration,
+	contextWindowMigration,
+	createMemoryService,
+	migration,
+} from "..";
 
 test("forget removes every version of a fact beyond the 1000-row listing cap, and never another principal's item", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-memory-forget-"));
@@ -24,7 +31,11 @@ test("forget removes every version of a fact beyond the 1000-row listing cap, an
 			avatarMotionMigration,
 			answerDeliveryMigration,
 			continuityMigration,
+			shortTermMigration,
 			migration,
+			contextWindowMigration,
+			agentHardeningMigration,
+			turnVectorsMigration,
 			...memoryPackageMigrations,
 		]);
 		const conversation = createConversationService(store);
@@ -106,3 +117,87 @@ test("forget removes every version of a fact beyond the 1000-row listing cap, an
 		rmSync(dir, { recursive: true, force: true });
 	}
 }, 60_000);
+
+test("forget refuses an unknown or foreign item before anything is journaled", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "eumenes-memory-forget-pre-"));
+	try {
+		const store = openStore(join(dir, "db.sqlite3"), [
+			conversationMigration,
+			avatarMotionMigration,
+			answerDeliveryMigration,
+			continuityMigration,
+			shortTermMigration,
+			migration,
+			contextWindowMigration,
+			agentHardeningMigration,
+			turnVectorsMigration,
+			...memoryPackageMigrations,
+		]);
+		const journalPath = join(dir, "journal.jsonl");
+		const memory = createMemoryService(
+			store,
+			createConversationService(store),
+			createContinuityService(store),
+			{ journalPath },
+		);
+		expect((await memory.recover()).healthy).toBe(true);
+		await expect(memory.forget(`state:${"a".repeat(64)}`)).rejects.toThrow(
+			"invalid_memory_item",
+		);
+		expect(existsSync(journalPath)).toBe(false);
+		await store.close();
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("a forget that fails after it was journaled reports memory_forget_incomplete (409)", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "eumenes-memory-forget-inc-"));
+	try {
+		const store = openStore(join(dir, "db.sqlite3"), [
+			conversationMigration,
+			avatarMotionMigration,
+			answerDeliveryMigration,
+			continuityMigration,
+			shortTermMigration,
+			migration,
+			contextWindowMigration,
+			agentHardeningMigration,
+			turnVectorsMigration,
+			...memoryPackageMigrations,
+		]);
+		const conversation = createConversationService(store);
+		const memory = createMemoryService(
+			store,
+			conversation,
+			createContinuityService(store),
+			{ journalPath: join(dir, "journal.jsonl") },
+		);
+		expect((await memory.recover()).healthy).toBe(true);
+		await conversation.append({
+			id: "m1",
+			conversationId: "c1",
+			role: "user",
+			text: "私はコーヒーが好きです",
+			createdAt: "2026-10-01T00:00:00Z",
+			runId: null,
+		});
+		const item = await memory.remember({
+			conversationId: "c1",
+			messageId: "m1",
+			quote: "コーヒーが好き",
+			kind: "preference",
+			semanticKey: "drink",
+			text: "コーヒーが好き",
+			polarity: "affirmed",
+		});
+		// The usage purge runs after the journal line: breaking its table fails the forget at that point.
+		await store.write((db) => db.exec("DROP TABLE memory_usage"));
+		await expect(memory.forget(item.id)).rejects.toThrow(
+			"memory_forget_incomplete",
+		);
+		await store.close();
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});

@@ -1,0 +1,186 @@
+import { afterEach, expect, test } from "bun:test";
+import { writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { Hono } from "hono";
+import { configureLogging } from "../../../infrastructure/logger";
+import {
+	conversationQuerySchema,
+	memoryContextSchema,
+	memoryItemsSchema,
+	memoryTendenciesSchema,
+	shortTermSchema,
+} from "../contracts";
+import { registerMemory } from "..";
+import type { AgentRefs } from "../service/operation";
+import { setupMemory, type MemoryHarness } from "./memory.fixture";
+
+const open: MemoryHarness[] = [];
+afterEach(async () => {
+	configureLogging({ level: "silent" });
+	for (const h of open.splice(0)) await h.close();
+});
+async function setup() {
+	const h = await setupMemory();
+	open.push(h);
+	const app = new Hono();
+	registerMemory(app, h.memory);
+	app.onError((error, c) => c.json({ error: error.message }, 400));
+	return { h, app };
+}
+
+test("items carry their evidence, period and who asked for them", async () => {
+	const { h, app } = await setup();
+	const id = await h.say("user", "9月からZedを使ってる", "c1", "run-a");
+	await h.memory.remember({
+		conversationId: "c1",
+		messageId: id,
+		quote: "Zedを使ってる",
+		kind: "habit",
+		semanticKey: "editor",
+		text: "Zedを使っている",
+		polarity: "affirmed",
+		validity: {
+			from: { precision: "month", year: 2026, month: 9 },
+			basis: "stated",
+		},
+	});
+	const response = await app.request("/api/memory/items");
+	const { items } = memoryItemsSchema.parse(await response.json());
+	expect(items).toHaveLength(1);
+	expect(items[0]).toMatchObject({
+		evidence: [{ messageId: id, quote: "Zedを使ってる" }],
+		validity: { from: "2026-09" },
+		capturedBy: "manual",
+	});
+	// An item with no period has none.
+	await h.seed("コーヒーが好き", "drink.coffee");
+	const second = memoryItemsSchema.parse(
+		await (await app.request("/api/memory/items")).json(),
+	).items;
+	expect(
+		second.find((i) => i.semanticKey === "drink.coffee")?.validity,
+	).toBeNull();
+});
+
+test("short-term notes of the named conversation only; the conversation is required", async () => {
+	const { h, app } = await setup();
+	await h.continuity.add("c1", { kind: "goal", text: "Rust移行" });
+	await h.continuity.add("c2", { kind: "memo", text: "別の会話" });
+	const response = await app.request(
+		"/api/memory/short-term?conversationId=c1",
+	);
+	expect(response.status).toBe(200);
+	const { items } = shortTermSchema.parse(await response.json());
+	expect(items.map((i) => i.text)).toEqual(["Rust移行"]);
+	expect(items[0]).toMatchObject({ origin: "user", expiresAt: null });
+	// No default conversation.
+	const missing = await app.request("/api/memory/short-term");
+	expect(missing.status).toBe(400);
+	expect(await missing.json()).toEqual({ error: "invalid_memory_input" });
+	expect((await app.request("/api/memory/context")).status).toBe(400);
+	expect(
+		conversationQuerySchema.safeParse({ conversationId: "" }).success,
+	).toBe(false);
+	// Expired notes are not listed.
+	await h.continuity.add("c1", { kind: "memo", text: "一週間のメモ" });
+	h.time.now = "2026-10-21T12:00:00.000Z";
+	const later = shortTermSchema.parse(
+		await (
+			await app.request("/api/memory/short-term?conversationId=c1")
+		).json(),
+	).items;
+	expect(later.map((i) => i.text)).toEqual(["Rust移行"]);
+});
+
+test("tendencies are listed and deleted for good", async () => {
+	const { h, app } = await setup();
+	const a = await h.seed("コーヒーが好き", "drink.coffee");
+	const b = await h.seed("毎朝走る", "run", "毎朝走る", "habit");
+	const refs: AgentRefs = {
+		m1: { namespace: "state", id: a.id, revision: a.revision },
+		m2: { namespace: "state", id: b.id, revision: b.revision },
+	};
+	await h.store.write((db) =>
+		h.memory.applyAgentOpInTransaction(
+			db,
+			{ conversationId: "c1", refs, turns: [] },
+			{ type: "tendency_add", text: "朝型", evidenceRefs: ["m1", "m2"] },
+		),
+	);
+	const listed = memoryTendenciesSchema.parse(
+		await (await app.request("/api/memory/tendencies")).json(),
+	).items;
+	expect(listed).toMatchObject([{ text: "朝型", revision: 1 }]);
+	const removed = await app.request(`/api/memory/tendencies/${listed[0]!.id}`, {
+		method: "DELETE",
+	});
+	expect(removed.status).toBe(200);
+	expect(await removed.json()).toEqual({ ok: true });
+	expect(
+		memoryTendenciesSchema.parse(
+			await (await app.request("/api/memory/tendencies")).json(),
+		).items,
+	).toEqual([]);
+	const again = await app.request(`/api/memory/tendencies/${listed[0]!.id}`, {
+		method: "DELETE",
+	});
+	expect(again.status).toBe(400);
+	expect(await again.json()).toEqual({ error: "invalid_memory_item" });
+});
+
+test("the context endpoint shows both layers against their limits, and is off when memory is", async () => {
+	const { h, app } = await setup();
+	await h.seed("コーヒーが好き", "drink.coffee");
+	await h.continuity.add("c1", { kind: "goal", text: "Rust移行" });
+	const response = await app.request("/api/memory/context?conversationId=c1");
+	const context = memoryContextSchema.parse(await response.json());
+	if ("disabled" in context && context.disabled) throw new Error("off");
+	expect(context).toMatchObject({
+		longTerm: { limit: 16 * 1024 },
+		shortTerm: { limit: 8 * 1024, pendingAdditions: 0 },
+		notices: 0,
+	});
+	if (!("longTerm" in context)) throw new Error("off");
+	expect(context.longTerm.text).toContain("コーヒーが好き");
+	expect(context.longTerm.bytes).toBe(Buffer.byteLength(context.longTerm.text));
+	expect(context.shortTerm.text).toContain("Rust移行");
+	await h.memory.setEnabled(false);
+	expect(
+		await (await app.request("/api/memory/context?conversationId=c1")).json(),
+	).toEqual({ disabled: true });
+});
+
+test("while the journal is inconsistent none of the new endpoints shows a body", async () => {
+	const { h, app } = await setup();
+	await h.seed("コーヒーが好き", "drink.coffee");
+	await h.continuity.add("c1", { kind: "goal", text: "Rust移行" });
+	writeFileSync(join(h.dir, "journal.jsonl"), "not json\n");
+	expect((await h.memory.recover()).healthy).toBe(false);
+	expect(
+		await (
+			await app.request("/api/memory/short-term?conversationId=c1")
+		).json(),
+	).toEqual({ items: [] });
+	expect(await (await app.request("/api/memory/tendencies")).json()).toEqual({
+		items: [],
+	});
+	expect(
+		await (await app.request("/api/memory/context?conversationId=c1")).json(),
+	).toEqual({ disabled: true });
+});
+
+test("a note that expires leaves the short-term layer without any other change", async () => {
+	const { h } = await setup();
+	await h.continuity.add("c1", { kind: "memo", text: "一週間のメモ" });
+	await h.continuity.add("c1", { kind: "goal", text: "Rust移行" });
+	const first = await h.window();
+	expect(first.shortTerm.text).toContain("一週間のメモ");
+	expect((await h.window()).version).toBe(first.version);
+	h.time.now = "2026-10-21T12:00:00.000Z";
+	const later = await h.window();
+	expect(later.version).toBeGreaterThan(first.version);
+	expect(later.shortTerm.text).not.toContain("一週間のメモ");
+	expect(later.shortTerm.text).toContain("Rust移行");
+	// Nothing left to expire: the window is stable again.
+	expect((await h.window()).version).toBe(later.version);
+});
