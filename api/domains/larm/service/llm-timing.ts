@@ -1,7 +1,7 @@
 import { readChatResponse } from "../../../infrastructure/chat-stream";
 import { getLogger } from "../../../infrastructure/logger";
 import type { LarmCallOptions, LarmPort } from "../contracts";
-import { auxiliaryProfile, type Provider } from "./profiles";
+import { type Provider } from "./profiles";
 import { fitContext } from "./context";
 
 const log = getLogger("larm");
@@ -31,18 +31,19 @@ function usageCounts(usage: Record<string, unknown> | undefined) {
  * Exactly one `larm.llm_timing` is emitted per exchange, success or failure.
  */
 export function startLlmTiming(
-	profile: string,
+	_profile: string,
 	messages: Parameters<LarmPort["answer"]>[0],
 	window: NonNullable<Provider["contextWindow"]>,
 	options: LarmCallOptions | undefined,
 	onDelta: ((text: string) => void) | undefined,
+	formalCount = false,
 ) {
 	// The fit check already measured the final messages; no extra serialization.
-	const { messages: selected, bytes: requestBytes } = fitContext(
-		messages,
-		window,
-		options?.contextPolicy === "exact",
-	);
+	const fitted = formalCount
+		? { messages, bytes: 0 }
+		: fitContext(messages, window, options?.contextPolicy === "exact");
+	const selected = fitted.messages;
+	let requestBytes = fitted.bytes;
 	const started = Date.now();
 	let firstDeltaAt: number | undefined;
 	let logged = false;
@@ -54,7 +55,7 @@ export function startLlmTiming(
 		logged = true;
 		try {
 			const fields = {
-				profile: profile === auxiliaryProfile ? "auxiliary" : "main",
+				profile: options?.sessionRole === "auxiliary" ? "auxiliary" : "main",
 				outcome,
 				...(firstDeltaAt === undefined
 					? {}
@@ -72,6 +73,9 @@ export function startLlmTiming(
 	}
 	return {
 		selected,
+		setRequestBytes(value: number) {
+			requestBytes = value;
+		},
 		/** Records a failure before the response could be read (send, status or exchange hook). Idempotent. */
 		failed(signal: AbortSignal) {
 			emit(signal.aborted ? "aborted" : "error");

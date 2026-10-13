@@ -3,10 +3,8 @@ import type { Database } from "bun:sqlite";
 import type { Settings, Purpose } from "../../settings/contracts";
 import type { SentenceLanguageDecision } from "../../larm";
 import type { SpeechDelivery, SpeechPreparation } from "../../delivery";
-export type Messages = Array<{
-	role: "system" | "user" | "assistant";
-	content: string;
-}>;
+export type { ChatImage } from "../../larm";
+export type Messages = import("../../larm").ChatMessage[];
 /** Instruction body excludes the output schema, which is rendered from its value. */
 export type ControlContract = {
 	instructions: string;
@@ -87,6 +85,7 @@ export interface InferencePort {
 		policy: "exact",
 	): void;
 	status(): {
+		chatInput?: import("../../larm").ChatInput;
 		state: "unconfigured" | "idle" | "ready" | "connecting" | "failed";
 		capabilities: Purpose[];
 		error?: string;

@@ -1,3 +1,4 @@
+import { attachmentErrors } from "../domains/conversation/contracts";
 import { errorStatus as objectRecognition } from "../domains/object-recognition/contracts";
 import { errorStatus as capabilities } from "../domains/capabilities/contracts";
 import type { HttpErrorStatus } from "../infrastructure/http";
@@ -66,6 +67,7 @@ export function mergeErrorStatus(
 }
 
 const statusByCode = mergeErrorStatus(
+	attachmentErrors,
 	objectRecognition,
 	capabilities,
 	dots,

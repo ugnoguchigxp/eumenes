@@ -1,16 +1,25 @@
 import type { Database } from "bun:sqlite";
 import { z } from "zod";
-export const submitSchema = z.object({
+const submitFields = z.object({
 	requestId: z.uuid(),
 	conversationId: z.string().min(1).max(120),
-	text: z.string().trim().min(1).max(8000),
+	text: z.string().trim().max(8000),
+	attachmentIds: z
+		.array(z.uuid())
+		.max(8)
+		.refine((ids) => new Set(ids).size === ids.length)
+		.optional(),
 	utteranceId: z.string().min(1).max(120).optional(),
 });
+const hasInput = (v: { text: string; attachmentIds?: string[] }) =>
+	!!(v.text || v.attachmentIds?.length);
+export const submitSchema = submitFields.refine(hasInput, "input_required");
 export type Submit = z.infer<typeof submitSchema>;
 /** Public HTTP input: voice runs are created only by voice-dialogue, never by clients. */
-export const publicSubmitSchema = submitSchema
+export const publicSubmitSchema = submitFields
 	.omit({ utteranceId: true })
-	.strict();
+	.strict()
+	.refine(hasInput, "input_required");
 export type PublicSubmit = z.infer<typeof publicSubmitSchema>;
 export const runSchema = z.object({
 	id: z.string(),

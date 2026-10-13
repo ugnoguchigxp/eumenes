@@ -98,6 +98,10 @@ export function createApp(options: AppOptions | LegacyAppOptions) {
 			c.req.method !== "HEAD" &&
 			!streamBoundedRoutes.has(c.req.path) &&
 			!(
+				c.req.method === "POST" &&
+				/^\/api\/conversations\/[^/]+\/attachments$/.test(c.req.path)
+			) &&
+			!(
 				c.req.method === "PUT" &&
 				/^\/api\/excalidraw\/sessions\/[a-f0-9-]{36}\/document$/.test(
 					c.req.path,

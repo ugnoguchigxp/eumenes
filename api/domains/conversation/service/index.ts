@@ -1,3 +1,5 @@
+import { createAttachments } from "./attachments";
+import { linkAttachments } from "../repository/attachments";
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { AvatarMotion, SpeechDelivery } from "../../delivery";
@@ -88,6 +90,7 @@ export function createConversationService(
 		);
 	};
 	return {
+		...createAttachments(store, outbox.principal),
 		historyFingerprintInTransaction: history.fingerprint,
 		historySearchInTransaction: history.search,
 		historyReadInTransaction: history.read,
@@ -218,12 +221,30 @@ export function createConversationService(
 		},
 		appendInTransaction(db: Database, message: Message): number {
 			ensureConversation(db, message.conversationId, message.createdAt);
-			return appendMessage(db, message, outbox);
+			const result = appendMessage(db, message, outbox);
+			if (message.attachments?.length)
+				linkAttachments(
+					db,
+					message.id,
+					message.attachments.map((a) => a.id),
+					outbox.principal,
+					message.conversationId,
+				);
+			return result;
 		},
 		append(message: Message): Promise<number> {
 			return store.write((db) => {
 				ensureConversation(db, message.conversationId, message.createdAt);
-				return appendMessage(db, message, outbox);
+				const result = appendMessage(db, message, outbox);
+				if (message.attachments?.length)
+					linkAttachments(
+						db,
+						message.id,
+						message.attachments.map((a) => a.id),
+						outbox.principal,
+						message.conversationId,
+					);
+				return result;
 			});
 		},
 	};

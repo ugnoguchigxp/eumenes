@@ -1,5 +1,6 @@
 import {
 	conversationSchema,
+	attachmentSchema,
 	historySearchResultSchema,
 	historyReadResultSchema,
 	type HistorySearchInput,
@@ -8,6 +9,29 @@ import {
 import { json, type Transport } from "./transport";
 export function conversationClient(transport: Transport) {
 	return {
+		uploadAttachment: async (id: string, requestId: string, file: File) => {
+			const body = new FormData();
+			body.set("file", file);
+			return attachmentSchema.parse(
+				await (
+					await transport.call(
+						`/api/conversations/${encodeURIComponent(id)}/attachments?requestId=${encodeURIComponent(requestId)}`,
+						{ method: "POST", body },
+					)
+				).json(),
+			);
+		},
+		attachmentPreview: async (
+			id: string,
+			attachmentId: string,
+			signal?: AbortSignal,
+		) =>
+			(
+				await transport.call(
+					`/api/conversations/${encodeURIComponent(id)}/attachments/${encodeURIComponent(attachmentId)}/content?preview=true`,
+					{ signal },
+				)
+			).blob(),
 		historySearch: async (
 			id: string,
 			input: HistorySearchInput,

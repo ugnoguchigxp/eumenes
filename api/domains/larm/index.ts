@@ -1,4 +1,10 @@
 export type {
+	ChatMessage,
+	ChatImage,
+	ChatInput,
+	ChatContentPart,
+} from "./contracts/chat-input";
+export type {
 	LarmPort,
 	LarmStatus,
 	LarmExchange,

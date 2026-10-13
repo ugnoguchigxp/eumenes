@@ -1,4 +1,10 @@
 import { z } from "zod";
+import {
+	chatInputSchema,
+	type ChatInput,
+	type ChatMessage,
+} from "./chat-input";
+export * from "./chat-input";
 export {
 	imageArtifactId,
 	imageArtifact,
@@ -66,6 +72,7 @@ export type LarmCallOptions = {
 	pitchScale?: number;
 };
 export type LarmStatus = {
+	chatInput?: ChatInput;
 	state: "unconfigured" | "idle" | "ready" | "connecting" | "failed";
 	capabilities: Capability[];
 	error?: string;
@@ -115,13 +122,13 @@ export interface LarmPort {
 	connect(): Promise<void>;
 	prepareVoice?(signal: AbortSignal): Promise<void>;
 	answerStream?(
-		messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
+		messages: ChatMessage[],
 		signal: AbortSignal,
 		onDelta: (text: string) => void,
 		options?: LarmCallOptions,
 	): Promise<string>;
 	answer(
-		messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
+		messages: ChatMessage[],
 		signal: AbortSignal,
 		options?: LarmCallOptions,
 	): Promise<string>;
@@ -141,6 +148,7 @@ export interface LarmPort {
 export const larmStatusSchema: z.ZodType<LarmStatus> = z.object({
 	state: z.enum(["unconfigured", "idle", "ready", "connecting", "failed"]),
 	capabilities: z.array(z.enum(["llm", "asr", "tts"])),
+	chatInput: chatInputSchema.optional(),
 	error: z.string().optional(),
 });
 export const statusResponseSchema = z.object({

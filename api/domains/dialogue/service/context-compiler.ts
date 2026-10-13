@@ -60,7 +60,16 @@ export function compileContext(
 		const ordinals: number[] = [];
 		const input = conversation.messageInTransaction(tx, prior.inputMessageId);
 		if (input) {
-			pair.push({ role: "user", content: input.message.text });
+			pair.push({
+				role: "user",
+				content: input.message.text,
+				...(input.message.attachments?.length
+					? {
+							attachments: input.message.attachments,
+							sourceMessageId: input.message.id,
+						}
+					: {}),
+			});
 			ordinals.push(input.ordinal);
 		}
 		if (prior.status === "completed" && prior.answerMessageId) {
@@ -85,7 +94,17 @@ export function compileContext(
 	for (const pair of exchanges.slice(first)) messages.push(...pair);
 
 	const input = conversation.messageInTransaction(tx, run.inputMessageId);
-	if (input) messages.push({ role: "user", content: input.message.text });
+	if (input)
+		messages.push({
+			role: "user",
+			content: input.message.text,
+			...(input.message.attachments?.length
+				? {
+						attachments: input.message.attachments,
+						sourceMessageId: input.message.id,
+					}
+				: {}),
+		});
 	const sent = [
 		...exchanges.slice(first).flatMap((pair) => pair.ordinals),
 		...(input ? [input.ordinal] : []),

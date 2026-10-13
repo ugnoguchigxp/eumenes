@@ -28,6 +28,8 @@ function bounded(response: Response, limit: number) {
 
 /** Drops the oldest turns (after the first message) until the estimate fits the window. */
 function fitMessages(row: RequestRow, resource: Resource, input: Messages) {
+	if (input.some((m) => m.images?.length))
+		throw new Error("image_not_supported");
 	const messages = [...input];
 	const reserve = Math.min(4096, Math.floor((resource.contextWindow ?? 0) / 4));
 	const budget = (resource.contextWindow ?? 0) - reserve - 512;
@@ -74,6 +76,8 @@ async function agentRequest(
 	onDelta?: (text: string) => void,
 	options?: import("../../larm").LarmCallOptions,
 ) {
+	if (input.some((m) => m.images?.length))
+		throw new Error("image_not_supported");
 	if (row.purpose !== "llm") throw new Error("cloud_agent_purpose_unsupported");
 	if (!env.agents) throw new Error("cloud_agent_unavailable");
 	const result = await env.agents.run({

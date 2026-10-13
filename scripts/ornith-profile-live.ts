@@ -172,10 +172,7 @@ if (import.meta.main) {
 			);
 		await until(() => inferred.length === 4, signal);
 		const ready = [...states.values()].filter((x) => x.status === "ready");
-		if (
-			ready.filter((x) => x.profile === "ornith1.5Strix").length !== 1 ||
-			ready.filter((x) => x.profile === "ornith1.5Strix-64k").length !== 3
-		)
+		if (ready.length !== 4 || ready.some((x) => x.profile !== "ornith1.5Strix"))
 			throw new Error("live_session_layout_mismatch");
 		launch(
 			main.answer(messages(4), signal, {

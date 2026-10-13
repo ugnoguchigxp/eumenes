@@ -1,10 +1,13 @@
 import { z } from "zod";
 import { avatarMotionSchema, speechDeliverySchema } from "../../delivery";
+import { attachmentSchema } from "./attachments";
+export * from "./attachments";
 export const messageSchema = z.object({
 	id: z.string(),
 	conversationId: z.string(),
 	role: z.enum(["user", "assistant"]),
 	text: z.string(),
+	attachments: z.array(attachmentSchema).optional(),
 	createdAt: z.string(),
 	runId: z.string().nullable(),
 	avatarMotion: avatarMotionSchema.optional(),

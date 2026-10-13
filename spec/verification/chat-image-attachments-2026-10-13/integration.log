@@ -1,0 +1,33 @@
+bun test v1.4.3 (c6da4a4d3)
+
+api/application/chat-image-attachments.test.ts:
+(pass) Eumenes upload, atomic acceptance, image-only streaming, ordered history resend and authorization [122.66ms]
+(pass) fits=false is visible as a failed run and no inference POST is made [90.43ms]
+(pass) missing bytes fail instead of omitting images [87.18ms]
+(pass) queue capacity rejection rolls back the message and attachment association [80.74ms]
+(pass) Eumenes cancel during count adopts no answer [94.02ms]
+(pass) Eumenes cancel during generate adopts no answer [91.82ms]
+(pass) withdrawn source rejects a late answer even when another live message uses the same image [96.23ms]
+
+api/domains/larm/test/chat-input.test.ts:
+(pass) image wire conversion preserves assistant tool_calls and ordinary string messages [0.09ms]
+(pass) formal counting uses the complete identical request, images, tools, output and stream; bytes are not tokens [1.16ms]
+(pass) fits false prevents inference without dropping images [0.65ms]
+(pass) count unavailable prevents inference without dropping images [0.34ms]
+(pass) unsupported capability prevents inference without dropping images [0.15ms]
+(pass) final body exceeds limit prevents inference without dropping images [0.25ms]
+(pass) cancels during count and does not retry [2.92ms]
+(pass) cancels during generate and does not retry [1.09ms]
+(pass) renew reclaims the credential before counting and generation [1.23ms]
+(pass) unknown generation result is not automatically retried [0.70ms]
+(pass) claim image limits cover all history and stop before counting [0.17ms]
+
+api/domains/conversation/test/attachments.test.ts:
+(pass) JPG PNG BMP fully decode; normalized pixels, alpha and EXIF match previews [9.29ms]
+(pass) rejects broken and mismatched images and predecode dimensions [1.97ms]
+(pass) attachment owner, conversation, replay identity and restart persistence [35.94ms]
+
+ 21 pass
+ 0 fail
+ 91 expect() calls
+Ran 21 tests across 3 files. [1055.00ms]

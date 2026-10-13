@@ -2,9 +2,9 @@
 
 新規設定とProfile未指定時の基本selectorは `ornith1.5Strix` です。保存済みの明示的な選択と初回の `LARM_PROFILE` 指定は維持します。`SAAA-gemma4-26b` は新規保存では選べません（保存済みの文書は読み込めます）。
 
-主会話は `ornith1.5Strix`（256K × 1）、補助のcontrol要求は `ornith1.5Strix-64k`（64K × 最大3）を使います。両方の公開LLMモデル名は `ornith-1.5-strix-lean`。LARM側で同じOrnithランタイムと512Kの共有KV領域へ割り当てます。主会話の同一接続上の推論は順番に実行し、補助要求はそれぞれ独立したConnectionと履歴を使い、終了・取消時に解放します。補助の実行中は主接続を保持し、5つ目はLARMの `pending / waiting-capacity` を同じConnectionで追跡します。readyとProviderのclaimableを確認するまでclaim・推論を始めません。待機は呼出元の期限・取消とLARMのConnection lifecycleに従います。
+主会話と補助のcontrol要求は `ornith1.5Strix` を使います。LARMは1M tokenの共有KVと4 Sessionを管理し、各Connectionのcontext window・出力予約はclaimを正本とします。公開モデル名は現在 `ornith-1.5-strix-lean` で、送信にはclaim値を使います。主会話の同一接続上の推論は順番に実行し、補助要求は独立したConnectionと履歴を使い、終了・取消時に解放します。5つ目の待機はLARMのConnection lifecycleと呼出元の期限・取消に従い、readyとclaimableを確認するまで推論しません。
 
-`GET /v3/agent-profiles?profile=...` から構成と `catalogRevision` を取得し、作成時に `expectedCatalogRevision` を指定します。同じclientとProfileの要求ではLARMが既存Connectionを再利用するため、各sessionに固有のclient識別子を使い、renew・再接続では同じ識別子を維持します。主・補助の入力予算はclaimのcontext windowから求め、現在は256072 / 59464 token、出力予約4096 tokenです。旧補助selector `SAAA-gemma4-26b-64k` の利用禁止は維持します。
+`GET /v3/agent-profiles?profile=...` から構成と `catalogRevision` を取得し、作成時に `expectedCatalogRevision` を指定します。同じclientとProfileの要求ではLARMが既存Connectionを再利用するため、各sessionに固有のclient識別子を使い、renew・再接続では同じ識別子を維持します。入力予算はclaimのcontext windowと正式なchat input計数から求めます。出力予約はclaimの上限以内で明示します。旧補助selector `SAAA-gemma4-26b-64k` の利用禁止は維持します。
 
 LLMのみの要求は `providers: ["llm"]`、音声の要求は `providers` を省略して選択Profile全体を取得します。不要なProviderを事前予約しません。Providerの接続先・model・tokenはclaimの `configuration.fields.baseURL` / `daemonURL`、`configuration.fields.model`、`credential.token` を使い、公開endpointとの整合性を確認します。ASR、日英TTS、Ruriの態度・文章言語判定とembeddingは新Profileのcatalogから発見する既存経路を使います。期限前のrenew後は再claimでtokenを更新し、終了時に解放し、失効時は既存の再接続処理を使います。
 
@@ -82,3 +82,7 @@ music domainのプレイリストは会話/run・検索条件・曲IDを保存�
 2026-10-12夕方の配備後、`SAAA-gemma4-26b` の `sentence-language` / `ruri-v3-30m-sentence-language` と既存態度用 `system-one` の共存を確認した。接続を保持し、分類のHTTP要求ごとにモデルを初期化しない。分類結果を使った日英両TTSと、Eumenes公開APIからの音声取得・receipt採用が成功した。実機器3往復は未実施。
 
 再確認は `bun scripts/sentence-language-live.ts --run`。保存済みbackend設定と公開接続だけを使い、既知の日英文で両TTSの通信とWAV取得を確認する。保存されたProvider、またはcapabilityに合う唯一の候補を使って二分類を確認する。`--benchmark` を付けると日本語・英語・態度との同時要求を各200回測る。このPCでの通常分類P95は日本語27.36ms・英語52.68ms。同時要求の両方完了までのP95は107.82ms、失敗0/600、同じConnectionを使用した。LARMホスト内の測定とネットワークを含むこの測定を区別する。公開API経路は `bun scripts/sentence-language-api-live.ts --run` で隔離backendの設定API・分類・合成・receipt採用を確認する。結果は `verification-reports/sentence-language-live/`、実施記録は [検証記録](../spec/verification/ruri-sentence-language-2026-10-12/README.md)。合成音声の取得はスピーカー再生の実機器受入に数えない。
+
+## チャットの画像入力
+
+ornith1.5のJPG・PNG・BMP入力は、Providerの`llm.vision`と`chatInput`を確認して使います。保存、履歴再送、正式token計数と保持説明は[チャット画像入力](chat-images.md)を参照してください。

@@ -1,0 +1,68 @@
+$ bun scripts/verify.ts --domain conversation
+[verify] selected=conversation dependencyClosure=delivery,conversation,avatar testClosure=delivery,avatar,conversation
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts api/domains/conversation web/src/domains/conversation web/src/components/domains/conversation
+size-budget ok (26 files)
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check api/domains/conversation web/src/domains/conversation web/src/components/domains/conversation
+$ oxfmt --check api/domains/conversation web/src/domains/conversation web/src/components/domains/conversation
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 5ms on 40 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint api/domains/conversation web/src/domains/conversation web/src/components/domains/conversation
+$ oxlint --deny-warnings api/domains/conversation web/src/domains/conversation web/src/components/domains/conversation
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun check -p /Users/y.noguchi/Code/eumenes/verification-reports/tsconfig.selected.json
+✓ No type errors in 193 files [155.29ms]
+[verify] TypeScript workspace closure: 197 files; api/infrastructure/flock.ts, api/infrastructure/logger.ts, api/infrastructure/sqlite, api/domains/conversation, api/domains/delivery, api/infrastructure/concurrency.ts, api/infrastructure/bounded-read.ts, client/transport.ts, client/conversation.ts, web/src/queryKeys.ts, web/src/domains, api/domains/object-recognition, client/object-recognition.ts, api/domains/excalidraw, client/excalidraw.ts, api/domains/capabilities, api/domains/image, api/domains/larm, api/infrastructure/http.ts, api/infrastructure/chat-stream.ts, client/image.ts, api/domains/music, client/music.ts, api/domains/dots, client/dots.ts, client/requirements.ts, packages/coding-runner/src, api/domains/coding-supervision, api/domains/task-reports, client/coding-supervision.ts, api/infrastructure/digest.ts, api/infrastructure/vector.ts, api/infrastructure/validation-log.ts, api/domains/tool-runtime, api/domains/queue, api/domains/agent-runtime, client/agent-runtime.ts, client/attitude-dataset.ts, api/domains/dialogue, client/run-stream.ts, client/dialogue.ts, client/events.ts, client/larm.ts, api/domains/continuity, api/domains/memory, client/memory.ts, client/queue.ts, api/domains/toolchain-history, client/toolchain-history.ts, api/domains/scheduler, client/scheduler.ts, api/domains/settings, api/infrastructure/ignore-error.ts, api/infrastructure/error-code.ts, api/domains/inference, client/settings.ts, api/domains/service-tests, client/service-tests.ts, api/domains/tts-dictionary, client/tts-dictionary.ts, api/domains/tasks, client/tasks.ts, api/domains/coding, client/coding.ts, api/domains/timers, client/timers.ts, api/domains/voice-dialogue, client/voice-dialogue.ts, api/domains/web-research, client/web-research.ts, api/domains/world, client/world.ts, client/index.ts, packages/design-system/dist, web/src/design-system, web/src/errorMessages.ts, web/src/components
+[verify] domain tests: /Users/y.noguchi/.bun/bin/bun run test:domain -- conversation
+$ bun scripts/test-domain.ts conversation
+bun test v1.4.3 (c6da4a4d3)
+
+api/domains/conversation/test/attachments.test.ts:
+(pass) JPG PNG BMP fully decode; normalized pixels, alpha and EXIF match previews [10.65ms]
+(pass) rejects broken and mismatched images and predecode dimensions [3.06ms]
+(pass) attachment owner, conversation, replay identity and restart persistence [26.61ms]
+
+api/domains/conversation/test/history.test.ts:
+(pass) H1/H5/H6/H8: exact search and ordered context exclude drafts, retractions, another conversation and the current request [10.16ms]
+(pass) H2/H3: 240 turns, identical timestamps and sparse rowids paginate without duplicate/lost IDs; 500-row scan returns a cursor even on zero matches [37.37ms]
+(pass) H2/H3: a large single message is scanned in finite chunks and a boundary-spanning match is not lost; read continues in Unicode positions [26.55ms]
+(pass) H4/H7: correction, append, retraction, TTL and restart invalidate cursors/views before adoption [9.95ms]
+(pass) one owner cannot use the whole search-session capacity; its oldest search is dropped [35.51ms]
+
+api/domains/conversation/test/bounded-read.test.ts:
+(pass) an invalid stored delivery is dropped for that row only [10.40ms]
+(pass) get keeps the newest 2000 messages and reports hasMore [16.63ms]
+(pass) turnsBefore returns the preceding messages oldest first [9.53ms]
+
+api/domains/conversation/test/outbox.test.ts:
+(pass) append records an added event with memory-compatible revision, no text [8.67ms]
+(pass) principal and scope are injectable [9.74ms]
+(pass) message save and outbox event roll back together on a mid-save exception [9.89ms]
+(pass) correction changes the revision, emits corrected, and replay is idempotent [11.93ms]
+(pass) retraction removes the text, emits retracted once, and blocks correction/re-add [11.87ms]
+(pass) seq is increasing with gaps allowed and drafts have no path to the outbox [9.88ms]
+(pass) a database without the outbox migration keeps working unless required [10.97ms]
+(pass) correction scrubs the digest of superseded revisions but keeps seq order and the newest digest [10.04ms]
+(pass) without the retraction column reads and corrections work and retraction fails clearly [10.32ms]
+
+api/domains/conversation/test/conversation.test.ts:
+(pass) conversation saves and survives reopen; second writer is refused [17.81ms]
+(pass) answer motion can arrive before text, keeps the first choice, and survives upgrade/reopen [20.76ms]
+(pass) answer-wide delivery persists provenance, upgrades fallback, and keeps an adopted none stable [18.51ms]
+(pass) ordinal reads: messages after a cursor, the newest ordinal and the n-th newest user message skip retracted rows [10.98ms]
+(pass) the retract hook runs inside the retraction while the message is still readable, and also for a missing message [10.23ms]
+
+ 25 pass
+ 0 fail
+ 211 expect() calls
+Ran 25 tests across 5 files. [463.00ms]
+
+ RUN  v4.1.8 /Users/y.noguchi/Code/eumenes
+
+
+ Test Files  6 passed (6)
+      Tests  31 passed (31)
+   Start at  22:53:33
+   Duration  1.54s (transform 492ms, setup 0ms, import 1.06s, tests 195ms, environment 4.88s)
+
+[verify] passed 3031 ms

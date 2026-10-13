@@ -1,3 +1,4 @@
+export type { ChatImage } from "./contracts";
 export { createInference, type InferenceService } from "./service";
 export {
 	migration,

@@ -52,6 +52,36 @@ const messages: Record<string, string> = {
 		"読み上げの準備が混み合っています。少し待ってからお試しください。",
 	speech_tts_target_unavailable:
 		"選択した言語の声を利用できません。音声設定を確認してください。",
+	image_invalid: "画像を読み取れません。破損していない画像を選んでください。",
+	image_format_unsupported: "対応形式はJPG・PNG・BMPです。",
+	image_mime_mismatch:
+		"画像の形式とデータが一致しません。保存し直して追加してください。",
+	image_not_supported:
+		"選択したモデルでは画像を送れません。画像入力対応のLARMモデルを選んでください。",
+	image_reference_unsupported: "画像の送信形式が接続先に対応していません。",
+	image_role_unsupported: "画像はユーザーの発言に添付してください。",
+	image_detail_unsupported: "画像の詳細指定が接続先に対応していません。",
+	image_too_large: "画像が大きすぎます。画像を縮小して再度追加してください。",
+	image_count_exceeded:
+		"過去の画像を含めた枚数が上限を超えました。画像の少ない会話で送信してください。",
+	image_dimensions_exceeded:
+		"画像の寸法が上限を超えました。画像を縮小してください。",
+	body_too_large:
+		"本文・履歴・画像の合計が大きすぎます。画像を減らすか縮小してください。",
+	context_budget_exceeded:
+		"入力がモデルの上限を超えました。本文や画像を減らしてください。",
+	chat_token_count_unavailable:
+		"入力の容量を確認できなかったため送信を止めました。接続状態を確認してください。",
+	chat_input_contract_unavailable:
+		"画像入力の接続仕様を確認できなかったため送信を止めました。接続を再確認してください。",
+	attachment_not_found: "添付画像が見つかりません。もう一度追加してください。",
+	attachment_source_unavailable:
+		"会話の画像を取得できません。画像を除いた要求は送信していません。",
+	attachment_capacity:
+		"未送信画像の保存容量が上限に達しました。時間をおいてお試しください。",
+	output_parameter_unsupported: "応答の長さの指定が接続先に対応していません。",
+	output_budget_exceeded: "応答の長さがモデルの上限を超えました。",
+	gateway_timeout: "画像の応答が時間切れになりました。",
 	larm_unconfigured: "LARMが設定されていません。",
 	larm_base_url_unconfigured: "LARMの接続先URLが設定されていません。",
 	larm_provider_host_mismatch:

@@ -1,6 +1,7 @@
 export {
 	Badge,
 	Button,
+	Modal,
 	Card,
 	CardContent,
 	CardHeader,

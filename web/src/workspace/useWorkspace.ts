@@ -1,9 +1,10 @@
+import { chatSend } from "./chat-send";
+import { useChatAttachments } from "./useChatAttachments";
 import { useDrawingArtifacts } from "../domains/excalidraw/useDrawingArtifacts";
 import { useOpenDrawing } from "./WorkspaceArtifacts";
 import { useRecognitionArtifacts } from "../domains/object-recognition";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-	type FormEvent,
 	useCallback,
 	useEffect,
 	useRef,
@@ -52,6 +53,7 @@ export function useWorkspace({
 }) {
 	const [input, setInput] = useState({ text: "", dictated: false });
 	const draft = input.text;
+	const attachments = useChatAttachments(client, "main");
 	const editedRecognition = useRef<string | null>(null);
 	const [settingsOpen, setSettingsOpen] = useState(
 		window.location.hash.startsWith("#settings"),
@@ -277,25 +279,19 @@ export function useWorkspace({
 		editedRecognition.current = recognitionId ?? null;
 		setInput({ text, dictated: false });
 	}
-	function send(event: FormEvent) {
-		event.preventDefault();
-		const text = draft.trim();
-		if (!text || automaticInput || submit.isPending) return;
-		const sentInput = input;
-		void submit
-			.mutateAsync(text)
-			.then((run) => {
-				if (run?.id) watchTimerRun(run.id);
-				setInput((current) =>
-					current === sentInput ? { text: "", dictated: false } : current,
-				);
-			})
-			.catch(() => {});
-	}
+	const send = chatSend(
+		input,
+		setInput,
+		attachments,
+		submit,
+		automaticInput,
+		watchTimerRun,
+	);
 	useEffect(() => {
 		if (voice.turn?.runId) watchTimerRun(voice.turn.runId);
 	}, [voice.turn?.runId, watchTimerRun]);
 	return {
+		attachments,
 		draft,
 		settingsOpen,
 		onDirty,

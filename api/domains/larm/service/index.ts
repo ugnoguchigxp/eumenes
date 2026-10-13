@@ -1,13 +1,12 @@
 import { createSpeechSynthesizer } from "./speech";
 import { createSentenceLanguageOperations } from "./sentence-language";
-import { chatRequest } from "./chat-request";
+import { answerRequest } from "./answer-request";
 import {
 	isNetworkError,
 	toErrorCode,
 } from "../../../infrastructure/error-code";
 import { getLogger } from "../../../infrastructure/logger";
 const log = getLogger("larm");
-import { forwardToolCalls } from "../../../infrastructure/chat-stream";
 import type {
 	Capability,
 	LarmPort,
@@ -24,7 +23,6 @@ import {
 	type ProviderName,
 } from "./profiles";
 import { assertRuriQuestions, decodeSpeechCredit } from "./context";
-import { startLlmTiming } from "./llm-timing";
 import {
 	awaitReady,
 	renewProviders,
@@ -76,7 +74,10 @@ export function createLarm(config: {
 	const token = config.token?.trim();
 	const request = config.fetch ?? fetch;
 	const profile = config.profile?.trim() || defaultProfile;
-	if (profile === unavailableAuxiliaryProfile)
+	if (
+		profile === unavailableAuxiliaryProfile ||
+		profile === "ornith1.5Strix-64k"
+	)
 		throw new Error("larm_aux_not_enabled");
 	const audience = config.audience?.trim() || "saaa-desktop";
 	// LARM reuses a live connection for the same client/profile binding.
@@ -135,6 +136,10 @@ export function createLarm(config: {
 							: lease
 								? "ready"
 								: "idle",
+			...(lease?.providers.get("llm")?.vision &&
+			lease.providers.get("llm")?.chatInput
+				? { chatInput: lease.providers.get("llm")!.chatInput }
+				: {}),
 			capabilities: lease
 				? [...lease.providers.keys()].filter(
 						(name): name is Capability =>
@@ -694,40 +699,15 @@ export function createLarm(config: {
 		onDelta?: (text: string) => void,
 		options?: LarmCallOptions,
 	) {
-		return withProvider("llm", signal, async (p, connectionId) => {
-			const window = p.contextWindow;
-			if (!window) throw new Error("larm_missing_context_window");
-			const timing = startLlmTiming(
+		return withProvider("llm", signal, (p, connectionId) =>
+			answerRequest(p, messages, signal, onDelta, options, {
 				profile,
-				messages,
-				window,
-				options,
-				onDelta,
-			);
-			let result: Awaited<ReturnType<typeof timing.read>>;
-			try {
-				const response = await infer(
-					p,
-					"chat/completions",
-					{
-						method: "POST",
-						headers: { "content-type": "application/json" },
-						body: JSON.stringify(
-							chatRequest(p, timing.selected, !!onDelta, options),
-						),
-					},
-					signal,
-					connectionId,
-					options,
-				);
-				result = await timing.read(response, signal);
-			} catch (error) {
-				timing.failed(signal);
-				throw error;
-			}
-			forwardToolCalls(result, options?.tools, options?.onToolCalls);
-			return result.text;
-		});
+				request,
+				sameClaim: () => lease?.providers.get("llm") === p,
+				send: (init) =>
+					infer(p, "chat/completions", init, signal, connectionId, options),
+			}),
+		);
 	}
 	async function answer(
 		messages: Parameters<LarmPort["answer"]>[0],
@@ -739,8 +719,7 @@ export function createLarm(config: {
 			return inferAnswer(messages, signal, onDelta, options);
 		const scoped = AbortSignal.any([signal, lifetime.signal]);
 		if (profile === defaultProfile && options?.sessionRole === "auxiliary") {
-			// Pin the main slot while helpers run. LARM admits three 64K slots and
-			// leaves further connections in waiting-capacity until a helper releases.
+			// Independent sessions share the current profile; admission and KV capacity belong to LARM.
 			return withProvider("llm", scoped, async () => {
 				const helper = createLarm({
 					...config,
@@ -750,8 +729,14 @@ export function createLarm(config: {
 				auxiliarySessions.add(helper);
 				try {
 					return onDelta
-						? await helper.answerStream!(messages, scoped, onDelta, options)
-						: await helper.answer(messages, scoped, options);
+						? await helper.answerStream!(messages, scoped, onDelta, {
+								...options,
+								sessionRole: "main",
+							})
+						: await helper.answer(messages, scoped, {
+								...options,
+								sessionRole: "main",
+							});
 				} finally {
 					await helper.close();
 					auxiliarySessions.delete(helper);

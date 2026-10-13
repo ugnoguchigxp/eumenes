@@ -8,6 +8,8 @@ export type ProviderName =
 export type Provider = {
 	/** External catalog name, retained across renewal when the internal role differs. */
 	claimName?: string;
+	chatInput?: import("../contracts/chat-input").ChatInput;
+	vision?: boolean;
 	name: ProviderName;
 	baseUrl: string;
 	/** Exact inference URL verified from the optional Provider claim. */
@@ -35,7 +37,7 @@ export type Lease = {
 };
 export const gemmaProfile = "SAAA-gemma4-26b";
 export const defaultProfile = "ornith1.5Strix";
-export const auxiliaryProfile = "ornith1.5Strix-64k";
+export const auxiliaryProfile = defaultProfile;
 export const unavailableAuxiliaryProfile = "SAAA-gemma4-26b-64k";
 export const gemmaAgentProfile = "saaa-conversation-gemma4-26b-voice";
 export const gemmaContext = {

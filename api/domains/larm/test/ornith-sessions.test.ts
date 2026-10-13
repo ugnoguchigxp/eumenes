@@ -35,7 +35,7 @@ function fixture() {
 	>();
 	const claimed: string[] = [],
 		released: string[] = [];
-	const specs = (profile: string) =>
+	const specs = (_profile: string) =>
 		["llm", "asr", "tts"].map((name) => ({
 			name,
 			protocol:
@@ -54,7 +54,7 @@ function fixture() {
 			...(name === "llm"
 				? {
 						contextWindow: {
-							maxTokens: profile.endsWith("-64k") ? 65536 : 262144,
+							maxTokens: 262144,
 							outputReserveTokens: 4096,
 							safetyMarginTokens: 1976,
 						},
@@ -201,7 +201,7 @@ test("Ornith main plus three helpers infer independently; fifth waits without cl
 		);
 		expect(f.bodies.map((x) => x.body.profile)).toEqual([
 			"ornith1.5Strix",
-			...Array(3).fill("ornith1.5Strix-64k"),
+			...Array(3).fill("ornith1.5Strix"),
 		]);
 		expect(f.bodies[0]!.body.providers).toEqual(["llm"]);
 		for (const { body } of f.bodies.slice(1))
@@ -265,7 +265,7 @@ test("cancellation of a waiting helper releases it and never infers; parent clos
 
 test("Ornith auxiliary renew reclaims tokens and a released connection reconnects with the catalog revision", async () => {
 	const f = fixture();
-	const p: LarmPort = f.create("ornith1.5Strix-64k");
+	const p: LarmPort = f.create("ornith1.5Strix");
 	const signal = AbortSignal.timeout(5000);
 	try {
 		await p.connect();

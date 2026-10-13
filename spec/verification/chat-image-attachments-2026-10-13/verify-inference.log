@@ -1,0 +1,106 @@
+$ bun scripts/verify.ts --domain inference
+[verify] selected=inference dependencyClosure=delivery,attitude-dataset,larm,settings,inference testClosure=delivery,attitude-dataset,larm,tts-dictionary,queue,tasks,dots,settings,inference
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts api/domains/inference
+size-budget ok (23 files)
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check api/domains/inference
+$ oxfmt --check api/domains/inference
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 6ms on 32 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint api/domains/inference
+$ oxlint --deny-warnings api/domains/inference
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun check -p /Users/y.noguchi/Code/eumenes/verification-reports/tsconfig.selected.json
+✓ No type errors in 96 files [116.54ms]
+[verify] TypeScript workspace closure: 97 files; api/infrastructure/flock.ts, api/infrastructure/logger.ts, api/infrastructure/sqlite, api/domains/settings, api/domains/inference, api/domains/larm, api/infrastructure/http.ts, api/infrastructure/chat-stream.ts, api/infrastructure/ignore-error.ts, api/infrastructure/bounded-read.ts, api/infrastructure/error-code.ts, api/domains/delivery, api/infrastructure/auth-config.ts, api/domains/attitude-dataset
+[verify] domain tests: /Users/y.noguchi/.bun/bin/bun run test:domain -- inference
+$ bun scripts/test-domain.ts inference
+bun test v1.4.3 (c6da4a4d3)
+
+api/domains/inference/test/codex-adapter.test.ts:
+(pass) Codex adapter fixes Luna, sends only supplied context, disables native tools and omits product secrets [752.51ms]
+(pass) SDK forwards final JSON to the common host parser without wrapping or dropping fields [2016.99ms]
+(pass) SDK failures keep only protocol diagnostics, never provider text [0.28ms]
+(pass) SDK never adopts a final candidate from failed, incomplete or duplicate turns [2828.21ms]
+(pass) Codex adapter preserves an unexpected process signal without provider text [724.72ms]
+(pass) Codex adapter kills its process on cancellation and discards partial answers [1701.90ms]
+(pass) Codex adapter reports fixed error codes and rejects oversized output [1454.35ms]
+(pass) the schema comes from the step contract, and per-step notices stay out of the base instructions [684.82ms]
+(pass) cancellation returns even when the child never closes its streams [1667.99ms]
+(pass) a completed SDK turn without a final agent message is an empty answer [847.30ms]
+
+api/domains/inference/test/maintenance-control.test.ts:
+(pass) I01 captures after the source answer was accepted, with its own deadline and fixed control limits [26.03ms]
+(pass) I01 rejects expired deadlines, cancelled requests and settings changes before the receipt is adopted [12.57ms]
+(pass) I01 normal captureControl still requires a pending parent [12.74ms]
+(pass) background control binds task authority independently of an expired conversation, with exact limits [12.07ms]
+(pass) background control rejects model budget expansion, expired authority and unavailable tokenizer [15.26ms]
+
+api/domains/inference/test/codex-control.test.ts:
+(pass) Luna controls persist their engine and use common receipts, cancellation and usage history [12.16ms]
+(pass) cancelled Luna work cannot return a late result even if the provider ignores its signal [13.62ms]
+(pass) unavailable Luna is rejected without recording a request or falling back to another model [14.06ms]
+
+api/domains/inference/test/inference.test.ts:
+(pass) answer requests use the main connection and control requests request independent auxiliary sessions [14.32ms]
+(pass) three purposes fall back once, adapters preserve paths and usage; no duplicate adoption [16.72ms]
+(pass) service tests pin a cloud resource without changing routes or falling back [14.93ms]
+(pass) cloud TTS keeps its own voice and speed from the accepted settings snapshot [13.54ms]
+(pass) judge absence preserves the immutable manual baseline for every phrase [11.06ms]
+(pass) authentication, invalid contracts and caller cancellation never trigger cloud [54.69ms]
+(pass) local timeout fences a late adapter result; immutable snapshot and revocation at adoption [35.16ms]
+(pass) revocation aborts pending cloud; regrant does not revive old request [18.44ms]
+(pass) acceptance updates rollback together with the caller transaction [10.45ms]
+(pass) a failed stream cannot append a cloud fallback to already published local text [9.98ms]
+(pass) late provider deltas are fenced after caller cancellation [17.55ms]
+(pass) provider diagnostics preserve the rejected and recovered Connection IDs on the same attempt [10.12ms]
+(pass) a failed provider still saves the rejected Connection ID and error fields [11.73ms]
+(pass) Laya judges the spoken text and carries one decision with bounded immutable voice settings [14.29ms]
+(pass) decision timeout keeps manual voice, fences late results and cancellation prevents synthesis [30.64ms]
+(pass) speech text is rewritten for the local provider and for the cloud fallback [22.34ms]
+(pass) speak with an override synthesizes with unsaved voice settings without changing saved ones [10.67ms]
+(pass) sample voice overrides remain usable with sentence-language enabled; authority uses saved settings [14.08ms]
+(pass) a sample shares the existing port through unrelated saves and rejects revoked late synthesis [25.39ms]
+(pass) Ruri dataset captures real-turn receipt adoption once; a technical collection request does not delay answer or TTS [21.24ms]
+(pass) control calls preserve exact context, stay local, skip emotion judgement, and rejected JSON is never adopted [20.98ms]
+(pass) a probe stuck running for over 10 minutes is marked probe_stale and a new probe starts [19.92ms]
+(pass) a recent running probe still blocks a new one [12.66ms]
+(pass) the final probe status survives a momentarily full writer queue [217.30ms]
+(pass) a non-network TypeError from the larm adapter does not fall back to cloud [19.95ms]
+(pass) transport-level TypeErrors from the larm adapter still fall back to cloud [56.61ms]
+(pass) a speech chunk gets its own short deadline when the turn's deadline is nearly over [17.51ms]
+(pass) streaming checks authority once per commit generation, not once per delta [16.85ms]
+(pass) a request revoked mid-stream stops delivering deltas at the next delta [15.26ms]
+(pass) whole spoken source is classified once across clauses and retries; English bypasses the Japanese dictionary [16.36ms]
+(pass) classification missing never synthesizes or falls back to cloud [13.90ms]
+(pass) classification bad-output never synthesizes or falls back to cloud [16.64ms]
+(pass) classification network never synthesizes or falls back to cloud [16.45ms]
+(pass) routing settings changed during classification reject late audio [23.45ms]
+(pass) Japanese language selection precedes pronunciation rewriting; disabling routing skips classification [13.52ms]
+(pass) classification deadline fences adapters that ignore abort and does not synthesize or fallback [43.30ms]
+(pass) cold voice admission precedes the short classification budget [46.66ms]
+(pass) a shorter TTS attempt deadline during classification cannot silently switch to cloud [28.57ms]
+
+api/domains/inference/test/migration.test.ts:
+(pass) append-only diagnostics migration preserves previous inference attempts [23.87ms]
+
+api/domains/inference/test/usage-pages.test.ts:
+(pass) usage API sorts and searches the entire retained dataset before pagination, with stable ties and bounded input [19.70ms]
+
+api/domains/inference/test/cloud-agents.test.ts:
+(pass) agent connections serve the conversation purpose only [0.43ms]
+(pass) Managed Agents connections require a stored agent and environment [0.12ms]
+(pass) an agent connection answers through the agent runner without a key [0.24ms]
+(pass) agent tool calls are forwarded to the conversation [0.09ms]
+(pass) a Codex choice streams only its decoded reply, growing monotonically [0.15ms]
+
+api/domains/inference/test/speech-language.test.ts:
+(pass) one cancelled subscriber does not cancel another; a last cancelled subscriber cannot seed the memo [0.19ms]
+(pass) source and authority changes cannot reuse a result; malformed output is not retained [0.13ms]
+(pass) capacity cannot evict an active classifier and clearing aborts it [0.11ms]
+
+ 66 pass
+ 0 fail
+ 359 expect() calls
+Ran 66 tests across 8 files. [13.98s]
+[verify] passed 15011 ms

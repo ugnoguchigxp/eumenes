@@ -30,6 +30,9 @@ export class WorldContextRetry extends Error {}
 export type ChatMessage = {
 	role: "system" | "user" | "assistant";
 	content: string;
+	attachments?: import("../../conversation/contracts").Attachment[];
+	sourceMessageId?: string;
+	images?: import("../../inference").ChatImage[];
 };
 export interface GenerateInput {
 	tools?: NativeTool[];
@@ -67,6 +70,7 @@ export interface GenerateInput {
 	agent?: AnswerTicket;
 }
 export interface Accept {
+	attachmentIds?: string[];
 	requestId: string;
 	conversationId: string;
 	text: string;

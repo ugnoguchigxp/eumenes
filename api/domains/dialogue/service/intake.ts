@@ -35,6 +35,8 @@ export function createIntake(deps: DialogueDeps) {
 			if (
 				existing.conversationId !== input.conversationId ||
 				original?.text !== input.text ||
+				JSON.stringify(original?.attachments?.map((a) => a.id) ?? []) !==
+					JSON.stringify(input.attachmentIds ?? []) ||
 				existing.utteranceId !== (input.utteranceId ?? null)
 			)
 				throw new Error("request_conflict");
@@ -48,6 +50,15 @@ export function createIntake(deps: DialogueDeps) {
 			conversationId: input.conversationId,
 			role: "user",
 			text: input.text,
+			...(input.attachmentIds?.length
+				? {
+						attachments: conversation.attachmentsByIdsInTransaction(
+							db,
+							input.conversationId,
+							input.attachmentIds,
+						),
+					}
+				: {}),
 			createdAt: now,
 			runId,
 		});

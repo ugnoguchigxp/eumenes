@@ -1,3 +1,5 @@
+import { AttachmentImages } from "./AttachmentImages";
+import type { EumenesClient } from "../../../../../client";
 import type {
 	Conversation,
 	Message,
@@ -21,6 +23,7 @@ const VISIBLE_LIMIT = 200;
 
 export const MessageList = memo(function MessageList({
 	conversation,
+	client,
 	streaming,
 	replayingId,
 	onReplay,
@@ -28,6 +31,7 @@ export const MessageList = memo(function MessageList({
 	renderFollowingMessage,
 }: {
 	conversation: Conversation | undefined;
+	client?: EumenesClient;
 	streaming?: string;
 	replayingId?: string | null;
 	onReplay?: (message: Pick<Message, "id" | "text" | "runId">) => void;
@@ -133,6 +137,12 @@ export const MessageList = memo(function MessageList({
 									</svg>
 								</button>
 							)}
+							{client && message.attachments?.length ? (
+								<AttachmentImages
+									client={client}
+									attachments={message.attachments}
+								/>
+							) : null}
 							{message.role === "assistant" ? (
 								<MarkdownContent text={message.text} />
 							) : (

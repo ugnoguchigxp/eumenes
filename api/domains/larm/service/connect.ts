@@ -1,3 +1,4 @@
+import { providerChatInput } from "./chat-input";
 import type { Capability } from "../contracts";
 import {
 	optionalSpeechProviders,
@@ -9,8 +10,6 @@ import {
 	gemmaAgentProfile,
 	gemmaContext,
 	gemmaProfile,
-	defaultProfile,
-	auxiliaryProfile,
 	protocols,
 	type Provider,
 	type ProviderName,
@@ -57,15 +56,7 @@ export async function fetchCatalog(
 	if (profile === gemmaProfile && catalogProfile.id !== gemmaAgentProfile)
 		throw new Error("larm_gemma_agent_profile_mismatch");
 	const catalogProviders = providersOf(catalogProfile);
-	if (profile === defaultProfile || profile === auxiliaryProfile) {
-		const llm = catalogProviders.find((p) => p.name === "llm");
-		const context = record(llm?.contextWindow);
-		if (
-			llm?.model !== "ornith-1.5-strix-lean" ||
-			context.maxTokens !== (profile === defaultProfile ? 262144 : 65536)
-		)
-			throw new Error("larm_ornith_contract_mismatch");
-	}
+	for (const p of catalogProviders) if (p.name === "llm") providerChatInput(p);
 	for (const name of required) {
 		const provider = catalogProviders.find((item) => item.name === name);
 		if (
@@ -249,6 +240,12 @@ export async function claimProviders(
 			)
 		)
 			throw new Error("larm_claim_context_mismatch");
+		if (
+			name === "llm" &&
+			JSON.stringify(providerChatInput(info)) !==
+				JSON.stringify(providerChatInput(declared))
+		)
+			throw new Error("chat_input_contract_unavailable");
 		providers.set(name, speechProvider(name, info, profile, hosts));
 	}
 	const decision = decisionProvider(claimed, created, catalogProviders, hosts);
@@ -299,6 +296,14 @@ function speechProvider(
 		name,
 		baseUrl,
 		endpoint,
+		...(name === "llm"
+			? {
+					chatInput: providerChatInput(info),
+					vision:
+						Array.isArray(info.supportedCapabilities) &&
+						info.supportedCapabilities.includes("llm.vision"),
+				}
+			: {}),
 		model: string(info.model),
 		protocol: string(info.protocol),
 		token: string(credential.token),
@@ -481,6 +486,14 @@ export async function renewProviders(
 			throw new Error("larm_renew_context_changed");
 		next.set(name, {
 			...previous,
+			...(name === "llm"
+				? {
+						chatInput: providerChatInput(info),
+						vision:
+							Array.isArray(info.supportedCapabilities) &&
+							info.supportedCapabilities.includes("llm.vision"),
+					}
+				: {}),
 			baseUrl,
 			endpoint: claimedEndpoint(info, baseUrl, name, hosts),
 			token: string(record(info.credential).token),

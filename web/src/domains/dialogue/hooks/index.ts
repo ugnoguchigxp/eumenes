@@ -33,12 +33,18 @@ export function useSubmit(client: DialogueClient, id: string) {
 		null,
 	);
 	return useMutation({
-		mutationFn: async (text: string) => {
+		mutationFn: async (
+			value: string | { text: string; attachmentIds: string[] },
+		) => {
+			const { text, attachmentIds } =
+				typeof value === "string" ? { text: value, attachmentIds: [] } : value;
 			const previous = pending.current;
 			const request =
 				previous?.client === client &&
 				previous.input.conversationId === id &&
-				previous.input.text === text
+				previous.input.text === text &&
+				JSON.stringify(previous.input.attachmentIds ?? []) ===
+					JSON.stringify(attachmentIds)
 					? previous
 					: {
 							client,
@@ -46,6 +52,7 @@ export function useSubmit(client: DialogueClient, id: string) {
 								requestId: crypto.randomUUID(),
 								conversationId: id,
 								text,
+								...(attachmentIds.length ? { attachmentIds } : {}),
 							},
 						};
 			// A failed acknowledgement does not prove that the server rejected the request.

@@ -1,3 +1,4 @@
+import { messageAttachments, attachmentsMigration } from "./attachments";
 import type { Database } from "bun:sqlite";
 import type { Migration } from "../../../infrastructure/sqlite";
 import { createHash } from "node:crypto";
@@ -424,7 +425,7 @@ function safeDelivery(row: MessageRow): SpeechDelivery | undefined {
 	});
 	return undefined;
 }
-function toMessage(row: MessageRow): Message {
+function toMessage(row: MessageRow, db: Database): Message {
 	const delivery = safeDelivery(row);
 	return {
 		id: row.id,
@@ -433,6 +434,9 @@ function toMessage(row: MessageRow): Message {
 		text: row.text,
 		createdAt: row.created_at,
 		runId: row.run_id,
+		...(messageAttachments(db, row.id).length
+			? { attachments: messageAttachments(db, row.id) }
+			: {}),
 		...(row.motion ? { avatarMotion: row.motion } : {}),
 		...(delivery ? { delivery } : {}),
 	};
@@ -441,7 +445,7 @@ export function listMessages(db: Database, id: string): Message[] {
 	const rows = db
 		.query(`${messageSelect(db, "m.conversation_id = ?")} ORDER BY m.rowid`)
 		.all(id) as MessageRow[];
-	return rows.map(toMessage);
+	return rows.map((row) => toMessage(row, db));
 }
 /** The last `limit` messages of a conversation in acceptance order. */
 export function tailMessages(
@@ -456,7 +460,10 @@ export function tailMessages(
 		.all(id, limit + 1) as MessageRow[];
 	const hasMore = rows.length > limit;
 	return {
-		messages: rows.slice(0, limit).reverse().map(toMessage),
+		messages: rows
+			.slice(0, limit)
+			.reverse()
+			.map((row) => toMessage(row, db)),
 		hasMore,
 	};
 }
@@ -474,7 +481,10 @@ export function messagesAfter(
 		.all(conversationId, afterOrdinal, limit) as Array<
 		MessageRow & { ordinal: number }
 	>;
-	return rows.map((row) => ({ message: toMessage(row), ordinal: row.ordinal }));
+	return rows.map((row) => ({
+		message: toMessage(row, db),
+		ordinal: row.ordinal,
+	}));
 }
 /** The live messages one run produced (its input and its adopted answer), oldest first, with their ordinals. */
 export function messagesOfRun(
@@ -487,7 +497,10 @@ export function messagesOfRun(
 			`${messageSelect(db, "m.conversation_id = ? AND m.run_id = ?", "m.rowid AS ordinal, ")} ORDER BY m.rowid`,
 		)
 		.all(conversationId, runId) as Array<MessageRow & { ordinal: number }>;
-	return rows.map((row) => ({ message: toMessage(row), ordinal: row.ordinal }));
+	return rows.map((row) => ({
+		message: toMessage(row, db),
+		ordinal: row.ordinal,
+	}));
 }
 /** The ordinal (rowid) of the conversation's newest live message; 0 when it has none. */
 export function latestOrdinal(db: Database, conversationId: string): number {
@@ -523,7 +536,7 @@ export function messageWithDelivery(db: Database, id: string): Message | null {
 	const row = db
 		.query(messageSelect(db, "m.id = ?"))
 		.get(id) as MessageRow | null;
-	return row ? toMessage(row) : null;
+	return row ? toMessage(row, db) : null;
 }
 /** Up to `limit` messages of a conversation before `beforeOrdinal`, ascending. */
 export function messagesBefore(
@@ -537,7 +550,7 @@ export function messagesBefore(
 			`${messageSelect(db, "m.conversation_id = ? AND m.rowid < ?")} ORDER BY m.rowid DESC LIMIT ?`,
 		)
 		.all(conversationId, beforeOrdinal, limit) as MessageRow[];
-	return rows.reverse().map(toMessage);
+	return rows.reverse().map((row) => toMessage(row, db));
 }
 export function revision(db: Database, id: string): number {
 	return (
@@ -576,6 +589,9 @@ export function getMessage(
 			text: row.text,
 			createdAt: row.created_at,
 			runId: row.run_id,
+			...(messageAttachments(db, row.id).length
+				? { attachments: messageAttachments(db, row.id) }
+				: {}),
 		},
 	};
 }
@@ -587,4 +603,5 @@ export const migrations: readonly Migration[] = [
 	{ id: "conversation/0003-answer-delivery", sql: answerDeliveryMigration },
 	{ id: "conversation/0004-outbox", sql: outboxMigration },
 	{ id: "conversation/0005-retraction", sql: retractionMigration },
+	attachmentsMigration,
 ];

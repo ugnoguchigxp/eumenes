@@ -1,0 +1,160 @@
+{
+  "date": "2026-10-13T13:36:11.082Z",
+  "lane": "live",
+  "events": [
+    {
+      "operation": "count",
+      "status": 200,
+      "imageCount": 3,
+      "promptTokens": 1246,
+      "imageTokens": 36,
+      "fits": true,
+      "bootEpoch": "epoch-1608c285-36b8-416f-8848-37bf4a143433",
+      "configRevision": "36ff1aef15217c25fa560c99cc287016435fee5a83cfe0085a20cbd2c58cb79e"
+    },
+    {
+      "operation": "generate",
+      "status": 200
+    },
+    {
+      "operation": "count",
+      "status": 200,
+      "imageCount": 3,
+      "promptTokens": 1068,
+      "imageTokens": 36,
+      "fits": true,
+      "bootEpoch": "epoch-1608c285-36b8-416f-8848-37bf4a143433",
+      "configRevision": "36ff1aef15217c25fa560c99cc287016435fee5a83cfe0085a20cbd2c58cb79e"
+    },
+    {
+      "operation": "generate",
+      "status": 200
+    },
+    {
+      "operation": "count",
+      "status": 200,
+      "imageCount": 4,
+      "promptTokens": 1120,
+      "imageTokens": 48,
+      "fits": true,
+      "bootEpoch": "epoch-1608c285-36b8-416f-8848-37bf4a143433",
+      "configRevision": "36ff1aef15217c25fa560c99cc287016435fee5a83cfe0085a20cbd2c58cb79e"
+    },
+    {
+      "operation": "generate",
+      "status": 200
+    },
+    {
+      "operation": "count",
+      "status": 200,
+      "imageCount": 6,
+      "promptTokens": 1182,
+      "imageTokens": 72,
+      "fits": true,
+      "bootEpoch": "epoch-1608c285-36b8-416f-8848-37bf4a143433",
+      "configRevision": "36ff1aef15217c25fa560c99cc287016435fee5a83cfe0085a20cbd2c58cb79e"
+    },
+    {
+      "operation": "generate",
+      "status": 200
+    }
+  ],
+  "cases": [
+    {
+      "label": "three-formats",
+      "status": "completed",
+      "error": null,
+      "passed": true,
+      "answer": "かしこまりました。添付順に、以下の色でございます。\n\n1. 赤（レッド）\n2. 青（ブルー）\n3. 緑（グリーン）",
+      "events": [
+        {
+          "operation": "count",
+          "status": 200,
+          "imageCount": 3,
+          "promptTokens": 1246,
+          "imageTokens": 36,
+          "fits": true,
+          "bootEpoch": "epoch-1608c285-36b8-416f-8848-37bf4a143433",
+          "configRevision": "36ff1aef15217c25fa560c99cc287016435fee5a83cfe0085a20cbd2c58cb79e"
+        },
+        {
+          "operation": "generate",
+          "status": 200
+        }
+      ]
+    },
+    {
+      "label": "history-resend",
+      "status": "completed",
+      "error": null,
+      "passed": true,
+      "answer": "添付順に、以下の色でございます。\n\n1. 赤\n2. 青\n3. 緑",
+      "events": [
+        {
+          "operation": "count",
+          "status": 200,
+          "imageCount": 3,
+          "promptTokens": 1068,
+          "imageTokens": 36,
+          "fits": true,
+          "bootEpoch": "epoch-1608c285-36b8-416f-8848-37bf4a143433",
+          "configRevision": "36ff1aef15217c25fa560c99cc287016435fee5a83cfe0085a20cbd2c58cb79e"
+        },
+        {
+          "operation": "generate",
+          "status": 200
+        }
+      ]
+    },
+    {
+      "label": "image-only",
+      "status": "completed",
+      "error": null,
+      "passed": true,
+      "answer": "赤でございます。",
+      "events": [
+        {
+          "operation": "count",
+          "status": 200,
+          "imageCount": 4,
+          "promptTokens": 1120,
+          "imageTokens": 48,
+          "fits": true,
+          "bootEpoch": "epoch-1608c285-36b8-416f-8848-37bf4a143433",
+          "configRevision": "36ff1aef15217c25fa560c99cc287016435fee5a83cfe0085a20cbd2c58cb79e"
+        },
+        {
+          "operation": "generate",
+          "status": 200
+        }
+      ]
+    },
+    {
+      "label": "two-images",
+      "status": "completed",
+      "error": null,
+      "passed": true,
+      "answer": "1枚目は赤、2枚目は青でございます。異なる2色でございます。",
+      "events": [
+        {
+          "operation": "count",
+          "status": 200,
+          "imageCount": 6,
+          "promptTokens": 1182,
+          "imageTokens": 72,
+          "fits": true,
+          "bootEpoch": "epoch-1608c285-36b8-416f-8848-37bf4a143433",
+          "configRevision": "36ff1aef15217c25fa560c99cc287016435fee5a83cfe0085a20cbd2c58cb79e"
+        },
+        {
+          "operation": "generate",
+          "status": 200
+        }
+      ]
+    }
+  ],
+  "image/jpeg_uploaded": true,
+  "image/png_uploaded": true,
+  "image/bmp_uploaded": true,
+  "passed": true
+}

@@ -1,3 +1,4 @@
+import { ChatImageInput } from "./ChatImageInput";
 import { useStore } from "zustand";
 import type { AudioStore } from "../domains/audio";
 import { Button, Textarea } from "../design-system";
@@ -66,6 +67,7 @@ export function ConversationComposer({
 				))}
 			</div>
 			<form className="chat-composer" onSubmit={send}>
+				<ChatImageInput state={state} />
 				<div className="composer-row">
 					<div className="voice-controls">
 						<Button
@@ -131,7 +133,12 @@ export function ConversationComposer({
 					/>
 					<Button
 						type="submit"
-						disabled={!draft.trim() || automaticInput || submit.isPending}
+						disabled={
+							(!draft.trim() && !state.attachments.items.length) ||
+							(automaticInput && !state.attachments.items.length) ||
+							submit.isPending ||
+							state.attachments.busy
+						}
 						aria-label="送信"
 					>
 						送信
@@ -159,7 +166,10 @@ export function ConversationComposer({
 			)}
 			{latestRun?.status === "failed" && (
 				<p className="chat-error" role="alert">
-					回答を取得できませんでした: {latestRun.error ?? "応答に失敗しました"}
+					回答を取得できませんでした:{" "}
+					{latestRun.error
+						? describeError(new Error(latestRun.error))
+						: "応答に失敗しました"}
 				</p>
 			)}
 		</div>

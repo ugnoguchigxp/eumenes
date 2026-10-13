@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import type { EumenesClient } from "../../../client";
 import type { AudioStore } from "../domains/audio";
 import { Button } from "../design-system";
@@ -41,11 +42,82 @@ export function ConversationPanel({
 		scrollLatest,
 	} = state;
 	const model = useConversationModel(client);
+	const panel = useRef<HTMLElement>(null);
+	const depth = useRef(0);
+	const [dragging, setDragging] = useState(false);
+	useEffect(() => {
+		function paste(event: ClipboardEvent) {
+			const target = document.activeElement;
+			if (
+				settingsOpen ||
+				document.querySelector('[role="dialog"][data-state="open"]') ||
+				(target !== document.body && !panel.current?.contains(target))
+			)
+				return;
+			const files = Array.from(event.clipboardData?.files ?? []);
+			if (!files.length) return;
+			event.preventDefault();
+			state.attachments.add(files);
+			const text = event.clipboardData?.getData("text/plain");
+			if (text && target instanceof HTMLTextAreaElement) {
+				const start = target.selectionStart;
+				const end = target.selectionEnd;
+				state.editInput(
+					target.value.slice(0, start) + text + target.value.slice(end),
+				);
+				requestAnimationFrame(() =>
+					target.setSelectionRange(start + text.length, start + text.length),
+				);
+			}
+		}
+		const element = panel.current;
+		const enter = (e: DragEvent) => {
+			if (e.dataTransfer?.types.includes("Files")) {
+				e.preventDefault();
+				depth.current++;
+				setDragging(true);
+			}
+		};
+		const leave = (e: DragEvent) => {
+			if (e.dataTransfer?.types.includes("Files") && --depth.current <= 0) {
+				depth.current = 0;
+				setDragging(false);
+			}
+		};
+		const over = (e: DragEvent) => {
+			if (e.dataTransfer?.types.includes("Files")) e.preventDefault();
+		};
+		const drop = (e: DragEvent) => {
+			if (e.dataTransfer?.files.length) {
+				e.preventDefault();
+				depth.current = 0;
+				setDragging(false);
+				state.attachments.add(Array.from(e.dataTransfer.files));
+			}
+		};
+		document.addEventListener("paste", paste);
+		element?.addEventListener("dragenter", enter);
+		element?.addEventListener("dragleave", leave);
+		element?.addEventListener("dragover", over);
+		element?.addEventListener("drop", drop);
+		return () => {
+			document.removeEventListener("paste", paste);
+			element?.removeEventListener("dragenter", enter);
+			element?.removeEventListener("dragleave", leave);
+			element?.removeEventListener("dragover", over);
+			element?.removeEventListener("drop", drop);
+		};
+	}, [settingsOpen, state]);
 	const lastUsed = actualModel
 		? `直近の利用: ${actualModel.source === "cloud" ? "クラウド" : "LARM"} / ${actualModel.model}`
 		: undefined;
 	return (
-		<section className="chat-panel" aria-label="会話">
+		<section ref={panel} className="chat-panel" aria-label="会話">
+			{dragging && (
+				<div className="chat-drop-target" aria-live="polite">
+					画像を追加
+				</div>
+			)}
 			<ConversationBackground
 				kind={settings.data?.general.background ?? "light-fairy"}
 				active={!settingsOpen && !settings.isPending}
@@ -144,6 +216,7 @@ export function ConversationPanel({
 				onScroll={(event) => onHistoryScroll(event.currentTarget)}
 			>
 				<MessageList
+					client={client}
 					conversation={conversation.data}
 					renderFollowingMessage={(message) => {
 						const run = runs.data?.find((r) => r.inputMessageId === message.id);

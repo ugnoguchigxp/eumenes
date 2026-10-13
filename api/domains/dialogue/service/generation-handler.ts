@@ -1,8 +1,12 @@
+import { observeAnswer } from "./post-answer";
+import {
+	resolveAttachmentContext,
+	validAttachmentContext,
+} from "./attachment-context";
 import { z } from "zod";
-import type { AnswerTicket } from "../../agent-runtime";
 import { getLogger, withLogContext } from "../../../infrastructure/logger";
 import type { Receipt } from "../../inference";
-import type { HandlerDefinition, Tx } from "../../queue";
+import type { HandlerDefinition } from "../../queue";
 import { settleConversationOperation } from "./generation-operation";
 import type { ConversationOperation } from "./conversation-tools";
 import {
@@ -49,27 +53,6 @@ export function createGenerationHandler(
 		postAnswer,
 		worldContext,
 	} = deps;
-	/** Optional learning runs in its own SAVEPOINT: any failure rolls back only that part. */
-	function observeAnswer(tx: Tx, runId: string, ticket?: AnswerTicket) {
-		if (!postAnswer || !ticket || ticket.reportEpoch === null) return;
-		const name = "dialogue_post_answer";
-		tx.exec(`SAVEPOINT ${name}`);
-		try {
-			const result = postAnswer.recordInTransaction(tx, {
-				runId,
-				ticketId: ticket.eventId,
-				reportEpoch: ticket.reportEpoch,
-			});
-			if (result.status !== "recorded") {
-				tx.exec(`ROLLBACK TO ${name}`);
-				log.info("dialogue.post_answer_skipped", { reason: result.code });
-			}
-		} catch {
-			tx.exec(`ROLLBACK TO ${name}`);
-			log.warn("dialogue.post_answer_skipped", { reason: "observer_error" });
-		}
-		tx.exec(`RELEASE ${name}`);
-	}
 
 	const handler: HandlerDefinition<
 		GeneratePayload,
@@ -102,6 +85,7 @@ export function createGenerationHandler(
 				},
 				async () => {
 					log.info("dialogue.generation_started");
+					resolveAttachmentContext(deps, input, run!.conversationId);
 					if (input.agent?.actionPayload && agents) {
 						// Refresh time/state before phrasing, without repeating the operation.
 						// A later change still rejects this generated answer at adoption.
@@ -268,6 +252,24 @@ export function createGenerationHandler(
 						worldContext?.releaseInTransaction(tx, run.id, run.conversationId);
 					return "stale";
 				}
+				if (!validAttachmentContext(deps, tx, input, run.conversationId)) {
+					if (input.world)
+						worldContext?.releaseInTransaction(tx, run.id, run.conversationId);
+					transition(
+						tx,
+						run.id,
+						run.revision,
+						"failed",
+						clock(),
+						"attachment_source_unavailable",
+					);
+					return failedAnswer(
+						deps,
+						tx,
+						run.id,
+						"attachment_source_unavailable",
+					);
+				}
 				traceSelection(deps, tx, run.id, outcome.result.selection);
 				if (outcome.result.operation)
 					return settleConversationOperation(
@@ -426,7 +428,7 @@ export function createGenerationHandler(
 				// The answer joins the conversation the memory agent is reading (scheduled runs have no user words).
 				if (done && run.sourceKind !== "schedule")
 					memory?.scheduleAgentInTransaction(tx, run.conversationId);
-				if (done) observeAnswer(tx, run.id, input.agent);
+				if (done) observeAnswer(postAnswer, tx, run.id, input.agent);
 				if (done) traceOutcome(deps, tx, run.id, agentOutcome(input.agent));
 				else if (input.world)
 					worldContext?.releaseInTransaction(tx, run.id, run.conversationId);
