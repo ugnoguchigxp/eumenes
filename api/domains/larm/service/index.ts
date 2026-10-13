@@ -704,21 +704,27 @@ export function createLarm(config: {
 				options,
 				onDelta,
 			);
-			const response = await infer(
-				p,
-				"chat/completions",
-				{
-					method: "POST",
-					headers: { "content-type": "application/json" },
-					body: JSON.stringify(
-						chatRequest(p, timing.selected, !!onDelta, options),
-					),
-				},
-				signal,
-				connectionId,
-				options,
-			);
-			const result = await timing.read(response, signal);
+			let result: Awaited<ReturnType<typeof timing.read>>;
+			try {
+				const response = await infer(
+					p,
+					"chat/completions",
+					{
+						method: "POST",
+						headers: { "content-type": "application/json" },
+						body: JSON.stringify(
+							chatRequest(p, timing.selected, !!onDelta, options),
+						),
+					},
+					signal,
+					connectionId,
+					options,
+				);
+				result = await timing.read(response, signal);
+			} catch (error) {
+				timing.failed(signal);
+				throw error;
+			}
 			forwardToolCalls(result, options?.tools, options?.onToolCalls);
 			return result.text;
 		});

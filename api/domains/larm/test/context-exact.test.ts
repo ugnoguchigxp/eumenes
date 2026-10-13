@@ -11,13 +11,13 @@ test("required control and summary segments are never silently truncated", () =>
 		outputReserveTokens: 100,
 		safetyMarginTokens: 100,
 	};
-	expect(fitContext(messages, window)).toHaveLength(2);
+	expect(fitContext(messages, window).messages).toHaveLength(2);
 	expect(() => fitContext(messages, window, true)).toThrow(
 		"context_window_exceeded",
 	);
-	expect(fitContext(messages, { ...window, maxTokens: 5000 }, true)).toEqual(
-		messages,
-	);
+	expect(
+		fitContext(messages, { ...window, maxTokens: 5000 }, true).messages,
+	).toEqual(messages);
 });
 
 test("the leading system run and the last message survive trimming; the oldest conversation is dropped first", () => {
@@ -37,7 +37,7 @@ test("the leading system run and the last message survive trimming; the oldest c
 	};
 	const total = new TextEncoder().encode(JSON.stringify(messages)).length;
 	expect(total).toBeGreaterThan(800);
-	const fitted = fitContext(messages, window);
+	const fitted = fitContext(messages, window).messages;
 	expect(fitted.slice(0, 3)).toEqual(messages.slice(0, 3));
 	expect(fitted.at(-1)).toEqual(messages.at(-1));
 	expect(fitted.length).toBeLessThan(messages.length);

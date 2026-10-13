@@ -38,7 +38,7 @@
 		"@eumenes/design-system": "workspace:*",
 		"@openai/codex-sdk": "0.160.0",
 		"@tanstack/react-query": "5.101.0",
-		"eumenes-memory": "file:vendor/eumenes-memory/eumenes-memory-0.3.7.tgz",
+		"eumenes-memory": "file:vendor/eumenes-memory/eumenes-memory-0.0.1.tgz",
 		"eumenes-world-model": "file:vendor/world/eumenes-world-model-0.0.0.tgz",
 		"hono": "4.12.34",
 		"jsonrepair": "3.15.0",

@@ -103,7 +103,7 @@
 
 **D9. 会話画面の途中表示（`holdBody`）は本計画では変えない。** 音声には影響しない（F10）。
 
-**D10. ライブラリ（`eumenes_memory`）は公開 API だけを使う。** 当初は変更しない方針だったが、2026-10-13 に 0.3.7 で次を追加した: State の由来 `agent_inferred`（記憶担当の依頼なしの書き込み。本人確認済みの保護は受けない）、`latestMemoryChangeSeq`、`readStateFact`。Eumenes の本番コードからライブラリ所有の表を直接読む SQL は無くした。
+**D10. ライブラリ（`eumenes_memory`）は公開 API だけを使う。** 当初は変更しない方針だったが、本計画のためにライブラリへ次を追加した: State の由来 `agent_inferred`（記憶担当の依頼なしの書き込み。本人確認済みの保護は受けない）、`latestMemoryChangeSeq`、`readStateFact`。Eumenes の本番コードからライブラリ所有の表を直接読む SQL は無くした。
 
 **D11. 対象の会話は `conversationId` 単位で扱う。** `"main"` を決め打ちしない。
 

@@ -28,6 +28,7 @@ function usageCounts(usage: Record<string, unknown> | undefined) {
 /**
  * Fits the request to the model window and times the exchange. Only durations,
  * sizes and counts are logged: no prompt, answer or provider payload.
+ * Exactly one `larm.llm_timing` is emitted per exchange, success or failure.
  */
 export function startLlmTiming(
 	profile: string,
@@ -36,40 +37,64 @@ export function startLlmTiming(
 	options: LarmCallOptions | undefined,
 	onDelta: ((text: string) => void) | undefined,
 ) {
-	const selected = fitContext(
+	// The fit check already measured the final messages; no extra serialization.
+	const { messages: selected, bytes: requestBytes } = fitContext(
 		messages,
 		window,
 		options?.contextPolicy === "exact",
 	);
-	const requestBytes = new TextEncoder().encode(
-		JSON.stringify(selected),
-	).length;
 	const started = Date.now();
 	let firstDeltaAt: number | undefined;
-	return {
-		selected,
-		/** Reads the response; call after the request is sent. */
-		async read(response: Response, signal: AbortSignal) {
-			const result = await readChatResponse(
-				response,
-				signal,
-				onDelta
-					? (text) => {
-							firstDeltaAt ??= Date.now();
-							onDelta(text);
-						}
-					: undefined,
-			);
-			log.info("larm.llm_timing", {
+	let logged = false;
+	function emit(
+		outcome: "ok" | "error" | "aborted",
+		usage?: Record<string, unknown>,
+	) {
+		if (logged) return;
+		logged = true;
+		try {
+			const fields = {
 				profile: profile === auxiliaryProfile ? "auxiliary" : "main",
+				outcome,
 				...(firstDeltaAt === undefined
 					? {}
 					: { ttftMs: firstDeltaAt - started }),
 				totalMs: Date.now() - started,
 				requestBytes,
 				droppedMessages: messages.length - selected.length,
-				...usageCounts(result.usage),
-			});
+				...usageCounts(usage),
+			};
+			if (outcome === "error") log.warn("larm.llm_timing", fields);
+			else log.info("larm.llm_timing", fields);
+		} catch {
+			// Diagnostics must never change the inference result or its error.
+		}
+	}
+	return {
+		selected,
+		/** Records a failure before the response could be read (send, status or exchange hook). Idempotent. */
+		failed(signal: AbortSignal) {
+			emit(signal.aborted ? "aborted" : "error");
+		},
+		/** Reads the response; call after the request is sent. */
+		async read(response: Response, signal: AbortSignal) {
+			let result: Awaited<ReturnType<typeof readChatResponse>>;
+			try {
+				result = await readChatResponse(
+					response,
+					signal,
+					onDelta
+						? (text) => {
+								firstDeltaAt ??= Date.now();
+								onDelta(text);
+							}
+						: undefined,
+				);
+			} catch (error) {
+				emit(signal.aborted ? "aborted" : "error");
+				throw error;
+			}
+			emit("ok", result.usage);
 			return result;
 		},
 	};

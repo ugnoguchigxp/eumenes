@@ -3,12 +3,15 @@ import type { Provider } from "./profiles";
 
 type Messages = Parameters<LarmPort["answer"]>[0];
 
-/** Drops the oldest turns until the request fits the model. The leading system run (policy, memory and reference blocks) and the last message are never dropped. */
+/**
+ * Drops the oldest turns until the request fits the model. The leading system run (policy, memory and reference blocks) and the last message are never dropped.
+ * `bytes` is the serialized size of the returned messages, measured by the final fit check, so callers need not serialize them again.
+ */
 export function fitContext(
 	messages: Messages,
 	window: NonNullable<Provider["contextWindow"]>,
 	exact = false,
-): Messages {
+): { messages: Messages; bytes: number } {
 	const budget =
 		window.maxTokens - window.outputReserveTokens - window.safetyMarginTokens;
 	if (budget <= 0) throw new Error("larm_invalid_context_window");
@@ -17,10 +20,13 @@ export function fitContext(
 		new TextEncoder().encode(JSON.stringify(items)).length;
 	let kept = 0;
 	while (kept < selected.length && selected[kept]?.role === "system") kept++;
-	while (!exact && selected.length - kept > 1 && estimate(selected) > budget)
+	let bytes = estimate(selected);
+	while (!exact && selected.length - kept > 1 && bytes > budget) {
 		selected.splice(kept, Math.min(2, selected.length - kept - 1));
-	if (estimate(selected) > budget) throw new Error("context_window_exceeded");
-	return selected;
+		bytes = estimate(selected);
+	}
+	if (bytes > budget) throw new Error("context_window_exceeded");
+	return { messages: selected, bytes };
 }
 
 /** An invalid optional credit never invalidates the audio it accompanies. */
