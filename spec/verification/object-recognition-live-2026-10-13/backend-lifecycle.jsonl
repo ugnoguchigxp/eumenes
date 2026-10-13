@@ -1,0 +1,12 @@
+{"level":"info","time":"2026-10-13T10:34:12.591Z","service":"eumenes","pid":58166,"bootId":"37734828-7420-48d3-9d0c-27d51c08df87","schemaVersion":1,"component":"server","event":"server.starting"}
+{"level":"info","time":"2026-10-13T10:34:12.657Z","service":"eumenes","pid":58166,"bootId":"37734828-7420-48d3-9d0c-27d51c08df87","schemaVersion":1,"component":"server","event":"server.recovery_started"}
+{"level":"info","time":"2026-10-13T10:34:12.707Z","service":"eumenes","pid":58166,"bootId":"37734828-7420-48d3-9d0c-27d51c08df87","schemaVersion":1,"component":"server","event":"server.recovery_completed"}
+{"level":"info","time":"2026-10-13T10:34:12.715Z","service":"eumenes","pid":58166,"bootId":"37734828-7420-48d3-9d0c-27d51c08df87","schemaVersion":1,"port":8787,"component":"server","event":"server.listening"}
+{"level":"info","time":"2026-10-13T10:34:13.199Z","service":"eumenes","pid":58166,"bootId":"37734828-7420-48d3-9d0c-27d51c08df87","schemaVersion":1,"status":"ready","component":"server","event":"larm.probe_completed"}
+{"level":"info","time":"2026-10-13T10:41:49.436Z","service":"eumenes","pid":58166,"bootId":"37734828-7420-48d3-9d0c-27d51c08df87","schemaVersion":1,"component":"server","event":"server.shutdown_started"}
+{"level":"info","time":"2026-10-13T10:41:49.456Z","service":"eumenes","pid":58166,"bootId":"37734828-7420-48d3-9d0c-27d51c08df87","schemaVersion":1,"reason":"ok","component":"server","event":"server.shutdown_completed"}
+{"level":"info","time":"2026-10-13T10:42:07.540Z","service":"eumenes","pid":59499,"bootId":"a53ed417-2d31-499c-a26c-413e9a4ca997","schemaVersion":1,"component":"server","event":"server.starting"}
+{"level":"info","time":"2026-10-13T10:42:07.569Z","service":"eumenes","pid":59499,"bootId":"a53ed417-2d31-499c-a26c-413e9a4ca997","schemaVersion":1,"component":"server","event":"server.recovery_started"}
+{"level":"info","time":"2026-10-13T10:42:07.599Z","service":"eumenes","pid":59499,"bootId":"a53ed417-2d31-499c-a26c-413e9a4ca997","schemaVersion":1,"component":"server","event":"server.recovery_completed"}
+{"level":"info","time":"2026-10-13T10:42:07.606Z","service":"eumenes","pid":59499,"bootId":"a53ed417-2d31-499c-a26c-413e9a4ca997","schemaVersion":1,"port":8787,"component":"server","event":"server.listening"}
+{"level":"info","time":"2026-10-13T10:42:08.086Z","service":"eumenes","pid":59499,"bootId":"a53ed417-2d31-499c-a26c-413e9a4ca997","schemaVersion":1,"status":"ready","component":"server","event":"larm.probe_completed"}

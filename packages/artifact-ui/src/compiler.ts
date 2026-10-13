@@ -11,11 +11,17 @@ import { artifactLibrary } from "./library";
 
 function checkSource(definition: ArtifactDefinition, snapshot: Snapshot) {
 	for (const request of definitionRequests(definition)) {
-		const kind =
-			request.view === "music-workspace" ||
-			request.view === "music-player" ||
-			request.view === "playlist" ||
-			request.view === "music-library"
+		const kind = [
+			"image-workspace",
+			"image-creation-form",
+			"image-preview",
+			"image-gallery",
+		].includes(request.view)
+			? "image-workspace"
+			: request.view === "music-workspace" ||
+				  request.view === "music-player" ||
+				  request.view === "playlist" ||
+				  request.view === "music-library"
 				? "music"
 				: request.view === "generation-status"
 					? "generation"

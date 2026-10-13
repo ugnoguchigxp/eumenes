@@ -1,0 +1,58 @@
+{
+  "selected": [
+    "excalidraw"
+  ],
+  "dependencySet": [
+    "capabilities",
+    "delivery",
+    "attitude-dataset",
+    "larm",
+    "settings",
+    "inference",
+    "queue",
+    "excalidraw"
+  ],
+  "testDependencySet": [
+    "capabilities",
+    "delivery",
+    "attitude-dataset",
+    "larm",
+    "tts-dictionary",
+    "queue",
+    "tasks",
+    "dots",
+    "settings",
+    "inference",
+    "excalidraw"
+  ],
+  "revision": "fd565c3304c5882f84080c55aa47a5b44d96007f14b84eb083b4e17a73126852",
+  "steps": [
+    {
+      "name": "size-budget",
+      "ms": 119,
+      "result": "pass"
+    },
+    {
+      "name": "format",
+      "ms": 95,
+      "result": "pass"
+    },
+    {
+      "name": "lint",
+      "ms": 53,
+      "result": "pass"
+    },
+    {
+      "name": "typecheck",
+      "ms": 157,
+      "result": "pass"
+    },
+    {
+      "name": "domain tests",
+      "ms": 1284,
+      "result": "pass"
+    }
+  ],
+  "totalMs": 1991,
+  "result": "pass"
+}

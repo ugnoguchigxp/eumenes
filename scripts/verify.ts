@@ -162,11 +162,13 @@ try {
 				2,
 			),
 		);
-		await run("typecheck", [process.execPath, "x", "tsc", "-p", config]);
+		await run("typecheck", [process.execPath, "check", "-p", config]);
 		const list = Bun.spawnSync(
-			[process.execPath, "x", "tsc", "-p", config, "--listFilesOnly"],
+			[process.execPath, "check", "-p", config, "--listFilesOnly"],
 			{ cwd: root },
 		);
+		if (list.exitCode !== 0)
+			throw new Error(`typecheck file listing failed (${list.exitCode})`);
 		const used = list.stdout
 			.toString()
 			.split("\n")

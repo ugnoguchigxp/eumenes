@@ -1,0 +1,179 @@
+import { test, expect } from "@playwright/test";
+import { mkdirSync } from "node:fs";
+import { createFixture } from "./fixture";
+test.setTimeout(90000);
+test.use({
+	launchOptions: {
+		args: [
+			"--use-fake-device-for-media-stream",
+			"--use-fake-ui-for-media-stream",
+		],
+	},
+});
+const fixture = createFixture();
+let origin: string;
+test.beforeAll(async () => {
+	const [apiPort, webPort] = (await fixture.ports(2)) as [number, number];
+	origin = `http://127.0.0.1:${webPort}`;
+	await fixture.launch(
+		["scripts/object-recognition-fixture-server.ts"],
+		{ EUMENES_PORT: String(apiPort), EUMENES_ORIGIN: origin },
+		{ ports: [apiPort] },
+	);
+	await fixture.ready(`http://127.0.0.1:${apiPort}/api/status`);
+	await fixture.launchWeb({
+		webPort,
+		apiPort,
+		token: "fixture-token-for-toolchain-browser",
+		cacheDir: `/tmp/eumenes-recognition-vite-${webPort}`,
+	});
+	await fixture.ready(origin);
+});
+test.afterAll(() => fixture.stopAll());
+test("recognition stays inside artifact: selected image, camera capture, video seek, cancel and conversation", async ({
+	page,
+}) => {
+	await page.setViewportSize({ width: 1440, height: 1040 });
+	await page.goto(origin);
+	await page.getByRole("button", { name: "アーティファクトを開く" }).click();
+	await page
+		.getByRole("menuitem", { name: "映っている物を調べる", exact: true })
+		.click();
+	const panel = page.getByRole("complementary", { name: "アーティファクト" });
+	const workspace = panel.locator(".recognition-workspace");
+	await expect(workspace).toBeVisible();
+	await expect(workspace.getByLabel("画像・動画を選ぶ")).toBeEnabled();
+	await workspace.getByLabel("物体認識の認証方式").selectOption("larm");
+	await expect(workspace.getByLabel("物体認識の認証方式")).toHaveValue("larm");
+	const frame = await panel.boundingBox(),
+		bounds = await workspace.boundingBox();
+	expect(bounds!.x).toBeGreaterThanOrEqual(frame!.x);
+	expect(bounds!.width).toBeLessThanOrEqual(frame!.width);
+	expect(bounds!.width).toBeLessThan(1440);
+	await expect(page.getByRole("dialog")).toHaveCount(0);
+	const bytes = await page.evaluate(async () => {
+		const c = document.createElement("canvas");
+		c.width = 320;
+		c.height = 240;
+		const ctx = c.getContext("2d")!;
+		ctx.fillStyle = "#dce8e4";
+		ctx.fillRect(0, 0, 320, 240);
+		ctx.fillStyle = "#245a69";
+		ctx.fillRect(130, 30, 150, 170);
+		ctx.fillStyle = "#fff";
+		ctx.fillRect(30, 40, 60, 110);
+		const blob = await new Promise<Blob>((r) =>
+			c.toBlob((b) => r(b!), "image/png"),
+		);
+		return Array.from(new Uint8Array(await blob.arrayBuffer()));
+	});
+	await workspace.getByLabel("画像・動画を選ぶ").setInputFiles({
+		name: "desk.png",
+		mimeType: "image/png",
+		buffer: Buffer.from(bytes),
+	});
+	await expect(workspace.getByText("解析完了", { exact: true })).toBeVisible();
+	await expect(workspace.locator(".recognition-boxes rect")).toHaveCount(2);
+	await expect(workspace.getByRole("img", { name: "desk.png" })).toBeVisible();
+	await workspace
+		.getByRole("button", { name: "表示中の結果を会話に追加" })
+		.click();
+	await expect(
+		page.getByText(/物体検出の観測結果（資料: desk.png/),
+	).toBeVisible();
+	await workspace.getByRole("button", { name: "カメラを開く" }).click();
+	await expect(workspace.getByLabel("カメラプレビュー")).toBeVisible();
+	await workspace.getByRole("button", { name: "撮影して調べる" }).click();
+	await expect(
+		workspace.getByRole("img", { name: "camera.jpg" }),
+	).toBeVisible();
+	await expect(workspace.getByLabel("カメラプレビュー")).toBeHidden();
+	const videoBytes = await page.evaluate(async () => {
+		const c = document.createElement("canvas");
+		c.width = 320;
+		c.height = 240;
+		const ctx = c.getContext("2d")!;
+		ctx.fillStyle = "#dce8e4";
+		ctx.fillRect(0, 0, 320, 240);
+		const stream = c.captureStream(10);
+		const r = new MediaRecorder(stream, { mimeType: "video/webm;codecs=vp8" });
+		const chunks: Blob[] = [];
+		r.ondataavailable = (e) => chunks.push(e.data);
+		const done = new Promise<Blob>((resolve) => {
+			r.onstop = () => resolve(new Blob(chunks, { type: "video/webm" }));
+		});
+		r.start();
+		const timer = setInterval(() => {
+			ctx.fillStyle = "#245a69";
+			ctx.fillRect(130, 30, 150, 170);
+		}, 100);
+		await new Promise((resolve) => setTimeout(resolve, 1800));
+		clearInterval(timer);
+		r.stop();
+		const blob = await done;
+		stream.getTracks().forEach((t) => t.stop());
+		return Array.from(new Uint8Array(await blob.arrayBuffer()));
+	});
+	await workspace.getByLabel("画像・動画を選ぶ").setInputFiles({
+		name: "clip.webm",
+		mimeType: "video/webm",
+		buffer: Buffer.from(videoBytes),
+	});
+	await expect(
+		workspace.getByRole("button", { name: "1.0秒 · 1件" }),
+	).toBeVisible();
+	await workspace.getByRole("button", { name: "1.0秒 · 1件" }).click();
+	await expect
+		.poll(() =>
+			workspace
+				.getByLabel("解析した動画")
+				.evaluate((v: HTMLVideoElement) => v.currentTime),
+		)
+		.toBeCloseTo(1, 1);
+	await workspace.getByRole("button", { name: "0.5秒 · 0件" }).click();
+	await expect(
+		workspace.getByText("検出対象は見つかりませんでした。"),
+	).toBeVisible();
+	await workspace.getByRole("button", { name: "1.0秒 · 1件" }).click();
+	mkdirSync("spec/verification/object-recognition-2026-10-13", {
+		recursive: true,
+	});
+	await panel.screenshot({
+		path: "spec/verification/object-recognition-2026-10-13/artifact-video.png",
+	});
+	await workspace.getByLabel("画像・動画を選ぶ").setInputFiles({
+		name: "cancel.webm",
+		mimeType: "video/webm",
+		buffer: Buffer.from(videoBytes),
+	});
+	await workspace.getByRole("button", { name: "取消", exact: true }).click();
+	await expect(workspace.getByText("中止", { exact: true })).toBeVisible();
+	await expect(workspace.getByLabel("検出枠")).toHaveCount(0);
+	await page.reload();
+	await page.getByRole("button", { name: "アーティファクトを開く" }).click();
+	await page
+		.getByRole("menuitem", { name: "映っている物を調べる", exact: true })
+		.click();
+	await expect(workspace.getByLabel("保存した資料")).toContainText("clip.webm");
+	await workspace
+		.getByLabel("保存した資料")
+		.selectOption({ label: "desk.png · 解析完了" });
+	await expect(workspace.getByRole("img", { name: "desk.png" })).toBeVisible();
+	await page.setViewportSize({ width: 1440, height: 1040 });
+	const separator = await page
+		.getByRole("separator", { name: "会話とアーティファクトのサイズを調整" })
+		.boundingBox();
+	await page.mouse.move(
+		separator!.x + separator!.width / 2,
+		separator!.y + 100,
+	);
+	await page.mouse.down();
+	await page.mouse.move(1030, separator!.y + 100);
+	await page.mouse.up();
+	await panel.screenshot({
+		path: "spec/verification/object-recognition-2026-10-13/artifact-narrow.png",
+	});
+	expect((await workspace.boundingBox())!.width).toBeLessThanOrEqual(
+		(await panel.boundingBox())!.width,
+	);
+});

@@ -1,5 +1,6 @@
 import type { Hono } from "hono";
 import type { InferenceService } from "../service";
+import { usagePageQuerySchema } from "../contracts";
 export function registerInference(app: Hono, service: InferenceService) {
 	app.get("/api/inference/status", (c) => c.json(service.status()));
 	app.get("/api/inference/larm", (c) => c.json(service.inspect()));
@@ -29,6 +30,12 @@ export function registerInference(app: Hono, service: InferenceService) {
 		);
 	});
 	app.get("/api/inference/usage", (c) => c.json(service.usage()));
+	app.get("/api/inference/usage/page", (c) => {
+		const query = usagePageQuerySchema.safeParse(c.req.query());
+		return query.success
+			? c.json(service.usagePage(query.data))
+			: c.json({ error: "invalid_request" }, 400);
+	});
 	app.get("/api/inference/probes", (c) => c.json(service.probes()));
 	app.post("/api/inference/probes", async (c) => {
 		const body = await c.req.text();

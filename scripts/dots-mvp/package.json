@@ -4,7 +4,7 @@
 	"type": "module",
 	"scripts": {
 		"test": "bun test",
-		"typecheck": "tsc --noEmit"
+		"typecheck": "bun check"
 	},
 	"dependencies": {
 		"@modelcontextprotocol/server": "2.3.1",

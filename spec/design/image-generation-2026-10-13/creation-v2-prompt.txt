@@ -1,0 +1,31 @@
+Use case: ui-mockup.
+Asset type: one high-fidelity Japanese desktop application screenshot, landscape approximately 1600x1100, straight-on crisp UI, no device frame.
+Primary request: Design Eumenes IMAGE GENERATION workspace using the SAME interaction pattern as its MUSIC GENERATION workspace: a structured selection form builds an editable generation prompt. Do not make this merely a blank prompt textarea. This is screen 1 of a consistent pair; generate ONLY the creation screen in this image.
+
+Visual style: practical premium desktop productivity interface. Dark charcoal background (#14171c), subtly lighter gray panels, thin gray borders, small 8px radii, restrained cobalt-blue buttons and blue selected checkboxes, off-white Japanese sans-serif text, muted gray secondary labels. Compact legible controls and evenly spaced 13–15px text, not huge headings. No purple, no decorative UI gradients, no glassmorphism, no marketing slogans, no browser chrome or watermark.
+
+Shared shell: slim full-width top header. Left title "画像生成". On right, an outlined grid icon button labeled "画像一覧" that navigates to a DIFFERENT FULL-SCREEN VIEW. No "過去の画像" tab, no embedded history list, no thumbnails of past results in this screen. Tiny close icon at far right.
+
+Main body: two columns, left 42% width preview, right 58% width creation form. Match the music studio's preview-left / selection-form-right design.
+LEFT: top small label "プレビュー". Large landscape illustration of a softly sunlit Japanese study with a wooden desk, linen curtains, house plants and a cup, watercolor style. Neutral matte border, not decorative frame. Below image short title "朝の光が差し込む書斎", dimensions "768 × 512 · PNG". A small green check status "生成完了". Small outlined download button "ダウンロード" and zoom icon button "拡大". Keep this panel uncluttered with generous breathing room; no gallery, no music player or audio controls.
+
+RIGHT: title "どんな画像にしますか？", top-right small "リセット" text button.
+First, compact input labeled "テーマ・描きたいもの" containing "朝の光が差し込む、静かな書斎".
+Next section "画風", with small helper "複数選択できます", a compact search input "画風を探す", and grouped compact square CHECKBOXES, not pills-only.
+Two category headers with four-column grids:
+"写真・リアル": 写真, フィルム, シネマティック, 3D.
+"イラスト・絵画": 水彩 (checked blue), 油彩, アニメ, 線画, 鉛筆画, パステル, 浮世絵, ドット絵.
+Below, small selected summary pill "水彩 ×".
+Next "雰囲気": a compact checkbox row 落ち着いた (checked), 温かい (checked), 明るい, 幻想的, 力強い.
+Next row two dropdowns: label "構図", value "広めの画角"; label "光", value "朝の自然光".
+Next very compact row of four generation settings: "幅" value "768", "高さ" value "512", "形式" value "PNG", "シード" value "42". These are controls, not prose. Width and height are editable integer fields.
+BOTTOM RIGHT: a clearly separated prompt editor area, always visible in the screenshot. Heading "画像作成プロンプト", a small subtle state label "選択内容と同期", and an outlined secondary button "選択内容を反映". Large multiline editable textarea containing the exact readable text:
+"テーマ：朝の光が差し込む、静かな書斎
+画風：水彩
+雰囲気：落ち着いた、温かい
+構図：広めの画角　光：朝の自然光
+木の机、白いカーテン、観葉植物。柔らかな筆づかいで、穏やかな朝の空気を描く。"
+Small helper "自由に編集できます".
+Bottom-right prominent blue button with simple sparkle icon "画像を生成".
+The hierarchy MUST clearly show that selecting settings assembles the editable prompt and the final prompt is what is submitted. No fake automatic overwrite warning, no unsupported reference-image upload/edit controls, no technical provider names or API jargon.
+Both the complete selection form and final prompt/editor/button should fit in the visible desktop screen without scrolling. Give the prompt enough height to read all five lines. Render Japanese text accurately.

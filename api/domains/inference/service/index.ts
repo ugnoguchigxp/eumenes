@@ -1,10 +1,11 @@
+import { createUsageReader } from "./usage";
 import { createVoiceAccess } from "./voice-access";
 import { createSpeechLanguageCache } from "./speech-language";
 import { createVoiceBinding } from "./voice-binding";
 import { bindControlPolicy } from "./control-policy";
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
-import { createLarm, type LarmPort, type LarmExchange } from "../../larm";
+import { createLarm, type LarmPort } from "../../larm";
 import type { SpeechPreparation } from "../../delivery/contracts";
 import type {
 	SettingsService,
@@ -34,22 +35,6 @@ import { safeError } from "./errors";
 import { validateReceipt as checkReceipt } from "./receipt-authority";
 /** Each clause gets its own short deadline; the turn's authority is still enforced through `parents`. */
 const SPEECH_CHUNK_DEADLINE_MS = 60_000;
-type UsageRow = {
-	id: string;
-	requestId: string;
-	subject: string;
-	purpose: Purpose;
-	source: "larm" | "cloud" | "codex";
-	model: string | null;
-	status: string;
-	reason: string | null;
-	started: number;
-	ended: number | null;
-	accepted: number;
-	inputTokens: number | null;
-	outputTokens: number | null;
-	providerDetails: string;
-};
 type RequestArgs =
 	Parameters<typeof runRequest> extends [unknown, ...infer R] ? R : never;
 type ControlArgs = [string, Messages, AbortSignal, ControlContract?];
@@ -620,23 +605,7 @@ export function createInference(
 		) => standalone("llm", messages, signal, onDelta) as Promise<string>,
 		transcribe: (wav: Uint8Array, signal: AbortSignal) =>
 			standalone("asr", wav, signal) as Promise<string>,
-		usage: () =>
-			store.read((db) =>
-				db
-					.query(
-						"SELECT a.id,a.request_id AS requestId,r.subject,r.purpose,a.source,a.model,a.status,a.reason,a.started,a.ended,a.accepted,a.input_tokens AS inputTokens,a.output_tokens AS outputTokens,a.provider_details AS providerDetails FROM inference_attempts a JOIN inference_requests r ON r.id=a.request_id WHERE r.subject NOT LIKE 'probe:%' ORDER BY a.started DESC LIMIT 100",
-					)
-					.all()
-					.map((row) => {
-						const value = row as UsageRow;
-						return {
-							...value,
-							providerDetails: JSON.parse(
-								value.providerDetails,
-							) as LarmExchange[],
-						};
-					}),
-			),
+		...createUsageReader(store),
 		getProbe: (id: string) =>
 			store.read((db) =>
 				db.query("SELECT * FROM inference_probes WHERE id=?").get(id),

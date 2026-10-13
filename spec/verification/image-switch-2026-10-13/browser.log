@@ -1,0 +1,8 @@
+
+Running 1 test using 1 worker
+
+(node:39984) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 tests/browser/image.spec.ts:25:1 › OpenUI image studio: selected prompt, protected edits, fullscreen gallery and result operations (55.8s)
+
+  1 passed (57.3s)

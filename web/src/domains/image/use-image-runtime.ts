@@ -1,0 +1,210 @@
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRef, useState } from "react";
+import { imagePlan } from "../../../../api/domains/image/contracts";
+import type { EumenesClient } from "../../../../client";
+import type { ArtifactEvent, Receipt } from "@eumenes/artifact-ui/contracts";
+import type { ImageWorkspaceResource } from "@eumenes/artifact-ui/contracts";
+import { imageStudioSource } from "./artifact-definition";
+import { useImageCreation } from "./use-image-creation";
+import { queryRoots } from "../../queryKeys";
+export function useImageRuntime(
+	client: EumenesClient,
+	conversationId = "main",
+	onClose?: () => void,
+) {
+	const cache = useQueryClient();
+	const query = useQuery({
+		queryKey: [queryRoots.image, "generations", conversationId],
+		queryFn: ({ signal }) => client.imageGenerations(conversationId, signal),
+		refetchInterval: (q) =>
+			q.state.data?.some(
+				(i) => i.state === "planning" || i.state === "generating",
+			)
+				? 1000
+				: false,
+	});
+	const items = query.data ?? [];
+	const latest = items[0];
+	const creation = useImageCreation(client, conversationId, items, latest);
+	const library = useQuery({
+		queryKey: [queryRoots.image, "library"],
+		queryFn: ({ signal }) => client.imageLibrary(signal),
+		refetchInterval: creation.busy ? 2000 : false,
+		retry: false,
+	});
+	const [selection, select] = useState<{ id?: string; latestId?: string }>();
+	const seen = useRef(new Set<string>());
+	const lock = useRef(false);
+	const images = (library.data?.images ?? [])
+		.slice()
+		.sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+		.map((a) => {
+			const record = items.find(
+				(i) => i.artifactId === a.id && i.state === "completed",
+			);
+			return {
+				id: a.id,
+				title: record?.title ?? `画像 ${a.createdAt.slice(0, 10)}`,
+				width: a.width,
+				height: a.height,
+				format: a.format,
+				createdAt: a.createdAt,
+				prompt: record?.prompt ?? undefined,
+				url: `/api/images/${encodeURIComponent(a.id)}/content`,
+			};
+		});
+	const resource: ImageWorkspaceResource = {
+		kind: "image-workspace",
+		revision: Math.max(...items.map((i) => i.updatedAt), 0) + creation.revision,
+		identity: latest?.id ?? "studio",
+		initialTab: latest?.action === "library" ? "history" : "create",
+		title: "画像生成",
+		defaults: {
+			prompt: latest?.prompt ?? "",
+			width: latest?.width ?? 512,
+			height: latest?.height ?? 512,
+			format: latest?.format ?? "webp",
+			seed: latest?.seed ?? 0,
+		},
+		images,
+		selectedId:
+			selection?.latestId === latest?.id
+				? selection?.id
+				: latest?.state === "completed"
+					? (latest.artifactId ?? images[0]?.id)
+					: undefined,
+		busy: creation.busy,
+		status: creation.creation.status,
+		statusTitle: creation.creation.title,
+		statusDescription: creation.creation.description,
+		canCancel: creation.creation.canCancel,
+		loading: library.isPending,
+		error: library.error
+			? "保存画像を取得できませんでした。一覧を更新してください。"
+			: undefined,
+	};
+	const snapshot = { [imageStudioSource]: resource };
+	async function dispatch(event: ArtifactEvent): Promise<Receipt> {
+		if (
+			event.source !== imageStudioSource ||
+			![
+				"image-generate",
+				"image-cancel",
+				"image-refresh",
+				"image-select",
+				"image-close",
+				"image-delete",
+			].includes(event.action)
+		)
+			return { status: "rejected", message: "この操作は利用できません。" };
+		if (seen.current.has(event.id))
+			return { status: "duplicate", message: "受付済みです。" };
+		if (event.revision !== resource.revision)
+			return {
+				status: "conflict",
+				message: "状態が更新されました。もう一度操作してください。",
+			};
+		if (lock.current)
+			return { status: "conflict", message: "操作を受け付けています。" };
+		lock.current = true;
+		try {
+			if (event.action === "image-close") {
+				if (!onClose)
+					return {
+						status: "rejected",
+						message: "この表示はここでは閉じられません。",
+					};
+				onClose();
+			} else if (event.action === "image-generate") {
+				if (creation.busy)
+					return { status: "rejected", message: "生成中です。" };
+				const plan = imagePlan.safeParse({
+					action: "generate",
+					title: "画像",
+					description: "",
+					prompt: event.values.prompt,
+					width: Number(event.values.width),
+					height: Number(event.values.height),
+					format: event.values.format,
+					seed: Number(event.values.seed),
+				});
+				if (!plan.success || !plan.data.prompt.trim())
+					return {
+						status: "rejected",
+						message: "プロンプトと画像の設定を確認してください。",
+					};
+				const { prompt, width, height, format, seed } = plan.data;
+				await creation.generate(
+					JSON.stringify({ prompt, width, height, format, seed }),
+				);
+			} else if (event.action === "image-cancel") {
+				if (!creation.creation.canCancel)
+					return {
+						status: "rejected",
+						message: "取消できる生成がありません。",
+					};
+				await creation.cancel();
+			} else if (event.action === "image-refresh") {
+				await cache.invalidateQueries({ queryKey: [queryRoots.image] });
+			} else if (event.action === "image-delete") {
+				const image = images.find((i) => i.id === event.values.id);
+				if (!image)
+					return {
+						status: "rejected",
+						message: "画像が見つかりません。一覧を更新してください。",
+					};
+				const queryKey = [queryRoots.image, "library"];
+				await cache.cancelQueries({ queryKey });
+				try {
+					await client.deleteImage(image.id);
+				} catch {
+					await cache.invalidateQueries({ queryKey });
+					return {
+						status: "rejected",
+						message: "削除結果を確認できませんでした。一覧を更新してください。",
+					};
+				}
+				await cache.cancelQueries({ queryKey });
+				cache.setQueryData<Awaited<ReturnType<EumenesClient["imageLibrary"]>>>(
+					queryKey,
+					(data) =>
+						data && {
+							...data,
+							images: data.images.filter((i) => i.id !== image.id),
+							totalBytes: Math.max(
+								0,
+								data.totalBytes -
+									(data.images.find((i) => i.id === image.id)?.bytes ?? 0),
+							),
+						},
+				);
+				if (resource.selectedId === image.id) select({ latestId: latest?.id });
+				seen.current.add(event.id);
+				await cache.invalidateQueries({ queryKey });
+				return { status: "accepted", message: "画像を削除しました。" };
+			} else {
+				const image = images.find((i) => i.id === event.values.id);
+				if (!image)
+					return { status: "rejected", message: "画像が見つかりません。" };
+				select({ id: image.id, latestId: latest?.id });
+			}
+			seen.current.add(event.id);
+			return { status: "accepted", message: "操作を受け付けました。" };
+		} catch (error) {
+			return {
+				status: "rejected",
+				message:
+					error instanceof Error && error.message === "image_prompt_too_long"
+						? "プロンプトが長すぎます。短くしてください。"
+						: "受付を確認できませんでした。状態を更新して再試行してください。",
+			};
+		} finally {
+			lock.current = false;
+		}
+	}
+	return {
+		runtime: { snapshot, dispatch },
+		loading: query.isPending,
+		error: query.error,
+	};
+}

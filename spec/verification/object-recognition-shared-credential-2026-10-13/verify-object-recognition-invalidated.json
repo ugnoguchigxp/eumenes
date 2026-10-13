@@ -1,0 +1,36 @@
+{
+  "selected": [
+    "object-recognition"
+  ],
+  "revision": "28cab3859952438a0f7daf2da675d4f322f45153a0a88145f5b55cdfa2f63959",
+  "steps": [
+    {
+      "name": "size-budget",
+      "ms": 116,
+      "result": "pass"
+    },
+    {
+      "name": "format",
+      "ms": 96,
+      "result": "pass"
+    },
+    {
+      "name": "lint",
+      "ms": 46,
+      "result": "pass"
+    },
+    {
+      "name": "typecheck",
+      "ms": 125,
+      "result": "pass"
+    },
+    {
+      "name": "domain tests",
+      "ms": 4526,
+      "result": "pass"
+    }
+  ],
+  "totalMs": 5145,
+  "result": "fail",
+  "error": "Error: source changed during verification"
+}

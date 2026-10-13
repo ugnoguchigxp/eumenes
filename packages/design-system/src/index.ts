@@ -100,3 +100,13 @@ export * from "./components/MusicLibraryControls";
 export * from "./components/SettingsPanels";
 export * from "./components/Subtitle";
 export * from "./components/TimerWorkspace";
+export * from "./components/RecordsWorkspace";
+export * from "./components/ServerDataTable";
+
+export * from "./components/ImageWorkspace";
+
+export * from "./components/FullscreenDialog";
+
+export * from "./components/ObjectRecognitionWorkspace";
+export { DrawingWorkspace, type DrawingWorkspaceProps } from "./components/DrawingWorkspace";
+export { DrawingEditorFrame, type DrawingEditorFrameProps } from "./components/DrawingWorkspace";

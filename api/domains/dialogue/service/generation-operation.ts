@@ -81,7 +81,33 @@ export function settleConversationOperation(
 		return { status: "failed", errorCode: "toolchain_unavailable" };
 	}
 	const { runtime, packageRevisionId } = resolved;
-	if (
+	if (runtime.execution === "excalidraw") {
+		if (!deps.excalidraw) throw new Error("excalidraw_unavailable");
+		const original = conversation
+			.messagesInTransaction(tx, run.conversationId)
+			.find((m) => m.id === run.inputMessageId)!.text;
+		const saved = deps.excalidraw.startInTransaction(tx, {
+			runId: run.id,
+			conversationId: run.conversationId,
+			question: chosen.request,
+			originalRequest: original,
+			deadline: Date.parse(run.deadlineAt!),
+		});
+		linkAnswer(tx, run.id, saved.jobId);
+	} else if (runtime.execution === "image") {
+		if (!deps.image) throw new Error("image_unavailable");
+		const original = conversation
+			.messagesInTransaction(tx, run.conversationId)
+			.find((m) => m.id === run.inputMessageId)!.text;
+		const saved = deps.image.startInTransaction(tx, {
+			runId: run.id,
+			conversationId: run.conversationId,
+			question: chosen.request,
+			originalRequest: original,
+			deadline: Date.parse(run.deadlineAt!),
+		});
+		linkAnswer(tx, run.id, saved.jobId);
+	} else if (
 		runtime.execution === "music-create" ||
 		runtime.execution === "music-playback"
 	) {

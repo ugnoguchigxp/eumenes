@@ -83,3 +83,4 @@ export type RecipeProposal = z.infer<typeof recipeProposal>;
 export const RECIPE_SUSPEND_AFTER = 3;
 /** Selection traces are kept like other conversation metadata. */
 export const SELECTION_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+export * from "./record-pages";

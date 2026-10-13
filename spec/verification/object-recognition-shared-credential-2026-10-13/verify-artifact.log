@@ -1,0 +1,29 @@
+$ bun scripts/verify.ts --domain artifact
+[verify] selected=artifact dependencyClosure=artifact,delivery,avatar,conversation testClosure=delivery,avatar,conversation,artifact
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts web/src/domains/artifact web/src/components/domains/artifact packages/artifact-ui/src
+size-budget ok (29 files)
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check web/src/domains/artifact web/src/components/domains/artifact packages/artifact-ui/src
+$ oxfmt --check web/src/domains/artifact web/src/components/domains/artifact packages/artifact-ui/src
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 3ms on 39 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint web/src/domains/artifact web/src/components/domains/artifact packages/artifact-ui/src
+$ oxlint --deny-warnings web/src/domains/artifact web/src/components/domains/artifact packages/artifact-ui/src
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun check -p /Users/y.noguchi/Code/eumenes/verification-reports/tsconfig.selected.json
+✓ No type errors in 38 files [105.54ms]
+[verify] TypeScript workspace closure: 40 files; web/src/domains, packages/design-system/dist, packages/artifact-ui/src, packages/design-system/src, web/src/components
+[verify] domain tests: /Users/y.noguchi/.bun/bin/bun run test:domain -- artifact
+$ bun scripts/test-domain.ts artifact
+
+ RUN  v4.1.8 /Users/y.noguchi/Code/eumenes
+
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+
+ Test Files  7 passed (7)
+      Tests  49 passed (49)
+   Start at  18:10:22
+   Duration  1.47s (transform 933ms, setup 0ms, import 1.80s, tests 621ms, environment 4.40s)
+
+[verify] passed 2302 ms

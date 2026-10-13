@@ -1,3 +1,6 @@
+import { objectRecognitionBuiltins } from "../builtin/object-recognition";
+import { excalidrawBuiltins } from "../builtin/excalidraw";
+import { imageBuiltins } from "../builtin/image";
 import { musicBuiltins } from "../builtin/music";
 import type { Database } from "bun:sqlite";
 import type { Definition } from "../contracts";
@@ -32,6 +35,13 @@ export function seedBuiltins(
 			continue;
 		registerBuiltinInTransaction(db, d);
 	}
+	if (backends.has("excalidraw"))
+		for (const d of excalidrawBuiltins) registerBuiltinInTransaction(db, d);
+	if (backends.has("object-recognition"))
+		for (const d of objectRecognitionBuiltins)
+			registerBuiltinInTransaction(db, d);
+	if (backends.has("image"))
+		for (const d of imageBuiltins) registerBuiltinInTransaction(db, d);
 	if (backends.has("music"))
 		for (const d of musicBuiltins) registerBuiltinInTransaction(db, d);
 	if (backends.has("dots"))

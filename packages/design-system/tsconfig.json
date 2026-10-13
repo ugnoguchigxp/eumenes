@@ -23,13 +23,17 @@
 		"noUncheckedIndexedAccess": true,
 		"forceConsistentCasingInFileNames": true,
 		"esModuleInterop": true,
-		"baseUrl": ".",
 		"paths": {
-			"@/*": ["src/*"],
-			"@components/*": ["src/components/*"],
-			"@lib/*": ["src/utils/*"]
+			"@/*": ["./src/*"],
+			"@components/*": ["./src/components/*"],
+			"@lib/*": ["./src/utils/*"]
 		},
-		"types": ["vitest/globals", "@testing-library/jest-dom", "node"]
+		"types": [
+			"vitest/globals",
+			"@testing-library/jest-dom",
+			"node",
+			"vite/client"
+		]
 	},
 	"include": ["src"],
 	"exclude": ["node_modules", "dist", "vite.config.ts", ".storybook"]

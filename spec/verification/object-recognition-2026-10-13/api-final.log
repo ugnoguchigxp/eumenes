@@ -1,0 +1,12 @@
+bun test v1.4.3 (c6da4a4d3)
+
+api/application/object-recognition-e2e.test.ts:
+(pass) authenticated upload → detection → stored source → conversation; command package opens the artifact [158.55ms]
+
+api/domains/settings/test/object-recognition.test.ts:
+(pass) dedicated gateway settings are encrypted, revision-bound, redacted and protected from missing/replaced master keys [9.94ms]
+
+ 2 pass
+ 0 fail
+ 26 expect() calls
+Ran 2 tests across 2 files. [767.00ms]

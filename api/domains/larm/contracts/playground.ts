@@ -17,6 +17,7 @@ export interface EmbeddingSpace {
 	passagePrefix: string;
 }
 export interface LarmTestTarget {
+	description?: string;
 	id: string;
 	name: string;
 	model: string;

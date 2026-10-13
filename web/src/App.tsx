@@ -1,10 +1,18 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { createClient } from "../../client";
 import { createAudioStore } from "./domains/audio";
 import { Workspace } from "./workspace/Workspace";
 
+const DrawingEditor = lazy(() => import("./domains/excalidraw/DrawingEditor"));
 export function App() {
+	const [hash, setHash] = useState(window.location.hash);
+	useEffect(() => {
+		const change = () => setHash(window.location.hash);
+		window.addEventListener("hashchange", change);
+		return () => window.removeEventListener("hashchange", change);
+	}, []);
+	const drawing = /^#drawing\/([a-f0-9-]{36})(?:\?revision=(\d+))?$/.exec(hash);
 	const [queryClient] = useState(
 		() =>
 			new QueryClient({
@@ -17,7 +25,18 @@ export function App() {
 	const [client] = useState(() => createClient(window.location.origin));
 	return (
 		<QueryClientProvider client={queryClient}>
-			<Workspace client={client} store={store} />
+			<Suspense fallback={<p role="status">編集画面を読み込み中です。</p>}>
+				{drawing ? (
+					<DrawingEditor
+						key={drawing[0]}
+						client={client}
+						referenceId={drawing[1]!}
+						revision={drawing[2] ? Number(drawing[2]) : undefined}
+					/>
+				) : (
+					<Workspace client={client} store={store} />
+				)}
+			</Suspense>
 		</QueryClientProvider>
 	);
 }

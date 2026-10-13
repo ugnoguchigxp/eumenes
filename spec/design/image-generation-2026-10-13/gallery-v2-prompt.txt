@@ -1,0 +1,25 @@
+Use case: ui-mockup.
+Edit the provided creation-screen mockup into SCREEN 2 of the same Japanese Eumenes image feature: its FULL-SCREEN GENERATED IMAGE GALLERY.
+
+The provided image is the edit target and the style reference. Preserve its exact outer canvas proportions, dark charcoal palette, off-white Japanese typography, thin gray borders, small 8px radii, cobalt-blue accents, refined outline icons and compact control sizes. Replace the CONTENT and header navigation to represent a completely different full-screen view. This must be one standalone gallery screen filling the entire application, NOT a side-by-side comparison or an editor with a gallery beside it.
+
+Header: at the far left, a compact left-arrow icon button with the exact text "画像生成に戻る". Next to it the main title "生成画像一覧". Far right the same small close X. The back action returns to the creation screen; there are NO inline tabs.
+Below the header, a narrow toolbar: left "生成した画像" and a muted "12枚"; right an understated refresh icon button and compact sort dropdown "新しい順".
+Below the toolbar, a beautiful full-width gallery: FOUR equally sized columns by THREE rows, twelve image cards. The grid uses the entire width, with consistent margins and gutters and comfortable vertical spacing. Card backgrounds subtly lighter than the canvas. Respect thumbnails' ratios within consistent landscape thumbnail frames. Each thumbnail is large and visually prominent, with a small strip below containing a readable Japanese image title, small muted generation date and dimensions, and a discreet download icon at the far right. No decorative gradients in UI surfaces.
+
+First card uses the same watercolor sunlit study image from the supplied creation screen, title "朝の光が差し込む書斎". Give the first card a restrained thin blue selected border.
+Other eleven thumbnails, beautiful and varied:
+"海辺の灯台" — watercolor coast and white lighthouse.
+"夜の街並み" — cinematic city lights reflected in water.
+"植物のスケッチ" — botanical eucalyptus illustration on paper.
+"静かな山の湖" — photographic mountains and lake.
+"やさしい器たち" — painterly ceramic still life.
+"雨上がりの小道" — an atmospheric garden path.
+"猫のいる窓辺" — gentle illustrated cat on a windowsill.
+"森の朝" — sunbeams through a forest.
+"夕焼けの海" — warm painterly ocean sunset.
+"花のある机" — refined photo of flowers on a wooden desk.
+"雲の向こう" — soft illustrated clouds and sky.
+Use sample dates "2026/10/13", "2026/10/12", "2026/10/11" across cards and short sizes such as "768 × 512" or "1024 × 768". Keep title typography restrained.
+
+Critical constraints: REMOVE the entire creation form, prompt editor, settings selectors, split-preview pane and generate button from the main content. The full screen belongs to the gallery. Do not show a chat, music controls, technical names, provider information, unsupported reference-image edit buttons or destructive delete buttons. No selected-image details panel taking away gallery space. No browser/device framing, marketing copy, watermark or annotations. This is a realistic polished desktop app screenshot. Render Japanese text accurately and keep all twelve cards inside the visible frame.

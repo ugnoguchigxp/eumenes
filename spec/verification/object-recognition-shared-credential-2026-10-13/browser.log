@@ -1,0 +1,8 @@
+
+Running 1 test using 1 worker
+
+(node:43342) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 tests/browser/object-recognition.spec.ts:33:1 › recognition stays inside artifact: selected image, camera capture, video seek, cancel and conversation (1.0m)
+
+  1 passed (1.1m)

@@ -11,3 +11,6 @@ export type {
 export { connectionKinds, isAgentConnection } from "./contracts";
 export { migrations } from "./repository";
 export { readStoredLarm } from "./repository/stored-larm";
+
+export { readStoredObjectRecognitionConnection } from "./repository/stored-object-recognition";
+export { readStoredExcalidrawAvailability } from "./repository/stored-larm";

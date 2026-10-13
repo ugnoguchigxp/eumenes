@@ -11,7 +11,10 @@
       "import": "./dist/index.mjs",
       "require": "./dist/index.js"
     },
-    "./styles": "./dist/design-system.css"
+    "./styles": {
+      "types": "./src/styles.d.ts",
+      "default": "./dist/design-system.css"
+    }
   },
   "files": [
     "dist",
@@ -19,8 +22,8 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json && vite build",
-    "typecheck": "tsc --noEmit",
+    "build": "bun check -p tsconfig.build.json && vite build",
+    "typecheck": "bun check",
     "test": "vitest run --project unit"
   },
   "peerDependencies": {
@@ -43,6 +46,7 @@
     "@radix-ui/react-switch": "^1.2.6",
     "@radix-ui/react-tabs": "^1.1.13",
     "@radix-ui/react-tooltip": "^1.2.8",
+    "@tanstack/react-table": "8.21.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.556.0",

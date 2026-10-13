@@ -1,4 +1,10 @@
 import { z } from "zod";
+export {
+	imageArtifactId,
+	imageArtifact,
+	imageArtifactDelete,
+	imageLibrary,
+} from "./image-library";
 import type {
 	SentenceLanguage,
 	SentenceLanguageDecision,

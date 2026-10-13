@@ -1,0 +1,40 @@
+bun test v1.4.3 (c6da4a4d3)
+
+api/application/timer-toolchain.test.ts:
+(pass) C01-C03: a relative timer request is saved through the toolchain [163.08ms]
+(pass) relative duration 90秒タイマー is stored as 90 seconds [131.61ms]
+(pass) relative duration 1時間のタイマー is stored as 3600 seconds [116.92ms]
+(pass) relative duration 3分30秒のタイマー is stored as 210 seconds [124.75ms]
+(pass) C06: cancelling the dialogue run leaves the committed timer active [124.25ms]
+(pass) C04: a revoked skill or a strict-invalid command does not start a timer [252.26ms]
+(pass) C04: another owner or extra arguments are refused before a timer is saved [266.65ms]
+(pass) C05: a failure before the action result rolls the timer back, and the same step then saves one [233.62ms]
+(pass) C07: list and cancel stay on one operation when the same step runs again [234.63ms]
+(pass) C08: without timer ports a timer request does not invent a start [204.61ms]
+(pass) real dialogue list and cancel select an authoritative timer snapshot [270.91ms]
+(pass) a made-up origin cannot authorize a timer through a valid capability reference [183.86ms]
+(pass) cancellation after preparation refreshes the result before the agent phrases it [198.64ms]
+(pass) a corrupted receipt after preparation cannot be adopted or streamed [330.55ms]
+(pass) T01/T03 both timer facts reach the model and action-like user text stays unchanged [132.31ms]
+
+api/application/object-recognition-e2e.test.ts:
+(pass) authenticated upload → detection → stored source → conversation; command package opens the artifact [211.03ms]
+
+api/domains/object-recognition/test/object-recognition.test.ts:
+(pass) single file multipart and credentials remain at the bound gateway; statusUrl is not followed [0.84ms]
+(pass) image result, source and observations persist; owner cannot read/cancel/delete/incorporate another input [51.24ms]
+(pass) video captures upstream id, stores numeric progress and timestamp results; reads never analyze again [1538.80ms]
+(pass) cancel while initial POST is outstanding captures its receipt and cancels upstream; late completion is discarded [611.38ms]
+(pass) an uncertain analyze submission is never replayed and in-flight configuration changes invalidate results [228.76ms]
+(pass) out of bounds coordinates, unsorted video times and unsupported formats are rejected [22.83ms]
+(pass) restarting the queue resumes a persisted video receipt without resubmitting analyze [540.70ms]
+(pass) cancel accepts an empty success response and reads actual terminal status; worker/gateway errors are bounded codes [0.46ms]
+(pass) after a prolonged disconnect an explicit recheck resumes the saved id without a second POST [567.89ms]
+
+api/domains/settings/test/object-recognition.test.ts:
+(pass) dedicated gateway settings are encrypted, revision-bound, redacted and protected from missing/replaced master keys [14.88ms]
+
+ 26 pass
+ 0 fail
+ 137 expect() calls
+Ran 26 tests across 4 files. [7.39s]

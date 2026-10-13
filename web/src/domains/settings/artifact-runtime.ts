@@ -21,7 +21,7 @@ import {
 const empty = z.strictObject({});
 const edit = z.strictObject({ fieldId: z.string(), value: z.string() });
 const open = z.strictObject({
-	id: z.enum(["conversation", "voice", "display"]),
+	id: z.enum(["conversation", "voice", "display", "records"]),
 });
 const accepted = (): Receipt => ({ status: "accepted", message: "" });
 
@@ -108,10 +108,12 @@ export function settingsArtifactRuntime(
 	host: SettingsDraftHost,
 	onOpen: (id: SettingsArtifactId) => void,
 	voice?: VoiceTools,
+	records?: ArtifactRuntime,
 ): ArtifactRuntime {
 	const revision = host.revision;
 	return {
 		snapshot: {
+			...records?.snapshot,
 			"settings-hub": {
 				kind: "settings-navigation",
 				revision,
@@ -138,13 +140,20 @@ export function settingsArtifactRuntime(
 						group: "使い方を変える",
 						enabled: true,
 					},
-					...["AIと接続", "外部作業"].map((label) => ({
+					...["外部作業"].map((label) => ({
 						id: label,
 						label,
 						group: "使い方を変える",
 						enabled: false,
 					})),
-					...["記憶", "読み方辞書", "動作確認", "記録"].map((label) => ({
+					{
+						id: "records",
+						label: "記録",
+						description: "AIの利用 ツールチェーン データと診断",
+						group: "管理と確認",
+						enabled: true,
+					},
+					...["記憶", "読み方辞書", "動作確認"].map((label) => ({
 						id: label,
 						label,
 						group: "管理と確認",
@@ -215,6 +224,8 @@ export function settingsArtifactRuntime(
 			},
 		},
 		dispatch: async (event: ArtifactEvent) => {
+			if (event.source === settingsArtifacts.records.source && records)
+				return records.dispatch(event);
 			const known = Object.values(settingsArtifacts).find(
 				(artifact) => artifact.source === event.source,
 			);

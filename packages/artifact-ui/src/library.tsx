@@ -1,3 +1,11 @@
+import { ObjectRecognitionWorkspaceView } from "./object-recognition-components";
+import { DrawingWorkspaceView } from "./drawing-components";
+import {
+	ImageWorkspaceView,
+	ImageCreationView,
+	ImagePreviewView,
+	ImageGalleryView,
+} from "./image-components";
 import { createLibrary, defineComponent } from "./sdk";
 import {
 	SettingsSectionView,
@@ -29,8 +37,16 @@ import {
 } from "./media-components";
 import { TimerWorkspaceView } from "./timer-components";
 import { SubtitlePreviewView } from "./subtitle-components";
+import { RecordsWorkspaceView } from "./records-components";
 
 const renderers = {
+	"object-recognition-workspace": ObjectRecognitionWorkspaceView,
+	"drawing-workspace": DrawingWorkspaceView,
+	"image-workspace": ImageWorkspaceView,
+	"image-creation-form": ImageCreationView,
+	"image-preview": ImagePreviewView,
+	"image-gallery": ImageGalleryView,
+	"records-workspace": RecordsWorkspaceView,
 	"subtitle-preview": SubtitlePreviewView,
 	"settings-section": SettingsSectionView,
 	"settings-navigation": SettingsNavigationView,

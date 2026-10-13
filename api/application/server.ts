@@ -1,3 +1,10 @@
+import {
+	createExcalidraw,
+	registerDrawingOperations,
+} from "../domains/excalidraw";
+import { createLocalServices } from "../domains/larm";
+import { createObjectRecognition } from "../domains/object-recognition";
+import { CONVERSATION_DEFAULT_PRINCIPAL } from "../domains/conversation/contracts";
 import { createTaskReportDelivery } from "./task-report-delivery";
 import { createDotsDialogue } from "./dots-dialogue";
 import { createDotsTasks } from "./dots-tasks";
@@ -11,6 +18,7 @@ import {
 	superviseCodingExecution,
 	purgeTaskDependents,
 } from "./coding-supervision";
+import { createImage } from "../domains/image";
 import { createMusic } from "../domains/music";
 import { createLarmPlayground } from "../domains/larm";
 import { larmEmbedder } from "./larm-embedder";
@@ -283,32 +291,80 @@ export async function buildServices(config: Config) {
 			history: config.historyToolsEnabled,
 			dots: true,
 			music: true,
+			image: true,
+			excalidraw: true,
+			objectRecognition: true,
 			webResearch: config.webResearchToolsEnabled,
 			embed: embedder,
 		},
 	);
 	const enabled = config.toolchainEnabled;
-	const music = createMusic({
+
+	const mediaGateway = () => {
+		const s = settings.get();
+		return createLarmPlayground({
+			baseUrl: s.larm.baseUrl ?? undefined,
+			token: config.larmToken,
+			profile: s.larm.profile,
+			audience: s.larm.audience,
+			providerHosts: config.larmProviderHosts,
+		});
+	};
+	const mediaDependencies = {
 		store,
 		queue,
 		inference,
 		capabilities: toolchain.capabilities,
-		gateway: () => {
-			const s = settings.get();
-			return createLarmPlayground({
-				baseUrl: s.larm.baseUrl ?? undefined,
-				token: config.larmToken,
-				profile: s.larm.profile,
-				audience: s.larm.audience,
-				providerHosts: config.larmProviderHosts,
-			});
-		},
-		onJob: (db, runId, jobId) =>
+		gateway: mediaGateway,
+		onJob: (db: import("bun:sqlite").Database, runId: string, jobId: string) =>
 			dialogue.linkOperationJobInTransaction(db, runId, jobId),
-		onFinished: (db, runId) => dialogue.finishOperationInTransaction(db, runId),
+		onFinished: (db: import("bun:sqlite").Database, runId: string) =>
+			dialogue.finishOperationInTransaction(db, runId),
+	};
+	const music = createMusic(mediaDependencies);
+	const image = createImage(mediaDependencies);
+	const excalidraw = createExcalidraw({
+		store,
+		webOrigin: config.origin,
+		connection: () => {
+			const saved = settings.excalidrawCredentials(),
+				larmUrl = settings.get().larm.baseUrl;
+			if (!saved || !larmUrl)
+				throw new Error("excalidraw_connection_unconfigured");
+			if (
+				saved.consumerToken === config.larmToken ||
+				saved.appToken === config.larmToken
+			)
+				throw new Error("excalidraw_credential_roles_invalid");
+			return {
+				version: `${larmUrl}:${saved.revision}`,
+				gatewayUrl: saved.gatewayUrl,
+				gatewayOrigin: saved.gatewayOrigin,
+				leaseEndpoint: saved.leaseEndpoint,
+				appToken: saved.appToken,
+				client: createLocalServices({
+					baseUrl: larmUrl,
+					token: saved.consumerToken,
+				}),
+			};
+		},
+	});
+	const drawingOperations = registerDrawingOperations({
+		...mediaDependencies,
+		service: excalidraw,
+	});
+	const objectRecognition = createObjectRecognition({
+		store,
+		queue,
+		connection: () => settings.objectRecognitionCredentials(),
 	});
 	const dialogue = createDialogueService({
+		objectRecognition: enabled
+			? objectRecognition.port(CONVERSATION_DEFAULT_PRINCIPAL)
+			: undefined,
 		music: enabled ? music : undefined,
+		image: enabled ? image : undefined,
+		excalidraw: enabled ? drawingOperations : undefined,
 		store,
 		conversation,
 		larm: inference,
@@ -344,6 +400,10 @@ export async function buildServices(config: Config) {
 		attitudeDataset,
 		inference,
 		serviceTests,
+		excalidraw,
+		drawingOperations,
+		image,
+		objectRecognition,
 		music,
 		queue,
 		webResearch,
@@ -389,6 +449,10 @@ export function appServices(s: Services) {
 		changes: s.changes,
 		serviceTests: s.serviceTests,
 		music: s.music,
+		image: s.image,
+		excalidraw: s.excalidraw,
+		drawingOperations: s.drawingOperations,
+		objectRecognition: s.objectRecognition,
 		tasks: s.delegated.tasks,
 		coding: s.codingComposition?.coding,
 		codingSupervision: s.supervision,
@@ -507,6 +571,12 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 				),
 			),
 	);
+	const drawingMaintenance = intervalLifecycle(
+		"excalidraw_idle",
+		1000,
+		() => s.excalidraw.tick(),
+		{ exclusive: true },
+	);
 	let feedResyncRequired = false;
 	return [
 		// Recovery runs to completion before any worker starts; a failure aborts startup.
@@ -528,6 +598,7 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 				await s.world?.recover({ feedResyncRequired });
 			},
 		},
+		{ name: "excalidraw_recovery", recover: () => s.excalidraw.recover() },
 		{ name: "voice_recovery", recover: () => s.voice.recover() },
 		{ name: "inference_recovery", recover: () => s.inference.recover() },
 		{ name: "service_tests_recovery", recover: () => s.serviceTests.recover() },
@@ -571,6 +642,7 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		},
 		{ name: "world_start", start: () => s.world?.start() },
 		{ name: "web_research_start", start: () => s.webResearch.start() },
+		{ name: "excalidraw_start", start: () => drawingMaintenance.start?.() },
 		{ name: "scheduler_start", start: () => s.scheduler.start() },
 		{ name: "task_maintenance_start", start: () => taskMaintenance.start?.() },
 		{ name: "store_retention_start", start: () => storeRetention.start?.() },
@@ -592,6 +664,14 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		{ name: "queue", close: () => s.queue.close(10_000) },
 		{ name: "capabilities", close: () => s.toolchain.capabilities.close() },
 		{ name: "agents", close: () => s.toolchain.agents.close() },
+		{
+			name: "excalidraw",
+			close: async () => {
+				drawingMaintenance.stop();
+				await drawingMaintenance.idle();
+				await s.excalidraw.close();
+			},
+		},
 		{ name: "voice", close: () => s.voice.close() },
 		{ name: "service_tests", close: () => s.serviceTests.close() },
 		{ name: "scheduler", close: () => s.scheduler.close() },

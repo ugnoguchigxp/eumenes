@@ -23,4 +23,19 @@ export function save(db: Database, value: Settings) {
 export const migrations: readonly Migration[] = [
 	{ id: "settings/0001-init", sql: migration },
 	{ id: "settings/0002-epochs", sql: epochsMigration },
+	{
+		id: "settings/0003-local-services",
+		after: ["settings/0002-epochs"],
+		sql: `CREATE TABLE settings_excalidraw(id INTEGER PRIMARY KEY CHECK(id=1),revision INTEGER NOT NULL,gateway_url TEXT NOT NULL,gateway_origin TEXT NOT NULL,lease_endpoint TEXT NOT NULL,consumer TEXT NOT NULL,app TEXT NOT NULL);`,
+	},
+	{
+		id: "settings/0004-object-recognition",
+		after: ["settings/0002-epochs"],
+		sql: `CREATE TABLE settings_object_recognition(id INTEGER PRIMARY KEY CHECK(id=1),revision INTEGER NOT NULL,base_url TEXT NOT NULL,credential TEXT NOT NULL);`,
+	},
+	{
+		id: "settings/0005-object-recognition-credential-source",
+		after: ["settings/0004-object-recognition"],
+		sql: `ALTER TABLE settings_object_recognition ADD COLUMN credential_source TEXT NOT NULL DEFAULT 'dedicated' CHECK(credential_source IN ('dedicated','larm'));`,
+	},
 ];

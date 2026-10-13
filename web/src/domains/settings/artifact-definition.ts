@@ -113,6 +113,12 @@ export const settingsArtifacts = {
 		source: "settings-display",
 		view: "settings-section",
 	},
+	records: {
+		id: "settings-records",
+		title: "記録",
+		source: "settings-records",
+		view: "records-workspace",
+	},
 	changes: {
 		id: "settings-changes",
 		title: "設定の変更一覧",

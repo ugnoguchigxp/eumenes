@@ -57,7 +57,9 @@ test("settings entry, OpenUI edits, tab lifecycle and real settings API persist 
 		artifact.getByRole("button", { name: "音声と入力", exact: true }),
 	).toBeEnabled();
 	await expect(
-		artifact.getByRole("button", { name: /予約|委任した作業|プロジェクト/ }),
+		artifact.getByRole("button", {
+			name: /AIと接続|予約|委任した作業|プロジェクト/,
+		}),
 	).toHaveCount(0);
 	await artifact.getByRole("button", { name: "会話", exact: true }).click();
 	await artifact

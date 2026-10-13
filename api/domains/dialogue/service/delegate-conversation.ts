@@ -84,11 +84,17 @@ export function prepareRouting(
 				? !!context?.lunaEnabled
 				: requires === "timers"
 					? !!context?.timersEnabled
-					: requires === "music"
-						? !!deps.music
-						: requires === "dots"
-							? available.dots
-							: false;
+					: requires === "excalidraw"
+						? !!deps.excalidraw
+						: requires === "object-recognition"
+							? !!deps.objectRecognition
+							: requires === "image"
+								? !!deps.image
+								: requires === "music"
+									? !!deps.music
+									: requires === "dots"
+										? available.dots
+										: false;
 	const ids = toolchainBuiltins
 		.map((d) => d.id)
 		.filter((id) => {

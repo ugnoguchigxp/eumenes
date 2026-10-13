@@ -1,3 +1,11 @@
+import {
+	objectRecognitionSettings,
+	storedRecognitionCiphertext,
+} from "./object-recognition";
+import {
+	localServiceSettings,
+	storedLocalServiceCiphertexts,
+} from "./local-services";
 import { validSettings } from "./valid";
 import {
 	createCipheriv,
@@ -114,6 +122,8 @@ export async function createSettings(
 		.split(",")
 		.map((v) => v.trim())
 		.filter(Boolean);
+	const recognitionCiphertext = storedRecognitionCiphertext(store);
+	const localServiceCiphertexts = storedLocalServiceCiphertexts(store);
 	let key: Buffer | null = null;
 	let keyError: string | null = null;
 	const keyDir =
@@ -126,6 +136,8 @@ export async function createSettings(
 			key = Buffer.from(env.EUMENES_SECRET_KEY, "base64");
 		else if (existsSync(path)) key = readFileSync(path);
 		else if (
+			localServiceCiphertexts.length > 0 ||
+			recognitionCiphertext ||
 			store.read(
 				(db) =>
 					(
@@ -143,6 +155,9 @@ export async function createSettings(
 			writeFileSync(path, key, { mode: 0o600, flag: "wx" });
 		}
 		if (key.length !== 32) throw new Error("secret_key_invalid");
+		if (recognitionCiphertext)
+			decrypt(recognitionCiphertext, "object-recognition:credential");
+		for (const row of localServiceCiphertexts) decrypt(row.encrypted, row.id);
 		// Verify existing ciphertext before accepting a replacement master key.
 		const upgraded: { id: string; encrypted: string }[] = [];
 		for (const row of store.read(
@@ -211,6 +226,8 @@ export async function createSettings(
 		return row ? decrypt(row.encrypted, `${c.id}:${c.epoch}`) : null;
 	}
 	return {
+		...localServiceSettings(store, encrypt, decrypt),
+		...objectRecognitionSettings(store, encrypt, decrypt, env),
 		get: () => store.read(read),
 		inTransaction: read,
 		credential: (c: Connection) => store.read((db) => credential(db, c)),

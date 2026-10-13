@@ -51,6 +51,9 @@ export function createDialogueService({
 	agents,
 	postAnswer,
 	delegation,
+	objectRecognition,
+	excalidraw,
+	image,
 	music,
 	worldContext,
 	toolchains,
@@ -65,6 +68,9 @@ export function createDialogueService({
 	agents?: AgentRuntime;
 	postAnswer?: PostAnswerObserverPort;
 	music?: import("../contracts/music").MusicPort;
+	excalidraw?: import("../contracts/image").ImagePort;
+	image?: import("../contracts/image").ImagePort;
+	objectRecognition?: import("../contracts/object-recognition").ObjectRecognitionPort;
 	delegation?: import("../contracts/delegation").DelegationPort;
 	worldContext?: WorldContextPort;
 	toolchains?: import("../contracts/toolchains").ToolchainRoutingPort;
@@ -80,6 +86,9 @@ export function createDialogueService({
 		agents,
 		postAnswer,
 		delegation,
+		objectRecognition,
+		excalidraw,
+		image,
 		music,
 		worldContext,
 		toolchains,

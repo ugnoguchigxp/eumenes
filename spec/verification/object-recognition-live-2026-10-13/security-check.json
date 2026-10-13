@@ -1,0 +1,7 @@
+{
+  "checkedAt": "2026-10-13T10:42:40.205Z",
+  "statusContainsSharedCredential": false,
+  "recordsContainSharedCredential": false,
+  "operationalLogContainsSharedCredential": false,
+  "gatewayUnauthenticatedStatus": 401
+}

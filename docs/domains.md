@@ -7,7 +7,10 @@
 <!-- domains:start -->
 | Domain | Backend 入口 | Web 入口 | Components | 依存 (api) | 依存 (web) | 依存 (試験のみ) |
 | --- | --- | --- | --- | --- | --- | --- |
+| `excalidraw` | `api/domains/excalidraw/index.ts` | `web/src/domains/excalidraw/` | なし | `capabilities`、`inference`、`larm`、`queue` | なし | なし |
+| `object-recognition` | `api/domains/object-recognition/index.ts` | `web/src/domains/object-recognition/index.ts` | なし | `capabilities`、`queue` | なし | なし |
 | `background` | なし | `web/src/domains/background/index.ts` | なし | なし | なし | なし |
+| `image` | `api/domains/image/index.ts` | `web/src/domains/image/index.ts` | なし | `capabilities`、`inference`、`larm`、`queue` | なし | なし |
 | `music` | `api/domains/music/index.ts` | `web/src/domains/music/index.ts` | `web/src/components/domains/music/` | `capabilities`、`inference`、`larm`、`queue` | なし | なし |
 | `dots` | `api/domains/dots/index.ts` | `web/src/domains/dots/index.tsx` | なし | `queue` | `tasks` | なし |
 | `task-reports` | `api/domains/task-reports/index.ts` | なし | なし | `tasks` | なし | なし |

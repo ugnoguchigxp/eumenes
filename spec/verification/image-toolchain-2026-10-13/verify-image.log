@@ -1,0 +1,48 @@
+[verify] selected=image dependencyClosu$ oxfmt --check api/domains/image web/src/domains/image
+$ oxlint --deny-warnings api/domains/image web/src/domains/image
+✓ No type errors in 205 files [137.09ms]
+$ bun scripts/test-domain.ts image
+
+api/domains/image/test/image.test.ts:
+(pass) image constraints preserve arbitrary integer dimensions and reject unsupported fields [0.91ms]
+(pass) registered image instructions and tools are distinct from current request data [0.65ms]
+
+ 2 pass
+ 0 fail
+ 13 expect() calls
+Ran 2 tests across 1 file. [65.00ms]
+ed in 4ms on 15 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint api/domains/image web/src/domains/image
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun check -p /Users/y.noguchi/Code/eumenes/verification-reports/tsconfig.selected.json
+[verify] TypeScript workspace closure: 208 files; api/infrastructure/flock.ts, api/infrastructure/logger.ts, api/infrastructure/sqlite, api/domains/capabilities, api/domains/image, api/infrastructure/digest.ts, api/infrastructure/vector.ts, api/infrastructure/http.ts, api/domains/larm, api/infrastructure/chat-stream.ts, api/domains/settings, api/infrastructure/ignore-error.ts, api/infrastructure/bounded-read.ts, api/infrastructure/error-code.ts, api/domains/delivery, api/domains/inference, api/domains/attitude-dataset, api/domains/queue, api/infrastructure/llm-json.ts, packages/artifact-ui/src, packages/design-system/dist, web/src/domains, client/transport.ts, client/image.ts, api/domains/music, client/music.ts, api/domains/dots, client/dots.ts, client/requirements.ts, packages/coding-runner/src, api/domains/coding-supervision, api/domains/task-reports, client/coding-supervision.ts, api/infrastructure/validation-log.ts, api/domains/tool-runtime, api/domains/agent-runtime, client/agent-runtime.ts, client/attitude-dataset.ts, api/domains/conversation, client/conversation.ts, api/domains/dialogue, client/run-stream.ts, client/dialogue.ts, client/events.ts, client/larm.ts, api/domains/continuity, api/domains/memory, client/memory.ts, client/queue.ts, api/domains/toolchain-history, client/toolchain-history.ts, api/domains/scheduler, client/scheduler.ts, client/settings.ts, api/domains/service-tests, client/service-tests.ts, api/domains/tts-dictionary, client/tts-dictionary.ts, api/domains/tasks, client/tasks.ts, api/domains/coding, client/coding.ts, api/domains/timers, client/timers.ts, api/domains/voice-dialogue, client/voice-dialogue.ts, api/domains/web-research, client/web-research.ts, api/domains/world, client/world.ts, client/index.ts, web/src/queryKeys.ts
+[verify] domain tests: /Users/y.noguchi/.bun/bin/bun run test:domain -- image
+bun test v1.4.3 (c6da4a4d3)
+
+ RUN  v4.1.8 /Users/y.noguchi/Code/eumenes
+
+
+ Test Files  2 passed (2)
+      Tests  3 passed (3)
+   Start at  11:40:21
+   Duration  941ms (transform 439ms, setup 0ms, import 747ms, tests 217ms, environment 715ms)
+
+[verify] passed 1843 ms
+
+api/domains/image/test/image.test.ts:
+(pass) image constraints preserve arbitrary integer dimensions and reject unsupported fields [1.60ms]
+(pass) registered image instructions and tools are distinct from current request data [1.13ms]
+
+ 2 pass
+ 0 fail
+ 13 expect() calls
+Ran 2 tests across 1 file. [188.00ms]
+
+ RUN  v4.1.8 /Users/y.noguchi/Code/eumenes
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  11:33:13
+   Duration  3.47s (transform 717ms, setup 0ms, import 1.19s, tests 200ms, environment 1.85s)
+
+[verify] passed 6037 ms

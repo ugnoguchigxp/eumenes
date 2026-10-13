@@ -1,0 +1,42 @@
+import type { GenerationStatusProps } from "../GenerationStatus";
+export type ImagePromptValues = {
+	prompt: string;
+	width: number;
+	height: number;
+	format: "png" | "webp";
+	seed: number;
+};
+export type WorkspaceImage = {
+	id: string;
+	title: string;
+	url: string;
+	width: number;
+	height: number;
+	createdAt: string;
+	format: "png" | "webp";
+	prompt?: string;
+};
+export type ImageWorkspaceProps = {
+	title?: string;
+	identity: string;
+	initialTab?: "create" | "history";
+	presentation?: "embedded" | "fullscreen";
+	defaults: ImagePromptValues;
+	images: WorkspaceImage[];
+	selectedId?: string;
+	busy?: boolean;
+	pending?: boolean;
+	status?: GenerationStatusProps["status"];
+	statusTitle?: string;
+	statusDescription?: string;
+	canCancel?: boolean;
+	loading?: boolean;
+	error?: string;
+	message?: string;
+	onGenerate: (values: ImagePromptValues) => void;
+	onCancel?: () => void;
+	onRefresh: () => void;
+	onSelect: (id: string) => void;
+	onDelete?: (id: string) => void;
+	onClose?: () => void;
+};

@@ -3,6 +3,36 @@ import type { Hono } from "hono";
 import { applySchema } from "../contracts";
 import type { SettingsService } from "../service";
 export function registerSettings(app: Hono, settings: SettingsService) {
+	app.get("/api/settings/excalidraw", (c) =>
+		c.json(settings.excalidrawConnection()),
+	);
+	app.put("/api/settings/excalidraw", async (c) => {
+		const raw = await readBounded(c.req.raw.body, {
+			limit: 16384,
+			tooLarge: "invalid_body_size",
+			missing: "invalid_body",
+		});
+		return c.json(
+			await settings.configureExcalidraw(
+				JSON.parse(new TextDecoder().decode(raw)),
+			),
+		);
+	});
+	app.get("/api/settings/object-recognition", (c) =>
+		c.json(settings.objectRecognitionConnection()),
+	);
+	app.put("/api/settings/object-recognition", async (c) => {
+		const raw = await readBounded(c.req.raw.body, {
+			limit: 16384,
+			tooLarge: "invalid_body_size",
+			missing: "invalid_body",
+		});
+		return c.json(
+			await settings.configureObjectRecognition(
+				JSON.parse(new TextDecoder().decode(raw)),
+			),
+		);
+	});
 	app.get("/api/settings", (c) => c.json(settings.get()));
 	app.get("/api/settings/diagnostics", (c) => c.json(settings.diagnostics()));
 	app.post("/api/settings/apply", async (c) => {

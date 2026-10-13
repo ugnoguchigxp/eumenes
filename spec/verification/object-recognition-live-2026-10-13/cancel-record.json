@@ -1,0 +1,14 @@
+{
+  "id": "074070df-54af-4986-83b4-b41d116180e4",
+  "conversationId": "object-recognition-live-2026-10-13",
+  "name": "bus-29s.mp4",
+  "mime": "video/mp4",
+  "state": "cancelled",
+  "revision": 4,
+  "progress": null,
+  "errorCode": null,
+  "result": null,
+  "createdAt": 1791888078993,
+  "updatedAt": 1791888080837,
+  "canRecheck": false
+}

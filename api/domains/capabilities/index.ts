@@ -19,6 +19,7 @@ export {
 
 export { coordinatorSkill } from "./builtin/dots";
 
+export { imageBuiltins } from "./builtin/image";
 export { musicBuiltins } from "./builtin/music";
 
 export { toolchainBuiltins } from "./builtin/toolchains";
@@ -26,3 +27,5 @@ import { toolchainBuiltins as registeredToolchains } from "./builtin/toolchains"
 /** Function names of the builtin toolchains (for detecting call syntax written as text). */
 export const builtinToolchainFunctions: readonly string[] =
 	registeredToolchains.map((d) => d.functionName!);
+
+export { drawingRequest, drawingPlan } from "./contracts/excalidraw";

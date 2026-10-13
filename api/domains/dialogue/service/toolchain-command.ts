@@ -7,7 +7,11 @@ import {
 	type ControlContract,
 	type Receipt,
 } from "../../inference";
-import { timerCommand, toolRuntimeOf } from "../../capabilities";
+import {
+	recognitionCommand,
+	timerCommand,
+	toolRuntimeOf,
+} from "../../capabilities";
 import type { HandlerDefinition } from "../../queue";
 import { delegationCommand } from "../contracts/delegation";
 import type { Run } from "../contracts";
@@ -118,6 +122,30 @@ type CommandOutput = {
 	question?: string;
 };
 
+function parseToolCommand(
+	input: Pick<CommandInput, "backend" | "toolIds">,
+	out: z.infer<typeof commandOutput>,
+) {
+	const operation = out.tool ? input.toolIds[out.tool] : undefined;
+	if (!operation) throw new Error("toolchain_command_tool_unknown");
+	const raw = { ...out.arguments, operation };
+	const command =
+		input.backend === "object-recognition"
+			? recognitionCommand.safeParse(raw)
+			: input.backend === "dots"
+				? delegationCommand.safeParse(raw)
+				: timerCommand.safeParse(raw);
+	if (!command.success) {
+		log.warn("dialogue.operation_rejected", {
+			reason: "command_arguments_invalid",
+			controlAction: input.toolIds[out.tool!] ? out.tool : "unknown",
+			issueCount: command.error.issues.length,
+		});
+		throw new Error("toolchain_command_invalid_arguments");
+	}
+	return command.data;
+}
+
 /**
  * The command sub-agent of a toolchain (timers, project delegation): it loads the toolchain's
  * fixed set (profile, SKILL, tool details), turns the request into one typed operation, and the
@@ -183,7 +211,16 @@ export function createToolchainCommandHandler(
 				inputSchema: unknown;
 			}>;
 			const toolIds: Record<string, string> = {};
-			if (set.backend === "dots") {
+			if (set.backend === "object-recognition") {
+				snapshot = deps.objectRecognition?.snapshotInTransaction(
+					tx,
+					run.conversationId,
+				);
+				tools = set.tools.map((t) => {
+					toolIds[t.id] = "manage";
+					return { id: t.id, description: t.summary, inputSchema: t.schema };
+				});
+			} else if (set.backend === "dots") {
 				snapshot =
 					deps.delegation?.prepareInTransaction(tx, run).catalog ?? null;
 				tools = dotsTools.map((t) => {
@@ -266,22 +303,7 @@ export function createToolchainCommandHandler(
 						throw new Error("toolchain_command_invalid_contract");
 					return { receipt, question: out.question };
 				}
-				const operation = out.tool ? input.toolIds[out.tool] : undefined;
-				if (!operation) throw new Error("toolchain_command_tool_unknown");
-				const raw = { ...out.arguments, operation };
-				const command =
-					input.backend === "dots"
-						? delegationCommand.safeParse(raw)
-						: timerCommand.safeParse(raw);
-				if (!command.success) {
-					log.warn("dialogue.operation_rejected", {
-						reason: "command_arguments_invalid",
-						controlAction: input.toolIds[out.tool!] ? out.tool : "unknown",
-						issueCount: command.error.issues.length,
-					});
-					throw new Error("toolchain_command_invalid_arguments");
-				}
-				return { receipt, command: command.data };
+				return { receipt, command: parseToolCommand(input, out) };
 			});
 		},
 		classify: () => "fail",
@@ -339,6 +361,16 @@ export function createToolchainCommandHandler(
 						outcome: "clarification_required",
 					});
 					answerJob(outcome.result.question);
+				} else if (input.backend === "object-recognition") {
+					if (!deps.objectRecognition)
+						throw new Error("capability_unavailable");
+					deps.objectRecognition.invokeInTransaction(
+						tx,
+						run.id,
+						run.conversationId,
+						outcome.result.command,
+					);
+					answerJob();
 				} else if (input.backend === "dots") {
 					if (!deps.delegation) throw new Error("dots_unavailable");
 					deps.delegation.invokeInTransaction(

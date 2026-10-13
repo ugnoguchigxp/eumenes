@@ -1,0 +1,44 @@
+bun test v1.4.3 (c6da4a4d3)
+
+api/application/excalidraw-e2e.test.ts:
+(pass) drawing create: conversation chooses the registered set, accepts the plan, and returns the browser entry [132.00ms]
+(pass) drawing library: conversation chooses the registered set, accepts the plan, and returns the browser entry [83.32ms]
+(pass) dedicated credentials are encrypted, distinct, and missing configuration never falls back to the LLM token [84.20ms]
+(pass) scene writes require idempotency, reject malformed input, and keep HTTP errors distinguishable [89.60ms]
+
+api/domains/settings/test/settings.test.ts:
+(pass) background selection persists without changing inference permissions; old documents remain valid [12.84ms]
+(pass) new or missing profile selects Ornith while explicit saved choices survive reopening [11.18ms]
+(pass) same-host can start unconfigured while configured URLs still require loopback [0.21ms]
+(pass) backend live evaluation reads the saved LARM connection without changing settings [10.04ms]
+(pass) new voice settings wait for a conversational pause and retain a saved custom interval [13.11ms]
+(pass) old settings retain normal playback; speech adjustments validate and persist [11.28ms]
+(pass) coding supervision instruction approval defaults to on, including for saved documents without it [9.24ms]
+(pass) bootstraps once; atomic revision and idempotency; encrypted secret never in document [14.56ms]
+(pass) revocation epochs cannot be reset by client; origin changes cannot reuse credential [13.62ms]
+(pass) missing or wrong master key preserves data, disables ciphertext and does not regenerate [11.76ms]
+(pass) deleting then recreating the same connection ID cannot revive old permissions [11.49ms]
+(pass) malformed LARM URLs are validation errors and same-host requires loopback [11.72ms]
+(pass) key replacement, key deletion and connection deletion discard obsolete ciphertext [13.19ms]
+(pass) envRef must be allowlisted when saved and when resolved [15.85ms]
+(pass) cloud connections require https outside private networks [0.17ms]
+(pass) a saved http cloud URL still loads, but applying it is rejected [11.78ms]
+(pass) credential ciphertext is bound to its row [13.22ms]
+(pass) v1 ciphertext is upgraded to v2 on startup and survives restart [13.60ms]
+(pass) keyDir option and EUMENES_KEY_DIR relocate the master key [13.72ms]
+(pass) a changed LARM origin needs an explicit confirmation; same origin or first setup does not [13.27ms]
+(pass) an Azure key is bound to one single-label host and one host per key [11.86ms]
+(pass) settings_requests keeps only the newest 64 requests [14.89ms]
+(pass) old settings keep sentence routing disabled and English settings persist independently [10.12ms]
+
+api/domains/excalidraw/test/excalidraw.test.ts:
+(pass) cold startup returns only an authenticated browser entry; save creates confirmed versions, idle/poll/restart preserve the reference [21.61ms]
+(pass) save failure never advances the reference; retries are idempotent and old revisions conflict [18.23ms]
+(pass) binding changes are rejected; closing during startup discards the late result and releases only its own lease [22.33ms]
+(pass) a reference cannot be reopened under a different conversation [11.61ms]
+(pass) a real HTTP relay preserves the native gateway Host across a different Mac-side port [7.03ms]
+
+ 32 pass
+ 0 fail
+ 178 expect() calls
+Ran 32 tests across 3 files. [1150.00ms]

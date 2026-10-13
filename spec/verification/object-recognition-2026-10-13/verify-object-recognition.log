@@ -1,0 +1,44 @@
+$ bun scripts/verify.ts --domain object-recognition
+[verify] selected=object-recognition dependencyClosure=capabilities,queue,object-recognition testClosure=capabilities,queue,object-recognition
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts api/domains/object-recognition web/src/domains/object-recognition
+size-budget ok (11 files)
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check api/domains/object-recognition web/src/domains/object-recognition
+$ oxfmt --check api/domains/object-recognition web/src/domains/object-recognition
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 7ms on 14 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint api/domains/object-recognition web/src/domains/object-recognition
+$ oxlint --deny-warnings api/domains/object-recognition web/src/domains/object-recognition
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun check -p /Users/y.noguchi/Code/eumenes/verification-reports/tsconfig.selected.json
+✓ No type errors in 181 files [144.54ms]
+[verify] TypeScript workspace closure: 183 files; api/infrastructure/flock.ts, api/infrastructure/logger.ts, api/infrastructure/sqlite, api/domains/object-recognition, api/infrastructure/http.ts, api/domains/queue, api/infrastructure/digest.ts, api/domains/capabilities, api/infrastructure/bounded-read.ts, client/transport.ts, client/object-recognition.ts, api/domains/excalidraw, client/excalidraw.ts, api/domains/image, api/domains/larm, api/infrastructure/chat-stream.ts, client/image.ts, api/domains/music, client/music.ts, api/domains/dots, client/dots.ts, client/requirements.ts, packages/coding-runner/src, api/domains/coding-supervision, api/domains/task-reports, client/coding-supervision.ts, api/infrastructure/vector.ts, api/infrastructure/validation-log.ts, api/domains/tool-runtime, api/domains/agent-runtime, client/agent-runtime.ts, client/attitude-dataset.ts, api/domains/delivery, api/domains/conversation, client/conversation.ts, api/domains/dialogue, client/run-stream.ts, client/dialogue.ts, client/events.ts, client/larm.ts, api/domains/continuity, api/domains/memory, client/memory.ts, client/queue.ts, api/domains/toolchain-history, client/toolchain-history.ts, api/domains/scheduler, client/scheduler.ts, api/domains/settings, api/infrastructure/ignore-error.ts, api/infrastructure/error-code.ts, api/domains/inference, client/settings.ts, api/domains/service-tests, client/service-tests.ts, api/domains/tts-dictionary, client/tts-dictionary.ts, api/domains/tasks, client/tasks.ts, api/domains/coding, client/coding.ts, api/domains/timers, client/timers.ts, api/domains/voice-dialogue, client/voice-dialogue.ts, api/domains/web-research, client/web-research.ts, api/domains/world, client/world.ts, client/index.ts, packages/design-system/dist, packages/artifact-ui/src, web/src/domains, web/src/queryKeys.ts
+[verify] domain tests: /Users/y.noguchi/.bun/bin/bun run test:domain -- object-recognition
+$ bun scripts/test-domain.ts object-recognition
+bun test v1.4.3 (c6da4a4d3)
+
+api/domains/object-recognition/test/object-recognition.test.ts:
+(pass) single file multipart and credentials remain at the bound gateway; statusUrl is not followed [0.93ms]
+(pass) image result, source and observations persist; owner cannot read/cancel/delete/incorporate another input [29.72ms]
+(pass) video captures upstream id, stores numeric progress and timestamp results; reads never analyze again [1539.45ms]
+(pass) cancel while initial POST is outstanding captures its receipt and cancels upstream; late completion is discarded [545.56ms]
+(pass) an uncertain analyze submission is never replayed and in-flight configuration changes invalidate results [77.44ms]
+(pass) out of bounds coordinates, unsorted video times and unsupported formats are rejected [21.57ms]
+(pass) restarting the queue resumes a persisted video receipt without resubmitting analyze [550.29ms]
+(pass) cancel accepts an empty success response and reads actual terminal status; worker/gateway errors are bounded codes [0.95ms]
+(pass) after a prolonged disconnect an explicit recheck resumes the saved id without a second POST [578.85ms]
+
+ 9 pass
+ 0 fail
+ 40 expect() calls
+Ran 9 tests across 1 file. [3.43s]
+
+ RUN  v4.1.8 /Users/y.noguchi/Code/eumenes
+
+
+ Test Files  2 passed (2)
+      Tests  2 passed (2)
+   Start at  17:09:09
+   Duration  1.11s (transform 304ms, setup 0ms, import 773ms, tests 69ms, environment 1.20s)
+
+[verify] passed 5545 ms

@@ -150,3 +150,25 @@ SettingsSectionはtext/select/toggle/range/number/multiple、区分、詳細欄�
 ```
 
 DesignSystemに`Subtitle`と`SubtitlePreview`を追加し、既存の字幕描画・CSSを共有した。API・認証は持たず、text/style/size/enabledをpropsで受ける。`subtitle-preview`をOpenUIへ登録し、通常のparser・Rendererを通す。会話の読み上げ字幕と旧表示フォームも同じ`Subtitle`を使い、既存4デザイン・3サイズを維持する。
+
+「記録」は`RecordsWorkspace`をDesignSystemに追加し、`records-workspace`として登録した。表の検索・ソート・ページ、選んだ1行の詳細、既存Tabsでの切替、取得手順の折りたたみと操作、共通の診断データ保存をprops/eventsで受ける。APIや認証は持たない。定義は`{"view":"records-workspace","source":"settings-records","title":"記録"}`で、他の登録viewとlayoutで合成できる。Webのsettingsホストが利用記録・ツールチェーン・診断の既存公開APIを解決し、source、revision、操作、取得済みの手順IDを検証する。表示JSONには記録本文、秘密、取得状態やBlob URLを保存しない。記録画面を閉じた後の診断ダウンロードは破棄し、Blob URLは解放する。新しいArtifact種別・専用renderは追加していない。
+記録の主一覧3種はDesignSystemの`ServerDataTable`を使う。TanStack Table v8.21.3の`manualSorting`・`manualFiltering`・`manualPagination`とCore row modelだけを使用し、クライアントで再ソート・再検索・ページ切出しをしない。APIの`total`をrowCountへ渡し、`records-query`で許可された表ID、ページ、表示件数、列ID、方向、検索文字列を送る。ホストは既存clientが公開する所有domainのschemaで検証してからquery keyを更新する。検索条件ごとのHTTP取消と別cache keyで古い検索結果を現在の表へ採用しない。初期10件、25／50件へ変更でき、詳細は選択した1行だけを描画する。選択記録の候補比較はその詳細内の読み取り専用表を維持する。[TanStackのページング仕様](https://tanstack.com/table/v8/docs/guide/pagination)と[ソート仕様](https://tanstack.com/table/v8/docs/guide/sorting)に従う。
+
+
+## 画像制作と一覧（2026-10-13）
+
+承認済みの制作・一覧デザインをDesignSystemで実装し、OpenUIへ登録した。`image-workspace` は小さな上部プレビュー・下部フォームの制作画面と、同じアーティファクト枠内で切り替える一覧を持つ。`presentation` は省略時embedded、通常の画像スタジオもembeddedを指定する。枠の幅に合わせて一覧の列数を調整し、フォームは枠内でスクロールする。FullscreenDialogは表示と操作だけを持ち、認証・取得・生成ジョブは扱わない。
+
+```json
+{"view":"image-workspace","source":"image-studio","presentation":"embedded"}
+```
+
+`image-creation-form`、`image-preview`、`image-gallery`は個別登録も行い、同一のimage-workspace sourceから描画できる。
+
+```json
+{"view":"layout","direction":"grid","children":[{"view":"image-preview","source":"image-studio"},{"view":"image-creation-form","source":"image-studio"}]}
+```
+
+選択内容の文章化は利用者が明示したフォーム値の直列化であり、テーマの意味解釈は既存の画像担当に渡す。手編集後の選択変更では自動上書きを止め、反映・編集継続・復元の操作を提供する。sourceの更新や制作・一覧の切り替えで草稿を破棄しない。画像URLは許可済みsnapshotで供給し、表示JSONに保持しない。生成、取消、選択、更新、閉じるのイベントはホストがsource・revision・重複・利用可否を検証する。
+
+`drawing-workspace`はDesignSystemのDrawingWorkspaceを使う。snapshotの保存済み図の参照、起動状態、実行時URLと`drawing-new`/`drawing-open`/`drawing-refresh`を接続し、他の登録済みviewとlayoutで並べられる。表示JSONにはscene・credential・実行時URLを埋め込まない。URLからの編集画面もEumenesの認証済みAPIを使い、保存未確定の下書きを保護する。手順は[Excalidraw連携](excalidraw.md)を参照する。

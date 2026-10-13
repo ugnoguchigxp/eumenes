@@ -1,8 +1,9 @@
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import { recipeProposal } from "../contracts";
-import { createRecipes } from "./recipes";
-import { createSelections } from "./selections";
+import { createRecipes, recipe } from "./recipes";
+import { createSelections, selection } from "./selections";
+import { createHistoryPages } from "./record-pages";
 
 /**
  * Selection traces (what the conversation model was offered, what it chose, how it ended) and
@@ -74,6 +75,11 @@ export function createToolchainHistory(
 				selections.markRecipeInTransaction(db, input.runId, "saved");
 		}
 	}
-	return { ...selections, ...recipes, settleRecipesInTransaction };
+	return {
+		...selections,
+		...recipes,
+		...createHistoryPages(store, selection, recipe),
+		settleRecipesInTransaction,
+	};
 }
 export type ToolchainHistory = ReturnType<typeof createToolchainHistory>;

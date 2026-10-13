@@ -1,0 +1,82 @@
+{
+  "checkedAt": "2026-10-13T03:55:36.771Z",
+  "path": "/v1/image-artifacts/{id}",
+  "delete": {
+    "operationId": "deleteImageArtifact",
+    "x-larm-lifecycle": {
+      "classification": "current"
+    },
+    "x-larm-governance": {
+      "audience": "agent",
+      "authority": "api-bearer",
+      "stability": "stable",
+      "compatibility": "canonical",
+      "lifecycle": "active"
+    },
+    "x-larm-policy": {
+      "owner": "image-artifact",
+      "consumers": [
+        "agent-consumer",
+        "operator"
+      ],
+      "authority": "api-bearer"
+    },
+    "security": [
+      {
+        "bearerAuth": []
+      }
+    ],
+    "responses": {
+      "200": {
+        "description": "Success",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ImageArtifactDelete"
+            }
+          }
+        }
+      },
+      "4XX": {
+        "description": "Client error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "5XX": {
+        "description": "Service error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      }
+    }
+  },
+  "ImageArtifactDelete": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128,
+        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$"
+      },
+      "deleted": {
+        "type": "boolean",
+        "const": true
+      }
+    },
+    "required": [
+      "id",
+      "deleted"
+    ],
+    "additionalProperties": false
+  }
+}

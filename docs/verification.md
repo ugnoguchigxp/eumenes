@@ -6,6 +6,10 @@ README の「検証」の詳細です。
 
 `verify` は対象 domain と型依存閉包を表示し、format、lint、型、境界、domain 試験を実行します。`verify:all` は全 TypeScript、保存・画面 build、ブラウザ fixture を含みます。`verify:live` は明示した LARM への ASR・LLM・TTS 個別疎通であり、ブラウザと実機器を使う循環受入ではありません。検証結果と入力 hash は `verification-reports/latest.json` に出力されます。
 
+型チェックは Bun 1.4.3 の `bun check` を使います。root、DesignSystem、dots MVP と domain ごとの検査は、従来と同じ tsconfig・対象範囲で実行します。DesignSystem の build 前検査も `bun check -p tsconfig.build.json` です。Bun は型宣言を出力しないため、`vite-plugin-dts` による `.d.ts` 生成と、それが使う TypeScript 依存を残します。root の TypeScript 依存も境界・SQL・サイズ検査の Compiler API に必要です。`@types/bun` などの型定義も引き続き必要です。
+
+仕様と制約は [Bun 1.4.3 リリースノート](https://bun.sh/blog/bun-v1.4.3) と [型チェックの公式ドキュメント](https://bun.sh/docs/runtime/check) を参照してください。Bun の型チェックは TypeScript 7 に対応するため、TypeScript 5 と診断が異なる場合があります。CSS の副作用 import は各 workspace の `styles` export に型宣言を付け、DesignSystem の path alias は `baseUrl` を使わず相対パスで指定しています。
+
 コマンドの一覧は README の「検証」を参照してください。fixture、live、実機器受入の結果は分けて記録します。
 
 ## 現在の限界の詳細

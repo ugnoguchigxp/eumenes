@@ -1,0 +1,10 @@
+{
+  "selected": [
+    "settings"
+  ],
+  "revision": "c5313df0d27c163beaa1445e87df13ef02ba734904075ecf3f3ded642732d4ae",
+  "steps": [],
+  "totalMs": 67,
+  "result": "fail",
+  "error": "Error: web/src/domains/settings/MemoryItemsPanel.test.tsx: forbidden dependency settings -> memory"
+}

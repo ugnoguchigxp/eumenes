@@ -1,0 +1,51 @@
+.ds-records-heading,
+.ds-records-actions {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	flex-wrap: wrap;
+}
+.ds-records-actions {
+	justify-content: flex-start;
+}
+.ds-records-workspace {
+	min-width: 0;
+}
+.ds-records-workspace [hidden] {
+	display: none;
+}
+.ds-records-hint {
+	color: var(--muted-foreground);
+	font-size: 0.875rem;
+}
+.ds-records-table {
+	overflow: auto;
+}
+.ds-records-table table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 0.875rem;
+}
+.ds-records-table th,
+.ds-records-table td {
+	text-align: left;
+	padding: 0.4rem;
+	border-bottom: 1px solid var(--border);
+	overflow-wrap: anywhere;
+}
+.ds-records-fold {
+	margin-top: 1rem;
+	border-top: 1px solid var(--border);
+	padding-top: 0.75rem;
+}
+.ds-records-fold > summary {
+	cursor: pointer;
+	font-weight: 600;
+}
+
+.ds-records-workspace td[data-column="started"],
+.ds-records-workspace td[data-column="createdAt"],
+.ds-records-workspace td[data-column="updatedAt"] {
+	white-space: nowrap;
+}

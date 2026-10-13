@@ -1,0 +1,11 @@
+
+ RUN  v4.1.8 /Users/y.noguchi/Code/eumenes
+
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+
+ Test Files  9 passed (9)
+      Tests  56 passed (56)
+   Start at  16:54:17
+   Duration  2.96s (transform 1.96s, setup 0ms, import 5.50s, tests 1.42s, environment 13.67s)
+

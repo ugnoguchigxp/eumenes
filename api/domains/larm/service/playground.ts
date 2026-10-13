@@ -1,3 +1,4 @@
+import { createImageLibrary } from "./image-library";
 import { createMusicLibrary } from "./music-library";
 import { createProviderAccess } from "./playground-provider";
 import { createHash } from "node:crypto";
@@ -115,11 +116,11 @@ export function createLarmPlayground(config: {
 		}
 		return r;
 	}
-	async function catalog(signal: AbortSignal) {
+	async function catalog(signal: AbortSignal, selectors?: readonly string[]) {
 		const targets = new Map<string, LarmTestTarget>();
 		const errors: string[] = [];
 		let revision: string | undefined;
-		for (const selector of [
+		for (const selector of selectors ?? [
 			config.profile,
 			"SAAA-w-Image",
 			"SAAA-w-music",
@@ -169,6 +170,10 @@ export function createLarmPlayground(config: {
 							targets.set(id, {
 								id,
 								name,
+								description:
+									typeof item.description === "string"
+										? item.description
+										: undefined,
 								model,
 								capability: str(item.capability),
 								protocol,
@@ -667,6 +672,7 @@ export function createLarmPlayground(config: {
 	}
 	return {
 		library: createMusicLibrary(control, publicUrl),
+		images: createImageLibrary(control, publicUrl),
 		embed,
 		catalog,
 		health,

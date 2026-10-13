@@ -1,0 +1,40 @@
+bun test v1.4.3 (c6da4a4d3)
+
+api/application/music-e2e.test.ts:
+(pass) completed vocal music answers and repairs without re-offering entry operations [101.16ms]
+(pass) music pipeline success: conversation, worker, API, result, audio [75.87ms]
+(pass) music pipeline failure: conversation, worker, API, result, audio [75.50ms]
+(pass) music pipeline invalid-plan: conversation, worker, API, result, audio [74.93ms]
+(pass) music pipeline correctable-plan: conversation, worker, API, result, audio [75.74ms]
+(pass) cancel music while the provider is running, send DELETE and never adopt audio [77.80ms]
+(pass) vocal orchestral music forwards the worker's voice description, exact lyrics and language through the authenticated API [74.07ms]
+
+api/application/image-e2e.test.ts:
+(pass) image pipeline success: routing, plan, result and authenticated content [81.34ms]
+(pass) image pipeline failure: routing, plan, result and authenticated content [73.58ms]
+(pass) image pipeline invalid-plan: routing, plan, result and authenticated content [72.12ms]
+(pass) image pipeline library: routing, plan, result and authenticated content [72.29ms]
+(pass) image pipeline studio: routing, plan, result and authenticated content [157.07ms]
+(pass) image pipeline fetch-failure: routing, plan, result and authenticated content [90.17ms]
+(pass) cancelled image generation discards a late synchronous response and never resubmits [190.87ms]
+(pass) capability revocation rejects a generated result at adoption [93.05ms]
+
+api/domains/capabilities/test/image.test.ts:
+(pass) image seed is additive, repeatable and published with one flat request schema [13.87ms]
+
+api/domains/larm/test/image-library.test.ts:
+(pass) image history is an authenticated read and validates the published content path [0.28ms]
+(pass) image history refuses invalid origin, binding, MIME or ID [0.06ms]
+(pass) image history refuses invalid origin, binding, MIME or ID [0.02ms]
+(pass) image history refuses invalid origin, binding, MIME or ID [0.02ms]
+(pass) image history refuses invalid origin, binding, MIME or ID [0.13ms]
+(pass) image discovery uses the selected profile and prefers returned service URL [0.10ms]
+
+api/domains/image/test/image.test.ts:
+(pass) image constraints preserve arbitrary integer dimensions and reject unsupported fields [0.21ms]
+(pass) registered image instructions and tools are distinct from current request data [0.13ms]
+
+ 24 pass
+ 0 fail
+ 189 expect() calls
+Ran 24 tests across 5 files. [1.71s]

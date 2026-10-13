@@ -21,7 +21,7 @@ import type { SelectionRow } from "../repository";
 const log = getLogger("toolchain-history");
 const SIMILAR_SCAN = 500;
 
-function selection(row: SelectionRow): Selection {
+export function selection(row: SelectionRow): Selection {
 	return {
 		id: row.id,
 		runId: row.run_id,

@@ -1,3 +1,4 @@
+import { errorStatus as objectRecognition } from "../domains/object-recognition/contracts";
 import { errorStatus as capabilities } from "../domains/capabilities/contracts";
 import type { HttpErrorStatus } from "../infrastructure/http";
 import { errorStatus as coding } from "../domains/coding/contracts";
@@ -65,6 +66,7 @@ export function mergeErrorStatus(
 }
 
 const statusByCode = mergeErrorStatus(
+	objectRecognition,
 	capabilities,
 	dots,
 	shared,

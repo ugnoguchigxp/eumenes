@@ -25,6 +25,8 @@
 
 [作業規則](../AGENTS.md)を守り、意味理解や担当選択はLLMに任せる。コードで追加する分岐は、公開操作・登録IDと実行先の接続に限る。発話の語句・企業名・地域による振り分けを追加しない。A〜Dのコードは登録方法を説明する未登録の例。Eの音楽UI・生成中表示は実装済みの登録例であり、新しい部品への適用手順と区別して示す。
 
+画像の登録例は `builtin/image.ts`・`builtin/image/SKILL.md`、実行先はimage domainです。同一の `image-workspace` viewで選択式のプロンプト作成とLARM画像一覧をアーティファクト枠内で切り替えます。通常の表示定義は `presentation: "embedded"` を指定します。API・保存先・検証入口は[画像生成](images.md)を参照してください。
+
 ## 1. 最初に追加の種類を選ぶ
 
 | 追加したいもの | 手順 | 製品コードの変更 |
@@ -455,3 +457,7 @@ LLMに表示の選択・構成を任せる場合は、公開済みview・source�
 [UI検証手順](toolchain-extension-verification.md#uiを追加変更した場合)に従い、部品→JSONとホストの結合→画面の順で確認する。他の登録済みUIと組み合わせ、表示だけでなく今回必要な操作まで確認する。保存済み成果物で確認できる変更なら生成APIを再実行しない。
 
 作業記録には、再利用した部品、新設が必要だった理由、登録view、sourceと操作の接続、JSON例、確認した状態・操作、失敗と未確認を残す。音楽UIの実績とfixtureの制約は[OpenUI移行の検証記録](../spec/verification/music-openui-2026-10-11/README.md)を参照する。
+
+物体認識の登録例は `builtin/object-recognition.ts` と `builtin/object-recognition/SKILL.md`。既存command経路で入力画面・保存結果・取消を扱い、`object-recognition-workspace`をアーティファクト領域内に表示する。APIと検証入口は[物体認識](object-recognition.md)を参照。
+
+Excalidrawの登録例は `builtin/excalidraw.ts` と `builtin/excalidraw/SKILL.md`。queueのplan/open二段階で結果を採用し、OpenUIの`drawing-workspace`とEumenesの認証済みWeb入口へ返す。sceneの正本は上流、Eumenesは図IDと版の参照を保持する。接続・API・配備前提は[Excalidraw連携](excalidraw.md)を参照する。

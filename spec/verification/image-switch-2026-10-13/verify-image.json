@@ -1,0 +1,58 @@
+{
+  "selected": [
+    "image"
+  ],
+  "dependencySet": [
+    "capabilities",
+    "delivery",
+    "attitude-dataset",
+    "larm",
+    "settings",
+    "inference",
+    "queue",
+    "image"
+  ],
+  "testDependencySet": [
+    "capabilities",
+    "delivery",
+    "attitude-dataset",
+    "larm",
+    "tts-dictionary",
+    "queue",
+    "tasks",
+    "dots",
+    "settings",
+    "inference",
+    "image"
+  ],
+  "revision": "5e944574fc59a1dadcd0bfb0b620e4f9c6165825ff40d83f38e3631e2575c983",
+  "steps": [
+    {
+      "name": "size-budget",
+      "ms": 140,
+      "result": "pass"
+    },
+    {
+      "name": "format",
+      "ms": 102,
+      "result": "pass"
+    },
+    {
+      "name": "lint",
+      "ms": 73,
+      "result": "pass"
+    },
+    {
+      "name": "typecheck",
+      "ms": 172,
+      "result": "pass"
+    },
+    {
+      "name": "domain tests",
+      "ms": 1449,
+      "result": "pass"
+    }
+  ],
+  "totalMs": 2257,
+  "result": "pass"
+}

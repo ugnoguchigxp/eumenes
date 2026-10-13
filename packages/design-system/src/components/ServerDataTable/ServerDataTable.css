@@ -1,0 +1,73 @@
+.ds-server-table {
+	min-width: 0;
+}
+.ds-server-table-tools {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem;
+	margin: 0.75rem 0;
+}
+.ds-server-table-tools input {
+	flex: 1;
+	min-width: 8rem;
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	background: var(--background);
+	padding: 0.5rem;
+}
+.ds-server-table-tools select {
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	background: var(--background);
+	padding: 0.35rem;
+}
+.ds-server-table-scroll {
+	overflow: auto;
+	max-height: 26rem;
+}
+.ds-server-table table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 0.875rem;
+}
+.ds-server-table th,
+.ds-server-table td {
+	text-align: left;
+	border-bottom: 1px solid var(--border);
+	padding: 0.5rem;
+	vertical-align: top;
+}
+.ds-server-table th {
+	background: var(--card);
+	position: sticky;
+	top: 0;
+	white-space: nowrap;
+}
+.ds-server-table th button {
+	cursor: pointer;
+}
+.ds-server-table-detail {
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	padding: 0.75rem;
+	overflow-wrap: anywhere;
+}
+.ds-server-table-detail dl {
+	display: grid;
+	grid-template-columns: minmax(5rem, 1fr) minmax(0, 3fr);
+	gap: 0.5rem;
+}
+.ds-server-table-detail dd {
+	margin: 0;
+	white-space: pre-wrap;
+}
+.ds-server-table td {
+	overflow-wrap: anywhere;
+	min-width: 4rem;
+}
+@media (max-width: 480px) {
+	.ds-server-table-detail dl {
+		grid-template-columns: 1fr;
+	}
+}

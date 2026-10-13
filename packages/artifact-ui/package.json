@@ -6,7 +6,10 @@
 	"exports": {
 		".": "./src/index.tsx",
 		"./contracts": "./src/contracts.ts",
-		"./styles": "./src/styles.css"
+		"./styles": {
+			"types": "./src/styles.d.ts",
+			"default": "./src/styles.css"
+		}
 	},
 	"dependencies": {
 		"@openuidev/react-lang": "0.3.0",

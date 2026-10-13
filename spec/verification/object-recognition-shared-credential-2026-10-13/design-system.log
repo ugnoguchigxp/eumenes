@@ -1,0 +1,24 @@
+│ ┌────────────────────────────────────────────────────────────────────────────┐
+│ │  Info: Found a setup file with "setProjectAnnotations".                    │
+│ │  Skipping automatic provisioning of preview annotations to avoid           │
+│ │  conflicts. Since Storybook 10.3, "@storybook/addon-vitest" applies these  │
+│ │   automatically.                                                           │
+│ │  You can safely remove the "setProjectAnnotations" call from your setup    │
+│ │  file, or remove the file entirely if you don't have custom code there.    │
+│ └────────────────────────────────────────────────────────────────────────────┘
+
+ RUN  v4.0.16 /Users/y.noguchi/Code/eumenes/packages/design-system
+
+stdout | src/components/ObjectRecognitionWorkspace/ObjectRecognitionWorkspace.test.tsx
+Test setup running...
+
+stdout | src/components/ObjectRecognitionWorkspace/ObjectRecognitionWorkspace.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/ObjectRecognitionWorkspace/ObjectRecognitionWorkspace.test.tsx (6 tests) 84ms
+
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
+   Start at  18:10:42
+   Duration  689ms (transform 70ms, setup 73ms, import 127ms, tests 84ms, environment 333ms)
+

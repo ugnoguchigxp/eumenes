@@ -1,9 +1,35 @@
 export const domains = {
+	excalidraw: {
+		backend: "api/domains/excalidraw",
+		web: "web/src/domains/excalidraw",
+		components: null,
+		depends: {
+			api: ["capabilities", "inference", "larm", "queue"],
+			web: [],
+			test: [],
+		},
+	},
+	"object-recognition": {
+		backend: "api/domains/object-recognition",
+		web: "web/src/domains/object-recognition",
+		components: null,
+		depends: { api: ["capabilities", "queue"], web: [], test: [] },
+	},
 	background: {
 		backend: null,
 		web: "web/src/domains/background",
 		components: null,
 		depends: { api: [], web: [], test: [] },
+	},
+	image: {
+		backend: "api/domains/image",
+		web: "web/src/domains/image",
+		components: null,
+		depends: {
+			api: ["capabilities", "inference", "larm", "queue"],
+			web: [],
+			test: [],
+		},
 	},
 	music: {
 		backend: "api/domains/music",

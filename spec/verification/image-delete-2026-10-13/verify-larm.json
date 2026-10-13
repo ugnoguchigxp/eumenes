@@ -1,0 +1,41 @@
+{
+  "selected": [
+    "larm"
+  ],
+  "dependencySet": [
+    "larm"
+  ],
+  "testDependencySet": [
+    "larm"
+  ],
+  "revision": "f1371079386714e7553694539f4ccb96febd404dcde3da75288833cd87100cec",
+  "steps": [
+    {
+      "name": "size-budget",
+      "ms": 249,
+      "result": "pass"
+    },
+    {
+      "name": "format",
+      "ms": 151,
+      "result": "pass"
+    },
+    {
+      "name": "lint",
+      "ms": 120,
+      "result": "pass"
+    },
+    {
+      "name": "typecheck",
+      "ms": 187,
+      "result": "pass"
+    },
+    {
+      "name": "domain tests",
+      "ms": 1411,
+      "result": "pass"
+    }
+  ],
+  "totalMs": 2472,
+  "result": "pass"
+}

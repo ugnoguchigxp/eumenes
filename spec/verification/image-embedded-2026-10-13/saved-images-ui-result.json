@@ -1,0 +1,123 @@
+{
+  "runId": "955a209a-bbe2-4819-addc-8287a33fb814",
+  "model": "fixture for UI only",
+  "live": "LARM saved-image reads only",
+  "displayed": 12,
+  "first": {
+    "id": "image_cd1a01e35d7d416198d1fa54df71d26a",
+    "width": 512,
+    "height": 384
+  },
+  "generationPosts": 0,
+  "requests": [
+    {
+      "path": "/v1/image-artifacts",
+      "status": 200
+    },
+    {
+      "path": "/v1/image-artifacts/image_cd1a01e35d7d416198d1fa54df71d26a",
+      "status": 200
+    },
+    {
+      "path": "/v1/image-artifacts/image_cd1a01e35d7d416198d1fa54df71d26a/content",
+      "status": 200
+    },
+    {
+      "path": "/v1/image-artifacts/image_8454624bdfdf40069ff72fdbce62b771",
+      "status": 200
+    },
+    {
+      "path": "/v1/image-artifacts/image_99f6d179346d45c5b5b4d5e4805dbfe0",
+      "status": 200
+    },
+    {
+      "path": "/v1/image-artifacts/image_2b34b3d393d3411bbe71646e478c20bf",
+      "status": 200
+    },
+    {
+      "path": "/v1/image-artifacts/image_e621555eaca543d4a0655ddc73bc85ab",
+      "status": 200
+    },
+    {
+      "path": "/v1/image-artifacts/image_ded2c55f96194172b18e687234dfdd49",
+      "status": 200
+    },
+    {
+      "path": "/v1/image-artifacts/image_8454624bdfdf40069ff72fdbce62b771/content",
+      "status": 200
+    },
+    {
+      "path": "/v1/image-artifacts/image_99f6d179346d45c5b5b4d5e4805dbfe0/content",
+      "status": 200
+    },
+    {
+      "path": "/v1/image-artifacts/image_2b34b3d393d3411bbe71646e478c20bf/content",
+      "status": 200
+    },
+    {
+      "path": "/v1/image-artifacts/image_e621555eaca543d4a0655ddc73bc85ab/content",
+      "status": 200
+    },
+    {
+      "path": "/v1/image-artifacts/image_ded2c55f96194172b18e687234dfdd49/content",
+      "status": 200
+    },
+    {
+      "path": "/v1/image-artifacts/image_670be8c2418d418f993ae27c29359aad",
+      "status": 200
+    },
+    {
+      "path": "/v1/image-artifacts/image_7d85fd5d3ee14a30a588a5cce2f69478",
+      "status": 200
+    },
+    {
+      "path": "/v1/image-artifacts/image_72e288265b074cd3a67dd681fafc00d1",
+      "status": 200
+    },
+    {
+      "path": "/v1/image-artifacts/image_670be8c2418d418f993ae27c29359aad/content",
+      "status": 200
+    },
+    {
+      "path": "/v1/image-artifacts/image_7d85fd5d3ee14a30a588a5cce2f69478/content",
+      "status": 200
+    },
+    {
+      "path": "/v1/image-artifacts/image_2edd9a138c8649a5ac12df6bad03a677",
+      "status": 200
+    },
+    {
+      "path": "/v1/image-artifacts/image_9b0cee103ede4cf9bb02380cb39138dd",
+      "status": 200
+    },
+    {
+      "path": "/v1/image-artifacts/image_72e288265b074cd3a67dd681fafc00d1/content",
+      "status": 200
+    },
+    {
+      "path": "/v1/image-artifacts/image_2edd9a138c8649a5ac12df6bad03a677/content",
+      "status": 200
+    },
+    {
+      "path": "/v1/image-artifacts/image_9b0cee103ede4cf9bb02380cb39138dd/content",
+      "status": 200
+    },
+    {
+      "path": "/v1/image-artifacts/image_bc0b3a96261848749f7c8f418ef6d3fb",
+      "status": 200
+    },
+    {
+      "path": "/v1/image-artifacts/image_bc0b3a96261848749f7c8f418ef6d3fb/content",
+      "status": 200
+    },
+    {
+      "path": "/v1/image-artifacts/image_cd1a01e35d7d416198d1fa54df71d26a",
+      "status": 200
+    },
+    {
+      "path": "/v1/image-artifacts/image_cd1a01e35d7d416198d1fa54df71d26a/content",
+      "status": 200
+    }
+  ],
+  "failures": []
+}

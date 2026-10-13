@@ -1,3 +1,11 @@
+import {
+	createExcalidraw,
+	registerDrawingOperations,
+} from "../domains/excalidraw";
+import type { DrawingConnection } from "../domains/excalidraw";
+import { createObjectRecognition } from "../domains/object-recognition";
+import { CONVERSATION_DEFAULT_PRINCIPAL } from "../domains/conversation/contracts";
+import { createImage } from "../domains/image";
 import { createMusic } from "../domains/music";
 import type { LarmPlayground } from "../domains/larm";
 import {
@@ -51,6 +59,12 @@ export async function harness(
 	options: {
 		model?: LarmPort;
 		musicGateway?: () => LarmPlayground;
+		imageGateway?: () => LarmPlayground;
+		drawingConnection?: () => DrawingConnection;
+		drawingFetch?: typeof fetch;
+		drawingIdleMs?: number;
+		recognitionFetcher?: typeof fetch;
+		settingsEnv?: Record<string, string | undefined>;
 		codexResearch?: {
 			model: string;
 			execute: (
@@ -101,7 +115,10 @@ export async function harness(
 	const conversation = createConversationService(store, {
 			requireOutbox: true,
 		}),
-		settings = await createSettings(store, { dbPath: join(dir, "db") });
+		settings = await createSettings(store, {
+			dbPath: join(dir, "db"),
+			env: options.settingsEnv,
+		});
 	const parentContexts: string[] = [],
 		workerContexts: string[] = [],
 		routeContexts: string[] = [],
@@ -441,6 +458,9 @@ export async function harness(
 		conversation: options.history ? conversation : undefined,
 		reconcileThrottleMs: 0,
 		music: !!options.musicGateway,
+		image: !!options.imageGateway,
+		excalidraw: !!options.drawingConnection,
+		objectRecognition: !!options.recognitionFetcher,
 	});
 	const music = options.musicGateway
 		? createMusic({
@@ -455,7 +475,54 @@ export async function harness(
 					dialogue.finishOperationInTransaction(db, runId),
 			})
 		: undefined;
+	const image = options.imageGateway
+		? createImage({
+				store,
+				queue,
+				inference,
+				capabilities: toolchain.capabilities,
+				gateway: options.imageGateway,
+				onJob: (db, runId, jobId) =>
+					dialogue.linkOperationJobInTransaction(db, runId, jobId),
+				onFinished: (db, runId) =>
+					dialogue.finishOperationInTransaction(db, runId),
+			})
+		: undefined;
+	const excalidraw = options.drawingConnection
+		? createExcalidraw({
+				store,
+				connection: options.drawingConnection,
+				webOrigin: process.env.EUMENES_ORIGIN ?? "http://127.0.0.1:5173",
+				fetch: options.drawingFetch,
+				pollMs: 5,
+				idleMs: options.drawingIdleMs,
+			})
+		: undefined;
+	const drawingOperations = excalidraw
+		? registerDrawingOperations({
+				store,
+				queue,
+				inference,
+				capabilities: toolchain.capabilities,
+				service: excalidraw,
+				onJob: (db, runId, jobId) =>
+					dialogue.linkOperationJobInTransaction(db, runId, jobId),
+				onFinished: (db, runId) =>
+					dialogue.finishOperationInTransaction(db, runId),
+			})
+		: undefined;
+	const objectRecognition = options.recognitionFetcher
+		? createObjectRecognition({
+				store,
+				queue,
+				connection: () => settings.objectRecognitionCredentials(),
+				fetcher: options.recognitionFetcher,
+			})
+		: undefined;
 	const dialogue = createDialogueService({
+		excalidraw: drawingOperations,
+		objectRecognition: objectRecognition?.port(CONVERSATION_DEFAULT_PRINCIPAL),
+		image,
 		music,
 		store,
 		conversation,
@@ -474,6 +541,10 @@ export async function harness(
 		token: "fixture-token-for-toolchain-browser",
 		origin: process.env.EUMENES_ORIGIN ?? "http://localhost",
 		changes,
+		excalidraw,
+		drawingOperations,
+		image,
+		objectRecognition,
 		music,
 		settings,
 		conversation,
@@ -500,6 +571,10 @@ export async function harness(
 		});
 	return {
 		dir,
+		excalidraw,
+		drawingOperations,
+		image,
+		objectRecognition,
 		music,
 		app,
 		store,
@@ -534,6 +609,7 @@ export async function harness(
 			await dialogue.close();
 			await voice.close();
 			await inference.close();
+			await excalidraw?.close();
 			await store.close();
 			rmSync(dir, { recursive: true, force: true });
 		},

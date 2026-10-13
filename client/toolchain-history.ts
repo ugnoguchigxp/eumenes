@@ -1,6 +1,8 @@
 import type {
 	Recipe,
 	Selection,
+	SelectionPageQuery,
+	RecipePageQuery,
 } from "../api/domains/toolchain-history/contracts";
 import { json, type Transport } from "./transport";
 function requestSignal(signal?: AbortSignal) {
@@ -14,6 +16,31 @@ export function toolchainHistoryClient(t: Transport) {
 			await t.call(path, { signal: requestSignal(signal) })
 		).json() as Promise<T>;
 	return {
+		toolchainSelectionsPage: (
+			query: SelectionPageQuery,
+			signal?: AbortSignal,
+		) => {
+			const params = new URLSearchParams(
+				Object.entries(query).map(([key, value]) => [key, String(value)]),
+			);
+			return get<{
+				items: Selection[];
+				total: number;
+				pageIndex: number;
+				pageSize: number;
+			}>(`/api/toolchain-history/selections/page?${params}`, signal);
+		},
+		toolchainRecipesPage: (query: RecipePageQuery, signal?: AbortSignal) => {
+			const params = new URLSearchParams(
+				Object.entries(query).map(([key, value]) => [key, String(value)]),
+			);
+			return get<{
+				items: Recipe[];
+				total: number;
+				pageIndex: number;
+				pageSize: number;
+			}>(`/api/toolchain-history/recipes/page?${params}`, signal);
+		},
 		toolchainSelections: (
 			query: {
 				runId?: string;
@@ -65,3 +92,7 @@ export function toolchainHistoryClient(t: Transport) {
 			).json() as Promise<{ ok: true }>,
 	};
 }
+export {
+	selectionPageQuerySchema,
+	recipePageQuerySchema,
+} from "../api/domains/toolchain-history/contracts";

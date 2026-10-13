@@ -1,0 +1,32 @@
+[
+  {
+    "domain": "image",
+    "code": 0,
+    "path": "spec/verification/image-toolchain-2026-10-13/verify-image.log"
+  },
+  {
+    "domain": "larm",
+    "code": 0,
+    "path": "spec/verification/image-toolchain-2026-10-13/verify-larm.log"
+  },
+  {
+    "domain": "capabilities",
+    "code": 0,
+    "path": "spec/verification/image-toolchain-2026-10-13/verify-capabilities.log"
+  },
+  {
+    "domain": "dialogue",
+    "code": 0,
+    "path": "spec/verification/image-toolchain-2026-10-13/verify-dialogue.log"
+  },
+  {
+    "domain": "artifact",
+    "code": 0,
+    "path": "spec/verification/image-toolchain-2026-10-13/verify-artifact.log"
+  },
+  {
+    "domain": "all",
+    "code": 1,
+    "path": "spec/verification/image-toolchain-2026-10-13/verify-all.log"
+  }
+]

@@ -39,9 +39,22 @@ export type ToolchainRuntimeMeta = {
 	 * command: a command sub-agent turns the request into one typed operation of the package.
 	 * music-create / music-playback: the music domain's own planner runs the package.
 	 */
-	execution: "research" | "command" | "music-create" | "music-playback";
+	execution:
+		| "research"
+		| "command"
+		| "music-create"
+		| "music-playback"
+		| "image"
+		| "excalidraw";
 	/** Runtime availability the host checks before offering the toolchain. */
-	requires?: "luna" | "timers" | "music" | "dots";
+	requires?:
+		| "object-recognition"
+		| "luna"
+		| "timers"
+		| "music"
+		| "dots"
+		| "image"
+		| "excalidraw";
 	/** Fixed engine for research toolchains; omitted means the current model. */
 	researcher?: "codex_luna";
 	/** The research route the agent runtime keeps for its existing contracts. */

@@ -1,3 +1,6 @@
+import { migrations as excalidrawMigrations } from "../domains/excalidraw";
+import { migrations as objectRecognitionMigrations } from "../domains/object-recognition";
+import { migrations as imageMigrations } from "../domains/image";
 import { migrations as musicMigrations } from "../domains/music";
 import type { Migration } from "../infrastructure/sqlite";
 import { orderMigrations } from "../infrastructure/sqlite";
@@ -143,6 +146,9 @@ const catalog: readonly Migration[] = [
 	...packageMigrations("memory-package", memoryPackageSql),
 	...serviceTestsMigrations,
 	...musicMigrations,
+	...imageMigrations,
+	...excalidrawMigrations,
+	...objectRecognitionMigrations,
 	...webResearchMigrations,
 	...capabilitiesMigrations,
 	...toolRuntimeMigrations,

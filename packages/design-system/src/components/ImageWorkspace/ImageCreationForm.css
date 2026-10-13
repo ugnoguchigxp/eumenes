@@ -1,0 +1,296 @@
+.image-creation-form {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	min-height: 0;
+	height: 100%;
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	padding: 1rem;
+	background: var(--card);
+	gap: 0.8rem;
+}
+.image-creation-settings {
+	flex: 1;
+	min-height: 0;
+	overflow: auto;
+	scrollbar-gutter: stable;
+	padding-right: 0.2rem;
+}
+.image-creation-heading,
+.image-creation-style-heading,
+.image-creation-prompt-heading,
+.image-creation-actions {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.6rem;
+}
+.image-creation-heading h3 {
+	font-size: 1.2rem;
+	margin: 0;
+	font-weight: 600;
+}
+.image-creation-theme {
+	display: flex;
+	flex-direction: column;
+	gap: 0.45rem;
+	margin: 0.6rem 0 0.8rem;
+	font-size: 0.9rem;
+}
+.image-creation-theme input {
+	font-size: 0.9rem;
+}
+.image-creation-style-heading h4 {
+	margin: 0.3rem 0;
+	font-size: 0.9rem;
+}
+.image-creation-style-heading small {
+	font-weight: 400;
+	font-size: 0.8rem;
+	margin-left: 0.6rem;
+	color: var(--muted-foreground);
+}
+.image-creation-search {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	padding: 0.4rem 0.55rem;
+	background: var(--background);
+	max-width: 14rem;
+	min-width: 0;
+}
+.image-creation-search svg {
+	width: 0.9rem;
+	height: 0.9rem;
+	color: var(--muted-foreground);
+}
+.image-creation-search input {
+	width: 100%;
+	min-width: 0;
+	border: 0;
+	outline: none;
+	font-size: 0.875rem;
+	color: var(--foreground);
+	background: transparent;
+}
+.image-creation-search:focus-within {
+	outline: 2px solid var(--ring);
+}
+.image-creation-choices {
+	border: 0;
+	border-top: 1px solid var(--border);
+	padding: 0.4rem 0 0.6rem;
+	margin: 0.3rem 0;
+	min-width: 0;
+}
+.image-creation-choices legend {
+	padding: 0.3rem 0;
+	font-size: 0.875rem;
+	font-weight: 500;
+}
+.image-creation-choices > div {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.3rem 0.9rem;
+}
+.image-creation-choices label {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+	font-size: 0.875rem;
+	min-height: 1.5rem;
+	cursor: pointer;
+}
+.image-creation-choices input {
+	width: 1rem;
+	height: 1rem;
+	accent-color: var(--primary);
+	flex-shrink: 0;
+}
+.image-creation-styles .image-creation-choices > div {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 0.3rem 0.4rem;
+}
+.image-creation-selected {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.3rem;
+	padding-bottom: 0.2rem;
+}
+.image-creation-selected svg {
+	width: 0.7rem;
+	height: 0.7rem;
+}
+.image-creation-selects {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0.8rem;
+	margin: 0.4rem 0 0.75rem;
+}
+.image-creation-select {
+	display: flex;
+	align-items: center;
+	gap: 0.6rem;
+	font-size: 0.875rem;
+	min-width: 0;
+}
+.image-creation-select select {
+	flex: 1;
+	min-width: 0;
+}
+.image-creation-form select {
+	color: var(--foreground);
+	background: var(--background);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	font-size: 0.875rem;
+	padding: 0.45rem;
+}
+.image-creation-parameters {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 0.6rem;
+}
+.image-creation-parameters label {
+	display: flex;
+	flex-direction: column;
+	gap: 0.4rem;
+	font-size: 0.875rem;
+	min-width: 0;
+}
+.image-creation-parameters input {
+	font-size: 0.875rem;
+	min-width: 0;
+	height: 2.15rem;
+}
+.image-creation-parameters select {
+	height: 2.15rem;
+}
+.image-creation-prompt {
+	flex-shrink: 0;
+	border-top: 1px solid var(--border);
+	padding-top: 0.7rem;
+}
+.image-creation-prompt-heading {
+	margin-bottom: 0.45rem;
+	flex-wrap: wrap;
+	font-size: 0.9rem;
+}
+.image-creation-prompt-heading label {
+	font-weight: 600;
+}
+.image-creation-prompt-heading > span {
+	color: var(--muted-foreground);
+	font-size: 0.8rem;
+	margin-right: auto;
+}
+.image-creation-form textarea {
+	width: 100%;
+	min-height: 7rem;
+	max-height: 16rem;
+	background: var(--background);
+	color: var(--foreground);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	padding: 0.6rem;
+	font-size: 0.875rem;
+	line-height: 1.55;
+	resize: vertical;
+}
+.image-creation-form :is(select, textarea):focus-visible {
+	outline: 2px solid var(--ring);
+	outline-offset: 2px;
+}
+.image-creation-actions {
+	margin-top: 0.5rem;
+	flex-wrap: wrap;
+}
+.image-creation-actions > span {
+	color: var(--muted-foreground);
+	font-size: 0.8rem;
+}
+.image-creation-actions button[type="submit"] {
+	margin-left: auto;
+}
+.image-creation-update {
+	font-size: 0.875rem;
+	padding: 0.5rem;
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	margin-bottom: 0.5rem;
+}
+.image-creation-update p {
+	margin: 0 0 0.35rem;
+}
+.image-creation-update pre {
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	max-height: 6rem;
+	overflow: auto;
+}
+@container (max-width: 760px) {
+	.image-creation-form {
+		height: auto;
+	}
+	.image-creation-settings {
+		overflow: visible;
+	}
+}
+@container (max-width: 500px) {
+	.image-creation-style-heading {
+		flex-wrap: wrap;
+	}
+	.image-creation-search {
+		max-width: none;
+		width: 100%;
+	}
+	.image-creation-styles .image-creation-choices > div {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+	.image-creation-parameters {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+	.image-creation-selects {
+		grid-template-columns: minmax(0, 1fr);
+	}
+	.image-creation-prompt-heading > span {
+		width: 100%;
+	}
+}
+
+.image-creation-choices input {
+	appearance: none;
+	border: 1px solid var(--muted-foreground);
+	border-radius: 0.15rem;
+	background: var(--background);
+	cursor: pointer;
+}
+.image-creation-choices input:checked {
+	background: var(--primary);
+	border-color: var(--primary);
+}
+.image-creation-choices input:checked::after {
+	content: "";
+	display: block;
+	width: 0.3rem;
+	height: 0.55rem;
+	margin: 0.05rem 0.28rem;
+	border: solid var(--primary-foreground);
+	border-width: 0 2px 2px 0;
+	transform: rotate(45deg);
+}
+.image-creation-choices input:focus-visible {
+	outline: 2px solid var(--ring);
+	outline-offset: 2px;
+}
+.image-creation-choices input:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+.image-creation-actions button {
+	gap: 0.5rem;
+}

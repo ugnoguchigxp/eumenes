@@ -10,10 +10,11 @@ const safeEqual = (a: string, b: string) =>
 const maxJsonBytes = 1024 * 1024;
 /**
  * Routes that read their body through their own bounded streaming reader
- * (`readBounded`, 4MB). The global Content-Length cap must not pre-empt them.
+ * (`readBounded`, with route-specific caps). The global Content-Length cap must not pre-empt them.
  * Exact path match only; never a prefix.
  */
 const streamBoundedRoutes = new Set([
+	"/api/object-recognition",
 	"/api/voice/turns",
 	"/api/voice/preview",
 	"/api/service-tests/uploads",
@@ -95,7 +96,13 @@ export function createApp(options: AppOptions | LegacyAppOptions) {
 		if (
 			c.req.method !== "GET" &&
 			c.req.method !== "HEAD" &&
-			!streamBoundedRoutes.has(c.req.path)
+			!streamBoundedRoutes.has(c.req.path) &&
+			!(
+				c.req.method === "PUT" &&
+				/^\/api\/excalidraw\/sessions\/[a-f0-9-]{36}\/document$/.test(
+					c.req.path,
+				)
+			)
 		) {
 			const length = c.req.header("content-length");
 			if (length === undefined) {

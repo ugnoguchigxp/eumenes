@@ -1,3 +1,13 @@
+import {
+	registerExcalidraw,
+	type ExcalidrawService,
+} from "../domains/excalidraw";
+import {
+	registerObjectRecognition,
+	type ObjectRecognitionService,
+} from "../domains/object-recognition";
+import { CONVERSATION_DEFAULT_PRINCIPAL } from "../domains/conversation/contracts";
+import { registerImage, type ImageService } from "../domains/image";
 import { registerMusic, type MusicService } from "../domains/music";
 import {
 	registerCodingSupervision,
@@ -83,6 +93,10 @@ export type AppServices = {
 	changes?: Changes;
 	serviceTests?: ServiceTests;
 	music?: MusicService;
+	image?: ImageService;
+	excalidraw?: ExcalidrawService;
+	drawingOperations?: { list: (conversationId: string) => unknown };
+	objectRecognition?: ObjectRecognitionService;
 	tasks?: TasksService;
 	coding?: CodingService;
 	codingSupervision?: CodingSupervision;
@@ -108,6 +122,30 @@ export function appModules(services: AppServices): AppModule[] {
 				),
 		},
 		s.dotsModule,
+		s.objectRecognition && {
+			mount: (app) =>
+				registerObjectRecognition(
+					app,
+					s.objectRecognition!,
+					CONVERSATION_DEFAULT_PRINCIPAL,
+					(text, conversationId, requestId) =>
+						s.dialogue.submit({ text, conversationId, requestId }),
+				),
+		},
+		s.excalidraw && {
+			mount: (app) => {
+				registerExcalidraw(app, s.excalidraw!);
+				if (s.drawingOperations)
+					app.get("/api/excalidraw/operations", (c) =>
+						c.json(
+							s.drawingOperations!.list(
+								c.req.query("conversationId") ?? "main",
+							),
+						),
+					);
+			},
+		},
+		s.image && { mount: (app) => registerImage(app, s.image!) },
 		s.music && { mount: (app) => registerMusic(app, s.music!) },
 		s.capabilities && {
 			mount: (app) => registerCapabilities(app, s.capabilities!),

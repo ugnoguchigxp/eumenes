@@ -1,0 +1,26 @@
+Use case: ui-mockup.
+Create a polished, high-fidelity visual design proposal for the image-generation feature of Eumenes, a Japanese desktop AI application. This is a UI design image, rendered as a beautiful crisp product design board, not code and not a scene illustration.
+
+Composition: a wide landscape design board showing TWO equally sized screenshots of THE SAME image studio, side by side, demonstrating its two tab states. Only these two screenshots; no device frames, hands, marketing decoration or perspective. The left screenshot shows the prompt editor tab active; the right screenshot shows the past-images tab active. Both have the identical header and tab bar, making it unmistakable that these are tabs within one feature, not separate apps. Generous margins and clean alignment.
+
+Visual style: sophisticated, calm, practical desktop software. White and pale cool-gray surfaces, hairline borders, restrained cobalt-blue accent, dark charcoal Japanese typography, subtle 10px corner radii. Excellent hierarchy and spacing, compact but comfortable controls, refined outline icons. No dark mode, no glass effects, no glossy 3D chrome, no rainbow gradients. Use legible Japanese text, precisely typeset.
+
+Shared header in both screenshots: title "画像生成", a small understated image icon. Directly underneath, two tabs with exact text "プロンプト編集" and "過去の画像". The selected tab has blue text and a thin blue underline.
+
+LEFT / prompt editor:
+- Visible section label "制作プロンプト".
+- A generous multiline text field containing "朝の光が差し込む部屋。柔らかな水彩画。".
+- Under the field, a tidy two-column set of compact controls. Exact labels "幅", "高さ", "保存形式", "シード". Values "768 px", "512 px", "PNG", "42".
+- A clear primary cobalt button labeled "画像を生成".
+- Below, a neatly framed medium landscape preview of a beautiful watercolor sunlit interior, with warm morning light on a wooden table, a plant and linen curtains. Keep the illustration tasteful and natural, no embedded words.
+- A small completion indicator "生成完了", and a discreet download icon with text "ダウンロード".
+- The screen must be specifically focused on image prompting and generation, without music controls, chat composer, coding jargon, provider credentials, model names, or irrelevant form sections.
+
+RIGHT / past-images:
+- The "過去の画像" tab is selected.
+- A compact toolbar showing "生成した画像" and an understated refresh icon button.
+- A balanced two-column gallery with six beautiful visually distinct image thumbnails: sunlit watercolor room, coastal lighthouse, botanical illustration, night cityscape, ceramic still life, mountain landscape. Consistent card geometry but respect image aspect ratios with subtle neutral framing.
+- Each card has a short unobtrusive Japanese title and a date, with an understated download icon. The first card shows a refined blue selected border.
+- Add a compact selected-image detail strip beneath the gallery, with exact button text "プロンプトを使う". This reuses the original prompt for a new generation; do not depict unsupported reference-image editing.
+
+Both screens should look readily implementable using reusable design-system components. The mockup must communicate the finished UI clearly, with beautiful image content and restrained interface design. Keep all main labels readable and spelled exactly. No explanatory annotations, no developer details, no watermark.

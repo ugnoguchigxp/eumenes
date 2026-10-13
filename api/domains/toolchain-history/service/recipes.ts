@@ -20,7 +20,7 @@ import type { RecipeRow } from "../repository";
 const log = getLogger("toolchain-history");
 const RECIPE_CANDIDATES = 3;
 
-function recipe(row: RecipeRow): Recipe {
+export function recipe(row: RecipeRow): Recipe {
 	return {
 		id: row.id,
 		toolchainId: row.toolchain_id,

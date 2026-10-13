@@ -1,0 +1,10 @@
+
+Running 3 tests using 1 worker
+
+(node:58220) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 tests/browser/image.spec.ts:25:1 › OpenUI image studio: selected prompt, protected edits, artifact gallery and result operations (56.3s)
+  ✓  2 tests/browser/image.spec.ts:153:1 › completed image prompt survives reloading and reopening the OpenUI workspace (16.3s)
+  ✓  3 tests/browser/image.spec.ts:179:1 › image deletion confirms, preserves failed results, then removes the saved bytes and selected preview (11.1s)
+
+  3 passed (1.4m)

@@ -1,4 +1,10 @@
+import { recognitionManage, recognitionCommand } from "./object-recognition";
+export { recognitionManage, recognitionCommand };
+import { drawingRequest, drawingPlan } from "./excalidraw";
+export { drawingRequest, drawingPlan };
 import { z } from "zod";
+import { imageRequest, imagePlan } from "./image";
+export { imageRequest, imagePlan };
 import {
 	musicRequest,
 	musicPlan,
@@ -111,6 +117,11 @@ export const recipeFindInput = z
 	})
 	.strict();
 export const validators = {
+	recognitionManage,
+	drawingRequest,
+	drawingPlan,
+	imageRequest,
+	imagePlan,
 	musicRequest,
 	musicPlan,
 	musicPlanV2,

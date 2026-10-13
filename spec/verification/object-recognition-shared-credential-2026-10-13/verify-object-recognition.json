@@ -1,0 +1,45 @@
+{
+  "selected": [
+    "object-recognition"
+  ],
+  "dependencySet": [
+    "capabilities",
+    "queue",
+    "object-recognition"
+  ],
+  "testDependencySet": [
+    "capabilities",
+    "queue",
+    "object-recognition"
+  ],
+  "revision": "3331fd656e4dae307003073124e63f1a08c8e8fd3e7b039a3a424e59cc32a1c6",
+  "steps": [
+    {
+      "name": "size-budget",
+      "ms": 113,
+      "result": "pass"
+    },
+    {
+      "name": "format",
+      "ms": 94,
+      "result": "pass"
+    },
+    {
+      "name": "lint",
+      "ms": 49,
+      "result": "pass"
+    },
+    {
+      "name": "typecheck",
+      "ms": 151,
+      "result": "pass"
+    },
+    {
+      "name": "domain tests",
+      "ms": 4551,
+      "result": "pass"
+    }
+  ],
+  "totalMs": 5210,
+  "result": "pass"
+}

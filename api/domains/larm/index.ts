@@ -40,3 +40,8 @@ export {
 	type MusicTrack,
 } from "./contracts/music-library";
 export { MusicLibraryError } from "./service/music-library";
+export { createLocalServices } from "./service/local-services";
+export type {
+	LocalServiceLease,
+	LocalServicesPort,
+} from "./contracts/local-services";

@@ -1,0 +1,9 @@
+
+Running 1 test using 1 worker
+
+(node:43539) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+drawing API failure PUT /api/excalidraw/sessions/7668960f-b3ad-4716-b8e6-c64e570f1d59/document 502 {"error":"excalidraw_http_503"}
+  ✓  1 tests/browser/excalidraw.spec.ts:26:1 › MacBook browser fixture: launch, edit, save, reopen, preserve failed drafts, idle and reconnect (29.1s)
+
+  1 passed (30.6s)

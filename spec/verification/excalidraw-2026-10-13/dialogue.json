@@ -1,0 +1,76 @@
+{
+  "selected": [
+    "dialogue"
+  ],
+  "dependencySet": [
+    "capabilities",
+    "delivery",
+    "attitude-dataset",
+    "larm",
+    "settings",
+    "inference",
+    "queue",
+    "tool-runtime",
+    "agent-runtime",
+    "conversation",
+    "continuity",
+    "memory",
+    "scheduler",
+    "toolchain-history",
+    "dialogue",
+    "avatar"
+  ],
+  "testDependencySet": [
+    "capabilities",
+    "delivery",
+    "attitude-dataset",
+    "larm",
+    "tts-dictionary",
+    "queue",
+    "tasks",
+    "dots",
+    "settings",
+    "inference",
+    "tool-runtime",
+    "agent-runtime",
+    "avatar",
+    "conversation",
+    "continuity",
+    "memory",
+    "scheduler",
+    "toolchain-history",
+    "goals",
+    "world",
+    "dialogue"
+  ],
+  "revision": "c5313df0d27c163beaa1445e87df13ef02ba734904075ecf3f3ded642732d4ae",
+  "steps": [
+    {
+      "name": "size-budget",
+      "ms": 156,
+      "result": "pass"
+    },
+    {
+      "name": "format",
+      "ms": 117,
+      "result": "pass"
+    },
+    {
+      "name": "lint",
+      "ms": 89,
+      "result": "pass"
+    },
+    {
+      "name": "typecheck",
+      "ms": 329,
+      "result": "pass"
+    },
+    {
+      "name": "domain tests",
+      "ms": 17148,
+      "result": "pass"
+    }
+  ],
+  "totalMs": 18275,
+  "result": "pass"
+}

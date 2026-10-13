@@ -27,6 +27,9 @@ export async function createToolchain(
 	options: {
 		dots?: boolean;
 		music?: boolean;
+		image?: boolean;
+		objectRecognition?: boolean;
+		excalidraw?: boolean;
 		history?: boolean;
 		/** LARM embedding provider; without it retrieval uses full-text search only. */
 		embed?: Embed;
@@ -44,6 +47,9 @@ export async function createToolchain(
 			...(options.timers ? ["timer"] : []),
 			...(options.dots ? ["dots"] : []),
 			...(options.music ? ["music"] : []),
+			...(options.image ? ["image"] : []),
+			...(options.objectRecognition ? ["object-recognition"] : []),
+			...(options.excalidraw ? ["excalidraw"] : []),
 			...(options.conversation && options.history !== false ? ["history"] : []),
 		]),
 	);

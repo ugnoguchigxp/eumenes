@@ -1,0 +1,489 @@
+{
+  "fixture": false,
+  "physicalCamera": "not_run",
+  "conversationId": "object-recognition-live-2026-10-13",
+  "stages": {
+    "image": {
+      "outcome": "passed",
+      "at": "2026-10-13T10:40:16.344Z",
+      "durationMs": 3302,
+      "id": "90a25839-7d8c-4ab9-bd96-30c41daaee60",
+      "state": "completed",
+      "errorCode": null,
+      "model": "yolo26n",
+      "objects": [
+        {
+          "label": "bus",
+          "box": [
+            5.58,
+            228.87,
+            807.23,
+            749.24
+          ],
+          "confidence": 0.92535
+        },
+        {
+          "label": "person",
+          "box": [
+            46.57,
+            398.75,
+            236.99,
+            901.75
+          ],
+          "confidence": 0.91514
+        },
+        {
+          "label": "person",
+          "box": [
+            223.06,
+            405.3,
+            345.19,
+            863.11
+          ],
+          "confidence": 0.89914
+        },
+        {
+          "label": "person",
+          "box": [
+            668.62,
+            391.23,
+            810,
+            879.67
+          ],
+          "confidence": 0.86023
+        },
+        {
+          "label": "person",
+          "box": [
+            0,
+            553.82,
+            64.84,
+            874.03
+          ],
+          "confidence": 0.52526
+        }
+      ],
+      "trace": [
+        {
+          "at": "2026-10-13T10:40:14.055Z",
+          "state": "queued",
+          "progress": null,
+          "errorCode": null
+        },
+        {
+          "at": "2026-10-13T10:40:14.308Z",
+          "state": "starting",
+          "progress": null,
+          "errorCode": null
+        },
+        {
+          "at": "2026-10-13T10:40:16.331Z",
+          "state": "completed",
+          "progress": null,
+          "errorCode": null
+        }
+      ],
+      "before": [
+        {
+          "id": "object-recognition-host",
+          "revision": "73c6fa9b1bff0d0ed4154cab4d2d5104f1958be9d326e9a72da4c086e9d8c3c2",
+          "generation": 3,
+          "state": "stopped",
+          "busy": null,
+          "activityFresh": false
+        },
+        {
+          "id": "ocr-host",
+          "revision": "b6d6514aeb4abb3a60847ce66e0c14107f3b4ee06e2260f1f443158ba1fded3e",
+          "generation": 5,
+          "state": "stopped",
+          "busy": null,
+          "activityFresh": false
+        }
+      ],
+      "after": [
+        {
+          "id": "object-recognition-host",
+          "revision": "73c6fa9b1bff0d0ed4154cab4d2d5104f1958be9d326e9a72da4c086e9d8c3c2",
+          "generation": 4,
+          "state": "ready",
+          "busy": false,
+          "activityFresh": true
+        },
+        {
+          "id": "ocr-host",
+          "revision": "b6d6514aeb4abb3a60847ce66e0c14107f3b4ee06e2260f1f443158ba1fded3e",
+          "generation": 5,
+          "state": "stopped",
+          "busy": null,
+          "activityFresh": false
+        }
+      ],
+      "requests": [
+        {
+          "path": "/api/object-recognition?conversationId=object-recognition-live-2026-10-13&requestId=90a25839-7d8c-4ab9-bd96-30c41daaee60",
+          "method": "POST",
+          "status": 202,
+          "requestId": "64c8aa99-df6d-4f65-b886-c22ea3e48798"
+        }
+      ]
+    },
+    "video": {
+      "outcome": "passed",
+      "at": "2026-10-13T10:40:48.532Z",
+      "durationMs": 1798,
+      "id": "c4f8b223-6e7e-4aa1-950f-a42ffe593d47",
+      "state": "completed",
+      "errorCode": null,
+      "model": "yolo26n",
+      "frameCount": 6,
+      "trace": [
+        {
+          "at": "2026-10-13T10:40:47.768Z",
+          "state": "queued",
+          "progress": null,
+          "errorCode": null
+        },
+        {
+          "at": "2026-10-13T10:40:48.524Z",
+          "state": "completed",
+          "progress": null,
+          "errorCode": null
+        }
+      ],
+      "before": [
+        {
+          "id": "object-recognition-host",
+          "revision": "73c6fa9b1bff0d0ed4154cab4d2d5104f1958be9d326e9a72da4c086e9d8c3c2",
+          "generation": 4,
+          "state": "ready",
+          "busy": false,
+          "activityFresh": true
+        },
+        {
+          "id": "ocr-host",
+          "revision": "b6d6514aeb4abb3a60847ce66e0c14107f3b4ee06e2260f1f443158ba1fded3e",
+          "generation": 5,
+          "state": "stopped",
+          "busy": null,
+          "activityFresh": false
+        }
+      ],
+      "after": [
+        {
+          "id": "object-recognition-host",
+          "revision": "73c6fa9b1bff0d0ed4154cab4d2d5104f1958be9d326e9a72da4c086e9d8c3c2",
+          "generation": 4,
+          "state": "ready",
+          "busy": true,
+          "activityFresh": true
+        },
+        {
+          "id": "ocr-host",
+          "revision": "b6d6514aeb4abb3a60847ce66e0c14107f3b4ee06e2260f1f443158ba1fded3e",
+          "generation": 5,
+          "state": "stopped",
+          "busy": null,
+          "activityFresh": false
+        }
+      ],
+      "requests": [
+        {
+          "path": "/api/object-recognition?conversationId=object-recognition-live-2026-10-13&requestId=c4f8b223-6e7e-4aa1-950f-a42ffe593d47",
+          "method": "POST",
+          "status": 202,
+          "requestId": "bd86054b-b479-4e73-9e5b-4a583dce83a6"
+        }
+      ]
+    },
+    "cancel": {
+      "outcome": "passed",
+      "at": "2026-10-13T10:41:21.064Z",
+      "durationMs": 3135,
+      "id": "074070df-54af-4986-83b4-b41d116180e4",
+      "state": "cancelled",
+      "errorCode": null,
+      "trace": [
+        {
+          "at": "2026-10-13T10:41:19.029Z",
+          "state": "starting",
+          "progress": null,
+          "errorCode": null
+        },
+        {
+          "at": "2026-10-13T10:41:19.031Z",
+          "state": "cancelling",
+          "progress": null,
+          "errorCode": null
+        },
+        {
+          "at": "2026-10-13T10:41:21.056Z",
+          "state": "cancelled",
+          "progress": null,
+          "errorCode": null
+        }
+      ],
+      "before": [
+        {
+          "id": "object-recognition-host",
+          "revision": "73c6fa9b1bff0d0ed4154cab4d2d5104f1958be9d326e9a72da4c086e9d8c3c2",
+          "generation": 4,
+          "state": "ready",
+          "busy": false,
+          "activityFresh": true
+        },
+        {
+          "id": "ocr-host",
+          "revision": "b6d6514aeb4abb3a60847ce66e0c14107f3b4ee06e2260f1f443158ba1fded3e",
+          "generation": 5,
+          "state": "stopped",
+          "busy": null,
+          "activityFresh": false
+        }
+      ],
+      "after": [
+        {
+          "id": "object-recognition-host",
+          "revision": "73c6fa9b1bff0d0ed4154cab4d2d5104f1958be9d326e9a72da4c086e9d8c3c2",
+          "generation": 4,
+          "state": "ready",
+          "busy": false,
+          "activityFresh": true
+        },
+        {
+          "id": "ocr-host",
+          "revision": "b6d6514aeb4abb3a60847ce66e0c14107f3b4ee06e2260f1f443158ba1fded3e",
+          "generation": 5,
+          "state": "stopped",
+          "busy": null,
+          "activityFresh": false
+        }
+      ],
+      "requests": [
+        {
+          "path": "/api/object-recognition?conversationId=object-recognition-live-2026-10-13&requestId=074070df-54af-4986-83b4-b41d116180e4",
+          "method": "POST",
+          "status": 202,
+          "requestId": "87886685-e265-4c67-b1b6-ed6d26af49a0"
+        },
+        {
+          "path": "/api/object-recognition/074070df-54af-4986-83b4-b41d116180e4/cancel",
+          "method": "POST",
+          "status": 200,
+          "requestId": "2b04832e-25b0-41aa-be00-6f024075e376"
+        }
+      ]
+    },
+    "incorporate": {
+      "outcome": "passed",
+      "at": "2026-10-13T10:41:36.728Z",
+      "runId": "03eb3f2e-7e16-4a0b-86b1-a44a17f73099",
+      "status": "completed",
+      "observationsSaved": true,
+      "requests": [
+        {
+          "path": "/api/object-recognition/c4f8b223-6e7e-4aa1-950f-a42ffe593d47/conversation",
+          "method": "POST",
+          "status": 200,
+          "requestId": "e537aa2f-7be1-496d-8255-10d341db23ab"
+        }
+      ]
+    },
+    "status": {
+      "outcome": "observed",
+      "at": "2026-10-13T10:42:40.310Z",
+      "services": [
+        {
+          "id": "object-recognition-host",
+          "revision": "73c6fa9b1bff0d0ed4154cab4d2d5104f1958be9d326e9a72da4c086e9d8c3c2",
+          "generation": 4,
+          "state": "ready",
+          "busy": false,
+          "activityFresh": true
+        },
+        {
+          "id": "ocr-host",
+          "revision": "b6d6514aeb4abb3a60847ce66e0c14107f3b4ee06e2260f1f443158ba1fded3e",
+          "generation": 5,
+          "state": "stopped",
+          "busy": null,
+          "activityFresh": false
+        }
+      ]
+    },
+    "recovery": {
+      "outcome": "passed",
+      "at": "2026-10-13T10:43:17.869Z",
+      "connection": {
+        "revision": 1,
+        "serviceId": "object-recognition-host",
+        "baseUrl": "http://127.0.0.1:18796",
+        "credentialConfigured": true,
+        "credentialSource": "larm",
+        "sharedCredentialAvailable": true
+      },
+      "recordCount": 3,
+      "sourceVerified": true
+    },
+    "idle": {
+      "outcome": "passed",
+      "at": "2026-10-13T10:43:10.204Z",
+      "statusGetOnly": true,
+      "samples": [
+        {
+          "at": "2026-10-13T10:43:10.204Z",
+          "services": [
+            {
+              "id": "object-recognition-host",
+              "revision": "73c6fa9b1bff0d0ed4154cab4d2d5104f1958be9d326e9a72da4c086e9d8c3c2",
+              "generation": 4,
+              "state": "stopped",
+              "busy": null,
+              "activityFresh": false
+            },
+            {
+              "id": "ocr-host",
+              "revision": "b6d6514aeb4abb3a60847ce66e0c14107f3b4ee06e2260f1f443158ba1fded3e",
+              "generation": 5,
+              "state": "stopped",
+              "busy": null,
+              "activityFresh": false
+            }
+          ]
+        }
+      ]
+    },
+    "cold-restart": {
+      "outcome": "passed",
+      "at": "2026-10-13T10:43:22.254Z",
+      "durationMs": 4278,
+      "id": "950267c6-d3eb-4250-9083-9ae9fc418be6",
+      "state": "completed",
+      "errorCode": null,
+      "model": "yolo26n",
+      "objects": [
+        {
+          "label": "bus",
+          "box": [
+            5.58,
+            228.87,
+            807.23,
+            749.24
+          ],
+          "confidence": 0.92535
+        },
+        {
+          "label": "person",
+          "box": [
+            46.57,
+            398.75,
+            236.99,
+            901.75
+          ],
+          "confidence": 0.91514
+        },
+        {
+          "label": "person",
+          "box": [
+            223.06,
+            405.3,
+            345.19,
+            863.11
+          ],
+          "confidence": 0.89914
+        },
+        {
+          "label": "person",
+          "box": [
+            668.62,
+            391.23,
+            810,
+            879.67
+          ],
+          "confidence": 0.86023
+        },
+        {
+          "label": "person",
+          "box": [
+            0,
+            553.82,
+            64.84,
+            874.03
+          ],
+          "confidence": 0.52526
+        }
+      ],
+      "trace": [
+        {
+          "at": "2026-10-13T10:43:18.965Z",
+          "state": "queued",
+          "progress": null,
+          "errorCode": null
+        },
+        {
+          "at": "2026-10-13T10:43:19.216Z",
+          "state": "starting",
+          "progress": null,
+          "errorCode": null
+        },
+        {
+          "at": "2026-10-13T10:43:22.245Z",
+          "state": "completed",
+          "progress": null,
+          "errorCode": null
+        }
+      ],
+      "before": [
+        {
+          "id": "object-recognition-host",
+          "revision": "73c6fa9b1bff0d0ed4154cab4d2d5104f1958be9d326e9a72da4c086e9d8c3c2",
+          "generation": 4,
+          "state": "stopped",
+          "busy": null,
+          "activityFresh": false
+        },
+        {
+          "id": "ocr-host",
+          "revision": "b6d6514aeb4abb3a60847ce66e0c14107f3b4ee06e2260f1f443158ba1fded3e",
+          "generation": 5,
+          "state": "stopped",
+          "busy": null,
+          "activityFresh": false
+        }
+      ],
+      "after": [
+        {
+          "id": "object-recognition-host",
+          "revision": "73c6fa9b1bff0d0ed4154cab4d2d5104f1958be9d326e9a72da4c086e9d8c3c2",
+          "generation": 5,
+          "state": "ready",
+          "busy": false,
+          "activityFresh": true
+        },
+        {
+          "id": "ocr-host",
+          "revision": "b6d6514aeb4abb3a60847ce66e0c14107f3b4ee06e2260f1f443158ba1fded3e",
+          "generation": 5,
+          "state": "stopped",
+          "busy": null,
+          "activityFresh": false
+        }
+      ],
+      "requests": [
+        {
+          "path": "/api/object-recognition?conversationId=object-recognition-live-2026-10-13&requestId=950267c6-d3eb-4250-9083-9ae9fc418be6",
+          "method": "POST",
+          "status": 202,
+          "requestId": "783535f1-0025-4882-a4e0-b056ab87c48b"
+        }
+      ]
+    }
+  },
+  "ids": {
+    "image": "90a25839-7d8c-4ab9-bd96-30c41daaee60",
+    "video": "c4f8b223-6e7e-4aa1-950f-a42ffe593d47",
+    "cancel": "074070df-54af-4986-83b4-b41d116180e4",
+    "cold-restart": "950267c6-d3eb-4250-9083-9ae9fc418be6"
+  },
+  "runId": "03eb3f2e-7e16-4a0b-86b1-a44a17f73099"
+}

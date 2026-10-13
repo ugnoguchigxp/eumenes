@@ -1,0 +1,22 @@
+[verify] selected=artifact dependencyClosu$ oxfmt --check web/src/domains/artifact web/src/components/domains/artifact packages/artifact-ui/src
+$ oxlint --deny-warnings web/src/domains/artifact web/src/components/domains/artifact packages/artifact-ui/src
+✓ No type errors in 36 files [90.57ms]
+$ bun scripts/test-domain.ts artifact
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+.
+Finished in 4ms on 37 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint web/src/domains/artifact web/src/components/domains/artifact packages/artifact-ui/src
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun check -p /Users/y.noguchi/Code/eumenes/verification-reports/tsconfig.selected.json
+[verify] TypeScript workspace closure: 38 files; web/src/domains, packages/design-system/dist, packages/artifact-ui/src, packages/design-system/src, web/src/components
+[verify] domain tests: /Users/y.noguchi/.bun/bin/bun run test:domain -- artifact
+
+ RUN  v4.1.8 /Users/y.noguchi/Code/eumenes
+
+
+ Test Files  7 passed (7)
+      Tests  49 passed (49)
+   Start at  11:40:32
+   Duration  1.46s (transform 978ms, setup 0ms, import 1.93s, tests 631ms, environment 4.12s)
+
+[verify] passed 2308 ms

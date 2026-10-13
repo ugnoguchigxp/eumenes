@@ -1,3 +1,6 @@
+import { objectRecognitionClient } from "./object-recognition";
+import { excalidrawClient } from "./excalidraw";
+import { imageClient } from "./image";
 import { musicClient } from "./music";
 import { dotsClient } from "./dots";
 import { requirementsClient } from "./requirements";
@@ -28,6 +31,9 @@ export function createClient(baseUrl: string, token?: string) {
 	const transport = createTransport(baseUrl, token);
 	return {
 		...musicClient(transport),
+		...imageClient(transport),
+		...objectRecognitionClient(transport),
+		...excalidrawClient(transport),
 		...requirementsClient(transport),
 		...dotsClient(transport),
 		...attitudeDatasetClient(transport),

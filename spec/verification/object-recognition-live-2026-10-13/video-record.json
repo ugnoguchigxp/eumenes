@@ -1,0 +1,384 @@
+{
+  "id": "c4f8b223-6e7e-4aa1-950f-a42ffe593d47",
+  "conversationId": "object-recognition-live-2026-10-13",
+  "name": "bus-3s.mp4",
+  "mime": "video/mp4",
+  "state": "completed",
+  "revision": 3,
+  "progress": null,
+  "errorCode": null,
+  "result": {
+    "kind": "video",
+    "model": "yolo26n",
+    "video": {
+      "width": 600,
+      "height": 800,
+      "durationSeconds": 3
+    },
+    "frames": [
+      {
+        "timestampSeconds": 0,
+        "objects": [
+          {
+            "classId": 5,
+            "label": "bus",
+            "confidence": 0.92191,
+            "box": [
+              7.07,
+              169.12,
+              597.73,
+              556.04
+            ]
+          },
+          {
+            "classId": 0,
+            "label": "person",
+            "confidence": 0.9172,
+            "box": [
+              34.06,
+              294.59,
+              176.28,
+              668.33
+            ]
+          },
+          {
+            "classId": 0,
+            "label": "person",
+            "confidence": 0.903,
+            "box": [
+              164.98,
+              299.83,
+              255.35,
+              638.47
+            ]
+          },
+          {
+            "classId": 0,
+            "label": "person",
+            "confidence": 0.85794,
+            "box": [
+              495.04,
+              289.82,
+              600,
+              651.37
+            ]
+          },
+          {
+            "classId": 0,
+            "label": "person",
+            "confidence": 0.48541,
+            "box": [
+              0,
+              410.81,
+              50.85,
+              648.6
+            ]
+          }
+        ]
+      },
+      {
+        "timestampSeconds": 0.5,
+        "objects": [
+          {
+            "classId": 5,
+            "label": "bus",
+            "confidence": 0.9209,
+            "box": [
+              6.84,
+              169.11,
+              597.7,
+              555.95
+            ]
+          },
+          {
+            "classId": 0,
+            "label": "person",
+            "confidence": 0.91737,
+            "box": [
+              34.02,
+              294.57,
+              176.36,
+              668.33
+            ]
+          },
+          {
+            "classId": 0,
+            "label": "person",
+            "confidence": 0.90288,
+            "box": [
+              164.96,
+              299.81,
+              255.36,
+              638.59
+            ]
+          },
+          {
+            "classId": 0,
+            "label": "person",
+            "confidence": 0.85777,
+            "box": [
+              495.08,
+              289.81,
+              600,
+              651.38
+            ]
+          },
+          {
+            "classId": 0,
+            "label": "person",
+            "confidence": 0.48498,
+            "box": [
+              0,
+              410.83,
+              50.84,
+              648.54
+            ]
+          }
+        ]
+      },
+      {
+        "timestampSeconds": 1,
+        "objects": [
+          {
+            "classId": 5,
+            "label": "bus",
+            "confidence": 0.92152,
+            "box": [
+              6.83,
+              169.11,
+              597.69,
+              555.97
+            ]
+          },
+          {
+            "classId": 0,
+            "label": "person",
+            "confidence": 0.91744,
+            "box": [
+              34.03,
+              294.59,
+              176.37,
+              668.34
+            ]
+          },
+          {
+            "classId": 0,
+            "label": "person",
+            "confidence": 0.90301,
+            "box": [
+              164.97,
+              299.82,
+              255.36,
+              638.6
+            ]
+          },
+          {
+            "classId": 0,
+            "label": "person",
+            "confidence": 0.85836,
+            "box": [
+              495.05,
+              289.81,
+              600,
+              651.38
+            ]
+          },
+          {
+            "classId": 0,
+            "label": "person",
+            "confidence": 0.48669,
+            "box": [
+              0,
+              410.85,
+              50.89,
+              648.5
+            ]
+          }
+        ]
+      },
+      {
+        "timestampSeconds": 1.5,
+        "objects": [
+          {
+            "classId": 5,
+            "label": "bus",
+            "confidence": 0.92155,
+            "box": [
+              6.83,
+              169.11,
+              597.68,
+              555.94
+            ]
+          },
+          {
+            "classId": 0,
+            "label": "person",
+            "confidence": 0.91747,
+            "box": [
+              34.03,
+              294.59,
+              176.38,
+              668.34
+            ]
+          },
+          {
+            "classId": 0,
+            "label": "person",
+            "confidence": 0.90296,
+            "box": [
+              164.97,
+              299.81,
+              255.36,
+              638.6
+            ]
+          },
+          {
+            "classId": 0,
+            "label": "person",
+            "confidence": 0.85841,
+            "box": [
+              495.06,
+              289.81,
+              600,
+              651.38
+            ]
+          },
+          {
+            "classId": 0,
+            "label": "person",
+            "confidence": 0.48666,
+            "box": [
+              0,
+              410.85,
+              50.89,
+              648.5
+            ]
+          }
+        ]
+      },
+      {
+        "timestampSeconds": 2,
+        "objects": [
+          {
+            "classId": 5,
+            "label": "bus",
+            "confidence": 0.92186,
+            "box": [
+              6.87,
+              169.13,
+              597.72,
+              555.89
+            ]
+          },
+          {
+            "classId": 0,
+            "label": "person",
+            "confidence": 0.91749,
+            "box": [
+              34.03,
+              294.59,
+              176.39,
+              668.34
+            ]
+          },
+          {
+            "classId": 0,
+            "label": "person",
+            "confidence": 0.90288,
+            "box": [
+              164.96,
+              299.81,
+              255.36,
+              638.61
+            ]
+          },
+          {
+            "classId": 0,
+            "label": "person",
+            "confidence": 0.85831,
+            "box": [
+              495.06,
+              289.77,
+              600,
+              651.38
+            ]
+          },
+          {
+            "classId": 0,
+            "label": "person",
+            "confidence": 0.48683,
+            "box": [
+              0,
+              410.85,
+              50.89,
+              648.5
+            ]
+          }
+        ]
+      },
+      {
+        "timestampSeconds": 2.5,
+        "objects": [
+          {
+            "classId": 5,
+            "label": "bus",
+            "confidence": 0.92184,
+            "box": [
+              6.87,
+              169.12,
+              597.72,
+              555.91
+            ]
+          },
+          {
+            "classId": 0,
+            "label": "person",
+            "confidence": 0.91749,
+            "box": [
+              34.03,
+              294.58,
+              176.39,
+              668.34
+            ]
+          },
+          {
+            "classId": 0,
+            "label": "person",
+            "confidence": 0.9029,
+            "box": [
+              164.95,
+              299.81,
+              255.36,
+              638.61
+            ]
+          },
+          {
+            "classId": 0,
+            "label": "person",
+            "confidence": 0.85834,
+            "box": [
+              495.06,
+              289.77,
+              600,
+              651.38
+            ]
+          },
+          {
+            "classId": 0,
+            "label": "person",
+            "confidence": 0.48685,
+            "box": [
+              0,
+              410.85,
+              50.89,
+              648.5
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "createdAt": 1791888047760,
+  "updatedAt": 1791888048481,
+  "canRecheck": false
+}

@@ -215,3 +215,4 @@ export const larmProfilesSchema = z.array(
 );
 export type LarmProfiles = z.infer<typeof larmProfilesSchema>;
 export const startedProbeSchema = z.object({ id: z.string() });
+export * from "./record-pages";

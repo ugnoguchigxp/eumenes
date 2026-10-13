@@ -3,6 +3,8 @@ import type { ArtifactEvent, Receipt, Snapshot } from "./contracts";
 
 export type ArtifactRuntime = {
 	snapshot: Snapshot;
+	/** Transient File bridge for host-owned uploads; never serialized into saved JSON. */
+	uploadFile?: (source: string, file: File) => Promise<Receipt>;
 	dispatch: (event: ArtifactEvent) => Promise<Receipt>;
 	/** Theme controlled by the host's preview toolbar, when present. */
 	previewTheme?: "light" | "dark";

@@ -8,6 +8,7 @@ import {
 	probeSchema,
 	startedProbeSchema,
 	usageSchema,
+	type UsagePageQuery,
 } from "../api/domains/inference/contracts";
 import {
 	diagnosticsSchema,
@@ -54,6 +55,20 @@ export function settingsClient(t: Transport) {
 			usageSchema
 				.array()
 				.parse(await (await t.call("/api/inference/usage")).json()),
+		inferenceUsagePage: async (query: UsagePageQuery, signal?: AbortSignal) => {
+			const params = new URLSearchParams(
+				Object.entries(query).map(([key, value]) => [key, String(value)]),
+			);
+			const page = (await (
+				await t.call("/api/inference/usage/page?" + params, { signal })
+			).json()) as {
+				items: unknown[];
+				total: number;
+				pageIndex: number;
+				pageSize: number;
+			};
+			return { ...page, items: usageSchema.array().parse(page.items) };
+		},
 		larmDetails: async () =>
 			larmDetailsSchema.parse(
 				await (await t.call("/api/inference/larm")).json(),
@@ -78,3 +93,4 @@ export function settingsClient(t: Transport) {
 		},
 	};
 }
+export { usagePageQuerySchema } from "../api/domains/inference/contracts";

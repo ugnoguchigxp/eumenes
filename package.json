@@ -2,6 +2,7 @@
 	"name": "eumenes",
 	"private": true,
 	"type": "module",
+	"packageManager": "bun@1.4.3",
 	"workspaces": [
 		"packages/*"
 	],
@@ -28,7 +29,7 @@
 		"build:design-system": "cd packages/design-system && bun run build",
 		"postinstall": "bun scripts/build-design-system.ts",
 		"build:web": "bun run build:design-system && vite build",
-		"typecheck": "tsc --noEmit",
+		"typecheck": "bun check",
 		"deadcode": "knip --include exports,types"
 	},
 	"dependencies": {
@@ -36,6 +37,7 @@
 		"@anthropic-ai/sdk": "0.131.0",
 		"@eumenes/artifact-ui": "workspace:*",
 		"@eumenes/design-system": "workspace:*",
+		"@excalidraw/excalidraw": "0.18.1",
 		"@openai/codex-sdk": "0.160.0",
 		"@tanstack/react-query": "5.101.0",
 		"eumenes-memory": "file:vendor/eumenes-memory/eumenes-memory-0.0.1.tgz",

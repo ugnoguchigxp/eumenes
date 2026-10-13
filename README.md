@@ -4,6 +4,8 @@ TypeScript、Bun、Hono、React、SQLite によるローカル音声対話の初
 
 ## クイックスタート
 
+Bun 1.4.3 を使用します（`bun upgrade` で更新）。型チェックは `bun run typecheck` / `bun check` で実行します。
+
 1. `bun install`
 2. 必要に応じて `.env.example` を `.env` にコピーし、`LARM_API_TOKEN` を設定します（export 済みでもよい）。LARMの接続先は「設定 → 接続」で保存し、SQLite内の設定を使います。`EUMENES_API_TOKEN` は空欄なら初回起動時に自動生成されます。
 3. `bun run dev` で API と画面用サーバーを起動します(Ctrl+C で両方終了)。個別に起動する場合は `bun run start` と `bun run dev:web` を使います。

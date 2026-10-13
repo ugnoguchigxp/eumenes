@@ -1,5 +1,6 @@
 import type { Hono } from "hono";
 import type { ToolchainHistory } from "../service";
+import { selectionPageQuerySchema, recipePageQuerySchema } from "../contracts";
 
 const code = (e: unknown) =>
 	e instanceof Error && /^[a-z_]+$/.test(e.message)
@@ -22,6 +23,18 @@ const valid = (q: URLSearchParams) =>
  * middleware for `/api/*` before any handler here.
  */
 export function registerToolchainHistory(app: Hono, history: ToolchainHistory) {
+	app.get("/api/toolchain-history/selections/page", (c) => {
+		const query = selectionPageQuerySchema.safeParse(c.req.query());
+		return query.success
+			? c.json(history.selectionPage(query.data))
+			: c.json({ error: "invalid_request" }, 400);
+	});
+	app.get("/api/toolchain-history/recipes/page", (c) => {
+		const query = recipePageQuerySchema.safeParse(c.req.query());
+		return query.success
+			? c.json(history.recipePage(query.data))
+			: c.json({ error: "invalid_request" }, 400);
+	});
 	app.get("/api/toolchain-history/selections", (c) => {
 		const q = new URL(c.req.url).searchParams;
 		if (!valid(q)) return c.json({ error: "invalid_request" }, 400);

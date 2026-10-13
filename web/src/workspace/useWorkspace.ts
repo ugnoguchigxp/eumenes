@@ -1,3 +1,6 @@
+import { useDrawingArtifacts } from "../domains/excalidraw/useDrawingArtifacts";
+import { useOpenDrawing } from "./WorkspaceArtifacts";
+import { useRecognitionArtifacts } from "../domains/object-recognition";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
 	type FormEvent,
@@ -9,6 +12,7 @@ import {
 } from "react";
 import { useStore } from "zustand";
 import type { EumenesClient } from "../../../client";
+import { useImageArtifacts } from "../domains/image";
 import { useMusicArtifacts, usePlaylistArtifacts } from "../domains/music";
 import { activeTimersQuery } from "../domains/timers/queries";
 import { useTimerArtifacts } from "../domains/timers/useTimerArtifacts";
@@ -32,6 +36,8 @@ import { createUnsavedFlags } from "../unsavedFlags";
 import { changeRoots, invalidateAllButLive, queryRoots } from "../queryKeys";
 import {
 	useOpenSettings,
+	useOpenImage,
+	useOpenRecognition,
 	useOpenMusic,
 	useOpenPlaylist,
 	useOpenTimer,
@@ -69,6 +75,12 @@ export function useWorkspace({
 	const artifacts = useArtifactWorkspace();
 	const openSettings = useOpenSettings(artifacts.open);
 	// Music generation and playback each own a stable screen, independent of record IDs.
+	const openDrawing = useOpenDrawing(artifacts.open);
+	useDrawingArtifacts(client, openDrawing);
+	const openImage = useOpenImage(artifacts.open);
+	const openRecognition = useOpenRecognition(artifacts.open);
+	useRecognitionArtifacts(client, openRecognition);
+	useImageArtifacts(client, "main", openImage);
 	const openMusic = useOpenMusic(artifacts.open);
 	const openPlaylist = useOpenPlaylist(artifacts.open);
 	const openTimer = useOpenTimer(artifacts.open);
@@ -289,6 +301,9 @@ export function useWorkspace({
 		onDirty,
 		artifacts,
 		openSettings,
+		openDrawing,
+		openImage,
+		openRecognition,
 		openMusic,
 		openPlaylist,
 		openTimer,

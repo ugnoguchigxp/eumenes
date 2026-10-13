@@ -888,7 +888,6 @@ select:focus-visible {
 	}
 }
 
-
 .artifact-open {
 	margin-top: 6px;
 	padding: 2px 8px;
@@ -930,22 +929,25 @@ select:focus-visible {
 	scrollbar-width: thin;
 	scrollbar-color: var(--border) transparent;
 }
-.artifact-panel-body:has(.music-workspace) {
+.artifact-panel-body:has(:is(.music-workspace, .image-workspace)) {
 	padding: 0;
 	overflow: hidden;
 }
-.artifact-panel-body:has(.music-workspace) .artifact-ui {
+.artifact-panel-body:has(:is(.music-workspace, .image-workspace)) .artifact-ui {
 	height: 100%;
 	display: flex;
 	flex-direction: column;
 }
-.artifact-panel-body .artifact-ui div:has(.music-workspace) {
+.artifact-panel-body
+	.artifact-ui
+	div:has(:is(.music-workspace, .image-workspace)) {
 	display: flex;
 	flex-direction: column;
 	flex: 1;
 	min-height: 0;
 }
-.artifact-panel-body:has(.music-workspace) .aui-composition {
+.artifact-panel-body:has(:is(.music-workspace, .image-workspace))
+	.aui-composition {
 	display: flex;
 	flex-direction: column;
 	flex: 1;

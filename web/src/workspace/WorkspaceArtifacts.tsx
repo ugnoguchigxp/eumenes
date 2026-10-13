@@ -1,3 +1,17 @@
+import {
+	DrawingArtifact,
+	drawingDefinition,
+} from "../domains/excalidraw/DrawingArtifact";
+import { ObjectRecognitionArtifact } from "../domains/object-recognition/ObjectRecognitionArtifact";
+import {
+	isRecognitionDefinition,
+	recognitionDefinition,
+} from "../domains/object-recognition/artifact-definition";
+import {
+	imageArtifactDefinition,
+	isImageArtifactDefinition,
+} from "../domains/image/artifact-definition";
+import { ImageArtifact } from "../domains/image/ImageArtifact";
 import { SettingsArtifact } from "../domains/settings/SettingsArtifact";
 import {
 	isSettingsArtifactDefinition,
@@ -42,6 +56,49 @@ export function useOpenSettings(
 	);
 }
 
+export function useOpenRecognition(
+	open: ReturnType<typeof useArtifactWorkspace>["open"],
+) {
+	return useCallback(
+		() =>
+			open({
+				id: "object-recognition",
+				kind: "openui",
+				title: "映っている物を調べる",
+				definition: recognitionDefinition(),
+			}),
+		[open],
+	);
+}
+
+export function useOpenDrawing(
+	open: ReturnType<typeof useArtifactWorkspace>["open"],
+) {
+	return useCallback(
+		() =>
+			open({
+				id: "drawing-workspace",
+				kind: "openui",
+				title: "図を描く・編集する",
+				definition: drawingDefinition,
+			}),
+		[open],
+	);
+}
+export function useOpenImage(
+	open: ReturnType<typeof useArtifactWorkspace>["open"],
+) {
+	return useCallback(
+		() =>
+			open({
+				id: "image-generation",
+				kind: "openui",
+				definition: imageArtifactDefinition(),
+				title: "画像生成",
+			}),
+		[open],
+	);
+}
 export function useOpenMusic(
 	open: ReturnType<typeof useArtifactWorkspace>["open"],
 ) {
@@ -112,7 +169,9 @@ export function WorkspaceArtifacts({
 				onSelect={artifacts.select}
 				onClose={artifacts.close}
 				renderOpenUI={(definition) =>
-					isSettingsArtifactDefinition(definition) ? (
+					JSON.parse(definition).view === "drawing-workspace" ? (
+						<DrawingArtifact client={client} definition={definition} />
+					) : isSettingsArtifactDefinition(definition) ? (
 						<SettingsArtifact definition={definition} onOpen={openSettings} />
 					) : timerArtifactSource(definition) === timerSetupSource ? (
 						<TimerSetupArtifact
@@ -129,6 +188,17 @@ export function WorkspaceArtifacts({
 							definition={definition}
 							onNewTimer={() => openTimer()}
 							clock={clock}
+						/>
+					) : isRecognitionDefinition(definition) ? (
+						<ObjectRecognitionArtifact
+							client={client}
+							definition={definition}
+						/>
+					) : isImageArtifactDefinition(definition) ? (
+						<ImageArtifact
+							client={client}
+							definition={definition}
+							onClose={() => artifacts.close(artifacts.activeTabId!)}
 						/>
 					) : (
 						<MusicArtifact

@@ -91,6 +91,9 @@ export type DialogueDeps = {
 	memory?: MemoryService;
 	agents?: AgentRuntime;
 	music?: import("../contracts/music").MusicPort;
+	excalidraw?: import("../contracts/image").ImagePort;
+	image?: import("../contracts/image").ImagePort;
+	objectRecognition?: import("../contracts/object-recognition").ObjectRecognitionPort;
 	delegation?: import("../contracts/delegation").DelegationPort;
 	toolchains?: import("../contracts/toolchains").ToolchainRoutingPort;
 	postAnswer?: PostAnswerObserverPort;

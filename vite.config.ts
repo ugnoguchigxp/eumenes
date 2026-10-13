@@ -1,3 +1,4 @@
+import { excalidrawAssets } from "./scripts/excalidraw-assets";
 import react from "@vitejs/plugin-react";
 import { defineConfig, loadEnv } from "vite";
 import { resolve } from "node:path";
@@ -40,6 +41,7 @@ export default defineConfig(({ command, mode }) => {
 	return {
 		plugins: [
 			react(),
+			excalidrawAssets(),
 			{
 				name: "eumenes-security-headers",
 				configureServer(server) {
@@ -87,7 +89,9 @@ export default defineConfig(({ command, mode }) => {
 		cacheDir:
 			env.EUMENES_VITE_CACHE_DIR ?? resolve("node_modules/.vite/development"),
 		// The lazy showcase needs this on first open, without a mid-session dependency rebuild.
-		optimizeDeps: { include: ["three", "@openuidev/react-lang"] },
+		optimizeDeps: {
+			include: ["three", "@openuidev/react-lang", "@excalidraw/excalidraw"],
+		},
 		server: {
 			host: "127.0.0.1",
 			cors: false,

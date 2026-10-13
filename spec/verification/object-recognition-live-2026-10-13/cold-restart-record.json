@@ -1,0 +1,76 @@
+{
+  "id": "950267c6-d3eb-4250-9083-9ae9fc418be6",
+  "conversationId": "object-recognition-live-2026-10-13",
+  "name": "bus.jpg",
+  "mime": "image/jpeg",
+  "state": "completed",
+  "revision": 2,
+  "progress": null,
+  "errorCode": null,
+  "result": {
+    "kind": "image",
+    "model": "yolo26n",
+    "width": 810,
+    "height": 1080,
+    "objects": [
+      {
+        "classId": 5,
+        "label": "bus",
+        "confidence": 0.92535,
+        "box": [
+          5.58,
+          228.87,
+          807.23,
+          749.24
+        ]
+      },
+      {
+        "classId": 0,
+        "label": "person",
+        "confidence": 0.91514,
+        "box": [
+          46.57,
+          398.75,
+          236.99,
+          901.75
+        ]
+      },
+      {
+        "classId": 0,
+        "label": "person",
+        "confidence": 0.89914,
+        "box": [
+          223.06,
+          405.3,
+          345.19,
+          863.11
+        ]
+      },
+      {
+        "classId": 0,
+        "label": "person",
+        "confidence": 0.86023,
+        "box": [
+          668.62,
+          391.23,
+          810,
+          879.67
+        ]
+      },
+      {
+        "classId": 0,
+        "label": "person",
+        "confidence": 0.52526,
+        "box": [
+          0,
+          553.82,
+          64.84,
+          874.03
+        ]
+      }
+    ]
+  },
+  "createdAt": 1791888198954,
+  "updatedAt": 1791888202092,
+  "canRecheck": false
+}

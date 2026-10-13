@@ -84,6 +84,12 @@ const toolchains: Readonly<
 	},
 	"history.research": { execution: "research", route: "history" },
 	"timers.manage": { execution: "command", requires: "timers" },
+	"excalidraw.edit": { execution: "excalidraw", requires: "excalidraw" },
+	"object-recognition.manage": {
+		execution: "command",
+		requires: "object-recognition",
+	},
+	"image.create": { execution: "image", requires: "image" },
 	"music.create": { execution: "music-create", requires: "music" },
 	"music.library": { execution: "music-playback", requires: "music" },
 	"dots.delegate": { execution: "command", requires: "dots" },

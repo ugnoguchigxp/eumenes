@@ -1,4 +1,10 @@
+import type { ObjectRecognitionResource } from "./object-recognition-components";
+export type { ObjectRecognitionResource } from "./object-recognition-components";
+import type { DrawingResource } from "./drawing-components";
 import { z } from "zod";
+import type { ImageWorkspaceResource } from "./image-components";
+export type { ImageWorkspaceResource } from "./image-components";
+import type { RecordsResource } from "./records-components";
 import type { MusicResource, GenerationResource } from "./media-contracts";
 import type {
 	SettingsSectionResource,
@@ -27,6 +33,62 @@ const question = z.strictObject({
 	options: z.array(z.string().min(1).max(120)).min(1).max(8).optional(),
 });
 export const viewRegistry = {
+	"object-recognition-workspace": {
+		name: "ObjectRecognitionWorkspace",
+		label: "物体検出とカメラ入力",
+		schema: z.strictObject({
+			view: z.literal("object-recognition-workspace"),
+			source,
+			title,
+		}),
+	},
+	"drawing-workspace": {
+		name: "DrawingWorkspace",
+		label: "図を描く・編集する",
+		schema: z.strictObject({
+			view: z.literal("drawing-workspace"),
+			source,
+			title,
+		}),
+	},
+	"image-workspace": {
+		name: "ImageWorkspace",
+		label: "画像制作と一覧",
+		schema: z.strictObject({
+			view: z.literal("image-workspace"),
+			source,
+			title,
+			presentation: z.enum(["embedded", "fullscreen"]).optional(),
+		}),
+	},
+	"image-creation-form": {
+		name: "ImageCreationForm",
+		label: "選択式画像プロンプト作成",
+		schema: z.strictObject({
+			view: z.literal("image-creation-form"),
+			source,
+			title,
+		}),
+	},
+	"image-preview": {
+		name: "ImagePreview",
+		label: "画像プレビューと取得",
+		schema: z.strictObject({ view: z.literal("image-preview"), source, title }),
+	},
+	"image-gallery": {
+		name: "ImageGallery",
+		label: "保存画像一覧",
+		schema: z.strictObject({ view: z.literal("image-gallery"), source, title }),
+	},
+	"records-workspace": {
+		name: "RecordsWorkspace",
+		label: "記録の閲覧と管理",
+		schema: z.strictObject({
+			view: z.literal("records-workspace"),
+			source,
+			title,
+		}),
+	},
 	"subtitle-preview": {
 		name: "SubtitlePreview",
 		label: "字幕の見本",
@@ -297,6 +359,9 @@ export type SettingsResource = {
 	volume: number;
 };
 export type Resource =
+	| ObjectRecognitionResource
+	| ImageWorkspaceResource
+	| RecordsResource
 	| SubtitlePreviewResource
 	| SettingsSectionResource
 	| SettingsNavigationResource
@@ -321,6 +386,7 @@ export type Resource =
 			mode?: "timer" | "stopwatch";
 			stopwatch?: { elapsedMs: number; running: boolean };
 	  }
+	| DrawingResource
 	| MusicResource
 	| GenerationResource
 	| ImageResource
@@ -335,6 +401,27 @@ export type ArtifactEvent = {
 	source: string;
 	revision: number;
 	action:
+		| "recognition-select"
+		| "recognition-cancel"
+		| "recognition-refresh"
+		| "recognition-recheck"
+		| "recognition-credential-source"
+		| "recognition-remove"
+		| "recognition-incorporate"
+		| "drawing-new"
+		| "drawing-open"
+		| "drawing-refresh"
+		| "image-close"
+		| "image-delete"
+		| "image-generate"
+		| "image-cancel"
+		| "image-refresh"
+		| "image-select"
+		| "records-refresh"
+		| "records-query"
+		| "records-procedure-state"
+		| "records-procedure-delete"
+		| "records-download"
 		| "settings-edit"
 		| "settings-action"
 		| "settings-open"
