@@ -361,10 +361,12 @@ export function compileContext(tx, run, conversation, general, window: WindowSna
 ### S1 の試験
 
 memory（`api/domains/memory/test/context-window.test.ts` 新規）:
-- 初回の読み出しで snapshot を作る。2回目は同じ version を返す。
-- 新規登録1件で L1 は不変、L2 の「最近覚えたこと」に出る。5件で L1 を作り直す。日付が変わると作り直す。
-- stop / retract / forget / 設定の切替 / continuity の本人 transition で、次の読み出しの L1・L2 が作り直される。
-- cache の版が DB と違うと DB を読む（別の store インスタンスでの書き込みを模す）。
+- 初回の読み出しで snapshot を作る。入力が変わらなければ、2回目は同じ version を返し、L1・L2 の文字列も同一。
+- API での新規登録1件 → L1 は不変、L2 の「最近覚えたこと」に出る。5件で L1 を作り直す（L2 から消えて L1 に移る）。日付が変わると作り直す。
+- continuity の API 追加 → L2 に出る、L1 は不変。
+- stop / retract / forget / 設定の切替 / continuity の本人 transition → 次の読み出しで L1 も作り直される。
+- rollback された組み立て: transaction 内で組み立てて例外で rollback → 次の読み出しは DB の行を使う（cache の `buildId` 不一致）。
+- 同じ入力から2回組み立てると、L1・L2 の文字列が同一。
 - 16 KiB・8 KiB を超えたときの詰め方と省略ログ。past の期間は描画しない。
 - 失効判定:
   - 追加 → valid
@@ -416,18 +418,25 @@ CREATE INDEX continuity_items_conversation ON continuity_items(conversation_id, 
   closeByAgentInTransaction(db, id, expectedRevision, "resolved" | "retracted")
   ```
 
-- 上限（30件）と L2 の byte 上限を適用し、超えたら例外にする（記憶担当側で拒否として数える）。
-- 既存の本人用の transition は、memory の `recordImmediateInTransaction(db, "continuity_close", null)` を呼べるよう、continuity に「本人の変更の通知先」を `setUserChangeHook` で注入する。下位の continuity は memory を import しない。
-- 試験は `continuity.test.ts` に追加する。
+- 3つとも `insertItem` / `transitionItem` と同じく `bump`（`continuity_revisions.revision`）を行う。記憶担当の操作では guard（L2 の 8 KiB）と上限（有効30件）を適用し、超えたら `invalid_continuity_limit` を投げる（記憶担当側で拒否として数える）。
+- `updateByAgentInTransaction` / `closeByAgentInTransaction` は、revision が一致しなければ null / false を返す（例外にしない）。
+- 本人用の既存操作 `transition` は、continuity に `setUserChangeHook(hook: (db: Database) => void)` を追加し、transition の成功時に同じ transaction で `hook(db)` を呼ぶ。memory service が生成時に `continuity.setUserChangeHook((db) => windows.recordImmediateInTransaction(db, "continuity_close", null))` を設定する。下位の continuity は memory を import しない。本人用の `add` は hook を呼ばない（追加扱い）。
+- 試験は `continuity.test.ts` に追加する（migration 前の行が残ること、新 kind、期限切れが snapshot に出ないこと、hook が transition でだけ呼ばれること、記憶担当の操作で guard が効くこと）。
 
 ### S2-3 操作の適用（`api/domains/memory/service/operation.ts` 新規）
 
 ```ts
-applyAgentOpInTransaction(db, ctx: { conversationId; runIdOf(messageId): string | null; refs: AgentRefs; turns: AgentTurn[] }, op: AgentOp)
-  → { status: "applied" | "rejected"; reason?: AgentReason; requested: boolean; sourceMessageId?: string }
+type AgentTurn = { label: string; messageId: string; runId: string | null; role: "user" | "assistant"; text: string; createdAt: string };
+type AgentRefs = Record<string, { namespace: "state" | "continuity" | "tendency"; id: string; revision: number }>; // "m1" → State など
+type AgentReason = "quote_mismatch" | "unknown_ref" | "item_changed" | "limit_reached" | "invalid_input" | "conflict" | "user_stopped";
+applyAgentOpInTransaction(db, ctx: { conversationId: string; refs: AgentRefs; turns: AgentTurn[] }, op: AgentOp)
+  → { status: "applied" | "rejected"; reason?: AgentReason }
 ```
 
-SAVEPOINT `memory_agent_op` の中で処理し、拒否なら ROLLBACK TO する。
+- SAVEPOINT `memory_agent_op` の中で処理する。拒否なら ROLLBACK TO してから RELEASE する。applied なら RELEASE する。
+- `turn` は `ctx.turns` の label で引く。見つからない、または State の操作で role が user でなければ `invalid_input`。
+- `ref` は `ctx.refs` で引く。見つからない、または namespace が type と合わなければ `unknown_ref`。
+- `source_run_id` と provenance の run には、turn の `runId`（messages.run_id）を使う。
 
 - **引用の照合** `locateQuote(text, quote)`（`service/quote.ts`）
   1. 完全一致。
@@ -437,12 +446,19 @@ SAVEPOINT `memory_agent_op` の中で処理し、拒否なら ROLLBACK TO する
 - **remember / update**
   - `turn` が指す user メッセージで `locateQuote`（なければ `quote_mismatch`）。
   - `requested=false` なら D8 の保護を検査（違反は `user_stopped`）。
-  - `rememberInTransaction` を呼ぶ（update は ref の kind・semanticKey を使う。ref の項目が prepare 時の版で今も active でなければ `item_changed`）。
-  - 成功したら `memory_item_provenance`（`request` / `agent`、run は `runIdOf(messageId)`）を書く。
-  - update と否定値の登録は即時変更（`state_replace` / `state_negate`、`source_run_id` 付き）を記録する。新規登録は `pendingAdditions` +1。
-- **stop**: `requested=true` のときだけ有効（false は `invalid_input`）。`deactivateState` を呼び、`state_stop` を記録する（`source_run_id` 付き）。
-- **note_add / note_update / note_close**: S2-2 の操作を使う（`sourceMessageId` は `turn` の user メッセージ）。
-- **tendency_add / tendency_update / tendency_retire**: `evidenceRefs` が2件以上で、全てが prepare 時の一覧にあり今も有効であることを確かめる。上限は active 20件、text は120文字。追加・更新は `pendingAdditions` +1、取り下げは何も記録しない（追加扱い）。
+  - `rememberInTransaction(db, { conversationId, messageId: turn.messageId, quote: 照合した元の部分文字列, kind, semanticKey, text, polarity: op.polarity ?? "affirmed", validity })` を呼ぶ。
+    - update は ref の項目の kind・semanticKey を使う。ref の項目が今も active で、prepare 時の revision と一致しなければ `item_changed`（`listState` で確認）。
+    - `validity`: `validFrom` / `validUntil` を `{ precision: "year" | "month" | "day", year, month?, day? }` に変換し、`basis: "stated"` を付ける。両方とも未指定なら渡さない。
+  - 成功したら `memory_item_provenance` に `(item_id, turn.runId, requested ? "request" : "agent", now)` を `INSERT OR REPLACE` する。
+  - update が applied なら、即時変更 `state_replace`（`source_run_id = turn.runId`）を記録する。新規登録は記録しない（追加扱い）。
+- **stop**: `requested=true` のときだけ有効（false は `invalid_input`）。`deactivateState` を呼び（既存の `transitionItem` の中身を `transitionInTransaction(db, action, itemId, expectedRevision)` として切り出して共用する）、`state_stop`（`source_run_id = turn.runId`）を記録する。`STALE_REVISION` は `item_changed`。
+- **note_add**: `addByAgentInTransaction(db, conversationId, { kind, text, sourceMessageId: turn.messageId })`。turn は user / assistant のどちらでもよい。
+- **note_update / note_close**: ref の id と prepare 時の revision で `updateByAgentInTransaction` / `closeByAgentInTransaction`。null / false なら `item_changed`。
+- **tendency_add / tendency_update**: `evidenceRefs` は2件以上で、それぞれ `ctx.refs` にあり（m か n）、今も有効（State は active、continuity は active で期限内）であることを確かめる（違反は `invalid_input`）。tendency_add は active が20件以上なら `limit_reached`。text は120文字まで（zod の上限とは別にホストでも検査する）。evidence には `{namespace, id}` を保存する。
+- **tendency_retire**: status を retired にする。
+- 傾向を書いたら `memory_tendency_revision` を +1 する。即時変更は記録しない（追加扱い）。
+
+`ctx.refs` の revision は prepare 時点の値である。State の revision は `StateItem.revision`、continuity は `ContinuityItem.revision`、傾向は `memory_tendency.revision`。
 
 例外の対応:
 
@@ -456,41 +472,59 @@ SAVEPOINT `memory_agent_op` の中で処理し、拒否なら ROLLBACK TO する
 
 ### S2-4 記憶担当ジョブ（`api/domains/memory/service/agent.ts` ＋ queue handler `memory.agent.v1`）
 
+**組み立て（依存の受け渡し）**
+- `createMemoryService(store, conversation, continuity, options)` の options に次を追加する（全て任意。無ければ記憶担当は動かない）。
+
+  ```ts
+  queue?: Pick<QueueService, "enqueueInTransaction">;
+  inference?: Pick<InferencePort, "captureBackgroundControlInTransaction" | "executeControl" | "acceptInTransaction" | "rejectControlInTransaction" | "cancelRequestsInTransaction" | "flushCancelledRequests">;
+  embed?: () => MemoryEmbed | undefined;   // S3。遅延取得（server.ts で embedder が後に作られるため）
+  ```
+
+- memory service は `agentHandler()` を返す。`api/application/server.ts` で、`createMemoryService` の後に `queue.registerHandler(memory.agentHandler())` を呼ぶ。`queue` と `inference` は server.ts で memory より先に作られている。
+- conversation（下位）に公開操作 `messagesAfterInTransaction(db, conversationId, afterOrdinal, limit): Array<{ message: Message; ordinal: number }>` を追加する。ordinal は `messages.rowid`（既存の `messageInTransaction` と同じ定義）で、既存の `liveOnly` 条件を付け、ordinal 昇順で返す。`latestOrdinalInTransaction(db, conversationId): number`（なければ 0）も追加する。
+
 **起動** `memory.scheduleAgentInTransaction(db, conversationId)`
 - 呼ぶ場所:
-  1. dialogue の run 作成時（`submit` / `submitVoice` の受理 transaction。`sourceKind === "schedule"` は除く）
-  2. 回答の採用時（`generation-handler.ts` の `done` の後）
+  1. dialogue の `intake.ts` の `acceptInTransaction` で、user メッセージを追加した後（`sourceKind === "schedule"` は除く。`existing` を返す再送の場合は呼ばない）。
+  2. 回答の採用時（`generation-handler.ts` で `done` が true のとき）。
+  3. 記憶担当自身の settle の最後（未処理が残っている場合）。
 - 処理:
-  - `!healthy || !enabled` なら何もしない。
-  - 会話の最新メッセージの ordinal が `memory_agent_cursor.last_ordinal` 以下なら何もしない。
-  - それ以外は次の設定でジョブを投入する。
+  - `!healthy || !enabled` または options に queue / inference が無ければ何もしない。
+  - `latestOrdinalInTransaction` が `memory_agent_cursor.last_ordinal`（なければ 0）以下なら何もしない。
+  - それ以外は次の設定でジョブを投入する（queue は `(scope, kind, dedupeKey)` で一意。完了済みのジョブと同じキーなら、新しく作らず既存を返す）。
 
     | 項目 | 値 |
     |---|---|
+    | scope | `memory` |
     | kind | `memory.agent.v1` |
+    | dedupeKey | `${conversationId}:${最新 ordinal}` |
+    | payload | `{ conversationId }` |
+    | subjectRef | conversationId |
     | lane | `background` |
     | resourceKey | `inference.aux` |
     | concurrencyKey | `memory-agent:${conversationId}` |
-    | dedupeKey | `memory-agent:${conversationId}:${最新 ordinal}` |
     | maxAttempts | 1 |
     | deadlineAtMs | now + 60s |
 
-- **確認事項**: queue の `dedupeKey` が完了済みジョブとの重複も拒むかを確認する。拒む場合でも、ordinal を含むので新しいメッセージでは別キーになる。
-- ジョブは prepare 時点の最新までをまとめて処理するので、先行ジョブが処理済みなら何もせずに終わる（推論しない）。
+- handler の定義: `kind: "memory.agent.v1"`、`payloadVersions: [1]`、`schema: z.object({ conversationId: z.string() })`、`recovery: "interrupt"`、`resourceKey: "inference.aux"`。`classify` は常に `"fail"`（再試行しない。未処理は次の起動で拾う）。
 
 **prepare（書込 transaction）**
-1. カーソル以降のメッセージを古い順に最大8件（user / assistant。メッセージ本文は1件2000文字まで）集め、`u1..` / `a1..` のラベルを振る。assistant は参考情報で、根拠には使わない。
-2. 長期一覧（有効な State に `m1..`、active の傾向に `t1..`）と短期一覧（continuity の有効項目に `n1..`）を作り、ref の解決表（ref → id・revision）を input に入れる。
-3. L1・L2 の使用 byte と上限、今日の日付を入れる。
-4. 推論を取る: `captureBackgroundControlInTransaction(db, { taskId: "memory-agent", decisionId: <jobId>, authorityEpoch: 1, executionGeneration: claim.generation, deadline: now+25s, taskDeadline: now+25s, maxOutputTokens: 1200 })`。
-   - **確認事項**: 受理・拒否・取消の扱いを `coding-supervision/service/decisions.ts` と同じ手順（`acceptInTransaction` / `rejectControlInTransaction` / `cancelRequestsInTransaction` / `flushCancelledRequests`）にする。`taskId` の形式が他の用途と衝突しないことも確かめる。
-   - 推論を取れない場合は、カーソルを進めずに終える（ログのみ）。
+1. `!healthy || !enabled` なら `{ status: "stale", reason: "memory_unavailable" }`。
+2. `messagesAfterInTransaction(db, conversationId, cursor, 8)` で、カーソル以降のメッセージを古い順に最大8件集める（本文は1件2000文字まで切る）。0件なら `{ status: "stale", reason: "nothing_to_do" }`（推論しない）。
+3. user に `u1..`、assistant に `a1..` のラベルを振り、`AgentTurn[]` を作る。
+4. 長期一覧（有効な State に `m1..`、active の傾向に `t1..`）と短期一覧（continuity の有効で期限内の項目に `n1..`）を作る。モデルへ渡す形は `{ ref, kind, text, polarity?, validFrom?, validUntil? }`（id は渡さない）。解決表 `AgentRefs` を作る。
+5. 現在の WindowSnapshot（`readForRunInTransaction`）から L1・L2 の byte と上限、今日の日付（ローカル `YYYY-MM-DD`）を得る。
+6. 推論を取る: `captureBackgroundControlInTransaction(db, { taskId: "memory-agent", decisionId: claim.jobId, authorityEpoch: 1, executionGeneration: claim.generation, deadline: now + 25_000, taskDeadline: now + 25_000, maxOutputTokens: 1200 })`。subject は `background:memory-agent:<jobId>` になる。例外（LARM 未接続など）なら、カーソルを進めずに `{ status: "stale", reason: "background_inference_unavailable" }` を返す（ログのみ）。
+7. input: `{ conversationId, requestId, turns, refs, lastOrdinal: 処理対象の最後の ordinal, messages: [指示, データ] }`。
 
 **execute**
-- `executeControl(requestId, messages, signal, { instructions, outputSchema })`。
-- messages は、指示（system）と、`{ today, turns, longTerm, shortTerm, budgets }` の JSON（user）。
-- 出力は `parseLlmJson` → `agentOutputSchema`。失敗したら全件拒否として settle する。
-- S3 では、ここで `prefetch.query` の embedding も行う。
+- `inference.executeControl(requestId, messages, signal, { instructions: 記憶担当への指示, outputSchema: z.toJSONSchema(agentOutputSchema の preprocess を除いた同形) })`。
+- messages は、system（指示）と、user（`JSON.stringify({ today, turns: [{label, role, text, createdAt}], longTerm, shortTerm, budgets: { longTermBytes, longTermLimit, shortTermBytes, shortTermLimit } })`）。
+- 出力は `parseLlmJson(receipt.value)` → `agentOutputSchema.safeParse`。失敗しても例外にせず、`{ receipt, ops: null }` を返す。
+- S3 では、ここで embedding も行う（§8）。
+
+**失敗・取消時の推論の後始末**: settle が success 以外、または採用しない場合は、`coding-supervision/service/decisions.ts` と同じ手順で行う。受理しない応答は `rejectControlInTransaction(db, receipt, code)`、未完了の request は `cancelRequestsInTransaction(db, [requestId])`、commit 後に `flushCancelledRequests([requestId])`。実装前に decisions.ts の該当箇所を読み、同じ順序で呼ぶ。
 
 **出力の契約**
 
@@ -498,7 +532,7 @@ SAVEPOINT `memory_agent_op` の中で処理し、拒否なら ROLLBACK TO する
 const opt = <T extends z.ZodTypeAny>(s: T) => z.preprocess((v) => (v === null ? undefined : v), s.optional());
 agentOpSchema = z.object({
 	type: z.enum(["remember","update","stop","note_add","note_update","note_close","tendency_add","tendency_update","tendency_retire"]),
-	turn: opt(z.string().regex(/^u[1-8]$/)),                     // remember/update/stop/note_add の根拠
+	turn: opt(z.string().regex(/^[ua][1-8]$/)),                  // remember/update/stop は u のみ（ホストで検査）、note_add は u / a
 	requested: opt(z.boolean()),                                 // remember/update/stop: 本人がそのturnで求めたか
 	ref: opt(z.string().regex(/^[mnt][1-9][0-9]{0,2}$/)),        // update/stop=m, note_update/close=n, tendency_update/retire=t
 	kind: opt(z.enum([...stateKinds, "goal","decision","open_question","activity","memo"])),
