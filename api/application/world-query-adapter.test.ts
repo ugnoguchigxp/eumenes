@@ -252,6 +252,8 @@ test("World not ON: the tool is unavailable and nothing is offered", async () =>
 		expect(off.readInTransaction(db, "wq1.e30")).toBeNull();
 		expect(h.adapter.availableInTransaction(db)).toBe(true);
 	});
+	// The artifact listing asks on a plain read, outside a transaction.
+	expect(h.store.read((db) => h.adapter.availableInTransaction(db))).toBe(true);
 	expect(
 		await codeOf(
 			h.store.write((tx) =>

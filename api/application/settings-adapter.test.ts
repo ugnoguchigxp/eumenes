@@ -608,7 +608,7 @@ test("the registered settings bundle applies a draft through the action ledger a
 			eventCreatedAt: new Date(now).toISOString(),
 			eventExpiresAt: new Date(now + 60_000).toISOString(),
 			artifactId: "tab-1",
-			artifactRevisionId: "artifact:settings.conversation@4",
+			artifactRevisionId: "artifact:settings.conversation@5",
 			source,
 			sourceRevision: revision,
 			actionId: "apply",

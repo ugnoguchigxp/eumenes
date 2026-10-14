@@ -63,7 +63,7 @@
 		{
 			"kind": "artifact",
 			"id": "settings.conversation",
-			"revision": 4,
+			"revision": 5,
 			"title": "会話の設定",
 			"variants": [
 				{
@@ -175,6 +175,16 @@
 					"label": "ワールドモデル（世界の状態の記録）を使う",
 					"control": "toggle",
 					"help": "変更はbackendの再起動後に反映されます。オフにしても、保存済みの内容が残っている間は、忘却の反映だけが動き続けます。"
+				},
+				{
+					"fieldId": "world.curation-resource",
+					"document": "document:settings@1",
+					"path": "$.world.curationResourceId",
+					"label": "ワールドモデルの記録に使うAI",
+					"control": "select",
+					"unset": "null",
+					"optionsSource": "query:settings.llm-resources@1",
+					"help": "未設定なら会話と同じAIで記録します。クラウドのAIを選ぶと、記録のたびに会話の内容をそのAIへ送ります。次の記録から反映されます。"
 				}
 			]
 		},

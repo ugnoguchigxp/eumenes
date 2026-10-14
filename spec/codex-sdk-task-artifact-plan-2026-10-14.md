@@ -1,6 +1,6 @@
 # 共通 Kanban と Codex SDK ツールチェーンの実装計画
 
-作成日: 2026-10-14、更新日: 2026-10-15、改訂3。状態: **計画・未実装**（外部レビューを既存実装と照合し、採用内容を反映）。対象 SDK は導入済みの `@openai/codex-sdk@0.160.0`。本書の登録名・API・テーブル名は追加予定であり、利用可能な機能を表すものではない。
+作成日: 2026-10-14、更新日: 2026-10-15、改訂4。状態: **P0検証中・停止証明の要件未達、P1〜P5未着手**。対象 SDK は導入済みの `@openai/codex-sdk@0.160.0`。本書の登録名・API・テーブル名は追加予定であり、利用可能な機能を表すものではない。P0の実測と阻害要因は[検証記録](verification/codex-tasks-2026-10-15/README.md)に記載する。
 
 一つの Kanban「タスクボード」で、カードごとに Claude Code または Codex を選んで開発作業を依頼する。キューは実行担当ごとに独立した二本とし、GUI で進行状況、活動イベント、結果と Blocker を確認する。画面とカード管理は共有し、サブエージェント・指示・会話・実行機構は分離する。将来の Grok は登録された実行担当を増やす形で接続できるようにする。
 
@@ -68,7 +68,7 @@
 | 受付 package・toolchain | `package:codex-tasks.manage@1`、`toolchain:codex-tasks.manage@1`、公開関数 `codex_tasks` |
 | binding・adapter | `binding:codex-tasks.manage@1`、`adapter:codex-tasks@1`。会話用 adapter は application で kanban の公開操作へ接続し、executorId を Codex に固定する |
 | 開発担当の指示 | `profile:codex-tasks.worker@1`、`skill:codex-tasks.worker@1`。runner が正確な revision 本文を読み、attempt に凍結する |
-| Artifact | 共通 `artifact:kanban.board@2`、title/launcher「タスクボード」。Codex toolchain もこれを参照する。既存 revision は書き換えない |
+| Artifact | 共通 `artifact:kanban.board@3`、title/launcher「タスクボード」。Codex toolchain もこれを参照する。並行する復旧作業が旧Claude画面を`@2`へ更新したため、次版を`@3`とする。既存 revision は書き換えない |
 | 共通 source query | `query:kanban.board@2`、`query:kanban.detail@2`、`query:kanban.activity@1`、`query:kanban.executors@1`。application が選択された run の実行担当から取得する |
 | 可用性・結果 | `availability:codex-tasks@1`、`domain:codex-tasks.receipt@1`、`projection:codex-tasks.result@1` |
 
@@ -439,6 +439,16 @@ P1 の最初に、Claude 実装完了時のコミットと契約、保存済み�
 
 ### 部分・結合の回帰試験
 
+#### P0実測による留保（2026-10-15）
+
+SDK 0.160.0 / CLI 0.162.1 / Bun 1.4.3 / macOS 26.6.2で、編集・検証・AGENTS読取り・別プロセスresume・制限されたfilesystem/network・別attemptのcommit/local bare pushを観測した。権限は公開`configOverrides`からinline TOMLを渡し、`default_permissions`で選ぶ。filesystemのpath/globキーはSDKのdotted-path展開では正しく伝送できなかった。旧`sandboxMode/networkAccessEnabled`を併用しない。`features.multi_agent=false`を保ち、ephemeral・履歴無効化・調査用launcherは使っていない。
+
+停止は**未達**。process groupのみではCLIの別groupコマンドが残り、PID・開始時刻・実行バイナリによる子孫ポーリングを加えても、別sessionへ分離した後に親が即時終了する子を見落とした。固定fixtureに加え、実SDKの正常終端後も`/bin/sleep`が残ることを再現した。P0候補の正常終端を停止証明として扱わず、製品には登録していない。頻度の変更、コマンド文字列の禁止パターン、LLMへの禁止指示ではこの境界を代替しない。
+
+現行macOSのkqueue自動子孫追跡は非対応で、fork通知の子PIDも公開keventへ渡らないことを現行SDKヘッダーと[Apple公開ソース](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/sys/event.h)で確認した。続行には子孫の分離後も残るOSの管理単位を用意し、同じ孤児プロセス試験で停止・空の状態を証明できることが必要。Linuxのcgroup等を用いる実行環境への変更、またはmacOSの適切な監視・終了機構の導入は、実行環境と権限の設計変更として別途決定する。full accessやApp Serverへ切り替えない。
+
+P1は、この停止要件が成立した後に開始する。並行作業で`kanban.bundle.json`、`terminals-screen.bundle.json`、tool-runtimeの受付とseed/upgrade試験が変わったため、その完成状態と公開参照を再確認する。復旧された`artifact:kanban.board@2`を共通担当対応の実装と扱わない。
+
 | ケース | 観測可能な合格条件 |
 | --- | --- |
 | transaction rollback・同 requestId 再送・起動直後 crash | rollback 時に SDK 未呼出し、再送で attempt が増えない、成否不明を自動再実行しない |
@@ -472,7 +482,7 @@ P1 の最初に、Claude 実装完了時のコミットと契約、保存済み�
 
 隔離したテスト repository とテスト用 bare remote を使い、(1) 共通ボードで Codex 選択・依頼・編集・検証・GUI イベント・Done 通知、(2) 不足情報で Blocker・回答・続行、(3) 作業中停止・停止確認・次タスク、(4) UI の commit/push・remote SHA 確認、(5) backend 再起動・同 thread 続行を確認する。さらに Claude Code と Codex を別のテスト作業場所で並行実行し、片方の停止が他方を止めないことを確認する。同じ作業場所では排他待機を確認する。実 LLM による担当選択は固定モデル試験と分ける。通常運用の remote への push、実製品 DB/秘密の複製は受入に含めない。Grok の実接続は今回の受入対象外。
 
-実装完了は、登録、固定試験、ブラウザ、実 SDK の結果を区別して報告する。計画作成段階ではこれらを実行しない。現在の残作業は P0〜P5 の全段階。まず P0 の観測で SDK/CLI の制約を確定し、その結果を本書へ反映してから製品実装へ進む。
+実装完了は、登録、固定試験、ブラウザ、実 SDK の結果を区別して報告する。現在はP0の接続・権限・履歴・gitの実測まで進み、停止証明が未達。P1〜P5は未着手。停止可能な実行境界を決定・実証してから製品実装へ進む。
 
 ## 13. 改訂3で反映したレビュー
 

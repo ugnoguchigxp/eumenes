@@ -1,0 +1,1431 @@
+{
+  "formatVersion": 1,
+  "definitions": [
+    {
+      "id": "package:claude-code.request@2",
+      "sha256": "9becce2beb680e91c7d1e48631faee675d22402ef31551c0317394a5d6d2f37e"
+    },
+    {
+      "id": "package:dots.orchestrate@1",
+      "sha256": "e4236c3e5b46912d9eb24f8ed50b565c904adbded1ad94c41eb3954969f53a90"
+    },
+    {
+      "id": "package:dots.orchestrate@2",
+      "sha256": "ba3f485919b20e5db86e3e75c02b284b04ed8c57bcde898d16b4821bb9a3c8a3"
+    },
+    {
+      "id": "package:excalidraw.edit@1",
+      "sha256": "8e4967b5410079fdb5d733500a5da786e3c06e613bc368637d76414dd940408f"
+    },
+    {
+      "id": "package:history.research@1",
+      "sha256": "d59317079918b2f097dc15183353dc8c86dc728a151ecc84e6fac73b2726db9d"
+    },
+    {
+      "id": "package:history.research@2",
+      "sha256": "c9a068a5dac05e66f0fa5844183e6e03d3293b5088166114512000d345b4423b"
+    },
+    {
+      "id": "package:image.create@1",
+      "sha256": "e761b47e38ed4393769a8eac5d57a3b5af3479610c5bbdb853b1929b6de4af8a"
+    },
+    {
+      "id": "package:kanban.manage@1",
+      "sha256": "bdc0624d0abda22d9b274c3b38f3ae9128b46be8fc4e730f3955693d266e8a9b"
+    },
+    {
+      "id": "package:music.create@1",
+      "sha256": "356f5da1a089ea3cd193f9f614d07ccc22d86c21f0522b4e0c257eba3b1187a3"
+    },
+    {
+      "id": "package:music.create@2",
+      "sha256": "4aa50df37cfc4b89ad7ed16e11862d283c15b4f2405651919f6b6777807c614f"
+    },
+    {
+      "id": "package:music.playback@1",
+      "sha256": "302dab078f771d60b6325924969ebd8af006ce2a975f24017e4b519e576da5ba"
+    },
+    {
+      "id": "package:object-recognition.manage@1",
+      "sha256": "d83dbd508d7e554a26026775ee4bc058e1aaa3400d588a69e4879b600b59c61b"
+    },
+    {
+      "id": "package:ocr.correct@1",
+      "sha256": "0d847dae9b66bbf32352bc4c9858c27400182c0a666d7e116ea4eb15b5c6be69"
+    },
+    {
+      "id": "package:ocr.manage@1",
+      "sha256": "5a6745971976288609612273bed87bf8a29e1a1389b5d73e3bea3db4d0534994"
+    },
+    {
+      "id": "package:steward.request@2",
+      "sha256": "ea35d7b381fd475fcdf4ec8d228deec9a38cd2f0321d54301efc07081b109754"
+    },
+    {
+      "id": "package:timers.manage@1",
+      "sha256": "d3520959a10569eefbafcc4fcd38a558ebdc50af003fa89f522538d6c58f3a75"
+    },
+    {
+      "id": "package:ui.compose@1",
+      "sha256": "f4efe8afdade9ac57e404ef438696981a14da06b8450d22c05f1840b6a28141a"
+    },
+    {
+      "id": "package:web.lookup@2",
+      "sha256": "21a4b7d2129547db5662123dd5f66cb86eb02c9213240c6db40f95ed47bac992"
+    },
+    {
+      "id": "package:web.lookup@3",
+      "sha256": "b6a72a9ae9f8ff299145f338d97b50161e8ee41c3d563f66d531407a5d398228"
+    },
+    {
+      "id": "package:web.lookup@4",
+      "sha256": "2d35a0cfc01535e353c7411b2d99f34e5e3792506d6b00b8c06d15e94f172867"
+    },
+    {
+      "id": "package:web.lookup@5",
+      "sha256": "c7c0aa1a09d373f799a15814033336b503339a1dcc2e13132b7a2fb26dd50618"
+    },
+    {
+      "id": "package:web.lookup@6",
+      "sha256": "fcb7060246be8daa6b67dcae0496b91866526ded176bc951a66f65f64aee44a0"
+    },
+    {
+      "id": "package:web.lookup@7",
+      "sha256": "ea3a18e8f67ea638823cfdaabd97854dc35f0553fa996b5013e3c0e94be6661b"
+    },
+    {
+      "id": "package:web.lookup@8",
+      "sha256": "95adcabea3d6756c13a0a89505c5e59265899946958bec8537c42259ba92272f"
+    },
+    {
+      "id": "package:web.quick@1",
+      "sha256": "34c28684fecc08cfc0d71459a9f060e6465bde88483b5514a8bf5b25e9d68d16"
+    },
+    {
+      "id": "package:web.quick@2",
+      "sha256": "503346e0d989b33cf330ca2988d11eecbd06bc3ed3065706a8707449c723c026"
+    },
+    {
+      "id": "package:web.read@2",
+      "sha256": "9098260ac5675f992ac4fd50b2878c8728e99e4474540aa47b03a46ccfe48fdf"
+    },
+    {
+      "id": "package:web.read@3",
+      "sha256": "6399f4b04a30096a97b915fe95b41104a72843a93aae366de65c75c514cd1ed8"
+    },
+    {
+      "id": "package:web.read@4",
+      "sha256": "40a3d688b16c54fe2ab620b31f40902795fc6a7a046749d582344212e248df1a"
+    },
+    {
+      "id": "package:web.read@5",
+      "sha256": "1aaf4288ac911c2cac42ee7c06b938ac7885a711aebe233afeb723b498fc0a43"
+    },
+    {
+      "id": "package:web.read@6",
+      "sha256": "7ef81630ef476658c61032b249b1f29c8136d69c69a9c229664c68bb97aa0584"
+    },
+    {
+      "id": "package:web.read@7",
+      "sha256": "b503a26848641062e058fef72c809f699dd2414347d45681790f0dd718eb4c1a"
+    },
+    {
+      "id": "package:web.recipe@1",
+      "sha256": "3d4254a189c075a2cc24e8710e22572872e39f0d06a61c0ca329f2a30f670b2b"
+    },
+    {
+      "id": "package:web.research@2",
+      "sha256": "fd0a2956972ccecee453989634c3607463a1e0a751991db36a1e142c055bfdcd"
+    },
+    {
+      "id": "package:web.research@3",
+      "sha256": "a3dd887c0f558f013397399b9bf090a1b8337b16a1ff98f8177d3ab2027173c2"
+    },
+    {
+      "id": "package:web.research@4",
+      "sha256": "da320214a7a0984425652d8f7fee9e8aadd0951e72f139fff1b19f467cc253e4"
+    },
+    {
+      "id": "package:web.research@5",
+      "sha256": "84e46eac87ab699b1a83449b38a215e635b700efc95904dc559c31b89c3b935b"
+    },
+    {
+      "id": "package:web.research@6",
+      "sha256": "957673db8fcdbceb62f70035de97d361293a7e47139275069ee786b7b3559a83"
+    },
+    {
+      "id": "package:web.research@7",
+      "sha256": "29a2a244e91d26fdd1f9058eac1352ac75f29837dad196589406904ae5487b9c"
+    },
+    {
+      "id": "package:web.research@8",
+      "sha256": "0fc3358155f928080fb6ef27402004d8e9230e69b8522a9cc83a0062bd74abc3"
+    },
+    {
+      "id": "package:web.research@9",
+      "sha256": "8435bcecab0814cafc7001ae4d0a07775f8278be722a4ae09a872a48a089bb27"
+    },
+    {
+      "id": "package:web.search@1",
+      "sha256": "1782a0b264c37c1f9ec844a1e6565ea72ec886852c960fdd63952574bbab2411"
+    },
+    {
+      "id": "package:world.query@1",
+      "sha256": "3ed853a73e529ad39dc70d7aae5dab928347a4888379c42d8748d2a58e8501a1"
+    },
+    {
+      "id": "profile:claude-code.request@1",
+      "sha256": "7958f6516e4196791bc057236a0ffff2c34cdb1d5287bfe264c573145fc6df8e"
+    },
+    {
+      "id": "profile:dots.orchestrate@1",
+      "sha256": "c34fc6d9a413c9824574e12698ba3138f6ff66d065269b0c5fbdb1a19f497438"
+    },
+    {
+      "id": "profile:excalidraw.edit@1",
+      "sha256": "809f5d95166d525d1889eb1e67a43fdbd265e9ef357176a1e3a78345e4e08e01"
+    },
+    {
+      "id": "profile:history.research@1",
+      "sha256": "b454bc54012b3423ca2fdf443f60d51bed3c65bdebdda581e395ffa003d7a775"
+    },
+    {
+      "id": "profile:image.create@1",
+      "sha256": "4a3c4bd6793a5065eac7c8c9728005d569c81467cc99f9fea8c296a72bde5d55"
+    },
+    {
+      "id": "profile:kanban.manage@1",
+      "sha256": "b6b76aade7ad2da2b9a6e30992da8e089c0a7b6e047781592520e956175a323a"
+    },
+    {
+      "id": "profile:music.create@1",
+      "sha256": "fb09cc58654c5c14699940a40d38657150ef7fe07c06333f14b0fcdd0bbf7580"
+    },
+    {
+      "id": "profile:music.playback@1",
+      "sha256": "b5c4928d2942a8ccc1bf8a84cabd8b5fc73ca6d008b95db86e898f2dc3c9d251"
+    },
+    {
+      "id": "profile:object-recognition.manage@1",
+      "sha256": "4dcbb10188cb125e5e62929035ebc7da51ce1bf587c2a86ec8c2f2491fb8060e"
+    },
+    {
+      "id": "profile:ocr.correct@1",
+      "sha256": "390d1a3c84007165c9512d476103a3251b8d3b6fba2bb77a5702e4605b8a1528"
+    },
+    {
+      "id": "profile:ocr.manage@1",
+      "sha256": "26b7e0bacb6eafa89a83ed1f19c6924f4d8699c2056951b30fac7aad316cea7f"
+    },
+    {
+      "id": "profile:steward.request@1",
+      "sha256": "f8cef2623c328f933bafc3d02e510533686483a5fb2b664a6177a028870f2eb9"
+    },
+    {
+      "id": "profile:timers.manage@1",
+      "sha256": "e4c379d3a65e983ef23921837d48b46edba556356b2827b08d43b8cdf1875ad7"
+    },
+    {
+      "id": "profile:ui.compose@1",
+      "sha256": "14c4f1cabe18f11962cd2fc423596cd768471caa995d0ad70aad63015aced035"
+    },
+    {
+      "id": "profile:web.quick@1",
+      "sha256": "efcf11ea757274170dd86d45dd3e73f6a58618577742ce4dab16be3993180929"
+    },
+    {
+      "id": "profile:web.recipe@1",
+      "sha256": "9d78a7ae53b2af1686c6652c0943fb1db648e2e3aeb2a316e10f3545edde1395"
+    },
+    {
+      "id": "profile:web.research@1",
+      "sha256": "8e87e0ef9452657d970ede71ae251cc29af113231a7a2820fc7304a04f078924"
+    },
+    {
+      "id": "profile:web.research@2",
+      "sha256": "0269c01ba031e581c4b9bedb8fd61550cd3ec75be2196e196c41e14cd9ef92f3"
+    },
+    {
+      "id": "profile:world.query@1",
+      "sha256": "5f6df7a3856c82090b7bc8d3aa0178c090843637a61e0cb2bb621832f62872e6"
+    },
+    {
+      "id": "skill:claude-code.request@1",
+      "sha256": "7c840c23fffce88bde113880b97fff0cea2d24a41b2a29e5b715dd29a08cc9e0"
+    },
+    {
+      "id": "skill:dots.orchestrate@1",
+      "sha256": "dc50b40545c0b26ffb1739d84863aafc9fd46a3de11c2d6e4b798aa710e1bb30"
+    },
+    {
+      "id": "skill:dots.orchestrate@2",
+      "sha256": "8a8f614b93cbaf78f138d92ee2b0fd69bb22ac2ea3d2b048d73563377725cfd4"
+    },
+    {
+      "id": "skill:excalidraw.edit@1",
+      "sha256": "fe1d5f079dc12ae77967bc06e3d5f04bff86a69724cfb9053744ddac12f117a9"
+    },
+    {
+      "id": "skill:history.research@1",
+      "sha256": "a8820b75d350e3ed43eb030a0e81efeca2dea8e195ee74675f6601b8ee32ea73"
+    },
+    {
+      "id": "skill:history.research@2",
+      "sha256": "833bdc3664381ad49b6496f23eafb0f6968fc77d9759146c1df5e5a0919a24d0"
+    },
+    {
+      "id": "skill:image.create@1",
+      "sha256": "042f710ad50a152b5db07c6ba8a6d21805d25e74971f6167c813fb7dba7f5f91"
+    },
+    {
+      "id": "skill:kanban.manage@1",
+      "sha256": "b40d25d59336db9173c8355ca9f91dcded8cbb1dd6ed2ddad083f69c57c623e6"
+    },
+    {
+      "id": "skill:music.create@1",
+      "sha256": "3e1db7c5de95bce45535d1a7478887c03bd23d9e3f28fc07b667bf6ac3ca85a9"
+    },
+    {
+      "id": "skill:music.create@2",
+      "sha256": "2d39b83a924a127e07b688c17b2b2959d944451a286a541df375ace875d7e333"
+    },
+    {
+      "id": "skill:music.playback@1",
+      "sha256": "65be266c08971ce668b854a045f18eae927e8ef223d4e13b61561631d6c36bf8"
+    },
+    {
+      "id": "skill:object-recognition.manage@1",
+      "sha256": "d8728637acba430ec8b0e852a100376aae1507ca76cfc7c5f81b33f96cc92809"
+    },
+    {
+      "id": "skill:ocr.correct@1",
+      "sha256": "b322f07e4134cbad0388805685346f14064404ec58ed96d8e7243e3c96726c2e"
+    },
+    {
+      "id": "skill:ocr.manage@1",
+      "sha256": "6dca8e6e637fa796665c3516d6548ce061a283e35ec9bb2550ec2af80c390403"
+    },
+    {
+      "id": "skill:steward.request@2",
+      "sha256": "0f7133f7dacd17156375e5cbf4e1cc01a9bc5a1bf33beb544f6dc4e850a504a5"
+    },
+    {
+      "id": "skill:timers.manage@1",
+      "sha256": "dc618cdb88a49c692c495bfecac89e1a0f8adea5c25cb59e40a0bbd7c890aac0"
+    },
+    {
+      "id": "skill:ui.compose@1",
+      "sha256": "9977592910160bf51486bd3f5f85bb2a609bd8d44b921ad0f6340df64583b833"
+    },
+    {
+      "id": "skill:web.recipe@1",
+      "sha256": "59dc206347fac06f2f0b74256e296f8311497b8ab23de6273501a46c462b8850"
+    },
+    {
+      "id": "skill:web.research@1",
+      "sha256": "3bb582ac01aeeea174ea6af2b23d530b6af6b58c6e4cab83b8e5b928ba373beb"
+    },
+    {
+      "id": "skill:web.research@2",
+      "sha256": "a13eb048351bc71f38623b51c71b526e522fff45807a0d511c1d30d34561600a"
+    },
+    {
+      "id": "skill:web.research@3",
+      "sha256": "587d033849b45dcf4a13a26c7131ebe9ff93c26cd2cb959b2b7155b7962630b0"
+    },
+    {
+      "id": "skill:web.research@4",
+      "sha256": "17be51bba1e2907923871b36f646dbfb490961b22129eb7da084d012fc883f5f"
+    },
+    {
+      "id": "skill:web.research@5",
+      "sha256": "cfa5cc8440fd3cf47ec8e6afa144d5e64462e1ba7626dd4cb67198410e4bde8b"
+    },
+    {
+      "id": "skill:web.research@6",
+      "sha256": "5f759d0f533cbe6ed3485d8ccf978bde82c3064e9188cc73b28b6bd8e4b65a4a"
+    },
+    {
+      "id": "skill:web.research@7",
+      "sha256": "604e967a28964230ef57f1dde56b7af277cbb246b0ad240b01526158a41e6921"
+    },
+    {
+      "id": "skill:web.research@8",
+      "sha256": "bd6364428b54da59547af817404804cc2f6e44dae5b532456e4868a85b95f742"
+    },
+    {
+      "id": "skill:web.search@1",
+      "sha256": "8842e0bb8fd2abc4e89294b3f94e362975fafa1adbf0017196c58b523d3fc482"
+    },
+    {
+      "id": "skill:world.query@1",
+      "sha256": "c38fd844c1601ee2bbd62aa6c29a3852ab422394b9eca288c491347e28aa82eb"
+    },
+    {
+      "id": "tool:claude-code.request@2",
+      "sha256": "73466f40fd57cbac5590e710496f6b261205c473f33c3bd0a19fa540dd4d9f6a"
+    },
+    {
+      "id": "tool:dots.coordinate@1",
+      "sha256": "3614aa0be0857d33861e62bdf3d97ba4eb4e39acf27b47e68c6847c0e1d50187"
+    },
+    {
+      "id": "tool:excalidraw.open@1",
+      "sha256": "dc93c729b3ff2455f788a5951158a7cd4e2601793f0fe93f51943058170a5b38"
+    },
+    {
+      "id": "tool:history.read@1",
+      "sha256": "1e78bd0f76a6edc8e07de8ea41d29dfbff18c01b4c37bc6004d2b97be949a2c2"
+    },
+    {
+      "id": "tool:history.search@1",
+      "sha256": "1fc4e77f41486f0655468c4eb5b68aea0848508ffb0b55cf2d6458e4a6864550"
+    },
+    {
+      "id": "tool:image.generate@1",
+      "sha256": "b00915e2a701bb630c3ab5b62c139d575feb380ce5ab6b0087525f02668599b8"
+    },
+    {
+      "id": "tool:kanban.add@1",
+      "sha256": "f0628d981abe8783596e1511b6e350b20b7cbde619179551c4b46da6f464b40a"
+    },
+    {
+      "id": "tool:kanban.cancel@1",
+      "sha256": "3acbad4f6435c0f0f16a6f8827fd59fdb19632a4f9d5c891b97ad61f63a4ac82"
+    },
+    {
+      "id": "tool:kanban.edit@1",
+      "sha256": "1d2b49266e9142f38ec95a1acb787d87cf636686a9d8815ebde5b96e9d270e04"
+    },
+    {
+      "id": "tool:kanban.followup@1",
+      "sha256": "46f70f47e3da327dd38613110364cbe9822fdaf970cab0561bd4396849fb483f"
+    },
+    {
+      "id": "tool:kanban.list@1",
+      "sha256": "a6d9e998584caa8e52617597d32426d7081957e7ff15c2c7b9111ac65d2536e9"
+    },
+    {
+      "id": "tool:kanban.move@1",
+      "sha256": "05b073960046fa71a447b07587a0feecd5cbc6f492e2a6f8ecd052f627425c6d"
+    },
+    {
+      "id": "tool:kanban.remove@1",
+      "sha256": "930b9074621e156e2bb1a3fcaa021052d3a36d5ec40d8cd0fe807d837e0db846"
+    },
+    {
+      "id": "tool:kanban.run@1",
+      "sha256": "08ecad4a3ccd913791b73fd434422dce04fadeda3508c01c773b368394252a30"
+    },
+    {
+      "id": "tool:music.generate@1",
+      "sha256": "3b74bd3256356e9038fcff53e3e021c9928e6a9a002ecf1d8f435d1bc0b29efb"
+    },
+    {
+      "id": "tool:music.generate@2",
+      "sha256": "f048a2d10009e560f21b04f458097de5e88c169b4e066b5f30c2de006a0275e8"
+    },
+    {
+      "id": "tool:music.library@1",
+      "sha256": "328d403a682e27a1fdae572693a6e48abef35d4826d03115b529c47d21d3efee"
+    },
+    {
+      "id": "tool:object-recognition.manage@1",
+      "sha256": "4a6492dbe31e2f9d048c19b946b5ad5eb013c041a9eefe7f85b45f6211201850"
+    },
+    {
+      "id": "tool:ocr.cancel@1",
+      "sha256": "af0dd6a5c3c6799ce7fc34486574f71bc990993a2d4337904b6db262fcdb4a6b"
+    },
+    {
+      "id": "tool:ocr.open@1",
+      "sha256": "b1c4808442b66ff3336239e5a12b51ce658b0713b35b6c8b05e1d80fbd3ef31f"
+    },
+    {
+      "id": "tool:ocr.read@1",
+      "sha256": "dc918953e71ace7745b58117f059ffee71cb1dbe2beef37f44063174f977cba3"
+    },
+    {
+      "id": "tool:recipe.find@1",
+      "sha256": "cf4634d78bf38e9a31af1718994b6a35788560b0840686ea4fd079d49d448a59"
+    },
+    {
+      "id": "tool:steward.request@2",
+      "sha256": "797e5935546a282f5344d5b84298f33545bf20320f2f33c49587664353785f18"
+    },
+    {
+      "id": "tool:timer.cancel@1",
+      "sha256": "de67aeac9fd085ea5a500730ecd6e22829b71b048a62151ffce00e09114d2b79"
+    },
+    {
+      "id": "tool:timer.list@1",
+      "sha256": "27078d9ce1ada0eeb2c6e1d890d57c771e22c27f4d9c35168bb2f86bf08d3d12"
+    },
+    {
+      "id": "tool:timer.start@1",
+      "sha256": "c9deb83a17a40e4c7363b4c396ac8eeebb68eea52192d156551eea1fc27dbb94"
+    },
+    {
+      "id": "tool:ui.compose.request@1",
+      "sha256": "3bd63e4826398e2b978025711eaff8c05dbfe407f7fb77c10fdc60764a96e441"
+    },
+    {
+      "id": "tool:web.find@1",
+      "sha256": "60da94dacf6e9ef3bd7022eec7d42a9250a1a0647cb2a9b204f59c783f671ae2"
+    },
+    {
+      "id": "tool:web.forecast@1",
+      "sha256": "adc2501884d93b54a48c1ed076eade6ba489d8d53db626715c98727ae812d51b"
+    },
+    {
+      "id": "tool:web.lookup@1",
+      "sha256": "a2167ba08764b5f661e9a7b1ac221613dd51963276cf7db95e7796d49b27c187"
+    },
+    {
+      "id": "tool:web.quote@1",
+      "sha256": "0d6f6ce2f89335668129c236a09b23ac9d73a93eaea3545550e7fb5fdad2d14c"
+    },
+    {
+      "id": "tool:web.read@1",
+      "sha256": "b8669b9dead969851db0008f7c7fec4e247faa9dcb78d9de76084c9bd2760e24"
+    },
+    {
+      "id": "tool:web.read_saved@1",
+      "sha256": "860d4228e8551e97a5d9118821bf76b9155bcaacaa40a4532494f798d200430f"
+    },
+    {
+      "id": "tool:world.query@1",
+      "sha256": "24d4e2c764c6740ba029431b199906b7eeef9112082d580555e0925de0dd9873"
+    },
+    {
+      "id": "toolchain:claude-code.request@2",
+      "sha256": "f6c11a87c5770cf470947118b2bd5a004016b4ccc0e4dbc6009c3f1b3f14c3c0"
+    },
+    {
+      "id": "toolchain:dots.delegate@1",
+      "sha256": "19776ff91876c90c0dd3cfb4559ea85d74c240592b60523bf163b2ef42e7d5b6"
+    },
+    {
+      "id": "toolchain:excalidraw.edit@1",
+      "sha256": "c7b5ad31efe03fc153bc911dde45efcc31ad1b21273781b99337ccc03e25da99"
+    },
+    {
+      "id": "toolchain:history.research@1",
+      "sha256": "057459f699c3e4a068f4b18994bbc9543f0cb5985465a41114fda94fa67d2768"
+    },
+    {
+      "id": "toolchain:image.create@1",
+      "sha256": "aaeb3956ef6c648600fc18064a30c65dc6bb7a784991765d2b6a2569999f1b6a"
+    },
+    {
+      "id": "toolchain:kanban.manage@2",
+      "sha256": "2ced31cb467c4a13153918b6b69362046944fd994f859517ea1a86c7e3d68dea"
+    },
+    {
+      "id": "toolchain:music.create@1",
+      "sha256": "dce8aa5b0c9597801a6fec8a2d25ff08a59aaa69c6ef792604f1843dd9c6b77c"
+    },
+    {
+      "id": "toolchain:music.library@1",
+      "sha256": "e3c15bda1db572af1cdd4422288b89c3ce1c8903e0eaf1f075a3248872080f09"
+    },
+    {
+      "id": "toolchain:object-recognition.manage@1",
+      "sha256": "8f2e8e01907e790e0d6c8c64927c40f469a833336b0df3fd16e17de24df6b154"
+    },
+    {
+      "id": "toolchain:ocr.manage@2",
+      "sha256": "e222d213b05dcea24219c8bec98b4338a6875cb6b2a85b6bee1154ed5786fad4"
+    },
+    {
+      "id": "toolchain:ocr.manage@3",
+      "sha256": "5d87ac60c759d51048b67b29c13321e695a080d86e2356685fc76bd275b872b5"
+    },
+    {
+      "id": "toolchain:ocr.manage@4",
+      "sha256": "cdd703c921819cda6cce2e4fdf05099e94e1982257f8be73539b27692c1a0a66"
+    },
+    {
+      "id": "toolchain:steward.request@3",
+      "sha256": "64c90b4a5bbc59493c65bd7374863d37acc18b78f8f21849ac2e8d1f7a5dea02"
+    },
+    {
+      "id": "toolchain:timers.manage@2",
+      "sha256": "9cba09c060560769b9dad1194adb5a6e38fc45a9898504ff192f59ecdef9d73d"
+    },
+    {
+      "id": "toolchain:timers.manage@3",
+      "sha256": "1ec9bab983eb9228f8264352de97834f41e1a4979388ef1297a1a0408375c43a"
+    },
+    {
+      "id": "toolchain:timers.manage@4",
+      "sha256": "e1db03fce5ab10aecb064eab28fd1457a7815bf734f370c21d21712ef09a35f4"
+    },
+    {
+      "id": "toolchain:ui.compose@1",
+      "sha256": "ea1f4ea40b98a363d9d64ac5f5d0b4fb31b070d0efe33f89d31139fa564ce0ff"
+    },
+    {
+      "id": "toolchain:web.research.luna@1",
+      "sha256": "bbd9b4ac6b5741059d28b07b0dda15bc0bbf1122db0d091147cc6ae2adc9b377"
+    },
+    {
+      "id": "toolchain:web.search@1",
+      "sha256": "69bb3bb3a1bfc8b3506b2cd37da1af0a53b78997001cca0a966a2be0475dafc0"
+    },
+    {
+      "id": "toolchain:world.query@1",
+      "sha256": "8c1bed7b6210d7c87aa35b27a67c807d58bcdaf94d2347a408a147afb59d2666"
+    },
+    {
+      "id": "toolchain:world.query@2",
+      "sha256": "6c64e40aaca5646e9cf3cce99b16d9f567b282b15683db5537c6d9c69f91aa57"
+    }
+  ],
+  "documents": [
+    {
+      "id": "artifact:image.generation@1",
+      "sha256": "551ce47d582919e795f5888050217a4d2cb43b6310b709cdce5076ec30a27f51"
+    },
+    {
+      "id": "artifact:kanban.board@2",
+      "sha256": "1fefbf7c4238305612596390c76cd22bef324400df5b074f414384a3a9447070"
+    },
+    {
+      "id": "artifact:music.generation@1",
+      "sha256": "9bea298b65e1b64f255a3225e060fd949688be6b19a5cf0c1fbe71addee352ad"
+    },
+    {
+      "id": "artifact:music.generation@2",
+      "sha256": "4d5ec9dba2bfb7f906437a65f34d07045c67e5bc3b12fbcf4bfc185cec032cc1"
+    },
+    {
+      "id": "artifact:object-recognition.workspace@1",
+      "sha256": "a6bab7767220801cb87b672a2862d8a254cb306f3d53de13510254ee2c87dc60"
+    },
+    {
+      "id": "artifact:ocr.workspace@2",
+      "sha256": "fb29f89947d379b1d49dda411ae0da41d586382021e99857c5a640a45f0a40e3"
+    },
+    {
+      "id": "artifact:ocr.workspace@3",
+      "sha256": "2cee38c85c436e898bec5d6f8c08ed643637cc2d812d2c3959ce9eae8b7a3626"
+    },
+    {
+      "id": "artifact:ocr.workspace@4",
+      "sha256": "f6c887ac14e5eef1c1283363ed77827c54f086c88f8423da2490cbf06590e878"
+    },
+    {
+      "id": "artifact:settings.ai-connections@5",
+      "sha256": "597385db6bdd6b24d2dafb4481efca635650d6bf6a8b8d2aa2449ba93cf53640"
+    },
+    {
+      "id": "artifact:settings.changes@2",
+      "sha256": "dcb29880da5033803f79901568987a04d39bc80534e9310d596501866008bfca"
+    },
+    {
+      "id": "artifact:settings.conversation@5",
+      "sha256": "313e3da1e27c4c8a3140fff9d8ca1715a495eb6d113c07e2b2ad1338eac96bd3"
+    },
+    {
+      "id": "artifact:settings.dictionary@2",
+      "sha256": "deacf73398d12eef01ee37cba9a9ca51bf31be64acfc48c127bc13d134ab8ab1"
+    },
+    {
+      "id": "artifact:settings.display@3",
+      "sha256": "acf5723ccbcfda345d531aae0324af6b859f6a370ec3d47d855788602d67215b"
+    },
+    {
+      "id": "artifact:settings.display@4",
+      "sha256": "928c01c9d269242716caa220f7fc1e70a559ad9b997a57fcaa49086b363ce880"
+    },
+    {
+      "id": "artifact:settings.display@5",
+      "sha256": "96c697ceb28f6fa47a7e0b31d0fe043fd13b576c61e9be2f8be8032289c72c56"
+    },
+    {
+      "id": "artifact:settings.external-work@4",
+      "sha256": "02d22debb663a7e5ca78bccd69bcb42596b78e1ec98308ee46951ddf3a32356c"
+    },
+    {
+      "id": "artifact:settings.google-accounts@1",
+      "sha256": "d5067613610c3fb60671b3be9a98c9589a59c3ffecbe8004671569f7fe364de3"
+    },
+    {
+      "id": "artifact:settings.hub@6",
+      "sha256": "dd2240a7478d0691c68ab77921ca9832d3ff2e39bdb27281626031e82c2de2a8"
+    },
+    {
+      "id": "artifact:settings.memory@4",
+      "sha256": "23cde2dd437c4c496129f5d8f9b6cf784f8870eeebcd74d91ec14221817ca491"
+    },
+    {
+      "id": "artifact:settings.records@3",
+      "sha256": "59e3c7710ed62e38669f9a421ff44621cbb56f76509f4b79990aa22cccf9909c"
+    },
+    {
+      "id": "artifact:settings.service-tests@6",
+      "sha256": "0392701f93acd09e36193d4339a6508565aac0a6e7ed81d7dcae241b0adc71f4"
+    },
+    {
+      "id": "artifact:settings.voice-input@3",
+      "sha256": "3cc186b364518ec7a99a9e037c926d9560ee1a5a29aa96de03b999131413a8ac"
+    },
+    {
+      "id": "artifact:settings.world@4",
+      "sha256": "3cd070be1597af4265afd5417260262a291a5973b4f17a3b736a309efe7cc954"
+    },
+    {
+      "id": "artifact:terminals.workspace@2",
+      "sha256": "57dd2e76a78b12afab0e497b639a720cb628afca1fa9e5c16522d8c051d7be91"
+    },
+    {
+      "id": "artifact:timers.workspace@1",
+      "sha256": "a86a1f499259c4478e7ded26f11c139b65ee187cecac3d1fb5ab21225a1918c1"
+    },
+    {
+      "id": "artifact:timers.workspace@2",
+      "sha256": "83b60f1e2a76a9e1a666bf19b4cf1a8cab1476379bbbea55cfe541d004d6cc66"
+    },
+    {
+      "id": "artifact:ui.workshop@1",
+      "sha256": "408122af7fef6dd6c3a5418c88a562a5941b99316d3568a3b3fecf8033364990"
+    },
+    {
+      "id": "binding:claude-code.request@2",
+      "sha256": "f6c45bbb022705e49106f289d8a8a149e4bdb600f6aa06718ff053c0f2708fbc"
+    },
+    {
+      "id": "binding:kanban.manage@2",
+      "sha256": "f689791b1a4d4249bdfa01ecef1f979c8e62bde3051a2c3b0f241b48d12b7ba8"
+    },
+    {
+      "id": "binding:ocr.command@2",
+      "sha256": "dd29e52e74b0979369dbf6b93e553cc00b6bc19f69c1b1c38307e2a890c61b19"
+    },
+    {
+      "id": "binding:ocr.command@3",
+      "sha256": "7638cddee37491f0ab5cd138e40d25f6453caba28b71ea8b8471bef68973b21b"
+    },
+    {
+      "id": "binding:ocr.command@4",
+      "sha256": "8783ee49ac44acc80255b190b74af836f651915b7293764252b694d5e1f74418"
+    },
+    {
+      "id": "binding:steward.request@2",
+      "sha256": "f4d372545830d97ebaf1354af8384256f3bdc3ca75e5f77f750f46ee590011e8"
+    },
+    {
+      "id": "binding:timers.command@1",
+      "sha256": "063383d05c8c6002cf8aa04e1d460d85c5331c1d69fd404cc2e7594af03194ce"
+    },
+    {
+      "id": "binding:timers.command@2",
+      "sha256": "cbaebe84252523f3bb6164067b5e47cc0de82fe84c8b5cd9ef617752e2100dad"
+    },
+    {
+      "id": "binding:timers.command@3",
+      "sha256": "712fa5908b5d00867d7eba31ecbf681be3430f2340893589a40e0c8c4b29490c"
+    },
+    {
+      "id": "binding:ui.compose@1",
+      "sha256": "0d17748e8a5c7637a05c2978bf3f5c0595c8f97c47236e07d836d18198603c87"
+    },
+    {
+      "id": "binding:world.query@1",
+      "sha256": "cd1bc291775cc53657b869796f857f6483fd857eb7bbb0c28ad4f30496cc6373"
+    },
+    {
+      "id": "schema:image-screen-generate@1",
+      "sha256": "cf86e5622548253f1acfcc2cacc7c60bb7e2cdd27eb5490b6fc7d3505d405a88"
+    },
+    {
+      "id": "schema:image-screen-id@1",
+      "sha256": "552a8350a71c5f31156b43b9c67f86fa5790407ac3546b43eef8c4c2bfdc9093"
+    },
+    {
+      "id": "schema:inference-probe-cancel@1",
+      "sha256": "c8426d4cd01b06587412898dc80f938ebd13b3ea80f428411ab9b61fb83239f0"
+    },
+    {
+      "id": "schema:inference-probe-start@1",
+      "sha256": "3b21f9fabd6bc95481b26826ebb4c0843ca71709fa4ca21a437d42dc35a8e9f1"
+    },
+    {
+      "id": "schema:kanban-add@2",
+      "sha256": "4ff07fad756858e4763abf75e165487e86d2da8705a945739e27c9310717e37f"
+    },
+    {
+      "id": "schema:kanban-card@1",
+      "sha256": "ebce95580034d463be5c756f1b6b9175528949512264cdb4d4075fd864d68475"
+    },
+    {
+      "id": "schema:kanban-edit@2",
+      "sha256": "f2a04c5d52588fcdb56c4bc9d4231ca4b468be21dddbb091a676ab4e0d0b3ff5"
+    },
+    {
+      "id": "schema:kanban-followup@1",
+      "sha256": "31b068ce5e790a1ca3364827df8b63e5141a610379bfcbfd3561860200d96d2a"
+    },
+    {
+      "id": "schema:kanban-move@1",
+      "sha256": "bc60b0be75ae65b91b8046848cdd86fec3b63b9526e4f461535f33f96a9c02cf"
+    },
+    {
+      "id": "schema:kanban-open@1",
+      "sha256": "3be7429afa6f44d4ee844888ee56e70ee10c4ce9a20e40675b95d60dcd1ba261"
+    },
+    {
+      "id": "schema:kanban-resume@1",
+      "sha256": "bef2bfac1aac9458e4e1b2b4aa68e2abcc58fa87e41708fed67fe064bc1ac3c3"
+    },
+    {
+      "id": "schema:memory-page@1",
+      "sha256": "3b8d137014f676d857e084735656005c95285bf43e8f33793aa4a280869d7212"
+    },
+    {
+      "id": "schema:memory-set-enabled@1",
+      "sha256": "8734351ed99ba38bbc4380838d0587090c6e9bb4ee9842ee72cb9876fb25ff58"
+    },
+    {
+      "id": "schema:music-screen-generate@1",
+      "sha256": "57aba0b35039ef4092dbefb839312637324e1b16d936da07fc3be822fef1bbe9"
+    },
+    {
+      "id": "schema:music-screen-select@1",
+      "sha256": "820d04b997352e91414481941be97d9d67bd100bb4866f084e6e6e6d4ea02263"
+    },
+    {
+      "id": "schema:object-recognition-screen-credential@1",
+      "sha256": "15451a3552e0635455d35e0ae60d2c149cf2764eaad78ed60f21703ef50a277e"
+    },
+    {
+      "id": "schema:object-recognition-screen-id@1",
+      "sha256": "1def9cd29496622d211b095f9116e4dc9f732063cc7ef06ca86791d4021d7038"
+    },
+    {
+      "id": "schema:object-recognition-screen-incorporate@1",
+      "sha256": "db20b37a8e59795b99c280a8adce8216a5f2962e9d715ef0fe4a443eae55015e"
+    },
+    {
+      "id": "schema:ocr-configure@1",
+      "sha256": "cf05c68502cd0da77a146bfa92aa1e63d795b525d64bff6d8bf7590b0b47cc1a"
+    },
+    {
+      "id": "schema:ocr-correction-candidate@1",
+      "sha256": "a7aff37bd8d1273b3789ad5681a3b2a83a66ff22dac5dea0bc56edad12a398e0"
+    },
+    {
+      "id": "schema:ocr-correction-evidence@1",
+      "sha256": "fb96e45a3bb5ad198c9a24678c8103bbdbc728598d030997f23e9672a1abbe1f"
+    },
+    {
+      "id": "schema:ocr-id@1",
+      "sha256": "6704644e5989aa8f4c8f400acc3adfaa4996eb5e16063ca1313e27aa9c28b0e4"
+    },
+    {
+      "id": "schema:ocr-incorporate@1",
+      "sha256": "b5bfae7d04536a2c75f6f0e68a5bce7a20bb604810e5c9207872dfe098e56fa6"
+    },
+    {
+      "id": "schema:ocr-index@1",
+      "sha256": "f1fd7a795366e97415522d020b0584d197579881db8b39f579647d646557544f"
+    },
+    {
+      "id": "schema:ocr-recording@1",
+      "sha256": "1ff42a7f5736001709daf4b99daa2ab8f7e1b65d47e060dbd69c7196ea26d0ac"
+    },
+    {
+      "id": "schema:ocr-target-index@1",
+      "sha256": "558dabab314b7cd47e8009215422b13503d80d55e28c69967b9b743f3dfc782d"
+    },
+    {
+      "id": "schema:records-recipe-delete@1",
+      "sha256": "ec4628feb05c54e517ad5c0ced021b9789620bf2bb68c4948cf9d98ca6b0ad8d"
+    },
+    {
+      "id": "schema:records-recipe-page@1",
+      "sha256": "f0eec4592f835e5691024311c7865b4b8fb8f247f249546a83fd91dddb4f402f"
+    },
+    {
+      "id": "schema:records-recipe-state@1",
+      "sha256": "46d0456ccbd5bea206d7733ce3f19305254f30100ecce1b670192754d1db44e5"
+    },
+    {
+      "id": "schema:records-selection-page@1",
+      "sha256": "ab0b6d4b599d3bb5acf33396aa2919ce84863adc02bf5f676d3493ba2195a3b7"
+    },
+    {
+      "id": "schema:records-usage-page@1",
+      "sha256": "bf5576f7d569a8ac6ab5349dab1492ce0cf3c230aa12ec43e5c6fb7e02433a94"
+    },
+    {
+      "id": "schema:service-tests-run@1",
+      "sha256": "c0b90392821cdec7242dbf1d95460872680ee2c30854a81f6ead2b5c3fe9b70d"
+    },
+    {
+      "id": "schema:service-tests-start@1",
+      "sha256": "d261e530dd92911464ebcb1e82f5695724e7c5aa85105ac554dd7e17a604871b"
+    },
+    {
+      "id": "schema:service-tests-start@2",
+      "sha256": "66b0d51392a0a73aa84d3d00bcce67798647482ed64f7b9359913219e5265eda"
+    },
+    {
+      "id": "schema:settings-add-connection@2",
+      "sha256": "8ffc7c40a40bd06334369219676176f57bf40ffdcc7498d72628c497cc5af709"
+    },
+    {
+      "id": "schema:settings-add-resource@1",
+      "sha256": "c1a054f9261562a39eadd0bf9fe7e19eca828631e550d6d4826f164e7445f1f7"
+    },
+    {
+      "id": "schema:settings-apply@2",
+      "sha256": "16fbde0c611b543b73ff9220a88e954fdc9b59fd363d994e4e24a8ca87b8d589"
+    },
+    {
+      "id": "schema:settings-confirm-larm-origin@1",
+      "sha256": "23dd08fdf27e7985be51a4a026756c58d820131d5551dcd68a4283878b5c74b7"
+    },
+    {
+      "id": "schema:settings-delete-connection@1",
+      "sha256": "f4bab36d74438b62e1d0d69ab3cae417283dc3226d5b8ebcb33b678f92f7972f"
+    },
+    {
+      "id": "schema:settings-delete-resource@1",
+      "sha256": "0f75f1d690bc310c5368a1fb9e60fbceca0bcc628748995217470a5299a83c46"
+    },
+    {
+      "id": "schema:terminals-screen-id@1",
+      "sha256": "bbae340437efc58f0041a3c86e4666116eb1c24c124abebf51b33b5592a466af"
+    },
+    {
+      "id": "schema:tts-dictionary-delete@1",
+      "sha256": "be02bde4c92fb67b16ddf124d23cb7a6c7c034ed5fb1180164b6f2d7a529d76d"
+    },
+    {
+      "id": "schema:tts-dictionary-page@1",
+      "sha256": "269de6e4a804cabe60c81832739b51e1efb88198ccd2294bca68be58f0671936"
+    },
+    {
+      "id": "schema:tts-dictionary-save@1",
+      "sha256": "adb882e7a0957f3c4a16df42c840bd2012db3c5aaec6bd9e1deee7fb1841871b"
+    },
+    {
+      "id": "schema:tts-dictionary-update@1",
+      "sha256": "db2dcd9f7aa666a4137498080dbf2874634ccc37f53ad164b65873d4e0641187"
+    },
+    {
+      "id": "schema:ui-compositions-select@1",
+      "sha256": "a438c8db1ace60b215808ca2bf88ffe0d6a4490aa9d32e6adcf372bbbe570a3f"
+    }
+  ],
+  "activeDefinitions": [
+    {
+      "key": "package:claude-code.request",
+      "revisionId": "package:claude-code.request@2"
+    },
+    {
+      "key": "package:dots.orchestrate",
+      "revisionId": "package:dots.orchestrate@2"
+    },
+    {
+      "key": "package:excalidraw.edit",
+      "revisionId": "package:excalidraw.edit@1"
+    },
+    {
+      "key": "package:history.research",
+      "revisionId": "package:history.research@2"
+    },
+    {
+      "key": "package:image.create",
+      "revisionId": "package:image.create@1"
+    },
+    {
+      "key": "package:kanban.manage",
+      "revisionId": "package:kanban.manage@1"
+    },
+    {
+      "key": "package:music.create",
+      "revisionId": "package:music.create@2"
+    },
+    {
+      "key": "package:music.playback",
+      "revisionId": "package:music.playback@1"
+    },
+    {
+      "key": "package:object-recognition.manage",
+      "revisionId": "package:object-recognition.manage@1"
+    },
+    {
+      "key": "package:ocr.correct",
+      "revisionId": "package:ocr.correct@1"
+    },
+    {
+      "key": "package:ocr.manage",
+      "revisionId": "package:ocr.manage@1"
+    },
+    {
+      "key": "package:steward.request",
+      "revisionId": "package:steward.request@2"
+    },
+    {
+      "key": "package:timers.manage",
+      "revisionId": "package:timers.manage@1"
+    },
+    {
+      "key": "package:ui.compose",
+      "revisionId": "package:ui.compose@1"
+    },
+    {
+      "key": "package:web.lookup",
+      "revisionId": "package:web.lookup@8"
+    },
+    {
+      "key": "package:web.quick",
+      "revisionId": "package:web.quick@2"
+    },
+    {
+      "key": "package:web.read",
+      "revisionId": "package:web.read@7"
+    },
+    {
+      "key": "package:web.recipe",
+      "revisionId": "package:web.recipe@1"
+    },
+    {
+      "key": "package:web.research",
+      "revisionId": "package:web.research@9"
+    },
+    {
+      "key": "package:web.search",
+      "revisionId": "package:web.search@1"
+    },
+    {
+      "key": "package:world.query",
+      "revisionId": "package:world.query@1"
+    },
+    {
+      "key": "profile:claude-code.request",
+      "revisionId": "profile:claude-code.request@1"
+    },
+    {
+      "key": "profile:dots.orchestrate",
+      "revisionId": "profile:dots.orchestrate@1"
+    },
+    {
+      "key": "profile:excalidraw.edit",
+      "revisionId": "profile:excalidraw.edit@1"
+    },
+    {
+      "key": "profile:history.research",
+      "revisionId": "profile:history.research@1"
+    },
+    {
+      "key": "profile:image.create",
+      "revisionId": "profile:image.create@1"
+    },
+    {
+      "key": "profile:kanban.manage",
+      "revisionId": "profile:kanban.manage@1"
+    },
+    {
+      "key": "profile:music.create",
+      "revisionId": "profile:music.create@1"
+    },
+    {
+      "key": "profile:music.playback",
+      "revisionId": "profile:music.playback@1"
+    },
+    {
+      "key": "profile:object-recognition.manage",
+      "revisionId": "profile:object-recognition.manage@1"
+    },
+    {
+      "key": "profile:ocr.correct",
+      "revisionId": "profile:ocr.correct@1"
+    },
+    {
+      "key": "profile:ocr.manage",
+      "revisionId": "profile:ocr.manage@1"
+    },
+    {
+      "key": "profile:steward.request",
+      "revisionId": "profile:steward.request@1"
+    },
+    {
+      "key": "profile:timers.manage",
+      "revisionId": "profile:timers.manage@1"
+    },
+    {
+      "key": "profile:ui.compose",
+      "revisionId": "profile:ui.compose@1"
+    },
+    {
+      "key": "profile:web.quick",
+      "revisionId": "profile:web.quick@1"
+    },
+    {
+      "key": "profile:web.recipe",
+      "revisionId": "profile:web.recipe@1"
+    },
+    {
+      "key": "profile:web.research",
+      "revisionId": "profile:web.research@2"
+    },
+    {
+      "key": "profile:world.query",
+      "revisionId": "profile:world.query@1"
+    },
+    {
+      "key": "skill:claude-code.request",
+      "revisionId": "skill:claude-code.request@1"
+    },
+    {
+      "key": "skill:dots.orchestrate",
+      "revisionId": "skill:dots.orchestrate@2"
+    },
+    {
+      "key": "skill:excalidraw.edit",
+      "revisionId": "skill:excalidraw.edit@1"
+    },
+    {
+      "key": "skill:history.research",
+      "revisionId": "skill:history.research@2"
+    },
+    {
+      "key": "skill:image.create",
+      "revisionId": "skill:image.create@1"
+    },
+    {
+      "key": "skill:kanban.manage",
+      "revisionId": "skill:kanban.manage@1"
+    },
+    {
+      "key": "skill:music.create",
+      "revisionId": "skill:music.create@2"
+    },
+    {
+      "key": "skill:music.playback",
+      "revisionId": "skill:music.playback@1"
+    },
+    {
+      "key": "skill:object-recognition.manage",
+      "revisionId": "skill:object-recognition.manage@1"
+    },
+    {
+      "key": "skill:ocr.correct",
+      "revisionId": "skill:ocr.correct@1"
+    },
+    {
+      "key": "skill:ocr.manage",
+      "revisionId": "skill:ocr.manage@1"
+    },
+    {
+      "key": "skill:steward.request",
+      "revisionId": "skill:steward.request@2"
+    },
+    {
+      "key": "skill:timers.manage",
+      "revisionId": "skill:timers.manage@1"
+    },
+    {
+      "key": "skill:ui.compose",
+      "revisionId": "skill:ui.compose@1"
+    },
+    {
+      "key": "skill:web.recipe",
+      "revisionId": "skill:web.recipe@1"
+    },
+    {
+      "key": "skill:web.research",
+      "revisionId": "skill:web.research@8"
+    },
+    {
+      "key": "skill:web.search",
+      "revisionId": "skill:web.search@1"
+    },
+    {
+      "key": "skill:world.query",
+      "revisionId": "skill:world.query@1"
+    },
+    {
+      "key": "tool:claude-code.request",
+      "revisionId": "tool:claude-code.request@2"
+    },
+    {
+      "key": "tool:dots.coordinate",
+      "revisionId": "tool:dots.coordinate@1"
+    },
+    {
+      "key": "tool:excalidraw.open",
+      "revisionId": "tool:excalidraw.open@1"
+    },
+    {
+      "key": "tool:history.read",
+      "revisionId": "tool:history.read@1"
+    },
+    {
+      "key": "tool:history.search",
+      "revisionId": "tool:history.search@1"
+    },
+    {
+      "key": "tool:image.generate",
+      "revisionId": "tool:image.generate@1"
+    },
+    {
+      "key": "tool:kanban.add",
+      "revisionId": "tool:kanban.add@1"
+    },
+    {
+      "key": "tool:kanban.cancel",
+      "revisionId": "tool:kanban.cancel@1"
+    },
+    {
+      "key": "tool:kanban.edit",
+      "revisionId": "tool:kanban.edit@1"
+    },
+    {
+      "key": "tool:kanban.followup",
+      "revisionId": "tool:kanban.followup@1"
+    },
+    {
+      "key": "tool:kanban.list",
+      "revisionId": "tool:kanban.list@1"
+    },
+    {
+      "key": "tool:kanban.move",
+      "revisionId": "tool:kanban.move@1"
+    },
+    {
+      "key": "tool:kanban.remove",
+      "revisionId": "tool:kanban.remove@1"
+    },
+    {
+      "key": "tool:kanban.run",
+      "revisionId": "tool:kanban.run@1"
+    },
+    {
+      "key": "tool:music.generate",
+      "revisionId": "tool:music.generate@2"
+    },
+    {
+      "key": "tool:music.library",
+      "revisionId": "tool:music.library@1"
+    },
+    {
+      "key": "tool:object-recognition.manage",
+      "revisionId": "tool:object-recognition.manage@1"
+    },
+    {
+      "key": "tool:ocr.cancel",
+      "revisionId": "tool:ocr.cancel@1"
+    },
+    {
+      "key": "tool:ocr.open",
+      "revisionId": "tool:ocr.open@1"
+    },
+    {
+      "key": "tool:ocr.read",
+      "revisionId": "tool:ocr.read@1"
+    },
+    {
+      "key": "tool:recipe.find",
+      "revisionId": "tool:recipe.find@1"
+    },
+    {
+      "key": "tool:steward.request",
+      "revisionId": "tool:steward.request@2"
+    },
+    {
+      "key": "tool:timer.cancel",
+      "revisionId": "tool:timer.cancel@1"
+    },
+    {
+      "key": "tool:timer.list",
+      "revisionId": "tool:timer.list@1"
+    },
+    {
+      "key": "tool:timer.start",
+      "revisionId": "tool:timer.start@1"
+    },
+    {
+      "key": "tool:ui.compose.request",
+      "revisionId": "tool:ui.compose.request@1"
+    },
+    {
+      "key": "tool:web.find",
+      "revisionId": "tool:web.find@1"
+    },
+    {
+      "key": "tool:web.forecast",
+      "revisionId": "tool:web.forecast@1"
+    },
+    {
+      "key": "tool:web.lookup",
+      "revisionId": "tool:web.lookup@1"
+    },
+    {
+      "key": "tool:web.quote",
+      "revisionId": "tool:web.quote@1"
+    },
+    {
+      "key": "tool:web.read",
+      "revisionId": "tool:web.read@1"
+    },
+    {
+      "key": "tool:web.read_saved",
+      "revisionId": "tool:web.read_saved@1"
+    },
+    {
+      "key": "tool:world.query",
+      "revisionId": "tool:world.query@1"
+    },
+    {
+      "key": "toolchain:claude-code.request",
+      "revisionId": "toolchain:claude-code.request@2"
+    },
+    {
+      "key": "toolchain:dots.delegate",
+      "revisionId": "toolchain:dots.delegate@1"
+    },
+    {
+      "key": "toolchain:excalidraw.edit",
+      "revisionId": "toolchain:excalidraw.edit@1"
+    },
+    {
+      "key": "toolchain:history.research",
+      "revisionId": "toolchain:history.research@1"
+    },
+    {
+      "key": "toolchain:image.create",
+      "revisionId": "toolchain:image.create@1"
+    },
+    {
+      "key": "toolchain:kanban.manage",
+      "revisionId": "toolchain:kanban.manage@2"
+    },
+    {
+      "key": "toolchain:music.create",
+      "revisionId": "toolchain:music.create@1"
+    },
+    {
+      "key": "toolchain:music.library",
+      "revisionId": "toolchain:music.library@1"
+    },
+    {
+      "key": "toolchain:object-recognition.manage",
+      "revisionId": "toolchain:object-recognition.manage@1"
+    },
+    {
+      "key": "toolchain:ocr.manage",
+      "revisionId": "toolchain:ocr.manage@4"
+    },
+    {
+      "key": "toolchain:steward.request",
+      "revisionId": "toolchain:steward.request@3"
+    },
+    {
+      "key": "toolchain:timers.manage",
+      "revisionId": "toolchain:timers.manage@4"
+    },
+    {
+      "key": "toolchain:ui.compose",
+      "revisionId": "toolchain:ui.compose@1"
+    },
+    {
+      "key": "toolchain:web.research.luna",
+      "revisionId": "toolchain:web.research.luna@1"
+    },
+    {
+      "key": "toolchain:web.search",
+      "revisionId": "toolchain:web.search@1"
+    },
+    {
+      "key": "toolchain:world.query",
+      "revisionId": "toolchain:world.query@2"
+    }
+  ],
+  "publishedArtifacts": [
+    {
+      "artifactId": "image.generation",
+      "revisionId": "artifact:image.generation@1"
+    },
+    {
+      "artifactId": "kanban.board",
+      "revisionId": "artifact:kanban.board@2"
+    },
+    {
+      "artifactId": "music.generation",
+      "revisionId": "artifact:music.generation@2"
+    },
+    {
+      "artifactId": "object-recognition.workspace",
+      "revisionId": "artifact:object-recognition.workspace@1"
+    },
+    {
+      "artifactId": "ocr.workspace",
+      "revisionId": "artifact:ocr.workspace@4"
+    },
+    {
+      "artifactId": "settings.ai-connections",
+      "revisionId": "artifact:settings.ai-connections@5"
+    },
+    {
+      "artifactId": "settings.changes",
+      "revisionId": "artifact:settings.changes@2"
+    },
+    {
+      "artifactId": "settings.conversation",
+      "revisionId": "artifact:settings.conversation@5"
+    },
+    {
+      "artifactId": "settings.dictionary",
+      "revisionId": "artifact:settings.dictionary@2"
+    },
+    {
+      "artifactId": "settings.display",
+      "revisionId": "artifact:settings.display@5"
+    },
+    {
+      "artifactId": "settings.external-work",
+      "revisionId": "artifact:settings.external-work@4"
+    },
+    {
+      "artifactId": "settings.google-accounts",
+      "revisionId": "artifact:settings.google-accounts@1"
+    },
+    {
+      "artifactId": "settings.hub",
+      "revisionId": "artifact:settings.hub@6"
+    },
+    {
+      "artifactId": "settings.memory",
+      "revisionId": "artifact:settings.memory@4"
+    },
+    {
+      "artifactId": "settings.records",
+      "revisionId": "artifact:settings.records@3"
+    },
+    {
+      "artifactId": "settings.service-tests",
+      "revisionId": "artifact:settings.service-tests@6"
+    },
+    {
+      "artifactId": "settings.voice-input",
+      "revisionId": "artifact:settings.voice-input@3"
+    },
+    {
+      "artifactId": "settings.world",
+      "revisionId": "artifact:settings.world@4"
+    },
+    {
+      "artifactId": "terminals.workspace",
+      "revisionId": "artifact:terminals.workspace@2"
+    },
+    {
+      "artifactId": "ui.workshop",
+      "revisionId": "artifact:ui.workshop@1"
+    }
+  ]
+}

@@ -156,6 +156,8 @@ export async function setupSteward(
 		wrapMemory?: (memory: MemoryService) => MemoryService;
 		/** The steward maintains goals (the real goals service on the same database). */
 		goals?: boolean;
+		/** The saved resource the World curation runs on. */
+		worldResourceId?: string;
 		/** The World the steward curates: built once the store and the conversation exist. */
 		world?: (parts: {
 			store: SqliteStore;
@@ -231,6 +233,7 @@ export async function setupSteward(
 		},
 		...(world ? { world } : {}),
 		...(goals ? { goals: { ops: goals, access: GOALS_ACCESS } } : {}),
+		worldResourceId: () => options.worldResourceId ?? null,
 	} satisfies StewardDeps);
 	queue.registerHandler(steward.handler as never);
 	let messages = 0;

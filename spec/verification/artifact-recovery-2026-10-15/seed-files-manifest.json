@@ -1,0 +1,343 @@
+{
+  "formatVersion": 1,
+  "capturedDate": "2026-10-15",
+  "baseCommit": "0bbcc8330593cdab1b726dd74f38fed3545dae4c",
+  "source": "working tree after artifact recovery; includes uncommitted seed revisions",
+  "files": [
+    {
+      "path": "api/domains/capabilities/builtin/dots/SKILL.md",
+      "sha256": "d02ec69e160a4a378bfe510a716bbf9e5cde3efdcf3c4f0d6234d4e3d9a5272b",
+      "bytes": 5814
+    },
+    {
+      "path": "api/domains/capabilities/builtin/dots/SKILL.v1.md",
+      "sha256": "b19c347d148cf5895516cd1f1ade31e5f5bd4cd8c80b3d076be63bf0cbb735ae",
+      "bytes": 3361
+    },
+    {
+      "path": "api/domains/capabilities/builtin/dots.ts",
+      "sha256": "d23a4d9ee03c7b519f7db30e6580f4628bf4fbf48c724de8cfac753cc0681849",
+      "bytes": 2350
+    },
+    {
+      "path": "api/domains/capabilities/builtin/excalidraw/SKILL.md",
+      "sha256": "f4700a4ca161fe8ce553ff6034cebbad0b1170e9bb1406b66cd35509d5f524bd",
+      "bytes": 860
+    },
+    {
+      "path": "api/domains/capabilities/builtin/excalidraw.ts",
+      "sha256": "9b6c9321cf344f89a4b234e3dc60148bcae70ba9eb8e317e2a68efcdefc0fa7d",
+      "bytes": 1624
+    },
+    {
+      "path": "api/domains/capabilities/builtin/history/SKILL.md",
+      "sha256": "ddfff5f690cc245fda4013e09e4dffcc05bf692dbe0d59b75e48db92e910dc93",
+      "bytes": 1372
+    },
+    {
+      "path": "api/domains/capabilities/builtin/history/SKILL.v2.md",
+      "sha256": "882059afae13d6b35bef6f9c583e6a6f1a74a42458c30fea326d5e308ef15660",
+      "bytes": 773
+    },
+    {
+      "path": "api/domains/capabilities/builtin/history.ts",
+      "sha256": "cbe8a3f57733c54657ec6c0a5c8ff10d537119f49bcb5b0cba3e23683f59dba9",
+      "bytes": 2473
+    },
+    {
+      "path": "api/domains/capabilities/builtin/image/SKILL.md",
+      "sha256": "36c3cb34a1286714e0314c775b1df68770ec8c1585dd607355c594e75a7f6a5b",
+      "bytes": 1559
+    },
+    {
+      "path": "api/domains/capabilities/builtin/image.ts",
+      "sha256": "05e28ec1aae788e66ec641c55a1b457ead7fa21bc64879dc84e0e8184eb957d3",
+      "bytes": 1674
+    },
+    {
+      "path": "api/domains/capabilities/builtin/music/SKILL-v2.md",
+      "sha256": "e9feb12c2fd3a1e62a6e6bccd252d822c05edf155515c58a28725aceeac9d258",
+      "bytes": 2171
+    },
+    {
+      "path": "api/domains/capabilities/builtin/music/SKILL.md",
+      "sha256": "c9e50d864dfb7291fba421591291fb4727405fa81d4bb7fea80e188ae126835f",
+      "bytes": 1121
+    },
+    {
+      "path": "api/domains/capabilities/builtin/music-playback/SKILL.md",
+      "sha256": "439733bec07a828869fd4968b9af8e0b702374b11bc0503d0b517ed711c7f6c4",
+      "bytes": 1204
+    },
+    {
+      "path": "api/domains/capabilities/builtin/music.ts",
+      "sha256": "40ed54929eea096e72ac204fd5d791601c2fa68d1e75d1bcce216fac7e80af46",
+      "bytes": 4073
+    },
+    {
+      "path": "api/domains/capabilities/builtin/object-recognition/SKILL.md",
+      "sha256": "cb77f3ea1b26ba58d0ea973708c28545b327e14282fe5cdc2e98f6aaaad1e1c9",
+      "bytes": 1256
+    },
+    {
+      "path": "api/domains/capabilities/builtin/object-recognition.ts",
+      "sha256": "ebefe37462138652d1ed128a9a9a6bd4beecfe7b8687ba25ea33fce669744844",
+      "bytes": 1883
+    },
+    {
+      "path": "api/domains/capabilities/builtin/timers/SKILL.md",
+      "sha256": "8047257c90eac1bf37762993122ca2e13607e031e054bbb6da85847e37cecf66",
+      "bytes": 974
+    },
+    {
+      "path": "api/domains/capabilities/builtin/timers.ts",
+      "sha256": "9caca69f06ad9bec4ba2a7b535ff5c13ca4b3550d455b8cc5ce8d0b796c51861",
+      "bytes": 2307
+    },
+    {
+      "path": "api/domains/capabilities/builtin/toolchains.ts",
+      "sha256": "b0fb1b556703d30dd7e0e3e94911da647716b7f1e96af58253b9e3213c4eab22",
+      "bytes": 253
+    },
+    {
+      "path": "api/domains/capabilities/builtin/web-recipe/SKILL.md",
+      "sha256": "22662d0c683b0056afc6e801f2254d83cae78606012ce4090b51e8b366cc431d",
+      "bytes": 2358
+    },
+    {
+      "path": "api/domains/capabilities/builtin/web-research/SKILL.md",
+      "sha256": "f77d1d5ad792ec5a42d61cabdb3648d034a587c001a734b1a2e913ea3181cc39",
+      "bytes": 3813
+    },
+    {
+      "path": "api/domains/capabilities/builtin/web-research/SKILL.v2.md",
+      "sha256": "5ce88b1e79a8ccb99b89581e5bdd6507a1923413b19834121b0b19ba2752c0bc",
+      "bytes": 3896
+    },
+    {
+      "path": "api/domains/capabilities/builtin/web-research/SKILL.v3.md",
+      "sha256": "08c79b4ca2588d99c4970dd73f97b8ef83a358e347f4f5b1a93ea1fdcef59f28",
+      "bytes": 4825
+    },
+    {
+      "path": "api/domains/capabilities/builtin/web-research/SKILL.v4.md",
+      "sha256": "44868f6a8170f1f824c1ced18ae0900239811e4774cf8fa39db2282b31905374",
+      "bytes": 5623
+    },
+    {
+      "path": "api/domains/capabilities/builtin/web-research/SKILL.v5.md",
+      "sha256": "22a289fea42bc9e07d4c485a1ef9ed61fa3ca27f5ad5fd5f0060e885473108ce",
+      "bytes": 2806
+    },
+    {
+      "path": "api/domains/capabilities/builtin/web-research/SKILL.v6.md",
+      "sha256": "37e3849976bcee516556ced15da590e1e12a5358d058f8f3b7f393be5f1db08a",
+      "bytes": 1462
+    },
+    {
+      "path": "api/domains/capabilities/builtin/web-research/SKILL.v7.md",
+      "sha256": "bded9a161f7d50271d371f1fb7d71e110aed70128df8d2f6babf4677a82dc22a",
+      "bytes": 731
+    },
+    {
+      "path": "api/domains/capabilities/builtin/web-research/SKILL.v8.md",
+      "sha256": "3cad6b399fd069968c82a74ae94e42e310c5e1014c72231363277f87c4165b82",
+      "bytes": 582
+    },
+    {
+      "path": "api/domains/capabilities/builtin/web-research.ts",
+      "sha256": "037d550cbe86a20fe9454d4e5406697970446e093d33042a1b1efa3601e6e17b",
+      "bytes": 16421
+    },
+    {
+      "path": "api/domains/capabilities/bundles/image-screen.bundle.json",
+      "sha256": "cefd501784f4d5d76e235ec80bb1978e2f597bfd6fce2dc8277fb2b513f49919",
+      "bytes": 3506
+    },
+    {
+      "path": "api/domains/capabilities/bundles/kanban.bundle.json",
+      "sha256": "fa0c4cd87e520ebcaf43e3ba75176c02484ae16db969a8c5e2e2a204b5481921",
+      "bytes": 19340
+    },
+    {
+      "path": "api/domains/capabilities/bundles/music-screen.bundle.json",
+      "sha256": "cf33b8d6d6a84c8a664d6f5021c17a5e4f7251538270318acf91803422e8a00d",
+      "bytes": 6680
+    },
+    {
+      "path": "api/domains/capabilities/bundles/object-recognition-screen.bundle.json",
+      "sha256": "58c230fcec2d63774e1ec8d654bfb5804d8799961c600182b2a529de7a0d8d0b",
+      "bytes": 3271
+    },
+    {
+      "path": "api/domains/capabilities/bundles/ocr.bundle.json",
+      "sha256": "35d5c5fa0edecdebfecc13baa5292b31d46ef79312ce9debd656e670d376df59",
+      "bytes": 22271
+    },
+    {
+      "path": "api/domains/capabilities/bundles/settings-dictionary.bundle.json",
+      "sha256": "3ea55042556ea610372da614ed876f25702c0dd0d8cb741cec79fa7ce7b64742",
+      "bytes": 5238
+    },
+    {
+      "path": "api/domains/capabilities/bundles/settings-google.bundle.json",
+      "sha256": "c2150b00cfe779df35380f1f33a6c2eacf84632df17ec1c60afbaffd8ec6454e",
+      "bytes": 1695
+    },
+    {
+      "path": "api/domains/capabilities/bundles/settings-memory.bundle.json",
+      "sha256": "7c4b0a3a51697d0f9fa55100889414d734c946e34180d09054392277039dcfe1",
+      "bytes": 10857
+    },
+    {
+      "path": "api/domains/capabilities/bundles/settings-service-tests.bundle.json",
+      "sha256": "864ade1e2cc8fe054e292720b48aa76d7692e15b9affd96382da951b3b7eaeea",
+      "bytes": 17058
+    },
+    {
+      "path": "api/domains/capabilities/bundles/settings-world.bundle.json",
+      "sha256": "b3d101641174d8a887c77e56fe2b4ac93b7efa22dfed5ed662cea6584d9da145",
+      "bytes": 4358
+    },
+    {
+      "path": "api/domains/capabilities/bundles/settings.bundle.json",
+      "sha256": "b73fddf68fb8fe941770fe1839549e86e85cca4014c3249ced19b020dd6d159d",
+      "bytes": 57956
+    },
+    {
+      "path": "api/domains/capabilities/bundles/settings.spatial.bundle.json",
+      "sha256": "7bcd09be705108412dbcd64a1dd352f9167591702b3c3b1c57b5043a419140c3",
+      "bytes": 21426
+    },
+    {
+      "path": "api/domains/capabilities/bundles/steward-request.bundle.json",
+      "sha256": "54f7fa211c078ac58d2555942569bdc395aba9aeddd47be75a73cff1bd159a78",
+      "bytes": 6168
+    },
+    {
+      "path": "api/domains/capabilities/bundles/terminals-screen.bundle.json",
+      "sha256": "9517f7ca4a2ebbb46eda590c8a1a93ca2519f9c00d80adcc3b78020d712307c0",
+      "bytes": 6668
+    },
+    {
+      "path": "api/domains/capabilities/bundles/timers.bundle.json",
+      "sha256": "101abf507da4916caf24095f67480d26baed9c487dd3a5f8d820e447ffeee9f8",
+      "bytes": 16559
+    },
+    {
+      "path": "api/domains/capabilities/bundles/ui-compositions.bundle.json",
+      "sha256": "fd64f6d0d0c3c59997d97901f8f6b54fa63334d8f5aee11b236646ac38d662a0",
+      "bytes": 6272
+    },
+    {
+      "path": "api/domains/capabilities/bundles/world-query.bundle.json",
+      "sha256": "fc1277031405f10bccd0ef0a23121a59a2b7be5f628e6580ea20ba39856b4154",
+      "bytes": 8859
+    },
+    {
+      "path": "api/domains/capabilities/contracts/bindings.ts",
+      "sha256": "a08048a11ab04ceaa33b2cc3634d1fc7f6f6c1e3d2db17383e2750e67ebc8c96",
+      "bytes": 23464
+    },
+    {
+      "path": "api/domains/capabilities/contracts/claude-code.ts",
+      "sha256": "1d50ffbf0a8411edc0365aabd9ef9ed686a996feac4039fd3c9360a5eb06a969",
+      "bytes": 976
+    },
+    {
+      "path": "api/domains/capabilities/contracts/dots.ts",
+      "sha256": "ab329f7375830f250e19af32a3e92695380aa448c56ad7d40727335b67d0f372",
+      "bytes": 515
+    },
+    {
+      "path": "api/domains/capabilities/contracts/excalidraw.ts",
+      "sha256": "16d6f179e8a205e27815a71d7b204f757c1030b80bf619f6eeec8f83082df6fe",
+      "bytes": 334
+    },
+    {
+      "path": "api/domains/capabilities/contracts/image.ts",
+      "sha256": "4a97348c99149533bb838e1712b6ef8acfe2ff17a8f225d7848b80005af9ca12",
+      "bytes": 608
+    },
+    {
+      "path": "api/domains/capabilities/contracts/index.ts",
+      "sha256": "859cc3c86090568e9254bb70a571a74dca5f428b9a6de52ed21a7c31e6390e85",
+      "bytes": 8177
+    },
+    {
+      "path": "api/domains/capabilities/contracts/inputs.ts",
+      "sha256": "eed652bfeb84cc5d4df98219a5aba11c73d894344052345e164d47d5e22b27dd",
+      "bytes": 353
+    },
+    {
+      "path": "api/domains/capabilities/contracts/kanban.ts",
+      "sha256": "d20a70b513810d5be2b82cc198cf893921eb85359d34fb6a25dd47da5785134c",
+      "bytes": 2017
+    },
+    {
+      "path": "api/domains/capabilities/contracts/memory-request.ts",
+      "sha256": "db06f8fa5217b350509017660b16030815d6495b3c51564bccfe70a9bd4aa8ad",
+      "bytes": 834
+    },
+    {
+      "path": "api/domains/capabilities/contracts/music.ts",
+      "sha256": "bd890090ed3dee00309054c724fe71b591e5c61537cc3f3adee249ee3a8526ed",
+      "bytes": 939
+    },
+    {
+      "path": "api/domains/capabilities/contracts/object-recognition.ts",
+      "sha256": "aac9f4c1e455df5d0b9391b89e98cc7e4593c7ffb81c7a64ac760ae646f60810",
+      "bytes": 295
+    },
+    {
+      "path": "api/domains/capabilities/contracts/public-url.ts",
+      "sha256": "dd731d3957bfa20159d00bbe0b55b7fc28691c4a4eebfb0b1e6be4e075157d95",
+      "bytes": 220
+    },
+    {
+      "path": "api/domains/capabilities/contracts/requirements.ts",
+      "sha256": "ea5515940d6756b859082f62b9c8a1cb9165c8135c302264083757ad7b4ba9ba",
+      "bytes": 3540
+    },
+    {
+      "path": "api/domains/capabilities/contracts/runtime-meta.ts",
+      "sha256": "e2b848c6b4f4dc6c77a5924d24d41d6330ff7a83630b838f11b20c5ce7900b15",
+      "bytes": 4317
+    },
+    {
+      "path": "api/domains/capabilities/contracts/timers.ts",
+      "sha256": "18a9f04afd883160edfe33c1d4e2bb69178accac2ad73d520b77020342eb2568",
+      "bytes": 2179
+    },
+    {
+      "path": "api/domains/capabilities/contracts/toolchains.ts",
+      "sha256": "b26e4cfc3aeee4a8a4ecdc25c68fb25d58bdf21f6236dd03d9ff91d4b23d83c6",
+      "bytes": 3186
+    },
+    {
+      "path": "api/domains/capabilities/contracts/ui-compositions.ts",
+      "sha256": "a807b92cf4dcb0a8f7f6257ef56d6becabf90b829a8d24cdcb07e864e2e2d543",
+      "bytes": 638
+    },
+    {
+      "path": "api/domains/capabilities/contracts/world-query.ts",
+      "sha256": "77e5d064c9ca670ee86cd7ad9adda132e99ed4811ab9d1910f3fa290d84ae44b",
+      "bytes": 3968
+    },
+    {
+      "path": "api/domains/capabilities/seeds/toolchains.json",
+      "sha256": "09d39051f3d40743b2c247048ab97eeb6c89abcab773e318a4c9e51fe64b6bdc",
+      "bytes": 8688
+    },
+    {
+      "path": "api/domains/capabilities/service/builtin-seed.ts",
+      "sha256": "ce306c09b06df189f808485f3b0b8f4487522d1ed3a61fbd386f50c3f329c987",
+      "bytes": 2820
+    },
+    {
+      "path": "api/domains/capabilities/service/bundle-files.ts",
+      "sha256": "aff53a823f5c979c52e57517994f811a2b8bbc343646ee2db8e0e7035548cc4a",
+      "bytes": 1171
+    }
+  ]
+}

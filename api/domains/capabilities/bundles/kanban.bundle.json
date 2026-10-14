@@ -184,7 +184,7 @@
 		{
 			"kind": "toolchain",
 			"id": "kanban.manage",
-			"revision": 1,
+			"revision": 2,
 			"title": "タスクボード",
 			"summary": "作業をカードとして登録・整理し、実行キューへ入れて状況を確認する",
 			"aliases": ["タスクボード", "カンバン", "タスク"],
@@ -208,15 +208,15 @@
 			"packageRevisionId": "package:kanban.manage@1",
 			"functionName": "kanban",
 			"redirects": [],
-			"bindingRevisionId": "binding:kanban.manage@1",
-			"artifactRevisionId": "artifact:kanban.board@1"
+			"bindingRevisionId": "binding:kanban.manage@2",
+			"artifactRevisionId": "artifact:kanban.board@2"
 		}
 	],
 	"bindings": [
 		{
 			"kind": "binding",
 			"id": "kanban.manage",
-			"revision": 1,
+			"revision": 2,
 			"execution": "command",
 			"adapterRef": "adapter:kanban@1",
 			"availabilityRef": "availability:kanban@1",
@@ -264,7 +264,7 @@
 			],
 			"outputSchemaRef": "domain:kanban.receipt@1",
 			"resultProjectionRef": "projection:kanban.result@1",
-			"artifactRevisionId": "artifact:kanban.board@1",
+			"artifactRevisionId": "artifact:kanban.board@2",
 			"questions": [
 				{
 					"inputSchemaRef": "builtin:kanbanCardAnswer",
@@ -277,7 +277,7 @@
 		{
 			"kind": "artifact",
 			"id": "kanban.board",
-			"revision": 1,
+			"revision": 2,
 			"title": "タスクボード",
 			"variants": [
 				{
@@ -305,7 +305,7 @@
 					"eventAction": "kanban-add",
 					"source": "kanban",
 					"operationId": "kanban.add",
-					"inputSchemaRef": "schema:kanban-add@1",
+					"inputSchemaRef": "schema:kanban-add@2",
 					"inputAdapterRef": "input:kanban.add@1",
 					"effect": "write"
 				},
@@ -314,7 +314,7 @@
 					"eventAction": "kanban-edit",
 					"source": "kanban",
 					"operationId": "kanban.edit",
-					"inputSchemaRef": "schema:kanban-edit@1",
+					"inputSchemaRef": "schema:kanban-edit@2",
 					"inputAdapterRef": "input:kanban.edit@1",
 					"effect": "write"
 				},
@@ -428,7 +428,7 @@
 		{
 			"kind": "schema",
 			"id": "kanban-add",
-			"revision": 1,
+			"revision": 2,
 			"schema": {
 				"type": "object",
 				"additionalProperties": false,
@@ -450,7 +450,7 @@
 		{
 			"kind": "schema",
 			"id": "kanban-edit",
-			"revision": 1,
+			"revision": 2,
 			"schema": {
 				"type": "object",
 				"additionalProperties": false,

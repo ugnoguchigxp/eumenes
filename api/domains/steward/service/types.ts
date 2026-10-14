@@ -103,6 +103,8 @@ export interface StewardDeps {
 	setTimer?(run: () => void, ms: number): () => void;
 	/** Absent: World is off, and the World curation, its routing and the World parts of a forget are skipped. */
 	world?: StewardWorld;
+	/** The saved cloud LLM resource the World curation runs on; absent or null keeps the conversation route. */
+	worldResourceId?(): string | null;
 	/** Absent: no goal reflection, no goal upkeep, no goal in a forget. */
 	goals?: StewardGoals;
 }

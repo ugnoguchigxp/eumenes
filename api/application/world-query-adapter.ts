@@ -78,7 +78,11 @@ export function createWorldQueryPorts(options: {
 	const { store, world } = options;
 	const query = createWorldQuery({ store, world });
 	return {
-		available: (db) => world.statusInTransaction(db).usable,
+		// Artifact listings ask outside a transaction; World reads its schema inside one.
+		available: (db) =>
+			db.inTransaction
+				? world.statusInTransaction(db).usable
+				: db.transaction(() => world.statusInTransaction(db).usable)(),
 		queryInTransaction: (db, raw) =>
 			query.queryInTransaction(db, options.context(), raw),
 		entitiesInTransaction(db) {

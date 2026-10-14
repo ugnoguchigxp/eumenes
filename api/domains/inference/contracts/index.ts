@@ -66,8 +66,11 @@ export interface BackgroundControl {
 	deadline: number;
 	taskDeadline: number;
 	maxOutputTokens: number;
-	/** `conversation` keeps the saved conversation route; absent means LARM only. */
-	route?: "conversation";
+	/**
+	 * `conversation` keeps the saved conversation route; `{ resourceId }` sends the request to that saved
+	 * cloud LLM resource (the conversation route when it can not be used); absent means LARM only.
+	 */
+	route?: "conversation" | { resourceId: string };
 	/** Enforce the control output schema as a strict provider schema; absent keeps plain JSON-object output. */
 	structuredOutput?: boolean;
 }

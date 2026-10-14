@@ -553,10 +553,12 @@ export function createActionRequests(deps: {
 		},
 		/** Launcher entries: one per active artifact whose adapter is usable now. */
 		artifacts(): ArtifactListEntry[] {
-			return store.read((db) => usableArtifacts(ctx, db));
+			return store.readSnapshot((db) => usableArtifacts(ctx, db));
 		},
 		artifact(artifactRevisionId: string): ArtifactView {
-			return store.read((db) => artifactView(ctx, db, artifactRevisionId));
+			return store.readSnapshot((db) =>
+				artifactView(ctx, db, artifactRevisionId),
+			);
 		},
 		source(
 			artifactRevisionId: string,
@@ -564,7 +566,7 @@ export function createActionRequests(deps: {
 			targetRef?: string,
 			params?: unknown,
 		): SourceView {
-			return store.read((db) =>
+			return store.readSnapshot((db) =>
 				readSource(ctx, db, artifactRevisionId, source, targetRef, params),
 			);
 		},

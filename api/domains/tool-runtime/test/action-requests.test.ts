@@ -31,6 +31,23 @@ const rows = () =>
 		db.query("SELECT * FROM tool_action_requests ORDER BY created_at").all(),
 	) as LedgerRow[];
 
+test("artifact reads keep availability and source queries inside a read snapshot", () => {
+	fresh();
+	h.adapter.availableInTransaction = (db) => {
+		expect(db.inTransaction).toBe(true);
+		return true;
+	};
+	const source = h.adapter.sourceInTransaction;
+	h.adapter.sourceInTransaction = (db, ...args) => {
+		expect(db.inTransaction).toBe(true);
+		expect(() => db.query("DELETE FROM fake_effects").run()).toThrow();
+		return source(db, ...args);
+	};
+	expect(h.service.artifacts().length).toBeGreaterThan(0);
+	expect(h.service.artifact(ARTIFACT_ID).artifactRevisionId).toBe(ARTIFACT_ID);
+	expect(h.service.source(ARTIFACT_ID, "item", "item-1").revision).toBe(3);
+});
+
 test("execution and acceptance commit together and the adapter receives eventId and host issuedAt", async () => {
 	fresh();
 	const event = h.event();

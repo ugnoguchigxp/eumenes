@@ -217,9 +217,14 @@ export const settingsSchema = z
 				 * restart). OFF still protects (forget propagation only) while World holds content.
 				 */
 				enabled: z.boolean().default(false),
+				/**
+				 * The cloud LLM resource the steward writes World with; null keeps the conversation route.
+				 * Read on each request: a change applies to the next World curation.
+				 */
+				curationResourceId: z.uuid().nullable().default(null),
 			})
 			.strict()
-			.default({ enabled: false }),
+			.default({ enabled: false, curationResourceId: null }),
 	})
 	.strict()
 	.superRefine((s, ctx) => {
@@ -285,6 +290,16 @@ export const settingsSchema = z
 					message: "クラウド専用には許可と代替先が必要です",
 				});
 		}
+		const worldResource = s.world.curationResourceId;
+		if (
+			worldResource &&
+			!s.resources.some((r) => r.id === worldResource && r.purpose === "llm")
+		)
+			ctx.addIssue({
+				code: "custom",
+				message: "Worldの記録に使うAIが会話モデルとして登録されていません",
+				path: ["world", "curationResourceId"],
+			});
 	});
 export type Settings = z.infer<typeof settingsSchema>;
 export type Connection = z.infer<typeof connectionSchema>;

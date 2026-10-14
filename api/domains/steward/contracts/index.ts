@@ -116,8 +116,11 @@ export interface InferencePort {
 			deadline: number;
 			taskDeadline: number;
 			maxOutputTokens: number;
-			/** "conversation": keep the conversation's own route (cloud allowed) instead of forcing the local one. */
-			route?: "conversation";
+			/**
+			 * "conversation": keep the conversation's own route (cloud allowed) instead of forcing the local one;
+			 * `{ resourceId }`: that saved cloud LLM resource.
+			 */
+			route?: "conversation" | { resourceId: string };
 			/** The output schema goes to the provider as a strict schema. */
 			structuredOutput?: boolean;
 		},

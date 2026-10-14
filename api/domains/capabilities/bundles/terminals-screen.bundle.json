@@ -32,7 +32,7 @@
 		{
 			"kind": "tool",
 			"id": "claude-code.request",
-			"revision": 1,
+			"revision": 2,
 			"title": "Claude Code に依頼する",
 			"summary": "依頼文を実行中の Claude Code に渡す。無ければ起動して渡す",
 			"aliases": [],
@@ -46,7 +46,7 @@
 		{
 			"kind": "package",
 			"id": "claude-code.request",
-			"revision": 1,
+			"revision": 2,
 			"title": "Claude Code",
 			"summary": "Claude Code にコーディング作業を依頼する",
 			"aliases": ["クロードコード"],
@@ -56,18 +56,18 @@
 			"dependencies": [
 				"profile:claude-code.request@1",
 				"skill:claude-code.request@1",
-				"tool:claude-code.request@1"
+				"tool:claude-code.request@2"
 			],
 			"backend": "claude-code",
 			"schemaKey": "claudeCodeRequest",
 			"profileRevisionId": "profile:claude-code.request@1",
 			"requiredSkillRevisionIds": ["skill:claude-code.request@1"],
-			"toolRevisionIds": ["tool:claude-code.request@1"]
+			"toolRevisionIds": ["tool:claude-code.request@2"]
 		},
 		{
 			"kind": "toolchain",
 			"id": "claude-code.request",
-			"revision": 1,
+			"revision": 2,
 			"title": "Claude Code",
 			"summary": "Claude Code にコーディング作業を依頼し、画面で進み具合を見る",
 			"aliases": ["Claude Code", "クロードコード"],
@@ -80,17 +80,17 @@
 				"プログラミングの一般的な質問に答えるだけ",
 				"Claude Code の使い方や料金を聞いているだけ"
 			],
-			"dependencies": ["package:claude-code.request@1"],
+			"dependencies": ["package:claude-code.request@2"],
 			"examples": [
 				"Claude Code でログイン画面のバグを直して",
 				"README のセットアップ手順を最新にするよう Claude Code に頼んで",
 				"テストが落ちている原因を Claude Code に調べさせて",
 				"別のセッションの Claude Code で依存パッケージを更新して"
 			],
-			"packageRevisionId": "package:claude-code.request@1",
+			"packageRevisionId": "package:claude-code.request@2",
 			"functionName": "claude_code",
 			"redirects": [],
-			"bindingRevisionId": "binding:claude-code.request@1",
+			"bindingRevisionId": "binding:claude-code.request@2",
 			"artifactRevisionId": "artifact:terminals.workspace@2"
 		}
 	],
@@ -98,13 +98,13 @@
 		{
 			"kind": "binding",
 			"id": "claude-code.request",
-			"revision": 1,
+			"revision": 2,
 			"execution": "command",
 			"adapterRef": "adapter:terminals@1",
 			"availabilityRef": "availability:terminals@1",
 			"tools": [
 				{
-					"toolRevisionId": "tool:claude-code.request@1",
+					"toolRevisionId": "tool:claude-code.request@2",
 					"operationId": "claude-code.request",
 					"inputSchemaRef": "builtin:claudeCodeRequest"
 				}

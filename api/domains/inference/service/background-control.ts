@@ -1,10 +1,15 @@
 import type { Database } from "bun:sqlite";
 import type { Purpose, Settings } from "../../settings";
+import { getLogger } from "../../../infrastructure/logger";
 import type { BackgroundControl } from "../contracts";
+
+const log = getLogger("inference");
 
 /**
  * Host-issued background control request, idempotent per task and decision. By default it is LARM only;
- * `route: "conversation"` keeps the saved conversation route (LARM preferred or cloud, as the settings allow).
+ * `route: "conversation"` keeps the saved conversation route (LARM preferred or cloud, as the settings allow);
+ * `route: { resourceId }` uses that saved cloud LLM resource only, while it is registered, its connection
+ * enabled and the conversation route allows the cloud (otherwise the conversation route).
  * `structuredOutput` makes the output schema a strict provider schema (see `controlJsonOptions`).
  */
 /** A background control request's deadline cap. */
@@ -70,9 +75,27 @@ export function captureBackgroundControl(
 		return old.id;
 	}
 	const snapshot = deps.snapshot();
-	if (input.route !== "conversation") {
+	if (input.route === undefined) {
 		snapshot.routes.llm.mode = "larm-only";
 		snapshot.routes.llm.cloudAllowed = false;
+	} else if (input.route !== "conversation") {
+		const resourceId = input.route.resourceId;
+		const resource = snapshot.resources.find(
+			(r) => r.id === resourceId && r.purpose === "llm",
+		);
+		const usable =
+			!!resource &&
+			snapshot.routes.llm.cloudAllowed &&
+			snapshot.connections.some(
+				(c) => c.id === resource.connectionId && c.enabled,
+			);
+		if (usable) {
+			snapshot.routes.llm.mode = "cloud-only";
+			snapshot.routes.llm.fallbackId = resourceId;
+		} else
+			log.warn("inference.background_resource_unusable", {
+				taskId: input.taskId,
+			});
 	}
 	const requestId = deps.capture(db, subject, "llm", input.deadline, snapshot);
 	db.query(

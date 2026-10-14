@@ -20,7 +20,7 @@ afterEach(async () => {
 	h = undefined;
 });
 
-async function setup() {
+async function setup(options: { worldResourceId?: string } = {}) {
 	const late: {
 		blocked: (db: Database, ids: Iterable<string>) => Set<string>;
 		kick: (conversationId: string) => void;
@@ -32,6 +32,7 @@ async function setup() {
 	});
 	expect((await opened.registerEntity()).status).toBe("applied");
 	const stewardHarness = await setupSteward({
+		...options,
 		goals: true,
 		host: {
 			store: opened.store,
@@ -81,6 +82,33 @@ const heads = async (opened: RealWorld) => {
 	if (read.status !== "ready") throw new Error(JSON.stringify(read));
 	return read.snapshot.assertions;
 };
+
+test("only the World curation runs on the resource chosen for World; every other step keeps the conversation route", async () => {
+	const resourceId = crypto.randomUUID();
+	const { opened, h } = await setup({ worldResourceId: resourceId });
+	h.inference.script("curate-memory", {
+		...empty,
+		route: [{ exchange: "e1", world: true, goals: false }],
+	});
+	h.inference.script("dispose-exchanges", keepAll);
+	h.inference.script("curate-world", {
+		entities: [],
+		claims: [claim],
+		changed: true,
+	});
+	await h.run({
+		user: "音声サービスは9月から利用できる。",
+		answer: "分かりました。",
+		end: "completed",
+	});
+	await h.drain();
+	await opened.lifecycle.consumeSourceChanges(SCOPE);
+	await h.drain();
+	expect(h.inference.callsOf("curate-world")).toHaveLength(1);
+	const routes = h.inference.captures.map((c) => c.route);
+	expect(routes.filter((r) => r !== "conversation")).toEqual([{ resourceId }]);
+	expect(routes.length).toBeGreaterThan(1);
+});
 
 test("a statement reaches World through the steward, and a forget request removes the claim, its evidence and the source", async () => {
 	const { opened, h } = await setup();

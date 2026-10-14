@@ -34,7 +34,10 @@ export function createPrepare(
 	function capture(
 		db: Database,
 		claim: { jobId: string; generation: number; attempt: number },
+		step: UnitRow["step"],
 	) {
+		const worldResourceId =
+			step === "curate-world" ? (deps.worldResourceId?.() ?? null) : null;
 		db.exec("SAVEPOINT steward_capture");
 		try {
 			const deadline = deps.nowMs() + INFERENCE_MS;
@@ -47,8 +50,10 @@ export function createPrepare(
 				deadline,
 				taskDeadline: deadline,
 				maxOutputTokens: MAX_OUTPUT_TOKENS,
-				// The conversation's own route (cloud allowed), the schema as a strict one.
-				route: "conversation",
+				// The conversation's own route (cloud allowed), or the resource chosen for World; the schema as a strict one.
+				route: worldResourceId
+					? { resourceId: worldResourceId }
+					: "conversation",
 				structuredOutput: true,
 			});
 			db.exec("RELEASE steward_capture");
@@ -137,7 +142,7 @@ export function createPrepare(
 			kick.kickOne(db, unit.conversationId);
 			return prepared;
 		}
-		const requestId = capture(db, claim);
+		const requestId = capture(db, claim, unit.step);
 		if (requestId === null) {
 			// Not the targets' fault and not counted; but it is not left until the next run: the timer tries again.
 			wake.captureFailed(unit.conversationId, unit.slot);

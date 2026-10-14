@@ -257,6 +257,7 @@ export async function buildServices(
 	const { stewardAssembly, steward, goals, world } = assembleCuration(config, {
 		...{ store, memory, conversation, continuity, queue, inference },
 		...{ dbPath, memoryJournalPath },
+		worldResourceId: () => settings.get().world.curationResourceId,
 	});
 	let imageForCompositions: ImageService;
 	const uiCompositions = createUiCompositions({

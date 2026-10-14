@@ -1064,6 +1064,70 @@ test("a background control keeps the conversation route only when asked, and a d
 	await expect(capture("b")).rejects.toThrow("background_control_conflict");
 });
 
+test("a background control on a saved resource goes to that resource only, and falls back to the conversation route when it can not be used", async () => {
+	const h = await setup();
+	const capture = (decisionId: string, resourceId: string) =>
+		h.store.write((db) =>
+			h.inference.captureBackgroundControlInTransaction!(db, {
+				taskId: "task",
+				decisionId,
+				authorityEpoch: 1,
+				executionGeneration: 1,
+				deadline: Date.now() + 20000,
+				taskDeadline: Date.now() + 30000,
+				maxOutputTokens: 512,
+				route: { resourceId },
+			}),
+		);
+	const routeOf = (id: string) =>
+		h.store.read((db) => {
+			const row = db
+				.query("SELECT snapshot FROM inference_requests WHERE id=?")
+				.get(id) as { snapshot: string };
+			const { llm } = JSON.parse(row.snapshot).routes;
+			return [llm.mode, llm.fallbackId];
+		});
+	const saved = h.settings.get();
+	const llm = saved.resources.find((r) => r.purpose === "llm")!;
+	const extra = crypto.randomUUID();
+	await h.settings.apply({
+		requestId: crypto.randomUUID(),
+		expectedRevision: saved.revision,
+		settings: {
+			...saved,
+			resources: [
+				...saved.resources,
+				{ ...llm, id: extra, model: "fixture-llm-2" },
+			],
+		},
+		keys: [],
+	});
+	expect(routeOf(await capture("a", extra))).toEqual(["cloud-only", extra]);
+	// Not a registered LLM resource: the saved conversation route.
+	expect(routeOf(await capture("b", crypto.randomUUID()))).toEqual([
+		"larm-preferred",
+		llm.id,
+	]);
+	// The conversation route forbids the cloud: the resource is not used.
+	const now = h.settings.get();
+	await h.settings.apply({
+		requestId: crypto.randomUUID(),
+		expectedRevision: now.revision,
+		settings: {
+			...now,
+			routes: {
+				...now.routes,
+				llm: { ...now.routes.llm, cloudAllowed: false },
+			},
+		},
+		keys: [],
+	});
+	expect(routeOf(await capture("c", extra))).toEqual([
+		"larm-preferred",
+		llm.id,
+	]);
+});
+
 // RT-12: a probe row must never stay "running" and block new probes.
 const probeRow = (
 	store: Awaited<ReturnType<typeof setup>>["store"],

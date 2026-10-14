@@ -15,7 +15,7 @@
 
 - steward は memory、continuity、conversation を使う。dialogue は memory だけを見る。複数 domain への保存は、step の settle が1つの transaction の中で各 domain の公開操作を呼んで行う。
 - 記憶の手動変更はない。HTTP・CLI・設定画面は閲覧だけで、残る変更は「メモリーの接続」の入り切りだけである。本人の意思は会話で伝える（依頼キュー）。
-- profile 名・モデル名はコードに固定しない。steward の推論は会話と同じ route、同じ接続先で行われる。
+- profile 名・モデル名はコードに固定しない。steward の推論は会話と同じ route、同じ接続先で行われる。例外は World の記録（curate-world）で、設定 `world.curationResourceId` に登録済みのクラウドの会話モデルを選ぶと、その resource だけで推論する（未設定・resource がない・接続が無効・会話の route がクラウドを許可しないときは会話と同じ route）。
 
 ## ContextWindow の層と並び順
 
@@ -146,6 +146,7 @@ State（過去の版を含む）・usage・Window・傾向、World の派生、�
 | 目標（Goals） | 本人が目指すこと（明言は採用、推測は提案。期限では取り下げない） | curate-goals、手入れの consolidate-goals |
 
 - **World の ON/OFF** は設定 `world.enabled`（再起動で反映）。OFF でも World に中身があれば、忘却の伝播だけが動く（protect）。
+- **World の記録に使う AI** は設定 `world.curationResourceId`（設定画面「会話」の「ワールドモデルの記録に使うAI」）。次の記録から反映される。応答は他の手順と同じく `parseLlmJson` で構文だけ補正してから schema で検査する。
 - **World への反映**: 会話の outbox から World が受け付けた event（ユーザー発言と、採用されたアシスタントの回答）を、steward の実行単位 `world_events` が1往復分（最大2件）ずつ処理する。往復の完了は World を待たない。受付の後に World が steward を kick する。3回保留された event は `STEWARD_GAVE_UP` で終わる。
 - **振り分け**: curate-memory が往復ごとに「World・目標の処理が要るか」を判定し、発言の revision と digest に結び付けて記録する。要らない往復は推論しない。版が違う・判定がないときは処理する。
 - **回答での使い方**: ① 採用済みの目標を L1 の直後に置く（優先度順、1件120文字、全体 2KB、溢れは「ほか N 件」）。② 本人の発言に出た既知の対象を名前・別名の一致で最大5件引き、その状態と直接の因果を L4 に入れる。③ 深い推論は会話エージェントが `world_query` ツールで引く。

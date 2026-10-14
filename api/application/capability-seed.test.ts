@@ -8,6 +8,7 @@ import {
 	toolchainBuiltins,
 } from "../domains/capabilities";
 import { loadConfig } from "../infrastructure/config";
+import { createSettings } from "../domains/settings";
 import { openStore } from "../infrastructure/sqlite";
 import { createLifecycleRunner } from "./lifecycle";
 import { migrations } from "./migrations";
@@ -172,11 +173,22 @@ test("reopening and seeding preserves disabled toolchains and explicitly publish
 test("normal server assembly seeds toolchains and launchers without a separate import", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-seed-startup-"));
 	try {
+		const dbPath = join(dir, "db");
+		const setup = openStore(dbPath, migrations);
+		const settings = await createSettings(setup, { dbPath, env: {} });
+		const saved = settings.get();
+		saved.world.enabled = true;
+		await settings.apply({
+			requestId: crypto.randomUUID(),
+			expectedRevision: saved.revision,
+			settings: saved,
+			keys: [],
+		});
+		await setup.close();
 		const services = await buildServices(
 			loadConfig({
 				EUMENES_DB: join(dir, "db"),
 				EUMENES_ATTITUDE_DATASET: join(dir, "dataset"),
-				EUMENES_WORLD: "protect",
 			}),
 		);
 		try {
@@ -191,6 +203,18 @@ test("normal server assembly seeds toolchains and launchers without a separate i
 			);
 			expect(artifacts).toContain("timers.workspace");
 			expect(artifacts).toContain("settings.hub");
+			// Exercise the public read path too: adapter availability may require a snapshot.
+			const entries = services.toolchain.actionRequests!.artifacts();
+			expect(
+				entries.some((a) =>
+					a.artifactRevisionId.startsWith("artifact:settings.hub@"),
+				),
+			).toBe(true);
+			for (const entry of entries)
+				expect(
+					services.toolchain.actionRequests!.artifact(entry.artifactRevisionId)
+						.artifactRevisionId,
+				).toBe(entry.artifactRevisionId);
 		} finally {
 			expect(
 				await createLifecycleRunner(

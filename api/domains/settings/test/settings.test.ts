@@ -206,7 +206,10 @@ test("coding supervision instruction approval defaults to on, including for save
 });
 test("world.enabled defaults to false (also for saved documents without it), persists through apply and is what startup reads", async () => {
 	const h = await setup();
-	expect(h.settings.get().world).toEqual({ enabled: false });
+	expect(h.settings.get().world).toEqual({
+		enabled: false,
+		curationResourceId: null,
+	});
 	expect(readStoredWorldEnabled(h.store)).toBe(false);
 	// A document saved before this setting existed still loads, with World off.
 	const legacy = JSON.parse(JSON.stringify(h.settings.get()));
@@ -255,7 +258,7 @@ test("the settings API saves world.enabled and returns it", async () => {
 	expect(response.status).toBe(200);
 	expect(((await response.json()) as Settings).world.enabled).toBe(true);
 	const saved = (await (await app.request("/api/settings")).json()) as Settings;
-	expect(saved.world).toEqual({ enabled: true });
+	expect(saved.world).toEqual({ enabled: true, curationResourceId: null });
 	expect(readStoredWorldEnabled(h.store)).toBe(true);
 });
 test("readStoredWorldEnabled is false while no settings document exists", async () => {
@@ -835,4 +838,44 @@ test("old settings keep sentence routing disabled and English settings persist i
 				larm: { ...value.larm, englishSpeed },
 			}).success,
 		).toBe(false);
+});
+
+test("world.curationResourceId must name a registered LLM resource", async () => {
+	const h = await setup();
+	const s = h.settings.get();
+	expect(
+		settingsSchema.safeParse({
+			...s,
+			world: { enabled: true, curationResourceId: crypto.randomUUID() },
+		}).success,
+	).toBe(false);
+	const connectionId = crypto.randomUUID();
+	const resourceId = crypto.randomUUID();
+	const withResource = {
+		...s,
+		connections: [
+			...s.connections,
+			{
+				id: connectionId,
+				name: "Cloud",
+				baseUrl: "https://example.com/v1",
+				enabled: true,
+				epoch: 0,
+				envRef: null,
+			},
+		],
+		resources: [
+			...s.resources,
+			{
+				id: resourceId,
+				connectionId,
+				purpose: "llm" as const,
+				model: "fixture-llm",
+				contextWindow: 8192,
+				voice: null,
+			},
+		],
+		world: { enabled: true, curationResourceId: resourceId },
+	};
+	expect(settingsSchema.safeParse(withResource).success).toBe(true);
 });

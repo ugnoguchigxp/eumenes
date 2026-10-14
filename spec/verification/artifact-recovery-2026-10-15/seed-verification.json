@@ -1,0 +1,21 @@
+{
+  "activeDefinitionsMatch": "pass",
+  "documentsMatch": "pass",
+  "protectedHistoricalVariants": [
+    {
+      "id": "skill:web.research@3",
+      "seedSha256": "587d033849b45dcf4a13a26c7131ebe9ff93c26cd2cb959b2b7155b7962630b0",
+      "installedSha256": "754235f73778cf3548ad3fd08295a34b1602fabbf6d8888f2c6a941e47788286"
+    }
+  ],
+  "freshSeed": "pass",
+  "secondSeedUnchanged": "pass",
+  "existingCatalogReseedUnchanged": "pass",
+  "bundleChecks": 17,
+  "definitions": 145,
+  "documents": 84,
+  "capabilityTests": {
+    "passed": 67,
+    "failed": 0
+  }
+}
