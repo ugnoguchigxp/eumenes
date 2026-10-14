@@ -7,11 +7,6 @@ import {
 	isRecognitionDefinition,
 	recognitionDefinition,
 } from "../domains/object-recognition/artifact-definition";
-import {
-	imageArtifactDefinition,
-	isImageArtifactDefinition,
-} from "../domains/image/artifact-definition";
-import { ImageArtifact } from "../domains/image/ImageArtifact";
 import { useCallback } from "react";
 import type { EumenesClient } from "../../../client";
 import {
@@ -53,20 +48,6 @@ export function useOpenDrawing(
 				title: "図を描く・編集する",
 				definition: drawingDefinition,
 				keepMounted: true,
-			}),
-		[open],
-	);
-}
-export function useOpenImage(
-	open: ReturnType<typeof useArtifactWorkspace>["open"],
-) {
-	return useCallback(
-		() =>
-			open({
-				id: "image-generation",
-				kind: "openui",
-				definition: imageArtifactDefinition(),
-				title: "画像生成",
 			}),
 		[open],
 	);
@@ -121,12 +102,6 @@ export function WorkspaceArtifacts({
 							<ObjectRecognitionArtifact
 								client={client}
 								definition={definition}
-							/>
-						) : isImageArtifactDefinition(definition) ? (
-							<ImageArtifact
-								client={client}
-								definition={definition}
-								onClose={() => artifacts.close(artifacts.activeTabId!)}
 							/>
 						) : (
 							<MusicArtifact

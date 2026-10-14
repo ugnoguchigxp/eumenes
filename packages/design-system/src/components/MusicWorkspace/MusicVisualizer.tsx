@@ -1,16 +1,19 @@
 import { useEffect, useRef } from "react";
+import "./MusicVisualizer.css";
+
+export type MusicVisualizerProps = {
+	analyser: AnalyserNode | null;
+	playing: boolean;
+	active: boolean;
+	mode: "spectrum" | "waveform";
+};
 
 export function MusicVisualizer({
 	analyser,
 	playing,
 	active,
 	mode,
-}: {
-	analyser: AnalyserNode | null;
-	playing: boolean;
-	active: boolean;
-	mode: "spectrum" | "waveform";
-}) {
+}: MusicVisualizerProps) {
 	const canvas = useRef<HTMLCanvasElement>(null);
 	useEffect(() => {
 		const surface = canvas.current;
@@ -84,7 +87,7 @@ export function MusicVisualizer({
 	return (
 		<canvas
 			ref={canvas}
-			className="music-workspace-canvas"
+			className="ds-music-visualizer"
 			aria-label="再生音声のVisualizer"
 			role="img"
 		/>

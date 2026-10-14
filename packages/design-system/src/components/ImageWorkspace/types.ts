@@ -1,4 +1,5 @@
 import type { GenerationStatusProps } from "../GenerationStatus";
+import type { ImageCreationOptions } from "./image-creation-options";
 export type ImagePromptValues = {
 	prompt: string;
 	width: number;
@@ -22,6 +23,7 @@ export type ImageWorkspaceProps = {
 	initialTab?: "create" | "history";
 	presentation?: "embedded" | "fullscreen";
 	defaults: ImagePromptValues;
+	creationOptions?: ImageCreationOptions;
 	images: WorkspaceImage[];
 	selectedId?: string;
 	busy?: boolean;

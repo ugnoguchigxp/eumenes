@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, expect, test } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
 import type { SpeechDelivery } from "../../../../../api/domains/delivery/contracts";
 import { MessageList } from "./MessageList";
 afterEach(cleanup);
@@ -37,6 +37,33 @@ test("activity after a request stays outside the user's bubble and before the an
 	expect(userBubble?.nextElementSibling).toBe(activity);
 	expect(activity.nextElementSibling).toBe(
 		container.querySelector(".message-assistant"),
+	);
+});
+test("a result action stays inside the answer bubble and outside spoken text", () => {
+	const replay = vi.fn();
+	const { container } = render(
+		<MessageList
+			conversation={convo(["answer", "assistant", "楽曲ができました。"])}
+			onReplay={replay}
+			renderInsideMessage={(message) =>
+				message.role === "assistant" ? (
+					<button>アーティファクトで再生する</button>
+				) : null
+			}
+		/>,
+	);
+	const action = screen.getByRole("button", {
+		name: "アーティファクトで再生する",
+	});
+	expect(action.closest(".message-assistant")).toBe(
+		container.querySelector(".message-assistant"),
+	);
+	expect(container.querySelector(".markdown-content")?.textContent).toBe(
+		"楽曲ができました。",
+	);
+	fireEvent.click(screen.getByRole("button", { name: "読み上げ直す" }));
+	expect(replay).toHaveBeenCalledExactlyOnceWith(
+		expect.objectContaining({ text: "楽曲ができました。" }),
 	);
 });
 test("adopted emotion belongs beside the assistant name, preserves body and follows a custom name", () => {

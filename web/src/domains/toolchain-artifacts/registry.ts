@@ -70,6 +70,11 @@ export type AdapterState = {
 	phase: AdapterPhase;
 	/** A resource per source in `artifact.sourceBindings` (the question source is the host's). */
 	snapshot: Snapshot;
+	/** Domain-owned binary input; the returned opaque id can be sent in a registered form. */
+	uploadFile?(
+		source: string,
+		file: File,
+	): Promise<Receipt & { value?: string }>;
 	/** The target the host sends with an event of this source; undefined when it has none. */
 	targetOf(source: string): string | undefined;
 	/**

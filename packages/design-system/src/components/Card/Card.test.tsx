@@ -39,7 +39,7 @@ describe("Card Components", () => {
 				expect(card).toHaveClass(
 					"border-destructive/50",
 					"bg-destructive/10",
-					"text-destructive-foreground",
+					"text-foreground",
 					"border-2",
 				);
 			});
@@ -50,7 +50,7 @@ describe("Card Components", () => {
 				expect(card).toHaveClass(
 					"border-warning/50",
 					"bg-warning/10",
-					"text-warning-foreground",
+					"text-foreground",
 					"border-2",
 				);
 			});

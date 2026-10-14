@@ -7,6 +7,9 @@ import type { LarmPlayground } from "../../larm";
 import type { ImageRecord } from "../contracts";
 import { row, byRun, record, patch, list } from "../repository";
 import { registerImageHandlers } from "./handlers";
+/** Read-only source for the registered image screen; the image domain owns this query. */
+export const imageListInTransaction = (db: Database, conversationId: string) =>
+	list(db, conversationId);
 const active = (r: ImageRecord) =>
 	r.state === "planning" || r.state === "generating";
 export function createImage(deps: {

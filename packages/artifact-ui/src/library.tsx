@@ -47,6 +47,7 @@ import { TimerWorkspaceView } from "./timer-components";
 import { SubtitlePreviewView } from "./subtitle-components";
 import { CollectionWorkspaceView } from "./collection-components";
 import { RecordsWorkspaceView } from "./records-components";
+import { ServiceTestWorkspaceView } from "./service-test-components";
 
 const renderers = {
 	"object-recognition-workspace": ObjectRecognitionWorkspaceView,
@@ -57,6 +58,7 @@ const renderers = {
 	"image-gallery": ImageGalleryView,
 	"records-workspace": RecordsWorkspaceView,
 	"collection-workspace": CollectionWorkspaceView,
+	"service-test-workspace": ServiceTestWorkspaceView,
 	"subtitle-preview": SubtitlePreviewView,
 	"settings-section": SettingsSectionView,
 	"settings-navigation": SettingsNavigationView,
@@ -111,6 +113,17 @@ function CompositionView({
 				{request.title && (
 					<h2 className="aui-composition-title">{request.title}</h2>
 				)}
+				{request.headerChildren?.map((index) => {
+					const child = request.children[index]!;
+					return (
+						<div
+							className="aui-composition-header-child"
+							key={`${index}:${child.source ?? child.view}`}
+						>
+							<RegisteredView request={child} />
+						</div>
+					);
+				})}
 				<Tabs value={selected} onValueChange={setSelected}>
 					<TabsList aria-label={`${request.title ?? "画面"}の区分`}>
 						{tabs.map((tab, index) => (

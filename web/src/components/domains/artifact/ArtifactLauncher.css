@@ -15,3 +15,10 @@
 .artifact-launcher-trigger:hover {
 	background: var(--accent);
 }
+/* The trigger is fixed; keep the menu wrapper out of the shell's flow. */
+.artifact-launcher {
+	position: fixed;
+	z-index: 11;
+	width: 0;
+	height: 0;
+}

@@ -123,6 +123,8 @@ function formFieldView(field: FormFieldV1): CollectionFormField {
 		label: field.label,
 		...(field.help ? { help: field.help } : {}),
 		control: field.control,
+		...(field.when ? { when: field.when } : {}),
+		...(field.accept ? { accept: field.accept } : {}),
 		...(field.defaultValue !== undefined
 			? { defaultValue: field.defaultValue }
 			: {}),
@@ -262,9 +264,16 @@ export function collectionResource({
 						...(a.form
 							? {
 									form: {
-										fields: withOptions(a.form.fields, formOptions).map(
-											formFieldView,
-										),
+										fields: withOptions(
+											a.form.fields.filter(
+												(field) =>
+													!field.when ||
+													field.when.in.includes(
+														getPath(raw, field.when.key) as never,
+													),
+											),
+											formOptions,
+										).map(formFieldView),
 										values: prefillOf(a.form, raw),
 									},
 								}

@@ -1,0 +1,90 @@
+{
+	"formatVersion": 1,
+	"bundleId": "image-screen",
+	"pins": [],
+	"definitions": [],
+	"bindings": [],
+	"artifacts": [
+		{
+			"kind": "artifact",
+			"id": "image.generation",
+			"revision": 1,
+			"title": "画像生成",
+			"variants": [
+				{
+					"id": "standard",
+					"label": "標準",
+					"definition": {
+						"view": "image-workspace",
+						"source": "image-studio",
+						"title": "画像生成",
+						"presentation": "embedded",
+						"creationOptions": {
+							"styleGroups": [
+								{
+									"label": "写真・リアル",
+									"options": ["写真", "フィルム", "シネマティック", "3D"]
+								},
+								{
+									"label": "イラスト・絵画",
+									"options": ["水彩", "油彩", "アニメ", "線画", "鉛筆画", "パステル", "浮世絵", "ドット絵"]
+								}
+							],
+							"moods": ["落ち着いた", "温かい", "明るい", "幻想的", "力強い"],
+							"compositions": ["おまかせ", "広めの画角", "被写体を中央に", "クローズアップ", "俯瞰"],
+							"lighting": ["おまかせ", "朝の自然光", "柔らかな光", "夕方の光", "夜の照明", "逆光"],
+							"defaults": { "width": 512, "height": 512, "format": "webp", "seed": 0 }
+						}
+					}
+				}
+			],
+			"defaultVariant": "standard",
+			"sourceBindings": [
+				{
+					"source": "image-studio",
+					"adapterRef": "adapter:image-screen@1",
+					"query": "query:image-screen.list@1",
+					"target": "none"
+				}
+			],
+			"actionBindings": [
+				{ "actionId": "generate", "eventAction": "image-generate", "source": "image-studio", "inputSchemaRef": "schema:image-screen-generate@1", "effect": "local" },
+				{ "actionId": "cancel", "eventAction": "image-cancel", "source": "image-studio", "inputSchemaRef": "builtin:emptyInput", "effect": "local" },
+				{ "actionId": "refresh", "eventAction": "image-refresh", "source": "image-studio", "inputSchemaRef": "builtin:emptyInput", "effect": "local" },
+				{ "actionId": "select", "eventAction": "image-select", "source": "image-studio", "inputSchemaRef": "schema:image-screen-id@1", "effect": "local" },
+				{ "actionId": "delete", "eventAction": "image-delete", "source": "image-studio", "inputSchemaRef": "schema:image-screen-id@1", "effect": "local" }
+			],
+			"launcher": { "label": "画像生成", "order": 20 }
+		}
+	],
+	"schemas": [
+		{
+			"kind": "schema",
+			"id": "image-screen-generate",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"prompt": { "type": "string", "minLength": 1, "maxLength": 7600 },
+					"width": { "type": "string", "minLength": 1 },
+					"height": { "type": "string", "minLength": 1 },
+					"format": { "type": "string", "enum": ["png", "webp"] },
+					"seed": { "type": "string", "minLength": 1 }
+				},
+				"required": ["prompt", "width", "height", "format", "seed"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "image-screen-id",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": { "id": { "type": "string", "minLength": 1 } },
+				"required": ["id"]
+			}
+		}
+	]
+}

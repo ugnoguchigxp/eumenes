@@ -280,7 +280,27 @@ export const formFieldV1 = z.strictObject({
 	fieldId: z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,40}$/),
 	label: z.string().min(1).max(80),
 	help: z.string().max(300).optional(),
-	control: z.enum(["text", "textarea", "select", "toggle", "number", "secret"]),
+	control: z.enum([
+		"text",
+		"textarea",
+		"select",
+		"toggle",
+		"number",
+		"secret",
+		"upload",
+	]),
+	/** Show this field only for rows with one of these registered values. */
+	when: z
+		.strictObject({
+			key: z.string().regex(/^[A-Za-z][A-Za-z0-9_.]{0,80}$/),
+			in: z
+				.array(z.union([z.string(), z.boolean(), z.number()]))
+				.min(1)
+				.max(16),
+		})
+		.optional(),
+	/** Browser file picker hint; the adapter validates the uploaded bytes. */
+	accept: z.string().max(120).optional(),
 	options: z
 		.array(
 			z.strictObject({
@@ -330,7 +350,7 @@ export const collectionV1 = z.strictObject({
 			}),
 		)
 		.min(1)
-		.max(12),
+		.max(16),
 	rowActions: z
 		.array(
 			z.strictObject({

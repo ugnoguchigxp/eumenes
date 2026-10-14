@@ -15,6 +15,7 @@ import { useStore } from "zustand";
 import type { EumenesClient } from "../../../client";
 import { useImageArtifacts } from "../domains/image";
 import { useMusicArtifacts, usePlaylistArtifacts } from "../domains/music";
+import { MUSIC_SCREEN_ADAPTER_REF } from "../domains/music/toolchain-adapter";
 import { activeTimersQuery } from "../domains/timers/queries";
 import { TIMER_ADAPTER_REF } from "../domains/timers/toolchain-adapter";
 import { useTimerArtifacts } from "../domains/timers/useTimerArtifacts";
@@ -37,11 +38,7 @@ import { useSettings, useVoiceMute } from "../domains/settings";
 import { useSettingsDraft } from "../domains/settings/SettingsDraftHost";
 import { createUnsavedFlags } from "../unsavedFlags";
 import { changeRoots, invalidateAllButLive, queryRoots } from "../queryKeys";
-import {
-	useOpenImage,
-	useOpenRecognition,
-	useOpenPlaylist,
-} from "./WorkspaceArtifacts";
+import { useOpenRecognition, useOpenPlaylist } from "./WorkspaceArtifacts";
 
 export function useWorkspace({
 	client,
@@ -77,14 +74,16 @@ export function useWorkspace({
 	// Music generation and playback each own a stable screen, independent of record IDs.
 	const openDrawing = useOpenDrawing(artifacts.open);
 	useDrawingArtifacts(client, openDrawing);
-	const openImage = useOpenImage(artifacts.open);
 	const openRecognition = useOpenRecognition(artifacts.open);
 	useRecognitionArtifacts(client, openRecognition);
-	useImageArtifacts(client, "main", openImage);
 	const openPlaylist = useOpenPlaylist(artifacts.open);
 	// One launcher entry per registered artifact; the saved timer is chosen inside the screen.
 	const toolchain = useToolchainArtifacts(client, artifacts.open);
-	const { openByAdapter } = toolchain;
+	const { openByAdapter, openById } = toolchain;
+	const openImage = useCallback(() => {
+		void openById("image.generation");
+	}, [openById]);
+	useImageArtifacts(client, "main", openImage);
 	const openTimer = useCallback(
 		(ref?: { timerId: string }) =>
 			void openByAdapter(TIMER_ADAPTER_REF, ref?.timerId),
@@ -92,11 +91,15 @@ export function useWorkspace({
 	);
 	const openGeneratedMusic = useCallback(
 		(_id: string, _title: string) => {
-			void toolchain.openById("music.generation");
+			void openById("music.generation");
 		},
-		[toolchain.openById],
+		[openById],
 	);
-	useMusicArtifacts(client, "main", openGeneratedMusic);
+	const musicItems = useMusicArtifacts(client, "main", openGeneratedMusic);
+	const openMusic = useCallback(
+		(id: string) => void openByAdapter(MUSIC_SCREEN_ADAPTER_REF, id),
+		[openByAdapter],
+	);
 	usePlaylistArtifacts(client, "main", openPlaylist);
 	const activeTimers = useQuery(activeTimersQuery(client));
 	const openArtifact = artifacts.open;
@@ -307,9 +310,10 @@ export function useWorkspace({
 		onDirty,
 		artifacts,
 		openDrawing,
-		openImage,
 		openRecognition,
 		openPlaylist,
+		openMusic,
+		musicItems,
 		toolchain,
 		activeTimers,
 		openShowcase,

@@ -28,6 +28,7 @@ export const MessageList = memo(function MessageList({
 	replayingId,
 	onReplay,
 	agentName,
+	renderInsideMessage,
 	renderFollowingMessage,
 }: {
 	conversation: Conversation | undefined;
@@ -36,6 +37,7 @@ export const MessageList = memo(function MessageList({
 	replayingId?: string | null;
 	onReplay?: (message: Pick<Message, "id" | "text" | "runId">) => void;
 	agentName?: string;
+	renderInsideMessage?: (message: Message) => ReactNode;
 	renderFollowingMessage?: (message: Message) => ReactNode;
 }) {
 	const assistantLabel = agentName || "Eumenes";
@@ -148,6 +150,7 @@ export const MessageList = memo(function MessageList({
 							) : (
 								<p>{message.text}</p>
 							)}
+							{renderInsideMessage?.(message)}
 						</article>
 						{renderFollowingMessage?.(message)}
 					</Fragment>

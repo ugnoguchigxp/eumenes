@@ -8,23 +8,27 @@ export const MUSIC_SCREEN_ADAPTER_REF = "adapter:music-screen@1";
 /** The registered view uses the existing authenticated creation, cancellation and audio APIs. */
 export const musicScreenWebAdapter: WebArtifactAdapter = {
 	adapterRef: MUSIC_SCREEN_ADAPTER_REF,
-	useArtifact({ client, artifact }) {
+	useArtifact({ client, artifact, targetRef, setTargetRef }) {
 		const cache = useQueryClient();
 		const definition = JSON.stringify(
 			artifact.variants.find((v) => v.id === artifact.defaultVariant)
 				?.definition,
 		);
-		const { runtime, loading, error } = useMusicRuntime(
+		const { runtime, loading, error, targetMissing } = useMusicRuntime(
 			client,
 			"main",
 			definition,
+			targetRef,
+			setTargetRef,
 		);
 		return {
 			phase: error
 				? { kind: "error", message: "楽曲の情報を取得できませんでした。" }
 				: loading
 					? { kind: "loading" }
-					: { kind: "ready" },
+					: targetMissing
+						? { kind: "blocked", message: "指定された楽曲は見つかりません。" }
+						: { kind: "ready" },
 			snapshot: runtime.snapshot,
 			targetOf: () => undefined,
 			local: (_binding, event) => runtime.dispatch(event),

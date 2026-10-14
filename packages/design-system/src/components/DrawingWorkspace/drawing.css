@@ -142,7 +142,7 @@
 	border-radius: 5px;
 	border: 1px solid var(--border, #303744);
 	color: var(--muted-foreground);
-	background: #ffffff08;
+	background: color-mix(in srgb, var(--foreground, #e5e7eb) 4%, transparent);
 	overflow: hidden;
 }
 .dw-thumbnail img {

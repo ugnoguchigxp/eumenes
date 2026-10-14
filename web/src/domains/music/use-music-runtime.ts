@@ -16,6 +16,8 @@ export function useMusicRuntime(
 	client: EumenesClient,
 	conversationId: string,
 	definition: string,
+	targetRef?: string,
+	setTargetRef?: (ref: string | undefined) => void,
 ) {
 	const waitingForCreation = useRef(false);
 	const query = useQuery({
@@ -45,12 +47,18 @@ export function useMusicRuntime(
 	);
 	const studio = sources.has(musicStudioSource);
 	const authorized = studio || !!legacy;
+	const targetMissing =
+		!!targetRef &&
+		!query.isPending &&
+		!items.some((item) => item.id === targetRef);
 	const initial = studio
-		? items.reduce<(typeof items)[number] | undefined>(
-				(latest, item) =>
-					!latest || item.createdAt > latest.createdAt ? item : latest,
-				undefined,
-			)
+		? targetRef
+			? items.find((item) => item.id === targetRef)
+			: items.reduce<(typeof items)[number] | undefined>(
+					(latest, item) =>
+						!latest || item.createdAt > latest.createdAt ? item : latest,
+					undefined,
+				)
 		: legacy;
 	const source = studio ? musicStudioSource : `music-${legacy?.id}`;
 	const creation = useMusicCreation(client, conversationId, items, initial);
@@ -58,14 +66,17 @@ export function useMusicRuntime(
 		waitingForCreation.current = creation.busy;
 	}, [creation.busy]);
 	const [selected, setSelected] = useState<{ id: string; latestId?: string }>();
-	const selectedItem = authorized
-		? (items.find(
-				(item) =>
-					selected?.latestId === initial?.id && item.id === selected?.id,
-			) ??
-			creation.submitted ??
-			initial)
-		: undefined;
+	const selectedItem =
+		authorized && !targetMissing
+			? targetRef
+				? initial
+				: (items.find(
+						(item) =>
+							selected?.latestId === initial?.id && item.id === selected?.id,
+					) ??
+					creation.submitted ??
+					initial)
+			: undefined;
 	const [audio, setAudio] = useState<{ id: string; url: string }>();
 	const [audioError, setAudioError] = useState<string>();
 	const seen = useRef(new Set<string>());
@@ -192,6 +203,7 @@ export function useMusicRuntime(
 				if (event.action === "music-generate") {
 					await creation.generate(String(event.values.prompt));
 					setSelected(undefined);
+					setTargetRef?.(undefined);
 				} else await creation.cancel();
 				return { status: "accepted", message: "操作を受け付けました。" };
 			} catch {
@@ -213,11 +225,13 @@ export function useMusicRuntime(
 			return { status: "rejected", message: "この楽曲は再生できません。" };
 		seen.current.add(event.id);
 		setSelected({ id: target.id, latestId: initial?.id });
+		if (targetRef) setTargetRef?.(target.id);
 		return { status: "accepted", message: "楽曲を選択しました。" };
 	};
 	return {
 		runtime: { snapshot, dispatch },
 		loading: query.isPending,
+		targetMissing,
 		error:
 			query.error ??
 			(!query.isPending && !authorized

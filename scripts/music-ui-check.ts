@@ -192,6 +192,12 @@ try {
 	await expect(
 		page.getByText("楽曲を生成しています", { exact: true }),
 	).toBeVisible();
+	await expect(
+		page.getByRole("button", { name: "Visualizer", exact: true }),
+	).toHaveAttribute("aria-pressed", "true");
+	await expect(
+		page.getByRole("img", { name: "再生音声のVisualizer" }),
+	).toBeVisible();
 	await page.screenshot({ path: `${out}/generating.png`, fullPage: true });
 	phase = "completed";
 	await page.reload();
@@ -213,6 +219,26 @@ try {
 			),
 		)
 		.toBeGreaterThan(0);
+	await expect
+		.poll(() =>
+			page
+				.getByRole("img", { name: "再生音声のVisualizer" })
+				.evaluate((node) => {
+					const canvas = node as HTMLCanvasElement;
+					const pixels = canvas
+						.getContext("2d")
+						?.getImageData(0, 0, canvas.width, canvas.height).data;
+					if (!pixels) return 0;
+					let painted = 0;
+					for (let i = 3; i < pixels.length; i += 4) if (pixels[i]) painted++;
+					return painted;
+				}),
+		)
+		.toBeGreaterThan(0);
+	await page.screenshot({
+		path: `${out}/visualizer-playing.png`,
+		fullPage: true,
+	});
 	await page.getByRole("button", { name: "一時停止", exact: true }).click();
 	const seek = page.getByRole("slider", { name: "再生位置" });
 	await seek.focus();

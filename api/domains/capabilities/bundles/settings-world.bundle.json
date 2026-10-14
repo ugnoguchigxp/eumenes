@@ -8,7 +8,7 @@
 		{
 			"kind": "artifact",
 			"id": "settings.world",
-			"revision": 2,
+			"revision": 3,
 			"title": "World",
 			"variants": [
 				{
@@ -16,18 +16,25 @@
 					"label": "標準",
 					"definition": {
 						"view": "layout",
-						"direction": "stack",
+						"direction": "tabs",
 						"title": "World",
+						"headerChildren": [0],
+						"tabs": [
+							{ "label": "主張の一覧", "children": [1] },
+							{ "label": "忘却の状況", "children": [2] }
+						],
 						"children": [
 							{
 								"view": "collection-workspace",
 								"source": "world-status",
-								"title": "Worldの状態"
+								"title": "Worldの状態",
+								"presentation": "summary"
 							},
 							{
 								"view": "collection-workspace",
 								"source": "world-claims",
-								"title": "主張の一覧"
+								"title": "主張の一覧",
+								"presentation": "catalog"
 							},
 							{
 								"view": "collection-workspace",

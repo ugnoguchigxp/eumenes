@@ -5,6 +5,13 @@
 		);
 	grid-template-rows: minmax(0, 1fr);
 }
+.workspace-layout.workspace-layout-fullscreen {
+	grid-template-columns: minmax(0, 1fr);
+	grid-template-rows: minmax(0, 1fr);
+}
+.workspace-layout-fullscreen > .chat-panel {
+	display: none;
+}
 .workspace-resize-handle {
 	position: relative;
 	z-index: 1;

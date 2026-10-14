@@ -64,6 +64,7 @@ export type SettingsChangeRow = {
 /** Controlled inputs only; the host owns edits, validation and persistence. */
 export function SettingsSection({
 	title,
+	presentation = "default",
 	description,
 	fields,
 	dirty,
@@ -80,6 +81,7 @@ export function SettingsSection({
 	onApply,
 }: {
 	title: string;
+	presentation?: "default" | "card";
 	description?: string;
 	fields: SettingsInputField[];
 	dirty: boolean;
@@ -139,7 +141,9 @@ export function SettingsSection({
 						} else onReview();
 					}}
 				>
-					{renderFields(false)}
+					{presentation === "card" ? (
+						<div className="ds-settings-field-card">{renderFields(false)}</div>
+					) : renderFields(false)}
 					{visible.some((f) => f.detail) && (
 						<details className="ds-settings-details">
 							<summary>詳細設定</summary>

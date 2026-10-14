@@ -5,6 +5,7 @@ import type { EumenesClient } from "../../../../client";
 import {
 	createdId,
 	findRow,
+	getPath,
 	guardOf,
 	parseForm,
 	rowInput,
@@ -124,12 +125,19 @@ export function useCollectionActions({
 					};
 				}
 			}
+			const visibleForm = isCreate
+				? form
+				: form.filter(
+						(field) =>
+							!field.when ||
+							field.when.in.includes(getPath(row, field.when.key) as never),
+					);
 			input = rowInput(binding, row);
-			if (form.length > 0) {
-				const parsed = parseForm(form, event.values);
+			if (visibleForm.length > 0) {
+				const parsed = parseForm(visibleForm, event.values);
 				if (!parsed.ok) return refuse(parsed.message);
 				const confidentialIds = new Set(
-					form
+					visibleForm
 						.filter((f) => f.confidential || f.control === "secret")
 						.map((f) => f.fieldId),
 				);

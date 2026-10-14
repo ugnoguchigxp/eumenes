@@ -14,10 +14,12 @@ export function ResizableWorkspace({
 	children,
 	artifact,
 	hidden,
+	fullscreen = false,
 }: {
 	children: ReactNode;
 	artifact: ReactNode;
 	hidden?: boolean;
+	fullscreen?: boolean;
 }) {
 	const container = useRef<HTMLDivElement>(null);
 	const drag = useRef<{
@@ -55,7 +57,7 @@ export function ResizableWorkspace({
 	return (
 		<div
 			ref={container}
-			className={`workspace-layout${split ? " workspace-layout-split" : ""}`}
+			className={`workspace-layout${split ? " workspace-layout-split" : ""}${fullscreen && split ? " workspace-layout-fullscreen" : ""}`}
 			hidden={hidden}
 			data-resizing={(split && !hidden && dragging) || undefined}
 			style={
@@ -66,7 +68,7 @@ export function ResizableWorkspace({
 			}
 		>
 			{children}
-			{split && (
+			{split && !fullscreen && (
 				<div
 					className="workspace-resize-handle"
 					// A focusable splitter is an interactive separator, not a thematic break.

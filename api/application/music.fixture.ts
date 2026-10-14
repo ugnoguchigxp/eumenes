@@ -135,7 +135,7 @@ export function musicFixture(
 			const result = messages.find((m) => m.content.includes('"musicResult":'));
 			if (!result) throw new Error("music_result_missing");
 			return JSON.parse(result.content).musicResult.state === "completed"
-				? "楽曲ができました。Artifactで再生できます。"
+				? "楽曲ができました。"
 				: "楽曲を生成できませんでした。";
 		},
 	};

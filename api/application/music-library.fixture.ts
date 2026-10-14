@@ -175,7 +175,7 @@ export function musicLibraryFixture(correctablePlan = false) {
 				messages.find((m) => m.content.includes('"musicResult":'))!.content,
 			).musicResult;
 			return result.state === "completed"
-				? "保存曲のプレイリストを開きました。Artifactで再生できます。"
+				? "保存曲のプレイリストを開きました。"
 				: "保存曲を取得できませんでした。";
 		},
 	};

@@ -351,8 +351,9 @@ function AdapterScreen({
 			dispatch,
 			settledEpoch,
 			fetchMedia: (path: string) => client.toolchainMedia(path),
+			...(state.uploadFile ? { uploadFile: state.uploadFile } : {}),
 		}),
-		[snapshot, dispatch, settledEpoch, client],
+		[snapshot, dispatch, settledEpoch, client, state.uploadFile],
 	);
 	return (
 		<div className="toolchain-artifact">

@@ -4,7 +4,7 @@
 	z-index: -1;
 	overflow: hidden;
 	pointer-events: none;
-	background: #0b1018;
+	background: var(--stage-background);
 }
 .spatial-background canvas {
 	display: block;

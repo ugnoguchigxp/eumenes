@@ -11,7 +11,11 @@ import { SettingsContent } from "./SettingsContent";
 import { WorkspaceArtifacts } from "./WorkspaceArtifacts";
 import { ConversationPanel } from "./ConversationPanel";
 import { useWorkspace } from "./useWorkspace";
-import { entryLabel, menuEntries } from "../domains/toolchain-artifacts";
+import {
+	artifactIdOf,
+	entryLabel,
+	menuEntries,
+} from "../domains/toolchain-artifacts";
 
 function WorkspaceContent({
 	client,
@@ -24,7 +28,6 @@ function WorkspaceContent({
 	const {
 		settingsOpen,
 		openDrawing,
-		openImage,
 		openRecognition,
 		openPlaylist,
 		toolchain,
@@ -75,7 +78,6 @@ function WorkspaceContent({
 			{!settingsOpen && (
 				<ArtifactLauncher
 					entries={[
-						{ label: "画像生成", onSelect: openImage },
 						{ label: "図を描く・編集する", onSelect: openDrawing },
 						{ label: "映っている物を調べる", onSelect: openRecognition },
 						{ label: "音楽プレイリスト", onSelect: openPlaylist },
@@ -119,6 +121,11 @@ function WorkspaceContent({
 			)}
 			<ResizableWorkspace
 				hidden={settingsOpen}
+				fullscreen={
+					artifacts.active?.kind === "toolchain" &&
+					artifactIdOf(artifacts.active.artifactRevisionId) ===
+						"settings.service-tests"
+				}
 				artifact={
 					artifacts.tabs.length > 0 ? (
 						<WorkspaceArtifacts client={client} artifacts={artifacts} />

@@ -11,6 +11,17 @@ import { artifactLibrary } from "./library";
 
 function checkSource(definition: ArtifactDefinition, snapshot: Snapshot) {
 	for (const request of definitionRequests(definition)) {
+		if (request.view === "service-test-workspace") {
+			for (const source of [
+				request.statusSource,
+				request.catalogSource,
+				request.runsSource,
+				request.healthSource,
+			])
+				if (snapshot[source]?.kind !== "collection")
+					throw new Error("この表示では参照できない source です");
+			continue;
+		}
 		const kind = [
 			"image-workspace",
 			"image-creation-form",

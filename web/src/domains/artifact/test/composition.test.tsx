@@ -128,6 +128,117 @@ test("unsafe host media URL is never rendered as audio or download", () => {
 	);
 	expect(result.container.querySelector("audio,a")).toBeNull();
 });
+
+test("tab headers require an explicit, non-overlapping tab partition", () => {
+	const children = [
+		{ view: "playlist", source: "m" },
+		{ view: "music-player", source: "m" },
+	];
+	expect(() =>
+		compileArtifact(
+			JSON.stringify({
+				view: "layout",
+				direction: "tabs",
+				headerChildren: [0],
+				children,
+			}),
+			snapshot,
+		),
+	).toThrow();
+	expect(() =>
+		compileArtifact(
+			JSON.stringify({
+				view: "layout",
+				direction: "tabs",
+				headerChildren: [0],
+				tabs: [{ label: "曲", children: [0, 1] }],
+				children,
+			}),
+			snapshot,
+		),
+	).toThrow();
+	expect(() =>
+		compileArtifact(
+			JSON.stringify({
+				view: "layout",
+				direction: "tabs",
+				headerChildren: [0],
+				tabs: [{ label: "曲", children: [1] }],
+				children,
+			}),
+			snapshot,
+		),
+	).not.toThrow();
+});
+
+test("registered catalog selection filters rows and preselects the action form", async () => {
+	const catalog: Snapshot = {
+		services: {
+			kind: "collection",
+			revision: 1,
+			title: "試せるサービス",
+			columns: [
+				{ key: "name", label: "サービス" },
+				{ key: "model", label: "モデル" },
+			],
+			rows: [
+				{ id: "a", cells: { name: "音声認識", model: "model-a" }, actions: [] },
+				{ id: "b", cells: { name: "会話", model: "model-b" }, actions: [] },
+			],
+			total: 2,
+			create: {
+				actionId: "start",
+				label: "試す",
+				fields: [
+					{
+						id: "targetId",
+						label: "サービス",
+						control: "select",
+						required: true,
+						options: [
+							{ value: "a", label: "音声認識" },
+							{ value: "b", label: "会話" },
+						],
+					},
+				],
+			},
+		},
+	};
+	const dispatch = vi.fn(async () => ({
+		status: "accepted" as const,
+		message: "",
+	}));
+	render(
+		<ArtifactRenderer
+			definition={JSON.stringify({
+				view: "collection-workspace",
+				source: "services",
+				presentation: "catalog",
+				selectionField: "targetId",
+			})}
+			runtime={{ snapshot: catalog, dispatch }}
+		/>,
+	);
+	fireEvent.change(screen.getByRole("searchbox", { name: "一覧を検索" }), {
+		target: { value: "会話" },
+	});
+	expect(screen.queryByRole("button", { name: /音声認識/ })).toBeNull();
+	fireEvent.click(screen.getByRole("button", { name: /会話.*model-b/ }));
+	fireEvent.click(screen.getByText("試す", { selector: "summary" }));
+	expect(
+		(screen.getByLabelText("サービス（必須）") as HTMLSelectElement).value,
+	).toBe("b");
+	fireEvent.click(screen.getByRole("button", { name: "試す" }));
+	await waitFor(() =>
+		expect(dispatch).toHaveBeenCalledWith(
+			expect.objectContaining({
+				source: "services",
+				action: "collection-create",
+				values: { actionId: "start", targetId: "b" },
+			}),
+		),
+	);
+});
 test("registered library controls share the music source and reject a wrong resource kind", () => {
 	const json = JSON.stringify({
 		view: "layout",

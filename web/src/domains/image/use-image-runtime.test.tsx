@@ -3,8 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, expect, test, vi } from "vitest";
 import type { ReactNode } from "react";
 import type { ArtifactEvent } from "@eumenes/artifact-ui/contracts";
-import { useImageRuntime } from "./use-image-runtime";
-import { imageStudioSource } from "./artifact-definition";
+import { imageStudioSource, useImageRuntime } from "./use-image-runtime";
 afterEach(cleanup);
 function setup(onClose?: () => void) {
 	const items = [

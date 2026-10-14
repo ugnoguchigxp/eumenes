@@ -173,7 +173,7 @@ for (const mode of [
 				expect(response.status).toBe(200);
 				expect(response.headers.get("content-type")).toBe("audio/ogg");
 				expect(new Uint8Array(await response.arrayBuffer())).toEqual(f.audio);
-				expect(h.dialogue.answerText(submitted.id)).toContain("Artifact");
+				expect(h.dialogue.answerText(submitted.id)).toBe("楽曲ができました。");
 			} else {
 				expect(response.status).toBe(404);
 				expect(music.errorCode).toBe(

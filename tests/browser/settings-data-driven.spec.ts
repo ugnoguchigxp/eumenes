@@ -193,9 +193,19 @@ test("display previews the subtitle before saving", async ({
 	const before = await savedSettings(request);
 	await openHub(page);
 	await openFromHub(page, "表示");
-	await page.getByRole("group", { name: "テーマ" }).getByRole("button", { name: "ダーク" }).click();
-	await expect(page.getByRole("group", { name: "テーマ" }).getByRole("button", { name: "ダーク" })).toHaveAttribute("aria-pressed", "true");
-	await page.getByRole("group", { name: "会話の背景" }).getByRole("button", { name: "Spatial" }).click();
+	await page
+		.getByRole("group", { name: "テーマ" })
+		.getByRole("button", { name: "ダーク" })
+		.click();
+	await expect(
+		page
+			.getByRole("group", { name: "テーマ" })
+			.getByRole("button", { name: "ダーク" }),
+	).toHaveAttribute("aria-pressed", "true");
+	await page
+		.getByRole("group", { name: "会話の背景" })
+		.getByRole("button", { name: "Spatial" })
+		.click();
 	await page.getByLabel("字幕のデザイン").selectOption("classic");
 	await page.getByLabel("字幕の大きさ").selectOption("xlarge");
 	const subtitle = page.getByTestId("subtitle");

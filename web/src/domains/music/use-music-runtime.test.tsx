@@ -17,7 +17,12 @@ afterEach(() => {
 });
 function setup(
 	state = "completed",
-	options: { studio?: boolean; empty?: boolean } = {},
+	options: {
+		studio?: boolean;
+		empty?: boolean;
+		other?: boolean;
+		targetRef?: string;
+	} = {},
 ) {
 	vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:audio");
 	vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
@@ -35,6 +40,21 @@ function setup(
 					createdAt: 1,
 					updatedAt: 1,
 				},
+				...(options.other
+					? [
+							{
+								id: "b",
+								runId: "newer-run",
+								state: "completed",
+								title: "新しい曲",
+								description: "",
+								durationSeconds: 30,
+								mime: "audio/ogg",
+								createdAt: 2,
+								updatedAt: 2,
+							},
+						]
+					: []),
 			];
 	const run = { id: "new-run", status: "queued", revision: 1 };
 	const api = {
@@ -56,12 +76,15 @@ function setup(
 	const cache = new QueryClient({
 		defaultOptions: { queries: { retry: false } },
 	});
+	const setTargetRef = vi.fn();
 	const result = renderHook(
 		() =>
 			useMusicRuntime(
 				api as never,
 				"main",
 				musicArtifactDefinition(options.studio ? undefined : "a"),
+				options.targetRef,
+				setTargetRef,
 			),
 		{
 			wrapper: ({ children }: { children: ReactNode }) => (
@@ -89,8 +112,24 @@ function setup(
 		});
 		return receipt;
 	};
-	return { ...result, api, cache, resource, event, dispatch };
+	return { ...result, api, cache, setTargetRef, resource, event, dispatch };
 }
+test("a result link selects its saved track even when a newer track exists", async () => {
+	const r = setup("completed", { studio: true, other: true, targetRef: "a" });
+	await waitFor(() => expect(r.resource().currentId).toBe("a"));
+	expect(r.result.current.targetMissing).toBe(false);
+	expect(await r.dispatch(r.event("music-select", { id: "b" }))).toMatchObject({
+		status: "accepted",
+	});
+	expect(r.setTargetRef).toHaveBeenCalledWith("b");
+	const missing = setup("completed", {
+		studio: true,
+		other: true,
+		targetRef: "deleted",
+	});
+	await waitFor(() => expect(missing.result.current.targetMissing).toBe(true));
+	expect(missing.resource().currentId).toBe("");
+});
 test("authorized creation sends the exact editable prompt through the normal API and cancels the accepted run", async () => {
 	const r = setup();
 	await waitFor(() => expect(r.resource()).toBeTruthy());

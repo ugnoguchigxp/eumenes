@@ -182,5 +182,12 @@ adapterが所有する「文書」（設定ではsettings文書）の項目を�
 
 - fresh DB: fixture server と `toolchain:bundle check` で全bundleが登録され、ブラウザで Hub から全画面を開けることを確認した。
 - upgrade DB: 製品DBの複製（鍵は複製せず、確認後に削除）へ seed を当て、設定の13画面がすべて新revision（hub@4・conversation@3・ai-connections@5・voice-input@3・display@3・external-work@3・changes@2・records@3・dictionary@2・memory@2・world@2・dots@3・service-tests@3）へ切り替わることを確認した。同じ seed で他の作業中の `music-screen.bundle.json` が `revision_conflict` で skip された（設定とは無関係）。
-- 現行 `#settings` に残り、新版に無いもの: 動作確認の WAV アップロード、委任作業の Session一覧・報告の根拠・リマインド、接続種類ごとの既定値やヒント、辞書のまとめ保存、World の scope 選択、dots の one-time token を失ったときの再発行、予約（作らない、§10.4）。
+- 現行 `#settings` に残り、新版に無いもの（当時の記録）: 動作確認の WAV アップロード、委任作業の Session一覧・報告の根拠・リマインド、接続種類ごとの既定値やヒント、辞書のまとめ保存、World の scope 選択、dots の one-time token を失ったときの再発行、予約（作らない、§10.4）。動作確認の WAV アップロードは §13 の試作で追加した。
 - 削除の判断は利用者が行う。削除する場合は §8 の再利用コードを先に移す。
+
+## 13. 動作確認画面の再現トライアル（2026-10-14）
+
+- 旧画面は維持したまま、`settings.service-tests@5` を全画面の作業画面に改訂した。登録されたカタログ・実行・Health の source と action を使い、接続先の切替、検索、代表Profileの絞り込み、対象別入力、結果と履歴、自己診断を一画面にまとめた。
+- バイナリ入力だけは Web adapter が既存の認証付き WAV アップロード API を呼び、返された一時IDを登録済み `start` 操作へ渡す。試用の受付・取消・結果再取得は従来どおり toolchain action 台帳を通る。入力項目の対象別表示は bundle の `when` で宣言する。
+- fixture 検証: service-tests domain 8件、service-tests adapter 13件、capabilities domain 63件、ブラウザ P3 7件（うち動作確認2件）が通過。暗色・明色の画面写真は `spec/verification/settings-service-tests-data-driven-2026-10-14/`。実LARMを使った生成・自己診断と、旧画面との差分を利用者が確認する前なので、新旧の削除判断は行わない。
+- 共有作業ツリーの別作業が進行中のため、最後の `verify --domain artifact` は画像画面側の未整形ファイルで停止し、全体型検査も画像画面・アバター側の未完了変更で停止した。動作確認画面のブラウザ試験と個別lintは通過している。これらの担当外ファイルは変更していない。

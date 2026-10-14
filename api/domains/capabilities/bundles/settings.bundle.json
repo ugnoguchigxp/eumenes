@@ -1536,7 +1536,7 @@
 		{
 			"kind": "artifact",
 			"id": "settings.external-work",
-			"revision": 3,
+			"revision": 4,
 			"title": "外部作業",
 			"variants": [
 				{
@@ -1545,7 +1545,8 @@
 					"definition": {
 						"view": "settings-section",
 						"source": "settings-external-work",
-						"title": "外部作業"
+						"title": "外部作業",
+						"presentation": "card"
 					}
 				}
 			],

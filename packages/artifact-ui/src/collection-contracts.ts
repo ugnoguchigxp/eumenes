@@ -33,7 +33,16 @@ export type CollectionFormField = {
 	id: string;
 	label: string;
 	help?: string;
-	control: "text" | "textarea" | "select" | "toggle" | "number" | "secret";
+	control:
+		| "text"
+		| "textarea"
+		| "select"
+		| "toggle"
+		| "number"
+		| "secret"
+		| "upload";
+	when?: { key: string; in: Array<string | boolean | number> };
+	accept?: string;
 	options?: { value: string; label: string }[];
 	maxLength?: number;
 	required?: boolean;

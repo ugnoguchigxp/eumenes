@@ -44,6 +44,7 @@ const startInput = z.strictObject({
 	format: z.enum(["png", "webp"]).optional(),
 	seed: z.number().int().safe().optional(),
 	durationSeconds: z.number().int().min(1).max(30).optional(),
+	uploadId: z.string().uuid().optional(),
 });
 const runInput = z.strictObject({ runId: z.uuid() });
 const emptyInput = z.strictObject({});
@@ -75,6 +76,16 @@ export const describeServiceTestsAdapter = () => ({
 });
 
 const sourceLabels = { larm: "LARM", cloud: "クラウド" } as const;
+const sampleText: Record<ServiceTarget["kind"], string> = {
+	llm: "こんにちは。自己紹介を一文でお願いします。",
+	tts: "こんにちは。音声の確認です。",
+	asr: "無音サンプル",
+	embedding: "猫が窓辺で眠っています。",
+	decision: "こんにちは。",
+	image: "朝の光が入る静かな書斎。木の机と観葉植物。",
+	music: "穏やかな朝に合う、ピアノの短いインストゥルメンタル。",
+	unsupported: "",
+};
 const statusLabels: Record<ServiceRun["status"], string> = {
 	running: "実行中",
 	succeeded: "成功",
@@ -84,16 +95,18 @@ const statusLabels: Record<ServiceRun["status"], string> = {
 	interrupted: "中断",
 	"result-unavailable": "生成済み・結果取得に失敗",
 };
-const shorten = (value: string | undefined, max: number) =>
-	value && value.length > max ? `${value.slice(0, max)}…` : value;
-
 function targetRow(target: ServiceTarget, revision: number) {
 	return {
 		id: target.id,
 		name: target.name,
 		model: target.model,
+		sample: sampleText[target.kind],
 		kind: kindLabels[target.kind],
+		kindCode: target.kind,
 		source: sourceLabels[target.source],
+		sourceCode: target.source,
+		primary: target.primary,
+		onDemand: target.onDemand,
 		start: target.onDemand ? "実行時に起動" : "常駐",
 		testable: target.testable,
 		state: target.testable
@@ -106,6 +119,7 @@ function targetRow(target: ServiceTarget, revision: number) {
 function runRow(run: ServiceRun) {
 	return {
 		id: run.id,
+		targetId: run.targetId,
 		kind: kindLabels[run.kind as keyof typeof kindLabels] ?? "Health確認",
 		model: run.model || "全サービス",
 		status: run.status,
@@ -114,7 +128,10 @@ function runRow(run: ServiceRun) {
 		created: run.created,
 		ended: run.ended ?? null,
 		error: run.error ? testErrorLabel(run.error) : "",
-		text: shorten(run.text, 400) ?? "",
+		text: run.text ?? "",
+		progress: run.progress ?? null,
+		revision: run.revision,
+		actualModel: run.actualModel ?? "",
 		previewAvailable: run.previewAvailable === true,
 		// A same-origin path and type the screen fetches and previews (image or audio).
 		preview:
@@ -236,6 +253,8 @@ export function createServiceTestsAdapter(
 		return [
 			{
 				id: "catalog",
+				catalogRevision: catalog.revision,
+				diagnosisRevision: latest?.revision ?? null,
 				state: catalog.stale ? "更新が必要です" : "最新",
 				discoveredAt: catalog.discoveredAt,
 				targetCount: catalog.targets.length,

@@ -7,15 +7,14 @@ import type { ImagePromptValues } from "./types";
 import {
 	emptyImageSelection,
 	imageSelectionText,
-	imageStyles,
-	imageMoods,
-	imageCompositions,
-	imageLighting,
+	defaultImageCreationOptions,
+	type ImageCreationOptions,
 	type ImageSelection,
 } from "./image-creation-options";
 import "./ImageCreationForm.css";
 export type ImageCreationFormProps = {
 	initialValues: ImagePromptValues;
+	creationOptions?: ImageCreationOptions;
 	busy?: boolean;
 	pending?: boolean;
 	onGenerate: (values: ImagePromptValues) => void;
@@ -180,12 +179,13 @@ function ImageParameters({
 /** Like MusicCreationForm, choices assemble the draft and manual edits require an explicit replacement decision. */
 export function ImageCreationForm({
 	initialValues,
+	creationOptions = defaultImageCreationOptions,
 	busy,
 	pending: sending,
 	onGenerate,
 }: ImageCreationFormProps) {
 	const id = useId();
-	const [selection, setSelection] = useState(emptyImageSelection);
+	const [selection, setSelection] = useState(() => emptyImageSelection(creationOptions));
 	const [parameters, setParameters] = useState(() => ({
 		width: initialValues.width,
 		height: initialValues.height,
@@ -201,24 +201,24 @@ export function ImageCreationForm({
 	const update = (next: ImageSelection) => {
 		setSelection(next);
 		if (edited) setPending(true);
-		else setPrompt(imageSelectionText(next));
+		else setPrompt(imageSelectionText(next, creationOptions));
 	};
 	const reflect = () => {
 		setPrevious(prompt);
-		setPrompt(imageSelectionText(selection));
+		setPrompt(imageSelectionText(selection, creationOptions));
 		setEdited(false);
 		setPending(false);
 	};
 	const reset = () => {
 		setPrevious(prompt);
-		setSelection(emptyImageSelection());
-		setParameters({ width: 512, height: 512, format: "webp", seed: 0 });
+		setSelection(emptyImageSelection(creationOptions));
+		setParameters({ ...creationOptions.defaults });
 		setPrompt("");
 		setEdited(false);
 		setPending(false);
 		setSearch("");
 	};
-	const groups = imageStyles
+	const groups = creationOptions.styleGroups
 		.map((group) => ({
 			...group,
 			options: group.options.filter((option) =>
@@ -315,7 +315,7 @@ export function ImageCreationForm({
 				)}
 				<Choices
 					label="雰囲気"
-					options={imageMoods}
+					options={creationOptions.moods}
 					selected={selection.moods}
 					disabled={disabled}
 					onChange={(moods) => update({ ...selection, moods })}
@@ -324,14 +324,14 @@ export function ImageCreationForm({
 					<ChoiceSelect
 						label="構図"
 						value={selection.composition}
-						options={imageCompositions}
+						options={creationOptions.compositions}
 						disabled={disabled}
 						onChange={(composition) => update({ ...selection, composition })}
 					/>
 					<ChoiceSelect
 						label="光"
 						value={selection.light}
-						options={imageLighting}
+						options={creationOptions.lighting}
 						disabled={disabled}
 						onChange={(light) => update({ ...selection, light })}
 					/>
@@ -367,7 +367,7 @@ export function ImageCreationForm({
 						</p>
 						<details>
 							<summary>選択内容の更新候補</summary>
-							<pre>{imageSelectionText(selection)}</pre>
+							<pre>{imageSelectionText(selection, creationOptions)}</pre>
 						</details>
 						<Button
 							type="button"

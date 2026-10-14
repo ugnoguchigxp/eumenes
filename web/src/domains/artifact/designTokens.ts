@@ -112,6 +112,7 @@ const tokenLabels: Record<string, string> = {
 	"--sidebar-accent-foreground": "サイドバーアクセント上の文字",
 	"--sidebar-border": "サイドバー枠線",
 	"--sidebar-ring": "サイドバーフォーカス枠線",
+	"--stage-background": "会話の舞台背景",
 };
 export const designTokens = Array.from(
 	new Set([...sizes, ...palettes].flatMap((rule) => Object.keys(rule.values))),

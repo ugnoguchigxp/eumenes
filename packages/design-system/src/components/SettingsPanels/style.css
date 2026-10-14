@@ -64,6 +64,14 @@
 	gap: 1.15rem;
 	padding: 1.45rem 0 1.8rem;
 }
+.ds-settings-field-card {
+	display: grid;
+	gap: 1rem;
+	border: 1px solid var(--color-border);
+	border-radius: 0.55rem;
+	padding: 1.25rem;
+	background: color-mix(in srgb, var(--color-muted) 25%, var(--color-card));
+}
 .ds-settings-field {
 	display: grid;
 	grid-template-columns: minmax(9rem, 28%) minmax(0, 1fr);
@@ -147,13 +155,14 @@
 	cursor: pointer;
 }
 .ds-settings-choice[aria-pressed="true"] { border-color: var(--color-primary); box-shadow: inset 0 0 0 1px var(--color-primary); }
-.ds-settings-choice-group-segmented { gap: 0; }
-.ds-settings-choice-group-segmented .ds-settings-choice { padding: 0.65rem 1.05rem; border-radius: 0; }
+.ds-settings-choice-group-segmented { width: 100%; flex-wrap: nowrap; gap: 0; }
+.ds-settings-choice-group-segmented .ds-settings-choice { flex: 1 1 0; min-width: 0; padding: 0.65rem 0.35rem; border-radius: 0; overflow-wrap: anywhere; }
+.ds-settings-choice-group-segmented .ds-settings-choice:first-child { flex-grow: 1.7; }
 .ds-settings-choice-group-segmented .ds-settings-choice:first-child { border-radius: 0.45rem 0 0 0.45rem; }
 .ds-settings-choice-group-segmented .ds-settings-choice:last-child { border-radius: 0 0.45rem 0.45rem 0; }
 .ds-settings-choice-group-segmented .ds-settings-choice + .ds-settings-choice { border-left: 0; }
 .ds-settings-choice-group-segmented .ds-settings-choice[aria-pressed="true"] { background: var(--color-primary); color: var(--color-primary-foreground); }
-.ds-settings-choice-group-cards .ds-settings-choice { min-width: 8.5rem; padding: 0.3rem; text-align: center; }
+.ds-settings-choice-group-cards .ds-settings-choice { flex: 1 1 7.5rem; min-width: min(7.5rem, 100%); padding: 0.3rem; text-align: center; }
 .ds-settings-choice-group-cards .ds-settings-choice > span:last-child { display: block; padding: 0.45rem; }
 .ds-settings-choice-preview { display: block; height: 4.9rem; border-radius: 0.3rem; background: radial-gradient(circle at 30% 45%, #d9e9ff 0 5%, transparent 24%), radial-gradient(circle at 72% 65%, #a5c6f3 0 8%, transparent 30%), linear-gradient(130deg, #d7e7f7, #607fa9); }
 .ds-settings-choice-preview[data-index="1"] { background: repeating-radial-gradient(ellipse at 80% 0%, transparent 0 7px, rgb(170 201 238 / .3) 8px 9px, transparent 10px 16px), linear-gradient(145deg, #172337, #48627d 50%, #101a29); }

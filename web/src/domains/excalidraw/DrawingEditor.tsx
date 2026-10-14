@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import "./asset-path";
 import { Excalidraw, serializeAsJSON } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
-import { DrawingEditorFrame } from "@eumenes/design-system";
+import { DrawingEditorFrame, THEME_COLORS } from "@eumenes/design-system";
 import type { EumenesClient } from "../../../../client";
 import type { Scene } from "../../../../api/domains/excalidraw/contracts";
 import { useDrawingEditor } from "./useDrawingEditor";
@@ -77,9 +77,8 @@ export default function DrawingEditor({
 				}
 				langCode="ja-JP"
 				theme={
-					window.matchMedia("(prefers-color-scheme: dark)").matches
-						? "dark"
-						: "light"
+					THEME_COLORS[document.documentElement.dataset.theme ?? ""]?.tone ??
+					"light"
 				}
 				onChange={(elements, appState, files) => {
 					const data = JSON.parse(

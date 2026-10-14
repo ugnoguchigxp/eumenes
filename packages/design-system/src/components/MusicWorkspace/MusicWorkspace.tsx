@@ -50,7 +50,7 @@ export function MusicWorkspace({
 	creation,
 }: MusicWorkspaceProps) {
 	const [display, setDisplay] = useState<"visualizer" | "image">(
-		creation ? "image" : "visualizer",
+		"visualizer",
 	);
 	const [tab, setTab] = useState<"create" | "history">("create");
 	const [draft, setDraft] = useState<{ prompt: string; revision: number }>();

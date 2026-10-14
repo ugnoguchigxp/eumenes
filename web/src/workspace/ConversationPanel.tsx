@@ -6,6 +6,7 @@ import { MessageList } from "../components/domains/conversation/MessageList";
 import { ConversationBackground } from "../components/ConversationBackground";
 import { Subtitle } from "../components/domains/subtitle/Subtitle";
 import { ResearchTaskCard } from "../domains/agent-runtime";
+import { MusicResultLink } from "../domains/music/MusicResultLink";
 import { useConversationModel } from "../domains/settings";
 import { describeConnectionState } from "../errorMessages";
 import { ConversationComposer } from "./ConversationComposer";
@@ -222,6 +223,15 @@ export function ConversationPanel({
 				<MessageList
 					client={client}
 					conversation={conversation.data}
+					renderInsideMessage={(message) =>
+						message.role === "assistant" ? (
+							<MusicResultLink
+								runId={message.runId}
+								items={state.musicItems}
+								onOpen={state.openMusic}
+							/>
+						) : null
+					}
 					renderFollowingMessage={(message) => {
 						const run = runs.data?.find((r) => r.inputMessageId === message.id);
 						return run?.agentTaskId ? (

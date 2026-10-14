@@ -8,7 +8,7 @@
 		{
 			"kind": "artifact",
 			"id": "settings.dots",
-			"revision": 3,
+			"revision": 4,
 			"title": "Codexへの委任",
 			"variants": [
 				{
@@ -16,13 +16,20 @@
 					"label": "標準",
 					"definition": {
 						"view": "layout",
-						"direction": "stack",
+						"direction": "tabs",
 						"title": "Codexへの委任",
+						"tabs": [
+							{ "label": "委任した作業", "children": [0] },
+							{ "label": "dotsへの接続", "children": [1] },
+							{ "label": "作業するプロジェクト", "children": [2] },
+							{ "label": "担当とSkill", "children": [3] }
+						],
 						"children": [
 							{
 								"view": "collection-workspace",
 								"source": "dots-tasks",
-								"title": "委任した作業"
+								"title": "委任した作業",
+								"presentation": "catalog"
 							},
 							{
 								"view": "collection-workspace",

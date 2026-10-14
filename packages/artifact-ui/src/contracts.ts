@@ -40,6 +40,22 @@ const question = z.strictObject({
 	options: z.array(z.string().min(1).max(120)).min(1).max(8).optional(),
 });
 const musicChoices = z.array(z.string().min(1).max(80)).min(1).max(80);
+const imageChoices = z.array(z.string().min(1).max(80)).min(1).max(80);
+const imageCreationOptions = z.strictObject({
+	styleGroups: z.array(z.strictObject({
+		label: z.string().min(1).max(80),
+		options: imageChoices,
+	})).min(1).max(12),
+	moods: imageChoices,
+	compositions: imageChoices,
+	lighting: imageChoices,
+	defaults: z.strictObject({
+		width: z.number().int().min(100).max(1280),
+		height: z.number().int().min(100).max(1280),
+		format: z.enum(["png", "webp"]),
+		seed: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
+	}),
+});
 const musicCreationOptions = z
 	.strictObject({
 		genreGroups: z
@@ -109,6 +125,7 @@ export const viewRegistry = {
 			source,
 			title,
 			presentation: z.enum(["embedded", "fullscreen"]).optional(),
+			creationOptions: imageCreationOptions.optional(),
 		}),
 	},
 	"image-creation-form": {
@@ -142,10 +159,36 @@ export const viewRegistry = {
 	"collection-workspace": {
 		name: "CollectionWorkspace",
 		label: "登録された一覧の表示と編集",
+		schema: z
+			.strictObject({
+				view: z.literal("collection-workspace"),
+				source,
+				title,
+				presentation: z.enum(["table", "catalog", "summary"]).optional(),
+				selectionField: z
+					.string()
+					.regex(/^[A-Za-z][A-Za-z0-9_-]{0,63}$/)
+					.optional(),
+			})
+			.refine(
+				(request) =>
+					!request.selectionField || request.presentation === "catalog",
+				{
+					message: "selectionField requires catalog presentation",
+				},
+			),
+	},
+	"service-test-workspace": {
+		name: "ServiceTestWorkspace",
+		label: "サービスの動作確認",
 		schema: z.strictObject({
-			view: z.literal("collection-workspace"),
-			source,
+			view: z.literal("service-test-workspace"),
+			source: source.optional(),
 			title,
+			statusSource: source,
+			catalogSource: source,
+			runsSource: source,
+			healthSource: source,
 		}),
 	},
 	"subtitle-preview": {
@@ -164,6 +207,7 @@ export const viewRegistry = {
 			view: z.literal("settings-section"),
 			source,
 			title,
+			presentation: z.enum(["default", "card"]).optional(),
 		}),
 	},
 	"settings-navigation": {
@@ -324,6 +368,7 @@ export const layoutSchema = z
 			.default("stack"),
 		title,
 		draftSource: source.optional(),
+		headerChildren: z.array(z.number().int().min(0).max(11)).max(12).optional(),
 		tabs: z
 			.array(
 				z.strictObject({
@@ -331,6 +376,7 @@ export const layoutSchema = z
 					children: z.array(z.number().int().min(0).max(11)).min(1),
 				}),
 			)
+			.min(1)
 			.max(12)
 			.optional(),
 		children: z
@@ -363,8 +409,21 @@ export const layoutSchema = z
 				message:
 					"form-preview requires a settings section and subtitle preview",
 			});
+		if (value.headerChildren && value.direction !== "tabs")
+			context.addIssue({
+				code: "custom",
+				message: "headerChildren requires tabs",
+			});
+		if (value.headerChildren && !value.tabs)
+			context.addIssue({
+				code: "custom",
+				message: "headerChildren requires explicit tabs",
+			});
 		if (!value.tabs) return;
-		const indexes = value.tabs.flatMap((tab) => tab.children);
+		const indexes = [
+			...(value.headerChildren ?? []),
+			...value.tabs.flatMap((tab) => tab.children),
+		];
 		if (
 			value.direction !== "tabs" ||
 			indexes.length !== value.children.length ||

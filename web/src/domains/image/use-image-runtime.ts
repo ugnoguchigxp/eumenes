@@ -4,13 +4,20 @@ import { imagePlan } from "../../../../api/domains/image/contracts";
 import type { EumenesClient } from "../../../../client";
 import type { ArtifactEvent, Receipt } from "@eumenes/artifact-ui/contracts";
 import type { ImageWorkspaceResource } from "@eumenes/artifact-ui/contracts";
-import { imageStudioSource } from "./artifact-definition";
 import { useImageCreation } from "./use-image-creation";
 import { queryRoots } from "../../queryKeys";
+import type { ImageCreationOptions } from "@eumenes/design-system";
+export const imageStudioSource = "image-studio";
 export function useImageRuntime(
 	client: EumenesClient,
 	conversationId = "main",
 	onClose?: () => void,
+	defaults: ImageCreationOptions["defaults"] = {
+		width: 512,
+		height: 512,
+		format: "webp",
+		seed: 0,
+	},
 ) {
 	const cache = useQueryClient();
 	const query = useQuery({
@@ -61,10 +68,10 @@ export function useImageRuntime(
 		title: "画像生成",
 		defaults: {
 			prompt: latest?.prompt ?? "",
-			width: latest?.width ?? 512,
-			height: latest?.height ?? 512,
-			format: latest?.format ?? "webp",
-			seed: latest?.seed ?? 0,
+			width: latest?.width ?? defaults.width,
+			height: latest?.height ?? defaults.height,
+			format: latest?.format ?? defaults.format,
+			seed: latest?.seed ?? defaults.seed,
 		},
 		images,
 		selectedId:

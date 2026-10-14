@@ -8,38 +8,19 @@
 		{
 			"kind": "artifact",
 			"id": "settings.service-tests",
-			"revision": 3,
+			"revision": 5,
 			"title": "動作確認",
 			"variants": [
 				{
 					"id": "standard",
 					"label": "標準",
 					"definition": {
-						"view": "layout",
-						"direction": "stack",
-						"title": "動作確認",
-						"children": [
-							{
-								"view": "collection-workspace",
-								"source": "service-tests-status",
-								"title": "サービスの一覧"
-							},
-							{
-								"view": "collection-workspace",
-								"source": "service-tests-catalog",
-								"title": "試せるサービス"
-							},
-							{
-								"view": "collection-workspace",
-								"source": "service-tests-runs",
-								"title": "確認の履歴"
-							},
-							{
-								"view": "collection-workspace",
-								"source": "service-tests-health",
-								"title": "Healthの結果"
-							}
-						]
+						"view": "service-test-workspace",
+						"title": "サービスを試す",
+						"statusSource": "service-tests-status",
+						"catalogSource": "service-tests-catalog",
+						"runsSource": "service-tests-runs",
+						"healthSource": "service-tests-health"
 					}
 				}
 			],
@@ -182,6 +163,21 @@
 						{
 							"key": "errors",
 							"label": "エラー"
+						},
+						{
+							"key": "busy",
+							"label": "処理中",
+							"format": "boolean"
+						},
+						{
+							"key": "catalogRevision",
+							"label": "設定版",
+							"format": "number"
+						},
+						{
+							"key": "diagnosisRevision",
+							"label": "診断時の設定版",
+							"format": "number"
 						}
 					],
 					"rowActions": [
@@ -216,8 +212,26 @@
 							"label": "種類"
 						},
 						{
+							"key": "kindCode",
+							"label": "種類コード"
+						},
+						{
 							"key": "source",
 							"label": "接続先"
+						},
+						{
+							"key": "sourceCode",
+							"label": "接続先コード"
+						},
+						{
+							"key": "primary",
+							"label": "代表Profile",
+							"format": "boolean"
+						},
+						{
+							"key": "onDemand",
+							"label": "実行時起動",
+							"format": "boolean"
 						},
 						{
 							"key": "start",
@@ -226,6 +240,10 @@
 						{
 							"key": "state",
 							"label": "試用"
+						},
+						{
+							"key": "sample",
+							"label": "サンプル"
 						}
 					],
 					"rowActions": [
@@ -234,6 +252,115 @@
 							"when": {
 								"key": "testable",
 								"in": [true]
+							},
+							"form": {
+								"fields": [
+									{
+										"fieldId": "text",
+										"label": "入力する文",
+										"control": "textarea",
+										"maxLength": 4096,
+										"help": "空欄の場合は短い挨拶で試します。"
+									},
+									{
+										"fieldId": "comparison",
+										"label": "比較する文",
+										"control": "text",
+										"maxLength": 4096,
+										"when": {
+											"key": "kindCode",
+											"in": ["embedding"]
+										},
+										"defaultValue": "窓のそばで猫が寝ています。"
+									},
+									{
+										"fieldId": "voice",
+										"label": "声",
+										"control": "text",
+										"maxLength": 128,
+										"when": {
+											"key": "kindCode",
+											"in": ["tts"]
+										}
+									},
+									{
+										"fieldId": "width",
+										"label": "幅（画像）",
+										"control": "number",
+										"min": 100,
+										"max": 1280,
+										"when": {
+											"key": "kindCode",
+											"in": ["image"]
+										},
+										"defaultValue": "512"
+									},
+									{
+										"fieldId": "height",
+										"label": "高さ（画像）",
+										"control": "number",
+										"min": 100,
+										"max": 1280,
+										"when": {
+											"key": "kindCode",
+											"in": ["image"]
+										},
+										"defaultValue": "512"
+									},
+									{
+										"fieldId": "format",
+										"label": "画像の形式",
+										"control": "select",
+										"options": [
+											{
+												"value": "png",
+												"label": "PNG"
+											},
+											{
+												"value": "webp",
+												"label": "WebP"
+											}
+										],
+										"when": {
+											"key": "kindCode",
+											"in": ["image"]
+										},
+										"defaultValue": "webp"
+									},
+									{
+										"fieldId": "seed",
+										"label": "シード（画像）",
+										"control": "number",
+										"when": {
+											"key": "kindCode",
+											"in": ["image"]
+										}
+									},
+									{
+										"fieldId": "durationSeconds",
+										"label": "長さ（秒・楽曲）",
+										"control": "number",
+										"min": 1,
+										"max": 30,
+										"when": {
+											"key": "kindCode",
+											"in": ["music"]
+										},
+										"defaultValue": "10"
+									},
+									{
+										"fieldId": "uploadId",
+										"label": "音声ファイル（WAV・4 MBまで）",
+										"control": "upload",
+										"help": "未選択なら1秒の無音サンプルで通信を確認します。",
+										"when": {
+											"key": "kindCode",
+											"in": ["asr"]
+										},
+										"accept": ".wav,audio/wav"
+									}
+								],
+								"prefill": {}
 							}
 						}
 					],
@@ -316,12 +443,16 @@
 					"rowKey": "id",
 					"columns": [
 						{
-							"key": "kind",
-							"label": "種類"
-						},
-						{
 							"key": "model",
 							"label": "対象"
+						},
+						{
+							"key": "targetId",
+							"label": "対象ID"
+						},
+						{
+							"key": "status",
+							"label": "状態コード"
 						},
 						{
 							"key": "statusLabel",
@@ -350,9 +481,33 @@
 							"label": "結果"
 						},
 						{
+							"key": "retryArtifact",
+							"label": "再取得",
+							"format": "boolean"
+						},
+						{
 							"key": "preview",
 							"label": "プレビュー",
 							"format": "media"
+						},
+						{
+							"key": "progress",
+							"label": "進捗",
+							"format": "number"
+						},
+						{
+							"key": "revision",
+							"label": "設定版",
+							"format": "number"
+						},
+						{
+							"key": "actualModel",
+							"label": "実行モデル"
+						},
+						{
+							"key": "previewAvailable",
+							"label": "プレビュー",
+							"format": "boolean"
 						}
 					],
 					"rowActions": [
@@ -469,6 +624,11 @@
 						"type": "integer",
 						"minimum": 1,
 						"maximum": 30
+					},
+					"uploadId": {
+						"type": "string",
+						"minLength": 36,
+						"maxLength": 36
 					}
 				},
 				"required": ["targetId"]

@@ -51,6 +51,9 @@ export function SettingsSectionView({
 		<>
 			<SettingsSection
 				title={request.title ?? "設定"}
+				presentation={
+					request.view === "settings-section" ? request.presentation : undefined
+				}
 				description={resource.description}
 				fields={resource.fields}
 				groups={resource.groups}

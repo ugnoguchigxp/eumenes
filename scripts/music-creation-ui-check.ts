@@ -150,20 +150,30 @@ try {
 		exact: true,
 	});
 	const panelBody = page.locator(".artifact-panel-body:visible");
-	await expect.poll(async () => {
-		const panel = await panelBody.boundingBox();
-		const music = await workspace.boundingBox();
-		return panel && music
-			? Math.abs(panel.y + panel.height - (music.y + music.height))
-			: Number.POSITIVE_INFINITY;
-	}).toBeLessThanOrEqual(1);
+	await expect
+		.poll(async () => {
+			const panel = await panelBody.boundingBox();
+			const music = await workspace.boundingBox();
+			return panel && music
+				? Math.abs(panel.y + panel.height - (music.y + music.height))
+				: Number.POSITIVE_INFINITY;
+		})
+		.toBeLessThanOrEqual(1);
 	const prompt = page.getByRole("textbox", { name: "音楽作成プロンプト" });
+	await expect(
+		page.getByRole("button", { name: "イメージを作成", exact: true }),
+	).toHaveCount(0);
+	await expect(
+		page.getByRole("img", { name: "再生音声のVisualizer" }),
+	).toBeVisible();
+	await page.getByRole("button", { name: "楽曲イメージ" }).click();
 	await expect(
 		page.getByRole("button", { name: "イメージを作成", exact: true }),
 	).toBeDisabled();
 	await expect(
 		page.getByRole("img", { name: "楽曲イメージのモック" }),
 	).toBeVisible();
+	await page.getByRole("button", { name: "Visualizer" }).click();
 	// Basic choices must fit the initial viewport, even with all 60 genres open.
 	const basicChoicesVisible = async () => {
 		const area = await page.locator(".music-creation-scroll").boundingBox();

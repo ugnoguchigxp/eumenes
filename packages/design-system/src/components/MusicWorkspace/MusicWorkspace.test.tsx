@@ -118,6 +118,13 @@ it("reuses the player for creation and history, shows a disabled artwork mock, a
 		/>,
 	);
 	const audio = r.container.querySelector("audio");
+	expect(screen.getByRole("button", { name: "Visualizer" })).toHaveAttribute(
+		"aria-pressed",
+		"true",
+	);
+	expect(
+		screen.getByRole("img", { name: "再生音声のVisualizer" }),
+	).toBeVisible();
 	fireEvent.click(screen.getByRole("button", { name: "楽曲イメージ" }));
 	expect(
 		screen.getByRole("img", { name: "楽曲イメージのモック" }),

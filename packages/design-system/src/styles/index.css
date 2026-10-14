@@ -3,6 +3,9 @@
 @import "./themes.css";
 @import "../components/Tabs/Tabs.css";
 
+/* dark: follows the app theme tone (THEME_COLORS), not the OS preference. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *, [data-theme="tokyonight"], [data-theme="tokyonight"] *, [data-theme="fire"], [data-theme="fire"] *, [data-theme="classicterminal"], [data-theme="classicterminal"] *, .ds-theme-dark, .ds-theme-dark *));
+
 @source "../**/*.{js,ts,jsx,tsx}";
 @source "../../.storybook/**/*.{js,ts,jsx,tsx}";
 

@@ -6,29 +6,31 @@
 /* Default Theme (Light) - Specificity: 0-1-0 */
 :root,
 .ds-theme-light {
-	--background: hsl(210 20% 99%);
-	--foreground: hsl(210 20% 10%);
-	--card: hsl(210 20% 97%);
-	--card-foreground: hsl(210 20% 10%);
-	--popover: hsl(210 20% 99%);
-	--popover-foreground: hsl(210 20% 10%);
-	--primary: hsl(214 78% 46%);
+	color-scheme: light;
+	/* Softened light: surfaces stay off-white so large areas do not glare. */
+	--background: hsl(216 16% 92%);
+	--foreground: hsl(215 22% 15%);
+	--card: hsl(216 18% 95.5%);
+	--card-foreground: hsl(215 22% 15%);
+	--popover: hsl(216 18% 96.5%);
+	--popover-foreground: hsl(215 22% 15%);
+	--primary: hsl(214 72% 44%);
 	--primary-foreground: hsl(0 0% 100%);
-	--secondary: hsl(214 18% 93%);
-	--secondary-foreground: hsl(210 20% 10%);
-	--muted: hsl(214 18% 93%);
-	--muted-foreground: hsl(210 10% 45%);
-	--accent: hsl(214 18% 93%);
-	--accent-foreground: hsl(210 20% 10%);
-	--destructive: hsl(0 55% 60%);
-	--destructive-foreground: hsl(0 40% 20%);
-	--success: hsl(150 60% 35%);
+	--secondary: hsl(216 16% 87.5%);
+	--secondary-foreground: hsl(215 22% 15%);
+	--muted: hsl(216 16% 87.5%);
+	--muted-foreground: hsl(215 12% 38%);
+	--accent: hsl(216 18% 85%);
+	--accent-foreground: hsl(215 22% 15%);
+	--destructive: hsl(0 60% 48%);
+	--destructive-foreground: hsl(0 0% 100%);
+	--success: hsl(150 60% 30%);
 	--success-foreground: hsl(0 0% 100%);
-	--warning: hsl(35 80% 50%);
+	--warning: hsl(34 85% 40%);
 	--warning-foreground: hsl(0 0% 100%);
-	--border: hsl(214 16% 84%);
-	--input: hsl(214 16% 84%);
-	--ring: hsl(214 78% 46%);
+	--border: hsl(216 14% 78%);
+	--input: hsl(216 14% 74%);
+	--ring: hsl(214 72% 44%);
 	--radius: 0.5rem;
 	--chart-1: hsl(210 85% 78%);
 	--chart-2: hsl(140 65% 73%);
@@ -36,19 +38,23 @@
 	--chart-4: hsl(285 70% 75%);
 
 	/* Sidebar - Light */
-	--sidebar-background: hsl(0 0% 98%);
-	--sidebar-foreground: hsl(240 5.3% 26.1%);
-	--sidebar-primary: hsl(240 5.9% 10%);
-	--sidebar-primary-foreground: hsl(0 0% 98%);
-	--sidebar-accent: hsl(240 4.8% 95.9%);
-	--sidebar-accent-foreground: hsl(240 5.9% 10%);
-	--sidebar-border: hsl(220 13% 91%);
-	--sidebar-ring: hsl(217.2 91.2% 59.8%);
+	--sidebar-background: hsl(216 16% 90%);
+	--sidebar-foreground: hsl(215 18% 24%);
+	--sidebar-primary: hsl(214 72% 44%);
+	--sidebar-primary-foreground: hsl(0 0% 100%);
+	--sidebar-accent: hsl(216 16% 85%);
+	--sidebar-accent-foreground: hsl(215 22% 15%);
+	--sidebar-border: hsl(216 14% 80%);
+	--sidebar-ring: hsl(214 72% 44%);
+
+	/* Conversation stage behind the avatar and spatial backgrounds */
+	--stage-background: hsl(216 12% 21%);
 }
 
 /* Dark Theme - Specificity: 0-2-0 */
 :root[data-theme="dark"],
 .ds-theme-dark {
+	color-scheme: dark;
 	--background: hsl(220 23% 8%);
 	--foreground: hsl(214 24% 93%);
 	--card: hsl(218 22% 12%);
@@ -86,10 +92,14 @@
 	--sidebar-accent-foreground: hsl(214 24% 93%);
 	--sidebar-border: hsl(218 22% 12%);
 	--sidebar-ring: hsl(214 85% 55%);
+
+	/* Conversation stage behind the avatar and spatial backgrounds */
+	--stage-background: hsl(216 37% 7%);
 }
 
 /* Tokyo Night Theme - Specificity: 0-2-0 */
 :root[data-theme="tokyonight"] {
+	color-scheme: dark;
 	--background: hsl(225 30% 14%);
 	--foreground: hsl(225 40% 96%);
 	--card: hsl(225 30% 20%);
@@ -127,10 +137,14 @@
 	--sidebar-accent-foreground: hsl(225 40% 96%);
 	--sidebar-border: hsl(225 30% 20%);
 	--sidebar-ring: hsl(190 75% 32%);
+
+	/* Conversation stage behind the avatar and spatial backgrounds */
+	--stage-background: hsl(225 30% 10%);
 }
 
 /* Eclipse Theme - Specificity: 0-2-0 */
 :root[data-theme="eclipse"] {
+	color-scheme: light;
 	--background: hsl(245 50% 90%);
 	--foreground: hsl(241 67% 17%);
 	--card: hsl(245 45% 83%);
@@ -168,10 +182,14 @@
 	--sidebar-accent-foreground: hsl(241 67% 17%);
 	--sidebar-border: hsl(245 30% 70%);
 	--sidebar-ring: hsl(240 38% 25%);
+
+	/* Conversation stage behind the avatar and spatial backgrounds */
+	--stage-background: hsl(242 22% 20%);
 }
 
 /* macOS Classic Theme - Specificity: 0-2-0 */
 :root[data-theme="macosclassic"] {
+	color-scheme: light;
 	--background: hsl(0 0% 88%);
 	--foreground: hsl(215 20% 12%);
 	--card: hsl(0 0% 94%);
@@ -209,10 +227,14 @@
 	--sidebar-accent-foreground: hsl(0 0% 100%);
 	--sidebar-border: hsl(0 0% 72%);
 	--sidebar-ring: hsl(210 85% 45%);
+
+	/* Conversation stage behind the avatar and spatial backgrounds */
+	--stage-background: hsl(215 10% 22%);
 }
 
 /* Fire Theme - Specificity: 0-2-0 */
 :root[data-theme="fire"] {
+	color-scheme: dark;
 	--background: hsl(5 15% 10%);
 	--foreground: hsl(20 40% 96%);
 	--card: hsl(5 20% 18%);
@@ -250,10 +272,14 @@
 	--sidebar-accent-foreground: hsl(20 40% 96%);
 	--sidebar-border: hsl(15 25% 34%);
 	--sidebar-ring: hsl(15 80% 50%);
+
+	/* Conversation stage behind the avatar and spatial backgrounds */
+	--stage-background: hsl(5 15% 7%);
 }
 
 /* Classic Terminal Theme - Specificity: 0-2-0 */
 :root[data-theme="classicterminal"] {
+	color-scheme: dark;
 	--background: hsl(0 0% 6%);
 	--foreground: hsl(0 0% 92%);
 	--card: hsl(120 10% 10%);
@@ -291,10 +317,14 @@
 	--sidebar-accent-foreground: hsl(0 0% 92%);
 	--sidebar-border: hsl(120 10% 22%);
 	--sidebar-ring: hsl(135 45% 32%);
+
+	/* Conversation stage behind the avatar and spatial backgrounds */
+	--stage-background: hsl(0 0% 4%);
 }
 
 /* Sakura Bloom Theme - Specificity: 0-2-0 */
 :root[data-theme="sakurabloom"] {
+	color-scheme: light;
 	--background: hsl(333 70% 96%);
 	--foreground: hsl(333 35% 15%);
 	--card: hsl(333 65% 86%);
@@ -332,10 +362,14 @@
 	--sidebar-accent-foreground: hsl(333 35% 15%);
 	--sidebar-border: hsl(333 35% 82%);
 	--sidebar-ring: hsl(336 65% 82%);
+
+	/* Conversation stage behind the avatar and spatial backgrounds */
+	--stage-background: hsl(333 14% 20%);
 }
 
 /* Leaf Mint Theme - Specificity: 0-2-0 */
 :root[data-theme="leafmint"] {
+	color-scheme: light;
 	--background: hsl(152 55% 95%);
 	--foreground: hsl(150 35% 15%);
 	--card: hsl(152 50% 85%);
@@ -373,10 +407,14 @@
 	--sidebar-accent-foreground: hsl(150 35% 15%);
 	--sidebar-border: hsl(152 35% 80%);
 	--sidebar-ring: hsl(155 85% 35%);
+
+	/* Conversation stage behind the avatar and spatial backgrounds */
+	--stage-background: hsl(152 12% 18%);
 }
 
 /* Latte Cream Theme - Specificity: 0-2-0 */
 :root[data-theme="lattecream"] {
+	color-scheme: light;
 	--background: hsl(32 55% 95%);
 	--foreground: hsl(28 32% 15%);
 	--card: hsl(32 48% 85%);
@@ -414,10 +452,14 @@
 	--sidebar-accent-foreground: hsl(28 32% 15%);
 	--sidebar-border: hsl(32 35% 78%);
 	--sidebar-ring: hsl(28 45% 52%);
+
+	/* Conversation stage behind the avatar and spatial backgrounds */
+	--stage-background: hsl(28 12% 19%);
 }
 
 /* Sunshine Orange Theme - Specificity: 0-2-0 */
 :root[data-theme="sunshineOrange"] {
+	color-scheme: light;
 	--background: hsl(38 70% 94%);
 	--foreground: hsl(30 45% 15%);
 	--card: hsl(38 60% 88%);
@@ -455,4 +497,7 @@
 	--sidebar-accent-foreground: hsl(30 45% 15%);
 	--sidebar-border: hsl(35 35% 78%);
 	--sidebar-ring: hsl(35 90% 50%);
+
+	/* Conversation stage behind the avatar and spatial backgrounds */
+	--stage-background: hsl(30 14% 19%);
 }

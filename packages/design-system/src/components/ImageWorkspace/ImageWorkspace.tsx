@@ -62,6 +62,7 @@ export function ImageWorkspace(props: ImageWorkspaceProps) {
 					/>
 					<ImageCreationForm
 						initialValues={props.defaults}
+						creationOptions={props.creationOptions}
 						busy={props.busy}
 						pending={props.pending}
 						onGenerate={props.onGenerate}

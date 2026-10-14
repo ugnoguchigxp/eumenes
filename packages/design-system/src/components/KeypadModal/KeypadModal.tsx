@@ -74,11 +74,11 @@ const KeypadModalLayout: React.FC<KeypadLayoutProps> = React.memo(
 			onClose={onClose}
 		>
 			<div className="flex flex-col gap-4">
-				<div className="bg-card border-2 border-theme-text-primary rounded-lg p-[var(--ui-modal-padding)] min-h-[60px] flex items-center justify-center text-lg font-semibold text-foreground">
+				<div className="bg-card border-2 border-border rounded-lg p-[var(--ui-modal-padding)] min-h-[60px] flex items-center justify-center text-lg font-semibold text-foreground">
 					{displayContent}
 				</div>
 				{errorMessage && (
-					<div className="text-destructive-foreground text-sm text-center p-2 bg-red-50 dark:bg-red-950 rounded-md border-l-[3px] border-theme-danger">
+					<div className="text-destructive text-sm text-center p-2 bg-destructive/10 rounded-md border-l-[3px] border-destructive">
 						{errorMessage}
 					</div>
 				)}
@@ -88,7 +88,7 @@ const KeypadModalLayout: React.FC<KeypadLayoutProps> = React.memo(
 							key={num}
 							type="button"
 							onClick={() => onNumberClick(num.toString())}
-							className="min-h-[var(--ui-keypad-button-height)] text-lg font-semibold bg-background text-foreground border-2 border-theme-text-primary rounded-lg cursor-pointer transition-all active:scale-95 active:brightness-90 hover:brightness-110"
+							className="min-h-[var(--ui-keypad-button-height)] text-lg font-semibold bg-background text-foreground border-2 border-border rounded-lg cursor-pointer transition-all active:scale-95 active:brightness-90 hover:brightness-110"
 						>
 							{num}
 						</button>
@@ -99,14 +99,14 @@ const KeypadModalLayout: React.FC<KeypadLayoutProps> = React.memo(
 					<button
 						type="button"
 						onClick={() => onNumberClick("0")}
-						className="min-h-[var(--ui-keypad-button-height)] text-lg font-semibold bg-background text-foreground border-2 border-theme-text-primary rounded-lg cursor-pointer transition-all active:scale-95 active:brightness-90 hover:brightness-110"
+						className="min-h-[var(--ui-keypad-button-height)] text-lg font-semibold bg-background text-foreground border-2 border-border rounded-lg cursor-pointer transition-all active:scale-95 active:brightness-90 hover:brightness-110"
 					>
 						0
 					</button>
 					<button
 						type="button"
 						onClick={onBackspace}
-						className="min-h-[var(--ui-keypad-button-height)] text-base font-semibold bg-background text-foreground border-2 border-theme-text-primary rounded-lg cursor-pointer transition-all active:scale-95 active:brightness-90 hover:brightness-110"
+						className="min-h-[var(--ui-keypad-button-height)] text-base font-semibold bg-background text-foreground border-2 border-border rounded-lg cursor-pointer transition-all active:scale-95 active:brightness-90 hover:brightness-110"
 					>
 						⌫
 					</button>
@@ -115,14 +115,14 @@ const KeypadModalLayout: React.FC<KeypadLayoutProps> = React.memo(
 					<button
 						type="button"
 						onClick={onClear}
-						className="min-h-[var(--ui-keypad-button-height)] text-base font-semibold bg-background text-foreground border-2 border-theme-text-primary rounded-lg cursor-pointer transition-all active:scale-95 active:bg-destructive active:text-white active:border-theme-danger hover:bg-destructive hover:text-white hover:border-theme-danger"
+						className="min-h-[var(--ui-keypad-button-height)] text-base font-semibold bg-background text-foreground border-2 border-border rounded-lg cursor-pointer transition-all active:scale-95 active:bg-destructive active:text-destructive-foreground active:border-destructive hover:bg-destructive hover:text-destructive-foreground hover:border-destructive"
 					>
 						C
 					</button>
 					<button
 						type="button"
 						onClick={onConfirm}
-						className="min-h-[var(--ui-keypad-button-height)] text-base font-semibold bg-background text-foreground border-2 border-theme-text-primary rounded-lg cursor-pointer transition-all active:scale-95 active:brightness-90 hover:brightness-110"
+						className="min-h-[var(--ui-keypad-button-height)] text-base font-semibold bg-background text-foreground border-2 border-border rounded-lg cursor-pointer transition-all active:scale-95 active:brightness-90 hover:brightness-110"
 					>
 						OK
 					</button>
@@ -384,7 +384,7 @@ export const KeypadModal: React.FC<UnifiedKeypadModalProps> = React.memo(
 					<button
 						type="button"
 						onClick={clickHandler}
-						className="min-h-[var(--ui-keypad-button-height)] text-lg font-semibold bg-background text-foreground border-2 border-theme-text-primary rounded-lg cursor-pointer transition-all active:scale-95 active:brightness-90 hover:brightness-110"
+						className="min-h-[var(--ui-keypad-button-height)] text-lg font-semibold bg-background text-foreground border-2 border-border rounded-lg cursor-pointer transition-all active:scale-95 active:brightness-90 hover:brightness-110"
 					>
 						{label}
 					</button>

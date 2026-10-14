@@ -10,3 +10,4 @@ export {
 } from "./ImageCreationForm";
 export { ImageGallery, type ImageGalleryProps } from "./ImageGallery";
 export { ImagePreview, type ImagePreviewProps } from "./ImagePreview";
+export type { ImageCreationOptions } from "./image-creation-options";

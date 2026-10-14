@@ -48,7 +48,9 @@ test("playback package routes through planning, saved references, parent answer 
 			trackIds: ["two", "one"],
 		});
 		expect(f.stages).toEqual(["route", "plan", "answer"]);
-		expect(h.dialogue.answerText(run.id)).toContain("Artifact");
+		expect(h.dialogue.answerText(run.id)).toBe(
+			"保存曲のプレイリストを開きました。",
+		);
 		expect(await (await h.request("/api/music")).json()).toEqual([]);
 		expect(
 			f.requests.every(

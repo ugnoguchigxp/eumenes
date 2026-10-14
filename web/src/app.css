@@ -136,6 +136,12 @@ select:focus-visible {
 	display: flex;
 	flex-direction: column;
 	background: transparent;
+	/* Text drawn directly on the stage, which stays dark in every theme. */
+	--stage-muted-foreground: color-mix(
+		in srgb,
+		var(--stage-background) 30%,
+		#fff
+	);
 }
 .light-avatar-background {
 	position: absolute;
@@ -143,7 +149,7 @@ select:focus-visible {
 	z-index: -1;
 	overflow: hidden;
 	pointer-events: none;
-	background: #0b1018;
+	background: var(--stage-background);
 }
 .light-avatar-background canvas {
 	display: block;
@@ -214,14 +220,20 @@ select:focus-visible {
 	border: 1px solid var(--border);
 	border-radius: 13px;
 	color: var(--foreground);
-	background: color-mix(in srgb, var(--card) 82%, transparent);
+	background: color-mix(in srgb, var(--card) 93%, transparent);
+	backdrop-filter: blur(12px);
 	overflow-wrap: anywhere;
 }
 .message-user {
 	align-self: flex-end;
-	color: var(--card);
-	border-color: var(--primary);
-	background: color-mix(in srgb, var(--primary) 90%, transparent);
+	color: var(--foreground);
+	border-color: color-mix(in srgb, var(--border) 70%, var(--primary));
+	background: color-mix(in srgb, var(--card) 85%, var(--primary));
+}
+:root[data-theme="light"] .message-user,
+:root:not([data-theme]) .message-user {
+	border-color: color-mix(in srgb, var(--border) 50%, var(--primary));
+	background: color-mix(in srgb, var(--card) 65%, var(--primary));
 }
 .message small {
 	display: block;
@@ -229,9 +241,6 @@ select:focus-visible {
 	font-size: 0.67rem;
 	font-weight: 750;
 	letter-spacing: 0.04em;
-}
-.message-user small {
-	color: color-mix(in srgb, var(--primary) 14%, var(--background));
 }
 .message p {
 	margin: 5px 0 0;
@@ -334,7 +343,7 @@ select:focus-visible {
 	width: 100%;
 	margin: auto;
 	padding: 40px 12px;
-	color: var(--muted-foreground);
+	color: var(--stage-muted-foreground);
 	text-align: center;
 	font-size: 0.9rem;
 }
@@ -344,7 +353,7 @@ select:focus-visible {
 	gap: 10px;
 	width: fit-content;
 	margin-top: 16px;
-	color: var(--muted-foreground);
+	color: var(--stage-muted-foreground);
 	font-size: 0.75rem;
 }
 .thinking-dots {
@@ -399,8 +408,13 @@ select:focus-visible {
 	gap: 4px;
 }
 .route-arrow {
-	color: var(--muted-foreground);
-	font-size: 0.72rem;
+	color: var(--stage-muted-foreground);
+	font-size: 0.8rem;
+	font-weight: 700;
+	/* Keeps the arrow legible over both the dark stage and the bright avatar. */
+	text-shadow:
+		0 0 2px var(--stage-background),
+		0 0 5px var(--stage-background);
 }
 .route-node {
 	display: flex;
@@ -435,7 +449,8 @@ select:focus-visible {
 	padding: 11px;
 	border: 1px solid var(--border);
 	border-radius: 17px;
-	background: color-mix(in srgb, var(--card) 88%, transparent);
+	background: color-mix(in srgb, var(--card) 96%, transparent);
+	backdrop-filter: blur(14px);
 	box-shadow: 0 18px 52px rgb(0 0 0 / 0.22);
 }
 .chat-composer:focus-within {
@@ -474,10 +489,30 @@ select:focus-visible {
 .chat-composer textarea::placeholder {
 	color: var(--muted-foreground);
 }
+.composer-actions button:not([type="submit"]) {
+	border: 1px solid var(--border);
+}
 .level {
 	width: 62px;
 	height: 8px;
-	accent-color: var(--primary);
+	border: 1px solid var(--border);
+	border-radius: 999px;
+	overflow: hidden;
+	background: var(--muted);
+	appearance: none;
+}
+.level::-webkit-meter-bar {
+	border: 0;
+	border-radius: 999px;
+	background: var(--muted);
+}
+.level::-webkit-meter-optimum-value {
+	border-radius: 999px;
+	background: var(--primary);
+}
+.level::-moz-meter-bar {
+	border-radius: 999px;
+	background: var(--primary);
 }
 .chat-error {
 	margin: 8px clamp(16px, 3.5vw, 58px);
@@ -936,6 +971,9 @@ select:focus-visible {
 	padding: 0;
 	overflow: hidden;
 }
+.artifact-panel-body:has(.aui-service-workspace) {
+	padding: 0;
+}
 .artifact-panel-body:has(:is(.music-workspace, .image-workspace))
 	> .toolchain-artifact {
 	height: 100%;
@@ -1007,6 +1045,10 @@ select:focus-visible {
 }
 .message-assistant {
 	padding-right: 44px;
+}
+.music-result-action {
+	margin-top: 10px;
+	gap: 5px;
 }
 
 .message small.message-author {
