@@ -83,7 +83,7 @@
 					"eventAction": "collection-start",
 					"source": "service-tests-catalog",
 					"operationId": "service-tests.start",
-					"inputSchemaRef": "schema:service-tests-start@1",
+					"inputSchemaRef": "schema:service-tests-start@2",
 					"effect": "write",
 					"label": "試す",
 					"rowInput": {
@@ -96,7 +96,7 @@
 					"eventAction": "collection-start-custom",
 					"source": "service-tests-catalog",
 					"operationId": "service-tests.start",
-					"inputSchemaRef": "schema:service-tests-start@1",
+					"inputSchemaRef": "schema:service-tests-start@2",
 					"effect": "write",
 					"label": "条件を指定して試す"
 				},
@@ -641,6 +641,62 @@
 			"kind": "schema",
 			"id": "service-tests-start",
 			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"targetId": {
+						"type": "string",
+						"maxLength": 150,
+						"minLength": 1
+					},
+					"revision": {
+						"type": "integer",
+						"minimum": 0
+					},
+					"text": {
+						"type": "string",
+						"maxLength": 4096
+					},
+					"comparison": {
+						"type": "string",
+						"maxLength": 4096
+					},
+					"voice": {
+						"type": "string",
+						"maxLength": 128
+					},
+					"width": {
+						"type": "integer",
+						"minimum": 100,
+						"maximum": 1280
+					},
+					"height": {
+						"type": "integer",
+						"minimum": 100,
+						"maximum": 1280
+					},
+					"format": {
+						"type": "string",
+						"maxLength": 4,
+						"enum": ["png", "webp"]
+					},
+					"seed": {
+						"type": "integer"
+					},
+					"durationSeconds": {
+						"type": "integer",
+						"minimum": 1,
+						"maximum": 30
+					}
+				},
+				"required": ["targetId"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "service-tests-start",
+			"revision": 2,
 			"schema": {
 				"type": "object",
 				"additionalProperties": false,

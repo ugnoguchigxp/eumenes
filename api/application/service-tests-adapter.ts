@@ -30,7 +30,7 @@ export type ServiceTestsPorts = Pick<
 	| "retryArtifactInTransaction"
 >;
 
-const START_SCHEMA = "schema:service-tests-start@1";
+const START_SCHEMA = "schema:service-tests-start@2";
 const RUN_SCHEMA = "schema:service-tests-run@1";
 const startInput = z.strictObject({
 	targetId: z.string().min(1).max(150),
