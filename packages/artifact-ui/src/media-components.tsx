@@ -187,6 +187,10 @@ export function MusicWorkspaceView({ request }: { request: ArtifactRequest }) {
 				creation={
 					data.creation
 						? {
+								options:
+									request.view === "music-workspace"
+										? request.creationOptions
+										: undefined,
 								busy: data.creation.busy,
 								onGenerate: (prompt) => {
 									void send("music-generate", { prompt });

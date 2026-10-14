@@ -1323,3 +1323,88 @@ test("structure actions can be row actions and create actions, and ids may be ge
 		).toEqual(["invalid_format:artifacts/0/actionBindings/2/rowInput"]);
 	});
 });
+
+test("a clean-draft requirement names a registered document that the artifact uses", async () => {
+	await fixture(async ({ load }) => {
+		const at = "artifacts/0/collections/0/rowActions/0/requiresCleanDraft";
+		const clean = (
+			document: string,
+			over: Parameters<typeof listing>[0] = {},
+		) =>
+			checkListing(load, {
+				collection: {
+					rowActions: [
+						{ actionId: "remove-note", requiresCleanDraft: document },
+					],
+				},
+				...over,
+			});
+		// The listing's draft actions use the notes document.
+		expect(await clean("document:notes@1")).toEqual([]);
+		expect(await clean("document:nothing@1")).toEqual([
+			`unknown_reference:${at}`,
+		]);
+		// Registered by an adapter but not used by this artifact.
+		expect(await clean("document:other@1")).toEqual([`invalid_format:${at}`]);
+		// A registered field counts as use, without any draft action.
+		const field = {
+			...(artifact("x", 1).fields![0] as object),
+			document: "document:other@1",
+			path: "$.anything",
+		};
+		expect(
+			await clean("document:other@1", {
+				actions: [
+					structureAction({
+						draftDocument: "document:notes@1",
+						confidentialFields: ["apiKey"],
+					}),
+					removeAction(),
+				],
+			}),
+		).toEqual([`invalid_format:${at}`]);
+		expect(
+			lines(
+				await load(
+					bundle(
+						[
+							artifact("a", 1, {
+								sourceBindings: artifact("a", 1).sourceBindings.map((s) =>
+									s.source === "notes-items"
+										? { ...s, paramsSchemaRef: "builtin:emptyInput" }
+										: s,
+								),
+								fields: [{ ...field, fieldId: "a.other", control: "text" }],
+								actionBindings: [
+									structureAction({ confidentialFields: ["apiKey"] }),
+									removeAction(),
+								],
+								collections: [
+									collection({
+										rowActions: [
+											{
+												actionId: "remove-note",
+												requiresCleanDraft: "document:other@1",
+											},
+										],
+									}),
+								],
+							}),
+						],
+						"notes",
+						[addSchema],
+					),
+					true,
+				),
+			),
+		).toEqual([]);
+		// The media column format needs nothing else.
+		expect(
+			await checkListing(load, {
+				collection: {
+					columns: [{ key: "image", label: "画像", format: "media" }],
+				},
+			}),
+		).toEqual([]);
+	});
+});

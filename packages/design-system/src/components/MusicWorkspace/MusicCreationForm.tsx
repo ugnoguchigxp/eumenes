@@ -4,10 +4,8 @@ import { Button } from "../Button";
 import {
 	emptyMusicSelection,
 	musicSelectionText,
-	musicGenres,
-	musicMoods,
-	musicInstruments,
-	musicVoiceQualities,
+	defaultMusicCreationOptions,
+	type MusicCreationOptions,
 	type MusicSelection,
 } from "./music-creation-options";
 import "./MusicCreationForm.css";
@@ -72,9 +70,11 @@ function SelectChoice({
 function VocalChoices({
 	selection,
 	update,
+	options,
 }: {
 	selection: MusicSelection;
 	update: (next: MusicSelection) => void;
+	options: MusicCreationOptions;
 }) {
 	return (
 		<section className="music-creation-vocals">
@@ -94,31 +94,31 @@ function VocalChoices({
 						<SelectChoice
 							label="ボーカル"
 							value={selection.gender}
-							options={["おまかせ", "男性ボーカル", "女性ボーカル"]}
+							options={options.vocalists}
 							onChange={(gender) => update({ ...selection, gender })}
 						/>
 						<SelectChoice
 							label="声の高さ"
 							value={selection.range}
-							options={["おまかせ", "低め", "中間", "高め"]}
+							options={options.ranges}
 							onChange={(range) => update({ ...selection, range })}
 						/>
 						<SelectChoice
 							label="歌い方"
 							value={selection.singing}
-							options={["ソロ", "デュエット", "コーラス", "ラップ"]}
+							options={options.singingStyles}
 							onChange={(singing) => update({ ...selection, singing })}
 						/>
 						<SelectChoice
 							label="歌詞の言語"
 							value={selection.language}
-							options={["日本語", "英語", "おまかせ"]}
+							options={options.languages}
 							onChange={(language) => update({ ...selection, language })}
 						/>
 					</div>
 					<Choices
 						label="声質"
-						options={musicVoiceQualities}
+					options={options.voiceQualities}
 						selected={selection.voiceQualities}
 						onChange={(voiceQualities) =>
 							update({ ...selection, voiceQualities })
@@ -152,17 +152,19 @@ function VocalChoices({
 export type MusicCreationFormProps = {
 	busy?: boolean;
 	initialPrompt?: string;
+	options?: MusicCreationOptions;
 	onGenerate: (prompt: string) => void;
 };
 export function MusicCreationForm({
 	busy,
 	initialPrompt,
+	options = defaultMusicCreationOptions,
 	onGenerate,
 }: MusicCreationFormProps) {
 	const id = useId();
-	const [selection, setSelection] = useState(emptyMusicSelection);
+	const [selection, setSelection] = useState(() => emptyMusicSelection(options));
 	const [prompt, setPrompt] = useState(
-		() => initialPrompt ?? musicSelectionText(emptyMusicSelection()),
+		() => initialPrompt ?? musicSelectionText(emptyMusicSelection(options)),
 	);
 	const [edited, setEdited] = useState(!!initialPrompt);
 	const [pending, setPending] = useState(false);
@@ -181,13 +183,13 @@ export function MusicCreationForm({
 	};
 	const reset = () => {
 		setPrevious(prompt);
-		setSelection(emptyMusicSelection());
-		setPrompt(musicSelectionText(emptyMusicSelection()));
+		setSelection(emptyMusicSelection(options));
+		setPrompt(musicSelectionText(emptyMusicSelection(options)));
 		setEdited(false);
 		setPending(false);
 		setSearch("");
 	};
-	const groups = musicGenres
+	const groups = options.genreGroups
 		.map((group) => ({
 			...group,
 			options: group.options.filter((option) =>
@@ -213,13 +215,13 @@ export function MusicCreationForm({
 				</header>
 				<Choices
 					label="雰囲気"
-					options={musicMoods}
+					options={options.moods}
 					selected={selection.moods}
 					onChange={(moods) => update({ ...selection, moods })}
 				/>
 				<Choices
 					label="楽器"
-					options={musicInstruments}
+					options={options.instruments}
 					selected={selection.instruments}
 					onChange={(instruments) => update({ ...selection, instruments })}
 				/>
@@ -227,7 +229,7 @@ export function MusicCreationForm({
 					<SelectChoice
 						label="テンポ"
 						value={selection.tempo}
-						options={["おまかせ", "ゆったり", "中くらい", "速め"]}
+						options={options.tempos}
 						onChange={(tempo) => update({ ...selection, tempo })}
 					/>
 					<label className="music-creation-select">
@@ -238,7 +240,7 @@ export function MusicCreationForm({
 								update({ ...selection, duration: event.target.value })
 							}
 						>
-							{[10, 30, 60, 90, 120, 180, 300, 600].map((seconds) => (
+							{options.durations.map((seconds) => (
 								<option key={seconds} value={seconds}>
 									{seconds < 60 ? `${seconds}秒` : `${seconds / 60}分`}
 								</option>
@@ -304,7 +306,7 @@ export function MusicCreationForm({
 						))}
 					</div>
 				)}
-				<VocalChoices selection={selection} update={update} />
+				<VocalChoices selection={selection} update={update} options={options} />
 			</div>
 			<div className="music-creation-prompt">
 				<div className="music-creation-prompt-heading">

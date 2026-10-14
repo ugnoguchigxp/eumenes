@@ -39,6 +39,8 @@ export type InferenceAdapterPorts = {
 		db: Database,
 		target: string,
 	): { id: string; launch(): void };
+	/** Marks a running probe as cancelling (throws probe_not_found / probe_not_running). */
+	cancelProbeInTransaction(db: Database, id: string): void;
 	cancelProbe(id: string): void;
 };
 /** The settings the targets are listed from (resources of the saved document). */
@@ -50,7 +52,7 @@ export type InferenceSettingsPort = {
 			purpose: Purpose;
 			model: string;
 		}>;
-		connections: Array<{ id: string; name: string }>;
+		connections: Array<{ id: string; name: string; enabled: boolean }>;
 	};
 };
 
@@ -113,11 +115,14 @@ export function createInferenceAdapter(
 	function targets(tx: Database) {
 		const saved = settings.inTransaction(tx);
 		return [
-			{ id: "larm", label: "LARM", purpose: null },
+			{ id: "larm", label: "LARM", purpose: null, enabled: true },
 			...saved.resources.map((r) => ({
 				id: r.id,
 				label: `${saved.connections.find((c) => c.id === r.connectionId)?.name ?? "登録モデル"} / ${r.model}`,
 				purpose: r.purpose,
+				enabled:
+					saved.connections.find((c) => c.id === r.connectionId)?.enabled ??
+					false,
 			})),
 		];
 	}
@@ -151,17 +156,15 @@ export function createInferenceAdapter(
 			if (request.operationName === "inference.probe-cancel") {
 				const input = probeCancel.safeParse(request.input);
 				if (!input.success) throw new Error("invalid_input");
-				const probe = inference.getProbe(input.data.id) as ProbeRow | null;
-				if (!probe) throw new Error("probe_not_found");
-				if (probe.status !== "running") throw new Error("probe_not_running");
-				cancels.push(probe.id);
+				inference.cancelProbeInTransaction(tx, input.data.id);
+				cancels.push(input.data.id);
 				return done(
-					{ version: 1, kind: "probe-cancelled", id: probe.id },
+					{ version: 1, kind: "probe-cancelled", id: input.data.id },
 					request.requestId,
 					{
 						owner: "inference",
 						kind: "probe",
-						id: probe.id,
+						id: input.data.id,
 						schemaRef: "domain:inference.probe@1",
 					},
 				);
@@ -211,7 +214,12 @@ export function createInferenceAdapter(
 					: {},
 		afterCommit() {
 			const start = launches.splice(0);
-			for (const id of cancels.splice(0)) inference.cancelProbe(id);
+			// Only a cancel that committed left its mark; a rolled-back one aborts nothing.
+			for (const id of cancels.splice(0))
+				if (
+					(inference.getProbe(id) as ProbeRow | null)?.status === "cancelling"
+				)
+					inference.cancelProbe(id);
 			for (const launch of start) launch();
 		},
 	};

@@ -38,7 +38,7 @@ export function openProbe(
 	revision: number,
 ) {
 	db.query(
-		"UPDATE inference_probes SET status='failed',error='probe_stale' WHERE status='running' AND created<?",
+		"UPDATE inference_probes SET status='failed',error='probe_stale' WHERE status IN ('running','cancelling') AND created<?",
 	).run(Date.now() - PROBE_STALE_MS);
 	if (db.query("SELECT id FROM inference_probes WHERE status='running'").get())
 		throw new Error("invalid_probe_busy");

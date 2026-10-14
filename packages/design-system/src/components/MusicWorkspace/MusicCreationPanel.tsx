@@ -45,6 +45,7 @@ export function MusicCreationPanel({
 				<MusicCreationForm
 					key={draft?.revision ?? 0}
 					initialPrompt={draft?.prompt}
+					options={creation.options}
 					busy={busy || creation.busy}
 					onGenerate={creation.onGenerate}
 				/>

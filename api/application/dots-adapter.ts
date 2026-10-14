@@ -10,6 +10,16 @@ import {
 	type createEvents,
 } from "../domains/dots";
 import type { AdapterResult, DomainAdapter } from "../domains/tool-runtime";
+import {
+	runTaskOperation,
+	TASK_OPERATIONS,
+	TASK_PROJECT_OPTIONS,
+	TASK_QUERIES,
+	TASKS,
+	taskProjectOptions,
+	taskRows,
+	type DotsTaskPorts,
+} from "./dots-task-operations";
 
 export const DOTS_ADAPTER_REF = "adapter:dots@1";
 const CONNECTIONS = "query:dots.connections@1";
@@ -33,6 +43,8 @@ export type DotsAdapterPorts = {
 		| "configureProjectInTransaction"
 	>;
 	events: Pick<ReturnType<typeof createEvents>, "statusInTransaction">;
+	/** The tasks domain, for the delegated work list (dots tasks are `orchestration` tasks). */
+	tasks: DotsTaskPorts;
 	packages: Pick<
 		Capabilities,
 		"listDotsPackagesInTransaction" | "putDotsPackageInTransaction"
@@ -164,6 +176,7 @@ export const describeDotsAdapter = () => ({
 				["dots.package-create", "schema:dots-package-create@1"],
 				["dots.package-update", "schema:dots-package-update@1"],
 				["dots.package-enabled", "schema:dots-package-enabled@1"],
+				...TASK_OPERATIONS,
 			] as const
 		).map(([name, inputSchemaRef]) => [
 			name,
@@ -176,6 +189,7 @@ export const describeDotsAdapter = () => ({
 		PACKAGES,
 		CONNECTION_OPTIONS,
 		CAPABILITY_OPTIONS,
+		...TASK_QUERIES,
 	]),
 	inputAdapters: new Map(),
 	projections: new Set<string>(),
@@ -226,7 +240,12 @@ const projectBody = (project: Project) => {
 };
 
 /** The sources: rows shaped for the collection and for the edit forms they prefill. */
-function sources(ports: DotsAdapterPorts, tx: Database, query: string) {
+function sources(
+	ports: DotsAdapterPorts,
+	tx: Database,
+	query: string,
+	nowMs: number,
+) {
 	const { connections, projects } = ports.config.listInTransaction(tx);
 	const packages = ports.packages.listDotsPackagesInTransaction(tx).items;
 	const titles = new Map(connections.map((c) => [c.id, c.title]));
@@ -301,6 +320,13 @@ function sources(ports: DotsAdapterPorts, tx: Database, query: string) {
 					),
 				})),
 			};
+		case TASKS:
+			return taskRows(ports.tasks, tx, nowMs);
+		case TASK_PROJECT_OPTIONS:
+			return taskProjectOptions(
+				projects,
+				new Set(connections.filter((c) => c.enabled).map((c) => c.id)),
+			);
 		case CONNECTION_OPTIONS:
 			return options(connections.map((c) => ({ value: c.id, label: c.title })));
 		case CAPABILITY_OPTIONS:
@@ -620,8 +646,25 @@ export function createDotsAdapter(
 					id,
 				);
 			}
-			default:
-				throw new Error("capability_unavailable");
+			default: {
+				const { connections, projects } = ports.config.listInTransaction(tx);
+				const receipt = runTaskOperation(ports.tasks, tx, {
+					operation,
+					data: input,
+					requestId: id,
+					nowMs: now(),
+					projects,
+					enabledConnections: new Set(
+						connections.filter((c) => c.enabled).map((c) => c.id),
+					),
+				}) as { taskId: string; revision: number } | null;
+				if (!receipt) throw new Error("capability_unavailable");
+				return done(receipt, id, {
+					kind: "task",
+					id: receipt.taskId,
+					revision: receipt.revision,
+				});
+			}
 		}
 	}
 	return {
@@ -653,7 +696,7 @@ export function createDotsAdapter(
 				replay: false,
 			};
 		},
-		sourceInTransaction: (tx, query) => sources(ports, tx, query),
+		sourceInTransaction: (tx, query) => sources(ports, tx, query, now()),
 		targetInput: () => ({}),
 	};
 }

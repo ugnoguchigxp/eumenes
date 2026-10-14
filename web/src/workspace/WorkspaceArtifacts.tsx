@@ -15,7 +15,6 @@ import { ImageArtifact } from "../domains/image/ImageArtifact";
 import { useCallback } from "react";
 import type { EumenesClient } from "../../../client";
 import {
-	musicArtifactDefinition,
 	playlistArtifactDefinition,
 } from "../domains/music/artifact-definition";
 import { useArtifactWorkspace } from "../domains/artifact";
@@ -68,20 +67,6 @@ export function useOpenImage(
 				kind: "openui",
 				definition: imageArtifactDefinition(),
 				title: "画像生成",
-			}),
-		[open],
-	);
-}
-export function useOpenMusic(
-	open: ReturnType<typeof useArtifactWorkspace>["open"],
-) {
-	return useCallback(
-		() =>
-			open({
-				id: "music-generation",
-				kind: "openui",
-				definition: musicArtifactDefinition(),
-				title: "楽曲生成",
 			}),
 		[open],
 	);

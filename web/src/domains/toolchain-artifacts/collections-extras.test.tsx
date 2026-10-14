@@ -91,7 +91,14 @@ const artifact = {
 	],
 } as unknown as ArtifactDefinitionV1;
 
-function setup(rows: Array<{ id: string; name: string; state: string }>) {
+function setup(
+	rows: unknown[],
+	definition: ArtifactDefinitionV1 = artifact,
+	options: {
+		adapters?: Parameters<typeof createWebAdapterRegistry>[0];
+		read?: (source: string) => Promise<unknown>;
+	} = {},
+) {
 	const receipt = { localToken: TOKEN };
 	const submit = vi.fn(async (event: { eventId: string; input: unknown }) => ({
 		httpStatus: 200,
@@ -113,14 +120,18 @@ function setup(rows: Array<{ id: string; name: string; state: string }>) {
 	const client = {
 		identity: crypto.randomUUID(),
 		toolchainArtifact: vi.fn(async () => ({
-			artifact,
+			artifact: definition,
 			artifactRevisionId: REV,
 			digest: "d",
 			scopeRef: "scope:main",
 		})),
 		toolchainArtifacts: vi.fn(async () => []),
-		toolchainArtifactSource: vi.fn(async (_r: string, source: string) =>
-			source === "kinds"
+		toolchainMedia: vi.fn(
+			async (_path: string) => new Blob(["x"], { type: "image/png" }),
+		),
+		toolchainArtifactSource: vi.fn(async (_r: string, source: string) => {
+			if (options.read) return options.read(source);
+			return source === "kinds"
 				? {
 						revision: 0,
 						data: {
@@ -130,8 +141,8 @@ function setup(rows: Array<{ id: string; name: string; state: string }>) {
 							],
 						},
 					}
-				: { revision: 0, data: rows },
-		),
+				: { revision: 0, data: rows };
+		}),
 		toolchainInteractions: vi.fn(async () => []),
 		submitToolchainAction: submit,
 		toolchainAction: vi.fn(),
@@ -145,7 +156,7 @@ function setup(rows: Array<{ id: string; name: string; state: string }>) {
 		>
 			<ToolchainArtifactHost
 				client={client as never}
-				adapters={createWebAdapterRegistry([])}
+				adapters={createWebAdapterRegistry(options.adapters ?? [])}
 				artifactRevisionId={REV}
 				artifactId="tab"
 			/>
@@ -226,4 +237,169 @@ test("the list is re-read every few seconds only while a watched row is in the w
 		await vi.advanceTimersByTimeAsync(10_000);
 	});
 	expect(reads()).toBe(start);
+});
+
+test("a screen made only of lists has no document to read: an accepted write leaves it intact", async () => {
+	const listOnly = {
+		...artifact,
+		sourceBindings: [artifact.sourceBindings[0]!],
+		collections: [
+			{
+				...artifact.collections![0]!,
+				create: {
+					actionId: "start",
+					fields: [{ fieldId: "name", label: "名前", control: "text" }],
+				},
+			},
+		],
+	} as ArtifactDefinitionV1;
+	const { client, submit } = setup(
+		[{ id: "j1", name: "既存", state: "done" }],
+		listOnly,
+	);
+	await screen.findByText("既存");
+	fireEvent.submit(await screen.findByRole("form", { name: "開始" }));
+	await waitFor(() => expect(submit).toHaveBeenCalledOnce());
+	await screen.findByRole("dialog");
+	// Settling reads the lists again, never a source that does not exist.
+	await waitFor(() =>
+		expect(
+			client.toolchainArtifactSource.mock.calls.filter((c) => c[1] === "jobs")
+				.length,
+		).toBeGreaterThan(1),
+	);
+	expect(
+		client.toolchainArtifactSource.mock.calls.some(
+			(c) => c[1] === "undefined" || c[1] === undefined,
+		),
+	).toBe(false);
+	expect(screen.queryByText("画面のデータを読み込めません。")).toBeNull();
+});
+
+test("a required choice with no default shows an empty first option, so what is seen is what is sent", async () => {
+	setup([]);
+	const form = await screen.findByRole("form", { name: "開始" });
+	await screen.findByRole("option", { name: "種類A" });
+	const select = form.querySelector("select")!;
+	expect(select.value).toBe("");
+	expect(select.options[0]!.textContent).toBe("選択してください");
+});
+
+const mediaArtifact = {
+	...artifact,
+	sourceBindings: [artifact.sourceBindings[0]!],
+	collections: [
+		{
+			source: "jobs",
+			title: "録音",
+			description: "保存した録音の一覧です。",
+			rowKey: "id",
+			columns: [
+				{ key: "name", label: "名前" },
+				{ key: "clip", label: "音", format: "media" },
+			],
+			rowActions: [],
+		},
+	],
+} as unknown as ArtifactDefinitionV1;
+
+test("a media column fetches nothing until asked, then previews a same-origin file and revokes it on leaving", async () => {
+	const created = vi.fn(() => "blob:preview-1");
+	const revoked = vi.fn();
+	vi.stubGlobal(
+		"URL",
+		class extends URL {
+			static createObjectURL = created;
+			static revokeObjectURL = revoked;
+		},
+	);
+	const { client } = setup(
+		[
+			{
+				id: "m1",
+				name: "一件目",
+				clip: { path: "/api/media/m1.png", mime: "image/png" },
+			},
+			{
+				id: "m2",
+				name: "不明",
+				clip: { path: "/api/media/m2.bin", mime: "application/octet-stream" },
+			},
+		],
+		mediaArtifact,
+	);
+	await screen.findByText("保存した録音の一覧です。");
+	await screen.findByText("一件目");
+	expect(client.toolchainMedia).not.toHaveBeenCalled();
+	expect(screen.getByText("表示できない形式です")).toBeTruthy();
+	fireEvent.click(screen.getByRole("button", { name: "画像を表示" }));
+	await waitFor(() =>
+		expect(client.toolchainMedia).toHaveBeenCalledWith("/api/media/m1.png"),
+	);
+	await waitFor(() =>
+		expect(document.querySelector("img")?.getAttribute("src")).toBe(
+			"blob:preview-1",
+		),
+	);
+	cleanup();
+	expect(revoked).toHaveBeenCalledWith("blob:preview-1");
+	vi.unstubAllGlobals();
+});
+
+test("a one-time value is shown even when settling the write fails afterwards", async () => {
+	const adapter = {
+		adapterRef: ADAPTER,
+		useArtifact: () => ({
+			phase: { kind: "ready" as const },
+			snapshot: {},
+			targetOf: () => undefined,
+			local: async () => ({ status: "rejected" as const, message: "" }),
+			settled: async () => {
+				throw new Error("refresh_failed");
+			},
+			refresh: () => {},
+		}),
+	};
+	setup([], artifact, { adapters: [adapter] });
+	const form = await screen.findByRole("form", { name: "開始" });
+	await screen.findByRole("option", { name: "種類A" });
+	fireEvent.change(form.querySelector("select")!, { target: { value: "a" } });
+	fireEvent.submit(form);
+	const dialog = await screen.findByRole("dialog");
+	expect(dialog.textContent).toContain(TOKEN);
+});
+
+test("watched polling stops after three failed reads in a row, and a manual refresh starts it again", async () => {
+	vi.useFakeTimers({ shouldAdvanceTime: true });
+	let fail = false;
+	const { client } = setup([], artifact, {
+		read: async (source) => {
+			if (source === "kinds")
+				return {
+					revision: 0,
+					data: { options: [{ value: "a", label: "種類A" }] },
+				};
+			if (fail) throw new Error("network");
+			return {
+				revision: 0,
+				data: [{ id: "j1", name: "実行中", state: "running" }],
+			};
+		},
+	});
+	await screen.findByText("実行中");
+	const reads = () =>
+		client.toolchainArtifactSource.mock.calls.filter((c) => c[1] === "jobs")
+			.length;
+	fail = true;
+	for (let i = 0; i < 8; i++)
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(3100);
+		});
+	const stopped = reads();
+	await act(async () => {
+		await vi.advanceTimersByTimeAsync(20_000);
+	});
+	// Three failures end the polling; nothing keeps hammering the source.
+	expect(reads()).toBe(stopped);
+	expect(stopped).toBeLessThanOrEqual(5);
 });

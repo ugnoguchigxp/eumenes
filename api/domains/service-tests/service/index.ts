@@ -1,6 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { createHash } from "node:crypto";
-import type { z } from "zod";
+import { z } from "zod";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import { getLogger } from "../../../infrastructure/logger";
 import {
@@ -21,6 +21,10 @@ import {
 } from "../contracts";
 import { readRun, readRuns, updateRun, type RunRecord } from "../repository";
 import { diagnoseWork, startWork, type Work, type WorkDeps } from "./works";
+
+const startInTransactionSchema = startSchema.extend({
+	revision: z.number().int().nonnegative().optional(),
+});
 
 export function createServiceTests(
 	store: SqliteStore,
@@ -298,16 +302,23 @@ export function createServiceTests(
 		launch(record, work);
 		return true;
 	}
+	/**
+	 * `revision` is the settings revision the person saw; without it only the catalog's own
+	 * stale check applies (settings changed since the last discovery).
+	 */
 	function startInTransaction(
 		db: Database,
-		raw: z.input<typeof startSchema>,
+		raw: Omit<z.input<typeof startSchema>, "revision"> & { revision?: number },
 	): Accepted {
 		if (closed) throw new Error("invalid_test_closed");
-		const parsed = startSchema.safeParse(raw);
+		const parsed = startInTransactionSchema.safeParse(raw);
 		if (!parsed.success) throw new Error("invalid_test_input");
 		const input = parsed.data;
 		const s = settings.inTransaction(db);
-		if (input.revision !== s.revision || catalog().stale)
+		if (
+			(input.revision !== undefined && input.revision !== s.revision) ||
+			catalog().stale
+		)
 			throw new Error("invalid_stale_settings");
 		const target = catalog().targets.find((t) => t.id === input.targetId);
 		if (!target?.testable) throw new Error("invalid_test_target");
@@ -383,8 +394,9 @@ export function createServiceTests(
 		return accepted.run;
 	}
 	/**
-	 * Mark the run as stopping; the returned function aborts it once the write commits (false
-	 * while the stopping mark is not committed yet).
+	 * Mark the run as stopping; the returned function aborts it once the write commits. It
+	 * decides by the run's status, not its phase: a progress save between the commit and this
+	 * call may rewrite the phase, but a run that is still running must still be aborted.
 	 */
 	function cancelInTransaction(db: Database, id: string) {
 		const r = readRun(db, id);
@@ -392,10 +404,10 @@ export function createServiceTests(
 		if (r.status !== "running") return () => true;
 		updateRun(db, id, { phase: "cancelling" });
 		return () => {
-			if (store.read((d) => readRun(d, id))?.phase !== "cancelling")
-				return false;
-			active.get(id)?.abort();
-			previews.delete(id);
+			if (store.read((d) => readRun(d, id))?.status === "running") {
+				active.get(id)?.abort();
+				previews.delete(id);
+			}
 			return true;
 		};
 	}

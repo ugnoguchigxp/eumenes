@@ -5,9 +5,8 @@ import type { WorkspaceState } from "./useWorkspace";
 export function ChatImageInput({ state }: { state: WorkspaceState }) {
 	const picker = useRef<HTMLInputElement>(null);
 	const images = state.attachments;
-	const input = state.status.data?.larm.chatInput;
 	return (
-		<div className="chat-image-input">
+		<>
 			<input
 				ref={picker}
 				type="file"
@@ -23,11 +22,36 @@ export function ChatImageInput({ state }: { state: WorkspaceState }) {
 			<Button
 				type="button"
 				variant="secondary"
+				size="icon"
+				aria-label="ファイルを添付"
+				title="ファイルを添付（現在はJPG・PNG・BMP画像に対応）"
 				onClick={() => picker.current?.click()}
 				disabled={images.busy || state.submit.isPending}
 			>
-				画像を添付
+				<svg
+					width="20"
+					height="20"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					strokeWidth="1.8"
+					strokeLinecap="round"
+					strokeLinejoin="round"
+					aria-hidden="true"
+				>
+					<path d="M12 16V4m-4 4 4-4 4 4M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
+				</svg>
 			</Button>
+		</>
+	);
+}
+
+export function ChatImagePreviews({ state }: { state: WorkspaceState }) {
+	const images = state.attachments;
+	const input = state.status.data?.larm.chatInput;
+	if (!images.items.length && !images.error) return null;
+	return (
+		<div className="chat-image-input">
 			{images.items.length > 0 && (
 				<div className="draft-images" aria-label="送信する添付画像">
 					{images.items.map((item) => (

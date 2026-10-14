@@ -22,6 +22,7 @@ import {
 	type SelectionDraft,
 } from "./selection-trace";
 import { generateConversation } from "./conversation-generation";
+import { reviewConversationAnswer } from "./conversation-routing";
 import { researchCitations } from "./research-citations";
 import { type Run, type WorldContextSettleInput } from "../contracts";
 import { byId, transition } from "../repository";
@@ -36,6 +37,21 @@ import { createPrepare } from "./generation-prepare";
 import { adoptMemoryWindow, clearShownNotices } from "./memory-window";
 import type { Progress } from "./progress";
 const log = getLogger("dialogue");
+
+function answerCollection(run: Run | null, input: GenerateInput) {
+	// An unadopted World-backed body must not be collected as an attitude sample.
+	// Speech collects the adopted answer later, from the voice side.
+	return run && !(input.world || input.worldUsed)
+		? {
+				collection: {
+					conversationId: run.conversationId,
+					turnId: run.id,
+					granularity: "answer" as const,
+					chunkOrder: null,
+				},
+			}
+		: undefined;
+}
 
 /** The queue handler of one generation: prepare, execute, settle (adopt) and cancel. */
 export function createGenerationHandler(
@@ -167,23 +183,10 @@ export function createGenerationHandler(
 						partials.set(input.runId, next);
 						publish(input.runId);
 					};
-					// An unadopted World-backed body must not be collected as an attitude
-					// sample (its text would persist before adoption): no collection identity.
-					// Speech collects the adopted answer later, from the voice side.
-					const preparation =
-						run && !(input.world || input.worldUsed)
-							? {
-									collection: {
-										conversationId: run.conversationId,
-										turnId: run.id,
-										granularity: "answer" as const,
-										chunkOrder: null,
-									},
-								}
-							: undefined;
+					const preparation = answerCollection(run, input);
 					const decision = await prepareDecision(deps, input, signal);
 					const { recallPins } = decision;
-					holdBody ||= recallPins.length > 0; // recalled exchanges are memory text
+					holdBody ||= recallPins.length > 0 || !!decision.tools?.length;
 					timing.policy(holdBody);
 					let generated: Awaited<ReturnType<typeof generateConversation>>;
 					try {
@@ -222,6 +225,17 @@ export function createGenerationHandler(
 							selection: chosen(decision, generated),
 							recallPins,
 						};
+					}
+					const reviewed = await reviewConversationAnswer(
+						deps,
+						run!,
+						input,
+						decision,
+						signal,
+					);
+					if (reviewed.operation) {
+						partials.delete(input.runId);
+						return { ...reviewed, text: "", recallPins };
 					}
 					const answered = decision.draft("answer", {
 						repaired: generated.repaired,

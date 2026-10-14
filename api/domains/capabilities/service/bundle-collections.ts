@@ -1,5 +1,5 @@
 import type { ArtifactDefinitionV1, FormFieldV1 } from "../contracts";
-import { schemaShape, takesInput } from "./bundle-fields";
+import { documentOwner, schemaShape, takesInput } from "./bundle-fields";
 import type { Check } from "./bundles";
 
 type Artifact = ArtifactDefinitionV1;
@@ -135,6 +135,11 @@ function checkForm(
 	});
 }
 
+/** Whether the artifact edits the document: a registered field or a draft action names it. */
+const usesDocument = (a: Artifact, document: string) =>
+	a.fields?.some((f) => f.document === document) ||
+	a.actionBindings.some((x) => x.draftDocument === document);
+
 /** Collections: a source, row actions built from rows, and a form for the create action. */
 export function checkCollections(c: Check, a: Artifact, path: string) {
 	a.collections?.forEach((collection, i) => {
@@ -147,6 +152,19 @@ export function checkCollections(c: Check, a: Artifact, path: string) {
 		if (collection.paging && !source.paramsSchemaRef)
 			c.issue("invalid_format", `${at}/paging`, collection.source);
 		collection.rowActions.forEach((row, k) => {
+			const clean = row.requiresCleanDraft;
+			if (clean && !documentOwner(c, clean))
+				c.issue(
+					"unknown_reference",
+					`${at}/rowActions/${k}/requiresCleanDraft`,
+					clean,
+				);
+			else if (clean && !usesDocument(a, clean))
+				c.issue(
+					"invalid_format",
+					`${at}/rowActions/${k}/requiresCleanDraft`,
+					clean,
+				);
 			const found = findAction(a, row.actionId);
 			if (!found)
 				c.issue(

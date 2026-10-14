@@ -39,6 +39,49 @@ const question = z.strictObject({
 	prompt: z.string().min(1).max(500),
 	options: z.array(z.string().min(1).max(120)).min(1).max(8).optional(),
 });
+const musicChoices = z.array(z.string().min(1).max(80)).min(1).max(80);
+const musicCreationOptions = z
+	.strictObject({
+		genreGroups: z
+			.array(
+				z.strictObject({
+					label: z.string().min(1).max(80),
+					options: musicChoices,
+				}),
+			)
+			.min(1)
+			.max(12),
+		moods: musicChoices,
+		instruments: musicChoices,
+		tempos: musicChoices,
+		durations: z.array(z.number().int().min(1).max(600)).min(1).max(20),
+		vocalists: musicChoices,
+		ranges: musicChoices,
+		voiceQualities: musicChoices,
+		singingStyles: musicChoices,
+		languages: musicChoices,
+		defaults: z.strictObject({
+			tempo: z.string(),
+			duration: z.number().int(),
+			vocalist: z.string(),
+			range: z.string(),
+			singingStyle: z.string(),
+			language: z.string(),
+		}),
+	})
+	.superRefine((value, ctx) => {
+		const checks = [
+			[value.defaults.tempo, value.tempos],
+			[value.defaults.duration, value.durations],
+			[value.defaults.vocalist, value.vocalists],
+			[value.defaults.range, value.ranges],
+			[value.defaults.singingStyle, value.singingStyles],
+			[value.defaults.language, value.languages],
+		] as const;
+		for (const [selected, options] of checks)
+			if (!(options as readonly (string | number)[]).includes(selected))
+				ctx.addIssue({ code: "custom", message: "unknown music default" });
+	});
 export const viewRegistry = {
 	"object-recognition-workspace": {
 		name: "ObjectRecognitionWorkspace",
@@ -157,6 +200,7 @@ export const viewRegistry = {
 			view: z.literal("music-workspace"),
 			source,
 			title,
+			creationOptions: musicCreationOptions.optional(),
 		}),
 	},
 	"music-library": {

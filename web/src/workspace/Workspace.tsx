@@ -26,7 +26,6 @@ function WorkspaceContent({
 		openDrawing,
 		openImage,
 		openRecognition,
-		openMusic,
 		openPlaylist,
 		toolchain,
 		openShowcase,
@@ -79,7 +78,6 @@ function WorkspaceContent({
 						{ label: "画像生成", onSelect: openImage },
 						{ label: "図を描く・編集する", onSelect: openDrawing },
 						{ label: "映っている物を調べる", onSelect: openRecognition },
-						{ label: "楽曲生成", onSelect: openMusic },
 						{ label: "音楽プレイリスト", onSelect: openPlaylist },
 						...menuEntries(toolchain.entries).map((entry) => ({
 							label: entryLabel(entry),

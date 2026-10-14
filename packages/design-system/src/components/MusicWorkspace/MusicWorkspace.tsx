@@ -13,6 +13,7 @@ import { formatClockSeconds } from "../DigitalClock/format";
 import { MusicVisualizer } from "./MusicVisualizer";
 import { MusicTrackDetails } from "./MusicTrackDetails";
 import { MusicCreationPanel } from "./MusicCreationPanel";
+import type { MusicCreationOptions } from "./music-creation-options";
 import type { GenerationStatusProps } from "../GenerationStatus";
 import "./MusicWorkspace.css";
 
@@ -30,6 +31,7 @@ export type MusicWorkspaceProps = {
 	creation?: {
 		busy?: boolean;
 		status?: GenerationStatusProps;
+		options?: MusicCreationOptions;
 		onGenerate: (prompt: string) => void;
 	};
 };

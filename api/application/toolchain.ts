@@ -39,6 +39,7 @@ import {
 	createInferenceAdapter,
 	type InferenceAdapterPorts,
 } from "./inference-adapter";
+import { createMusicScreenAdapter } from "./music-screen-adapter";
 import {
 	bundleHostOf,
 	createRegistryActions,
@@ -93,6 +94,7 @@ export async function createToolchain(
 ) {
 	// Typed domain adapters this host offers; bundles naming any other adapter are not registered.
 	const registry = createAdapterRegistry([
+		...(options.music ? [createMusicScreenAdapter()] : []),
 		...(options.timers
 			? [
 					createTimerAdapter(options.timers, {

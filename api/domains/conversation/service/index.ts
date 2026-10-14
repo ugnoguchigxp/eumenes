@@ -40,7 +40,7 @@ import { createHistory } from "./history";
 import type { HistoryOwner } from "../contracts/history";
 
 /** Upper bound of messages returned by `get` (newest kept). */
-const GET_MESSAGE_LIMIT = 2000;
+const GET_MESSAGE_LIMIT = 200;
 
 export type ConversationServiceOptions = {
 	/** Principal / scope recorded on outbox events and source states. */

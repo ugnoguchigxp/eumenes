@@ -390,15 +390,22 @@ test("tendencies, short-term notes and the context are read; notes and tendencie
 		"メモリーを利用していない",
 	);
 	await run(h, "memory.set-enabled", { enabled: true });
-	expect(read(h, "query:memory.context@1").items[0].state).toContain(
-		"まだ組み立てていません",
+	const empty = read(h, "query:memory.context@1").items[0];
+	expect(empty.state).toContain("まだ組み立てていません");
+	expect(empty.state).toContain("次のターン");
+	expect(empty.longTermText).toBeUndefined();
+	const window = await h.store.write((db) =>
+		h.memory.windowForRunInTransaction(db, "main"),
 	);
-	await h.store.write((db) => h.memory.windowForRunInTransaction(db, "main"));
-	expect(read(h, "query:memory.context@1").items[0]).toMatchObject({
-		state: "組み立て済み",
-		version: 1,
-		pendingAdditions: 0,
-	});
+	const built = read(h, "query:memory.context@1").items[0];
+	expect(built).toMatchObject({ version: 1, pendingAdditions: 0 });
+	expect(built.state).toContain("組み立て済み");
+	// The rendered texts are shown (bounded), an empty layer says so.
+	expect(built.longTermText).toBe(
+		window!.longTerm.text === "" ? "（空）" : window!.longTerm.text,
+	);
+	expect(built.longTermText).toContain("コーヒーが好き");
+	expect(built.shortTermText.length).toBeGreaterThan(0);
 });
 
 test("the memory bundle runs through the action ledger: a stale row is a conflict, forget is confirmed", async () => {

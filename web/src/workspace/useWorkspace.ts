@@ -40,7 +40,6 @@ import { changeRoots, invalidateAllButLive, queryRoots } from "../queryKeys";
 import {
 	useOpenImage,
 	useOpenRecognition,
-	useOpenMusic,
 	useOpenPlaylist,
 } from "./WorkspaceArtifacts";
 
@@ -82,7 +81,6 @@ export function useWorkspace({
 	const openRecognition = useOpenRecognition(artifacts.open);
 	useRecognitionArtifacts(client, openRecognition);
 	useImageArtifacts(client, "main", openImage);
-	const openMusic = useOpenMusic(artifacts.open);
 	const openPlaylist = useOpenPlaylist(artifacts.open);
 	// One launcher entry per registered artifact; the saved timer is chosen inside the screen.
 	const toolchain = useToolchainArtifacts(client, artifacts.open);
@@ -92,7 +90,13 @@ export function useWorkspace({
 			void openByAdapter(TIMER_ADAPTER_REF, ref?.timerId),
 		[openByAdapter],
 	);
-	useMusicArtifacts(client, "main", openMusic);
+	const openGeneratedMusic = useCallback(
+		(_id: string, _title: string) => {
+			void toolchain.openById("music.generation");
+		},
+		[toolchain.openById],
+	);
+	useMusicArtifacts(client, "main", openGeneratedMusic);
 	usePlaylistArtifacts(client, "main", openPlaylist);
 	const activeTimers = useQuery(activeTimersQuery(client));
 	const openArtifact = artifacts.open;
@@ -305,7 +309,6 @@ export function useWorkspace({
 		openDrawing,
 		openImage,
 		openRecognition,
-		openMusic,
 		openPlaylist,
 		toolchain,
 		activeTimers,

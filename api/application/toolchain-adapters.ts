@@ -38,6 +38,10 @@ import {
 	describeInferenceAdapter,
 	INFERENCE_ADAPTER_REF,
 } from "./inference-adapter";
+import {
+	describeMusicScreenAdapter,
+	MUSIC_SCREEN_ADAPTER_REF,
+} from "./music-screen-adapter";
 
 /** `domain:` result schemas registered by the host's adapters. */
 const domainSchemas: Readonly<Record<string, ZodType>> = {
@@ -88,6 +92,7 @@ export const hostAdapterDescriptions: Array<
 	{ ref: SETTINGS_ADAPTER_REF, describe: describeSettingsAdapter },
 	{ ref: RECORDS_ADAPTER_REF, describe: describeRecordsAdapter },
 	{ ref: INFERENCE_ADAPTER_REF, describe: describeInferenceAdapter },
+	{ ref: MUSIC_SCREEN_ADAPTER_REF, describe: describeMusicScreenAdapter },
 	{ ref: TTS_DICTIONARY_ADAPTER_REF, describe: describeTtsDictionaryAdapter },
 	{ ref: MEMORY_ADAPTER_REF, describe: describeMemoryAdapter },
 	{ ref: WORLD_ADAPTER_REF, describe: describeWorldAdapter },

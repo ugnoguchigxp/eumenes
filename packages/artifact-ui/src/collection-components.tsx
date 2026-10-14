@@ -7,7 +7,7 @@ import {
 	Textarea,
 	type ServerDataTableProps,
 } from "@eumenes/design-system";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import type { ArtifactRequest } from "./contracts";
 import type {
 	CollectionFormField,
@@ -15,9 +15,15 @@ import type {
 	CollectionRowAction,
 } from "./collection-contracts";
 import { useAction } from "./components";
+import { useArtifactRuntime } from "./runtime";
 
 type Row = CollectionRow;
-type Pending = { actionId: string; rowId: string; text: string };
+type Pending = {
+	actionId: string;
+	rowId: string;
+	text: string;
+	guard?: string;
+};
 type Editing = { row: Row; action: CollectionRowAction };
 
 function RowActions({
@@ -32,19 +38,82 @@ function RowActions({
 	return (
 		<span className="aui-row-actions">
 			{row.actions.map((action) => (
-				<Button
-					key={action.actionId}
-					type="button"
-					size="sm"
-					variant={action.destructive ? "outline" : "secondary"}
-					disabled={disabled || action.disabled}
-					aria-label={`${action.label}: ${row.cells[Object.keys(row.cells)[0] ?? ""] ?? row.id}`}
-					onClick={() => onAct(row, action)}
-				>
-					{action.label}
-				</Button>
+				<span key={action.actionId}>
+					<Button
+						type="button"
+						size="sm"
+						variant={action.destructive ? "outline" : "secondary"}
+						disabled={disabled || action.disabled}
+						aria-label={`${action.label}: ${row.cells[Object.keys(row.cells)[0] ?? ""] ?? row.id}`}
+						onClick={() => onAct(row, action)}
+					>
+						{action.label}
+					</Button>
+					{action.hint && <small>{action.hint}</small>}
+				</span>
 			))}
 		</span>
+	);
+}
+
+/**
+ * A media value shown on demand: nothing is fetched until the button is pressed, and the object
+ * URL made for the preview is revoked when it is replaced or the row goes away.
+ */
+function MediaCell({ path, mime }: { path: string; mime: string }) {
+	const runtime = useArtifactRuntime();
+	const [state, setState] = useState<{
+		url?: string;
+		loading?: boolean;
+		error?: string;
+	}>({});
+	const url = state.url;
+	useEffect(
+		() => () => {
+			if (url) URL.revokeObjectURL(url);
+		},
+		[url],
+	);
+	const kind = mime.startsWith("image/")
+		? "image"
+		: mime.startsWith("audio/")
+			? "audio"
+			: null;
+	if (!kind || !runtime.fetchMedia) return <span>表示できない形式です</span>;
+	if (url)
+		return kind === "image" ? (
+			<img src={url} alt="" style={{ maxWidth: "12rem" }} />
+		) : (
+			// oxlint-disable-next-line jsx-a11y/media-has-caption -- a stored recording has no captions
+			<audio controls src={url} />
+		);
+	return (
+		<span>
+			<Button
+				type="button"
+				size="sm"
+				variant="secondary"
+				disabled={state.loading}
+				onClick={() => {
+					setState({ loading: true });
+					runtime.fetchMedia!(path)
+						.then((blob) => setState({ url: URL.createObjectURL(blob) }))
+						.catch(() => setState({ error: "読み込めませんでした。" }));
+				}}
+			>
+				{kind === "image" ? "画像を表示" : "音声を再生"}
+			</Button>
+			{state.error && <small role="alert">{state.error}</small>}
+		</span>
+	);
+}
+
+function MediaValue({ row, column }: { row: Row; column: string }) {
+	const media = row.media?.[column];
+	return media ? (
+		<MediaCell key={media.path} path={media.path} mime={media.mime} />
+	) : (
+		<span>{row.cells[column]}</span>
 	);
 }
 
@@ -53,9 +122,12 @@ function CollectionForm({
 	fields,
 	initial: start,
 	busy,
+	notice,
 	onSubmit,
 }: {
 	label: string;
+	/** Why the last send did not go through (the dialog stays open). */
+	notice?: string;
 	fields: CollectionFormField[];
 	initial?: Record<string, string | boolean>;
 	busy: boolean;
@@ -95,6 +167,11 @@ function CollectionForm({
 						value={String(value)}
 						onChange={(e) => set(field.id, e.target.value)}
 					>
+						{/* The visible state matches the value: nothing is chosen yet. */}
+						{!field.options?.some((o) => o.value === "") &&
+							String(value) === "" && (
+								<option value="">選択してください</option>
+							)}
 						{field.options?.map((o) => (
 							<option key={o.value} value={o.value}>
 								{o.label}
@@ -150,6 +227,7 @@ function CollectionForm({
 					{field.help && <small>{field.help}</small>}
 				</label>
 			))}
+			{notice && <p role="alert">{notice}</p>}
 			<Button type="submit" disabled={busy}>
 				{label}
 			</Button>
@@ -169,18 +247,23 @@ export function CollectionWorkspaceView({
 	const [editing, setEditing] = useState<Editing | null>(null);
 	if (data?.kind !== "collection") return null;
 	const busy = !!data.busy || action.pending;
+	const failed = action.status === "conflict" || action.status === "rejected";
+	const notice = failed ? action.message : "";
 	const act = (row: Row, chosen: CollectionRowAction) => {
+		// The dialog keeps the row as it was when it opened; the host compares its guard.
 		if (chosen.form) setEditing({ row, action: chosen });
 		else if (chosen.confirm)
 			setPending({
 				actionId: chosen.actionId,
 				rowId: row.id,
 				text: chosen.confirm,
+				guard: chosen.guard,
 			});
 		else
 			void action.send("collection-action", {
 				actionId: chosen.actionId,
 				rowId: row.id,
+				...(chosen.guard ? { guard: chosen.guard } : {}),
 			});
 	};
 	const columns: ServerDataTableProps<Row>["columns"] = [
@@ -188,6 +271,14 @@ export function CollectionWorkspaceView({
 			id: column.key,
 			header: column.label,
 			accessorFn: (row: Row) => row.cells[column.key] ?? "",
+			...(column.media
+				? {
+						enableSorting: false,
+						cell: ({ row }: { row: { original: Row } }) => (
+							<MediaValue row={row.original} column={column.key} />
+						),
+					}
+				: {}),
 		})),
 		...(data.rows.some((row) => row.actions.length)
 			? [
@@ -205,6 +296,7 @@ export function CollectionWorkspaceView({
 	return (
 		<section className="aui-stack" aria-label={data.title ?? request.title}>
 			{request.title && <h3>{request.title}</h3>}
+			{data.description && <p>{data.description}</p>}
 			{data.paging ? (
 				<ServerDataTable
 					label={data.title ?? request.title ?? "一覧"}
@@ -243,7 +335,13 @@ export function CollectionWorkspaceView({
 						{data.rows.map((row) => (
 							<tr key={row.id}>
 								{data.columns.map((column) => (
-									<td key={column.key}>{row.cells[column.key]}</td>
+									<td key={column.key}>
+										{column.media ? (
+											<MediaValue row={row} column={column.key} />
+										) : (
+											row.cells[column.key]
+										)}
+									</td>
 								))}
 								{row.actions.length > 0 && (
 									<td>
@@ -288,10 +386,14 @@ export function CollectionWorkspaceView({
 						fields={editing.action.form.fields}
 						initial={editing.action.form.values}
 						busy={busy}
+						notice={notice}
 						onSubmit={async (values) => {
 							const ok = await action.send("collection-action", {
 								actionId: editing.action.actionId,
 								rowId: editing.row.id,
+								...(editing.action.guard
+									? { guard: editing.action.guard }
+									: {}),
 								...values,
 							});
 							if (ok) setEditing(null);
@@ -306,17 +408,24 @@ export function CollectionWorkspaceView({
 					if (!open) setPending(null);
 				}}
 				title="確認"
-				description={pending?.text}
+				description={
+					pending ? `${pending.text}${notice ? `\n${notice}` : ""}` : undefined
+				}
 				confirmText="実行する"
 				cancelText="やめる"
 				variant="destructive"
 				onConfirm={() => {
+					// The dialog stays open when the row changed meanwhile: it says so.
 					if (pending)
-						void action.send("collection-action", {
-							actionId: pending.actionId,
-							rowId: pending.rowId,
-						});
-					setPending(null);
+						void action
+							.send("collection-action", {
+								actionId: pending.actionId,
+								rowId: pending.rowId,
+								...(pending.guard ? { guard: pending.guard } : {}),
+							})
+							.then((ok) => {
+								if (ok) setPending(null);
+							});
 				}}
 			/>
 		</section>

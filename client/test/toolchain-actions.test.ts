@@ -255,3 +255,33 @@ describe("submitToolchainAction", () => {
 		});
 	});
 });
+
+describe("toolchainMedia", () => {
+	it("fetches only this API's own /api/ paths, with the session's credentials", async () => {
+		const seen = stubFetch(() => new Response("x"));
+		const blob = await newClient().toolchainMedia("/api/media/a.png?v=1");
+		expect(await blob.text()).toBe("x");
+		expect(seen[0]).toMatchObject({
+			method: "GET",
+			path: "/api/media/a.png?v=1",
+		});
+		expect(seen[0]?.headers.authorization).toBe("Bearer test-token");
+	});
+
+	it.each([
+		"https://evil.example/api/x",
+		"//evil.example/api/x",
+		"/other/path",
+		"/api/../secret",
+		"/api//x",
+		"api/x",
+		"/api/x#frag",
+		"javascript:alert(1)",
+	])("refuses %s before any request", async (path) => {
+		const seen = stubFetch(() => new Response("x"));
+		await expect(newClient().toolchainMedia(path)).rejects.toThrow(
+			"invalid_media_path",
+		);
+		expect(seen).toHaveLength(0);
+	});
+});

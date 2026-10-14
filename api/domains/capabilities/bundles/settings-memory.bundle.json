@@ -429,6 +429,16 @@
 							"key": "notices",
 							"label": "次の会話で伝える通知",
 							"format": "number"
+						},
+						{
+							"key": "longTermText",
+							"label": "長期の本文",
+							"format": "text"
+						},
+						{
+							"key": "shortTermText",
+							"label": "短期の本文",
+							"format": "text"
 						}
 					]
 				},

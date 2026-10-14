@@ -118,6 +118,48 @@ export const musicVoiceQualities = [
 	"力強い",
 	"息を含んだ",
 ];
+export type MusicCreationOptions = {
+	genreGroups: readonly { label: string; options: readonly string[] }[];
+	moods: readonly string[];
+	instruments: readonly string[];
+	tempos: readonly string[];
+	durations: readonly number[];
+	vocalists: readonly string[];
+	ranges: readonly string[];
+	voiceQualities: readonly string[];
+	singingStyles: readonly string[];
+	languages: readonly string[];
+	defaults: {
+		tempo: string;
+		duration: number;
+		vocalist: string;
+		range: string;
+		singingStyle: string;
+		language: string;
+	};
+};
+
+/** Legacy saved views without registered choices keep their original form. */
+export const defaultMusicCreationOptions: MusicCreationOptions = {
+	genreGroups: musicGenres,
+	moods: musicMoods,
+	instruments: musicInstruments,
+	tempos: ["おまかせ", "ゆったり", "中くらい", "速め"],
+	durations: [10, 30, 60, 90, 120, 180, 300, 600],
+	vocalists: ["おまかせ", "男性ボーカル", "女性ボーカル"],
+	ranges: ["おまかせ", "低め", "中間", "高め"],
+	voiceQualities: musicVoiceQualities,
+	singingStyles: ["ソロ", "デュエット", "コーラス", "ラップ"],
+	languages: ["日本語", "英語", "おまかせ"],
+	defaults: {
+		tempo: "おまかせ",
+		duration: 30,
+		vocalist: "おまかせ",
+		range: "おまかせ",
+		singingStyle: "ソロ",
+		language: "日本語",
+	},
+};
 export type MusicSelection = {
 	genres: string[];
 	moods: string[];
@@ -132,18 +174,20 @@ export type MusicSelection = {
 	language: string;
 	lyrics: string;
 };
-export const emptyMusicSelection = (): MusicSelection => ({
+export const emptyMusicSelection = (
+	options: MusicCreationOptions = defaultMusicCreationOptions,
+): MusicSelection => ({
 	genres: [],
 	moods: [],
 	instruments: [],
-	tempo: "おまかせ",
-	duration: "30",
+	tempo: options.defaults.tempo,
+	duration: String(options.defaults.duration),
 	vocals: false,
-	gender: "おまかせ",
-	range: "おまかせ",
+	gender: options.defaults.vocalist,
+	range: options.defaults.range,
 	voiceQualities: [],
-	singing: "ソロ",
-	language: "日本語",
+	singing: options.defaults.singingStyle,
+	language: options.defaults.language,
 	lyrics: "",
 });
 /** Serialize explicitly selected values only; the music worker interprets them. */

@@ -8,7 +8,7 @@
 		{
 			"kind": "artifact",
 			"id": "settings.service-tests",
-			"revision": 1,
+			"revision": 2,
 			"title": "動作確認",
 			"variants": [
 				{
@@ -347,6 +347,11 @@
 						{
 							"key": "text",
 							"label": "結果"
+						},
+						{
+							"key": "preview",
+							"label": "プレビュー",
+							"format": "media"
 						}
 					],
 					"rowActions": [

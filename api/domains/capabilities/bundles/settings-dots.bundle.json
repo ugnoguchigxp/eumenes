@@ -8,8 +8,8 @@
 		{
 			"kind": "artifact",
 			"id": "settings.dots",
-			"revision": 1,
-			"title": "Codexへの委任",
+			"revision": 2,
+			"title": "外部作業",
 			"variants": [
 				{
 					"id": "standard",
@@ -19,6 +19,11 @@
 						"direction": "stack",
 						"title": "外部作業",
 						"children": [
+							{
+								"view": "collection-workspace",
+								"source": "dots-tasks",
+								"title": "委任した作業"
+							},
 							{
 								"view": "collection-workspace",
 								"source": "dots-connections",
@@ -40,6 +45,18 @@
 			],
 			"defaultVariant": "standard",
 			"sourceBindings": [
+				{
+					"source": "dots-tasks",
+					"adapterRef": "adapter:dots@1",
+					"query": "query:dots.tasks@1",
+					"target": "none"
+				},
+				{
+					"source": "dots-task-project-options",
+					"adapterRef": "adapter:dots@1",
+					"query": "query:dots.task-project-options@1",
+					"target": "none"
+				},
 				{
 					"source": "dots-connections",
 					"adapterRef": "adapter:dots@1",
@@ -72,6 +89,87 @@
 				}
 			],
 			"actionBindings": [
+				{
+					"actionId": "task-create",
+					"eventAction": "collection-task-create",
+					"source": "dots-tasks",
+					"operationId": "dots.task-create",
+					"inputSchemaRef": "schema:dots-task-create@1",
+					"effect": "write",
+					"label": "作業を依頼"
+				},
+				{
+					"actionId": "task-start",
+					"eventAction": "collection-task-start",
+					"source": "dots-tasks",
+					"operationId": "dots.task-start",
+					"inputSchemaRef": "schema:dots-task-command@1",
+					"effect": "write",
+					"label": "開始する",
+					"rowInput": {
+						"id": "$row.id",
+						"expectedRevision": "$row.revision"
+					}
+				},
+				{
+					"actionId": "task-pause",
+					"eventAction": "collection-task-pause",
+					"source": "dots-tasks",
+					"operationId": "dots.task-stop",
+					"inputSchemaRef": "schema:dots-task-stop@1",
+					"effect": "write",
+					"label": "一時停止",
+					"rowInput": {
+						"id": "$row.id",
+						"expectedRevision": "$row.revision",
+						"intent": {
+							"literal": "pause"
+						}
+					}
+				},
+				{
+					"actionId": "task-cancel",
+					"eventAction": "collection-task-cancel",
+					"source": "dots-tasks",
+					"operationId": "dots.task-stop",
+					"inputSchemaRef": "schema:dots-task-stop@1",
+					"effect": "write",
+					"label": "取消",
+					"rowInput": {
+						"id": "$row.id",
+						"expectedRevision": "$row.revision",
+						"intent": {
+							"literal": "cancel"
+						}
+					}
+				},
+				{
+					"actionId": "task-answer",
+					"eventAction": "collection-task-answer",
+					"source": "dots-tasks",
+					"operationId": "dots.task-answer",
+					"inputSchemaRef": "schema:dots-task-answer@1",
+					"effect": "write",
+					"label": "回答する",
+					"rowInput": {
+						"id": "$row.id",
+						"expectedRevision": "$row.revision",
+						"questionId": "$row.questionId"
+					}
+				},
+				{
+					"actionId": "task-forget",
+					"eventAction": "collection-task-forget",
+					"source": "dots-tasks",
+					"operationId": "dots.task-forget",
+					"inputSchemaRef": "schema:dots-task-command@1",
+					"effect": "write",
+					"label": "依頼の本文を削除",
+					"rowInput": {
+						"id": "$row.id",
+						"expectedRevision": "$row.revision"
+					}
+				},
 				{
 					"actionId": "connection-create",
 					"eventAction": "collection-connection-create",
@@ -236,12 +334,142 @@
 				}
 			],
 			"launcher": {
-				"label": "Codexへの委任",
+				"label": "外部作業",
 				"group": "管理と確認",
 				"order": 60,
 				"description": "dotsへの接続 プロジェクト 担当とSkill"
 			},
 			"collections": [
+				{
+					"source": "dots-tasks",
+					"title": "委任した作業",
+					"rowKey": "id",
+					"columns": [
+						{
+							"key": "title",
+							"label": "作業名"
+						},
+						{
+							"key": "stateLabel",
+							"label": "状態",
+							"format": "badge"
+						},
+						{
+							"key": "question",
+							"label": "質問"
+						},
+						{
+							"key": "result",
+							"label": "結果"
+						},
+						{
+							"key": "request",
+							"label": "依頼"
+						},
+						{
+							"key": "updatedAt",
+							"label": "更新",
+							"format": "date"
+						}
+					],
+					"rowActions": [
+						{
+							"actionId": "task-start",
+							"when": {
+								"key": "canStart",
+								"in": [true]
+							}
+						},
+						{
+							"actionId": "task-answer",
+							"when": {
+								"key": "canAnswer",
+								"in": [true]
+							},
+							"form": {
+								"fields": [
+									{
+										"fieldId": "answer",
+										"label": "回答",
+										"control": "textarea",
+										"required": true,
+										"maxLength": 8192
+									}
+								],
+								"prefill": {}
+							}
+						},
+						{
+							"actionId": "task-pause",
+							"when": {
+								"key": "canPause",
+								"in": [true]
+							}
+						},
+						{
+							"actionId": "task-cancel",
+							"confirm": "この作業を取り消します。進行中の作業は停止確認を待って止まります。",
+							"when": {
+								"key": "canCancel",
+								"in": [true]
+							}
+						},
+						{
+							"actionId": "task-forget",
+							"confirm": "依頼の本文を削除します。元に戻せません。",
+							"when": {
+								"key": "canForget",
+								"in": [true]
+							}
+						}
+					],
+					"refreshWhile": {
+						"key": "state",
+						"in": ["registered", "queued", "active", "reconciling", "stopping"]
+					},
+					"create": {
+						"actionId": "task-create",
+						"fields": [
+							{
+								"fieldId": "projectRef",
+								"label": "プロジェクト",
+								"control": "select",
+								"required": true,
+								"optionsSource": "query:dots.task-project-options@1"
+							},
+							{
+								"fieldId": "title",
+								"label": "作業名",
+								"control": "text",
+								"required": true,
+								"maxLength": 120
+							},
+							{
+								"fieldId": "request",
+								"label": "依頼",
+								"control": "textarea",
+								"required": true,
+								"maxLength": 8000
+							},
+							{
+								"fieldId": "completionConditions",
+								"label": "完了条件（1行に1つ）",
+								"control": "textarea",
+								"required": true,
+								"maxLength": 8000
+							},
+							{
+								"fieldId": "maxSessions",
+								"label": "Session数の上限",
+								"control": "number",
+								"min": 1,
+								"max": 20,
+								"defaultValue": "1",
+								"help": "許可する操作はプロジェクトの設定のとおりです。実行期限は2時間です。"
+							}
+						]
+					}
+				},
 				{
 					"source": "dots-connections",
 					"title": "dotsへの接続",
@@ -1369,6 +1597,121 @@
 					}
 				},
 				"required": ["id", "expectedToken", "enabled"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "dots-task-create",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"projectRef": {
+						"type": "string",
+						"maxLength": 160,
+						"minLength": 1
+					},
+					"title": {
+						"type": "string",
+						"maxLength": 120,
+						"minLength": 1
+					},
+					"request": {
+						"type": "string",
+						"maxLength": 8000,
+						"minLength": 1
+					},
+					"completionConditions": {
+						"type": "string",
+						"maxLength": 8000,
+						"minLength": 1
+					},
+					"maxSessions": {
+						"type": "integer",
+						"minimum": 1,
+						"maximum": 20
+					}
+				},
+				"required": ["projectRef", "title", "request", "completionConditions"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "dots-task-command",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"id": {
+						"type": "string",
+						"maxLength": 160,
+						"minLength": 1
+					},
+					"expectedRevision": {
+						"type": "integer",
+						"minimum": 0
+					}
+				},
+				"required": ["id", "expectedRevision"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "dots-task-stop",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"id": {
+						"type": "string",
+						"maxLength": 160,
+						"minLength": 1
+					},
+					"expectedRevision": {
+						"type": "integer",
+						"minimum": 0
+					},
+					"intent": {
+						"type": "string",
+						"maxLength": 6,
+						"enum": ["pause", "cancel"]
+					}
+				},
+				"required": ["id", "expectedRevision", "intent"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "dots-task-answer",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"id": {
+						"type": "string",
+						"maxLength": 160,
+						"minLength": 1
+					},
+					"expectedRevision": {
+						"type": "integer",
+						"minimum": 0
+					},
+					"questionId": {
+						"type": "string",
+						"maxLength": 160,
+						"minLength": 1
+					},
+					"answer": {
+						"type": "string",
+						"maxLength": 8192,
+						"minLength": 1
+					}
+				},
+				"required": ["id", "expectedRevision", "questionId", "answer"]
 			}
 		}
 	]

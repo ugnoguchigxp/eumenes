@@ -324,10 +324,10 @@ test("service tests: the catalog and the status are shown", async ({
 	).toBeVisible();
 	const answered = nextAction(page);
 	await screen.getByRole("button", { name: "一覧を更新" }).click();
-	console.log(
-		"ST",
-		JSON.stringify(await (await answered).json()).slice(0, 500),
-	);
-	await page.waitForTimeout(1500);
-	console.log("ST SCREEN", await screen.innerText());
+	expect((await (await answered).json()).status).toBe("accepted");
+	// No LARM is configured on this fixture: the list is read again and reports the failure.
+	await expect(
+		screen.getByRole("cell", { name: "最新", exact: true }),
+	).toBeVisible();
+	await expect(screen.getByText(/確認に失敗しました/).first()).toBeVisible();
 });

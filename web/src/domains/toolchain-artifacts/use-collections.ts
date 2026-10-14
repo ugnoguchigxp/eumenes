@@ -4,7 +4,7 @@ import {
 	useQueries,
 	useQueryClient,
 } from "@tanstack/react-query";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { ArtifactDefinitionV1 } from "../../../../api/domains/capabilities/contracts";
 import type { EumenesClient } from "../../../../client";
 import { queryRoots } from "../../queryKeys";
@@ -20,6 +20,8 @@ import {
 
 /** How often a list is re-read while one of its rows is in a state the registration watches. */
 export const REFRESH_MS = 3000;
+/** Consecutive read errors after which the watched polling stops. */
+export const MAX_FAILURES = 3;
 
 /**
  * The registered collections of an artifact: each source is read (with the table query as
@@ -30,8 +32,11 @@ export function useCollections(
 	client: EumenesClient,
 	artifact: ArtifactDefinitionV1,
 	artifactRevisionId: string,
+	dirtyDocuments: ReadonlySet<string> = new Set(),
 ) {
 	const cache = useQueryClient();
+	// Consecutive failed reads per source: the watched polling stops after a few of them.
+	const failures = useRef(new Map<string, number>());
 	const collections = artifact.collections ?? [];
 	const [queries, setQueries] = useState<Record<string, PagingQuery>>({});
 	const [messages, setMessages] = useState<Record<string, string>>({});
@@ -46,9 +51,9 @@ export function useCollections(
 				collection.source,
 				collection.paging ? queryOf(collection.source) : null,
 			],
-			queryFn: async ({ signal }: { signal: AbortSignal }) =>
-				(
-					await client.toolchainArtifactSource(
+			queryFn: async ({ signal }: { signal: AbortSignal }) => {
+				try {
+					const read = await client.toolchainArtifactSource(
 						artifactRevisionId,
 						collection.source,
 						undefined,
@@ -56,13 +61,25 @@ export function useCollections(
 						collection.paging
 							? pagingParams(queryOf(collection.source))
 							: undefined,
-					)
-				).data,
+					);
+					failures.current.delete(collection.source);
+					return read.data;
+				} catch (error) {
+					failures.current.set(
+						collection.source,
+						(failures.current.get(collection.source) ?? 0) + 1,
+					);
+					throw error;
+				}
+			},
 			retry: false,
 			placeholderData: keepPreviousData,
 			// Only while a row is in a registered state (a running test): no other polling.
 			refetchInterval: (query: { state: { data: unknown } }) => {
 				const watch = collection.refreshWhile;
+				// A source that keeps failing is not hammered: a manual refresh starts it again.
+				if ((failures.current.get(collection.source) ?? 0) >= MAX_FAILURES)
+					return false;
 				return watch &&
 					rowsOf(collection, query.state.data).some((row) =>
 						watch.in.includes(getPath(row, watch.key) as never),
@@ -147,26 +164,28 @@ export function useCollections(
 				: undefined,
 			message: messages[collection.source],
 			formOptions,
+			dirtyDocuments,
 		});
 	});
-	const reload = useCallback(
-		() =>
-			void cache.invalidateQueries({
-				queryKey: [
-					queryRoots.toolchainArtifacts,
-					client.identity,
-					"collection",
-					artifactRevisionId,
-				],
-			}),
-		[cache, client.identity, artifactRevisionId],
-	);
+	const reload = useCallback(() => {
+		failures.current.clear();
+		void cache.invalidateQueries({
+			queryKey: [
+				queryRoots.toolchainArtifacts,
+				client.identity,
+				"collection",
+				artifactRevisionId,
+			],
+		});
+	}, [cache, client.identity, artifactRevisionId]);
 	return {
 		collections,
 		formOptions: formOptions as FormOptions,
 		resources,
 		data,
 		reload,
+		/** The shared draft of this document has unapplied changes. */
+		isDirty: (document: string) => dirtyDocuments.has(document),
 		page: (source: string, query: PagingQuery) =>
 			setQueries((old) => ({ ...old, [source]: query })),
 		say: (source: string, message: string) =>

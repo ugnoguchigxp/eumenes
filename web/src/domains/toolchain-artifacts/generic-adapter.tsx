@@ -46,6 +46,8 @@ function useGenericArtifact(context: AdapterHostContext): AdapterState {
 		(s) => !listSources.has(s.source),
 	)?.source;
 	const own = (artifact.fields ?? []) as RegisteredField[];
+	const documentEnabled =
+		!!documentSource && (own.length > 0 || hasChangesView(artifact));
 	const document = useQuery({
 		queryKey: [
 			queryRoots.toolchainArtifacts,
@@ -60,7 +62,7 @@ function useGenericArtifact(context: AdapterHostContext): AdapterState {
 				undefined,
 				signal,
 			),
-		enabled: !!documentSource && (own.length > 0 || hasChangesView(artifact)),
+		enabled: documentEnabled,
 		retry: false,
 	});
 	const documents: Record<string, DocumentAccess> = {};
@@ -210,10 +212,13 @@ function useGenericArtifact(context: AdapterHostContext): AdapterState {
 			message: "この操作は利用できません",
 		}),
 		// The host reads its lists again after a settled write; the document is read here.
+		// Only a screen with a document source has a document to read again.
 		settled: async () => {
-			await document.refetch();
+			if (documentEnabled) await document.refetch();
 		},
-		refresh: () => void document.refetch(),
+		refresh: () => {
+			if (documentEnabled) void document.refetch();
+		},
 		documents,
 	};
 }

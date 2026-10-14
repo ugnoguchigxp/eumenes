@@ -58,7 +58,7 @@ const addConnection = z
 		(c) =>
 			c.purpose
 				? !!c.resourceId && !!c.model
-				: !c.resourceId &&
+				: // A generated model id without a purpose is no model (a form left it empty).
 					!c.model &&
 					c.contextWindow === undefined &&
 					c.voice === undefined &&

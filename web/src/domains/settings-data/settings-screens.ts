@@ -19,6 +19,7 @@ import {
 	type RegisteredField,
 } from "../toolchain-artifacts/documents";
 import {
+	DELETE_SUFFIX,
 	SECRET_MASK,
 	entryKey,
 	type DraftEntry,
@@ -39,6 +40,20 @@ export const settingsMessages: Record<string, string> = {
 	target_not_found:
 		"対象のモデルや接続が見つかりません。画面を更新してやり直してください。",
 	invalid_value: "入力値がこの項目の条件に合いません。",
+	credential_required: "APIキーまたは環境変数名のどちらかが必要です。",
+	invalid_credential_source:
+		"APIキーと環境変数名は同時に使えません。どちらか一方にしてください。",
+	connection_exists: "同じ接続がすでに登録されています。",
+	resource_exists: "同じモデルがすでに登録されています。",
+	invalid_larm_origin_unconfirmed:
+		"LARM の接続先の変更が確認されませんでした。",
+	invalid_env_ref: "この環境変数は認証情報として指定できません。",
+	invalid_env_ref_host_conflict:
+		"この環境変数は、同じ接続先ホストの別の接続で使われています。",
+	invalid_origin_requires_new_key:
+		"接続先のオリジンを変えるときは、新しいAPIキーを入力してください。",
+	invalid_key_connection: "APIキーを保存する接続が見つかりません。",
+	invalid_duplicate_key: "同じ接続のAPIキーが重複して指定されています。",
 	secret_key_unavailable:
 		"認証情報を保存できませんでした。保存用の鍵の状態を確認してください。",
 };
@@ -172,6 +187,23 @@ export function buildInputs({
 					...(rule.disabled ? { disabled: true } : {}),
 					...(field.searchable ? { searchable: true } : {}),
 				});
+				// A secret that may be unset also gets a switch to delete the stored one.
+				if (field.confidential && field.unset)
+					inputs.push({
+						id: `${entryKey(field.fieldId, target.id)}${DELETE_SUFFIX}`,
+						label: "キーを削除",
+						help: "保存済みのキーを削除します。環境変数を使う場合などに使います。",
+						control: "toggle",
+						value: view.secrets.some(
+							(x) =>
+								x.fieldId === field.fieldId &&
+								x.target === target.id &&
+								x.delete,
+						)
+							? "true"
+							: "false",
+						...(group ? { group } : {}),
+					});
 			}
 		}
 		if (speechActive && voice.targets.length > 1) {

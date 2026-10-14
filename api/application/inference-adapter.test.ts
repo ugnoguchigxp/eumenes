@@ -30,6 +30,13 @@ function setup() {
 		started: [] as string[],
 	};
 	let probes: Array<{ id: string; target: string; status: string }> = [];
+	const marks: string[] = [];
+	const commit = () => {
+		for (const id of marks.splice(0))
+			probes = probes.map((p) =>
+				p.id === id ? { ...p, status: "cancelling" } : p,
+			);
+	};
 	const ports: InferenceAdapterPorts = {
 		probes: () => probes,
 		getProbe: (id) => probes.find((p) => p.id === id) ?? null,
@@ -48,6 +55,13 @@ function setup() {
 			probes = [{ id, target, status: "running" }, ...probes];
 			return { id, launch: () => log.launched.push(id) };
 		},
+		// The mark is written by the transaction: it takes effect only when `commit()` is called.
+		cancelProbeInTransaction: (_db, id) => {
+			const probe = probes.find((p) => p.id === id);
+			if (!probe) throw new Error("probe_not_found");
+			if (probe.status !== "running") throw new Error("probe_not_running");
+			marks.push(id);
+		},
 		cancelProbe: (id) => log.cancelled.push(id),
 	};
 	const adapter = createInferenceAdapter(ports, {
@@ -60,13 +74,14 @@ function setup() {
 					model: "tts-1",
 				},
 			],
-			connections: [{ id: CONNECTION, name: "クラウド" }],
+			connections: [{ id: CONNECTION, name: "クラウド", enabled: true }],
 		}),
 	});
 	return {
 		store: store,
 		adapter,
 		log,
+		commit,
 		setProbes: (p: typeof probes) => (probes = p),
 	};
 }
@@ -157,7 +172,18 @@ test("only a running probe can be cancelled, and the cancel happens after the co
 		{ id: done, target: "larm", status: "succeeded" },
 	]);
 	await run(h, "inference.probe-cancel", { id: running });
+	// Nothing is aborted before the commit hook.
 	expect(h.log.cancelled).toEqual([]);
+	// A cancel whose transaction rolled back left no mark: the hook aborts nothing, now or later.
+	h.adapter.afterCommit!();
+	expect(h.log.cancelled).toEqual([]);
+	h.adapter.afterCommit!();
+	expect(h.log.cancelled).toEqual([]);
+	// A committed cancel is marked, and only then is the probe aborted.
+	await run(h, "inference.probe-cancel", { id: running });
+	h.commit();
+	h.adapter.afterCommit!();
+	expect(h.log.cancelled).toEqual([running]);
 	h.adapter.afterCommit!();
 	expect(h.log.cancelled).toEqual([running]);
 	expect(await codeOf(run(h, "inference.probe-cancel", { id: done }))).toBe(
@@ -215,11 +241,16 @@ test("sources give the probes, the targets with their input, the LARM details an
 	h.setProbes([{ id, target: "larm", status: "running" }]);
 	expect(read(h, "query:inference.probes@1", crypto.randomUUID())).toBeNull();
 	const targets = read(h, "query:inference.probe-targets@1")!.data as {
-		targets: Array<{ id: string; label: string; purpose: string | null }>;
+		targets: Array<{
+			id: string;
+			label: string;
+			purpose: string | null;
+			enabled: boolean;
+		}>;
 	};
 	expect(targets.targets).toEqual([
-		{ id: "larm", label: "LARM", purpose: null },
-		{ id: RESOURCE, label: "クラウド / tts-1", purpose: "tts" },
+		{ id: "larm", label: "LARM", purpose: null, enabled: true },
+		{ id: RESOURCE, label: "クラウド / tts-1", purpose: "tts", enabled: true },
 	]);
 	expect(read(h, "query:inference.probe-targets@1", "larm")).not.toBeNull();
 	expect(read(h, "query:inference.probe-targets@1", "gone")).toBeNull();

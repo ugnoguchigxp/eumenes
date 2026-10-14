@@ -8,6 +8,7 @@ import type {
 } from "../domains/world";
 import type {
 	ClaimContent,
+	ClaimDetail,
 	ClaimRow,
 	ForgetView,
 } from "../domains/world/contracts/view";
@@ -45,6 +46,7 @@ export type WorldAdapterPorts = {
 		WorldClaims,
 		| "status"
 		| "list"
+		| "detail"
 		| "forgets"
 		| "correctInTransaction"
 		| "retractInTransaction"
@@ -135,7 +137,83 @@ const forgetRow = (view: ForgetView) => ({
 	rootCount: view.rootCount,
 	createdAt: view.createdAt,
 	updatedAt: view.updatedAt,
+	// Only these are still moving; the screen re-reads the list while one is.
+	inProgress:
+		view.display === "pending" || view.display === "awaiting_confirmation",
 });
+
+const sourceStateLabels = {
+	current: "現在の版",
+	changed: "版が変わった",
+	unavailable: "参照できない",
+} as const;
+const conditionLabels = {
+	satisfied: "成立",
+	violated: "不成立",
+	unknown: "未確認",
+} as const;
+/** The claim's grounds, as bounded plain text for table cells (the legacy detail drawer's content). */
+const DETAIL_LIMIT = 50;
+const CELL_CHARS = 600;
+const cell = (parts: string[]) => {
+	const text = parts.join(" / ");
+	return text === ""
+		? "なし"
+		: text.length > CELL_CHARS
+			? `${text.slice(0, CELL_CHARS)}…`
+			: text;
+};
+const sourceText = (source: { kind: string; id: string }, revision: string) =>
+	`${source.kind} ${source.id}（版 ${revision.slice(0, 12)}）`;
+function detailColumns(detail: ClaimDetail) {
+	const evidence = (e: ClaimDetail["supports"][number]) =>
+		`${evidenceLabels[e.kind]} — ${sourceText(e.source, e.source.revision)}`;
+	return {
+		condition: `${detail.condition.text}（${conditionLabels[detail.condition.evaluation]}）`,
+		supports: cell(detail.supports.map(evidence)),
+		refutations: cell([
+			...detail.refutations.evidence.map(evidence),
+			...detail.refutations.claims.map(
+				(c) =>
+					`別の主張 ${c.id}（版 ${c.revision}）${c.predicate ? ` : ${c.predicate}` : ""}`,
+			),
+		]),
+		sourceVersions: cell(
+			detail.sources.map(
+				(s) =>
+					`${sourceText(s, s.citedRevision)} — ${sourceStateLabels[s.state]}`,
+			),
+		),
+		history:
+			cell(
+				detail.history.map(
+					(h) =>
+						`版${h.revision}: ${h.lifecycle} — ${contentText(h.content)}（${originLabels[h.origin]}）`,
+				),
+			) + (detail.historyTruncated ? "（古い版は省略）" : ""),
+	};
+}
+const NO_DETAIL = {
+	condition: "—",
+	supports: "—",
+	refutations: "—",
+	sourceVersions: "—",
+	history: "—",
+};
+
+/** Why a list cannot be shown, in words (an empty list would read as "nothing is held"). */
+const unavailableText = (what: string, code: string) => {
+	switch (code) {
+		case "world_disabled":
+			return `Worldがオフのため、${what}を表示できません`;
+		case "world_unavailable":
+			return `Worldを利用できる状態ではないため（起動の確認中、または忘却の処理中）、${what}を表示できません`;
+		case "not_found":
+			return `${what}を表示できる対象がありません`;
+		default:
+			return `${what}を表示できません（${code}）`;
+	}
+};
 
 const preview = (text: string) =>
 	text.length > 40 ? `${text.slice(0, 40)}…` : text;
@@ -185,6 +263,10 @@ function correctedValue(input: z.infer<typeof correct>) {
  * the domain. A forget is only accepted here (its intake is durable with the action); it then
  * advances after the commit and the receipt states `accepted`, never `complete`, until World's
  * ledger says so. The adapter is unavailable while World is OFF (no ports).
+ * One Scope only: the screen acts for the host-bound `context()` Scope and offers no Scope
+ * choice (the legacy panel's choice appeared only with several Scopes, which this host has not).
+ * The first 50 claims carry their grounds (condition, evidence, refutations, source
+ * versions, history) as table columns; later rows show "—".
  */
 export function createWorldAdapter(
 	lookup: WorldAdapterPortsLookup,
@@ -364,6 +446,7 @@ export function createWorldAdapter(
 				case STATUS: {
 					const status = ports.claims.status(ctx);
 					const list = ports.claims.list(ctx);
+					const forgets = ports.claims.forgets(ctx);
 					return {
 						revision: 0,
 						data: {
@@ -381,11 +464,28 @@ export function createWorldAdapter(
 											: status.gateOpen
 												? "オン"
 												: "オン（Scopeの受付を閉じています）",
-									// Absence from the list is not "no such claim" when a read budget stopped it.
 									listComplete:
 										list.status === "ok" ? list.value.complete : undefined,
 									stopped:
 										list.status === "ok" ? list.value.stopped : undefined,
+									// Absence from the list is not "no such claim" when a read budget stopped it.
+									claimsNote:
+										list.status !== "ok"
+											? unavailableText("主張の一覧", list.code)
+											: [
+													list.value.complete
+														? ""
+														: "読み取りの上限に達したため、一部が表示されていません。表示がないことは「存在しない」ではありません",
+													list.value.stopped > 0
+														? `出典が変わったため、利用を止めている主張が${list.value.stopped}件あります`
+														: "",
+												]
+													.filter(Boolean)
+													.join("。") || "すべて表示しています",
+									forgetsNote:
+										forgets.status === "ok"
+											? "—"
+											: unavailableText("忘却の状況", forgets.code),
 								},
 							],
 						},
@@ -401,9 +501,24 @@ export function createWorldAdapter(
 										scopeKey: list.value.scopeKey,
 										complete: list.value.complete,
 										stopped: list.value.stopped,
-										items: list.value.items.map(claimRow),
+										items: list.value.items.map((row, index) => {
+											const detail =
+												index < DETAIL_LIMIT
+													? ports.claims.detail(ctx, { claimId: row.id })
+													: undefined;
+											return {
+												...claimRow(row),
+												...(detail?.status === "ok"
+													? detailColumns(detail.value)
+													: NO_DETAIL),
+											};
+										}),
 									}
-								: { items: [], unavailable: list.code },
+								: {
+										items: [],
+										unavailable: list.code,
+										unavailableText: unavailableText("主張の一覧", list.code),
+									},
 					};
 				}
 				case FORGETS: {
@@ -413,7 +528,14 @@ export function createWorldAdapter(
 						data:
 							forgets.status === "ok"
 								? { items: forgets.value.forgets.map(forgetRow) }
-								: { items: [], unavailable: forgets.code },
+								: {
+										items: [],
+										unavailable: forgets.code,
+										unavailableText: unavailableText(
+											"忘却の状況",
+											forgets.code,
+										),
+									},
 					};
 				}
 				case REASONS:

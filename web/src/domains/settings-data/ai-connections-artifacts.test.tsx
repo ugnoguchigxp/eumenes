@@ -215,6 +215,8 @@ test("deleting a connection is staged after a confirmation and applied with the 
 	)[0]!;
 	fireEvent.click(row);
 	fireEvent.click(await screen.findByRole("button", { name: "実行する" }));
+	// The dialog closes once the host has taken the action.
+	await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
 	await review();
 	await screen.findByText(/接続を削除/);
 	expect(backend.sent).toHaveLength(0);
@@ -252,4 +254,69 @@ test("discarding the draft takes staged operations and their keys back", async (
 		expect(screen.queryByText(/クラウドAPIを登録（/)).toBeNull(),
 	);
 	expect(screen.queryByText(/更新・削除予定/)).toBeNull();
+});
+
+test("the stored key can be deleted with its own switch; the review counts it as a deletion", async () => {
+	const backend = seeded();
+	fireEvent.click(await screen.findByRole("button", { name: "クラウド音声" }));
+	fireEvent.click(screen.getByLabelText("キーを削除"));
+	expect(screen.getByLabelText("キーを削除")).toHaveProperty("checked", true);
+	await review();
+	await screen.findByText("削除予定 1件");
+	expect(screen.queryByText(/更新・削除予定/)).toBeNull();
+	applyAll();
+	await screen.findAllByText("変更を適用しました");
+	expect(lastSent(backend)).toMatchObject({
+		keys: [{ connectionId: backend.cloud.connectionId, delete: true }],
+	});
+});
+
+test("typing a new key replaces a pending deletion, and switching it off takes the deletion back", async () => {
+	const backend = seeded();
+	fireEvent.click(await screen.findByRole("button", { name: "クラウド音声" }));
+	fireEvent.click(screen.getByLabelText("キーを削除"));
+	fireEvent.change(screen.getByLabelText("APIキーの更新"), {
+		target: { value: KEY },
+	});
+	expect(screen.getByLabelText("キーを削除")).toHaveProperty("checked", false);
+	await review();
+	await screen.findByText("更新・削除予定 1件");
+	fireEvent.click(screen.getByText("開く:ai-connections"));
+	fireEvent.click(await screen.findByRole("button", { name: "クラウド音声" }));
+	fireEvent.click(screen.getByLabelText("キーを削除"));
+	fireEvent.click(screen.getByLabelText("キーを削除"));
+	expect(backend.sent).toHaveLength(0);
+	expect(saveButton()).toHaveProperty("disabled", true);
+});
+
+test("refusals of a connection apply are explained in words", async () => {
+	const backend = seeded();
+	fireEvent.click(await screen.findByRole("button", { name: "クラウド音声" }));
+	for (const [code, text] of [
+		["credential_required", "APIキーまたは環境変数名のどちらかが必要です。"],
+		["connection_exists", "同じ接続がすでに登録されています。"],
+		[
+			"invalid_origin_requires_new_key",
+			"接続先のオリジンを変えるときは、新しいAPIキーを入力してください。",
+		],
+		[
+			"invalid_env_ref_host_conflict",
+			"この環境変数は、同じ接続先ホストの別の接続で使われています。",
+		],
+	] as const) {
+		backend.client.submitToolchainAction.mockResolvedValueOnce({
+			httpStatus: 200,
+			view: {
+				eventId: crypto.randomUUID(),
+				status: "rejected",
+				errorCode: code,
+				createdAt: new Date().toISOString(),
+			},
+		});
+		fireEvent.change(screen.getByLabelText("接続名"), {
+			target: { value: `名前-${code}` },
+		});
+		fireEvent.click(saveButton());
+		await screen.findAllByText(new RegExp(text));
+	}
 });

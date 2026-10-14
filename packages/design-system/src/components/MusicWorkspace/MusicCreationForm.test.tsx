@@ -7,6 +7,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { MusicCreationForm } from "./MusicCreationForm";
+import { defaultMusicCreationOptions } from "./music-creation-options";
 afterEach(cleanup);
 const prompt = () =>
 	screen.getByRole("textbox", {
@@ -92,4 +93,18 @@ it("does not submit a blank or busy draft", () => {
 	expect(screen.getByRole("button", { name: "楽曲を生成" })).toBeDisabled();
 	fireEvent.submit(prompt().closest("form")!);
 	expect(generate).not.toHaveBeenCalled();
+});
+it("uses registered choices and defaults when a screen supplies them", () => {
+	const options = {
+		...defaultMusicCreationOptions,
+		genreGroups: [{ label: "新しいジャンル", options: ["和風アンビエント"] }],
+		tempos: ["ゆっくり", "疾走感"],
+		defaults: { ...defaultMusicCreationOptions.defaults, tempo: "ゆっくり" },
+	};
+	render(<MusicCreationForm options={options} onGenerate={vi.fn()} />);
+	expect(prompt().value).toContain("テンポ：ゆっくり");
+	expect(screen.getByRole("checkbox", { name: "和風アンビエント" })).toBeVisible();
+	expect(screen.queryByRole("checkbox", { name: "オーケストラ" })).toBeNull();
+	fireEvent.click(screen.getByRole("checkbox", { name: "和風アンビエント" }));
+	expect(prompt().value).toContain("ジャンル：和風アンビエント");
 });

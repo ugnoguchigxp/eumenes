@@ -26,6 +26,9 @@ export type DraftEntry = {
 /** What a screen shows for each character of a secret it must not echo. */
 export const SECRET_MASK = "•";
 
+/** Appended to a secret field's key for its "delete the stored secret" switch. */
+export const DELETE_SUFFIX = "!delete";
+
 /** `fieldId` or `fieldId~target`: the id a screen shows and an edit event names. */
 export const entryKey = (fieldId: string, target?: string) =>
 	target ? `${fieldId}~${target}` : fieldId;
@@ -66,7 +69,13 @@ export type DraftView = {
 	/** Staged structural operations, in the order they were staged. */
 	structural: ReadonlyArray<StructuralEntry>;
 	/** Confidential entries by identity and length only (a screen masks them). */
-	secrets: ReadonlyArray<{ fieldId: string; target?: string; length: number }>;
+	secrets: ReadonlyArray<{
+		fieldId: string;
+		target?: string;
+		length: number;
+		/** The stored secret is to be deleted (no new value). */
+		delete?: true;
+	}>;
 	/** An apply is in flight; edits made meanwhile are kept. */
 	busy: boolean;
 	message: string;
@@ -99,6 +108,7 @@ export function createDraftStore() {
 					fieldId,
 					...(target ? { target } : {}),
 					length: "value" in change ? String(change.value).length : 0,
+					...("unset" in change ? { delete: true as const } : {}),
 				})),
 			busy,
 			message,

@@ -577,6 +577,35 @@ test("confidential replay: same secret returns the stored result, a different se
 	]);
 });
 
+test("an action that declares confidential fields but carries none needs no host key", async () => {
+	fresh();
+	h.setKey(undefined);
+	for (let i = 0; i < 2; i++) {
+		const input = {
+			expectedRevision: 4,
+			changes: [{ fieldId: "general.theme", value: "dark" }],
+		};
+		const event = h.event({ actionId: "apply", input });
+		const { request } = await h.service.submit(event);
+		expect(request.status).toBe("accepted");
+		// Digested normally, and replayable without any key.
+		const row = h.store.read((db) =>
+			db
+				.query("SELECT input_digest FROM tool_action_requests WHERE event_id=?")
+				.get(event.eventId),
+		) as { input_digest: string };
+		expect(row.input_digest).toMatch(/^[0-9a-f]{64}$/);
+		expect((await h.service.submit(event)).replay).toBe(true);
+	}
+	expect(h.effects()).toBe(2);
+	// A non-empty secret still needs the key.
+	const error = await refused(
+		h.service.submit(h.event({ actionId: "apply", input: applyInput("S") })),
+	);
+	expect(error.code).toBe("secret_key_unavailable");
+	expect(h.effects()).toBe(2);
+});
+
 test("a confidential action without a host key is refused before anything is stored", async () => {
 	fresh();
 	h.setKey(undefined);

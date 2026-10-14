@@ -298,7 +298,11 @@ export async function buildServices(config: Config) {
 		history: config.historyToolsEnabled,
 		webResearchEnabled: config.webResearchToolsEnabled,
 		embed: embedder,
-		dotsScreen: { config: dots.config, events: dotsEvents },
+		dotsScreen: {
+			config: dots.config,
+			events: dotsEvents,
+			tasks: () => delegated.tasks,
+		},
 	});
 	const enabled = config.toolchainEnabled;
 

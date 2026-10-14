@@ -172,7 +172,7 @@
 		{
 			"kind": "artifact",
 			"id": "settings.ai-connections",
-			"revision": 3,
+			"revision": 4,
 			"title": "AIと接続",
 			"variants": [
 				{
@@ -323,6 +323,9 @@
 					"label": "クラウドAPIを登録",
 					"rowInput": {
 						"connectionId": {
+							"generate": "uuid"
+						},
+						"resourceId": {
 							"generate": "uuid"
 						}
 					},
@@ -703,6 +706,7 @@
 				{
 					"source": "settings-connections",
 					"title": "クラウド接続",
+					"description": "クラウドへの自動切替は初期値で有効です。代替先を登録すると、会話・録音・読み上げ用のテキストが設定したAPIへ送信されます。",
 					"rowKey": "id",
 					"rowsPath": "targets",
 					"columns": [
@@ -802,6 +806,54 @@
 								"control": "text",
 								"maxLength": 128,
 								"help": "Claude Managed Agentsのとき、環境を指定します。"
+							},
+							{
+								"fieldId": "purpose",
+								"label": "最初のモデルの用途",
+								"control": "select",
+								"help": "最初のモデルを同時に登録する場合に選びます。空欄なら接続だけを登録します。",
+								"options": [
+									{
+										"value": "llm",
+										"label": "会話"
+									},
+									{
+										"value": "asr",
+										"label": "聞き取り"
+									},
+									{
+										"value": "tts",
+										"label": "読み上げ"
+									}
+								]
+							},
+							{
+								"fieldId": "model",
+								"label": "モデル名",
+								"control": "text",
+								"maxLength": 200
+							},
+							{
+								"fieldId": "contextWindow",
+								"label": "文脈長",
+								"control": "number",
+								"min": 2048,
+								"max": 2000000,
+								"help": "会話用途のときに指定します。省略すると8192です。"
+							},
+							{
+								"fieldId": "voice",
+								"label": "音声名",
+								"control": "text",
+								"maxLength": 200,
+								"help": "読み上げ用途のときに指定します。"
+							},
+							{
+								"fieldId": "assign",
+								"label": "この用途の代替先として使う",
+								"control": "toggle",
+								"defaultValue": "false",
+								"help": "既に代替先を選んでいる場合は、その選択を維持します。"
 							}
 						]
 					}
@@ -914,7 +966,12 @@
 					],
 					"rowActions": [
 						{
-							"actionId": "probe"
+							"actionId": "probe",
+							"when": {
+								"key": "enabled",
+								"in": [true]
+							},
+							"requiresCleanDraft": "document:settings@1"
 						}
 					]
 				},
@@ -956,7 +1013,7 @@
 					],
 					"refreshWhile": {
 						"key": "status",
-						"in": ["running"]
+						"in": ["running", "cancelling"]
 					}
 				}
 			]

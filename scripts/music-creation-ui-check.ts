@@ -183,7 +183,7 @@ try {
 		.check();
 	await expect(prompt).toHaveValue(/テンポ：ゆったり/);
 	await expect(prompt).toHaveValue(/雰囲気：落ち着いた/);
-	await workspace.screenshot({ path: `${out}/overview.png` });
+	await page.screenshot({ path: `${out}/overview.png`, fullPage: true });
 	await page
 		.getByRole("textbox", { name: "ジャンルを探す" })
 		.fill("オーケストラ");
@@ -207,7 +207,7 @@ try {
 	await page.locator(".music-creation-scroll").evaluate((node) => {
 		node.scrollTop = 0;
 	});
-	await workspace.screenshot({ path: `${out}/genres.png` });
+	await page.screenshot({ path: `${out}/genres.png`, fullPage: true });
 	const written =
 		(await prompt.inputValue()) + "\n自由記述：静かな朝の曲にしたい。";
 	await prompt.fill(written);
@@ -291,10 +291,9 @@ try {
 	await expect(
 		page.getByRole("textbox", { name: "検索", exact: true }),
 	).toHaveValue("");
-	await expect(page.locator("audio")).toHaveAttribute(
-		"src",
-		"/api/music/tracks/saved-1/audio",
-	);
+	await expect(
+		page.getByRole("region", { name: "音楽プレイヤー" }).locator("audio"),
+	).toHaveAttribute("src", "/api/music/tracks/saved-1/audio");
 	await page.screenshot({ path: `${out}/playlist.png`, fullPage: true });
 	await openFromLauncher(page, "楽曲生成");
 	await expect(
@@ -309,20 +308,28 @@ try {
 	await expect(
 		page.getByRole("button", { name: "楽曲を生成", exact: true }),
 	).toBeVisible();
-	expect(
-		await page.evaluate(
-			() => document.documentElement.scrollWidth <= window.innerWidth,
-		),
-	).toBe(true);
-	await page.screenshot({ path: `${out}/narrow.png`, fullPage: true });
-	expect(requests.some((request) => request.path.includes("/images/"))).toBe(
-		false,
+	const fitsViewport = await page.evaluate(
+		() => document.documentElement.scrollWidth <= window.innerWidth,
 	);
+	expect(fitsViewport, "music screen fits the narrow viewport").toBe(true);
+	await page.screenshot({ path: `${out}/narrow.png`, fullPage: true });
+	const imageMutationRequests = requests
+		.filter(
+			(request) =>
+				request.path.includes("/images/") && request.method !== "GET",
+		)
+		.map((request) => `${request.method} ${request.path}`);
+	const providerImageRequests = [...fast.requests, ...slow.requests].filter(
+		(request) => request.path.includes("/images/"),
+	).length;
 	expect(
-		[...fast.requests, ...slow.requests].some((request) =>
-			request.path.includes("/images/"),
-		),
-	).toBe(false);
+		imageMutationRequests,
+		"the image mock makes no image creation request",
+	).toHaveLength(0);
+	expect(
+		providerImageRequests,
+		"the image mock makes no provider image request",
+	).toBe(0);
 	expect(errors).toEqual([]);
 	writeFileSync(
 		`${out}/result.json`,

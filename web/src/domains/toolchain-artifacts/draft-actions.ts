@@ -7,7 +7,7 @@ import type { ActionDispatcher } from "./dispatcher";
 import { dirtyEntries, equalsSaved, parseWire, toWire } from "./documents";
 import { draftStoreFor, entryKey, splitEntryKey } from "./drafts";
 import { pendingMessage, receiptOf, unsettledMessage } from "./messages";
-import { SECRET_MASK } from "./drafts";
+import { DELETE_SUFFIX, SECRET_MASK } from "./drafts";
 import type { GetLatest } from "./screen-state";
 
 /** What the user did to a masked secret field: appended, deleted from the end, or replaced. */
@@ -61,6 +61,29 @@ export function useDraftActions({
 			if (keys !== "fieldId,value" || typeof event.values.fieldId !== "string")
 				return { status: "rejected", message: "入力を確認してください" };
 			const key = event.values.fieldId;
+			if (key.endsWith(DELETE_SUFFIX)) {
+				// The switch of a secret field that may be unset: delete the stored secret.
+				const base = splitEntryKey(key.slice(0, -DELETE_SUFFIX.length));
+				const target = (all[doc] ?? []).find(
+					(f) =>
+						f.fieldId === base.fieldId &&
+						f.confidential &&
+						f.unset &&
+						artifact.fields?.some((o) => o.fieldId === f.fieldId),
+				);
+				const wire = event.values.value;
+				if (!target || (wire !== "true" && wire !== "false"))
+					return { status: "rejected", message: "未登録の設定項目です" };
+				if (wire === "true")
+					store.set({
+						fieldId: base.fieldId,
+						...(base.target ? { target: base.target } : {}),
+						change: { unset: true },
+						confidential: true,
+					});
+				else store.remove(base.fieldId, base.target);
+				return accepted;
+			}
 			const handled = s.editLocal?.(key, String(event.values.value));
 			if (handled) return handled;
 			const access = s.documents?.[doc];

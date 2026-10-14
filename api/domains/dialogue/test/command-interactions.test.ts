@@ -161,6 +161,17 @@ function setup(
 			_signal?: AbortSignal,
 			control?: { outputSchema?: unknown },
 		) => {
+			if (prompt[0]?.content.includes("OUTPUT_SCHEMA="))
+				return {
+					requestId,
+					attemptId: "route",
+					value: JSON.stringify({
+						decision: "answer",
+						functionName: "",
+						request: "",
+						questionRef: "",
+					}),
+				} as Receipt;
 			commandPrompts.push(prompt);
 			commandSchemas.push(JSON.stringify(control?.outputSchema ?? null));
 			await state.gate;

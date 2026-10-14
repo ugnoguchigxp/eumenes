@@ -180,6 +180,8 @@ test("status, claims, forgets and the reason choices are plain rows with the wor
 		state: "オン",
 		listComplete: true,
 		stopped: 0,
+		claimsNote: "すべて表示しています",
+		forgetsNote: "—",
 	});
 	const claims = read(h, "query:world.claims@1");
 	expect(claims.complete).toBe(true);
@@ -192,6 +194,14 @@ test("status, claims, forgets and the reason choices are plain rows with the wor
 		evidenceLabel: "本人の発言",
 		correctable: true,
 	});
+	// The grounds the legacy detail drawer showed are columns now.
+	const grounds = claimOf(h, "claim-report")!;
+	expect(grounds.condition).toBe("条件は記述されていません（未確認）");
+	expect(grounds.supports).toContain("本人の発言 — message m1");
+	expect(grounds.sourceVersions).toContain("message m1");
+	expect(grounds.sourceVersions).toContain("現在の版");
+	expect(grounds.refutations).toBe("なし");
+	expect(grounds.history).toContain("版1:");
 	expect(claimOf(h, "claim-hyp")).toMatchObject({
 		toneLabel: "仮説（採用しても未確認）",
 		originLabel: "モデルの仮説",
@@ -491,4 +501,65 @@ test("the World bundle runs through the action ledger", async () => {
 			}
 		).items,
 	).toHaveLength(1);
+});
+
+test("an unavailable or partial list says why in the status row instead of passing for empty", async () => {
+	const h = await setup();
+	const withList = (list: unknown, forgets?: unknown) =>
+		createWorldAdapter(() => ({
+			...h.ports,
+			claims: {
+				...h.ports.claims,
+				list: () => list as never,
+				...(forgets ? { forgets: () => forgets as never } : {}),
+			},
+		}));
+	const status = (adapter: ReturnType<typeof createWorldAdapter>) =>
+		h.store.read((db) =>
+			adapter.sourceInTransaction(db, "query:world.status@1", undefined),
+		)!.data as { items: Array<Record<string, any>> };
+	const down = withList(
+		{ status: "failed", code: "world_unavailable" },
+		{ status: "failed", code: "world_disabled" },
+	);
+	const note = status(down).items[0]!;
+	expect(note.claimsNote).toContain("主張の一覧を表示できません");
+	expect(note.forgetsNote).toBe(
+		"Worldがオフのため、忘却の状況を表示できません",
+	);
+	const claims = h.store.read((db) =>
+		down.sourceInTransaction(db, "query:world.claims@1", undefined),
+	)!.data as Record<string, any>;
+	expect(claims).toMatchObject({
+		items: [],
+		unavailable: "world_unavailable",
+	});
+	expect(claims.unavailableText).toContain("表示できません");
+	const partial = status(
+		withList({
+			status: "ok",
+			value: { scopeKey: "s", complete: false, stopped: 3, items: [] },
+		}),
+	).items[0]!;
+	expect(partial.claimsNote).toContain("一部が表示されていません");
+	expect(partial.claimsNote).toContain("利用を止めている主張が3件");
+});
+
+test("the forgets list marks the forgets still moving, and the bundle re-reads it only while one is", async () => {
+	const h = await setup();
+	const forgets = worldBundle.artifacts[0].collections.find(
+		(c: { source: string }) => c.source === "world-forgets",
+	);
+	expect(forgets.refreshWhile).toEqual({ key: "inProgress", in: [true] });
+	await run(h, "world.forget", {
+		claimId: "claim-cand",
+		expectedRevision: revisionOf(h, "claim-cand"),
+	});
+	expect(read(h, "query:world.forgets@1").items[0].inProgress).toBe(true);
+	h.adapter.afterCommit!();
+	await h.settled();
+	expect(read(h, "query:world.forgets@1").items[0]).toMatchObject({
+		display: "complete",
+		inProgress: false,
+	});
 });

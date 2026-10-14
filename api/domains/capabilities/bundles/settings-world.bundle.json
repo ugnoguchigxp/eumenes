@@ -124,14 +124,14 @@
 							"format": "boolean"
 						},
 						{
-							"key": "listComplete",
-							"label": "一覧の完全性",
-							"format": "boolean"
+							"key": "claimsNote",
+							"label": "主張の一覧の状況",
+							"format": "text"
 						},
 						{
-							"key": "stopped",
-							"label": "出典が変わり利用停止中の主張",
-							"format": "number"
+							"key": "forgetsNote",
+							"label": "忘却の状況の読み取り",
+							"format": "text"
 						}
 					]
 				},
@@ -162,13 +162,33 @@
 							"format": "text"
 						},
 						{
-							"key": "evidenceLabel",
-							"label": "根拠",
+							"key": "freshnessLabel",
+							"label": "鮮度",
 							"format": "text"
 						},
 						{
-							"key": "freshnessLabel",
-							"label": "鮮度",
+							"key": "condition",
+							"label": "条件",
+							"format": "text"
+						},
+						{
+							"key": "supports",
+							"label": "支持する根拠",
+							"format": "text"
+						},
+						{
+							"key": "refutations",
+							"label": "反証",
+							"format": "text"
+						},
+						{
+							"key": "sourceVersions",
+							"label": "出典の版",
+							"format": "text"
+						},
+						{
+							"key": "history",
+							"label": "履歴",
 							"format": "text"
 						},
 						{
@@ -285,7 +305,11 @@
 							"label": "保留の理由",
 							"format": "text"
 						}
-					]
+					],
+					"refreshWhile": {
+						"key": "inProgress",
+						"in": [true]
+					}
 				}
 			],
 			"launcher": {

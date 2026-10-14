@@ -1038,6 +1038,32 @@ test("a probe registered inside a transaction runs after the commit and only if 
 	second.launch();
 	await until(() => probeRow(store, second.id)?.status !== "running");
 });
+test("a probe cancel is a mark written by the transaction: a rollback leaves it running", async () => {
+	const { store, inference, settings } = await setup();
+	await store.write((db) =>
+		db
+			.query("INSERT INTO inference_probes VALUES(?,?,'running',NULL,?,?)")
+			.run("live", "larm", settings.get().revision, Date.now()),
+	);
+	await store
+		.write((db) => {
+			inference.cancelProbeInTransaction(db, "live");
+			throw new Error("rolled_back");
+		})
+		.catch(() => undefined);
+	expect(probeRow(store, "live")?.status).toBe("running");
+	await store.write((db) => inference.cancelProbeInTransaction(db, "live"));
+	expect(probeRow(store, "live")?.status).toBe("cancelling");
+	// Only a running probe is marked; a stuck mark is failed like a stuck run.
+	await expect(
+		store.write((db) => inference.cancelProbeInTransaction(db, "live")),
+	).rejects.toThrow("probe_not_running");
+	await expect(
+		store.write((db) => inference.cancelProbeInTransaction(db, "none")),
+	).rejects.toThrow("probe_not_found");
+	await inference.recover();
+	expect(probeRow(store, "live")?.status).toBe("interrupted");
+});
 test("a recent running probe still blocks a new one", async () => {
 	const { store, inference, settings } = await setup();
 	await store.write((db) =>

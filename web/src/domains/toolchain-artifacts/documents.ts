@@ -249,13 +249,20 @@ export function reviewRows(
 			after: entry.label,
 		})),
 	);
-	if (view.secrets.length)
+	if (view.secrets.length) {
+		const removed = view.secrets.filter((x) => x.delete).length;
+		const updated = view.secrets.length - removed;
 		rows.push({
 			id: "credentials",
 			label: "認証情報",
 			before: "現在の認証情報",
-			after: `更新・削除予定 ${view.secrets.length}件`,
+			after: removed
+				? [updated ? `更新予定 ${updated}件` : "", `削除予定 ${removed}件`]
+						.filter(Boolean)
+						.join("・")
+				: `更新・削除予定 ${updated}件`,
 		});
+	}
 	return rows;
 }
 

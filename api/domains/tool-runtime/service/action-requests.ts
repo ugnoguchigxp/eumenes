@@ -33,6 +33,7 @@ import {
 	canonical,
 	codePattern,
 	fieldErrors,
+	hasSecret,
 	hmacDigest,
 	isCancel,
 	isRecord,
@@ -147,7 +148,7 @@ function plan(
 	if (!adapter) return fail("adapter_unavailable", 503);
 	const confidential = action.confidentialFields ?? [];
 	let digest = sha256Hex(identity);
-	if (confidential.length) {
+	if (hasSecret(event.input, confidential)) {
 		// The digest must cover the secret without being a brute-forceable hash of it.
 		const key = ctx.secretKey();
 		if (!key?.length) return fail("secret_key_unavailable", 503);
@@ -419,7 +420,7 @@ function conflictDigest(
 	const action = resolved.doc.document.actionBindings.find(
 		(a) => a.actionId === event.actionId,
 	);
-	return action && !action.confidentialFields?.length
+	return action && !hasSecret(event.input, action.confidentialFields ?? [])
 		? sha256Hex(identity)
 		: undefined;
 }

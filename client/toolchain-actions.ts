@@ -134,8 +134,23 @@ const answerResult = z.looseObject({
 /** The submit answer: 200 is settled, 202 is accepted for later settlement. */
 export type SubmittedAction = { httpStatus: number; view: ActionRequestView };
 
+/**
+ * A media path a registered screen may preview: this API's own `/api/` paths only. Anything
+ * with another origin, a protocol, a parent step or a doubled slash is refused before a request.
+ */
+export const mediaPathPattern =
+	/^\/api\/[A-Za-z0-9._~%-]+(?:\/[A-Za-z0-9._~%-]+)*(?:\?[A-Za-z0-9._~%=&-]{0,300})?$/;
+export function isMediaPath(path: string) {
+	return mediaPathPattern.test(path) && !path.split("?")[0]!.includes("..");
+}
+
 export function toolchainActionsClient(transport: Transport) {
 	return {
+		/** A same-origin media file for a preview, with the session's credentials. */
+		toolchainMedia: async (path: string, signal?: AbortSignal) => {
+			if (!isMediaPath(path)) throw new Error("invalid_media_path");
+			return (await transport.call(path, { signal })).blob();
+		},
 		/** `POST /api/toolchain-actions`; a non-2xx answer throws ApiError (message = error code). */
 		submitToolchainAction: async (
 			event: ToolchainActionEventV1,

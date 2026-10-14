@@ -7,6 +7,11 @@ export type ArtifactRuntime = {
 	uploadFile?: (source: string, file: File) => Promise<Receipt>;
 	dispatch: (event: ArtifactEvent) => Promise<Receipt>;
 	/**
+	 * Reads a media file the host allows (a same-origin `/api/` path, with the session's
+	 * credentials) for a preview. The host refuses any other path.
+	 */
+	fetchMedia?: (path: string) => Promise<Blob>;
+	/**
 	 * Advances when the host settles an earlier unsettled operation in the background. A
 	 * pending/indeterminate message shown for an older epoch no longer applies.
 	 */

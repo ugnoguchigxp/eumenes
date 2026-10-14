@@ -357,6 +357,8 @@ test("a row starts a test once, the run is listed with its result, and a resend 
 		statusLabel: "成功",
 		text: "生成結果",
 		error: "",
+		// A text result has no preview.
+		preview: null,
 	});
 	const again = await h.send("start", {}, h.catalogRow("image"), eventId);
 	expect(again.replay).toBe(true);
@@ -587,4 +589,87 @@ test("the screen re-reads only while something runs: the bundle names the field 
 	expect(h.rows("service-tests-health")).toMatchObject([
 		{ targetId: "image", running: false },
 	]);
+});
+
+test("a cancel still aborts the run when a progress save rewrote its phase before the abort ran", async () => {
+	let progress!: (p: { phase: string }) => Promise<void>;
+	let release!: () => void;
+	const h = await setup({
+		execute: async (_target, _input, signal, report) => {
+			progress = report as typeof progress;
+			await new Promise<void>((resolve, reject) => {
+				release = resolve;
+				signal.addEventListener("abort", () => reject(new Error("aborted")));
+			});
+			return { text: "late" };
+		},
+	});
+	await refreshed(h);
+	await h.send("start", {}, h.catalogRow("image"));
+	for (let i = 0; !progress && i < 200; i++) await Bun.sleep(5);
+	// Commit the cancel, then let a progress save overwrite the phase before afterCommit.
+	await invoke(h, "service-tests.cancel", {
+		runId: (h.rows("service-tests-runs")[0] as { id: string }).id,
+	});
+	await progress({ phase: "generating" });
+	expect(h.rows("service-tests-runs")[0]).toMatchObject({
+		status: "running",
+		phase: "起動・生成を待っています",
+	});
+	h.adapter.afterCommit?.();
+	await h.finished();
+	expect(h.rows("service-tests-runs")[0]).toMatchObject({
+		status: "cancelled",
+	});
+	release();
+});
+
+test("the free-form start carries no revision of its own: only the catalog's stale check guards it", async () => {
+	const h = await setup();
+	await refreshed(h);
+	const settings = h.settings.get();
+	settings.larm.profile = "SAAA-2";
+	await h.settings.apply({
+		requestId: crypto.randomUUID(),
+		expectedRevision: settings.revision,
+		settings,
+		keys: [],
+	});
+	const stale = await h.send("start-custom", { targetId: "image" });
+	expect(stale.request.errorCode).toBe("invalid_stale_settings");
+	expect(h.rows("service-tests-runs")).toEqual([]);
+	await refreshed(h);
+	expect(
+		(await h.send("start-custom", { targetId: "image" })).request.status,
+	).toBe("accepted");
+	await h.finished();
+	expect(h.rows("service-tests-runs")).toHaveLength(1);
+});
+
+test("a run with a preview carries its path and type for the media column", async () => {
+	const h = await setup({
+		execute: async () => ({ bytes: new Uint8Array([1, 2]), mime: "image/png" }),
+	});
+	const column = (
+		artifact as unknown as {
+			collections: Array<{
+				source: string;
+				columns: Array<{ key: string; format?: string }>;
+			}>;
+		}
+	).collections
+		.find((c) => c.source === "service-tests-runs")!
+		.columns.find((c) => c.key === "preview");
+	expect(column?.format).toBe("media");
+	await refreshed(h);
+	await h.send("start", {}, h.catalogRow("image"));
+	await h.finished();
+	const [run] = h.rows("service-tests-runs") as Array<{
+		id: string;
+		preview: { path: string; mime: string } | null;
+	}>;
+	expect(run!.preview).toEqual({
+		path: `/api/service-tests/runs/${run!.id}/artifact`,
+		mime: "image/png",
+	});
 });

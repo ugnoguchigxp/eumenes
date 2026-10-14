@@ -1284,6 +1284,7 @@ test("the AI and external-work artifacts apply through the action ledger with st
 					inspect: () => ({}),
 					usage: () => [],
 					startProbeInTransaction: () => ({ id: "x", launch() {} }),
+					cancelProbeInTransaction() {},
 					cancelProbe() {},
 				},
 				h.settings,
@@ -1301,7 +1302,7 @@ test("the AI and external-work artifacts apply through the action ledger with st
 			eventCreatedAt: new Date(now).toISOString(),
 			eventExpiresAt: new Date(now + 60_000).toISOString(),
 			artifactId: "tab-ai",
-			artifactRevisionId: "artifact:settings.ai-connections@3",
+			artifactRevisionId: "artifact:settings.ai-connections@4",
 			source: "settings-ai",
 			sourceRevision: rev(h),
 			actionId: "apply",
@@ -1409,6 +1410,7 @@ test("the AI screen's collections name registered actions with rows built by fix
 	]);
 	expect(action("add-connection").rowInput).toEqual({
 		connectionId: { generate: "uuid" },
+		resourceId: { generate: "uuid" },
 	});
 	expect(action("add-connection").confidentialFields).toEqual(["apiKey"]);
 	expect(action("delete-connection").rowInput).toEqual({
@@ -1416,4 +1418,128 @@ test("the AI screen's collections name registered actions with rows built by fix
 	});
 	expect(action("probe").operationId).toBe("inference.probe-start");
 	expect(action("probe-cancel").rowInput).toEqual({ id: "$row.id" });
+});
+
+test("the connection form registers a connection alone or with its first model in one apply", async () => {
+	const h = await setup();
+	const alone = crypto.randomUUID();
+	// The form always carries a generated model id; without a purpose it adds no model.
+	await apply(h, {
+		expectedRevision: rev(h),
+		structural: [
+			structure(
+				ADD_CONNECTION,
+				connectionInput(alone, {
+					envRef: "EUMENES_CLOUD_A",
+					resourceId: crypto.randomUUID(),
+				}),
+			),
+		],
+	});
+	expect(h.settings.get().resources).toEqual([]);
+	const withModel = crypto.randomUUID();
+	const modelId = crypto.randomUUID();
+	await apply(h, {
+		expectedRevision: rev(h),
+		structural: [
+			structure(
+				ADD_CONNECTION,
+				connectionInput(withModel, {
+					envRef: "EUMENES_CLOUD_B",
+					resourceId: modelId,
+					purpose: "tts",
+					model: "tts-9",
+					voice: "alloy",
+					assign: true,
+				}),
+			),
+		],
+	});
+	expect(h.settings.get().resources).toEqual([
+		expect.objectContaining({
+			id: modelId,
+			connectionId: withModel,
+			purpose: "tts",
+			voice: "alloy",
+		}),
+	]);
+	expect(h.settings.get().routes.tts.fallbackId).toBe(modelId);
+	// A purpose without a model name is refused as input.
+	expect(
+		await codeOf(
+			apply(h, {
+				expectedRevision: rev(h),
+				structural: [
+					structure(
+						ADD_CONNECTION,
+						connectionInput(crypto.randomUUID(), {
+							envRef: "EUMENES_CLOUD_C",
+							resourceId: crypto.randomUUID(),
+							purpose: "llm",
+						}),
+					),
+				],
+			}),
+		),
+	).toBe("invalid_input");
+});
+
+test("the probe row is offered for enabled targets and a clean draft, and the key field can be unset", () => {
+	const ai = (
+		bundle as unknown as {
+			artifacts: Array<{
+				id: string;
+				fields: Array<{
+					fieldId: string;
+					help?: string;
+					unset?: string;
+					confidential?: boolean;
+				}>;
+				collections: Array<{
+					source: string;
+					description?: string;
+					rowActions: Array<Record<string, unknown>>;
+					refreshWhile?: { in: string[] };
+					create?: { fields: Array<{ fieldId: string }> };
+				}>;
+			}>;
+		}
+	).artifacts.find((a) => a.id === "settings.ai-connections")!;
+	const probe = ai.collections.find(
+		(c) => c.source === "inference-probe-targets",
+	)!;
+	expect(probe.rowActions).toEqual([
+		{
+			actionId: "probe",
+			when: { key: "enabled", in: [true] },
+			requiresCleanDraft: "document:settings@1",
+		},
+	]);
+	expect(
+		ai.collections.find((c) => c.source === "inference-probes")!.refreshWhile
+			?.in,
+	).toEqual(["running", "cancelling"]);
+	expect(
+		ai.collections
+			.find((c) => c.source === "settings-connections")!
+			.create!.fields.map((f) => f.fieldId),
+	).toEqual(
+		expect.arrayContaining([
+			"purpose",
+			"model",
+			"contextWindow",
+			"voice",
+			"assign",
+		]),
+	);
+	// The cloud-send notice sits on the connections collection, not on a route field.
+	expect(
+		ai.collections.find((c) => c.source === "settings-connections")!
+			.description,
+	).toMatch(/^クラウドへの自動切替は初期値で有効です。/);
+	expect(
+		ai.fields.find((f) => f.fieldId === "route.llm.mode")!.help,
+	).toBeUndefined();
+	const key = ai.fields.find((f) => f.fieldId === "connection.api-key")!;
+	expect(key).toMatchObject({ confidential: true, unset: "null" });
 });

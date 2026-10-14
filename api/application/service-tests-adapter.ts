@@ -116,6 +116,14 @@ function runRow(run: ServiceRun) {
 		error: run.error ? testErrorLabel(run.error) : "",
 		text: shorten(run.text, 400) ?? "",
 		previewAvailable: run.previewAvailable === true,
+		// A same-origin path and type the screen fetches and previews (image or audio).
+		preview:
+			run.previewAvailable === true && run.mime
+				? {
+						path: `/api/service-tests/runs/${run.id}/artifact`,
+						mime: run.mime,
+					}
+				: null,
 		retryArtifact: run.retryArtifact === true,
 	};
 }
@@ -185,7 +193,8 @@ export function createServiceTestsAdapter(
 			requestId,
 			service.startInTransaction(tx, {
 				targetId,
-				revision: revision ?? service.catalog().revision,
+				// The revision of a row the person acted on; a free-form start has none.
+				revision,
 				// The ledger's event id is the idempotency key: a resend never starts a second run.
 				requestKey: requestId,
 				input: rest,

@@ -1,6 +1,7 @@
 import { chunkTiming, timedVoiceAudio } from "./audio-timing";
 import { requestPreview, type RecognitionCandidate } from "./preview";
 import { commitIdleInput } from "./input-commit";
+import { useTranscription } from "./transcription";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { VoiceDialogueClient } from "../../../../../client/voice-dialogue";
@@ -75,10 +76,14 @@ export function useVoiceDialogue(
 	useEffect(() => {
 		const value = turn.data;
 		if (!value) return;
-		if (value.status === "failed")
+		if (value.status === "failed" || (value.status === "draft" && value.error))
 			// Keep the failure visible when restoring a previous accepted turn.
 			// oxlint-disable-next-line react/set-state-in-effect
-			setError(value.error ?? "音声処理に失敗しました");
+			setError(
+				value.status === "draft"
+					? describeError(value.error)
+					: (value.error ?? "音声処理に失敗しました"),
+			);
 		const pending = replacement.current;
 		if (pending?.id === value.utteranceId) {
 			if (
@@ -266,7 +271,7 @@ export function useVoiceDialogue(
 		if (value.status !== "input_ready") {
 			// A bounded notice leaves the transcript editable after pausing the microphone.
 			const timer = setTimeout(() => {
-				if (!candidate.current && turnId === value.utteranceId)
+				if (!value.error && !candidate.current && turnId === value.utteranceId)
 					setError(
 						"発話の続き待ちです。マイクを停止すると、文字起こしを編集して送信できます。",
 					);
@@ -352,6 +357,7 @@ export function useVoiceDialogue(
 						busy: false,
 					};
 					candidate.current = nextCandidate;
+					setError(null);
 					setInputVersion((v) => v + 1);
 					setRecognitionId(nextCandidate.id);
 					setPreviewText(null);
@@ -371,7 +377,6 @@ export function useVoiceDialogue(
 					}
 					candidate.current = null;
 					setInputVersion((v) => v + 1);
-					setPreviewText(null);
 					const id = pending?.id ?? crypto.randomUUID();
 					setRecognitionId(id);
 					// Also becomes the current turn and drops the previous turn's delivered chunks.
@@ -557,9 +562,7 @@ export function useVoiceDialogue(
 		},
 		[client, machine, cancelPlayback],
 	);
-	const transcriptionText =
-		previewText ||
-		(turn.data?.utteranceId === recognitionId ? turn.data.text : null);
+	const transcription = useTranscription(turn.data, recognitionId, previewText);
 	return {
 		ownsSpeech: machine.ownsSpeech,
 		start,
@@ -580,10 +583,7 @@ export function useVoiceDialogue(
 		turn: turn.data,
 		previewText,
 		recognitionId,
-		transcription:
-			recognitionId && transcriptionText
-				? { id: recognitionId, text: transcriptionText }
-				: null,
+		transcription,
 		error:
 			error ??
 			(turn.isError

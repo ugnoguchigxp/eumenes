@@ -2,6 +2,63 @@ import { expect, test } from "bun:test";
 import { harness } from "./toolchain.fixture";
 import { musicFixture, musicQuestion, musicTestPlan } from "./music.fixture";
 
+test("a prose-only creation claim is withheld and routed to the music agent", async () => {
+	const f = musicFixture("success");
+	const claim = "新しい曲を1曲作りました。再生：https://127.0.0.1:8000/play/";
+	let reviewed = 0;
+	let release!: () => void;
+	const paused = new Promise<void>((resolve) => (release = resolve));
+	const visible: string[] = [];
+	const model = {
+		...f.model,
+		answer: async (...args: Parameters<typeof f.model.answer>) => {
+			const [messages, signal, options] = args;
+			if (options?.tools?.length) {
+				await paused;
+				return claim;
+			}
+			if (messages[0]?.content.includes("FUNCTIONS=")) {
+				reviewed++;
+				return JSON.stringify({
+					decision: "toolchain",
+					functionName: "music",
+					request: musicQuestion,
+					questionRef: "",
+				});
+			}
+			return f.model.answer(messages, signal, options);
+		},
+	};
+	const h = await harness({ model, musicGateway: f.gateway });
+	let unsubscribe = () => {};
+	try {
+		const submitted = await (
+			await h.request("/api/runs", {
+				requestId: crypto.randomUUID(),
+				conversationId: "main",
+				text: musicQuestion,
+			})
+		).json();
+		unsubscribe = h.dialogue.subscribeProgress(submitted.id, (progress) =>
+			visible.push(progress.text),
+		);
+		release();
+		const run = await h.dialogue.waitForTerminal(submitted.id, {
+			timeoutMs: 5000,
+		});
+		expect(run?.status).toBe("completed");
+		expect(reviewed).toBe(1);
+		expect(h.music!.list("main")[0]?.state).toBe("completed");
+		expect(f.requests.filter((r) => r.method === "POST")).toHaveLength(1);
+		expect(h.dialogue.answerText(submitted.id)).not.toContain(claim);
+		expect(visible.every((text) => !text.includes(claim))).toBe(true);
+	} finally {
+		release();
+		unsubscribe();
+		await h.close();
+	}
+});
+
 test("completed vocal music answers and repairs without re-offering entry operations", async () => {
 	const question =
 		"休日の朝に聞く目覚めのテーマ。クラシック、落ち着いたピアノ、90秒、透明感のある女性ソロ、日本語の歌詞をテーマに合わせて作成。";

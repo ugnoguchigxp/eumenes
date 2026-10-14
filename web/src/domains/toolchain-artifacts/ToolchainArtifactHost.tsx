@@ -24,6 +24,7 @@ import {
 	useDocumentFields,
 	useDraftViews,
 } from "./document-hooks";
+import { dirtyEntries } from "./documents";
 import { toolchainArtifactsQuery } from "./launcher";
 import { receiptOf } from "./messages";
 import { navigationDestination } from "./navigation";
@@ -162,7 +163,6 @@ function AdapterScreen({
 		ready: documentFieldsReady,
 	} = useDocumentFields(client, artifact, artifactRevisionId, catalog);
 	const drafts = useDraftViews(client.identity, documents);
-	const collections = useCollections(client, artifact, artifactRevisionId);
 	const own: AdapterState = adapter.useArtifact({
 		client,
 		artifact,
@@ -175,6 +175,25 @@ function AdapterScreen({
 		documentFieldsReady,
 		drafts,
 	});
+	// Documents whose shared draft has unapplied changes: row actions that need a clean one wait.
+	const dirtyDocuments = new Set(
+		documents.filter((ref) => {
+			const view = drafts[ref];
+			return (
+				!!view &&
+				(dirtyEntries(view, documentFields[ref] ?? [], own.documents?.[ref])
+					.length > 0 ||
+					view.structural.length > 0 ||
+					view.secrets.length > 0)
+			);
+		}),
+	);
+	const collections = useCollections(
+		client,
+		artifact,
+		artifactRevisionId,
+		dirtyDocuments,
+	);
 	// A change to the saved data (a settled write, a conflict) reads the lists again too.
 	const reload = collections.reload;
 	const state: AdapterState = {
@@ -292,8 +311,9 @@ function AdapterScreen({
 				input: event.values,
 			});
 			if (outcome.kind === "accepted" && outcome.result) {
-				s.settled(binding, outcome.result, timing, event.values);
+				// A one-time value is shown before anything else can fail.
 				reveal(outcome.result.receipt);
+				s.settled(binding, outcome.result, timing, event.values);
 			}
 			if (outcome.kind === "rejected" && outcome.conflict) s.refresh();
 			return receiptOf(outcome, describe);
@@ -326,8 +346,13 @@ function AdapterScreen({
 		[variant, question],
 	);
 	const runtime = useMemo<ArtifactRuntime>(
-		() => ({ snapshot, dispatch, settledEpoch }),
-		[snapshot, dispatch, settledEpoch],
+		() => ({
+			snapshot,
+			dispatch,
+			settledEpoch,
+			fetchMedia: (path: string) => client.toolchainMedia(path),
+		}),
+		[snapshot, dispatch, settledEpoch, client],
 	);
 	return (
 		<div className="toolchain-artifact">

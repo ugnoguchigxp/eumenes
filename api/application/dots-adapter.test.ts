@@ -76,7 +76,12 @@ async function setup(options: { now?: () => number } = {}) {
 	const f = await dotsFixture();
 	fixture = f;
 	const adapter = createDotsAdapter(
-		{ config: f.dots.config, events: f.events, packages: f.capabilities },
+		{
+			config: f.dots.config,
+			events: f.events,
+			packages: f.capabilities,
+			tasks: f.tasks,
+		},
 		options,
 	);
 	await f.store.write((db) =>
@@ -206,7 +211,7 @@ test("the dots bundle passes a dry-run import against this host, and is not acce
 	expect(refused.map((i) => i.code)).toContain("unregistered_adapter");
 });
 
-test("describe lists the nine dots writes and the five queries", () => {
+test("describe lists the fourteen dots writes and the seven queries", () => {
 	const d = describeDotsAdapter();
 	expect(
 		Object.fromEntries(
@@ -224,10 +229,15 @@ test("describe lists the nine dots writes and the five queries", () => {
 				"dots.package-create",
 				"dots.package-update",
 				"dots.package-enabled",
+				"dots.task-create",
+				"dots.task-start",
+				"dots.task-stop",
+				"dots.task-answer",
+				"dots.task-forget",
 			].map((name) => [name, "write"]),
 		),
 	);
-	expect(d.queries.size).toBe(5);
+	expect(d.queries.size).toBe(7);
 	expect(d.availability).toBe("availability:dots@1");
 });
 
@@ -237,7 +247,10 @@ test("the bundle restores the legacy defaults, edits from prefilled rows, and ha
 	expect(
 		artifact.actionBindings.every((a) => a.confidentialFields === undefined),
 	).toBe(true);
-	const [connections, projects] = artifact.collections;
+	const bySource = (source: string) =>
+		artifact.collections.find((c) => c.source === source)!;
+	const connections = bySource("dots-connections");
+	const projects = bySource("dots-projects");
 	const defaults = (
 		fields: Array<{ fieldId: string; defaultValue?: string }>,
 	) =>
@@ -263,7 +276,8 @@ test("the bundle restores the legacy defaults, edits from prefilled rows, and ha
 	for (const collection of artifact.collections) {
 		const edit = collection.rowActions.find((a) =>
 			a.actionId.endsWith("-edit"),
-		)!;
+		);
+		if (!edit) continue;
 		const binding = artifact.actionBindings.find(
 			(a) => a.actionId === edit.actionId,
 		)!;
@@ -633,6 +647,7 @@ test("a user package is created, edited from its row with the row's token, chose
 
 test("sources give rows with labels and option lists, without secrets", async () => {
 	const h = await setup();
+	await h.send("task-create", taskForm);
 	await h.send("package-create", {
 		title: "担当",
 		summary: "概要",
@@ -751,4 +766,137 @@ test("a ledger without the dots adapter refuses every dots action (dots turned o
 		"dots",
 		"other",
 	]);
+});
+
+const taskForm = {
+	projectRef: "project",
+	title: "調査",
+	request: "コードを読んで報告する",
+	completionConditions: "テストが通る\n  \n報告がある",
+	maxSessions: 2,
+};
+
+test("delegated work is requested from an enabled project, listed with what it accepts, and commanded with the row's revision", async () => {
+	const h = await setup();
+	expect(h.rows("dots-tasks")).toEqual([]);
+	expect(h.ledger.source(ARTIFACT, "dots-task-project-options").data).toEqual({
+		options: [{ value: "project", label: "fixture" }],
+	});
+	const created = await h.send("task-create", taskForm);
+	expect(created.request.status).toBe("accepted");
+	const taskId = receiptOf<{ taskId: string; kind: string }>(created).taskId;
+	const row = () => h.rowOf("dots-tasks", "id", taskId);
+	expect(row()).toMatchObject({
+		title: "調査",
+		state: "queued",
+		stateLabel: "受領待ち",
+		request: "コードを読んで報告する",
+		canStart: false,
+		canPause: true,
+		canCancel: true,
+		canForget: true,
+		canAnswer: false,
+	});
+	// The grant is the project's own: its operations, its connection, two sessions, two hours.
+	const saved = h.f.tasks.get(taskId).task;
+	expect(saved.kind).toBe("orchestration");
+	expect(saved).toMatchObject({
+		completionConditions: ["テストが通る", "報告がある"],
+		grant: {
+			connectionRef: "dots",
+			projectRef: "project",
+			operations: ["read", "create_session", "edit", "check"],
+			maxSessions: 2,
+		},
+	});
+	// A project that is not enabled, or does not exist, cannot be requested.
+	expect(
+		(await h.send("task-create", { ...taskForm, projectRef: "nothing" }))
+			.request.errorCode,
+	).toBe("dots_unavailable");
+	expect(h.rows("dots-tasks")).toHaveLength(1);
+
+	const stalePause = await h.send("task-pause", {}, { ...row(), revision: 99 });
+	expect(stalePause.request.errorCode).toBe("revision_conflict");
+	expect(row().state).toBe("queued");
+	expect((await h.send("task-pause", {}, row())).request.status).toBe(
+		"accepted",
+	);
+	expect(["stopping", "paused"]).toContain(String(row().state));
+	const cancelled = await h.send("task-cancel", {}, row());
+	expect(cancelled.request.status).toBe("accepted");
+	const forgotten = await h.send("task-forget", {}, row());
+	expect(forgotten.request.status).toBe("accepted");
+	expect(row()).toMatchObject({ request: "", canForget: false });
+});
+
+test("a waiting question is answered from the task's row, with the question the row carried", async () => {
+	const h = await setup();
+	const r = await h.f.tasks.create(h.f.input());
+	const c = h.f.command(r.taskId);
+	await h.f.dots.claim("dots", {
+		commandId: c.commandId,
+		leaseId: crypto.randomUUID(),
+	});
+	await h.f.dots.report(
+		"dots",
+		h.f.report(c, 1, "session_started", { sessions: [h.f.session] }),
+	);
+	await h.f.dots.report(
+		"dots",
+		h.f.report(c, 2, "blocked", {
+			question: {
+				questionId: "question",
+				prompt: "対象を選んでください",
+				answerType: "choice",
+				choices: ["A", "B"],
+			},
+		}),
+	);
+	await h.f.tasks.recover();
+	await h.f.dots.recover();
+	const row = () => h.rowOf("dots-tasks", "id", r.taskId);
+	expect(row()).toMatchObject({
+		state: "waiting_user",
+		question: "対象を選んでください（選択肢: A / B）",
+		questionId: "question",
+		canAnswer: true,
+		canStart: false,
+	});
+	// A stale row cannot answer; the answer never reaches the task.
+	expect(
+		(await h.send("task-answer", { answer: "A" }, { ...row(), revision: 0 }))
+			.request.errorCode,
+	).toBe("revision_conflict");
+	expect(
+		(await h.send("task-answer", { answer: "A" }, row())).request.status,
+	).toBe("accepted");
+	expect(row()).toMatchObject({ canAnswer: false, question: "" });
+	expect(h.f.command(r.taskId, "answer").snapshot.answer).toEqual({
+		questionId: "question",
+		text: "A",
+	});
+});
+
+test("task commands are for delegated work only, validate their input and refuse conversations", async () => {
+	const h = await setup();
+	const command = { id: "no-such-task", expectedRevision: 0 };
+	for (const operation of ["dots.task-start", "dots.task-forget"])
+		expect(await codeOf(invoke(h, operation, command))).toBe("task_not_found");
+	expect(
+		await codeOf(invoke(h, "dots.task-stop", { ...command, intent: "cancel" })),
+	).toBe("task_not_found");
+	expect(
+		await codeOf(invoke(h, "dots.task-stop", { ...command, intent: "other" })),
+	).toBe("invalid_input");
+	expect(await codeOf(invoke(h, "dots.task-start", { id: "x" }))).toBe(
+		"invalid_input",
+	);
+	expect(
+		await codeOf(invoke(h, "dots.task-create", taskForm, "conversation")),
+	).toBe("capability_unavailable");
+	expect(
+		await codeOf(invoke(h, "dots.task-create", { ...taskForm, extra: 1 })),
+	).toBe("invalid_input");
+	expect(h.f.tasks.list().items).toHaveLength(0);
 });

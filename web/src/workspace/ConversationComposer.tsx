@@ -1,8 +1,8 @@
-import { ChatImageInput } from "./ChatImageInput";
+import { ChatImageInput, ChatImagePreviews } from "./ChatImageInput";
 import { useStore } from "zustand";
 import type { AudioStore } from "../domains/audio";
 import { Button, Textarea } from "../design-system";
-import { describeError, describeTurnStatus } from "../errorMessages";
+import { describeError } from "../errorMessages";
 import type { WorkspaceState } from "./useWorkspace";
 
 function MicLevelMeter({ store }: { store: AudioStore }) {
@@ -67,8 +67,21 @@ export function ConversationComposer({
 				))}
 			</div>
 			<form className="chat-composer" onSubmit={send}>
-				<ChatImageInput state={state} />
-				<div className="composer-row">
+				<ChatImagePreviews state={state} />
+				<Textarea
+					aria-label="メッセージ"
+					value={draft}
+					onChange={(event) => editInput(event.target.value)}
+					onKeyDown={(event) => {
+						if ((event.metaKey || event.ctrlKey) && event.key === "Enter")
+							event.currentTarget.form?.requestSubmit();
+					}}
+					placeholder="メッセージを入力、または話しかけてください"
+					maxLength={8000}
+					rows={4}
+				/>
+				<div className="composer-actions">
+					<ChatImageInput state={state} />
 					<div className="voice-controls">
 						<Button
 							type="button"
@@ -119,18 +132,6 @@ export function ConversationComposer({
 						</Button>
 						<MicLevelMeter store={store} />
 					</div>
-					<Textarea
-						aria-label="メッセージ"
-						value={draft}
-						onChange={(event) => editInput(event.target.value)}
-						onKeyDown={(event) => {
-							if ((event.metaKey || event.ctrlKey) && event.key === "Enter")
-								event.currentTarget.form?.requestSubmit();
-						}}
-						placeholder="メッセージを入力、または話しかけてください"
-						maxLength={8000}
-						rows={2}
-					/>
 					<Button
 						type="submit"
 						disabled={
@@ -143,18 +144,6 @@ export function ConversationComposer({
 					>
 						送信
 					</Button>
-				</div>
-				<div className="composer-meta">
-					<span>
-						{(voice.turn?.status
-							? describeTurnStatus(voice.turn.status)
-							: null) ?? (voice.active ? "音声を待機中" : "待機中")}
-					</span>
-					<span className="composer-shortcut">
-						{automaticInput
-							? "音声入力は自動送信されます"
-							: "⌘/Ctrl + Enter で送信"}
-					</span>
 				</div>
 			</form>
 			{(submit.isError || voice.error || audioError) && (

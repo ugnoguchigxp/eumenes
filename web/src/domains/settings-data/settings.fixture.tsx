@@ -1036,14 +1036,7 @@ export function Screens({
 			<button type="button" onClick={() => setCurrent(null)}>
 				閉じる
 			</button>
-			{[
-				"hub",
-				"conversation",
-				"display",
-				"voice-input",
-				"records",
-				"changes",
-			].map((key) => (
+			{Object.keys(backend.artifacts).map((key) => (
 				<button type="button" key={key} onClick={() => setCurrent(key)}>
 					{`開く:${key}`}
 				</button>

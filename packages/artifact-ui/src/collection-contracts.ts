@@ -8,6 +8,13 @@ export type CollectionRowAction = {
 	confirm?: string;
 	destructive?: boolean;
 	disabled?: boolean;
+	/** Why the action is unavailable right now (shown beside it). */
+	hint?: string;
+	/**
+	 * A digest of the row values the action's input and form start from. The view sends back
+	 * the one it held when the dialog opened; the host refuses it if the row has changed since.
+	 */
+	guard?: string;
 	/** Opens a form for the row first; `values` are the host's prefill from the row. */
 	form?: {
 		fields: CollectionFormField[];
@@ -18,6 +25,8 @@ export type CollectionRow = {
 	id: string;
 	/** Displayed text per column key. */
 	cells: Record<string, string>;
+	/** Media columns: a same-origin `/api/` path and its mime type (fetched on demand). */
+	media?: Record<string, { path: string; mime: string }>;
 	actions: CollectionRowAction[];
 };
 export type CollectionFormField = {
@@ -40,7 +49,9 @@ export type CollectionResource = {
 	kind: "collection";
 	revision: number;
 	title?: string;
-	columns: Array<{ key: string; label: string }>;
+	/** A short note shown above the table. */
+	description?: string;
+	columns: Array<{ key: string; label: string; media?: true }>;
 	rows: CollectionRow[];
 	total: number;
 	/** Present when the source pages, sorts and searches by params. */

@@ -36,6 +36,41 @@ test.afterAll(async () => {
 	if (webDir) rmSync(webDir, { recursive: true, force: true });
 });
 
+test("wide and narrow composer keeps upload below the full-width input", async ({
+	page,
+}) => {
+	await page.goto(origin);
+	const attach = page.getByRole("button", { name: "ファイルを添付" });
+	const textarea = page.getByRole("textbox", { name: "メッセージ" });
+	const composer = page.locator(".chat-composer");
+	const send = page.getByRole("button", { name: "送信", exact: true });
+	await expect(composer.getByText("待機中")).toHaveCount(0);
+	await expect(composer.getByText("⌘/Ctrl + Enter で送信")).toHaveCount(0);
+	for (const width of [1280, 390]) {
+		await page.setViewportSize({ width, height: 844 });
+		const frame = await composer.boundingBox();
+		const field = await textarea.boundingBox();
+		const upload = await attach.boundingBox();
+		const submit = await send.boundingBox();
+		expect(frame && field && upload && submit).toBeTruthy();
+		expect(field!.width).toBeGreaterThan(frame!.width - 32);
+		expect(upload!.y).toBeGreaterThan(field!.y + field!.height - 1);
+		expect(upload!.x).toBeLessThan(frame!.x + 70);
+		expect(submit!.x).toBeGreaterThan(upload!.x);
+		await page.screenshot({ path: `test-results/composer-${width}.png` });
+	}
+	await expect(attach).toHaveAttribute(
+		"title",
+		"ファイルを添付（現在はJPG・PNG・BMP画像に対応）",
+	);
+	await expect(attach.locator("svg")).toBeVisible();
+	const fileChooser = page.waitForEvent("filechooser");
+	await attach.click();
+	expect(await (await fileChooser).element().getAttribute("accept")).toBe(
+		"image/jpeg,image/png,image/bmp,.jpg,.jpeg,.png,.bmp",
+	);
+});
+
 test("full chat paste and drop, picker, thumbnail removal, image-only send, reload and past-image resend", async ({
 	page,
 }) => {

@@ -148,6 +148,19 @@ export type LedgerContext = {
 export function hmacDigest(key: Uint8Array, identity: string) {
 	return `hmac:${createHmac("sha256", key).update(identity).digest("hex")}`;
 }
+const isEmpty = (v: unknown) =>
+	v === undefined ||
+	v === null ||
+	v === "" ||
+	(Array.isArray(v) && v.length === 0) ||
+	(isRecord(v) && Object.keys(v).length === 0);
+/** True when the input carries a non-empty value under any confidential top-level key. */
+export function hasSecret(input: unknown, confidential: readonly string[]) {
+	return (
+		isRecord(input) &&
+		confidential.some((key) => key in input && !isEmpty(input[key]))
+	);
+}
 /** The input with each confidential top-level key replaced by a marker (never the value). */
 export function redactInput(input: unknown, confidential: readonly string[]) {
 	if (!isRecord(input) || !confidential.length) return input;

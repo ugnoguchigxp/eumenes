@@ -1,6 +1,6 @@
 {
 	"files": {
-		"api/application/server.ts": 852,
+		"api/application/server.ts": 856,
 		"api/domains/inference/service/index.ts": 802,
 		"api/domains/larm/service/index.ts": 993,
 		"api/domains/world/service/world-claims.ts": 837

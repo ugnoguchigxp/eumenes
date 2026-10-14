@@ -1,0 +1,46 @@
+{
+  "scope": "言い直し中の未送信文の表示保持と、入力判定失敗の理由表示",
+  "date": "2026-10-14",
+  "findings": [
+    "途中認識の本文だけで入力欄全体を置換し、前の未送信文が判定前に見えなくなっていた",
+    "最終音声のアップロード開始時に途中認識を消していた",
+    "言語判定が拒否したdraftのerrorを画面へ反映せず、後から続き待ちの案内を表示していた"
+  ],
+  "changes": [
+    "サーバーから取得した未送信文を表示用に保持し、途中認識と最終認識の判定待ちの間は新しい断片と併記する",
+    "サーバーの判定後は確定した本文に置換する。別の発話という判定も尊重し、表示用の連結文を自動送信には使わない",
+    "アップロード開始時にも途中認識の表示を保持する",
+    "draftの拒否理由を表示し、続き待ち案内で上書きしない。次の発話開始時には古い案内を消す"
+  ],
+  "before": {
+    "command": "bun x vitest run web/src/domains/voice-dialogue/test/corrections.test.tsx",
+    "tests": 2,
+    "failed": 2,
+    "failures": ["前の未送信文が途中認識で消える", "言語拒否のエラーが表示されない"]
+  },
+  "after": {
+    "voice_backend_tests_passed": 71,
+    "voice_web_tests_passed": 45,
+    "browser_tests_passed": 3,
+    "browser_cases": [
+      "voice-input.spec.ts: 録音が終わる前の途中認識で3断片を保持し、確定後は会話入力1件・回答1件になる",
+      "voice.spec.ts: 途中認識後の手入力を最終認識で上書きしない",
+      "voice.spec.ts: 1秒の間を含む長い発話を一度だけ送る"
+    ],
+    "typecheck": "pass: 619 files",
+    "format_lint_size_budget": "pass for voice-dialogue; browser fixture format/lint also pass",
+    "domain_verify_overall": "not passed: 2 runs completed all checks, but source changed during verification due to concurrent unrelated edits"
+  },
+  "unchanged": [
+    "LLMへの言語・継続関係・回答可能性の指示",
+    "信頼度の閾値と許可言語",
+    "古い結果・取消・権限失効・重複送信の検査",
+    "認識結果の保存と自動送信の本文・条件"
+  ],
+  "limits": [
+    "合成入力と固定Provider応答によるfixture試験。実マイク・実Providerでの今回の修正後の受入は未実施",
+    "LLMが続き待ち・判断保留・言語拒否と判定した場合の自動送信停止は維持している",
+    "ASR後の判定速度や精度が改善したとは主張しない",
+    "最新実利用ログでは言語拒否、draft、awaiting_inputを経てinput_readyと回答生成に進んでいた。恒久的な送信停止はそのログからは確認できない"
+  ]
+}

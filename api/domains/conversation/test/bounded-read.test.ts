@@ -60,20 +60,23 @@ test("an invalid stored delivery is dropped for that row only", async () => {
 	});
 });
 
-test("get keeps the newest 2000 messages and reports hasMore", async () => {
+test("get keeps the newest 200 messages and reports hasMore", async () => {
 	await withService(async (service, store) => {
 		await service.append(msg(0));
 		await store.write((db) => {
 			const insert = db.query(
 				"INSERT INTO messages (id, conversation_id, role, text, created_at, run_id) VALUES (?, 'c1', 'user', ?, '2026-01-01T00:00:00Z', NULL)",
 			);
-			for (let n = 1; n <= 2000; n++) insert.run(`m${n}`, `t${n}`);
+			for (let n = 1; n < 200; n++) insert.run(`m${n}`, `t${n}`);
 		});
+		expect(service.get("c1").messages).toHaveLength(200);
+		expect(service.get("c1").hasMore).toBeUndefined();
+		await service.append(msg(200));
 		const conversation = service.get("c1");
-		expect(conversation.messages).toHaveLength(2000);
+		expect(conversation.messages).toHaveLength(200);
 		expect(conversation.hasMore).toBe(true);
 		expect(conversation.messages[0]?.id).toBe("m1");
-		expect(conversation.messages.at(-1)?.id).toBe("m2000");
+		expect(conversation.messages.at(-1)?.id).toBe("m200");
 	});
 });
 

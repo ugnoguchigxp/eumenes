@@ -23,9 +23,9 @@ test("three paused ASR fragments create one conversation request and one answer"
 	page,
 }) => {
 	const fragments = [
-		"じゃあ今日は。",
-		"イラン側の。",
-		"最新のニュースを教えてください。",
+		"明日の予定を。",
+		"いえ、来週の予定を。",
+		"教えてください。",
 	];
 	await fetch(`http://127.0.0.1:${larmPort}/fixture/voice-inputs`, {
 		method: "POST",
@@ -57,15 +57,16 @@ test("three paused ASR fragments create one conversation request and one answer"
 					oscillator.connect(gain);
 					gain.connect(output);
 					oscillator.start();
-					setTimeout(() => oscillator.stop(), 550);
+					Reflect.set(window, "finishSpeech", () => oscillator.stop());
 				});
 				return output.stream;
 			},
 		});
 	});
 	// Provisional recognition must not consume the scripted final-ASR responses.
+	let preview = "";
 	await page.route("**/api/voice/preview", (route) =>
-		route.fulfill({ json: { utteranceId: "preview", text: "" } }),
+		route.fulfill({ json: { utteranceId: "preview", text: preview } }),
 	);
 	const ids: string[] = [],
 		commits: string[] = [];
@@ -88,13 +89,23 @@ test("three paused ASR fragments create one conversation request and one answer"
 		() => typeof Reflect.get(window, "triggerSpeech") === "function",
 	);
 	for (let i = 0; i < 3; i++) {
+		preview = fragments[i]!;
 		await page.evaluate(() => Reflect.get(window, "triggerSpeech")());
+		// While the next segment is still being recorded, earlier input stays visible.
+		await expect(page.getByRole("textbox", { name: "メッセージ" })).toHaveValue(
+			fragments.slice(0, i + 1).join("\n"),
+		);
+		expect(ids).toHaveLength(i); // This is a preview, not the final ASR result.
+		await page.evaluate(() => Reflect.get(window, "finishSpeech")());
 		await expect.poll(() => ids.length).toBe(i + 1);
 		if (i < 2) {
 			await expect
 				.poll(async () => (await getTurn(ids[i]!)).status)
 				.toBe("awaiting_input");
 			expect(commits).toHaveLength(0);
+			await expect(
+				page.getByRole("textbox", { name: "メッセージ" }),
+			).toHaveValue(fragments.slice(0, i + 1).join("\n"));
 		}
 	}
 	await expect.poll(() => commits.length).toBe(1);

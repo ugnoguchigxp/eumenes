@@ -156,6 +156,14 @@ function pageOf(rows: ItemRow[], query: z.infer<typeof page>) {
 	};
 }
 
+/** The rendered context text is shown in full up to this many characters. */
+const CONTEXT_TEXT_CHARS = 1500;
+const clip = (text: string) =>
+	text === ""
+		? "（空）"
+		: text.length > CONTEXT_TEXT_CHARS
+			? `${text.slice(0, CONTEXT_TEXT_CHARS)}…（以降は省略）`
+			: text;
 const bytes = (used: number, limit: number) => `${used} / ${limit} byte`;
 const sha256 = (value: unknown) =>
 	createHash("sha256").update(JSON.stringify(value)).digest("hex");
@@ -400,10 +408,10 @@ export function createMemoryAdapter(ports: MemoryAdapterPorts): DomainAdapter {
 				case CONTEXT: {
 					const window = memory.storedContext(conversationId);
 					const state = !window
-						? "まだ組み立てていません（次の会話の準備時に作られます）"
+						? "まだ組み立てていません。会話の次のターンの準備で組み立てられ、その後ここに表示されます"
 						: window.disabled
 							? "メモリーを利用していないため、文脈は組み立てていません"
-							: "組み立て済み";
+							: "組み立て済み（直近に組み立てた版です）";
 					const built = window && !window.disabled ? window : undefined;
 					return {
 						revision: 0,
@@ -421,6 +429,8 @@ export function createMemoryAdapter(ports: MemoryAdapterPorts): DomainAdapter {
 										: undefined,
 									pendingAdditions: built?.shortTerm.pendingAdditions,
 									notices: built?.notices,
+									longTermText: built ? clip(built.longTerm.text) : undefined,
+									shortTermText: built ? clip(built.shortTerm.text) : undefined,
 								},
 							],
 						},

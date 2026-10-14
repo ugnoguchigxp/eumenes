@@ -671,6 +671,21 @@ export function createInference(
 		cancelProbe(id: string) {
 			probeControllers.get(id)?.abort();
 		},
+		/**
+		 * Mark a running probe as being cancelled inside the caller's writer transaction. The
+		 * caller aborts it (`cancelProbe`) after the commit, only if the mark is still there.
+		 */
+		cancelProbeInTransaction(db: Database, id: string) {
+			const changed = db
+				.query(
+					"UPDATE inference_probes SET status='cancelling' WHERE id=? AND status='running'",
+				)
+				.run(id).changes;
+			if (changed) return;
+			if (!db.query("SELECT 1 FROM inference_probes WHERE id=?").get(id))
+				throw new Error("probe_not_found");
+			throw new Error("probe_not_running");
+		},
 		async recover() {
 			await store.write((db) => {
 				db.query(
@@ -680,7 +695,7 @@ export function createInference(
 					"UPDATE inference_attempts SET status='interrupted',ended=? WHERE status='running'",
 				).run(Date.now());
 				db.query(
-					"UPDATE inference_probes SET status='interrupted' WHERE status='running'",
+					"UPDATE inference_probes SET status='interrupted' WHERE status IN ('running','cancelling')",
 				).run();
 			});
 		},

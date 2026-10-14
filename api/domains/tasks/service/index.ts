@@ -62,6 +62,9 @@ export function createTasks(store: SqliteStore, options: TasksOptions = {}) {
 		questionInTransaction: (tx: Database, questionId: string) =>
 			repo.question(tx, questionId),
 		openQuestionInTransaction: repo.openQuestion,
+		/** The newest tasks of every kind, for a screen that reads inside a transaction. */
+		listInTransaction: (tx: Database, limit = 100) =>
+			repo.list(tx, { limit }).map((row) => row.task),
 		assertFenceInTransaction: core.fence,
 		create: (input: CreateTask, context?: TrustedTaskContext) =>
 			writeCommand(

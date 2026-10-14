@@ -5,6 +5,7 @@ import type { EumenesClient } from "../../../../client";
 import {
 	createdId,
 	findRow,
+	guardOf,
 	parseForm,
 	rowInput,
 	withOptions,
@@ -106,6 +107,22 @@ export function useCollectionActions({
 				);
 				if (row === undefined)
 					return refuse("対象が見つかりません。一覧を更新してください。");
+				if (
+					rowAction?.requiresCleanDraft &&
+					collections.isDirty(rowAction.requiresCleanDraft)
+				)
+					return refuse("未適用の変更を適用してから確認してください。");
+				// The row must still hold what it held when the dialog opened.
+				if (
+					String(event.values.guard ?? "") !== guardOf(rowAction!, binding, row)
+				) {
+					collections.reload();
+					return {
+						status: "conflict",
+						message:
+							"状態が変わりました。最新の表示を確認して、もう一度操作してください。",
+					};
+				}
 			}
 			input = rowInput(binding, row);
 			if (form.length > 0) {
@@ -169,13 +186,14 @@ export function useCollectionActions({
 			});
 			if (outcome.kind === "accepted") {
 				if (outcome.result) {
+					// A one-time value is shown first: nothing after this may lose it.
+					reveal(outcome.result.receipt);
 					await getLatest().state.settled(
 						binding,
 						outcome.result,
 						timing,
 						input,
 					);
-					reveal(outcome.result.receipt);
 				}
 				collections.reload();
 			} else if (outcome.kind === "rejected" && outcome.conflict) {

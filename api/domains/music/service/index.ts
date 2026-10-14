@@ -8,6 +8,9 @@ import type { LarmPlayground } from "../../larm";
 import type { MusicRecord } from "../contracts";
 import { row, byRun, record, patch, list } from "../repository";
 import { registerMusicHandlers } from "./handlers";
+/** Read-only source for registered music screens; the music domain owns this query. */
+export const musicListInTransaction = (db: Database, conversationId: string) =>
+	list(db, conversationId);
 const active = (r: MusicRecord) =>
 	r.state === "planning" || r.state === "generating";
 export function createMusic(deps: {

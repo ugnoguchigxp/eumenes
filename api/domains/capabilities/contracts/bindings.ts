@@ -304,6 +304,8 @@ export type FormFieldV1 = z.infer<typeof formFieldV1>;
 export const collectionV1 = z.strictObject({
 	source: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/),
 	title: z.string().max(80).optional(),
+	/** A short note shown above the list (e.g. that registering sends data to a cloud API). */
+	description: z.string().max(400).optional(),
 	/** The row field holding its stable id. */
 	rowKey: z.string().regex(/^[A-Za-z][A-Za-z0-9_.]{0,80}$/),
 	/** Where the rows are inside the source data (default: the data itself is the array). */
@@ -316,8 +318,12 @@ export const collectionV1 = z.strictObject({
 			z.strictObject({
 				key: z.string().regex(/^[A-Za-z][A-Za-z0-9_.]{0,80}$/),
 				label: z.string().min(1).max(60),
+				/**
+				 * media: the row value is `{ path, mime }` from the adapter, a same-origin `/api/` path
+				 * the host fetches with the session's authorization and previews (image/audio).
+				 */
 				format: z
-					.enum(["text", "date", "number", "boolean", "badge"])
+					.enum(["text", "date", "number", "boolean", "badge", "media"])
 					.default("text"),
 			}),
 		)
@@ -329,6 +335,11 @@ export const collectionV1 = z.strictObject({
 				actionId: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/),
 				/** Asked before the action is sent (e.g. deletes). */
 				confirm: z.string().max(200).optional(),
+				/**
+				 * Disabled while the shared draft of this document has unapplied changes (e.g. a
+				 * connection probe that tests the saved settings, not the draft).
+				 */
+				requiresCleanDraft: hostRef("document").optional(),
 				/**
 				 * Opens a form for the row before sending (row edit). Its values join the input built
 				 * by the action's rowInput; `prefill` fills the form from the row by fixed paths.

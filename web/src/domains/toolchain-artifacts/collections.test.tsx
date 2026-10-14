@@ -5,6 +5,7 @@ import {
 	render,
 	screen,
 	waitFor,
+	within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { ArtifactDefinitionV1 } from "../../../../api/domains/capabilities/contracts";
@@ -100,6 +101,7 @@ const artifact = {
 			rowActions: [
 				{ actionId: "delete", confirm: "この読み方を削除しますか？" },
 				{ actionId: "restore", when: { key: "state", in: ["removed"] } },
+				{ actionId: "reindex", requiresCleanDraft: DOC },
 				{
 					actionId: "edit-entry",
 					form: {
@@ -169,6 +171,7 @@ const artifact = {
 			rowInput: { id: "$row.id" },
 		}),
 		write("restore", { label: "戻す", rowInput: { id: "$row.id" } }),
+		write("reindex", { label: "再構築", rowInput: { id: "$row.id" } }),
 		write("save", {
 			label: "登録",
 			confidentialFields: ["token"],
@@ -453,4 +456,60 @@ test("a row action with a form opens it prefilled from the row and sends the reg
 		spoken: "とーきょー",
 	});
 	await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+});
+
+test("a dialog acts on the row as it was when it opened: a changed row is refused and the dialog stays", async () => {
+	const { submit, client } = setup();
+	await screen.findByText("東京");
+	fireEvent.click(screen.getByRole("button", { name: "編集: 東京" }));
+	const dialog = await screen.findByRole("dialog");
+	// The row changes behind the open dialog and the list is read again.
+	page.items[0]!.spoken = "とーきょー";
+	const search = screen.getByLabelText("辞書を検索");
+	fireEvent.change(search, { target: { value: "京" } });
+	fireEvent.submit(search.closest("form")!);
+	await waitFor(() =>
+		expect(client.toolchainArtifactSource).toHaveBeenCalledWith(
+			REV,
+			"dictionary-list",
+			undefined,
+			expect.anything(),
+			expect.objectContaining({ q: "京" }),
+		),
+	);
+	fireEvent.submit(dialog.querySelector("form")!);
+	await within(dialog).findByText(/状態が変わりました/);
+	expect(submit).not.toHaveBeenCalled();
+	expect(screen.getByRole("dialog")).toBeTruthy();
+	page.items[0]!.spoken = "とうきょう";
+});
+
+test("a confirmation also stays open, with the reason, when its row changed meanwhile", async () => {
+	const { submit } = setup();
+	await screen.findByText("東京");
+	fireEvent.click(screen.getByRole("button", { name: "削除: 東京" }));
+	await screen.findByRole("button", { name: "実行する" });
+	page.items[0]!.spoken = "ちがう読み";
+	const search = screen.getByLabelText("辞書を検索");
+	fireEvent.change(search, { target: { value: "東" } });
+	fireEvent.submit(search.closest("form")!);
+	await waitFor(() => expect(page.items[0]!.spoken).toBe("ちがう読み"));
+	fireEvent.click(screen.getByRole("button", { name: "実行する" }));
+	const dialog = await screen.findByRole("dialog");
+	await within(dialog).findByText(/状態が変わりました/);
+	expect(submit).not.toHaveBeenCalled();
+	page.items[0]!.spoken = "とうきょう";
+});
+
+test("a row action that needs a clean draft waits while the draft has unapplied changes", async () => {
+	const { submit } = setup();
+	await screen.findByText("東京");
+	const button = () => screen.getAllByRole("button", { name: /^再構築/ })[0]!;
+	expect(button()).toHaveProperty("disabled", false);
+	fireEvent.click(await screen.findByLabelText("辞書を使う"));
+	await waitFor(() => expect(button()).toHaveProperty("disabled", true));
+	expect(
+		screen.getAllByText("未適用の変更を適用してから確認してください").length,
+	).toBeGreaterThan(0);
+	expect(submit).not.toHaveBeenCalled();
 });
