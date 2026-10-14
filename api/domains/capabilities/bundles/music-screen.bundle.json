@@ -17,6 +17,59 @@
 					"definition": {
 						"view": "music-workspace",
 						"source": "music-studio",
+						"title": "楽曲生成"
+					}
+				}
+			],
+			"defaultVariant": "standard",
+			"sourceBindings": [
+				{
+					"source": "music-studio",
+					"adapterRef": "adapter:music-screen@1",
+					"query": "query:music-screen.list@1",
+					"target": "none"
+				}
+			],
+			"actionBindings": [
+				{
+					"actionId": "select",
+					"eventAction": "music-select",
+					"source": "music-studio",
+					"inputSchemaRef": "schema:music-screen-select@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "generate",
+					"eventAction": "music-generate",
+					"source": "music-studio",
+					"inputSchemaRef": "schema:music-screen-generate@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "cancel",
+					"eventAction": "music-cancel",
+					"source": "music-studio",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				}
+			],
+			"launcher": {
+				"label": "楽曲生成",
+				"order": 30
+			}
+		},
+		{
+			"kind": "artifact",
+			"id": "music.generation",
+			"revision": 2,
+			"title": "楽曲生成",
+			"variants": [
+				{
+					"id": "standard",
+					"label": "標準",
+					"definition": {
+						"view": "music-workspace",
+						"source": "music-studio",
 						"title": "楽曲生成",
 						"creationOptions": {
 							"genreGroups": [
@@ -185,6 +238,13 @@
 					"eventAction": "music-cancel",
 					"source": "music-studio",
 					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				},
+				{
+					"actionId": "artwork",
+					"eventAction": "music-artwork",
+					"source": "music-studio",
+					"inputSchemaRef": "schema:music-screen-select@1",
 					"effect": "local"
 				}
 			],

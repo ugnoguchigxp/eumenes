@@ -7,9 +7,12 @@ afterEach(() => {
 	cleanup();
 	window.history.replaceState(null, "", "/");
 });
-const editor = { drawing: { revision: 3 } } as ReturnType<
-	typeof useDrawingEditor
->;
+const editorOf = (referenceId: string) =>
+	({
+		frameId: referenceId,
+		referenceId,
+		drawing: { revision: 3 },
+	}) as ReturnType<typeof useDrawingEditor>;
 test("an embedded editor reloads its confirmed revision and retains the conversation", () => {
 	const referenceId = crypto.randomUUID();
 	window.history.replaceState(
@@ -17,7 +20,7 @@ test("an embedded editor reloads its confirmed revision and retains the conversa
 		"",
 		`/excalidraw?embedded=1#drawing/${referenceId}?revision=1&conversationId=design`,
 	);
-	renderHook(() => useDrawingBridge(true, referenceId, editor));
+	renderHook(() => useDrawingBridge(true, editorOf(referenceId)));
 	expect(window.location.pathname).toBe("/excalidraw");
 	expect(window.location.search).toBe("?embedded=1");
 	expect(window.location.hash).toBe(
@@ -27,6 +30,6 @@ test("an embedded editor reloads its confirmed revision and retains the conversa
 test("a standalone historical link keeps its requested revision", () => {
 	const referenceId = crypto.randomUUID();
 	window.history.replaceState(null, "", `/#drawing/${referenceId}?revision=1`);
-	renderHook(() => useDrawingBridge(false, referenceId, editor));
+	renderHook(() => useDrawingBridge(false, editorOf(referenceId)));
 	expect(window.location.hash).toBe(`#drawing/${referenceId}?revision=1`);
 });

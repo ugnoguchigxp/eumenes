@@ -173,7 +173,7 @@ const model = {
 		: {}),
 };
 const codex = createCodexResearch(process.env);
-if (!codex && cases.some((c) => c.id === "luna"))
+if (!codex && cases.some((c) => c.expectedPackage === "package:web.search@1"))
 	throw new Error("codex_unavailable");
 const acquire = createWebAcquisition();
 let operations: Array<{

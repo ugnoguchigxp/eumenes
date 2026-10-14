@@ -49,10 +49,12 @@ import {
 	describeObjectRecognitionScreenAdapter,
 	OBJECT_RECOGNITION_SCREEN_ADAPTER_REF,
 } from "./object-recognition-screen-adapter";
+import { describeUiCompositionsAdapter, UI_COMPOSITIONS_ADAPTER_REF, uiCompositionsDomainSchemas } from "./ui-compositions-adapter";
 
 /** `domain:` result schemas registered by the host's adapters. */
 const domainSchemas: Readonly<Record<string, ZodType>> = {
 	...timerDomainSchemas,
+	...uiCompositionsDomainSchemas,
 };
 
 /** What this host can execute, for checking bundles before they are registered. */
@@ -101,6 +103,7 @@ export const hostAdapterDescriptions: Array<
 	{ ref: INFERENCE_ADAPTER_REF, describe: describeInferenceAdapter },
 	{ ref: MUSIC_SCREEN_ADAPTER_REF, describe: describeMusicScreenAdapter },
 	{ ref: IMAGE_SCREEN_ADAPTER_REF, describe: describeImageScreenAdapter },
+	{ ref: UI_COMPOSITIONS_ADAPTER_REF, describe: describeUiCompositionsAdapter },
 	{
 		ref: OBJECT_RECOGNITION_SCREEN_ADAPTER_REF,
 		describe: describeObjectRecognitionScreenAdapter,

@@ -22,6 +22,7 @@ function setup(
 		empty?: boolean;
 		other?: boolean;
 		targetRef?: string;
+		prompt?: string;
 	} = {},
 ) {
 	vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:audio");
@@ -35,6 +36,10 @@ function setup(
 					state,
 					title: "曲",
 					description: "制作意図",
+					prompt: options.prompt ?? null,
+					artwork: undefined as
+						| { state: string; revision: number; errorCode: null }
+						| undefined,
 					durationSeconds: 30,
 					mime: "audio/ogg",
 					createdAt: 1,
@@ -58,8 +63,14 @@ function setup(
 			];
 	const run = { id: "new-run", status: "queued", revision: 1 };
 	const api = {
-		musicList: vi.fn(async () => items),
+		musicList: vi.fn(async () => structuredClone(items)),
 		musicAudio: vi.fn(async () => new Blob(["fixture"])),
+		musicArtwork: vi.fn(async () => new Blob(["png"])),
+		generateMusicArtwork: vi.fn(async (_id: string) => {
+			items[0]!.artwork = { state: "completed", revision: 1, errorCode: null };
+			items[0]!.updatedAt = 3;
+			return items[0];
+		}),
 		submit: vi.fn(
 			async (_input: {
 				requestId: string;
@@ -235,4 +246,28 @@ test("duplicate and simultaneous dispatches cannot create a second request", asy
 		await first;
 	});
 	expect(r.api.submit).toHaveBeenCalledTimes(1);
+});
+test("artwork is requested for the selected completed track and its image is shown by the host", async () => {
+	const r = setup("completed", { prompt: "雨の夜のピアノ" });
+	await waitFor(() => expect(r.resource().creation?.canArtwork).toBe(true));
+	expect(r.resource().tracks[0]!.artworkUrl).toBeUndefined();
+	expect(
+		await r.dispatch(r.event("music-artwork", { id: "missing" })),
+	).toMatchObject({ status: "rejected" });
+	expect(await r.dispatch(r.event("music-artwork", { id: "a" }))).toMatchObject(
+		{ status: "accepted" },
+	);
+	expect(r.api.generateMusicArtwork).toHaveBeenCalledWith("a");
+	await waitFor(() =>
+		expect(r.resource().tracks[0]).toMatchObject({
+			artworkStatus: "completed",
+			artworkUrl: "blob:audio",
+		}),
+	);
+	expect(r.api.musicArtwork).toHaveBeenCalledWith("a", expect.anything());
+	const none = setup("completed");
+	await waitFor(() => expect(none.resource()).toBeTruthy());
+	expect(
+		await none.dispatch(none.event("music-artwork", { id: "a" })),
+	).toMatchObject({ status: "rejected" });
 });

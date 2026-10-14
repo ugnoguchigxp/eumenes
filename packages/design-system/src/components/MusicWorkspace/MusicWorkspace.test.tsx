@@ -7,6 +7,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { MusicWorkspace } from "./MusicWorkspace";
+import type { PlaylistTrack } from "../MusicPlayer";
 
 const tracks = [
 	{
@@ -105,7 +106,7 @@ it("shows supplied artwork and paginates many tracks without adding another play
 	).not.toBeInTheDocument();
 	expect(r.container.querySelectorAll("audio")).toHaveLength(1);
 });
-it("reuses the player for creation and history, shows a disabled artwork mock, and reuses a saved prompt without interpreting it", () => {
+it("reuses the player for creation and history, and reuses a saved prompt without interpreting it", () => {
 	const r = setup();
 	r.rerender(
 		<MusicWorkspace
@@ -127,9 +128,8 @@ it("reuses the player for creation and history, shows a disabled artwork mock, a
 	).toBeVisible();
 	fireEvent.click(screen.getByRole("button", { name: "楽曲イメージ" }));
 	expect(
-		screen.getByRole("img", { name: "楽曲イメージのモック" }),
-	).toBeInTheDocument();
-	expect(screen.getByRole("button", { name: "イメージを作成" })).toBeDisabled();
+		screen.queryByRole("button", { name: "イメージを作成" }),
+	).not.toBeInTheDocument();
 	fireEvent.click(screen.getByRole("button", { name: "生成履歴" }));
 	fireEvent.click(
 		screen.getByRole("button", { name: "この曲のプロンプトを使う" }),
@@ -140,4 +140,53 @@ it("reuses the player for creation and history, shows a disabled artwork mock, a
 	expect(r.container.querySelector("audio")).toBe(audio);
 	fireEvent.click(screen.getByRole("button", { name: "Visualizer" }));
 	expect(r.container.querySelector("audio")).toBe(audio);
+});
+it("requests artwork from the track's prompt, shows progress, and offers regeneration with the title", () => {
+	const onArtwork = vi.fn();
+	const r = setup();
+	const base = { ...tracks[0]!, prompt: "雨の夜のピアノ" };
+	const show = (track: PlaylistTrack) =>
+		r.rerender(
+			<MusicWorkspace
+				{...r.props}
+				tracks={[track, tracks[1]!]}
+				onArtwork={onArtwork}
+			/>,
+		);
+	show(base);
+	fireEvent.click(screen.getByRole("button", { name: "楽曲イメージ" }));
+	fireEvent.click(screen.getByRole("button", { name: "イメージを作成" }));
+	expect(onArtwork).toHaveBeenCalledWith(base.id);
+	r.rerender(
+		<MusicWorkspace
+			{...r.props}
+			busy
+			tracks={[base, tracks[1]!]}
+			onArtwork={onArtwork}
+		/>,
+	);
+	expect(screen.getByText("楽曲イメージを生成しています。")).toBeVisible();
+	expect(screen.getByRole("button", { name: "生成中" })).toBeDisabled();
+	show({ ...base, artworkStatus: "generating" });
+	expect(screen.getByText("楽曲イメージを生成しています。")).toBeVisible();
+	expect(screen.getByRole("button", { name: "生成中" })).toBeDisabled();
+	show({ ...base, artworkStatus: "failed" });
+	expect(screen.getByRole("alert")).toHaveTextContent(
+		"楽曲イメージを作成できませんでした。",
+	);
+	show({
+		...base,
+		artworkStatus: "completed",
+		artworkUrl: "blob:artwork",
+	});
+	expect(
+		screen.getByRole("img", { name: `${base.title}の楽曲イメージ` }),
+	).toHaveAttribute("src", "blob:artwork");
+	expect(
+		screen.getByRole("figure").querySelector("figcaption"),
+	).toHaveTextContent(base.title);
+	fireEvent.click(screen.getByRole("button", { name: "作り直す" }));
+	expect(onArtwork).toHaveBeenCalledTimes(2);
+	show({ ...base, prompt: undefined });
+	expect(screen.getByRole("button", { name: "イメージを作成" })).toBeDisabled();
 });

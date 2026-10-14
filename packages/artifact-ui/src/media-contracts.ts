@@ -8,6 +8,8 @@ export type MusicResource = {
 		title?: string;
 		description?: string;
 		canCancel?: boolean;
+		/** The host can generate artwork from a completed track's prompt. */
+		canArtwork?: boolean;
 	};
 	library?: {
 		filter: {
@@ -35,6 +37,7 @@ export type MusicResource = {
 		createdAt?: string;
 		favorite?: boolean;
 		artworkUrl?: string;
+		artworkStatus?: "generating" | "completed" | "failed";
 		lyrics?: string;
 		prompt?: string;
 		model?: string;

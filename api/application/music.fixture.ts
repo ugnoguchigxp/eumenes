@@ -1,5 +1,7 @@
 import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { createLarmPlayground, type LarmPort } from "../domains/larm";
+import { png } from "./image.fixture";
 export const musicQuestion = "Tetrisをテーマにした30秒の楽曲を作って";
 export const musicTestPlan = {
 	title: "落ちるブロックのリズム",
@@ -16,7 +18,11 @@ export function musicFixture(
 		| "cancel"
 		| "invalid-plan"
 		| "correctable-plan" = "success",
-	fixtureOptions: { plan?: Record<string, unknown>; question?: string } = {},
+	fixtureOptions: {
+		plan?: Record<string, unknown>;
+		question?: string;
+		artworkFailure?: boolean;
+	} = {},
 ) {
 	const requests: Array<{ method: string; path: string; body: unknown }> = [];
 	const stages: string[] = [];
@@ -25,6 +31,7 @@ export function musicFixture(
 			new URL("../../tests/browser/fixtures/silence.opus", import.meta.url),
 		),
 	);
+	const artwork = png(256, 256);
 	const gateway = () =>
 		createLarmPlayground({
 			baseUrl: "http://127.0.0.1:9999",
@@ -49,19 +56,57 @@ export function musicFixture(
 								id: "music",
 								providers: [],
 								services:
-									u.searchParams.get("profile") === "SAAA-w-music"
+									u.searchParams.get("profile") === "SAAA-w-Image"
 										? [
 												{
-													name: "music",
-													model: "fixture-music",
-													protocol: "larm.music-generation.v1",
-													capability: "media.music.generate",
-													endpoint: "/v1/music/generations",
+													name: "image",
+													capability: "media.image.generate",
+													protocol: "larm.image-generation.v1",
+													endpoint: "/v1/images/generations",
+													url: "/v1/images/generations",
+													model: "qwen-image-2.1-turbo",
+													description:
+														"Qwen Image, synchronous POST, exact dimensions, PNG/WebP",
 												},
 											]
-										: [],
+										: u.searchParams.get("profile") === "SAAA-w-music"
+											? [
+													{
+														name: "music",
+														model: "fixture-music",
+														protocol: "larm.music-generation.v1",
+														capability: "media.music.generate",
+														endpoint: "/v1/music/generations",
+													},
+												]
+											: [],
 							},
 						],
+					});
+				if (path === "/v1/images/generations")
+					return fixtureOptions.artworkFailure
+						? new Response(null, { status: 503 })
+						: Response.json({
+								status: "succeeded",
+								artifact: {
+									id: "artwork",
+									width: body.width,
+									height: body.height,
+									format: "png",
+									mimeType: "image/png",
+									createdAt: "2026-10-14T00:00:00Z",
+									hasAlpha: false,
+									bytes: artwork.length,
+									sha256: createHash("sha256").update(artwork).digest("hex"),
+									model: "qwen-image-2.1-turbo",
+									contentUrl: "/v1/image-artifacts/artwork/content",
+								},
+							});
+				if (path === "/v1/image-artifacts/artwork" && method === "DELETE")
+					return Response.json({ id: "artwork", deleted: true });
+				if (path === "/v1/image-artifacts/artwork/content")
+					return new Response(artwork, {
+						headers: { "Content-Type": "image/png" },
 					});
 				if (path === "/v1/music/generations") {
 					if (mode === "failure")
@@ -139,5 +184,5 @@ export function musicFixture(
 				: "楽曲を生成できませんでした。";
 		},
 	};
-	return { model, gateway, requests, stages, audio };
+	return { model, gateway, requests, stages, audio, artwork };
 }

@@ -20,7 +20,7 @@ function crc(bytes: Uint8Array) {
 	}
 	return (c ^ 0xffffffff) >>> 0;
 }
-function png(width: number, height: number) {
+export function png(width: number, height: number) {
 	const chunk = (name: string, data: Uint8Array) => {
 		const body = Buffer.concat([Buffer.from(name), data]);
 		const a = Buffer.alloc(8);

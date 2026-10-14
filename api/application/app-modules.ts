@@ -8,6 +8,7 @@ import {
 } from "../domains/object-recognition";
 import { CONVERSATION_DEFAULT_PRINCIPAL } from "../domains/conversation/contracts";
 import { registerImage, type ImageService } from "../domains/image";
+import { registerUiCompositions, type UiCompositionsService } from "../domains/ui-compositions";
 import { registerMusic, type MusicService } from "../domains/music";
 import {
 	registerCodingSupervision,
@@ -102,6 +103,7 @@ export type AppServices = {
 	serviceTests?: ServiceTests;
 	music?: MusicService;
 	image?: ImageService;
+	uiCompositions?: UiCompositionsService;
 	excalidraw?: ExcalidrawService;
 	drawingOperations?: { list: (conversationId: string) => unknown };
 	objectRecognition?: ObjectRecognitionService;
@@ -156,6 +158,7 @@ export function appModules(services: AppServices): AppModule[] {
 			},
 		},
 		s.image && { mount: (app) => registerImage(app, s.image!) },
+		s.uiCompositions && { mount: (app) => registerUiCompositions(app, s.uiCompositions!) },
 		s.music && { mount: (app) => registerMusic(app, s.music!) },
 		s.capabilities && {
 			mount: (app) => registerCapabilities(app, s.capabilities!),

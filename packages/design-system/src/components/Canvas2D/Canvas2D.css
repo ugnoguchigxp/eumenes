@@ -1,0 +1,19 @@
+.ds-canvas-2d {
+	display: block;
+	width: 100%;
+	height: auto;
+	background: var(--background);
+}
+
+.ds-canvas-2d-pointer {
+	touch-action: none;
+}
+
+.ds-canvas-2d:focus-visible {
+	outline: 2px solid var(--ring);
+	outline-offset: 2px;
+}
+
+.ds-canvas-2d-pixelated {
+	image-rendering: pixelated;
+}

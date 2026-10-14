@@ -6,6 +6,7 @@ import {
 import { timerWebAdapter } from "../domains/timers/toolchain-adapter";
 import { musicScreenWebAdapter } from "../domains/music/toolchain-adapter";
 import { imageScreenWebAdapter } from "../domains/image/toolchain-adapter";
+import { uiCompositionsWebAdapter } from "../domains/ui-compositions/toolchain-adapter";
 import { objectRecognitionScreenWebAdapter } from "../domains/object-recognition/toolchain-adapter";
 import { serviceTestsWebAdapter } from "../domains/service-tests/toolchain-adapter";
 
@@ -14,6 +15,7 @@ export const toolchainWebAdapters = createWebAdapterRegistry([
 	timerWebAdapter,
 	musicScreenWebAdapter,
 	imageScreenWebAdapter,
+	uiCompositionsWebAdapter,
 	objectRecognitionScreenWebAdapter,
 	settingsWebAdapter,
 	recordsWebAdapter,

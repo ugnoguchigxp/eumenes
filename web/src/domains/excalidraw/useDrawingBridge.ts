@@ -8,14 +8,15 @@ import type { useDrawingEditor } from "./useDrawingEditor";
 /** Only the same-origin parent can command this embedded editor. No secrets cross the bridge. */
 export function useDrawingBridge(
 	embedded: boolean,
-	referenceId: string,
 	editor: ReturnType<typeof useDrawingEditor>,
 ) {
+	const { frameId, referenceId } = editor;
 	const current = useRef(editor);
 	const loaded = !!editor.drawing;
-	const revision = editor.drawing?.revision;
+	// A new drawing reports revision 0 until its first save.
+	const revision = editor.drawing?.revision || undefined;
 	useEffect(() => {
-		if (!embedded || !revision) return;
+		if (!embedded || !revision || !referenceId) return;
 		const url = new URL(window.location.href);
 		const [path, query] = url.hash.slice(1).split("?");
 		if (path !== `drawing/${referenceId}`) return;
@@ -32,7 +33,7 @@ export function useDrawingBridge(
 		if (!embedded || window.parent === window) return;
 		const state: DrawingFrameState = {
 			type: "eumenes:drawing-state",
-			referenceId,
+			referenceId: frameId,
 			sessionId: editor.session?.id,
 			title: editor.title,
 			status: editor.status,
@@ -41,12 +42,12 @@ export function useDrawingBridge(
 			hasDraft: editor.hasDraft,
 			dirty: editor.unsaved,
 			loaded,
-			revision: editor.drawing?.revision,
+			revision,
 		};
 		window.parent.postMessage(state, window.location.origin);
 	}, [
 		embedded,
-		referenceId,
+		frameId,
 		editor.session?.id,
 		editor.title,
 		editor.status,
@@ -54,7 +55,7 @@ export function useDrawingBridge(
 		editor.busy,
 		editor.hasDraft,
 		editor.unsaved,
-		editor.drawing?.revision,
+		revision,
 		loaded,
 	]);
 	useEffect(() => {

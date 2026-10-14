@@ -3,6 +3,13 @@ export { recognitionManage, recognitionCommand };
 import { drawingRequest, drawingPlan } from "./excalidraw";
 export { drawingRequest, drawingPlan };
 import { z } from "zod";
+import {
+	uiComposeRequest,
+	uiCancelRequest,
+	uiResponseFields,
+	uiSubmitRequest,
+} from "./ui-compositions";
+export { uiComposeRequest, uiCancelRequest, uiResponseFields, uiSubmitRequest };
 import { imageRequest, imagePlan } from "./image";
 export { imageRequest, imagePlan };
 import {
@@ -135,6 +142,10 @@ export const recipeFindInput = z
 	})
 	.strict();
 export const validators = {
+	uiComposeRequest,
+	uiCancelRequest,
+	uiResponseFields,
+	uiSubmitRequest,
 	recognitionManage,
 	drawingRequest,
 	drawingPlan,

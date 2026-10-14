@@ -12,6 +12,7 @@ export function drawingFixture() {
 		saved = new Map<string, { body: string; result: unknown }>();
 	let generation = 1,
 		failSave = false,
+		deleteRoute = true,
 		bindingChanged = false,
 		delay: Promise<void> | null = null,
 		cold = true,
@@ -71,6 +72,15 @@ export function drawingFixture() {
 		)
 			return reply({ error: "unauthorized" }, 401);
 		const id = u.pathname.split("/")[3];
+		// The requested deletion contract: JSON confirmation, 404 once gone.
+		if (method === "DELETE") {
+			// An older host has no delete route and answers a plain-text 404.
+			if (!deleteRoute) return new Response("Not Found", { status: 404 });
+			if (failSave) return reply({ error: "storage_error" }, 503);
+			if (!id || !documents.delete(id))
+				return reply({ error: "document_not_found" }, 404);
+			return reply({ id, deleted: true });
+		}
 		if (method === "POST" || method === "PUT") {
 			if (failSave && method === "PUT")
 				return reply({ error: "storage_error" }, 503);
@@ -79,8 +89,8 @@ export function drawingFixture() {
 			const prior = saved.get(key);
 			if (prior)
 				return prior.body === JSON.stringify(body)
-					? reply(prior.result)
-					: reply({}, 409);
+					? reply(prior.result, method === "POST" ? 201 : 200)
+					: reply({ error: "idempotency_conflict" }, 409);
 			const versions = id ? documents.get(id) : undefined;
 			if (id && !versions) return reply({}, 404);
 			const old = versions?.at(-1);
@@ -130,6 +140,9 @@ export function drawingFixture() {
 				fetch: fetcher,
 			}),
 		}),
+		deleteRoute(value: boolean) {
+			deleteRoute = value;
+		},
 		failSave(value: boolean) {
 			failSave = value;
 		},

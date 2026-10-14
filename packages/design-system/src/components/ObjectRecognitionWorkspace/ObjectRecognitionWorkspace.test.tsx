@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { ObjectRecognitionWorkspace } from "./ObjectRecognitionWorkspace";
 import { DetectionPreview } from "./DetectionPreview";
 import { CameraCapture } from "./CameraCapture";
@@ -37,11 +37,60 @@ it("a camera stream obtained after unmount is stopped and never adopted", async 
 it("a result finished after cancellation is explicitly discarded without claiming the upstream execution stopped", () => {
 	render(<ObjectRecognitionWorkspace items={[{ ...item, state: "cancelled", errorCode: "recognition_result_discarded", result: null }]} selectedId="one" configured />);
 	expect(screen.getByText("取消済み（処理終了・結果不採用）", { exact: true })).toBeTruthy();
+	expect(screen.getByText("この資料の解析は中止されました。")).toBeTruthy();
 	expect(screen.queryByLabelText("検出枠")).toBeNull();
+});
+it("distinguishes a saved camera image from an unconfirmed analysis submission", () => {
+	render(<ObjectRecognitionWorkspace items={[{ ...item, name: "camera.jpg", state: "failed", errorCode: "recognition_submission_unconfirmed", result: null }]} selectedId="one" configured />);
+	expect(screen.getByText(/画像・動画は保存済みです。解析サービスへの受付を確認できませんでした。/)).toBeTruthy();
+});
+it("opens saved media from the header menu and confirms deletion of a finished item", () => {
+	const onSelect = vi.fn();
+	const onRemove = vi.fn();
+	render(<ObjectRecognitionWorkspace items={[item, { ...item, id: "two", name: "recording.webm", state: "running", result: null }]} selectedId="one" configured onSelect={onSelect} onRemove={onRemove} />);
+	fireEvent.click(screen.getByRole("button", { name: "資料一覧" }));
+	const menu = screen.getByRole("menu", { name: "資料一覧" });
+	expect(menu).toBeTruthy();
+	expect((screen.getByRole("button", { name: "recording.webmを削除" }) as HTMLButtonElement).disabled).toBe(true);
+	fireEvent.click(screen.getByRole("button", { name: "desk.pngを削除" }));
+	expect(onRemove).not.toHaveBeenCalled();
+	fireEvent.click(screen.getByRole("button", { name: "削除する" }));
+	expect(onRemove).toHaveBeenCalledWith("one");
+	expect(screen.queryByRole("menu", { name: "資料一覧" })).toBeNull();
+	fireEvent.click(screen.getByRole("button", { name: "資料一覧" }));
+	fireEvent.click(screen.getByRole("menuitem", { name: /recording.webm/ }));
+	expect(onSelect).toHaveBeenCalledWith("two");
 });
 it("offers only an available backend shared credential and sends the selected source without a secret", () => {
 	const change = vi.fn();
 	render(<ObjectRecognitionWorkspace items={[]} configured hasEndpoint credentialSource="dedicated" sharedCredentialAvailable onCredentialSourceChange={change} />);
 	fireEvent.change(screen.getByRole("combobox", { name: "物体認識の認証方式" }), { target: { value: "larm" } });
 	expect(change).toHaveBeenCalledWith("larm");
+});
+
+it("shows a labeled loading indicator while submitting and analyzing", async () => {
+	let finishUpload!: () => void;
+	const onFile = vi.fn(() => new Promise<void>((resolve) => { finishUpload = resolve; }));
+	const { container, rerender } = render(
+		<ObjectRecognitionWorkspace items={[]} configured onFile={onFile} />,
+	);
+	fireEvent.change(screen.getByLabelText("画像・動画を選ぶ"), {
+		target: { files: [new File(["image"], "desk.png", { type: "image/png" })] },
+	});
+	const submitting = screen.getByRole("button", { name: "画像・動画を送信中" });
+	expect(submitting.getAttribute("aria-busy")).toBe("true");
+	expect(container.querySelector(".recognition-submit-loading .recognition-spinner")).toBeTruthy();
+	await act(async () => finishUpload());
+	rerender(
+		<ObjectRecognitionWorkspace
+			items={[{ ...item, state: "running", result: null }]}
+			selectedId="one"
+			configured
+		/>,
+	);
+	expect(screen.getByRole("button", { name: "解析中" }).getAttribute("aria-busy")).toBe("true");
+	expect(container.querySelectorAll(".recognition-spinner")).toHaveLength(2);
+	rerender(<ObjectRecognitionWorkspace items={[item]} selectedId="one" configured />);
+	expect(screen.getByRole("button", { name: "撮影して調べる" }).getAttribute("aria-busy")).toBe("false");
+	expect(container.querySelector(".recognition-spinner")).toBeNull();
 });

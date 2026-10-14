@@ -18,7 +18,8 @@ import {
 	superviseCodingExecution,
 	purgeTaskDependents,
 } from "./coding-supervision";
-import { createImage } from "../domains/image";
+import { createImage, type ImageService } from "../domains/image";
+import { createUiCompositions } from "../domains/ui-compositions";
 import { createMusic } from "../domains/music";
 import { createLarmPlayground } from "../domains/larm";
 import { larmEmbedder } from "./larm-embedder";
@@ -281,9 +282,12 @@ export async function buildServices(config: Config) {
 						: {}),
 					...(config.worldPollMs ? { pollMs: config.worldPollMs } : {}),
 				});
+	let imageForCompositions: ImageService;
+	const uiCompositions = createUiCompositions({ store, queue, inference, image: () => imageForCompositions });
 	const { toolchain, links } = await createHostToolchain({
 		store,
 		queue,
+		uiCompositions,
 		inference,
 		webResearch,
 		settings,
@@ -324,6 +328,7 @@ export async function buildServices(config: Config) {
 	};
 	const music = createMusic(mediaDependencies);
 	const image = createImage(mediaDependencies);
+	imageForCompositions = image;
 	const excalidraw = createExcalidraw({
 		store,
 		webOrigin: config.origin,
@@ -407,6 +412,7 @@ export async function buildServices(config: Config) {
 		excalidraw,
 		drawingOperations,
 		image,
+		uiCompositions,
 		objectRecognition,
 		music,
 		queue,
@@ -454,6 +460,7 @@ export function appServices(s: Services) {
 		serviceTests: s.serviceTests,
 		music: s.music,
 		image: s.image,
+		uiCompositions: s.uiCompositions,
 		excalidraw: s.excalidraw,
 		drawingOperations: s.drawingOperations,
 		objectRecognition: s.objectRecognition,

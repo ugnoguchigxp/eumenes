@@ -26,7 +26,17 @@ CREATE TABLE music_playlists (
 CREATE INDEX music_playlist_conversation ON music_playlists(conversation_id);
 `,
 	},
+	{
+		id: "music/0003-artwork",
+		after: ["music/0001-init"],
+		sql: `
+ALTER TABLE music_generations ADD COLUMN artwork BLOB;
+ALTER TABLE music_generations ADD COLUMN artwork_mime TEXT;
+`,
+	},
 ];
+const COLUMNS =
+	"id, run_id, conversation_id, record_json, request_json, plan_json, bindings_json, deadline, queue_job_id";
 export type Row = {
 	id: string;
 	run_id: string;
@@ -37,16 +47,25 @@ export type Row = {
 	bindings_json: string;
 	deadline: number;
 	queue_job_id: string | null;
-	audio: Uint8Array | null;
 };
 export function row(db: Database, id: string) {
 	return db
-		.query("SELECT * FROM music_generations WHERE id=?")
+		.query(`SELECT ${COLUMNS} FROM music_generations WHERE id=?`)
 		.get(id) as Row | null;
+}
+/** Media BLOBs are read only when they are served. */
+export function media(db: Database, id: string, kind: "audio" | "artwork") {
+	return db
+		.query(
+			kind === "audio"
+				? "SELECT audio AS bytes, NULL AS mime FROM music_generations WHERE id=?"
+				: "SELECT artwork AS bytes, artwork_mime AS mime FROM music_generations WHERE id=?",
+		)
+		.get(id) as { bytes: Uint8Array | null; mime: string | null } | null;
 }
 export function byRun(db: Database, id: string) {
 	return db
-		.query("SELECT * FROM music_generations WHERE run_id=?")
+		.query(`SELECT ${COLUMNS} FROM music_generations WHERE run_id=?`)
 		.get(id) as Row | null;
 }
 export function record(r: Row): MusicRecord {

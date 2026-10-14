@@ -8,6 +8,7 @@ import {
 	FileImage,
 	Download,
 	RotateCcw,
+	Trash2,
 	X,
 } from "lucide-react";
 import { Button } from "../Button";
@@ -15,6 +16,7 @@ import { Input } from "../Input";
 import { useDrawingFrame } from "./useDrawingFrame";
 import "./drawing.css";
 export {
+	isDrawingFrameOf,
 	isDrawingFrameState,
 	type DrawingFrameState,
 	type DrawingFrameCommand,
@@ -30,6 +32,8 @@ export type DrawingWorkspaceProps = {
 	onNew: () => void;
 	onOpen: (id: string) => void;
 	onRefresh: () => void;
+	/** Deletes a saved drawing; the open drawing is not offered for deletion. */
+	onDelete?: (id: string) => void | Promise<unknown>;
 	onBrowse?: (open: boolean) => void | Promise<unknown>;
 };
 /** Auth and storage stay in the existing editor; this host owns only layout and frame controls. */
@@ -41,6 +45,7 @@ export function DrawingWorkspace(p: DrawingWorkspaceProps) {
 		first = useRef<HTMLButtonElement>(null);
 	const f = frame.state;
 	const [title, setTitle] = useState("");
+	const [deleting, setDeleting] = useState<string | null>(null);
 	const pendingTitle = useRef<string | null>(null),
 		titleReference = useRef<string | undefined>(undefined);
 	useEffect(() => {
@@ -54,6 +59,7 @@ export function DrawingWorkspace(p: DrawingWorkspaceProps) {
 	const busy = p.busy || f?.busy;
 	async function browse(open: boolean) {
 		setMenu(open);
+		setDeleting(null);
 		await p.onBrowse?.(open);
 		if (!open) trigger.current?.focus();
 	}
@@ -186,23 +192,63 @@ export function DrawingWorkspace(p: DrawingWorkspaceProps) {
 						</Button>
 						<div className="dw-items">
 							{p.references.map((r) => (
-								<button
-									key={r.id}
-									role="menuitem"
-									className="dw-item"
-									disabled={busy}
-									aria-current={f?.referenceId === r.id ? "true" : undefined}
-									onClick={() => void choose(r.id)}
-								>
-									<span className="dw-thumbnail">
-										{p.previews?.[`${r.id}:${r.revision}`] ? (
-											<img src={p.previews[`${r.id}:${r.revision}`]} alt="" />
-										) : (
-											<FileImage size={22} />
-										)}
-									</span>
-									<span className="dw-item-title">{r.title}</span>
-								</button>
+								<div key={r.id} className="dw-entry">
+									<button
+										role="menuitem"
+										className="dw-item"
+										disabled={busy}
+										aria-current={f?.referenceId === r.id ? "true" : undefined}
+										onClick={() => void choose(r.id)}
+									>
+										<span className="dw-thumbnail">
+											{p.previews?.[`${r.id}:${r.revision}`] ? (
+												<img src={p.previews[`${r.id}:${r.revision}`]} alt="" />
+											) : (
+												<FileImage size={22} />
+											)}
+										</span>
+										<span className="dw-item-title">{r.title}</span>
+									</button>
+									{p.onDelete && f?.referenceId !== r.id && (
+										<Button
+											variant="ghost"
+											size="icon"
+											className="dw-delete"
+											aria-label={`${r.title}を削除`}
+											disabled={busy}
+											onClick={() => setDeleting(r.id)}
+										>
+											<Trash2 size={14} />
+										</Button>
+									)}
+									{deleting === r.id && (
+										<div
+											className="dw-confirm"
+											role="group"
+											aria-label={`${r.title}の削除確認`}
+										>
+											<p>この図を削除しますか？元に戻せません。</p>
+											<Button
+												variant="destructive"
+												size="sm"
+												disabled={busy}
+												onClick={() => {
+													setDeleting(null);
+													void p.onDelete?.(r.id);
+												}}
+											>
+												削除
+											</Button>
+											<Button
+												variant="ghost"
+												size="sm"
+												onClick={() => setDeleting(null)}
+											>
+												キャンセル
+											</Button>
+										</div>
+									)}
+								</div>
 							))}
 						</div>
 						{!p.references.length && <p>保存済みの図はありません。</p>}

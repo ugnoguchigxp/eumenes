@@ -53,6 +53,20 @@ export function registerExcalidraw(app: Hono, s: ExcalidrawService) {
 		"/api/excalidraw/references",
 		safe((c) => c.json(s.list(c.req.query("conversationId") ?? "main"))),
 	);
+	app.delete(
+		"/api/excalidraw/references/:id",
+		safe(async (c) => {
+			await s.remove(
+				z.uuid().parse(c.req.param("id")),
+				z
+					.string()
+					.min(1)
+					.max(128)
+					.parse(c.req.query("conversationId") ?? "main"),
+			);
+			return c.body(null, 204);
+		}),
+	);
 	app.post(
 		"/api/excalidraw/sessions",
 		safe(async (c) => c.json(await s.session(await body(c.req.raw)), 202)),
@@ -96,20 +110,25 @@ export function registerExcalidraw(app: Hono, s: ExcalidrawService) {
 			),
 		),
 	);
-	app.put(
-		"/api/excalidraw/sessions/:id/document",
-		safe(async (c) => {
-			const key = c.req.header("Idempotency-Key");
-			if (!key || !/^[a-zA-Z0-9._:-]{1,128}$/.test(key))
-				return c.json({ error: "invalid_idempotency_key" }, 400);
-			return c.json(
-				await s.save(
-					z.uuid().parse(c.req.param("id")),
-					await body(c.req.raw),
-					key,
-					AbortSignal.any([c.req.raw.signal, AbortSignal.timeout(180000)]),
-				),
-			);
-		}),
-	);
+	for (const [method, write] of [
+		["post", s.create],
+		["put", s.save],
+	] as const)
+		app[method](
+			"/api/excalidraw/sessions/:id/document",
+			safe(async (c) => {
+				const key = c.req.header("Idempotency-Key");
+				// The same key rule as excalidraw-host, so a bad key never reaches LARM.
+				if (!key || !/^[a-zA-Z0-9._-]{8,128}$/.test(key))
+					return c.json({ error: "invalid_idempotency_key" }, 400);
+				return c.json(
+					await write(
+						z.uuid().parse(c.req.param("id")),
+						await body(c.req.raw),
+						key,
+						AbortSignal.any([c.req.raw.signal, AbortSignal.timeout(180000)]),
+					),
+				);
+			}),
+		);
 }

@@ -15,6 +15,7 @@ import { questionReader, type InteractionViews } from "./toolchain-adapters";
 import type { TtsDictionaryPorts } from "./tts-dictionary-adapter";
 import type { WorldAdapterPorts } from "./world-adapter";
 import type { WorldAssembly } from "./world";
+import type { UiCompositionsService } from "../domains/ui-compositions";
 
 /** How many of the person's latest statements a World correction may cite as its reason. */
 const REASON_MESSAGES = 20;
@@ -95,6 +96,7 @@ export async function createHostToolchain(
 	s: Parameters<typeof createToolchainHostLinks>[0] & {
 		store: SqliteStore;
 		queue: QueueService;
+		uiCompositions?: UiCompositionsService;
 		inference: InferencePort &
 			Parameters<typeof createToolchainHostLinks>[0]["inference"];
 		webResearch: WebResearchService;
@@ -112,6 +114,7 @@ export async function createHostToolchain(
 		s.webResearch,
 		{
 			timers: s.timers,
+			uiCompositions: s.uiCompositions,
 			...links.options,
 			history: s.history,
 			dots: true,

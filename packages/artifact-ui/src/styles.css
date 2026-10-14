@@ -74,6 +74,20 @@
 	display: grid;
 	gap: 1rem;
 }
+.aui-text-block h2 {
+	font-size: 1.125rem;
+	font-weight: 600;
+}
+.aui-text-block p {
+	margin-top: 0.5rem;
+	color: var(--muted-foreground);
+	white-space: pre-wrap;
+}
+.aui-choice {
+	display: flex !important;
+	align-items: center;
+	gap: 0.5rem;
+}
 .aui-grid {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr));

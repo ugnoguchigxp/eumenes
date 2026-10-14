@@ -1,16 +1,13 @@
+import { z } from "zod";
 import { drawingDocuments } from "./documents";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
-import {
-	documentSchema,
-	documentMetadata,
-	openDrawing,
-	type DrawingSession,
-} from "../contracts";
+import { documentSchema, openDrawing, type DrawingSession } from "../contracts";
 import {
 	getSession,
 	updateSession,
 	references,
 	reference,
+	saveReference,
 } from "../repository";
 import { drawingConnection, type DrawingConnection } from "./connection";
 export function createExcalidraw(deps: {
@@ -61,66 +58,29 @@ export function createExcalidraw(deps: {
 				const ref = s.referenceId
 					? store.read((db) => reference(db, s.referenceId!))
 					: null;
-				const response = await connection.request(
-					id,
-					ref
-						? `/api/documents/${ref.documentId}${s.revision ? `?revision=${s.revision}` : ""}`
-						: "/api/documents",
-					signal,
-					ref
-						? {}
-						: {
-								method: "POST",
-								headers: {
-									"content-type": "application/json",
-									"Idempotency-Key": `create-${id}`,
-								},
-								body: JSON.stringify({
-									title: s.title,
-									scene: {
-										elements: [],
-										appState: { viewBackgroundColor: "#ffffff" },
-										files: {},
-									},
-								}),
-							},
-				);
-				const metadata = (ref ? documentSchema : documentMetadata).parse(
-					response,
-				);
+				if (s.referenceId && !ref)
+					throw new Error("excalidraw_reference_not_found");
+				// A new drawing only holds the lease; the first save creates the upstream document.
 				const drawing = ref
-					? documentSchema.parse(response)
-					: documentSchema.parse(
+					? documentSchema.parse(
 							await connection.request(
 								id,
-								`/api/documents/${metadata.id}?revision=${metadata.revision}`,
+								`/api/documents/${ref.documentId}${s.revision ? `?revision=${s.revision}` : ""}`,
 								signal,
 							),
-						);
-				if (
-					drawing.id !== metadata.id ||
-					drawing.revision !== metadata.revision ||
-					(ref && drawing.id !== ref.documentId)
-				)
+						)
+					: null;
+				if (ref && drawing!.id !== ref.documentId)
 					throw new Error("excalidraw_document_identity_mismatch");
 				await store.write((db) => {
 					const current = getSession(db, id);
 					if (!current || current.epoch !== epoch || current.state === "closed")
 						return;
-					const refId = ref?.id ?? crypto.randomUUID();
-					db.query(
-						"INSERT INTO excalidraw_references VALUES(?,?,?,?,?) ON CONFLICT(document_id) DO UPDATE SET revision=excluded.revision,title=excluded.title WHERE excluded.revision>=excalidraw_references.revision",
-					).run(
-						refId,
-						s.conversationId,
-						drawing.id,
-						drawing.revision,
-						drawing.title,
-					);
+					if (drawing) saveReference(db, s.conversationId, drawing);
 					updateSession(db, id, {
-						referenceId: refId,
-						revision: drawing.revision,
-						title: drawing.title,
+						...(drawing
+							? { revision: drawing.revision, title: drawing.title }
+							: {}),
 						state: "ready",
 						errorCode: null,
 						lastOperation: clock(),
@@ -212,13 +172,99 @@ export function createExcalidraw(deps: {
 		return publicView(get(id)!);
 	}
 
+	async function wait(id: string) {
+		await opening.get(id);
+		return get(id) ? publicView(get(id)!) : null;
+	}
+	async function release(id: string) {
+		await store.write((db) => {
+			const s = getSession(db, id);
+			if (s)
+				updateSession(db, id, {
+					state: "closed",
+					url: null,
+					epoch: s.epoch + 1,
+				});
+		});
+		aborts.get(id)?.abort();
+		await connection.release(id);
+	}
+	/** A new drawing link opens a local editor; nothing is stored upstream until its first save. */
+	function draftUrl(conversationId: string, title: string) {
+		return `${deps.webOrigin}/#drawing/new/${crypto.randomUUID()}?${new URLSearchParams(
+			{
+				title,
+				...(conversationId !== "main" ? { conversationId } : {}),
+			},
+		)}`;
+	}
+	/** Deletes the upstream document first; the reference goes only after that is confirmed. */
+	async function remove(referenceId: string, conversationId: string) {
+		const ref = store.read((db) => reference(db, referenceId));
+		if (!ref || ref.conversationId !== conversationId)
+			throw new Error("excalidraw_reference_not_found");
+		const s = await session({
+			requestId: crypto.randomUUID(),
+			conversationId,
+			title: ref.title,
+		});
+		try {
+			const ready = await wait(s.id);
+			if (ready?.state !== "ready") throw new Error("excalidraw_start_failed");
+			try {
+				const result = z
+					.object({ id: z.uuid(), deleted: z.literal(true) })
+					.parse(
+						await connection.request(
+							s.id,
+							`/api/documents/${ref.documentId}`,
+							AbortSignal.timeout(180000),
+							{ method: "DELETE" },
+						),
+					);
+				if (result.id !== ref.documentId)
+					throw new Error("excalidraw_document_identity_mismatch");
+			} catch (e) {
+				if (!(e instanceof Error && e.message === "excalidraw_http_404"))
+					throw e;
+				// A host without the delete route also answers 404; only a document
+				// that cannot be read any more counts as already deleted.
+				const gone = await connection
+					.request(
+						s.id,
+						`/api/documents/${ref.documentId}`,
+						AbortSignal.timeout(180000),
+					)
+					.then(
+						() => false,
+						(error) =>
+							error instanceof Error && error.message === "excalidraw_http_404",
+					);
+				if (!gone) throw new Error("excalidraw_delete_unsupported");
+			}
+			// Editors still open on the drawing lose their sessions; their unsaved work stays in drafts.
+			const open = store.read(
+				(db) =>
+					db
+						.query(
+							"SELECT id FROM excalidraw_sessions WHERE json_extract(record_json,'$.referenceId')=? AND json_extract(record_json,'$.state')<>'closed'",
+						)
+						.all(ref.id) as { id: string }[],
+			);
+			await store.write((db) =>
+				db.query("DELETE FROM excalidraw_references WHERE id=?").run(ref.id),
+			);
+			for (const { id } of open) await release(id);
+		} finally {
+			await release(s.id);
+		}
+	}
 	return {
 		session,
 		reconnect,
-		async wait(id: string) {
-			await opening.get(id);
-			return get(id) ? publicView(get(id)!) : null;
-		},
+		remove,
+		draftUrl,
+		wait,
 		get: (id: string) => {
 			const s = get(id);
 			return s ? publicView(s) : null;
@@ -237,19 +283,7 @@ export function createExcalidraw(deps: {
 			});
 			return get(id);
 		},
-		async release(id: string) {
-			await store.write((db) => {
-				const s = getSession(db, id);
-				if (s)
-					updateSession(db, id, {
-						state: "closed",
-						url: null,
-						epoch: s.epoch + 1,
-					});
-			});
-			aborts.get(id)?.abort();
-			await connection.release(id);
-		},
+		release,
 		async tick() {
 			for (const id of await connection.tick())
 				await store.write((db) => {

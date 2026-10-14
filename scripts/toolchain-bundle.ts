@@ -22,6 +22,7 @@ const BACKENDS = [
 	"music",
 	"dots",
 	"image",
+	"ui-compositions",
 	"excalidraw",
 	"object-recognition",
 ];

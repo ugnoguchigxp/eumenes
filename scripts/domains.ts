@@ -31,6 +31,12 @@ export const domains = {
 			test: [],
 		},
 	},
+	"ui-compositions": {
+		backend: "api/domains/ui-compositions",
+		web: "web/src/domains/ui-compositions",
+		components: null,
+		depends: { api: ["capabilities", "inference", "larm", "queue"], web: [], test: [] },
+	},
 	music: {
 		backend: "api/domains/music",
 		web: "web/src/domains/music",

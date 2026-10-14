@@ -1,6 +1,7 @@
 /** Same-origin editor messages contain display state, never scenes or credentials. */
 export type DrawingFrameState = {
 	type: "eumenes:drawing-state";
+	/** The saved reference, or the draft id of a new drawing (no revision yet). */
 	referenceId: string;
 	sessionId?: string;
 	title: string;
@@ -18,6 +19,29 @@ export type DrawingFrameCommand = {
 	requestId: string;
 	value?: string;
 };
+/**
+ * The editor's current same-origin location names it: a saved reference, or a new
+ * drawing's draft id. Its first save replaces the draft link without a reload.
+ */
+export function isDrawingFrameOf(
+	frame: HTMLIFrameElement | null | undefined,
+	id: string,
+) {
+	if (!frame) return false;
+	let hash: string;
+	try {
+		const live = frame.contentWindow?.location;
+		// Before navigation the frame is about:blank; its requested link is all it can claim.
+		hash =
+			!live || live.href === "about:blank"
+				? new URL(frame.src).hash
+				: live.hash;
+	} catch {
+		return false;
+	}
+	const path = hash.split("?")[0];
+	return path === `#drawing/${id}` || path === `#drawing/new/${id}`;
+}
 export function isDrawingFrameState(
 	value: unknown,
 ): value is DrawingFrameState {

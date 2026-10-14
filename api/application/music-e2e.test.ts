@@ -267,3 +267,135 @@ test("vocal orchestral music forwards the worker's voice description, exact lyri
 		await h.close();
 	}
 });
+test("artwork is generated on request from the completed track's prompt at 256×256 and can be regenerated", async () => {
+	const f = musicFixture("success");
+	const h = await harness({ model: f.model, musicGateway: f.gateway });
+	try {
+		const submitted = await (
+			await h.request("/api/runs", {
+				requestId: crypto.randomUUID(),
+				conversationId: "main",
+				text: musicQuestion,
+			})
+		).json();
+		await h.dialogue.waitForTerminal(submitted.id, { timeoutMs: 5000 });
+		const music = h.music!.list("main")[0]!;
+		expect(music.state).toBe("completed");
+		expect(music.artwork).toBeUndefined();
+		expect(f.requests.some((r) => r.path === "/v1/images/generations")).toBe(
+			false,
+		);
+		expect((await h.request(`/api/music/${music.id}/artwork`)).status).toBe(
+			404,
+		);
+		expect((await h.request("/api/music/missing/artwork", {})).status).toBe(
+			404,
+		);
+		const generate = async (revision: number) => {
+			const accepted = await h.request(`/api/music/${music.id}/artwork`, {});
+			expect(accepted.status).toBe(202);
+			expect((await accepted.json()).artwork).toEqual({
+				state: "generating",
+				revision,
+				errorCode: null,
+			});
+			for (
+				let i = 0;
+				i < 500 && h.music!.get(music.id)?.artwork?.state === "generating";
+				i++
+			)
+				await Bun.sleep(10);
+			expect(h.music!.get(music.id)?.artwork).toEqual({
+				state: "completed",
+				revision,
+				errorCode: null,
+			});
+		};
+		await generate(1);
+		const busy = await h.request(`/api/music/${music.id}/artwork`, {});
+		expect(busy.status).toBe(202);
+		expect((await h.request(`/api/music/${music.id}/artwork`, {})).status).toBe(
+			409,
+		);
+		for (
+			let i = 0;
+			i < 500 && h.music!.get(music.id)?.artwork?.state === "generating";
+			i++
+		)
+			await Bun.sleep(10);
+		const image = f.requests.find((r) => r.path === "/v1/images/generations")!;
+		expect(image.body).toMatchObject({ width: 256, height: 256 });
+		const text = JSON.stringify(image.body);
+		expect(text).toContain(musicTestPlan.prompt);
+		expect(text).toContain(musicTestPlan.title);
+		const content = await h.request(`/api/music/${music.id}/artwork`);
+		expect(content.status).toBe(200);
+		expect(content.headers.get("content-type")).toBe("image/png");
+		expect(new Uint8Array(await content.arrayBuffer())).toEqual(f.artwork);
+		await generate(3);
+		expect(
+			f.requests.filter((r) => r.path === "/v1/images/generations"),
+		).toHaveLength(3);
+		expect(
+			f.requests.filter(
+				(r) =>
+					r.path === "/v1/image-artifacts/artwork" && r.method === "DELETE",
+			),
+		).toHaveLength(3);
+	} finally {
+		await h.close();
+	}
+});
+test("artwork is refused for an unfinished track and a provider failure is recorded", async () => {
+	const f = musicFixture("failure");
+	const h = await harness({ model: f.model, musicGateway: f.gateway });
+	try {
+		const submitted = await (
+			await h.request("/api/runs", {
+				requestId: crypto.randomUUID(),
+				conversationId: "main",
+				text: musicQuestion,
+			})
+		).json();
+		await h.dialogue.waitForTerminal(submitted.id, { timeoutMs: 5000 });
+		const music = h.music!.list("main")[0]!;
+		expect(music.state).toBe("failed");
+		const refused = await h.request(`/api/music/${music.id}/artwork`, {});
+		expect(refused.status).toBe(409);
+		expect(await refused.json()).toEqual({ error: "music_not_completed" });
+	} finally {
+		await h.close();
+	}
+	const ok = musicFixture("success", { artworkFailure: true });
+	const g = await harness({ model: ok.model, musicGateway: ok.gateway });
+	try {
+		const submitted = await (
+			await g.request("/api/runs", {
+				requestId: crypto.randomUUID(),
+				conversationId: "main",
+				text: musicQuestion,
+			})
+		).json();
+		await g.dialogue.waitForTerminal(submitted.id, { timeoutMs: 5000 });
+		const music = g.music!.list("main")[0]!;
+		expect((await g.request(`/api/music/${music.id}/artwork`, {})).status).toBe(
+			202,
+		);
+		for (
+			let i = 0;
+			i < 500 && g.music!.get(music.id)?.artwork?.state === "generating";
+			i++
+		)
+			await Bun.sleep(10);
+		expect(g.music!.get(music.id)?.artwork).toMatchObject({
+			state: "failed",
+			revision: 1,
+		});
+		expect(g.music!.get(music.id)?.artwork?.errorCode).toMatch(/^[a-z_0-9]+$/);
+		expect((await g.request(`/api/music/${music.id}/artwork`)).status).toBe(
+			404,
+		);
+	} finally {
+		await g.close();
+	}
+});

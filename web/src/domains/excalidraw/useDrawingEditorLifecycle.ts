@@ -7,7 +7,8 @@ import type {
 import { waitForDrawing } from "./editor-session";
 export function useDrawingEditorLifecycle(options: {
 	client: EumenesClient;
-	referenceId: string;
+	/** Null for a new drawing: no lease until its first save. */
+	referenceId: string | null;
 	revision?: number;
 	conversationId: string;
 	onReady: (session: DrawingSession, drawing: Drawing) => void;
@@ -27,32 +28,33 @@ export function useDrawingEditorLifecycle(options: {
 	useEffect(() => {
 		const abort = new AbortController();
 		lifetime.current = abort;
-		void (async () => {
-			try {
-				const s = await client.openDrawing(
-					{
-						requestId: crypto.randomUUID(),
-						referenceId,
-						conversationId,
-						...(revision ? { revision } : {}),
-					},
-					abort.signal,
-				);
-				if (abort.signal.aborted) {
-					await client.releaseDrawing(s.id);
-					return;
-				}
-				ownedSession.current = s.id;
-				const ready = await waitForDrawing(client, s, abort.signal);
-				const doc = await client.drawingDocument(s.id, abort.signal);
-				if (!abort.signal.aborted) callbacks.current.onReady(ready, doc);
-			} catch (error) {
-				if (!abort.signal.aborted)
-					callbacks.current.onError(
-						error instanceof Error ? error.message : "接続できませんでした。",
+		if (referenceId)
+			void (async () => {
+				try {
+					const s = await client.openDrawing(
+						{
+							requestId: crypto.randomUUID(),
+							referenceId,
+							conversationId,
+							...(revision ? { revision } : {}),
+						},
+						abort.signal,
 					);
-			}
-		})();
+					if (abort.signal.aborted) {
+						await client.releaseDrawing(s.id);
+						return;
+					}
+					ownedSession.current = s.id;
+					const ready = await waitForDrawing(client, s, abort.signal);
+					const doc = await client.drawingDocument(s.id, abort.signal);
+					if (!abort.signal.aborted) callbacks.current.onReady(ready, doc);
+				} catch (error) {
+					if (!abort.signal.aborted)
+						callbacks.current.onError(
+							error instanceof Error ? error.message : "接続できませんでした。",
+						);
+				}
+			})();
 		const before = (event: BeforeUnloadEvent) => {
 			if (callbacks.current.beforeLeave()) {
 				event.preventDefault();

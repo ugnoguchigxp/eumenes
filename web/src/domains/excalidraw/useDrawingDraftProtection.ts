@@ -4,8 +4,9 @@ import type {
 	Scene,
 } from "../../../../api/domains/excalidraw/contracts";
 import { drawingDrafts, makeDrawingDraft, type DrawingDraft } from "./drafts";
+/** `key` is read at call time: a new drawing's draft id becomes its reference on first save. */
 export function useDrawingDraftProtection(
-	referenceId: string,
+	key: () => string,
 	current: RefObject<Drawing | null>,
 	latest: RefObject<{ title: string; scene: Scene } | null>,
 	pending: RefObject<DrawingDraft | null>,
@@ -25,7 +26,7 @@ export function useDrawingDraftProtection(
 		try {
 			drafts.current.write(
 				makeDrawingDraft(
-					referenceId,
+					key(),
 					current.current.revision,
 					latest.current,
 					pending.current,
@@ -39,23 +40,23 @@ export function useDrawingDraftProtection(
 			);
 			return false;
 		}
-	}, [referenceId, current, latest, pending, setError]);
+	}, [key, current, latest, pending, setError]);
 	const read = useCallback(() => {
 		try {
-			return drafts.current.read(referenceId);
+			return drafts.current.read(key());
 		} catch {
 			setError(
 				"下書きを読み込めませんでした。編集中の図をダウンロードして保護してください。",
 			);
 			return null;
 		}
-	}, [referenceId, setError]);
+	}, [key, setError]);
 	const check = useCallback(() => {
 		setHasDraft(!!read());
 	}, [read]);
 	function clearSaved() {
 		try {
-			drafts.current.remove(referenceId);
+			drafts.current.remove(key());
 			setHasDraft(false);
 			setError("");
 		} catch {

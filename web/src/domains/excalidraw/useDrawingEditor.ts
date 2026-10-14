@@ -1,7 +1,11 @@
 import { useDrawingEditorLifecycle } from "./useDrawingEditorLifecycle";
-import { reconnectDrawingSession, downloadScene } from "./editor-session";
+import {
+	reconnectDrawingSession,
+	downloadScene,
+	createDrawingDocument,
+} from "./editor-session";
 import { useDrawingSessionStatus } from "./useDrawingSessionStatus";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { EumenesClient } from "../../../../client";
 import type {
 	Drawing,
@@ -9,13 +13,30 @@ import type {
 	DrawingSession,
 } from "../../../../api/domains/excalidraw/contracts";
 import type { DrawingDraft } from "./drafts";
+import { drawingFrameId, type DrawingLocation } from "./location";
 import { useDrawingDraftProtection } from "./useDrawingDraftProtection";
+const blankScene: Scene = {
+	elements: [],
+	appState: { viewBackgroundColor: "#ffffff" },
+	files: {},
+};
+const unsavedStatus = "新しい図です。描いた内容は保存したときに作成されます。";
 export function useDrawingEditor(
 	client: EumenesClient,
-	referenceId: string,
-	revision?: number,
-	conversationId = "main",
+	location: DrawingLocation,
 ) {
+	const { conversationId } = location;
+	const revision =
+		location.kind === "reference" ? location.revision : undefined;
+	// A new drawing has no reference until its first confirmed save creates one.
+	const [referenceId, setReferenceId] = useState(
+		location.kind === "reference" ? location.referenceId : null,
+	);
+	const initialId = drawingFrameId(location),
+		frameId = referenceId ?? initialId;
+	// Timers and retries outlive a render; they must see a reference created meanwhile.
+	const saved = useRef(referenceId);
+	const draftKey = useCallback(() => saved.current ?? initialId, [initialId]);
 	const [drawing, setDrawing] = useState<Drawing | null>(null),
 		[session, setSession] = useState<DrawingSession | null>(null);
 	const [title, setTitle] = useState(""),
@@ -34,7 +55,7 @@ export function useDrawingEditor(
 	const activityAt = useRef(0),
 		initializing = useRef(true);
 	const drafts = useDrawingDraftProtection(
-		referenceId,
+		draftKey,
 		current,
 		latest,
 		pending,
@@ -51,13 +72,25 @@ export function useDrawingEditor(
 			setTitle(doc.title);
 			setCanvasEpoch((v) => v + 1);
 			check();
-			setStatus(`保存済み（版 ${doc.revision}）`);
+			setStatus(
+				doc.revision ? `保存済み（版 ${doc.revision}）` : unsavedStatus,
+			);
 		},
 		[check],
 	);
+	const draftTitle = location.kind === "new" ? location.title : "",
+		draftId = location.kind === "new" ? location.draftId : "";
+	const opened = useRef("");
+	useEffect(() => {
+		// Only the first render opens the blank canvas; a later save must not reset it.
+		if (!draftId || opened.current === draftId) return;
+		opened.current = draftId;
+		apply({ id: draftId, title: draftTitle, revision: 0, scene: blankScene });
+		setBusy(false);
+	}, [draftId, draftTitle, apply]);
 	const lifecycle = useDrawingEditorLifecycle({
 		client,
-		referenceId,
+		referenceId: location.kind === "reference" ? location.referenceId : null,
 		revision,
 		conversationId,
 		onReady: (ready, doc) => {
@@ -118,13 +151,37 @@ export function useDrawingEditor(
 			);
 		}
 	}, [client]);
+	async function create(input: { title: string; scene: Scene }, key: string) {
+		const created = await createDrawingDocument(client, {
+			session: selected.current,
+			conversationId,
+			input,
+			key,
+			signal: AbortSignal.any([
+				lifecycle.signal(),
+				AbortSignal.timeout(180000),
+			]),
+			accepted: lifecycle.accept,
+			ready: (s) => {
+				selected.current = s;
+				setSession(s);
+			},
+		});
+		// The unsaved draft is stored under the draft id; the reference takes over from here.
+		drafts.clearSaved();
+		selected.current = created.session;
+		setSession(created.session);
+		saved.current = created.referenceId;
+		setReferenceId(created.referenceId);
+		return created.doc;
+	}
 	async function save() {
 		if (
 			saving.current ||
 			!dirty.current ||
 			!current.current ||
 			!latest.current ||
-			!selected.current
+			(saved.current && !selected.current)
 		)
 			return;
 		if (timer.current) {
@@ -137,7 +194,7 @@ export function useDrawingEditor(
 		const candidate = pending.current ?? {
 			...latest.current,
 			key: crypto.randomUUID(),
-			referenceId,
+			referenceId: draftKey(),
 			expectedRevision: current.current.revision,
 		};
 		pending.current = candidate;
@@ -149,7 +206,9 @@ export function useDrawingEditor(
 				scene: candidate.scene,
 				expectedRevision: candidate.expectedRevision,
 			};
-			const doc = await client.saveDrawing(selected.current.id, body, key);
+			const doc = saved.current
+				? await client.saveDrawing(selected.current!.id, body, key)
+				: await create({ title: body.title, scene: body.scene }, key);
 			pending.current = null;
 			current.current = doc;
 			setDrawing(doc);
@@ -214,6 +273,15 @@ export function useDrawingEditor(
 		setError("");
 		setStatus("再接続中です。");
 		try {
+			if (!saved.current) {
+				// Nothing is stored yet; the next save opens a fresh lease.
+				if (selected.current)
+					await client.releaseDrawing(selected.current.id).catch(() => {});
+				selected.current = null;
+				setSession(null);
+				setStatus(dirty.current ? "未保存の変更があります。" : unsavedStatus);
+				return;
+			}
 			if (!selected.current) {
 				window.location.reload();
 				return;
@@ -222,7 +290,7 @@ export function useDrawingEditor(
 				client,
 				selected.current,
 				{
-					referenceId,
+					referenceId: saved.current,
 					conversationId,
 					revision: current.current?.revision ?? revision,
 				},
@@ -249,7 +317,9 @@ export function useDrawingEditor(
 		const value = drafts.read();
 		if (!value || !current.current) return;
 		initializing.current = true;
-		pending.current = value.pending ? { ...value.pending, referenceId } : value;
+		pending.current = value.pending
+			? { ...value.pending, referenceId: draftKey() }
+			: value;
 		latest.current = { title: value.title, scene: value.scene };
 		dirty.current = true;
 		setUnsaved(true);
@@ -282,6 +352,8 @@ export function useDrawingEditor(
 		return true;
 	}
 	return {
+		frameId,
+		referenceId,
 		drawing,
 		session,
 		title,

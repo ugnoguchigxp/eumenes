@@ -613,6 +613,9 @@ select:focus-visible {
 	scrollbar-width: thin;
 	scrollbar-color: var(--border) transparent;
 }
+.artifact-panel-body:has(.aui-ui-workspace) {
+	padding: 1rem;
+}
 .artifact-panel-body:has(:is(.music-workspace, .image-workspace)) {
 	padding: 0;
 	overflow: hidden;

@@ -6,8 +6,9 @@ import type { InferencePort } from "../../inference";
 import type { QueueService } from "../../queue";
 import type { LarmPlayground } from "../../larm";
 import type { MusicRecord } from "../contracts";
-import { row, byRun, record, patch, list } from "../repository";
+import { row, byRun, record, patch, list, media } from "../repository";
 import { registerMusicHandlers } from "./handlers";
+import { createArtwork } from "./artwork";
 /** Read-only source for registered music screens; the music domain owns this query. */
 export const musicListInTransaction = (db: Database, conversationId: string) =>
 	list(db, conversationId);
@@ -65,8 +66,11 @@ export function createMusic(deps: {
 	}
 	registerMusicHandlers({ ...deps, enqueue, fail, cancel });
 	const playback = createPlayback(deps);
+	const artwork = createArtwork(deps);
 	return {
 		playback,
+		requestArtwork: artwork.request,
+		artwork: artwork.content,
 		library: () => deps.gateway().library,
 		startPlaybackInTransaction: playback.startInTransaction,
 		startInTransaction(
@@ -137,8 +141,10 @@ export function createMusic(deps: {
 		audio: (id: string) =>
 			store.read((db) => {
 				const r = row(db, id);
-				return r && record(r).state === "completed" && r.audio
-					? { bytes: r.audio, mime: record(r).mime! }
+				const audio =
+					r && record(r).state === "completed" && media(db, id, "audio");
+				return audio && audio.bytes
+					? { bytes: audio.bytes, mime: record(r).mime! }
 					: null;
 			}),
 	};

@@ -24,12 +24,13 @@ for (const action of ["create", "library"] as const)
 			expect(f.stages).toEqual(["route", "plan", "answer"]);
 			expect(f.contexts.join("\n")).not.toContain("consumer-");
 			expect(f.contexts.join("\n")).not.toContain("business-");
-			if (action === "create") {
-				expect(operation.url).toContain("http://127.0.0.1:5173/#drawing/");
-				expect(h.excalidraw!.list("main")).toHaveLength(1);
-			} else {
-				expect(f.requests).toHaveLength(0);
-			}
+			// A new drawing is an unsaved draft link: LARM is not contacted until it is saved.
+			if (action === "create")
+				expect(operation.url).toMatch(
+					/^http:\/\/127\.0\.0\.1:5173\/#drawing\/new\/[0-9a-f-]{36}\?title=/,
+				);
+			expect(h.excalidraw!.list("main")).toHaveLength(0);
+			expect(f.requests).toHaveLength(0);
 			expect((await h.app.request("/api/excalidraw/references")).status).toBe(
 				401,
 			);
@@ -101,6 +102,38 @@ test("scene writes require idempotency, reject malformed input, and keep HTTP er
 			"Content-Type": "application/json",
 		};
 		const path = `/api/excalidraw/sessions/${s.id}/document`;
+		const scene = {
+			elements: [],
+			appState: { viewBackgroundColor: "#ffffff" },
+			files: {},
+		};
+		expect(
+			(
+				await h.app.request(path, {
+					method: "POST",
+					headers,
+					body: JSON.stringify({ title: "図", scene }),
+				})
+			).status,
+		).toBe(400);
+		for (const key of ["short", "has:colon-key"])
+			expect(
+				(
+					await h.app.request(path, {
+						method: "POST",
+						headers: { ...headers, "Idempotency-Key": key },
+						body: JSON.stringify({ title: "図", scene }),
+					})
+				).status,
+			).toBe(400);
+		const created = await h.app.request(path, {
+			method: "POST",
+			headers: { ...headers, "Idempotency-Key": "test-create" },
+			body: JSON.stringify({ title: "最初の保存", scene }),
+		});
+		expect(created.status).toBe(200);
+		const { referenceId } = await created.json();
+		expect(h.excalidraw!.list("main").map((r) => r.id)).toEqual([referenceId]);
 		expect(
 			(await h.app.request(path, { method: "PUT", headers, body: "{}" }))
 				.status,
@@ -129,6 +162,15 @@ test("scene writes require idempotency, reject malformed input, and keep HTTP er
 		});
 		expect(failed.status).toBe(502);
 		expect((await failed.json()).error).toBe("excalidraw_http_503");
+		f.failSave(false);
+		const remove = (conversationId: string) =>
+			h.app.request(
+				`/api/excalidraw/references/${referenceId}?conversationId=${conversationId}`,
+				{ method: "DELETE", headers },
+			);
+		expect((await remove("other")).status).toBe(404);
+		expect((await remove("main")).status).toBe(204);
+		expect(h.excalidraw!.list("main")).toHaveLength(0);
 	} finally {
 		await h.close();
 	}

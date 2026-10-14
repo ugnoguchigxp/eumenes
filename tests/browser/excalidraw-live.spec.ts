@@ -58,8 +58,9 @@ test("formal connection: cold start, MacBook drawing/save/reopen, physical idle 
 	const url = `${origin}/${embedded.hash}`;
 	expect(new URL(url).origin).toBe(new URL(origin).origin);
 	expect(url).not.toMatch(/token|consumer|127\.0\.0\.1:1879/);
-	const startedPid = await workerPid();
-	expect(startedPid).toBeGreaterThan(0);
+	// A new drawing is unsaved: opening it starts no worker.
+	expect(url).toMatch(/#drawing\/new\//);
+	expect(await workerPid()).toBe(0);
 	const editor = await context.newPage();
 	editor.on("pageerror", (error) => errors.push(error.message));
 	await editor.setViewportSize({ width: 1440, height: 1000 });
@@ -70,8 +71,10 @@ test("formal connection: cold start, MacBook drawing/save/reopen, physical idle 
 	const title = `Eumenes実接続受入 ${new Date().toISOString()}`;
 	await editor.getByLabel("図の名前").fill(title);
 	await expect(editor.getByRole("status").first()).toContainText(
-		"保存済み（版 2）",
+		"保存済み（版 1）",
 	);
+	const startedPid = await workerPid();
+	expect(startedPid).toBeGreaterThan(0);
 	const canvas = editor.locator(".excalidraw canvas").first();
 	const box = (await canvas.boundingBox())!;
 	await editor.mouse.click(box.x + 120, box.y + 120);
@@ -81,7 +84,7 @@ test("formal connection: cold start, MacBook drawing/save/reopen, physical idle 
 	await editor.mouse.move(box.x + 530, box.y + 380);
 	await editor.mouse.up();
 	await expect(editor.getByRole("status").first()).toContainText(
-		"保存済み（版 3）",
+		"保存済み（版 2）",
 	);
 	let loaded: { revision: number; count: number } | undefined;
 	const observedDocument = () => loaded;
@@ -95,10 +98,11 @@ test("formal connection: cold start, MacBook drawing/save/reopen, physical idle 
 			loaded = { revision: data.revision, count: data.scene.elements.length };
 		}
 	});
-	const latestUrl = url.replace(/\?revision=\d+$/, "");
+	// The first save replaced the draft link with the created reference.
+	const latestUrl = editor.url().replace(/\?revision=\d+$/, "");
 	await editor.goto(latestUrl);
 	await expect(editor.getByLabel("図の名前")).toHaveValue(title);
-	await expect.poll(() => loaded).toEqual({ revision: 3, count: 1 });
+	await expect.poll(() => loaded).toEqual({ revision: 2, count: 1 });
 	await expect(editor.getByRole("status").first()).toContainText(
 		"無操作のため接続を解放",
 		{ timeout: 45000 },
@@ -109,7 +113,7 @@ test("formal connection: cold start, MacBook drawing/save/reopen, physical idle 
 	await expect(editor.getByLabel("図の名前")).toHaveValue(title, {
 		timeout: 180000,
 	});
-	await expect.poll(() => loaded).toEqual({ revision: 3, count: 1 });
+	await expect.poll(() => loaded).toEqual({ revision: 2, count: 1 });
 	const restartedPid = await workerPid();
 	expect(restartedPid).toBeGreaterThan(0);
 	expect(restartedPid).not.toBe(startedPid);
@@ -122,12 +126,12 @@ test("formal connection: cold start, MacBook drawing/save/reopen, physical idle 
 	await editor.mouse.move(box.x + 760, box.y + 550);
 	await editor.mouse.up();
 	await expect(editor.getByRole("status").first()).toContainText(
-		"保存済み（版 4）",
+		"保存済み（版 3）",
 	);
 	loaded = undefined;
 	await editor.goto(latestUrl);
 	await expect(editor.getByLabel("図の名前")).toHaveValue(title);
-	await expect.poll(() => loaded).toEqual({ revision: 4, count: 2 });
+	await expect.poll(() => loaded).toEqual({ revision: 3, count: 2 });
 	expect(errors).toEqual([]);
 	const directory = "spec/verification/excalidraw-live";
 	mkdirSync(directory, { recursive: true });
@@ -195,7 +199,7 @@ test("formal artifact iframe: MacBook edit, LARM save, thumbnail, reopen and idl
 	const title = `Artifact埋め込み受入 ${new Date().toISOString()}`;
 	await panel.getByLabel("図の名前").fill(title);
 	await expect(panel.getByRole("status").first()).toContainText(
-		"保存済み（版 2）",
+		"保存済み（版 1）",
 	);
 	await frame
 		.getByRole("radio", { name: "矩形", exact: true })
@@ -210,7 +214,7 @@ test("formal artifact iframe: MacBook edit, LARM save, thumbnail, reopen and idl
 	await page.mouse.move(box.x + box.width * 0.7, box.y + box.height * 0.65);
 	await page.mouse.up();
 	await expect(panel.getByRole("status").first()).toContainText(
-		"保存済み（版 3）",
+		"保存済み（版 2）",
 	);
 	const url = (await iframe.getAttribute("src"))!;
 	expect(new URL(url).origin).toBe(new URL(origin).origin);
@@ -231,7 +235,7 @@ test("formal artifact iframe: MacBook edit, LARM save, thumbnail, reopen and idl
 		)!;
 	documents.length = 0;
 	await child.evaluate(() => window.location.reload());
-	await expect.poll(() => documents.at(-1)).toEqual({ revision: 3, count: 1 });
+	await expect.poll(() => documents.at(-1)).toEqual({ revision: 2, count: 1 });
 	await expect(panel.getByLabel("図の名前")).toHaveValue(title);
 	await expect(panel.getByRole("status").first()).toContainText(
 		"無操作のため接続を解放",
@@ -239,9 +243,9 @@ test("formal artifact iframe: MacBook edit, LARM save, thumbnail, reopen and idl
 	);
 	documents.length = 0;
 	await panel.getByRole("button", { name: "再接続", exact: true }).click();
-	await expect.poll(() => documents.at(-1)).toEqual({ revision: 3, count: 1 });
+	await expect.poll(() => documents.at(-1)).toEqual({ revision: 2, count: 1 });
 	await expect(panel.getByRole("status").first()).toContainText(
-		"保存済み（版 3）",
+		"保存済み（版 2）",
 	);
 	await panel.screenshot({ path: `${directory}/artifact-2026-10-14.png` });
 	expect(errors).toEqual([]);
@@ -253,7 +257,7 @@ test("formal artifact iframe: MacBook edit, LARM save, thumbnail, reopen and idl
 				mode: "formal-live-artifact-iframe",
 				initialFrameUrl: url,
 				reopenedFrameUrl: child.url(),
-				revision: 3,
+				revision: 2,
 				sceneElements: 1,
 				browserEdited: true,
 				larmSaveAndReopen: true,

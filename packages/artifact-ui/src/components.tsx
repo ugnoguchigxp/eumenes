@@ -334,6 +334,54 @@ function FieldInput({
 	prefix: string;
 }) {
 	const id = `${prefix}-${field.id}`;
+	if (field.type === "radio" || field.type === "checkbox") {
+		let selected: string[] = [];
+		if (field.type === "checkbox" && typeof value === "string") {
+			try {
+				const parsed: unknown = JSON.parse(value);
+				if (Array.isArray(parsed) && parsed.every((v) => typeof v === "string"))
+					selected = parsed;
+			} catch {
+				/* No selection yet. */
+			}
+		}
+		return (
+			<fieldset className="aui-field">
+				<legend>
+					{field.label}
+					{field.required && "（必須）"}
+				</legend>
+				{field.options?.map((option, index) => (
+					<label key={option} className="aui-choice">
+						<input
+							type={field.type}
+							name={id}
+							value={option}
+							checked={
+								field.type === "radio"
+									? value === option
+									: selected.includes(option)
+							}
+							onChange={(event) => {
+								if (field.type === "radio") onChange(option);
+								else
+									onChange(
+										JSON.stringify(
+											event.target.checked
+												? [...selected, option]
+												: selected.filter((item) => item !== option),
+										),
+									);
+							}}
+							disabled={disabled}
+							required={field.type === "radio" && field.required && index === 0}
+						/>
+						{option}
+					</label>
+				))}
+			</fieldset>
+		);
+	}
 	return (
 		<label htmlFor={id} className="aui-field">
 			{field.label}
@@ -387,18 +435,35 @@ export function SmallForm({ request }: { request: ArtifactRequest }) {
 	const action = useAction(request);
 	const data = action.resource as FormResource;
 	const [values, setValues] = useState(data.defaults);
+	const [sent, setSent] = useState(false);
+	const [validationMessage, setValidationMessage] = useState("");
 	const prefix = useId();
 	return (
 		<Card>
-			<CardHeader>
-				<CardTitle>{request.title ?? "希望を入力"}</CardTitle>
-			</CardHeader>
+			{request.title !== "" && (
+				<CardHeader>
+					<CardTitle>{request.title ?? "希望を入力"}</CardTitle>
+				</CardHeader>
+			)}
 			<CardContent>
 				<form
 					className="aui-stack"
 					onSubmit={(e) => {
 						e.preventDefault();
-						if (!action.pending) void action.send("submit", values);
+						if (
+							data.fields.some(
+								(field) =>
+									field.type === "checkbox" &&
+									field.required &&
+									(!values[field.id] || values[field.id] === "[]"),
+							)
+						) {
+							setValidationMessage("必須の選択肢を選んでください");
+							return;
+						}
+						setValidationMessage("");
+						if (!action.pending)
+							void action.send("submit", values).then(setSent);
 					}}
 				>
 					{data.fields.map((field) => (
@@ -407,12 +472,19 @@ export function SmallForm({ request }: { request: ArtifactRequest }) {
 							prefix={prefix}
 							field={field}
 							value={
-								values[field.id] ?? (field.type === "boolean" ? false : "")
+								values[field.id] ??
+								(field.type === "boolean"
+									? false
+									: field.type === "checkbox"
+										? "[]"
+										: "")
 							}
 							disabled={action.pending}
-							onChange={(value) =>
-								setValues((v) => ({ ...v, [field.id]: value }))
-							}
+							onChange={(value) => {
+								setSent(false);
+								setValidationMessage("");
+								setValues((v) => ({ ...v, [field.id]: value }));
+							}}
 						/>
 					))}
 					<div className="aui-row">
@@ -421,16 +493,28 @@ export function SmallForm({ request }: { request: ArtifactRequest }) {
 								? "送信中"
 								: (data.submitLabel ?? "フォームを送信")}
 						</Button>
-						<Button
-							type="button"
-							variant="secondary"
-							disabled={action.pending}
-							onClick={() => setValues(data.defaults)}
-						>
-							入力をリセット
-						</Button>
+						{request.title !== "" && (
+							<Button
+								type="button"
+								variant="secondary"
+								disabled={action.pending}
+								onClick={() => {
+									setValues(data.defaults);
+									setSent(false);
+									setValidationMessage("");
+								}}
+							>
+								入力をリセット
+							</Button>
+						)}
 					</div>
-					<Feedback message={action.message} />
+					<Feedback
+						message={
+							validationMessage ||
+							action.message ||
+							(sent ? "送信しました" : "")
+						}
+					/>
 					{data.submitted && (
 						<Result
 							title="前回受け取った内容"

@@ -52,6 +52,10 @@ export interface GenerateInput {
 		openQuestions: import("./conversation-tools").OpenQuestion[];
 	};
 	actionResultIndex?: number;
+	/** Media result replies have no host-granted URLs; hold and check the body before showing it. */
+	mediaResult?: true;
+	/** A saved operation is being phrased; its result context must remain in the prompt. */
+	operationResult?: true;
 	runId: string;
 	revision: number;
 	messages: ChatMessage[];

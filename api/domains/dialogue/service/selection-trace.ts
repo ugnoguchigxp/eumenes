@@ -73,6 +73,9 @@ export async function prepareDecision(
 	let query: QueryVector | undefined;
 	let recallPins: TurnRecall["pins"] = [];
 	let openQuestions: OpenQuestion[] = [];
+	let selectionMessages: typeof messages | undefined;
+	let answerMessages: typeof messages | undefined;
+	let selectionRecall: string | undefined;
 	if (input.routing && deps.toolchains && !input.agent) {
 		const routing = input.routing;
 		query = await measureStage("dialogue", "query_embedding", () =>
@@ -95,12 +98,22 @@ export async function prepareDecision(
 				role: "system",
 				content: recalled.text,
 			});
+			selectionRecall = recalled.text;
 			recallPins = recalled.pins;
 		}
 		// A question is answerable only through a function that is offered now.
 		openQuestions = routing.openQuestions.filter((q) =>
 			route!.cards.some((c) => c.functionName === q.functionName),
 		);
+		answerMessages = [...messages];
+		if (route.cards.length && !input.operationResult) {
+			// Prior assistant prose can be wrong about whether an operation ran. Let the
+			// model choose from recent human requests; keep the full exchange for answers.
+			selectionMessages = messages.filter((m) => m.role === "user").slice(-3);
+			if (selectionRecall)
+				selectionMessages.unshift({ role: "system", content: selectionRecall });
+			appendConversationPolicy(selectionMessages, true, [], openQuestions);
+		}
 		appendConversationPolicy(
 			messages,
 			route.cards.length > 0,
@@ -146,6 +159,8 @@ export async function prepareDecision(
 			: undefined;
 	return {
 		messages,
+		selectionMessages,
+		answerMessages,
 		tools,
 		cards: route?.cards,
 		openQuestions,

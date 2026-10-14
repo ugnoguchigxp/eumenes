@@ -1,15 +1,15 @@
 {
-  "at": "2026-10-13T09:07:53.771Z",
+  "at": "2026-10-14T09:16:02.318Z",
   "connection": {
     "serviceId": "object-recognition-host",
-    "revision": 0,
-    "baseUrl": null,
-    "configured": false,
-    "credentialSource": "dedicated",
+    "revision": 1,
+    "baseUrl": "http://127.0.0.1:18796",
+    "configured": true,
+    "credentialSource": "larm",
     "formalDeployment": "unconfirmed"
   },
   "fixture": false,
   "live": "not_run",
   "camera": "not_run",
-  "reason": "backend_object_recognition_connection_not_configured"
+  "reason": "read_only_check_no_analysis_requested"
 }

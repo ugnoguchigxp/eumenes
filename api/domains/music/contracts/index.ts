@@ -1,4 +1,10 @@
 import { z } from "zod";
+export const musicArtwork = z.object({
+	state: z.enum(["generating", "completed", "failed"]),
+	revision: z.number().int(),
+	errorCode: z.string().nullable(),
+});
+export type MusicArtwork = z.infer<typeof musicArtwork>;
 export const musicRecord = z.object({
 	id: z.string(),
 	runId: z.string(),
@@ -16,6 +22,8 @@ export const musicRecord = z.object({
 	errorCode: z.string().nullable(),
 	mime: z.string().nullable(),
 	actualModel: z.string().nullable(),
+	/** Artwork is generated on demand from the track's prompt; absent until requested. */
+	artwork: musicArtwork.optional(),
 	createdAt: z.number(),
 	updatedAt: z.number(),
 });

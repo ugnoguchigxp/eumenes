@@ -68,3 +68,53 @@ export async function reconnectDrawingSession(
 		throw error;
 	}
 }
+
+/** A new drawing leases LARM only for its first save, which creates the document. */
+export async function createDrawingDocument(
+	client: EumenesClient,
+	options: {
+		session: DrawingSession | null;
+		conversationId: string;
+		input: { title: string; scene: Scene };
+		key: string;
+		signal: AbortSignal;
+		accepted: (id: string) => void;
+		ready: (session: DrawingSession) => void;
+	},
+) {
+	const { conversationId, input, signal } = options;
+	let s = options.session;
+	if (!s || s.state === "closed" || s.state === "failed") {
+		const opened = await client.openDrawing(
+			{ requestId: crypto.randomUUID(), conversationId, title: input.title },
+			signal,
+		);
+		options.accepted(opened.id);
+		try {
+			s = await waitForDrawing(client, opened, signal);
+		} catch (error) {
+			// The next save opens a fresh lease; this one must not linger.
+			await client.releaseDrawing(opened.id).catch(() => {});
+			throw error;
+		}
+		options.ready(s);
+	}
+	const { referenceId, ...doc } = await client.createDrawing(
+		s.id,
+		input,
+		options.key,
+		signal,
+	);
+	// The draft link becomes the saved reference without remounting the editor.
+	const url = new URL(window.location.href);
+	url.hash = `drawing/${referenceId}?${new URLSearchParams({
+		revision: String(doc.revision),
+		...(conversationId !== "main" ? { conversationId } : {}),
+	})}`;
+	window.history.replaceState(window.history.state, "", url);
+	return {
+		session: { ...s, referenceId, revision: doc.revision },
+		referenceId,
+		doc,
+	};
+}

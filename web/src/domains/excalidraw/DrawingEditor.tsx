@@ -7,22 +7,19 @@ import type { EumenesClient } from "../../../../client";
 import type { Scene } from "../../../../api/domains/excalidraw/contracts";
 import { useDrawingEditor } from "./useDrawingEditor";
 import { useDrawingBridge } from "./useDrawingBridge";
+import type { DrawingLocation } from "./location";
 import "./drawing-editor.css";
 export default function DrawingEditor({
 	client,
-	referenceId,
-	revision,
-	conversationId = "main",
+	location,
 	embedded = false,
 }: {
 	client: EumenesClient;
-	referenceId: string;
-	revision?: number;
-	conversationId?: string;
+	location: DrawingLocation;
 	embedded?: boolean;
 }) {
-	const e = useDrawingEditor(client, referenceId, revision, conversationId);
-	useDrawingBridge(embedded, referenceId, e);
+	const e = useDrawingEditor(client, location);
+	useDrawingBridge(embedded, e);
 	const activity = e.activity;
 	useEffect(() => {
 		const operation = (event: Event) => {

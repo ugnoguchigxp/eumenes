@@ -1,4 +1,4 @@
-import { ImageOff, Music2, Star } from "lucide-react";
+import { ImageOff, Loader2, Star } from "lucide-react";
 import { useRef, useState, type ReactNode } from "react";
 import { Button } from "../Button";
 import { Modal } from "../Modal";
@@ -28,6 +28,8 @@ export type MusicWorkspaceProps = {
 	onFavorite?: (id: string, favorite: boolean) => void;
 	onDelete?: (id: string) => void;
 	downloadName?: string;
+	/** Starts (or restarts) artwork generation for a track; omitted when the host cannot generate. */
+	onArtwork?: (id: string) => void;
 	creation?: {
 		busy?: boolean;
 		status?: GenerationStatusProps;
@@ -47,6 +49,7 @@ export function MusicWorkspace({
 	onFavorite,
 	onDelete,
 	downloadName,
+	onArtwork,
 	creation,
 }: MusicWorkspaceProps) {
 	const [display, setDisplay] = useState<"visualizer" | "image">(
@@ -77,6 +80,13 @@ export function MusicWorkspace({
 	const shown = tracks.slice(currentPage * 8, (currentPage + 1) * 8);
 	const neighbor = (offset: number) => available[index + offset];
 	const image = current?.artworkUrl;
+	// Show progress from the click until the host reports the generation (or rejects it).
+	const [artworkRequest, setArtworkRequest] = useState<string>();
+	const artworkStatus =
+		current?.artworkStatus === "generating" ||
+		(busy && current && artworkRequest === current.id)
+			? "generating"
+			: current?.artworkStatus;
 	return (
 		<section
 			className={`music-workspace${creation ? " music-workspace-creation" : ""}`}
@@ -137,42 +147,73 @@ export function MusicWorkspace({
 								</p>
 							)}
 						</div>
-						{display === "image" &&
-							(image && failedImage !== image ? (
-								<img
-									src={image}
-									alt={`${current.title}の楽曲イメージ`}
-									onError={() => setFailedImage(image)}
-								/>
-							) : creation ? (
-								<div
-									className="music-workspace-artwork-mock"
-									role="img"
-									aria-label="楽曲イメージのモック"
-								>
-									<div className="music-workspace-mock-disc">
-										<Music2 aria-hidden="true" />
+						{display === "image" && (
+							<figure className="music-workspace-artwork">
+								{image &&
+								failedImage !== image &&
+								artworkStatus !== "generating" ? (
+									<img
+										src={image}
+										alt={`${current.title}の楽曲イメージ`}
+										onError={() => setFailedImage(image)}
+									/>
+								) : (
+									<div className="music-workspace-no-image">
+										{artworkStatus === "generating" ? (
+											<Loader2
+												aria-hidden="true"
+												className="music-workspace-spin"
+											/>
+										) : (
+											<ImageOff aria-hidden="true" />
+										)}
+										<p role={artworkStatus === "failed" ? "alert" : undefined}>
+											{artworkStatus === "generating"
+												? "楽曲イメージを生成しています。"
+												: artworkStatus === "failed"
+													? "楽曲イメージを作成できませんでした。"
+													: image
+														? "楽曲イメージを読み込めませんでした。"
+														: "この楽曲のイメージは未登録です。"}
+										</p>
 									</div>
-									<span>MUSIC STUDIO</span>
-									<strong>楽曲イメージ</strong>
-									<small>モック表示</small>
-								</div>
-							) : (
-								<div className="music-workspace-no-image">
-									<ImageOff aria-hidden="true" />
-									<p>
-										{image
-											? "楽曲イメージを読み込めませんでした。"
-											: "この楽曲のイメージは未登録です。"}
-									</p>
-								</div>
-							))}
+								)}
+								{current && <figcaption>{current.title}</figcaption>}
+							</figure>
+						)}
 					</div>
-					{creation && display === "image" && (
-						<div className="music-workspace-mock-note">
-							<span>イメージ生成は準備中です</span>
-							<Button type="button" size="sm" variant="outline" disabled>
-								イメージを作成
+					{onArtwork && current && !current.disabled && display === "image" && (
+						<div className="music-workspace-artwork-actions">
+							<span>
+								{current.prompt
+									? "この曲のプロンプトから256×256で作成します"
+									: "プロンプトがないため作成できません"}
+							</span>
+							<Button
+								type="button"
+								size="sm"
+								variant="outline"
+								disabled={
+									busy || artworkStatus === "generating" || !current.prompt
+								}
+								onClick={() => {
+									setArtworkRequest(current.id);
+									onArtwork(current.id);
+								}}
+							>
+								{artworkStatus === "generating" ? (
+									<>
+										<Loader2
+											aria-hidden="true"
+											className="music-workspace-spin"
+										/>
+										生成中
+									</>
+								) : image ? (
+									"作り直す"
+								) : (
+									"イメージを作成"
+								)}
 							</Button>
 						</div>
 					)}

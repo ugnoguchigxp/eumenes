@@ -75,6 +75,32 @@ export function excalidrawClient(t: Transport) {
 					body: JSON.stringify(input),
 				})
 			).json(),
+		createDrawing: async (
+			id: string,
+			input: { title: string; scene: Scene },
+			key: string,
+			signal?: AbortSignal,
+		): Promise<Drawing & { referenceId: string }> =>
+			(
+				await t.call(`${path(id)}/document`, {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						"Idempotency-Key": key,
+					},
+					body: JSON.stringify(input),
+					signal,
+				})
+			).json(),
+		deleteDrawing: async (
+			referenceId: string,
+			conversationId = "main",
+		): Promise<void> => {
+			await t.call(
+				`/api/excalidraw/references/${encodeURIComponent(referenceId)}?conversationId=${encodeURIComponent(conversationId)}`,
+				{ method: "DELETE" },
+			);
+		},
 		drawingActivity: async (id: string): Promise<void> => {
 			await t.call(`${path(id)}/activity`, json({}));
 		},

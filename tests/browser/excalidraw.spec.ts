@@ -38,22 +38,13 @@ test("MacBook browser fixture: launch, edit, save, reopen, preserve failed draft
 		.getByRole("menuitem", { name: "図を描く・編集する", exact: true })
 		.click();
 	const panel = page.getByRole("complementary", { name: "アーティファクト" });
-	const accepted = page.waitForResponse(
-		(r) =>
-			r.request().method() === "POST" &&
-			r.url().endsWith("/api/excalidraw/sessions"),
-	);
-	await panel.getByRole("button", { name: "図一覧", exact: true }).click();
-	await panel
-		.getByRole("menuitem", { name: "新しい図を作成", exact: true })
-		.click();
-	expect((await accepted).status()).toBe(202);
+	// The artifact opens on a new drawing; nothing reaches LARM before a save.
 	const link = panel.locator("iframe");
 	await expect(link).toBeVisible();
 	const embeddedUrl = await link.getAttribute("src");
 	const parsed = new URL(embeddedUrl!);
 	const url = `${origin}/${parsed.hash}`;
-	expect(url).toContain(`${origin}/#drawing/`);
+	expect(url).toMatch(/\/#drawing\/new\/[0-9a-f-]{36}$/);
 	expect(url).not.toMatch(/18790|token|consumer|business/);
 	const editor = await context.newPage();
 	let gestures = 0;
@@ -77,7 +68,11 @@ test("MacBook browser fixture: launch, edit, save, reopen, preserve failed draft
 	await expect(editor.locator(".excalidraw canvas").first()).toBeVisible();
 	await editor.getByLabel("図の名前").fill("ブラウザで保存した構成図");
 	await expect(editor.getByRole("status").first()).toContainText(
-		"保存済み（版 2）",
+		"保存済み（版 1）",
+	);
+	// The first save replaces the draft link with the created reference.
+	expect(new URL(editor.url()).hash).toMatch(
+		/^#drawing\/[0-9a-f-]{36}\?revision=1$/,
 	);
 	const canvas = editor.locator(".excalidraw canvas").first(),
 		box = await canvas.boundingBox();
@@ -88,16 +83,16 @@ test("MacBook browser fixture: launch, edit, save, reopen, preserve failed draft
 	await editor.mouse.move(box!.x + 530, box!.y + 380);
 	await editor.mouse.up();
 	await expect(editor.getByRole("status").first()).toContainText(
-		"保存済み（版 3）",
+		"保存済み（版 2）",
 	);
 	// URL records a particular revision; reopen latest through the saved reference.
-	const latestUrl = url!.replace(/\?revision=\d+$/, "");
+	const latestUrl = editor.url().replace(/\?revision=\d+$/, "");
 	await editor.goto(latestUrl);
 	await expect(editor.getByLabel("図の名前")).toHaveValue(
 		"ブラウザで保存した構成図",
 	);
 	await expect(editor.getByRole("status").first()).toContainText(
-		"保存済み（版 3）",
+		"保存済み（版 2）",
 	);
 	const fail = await request.get(`${api}/fixture/save-failure?enabled=true`, {
 		headers: { authorization: "Bearer fixture-token-for-toolchain-browser" },
@@ -123,7 +118,7 @@ test("MacBook browser fixture: launch, edit, save, reopen, preserve failed draft
 	});
 	await editor.getByRole("button", { name: "保存", exact: true }).click();
 	await expect(editor.getByRole("status").first()).toContainText(
-		"保存済み（版 4）",
+		"保存済み（版 3）",
 	);
 	await expect(editor.getByRole("status").first()).toContainText(
 		"無操作のため接続を解放",
@@ -132,7 +127,7 @@ test("MacBook browser fixture: launch, edit, save, reopen, preserve failed draft
 	const beforeReconnect = gestures;
 	await editor.getByRole("button", { name: "再接続", exact: true }).click();
 	await expect(editor.getByRole("status").first()).toContainText(
-		"保存済み（版 4）",
+		"保存済み（版 3）",
 	);
 	expect(gestures).toBe(beforeReconnect);
 	await request.get(`${api}/fixture/restart`, {
@@ -140,7 +135,7 @@ test("MacBook browser fixture: launch, edit, save, reopen, preserve failed draft
 	});
 	await editor.getByLabel("図の名前").fill("再起動後の図");
 	await expect(editor.getByRole("status").first()).toContainText(
-		"保存済み（版 5）",
+		"保存済み（版 4）",
 	);
 	mkdirSync("spec/verification/excalidraw-artifact-2026-10-14", {
 		recursive: true,
@@ -210,6 +205,7 @@ test("the artifact edits in an iframe, browses thumbnails, protects unsaved work
 	const panel = page.getByRole("complementary", { name: "アーティファクト" });
 	const browse = () =>
 		panel.getByRole("button", { name: "図一覧", exact: true }).click();
+	// The earlier conversation's draft may be shown; start from a fresh one.
 	await browse();
 	await panel
 		.getByRole("menuitem", { name: "新しい図を作成", exact: true })
@@ -229,7 +225,7 @@ test("the artifact edits in an iframe, browses thumbnails, protects unsaved work
 	expect(policy.headers()["x-frame-options"]).toBe("SAMEORIGIN");
 	await panel.getByLabel("図の名前").fill("枠内で保存した図");
 	await expect(panel.getByRole("status").first()).toContainText(
-		"保存済み（版 2）",
+		"保存済み（版 1）",
 	);
 	const rectangle = frame.getByRole("radio", { name: "矩形", exact: true });
 	await rectangle.locator("..").click();
@@ -243,7 +239,7 @@ test("the artifact edits in an iframe, browses thumbnails, protects unsaved work
 	await page.mouse.move(box!.x + box!.width * 0.7, box!.y + box!.height * 0.65);
 	await page.mouse.up();
 	await expect(panel.getByRole("status").first()).toContainText(
-		"保存済み（版 3）",
+		"保存済み（版 2）",
 	);
 	const savedUrl = await element.getAttribute("src");
 	await browse();
@@ -258,7 +254,7 @@ test("the artifact edits in an iframe, browses thumbnails, protects unsaved work
 	await panel.getByRole("menuitem", { name: "枠内で保存した図" }).click();
 	await expect(panel.getByLabel("図の名前")).toHaveValue("枠内で保存した図");
 	await expect(panel.getByRole("status").first()).toContainText(
-		"保存済み（版 3）",
+		"保存済み（版 2）",
 	);
 	const currentFrame = page
 		.frames()
@@ -274,11 +270,11 @@ test("the artifact edits in an iframe, browses thumbnails, protects unsaved work
 	);
 	await currentFrame.evaluate(() => window.location.reload());
 	const document = await (await reloaded).json();
-	expect(document.revision).toBe(3);
+	expect(document.revision).toBe(2);
 	await expect(frame.locator(".excalidraw canvas").first()).toBeVisible();
 	await expect(panel.getByLabel("図の名前")).toHaveValue("枠内で保存した図");
 	await expect(panel.getByRole("status").first()).toContainText(
-		"保存済み（版 3）",
+		"保存済み（版 2）",
 	);
 	if (await page.evaluate(() => document.fullscreenEnabled)) {
 		const before = await element.getAttribute("src");
@@ -313,7 +309,7 @@ test("the artifact edits in an iframe, browses thumbnails, protects unsaved work
 	await request.get(`${api}/fixture/save-failure?enabled=false`, { headers });
 	await panel.getByRole("button", { name: "保存", exact: true }).click();
 	await expect(panel.getByRole("status").first()).toContainText(
-		"保存済み（版 4）",
+		"保存済み（版 3）",
 	);
 	await expect(panel.getByRole("status").first()).toContainText(
 		"無操作のため接続を解放",
@@ -321,13 +317,39 @@ test("the artifact edits in an iframe, browses thumbnails, protects unsaved work
 	);
 	await panel.getByRole("button", { name: "再接続", exact: true }).click();
 	await expect(panel.getByRole("status").first()).toContainText(
-		"保存済み（版 4）",
+		"保存済み（版 3）",
 	);
 	await request.get(`${api}/fixture/restart`, { headers });
 	await panel.getByLabel("図の名前").fill("枠内の再起動後");
 	await expect(panel.getByRole("status").first()).toContainText(
-		"保存済み（版 5）",
+		"保存済み（版 4）",
 	);
+	// Another saved drawing can be deleted from the list; the open one cannot.
+	await browse();
+	await panel
+		.getByRole("menuitem", { name: "新しい図を作成", exact: true })
+		.click();
+	await expect(panel.getByLabel("図の名前")).toHaveValue("新しい図");
+	await panel.getByLabel("図の名前").fill("削除する図");
+	await expect(panel.getByRole("status").first()).toContainText(
+		"保存済み（版 1）",
+	);
+	await browse();
+	await expect(
+		panel.getByRole("button", { name: "削除する図を削除" }),
+	).toHaveCount(0);
+	await panel.getByRole("button", { name: "枠内の再起動後を削除" }).click();
+	await panel
+		.getByRole("group", { name: "枠内の再起動後の削除確認" })
+		.getByRole("button", { name: "削除", exact: true })
+		.click();
+	await expect(
+		panel.getByRole("menuitem", { name: "枠内の再起動後" }),
+	).toHaveCount(0);
+	await expect(
+		panel.getByRole("menuitem", { name: "削除する図" }),
+	).toBeVisible();
+	await panel.getByRole("button", { name: "図一覧を閉じる" }).first().click();
 	expect(savedUrl).not.toMatch(/token|consumer|18790/);
 	await page.screenshot({ path: "/tmp/eumenes-excalidraw-artifact.png" });
 	await panel

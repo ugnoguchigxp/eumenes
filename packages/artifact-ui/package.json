@@ -13,6 +13,7 @@
 	},
 	"dependencies": {
 		"@openuidev/react-lang": "0.3.0",
+		"lucide-react": "^0.556.0",
 		"zod": "4.4.3"
 	},
 	"peerDependencies": {

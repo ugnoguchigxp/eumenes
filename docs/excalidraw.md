@@ -1,6 +1,6 @@
 # Excalidrawの図を描く・編集する
 
-2026年10月14日。Eumenesのアーティファクトメニュー「図を描く・編集する」または会話から編集画面を準備する。編集画面は右側のアーティファクト内にiframeで表示し、会話を見ながら図を編集できる。「図一覧」のメニューから新しい図を作成し、保存済みの図をサムネイルから選ぶ。選択後はメニューを閉じ、編集領域を広く使う。全画面は任意で、切替時にも同じ編集画面を保持する。
+2026年10月14日。Eumenesのアーティファクトメニュー「図を描く・編集する」または会話から編集画面を準備する。編集画面は右側のアーティファクト内にiframeで表示し、会話を見ながら図を編集できる。開いた直後は新しい図の編集画面を表示する。新しい図は何か描くか名前を変えて保存したときに初めてLARMへ作成し、何もしないで閉じた図は保存しない。「図一覧」のメニューから新しい図を作成し、保存済みの図をサムネイルから選ぶ。開いている図以外は一覧の削除ボタンから確認のうえ削除できる。選択後はメニューを閉じ、編集領域を広く使う。全画面は任意で、切替時にも同じ編集画面を保持する。
 
 ## 接続と認証
 
@@ -16,17 +16,19 @@ Linux上のloopback入口をMacBookから直接使わない。MacBook上のbacke
 
 | API | 契約 |
 | --- | --- |
-| POST `/api/excalidraw/sessions` | `requestId`（UUID）、`conversationId`（既定main）、新規の`title`または保存済み`referenceId`、任意の`revision`。202でsessionのstarting/ready/failedを返す。冪等requestIdの内容変更は409 |
+| POST `/api/excalidraw/sessions` | `requestId`（UUID）、`conversationId`（既定main）、新規の`title`または保存済み`referenceId`、任意の`revision`。202でsessionのstarting/ready/failedを返す。冪等requestIdの内容変更は409。新規はleaseだけを確保し、上流の図は作らない |
 | GET `/api/excalidraw/sessions/{id}` | 状態のみ。起動・renew・上流のactivity要求をしない |
 | POST `/api/excalidraw/sessions/{id}/reconnect` | 利用者の操作による再接続。startingは重複起動しない |
 | GET `/api/excalidraw/sessions/{id}/document` | 上流sceneと版を取得。利用者による再表示なので必要なら再起動 |
+| POST `/api/excalidraw/sessions/{id}/document` | 新しい図の初回保存。`title`、`scene`と`Idempotency-Key`が必要。上流へ作成し、保存後のsceneを確認してから参照を作る。応答は図と`referenceId`。作成済みのsessionへの再送は同じ図を返し、同じsessionの同時作成は直列化する。lease交換後の再送は同じキーと同じpayloadで行い、上流がowner＋キーで永続的に重複排除して元の作成結果を返す（内容違いは409）。キーは上流と同じ8〜128文字の英数字・`.`・`_`・`-`だけを受け付ける |
 | PUT `/api/excalidraw/sessions/{id}/document` | `title`、`scene`、`expectedRevision`と`Idempotency-Key`が必要。原本は上流へ保存し、確認後に参照の版を更新 |
 | POST `/api/excalidraw/sessions/{id}/activity` | 編集・キー入力等の実操作で利用権を維持。表示/監視timerから呼ばない |
 | DELETE `/api/excalidraw/sessions/{id}` | 自分のleaseだけを解放。共有serviceの強制停止ではない |
 | GET `/api/excalidraw/references` | 保存済み図ID・版・名前・作成元会話の参照。sceneの二重正本を作らない |
+| DELETE `/api/excalidraw/references/{id}` | `conversationId`（既定main）の参照だけを削除する。短いleaseで上流の`DELETE /api/documents/{documentId}`を確認してから参照を消す。上流のDELETEが404でも、文書を読み取れる場合は削除未対応のhostとして`excalidraw_delete_unsupported`を返し、参照を残す。読み取りも404なら削除済みとして参照を消す。削除した図を開いている編集sessionは閉じ、未保存の内容はブラウザ下書きとダウンロードで保護する。204 |
 | GET `/api/excalidraw/operations` | 会話担当のplanning/starting/completed/failed/cancelled。モデルへ渡す結果とOpenUIの入口 |
 
-ready URLはEumenesのWeb originにある`/#drawing/{referenceId}?revision={revision}`。main以外の会話では`conversationId`もURLへ付け、編集画面の再表示要求へ渡す。会話と参照の一致はbackendで引き続き検査する。URLにcredentialを含めない。歴史版も取得できるが、保存には現在版との一致が必要で、競合時に上書きはしない。版指定を省いた再表示は上流の最新版から復帰する。
+ready URLはEumenesのWeb originにある`/#drawing/{referenceId}?revision={revision}`。新しい図は`/#drawing/new/{draftId}`（任意で`title`・`conversationId`）で、ブラウザ内の未保存の編集画面を開く。初回保存で作成した参照のURLへ再読み込みなしで置き換える。会話から新しい図を頼まれた場合もこの未保存リンクを返し、LARMには接続しない。main以外の会話では`conversationId`もURLへ付け、編集画面の再表示要求へ渡す。会話と参照の一致はbackendで引き続き検査する。URLにcredentialを含めない。歴史版も取得できるが、保存には現在版との一致が必要で、競合時に上書きはしない。版指定を省いた再表示は上流の最新版から復帰する。
 
 アーティファクトはこのURLの同一origin・図ID・版・会話を検証し、専用入口`/excalidraw?embedded=1#drawing/{referenceId}?...`へ変換する。専用入口だけが同一originのiframeを許可し、親子の通知も送信元originとwindowを照合する。通知するのは表示状態と編集操作で、credentialやsceneは渡さない。APIと通常画面の埋め込み拒否は維持する。保存処理は既存のEumenes編集画面とAPIを使用し、原本はLARMに保存する。LARMの画面や認証方式の追加開発は不要。
 

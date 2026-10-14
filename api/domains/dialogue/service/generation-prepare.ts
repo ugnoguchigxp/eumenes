@@ -248,6 +248,16 @@ export function createPrepare(
 				revision: current.revision,
 				messages,
 				actionResultIndex,
+				...(imageResult || musicResult ? { mediaResult: true as const } : {}),
+				...(actionResultIndex !== undefined ||
+				delegated?.receipt ||
+				drawingResult ||
+				recognitionResult ||
+				imageResult ||
+				musicResult ||
+				note
+					? { operationResult: true as const }
+					: {}),
 				...routing,
 				agent,
 				// An empty window still travels: the exchanges recalled for this turn are checked against it.

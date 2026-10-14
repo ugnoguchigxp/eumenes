@@ -13,6 +13,8 @@
 		"api/domains/capabilities/service/index.ts#createCapabilities": 410,
 		"api/domains/coding/service/index.ts#createCoding": 365,
 		"api/domains/dialogue/service/generation-handler.ts#createGenerationHandler": 440,
+		"api/domains/excalidraw/service/index.ts#createExcalidraw": 305,
+		"api/domains/excalidraw/service/operations.ts#registerDrawingOperations": 302,
 		"api/domains/inference/service/index.ts#createInference": 752,
 		"api/domains/larm/service/index.ts#createLarm": 943,
 		"api/domains/larm/service/playground.ts#createLarmPlayground": 696,
@@ -36,6 +38,7 @@
 		"web/src/App.tsx#Workspace": 606,
 		"web/src/components/domains/timers/TimerNotifications.tsx#TimerNotifications": 317,
 		"web/src/domains/audio/controller/index.ts#createAudioController": 546,
+		"web/src/domains/excalidraw/useDrawingEditor.ts#useDrawingEditor": 354,
 		"web/src/domains/voice-dialogue/hooks/index.ts#useVoiceDialogue": 577
 	}
 }

@@ -1,9 +1,14 @@
 import { z } from "zod";
 import { saveDrawing } from "../../../../api/domains/excalidraw/contracts";
-export const draftSchema = saveDrawing.extend({
+// Revision 0 is a new drawing that has no upstream document yet.
+const candidate = saveDrawing.extend({
 	key: z.string().min(1).max(128),
+	expectedRevision: z.number().int().nonnegative(),
+});
+/** referenceId is the saved reference, or the draft id of a new drawing. */
+export const draftSchema = candidate.extend({
 	referenceId: z.uuid(),
-	pending: saveDrawing.extend({ key: z.string().min(1).max(128) }).optional(),
+	pending: candidate.optional(),
 });
 export type DrawingDraft = z.infer<typeof draftSchema>;
 export function drawingDrafts(

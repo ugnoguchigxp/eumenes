@@ -27,12 +27,20 @@ const field = z
 	.strictObject({
 		id: source,
 		label: z.string().min(1).max(120),
-		type: z.enum(["text", "textarea", "number", "select", "boolean"]),
+		type: z.enum([
+			"text",
+			"textarea",
+			"number",
+			"select",
+			"radio",
+			"checkbox",
+			"boolean",
+		]),
 		required: z.boolean().optional(),
 		options: z.array(z.string().min(1).max(120)).min(1).max(8).optional(),
 	})
 	.superRefine((f, ctx) => {
-		if (f.type === "select" && !f.options)
+		if (["select", "radio", "checkbox"].includes(f.type) && !f.options)
 			ctx.addIssue({ code: "custom", message: "選択肢が必要です" });
 	});
 const question = z.strictObject({
@@ -104,6 +112,44 @@ const musicCreationOptions = z
 				ctx.addIssue({ code: "custom", message: "unknown music default" });
 	});
 export const viewRegistry = {
+	"text-block": {
+		name: "TextBlock",
+		label: "見出しと説明文",
+		schema: z.strictObject({
+			view: z.literal("text-block"),
+			source: z.never().optional(),
+			title: z.string().min(1).max(120),
+			body: z.string().max(2000).optional(),
+		}),
+	},
+	"info-card": {
+		name: "InfoCard",
+		label: "情報カード",
+		schema: z.strictObject({
+			view: z.literal("info-card"),
+			source: z.never().optional(),
+			title: z.string().min(1).max(120),
+			body: z.string().max(1000),
+		}),
+	},
+	"ui-workspace": {
+		name: "UiWorkspace",
+		label: "UI制作と保存作品",
+		schema: z.strictObject({
+			view: z.literal("ui-workspace"),
+			source,
+			title,
+			starterPrompts: z
+				.array(
+					z.strictObject({
+						label: z.string().min(1).max(80),
+						prompt: z.string().min(1).max(4000),
+					}),
+				)
+				.max(6)
+				.optional(),
+		}),
+	},
 	"object-recognition-workspace": {
 		name: "ObjectRecognitionWorkspace",
 		label: "物体検出とカメラ入力",
@@ -382,6 +428,7 @@ export const layoutSchema = z
 		direction: z
 			.enum(["stack", "grid", "tabs", "form-preview"])
 			.default("stack"),
+		appearance: z.enum(["clean", "warm", "elegant", "friendly"]).optional(),
 		title,
 		draftSource: source.optional(),
 		headerChildren: z.array(z.number().int().min(0).max(11)).max(12).optional(),
@@ -593,6 +640,24 @@ export type Resource =
 	| QuestionResource
 	| CollectionResource
 	| FormResource
+	| {
+			kind: "ui-workspace";
+			revision: number;
+			items: Array<{
+				id: string;
+				title: string;
+				prompt?: string;
+				state: "generating" | "ready" | "failed" | "cancelled";
+				updatedAt: number;
+				generation: number;
+				definition?: unknown;
+				description?: string;
+				errorCode?: string;
+				motifId?: string;
+			}>;
+			images: Array<{ id: string; title?: string }>;
+			selectedId?: string;
+	  }
 	| MemoryResource
 	| SettingsResource
 	| { kind: "components"; revision: number; example?: string };
@@ -612,6 +677,7 @@ export type ArtifactEvent = {
 		| "drawing-new"
 		| "drawing-open"
 		| "drawing-refresh"
+		| "drawing-delete"
 		| "drawing-browse"
 		| "image-close"
 		| "image-delete"
@@ -644,6 +710,10 @@ export type ArtifactEvent = {
 		| "stopwatch-reset"
 		| "answer"
 		| "submit"
+		| "ui-generate"
+		| "ui-cancel"
+		| "ui-select"
+		| "ui-refresh"
 		| "memory-correct"
 		| "memory-select"
 		| "settings-save"
@@ -651,6 +721,7 @@ export type ArtifactEvent = {
 		| "music-select"
 		| "music-generate"
 		| "music-cancel"
+		| "music-artwork"
 		| "music-search"
 		| "music-more"
 		| "music-refresh"

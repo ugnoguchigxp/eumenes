@@ -29,12 +29,12 @@
 
 profile・skill・packageは`object-recognition.manage@1`、toolは同ID@1。toolchain `object-recognition.manage@1`、関数`object_recognition({request})`。既存command担当がflat toolのopen/read/cancelを選ぶ。readとcancelの対象は保存済みsnapshotのみ。SystemContextは登録profile・SKILL・tool schemaと汎用command規則を合成する。
 
-DesignSystemの`ObjectRecognitionWorkspace`をOpenUI view `object-recognition-workspace`として登録。JSONにはsourceだけを保存し、媒体Blob URL・業務状態・Fileを埋め込まない。撮影Fileは既存JSON eventでは表現できないため、共通runtimeに一時的なhost uploadFile bridgeを追加した。hostがsourceを検査して認証済みAPIへ送る。表示JSONと任意API実行権を結び付けない。
+画面は`object-recognition-screen.bundle.json`の単独公開artifact `object-recognition.workspace@1`として登録する。backendの`object-recognition-screen` adapterが履歴sourceを提供し、Webの登録adapterが既存の認証済みAPIへ撮影・アップロード・取消などを接続する。会話用の`object-recognition.manage@1`は従来の経路を維持する。DesignSystemの`ObjectRecognitionWorkspace`をOpenUI view `object-recognition-workspace`として表示し、カメラのキャプチャを左、撮影・録画と検出物を右に置く。JSONにはsourceだけを保存し、媒体Blob URL・業務状態・Fileを埋め込まない。撮影Fileは既存JSON eventでは表現できないため、共通runtimeのhost uploadFile bridgeで認証済みAPIへ送る。表示JSONと任意API実行権を結び付けない。
 
 80クラスの検出で、動画30秒、毎秒2枚・最大60枚。追跡ID・任意クラス指定・人物同定はない。scoreは校正済み確率ではなく、各フレームの同じlabelを同一個体として数えない。カメラは明示操作で開き、終了・非表示・アンマウントでtrackを解放する。動画撮影はブラウザのMediaRecorder対応形式を使い、30秒上限を越えないよう29秒で自動終了する。上流が媒体形式・長さ・decodeの最終検査を行う。
 
 ## 検証
 
-`bun run verify -- --domain object-recognition`、影響のある利用側domainのverify。API結合は`api/application/object-recognition-e2e.test.ts`、ブラウザfixtureは`tests/browser/object-recognition.spec.ts`。カメラfixtureはChromiumの仮想カメラで、MacBook実カメラ受入とは区別する。
+`bun run verify -- --domain object-recognition`、影響のある利用側domainのverify。登録の試験は`api/application/object-recognition-screen-adapter.test.ts`、API結合は`api/application/object-recognition-e2e.test.ts`、ブラウザfixtureは`tests/browser/object-recognition.spec.ts`。カメラfixtureはChromiumの仮想カメラで、MacBook実カメラ受入とは区別する。
 
 `bun scripts/object-recognition-live.ts`はbackend settingsのreadonly保存設定を確認する。`--file <path>`を指定すると、設定済みの稼働backendの公開APIへ一度送信し、完了・元媒体取得を確認する。credentialsや本文を証拠に保存しない。正式配備は設定の有無だけでは確認済みとしない。記録は[作業記録](../spec/object-recognition-work-record-2026-10-13.md)。

@@ -20,6 +20,8 @@ LLMのみの要求は `providers: ["llm"]`、音声の要求は `providers` を�
 
 担当の指示・schema・package版は変更していません。非同期ジョブ、生成POSTの自動再送禁止、取消後の結果不採用、Artifactの構成も既存経路を使います。ライブラリ・タグ検索・お気に入り・Range中継と再生プレイヤーの拡張は別作業です。
 
+楽曲イメージは楽曲と同時には作りません。完成した楽曲の「楽曲イメージ」表示で利用者が「イメージを作成」を押すと、`POST /api/music/:id/artwork` が music domain のジョブ `music.artwork` を積み、その曲のタイトル・説明・制作プロンプトから画像プロンプトを組み立てて `SAAA-w-Image` / `qwen-image-2.1-turbo` で256×256のPNGを1枚生成します（文字は描かせず、曲名は画面側で重ねて表示）。画像は楽曲行に保存し、`GET /api/music/:id/artwork` で取得します。LARM側に作られた画像は取得後に削除し、画像スタジオの一覧には残しません。完成後は「作り直す」で新しいrevisionとして再生成でき、古いジョブの結果は採用しません。画面操作は `artifact:music.generation@2` の `music-artwork` actionです。
+
 `bun scripts/music-live.ts --run` は隔離環境から短い確認曲を1曲生成し、Opusのデコード・長さ・既存Artifactでの再生を確認します。完了した確認曲だけをLARMから削除し、404で削除を確認します。
 
 ## 画像生成

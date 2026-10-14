@@ -9,18 +9,22 @@ import {
 	cleanup,
 	fireEvent,
 	waitFor,
+	within,
 } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 afterEach(cleanup);
 const definition = JSON.stringify({ view: "drawing-workspace", source: "d" });
-function show(url: string) {
+function show(
+	url: string,
+	references = [{ id: "other", title: "別の図", revision: 2 }],
+) {
 	const snapshot: Snapshot = {
 		d: {
 			kind: "drawing-workspace",
 			revision: 1,
 			status: "利用可能",
 			url,
-			references: [{ id: "other", title: "別の図", revision: 2 }],
+			references,
 		},
 	};
 	const dispatch = vi.fn(async (_event: ArtifactEvent) => ({
@@ -146,4 +150,84 @@ test("foreign frame messages cannot alter controls; unsaved state refuses select
 	expect(event.defaultPrevented).toBe(true);
 	await new Promise((resolve) => setTimeout(resolve, 0));
 	expect(close).not.toHaveBeenCalled();
+});
+test("a new drawing's draft link becomes the editor; only other saved drawings can be deleted after confirmation", async () => {
+	const draftId = crypto.randomUUID();
+	const dispatch = show(
+		`${window.location.origin}/#drawing/new/${draftId}?title=%E6%96%B0%E3%81%97%E3%81%84%E5%9B%B3`,
+	);
+	const frame = (await screen.findByTitle(
+		"Excalidraw編集画面",
+	)) as HTMLIFrameElement;
+	expect(frame.src).toContain(`/excalidraw?embedded=1#drawing/new/${draftId}`);
+	fireEvent(
+		window,
+		new MessageEvent("message", {
+			origin: window.location.origin,
+			source: frame.contentWindow,
+			data: {
+				type: "eumenes:drawing-state",
+				referenceId: draftId,
+				title: "新しい図",
+				status: "新しい図です。",
+				error: "",
+				busy: false,
+				hasDraft: false,
+				dirty: false,
+				loaded: true,
+			},
+		}),
+	);
+	expect((screen.getByLabelText("図の名前") as HTMLInputElement).value).toBe(
+		"新しい図",
+	);
+	fireEvent.click(screen.getByRole("button", { name: "図一覧" }));
+	fireEvent.click(await screen.findByRole("button", { name: "別の図を削除" }));
+	const confirm = screen.getByRole("group", { name: "別の図の削除確認" });
+	expect(
+		dispatch.mock.calls.some(([event]) => event.action === "drawing-delete"),
+	).toBe(false);
+	fireEvent.click(within(confirm).getByRole("button", { name: "削除" }));
+	await waitFor(() =>
+		expect(dispatch).toHaveBeenCalledWith(
+			expect.objectContaining({
+				action: "drawing-delete",
+				values: { id: "other" },
+			}),
+		),
+	);
+});
+test("the drawing open in the editor offers no delete button", async () => {
+	const id = crypto.randomUUID();
+	show(`${window.location.origin}/#drawing/${id}`, [
+		{ id, title: "開いている図", revision: 1 },
+		{ id: "other", title: "別の図", revision: 2 },
+	]);
+	const frame = (await screen.findByTitle(
+		"Excalidraw編集画面",
+	)) as HTMLIFrameElement;
+	fireEvent(
+		window,
+		new MessageEvent("message", {
+			origin: window.location.origin,
+			source: frame.contentWindow,
+			data: {
+				type: "eumenes:drawing-state",
+				referenceId: id,
+				title: "開いている図",
+				status: "保存済み",
+				error: "",
+				busy: false,
+				hasDraft: false,
+				dirty: false,
+				loaded: true,
+				revision: 1,
+			},
+		}),
+	);
+	fireEvent.click(screen.getByRole("button", { name: "図一覧" }));
+	expect(screen.getByRole("button", { name: "別の図を削除" })).toBeTruthy();
+	expect(
+		screen.queryByRole("button", { name: "開いている図を削除" }),
+	).toBeNull();
 });

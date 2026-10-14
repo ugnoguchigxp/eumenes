@@ -84,5 +84,19 @@ export function musicClient(t: Transport) {
 			(
 				await t.call(`/api/music/${encodeURIComponent(id)}/audio`, { signal })
 			).blob(),
+		generateMusicArtwork: async (id: string) =>
+			musicRecord.parse(
+				await (
+					await t.call(`/api/music/${encodeURIComponent(id)}/artwork`, {
+						method: "POST",
+					})
+				).json(),
+			),
+		musicArtwork: async (id: string, signal?: AbortSignal) =>
+			(
+				await t.call(`/api/music/${encodeURIComponent(id)}/artwork`, {
+					signal,
+				})
+			).blob(),
 	};
 }

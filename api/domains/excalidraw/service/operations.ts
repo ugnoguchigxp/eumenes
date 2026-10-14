@@ -188,18 +188,23 @@ export function registerDrawingOperations(deps: {
 				fail(db, r, "excalidraw_reference_not_found");
 				return "applied";
 			}
+			// A new drawing is an unsaved local editor; LARM is reached only by its first save.
+			const opens = plan.action === "open";
 			patch(db, r, {
-				state: plan.action === "library" ? "completed" : "starting",
-				referenceId: plan.action === "open" ? plan.referenceId : null,
+				state: opens ? "starting" : "completed",
+				referenceId: opens ? plan.referenceId : null,
 				title: plan.title,
 				action: plan.action,
+				...(plan.action === "create"
+					? { url: service.draftUrl(r.conversation_id, plan.title) }
+					: {}),
 			});
 			// A plan is not an external success. The second job starts after the accepted receipt commits.
 			db.query(
 				"UPDATE excalidraw_operations SET request_json=? WHERE id=?",
 			).run(JSON.stringify(plan), r.id);
-			if (plan.action === "library") deps.onFinished(db, r.run_id);
-			else enqueue(db, r, "open");
+			if (opens) enqueue(db, r, "open");
+			else deps.onFinished(db, r.run_id);
 			return "applied";
 		},
 		cancelInTransaction: cancel,
@@ -227,7 +232,7 @@ export function registerDrawingOperations(deps: {
 				requestId: r.id,
 				conversationId: r.conversation_id,
 				title: plan.title,
-				...(plan.referenceId ? { referenceId: plan.referenceId } : {}),
+				referenceId: plan.referenceId!,
 				...(plan.revision ? { revision: plan.revision } : {}),
 			});
 			const abort = () => {

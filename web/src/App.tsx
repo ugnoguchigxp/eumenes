@@ -31,9 +31,7 @@ export function App() {
 					<DrawingEditor
 						key={hash}
 						client={client}
-						referenceId={drawing.referenceId}
-						revision={drawing.revision}
-						conversationId={drawing.conversationId}
+						location={drawing}
 						embedded={
 							window.location.pathname === "/excalidraw" &&
 							new URLSearchParams(window.location.search).get("embedded") ===

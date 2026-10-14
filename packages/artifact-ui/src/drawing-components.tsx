@@ -7,7 +7,7 @@ import { useAction } from "./components";
 import { z } from "zod";
 export type DrawingResource = Omit<
 	DrawingWorkspaceProps,
-	"onNew" | "onOpen" | "onRefresh" | "onBrowse"
+	"onNew" | "onOpen" | "onRefresh" | "onDelete" | "onBrowse"
 > & { kind: "drawing-workspace"; revision: number };
 export function DrawingWorkspaceView({
 	request,
@@ -20,26 +20,33 @@ export function DrawingWorkspaceView({
 	let url: string | undefined;
 	try {
 		const target = new URL(r.url ?? "", window.location.origin);
-		const match = /^#drawing\/([a-f0-9-]{36})(?:\?(.*))?$/.exec(target.hash);
-		const context = new URLSearchParams(match?.[2]);
+		// A saved reference, or a new drawing's draft that is stored only by its first save.
+		const match = /^#drawing\/(new\/)?([a-f0-9-]{36})(?:\?(.*))?$/.exec(
+			target.hash,
+		);
+		const keys = match?.[1]
+			? ["title", "conversationId"]
+			: ["revision", "conversationId"];
+		const context = new URLSearchParams(match?.[3]);
 		if (
 			r.url &&
 			target.origin === window.location.origin &&
 			!target.username &&
 			!target.password &&
 			match &&
-			z.uuid().safeParse(match[1]).success &&
+			z.uuid().safeParse(match[2]).success &&
 			(!context.has("revision") ||
 				(/^\d+$/.test(context.get("revision")!) &&
 					Number.isSafeInteger(Number(context.get("revision"))) &&
 					Number(context.get("revision")) > 0)) &&
+			(!context.has("title") ||
+				(context.get("title")!.length > 0 &&
+					context.get("title")!.length <= 200)) &&
 			(!context.has("conversationId") ||
 				(context.get("conversationId")!.length > 0 &&
 					context.get("conversationId")!.length <= 128)) &&
 			[...context.keys()].every(
-				(key) =>
-					["revision", "conversationId"].includes(key) &&
-					context.getAll(key).length === 1,
+				(key) => keys.includes(key) && context.getAll(key).length === 1,
 			)
 		) {
 			target.pathname = "/excalidraw";
@@ -64,6 +71,7 @@ export function DrawingWorkspaceView({
 			onRefresh={() => {
 				void action.send("drawing-refresh", {});
 			}}
+			onDelete={(id) => action.send("drawing-delete", { id })}
 		/>
 	);
 }

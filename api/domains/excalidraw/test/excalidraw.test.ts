@@ -38,6 +38,29 @@ async function setup() {
 		},
 	};
 }
+const blank = {
+	elements: [],
+	appState: { viewBackgroundColor: "#ffffff" },
+	files: {},
+};
+/** A new drawing exists upstream only after its first save. */
+async function created(
+	h: Awaited<ReturnType<typeof setup>>,
+	input: Record<string, unknown> = {},
+) {
+	const s = await h.service.session({
+		requestId: crypto.randomUUID(),
+		...input,
+	});
+	await h.service.wait(s.id);
+	const doc = await h.service.create(
+		s.id,
+		{ title: "図", scene: blank },
+		crypto.randomUUID(),
+		AbortSignal.timeout(1000),
+	);
+	return { ...h.service.get(s.id)!, doc };
+}
 test("cold startup returns only an authenticated browser entry; save creates confirmed versions, idle/poll/restart preserve the reference", async () => {
 	const h = await setup();
 	try {
@@ -47,9 +70,36 @@ test("cold startup returns only an authenticated browser entry; save creates con
 		expect(starting.url).toBeNull();
 		const ready = (await h.service.wait(starting.id))!;
 		expect(ready.state).toBe("ready");
-		expect(ready.url).toMatch(
+		// Opening a new drawing leases only; nothing is stored until the first save.
+		expect(ready.url).toBeNull();
+		expect(ready.referenceId).toBeNull();
+		expect(h.f.documents.size).toBe(0);
+		expect(h.f.requests.some((r) => r.path.startsWith("/api/documents"))).toBe(
+			false,
+		);
+		const createKey = crypto.randomUUID();
+		const first = await h.service.create(
+			starting.id,
+			{ title: "構成図", scene: blank },
+			createKey,
+			AbortSignal.timeout(1000),
+		);
+		expect(first.revision).toBe(1);
+		expect(h.service.get(starting.id)?.url).toMatch(
 			/^http:\/\/127.0.0.1:5173\/#drawing\/.*\?revision=1$/,
 		);
+		// A retry after a lost response returns the same document, never a second one.
+		expect(
+			(
+				await h.service.create(
+					starting.id,
+					{ title: "構成図", scene: blank },
+					createKey,
+					AbortSignal.timeout(1000),
+				)
+			).referenceId,
+		).toBe(first.referenceId);
+		expect(h.f.documents.size).toBe(1);
 		expect(
 			h.f.requests.find(
 				(r) => r.method === "POST" && r.path.endsWith("/leases"),
@@ -129,8 +179,7 @@ test("cold startup returns only an authenticated browser entry; save creates con
 test("save failure never advances the reference; retries are idempotent and old revisions conflict", async () => {
 	const h = await setup();
 	try {
-		const s = await h.service.session({ requestId: crypto.randomUUID() });
-		await h.service.wait(s.id);
+		const s = await created(h);
 		const d = await h.service.document(s.id, AbortSignal.timeout(1000)),
 			body = { title: "retry", expectedRevision: d.revision, scene: d.scene },
 			key = crypto.randomUUID();
@@ -160,8 +209,7 @@ test("save failure never advances the reference; retries are idempotent and old 
 test("binding changes are rejected; closing during startup discards the late result and releases only its own lease", async () => {
 	const h = await setup();
 	try {
-		const s = await h.service.session({ requestId: crypto.randomUUID() });
-		await h.service.wait(s.id);
+		const s = await created(h);
 		h.f.changeBinding();
 		await expect(
 			h.service.document(s.id, AbortSignal.timeout(1000)),
@@ -192,8 +240,7 @@ test("binding changes are rejected; closing during startup discards the late res
 test("a reference cannot be reopened under a different conversation", async () => {
 	const h = await setup();
 	try {
-		const s = await h.service.session({ requestId: crypto.randomUUID() });
-		await h.service.wait(s.id);
+		await created(h);
 		await expect(
 			h.service.session({
 				requestId: crypto.randomUUID(),
@@ -249,11 +296,7 @@ test("browser entry retains the owning conversation and can reopen its version w
 	const h = await setup();
 	try {
 		const conversationId = "design / 構成 & review";
-		const opening = await h.service.session({
-			requestId: crypto.randomUUID(),
-			conversationId,
-		});
-		const ready = (await h.service.wait(opening.id))!;
+		const ready = await created(h, { conversationId });
 		const hash = new URL(ready.url!).hash;
 		const query = new URLSearchParams(hash.slice(hash.indexOf("?") + 1));
 		expect(query.get("conversationId")).toBe(conversationId);
@@ -303,5 +346,129 @@ test("a cancelled activity acquisition cannot release the replacement reconnect 
 	} finally {
 		continueEnsure();
 		await c.close();
+	}
+});
+
+test("deleting a drawing removes the upstream document before its reference, within its conversation", async () => {
+	const h = await setup();
+	try {
+		const kept = await created(h);
+		const gone = await created(h);
+		await expect(h.service.remove(gone.referenceId!, "other")).rejects.toThrow(
+			"excalidraw_reference_not_found",
+		);
+		// Only a confirmed deletion (or a document that is gone) removes the reference.
+		h.f.failSave(true);
+		await expect(h.service.remove(gone.referenceId!, "main")).rejects.toThrow(
+			"excalidraw_http_503",
+		);
+		expect(h.service.list("main")).toHaveLength(2);
+		h.f.failSave(false);
+		await h.service.remove(gone.referenceId!, "main");
+		expect(h.service.list("main").map((r) => r.id)).toEqual([
+			kept.referenceId!,
+		]);
+		expect(h.f.documents.has(gone.doc.id)).toBe(false);
+		expect(h.f.documents.has(kept.doc.id)).toBe(true);
+		// An upstream document that is already gone still releases its reference.
+		h.f.documents.delete(kept.doc.id);
+		await h.service.remove(kept.referenceId!, "main");
+		expect(h.service.list("main")).toHaveLength(0);
+		await expect(h.service.remove(kept.referenceId!, "main")).rejects.toThrow(
+			"excalidraw_reference_not_found",
+		);
+		// Deletion releases its own lease and those of editors on the deleted drawings.
+		expect(
+			[...h.f.leases.values()].filter((l) => l.status === "ready"),
+		).toHaveLength(0);
+	} finally {
+		await h.close();
+	}
+});
+
+test("deleting closes editors still open on the drawing; a host without the delete route keeps the reference", async () => {
+	const h = await setup();
+	try {
+		const open = await created(h);
+		h.f.deleteRoute(false);
+		await expect(h.service.remove(open.referenceId!, "main")).rejects.toThrow(
+			"excalidraw_delete_unsupported",
+		);
+		expect(h.service.list("main")).toHaveLength(1);
+		h.f.deleteRoute(true);
+		await h.service.remove(open.referenceId!, "main");
+		expect(h.service.get(open.id)?.state).toBe("closed");
+		await expect(
+			h.service.save(
+				open.id,
+				{ title: "x", scene: blank, expectedRevision: 1 },
+				crypto.randomUUID(),
+				AbortSignal.timeout(1000),
+			),
+		).rejects.toThrow("excalidraw_session_not_found");
+		const reopened = await h.service.session({
+			requestId: crypto.randomUUID(),
+			title: "別",
+		});
+		await h.service.wait(reopened.id);
+		await expect(
+			h.service.session({
+				requestId: crypto.randomUUID(),
+				referenceId: open.referenceId!,
+			}),
+		).rejects.toThrow("excalidraw_reference_not_found");
+	} finally {
+		await h.close();
+	}
+});
+test("concurrent first saves of one session create a single document", async () => {
+	const h = await setup();
+	try {
+		const s = await h.service.session({ requestId: crypto.randomUUID() });
+		await h.service.wait(s.id);
+		const save = (title: string) =>
+			h.service.create(
+				s.id,
+				{ title, scene: blank },
+				crypto.randomUUID(),
+				AbortSignal.timeout(1000),
+			);
+		const [a, b] = await Promise.all([save("一"), save("二")]);
+		expect(a.referenceId).toBe(b.referenceId);
+		expect(h.f.documents.size).toBe(1);
+	} finally {
+		await h.close();
+	}
+});
+
+test("a first save retried on a new lease with the same key adopts the original document", async () => {
+	const h = await setup();
+	try {
+		const key = crypto.randomUUID(),
+			input = { title: "応答喪失", scene: blank };
+		const first = await h.service.session({ requestId: crypto.randomUUID() });
+		await h.service.wait(first.id);
+		const original = await h.service.create(
+			first.id,
+			input,
+			key,
+			AbortSignal.timeout(1000),
+		);
+		// The response was lost: the editor opens a new lease and resends the same key and payload.
+		await h.service.release(first.id);
+		const retry = await h.service.session({ requestId: crypto.randomUUID() });
+		await h.service.wait(retry.id);
+		const again = await h.service.create(
+			retry.id,
+			input,
+			key,
+			AbortSignal.timeout(1000),
+		);
+		expect(again.id).toBe(original.id);
+		expect(again.referenceId).toBe(original.referenceId);
+		expect(h.f.documents.size).toBe(1);
+		expect(h.service.list("main")).toHaveLength(1);
+	} finally {
+		await h.close();
 	}
 });

@@ -22,7 +22,6 @@ import {
 	type SelectionDraft,
 } from "./selection-trace";
 import { generateConversation } from "./conversation-generation";
-import { reviewConversationAnswer } from "./conversation-routing";
 import { researchCitations } from "./research-citations";
 import { type Run, type WorldContextSettleInput } from "../contracts";
 import { byId, transition } from "../repository";
@@ -51,6 +50,26 @@ function answerCollection(run: Run | null, input: GenerateInput) {
 				},
 			}
 		: undefined;
+}
+
+function verifiedAnswerLinks(text: string, input: GenerateInput) {
+	if (input.mediaResult)
+		return researchCitations(text, null, { preserveLinkLabels: false });
+	if (input.agent?.projection || input.agent?.failureCode)
+		return researchCitations(text, input.agent.projection);
+	return text;
+}
+
+function shouldHoldBody(input: GenerateInput) {
+	return !!(
+		(input.memory && !input.memory.quiet) ||
+		input.world ||
+		input.worldUsed ||
+		input.agent?.projection ||
+		input.agent?.failureCode ||
+		input.agent?.actionPayload ||
+		input.mediaResult
+	);
 }
 
 /** The queue handler of one generation: prepare, execute, settle (adopt) and cancel. */
@@ -130,14 +149,7 @@ export function createGenerationHandler(
 						};
 						signal.throwIfAborted();
 					}
-					let holdBody = !!(
-						(input.memory && !input.memory.quiet) ||
-						input.world ||
-						input.worldUsed ||
-						input.agent?.projection ||
-						input.agent?.failureCode ||
-						input.agent?.actionPayload
-					);
+					let holdBody = shouldHoldBody(input);
 					if (input.world && worldContext) {
 						// The last gate before the model. A source, policy or forget change makes
 						// the context stale; a stopped run or a replaced attempt must not send either.
@@ -193,10 +205,10 @@ export function createGenerationHandler(
 						generated = await generateConversation({
 							inference: larm,
 							requestId: input.requestId,
-							messages: decision.messages,
+							messages: decision.selectionMessages ?? decision.messages,
 							signal,
-							delta,
-							preparation,
+							delta: decision.selectionMessages ? () => {} : delta,
+							preparation: decision.selectionMessages ? undefined : preparation,
 							tools: decision.tools,
 							cards: decision.cards,
 							openQuestions: decision.openQuestions,
@@ -214,8 +226,6 @@ export function createGenerationHandler(
 							await recordRejected(deps, input.runId, decision.draft);
 						throw error;
 					}
-					let { text } = generated;
-					const { receipt } = generated;
 					if (generated.operation) {
 						if (!deps.toolchains || input.agent)
 							throw new Error("invalid_conversation_operation");
@@ -226,17 +236,23 @@ export function createGenerationHandler(
 							recallPins,
 						};
 					}
-					const reviewed = await reviewConversationAnswer(
-						deps,
-						run!,
-						input,
-						decision,
-						signal,
-					);
-					if (reviewed.operation) {
-						partials.delete(input.runId);
-						return { ...reviewed, text: "", recallPins };
+					if (decision.selectionMessages && decision.answerMessages) {
+						// Selection prose has no authority as an answer; answer with the full exchange.
+						generated = await generateConversation({
+							inference: larm,
+							requestId: input.requestId,
+							messages: decision.answerMessages,
+							signal,
+							delta,
+							preparation,
+							repair: () => {
+								partials.delete(input.runId);
+								held = 0;
+								publish(input.runId);
+							},
+						});
 					}
+					const { text, receipt } = generated;
 					const answered = decision.draft("answer", {
 						repaired: generated.repaired,
 					});
@@ -248,9 +264,12 @@ export function createGenerationHandler(
 					} else if (text.length > prefix.length)
 						delta(text.slice(prefix.length));
 					log.info("dialogue.generation_completed");
-					if (input.agent?.projection || input.agent?.failureCode)
-						text = researchCitations(text, input.agent.projection);
-					return { text, receipt, selection: answered, recallPins };
+					return {
+						text: verifiedAnswerLinks(text, input),
+						receipt,
+						selection: answered,
+						recallPins,
+					};
 				},
 			);
 		},

@@ -8,6 +8,7 @@ export type PlaylistTrack = {
 	createdAt?: string;
 	favorite?: boolean;
 	artworkUrl?: string;
+	artworkStatus?: "generating" | "completed" | "failed";
 	lyrics?: string;
 	prompt?: string;
 	model?: string;

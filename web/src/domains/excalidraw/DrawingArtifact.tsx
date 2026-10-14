@@ -3,9 +3,9 @@ import { useQuery } from "@tanstack/react-query";
 import { ArtifactRenderer, type ArtifactRuntime } from "@eumenes/artifact-ui";
 import type { EumenesClient } from "../../../../client";
 import type { DrawingSession } from "../../../../api/domains/excalidraw/contracts";
-import { isDrawingFrameState } from "@eumenes/design-system";
+import { isDrawingFrameOf, isDrawingFrameState } from "@eumenes/design-system";
 import { useDrawingPreviews } from "./useDrawingPreviews";
-import { drawingLocation } from "./location";
+import { draftDrawingHash, drawingLocation } from "./location";
 import { queryRoots } from "../../queryKeys";
 const emptyReferences: Awaited<ReturnType<EumenesClient["drawingReferences"]>> =
 	[];
@@ -29,6 +29,10 @@ export function DrawingArtifact({
 	const root = useRef<HTMLDivElement>(null),
 		ownedFrames = useRef(new Set<string>());
 	const [browsing, setBrowsing] = useState(false);
+	// The artifact opens on a new, unsaved drawing; LARM is reached only by its first save.
+	const [draftUrl, setDraftUrl] = useState(
+		() => `${window.location.origin}/${draftDrawingHash()}`,
+	);
 	const refs = useQuery({
 		queryKey: [queryRoots.drawings, client.identity],
 		queryFn: ({ signal }) => client.drawingReferences("main", signal),
@@ -48,11 +52,7 @@ export function DrawingArtifact({
 				!isDrawingFrameState(e.data)
 			)
 				return;
-			if (
-				drawingLocation(new URL(frame.src).hash)?.referenceId !==
-				e.data.referenceId
-			)
-				return;
+			if (!isDrawingFrameOf(frame, e.data.referenceId)) return;
 			if (e.data.sessionId) ownedFrames.current.add(e.data.sessionId);
 		};
 		const owned = ownedFrames.current;
@@ -93,7 +93,8 @@ export function DrawingArtifact({
 	);
 	const operationId = latestOp?.id,
 		operationState = latestOp?.state,
-		operationSession = latestOp?.sessionId;
+		operationSession = latestOp?.sessionId,
+		operationUrl = latestOp?.url;
 	useEffect(() => {
 		if (
 			!operationId ||
@@ -108,6 +109,12 @@ export function DrawingArtifact({
 			const incoming = operationSession
 				? await client.drawingSession(operationSession)
 				: null;
+			// A conversation's new drawing is a draft link; it has no session until saved.
+			const draft =
+				!incoming && operationUrl
+					? drawingLocation(new URL(operationUrl).hash)
+					: null;
+			if (draft?.kind === "new") setDraftUrl(operationUrl!);
 			if (disposed) return;
 			if (prior && prior !== incoming?.id)
 				await client.releaseDrawing(prior).catch(() => {});
@@ -125,6 +132,7 @@ export function DrawingArtifact({
 		operationId,
 		operationState,
 		operationSession,
+		operationUrl,
 		client,
 		refresh,
 		session?.id,
@@ -153,10 +161,12 @@ export function DrawingArtifact({
 				busy,
 				url: busy
 					? undefined
-					: (shown?.url ??
-						(shown?.state === "idle" && latestOp?.sessionId === shown.id
-							? (latestOp.url ?? undefined)
-							: undefined)),
+					: shown
+						? (shown.url ??
+							(shown.state === "idle" && latestOp?.sessionId === shown.id
+								? (latestOp.url ?? undefined)
+								: undefined))
+						: draftUrl,
 			},
 		},
 		dispatch: async (e) => {
@@ -173,34 +183,52 @@ export function DrawingArtifact({
 			if (e.source !== "drawings" || e.revision !== revision || busy)
 				return { status: "conflict", message: "画面を再表示してください" };
 			if (
-				!["drawing-new", "drawing-open", "drawing-refresh"].includes(e.action)
+				![
+					"drawing-new",
+					"drawing-open",
+					"drawing-refresh",
+					"drawing-delete",
+				].includes(e.action)
 			)
 				return { status: "rejected", message: "この操作は利用できません" };
 			events.current.add(e.id);
 			setError("");
 			try {
 				if (e.action === "drawing-refresh") await refs.refetch();
-				else {
-					const refId =
-						e.action === "drawing-open" && typeof e.values.id === "string"
-							? e.values.id
-							: undefined;
+				else if (e.action === "drawing-delete") {
+					const id = typeof e.values.id === "string" ? e.values.id : "";
+					// The open drawing is never deleted underneath its editor.
+					if (!refs.data?.some((r) => r.id === id) || shown?.referenceId === id)
+						throw new Error("図を確認できませんでした。");
+					await client.deleteDrawing(id);
+					await refs.refetch();
+				} else if (e.action === "drawing-new") {
+					if (active.current) await client.releaseDrawing(active.current);
+					active.current = null;
+					setSession(null);
+					setDraftUrl(`${window.location.origin}/${draftDrawingHash()}`);
+				} else {
+					const refId = e.values.id;
 					if (
-						e.action === "drawing-open" &&
+						typeof refId !== "string" ||
 						!refs.data?.some((r) => r.id === refId)
 					)
 						throw new Error("図を確認できませんでした。");
 					if (active.current) await client.releaseDrawing(active.current);
 					const s = await client.openDrawing({
 						requestId: e.id,
-						...(refId ? { referenceId: refId } : {}),
+						referenceId: refId,
 					});
 					active.current = s.id;
 					setSession(s);
 				}
 				return { status: "accepted", message: "操作を受け付けました" };
 			} catch {
-				setError("Excalidrawに接続できませんでした。");
+				setError(
+					e.action === "drawing-delete"
+						? "図を削除できませんでした。"
+						: "Excalidrawに接続できませんでした。",
+				);
 				return { status: "rejected", message: "接続できませんでした" };
 			}
 		},

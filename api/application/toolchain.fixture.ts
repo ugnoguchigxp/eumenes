@@ -5,7 +5,8 @@ import {
 import type { DrawingConnection } from "../domains/excalidraw";
 import { createObjectRecognition } from "../domains/object-recognition";
 import { CONVERSATION_DEFAULT_PRINCIPAL } from "../domains/conversation/contracts";
-import { createImage } from "../domains/image";
+import { createImage, type ImageService } from "../domains/image";
+import { createUiCompositions } from "../domains/ui-compositions";
 import { createMusic } from "../domains/music";
 import type { LarmPlayground } from "../domains/larm";
 import {
@@ -62,6 +63,12 @@ export async function harness(
 		model?: LarmPort;
 		musicGateway?: () => LarmPlayground;
 		imageGateway?: () => LarmPlayground;
+		uiCompositions?: boolean;
+		uiDesignOutput?: unknown;
+		routeTool?: string;
+		command?: (
+			messages: import("../domains/inference/contracts").Messages,
+		) => string;
 		drawingConnection?: () => DrawingConnection;
 		drawingFetch?: typeof fetch;
 		drawingIdleMs?: number;
@@ -143,6 +150,11 @@ export async function harness(
 		},
 		answer: async (messages, _signal, callOptions) => {
 			calls++;
+			if (
+				options.uiCompositions &&
+				messages[0]?.content.includes("あなたはOpenUI画面の制作担当です")
+			)
+				return JSON.stringify(options.uiDesignOutput ?? {});
 			if (messages[0]!.content.includes("転記された発話の主要な言語"))
 				return JSON.stringify({
 					status: "identified",
@@ -168,6 +180,8 @@ export async function harness(
 					]);
 					return "";
 				};
+				if (options.routeTool)
+					return send(options.routeTool, { request: question });
 				// The conversation only hands the request to a toolchain; its sub-agent decides the rest.
 				if (options.timers && /タイマー/.test(question))
 					return send("timer", { request: question });
@@ -186,6 +200,7 @@ export async function harness(
 			}
 			if (system.includes("あなたはこのツールチェーンの操作担当です")) {
 				commandContexts.push(JSON.stringify(messages));
+				if (options.command) return options.command(messages);
 				const data = JSON.parse(question) as {
 					request: string;
 					snapshot?: {
@@ -462,6 +477,18 @@ export async function harness(
 		conversation,
 		ttsDictionary: createTtsDictionary(store),
 	});
+	let imageForCompositions: ImageService | undefined;
+	const uiCompositions = options.uiCompositions
+		? createUiCompositions({
+				store,
+				queue,
+				inference,
+				image: () => {
+					if (!imageForCompositions) throw new Error("ui_motif_unavailable");
+					return imageForCompositions;
+				},
+			})
+		: undefined;
 	const toolchain = await createToolchain(store, queue, inference, web, {
 		...toolchainLinks.options,
 		timers,
@@ -469,6 +496,7 @@ export async function harness(
 		reconcileThrottleMs: 0,
 		music: !!options.musicGateway,
 		image: !!options.imageGateway,
+		uiCompositions,
 		excalidraw: !!options.drawingConnection,
 		objectRecognition: !!options.recognitionFetcher,
 	});
@@ -498,6 +526,7 @@ export async function harness(
 					dialogue.finishOperationInTransaction(db, runId),
 			})
 		: undefined;
+	imageForCompositions = image;
 	const excalidraw = options.drawingConnection
 		? createExcalidraw({
 				store,
@@ -557,6 +586,7 @@ export async function harness(
 		excalidraw,
 		drawingOperations,
 		image,
+		uiCompositions,
 		objectRecognition,
 		music,
 		settings,
@@ -588,6 +618,7 @@ export async function harness(
 		excalidraw,
 		drawingOperations,
 		image,
+		uiCompositions,
 		objectRecognition,
 		music,
 		app,

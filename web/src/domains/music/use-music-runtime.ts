@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { EumenesClient } from "../../../../client";
 import {
 	definitionRequests,
@@ -10,6 +10,7 @@ import {
 } from "@eumenes/artifact-ui/contracts";
 import { queryRoots } from "../../queryKeys";
 import { useMusicCreation } from "./use-music-creation";
+import { useMusicArtworkUrl } from "./use-music-artwork";
 import { musicStudioSource } from "./artifact-definition";
 
 export function useMusicRuntime(
@@ -19,6 +20,7 @@ export function useMusicRuntime(
 	targetRef?: string,
 	setTargetRef?: (ref: string | undefined) => void,
 ) {
+	const cache = useQueryClient();
 	const waitingForCreation = useRef(false);
 	const query = useQuery({
 		queryKey: [queryRoots.music, "list", conversationId],
@@ -26,7 +28,10 @@ export function useMusicRuntime(
 		refetchInterval: (query) =>
 			waitingForCreation.current ||
 			query.state.data?.some(
-				(item) => item.state === "planning" || item.state === "generating",
+				(item) =>
+					item.state === "planning" ||
+					item.state === "generating" ||
+					item.artwork?.state === "generating",
 			)
 				? 1000
 				: false,
@@ -103,6 +108,11 @@ export function useMusicRuntime(
 			if (url) URL.revokeObjectURL(url);
 		};
 	}, [client, id, ready]);
+	const artworkRevision =
+		selectedItem?.artwork?.state === "completed"
+			? selectedItem.artwork.revision
+			: undefined;
+	const artwork = useMusicArtworkUrl(client, id, artworkRevision);
 	const snapshot: Record<string, Snapshot[string]> = {};
 	if (authorized) {
 		const revision =
@@ -116,10 +126,11 @@ export function useMusicRuntime(
 				audioError && audioError === id
 					? {
 							...creation.creation,
+							canArtwork: true,
 							status: "failed",
 							title: "音声を取得できませんでした",
 						}
-					: creation.creation,
+					: { ...creation.creation, canArtwork: true },
 			tracks: items.map((item) => ({
 				id: item.id,
 				title: item.title,
@@ -132,6 +143,9 @@ export function useMusicRuntime(
 				durationSeconds: item.durationSeconds ?? undefined,
 				disabled: item.state !== "completed",
 				url: item.id === id ? url : undefined,
+				artworkStatus:
+					item.id === id && artwork?.failed ? "failed" : item.artwork?.state,
+				artworkUrl: item.id === id ? artwork?.url : undefined,
 				downloadName: `${item.title}.${item.mime === "audio/ogg" ? "opus" : item.mime === "audio/mpeg" ? "mp3" : item.mime === "audio/flac" ? "flac" : "wav"}`,
 			})),
 		};
@@ -174,13 +188,51 @@ export function useMusicRuntime(
 			!authorized ||
 			event.source !== source ||
 			resource?.kind !== "music" ||
-			!["music-select", "music-generate", "music-cancel"].includes(event.action)
+			![
+				"music-select",
+				"music-generate",
+				"music-cancel",
+				"music-artwork",
+			].includes(event.action)
 		)
 			return { status: "rejected", message: "許可されていない操作です。" };
 		if (event.revision !== resource.revision)
 			return { status: "conflict", message: "楽曲一覧を更新してください。" };
 		if (seen.current.has(event.id))
 			return { status: "duplicate", message: "選択済みです。" };
+		if (event.action === "music-artwork") {
+			const target = items.find(
+				(item) =>
+					item.id === event.values.id &&
+					item.state === "completed" &&
+					!!item.prompt &&
+					item.artwork?.state !== "generating",
+			);
+			if (!target || operation.current)
+				return {
+					status: "rejected",
+					message: "この楽曲のイメージは作成できません。",
+				};
+			seen.current.add(event.id);
+			operation.current = true;
+			try {
+				await client.generateMusicArtwork(target.id);
+				await cache.invalidateQueries({
+					queryKey: [queryRoots.music, "list", conversationId],
+				});
+				return {
+					status: "accepted",
+					message: "イメージの作成を受け付けました。",
+				};
+			} catch {
+				return {
+					status: "rejected",
+					message: "イメージの作成を受け付けられませんでした。",
+				};
+			} finally {
+				operation.current = false;
+			}
+		}
 		if (event.action !== "music-select") {
 			if (operation.current)
 				return { status: "rejected", message: "操作の受付を待っています。" };

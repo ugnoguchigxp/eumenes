@@ -169,14 +169,14 @@ export function drawingConnection(
 				});
 				if (use.epoch !== epoch || get().version !== config.version)
 					throw new Error("excalidraw_connection_invalidated");
-				const data = JSON.parse(new TextDecoder().decode(bytes));
+				// An error body need not be JSON; its status is what callers act on.
 				if (!response.ok)
 					throw new Error(
 						response.status === 409
 							? "excalidraw_revision_conflict"
 							: `excalidraw_http_${response.status}`,
 					);
-				return data as unknown;
+				return JSON.parse(new TextDecoder().decode(bytes)) as unknown;
 			} finally {
 				use.active--;
 				use.lastOperation = clock();

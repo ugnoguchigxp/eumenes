@@ -25,6 +25,16 @@ export const searchAgentCases = [
 		answerPattern: /AI|LLM/,
 	},
 	{
+		id: "model-detail",
+		question:
+			"LFM2.5-24B-A2B というモデルが出たそうです。どんなモデルか調査して詳細を教えて",
+		expectedPackage: "package:web.search@1",
+		query: "LFM2.5-24B-A2B model specifications",
+		queryPattern: /LFM2\.5-24B-A2B/i,
+		facts: ["公開資料はLFM2.5-24B-A2Bのモデル構成を説明しています。"],
+		answerPattern: /LFM2\.5-24B-A2B/,
+	},
+	{
 		id: "stock",
 		question: "マイクロソフトの最新の株価を教えて",
 		expectedPackage: "package:web.recipe@1",

@@ -215,6 +215,13 @@ export function MusicWorkspaceView({ request }: { request: ArtifactRequest }) {
 				onSelect={(id) => {
 					void send("music-select", { id });
 				}}
+				onArtwork={
+					data.creation?.canArtwork
+						? (id) => {
+								void send("music-artwork", { id });
+							}
+						: undefined
+				}
 				onFavorite={
 					library
 						? (id, favorite) => {

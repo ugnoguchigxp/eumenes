@@ -90,6 +90,60 @@ afterEach(async () => {
 	for (const close of open.splice(0).reverse()) await close();
 });
 
+test("an earlier mistaken answer does not enter the next toolchain choice", async () => {
+	const h = setup({
+		conversation: (call, index) => {
+			if (!call.tools.length || index === 0) return {};
+			return {
+				toolCalls: operationCall({ request: lastUser(call.history) }),
+			};
+		},
+	});
+	const first = await h.run("操作を実行して");
+	await until(() => h.status(first.id) === "completed");
+	h.state.commands.push({
+		action: "invoke",
+		tool: "fake.start",
+		arguments: { seconds: 60 },
+	});
+	h.state.outcome = {
+		state: "saved",
+		adapterRef: ADAPTER,
+		operationId: "op-history",
+		digest: "digest-history",
+	};
+	await h.run("先ほどの操作を実行して");
+	await until(() => h.started.length === 1);
+	const selection = h.conversationCalls[2]!;
+	expect(selection.tools).toHaveLength(1);
+	expect(selection.history.map((m) => m.content)).toContain("操作を実行して");
+	expect(selection.history.map((m) => m.content)).toContain(
+		"先ほどの操作を実行して",
+	);
+	expect(selection.history.some((m) => m.role === "assistant")).toBe(false);
+	expect(h.started).toHaveLength(1);
+});
+
+test("a direct answer after toolchain selection retains the full exchange", async () => {
+	const h = setup({
+		conversation: (call) => (call.tools.length ? {} : undefined),
+	});
+	const first = await h.run("前の話を覚えておいて");
+	await until(() => h.status(first.id) === "completed");
+	const second = await h.run("その話の続きは？");
+	await until(() => h.status(second.id) === "completed");
+	const selection = h.conversationCalls.at(-2)!;
+	const answer = h.conversationCalls.at(-1)!;
+	expect(selection.tools).toHaveLength(1);
+	expect(selection.history.some((m) => m.role === "assistant")).toBe(false);
+	expect(answer.tools).toHaveLength(0);
+	expect(
+		answer.history.some(
+			(m) => m.role === "assistant" && m.content === "了解しました",
+		),
+	).toBe(true);
+});
+
 type Command = Record<string, unknown>;
 type Call = {
 	history: Array<{ role: string; content: string }>;

@@ -126,6 +126,36 @@
 	background: transparent;
 	cursor: pointer;
 }
+.dw-entry {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 2px;
+}
+.dw-entry > .dw-item {
+	grid-column: 1;
+}
+.dw-delete {
+	color: var(--muted-foreground, #9aa4b2);
+}
+.dw-delete:hover {
+	color: var(--destructive, #e5484d);
+}
+.dw-confirm {
+	grid-column: 1 / -1;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+	padding: 6px;
+	border: 1px solid var(--destructive, #e5484d);
+	border-radius: 6px;
+}
+.dw-confirm p {
+	flex: 1 1 100%;
+	margin: 0;
+	font-size: 0.8125rem;
+}
 .dw-item:hover,
 .dw-item[aria-current="true"] {
 	background: var(--accent, #273951);

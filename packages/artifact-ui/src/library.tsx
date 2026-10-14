@@ -49,8 +49,16 @@ import { AvatarMotionLabView } from "./avatar-components";
 import { CollectionWorkspaceView } from "./collection-components";
 import { RecordsWorkspaceView } from "./records-components";
 import { ServiceTestWorkspaceView } from "./service-test-components";
+import {
+	UiWorkspaceView,
+	TextBlockView,
+	InfoCardView,
+} from "./ui-composition-components";
 
 const renderers = {
+	"ui-workspace": UiWorkspaceView,
+	"text-block": TextBlockView,
+	"info-card": InfoCardView,
 	"object-recognition-workspace": ObjectRecognitionWorkspaceView,
 	"drawing-workspace": DrawingWorkspaceView,
 	"image-workspace": ImageWorkspaceView,
@@ -186,6 +194,7 @@ function CompositionView({
 		<section
 			aria-label={request.title ?? "組合せ表示"}
 			className={`aui-composition aui-composition-${request.direction}`}
+			data-appearance={request.appearance}
 		>
 			{request.children.map((child, index) => (
 				<RegisteredView

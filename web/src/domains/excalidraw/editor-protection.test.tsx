@@ -2,6 +2,11 @@ import { test, expect, vi, afterEach } from "vitest";
 import { renderHook, act, waitFor, cleanup } from "@testing-library/react";
 import type { EumenesClient } from "../../../../client";
 import { useDrawingEditor } from "./useDrawingEditor";
+const at = (referenceId: string, conversationId = "main") => ({
+	kind: "reference" as const,
+	referenceId,
+	conversationId,
+});
 afterEach(() => {
 	cleanup();
 	vi.restoreAllMocks();
@@ -35,7 +40,9 @@ test("failed saves with full browser storage never claim the draft was retained"
 			throw new Error("save_failed");
 		}),
 	} as unknown as EumenesClient;
-	const { result } = renderHook(() => useDrawingEditor(client, referenceId));
+	const { result } = renderHook(() =>
+		useDrawingEditor(client, at(referenceId)),
+	);
 	await waitFor(() => expect(result.current.drawing).not.toBeNull());
 	vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
 		throw new DOMException("full", "QuotaExceededError");
@@ -111,7 +118,7 @@ test("opening an idle session still loads the document through the lease-aware A
 		revision: 1,
 	});
 	const { result } = renderHook(() =>
-		useDrawingEditor(h.client, h.referenceId),
+		useDrawingEditor(h.client, at(h.referenceId)),
 	);
 	await waitFor(() => expect(result.current.drawing?.id).toBe(h.document.id));
 	expect(result.current.title).toBe(h.document.title);
@@ -124,7 +131,7 @@ test("disabled browser storage still permits loading and confirmed upstream savi
 		throw new DOMException("disabled", "SecurityError");
 	});
 	const { result } = renderHook(() =>
-		useDrawingEditor(h.client, h.referenceId),
+		useDrawingEditor(h.client, at(h.referenceId)),
 	);
 	await waitFor(() => expect(result.current.drawing?.id).toBe(h.document.id));
 	act(() => result.current.changeTitle("保存可能"));
@@ -138,7 +145,7 @@ test("disabled browser storage still permits loading and confirmed upstream savi
 test("failure to remove a local draft does not turn a confirmed save into a failed mutation", async () => {
 	const h = editorClient();
 	const { result } = renderHook(() =>
-		useDrawingEditor(h.client, h.referenceId),
+		useDrawingEditor(h.client, at(h.referenceId)),
 	);
 	await waitFor(() => expect(result.current.drawing).not.toBeNull());
 	vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => {
@@ -155,7 +162,7 @@ test("failure to remove a local draft does not turn a confirmed save into a fail
 test("returning from browser history starts a new owned session while preserving unsaved edits and conversation", async () => {
 	const h = editorClient();
 	const { result } = renderHook(() =>
-		useDrawingEditor(h.client, h.referenceId, undefined, "design"),
+		useDrawingEditor(h.client, at(h.referenceId, "design")),
 	);
 	await waitFor(() => expect(result.current.drawing).not.toBeNull());
 	const first = result.current.session!.id;
@@ -184,4 +191,103 @@ test("returning from browser history starts a new owned session while preserving
 		result.current.session!.id,
 	);
 	expect(result.current.status).toBe("保存済み（版 2）");
+});
+test("a new drawing stores nothing until its first save creates it, then saves as a reference", async () => {
+	const draftId = crypto.randomUUID(),
+		referenceId = crypto.randomUUID(),
+		id = crypto.randomUUID(),
+		documentId = crypto.randomUUID();
+	window.history.replaceState(
+		null,
+		"",
+		`/excalidraw?embedded=1#drawing/new/${draftId}?title=x&conversationId=design`,
+	);
+	const session = {
+		id,
+		referenceId: null,
+		state: "ready",
+		epoch: 0,
+		revision: null,
+	};
+	const client = {
+		openDrawing: vi.fn(async () => session),
+		drawingSession: vi.fn(async () => session),
+		createDrawing: vi.fn(
+			async (_id: string, input: { title: string; scene: unknown }) => ({
+				referenceId,
+				id: documentId,
+				revision: 1,
+				...input,
+			}),
+		),
+		saveDrawing: vi.fn(
+			async (
+				_id: string,
+				input: { title: string; scene: unknown; expectedRevision: number },
+			) => ({
+				id: documentId,
+				revision: input.expectedRevision + 1,
+				title: input.title,
+				scene: input.scene,
+			}),
+		),
+		drawingActivity: vi.fn(async () => {}),
+		releaseDrawing: vi.fn(async () => {}),
+	} as unknown as EumenesClient;
+	const { result } = renderHook(() =>
+		useDrawingEditor(client, {
+			kind: "new",
+			draftId,
+			title: "構成図",
+			conversationId: "design",
+		}),
+	);
+	await waitFor(() => expect(result.current.drawing).not.toBeNull());
+	expect(result.current.title).toBe("構成図");
+	expect(result.current.busy).toBe(false);
+	// Opening, saving without edits and leaving never reach the host.
+	await act(async () => {
+		await result.current.save();
+	});
+	expect(await result.current.leaveFrame()).toBe(true);
+	expect(client.openDrawing).not.toHaveBeenCalled();
+	expect(client.createDrawing).not.toHaveBeenCalled();
+	act(() => result.current.changeTitle("構成図 v1"));
+	await act(async () => {
+		await result.current.save();
+	});
+	expect(client.openDrawing).toHaveBeenCalledWith(
+		expect.objectContaining({ conversationId: "design", title: "構成図 v1" }),
+		expect.anything(),
+	);
+	expect(client.createDrawing).toHaveBeenCalledWith(
+		id,
+		{ title: "構成図 v1", scene: expect.anything() },
+		expect.any(String),
+		expect.anything(),
+	);
+	expect(result.current.referenceId).toBe(referenceId);
+	expect(result.current.frameId).toBe(referenceId);
+	expect(window.location.hash).toBe(
+		`#drawing/${referenceId}?revision=1&conversationId=design`,
+	);
+	act(() => result.current.changeTitle("構成図 v2"));
+	// Unsaved edits after creation are protected under the reference, not the draft id.
+	expect(
+		sessionStorage.getItem(`eumenes-excalidraw-draft:${draftId}`),
+	).toBeNull();
+	expect(
+		sessionStorage.getItem(`eumenes-excalidraw-draft:${referenceId}`),
+	).not.toBeNull();
+	await act(async () => {
+		await result.current.save();
+	});
+	expect(client.createDrawing).toHaveBeenCalledTimes(1);
+	expect(client.saveDrawing).toHaveBeenCalledWith(
+		id,
+		expect.objectContaining({ title: "構成図 v2", expectedRevision: 1 }),
+		expect.any(String),
+	);
+	expect(result.current.status).toBe("保存済み（版 2）");
+	window.history.replaceState(null, "", "/");
 });

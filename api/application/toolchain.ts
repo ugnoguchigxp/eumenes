@@ -40,6 +40,7 @@ import {
 } from "./inference-adapter";
 import { createMusicScreenAdapter } from "./music-screen-adapter";
 import { createImageScreenAdapter } from "./image-screen-adapter";
+import { createUiCompositionsAdapter } from "./ui-compositions-adapter";
 import { createObjectRecognitionScreenAdapter } from "./object-recognition-screen-adapter";
 import {
 	bundleHostOf,
@@ -59,6 +60,7 @@ export async function createToolchain(
 		dots?: boolean;
 		music?: boolean;
 		image?: boolean;
+		uiCompositions?: import("../domains/ui-compositions").UiCompositionsService;
 		objectRecognition?: boolean;
 		excalidraw?: boolean;
 		history?: boolean;
@@ -95,6 +97,7 @@ export async function createToolchain(
 	const registry = createAdapterRegistry([
 		...(options.music ? [createMusicScreenAdapter()] : []),
 		...(options.image ? [createImageScreenAdapter()] : []),
+		...(options.uiCompositions ? [createUiCompositionsAdapter(options.uiCompositions)] : []),
 		...(options.objectRecognition
 			? [createObjectRecognitionScreenAdapter()]
 			: []),
@@ -135,6 +138,7 @@ export async function createToolchain(
 			...(options.dots ? ["dots"] : []),
 			...(options.music ? ["music"] : []),
 			...(options.image ? ["image"] : []),
+			...(options.uiCompositions ? ["ui-compositions"] : []),
 			...(options.objectRecognition ? ["object-recognition"] : []),
 			...(options.excalidraw ? ["excalidraw"] : []),
 			...(options.conversation && options.history !== false ? ["history"] : []),

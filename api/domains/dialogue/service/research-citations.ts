@@ -70,8 +70,12 @@ function readRawUrl(text: string, start: number) {
 	return i;
 }
 
-/** A research answer can link only to URLs in its host-verified report. */
-export function researchCitations(text: string, projection?: string | null) {
+/** Keep only URLs granted by a host-verified result. */
+export function researchCitations(
+	text: string,
+	projection?: string | null,
+	options: { preserveLinkLabels?: boolean } = {},
+) {
 	const allowed = new Set<string>();
 	try {
 		const parsed = sourceList.safeParse(JSON.parse(projection ?? "null"));
@@ -116,7 +120,12 @@ export function researchCitations(text: string, projection?: string | null) {
 							out += keep(line.slice(i, dest.end));
 						else {
 							removed++;
-							out += image || !citationLine ? label : "";
+							out +=
+								options.preserveLinkLabels === false
+									? ""
+									: image || !citationLine
+										? label
+										: "";
 						}
 						i = dest.end;
 						continue;
@@ -154,6 +163,13 @@ export function researchCitations(text: string, projection?: string | null) {
 				(_, n: string) => kept[Number(n)]!,
 			);
 			if (citationLine && removed > 0 && kept.length === 0) return [];
+			if (
+				options.preserveLinkLabels === false &&
+				removed > 0 &&
+				kept.length === 0 &&
+				/^.{1,60}[:：]\s*$/.test(filtered.trim())
+			)
+				return [];
 			return [
 				citationLine
 					? filtered.replace(/([:：])[\s、,]+/g, "$1").replace(/[\s、,]+$/, "")

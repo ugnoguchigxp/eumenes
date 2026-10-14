@@ -39,6 +39,26 @@ export function references(db: Database, conversationId: string): Reference[] {
 		)
 		.all(conversationId) as Reference[];
 }
+export function saveReference(
+	db: Database,
+	conversationId: string,
+	drawing: { id: string; revision: number; title: string },
+) {
+	db.query(
+		"INSERT INTO excalidraw_references VALUES(?,?,?,?,?) ON CONFLICT(document_id) DO UPDATE SET revision=excluded.revision,title=excluded.title WHERE excluded.revision>=excalidraw_references.revision",
+	).run(
+		crypto.randomUUID(),
+		conversationId,
+		drawing.id,
+		drawing.revision,
+		drawing.title,
+	);
+	return (
+		db
+			.query("SELECT id FROM excalidraw_references WHERE document_id=?")
+			.get(drawing.id) as { id: string }
+	).id;
+}
 export function reference(db: Database, id: string): Reference | null {
 	return db
 		.query(

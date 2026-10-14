@@ -12,7 +12,7 @@ import { assessSearchAgent, searchAgentCases } from "./search-agents.fixture";
 for (const c of searchAgentCases)
 	for (const mode of ["success", "timeout", "repair"] as const)
 		test(`search API E2E fixture: ${c.id}, ${mode}`, async () => {
-			const luna = c.id === "luna";
+			const luna = c.expectedPackage === "package:web.search@1";
 			const fail = mode === "timeout";
 			let repaired = false;
 			const facts = [...c.facts];

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
+	isDrawingFrameOf,
 	isDrawingFrameState,
 	type DrawingFrameCommand,
 	type DrawingFrameState,
@@ -63,11 +64,7 @@ export function useDrawingFrame(url: string | undefined, refresh: () => void) {
 				return;
 			const value: unknown = event.data;
 			if (isDrawingFrameState(value)) {
-				if (
-					new URL(iframe.current!.src).hash.split("?")[0] !==
-					`#drawing/${value.referenceId}`
-				)
-					return;
+				if (!isDrawingFrameOf(iframe.current, value.referenceId)) return;
 				setState(value);
 				if (!value.dirty && !value.error) setError("");
 				if (value.revision && value.revision !== version.current) {
