@@ -216,23 +216,28 @@ test("display previews the subtitle before saving", async ({
 	expect(await savedSettings(request)).toEqual(before);
 });
 
-test("display has an animation tab that plays every motion on its own canvas", async ({
+test("display has an animation tab that plays every motion on the background spirit", async ({
 	page,
 	request,
 }) => {
 	const before = await savedSettings(request);
 	await openHub(page);
 	await openFromHub(page, "表示");
+	const background = page.locator(".light-avatar-background");
+	await expect(background).toHaveAttribute("data-avatar-state", "ready", {
+		timeout: 30000,
+	});
 	const tabs = page.getByLabel("表示の設定の区分");
 	await expect(tabs.getByRole("tab", { name: "表示" })).toBeVisible();
-	// The hidden tab stays mounted but loads no renderer until shown.
-	await expect(page.locator(".light-spirit-lab canvas")).toHaveCount(0);
 	await tabs.getByRole("tab", { name: "アニメーション" }).click();
 	const lab = page.locator(".light-spirit-lab");
 	await expect(lab).toHaveAttribute("data-lab-state", "ready", {
 		timeout: 30000,
 	});
-	await expect(lab.locator("canvas")).toHaveCount(1);
+	// One spirit: the lab drives the conversation background and draws no canvas of its own.
+	await expect(lab.locator("canvas")).toHaveCount(0);
+	await expect(background).toHaveAttribute("data-avatar-state", "motion-lab");
+	await expect(background.locator("canvas")).toHaveCount(1);
 	for (const group of ["状態", "発話", "感情と仕草", "待機中の仕草"])
 		await expect(page.getByRole("group", { name: group })).toBeVisible();
 	await page.getByRole("button", { name: "うれしい" }).click();
@@ -248,7 +253,8 @@ test("display has an animation tab that plays every motion on its own canvas", a
 	await page.getByRole("button", { name: "停止" }).click();
 	await expect(page.getByRole("button", { name: "再生" })).toBeVisible();
 	await tabs.getByRole("tab", { name: "表示" }).click();
-	await expect(lab.locator("canvas")).toHaveCount(0);
+	// Leaving the tab hands the spirit back to the conversation.
+	await expect(background).toHaveAttribute("data-avatar-state", "ready");
 	// Trying motions never writes settings.
 	expect(await savedSettings(request)).toEqual(before);
 });

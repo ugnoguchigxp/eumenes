@@ -233,7 +233,7 @@ P0→P1 の結果を見て、P1 の難所（粒子と線のスキニング）が
 
 | 計画 | 実装 | 理由 |
 | --- | --- | --- |
-| 描画一式を `packages/design-system` へ移す（§3・§7） | 描画器は `web/.../light-avatar/` に残し、design-system には試写画面の部品 `LightSpiritLab`（操作と表示だけ）を置いた。artifact-ui の `avatar-motion-lab` は host が `ArtifactRuntime.hostViews` で渡す描画を置くだけ | three.js を design-system の dist に同梱せず、web の dynamic import（初回表示に含めない）を保つため |
+| 描画一式を `packages/design-system` へ移す（§3・§7） | 描画器は `web/.../light-avatar/` に残し、design-system には試写画面の部品 `LightSpiritLab`（操作と表示だけ）を置いた。artifact-ui の `avatar-motion-lab` は host が `ArtifactRuntime.hostViews` で渡す画面を置くだけ | three.js を design-system の dist に同梱せず、web の dynamic import（初回表示に含めない）を保つため |
 | ボーン25本（§4） | 29本（`core` と腕先 `tip` を独立ボーンにした） | 光の核と腕先の光をボーンの子として付け、揺れの追従の終端にも使うため |
 | `AnimationMixer` で層を重ねる（§5） | 自前の sampler（Catmull-Rom 接線の3次Hermite）と加算合成 | 鏡映、累積角の `spin`、発話中の振り向きへの変換、静止姿勢の検査を一つの形式で扱うため |
 | 速度を ±10% 揺らす（§5） | 0〜15% 速める側だけ | 遅くすると、8秒で待機へ戻るときにクリップが静止姿勢の前で切れるため |
@@ -242,8 +242,9 @@ P0→P1 の結果を見て、P1 の難所（粒子と線のスキニング）が
 | `settings.display` revision 4（§6.1） | revision 5（`settings.spatial.bundle.json` に追加） | 作業中に別作業が revision 4（Spatial の項目）を登録済みだったため。revision 4 は登録内容のまま残した |
 | `direction: "form-preview"` を tabs の `arrangement` へ移す | `tabs[].arrangement: "form-preview"` を追加し、`direction: "form-preview"` も残した | revision 4 が `direction: "form-preview"` を使っているため |
 | 腕先の光の尾 | 腕先の直近8点を1つの Points で描き、腕先が動いたときだけ見える | 描画呼び出しを1回に抑えるため |
+| 試写タブに専用の試写面（canvas）を置き、その間は会話背景を止める（§6.2） | 試写面は持たず、タブの操作で会話背景の精霊そのものを動かす。背景はモデルを `load.ts` に登録し、タブ表示中は cue 再生を止めて `data-avatar-state="motion-lab"` になる | 利用者の確認で、背景の精霊と連動していないと別物に見えるため（2026-10-14 変更） |
 
-このほか、試写タブが画面に出ている間は会話背景の精霊を一時停止する（`load.ts` の共有状態。背景は model を保持したまま `paused`）。カメラは跳ね・回転の余白のため 7.7→8.5（縦長 8.6→9.5）へ引いた。
+カメラは跳ね・回転の余白のため 7.7→8.5（縦長 8.6→9.5）へ引いた。
 
 ### 検証結果
 

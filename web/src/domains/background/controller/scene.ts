@@ -18,6 +18,7 @@ import {
 } from "../options";
 import { createPlaceholder } from "../models/placeholder";
 import { createCameraController } from "./camera";
+import { fitEnvelope, hitTestEntries } from "./placement";
 
 /** One context, one loop, immutable point buffers; the scene owns layout separately from model motion. */
 export function createSpatialScene(
@@ -38,6 +39,7 @@ export function createSpatialScene(
 	const camera = new OrthographicCamera(-15, 15, 15, -15, 0.1, 100);
 	const view = createCameraController(camera);
 	const models = options.models ?? {};
+	const envelope = { x: 1, y: 1, z: 1, focusRadius: 1 };
 	const entries = new Map<string, { item: SpatialItem; model: SpatialModel }>();
 	const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
 	let settings = normalizeOptions(options.settings ?? defaultSpatialOptions);
@@ -115,16 +117,11 @@ export function createSpatialScene(
 	function draw(dt = 0) {
 		if (disposed || document.hidden) return;
 		place();
-		let extent = 2.5;
-		for (const { item } of entries.values())
-			extent = Math.max(
-				extent,
-				item.orbit?.radius ?? Math.max(...item.position.map(Math.abs)),
-			);
+		fitEnvelope(entries.values(), settings, selected, envelope);
 		const focus = selected
 			? entries.get(selected)?.model.object.position
 			: undefined;
-		const blend = view.update(dt, settings, focus, extent, reduced());
+		const blend = view.update(dt, settings, focus, envelope, reduced());
 		for (const { item, model } of entries.values())
 			model.configure?.(
 				settings,
@@ -272,6 +269,17 @@ export function createSpatialScene(
 	}
 	return {
 		dispose,
+		hitTest(x: number, y: number) {
+			return disposed
+				? null
+				: hitTestEntries(
+						entries.values(),
+						camera,
+						host.getBoundingClientRect(),
+						x,
+						y,
+					);
+		},
 		setItems(items: readonly SpatialItem[]) {
 			if (disposed) return;
 			try {

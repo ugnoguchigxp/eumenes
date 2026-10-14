@@ -76,54 +76,46 @@ test("12 models, settings tabs, saved zero-speed pause, demo health and focus, r
 	await expect(
 		page.locator(".spatial-preview [data-background-state='paused'] canvas"),
 	).toBeVisible();
-	await page
-		.locator(".spatial-preview")
-		.screenshot({
-			path: test.info().outputPath("spatial-all-models-preview.png"),
-		});
+	await page.locator(".spatial-preview").screenshot({
+		path: test.info().outputPath("spatial-all-models-preview.png"),
+	});
 	await page.screenshot({
 		path: test.info().outputPath("spatial-settings.png"),
 	});
+	const preview = page.getByRole("button", {
+		name: /Spatialのモデルプレビュー/,
+	});
+	await preview.focus();
+	await preview.press("Enter");
+	await expect(page.getByText("選択中：CPU", { exact: true })).toBeVisible();
+	await page.waitForTimeout(1000);
+	await page
+		.locator(".spatial-preview")
+		.screenshot({ path: test.info().outputPath("spatial-focus.png") });
+	await page.getByLabel("health", { exact: true }).selectOption("fault");
+	await expect(
+		page.getByRole("button", { name: "CPU：問題あり", exact: true }),
+	).toHaveAttribute("aria-pressed", "true");
+	await preview.focus();
+	await preview.press("Escape");
+	await expect(page.locator(".spatial-background-summary")).toHaveCount(0);
 	await save(page);
 	const host = page.locator(".chat-panel .spatial-background");
 	await expect(host).toHaveAttribute("data-model-count", "12");
 	await expect(host).toHaveAttribute("data-background-state", "paused");
-	await page.getByRole("button", { name: "状態を見る", exact: true }).click();
-	await expect(page.getByRole("button", { name: /：正常$/ })).toHaveCount(12);
-	await expect(page.getByText("デモ値での状態プレビュー")).toBeVisible();
+	await expect(
+		page.getByRole("button", { name: "状態を見る", exact: true }),
+	).toHaveCount(0);
+	await expect(
+		page.getByRole("combobox", { name: "会話モデル", exact: true }),
+	).toHaveCount(0);
 	const canvas = host.locator("canvas");
 	await page.waitForTimeout(1100);
 	const still = await canvas.screenshot();
 	await page.waitForTimeout(250);
 	expect(await canvas.screenshot()).toEqual(still);
-	await page.getByRole("button", { name: "CPU：正常", exact: true }).click();
-	await page.waitForTimeout(1100);
-	await expect(page.getByText("選択中：CPU", { exact: true })).toBeVisible();
-	await page.screenshot({ path: test.info().outputPath("spatial-focus.png") });
-	await page.getByLabel("health", { exact: true }).selectOption("fault");
-	await expect(
-		page.getByRole("button", { name: "CPU：問題あり", exact: true }),
-	).toHaveAttribute("aria-pressed", "true");
-	await page.getByRole("button", { name: "全体に戻る", exact: true }).click();
-	await page.waitForTimeout(1100);
-	await expect(
-		page.locator(".spatial-background-summary button[aria-pressed='true']"),
-	).toHaveCount(0);
 	await page.screenshot({
 		path: test.info().outputPath("spatial-galaxy-wide.png"),
-	});
-	await test.info().attach("spatial-presentation", {
-		contentType: "application/json",
-		body: JSON.stringify(
-			await page.evaluate(() => {
-				const el = document.querySelector(".chat-panel .spatial-background")!;
-				return {
-					host: getComputedStyle(el).backgroundColor,
-					canvas: getComputedStyle(el.querySelector("canvas")!).backgroundColor,
-					parent: getComputedStyle(el.parentElement!).backgroundColor,
-				};
-			}),
-		),
 	});
 	await page.setViewportSize({ width: 390, height: 844 });
 	await expect(canvas).toBeVisible();
@@ -161,7 +153,7 @@ test("12 models, settings tabs, saved zero-speed pause, demo health and focus, r
 		page.locator(".spatial-background-summary li button"),
 	).toHaveCount(12);
 	await expect(
-		page.getByRole("button", { name: "CPU：問題あり", exact: true }),
+		page.getByRole("button", { name: "CPU：正常", exact: true }),
 	).toBeVisible();
 	await page.getByRole("button", { name: "再表示", exact: true }).click();
 	await expect(host).toHaveAttribute("data-background-state", "ready");

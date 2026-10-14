@@ -157,20 +157,10 @@ export function ConversationPanel({
 					</span>
 				</span>
 				{model.ready ? (
-					<select
-						className="model-label model-select"
-						aria-label="会話モデル"
-						title={lastUsed}
-						value={model.selected}
-						disabled={model.busy}
-						onChange={(e) => void model.select(e.target.value)}
-					>
-						{model.options.map((o) => (
-							<option key={o.id} value={o.id}>
-								{o.label}
-							</option>
-						))}
-					</select>
+					<span className="model-label" title={lastUsed}>
+						{model.options.find((option) => option.id === model.selected)
+							?.label ?? actualModel?.model}
+					</span>
 				) : (
 					<span className="model-label">
 						{actualModel?.source === "cloud" && "クラウド / "}

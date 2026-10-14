@@ -10,15 +10,29 @@ export function loadLightAvatar() {
 }
 export const lightAvatarLoaded = () => modulePromise !== null;
 
-// While the motion lab is on screen the conversation background pauses, so only one spirit animates.
-let labsOnScreen = 0;
-const listeners = new Set<() => void>();
-export function setMotionLabOnScreen(onScreen: boolean) {
-	labsOnScreen = Math.max(0, labsOnScreen + (onScreen ? 1 : -1));
+// The conversation background owns the one spirit. While the settings motion lab is on
+// screen, the background pauses its own playback and the lab drives the same model.
+type Listener = () => void;
+const listeners = new Set<Listener>();
+const notify = () => {
 	for (const listener of listeners) listener();
-}
-export function subscribeMotionLab(listener: () => void) {
+};
+export function subscribeLightAvatar(listener: Listener) {
 	listeners.add(listener);
 	return () => listeners.delete(listener);
 }
+let labsOnScreen = 0;
+export function setMotionLabOnScreen(onScreen: boolean) {
+	labsOnScreen = Math.max(0, labsOnScreen + (onScreen ? 1 : -1));
+	notify();
+}
 export const motionLabOnScreen = () => labsOnScreen > 0;
+let backgroundModel: import("./model.js").LightAvatar | null = null;
+/** Set by the background when its model is ready, cleared when it releases it. */
+export function setBackgroundAvatar(
+	model: import("./model.js").LightAvatar | null,
+) {
+	backgroundModel = model;
+	notify();
+}
+export const backgroundAvatar = () => backgroundModel;

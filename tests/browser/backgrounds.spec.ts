@@ -58,9 +58,14 @@ test("saved backgrounds render with WebGL, survive reload, and release the previ
 	).toBeVisible();
 	expect(await fairy!.evaluate((canvas) => canvas.isConnected)).toBe(false);
 	await expect(page.locator(".light-avatar-background")).toHaveCount(0);
-	await page.getByRole("button", { name: "状態を見る" }).click();
-	await page.getByRole("button", { name: "CPU：未確認" }).click();
-	await expect(page.getByText("選択中：CPU")).toBeVisible();
+	await expect(page.getByRole("button", { name: "状態を見る" })).toHaveCount(0);
+	await expect(page.getByRole("combobox", { name: "会話モデル" })).toHaveCount(
+		0,
+	);
+	await expect(page.locator(".spatial-background")).toHaveAttribute(
+		"data-model-count",
+		"12",
+	);
 	await expect(page.getByRole("textbox", { name: "メッセージ" })).toBeVisible();
 	await page.screenshot({ path: "test-results/spatial-background.png" });
 	await page.reload();

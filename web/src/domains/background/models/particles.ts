@@ -15,6 +15,7 @@ import {
 	healthColors,
 } from "../options";
 import { fragmentShader, vertexShader } from "./shaders";
+import { createParticleEnvelope, PARTICLE_MODEL_SCALE } from "./envelope";
 
 export type ParticleData = {
 	id: string;
@@ -27,6 +28,8 @@ const TAU = 2 * Math.PI;
 /** One immutable interleaved point buffer; activity, shape diffusion and CPU motion run on GPU. */
 export function createParticleModel(data: ParticleData): SpatialModel {
 	const object = new Group();
+	object.scale.setScalar(PARTICLE_MODEL_SCALE);
+	const bounds = createParticleEnvelope(data);
 	const geometry = new BufferGeometry();
 	const buffer = new InterleavedBuffer(data.points, 8);
 	geometry.setAttribute(
@@ -82,6 +85,7 @@ export function createParticleModel(data: ParticleData): SpatialModel {
 	let destroyed = false;
 	return {
 		object,
+		bounds,
 		update(state, selected) {
 			current = state;
 			uniforms.uHealthColor.value.set(

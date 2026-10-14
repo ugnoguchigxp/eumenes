@@ -1,0 +1,35 @@
+[
+  {
+    "width": 2048,
+    "height": 862,
+    "bluePixels": 23750,
+    "blueBounds": {
+      "minX": 518,
+      "minY": 104,
+      "maxX": 1977,
+      "maxY": 827
+    }
+  },
+  {
+    "width": 1280,
+    "height": 720,
+    "bluePixels": 22079,
+    "blueBounds": {
+      "minX": 217,
+      "minY": 87,
+      "maxX": 1222,
+      "maxY": 685
+    }
+  },
+  {
+    "width": 390,
+    "height": 844,
+    "bluePixels": 15992,
+    "blueBounds": {
+      "minX": 40,
+      "minY": 243,
+      "maxX": 366,
+      "maxY": 809
+    }
+  }
+]

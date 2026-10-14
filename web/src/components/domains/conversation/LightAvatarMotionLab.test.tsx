@@ -9,6 +9,7 @@ import {
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { LightAvatarMotionLab } from "./LightAvatarMotionLab";
 import { createLightAvatar } from "./light-avatar/model.js";
+import { motionLabOnScreen, setBackgroundAvatar } from "./light-avatar/load";
 
 vi.mock("./light-avatar/model.js", () => ({
 	createLightAvatar: vi.fn(),
@@ -64,13 +65,6 @@ beforeEach(() => {
 			disconnect() {}
 		},
 	);
-	vi.stubGlobal(
-		"ResizeObserver",
-		class {
-			observe() {}
-			disconnect() {}
-		},
-	);
 	vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
 		frames.push(callback);
 		return frames.length;
@@ -79,6 +73,7 @@ beforeEach(() => {
 });
 afterEach(() => {
 	cleanup();
+	setBackgroundAvatar(null);
 	vi.unstubAllGlobals();
 	vi.mocked(createLightAvatar).mockReset();
 });
@@ -88,11 +83,11 @@ const step = (at: number) => {
 	for (const callback of pending) callback(at);
 };
 
-test("the renderer loads only on screen, plays a chosen motion, and is released off screen", async () => {
+test("on screen, the lab drives the background's spirit and hands it back when hidden", async () => {
 	const avatar = model();
-	vi.mocked(createLightAvatar).mockReturnValue(avatar);
+	setBackgroundAvatar(avatar);
 	render(<LightAvatarMotionLab />);
-	expect(createLightAvatar).not.toHaveBeenCalled();
+	expect(motionLabOnScreen()).toBe(false);
 	act(() => intersect(true));
 	await waitFor(() =>
 		expect(
@@ -100,9 +95,11 @@ test("the renderer loads only on screen, plays a chosen motion, and is released 
 				.disabled,
 		).toBe(false),
 	);
+	expect(motionLabOnScreen()).toBe(true);
+	expect(screen.getByText("会話の背景の精霊で再生しています。")).toBeTruthy();
 	expect(screen.getByRole("group", { name: "待機中の仕草" })).toBeTruthy();
 	fireEvent.click(screen.getByRole("button", { name: "うれしい" }));
-	expect(avatar.beginMotion).toHaveBeenCalledWith(undefined);
+	expect(avatar.beginMotion).toHaveBeenLastCalledWith(undefined);
 	fireEvent.change(screen.getByLabelText("変化版"), {
 		target: { value: "joyful-bounce" },
 	});
@@ -126,13 +123,26 @@ test("the renderer loads only on screen, plays a chosen motion, and is released 
 		expect.objectContaining({ gaze: false }),
 	);
 	act(() => intersect(false));
-	expect(avatar.dispose).toHaveBeenCalled();
+	expect(motionLabOnScreen()).toBe(false);
+	expect(avatar.showSkeleton).toHaveBeenLastCalledWith(false);
+	expect(avatar.setLayers).toHaveBeenLastCalledWith({
+		secondary: true,
+		gaze: true,
+		gestures: true,
+	});
+	// The lab never builds a renderer of its own.
+	expect(createLightAvatar).not.toHaveBeenCalled();
 });
 
-test("without WebGL 2 the lab says so and never loads the renderer", () => {
-	vi.stubGlobal("WebGL2RenderingContext", undefined);
+test("without the background spirit the lab explains how to get one", async () => {
 	render(<LightAvatarMotionLab />);
 	act(() => intersect(true));
-	expect(screen.getByText("この環境では3D表示を利用できません")).toBeTruthy();
-	expect(createLightAvatar).not.toHaveBeenCalled();
+	await waitFor(() =>
+		expect(screen.getByText("動かせる精霊がありません")).toBeTruthy(),
+	);
+	expect(motionLabOnScreen()).toBe(false);
+	expect(
+		(screen.getByRole("button", { name: "うれしい" }) as HTMLButtonElement)
+			.disabled,
+	).toBe(true);
 });

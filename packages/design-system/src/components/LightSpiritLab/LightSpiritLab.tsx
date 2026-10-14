@@ -1,5 +1,5 @@
 import { Play, RotateCcw, Square } from "lucide-react";
-import { useId, type ReactNode } from "react";
+import { useId } from "react";
 import { cn } from "../../utils/cn";
 import { Button } from "../Button";
 import { Switch } from "../Switch";
@@ -14,8 +14,9 @@ export type LightSpiritLabMotion = {
 };
 export type LightSpiritLabLayer = "secondary" | "gaze" | "gestures";
 export type LightSpiritLabStatus = {
-	state: "loading" | "ready" | "failed" | "unsupported";
-	/** Shown under the stage, e.g. why the preview is still. */
+	/** `unavailable`: no spirit to drive right now (the message says why). */
+	state: "loading" | "ready" | "failed" | "unavailable";
+	/** Shown under the status, e.g. where the motion plays or why it cannot. */
 	message?: string;
 	motionLabel?: string;
 	variantLabel?: string;
@@ -23,9 +24,7 @@ export type LightSpiritLabStatus = {
 	fps?: number;
 };
 export type LightSpiritLabProps = {
-	/** The host-owned canvas container. */
-	stage: ReactNode;
-	motions: LightSpiritLabMotion[];
+motions: LightSpiritLabMotion[];
 	selected: string | null;
 	/** `""` picks a variant automatically on each play. */
 	variant: string;
@@ -82,9 +81,11 @@ function Toggle({
 	);
 }
 
-/** Plays every avatar motion with its variants, speed, loop and layer switches. */
+/**
+ * Controls that play every avatar motion — variants, speed, loop and layer switches — on a
+ * spirit the host shows elsewhere (the conversation background).
+ */
 export function LightSpiritLab({
-	stage,
 	motions,
 	selected,
 	variant,
@@ -122,13 +123,11 @@ export function LightSpiritLab({
 		<div
 			className={cn("light-spirit-lab", className)}
 			data-lab-state={status.state}
-		>
-			<div className="light-spirit-lab-stage-column">
-				<div className="light-spirit-lab-stage">{stage}</div>
-				<output className="light-spirit-lab-status" aria-live="polite">
+>
+			<div className="light-spirit-lab-summary">
+<output className="light-spirit-lab-status" aria-live="polite">
 					{status.state === "loading" && "読み込んでいます"}
-					{status.state === "unsupported" &&
-						"この環境では3D表示を利用できません"}
+					{status.state === "unavailable" && "動かせる精霊がありません"}
 					{status.state === "failed" && "表示に失敗しました"}
 					{ready && (
 						<>

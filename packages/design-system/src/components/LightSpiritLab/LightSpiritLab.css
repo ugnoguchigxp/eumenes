@@ -1,34 +1,15 @@
 .light-spirit-lab {
 	display: grid;
-	grid-template-columns: minmax(0, 1fr) minmax(16rem, 22rem);
 	gap: 1rem;
+	max-width: 44rem;
 	color: var(--foreground);
 	min-width: 0;
 }
-.light-spirit-lab-stage-column {
+.light-spirit-lab-summary {
 	display: grid;
 	gap: 0.5rem;
 	align-content: start;
 	min-width: 0;
-}
-.light-spirit-lab-stage {
-	position: relative;
-	aspect-ratio: 4 / 5;
-	max-height: 36rem;
-	border-radius: var(--radius);
-	border: 1px solid var(--border);
-	/* The spirit is light on a dark field in both themes. */
-	background: radial-gradient(circle at 50% 40%, #1d2433, #0b0e16 70%);
-	overflow: hidden;
-}
-.light-spirit-lab-stage > * {
-	position: absolute;
-	inset: 0;
-}
-.light-spirit-lab-stage canvas {
-	width: 100%;
-	height: 100%;
-	display: block;
 }
 .light-spirit-lab-status {
 	display: flex;
@@ -91,14 +72,4 @@
 	align-items: center;
 	gap: 0.6rem;
 	font-size: 0.9rem;
-}
-@media (max-width: 720px) {
-	.light-spirit-lab {
-		grid-template-columns: minmax(0, 1fr);
-	}
-	.light-spirit-lab-stage {
-		max-height: 26rem;
-		aspect-ratio: auto;
-		height: min(26rem, 70vh);
-	}
 }

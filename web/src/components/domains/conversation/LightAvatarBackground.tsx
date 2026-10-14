@@ -5,7 +5,8 @@ import {
 	lightAvatarLoaded,
 	loadLightAvatar,
 	motionLabOnScreen,
-	subscribeMotionLab,
+	setBackgroundAvatar,
+	subscribeLightAvatar,
 } from "./light-avatar/load";
 
 function scheduleIdle(callback: () => void): () => void {
@@ -47,9 +48,13 @@ export function LightAvatarBackground({
 		};
 	}, []);
 	const reducedRef = useRef(reduced);
-	// The settings motion lab takes over while on screen; the background pauses meanwhile.
-	const labShown = useSyncExternalStore(subscribeMotionLab, motionLabOnScreen);
-	const visibleRef = useRef(visible && !labShown);
+	// While the settings motion lab is on screen it drives this model instead of the cues.
+	const labShown = useSyncExternalStore(
+		subscribeLightAvatar,
+		motionLabOnScreen,
+	);
+	const visibleRef = useRef(visible);
+	const labRef = useRef(labShown);
 	// Set by the lifecycle effect so the pause effect can rebuild only the playback.
 	const resync = useRef<(() => void) | null>(null);
 	useEffect(() => {
@@ -73,6 +78,7 @@ export function LightAvatarBackground({
 		};
 		const release = () => {
 			resync.current = null;
+			if (model) setBackgroundAvatar(null);
 			observer?.disconnect();
 			disposePlayback();
 			model?.canvas.removeEventListener("webglcontextlost", contextLost);
@@ -106,6 +112,10 @@ export function LightAvatarBackground({
 				element.dataset.avatarState = "paused";
 				return;
 			}
+			if (labRef.current) {
+				element.dataset.avatarState = "motion-lab";
+				return;
+			}
 			const controller = createAvatarPlayback(model, {
 				reduced: reducedRef.current,
 				onError: () => {
@@ -130,6 +140,7 @@ export function LightAvatarBackground({
 					if (!model) return;
 					model.canvas.addEventListener("webglcontextlost", contextLost);
 					resync.current = sync;
+					setBackgroundAvatar(model);
 					sync();
 					if (failed || !model) return;
 					observer = new ResizeObserver(() => {
@@ -166,7 +177,8 @@ export function LightAvatarBackground({
 	}, [active]);
 	useEffect(() => {
 		reducedRef.current = reduced;
-		visibleRef.current = visible && !labShown;
+		visibleRef.current = visible;
+		labRef.current = labShown;
 		resync.current?.();
 	}, [visible, reduced, labShown]);
 	useEffect(() => {

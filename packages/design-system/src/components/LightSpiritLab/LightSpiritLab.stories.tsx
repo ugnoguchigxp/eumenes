@@ -31,14 +31,14 @@ const motions: LightSpiritLabMotion[] = [
 		variants: [{ id: "twirl", label: "くるっと1回転" }],
 	},
 ];
-/** The real stage is a WebGL canvas owned by the web host; stories show a placeholder. */
-const stage = (
-	<div style={{ display: "grid", placeItems: "center", color: "#ffdca2" }}>
-		光の精霊
-	</div>
-);
 
-function Interactive({ state }: { state: "ready" | "loading" | "failed" }) {
+function Interactive({
+	state,
+	message,
+}: {
+	state: "ready" | "loading" | "failed" | "unavailable";
+	message?: string;
+}) {
 	const [selected, setSelected] = useState<string | null>("joyful");
 	const [variant, setVariant] = useState("");
 	const [playing, setPlaying] = useState(false);
@@ -53,7 +53,6 @@ function Interactive({ state }: { state: "ready" | "loading" | "failed" }) {
 	});
 	return (
 		<LightSpiritLab
-			stage={stage}
 			motions={motions}
 			selected={selected}
 			variant={variant}
@@ -69,6 +68,7 @@ function Interactive({ state }: { state: "ready" | "loading" | "failed" }) {
 				variantLabel: "跳ねて1回転",
 				elapsed: 1.8,
 				fps: 24,
+				message,
 			}}
 			onSelect={(id) => {
 				setSelected(id);
@@ -98,6 +98,15 @@ const meta: Meta<typeof Interactive> = {
 };
 export default meta;
 type Story = StoryObj<typeof Interactive>;
-export const Ready: Story = { args: { state: "ready" } };
+/** The web host drives the conversation background's spirit, so there is no own stage. */
+export const Ready: Story = {
+	args: { state: "ready", message: "会話の背景の精霊で再生しています。" },
+};
+export const Unavailable: Story = {
+	args: {
+		state: "unavailable",
+		message: "会話の背景を「光の妖精」にすると、ここから精霊を動かせます。",
+	},
+};
 export const Loading: Story = { args: { state: "loading" } };
 export const Failed: Story = { args: { state: "failed" } };

@@ -2,7 +2,7 @@ import { act, cleanup, render, waitFor } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import { LightAvatarBackground } from "./LightAvatarBackground";
 import { createLightAvatar } from "./light-avatar/model.js";
-import { setMotionLabOnScreen } from "./light-avatar/load";
+import { backgroundAvatar, setMotionLabOnScreen } from "./light-avatar/load";
 
 vi.mock("./light-avatar/model.js", () => ({ createLightAvatar: vi.fn() }));
 afterEach(() => {
@@ -201,16 +201,19 @@ test("unmounting while a rebuild is pending cancels it", async () => {
 	}
 });
 
-test("the background pauses while the settings motion lab is on screen", async () => {
+test("the background lends its model to the settings motion lab while it is on screen", async () => {
 	const { create } = lostFixture();
 	const view = render(<LightAvatarBackground active />);
 	const state = () =>
 		view.container.firstElementChild?.getAttribute("data-avatar-state");
 	await waitFor(() => expect(state()).toBe("ready"));
+	expect(backgroundAvatar()).toBe(create.mock.results[0]!.value);
 	act(() => setMotionLabOnScreen(true));
-	expect(state()).toBe("paused");
+	expect(state()).toBe("motion-lab");
 	act(() => setMotionLabOnScreen(false));
 	expect(state()).toBe("ready");
-	// Pausing keeps the model: no second renderer is built.
+	// Handing over keeps the model: no second renderer is built.
 	expect(create).toHaveBeenCalledTimes(1);
+	view.unmount();
+	expect(backgroundAvatar()).toBeNull();
 });

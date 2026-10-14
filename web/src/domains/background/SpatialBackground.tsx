@@ -47,13 +47,12 @@ export function SpatialBackground({
 	standalone?: boolean;
 }) {
 	const settings = useMemo(() => normalizeOptions(input), [input]);
-	const host = useRef<HTMLDivElement>(null);
+	const host = useRef<HTMLButtonElement>(null);
 	const scene = useRef<ReturnType<SceneModule["createSpatialScene"]> | null>(
 		null,
 	);
 	const [status, setStatus] = useState<SceneStatus | "loading">("loading");
 	const [retry, setRetry] = useState(0);
-	const [details, setDetails] = useState(false);
 	const [selected, setSelected] = useState<string | null>(null);
 	const [demoOverrides, setDemoOverrides] = useState<
 		Record<string, Partial<SpatialState>>
@@ -130,22 +129,57 @@ export function SpatialBackground({
 	};
 	return (
 		<div className={standalone ? "spatial-preview" : "spatial-container"}>
-			<div
+			<button
+				type="button"
 				ref={host}
 				className="spatial-background"
 				data-background-state={active ? status : "inactive"}
 				data-model-count={displayItems.length}
-				aria-hidden="true"
+				aria-hidden={!standalone}
+				tabIndex={standalone ? 0 : -1}
+				aria-label={
+					standalone
+						? "Spatialのモデルプレビュー。クリックか矢印キーで選択、Escで全体へ戻る"
+						: undefined
+				}
+				onClick={(event) => {
+					if (!standalone) return;
+					const rect = event.currentTarget.getBoundingClientRect();
+					const hit = scene.current?.hitTest(
+						event.clientX - rect.left,
+						event.clientY - rect.top,
+					);
+					setSelected(hit && hit !== selected ? hit : null);
+				}}
+				onKeyDown={(event) => {
+					if (!standalone) return;
+					if (
+						["ArrowLeft", "ArrowRight", "Enter", " ", "Escape"].includes(
+							event.key,
+						)
+					)
+						event.preventDefault();
+					if (event.key === "Escape") setSelected(null);
+					else if (event.key === "Enter" || event.key === " ")
+						setSelected(selected ? null : (displayItems[0]?.id ?? null));
+					else if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+						const index = Math.max(
+							0,
+							displayItems.findIndex((item) => item.id === selected),
+						);
+						setSelected(
+							displayItems[
+								(index +
+									(event.key === "ArrowLeft" ? -1 : 1) +
+									displayItems.length) %
+									displayItems.length
+							]?.id ?? null,
+						);
+					}
+				}}
 			/>
 			{active && (
 				<div className="spatial-background-controls">
-					<button
-						type="button"
-						aria-expanded={details}
-						onClick={() => setDetails(!details)}
-					>
-						{details ? "状態一覧を閉じる" : "状態を見る"}
-					</button>
 					{selected && (
 						<button type="button" onClick={() => setSelected(null)}>
 							全体に戻る
@@ -165,7 +199,7 @@ export function SpatialBackground({
 							</button>
 						</div>
 					)}
-					{(details || status === "failed") && (
+					{((standalone && selected) || status === "failed") && (
 						<section
 							className="spatial-background-summary"
 							aria-label="Spatialの状態"

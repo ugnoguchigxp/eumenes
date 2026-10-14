@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from "vitest";
 import { LightSpiritLab, type LightSpiritLabProps } from "./LightSpiritLab";
 
 const props = (overrides: Partial<LightSpiritLabProps> = {}): LightSpiritLabProps => ({
-	stage: <div data-testid="stage" />,
 	motions: [
 		{
 			id: "joyful",
@@ -72,6 +71,19 @@ describe("LightSpiritLab", () => {
 		render(<LightSpiritLab {...props({ selected: "twirl", playing: true })} />);
 		expect(screen.queryByLabelText("変化版")).toBeNull();
 		expect(screen.getByRole("button", { name: "停止" })).toBeEnabled();
+	});
+
+	it("explains why nothing can be driven", () => {
+		render(
+			<LightSpiritLab
+				{...props({
+					status: { state: "unavailable", message: "背景を光の妖精にしてください" },
+				})}
+			/>,
+		);
+		expect(screen.getByText("動かせる精霊がありません")).toBeInTheDocument();
+		expect(screen.getByText("背景を光の妖精にしてください")).toBeInTheDocument();
+		expect(screen.getByRole("button", { name: "再生" })).toBeDisabled();
 	});
 
 	it("disables every control until the stage is ready", () => {
