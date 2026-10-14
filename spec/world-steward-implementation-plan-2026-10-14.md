@@ -1,0 +1,266 @@
+# World Model を記憶担当（steward）につなぐ実装計画
+
+2026-10-14 / 状態: **計画**（未実装・未検証）/ 改訂2・確認事項は決定済み、外部レビュー待ち。
+前提: [記憶担当の実装計画](memory-steward-implementation-plan-2026-10-14.md)（実装済み。以下「steward 計画」）、[World の host 側の説明](../api/domains/world/README.md)、World Model パッケージの設計書（`../eumenes_world_model/spec/world-model-design.md`）。
+実装形態: steward 計画と同じく TypeScript で直接実装する。会話エージェントが呼ぶツール（`world_query`）と設定画面の閲覧だけは、toolchain・bundle の手順（[登録と拡張の手順](../docs/toolchain-extension.md)）に載せる。
+
+---
+
+## 0. 現状の診断（2026-10-14）
+
+| # | 事実 | 根拠 |
+|---|---|---|
+| W1 | World は **OFF**。`EUMENES_WORLD` が未設定。表はあるが中身は0件（`world_entity`、`world_inbox`、`world_host_extract_event` が0件）。World のログもない | `api/infrastructure/config.ts:36`、`data/eumenes.sqlite3` |
+| W2 | 会話から World へ事実を抜き出すのは、steward とは**別の背景ジョブ** `world.extract`。同じ会話を2つのエージェントが別々に読む構造になっている | `api/domains/world/service/extraction-handler.ts`、`README.md` の Local extraction |
+| W3 | `world.extract` は Local（LARM）専用。prepare で推論の route が `larm-only` で cloud 不可でなければ `local_provider_required` で止まる | `extraction-prepare.ts:256-283` |
+| W4 | 主語（対象）の照合に必要な**対象の一覧**を、パッケージが提供していない。製品の既定ではすべての主語が `SUBJECT_UNRESOLVED` として**保留**される。ON にしても事実が入らない | `README.md` の「What is fixture-grade」、`application/world.ts:189` |
+| W5 | 推論の問い合わせ `world.query`（関連・影響・依存・比較・不足）は実装済みだが、会話エージェントのツールとして**未登録** | `service/world-query-tool.ts`、`README.md` P5-01 |
+| W6 | 主張の一覧・詳細の画面に、手動の訂正・取り消し・忘却の操作がある（`POST /api/world/claims/correct|retract|forget`、bundle `settings-world`） | `controller/claims.ts`、`capabilities/bundles/settings-world.bundle.json` |
+| W7 | 会話の発言を忘れる製品の経路がない（`conversation.retract` も Memory の host source の忘却も、製品からは呼ばれない）。World は会話の outbox の `retracted` で source を忘れる作りだが、steward の除外台帳（メッセージを記憶・文脈に使わない）は会話の原文を変えないので、World には伝わらない | `README.md`、`service/lifecycle-feed.ts:185-215` |
+| W8 | 目標の domain `goals` はあるが、server で組み立てられていない（`createGoalsService` を呼ぶ製品コードがない）。表は0件。Broker は `goalSnapshot` を読むだけ | `api/domains/goals/README.md`、`service/context-broker.ts:292` |
+| W9 | 回答の文脈に World を差し込む Broker（`worldContext`）は dialogue に接続済み。World を使う回答は採用まで本文の公開を保留する | `dialogue/service/generation-handler.ts:154`、`context.ts:124` |
+| W10 | World の ON/OFF/protect は環境変数で決まる。OFF に戻すと忘却の伝播も止まる（内容が残っているなら protect にする必要がある） | `README.md` の Assembly |
+
+## 1. 決定事項（ユーザー合意済み）
+
+| # | 決定 |
+|---|---|
+| G1 | World の更新・検索にも **cloud の API を使ってよい**（LARM がない環境もあるため）。steward と同じく、会話と同じ route を使う（steward 計画 K7） |
+| G2 | World の読み書きは**記憶担当（steward）が兼任**する。失敗が続くようなら分けることを検討する（分けられる形にしておく） |
+| G3 | World の主張を利用者が手で変える機能は持たない。**閲覧（観測）だけ**できる |
+| G4 | 目標（Goals）も **steward が登録・保守**する。本人からの依頼（依頼キュー）でも変更できる |
+| G6 | `world.extract` を廃止し、steward に一本化する |
+| G7 | 目標は**期限で自動的に取り下げない**。採用済みの目標は本人が終えた・やめたと分かるまで残す（数年かかる目標もある）。推測から作った提案も期限では消さず、手入れで見直す |
+| G8 | World の使い方は3つの組み合わせ（§4）: ①採用済みの目標は常に文脈に置く、②本人の発言に出た既知の対象は**ホストが名前・別名の一致で決定的に引き**、その状態と直接の因果・依存を回答の前に文脈へ入れる、③深い推論は会話エージェントが必要なときに `world_query` で引く。対象を LLM で毎回選ぶ step は作らない |
+| G9 | World の ON/OFF は再起動で反映してよい。原則として常用する |
+| G5 | steward 計画の K8（profile・モデル名を固定しない）、K9（互換層を作らない）、K10（機能が揃ってから live で観測）、K12/K13（忘却は原文を残し、再利用を禁止する）を World にも適用する |
+
+## 2. 全体像
+
+### 2.1 棚の分担（何をどこに置くか）
+
+| 棚 | 入れるもの | 例 | 書き手 |
+|---|---|---|---|
+| 長期記憶（Memory State） | **本人について**のこと | 辛い物が苦手、仕事はエンジニア | steward（curate-memory） |
+| World | **本人の外の世界**の、状態・関係・因果・依存・予測と結果 | 「Eumenes の記憶は steward が管理している」（状態）、「この作業は LARM の接続に依存する」（依存）、「cache を入れると応答が速くなりそう」（仮説） | steward（curate-world） |
+| 目標（Goals） | 本人が目指すこと | 「音声応答の遅延を減らしたい」 | steward（curate-goals） |
+| 短期メモ・要約 | 今の会話の流れ | 今調べている店 | steward（既存） |
+
+- 同じ事実を Memory と World の両方に書かない（World の設計書 §2「二重管理を区別する」）。本人の好み・習慣は Memory、それ以外の世界の解釈は World。
+- 本人の発言は「本人がそう報告した」根拠（`origin: user_report`）として World に入る。アシスタントの説明・推測は `model_hypothesis`（仮説）として入り、本人の報告や観測に格上げしない。
+
+### 2.2 流れ（steward 計画の反映サイクルに step を足す）
+
+```
+run の終わり → 往復の台帳（既存）
+                  ▼
+反映 step（往復ごと。この順で連鎖する）
+   curate-memory → curate-world（新） → curate-goals（新） → dispose-exchanges → summarize
+付随 step
+   prepare-recall（既存。World の対象選びは LLM を使わない: §4.1）
+手入れ step（反映すべきものがないとき）
+   consolidate-memory、compact-history、refine-summary、consolidate-world（新）
+```
+
+- 新しい step（curate-world、curate-goals、consolidate-world）は steward 計画の `StewardStep` の形で足す（steward 計画 §2.2 で用意済み）。
+- **G2 の「分けられる形」**: World の step は steward の単位・判断記録・忘却の再検証をそのまま使うが、World 固有の処理（候補の検証、保存、採用）は world domain の公開操作に閉じる。将来 World 担当を分けるときは、step の呼び出し元を別のエージェントに移すだけで済む。
+
+### 2.3 domain の依存
+
+```
+steward ──▶ memory, continuity, conversation, world（新）, goals（新）
+world   ──▶ memory, conversation, goals（既存）
+dialogue ─▶ memory（既存）。World の Broker は今と同じく port で受ける
+```
+
+steward は world の上位なので、steward から world・goals の公開操作を呼べる（steward 計画 §2.1 の想定どおり）。`scripts/domains.ts` の steward の依存に `world`、`goals` を足す。
+
+## 3. 抽出の一本化（W2・W3・W4）
+
+### 3.1 `world.extract` を廃止し、steward の `curate-world` に置き換える
+
+| 段階 | 今（`world.extract`） | これから（`curate-world`） |
+|---|---|---|
+| 入力の受付 | 会話の outbox → World の inbox（決定的。取り消し・訂正の反映も含む） | **そのまま使う**（feed の consumer は残す） |
+| 起動 | World の `pump()` が未処理の inbox を見て1ジョブを積む | steward の往復の単位。往復ごとに、その往復の発言に対応する inbox の event を対象にする |
+| prepare | 入力窓の作成、Memory の外部依存の登録、推論 request の取得（Local の証明が必須） | 同じ処理を **world の公開操作** `prepareCurationInTransaction` として切り出して呼ぶ。Local の証明は外す（G1）。推論は steward の route（会話と同じ、cloud 可） |
+| 推論 | 候補だけを返させる | 同じ。schema は strict 互換（steward 計画 §4.2 L5） |
+| settle | `validateCandidates` → `candidate.settle`。ID・時刻・根拠はホストが付ける | 同じ処理を `settleCurationInTransaction` として切り出して呼ぶ。加えて**採用**（§3.3）まで同じ transaction で行う |
+| 保留 | `held` の候補があると窓全体を保留 | 同じ規則を使う。保留が続く往復は steward の失敗の数え方（3回で skipped）に乗せる |
+
+- `world.extract` のジョブ種別、`createWorldExtraction`、`extraction-handler.ts`、`extraction-execute.ts`、slot の管理、`pump()` からの schedule を**削除**する（K9）。prepare/settle の中身は world の公開操作として残す。
+- 既存の `world_host_extract_event`（host の記録）は、steward の単位の対象と1対1になるように使い続ける。
+- 抽出の上限（12発言 / 32KiB / 依存32件 / 候補8件）は world の公開操作の中で今のまま強制する。steward の入力上限（4往復 / 16KB）の方が小さいので、通常は World の上限に達しない。
+
+### 3.2 対象の一覧（W4）— パッケージの変更
+
+| # | 変更 | 場所 |
+|---|---|---|
+| E1 | `eumenes-world-model/sqlite` に、Scope 内の対象を読む公開 API `listEntities(db, { contractVersion, access, scopeKey, query?: { kind?, aliasPrefix?, ids? }, limit })` を足す。忘却済み・統合済みの扱いは既存の規則（tombstone は返さない、統合先を返す） | `../eumenes_world_model`（別リポジトリ）。試験と spec（`world-sqlite-public-api.md`）も更新する |
+| E2 | パッケージを再配布し、Eumenes の vendor を更新する | `package.json`、`bun.lock`（vendor の tgz）。版は patch だけ上げる |
+| E3 | host 側は `extraction.entities` に `listEntities` を渡す。curate-world の入力には、往復の言葉に近い対象（別名の前方一致と、最近使った対象）を最大30件だけ見せる | `api/application/world.ts`、world の公開操作 |
+
+- モデルは、見せた対象の ref（`w1`〜）を使うか、新しい対象の登録を提案する。同名だけで統合しない。候補が複数あれば未解決のまま保留する（World の設計書 §3 の規則のまま）。
+
+### 3.3 採用（G2）
+
+| 主張の種類 | 扱い |
+|---|---|
+| 本人の発言を根拠にした状態・関係（`user_report`） | steward が採用する（`active`） |
+| アシスタントの説明・推測（`model_hypothesis`） | 採用しても `hypothesis` の印のまま使う（World の claimTone の規則） |
+| 既存の主張と矛盾する本人の発言 | 既存の主張を supersede し、新しい主張を採用する（今の `correctInTransaction` と同じ処理を steward が呼ぶ） |
+| 本人が「それは違う」と言った主張 | retract する |
+
+採用・訂正・取り消しは、すべて steward の判断記録に残る。
+
+## 4. 使う（W5・W9）
+
+### 4.1 常に・自動で使う（G8 の①②。LLM は使わない）
+
+| 層 | 中身 | 決め方 | 置き場所 |
+|---|---|---|---|
+| ① 目標 | 採用済みの目標の一覧（文面・優先度。最大 2KB） | goals の `goalSnapshot`。変わるのは目標の採用・完了・取り下げのときだけ | **L1 の直後**（変わりにくいので前の方。prompt cache が効く）。目標が変わったときだけ作り直す |
+| ② 話題の対象 | 本人の今回の発言と直前の往復に出た**既知の対象**の、今の状態と直接の因果・依存（1段）、根拠の種類と鮮度（最大 4KB、対象は最大5件） | ホストが対象の名前・別名を発言の中で探す（`listEntities` の別名一覧を使った決定的な一致。正規化して最長一致）。曖昧な一致（同じ別名の対象が2つ以上）は入れない | **L4**（今の World の位置。毎回変わるので末尾） |
+
+- ②は回答の prepare で Broker が作る（今の Broker の WorldSlice の仕組みに「発言の中の対象」を起点として渡す）。steward の Window には何も足さない。
+- 既知の対象が発言になければ②は空（今と同じ既定の動作）。
+- 予算は World の既存の予算配分（`CONTEXT_TOTAL_BYTES`）の中で、①と②を合わせて最大 6KB。①は必ず入れ、②は残りで入るだけ入れる。
+
+### 4.2 質問されたとき：会話エージェントのツール `world_query`
+
+- `createWorldQueryTool`（実装済み）を toolchain として登録する（bundle と adapter）。使える mode は `snapshot`、`relevance`、`influence`、`dependencies`、`scenarios`、`gaps`。
+- 結果は参照データで、操作の許可にはならない（`executionPermission: "none"` のまま）。
+- `linkGaps`（不足を作業に変える）は使わない（実際の Tasks domain が受け付けないため。W5 の README の記述）。
+
+## 5. 目標（G4・W8）
+
+| # | 内容 |
+|---|---|
+| O1 | server で `createGoalsService` を組み立てる（今は誰も作っていない） |
+| O2 | 反映 step `curate-goals`: 往復と今の目標の一覧から、目標の登録・改訂・完了・取り下げを決める。本人が「〜したい」「〜を目指す」と言ったものは採用、会話の流れから推測したものは**提案**（goals の既存の区別）。**期限による自動の取り下げはしない**（G7）。完了・取り下げは、本人が終えた・やめたと言ったとき、または明らかに達成・不要になったことが会話から分かったときだけ |
+| O2b | 手入れ step `consolidate-goals`（`consolidate-world` と同じ手入れの枠）: 提案の重複をまとめ、明らかに古くなった提案を取り下げる。提案が上限（50件）に近づいたら、関係の薄いものから取り下げる。採用済みの目標は手入れで取り下げない（本人の言葉が要る） |
+| O3 | 依頼キューの kind に `goal` を足す（「この目標はもう終わった」など）。steward 計画 §3.4 の状態遷移をそのまま使う |
+| O4 | goals の既存の上限（提案50、採用30）、operationKey（再送の冪等性）、revision・epoch の検証は変えない。operationKey は steward の単位 ID と要素の番号から作る |
+
+## 6. 忘却（W7・G5）
+
+| # | 内容 |
+|---|---|
+| F1 | steward 計画 §6 の忘却で除外台帳に入れたメッセージを、**同じ transaction で World の source の忘却として受け付ける**（`lifecycle.acceptForgetInTransaction`、roots は `{ kind: "source", id: <会話メッセージの source key> }`、reasonCode `SOURCE_BLOCKED`、origin `steward`）。commit の後に `resumeForget` で進める（World の既存の流れ） |
+| F2 | Memory の State を忘れたときの World への伝播は、既存の `lifecycle-forget-memory` のまま |
+| F3 | 依頼キューの「忘れて」で World の主張も消せるようにする。curate-memory の入力に World の主張の ref（`c1`〜、対象と述語と値の短い文）を足し、`resolve.refs` で指せるようにする。主張の忘却は `forgetInTransaction`（World の既存の公開操作）で受け付ける。1件の依頼で消せる上限は、Memory と合わせて5件 |
+| F4 | 対象（entity）ごと忘れる依頼（「〇〇プロジェクトのことは全部忘れて」）は、entity の忘却（パッケージの既存機能。関係先・統合された配下まで届く）として受け付ける |
+| F5 | steward の判断記録の削除は、World の主張・対象の ref も `steward_decision_ref` に書き、忘却で消す（steward 計画 §6.2 と同じ） |
+| F6 | 忘却と重なった World の step の結果は採用しない。`forget_seq` に加え、World の forget epoch を単位に記録して settle で照合する |
+
+## 7. 手動変更の削除と閲覧（G3・W6）
+
+| 対象 | 削除するもの | 残すもの・足すもの |
+|---|---|---|
+| HTTP | `POST /api/world/claims/correct|retract|forget` | `GET /api/world/status`、`/claims`、`/claims/:id`、`/forgets` |
+| bundle `settings-world` と adapter | 訂正・取り消し・忘却の action | 一覧・詳細・忘却の進み具合の表示。判断記録（steward の World の step）へのリンク |
+| service | `world-claims-changes.ts` の `correct/retract/forget` の外部向けの入口 | 同じ処理の内部の公開操作（steward が使う） |
+
+## 8. ON/OFF を設定にする（W10）
+
+- `EUMENES_WORLD` を廃止し、SQLite の設定項目 `world.enabled`（true/false）にする（環境変数を設定へ移す方針の先取り）。
+- OFF でも、World に内容が残っている間は自動的に protect（忘却の伝播だけ動く）にする。利用者が「OFF に戻すと忘却が止まる」ことを意識しなくてよくする。
+- 切り替えは backend の再起動で反映する（初回の同期と gate の扱いが起動時の処理のため）。設定画面に「再起動で反映」と出す。
+- `EUMENES_WORLD_JOURNAL`、`EUMENES_WORLD_POLL_MS`、`EUMENES_WORLD_CURSOR_SECRET` は今回は変えない（運用の値なので、環境変数の整理の時にまとめて扱う）。
+
+## 9. 出力契約（概要）
+
+すべて strict 互換の JSON（全 key が required、任意の値は `null`）。ホストが要素ごとに検証する。
+
+**curate-world**
+```json
+{
+  "entities": [{ "op": "register|alias", "ref": "w1|null", "kind": "<entity kinds>", "name": "…", "alias": "…|null" }],
+  "claims":   [{ "op": "assert|correct|retract", "ref": "c1|null", "subject": "w1|new:0", "predicate": "…", "value": { "type": "<typed value>", "value": "…" } | null,
+                 "relation": { "kind": "increases|decreases|causes|enables|inhibits|depends_on|correlates|part_of|related_to", "object": "w2|new:1" } | null,
+                 "condition": "…|null", "evidence": "e1", "origin": "user_report|model_hypothesis", "validFrom": "YYYY(-MM(-DD))|null", "validUntil": "…|null" }],
+  "changed": true
+}
+```
+- 型付きの値、条件の式、述語の語彙は World パッケージの既存の契約（`validateCandidates` が受け付けるもの）に合わせる。実装時に契約から schema を作る。
+- 上限: 対象の登録4件、主張8件（World の候補上限）。
+
+**curate-goals**
+```json
+{ "goals": [{ "op": "propose|adopt|revise|complete|withdraw", "ref": "g1|null", "text": "…|null", "priority": "high|normal|low|null", "evidence": "e1|null" }] }
+```
+
+
+**consolidate-world**（手入れ）: 統合の提案（`planMerge` に渡す。可逆）、古くなった状態の `stale` の印、使われない仮説の取り下げ。上限は1回4件。
+
+## 10. 指示文の方針
+
+- curate-world: 本人の外の世界について、今後の判断に役立つ状態・関係・依存・因果を書く。本人について（好み・習慣）は書かない（curate-memory の仕事）。本人の言葉は `user_report`、アシスタントの説明・推測は `model_hypothesis`。同名だけで別の対象をまとめない。分からなければ書かない。
+- curate-goals: 本人が明言した目標は adopt、会話から推測した目標は propose。目標の達成・断念が分かったら complete / withdraw。
+
+## 11. タスク
+
+順序: パッケージ（対象の一覧）→ 設定と組み立て → 抽出の一本化 → 採用と目標 → 使う側（focus・ツール）→ 忘却 → 閲覧と削除 → 総合検証。
+
+| 段 | # | 内容 | 主なファイル |
+|---|---|---|---|
+| A | T1 | パッケージに `listEntities` を足し、試験と spec を更新して再配布する（§3.2 E1・E2） | `../eumenes_world_model/**`、`package.json`、vendor |
+| B | T2 | ON/OFF を設定にする。OFF でも内容があれば protect（§8） | `settings/**`、`api/application/world.ts`、`server-world.ts`、`infrastructure/config.ts` |
+| | T3 | goals を組み立てる（§5 O1） | `api/application/server.ts`（または組み立て用の補助ファイル） |
+| C | T4 | world の公開操作 `prepareCurationInTransaction` / `settleCurationInTransaction` を切り出し、Local の証明を外す。`world.extract` 一式を削除する（§3.1） | `api/domains/world/service/extraction-*.ts`、`world.ts` |
+| | T5 | steward の `curate-world` step と指示文（§9・§10） | `api/domains/steward/service/steps/`、`prompts/` |
+| D | T6 | 採用・訂正・取り消しの公開操作と steward からの呼び出し（§3.3） | `world/service/world-claims-changes.ts`、steward |
+| | T7 | `curate-goals` と依頼の `goal`（§5 O2・O3） | steward、`goals/**` |
+| E | T8 | ①目標を L1 の直後に置く、②発言の中の既知の対象を名前・別名の一致で引いて Broker の WorldSlice の起点にする（§4.1） | `world/service/context-broker.ts`、`dialogue/service/context-compiler.ts`、`memory/service/context-window.ts`（目標の層の位置） |
+| | T9 | `world_query` ツールの bundle と adapter（§4.2） | `capabilities/bundles/`、`api/application/` |
+| F | T10 | 忘却の接続（§6 F1〜F6） | steward、`world/service/lifecycle-*.ts`、memory の purge hook |
+| G | T11 | 手動変更の削除と閲覧（§7） | `world/controller/claims.ts`、`world-claims*.ts`、`settings-world.bundle.json`、`application/world-adapter.ts` |
+| | T12 | `consolidate-world` と `consolidate-goals`（手入れ） | steward |
+| H | T13 | 文書: `docs/memory.md` に World と目標の節を足す。`api/domains/world/README.md` を更新する（抽出・手動変更・設定）。`docs/domains.md` を再生成する | `docs/*`、`api/domains/world/README.md` |
+| | T14 | 総合の verify と live の受入（§13） | `spec/verification/world-steward-2026-10-14/README.md` |
+
+## 12. 試験（fixture）
+
+| 対象 | 確かめること |
+|---|---|
+| 対象の一覧 | Scope 内だけ返す / 忘却済みを返さない / 統合先を返す / 上限 |
+| 抽出の一本化 | 往復ごとに curate-world が対応する inbox の event を settle する / `world.extract` のジョブ種別がない / cloud の route でも動く / 保留が3回続くと skipped / 忘却と重なると不採用 |
+| 採用 | 本人の報告は active、仮説は hypothesis / 本人の訂正で supersede / 「違う」で retract |
+| 目標 | 明言は adopt、推測は propose / 時間がたっても自動で withdraw しない / 手入れで重複の提案をまとめ、上限に近づくと関係の薄い提案から withdraw / 採用済みは手入れで withdraw しない / 依頼で complete |
+| 目標の層と話題の対象 | 目標は L1 の直後に入り、目標が変わらなければ同じ文面（cache が効く） / 発言に出た既知の対象の状態と直接の因果が L4 に入る / 曖昧な一致は入らない / 対象が出なければ L4 は今と同じ / 予算 6KB を超えない |
+| ツール | `world_query` が登録され、mode ごとに答える / 結果に操作の許可がない |
+| 忘却 | 除外台帳のメッセージを根拠にした World の主張が消える / 依頼で主張・対象を消せる / 上限5件 / 判断記録から消える / 起動時の復旧で同じ状態になる |
+| 閲覧と削除 | 変更の HTTP と action がない / 閲覧は動く |
+| 設定 | OFF・内容なしなら何も組み立てない / OFF・内容ありなら protect / ON で初回同期 |
+
+## 13. live の受入（機能が揃ってから）
+
+| # | シナリオ | 合格の条件 |
+|---|---|---|
+| L1 | 「Eumenes の記憶は steward が管理している」のように外の世界の状態を話す | World に対象と主張が入り、採用される。Memory には入らない |
+| L2 | アシスタントが「cache を入れると速くなるかもしれません」と言う | 仮説として入り、本人の報告にはならない |
+| L3 | 訂正（「いや、それは LARM ではなく cloud で動いている」） | 古い主張が supersede され、その後の回答が変わる |
+| L4 | 既知の対象（例: Eumenes）を話題に出す | その対象の状態と因果が L4 に入り、回答で「それを変えると〇〇に響く」のように使われる |
+| L5 | 「この変更で何に影響する？」 | 会話エージェントが `world_query` を使う |
+| L6 | 「〇〇のことは全部忘れて」 | World の対象と主張が消え、以後使われない |
+| L7 | 「音声の遅延を減らしたい」 | 目標が採用され、関連する回答で目標が踏まえられる |
+| L8 | LARM が使えない状態 | cloud で World の step が動く |
+| 計測 | step ごとの時間・出力 tokens・期限切れの率、World の主張の件数と採用率 | steward 計画 §11 と同じ判断基準 |
+
+## 14. リスク
+
+| # | リスク | 対策 |
+|---|---|---|
+| R1 | 1回の往復の推論が増える（curate-world、curate-goals の2回。対象選びは LLM を使わない） | 往復に対象がなければ step を省く（curate-memory の出力と往復の言葉から判定し、モデルを呼ばない）。失敗が続けば World 担当を分ける（G2） |
+| R2 | 外の世界の情報が cloud に送られる（World の設計書は Local 限定だった） | G1 で合意済み。route は会話と同じなので、会話で cloud に送っている範囲を超えない |
+| R3 | 対象の取り違え（同名の別物を1つにまとめる） | 同名だけで統合しない。統合は手入れの step で、可逆の `planMerge` を使う |
+| R4 | 小さいモデルが World の契約（型付き値・関係）を守れない | 要素ごとに捨てる。判断記録で失敗の傾向を見て指示文と語彙を絞る |
+| R5 | パッケージの変更（対象の一覧）が別リポジトリになる | T1 を最初に行い、版を patch だけ上げる |
+
+## 15. 決定済みの確認事項（2026-10-14）
+
+| # | 確認事項 | 決定 |
+|---|---|---|
+| 1 | 目標を L1 の直後に置く（目標が変わると後ろの cache は崩れる） | この位置でよい |
+| 2 | 対象の一致は名前・別名の決定的な一致だけ（言い換えや指示語は拾わない） | これでよい。拾えない分は③のツールと curate-world で補う |
+| 3 | 予算（①と②で最大 6KB、②の対象は最大5件） | まずこの値で運用し、live の様子を見て見直す |
