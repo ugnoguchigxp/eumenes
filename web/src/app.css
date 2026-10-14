@@ -194,6 +194,19 @@ select:focus-visible {
 	gap: 16px;
 	min-height: 100%;
 }
+.messages-older {
+	align-self: center;
+	padding: 7px 12px;
+	border: 1px solid var(--border);
+	border-radius: 999px;
+	color: var(--foreground);
+	background: var(--card);
+	cursor: pointer;
+	font-size: 0.72rem;
+}
+.messages-older:hover {
+	background: var(--accent);
+}
 .message {
 	width: fit-content;
 	max-width: min(780px, 84%);

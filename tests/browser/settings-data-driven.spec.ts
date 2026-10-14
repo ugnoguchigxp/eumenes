@@ -2,8 +2,8 @@ import { test, expect, type Page } from "@playwright/test";
 import { createFixture } from "./fixture";
 
 const TOKEN = "fixture-token-for-toolchain-browser";
-/** The registered (data-driven) settings entry; the legacy 「設定」 stays beside it. */
-const TITLE = "設定（データドリブン）";
+/** The registered settings artifact. */
+const TITLE = "設定";
 
 test.setTimeout(60000);
 let apiPort: number, webPort: number;
@@ -75,17 +75,15 @@ async function openFromHub(page: Page, label: string) {
 	).not.toHaveText(TITLE);
 }
 
-test("the launcher has one data-driven entry beside the legacy settings, and no per-screen entries", async ({
-	page,
-}) => {
+test("the launcher exposes one settings artifact", async ({ page }) => {
 	await page.goto(`http://127.0.0.1:${webPort}`);
 	await page.getByRole("button", { name: "アーティファクトを開く" }).click();
 	await expect(
 		page.getByRole("menuitem", { name: TITLE, exact: true }),
 	).toHaveCount(1);
 	await expect(
-		page.getByRole("menuitem", { name: "設定", exact: true }),
-	).toHaveCount(1);
+		page.getByRole("menuitem", { name: "設定（データドリブン）", exact: true }),
+	).toHaveCount(0);
 	// Screens with a group are reached through the hub, not the top menu.
 	for (const hidden of ["会話", "表示", "音声と入力", "記録", "変更一覧"])
 		await expect(
@@ -94,7 +92,7 @@ test("the launcher has one data-driven entry beside the legacy settings, and no 
 	await page.getByRole("menuitem", { name: TITLE, exact: true }).click();
 	for (const name of ["会話", "音声と入力", "表示", "記録"])
 		await expect(page.getByRole("button", { name })).toBeVisible();
-	// Nothing opens by itself and the legacy page is untouched.
+	// Nothing opens by itself.
 	await expect(
 		page
 			.getByRole("tablist", { name: "アーティファクトのタブ" })
@@ -302,9 +300,9 @@ test("AIと接続: an API key is applied through the draft, never stored in the 
 	expect(seeded.ok()).toBe(true);
 	await openHub(page);
 	await openFromHub(page, "AIと接続");
-	await page.getByRole("button", { name: "検証用の接続" }).click();
+	await page.getByRole("button", { name: "検証用の接続", exact: true }).click();
 	// The settings adapter refuses an apply with a key and no other change, so rename too.
-	await page.getByLabel("接続名").fill("検証用の接続（更新）");
+	await page.getByLabel("接続名").first().fill("検証用の接続（更新）");
 	const field = page.getByLabel("APIキーの更新");
 	await field.pressSequentially(KEY);
 	// The field shows one mark per character, never the key.
@@ -349,8 +347,11 @@ test("AIと接続: a connection added from the list form carries its key apart, 
 	const form = page.getByRole("form", { name: "クラウドAPIを登録" });
 	await form.getByLabel("接続名").fill(name);
 	await form.getByLabel("APIのベースURL").fill("https://example.test/v1");
-	await form.getByLabel("APIキー").fill(KEY);
+	await form.getByLabel("APIキー", { exact: true }).fill(KEY);
 	await form.getByRole("button", { name: "クラウドAPIを登録" }).click();
+	await expect(
+		page.getByRole("button", { name: "設定の変更をすべて保存" }),
+	).toBeEnabled();
 	await page.getByRole("button", { name: "変更一覧を開く" }).first().click();
 	await expect(page.getByText(`クラウドAPIを登録（${name}）`)).toBeVisible();
 	await expect(page.getByText("更新・削除予定 1件")).toBeVisible();
@@ -392,10 +393,13 @@ test("AIと接続: a connection added from the list form carries its key apart, 
 			?.credentialAvailable,
 	).toBe(true);
 	// Delete it again: a confirmed row action staged in the draft, then applied.
+	await page.getByRole("tab", { name: "AIと接続", exact: true }).click();
 	await page.getByRole("button", { name: `削除: ${name}` }).click();
 	await page.getByRole("button", { name: "実行する" }).click();
 	await page.getByRole("button", { name: "変更一覧を開く" }).first().click();
-	await expect(page.getByText(/削除/).first()).toBeVisible();
+	await expect(
+		page.getByRole("tabpanel").getByText("構成の変更"),
+	).toBeVisible();
 	await page.getByRole("button", { name: "設定の変更をすべて適用" }).click();
 	await expect
 		.poll(async () =>

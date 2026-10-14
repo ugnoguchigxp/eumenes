@@ -433,8 +433,8 @@ const structure = (
 
 export const settingsArtifacts: Record<string, ArtifactDefinitionV1> = {
 	hub: {
-		...base("hub", "設定（データドリブン）"),
-		launcher: { label: "設定（データドリブン）" },
+		...base("hub", "設定"),
+		launcher: { label: "設定" },
 		variants: variant({
 			view: "settings-navigation",
 			source: "settings-hub",

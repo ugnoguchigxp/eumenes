@@ -174,9 +174,9 @@ test("history on first render is not announced; new answers are, even with ident
 	expect(container.querySelector("output[aria-live]")).not.toBe(first);
 });
 
-test("only the latest 200 messages render until older ones are requested", () => {
+test("the newest 20 bubbles render first and older bubbles appear 20 at a time", () => {
 	const many = Array.from(
-		{ length: 205 },
+		{ length: 45 },
 		(_, i): ["user" | "assistant", string] => ["user", `発言${i}`],
 	).map(([role, text], i): [string, "user" | "assistant", string] => [
 		`m${i}`,
@@ -184,7 +184,33 @@ test("only the latest 200 messages render until older ones are requested", () =>
 		text,
 	]);
 	const { container } = render(<MessageList conversation={convo(...many)} />);
-	expect(container.querySelectorAll("article").length).toBe(200);
-	fireEvent.click(screen.getByRole("button", { name: "以前の会話を表示" }));
-	expect(container.querySelectorAll("article").length).toBe(205);
+	const articles = () => container.querySelectorAll("article");
+	const older = () => screen.getByRole("button", { name: "さらに20件表示" });
+	expect(articles()).toHaveLength(20);
+	expect(articles()[0]?.textContent).toContain("発言25");
+	expect(older().nextElementSibling).toBe(articles()[0]);
+	fireEvent.click(older());
+	expect(articles()).toHaveLength(40);
+	expect(articles()[0]?.textContent).toContain("発言5");
+	fireEvent.click(older());
+	expect(articles()).toHaveLength(45);
+	expect(articles()[0]?.textContent).toContain("発言0");
+	expect(screen.queryByRole("button", { name: "さらに20件表示" })).toBeNull();
+});
+
+test("a streaming answer counts as one visible bubble", () => {
+	const many = Array.from(
+		{ length: 20 },
+		(_, i) => [`m${i}`, "user", `発言${i}`] as [string, "user", string],
+	);
+	const conversation = convo(...many);
+	const { container, rerender } = render(
+		<MessageList conversation={conversation} streaming="回答中" />,
+	);
+	expect(container.querySelectorAll("article")).toHaveLength(20);
+	expect(container.querySelector("article")?.textContent).toContain("発言1");
+	expect(screen.getByRole("button", { name: "さらに20件表示" })).toBeTruthy();
+	rerender(<MessageList conversation={conversation} />);
+	expect(container.querySelectorAll("article")).toHaveLength(20);
+	expect(screen.queryByRole("button", { name: "さらに20件表示" })).toBeNull();
 });

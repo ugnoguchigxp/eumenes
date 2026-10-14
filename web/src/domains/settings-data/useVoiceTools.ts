@@ -4,7 +4,7 @@ import type { EumenesClient } from "../../../../client";
 import type { Settings } from "../../../../api/domains/settings/contracts";
 import { queryRoots } from "../../queryKeys";
 import { useVoiceSample } from "../settings/useVoiceSample";
-import type { VoiceCatalog } from "../settings/voice-presentation";
+import type { VoiceCatalog } from "./voice-presentation";
 
 /**
  * The effectful part of the voice screen, kept apart from the registered fields: the LARM voice

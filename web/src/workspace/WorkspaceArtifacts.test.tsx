@@ -1,39 +1,8 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, expect, test } from "vitest";
 import { useArtifactWorkspace } from "../domains/artifact";
-import {
-	useOpenMusic,
-	useOpenPlaylist,
-	useOpenSettings,
-} from "./WorkspaceArtifacts";
+import { useOpenMusic, useOpenPlaylist } from "./WorkspaceArtifacts";
 afterEach(cleanup);
-test("settings launchers retain stable OpenUI identities across closing and reopening", () => {
-	const hook = renderHook(() => {
-		const workspace = useArtifactWorkspace();
-		return { workspace, open: useOpenSettings(workspace.open) };
-	});
-	act(() => {
-		hook.result.current.open();
-		hook.result.current.open("conversation");
-		hook.result.current.open("changes");
-		hook.result.current.open("display");
-		hook.result.current.open("conversation");
-	});
-	expect(hook.result.current.workspace.tabs.map((tab) => tab.id)).toEqual([
-		"settings",
-		"settings-conversation",
-		"settings-changes",
-		"settings-display",
-	]);
-	expect(
-		hook.result.current.workspace.tabs.every((tab) => tab.kind === "openui"),
-	).toBe(true);
-	act(() => {
-		hook.result.current.workspace.close("settings-conversation");
-		hook.result.current.open("conversation");
-	});
-	expect(hook.result.current.workspace.tabs).toHaveLength(4);
-});
 test("generation and playlist each keep one stable screen with separate identities", () => {
 	const view = renderHook(() => {
 		const workspace = useArtifactWorkspace();

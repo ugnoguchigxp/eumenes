@@ -148,11 +148,11 @@ const standalone = (
 test("the menu keeps one entry per feature: grouped screens are reached through their hub", () => {
 	const entries = [
 		standalone("display", "表示", "使い方を変える"),
-		standalone("hub", "設定（データドリブン）", undefined, 10),
+		standalone("hub", "設定", undefined, 10),
 		entry,
 	] as never;
 	expect(menuEntries(entries).map((e) => entryLabel(e))).toEqual([
-		"設定（データドリブン）",
+		"設定",
 		"タイマー（データドリブン）",
 	]);
 	expect(artifactIdOf("artifact:settings.display@1")).toBe("settings.display");

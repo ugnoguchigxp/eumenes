@@ -10,7 +10,7 @@ import {
 	type Settings,
 } from "../../../../api/domains/settings/contracts";
 import type { ToolchainArtifactEntry } from "../../../../client/toolchain-actions";
-import { serviceSummary } from "../settings/voice-presentation";
+import { serviceSummary } from "./voice-presentation";
 import {
 	reviewRows,
 	toWire,

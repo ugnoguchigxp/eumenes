@@ -6,7 +6,7 @@ import {
 	waitFor,
 } from "@testing-library/react";
 import { afterEach, expect, test } from "vitest";
-import type { Recipe, Selection } from "../settings/records-presentation";
+import type { Recipe, Selection } from "./records-presentation";
 import { createSettingsBackend, newCache, Screens } from "./settings.fixture";
 
 afterEach(cleanup);

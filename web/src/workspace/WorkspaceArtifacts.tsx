@@ -12,13 +12,6 @@ import {
 	isImageArtifactDefinition,
 } from "../domains/image/artifact-definition";
 import { ImageArtifact } from "../domains/image/ImageArtifact";
-import { SettingsArtifact } from "../domains/settings/SettingsArtifact";
-import {
-	isSettingsArtifactDefinition,
-	settingsArtifacts,
-	settingsArtifactDefinition,
-	type SettingsArtifactId,
-} from "../domains/settings/artifact-definition";
 import { useCallback } from "react";
 import type { EumenesClient } from "../../../client";
 import {
@@ -34,23 +27,6 @@ import {
 	useToolchainArtifacts,
 } from "../domains/toolchain-artifacts";
 import { toolchainWebAdapters } from "./toolchain-adapters";
-
-export function useOpenSettings(
-	open: ReturnType<typeof useArtifactWorkspace>["open"],
-) {
-	return useCallback(
-		(id: SettingsArtifactId = "hub") => {
-			const entry = settingsArtifacts[id];
-			open({
-				id: entry.id,
-				title: entry.title,
-				kind: "openui",
-				definition: settingsArtifactDefinition(id),
-			});
-		},
-		[open],
-	);
-}
 
 export function useOpenRecognition(
 	open: ReturnType<typeof useArtifactWorkspace>["open"],
@@ -131,7 +107,6 @@ export function WorkspaceArtifacts({
 	client: EumenesClient;
 	artifacts: ReturnType<typeof useArtifactWorkspace>;
 }) {
-	const openSettings = useOpenSettings(artifacts.open);
 	const { openById } = useToolchainArtifacts(client, artifacts.open);
 	return artifacts.tabs.length > 0 ? (
 		<ErrorBoundary label="artifact">
@@ -157,8 +132,6 @@ export function WorkspaceArtifacts({
 					<>
 						{JSON.parse(definition).view === "drawing-workspace" ? (
 							<DrawingArtifact client={client} definition={definition} />
-						) : isSettingsArtifactDefinition(definition) ? (
-							<SettingsArtifact definition={definition} onOpen={openSettings} />
 						) : isRecognitionDefinition(definition) ? (
 							<ObjectRecognitionArtifact
 								client={client}

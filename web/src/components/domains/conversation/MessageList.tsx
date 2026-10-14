@@ -19,7 +19,7 @@ import {
 } from "react";
 import { emotionEmoji } from "./emotionEmoji";
 import { renderSafeMarkdown } from "./markdownRenderer";
-const VISIBLE_LIMIT = 200;
+const PAGE_SIZE = 20;
 
 export const MessageList = memo(function MessageList({
 	conversation,
@@ -65,9 +65,9 @@ export const MessageList = memo(function MessageList({
 			text: lastAssistantText.slice(0, 80),
 		});
 	}, [conversation, lastAssistantId, lastAssistantText, streaming]);
-	const [showAll, setShowAll] = useState(false);
+	const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 	const all = conversation?.messages ?? [];
-	const hidden = showAll ? 0 : Math.max(0, all.length - VISIBLE_LIMIT);
+	const hidden = Math.max(0, all.length + (streaming ? 1 : 0) - visibleCount);
 	const visibleMessages = hidden ? all.slice(hidden) : all;
 	return (
 		<div className="messages">
@@ -82,9 +82,9 @@ export const MessageList = memo(function MessageList({
 				<button
 					type="button"
 					className="messages-older"
-					onClick={() => setShowAll(true)}
+					onClick={() => setVisibleCount((count) => count + PAGE_SIZE)}
 				>
-					以前の会話を表示
+					さらに20件表示
 				</button>
 			)}
 			{all.length ? (

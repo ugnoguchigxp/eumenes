@@ -8,8 +8,8 @@
 		{
 			"kind": "artifact",
 			"id": "settings.hub",
-			"revision": 3,
-			"title": "設定（データドリブン）",
+			"revision": 4,
+			"title": "設定",
 			"variants": [
 				{
 					"id": "standard",
@@ -56,7 +56,7 @@
 				}
 			],
 			"launcher": {
-				"label": "設定（データドリブン）",
+				"label": "設定",
 				"order": 100
 			}
 		},

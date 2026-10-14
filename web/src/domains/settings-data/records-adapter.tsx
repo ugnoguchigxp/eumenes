@@ -15,7 +15,7 @@ import {
 	usageRow,
 	type Recipe,
 	type Selection,
-} from "../settings/records-presentation";
+} from "./records-presentation";
 import type {
 	AdapterHostContext,
 	AdapterState,

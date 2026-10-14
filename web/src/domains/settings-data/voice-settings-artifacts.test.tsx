@@ -7,7 +7,7 @@ import {
 	waitFor,
 } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
-import type { VoiceCatalog } from "../settings/voice-presentation";
+import type { VoiceCatalog } from "./voice-presentation";
 import { createSettingsBackend, newCache, Screens } from "./settings.fixture";
 
 const catalog: VoiceCatalog = {

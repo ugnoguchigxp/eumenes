@@ -38,7 +38,6 @@ import { useSettingsDraft } from "../domains/settings/SettingsDraftHost";
 import { createUnsavedFlags } from "../unsavedFlags";
 import { changeRoots, invalidateAllButLive, queryRoots } from "../queryKeys";
 import {
-	useOpenSettings,
 	useOpenImage,
 	useOpenRecognition,
 	useOpenMusic,
@@ -76,7 +75,6 @@ export function useWorkspace({
 		onDirty(settingsDraft.dirty);
 	}, [onDirty, settingsDraft.dirty]);
 	const artifacts = useArtifactWorkspace();
-	const openSettings = useOpenSettings(artifacts.open);
 	// Music generation and playback each own a stable screen, independent of record IDs.
 	const openDrawing = useOpenDrawing(artifacts.open);
 	useDrawingArtifacts(client, openDrawing);
@@ -304,7 +302,6 @@ export function useWorkspace({
 		settingsOpen,
 		onDirty,
 		artifacts,
-		openSettings,
 		openDrawing,
 		openImage,
 		openRecognition,
