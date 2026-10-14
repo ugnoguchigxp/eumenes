@@ -8,11 +8,20 @@ import type {
 import { type Listener, outputStream } from "./stream";
 import {
 	type HookPayload,
-	hookSettings,
+	hookBaseUrl,
 	LAST_MESSAGE_CHARS,
 	newHookToken,
+	removeHookSettings,
 	sameToken,
+	writeHookSettings,
 } from "./hooks";
+import {
+	applyHook,
+	createTaskTracker,
+	type HandedTask,
+	type TaskOutcome,
+	type TaskTracker,
+} from "./tasks";
 
 export type TerminalSize = { cols: number; rows: number };
 
@@ -55,13 +64,16 @@ export type TerminalsOptions = {
 	now?: () => Date;
 };
 
-/** A task handed over from the conversation that Claude Code finished (its Stop hook). */
+/** A handed-over task that is over: finished (its Stop), interrupted, or its run ended. */
 export type TaskFinished = {
 	sessionId: string;
 	run: number;
+	/** Counts the session's reports, so each report has a stable identity. */
+	seq: number;
 	task: string;
+	outcome: TaskOutcome;
 	conversationId?: string;
-	/** Claude Code's last answer, cut to a bounded length; data, never instructions. */
+	/** Claude Code's last answer (completed only), cut to a bounded length; data, never instructions. */
 	lastMessage: string;
 };
 
@@ -83,8 +95,10 @@ type Session = {
 	pty: Pty;
 	size: TerminalSize;
 	activity: TerminalActivity;
-	task?: { name: string; conversationId?: string };
+	tasks: TaskTracker;
+	reports: number;
 	hookToken?: string;
+	settingsPath?: string;
 	backlog: Uint8Array[];
 	backlogSize: number;
 	listeners: Set<Listener>;
@@ -169,6 +183,29 @@ function defaultCommand(): readonly string[] | null {
 	return path ? [path] : null;
 }
 
+/** Tells the listeners that a conversation's task is over; other tasks are not reported. */
+function notifyOver(
+	listeners: Set<(event: TaskFinished) => void>,
+	session: { id: string; run: number; reports: number },
+	task: HandedTask,
+	outcome: TaskOutcome,
+	lastMessage: string,
+) {
+	if (!task.conversationId) return;
+	session.reports += 1;
+	const event: TaskFinished = {
+		sessionId: session.id,
+		run: session.run,
+		seq: session.reports,
+		task: task.name,
+		outcome,
+		conversationId: task.conversationId,
+		lastMessage: lastMessage.slice(0, LAST_MESSAGE_CHARS),
+	};
+	log.info("terminals.task_finished", { sessionId: session.id, outcome });
+	for (const listener of listeners) listener(event);
+}
+
 /**
  * PTY sessions of one fixed command, held in memory by this process. Sessions end with the
  * server; nothing is saved. Terminal input and output never reach the log.
@@ -186,6 +223,9 @@ export function createTerminals(options: TerminalsOptions = {}) {
 	let opened = 0;
 	let requests = 0;
 	const finished = new Set<(event: TaskFinished) => void>();
+	const baseUrl = hookBaseUrl(options.hookBaseUrl);
+	if (options.hookBaseUrl && !baseUrl)
+		log.warn("terminals.hooks_disabled", { reason: "hook_url_invalid" });
 	const changed = () => {
 		revision += 1;
 		options.onChange?.();
@@ -197,7 +237,9 @@ export function createTerminals(options: TerminalsOptions = {}) {
 		status: s.status,
 		run: s.run,
 		...(s.status === "running" ? { activity: s.activity } : {}),
-		...(s.task ? { task: s.task.name } : {}),
+		...(s.status === "running" && s.tasks.current()
+			? { task: s.tasks.current() }
+			: {}),
 		...(s.exitCode !== undefined ? { exitCode: s.exitCode } : {}),
 		startedAt: s.startedAt,
 		...(s.endedAt ? { endedAt: s.endedAt } : {}),
@@ -214,16 +256,71 @@ export function createTerminals(options: TerminalsOptions = {}) {
 	/** Starts a run; a request becomes Claude Code's initial prompt (an argument, never a shell). */
 	function launch(session: Session, size: TerminalSize, prompt?: string) {
 		if (!command) throw new Error("terminal_unavailable");
-		const token = options.hookBaseUrl ? newHookToken() : undefined;
-		const pty = spawn({
+		const token = baseUrl ? newHookToken() : undefined;
+		const settingsPath = token
+			? writeHookSettings(baseUrl!, session.id, token)
+			: undefined;
+		let pty: Pty;
+		try {
+			pty = spawnRun(session, size, prompt, settingsPath);
+		} catch (error) {
+			removeHookSettings(settingsPath);
+			throw error;
+		}
+		// Cleared only once the new run exists, so a failed restart keeps the last output.
+		session.backlog = [];
+		session.backlogSize = 0;
+		removeHookSettings(session.settingsPath);
+		session.settingsPath = settingsPath;
+		session.pty = pty;
+		session.hookToken = token;
+		session.size = { cols: size.cols, rows: size.rows };
+		session.status = "running";
+		session.activity = prompt ? "working" : "idle";
+		session.tasks = createTaskTracker();
+		session.run += 1;
+		session.startedAt = now().toISOString();
+		delete session.exitCode;
+		delete session.endedAt;
+		changed();
+		void pty.exited.then((code) => {
+			if (session.pty !== pty || sessions.get(session.id) !== session) return;
+			pty.close();
+			removeHookSettings(settingsPath);
+			session.status = "exited";
+			session.exitCode = code;
+			session.endedAt = now().toISOString();
+			// Tasks the run did not finish are reported as ended.
+			for (const task of session.tasks.drain())
+				notifyOver(finished, session, task, "ended", "");
+			changed();
+			endListeners(session);
+			log.info("terminals.exited", {
+				sessionId: session.id,
+				exitCode: code ?? -1,
+			});
+		});
+	}
+	function verifyHook(id: string, token: string) {
+		const session = find(id);
+		if (
+			session.status !== "running" ||
+			!session.hookToken ||
+			!sameToken(token, session.hookToken)
+		)
+			throw new Error("terminal_hook_forbidden");
+		return session;
+	}
+	function spawnRun(
+		session: Session,
+		size: TerminalSize,
+		prompt: string | undefined,
+		settingsPath: string | undefined,
+	): Pty {
+		const pty: Pty = spawn({
 			command: [
-				...command,
-				...(token
-					? [
-							"--settings",
-							hookSettings(options.hookBaseUrl!, session.id, token),
-						]
-					: []),
+				...command!,
+				...(settingsPath ? ["--settings", settingsPath] : []),
 				// A leading space keeps a request that starts with "-" from being read as an option.
 				...(prompt ? [prompt.startsWith("-") ? ` ${prompt}` : prompt] : []),
 			],
@@ -238,34 +335,7 @@ export function createTerminals(options: TerminalsOptions = {}) {
 				for (const listener of session.listeners) listener.data(copy);
 			},
 		});
-		// Cleared only once the new run exists, so a failed restart keeps the last output.
-		session.backlog = [];
-		session.backlogSize = 0;
-		session.pty = pty;
-		session.hookToken = token;
-		session.size = { cols: size.cols, rows: size.rows };
-		session.status = "running";
-		session.activity = prompt ? "working" : "idle";
-		delete session.task;
-		session.run += 1;
-		session.startedAt = now().toISOString();
-		delete session.exitCode;
-		delete session.endedAt;
-		changed();
-		void pty.exited.then((code) => {
-			if (session.pty !== pty || sessions.get(session.id) !== session) return;
-			pty.close();
-			session.status = "exited";
-			session.exitCode = code;
-			session.endedAt = now().toISOString();
-			delete session.task;
-			changed();
-			endListeners(session);
-			log.info("terminals.exited", {
-				sessionId: session.id,
-				exitCode: code ?? -1,
-			});
-		});
+		return pty;
 	}
 
 	function open(
@@ -278,6 +348,7 @@ export function createTerminals(options: TerminalsOptions = {}) {
 			id: crypto.randomUUID(),
 			title: request.title ?? `Claude Code ${opened}`,
 			run: 0,
+			reports: 0,
 			listeners: new Set<Listener>(),
 		} as Session;
 		launch(session, request, request.prompt);
@@ -362,7 +433,13 @@ export function createTerminals(options: TerminalsOptions = {}) {
 		} {
 			const handed = handOver(input);
 			const session = sessions.get(handed.session.id)!;
-			session.task = { name: input.task, conversationId: input.conversationId };
+			// Tracked only where hooks report the turns; otherwise its end is never known.
+			if (session.hookToken)
+				session.tasks.hand({
+					name: input.task,
+					prompt: input.prompt,
+					conversationId: input.conversationId,
+				});
 			session.activity = "working";
 			requests += 1;
 			changed();
@@ -389,41 +466,27 @@ export function createTerminals(options: TerminalsOptions = {}) {
 				throw new Error("terminal_stream_capacity");
 			return outputStream(session, signal, options.heartbeatMs ?? 15_000);
 		},
+		/** Checks a hook's token for the session's current run before its body is read. */
+		verifyHook,
 		/**
 		 * One Claude Code hook of a session's current run, authenticated by that run's token. A
-		 * Stop while a conversation task is open finishes the task and reports it to listeners.
+		 * handed-over task becomes the running turn when its prompt is submitted and is reported
+		 * when that turn stops (or as interrupted when another turn starts first).
 		 */
 		hook(id: string, token: string, payload: HookPayload) {
-			const session = find(id);
-			if (
-				session.status !== "running" ||
-				!session.hookToken ||
-				!sameToken(token, session.hookToken)
-			)
-				throw new Error("terminal_hook_forbidden");
-			const event = payload.hook_event_name;
-			session.activity =
-				event === "Stop"
-					? "idle"
-					: event === "Notification"
-						? "waiting"
-						: "working";
-			const task = event === "Stop" ? session.task : undefined;
-			if (task) delete session.task;
-			changed();
-			if (!task) return;
-			const report: TaskFinished = {
-				sessionId: session.id,
-				run: session.run,
-				task: task.name,
-				...(task.conversationId ? { conversationId: task.conversationId } : {}),
-				lastMessage: (payload.last_assistant_message ?? "").slice(
-					0,
-					LAST_MESSAGE_CHARS,
-				),
-			};
-			log.info("terminals.task_finished", { sessionId: session.id });
-			for (const listener of finished) listener(report);
+			const session = verifyHook(id, token);
+			const { changed: moved, over } = applyHook(session, payload);
+			if (moved) changed();
+			if (over)
+				notifyOver(
+					finished,
+					session,
+					over.task,
+					over.outcome,
+					over.outcome === "completed"
+						? (payload.last_assistant_message ?? "")
+						: "",
+				);
 		},
 		/** Listens for finished conversation tasks; returns the unsubscribe. */
 		onTaskFinished(listener: (event: TaskFinished) => void) {
@@ -437,6 +500,7 @@ export function createTerminals(options: TerminalsOptions = {}) {
 			for (const session of sessions.values()) {
 				if (session.status === "running") session.pty.kill();
 				else session.pty.close();
+				removeHookSettings(session.settingsPath);
 				endListeners(session);
 			}
 			sessions.clear();

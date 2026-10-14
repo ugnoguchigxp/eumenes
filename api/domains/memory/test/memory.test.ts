@@ -4,43 +4,16 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Hono } from "hono";
-import { migrations as memoryPackageMigrations } from "eumenes-memory/sqlite";
 import { openStore } from "../../../infrastructure/sqlite";
-import {
-	migration as conversationMigration,
-	avatarMotionMigration,
-	answerDeliveryMigration,
-	createConversationService,
-} from "../../conversation";
-import {
-	createContinuityService,
-	migration as continuityMigration,
-	shortTermMigration,
-} from "../../continuity";
-import {
-	contextWindowMigration,
-	agentHardeningMigration,
-	turnVectorsMigration,
-	createMemoryService,
-	migration,
-	registerMemory,
-} from "..";
+import { createConversationService } from "../../conversation";
+import { createContinuityService } from "../../continuity";
+import { createMemoryService, registerMemory } from "..";
+import { memoryTestMigrations, saveItem } from "./memory.fixture";
 
-test("remember, stop, retract and forget work end to end over HTTP without dialogue; memory is shared across conversations", async () => {
+test("save, stop and forget work without dialogue; memory is shared across conversations; no HTTP route changes it", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-memory-unit-"));
 	try {
-		const store = openStore(join(dir, "db.sqlite3"), [
-			conversationMigration,
-			avatarMotionMigration,
-			answerDeliveryMigration,
-			continuityMigration,
-			shortTermMigration,
-			migration,
-			contextWindowMigration,
-			agentHardeningMigration,
-			turnVectorsMigration,
-			...memoryPackageMigrations,
-		]);
+		const store = openStore(join(dir, "db.sqlite3"), memoryTestMigrations);
 		const conversation = createConversationService(store);
 		const memory = createMemoryService(
 			store,
@@ -60,14 +33,16 @@ test("remember, stop, retract and forget work end to end over HTTP without dialo
 		const app = new Hono();
 		registerMemory(app, memory);
 		app.onError((error, c) => c.json({ error: error.message }, 400));
-		const post = (path: string, body: unknown) =>
-			app.request(path, {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify(body),
-			});
-		expect((await post("/api/memory/items", { nope: 1 })).status).toBe(400);
-		const created = await post("/api/memory/items", {
+		expect(
+			(
+				await app.request("/api/memory/items", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ nope: 1 }),
+				})
+			).status,
+		).toBe(404);
+		const item = await saveItem(store, memory, {
 			conversationId: "c1",
 			messageId: "m1",
 			quote: "コーヒーが好き",
@@ -75,8 +50,6 @@ test("remember, stop, retract and forget work end to end over HTTP without dialo
 			semanticKey: "drink",
 			text: "コーヒーが好き",
 		});
-		expect(created.status).toBe(201);
-		const item = (await created.json()) as { id: string; revision: number };
 		// Profile memory is not tied to the conversation it came from.
 		const window = await store.write((db) =>
 			memory.windowForRunInTransaction(db, "c2"),
@@ -94,26 +67,36 @@ test("remember, stop, retract and forget work end to end over HTTP without dialo
 				db.query("SELECT count(*) AS n FROM memory_usage").get(),
 			),
 		).toEqual({ n: 0 });
-		const stopped = await post(`/api/memory/items/${item.id}/stop`, {
-			expectedRevision: item.revision,
-		});
-		expect(((await stopped.json()) as { status: string }).status).toBe(
-			"inactive",
+		const [stopped] = await store.write((db) =>
+			memory.applyCurationInTransaction(db, {
+				conversationId: "c1",
+				items: [{ op: "stop", itemId: item.id, revision: item.revision }],
+			}),
 		);
+		expect(stopped).toMatchObject({ status: "applied", op: "stop" });
+		expect(memory.list(true)[0]?.status).toBe("inactive");
 		expect(
 			store.read((db) =>
 				memory.validateWindowInTransaction(db, "r1", prepared),
 			),
 		).toEqual({ ok: false, reason: "memory_stale" });
-		expect(
-			(
-				await post(`/api/memory/items/${item.id}/stop`, {
-					expectedRevision: 99,
-				})
-			).status,
-		).toBe(400);
-		const forgotten = await post(`/api/memory/items/${item.id}/forget`, {});
-		expect(forgotten.status).toBe(200);
+		// A stale revision is refused, element by element.
+		const [stale] = await store.write((db) =>
+			memory.applyCurationInTransaction(db, {
+				conversationId: "c1",
+				items: [{ op: "stop", itemId: item.id, revision: 99 }],
+			}),
+		);
+		expect(stale).toEqual({
+			status: "rejected",
+			op: "stop",
+			reason: "item_changed",
+		});
+		await memory.forget({
+			conversationId: "c1",
+			itemIds: [item.id],
+			messageIds: [],
+		});
 		expect(memory.list(true)).toEqual([]);
 		await store.close();
 	} finally {
@@ -124,18 +107,7 @@ test("remember, stop, retract and forget work end to end over HTTP without dialo
 test("policyRevisionInTransaction is the revision memory's access() uses and moves with the memory ON/OFF setting", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-memory-policy-"));
 	try {
-		const store = openStore(join(dir, "db.sqlite3"), [
-			conversationMigration,
-			avatarMotionMigration,
-			answerDeliveryMigration,
-			continuityMigration,
-			shortTermMigration,
-			migration,
-			contextWindowMigration,
-			agentHardeningMigration,
-			turnVectorsMigration,
-			...memoryPackageMigrations,
-		]);
+		const store = openStore(join(dir, "db.sqlite3"), memoryTestMigrations);
 		const memory = createMemoryService(
 			store,
 			createConversationService(store),

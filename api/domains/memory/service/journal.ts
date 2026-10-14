@@ -13,26 +13,43 @@ import {
 } from "node:fs";
 import type { ForgetJournalEntry } from "eumenes-memory/sqlite";
 
+/** One line of the block journal: the intent of a forget, written before the database is touched. */
+export interface BlockJournalEntry {
+	forgetId: string;
+	conversationId: string;
+	/** Messages that must never be used for memory or context again. */
+	messageIds: string[];
+	/** State items to forget (every version of the facts). */
+	itemIds: string[];
+	at: string;
+}
+/** `<name>.blocks.jsonl` next to the forget journal (`<name>.jsonl`): the library validates the forget journal, so nothing else may enter it. */
+export function blockJournalPathOf(journalPath: string): string {
+	return journalPath.endsWith(".jsonl")
+		? `${journalPath.slice(0, -".jsonl".length)}.blocks.jsonl`
+		: `${journalPath}.blocks`;
+}
+
 /** Thrown for an unreadable journal; callers treat it as "memory unusable" (fail closed). */
 class JournalCorruptError extends Error {
 	constructor() {
 		super("journal_corrupt");
 	}
 }
-/** Append-only forget journal kept outside the database (a restored old DB must not lose it). */
-export function readJournal(path: string): ForgetJournalEntry[] {
+/** Append-only journal kept outside the database (a restored old DB must not lose it): the forget journal or the block journal. */
+export function readJournal<T = ForgetJournalEntry>(path: string): T[] {
 	if (!existsSync(path)) return [];
 	try {
 		return readFileSync(path, "utf8")
 			.split("\n")
 			.filter((line) => line.trim() !== "")
-			.map((line) => JSON.parse(line) as ForgetJournalEntry);
+			.map((line) => JSON.parse(line) as T);
 	} catch {
 		throw new JournalCorruptError();
 	}
 }
 /** Newline-terminated, fsynced append. A failed write is truncated back so no torn line is left. */
-export function appendJournal(path: string, entry: ForgetJournalEntry) {
+export function appendJournal<T = ForgetJournalEntry>(path: string, entry: T) {
 	mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
 	const created = !existsSync(path);
 	const fd = openSync(path, "a", 0o600);

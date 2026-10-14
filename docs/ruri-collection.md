@@ -1,6 +1,6 @@
 # Ruri判定の収集・レビュー
 
-GemmaのSystem Oneは発話態度専用の`ruri-v3-30m-speaking-attitude`を使います。接続先・モデル・認証はLARMのdiscovery/claimから取得します。Layaの互換経路も残しています。分類スコアは合成データ由来の暫定校正であり、実会話で正解する確率ではありません。instructionを変更してもRuriの固定タスクは変わりません。
+LARMのSystem Oneは発話態度専用の`ruri-v3-30m-speaking-attitude`を使います。接続先・モデル・認証はLARMのdiscovery/claimから取得します。Layaの互換経路も残しています。分類スコアは合成データ由来の暫定校正であり、実会話で正解する確率ではありません。instructionを変更してもRuriの固定タスクは変わりません。
 
 ## 収集を開始・停止する
 

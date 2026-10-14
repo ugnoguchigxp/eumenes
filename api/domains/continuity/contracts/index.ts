@@ -32,16 +32,11 @@ export const continuityItemSchema = z.object({
 	expiresAt: z.string().nullable(),
 });
 export type ContinuityItem = z.infer<typeof continuityItemSchema>;
-export const addContinuitySchema = z.object({
-	kind: z.enum(continuityKinds),
-	text: z.string().trim().min(1).max(500),
-});
-export type AddContinuity = z.infer<typeof addContinuitySchema>;
-export const continuityTransitionSchema = z.object({
-	expectedRevision: z.number().int().min(1),
-	status: z.enum(["resolved", "retracted"]),
-});
-export type ContinuityTransition = z.infer<typeof continuityTransitionSchema>;
+export type AddContinuity = { kind: ContinuityKind; text: string };
+export type ContinuityTransition = {
+	expectedRevision: number;
+	status: "resolved" | "retracted";
+};
 /** Goals, decisions, open questions, recent activity and memos that must survive restarts and topic changes. */
 export interface ContinuitySnapshot {
 	/** Changes whenever any item of the conversation changes. */

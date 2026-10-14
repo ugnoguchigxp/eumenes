@@ -147,7 +147,8 @@ export const settingsSchema = z
 		larm: z
 			.object({
 				baseUrl: endpoint.nullable(),
-				profile: z.string().trim().min(1).max(200).default("ornith1.5Strix"),
+				/** The Agent Profile selector chosen by the user; absent until saved. */
+				profile: z.string().trim().min(1).max(200).optional(),
 				audience: z.enum(["saaa-desktop", "same-host"]),
 				voice: z.string().max(200),
 				sentenceLanguageEnabled: z.boolean().optional(),
@@ -212,8 +213,6 @@ export const settingsSchema = z
 	})
 	.strict()
 	.superRefine((s, ctx) => {
-		if (s.larm.profile === "SAAA-gemma4-26b-64k")
-			ctx.addIssue({ code: "custom", message: "補助Profileは利用できません" });
 		if (s.larm.baseUrl && URL.canParse(s.larm.baseUrl)) {
 			const u = new URL(s.larm.baseUrl);
 			const host = u.hostname;
@@ -308,14 +307,6 @@ export const applySchema = z
 	})
 	.strict()
 	.superRefine((input, ctx) => {
-		// Read path stays lenient so a stored Gemma selection still loads; new saves cannot choose it.
-		if (input.settings.larm.profile === "SAAA-gemma4-26b")
-			ctx.addIssue({
-				code: "custom",
-				message:
-					"Gemma 4 のProfileは廃止しました。ornith1.5Strix を指定してください",
-				path: ["settings", "larm", "profile"],
-			});
 		input.settings.connections.forEach((connection, index) => {
 			if (!cloudEndpoint.safeParse(connection.baseUrl).success)
 				ctx.addIssue({

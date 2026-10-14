@@ -120,4 +120,6 @@ export const errorStatus = {
 	ocr_not_ready: 409,
 	ocr_not_configured: 503,
 	ocr_capacity: 429,
+	ocr_text_too_large: 413,
+	ocr_connection_changed: 409,
 } as const;

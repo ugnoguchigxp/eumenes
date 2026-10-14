@@ -35,16 +35,6 @@ export type Lease = {
 	idleTimer?: ReturnType<typeof setTimeout>;
 	idleAt: number;
 };
-export const gemmaProfile = "SAAA-gemma4-26b";
-export const defaultProfile = "ornith1.5Strix";
-export const auxiliaryProfile = defaultProfile;
-export const unavailableAuxiliaryProfile = "SAAA-gemma4-26b-64k";
-export const gemmaAgentProfile = "saaa-conversation-gemma4-26b-voice";
-export const gemmaContext = {
-	maxTokens: 262144,
-	outputReserveTokens: 4096,
-	safetyMarginTokens: 1976,
-};
 export const protocols: Record<ProviderName, string> = {
 	llm: "openai.chat-completions.v1",
 	asr: "openai.audio-transcriptions.v1",

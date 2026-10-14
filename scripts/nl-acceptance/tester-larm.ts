@@ -17,7 +17,7 @@ export type LarmTesterRates = {
 const MAX_OUTPUT_TOKENS = 400;
 
 /**
- * Tester backed by the image-capable LARM model (ornith1.5) through the backend `larm`
+ * Tester backed by the image-capable LARM model through the backend `larm`
  * domain. The connection comes from the saved SQLite settings; the credential never leaves
  * this process and is never printed. The model sees the screenshot as an ordered image part
  * of one user message and nothing else about the product.

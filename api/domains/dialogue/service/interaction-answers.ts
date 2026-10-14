@@ -7,7 +7,8 @@ import {
 	type InteractionView,
 } from "../contracts/command-interactions";
 import type { Run } from "../contracts";
-import { byId, transition } from "../repository";
+import { byId } from "../repository";
+import { endRun } from "./run-end";
 import {
 	OPEN_STATUSES,
 	bodyBytes,
@@ -264,14 +265,7 @@ export function createInteractionAnswers(
 						}
 						const current = byId(tx, run.id);
 						if (current)
-							transition(
-								tx,
-								current.id,
-								current.revision,
-								"cancelled",
-								clock(),
-								"cancel_requested",
-							);
+							endRun(deps, tx, current, "cancelled", "cancel_requested");
 					}
 					return {
 						ok: true,

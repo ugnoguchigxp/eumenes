@@ -5,6 +5,7 @@ import type { ConversationOperation } from "./conversation-tools";
 import type { DialogueDeps, GenerateInput } from "./context";
 import { COMMAND_KIND } from "./context";
 import { transition, linkAnswer } from "../repository";
+import { endRun } from "./run-end";
 import { delegateConversation } from "./delegate-conversation";
 import { operationRejection } from "./operation-authority";
 
@@ -87,7 +88,7 @@ export function settleConversationOperation(
 	if (rejected) {
 		if (input.world)
 			worldContext?.releaseInTransaction(tx, run.id, run.conversationId);
-		transition(tx, run.id, run.revision, "failed", clock(), rejected);
+		endRun(deps, tx, run, "failed", rejected);
 		return { status: "failed", errorCode: rejected };
 	}
 	// The initial receipt stays pending; the final answer is a later attempt
@@ -103,14 +104,7 @@ export function settleConversationOperation(
 		// The exact revision offered must still be active (and its package available).
 		resolved = deps.toolchains.resolveInTransaction(tx, chosen.revisionId);
 	} catch {
-		transition(
-			tx,
-			run.id,
-			run.revision,
-			"failed",
-			clock(),
-			"toolchain_unavailable",
-		);
+		endRun(deps, tx, run, "failed", "toolchain_unavailable");
 		deps.toolchains?.settleSelectionInTransaction(tx, run.id, {
 			outcome: "failed",
 			code: "toolchain_unavailable",
@@ -172,7 +166,7 @@ export function settleConversationOperation(
 		if (chosen.questionRef) {
 			const answered = acceptAnswer(deps, tx, run, chosen, !!runtime.binding);
 			if (!answered.ok) {
-				transition(tx, run.id, run.revision, "failed", clock(), answered.code);
+				endRun(deps, tx, run, "failed", answered.code);
 				deps.toolchains?.settleSelectionInTransaction(tx, run.id, {
 					outcome: "failed",
 					code: answered.code,

@@ -105,6 +105,19 @@ export interface PostAnswerObserverPort {
 }
 
 /**
+ * The steward as dialogue sees it (wired by the application). Called in the transaction in which a run ends,
+ * after the run's exchange was recorded in memory's ledger.
+ */
+export type StewardRunEnd = {
+	runId: string;
+	conversationId: string;
+	state: "completed" | "failed" | "interrupted" | "cancelled";
+};
+export interface StewardPort {
+	runEndedInTransaction(db: Database, input: StewardRunEnd): void;
+}
+
+/**
  * Optional World context owned by dialogue's caller (the Context Broker).
  * Dialogue knows no World types: it passes the opaque `context` back and
  * treats the block as reference data in its own labelled message. With no

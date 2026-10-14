@@ -3,12 +3,11 @@ import { getLogger } from "../../../infrastructure/logger";
 import { packVector, vectorSpaceKey } from "../../../infrastructure/vector";
 import type { ConversationService } from "../../conversation";
 import {
-	TURN_WINDOW,
 	type MemoryEmbed,
 	type MemoryVectorSpace,
 	type TurnRecall,
 } from "../contracts";
-import { isExcluded, putTurnVector } from "../repository";
+import { isBlocked, putTurnVector } from "../repository";
 import { PREFETCH_BYTES } from "./context-render";
 import type { WindowPrefetch } from "./context-window";
 import {
@@ -126,7 +125,7 @@ export function createAgentVectors(deps: {
 						!digest ||
 						!found ||
 						found.message.conversationId !== input.conversationId ||
-						isExcluded(db, item.messageId)
+						isBlocked(db, item.messageId)
 					)
 						continue;
 					putTurnVector(db, {
@@ -151,8 +150,8 @@ export function createAgentVectors(deps: {
 			}
 		},
 		/**
-		 * The prefetched exchanges for the next turn: what the model's query finds before that turn's verbatim
-		 * window (the newest TURN_WINDOW user messages). undefined keeps the earlier prefetch.
+		 * The prefetched exchanges for the next turn: what the model's query finds among the exchanges that turn does
+		 * not show verbatim. undefined keeps the earlier prefetch.
 		 */
 		prefetchOf(
 			db: Database,
@@ -165,11 +164,6 @@ export function createAgentVectors(deps: {
 					conversationId,
 					space: query.space,
 					vector: query.vector,
-					beforeOrdinal: conversation.nthLatestUserOrdinalInTransaction(
-						db,
-						conversationId,
-						TURN_WINDOW,
-					),
 					limit: RECALL_LIMIT,
 					minScore: RECALL_MIN_SCORE,
 					maxBytes: PREFETCH_BYTES,

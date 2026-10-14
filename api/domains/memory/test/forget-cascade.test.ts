@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import {
-	deleteTendenciesByStateEvidence,
+	deleteTendenciesByEvidence,
 	insertTendency,
 	tendencyRevision,
 } from "../repository";
@@ -79,7 +79,7 @@ test("forgetting a State item deletes the tendencies that name it, and only thos
 		);
 	});
 	const revision = h.store.read((db) => tendencyRevision(db));
-	await h.memory.forget(a.id);
+	await h.forget([a.id]);
 	expect(tendencyIds(h)).toEqual(["t-bc", "t-note"]);
 	expect(h.store.read((db) => tendencyRevision(db))).toBe(revision + 1);
 });
@@ -93,14 +93,13 @@ test("forgetting one version of a fact deletes tendencies that name any version 
 		"やっぱりコーヒーはブラックが好き",
 		"c1",
 	);
-	const replaced = await h.memory.remember({
+	const replaced = await h.remember({
 		conversationId: "c1",
 		messageId,
 		quote: "コーヒーはブラックが好き",
 		kind: "preference",
 		semanticKey: "drink.coffee",
 		text: "コーヒーはブラックが好き",
-		polarity: "affirmed",
 	});
 	await h.store.write((db) => {
 		insertTendency(
@@ -115,7 +114,7 @@ test("forgetting one version of a fact deletes tendencies that name any version 
 			tendency("t-keep", [{ namespace: "state", id: second.id }]),
 		);
 	});
-	await h.memory.forget(replaced.id);
+	await h.forget([replaced.id]);
 	expect(tendencyIds(h)).toEqual(["t-keep"]);
 });
 
@@ -125,7 +124,7 @@ test("a forget that fails leaves the tendencies alone", async () => {
 	await h.store.write((db) =>
 		insertTendency(db, tendency("t-a", [{ namespace: "state", id: a.id }])),
 	);
-	await expect(h.memory.forget(`state:${"a".repeat(64)}`)).rejects.toThrow(
+	await expect(h.forget([`state:${"a".repeat(64)}`])).rejects.toThrow(
 		"invalid_memory_item",
 	);
 	expect(tendencyIds(h)).toEqual(["t-a"]);
@@ -135,7 +134,7 @@ test("recovery removes tendencies derived from journaled forgets, also when the 
 	const h = await setup();
 	const a = await h.seed("コーヒーが好き", "drink.coffee");
 	const b = await h.seed("紅茶が好き", "drink.tea");
-	await h.memory.forget(a.id);
+	await h.forget([a.id]);
 	// A restored older database: the forgotten item's tendency is back.
 	await h.store.write((db) => {
 		insertTendency(
@@ -185,14 +184,14 @@ test("more than five hundred item ids are deleted in chunks, with duplicates ign
 	});
 	const revision = h.store.read((db) => tendencyRevision(db));
 	const deleted = await h.store.write((db) =>
-		deleteTendenciesByStateEvidence(db, [...ids, ...ids]),
+		deleteTendenciesByEvidence(db, "state", [...ids, ...ids]),
 	);
 	expect(deleted).toBe(3);
 	expect(tendencyIds(h)).toEqual(["t-other"]);
 	expect(h.store.read((db) => tendencyRevision(db))).toBe(revision + 1);
 	// Nothing to delete: no revision change.
 	expect(
-		await h.store.write((db) => deleteTendenciesByStateEvidence(db, ids)),
+		await h.store.write((db) => deleteTendenciesByEvidence(db, "state", ids)),
 	).toBe(0);
 	expect(h.store.read((db) => tendencyRevision(db))).toBe(revision + 1);
 });

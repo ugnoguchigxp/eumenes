@@ -22,7 +22,7 @@ const result = (value: unknown, status = 200) =>
 	Response.json(value, { status });
 function fixture(
 	mismatch = false,
-	selectedProfile = "SAAA",
+	selectedProfile = "test-profile",
 	initialExpiryMs = 900_000,
 	ttsModel = "model-tts",
 	decisions = false,
@@ -36,29 +36,21 @@ function fixture(
 			: names;
 	const calls: string[] = [];
 	const requests: Record<string, unknown>[] = [];
-	const agentProfile =
-		selectedProfile === "SAAA-gemma4-26b"
-			? "saaa-conversation-gemma4-26b-voice"
-			: "fixture-profile";
+	const agentProfile = "fixture-profile";
 	const model = (name: string) =>
 		name === "tts-english"
 			? englishModel
 			: name === "tts"
 				? ttsModel
-				: selectedProfile.startsWith("ornith1.5Strix") && name === "llm"
-					? "ornith-1.5-strix-lean"
-					: selectedProfile === "SAAA-gemma4-26b" && name === "llm"
-						? "gemma4-26b-a4b"
-						: `model-${name}`;
-	const contextWindow = ["SAAA-gemma4-26b", "ornith1.5Strix"].includes(
-		selectedProfile,
-	)
-		? {
-				maxTokens: 262144,
-				outputReserveTokens: 4096,
-				safetyMarginTokens: 1976,
-			}
-		: { maxTokens: 4096, outputReserveTokens: 512, safetyMarginTokens: 128 };
+				: `model-${name}`;
+	const contextWindow =
+		selectedProfile === "test-profile-large"
+			? {
+					maxTokens: 262144,
+					outputReserveTokens: 4096,
+					safetyMarginTokens: 1976,
+				}
+			: { maxTokens: 4096, outputReserveTokens: 512, safetyMarginTokens: 128 };
 	let expiryMs = initialExpiryMs;
 	let tokenVersion = 1;
 	const catalog = {
@@ -194,7 +186,7 @@ test("control JSON generation is opt-in and ordinary answers keep provider defau
 	const bodies: Record<string, unknown>[] = [];
 	const larm = createLarm({
 		baseUrl: "http://127.0.0.1:9810",
-		profile: "SAAA",
+		profile: "test-profile",
 		token: "control",
 		fetch: async (input, init) => {
 			if (new URL(String(input)).pathname === "/llm/v1/chat/completions")
@@ -220,7 +212,7 @@ test("catalog, claim, ASR/LLM/TTS and release use public contract", async () => 
 	const fake = fixture();
 	const larm = createLarm({
 		baseUrl: "http://127.0.0.1:9810",
-		profile: "SAAA",
+		profile: "test-profile",
 		token: "control",
 		fetch: fake.fetcher,
 	});
@@ -239,7 +231,7 @@ test("ASR accepts empty silence but rejects missing, nontext or oversized transc
 		const fake = fixture();
 		const larm = createLarm({
 			baseUrl: "http://127.0.0.1:9810",
-			profile: "SAAA",
+			profile: "test-profile",
 			token: "control",
 			fetch: async (input, init) =>
 				new URL(String(input)).pathname === "/asr/v1/audio/transcriptions"
@@ -264,7 +256,7 @@ test("voice menu uses claimed provider auth and TTS sends selected voice and spe
 	let payload: unknown;
 	const larm = createLarm({
 		baseUrl: "http://127.0.0.1:9810",
-		profile: "SAAA",
+		profile: "test-profile",
 		token: "control",
 		voice: "menu-voice",
 		speed: 1.3,
@@ -311,12 +303,12 @@ test("VOICEVOX catalog labels, style, inclusive numeric bounds and decoded credi
 		[0.5, -0.15, 0],
 		[2, 0.15, 2],
 	]) {
-		const fake = fixture(false, "SAAA", 900000, "voicevox-core");
+		const fake = fixture(false, "test-profile", 900000, "voicevox-core");
 		let body: Record<string, unknown> = {};
 		let catalogRequests = 0;
 		const larm = createLarm({
 			baseUrl: "http://127.0.0.1:9810",
-			profile: "SAAA",
+			profile: "test-profile",
 			token: "control",
 			voice: "Kasukabe_Tsumugi",
 			style: "normal",
@@ -395,11 +387,11 @@ test("VOICEVOX catalog labels, style, inclusive numeric bounds and decoded credi
 	}
 });
 test("a refused VOICEVOX catalog does not block synthesis of a chosen voice", async () => {
-	const fake = fixture(false, "SAAA", 900000, "voicevox-core");
+	const fake = fixture(false, "test-profile", 900000, "voicevox-core");
 	let body: Record<string, unknown> = {};
 	const larm = createLarm({
 		baseUrl: "http://127.0.0.1:9810",
-		profile: "SAAA",
+		profile: "test-profile",
 		token: "control",
 		voice: "Zundamon",
 		fetch: async (input, init) => {
@@ -438,7 +430,7 @@ test("a caller's deadline that aborts a shared connection attempt does not fail 
 	});
 	const larm = createLarm({
 		baseUrl: "http://127.0.0.1:9810",
-		profile: "SAAA",
+		profile: "test-profile",
 		token: "control",
 		voice: "v",
 		fetch: async (input, init) => {
@@ -484,7 +476,7 @@ test("other models omit VOICEVOX fields and busy responses never replay or repla
 			calls = 0;
 		const larm = createLarm({
 			baseUrl: "http://127.0.0.1:9810",
-			profile: "SAAA",
+			profile: "test-profile",
 			token: "control",
 			style: "whisper",
 			pitchScale: 0.03,
@@ -520,7 +512,7 @@ test("mismatched claim is rejected before inference and lease is released", asyn
 	const fake = fixture(true);
 	const larm = createLarm({
 		baseUrl: "http://127.0.0.1:9810",
-		profile: "SAAA",
+		profile: "test-profile",
 		token: "control",
 		fetch: fake.fetcher,
 	});
@@ -537,7 +529,7 @@ test("oversized inference response is rejected while streaming", async () => {
 	const fake = fixture();
 	const larm = createLarm({
 		baseUrl: "http://127.0.0.1:9810",
-		profile: "SAAA",
+		profile: "test-profile",
 		token: "control",
 		fetch: async (input, init) => {
 			if (new URL(String(input)).pathname === "/tts/v1/audio/speech") {
@@ -563,18 +555,16 @@ test("simultaneous capability upgrades share one replacement connection", async 
 	const fake = fixture();
 	const larm = createLarm({
 		baseUrl: "http://127.0.0.1:9810",
-		profile: "SAAA",
+		profile: "test-profile",
 		token: "control",
 		fetch: fake.fetcher,
 	});
 	const signal = new AbortController().signal;
 	try {
+		// The conversation lease holds only the llm provider; speech then upgrades it.
+		await driveFakeTimers(larm.connect(), 1000);
 		await driveFakeTimers(
-			Promise.all([
-				larm.answer([{ role: "user", content: "質問" }], signal),
-				larm.speak("回答 1", signal),
-				larm.speak("回答 2", signal),
-			]),
+			Promise.all([larm.speak("回答 1", signal), larm.speak("回答 2", signal)]),
 			1000,
 		);
 		expect(
@@ -585,11 +575,11 @@ test("simultaneous capability upgrades share one replacement connection", async 
 		await larm.close();
 	}
 });
-test("Gemma requests the live profile and renews by reclaiming the rotated token", async () => {
-	const fake = fixture(false, "SAAA-gemma4-26b", 60_000);
+test("The saved profile is requested and renews by reclaiming the rotated token", async () => {
+	const fake = fixture(false, "test-profile-large", 60_000);
 	const larm = createLarm({
 		baseUrl: "http://127.0.0.1:9810",
-		profile: "SAAA-gemma4-26b",
+		profile: "test-profile-large",
 		token: "control",
 		fetch: fake.fetcher,
 	});
@@ -602,7 +592,7 @@ test("Gemma requests the live profile and renews by reclaiming the rotated token
 	);
 	expect(fake.requests).toHaveLength(1);
 	expect(fake.requests[0]).toMatchObject({
-		profile: "SAAA-gemma4-26b",
+		profile: "test-profile-large",
 		audience: "saaa-desktop",
 		client: expect.stringMatching(/^eumenes-client-/),
 		providers: ["llm"],
@@ -619,11 +609,11 @@ test("Gemma requests the live profile and renews by reclaiming the rotated token
 	).toHaveLength(1);
 	await larm.close();
 });
-test("voice requests every provider in the Gemma profile", async () => {
-	const fake = fixture(false, "SAAA-gemma4-26b");
+test("voice requests every provider in the saved profile", async () => {
+	const fake = fixture(false, "test-profile-large");
 	const larm = createLarm({
 		baseUrl: "http://127.0.0.1:9810",
-		profile: "SAAA-gemma4-26b",
+		profile: "test-profile-large",
 		token: "control",
 		fetch: fake.fetcher,
 	});
@@ -635,10 +625,10 @@ test("voice requests every provider in the Gemma profile", async () => {
 	await larm.close();
 });
 test("an expired connection stops polling and is released", async () => {
-	const fake = fixture(false, "SAAA-gemma4-26b");
+	const fake = fixture(false, "test-profile-large");
 	const larm = createLarm({
 		baseUrl: "http://127.0.0.1:9810",
-		profile: "SAAA-gemma4-26b",
+		profile: "test-profile-large",
 		token: "control",
 		fetch: async (input, init) => {
 			const response = await fake.fetcher(input, init);
@@ -667,12 +657,12 @@ test("an expired connection stops polling and is released", async () => {
 });
 
 test("an explicit baseUrl is the only control origin the token is sent to", async () => {
-	const fake = fixture(false, "ornith1.5Strix");
+	const fake = fixture(false, "test-profile-large");
 	const origins: string[] = [];
 	const larm = createLarm({
 		baseUrl: "http://127.0.0.1:9810",
 		token: "control",
-		profile: "",
+		profile: "test-profile-large",
 		audience: "",
 		fetch: async (input, init) => {
 			origins.push(new URL(String(input)).origin);
@@ -721,7 +711,7 @@ test("missing claim voice discovers and caches the advertised default with the c
 	let discoveries = 0;
 	const larm = createLarm({
 		baseUrl: "http://127.0.0.1:9810",
-		profile: "SAAA",
+		profile: "test-profile",
 		token: "control",
 		voice: "",
 		fetch: async (input, init) => {
@@ -762,7 +752,7 @@ test("an unadvertised default voice is rejected before speech inference", async 
 	const fake = fixture();
 	const larm = createLarm({
 		baseUrl: "http://127.0.0.1:9810",
-		profile: "SAAA",
+		profile: "test-profile",
 		token: "control",
 		fetch: async (input, init) => {
 			const url = new URL(String(input));
@@ -794,7 +784,7 @@ test("an unadvertised default voice is rejected before speech inference", async 
 });
 
 test("cancelling a caller returns promptly during allocation and close stops polling", async () => {
-	const fake = fixture(false, "SAAA-gemma4-26b");
+	const fake = fixture(false, "test-profile-large");
 	let allocated = false;
 	let onAllocated = () => {};
 	const allocatedSeen = new Promise<void>((resolve) => {
@@ -803,7 +793,7 @@ test("cancelling a caller returns promptly during allocation and close stops pol
 	let observedSignal: AbortSignal | null | undefined;
 	const larm = createLarm({
 		baseUrl: "http://127.0.0.1:9810",
-		profile: "SAAA-gemma4-26b",
+		profile: "test-profile-large",
 		token: "control",
 		fetch: async (input, init) => {
 			const response = await fake.fetcher(input, init);
@@ -845,7 +835,7 @@ test("runtime changes notify connecting and ready/failed without exposing creden
 		const fake = fixture(mismatch);
 		const larm = createLarm({
 			baseUrl: "http://127.0.0.1:9810",
-			profile: "SAAA",
+			profile: "test-profile",
 			token: "control",
 			fetch: fake.fetcher,
 		});
@@ -870,7 +860,7 @@ test("runtime changes notify connecting and ready/failed without exposing creden
 
 // Give each created connection a distinct ID, preserving the public fixture contract.
 function lifecycleFixture(initialExpiryMs = 900_000) {
-	const fake = fixture(false, "SAAA", initialExpiryMs);
+	const fake = fixture(false, "test-profile", initialExpiryMs);
 	let generation = 0;
 	const fetcher = async (input: RequestInfo | URL, init?: RequestInit) => {
 		const url = new URL(String(input));
@@ -905,7 +895,7 @@ function makeLarm(
 ) {
 	return createLarm({
 		baseUrl: "http://127.0.0.1:9810",
-		profile: "SAAA",
+		profile: "test-profile",
 		token: "control",
 		fetch: fetcher,
 		idleTimeoutMs,
@@ -986,7 +976,7 @@ test("local idle expires a still-valid lease without requests; next voice use re
 		);
 		expect(larm.inspect?.().connectionId).toBe("connection2");
 		expect(fake.requests[1]).toMatchObject({
-			profile: "SAAA",
+			profile: "test-profile",
 		});
 	} finally {
 		jest.useRealTimers();
@@ -1075,39 +1065,6 @@ test("cancellation after the 409 diagnostic prevents replacement and replay", as
 		).rejects.toThrow();
 		expect(fake.generation()).toBe(1);
 	} finally {
-		await larm.close();
-	}
-});
-
-test("a late concurrent rejection cannot discard the replacement lease", async () => {
-	const fake = lifecycleFixture();
-	let calls = 0;
-	let finishLate: () => void = () => {};
-	const gate = new Promise<void>((resolve) => {
-		finishLate = resolve;
-	});
-	const larm = makeLarm(async (input, init) => {
-		if (String(input).endsWith("chat/completions")) {
-			const n = ++calls;
-			if (n === 1) {
-				await gate;
-				return idleReleased();
-			}
-			if (n === 2) return idleReleased();
-		}
-		return fake.fetcher(input, init);
-	});
-	try {
-		await larm.connect();
-		const late = larm.answer(question, freshSignal());
-		await larm.answer(question, freshSignal());
-		expect(larm.inspect?.().connectionId).toBe("connection2");
-		finishLate();
-		expect(await late).toBe("承知しました");
-		expect(fake.generation()).toBe(2);
-		expect(larm.inspect?.().connectionId).toBe("connection2");
-	} finally {
-		finishLate();
 		await larm.close();
 	}
 });
@@ -1334,7 +1291,7 @@ test("context trimming retains the current input after an unanswered prior turn"
 	let sent: unknown;
 	const larm = createLarm({
 		baseUrl: "http://127.0.0.1:9810",
-		profile: "SAAA",
+		profile: "test-profile",
 		token: "control",
 		fetch: async (input, init) => {
 			if (new URL(String(input)).pathname.endsWith("chat/completions"))
@@ -1358,12 +1315,12 @@ test("context trimming retains the current input after an unanswered prior turn"
 });
 
 test("native decision shares the voice lease, uses its own auth, and rotates credentials", async () => {
-	const fake = fixture(false, "SAAA", 60000, "model-tts", true);
+	const fake = fixture(false, "test-profile", 60000, "model-tts", true);
 	const bodies: unknown[] = [],
 		tokens: (string | null)[] = [];
 	const larm = createLarm({
 		baseUrl: "http://127.0.0.1:9810",
-		profile: "SAAA",
+		profile: "test-profile",
 		token: "control",
 		fetch: async (input, init) => {
 			if (new URL(String(input)).pathname === "/system-one/v1/systemone") {
@@ -1409,10 +1366,10 @@ test("native decision shares the voice lease, uses its own auth, and rotates cre
 
 test("absent or invalid optional decision never breaks ordinary voice providers", async () => {
 	for (const present of [false, true]) {
-		const fake = fixture(false, "SAAA", 900000, "model-tts", present);
+		const fake = fixture(false, "test-profile", 900000, "model-tts", present);
 		const larm = createLarm({
 			baseUrl: "http://127.0.0.1:9810",
-			profile: "SAAA",
+			profile: "test-profile",
 			token: "control",
 			fetch: async (input, init) => {
 				const response = await fake.fetcher(input, init);
@@ -1462,7 +1419,7 @@ test("inference timing and token usage are logged without prompt or answer text"
 	const larm = createLarm({
 		baseUrl: "http://127.0.0.1:9810",
 		token: "control",
-		profile: "SAAA",
+		profile: "test-profile",
 		fetch: async (input, init) =>
 			new URL(String(input)).pathname === "/llm/v1/chat/completions"
 				? new Response(
@@ -1526,7 +1483,7 @@ test("the timing log reports the sent body size on success and outcome=error whe
 			const larm = createLarm({
 				baseUrl: "http://127.0.0.1:9810",
 				token: "control",
-				profile: "SAAA",
+				profile: "test-profile",
 				fetch: async (input, init) => {
 					if (new URL(String(input)).pathname !== "/llm/v1/chat/completions")
 						return fake.fetcher(input, init);
@@ -1597,7 +1554,7 @@ test("caller cancellation is logged separately from a provider network failure",
 			const larm = createLarm({
 				baseUrl: "http://127.0.0.1:9810",
 				token: "control",
-				profile: "SAAA",
+				profile: "test-profile",
 				fetch: async (input, init) => {
 					if (new URL(String(input)).pathname === "/llm/v1/chat/completions") {
 						began();
@@ -1652,13 +1609,13 @@ test("caller cancellation is logged separately from a provider network failure",
 });
 
 test("Ruri uses claimed model/token and current chunk only; rejects unsupported questions before provider request", async () => {
-	const fake = fixture(false, "SAAA-gemma4-26b", 900000, "model-tts", true);
+	const fake = fixture(false, "test-profile-large", 900000, "model-tts", true);
 	const ruri = "ruri-v3-30m-speaking-attitude";
 	let calls = 0;
 	const bodies: Record<string, unknown>[] = [];
 	const larm = createLarm({
 		baseUrl: "http://127.0.0.1:9810",
-		profile: "SAAA-gemma4-26b",
+		profile: "test-profile-large",
 		token: "control",
 		fetch: async (input, init) => {
 			if (new URL(String(input)).pathname === "/system-one/v1/systemone") {
@@ -1792,7 +1749,7 @@ test("a timed-out connection POST is retried with the same Idempotency-Key", asy
 });
 
 test("a caller abort during renewal neither fails the status nor releases the shared lease", async () => {
-	const fake = fixture(false, "SAAA", 185_000);
+	const fake = fixture(false, "test-profile", 185_000);
 	const controller = new AbortController();
 	let skew = 0;
 	const realNow = Date.now.bind(Date);
@@ -1832,16 +1789,18 @@ test("close waits for in-use leases before sending DELETE", async () => {
 	});
 	const larm = makeLarm(async (input, init) => {
 		if (init?.method === "DELETE") order.push("delete");
-		if (String(input).endsWith("chat/completions")) {
+		if (String(input).endsWith("audio/transcriptions")) {
 			entered();
 			await gate;
 		}
 		return fake.fetcher(input, init);
 	});
-	const work = larm.answer(question, freshSignal()).then((text) => {
-		order.push("answered");
-		return text;
-	});
+	const work = larm
+		.transcribe(new Uint8Array(44), freshSignal())
+		.then((text) => {
+			order.push("transcribed");
+			return text;
+		});
 	await started;
 	const closing = larm.close();
 	for (let i = 0; i < 25; i++)
@@ -1849,16 +1808,16 @@ test("close waits for in-use leases before sending DELETE", async () => {
 	expect(order).toEqual([]);
 	complete();
 	try {
-		expect(await work).toBe("承知しました");
+		expect(await work).toBe("こんにちは");
 		await driveFakeTimers(closing, 100);
-		expect(order).toEqual(["answered", "delete"]);
+		expect(order).toEqual(["transcribed", "delete"]);
 	} finally {
 		jest.useRealTimers();
 	}
 });
 
 test("a valid lease serves new inference while a renewal is still waiting", async () => {
-	const fake = fixture(false, "SAAA", 120_000);
+	const fake = fixture(false, "test-profile", 120_000);
 	let renewing: () => void = () => {};
 	const renewStarted = new Promise<void>((resolve) => {
 		renewing = resolve;
@@ -1947,14 +1906,14 @@ test("the providerHosts config allows another host and the environment is not re
 	const fake = fixture();
 	const configured = createLarm({
 		baseUrl: "http://127.0.0.1:9810",
-		profile: "SAAA",
+		profile: "test-profile",
 		token: "control",
 		providerHosts: ["10.9.9.9", "Other.LOCAL"],
 		fetch: claimAt(fake.fetcher, "http://10.9.9.9"),
 	});
 	const second = createLarm({
 		baseUrl: "http://127.0.0.1:9810",
-		profile: "SAAA",
+		profile: "test-profile",
 		token: "control",
 		providerHosts: ["10.9.9.9", "Other.LOCAL"],
 		fetch: claimAt(fake.fetcher, "http://other.local"),
@@ -1964,7 +1923,7 @@ test("the providerHosts config allows another host and the environment is not re
 	try {
 		const ignoredEnv = createLarm({
 			baseUrl: "http://127.0.0.1:9810",
-			profile: "SAAA",
+			profile: "test-profile",
 			token: "control",
 			fetch: claimAt(fake.fetcher, "http://10.8.8.8"),
 		});
@@ -1990,7 +1949,7 @@ test("a .local provider is accepted only when the LARM base itself is .local", a
 	const fake = fixture();
 	const larm = createLarm({
 		baseUrl: "http://larm.local:9810",
-		profile: "SAAA",
+		profile: "test-profile",
 		token: "control",
 		fetch: claimAt(fake.fetcher, "http://larm.local:8080"),
 	});
@@ -2011,7 +1970,7 @@ test("a failed connect exposes only a machine-readable error code", async () => 
 	] as const) {
 		const larm = createLarm({
 			baseUrl: "http://127.0.0.1:9810",
-			profile: "SAAA",
+			profile: "test-profile",
 			token: "control",
 			fetch: async () => {
 				throw failure;
@@ -2028,7 +1987,7 @@ test.each(["model-tts-english", "voicevox-core"])(
 	async (englishModel) => {
 		const fake = fixture(
 			false,
-			"SAAA",
+			"test-profile",
 			60_000,
 			"model-tts",
 			false,
@@ -2039,7 +1998,7 @@ test.each(["model-tts-english", "voicevox-core"])(
 		const headers: string[] = [];
 		const larm = createLarm({
 			baseUrl: "http://127.0.0.1:9810",
-			profile: "SAAA",
+			profile: "test-profile",
 			token: "control",
 			voice: "fixture-voice",
 			style: "ja-style",
@@ -2170,10 +2129,17 @@ for (const body of [
 	},
 ])
 	test("sentence language rejects invalid or shortened System One results", async () => {
-		const fake = fixture(false, "SAAA", 900_000, "model-tts", false, true);
+		const fake = fixture(
+			false,
+			"test-profile",
+			900_000,
+			"model-tts",
+			false,
+			true,
+		);
 		const larm = createLarm({
 			baseUrl: "http://127.0.0.1:9810",
-			profile: "SAAA",
+			profile: "test-profile",
 			token: "control",
 			sentenceLanguageProvider: "language-fixture",
 			fetch: (input, init) =>
@@ -2191,10 +2157,10 @@ for (const body of [
 	});
 
 test("missing classifier and English providers never reuse attitude or Japanese synthesis", async () => {
-	const fake = fixture(false, "SAAA", 900_000, "model-tts", true);
+	const fake = fixture(false, "test-profile", 900_000, "model-tts", true);
 	const larm = createLarm({
 		baseUrl: "http://127.0.0.1:9810",
-		profile: "SAAA",
+		profile: "test-profile",
 		token: "control",
 		sentenceLanguageProvider: "language-fixture",
 		fetch: fake.fetcher,
@@ -2226,7 +2192,7 @@ test.each(["model", "host", "renew"])(
 	async (fault) => {
 		const fake = fixture(
 			false,
-			"SAAA",
+			"test-profile",
 			fault === "renew" ? 60_000 : 900_000,
 			"model-tts",
 			false,
@@ -2235,7 +2201,7 @@ test.each(["model", "host", "renew"])(
 		let claims = 0;
 		const larm = createLarm({
 			baseUrl: "http://127.0.0.1:9810",
-			profile: "SAAA",
+			profile: "test-profile",
 			token: "control",
 			sentenceLanguageProvider: "language-fixture",
 			fetch: async (input, init) => {
@@ -2280,11 +2246,18 @@ test.each(["model", "host", "renew"])(
 );
 
 test("sentence capability discovery binds the shared voice profile without a fixed model selector", async () => {
-	const fake = fixture(false, "SAAA", 900_000, "model-tts", false, true);
+	const fake = fixture(
+		false,
+		"test-profile",
+		900_000,
+		"model-tts",
+		false,
+		true,
+	);
 	let requests = 0;
 	const larm = createLarm({
 		baseUrl: "http://127.0.0.1:9810",
-		profile: "SAAA",
+		profile: "test-profile",
 		token: "control",
 		fetch: async (input, init) => {
 			if (
@@ -2334,10 +2307,17 @@ test("sentence capability discovery binds the shared voice profile without a fix
 test.each(["missing", "foreign", "mismatched"])(
 	"invalid claimed sentence endpoint (%s) never receives a credential",
 	async (kind) => {
-		const fake = fixture(false, "SAAA", 900_000, "model-tts", false, true);
+		const fake = fixture(
+			false,
+			"test-profile",
+			900_000,
+			"model-tts",
+			false,
+			true,
+		);
 		const larm = createLarm({
 			baseUrl: "http://127.0.0.1:9810",
-			profile: "SAAA",
+			profile: "test-profile",
 			token: "control",
 			fetch: async (input, init) => {
 				const response = await fake.fetcher(input, init);
@@ -2368,12 +2348,19 @@ test.each(["missing", "foreign", "mismatched"])(
 );
 
 test("daemon epoch loss discards the old sentence credential and claims a new connection once", async () => {
-	const fake = fixture(false, "SAAA", 900_000, "model-tts", false, true);
+	const fake = fixture(
+		false,
+		"test-profile",
+		900_000,
+		"model-tts",
+		false,
+		true,
+	);
 	let claims = 0;
 	const tokens: string[] = [];
 	const larm = createLarm({
 		baseUrl: "http://127.0.0.1:9810",
-		profile: "SAAA",
+		profile: "test-profile",
 		token: "control",
 		fetch: async (input, init) => {
 			const path = new URL(String(input)).pathname;
@@ -2422,12 +2409,19 @@ test("daemon epoch loss discards the old sentence credential and claims a new co
 });
 
 test("a cached pre-deployment voice lease reclaims the added sentence provider after epoch loss", async () => {
-	const fake = fixture(false, "SAAA", 900_000, "model-tts", false, true);
+	const fake = fixture(
+		false,
+		"test-profile",
+		900_000,
+		"model-tts",
+		false,
+		true,
+	);
 	let legacy = true,
 		lost = false;
 	const larm = createLarm({
 		baseUrl: "http://127.0.0.1:9810",
-		profile: "SAAA",
+		profile: "test-profile",
 		token: "control",
 		fetch: async (input, init) => {
 			const path = new URL(String(input)).pathname;
@@ -2477,4 +2471,75 @@ test("a cached pre-deployment voice lease reclaims the added sentence provider a
 	} finally {
 		await larm.close();
 	}
+});
+
+test("without a saved profile the port reports larm_profile_missing and never contacts LARM", async () => {
+	let contacted = 0;
+	const larm = createLarm({
+		baseUrl: "http://127.0.0.1:9810",
+		token: "control",
+		fetch: async () => {
+			contacted++;
+			return result({});
+		},
+	});
+	expect(larm.status()).toEqual({
+		state: "unconfigured",
+		capabilities: [],
+		error: "larm_profile_missing",
+	});
+	await expect(larm.connect()).rejects.toThrow("larm_profile_missing");
+	await expect(
+		larm.answer([{ role: "user", content: "test" }], freshSignal()),
+	).rejects.toThrow("larm_profile_missing");
+	expect(contacted).toBe(0);
+	await larm.close();
+});
+
+test("conversation profiles come from the unselected catalog and skip profiles without an llm provider", async () => {
+	const urls: string[] = [];
+	const larm = createLarm({
+		baseUrl: "http://127.0.0.1:9810",
+		token: "control",
+		profile: "saved-profile",
+		fetch: async (input) => {
+			const url = new URL(String(input));
+			urls.push(`${url.pathname}${url.search}`);
+			return result({
+				contractVersion: "agent-connection.v3",
+				catalogRevision: "rev1",
+				profiles: [
+					{ id: "chat-a", providers: [{ name: "llm", model: "model-a" }] },
+					{
+						id: "chat-b",
+						providers: [
+							{ name: "llm", model: "model-b" },
+							{ name: "asr", model: "model-asr" },
+						],
+					},
+					{ id: "backchannel-only", providers: [{ name: "backchannel" }] },
+					{ id: "image-only", providers: [], services: [{ name: "image" }] },
+				],
+			});
+		},
+	});
+	expect(await larm.conversationProfiles!(freshSignal())).toEqual([
+		{ profile: "chat-a", model: "model-a" },
+		{ profile: "chat-b", model: "model-b" },
+	]);
+	expect(urls).toEqual(["/v3/agent-profiles"]);
+	await larm.close();
+});
+
+test("conversation profiles fall back to the saved profile without a model when the catalog fails", async () => {
+	const larm = createLarm({
+		baseUrl: "http://127.0.0.1:9810",
+		token: "control",
+		profile: "saved-profile",
+		fetch: async () => result({ error: "down" }, 503),
+	});
+	expect(await larm.conversationProfiles!(freshSignal())).toEqual([
+		{ profile: "saved-profile", model: null },
+	]);
+	await larm.close();
 });

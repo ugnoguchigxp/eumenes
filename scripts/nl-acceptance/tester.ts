@@ -34,7 +34,7 @@ export type TesterReply = {
 	costUSD?: number;
 };
 export interface TesterAdapter {
-	/** Stable label for the manifest, e.g. `larm:ornith1.5`. */
+	/** Stable label for the manifest, e.g. `larm:<profile>`. */
 	readonly id: string;
 	/** The concrete model id/version once known. */
 	modelId(): string | null;

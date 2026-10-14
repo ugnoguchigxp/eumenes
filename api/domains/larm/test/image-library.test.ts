@@ -37,7 +37,7 @@ function gateway(change: Partial<typeof metadata> = {}) {
 							services: [
 								{
 									name: "image",
-									model: "qwen-image-2.1-turbo",
+									model: "model-image",
 									capability: "media.image.generate",
 									protocol: "larm.image-generation.v1",
 									endpoint: "/v1/images/generations",
@@ -81,15 +81,17 @@ for (const change of [
 		const { g } = gateway(change);
 		await expect(g.images.list(AbortSignal.timeout(1000))).rejects.toThrow();
 	});
-test("image discovery uses the selected profile and prefers returned service URL", async () => {
+test("image discovery reads the saved profile and the catalog and prefers returned service URL", async () => {
 	const { g, calls } = gateway();
-	const catalog = await g.catalog(AbortSignal.timeout(1000), ["SAAA-w-Image"]);
-	expect(calls).toHaveLength(1);
+	const catalog = await g.catalog(AbortSignal.timeout(1000));
+	expect(calls).toHaveLength(2);
+	expect(catalog.targets).toHaveLength(1);
 	expect(catalog.targets[0]).toMatchObject({
-		selector: "SAAA-w-Image",
+		selector: "normal",
+		capability: "media.image.generate",
 		endpoint: "/v1/images/custom-generation",
 		description: "synchronous image service",
-		model: "qwen-image-2.1-turbo",
+		model: "model-image",
 		kind: "image",
 	});
 });

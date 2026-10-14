@@ -7,9 +7,6 @@ import {
 import { providerEndpoint, readJson, record, string } from "./guards";
 import {
 	endpoints,
-	gemmaAgentProfile,
-	gemmaContext,
-	gemmaProfile,
 	protocols,
 	type Provider,
 	type ProviderName,
@@ -53,8 +50,6 @@ export async function fetchCatalog(
 		throw new Error("larm_catalog_invalid");
 	const catalogRevision = string(catalog.catalogRevision);
 	const catalogProfile = record(catalog.profiles[0]);
-	if (profile === gemmaProfile && catalogProfile.id !== gemmaAgentProfile)
-		throw new Error("larm_gemma_agent_profile_mismatch");
 	const catalogProviders = providersOf(catalogProfile);
 	for (const p of catalogProviders) if (p.name === "llm") providerChatInput(p);
 	for (const name of required) {
@@ -66,17 +61,6 @@ export async function fetchCatalog(
 			!provider.model
 		)
 			throw new Error("larm_catalog_provider_missing");
-	}
-	if (profile === gemmaProfile) {
-		const llm = catalogProviders.find((p) => p.name === "llm");
-		const context = record(llm?.contextWindow);
-		if (
-			llm?.model !== "gemma4-26b-a4b" ||
-			Object.entries(gemmaContext).some(
-				([key, value]) => context[key] !== value,
-			)
-		)
-			throw new Error("larm_gemma_contract_mismatch");
 	}
 	return { catalogRevision, catalogProfile, catalogProviders };
 }
@@ -190,14 +174,13 @@ export async function claimProviders(
 		id: string;
 		created: Rec;
 		required: Capability[];
-		profile: string;
 		catalogProviders: Rec[];
 		fullProfile: boolean;
 		hosts: ProviderHosts;
 		languageProvider?: string;
 	},
 ): Promise<{ expiresAt: number; providers: Map<ProviderName, Provider> }> {
-	const { id, created, required, profile, catalogProviders, hosts } = input;
+	const { id, created, required, catalogProviders, hosts } = input;
 	const claimed = record(
 		await readJson(
 			await control(
@@ -246,7 +229,7 @@ export async function claimProviders(
 				JSON.stringify(providerChatInput(declared))
 		)
 			throw new Error("chat_input_contract_unavailable");
-		providers.set(name, speechProvider(name, info, profile, hosts));
+		providers.set(name, speechProvider(name, info, hosts));
 	}
 	const decision = decisionProvider(claimed, created, catalogProviders, hosts);
 	if (input.fullProfile && decision) providers.set("system-one", decision);
@@ -265,7 +248,6 @@ export async function claimProviders(
 function speechProvider(
 	name: Capability,
 	info: Rec,
-	profile: string,
 	hosts: ProviderHosts,
 ): Provider {
 	const credential = record(info.credential);
@@ -284,14 +266,6 @@ function speechProvider(
 		)
 	)
 		throw new Error("larm_invalid_context_window");
-	if (
-		name === "llm" &&
-		profile === gemmaProfile &&
-		Object.entries(gemmaContext).some(
-			([key, value]) => contextWindow?.[key] !== value,
-		)
-	)
-		throw new Error("larm_gemma_contract_mismatch");
 	return {
 		name,
 		baseUrl,

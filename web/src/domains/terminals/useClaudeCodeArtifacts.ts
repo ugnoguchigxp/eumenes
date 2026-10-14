@@ -38,7 +38,8 @@ export function useClaudeCodeArtifacts(
 		for (const [key, activity] of next) {
 			const was = previous.get(key);
 			if (
-				(was === "working" && activity === "idle") ||
+				// Done, also after a permission wait; a run seen for the first time is not a change.
+				(was !== undefined && was !== "idle" && activity === "idle") ||
 				(activity === "waiting" && was !== "waiting")
 			) {
 				chime();

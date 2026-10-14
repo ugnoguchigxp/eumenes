@@ -31,6 +31,8 @@ export type CloudAgentCall = {
 	environmentId?: string | null;
 	messages: Messages;
 	tools?: NativeTool[];
+	/** JSON Schema the final text must satisfy (control requests); ignored by Managed Agents. */
+	outputSchema?: Record<string, unknown>;
 	signal: AbortSignal;
 	onDelta?: (text: string) => void;
 };
@@ -226,7 +228,11 @@ async function runCodex(
 				model: call.model,
 				instructions: system + (tools ? codexFunctions(tools) : ""),
 				prompt,
-				...(tools ? { outputSchema: codexChoiceSchema(tools) } : {}),
+				...(tools
+					? { outputSchema: codexChoiceSchema(tools) }
+					: call.outputSchema
+						? { outputSchema: call.outputSchema }
+						: {}),
 				signal: call.signal,
 				onMessage: (text) => {
 					// With tools the turn is a JSON choice: only its reply text streams.
@@ -313,6 +319,7 @@ const claudeEnvKeys = [
 async function runClaudeAgent(
 	environment: Readonly<Record<string, string | undefined>>,
 	call: CloudAgentCall,
+	startQuery: typeof query,
 ): Promise<CloudAgentResult> {
 	const { system, prompt } = promptParts(call.messages);
 	const tools = call.tools ?? [];
@@ -361,7 +368,7 @@ async function runClaudeAgent(
 	let result: SDKResultMessage | undefined;
 	let streamed = 0;
 	try {
-		q = query({
+		q = startQuery({
 			prompt,
 			options: {
 				abortController,
@@ -379,7 +386,11 @@ async function runClaudeAgent(
 				persistSession: false,
 				permissionMode: "dontAsk",
 				includePartialMessages: stream,
-				maxTurns: tools.length ? 2 : 1,
+				...(call.outputSchema && !tools.length
+					? { outputFormat: { type: "json_schema", schema: call.outputSchema } }
+					: {}),
+				// The structured-output tool call and its retries need turns of their own.
+				maxTurns: tools.length ? 2 : call.outputSchema ? 3 : 1,
 			},
 		});
 		for await (const message of q) {
@@ -409,7 +420,11 @@ async function runClaudeAgent(
 	if (!result) throw fail("incomplete_turn");
 	if (result.subtype !== "success" || result.is_error)
 		throw fail(result.subtype === "success" ? "failed" : result.subtype);
-	const text = checkedText(result.result);
+	const text = checkedText(
+		call.outputSchema && !tools.length && result.structured_output !== undefined
+			? JSON.stringify(result.structured_output)
+			: result.result,
+	);
 	if (!text.trim()) throw fail("empty_output");
 	if (call.onDelta && !streamed) call.onDelta(text);
 	return {
@@ -570,7 +585,11 @@ function safeAgentError(error: unknown) {
 /** Agent SDKs as cloud LLM providers. Process environment comes from Config. */
 export function createCloudAgents(
 	environment: Readonly<Record<string, string | undefined>>,
-	options: { codexExecutable?: string } = {},
+	options: {
+		codexExecutable?: string;
+		/** Test seam for the Claude Agent SDK entry point. */
+		claudeQuery?: typeof query;
+	} = {},
 ): CloudAgents {
 	const codex = codexRuntime(environment, options.codexExecutable);
 	return {
@@ -582,7 +601,11 @@ export function createCloudAgents(
 					return await runCodex(codex, call);
 				}
 				if (call.kind === "claude-agent-sdk")
-					return await runClaudeAgent(environment, call);
+					return await runClaudeAgent(
+						environment,
+						call,
+						options.claudeQuery ?? query,
+					);
 				return await runManagedAgents(call);
 			} catch (error) {
 				call.signal.throwIfAborted();

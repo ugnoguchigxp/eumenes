@@ -1,7 +1,8 @@
 import type { Database } from "bun:sqlite";
 import type { Migration } from "../../../infrastructure/sqlite";
 export * from "./window";
-export * from "./agent";
+export * from "./tendency";
+export * from "./ledger";
 export * from "./turn-vector";
 export const migration = `
 CREATE TABLE memory_host_settings (id INTEGER PRIMARY KEY CHECK(id = 1), enabled INTEGER NOT NULL, revision INTEGER NOT NULL);
@@ -74,7 +75,7 @@ export function getUsage(db: Database, runId: string): UsageReceipt | null {
 
 /**
  * ContextWindow: the per-conversation snapshot, the immediate-change log that expires runs in flight,
- * and the host tables the memory agent (S2) writes. Frozen once deployed.
+ * and the host tables the memory agent (S2) wrote. Frozen once deployed.
  */
 export const contextWindowMigration = `
 CREATE TABLE memory_context_window (
@@ -126,6 +127,47 @@ CREATE TABLE memory_turn_vector (
 CREATE INDEX memory_turn_vector_conversation ON memory_turn_vector(conversation_id, space, ordinal);
 `;
 
+/**
+ * The steward's ledgers: exchanges with their step marks, the conversation summary and its sources, the blocked
+ * messages (what `memory_agent_excluded_message` held becomes `scheduled_prompt`), and the forget fence.
+ * The old agent's cursor, request and exclusion tables go.
+ */
+export const stewardLedgersMigration = `
+CREATE TABLE memory_exchange (
+ input_message_id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL, run_id TEXT NOT NULL,
+ answer_message_id TEXT, outcome TEXT NOT NULL CHECK(outcome IN ('answered','failed')),
+ input_ordinal INTEGER NOT NULL, answer_ordinal INTEGER,
+ state TEXT NOT NULL CHECK(state IN ('pending','done')),
+ curated TEXT CHECK(curated IN ('done','skipped')), disposed TEXT CHECK(disposed IN ('done','skipped')),
+ summarized TEXT CHECK(summarized IN ('done','skipped')),
+ disposition TEXT CHECK(disposition IN ('keep','summarize','drop')), duplicate_of TEXT,
+ failures TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+CREATE INDEX memory_exchange_state ON memory_exchange(conversation_id, state, answer_ordinal);
+CREATE TABLE memory_conversation_summary (
+ conversation_id TEXT PRIMARY KEY, text TEXT NOT NULL, revision INTEGER NOT NULL, updated_at TEXT NOT NULL
+);
+CREATE TABLE memory_summary_source (
+ conversation_id TEXT NOT NULL, revision INTEGER NOT NULL, input_message_id TEXT NOT NULL,
+ PRIMARY KEY (conversation_id, revision, input_message_id)
+);
+CREATE INDEX memory_summary_source_message ON memory_summary_source(input_message_id);
+CREATE TABLE memory_forget_fence (id INTEGER PRIMARY KEY CHECK(id = 1), seq INTEGER NOT NULL);
+INSERT INTO memory_forget_fence (id, seq) VALUES (1, 0);
+CREATE TABLE memory_message_block (
+ message_id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL,
+ reason TEXT NOT NULL CHECK(reason IN ('scheduled_prompt','forgotten')), forget_id TEXT, created_at TEXT NOT NULL
+);
+CREATE INDEX memory_message_block_conversation ON memory_message_block(conversation_id);
+INSERT INTO memory_message_block (message_id, conversation_id, reason, forget_id, created_at)
+ SELECT e.message_id, COALESCE(m.conversation_id, ''), 'scheduled_prompt', NULL, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+ FROM memory_agent_excluded_message e LEFT JOIN messages m ON m.id = e.message_id;
+ALTER TABLE memory_item_provenance ADD COLUMN quote_matched INTEGER;
+DROP TABLE memory_agent_cursor;
+DROP TABLE memory_agent_request;
+DROP TABLE memory_agent_excluded_message;
+`;
+
 /** Named migrations of this domain; the SQL above is frozen once deployed. */
 export const migrations: readonly Migration[] = [
 	{ id: "memory/0001-init", sql: migration },
@@ -143,5 +185,10 @@ export const migrations: readonly Migration[] = [
 		id: "memory/0004-turn-vectors",
 		sql: turnVectorsMigration,
 		after: ["memory/0003-agent-hardening"],
+	},
+	{
+		id: "memory/0005-steward-ledgers",
+		sql: stewardLedgersMigration,
+		after: ["memory/0004-turn-vectors", "conversation/0001-init"],
 	},
 ];

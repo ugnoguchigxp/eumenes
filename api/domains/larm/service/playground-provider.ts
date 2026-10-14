@@ -95,6 +95,7 @@ export function createProviderAccess({
 	async function findEmbedding(signal: AbortSignal) {
 		if (embeddingTarget && Date.now() - embeddingTarget.at < 600_000)
 			return embeddingTarget;
+		if (!profile) throw new Error("larm_profile_missing");
 		const data = await json(
 			await control(
 				`/v3/agent-profiles?profile=${encodeURIComponent(profile)}`,

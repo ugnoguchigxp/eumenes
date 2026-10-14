@@ -2,6 +2,7 @@ import type { Database } from "bun:sqlite";
 
 // ---- provenance: who asked for a State item ----
 
+/** `manual`: only rows written before manual changes were removed (an item with no row reads as `manual` too). */
 export type Provenance = "request" | "agent" | "manual";
 export function putProvenance(
 	db: Database,
@@ -9,17 +10,39 @@ export function putProvenance(
 	runId: string | null,
 	mode: Provenance,
 	now: string,
+	/** Whether the model's quote was found in the message (null: no quote was involved). */
+	quoteMatched: boolean | null = null,
 ) {
 	db.query(
-		"INSERT OR REPLACE INTO memory_item_provenance (item_id, run_id, mode, created_at) VALUES (?,?,?,?)",
-	).run(itemId, runId, mode, now);
+		"INSERT OR REPLACE INTO memory_item_provenance (item_id, run_id, mode, created_at, quote_matched) VALUES (?,?,?,?,?)",
+	).run(
+		itemId,
+		runId,
+		mode,
+		now,
+		quoteMatched === null ? null : quoteMatched ? 1 : 0,
+	);
 }
-/** An item with no row was registered through the API. */
 export function provenanceOf(db: Database, itemId: string): Provenance {
 	const row = db
 		.query("SELECT mode FROM memory_item_provenance WHERE item_id = ?")
 		.get(itemId) as { mode: Provenance } | null;
 	return row?.mode ?? "manual";
+}
+/** `quote_matched` of an item: null when none was recorded. */
+export function quoteMatchedOf(db: Database, itemId: string): boolean | null {
+	const row = db
+		.query(
+			"SELECT quote_matched AS q FROM memory_item_provenance WHERE item_id = ?",
+		)
+		.get(itemId) as { q: number | null } | null;
+	return row?.q == null ? null : row.q === 1;
+}
+export function deleteProvenance(db: Database, itemIds: readonly string[]) {
+	const remove = db.query(
+		"DELETE FROM memory_item_provenance WHERE item_id = ?",
+	);
+	for (const id of itemIds) remove.run(id);
 }
 
 // ---- tendencies: observations the agent derived from several items ----
@@ -75,7 +98,7 @@ export function listActiveTendencies(db: Database): TendencyFull[] {
 			.all() as Record<string, unknown>[]
 	).map(mapTendency);
 }
-export function bumpTendencyRevision(db: Database) {
+function bumpTendencyRevision(db: Database) {
 	db.query(
 		"UPDATE memory_tendency_revision SET revision = revision + 1 WHERE id = 1",
 	).run();
@@ -132,21 +155,16 @@ export function retireTendency(
 	bumpTendencyRevision(db);
 	return true;
 }
-/** Physical delete (the user removing it from the settings screen). */
-export function deleteTendency(db: Database, id: string): boolean {
-	const result = db.query("DELETE FROM memory_tendency WHERE id = ?").run(id);
-	if (result.changes !== 1) return false;
-	bumpTendencyRevision(db);
-	return true;
-}
 /** Ids bound per statement: far below SQLite's variable limit. */
 const EVIDENCE_CHUNK = 500;
 /**
- * Physical delete of every tendency (active or retired) that names one of the State items as evidence: a
- * forgotten item must not live on in a summary derived from it. Bumps the revision once when any row went.
+ * Physical delete of every tendency (active or retired) that names one of the items as evidence: a
+ * forgotten item (or a note retracted with it) must not live on in a summary derived from it.
+ * Bumps the revision once when any row went.
  */
-export function deleteTendenciesByStateEvidence(
+export function deleteTendenciesByEvidence(
 	db: Database,
+	namespace: TendencyEvidence["namespace"],
 	itemIds: readonly string[],
 ): number {
 	const unique = [...new Set(itemIds)];
@@ -158,103 +176,11 @@ export function deleteTendenciesByStateEvidence(
 			.query(
 				`DELETE FROM memory_tendency WHERE EXISTS (
 					SELECT 1 FROM json_each(memory_tendency.evidence) AS e
-					WHERE json_extract(e.value, '$.namespace') = 'state' AND json_extract(e.value, '$.id') IN (${marks})
+					WHERE json_extract(e.value, '$.namespace') = ? AND json_extract(e.value, '$.id') IN (${marks})
 				)`,
 			)
-			.run(...chunk).changes;
+			.run(namespace, ...chunk).changes;
 	}
 	if (deleted > 0) bumpTendencyRevision(db);
 	return deleted;
-}
-
-// ---- cursor: the last message the agent has read per conversation ----
-
-export interface CursorRow {
-	lastOrdinal: number;
-	/** Consecutive runs that read these messages and failed. */
-	failures: number;
-}
-export function readCursorRow(
-	db: Database,
-	conversationId: string,
-): CursorRow | null {
-	return db
-		.query(
-			"SELECT last_ordinal AS lastOrdinal, failures FROM memory_agent_cursor WHERE conversation_id = ?",
-		)
-		.get(conversationId) as CursorRow | null;
-}
-export function listCursors(
-	db: Database,
-): Array<{ conversationId: string; lastOrdinal: number }> {
-	return db
-		.query(
-			"SELECT conversation_id AS conversationId, last_ordinal AS lastOrdinal FROM memory_agent_cursor",
-		)
-		.all() as Array<{ conversationId: string; lastOrdinal: number }>;
-}
-/** The first cursor of a conversation; an existing one is left alone. */
-export function initCursor(
-	db: Database,
-	conversationId: string,
-	ordinal: number,
-) {
-	db.query(
-		"INSERT OR IGNORE INTO memory_agent_cursor (conversation_id, last_ordinal, failures) VALUES (?,?,0)",
-	).run(conversationId, ordinal);
-}
-/** Never moves backwards; a read that worked clears the failure count. */
-export function advanceCursor(
-	db: Database,
-	conversationId: string,
-	ordinal: number,
-) {
-	db.query(
-		`INSERT INTO memory_agent_cursor (conversation_id, last_ordinal, failures) VALUES (?,?,0)
-		 ON CONFLICT(conversation_id) DO UPDATE SET last_ordinal = MAX(last_ordinal, excluded.last_ordinal), failures = 0`,
-	).run(conversationId, ordinal);
-}
-/** One more failed run over the same messages; returns the count. */
-export function countCursorFailure(
-	db: Database,
-	conversationId: string,
-): number {
-	db.query(
-		"UPDATE memory_agent_cursor SET failures = failures + 1 WHERE conversation_id = ?",
-	).run(conversationId);
-	return readCursorRow(db, conversationId)?.failures ?? 0;
-}
-
-// ---- messages the agent must never learn from (scheduled prompts) ----
-
-export function excludeMessage(db: Database, messageId: string) {
-	db.query(
-		"INSERT OR IGNORE INTO memory_agent_excluded_message (message_id) VALUES (?)",
-	).run(messageId);
-}
-export function isExcluded(db: Database, messageId: string): boolean {
-	return (
-		db
-			.query("SELECT 1 FROM memory_agent_excluded_message WHERE message_id = ?")
-			.get(messageId) != null
-	);
-}
-
-// ---- the control request of a job in flight (survives a restart) ----
-
-export function putRequest(db: Database, jobId: string, requestId: string) {
-	db.query(
-		"INSERT OR REPLACE INTO memory_agent_request (job_id, request_id) VALUES (?,?)",
-	).run(jobId, requestId);
-}
-/** Reads and removes the job's request; null when there is none. */
-export function takeRequest(db: Database, jobId: string): string | null {
-	const row = db
-		.query(
-			"SELECT request_id AS requestId FROM memory_agent_request WHERE job_id = ?",
-		)
-		.get(jobId) as { requestId: string } | null;
-	if (!row) return null;
-	db.query("DELETE FROM memory_agent_request WHERE job_id = ?").run(jobId);
-	return row.requestId;
 }

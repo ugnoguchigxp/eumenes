@@ -8,7 +8,7 @@
 		{
 			"kind": "artifact",
 			"id": "settings.memory",
-			"revision": 2,
+			"revision": 3,
 			"title": "記憶",
 			"variants": [
 				{
@@ -18,8 +18,14 @@
 						"view": "layout",
 						"direction": "tabs",
 						"tabs": [
-							{ "label": "会話で使う記憶", "children": [0, 1, 2, 3, 4] },
-							{ "label": "記憶の履歴", "children": [5] }
+							{
+								"label": "会話で使う記憶",
+								"children": [0, 1, 2, 3, 4]
+							},
+							{
+								"label": "記憶の履歴",
+								"children": [5]
+							}
 						],
 						"title": "記憶",
 						"children": [
@@ -126,113 +132,6 @@
 							"literal": false
 						}
 					}
-				},
-				{
-					"actionId": "item-stop",
-					"eventAction": "memory-item-stop",
-					"source": "memory-items",
-					"inputSchemaRef": "schema:memory-item-revision@1",
-					"effect": "write",
-					"operationId": "memory.stop",
-					"label": "利用を止める",
-					"rowInput": {
-						"id": "$row.id",
-						"expectedRevision": "$row.revision"
-					}
-				},
-				{
-					"actionId": "item-resume",
-					"eventAction": "memory-item-resume",
-					"source": "memory-items",
-					"inputSchemaRef": "schema:memory-item-revision@1",
-					"effect": "write",
-					"operationId": "memory.resume",
-					"label": "再開する",
-					"rowInput": {
-						"id": "$row.id",
-						"expectedRevision": "$row.revision"
-					}
-				},
-				{
-					"actionId": "item-retract",
-					"eventAction": "memory-item-retract",
-					"source": "memory-items",
-					"inputSchemaRef": "schema:memory-item-revision@1",
-					"effect": "write",
-					"operationId": "memory.retract",
-					"label": "誤りとして撤回",
-					"rowInput": {
-						"id": "$row.id",
-						"expectedRevision": "$row.revision"
-					}
-				},
-				{
-					"actionId": "item-forget",
-					"eventAction": "memory-item-forget",
-					"source": "memory-items",
-					"inputSchemaRef": "schema:memory-id@1",
-					"effect": "write",
-					"operationId": "memory.forget",
-					"label": "完全に消す",
-					"rowInput": {
-						"id": "$row.id"
-					}
-				},
-				{
-					"actionId": "tendency-delete",
-					"eventAction": "memory-tendency-delete",
-					"source": "memory-tendencies",
-					"inputSchemaRef": "schema:memory-id@1",
-					"effect": "write",
-					"operationId": "memory.delete-tendency",
-					"label": "傾向を削除",
-					"rowInput": {
-						"id": "$row.id"
-					}
-				},
-				{
-					"actionId": "note-resolve",
-					"eventAction": "memory-note-resolve",
-					"source": "memory-short-term",
-					"inputSchemaRef": "schema:memory-continuity-transition@1",
-					"effect": "write",
-					"operationId": "memory.continuity-transition",
-					"label": "完了にする",
-					"rowInput": {
-						"id": "$row.id",
-						"expectedRevision": "$row.revision",
-						"status": {
-							"literal": "resolved"
-						}
-					}
-				},
-				{
-					"actionId": "note-retract",
-					"eventAction": "memory-note-retract",
-					"source": "memory-short-term",
-					"inputSchemaRef": "schema:memory-continuity-transition@1",
-					"effect": "write",
-					"operationId": "memory.continuity-transition",
-					"label": "取り消す",
-					"rowInput": {
-						"id": "$row.id",
-						"expectedRevision": "$row.revision",
-						"status": {
-							"literal": "retracted"
-						}
-					}
-				},
-				{
-					"actionId": "history-forget",
-					"eventAction": "memory-history-forget",
-					"source": "memory-history",
-					"inputSchemaRef": "schema:memory-id@1",
-					"effect": "write",
-					"operationId": "memory.forget",
-					"label": "完全に消す",
-					"rowInput": {
-						"id": "$row.id"
-					}
 				}
 			],
 			"collections": [
@@ -308,34 +207,6 @@
 							"label": "元の発言",
 							"format": "text"
 						}
-					],
-					"rowActions": [
-						{
-							"actionId": "item-stop",
-							"when": {
-								"key": "status",
-								"in": ["active"]
-							}
-						},
-						{
-							"actionId": "item-resume",
-							"when": {
-								"key": "status",
-								"in": ["inactive"]
-							}
-						},
-						{
-							"actionId": "item-retract",
-							"when": {
-								"key": "status",
-								"in": ["active", "inactive"]
-							},
-							"confirm": "この記憶を誤りとして撤回します。履歴には残り、回答には使われなくなります。よろしいですか？"
-						},
-						{
-							"actionId": "item-forget",
-							"confirm": "完全に消すと元に戻せません。よろしいですか？"
-						}
 					]
 				},
 				{
@@ -353,12 +224,6 @@
 							"key": "updatedAt",
 							"label": "更新",
 							"format": "date"
-						}
-					],
-					"rowActions": [
-						{
-							"actionId": "tendency-delete",
-							"confirm": "削除すると元に戻せません。よろしいですか？"
 						}
 					]
 				},
@@ -387,14 +252,6 @@
 							"key": "expiresAt",
 							"label": "期限",
 							"format": "date"
-						}
-					],
-					"rowActions": [
-						{
-							"actionId": "note-resolve"
-						},
-						{
-							"actionId": "note-retract"
 						}
 					]
 				},
@@ -478,12 +335,6 @@
 							"label": "元の発言",
 							"format": "text"
 						}
-					],
-					"rowActions": [
-						{
-							"actionId": "history-forget",
-							"confirm": "完全に消すと元に戻せません。よろしいですか？"
-						}
 					]
 				}
 			],
@@ -541,69 +392,6 @@
 					}
 				},
 				"required": ["enabled"]
-			}
-		},
-		{
-			"kind": "schema",
-			"id": "memory-item-revision",
-			"revision": 1,
-			"schema": {
-				"type": "object",
-				"additionalProperties": false,
-				"properties": {
-					"id": {
-						"type": "string",
-						"minLength": 1,
-						"maxLength": 200
-					},
-					"expectedRevision": {
-						"type": "integer",
-						"minimum": 1
-					}
-				},
-				"required": ["id", "expectedRevision"]
-			}
-		},
-		{
-			"kind": "schema",
-			"id": "memory-id",
-			"revision": 1,
-			"schema": {
-				"type": "object",
-				"additionalProperties": false,
-				"properties": {
-					"id": {
-						"type": "string",
-						"minLength": 1,
-						"maxLength": 200
-					}
-				},
-				"required": ["id"]
-			}
-		},
-		{
-			"kind": "schema",
-			"id": "memory-continuity-transition",
-			"revision": 1,
-			"schema": {
-				"type": "object",
-				"additionalProperties": false,
-				"properties": {
-					"id": {
-						"type": "string",
-						"minLength": 1,
-						"maxLength": 200
-					},
-					"expectedRevision": {
-						"type": "integer",
-						"minimum": 1
-					},
-					"status": {
-						"type": "string",
-						"enum": ["resolved", "retracted"]
-					}
-				},
-				"required": ["id", "expectedRevision", "status"]
 			}
 		}
 	]

@@ -122,12 +122,7 @@ test("a Claude Code request is handed over once per request id", () => {
 	expect(adapter.snapshotInTransaction(tx)).toEqual({
 		limit: 4,
 		sessions: [
-			{
-				title: "Claude Code 1",
-				status: "running",
-				activity: "working",
-				task: "README 修正",
-			},
+			{ title: "Claude Code 1", status: "running", activity: "working" },
 		],
 	});
 	terminals.closeAll();

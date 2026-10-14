@@ -119,11 +119,13 @@ export function createIntake(deps: DialogueDeps) {
 			});
 		else larm.captureInTransaction?.(db, runId, "llm", deadlineAtMs);
 		insert(db, run);
-		// The memory agent reads the user's words alongside the answer's generation. A scheduled prompt is
-		// stored as a user message but is the system's: it is never learned from, and starts nothing.
+		// A scheduled prompt is stored as a user message but is the system's: it is never learned from.
 		if (isSystemPrompt(input.sourceKind))
-			memory?.excludeMessageInTransaction(db, messageId);
-		else memory?.scheduleAgentInTransaction(db, input.conversationId);
+			memory?.blockMessagesInTransaction(db, {
+				conversationId: input.conversationId,
+				messageIds: [messageId],
+				reason: "scheduled_prompt",
+			});
 		return { run, fresh: true };
 	}
 

@@ -143,8 +143,7 @@ function setup(
 		recordUsageInTransaction: () => {},
 		clearNoticesInTransaction: () => {},
 		discardUsageInTransaction: () => {},
-		scheduleAgentInTransaction: () => {},
-		excludeMessageInTransaction: () => {},
+		blockMessagesInTransaction: () => {},
 	} as unknown as MemoryService;
 	const released: string[] = [];
 	const recorded: string[] = [];

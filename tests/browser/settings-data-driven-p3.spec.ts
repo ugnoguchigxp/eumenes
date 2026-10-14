@@ -313,7 +313,7 @@ test("service tests: full-screen workbench and catalog refresh", async ({
 	await expect(screen.getByText(/一覧取得：/)).toBeVisible();
 	await screen.getByText("一部の一覧を取得できませんでした").click();
 	await expect(
-		screen.getByText(/SAAA-w-Image：LARMの接続先URLが設定されていません/),
+		screen.getByText(/all：LARMの接続先URLが設定されていません/),
 	).toBeVisible();
 });
 
@@ -399,8 +399,8 @@ test("service tests: selected service, input, result, and WAV control", async ({
 					data: [
 						{
 							id: "image",
-							name: "SAAA-w-Image",
-							model: "qwen-image-2.1-turbo",
+							name: "test-image-profile",
+							model: "fixture-image",
 							kind: "画像生成",
 							kindCode: "image",
 							source: "LARM",
@@ -418,7 +418,7 @@ test("service tests: selected service, input, result, and WAV control", async ({
 						{
 							id: "asr",
 							name: "音声認識",
-							model: "qwen-asr",
+							model: "fixture-asr",
 							kind: "音声認識",
 							kindCode: "asr",
 							source: "LARM",
@@ -452,7 +452,7 @@ test("service tests: selected service, input, result, and WAV control", async ({
 						{
 							id: "11111111-1111-4111-8111-111111111111",
 							targetId: "image",
-							model: "qwen-image-2.1-turbo",
+							model: "fixture-image",
 							kindCode: "image",
 							status: "succeeded",
 							statusLabel: "成功",
@@ -502,7 +502,7 @@ test("service tests: selected service, input, result, and WAV control", async ({
 	await screen.evaluate((element) => {
 		element.scrollTop = 0;
 	});
-	await screen.getByRole("button", { name: /音声認識.*qwen-asr/ }).click();
+	await screen.getByRole("button", { name: /音声認識.*fixture-asr/ }).click();
 	await expect(
 		screen.getByLabel("音声ファイル（WAV・4 MBまで）"),
 	).toBeVisible();
@@ -576,8 +576,8 @@ test("service tests: diagnosis, cancellation and saved preview remain available"
 					data: [
 						{
 							id: "image",
-							name: "SAAA-w-Image",
-							model: "qwen-image-2.1-turbo",
+							name: "test-image-profile",
+							model: "fixture-image",
 							kind: "画像生成",
 							kindCode: "image",
 							source: "LARM",
@@ -607,7 +607,7 @@ test("service tests: diagnosis, cancellation and saved preview remain available"
 							id: "22222222-2222-4222-8222-222222222222",
 							targetId: "image",
 							kindCode: "image",
-							model: "qwen-image-2.1-turbo",
+							model: "fixture-image",
 							status: "running",
 							statusLabel: "実行中",
 							phase: "起動・生成を待っています",
@@ -642,7 +642,7 @@ test("service tests: diagnosis, cancellation and saved preview remain available"
 							id: "11111111-1111-4111-8111-111111111111",
 							targetId: "image",
 							kindCode: "image",
-							model: "qwen-image-2.1-turbo",
+							model: "fixture-image",
 							status: "succeeded",
 							statusLabel: "成功",
 							phase: "成功",
@@ -672,7 +672,7 @@ test("service tests: diagnosis, cancellation and saved preview remain available"
 						{
 							targetId: "image",
 							name: "画像生成",
-							model: "qwen-image-2.1-turbo",
+							model: "fixture-image",
 							state: "正常",
 							reason: "",
 							checkedAt: now - 4000,
@@ -701,7 +701,7 @@ test("service tests: diagnosis, cancellation and saved preview remain available"
 	await expect(screen.getByText(/待機を終了しても生成が続く/)).toBeVisible();
 	await screen.getByText(/自己診断の結果/).click();
 	await expect(screen.getByText("LARM本体：正常")).toBeVisible();
-	await expect(screen.getByText("qwen-image-2.1-turbo").last()).toBeVisible();
+	await expect(screen.getByText("fixture-image").last()).toBeVisible();
 	await screen.getByText(/実行履歴/).click();
 	await screen.getByRole("button", { name: /成功/ }).click();
 	await expect(screen.getByRole("img", { name: "生成した画像" })).toBeVisible();

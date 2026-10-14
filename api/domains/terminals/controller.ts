@@ -54,12 +54,15 @@ export function registerTerminals(app: Hono, service: TerminalsService) {
 		const id = idOf(c);
 		const token = c.req.header(HOOK_TOKEN_HEADER);
 		if (!id || !token) return c.json({ error: "terminal_hook_forbidden" }, 403);
+		// The token is checked before anything of the body is read.
+		service.verifyHook(id, token);
 		let payload: unknown;
 		try {
 			const bytes = await readBounded(c.req.raw.body, {
 				limit: 512 * 1024,
 				tooLarge: "payload_too_large",
 				missing: "invalid_terminal_input",
+				signal: c.req.raw.signal,
 			});
 			payload = JSON.parse(new TextDecoder().decode(bytes));
 		} catch (error) {

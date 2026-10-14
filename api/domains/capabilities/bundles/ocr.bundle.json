@@ -123,6 +123,32 @@
 			"redirects": [],
 			"bindingRevisionId": "binding:ocr.command@2",
 			"artifactRevisionId": "artifact:ocr.workspace@2"
+		},
+		{
+			"revision": 3,
+			"aliases": ["OCR"],
+			"tags": [],
+			"useWhen": [
+				"画像や写真の文字を読みたい",
+				"動画に映る文字を調べたい",
+				"OCRの履歴や結果を確認・中止したい"
+			],
+			"avoidWhen": ["物体の種類や位置だけを調べたい"],
+			"dependencies": ["package:ocr.manage@1"],
+			"kind": "toolchain",
+			"id": "ocr.manage",
+			"title": "文字を読み取る",
+			"summary": "画像・カメラ・短い動画から文字を読み、保存済み原文を参照する",
+			"examples": [
+				"この画像の文字を読み取って",
+				"動画の文字を確認したい",
+				"前に読み取った資料の原文を見せて"
+			],
+			"packageRevisionId": "package:ocr.manage@1",
+			"functionName": "ocr",
+			"redirects": [],
+			"bindingRevisionId": "binding:ocr.command@3",
+			"artifactRevisionId": "artifact:ocr.workspace@3"
 		}
 	],
 	"bindings": [
@@ -151,6 +177,34 @@
 				}
 			],
 			"artifactRevisionId": "artifact:ocr.workspace@2",
+			"outputSchemaRef": "domain:ocr.receipt@1",
+			"resultProjectionRef": "projection:ocr-result@1"
+		},
+		{
+			"kind": "binding",
+			"id": "ocr.command",
+			"revision": 3,
+			"execution": "command",
+			"adapterRef": "adapter:ocr@1",
+			"availabilityRef": "availability:ocr@1",
+			"tools": [
+				{
+					"toolRevisionId": "tool:ocr.open@1",
+					"operationId": "ocr.open",
+					"inputSchemaRef": "builtin:emptyInput"
+				},
+				{
+					"toolRevisionId": "tool:ocr.read@1",
+					"operationId": "ocr.read",
+					"inputSchemaRef": "builtin:ocrTarget"
+				},
+				{
+					"toolRevisionId": "tool:ocr.cancel@1",
+					"operationId": "ocr.cancel",
+					"inputSchemaRef": "builtin:ocrTarget"
+				}
+			],
+			"artifactRevisionId": "artifact:ocr.workspace@3",
 			"outputSchemaRef": "domain:ocr.receipt@1",
 			"resultProjectionRef": "projection:ocr-result@1"
 		}
@@ -212,6 +266,126 @@
 					"eventAction": "ocr-line",
 					"source": "ocr",
 					"inputSchemaRef": "schema:ocr-index@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "refresh",
+					"eventAction": "ocr-refresh",
+					"source": "ocr",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				},
+				{
+					"actionId": "cancel",
+					"eventAction": "ocr-cancel",
+					"source": "ocr",
+					"inputSchemaRef": "schema:ocr-id@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "recheck",
+					"eventAction": "ocr-recheck",
+					"source": "ocr",
+					"inputSchemaRef": "schema:ocr-id@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "remove",
+					"eventAction": "ocr-remove",
+					"source": "ocr",
+					"inputSchemaRef": "schema:ocr-id@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "configure",
+					"eventAction": "ocr-configure",
+					"source": "ocr",
+					"inputSchemaRef": "schema:ocr-configure@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "incorporate",
+					"eventAction": "ocr-incorporate",
+					"source": "ocr",
+					"inputSchemaRef": "schema:ocr-incorporate@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "recording",
+					"eventAction": "ocr-recording",
+					"source": "ocr",
+					"inputSchemaRef": "schema:ocr-recording@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "thumbnail",
+					"eventAction": "ocr-thumbnail",
+					"source": "ocr",
+					"inputSchemaRef": "schema:ocr-id@1",
+					"effect": "local"
+				}
+			],
+			"launcher": {
+				"label": "文字を読み取る",
+				"order": 41
+			}
+		},
+		{
+			"kind": "artifact",
+			"id": "ocr.workspace",
+			"revision": 3,
+			"title": "文字を読み取る",
+			"variants": [
+				{
+					"id": "standard",
+					"label": "標準",
+					"definition": {
+						"view": "layout",
+						"direction": "grid",
+						"children": [
+							{
+								"view": "ocr-media",
+								"source": "ocr",
+								"title": "元資料"
+							},
+							{
+								"view": "ocr-panel",
+								"source": "ocr",
+								"title": "OCR結果"
+							}
+						]
+					}
+				}
+			],
+			"defaultVariant": "standard",
+			"sourceBindings": [
+				{
+					"source": "ocr",
+					"adapterRef": "adapter:ocr@1",
+					"query": "query:ocr.list@1",
+					"target": "none"
+				}
+			],
+			"actionBindings": [
+				{
+					"actionId": "select",
+					"eventAction": "ocr-select",
+					"source": "ocr",
+					"inputSchemaRef": "schema:ocr-id@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "frame",
+					"eventAction": "ocr-frame",
+					"source": "ocr",
+					"inputSchemaRef": "schema:ocr-target-index@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "line",
+					"eventAction": "ocr-line",
+					"source": "ocr",
+					"inputSchemaRef": "schema:ocr-target-index@1",
 					"effect": "local"
 				},
 				{
@@ -363,6 +537,26 @@
 					}
 				},
 				"required": ["recording"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "ocr-target-index",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"id": {
+						"type": "string",
+						"maxLength": 64
+					},
+					"index": {
+						"type": "string",
+						"maxLength": 4
+					}
+				},
+				"required": ["id", "index"]
 			}
 		}
 	]

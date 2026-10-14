@@ -46,43 +46,49 @@ export function musicFixture(
 				const body =
 					typeof init.body === "string" ? JSON.parse(init.body) : null;
 				requests.push({ path, method, body });
-				if (path === "/v3/agent-profiles")
+				if (path === "/v3/agent-profiles") {
+					const selector = u.searchParams.get("profile");
+					// The unselected catalog lists the profiles without services; fetched by id they carry them.
+					const profiles = [
+						{
+							id: "image-profile",
+							providers: [],
+							services: [
+								{
+									name: "image",
+									capability: "media.image.generate",
+									protocol: "larm.image-generation.v1",
+									endpoint: "/v1/images/generations",
+									url: "/v1/images/generations",
+									model: "fixture-image",
+									description:
+										"Image service, synchronous POST, exact dimensions, PNG/WebP",
+								},
+							],
+						},
+						{
+							id: "music-profile",
+							providers: [],
+							services: [
+								{
+									name: "music",
+									model: "fixture-music",
+									protocol: "larm.music-generation.v1",
+									capability: "media.music.generate",
+									endpoint: "/v1/music/generations",
+								},
+							],
+						},
+					];
 					return Response.json({
 						contractVersion: "agent-connection.v3",
 						catalogRevision: "1",
-						requestedProfile: u.searchParams.get("profile"),
-						profiles: [
-							{
-								id: "music",
-								providers: [],
-								services:
-									u.searchParams.get("profile") === "SAAA-w-Image"
-										? [
-												{
-													name: "image",
-													capability: "media.image.generate",
-													protocol: "larm.image-generation.v1",
-													endpoint: "/v1/images/generations",
-													url: "/v1/images/generations",
-													model: "qwen-image-2.1-turbo",
-													description:
-														"Qwen Image, synchronous POST, exact dimensions, PNG/WebP",
-												},
-											]
-										: u.searchParams.get("profile") === "SAAA-w-music"
-											? [
-													{
-														name: "music",
-														model: "fixture-music",
-														protocol: "larm.music-generation.v1",
-														capability: "media.music.generate",
-														endpoint: "/v1/music/generations",
-													},
-												]
-											: [],
-							},
-						],
+						requestedProfile: selector,
+						profiles: selector
+							? profiles.filter((p) => p.id === selector)
+							: profiles.map((p) => ({ ...p, services: [] })),
 					});
+				}
 				if (path === "/v1/images/generations")
 					return fixtureOptions.artworkFailure
 						? new Response(null, { status: 503 })
@@ -98,7 +104,7 @@ export function musicFixture(
 									hasAlpha: false,
 									bytes: artwork.length,
 									sha256: createHash("sha256").update(artwork).digest("hex"),
-									model: "qwen-image-2.1-turbo",
+									model: "fixture-image",
 									contentUrl: "/v1/image-artifacts/artwork/content",
 								},
 							});

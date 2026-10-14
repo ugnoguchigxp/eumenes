@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite";
 import { z } from "zod";
 import type { HandlerDefinition } from "../../queue";
-import type { TestOutput } from "../../larm";
+import { findServiceTarget, type TestOutput } from "../../larm";
 import type { MusicRecord } from "../contracts";
 import { row, record, patch, media } from "../repository";
 import type { createMusic } from "./index";
@@ -63,13 +63,11 @@ export function createArtwork(deps: Parameters<typeof createMusic>[0]) {
 		async execute(input, { signal }) {
 			try {
 				const gateway = deps.gateway();
-				const catalog = await gateway.catalog(signal, ["SAAA-w-Image"]);
-				const target = catalog.targets.find(
-					(t) =>
-						t.kind === "image" &&
-						t.mode === "service" &&
-						t.selector === "SAAA-w-Image" &&
-						t.model === "qwen-image-2.1-turbo",
+				const catalog = await gateway.catalog(signal);
+				const target = findServiceTarget(
+					catalog.targets,
+					"media.image.generate",
+					"larm.image-generation.v1",
 				);
 				if (!target || !target.description?.trim())
 					throw new Error("image_service_unavailable");

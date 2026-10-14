@@ -12,11 +12,11 @@ backend の `/api/settings/ocr` に、backend 自身から到達できる gatewa
 
 OCR domain は原本と結果を所有者・会話・受付 ID ごとに SQLite へ保存する。画像は同期結果、動画は上流 job ID を保存して状態を照会する。上流の `statusUrl` は追わず、保存した接続先へ既知の job path を組み立てる。受付が不明な場合に解析 POST を自動再送しない。再表示は保存済み原本と結果を読み、再解析しない。取消後に到着した結果は採用しない。設定が変わった実行も採用しない。失敗後に上流 job ID がある場合だけ「状態を再確認」を許す。
 
-`GET /api/ocr`、`GET /api/ocr/:id`、`GET /api/ocr/:id/content` は保存済み履歴と原本を返す。`POST /api/ocr/:id/cancel`、`POST /api/ocr/:id/recheck`、`DELETE /api/ocr/:id` は状態と所有者を検証する。削除できるのは完了・失敗・中止した資料だけ。`POST /api/ocr/:id/conversation` は選択時刻・行番号に対応する原文、polygon、資料 ID を会話の公開操作へ渡す。保存済みの本文・行は補正・要約せずに扱い、confidence を正答率とは呼ばない。
+`GET /api/ocr`、`GET /api/ocr/:id`、`GET /api/ocr/:id/content` は保存済み履歴と原本を返す。`POST /api/ocr/:id/cancel`、`POST /api/ocr/:id/recheck`、`DELETE /api/ocr/:id` は状態と所有者を検証する。削除できるのは完了・失敗・中止した資料だけで、削除時にはその資料を含む OCR 操作結果も消す。接続設定が変わった資料は上流の状態を再確認できない。`POST /api/ocr/:id/conversation` は選択時刻・行番号に対応する原文、polygon、資料 ID を会話の公開操作へ渡す。会話の入力上限である8000文字を超える場合は、行を選んで追加する。保存済みの本文・行は補正・要約せずに扱い、confidence を正答率とは呼ばない。
 
 ## データ駆動 Artifact と担当
 
-`ocr.bundle.json` が profile・Skill・open/read/cancel の tool・package・toolchain・binding・Artifact・入力 schema を版付きで定義する。`adapter:ocr@1` は OCR domain の公開操作に接続する。会話の command 担当は登録された SystemContext と認可済み snapshot から操作を選ぶ。画面は JSON の `layout` に登録 view `ocr-media` と `ocr-panel` を組み合わせる。Web adapter が認証済み API と `uploadFile` bridge を使い、原本の Blob URL は表示時だけ作る。履歴のサムネイルは、見えている項目の保存原本をブラウザで縮小して一時的に表示する。ファイル選択は読み上げ名を持つアイコンボタン。履歴選択・時刻・行選択は local action、取消・再確認・削除・会話追加は OCR の認証済み API を呼ぶ local action である。
+`ocr.bundle.json` が profile・Skill・open/read/cancel の tool・package・toolchain・binding・Artifact・入力 schema を版付きで定義する。`adapter:ocr@1` は OCR domain の公開操作に接続する。会話の command 担当は登録された SystemContext と認可済み snapshot から操作を選ぶ。画面は JSON の `layout` に登録 view `ocr-media` と `ocr-panel` を組み合わせる。Web adapter が認証済み API と `uploadFile` bridge を使い、原本の Blob URL は表示時だけ作る。履歴のサムネイルは、見えている項目の保存原本をブラウザで縮小して一時的に表示する。ファイル選択は読み上げ名を持つアイコンボタン。履歴選択・時刻・行選択は local actionで、時刻・行の操作には選択中の資料IDを含める。取消・再確認・削除・会話追加は OCR の認証済み API を呼ぶ local action である。
 
 ## 確認
 

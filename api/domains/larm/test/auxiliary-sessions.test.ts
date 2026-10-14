@@ -50,7 +50,7 @@ function fixture() {
 					: name === "asr"
 						? "/v1/audio/transcriptions"
 						: "/v1/audio/speech",
-			model: name === "llm" ? "ornith-1.5-strix-lean" : `fixture-${name}`,
+			model: name === "llm" ? "fixture-llm" : `fixture-${name}`,
 			...(name === "llm"
 				? {
 						contextWindow: {
@@ -150,7 +150,7 @@ function fixture() {
 			`Bearer ${id}-llm-${c.token}`,
 		);
 		const body = JSON.parse(String(init?.body));
-		expect(body.model).toBe("ornith-1.5-strix-lean");
+		expect(body.model).toBe("fixture-llm");
 		expect(c.ready).toBe(true);
 		const output = deferred<string>();
 		inference.set(id, { messages: body.messages, output });
@@ -166,7 +166,7 @@ function fixture() {
 		]);
 		return Response.json({ choices: [{ message: { content: text } }] });
 	};
-	const create = (profile?: string) =>
+	const create = (profile = "saved-profile") =>
 		createLarm({
 			baseUrl: "http://127.0.0.1:9810",
 			token: "control",
@@ -181,7 +181,7 @@ const history = (key: string) => [
 	{ role: "user" as const, content: "私の識別子を答えてください。" },
 ];
 
-test("Ornith main plus three helpers infer independently; fifth waits without claim or inference then uses a released slot", async () => {
+test("main plus three helpers infer independently; fifth waits without claim or inference then uses a released slot", async () => {
 	const f = fixture();
 	const main = f.create();
 	const signal = AbortSignal.timeout(10000);
@@ -199,10 +199,10 @@ test("Ornith main plus three helpers infer independently; fifth waits without cl
 		expect(new Set([...f.connections.values()].map((c) => c.client)).size).toBe(
 			4,
 		);
-		expect(f.bodies.map((x) => x.body.profile)).toEqual([
-			"ornith1.5Strix",
-			...Array(3).fill("ornith1.5Strix"),
-		]);
+		// Helpers always use the saved profile, whatever its name is.
+		expect(f.bodies.map((x) => x.body.profile)).toEqual(
+			Array(4).fill("saved-profile"),
+		);
 		expect(f.bodies[0]!.body.providers).toEqual(["llm"]);
 		for (const { body } of f.bodies.slice(1))
 			expect(body.providers).toEqual(["llm"]);
@@ -263,9 +263,9 @@ test("cancellation of a waiting helper releases it and never infers; parent clos
 	}
 });
 
-test("Ornith auxiliary renew reclaims tokens and a released connection reconnects with the catalog revision", async () => {
+test("auxiliary renew reclaims tokens and a released connection reconnects with the catalog revision", async () => {
 	const f = fixture();
-	const p: LarmPort = f.create("ornith1.5Strix");
+	const p: LarmPort = f.create("other-profile");
 	const signal = AbortSignal.timeout(5000);
 	try {
 		await p.connect();

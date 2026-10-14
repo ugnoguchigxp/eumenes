@@ -16,6 +16,7 @@ import {
 	getItem,
 	insertItem,
 	listItems,
+	deleteBySource,
 	transitionItem,
 	updateItem,
 } from "../repository";
@@ -178,6 +179,17 @@ export function createContinuityService(
 			status: "resolved" | "retracted",
 		): boolean {
 			return transitionItem(db, itemId, expectedRevision, status, clock());
+		},
+		/**
+		 * Forgetting messages: physically deletes every note that came from one of them. `noteIds` lists the deleted
+		 * notes (the caller deletes what was derived from them); no hook runs, the forget records its own immediate
+		 * change. Running it again finds nothing.
+		 */
+		deleteBySourceMessagesInTransaction(
+			db: Database,
+			messageIds: readonly string[],
+		): { noteIds: string[]; deleted: number } {
+			return deleteBySource(db, messageIds);
 		},
 		/** The user closing an item, in the caller's writer transaction (hooks included). */
 		transitionInTransaction,

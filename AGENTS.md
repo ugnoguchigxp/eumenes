@@ -7,7 +7,8 @@
 - ツールチェーンの追加・改訂・移行はデータドリブン形式（bundle＋登録adapter）で行い、[登録と拡張の手順](docs/toolchain-extension.md)と[検証手順](docs/toolchain-extension-verification.md)に従う。作業順の要約は `.claude/skills/data-driven-toolchain/SKILL.md`。UIが必要な場合は、登録手順のDesignSystem・OpenUI・Artifactの追加手順も参照する。
 - Web と CLI は API を使い、DB を直接開かない。LARM credential は backend 内に留め、古い結果を取消後に採用しない。
 - LARM の接続先は SQLite に保存済みの設定を正本とする。接続先の環境変数を要求したり、利用者に同じ接続先を再確認したりしない。live 検証は backend の settings domain の読み取り専用操作を使い、テスト接続先は設定 API で保存する。
-- 画像生成は LARM の `SAAA-w-Image` / `qwen-image-2.1-turbo`（Qwen-Image 2.1 Turbo AD-Q4_K）を基本とする。サービス発見・確保応答の `services[].url` と `description` を確認し、手順は `docs/larm.md` に従う。参照画像編集は現行APIでは未対応。
+- 画像生成は、保存済みの LARM 接続先の catalog から capability `media.image.generate`（protocol `larm.image-generation.v1`）を持つサービスを発見して使う。profile 名・モデル名をコード・設定・手順に固定しない。サービス発見・確保応答の `services[].url` と `description` を確認し、手順は `docs/larm.md` に従う。参照画像編集は現行APIでは未対応。
+- LLM・音声・画像・音楽の profile 名とモデル名は、コード（定数・分岐・既定値・エラーメッセージ）とファイル名に書かない。SQLite に保存した設定と、catalog から実行時に得た値だけを使う。
 - 検証は `bun run verify -- --domain <name>` を使い、変更の影響がある利用側 domain も選んで確認する。E2E は対象 domain の試験ファイルを明示して個別に実行する。`verify:all` にブラウザE2Eは含めない。fixture、live、実機器受入の結果を分けて記録する。
 - 実装済み、検証済み、計画を区別する。実機器の3往復受入を通すまで音声 MVP の完成を宣言しない。
 - 障害調査では `bun run logs -- --level warn` から始め、runId・jobId・HTTPの `X-Request-Id` で JSONL を絞る。手順は `docs/logging.md`。ログに会話本文・音声・認証情報・設定・Providerの生応答を渡さない。

@@ -2,27 +2,12 @@ import { afterEach, expect, test } from "bun:test";
 import { copyFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { migrations as memoryPackageMigrations } from "eumenes-memory/sqlite";
 import { configureLogging } from "../../../infrastructure/logger";
 import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
-import {
-	migration as conversationMigration,
-	avatarMotionMigration,
-	answerDeliveryMigration,
-	createConversationService,
-} from "../../conversation";
-import {
-	createContinuityService,
-	migration as continuityMigration,
-	shortTermMigration,
-} from "../../continuity";
-import {
-	agentHardeningMigration,
-	turnVectorsMigration,
-	contextWindowMigration,
-	createMemoryService,
-	migration,
-} from "..";
+import { createConversationService } from "../../conversation";
+import { createContinuityService } from "../../continuity";
+import { createMemoryService } from "..";
+import { memoryTestMigrations, saveItem } from "./memory.fixture";
 import {
 	LONG_TERM_BYTES,
 	renderLongTerm,
@@ -39,18 +24,10 @@ afterEach(async () => {
 
 async function setup() {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-memory-window-"));
-	const store: SqliteStore = openStore(join(dir, "db.sqlite3"), [
-		conversationMigration,
-		avatarMotionMigration,
-		answerDeliveryMigration,
-		continuityMigration,
-		shortTermMigration,
-		migration,
-		contextWindowMigration,
-		agentHardeningMigration,
-		turnVectorsMigration,
-		...memoryPackageMigrations,
-	]);
+	const store: SqliteStore = openStore(
+		join(dir, "db.sqlite3"),
+		memoryTestMigrations,
+	);
 	cleanups.push(async () => {
 		await store.close();
 		rmSync(dir, { recursive: true, force: true });
@@ -80,15 +57,28 @@ async function setup() {
 		kind: "preference" | "habit" = "preference",
 		quote = "コーヒーが好き",
 	) =>
-		memory.remember({
+		saveItem(store, memory, {
 			conversationId: "c1",
 			messageId: "m1",
 			quote,
 			kind,
 			semanticKey: `key-${++n}`,
 			text,
-			polarity: "affirmed",
 		});
+	const stop = async (id: string, revision: number) => {
+		const [result] = await store.write((db) =>
+			memory.applyCurationInTransaction(db, {
+				conversationId: "c1",
+				items: [{ op: "stop", itemId: id, revision }],
+			}),
+		);
+		if (result?.status !== "applied") throw new Error("stop_rejected");
+		return must(memory.list(true).find((entry) => entry.id === id));
+	};
+	const forget = (id: string) =>
+		memory.forget({ conversationId: "c1", itemIds: [id], messageIds: [] });
+	const save = (input: Parameters<typeof saveItem>[2]) =>
+		saveItem(store, memory, input);
 	const read = (conversationId = "c1") =>
 		store.write((db) => memory.windowForRunInTransaction(db, conversationId));
 	return {
@@ -99,13 +89,16 @@ async function setup() {
 		conversation,
 		time,
 		remember,
+		stop,
+		forget,
+		save,
 		read,
 	};
 }
-const must = <T>(value: T | null | undefined): T => {
+function must<T>(value: T | null | undefined): T {
 	if (value == null) throw new Error("expected_value");
 	return value;
-};
+}
 
 test("the first read builds a snapshot and an unchanged input returns the same version and strings", async () => {
 	const h = await setup();
@@ -132,7 +125,7 @@ test("an empty memory renders no layers and is not treated as unavailable", asyn
 	expect(await h.read()).toBeNull();
 });
 
-test("a new registration reaches the short-term layer only; the fifth republishes the long-term layer", async () => {
+test("new registrations reach the short-term layer only, however many; the long-term layer waits for the steward's republish", async () => {
 	const h = await setup();
 	await h.remember("コーヒーが好き");
 	const base = must(await h.read());
@@ -143,30 +136,32 @@ test("a new registration reaches the short-term layer only; the fifth republishe
 	expect(added.shortTerm.text).toContain("最近覚えたこと");
 	expect(added.shortTerm.text).toContain("毎朝走っている");
 	expect(added.shortTerm.pendingAdditions).toBe(1);
-	for (const text of ["二", "三", "四"]) await h.remember(`${text}番目`);
-	const four = must(await h.read());
-	expect(four.longTerm.text).toBe(base.longTerm.text);
-	expect(four.shortTerm.pendingAdditions).toBe(4);
-	await h.remember("五番目");
+	for (const text of ["二", "三", "四", "五"]) await h.remember(`${text}番目`);
+	// The fifth addition used to republish L1 by itself; now it does not.
 	const five = must(await h.read());
-	expect(five.longTerm.text).not.toBe(base.longTerm.text);
+	expect(five.longTerm.text).toBe(base.longTerm.text);
+	expect(five.shortTerm.pendingAdditions).toBe(5);
+	expect(five.shortTerm.text).toContain("五番目");
+	const published = await h.store.write((db) =>
+		h.memory.publishWindowInTransaction(db, "c1", { republishLongTerm: true }),
+	);
+	expect(published.longTerm.text).not.toBe(base.longTerm.text);
 	for (const text of ["毎朝走っている", "二番目", "五番目"])
-		expect(five.longTerm.text).toContain(text);
-	expect(five.shortTerm.pendingAdditions).toBe(0);
-	expect(five.shortTerm.text).toBe("");
+		expect(published.longTerm.text).toContain(text);
+	expect(published.shortTerm.pendingAdditions).toBe(0);
+	expect(published.shortTerm.text).toBe("");
 });
 
-test("the long-term layer is republished when the local date changes", async () => {
+test("the long-term layer is not republished when the local date changes", async () => {
 	const h = await setup();
 	await h.remember("コーヒーが好き");
 	const day1 = must(await h.read());
-	expect(day1.longTerm.publishedOn).toBe("2026-10-13");
 	h.time.now = "2026-10-13T13:00:00.000Z";
 	expect(must(await h.read()).version).toBe(day1.version);
 	h.time.now = "2026-10-15T12:00:00.000Z";
 	const day2 = must(await h.read());
-	expect(day2.version).toBe(day1.version + 1);
-	expect(day2.longTerm.publishedOn).toBe("2026-10-15");
+	expect(day2.version).toBe(day1.version);
+	expect(day2.buildId).toBe(day1.buildId);
 	expect(day2.longTerm.text).toBe(day1.longTerm.text);
 });
 
@@ -199,11 +194,11 @@ test("stop, retract, forget, the ON/OFF setting and the user closing a continuit
 		window = next;
 		return next;
 	};
-	await h.memory.stop(a.id, a.revision);
+	await h.stop(a.id, a.revision);
 	expect((await seen()).longTerm.text).not.toContain("コーヒーが好き");
-	await h.memory.retract(b.id, b.revision);
+	await h.stop(b.id, b.revision);
 	expect((await seen()).longTerm.text).not.toContain("毎朝走っている");
-	await h.memory.forget(c.id);
+	await h.forget(c.id);
 	expect((await seen()).longTerm.text).not.toContain("三つ目の事実");
 	const before = window.inputs.policyRevision;
 	await h.memory.setEnabled(false);
@@ -223,7 +218,7 @@ test("stop, retract, forget, the ON/OFF setting and the user closing a continuit
 	expect(closed.longTerm.text).toContain("四つ目の事実");
 });
 
-test("replacing or denying a value is immediate; a plain addition and resuming are not", async () => {
+test("replacing, stopping or denying a value is immediate; a plain addition is not", async () => {
 	const h = await setup();
 	const first = await h.remember("コーヒーが好き");
 	await h.read();
@@ -241,11 +236,9 @@ test("replacing or denying a value is immediate; a plain addition and resuming a
 	const start = await seq();
 	await h.remember("毎朝走っている", "habit", "毎朝走って");
 	expect(await seq()).toBe(start);
-	const stopped = await h.memory.stop(first.id, first.revision);
+	await h.stop(first.id, first.revision);
 	expect(await seq()).toBe(start + 1);
-	await h.memory.resume(first.id, stopped.revision);
-	expect(await seq()).toBe(start + 1);
-	await h.memory.remember({
+	await h.save({
 		conversationId: "c1",
 		messageId: "m1",
 		quote: "コーヒーが好き",
@@ -296,31 +289,23 @@ test("the same inputs always render the same strings", async () => {
 
 test("an expired period is not rendered; a stated period is", async () => {
 	const h = await setup();
-	await h.memory.remember({
+	await h.save({
 		conversationId: "c1",
 		messageId: "m1",
 		quote: "コーヒーが好き",
 		kind: "preference",
 		semanticKey: "coffee",
 		text: "コーヒーが好き",
-		polarity: "affirmed",
-		validity: {
-			from: { precision: "month", year: 2026, month: 9 },
-			basis: "stated",
-		},
+		validFrom: "2026-09",
 	});
-	await h.memory.remember({
+	await h.save({
 		conversationId: "c1",
 		messageId: "m1",
 		quote: "毎朝走って",
 		kind: "habit",
 		semanticKey: "old",
 		text: "昔の習慣",
-		polarity: "affirmed",
-		validity: {
-			until: { precision: "year", year: 2020 },
-			basis: "stated",
-		},
+		validUntil: "2020",
 	});
 	const window = must(await h.read());
 	expect(window.longTerm.text).toContain(
@@ -442,7 +427,7 @@ test("window validation: additions keep a run valid; stop, own-run changes, sett
 	const second = must(await h.read());
 	const preparedSecond = h.memory.preparedWindow(second);
 	expect(await validate("run-3", preparedSecond)).toEqual({ ok: true });
-	await h.memory.stop(item.id, item.revision);
+	await h.stop(item.id, item.revision);
 	expect(await validate("run-3", preparedSecond)).toEqual({
 		ok: false,
 		reason: "memory_stale",
@@ -509,20 +494,20 @@ test("the continuity guard limits the short-term layer to its budget", async () 
 
 test("S0-3: expired items do not count toward the active-item limit", async () => {
 	const h = await setup();
-	const until = Date.parse("2026-10-20T00:00:00.000Z");
-	const add = (key: string, validUntilMs: number | null = until) =>
-		h.memory.remember({
+	// Through the 19th, inclusive: expired from 2026-10-20T00:00:00Z.
+	const until: string | null = "2026-10-19";
+	const add = (key: string, validUntil: string | null = until) =>
+		h.save({
 			conversationId: "c1",
 			messageId: "m1",
 			quote: "コーヒーが好き",
 			kind: "preference",
 			semanticKey: key,
 			text: `項目 ${key}`,
-			polarity: "affirmed",
-			...(validUntilMs === null ? {} : { validUntilMs }),
+			...(validUntil === null ? {} : { validUntil }),
 		});
 	for (let i = 0; i < 100; i++) await add(`k${i}`);
-	await expect(add("over", null)).rejects.toThrow("invalid_memory_limit");
+	await expect(add("over", null)).rejects.toThrow("limit_reached");
 	// Replacing a fact under the same key is still allowed at the limit.
 	await add("k0");
 	h.time.now = "2026-10-21T00:00:00.000Z";
@@ -534,18 +519,7 @@ test("S0-3: expired items do not count toward the active-item limit", async () =
 	expect(window.longTerm.text).not.toContain("項目 k1\n");
 });
 
-const MIGRATIONS = [
-	conversationMigration,
-	avatarMotionMigration,
-	answerDeliveryMigration,
-	continuityMigration,
-	shortTermMigration,
-	migration,
-	contextWindowMigration,
-	agentHardeningMigration,
-	turnVectorsMigration,
-	...memoryPackageMigrations,
-];
+const MIGRATIONS = memoryTestMigrations;
 const windowRows = (h: Awaited<ReturnType<typeof setup>>) =>
 	h.store.read(
 		(db) =>
@@ -565,7 +539,7 @@ test("forgetting purges every stored window, also with memory OFF", async () => 
 			true,
 		);
 		if (off) await h.memory.setEnabled(false);
-		await h.memory.forget(item.id);
+		await h.forget(item.id);
 		expect(windowRows(h)).toEqual([]);
 		// The next read builds from State again and does not bring the value back.
 		if (off) await h.memory.setEnabled(true);
@@ -586,7 +560,7 @@ test("a forget re-applied by recovery purges windows and records the immediate c
 	await h.store.write((db) => db.exec("PRAGMA wal_checkpoint(TRUNCATE)"));
 	const backup = join(h.dir, "backup.sqlite3");
 	copyFileSync(join(h.dir, "db.sqlite3"), backup);
-	await h.memory.forget(item.id);
+	await h.forget(item.id);
 	await h.store.close();
 	// The old database (with the rendered window) comes back; the journal wins.
 	copyFileSync(backup, join(h.dir, "db.sqlite3"));
@@ -617,35 +591,36 @@ test("a forget re-applied by recovery purges windows and records the immediate c
 
 test("a validity boundary crossed by time refreshes the layers without waiting for the date to change", async () => {
 	const h = await setup();
-	h.time.now = "2026-10-13T00:00:00.000Z";
-	const until = Date.parse("2026-10-13T06:00:00.000Z");
-	const from = Date.parse("2026-10-13T09:00:00.000Z");
+	// The local date of these instants does not change in UTC+9 between the first and the last of them.
+	h.time.now = "2026-10-13T16:00:00.000Z";
+	// "Through the 13th" ends at 2026-10-14T00:00:00Z; "from the 15th" starts at 2026-10-15T00:00:00Z.
+	const until = Date.parse("2026-10-14T00:00:00.000Z");
+	const from = Date.parse("2026-10-15T00:00:00.000Z");
 	const add = (key: string, text: string, period: object) =>
-		h.memory.remember({
+		h.save({
 			conversationId: "c1",
 			messageId: "m1",
 			quote: "コーヒーが好き",
 			kind: "preference",
 			semanticKey: key,
 			text,
-			polarity: "affirmed",
 			...period,
 		});
-	await add("ending", "終わる習慣", { validUntilMs: until });
-	await add("starting", "始まる習慣", { validFromMs: from });
+	await add("ending", "終わる習慣", { validUntil: "2026-10-13" });
+	await add("starting", "始まる習慣", { validFrom: "2026-10-15" });
 	const early = must(await h.read());
 	expect(early.longTerm.text).toContain("終わる習慣");
 	expect(early.longTerm.text).not.toContain("始まる習慣");
 	expect(early.nextBoundaryMs).toBe(until);
 	// Still before the first boundary: nothing is rebuilt.
-	h.time.now = "2026-10-13T05:59:00.000Z";
+	h.time.now = "2026-10-13T23:59:00.000Z";
 	expect(must(await h.read()).version).toBe(early.version);
-	h.time.now = "2026-10-13T06:00:00.000Z";
+	h.time.now = "2026-10-14T00:00:00.000Z";
 	const ended = must(await h.read());
 	expect(ended.version).toBeGreaterThan(early.version);
 	expect(ended.longTerm.text).not.toContain("終わる習慣");
 	expect(ended.nextBoundaryMs).toBe(from);
-	h.time.now = "2026-10-13T09:00:00.000Z";
+	h.time.now = "2026-10-15T00:00:00.000Z";
 	const started = must(await h.read());
 	expect(started.longTerm.text).toContain("始まる習慣");
 	expect(started.nextBoundaryMs).toBeNull();
@@ -707,7 +682,7 @@ test("an unhealthy memory fails validation as unavailable", async () => {
 		pins: [],
 		prefetchBytes: 0,
 		noticeIds: [],
-		windowStartOrdinal: 0,
+		shownMessageIds: [],
 	};
 	expect(
 		store.read((db) => memory.validateWindowInTransaction(db, "r", prepared)),

@@ -141,26 +141,51 @@ export function insert(db: Database, run: Run) {
 		run.updatedAt,
 	);
 }
+const UPDATE_RUN =
+	"UPDATE dialogue_runs SET status=?,revision=revision+1,updated_at=?,error=?,answer_message_id=COALESCE(?,answer_message_id) WHERE id=? AND revision=? AND status IN ('queued','running')";
+/** A run that goes on (claimed, or queued again for another attempt). */
 export function transition(
 	db: Database,
 	id: string,
 	revision: number,
-	status: Run["status"],
+	status: "queued" | "running",
 	now: string,
 	error: string | null = null,
-	answerMessageId: string | null = null,
 ): boolean {
-	const result = db
-		.query(
-			"UPDATE dialogue_runs SET status=?,revision=revision+1,updated_at=?,error=?,answer_message_id=COALESCE(?,answer_message_id) WHERE id=? AND revision=? AND status IN ('queued','running')",
-		)
-		.run(status, now, error, answerMessageId, id, revision);
-	return result.changes === 1;
+	return (
+		db.query(UPDATE_RUN).run(status, now, error, null, id, revision)
+			.changes === 1
+	);
 }
-export function interruptUnfinished(db: Database, now: string) {
+/** A run that ends. Only `endRun` calls this: the exchange and the steward must hear of the end in the same transaction. */
+export function endTransition(
+	db: Database,
+	id: string,
+	revision: number,
+	status: "completed" | "failed" | "cancelled" | "interrupted",
+	now: string,
+	error: string | null,
+	answerMessageId: string | null,
+): boolean {
+	return (
+		db
+			.query(UPDATE_RUN)
+			.run(status, now, error, answerMessageId, id, revision).changes === 1
+	);
+}
+/** Runs without a queue job predate the queue: they are interrupted, and returned (as they were) so the end can be recorded. */
+export function interruptUnfinished(db: Database, now: string): Run[] {
+	const runs = (
+		db
+			.query(
+				"SELECT * FROM dialogue_runs WHERE status IN ('queued','running') AND job_id IS NULL",
+			)
+			.all() as Record<string, unknown>[]
+	).map(map);
 	db.query(
 		"UPDATE dialogue_runs SET status='interrupted',revision=revision+1,updated_at=?,error='backend_restarted' WHERE status IN ('queued','running') AND job_id IS NULL",
 	).run(now);
+	return runs;
 }
 /** The newest `limit` runs accepted before `run`, oldest first (the verbatim part of the model-visible history). */
 export function recentPriorRuns(db: Database, run: Run, limit: number): Run[] {

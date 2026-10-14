@@ -12,6 +12,7 @@ import {
 import type {
 	PostAnswerObserverPort,
 	Run,
+	StewardPort,
 	WorldContextPort,
 } from "../contracts";
 
@@ -105,6 +106,8 @@ export type DialogueDeps = {
 	clock: () => string;
 	id: () => string;
 	memory?: MemoryService;
+	/** Told in the transaction in which a run ends, after its exchange is in memory's ledger. */
+	steward?: StewardPort;
 	agents?: AgentRuntime;
 	music?: import("../contracts/music").MusicPort;
 	excalidraw?: import("../contracts/image").ImagePort;

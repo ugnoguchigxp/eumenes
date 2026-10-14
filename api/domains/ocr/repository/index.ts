@@ -31,24 +31,53 @@ export function owned(db: Database, id: string, owner: string) {
 	if (!r || r.owner !== owner) throw new Error("ocr_not_found");
 	return r;
 }
-export function record(r: Pick<Row, "record_json" | "upstream_id">): OcrRecord {
+export function connectionMatches(
+	bindingJson: string,
+	current: Connection | null,
+) {
+	if (!current) return false;
+	const bound = JSON.parse(bindingJson) as Pick<
+		Connection,
+		"revision" | "baseUrl" | "credentialVersion"
+	>;
+	return (
+		bound.revision === current.revision &&
+		bound.baseUrl === current.baseUrl &&
+		bound.credentialVersion === current.credentialVersion
+	);
+}
+export function record(
+	r: Pick<Row, "record_json" | "upstream_id"> &
+		Partial<Pick<Row, "connection_json">>,
+	current?: Connection | null,
+): OcrRecord {
 	const v = JSON.parse(r.record_json) as OcrRecord;
-	return { ...v, canRecheck: !!r.upstream_id && v.state === "failed" };
+	return {
+		...v,
+		canRecheck:
+			!!r.upstream_id &&
+			v.state === "failed" &&
+			v.errorCode !== "ocr_connection_changed" &&
+			(current === undefined ||
+				(!!r.connection_json && connectionMatches(r.connection_json, current))),
+	};
 }
 export function patch(db: Database, id: string, change: Partial<OcrRecord>) {
 	const r = row(db, id)!;
-	const previous = record(r);
+	const previous = JSON.parse(r.record_json) as OcrRecord;
 	const v = {
 		...previous,
 		...change,
+		canRecheck: undefined,
 		revision: previous.revision + 1,
 		updatedAt: Date.now(),
 	};
+	const serialized = JSON.stringify(v);
 	db.query("UPDATE ocr_inputs SET record_json=? WHERE id=?").run(
-		JSON.stringify(v),
+		serialized,
 		id,
 	);
-	return v;
+	return record({ ...r, record_json: serialized });
 }
 /** Store only endpoint/revision binding, never decrypted credential. */
 export function binding(c: Connection) {
@@ -58,12 +87,33 @@ export function binding(c: Connection) {
 		credentialVersion: c.credentialVersion,
 	});
 }
-export function list(db: Database, owner: string, conversationId: string) {
+export function activeCount(
+	db: Database,
+	owner: string,
+	conversationId: string,
+) {
 	return (
 		db
 			.query(
-				"SELECT record_json,upstream_id FROM ocr_inputs WHERE owner=? AND conversation_id=? ORDER BY rowid DESC LIMIT 100",
+				"SELECT count(*) AS n FROM ocr_inputs WHERE owner=? AND conversation_id=? AND json_extract(record_json,'$.state') IN ('queued','starting','running','cancelling')",
 			)
-			.all(owner, conversationId) as Pick<Row, "record_json" | "upstream_id">[]
-	).map(record);
+			.get(owner, conversationId) as { n: number }
+	).n;
+}
+export function list(
+	db: Database,
+	owner: string,
+	conversationId: string,
+	current?: Connection | null,
+) {
+	return (
+		db
+			.query(
+				"SELECT record_json,upstream_id,connection_json FROM ocr_inputs WHERE owner=? AND conversation_id=? ORDER BY rowid DESC LIMIT 100",
+			)
+			.all(owner, conversationId) as Pick<
+			Row,
+			"record_json" | "upstream_id" | "connection_json"
+		>[]
+	).map((r) => record(r, current));
 }

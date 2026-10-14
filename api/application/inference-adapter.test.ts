@@ -43,7 +43,7 @@ function setup() {
 		inspect: () => ({ profile: "p", providers: [] }),
 		usage: () => [
 			{ purpose: "llm", source: "cloud", model: "rejected", accepted: 0 },
-			{ purpose: "llm", source: "larm", model: "ornith", accepted: 1 },
+			{ purpose: "llm", source: "larm", model: "fixture-model", accepted: 1 },
 			{ purpose: "tts", source: "cloud", model: "tts-1", accepted: 1 },
 			{ purpose: "llm", source: "cloud", model: "older", accepted: 1 },
 		],
@@ -267,7 +267,7 @@ test("sources give the probes, the targets with their input, the LARM details an
 		providers: [],
 	});
 	expect(read(h, "query:inference.last-usage@1")!.data).toEqual({
-		llm: { source: "larm", model: "ornith" },
+		llm: { source: "larm", model: "fixture-model" },
 		asr: null,
 		tts: { source: "cloud", model: "tts-1" },
 	});

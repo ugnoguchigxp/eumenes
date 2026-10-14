@@ -120,6 +120,35 @@ export function transitionItem(
 	if (item) bump(db, item.conversationId);
 	return true;
 }
+/** Ids bound per statement: far below SQLite's variable limit. */
+const SOURCE_CHUNK = 500;
+/**
+ * Physically deletes every note that came from one of the messages and returns their ids. A forgotten message must
+ * not live on in a note, not even as a retracted row. The conversations' revisions move (they hold no text).
+ */
+export function deleteBySource(
+	db: Database,
+	messageIds: readonly string[],
+): { noteIds: string[]; deleted: number } {
+	const unique = [...new Set(messageIds)];
+	const noteIds: string[] = [];
+	for (let start = 0; start < unique.length; start += SOURCE_CHUNK) {
+		const chunk = unique.slice(start, start + SOURCE_CHUNK);
+		const marks = chunk.map(() => "?").join(",");
+		const rows = db
+			.query(
+				`SELECT id, conversation_id AS conversationId FROM continuity_items WHERE source_message_id IN (${marks})`,
+			)
+			.all(...chunk) as Array<{ id: string; conversationId: string }>;
+		const remove = db.query("DELETE FROM continuity_items WHERE id = ?");
+		for (const row of rows) {
+			remove.run(row.id);
+			noteIds.push(row.id);
+			bump(db, row.conversationId);
+		}
+	}
+	return { noteIds, deleted: noteIds.length };
+}
 export function listItems(
 	db: Database,
 	conversationId: string,

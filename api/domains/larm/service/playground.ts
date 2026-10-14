@@ -54,7 +54,8 @@ export function createLarmPlayground(config: {
 	/** Extra hosts that may receive provider credentials; defaults to EUMENES_LARM_PROVIDER_HOSTS (read once). */
 	providerHosts?: readonly string[];
 	token?: string;
-	profile: string;
+	/** The saved profile; absent until the user has chosen one. */
+	profile?: string;
 	audience: string;
 	voice?: string;
 	fetch?: typeof fetch;
@@ -116,82 +117,105 @@ export function createLarmPlayground(config: {
 		}
 		return r;
 	}
-	async function catalog(signal: AbortSignal, selectors?: readonly string[]) {
+	/**
+	 * Targets of the saved profile and of every profile LARM lists. The unselected response
+	 * can omit a profile's services, so a profile without any is fetched again by its id.
+	 */
+	async function catalog(signal: AbortSignal) {
 		const targets = new Map<string, LarmTestTarget>();
 		const errors: string[] = [];
 		let revision: string | undefined;
-		for (const selector of selectors ?? [
-			config.profile,
-			"SAAA-w-Image",
-			"SAAA-w-music",
-			"",
-		]) {
+		async function fetchProfiles(selector: string) {
+			const data = await json(
+				await control(
+					`/v3/agent-profiles${selector ? `?profile=${encodeURIComponent(selector)}` : ""}`,
+					signal,
+				),
+			);
+			if (
+				data.contractVersion !== "agent-connection.v3" ||
+				(selector && data.requestedProfile !== selector)
+			)
+				throw new Error("invalid_catalog");
+			const rev = str(data.catalogRevision);
+			if (revision && revision !== rev) throw new Error("stale_catalog");
+			revision = rev;
+			return { rev, profiles: list(data.profiles) };
+		}
+		function ingest(
+			selector: string,
+			rev: string,
+			profiles: ReturnType<typeof list>,
+			modes: readonly ("provider" | "service")[],
+		) {
+			for (const p of profiles)
+				for (const mode of modes)
+					for (const item of list(
+						p[mode === "provider" ? "providers" : "services"] ?? [],
+					)) {
+						const protocol = str(item.protocol),
+							endpoint = str(item.endpoint),
+							model = str(item.model),
+							name = str(item.name),
+							profile = str(p.id);
+						const kind = kinds[protocol] ?? "unsupported";
+						const id = createHash("sha256")
+							.update(
+								JSON.stringify([
+									larmBase().origin,
+									mode,
+									profile,
+									name,
+									protocol,
+									model,
+									endpoint,
+								]),
+							)
+							.digest("hex")
+							.slice(0, 32);
+						const previous = targets.get(id);
+						targets.set(id, {
+							id,
+							name,
+							description:
+								typeof item.description === "string"
+									? item.description
+									: undefined,
+							model,
+							capability: str(item.capability),
+							protocol,
+							kind: paths[kind] === endpoint ? kind : "unsupported",
+							mode,
+							endpoint:
+								mode === "service"
+									? publicUrl(str(item.url ?? endpoint)).pathname
+									: endpoint,
+							profile,
+							selector: previous?.selector ?? (selector || undefined),
+							revision: rev,
+							onDemand:
+								mode === "service" &&
+								object(item.startupPolicy ?? {}).minWarmInstances === 0,
+							primary: previous?.primary || !!selector,
+						});
+					}
+		}
+		for (const selector of new Set([config.profile?.trim() ?? "", ""])) {
 			try {
-				const data = await json(
-					await control(
-						`/v3/agent-profiles${selector ? `?profile=${encodeURIComponent(selector)}` : ""}`,
-						signal,
-					),
-				);
-				if (
-					data.contractVersion !== "agent-connection.v3" ||
-					(selector && data.requestedProfile !== selector)
-				)
-					throw new Error("invalid_catalog");
-				const rev = str(data.catalogRevision);
-				if (revision && revision !== rev) throw new Error("stale_catalog");
-				revision = rev;
-				for (const p of list(data.profiles))
-					for (const mode of ["provider", "service"] as const)
-						for (const item of list(
-							p[mode === "provider" ? "providers" : "services"] ?? [],
-						)) {
-							const protocol = str(item.protocol),
-								endpoint = str(item.endpoint),
-								model = str(item.model),
-								name = str(item.name),
-								profile = str(p.id);
-							const kind = kinds[protocol] ?? "unsupported";
-							const id = createHash("sha256")
-								.update(
-									JSON.stringify([
-										larmBase().origin,
-										mode,
-										profile,
-										name,
-										protocol,
-										model,
-										endpoint,
-									]),
-								)
-								.digest("hex")
-								.slice(0, 32);
-							const previous = targets.get(id);
-							targets.set(id, {
-								id,
-								name,
-								description:
-									typeof item.description === "string"
-										? item.description
-										: undefined,
-								model,
-								capability: str(item.capability),
-								protocol,
-								kind: paths[kind] === endpoint ? kind : "unsupported",
-								mode,
-								endpoint:
-									mode === "service"
-										? publicUrl(str(item.url ?? endpoint)).pathname
-										: endpoint,
-								profile,
-								selector: previous?.selector ?? (selector || undefined),
-								revision: rev,
-								onDemand:
-									mode === "service" &&
-									object(item.startupPolicy ?? {}).minWarmInstances === 0,
-								primary: previous?.primary || !!selector,
-							});
-						}
+				const { rev, profiles } = await fetchProfiles(selector);
+				ingest(selector, rev, profiles, ["provider", "service"]);
+				if (selector) continue;
+				for (const p of profiles) {
+					if (list(p.services ?? []).length) continue;
+					const id = str(p.id);
+					try {
+						const again = await fetchProfiles(id);
+						ingest(id, again.rev, again.profiles, ["service"]);
+					} catch (e) {
+						if (code(e) === "stale_catalog") throw e;
+						errors.push(`${id}: ${code(e)}`);
+					}
+				}
 			} catch (e) {
 				if (code(e) === "stale_catalog") throw e;
 				errors.push(`${selector || "all"}: ${code(e)}`);
@@ -285,7 +309,7 @@ export function createLarmPlayground(config: {
 		connection,
 		providerUrl,
 		request,
-		profile: config.profile,
+		profile: config.profile?.trim() ?? "",
 		embeddingPath: paths.embedding ?? "/v1/embed",
 	});
 	async function health(

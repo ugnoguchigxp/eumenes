@@ -168,37 +168,6 @@ contracts("memory client", [
 		result: [memoryItem],
 	},
 	{
-		name: "rememberItem",
-		call: (c) =>
-			c.rememberItem({
-				conversationId: "c1",
-				messageId: "m1",
-				quote: "tea",
-				kind: "preference",
-				semanticKey: "drink",
-				text: "likes tea",
-			}),
-		method: "POST",
-		path: "/api/memory/items",
-		body: {
-			conversationId: "c1",
-			messageId: "m1",
-			quote: "tea",
-			kind: "preference",
-			semanticKey: "drink",
-			text: "likes tea",
-		},
-		response: memoryItem,
-	},
-	{
-		name: "memoryAction",
-		call: (c) => c.memoryAction("mem/1", "stop", 3),
-		method: "POST",
-		path: "/api/memory/items/mem%2F1/stop",
-		body: { expectedRevision: 3 },
-		response: { ...memoryItem, status: "stopped", revision: 4 },
-	},
-	{
 		name: "memoryShortTerm",
 		call: (c) => c.memoryShortTerm("main/1"),
 		method: "GET",
@@ -229,51 +198,7 @@ contracts("memory client", [
 		response: { disabled: true },
 		parsed: false,
 	},
-	{
-		name: "continuityTransition",
-		call: (c) => c.continuityTransition("n/1", "resolved", 2),
-		method: "POST",
-		path: "/api/continuity/n%2F1/transition",
-		body: { expectedRevision: 2, status: "resolved" },
-		response: { ...continuityNote, status: "resolved", revision: 3 },
-	},
-	{
-		name: "forgetItem",
-		call: (c) => c.forgetItem("mem1"),
-		method: "POST",
-		path: "/api/memory/items/mem1/forget",
-		body: {},
-		response: { forgetId: "f1", completed: true },
-	},
 ]);
-
-describe("memory client: deleteTendency", () => {
-	it("sends DELETE with the bearer token and returns the parsed answer", async () => {
-		const seen = stubFetch(() => Response.json({ ok: true }));
-		expect(await newClient().deleteTendency("t/1")).toEqual({ ok: true });
-		expect(seen).toHaveLength(1);
-		expect(seen[0]).toMatchObject({
-			method: "DELETE",
-			path: "/api/memory/tendencies/t%2F1",
-		});
-		expect(seen[0]?.headers.authorization).toBe("Bearer test-token");
-	});
-	it("rejects an answer that violates the schema", async () => {
-		stubFetch(() => Response.json("not-the-contract"));
-		await expect(newClient().deleteTendency("t1")).rejects.toMatchObject({
-			name: "ZodError",
-		});
-	});
-	it("surfaces a 4xx {error} as ApiError", async () => {
-		stubFetch(() =>
-			Response.json({ error: "invalid_memory_item" }, { status: 400 }),
-		);
-		await expect(newClient().deleteTendency("t1")).rejects.toMatchObject({
-			status: 400,
-			message: "invalid_memory_item",
-		});
-	});
-});
 
 const entry = { written: "NASA", spoken: "ナサ" };
 const dictionaryAnswer = { entries: [entry] };

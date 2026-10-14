@@ -1,3 +1,5 @@
+import type { ContextSections } from "./context-compiler";
+
 type Message = { role: "system" | "user" | "assistant"; content: string };
 // Required rules keep reported certainty intact; presentation rules only shape the wording.
 const requiredRules =
@@ -8,23 +10,26 @@ const policy = requiredRules + "\n" + presentation;
 const failureRules =
 	"今回の回答は、既に調査担当へ渡した依頼の実行結果を説明する回答です。失敗説明はCURRENT_RESEARCH_FAILUREを正本とし、失敗した処理と、分かっている原因または詳細不明を短い自然な言葉で伝えます。過去の会話にある障害説明を流用しません。モデル実行の失敗、検索・読取りの失敗、出力形式の拒否を区別します。モデル呼出しが失敗しただけなら制御JSON不正・検索失敗と断定しません。システム障害を利用者のキーワード不足に置き換えて追加指定を求めません。内部の形式名やコードは回答に出しません。";
 
-/** Keep the current request and report required; remove only optional earlier turns. */
+/**
+ * Keep the current request and report required; remove only optional earlier turns (kept exchanges first,
+ * oldest first). The layers keep their places: memory and the summary are never dropped or repeated.
+ */
 export function researchResultContext(
-	messages: Message[],
-	referenceTexts: readonly string[],
+	sections: Pick<
+		ContextSections,
+		"system" | "longTerm" | "history" | "working" | "unprocessed" | "input"
+	>,
 	projection: string | undefined,
 	failureCode?: string | null,
 ) {
-	const input = messages.at(-1)!;
-	const references = referenceTexts.map((content): Message => ({
-		role: "system",
-		content,
-	}));
-	const history = messages.slice(1 + references.length, -1);
+	const { input, longTerm, working } = sections;
+	// Both lists are oldest first; the kept exchanges are the older part.
+	const history = [...sections.history];
+	const unprocessed = [...sections.unprocessed];
 	const system: Message = {
-		...messages[0]!,
+		...sections.system,
 		content:
-			messages[0]!.content +
+			sections.system.content +
 			"\n" +
 			policy +
 			(failureCode
@@ -54,12 +59,23 @@ export function researchResultContext(
 	};
 	// Put host failure authority in the first system message, including for models
 	// that give later system messages less weight. Acquired reports stay user data.
-	const assemble = () => [system, ...references, ...history, result, input];
+	const assemble = () => [
+		system,
+		...longTerm,
+		...history,
+		...working,
+		...unprocessed,
+		result,
+		input,
+	];
 	while (
-		history.length &&
+		history.length + unprocessed.length &&
 		Buffer.byteLength(JSON.stringify(assemble())) > 65536
 	)
-		history.splice(0, Math.min(2, history.length));
+		(history.length ? history : unprocessed).splice(
+			0,
+			Math.min(2, (history.length ? history : unprocessed).length),
+		);
 	if (Buffer.byteLength(JSON.stringify(assemble())) > 65536)
 		throw new Error("required_context_overflow");
 	return assemble();

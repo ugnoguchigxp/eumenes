@@ -47,7 +47,7 @@ export function defaults(env: Record<string, string | undefined>): Settings {
 		revision: 0,
 		larm: {
 			baseUrl: null,
-			profile: env.LARM_PROFILE?.trim() || "ornith1.5Strix",
+			profile: env.LARM_PROFILE?.trim() || undefined,
 			audience: env.LARM_AUDIENCE ?? "saaa-desktop",
 			voice: env.EUMENES_TTS_VOICE ?? "",
 			speed: 1,

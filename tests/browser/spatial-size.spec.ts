@@ -45,7 +45,7 @@ test("Spatial fills wide and portrait viewports without extra overlay controls",
 	await page.route("**/api/settings", async (route) => {
 		if (route.request().method() !== "GET") return route.continue();
 		const settings = settingsFixture();
-		settings.larm.profile = "ornith1.5Strix";
+		settings.larm.profile = "test-profile";
 		await route.fulfill({
 			json: {
 				...settings,

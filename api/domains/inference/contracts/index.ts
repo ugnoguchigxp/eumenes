@@ -20,6 +20,15 @@ export function controlInstructions(control: ControlContract) {
 			: "\nOUTPUT_SCHEMA=" + JSON.stringify(control.outputSchema))
 	);
 }
+/** The output schema as a JSON Schema object for the providers that enforce it; absent when the contract has none. */
+export function controlJsonSchema(
+	control: ControlContract | undefined,
+): Record<string, unknown> | undefined {
+	const schema = control?.outputSchema;
+	return schema && typeof schema === "object" && !Array.isArray(schema)
+		? (schema as Record<string, unknown>)
+		: undefined;
+}
 /** One-off voice settings for a sample; never persisted. */
 export type SpeechOverride = Partial<
 	Pick<

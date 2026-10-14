@@ -44,7 +44,7 @@ Eumenesは、**ユーザーを継続的に理解し、任された仕事を進�
 1. リポジトリのルートで`bun install`を実行します。`postinstall`でDesignSystemをビルドします。
 2. 必要に応じて`.env.example`を`.env`へコピーし、backendで使う`LARM_API_TOKEN`を設定します。すでにexportしている場合はその値を使えます。`EUMENES_API_TOKEN`は省略可能で、初回に`data/keys/api.token`へ自動生成し、API・Vite・CLIで共有します。明示指定する場合は24文字以上にします。
 3. `bun run dev`を実行し、`http://127.0.0.1:5173`を開きます。APIの既定待受は`127.0.0.1:8787`です。API起動後にViteが起動し、Ctrl+Cで両方を終了します。すでに起動中のAPIがあれば終了してから実行してください。
-4. 「アーティファクトを開く」→「設定」→「AIと接続」から、LARM接続を保存します。接続先の正本はSQLiteの保存設定で、未登録の間はLARMへ接続しません。保存済みの接続・Profileは維持します。新規設定の既定Profileは`ornith1.5Strix`です。
+4. 「アーティファクトを開く」→「設定」→「AIと接続」から、LARM接続を保存します。接続先の正本はSQLiteの保存設定で、未登録の間はLARMへ接続しません。保存済みの接続・Profileは維持します。Profileの既定値はなく、設定画面で選んで保存するまでLARMへ接続しません。
 5. 会話欄から文字を送信するか、「音声を開始」でマイクを許可します。「マイクを停止」で入力を止め、読み上げのON/OFFはミュートで切り替えます。
 
 個別起動は別々のターミナルで`bun run start`と`bun run dev:web`を使います。API・Vite・CLIには同じAPI認証とデータ保存先の環境設定を使ってください。ViteのローカルproxyがAPI認証を付け、LARM認証やクラウドキーはbackend内に保持します。既定DBは`data/eumenes.sqlite3`、変更には`EUMENES_DB`を使います。DBと`data/keys/`内の鍵は一緒に保全してください。
@@ -107,7 +107,7 @@ EUMENES_LIVE_ASR_WAV=/absolute/path/speech.wav EUMENES_LIVE_EXPECT_TEXT=こん�
 ## 制限と未完了の受入
 
 - 実マイク・ヘッドホンによる3往復と再生中割込み、機器ごとの権限・echoの受入は未完了です。録音中の逐次ASRは未実装です。[音声受入記録](docs/acceptance.md)を参照してください。
-- 主会話`ornith1.5Strix`と補助`ornith1.5Strix-64k`は接続経路があり、主256K×1・補助64K×最大3、待機・履歴分離の実接続記録があります。旧`SAAA-gemma4-26b-64k`の利用禁止と混同しないでください。この更新では実接続を再検証していません。[LARMの説明と検証記録](docs/larm.md)を参照してください。
+- 主会話と補助は、どちらも保存済みのProfileで独立したSessionを持ちます。待機・履歴分離の実接続記録が過去にありますが、この更新では実接続を再検証していません。[LARMの説明と検証記録](docs/larm.md)を参照してください。
 - 直接CLIを実行する委任は`EUMENES_DELEGATED_TASKS_ENABLED`が既定で無効です。有効化だけでは本番隔離を満たさず、coding runnerは`isolation_not_verified`で実行不可です。dots連携は製品側の処理と一部の実接続記録がありますが、新規Sessionから成果返却までの受入は未完了です。[runnerの残工程](docs/coding-runner.md)、[dotsの受入状況](docs/dots.md)を参照してください。
 - 個別のサービスや画面の成功を、専属アシスタント全体の完成認定には使いません。[Excalidraw](docs/excalidraw.md)、[物体認識](docs/object-recognition.md)、[設定](docs/settings.md)の受入範囲は各文書と検証記録を参照してください。計画書には未実装・部分実装の内容を含みます。
 

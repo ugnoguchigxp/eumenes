@@ -91,7 +91,6 @@ function recall(
 			conversationId: "c1",
 			space: SPACE,
 			vector: A,
-			beforeOrdinal: 1_000_000,
 			limit: 3,
 			minScore: RECALL_MIN_SCORE,
 			maxBytes: PREFETCH_BYTES,
@@ -121,17 +120,15 @@ test("vector encoding and the space key are the toolchain embeddings' (shared im
 	expect(vectorSpaceKey(OTHER)).not.toBe(legacy);
 });
 
-test("an exchange before the window is recalled whole, once, even when both its messages match", async () => {
+test("an exchange the prompt does not show is recalled whole, once, even when both its messages match", async () => {
 	const h = await setup();
 	const old = await exchange(h, "去年の京都旅行の話", "清水寺が良かったですね");
 	const recent = await exchange(h, "最近の京都の話", "紅葉の季節ですね");
 	await embed(h, old.userId, A);
 	await embed(h, old.answerId!, A);
 	await embed(h, recent.userId, A);
-	const start = h.store.read(
-		(db) => h.conversation.messageInTransaction(db, recent.userId)!.ordinal,
-	);
-	const found = recall(h, { beforeOrdinal: start });
+	// The recent exchange is the one the prompt shows.
+	const found = recall(h, { excludeMessageIds: [recent.userId] });
 	expect(found).not.toBeNull();
 	expect(found!.text).toContain("past_turns_reference_data");
 	const entries = entriesOf(found!.text);
@@ -220,7 +217,11 @@ test("messages the other recall already uses, scheduled prompts and changed text
 	// The answer of a scheduled run carries a vector too; the exchange is dropped as a whole.
 	await embed(h, scheduled.answerId!, A);
 	await h.store.write((db) =>
-		h.memory.excludeMessageInTransaction(db, scheduled.userId),
+		h.memory.blockMessagesInTransaction(db, {
+			conversationId: "c1",
+			messageIds: [scheduled.userId],
+			reason: "scheduled_prompt",
+		}),
 	);
 	// The text changed after it was embedded: the vector no longer stands for it.
 	await h.store.write((db) =>
@@ -386,7 +387,11 @@ test("the search gives up at the attempt cap, and with no room left for a minima
 		const e = await exchange(h, `定期${i}`, `定期回答${i}`);
 		await embed(h, e.userId, A);
 		await h.store.write((db) =>
-			h.memory.excludeMessageInTransaction(db, e.userId),
+			h.memory.blockMessagesInTransaction(db, {
+				conversationId: "c1",
+				messageIds: [e.userId],
+				reason: "scheduled_prompt",
+			}),
 		);
 	}
 	const good = await exchange(h, "拾える話", "拾える回答");
@@ -441,4 +446,23 @@ test("retracting a message drops its vector and its exchange partner's; a prefet
 	// Retracting only the answer drops the user's vector with it too (the exchange is one thing).
 	await h.conversation.retract({ messageId: kept.answerId! });
 	expect(ids()).toEqual([]);
+});
+
+test("there is no ordinal boundary: a hidden exchange between shown ones is found, and a shown one is not", async () => {
+	const h = await setup();
+	const shownOld = await exchange(h, "最初の京都の話", "清水寺の話ですね");
+	const hidden = await exchange(h, "二番目の京都の話", "紅葉の話ですね");
+	const shownNew = await exchange(h, "三番目の京都の話", "嵐山の話ですね");
+	for (const turn of [shownOld, hidden, shownNew]) await embed(h, turn.userId, A);
+	const found = recall(h, {
+		excludeMessageIds: [shownOld.userId, shownNew.userId],
+	});
+	expect(found).not.toBeNull();
+	expect(entriesOf(found!.text)).toEqual([
+		{
+			at: expect.any(String),
+			user: "二番目の京都の話",
+			assistant: "紅葉の話ですね",
+		},
+	]);
 });

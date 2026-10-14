@@ -1,12 +1,12 @@
 # 記憶担当（Steward）実装計画 — ContextWindow を記憶として管理し続ける背景エージェント
 
-2026-10-14 / 状態: **計画**（未実装・未検証）/ 改訂6・再レビュー待ち。
+2026-10-14 / 状態: **計画**（未実装・未検証）/ 改訂7・再レビュー待ち。
 実装形態: **TypeScript で直接実装**する。データドリブンの toolchain bundle にはしない。例外は2つで、会話エージェントが呼ぶ依頼ツール（§3.4）と、設定画面の閲覧（§8）は、既存の toolchain・bundle の仕組みに[登録と拡張の手順](../docs/toolchain-extension.md)どおりに載せる。
 
 関連: [前計画 memory-activation（2026-10-13）](memory-activation-implementation-plan-2026-10-13.md)、[LARM](../docs/larm.md)、[ログ](../docs/logging.md)、[domain 一覧](../docs/domains.md)。
 本書は前計画のうち「記憶担当サブエージェント」の部分（出力契約、スケジュール、ContextWindow の範囲、手動操作）を置き換える。Window の版管理、採用時の検証、usage receipt、忘却 journal は前計画のものを使う。
 
-改訂6 の変更点は §14 にまとめる（外部レビューの7件への対応、除外台帳）。
+改訂6・改訂7 の変更点は §14 にまとめる（外部レビュー2回分への対応）。
 
 ---
 
@@ -47,6 +47,7 @@
 | K10 | 段階ごとに観測せず、機能が揃ってからまとめて live で観測する |
 | K11 | 本人の「忘れて」「覚えて」「違う」は、会話エージェントが steward への依頼キューに入れる。steward は溜まった依頼をまとめて処理する。忘却の依頼は完全な削除として実行してよい |
 | K12 | 忘却しても**会話の原文は残す**（会話画面の履歴はそのまま）。そのメッセージは、記憶にも文脈にも二度と使わない |
+| K14 | 本人が取り消した run の発言は記憶の判断に使わない。**例外として、「覚えて」の依頼（`remember`）だけは、取り消した run のものでも実行する**。また明示の `remember` は、同じ内容の記憶が既にあっても省略せず、本人が確認した版として保存し直す |
 | K13 | 「記憶に使わない」メッセージは、会話のメッセージ表にフィールドを足すのではなく、**memory が SQLite に持つ除外台帳**に message ID で記録する。行があれば使わない、なければ使ってよい。DB を古い状態に戻しても消えないよう、journal にも書く |
 
 ## 2. 全体像
@@ -69,11 +70,12 @@ steward  ──▶ memory, continuity, conversation, (将来) world
 ### 2.2 流れ
 
 ```
-回答採用（dialogue、採用と同じ transaction）
-  ├─ memory.recordExchangeInTransaction(tx, {conversationId, runId, inputMessageId, answerMessageId})
-  │     → memory_exchange に登録（全 step の印が空）
-  ├─ steward.confirmRequestsInTransaction(tx, runId)   … その run の依頼を staged → pending（§3.4）
-  └─ steward.kickInTransaction(tx, conversationId)     … 次に走らせる step のジョブを enqueue
+run の終わり（dialogue、run が終わる transaction の中。§2.5）
+  ├─ completed（回答採用） → memory.recordExchangeInTransaction(tx, {conversationId, runId, inputMessageId, answerMessageId, outcome: "answered"})
+  ├─ failed / interrupted  → memory.recordExchangeInTransaction(tx, {…, answerMessageId: null, outcome: "failed"})
+  ├─ cancelled             → 往復は登録しない
+  ├─ steward.settleRequestsInTransaction(tx, runId, runState)  … その run の依頼を確定または破棄する（§3.4）
+  └─ steward.kickInTransaction(tx, conversationId)              … 必要な実行単位を enqueue する（§2.3）
                              ▼
 step ジョブ（1ジョブ = 1 step = 推論1回。queue の prepare / execute / settle をそのまま使う）
   反映 step（往復ごとに必ず通る。この順で連鎖する）:
@@ -92,15 +94,26 @@ step ジョブ（1ジョブ = 1 step = 推論1回。queue の prepare / execute 
 
 | 項目 | 決まり |
 |---|---|
-| ジョブ | `steward.step.v1`、payload は `{ conversationId, step }`。`dedupeKey = conversationId:step:<対象の最初の往復>:<最後の往復>` |
-| prepare | その step がまだ済んでいない往復を台帳から選ぶ（最大4往復・16KB。前の step が済んでいるものだけ）。**推論の期限と request はここで取る**（step の開始時点。今の `captureBackgroundControlInTransaction` の使い方と同じ） |
+| 実行単位 | steward が `steward_unit` 表で管理する（§5.2）。1単位 = 1 step = 1ジョブ = 推論1回。単位には次の3種類がある（下の表） |
+| ジョブ | `steward.step.v1`、payload は `{ unitId }`。**`dedupeKey = unitId`**。既存の Queue は、終了済みのジョブでも同じ dedupeKey なら既存のジョブを返す（`queue/service/index.ts:109`）。そのため、再開するときは必ず新しい単位（新しい unitId）を作る |
+| prepare | 単位に記録した対象（往復・依頼・revision）を読み、まだ有効か確かめる。**推論の期限と request はここで取る**（step の開始時点）。**忘却の連番 `forget_seq`（§6.5）を単位に記録する** |
 | execute | 推論1回。schema 付き（§4.2 L4） |
-| settle | 1つの transaction で、結果の適用、対象の往復への step の完了印、判断記録、Window の再公開、次の step の enqueue を行う |
-| 冪等 | settle は、対象の往復にその step の印が**まだ付いていないこと**を確かめてから適用する。付いていれば何も適用せず、request を解放して `stale` で終わる。同じ往復を2回保存することはない |
-| 失敗 | 推論の失敗や出力の不正は、その step の `failures` を対象の往復ごとに数える。3回で、その step を `skipped` として印を付け、次の step へ進む。印より前の step の結果は確定済みなので、やり直さない |
+| settle | 1つの transaction で、**再検証（§6.5）**、結果の適用、完了印、判断記録、Window の再公開、単位を閉じる、次の単位の enqueue を行う |
+| 冪等 | 往復の step は「対象の往復にその step の印がまだないこと」、依頼のまとめは「対象の依頼がまだ pending であること」、手入れは「`maintenance_revision` が単位を作ったときと同じであること」を settle で確かめる。満たさなければ何も適用せず、request を解放して単位を閉じる |
+| 一時的な失敗 | 推論のタイムアウトや接続の失敗は、既存 Queue の retry（`classify: "retry"`、`maxAttempts: 3`）で**同じジョブのまま**再試行する |
+| 終わったジョブ | Queue で終わった（failed / expired / interrupted）単位は `failed` として閉じ、対象ごとの `failures` を数える。`kick` が新しい単位を作り直す。対象ごとに3回失敗したら、往復の step は `skipped` の印を付けて次の step へ進み、依頼は `none`（理由 `steward_failed`）にし、手入れはその revision では諦める |
+| 出力の不正 | 推論は成功したが出力が使えない場合も「終わったジョブ」と同じに数える（再試行で同じ入力を同じモデルに渡すため、Queue の retry ではなく新しい単位にする） |
 | 往復の完了 | 反映 step（curate-memory、dispose-exchanges、summarize）の3つすべてに印（done または skipped）が付いた往復だけが `done` になる |
-| 再起動 | ジョブが失われても台帳の印から再開できる。`steward.kickInTransaction` は起動時と各 settle の後に呼ばれ、印の足りない往復があれば次の step を enqueue する |
+| 再起動 | `steward.kickInTransaction` は起動時と各 settle の後に呼ばれる。開いている単位がない対象（印の足りない往復、pending の依頼、進んだ revision）があれば新しい単位を作る。開いている単位があればそれを待つ（二重に作らない） |
 | 推論 request | 既存と同じく DB（`steward_request`）に記録し、ジョブの終わり方に関係なく解放する |
+
+**実行単位の種類**
+
+| 種類 | 対象 | 単位の識別（同じ対象に開いている単位は1つだけ） |
+|---|---|---|
+| 往復の step | 1つの会話の、ある反映 step が未了の往復（最大4往復） | (会話, step, 往復の範囲, 試行の連番) |
+| 依頼のまとめ | 1つの会話の pending の依頼（最大8件）。curate-memory として実行する | (会話, 依頼 ID の集合)。往復の step の curate-memory と同じ単位にまとめてよい（両方を入力に入れる） |
+| 手入れ | 1つの会話の手入れ step | (会話, step, `maintenance_revision`) |
 
 **台帳と Window の整合（往復が逐語から消える条件）**
 
@@ -151,13 +164,27 @@ prompt cache は先頭から一致する部分にしか効かない（K4）。�
 | `PENDING_LIMIT` に達した | **作り直さない**。代わりに `consolidate-memory` を優先して起動する。新しい記憶は L2 の「最近覚えたこと」に出し続ける（バイト上限内で新しい順） | L1 に入れるかは steward が判断する |
 
 **予算（コードが強制する）**
-- 会話履歴（L3、未処理、直近2往復）の合計は、今と同じ `HISTORY_MAX_BYTES`（48KB）を超えない。
+- **履歴に入れるメッセージは1件あたり最大 12KB**（`HISTORY_MESSAGE_MAX_BYTES`）。超えるメッセージは先頭 8KB と末尾 4KB を残し、間に「（中略：約N文字）」を入れる。切る位置は UTF-8 の文字の境界にそろえる。会話の原文は変えない（文脈に入れるときだけ切る）
+- 会話履歴（L3、未処理、直近2往復）の合計は、今と同じ `HISTORY_MAX_BYTES`（48KB）を超えない。1件12KB にしたので、直近2往復（最大4件 = 48KB）だけで上限を超えることはなく、**上限と直近の保持が両立する**。今の `KEEP_RUNS` が上限超過を許している挙動はなくす
 - **直近2往復は常に入れる**（K3 の安全策）。L3 になければ未処理の位置に補う。
+- **今回の入力（L5）は切らない**。履歴の予算にも数えない（今と同じ）。
 - 超えたら、直近2往復以外を**古い順に落とす**。L3 と未処理を区別しない（今の「古い往復から落とす」と同じ縮退）。落とした往復は想起の検索対象には残る。
 - steward が遅れたり止まったりしても、文脈は今の挙動（直近の往復を予算内で逐語）より悪くならない。
 - `skipped`（dispose が skipped）の往復は未処理と同じに扱う。予算内なら逐語で、溢れたら古い順に落ちる。想起の検索対象には残る。
 - L1、L2 の各予算は既存の `LONG_TERM_BYTES`、`SHORT_TERM_BYTES`。要約は最大1200文字。
-- steward の各 step の入力も上限を持つ（最大4往復・16KB、依頼は8件、L1 一覧は `LONG_TERM_BYTES` 以内）。
+- steward の各 step の入力も上限を持つ（最大4往復・16KB、依頼は8件、L1 一覧は `LONG_TERM_BYTES` 以内）。steward に渡すメッセージは1件あたり最大 6KB（先頭 4KB と末尾 2KB、間に「（中略）」）。**1往復だけで16KB を超えることはない**ので、最低1往復は必ず入る。切ったメッセージには `truncated: true` を付けて渡す。根拠はホストが全文の範囲で作れるので（§3.1）、切っても保存の検証は通る
+
+### 2.5 どの run を取り込むか（K14）
+
+| run の終わり方 | 往復の登録（記憶の判断に使うか） | その run の依頼（inbox） |
+|---|---|---|
+| completed（回答を採用） | 登録する（`outcome: answered`） | すべて pending にする |
+| failed / interrupted（システム側の失敗） | ユーザー発言だけを回答なしの往復として登録する（`outcome: failed`） | すべて pending にする（本人の意思は撤回されていない） |
+| cancelled（本人の取り消し） | **登録しない**（本人が撤回したため） | **`remember` だけ pending にする**。`forget`・`correct` は discarded |
+| stale（新しい run に置き換えられた） | 登録しない | discarded |
+
+- `outcome: failed` の往復は、curate-memory には「回答が出なかった往復」として渡す。dispose-exchanges では、既定で `drop` を勧める（制約は curate-memory が notes か記憶に残す）。
+- 取り消した run の `remember` の依頼は、その run のユーザー発言を根拠にして保存する（往復は登録しないが、根拠としては使う）。取り消した run のその他の内容は、根拠にも入力にも使わない。
 
 ## 3. 保存の契約と各 step の出力契約
 
@@ -174,6 +201,7 @@ D11 のとおり、保存 API とライブラリは「検証できる根拠」�
 | 同一性 | `key`（短い英数字の識別子。例 `food.spicy`） | `semanticKey` = 正規化した `key`（小文字、`[a-z0-9._-]`、最大64文字）。key が無効な要素は捨てる |
 | 既存との関係 | `update` は `ref`、`remember` は ref なし | 同じ `(kind, self, semanticKey)` の有効な項目があれば `replaces` を付ける（今の `rememberInTransaction` と同じ）。`remember` が既存の key と衝突した場合も置き換えとして扱う |
 | origin | なし | 依頼キュー由来（§3.4）なら `user_confirmed`、それ以外は `agent_inferred`（既存の区別） |
+| 明示の `remember`（K14） | `resolve.action = "remember"` | 同じ `(kind, self, semanticKey)` の有効な項目があり、値も同じでも、**省略しない**。`replaces` を付けて新しい版を作り、origin を `user_confirmed`、根拠をその依頼の発言にする（ライブラリは `replaces` なしの同値を `unchanged` として何もしないので、必ず `replaces` を付ける）。判断記録には `reconfirmed` として残す |
 | 使えない根拠 | — | 除外台帳にあるメッセージ（§6）は根拠にしない（その要素は `blocked_source` で捨てる）。ライブラリの tombstone 検査（`SOURCE_TOMBSTONED`）も今のまま効く |
 
 **merge（consolidate-memory）の根拠**
@@ -197,7 +225,7 @@ D11 のとおり、保存 API とライブラリは「検証できる根拠」�
 ```
 - 上限: `remember`+`update` が6件、`stop` が4件、`notes` が6件、`resolve` は依頼の数だけ。超えた分は捨てて判断記録に残す。
 - 「本人が述べた事実」と「アシスタントの推測」を区別する。根拠にするのはユーザー発言だけ（§3.1）。アシスタントの推測を本人が肯定していなければ保存しない。
-- 失敗した試行（エラーやキャンセルで終わった往復）にユーザーの制約が含まれていれば、`notes` か `remember` に残す。こうすれば、往復を `drop` しても制約は失われない。
+- 失敗した試行（`outcome: failed` の往復。§2.5）にユーザーの制約が含まれていれば、`notes` か `remember` に残す。こうすれば、往復を `drop` しても制約は失われない。本人が取り消した run は入力に入らない。
 
 **dispose-exchanges**（入力: 対象の往復、L3 の keep 群のラベルと冒頭100文字、curate-memory の結果）
 ```json
@@ -210,6 +238,7 @@ D11 のとおり、保存 API とライブラリは「検証できる根拠」�
 { "summary": "会話全体の要約（更新後の全文、最大1200文字）", "included": ["e3", "e4"] }
 ```
 - `included` にある往復だけに「要約済み」の印を付ける（§2.3 の表）。
+- 要約を保存する transaction で、**要約の依存元**（`memory_summary_source`）を書く。依存元 = 以前の版の依存元 ∪ `included`（§5.1）。compact-history と refine-summary も同じ規則で、以前の版の依存元を必ず引き継ぐ。
 
 **prepare-recall**（付随 step。入力: 直近の往復、要約）
 ```json
@@ -243,19 +272,19 @@ D11 のとおり、保存 API とライブラリは「検証できる根拠」�
 **状態遷移**
 
 ```
-staged ──(回答採用と同じ transaction)──▶ pending ──(curate-memory の settle)──▶ done / none
+staged ──(run が終わる transaction。§2.5 の表に従う)──▶ pending ──(curate-memory の settle)──▶ done / none
    │
-   └──(run が採用されずに終わった: cancel / failed / stale / 起動時の掃除)──▶ discarded
+   └──(§2.5 で破棄となる終わり方 / 起動時の掃除)──▶ discarded
 ```
 
 | 状態 | いつ | 何が起きるか |
 |---|---|---|
 | `staged` | 会話エージェントが `memory_request` を呼んだとき（toolchain の command の実行時） | `steward_inbox` に `run_id` 付きで1行入れて、すぐ受付を返す。**steward は staged を読まない** |
-| `pending` | その run の回答が採用されたとき。`generation-handler.ts` の採用 transaction で `steward.confirmRequestsInTransaction(tx, runId)` を呼ぶ | 依頼が確定する。`steward.kickInTransaction` で curate-memory を起動する |
-| `discarded` | run が採用されずに終わったとき（その終了の transaction）。起動時には、終了済みの run の staged を全部 discarded にする | 取り消された回答の依頼は**実行されない** |
+| `pending` | run が終わる transaction で `steward.settleRequestsInTransaction(tx, runId, runState)` を呼んだとき。completed・failed・interrupted なら全件、cancelled なら `remember` だけ（§2.5） | 依頼が確定する。`steward.kickInTransaction` で依頼のまとめの単位を作る |
+| `discarded` | §2.5 で破棄となる依頼（cancelled の `forget`・`correct`、stale の全件）。起動時には、終了済みの run に残った staged を §2.5 の表で振り分ける | 取り消した回答の忘却・訂正の依頼は**実行されない** |
 | `done` / `none` | curate-memory の settle で `resolve` を適用したとき | 結果を判断記録と notice に出す。依頼の本文（`what`、`detail`）は空にする（§6） |
 
-- **依頼だけでも起動する**: `kickInTransaction` は、反映待ちの往復がなくても pending の依頼があれば curate-memory を enqueue する。prepare は、依頼がその run の往復を指していれば一緒に読む。往復が既に curate 済みでも、依頼の処理のためにもう一度入力に入れる（印は付け直さない）。
+- **依頼だけでも起動する**: `kickInTransaction` は、反映待ちの往復がなくても pending の依頼があれば「依頼のまとめ」の単位を作る（§2.3）。依頼の冪等性は往復の印ではなく**依頼の状態**（pending のままか）で判定する。prepare は、依頼の発言を含む往復を一緒に読む。往復が既に curate 済みでも入力に入れる（印は付け直さない）。取り消した run の `remember` の依頼は、往復が登録されていないので、その run のユーザー発言だけを入力に入れる。
 - **まとめて処理する**: pending の依頼は、会話ごとに最大8件を1回の curate-memory に入れる。超えた分は次の step に回す。
 - **ツールの入口**: `memory_request`（`{ kind: "forget|remember|correct", what, detail? }`）は、手順どおりの小さな bundle と adapter にする。adapter の command `command:steward.request@1` は staged の行を入れて受付を返すだけ。
 - **依頼がなくても判断する**: ツールが呼ばれなかった場合でも、curate-memory は往復の中の「忘れて」を読み取って `stop` できる。依頼キューは、意図を確実に伝えるための経路。
@@ -331,33 +360,35 @@ staged ──(回答採用と同じ transaction)──▶ pending ──(curate-
 
 | 表 | 列 | 用途 |
 |---|---|---|
-| `memory_exchange` | `input_message_id` PK, `conversation_id`, `run_id`, `answer_message_id`, `answer_ordinal`, `state`(`pending`/`done`), `curated`(`done`/`skipped`/null), `disposed`(同), `summarized`(同), `disposition`(`keep`/`summarize`/`drop`/null), `duplicate_of`, `failures`(json: step ごと), `created_at`, `updated_at` | 往復の台帳と step の印。index `(conversation_id, state, answer_ordinal)` |
+| `memory_exchange` | `input_message_id` PK, `conversation_id`, `run_id`, `answer_message_id`(null 可), `outcome`(`answered`/`failed`), `input_ordinal`, `answer_ordinal`(null 可), `state`(`pending`/`done`), `curated`(`done`/`skipped`/null), `disposed`(同), `summarized`(同), `disposition`(`keep`/`summarize`/`drop`/null), `duplicate_of`, `failures`(json: step ごと), `created_at`, `updated_at` | 往復の台帳と step の印。index `(conversation_id, state, answer_ordinal)` |
 | `memory_conversation_summary` | `conversation_id` PK, `text`, `revision`, `updated_at` | L2 の要約 |
+| `memory_summary_source` | `conversation_id`, `revision`, `input_message_id`, PK は3列 | 要約の依存元。要約本体と**同じ transaction** で書く。書き直すときは以前の版の依存元を引き継ぐ（§3.2）。古い版の行は、新しい版を書いた transaction で消す |
+| `memory_forget_fence` | `id` PK（1行だけ）, `seq` | 忘却の連番 `forget_seq`。除外台帳への登録と State の忘却のたびに1つ進める（§6.5） |
 | `memory_message_block` | `message_id` PK, `conversation_id`, `reason`(`scheduled_prompt`/`forgotten`), `forget_id`(null 可), `created_at` | 除外台帳（K13）。`memory_agent_excluded_message` を置き換える。既存の行は `reason = scheduled_prompt` として移す |
 
 - 削除するもの: `memory_agent_cursor`、`memory_agent_request`、`memory_agent_excluded_message`（移した後）。
-- `WindowSnapshot` に `history` を足す: `{ keep: { inputMessageId, answerMessageId }[], summaryText, summarizedIds: string[] }`。
+- `WindowSnapshot` に `history` を足す: `{ keep: { inputMessageId, answerMessageId }[], summaryText, summaryRevision }`。要約の依存元は `memory_summary_source` が正本で、Window には持たせない（Window は忘却で消えるため）。
 
 **block journal**（K13）
-- `memory_message_block` の `forgotten` の行は、DB に書く前に別ファイルの block journal にも書く（`journal.ts` と同じ追記、fsync、書き損じた行の切り詰め）。
-- 1行の内容は `{ forgetId, conversationId, messageIds, itemIds, at }`。
+- 忘却を始めるとき、DB に書く前に、別ファイルの block journal に**忘却の意図**を1行書く（`journal.ts` と同じ追記、fsync、書き損じた行の切り詰め）。
+- 1行の内容は `{ forgetId, conversationId, messageIds, itemIds, at }`。`itemIds` は忘れる State（過去の版を含む）、`messageIds` は除外台帳に入れるメッセージ。
 - forget journal の形式はライブラリが検証するので、別の内容の行は混ぜない。
-- 書く順番は「block journal → forget journal → DB」。途中で落ちても、ブロックが多めに残る側に倒れる。
-- 起動時の照合（`index.ts:459-490`）で block journal を読み、§6 の派生データの削除をやり直す。
+- 書く順番は「block journal → forget journal → DB」。block journal の行は**完遂しなければならない意図**として扱う（§6.4）。forget journal が書かれる前に落ちても、起動時に State の忘却まで完遂する。
 
 ### 5.2 steward（migration `steward/0001-init`）
 
 | 表 | 列 | 用途 |
 |---|---|---|
+| `steward_unit` | `id` PK（= ジョブの dedupeKey）, `conversation_id`, `kind`(`exchange_step`/`requests`/`maintenance`), `step`, `targets`(json: 往復の ID、依頼の ID、または revision), `attempt`, `forget_seq`（prepare 時の値）, `summary_revision`（prepare 時の値。要約を入力に使う step だけ）, `state`(`open`/`applied`/`stale`/`failed`), `job_id`, `created_at`, `closed_at` | 実行単位（§2.3）。同じ対象に `open` の単位は1つだけ（部分 unique index） |
 | `steward_request` | `job_id`, `step`, `request_id`, PK `(job_id, step)` | 推論 request の解放 |
 | `steward_state` | `conversation_id` PK, `maintenance_revision`, `maintained_revision`, `quiet_steps`(json), `next_maintenance_at` | 手入れの制御 |
 | `steward_inbox` | `id` PK, `conversation_id`, `run_id`, `message_id`, `kind`, `what`, `detail`, `state`(`staged`/`pending`/`done`/`none`/`discarded`), `result_code`, `created_at`, `resolved_at` | 依頼キュー（§3.4）。`what` と `detail` は done/none/discarded になった時点で空にする |
 | `steward_decision` | `id` PK, `conversation_id`, `job_id`, `step`, `created_at`, `output`(json、正規化後), `results`(json), `window_version_before`, `window_version_after`, `duration_ms`, `output_tokens`, `error_code` | 判断記録。1行が1 step。会話ごとに最新1000行 |
 | `steward_decision_ref` | `decision_id`, `ref_type`(`item`/`message`/`request`), `ref_id`, PK は3列 | 判断記録が触れた記憶・メッセージ・依頼の索引。**全 step で必ず書く**（要約の step も、入力の往復のメッセージ ID を書く）。忘却の削除はこの索引で引く |
 
-## 6. 忘却の範囲（K12・K13）
+## 6. 忘却の契約（K12・K13）
 
-**会話の原文は残す。記憶と文脈への再利用を禁止し、派生データを消す。**
+**会話の原文は残す。記憶と文脈への再利用を禁止し、派生データを消す。忘却は必ず完遂し、忘却と重なった古い結果は採用しない。** 本節がこの契約の正本で、§2.3・§3・§5・§7 はここを参照する。
 
 ### 6.1 何を除外台帳に入れるか
 
@@ -370,18 +401,22 @@ staged ──(回答採用と同じ transaction)──▶ pending ──(curate-
 
 単位はメッセージ（往復）。同じ発言にあった他の話題も文脈から消えるが、記憶として保存済みなら記憶には残る。
 
-### 6.2 忘却の transaction で消すもの
+### 6.2 忘却の手順と、同じ transaction で消すもの
+
+手順: ① block journal に意図を書く → ② `forget_seq` を進める → ③ State ごとに既存の `forgetItem`（plan → forget journal → apply）→ ④ 下の表の派生データを消す。②〜④は1つの transaction。
 
 | データ | 処理 | 既存か |
 |---|---|---|
 | State（過去の版を含む）、usage、tendency、Window | ライブラリの忘却、`purgeUsageFor`、`deleteTendenciesByStateEvidence`、`windows.purgeInTransaction` | 既存 |
 | World の派生 | `world/service/lifecycle-forget-memory.ts` | 既存 |
-| 除外台帳 | B1〜B3 を `forgotten` で入れる（journal が先） | 新規 |
+| 除外台帳 | B1〜B3 を `forgotten` で入れる | 新規 |
+| 短期メモ（continuity） | `sourceMessageId`（`continuity/repository/index.ts:24`）が除外したメッセージを指すメモを retract する。B1 の State を根拠にしたメモも同じ | 新規 |
 | turn vector | 除外したメッセージの `memory_turn_vector` を削除する | 新規 |
-| 要約 | 除外した往復が `summarizedIds` に含まれる会話の要約を削除する。次の summarize で、除外分を入れずに作り直す | 新規 |
+| 要約 | `memory_summary_source` に除外した往復を含む要約を、依存元の行ごと削除する。**依存元のうち除外されていない往復は、`summarized` の印を空に戻して作り直しの対象にする**。作り直すまで、それらの往復は §2.3 の表どおり逐語（予算内）で残る。`kick` が summarize の単位を作り、古い順に4往復ずつ作り直す | 新規 |
 | 判断記録 | `steward_decision_ref` で、忘れた itemId または除外したメッセージ ID を参照する行を削除する | 新規 |
 | inbox | その依頼の `what`・`detail` を空にする（解決した依頼はすべて空にする規則で、ここでも空になる） | 新規 |
 | 往復の台帳 | 除外した往復の `disposition` を `drop` にする | 新規 |
+| 開いている単位 | `forget_seq` が進んだので、開いている単位はすべて settle で不採用になる（§6.5） | 新規 |
 
 ### 6.3 除外台帳を参照する場所（すべて memory の公開操作を通す）
 
@@ -391,11 +426,29 @@ staged ──(回答採用と同じ transaction)──▶ pending ──(curate-
 | 根拠の作成（§3.1） | 除外したメッセージを根拠にしない |
 | `compileContext` の L3・未処理・直近2往復 | 出さない。**memory の有効/無効に関係なく適用する** |
 | 想起 | turn vector は削除済み。検索の除外 ID にも入れる |
-| 要約 | 除外した往復は要約の入力に入れない |
+| 要約 | 除外した往復は要約の入力にも依存元にも入れない |
+| 短期メモ | 除外したメッセージを `sourceMessageId` にするメモは作らない |
+| 調査ツールの `history.search` / `history.read`（`application/research-history-ports.ts:129-150`） | 結果から除外したメッセージを取り除いてからモデルへ渡す。application 層の port が memory の `blockedMessageIdsInTransaction` を引く（application はどの domain も参照できる） |
+| 調査結果の採用時の検証（`research-history-ports.ts:240-262` の `conversation_source` の検証） | 根拠に除外したメッセージが含まれていれば採用しない（調査の途中で忘却が起きた場合） |
+| 会話画面の履歴表示 | **変えない**（原文は見える。K12） |
 
-### 6.4 journal からの復旧
+### 6.4 journal からの復旧（完遂するまで記憶を使わせない）
 
-起動時の照合で、block journal の全行について次をやり直す: 台帳の再登録、turn vector の削除、要約の削除、判断記録の削除、inbox の本文を空にする、往復を `drop` にする。いずれも冪等にする。今の forget journal の照合（usage、tendency、Window）はそのまま残す。
+起動時の照合（`memory/service/index.ts:459-490`）を次のように広げる。照合が終わるまでは今の `ready()` が false のままなので、**State も Window も使われない**。
+
+1. block journal の全行を読む。
+2. 行の `itemIds` のうち、まだ忘却されていないもの（forget journal に entry がない、または State が残っている）は、その場で `forgetItem` を実行して**完遂する**（plan → forget journal → apply）。
+3. 今の forget journal の照合（usage、tendency、Window）を行う。
+4. 行ごとに §6.2 の派生データの削除をやり直す: 除外台帳の再登録、短期メモの retract、turn vector の削除、要約の削除と作り直しの印、判断記録の削除、inbox の本文を空にする、往復を `drop` にする。いずれも冪等にする。
+5. `forget_seq` を進める（照合の前に開いていた単位を不採用にするため）。
+
+### 6.5 忘却と重なった結果を採用しない（採用時の再検証）
+
+- 各単位は、prepare のときの `forget_seq` を記録する。要約を入力に使う単位（summarize、compact-history、refine-summary、prepare-recall）は、要約の `revision` も記録する。
+- **全 step の settle** で、記録した値と今の値を比べる。`forget_seq` が進んでいれば、**結果を一切採用しない**。単位を `stale` で閉じ、request を解放し、`kick` に作り直させる。判断記録には本文を残さず、`stale_forget` の理由コードだけを書く。
+- 要約の `revision` が変わっていた場合も同じに扱う（古い要約を土台にした書き直しで、新しい要約を上書きしないため）。
+- 忘却はまれなので、粗い判定（全体で1つの連番）で足りる。会話や項目ごとの細かい判定はしない。
+- prefetch（想起）の結果も同じ判定を通す。会話エージェントの回答の採用は、既存の immediate change（`state_forget`）で `memory_stale` になる。
 
 ## 7. Window の利用側の対応
 
@@ -408,6 +461,9 @@ staged ──(回答採用と同じ transaction)──▶ pending ──(curate-
 | `memory/service/turn-recall.ts`（`recallTurns`） | `beforeOrdinal` を必須にしている | `beforeOrdinal` を外し、`excludeMessageIds` で除外する |
 | `memory/service/context-window.ts:303-347` | D15 の自動作り直し | §2.4 の「L1 を作り直す条件」にする |
 | `generation-prepare.ts:126-137,269` | `compiled.references`、`compiled.windowStartOrdinal` を使う | `sections`、`shownMessageIds` に置き換える |
+| `context-compiler.ts` の `KEEP_RUNS` | 直近2往復は上限を超えても残す | 1件12KB の切り詰め（§2.4）を入れて、上限の中で直近2往復を保つ |
+| `application/research-history-ports.ts:129-150,240-262` | 会話の原文をそのまま検索・読み取り・採用する | §6.3 のとおり除外台帳を適用する |
+| `dialogue` の run が終わる箇所（`generation-handler.ts` の `transition` の各呼び出し） | 採用時だけ memory を呼ぶ | §2.5 のとおり、終わり方ごとに往復の登録と依頼の確定・破棄を行う。終わり方を1か所で扱う関数にまとめる |
 
 ## 8. 手動変更の削除と閲覧（K6・K9）
 
@@ -430,12 +486,12 @@ staged ──(回答採用と同じ transaction)──▶ pending ──(curate-
 | A 保存・忘却の契約 | T1 | `steward` domain の骨格、`scripts/domains.ts` への登録、port（queue、inference）の移設 | 新規 `api/domains/steward/**`、`scripts/domains.ts`、`scripts/boundaries.ts` |
 | | T2 | memory の台帳3表と migration（§5.1）。旧表の削除と、除外の既存行の移行 | `memory/repository/*` |
 | | T3 | 保存の契約（§3.1）: `applyCurationInTransaction`、根拠の作成、`key` の正規化、merge の根拠 | `memory/service/index.ts`、`memory/service/quote.ts`、`memory/contracts/index.ts` |
-| | T4 | 忘却の範囲（§6）: 除外台帳、block journal、派生データの削除、起動時の復旧 | `memory/service/forget.ts`、`memory/service/journal.ts`、`memory/service/index.ts` |
-| B 依頼と step の状態遷移 | T5 | step ジョブの仕組み（§2.3）: 印、冪等、失敗と skipped、`kickInTransaction`、`concurrencyKey`、推論 request の取得と解放、判断記録と `steward_decision_ref` | `steward/service/steps.ts`、`steward/service/kick.ts`、`steward/repository/*`、`application/server.ts` |
+| | T4 | 忘却の契約（§6）: 除外台帳、block journal（意図として完遂）、`forget_seq`、派生データの削除（短期メモ、要約の依存元と作り直し）、起動時の復旧 | `memory/service/forget.ts`、`memory/service/journal.ts`、`memory/service/index.ts`、`continuity/service/index.ts`（公開操作の追加） |
+| B 依頼と step の状態遷移 | T5 | 実行単位の仕組み（§2.3）: `steward_unit`、dedupeKey = unitId、Queue の retry と新しい単位の使い分け、印、冪等、失敗と skipped、`kickInTransaction`、`concurrencyKey`、settle での再検証（§6.5）、推論 request の取得と解放、判断記録と `steward_decision_ref` | `steward/service/units.ts`、`steward/service/kick.ts`、`steward/repository/*`、`application/server.ts` |
 | | T6 | 依頼キュー（§3.4）: inbox の状態遷移、`memory_request` の bundle と adapter | `steward/**`、`capabilities/bundles/`、`application/` |
-| | T7 | dialogue の接続: 採用 transaction で `recordExchangeInTransaction`・`confirmRequestsInTransaction`・`kickInTransaction` を呼ぶ。run が採用されずに終わる transaction で staged を discarded にする。受付時のスケジュールを削除する | `dialogue/service/generation-handler.ts`、`dialogue/service/intake.ts` |
+| | T7 | dialogue の接続（§2.5）: run が終わる箇所を1つの関数にまとめ、終わり方ごとに `recordExchangeInTransaction`・`settleRequestsInTransaction`・`kickInTransaction` を呼ぶ。受付時のスケジュールを削除する | `dialogue/service/generation-handler.ts`、`dialogue/service/intake.ts` |
 | C Window と利用側 | T8 | Window の層・予算・L1 を作り直す条件（§2.4）、`WindowSnapshot.history` | `memory/service/context-window.ts`、`context-render.ts` |
-| | T9 | 利用側（§7）: `compileContext`、`research-result-context`、想起の除外、`prefetchDropped`、`generation-prepare` | `dialogue/service/*`、`memory/service/turn-recall.ts` |
+| | T9 | 利用側（§7）: `compileContext`（1件12KB の切り詰めを含む）、`research-result-context`、想起の除外、`prefetchDropped`、`generation-prepare`、調査ツールの履歴の検索・読み取り・採用時の検証 | `dialogue/service/*`、`memory/service/turn-recall.ts`、`application/research-history-ports.ts` |
 | D 各 step | T10 | 反映 step（§3.2）と指示文 | `steward/service/steps/*`、`steward/service/prompts/*` |
 | | T11 | 手入れ step（§3.3）と止まる条件 | 同上 |
 | | T12 | LLM の選択と schema の受け渡し（§4.2 L1〜L6） | `larm/service/index.ts`、`inference/service/execute.ts`、`inference/service/cloud.ts`、`inference/adapters/*` |
@@ -452,9 +508,14 @@ fixture で確かめるのは**ホストの契約**（保存、忘却、状態�
 | 対象 | 確かめること |
 |---|---|
 | 保存の契約 | quote が一致 → その範囲が根拠になる / 一致しない → 全文が根拠になり `quote_matched=false` / アシスタントの発言は根拠にならない / 同じ `key` → 置き換え（`ACTIVE_EXISTS` にならない） / 無効な `key` の要素だけ捨てる / merge は元の evidence を合わせ、除外済みの evidence は外す / 除外台帳のメッセージは根拠にならない |
-| step と再開 | curate-memory は済み、summarize で失敗 → 再実行しても記憶は重複しない / summarize 未了の `summarize` 往復は逐語のまま / summarize が skipped → `keep` 扱い / 印が付いた往復の結果を再適用しない / ジョブが消えても `kick` で印の足りない step から再開する / 長期記憶の step は会話をまたいで直列になる |
-| 依頼キュー | ツール呼び出しで staged / 採用で pending になり curate-memory が起動 / run を取り消すと discarded で、忘却は起きない / 起動時の掃除で終了済みの run の staged が discarded になる / 往復がなく依頼だけでも起動する / 複数の依頼が1回で処理される / 解決後に本文が空になる |
-| 忘却 | B1〜B3 が台帳に入る / turn vector、要約、該当する判断記録が消える / 会話の原文は残る / L3・未処理・想起・steward の入力に出ない（memory を無効にしても出ない） / block journal から復旧すると同じ状態になる / 書く途中で落ちた場合はブロックが多めに残る |
+| step と再開 | curate-memory は済み、summarize で失敗 → 再実行しても記憶は重複しない / summarize 未了の `summarize` 往復は逐語のまま / summarize が skipped → `keep` 扱い / 印が付いた往復の結果を再適用しない / 長期記憶の step は会話をまたいで直列になる |
+| 実行単位と Queue | 一時的な失敗は同じジョブのまま Queue の retry で再試行される / Queue で終わったジョブの後、`kick` が**新しい unitId** で単位を作り、実際に再実行される（既存のジョブが返って何も起きない、にならない） / 同じ対象に開いている単位は1つだけ / 依頼だけの単位は依頼の状態で冪等になる（往復の印を見ない） / 手入れの単位は revision ごとに1つ |
+| run の取り込み（§2.5） | completed → 往復と依頼が確定 / failed・interrupted → ユーザー発言だけの往復と、依頼すべてが確定 / cancelled → 往復は登録されず、`remember` の依頼だけ確定し、`forget`・`correct` は discarded / stale → すべて discarded / 起動時に残った staged が同じ表で振り分けられる |
+| 依頼キュー | ツール呼び出しで staged / 往復がなく依頼だけでも起動する / 複数の依頼が1回で処理される / 解決後に本文が空になる / 明示の `remember` は、同じ内容の記憶があっても `replaces` 付きで新しい版になり、origin が `user_confirmed` になる（`unchanged` で終わらない） / 取り消した run の `remember` はその発言を根拠に保存される |
+| 忘却 | B1〜B3 が台帳に入る / 短期メモ、turn vector、要約、該当する判断記録が消える / 要約の依存元のうち除外されていない往復が作り直しの対象になり、作り直すまで逐語で残る / 書き直した要約が以前の版の依存元を引き継ぐ / 会話の原文は残る / L3・未処理・想起・steward の入力・調査ツールの履歴の検索と読み取りに出ない（memory を無効にしても出ない） / 調査結果の根拠に除外したメッセージがあれば採用されない |
+| 忘却の完遂（停止位置ごとの回帰試験） | ① block journal を書いた直後に停止 → 起動時に State の忘却まで完遂され、照合が終わるまで記憶が使われない / ② forget journal を書いた直後に停止 → 既存の照合と派生データの削除で同じ状態になる / ③ DB の transaction の途中で停止 → ①と同じ状態になる / 忘却前の DB のバックアップに戻して起動 → 同じ状態になる |
+| 忘却と重なった結果 | 要約の単位の prepare → 忘却 → settle の順で、要約が採用されず、判断記録に本文が残らない / prefetch・curate-memory・consolidate-memory も同じ / 要約の revision が変わっていれば古い書き直しを採用しない |
+| 長文 | 1件12KB を超える日本語の発言と回答 → 履歴には先頭8KB・末尾4KB と「（中略）」で入り、文字が化けない / 直近2往復がどちらも長文でも合計が48KB 以内 / 今回の入力は切られない / steward には1件6KB で渡り、1往復だけで16KB を超えない / 切った発言からの記憶も根拠の検証を通る |
 | Window と予算 | 新しい記憶は L2 に出て L1 は変わらない / L1 は §2.4 の条件でだけ作り直される（日付が変わっても作り直さない、期限が切れたら作り直す） / L3 は追記になる / 同じ質問5回で1往復だけ残る / 履歴の合計が `HISTORY_MAX_BYTES` を超えない / 直近2往復は常にある / steward が止まっても今の挙動より悪くならない / Window の更新で生成中の run が `memory_stale` にならない |
 | 利用側 | `research-result-context` が新しい並びで履歴を欠かさず、L2 を重複させない / 想起は表示済みの ID だけを除外し、keep の間にある非表示の往復を見つける |
 | 手入れ | revision が進まなければ走らない / `changed: false` の step は次の revision まで走らない / 前景の run があれば延期する / `PENDING_LIMIT` で consolidate-memory が起動する |
@@ -472,9 +533,11 @@ fixture で確かめるのは**ホストの契約**（保存、忘却、状態�
 | A2 | 本人の事実とアシスタントの推測 | アシスタントが「〜がお好きなんですね」と推測し、本人が肯定しない → 本人の事実として保存されない。本人が肯定する → 保存される |
 | A3 | 訂正 | 「辛いものは苦手」→「最近は食べられる」→ 記憶が update され、その後の関連する質問への**回答が変わる** |
 | A4 | 忘却 | 住所などを話した後に「忘れて」→ 記憶、要約、turn vector、判断記録から消える。会話画面の原文は残る。「住所を覚えてる？」に答えない。想起にも出ない |
-| A5 | 取り消し | 「忘れて」の回答を生成中に取り消す → 依頼は discarded で、何も消えない |
+| A5 | 取り消し | 「忘れて」の回答を生成中に取り消す → 依頼は discarded で、何も消えない。「これを覚えて」の回答を生成中に取り消す → 記憶される（K14） |
+| A5b | 明示の再確認 | 既に覚えている内容を「覚えて」と頼む → 本人が確認した版として保存し直される |
 | A6 | 復旧 | 忘却の後、忘却前の DB のバックアップに戻して起動 → 除外と派生データの削除がやり直される |
-| A7 | 失敗した試行の中の制約 | 失敗に終わった往復で本人が「予算は3万円以内」と言う → 往復が drop されても、制約が記憶か短期メモに残り、後の回答に効く |
+| A7 | 失敗した試行の中の制約 | システム側の失敗で回答が出なかった run で、本人が「予算は3万円以内」と言う → 制約が記憶か短期メモに残り、後の回答に効く。本人が取り消した run の発言は使われない |
+| A7b | 長文 | 長い日本語の資料を貼った往復が続いても、直近2往復が保たれ、文脈が上限を超えない |
 | A8 | 同じ質問の繰り返し | L3 が膨らまない |
 | A9 | 手入れ | 会話を止めると手入れが走り、変更がなくなったら止まる |
 | A10 | steward の停止 | steward のジョブを止めても、会話は直近の往復を予算内で使って続く |
@@ -505,12 +568,16 @@ fixture で確かめるのは**ホストの契約**（保存、忘却、状態�
 
 | 用語 | 意味 |
 |---|---|
-| 往復 | ユーザー発言1つと、それに対して採用された回答1つ |
+| 往復 | ユーザー発言1つと、それに対して採用された回答1つ。システム側の失敗で回答がない場合は、ユーザー発言だけの往復（§2.5） |
+| 実行単位 | 1つの step を1回実行する単位（`steward_unit`）。Queue のジョブと1対1 |
+| `forget_seq` | 忘却の連番。単位の結果を採用してよいかの判定に使う（§6.5） |
 | 印 | 往復ごと・反映 step ごとの完了の記録（`done`/`skipped`） |
 | 除外台帳 | 記憶と文脈に使わないメッセージの一覧（`memory_message_block`） |
 | 反映 step / 手入れ step | 新しい往復を取り込む step / 取り込み済みの状態を整える step |
 
-## 14. 改訂6 の変更点（外部レビューへの対応）
+## 14. 変更点（外部レビューへの対応）
+
+### 14.1 改訂6（1回目のレビュー）
 
 | # | 指摘 | 対応 |
 |---|---|---|
@@ -521,3 +588,15 @@ fixture で確かめるのは**ホストの契約**（保存、忘却、状態�
 | 5 | 未処理の履歴に上限がない | §2.4 の予算: 合計を `HISTORY_MAX_BYTES` 以内にし、古い順に落とす。`skipped` の扱い |
 | 6 | Window の利用側が漏れている | §7: `research-result-context`、想起の除外、`prefetchDropped`、`generation-prepare`。§2.4: L1 を作り直す条件の見直し（期限切れは例外として作り直す） |
 | 7 | 検証が「保存された」に偏っている | §10 は契約の試験に絞り、§11 に live の受入 A1〜A10 と、上限の計測・判断基準を足す |
+
+### 14.2 改訂7（2回目のレビュー）
+
+| # | 指摘 | 対応 |
+|---|---|---|
+| 1 | block journal だけが残ると State が残る | §5.1・§6.4: block journal の行を完遂すべき意図とし、`itemIds` を含める。起動時に、まだ忘却されていない State の忘却を完遂する。照合が終わるまでは `ready()` が false で記憶を使わない。停止位置ごとの回帰試験（§10） |
+| 2 | 忘却の前に始めた要約が書き戻る | §6.5: `forget_seq` と要約の revision を単位に記録し、全 step の settle で再検証して古い結果を採用しない |
+| 3 | 短期メモと、調査ツールの履歴の検索・読み取り・採用時の検証が漏れている | §6.2・§6.3・§7: `sourceMessageId` による短期メモの retract、`research-history-ports.ts` での除外と採用時の拒否 |
+| 4 | 要約の依存元と作り直しの手順がない | §5.1 `memory_summary_source`（要約と同じ transaction、書き直しで引き継ぐ）、§6.2（削除時に印を戻して作り直しの対象にする） |
+| 5 | Queue の dedupe と再開が噛み合わない | §2.3・§5.2: `steward_unit`、dedupeKey = unitId、一時的な失敗は Queue の retry、終わった後は新しい単位、依頼と手入れの単位、依頼の冪等性は依頼の状態で判定 |
+| 6 | 長文で予算の規則が矛盾する | §2.4: 履歴の1件12KB（先頭と末尾を残す）で上限と直近2往復を両立させる。今回の入力は切らない。steward には1件6KB |
+| 7 | 失敗・取り消しの run の発言の経路がない | §2.5・K14: システム側の失敗はユーザー発言だけの往復として登録する。本人の取り消しは使わない。例外として `remember` の依頼は実行し、同じ内容でも保存し直す |

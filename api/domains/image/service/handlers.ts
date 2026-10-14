@@ -4,7 +4,7 @@ import { z } from "zod";
 import { imagePlan, type Prepared } from "../../capabilities";
 import type { Receipt } from "../../inference";
 import type { HandlerDefinition } from "../../queue";
-import type { TestOutput } from "../../larm";
+import { findServiceTarget, type TestOutput } from "../../larm";
 import type { ImageRecord } from "../contracts";
 import { row, record, patch } from "../repository";
 import { imageContext } from "./context";
@@ -168,13 +168,11 @@ export function registerImageHandlers(
 				if (Date.now() >= input.deadline - 15000)
 					throw new Error("deadline_exceeded");
 				const gateway = deps.gateway();
-				const catalog = await gateway.catalog(signal, ["SAAA-w-Image"]);
-				const target = catalog.targets.find(
-					(t) =>
-						t.kind === "image" &&
-						t.mode === "service" &&
-						t.selector === "SAAA-w-Image" &&
-						t.model === "qwen-image-2.1-turbo",
+				const catalog = await gateway.catalog(signal);
+				const target = findServiceTarget(
+					catalog.targets,
+					"media.image.generate",
+					"larm.image-generation.v1",
 				);
 				if (!target || !target.description?.trim())
 					throw new Error("image_service_unavailable");

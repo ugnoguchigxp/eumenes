@@ -17,11 +17,12 @@ import type {
 } from "../../delivery/contracts";
 import type { Connection, Resource, Settings } from "../../settings";
 import type { SettingsService } from "../../settings";
-import type {
-	ControlContract,
-	Messages,
-	Receipt,
-	SpeechOverride,
+import {
+	controlJsonSchema,
+	type ControlContract,
+	type Messages,
+	type Receipt,
+	type SpeechOverride,
 } from "../contracts";
 import { createSpeechLanguageCache } from "./speech-language";
 import type { SentenceLanguageDecision } from "../../larm";
@@ -157,7 +158,7 @@ async function recordAttemptStart(r: Request, source: Source) {
 					? (r.selected?.resource.model ?? null)
 					: source === "codex"
 						? r.env.options.codexResearch!.model
-						: r.row.snapshot.larm.profile,
+						: (r.row.snapshot.larm.profile ?? null),
 				r.reason,
 				Date.now(),
 			),
@@ -180,7 +181,9 @@ function callOptionsFor(r: Request, attemptId: string): LarmCallOptions {
 					},
 				}
 			: {}),
-		...(r.row.mode === "control" ? { jsonOutput: true } : {}),
+		...(r.row.mode === "control"
+			? { jsonOutput: true, jsonSchema: controlJsonSchema(r.control) }
+			: {}),
 		...(r.row.contextPolicy === "exact"
 			? { contextPolicy: "exact" as const }
 			: {}),

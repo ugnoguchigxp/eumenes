@@ -9,6 +9,7 @@ import { ANSWER_TEXT_SCHEMA } from "../contracts/command-interactions";
 import { delegationCommand } from "../contracts/delegation";
 import type { Run } from "../contracts";
 import { byId, linkAnswer, transition } from "../repository";
+import { endRun } from "./run-end";
 import { COMMAND_KIND, GENERATE_KIND, type DialogueDeps } from "./context";
 import { applyCommand } from "./command-apply";
 import { commandSource } from "./command-source";
@@ -129,7 +130,7 @@ export function createToolchainCommandHandler(
 > {
 	const { larm, queue, clock } = deps;
 	function fail(db: Database, run: Run, code: string) {
-		transition(db, run.id, run.revision, "failed", clock(), code);
+		endRun(deps, db, run, "failed", code);
 		deps.toolchains?.settleSelectionInTransaction(db, run.id, {
 			outcome: "failed",
 			code,
@@ -386,14 +387,7 @@ export function createToolchainCommandHandler(
 		cancelInTransaction(tx, job) {
 			const run = byId(tx, job.payload.runId);
 			if (run && (run.status === "queued" || run.status === "running")) {
-				transition(
-					tx,
-					run.id,
-					run.revision,
-					"cancelled",
-					clock(),
-					"cancel_requested",
-				);
+				endRun(deps, tx, run, "cancelled", "cancel_requested");
 				deps.toolchains?.settleSelectionInTransaction(tx, run.id, {
 					outcome: "cancelled",
 					code: "cancel_requested",

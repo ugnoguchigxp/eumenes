@@ -37,7 +37,6 @@ export function createToolchainHostLinks(services: {
 	conversation: ConversationService;
 	ttsDictionary?: TtsDictionaryPorts;
 	memory?: MemoryAdapterPorts["memory"];
-	continuity?: MemoryAdapterPorts["continuity"];
 	world?: WorldAssembly;
 	serviceTests?: ServiceTestsPorts;
 	log?: {
@@ -70,10 +69,7 @@ export function createToolchainHostLinks(services: {
 			settings,
 			inference,
 			ttsDictionary: services.ttsDictionary,
-			memory:
-				services.memory && services.continuity
-					? { memory: services.memory, continuity: services.continuity }
-					: undefined,
+			memory: services.memory ? { memory: services.memory } : undefined,
 			world: () => worldPorts,
 			serviceTests: services.serviceTests,
 			records: {

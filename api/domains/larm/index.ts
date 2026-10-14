@@ -33,6 +33,7 @@ export type {
 	TestProgress,
 	TestArtifact,
 } from "./contracts/playground";
+export { findServiceTarget } from "./service/playground-select";
 export { silentWav, code as playgroundError } from "./service/playground-http";
 
 export {

@@ -729,7 +729,7 @@ export function createSettingsBackend(
 		launcher: artifact.launcher,
 	}));
 	let saved: Settings = settingsFixture();
-	saved.larm.profile = "ornith1.5Strix";
+	saved.larm.profile = "test-profile";
 	saved.larm.baseUrl = "http://127.0.0.1:9001";
 	const original = structuredClone(saved);
 	const cloud = { connectionId: crypto.randomUUID(), id: crypto.randomUUID() };

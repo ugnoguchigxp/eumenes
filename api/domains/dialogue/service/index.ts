@@ -16,13 +16,13 @@ import type { MemoryService } from "../../memory";
 import type {
 	PostAnswerObserverPort,
 	Run,
+	StewardPort,
 	WorldContextPort,
 } from "../contracts";
 import {
 	byId,
 	interruptUnfinished,
 	listRuns,
-	transition,
 	linkAnswer,
 } from "../repository";
 import { createAgentSync } from "./agent-sync";
@@ -35,6 +35,7 @@ import {
 } from "./context";
 import { createGenerationHandler } from "./generation-handler";
 import { createIntake } from "./intake";
+import { endRun, runEndedInTransaction } from "./run-end";
 import { createProgress } from "./progress";
 const log = getLogger("dialogue");
 
@@ -49,6 +50,7 @@ export function createDialogueService({
 	clock = () => new Date().toISOString(),
 	id = () => crypto.randomUUID(),
 	memory,
+	steward,
 	agents,
 	postAnswer,
 	delegation,
@@ -66,6 +68,7 @@ export function createDialogueService({
 	clock?: () => string;
 	id?: () => string;
 	memory?: MemoryService;
+	steward?: StewardPort;
 	agents?: AgentRuntime;
 	postAnswer?: PostAnswerObserverPort;
 	music?: import("../contracts/music").MusicPort;
@@ -84,6 +87,7 @@ export function createDialogueService({
 		clock,
 		id,
 		memory,
+		steward,
 		agents,
 		postAnswer,
 		delegation,
@@ -113,14 +117,7 @@ export function createDialogueService({
 			const run = byId(db, runId);
 			if (!run || !["queued", "running"].includes(run.status)) return;
 			if (Date.parse(run.deadlineAt!) <= Date.parse(clock())) {
-				transition(
-					db,
-					run.id,
-					run.revision,
-					"failed",
-					clock(),
-					"deadline_exceeded",
-				);
+				endRun(deps, db, run, "failed", "deadline_exceeded");
 				return;
 			}
 			const { job } = queue.enqueueInTransaction(db, {
@@ -146,7 +143,10 @@ export function createDialogueService({
 		notify: intake.notify,
 		async recover() {
 			// Runs without a queue job predate the queue and are interrupted as before.
-			await store.write((db) => interruptUnfinished(db, clock()));
+			await store.write((db) => {
+				for (const run of interruptUnfinished(db, clock()))
+					runEndedInTransaction(deps, db, run, "interrupted", null);
+			});
 			// Questions past their time and interactions whose run ended are closed after a restart.
 			if (toolchains?.bound) await interactions.maintenance();
 		},
@@ -268,14 +268,7 @@ export function createDialogueService({
 					agents.cancelTreeInTransaction(db, runId);
 					if (row.jobId)
 						queue.cancelInTransaction(db, row.jobId, "cancel_requested");
-					transition(
-						db,
-						row.id,
-						row.revision,
-						"cancelled",
-						clock(),
-						"cancel_requested",
-					);
+					endRun(deps, db, row, "cancelled", "cancel_requested");
 				});
 				if (current.jobId) queue.flushCancellations([current.jobId]);
 			} else if (current.jobId) await queue.cancel(current.jobId);
@@ -288,14 +281,7 @@ export function createDialogueService({
 				await store.write((db) => {
 					const row = byId(db, runId);
 					if (row && (row.status === "queued" || row.status === "running"))
-						transition(
-							db,
-							runId,
-							row.revision,
-							"cancelled",
-							clock(),
-							"cancel_requested",
-						);
+						endRun(deps, db, row, "cancelled", "cancel_requested");
 				});
 			return store.read((db) => byId(db, runId));
 		},

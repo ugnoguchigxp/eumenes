@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { createLarm } from "..";
 
-test("Ornith serializes foreground calls without allowing a cancelled queued call to overtake an active call", async () => {
+test("foreground answers serialize without allowing a cancelled queued call to overtake an active call", async () => {
 	let finish!: () => void;
 	const held = new Promise<void>((r) => {
 		finish = r;
@@ -9,7 +9,7 @@ test("Ornith serializes foreground calls without allowing a cancelled queued cal
 	const inputs: string[] = [];
 	const provider = {
 		name: "llm",
-		model: "ornith-1.5-strix-lean",
+		model: "fixture-llm",
 		protocol: "openai.chat-completions.v1",
 		endpoint: "/v1/chat/completions",
 		contextWindow: {
@@ -20,14 +20,15 @@ test("Ornith serializes foreground calls without allowing a cancelled queued cal
 	};
 	const connection = {
 		id: "main",
-		profile: "ornith1.5Strix",
-		agentProfile: "ornith1.5Strix",
+		profile: "test-profile",
+		agentProfile: "test-profile",
 		status: "ready",
 		expiresAt: new Date(Date.now() + 900000).toISOString(),
 		providers: [{ ...provider, readiness: "ready", claimable: true }],
 	};
 	const p = createLarm({
 		baseUrl: "http://127.0.0.1:9810",
+		profile: "test-profile",
 		token: "control",
 		fetch: async (input, init) => {
 			const path = new URL(String(input)).pathname;
@@ -36,8 +37,8 @@ test("Ornith serializes foreground calls without allowing a cancelled queued cal
 				return Response.json({
 					contractVersion: "agent-connection.v3",
 					catalogRevision: "revision",
-					requestedProfile: "ornith1.5Strix",
-					profiles: [{ id: "ornith1.5Strix", providers: [provider] }],
+					requestedProfile: "test-profile",
+					profiles: [{ id: "test-profile", providers: [provider] }],
 				});
 			if (path === "/v1/agent-connections")
 				return Response.json(connection, { status: 201 });

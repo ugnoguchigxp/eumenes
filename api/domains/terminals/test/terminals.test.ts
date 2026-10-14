@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { Hono } from "hono";
 import { registerTerminals } from "../controller";
 import {
@@ -361,94 +362,192 @@ test("Enter is not pressed into a run that ended before it", async () => {
 	expect(pty.spawned[0]!.writes).toEqual(["\x1b[200~x\x1b[201~"]);
 });
 
-test("hooks report activity and finish the conversation's task with Claude Code's last answer", async () => {
+const hookTokenOf = (command: readonly string[]) => {
+	expect(command[1]).toBe("--settings");
+	const settings = readFileSync(command[2]!, "utf8");
+	return /x-eumenes-hook-token: ([0-9a-f]{64})/.exec(settings)![1]!;
+};
+
+function hooked() {
 	const pty = fakePty();
 	const changes: number[] = [];
 	const terminals = createTerminals({
 		command: ["claude"],
 		spawn: pty.spawn,
 		hookBaseUrl: "http://127.0.0.1:8787",
-		onChange: () => changes.push(Date.now()),
+		submitDelayMs: 0,
+		onChange: () => changes.push(1),
 	});
 	const finished: TaskFinished[] = [];
 	terminals.onTaskFinished((event) => finished.push(event));
+	return { pty, terminals, finished, changes };
+}
+
+test("hooks come from a private settings file and report a handed-over task by its own turn", async () => {
+	const { pty, terminals, finished, changes } = hooked();
 	const handed = terminals.request({
 		prompt: "README を直して",
 		task: "README 修正",
 		conversationId: "main",
 	});
 	const command = pty.spawned[0]!.command;
-	expect(command[0]).toBe("claude");
-	expect(command[1]).toBe("--settings");
 	expect(command.at(-1)).toBe("README を直して");
-	const settings = JSON.parse(command[2]!) as {
+	// The token is in a 0600 file, never in the process arguments.
+	expect(command.join(" ")).not.toMatch(/[0-9a-f]{64}/);
+	expect(statSync(command[2]!).mode & 0o777).toBe(0o600);
+	const settings = JSON.parse(readFileSync(command[2]!, "utf8")) as {
 		hooks: Record<string, Array<{ hooks: Array<{ command: string }> }>>;
 	};
 	expect(Object.keys(settings.hooks).sort()).toEqual([
 		"Notification",
+		"PostToolUse",
 		"Stop",
 		"UserPromptSubmit",
 	]);
 	const hookCommand = settings.hooks.Stop![0]!.hooks[0]!.command;
+	expect(hookCommand).toStartWith("curl -q -s -m 5 --noproxy '*'");
 	expect(hookCommand).toContain(
-		`http://127.0.0.1:8787/hooks/terminals/${handed.session.id}`,
+		`'http://127.0.0.1:8787/hooks/terminals/${handed.session.id}'`,
 	);
 	expect(hookCommand).not.toContain("README");
-	const token = /x-eumenes-hook-token: ([0-9a-f]{64})/.exec(hookCommand)![1]!;
+	const token = hookTokenOf(command);
 	expect(terminals.list().sessions[0]).toMatchObject({
 		activity: "working",
 		task: "README 修正",
 	});
-
 	expect(() =>
 		terminals.hook(handed.session.id, "0".repeat(64), {
 			hook_event_name: "Stop",
 		}),
 	).toThrow("terminal_hook_forbidden");
-	terminals.hook(handed.session.id, token, { hook_event_name: "Notification" });
-	expect(terminals.list().sessions[0]!.activity).toBe("waiting");
-	expect(finished).toEqual([]);
 
-	terminals.hook(handed.session.id, token, {
+	const id = handed.session.id;
+	terminals.hook(id, token, {
+		hook_event_name: "UserPromptSubmit",
+		prompt: "README を直して",
+	});
+	// A permission question waits; `idle_prompt` (left idle) does not.
+	terminals.hook(id, token, {
+		hook_event_name: "Notification",
+		notification_type: "permission_prompt",
+	});
+	expect(terminals.list().sessions[0]!.activity).toBe("waiting");
+	terminals.hook(id, token, { hook_event_name: "PostToolUse" });
+	expect(terminals.list().sessions[0]!.activity).toBe("working");
+	terminals.hook(id, token, {
 		hook_event_name: "Stop",
 		last_assistant_message: "README を更新しました。",
 	});
 	expect(finished).toEqual([
 		{
-			sessionId: handed.session.id,
+			sessionId: id,
 			run: 1,
+			seq: 1,
 			task: "README 修正",
+			outcome: "completed",
 			conversationId: "main",
 			lastMessage: "README を更新しました。",
 		},
 	]);
 	expect(terminals.list().sessions[0]).toMatchObject({ activity: "idle" });
 	expect(terminals.list().sessions[0]!.task).toBeUndefined();
-	expect(changes.length).toBeGreaterThanOrEqual(4);
+	terminals.hook(id, token, {
+		hook_event_name: "Notification",
+		notification_type: "idle_prompt",
+	});
+	expect(terminals.list().sessions[0]!.activity).toBe("idle");
+	expect(changes.length).toBeGreaterThanOrEqual(5);
 
 	// Work typed directly in the screen has no task: activity only, no report.
-	terminals.hook(handed.session.id, token, {
+	terminals.hook(id, token, {
 		hook_event_name: "UserPromptSubmit",
+		prompt: "ls",
 	});
-	terminals.hook(handed.session.id, token, { hook_event_name: "Stop" });
+	terminals.hook(id, token, { hook_event_name: "Stop" });
 	expect(finished).toHaveLength(1);
 
-	// A restarted run gets a new token; the old one no longer reports.
+	// The run ends: the old token stops reporting and its settings file is removed.
+	const path = command[2]!;
 	pty.spawned[0]!.exit(0);
 	await Bun.sleep(0);
-	expect(() =>
-		terminals.hook(handed.session.id, token, { hook_event_name: "Stop" }),
-	).toThrow("terminal_hook_forbidden");
+	expect(existsSync(path)).toBe(false);
+	expect(() => terminals.hook(id, token, { hook_event_name: "Stop" })).toThrow(
+		"terminal_hook_forbidden",
+	);
 	terminals.closeAll();
 });
 
-test("the hook route needs the run's token and ignores unknown events", async () => {
-	const pty = fakePty();
-	const terminals = createTerminals({
-		command: ["claude"],
-		spawn: pty.spawn,
-		hookBaseUrl: "http://127.0.0.1:8787",
+test("an earlier turn's Stop never finishes a queued task; interrupted and ended tasks are reported", async () => {
+	const { pty, terminals, finished } = hooked();
+	const first = terminals.request({
+		prompt: "A をして",
+		task: "A",
+		conversationId: "main",
 	});
+	const id = first.session.id;
+	const token = hookTokenOf(pty.spawned[0]!.command);
+	terminals.hook(id, token, {
+		hook_event_name: "UserPromptSubmit",
+		prompt: "A をして",
+	});
+	// B is queued while A runs: A's Stop reports A, not B.
+	terminals.request({ prompt: "B をして", task: "B", conversationId: "main" });
+	expect(terminals.list().sessions[0]!.task).toBe("A");
+	terminals.hook(id, token, {
+		hook_event_name: "Stop",
+		last_assistant_message: "A 完了",
+	});
+	expect(finished.map((e) => [e.task, e.outcome, e.lastMessage])).toEqual([
+		["A", "completed", "A 完了"],
+	]);
+	expect(terminals.list().sessions[0]!.task).toBe("B");
+	// B starts, then (Esc, no Stop) a turn typed in the screen starts: B was interrupted.
+	terminals.hook(id, token, {
+		hook_event_name: "UserPromptSubmit",
+		prompt: "B をして",
+	});
+	terminals.hook(id, token, {
+		hook_event_name: "UserPromptSubmit",
+		prompt: "別の作業",
+	});
+	expect(finished.at(-1)).toMatchObject({
+		task: "B",
+		outcome: "interrupted",
+		seq: 2,
+	});
+	// C is handed over, and the run exits before C ran: C ended.
+	terminals.request({ prompt: "C をして", task: "C", conversationId: "main" });
+	pty.spawned[0]!.exit(1);
+	await Bun.sleep(0);
+	expect(finished.at(-1)).toMatchObject({
+		task: "C",
+		outcome: "ended",
+		seq: 3,
+	});
+	expect(finished).toHaveLength(3);
+	terminals.closeAll();
+});
+
+test("hooks are off without a loopback URL with a real port", () => {
+	for (const hookBaseUrl of [
+		"http://0.0.0.0:8787",
+		"http://127.0.0.1:0",
+		"http://x'y:1",
+	]) {
+		const pty = fakePty();
+		const terminals = createTerminals({
+			command: ["claude"],
+			spawn: pty.spawn,
+			hookBaseUrl,
+		});
+		terminals.request({ prompt: "x", task: "x" });
+		expect(pty.spawned[0]!.command).toEqual(["claude", "x"]);
+		terminals.closeAll();
+	}
+});
+
+test("the hook route checks the run's token before reading the body", async () => {
+	const { pty, terminals } = hooked();
 	const app = new Hono();
 	registerTerminals(app, terminals);
 	app.onError((error, c) =>
@@ -462,33 +561,30 @@ test("the hook route needs the run's token and ignores unknown events", async ()
 		task: "x",
 		conversationId: "main",
 	}).session;
-	const token = /x-eumenes-hook-token: ([0-9a-f]{64})/.exec(
-		pty.spawned[0]!.command[2]!,
-	)![1]!;
-	const post = (body: unknown, headers: Record<string, string> = {}) =>
+	const token = hookTokenOf(pty.spawned[0]!.command);
+	const post = (body: string, headers: Record<string, string> = {}) =>
 		app.request(`/hooks/terminals/${session.id}`, {
 			method: "POST",
 			headers: { "content-type": "application/json", ...headers },
-			body: JSON.stringify(body),
+			body,
 		});
-	expect((await post({ hook_event_name: "Stop" })).status).toBe(403);
+	const stop = JSON.stringify({ hook_event_name: "Stop" });
+	expect((await post(stop)).status).toBe(403);
+	// A wrong token is refused even with a body that is not JSON.
 	expect(
-		(await post({ hook_event_name: "Stop" }, { "x-eumenes-hook-token": "bad" }))
-			.status,
+		(await post("not json", { "x-eumenes-hook-token": "bad" })).status,
 	).toBe(403);
 	expect(
 		(
-			await post(
-				{ hook_event_name: "PreToolUse" },
-				{ "x-eumenes-hook-token": token },
-			)
+			await post(JSON.stringify({ hook_event_name: "PreToolUse" }), {
+				"x-eumenes-hook-token": token,
+			})
 		).status,
 	).toBe(204);
 	expect(terminals.list().sessions[0]!.activity).toBe("working");
-	expect(
-		(await post({ hook_event_name: "Stop" }, { "x-eumenes-hook-token": token }))
-			.status,
-	).toBe(204);
+	expect((await post(stop, { "x-eumenes-hook-token": token })).status).toBe(
+		204,
+	);
 	expect(terminals.list().sessions[0]!.activity).toBe("idle");
 	terminals.closeAll();
 });

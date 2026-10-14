@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { Database } from "bun:sqlite";
 import type { HandlerDefinition } from "../../queue";
 import type { createOcr } from "./index";
-import { row, patch, record } from "../repository";
+import { row, patch, record, connectionMatches } from "../repository";
 import { ocrGateway } from "./gateway";
 import type { Connection } from "../contracts";
 type Stage = "analyze" | "poll" | "cancel";
@@ -64,17 +64,7 @@ function registerStage(deps: Deps, stage: Stage) {
 				return { status: "stale", reason: "ocr_state_changed" };
 
 			const c = deps.connection();
-			const bound = JSON.parse(r.connection_json) as {
-				revision: number;
-				baseUrl: string;
-				credentialVersion?: string;
-			};
-			if (
-				!c ||
-				c.revision !== bound.revision ||
-				c.baseUrl !== bound.baseUrl ||
-				c.credentialVersion !== bound.credentialVersion
-			) {
+			if (!c || !connectionMatches(r.connection_json, c)) {
 				patch(db, r.id, {
 					state: "failed",
 					errorCode: "ocr_connection_changed",

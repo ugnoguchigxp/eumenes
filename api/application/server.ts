@@ -220,7 +220,7 @@ export async function buildServices(config: Config) {
 					settings.get().codingSupervision.approveInstructions,
 			})
 		: undefined;
-	// One embedder on the saved LARM connection serves both the toolchain routing and the memory agent's turn vectors.
+	// One embedder on the saved LARM connection serves both the toolchain routing and the memory turn vectors.
 	const embedder = larmEmbedder(
 		() => {
 			const s = settings.get();
@@ -241,12 +241,8 @@ export async function buildServices(config: Config) {
 	const memoryJournalPath = resolve(config.memoryJournalPath);
 	const memory = createMemoryService(store, conversation, continuity, {
 		journalPath: memoryJournalPath,
-		queue,
-		inference,
 		embed: () => embedder,
 	});
-	// The memory agent infers on the auxiliary connections (`inference.aux`), never on the answer's connection.
-	queue.registerHandler(memory.agentHandler());
 	// Foreground priority of Local extraction (P4-03): only with World ON.
 	const worldForeground =
 		config.worldMode === "on"
@@ -306,7 +302,6 @@ export async function buildServices(config: Config) {
 		conversation,
 		ttsDictionary,
 		memory,
-		continuity,
 		world,
 		serviceTests,
 		timers,

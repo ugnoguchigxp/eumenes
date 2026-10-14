@@ -1,6 +1,9 @@
-import type { Remember } from "../contracts";
-
-type DatePart = NonNullable<NonNullable<Remember["validity"]>["from"]>;
+export type DatePart = {
+	precision: "year" | "month" | "day";
+	year: number;
+	month?: number | undefined;
+	day?: number | undefined;
+};
 const pad = (n: number) => String(n).padStart(2, "0");
 
 /** "2026", "2026-09" or "2026-09-01" as the library's precision-carrying date; null for any other text. */

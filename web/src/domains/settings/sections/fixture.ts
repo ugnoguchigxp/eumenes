@@ -16,7 +16,7 @@ export function settingsFixture(): Settings {
 		revision: 1,
 		larm: {
 			baseUrl: null,
-			profile: "SAAA-gemma4-26b",
+			profile: "test-profile",
 			audience: "saaa-desktop",
 			voice: "",
 			speed: 1,

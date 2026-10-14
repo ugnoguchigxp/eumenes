@@ -590,7 +590,7 @@ export function createInference(
 		},
 		inspect: () =>
 			port(settings.get()).inspect?.() ?? {
-				profile: settings.get().larm.profile,
+				profile: settings.get().larm.profile ?? "",
 				providers: [],
 			},
 		larmProfiles: async (signal: AbortSignal) =>

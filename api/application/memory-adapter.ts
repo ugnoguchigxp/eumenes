@@ -1,7 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import type { ContinuityService } from "../domains/continuity";
 import type { MemoryItemDto, MemoryService } from "../domains/memory";
 import type { AdapterResult, DomainAdapter } from "../domains/tool-runtime";
 
@@ -15,16 +14,7 @@ const CONTEXT = "query:memory.context@1";
 /** The conversation whose short-term notes and context the screen shows (the app's one conversation). */
 export const MEMORY_SCREEN_CONVERSATION = "main";
 
-const id = z.string().min(1).max(200);
-const expectedRevision = z.number().int().min(1);
 const setEnabled = z.strictObject({ enabled: z.boolean() });
-const itemRevision = z.strictObject({ id, expectedRevision });
-const targetId = z.strictObject({ id });
-const continuityTransition = z.strictObject({
-	id,
-	expectedRevision,
-	status: z.enum(["resolved", "retracted"]),
-});
 const page = z.strictObject({
 	pageIndex: z.number().int().min(0).max(100_000).default(0),
 	pageSize: z.union([z.literal(10), z.literal(25), z.literal(50)]).default(10),
@@ -33,7 +23,7 @@ const page = z.strictObject({
 	q: z.string().max(200).default(""),
 });
 
-/** What the memory adapter reads and changes; each is a public operation of the memory or continuity domain. */
+/** What the memory adapter reads and changes; each is a public operation of the memory domain. */
 export type MemoryAdapterPorts = {
 	memory: Pick<
 		MemoryService,
@@ -43,11 +33,7 @@ export type MemoryAdapterPorts = {
 		| "shortTerm"
 		| "storedContext"
 		| "setEnabledInTransaction"
-		| "transitionItemInTransaction"
-		| "forgetInTransaction"
-		| "deleteTendencyInTransaction"
 	>;
-	continuity: Pick<ContinuityService, "transitionInTransaction">;
 	conversationId?: string;
 };
 
@@ -172,23 +158,12 @@ const sha256 = (value: unknown) =>
 export const describeMemoryAdapter = () => ({
 	owner: "memory",
 	operations: new Map(
-		(
-			[
-				["memory.set-enabled", "schema:memory-set-enabled@1"],
-				["memory.stop", "schema:memory-item-revision@1"],
-				["memory.resume", "schema:memory-item-revision@1"],
-				["memory.retract", "schema:memory-item-revision@1"],
-				["memory.forget", "schema:memory-id@1"],
-				["memory.delete-tendency", "schema:memory-id@1"],
-				[
-					"memory.continuity-transition",
-					"schema:memory-continuity-transition@1",
-				],
-			] as const
-		).map(([name, inputSchemaRef]) => [
-			name,
-			{ inputSchemaRef, effect: "write" as const },
-		]),
+		([["memory.set-enabled", "schema:memory-set-enabled@1"]] as const).map(
+			([name, inputSchemaRef]) => [
+				name,
+				{ inputSchemaRef, effect: "write" as const },
+			],
+		),
 	),
 	queries: new Set([STATUS, ITEMS, HISTORY, TENDENCIES, SHORT_TERM, CONTEXT]),
 	inputAdapters: new Map(),
@@ -198,18 +173,16 @@ export const describeMemoryAdapter = () => ({
 
 /**
  * The typed memory adapter: the connection state and its switch, the saved items (current and
- * history), tendencies, the short-term notes and the context window, with the item operations
- * (stop / resume / retract with the revision the person saw, forget), tendency deletion and the
- * continuity transition. Every operation is the owning domain's public transaction operation, so
- * its guards (health, revision, journal) stay in the domain. Conversations cannot use it.
+ * history), tendencies, the short-term notes and the context window. The screen only reads; the one
+ * change is the connection switch, which is the memory domain's public transaction operation, so its
+ * guards stay in the domain. Memory content is never changed by hand. Conversations cannot use it.
  */
 export function createMemoryAdapter(ports: MemoryAdapterPorts): DomainAdapter {
-	const { memory, continuity } = ports;
+	const { memory } = ports;
 	const conversationId = ports.conversationId ?? MEMORY_SCREEN_CONVERSATION;
 	function done(
 		receipt: Record<string, unknown>,
 		requestId: string,
-		resultRefs: AdapterResult["resultRefs"] = [],
 	): AdapterResult {
 		return {
 			receipt,
@@ -218,17 +191,10 @@ export function createMemoryAdapter(ports: MemoryAdapterPorts): DomainAdapter {
 				operationId: requestId,
 				digest: sha256(receipt),
 			},
-			resultRefs,
+			resultRefs: [],
 			replay: false,
 		};
 	}
-	const ref = (kind: string, refId: string, revision?: number) => ({
-		owner: "memory",
-		kind,
-		id: refId,
-		schemaRef: `domain:memory.${kind}@1`,
-		...(revision === undefined ? {} : { revision }),
-	});
 	function parse<T>(schema: z.ZodType<T>, raw: unknown): T {
 		const parsed = schema.safeParse(raw);
 		if (!parsed.success) throw new Error("invalid_input");
@@ -255,77 +221,6 @@ export function createMemoryAdapter(ports: MemoryAdapterPorts): DomainAdapter {
 						healthy: status.healthy,
 					},
 					requestId,
-				);
-			}
-			case "memory.stop":
-			case "memory.resume":
-			case "memory.retract": {
-				const input = parse(itemRevision, raw);
-				const action = name.slice("memory.".length) as
-					| "stop"
-					| "resume"
-					| "retract";
-				const item = memory.transitionItemInTransaction(
-					tx,
-					action,
-					input.id,
-					input.expectedRevision,
-				);
-				return done(
-					{
-						version: 1,
-						kind: "memory-item",
-						action,
-						id: item.id,
-						status: item.status,
-						revision: item.revision,
-					},
-					requestId,
-					[ref("item", item.id, item.revision)],
-				);
-			}
-			case "memory.forget": {
-				const input = parse(targetId, raw);
-				const forgotten = memory.forgetInTransaction(tx, input.id);
-				// `completed: false` is kept as it is: part of the removal is still owed.
-				return done(
-					{
-						version: 1,
-						kind: "memory-forget",
-						id: input.id,
-						forgetId: forgotten.forgetId,
-						status: forgotten.completed ? "completed" : "incomplete",
-						completed: forgotten.completed,
-					},
-					requestId,
-					[ref("item", input.id)],
-				);
-			}
-			case "memory.delete-tendency": {
-				const input = parse(targetId, raw);
-				memory.deleteTendencyInTransaction(tx, input.id);
-				return done(
-					{ version: 1, kind: "memory-tendency-deleted", id: input.id },
-					requestId,
-					[ref("tendency", input.id)],
-				);
-			}
-			case "memory.continuity-transition": {
-				const input = parse(continuityTransition, raw);
-				const note = continuity.transitionInTransaction(tx, input.id, {
-					expectedRevision: input.expectedRevision,
-					status: input.status,
-				});
-				return done(
-					{
-						version: 1,
-						kind: "memory-note",
-						id: note.id,
-						status: note.status,
-						revision: note.revision,
-					},
-					requestId,
-					[ref("note", note.id, note.revision)],
 				);
 			}
 			default:

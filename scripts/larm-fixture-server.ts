@@ -10,26 +10,37 @@ const asrInputs: Array<{ rate: number; bytes: number }> = [];
 let voiceInputs: Array<{ text: string; relation: string; readiness: string }> =
 	[];
 const assessments: Array<{ relation: string; readiness: string }> = [];
-const profile = "SAAA-gemma4-26b";
-const agentProfile = "saaa-conversation-gemma4-26b-voice";
+// Neutral fixture ids: the product takes profile and model names from saved settings and the catalog.
+const profile = "test-profile";
+const agentProfile = profile;
+const imageProfile = "test-image-profile";
+const musicProfile = "test-music-profile";
 const profileBindings: Record<
 	string,
 	{ agentProfile: string; model: string; maxTokens: number }
 > = {
-	[profile]: { agentProfile, model: "gemma4-26b-a4b", maxTokens: 262144 },
-	"ornith1.5Strix": {
-		agentProfile: "ornith1.5Strix",
-		model: "ornith-1.5-strix-lean",
-		maxTokens: 262144,
-	},
-	"ornith1.5Strix-64k": {
-		agentProfile: "ornith1.5Strix-64k",
-		model: "ornith-1.5-strix-lean",
-		maxTokens: 65536,
-	},
+	[profile]: { agentProfile, model: "fixture-llm", maxTokens: 262144 },
 };
 const binding = (selected: string) =>
 	profileBindings[selected] ?? profileBindings[profile]!;
+const services: Record<string, Record<string, unknown>> = {
+	[imageProfile]: {
+		name: "image",
+		capability: "media.image.generate",
+		protocol: "larm.image-generation.v1",
+		endpoint: "/v1/images/generations",
+		model: "fixture-image",
+		startupPolicy: { minWarmInstances: 0, idleTtlSeconds: 0 },
+	},
+	[musicProfile]: {
+		name: "music",
+		capability: "media.music.generate",
+		protocol: "larm.music-generation.v1",
+		endpoint: "/v1/music/generations",
+		model: "fixture-music",
+		startupPolicy: { minWarmInstances: 0, idleTtlSeconds: 0 },
+	},
+};
 const names = ["llm", "asr", "tts"] as const;
 const protocol = {
 	llm: "openai.chat-completions.v1",
@@ -184,69 +195,48 @@ const server = Bun.serve({
 			return Response.json(voiceCatalog);
 		}
 		if (path === "/v3/agent-profiles") {
-			const selected = url.searchParams.get("profile") ?? profile;
-			const serviceProfile =
-				selected === "SAAA-w-Image" || selected === "SAAA-w-music";
+			const requested = url.searchParams.get("profile");
+			const selected = requested ?? profile;
+			const conversation = {
+				id: binding(selected).agentProfile,
+				providers: names.map((name) => ({
+					name,
+					capability: name,
+					protocol: protocol[name],
+					endpoint: endpoint[name],
+					model: model(name, selected),
+					...(name === "llm"
+						? {
+								contextWindow: {
+									maxTokens: binding(selected).maxTokens,
+									outputReserveTokens: 4096,
+									safetyMarginTokens: 1976,
+								},
+							}
+						: {}),
+				})),
+				services: [],
+			};
+			// The unselected catalog lists every profile without services; a service profile carries its service when asked by id.
+			const serviceOf = (id: string) => ({
+				id,
+				providers: [],
+				services: [services[id]],
+			});
+			const profiles = !requested
+				? [
+						conversation,
+						{ id: imageProfile, providers: [], services: [] },
+						{ id: musicProfile, providers: [], services: [] },
+					]
+				: services[requested]
+					? [serviceOf(requested)]
+					: [conversation];
 			return Response.json({
 				contractVersion: "agent-connection.v3",
 				catalogRevision: "fixture1",
-				requestedProfile: url.searchParams.get("profile") ?? undefined,
-				profiles: [
-					{
-						id: binding(selected).agentProfile,
-						providers: names
-							.filter(
-								(name) =>
-									!serviceProfile &&
-									(selected !== "ornith1.5Strix-64k" || name === "llm"),
-							)
-							.map((name) => ({
-								name,
-								capability: name,
-								protocol: protocol[name],
-								endpoint: endpoint[name],
-								model: model(name, selected),
-								...(name === "llm"
-									? {
-											contextWindow: {
-												maxTokens: binding(selected).maxTokens,
-												outputReserveTokens: 4096,
-												safetyMarginTokens: 1976,
-											},
-										}
-									: {}),
-							})),
-						services: /SAAA-w-(Image|music)/.test(
-							url.searchParams.get("profile") ?? "",
-						)
-							? [
-									{
-										name:
-											url.searchParams.get("profile") === "SAAA-w-Image"
-												? "image"
-												: "music",
-										capability:
-											url.searchParams.get("profile") === "SAAA-w-Image"
-												? "media.image.generate"
-												: "media.music.generate",
-										protocol:
-											url.searchParams.get("profile") === "SAAA-w-Image"
-												? "larm.image-generation.v1"
-												: "larm.music-generation.v1",
-										endpoint:
-											url.searchParams.get("profile") === "SAAA-w-Image"
-												? "/v1/images/generations"
-												: "/v1/music/generations",
-										model:
-											url.searchParams.get("profile") === "SAAA-w-Image"
-												? "fixture-image"
-												: "fixture-music",
-										startupPolicy: { minWarmInstances: 0, idleTtlSeconds: 0 },
-									},
-								]
-							: [],
-					},
-				],
+				requestedProfile: requested ?? undefined,
+				profiles,
 			});
 		}
 		if (path === "/v1/agent-connections" && request.method === "POST") {
@@ -256,9 +246,7 @@ const server = Bun.serve({
 			};
 			const selected = body.profile;
 			const id = crypto.randomUUID();
-			const requested =
-				body.providers ??
-				(selected === "ornith1.5Strix-64k" ? ["llm"] : [...names]);
+			const requested = body.providers ?? [...names];
 			claimed.set(id, { profile: selected, providers: requested });
 			return Response.json(
 				{

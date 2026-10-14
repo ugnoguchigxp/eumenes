@@ -25,12 +25,20 @@ async function until(condition: () => boolean, signal: AbortSignal) {
 
 if (import.meta.main) {
 	if (!process.argv.includes("--run"))
-		throw new Error("ornith_live_requires_run");
+		throw new Error("profile_live_requires_run");
 	const saved = liveLarmSettings();
 	if (!saved.baseUrl) throw new Error("saved_larm_connection_unconfigured");
 	const token = resolveLarmToken(process.env);
 	if (!token) throw new Error("larm_credential_unconfigured");
-	const output = resolve("spec/verification/ornith-profile-2026-10-12");
+	// The profile is the saved one unless `--profile=<name>` names another.
+	const profile =
+		process.argv
+			.find((arg) => arg.startsWith("--profile="))
+			?.slice("--profile=".length) || saved.profile;
+	if (!profile) throw new Error("larm_profile_missing");
+	const output = resolve(
+		`spec/verification/profile-live-${new Date().toISOString().slice(0, 10)}`,
+	);
 	mkdirSync(output, { recursive: true });
 	const report: Record<string, unknown> = {
 		date: new Date().toISOString(),
@@ -50,11 +58,12 @@ if (import.meta.main) {
 	const holds = Array.from({ length: 4 }, gate),
 		start = gate();
 	let gated = true;
+	let claimedModel: string | undefined;
 	const config = {
 		...saved,
 		baseUrl: saved.baseUrl,
 		token,
-		profile: "ornith1.5Strix",
+		profile,
 	};
 	const request = Object.assign(
 		async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -76,7 +85,7 @@ if (import.meta.main) {
 						message?: { content?: string };
 					}>;
 				};
-				if (data.model !== "ornith-1.5-strix-lean")
+				if (!claimedModel || data.model !== claimedModel)
 					throw new Error("live_response_model_mismatch");
 				(report.responses as unknown[]).push({
 					index,
@@ -141,6 +150,9 @@ if (import.meta.main) {
 	}
 	try {
 		await main.probe!(signal);
+		claimedModel = main.inspect!().providers.find(
+			(p) => p.name === "llm",
+		)?.model;
 		const markers = Array.from(
 			{ length: 5 },
 			(_, i) => `SESSION${i}_${crypto.randomUUID().replaceAll("-", "")}`,
@@ -172,7 +184,7 @@ if (import.meta.main) {
 			);
 		await until(() => inferred.length === 4, signal);
 		const ready = [...states.values()].filter((x) => x.status === "ready");
-		if (ready.length !== 4 || ready.some((x) => x.profile !== "ornith1.5Strix"))
+		if (ready.length !== 4 || ready.some((x) => x.profile !== profile))
 			throw new Error("live_session_layout_mismatch");
 		launch(
 			main.answer(messages(4), signal, {

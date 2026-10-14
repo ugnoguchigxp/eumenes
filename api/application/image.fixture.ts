@@ -88,7 +88,7 @@ export function imageFixture(
 			hasAlpha: false,
 			bytes: bytes.length,
 			sha256: createHash("sha256").update(bytes).digest("hex"),
-			model: "qwen-image-2.1-turbo",
+			model: "fixture-image",
 			contentUrl: `/v1/image-artifacts/${id}/content`,
 		};
 	}
@@ -130,9 +130,9 @@ export function imageFixture(
 										protocol: "larm.image-generation.v1",
 										endpoint: "/v1/images/generations",
 										url: "/v1/images/generations",
-										model: "qwen-image-2.1-turbo",
+										model: "fixture-image",
 										description:
-											"Qwen Image, synchronous POST, exact dimensions, PNG/WebP; no reference editing",
+											"Image service, synchronous POST, exact dimensions, PNG/WebP; no reference editing",
 										startupPolicy: { minWarmInstances: 0 },
 									},
 								],

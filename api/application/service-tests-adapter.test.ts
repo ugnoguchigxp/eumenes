@@ -67,7 +67,7 @@ const image: LarmTestTarget = {
 	mode: "service",
 	endpoint: "/v1/images/generations",
 	profile: "profile",
-	selector: "SAAA-w-Image",
+	selector: "image-profile",
 	revision: "a".repeat(64),
 	onDemand: true,
 	primary: true,
@@ -626,7 +626,7 @@ test("the free-form start carries no revision of its own: only the catalog's sta
 	const h = await setup();
 	await refreshed(h);
 	const settings = h.settings.get();
-	settings.larm.profile = "SAAA-2";
+	settings.larm.profile = "test-profile-2";
 	await h.settings.apply({
 		requestId: crypto.randomUUID(),
 		expectedRevision: settings.revision,

@@ -20,7 +20,7 @@ Eumenesの受付上限は1画像3 MiB、1入力8枚、各辺8,192px、総画素�
 
 ## LARMへの接続と送信
 
-保存済みLARM設定からprofileを発見し、Connectionのready確認とclaimを経て、backendだけがProvider credentialを使います。主会話と補助要求は`ornith1.5Strix`で、それぞれ独立したsession identityを使います。1M tokenを共有する4 Sessionの構成と、個別sessionのcontext window・出力予約はLARMが管理します。
+保存済みLARM設定からprofileを発見し、Connectionのready確認とclaimを経て、backendだけがProvider credentialを使います。主会話と補助要求は保存済みのprofileを使い、それぞれ独立したsession identityを持ちます。共有KVとSessionの構成、個別sessionのcontext window・出力予約はLARMが管理します。
 
 画像対応はモデル名で判断せず、`supportedCapabilities`の`llm.vision`と`chatInput.contractVersion=larm-chat-input.v1`で確認します。user messageの本文と画像を順序付きcontent partsにし、画像bytesをBase64 data URLへ変換するのは推論を組み立てるbackendだけです。特殊markerはProviderが挿入します。
 

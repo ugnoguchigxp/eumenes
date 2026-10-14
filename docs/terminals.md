@@ -25,7 +25,7 @@
 
 画面への反映: 依頼は画面が表示しているのと同じ PTY セッションに入るので、出力はそのまま画面に流れる。セッション一覧の `requests`（会話から渡した件数）が増えると Web の `useClaudeCodeArtifacts` が「Claude Code」画面を開く。一覧の query（root `terminals`）は backend の変更通知（会話の操作の commit）で読み直すため、開いたままの画面にも会話が起動・再起動したセッションが現れる。検証は `tests/browser/claude-code.spec.ts`（[記録](../spec/verification/claude-code-toolchain-2026-10-14/README.md)）。
 
-依頼文は引数として渡し、shell を通さない。`-` で始まる依頼はオプションと解釈されないよう先頭に空白を足す。同じ requestId の再実行は受領票を返すだけで再送しない（受領票は backend のメモリに直近200件）。会話の回答に渡すのは `{delivered, session, completed:false}` だけで、Claude Code の作業完了・内容は回答しない。
+依頼文は引数として渡し、shell を通さない。`-` で始まる依頼はオプションと解釈されないよう先頭に空白を足す。同じ requestId の再実行は受領票を返すだけで再送しない（受領票は backend のメモリに直近200件）。会話の回答に渡すのは `{delivered, task, completed:false, reportedWhenDone:true}` だけで、作業の完了・内容は回答しない（完了は後から報告される）。
 
 | 単位 | revision |
 | --- | --- |
@@ -35,6 +35,23 @@
 | binding | `binding:claude-code.request@1`：→ `adapter:terminals@1` の `claude-code.request`、結果 `domain:claude-code.receipt@1`、`projection:claude-code.result@1` |
 
 command 担当の SystemContext は、登録 profile・SKILL・共通の操作規則・TOOLS（入力定義）の順に合成され、snapshot として現在のセッション一覧（名前と状態だけ、上限）を受け取る。会話担当の判断は「直接回答・確認・`claude_code` を呼ぶ」だけで、依頼文は command 担当が作る。
+
+## 完了の報告と SE
+
+状態は画面を読まず、Claude Code 自身のフックで受け取る。起動ごとに `--settings <file>` で `UserPromptSubmit`・`Stop`・`Notification`・`PostToolUse` のフックを足す（利用者の設定ファイルは変えない）。設定は 0600 の一時ファイルで渡し、実行の終了で消すので、token はプロセスの引数に出ない。フックは `curl -q --noproxy '*'`（利用者の curlrc とプロキシを使わない）で backend の `POST /hooks/terminals/:id` に送る。認証はその実行だけに有効な使い捨て token（`x-eumenes-hook-token`、再起動で変わる）で、本文を読む前に照合する。API token は子に渡さない。本文は 512 KiB まで、使うのはイベント名・`prompt`・`notification_type`・`last_assistant_message`（4000字まで）だけ。フックの宛先は `http://127.0.0.1|localhost|[::1]:<port>` だけを受け付け、それ以外ではフックを付けない。`curl` が無い環境では状態が分からないだけで、依頼と画面は動く。
+
+| フック | 状態（一覧の `activity`） | タスク |
+| --- | --- | --- |
+| `UserPromptSubmit` | `working` | `prompt` が渡した依頼文と一致すればそのタスクの作業が始まる。一致しない作業（画面で直接打った依頼）はタスクにしない。前のタスクが Stop 無しで残っていれば「途中で止まった」と報告する |
+| `PostToolUse` | 許可待ちのあとに `working` へ戻す | — |
+| `Notification` | `permission_prompt`・`elicitation_dialog` のとき `waiting` | 報告はせず SE だけ。`idle_prompt`（放置）は無視する |
+| `Stop` | `idle` | 作業中のタスクを「終わった」と報告する |
+| 実行の終了 | — | 未報告のタスクを「作業担当が終了した」と報告する |
+
+- タスク名: 会話から依頼するとき command 担当が依頼の言葉から短い `task`（40字以内）を付ける。依頼は順に並び、Claude Code が実際にその依頼を始めた時だけ作業中になるので、先に動いていた作業の Stop が後の依頼の完了と扱われない。フックが無い環境ではタスクを追わない。
+- 報告: タスクが終わると host が会話へ通知を送る（dialogue の `notify`。requestId はセッション・実行・報告番号で決まる。入力は `presentation: "artifact"` で画面に出さず、`sourceKind: "notice"` は予約実行と同じく記憶の学習対象外・ツールチェーン無し・background）。会話担当はタスク名で何が起きたかを伝え、次の行動を「変更をコミットする・動作を確認する・追加で直す・やり直す」から一つ提案して確認する。作業担当やツールの名前は言わない。提案だけで実行はせず、利用者が「コミットして」と答えれば通常の `claude_code` 経路で同じセッションに渡る。Claude Code の最後の報告は JSON 文字列として通知に入れ（引用を閉じられない）、中の指示に従わない。通知を会話が受け付けなかった場合（キュー満杯など）はログだけで再送しない。通知文は `api/application/claude-code-reports.ts`。
+- SE: `activity` が `idle` 以外から `idle` へ、または `waiting` に変わると、Web がタイマーと同じ短い音を鳴らす（`useClaudeCodeArtifacts`、出力先・音量・自動再生の解除はタイマー音と共通）。読み込み時点の状態では鳴らさない。
+- 既知の制約: 通知は画面に出さないが会話の履歴（利用者側の入力）には残り、予約実行の入力と同じく World の抽出対象から外していない。Esc での中断は Stop が来ないため、次の作業が始まった時に初めて「途中で止まった」と分かる。
 
 ## 構成
 

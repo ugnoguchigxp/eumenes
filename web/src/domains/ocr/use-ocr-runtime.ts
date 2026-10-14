@@ -6,6 +6,7 @@ import type {
 	Receipt,
 } from "@eumenes/artifact-ui/contracts";
 import type { EumenesClient } from "../../../../client";
+import { ApiError } from "../../../../client/transport";
 import {
 	maxInputBytes,
 	inputMime,
@@ -13,6 +14,14 @@ import {
 import { queryRoots } from "../../queryKeys";
 import { ocrSource } from "./source";
 import { ocrThumbnail } from "./thumbnail";
+function incorporationError(cause: unknown): Receipt {
+	if (cause instanceof ApiError && cause.message === "ocr_text_too_large")
+		return {
+			status: "rejected",
+			message: "会話に追加できる長さを超えました。行を選んで追加してください。",
+		};
+	throw cause;
+}
 export function useOcrRuntime(client: EumenesClient, conversationId = "main") {
 	const cache = useQueryClient();
 	const key = [queryRoots.ocr, client.identity, conversationId];
@@ -209,7 +218,12 @@ export function useOcrRuntime(client: EumenesClient, conversationId = "main") {
 		const id = typeof event.values.id === "string" ? event.values.id : "";
 		if (["ocr-frame", "ocr-line"].includes(event.action)) {
 			const index = Number(event.values.index);
-			if (!selected || !Number.isInteger(index) || index < 0)
+			if (
+				id !== selectedId ||
+				!selected ||
+				!Number.isInteger(index) ||
+				index < 0
+			)
 				return { status: "rejected", message: "対象を選び直してください。" };
 			if (event.action === "ocr-frame") {
 				if (
@@ -268,6 +282,8 @@ export function useOcrRuntime(client: EumenesClient, conversationId = "main") {
 			}
 			await records.refetch();
 		} else if (event.action === "ocr-incorporate") {
+			if (id !== selectedId)
+				return { status: "rejected", message: "対象を選び直してください。" };
 			const index =
 				event.values.frameIndex === ""
 					? undefined
@@ -282,7 +298,11 @@ export function useOcrRuntime(client: EumenesClient, conversationId = "main") {
 				(!Number.isInteger(index) || index < 0 || index > 59)
 			)
 				return { status: "rejected", message: "時刻を選び直してください。" };
-			await client.ocrIncorporate(id, event.id, index, lineIndexes);
+			try {
+				await client.ocrIncorporate(id, event.id, index, lineIndexes);
+			} catch (cause) {
+				return incorporationError(cause);
+			}
 			await Promise.all([
 				cache.invalidateQueries({ queryKey: [queryRoots.conversation] }),
 				cache.invalidateQueries({ queryKey: [queryRoots.dialogue] }),

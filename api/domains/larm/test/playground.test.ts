@@ -1,6 +1,11 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { createLarmPlayground, silentWav, type TestProgress } from "..";
+import {
+	createLarmPlayground,
+	findServiceTarget,
+	silentWav,
+	type TestProgress,
+} from "..";
 const revision = "a".repeat(64);
 const names = ["llm", "asr", "tts", "embedding", "system-one"];
 const protocols = [
@@ -56,37 +61,46 @@ function fixture(
 		if (override) return override;
 		if (path === "/v3/agent-profiles") {
 			const selector = u.searchParams.get("profile");
-			const kind =
-				selector === "SAAA-w-Image"
-					? "image"
-					: selector === "SAAA-w-music"
-						? "music"
-						: undefined;
+			const service = (kind: "image" | "music") => ({
+				name: kind,
+				model: `model-${kind}`,
+				protocol: `larm.${kind}-generation.v1`,
+				capability: `media.${kind}.generate`,
+				endpoint:
+					kind === "image" ? "/v1/images/generations" : "/v1/music/generations",
+				startupPolicy: { minWarmInstances: 0, idleTtlSeconds: 0 },
+			});
+			// The unselected catalog lists every profile without services; a profile fetched by id carries them.
+			const profiles = [
+				{ id: "profile", providers, services: [], withServices: [] },
+				{
+					id: "image-profile",
+					providers: [],
+					services: [],
+					withServices: [service("image")],
+				},
+				{
+					id: "music-profile",
+					providers: [],
+					services: [],
+					withServices: [service("music")],
+				},
+			];
+			const selected = !selector
+				? profiles
+				: profiles.filter(
+						(p) =>
+							p.id === selector ||
+							(selector === "test-profile" && p.id === "profile"),
+					);
 			return Response.json({
 				contractVersion: "agent-connection.v3",
 				catalogRevision: revision,
 				requestedProfile: selector,
-				profiles: [
-					{
-						id: "profile",
-						providers,
-						services: kind
-							? [
-									{
-										name: kind,
-										model: `model-${kind}`,
-										protocol: `larm.${kind}-generation.v1`,
-										capability: `media.${kind}.generate`,
-										endpoint:
-											kind === "image"
-												? "/v1/images/generations"
-												: "/v1/music/generations",
-										startupPolicy: { minWarmInstances: 0, idleTtlSeconds: 0 },
-									},
-								]
-							: [],
-					},
-				],
+				profiles: selected.map(({ withServices, ...p }) => ({
+					...p,
+					...(selector ? { services: withServices } : {}),
+				})),
 			});
 		}
 		if (path === "/v1/agent-connections") {
@@ -209,7 +223,7 @@ function fixture(
 	const gateway = createLarmPlayground({
 		baseUrl: "http://127.0.0.1:9999",
 		token: "control-secret",
-		profile: "SAAA-gemma4-26b",
+		profile: "test-profile",
 		audience: "same-host",
 		pollMs: 1,
 		fetch: fetcher as typeof fetch,
@@ -224,6 +238,29 @@ test("catalog merges selector-only cold services without starting anything", asy
 	expect(c.errors).toEqual([]);
 	expect(h.calls.every((c) => c.method === "GET")).toBe(true);
 	expect(JSON.stringify(c)).not.toContain("control-secret");
+});
+test("services missing from the unselected catalog are fetched again by profile id", async () => {
+	const h = fixture();
+	const c = await h.gateway.catalog(AbortSignal.timeout(1000));
+	const queried = h.calls
+		.filter((x) => x.path === "/v3/agent-profiles")
+		.map((x) => new URL(x.url).searchParams.get("profile"));
+	// Saved profile first, then the whole catalog, then each profile that came back without services.
+	expect(queried).toEqual([
+		"test-profile",
+		null,
+		"profile",
+		"image-profile",
+		"music-profile",
+	]);
+	expect(
+		c.targets
+			.filter((t) => t.mode === "service")
+			.map((t) => [t.capability, t.selector]),
+	).toEqual([
+		["media.image.generate", "image-profile"],
+		["media.music.generate", "music-profile"],
+	]);
 });
 test("every warm provider executes independently, validates claim and releases", async () => {
 	const h = fixture();
@@ -570,7 +607,7 @@ test("malformed local hostnames cannot receive credentials", () => {
 	expect(() =>
 		createLarmPlayground({
 			baseUrl: "http://127.attacker.example",
-			profile: "SAAA",
+			profile: "test-profile",
 			audience: "same-host",
 		}),
 	).toThrow("invalid_larm_url");
@@ -635,7 +672,7 @@ test("playground claims on another private host are refused unless listed", asyn
 test("a missing baseUrl leaves the playground unconfigured", async () => {
 	const gateway = createLarmPlayground({
 		token: "control-secret",
-		profile: "SAAA",
+		profile: "test-profile",
 		audience: "saaa-desktop",
 		fetch: (async () => {
 			throw new Error("must_not_contact");
@@ -653,20 +690,20 @@ test("image uses the discovered service URL and preserves arbitrary dimensions a
 	const h = fixture((path, _init, url) => {
 		if (
 			path === "/v3/agent-profiles" &&
-			url.searchParams.get("profile") === "SAAA-w-Image"
+			url.searchParams.get("profile") === "image-profile"
 		)
 			return Response.json({
 				contractVersion: "agent-connection.v3",
 				catalogRevision: revision,
-				requestedProfile: "SAAA-w-Image",
+				requestedProfile: "image-profile",
 				profiles: [
 					{
-						id: "profile",
+						id: "image-profile",
 						providers: [],
 						services: [
 							{
 								name: "image",
-								model: "qwen-image-2.1-turbo",
+								model: "model-image-discovered",
 								protocol: "larm.image-generation.v1",
 								capability: "media.image.generate",
 								endpoint: "/v1/images/generations",
@@ -699,7 +736,7 @@ test("image uses the discovered service URL and preserves arbitrary dimensions a
 		async () => {},
 	);
 	expect(h.calls.find((c) => c.url === serviceUrl)?.body).toEqual({
-		model: "qwen-image-2.1-turbo",
+		model: "model-image-discovered",
 		prompt: "写真",
 		width: 1200,
 		height: 777,
@@ -739,4 +776,37 @@ test("image defaults an omitted edge to 512, format to webp and seed to zero", a
 		seed: 0,
 		format: "webp",
 	});
+});
+test("services are chosen by capability and protocol in catalog order, never by name", async () => {
+	const h = fixture();
+	const { targets } = await h.gateway.catalog(AbortSignal.timeout(1000));
+	expect(
+		findServiceTarget(
+			targets,
+			"media.image.generate",
+			"larm.image-generation.v1",
+		)?.profile,
+	).toBe("image-profile");
+	expect(findServiceTarget(targets, "media.music.generate")?.profile).toBe(
+		"music-profile",
+	);
+	expect(
+		findServiceTarget(targets, "media.image.generate", "other.protocol.v1"),
+	).toBeUndefined();
+	// A provider with the same capability is not a service; a second service loses to the first.
+	const second = {
+		...targets.find((t) => t.mode === "service")!,
+		id: "second",
+		profile: "later-image-profile",
+	};
+	expect(
+		findServiceTarget(
+			[
+				{ ...targets[0]!, capability: "media.image.generate" },
+				...targets,
+				second,
+			],
+			"media.image.generate",
+		)?.profile,
+	).toBe("image-profile");
 });

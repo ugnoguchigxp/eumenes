@@ -6,7 +6,6 @@ import { createCapabilities } from "../domains/capabilities";
 import { createContinuityService } from "../domains/continuity";
 import { createConversationService } from "../domains/conversation";
 import { createMemoryService } from "../domains/memory";
-import type { AgentRefs } from "../domains/memory";
 import {
 	createActionRequests,
 	createAdapterRegistry,
@@ -44,7 +43,7 @@ async function setup() {
 		journalPath: join(dir, "memory-forget-journal.jsonl"),
 	});
 	expect((await memory.recover()).healthy).toBe(true);
-	const adapter = createMemoryAdapter({ memory, continuity });
+	const adapter = createMemoryAdapter({ memory });
 	let messages = 0;
 	const say = async (text: string) => {
 		const id = `m${++messages}`;
@@ -58,16 +57,27 @@ async function setup() {
 		});
 		return id;
 	};
-	const remember = async (text: string, semanticKey: string) =>
-		memory.remember({
-			conversationId: "main",
-			messageId: await say(`${text}。`),
-			quote: text,
-			kind: "preference",
-			semanticKey,
-			text,
-			polarity: "affirmed",
-		});
+	const remember = async (text: string, semanticKey: string) => {
+		const messageId = await say(`${text}。`);
+		const [result] = await store!.write((db) =>
+			memory.applyCurationInTransaction(db, {
+				conversationId: "main",
+				items: [
+					{
+						op: "remember",
+						kind: "preference",
+						key: semanticKey,
+						text,
+						messageId,
+						quote: text,
+						explicit: true,
+					},
+				],
+			}),
+		);
+		if (result?.status !== "applied") throw new Error("remember_rejected");
+		return memory.list(true).find((item) => item.id === result.id)!;
+	};
 	return { store, conversation, continuity, memory, adapter, say, remember };
 }
 type Harness = Awaited<ReturnType<typeof setup>>;
@@ -111,7 +121,7 @@ const read = (h: Harness, query: string, params?: unknown) =>
 		h.adapter.sourceInTransaction(db, query, undefined, params),
 	)!.data as Record<string, any>;
 
-test("describe offers the memory queries and the seven writes, all for the UI only", async () => {
+test("describe offers the memory queries and the one write (the connection switch), for the UI only", async () => {
 	const d = describeMemoryAdapter();
 	expect([...d.queries].sort()).toEqual([
 		"query:memory.context@1",
@@ -121,15 +131,7 @@ test("describe offers the memory queries and the seven writes, all for the UI on
 		"query:memory.status@1",
 		"query:memory.tendencies@1",
 	]);
-	expect([...d.operations.keys()].sort()).toEqual([
-		"memory.continuity-transition",
-		"memory.delete-tendency",
-		"memory.forget",
-		"memory.resume",
-		"memory.retract",
-		"memory.set-enabled",
-		"memory.stop",
-	]);
+	expect([...d.operations.keys()]).toEqual(["memory.set-enabled"]);
 	const h = await setup();
 	expect(h.adapter.ref).toBe(MEMORY_ADAPTER_REF);
 	expect(h.adapter.availableInTransaction(h.store.read((db) => db))).toBe(true);
@@ -199,7 +201,7 @@ test("status shows the connection and the switch needs a healthy memory to turn 
 	expect(await codeOf(run(h, "memory.set-enabled", {}))).toBe("invalid_input");
 });
 
-test("items page, search and sort; stop, resume and retract carry the revision the person saw", async () => {
+test("items page, search and sort; memory content cannot be changed by hand", async () => {
 	const h = await setup();
 	const coffee = await h.remember("コーヒーが好き", "drink.coffee");
 	const run1 = await h.remember("毎朝走る", "habit.run");
@@ -233,128 +235,54 @@ test("items page, search and sort; stop, resume and retract carry the revision t
 	expect(() => read(h, "query:memory.items@1", { pageSize: 7 })).toThrow(
 		"invalid_input",
 	);
-
-	const stop = await run(h, "memory.stop", {
-		id: coffee.id,
-		expectedRevision: coffee.revision,
-	});
-	expect(stop.receipt).toMatchObject({ action: "stop", status: "inactive" });
+	// Every manual change is gone: the adapter does not know them.
+	for (const name of [
+		"memory.stop",
+		"memory.resume",
+		"memory.retract",
+		"memory.forget",
+		"memory.delete-tendency",
+		"memory.continuity-transition",
+	])
+		expect(
+			await codeOf(run(h, name, { id: coffee.id, expectedRevision: 1 })),
+		).toBe("capability_unavailable");
+	expect(read(h, "query:memory.items@1").total).toBe(2);
+	// A stopped item (the steward's decision) moves from the current list to the history.
+	await h.store.write((db) =>
+		h.memory.applyCurationInTransaction(db, {
+			conversationId: "main",
+			items: [{ op: "stop", itemId: coffee.id, revision: coffee.revision }],
+		}),
+	);
 	expect(
 		read(h, "query:memory.items@1").items.map(
 			(i: { id: string; status: string }) => [i.id, i.status],
 		),
 	).toContainEqual([coffee.id, "inactive"]);
-	// A stale draft of the row is a conflict, and the item is unchanged.
-	expect(
-		await codeOf(
-			run(h, "memory.resume", {
-				id: coffee.id,
-				expectedRevision: coffee.revision,
-			}),
-		),
-	).toBe("revision_conflict");
-	const stopped = (
-		read(h, "query:memory.items@1").items as Array<{
-			id: string;
-			revision: number;
-		}>
-	).find((i) => i.id === coffee.id)!;
-	await run(h, "memory.resume", {
-		id: coffee.id,
-		expectedRevision: stopped.revision,
-	});
-	const resumed = (
-		read(h, "query:memory.items@1").items as Array<{
-			id: string;
-			revision: number;
-			status: string;
-		}>
-	).find((i) => i.id === coffee.id)!;
-	expect(resumed.status).toBe("active");
-	await run(h, "memory.retract", {
-		id: coffee.id,
-		expectedRevision: resumed.revision,
-	});
-	// A retracted item leaves the current list and shows in the history, where it can still be forgotten.
-	expect(
-		read(h, "query:memory.items@1").items.map((i: { id: string }) => i.id),
-	).toEqual([run1.id]);
-	expect(
-		read(h, "query:memory.item-history@1").items.map(
-			(i: { id: string; statusLabel: string }) => [i.id, i.statusLabel],
-		),
-	).toEqual([[coffee.id, "撤回済み"]]);
-	expect(
-		await codeOf(
-			run(h, "memory.stop", { id: "state:nothing", expectedRevision: 1 }),
-		),
-	).toBe("invalid_memory_item");
 });
 
-test("forget removes an item for good and says when it is not complete", async () => {
-	const h = await setup();
-	const item = await h.remember("コーヒーが好き", "drink.coffee");
-	const forgotten = await run(h, "memory.forget", { id: item.id });
-	expect(forgotten.receipt).toMatchObject({
-		kind: "memory-forget",
-		id: item.id,
-		status: "completed",
-		completed: true,
-	});
-	expect(read(h, "query:memory.items@1").total).toBe(0);
-	expect(read(h, "query:memory.item-history@1").total).toBe(0);
-	expect(await codeOf(run(h, "memory.forget", { id: item.id }))).toBe(
-		"invalid_memory_item",
-	);
-	expect(await codeOf(run(h, "memory.forget", { id: "x" }))).toBe(
-		"invalid_memory_item",
-	);
-});
-
-test("a forget whose transaction rolls back is reconciled from the journal, not forgotten about", async () => {
-	const h = await setup();
-	const item = await h.remember("コーヒーが好き", "drink.coffee");
-	// The action's own transaction fails after the entry reached the journal.
-	const failing = h.store.write((db) => {
-		h.memory.forgetInTransaction(db, item.id);
-		throw new Error("outer_failure");
-	});
-	expect(await codeOf(failing)).toBe("outer_failure");
-	// The journal carries the forget to completion once the writer queue reaches the reconcile.
-	await h.store.write(() => undefined);
-	expect(h.memory.status().healthy).toBe(true);
-	expect(h.memory.list(true)).toEqual([]);
-	// A refusal inside the transaction (a bad id) journals nothing and leaves memory open.
-	await h.remember("毎朝走る", "habit.run");
-	expect(await codeOf(run(h, "memory.forget", { id: "state:nothing" }))).toBe(
-		"invalid_memory_item",
-	);
-	expect(h.memory.status().healthy).toBe(true);
-	expect(h.memory.list(true)).toHaveLength(1);
-});
-
-test("tendencies, short-term notes and the context are read; notes and tendencies change with their revision", async () => {
+test("tendencies, short-term notes and the context are read", async () => {
 	const h = await setup();
 	const a = await h.remember("コーヒーが好き", "drink.coffee");
 	const b = await h.remember("毎朝走る", "habit.run");
-	const refs: AgentRefs = {
-		m1: { namespace: "state", id: a.id, revision: a.revision },
-		m2: { namespace: "state", id: b.id, revision: b.revision },
-	};
 	await h.store.write((db) =>
-		h.memory.applyAgentOpInTransaction(
-			db,
-			{ conversationId: "main", refs, turns: [] },
-			{ type: "tendency_add", text: "朝型", evidenceRefs: ["m1", "m2"] },
-		),
+		h.memory.applyCurationInTransaction(db, {
+			conversationId: "main",
+			items: [
+				{
+					op: "tendency_add",
+					text: "朝型",
+					evidence: [
+						{ namespace: "state", id: a.id },
+						{ namespace: "state", id: b.id },
+					],
+				},
+			],
+		}),
 	);
 	const tendencies = read(h, "query:memory.tendencies@1").items;
 	expect(tendencies).toMatchObject([{ text: "朝型", revision: 1 }]);
-	await run(h, "memory.delete-tendency", { id: tendencies[0].id });
-	expect(read(h, "query:memory.tendencies@1").items).toEqual([]);
-	expect(
-		await codeOf(run(h, "memory.delete-tendency", { id: tendencies[0].id })),
-	).toBe("invalid_memory_item");
 
 	const note = await h.continuity.add("main", {
 		kind: "goal",
@@ -364,25 +292,6 @@ test("tendencies, short-term notes and the context are read; notes and tendencie
 	expect(notes).toMatchObject([
 		{ id: note.id, revision: 1, kindLabel: "目的", text: "旅行の計画" },
 	]);
-	expect(
-		await codeOf(
-			run(h, "memory.continuity-transition", {
-				id: note.id,
-				expectedRevision: 5,
-				status: "resolved",
-			}),
-		),
-	).toBe("revision_conflict");
-	const closed = await run(h, "memory.continuity-transition", {
-		id: note.id,
-		expectedRevision: 1,
-		status: "resolved",
-	});
-	expect(closed.receipt).toMatchObject({
-		kind: "memory-note",
-		status: "resolved",
-	});
-	expect(read(h, "query:memory.short-term@1").items).toEqual([]);
 
 	// No window has been built yet; once a run reads it, the screen shows that build.
 	await run(h, "memory.set-enabled", { enabled: false });
@@ -408,7 +317,7 @@ test("tendencies, short-term notes and the context are read; notes and tendencie
 	expect(built.shortTermText.length).toBeGreaterThan(0);
 });
 
-test("the memory bundle runs through the action ledger: a stale row is a conflict, forget is confirmed", async () => {
+test("the memory bundle runs through the action ledger: only the connection switch is offered", async () => {
 	const h = await setup();
 	const registry = createAdapterRegistry([h.adapter]);
 	const host = bundleHostOf(registry);
@@ -425,13 +334,17 @@ test("the memory bundle runs through the action ledger: a stale row is a conflic
 		registry,
 		scope: "test-scope",
 	});
-	const revisionId = "artifact:settings.memory@2";
+	const revisionId = "artifact:settings.memory@3";
 	expect(ledger.artifacts().map((a) => a.artifactRevisionId)).toContain(
 		revisionId,
 	);
+	const artifact = memoryBundle.artifacts[0];
+	expect(
+		artifact.actionBindings.map((a: { actionId: string }) => a.actionId),
+	).toEqual(["connect", "disconnect"]);
 	const item = await h.remember("コーヒーが好き", "drink.coffee");
-	const rows = ledger.source(revisionId, "memory-items");
-	const send = (actionId: string, source: string, input: unknown) => {
+	const status = ledger.source(revisionId, "memory-status");
+	const send = (actionId: string, input: unknown) => {
 		const now = Date.now();
 		return ledger.submit({
 			version: 1,
@@ -440,32 +353,17 @@ test("the memory bundle runs through the action ledger: a stale row is a conflic
 			eventExpiresAt: new Date(now + 60_000).toISOString(),
 			artifactId: "tab-1",
 			artifactRevisionId: revisionId,
-			source,
-			sourceRevision: rows.revision,
+			source: "memory-status",
+			sourceRevision: status.revision,
 			actionId,
 			scopeRef: ledger.scopeRef,
 			input,
 		});
 	};
-	const stopped = await send("item-stop", "memory-items", {
-		id: item.id,
-		expectedRevision: item.revision,
-	});
-	expect(stopped.request.status).toBe("accepted");
-	expect(stopped.request.result?.receipt).toBeUndefined();
-	const stale = await send("item-resume", "memory-items", {
-		id: item.id,
-		expectedRevision: item.revision,
-	});
-	expect(stale.request).toMatchObject({
-		status: "rejected",
-		errorCode: "revision_conflict",
-	});
-	const forgot = await send("item-forget", "memory-items", { id: item.id });
-	expect(forgot.request.status).toBe("accepted");
-	expect(h.memory.list(true)).toEqual([]);
-	// An input that is not the registered one never reaches the domain.
-	await expect(
-		send("item-stop", "memory-items", { id: item.id }),
-	).rejects.toMatchObject({ code: "invalid_input" });
+	const off = await send("disconnect", { enabled: false });
+	expect(off.request.status).toBe("accepted");
+	expect(h.memory.status().enabled).toBe(false);
+	// The item actions of the earlier revision do not exist any more.
+	await expect(send("item-stop", { id: item.id })).rejects.toBeDefined();
+	expect(h.memory.list(true)).toHaveLength(1);
 });

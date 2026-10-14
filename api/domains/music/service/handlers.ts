@@ -4,7 +4,7 @@ import { z } from "zod";
 import { musicPlan, musicPlanV2, type Prepared } from "../../capabilities";
 import type { Receipt } from "../../inference";
 import type { HandlerDefinition } from "../../queue";
-import type { TestOutput } from "../../larm";
+import { findServiceTarget, type TestOutput } from "../../larm";
 import type { MusicRecord } from "../contracts";
 import { row, record, patch } from "../repository";
 import { musicContext } from "./context";
@@ -161,8 +161,9 @@ export function registerMusicHandlers(
 			try {
 				const gateway = deps.gateway();
 				const catalog = await gateway.catalog(signal);
-				const target = catalog.targets.find(
-					(t) => t.kind === "music" && t.selector === "SAAA-w-music",
+				const target = findServiceTarget(
+					catalog.targets,
+					"media.music.generate",
 				);
 				if (!target) throw new Error("music_service_unavailable");
 				const output = await gateway.execute(

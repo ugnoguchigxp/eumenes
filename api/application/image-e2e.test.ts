@@ -43,7 +43,7 @@ for (const mode of [
 					height: 177,
 					seed: 42,
 					format: "png",
-					model: "qwen-image-2.1-turbo",
+					model: "fixture-image",
 				});
 			expect(f.stages).toEqual(["route", "plan", "answer"]);
 			const library = await (await h.request("/api/images/library")).json();

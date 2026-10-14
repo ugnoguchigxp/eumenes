@@ -168,7 +168,7 @@ export async function prepareDecision(
 		recallPins,
 	};
 }
-/** The exchanges before the verbatim window that resemble the request; null when there are none or recall is unavailable. */
+/** The earlier exchanges (not shown in the prompt) that resemble the request; null when there are none or recall is unavailable. */
 function recallFor(
 	deps: DialogueDeps,
 	input: GenerateInput,
@@ -182,12 +182,15 @@ function recallFor(
 				conversationId: window.conversationId,
 				space: query.space,
 				vector: query.vector,
-				beforeOrdinal: window.windowStartOrdinal,
 				limit: RECALL_LIMIT,
 				minScore: RECALL_MIN_SCORE,
 				// What the prefetch already uses comes off the same budget.
 				maxBytes: PREFETCH_BYTES - window.prefetchBytes,
-				excludeMessageIds: window.pins.map((pin) => pin.messageId),
+				// Blocked messages are left out by the recall itself, at the time it reads them.
+				excludeMessageIds: [
+					...window.shownMessageIds,
+					...window.pins.map((pin) => pin.messageId),
+				],
 			}),
 		);
 	} catch (error) {

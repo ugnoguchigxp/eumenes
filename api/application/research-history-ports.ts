@@ -8,10 +8,17 @@ import type {
 import type { ToolAdapter, Source } from "../domains/tool-runtime";
 import type { WebResearchService } from "../domains/web-research";
 import { readActionOriginInTransaction } from "../domains/dialogue";
+import type { MemoryService } from "../domains/memory";
+/** Memory's ledger of the messages that must not reach a model again (forgotten ones, scheduled prompts). */
+export type BlockedMessages = Pick<
+	MemoryService,
+	"blockedMessageIdsInTransaction"
+>;
 export function createReadPorts(
 	web: WebResearchService,
 	conversation: ConversationService | undefined,
 	runtime: () => AgentRuntime,
+	blocked?: BlockedMessages,
 ): Pick<
 	ToolAdapter,
 	| "operationFingerprintInTransaction"
@@ -129,8 +136,15 @@ export function createReadPorts(
 				r.tool.id === "history.search"
 					? conversation!.historySearchInTransaction(db, owner, r.arguments)
 					: conversation!.historyReadInTransaction(db, owner, r.arguments);
-			const messages =
+			// A forgotten message stays in the conversation but never reaches the researcher.
+			const found =
 				"candidates" in result ? result.candidates : result.messages;
+			const hidden =
+				blocked?.blockedMessageIdsInTransaction(
+					db,
+					found.map((m) => m.messageId),
+				) ?? new Set<string>();
+			const messages = found.filter((m) => !hidden.has(m.messageId));
 			const readings: Source[] = messages.map((m) => ({
 				kind: "conversation_source",
 				sourceId: m.messageId,
@@ -246,6 +260,15 @@ export function createReadPorts(
 				)
 					return false;
 				const history = sources.filter((s) => s.kind === "conversation_source");
+				// A message forgotten while the research ran must not support the report.
+				if (
+					history.length &&
+					blocked?.blockedMessageIdsInTransaction(
+						db,
+						history.map((s) => s.messageId!),
+					).size
+				)
+					return false;
 				if (history.length || proofs.length) {
 					const scope = historyOwner(db, owner, "adopt");
 					for (const ref of new Set([

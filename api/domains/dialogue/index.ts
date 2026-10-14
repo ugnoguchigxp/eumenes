@@ -16,6 +16,8 @@ export type {
 	PostAnswerObservation,
 	PostAnswerObserverPort,
 	PostAnswerObserverResult,
+	StewardPort,
+	StewardRunEnd,
 	WorldContextPort,
 	WorldContextPrepareInput,
 	WorldContextPrepared,

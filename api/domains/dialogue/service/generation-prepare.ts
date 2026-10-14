@@ -9,6 +9,7 @@ import {
 import { prepareRouting } from "./delegate-conversation";
 import { researchResultContext } from "./research-result-context";
 import { markWorld, byId, transition } from "../repository";
+import { endRun } from "./run-end";
 import { isSystemPrompt, type Run } from "../contracts";
 import {
 	DEFAULT_DEADLINE_MS,
@@ -37,14 +38,7 @@ export function createPrepare(
 			try {
 				agent = agents.prepareAnswerInTransaction(tx, run.id);
 			} catch {
-				transition(
-					tx,
-					run.id,
-					run.revision,
-					"failed",
-					clock(),
-					"report_invalidated",
-				);
+				endRun(deps, tx, run, "failed", "report_invalidated");
 				agents.failAnswerInTransaction(tx, run.id, "report_invalidated");
 				return { status: "stale", reason: "report_invalidated" };
 			}
@@ -64,14 +58,7 @@ export function createPrepare(
 			if (run.agentTaskId)
 				agents?.failAnswerInTransaction(tx, run.id, "memory_blocked");
 			// Never silently drop memory and continue; end the run with the reason.
-			transition(
-				tx,
-				run.id,
-				current.revision,
-				"failed",
-				clock(),
-				"memory_blocked",
-			);
+			endRun(deps, tx, current, "failed", "memory_blocked");
 			return { status: "stale", reason: "memory_blocked" };
 		}
 		// World reads in the SAME transaction as Memory's recall and shares its budget.
@@ -87,6 +74,7 @@ export function createPrepare(
 							? // The prefetch and this turn's recall share PREFETCH_BYTES: all of it is reserved.
 								window.longTerm.bytes +
 								window.shortTerm.bytes +
+								Buffer.byteLength(window.history.summaryText, "utf8") +
 								PREFETCH_BYTES +
 								Buffer.byteLength(noticeMessage(window)?.content ?? "", "utf8")
 							: 0,
@@ -99,7 +87,7 @@ export function createPrepare(
 			if (run.agentTaskId)
 				agents?.failAnswerInTransaction(tx, run.id, world.reason);
 			// Never silently run without the World context; end the run with the reason.
-			transition(tx, run.id, current.revision, "failed", clock(), world.reason);
+			endRun(deps, tx, current, "failed", world.reason);
 			return { status: "stale", reason: world.reason };
 		}
 		if (world?.status === "ready") {
@@ -129,12 +117,12 @@ export function createPrepare(
 			conversation,
 			larm.snapshotInTransaction?.(tx).general,
 			window,
+			memory,
 		);
 		let messages = compiled.messages;
 		if (agent?.projection || agent?.failureCode)
 			messages = researchResultContext(
-				messages,
-				compiled.references,
+				compiled.sections,
 				agent.projection ?? undefined,
 				agent.failureCode,
 			);
@@ -143,7 +131,7 @@ export function createPrepare(
 		messages.splice(
 			messages.length - 1,
 			0,
-			...compiled.tail,
+			...compiled.sections.tail,
 			...(world?.status === "ready"
 				? [{ role: "system" as const, content: world.block }]
 				: []),
@@ -266,7 +254,7 @@ export function createPrepare(
 							memory: {
 								window: memory!.preparedWindow(
 									prepared,
-									compiled.windowStartOrdinal,
+									compiled.shownMessageIds,
 								),
 								...(windowIsEmpty(prepared) ? { quiet: true as const } : {}),
 							},

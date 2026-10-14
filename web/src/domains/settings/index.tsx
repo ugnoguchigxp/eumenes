@@ -78,7 +78,9 @@ export function useConversationModel(client: EumenesClient) {
 		route.fallbackId &&
 		options.some((o) => o.id === route.fallbackId)
 			? route.fallbackId
-			: `${larmPrefix}${savedProfile}`;
+			: savedProfile
+				? `${larmPrefix}${savedProfile}`
+				: "";
 	async function select(id: string) {
 		if (!value || busy || id === selected) return;
 		setBusy(true);

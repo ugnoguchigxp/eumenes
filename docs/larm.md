@@ -1,10 +1,10 @@
 # LARM の接続・予算・session 構成
 
-新規設定とProfile未指定時の基本selectorは `ornith1.5Strix` です。保存済みの明示的な選択と初回の `LARM_PROFILE` 指定は維持します。`SAAA-gemma4-26b` は新規保存では選べません（保存済みの文書は読み込めます）。
+LLMのProfileは設定画面で保存した値（`larm.profile`）だけを使います。コード・既定値・手順にProfile名やモデル名を固定しません。未保存のときは `larm_profile_missing` で接続しません。初回の `LARM_PROFILE` 指定は、未保存の設定へ取り込みます。選択肢は、保存済みのLARM接続先に `GET /v3/agent-profiles` をProfile指定なしで送って得たcatalogから作り、`llm` Providerを持つProfileだけを挙げます（`backchannel` だけのProfileは含めません）。catalogを読めないときは保存済みのProfileをモデルなしで1件返します。
 
-主会話と補助のcontrol要求は `ornith1.5Strix` を使います。LARMは1M tokenの共有KVと4 Sessionを管理し、各Connectionのcontext window・出力予約はclaimを正本とします。公開モデル名は現在 `ornith-1.5-strix-lean` で、送信にはclaim値を使います。主会話の同一接続上の推論は順番に実行し、補助要求は独立したConnectionと履歴を使い、終了・取消時に解放します。5つ目の待機はLARMのConnection lifecycleと呼出元の期限・取消に従い、readyとclaimableを確認するまで推論しません。
+主会話と補助のcontrol要求は、どちらも保存済みのProfileを使います。補助のcontrol要求は別のclient識別子で独立したConnectionと履歴を持ち、Profileの名前によらず同じ構成になります。LARMは共有KVとSessionを管理し、各Connectionのcontext window・出力予約はclaimを正本とします。モデル名はcatalogとclaimが返す値を使い、送信にはclaim値を使います。主会話の同一接続上の推論は順番に実行し、補助要求は独立したConnectionと履歴を使い、終了・取消時に解放します。待機中の要求はLARMのConnection lifecycleと呼出元の期限・取消に従い、readyとclaimableを確認するまで推論しません。control要求の出力schemaは、LARMには `response_format: json_schema`（strict）、OpenAI互換のcloudには `response_format: json_schema`、Codexには `outputSchema`、Claude Agent SDKには `outputFormat` で渡します。Managed Agentsには渡さず、指示文とhostの検証で受けます。
 
-`GET /v3/agent-profiles?profile=...` から構成と `catalogRevision` を取得し、作成時に `expectedCatalogRevision` を指定します。同じclientとProfileの要求ではLARMが既存Connectionを再利用するため、各sessionに固有のclient識別子を使い、renew・再接続では同じ識別子を維持します。入力予算はclaimのcontext windowと正式なchat input計数から求めます。出力予約はclaimの上限以内で明示します。旧補助selector `SAAA-gemma4-26b-64k` の利用禁止は維持します。
+`GET /v3/agent-profiles?profile=...` から構成と `catalogRevision` を取得し、作成時に `expectedCatalogRevision` を指定します。同じclientとProfileの要求ではLARMが既存Connectionを再利用するため、各sessionに固有のclient識別子を使い、renew・再接続では同じ識別子を維持します。入力予算はclaimのcontext windowと正式なchat input計数から求めます。出力予約はclaimの上限以内で明示します。
 
 LLMのみの要求は `providers: ["llm"]`、音声の要求は `providers` を省略して選択Profile全体を取得します。不要なProviderを事前予約しません。Providerの接続先・model・tokenはclaimの `configuration.fields.baseURL` / `daemonURL`、`configuration.fields.model`、`credential.token` を使い、公開endpointとの整合性を確認します。ASR、日英TTS、Ruriの態度・文章言語判定とembeddingは新Profileのcatalogから発見する既存経路を使います。期限前のrenew後は再claimでtokenを更新し、終了時に解放し、失効時は既存の再接続処理を使います。
 
@@ -14,23 +14,23 @@ LLMのみの要求は `providers: ["llm"]`、音声の要求は `providers` を�
 
 ## 楽曲生成の音声形式
 
-楽曲生成ツールチェーンは、保存済みControl接続先から `SAAA-w-music` の `services` にある `music` / `larm.music-generation.v1` を発見し、返されたendpointとmodelを使います。生成・状態照会・音声取得にはControl認証を使い、Providerのclaimは行いません。
+楽曲生成ツールチェーンは、保存済みControl接続先のcatalogから、capability `media.music.generate` を持つ `services` のサービス（`larm.music-generation.v1`）を発見し、返されたendpointとmodelを使います。複数あるときはcatalogの順で最初のサービスです。生成・状態照会・音声取得にはControl認証を使い、Providerのclaimは行いません。
 
 2026-10-11に配備先の `GET /openapi.json` で確認した契約に合わせ、`outputFormat: "opus"` を明示します。出力はOgg Opus・64 kbps固定・48 kHzです。完了確認後に `result.audioUrl` と `metadataUrl` をControlのURLとして解決し、音声のMIMEとOgg / Opus識別ヘッダーを検査します。Eumenesで再変換せず、既存の音声保存・認証済み取得APIへ渡します。保存ファイルの拡張子は `.opus` です。既存のMP3・WAV・FLAC結果の取得にも対応します。
 
 担当の指示・schema・package版は変更していません。非同期ジョブ、生成POSTの自動再送禁止、取消後の結果不採用、Artifactの構成も既存経路を使います。ライブラリ・タグ検索・お気に入り・Range中継と再生プレイヤーの拡張は別作業です。
 
-楽曲イメージは楽曲と同時には作りません。完成した楽曲の「楽曲イメージ」表示で利用者が「イメージを作成」を押すと、`POST /api/music/:id/artwork` が music domain のジョブ `music.artwork` を積み、その曲のタイトル・説明・制作プロンプトから画像プロンプトを組み立てて `SAAA-w-Image` / `qwen-image-2.1-turbo` で256×256のPNGを1枚生成します（文字は描かせず、曲名は画面側で重ねて表示）。画像は楽曲行に保存し、`GET /api/music/:id/artwork` で取得します。LARM側に作られた画像は取得後に削除し、画像スタジオの一覧には残しません。完成後は「作り直す」で新しいrevisionとして再生成でき、古いジョブの結果は採用しません。画面操作は `artifact:music.generation@2` の `music-artwork` actionです。プレイリストでは、LARMのtrack idが生成時のLARM job id（`music_<uuid>`）と一致する楽曲だけ、`GET /api/music/tracks/:id/generation` で生成レコードを引き、同じ画像の表示・作り直しができます。Eumenesで生成していないLARMの楽曲には画像がありません。
+楽曲イメージは楽曲と同時には作りません。完成した楽曲の「楽曲イメージ」表示で利用者が「イメージを作成」を押すと、`POST /api/music/:id/artwork` が music domain のジョブ `music.artwork` を積み、その曲のタイトル・説明・制作プロンプトから画像プロンプトを組み立てて 画像生成サービス（capability `media.image.generate`）で256×256のPNGを1枚生成します（文字は描かせず、曲名は画面側で重ねて表示）。画像は楽曲行に保存し、`GET /api/music/:id/artwork` で取得します。LARM側に作られた画像は取得後に削除し、画像スタジオの一覧には残しません。完成後は「作り直す」で新しいrevisionとして再生成でき、古いジョブの結果は採用しません。画面操作は `artifact:music.generation@2` の `music-artwork` actionです。プレイリストでは、LARMのtrack idが生成時のLARM job id（`music_<uuid>`）と一致する楽曲だけ、`GET /api/music/tracks/:id/generation` で生成レコードを引き、同じ画像の表示・作り直しができます。Eumenesで生成していないLARMの楽曲には画像がありません。
 
 `bun scripts/music-live.ts --run` は隔離環境から短い確認曲を1曲生成し、Opusのデコード・長さ・既存Artifactでの再生を確認します。完了した確認曲だけをLARMから削除し、404で削除を確認します。
 
 ## 画像生成
 
-2026-10-10以降の基本サービスは **Qwen-Image 2.1 Turbo（AD-Q4_K）** です。Profileは `SAAA-w-Image`、モデル指定は `qwen-image-2.1-turbo`、生成APIは `POST /v1/images/generations` です。Controlの接続先はSQLiteの保存済みLARM設定を使います。サービス発見・確保応答の `services[].url` を生成先として使い、`description` で利用条件を確認します。URLを設定や手順に固定しません。現行の `GET /v3/agent-profiles?profile=SAAA-w-Image` は `url` を含まず `endpoint` を返すため、その応答では返された `endpoint` をControlのURLに解決します。試用経路は `url` があればそちらを優先します。
+画像生成は、保存済みControl接続先のcatalogから、capability `media.image.generate`（protocol `larm.image-generation.v1`）を持つ `services` のサービスを発見して使います。複数あるときはcatalogの順で最初のサービスです。Profile名・モデル名は設定・コード・手順に固定せず、サービス発見・確保応答が返す値を使います。生成APIは `POST /v1/images/generations` です。Controlの接続先はSQLiteの保存済みLARM設定を使います。サービス発見・確保応答の `services[].url` を生成先として使い、`description` で利用条件を確認します。URLを設定や手順に固定しません。Profile指定なしの `GET /v3/agent-profiles` は `services` を省くことがあるため、`services` が空のProfileはIDを指定して取り直します。取り直した応答が `url` を含まず `endpoint` を返す場合は、返された `endpoint` をControlのURLに解決します。試用経路は `url` があればそちらを優先します。
 
 ```json
 {
-  "model": "qwen-image-2.1-turbo",
+  "model": "<発見したサービスのmodel>",
   "prompt": "自然光の入る室内。木目と布地を自然な質感で描いた写真。",
   "width": 1200,
   "height": 800,
@@ -87,4 +87,4 @@ music domainのプレイリストは会話/run・検索条件・曲IDを保存�
 
 ## チャットの画像入力
 
-ornith1.5のJPG・PNG・BMP入力は、Providerの`llm.vision`と`chatInput`を確認して使います。保存、履歴再送、正式token計数と保持説明は[チャット画像入力](chat-images.md)を参照してください。
+画像入力（JPG・PNG・BMP）は、Providerの`llm.vision`と`chatInput`を確認して使います。保存、履歴再送、正式token計数と保持説明は[チャット画像入力](chat-images.md)を参照してください。

@@ -89,6 +89,7 @@ async function agentRequest(
 		environmentId: connection.environmentId,
 		messages: fitMessages(row, resource, input).messages,
 		tools: options?.tools,
+		outputSchema: options?.jsonOutput ? options.jsonSchema : undefined,
 		signal,
 		onDelta,
 	});
@@ -174,6 +175,19 @@ export async function cloudRequest(
 							tools: options.tools,
 							tool_choice: "auto",
 							parallel_tool_calls: false,
+						}
+					: {}),
+				// Not strict: the schemas of existing control callers are not all strict-compatible; the host validates the result.
+				...(options?.jsonOutput && options.jsonSchema
+					? {
+							response_format: {
+								type: "json_schema",
+								json_schema: {
+									name: "control",
+									strict: false,
+									schema: options.jsonSchema,
+								},
+							},
 						}
 					: {}),
 				stream: !!onDelta,

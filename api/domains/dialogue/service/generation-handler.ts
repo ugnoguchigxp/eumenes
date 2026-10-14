@@ -23,12 +23,9 @@ import {
 } from "./selection-trace";
 import { generateConversation } from "./conversation-generation";
 import { researchCitations } from "./research-citations";
-import {
-	isSystemPrompt,
-	type Run,
-	type WorldContextSettleInput,
-} from "../contracts";
+import type { Run, WorldContextSettleInput } from "../contracts";
 import { byId, transition } from "../repository";
+import { endRun, type RunEndState } from "./run-end";
 import {
 	GENERATE_KIND,
 	WorldContextRetry,
@@ -297,14 +294,7 @@ export function createGenerationHandler(
 				if (!validAttachmentContext(deps, tx, input, run.conversationId)) {
 					if (input.world)
 						worldContext?.releaseInTransaction(tx, run.id, run.conversationId);
-					transition(
-						tx,
-						run.id,
-						run.revision,
-						"failed",
-						clock(),
-						"attachment_source_unavailable",
-					);
+					endRun(deps, tx, run, "failed", "attachment_source_unavailable");
 					return failedAnswer(
 						deps,
 						tx,
@@ -328,14 +318,7 @@ export function createGenerationHandler(
 					agents &&
 					!agents.validAnswerInTransaction(tx, input.agent)
 				) {
-					transition(
-						tx,
-						run.id,
-						run.revision,
-						"failed",
-						clock(),
-						"report_invalidated",
-					);
+					endRun(deps, tx, run, "failed", "report_invalidated");
 					agents.failAnswerInTransaction(tx, run.id, "report_invalidated");
 					// Not adopted: the World context's input dependencies go.
 					if (input.world)
@@ -371,14 +354,7 @@ export function createGenerationHandler(
 						worldContext.releaseInTransaction(tx, run.id, run.conversationId);
 						if (run.agentTaskId)
 							agents?.failAnswerInTransaction(tx, run.id, verdict.reason);
-						transition(
-							tx,
-							run.id,
-							run.revision,
-							"failed",
-							clock(),
-							verdict.reason,
-						);
+						endRun(deps, tx, run, "failed", verdict.reason);
 						return failedAnswer(deps, tx, run.id, verdict.reason);
 					}
 				}
@@ -400,14 +376,7 @@ export function createGenerationHandler(
 							);
 						if (run.agentTaskId)
 							agents?.failAnswerInTransaction(tx, run.id, adopted.reason);
-						transition(
-							tx,
-							run.id,
-							run.revision,
-							"failed",
-							clock(),
-							adopted.reason,
-						);
+						endRun(deps, tx, run, "failed", adopted.reason);
 						return failedAnswer(deps, tx, run.id, adopted.reason);
 					}
 				}
@@ -418,14 +387,7 @@ export function createGenerationHandler(
 					memory?.discardUsageInTransaction(tx, run.id);
 					if (run.agentTaskId)
 						agents?.failAnswerInTransaction(tx, run.id, "permission_revoked");
-					transition(
-						tx,
-						run.id,
-						run.revision,
-						"failed",
-						clock(),
-						"permission_revoked",
-					);
+					endRun(deps, tx, run, "failed", "permission_revoked");
 					if (input.world)
 						worldContext?.releaseInTransaction(tx, run.id, run.conversationId);
 					return failedAnswer(deps, tx, run.id, "permission_revoked");
@@ -458,18 +420,14 @@ export function createGenerationHandler(
 						run.conversationId,
 						outcome.result.receipt.delivery,
 					);
-				const done = transition(
+				const done = endRun(
+					deps,
 					tx,
-					run.id,
-					run.revision,
+					run,
 					"completed",
-					clock(),
 					null,
 					messageId,
 				);
-				// The answer joins the conversation the memory agent is reading (scheduled runs have no user words).
-				if (done && !isSystemPrompt(run.sourceKind))
-					memory?.scheduleAgentInTransaction(tx, run.conversationId);
 				if (done) observeAnswer(postAnswer, tx, run.id, input.agent);
 				if (done) traceOutcome(deps, tx, run.id, agentOutcome(input.agent));
 				else if (input.world)
@@ -480,7 +438,7 @@ export function createGenerationHandler(
 			if (run.status !== "queued" && run.status !== "running") return "applied";
 			// Not adopted (failed, retried, expired, interrupted): drop the input dependencies.
 			worldContext?.releaseInTransaction(tx, run.id, run.conversationId);
-			const next: [Run["status"], string | null] =
+			const next: [RunEndState | "queued", string | null] =
 				outcome.type === "retry"
 					? ["queued", outcome.errorCode]
 					: outcome.type === "failed"
@@ -492,21 +450,16 @@ export function createGenerationHandler(
 				agents?.failAnswerInTransaction(tx, run.id, next[1] ?? "answer_failed");
 			if (next[0] !== "queued")
 				traceFailure(deps, tx, run.id, outcome.type, next[1]);
-			return transition(tx, run.id, run.revision, next[0], clock(), next[1])
-				? "applied"
-				: "stale";
+			const moved =
+				next[0] === "queued"
+					? transition(tx, run.id, run.revision, "queued", clock(), next[1])
+					: endRun(deps, tx, run, next[0], next[1]);
+			return moved ? "applied" : "stale";
 		},
 		cancelInTransaction(tx, job) {
 			const run = byId(tx, job.payload.runId);
 			if (run && (run.status === "queued" || run.status === "running")) {
-				transition(
-					tx,
-					run.id,
-					run.revision,
-					"cancelled",
-					clock(),
-					"cancel_requested",
-				);
+				endRun(deps, tx, run, "cancelled", "cancel_requested");
 				// A late result is rejected by the queue; what the run registered is released.
 				worldContext?.releaseInTransaction(tx, run.id, run.conversationId);
 				traceFailure(deps, tx, run.id, "cancelled", "cancel_requested");

@@ -31,7 +31,7 @@ const target: LarmTestTarget = {
 	mode: "service",
 	endpoint: "/v1/images/generations",
 	profile: "profile",
-	selector: "SAAA-w-Image",
+	selector: "image-profile",
 	revision: "a".repeat(64),
 	onDemand: true,
 	primary: true,

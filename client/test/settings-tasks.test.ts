@@ -156,7 +156,7 @@ contracts("settings client", [
 	},
 ]);
 
-it.each(["ornith1.5Strix", "ornith1.5Strix-64k", "SAAA-gemma4-26b"])(
+it.each(["test-profile", "test-profile-large"])(
 	"settings client accepts and preserves profile %s",
 	async (profile) => {
 		const selected = { ...settings, larm: { ...settings.larm, profile } };

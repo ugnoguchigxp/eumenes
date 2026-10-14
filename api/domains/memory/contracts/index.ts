@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ContinuityKind } from "../../continuity/contracts";
 import { CONVERSATION_DEFAULT_PRINCIPAL } from "../../conversation/contracts";
 import { continuityItemSchema } from "../../continuity/contracts";
 import type { VectorSpaceShape } from "../../../infrastructure/vector";
@@ -14,40 +15,8 @@ export const stateKinds = [
 	"constraint",
 	"habit",
 ] as const;
-const datePartSchema = z.object({
-	precision: z.enum(["year", "month", "day"]),
-	year: z.number().int(),
-	month: z.number().int().optional(),
-	day: z.number().int().optional(),
-});
-export const rememberSchema = z.object({
-	conversationId: z.string().min(1),
-	/** The user message the fact comes from. */
-	messageId: z.string().min(1),
-	/** An exact substring of that message. */
-	quote: z.string().min(1).max(1024),
-	kind: z.enum(stateKinds),
-	semanticKey: z.string().min(1).max(128),
-	text: z.string().trim().min(1).max(500),
-	polarity: z.enum(["affirmed", "negated"]).default("affirmed"),
-	/** Optional validity (ms since epoch). `validUntilMs` is exclusive. */
-	validFromMs: z.number().int().nonnegative().optional(),
-	validUntilMs: z.number().int().nonnegative().optional(),
-	/** Calendar period with precision ("since September" stays month precision). Not combinable with the ms bounds. */
-	validity: z
-		.object({
-			from: datePartSchema.optional(),
-			until: datePartSchema.optional(),
-			basis: z.enum(["stated", "inferred", "unknown"]),
-		})
-		.optional(),
-});
-export type Remember = z.infer<typeof rememberSchema>;
-export const itemActionSchema = z.object({
-	expectedRevision: z.number().int().min(1),
-});
 export const settingsSchema = z.object({ enabled: z.boolean() });
-/** Who asked for an item: the user in conversation, the memory agent on its own, or the API. */
+/** Who asked for an item: the user in conversation (`request`), or the steward on its own (`agent`). `manual`: rows from before manual changes were removed. */
 export type MemoryCapturedBy = "request" | "agent" | "manual";
 export interface MemoryItemDto {
 	id: string;
@@ -89,8 +58,8 @@ export type PreparedWindow = {
 	noticeIds: string[];
 	/** Bytes of the prefetched text already in the prompt (the per-turn recall fills what is left of its budget). */
 	prefetchBytes: number;
-	/** Ordinal of the oldest message in the verbatim window: the per-turn recall looks only before it (0: no window yet). */
-	windowStartOrdinal: number;
+	/** The messages the prompt shows verbatim: the per-turn recall leaves them out. */
+	shownMessageIds: string[];
 };
 /** The vector space of an embedding (same shape as the toolchain embeddings'). */
 export type MemoryVectorSpace = VectorSpaceShape;
@@ -138,10 +107,6 @@ export const memoryItemSchema: z.ZodType<MemoryItemDto> = z.object({
 	capturedBy: z.enum(["request", "agent", "manual"]),
 });
 export const memoryItemsSchema = z.object({ items: z.array(memoryItemSchema) });
-export const forgetResultSchema = z.object({
-	forgetId: z.string(),
-	completed: z.boolean(),
-});
 
 /** Query of the short-term and context APIs: the conversation is always named (there is no default). */
 export const conversationQuerySchema = z.object({
@@ -168,7 +133,6 @@ export const memoryTendenciesSchema: z.ZodType<{
 		}),
 	),
 });
-export const okSchema = z.object({ ok: z.literal(true) });
 /** The ContextWindow as the screen shows it: sizes against their limits, and the rendered texts. */
 export type MemoryContextDto =
 	| { disabled: true }
@@ -203,3 +167,151 @@ export const memoryContextSchema: z.ZodType<MemoryContextDto> = z.union([
 		notices: z.number(),
 	}),
 ]);
+
+// ---- the steward's ledgers (exchanges, summary, blocked messages) ----
+
+export type {
+	BlockReason,
+	Disposition,
+	ExchangeRow as ExchangeDto,
+	ExchangeStep,
+	StepMark,
+	SummaryRow as SummaryDto,
+} from "../repository/ledger";
+
+/** What a run left to learn from: the user's message and, when one was adopted, the answer. */
+export type RecordExchangeInput = {
+	conversationId: string;
+	runId: string;
+	inputMessageId: string;
+	answerMessageId: string | null;
+	outcome: "answered" | "failed";
+};
+
+// ---- the save contract ----
+
+/** A calendar bound as the model writes it: `YYYY`, `YYYY-MM` or `YYYY-MM-DD`. */
+type CurationDate = string;
+/**
+ * One element of a curation, already resolved by the steward (labels to ids and revisions). The host builds the
+ * evidence from `messageId` (a user message of the conversation) and `quote` (only a hint).
+ */
+export type CurationItem =
+	| {
+			op: "remember";
+			kind: (typeof stateKinds)[number];
+			/** The model's `key`; normalized to the item's `semanticKey`, an invalid one rejects the element. */
+			key: string;
+			text: string;
+			negated?: boolean;
+			messageId: string;
+			quote?: string | null;
+			validFrom?: CurationDate | null;
+			validUntil?: CurationDate | null;
+			/** The user asked for it (K14): always a new version, origin `user_confirmed`, even when the value is the same. */
+			explicit?: boolean;
+	  }
+	| {
+			op: "update";
+			itemId: string;
+			revision: number;
+			text: string;
+			negated?: boolean;
+			messageId: string;
+			quote?: string | null;
+			validFrom?: CurationDate | null;
+			validUntil?: CurationDate | null;
+			explicit?: boolean;
+	  }
+	| { op: "stop"; itemId: string; revision: number }
+	| {
+			op: "merge";
+			sources: ReadonlyArray<{ itemId: string; revision: number }>;
+			/** Defaults to the key of the newest source. */
+			key?: string | null;
+			text: string;
+			negated?: boolean;
+	  }
+	| {
+			op: "note_add";
+			kind: ContinuityKind;
+			text: string;
+			/** The message the note comes from. */
+			messageId: string;
+	  }
+	| { op: "note_update"; noteId: string; revision: number; text: string }
+	| {
+			op: "note_close";
+			noteId: string;
+			revision: number;
+			status: "resolved" | "retracted";
+	  }
+	| {
+			op: "tendency_add";
+			text: string;
+			evidence: ReadonlyArray<{
+				namespace: "state" | "continuity";
+				id: string;
+			}>;
+	  }
+	| {
+			op: "tendency_update";
+			tendencyId: string;
+			revision: number;
+			text: string;
+			evidence: ReadonlyArray<{
+				namespace: "state" | "continuity";
+				id: string;
+			}>;
+	  }
+	| { op: "tendency_retire"; tendencyId: string; revision: number };
+export type CurationRejection =
+	| "invalid_key"
+	| "invalid_input"
+	| "invalid_validity"
+	| "invalid_source"
+	| "blocked_source"
+	| "source_tombstoned"
+	| "no_evidence"
+	| "unknown_item"
+	| "item_changed"
+	| "limit_reached"
+	| "conflict";
+export type CurationResult =
+	| {
+			status: "applied";
+			op: CurationItem["op"];
+			/** The State item, note or tendency written (remember, update, merge, a note, a tendency) or stopped (stop). */
+			id: string | null;
+			revision: number | null;
+			/** false: the same value was already stored (nothing new was written). */
+			changed: boolean;
+			/** remember/update: whether the model's quote was found in the message (false: the whole message is the evidence). */
+			quoteMatched: boolean | null;
+			/** An explicit `remember` that saved an already stored value again. */
+			reconfirmed: boolean;
+			/** merge: the sources that were stopped (the one it replaced is superseded, not listed). */
+			stoppedIds: string[];
+	  }
+	| { status: "rejected"; op: CurationItem["op"]; reason: CurationRejection };
+
+/** The steward's forget request: State items (every version goes), messages it also found, and the conversation they came up in. */
+export type ForgetInput = {
+	conversationId: string;
+	itemIds: readonly string[];
+	messageIds: readonly string[];
+};
+export type ForgetOutcome = {
+	forgetId: string;
+	/** Every message that was blocked (the item evidence, the steward's choices and their exchange partners). */
+	blockedMessageIds: string[];
+	/** Every State item id that was forgotten (all versions). */
+	forgottenItemIds: string[];
+	completed: boolean;
+};
+/** What a derived-data purge is told (the steward registers one: decisions, inbox bodies). */
+export type ForgetPurge = {
+	itemIds: readonly string[];
+	messageIds: readonly string[];
+	conversationId: string;
+};

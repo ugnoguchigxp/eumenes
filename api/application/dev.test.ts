@@ -48,7 +48,7 @@ function launch(
 				EUMENES_SECRET_KEY: "",
 				LARM_API_TOKEN: "",
 				LARM_CONTROL_TOKEN: "",
-				LARM_PROFILE: "SAAA-gemma4-26b",
+				LARM_PROFILE: "test-profile",
 				LARM_AUDIENCE: "saaa-desktop",
 				EUMENES_TTS_VOICE: "",
 			},

@@ -40,10 +40,16 @@ function useOcrProps(request: ArtifactRequest): OcrWorkspaceProps {
 			void action.send("ocr-select", { id });
 		},
 		onFrame: (index) => {
-			void action.send("ocr-frame", { index: String(index) });
+			void action.send("ocr-frame", {
+				id: resource.selectedId ?? "",
+				index: String(index),
+			});
 		},
 		onLine: (index) => {
-			void action.send("ocr-line", { index: String(index) });
+			void action.send("ocr-line", {
+				id: resource.selectedId ?? "",
+				index: String(index),
+			});
 		},
 		onRefresh: () => {
 			void action.send("ocr-refresh", {});

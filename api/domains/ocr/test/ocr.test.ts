@@ -6,7 +6,8 @@ import { openStore } from "../../../infrastructure/sqlite";
 import { createQueue, migrations as queueMigrations } from "../../queue";
 import { createOcr, migrations } from "..";
 import { ocrGateway } from "../service/gateway";
-import { imageResult, videoResult } from "../contracts";
+import { imageResult, videoResult, type Connection } from "../contracts";
+import { binding } from "../repository";
 const line = {
 	text: "原文のまま",
 	confidence: 0.72,
@@ -58,10 +59,13 @@ function setup(fetcher: typeof fetch) {
 		pollMs: 5,
 		backoff: { baseMs: 10, maxMs: 10 },
 	});
+	const connectionState: { current: Connection | null } = {
+		current: connection,
+	};
 	const service = createOcr({
 		store,
 		queue,
-		connection: () => connection,
+		connection: () => connectionState.current,
 		fetcher,
 	});
 	queue.start();
@@ -70,7 +74,7 @@ function setup(fetcher: typeof fetch) {
 		await store.close();
 		rmSync(dir, { recursive: true, force: true });
 	});
-	return { service, store };
+	return { service, store, connectionState };
 }
 test("OCR gateway sends only one multipart file and ignores untrusted statusUrl", async () => {
 	const calls: string[] = [];
@@ -202,4 +206,124 @@ test("cancelling a video discards a late completed result", async () => {
 	await until(() => h.service.get("alice", id).state === "cancelled");
 	expect(h.service.get("alice", id).result).toBeNull();
 	expect(posts).toBe(1);
+});
+test("capacity counts active records beyond the 100-item history page", async () => {
+	const h = setup((async () =>
+		Response.json(image)) as unknown as typeof fetch);
+	await h.store.write((db) => {
+		for (let i = 0; i < 104; i++) {
+			const id = crypto.randomUUID();
+			db.query(
+				"INSERT INTO ocr_inputs(id,owner,conversation_id,mime,bytes,record_json,connection_json,deadline) VALUES(?,?,?,?,?,?,?,?)",
+			).run(
+				id,
+				"alice",
+				"main",
+				"image/png",
+				new Uint8Array([1]),
+				JSON.stringify({ state: i < 3 ? "queued" : "completed" }),
+				binding(connection),
+				0,
+			);
+		}
+	});
+	expect(h.service.list("alice", "main")).toHaveLength(100);
+	await expect(
+		h.service.upload(
+			"alice",
+			"main",
+			new File(["png"], "new.png", { type: "image/png" }),
+			crypto.randomUUID(),
+		),
+	).rejects.toThrow("ocr_capacity");
+});
+test("recheck is unavailable after connection changes", async () => {
+	const h = setup((async () =>
+		Response.json(image)) as unknown as typeof fetch);
+	const id = crypto.randomUUID();
+	await h.service.upload(
+		"alice",
+		"main",
+		new File(["png"], "note.png", { type: "image/png" }),
+		id,
+	);
+	await until(() => h.service.get("alice", id).state === "completed");
+	const completed = h.service.get("alice", id);
+	await h.store.write((db) => {
+		db.query(
+			"UPDATE ocr_inputs SET upstream_id=?, record_json=? WHERE id=?",
+		).run(
+			"upstream-1",
+			JSON.stringify({
+				...completed,
+				state: "failed",
+				errorCode: "ocr_upstream_failed",
+				result: null,
+			}),
+			id,
+		);
+	});
+	expect(h.service.get("alice", id).canRecheck).toBe(true);
+	h.connectionState.current = { ...connection, revision: 2 };
+	expect(h.service.get("alice", id).canRecheck).toBe(false);
+	await expect(h.service.recheck("alice", id)).rejects.toThrow(
+		"ocr_connection_changed",
+	);
+	h.connectionState.current = connection;
+	expect((await h.service.recheck("alice", id)).canRecheck).toBe(false);
+});
+test("deleting a source removes retained command results", async () => {
+	const h = setup((async () =>
+		Response.json(image)) as unknown as typeof fetch);
+	const id = crypto.randomUUID();
+	await h.service.upload(
+		"alice",
+		"main",
+		new File(["png"], "note.png", { type: "image/png" }),
+		id,
+	);
+	await until(() => h.service.get("alice", id).state === "completed");
+	const requestId = crypto.randomUUID();
+	await h.store.write((db) =>
+		h.service.commandInTransaction(db, "alice", "main", "read", id, requestId),
+	);
+	expect(
+		h.store.read((db) =>
+			h.service.commandResultInTransaction(db, "alice", requestId),
+		),
+	).toBeTruthy();
+	await h.service.remove("alice", id);
+	expect(
+		h.store.read((db) =>
+			h.service.commandResultInTransaction(db, "alice", requestId),
+		),
+	).toBeNull();
+});
+test("upload replay returns its receipt after configuration is removed", async () => {
+	const h = setup((async () =>
+		Response.json(image)) as unknown as typeof fetch);
+	const id = crypto.randomUUID();
+	const file = new File(["png"], "note.png", { type: "image/png" });
+	await h.service.upload("alice", "main", file, id);
+	h.connectionState.current = null;
+	expect((await h.service.upload("alice", "main", file, id)).id).toBe(id);
+});
+test("conversation export reports the dialogue size limit before submission", async () => {
+	const large = imageResult.parse({ ...image, text: "字".repeat(8100) });
+	const h = setup((async () =>
+		Response.json(large)) as unknown as typeof fetch);
+	const id = crypto.randomUUID();
+	await h.service.upload(
+		"alice",
+		"main",
+		new File(["png"], "long.png", { type: "image/png" }),
+		id,
+	);
+	await until(() => h.service.get("alice", id).state === "completed");
+	expect(() => h.service.conversationText("alice", id)).toThrow(
+		"ocr_text_too_large",
+	);
+	expect(h.service.conversationText("alice", id, undefined, [0])).toContain(
+		"原文のまま",
+	);
 });

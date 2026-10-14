@@ -11,7 +11,6 @@ import {
 	shortTermSchema,
 } from "../contracts";
 import { registerMemory } from "..";
-import type { AgentRefs } from "../service/operation";
 import { setupMemory, type MemoryHarness } from "./memory.fixture";
 
 const open: MemoryHarness[] = [];
@@ -31,18 +30,14 @@ async function setup() {
 test("items carry their evidence, period and who asked for them", async () => {
 	const { h, app } = await setup();
 	const id = await h.say("user", "9月からZedを使ってる", "c1", "run-a");
-	await h.memory.remember({
+	await h.remember({
 		conversationId: "c1",
 		messageId: id,
 		quote: "Zedを使ってる",
 		kind: "habit",
 		semanticKey: "editor",
 		text: "Zedを使っている",
-		polarity: "affirmed",
-		validity: {
-			from: { precision: "month", year: 2026, month: 9 },
-			basis: "stated",
-		},
+		validFrom: "2026-09",
 	});
 	const response = await app.request("/api/memory/items");
 	const { items } = memoryItemsSchema.parse(await response.json());
@@ -50,7 +45,7 @@ test("items carry their evidence, period and who asked for them", async () => {
 	expect(items[0]).toMatchObject({
 		evidence: [{ messageId: id, quote: "Zedを使ってる" }],
 		validity: { from: "2026-09" },
-		capturedBy: "manual",
+		capturedBy: "request",
 	});
 	// An item with no period has none.
 	await h.seed("コーヒーが好き", "drink.coffee");
@@ -92,40 +87,49 @@ test("short-term notes of the named conversation only; the conversation is requi
 	expect(later.map((i) => i.text)).toEqual(["Rust移行"]);
 });
 
-test("tendencies are listed and deleted for good", async () => {
+test("tendencies are listed; there is no route to change or delete them by hand", async () => {
 	const { h, app } = await setup();
 	const a = await h.seed("コーヒーが好き", "drink.coffee");
 	const b = await h.seed("毎朝走る", "run", "毎朝走る", "habit");
-	const refs: AgentRefs = {
-		m1: { namespace: "state", id: a.id, revision: a.revision },
-		m2: { namespace: "state", id: b.id, revision: b.revision },
-	};
-	await h.store.write((db) =>
-		h.memory.applyAgentOpInTransaction(
-			db,
-			{ conversationId: "c1", refs, turns: [] },
-			{ type: "tendency_add", text: "朝型", evidenceRefs: ["m1", "m2"] },
-		),
-	);
+	const [added] = await h.curate([
+		{
+			op: "tendency_add",
+			text: "朝型",
+			evidence: [
+				{ namespace: "state", id: a.id },
+				{ namespace: "state", id: b.id },
+			],
+		},
+	]);
+	expect(added).toMatchObject({ status: "applied", op: "tendency_add" });
 	const listed = memoryTendenciesSchema.parse(
 		await (await app.request("/api/memory/tendencies")).json(),
 	).items;
 	expect(listed).toMatchObject([{ text: "朝型", revision: 1 }]);
-	const removed = await app.request(`/api/memory/tendencies/${listed[0]!.id}`, {
-		method: "DELETE",
-	});
-	expect(removed.status).toBe(200);
-	expect(await removed.json()).toEqual({ ok: true });
+	for (const [method, path, body] of [
+		["DELETE", `/api/memory/tendencies/${listed[0]!.id}`, undefined],
+		["POST", "/api/memory/items", { nope: 1 }],
+		["POST", `/api/memory/items/${a.id}/stop`, { expectedRevision: 1 }],
+		["POST", `/api/memory/items/${a.id}/resume`, { expectedRevision: 1 }],
+		["POST", `/api/memory/items/${a.id}/retract`, { expectedRevision: 1 }],
+		["POST", `/api/memory/items/${a.id}/forget`, {}],
+	] as const) {
+		const response = await app.request(path, {
+			method,
+			...(body
+				? {
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify(body),
+					}
+				: {}),
+		});
+		expect(response.status).toBe(404);
+	}
 	expect(
 		memoryTendenciesSchema.parse(
 			await (await app.request("/api/memory/tendencies")).json(),
 		).items,
-	).toEqual([]);
-	const again = await app.request(`/api/memory/tendencies/${listed[0]!.id}`, {
-		method: "DELETE",
-	});
-	expect(again.status).toBe(400);
-	expect(await again.json()).toEqual({ error: "invalid_memory_item" });
+	).toHaveLength(1);
 });
 
 test("the context endpoint shows both layers against their limits, and is off when memory is", async () => {

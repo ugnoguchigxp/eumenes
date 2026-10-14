@@ -7,9 +7,9 @@ import type { Run } from "../contracts";
 import {
 	byId,
 	linkAnswer,
-	transition,
 	unfinishedAgentRuns,
 } from "../repository";
+import { endRun, type RunEndState } from "./run-end";
 import { GENERATE_KIND, TERMINAL, type DialogueDeps } from "./context";
 const log = getLogger("dialogue");
 
@@ -39,14 +39,7 @@ export function createAgentSync(deps: DialogueDeps) {
 			await store.write((db) => {
 				const run = byId(db, runId);
 				if (!run || TERMINAL.includes(run.status)) return;
-				transition(
-					db,
-					run.id,
-					run.revision,
-					"failed",
-					clock(),
-					"agent_event_failed",
-				);
+				endRun(deps, db, run, "failed", "agent_event_failed");
 				agents!.failAnswerInTransaction(db, run.id, "agent_event_failed");
 			});
 			eventFailures.delete(eventId);
@@ -87,14 +80,7 @@ export function createAgentSync(deps: DialogueDeps) {
 							const root = agents!.byRootInTransaction(db, run.id);
 							if (root?.state !== "ready_for_answer") return;
 							if (root.deadline <= Date.now()) {
-								transition(
-									db,
-									run.id,
-									run.revision,
-									"failed",
-									clock(),
-									"deadline_exceeded",
-								);
+								endRun(deps, db, run, "failed", "deadline_exceeded");
 								agents!.failAnswerInTransaction(
 									db,
 									run.id,
@@ -148,12 +134,11 @@ export function createAgentSync(deps: DialogueDeps) {
 							await store.write((db) => {
 								const current = byId(db, run.id);
 								if (current && !TERMINAL.includes(current.status))
-									transition(
+									endRun(
+										deps,
 										db,
-										run.id,
-										current.revision,
-										root.state as Run["status"],
-										clock(),
+										current,
+										root.state as RunEndState,
 										root.error_code,
 									);
 							});

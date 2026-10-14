@@ -23,7 +23,7 @@ function setup(onClose?: () => void) {
 			artifactId: "old-image",
 			phase: "completed",
 			mime: "image/png",
-			actualModel: "qwen",
+			actualModel: "fixture-model",
 			errorCode: null,
 			createdAt: 1,
 			updatedAt: 1,

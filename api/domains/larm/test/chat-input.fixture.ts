@@ -68,8 +68,8 @@ export function imageLarmFixture(
 	});
 	const connection = () => ({
 		id: "vision-session",
-		profile: "ornith1.5Strix",
-		agentProfile: "ornith1.5Strix",
+		profile: "test-profile",
+		agentProfile: "test-profile",
 		status: "ready",
 		expiresAt: new Date(
 			Date.now() + (options.renew && revision === 1 ? 40000 : 900000),
@@ -84,8 +84,8 @@ export function imageLarmFixture(
 			return Response.json({
 				contractVersion: "agent-connection.v3",
 				catalogRevision: "rev",
-				requestedProfile: "ornith1.5Strix",
-				profiles: [{ id: "ornith1.5Strix", providers: [provider()] }],
+				requestedProfile: "test-profile",
+				profiles: [{ id: "test-profile", providers: [provider()] }],
 			});
 		if (path === "/v1/agent-connections")
 			return Response.json(connection(), { status: 201 });
@@ -173,6 +173,7 @@ export function imageLarmFixture(
 	};
 	const p = createLarm({
 		baseUrl: "http://127.0.0.1:9998",
+		profile: "test-profile",
 		token: "control-fixture",
 		fetch: request,
 	});

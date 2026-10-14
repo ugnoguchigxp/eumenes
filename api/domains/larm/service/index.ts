@@ -16,9 +16,6 @@ import type {
 	LarmCallOptions,
 } from "../contracts";
 import {
-	auxiliaryProfile,
-	defaultProfile,
-	unavailableAuxiliaryProfile,
 	type Fetcher,
 	type Lease,
 	type Provider,
@@ -75,12 +72,8 @@ export function createLarm(config: {
 		config.providerHosts?.map((host) => host.toLowerCase()) ?? [];
 	const token = config.token?.trim();
 	const request = config.fetch ?? fetch;
-	const profile = config.profile?.trim() || defaultProfile;
-	if (
-		profile === unavailableAuxiliaryProfile ||
-		profile === "ornith1.5Strix-64k"
-	)
-		throw new Error("larm_aux_not_enabled");
+	// The saved profile is the only source; without it the port reports larm_profile_missing instead of guessing.
+	const profile = config.profile?.trim() ?? "";
 	const audience = config.audience?.trim() || "saaa-desktop";
 	// LARM reuses a live connection for the same client/profile binding.
 	// Each port owns an independent session identity, retained across renew/reconnect.
@@ -129,7 +122,7 @@ export function createLarm(config: {
 	function status(): LarmStatus {
 		return {
 			state:
-				!token || !base
+				!token || !base || !profile
 					? "unconfigured"
 					: connecting
 						? "connecting"
@@ -150,9 +143,11 @@ export function createLarm(config: {
 				: [],
 			...(!base
 				? { error: "larm_base_url_unconfigured" }
-				: lastError
-					? { error: lastError }
-					: {}),
+				: !profile
+					? { error: "larm_profile_missing" }
+					: lastError
+						? { error: lastError }
+						: {}),
 		};
 	}
 	let previousStatus = JSON.stringify(status());
@@ -333,6 +328,7 @@ export function createLarm(config: {
 		if (closed) throw new Error("larm_closed");
 		if (!base) throw new Error("larm_base_url_unconfigured");
 		if (!token) throw new Error("larm_unconfigured");
+		if (!profile) throw new Error("larm_profile_missing");
 		if (lease && !lease.useCount && lease.idleAt <= Date.now()) discard(lease);
 		if (
 			!force &&
@@ -440,7 +436,6 @@ export function createLarm(config: {
 					id,
 					created: ready,
 					required,
-					profile,
 					catalogProviders,
 					fullProfile,
 					languageProvider: config.sentenceLanguageProvider,
@@ -723,15 +718,13 @@ export function createLarm(config: {
 		onDelta?: (text: string) => void,
 		options?: LarmCallOptions,
 	) {
-		if (profile !== defaultProfile)
-			return inferAnswer(messages, signal, onDelta, options);
 		const scoped = AbortSignal.any([signal, lifetime.signal]);
-		if (profile === defaultProfile && options?.sessionRole === "auxiliary") {
-			// Independent sessions share the current profile; admission and KV capacity belong to LARM.
+		if (options?.sessionRole === "auxiliary") {
+			// Independent sessions share the saved profile; admission and KV capacity belong to LARM.
 			return withProvider("llm", scoped, async () => {
 				const helper = createLarm({
 					...config,
-					profile: auxiliaryProfile,
+					profile,
 					client: `eumenes-helper-${crypto.randomUUID()}`,
 				});
 				auxiliarySessions.add(helper);
@@ -794,13 +787,15 @@ export function createLarm(config: {
 		...createSentenceLanguageOperations({
 			withProvider,
 			infer,
-			catalog: (signal) =>
-				fetchCatalog(
+			catalog: (signal) => {
+				if (!profile) throw new Error("larm_profile_missing");
+				return fetchCatalog(
 					(path, init, statuses) =>
 						control(path, { ...init, signal }, statuses),
 					profile,
 					[],
-				),
+				);
+			},
 		}),
 		decisionModel: () => lease?.providers.get("system-one")?.model ?? null,
 		async judge(state, questions, signal) {
@@ -861,34 +856,37 @@ export function createLarm(config: {
 			await connect(["llm"], undefined, true);
 		},
 		async conversationProfiles(signal) {
-			// A profile LARM does not publish stays listed without a model, so the saved choice remains visible.
-			return Promise.all(
-				[defaultProfile].map(async (selector) => {
-					try {
-						const catalog = record(
-							await readJson(
-								await control(
-									`/v3/agent-profiles?profile=${encodeURIComponent(selector)}`,
-									{ method: "GET", signal },
-									[200],
-								),
-							),
-						);
-						const entry = Array.isArray(catalog.profiles)
-							? record(catalog.profiles[0])
-							: {};
-						const llm = (
-							Array.isArray(entry.providers) ? entry.providers.map(record) : []
-						).find((p) => p.name === "llm");
-						return {
-							profile: selector,
-							model: typeof llm?.model === "string" ? llm.model : null,
-						};
-					} catch {
-						return { profile: selector, model: null };
-					}
-				}),
-			);
+			// The unselected catalog lists every profile; only those with an llm provider can hold a conversation.
+			try {
+				const catalog = record(
+					await readJson(
+						await control(
+							"/v3/agent-profiles",
+							{ method: "GET", signal },
+							[200],
+						),
+					),
+				);
+				return (
+					Array.isArray(catalog.profiles) ? catalog.profiles : []
+				).flatMap((item) => {
+					const entry = record(item);
+					const llm = (
+						Array.isArray(entry.providers) ? entry.providers.map(record) : []
+					).find((p) => p.name === "llm");
+					return llm && typeof entry.id === "string" && entry.id
+						? [
+								{
+									profile: entry.id,
+									model: typeof llm.model === "string" ? llm.model : null,
+								},
+							]
+						: [];
+				});
+			} catch {
+				// The catalog is unreachable; the saved choice stays visible without a model.
+				return profile ? [{ profile, model: null }] : [];
+			}
 		},
 		inspect() {
 			return {

@@ -47,30 +47,20 @@ test("background selection persists without changing inference permissions; old 
 		}).success,
 	).toBe(false);
 });
-test("new or missing profile selects Ornith while explicit saved choices survive reopening", async () => {
-	expect(defaults({}).larm.profile).toBe("ornith1.5Strix");
-	expect(defaults({ LARM_PROFILE: " " }).larm.profile).toBe("ornith1.5Strix");
-	expect(defaults({ LARM_PROFILE: "SAAA-gemma4-26b" }).larm.profile).toBe(
-		"SAAA-gemma4-26b",
+test("a fresh install has no profile; the env import and saved choices survive reopening", async () => {
+	expect(defaults({}).larm.profile).toBeUndefined();
+	expect(defaults({ LARM_PROFILE: " " }).larm.profile).toBeUndefined();
+	expect(defaults({ LARM_PROFILE: "env-profile" }).larm.profile).toBe(
+		"env-profile",
 	);
 	const h = await setup();
-	expect(h.settings.get().larm.profile).toBe("ornith1.5Strix");
+	expect(h.settings.get().larm.profile).toBeUndefined();
 	const missing = structuredClone(h.settings.get()) as {
 		larm: { profile?: string };
 	};
 	delete missing.larm.profile;
-	expect(settingsSchema.parse(missing).larm.profile).toBe("ornith1.5Strix");
-	const retired = h.settings.get();
-	retired.larm.profile = "SAAA-gemma4-26b";
-	await expect(
-		h.settings.apply({
-			requestId: crypto.randomUUID(),
-			expectedRevision: retired.revision,
-			settings: retired,
-			keys: [],
-		}),
-	).rejects.toThrow();
-	for (const profile of ["ornith1.5Strix", "ornith1.5Strix-64k"]) {
+	expect(settingsSchema.parse(missing).larm.profile).toBeUndefined();
+	for (const profile of ["test-profile", "test-profile-large"]) {
 		const s = h.settings.get();
 		s.larm.profile = profile;
 		await h.settings.apply({

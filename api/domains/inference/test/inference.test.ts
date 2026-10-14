@@ -508,7 +508,7 @@ test("provider diagnostics preserve the rejected and recovered Connection IDs on
 		localStream: async (_messages, _signal, delta, options) => {
 			await options?.onExchange?.({
 				connectionId: "old-connection",
-				model: "gemma4-26b-a4b",
+				model: "fixture-model",
 				started: Date.now(),
 				httpStatus: 409,
 				errorCode: "connection_idle_released",
@@ -517,7 +517,7 @@ test("provider diagnostics preserve the rejected and recovered Connection IDs on
 			});
 			await options?.onExchange?.({
 				connectionId: "replacement-connection",
-				model: "gemma4-26b-a4b",
+				model: "fixture-model",
 				started: Date.now(),
 				httpStatus: 200,
 			});
@@ -533,7 +533,7 @@ test("provider diagnostics preserve the rejected and recovered Connection IDs on
 	expect(usage[0]).toMatchObject({
 		source: "larm",
 		status: "succeeded",
-		model: "gemma4-26b-a4b",
+		model: "fixture-model",
 		accepted: 1,
 		providerDetails: [
 			{
@@ -551,7 +551,7 @@ test("a failed provider still saves the rejected Connection ID and error fields"
 		local: async (_messages, _signal, options) => {
 			await options?.onExchange?.({
 				connectionId: "rejected-connection",
-				model: "gemma4-26b-a4b",
+				model: "fixture-model",
 				started: Date.now(),
 				httpStatus: 409,
 				errorCode: "connection_idle_released",
@@ -978,6 +978,35 @@ test("control calls preserve exact context, stay local, skip emotion judgement, 
 			db.query("SELECT status,mode FROM inference_requests WHERE id=?").get(id),
 		),
 	).toEqual({ status: "rejected", mode: "control" });
+});
+
+test("the LARM route receives the control output schema and ordinary answers do not", async () => {
+	const seen: Array<Record<string, unknown> | undefined> = [];
+	const h = await setup({
+		local: async (_messages, _signal, options) => {
+			seen.push(options?.jsonSchema);
+			return "{}";
+		},
+	});
+	const outputSchema = {
+		type: "object",
+		properties: { done: { type: "boolean" } },
+		required: ["done"],
+		additionalProperties: false,
+	};
+	const id = await h.store.write((db) =>
+		h.inference.captureMaintenanceControlInTransaction(db, {
+			subject: "schema-route",
+			deadline: Date.now() + 30000,
+			maxOutputTokens: 512,
+		}),
+	);
+	await h.inference.executeControl(id, messages, new AbortController().signal, {
+		instructions: "step",
+		outputSchema,
+	});
+	await h.inference.answer(messages, new AbortController().signal);
+	expect(seen).toEqual([outputSchema, undefined]);
 });
 
 // RT-12: a probe row must never stay "running" and block new probes.

@@ -200,6 +200,7 @@ export function createFixture() {
 		const client = createClient(`http://127.0.0.1:${apiPort}`, options.token);
 		const settings = await client.settings();
 		settings.larm.baseUrl = `http://127.0.0.1:${larmPort}`;
+		settings.larm.profile = "test-profile";
 		await client.applySettings({
 			requestId: crypto.randomUUID(),
 			expectedRevision: settings.revision,

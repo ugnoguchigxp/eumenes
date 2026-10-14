@@ -7,7 +7,7 @@ import {
 } from "../../../infrastructure/vector";
 import type { ConversationService } from "../../conversation";
 import type { MemoryVectorSpace, TurnRecall } from "../contracts";
-import { isExcluded, turnVectorsBefore } from "../repository";
+import { isBlocked, turnVectorsBefore } from "../repository";
 
 /**
  * Exchanges and similarity of a recall. Embeddings of unrelated texts often score high (multilingual-e5 dot
@@ -43,6 +43,8 @@ type RecalledEntry = { at: string; user?: string; assistant?: string };
 function renderBlock(entries: readonly RecalledEntry[]): string {
 	return `${FRAME}\n${RECALL_BLOCK_OPEN}\n${safeJson(entries)}\n${RECALL_BLOCK_CLOSE}`;
 }
+/** The vector scan has no ordinal bound: what the prompt shows is left out by message id. */
+const ALL_ORDINALS = Number.MAX_SAFE_INTEGER;
 /** One message in a recalled exchange is cut here: a few short exchanges serve better than one long one. */
 const MESSAGE_CHARS = 500;
 
@@ -50,14 +52,12 @@ export type RecallInput = {
 	conversationId: string;
 	space: MemoryVectorSpace;
 	vector: ArrayLike<number>;
-	/** Only messages before this ordinal (the start of the verbatim window) are looked at. */
-	beforeOrdinal: number;
 	/** Most exchanges returned. */
 	limit: number;
 	minScore: number;
 	/** Size of the whole returned text. */
 	maxBytes: number;
-	/** Messages already in the prompt (the other recall): an exchange containing one is skipped. */
+	/** Messages already in the prompt (shown verbatim, pinned by the other recall): an exchange containing one is skipped. */
 	excludeMessageIds?: Iterable<string> | undefined;
 };
 
@@ -96,8 +96,10 @@ export function recallTurns(
 		db,
 		input.conversationId,
 		vectorSpaceKey(input.space),
-		input.beforeOrdinal,
+		ALL_ORDINALS,
 	)) {
+		// Shown messages cannot be recalled; leaving them out here keeps them from using up the attempts.
+		if (skipped.has(row.messageId)) continue;
 		const vector = unpackVector(row.vector);
 		if (vector.length !== dimension || input.vector.length !== dimension)
 			continue;
@@ -139,10 +141,8 @@ export function recallTurns(
 		if (
 			exchange.length === 0 ||
 			exchange.some(
-				({ message, ordinal }) =>
-					ordinal >= input.beforeOrdinal ||
-					skipped.has(message.id) ||
-					isExcluded(db, message.id),
+				({ message }) =>
+					skipped.has(message.id) || isBlocked(db, message.id),
 			)
 		)
 			continue;

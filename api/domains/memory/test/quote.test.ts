@@ -1,5 +1,10 @@
 import { expect, test } from "bun:test";
-import { locateQuote } from "../service/quote";
+import {
+	foldedLength,
+	locateQuote,
+	locateQuoteSpan,
+	normalizeKey,
+} from "../service/quote";
 
 test("an exact quote is returned as it is", () => {
 	expect(locateQuote("私はコーヒーが好きです", "コーヒーが好き")).toBe(
@@ -42,4 +47,39 @@ test("surrogate pairs are never cut", () => {
 	expect(found).toBe("𠮷野家 です");
 	// Every returned string is a literal slice of the text.
 	expect(text.includes(found as string)).toBe(true);
+});
+
+test("punctuation differences are forgiven", () => {
+	const text = "毎朝5時に起きて、走っています。";
+	expect(locateQuote(text, "毎朝5時に起きて走っています")).toBe(
+		"毎朝5時に起きて、走っています",
+	);
+	expect(locateQuote(text, "起きて，走って")).toBe("起きて、走って");
+	// Only punctuation folds to nothing.
+	expect(locateQuote(text, "、。")).toBeNull();
+});
+
+test("the span is where the text was found, not where the first copy of its words is", () => {
+	const text = "辛いものが好き。辛いものが好きです";
+	expect(locateQuoteSpan(text, "辛いものが好きです")).toEqual({
+		start: 8,
+		end: 17,
+	});
+	expect(locateQuoteSpan("a 一  二 b", "一二")).toEqual({ start: 2, end: 6 });
+	expect(locateQuoteSpan("私はお茶", "コーヒー")).toBeNull();
+});
+
+test("folded length counts what is left after normalization", () => {
+	expect(foldedLength("Ａ、 b")).toBe(2);
+});
+
+test("a key is lower case [a-z0-9._-] and at most 64 characters", () => {
+	expect(normalizeKey("  Food.Spicy ")).toBe("food.spicy");
+	expect(normalizeKey("a_b-c.1")).toBe("a_b-c.1");
+	expect(normalizeKey("")).toBeNull();
+	expect(normalizeKey("食べ物")).toBeNull();
+	expect(normalizeKey("a b")).toBeNull();
+	expect(normalizeKey("-x")).toBeNull();
+	expect(normalizeKey("a".repeat(64))).toBe("a".repeat(64));
+	expect(normalizeKey("a".repeat(65))).toBeNull();
 });

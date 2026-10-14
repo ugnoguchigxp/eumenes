@@ -16,7 +16,6 @@ import {
 	writeWindowRow,
 } from "../repository";
 import {
-	PENDING_LIMIT,
 	formatPeriod,
 	noteLines,
 	renderLongTerm,
@@ -24,6 +23,7 @@ import {
 	type StateLine,
 	type TendencyLine,
 } from "./context-render";
+import { buildHistory, type WindowHistory } from "./context-history";
 
 export type ImmediateKind =
 	| "state_stop"
@@ -57,7 +57,6 @@ export type WindowSnapshot = {
 		manifest: { itemId: string; revision: string }[];
 		/** Items the budget left out of `text` (not shown as "recently remembered" either). */
 		omitted: { itemId: string; revision: string }[];
-		publishedOn: string;
 		bytes: number;
 	};
 	shortTerm: {
@@ -67,6 +66,8 @@ export type WindowSnapshot = {
 		/** The State items behind "recently remembered": a usage receipt must name them too (forgetting purges by item). */
 		recentItemIds?: string[];
 	};
+	/** L3 (the exchanges kept verbatim) and the summary, from the exchange ledger at the time of the build. */
+	history: WindowHistory;
 	prefetch: WindowPrefetch;
 	notices: { id: string; text: string }[];
 	/** The earliest validFrom/validUntil of an active State item after the build time: crossing it changes what is current. */
@@ -80,13 +81,6 @@ const MAX_NOTICES = 5;
 /** A notice is one short sentence; longer text is cut so it cannot crowd out World. */
 export const MAX_NOTICE_CHARS = 200;
 const CONTRACT_VERSION = 1 as const;
-
-const pad = (n: number) => String(n).padStart(2, "0");
-/** The host's local date, `YYYY-MM-DD`. */
-function localDate(iso: string): string {
-	const date = new Date(iso);
-	return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-}
 
 /** The package's change counter for the shared profile: it moves whenever State there changes. */
 function latestStateChange(db: Database, policyRevision: string): number {
@@ -141,6 +135,8 @@ export function createContextWindowStore(deps: {
 		const row = readWindowRow(db, conversationId);
 		if (!row) return null;
 		const parsed = JSON.parse(row.snapshot) as WindowSnapshot;
+		// Built before the history was part of a window: the next read builds it again.
+		if (!parsed.history) return null;
 		cache.set(conversationId, parsed);
 		return parsed;
 	}
@@ -219,7 +215,6 @@ export function createContextWindowStore(deps: {
 				text: rendered.text,
 				manifest: rendered.manifest,
 				omitted: rendered.omitted,
-				publishedOn: localDate(now),
 				bytes: rendered.bytes,
 			};
 		} else
@@ -266,6 +261,7 @@ export function createContextWindowStore(deps: {
 							policyRevision: previous.inputs.policyRevision,
 						},
 			longTerm,
+			history: buildHistory(db, conversationId, previous?.history),
 			shortTerm: {
 				text: shortTerm.text,
 				bytes: shortTerm.bytes,
@@ -294,6 +290,11 @@ export function createContextWindowStore(deps: {
 		// A rolled-back transaction leaves the row behind this copy; the next read notices by buildId.
 		cache.set(conversationId, snapshot);
 		return snapshot;
+	}
+
+	function boundaryCrossed(snapshot: WindowSnapshot): boolean {
+		const boundary = snapshot.nextBoundaryMs ?? null;
+		return boundary !== null && Date.parse(clock()) >= boundary;
 	}
 
 	return {
@@ -334,19 +335,44 @@ export function createContextWindowStore(deps: {
 				snapshot = rebuildInTransaction(db, conversationId, {
 					refreshLongTerm: false,
 				});
-			const boundary = snapshot.nextBoundaryMs ?? null;
-			if (
-				!refreshed &&
-				(snapshot.longTerm.publishedOn !== localDate(clock()) ||
-					snapshot.shortTerm.pendingAdditions >= PENDING_LIMIT ||
-					(boundary !== null && Date.parse(clock()) >= boundary))
-			)
+			// Crossing the validity boundary changes what is current; the date changing or additions piling up do not.
+			if (!refreshed && boundaryCrossed(snapshot))
 				snapshot = rebuildInTransaction(db, conversationId, {
 					refreshLongTerm: true,
 				});
 			return snapshot;
 		},
 		rebuildInTransaction,
+		/**
+		 * The steward's republish (section 2.4): history, summary, short-term and notices are built again from the
+		 * ledger and State. L1 is rendered again only when `republishLongTerm` asks for it, there was no window, or
+		 * the conditions of readForRunInTransaction apply (an immediate change, a policy change, a validity
+		 * boundary crossed). It records no immediate change, so a run in flight is not expired by it.
+		 */
+		publishInTransaction(
+			db: Database,
+			conversationId: string,
+			opts: {
+				republishLongTerm?: boolean;
+				prefetch?: WindowPrefetch;
+				addNotices?: string[];
+			},
+		): WindowSnapshot {
+			const previous = current(db, conversationId);
+			let refresh = opts.republishLongTerm === true || !previous;
+			if (previous && !refresh) {
+				const inputs = readInputs(db, conversationId);
+				refresh =
+					inputs.immediateSeq !== previous.inputs.immediateSeq ||
+					inputs.policyRevision !== previous.inputs.policyRevision ||
+					boundaryCrossed(previous);
+			}
+			return rebuildInTransaction(db, conversationId, {
+				refreshLongTerm: refresh,
+				...(opts.prefetch ? { prefetch: opts.prefetch } : {}),
+				...(opts.addNotices ? { addNotices: opts.addNotices } : {}),
+			});
+		},
 		/**
 		 * Drops shown notices without re-rendering anything (it runs after the answer is saved and must not fail
 		 * on memory state). No stored window, or none of the ids present, is a no-op.

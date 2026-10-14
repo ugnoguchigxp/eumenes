@@ -312,3 +312,56 @@ test("the guard and the item limit apply to the memory agent, and expired items 
 		rmSync(dir, { recursive: true, force: true });
 	}
 });
+
+test("deleting by source message removes the notes and their text for good, moves the revision, and is idempotent", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "eumenes-continuity-del-"));
+	try {
+		const store = openStore(join(dir, "db.sqlite3"), [
+			migration,
+			shortTermMigration,
+		]);
+		const service = createContinuityService(store);
+		const mk = (
+			conversationId: string,
+			text: string,
+			sourceMessageId: string,
+		) =>
+			store.write((db) =>
+				service.addByAgentInTransaction(db, conversationId, {
+					kind: "memo",
+					text,
+					sourceMessageId,
+				}),
+			);
+		const a = await mk("c1", "忘れるべきメモ", "m1");
+		const b = await mk("c1", "残すメモ", "m2");
+		const closed = await mk("c2", "閉じた後も消すメモ", "m1");
+		await store.write((db) =>
+			service.closeByAgentInTransaction(db, closed.id, 1, "resolved"),
+		);
+		const before = service.snapshot("c1").revision;
+		const result = await store.write((db) =>
+			service.deleteBySourceMessagesInTransaction(db, ["m1", "m1", "none"]),
+		);
+		expect(result.deleted).toBe(2);
+		expect(new Set(result.noteIds)).toEqual(new Set([a.id, closed.id]));
+		expect(service.snapshot("c1").revision).toBeGreaterThan(before);
+		expect(service.list("c1", true).map((n) => n.id)).toEqual([b.id]);
+		expect(service.list("c2", true)).toEqual([]);
+		const dump = store.read((db) =>
+			JSON.stringify([
+				db.query("SELECT * FROM continuity_items").all(),
+				db.query("SELECT * FROM continuity_revisions").all(),
+			]),
+		);
+		expect(dump).not.toContain("忘れるべきメモ");
+		expect(dump).not.toContain("閉じた後も消すメモ");
+		const again = await store.write((db) =>
+			service.deleteBySourceMessagesInTransaction(db, ["m1"]),
+		);
+		expect(again).toEqual({ noteIds: [], deleted: 0 });
+		await store.close();
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
