@@ -100,7 +100,8 @@ API全経路・実機器の再測定は、採用候補が品質条件を満た�
 
 - 部分: 比較器の同一入力・schema・閾値試験、共通要求試験など81件成功。最終比較器単体は391 assertions成功。
 - ログ追加の部分試験: 共通reader、logger、LARM時間計測、比較器の23試験・498 assertions成功。不正な任意metadataで回答を変えないこと、本文・秘密がログへ出ないことを含む。
-- 結合: ログ追加後のLARM domain gate成功（150試験）。音声domain gate成功（backend 71、Web 42）は最終ログ追加後にも再確認中。inference直接試験66件成功（ログ追加前）。
+- 結合: ログ追加後のLARM domain gate成功（150試験）、音声domain gate成功（backend 71、Web 42）、inference domain gate成功（66試験）。
 - 型検査: ログ追加後も1,334ファイル成功。変更したTSファイルのformat/lint成功。
-- 全体: `verify-all-final.log` はbackend・Web試験を通過後、画面試験6件成功の時点でSIGTERM終了（143）。送信元は不明で成功扱いにしない。ログ追加後の `verify-all-timings.log` はformat成功後、担当外の `api/application/toolchain-history.test.ts:7` の未使用import `offlineBundleHost` によりlint失敗。担当外ファイルは修正していない。したがって全体gateの完走は未確認。
+- 全体: `verify-all-final.log` はbackend・Web試験を通過後、画面試験6件成功の時点でSIGTERM終了（143）。送信元は不明で成功扱いにしない。ログ追加後の `verify-all-timings.log` はformat成功後、担当外の `api/application/toolchain-history.test.ts:7` の未使用import `offlineBundleHost` によりlint失敗。その後の共用checkoutでは当該ファイルのlint成功を確認したが、全体gateの完走は未確認。担当外ファイルは本作業から修正していない。
+- 差分確認: 音声判定prompt/parserは作業開始時の `caa6ab0` と同一。例示・短縮・stream方式は比較器からのみ呼び、製品の意味判断への専用分岐追加はない。共用checkoutのHEADは途中で `b8808e8` へ進み、本作業の既存変更も含まれた。ここからcommit、push、branch作成、別チャットへの送信は行っていない。担当外のtimer/acceptance等の変更が残るため、全体gateの最終確認はそれらの確定後に必要。
 - context_compile / compile_evalはこの続行で各1回、会話全体では各3回。返された一般的な変更前後計測・変更範囲制御・段階検証を使用した。

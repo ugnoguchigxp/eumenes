@@ -15,6 +15,7 @@ import {
 	type Definition,
 } from "../contracts";
 import { getDocument, insertDocument, type DocumentKind } from "../repository";
+import { schemaInTransaction } from "./documents";
 import { bundleFiles } from "./bundle-files";
 import {
 	compileJsonSchemaSubset,
@@ -95,6 +96,7 @@ type Check = {
 	hasRevision: (id: string) => boolean;
 	hasDocument: (id: string, kind: DocumentKind) => boolean;
 	schemaRef: (ref: string, path: string) => void;
+	schemaResolves: (ref: string) => boolean;
 };
 
 function collectDocs(bundle: Parsed): Doc[] {
@@ -172,6 +174,7 @@ function createCheck(
 		storedRevision,
 		hasRevision: (id) => bundleDefinitions.has(id) || storedRevision(id),
 		hasDocument,
+		schemaResolves,
 		schemaRef: (ref, path) => {
 			if (!schemaResolves(ref)) issue("unknown_reference", path, ref);
 		},
@@ -229,6 +232,44 @@ function checkTool(
 		issue("schema_mismatch", `${at}/inputSchemaRef`, tool.inputSchemaRef);
 }
 
+/** Property names of an object schema reference, or null when it cannot be read. */
+function schemaProperties(c: Check, ref: string): string[] | null {
+	const local = c.bundle.schemas.find(
+		(x) => `schema:${x.id}@${x.revision}` === ref,
+	);
+	const json = local
+		? local.schema
+		: (() => {
+				const zod = schemaInTransaction(c.db, ref);
+				return zod ? (z.toJSONSchema(zod) as Record<string, unknown>) : null;
+			})();
+	const properties = json?.properties;
+	return properties && typeof properties === "object"
+		? Object.keys(properties)
+		: null;
+}
+
+/** Question schemas must be readable validators; the choice field must be one of their fields. */
+function checkQuestions(
+	c: Check,
+	questions: NonNullable<z.infer<typeof commandBindingV1>["questions"]>,
+	path: string,
+) {
+	const seen = new Set<string>();
+	questions.forEach((q, k) => {
+		const at = `${path}/questions/${k}`;
+		const ref = q.inputSchemaRef;
+		if (ref === "builtin:answerText" || seen.has(ref))
+			c.issue("invalid_format", `${at}/inputSchemaRef`, ref);
+		seen.add(ref);
+		if (ref.startsWith("domain:") || !c.schemaResolves(ref))
+			return c.issue("unknown_reference", `${at}/inputSchemaRef`, ref);
+		if (q.choiceField === undefined) return;
+		if (!schemaProperties(c, ref)?.includes(q.choiceField))
+			c.issue("schema_mismatch", `${at}/choiceField`, q.choiceField);
+	});
+}
+
 function checkCommandBinding(
 	c: Check,
 	b: z.infer<typeof commandBindingV1>,
@@ -253,6 +294,7 @@ function checkCommandBinding(
 			`${path}/artifactRevisionId`,
 			b.artifactRevisionId,
 		);
+	checkQuestions(c, b.questions ?? [], path);
 	const seen = new Set<string>();
 	b.tools.forEach((tool, j) =>
 		checkTool(c, tool, adapter, seen, `${path}/tools/${j}`),

@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite";
 import {
 	INTERACTION_POLICY,
-	choiceQuestionFields,
+	ANSWER_TEXT_SCHEMA,
 } from "../contracts/command-interactions";
 import type { BoundCommandSet } from "../contracts/toolchains";
 import type { Run } from "../contracts";
@@ -21,8 +21,9 @@ const MAX_OPEN_QUESTIONS_OFFERED = 3;
 const MAX_CHOICES = 20;
 
 /**
- * The host-issued choices of a choice question, and the schema it is really asked with: a
- * question that needs choices but has none falls back to free text.
+ * The question as it is really asked. The binding of the chain allows the schema (or it is the
+ * generic text); a schema with a `choiceField` carries the host-issued choices, and without any
+ * it falls back to free text.
  */
 function questionWithChoices(
 	deps: DialogueDeps,
@@ -30,8 +31,10 @@ function questionWithChoices(
 	set: BoundCommandSet,
 	schemaRef: string,
 ) {
-	if (!Object.hasOwn(choiceQuestionFields, schemaRef))
-		return { schemaRef, choicesJson: null };
+	if (schemaRef === ANSWER_TEXT_SCHEMA) return { schemaRef, choicesJson: null };
+	const allowed = set.questions.find((q) => q.inputSchemaRef === schemaRef);
+	if (!allowed) throw new Error("toolchain_command_invalid_contract");
+	if (!allowed.choiceField) return { schemaRef, choicesJson: null };
 	const choices = (
 		deps.toolchains?.bound?.questionChoicesInTransaction(
 			tx,
@@ -46,7 +49,7 @@ function questionWithChoices(
 		}));
 	return choices.length
 		? { schemaRef, choicesJson: JSON.stringify(choices) }
-		: { schemaRef: "builtin:answerText", choicesJson: null };
+		: { schemaRef: ANSWER_TEXT_SCHEMA, choicesJson: null };
 }
 
 /**

@@ -370,15 +370,4 @@ describe("other cases", () => {
 			"environment",
 		]);
 	});
-
-	test("rediscovery: creating a timer or never reloading fails", () => {
-		const c = criteriaOf("timer-rediscovery-01");
-		const seeded = tea(0, "active");
-		const r = judge(
-			c,
-			evidenceOf(c.caseId, [snap(0, [seeded]), snap(5, [seeded])]),
-		);
-		expect(r.verdict).toBe("failure");
-		expect(byId(r, "C3").code).toBe("page_not_reloaded");
-	});
 });

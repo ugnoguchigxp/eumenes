@@ -158,8 +158,7 @@ export function validateToolchain(
 		!d.useWhen.length ||
 		(d.examples?.length ?? 0) < 3 ||
 		d.examples!.some((e) => !e.trim() || e.length > 200) ||
-		!d.artifact ||
-		(d.artifact.kind === "component" && !d.artifact.component.trim()) ||
+		invalidArtifact(d) ||
 		(d.redirects ?? []).some((r) => !r.when.trim() || r.toolchainId === d.id)
 	)
 		throw new Error("invalid_toolchain");
@@ -174,6 +173,17 @@ export function validateToolchain(
 		)
 		.get(d.id, d.functionName);
 	if (taken) throw new Error("toolchain_function_conflict");
+}
+/**
+ * An unbound toolchain declares how its result is shown. A bound one is shown by its artifact
+ * registration, so `artifact` is neither required nor used there.
+ */
+function invalidArtifact(d: Definition) {
+	if (d.bindingRevisionId !== undefined) return false;
+	return (
+		!d.artifact ||
+		(d.artifact.kind === "component" && !d.artifact.component.trim())
+	);
 }
 /**
  * A bound toolchain names a stored command binding and the artifact it presents. Every tool

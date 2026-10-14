@@ -482,22 +482,6 @@ register("timer-final-state", {
 	},
 });
 
-register("timer-unchanged", {
-	schema: z.strictObject({ target }),
-	run(ctx, p) {
-		const id = resolve(ctx, p.target);
-		if (!id) return unresolved(p.target);
-		const before = ctx.initial?.get(id);
-		const latest = ctx.ev.hostSeries[ctx.ev.hostSeries.length - 1]!;
-		const now = latest.timers.find((x) => x.id === id);
-		if (!before || !now)
-			return unknown("target_missing", undefined, "environment");
-		return before.revision === now.revision && before.state === now.state
-			? ok("unchanged")
-			: violated("timer_modified", `${now.state}@${now.revision}`);
-	},
-});
-
 register("screen-mentions", {
 	schema: z.strictObject({
 		sets: z
@@ -572,15 +556,6 @@ register("interaction-lifecycle", {
 		)
 			return unmet("no_reload_while_waiting");
 		return ok("interaction_completed");
-	},
-});
-
-register("page-reloaded", {
-	schema: z.strictObject({ min: z.number().int().positive() }),
-	run(ctx, p) {
-		return ctx.ev.reloads.length >= p.min
-			? ok("page_reloaded", `${ctx.ev.reloads.length}回`)
-			: unmet("page_not_reloaded");
 	},
 });
 

@@ -35,7 +35,7 @@ const REVISION = "toolchain:fake.manage@1";
 const BINDING = "binding:fake.command@1";
 const PACKAGE = "package:fake.manage@1";
 const ADAPTER = "adapter:fake@1";
-const set: BoundCommandSet = {
+const baseSet: Omit<BoundCommandSet, "questions"> = {
 	bindingRevisionId: BINDING,
 	adapterRef: ADAPTER,
 	artifactRevisionId: "artifact:fake.workspace@1",
@@ -56,6 +56,11 @@ const set: BoundCommandSet = {
 		},
 	],
 };
+/** The question schemas this fake binding allows besides the generic text. */
+const QUESTIONS: BoundCommandSet["questions"] = [
+	{ inputSchemaRef: "builtin:timerDurationAnswer" },
+	{ inputSchemaRef: "builtin:timerTargetAnswer", choiceField: "timerId" },
+];
 const card: ToolchainCard = {
 	revisionId: REVISION,
 	id: "fake.manage",
@@ -103,8 +108,14 @@ function setup(
 		backend?: string;
 		bound?: boolean;
 		available?: boolean;
+		/** The binding's allowed question schemas (default: QUESTIONS). */
+		questions?: BoundCommandSet["questions"];
 	} = {},
 ) {
+	const set: BoundCommandSet = {
+		...baseSet,
+		questions: options.questions ?? QUESTIONS,
+	};
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-interactions-"));
 	const store: SqliteStore = openStore(join(dir, "db.sqlite3"), [
 		conversationMigration,
@@ -131,6 +142,7 @@ function setup(
 		commands: [] as Command[],
 	};
 	const conversationCalls: Call[] = [];
+	const commandSchemas: string[] = [];
 	const commandPrompts: Array<Array<{ role: string; content: string }>> = [];
 	const started: Array<Record<string, any>> = [];
 	const routed: string[][] = [];
@@ -146,8 +158,11 @@ function setup(
 		executeControl: async (
 			requestId: string,
 			prompt: Array<{ role: string; content: string }>,
+			_signal?: AbortSignal,
+			control?: { outputSchema?: unknown },
 		) => {
 			commandPrompts.push(prompt);
+			commandSchemas.push(JSON.stringify(control?.outputSchema ?? null));
 			await state.gate;
 			const next = state.commands.shift();
 			if (!next) throw new Error("fixture_command_missing");
@@ -234,6 +249,10 @@ function setup(
 			if (ref === "builtin:timerTargetAnswer")
 				return typeof value?.timerId === "string"
 					? { ok: true, value: { timerId: value.timerId } }
+					: { ok: false, code: "invalid_answer" };
+			if (ref === "schema:pick-item@1")
+				return typeof value?.itemId === "string"
+					? { ok: true, value: { itemId: value.itemId } }
 					: { ok: false, code: "invalid_answer" };
 			if (ref === "builtin:answerText") {
 				const text = typeof value?.text === "string" ? value.text.trim() : "";
@@ -355,6 +374,7 @@ function setup(
 		state,
 		conversationCalls,
 		commandPrompts,
+		commandSchemas,
 		started,
 		routed,
 		settled,
@@ -636,6 +656,82 @@ test("a target question carries the host's choices and accepts only one of them"
 	expect(h.rows("SELECT id FROM dialogue_runs")).toHaveLength(runs);
 	const accepted = await h.interactions.answer(interaction.id, body("timer-2"));
 	expect(accepted.replay).toBe(false);
+});
+
+test("a binding without questions allows only free text, and the model is offered no other schema", async () => {
+	const h = setup({ questions: [] });
+	h.state.commands.push({
+		action: "clarify",
+		question: "何秒ですか",
+		answerSchema: "builtin:timerDurationAnswer",
+	});
+	const refused = await h.commandRun();
+	await until(() => h.status(refused.id) === "failed");
+	expect(h.dialogue.get(refused.id)?.error).toBe(
+		"toolchain_command_invalid_contract",
+	);
+	expect(h.commandSchemas[0]).not.toContain("timerDurationAnswer");
+	expect(h.commandSchemas[0]).toContain("builtin:answerText");
+	expect(h.rows("SELECT id FROM command_interactions")).toHaveLength(0);
+	// Free text is always allowed.
+	h.state.commands.push({
+		action: "clarify",
+		question: "何秒ですか",
+		answerSchema: "builtin:answerText",
+	});
+	await h.commandRun();
+	await until(() => h.interaction()?.status === "waiting_input");
+	expect(h.interaction()!.question!.inputSchemaRef).toBe("builtin:answerText");
+});
+
+test("a binding with questions offers exactly those schemas to the model", async () => {
+	const h = setup();
+	h.state.commands.push({ action: "clarify", question: "どれ" });
+	await h.commandRun();
+	await until(() => h.commandPrompts.length === 1);
+	expect(h.commandSchemas[0]).toContain("builtin:timerDurationAnswer");
+	expect(h.commandSchemas[0]).toContain("builtin:timerTargetAnswer");
+	expect(h.commandSchemas[0]).toContain("builtin:answerText");
+});
+
+test("the choice field is the binding's: a schema with another field is validated the same way", async () => {
+	const h = setup({
+		questions: [
+			{ inputSchemaRef: "schema:pick-item@1", choiceField: "itemId" },
+		],
+	});
+	h.state.choices["schema:pick-item@1"] = [
+		{ ref: "item-a", label: "A" },
+		{ ref: "item-b", label: "B" },
+	];
+	await h.clarified("どの項目ですか", "schema:pick-item@1");
+	const interaction = h.interaction()!;
+	expect(interaction.question).toMatchObject({
+		inputSchemaRef: "schema:pick-item@1",
+		choices: h.state.choices["schema:pick-item@1"],
+	});
+	const body = (itemId: string) => ({
+		eventId: crypto.randomUUID(),
+		questionId: interaction.question!.questionId,
+		expectedRevision: 0,
+		input: { itemId },
+	});
+	await expect(
+		h.interactions.answer(interaction.id, body("item-z")),
+	).rejects.toThrow("invalid_answer");
+	expect(
+		(await h.interactions.answer(interaction.id, body("item-b"))).replay,
+	).toBe(false);
+});
+
+test("a schema without a choice field carries no choices even if the host has some", async () => {
+	const h = setup();
+	h.state.choices["builtin:timerDurationAnswer"] = [{ ref: "x", label: "X" }];
+	await h.clarified();
+	expect(h.interaction()!.question).toMatchObject({
+		inputSchemaRef: "builtin:timerDurationAnswer",
+	});
+	expect(h.interaction()!.question!.choices).toBeUndefined();
 });
 
 test("a target question without host choices is asked as free text", async () => {

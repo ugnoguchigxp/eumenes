@@ -25,6 +25,7 @@
 		"verify:all": "bun scripts/verify.ts --all",
 		"verify:live": "bun scripts/verify-live.ts",
 		"nl-acceptance": "bun scripts/nl-acceptance.ts",
+		"toolchain:bundle": "bun scripts/toolchain-bundle.ts",
 		"decision:bench": "python3 -B scripts/decision-bench/bench.py",
 		"decision:bench:check": "python3 -B scripts/decision-bench/bench.py self-test",
 		"build:design-system": "cd packages/design-system && bun run build",

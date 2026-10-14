@@ -165,6 +165,7 @@ export function createToolchainRouting(
 					adapterRef: doc.adapterRef,
 					artifactRevisionId: doc.artifactRevisionId,
 					packageRevisionId: set.package.revisionId,
+					questions: doc.questions ?? [],
 					tools: doc.tools.map((t) => {
 						const tool = set.tools.find(
 							(x) => x.revisionId === t.toolRevisionId,

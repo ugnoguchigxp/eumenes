@@ -4,7 +4,7 @@
 - ユーザーが明示的に依頼した場合を除き、新しい作業ブランチを作成せず、mainで作業する。
 - ユーザーの明示依頼なしに、別の Codex チャットへメッセージを送らない。SAAA と `hono-standard` は参照専用とし、製品 DB・設定・秘密をコピーしない。
 - domain の業務判断・SQL・試験を各 domain に置く。下位 domain は上位 domain を参照しない。複数 domain の保存は単一 writer の transaction と公開操作で行う。
-- ツールチェーンの追加・改訂は[登録と拡張の手順](docs/toolchain-extension.md)と[検証手順](docs/toolchain-extension-verification.md)に従う。UIが必要な場合は、登録手順のDesignSystem・OpenUI・Artifactの追加手順も参照する。
+- ツールチェーンの追加・改訂・移行はデータドリブン形式（bundle＋登録adapter）で行い、[登録と拡張の手順](docs/toolchain-extension.md)と[検証手順](docs/toolchain-extension-verification.md)に従う。作業順の要約は `.claude/skills/data-driven-toolchain/SKILL.md`。UIが必要な場合は、登録手順のDesignSystem・OpenUI・Artifactの追加手順も参照する。
 - Web と CLI は API を使い、DB を直接開かない。LARM credential は backend 内に留め、古い結果を取消後に採用しない。
 - LARM の接続先は SQLite に保存済みの設定を正本とする。接続先の環境変数を要求したり、利用者に同じ接続先を再確認したりしない。live 検証は backend の settings domain の読み取り専用操作を使い、テスト接続先は設定 API で保存する。
 - 画像生成は LARM の `SAAA-w-Image` / `qwen-image-2.1-turbo`（Qwen-Image 2.1 Turbo AD-Q4_K）を基本とする。サービス発見・確保応答の `services[].url` と `description` を確認し、手順は `docs/larm.md` に従う。参照画像編集は現行APIでは未対応。

@@ -20,7 +20,7 @@ streamでは、function名や制御区切りになり得る末尾だけを保留
 
 通常の会話入力から、登録済みのツールチェーン(定形セット)を選べます。`EUMENES_TOOLCHAIN_ENABLED` は既定 `1`、`0` なら従来の会話生成へ戻ります。内部JSONを読み上げや態度収集へ渡しません。子の待機中は推論枠を解放します。
 
-ツールチェーンは「サブエージェント・SystemContext・SKILL・ツールの使い方・ツール詳細・Artifact」の一組です([設計](../spec/toolchain-set-routing-design-2026-10-12.md)、[登録手順](toolchain-extension.md#0-ツールチェーン定形セットとして会話へ公開する))。会話担当の判断は「直接回答する・確認質問を返す・提示された関数を一つ呼ぶ」だけで、関数の引数は全ツールチェーン共通の `{ request }` です。経路・ツール・引数はツールチェーン内のサブエージェントが決めます。
+ツールチェーンは「サブエージェント・SystemContext・SKILL・ツールの使い方・ツール詳細・Artifact」の一組です([設計](../spec/toolchain-set-routing-design-2026-10-12.md)、[登録手順](toolchain-extension.md#1-全体像))。会話担当の判断は「直接回答する・確認質問を返す・提示された関数を一つ呼ぶ」だけで、関数の引数は全ツールチェーン共通の `{ request }` です。経路・ツール・引数はツールチェーン内のサブエージェントが決めます。
 
 調査担当には今回の依頼を渡し、検索キーワードは担当が選びます。過去の会話から出典URLを集めて渡しません。URLの直接読取りは今回の依頼に明示されたURL、今回の検索結果、今回の依頼に合う保存済み手順の候補に限ります。
 
@@ -86,7 +86,7 @@ profileは最大12要件・16 KiB、同時選択は4profile、合成後は12要�
 
 ## タイマーと音声
 
-タイマーは bundle 登録の `toolchain:timers.manage@2`（「タイマー（データドリブン）」）で、binding `binding:timers.command@1` と artifact `artifact:timers.workspace@1` を通じて登録 adapter `adapter:timers@1` が実行します（[登録手順](toolchain-extension.md#01-データ定義bundleと登録adapterで公開する)）。
+タイマーは bundle 登録の `toolchain:timers.manage@3`（「タイマー（データドリブン）」）で、binding `binding:timers.command@2`（確認質問の回答schemaを宣言）と artifact `artifact:timers.workspace@1` を通じて登録 adapter `adapter:timers@1` が実行します（[登録手順](toolchain-extension.md#3-bundleだけで追加改訂する)）。
 
 タイマーは権限・操作receiptを再検査したうえで、label、状態、残時間、期限を含む全itemsを回答モデルへ渡します。ページングされた一覧は `complete:false`、失敗は固定codeを含む構造化結果です。回答直前に状態をrefreshし、ユーザー本文を位置・内容検索で書き換えません。操作の再実行やホストでの定型文章化は行いません。
 

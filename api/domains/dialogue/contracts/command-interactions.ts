@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { schemaRefPattern } from "../../capabilities/contracts/bindings";
 
 /**
  * One operation's question and answer (spec §7). Dialogue owns the interaction: the question the
@@ -27,27 +28,14 @@ export const INTERACTION_POLICY = {
 	tombstoneRetentionMs: 30 * 24 * 60 * 60 * 1000,
 } as const;
 
-/** Registered question schemas. The model never defines a new schema. */
-export const questionSchemaRefs = [
-	"builtin:answerText",
-	"builtin:timerDurationAnswer",
-	"builtin:timerTargetAnswer",
-] as const;
-
-/**
- * Question schemas whose answer must be one of the host-issued choices, and the answer field
- * that names the chosen ref. Without choices such a question falls back to `builtin:answerText`.
- */
-export const choiceQuestionFields = {
-	"builtin:timerTargetAnswer": "timerId",
-} as const satisfies Partial<
-	Record<(typeof questionSchemaRefs)[number], string>
->;
+/** The generic question schema; every binding allows it. */
+export const ANSWER_TEXT_SCHEMA = "builtin:answerText";
 
 export const interactionQuestion = z.strictObject({
 	questionId: z.uuid(),
 	prompt: z.string().min(1).max(500),
-	inputSchemaRef: z.enum(questionSchemaRefs),
+	/** A registered schema ref; the binding of the chain decides which ones it may ask. */
+	inputSchemaRef: z.string().regex(schemaRefPattern),
 	revision: z.number().int().min(0),
 	expiresAt: z.iso.datetime({ offset: true }),
 	/** For target selection: the host-issued choices (id + label), never model text. */

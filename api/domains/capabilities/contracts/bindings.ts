@@ -47,6 +47,16 @@ export const bindingTool = z.strictObject({
 	inputSchemaRef: schemaRef,
 });
 
+/** A question schema a command binding allows (see `commandBindingV1.questions`). */
+export const bindingQuestion = z.strictObject({
+	inputSchemaRef: schemaRef,
+	choiceField: z
+		.string()
+		.regex(/^[A-Za-z][A-Za-z0-9_]{0,40}$/)
+		.optional(),
+});
+export type BindingQuestion = z.infer<typeof bindingQuestion>;
+
 /** A command toolchain executed by a typed host adapter. */
 export const commandBindingV1 = z.strictObject({
 	kind: z.literal("binding"),
@@ -59,6 +69,12 @@ export const commandBindingV1 = z.strictObject({
 	outputSchemaRef: schemaRef,
 	resultProjectionRef: hostRef("projection"),
 	artifactRevisionId: z.string().regex(artifactRevisionIdPattern),
+	/**
+	 * The question schemas the command sub-agent may ask with, besides the generic free-text
+	 * `builtin:answerText`. `choiceField` names the schema field the host fills from its own
+	 * choices (the adapter's `choicesInTransaction`); the model never offers choices itself.
+	 */
+	questions: z.array(bindingQuestion).max(8).optional(),
 });
 export type CommandBindingV1 = z.infer<typeof commandBindingV1>;
 

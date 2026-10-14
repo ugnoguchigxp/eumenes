@@ -89,6 +89,19 @@ export function createInteractionCore(deps: DialogueDeps) {
 		}
 	}
 
+	/** The answer field the frozen binding fills from host choices for this question's schema. */
+	function choiceFieldOf(tx: Database, row: InteractionRow) {
+		try {
+			return deps.toolchains
+				?.commandSetInTransaction(tx, row.chainRevisionId)
+				.binding?.questions.find(
+					(q) => q.inputSchemaRef === row.questionSchemaRef,
+				)?.choiceField;
+		} catch {
+			return undefined;
+		}
+	}
+
 	function addEvent(
 		tx: Database,
 		interactionId: string,
@@ -163,6 +176,7 @@ export function createInteractionCore(deps: DialogueDeps) {
 		nowMs,
 		view,
 		frozenValid,
+		choiceFieldOf,
 		addEvent,
 		checkBody,
 		settle,

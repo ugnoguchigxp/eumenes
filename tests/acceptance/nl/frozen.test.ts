@@ -38,7 +38,6 @@ describe("the committed frozen set", () => {
 			"timer-invalid-input-01",
 			"timer-network-loss-01",
 			"timer-question-continuation-01",
-			"timer-rediscovery-01",
 			"timer-ui-purpose-01",
 		]);
 	});
@@ -139,9 +138,9 @@ describe("the lock refuses a changed or unlocked set", () => {
 	test("an added file is unlocked and a deleted file is missing", () => {
 		const dir = copy();
 		writeFileSync(join(dir, "cases", "extra.json"), "{}");
-		rmSync(join(dir, "fixtures", "one-active-timer.json"));
+		rmSync(join(dir, "fixtures", "empty-timers-lost-response.json"));
 		expect(verifyLock(dir).sort()).toEqual([
-			"missing_file fixtures/one-active-timer.json",
+			"missing_file fixtures/empty-timers-lost-response.json",
 			"unlocked_file cases/extra.json",
 		]);
 	});

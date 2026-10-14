@@ -22,9 +22,9 @@ export function bundleFiles(): { name: string; raw: unknown }[] {
 		});
 }
 
-/** Function names of the toolchains shipped inside bundles. */
+/** Function names of the toolchains shipped inside bundles (one per name across revisions). */
 export function bundleToolchainFunctions(): string[] {
-	return bundleFiles().flatMap(({ raw }) => {
+	const names = bundleFiles().flatMap(({ raw }) => {
 		const definitions = (raw as { definitions?: unknown })?.definitions;
 		return Array.isArray(definitions)
 			? definitions.flatMap((d: { kind?: unknown; functionName?: unknown }) =>
@@ -34,4 +34,5 @@ export function bundleToolchainFunctions(): string[] {
 				)
 			: [];
 	});
+	return [...new Set(names)];
 }

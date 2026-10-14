@@ -121,6 +121,11 @@ export type BoundCommandSet = {
 		/** Flat JSON Schema projected from inputSchemaRef. */
 		schema: Record<string, unknown>;
 	}>;
+	/**
+	 * The question schemas this binding allows besides `builtin:answerText`, and which field
+	 * the host fills from its own choices.
+	 */
+	questions: Array<{ inputSchemaRef: string; choiceField?: string }>;
 };
 
 /**

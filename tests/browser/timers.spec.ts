@@ -10,19 +10,43 @@ const TOKEN = "fixture-token-for-toolchain-browser";
 const TITLE = "タイマー（データドリブン）";
 const ACTIONS = "/api/toolchain-actions";
 
-async function openSavedTimer(
+/**
+ * Opens the one launcher entry and starts a timer from the screen's own h/m/s fields.
+ * The label cannot be set from the UI, so the title is the default "<duration>のタイマー".
+ */
+async function startFromScreen(
 	page: Page,
-	label: string,
-	durationSeconds?: number,
+	{ hours = "0", minutes = "0", seconds = "0" } = {},
 ) {
 	await openFromLauncher(page, TITLE);
-	await page.getByRole("button", { name: "保存済みタイマーを選ぶ" }).click();
-	await page
-		.getByRole("menuitem")
-		.filter({
-			hasText: `${label}（${durationSeconds === undefined ? "" : `${durationSeconds}秒・`}`,
-		})
-		.click();
+	await page.getByLabel("時間", { exact: true }).fill(hours);
+	await page.getByLabel("分", { exact: true }).fill(minutes);
+	await page.getByLabel("秒", { exact: true }).fill(seconds);
+	const settled = page.waitForResponse(
+		(response) =>
+			response.request().method() === "POST" &&
+			response.url().endsWith(ACTIONS),
+	);
+	await page.getByRole("button", { name: "開始する", exact: true }).click();
+	const view = await (await settled).json();
+	expect(view.status).toBe("accepted");
+	return view.result.receipt.timer as { id: string; revision: number };
+}
+
+async function readTimer(
+	request: import("@playwright/test").APIRequestContext,
+	id: string,
+) {
+	const response = await request.get(
+		`http://127.0.0.1:${apiPort}/api/timers/${id}`,
+		{ headers: { authorization: `Bearer ${TOKEN}` } },
+	);
+	expect(response.ok()).toBe(true);
+	return (await response.json()).timer as {
+		state: string;
+		revision: number;
+		remainingSeconds: number;
+	};
 }
 
 test.setTimeout(60000);
@@ -63,7 +87,7 @@ test.afterAll(async () => {
 	await fixture.stopAll();
 });
 
-test("one timer launcher reopens multiple saved timers with the same name", async ({
+test("saved timers never add launcher entries or open tabs on load", async ({
 	page,
 	request,
 }) => {
@@ -90,24 +114,32 @@ test("one timer launcher reopens multiple saved timers with the same name", asyn
 			browserStarts++;
 	});
 	await page.goto(`http://127.0.0.1:${webPort}`);
+	await expect(page.getByText(/接続済み/)).toBeVisible({ timeout: 20000 });
+	// Seeded timers open nothing by themselves, before or after a reload.
+	await expect(page.getByRole("tab")).toHaveCount(0);
+	await page.reload();
+	await expect(page.getByText(/接続済み/)).toBeVisible({ timeout: 20000 });
+	await expect(page.getByRole("tab")).toHaveCount(0);
+	await expect(page.getByRole("timer")).toHaveCount(0);
 	await page.getByRole("button", { name: "アーティファクトを開く" }).click();
 	await expect(page.getByRole("menuitem", { name: /^タイマー/ })).toHaveCount(
 		1,
 	);
-	await page.getByRole("menuitem", { name: TITLE, exact: true }).click();
-	await page.getByRole("button", { name: "保存済みタイマーを選ぶ" }).click();
-	await page.getByRole("menuitem", { name: /^タイマー（1800秒・/ }).click();
-	await expect(page.getByText("30分のタイマー", { exact: true })).toBeVisible();
-	await page.reload();
-	await openSavedTimer(page, "タイマー", 3600);
 	await expect(
-		page.getByText("1時間のタイマー", { exact: true }),
-	).toBeVisible();
+		page.getByRole("menuitem", { name: TITLE, exact: true }),
+	).toHaveCount(1);
+	// No per-timer entry: no menu item mentions a duration or a start time.
+	await expect(page.getByRole("menuitem", { name: /秒・/ })).toHaveCount(0);
+	await page.getByRole("menuitem", { name: TITLE, exact: true }).click();
 	await expect(
 		page
 			.getByRole("tablist", { name: "アーティファクトのタブ" })
 			.getByRole("tab"),
 	).toHaveCount(1);
+	// The screen opens at its setup state; nothing was started from the browser.
+	await expect(
+		page.getByRole("button", { name: "開始する", exact: true }),
+	).toBeVisible();
 	expect(browserStarts).toBe(0);
 	for (const timer of saved) {
 		const cancelled = await request.post(
@@ -262,10 +294,6 @@ test("the timer launcher works before any timer exists and starts a saved clock"
 			animations: "disabled",
 		});
 	}
-	await page
-		.getByRole("button", { name: `${TITLE}を閉じる`, exact: true })
-		.click();
-	await openSavedTimer(page, "タイマー");
 	await expect(page.getByRole("timer")).toBeVisible();
 	await page.getByRole("button", { name: "停止する", exact: true }).click();
 	await expect(page.getByText("停止中", { exact: true })).toBeVisible();
@@ -274,17 +302,9 @@ test("the timer launcher works before any timer exists and starts a saved clock"
 		for (const [axis, value] of box.entries())
 			expect(pausedLayout[i]![axis]).toBeCloseTo(value, 0);
 	}
-	const saved = await request.get(
-		`http://127.0.0.1:${apiPort}/api/timers/${receipt.timer.id}`,
-		{ headers: { authorization: `Bearer ${TOKEN}` } },
-	);
-	const paused = (await saved.json()).timer;
+	const paused = await readTimer(request, receipt.timer.id);
 	expect(paused.state).toBe("paused");
 	const frozen = await page.getByRole("timer").innerText();
-	await page.reload();
-	await openSavedTimer(page, "タイマー");
-	await expect(page.getByText("停止中", { exact: true })).toBeVisible();
-	await expect(page.getByRole("timer")).toHaveText(frozen);
 	await expect(page.locator(".timer-workspace time")).toHaveCount(0);
 	if (process.env.EUMENES_TIMER_SCREENSHOTS === "1") {
 		await page.emulateMedia({ colorScheme: "dark" });
@@ -313,19 +333,12 @@ test("the timer launcher works before any timer exists and starts a saved clock"
 				.reduce((total, part) => total * 60 + part, 0);
 		})
 		.toBeLessThan(paused.remainingSeconds);
-	// Terminal cleanup avoids another default-label timer in later launcher tests.
-	const cleanup = await request.post(
-		`http://127.0.0.1:${apiPort}/api/timers/${receipt.timer.id}/cancel`,
-		{
-			headers: { authorization: `Bearer ${TOKEN}` },
-			data: {
-				requestId: crypto.randomUUID(),
-				issuedAt: new Date().toISOString(),
-				expectedRevision: resumed.timer.revision,
-			},
-		},
-	);
-	expect(cleanup.ok()).toBe(true);
+	// Pause again so the saved state can be checked after a reload without a ringing timer.
+	await page.getByRole("button", { name: "停止する", exact: true }).click();
+	await expect(page.getByText("停止中", { exact: true })).toBeVisible();
+	const pausedAgain = await readTimer(request, receipt.timer.id);
+	expect(pausedAgain.state).toBe("paused");
+	expect(frozen).toMatch(/^\d{2}:\d{2}:\d{2}$/);
 	await page
 		.getByRole("button", { name: "新しいタイマー", exact: true })
 		.click();
@@ -340,6 +353,32 @@ test("the timer launcher works before any timer exists and starts a saved clock"
 			.getByRole("tab", { name: TITLE, exact: true })
 			.count(),
 	).toBe(1);
+	// The screen cannot reopen an existing timer after a reload: no tab comes back, the
+	// launcher keeps its single entry, and the saved state stays readable from the API.
+	await page.reload();
+	await expect(page.getByText(/接続済み/)).toBeVisible({ timeout: 20000 });
+	await expect(page.getByRole("tab")).toHaveCount(0);
+	await page.getByRole("button", { name: "アーティファクトを開く" }).click();
+	await expect(page.getByRole("menuitem", { name: /^タイマー/ })).toHaveCount(
+		1,
+	);
+	await page.keyboard.press("Escape");
+	const afterReload = await readTimer(request, receipt.timer.id);
+	expect(afterReload.state).toBe("paused");
+	expect(afterReload.remainingSeconds).toBe(pausedAgain.remainingSeconds);
+	// Terminal cleanup avoids another default-label timer in later tests.
+	const cleanup = await request.post(
+		`http://127.0.0.1:${apiPort}/api/timers/${receipt.timer.id}/cancel`,
+		{
+			headers: { authorization: `Bearer ${TOKEN}` },
+			data: {
+				requestId: crypto.randomUUID(),
+				issuedAt: new Date().toISOString(),
+				expectedRevision: afterReload.revision,
+			},
+		},
+	);
+	expect(cleanup.ok()).toBe(true);
 });
 
 test("stopwatch continues across clock and artifact tabs, stops, resumes, resets and closes", async ({
@@ -497,25 +536,15 @@ test("a 90-second request opens the saved timer", async ({ page, request }) => {
 	expect(cancelled.ok()).toBe(true);
 });
 
-test("the 24-hour clock fits a narrow artifact and reopens from the launcher after reload", async ({
+test("the 24-hour clock fits a narrow artifact and its saved state survives a reload", async ({
 	page,
 	request,
 }) => {
-	const started = await request.post(`http://127.0.0.1:${apiPort}/api/timers`, {
-		headers: { authorization: `Bearer ${TOKEN}` },
-		data: {
-			requestId: crypto.randomUUID(),
-			issuedAt: new Date().toISOString(),
-			durationSeconds: 86400,
-			label: "24時間の時計",
-		},
-	});
-	expect(started.ok()).toBe(true);
 	await page.setViewportSize({ width: 375, height: 812 });
 	await page.goto(`http://127.0.0.1:${webPort}`);
-	await openSavedTimer(page, "24時間の時計");
+	const timer = await startFromScreen(page, { hours: "24" });
 	await expect(
-		page.getByText("24時間の時計", { exact: true }).last(),
+		page.getByText("24時間のタイマー", { exact: true }).last(),
 	).toBeVisible({ timeout: 20000 });
 	const clock = page.getByRole("timer");
 	await expect(clock).toHaveText(/24:00:00|23:59:\d\d/);
@@ -523,38 +552,34 @@ test("the 24-hour clock fits a narrow artifact and reopens from the launcher aft
 		(element) => element.scrollWidth <= element.clientWidth + 1,
 	);
 	expect(fits).toBe(true);
+	await page.getByRole("button", { name: "停止する", exact: true }).click();
+	await expect(page.getByText("停止中", { exact: true })).toBeVisible();
+	const paused = await readTimer(request, timer.id);
+	expect(paused.state).toBe("paused");
 	await page.reload();
 	await expect(page.getByText(/接続済み/)).toBeVisible({ timeout: 20000 });
 	await expect(page.getByRole("timer")).toHaveCount(0);
-	await openSavedTimer(page, "24時間の時計");
-	await expect(
-		page.getByText("24時間の時計", { exact: true }).last(),
-	).toBeVisible({ timeout: 20000 });
-	await expect(page.getByRole("timer")).toHaveText(/24:00:00|23:59:\d\d/);
-	await page.getByRole("button", { name: "停止する", exact: true }).click();
-	await expect(page.getByText("停止中", { exact: true })).toBeVisible();
+	await expect(page.getByRole("tab")).toHaveCount(0);
+	await page.getByRole("button", { name: "アーティファクトを開く" }).click();
+	await expect(page.getByRole("menuitem", { name: /^タイマー/ })).toHaveCount(
+		1,
+	);
+	await page.keyboard.press("Escape");
+	expect(await readTimer(request, timer.id)).toMatchObject({
+		state: "paused",
+		remainingSeconds: paused.remainingSeconds,
+	});
 });
 
 test("a persisted timer expires and its notice survives closing the clock", async ({
 	page,
 	request,
 }) => {
-	const started = await request.post(`http://127.0.0.1:${apiPort}/api/timers`, {
-		headers: { authorization: `Bearer ${TOKEN}` },
-		data: {
-			requestId: crypto.randomUUID(),
-			issuedAt: new Date().toISOString(),
-			durationSeconds: 20,
-			label: "終了通知の検証",
-		},
-	});
-	expect(started.ok()).toBe(true);
-	const { timer } = await started.json();
 	await page.goto(`http://127.0.0.1:${webPort}`);
 	await expect(page.getByText(/接続済み/)).toBeVisible({ timeout: 20000 });
-	await openSavedTimer(page, "終了通知の検証");
+	const timer = await startFromScreen(page, { seconds: "20" });
 	await expect(
-		page.getByText("終了通知の検証", { exact: true }).last(),
+		page.getByText("20秒のタイマー", { exact: true }).last(),
 	).toBeVisible();
 	await page
 		.getByRole("button", { name: `${TITLE}を閉じる`, exact: true })
@@ -562,7 +587,7 @@ test("a persisted timer expires and its notice survives closing the clock", asyn
 	const notice = page
 		.getByRole("status", { name: "タイマーの終了" })
 		.locator(".timer-notification")
-		.filter({ hasText: "終了通知の検証" });
+		.filter({ hasText: "20秒のタイマー" });
 	await expect
 		.poll(
 			async () =>
@@ -594,21 +619,11 @@ test("a persisted timer expires and its notice survives closing the clock", asyn
 
 test("the timer has usable controls and fits both themes and a narrow screen", async ({
 	page,
-	request,
 }) => {
-	const started = await request.post(`http://127.0.0.1:${apiPort}/api/timers`, {
-		headers: { authorization: `Bearer ${TOKEN}` },
-		data: {
-			requestId: crypto.randomUUID(),
-			issuedAt: new Date().toISOString(),
-			durationSeconds: 180,
-			label: "タイマー",
-		},
-	});
-	expect(started.ok()).toBe(true);
 	await page.setViewportSize({ width: 1440, height: 900 });
 	await page.goto(`http://127.0.0.1:${webPort}`);
-	await openSavedTimer(page, "タイマー");
+	// The default draft is 3 minutes.
+	await startFromScreen(page, { minutes: "3" });
 	await expect(page.getByText("3分のタイマー", { exact: true })).toBeVisible({
 		timeout: 20000,
 	});

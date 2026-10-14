@@ -65,6 +65,26 @@ bun test api/application/search-results.test.ts api/application/requirements-too
 
 ドキュメントだけの変更では、参照先と最小例の契約を確認し、製品試験・生成APIは再実行しない。検証中は実装を編集せず、結果記録は検証終了後に追記する。
 
+### データドリブン形式（bundle・adapter）を追加・変更した場合
+
+登録手順は[データドリブン形式の手順](toolchain-extension.md#3-bundleだけで追加改訂する)。変更した段階から次の順に確認する。
+
+1. **bundle**: `bun run toolchain:bundle -- check <bundle>` がissue無し。pinは `bun run toolchain:bundle -- pins <revisionId>...` の値と一致。旧revisionのhashが変わらないこと、fresh DBと旧版seed済みDBの両方で登録できること、二度目のseedが冪等であることを `api/domains/capabilities/test/bundles.test.ts` の形で確認する。
+2. **adapter**: 追加・変更した操作ごとに、正常・domainの拒否・同requestIdのreplay・revision競合・会話originの対象検査を単体で確認する。domainの業務判断はdomainの試験に置き、adapterでは接続だけを試す。
+3. **会話の結合**: 固定モデルで候補提示 → command → 保存receipt → 回答と、clarify → 質問保存 → 回答 → 再開を通す（例 `api/application/timer-toolchain.test.ts`、`api/domains/dialogue/test/command-interactions.test.ts`）。
+4. **UI操作**: 受付と実行の原子性、同eventIdの再送、異なる入力の409、時刻窓、source/action偽装の拒否、field errorの非保存は共通機構の試験（`api/domains/tool-runtime/test/action-requests.test.ts`）が持つ。新しいdomainでは、そのadapterを通る代表操作を1件以上の結合試験で通す。
+5. **Web**: Web adapterの試験（source解決、`settled` の反映、競合時の `refresh`、通信断のindeterminate）と、`bunx playwright test tests/browser/<domain>.spec.ts`。入口が一件であること、再読込みでタブが自動で増えないことを含める。
+6. **自然言語受入（必要な場合）**: 凍結ケースを `tests/acceptance/nl/` に置き `--freeze` でlockを更新、`bun run nl-acceptance -- --dry-run --case <id>` で計画を確認してから実行する（[自然言語UI受入](nl-acceptance.md)）。テスターモデルの能力が結果を左右するため、モデルと版を記録し、別モデルは別群にする。
+
+```sh
+bun run toolchain:bundle -- check api/domains/capabilities/bundles/<名前>.bundle.json
+bun run verify -- --domain capabilities
+bun run verify -- --domain tool-runtime
+bun run verify -- --domain dialogue
+bun test api/application/<domain>-*.test.ts
+bunx playwright test tests/browser/<domain>.spec.ts
+```
+
 ### 部分試験を厚くする項目
 
 - 公開の有無と提示schemaの一致、使えない担当の非公開。

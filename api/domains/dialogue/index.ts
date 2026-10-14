@@ -34,7 +34,7 @@ export {
 	interactionAnswer,
 	interactionCancel,
 	interactionStatuses,
-	questionSchemaRefs,
+	ANSWER_TEXT_SCHEMA,
 	type InteractionAnswer,
 	type InteractionAnswerResult,
 	type InteractionStatus,

@@ -5,7 +5,7 @@ import { getLogger, withLogContext } from "../../../infrastructure/logger";
 import { controlInstructions, type ControlContract } from "../../inference";
 import { recognitionCommand } from "../../capabilities";
 import type { HandlerDefinition } from "../../queue";
-import { questionSchemaRefs } from "../contracts/command-interactions";
+import { ANSWER_TEXT_SCHEMA } from "../contracts/command-interactions";
 import { delegationCommand } from "../contracts/delegation";
 import type { Run } from "../contracts";
 import { byId, linkAnswer, transition } from "../repository";
@@ -24,26 +24,34 @@ const log = getLogger("dialogue");
  * The sub-agent's whole contract: one tool of the set with flat arguments, or one question
  * back to the user. No discriminated union: the model fills one object.
  */
-const commandOutput = z
-	.object({
-		action: z.enum(["invoke", "clarify"]),
-		tool: z.string().min(1).max(64).optional(),
-		arguments: z.record(z.string(), z.unknown()).optional(),
-		question: z.string().trim().min(1).max(500).optional(),
-		/** The registered schema the user's answer to `question` is checked against. */
-		answerSchema: z.enum(questionSchemaRefs).optional(),
-	})
-	.strict()
-	.meta({
-		examples: [
-			{ action: "invoke", tool: "TOOLSのid", arguments: {} },
-			{
-				action: "clarify",
-				question: "ユーザーへの確認質問",
-				answerSchema: "builtin:answerText",
-			},
-		],
-	});
+function commandOutputFor(questionRefs: readonly string[]) {
+	return z
+		.object({
+			action: z.enum(["invoke", "clarify"]),
+			tool: z.string().min(1).max(64).optional(),
+			arguments: z.record(z.string(), z.unknown()).optional(),
+			question: z.string().trim().min(1).max(500).optional(),
+			/** The registered schema the user's answer to `question` is checked against. */
+			answerSchema: z
+				.enum([ANSWER_TEXT_SCHEMA, ...questionRefs] as [string, ...string[]])
+				.optional(),
+		})
+		.strict()
+		.meta({
+			examples: [
+				{ action: "invoke", tool: "TOOLSのid", arguments: {} },
+				{
+					action: "clarify",
+					question: "ユーザーへの確認質問",
+					answerSchema: ANSWER_TEXT_SCHEMA,
+				},
+			],
+		});
+}
+/** The question schemas a set may ask besides the generic text: its binding's, if any. */
+const questionRefsOf = (set?: {
+	questions: Array<{ inputSchemaRef: string }>;
+}) => set?.questions.map((q) => q.inputSchemaRef) ?? [];
 const COMMAND_RULES =
 	"あなたはこのツールチェーンの操作担当です。requestとoriginalRequestから現在の依頼を理解し、TOOLSから一つを選んでargumentsを入力定義どおりに埋め、invokeで返します。" +
 	"必要な値が依頼とsnapshotから一意に決まらない場合だけ、clarifyで確認質問を一つ返します。値を推測で補いません。" +
@@ -56,6 +64,7 @@ function commandPrompt(
 	set: { profile: string; skills: string[] },
 	tools: Array<{ id: string; description: string; inputSchema: unknown }>,
 	data: Record<string, unknown>,
+	questionRefs: readonly string[],
 ) {
 	const control: ControlContract = {
 		instructions:
@@ -66,7 +75,7 @@ function commandPrompt(
 			COMMAND_RULES +
 			"\nTOOLS=" +
 			JSON.stringify(tools),
-		outputSchema: z.toJSONSchema(commandOutput),
+		outputSchema: z.toJSONSchema(commandOutputFor(questionRefs)),
 	};
 	return {
 		control,
@@ -86,7 +95,7 @@ function commandPrompt(
 
 function parseToolCommand(
 	input: Pick<CommandInput, "backend" | "toolIds">,
-	out: z.infer<typeof commandOutput>,
+	out: z.infer<ReturnType<typeof commandOutputFor>>,
 ) {
 	const operation = out.tool ? input.toolIds[out.tool] : undefined;
 	if (!operation) throw new Error("toolchain_command_tool_unknown");
@@ -180,14 +189,19 @@ export function createToolchainCommandHandler(
 			}
 			if (!transition(tx, run.id, run.revision, "running", clock()))
 				return { status: "stale", reason: "run_changed" };
-			const prompt = commandPrompt(set, tools, {
-				request,
-				originalRequest: original,
-				...(set.backend === "dots" ? { catalog: snapshot } : { snapshot }),
-				...(resume?.exchanges.length
-					? { previousQuestions: resume.exchanges }
-					: {}),
-			});
+			const prompt = commandPrompt(
+				set,
+				tools,
+				{
+					request,
+					originalRequest: original,
+					...(set.backend === "dots" ? { catalog: snapshot } : { snapshot }),
+					...(resume?.exchanges.length
+						? { previousQuestions: resume.exchanges }
+						: {}),
+				},
+				questionRefsOf(set.binding),
+			);
 			const requestId = larm.captureControlInTransaction(tx, {
 				subject: `toolchain:${run.id}:command`,
 				policySubject: run.id,
@@ -233,7 +247,9 @@ export function createToolchainCommandHandler(
 				} catch {
 					throw new Error("toolchain_command_invalid_json");
 				}
-				const parsed = commandOutput.safeParse(value);
+				const parsed = commandOutputFor(
+					questionRefsOf(input.boundSet),
+				).safeParse(value);
 				if (!parsed.success)
 					throw new Error("toolchain_command_invalid_contract");
 				const out = parsed.data;

@@ -37,6 +37,32 @@
 			},
 			"bindingRevisionId": "binding:timers.command@1",
 			"artifactRevisionId": "artifact:timers.workspace@1"
+		},
+		{
+			"kind": "toolchain",
+			"id": "timers.manage",
+			"revision": 3,
+			"title": "タイマー（データドリブン）",
+			"summary": "相対時間のタイマーを開始・確認・取消する",
+			"aliases": ["タイマー"],
+			"tags": [],
+			"useWhen": [
+				"何分後に知らせてほしい",
+				"タイマーの残り時間を知りたい",
+				"タイマーを止めたい"
+			],
+			"avoidWhen": ["時刻指定の予定", "繰り返しのアラーム"],
+			"examples": [
+				"3分のタイマーをセットして",
+				"タイマーあと何分？",
+				"パスタのタイマーを止めて"
+			],
+			"dependencies": ["package:timers.manage@1"],
+			"packageRevisionId": "package:timers.manage@1",
+			"functionName": "timer",
+			"redirects": [],
+			"bindingRevisionId": "binding:timers.command@2",
+			"artifactRevisionId": "artifact:timers.workspace@1"
 		}
 	],
 	"bindings": [
@@ -67,6 +93,43 @@
 			"outputSchemaRef": "domain:timers.receipt@1",
 			"resultProjectionRef": "projection:timer-result@1",
 			"artifactRevisionId": "artifact:timers.workspace@1"
+		},
+		{
+			"kind": "binding",
+			"id": "timers.command",
+			"revision": 2,
+			"execution": "command",
+			"adapterRef": "adapter:timers@1",
+			"availabilityRef": "availability:timers@1",
+			"tools": [
+				{
+					"toolRevisionId": "tool:timer.start@1",
+					"operationId": "timers.start",
+					"inputSchemaRef": "builtin:timerStart"
+				},
+				{
+					"toolRevisionId": "tool:timer.list@1",
+					"operationId": "timers.list-with-receipt",
+					"inputSchemaRef": "builtin:timerList"
+				},
+				{
+					"toolRevisionId": "tool:timer.cancel@1",
+					"operationId": "timers.cancel",
+					"inputSchemaRef": "builtin:timerCancel"
+				}
+			],
+			"outputSchemaRef": "domain:timers.receipt@1",
+			"resultProjectionRef": "projection:timer-result@1",
+			"artifactRevisionId": "artifact:timers.workspace@1",
+			"questions": [
+				{
+					"inputSchemaRef": "builtin:timerDurationAnswer"
+				},
+				{
+					"inputSchemaRef": "builtin:timerTargetAnswer",
+					"choiceField": "timerId"
+				}
+			]
 		}
 	],
 	"artifacts": [

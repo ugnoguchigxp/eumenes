@@ -2,7 +2,6 @@ import type { Database } from "bun:sqlite";
 import { canonicalJson, sha256Hex } from "../../../infrastructure/digest";
 import {
 	INTERACTION_POLICY,
-	choiceQuestionFields,
 	type InteractionAnswer,
 	type InteractionAnswerResult,
 	type InteractionView,
@@ -32,7 +31,15 @@ export function createInteractionAnswers(
 	accept: (db: Database, input: Accept) => { run: Run; fresh: boolean },
 ) {
 	const { store, queue, clock } = deps;
-	const { nowMs, view, frozenValid, addEvent, settle, expireDue } = core;
+	const {
+		nowMs,
+		view,
+		frozenValid,
+		choiceFieldOf,
+		addEvent,
+		settle,
+		expireDue,
+	} = core;
 	return {
 		/**
 		 * The conversation model answered an open question in natural language: the run that
@@ -144,12 +151,13 @@ export function createInteractionAnswers(
 						body.input,
 					);
 					if (!parsed.ok) return { ok: false, code: "invalid_answer" };
-					// A choice question accepts only a ref the host issued with it.
+					// A choice question accepts only a ref the host issued with it. The field comes
+					// from the frozen binding, so it validates the same way after a restart.
 					const field = row.questionChoicesJson
-						? (choiceQuestionFields as Record<string, string>)[
-								row.questionSchemaRef ?? ""
-							]
+						? choiceFieldOf(tx, row)
 						: undefined;
+					if (row.questionChoicesJson && !field)
+						return { ok: false, code: "version_invalidated" };
 					if (field) {
 						const chosen = (parsed.value as Record<string, unknown> | null)?.[
 							field

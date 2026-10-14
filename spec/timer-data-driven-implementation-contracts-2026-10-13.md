@@ -82,3 +82,9 @@
 - 固定試験: `bun run verify:all` で size-budget・SQL境界・domain文書・format・lint・typecheck・backend 1953 pass・Web 442・client 360・design-system 1139・web build が通過。Playwright は 65 pass / 3 fail。失敗3件（`voice.spec.ts` のexcalidraw operations再取得回数、`settings-voice-sample.spec.ts`、`timers.spec.ts` の期限到達後TTS再生）は、いずれも本変更の外の音声・Excalidraw経路で、他作業の未commit変更と重なるため原因は未確定。`tests/browser/timers.spec.ts` の他9件は通過。
 - 自然言語受入: `bun test tests/acceptance` 67 pass（判定器・lock・driver結合）。pilot（主case v2、UI専用surface、tester = LARM ornith1.5、4群×3、費用0 USD）は **12 run 中 success 0**（failure 11、inconclusive 1）。基準（各群3/3）に未達。baseline（移行前UI）も同じく0/3で、testerが右上の入口から画面を開けない・未実施の操作を完了と申告する・3分を3秒と誤入力する、が主因（判定は全てhost状態から未達成で、AI自己申告を成功扱いしていない）。testerモデルの能力不足が支配的で、新UIと旧UIの差は測れていない。pilot実施中に受入runnerの欠陥を3件修正した（UI専用surfaceの未定義→会話欄の除外、初回観測のtimeout→読込み待ちと再試行、境界判定のfail-open→fail-closed）。無効試行の証拠は `verification-reports/nl-acceptance/aborted-harness-v1/`・`v2/` に分けて保存。
 - 未実施: 会話LLMを使うcase（`--with-product-llm`）、別testerモデルでの群、実機器受入。
+
+## 4. 実装後の変更（2026-10-14）
+
+- 利用者判断により、タイマー画面の「保存済みタイマーを選ぶ」（`TimerPicker`）と、共通hostのWeb adapterの `chrome` 枠（この部品専用だった）を削除した。再読込み後に既存timerを画面から開き直す手段はなく、会話のreceiptと期限到達の通知から開く。
+- これに伴い、自然言語受入の凍結ケース `timer-rediscovery-01` とその専用check（`page-reloaded`・`timer-unchanged`）・fixture（`one-active-timer`）を削除し、lockを更新した。固定ブラウザ試験 `tests/browser/timers.spec.ts` は保存済み選択を使わない形へ書き換えた。
+- タイマー固有の部分を汎用層から外した。確認質問の回答schema（所要時間・対象timer選択）はdialogueの固定一覧ではなく binding の `questions` で宣言する（`binding:timers.command@2`）。binding を持つtoolchainでは旧形式の `artifact` 項目を不要（使わない）にした（`toolchain:timers.manage@3`）。@2・binding@1 は残るので、公開を@2へ戻す切戻しも引き続き可能。
