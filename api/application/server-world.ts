@@ -4,14 +4,17 @@ import {
 	createWorldAssembly,
 	defaultWorldJournalPath,
 	resolveWorldCursorSecret,
+	resolveWorldMode,
 } from "./world";
 import { createWorldForeground } from "./world-foreground";
 
 type WorldInput = Parameters<typeof createWorldAssembly>[0];
 
 /**
- * World as the server runs it: nothing with World OFF; Local extraction and its foreground
- * priority (P4-02, P4-03) only with World ON.
+ * World as the server runs it. The mode is decided here, once, from the saved setting
+ * `world.enabled` and the presence of World content (see `resolveWorldMode`): nothing when off;
+ * lifecycle only for protect; Local extraction and its foreground priority (P4-02, P4-03)
+ * only with World ON.
  */
 export function assembleServerWorld(
 	config: Config,
@@ -25,18 +28,19 @@ export function assembleServerWorld(
 	},
 ) {
 	const { store, conversation, memory, queue, inference } = deps;
+	const mode = resolveWorldMode(store);
 	const worldForeground =
-		config.worldMode === "on"
+		mode === "on"
 			? createWorldForeground({ store, queue, inference })
 			: undefined;
 	const world =
-		config.worldMode === "off"
+		mode === "off"
 			? undefined
 			: createWorldAssembly({
 					store,
 					conversation,
 					memory,
-					mode: config.worldMode,
+					mode,
 					journalPath: resolve(
 						config.worldJournalPath ??
 							defaultWorldJournalPath(deps.memoryJournalPath),
@@ -46,7 +50,7 @@ export function assembleServerWorld(
 						keyDir: config.env.EUMENES_KEY_DIR,
 						env: { EUMENES_WORLD_CURSOR_SECRET: config.worldCursorSecret },
 					}),
-					...(config.worldMode === "on"
+					...(mode === "on"
 						? {
 								extraction: {
 									queue,

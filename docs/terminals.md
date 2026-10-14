@@ -30,7 +30,7 @@ Claude Code への依頼は、PTY に直接書かずに **作業依頼表（SQLi
 - 上限（既定4）は **生きているプロセス** だけで数える。上限に達していたら、依頼がなく idle の `kanban:*` の PTY のうち最後に使った時刻が最も古いものを閉じて空ける（会話は残る）。`direct` は自動で閉じず、空けられなければ `queued` のまま待つ。終了した PTY は一覧に最大8件残る。
 - 本文は引数として渡し、shell を通さない。`-` で始まる本文はオプションと解釈されないよう先頭に空白を足す。貼り付けは bracketed paste。
 - 起動時に指定する作業ディレクトリは、依頼の `projectId`（登録済みのプロジェクトだけ）から host が決める。入力からパスを受け取らない。当面の登録は `eumenes`（backend の作業ディレクトリ）だけ。
-- 受け付けない場合: フックの宛先が無効・`curl` が無い・保存先（store）が無い → `terminal_tracking_unavailable`、未登録のプロジェクト → `terminal_project_unknown`、同じ id で中身が違う → `terminal_request_conflict`（同じなら保存済みを返す replay）。
+- 受け付けない場合: フックの宛先が無効・`curl` が無い・保存先（store）が無い → `terminal_tracking_unavailable`、未登録のプロジェクト → `terminal_project_unknown`、同じ id で中身が違う → `terminal_request_conflict`、制御文字を含む本文 → `terminal_prompt_invalid`（同じなら保存済みを返す replay）。
 - 会話の回答に渡すのは `{delivered:"queued", task, completed:false, reportedWhenDone:true}` だけ。受領票（`domain:claude-code.receipt@1`）は保存時に固定される `{attemptId, task, target}` で、状態は表から読む。同じ operation の requestId は同じ依頼を指す。作業中の PTY へはすぐ貼り付けず、作業が終わってから送る。
 
 command 担当の SystemContext は、登録 profile・SKILL・共通の操作規則・TOOLS（入力定義）の順に合成され、snapshot として現在のセッション一覧（名前と状態だけ、上限）を受け取る。依頼文は command 担当が作る。
@@ -44,7 +44,7 @@ command 担当の SystemContext は、登録 profile・SKILL・共通の操作�
 
 ## フックと追跡
 
-状態は画面を読まず、Claude Code 自身のフックで受け取る。起動ごとに `--settings <file>` で `SessionStart`・`UserPromptSubmit`・`PostToolUse`・`Notification`・`Stop` のフックを足す（利用者の設定ファイルは変えない）。設定は 0600 の一時ファイルで渡し、実行の終了で消すので、token はプロセスの引数に出ない。フックは `curl -q --noproxy '*'`（利用者の curlrc とプロキシを使わない）で backend の `POST /hooks/terminals/:id` に送る。認証はその実行だけに有効な使い捨て token（`x-eumenes-hook-token`、再起動で変わる）で、本文を読む前に照合する。API token は子に渡さない。本文は 512 KiB まで。フックの宛先は `http://127.0.0.1|localhost|[::1]:<port>` だけを受け付け、それ以外ではフックを付けない（この場合は依頼を受け付けない）。
+状態は画面を読まず、Claude Code 自身のフックで受け取る。起動ごとに `--settings <file>` で `SessionStart`・`UserPromptSubmit`・`PostToolUse`・`Notification`・`Stop` のフックを足す（利用者の設定ファイルは変えない）。設定は 0600 の一時ファイルで渡し、実行の終了で消す。token は設定にもプロセスの引数にも書かず、設定の隣の 0600 のファイル（`….header`、`x-eumenes-hook-token: <token>` の一行）に置いて `curl -H @<file>` で読ませるので、`ps` に出ない（設定と一緒に消す）。フックは `curl -q --noproxy '*'`（利用者の curlrc とプロキシを使わない）で backend の `POST /hooks/terminals/:id` に送る。認証はその実行だけに有効な使い捨て token（`x-eumenes-hook-token`、再起動で変わる）で、本文を読む前に照合する。API token は子に渡さない。本文は 4 MiB まで（`PostToolUse` は編集内容を含み大きくなり得る）。超えた本文は 413 で拒み、`terminals.hook_too_large`（`attemptId` のみ）を記録する。フックの宛先は `http://127.0.0.1|localhost|[::1]:<port>` だけを受け付け、それ以外ではフックを付けない（この場合は依頼を受け付けない）。
 
 **依頼への結び付けは `prompt_id`**（実機 Claude Code 2.1.299 で、同じ turn の `UserPromptSubmit`・`PostToolUse`・`Notification`・`Stop` が同じ `prompt_id` を持つことを確認。[記録](../spec/verification/claude-code-requests-2026-10-14/README.md)）。payload の `session_id` がその PTY の会話 ID（`--session-id` / `--resume`）と違うフックは捨てる。
 
@@ -58,8 +58,14 @@ command 担当の SystemContext は、登録 profile・SKILL・共通の操作�
 | 実行の終了 | `delivered`・`started` の依頼は `ended`（`--resume` で `SessionStart` が無ければ `resume_failed`）。`stop()` で止めたときだけ `unknown（stopped_by_person）` |
 
 - 終端は一つの writer transaction で、表の更新と `onFinishedInTransaction` の購読者を一緒に行う（購読者が例外なら終端も巻き戻る）。保存に失敗したらフックの応答は 503 にし、次のフック・5秒ごとの見直しで一度だけ再試行する。再試行も失敗したら依頼は `started` のまま（`terminals.finish_save_failed`、`attemptId` のみ）。
-- `stop(attemptId)`: その PTY に SIGTERM、5秒で SIGKILL。10秒以内に終了を確認したら `unknown（stopped_by_person）` を書いて購読者を呼ぶ。確認できなければ何も書かず `unconfirmed`。
-- 起動時の `recover()`: `queued → cancelled（restarted）`、`sending`・`delivered`・`started → unknown（restarted）`（購読者を同じ transaction で呼ぶ）。
+- `stop(attemptId)`: その PTY に SIGTERM、5秒で SIGKILL。10秒以内に終了を確認したら `unknown（stopped_by_person）` を書いて購読者を呼ぶ（`stopped`）。確認できなければ何も書かず `unconfirmed`。すでに終端なら何も書かず `final`。PTY へ渡している最中（`sending`、まだ PTY が登録されていない）は渡し終える（または失敗する）のを待ってから止める。未送信（`queued`）は `terminal_not_running`（取消を使う）。
+- 起動時の `recover()`: `queued → cancelled（restarted）`、`sending`・`delivered`・`started → unknown（restarted）`（購読者を同じ transaction で呼ぶ）。**`recover()` が終わるまで送信器は何も送らない**（起動前の古い `queued` を送らないため）。
+- 追跡できなくなった（`tracking_lost`）ときは PTY を閉じ、プロセスの終了を確認してから `unknown（tracking_lost）` を書く。10秒以内に終了を確認できなければ `unknown（stop_unconfirmed）` を書き、Kanban は待ち行列を止める。
+- `/clear` などで Claude の `session_id` が変わる（`SessionStart` の `source: clear`、または実行開始後に別の `session_id`）と、その PTY の `delivered`・`started` の依頼は `interrupted`。以降は新しい `session_id` で activity だけを追う（依頼の `claudeSessionId` は変えない）。
+- 作業中・許可待ちのまま Stop が来ない PTY（Esc での中断）: 依頼が載っていない `working`・`waiting` は、最後のフックから30分で Kanban の単一実行の判定に数えない（`activities()` に `stale: true`）。
+- 受け付けない本文: `\n`・`\t` 以外の制御文字（C0・C1。`ESC` で bracketed paste を終わらせて残りをキー入力にできるため）は `terminal_prompt_invalid`（400）。貼り付け時も `ESC` を除く。`owner` が `kanban:*` の依頼は `exclusiveGroup: "kanban"` に固定する。
+- 保存期間: 終端の依頼は30日で、また新しい2000件を超えた分を `pruneInTransaction(tx, now)` で削除する（host が定期的に呼ぶ。未完了の依頼は消さない）。
+- 終了済みの Kanban のセッションを画面から再起動するとき、同じ `claudeSessionId` の生きた PTY があれば `terminal_conversation_busy`（409）。
 - git の制限: **`owner` が `kanban:` で始まり `mode` が `work` の PTY だけ**、設定ファイルに `permissions.deny: ["Bash(git commit *)", "Bash(git push *)"]` を入れて起動する（実機で `git commit`・`git push` が止まることを確認）。直接依頼（`direct`）は利用者がその場で明示した作業なので制限しない。`mode: commit` は制限を外した設定で `--resume` する。
 
 ## 完了の報告と SE

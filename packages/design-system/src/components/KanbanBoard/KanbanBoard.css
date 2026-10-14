@@ -64,6 +64,9 @@
 	gap: 6px;
 	margin: 0;
 }
+.kanban-queue .kanban-queue-manual {
+	flex-basis: 100%;
+}
 .kanban-queue[data-state="paused"] {
 	color: var(--foreground);
 	border-color: var(--warning);

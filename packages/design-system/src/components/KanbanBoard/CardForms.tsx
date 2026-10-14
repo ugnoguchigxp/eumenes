@@ -11,8 +11,31 @@ import { Input } from "../Input";
 import { Textarea } from "../Textarea";
 
 export const TITLE_MAX = 40;
-export const PROMPT_MAX = 8000;
+/** A task request is the prompt plus fixed instructions; the host sends at most 8000 in all. */
+export const PROMPT_MAX = 7850;
 export const NOTE_MAX = 4000;
+/**
+ * A follow-up is sent with the note as a JSON string (a line break counts 2, a quote 2). The host
+ * accepts a little more than this (about 7800); the screen stays below it on purpose.
+ */
+export const NOTE_QUOTED_MAX = 6500;
+
+/** What the note takes in the request, escapes included (without the quotes around it). */
+const quotedLength = (note: string) => JSON.stringify(note).length - 2;
+
+function Remaining({ id, left }: { id: string; left: number }) {
+	return (
+		<p
+			id={id}
+			className={left < 0 ? "kanban-message" : "kanban-muted"}
+			role={left < 0 ? "alert" : undefined}
+		>
+			{left < 0
+				? `${-left}字 長すぎます。短くしてください。`
+				: `残り ${left} 字`}
+		</p>
+	);
+}
 
 const cancelOnEscape =
 	(onCancel: () => void) => (event: KeyboardEvent<HTMLFormElement>) => {
@@ -39,7 +62,7 @@ export function TaskForm({
 	onSubmit,
 	onCancel,
 }: TaskFormProps) {
-	const ids = { title: useId(), prompt: useId() };
+	const ids = { title: useId(), prompt: useId(), left: useId() };
 	const [title, setTitle] = useState(initial?.title ?? "");
 	const [prompt, setPrompt] = useState(initial?.prompt ?? "");
 	const titleRef = useRef<HTMLInputElement>(null);
@@ -78,8 +101,10 @@ export function TaskForm({
 					maxLength={PROMPT_MAX}
 					rows={5}
 					required
+					aria-describedby={ids.left}
 					onChange={(e) => setPrompt(e.target.value)}
 				/>
+				<Remaining id={ids.left} left={PROMPT_MAX - prompt.length} />
 			</div>
 			<div className="kanban-form-actions">
 				<Button type="submit" size="sm" disabled={!ready || disabled}>
@@ -102,17 +127,22 @@ type NoteFormProps = {
 /** The extra request of 「追加で直す」. */
 export function NoteForm({ disabled, onSubmit, onCancel }: NoteFormProps) {
 	const id = useId();
+	const leftId = useId();
 	const [note, setNote] = useState("");
 	const ref = useRef<HTMLTextAreaElement>(null);
 	useEffect(() => ref.current?.focus(), []);
 	const trimmed = note.trim();
+	const left = Math.min(
+		NOTE_MAX - note.length,
+		NOTE_QUOTED_MAX - quotedLength(trimmed),
+	);
 	return (
 		<form
 			className="kanban-form"
 			aria-label="追加で直す"
 			onSubmit={(event) => {
 				event.preventDefault();
-				if (trimmed && !disabled) onSubmit(trimmed);
+				if (trimmed && left >= 0 && !disabled) onSubmit(trimmed);
 			}}
 			onKeyDown={cancelOnEscape(onCancel)}
 		>
@@ -125,11 +155,17 @@ export function NoteForm({ disabled, onSubmit, onCancel }: NoteFormProps) {
 					maxLength={NOTE_MAX}
 					rows={4}
 					required
+					aria-describedby={leftId}
 					onChange={(e) => setNote(e.target.value)}
 				/>
+				<Remaining id={leftId} left={left} />
 			</div>
 			<div className="kanban-form-actions">
-				<Button type="submit" size="sm" disabled={!trimmed || disabled}>
+				<Button
+					type="submit"
+					size="sm"
+					disabled={!trimmed || left < 0 || disabled}
+				>
 					送る
 				</Button>
 				<Button type="button" size="sm" variant="outline" onClick={onCancel}>

@@ -6,7 +6,7 @@ import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
 import type { EnqueueRequest } from "../contracts";
 import { migrations } from "../repository";
 import { createTerminals } from "../service";
-import type { HookPayload } from "../hooks";
+import { type HookPayload, headerFileOf } from "../hooks";
 import type { SpawnPty, TerminalsOptions } from "../types";
 
 /** What the fake PTY did, with the facts a test needs read at spawn time. */
@@ -71,7 +71,7 @@ export function fakePty(
 				? {
 						settings: JSON.parse(settingsText),
 						token: /x-eumenes-hook-token: ([0-9a-f]{64})/.exec(
-							settingsText,
+							readFileSync(headerFileOf(settingsPath!), "utf8"),
 						)![1]!,
 						sessionId: /hooks\/terminals\/([0-9a-f-]{36})/.exec(
 							settingsText,
@@ -159,8 +159,11 @@ export function hooked(
 		cwd: db.dir,
 		...options,
 	});
+	/** Startup recovery has run, as the host does before it lets anything be sent. */
+	const ready = terminals.recover();
 	const harness = {
 		...db,
+		ready,
 		store,
 		terminals,
 		pty,
@@ -168,6 +171,7 @@ export function hooked(
 		/** Saves a request as a caller would (its own writer transaction) and lets the sender run. */
 		async enqueue(over: Partial<EnqueueRequest> = {}) {
 			const request = requestOf(over);
+			await ready;
 			await store.write((tx) => terminals.enqueueInTransaction(tx, request));
 			await terminals.settled();
 			return request;

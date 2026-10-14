@@ -56,6 +56,7 @@ export {
 	resolveSources,
 	sourceKeyOf,
 	verifyWorldJournal,
+	worldHasContent,
 } from "./service";
 export type {
 	AssessedObservations,

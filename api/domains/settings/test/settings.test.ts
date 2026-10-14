@@ -10,8 +10,16 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Hono } from "hono";
 import { openStore } from "../../../infrastructure/sqlite";
-import { createSettings, migration, epochsMigration, readStoredLarm } from "..";
+import {
+	createSettings,
+	migration,
+	epochsMigration,
+	readStoredLarm,
+	readStoredWorldEnabled,
+	registerSettings,
+} from "..";
 import { defaults } from "../service";
 import type { Settings } from "../contracts";
 import { applySchema, cloudEndpoint, settingsSchema } from "../contracts";
@@ -195,6 +203,69 @@ test("coding supervision instruction approval defaults to on, including for save
 	expect(
 		settingsSchema.safeParse({ ...s, codingSupervision: { extra: 1 } }).success,
 	).toBe(false);
+});
+test("world.enabled defaults to false (also for saved documents without it), persists through apply and is what startup reads", async () => {
+	const h = await setup();
+	expect(h.settings.get().world).toEqual({ enabled: false });
+	expect(readStoredWorldEnabled(h.store)).toBe(false);
+	// A document saved before this setting existed still loads, with World off.
+	const legacy = JSON.parse(JSON.stringify(h.settings.get()));
+	delete legacy.world;
+	await h.store.write((db) => {
+		db.query("UPDATE settings_document SET document=? WHERE id=1").run(
+			JSON.stringify(legacy),
+		);
+	});
+	expect(readStoredWorldEnabled(h.store)).toBe(false);
+	const reopened = await createSettings(h.store, { dbPath: h.dbPath, env: {} });
+	const s = reopened.get();
+	s.world.enabled = true;
+	await reopened.apply({
+		requestId: crypto.randomUUID(),
+		expectedRevision: s.revision,
+		settings: s,
+		keys: [],
+	});
+	expect(readStoredWorldEnabled(h.store)).toBe(true);
+	const again = await createSettings(h.store, { dbPath: h.dbPath, env: {} });
+	expect(again.get().world.enabled).toBe(true);
+	expect(
+		settingsSchema.safeParse({ ...s, world: { enabled: "yes" } }).success,
+	).toBe(false);
+	expect(
+		settingsSchema.safeParse({ ...s, world: { enabled: true, extra: 1 } })
+			.success,
+	).toBe(false);
+});
+test("the settings API saves world.enabled and returns it", async () => {
+	const h = await setup();
+	const app = new Hono();
+	registerSettings(app, h.settings);
+	const s = h.settings.get();
+	s.world.enabled = true;
+	const response = await app.request("/api/settings/apply", {
+		method: "POST",
+		body: JSON.stringify({
+			requestId: crypto.randomUUID(),
+			expectedRevision: s.revision,
+			settings: s,
+			keys: [],
+		}),
+	});
+	expect(response.status).toBe(200);
+	expect(((await response.json()) as Settings).world.enabled).toBe(true);
+	const saved = (await (await app.request("/api/settings")).json()) as Settings;
+	expect(saved.world).toEqual({ enabled: true });
+	expect(readStoredWorldEnabled(h.store)).toBe(true);
+});
+test("readStoredWorldEnabled is false while no settings document exists", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "eumenes-settings-world-"));
+	const store = openStore(join(dir, "test.db"), [migration, epochsMigration]);
+	cleanup.push(async () => {
+		await store.close();
+		rmSync(dir, { recursive: true, force: true });
+	});
+	expect(readStoredWorldEnabled(store)).toBe(false);
 });
 async function setup() {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-settings-"));

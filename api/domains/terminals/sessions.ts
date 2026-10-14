@@ -45,6 +45,30 @@ export function sessionView(s: Session): TerminalSessionView {
 	};
 }
 
+/** A turn the person started (no request of ours) counts as running for this long after its last hook. */
+export const MANUAL_TURN_MS = 30 * 60 * 1000;
+/**
+ * `working` / `waiting` with no request on the PTY and no hook for `MANUAL_TURN_MS`: the turn was
+ * most likely interrupted (Esc sends no hook), so it no longer holds back the Kanban queue.
+ */
+export const activityStale = (s: Session, nowMs: number) =>
+	(s.activity === "working" || s.activity === "waiting") &&
+	!s.inflight &&
+	nowMs - s.lastHookAtMs >= MANUAL_TURN_MS;
+
+/**
+ * Another live PTY holds the Kanban session's Claude conversation: a second process on it would
+ * write into the same history.
+ */
+const conversationBusy = (list: Session[], session: Session) =>
+	session.owner.startsWith("kanban:") &&
+	list.some(
+		(s) =>
+			s !== session &&
+			s.status === "running" &&
+			s.claudeSessionId === session.claudeSessionId,
+	);
+
 export function createEntry(init: {
 	title: string;
 	owner: SessionOwner;
@@ -59,6 +83,7 @@ export function createEntry(init: {
 		cwd: init.cwd,
 		run: 0,
 		lastInputAtMs: 0,
+		lastHookAtMs: 0,
 		listeners: new Set<Listener>(),
 	} as unknown as Session;
 }
@@ -148,6 +173,7 @@ export function createSessions(
 		pty.close();
 		removeHookSettings(settingsPath);
 		clearTimeout(session.trackingTimer);
+		clearTimeout(session.wakeTimer);
 		session.status = "exited";
 		session.exitCode = code;
 		session.endedAt = rt.nowIso();
@@ -232,6 +258,7 @@ export function createSessions(
 		session.status = "running";
 		session.activity = spec.prompt ? "working" : "idle";
 		session.claudeSessionId = spec.claude.id;
+		session.hookSessionId = spec.claude.id;
 		session.resumed = spec.claude.resume;
 		session.sessionStarted = false;
 		session.promptChecked = false;
@@ -242,6 +269,7 @@ export function createSessions(
 		session.startedAt = rt.nowIso();
 		session.startedAtMs = rt.now();
 		session.lastUsedAtMs = session.startedAtMs;
+		session.lastHookAtMs = session.startedAtMs;
 		delete session.exitCode;
 		delete session.endedAt;
 		session.exit = new Promise<void>((resolve) => {
@@ -300,6 +328,8 @@ export function createSessions(
 			const session = find(id);
 			if (isLive(session)) throw new Error("terminal_running");
 			if (liveCount() >= rt.limit) throw new Error("terminal_limit_reached");
+			if (conversationBusy(all(), session))
+				throw new Error("terminal_conversation_busy");
 			launch(session, {
 				size,
 				claude: session.owner.startsWith("kanban:")
@@ -312,7 +342,8 @@ export function createSessions(
 		/** Types a request into a running session and presses Enter once the paste landed. */
 		paste(session: Session, prompt: string) {
 			const pty = session.pty;
-			pty.write(`${PASTE_START}${prompt}${PASTE_END}`);
+			// A raw ESC could end the bracketed paste early; requests are refused at enqueue, this is the last guard.
+			pty.write(`${PASTE_START}${prompt.replaceAll("\x1b", "")}${PASTE_END}`);
 			const enter = setTimeout(() => {
 				if (session.pty === pty && isLive(session)) pty.write("\r");
 			}, submitDelayMs);
@@ -326,11 +357,13 @@ export function createSessions(
 			session.lastUsedAtMs = session.lastInputAtMs;
 			session.pty.write(data);
 			// A request waiting for the quiet time after typing is looked at again then.
-			const wake = setTimeout(
+			// One pending wake-up per PTY, however many keystrokes arrive.
+			clearTimeout(session.wakeTimer);
+			session.wakeTimer = setTimeout(
 				rt.kick,
 				(options.manualInputWaitMs ?? 3000) + 20,
 			);
-			wake.unref?.();
+			session.wakeTimer.unref?.();
 		},
 
 		resize(id: string, size: TerminalSize) {
@@ -373,6 +406,7 @@ export function createSessions(
 		closeAll() {
 			for (const session of rt.sessions.values()) {
 				clearTimeout(session.trackingTimer);
+				clearTimeout(session.wakeTimer);
 				if (isLive(session)) session.pty.kill();
 				else session.pty.close();
 				removeHookSettings(session.settingsPath);

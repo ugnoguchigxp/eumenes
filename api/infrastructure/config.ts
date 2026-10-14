@@ -19,8 +19,6 @@ import { resolveLarmToken } from "./auth-config";
  * `EUMENES_TTS_VOICE` / `EUMENES_KEY_DIR` / `EUMENES_SECRET_KEY` /
  * `EUMENES_ENV_REF_ALLOWLIST`, which Settings reads itself.
  */
-export type WorldMode = "off" | "protect" | "on";
-
 const text = z.string().optional();
 const flag = (fallback: boolean) =>
 	z
@@ -32,20 +30,6 @@ const flag = (fallback: boolean) =>
 		.transform((value) =>
 			value === undefined ? fallback : ["1", "true", "on"].includes(value),
 		);
-/** off (default) | protect | on; 0/false mean off and 1/true mean on. */
-const worldMode = z
-	.preprocess(
-		(value) => {
-			if (typeof value !== "string") return value;
-			const raw = value.trim().toLowerCase();
-			if (raw === "0" || raw === "false") return "off";
-			if (raw === "1" || raw === "true") return "on";
-			return raw;
-		},
-		z.enum(["off", "protect", "on"]).optional(),
-	)
-	.transform((value): WorldMode => value ?? "off");
-
 /** Strict decimal digits only: no sign, exponent, hex, or fraction. */
 const integer = (max?: number) =>
 	z
@@ -72,7 +56,6 @@ const schema = z.object({
 	EUMENES_WORLD_JOURNAL: text,
 	EUMENES_CODING_RUNNER_CONFIG: text,
 	EUMENES_RESEARCH_CODEX_EXECUTABLE: text,
-	EUMENES_WORLD: worldMode,
 	EUMENES_WORLD_POLL_MS: integer(),
 	EUMENES_WORLD_CURSOR_SECRET: text,
 	EUMENES_LARM_PROVIDER_HOSTS: text,
@@ -100,7 +83,6 @@ export type Config = {
 	worldJournalPath: string | undefined;
 	codingRunnerConfig: string | undefined;
 	researchCodexExecutable: string;
-	worldMode: WorldMode;
 	/** Already clamped to the 1000 ms floor. */
 	worldPollMs: number | undefined;
 	worldCursorSecret: string | undefined;
@@ -112,15 +94,6 @@ export type Config = {
 	delegatedTasksEnabled: boolean;
 	env: Readonly<Record<string, string | undefined>>;
 };
-
-/** Shared with `worldModeFromEnv`: undefined/empty is off, a typo throws. */
-export function parseWorldMode(raw: string | undefined): WorldMode {
-	const parsed = schema.shape.EUMENES_WORLD.safeParse(
-		raw === undefined || raw.trim() === "" ? undefined : raw,
-	);
-	if (!parsed.success) throw new Error("world_mode_invalid");
-	return parsed.data;
-}
 
 /** Comma-separated host list: lower-cased, trimmed, de-duplicated; empty becomes undefined. */
 export function parseHostList(
@@ -171,7 +144,6 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
 		worldJournalPath: v.EUMENES_WORLD_JOURNAL,
 		codingRunnerConfig: v.EUMENES_CODING_RUNNER_CONFIG,
 		researchCodexExecutable: v.EUMENES_RESEARCH_CODEX_EXECUTABLE ?? "codex",
-		worldMode: v.EUMENES_WORLD,
 		worldPollMs:
 			v.EUMENES_WORLD_POLL_MS === undefined
 				? undefined

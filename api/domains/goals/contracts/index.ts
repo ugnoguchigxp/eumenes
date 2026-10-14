@@ -8,6 +8,14 @@ export const MAX_SNAPSHOT_SCOPES = 32;
 export const MAX_ADOPTED_GOALS = 30;
 /** Open proposals per (principal, scope). */
 export const MAX_PROPOSED_GOALS = 50;
+/** Conversation messages one goal revision may cite as its basis. */
+export const MAX_SOURCE_MESSAGES = 20;
+/** World entities one goal change may link. */
+export const MAX_GOAL_ENTITIES = 20;
+/** Operations one steward batch may carry. */
+export const MAX_GOAL_OPS = 50;
+/** Goals and entities one forget call may name. */
+export const MAX_FORGET_IDS = 500;
 export const MIN_PRIORITY = 0;
 export const MAX_PRIORITY = 100;
 export const DEFAULT_PRIORITY = 50;
@@ -48,6 +56,16 @@ export const goalAccessSchema = z.object({
 	scopeKeys: z.array(key).min(1).max(MAX_SNAPSHOT_SCOPES),
 });
 
+/**
+ * Provenance of a goal revision for forgetting (F8/F10): the conversation
+ * messages the revision is based on, and the World entities the goal concerns.
+ * Message ids are stored per revision. Entity ids accumulate: a goal stays
+ * linked to every entity any of its revisions was linked to, so forgetting an
+ * entity also reaches goals whose older revisions mentioned it.
+ */
+const sourceMessageIds = z.array(key).max(MAX_SOURCE_MESSAGES).default([]);
+const entityIds = z.array(key).max(MAX_GOAL_ENTITIES).default([]);
+
 const desiredState = z.string().trim().min(1).max(MAX_DESIRED_STATE_LENGTH);
 const priority = z.number().int().min(MIN_PRIORITY).max(MAX_PRIORITY);
 const expectedRevision = z.number().int().min(1);
@@ -64,6 +82,8 @@ export const adoptGoalSchema = z
 		desiredState,
 		priority: priority.default(DEFAULT_PRIORITY),
 		source: goalSourceSchema,
+		sourceMessageIds,
+		entityIds,
 		operationKey,
 	})
 	.strict();
@@ -75,7 +95,15 @@ export type ProposeGoal = AdoptGoal;
 
 /** Explicit adoption of an existing proposal. */
 export const adoptProposalSchema = z
-	.object({ expectedRevision, source: goalSourceSchema })
+	.object({
+		expectedRevision,
+		/** Optional edits applied in the same revision as the adoption. */
+		desiredState: desiredState.optional(),
+		priority: priority.optional(),
+		source: goalSourceSchema,
+		sourceMessageIds,
+		entityIds,
+	})
 	.strict();
 export type AdoptProposal = z.input<typeof adoptProposalSchema>;
 
@@ -85,6 +113,8 @@ export const updateGoalSchema = z
 		desiredState: desiredState.optional(),
 		priority: priority.optional(),
 		source: goalSourceSchema,
+		sourceMessageIds,
+		entityIds,
 	})
 	.strict()
 	.refine((v) => v.desiredState !== undefined || v.priority !== undefined, {
@@ -94,9 +124,83 @@ export type UpdateGoal = z.input<typeof updateGoalSchema>;
 
 /** Used for withdraw and complete. */
 export const goalTransitionSchema = z
-	.object({ expectedRevision, source: goalSourceSchema })
+	.object({
+		expectedRevision,
+		source: goalSourceSchema,
+		sourceMessageIds,
+		entityIds,
+	})
 	.strict();
 export type GoalTransition = z.input<typeof goalTransitionSchema>;
+
+export const forgetGoalsSchema = z
+	.object({
+		goalIds: z.array(key).max(MAX_FORGET_IDS),
+		entityIds: z.array(key).max(MAX_FORGET_IDS),
+	})
+	.strict();
+export type ForgetGoalsInput = z.input<typeof forgetGoalsSchema>;
+
+/** Goals that a forget deletes and every message any of their revisions cites. */
+export interface ForgetGoalsResult {
+	goalIds: string[];
+	messageIds: string[];
+}
+
+/** Why one operation of a batch was not applied. Nothing of it was written. */
+export const goalRejectReasons = [
+	"invalid_goal_input",
+	"source_required",
+	"goal_scope_forbidden",
+	"invalid_goal",
+	"revision_conflict",
+	"goal_state_conflict",
+	"goal_limit",
+	"operation_conflict",
+] as const;
+export type GoalRejectReason = (typeof goalRejectReasons)[number];
+
+/**
+ * One steward operation. Input types are the plain operations' plus the
+ * discriminator; `sourceMessageIds` is required (at least one) in a batch.
+ */
+export type GoalOp =
+	| ({ op: "propose" } & ProposeGoal)
+	| ({ op: "adopt"; goalId?: undefined } & AdoptGoal)
+	| ({ op: "adopt"; goalId: string } & AdoptProposal)
+	| ({ op: "revise"; goalId: string } & UpdateGoal)
+	| ({ op: "complete" | "withdraw"; goalId: string } & GoalTransition);
+
+export type GoalOpResult =
+	| {
+			index: number;
+			status: "applied";
+			goal: Goal;
+			/** The operationKey had already created this goal; nothing was written. */
+			replayed: boolean;
+	  }
+	| { index: number; status: "rejected"; reason: GoalRejectReason };
+
+/** A goal as the steward reviews it (every status). */
+export interface StewardGoal {
+	goalId: string;
+	scopeKey: string;
+	status: GoalStatus;
+	priority: number;
+	desiredState: string;
+	revision: number;
+	updatedAt: string;
+}
+
+/** An adopted goal as the context builder reads it. */
+export interface ContextGoal {
+	goalId: string;
+	scopeKey: string;
+	priority: number;
+	desiredState: string;
+	revision: number;
+	updatedAt: string;
+}
 
 export interface Goal {
 	id: string;

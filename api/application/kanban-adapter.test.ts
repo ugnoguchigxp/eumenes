@@ -173,7 +173,7 @@ test("the same request id replays and can be read back", async () => {
 	expect(store.read((tx) => adapter.snapshotInTransaction(tx))).toMatchObject({
 		runnable: true,
 		queue: { state: "running", waiting: 0 },
-		cards: [{ title: "A", column: "todo", revision: 1 }],
+		cards: [{ title: JSON.stringify("A"), column: "todo", revision: 1 }],
 	});
 });
 
@@ -540,4 +540,50 @@ test("follow-up, review and reset go through the domain; the follow-up input ada
 	await expect(
 		store.write((tx) => invoke(tx, adapter, "kanban.reset", ref())),
 	).rejects.toThrow("kanban_card_busy");
+});
+
+test("the board says when a Claude Code session of the board is busy without a run holding the queue back", async () => {
+	const { store, adapter, fake } = setup();
+	const a = await addCard(store, adapter, "A");
+	const session = (over: Record<string, unknown>) =>
+		({
+			terminalSessionId: "t1",
+			owner: `kanban:${a}`,
+			mode: "work",
+			claudeSessionId: "typed-by-hand",
+			status: "running",
+			activity: "working",
+			...over,
+		}) as never;
+	expect(boardData(store, adapter).queue.manual).toBeUndefined();
+
+	// Typed by hand in the Claude Code screen: no run of the board is on it.
+	fake.state.sessions = [session({})];
+	expect(boardData(store, adapter).queue.manual).toEqual({
+		activity: "working",
+		stale: false,
+	});
+	// Terminals' own judgement that the state is old (an optional flag it may add).
+	fake.state.sessions = [session({ activity: "waiting", stale: true })];
+	expect(boardData(store, adapter).queue.manual).toEqual({
+		activity: "waiting",
+		stale: true,
+	});
+	// Idle, another owner, or a session that is not running: nothing holds the queue back.
+	fake.state.sessions = [
+		session({ activity: "idle" }),
+		session({ owner: "conversation:x" }),
+		session({ status: "exited" }),
+	];
+	expect(boardData(store, adapter).queue.manual).toBeUndefined();
+
+	// The session of the board's own handed run is the run itself.
+	const run = await store.write((tx) =>
+		invoke(tx, adapter, "kanban.run", { cardId: a, expectedRevision: 1 }),
+	);
+	const claudeSessionId = boardData(store, adapter).runs.find(
+		(r) => r.id === (run.receipt as { runId: string }).runId,
+	)!.claudeSessionId;
+	fake.state.sessions = [session({ claudeSessionId })];
+	expect(boardData(store, adapter).queue.manual).toBeUndefined();
 });

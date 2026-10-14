@@ -32,6 +32,24 @@ ALTER TABLE goals_ledger ADD COLUMN operation_digest TEXT;
 CREATE UNIQUE INDEX goals_ledger_operation ON goals_ledger(principal, scope_key, operation_key) WHERE operation_key IS NOT NULL;
 `;
 
+/**
+ * Provenance for forgetting (F8): the messages each revision is based on, and
+ * the World entities a goal concerns (accumulated over its revisions). Message
+ * and entity ids are opaque here; goals never resolves them.
+ */
+export const sourceMigration = `
+CREATE TABLE goals_source (
+ goal_id TEXT NOT NULL, revision INTEGER NOT NULL, message_id TEXT NOT NULL,
+ PRIMARY KEY (goal_id, revision, message_id)
+);
+CREATE INDEX goals_source_message ON goals_source(message_id);
+CREATE TABLE goals_entity (
+ goal_id TEXT NOT NULL, entity_id TEXT NOT NULL,
+ PRIMARY KEY (goal_id, entity_id)
+);
+CREATE INDEX goals_entity_entity ON goals_entity(entity_id);
+`;
+
 const columns =
 	"id, principal, scope_key, desired_state, priority, status, source_json, proposed_from_json, revision, created_at, updated_at";
 
@@ -236,8 +254,133 @@ export function goalHistory(
 	}));
 }
 
+/** Writes the provenance of one goal revision. Entity links only accumulate. */
+export function recordGoalLinks(
+	db: Database,
+	goalId: string,
+	revision: number,
+	links: { sourceMessageIds: readonly string[]; entityIds: readonly string[] },
+) {
+	for (const messageId of new Set(links.sourceMessageIds))
+		db.query(
+			"INSERT OR IGNORE INTO goals_source (goal_id, revision, message_id) VALUES (?,?,?)",
+		).run(goalId, revision, messageId);
+	for (const entityId of new Set(links.entityIds))
+		db.query(
+			"INSERT OR IGNORE INTO goals_entity (goal_id, entity_id) VALUES (?,?)",
+		).run(goalId, entityId);
+}
+
+/** All goals of the access, optionally limited to some statuses; newest first within a status. */
+export function listGoals(
+	db: Database,
+	principal: string,
+	scopeKeys: readonly string[],
+	statuses: readonly GoalStatus[],
+): Goal[] {
+	if (scopeKeys.length === 0 || statuses.length === 0) return [];
+	const scopes = scopeKeys.map(() => "?").join(",");
+	const marks = statuses.map(() => "?").join(",");
+	return (
+		db
+			.query(
+				`SELECT ${columns} FROM goals_ledger WHERE principal=? AND scope_key IN (${scopes}) AND status IN (${marks}) ORDER BY CASE status WHEN 'adopted' THEN 0 WHEN 'proposed' THEN 1 WHEN 'completed' THEN 2 ELSE 3 END, priority DESC, updated_at DESC, rowid DESC`,
+			)
+			.all(principal, ...scopeKeys, ...statuses) as Record<string, unknown>[]
+	).map(map);
+}
+
+/** Adopted goals by priority (high first), then the most recently revised. */
+export function listAdoptedByPriority(
+	db: Database,
+	principal: string,
+	scopeKeys: readonly string[],
+): Goal[] {
+	if (scopeKeys.length === 0) return [];
+	const marks = scopeKeys.map(() => "?").join(",");
+	return (
+		db
+			.query(
+				`SELECT ${columns} FROM goals_ledger WHERE principal=? AND status='adopted' AND scope_key IN (${marks}) ORDER BY priority DESC, updated_at DESC, rowid DESC`,
+			)
+			.all(principal, ...scopeKeys) as Record<string, unknown>[]
+	).map(map);
+}
+
+/**
+ * Goals a forget reaches: the named ones plus those linked to the entities.
+ * Only goals with a row in some goals table are returned, sorted.
+ */
+export function forgetClosure(
+	db: Database,
+	goalIds: readonly string[],
+	entityIds: readonly string[],
+): string[] {
+	const rows = db
+		.query(
+			`WITH named(id) AS (SELECT value FROM json_each(?1)),
+ linked(id) AS (SELECT DISTINCT goal_id FROM goals_entity WHERE entity_id IN (SELECT value FROM json_each(?2))),
+ want(id) AS (SELECT id FROM named UNION SELECT id FROM linked)
+ SELECT id FROM want WHERE id IN (
+  SELECT id FROM goals_ledger UNION SELECT goal_id FROM goals_history
+  UNION SELECT goal_id FROM goals_source UNION SELECT goal_id FROM goals_entity)
+ ORDER BY id`,
+		)
+		.all(JSON.stringify(goalIds), JSON.stringify(entityIds)) as {
+		id: string;
+	}[];
+	return rows.map((r) => r.id);
+}
+
+export function messageIdsOfGoals(
+	db: Database,
+	goalIds: readonly string[],
+): string[] {
+	return (
+		db
+			.query(
+				"SELECT DISTINCT message_id FROM goals_source WHERE goal_id IN (SELECT value FROM json_each(?)) ORDER BY message_id",
+			)
+			.all(JSON.stringify(goalIds)) as { message_id: string }[]
+	).map((r) => r.message_id);
+}
+
+/** Scopes of the goals about to be deleted, for the epoch bump. */
+export function scopesOfGoals(
+	db: Database,
+	goalIds: readonly string[],
+): { principal: string; scopeKey: string }[] {
+	return (
+		db
+			.query(
+				"SELECT DISTINCT principal, scope_key FROM goals_ledger WHERE id IN (SELECT value FROM json_each(?)) ORDER BY principal, scope_key",
+			)
+			.all(JSON.stringify(goalIds)) as {
+			principal: string;
+			scope_key: string;
+		}[]
+	).map((r) => ({ principal: r.principal, scopeKey: r.scope_key }));
+}
+
+/** Deletes the goals with every revision, history row and provenance row. */
+export function deleteGoals(db: Database, goalIds: readonly string[]) {
+	const ids = JSON.stringify(goalIds);
+	for (const sql of [
+		"DELETE FROM goals_source WHERE goal_id IN (SELECT value FROM json_each(?))",
+		"DELETE FROM goals_entity WHERE goal_id IN (SELECT value FROM json_each(?))",
+		"DELETE FROM goals_history WHERE goal_id IN (SELECT value FROM json_each(?))",
+		"DELETE FROM goals_ledger WHERE id IN (SELECT value FROM json_each(?))",
+	])
+		db.query(sql).run(ids);
+}
+
 /** Named migrations of this domain; the SQL above is frozen once deployed. */
 export const migrations: readonly Migration[] = [
 	{ id: "goals/0001-init", sql: migration },
 	{ id: "goals/0002-operation", sql: operationMigration },
+	{
+		id: "goals/0003-sources",
+		sql: sourceMigration,
+		after: ["goals/0002-operation"],
+	},
 ];

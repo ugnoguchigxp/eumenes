@@ -22,15 +22,27 @@ export type KanbanBlockerReason =
 	| "send_failed"
 	| "stopped_by_person"
 	| "resume_failed";
+/** Work typed by hand in a Claude Code session of the board that holds the queue back. */
+export type KanbanManualActivity = {
+	activity: "working" | "waiting";
+	/** Its state is old: the queue no longer waits for it. */
+	stale: boolean;
+};
 export type KanbanBoardSource = {
 	revision: number;
 	queue:
-		| { state: "running"; waiting: number; handedRunId?: string }
+		| {
+				state: "running";
+				waiting: number;
+				handedRunId?: string;
+				manual?: KanbanManualActivity;
+		  }
 		| {
 				state: "paused";
 				reason: "tracking_lost" | "stop_unconfirmed" | "restarted";
 				waiting: number;
 				handedRunId?: string;
+				manual?: KanbanManualActivity;
 		  };
 	runnable: boolean;
 	cards: Array<
@@ -113,6 +125,14 @@ function statusText(
 	return "作業中";
 }
 
+function manualText(manual: KanbanManualActivity): string {
+	if (manual.stale)
+		return "Claude Code の画面の手入力の作業は状態が古いため、待たずに次のタスクを始めます";
+	return manual.activity === "waiting"
+		? "Claude Code の画面で手入力の作業が許可を待っています。終わるまで次のタスクは始まりません"
+		: "Claude Code の画面で手入力の作業が続いています。終わるまで次のタスクは始まりません";
+}
+
 function queueOf(board: KanbanBoardSource): KanbanBoardQueue {
 	const handed = board.cards.find(
 		(c) => c.currentRunId && c.currentRunId === board.queue.handedRunId,
@@ -121,6 +141,9 @@ function queueOf(board: KanbanBoardSource): KanbanBoardQueue {
 		state: board.queue.state,
 		waiting: board.queue.waiting,
 		...(handed ? { runningTitle: handed.title } : {}),
+		...(board.queue.manual
+			? { manualText: manualText(board.queue.manual) }
+			: {}),
 		...(board.queue.state === "paused"
 			? { reasonText: QUEUE_PAUSED_TEXT[board.queue.reason] }
 			: {}),

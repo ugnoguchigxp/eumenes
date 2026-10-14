@@ -17,15 +17,20 @@ import { join } from "node:path";
 import { createContinuityService } from "../domains/continuity";
 import { createConversationService } from "../domains/conversation";
 import { createMemoryService } from "../domains/memory";
+import { createSettings } from "../domains/settings";
+import { loadConfig } from "../infrastructure/config";
 import { openStore } from "../infrastructure/sqlite";
 import { migrations } from "./migrations";
 import {
 	createWorldAssembly,
 	defaultWorldJournalPath,
+	manualAccess,
 	resolveWorldCursorSecret,
-	worldModeFromEnv,
+	resolveWorldMode,
+	WORLD_DEFAULT_SCOPE,
 	type WorldAssembly,
 } from "./world";
+import { assembleServerWorld } from "./server-world";
 
 const dirs: string[] = [];
 const closers: Array<() => Promise<void>> = [];
@@ -90,17 +95,117 @@ async function assemble(
 	};
 }
 
-test("mode flag: unset/off/0 mean nothing is assembled; protect and on are explicit; a typo fails startup", () => {
-	for (const value of [undefined, "", "off", "OFF", "0", "false"])
-		expect(worldModeFromEnv({ EUMENES_WORLD: value })).toBe("off");
-	expect(worldModeFromEnv({})).toBe("off");
-	expect(worldModeFromEnv({ EUMENES_WORLD: "protect" })).toBe("protect");
-	for (const value of ["on", "ON", "1", "true"])
-		expect(worldModeFromEnv({ EUMENES_WORLD: value })).toBe("on");
-	for (const value of ["onn", "enabled", "2", "protected"])
-		expect(() => worldModeFromEnv({ EUMENES_WORLD: value })).toThrow(
-			"world_mode_invalid",
-		);
+/** The startup path of server.ts: saved setting + stored content decide the mode. */
+async function startServerWorld(dir: string, enabled: boolean) {
+	const dbPath = join(dir, "db.sqlite3");
+	const store = openStore(dbPath, migrations);
+	const conversation = createConversationService(store, {
+		requireOutbox: true,
+	});
+	const memoryJournalPath = join(dir, "memory-forget-journal.jsonl");
+	const memory = createMemoryService(
+		store,
+		conversation,
+		createContinuityService(store),
+		{ journalPath: memoryJournalPath },
+	);
+	const settings = await createSettings(store, { dbPath, env: {} });
+	const saved = settings.get();
+	if (saved.world.enabled !== enabled) {
+		saved.world.enabled = enabled;
+		await settings.apply({
+			requestId: crypto.randomUUID(),
+			expectedRevision: saved.revision,
+			settings: saved,
+			keys: [],
+		});
+	}
+	const started = assembleServerWorld(loadConfig({}), {
+		store,
+		conversation,
+		memory,
+		queue: { stats: () => ({ lanes: {} }), registerHandler() {} } as never,
+		inference: {
+			foregroundBusy: () => false,
+			onActivity: () => () => {},
+		} as never,
+		dbPath,
+		memoryJournalPath,
+	});
+	const recovery = await memory.recover();
+	await started.world?.recover({
+		feedResyncRequired: recovery.feedResyncRequired === true,
+	});
+	const close = async () => {
+		started.worldForeground?.stop();
+		await started.world?.close();
+		await store.close();
+	};
+	closers.push(close);
+	return {
+		store,
+		...started,
+		async close() {
+			await close();
+			closers.splice(closers.indexOf(close), 1);
+		},
+	};
+}
+
+const registerEntity = (world: WorldAssembly) =>
+	world.service.apply({
+		access: manualAccess(),
+		scope: WORLD_DEFAULT_SCOPE,
+		operationKey: "entity-1",
+		clock: Date.now(),
+		operation: {
+			kind: "entity.register",
+			entity: {
+				id: "svc-1",
+				displayName: "音声サービス",
+				aliases: [],
+				externalRefs: [],
+			},
+		},
+	});
+
+test("startup mode: setting off and no content assembles nothing", async () => {
+	const dir = tempDir();
+	const h = await startServerWorld(dir, false);
+	expect(resolveWorldMode(h.store)).toBe("off");
+	expect(h.world).toBeUndefined();
+	expect(h.worldForeground).toBeUndefined();
+});
+
+test("startup mode: setting off but World holds content means protect (forgetting keeps flowing, World stays OFF)", async () => {
+	const dir = tempDir();
+	let h = await startServerWorld(dir, true);
+	expect(h.world?.mode).toBe("on");
+	expect((await registerEntity(h.world!)).status).toBe("applied");
+	await h.close();
+	// The user turns World off; the content remains, so the next start is protect.
+	h = await startServerWorld(dir, false);
+	expect(resolveWorldMode(h.store)).toBe("protect");
+	expect(h.world?.mode).toBe("protect");
+	expect(h.worldForeground).toBeUndefined();
+	expect(h.world?.extraction).toBeUndefined();
+	expect(h.world?.status()).toMatchObject({
+		gate: { open: true },
+		world: { enabled: false, usable: false },
+	});
+});
+
+test("startup mode: setting on runs the initial sync and then turns World ON, with extraction and foreground", async () => {
+	const dir = tempDir();
+	const h = await startServerWorld(dir, true);
+	expect(resolveWorldMode(h.store)).toBe("on");
+	expect(h.world?.mode).toBe("on");
+	expect(h.worldForeground).toBeDefined();
+	expect(h.world?.extraction).toBeDefined();
+	expect(h.world?.status()).toMatchObject({
+		world: { enabled: true, usable: true },
+		initialSyncComplete: true,
+	});
 });
 
 test("cursor secret: host-owned file (dir 0700, file 0600), created once, stable, never from the database; env overrides; short values fail", () => {

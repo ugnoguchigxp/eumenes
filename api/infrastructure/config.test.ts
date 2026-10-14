@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { loadConfig, parseWorldMode } from "./config";
+import { loadConfig } from "./config";
 import { parseProviderHosts } from "../domains/larm/service/guards";
 
 test("defaults are the values the server used before the config was centralised", () => {
@@ -18,7 +18,6 @@ test("defaults are the values the server used before the config was centralised"
 		worldJournalPath: undefined,
 		codingRunnerConfig: undefined,
 		researchCodexExecutable: "codex",
-		worldMode: "off",
 		worldPollMs: undefined,
 		worldCursorSecret: undefined,
 		larmProviderHosts: undefined,
@@ -118,18 +117,10 @@ test("flags: 1/true/on and 0/false/off; anything else fails with the variable na
 	);
 });
 
-test("EUMENES_WORLD keeps its three modes and the 0/false/1/true aliases", () => {
-	for (const value of [undefined, "", "off", "OFF", "0", "false"])
-		expect(loadConfig({ EUMENES_WORLD: value }).worldMode).toBe("off");
-	expect(loadConfig({ EUMENES_WORLD: "protect" }).worldMode).toBe("protect");
-	for (const value of ["on", "ON", "1", "true"])
-		expect(loadConfig({ EUMENES_WORLD: value }).worldMode).toBe("on");
-	for (const value of ["onn", "enabled", "2", "protected"])
-		expect(() => loadConfig({ EUMENES_WORLD: value })).toThrow(
-			"config_invalid:EUMENES_WORLD",
-		);
-	expect(parseWorldMode(undefined)).toBe("off");
-	expect(() => parseWorldMode("typo")).toThrow("world_mode_invalid");
+test("EUMENES_WORLD is no longer read: World ON/OFF is the saved setting world.enabled", () => {
+	const config = loadConfig({ EUMENES_WORLD: "on" });
+	expect(config).not.toHaveProperty("worldMode");
+	expect(() => loadConfig({ EUMENES_WORLD: "typo" })).not.toThrow();
 });
 
 test("numbers are validated; the World poll keeps its 1000 ms floor", () => {
@@ -187,7 +178,6 @@ test("whitespace-only values are unset, and the World enum is still trimmed", ()
 			EUMENES_WORLD_POLL_MS: "\t",
 			EUMENES_DB: "  ",
 			EUMENES_TOOLCHAIN_ENABLED: " ",
-			EUMENES_WORLD: " ",
 			LARM_API_TOKEN: " ",
 		}),
 	).toMatchObject({
@@ -195,11 +185,8 @@ test("whitespace-only values are unset, and the World enum is still trimmed", ()
 		worldPollMs: undefined,
 		dbPath: "./data/eumenes.sqlite3",
 		toolchainEnabled: true,
-		worldMode: "off",
 		larmToken: undefined,
 	});
-	expect(loadConfig({ EUMENES_WORLD: " protect " }).worldMode).toBe("protect");
-	expect(parseWorldMode(" ")).toBe("off");
 	expect(loadConfig({ EUMENES_PORT: " 9000 " }).port).toBe(9000);
 });
 

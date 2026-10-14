@@ -12,6 +12,7 @@ import {
 	writeSync,
 } from "node:fs";
 import type { ForgetJournalEntry } from "eumenes-memory/sqlite";
+import type { ForgetDerived } from "../contracts";
 
 /** One line of the block journal: the intent of a forget, written before the database is touched. */
 export interface BlockJournalEntry {
@@ -21,6 +22,8 @@ export interface BlockJournalEntry {
 	messageIds: string[];
 	/** State items to forget (every version of the facts). */
 	itemIds: string[];
+	/** Opaque ids of other domains' derived data (see `ForgetDerived`); absent on lines written without any. */
+	derived?: ForgetDerived;
 	at: string;
 }
 /** `<name>.blocks.jsonl` next to the forget journal (`<name>.jsonl`): the library validates the forget journal, so nothing else may enter it. */

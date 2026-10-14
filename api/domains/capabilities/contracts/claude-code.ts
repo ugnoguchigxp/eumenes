@@ -7,6 +7,8 @@ export const claudeCodeRequest = z.strictObject({
 		.trim()
 		.min(1)
 		.max(8000)
+		// Control characters (other than newline and tab) could break out of a bracketed paste.
+		.regex(/^[^\u0000-\u0008\u000b-\u001f\u007f-\u009f]*$/, "terminal_prompt_invalid")
 		.describe(
 			"Claude Code に渡す依頼文。利用者の指示・対象・条件をそのまま含め、要約や推測で変えない。",
 		),

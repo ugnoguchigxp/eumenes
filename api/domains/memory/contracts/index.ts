@@ -313,7 +313,14 @@ export type ForgetInput = {
 	conversationId: string;
 	itemIds: readonly string[];
 	messageIds: readonly string[];
+	derived?: ForgetDerived;
 };
+/**
+ * Ids of data other domains derived and delete themselves (for example `{ goalIds }`), keyed by a name the registered
+ * purge hook understands. Memory never interprets it: it is written to the block journal line before the database,
+ * handed to every purge hook, and handed again when the line is replayed at startup.
+ */
+export type ForgetDerived = Readonly<Record<string, readonly string[]>>;
 export type ForgetOutcome = {
 	forgetId: string;
 	/** Every message that was blocked (the item evidence, the steward's choices and their exchange partners). */
@@ -327,6 +334,8 @@ export type ForgetPurge = {
 	itemIds: readonly string[];
 	messageIds: readonly string[];
 	conversationId: string;
+	/** The opaque `derived` of the forget that wrote this journal line (empty when it had none). */
+	derived: ForgetDerived;
 	/** The conversations whose summary this forget (or this replay of it) deleted: their summary-step decisions go too. */
 	deletedSummaryConversationIds: readonly string[];
 };

@@ -342,3 +342,25 @@ test("a rejected action shows the host's message", async () => {
 		"他の操作でタスクの状態が変わりました。",
 	);
 });
+
+test("work typed by hand in a Claude Code session is named in the queue line, or said to be ignored when stale", () => {
+	mount({
+		...boardFixture,
+		queue: {
+			state: "running",
+			waiting: 1,
+			manual: { activity: "working", stale: false },
+		},
+	});
+	expect(screen.getByText(/手入力の作業が続いています/)).toBeDefined();
+	cleanup();
+	mount({
+		...boardFixture,
+		queue: {
+			state: "running",
+			waiting: 1,
+			manual: { activity: "waiting", stale: true },
+		},
+	});
+	expect(screen.getByText(/状態が古いため、待たずに/)).toBeDefined();
+});

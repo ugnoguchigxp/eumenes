@@ -9,6 +9,7 @@ export type {
 export {
 	DEFAULT_PROJECT_ID,
 	errorStatus,
+	KANBAN_PROMPT_MAX,
 	kanbanReceiptSchema,
 	WORK_ONLY_INSTRUCTION,
 } from "./contracts";

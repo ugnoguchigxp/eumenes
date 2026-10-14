@@ -19,7 +19,9 @@ while [ $# -gt 0 ]; do
 done
 config=$(cat "$settings")
 url=$(printf '%s' "$config" | sed -n "s/.*--data-binary @- '\([^']*\)'.*/\1/p")
-token=$(printf '%s' "$config" | sed -n 's/.*x-eumenes-hook-token: \([0-9a-f]*\).*/\1/p')
+# The token is a header line in a private file next to the settings (`curl -H @file`).
+header=$(printf '%s' "$config" | sed -n "s/.*-H @'\([^']*\)'.*/\1/p")
+token=$(sed -n 's/^x-eumenes-hook-token: //p' "$header")
 hook() {
 	curl -q -s -m 5 --noproxy '*' -X POST -H 'Content-Type: application/json' \
 		-H "x-eumenes-hook-token: $token" --data-binary "$1" "$url" >/dev/null 2>&1 || true

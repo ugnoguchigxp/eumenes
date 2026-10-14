@@ -12,7 +12,7 @@ import {
 	boardRuns,
 	getQueue,
 	getRun,
-	handedByOthersAfter,
+	latestHandedRuns,
 	waitingCount,
 	handedRuns,
 	type RunRow,
@@ -100,15 +100,15 @@ function cardView(
 	};
 }
 
-const followedByOthers = (
-	tx: Database,
-	card: CardRow,
-	run: RunRow | null,
-): boolean =>
-	card.label === "done" &&
-	!card.commitPushReported &&
-	run !== null &&
-	handedByOthersAfter(tx, run);
+/** Whether another card's run was handed over after the card's last run (changes may mix). */
+function followedBy(latest: ReturnType<typeof latestHandedRuns>) {
+	return (card: CardRow, run: RunRow | null): boolean => {
+		if (card.label !== "done" || card.commitPushReported || run === null)
+			return false;
+		const other = latest.find((item) => item.cardId !== card.id);
+		return other !== undefined && other.seq > run.seq;
+	};
+}
 
 function runView(run: RunRow): KanbanRunView {
 	return {
@@ -134,6 +134,7 @@ export function boardInTransaction(
 	const runs = boardRuns(tx);
 	const byId = new Map(runs.map((run) => [run.id, run]));
 	const handed = handedRuns(tx)[0];
+	const followed = followedBy(latestHandedRuns(tx));
 	return {
 		revision: boardRevision(tx),
 		queue: {
@@ -146,7 +147,7 @@ export function boardInTransaction(
 			const run = card.currentRunId
 				? (byId.get(card.currentRunId) ?? null)
 				: null;
-			return cardView(card, view, run, followedByOthers(tx, card, run));
+			return cardView(card, view, run, followed(card, run));
 		}),
 		runs: runs.map(runView),
 	};
@@ -160,5 +161,5 @@ export function cardInTransaction(
 	const card = getCard(tx, cardId);
 	if (!card) return null;
 	const run = card.currentRunId ? getRun(tx, card.currentRunId) : null;
-	return cardView(card, view, run, followedByOthers(tx, card, run));
+	return cardView(card, view, run, followedBy(latestHandedRuns(tx))(card, run));
 }

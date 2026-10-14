@@ -49,6 +49,11 @@ export type KanbanBoardQueue = {
 	waiting: number;
 	/** Title of the card whose run is in progress. */
 	runningTitle?: string;
+	/**
+	 * Host wording for work typed by hand in a Claude Code session of the board that holds the
+	 * queue back (or, when its state is old, that it is being ignored).
+	 */
+	manualText?: string;
 };
 
 export type KanbanBoardProps = {

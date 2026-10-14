@@ -14,3 +14,4 @@ export { readStoredLarm } from "./repository/stored-larm";
 
 export { readStoredObjectRecognitionConnection } from "./repository/stored-object-recognition";
 export { readStoredExcalidrawAvailability } from "./repository/stored-larm";
+export { readStoredWorldEnabled } from "./repository/stored-world";

@@ -210,6 +210,16 @@ export const settingsSchema = z
 			})
 			.strict()
 			.default({ approveInstructions: true }),
+		world: z
+			.object({
+				/**
+				 * Personal World ON/OFF, read once at backend startup (a change takes effect on
+				 * restart). OFF still protects (forget propagation only) while World holds content.
+				 */
+				enabled: z.boolean().default(false),
+			})
+			.strict()
+			.default({ enabled: false }),
 	})
 	.strict()
 	.superRefine((s, ctx) => {

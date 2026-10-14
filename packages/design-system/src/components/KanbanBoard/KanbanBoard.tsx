@@ -167,6 +167,9 @@ export function KanbanBoard(props: KanbanBoardProps) {
 				) : (
 					<p>{queueText(queue)}</p>
 				)}
+				{queue.manualText && (
+					<p className="kanban-queue-manual">{queue.manualText}</p>
+				)}
 			</section>
 			<div className="kanban-columns">
 				{COLUMNS.map((column) => (

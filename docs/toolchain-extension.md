@@ -24,6 +24,26 @@
 - **UI**: ランチャーは `GET /api/toolchain-artifacts` の一件ずつ。共通host（`web/src/domains/toolchain-artifacts`）が登録artifactを開き、書込みは `POST /api/toolchain-actions` が受付・domain実行・receipt参照を一つのtransactionで保存する。
 - **質問**: clarifyは `command_interactions` に保存され、UI（`POST /api/toolchain-interactions/:id/answers`）または会話の次の発話で回答して同じ凍結revisionで再開する。
 
+### 1.1 Seedと初期化
+
+ツールチェーン関係のSeedは次のファイルを正本とする。製品DBのダンプをSeedとして保存しない。
+
+| データ | リポジトリ内の正本 |
+| --- | --- |
+| 旧形式のツールチェーン一覧（関数名・用途・依存package・表示先） | `api/domains/capabilities/seeds/toolchains.json` |
+| 旧形式のprofile・skill・tool・package | `api/domains/capabilities/builtin/*.ts` と同ディレクトリ配下の `SKILL*.md` |
+| データドリブン形式の担当・ツールチェーン・binding・artifact・schema | `api/domains/capabilities/bundles/*.bundle.json` |
+
+`bun run dev` または `bun run start` のAPI初期化でmigrationを適用した後、`createToolchain` が `capabilities.seed()` を呼ぶ。対応backendの基礎定義、旧形式のツールチェーン、ファイル名順のbundleを同じwriter transaction内で登録する。新規DBへの別途のSQL投入やインポートは不要。ツールチェーン自体を無効にした構成では登録しない。
+
+Seedに含めるのは再利用する定義だけで、会話、実行・操作履歴、学習済みrecipe、生成物、個人の記憶、接続先、認証情報、モデルの選択は含めない。`examples` は担当選択のための例文であり、保存済み会話のコピーではない。接続先とモデルは利用先で設定し、起動時に製品DBからSeedへ書き戻さない。
+
+同一revisionの再投入は何も変更せず、無効化・公開版の手動切替・generationを保持する。新revisionの追加は既存の登録規則に従って公開版を進めるので、既存revisionの本文を書き換えず新revisionで更新する。実行できないbundleは丸ごとスキップされるため、起動成功だけを全件投入の根拠にしない。`capability.bundle_skipped` は[ログ](logging.md)で確認する。
+
+新規追加は引き続き§3のbundleを使う。`seeds/toolchains.json` は旧形式の互換データで、ここに新しい担当を追加しない。旧形式を移行するときは該当定義をJSONから削除する。読み込み窓口の `builtin/toolchains.ts` は維持する。
+
+全Seedの初期化確認は `bun test api/application/capability-seed.test.ts`。隔離DBで全bundleの登録漏れ、会話等の非投入、再投入の冪等性、DB再オープン後の無効化・公開版保持、通常のサーバー初期化からの自動投入を確認する。部分試験は `bun run verify -- --domain capabilities`、会話側の回帰は `bun run verify -- --domain dialogue` を使う。
+
 ## 2. 追加の種類を選ぶ
 
 | 追加したいもの | 手順 | 製品コードの変更 |
@@ -187,7 +207,7 @@
 1. 現行の公開操作・受付・receipt・UIを固定試験で押さえる（比較基準）。
 2. §5でadapterとWeb adapterを作る。domainの業務処理・時計・保存はdomainに残す。
 3. bundleを書く。既存packageを再利用するならpinで固定し、toolchainは**新revision**（例 `@2`）にして `bindingRevisionId`・`artifactRevisionId` を足し、旧形式の `artifact` 項目は外す。domain固有の確認質問があればbindingの `questions` に宣言する。表示名・入口は一つにする。
-4. 旧経路を削除する: `builtin/toolchains.ts` の旧toolchain定義、`runtime-meta.ts` の固定runtime（toolchainと`localAction`等）、dialogueの専用分岐、Webの専用hostとWorkspaceArtifactsの分岐。DB上の旧revisionはデータとして残る。
+4. 旧経路を削除する: `seeds/toolchains.json` の旧toolchain定義、`runtime-meta.ts` の固定runtime（toolchainと`localAction`等）、dialogueの専用分岐、Webの専用hostとWorkspaceArtifactsの分岐。DB上の旧revisionはデータとして残る。
 5. 固定試験（domain・application結合・ブラウザ）を新経路へ合わせ、`check`・domain verify・ブラウザを通す。
 6. 自然言語受入の凍結ケースを用意し、必要なら旧UIをbaselineにpilotする（[自然言語UI受入](nl-acceptance.md)）。
 
@@ -422,7 +442,7 @@ Excalidrawの登録例は `builtin/excalidraw.ts` と `builtin/excalidraw/SKILL.
 
 ## 付録 旧形式（固定runtime map）の保守
 
-未移行のツールチェーン（Web検索・会話履歴・音楽・画像・Excalidraw・物体認識・dots）は、`builtin/toolchains.ts` の定義と `runtime-meta.ts` の固定runtimeで動く。新規追加は本文の§3〜§5を使い、ここは既存の旧形式を移行までの間に直す場合だけに使う。移行は[§6](#6-旧形式のツールチェーンを移行する)。
+未移行のツールチェーン（Web検索・会話履歴・音楽・画像・Excalidraw・物体認識・dots）は、`seeds/toolchains.json` の定義と `runtime-meta.ts` の固定runtimeで動く。新規追加は本文の§3〜§5を使い、ここは既存の旧形式を移行までの間に直す場合だけに使う。移行は[§6](#6-旧形式のツールチェーンを移行する)。
 
 ### 付録B 既存ツールを使うpackageを追加・改訂する
 
@@ -436,7 +456,7 @@ Excalidrawの登録例は `builtin/excalidraw.ts` と `builtin/excalidraw/SKILL.
 | 2 | `api/domains/capabilities/service/builtin-seed.ts` | 新しい定義配列ならimportし、対応backendが有効なとき登録する。既存配列へ追加する場合は追加配線不要 |
 | 3 | `api/domains/capabilities/contracts/runtime-meta.ts` | 新package IDの予算・報告方式。既存IDの新revisionは同じ設定を引き継ぐ |
 | 4 | `api/domains/agent-runtime/service/start-task.ts` | 新しい実行で起動する正確な`package:<id>@<revision>` |
-| 5 | `api/domains/capabilities/builtin/toolchains.ts` | 会話へ出す新経路なら[0章](#1-全体像)のツールチェーンを追加し、`packageRevisionId`で版を指す。会話の関数・方針は手で書かない |
+| 5 | `api/domains/capabilities/seeds/toolchains.json` | 会話へ出す新経路なら[0章](#1-全体像)のツールチェーンを追加し、`packageRevisionId`で版を指す。会話の関数・方針は手で書かない |
 | 6 | `api/domains/dialogue/service/delegate-conversation.ts` | 新しいruntime条件が必要な場合だけ`prepareRouting`の利用可否へ追加する。既存経路の版更新なら変更不要 |
 | 7 | 所有domainのtest、`api/application/`の該当結合試験 | 登録、選択、起動したpackageの版、報告方式、会話への返却 |
 
@@ -479,7 +499,7 @@ builtins.push(briefSkill, {
 
 | 接続 | 例で追加する内容 |
 | --- | --- |
-| `builtin/toolchains.ts` | `web.brief`ツールチェーン。`useWhen`・`examples`・既存`web.search`との`redirects`を双方に書く。会話の引数は共通の`{request}`のまま |
+| `seeds/toolchains.json` | `web.brief`ツールチェーン。`useWhen`・`examples`・既存`web.search`との`redirects`を双方に書く。会話の引数は共通の`{request}`のまま |
 | `runtime-meta.ts` | toolchainsへ`"web.brief": { execution: "research", route: "web" }` |
 | 結合fixture | 呼出しから開始したpackageRevisionIdまで確認。会話の選択と起動先が一致することを試す |
 

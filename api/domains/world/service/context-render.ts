@@ -4,7 +4,7 @@ import type { WorldSlice } from "eumenes-world-model";
  * World text reaches the model as REFERENCE DATA, never as an instruction.
  * The data is a JSON document between two fixed delimiter lines; inside it
  * every `<`, `>`, `&` and line separator is a \uXXXX escape, so no claim,
- * quote or goal text can forge the closing delimiter or start a new
+ * quote or entity name can forge the closing delimiter or start a new
  * line-level instruction. The framing sentences are fixed and contain no
  * user data. The block is a separate labelled message and must be placed
  * after the persona/system prompt, never merged into it.
@@ -29,17 +29,17 @@ export const WORLD_FRAME = [
 	"stance=hypothesisは仮説、refutationsがあるものは反証付きです。条件(condition)を満たさない主張を無条件の事実として述べないでください。complete=falseのときは一部が省かれています。",
 ].join("\n");
 
-export type RenderGoal = { desiredState: string; priority: number };
+/** A known target named in the user's words: shown next to the Slice so the ids in it can be read. */
+export type RenderTopic = { id: string; name: string };
 
-/** Bytes one goal occupies in the rendered block (escaped JSON plus its separator). */
-export const goalRenderedBytes = (goal: RenderGoal): number =>
-	utf8(safeJson({ desiredState: goal.desiredState, priority: goal.priority })) +
-	1;
+/** Added to the frame only when the data carries `entities`. */
+export const WORLD_TOPIC_FRAME =
+	"entitiesは対象のIDと名前の対応です。今回の発言に出た対象の状態と、その直接の因果・依存だけを含みます。";
 
-/** The delimited data document for one slice (and the adopted goals, when any). */
+/** The delimited data document for one slice (and the topic names, when the slice was built for them). */
 function renderWorldData(
 	slice: WorldSlice,
-	goals: readonly RenderGoal[],
+	topics: readonly RenderTopic[],
 ): string {
 	return safeJson({
 		asOf: slice.asOf,
@@ -47,10 +47,9 @@ function renderWorldData(
 		complete: slice.completeness.complete,
 		omittedUnits: slice.completeness.omittedUnits,
 		reasonCodes: slice.reasonCodes,
-		goals: goals.map((goal) => ({
-			desiredState: goal.desiredState,
-			priority: goal.priority,
-		})),
+		...(topics.length === 0
+			? {}
+			: { entities: topics.map(({ id, name }) => ({ id, name })) }),
 		claims: slice.units,
 	});
 }
@@ -58,9 +57,11 @@ function renderWorldData(
 /** The complete model-visible message content. */
 export function renderWorldBlock(
 	slice: WorldSlice,
-	goals: readonly RenderGoal[],
+	topics: readonly RenderTopic[] = [],
 ): string {
-	return `${WORLD_FRAME}\n${WORLD_BLOCK_OPEN}\n${renderWorldData(slice, goals)}\n${WORLD_BLOCK_CLOSE}`;
+	const frame =
+		topics.length === 0 ? WORLD_FRAME : `${WORLD_FRAME}\n${WORLD_TOPIC_FRAME}`;
+	return `${frame}\n${WORLD_BLOCK_OPEN}\n${renderWorldData(slice, topics)}\n${WORLD_BLOCK_CLOSE}`;
 }
 
 export const worldBlockBytes = (block: string) => utf8(block);
@@ -68,65 +69,71 @@ export const worldBlockBytes = (block: string) => utf8(block);
 // --- shared input budget ---------------------------------------------------------
 
 /**
- * The default shared budget: Memory's own view plus the slice limit (8 KiB) plus 2 KiB of slack for the notice.
- * Memory's view is long-term 16 KiB + short-term 8 KiB + recall 6 KiB + the history summary (at most 1200
- * characters, 3600 bytes in Japanese) = 33,920 bytes; with the slice and the slack that is 44,560.
+ * The goals layer dialogue places right after L1 (adopted goals, at most 2 KiB). Dialogue counts its actual
+ * size in `reservedBytes`; the total below only has room for it.
  */
-export const CONTEXT_TOTAL_BYTES = 44_560;
+export const GOALS_LAYER_BYTES = 2_048;
+/**
+ * The topic block (the known targets named in this turn and their direct causal/dependency claims) is at most
+ * 4 KiB rendered, so the goals layer and the topic block together stay within 6 KiB.
+ */
+export const TOPIC_BLOCK_MAX_BYTES = 4_096;
+/** Most known targets one turn's wording is resolved to. */
+export const TOPIC_MAX_ENTITIES = 5;
+/**
+ * The default shared budget: Memory's own view plus the slice limit (8 KiB) plus 2 KiB of slack for the notice,
+ * plus the goals layer.
+ * Memory's view is long-term 16 KiB + short-term 8 KiB + recall 6 KiB + the history summary (at most 1200
+ * characters, 3600 bytes in Japanese) = 33,920 bytes; with the slice, the slack and the goals layer
+ * that is 46,608.
+ */
+export const CONTEXT_TOTAL_BYTES = 44_560 + GOALS_LAYER_BYTES;
 /** Fixed framing sentences, delimiters and the JSON envelope. */
 export const FRAME_BYTES = 1_536;
 /** A slice below this cannot hold even one explanation unit. */
 export const WORLD_MIN_BYTES = 1_024;
-export const GOAL_MAX_BYTES = 1_024;
 
 export type BudgetAllocation =
 	| {
 			ok: true;
 			/**
-			 * The most the whole RENDERED block (framing, escaped JSON, goals) may
-			 * occupy: everything the shared budget leaves after Memory's recall.
+			 * The most the whole RENDERED block (framing, escaped JSON) may
+			 * occupy: everything the shared budget leaves after Memory's recall
+			 * and the goals layer, and at most `blockCapBytes` when given.
 			 * Escaping can expand text up to 6x, so the rendered block is measured
 			 * against this, not only the slice against `worldBytes`.
 			 */
 			blockLimitBytes: number;
 			/** The maxBytes handed to buildWorldSlice (measured on the unescaped slice). */
 			worldBytes: number;
-			/** How many of the goals (in the given order) are shown. */
-			goalCount: number;
-			goalBytes: number;
 	  }
 	| { ok: false };
 
 /**
- * Splits the one shared input budget. `goalBytes` are the sizes of each goal
- * AS RENDERED (see `goalRenderedBytes`), i.e. after escaping. Memory's recall is already fixed when
- * the Broker runs (`reservedBytes`) and is never shrunk; the Goal gets at most
- * GOAL_MAX_BYTES and only while the slice keeps WORLD_MIN_BYTES; the slice gets
- * the rest up to its own 8 KiB cap. Goals are dropped whole, from the lowest
- * priority. No room for even the minimum slice -> not ok (never truncated).
+ * Splits the one shared input budget. Memory's recall and the goals layer are already fixed when the Broker
+ * runs (`reservedBytes`) and are never shrunk; the slice gets the rest up to its own 8 KiB cap (or the smaller
+ * `blockCapBytes`). No room for even the minimum slice -> not ok (never truncated).
  * Pure and deterministic.
  */
 export function allocateContextBudget(input: {
 	totalBytes: number;
 	reservedBytes: number;
 	sliceCapBytes: number;
-	goalBytes: readonly number[];
+	blockCapBytes?: number;
 }): BudgetAllocation {
 	const available = input.totalBytes - input.reservedBytes - FRAME_BYTES;
 	if (!(available >= WORLD_MIN_BYTES)) return { ok: false };
-	let goalCount = 0;
-	let goalBytes = 0;
-	for (const size of input.goalBytes) {
-		if (goalBytes + size > GOAL_MAX_BYTES) break;
-		if (available - (goalBytes + size) < WORLD_MIN_BYTES) break;
-		goalBytes += size;
-		goalCount += 1;
-	}
+	const cap = input.blockCapBytes;
 	return {
 		ok: true,
-		blockLimitBytes: input.totalBytes - input.reservedBytes,
-		worldBytes: Math.min(input.sliceCapBytes, available - goalBytes),
-		goalCount,
-		goalBytes,
+		blockLimitBytes: Math.min(
+			input.totalBytes - input.reservedBytes,
+			cap ?? Number.POSITIVE_INFINITY,
+		),
+		worldBytes: Math.min(
+			input.sliceCapBytes,
+			available,
+			cap === undefined ? Number.POSITIVE_INFINITY : cap - FRAME_BYTES,
+		),
 	};
 }

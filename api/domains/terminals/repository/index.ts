@@ -228,3 +228,25 @@ export function transition(
 		);
 	return result.changes > 0;
 }
+
+const FINAL_STATES = "'completed','interrupted','ended','unknown','cancelled'";
+
+/**
+ * Deletes final requests last changed before `cutoff`, then all but the newest `keep` final
+ * ones. Open requests are never touched. Returns how many rows were deleted.
+ */
+export function pruneFinal(db: Database, cutoff: string, keep: number): number {
+	const aged = db
+		.query(
+			`DELETE FROM terminal_requests WHERE state IN (${FINAL_STATES}) AND updated_at < ?`,
+		)
+		.run(cutoff).changes;
+	const surplus = db
+		.query(
+			`DELETE FROM terminal_requests WHERE state IN (${FINAL_STATES}) AND rowid NOT IN (
+			   SELECT rowid FROM terminal_requests WHERE state IN (${FINAL_STATES})
+			   ORDER BY updated_at DESC, rowid DESC LIMIT ?)`,
+		)
+		.run(keep).changes;
+	return aged + surplus;
+}

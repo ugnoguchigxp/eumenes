@@ -96,6 +96,8 @@ test("a Claude Code request is saved once per request id and read back from the 
 		hookBaseUrl: "http://127.0.0.1:8787",
 		curl: "curl",
 	});
+	// The host recovers at startup, before anything is sent.
+	await terminals.recover();
 	try {
 		const adapter = createTerminalsAdapter(terminals);
 		type Invocation = Parameters<typeof adapter.invokeInTransaction>[1];

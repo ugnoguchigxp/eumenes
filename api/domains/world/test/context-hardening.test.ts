@@ -15,7 +15,6 @@ import {
 	type ContextPrepared,
 	type PreparedWorldContext,
 } from "..";
-import { goalRenderedBytes } from "../service/context-render";
 import {
 	NOW,
 	PURPOSE,
@@ -329,23 +328,27 @@ test("escape expansion cannot push the block past the shared total: blocked worl
 	});
 });
 
-test("goal bytes are measured on the escaped JSON too", () => {
-	const goal = { desiredState: "<".repeat(200), priority: 1 };
-	// 200 '<' are 1200 bytes once escaped: more than the raw JSON ever shows.
-	expect(goalRenderedBytes(goal)).toBeGreaterThan(1200);
+test("the block limit is what the shared budget leaves, and a cap only lowers it", () => {
 	const base = {
 		totalBytes: CONTEXT_TOTAL_BYTES,
 		reservedBytes: 0,
 		sliceCapBytes: 8192,
 	};
-	// Raw it would fit the goal cap (1024); rendered it does not, so it is dropped whole.
-	expect(
-		allocateContextBudget({ ...base, goalBytes: [goalRenderedBytes(goal)] }),
-	).toMatchObject({ ok: true, goalCount: 0, goalBytes: 0 });
-	expect(allocateContextBudget({ ...base, goalBytes: [] })).toMatchObject({
+	expect(allocateContextBudget(base)).toMatchObject({
 		ok: true,
 		blockLimitBytes: CONTEXT_TOTAL_BYTES,
 	});
+	expect(
+		allocateContextBudget({ ...base, blockCapBytes: 4096 }),
+	).toMatchObject({ ok: true, blockLimitBytes: 4096 });
+	// A cap never makes room: with no room for the minimal slice it stays not ok.
+	expect(
+		allocateContextBudget({
+			...base,
+			reservedBytes: CONTEXT_TOTAL_BYTES - 2000,
+			blockCapBytes: 4096,
+		}),
+	).toMatchObject({ ok: false });
 });
 
 // --- 7(e) retryable pre-send verdict ---------------------------------------------------------

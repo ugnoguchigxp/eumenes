@@ -388,6 +388,7 @@ export function createMemoryService(
 							conversationId: line.conversationId,
 							itemIds: line.itemIds,
 							messageIds: line.messageIds,
+							derived: line.derived,
 						})
 					)
 						republish = true;

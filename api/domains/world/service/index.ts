@@ -24,6 +24,7 @@ export {
 export { PROTECTIVE_KINDS, createWorldService } from "./world-service";
 export type { WorldService, WorldServiceOptions } from "./world-service";
 export type { VersionInputs } from "./inputs";
+export { worldHasContent } from "./world-content";
 export { createWorldHostGate } from "./host-gate";
 export type { WorldHostGate } from "./host-gate";
 export {
@@ -79,7 +80,6 @@ export type {
 export {
 	CONTEXT_TOTAL_BYTES,
 	FRAME_BYTES,
-	GOAL_MAX_BYTES,
 	WORLD_BLOCK_CLOSE,
 	WORLD_BLOCK_OPEN,
 	WORLD_MIN_BYTES,
@@ -87,7 +87,7 @@ export {
 	renderWorldBlock,
 	safeJson,
 } from "./context-render";
-export type { BudgetAllocation, RenderGoal } from "./context-render";
+export type { BudgetAllocation, RenderTopic } from "./context-render";
 export { forgetUsageInScope, sliceDependentPrefix } from "./usage-ledger";
 export { SKIP_REASONS, extractEventId, scopeSetOf } from "./extraction-intake";
 export type {

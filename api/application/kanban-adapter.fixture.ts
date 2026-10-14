@@ -29,9 +29,21 @@ function fakeTerminals() {
 		unsent: false,
 		failEnqueue: undefined as string | undefined,
 		stops: [] as string[],
-		stopResult: "stopped" as "stopped" | "unconfirmed",
-		requests: new Map<string, { state: string }>(),
+		/** Makes `stop` fail with this message. */
+		stopError: undefined as string | undefined,
+		stopResult: "stopped" as "stopped" | "unconfirmed" | "final",
+		/** The terminals request of each run, as `requestInTransaction` answers. */
+		requests: new Map<
+			string,
+			{
+				state: string;
+				reason?: string;
+				lastReport?: string;
+				files?: readonly string[];
+			}
+		>(),
 		sessions: [] as ReturnType<TerminalsPort["activities"]>,
+		finished: [] as Array<(tx: Database, event: Finished) => void>,
 	};
 	const terminals = {
 		enqueueInTransaction(_tx: Database, request: Enqueued) {
@@ -44,15 +56,22 @@ function fakeTerminals() {
 			(state.requests.get(id) as never) ?? null,
 		stop: async (id: string) => {
 			state.stops.push(id);
-			return state.stopResult;
+			if (state.stopError) throw new Error(state.stopError);
+			return state.stopResult as "stopped" | "unconfirmed";
 		},
 		activities: () => state.sessions,
-		onFinishedInTransaction: () => () => {},
+		onFinishedInTransaction: (
+			listener: (tx: Database, event: Finished) => void,
+		) => {
+			state.finished.push(listener);
+			return () => {};
+		},
 		onWaitingInTransaction: () => () => {},
 	} satisfies TerminalsPort;
 	return { terminals, state };
 }
 type TerminalsPort = import("./kanban-runs").KanbanTerminals;
+type Finished = import("../domains/terminals").TerminalRequestFinished;
 
 export function setup(runnable = true) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-kanban-adapter-"));
@@ -72,11 +91,11 @@ export function setup(runnable = true) {
 	});
 	const state = { runnable };
 	const fake = fakeTerminals();
-	connectKanbanRuns(kanban, fake.terminals);
+	const link = connectKanbanRuns(kanban, fake.terminals);
 	const adapter = createKanbanAdapter(kanban, {
 		runnable: () => state.runnable,
 	});
-	return { store, adapter, state, kanban, fake };
+	return { store, adapter, state, kanban, fake, link };
 }
 
 export const origin = { kind: "ui" as const, scope: "s", actionRequestId: "a" };
@@ -124,3 +143,19 @@ export const revisionOf = (
 	adapter: ReturnType<typeof setup>["adapter"],
 	cardId: string,
 ) => boardData(store, adapter).cards.find((c) => c.id === cardId)!.revision;
+
+/** What terminals tells the board when a request ends (inside the transaction that ends it). */
+export const finishedEvent = (
+	runId: string,
+	cardId: string,
+	over: Partial<import("../domains/terminals").TerminalRequestFinished> = {},
+): import("../domains/terminals").TerminalRequestFinished => ({
+	attemptId: runId,
+	state: "completed",
+	owner: `kanban:${cardId}` as never,
+	origin: "board",
+	task: "T",
+	lastReport: "済",
+	files: ["a.ts"],
+	...over,
+});

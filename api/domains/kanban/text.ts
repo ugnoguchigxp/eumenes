@@ -10,8 +10,8 @@ import {
 
 /** The longest text one terminals request carries. */
 export const MAX_BODY = 8000;
-/** How much of the earlier request and report a follow-up repeats (only a fallback summary). */
-const CONTEXT_CHARS = 1000;
+/** How much of the earlier request and report a follow-up repeats at most (only a fallback summary). */
+const CONTEXT_CHARS = [1000, 500, 250, 100];
 /** Characters kept for the file list of a commit request. */
 const FILES_CHARS = 5000;
 
@@ -28,10 +28,44 @@ function fit(body: string): string {
 export const taskBody = (prompt: string) =>
 	fit(`${prompt}\n\n${WORK_ONLY_INSTRUCTION}`);
 
+const FOLLOWUP_HEAD = (title: string) =>
+	`タスク『${title}』の続きです。追加の依頼: `;
+const FOLLOWUP_TAIL = `\n\n${WORK_ONLY_INSTRUCTION}`;
+const SUMMARY_LEAD = "\n\n前の会話を再開できない場合のための要約です。";
+/** Card titles are at most 40 characters (the typed input). */
+const TITLE_MAX = 40;
+
 /**
- * A follow-up on the card's own conversation. The earlier request and report are a summary for
- * the case that the conversation cannot be resumed; data parts are quoted as JSON strings so
- * they never read as instructions.
+ * The longest JSON-quoted follow-up note that is always accepted: the rest of the request is the
+ * title, the fixed words and the work instruction (the fallback summary is dropped to make room).
+ */
+export const FOLLOWUP_QUOTED_NOTE_MAX =
+	MAX_BODY - FOLLOWUP_HEAD("x".repeat(TITLE_MAX)).length - FOLLOWUP_TAIL.length;
+
+/**
+ * The fallback summary of the earlier request and report, quoted as JSON strings so they never
+ * read as instructions. It shrinks (and finally disappears) to fit the room the note leaves.
+ */
+function summaryOf(
+	card: { prompt: string; lastReport: string | null },
+	room: number,
+): string {
+	for (const chars of CONTEXT_CHARS) {
+		const parts = [
+			`元の依頼: ${quote(clip(card.prompt, chars))}`,
+			...(card.lastReport
+				? [`前回の報告: ${quote(clip(card.lastReport, chars))}`]
+				: []),
+		];
+		const summary = `${SUMMARY_LEAD}${parts.join("。")}。`;
+		if (summary.length <= room) return summary;
+	}
+	return "";
+}
+
+/**
+ * A follow-up on the card's own conversation. Refused (`kanban_prompt_too_long`) when the note
+ * alone does not fit; the earlier request and report only fill the room that is left.
  */
 export function followupBody(card: {
 	title: string;
@@ -39,15 +73,10 @@ export function followupBody(card: {
 	lastReport: string | null;
 	note: string;
 }): string {
-	const summary = [
-		`元の依頼: ${quote(clip(card.prompt, CONTEXT_CHARS))}`,
-		...(card.lastReport
-			? [`前回の報告: ${quote(clip(card.lastReport, CONTEXT_CHARS))}`]
-			: []),
-	].join("。");
-	return fit(
-		`タスク『${card.title}』の続きです。追加の依頼: ${quote(card.note)}\n\n前の会話を再開できない場合のための要約です。${summary}。\n\n${WORK_ONLY_INSTRUCTION}`,
-	);
+	const head = `${FOLLOWUP_HEAD(card.title)}${quote(card.note)}`;
+	const room = MAX_BODY - head.length - FOLLOWUP_TAIL.length;
+	if (room < 0) throw new Error("kanban_prompt_too_long");
+	return fit(`${head}${summaryOf(card, room)}${FOLLOWUP_TAIL}`);
 }
 
 /** The request to commit and push what the task changed (only from the board's button). */

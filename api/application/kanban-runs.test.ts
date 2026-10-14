@@ -53,6 +53,8 @@ function make(
 		cwd: dir,
 		...options,
 	});
+	// Terminals dispatches nothing until its startup recovery has run.
+	if (!restartOf) void terminals.recover();
 	const kanban = createKanban({ store });
 	let wrapped: KanbanTerminals = terminals;
 	const link = connectKanbanRuns(kanban, {
@@ -284,6 +286,28 @@ test("a stop that cannot be confirmed pauses the queue and keeps the card runnin
 	await h.act("kanban.resume-queue", {});
 	await until(() => h.spawned.length === 2);
 	expect(h.board().queue.state).toBe("running");
+});
+
+test("a finish the board could not write is settled from the request: the card is Done and the next run goes", async () => {
+	const h = make();
+	const a = await h.add("A");
+	const b = await h.add("B");
+	await h.run(a);
+	await h.run(b);
+	await h.begin(0, "p1");
+	// The board's part of the finishing transaction fails once; terminals' final state stays.
+	const real = h.kanban.finishRunInTransaction;
+	let failures = 0;
+	h.kanban.finishRunInTransaction = (tx, finish) => {
+		if (failures++ === 0) throw new Error("boom");
+		return real(tx, finish);
+	};
+	await h.stop(0, "p1", "A を直しました");
+	await until(() => h.card(a).label === "done");
+	expect(h.card(a)).toMatchObject({ lastReport: "A を直しました" });
+	await until(() => h.spawned.length === 2);
+	expect(h.spawned[1]!.command.at(-1)).toContain("B の依頼");
+	expect(noticeKinds(h)).toEqual(["done"]);
 });
 
 test("hooks that never arrive make a Blocker, stop the queue and announce both", async () => {

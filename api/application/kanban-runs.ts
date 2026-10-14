@@ -2,6 +2,7 @@ import type { Database } from "bun:sqlite";
 import type {
 	KanbanBoardView,
 	KanbanDispatch,
+	KanbanRecoverPorts,
 	KanbanService,
 } from "../domains/kanban";
 import type {
@@ -24,6 +25,7 @@ export type KanbanTerminals = Pick<
 	| "onWaitingInTransaction"
 >;
 
+const PRUNE_EVERY_MS = 60 * 60 * 1000;
 const OWNER_PREFIX = "kanban:";
 const ownerOf = (cardId: string) => `${OWNER_PREFIX}${cardId}` as const;
 const isKanbanOwner = (owner: string) => owner.startsWith(OWNER_PREFIX);
@@ -70,6 +72,52 @@ function guarded(tx: Database, name: string, work: () => void): boolean {
 	}
 }
 
+/**
+ * Hands the next run to terminals inside the caller's transaction. When terminals cannot take it
+ * (tracking became unavailable) only that hand-over is undone: the run becomes a Blocker and the
+ * queue stops, instead of the failure aborting the caller (a final state, or the startup).
+ */
+function handOver(
+	kanban: KanbanService,
+	terminals: Pick<TerminalsService, "enqueueInTransaction">,
+	tx: Database,
+	dispatch: KanbanDispatch,
+) {
+	const handed = guarded(tx, "kanban_dispatch", () =>
+		enqueueDispatch(terminals, tx, dispatch),
+	);
+	if (!handed) kanban.dispatchFailedInTransaction(tx, dispatch.runId);
+}
+
+type RecoveryTerminals = Pick<
+	TerminalsService,
+	"requestInTransaction" | "enqueueInTransaction"
+>;
+/** What settling a run from its terminals request reads and hands over. */
+const portsOf = (
+	kanban: KanbanService,
+	terminals: RecoveryTerminals,
+): KanbanRecoverPorts => ({
+	request: (tx, runId) => terminals.requestInTransaction(tx, runId),
+	enqueue: (tx, dispatch) => handOver(kanban, terminals, tx, dispatch),
+});
+
+/**
+ * Settles handed runs whose request is already final (see `KanbanService.reconcile`). Never
+ * throws: a failure is logged and the next call tries again.
+ */
+function createReconciler(kanban: KanbanService, terminals: RecoveryTerminals) {
+	return async (check?: { always?: boolean }): Promise<void> => {
+		try {
+			// A run settled here was stuck: worth a trace.
+			if ((await kanban.reconcile(portsOf(kanban, terminals), check)) > 0)
+				log.warn("kanban.runs_reconciled", {});
+		} catch (error) {
+			log.warn("kanban.reconcile_failed", {}, error);
+		}
+	};
+}
+
 const finishOf = (event: TerminalRequestFinished) => ({
 	runId: event.attemptId,
 	state: event.state,
@@ -102,18 +150,19 @@ export function connectKanbanRuns(
 	kanban: KanbanService,
 	terminals: KanbanTerminals,
 ) {
+	const reconcile = createReconciler(kanban, terminals);
 	const offFinished = terminals.onFinishedInTransaction((tx, event) => {
 		if (!isKanbanOwner(event.owner)) return;
-		guarded(tx, "kanban_finish", () => {
-			const out = kanban.finishRunInTransaction(tx, finishOf(event));
-			const dispatch = out?.dispatch;
-			if (!dispatch) return;
-			const handed = guarded(tx, "kanban_dispatch", () =>
-				enqueueDispatch(terminals, tx, dispatch),
-			);
-			// Terminals cannot take the next run (tracking became unavailable): stop the queue.
-			if (!handed) kanban.dispatchFailedInTransaction(tx, dispatch.runId);
+		const settled = guarded(tx, "kanban_finish", () => {
+			const dispatch = kanban.finishRunInTransaction(
+				tx,
+				finishOf(event),
+			)?.dispatch;
+			if (dispatch) handOver(kanban, terminals, tx, dispatch);
 		});
+		// The request is final but the card could not follow: settle it from the request once
+		// this transaction committed (the writer runs after it), so the queue does not stay blocked.
+		if (!settled) void reconcile({ always: true });
 	});
 	const offWaiting = terminals.onWaitingInTransaction((tx, event) => {
 		if (!isKanbanOwner(event.owner)) return;
@@ -125,13 +174,26 @@ export function connectKanbanRuns(
 		terminals,
 		stopper: createStopper(kanban, terminals),
 	});
+	let prunedAt = 0;
 	return {
 		/** Startup: settle handed-over runs from their requests (after terminals' recovery). */
-		recover: () =>
-			kanban.recover({
-				request: (tx, runId) => terminals.requestInTransaction(tx, runId),
-				enqueue: (tx, dispatch) => enqueueDispatch(terminals, tx, dispatch),
-			}),
+		recover: () => kanban.recover(portsOf(kanban, terminals)),
+		/** Settles handed runs whose request is final but whose card did not follow. */
+		reconcile: () => reconcile(),
+		/**
+		 * Periodic upkeep for the host (every few tens of seconds): reconciles stuck runs, and
+		 * about once an hour deletes old final runs and receipts. Never throws.
+		 */
+		async maintain() {
+			await reconcile();
+			if (Date.now() - prunedAt < PRUNE_EVERY_MS) return;
+			prunedAt = Date.now();
+			try {
+				await kanban.prune();
+			} catch (error) {
+				log.warn("kanban.prune_failed", {}, error);
+			}
+		},
 		disconnect() {
 			offFinished();
 			offWaiting();
@@ -147,9 +209,11 @@ export function connectKanbanRuns(
  */
 export function createStopper(
 	kanban: KanbanService,
-	terminals: Pick<TerminalsService, "stop">,
+	terminals: Pick<TerminalsService, "stop"> & RecoveryTerminals,
 ) {
 	const inflight = new Set<string>();
+	const reconcile = createReconciler(kanban, terminals);
+	const stillPending = (runId: string) => kanban.pendingStops().includes(runId);
 	return {
 		flush() {
 			for (const runId of kanban.pendingStops()) {
@@ -157,13 +221,18 @@ export function createStopper(
 				inflight.add(runId);
 				void terminals
 					.stop(runId)
-					.then((result) =>
-						result === "unconfirmed"
-							? kanban.stopUnconfirmed(runId)
-							: undefined,
-					)
+					// Whatever terminals answers except "unconfirmed" (stopped, already final, or a
+					// value added later), its request may be final: the card follows it.
+					.then(async (result) => {
+						if (result !== "unconfirmed") await reconcile();
+						// Still handed with the stop pending: no final state was written.
+						if (result === "unconfirmed" || stillPending(runId))
+							await kanban.stopUnconfirmed(runId);
+					})
 					.catch(async (error) => {
 						log.warn("kanban.stop_failed", { runId }, error);
+						// A request that already ended settles the run; otherwise the stop is unconfirmed.
+						await reconcile();
 						await kanban.stopUnconfirmed(runId);
 					})
 					.catch((error) =>
@@ -206,8 +275,31 @@ export function composeBoard(
 	const unsent = new Set(
 		runs.filter((run) => run.requestState === "queued").map((run) => run.id),
 	);
+	// A Kanban session that is busy although no handed run is on it holds the queue back.
+	const manual = sessions.find(
+		(s) =>
+			isKanbanOwner(s.owner) &&
+			(s.activity === "working" || s.activity === "waiting") &&
+			!board.runs.some(
+				(run) =>
+					run.state === "handed" &&
+					s.owner === ownerOf(run.cardId) &&
+					s.claudeSessionId === run.claudeSessionId,
+			),
+	);
 	return {
 		...board,
+		queue: {
+			...board.queue,
+			...(manual
+				? {
+						manual: {
+							activity: manual.activity as "working" | "waiting",
+							stale: manual.stale === true,
+						},
+					}
+				: {}),
+		},
 		runs,
 		cards: board.cards.map((card) =>
 			card.currentRunId && unsent.has(card.currentRunId)

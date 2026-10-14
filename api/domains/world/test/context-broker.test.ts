@@ -8,6 +8,7 @@
  * message (no extraction), the clock is the fixture NOW.
  */
 import { expect, test } from "bun:test";
+import worldPackage from "eumenes-world-model/package.json";
 import { createGoalsService } from "../../goals";
 import {
 	CONTEXT_TOTAL_BYTES,
@@ -20,6 +21,10 @@ import {
 	type ContextPrepared,
 	type PreparedWorldContext,
 } from "..";
+import {
+	GOALS_LAYER_BYTES,
+	TOPIC_BLOCK_MAX_BYTES,
+} from "../service/context-render";
 import {
 	ACCESS,
 	NOW,
@@ -102,43 +107,40 @@ const ready = (prepared: ContextPrepared) => {
 const sliceDependents = (h: Harness) =>
 	worldEdges(h).filter((edge) => edge.dependent_id.includes(":w1s-"));
 
-test("shared budget: Memory is never shrunk, the Goal is capped and dropped whole, the slice keeps its minimum", () => {
-	const base = {
-		totalBytes: CONTEXT_TOTAL_BYTES,
-		sliceCapBytes: 8192,
-		goalBytes: [200, 300],
-	};
-	// Plenty of room: full slice, both goals.
+test("shared budget: Memory and the goals layer are never shrunk, the slice keeps its minimum, the topic block is capped", () => {
+	const base = { totalBytes: CONTEXT_TOTAL_BYTES, sliceCapBytes: 8192 };
+	// Plenty of room: the full slice.
 	expect(allocateContextBudget({ ...base, reservedBytes: 0 })).toMatchObject({
 		ok: true,
 		worldBytes: 8192,
-		goalCount: 2,
-		goalBytes: 500,
+		blockLimitBytes: CONTEXT_TOTAL_BYTES,
 	});
-	// Memory at its own limit (layers, history summary and notice: about 36 KB) is never shrunk: the slice takes what is left.
+	// Memory at its own limit (layers, history summary, notice and the goals layer: about 38 KB) is never shrunk: the slice takes what is left.
 	expect(
-		allocateContextBudget({ ...base, reservedBytes: 36_000 }),
+		allocateContextBudget({ ...base, reservedBytes: 38_000 }),
 	).toMatchObject({
 		ok: true,
-		worldBytes: CONTEXT_TOTAL_BYTES - 36_000 - 1536 - 500,
-		goalCount: 2,
+		worldBytes: CONTEXT_TOTAL_BYTES - 38_000 - 1536,
 	});
-	// A tight total: goals go first (whole), then the slice shrinks.
-	const tight = allocateContextBudget({
-		totalBytes: 1536 + 1024 + 250,
+	// The topic block is capped: goals layer (2 KiB) + topic block stay within 6 KiB.
+	const topic = allocateContextBudget({
+		...base,
 		reservedBytes: 0,
-		sliceCapBytes: 8192,
-		goalBytes: [200, 300],
+		blockCapBytes: TOPIC_BLOCK_MAX_BYTES,
 	});
-	expect(tight).toMatchObject({ ok: true, goalCount: 1, goalBytes: 200 });
-	if (tight.ok) expect(tight.worldBytes).toBeGreaterThanOrEqual(1024);
+	expect(topic).toMatchObject({
+		ok: true,
+		blockLimitBytes: TOPIC_BLOCK_MAX_BYTES,
+	});
+	if (topic.ok) expect(topic.worldBytes).toBeGreaterThanOrEqual(1024);
+	expect(GOALS_LAYER_BYTES + TOPIC_BLOCK_MAX_BYTES).toBeLessThanOrEqual(6144);
 	// No room for even the minimal slice: not ok, nothing truncated into existence.
 	expect(
 		allocateContextBudget({ ...base, reservedBytes: CONTEXT_TOTAL_BYTES }),
 	).toEqual({ ok: false });
 	// Deterministic.
-	expect(allocateContextBudget({ ...base, reservedBytes: 100 })).toEqual(
-		allocateContextBudget({ ...base, reservedBytes: 100 }),
+	expect(allocateContextBudget({ ...base, reservedBytes: 36_000 })).toEqual(
+		allocateContextBudget({ ...base, reservedBytes: 36_000 }),
 	);
 });
 
@@ -291,7 +293,7 @@ test("validate/record: the receipt ties slice digest, versions, package, run, at
 			assertionVersions: [{ id: "claim-1", revision: 2, lifecycle: "active" }],
 			goal: null,
 			contractVersion: 1,
-			packageVersion: "0.0.0",
+			packageVersion: worldPackage.version,
 			inferenceRequestId: "req-r1",
 			inferenceAttemptId: "att-r1",
 			dependentIds: [...context.dependentIds],
@@ -409,7 +411,8 @@ test("Goal: the adopted goal is the slice's goalRef; withdrawal or any later Goa
 		const context = prepared.context;
 		expect(context.slice.goalRef).toEqual({ id: goal.id, revision: 1 });
 		expect(context.goal).toEqual({ id: goal.id, revision: 1 });
-		expect(prepared.block).toContain("来週までに音声機能を公開する");
+		// Goals are shown by dialogue's own layer, never twice.
+		expect(prepared.block).not.toContain("来週までに音声機能を公開する");
 		const check = (c: PreparedWorldContext) =>
 			h.store.readSnapshot((db) =>
 				b.validateInTransaction(db, settleInput("r1"), c),

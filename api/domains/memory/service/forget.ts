@@ -12,6 +12,7 @@ import type { ContinuityService } from "../../continuity";
 import {
 	FORGET_MAX_ITEMS,
 	PROFILE_SCOPE,
+	type ForgetDerived,
 	type ForgetInput,
 	type ForgetOutcome,
 	type ForgetPurge,
@@ -57,6 +58,18 @@ export type ForgetDeps = {
 	/** The derived-data purges other domains registered (the steward's decisions and inbox). */
 	purgeHooks: ReadonlyArray<(db: Database, purge: ForgetPurge) => void>;
 };
+
+/** A record of string lists; memory checks the shape only, never the meaning. */
+function isDerived(value: unknown): value is ForgetDerived {
+	if (typeof value !== "object" || value === null || Array.isArray(value))
+		return false;
+	return Object.entries(value).every(
+		([key, ids]) =>
+			key !== "" &&
+			Array.isArray(ids) &&
+			ids.every((id) => typeof id === "string" && id !== ""),
+	);
+}
 
 function refuse(code: string): never {
 	throw new Error(code);
@@ -213,8 +226,9 @@ export function createForget(deps: ForgetDeps) {
 	 */
 	function purgeDerivedInTransaction(
 		db: Database,
-		purge: Omit<ForgetPurge, "deletedSummaryConversationIds"> & {
+		purge: Omit<ForgetPurge, "deletedSummaryConversationIds" | "derived"> & {
 			forgetId: string;
+			derived?: ForgetDerived;
 		},
 	): boolean {
 		const now = deps.clock();
@@ -276,6 +290,7 @@ export function createForget(deps: ForgetDeps) {
 				itemIds: purge.itemIds,
 				messageIds: existing,
 				conversationId: purge.conversationId,
+				derived: purge.derived ?? {},
 				deletedSummaryConversationIds,
 			});
 		// This line's purge is in the database now; a restored older database lacks the mark and runs it again.
@@ -297,9 +312,14 @@ export function createForget(deps: ForgetDeps) {
 			onJournaled: () => void,
 		): ForgetOutcome {
 			if (!deps.ready()) return refuse("memory_unavailable");
+			const derived = input.derived;
+			if (derived !== undefined && !isDerived(derived))
+				return refuse("invalid_forget");
 			if (
 				input.conversationId === "" ||
-				(input.itemIds.length === 0 && input.messageIds.length === 0)
+				(input.itemIds.length === 0 &&
+					input.messageIds.length === 0 &&
+					!Object.values(derived ?? {}).some((ids) => ids.length > 0))
 			)
 				return refuse("invalid_forget");
 			if (input.itemIds.length > FORGET_MAX_ITEMS)
@@ -320,6 +340,7 @@ export function createForget(deps: ForgetDeps) {
 				conversationId: input.conversationId,
 				messageIds,
 				itemIds: [...itemIds],
+				...(derived !== undefined ? { derived } : {}),
 				at: deps.clock(),
 			};
 			onJournaled();
@@ -335,6 +356,7 @@ export function createForget(deps: ForgetDeps) {
 				conversationId: input.conversationId,
 				itemIds: entry.itemIds,
 				messageIds,
+				derived,
 			});
 			windows.purgeInTransaction(db);
 			return {

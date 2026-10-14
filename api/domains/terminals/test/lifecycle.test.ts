@@ -86,8 +86,8 @@ test("stop ends the PTY and records unknown (stopped_by_person) once the exit is
 		reason: "stopped_by_person",
 	});
 	expect(events).toHaveLength(1);
-	// Stopping a request that is already final changes nothing.
-	expect(await h.terminals.stop(request.attemptId)).toBe("stopped");
+	// Stopping a request that is already final changes nothing and says so.
+	expect(await h.terminals.stop(request.attemptId)).toBe("final");
 	expect(events).toHaveLength(1);
 });
 

@@ -10,6 +10,9 @@ import {
 } from "./contracts";
 import type { TerminalsService } from "./service";
 
+/** Bytes of one hook body read at most. */
+const HOOK_BODY_LIMIT = 4 * 1024 * 1024;
+
 const idOf = (c: Context) => {
 	const id = c.req.param("id");
 	return id && terminalIdSchema.safeParse(id).success ? id : undefined;
@@ -59,15 +62,18 @@ export function registerTerminals(app: Hono, service: TerminalsService) {
 		let payload: unknown;
 		try {
 			const bytes = await readBounded(c.req.raw.body, {
-				limit: 512 * 1024,
+				// PostToolUse carries the whole tool input (a Write of a large file); still bounded.
+				limit: HOOK_BODY_LIMIT,
 				tooLarge: "payload_too_large",
 				missing: "invalid_terminal_input",
 				signal: c.req.raw.signal,
 			});
 			payload = JSON.parse(new TextDecoder().decode(bytes));
 		} catch (error) {
-			if (error instanceof Error && error.message === "payload_too_large")
+			if (error instanceof Error && error.message === "payload_too_large") {
+				service.hookTooLarge(id);
 				return c.json({ error: "payload_too_large" }, 413);
+			}
 			return invalid(c);
 		}
 		const parsed = hookPayloadSchema.safeParse(payload);

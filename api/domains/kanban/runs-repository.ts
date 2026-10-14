@@ -173,13 +173,31 @@ export const boardRuns = (db: Database): RunRow[] =>
 			.all() as RawRun[]
 	).map(toRun);
 
-/** Another card's run was handed over after this run (the working directory is shared). */
-export const handedByOthersAfter = (db: Database, run: RunRow): boolean =>
+/**
+ * The two most recently handed-over runs of different cards (newest first): enough to tell for
+ * any run whether another card's run was handed over after it (the working directory is shared).
+ */
+export const latestHandedRuns = (
+	db: Database,
+): Array<{ cardId: string; seq: number }> =>
+	(
+		db
+			.query(
+				`SELECT card_id, MAX(seq) AS seq FROM kanban_runs WHERE handed_at IS NOT NULL
+ GROUP BY card_id ORDER BY seq DESC LIMIT 2`,
+			)
+			.all() as Array<{ card_id: string; seq: number }>
+	).map((row) => ({ cardId: row.card_id, seq: row.seq }));
+
+/** Deletes final runs finished before `before` that no card points to; returns how many. */
+export const deleteOldRuns = (db: Database, before: number): number =>
 	db
 		.query(
-			"SELECT 1 FROM kanban_runs WHERE card_id<>? AND handed_at IS NOT NULL AND seq>? LIMIT 1",
+			`DELETE FROM kanban_runs WHERE state IN ('completed','blocked','cancelled')
+ AND finished_at IS NOT NULL AND finished_at<?
+ AND id NOT IN (SELECT current_run_id FROM kanban_cards WHERE current_run_id IS NOT NULL)`,
 		)
-		.get(run.cardId, run.seq) !== null;
+		.run(before).changes;
 
 export const setStopRequested = (db: Database, id: string, value: boolean) =>
 	db

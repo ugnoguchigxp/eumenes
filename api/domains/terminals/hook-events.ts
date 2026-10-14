@@ -68,10 +68,46 @@ export function createHookEvents(
 		}
 	}
 
+	/**
+	 * `/clear` (or any new conversation in the same PTY) changes Claude's session id. The request
+	 * that was handed over belonged to the old conversation and will get no Stop: it is
+	 * interrupted. The new id is followed for activity only; requests keep their claudeSessionId.
+	 */
+	async function onNewConversation(session: Session, payload: HookPayload) {
+		const flight = session.inflight;
+		log.info("terminals.conversation_changed", {
+			sessionId: session.id,
+			source: payload.source ?? "unknown",
+		});
+		if (payload.session_id) session.hookSessionId = payload.session_id;
+		session.sessionStarted = true;
+		session.activity = "idle";
+		clearTimeout(session.trackingTimer);
+		rt.changed();
+		try {
+			if (flight && flight.phase !== "sending")
+				await ledger.finalize(flight.id, { state: "interrupted" }, session);
+		} finally {
+			rt.kick();
+		}
+	}
+
 	return async function apply(session: Session, payload: HookPayload) {
 		await ledger.retryUnsaved();
+		// Only after the run reported once: before that, a foreign id is a stale file or a copy.
+		if (
+			payload.hook_event_name === "SessionStart" &&
+			session.sessionStarted &&
+			payload.session_id !== undefined &&
+			(payload.source === "clear" ||
+				payload.session_id !== session.hookSessionId)
+		) {
+			session.lastHookAtMs = rt.now();
+			return onNewConversation(session, payload);
+		}
 		// A hook of another conversation (a stale file, a copy) does not belong to this run.
-		if (payload.session_id !== session.claudeSessionId) return;
+		if (payload.session_id !== session.hookSessionId) return;
+		session.lastHookAtMs = rt.now();
 		switch (payload.hook_event_name) {
 			case "SessionStart":
 				session.sessionStarted = true;

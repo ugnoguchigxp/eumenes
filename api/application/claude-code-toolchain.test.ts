@@ -16,14 +16,14 @@ function fakeClaude() {
 	}> = [];
 	const writes: string[] = [];
 	const spawn: SpawnPty = ({ command }) => {
-		const settings = readFileSync(
-			command[command.indexOf("--settings") + 1]!,
-			"utf8",
-		);
+		const settingsPath = command[command.indexOf("--settings") + 1]!;
+		const settings = readFileSync(settingsPath, "utf8");
 		spawned.push({
 			command,
 			sessionId: /hooks\/terminals\/([0-9a-f-]{36})/.exec(settings)![1]!,
-			token: /x-eumenes-hook-token: ([0-9a-f]{64})/.exec(settings)![1]!,
+			token: /x-eumenes-hook-token: ([0-9a-f]{64})/.exec(
+				readFileSync(/-H @'([^']+)'/.exec(settings)![1]!, "utf8"),
+			)![1]!,
 			claudeId: command[command.indexOf("--session-id") + 1]!,
 		});
 		return {
@@ -37,8 +37,8 @@ function fakeClaude() {
 	return {
 		spawned,
 		writes,
-		terminals: (store: Store) =>
-			createTerminals({
+		terminals: (store: Store) => {
+			const terminals = createTerminals({
 				store,
 				command: ["claude"],
 				spawn,
@@ -46,7 +46,11 @@ function fakeClaude() {
 				hookBaseUrl: "http://127.0.0.1:8787",
 				curl: "curl",
 				manualInputWaitMs: 0,
-			}),
+			});
+			// The host recovers at startup, before anything is sent.
+			void terminals.recover();
+			return terminals;
+		},
 	};
 }
 
@@ -276,8 +280,8 @@ test("a conversation request whose run cannot be tracked is stopped and reported
 	const claude = fakeClaude();
 	const parents: string[] = [];
 	const h = await harness({
-		terminals: (store) =>
-			createTerminals({
+		terminals: (store) => {
+			const terminals = createTerminals({
 				store,
 				command: ["claude"],
 				spawn: ({ command }) => {
@@ -287,20 +291,28 @@ test("a conversation request whose run cannot be tracked is stopped and reported
 						token: "",
 						claudeId: "",
 					});
+					let exit!: (code: number | null) => void;
+					const exited = new Promise<number | null>((resolve) => {
+						exit = resolve;
+					});
 					return {
 						write() {},
 						resize() {},
-						kill() {},
+						// The process ends when it is told to: the exit is confirmed.
+						kill: () => exit(null),
 						close() {},
-						exited: new Promise(() => {}),
+						exited,
 					};
 				},
 				hookBaseUrl: "http://127.0.0.1:8787",
 				curl: "curl",
 				trackingMs: 40,
 				killAfterMs: 10,
-				stopConfirmMs: 20,
-			}),
+				stopConfirmMs: 200,
+			});
+			void terminals.recover();
+			return terminals;
+		},
 		routeTool: "claude_code",
 		command: (messages) => {
 			const data = JSON.parse(messages.at(-1)!.content) as { request: string };

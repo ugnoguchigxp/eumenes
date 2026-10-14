@@ -35,7 +35,7 @@ const REJECTIONS: Record<string, string> = {
 };
 const FIELDS: Record<string, string> = {
 	title: "タイトルは1〜40字で入力してください。",
-	prompt: "依頼内容は1〜8000字で入力してください。",
+	prompt: "依頼内容は1〜7850字で入力してください。",
 	note: "追加の依頼は1〜4000字で入力してください。",
 };
 

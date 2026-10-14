@@ -6,19 +6,31 @@ Memory registration, forget/restore lifecycle, Context Broker, usage receipts.
 
 ## Assembly (`api/application/world.ts`)
 
-`server.ts` builds World through `createWorldAssembly`, behind one switch:
+`server.ts` builds World through `assembleServerWorld` (`api/application/server-world.ts`)
+and `createWorldAssembly`. The mode is decided once at backend startup by
+`resolveWorldMode` from the saved setting `world.enabled` (SQLite settings document,
+boolean, default `false`; edit it on the settings screen "会話" or through
+`POST /api/settings/apply`) and from whether World holds content (`worldHasContent`):
 
-| `EUMENES_WORLD` | Effect |
-|---|---|
-| unset, `off`, `0`, `false` (default) | Nothing is assembled. The application behaves exactly as before. |
-| `protect` | Lifecycle only: startup recovery, forget intake, feed consumers, release sweeps. World is forced OFF at startup; it reads and writes no content on its own. |
-| `on` (`1`, `true`) | `protect`, plus the first feed pass (initial sync) and then World is turned ON. |
+| `world.enabled` | World content | Mode | Effect |
+|---|---|---|---|
+| false (default) | none | `off` | Nothing is assembled. The application behaves exactly as before. |
+| false | exists | `protect` | Lifecycle only: startup recovery, forget intake, feed consumers, release sweeps. World is forced OFF at startup; it reads and writes no content on its own. |
+| true | any | `on` | `protect`, plus the first feed pass (initial sync) and then World is turned ON. |
 
-Any other value fails startup (`world_mode_invalid`): a typo must not mean "no forgetting".
-Going from `protect`/`on` back to `off` stops forget propagation; keep `protect`
-while World content exists in the database.
+A change of the setting takes effect on the next backend start (the initial sync and the
+gate are startup work); the settings screen says so. Turning World off therefore never stops
+forget propagation while World content remains: the next start is `protect` by itself.
 
-Other settings:
+"Content exists" (`worldHasContent(store)`, `service/world-content.ts`) is true when any of
+`world_entity`, `world_assertion`, `world_inbox`, `world_host_extract_event` or
+`world_host_forget_intake` has a row (any Scope). It does not depend on the ON/OFF flag or
+the gate, so it works before World is assembled. When it selects `protect`, the log line
+`world.protect_for_content` is written once at startup.
+
+`EUMENES_WORLD` is no longer read.
+
+Other environment variables (unchanged):
 
 - `EUMENES_WORLD_JOURNAL`: World journal path. Default `world-forget-journal.jsonl`
   next to the Memory journal.
@@ -202,7 +214,7 @@ is the one product entry for World's pure reasoning. Read-only, enumerated:
 
 `createWorldClaims({ store, world, lifecycle, state, reasonSource, ... })`
 (`service/world-claims.ts`) behind `registerWorldClaims` (`controller/claims.ts`), mounted by
-`createApp({ worldClaims })` only when World is configured (`EUMENES_WORLD` protect or on). With
+`createApp({ worldClaims })` only when World is assembled (mode `protect` or `on`). With
 World OFF nothing is assembled and every `/api/world/*` route is a plain 404 (the bearer and
 origin checks of `/api/*` still come first). The Scope is bound by the host (`claimsContext`),
 never by a body or a query string.

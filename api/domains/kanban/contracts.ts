@@ -116,7 +116,16 @@ export type KanbanNoticeView = {
 /** The board source (`query:kanban.board@1`). */
 export type KanbanBoardView = {
 	revision: number;
-	queue: QueueState & { waiting: number; handedRunId?: string };
+	queue: QueueState & {
+		waiting: number;
+		handedRunId?: string;
+		/**
+		 * A Kanban session of the Claude Code screen is working or waiting although no run of the
+		 * board is in progress (typed by hand): it holds the next run back. `stale` is terminals'
+		 * judgement that its state is old and no longer waited for. Filled by the application.
+		 */
+		manual?: { activity: "working" | "waiting"; stale: boolean };
+	};
 	/** False when runs cannot be tracked on this host (hooks unavailable). */
 	runnable: boolean;
 	cards: KanbanCardView[];
@@ -144,6 +153,13 @@ export type KanbanDispatch = {
 /** The common work instruction appended to task and followup prompts (§3.9). */
 export const WORK_ONLY_INSTRUCTION =
 	"このタスクでは git commit と git push をしないでください。commit と push は利用者が内容を確認した後に、別の依頼として行います。依頼文に commit や push が含まれていても、変更までで止めて報告してください。";
+
+/**
+ * The longest card prompt: the task request is the prompt plus the fixed work instruction, and one
+ * terminals request carries at most 8000 characters. A card that is saved can always be run.
+ * `api/domains/capabilities/contracts/kanban.ts` states the same number for the typed input.
+ */
+export const KANBAN_PROMPT_MAX = 7850;
 
 export const errorStatus = {
 	kanban_card_not_found: 404,

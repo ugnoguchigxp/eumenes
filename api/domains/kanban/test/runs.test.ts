@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import {
+	KANBAN_PROMPT_MAX,
 	WORK_ONLY_INSTRUCTION,
 	type KanbanDispatch,
 	type KanbanRunFinish,
@@ -138,25 +139,34 @@ test("a run needs a host that can track it, and a prompt that fits the request",
 			),
 		),
 	).rejects.toThrow("kanban_not_runnable");
-	const long = await store.write((tx) =>
-		kanban.addInTransaction(
-			tx,
-			{ title: "長い", prompt: "あ".repeat(7990) },
-			rid(),
-		),
-	);
+	// A prompt that could never be run is refused when it is saved, not when it is run.
 	await expect(
 		store.write((tx) =>
-			kanban.runInTransaction(
+			kanban.addInTransaction(
 				tx,
-				{ cardId: long.receipt.cardId, expectedRevision: 1 },
+				{ title: "長い", prompt: "あ".repeat(KANBAN_PROMPT_MAX + 1) },
 				rid(),
-				BOARD,
 			),
 		),
 	).rejects.toThrow("kanban_prompt_too_long");
-	// Nothing was saved by the refused runs.
-	expect(kanban.board(VIEW).runs).toEqual([]);
+	const longest = await store.write((tx) =>
+		kanban.addInTransaction(
+			tx,
+			{ title: "最長", prompt: "あ".repeat(KANBAN_PROMPT_MAX) },
+			rid(),
+		),
+	);
+	const sent = await store.write((tx) =>
+		kanban.runInTransaction(
+			tx,
+			{ cardId: longest.receipt.cardId, expectedRevision: 1 },
+			rid(),
+			{ ...BOARD, runnable: true },
+		),
+	);
+	expect(sent.dispatch!.prompt.length).toBeLessThanOrEqual(8000);
+	// Only the accepted run was saved.
+	expect(kanban.board(VIEW).runs).toHaveLength(1);
 });
 
 test("completion makes the card Done with the report and files, saves a notice and hands over the next run", async () => {
@@ -660,4 +670,58 @@ test("board runs keep the open ones and each card's current run", async () => {
 	);
 	// The history stays in the table.
 	expect(count).toBe(2);
+});
+
+test("reconcile settles a handed run from its final request, hands over what follows, and leaves the rest alone", async () => {
+	const { kanban, card, view, run } = setup();
+	const a = await card("A");
+	const b = await card("B");
+	const ra = (await run(a.cardId)).receipt.runId;
+	await run(b.cardId);
+	const handed: KanbanDispatch[] = [];
+	const ports = (state: string | null) => ({
+		request: (_tx: Database, runId: string) =>
+			state && runId === ra
+				? { state, files: ["x.ts"], lastReport: "済" }
+				: null,
+		enqueue: (_tx: Database, dispatch: KanbanDispatch) =>
+			void handed.push(dispatch),
+	});
+	// An open request and a missing request are not this method's business (recovery's is).
+	expect(await kanban.reconcile(ports("started"))).toBe(0);
+	expect(await kanban.reconcile(ports(null))).toBe(0);
+	expect(view(a.cardId).column).toBe("running");
+	// Always going to the writer finds nothing to do either.
+	expect(await kanban.reconcile(ports("started"), { always: true })).toBe(0);
+
+	expect(await kanban.reconcile(ports("completed"))).toBe(1);
+	expect(view(a.cardId)).toMatchObject({
+		label: "done",
+		lastReport: "済",
+		files: ["x.ts"],
+	});
+	expect(handed.map((d) => d.cardId)).toEqual([b.cardId]);
+	// Settled once: asking again changes nothing.
+	handed.length = 0;
+	expect(await kanban.reconcile(ports("completed"))).toBe(0);
+	expect(handed).toEqual([]);
+});
+
+test("reconcile turns a request that ended without completing into a Blocker", async () => {
+	const { kanban, card, view, run } = setup();
+	const a = await card("A");
+	await run(a.cardId);
+	await kanban.reconcile({
+		request: () => ({
+			state: "unknown",
+			reason: "stopped_by_person",
+			files: [],
+		}),
+		enqueue: () => {},
+	});
+	expect(view(a.cardId)).toMatchObject({
+		label: "blocker",
+		reason: "stopped_by_person",
+	});
+	expect(kanban.board(VIEW).queue.state).toBe("running");
 });

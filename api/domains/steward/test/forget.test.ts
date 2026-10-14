@@ -233,6 +233,7 @@ test("the purge is idempotent: running it again changes nothing", async () => {
 		itemIds: [item.id],
 		messageIds: [first.inputMessageId],
 		deletedSummaryConversationIds: [],
+		derived: {},
 	};
 	await h.store.write((db) => {
 		hooks[0]!(db, purge);

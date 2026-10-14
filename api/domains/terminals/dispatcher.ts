@@ -2,7 +2,12 @@ import { getLogger } from "../../infrastructure/logger";
 import type { Ledger } from "./ledger";
 import * as repository from "./repository";
 import type { RequestRow } from "./repository";
-import { createEntry, DEFAULT_TERMINAL_SIZE, type Sessions } from "./sessions";
+import {
+	activityStale,
+	createEntry,
+	DEFAULT_TERMINAL_SIZE,
+	type Sessions,
+} from "./sessions";
 import type { Inflight, Runtime, Session } from "./types";
 
 const log = getLogger("terminals");
@@ -28,19 +33,21 @@ export function createDispatcher(
 	let active = false;
 	let current: Promise<void> = Promise.resolve();
 	let again = false;
+	/** Requests being handed to a PTY right now, until `delivered` (or the failure) is saved. */
+	const sends = new Map<string, Promise<void>>();
 
 	/** Kanban runs one task at a time: no other Kanban run in flight or at work. */
 	function groupBusy(row: RequestRow) {
 		if (row.exclusiveGroup !== "kanban") return false;
-		return sessions
-			.all()
-			.some(
-				(s) =>
-					(sessions.isLive(s) &&
-						s.owner.startsWith("kanban:") &&
-						(s.activity === "working" || s.activity === "waiting")) ||
-					s.inflight?.exclusiveGroup === "kanban",
-			);
+		return sessions.all().some(
+			(s) =>
+				(sessions.isLive(s) &&
+					s.owner.startsWith("kanban:") &&
+					(s.activity === "working" || s.activity === "waiting") &&
+					// Esc sends no hook: a turn without a request and without news is not running.
+					!activityStale(s, rt.now())) ||
+				s.inflight?.exclusiveGroup === "kanban",
+		);
 	}
 
 	const canPaste = (s: Session) =>
@@ -70,6 +77,12 @@ export function createDispatcher(
 			);
 			if (live) {
 				if (live.closing) return WAIT;
+				// After /clear the PTY talks in another conversation: never paste into it. Once it is
+				// idle it is closed, and the conversation is resumed in a PTY of its own.
+				if (live.hookSessionId !== live.claudeSessionId) {
+					if (canPaste(live)) sessions.close(live);
+					return WAIT;
+				}
 				if (live.mode !== row.mode) {
 					// Settings are fixed per run: the other mode needs a new run once this one is idle.
 					if (canPaste(live)) sessions.close(live);
@@ -206,13 +219,17 @@ export function createDispatcher(
 		for (const row of store.read((db) => repository.queued(db))) {
 			const chosen = plan(row);
 			if (chosen.kind === "wait") continue;
-			try {
-				await execute(row, chosen);
-			} catch (error) {
+			const send = execute(row, chosen).catch((error) => {
 				log.warn("terminals.dispatch_failed", {
 					attemptId: row.id,
 					reason: error instanceof Error ? error.message : "error",
 				});
+			});
+			sends.set(row.id, send);
+			try {
+				await send;
+			} finally {
+				sends.delete(row.id);
 			}
 		}
 	}
@@ -252,6 +269,8 @@ export function createDispatcher(
 
 	return {
 		kick,
+		/** The hand-over of this request while it is under way (its PTY may not be registered yet). */
+		sending: (id: string): Promise<void> | undefined => sends.get(id),
 		/** Resolves once the sender has nothing more to do right now. */
 		async settled() {
 			while (active) await current;

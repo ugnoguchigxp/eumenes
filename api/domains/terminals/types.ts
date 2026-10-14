@@ -104,6 +104,15 @@ export type Session = {
 	mode: SessionMode;
 	/** The Claude conversation this run was launched with (`--session-id` / `--resume`). */
 	claudeSessionId: string;
+	/**
+	 * The conversation the run's hooks currently report: `claudeSessionId` until the person
+	 * clears it (`/clear` starts a new one). Used for activity tracking only.
+	 */
+	hookSessionId: string;
+	/** The last accepted hook of this run (ms); a turn the person started is trusted for 30 min. */
+	lastHookAtMs: number;
+	/** Pending wake-up of the sender after the person typed (one per PTY). */
+	wakeTimer?: ReturnType<typeof setTimeout>;
 	cwd: string | undefined;
 	/** Launched with `--resume`: ending without SessionStart means the conversation is gone. */
 	resumed: boolean;

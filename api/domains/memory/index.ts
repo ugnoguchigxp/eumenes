@@ -21,6 +21,7 @@ export type {
 	Disposition,
 	ExchangeDto,
 	ExchangeStep,
+	ForgetDerived,
 	ForgetInput,
 	ForgetOutcome,
 	ForgetPurge,

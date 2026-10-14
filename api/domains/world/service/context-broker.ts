@@ -7,12 +7,17 @@ import {
 	canonicalDigest,
 	SLICE_MAX_BYTES,
 	toSliceReceipt,
+	type Assertion,
 	type CanonicalHasher,
+	type ProjectionSnapshot,
 	type ScopeRef,
 	type SliceReceipt,
 	type WorldSlice,
 } from "eumenes-world-model";
-import { WORLD_INTERPRETATION_VERSION } from "eumenes-world-model/sqlite";
+import {
+	WORLD_INTERPRETATION_VERSION,
+	listEntities,
+} from "eumenes-world-model/sqlite";
 import worldPackage from "eumenes-world-model/package.json";
 import {
 	WriterBusyError,
@@ -34,13 +39,15 @@ import {
 import { upsertDependent } from "../repository/lifecycle";
 import {
 	CONTEXT_TOTAL_BYTES,
+	TOPIC_BLOCK_MAX_BYTES,
+	TOPIC_MAX_ENTITIES,
 	WORLD_MIN_BYTES,
 	allocateContextBudget,
-	goalRenderedBytes,
 	renderWorldBlock,
 	worldBlockBytes,
-	type RenderGoal,
+	type RenderTopic,
 } from "./context-render";
+import { matchTopicEntities } from "./context-topics";
 import { isMemoryStateItem } from "./inputs";
 import {
 	MemoryRegistrationRejected,
@@ -67,6 +74,8 @@ import type { WorldService } from "./world-service";
 export const KEEP_USAGE_PER_SCOPE = 500;
 /** World contract version the receipt records. */
 const CONTRACT_VERSION = 1;
+/** Most entities one `listEntities` call returns (the package's own maximum). */
+const MAX_LISTED_ENTITIES = 500;
 /** Shrink-and-render rounds before the rendered block is declared an overflow. */
 const MAX_FIT_ATTEMPTS = 6;
 
@@ -76,8 +85,14 @@ export type ContextPrepareInput = {
 	jobId: string;
 	attempt: number;
 	generation: number;
-	/** Bytes of reference data already fixed for this input (Memory's recall block). */
+	/** Bytes of reference data already fixed for this input (Memory's recall block and the goals layer). */
 	reservedBytes: number;
+	/**
+	 * The wording of this turn the known targets are looked for in: the current user input first, then the
+	 * previous exchange (its user input and its answer). Forgotten messages are left out by the caller. Without
+	 * any, or when no known target is named, the Slice is the default one.
+	 */
+	topicTexts?: readonly string[];
 	/** UTC epoch ms used as the Slice's asOf (supplied; World never reads a clock). */
 	nowMs: number;
 };
@@ -120,11 +135,12 @@ export type PreparedWorldContext = {
 	readonly goalEpoch: number;
 	/** Memory external dependents registered for the Slice's inputs. */
 	readonly dependentIds: readonly string[];
+	/** The known targets the Slice was built for (empty: the default Slice). */
+	readonly topicEntityIds: readonly string[];
 	readonly budget: {
 		readonly totalBytes: number;
 		readonly reservedBytes: number;
 		readonly worldBytes: number;
-		readonly goalBytes: number;
 		readonly blockBytes: number;
 	};
 };
@@ -155,6 +171,51 @@ function deepFreeze<T>(value: T): T {
 		for (const child of Object.values(value)) deepFreeze(child);
 	}
 	return value;
+}
+
+/** Relations that carry cause and dependency; the topic Slice follows these one step from a named target. */
+const TOPIC_RELATIONS: ReadonlySet<string> = new Set([
+	"increases",
+	"decreases",
+	"causes",
+	"enables",
+	"inhibits",
+	"depends_on",
+	"part_of",
+]);
+
+/**
+ * The part of a focused snapshot the topic Slice shows: what is asserted about a named target (its state, and its
+ * causal/dependency relations to others), and the claims of others that act on it through such a relation
+ * (depth 1). The assertions that dispute a kept one, and those a kept one disputes, stay so a contested claim
+ * keeps its refutations.
+ */
+function topicAssertions(
+	assertions: readonly Assertion[],
+	focus: ReadonlySet<string>,
+): Assertion[] {
+	const direct = (assertion: Assertion) => {
+		const { payload } = assertion;
+		if (payload.kind === "relation")
+			return (
+				TOPIC_RELATIONS.has(payload.relation) &&
+				(focus.has(assertion.subjectId) || focus.has(payload.objectId))
+			);
+		return focus.has(assertion.subjectId);
+	};
+	const key = (ref: { id: string; revision: number }) =>
+		`${ref.id}\u0000${ref.revision}`;
+	const kept = new Set(assertions.filter(direct).map(key));
+	const related = new Set<string>();
+	for (const assertion of assertions) {
+		if (kept.has(key(assertion)))
+			for (const target of assertion.contradicts) related.add(key(target));
+		else if (assertion.contradicts.some((target) => kept.has(key(target))))
+			related.add(key(assertion));
+	}
+	return assertions.filter(
+		(assertion) => kept.has(key(assertion)) || related.has(key(assertion)),
+	);
 }
 
 /**
@@ -231,6 +292,56 @@ export function createWorldContextBroker(options: ContextBrokerOptions) {
 	}
 
 	/**
+	 * The known targets this turn's wording names: names and aliases come from `listEntities` (live
+	 * entities of the Scope only; merged ones are represented by their representative, forgotten ones are
+	 * never listed) and are matched deterministically. A closed gate or a refusal names nothing.
+	 */
+	function topicEntitiesOf(
+		db: Database,
+		scope: ScopeRef,
+		access: ReturnType<typeof requestAccess>,
+		texts: readonly string[] | undefined,
+	): string[] {
+		if (!texts || texts.every((text) => text.trim() === "")) return [];
+		const listed = listEntities(db, {
+			contractVersion: 1,
+			access: world.accessInTransaction(db, { access }),
+			scopeKey: scope.scopeKey,
+			limit: MAX_LISTED_ENTITIES,
+		});
+		if (listed.status !== "ready") return [];
+		return matchTopicEntities(listed.entities, texts, TOPIC_MAX_ENTITIES);
+	}
+
+	/** Display names of the targets a topic Slice mentions (as subject or relation object), in id order. */
+	function topicNames(
+		db: Database,
+		scope: ScopeRef,
+		access: ReturnType<typeof requestAccess>,
+		slice: WorldSlice,
+	): RenderTopic[] {
+		const ids = new Set<string>();
+		for (const unit of slice.units) {
+			ids.add(unit.conclusion.subjectId);
+			if (unit.conclusion.payload.kind === "relation")
+				ids.add(unit.conclusion.payload.objectId);
+		}
+		if (ids.size === 0 || ids.size > MAX_LISTED_ENTITIES) return [];
+		const listed = listEntities(db, {
+			contractVersion: 1,
+			access: world.accessInTransaction(db, { access }),
+			scopeKey: scope.scopeKey,
+			query: { ids: [...ids].sort() },
+			limit: MAX_LISTED_ENTITIES,
+		});
+		if (listed.status !== "ready") return [];
+		return listed.entities.map((entity) => ({
+			id: entity.id,
+			name: entity.displayName,
+		}));
+	}
+
+	/**
 	 * The one decision "may this Slice still be used?", read-only. It runs at
 	 * adoption (inside the Writer transaction) and again just before sending.
 	 * A plain re-read of the claim is not enough: the Scope epoch moves on
@@ -289,87 +400,134 @@ export function createWorldContextBroker(options: ContextBrokerOptions) {
 			const scope = scopeOf(input.conversationId);
 			const access = requestAccess(scope);
 
+			// Goals are shown by dialogue's own layer (after L1); the Broker only keeps the top goal as the
+			// Slice's goalRef and the goal epoch for the receipt.
 			const goals = goalSnapshot(db, access);
 			const inScope = goals.goals.filter(
 				(goal) => goal.scopeKey === scope.scopeKey,
 			);
 			const goalEpoch = goalEpochOf(db, scope.principal, scope.scopeKey);
-			const shown: RenderGoal[] = inScope.map((goal) => ({
-				desiredState: goal.desiredState,
-				priority: goal.priority,
-			}));
-
-			const snapshot = world.readSnapshot(db, {
-				access,
-				scope,
-				asOf: input.nowMs,
-			});
-			if (snapshot.status === "blocked") {
-				if (snapshot.reasonCode === "WORLD_DISABLED")
-					return { status: "disabled" };
-				if (snapshot.reasonCode === "SCHEMA_INCOMPATIBLE")
-					return { status: "disabled" };
-				return { status: "blocked", reason: reasonOf(snapshot.reasonCode) };
-			}
-			if (snapshot.status !== "ready")
-				return { status: "blocked", reason: reasonOf(snapshot.reasonCode) };
-
-			const allocation = allocateContextBudget({
-				totalBytes,
-				reservedBytes: input.reservedBytes,
-				sliceCapBytes: SLICE_MAX_BYTES,
-				goalBytes: shown.map(goalRenderedBytes),
-			});
-			if (!allocation.ok) return { status: "blocked", reason: "world_budget" };
-			const goalsShown = shown.slice(0, allocation.goalCount);
 			const top = inScope[0];
+			const goalRef =
+				top === undefined
+					? {}
+					: { goalRef: { id: top.goalId, revision: top.revision } };
 
-			// The slice is sized on its UNESCAPED JSON, the model sees the ESCAPED
-			// block (up to 6x per character), so the rendered block is measured and
-			// the slice shrunk (whole units are dropped by buildWorldSlice) until
-			// it fits the shared total; no room left means world_overflow.
-			let worldBytes = allocation.worldBytes;
-			let slice: WorldSlice | undefined;
-			let block = "";
-			for (let attempt = 0; ; attempt++) {
-				if (attempt >= MAX_FIT_ATTEMPTS || worldBytes < WORLD_MIN_BYTES)
-					return { status: "blocked", reason: "world_overflow" };
-				const built = buildWorldSlice(
-					{
-						contractVersion: 1,
-						snapshot: snapshot.snapshot,
-						request: {
-							...(top === undefined
-								? {}
-								: { goalRef: { id: top.goalId, revision: top.revision } }),
-							maxBytes: worldBytes,
+			/**
+			 * Builds the Slice and renders its block. The slice is sized on its UNESCAPED JSON, the model sees
+			 * the ESCAPED block (up to 6x per character), so the rendered block is measured and the slice
+			 * shrunk (whole units are dropped by buildWorldSlice) until it fits; no room left means
+			 * world_overflow. `topic` is set for the topic Slice: its block is capped at TOPIC_BLOCK_MAX_BYTES.
+			 */
+			const fit = (
+				snapshot: ProjectionSnapshot,
+				topic: boolean,
+			):
+				| {
+						status: "fitted";
+						slice: WorldSlice;
+						block: string;
+						worldBytes: number;
+				  }
+				| { status: "disabled" }
+				| { status: "blocked"; reason: string } => {
+				const allocation = allocateContextBudget({
+					totalBytes,
+					reservedBytes: input.reservedBytes,
+					sliceCapBytes: SLICE_MAX_BYTES,
+					...(topic ? { blockCapBytes: TOPIC_BLOCK_MAX_BYTES } : {}),
+				});
+				if (!allocation.ok)
+					return { status: "blocked", reason: "world_budget" };
+				let worldBytes = allocation.worldBytes;
+				for (let attempt = 0; ; attempt++) {
+					if (attempt >= MAX_FIT_ATTEMPTS || worldBytes < WORLD_MIN_BYTES)
+						return { status: "blocked", reason: "world_overflow" };
+					const built = buildWorldSlice(
+						{
+							contractVersion: 1,
+							snapshot,
+							request: { ...goalRef, maxBytes: worldBytes },
 						},
-					},
-					hasher,
-				);
-				if (!built.ok)
-					return { status: "blocked", reason: "world_slice_invalid" };
-				if (built.value.status === "disabled") return { status: "disabled" };
-				if (built.value.status === "overflow")
-					return { status: "blocked", reason: "world_overflow" };
-				if (built.value.status === "blocked")
-					return {
-						status: "blocked",
-						reason: reasonOf(built.value.reasonCodes[0] ?? "blocked"),
-					};
-				// Nothing to say: no usage, no receipt, no input dependency.
-				if (built.value.units.length === 0) return { status: "disabled" };
-				const rendered = renderWorldBlock(built.value, goalsShown);
-				const size = worldBlockBytes(rendered);
-				if (size <= allocation.blockLimitBytes) {
-					slice = built.value;
-					block = rendered;
-					break;
+						hasher,
+					);
+					if (!built.ok)
+						return { status: "blocked", reason: "world_slice_invalid" };
+					if (built.value.status === "disabled") return { status: "disabled" };
+					if (built.value.status === "overflow")
+						return { status: "blocked", reason: "world_overflow" };
+					if (built.value.status === "blocked")
+						return {
+							status: "blocked",
+							reason: reasonOf(built.value.reasonCodes[0] ?? "blocked"),
+						};
+					// Nothing to say: no usage, no receipt, no input dependency.
+					if (built.value.units.length === 0) return { status: "disabled" };
+					const rendered = renderWorldBlock(
+						built.value,
+						topic ? topicNames(db, scope, access, built.value) : [],
+					);
+					const size = worldBlockBytes(rendered);
+					if (size <= allocation.blockLimitBytes)
+						return {
+							status: "fitted",
+							slice: built.value,
+							block: rendered,
+							worldBytes: allocation.worldBytes,
+						};
+					worldBytes -= size - allocation.blockLimitBytes;
 				}
-				worldBytes -= size - allocation.blockLimitBytes;
+			};
+
+			// The known targets this turn names: the Slice is built from them when it can be.
+			let fitted: ReturnType<typeof fit> | undefined;
+			let topicEntityIds: string[] = [];
+			const topicIds = topicEntitiesOf(db, scope, access, input.topicTexts);
+			if (topicIds.length > 0) {
+				const focus = world.readSnapshot(db, {
+					access,
+					scope,
+					asOf: input.nowMs,
+					focus: { subjectIds: topicIds, depth: 1 },
+				});
+				if (focus.status === "ready") {
+					const focused = new Set(topicIds);
+					const attempt = fit(
+						{
+							...focus.snapshot,
+							assertions: topicAssertions(focus.snapshot.assertions, focused),
+						},
+						true,
+					);
+					// A target without anything to say, or one that does not fit its small block, leaves
+					// the default Slice (today's behaviour).
+					if (attempt.status === "fitted") {
+						fitted = attempt;
+						topicEntityIds = topicIds;
+					}
+				}
 			}
-			if (slice === undefined)
-				return { status: "blocked", reason: "world_overflow" };
+
+			if (fitted === undefined) {
+				const snapshot = world.readSnapshot(db, {
+					access,
+					scope,
+					asOf: input.nowMs,
+				});
+				if (snapshot.status === "blocked") {
+					if (snapshot.reasonCode === "WORLD_DISABLED")
+						return { status: "disabled" };
+					if (snapshot.reasonCode === "SCHEMA_INCOMPATIBLE")
+						return { status: "disabled" };
+					return { status: "blocked", reason: reasonOf(snapshot.reasonCode) };
+				}
+				if (snapshot.status !== "ready")
+					return { status: "blocked", reason: reasonOf(snapshot.reasonCode) };
+				fitted = fit(snapshot.snapshot, false);
+			}
+			if (fitted.status === "disabled") return { status: "disabled" };
+			if (fitted.status === "blocked") return fitted;
+			const { slice, block } = fitted;
 
 			const dependentIds: string[] = [];
 			const planned = planDependents(
@@ -432,11 +590,11 @@ export function createWorldContextBroker(options: ContextBrokerOptions) {
 					top === undefined ? null : { id: top.goalId, revision: top.revision },
 				goalEpoch,
 				dependentIds,
+				topicEntityIds,
 				budget: {
 					totalBytes,
 					reservedBytes: input.reservedBytes,
-					worldBytes: allocation.worldBytes,
-					goalBytes: allocation.goalBytes,
+					worldBytes: fitted.worldBytes,
 					blockBytes: worldBlockBytes(block),
 				},
 			});

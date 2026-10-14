@@ -27,6 +27,10 @@ const OPEN_STATES: readonly RequestState[] = [
 	"started",
 ];
 
+/** How long and how many final requests are kept. */
+const RETAIN_MS = 30 * 24 * 60 * 60 * 1000;
+const RETAIN_FINAL_ROWS = 2000;
+
 type FinishedListener = (tx: Database, event: TerminalRequestFinished) => void;
 type WaitingListener = (
 	tx: Database,
@@ -92,7 +96,23 @@ export function createLedger(rt: Runtime) {
 
 	return {
 		enqueue(tx: Database, input: EnqueueRequest): TerminalRequestView {
-			const request = enqueueRequestSchema.parse(input) as EnqueueRequest;
+			const parsed = enqueueRequestSchema.safeParse(input);
+			if (!parsed.success) {
+				if (
+					parsed.error.issues.some(
+						(i) => i.message === "terminal_prompt_invalid",
+					)
+				)
+					throw new Error("terminal_prompt_invalid");
+				throw parsed.error;
+			}
+			// Kanban's single-run rule applies to every request of a card, whatever the caller sent.
+			const request = {
+				...parsed.data,
+				...(parsed.data.owner.startsWith("kanban:")
+					? { exclusiveGroup: "kanban" as const }
+					: {}),
+			} as EnqueueRequest;
 			const digest = requestDigest(request);
 			const saved = repository.get(tx, request.attemptId);
 			if (saved) {
@@ -224,6 +244,15 @@ export function createLedger(rt: Runtime) {
 		},
 
 		request: (tx: Database, id: string) => repository.get(tx, id),
+
+		/**
+		 * Retention: final requests older than 30 days are deleted, and at most the newest 2000
+		 * final ones are kept. Open requests stay. Returns the number of deleted rows.
+		 */
+		prune(tx: Database, now: Date): number {
+			const cutoff = new Date(now.getTime() - RETAIN_MS).toISOString();
+			return repository.pruneFinal(tx, cutoff, RETAIN_FINAL_ROWS);
+		},
 
 		/**
 		 * Tells the after-commit listeners about final states, once the transaction that wrote them

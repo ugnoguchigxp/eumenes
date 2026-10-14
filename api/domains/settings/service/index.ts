@@ -77,6 +77,7 @@ export function defaults(env: Record<string, string | undefined>): Settings {
 			subtitles: defaultSubtitles,
 		},
 		codingSupervision: { approveInstructions: true },
+		world: { enabled: false },
 	});
 }
 export async function createSettings(

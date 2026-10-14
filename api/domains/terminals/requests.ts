@@ -16,6 +16,19 @@ const uuidLike = z
 	.string()
 	.regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
 
+/**
+ * C0/C1 control characters other than line feed and tab: a raw ESC in a pasted request could end
+ * the bracketed paste and turn the rest into keystrokes.
+ */
+export function hasControlCharacter(text: string): boolean {
+	for (let i = 0; i < text.length; i++) {
+		const code = text.charCodeAt(i);
+		if (code === 0x09 || code === 0x0a) continue;
+		if (code < 0x20 || (code >= 0x7f && code <= 0x9f)) return true;
+	}
+	return false;
+}
+
 export const enqueueRequestSchema = z
 	.strictObject({
 		attemptId: uuidLike,
@@ -27,7 +40,13 @@ export const enqueueRequestSchema = z
 		claudeSessionId: uuidLike.optional(),
 		mode: z.enum(["work", "commit"]),
 		projectId: z.string().min(1).max(80),
-		prompt: z.string().min(1).max(8000),
+		prompt: z
+			.string()
+			.min(1)
+			.max(8000)
+			.refine((text) => !hasControlCharacter(text), {
+				message: "terminal_prompt_invalid",
+			}),
 		task: z.string().min(1).max(40),
 		origin: z.enum(["board", "conversation"]),
 		conversationId: z.string().min(1).max(200).optional(),

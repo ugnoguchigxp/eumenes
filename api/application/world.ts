@@ -12,7 +12,6 @@ import {
 } from "node:fs";
 import { dirname, join } from "node:path";
 import type { ScopeRef } from "eumenes-world-model";
-import { parseWorldMode, type WorldMode } from "../infrastructure/config";
 import { getLogger } from "../infrastructure/logger";
 import type { SqliteStore } from "../infrastructure/sqlite";
 import {
@@ -21,6 +20,7 @@ import {
 	type ConversationService,
 } from "../domains/conversation";
 import type { WorldContextPort } from "../domains/dialogue";
+import { readStoredWorldEnabled } from "../domains/settings";
 import type { MemoryService } from "../domains/memory";
 import {
 	SourceCursorError,
@@ -49,31 +49,34 @@ import {
 	type WorldService,
 	type WorldStatus,
 	WORLD_EXTRACT_PURPOSE,
+	worldHasContent,
 } from "../domains/world";
 
 /**
- * Host assembly of World (P3-09). The product has three states, chosen by the
- * environment variable `EUMENES_WORLD`:
+ * Host assembly of World (P3-09). The product has three states, decided once at
+ * backend startup by `resolveWorldMode` from the saved setting `world.enabled`
+ * and from whether World holds content:
  *
- *   off (default / unset)  Nothing is assembled. The application behaves
- *                          exactly as it did before World existed.
- *   protect                Lifecycle only: startup recovery, forget intake,
- *                          change-feed consumers, release sweeps. World is
- *                          forced OFF at startup, so it never reads or writes
- *                          content on its own.
- *   on                     protect, plus: the first full feed pass
- *                          (`initialSync`) and then World is turned ON.
- *
- * Any other value fails startup (`world_mode_invalid`): a typo must never be
- * read as "no forgetting".
+ *   off      Nothing is assembled. The application behaves exactly as it did
+ *            before World existed. Only with `world.enabled` false AND no content.
+ *   protect  Lifecycle only: startup recovery, forget intake, change-feed
+ *            consumers, release sweeps. World is forced OFF at startup, so it
+ *            never reads or writes content on its own. Chosen automatically when
+ *            `world.enabled` is false but World content exists, so turning World
+ *            off never stops forget propagation.
+ *   on       protect, plus: the first full feed pass (`initialSync`) and then
+ *            World is turned ON. `world.enabled` true.
  */
-export const WORLD_ENV = "EUMENES_WORLD";
-export type { WorldMode };
+export type WorldMode = "off" | "protect" | "on";
 
-export function worldModeFromEnv(
-	env: Record<string, string | undefined>,
-): WorldMode {
-	return parseWorldMode(env[WORLD_ENV]);
+/** Startup decision. A changed setting takes effect on the next backend start. */
+export function resolveWorldMode(store: SqliteStore): WorldMode {
+	if (readStoredWorldEnabled(store)) return "on";
+	if (!worldHasContent(store)) return "off";
+	getLogger("world").info("world.protect_for_content", {
+		reason: "content_exists",
+	});
+	return "protect";
 }
 
 /** AccessContext purposes the conversation SourceAdapter allows (deny by default). */

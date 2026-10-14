@@ -573,6 +573,7 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 				const at = Date.now();
 				s.queue.pruneInTransaction(db, at);
 				s.scheduler.pruneInTransaction(db, at);
+				s.toolchain.terminals.pruneInTransaction(db, new Date(at));
 			})
 			.catch((error) =>
 				log.warn(
@@ -587,6 +588,10 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		15_000,
 		() => s.codingExecution?.heartbeat(),
 		{ exclusive: false },
+	);
+	// Settles board runs whose result could not be applied, and prunes old runs (hourly).
+	const kanbanMaintenance = intervalLifecycle("kanban_maintenance", 30_000, () =>
+		s.toolchain.kanbanRuns.maintain(),
 	);
 	const timerMaintenance = intervalLifecycle("timer_maintenance", 1000, () =>
 		s.timers
@@ -691,6 +696,10 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 			name: "timer_maintenance_start",
 			start: () => timerMaintenance.start?.(),
 		},
+		{
+			name: "kanban_maintenance_start",
+			start: () => kanbanMaintenance.start?.(),
+		},
 		// Bring-up order of the resources; closed in reverse.
 		{ name: "store", close: () => s.store.close() },
 		{ name: "dataset_store", close: () => s.datasetStore.close() },
@@ -727,6 +736,7 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		{ name: "store_retention", close: () => storeRetention.idle() },
 		googleMaintenance,
 		{ name: "timer_maintenance", close: () => timerMaintenance.idle() },
+		{ name: "kanban_maintenance", close: () => kanbanMaintenance.idle() },
 		// Worker lease also expires independently if shutdown cannot deliver a stop.
 		{ name: "coding", close: () => s.codingComposition?.coding.close() },
 		{ name: "coding_execution", close: () => s.codingExecution?.shutdown() },
@@ -738,6 +748,7 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 				storeRetention.stop();
 				codingHeartbeat.stop();
 				timerMaintenance.stop();
+				kanbanMaintenance.stop();
 				vectorRefresh.stop();
 			},
 		},

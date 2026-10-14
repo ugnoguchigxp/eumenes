@@ -394,6 +394,114 @@ test("commit & push shows the files and the last report and sends only after con
 	expect(screen.queryByRole("dialog")).toBeNull();
 });
 
+test("commit & push sends the revision the person confirmed; a card that changed meanwhile must be confirmed again", async () => {
+	const { user, onAction, again } = setup({
+		cards: [{ ...doneCard, revision: 6 }],
+	});
+	await user.click(
+		within(cardOf("テストの追加")).getByRole("button", {
+			name: "commit & push",
+		}),
+	);
+	// The card changed while the dialog was open (new files, new revision).
+	again({
+		cards: [
+			{
+				...doneCard,
+				revision: 7,
+				files: ["other.ts"],
+				lastReport: "別の報告",
+			},
+		],
+	});
+	const dialog = screen.getByRole("dialog", { name: "commit & push の確認" });
+	expect(within(dialog).getByRole("alert")).toHaveTextContent(
+		"確認している間にタスクの内容が変わりました",
+	);
+	// What was confirmed is still what is shown, and it cannot be sent.
+	expect(within(dialog).getByText("docs/kanban.md")).toBeVisible();
+	expect(
+		within(dialog).queryByRole("button", { name: "commit & push を依頼する" }),
+	).toBeNull();
+	await user.click(
+		within(dialog).getByRole("button", { name: "最新の内容を確認する" }),
+	);
+	expect(onAction).not.toHaveBeenCalled();
+	expect(within(dialog).queryByRole("alert")).toBeNull();
+	expect(within(dialog).getByText("other.ts")).toBeVisible();
+	expect(within(dialog).getByText("別の報告")).toBeVisible();
+	await user.click(
+		within(dialog).getByRole("button", { name: "commit & push を依頼する" }),
+	);
+	expect(onAction).toHaveBeenCalledOnce();
+	expect(onAction).toHaveBeenCalledWith("commitPush", "d", 7);
+});
+
+test("confirming unchanged sends the shown revision, and a card that can no longer be pushed closes the dialog on refresh", async () => {
+	const { user, onAction, again } = setup({
+		cards: [{ ...doneCard, revision: 6 }],
+	});
+	await user.click(
+		within(cardOf("テストの追加")).getByRole("button", {
+			name: "commit & push",
+		}),
+	);
+	again({
+		cards: [{ ...doneCard, revision: 8, actions: ["reset"] }],
+	});
+	await user.click(
+		screen.getByRole("button", { name: "最新の内容を確認する" }),
+	);
+	expect(screen.queryByRole("dialog")).toBeNull();
+	expect(onAction).not.toHaveBeenCalled();
+});
+
+test("the prompt form shows the characters left under the host limit; a follow-up note counts escapes", async () => {
+	const { user, onAdd, onAction } = setup({
+		cards: [{ ...doneCard, revision: 3 }],
+	});
+	await user.click(screen.getByRole("button", { name: "タスクを追加" }));
+	const form = screen.getByRole("form", { name: "タスクを追加" });
+	const prompt = within(form).getByLabelText("依頼内容");
+	expect(prompt).toHaveAttribute("maxlength", "7850");
+	expect(within(form).getByText("残り 7850 字")).toBeVisible();
+	await user.type(within(form).getByLabelText("タイトル"), "T");
+	await user.type(prompt, "あいう");
+	expect(within(form).getByText("残り 7847 字")).toBeVisible();
+	await user.click(within(form).getByRole("button", { name: "追加" }));
+	expect(onAdd).toHaveBeenCalledOnce();
+
+	await user.click(
+		within(cardOf("テストの追加")).getByRole("button", { name: "追加で直す" }),
+	);
+	const note = screen.getByRole("form", { name: "追加で直す" });
+	const box = within(note).getByLabelText("追加の依頼");
+	// Line breaks are escaped in the request: 3300 of them take 6600 of the room.
+	fireEvent.change(box, { target: { value: `x${"\n".repeat(3300)}y` } });
+	expect(within(note).getByRole("alert")).toHaveTextContent("長すぎます");
+	expect(within(note).getByRole("button", { name: "送る" })).toBeDisabled();
+	fireEvent.change(box, { target: { value: `x${"\n".repeat(3000)}y` } });
+	expect(within(note).queryByRole("alert")).toBeNull();
+	expect(within(note).getByRole("button", { name: "送る" })).toBeEnabled();
+	await user.click(within(note).getByRole("button", { name: "送る" }));
+	expect(onAction).toHaveBeenCalledOnce();
+});
+
+test("work typed by hand that holds the queue back is said in the queue line", () => {
+	setup({
+		queue: {
+			state: "running",
+			waiting: 1,
+			manualText: "Claude Code の画面で手入力の作業が続いています",
+		},
+	});
+	expect(
+		within(screen.getByRole("region", { name: "実行キュー" })).getByText(
+			"Claude Code の画面で手入力の作業が続いています",
+		),
+	).toBeVisible();
+});
+
 test("details show the prompt, a scrollable report and the changed files", async () => {
 	const { user } = setup({
 		cards: [

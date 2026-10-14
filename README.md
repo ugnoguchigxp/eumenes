@@ -49,6 +49,8 @@ Eumenesは、**ユーザーを継続的に理解し、任された仕事を進�
 
 個別起動は別々のターミナルで`bun run start`と`bun run dev:web`を使います。API・Vite・CLIには同じAPI認証とデータ保存先の環境設定を使ってください。ViteのローカルproxyがAPI認証を付け、LARM認証やクラウドキーはbackend内に保持します。既定DBは`data/eumenes.sqlite3`、変更には`EUMENES_DB`を使います。DBと`data/keys/`内の鍵は一緒に保全してください。
 
+ツールチェーンのSeedはリポジトリで管理し、API起動時に自動投入します。新しいDBでも担当・SKILL・ツール・画面定義が入り、別のインポート操作は不要です。会話本文、実行履歴、生成物、接続先・認証情報は含みません。同じSeedの再投入では無効化や公開版の手動切替を保持します。保存場所と更新方法は[Seedと初期化](docs/toolchain-extension.md#11-seedと初期化)を参照してください。
+
 クラウドを使う場合は設定の「AIと接続」で登録し、用途に割り当てます。OpenAI互換APIに加え、会話用途はCodex SDK・Claude Agent SDK・Claude Managed Agentsのadapterがあります。自動切替は保存した許可・用途・代替先に従い、未登録の代替先へは送信しません。詳しくは[セットアップ](docs/setup.md)、[設定](docs/settings.md)、[LARMの接続とサービス](docs/larm.md)を参照してください。
 
 ## 画面の入口

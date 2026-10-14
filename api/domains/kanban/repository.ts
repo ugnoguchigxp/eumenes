@@ -200,3 +200,8 @@ export function saveReceipt(
 		"INSERT INTO kanban_receipts(request_id,operation,input_digest,receipt_json,created_at) VALUES(?,?,?,?,?)",
 	).run(requestId, operation, digest, JSON.stringify(receipt), createdAt);
 }
+
+/** Deletes the receipts saved before `before`; returns how many. */
+export const deleteOldReceipts = (db: Database, before: number): number =>
+	db.query("DELETE FROM kanban_receipts WHERE created_at<?").run(before)
+		.changes;

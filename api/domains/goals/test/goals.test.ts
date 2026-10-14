@@ -9,8 +9,7 @@ import {
 	goalEpochOf,
 	goalRevisionOf,
 	goalSnapshot,
-	migration,
-	operationMigration,
+	migrations,
 } from "..";
 import type { GoalAccess } from "..";
 import { goalHistory } from "../repository";
@@ -45,7 +44,7 @@ const snap = (access: GoalAccess) =>
 beforeEach(() => {
 	counter = 0;
 	dir = mkdtempSync(join(tmpdir(), "eumenes-goals-"));
-	store = openStore(join(dir, "db.sqlite3"), [migration, operationMigration]);
+	store = openStore(join(dir, "db.sqlite3"), migrations);
 });
 afterEach(async () => {
 	await store.close();
@@ -622,7 +621,7 @@ test("goals survive restart", async () => {
 		source: src("m1"),
 	});
 	await store.close();
-	store = openStore(join(dir, "db.sqlite3"), [migration, operationMigration]);
+	store = openStore(join(dir, "db.sqlite3"), migrations);
 	expect(snap(alice)).toMatchObject({
 		state: "present",
 		revision: 1,

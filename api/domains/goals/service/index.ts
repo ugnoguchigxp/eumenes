@@ -6,7 +6,9 @@ import {
 	MAX_PROPOSED_GOALS,
 	adoptGoalSchema,
 	adoptProposalSchema,
+	forgetGoalsSchema,
 	goalAccessSchema,
+	goalStatuses,
 	goalTransitionSchema,
 	proposeGoalSchema,
 	updateGoalSchema,
@@ -14,8 +16,13 @@ import {
 import type {
 	AdoptGoal,
 	AdoptProposal,
+	ContextGoal,
+	ForgetGoalsInput,
+	ForgetGoalsResult,
 	Goal,
 	GoalAccess,
+	GoalOp,
+	GoalOpResult,
 	GoalRef,
 	GoalRevision,
 	GoalSnapshot,
@@ -23,19 +30,28 @@ import type {
 	GoalStatus,
 	GoalTransition,
 	ProposeGoal,
+	StewardGoal,
 	UpdateGoal,
 } from "../contracts";
 import {
 	bumpScopeEpoch,
 	countGoals,
+	deleteGoals,
+	forgetClosure,
 	getGoal,
 	getGoalByOperation,
 	insertGoal,
+	listAdoptedByPriority,
 	listAdoptedGoals,
+	listGoals,
 	listProposedGoals,
+	messageIdsOfGoals,
+	recordGoalLinks,
 	replaceGoal,
 	scopeEpoch,
+	scopesOfGoals,
 } from "../repository";
+import { applyGoalOps } from "./ops";
 
 function parse<T>(
 	schema: { safeParse(v: unknown): { success: boolean; data?: T } },
@@ -164,6 +180,105 @@ export function goalEpochOf(
 	return scopeEpoch(db, principal, scopeKey);
 }
 
+const operationDigest = (
+	status: string,
+	value: {
+		scopeKey: string;
+		desiredState: string;
+		priority: number;
+		source: GoalSource;
+		sourceMessageIds: readonly string[];
+		entityIds: readonly string[];
+	},
+) =>
+	createHash("sha256")
+		.update(
+			JSON.stringify([
+				"goal-operation/2",
+				status,
+				value.scopeKey,
+				value.desiredState,
+				value.priority,
+				[
+					value.source.namespace,
+					value.source.kind,
+					value.source.id,
+					value.source.revision ?? null,
+					value.source.digest ?? null,
+					value.source.representation ?? null,
+				],
+				[...new Set(value.sourceMessageIds)].sort(),
+				[...new Set(value.entityIds)].sort(),
+			]),
+		)
+		.digest("hex");
+
+/** Every goal of the access in the given statuses (all by default), for the steward to review. */
+export function listGoalsForSteward(
+	db: Database,
+	access: GoalAccess,
+	statuses: readonly GoalStatus[] = goalStatuses,
+): StewardGoal[] {
+	const own = parseAccess(access);
+	return listGoals(db, own.principal, own.scopeKeys, statuses).map((g) => ({
+		goalId: g.id,
+		scopeKey: g.scopeKey,
+		status: g.status,
+		priority: g.priority,
+		desiredState: g.desiredState,
+		revision: g.revision,
+		updatedAt: g.updatedAt,
+	}));
+}
+
+/** Adopted goals for context: priority high first, then most recently revised. */
+export function adoptedGoalsForContext(
+	db: Database,
+	access: GoalAccess,
+): ContextGoal[] {
+	const own = parseAccess(access);
+	return listAdoptedByPriority(db, own.principal, own.scopeKeys).map((g) => ({
+		goalId: g.id,
+		scopeKey: g.scopeKey,
+		priority: g.priority,
+		desiredState: g.desiredState,
+		revision: g.revision,
+		updatedAt: g.updatedAt,
+	}));
+}
+
+/**
+ * The goals a forget reaches and the messages their revisions cite. Read-only:
+ * the steward calls it first to write the durable intent (block journal) and
+ * to block the messages, then deletes in the same transaction.
+ */
+export function resolveGoalForget(
+	db: Database,
+	input: ForgetGoalsInput,
+): ForgetGoalsResult {
+	const value = parse(forgetGoalsSchema, input, "invalid_goal_forget_input");
+	const goalIds = forgetClosure(db, value.goalIds, value.entityIds);
+	return { goalIds, messageIds: messageIdsOfGoals(db, goalIds) };
+}
+
+/**
+ * F8: deletes the named goals and those linked to the given World entities
+ * with every revision, history row and provenance row, whatever their status.
+ * Idempotent: a repeat finds nothing and returns empty lists. The goal epoch
+ * of every affected scope moves, so anything built from goals is invalidated.
+ */
+export function forgetGoals(
+	db: Database,
+	input: ForgetGoalsInput,
+): ForgetGoalsResult {
+	const result = resolveGoalForget(db, input);
+	if (result.goalIds.length === 0) return result;
+	for (const scope of scopesOfGoals(db, result.goalIds))
+		bumpScopeEpoch(db, scope.principal, scope.scopeKey);
+	deleteGoals(db, result.goalIds);
+	return result;
+}
+
 export function createGoalsService(
 	store: SqliteStore,
 	clock: () => string = () => new Date().toISOString(),
@@ -189,40 +304,12 @@ export function createGoalsService(
 		if (countGoals(db, goal.principal, goal.scopeKey, status) >= limit)
 			throw new Error("goal_limit");
 	}
-	const operationDigest = (
-		status: string,
-		value: {
-			scopeKey: string;
-			desiredState: string;
-			priority: number;
-			source: GoalSource;
-		},
-	) =>
-		createHash("sha256")
-			.update(
-				JSON.stringify([
-					"goal-operation/1",
-					status,
-					value.scopeKey,
-					value.desiredState,
-					value.priority,
-					[
-						value.source.namespace,
-						value.source.kind,
-						value.source.id,
-						value.source.revision ?? null,
-						value.source.digest ?? null,
-						value.source.representation ?? null,
-					],
-				]),
-			)
-			.digest("hex");
 	function create(
 		db: Database,
 		rawAccess: GoalAccess,
 		input: unknown,
 		status: "adopted" | "proposed",
-	): Goal {
+	): { goal: Goal; replayed: boolean } {
 		const access = parseAccess(rawAccess);
 		const value = parse(
 			status === "adopted" ? adoptGoalSchema : proposeGoalSchema,
@@ -247,7 +334,7 @@ export function createGoalsService(
 			if (done) {
 				if (done.digest !== operation.digest)
 					throw new Error("operation_conflict");
-				return done.goal;
+				return { goal: done.goal, replayed: true };
 			}
 		}
 		const now = clock();
@@ -266,8 +353,9 @@ export function createGoalsService(
 		};
 		assertCapacity(db, goal, status);
 		insertGoal(db, goal, operation);
+		recordGoalLinks(db, goal.id, goal.revision, value);
 		if (status === "adopted") bumpScopeEpoch(db, goal.principal, goal.scopeKey);
-		return goal;
+		return { goal, replayed: false };
 	}
 	/** Revision first, then state, then compare-and-swap; epoch moves with visibility. */
 	function transition(
@@ -276,6 +364,10 @@ export function createGoalsService(
 		goalId: string,
 		expectedRevision: number,
 		from: readonly GoalStatus[],
+		links: {
+			sourceMessageIds: readonly string[];
+			entityIds: readonly string[];
+		},
 		build: (current: Goal, now: string) => Goal,
 	): Goal {
 		const access = parseAccess(rawAccess);
@@ -288,6 +380,7 @@ export function createGoalsService(
 			assertCapacity(db, current, "adopted");
 		const saved = replaceGoal(db, next, expectedRevision, current.status);
 		if (!saved) throw new Error("revision_conflict");
+		recordGoalLinks(db, saved.id, saved.revision, links);
 		if (current.status === "adopted" || next.status === "adopted")
 			bumpScopeEpoch(db, saved.principal, saved.scopeKey);
 		return saved;
@@ -300,7 +393,7 @@ export function createGoalsService(
 			access: GoalAccess,
 			input: AdoptGoal,
 		): Goal {
-			return create(db, access, input, "adopted");
+			return create(db, access, input, "adopted").goal;
 		},
 		/** Stores an inferred goal as a proposal. Never visible in snapshots. */
 		proposeInTransaction(
@@ -308,7 +401,7 @@ export function createGoalsService(
 			access: GoalAccess,
 			input: ProposeGoal,
 		): Goal {
-			return create(db, access, input, "proposed");
+			return create(db, access, input, "proposed").goal;
 		},
 		/** Explicit adoption of an existing proposal. */
 		adoptProposalInTransaction(
@@ -324,8 +417,11 @@ export function createGoalsService(
 				goalId,
 				value.expectedRevision,
 				["proposed"],
+				value,
 				(c, now) => ({
 					...c,
+					desiredState: value.desiredState ?? c.desiredState,
+					priority: value.priority ?? c.priority,
 					status: "adopted",
 					source: value.source,
 					proposedFrom: c.source,
@@ -347,6 +443,7 @@ export function createGoalsService(
 				goalId,
 				value.expectedRevision,
 				["adopted"],
+				value,
 				(c, now) => ({
 					...c,
 					desiredState: value.desiredState ?? c.desiredState,
@@ -371,6 +468,7 @@ export function createGoalsService(
 				goalId,
 				value.expectedRevision,
 				["adopted", "proposed"],
+				value,
 				(c, now) => ({
 					...c,
 					status: "withdrawn",
@@ -393,6 +491,7 @@ export function createGoalsService(
 				goalId,
 				value.expectedRevision,
 				["adopted"],
+				value,
 				(c, now) => ({
 					...c,
 					status: "completed",
@@ -407,6 +506,32 @@ export function createGoalsService(
 			const own = parseAccess(access);
 			return listProposedGoals(db, own.principal, own.scopeKeys);
 		},
+		/**
+		 * Applies steward operations in order, each in its own savepoint: a
+		 * rejected one writes nothing and does not stop the others. Later
+		 * operations see the effects of earlier ones. Writes must run in the
+		 * caller's transaction.
+		 */
+		applyInTransaction(
+			db: Database,
+			access: GoalAccess,
+			ops: readonly GoalOp[],
+		): GoalOpResult[] {
+			return applyGoalOps(db, access, ops, {
+				create: (a, input, status) => create(db, a, input, status),
+				adoptProposal: inTransaction.adoptProposalInTransaction,
+				update: inTransaction.updateInTransaction,
+				withdraw: inTransaction.withdrawInTransaction,
+				complete: inTransaction.completeInTransaction,
+			});
+		},
+		/** Every goal of the access, any status, for the steward to review. */
+		listForStewardInTransaction: listGoalsForSteward,
+		/** Adopted goals for context: priority high first, then most recently revised. */
+		adoptedForContextInTransaction: adoptedGoalsForContext,
+		/** What `forgetGoalsInTransaction` would delete; writes nothing. */
+		resolveForgetInTransaction: resolveGoalForget,
+		forgetGoalsInTransaction: forgetGoals,
 		snapshotInTransaction: goalSnapshot,
 		/** Access is required: a goal outside it is reported as unknown. */
 		revisionOfInTransaction: goalRevisionOf,

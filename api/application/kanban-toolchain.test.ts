@@ -30,7 +30,9 @@ function fakeClaude() {
 			command,
 			settings,
 			sessionId: /hooks\/terminals\/([0-9a-f-]{36})/.exec(settings)![1]!,
-			token: /x-eumenes-hook-token: ([0-9a-f]{64})/.exec(settings)![1]!,
+			token: /x-eumenes-hook-token: ([0-9a-f]{64})/.exec(
+				readFileSync(/-H @'([^']+)'/.exec(settings)![1]!, "utf8"),
+			)![1]!,
 			claudeId: command[command.indexOf("--session-id") + 1]!,
 		});
 		return {
@@ -43,8 +45,8 @@ function fakeClaude() {
 	};
 	return {
 		spawned,
-		terminals: (store: Store) =>
-			createTerminals({
+		terminals: (store: Store) => {
+			const terminals = createTerminals({
 				store,
 				command: ["claude"],
 				spawn,
@@ -52,7 +54,11 @@ function fakeClaude() {
 				hookBaseUrl: "http://127.0.0.1:8787",
 				curl: "curl",
 				manualInputWaitMs: 0,
-			}),
+			});
+			// Terminals dispatches nothing until its startup recovery has run.
+			void terminals.recover();
+			return terminals;
+		},
 	};
 }
 

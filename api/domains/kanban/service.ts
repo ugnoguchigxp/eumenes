@@ -3,13 +3,12 @@ import type { SqliteStore } from "../../infrastructure/sqlite";
 import { boardInTransaction, cardActions, cardInTransaction } from "./board";
 import {
 	DEFAULT_PROJECT_ID,
+	KANBAN_PROMPT_MAX,
 	type KanbanAddInput,
 	type KanbanCardRefInput,
-	type KanbanDispatch,
 	type KanbanEditInput,
 	type KanbanMoveInput,
 	type KanbanNoticeView,
-	type KanbanRunFinish,
 	type KanbanViewContext,
 } from "./contracts";
 import { createCore, type Applied, type KanbanOutcome } from "./core";
@@ -24,40 +23,15 @@ import {
 	updateCard,
 	type CardRow,
 } from "./repository";
+import { createRecovery } from "./recovery";
 import { createRuns } from "./runs";
-import {
-	handedRuns,
-	listNotices,
-	markNoticeRead,
-	unreadNotices,
-} from "./runs-repository";
+import { listNotices, markNoticeRead, unreadNotices } from "./runs-repository";
 
 export type { KanbanOutcome } from "./core";
+export type { KanbanRecoverPorts } from "./recovery";
 export { cardActions };
 
 const iso = (ms: number) => new Date(ms).toISOString();
-
-/** What the run recovery reads of a terminals request (structural; no terminals import). */
-export type KanbanRecoverPorts = {
-	request(
-		tx: Database,
-		runId: string,
-	): {
-		state: string;
-		reason?: string;
-		lastReport?: string;
-		files: readonly string[];
-	} | null;
-	/** Hands a run over to terminals inside the recovery transaction. */
-	enqueue(tx: Database, dispatch: KanbanDispatch): void;
-};
-const FINAL = new Set([
-	"completed",
-	"interrupted",
-	"ended",
-	"unknown",
-	"cancelled",
-]);
 
 /** A card back to a state without any run (todo): nothing of its conversation is kept. */
 const NO_RUN: Pick<
@@ -92,6 +66,17 @@ export function createKanban(options: {
 	});
 	const { now, newId, operate, target, receiptOf } = core;
 	const { pendingStops, stopUnconfirmed, ...runOperations } = createRuns(core);
+	const recovery = createRecovery(
+		options.store,
+		runOperations.finishRunInTransaction,
+		now,
+	);
+
+	/** A prompt that could be saved but never run is refused when it is saved. */
+	function promptFits(prompt: string | undefined) {
+		if (prompt !== undefined && prompt.length > KANBAN_PROMPT_MAX)
+			throw new Error("kanban_prompt_too_long");
+	}
 
 	function notRunning(card: CardRow) {
 		if (card.column === "running") throw new Error("kanban_card_busy");
@@ -117,6 +102,7 @@ export function createKanban(options: {
 		requestId: string,
 	): KanbanOutcome {
 		return operate(tx, requestId, "add", input, () => {
+			promptFits(input.prompt);
 			const ids = columnIds(tx, "todo");
 			const index = insertIndex(tx, ids, input.beforeCardId);
 			const at = now();
@@ -146,6 +132,7 @@ export function createKanban(options: {
 		requestId: string,
 	): KanbanOutcome {
 		return operate(tx, requestId, "edit", input, () => {
+			promptFits(input.prompt);
 			const card = target(tx, input.cardId, input.expectedRevision);
 			notRunning(card);
 			const title = input.title ?? card.title;
@@ -285,38 +272,6 @@ export function createKanban(options: {
 		unread: unreadNotices(tx),
 	});
 
-	/**
-	 * Startup: runs that were handed over are settled from their terminals requests (a request that
-	 * is gone, or that terminals recovery already ended, blocks the run and stops the queue).
-	 */
-	async function recover(ports: KanbanRecoverPorts) {
-		await options.store.write((tx) => {
-			for (const run of handedRuns(tx)) {
-				const request = ports.request(tx, run.id);
-				if (request && !FINAL.has(request.state)) continue;
-				const out = runOperations.finishRunInTransaction(
-					tx,
-					request
-						? {
-								runId: run.id,
-								state: request.state as KanbanRunFinish["state"],
-								reason: request.reason,
-								lastReport: request.lastReport ?? "",
-								files: request.files,
-							}
-						: {
-								runId: run.id,
-								state: "unknown",
-								reason: "restarted",
-								lastReport: "",
-								files: [],
-							},
-				);
-				if (out?.dispatch) ports.enqueue(tx, out.dispatch);
-			}
-		});
-	}
-
 	return {
 		addInTransaction,
 		editInTransaction,
@@ -345,7 +300,7 @@ export function createKanban(options: {
 		/** Records that a stopped run's process could not be confirmed gone. */
 		stopUnconfirmed: (runId: string) =>
 			options.store.write((tx) => stopUnconfirmed(tx, runId)),
-		recover,
+		...recovery,
 	};
 }
 

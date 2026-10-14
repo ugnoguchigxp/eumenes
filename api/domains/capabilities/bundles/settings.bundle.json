@@ -63,7 +63,7 @@
 		{
 			"kind": "artifact",
 			"id": "settings.conversation",
-			"revision": 3,
+			"revision": 4,
 			"title": "会話の設定",
 			"variants": [
 				{
@@ -121,7 +121,7 @@
 				"label": "会話",
 				"group": "使い方を変える",
 				"order": 10,
-				"description": "AIの名前 あなたの名前 口調"
+				"description": "AIの名前 あなたの名前 口調 ワールドモデル"
 			},
 			"fields": [
 				{
@@ -167,6 +167,14 @@
 							"label": "老師"
 						}
 					]
+				},
+				{
+					"fieldId": "world.enabled",
+					"document": "document:settings@1",
+					"path": "$.world.enabled",
+					"label": "ワールドモデル（世界の状態の記録）を使う",
+					"control": "toggle",
+					"help": "変更はbackendの再起動後に反映されます。オフにしても、保存済みの内容が残っている間は、忘却の反映だけが動き続けます。"
 				}
 			]
 		},

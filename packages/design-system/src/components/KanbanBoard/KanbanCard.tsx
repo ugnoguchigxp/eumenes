@@ -116,7 +116,8 @@ export function KanbanCard({
 	const detailId = useId();
 	const [panel, setPanel] = useState<Panel>(null);
 	const [expanded, setExpanded] = useState(false);
-	const [confirming, setConfirming] = useState(false);
+	// The card as the person saw it when the dialog opened (what they confirm is this revision).
+	const [confirming, setConfirming] = useState<KanbanBoardCard | null>(null);
 	const article = useRef<HTMLElement>(null);
 	const opener = useRef<Element | null>(null);
 	const afterClose = useRef<"trigger" | "card" | null>(null);
@@ -174,7 +175,7 @@ export function KanbanCard({
 	const run = (action: KanbanCardAction) => {
 		if (action === "edit" || action === "followup" || action === "remove")
 			return open(action);
-		if (action === "commitPush") return setConfirming(true);
+		if (action === "commitPush") return setConfirming(card);
 		onAction(action as Act, card.id, card.revision);
 	};
 	const disabled = (action: KanbanCardAction) =>
@@ -385,11 +386,12 @@ export function KanbanCard({
 			</article>
 			{confirming && (
 				<CommitPushDialog
-					card={card}
-					onClose={() => setConfirming(false)}
+					card={confirming}
+					current={card}
+					onShow={setConfirming}
 					onConfirm={() => {
-						setConfirming(false);
-						onAction("commitPush", card.id, card.revision);
+						setConfirming(null);
+						onAction("commitPush", confirming.id, confirming.revision);
 					}}
 				/>
 			)}
