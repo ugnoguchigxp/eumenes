@@ -40,6 +40,7 @@ import {
 } from "./inference-adapter";
 import { createMusicScreenAdapter } from "./music-screen-adapter";
 import { createImageScreenAdapter } from "./image-screen-adapter";
+import { createObjectRecognitionScreenAdapter } from "./object-recognition-screen-adapter";
 import {
 	bundleHostOf,
 	createRegistryActions,
@@ -94,6 +95,9 @@ export async function createToolchain(
 	const registry = createAdapterRegistry([
 		...(options.music ? [createMusicScreenAdapter()] : []),
 		...(options.image ? [createImageScreenAdapter()] : []),
+		...(options.objectRecognition
+			? [createObjectRecognitionScreenAdapter()]
+			: []),
 		...(options.timers
 			? [
 					createTimerAdapter(options.timers, {

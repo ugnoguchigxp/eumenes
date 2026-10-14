@@ -421,7 +421,7 @@ test("stopwatch continues across clock and artifact tabs, stops, resumes, resets
 		return parts[0]! * 60 + parts[1]!;
 	};
 	await expect.poll(seconds).toBeGreaterThanOrEqual(3);
-	await openFromLauncher(page, "UIショーケース");
+	await openFromLauncher(page, "設定");
 	await page.clock.runFor(2000);
 	await page
 		.getByRole("tablist", { name: "アーティファクトのタブ" })
@@ -750,7 +750,7 @@ test("top-right banners and notification drawer fit desktop and mobile in both t
 	await expect(page.getByText(/接続済み/)).toBeVisible({ timeout: 20000 });
 	const notice = page.getByRole("status", { name: "タイマーの終了" });
 	await expect(notice).toBeVisible({ timeout: 10000 });
-	await openFromLauncher(page, "UIショーケース");
+	await openFromLauncher(page, "設定");
 	for (const width of [1840, 1280, 790, 390]) {
 		await page.setViewportSize({ width, height: 1000 });
 		const geometry = await page
@@ -765,8 +765,8 @@ test("top-right banners and notification drawer fit desktop and mobile in both t
 				const trigger = document
 					.querySelector(".notification-center-trigger")!
 					.getBoundingClientRect();
-				const settings = document
-					.querySelector(".floating-settings")!
+				const launcher = document
+					.querySelector(".artifact-launcher-trigger")!
 					.getBoundingClientRect();
 				const status = document
 					.querySelector(".conversation-status")!
@@ -782,7 +782,7 @@ test("top-right banners and notification drawer fit desktop and mobile in both t
 					right: innerWidth - n.right,
 					top: n.top,
 					width: n.width,
-					iconsOverlap: trigger.right > settings.left,
+					iconsOverlap: launcher.right > trigger.left,
 					statusOverlaps:
 						status.right > trigger.left && status.bottom > trigger.top,
 				};
@@ -841,17 +841,6 @@ test("top-right banners and notification drawer fit desktop and mobile in both t
 		await expect(trigger).toBeFocused();
 		await expect(notice).toBeVisible();
 	}
-	// Notification UI is global even when the workspace is hidden by settings.
-	await page.getByRole("button", { name: "設定", exact: true }).click();
-	await expect(notice).toBeVisible();
-	await page.getByRole("button", { name: "通知センター、12件" }).click();
-	await expect(
-		page.getByRole("dialog", { name: "通知センター" }),
-	).toBeVisible();
-	await page.getByRole("button", { name: "通知センターを閉じる" }).click();
-	await expect(page.getByRole("dialog", { name: "通知センター" })).toHaveCount(
-		0,
-	);
 });
 
 test("a restored alarm waits for audio activation and then beeps and requests TTS", async ({

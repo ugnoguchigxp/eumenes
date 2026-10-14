@@ -43,9 +43,9 @@ export const domains = {
 	},
 	dots: {
 		backend: "api/domains/dots",
-		web: "web/src/domains/dots",
+		web: null,
 		components: null,
-		depends: { api: ["queue"], web: ["tasks"], test: [] },
+		depends: { api: ["queue"], web: [], test: [] },
 	},
 	"task-reports": {
 		backend: "api/domains/task-reports",
@@ -105,7 +105,7 @@ export const domains = {
 	},
 	"toolchain-history": {
 		backend: "api/domains/toolchain-history",
-		web: "web/src/domains/toolchain-history",
+		web: null,
 		components: null,
 		depends: { api: ["capabilities"], web: [], test: [] },
 	},
@@ -145,7 +145,7 @@ export const domains = {
 		components: null,
 		depends: {
 			api: [],
-			web: ["tts-dictionary", "dots", "background"],
+			web: [],
 			test: [],
 		},
 	},
@@ -161,7 +161,7 @@ export const domains = {
 	},
 	"tts-dictionary": {
 		backend: "api/domains/tts-dictionary",
-		web: "web/src/domains/tts-dictionary",
+		web: null,
 		components: null,
 		depends: { api: [], web: [], test: [] },
 	},
@@ -185,11 +185,11 @@ export const domains = {
 	},
 	world: {
 		backend: "api/domains/world",
-		web: "web/src/domains/world",
-		components: "web/src/components/domains/world",
+		web: null,
+		components: null,
 		depends: {
 			api: ["conversation", "goals"],
-			web: ["conversation"],
+			web: [],
 			test: ["memory"],
 		},
 	},

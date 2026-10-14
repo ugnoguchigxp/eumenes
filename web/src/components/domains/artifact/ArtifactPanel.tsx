@@ -3,48 +3,10 @@ import {
 	TabsList,
 	TabsTrigger,
 	TabsContent,
-	Button,
 } from "@eumenes/design-system";
-import {
-	Component,
-	lazy,
-	Suspense,
-	useEffect,
-	useRef,
-	type ReactNode,
-} from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import type { ArtifactTab } from "../../../domains/artifact";
 import { renderSafeMarkdown } from "../conversation";
-
-const ArtifactShowcase = lazy(() =>
-	import("./ArtifactShowcase").then((module) => ({
-		default: module.ArtifactShowcase,
-	})),
-);
-
-class ShowcaseBoundary extends Component<
-	{ children: ReactNode },
-	{ failed: boolean }
-> {
-	state = { failed: false };
-	static getDerivedStateFromError() {
-		return { failed: true };
-	}
-	render() {
-		return this.state.failed ? (
-			<div role="alert" className="aui-stack">
-				<p>
-					ショーケースを読み込めませんでした。画面を再読み込みしてください。
-				</p>
-				<Button onClick={() => window.location.reload()}>
-					画面を再読み込み
-				</Button>
-			</div>
-		) : (
-			this.props.children
-		);
-	}
-}
 
 export function ArtifactPanel({
 	tabs,
@@ -104,23 +66,6 @@ export function ArtifactPanel({
 						))}
 					</TabsList>
 				</header>
-				{tabs
-					.filter((tab) => tab.kind === "showcase")
-					.map((tab) => (
-						<TabsContent
-							key={tab.id}
-							value={tab.id}
-							forceMount
-							className="artifact-panel-body"
-							hidden={tab.id !== activeTabId}
-						>
-							<ShowcaseBoundary>
-								<Suspense fallback={<output>UIを準備中です</output>}>
-									<ArtifactShowcase />
-								</Suspense>
-							</ShowcaseBoundary>
-						</TabsContent>
-					))}
 				{tabs.map((tab) =>
 					tab.kind === "toolchain" ? (
 						<TabsContent

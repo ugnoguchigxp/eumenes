@@ -262,7 +262,7 @@ bun run cli -- requirements show history-criteria --json
 
 ### A2 dotsの担当packageを登録する
 
-通常は「設定 → Codexへの委任 → 担当とSkill」で保存する。APIを使う場合は、dotsが有効で標準依存`tool:dots.coordinate@1`がseed済みの環境で `PUT /api/capabilities/dots-packages` へ次を送る。
+Web の dots 設定画面は削除したため、APIで保存する。dotsが有効で標準依存`tool:dots.coordinate@1`がseed済みの環境で `PUT /api/capabilities/dots-packages` へ次を送る。
 
 ```json
 {
@@ -281,7 +281,7 @@ bun run cli -- requirements show history-criteria --json
 
 1. 新規IDは`dots.user.`＋小文字16進数32桁で生成する。例の固定IDを繰り返し使わない。
 2. 応答の`revisionId`と`stateToken`を保存する。改訂時は同じIDと現行`stateToken`を`expectedToken`へ渡す。
-3. 「設定 → Codexへの委任」の対象プロジェクトで、返された担当版を選んで保存する。`capabilityRevisionId`の更新が必要で、packageの保存だけではプロジェクトの担当は切り替わらない。
+3. `/api/dots/projects` で対象プロジェクトに返された担当版を指定して保存する。`capabilityRevisionId`の更新が必要で、packageの保存だけではプロジェクトの担当は切り替わらない。
 4. `GET /api/capabilities/dots-packages`とプロジェクト設定で、版・有効状態・担当の接続を確認する。
 
 profile・skill・packageの生成とrevision更新はAPIが行う。skillsは1〜4件、profileとSkill本文の合計には14,000 bytesの枠がある。新規Sessionや成果返却の実受入は別段階であり、登録成功を実行成功と扱わない。接続とプロジェクト設定は[dotsの設定手順](dots.md#設定して使う)を使う。

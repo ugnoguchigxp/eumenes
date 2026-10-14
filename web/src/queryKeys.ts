@@ -16,25 +16,12 @@ export const queryRoots = {
 	larmProfiles: "larm-profiles",
 	larmVoices: "larm-voices",
 	settings: "settings",
-	settingsSchedules: "settings-schedules",
-	settingsOccurrences: "settings-occurrences",
 	settingsDiagnostics: "settings-diagnostics",
 	inferenceUsage: "inference-usage",
-	inferenceProbes: "inference-probes",
-	memoryStatus: "memory-status",
-	memoryItems: "memory-items",
-	memoryShortTerm: "memory-short-term",
-	memoryTendencies: "memory-tendencies",
-	memoryContext: "memory-context",
-	ttsDictionary: "tts-dictionary",
-	serviceCatalog: "service-catalog",
-	serviceRuns: "service-runs",
 	voiceDialogue: "voice-dialogue",
-	toolchainHistory: "toolchain-history",
 	timers: "timers",
 	toolchainArtifacts: "toolchain-artifacts",
 	toolchainInteractions: "toolchain-interactions",
-	world: "world",
 } as const;
 
 /**
@@ -55,27 +42,15 @@ export const changeRoots = [
 	queryRoots.larm,
 	queryRoots.larmDetails,
 	queryRoots.settings,
-	queryRoots.settingsSchedules,
-	queryRoots.settingsOccurrences,
 	queryRoots.inferenceUsage,
-	queryRoots.memoryStatus,
-	queryRoots.memoryItems,
-	queryRoots.memoryShortTerm,
-	queryRoots.memoryTendencies,
-	queryRoots.ttsDictionary,
-	queryRoots.serviceCatalog,
-	queryRoots.serviceRuns,
 	queryRoots.voiceDialogue,
-	queryRoots.toolchainHistory,
 	queryRoots.timers,
 	queryRoots.toolchainInteractions,
-	queryRoots.world,
 ] as const;
 
 /** Roots whose queries call live providers; they are fetched on demand only. */
 export const liveProviderRoots: readonly string[] = [
 	queryRoots.settingsDiagnostics,
-	queryRoots.inferenceProbes,
 	queryRoots.larmVoices,
 ];
 

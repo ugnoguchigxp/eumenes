@@ -22,7 +22,6 @@ function mockScene() {
 		select: vi.fn(),
 		setItems: vi.fn(),
 		setOptions: vi.fn(),
-		hitTest: vi.fn(),
 	};
 	vi.mocked(createSpatialScene).mockImplementation(
 		(_host, _items, { onStatus }) => {
@@ -72,22 +71,9 @@ test("unmounting before the deferred initialization never creates a scene", asyn
 	expect(createSpatialScene).not.toHaveBeenCalled();
 });
 
-test("normal background has no state toggle; standalone selection uses the canvas keyboard", async () => {
-	const scene = mockScene();
-	const view = render(<SpatialBackground active standalone />);
+test("normal background has no state toggle", async () => {
+	mockScene();
+	render(<SpatialBackground active />);
 	await waitFor(() => expect(createSpatialScene).toHaveBeenCalledOnce());
-	expect(screen.queryByRole("button", { name: "状態を見る" })).toBeNull();
-	fireEvent.keyDown(
-		screen.getByRole("button", { name: /Spatialのモデルプレビュー/ }),
-		{ key: "Enter" },
-	);
-	expect(screen.getByText("選択中：CPU")).toBeTruthy();
-	expect(scene.select).toHaveBeenLastCalledWith("mac-cpu");
-	fireEvent.keyDown(
-		screen.getByRole("button", { name: /Spatialのモデルプレビュー/ }),
-		{ key: "Escape" },
-	);
-	expect(screen.queryByText("選択中：CPU")).toBeNull();
-	view.rerender(<SpatialBackground active />);
 	expect(screen.queryByRole("button", { name: "状態を見る" })).toBeNull();
 });

@@ -45,6 +45,10 @@ import {
 	describeImageScreenAdapter,
 	IMAGE_SCREEN_ADAPTER_REF,
 } from "./image-screen-adapter";
+import {
+	describeObjectRecognitionScreenAdapter,
+	OBJECT_RECOGNITION_SCREEN_ADAPTER_REF,
+} from "./object-recognition-screen-adapter";
 
 /** `domain:` result schemas registered by the host's adapters. */
 const domainSchemas: Readonly<Record<string, ZodType>> = {
@@ -97,6 +101,10 @@ export const hostAdapterDescriptions: Array<
 	{ ref: INFERENCE_ADAPTER_REF, describe: describeInferenceAdapter },
 	{ ref: MUSIC_SCREEN_ADAPTER_REF, describe: describeMusicScreenAdapter },
 	{ ref: IMAGE_SCREEN_ADAPTER_REF, describe: describeImageScreenAdapter },
+	{
+		ref: OBJECT_RECOGNITION_SCREEN_ADAPTER_REF,
+		describe: describeObjectRecognitionScreenAdapter,
+	},
 	{ ref: TTS_DICTIONARY_ADAPTER_REF, describe: describeTtsDictionaryAdapter },
 	{ ref: MEMORY_ADAPTER_REF, describe: describeMemoryAdapter },
 	{ ref: WORLD_ADAPTER_REF, describe: describeWorldAdapter },

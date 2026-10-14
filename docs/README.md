@@ -7,7 +7,7 @@
 | 文書 | 内容 |
 | --- | --- |
 | [setup.md](setup.md) | 起動の詳細。API token、LARM、TTS、VOICEVOX の環境変数と起動後の動作 |
-| [settings.md](settings.md) | 設定画面(AI の使い方・接続先・音声・予約)とサービスの試用・自己診断 |
+| [settings.md](settings.md) | 設定アーティファクト(会話・AIと接続・音声と入力・表示・記録)とサービスの試用・自己診断 |
 | [realtime.md](realtime.md) | SSE 通知と再接続の仕様、定期取得をしない方針 |
 | [larm.md](larm.md) | LARM の接続、claim、予算、session 構成 |
 | [logging.md](logging.md) | JSONL ログの保存先・相関 ID・障害調査の手順 |
@@ -54,4 +54,4 @@
 
 | 文書 | 内容 |
 | --- | --- |
-| [openui-artifact-showcase.md](openui-artifact-showcase.md) | OpenUI Artifact Showcase |
+| [openui-artifact.md](openui-artifact.md) | OpenUI Artifact |

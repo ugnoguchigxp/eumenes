@@ -34,16 +34,8 @@
 		"packages/coding-runner/src/git-operations.ts#executeGit": 342,
 		"packages/coding-runner/src/worker.ts#runWorker": 333,
 		"web/src/App.tsx#Workspace": 606,
-		"web/src/components/domains/artifact/ArtifactShowcase.tsx#ArtifactShowcase": 417,
 		"web/src/components/domains/timers/TimerNotifications.tsx#TimerNotifications": 317,
-		"web/src/components/domains/world/ClaimDrawer.tsx#ClaimDrawer": 387,
-		"web/src/domains/artifact/showcaseFixture.ts#createShowcaseFixture": 327,
 		"web/src/domains/audio/controller/index.ts#createAudioController": 546,
-		"web/src/domains/service-tests/index.tsx#ServiceTestsPanel": 322,
-		"web/src/domains/settings/MemoryItemsPanel.tsx#MemoryItemsPanel": 399,
-		"web/src/domains/settings/SettingsPage.tsx#SettingsPage": 398,
-		"web/src/domains/settings/sections/voice.tsx#VoiceSection": 357,
-		"web/src/domains/tts-dictionary/index.tsx#TtsDictionaryPanel": 396,
 		"web/src/domains/voice-dialogue/hooks/index.ts#useVoiceDialogue": 577
 	}
 }

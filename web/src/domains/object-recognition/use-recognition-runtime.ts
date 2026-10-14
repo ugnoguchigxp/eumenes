@@ -10,7 +10,7 @@ import {
 	maxInputBytes,
 	inputMime,
 } from "../../../../api/domains/object-recognition/contracts";
-import { recognitionSource } from "./artifact-definition";
+import { recognitionSource } from "./source";
 import { queryRoots } from "../../queryKeys";
 export function useRecognitionRuntime(
 	client: EumenesClient,
@@ -216,6 +216,8 @@ export function useRecognitionRuntime(
 		return { status: "accepted", message: "操作を受け付けました。" };
 	}
 	return {
+		loading: records.isPending || connection.isPending,
+		refresh,
 		runtime: {
 			snapshot: { [recognitionSource]: resource },
 			dispatch,

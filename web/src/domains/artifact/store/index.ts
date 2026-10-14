@@ -2,7 +2,7 @@ export type ArtifactTab =
 	| {
 			id: string;
 			title: string;
-			kind: "markdown" | "showcase";
+			kind: "markdown";
 			content: string;
 	  }
 	| {

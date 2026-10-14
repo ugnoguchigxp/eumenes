@@ -1,4 +1,3 @@
-import { Vector3, type OrthographicCamera } from "three";
 import type { SpatialItem, SpatialModel } from "../contracts";
 import type { SpatialOptions } from "../options";
 import type { SceneEnvelope } from "./camera";
@@ -31,32 +30,4 @@ export function fitEnvelope(
 		);
 		if (item.id === selected) envelope.focusRadius = bounds.radius;
 	}
-}
-
-export function hitTestEntries(
-	entries: Iterable<Entry>,
-	camera: OrthographicCamera,
-	rect: Pick<DOMRect, "width" | "height">,
-	x: number,
-	y: number,
-) {
-	const projected = new Vector3();
-	let nearest: string | null = null,
-		distance = Infinity;
-	const radius = Math.max(
-		12,
-		(1.6 * rect.width) / (camera.right - camera.left),
-	);
-	for (const { item, model } of entries) {
-		projected.copy(model.object.position).project(camera);
-		const d = Math.hypot(
-			((projected.x + 1) * rect.width) / 2 - x,
-			((1 - projected.y) * rect.height) / 2 - y,
-		);
-		if (d < radius && d < distance) {
-			nearest = item.id;
-			distance = d;
-		}
-	}
-	return nearest;
 }

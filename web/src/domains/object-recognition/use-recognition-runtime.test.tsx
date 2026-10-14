@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import type { EumenesClient } from "../../../../client";
 import type { RecognitionRecord } from "../../../../api/domains/object-recognition/contracts";
 import { useRecognitionRuntime } from "./use-recognition-runtime";
-import { recognitionSource } from "./artifact-definition";
+import { recognitionSource } from "./source";
 test("credential selection works before uploading any media and sends only a reference with the saved revision", async () => {
 	let connection = {
 		revision: 4,

@@ -8,12 +8,14 @@ Eumenes は依頼、許可する範囲、質問、結果を保存する。dots �
 
 ## 設定して使う
 
-1. 「設定 → Codexへの委任」で接続を保存する。
+Web の dots 設定画面（従来の設定ページの「Codexへの委任」）は削除した。以下の登録は `/api/dots` の API で行う。
+
+1. 接続を保存する。
 2. Codex で返された実際のプロジェクト ID とホスト ID を登録する。ローカル／クラウドの実行場所、許可操作、使用する担当の版も選ぶ。
-3. 必要なら「担当とSkill」で役割と手順を保存し、プロジェクトの「担当」でその版を選ぶ。標準の調整担当も利用できる。
-4. dots 側に MCP を登録し、`command.available` の受信を有効にする。設定画面の受信登録は購読の有効期限を表示する。購読が有効でも、仕事の実行成功を意味しない。
-5. 会話で依頼するか、設定画面の「作業を依頼」から目的・完了条件・Session 数の上限を指定する。画面からの依頼の実行期限は2時間。会話の LLM は保存済みプロジェクトと許可操作から選び、対象が不明な場合は確認する。
-6. dots の質問に回答すると、同じタスクに answer コマンドを追加する。元の許可範囲は広がらない。完了・失敗・次の作業なしの報告は元の会話にも届く。画面から作った作業の結果は作業詳細で確認する。
+3. 必要なら `PUT /api/capabilities/dots-packages` で役割と手順を保存し、プロジェクトの担当にその版を指定する。標準の調整担当も利用できる。
+4. dots 側に MCP を登録し、`command.available` の受信を有効にする。受信登録の API は購読の有効期限を返す。購読が有効でも、仕事の実行成功を意味しない。
+5. 会話で依頼するか、API から目的・完了条件・Session 数の上限を指定する。APIからの依頼の実行期限は2時間。会話の LLM は保存済みプロジェクトと許可操作から選び、対象が不明な場合は確認する。
+6. dots の質問に回答すると、同じタスクに answer コマンドを追加する。元の許可範囲は広がらない。完了・失敗・次の作業なしの報告は元の会話にも届く。API から作った作業の結果は作業詳細の API で確認する。
 
 「一時停止」「取消」は停止要求を保存する。dots が全 Session の停止を報告するまで「停止確認待ち」となる。本文削除後も、停止に必要な識別子を保持する。Eumenes 自身が Codex の Session を直接強制停止する API は実装していない。
 
@@ -119,7 +121,7 @@ Session 数はタスク grant の上限で管理する。サブエージェン�
 
 前のタスクの Session を続行する場合は、同じ接続・登録プロジェクトで、grant.sessionRefs と continue_session を明示する。前の作業が終了または一時停止している必要があり、同じ Session を複数の実行中タスクで使うことは拒否する。タスクごとの Session 紐付けを保存するため、旧タスクの保持期限や本文削除で新しいタスクの参照は消えない。
 
-MCP は `skills/list`／`skills/get`／`resources/read` で標準の `eumenes-coordinator` Skill を提供し、UTF-8 本文の SHA-256 digest を返す。これは MCP の接続・報告手順で、変更した場合は dots 側のツール／Skill 検出を更新する。設定画面の担当・Skill はコマンド取得時に渡す実行コンテキストで、native の Skill インストールそのものではない。
+MCP は `skills/list`／`skills/get`／`resources/read` で標準の `eumenes-coordinator` Skill を提供し、UTF-8 本文の SHA-256 digest を返す。これは MCP の接続・報告手順で、変更した場合は dots 側のツール／Skill 検出を更新する。保存した担当・Skill はコマンド取得時に渡す実行コンテキストで、native の Skill インストールそのものではない。
 
 ## 登録済み予定からのリマインド
 
@@ -155,7 +157,6 @@ Queue が満杯でもコマンドを保存し、60秒ごとの maintenance で�
 ```sh
 bun run verify -- --domain dots
 bun test api/domains/dots api/application/dots-tasks.test.ts api/application/dots-review.test.ts api/application/dots-dialogue.test.ts api/application/dots-http.test.ts scripts/dots-gateway.test.ts packages/dots-mcp/test
-bun x playwright test tests/browser/dots.spec.ts
 ```
 
 実 dots の製品受入には、認証付きの公開 MCP 接続と対象プロジェクトの登録が必要。接続後に、新規 Session、ブロッカー、回答後の同一 Session の再開、成果と根拠、no_next_work、取消後の全子停止、再起動時の照合、予定からの一回のリマインドを確認する。これらを確認するまで、製品接続の完成とは記録しない。

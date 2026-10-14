@@ -2,16 +2,9 @@ import {
 	DrawingArtifact,
 	drawingDefinition,
 } from "../domains/excalidraw/DrawingArtifact";
-import { ObjectRecognitionArtifact } from "../domains/object-recognition/ObjectRecognitionArtifact";
-import {
-	isRecognitionDefinition,
-	recognitionDefinition,
-} from "../domains/object-recognition/artifact-definition";
 import { useCallback } from "react";
 import type { EumenesClient } from "../../../client";
-import {
-	playlistArtifactDefinition,
-} from "../domains/music/artifact-definition";
+import { playlistArtifactDefinition } from "../domains/music/artifact-definition";
 import { useArtifactWorkspace } from "../domains/artifact";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import { ArtifactPanel } from "../components/domains/artifact/ArtifactPanel";
@@ -21,21 +14,6 @@ import {
 	useToolchainArtifacts,
 } from "../domains/toolchain-artifacts";
 import { toolchainWebAdapters } from "./toolchain-adapters";
-
-export function useOpenRecognition(
-	open: ReturnType<typeof useArtifactWorkspace>["open"],
-) {
-	return useCallback(
-		() =>
-			open({
-				id: "object-recognition",
-				kind: "openui",
-				title: "映っている物を調べる",
-				definition: recognitionDefinition(),
-			}),
-		[open],
-	);
-}
 
 export function useOpenDrawing(
 	open: ReturnType<typeof useArtifactWorkspace>["open"],
@@ -98,11 +76,6 @@ export function WorkspaceArtifacts({
 					<>
 						{JSON.parse(definition).view === "drawing-workspace" ? (
 							<DrawingArtifact client={client} definition={definition} />
-						) : isRecognitionDefinition(definition) ? (
-							<ObjectRecognitionArtifact
-								client={client}
-								definition={definition}
-							/>
 						) : (
 							<MusicArtifact
 								key={definition}

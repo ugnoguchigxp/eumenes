@@ -1,13 +1,7 @@
 export {
-	Badge,
 	Button,
 	Modal,
-	Card,
-	CardContent,
-	CardHeader,
-	CardTitle,
 	ChatDock,
-	Input,
 	Textarea,
 	DigitalClock,
 	Drawer,

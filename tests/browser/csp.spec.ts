@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { openFromLauncher } from "./artifact-launcher";
+import { openSettings } from "./artifact-launcher";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -59,15 +59,9 @@ test("the SPA policy is sent and the main screens raise no CSP violation", async
 	expect(csp).toContain("default-src 'self'");
 	expect(csp).toContain("frame-ancestors 'none'");
 	await expect(page.locator("#root")).not.toBeEmpty();
-	// Conversation (initial screen), the artifact showcase, then settings.
-	await openFromLauncher(page, "UIショーケース");
-	await expect(
-		page.getByRole("region", { name: "UIショーケース", exact: true }),
-	).toBeVisible();
-	await page.getByRole("button", { name: "設定", exact: true }).click();
-	await expect(
-		page.getByRole("button", { name: "ツールチェーンの記録" }),
-	).toBeVisible();
+	// Conversation (initial screen), then settings.
+	await openSettings(page, "記録");
+	await expect(page.getByRole("tab", { name: "AIの利用" })).toBeVisible();
 	const violations = await page.evaluate(() => window.__cspViolations);
 	// zod 4 probes `new Function("")` once and swallows the CSP failure (it only
 	// disables its JIT); the browser still reports it. No other code uses eval.

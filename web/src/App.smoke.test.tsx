@@ -1,11 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import {
-	cleanup,
-	fireEvent,
-	render,
-	screen,
-	waitFor,
-} from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { settingsFixture } from "./domains/settings/sections/fixture";
 
 // App builds its own client; every call goes to this in-memory stand-in.
@@ -75,7 +69,7 @@ afterEach(() => {
 	window.location.hash = "";
 });
 
-test("A01 boot: the conversation screen renders and the settings button switches screens", async () => {
+test("A01 boot: the conversation screen renders without a settings button", async () => {
 	render(<App />);
 	expect(await screen.findByRole("region", { name: "会話" })).toBeTruthy();
 	expect(
@@ -92,9 +86,5 @@ test("A01 boot: the conversation screen renders and the settings button switches
 		expect(screen.getByLabelText("LARMの接続状態: 接続済み")).toBeTruthy(),
 	);
 
-	fireEvent.click(screen.getByRole("button", { name: "設定" }));
-	expect(
-		await screen.findByRole("navigation", { name: "設定カテゴリ" }),
-	).toBeTruthy();
-	expect(screen.getByRole("button", { name: "会話に戻る" })).toBeTruthy();
+	expect(screen.queryByRole("button", { name: "設定" })).toBeNull();
 });

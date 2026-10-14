@@ -18,7 +18,7 @@ import {
 } from "../options";
 import { createPlaceholder } from "../models/placeholder";
 import { createCameraController } from "./camera";
-import { fitEnvelope, hitTestEntries } from "./placement";
+import { fitEnvelope } from "./placement";
 
 /** One context, one loop, immutable point buffers; the scene owns layout separately from model motion. */
 export function createSpatialScene(
@@ -269,17 +269,6 @@ export function createSpatialScene(
 	}
 	return {
 		dispose,
-		hitTest(x: number, y: number) {
-			return disposed
-				? null
-				: hitTestEntries(
-						entries.values(),
-						camera,
-						host.getBoundingClientRect(),
-						x,
-						y,
-					);
-		},
 		setItems(items: readonly SpatialItem[]) {
 			if (disposed) return;
 			try {

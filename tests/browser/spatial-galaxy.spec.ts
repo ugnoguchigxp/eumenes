@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createFixture } from "./fixture";
+import { closeArtifact, openSettings, saveSettings } from "./artifact-launcher";
 
 const fixture = createFixture();
 let webPort: number, dir: string;
@@ -35,18 +36,15 @@ test.afterAll(async () => {
 });
 
 async function settings(page: Page) {
-	await page.getByRole("button", { name: "設定", exact: true }).click();
-	await page.getByRole("button", { name: "表示", exact: true }).click();
+	await openSettings(page, "表示");
 }
 async function save(page: Page) {
-	await page.getByRole("button", { name: "変更を適用", exact: true }).click();
-	await expect(
-		page.getByText("変更を適用しました", { exact: true }),
-	).toBeVisible();
-	await page.getByRole("button", { name: "会話に戻る", exact: true }).click();
+	await saveSettings(page);
+	await closeArtifact(page, "表示");
+	await closeArtifact(page, "設定");
 }
 
-test("12 models, settings tabs, saved zero-speed pause, demo health and focus, resize, context loss and recovery", async ({
+test("12 models, saved zero-speed pause, demo health, resize, context loss and recovery", async ({
 	page,
 }) => {
 	test.setTimeout(60000);
@@ -61,7 +59,10 @@ test("12 models, settings tabs, saved zero-speed pause, demo health and focus, r
 	});
 	await page.goto(`http://127.0.0.1:${webPort}/`);
 	await settings(page);
-	await page.getByLabel("会話の背景").selectOption("spatial");
+	await page
+		.getByRole("group", { name: "会話の背景" })
+		.getByRole("button", { name: "Spatial" })
+		.click();
 	await page
 		.getByRole("button", { name: "状態プレビュー", exact: true })
 		.click();
@@ -73,32 +74,9 @@ test("12 models, settings tabs, saved zero-speed pause, demo health and focus, r
 	await orbit.press("Home");
 	await expect(orbit).toHaveValue("0");
 	await page.getByLabel("動きを停止", { exact: true }).check();
-	await expect(
-		page.locator(".spatial-preview [data-background-state='paused'] canvas"),
-	).toBeVisible();
-	await page.locator(".spatial-preview").screenshot({
-		path: test.info().outputPath("spatial-all-models-preview.png"),
-	});
 	await page.screenshot({
 		path: test.info().outputPath("spatial-settings.png"),
 	});
-	const preview = page.getByRole("button", {
-		name: /Spatialのモデルプレビュー/,
-	});
-	await preview.focus();
-	await preview.press("Enter");
-	await expect(page.getByText("選択中：CPU", { exact: true })).toBeVisible();
-	await page.waitForTimeout(1000);
-	await page
-		.locator(".spatial-preview")
-		.screenshot({ path: test.info().outputPath("spatial-focus.png") });
-	await page.getByLabel("health", { exact: true }).selectOption("fault");
-	await expect(
-		page.getByRole("button", { name: "CPU：問題あり", exact: true }),
-	).toHaveAttribute("aria-pressed", "true");
-	await preview.focus();
-	await preview.press("Escape");
-	await expect(page.locator(".spatial-background-summary")).toHaveCount(0);
 	await save(page);
 	const host = page.locator(".chat-panel .spatial-background");
 	await expect(host).toHaveAttribute("data-model-count", "12");
@@ -167,9 +145,7 @@ test("registered display revision exposes tabs and applies particle/motion field
 	page,
 }) => {
 	await page.goto(`http://127.0.0.1:${webPort}/`);
-	await page.getByRole("button", { name: "アーティファクトを開く" }).click();
-	await page.getByRole("menuitem", { name: "設定", exact: true }).click();
-	await page.getByRole("button", { name: "表示", exact: true }).click();
+	await settings(page);
 	await page.getByRole("button", { name: "粒子", exact: true }).click();
 	const core = page.getByLabel("元の形を残す割合（%）");
 	await core.focus();
@@ -180,19 +156,12 @@ test("registered display revision exposes tabs and applies particle/motion field
 	await orbit.focus();
 	await orbit.press("Home");
 	await expect(orbit).toHaveValue("0");
-	await page
-		.getByRole("button", { name: "設定の変更をすべて保存", exact: true })
-		.click();
-	await expect(
-		page.getByRole("status").filter({ hasText: "変更を適用しました" }).first(),
-	).toBeVisible();
+	await saveSettings(page);
 	await page.screenshot({
 		path: test.info().outputPath("spatial-registered-settings.png"),
 	});
 	await page.reload();
-	await page.getByRole("button", { name: "アーティファクトを開く" }).click();
-	await page.getByRole("menuitem", { name: "設定", exact: true }).click();
-	await page.getByRole("button", { name: "表示", exact: true }).click();
+	await settings(page);
 	await page.getByRole("button", { name: "動き", exact: true }).click();
 	await expect(page.getByLabel("公転速度（%）")).toHaveValue("0");
 	await page.getByRole("button", { name: "粒子", exact: true }).click();

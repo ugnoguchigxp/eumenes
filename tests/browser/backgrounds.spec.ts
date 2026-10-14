@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createFixture } from "./fixture";
+import { closeArtifact, openSettings, saveSettings } from "./artifact-launcher";
 
 const fixture = createFixture();
 let webPort: number;
@@ -45,14 +46,14 @@ test("saved backgrounds render with WebGL, survive reload, and release the previ
 	const fairy = await page
 		.locator(".light-avatar-background canvas")
 		.elementHandle();
-	await page.getByRole("button", { name: "設定", exact: true }).click();
-	await page.getByRole("button", { name: "表示", exact: true }).click();
-	await page.getByLabel("会話の背景").selectOption("spatial");
-	await page.getByRole("button", { name: "変更を適用", exact: true }).click();
-	await expect(
-		page.getByText("変更を適用しました", { exact: true }),
-	).toBeVisible();
-	await page.getByRole("button", { name: "会話に戻る", exact: true }).click();
+	await openSettings(page, "表示");
+	await page
+		.getByRole("group", { name: "会話の背景" })
+		.getByRole("button", { name: "Spatial" })
+		.click();
+	await saveSettings(page);
+	await closeArtifact(page, "表示");
+	await closeArtifact(page, "設定");
 	await expect(
 		page.locator(".spatial-background[data-background-state='ready'] canvas"),
 	).toBeVisible();
@@ -75,15 +76,15 @@ test("saved backgrounds render with WebGL, survive reload, and release the previ
 	const spatial = await page
 		.locator(".spatial-background canvas")
 		.elementHandle();
-	await page.getByRole("button", { name: "設定", exact: true }).click();
-	await page.getByRole("button", { name: "表示", exact: true }).click();
-	await expect(page.getByLabel("会話の背景")).toHaveValue("spatial");
-	await page.getByLabel("会話の背景").selectOption("light-fairy");
-	await page.getByRole("button", { name: "変更を適用", exact: true }).click();
+	await openSettings(page, "表示");
+	const background = page.getByRole("group", { name: "会話の背景" });
 	await expect(
-		page.getByText("変更を適用しました", { exact: true }),
-	).toBeVisible();
-	await page.getByRole("button", { name: "会話に戻る", exact: true }).click();
+		background.getByRole("button", { name: "Spatial" }),
+	).toHaveAttribute("aria-pressed", "true");
+	await background.getByRole("button", { name: "光の妖精" }).click();
+	await saveSettings(page);
+	await closeArtifact(page, "表示");
+	await closeArtifact(page, "設定");
 	await expect(
 		page.locator(".light-avatar-background[data-avatar-state='ready'] canvas"),
 	).toBeVisible();

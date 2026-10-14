@@ -13,12 +13,10 @@ const clamp = (value: number) => Math.min(75, Math.max(25, value));
 export function ResizableWorkspace({
 	children,
 	artifact,
-	hidden,
 	fullscreen = false,
 }: {
 	children: ReactNode;
 	artifact: ReactNode;
-	hidden?: boolean;
 	fullscreen?: boolean;
 }) {
 	const container = useRef<HTMLDivElement>(null);
@@ -58,8 +56,7 @@ export function ResizableWorkspace({
 		<div
 			ref={container}
 			className={`workspace-layout${split ? " workspace-layout-split" : ""}${fullscreen && split ? " workspace-layout-fullscreen" : ""}`}
-			hidden={hidden}
-			data-resizing={(split && !hidden && dragging) || undefined}
+			data-resizing={(split && dragging) || undefined}
 			style={
 				{
 					"--workspace-chat-size": `${share}fr`,

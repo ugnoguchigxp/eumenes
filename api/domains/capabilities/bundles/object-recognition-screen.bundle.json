@@ -1,0 +1,130 @@
+{
+	"formatVersion": 1,
+	"bundleId": "object-recognition-screen",
+	"pins": [],
+	"definitions": [],
+	"bindings": [],
+	"artifacts": [
+		{
+			"kind": "artifact",
+			"id": "object-recognition.workspace",
+			"revision": 1,
+			"title": "映っている物を調べる",
+			"variants": [
+				{
+					"id": "standard",
+					"label": "標準",
+					"definition": {
+						"view": "object-recognition-workspace",
+						"source": "object-recognition",
+						"title": "映っている物を調べる"
+					}
+				}
+			],
+			"defaultVariant": "standard",
+			"sourceBindings": [
+				{
+					"source": "object-recognition",
+					"adapterRef": "adapter:object-recognition-screen@1",
+					"query": "query:object-recognition-screen.list@1",
+					"target": "none"
+				}
+			],
+			"actionBindings": [
+				{
+					"actionId": "credential-source",
+					"eventAction": "recognition-credential-source",
+					"source": "object-recognition",
+					"inputSchemaRef": "schema:object-recognition-screen-credential@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "select",
+					"eventAction": "recognition-select",
+					"source": "object-recognition",
+					"inputSchemaRef": "schema:object-recognition-screen-id@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "cancel",
+					"eventAction": "recognition-cancel",
+					"source": "object-recognition",
+					"inputSchemaRef": "schema:object-recognition-screen-id@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "refresh",
+					"eventAction": "recognition-refresh",
+					"source": "object-recognition",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				},
+				{
+					"actionId": "recheck",
+					"eventAction": "recognition-recheck",
+					"source": "object-recognition",
+					"inputSchemaRef": "schema:object-recognition-screen-id@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "remove",
+					"eventAction": "recognition-remove",
+					"source": "object-recognition",
+					"inputSchemaRef": "schema:object-recognition-screen-id@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "incorporate",
+					"eventAction": "recognition-incorporate",
+					"source": "object-recognition",
+					"inputSchemaRef": "schema:object-recognition-screen-incorporate@1",
+					"effect": "local"
+				}
+			],
+			"launcher": { "label": "映っている物を調べる", "order": 40 }
+		}
+	],
+	"schemas": [
+		{
+			"kind": "schema",
+			"id": "object-recognition-screen-id",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": { "id": { "type": "string", "minLength": 1 } },
+				"required": ["id"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "object-recognition-screen-credential",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"credentialSource": {
+						"type": "string",
+						"enum": ["dedicated", "larm"]
+					}
+				},
+				"required": ["credentialSource"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "object-recognition-screen-incorporate",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"id": { "type": "string", "minLength": 1 },
+					"frameIndex": { "type": "string" }
+				},
+				"required": ["id", "frameIndex"]
+			}
+		}
+	]
+}

@@ -4,13 +4,75 @@ import {
 	compileArtifact,
 	compileLang,
 } from "@eumenes/artifact-ui";
-import { parseDefinition, viewRegistry } from "@eumenes/artifact-ui/contracts";
+import {
+	parseDefinition,
+	viewRegistry,
+	type Receipt,
+	type Snapshot,
+} from "@eumenes/artifact-ui/contracts";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { afterEach, expect, test } from "vitest";
-import { createShowcaseFixture } from "..";
 
 afterEach(cleanup);
-const fixture = createShowcaseFixture();
+function initial(): Snapshot {
+	return {
+		c1: { kind: "components", revision: 0 },
+		g1: {
+			kind: "generated-image",
+			revision: 0,
+			status: "queued",
+			alt: "山と湖のイラスト",
+		},
+		q1: {
+			kind: "question",
+			revision: 0,
+			status: "open",
+			question: {
+				prompt: "回答の長さはどのくらいが良いですか？",
+				options: ["短く", "詳しく"],
+			},
+		},
+		f1: {
+			kind: "form",
+			revision: 0,
+			fields: [
+				{ id: "name", label: "呼び名", type: "text", required: true },
+				{ id: "detail", label: "補足", type: "textarea" },
+				{
+					id: "style",
+					label: "回答のスタイル",
+					type: "select",
+					options: ["簡潔", "詳しく"],
+				},
+				{ id: "remember", label: "覚えておく", type: "boolean" },
+			],
+			defaults: { name: "", detail: "", style: "", remember: false },
+		},
+		m1: {
+			kind: "memory",
+			revision: 0,
+			entries: [
+				{
+					id: "preference",
+					text: "回答は短く、結論から知りたい",
+					selected: false,
+				},
+			],
+		},
+		s1: {
+			kind: "settings",
+			revision: 0,
+			theme: "light",
+			autoSpeak: false,
+			volume: 60,
+		},
+	};
+}
+const resources = initial();
+const dispatch = async (): Promise<Receipt> => ({
+	status: "accepted",
+	message: "受け付けました",
+});
 for (const [view, source] of [
 	["components", "c1"],
 	["generated-image", "g1"],
@@ -20,13 +82,8 @@ for (const [view, source] of [
 	["settings", "s1"],
 ]) {
 	test(`${view}: compact JSON compiles and roundtrips through actual OpenUI parser`, () => {
-		const result = compileArtifact(
-			JSON.stringify({ view, source }),
-			fixture.getSnapshot().resources,
-		);
-		expect(compileLang(result.lang, fixture.getSnapshot().resources)).toEqual(
-			result,
-		);
+		const result = compileArtifact(JSON.stringify({ view, source }), resources);
+		expect(compileLang(result.lang, resources)).toEqual(result);
 	});
 }
 for (const input of [
@@ -48,9 +105,7 @@ for (const input of [
 	" ".repeat(16385),
 ])
 	test("rejects unregistered, oversized, invalid or unauthorized definitions", () => {
-		expect(() =>
-			compileArtifact(input, fixture.getSnapshot().resources),
-		).toThrow();
+		expect(() => compileArtifact(input, resources)).toThrow();
 	});
 for (const lang of [
 	'root = Query("x", {})',
@@ -60,20 +115,20 @@ for (const lang of [
 	'root = SmallForm({"view":"form","source":"f1", "fields":[]})',
 ])
 	test("Lang test mode rejects tool calls, state and extra statements", () =>
-		expect(() => compileLang(lang, fixture.getSnapshot().resources)).toThrow());
+		expect(() => compileLang(lang, resources)).toThrow());
 test("quoted instructions remain inert text in the SDK renderer", () => {
 	const title =
 		'額縁")\nroot = Query("secret", {}) <script>INJECTION</script>\u2028';
 	const result = compileArtifact(
 		JSON.stringify({ view: "components", source: "c1", title }),
-		fixture.getSnapshot().resources,
+		resources,
 	);
 	render(
 		<ArtifactRenderer
 			lang={result.lang}
 			runtime={{
-				snapshot: fixture.getSnapshot().resources,
-				dispatch: fixture.dispatch,
+				snapshot: resources,
+				dispatch,
 			}}
 		/>,
 	);
@@ -87,20 +142,28 @@ test("quoted instructions remain inert text in the SDK renderer", () => {
 	);
 });
 test("actual renderer preserves dirty form input when resource snapshot changes", () => {
-	const lang = compileArtifact(
-		'{"view":"form","source":"f1"}',
-		fixture.getSnapshot().resources,
-	).lang;
-	const runtime = () => ({
-		snapshot: fixture.getSnapshot().resources,
-		dispatch: fixture.dispatch,
-	});
-	const view = render(<ArtifactRenderer lang={lang} runtime={runtime()} />);
+	const lang = compileArtifact('{"view":"form","source":"f1"}', resources).lang;
+	const view = render(
+		<ArtifactRenderer
+			lang={lang}
+			runtime={{ snapshot: resources, dispatch }}
+		/>,
+	);
 	fireEvent.change(screen.getByLabelText("呼び名（必須）"), {
 		target: { value: "入力途中" },
 	});
-	fixture.refresh();
-	view.rerender(<ArtifactRenderer lang={lang} runtime={runtime()} />);
+	const refreshed = Object.fromEntries(
+		Object.entries(resources).map(([key, value]) => [
+			key,
+			{ ...value, revision: value.revision + 1 },
+		]),
+	) as Snapshot;
+	view.rerender(
+		<ArtifactRenderer
+			lang={lang}
+			runtime={{ snapshot: refreshed, dispatch }}
+		/>,
+	);
 	expect(
 		(screen.getByLabelText("呼び名（必須）") as HTMLInputElement).value,
 	).toBe("入力途中");
@@ -117,8 +180,8 @@ test("invalid Lang is isolated at Artifact boundary without invoking a tool", ()
 		<ArtifactRenderer
 			lang={'root = Query("secret", {})'}
 			runtime={{
-				snapshot: fixture.getSnapshot().resources,
-				dispatch: fixture.dispatch,
+				snapshot: resources,
+				dispatch,
 			}}
 		/>,
 	);

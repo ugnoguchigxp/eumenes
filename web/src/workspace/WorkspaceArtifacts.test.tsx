@@ -19,9 +19,7 @@ test("playlist keeps one stable legacy screen", () => {
 			id: tab.id,
 			title: tab.title,
 		})),
-	).toEqual([
-		{ id: "music-playlist", title: "音楽プレイリスト" },
-	]);
+	).toEqual([{ id: "music-playlist", title: "音楽プレイリスト" }]);
 	const definitions = view.result.current.workspace.tabs.map(
 		(tab) => tab.kind === "openui" && JSON.parse(tab.definition).source,
 	);

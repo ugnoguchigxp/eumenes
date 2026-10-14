@@ -36,10 +36,8 @@ import {
 	useVoiceDialogue,
 } from "../domains/voice-dialogue";
 import { useSettings, useVoiceMute } from "../domains/settings";
-import { useSettingsDraft } from "../domains/settings/SettingsDraftHost";
-import { createUnsavedFlags } from "../unsavedFlags";
 import { changeRoots, invalidateAllButLive, queryRoots } from "../queryKeys";
-import { useOpenRecognition, useOpenPlaylist } from "./WorkspaceArtifacts";
+import { useOpenPlaylist } from "./WorkspaceArtifacts";
 
 export function useWorkspace({
 	client,
@@ -52,35 +50,18 @@ export function useWorkspace({
 	const draft = input.text;
 	const attachments = useChatAttachments(client, "main");
 	const editedRecognition = useRef<string | null>(null);
-	const [settingsOpen, setSettingsOpen] = useState(
-		window.location.hash.startsWith("#settings"),
-	);
-	// Unsaved settings edits are checked before leaving the page.
-	const unsaved = useRef(createUnsavedFlags());
-	const onDirty = useCallback((v: boolean) => {
-		unsaved.current.set("settings", v);
-	}, []);
-	useEffect(() => {
-		const prevent = (e: BeforeUnloadEvent) => {
-			if (unsaved.current.any()) e.preventDefault();
-		};
-		window.addEventListener("beforeunload", prevent);
-		return () => window.removeEventListener("beforeunload", prevent);
-	}, []);
-	const settingsDraft = useSettingsDraft();
-	useEffect(() => {
-		onDirty(settingsDraft.dirty);
-	}, [onDirty, settingsDraft.dirty]);
 	const artifacts = useArtifactWorkspace();
 	// Music generation and playback each own a stable screen, independent of record IDs.
 	const openDrawing = useOpenDrawing(artifacts.open);
 	useDrawingArtifacts(client, openDrawing);
-	const openRecognition = useOpenRecognition(artifacts.open);
-	useRecognitionArtifacts(client, openRecognition);
 	const openPlaylist = useOpenPlaylist(artifacts.open);
 	// One launcher entry per registered artifact; the saved timer is chosen inside the screen.
 	const toolchain = useToolchainArtifacts(client, artifacts.open);
 	const { openByAdapter, openById } = toolchain;
+	const openRecognition = useCallback(() => {
+		void openById("object-recognition.workspace");
+	}, [openById]);
+	useRecognitionArtifacts(client, openRecognition);
 	const openImage = useCallback(() => {
 		void openById("image.generation");
 	}, [openById]);
@@ -107,17 +88,6 @@ export function useWorkspace({
 	);
 	usePlaylistArtifacts(client, "main", openPlaylist);
 	const activeTimers = useQuery(activeTimersQuery(client));
-	const openArtifact = artifacts.open;
-	const openShowcase = useCallback(
-		() =>
-			openArtifact({
-				id: "ui-showcase",
-				title: "UIショーケース",
-				kind: "showcase",
-				content: "",
-			}),
-		[openArtifact],
-	);
 	const settings = useSettings(client);
 	const usage = useQuery({
 		queryKey: [queryRoots.inferenceUsage, client.identity],
@@ -138,14 +108,6 @@ export function useWorkspace({
 		media.addEventListener("change", apply);
 		return () => media.removeEventListener("change", apply);
 	}, [settings.data?.general.theme]);
-	useEffect(() => {
-		const navigate = () => {
-			const open = window.location.hash.startsWith("#settings");
-			setSettingsOpen(open);
-		};
-		window.addEventListener("hashchange", navigate);
-		return () => window.removeEventListener("hashchange", navigate);
-	}, []);
 	const historyRef = useRef<HTMLDivElement>(null);
 	const followLatest = useRef(true);
 	const [showLatest, setShowLatest] = useState(false);
@@ -311,8 +273,6 @@ export function useWorkspace({
 	return {
 		attachments,
 		draft,
-		settingsOpen,
-		onDirty,
 		artifacts,
 		openDrawing,
 		openRecognition,
@@ -323,7 +283,6 @@ export function useWorkspace({
 		musicItems,
 		toolchain,
 		activeTimers,
-		openShowcase,
 		settings,
 		actualModel,
 		historyRef,
@@ -337,7 +296,6 @@ export function useWorkspace({
 		automaticInput,
 		phase,
 		audioError,
-		cache,
 		changesState,
 		status,
 		reconnect,

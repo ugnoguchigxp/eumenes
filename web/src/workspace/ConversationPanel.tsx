@@ -24,7 +24,6 @@ export function ConversationPanel({
 	state: WorkspaceState;
 }) {
 	const {
-		settingsOpen,
 		replay,
 		voice,
 		phase,
@@ -53,7 +52,6 @@ export function ConversationPanel({
 		function paste(event: ClipboardEvent) {
 			const target = document.activeElement;
 			if (
-				settingsOpen ||
 				document.querySelector('[role="dialog"][data-state="open"]') ||
 				(target !== document.body && !panel.current?.contains(target))
 			)
@@ -111,7 +109,7 @@ export function ConversationPanel({
 			element?.removeEventListener("dragover", over);
 			element?.removeEventListener("drop", drop);
 		};
-	}, [settingsOpen, state]);
+	}, [state]);
 	const lastUsed = actualModel
 		? `直近の利用: ${actualModel.source === "cloud" ? "クラウド" : "LARM"} / ${actualModel.model}`
 		: undefined;
@@ -132,7 +130,7 @@ export function ConversationPanel({
 			<ConversationBackground
 				kind={settings.data?.general.background ?? "light-fairy"}
 				spatial={spatial}
-				active={!settingsOpen && !settings.isPending}
+				active={!settings.isPending}
 				cue={replay.avatarCue ?? voice.avatarCue}
 				phase={
 					phase === "playing"
