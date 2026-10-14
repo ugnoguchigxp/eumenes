@@ -34,6 +34,7 @@ const view = {
 };
 const entry = {
 	toolchainId: "timers.manage",
+	launcher: null,
 	toolchainRevisionId: "toolchain:timers.manage@2",
 	artifactRevisionId: event.artifactRevisionId,
 	title: "タイマー（データドリブン）",
@@ -114,6 +115,38 @@ contracts("toolchain actions client", [
 		result: [entry],
 	},
 	{
+		name: "toolchainArtifacts (standalone launcher artifact)",
+		call: (c) => c.toolchainArtifacts(),
+		method: "GET",
+		path: "/api/toolchain-artifacts",
+		response: {
+			artifacts: [
+				{
+					artifactId: "settings.hub",
+					artifactRevisionId: "artifact:settings.hub@1",
+					title: "設定（データドリブン）",
+					toolchainId: null,
+					toolchainRevisionId: null,
+					adapterRef: null,
+					adapterRefs: ["adapter:settings@1"],
+					launcher: { label: "設定（データドリブン）", order: 10 },
+				},
+			],
+		},
+		result: [
+			{
+				artifactId: "settings.hub",
+				toolchainId: null,
+				toolchainRevisionId: null,
+				artifactRevisionId: "artifact:settings.hub@1",
+				title: "設定（データドリブン）",
+				adapterRef: "adapter:settings@1",
+				adapterRefs: ["adapter:settings@1"],
+				launcher: { label: "設定（データドリブン）", order: 10 },
+			},
+		],
+	},
+	{
 		name: "toolchainArtifact",
 		call: (c) => c.toolchainArtifact("artifact:timers.workspace@1"),
 		method: "GET",
@@ -137,6 +170,20 @@ contracts("toolchain actions client", [
 		method: "GET",
 		path: "/api/toolchain-artifacts/artifact%3Atimers.workspace%401/sources/timer-current?target=t1",
 		response: { revision: 3, data: { anything: true } },
+	},
+	{
+		name: "toolchainArtifactSource with params",
+		call: (c) =>
+			c.toolchainArtifactSource(
+				"artifact:settings.records@1",
+				"settings-records",
+				undefined,
+				undefined,
+				{ pageIndex: "1", desc: true },
+			),
+		method: "GET",
+		path: "/api/toolchain-artifacts/artifact%3Asettings.records%401/sources/settings-records?params=%7B%22pageIndex%22%3A%221%22%2C%22desc%22%3Atrue%7D",
+		response: { revision: 0, data: { items: [] } },
 	},
 	{
 		name: "toolchainInteractions",

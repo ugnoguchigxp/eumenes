@@ -4,6 +4,8 @@ import type { QueryClient } from "@tanstack/react-query";
 export const queryRoots = {
 	music: "music",
 	image: "image",
+	drawings: "drawings",
+	drawingOperations: "drawing-operations",
 	objectRecognition: "object-recognition",
 	agentTasks: "agent-tasks",
 	agentReports: "agent-reports",
@@ -44,6 +46,8 @@ export const changeRoots = [
 	queryRoots.objectRecognition,
 	queryRoots.music,
 	queryRoots.image,
+	queryRoots.drawings,
+	queryRoots.drawingOperations,
 	queryRoots.agentTasks,
 	queryRoots.agentReports,
 	queryRoots.conversation,

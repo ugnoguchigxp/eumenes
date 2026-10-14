@@ -24,7 +24,10 @@ import { createLarmPlayground } from "../domains/larm";
 import { larmEmbedder } from "./larm-embedder";
 import { createToolchainRouting } from "./toolchain-routing";
 import { createToolchain } from "./toolchain";
-import { questionReader, toolchainMaintenance } from "./toolchain-adapters";
+import {
+	createToolchainHostLinks,
+	toolchainMaintenance,
+} from "./toolchain-adapters";
 import {
 	createAttitudeDataset,
 	openAttitudeStore,
@@ -281,9 +284,7 @@ export async function buildServices(config: Config) {
 						: {}),
 					...(config.worldPollMs ? { pollMs: config.worldPollMs } : {}),
 				});
-	let dialogueInteractions:
-		| ReturnType<typeof createDialogueService>["interactions"]
-		| undefined;
+	const toolchainLinks = createToolchainHostLinks(settings, inference);
 	const toolchain = await createToolchain(
 		store,
 		queue,
@@ -292,8 +293,7 @@ export async function buildServices(config: Config) {
 		{
 			timers,
 			conversation,
-			// The dialogue service is assembled after the toolchain; its questions are read lazily.
-			interactions: questionReader(() => dialogueInteractions),
+			...toolchainLinks.options,
 			history: config.historyToolsEnabled,
 			dots: true,
 			music: true,
@@ -395,7 +395,7 @@ export async function buildServices(config: Config) {
 				)
 			: undefined,
 	});
-	dialogueInteractions = dialogue.interactions;
+	toolchainLinks.attachDialogue(dialogue);
 	const voice = createVoiceDialogue(store, dialogue, inference);
 	scheduler.registerTarget(dialogue.promptTarget);
 	return {

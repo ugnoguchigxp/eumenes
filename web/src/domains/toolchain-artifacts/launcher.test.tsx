@@ -4,7 +4,10 @@ import type { ReactNode } from "react";
 import { afterEach, expect, test, vi } from "vitest";
 import { useArtifactWorkspace } from "../artifact";
 import {
+	artifactIdOf,
 	artifactVariantFromUrl,
+	entryLabel,
+	menuEntries,
 	toolchainTabId,
 	useToolchainArtifacts,
 } from "./launcher";
@@ -124,4 +127,74 @@ test("the variant comes from the artifactVariant query only", () => {
 			variantId: "variant-a",
 		});
 	});
+});
+
+const standalone = (
+	id: string,
+	label: string,
+	group?: string,
+	order?: number,
+) => ({
+	artifactRevisionId: `artifact:settings.${id}@1`,
+	title: label,
+	adapterRef: "adapter:settings@1",
+	launcher: {
+		label,
+		...(group ? { group } : {}),
+		...(order !== undefined ? { order } : {}),
+	},
+});
+
+test("the menu keeps one entry per feature: grouped screens are reached through their hub", () => {
+	const entries = [
+		standalone("display", "表示", "使い方を変える"),
+		standalone("hub", "設定（データドリブン）", undefined, 10),
+		entry,
+	] as never;
+	expect(menuEntries(entries).map((e) => entryLabel(e))).toEqual([
+		"設定（データドリブン）",
+		"タイマー（データドリブン）",
+	]);
+	expect(artifactIdOf("artifact:settings.display@1")).toBe("settings.display");
+});
+
+test("a navigate binding opens the artifact with that id, without the variant override", async () => {
+	vi.stubGlobal("location", { search: "?artifactVariant=variant-b" });
+	const client = {
+		identity: "http://127.0.0.1:1",
+		toolchainArtifacts: vi.fn(async () => [
+			standalone("display", "表示", "使い方を変える"),
+		]),
+	};
+	const cache = new QueryClient({
+		defaultOptions: { queries: { retry: false } },
+	});
+	const hook = renderHook(
+		() => {
+			const workspace = useArtifactWorkspace();
+			return {
+				workspace,
+				toolchain: useToolchainArtifacts(client as never, workspace.open),
+			};
+		},
+		{
+			wrapper: ({ children }: { children: ReactNode }) => (
+				<QueryClientProvider client={cache}>{children}</QueryClientProvider>
+			),
+		},
+	);
+	let opened = false;
+	await act(async () => {
+		opened = await hook.result.current.toolchain.openById("settings.display");
+	});
+	expect(opened).toBe(true);
+	expect(hook.result.current.workspace.tabs[0]).toMatchObject({
+		title: "表示",
+		artifactRevisionId: "artifact:settings.display@1",
+	});
+	expect(hook.result.current.workspace.tabs[0]).not.toHaveProperty("variantId");
+	await act(async () => {
+		opened = await hook.result.current.toolchain.openById("settings.unknown");
+	});
+	expect(opened).toBe(false);
 });

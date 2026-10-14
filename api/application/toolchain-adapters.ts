@@ -18,6 +18,16 @@ import {
 	TIMER_ADAPTER_REF,
 	timerDomainSchemas,
 } from "./timer-adapter";
+import {
+	describeSettingsAdapter,
+	SETTINGS_ADAPTER_REF,
+	type SettingsAdapterPorts,
+} from "./settings-adapter";
+import {
+	describeRecordsAdapter,
+	RECORDS_ADAPTER_REF,
+	type RecordsPorts,
+} from "./records-adapter";
 
 /** `domain:` result schemas registered by the host's adapters. */
 const domainSchemas: Readonly<Record<string, ZodType>> = {
@@ -37,7 +47,12 @@ export function bundleHostOf(
 		adapters: new Map(
 			adapters.map(([a, d]) => [
 				a.ref,
-				{ operations: d.operations, queries: d.queries },
+				{
+					operations: d.operations,
+					queries: d.queries,
+					documents: d.documents,
+					conditions: d.conditions,
+				},
 			]),
 		),
 		availability: new Set(adapters.map(([, d]) => d.availability)),
@@ -57,7 +72,11 @@ export function bundleHostOf(
  */
 export const hostAdapterDescriptions: Array<
 	Pick<DomainAdapter, "ref" | "describe">
-> = [{ ref: TIMER_ADAPTER_REF, describe: describeTimerAdapter }];
+> = [
+	{ ref: TIMER_ADAPTER_REF, describe: describeTimerAdapter },
+	{ ref: SETTINGS_ADAPTER_REF, describe: describeSettingsAdapter },
+	{ ref: RECORDS_ADAPTER_REF, describe: describeRecordsAdapter },
+];
 
 /** The bundle host as if every adapter were registered (see `hostAdapterDescriptions`). */
 export const offlineBundleHost = () => bundleHostOf(hostAdapterDescriptions);
@@ -169,15 +188,14 @@ export function createRegistryActions(
  * The timer question source reads dialogue's open interaction lazily: the dialogue service is
  * assembled after the toolchain.
  */
+export type InteractionViews = {
+	viewInTransaction(
+		db: Database,
+		id: string,
+	): { revision: number; status: string; question: unknown } | null;
+};
 export function questionReader(
-	interactions: () =>
-		| {
-				viewInTransaction(
-					db: Database,
-					id: string,
-				): { revision: number; status: string; question: unknown } | null;
-		  }
-		| undefined,
+	interactions: () => InteractionViews | undefined,
 ) {
 	return () => {
 		const current = interactions();
@@ -222,4 +240,39 @@ export function toolchainMaintenance(
 		run("toolchain_interactions", s.dialogue.interactions),
 		run("toolchain_actions", s.toolchain.actionRequests),
 	];
+}
+
+/**
+ * What the toolchain composition needs from services assembled around it: the settings-derived
+ * key for HMAC digests of secret-bearing UI actions, and dialogue's open questions (dialogue is
+ * assembled after the toolchain, so it is attached later).
+ */
+export function createToolchainHostLinks(
+	settings: SettingsAdapterPorts & {
+		derivedKey(purpose: string): Uint8Array | undefined;
+		diagnostics: RecordsPorts["diagnostics"];
+	},
+	inference: {
+		usagePage: RecordsPorts["usagePage"];
+		usage: RecordsPorts["usage"];
+		inspect: RecordsPorts["larm"];
+	},
+) {
+	let interactions: InteractionViews | undefined;
+	return {
+		options: {
+			settings,
+			records: {
+				usagePage: inference.usagePage,
+				usage: inference.usage,
+				larm: inference.inspect,
+				diagnostics: settings.diagnostics,
+			},
+			secretKey: () => settings.derivedKey("tool-runtime.action-digest"),
+			interactions: questionReader(() => interactions),
+		},
+		attachDialogue(dialogue: { interactions: InteractionViews }) {
+			interactions = dialogue.interactions;
+		},
+	};
 }

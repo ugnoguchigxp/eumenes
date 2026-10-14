@@ -19,7 +19,7 @@ test("drawing controls compose with another registered view; actions stay bound 
 			revision: 7,
 			status: "利用可能",
 			references: [{ id: "ref", title: "図A", revision: 2 }],
-			url: `http://127.0.0.1:5173/#drawing/${crypto.randomUUID()}?revision=2`,
+			url: `${window.location.origin}/#drawing/${crypto.randomUUID()}?revision=2`,
 		},
 		c: { kind: "components", revision: 1 },
 	};
@@ -44,12 +44,50 @@ test("drawing controls compose with another registered view; actions stay bound 
 			runtime={{ snapshot, dispatch }}
 		/>,
 	);
-	expect(
-		screen.getByRole("link", { name: "Excalidrawを開く" }).getAttribute("href"),
-	).toBe(
-		snapshot.d!.kind === "drawing-workspace" ? snapshot.d!.url : undefined,
+	const frame = (await screen.findByTitle(
+		"Excalidraw編集画面",
+	)) as HTMLIFrameElement;
+	expect(frame.src).toContain("/excalidraw?embedded=1#drawing/");
+	fireEvent(
+		window,
+		new MessageEvent("message", {
+			origin: window.location.origin,
+			source: frame.contentWindow,
+			data: {
+				type: "eumenes:drawing-state",
+				referenceId: new URL(frame.src).hash.split("/")[1]!.split("?")[0],
+				title: "現在の図",
+				status: "保存済み",
+				error: "",
+				busy: false,
+				hasDraft: false,
+				dirty: false,
+				loaded: true,
+			},
+		}),
 	);
-	fireEvent.click(screen.getByRole("button", { name: "図A（版 2）" }));
+	vi.spyOn(frame.contentWindow!, "postMessage").mockImplementation((data) => {
+		if (data.action === "leave")
+			window.dispatchEvent(
+				new MessageEvent("message", {
+					origin: window.location.origin,
+					source: frame.contentWindow,
+					data: {
+						type: "eumenes:drawing-leave",
+						requestId: data.requestId,
+						allowed: true,
+					},
+				}),
+			);
+	});
+	fireEvent.click(screen.getByRole("button", { name: "図一覧" }));
+	await waitFor(() =>
+		expect(
+			(screen.getByRole("menuitem", { name: "図A" }) as HTMLButtonElement)
+				.disabled,
+		).toBe(false),
+	);
+	fireEvent.click(screen.getByRole("menuitem", { name: "図A" }));
 	await waitFor(() =>
 		expect(dispatch).toHaveBeenCalledWith(
 			expect.objectContaining({

@@ -1,0 +1,14 @@
+{
+  "checkedAt": "2026-10-14T01:43:30.092Z",
+  "mode": "formal-live-artifact-iframe",
+  "initialFrameUrl": "http://127.0.0.1:5173/excalidraw?embedded=1#drawing/2c694ce9-8197-448c-88f3-09a4b0624843?revision=1",
+  "revision": 3,
+  "sceneElements": 1,
+  "browserEdited": true,
+  "larmSaveAndReopen": true,
+  "thumbnail": true,
+  "artifactIdleReleaseAndReconnect": true,
+  "physicalWorkerStop": "previous_acceptance_only",
+  "backendRestart": "fixture_only_this_change",
+  "pageErrors": []
+}

@@ -15,7 +15,11 @@ const first = (value: string | string[] | undefined) =>
  * CSP for the SPA. Script inline is allowed only on the dev server (React
  * Refresh preamble). The HMR WebSocket is limited to the request's own host.
  */
-function spaCsp(host: string | undefined, dev: boolean): string {
+function spaCsp(
+	host: string | undefined,
+	dev: boolean,
+	embedded = false,
+): string {
 	const ws = host && /^[a-z0-9.-]+(:\d+)?$/i.test(host) ? ` ws://${host}` : "";
 	return [
 		"default-src 'self'",
@@ -29,7 +33,7 @@ function spaCsp(host: string | undefined, dev: boolean): string {
 		"object-src 'none'",
 		"base-uri 'none'",
 		"form-action 'self'",
-		"frame-ancestors 'none'",
+		`frame-ancestors '${embedded ? "self" : "none"}'`,
 	].join("; ");
 }
 
@@ -64,20 +68,22 @@ export default defineConfig(({ command, mode }) => {
 								return;
 							}
 						}
-						res.setHeader("X-Frame-Options", "DENY");
+						const embedded = url.split("?")[0] === "/excalidraw";
+						res.setHeader("X-Frame-Options", embedded ? "SAMEORIGIN" : "DENY");
 						res.setHeader(
 							"Content-Security-Policy",
-							spaCsp(req.headers.host, true),
+							spaCsp(req.headers.host, true, embedded),
 						);
 						next();
 					});
 				},
 				configurePreviewServer(server) {
 					server.middlewares.use((req, res, next) => {
-						res.setHeader("X-Frame-Options", "DENY");
+						const embedded = (req.url ?? "/").split("?")[0] === "/excalidraw";
+						res.setHeader("X-Frame-Options", embedded ? "SAMEORIGIN" : "DENY");
 						res.setHeader(
 							"Content-Security-Policy",
-							spaCsp(req.headers.host, false),
+							spaCsp(req.headers.host, false, embedded),
 						);
 						next();
 					});

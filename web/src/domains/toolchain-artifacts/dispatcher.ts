@@ -25,6 +25,11 @@ export type ActionOutcome =
 	| { kind: "indeterminate" };
 
 export type ActionDraft = {
+	/**
+	 * false for an event holding secrets: it is never written to the outbox, never resent, and
+	 * an unknown outcome is reported as such instead of reconciled.
+	 */
+	persist?: boolean;
 	actionId: string;
 	source: string;
 	sourceRevision: number;
@@ -235,9 +240,46 @@ export function createActionDispatcher(options: ActionDispatcherOptions) {
 		return outcome;
 	}
 
+	function eventOf(
+		draft: ActionDraft,
+		eventId: string,
+		created: number,
+	): ToolchainActionEventV1 {
+		return {
+			version: 1,
+			eventId,
+			eventCreatedAt: new Date(created).toISOString(),
+			eventExpiresAt: new Date(created + OUTBOX_TTL_MS).toISOString(),
+			artifactId: options.artifactId,
+			artifactRevisionId,
+			source: draft.source,
+			sourceRevision: draft.sourceRevision,
+			...(draft.targetRef ? { targetRef: draft.targetRef } : {}),
+			actionId: draft.actionId,
+			scopeRef: options.scopeRef,
+			input: draft.input,
+		};
+	}
+
 	return {
 		/** Saves the event in the outbox, then sends it. A resend of the same operation reuses it. */
 		async send(draft: ActionDraft): Promise<ActionOutcome> {
+			if (draft.persist === false) {
+				// Secrets: one send, kept nowhere. An unknown outcome is left to the user.
+				const created = now();
+				try {
+					const submitted = await client.submitToolchainAction(
+						eventOf(draft, newId(), created),
+						AbortSignal.timeout(SEND_TIMEOUT_MS),
+					);
+					return submitted.httpStatus === 202 &&
+						submitted.view.status === "accepted"
+						? { kind: "pending" }
+						: classify(submitted.view);
+				} catch (error) {
+					return fromError(error);
+				}
+			}
 			const previous = outbox.reusable({
 				artifactRevisionId,
 				actionId: draft.actionId,
@@ -253,21 +295,7 @@ export function createActionDispatcher(options: ActionDispatcherOptions) {
 					outbox.remove(previous.event.eventId);
 					options.onDiscarded([previous.event]);
 				}
-				const created = now();
-				event = {
-					version: 1,
-					eventId: newId(),
-					eventCreatedAt: new Date(created).toISOString(),
-					eventExpiresAt: new Date(created + OUTBOX_TTL_MS).toISOString(),
-					artifactId: options.artifactId,
-					artifactRevisionId,
-					source: draft.source,
-					sourceRevision: draft.sourceRevision,
-					...(draft.targetRef ? { targetRef: draft.targetRef } : {}),
-					actionId: draft.actionId,
-					scopeRef: options.scopeRef,
-					input: draft.input,
-				};
+				event = eventOf(draft, newId(), now());
 			}
 			cancel(event.eventId);
 			attempts.delete(event.eventId);

@@ -1,6 +1,7 @@
 import type { Database } from "bun:sqlite";
 import { get } from "../repository";
 import { zSchema } from "./schema";
+import { createArtifacts } from "./artifacts";
 import { indexSearch, validateToolchain } from "./registry";
 import {
 	artifactInTransaction,
@@ -42,6 +43,7 @@ function trigrams(text: string) {
 
 export function createToolchains(
 	closure: (db: Database, revisionId: string) => FixedDefinition[],
+	now: () => number,
 ) {
 	function activeInTransaction(db: Database) {
 		const rows = db
@@ -272,23 +274,6 @@ export function createToolchains(
 			: null;
 		return binding && artifact ? { binding, artifact } : null;
 	}
-	/** The artifacts of the active bound toolchains: one launcher entry each. */
-	function artifactsInTransaction(db: Database) {
-		return activeInTransaction(db).flatMap((d) => {
-			const found = bindingInTransaction(db, d.revisionId);
-			return found
-				? [
-						{
-							toolchainId: d.id,
-							toolchainRevisionId: d.revisionId,
-							artifactRevisionId: found.artifact.revisionId,
-							title: found.artifact.document.title,
-							adapterRef: found.binding.document.adapterRef,
-						},
-					]
-				: [];
-		});
-	}
 	/**
 	 * Make an existing revision of a toolchain the published one (also the way back to an
 	 * earlier revision). Nothing is written unless the revision is complete and valid now.
@@ -327,7 +312,11 @@ export function createToolchains(
 		resolveToolchainInTransaction: resolveInTransaction,
 		toolchainSetInTransaction: setInTransaction,
 		toolchainBindingInTransaction: bindingInTransaction,
-		artifactsInTransaction,
+		...createArtifacts({
+			activeToolchains: activeInTransaction,
+			bindingOf: bindingInTransaction,
+			now,
+		}),
 		publishToolchainRevisionInTransaction: publishRevisionInTransaction,
 		toolchainExamplesInTransaction: examplesInTransaction,
 	};

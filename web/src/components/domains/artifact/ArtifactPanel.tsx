@@ -67,6 +67,18 @@ export function ArtifactPanel({
 }) {
 	const active = tabs.find((tab) => tab.id === activeTabId);
 	const panel = useRef<HTMLElement>(null);
+	function close(tabId: string) {
+		const content = [
+			...(panel.current?.querySelectorAll<HTMLElement>("[data-artifact-tab]") ??
+				[]),
+		].find((el) => el.dataset.artifactTab === tabId);
+		const event = new CustomEvent("eumenes:artifact-close", {
+			cancelable: true,
+			detail: { close: () => onClose(tabId) },
+		});
+		content?.dispatchEvent(event);
+		if (!event.defaultPrevented) onClose(tabId);
+	}
 	useEffect(() => {
 		if (window.matchMedia("(max-width: 700px)").matches)
 			panel.current?.scrollIntoView({ block: "start" });
@@ -84,7 +96,7 @@ export function ArtifactPanel({
 							<TabsTrigger
 								key={tab.id}
 								value={tab.id}
-								onClose={() => onClose(tab.id)}
+								onClose={() => close(tab.id)}
 								closeLabel={`${tab.title}を閉じる`}
 							>
 								{tab.title}
@@ -133,11 +145,24 @@ export function ArtifactPanel({
 						/>
 					</TabsContent>
 				)}
-				{active?.kind === "openui" && (
-					<TabsContent value={active.id} className="artifact-panel-body">
-						{renderOpenUI?.(active.definition)}
-					</TabsContent>
-				)}
+				{tabs
+					.filter(
+						(tab): tab is Extract<ArtifactTab, { kind: "openui" }> =>
+							tab.kind === "openui" &&
+							(tab.id === activeTabId || tab.keepMounted === true),
+					)
+					.map((tab) => (
+						<TabsContent
+							key={tab.id}
+							value={tab.id}
+							data-artifact-tab={tab.id}
+							forceMount
+							hidden={tab.id !== activeTabId}
+							className="artifact-panel-body"
+						>
+							{renderOpenUI?.(tab.definition)}
+						</TabsContent>
+					))}
 			</aside>
 		</Tabs>
 	);

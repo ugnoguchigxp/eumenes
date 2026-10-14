@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import { mkdirSync } from "node:fs";
 import { createFixture } from "./fixture";
 test.setTimeout(90000);
+test.use({ actionTimeout: 20000 });
 const fixture = createFixture();
 let origin: string, api: string;
 test.beforeAll(async () => {
@@ -42,11 +43,16 @@ test("MacBook browser fixture: launch, edit, save, reopen, preserve failed draft
 			r.request().method() === "POST" &&
 			r.url().endsWith("/api/excalidraw/sessions"),
 	);
-	await panel.getByRole("button", { name: "新しい図", exact: true }).click();
+	await panel.getByRole("button", { name: "図一覧", exact: true }).click();
+	await panel
+		.getByRole("menuitem", { name: "新しい図を作成", exact: true })
+		.click();
 	expect((await accepted).status()).toBe(202);
-	const link = panel.getByRole("link", { name: "Excalidrawを開く" });
+	const link = panel.locator("iframe");
 	await expect(link).toBeVisible();
-	const url = await link.getAttribute("href");
+	const embeddedUrl = await link.getAttribute("src");
+	const parsed = new URL(embeddedUrl!);
+	const url = `${origin}/${parsed.hash}`;
 	expect(url).toContain(`${origin}/#drawing/`);
 	expect(url).not.toMatch(/18790|token|consumer|business/);
 	const editor = await context.newPage();
@@ -136,9 +142,11 @@ test("MacBook browser fixture: launch, edit, save, reopen, preserve failed draft
 	await expect(editor.getByRole("status").first()).toContainText(
 		"保存済み（版 5）",
 	);
-	mkdirSync("spec/verification/excalidraw-2026-10-13", { recursive: true });
+	mkdirSync("spec/verification/excalidraw-artifact-2026-10-14", {
+		recursive: true,
+	});
 	await editor.screenshot({
-		path: "spec/verification/excalidraw-2026-10-13/editor.png",
+		path: "spec/verification/excalidraw-artifact-2026-10-14/standalone-editor.png",
 	});
 	await page.bringToFront();
 	const runHeaders = {
@@ -154,12 +162,15 @@ test("MacBook browser fixture: launch, edit, save, reopen, preserve failed draft
 	});
 	await expect
 		.poll(async () => {
-			const href = await link.getAttribute("href");
-			return !!href?.includes(`${origin}/#drawing/`) && href !== url;
+			const href = await link.getAttribute("src");
+			return (
+				!!href?.includes("/excalidraw?embedded=1#drawing/") &&
+				href !== embeddedUrl
+			);
 		})
 		.toBe(true);
-	const next = await link.getAttribute("href");
-	expect(next).toContain(`${origin}/#drawing/`);
+	const next = await link.getAttribute("src");
+	expect(next).toContain("/excalidraw?embedded=1#drawing/");
 	await request.post(`${api}/api/runs`, {
 		headers: runHeaders,
 		data: {
@@ -170,11 +181,158 @@ test("MacBook browser fixture: launch, edit, save, reopen, preserve failed draft
 	});
 	await expect
 		.poll(async () => {
-			const href = await link.getAttribute("href");
-			return !!href?.includes(`${origin}/#drawing/`) && href !== next;
+			const href = await link.getAttribute("src");
+			return (
+				!!href?.includes("/excalidraw?embedded=1#drawing/") && href !== next
+			);
 		})
 		.toBe(true);
-	expect(await link.getAttribute("href")).toContain(`${origin}/#drawing/`);
+	expect(await link.getAttribute("src")).toContain(
+		"/excalidraw?embedded=1#drawing/",
+	);
 
 	expect(problems).toEqual([]);
+});
+
+test("the artifact edits in an iframe, browses thumbnails, protects unsaved work and keeps the conversation visible", async ({
+	page,
+	request,
+}) => {
+	await page.setViewportSize({ width: 1440, height: 960 });
+	test.setTimeout(120000);
+	const errors: string[] = [];
+	page.on("pageerror", (e) => errors.push(e.message));
+	await page.goto(origin);
+	await page.getByRole("button", { name: "アーティファクトを開く" }).click();
+	await page
+		.getByRole("menuitem", { name: "図を描く・編集する", exact: true })
+		.click();
+	const panel = page.getByRole("complementary", { name: "アーティファクト" });
+	const browse = () =>
+		panel.getByRole("button", { name: "図一覧", exact: true }).click();
+	await browse();
+	await panel
+		.getByRole("menuitem", { name: "新しい図を作成", exact: true })
+		.click();
+	const element = panel.locator("iframe");
+	const frame = panel.frameLocator("iframe");
+	await expect(frame.locator(".excalidraw canvas").first()).toBeVisible();
+	await expect(panel.getByLabel("図の名前")).toHaveValue("新しい図");
+	await expect(panel.getByRole("menu", { name: "図一覧" })).toHaveCount(0);
+	const bounds = await panel.boundingBox();
+	expect(bounds!.width).toBeLessThan(1440);
+	expect(bounds!.x).toBeGreaterThan(0);
+	const policy = await request.get(`${origin}/excalidraw?embedded=1`);
+	expect(policy.headers()["content-security-policy"]).toContain(
+		"frame-ancestors 'self'",
+	);
+	expect(policy.headers()["x-frame-options"]).toBe("SAMEORIGIN");
+	await panel.getByLabel("図の名前").fill("枠内で保存した図");
+	await expect(panel.getByRole("status").first()).toContainText(
+		"保存済み（版 2）",
+	);
+	const rectangle = frame.getByRole("radio", { name: "矩形", exact: true });
+	await rectangle.locator("..").click();
+	await expect(rectangle).toBeChecked();
+	const box = await frame.locator(".excalidraw canvas").first().boundingBox();
+	await page.mouse.move(
+		box!.x + box!.width * 0.35,
+		box!.y + box!.height * 0.45,
+	);
+	await page.mouse.down();
+	await page.mouse.move(box!.x + box!.width * 0.7, box!.y + box!.height * 0.65);
+	await page.mouse.up();
+	await expect(panel.getByRole("status").first()).toContainText(
+		"保存済み（版 3）",
+	);
+	const savedUrl = await element.getAttribute("src");
+	await browse();
+	await expect(
+		panel.getByRole("menuitem", { name: "枠内で保存した図" }).locator("img"),
+	).toBeVisible();
+	await panel
+		.getByRole("menuitem", { name: "新しい図を作成", exact: true })
+		.click();
+	await expect(panel.getByLabel("図の名前")).toHaveValue("新しい図");
+	await browse();
+	await panel.getByRole("menuitem", { name: "枠内で保存した図" }).click();
+	await expect(panel.getByLabel("図の名前")).toHaveValue("枠内で保存した図");
+	await expect(panel.getByRole("status").first()).toContainText(
+		"保存済み（版 3）",
+	);
+	const currentFrame = page
+		.frames()
+		.find(
+			(f) =>
+				f.parentFrame() === page.mainFrame() && f.url().includes("/excalidraw"),
+		)!;
+	const reloaded = page.waitForResponse(
+		(r) =>
+			r.ok() &&
+			r.request().method() === "GET" &&
+			new URL(r.url()).pathname.endsWith("/document"),
+	);
+	await currentFrame.evaluate(() => window.location.reload());
+	const document = await (await reloaded).json();
+	expect(document.revision).toBe(3);
+	await expect(frame.locator(".excalidraw canvas").first()).toBeVisible();
+	await expect(panel.getByLabel("図の名前")).toHaveValue("枠内で保存した図");
+	await expect(panel.getByRole("status").first()).toContainText(
+		"保存済み（版 3）",
+	);
+	if (await page.evaluate(() => document.fullscreenEnabled)) {
+		const before = await element.getAttribute("src");
+		await panel.getByRole("button", { name: "全画面で編集" }).click();
+		await expect
+			.poll(() => page.evaluate(() => !!document.fullscreenElement))
+			.toBe(true);
+		await panel.getByRole("button", { name: "全画面を終了" }).click();
+		await expect
+			.poll(() => page.evaluate(() => !!document.fullscreenElement))
+			.toBe(false);
+		expect(await element.getAttribute("src")).toBe(before);
+	}
+	const headers = {
+		authorization: "Bearer fixture-token-for-toolchain-browser",
+	};
+	await request.get(`${api}/fixture/save-failure?enabled=true`, { headers });
+	await panel.getByLabel("図の名前").fill("失敗中の編集を保持");
+	await expect(panel.getByRole("status").first()).toContainText("保存失敗");
+	const protectedUrl = await element.getAttribute("src");
+	await browse();
+	await panel
+		.getByRole("menuitem", { name: "新しい図を作成", exact: true })
+		.click();
+	await expect(panel.getByRole("alert")).toContainText("未保存");
+	expect(await element.getAttribute("src")).toBe(protectedUrl);
+	await panel.getByRole("button", { name: "図一覧を閉じる" }).first().click();
+	await panel
+		.getByRole("button", { name: "図を描く・編集するを閉じる", exact: true })
+		.click();
+	await expect(element).toBeVisible();
+	await request.get(`${api}/fixture/save-failure?enabled=false`, { headers });
+	await panel.getByRole("button", { name: "保存", exact: true }).click();
+	await expect(panel.getByRole("status").first()).toContainText(
+		"保存済み（版 4）",
+	);
+	await expect(panel.getByRole("status").first()).toContainText(
+		"無操作のため接続を解放",
+		{ timeout: 10000 },
+	);
+	await panel.getByRole("button", { name: "再接続", exact: true }).click();
+	await expect(panel.getByRole("status").first()).toContainText(
+		"保存済み（版 4）",
+	);
+	await request.get(`${api}/fixture/restart`, { headers });
+	await panel.getByLabel("図の名前").fill("枠内の再起動後");
+	await expect(panel.getByRole("status").first()).toContainText(
+		"保存済み（版 5）",
+	);
+	expect(savedUrl).not.toMatch(/token|consumer|18790/);
+	await page.screenshot({ path: "/tmp/eumenes-excalidraw-artifact.png" });
+	await panel
+		.getByRole("button", { name: "図を描く・編集するを閉じる", exact: true })
+		.click();
+	await expect(element).toHaveCount(0);
+	expect(errors).toEqual([]);
 });

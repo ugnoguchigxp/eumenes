@@ -71,13 +71,32 @@ const listOf = <K extends string, T extends z.ZodType>(key: K, item: T) =>
 		.looseObject({ [key]: z.array(item) } as Record<K, z.ZodArray<T>>)
 		.transform((value) => value[key] as z.infer<T>[]);
 
-const launcherEntry = z.looseObject({
-	toolchainId: z.string(),
-	toolchainRevisionId: z.string(),
-	artifactRevisionId: z.string(),
-	title: z.string().min(1),
-	adapterRef: z.string(),
-});
+/**
+ * A launcher row: an artifact of an enabled toolchain, or a standalone artifact that carries
+ * `launcher` metadata (then it has no toolchain).
+ */
+const launcherEntry = z
+	.looseObject({
+		toolchainId: z.string().nullish(),
+		toolchainRevisionId: z.string().nullish(),
+		artifactRevisionId: z.string(),
+		title: z.string().min(1),
+		/** The artifact's adapter; the server sends all of them as `adapterRefs`. */
+		adapterRef: z.string().nullish(),
+		adapterRefs: z.array(z.string()).optional(),
+		launcher: z
+			.looseObject({
+				label: z.string().min(1),
+				description: z.string().optional(),
+				group: z.string().optional(),
+				order: z.number().int().optional(),
+			})
+			.nullish(),
+	})
+	.transform((entry) => ({
+		...entry,
+		adapterRef: entry.adapterRef ?? entry.adapterRefs?.[0] ?? "",
+	}));
 export type ToolchainArtifactEntry = z.infer<typeof launcherEntry>;
 
 const artifactResponse = z.looseObject({
@@ -175,17 +194,23 @@ export function toolchainActionsClient(transport: Transport) {
 			source: string,
 			targetRef?: string,
 			signal?: AbortSignal,
-		) =>
-			sourceResponse.parse(
+			/** Query of a source that takes one (validated by the server); sent as JSON. */
+			params?: unknown,
+		) => {
+			const query = new URLSearchParams();
+			if (targetRef) query.set("target", targetRef);
+			if (params !== undefined) query.set("params", JSON.stringify(params));
+			return sourceResponse.parse(
 				await (
 					await transport.call(
 						`/api/toolchain-artifacts/${encodeURIComponent(artifactRevisionId)}/sources/${encodeURIComponent(source)}${
-							targetRef ? `?target=${encodeURIComponent(targetRef)}` : ""
+							query.size ? `?${query}` : ""
 						}`,
 						{ signal },
 					)
 				).json(),
-			),
+			);
+		},
 		toolchainInteractions: async (
 			query: { conversationId: string; status?: string },
 			signal?: AbortSignal,

@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite";
 import type { z } from "zod";
+import { createHmac } from "node:crypto";
 import { canonicalJson } from "../../../infrastructure/digest";
 import type { ArtifactDefinitionV1, FixedDocument } from "../../capabilities";
 import type {
@@ -14,14 +15,11 @@ import type {
  * not depend on the shape of the whole capabilities service (and tests use fakes).
  */
 export interface CapabilityReads {
-	/** Artifacts referenced by the currently active toolchain revisions. */
-	artifactsInTransaction(db: Database): Array<{
-		toolchainId: string;
-		toolchainRevisionId: string;
-		artifactRevisionId: string;
-		title: string;
-		adapterRef: string;
-	}>;
+	/**
+	 * Artifacts referenced by active toolchain revisions plus active standalone launcher
+	 * artifacts (no toolchain). Availability is decided here from the artifact's sources.
+	 */
+	artifactsInTransaction(db: Database): ArtifactListEntry[];
 	documentInTransaction(
 		db: Database,
 		revisionId: string,
@@ -66,12 +64,16 @@ export class ActionRequestError extends Error {
 	}
 }
 
+export type LauncherMeta = { label: string; group?: string; order?: number };
 export type ArtifactListEntry = {
-	toolchainId: string;
-	toolchainRevisionId: string;
+	/** null for a standalone launcher artifact. */
+	toolchainId: string | null;
+	toolchainRevisionId: string | null;
 	artifactRevisionId: string;
 	title: string;
-	adapterRef: string;
+	/** The toolchain binding's adapter; absent for standalone artifacts (sources name theirs). */
+	adapterRef?: string | null;
+	launcher?: LauncherMeta | null;
 };
 export type ArtifactView = {
 	artifact: ArtifactDefinitionV1;
@@ -138,4 +140,18 @@ export type LedgerContext = {
 	scopeRef: string;
 	now: () => number;
 	epoch: () => number;
+	/** Host key for HMAC digests of confidential input; undefined while unavailable. */
+	secretKey: () => Uint8Array | undefined;
 };
+
+/** `hmac:<hex>` digest of an identity string that contains confidential input. */
+export function hmacDigest(key: Uint8Array, identity: string) {
+	return `hmac:${createHmac("sha256", key).update(identity).digest("hex")}`;
+}
+/** The input with each confidential top-level key replaced by a marker (never the value). */
+export function redactInput(input: unknown, confidential: readonly string[]) {
+	if (!isRecord(input) || !confidential.length) return input;
+	const out: Record<string, unknown> = { ...input };
+	for (const key of confidential) if (key in out) out[key] = "[secret]";
+	return out;
+}

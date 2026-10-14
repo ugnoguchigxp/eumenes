@@ -54,6 +54,16 @@ CREATE TABLE capability_documents(
  document_json TEXT NOT NULL,bundle_id TEXT NOT NULL,created_at_ms INTEGER NOT NULL,
  UNIQUE(kind,item_id,revision));
 `;
+/**
+ * The published revision of an artifact that is shown on its own (it has a `launcher`): a
+ * pointer into `capability_documents`, switched by registering a newer revision or by an
+ * explicit publish, as the active revision of a toolchain is.
+ */
+export const artifactPointersMigration = `
+CREATE TABLE capability_artifact_pointers(
+ artifact_id TEXT PRIMARY KEY,active_revision_id TEXT NOT NULL,
+ generation INTEGER NOT NULL DEFAULT 0,updated_at_ms INTEGER NOT NULL);
+`;
 /** Named migrations of this domain; the SQL above is frozen once deployed. */
 export const migrations: readonly Migration[] = [
 	{ id: "capabilities/0001-init", sql: migration },
@@ -67,6 +77,11 @@ export const migrations: readonly Migration[] = [
 		id: "capabilities/0004-bindings",
 		sql: documentsMigration,
 		after: ["capabilities/0003-toolchain-vectors"],
+	},
+	{
+		id: "capabilities/0005-artifact-pointers",
+		sql: artifactPointersMigration,
+		after: ["capabilities/0004-bindings"],
 	},
 ];
 
@@ -127,5 +142,43 @@ export function insertDocument(
 		JSON.stringify(row.document),
 		row.bundleId,
 		row.createdAtMs,
+	);
+}
+
+export function setArtifactPointer(
+	db: Database,
+	artifactId: string,
+	revisionId: string,
+	nowMs: number,
+) {
+	db.query(
+		"INSERT INTO capability_artifact_pointers(artifact_id,active_revision_id,updated_at_ms) VALUES(?,?,?) ON CONFLICT(artifact_id) DO UPDATE SET active_revision_id=excluded.active_revision_id,generation=generation+1,updated_at_ms=excluded.updated_at_ms",
+	).run(artifactId, revisionId, nowMs);
+}
+export function clearArtifactPointer(db: Database, artifactId: string) {
+	db.query("DELETE FROM capability_artifact_pointers WHERE artifact_id=?").run(
+		artifactId,
+	);
+}
+/** Published revision ids of the standalone artifacts, in id order. */
+export function artifactPointers(db: Database): string[] {
+	return (
+		db
+			.query(
+				"SELECT active_revision_id r FROM capability_artifact_pointers ORDER BY artifact_id",
+			)
+			.all() as { r: string }[]
+	).map((row) => row.r);
+}
+/** The published revision of a standalone artifact, or null when none is published. */
+export function artifactPointer(db: Database, artifactId: string) {
+	return (
+		(
+			db
+				.query(
+					"SELECT active_revision_id r FROM capability_artifact_pointers WHERE artifact_id=?",
+				)
+				.get(artifactId) as { r: string } | null
+		)?.r ?? null
 	);
 }

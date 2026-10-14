@@ -15,7 +15,13 @@ export type ArtifactTab =
 			/** The saved item the screen shows (host-issued ref, e.g. a timer id). */
 			targetRef?: string;
 	  }
-	| { id: string; kind: "openui"; title: string; definition: string };
+	| {
+			id: string;
+			kind: "openui";
+			title: string;
+			definition: string;
+			keepMounted?: boolean;
+	  };
 
 export type ArtifactWorkspaceState = {
 	tabs: ArtifactTab[];

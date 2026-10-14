@@ -102,4 +102,8 @@ export const errorStatus = {
 	requirement_profile_invalidated: 409,
 	invalid_requirement_profile: 400,
 	invalid_requirement_schema: 400,
+	capability_not_found: 404,
+	capability_publish_conflict: 409,
+	invalid_capability: 400,
+	invalid_toolchain: 400,
 } as const;

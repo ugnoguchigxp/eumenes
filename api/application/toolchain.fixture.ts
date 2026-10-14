@@ -30,6 +30,7 @@ import {
 import { createDialogueService } from "../domains/dialogue";
 import { createVoiceDialogue } from "../domains/voice-dialogue";
 import { createToolchain } from "./toolchain";
+import { createToolchainHostLinks } from "./toolchain-adapters";
 import { createTimers } from "../domains/timers";
 import { createToolchainRouting } from "./toolchain-routing";
 import { createTimerAnnouncements } from "./timer-announcements";
@@ -453,7 +454,10 @@ export async function harness(
 				},
 			)
 		: undefined;
+	// The data-driven settings and records screens, as the server composes them.
+	const toolchainLinks = createToolchainHostLinks(settings, inference);
 	const toolchain = await createToolchain(store, queue, inference, web, {
+		...toolchainLinks.options,
 		timers,
 		conversation: options.history ? conversation : undefined,
 		reconcileThrottleMs: 0,
@@ -538,6 +542,7 @@ export async function harness(
 			toolchain.schemas,
 		),
 	});
+	toolchainLinks.attachDialogue(dialogue);
 	const voice = createVoiceDialogue(store, dialogue, inference);
 	const app = createApp({
 		token: "fixture-token-for-toolchain-browser",

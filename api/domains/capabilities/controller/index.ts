@@ -82,6 +82,49 @@ export function registerCapabilities(app: Hono, service: Capabilities) {
 			),
 		);
 	});
+	app.use(
+		"/api/capabilities/*/:id/publish",
+		bodyLimit({
+			maxSize: 1024,
+			onError: (c) => c.json({ error: "payload_too_large" }, 413),
+		}),
+	);
+	const revisionId = z.string().min(1).max(200);
+	app.post("/api/capabilities/toolchains/:id/publish", async (c) => {
+		const b = await parseJsonBody(
+			c,
+			z.object({ revisionId, expectedActiveRevisionId: revisionId }).strict(),
+			{ code: "invalid_capability" },
+		);
+		if (!b.ok) return b.response;
+		return c.json(
+			await service.publishToolchain(
+				c.req.param("id"),
+				b.data.revisionId,
+				b.data.expectedActiveRevisionId,
+			),
+		);
+	});
+	app.post("/api/capabilities/artifacts/:id/publish", async (c) => {
+		const b = await parseJsonBody(
+			c,
+			z
+				.object({
+					revisionId,
+					expectedActiveRevisionId: revisionId.nullable(),
+				})
+				.strict(),
+			{ code: "invalid_capability" },
+		);
+		if (!b.ok) return b.response;
+		return c.json(
+			await service.publishArtifact(
+				c.req.param("id"),
+				b.data.revisionId,
+				b.data.expectedActiveRevisionId,
+			),
+		);
+	});
 	app.get("/api/capabilities", (c) => {
 		const raw = c.req.query("limit") ?? "50";
 		if (!/^\d+$/.test(raw) || Number(raw) < 1 || Number(raw) > 50)

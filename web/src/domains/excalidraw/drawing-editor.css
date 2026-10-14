@@ -1,0 +1,13 @@
+.drawing-embedded {
+	height: 100dvh;
+	min-height: 0;
+	overflow: hidden;
+}
+.drawing-loading {
+	display: grid;
+	place-content: center;
+	height: 100%;
+	padding: 24px;
+	font-size: 13px;
+	text-align: center;
+}

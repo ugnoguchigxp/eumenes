@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { schemaRefPattern } from "../../capabilities/contracts/bindings";
+import { schemaRefPattern } from "../../capabilities/contracts";
 
 /**
  * One operation's question and answer (spec §7). Dialogue owns the interaction: the question the

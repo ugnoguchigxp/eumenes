@@ -92,6 +92,12 @@ test("cold startup returns only an authenticated browser entry; save creates con
 		expect(h.f.requests).toHaveLength(before);
 		await h.service.tick();
 		expect(h.service.get(starting.id)?.state).toBe("idle");
+		expect(h.service.get(starting.id)?.url).toBe(
+			`http://127.0.0.1:5173/#drawing/${reference.id}?revision=2`,
+		);
+		const afterRelease = h.f.requests.length;
+		h.service.get(starting.id);
+		expect(h.f.requests).toHaveLength(afterRelease);
 		expect(h.f.requests.at(-1)?.method).toBe("DELETE");
 		h.f.stop();
 		const restored = await h.service.document(

@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { Hono } from "hono";
 import { registerToolchainActions } from "..";
-import { ARTIFACT_ID, makeHarness } from "./action-fixture";
+import { ARTIFACT_ID, HUB_ID, makeHarness } from "./action-fixture";
 
 let h = makeHarness();
 afterEach(async () => {
@@ -97,6 +97,7 @@ test("unsettled list, launcher list, artifact and source endpoints", async () =>
 	).json()) as { artifacts: Array<{ artifactRevisionId: string }> };
 	expect(list.artifacts.map((a) => a.artifactRevisionId)).toEqual([
 		ARTIFACT_ID,
+		HUB_ID,
 	]);
 
 	const artifact = await hono.request(
@@ -146,4 +147,35 @@ test("unsettled list, launcher list, artifact and source endpoints", async () =>
 	expect(
 		(await hono.request(`/api/toolchain-artifacts/${ARTIFACT_ID}`)).status,
 	).toBe(503);
+});
+
+test("source params are URL-encoded JSON of at most 4 KiB validated by the source's schema", async () => {
+	const { hono } = app();
+	const url = (params: string) =>
+		`/api/toolchain-artifacts/${ARTIFACT_ID}/sources/records?params=${params}`;
+	const ok = await hono.request(
+		url(encodeURIComponent(JSON.stringify({ offset: 0, limit: 20 }))),
+	);
+	expect(ok.status).toBe(200);
+	expect(await ok.json()).toEqual({
+		revision: 2,
+		data: { rows: [], params: { offset: 0, limit: 20 } },
+	});
+	expect((await hono.request(url("%7Bnot-json"))).status).toBe(400);
+	const invalid = await hono.request(
+		url(encodeURIComponent(JSON.stringify({ offset: 0, limit: 999 }))),
+	);
+	expect([invalid.status, await invalid.json()]).toEqual([
+		400,
+		{ error: "invalid_params" },
+	]);
+	const big = encodeURIComponent(JSON.stringify({ search: "x".repeat(5000) }));
+	expect(await (await hono.request(url(big))).json()).toEqual({
+		error: "invalid_params",
+	});
+	const noSchema = await hono.request(
+		`/api/toolchain-artifacts/${ARTIFACT_ID}/sources/setup?params=%7B%7D`,
+	);
+	expect(noSchema.status).toBe(400);
+	expect(h.ledger()).toBe(0);
 });

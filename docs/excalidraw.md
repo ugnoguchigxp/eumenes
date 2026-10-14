@@ -1,6 +1,6 @@
 # Excalidrawの図を描く・編集する
 
-2026年10月14日。Eumenesのアーティファクトメニュー「図を描く・編集する」または会話から編集画面を準備する。新しい図を作成し、利用可能になってから「Excalidrawを開く」で別のブラウザタブへ移動する。保存済みの図は一覧から再表示できる。
+2026年10月14日。Eumenesのアーティファクトメニュー「図を描く・編集する」または会話から編集画面を準備する。編集画面は右側のアーティファクト内にiframeで表示し、会話を見ながら図を編集できる。「図一覧」のメニューから新しい図を作成し、保存済みの図をサムネイルから選ぶ。選択後はメニューを閉じ、編集領域を広く使う。全画面は任意で、切替時にも同じ編集画面を保持する。
 
 ## 接続と認証
 
@@ -27,6 +27,10 @@ Linux上のloopback入口をMacBookから直接使わない。MacBook上のbacke
 | GET `/api/excalidraw/operations` | 会話担当のplanning/starting/completed/failed/cancelled。モデルへ渡す結果とOpenUIの入口 |
 
 ready URLはEumenesのWeb originにある`/#drawing/{referenceId}?revision={revision}`。main以外の会話では`conversationId`もURLへ付け、編集画面の再表示要求へ渡す。会話と参照の一致はbackendで引き続き検査する。URLにcredentialを含めない。歴史版も取得できるが、保存には現在版との一致が必要で、競合時に上書きはしない。版指定を省いた再表示は上流の最新版から復帰する。
+
+アーティファクトはこのURLの同一origin・図ID・版・会話を検証し、専用入口`/excalidraw?embedded=1#drawing/{referenceId}?...`へ変換する。専用入口だけが同一originのiframeを許可し、親子の通知も送信元originとwindowを照合する。通知するのは表示状態と編集操作で、credentialやsceneは渡さない。APIと通常画面の埋め込み拒否は維持する。保存処理は既存のEumenes編集画面とAPIを使用し、原本はLARMに保存する。LARMの画面や認証方式の追加開発は不要。
+
+メニューを開いたときだけ保存済みsceneから小さなPNGを生成する。メニューを閉じたら未完了の取得を取り消し、取得用sessionを解放する。表示中のサムネイルを定期取得してserviceを常駐させない。未保存の変更がある場合は図の切替とアーティファクトの閉じる操作を止め、保存・再接続・下書き復元・ダウンロードを選べる。別のアーティファクトへ切り替えても編集中のiframeは保持する。
 
 図はExcalidraw scene APIへ保存し、Eumenesには参照と操作状態をSQLiteに保持する。保存応答のID・版と保存後のsceneを確認したときだけ保存済みとする。保存失敗時は同じkey/expectedRevisionで再送する。失敗した保存候補と、その後の編集は別々にブラウザ下書きへ残し、再読込み後に「下書きを復元」できる。保存未確定の画面は閉じる操作とbeforeunloadで保護し、下書きのダウンロードも提供する。
 
@@ -74,6 +78,14 @@ EUMENES_EXCALIDRAW_LIVE=1 bunx playwright test tests/browser/excalidraw-live.spe
 
 ## 現在の受入状況
 
-2026年10月14日、mainの固定版（0cacd23、Excalidraw製品コードは現在の作業ツリーと同一）で実接続受入を実施した。MacBookのBraveで、実LLMが返したURLから描画・版2保存・再表示、backend再起動後の同じsceneと設定の保持、追加編集・版3保存を確認した。ブラウザを表示したままworkerがPID 0へ自然停止し、「再接続」から別PIDで復帰した後、矩形3個を版4で保存・再表示できた。実LLMによるmain会話の担当選択、回答リンク、Artifactの一覧・準備中・利用可能・編集画面への移動も確認済み。
+### Artifact内iframeへの変更
 
-固定の部分試験・API結合・ブラウザfixtureは成功。正式接続の自動通し試験は、自然停止後にブラウザが閉じられたため未完走であり、MacBook実画面による受入とは分ける。verify:allは既存のsettings→memory試験依存違反で未完了。並行改修中の作業ツリーには共有clientの契約不整合もあり、その差分は実接続受入に含めていない。全体gateの成功は宣言しない。証拠は`spec/verification/excalidraw-live/native-acceptance-2026-10-14.json`、詳細は`spec/excalidraw-work-record-2026-10-13.md`に記録する。
+2026年10月14日、採用した画面案をmainに実装した。Excalidrawのdomain verify（backend 7件、Web 18件）、利用側Artifactのverify（50件）、API結合4件とWebビルドは成功。最終確認時には並行改修中のsettings-dataとToolchainArtifactHostに4件の型エラーがあったが、commit前の再確認では解消され、1,374ファイルの型検査が成功した。対象ブラウザの別タブ編集シナリオとArtifact内iframeシナリオは個別に成功し、未保存の図切替・タブ閉じの保護、下書き復元、保存失敗、無操作解放、再接続、fixtureの再起動復帰を確認した。全件E2Eは実行していない。
+
+正式接続ではMacBook上のブラウザでArtifact内に矩形を描画し、LARMへの版2/3保存、サムネイル表示、再読み込み後の版3・矩形1個、無操作解放後の再接続を確認した。workerの物理停止とbackend再起動は今回繰り返しておらず、以下の旧画面の実機受入と区別する。証拠と変更範囲は[iframe編集の記録](../spec/excalidraw-artifact-2026-10-14.md)、実接続の結果は`spec/verification/excalidraw-live/artifact-2026-10-14.json`に保存した。LARM側の追加開発・配備変更は不要だった。
+
+### 旧画面での実機受入
+
+2026年10月14日、当時のmainの固定版（0cacd23）で実接続受入を実施した。MacBookのBraveで、実LLMが返したURLから描画・版2保存・再表示、backend再起動後の同じsceneと設定の保持、追加編集・版3保存を確認した。ブラウザを表示したままworkerがPID 0へ自然停止し、「再接続」から別PIDで復帰した後、矩形3個を版4で保存・再表示できた。実LLMによるmain会話の担当選択、回答リンク、Artifactの一覧・準備中・利用可能・編集画面への移動も確認済み。
+
+固定の部分試験・API結合・ブラウザfixtureは成功。正式接続の自動通し試験は、自然停止後にブラウザが閉じられたため未完走であり、MacBook実画面による受入とは分ける。当時のverify:allは既存のsettings→memory試験依存違反で未完了であり、当時の並行改修による共有clientの契約不整合も実接続受入には含めていなかった。この旧記録を現在の全体gateの結果として扱わない。証拠は`spec/verification/excalidraw-live/native-acceptance-2026-10-14.json`、詳細は`spec/excalidraw-work-record-2026-10-13.md`に記録する。

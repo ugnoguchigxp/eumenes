@@ -128,8 +128,10 @@ export function recordConflict(
 	ctx: LedgerContext,
 	db: Database,
 	eventId: string,
-	digest: string,
+	digest: string | undefined,
 ) {
+	// No digest means the event may carry a secret and no key could protect it: audit nothing.
+	if (!digest) return;
 	const n = (
 		db
 			.query("SELECT COUNT(*) AS n FROM tool_action_request_conflicts")

@@ -10,7 +10,10 @@ export {
 	type WebArtifactAdapter,
 } from "./registry";
 export {
+	artifactIdOf,
 	artifactVariantFromUrl,
+	entryLabel,
+	menuEntries,
 	toolchainArtifactsQuery,
 	toolchainTabId,
 	useToolchainArtifacts,

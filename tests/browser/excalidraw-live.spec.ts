@@ -48,10 +48,14 @@ test("formal connection: cold start, MacBook drawing/save/reopen, physical idle 
 		.getByRole("menuitem", { name: "図を描く・編集する", exact: true })
 		.click();
 	const panel = page.getByRole("complementary", { name: "アーティファクト" });
-	await panel.getByRole("button", { name: "新しい図", exact: true }).click();
-	const link = panel.getByRole("link", { name: "Excalidrawを開く" });
+	await panel.getByRole("button", { name: "図一覧", exact: true }).click();
+	await panel
+		.getByRole("menuitem", { name: "新しい図を作成", exact: true })
+		.click();
+	const link = panel.locator("iframe");
 	await expect(link).toBeVisible({ timeout: 180000 });
-	const url = (await link.getAttribute("href"))!;
+	const embedded = new URL((await link.getAttribute("src"))!);
+	const url = `${origin}/${embedded.hash}`;
 	expect(new URL(url).origin).toBe(new URL(origin).origin);
 	expect(url).not.toMatch(/token|consumer|127\.0\.0\.1:1879/);
 	const startedPid = await workerPid();
@@ -109,7 +113,10 @@ test("formal connection: cold start, MacBook drawing/save/reopen, physical idle 
 	const restartedPid = await workerPid();
 	expect(restartedPid).toBeGreaterThan(0);
 	expect(restartedPid).not.toBe(startedPid);
-	await editor.getByRole("radio", { name: /矩形/ }).click();
+	await editor
+		.getByRole("radio", { name: /矩形/ })
+		.locator("..")
+		.click();
 	await editor.mouse.move(box.x + 600, box.y + 420);
 	await editor.mouse.down();
 	await editor.mouse.move(box.x + 760, box.y + 550);
@@ -150,4 +157,118 @@ test("formal connection: cold start, MacBook drawing/save/reopen, physical idle 
 	);
 	// Close this test's sessions; retain the explicitly created acceptance drawing as evidence.
 	await editor.getByRole("button", { name: "閉じる", exact: true }).click();
+});
+
+test("formal artifact iframe: MacBook edit, LARM save, thumbnail, reopen and idle reconnect", async ({
+	page,
+}) => {
+	test.setTimeout(150000);
+	await page.setViewportSize({ width: 1440, height: 960 });
+	const errors: string[] = [];
+	const documents: Array<{ revision: number; count: number }> = [];
+	page.on("pageerror", (e) => errors.push(e.message));
+	page.on("response", async (r) => {
+		if (
+			r.ok() &&
+			r.request().method() === "GET" &&
+			new URL(r.url()).pathname.endsWith("/document")
+		) {
+			const d = await r.json();
+			documents.push({ revision: d.revision, count: d.scene.elements.length });
+		}
+	});
+	await page.goto(origin);
+	await page.getByRole("button", { name: "アーティファクトを開く" }).click();
+	await page
+		.getByRole("menuitem", { name: "図を描く・編集する", exact: true })
+		.click();
+	const panel = page.getByRole("complementary", { name: "アーティファクト" });
+	await panel.getByRole("button", { name: "図一覧", exact: true }).click();
+	await panel
+		.getByRole("menuitem", { name: "新しい図を作成", exact: true })
+		.click();
+	const iframe = panel.locator("iframe");
+	const frame = panel.frameLocator("iframe");
+	await expect(frame.locator(".excalidraw canvas").first()).toBeVisible({
+		timeout: 60000,
+	});
+	const title = `Artifact埋め込み受入 ${new Date().toISOString()}`;
+	await panel.getByLabel("図の名前").fill(title);
+	await expect(panel.getByRole("status").first()).toContainText(
+		"保存済み（版 2）",
+	);
+	await frame
+		.getByRole("radio", { name: "矩形", exact: true })
+		.locator("..")
+		.click();
+	const box = (await frame
+		.locator(".excalidraw canvas")
+		.first()
+		.boundingBox())!;
+	await page.mouse.move(box.x + box.width * 0.35, box.y + box.height * 0.45);
+	await page.mouse.down();
+	await page.mouse.move(box.x + box.width * 0.7, box.y + box.height * 0.65);
+	await page.mouse.up();
+	await expect(panel.getByRole("status").first()).toContainText(
+		"保存済み（版 3）",
+	);
+	const url = (await iframe.getAttribute("src"))!;
+	expect(new URL(url).origin).toBe(new URL(origin).origin);
+	expect(url).not.toMatch(/token|consumer|18790/);
+	await panel.getByRole("button", { name: "図一覧", exact: true }).click();
+	const item = panel.getByRole("menuitem", { name: title, exact: true });
+	await expect(item.locator("img")).toBeVisible();
+	const directory = "spec/verification/excalidraw-live";
+	mkdirSync(directory, { recursive: true });
+	await panel.screenshot({ path: `${directory}/artifact-menu-2026-10-14.png` });
+	await item.click();
+	await expect(panel.getByRole("menu", { name: "図一覧" })).toHaveCount(0);
+	const child = page
+		.frames()
+		.find(
+			(f) =>
+				f.parentFrame() === page.mainFrame() && f.url().includes("/excalidraw"),
+		)!;
+	documents.length = 0;
+	await child.evaluate(() => window.location.reload());
+	await expect.poll(() => documents.at(-1)).toEqual({ revision: 3, count: 1 });
+	await expect(panel.getByLabel("図の名前")).toHaveValue(title);
+	await expect(panel.getByRole("status").first()).toContainText(
+		"無操作のため接続を解放",
+		{ timeout: 45000 },
+	);
+	documents.length = 0;
+	await panel.getByRole("button", { name: "再接続", exact: true }).click();
+	await expect.poll(() => documents.at(-1)).toEqual({ revision: 3, count: 1 });
+	await expect(panel.getByRole("status").first()).toContainText(
+		"保存済み（版 3）",
+	);
+	await panel.screenshot({ path: `${directory}/artifact-2026-10-14.png` });
+	expect(errors).toEqual([]);
+	writeFileSync(
+		`${directory}/artifact-2026-10-14.json`,
+		JSON.stringify(
+			{
+				checkedAt: new Date().toISOString(),
+				mode: "formal-live-artifact-iframe",
+				initialFrameUrl: url,
+				reopenedFrameUrl: child.url(),
+				revision: 3,
+				sceneElements: 1,
+				browserEdited: true,
+				larmSaveAndReopen: true,
+				thumbnail: true,
+				artifactIdleReleaseAndReconnect: true,
+				physicalWorkerStop: "previous_acceptance_only",
+				backendRestart: "fixture_only_this_change",
+				pageErrors: errors,
+			},
+			null,
+			2,
+		),
+	);
+	await panel
+		.getByRole("button", { name: "図を描く・編集するを閉じる", exact: true })
+		.click();
+	await expect(iframe).toHaveCount(0);
 });

@@ -33,10 +33,12 @@ import {
 	canonical,
 	codePattern,
 	fieldErrors,
+	hmacDigest,
 	isCancel,
 	isRecord,
 	iso,
 	programmerErrors,
+	redactInput,
 	type ActionRequestErrorStatus,
 	type ArtifactListEntry,
 	type ArtifactView,
@@ -72,7 +74,12 @@ const invalidType = () =>
 /** Everything a new request resolved from the registered artifact before any input is read. */
 type Plan = ResolvedArtifact & {
 	event: ToolchainActionEventV1;
+	/** Plain sha256 of the identity, or `hmac:<hex>` when the action carries confidential input. */
 	digest: string;
+	/** Top-level input keys that are never stored. */
+	confidential: readonly string[];
+	/** The adapter of the action's source. */
+	adapter: DomainAdapter;
 	t: number;
 	action: ResolvedArtifact["doc"]["document"]["actionBindings"][number] & {
 		operationId: string;
@@ -108,12 +115,12 @@ function plan(
 	ctx: LedgerContext,
 	db: Database,
 	event: ToolchainActionEventV1,
-	digest: string,
+	identity: string,
 ): Plan | Outcome {
 	const resolved = resolveArtifact(ctx, db, event.artifactRevisionId);
 	if (resolved instanceof ActionRequestError)
 		return { kind: "error", error: resolved };
-	const { entry, doc, adapter } = resolved;
+	const { entry, doc } = resolved;
 	const definition = doc.document;
 	const action = definition.actionBindings.find(
 		(a) => a.actionId === event.actionId,
@@ -121,15 +128,31 @@ function plan(
 	if (!action) return fail("action_not_found", 404);
 	if (action.source !== event.source)
 		return fail("action_source_mismatch", 400);
-	if (action.effect === "local") return fail("local_action", 400);
+	// local, navigate and draft actions are handled by the Web host and never reach the backend.
+	if (
+		action.effect === "local" ||
+		action.effect === "navigate" ||
+		action.effect === "draft"
+	)
+		return fail("local_action", 400);
 	if (action.answer) return fail("use_interaction_answer", 400);
 	if (!action.operationId) return fail("action_unbound", 400);
 	const source = definition.sourceBindings.find(
 		(s) => s.source === action.source,
 	);
 	if (!source) return fail("source_not_found", 404);
-	if (source.adapterRef !== entry.adapterRef)
+	if (entry.adapterRef && source.adapterRef !== entry.adapterRef)
 		return fail("artifact_unavailable", 503);
+	const adapter = resolved.adapters.get(source.adapterRef);
+	if (!adapter) return fail("adapter_unavailable", 503);
+	const confidential = action.confidentialFields ?? [];
+	let digest = sha256Hex(identity);
+	if (confidential.length) {
+		// The digest must cover the secret without being a brute-forceable hash of it.
+		const key = ctx.secretKey();
+		if (!key?.length) return fail("secret_key_unavailable", 503);
+		digest = hmacDigest(key, identity);
+	}
 	const described = adapter.describe();
 	const operation = described.operations.get(action.operationId);
 	if (!operation) return fail("operation_unavailable", 503);
@@ -142,6 +165,8 @@ function plan(
 		...resolved,
 		event,
 		digest,
+		confidential,
+		adapter,
 		t: ctx.now(),
 		action: { ...action, operationId: action.operationId },
 		source,
@@ -153,7 +178,7 @@ function plan(
 				action,
 				source,
 				operation,
-				adapterRef: entry.adapterRef,
+				adapterRef: source.adapterRef,
 			}),
 		),
 	};
@@ -225,12 +250,12 @@ function insertPending(ctx: LedgerContext, db: Database, p: Plan) {
 		event.sourceRevision,
 		event.targetRef ?? null,
 		event.actionId,
-		p.entry.adapterRef,
+		p.source.adapterRef,
 		p.action.operationId,
 		event.eventId,
 		// Host time of the first acceptance; a resend reuses the stored value.
 		iso(p.t),
-		canonical(event.input ?? null),
+		canonical(redactInput(event.input ?? null, p.confidential)),
 		p.digest,
 		p.bindingDigest,
 		event.eventCreatedAt,
@@ -246,7 +271,9 @@ const envelope = (
 ): ExecutionResultV1 => ({
 	version: 1,
 	executionId: p.event.eventId,
-	chainRevisionId: p.entry.toolchainRevisionId,
+	...(p.entry.toolchainRevisionId
+		? { chainRevisionId: p.entry.toolchainRevisionId }
+		: {}),
 	artifactRevisionId: p.event.artifactRevisionId,
 	outcome: "completed",
 	resultRefs: [],
@@ -374,24 +401,58 @@ function execute(
 	}
 }
 
+/**
+ * The digest audited for a conflicting resend. With a host key it is always the HMAC. Without
+ * one, a plain sha256 is stored only when the event's own action carries no confidential
+ * input; otherwise nothing is stored (a plain hash would make a secret brute-forceable).
+ */
+function conflictDigest(
+	ctx: LedgerContext,
+	db: Database,
+	event: ToolchainActionEventV1,
+	identity: string,
+): string | undefined {
+	const key = ctx.secretKey();
+	if (key?.length) return hmacDigest(key, identity);
+	const resolved = resolveArtifact(ctx, db, event.artifactRevisionId);
+	if (resolved instanceof ActionRequestError) return undefined;
+	const action = resolved.doc.document.actionBindings.find(
+		(a) => a.actionId === event.actionId,
+	);
+	return action && !action.confidentialFields?.length
+		? sha256Hex(identity)
+		: undefined;
+}
+
 function accept(
 	ctx: LedgerContext,
 	db: Database,
 	event: ToolchainActionEventV1,
-	digest: string,
+	identity: string,
 ): Outcome {
 	const existing = rowOf(db, event.eventId);
 	if (existing) {
 		// Owner and digest first: a legitimate resend never fails on the send window.
-		if (existing.scope !== ctx.scope || existing.input_digest !== digest) {
-			recordConflict(ctx, db, event.eventId, digest);
+		const key = ctx.secretKey();
+		const secretRow = existing.input_digest.startsWith("hmac:");
+		if (secretRow && !key?.length) return fail("secret_key_unavailable", 503);
+		const computed = secretRow
+			? hmacDigest(key!, identity)
+			: sha256Hex(identity);
+		if (existing.scope !== ctx.scope || existing.input_digest !== computed) {
+			recordConflict(
+				ctx,
+				db,
+				event.eventId,
+				conflictDigest(ctx, db, event, identity),
+			);
 			return fail("request_conflict", 409);
 		}
 		return { kind: "ok", request: viewOf(ctx, db, existing), replay: true };
 	}
 	const late = checkWindow(ctx, event);
 	if (late) return late;
-	const planned = plan(ctx, db, event, digest);
+	const planned = plan(ctx, db, event, identity);
 	if ("kind" in planned) return planned;
 	const p = planned;
 	const cancel = isCancel(p.action.operationId);
@@ -428,6 +489,8 @@ export function createActionRequests(deps: {
 	 * revocation yet). It is the host's epoch, never one the client sends.
 	 */
 	authorityEpoch?: () => number;
+	/** Host key for HMAC digests of confidential input; without it such actions are refused. */
+	secretKey?: () => Uint8Array | undefined;
 }) {
 	const { store, scope } = deps;
 	const ctx: LedgerContext = {
@@ -437,6 +500,7 @@ export function createActionRequests(deps: {
 		scopeRef: `scope:${sha256Hex(scope).slice(0, 24)}`,
 		now: deps.now ?? Date.now,
 		epoch: deps.authorityEpoch ?? (() => 0),
+		secretKey: deps.secretKey ?? (() => undefined),
 	};
 	return {
 		scopeRef: ctx.scopeRef,
@@ -453,18 +517,18 @@ export function createActionRequests(deps: {
 				);
 			}
 			const event = parsed.data;
-			const digest = sha256Hex(
-				canonical({
-					artifactRevisionId: event.artifactRevisionId,
-					source: event.source,
-					sourceRevision: event.sourceRevision,
-					targetRef: event.targetRef ?? null,
-					actionId: event.actionId,
-					scopeRef: event.scopeRef,
-					input: event.input ?? null,
-				}),
+			const identity = canonical({
+				artifactRevisionId: event.artifactRevisionId,
+				source: event.source,
+				sourceRevision: event.sourceRevision,
+				targetRef: event.targetRef ?? null,
+				actionId: event.actionId,
+				scopeRef: event.scopeRef,
+				input: event.input ?? null,
+			});
+			const outcome = await store.write((db) =>
+				accept(ctx, db, event, identity),
 			);
-			const outcome = await store.write((db) => accept(ctx, db, event, digest));
 			if (outcome.kind === "error") throw outcome.error;
 			outcome.logged?.();
 			try {
@@ -497,9 +561,10 @@ export function createActionRequests(deps: {
 			artifactRevisionId: string,
 			source: string,
 			targetRef?: string,
+			params?: unknown,
 		): SourceView {
 			return store.read((db) =>
-				readSource(ctx, db, artifactRevisionId, source, targetRef),
+				readSource(ctx, db, artifactRevisionId, source, targetRef, params),
 			);
 		},
 		/** Delete old bodies and tombstones (30 days each). */

@@ -74,7 +74,9 @@ function editorClient() {
 				revision: 1,
 			}),
 		),
-		drawingDocument: vi.fn(async () => document),
+		drawingDocument: vi.fn(
+			async (_sessionId: string, _signal?: AbortSignal) => document,
+		),
 		drawingSession: vi.fn(async () => {
 			throw new Error("status_unavailable");
 		}),
@@ -98,6 +100,24 @@ function editorClient() {
 		client: port as unknown as EumenesClient,
 	};
 }
+test("opening an idle session still loads the document through the lease-aware API", async () => {
+	const h = editorClient();
+	const sessionId = crypto.randomUUID();
+	h.port.openDrawing.mockResolvedValueOnce({
+		id: sessionId,
+		referenceId: h.referenceId,
+		state: "idle",
+		epoch: 0,
+		revision: 1,
+	});
+	const { result } = renderHook(() =>
+		useDrawingEditor(h.client, h.referenceId),
+	);
+	await waitFor(() => expect(result.current.drawing?.id).toBe(h.document.id));
+	expect(result.current.title).toBe(h.document.title);
+	expect(result.current.error).toBe("");
+	expect(h.port.drawingDocument.mock.calls[0]?.[0]).toBe(sessionId);
+});
 test("disabled browser storage still permits loading and confirmed upstream saving", async () => {
 	const h = editorClient();
 	vi.spyOn(window, "sessionStorage", "get").mockImplementation(() => {

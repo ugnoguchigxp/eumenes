@@ -29,7 +29,10 @@ import { useArtifactWorkspace } from "../domains/artifact";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import { ArtifactPanel } from "../components/domains/artifact/ArtifactPanel";
 import { MusicArtifact } from "../components/domains/music/MusicArtifact";
-import { ToolchainArtifactHost } from "../domains/toolchain-artifacts";
+import {
+	ToolchainArtifactHost,
+	useToolchainArtifacts,
+} from "../domains/toolchain-artifacts";
 import { toolchainWebAdapters } from "./toolchain-adapters";
 
 export function useOpenSettings(
@@ -74,6 +77,7 @@ export function useOpenDrawing(
 				kind: "openui",
 				title: "図を描く・編集する",
 				definition: drawingDefinition,
+				keepMounted: true,
 			}),
 		[open],
 	);
@@ -128,6 +132,7 @@ export function WorkspaceArtifacts({
 	artifacts: ReturnType<typeof useArtifactWorkspace>;
 }) {
 	const openSettings = useOpenSettings(artifacts.open);
+	const { openById } = useToolchainArtifacts(client, artifacts.open);
 	return artifacts.tabs.length > 0 ? (
 		<ErrorBoundary label="artifact">
 			<ArtifactPanel
@@ -145,6 +150,7 @@ export function WorkspaceArtifacts({
 						targetRef={tab.targetRef}
 						visible={visible}
 						onTargetChange={(ref) => artifacts.setTarget(tab.id, ref)}
+						onNavigate={openById}
 					/>
 				)}
 				renderOpenUI={(definition) => (

@@ -16,6 +16,12 @@ import { DEFAULT_TIMER_SCOPE } from "../domains/timers";
 import { createAgentRuntime } from "../domains/agent-runtime";
 import { createTimerAdapter } from "./timer-adapter";
 import {
+	createSettingsAdapter,
+	publishedSettingsFields,
+	type SettingsAdapterPorts,
+} from "./settings-adapter";
+import { createRecordsAdapter, type RecordsPorts } from "./records-adapter";
+import {
 	bundleHostOf,
 	createRegistryActions,
 	createSchemaProvider,
@@ -43,6 +49,12 @@ export async function createToolchain(
 		timers?: import("../domains/timers").TimersService;
 		/** Tests that observe a pass immediately after a commit set 0. */
 		reconcileThrottleMs?: number;
+		/** Settings service for the data-driven settings screens (absent: no settings adapter). */
+		settings?: SettingsAdapterPorts;
+		/** Domain readers for the data-driven records screen (absent: no records adapter). */
+		records?: Omit<RecordsPorts, "history">;
+		/** Key for HMAC digests of secret-bearing UI actions (absent: such actions are refused). */
+		secretKey?: () => Uint8Array | undefined;
 		/** Open toolchain interactions for the timer question source (dialogue, created later). */
 		interactions?: NonNullable<
 			Parameters<typeof createTimerAdapter>[1]
@@ -50,15 +62,25 @@ export async function createToolchain(
 	} = {},
 ) {
 	// Typed domain adapters this host offers; bundles naming any other adapter are not registered.
-	const registry = createAdapterRegistry(
-		options.timers
+	const registry = createAdapterRegistry([
+		...(options.timers
 			? [
 					createTimerAdapter(options.timers, {
 						interactions: options.interactions,
 					}),
 				]
-			: [],
-	);
+			: []),
+		...(options.settings
+			? [
+					createSettingsAdapter(options.settings, {
+						fields: publishedSettingsFields(() => capabilities),
+					}),
+				]
+			: []),
+		...(options.records
+			? [createRecordsAdapter({ ...options.records, history: () => history })]
+			: []),
+	]);
 	const capabilities = createCapabilities(
 		store,
 		new Set([
@@ -163,6 +185,8 @@ export async function createToolchain(
 			registry,
 			// The only host scope until per-user scopes exist (design §8).
 			scope: options.timers?.scope ?? DEFAULT_TIMER_SCOPE,
+			// Secret-bearing UI actions are matched by HMAC under a settings-derived key.
+			secretKey: options.secretKey,
 			// `authority_epoch` of an acceptance row is the host's authority epoch. The host has a
 			// single owner and no revocation yet, so the ledger's default (0) is the whole truth;
 			// a per-user scope would pass its own `authorityEpoch` here.

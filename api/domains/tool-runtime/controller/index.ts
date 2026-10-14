@@ -89,13 +89,32 @@ export function registerToolchainActions(app: Hono, service: ActionRequests) {
 				rawTarget === undefined ? undefined : targetRef.safeParse(rawTarget);
 			if (!id.success || !source.success || (target && !target.success))
 				return c.json({ error: "invalid_artifact" }, 400);
+			const params = parseParams(c.req.query("params"));
+			if (params === invalidParams)
+				return c.json({ error: "invalid_params" }, 400);
 			try {
-				return c.json(service.source(id.data, source.data, target?.data));
+				return c.json(
+					service.source(id.data, source.data, target?.data, params),
+				);
 			} catch (error) {
 				return refusal(c, error);
 			}
 		},
 	);
+}
+
+const MAX_PARAMS_BYTES = 4096;
+const invalidParams = Symbol("invalid_params");
+/** `params` is URL-encoded JSON (at most 4 KiB); the source's registered schema validates it. */
+function parseParams(raw: string | undefined): unknown {
+	if (raw === undefined) return undefined;
+	if (new TextEncoder().encode(raw).length > MAX_PARAMS_BYTES)
+		return invalidParams;
+	try {
+		return JSON.parse(raw);
+	} catch {
+		return invalidParams;
+	}
 }
 
 function refusal(c: import("hono").Context, error: unknown) {

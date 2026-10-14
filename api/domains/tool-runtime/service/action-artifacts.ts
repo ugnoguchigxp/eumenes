@@ -13,10 +13,50 @@ import {
 export type ResolvedArtifact = {
 	entry: ArtifactListEntry;
 	doc: FixedDocument<ArtifactDefinitionV1>;
-	adapter: DomainAdapter;
+	/** Every adapter its sources (and toolchain binding) name; all registered and available. */
+	adapters: ReadonlyMap<string, DomainAdapter>;
 };
 
-/** The artifact a request may act on: active toolchain, definition present, adapter usable. */
+/** The artifact definition when it is a complete artifact document, else undefined. */
+function definitionOf(
+	ctx: LedgerContext,
+	db: Database,
+	artifactRevisionId: string,
+): FixedDocument<ArtifactDefinitionV1> | undefined {
+	const doc = ctx.capabilities.documentInTransaction(db, artifactRevisionId);
+	if (
+		!doc ||
+		!isRecord(doc.document) ||
+		doc.document.kind !== "artifact" ||
+		!Array.isArray(doc.document.sourceBindings) ||
+		!Array.isArray(doc.document.actionBindings)
+	)
+		return undefined;
+	return doc as FixedDocument<ArtifactDefinitionV1>;
+}
+
+/** The adapters an artifact needs, or undefined when one is unregistered or unavailable. */
+function usableAdapters(
+	ctx: LedgerContext,
+	db: Database,
+	entry: ArtifactListEntry,
+	doc: ArtifactDefinitionV1,
+): Map<string, DomainAdapter> | undefined {
+	const refs = new Set(doc.sourceBindings.map((s) => s.adapterRef));
+	if (entry.adapterRef) refs.add(entry.adapterRef);
+	const adapters = new Map<string, DomainAdapter>();
+	for (const ref of refs) {
+		const adapter = ctx.registry.get(ref);
+		if (!adapter || !adapter.availableInTransaction(db)) return undefined;
+		adapters.set(ref, adapter);
+	}
+	return adapters;
+}
+
+/**
+ * The artifact a request may act on: published (toolchain or launcher), definition present,
+ * and every adapter its sources name registered and available.
+ */
 export function resolveArtifact(
 	ctx: LedgerContext,
 	db: Database,
@@ -26,19 +66,11 @@ export function resolveArtifact(
 		.artifactsInTransaction(db)
 		.find((a) => a.artifactRevisionId === artifactRevisionId);
 	if (!entry) return new ActionRequestError("artifact_not_found", 404);
-	const adapter = ctx.registry.get(entry.adapterRef);
-	if (!adapter || !adapter.availableInTransaction(db))
-		return new ActionRequestError("adapter_unavailable", 503);
-	const doc = ctx.capabilities.documentInTransaction(db, artifactRevisionId);
-	if (
-		!doc ||
-		!isRecord(doc.document) ||
-		doc.document.kind !== "artifact" ||
-		!Array.isArray(doc.document.sourceBindings) ||
-		!Array.isArray(doc.document.actionBindings)
-	)
-		return new ActionRequestError("artifact_unavailable", 503);
-	return { entry, doc: doc as FixedDocument<ArtifactDefinitionV1>, adapter };
+	const doc = definitionOf(ctx, db, artifactRevisionId);
+	if (!doc) return new ActionRequestError("artifact_unavailable", 503);
+	const adapters = usableAdapters(ctx, db, entry, doc.document);
+	if (!adapters) return new ActionRequestError("adapter_unavailable", 503);
+	return { entry, doc, adapters };
 }
 
 export function targetProblem(
@@ -52,14 +84,16 @@ export function targetProblem(
 	return undefined;
 }
 
-/** Artifacts whose adapter is usable now: one launcher entry each. */
+/** Artifacts whose adapters are all usable now: toolchain artifacts and launchers. */
 export function usableArtifacts(
 	ctx: LedgerContext,
 	db: Database,
 ): ArtifactListEntry[] {
-	return ctx.capabilities.artifactsInTransaction(db).filter((a) => {
-		const adapter = ctx.registry.get(a.adapterRef);
-		return !!adapter && adapter.availableInTransaction(db);
+	return ctx.capabilities.artifactsInTransaction(db).flatMap((entry) => {
+		const doc = definitionOf(ctx, db, entry.artifactRevisionId);
+		return doc && usableAdapters(ctx, db, entry, doc.document)
+			? [{ ...entry, launcher: entry.launcher ?? null }]
+			: [];
 	});
 }
 
@@ -78,6 +112,22 @@ export function artifactView(
 	};
 }
 
+/** Read parameters are accepted only for sources that register a schema, and are validated. */
+function validParams(
+	ctx: LedgerContext,
+	db: Database,
+	schemaRef: string | undefined,
+	params: unknown,
+): unknown {
+	if (params === undefined) return undefined;
+	if (!schemaRef) throw new ActionRequestError("invalid_params", 400);
+	const schema = ctx.capabilities.schemaInTransaction(db, schemaRef);
+	if (!schema) throw new ActionRequestError("schema_unavailable", 503);
+	const parsed = schema.safeParse(params);
+	if (!parsed.success) throw new ActionRequestError("invalid_params", 400);
+	return parsed.data;
+}
+
 /** One registered source of an artifact; the host resolves the query, not the caller. */
 export function readSource(
 	ctx: LedgerContext,
@@ -85,6 +135,8 @@ export function readSource(
 	artifactRevisionId: string,
 	source: string,
 	targetRef?: string,
+	/** Parsed `params` of the request; undefined when the client sent none. */
+	params?: unknown,
 ): SourceView {
 	const resolved = resolveArtifact(ctx, db, artifactRevisionId);
 	if (resolved instanceof ActionRequestError) throw resolved;
@@ -92,16 +144,17 @@ export function readSource(
 		(s) => s.source === source,
 	);
 	if (!binding) throw new ActionRequestError("source_not_found", 404);
-	if (binding.adapterRef !== resolved.entry.adapterRef)
-		throw new ActionRequestError("artifact_unavailable", 503);
-	if (!resolved.adapter.describe().queries.has(binding.query))
+	const adapter = resolved.adapters.get(binding.adapterRef);
+	if (!adapter) throw new ActionRequestError("adapter_unavailable", 503);
+	if (!adapter.describe().queries.has(binding.query))
 		throw new ActionRequestError("query_unavailable", 503);
 	const problem = targetProblem(binding.target, targetRef);
 	if (problem) throw problem;
-	const read = resolved.adapter.sourceInTransaction(
+	const read = adapter.sourceInTransaction(
 		db,
 		binding.query,
 		targetRef,
+		validParams(ctx, db, binding.paramsSchemaRef, params),
 	);
 	if (!read) throw new ActionRequestError("target_not_found", 404);
 	return { revision: read.revision, data: read.data };

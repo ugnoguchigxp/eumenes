@@ -12,7 +12,7 @@ const revisionNumber = z.number().int().min(1).max(1_000_000);
 const slug = z.string().regex(/^[a-z][a-z0-9._-]{0,100}$/);
 /** `adapter:timers@1`, `availability:timers@1`, `input:timer-hms@1`, `projection:timer-result@1`. */
 export const hostRefPattern =
-	/^(adapter|availability|input|projection|connection|query):[a-z][a-z0-9._-]{0,80}(@[1-9][0-9]*)?$/;
+	/^(adapter|availability|input|projection|connection|query|document|condition|structure):[a-z][a-z0-9._-]{0,80}(@[1-9][0-9]*)?$/;
 export const hostRef = (kind: string) =>
 	z
 		.string()
@@ -132,6 +132,11 @@ export const sourceBindingV1 = z.strictObject({
 	query: hostRef("query"),
 	/** none: no target; required: the host resolves one target ref it issued (e.g. a timer id). */
 	target: z.enum(["none", "required", "optional"]),
+	/**
+	 * Read parameters the client may pass to this source (paging, sorting, search), validated by
+	 * this schema. Reads never go through the action ledger.
+	 */
+	paramsSchemaRef: schemaRef.optional(),
 });
 export type SourceBindingV1 = z.infer<typeof sourceBindingV1>;
 
@@ -147,10 +152,102 @@ export const actionBindingV1 = z.strictObject({
 	inputSchemaRef: schemaRef,
 	/** Registered typed input conversion, e.g. `input:timer-hms@1`. */
 	inputAdapterRef: hostRef("input").optional(),
-	/** Local-only actions (tab switch, clock mode) are never sent to the backend. */
-	effect: z.enum(["write", "read", "local"]),
+	/**
+	 * write: an adapter operation through the action ledger (reads are parameterized source
+	 * reads, never ledger entries). local: handled by the Web
+	 * adapter (clock mode, stopwatch). navigate: the common host opens `navigateTo`. draft: the
+	 * common host edits or discards the shared draft of `draftDocument` (`draftAction`).
+	 */
+	effect: z.enum(["write", "local", "navigate", "draft"]),
+	/**
+	 * navigate only: the registered artifact to open — fixed (`artifactId`), or chosen by the
+	 * event's string value `byValue` from a closed map of value → artifact id.
+	 */
+	navigateTo: z
+		.union([
+			z.strictObject({ artifactId: slug }),
+			z.strictObject({
+				byValue: z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,40}$/),
+				artifacts: z
+					.record(z.string().regex(/^[a-z][a-z0-9-]{0,40}$/), slug)
+					.refine(
+						(m) => Object.keys(m).length >= 1 && Object.keys(m).length <= 32,
+					),
+			}),
+		])
+		.optional(),
+	/** draft only. */
+	draftAction: z.enum(["edit", "discard"]).optional(),
+	/**
+	 * The adapter document whose shared draft this action edits (draft) or applies (write: the
+	 * host sends the frozen draft changes as the operation input).
+	 */
+	draftDocument: hostRef("document").optional(),
+	/**
+	 * Input paths (top-level keys) holding secrets: never stored in the outbox, the action ledger
+	 * body, logs or snapshots; the ledger keeps an HMAC only.
+	 */
+	confidentialFields: z
+		.array(z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,40}$/))
+		.max(8)
+		.optional(),
 });
 export type ActionBindingV1 = z.infer<typeof actionBindingV1>;
+
+/**
+ * A registered field of an adapter-owned document (e.g. the settings document). The path is a
+ * fixed, reviewed pointer checked by the adapter against its own schema; clients never send paths.
+ * `$.a.b` or an array element chosen by stable id: `$.resources[id=$target].voice`.
+ */
+export const documentFieldV1 = z.strictObject({
+	fieldId: z.string().regex(/^[a-z][a-z0-9.-]{0,80}$/),
+	document: hostRef("document"),
+	path: z
+		.string()
+		.regex(
+			/^\$(\.[A-Za-z][A-Za-z0-9_]{0,40}(\[id=\$target\])?)+$/,
+			"fixed path",
+		),
+	/** The source listing the array targets, when the path selects `[id=$target]`. */
+	target: z
+		.string()
+		.regex(/^[a-z][a-z0-9-]{0,63}$/)
+		.optional(),
+	label: z.string().min(1).max(80),
+	help: z.string().max(300).optional(),
+	group: z
+		.string()
+		.regex(/^[a-z][a-z0-9-]{0,40}$/)
+		.optional(),
+	/** Shown under the detail disclosure. */
+	detail: z.boolean().optional(),
+	control: z.enum(["text", "select", "toggle", "range", "number", "multiple"]),
+	options: z
+		.array(
+			z.strictObject({
+				value: z.string().max(200),
+				label: z.string().min(1).max(120),
+			}),
+		)
+		.max(64)
+		.optional(),
+	/** A registered adapter query returning the options at runtime. */
+	optionsSource: hostRef("query").optional(),
+	searchable: z.boolean().optional(),
+	min: z.number().optional(),
+	max: z.number().optional(),
+	step: z.number().positive().optional(),
+	maxLength: z.number().int().positive().max(4096).optional(),
+	/** What an empty input means; only for optional fields. */
+	unset: z.enum(["delete-key", "null", "empty-string"]).optional(),
+	/** The value shown when the document has none (display only; never written as a change). */
+	defaultValue: z.string().max(200).optional(),
+	/** A secret: kept only in the draft's memory and sent through confidential action fields. */
+	confidential: z.boolean().optional(),
+	/** A registered condition (evaluated by the Web adapter) that shows the field. */
+	visibleWhen: hostRef("condition").optional(),
+});
+export type DocumentFieldV1 = z.infer<typeof documentFieldV1>;
 
 /** A presentation of the same sources and actions; variants differ only in layout. */
 export const artifactVariantV1 = z.strictObject({
@@ -172,7 +269,26 @@ export const artifactDefinitionV1 = z
 		variants: z.array(artifactVariantV1).min(1).max(8),
 		defaultVariant: z.string(),
 		sourceBindings: z.array(sourceBindingV1).min(1).max(16),
-		actionBindings: z.array(actionBindingV1).max(32),
+		actionBindings: z.array(actionBindingV1).max(48),
+		/**
+		 * Published on its own (no toolchain): a launcher entry. A newer revision of the same id
+		 * switches the published pointer, as with toolchains.
+		 */
+		launcher: z
+			.strictObject({
+				label: z.string().min(1).max(80),
+				/** Shown with the entry inside a hub screen. */
+				description: z.string().max(200).optional(),
+				/**
+				 * Without a group the entry is in the top launcher menu; with a group it is published
+				 * for in-app navigation (e.g. a hub screen) and grouped there, not in the top menu.
+				 */
+				group: z.string().max(40).optional(),
+				order: z.number().int().min(0).max(1000).optional(),
+			})
+			.optional(),
+		/** Registered fields of adapter documents shown by this artifact. */
+		fields: z.array(documentFieldV1).max(128).optional(),
 	})
 	.superRefine((a, ctx) => {
 		if (!a.variants.some((v) => v.id === a.defaultVariant))
@@ -187,8 +303,15 @@ export const artifactDefinitionV1 = z
 			if (ids.has(action.actionId))
 				ctx.addIssue({ code: "custom", message: "duplicate action" });
 			ids.add(action.actionId);
-			if (!!action.operationId === !!action.answer && action.effect !== "local")
+			const sent = action.effect === "write";
+			if (sent && !!action.operationId === !!action.answer)
 				ctx.addIssue({ code: "custom", message: "operation or answer" });
+			if ((action.effect === "navigate") !== !!action.navigateTo)
+				ctx.addIssue({ code: "custom", message: "navigateTo" });
+			if ((action.effect === "draft") !== !!action.draftAction)
+				ctx.addIssue({ code: "custom", message: "draftAction" });
+			if (action.effect === "draft" && !action.draftDocument)
+				ctx.addIssue({ code: "custom", message: "draftDocument" });
 		}
 	});
 export type ArtifactDefinitionV1 = z.infer<typeof artifactDefinitionV1>;
@@ -227,6 +350,27 @@ export const capabilityBundleV1 = z.strictObject({
 });
 export type CapabilityBundleV1 = z.infer<typeof capabilityBundleV1>;
 
+/** What a document's schema says about one fixed path; null when the path names no field. */
+export type DocumentPathInfo = {
+	kind: "string" | "number" | "integer" | "boolean" | "enum" | "array";
+	/** Allowed values of an enum, or of the items of an array of enums. */
+	values?: readonly string[];
+	min?: number;
+	max?: number;
+	maxLength?: number;
+	/** May be absent (`delete-key`) or null (`null`). */
+	optional: boolean;
+	nullable: boolean;
+};
+export type DocumentDescription = {
+	describePath(path: string): DocumentPathInfo | null;
+	/**
+	 * For `[id=$target]` paths: the registered query whose data lists the allowed targets
+	 * (registration requires the field's target source to use it).
+	 */
+	targetQuery?(path: string): string | null;
+};
+
 /** What this host can execute; bundles referring to anything else are rejected before saving. */
 export type BundleHost = {
 	adapters: ReadonlyMap<
@@ -234,6 +378,10 @@ export type BundleHost = {
 		{
 			operations: ReadonlyMap<string, { inputSchemaRef: string }>;
 			queries: ReadonlySet<string>;
+			/** Documents whose fields may be registered, with the adapter's own path description. */
+			documents?: ReadonlyMap<string, DocumentDescription>;
+			/** Field visibility conditions the adapter's Web counterpart implements. */
+			conditions?: ReadonlySet<string>;
 		}
 	>;
 	availability: ReadonlySet<string>;

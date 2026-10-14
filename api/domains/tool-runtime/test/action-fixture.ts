@@ -17,6 +17,8 @@ import type { CapabilityReads } from "../service/action-types";
 
 export const ADAPTER_REF = "adapter:fake@1";
 export const ARTIFACT_ID = "artifact:fake.workspace@1";
+export const OTHER_REF = "adapter:other@1";
+export const HUB_ID = "artifact:fake.hub@1";
 export const SCOPE = "default";
 
 export const artifact: ArtifactDefinitionV1 = {
@@ -39,6 +41,13 @@ export const artifact: ArtifactDefinitionV1 = {
 			query: "query:fake.current@1",
 			target: "required",
 		},
+		{
+			source: "records",
+			adapterRef: ADAPTER_REF,
+			query: "query:fake.records@1",
+			target: "none",
+			paramsSchemaRef: "builtin:fakeParams",
+		},
 	],
 	actionBindings: [
 		{
@@ -59,14 +68,6 @@ export const artifact: ArtifactDefinitionV1 = {
 			effect: "write",
 		},
 		{
-			actionId: "refresh",
-			eventAction: "fake-refresh",
-			source: "item",
-			operationId: "fake.read",
-			inputSchemaRef: "builtin:fakeEmpty",
-			effect: "read",
-		},
-		{
 			actionId: "clock",
 			eventAction: "fake-clock",
 			source: "setup",
@@ -85,12 +86,64 @@ export const artifact: ArtifactDefinitionV1 = {
 			actionId: "mismatch",
 			eventAction: "fake-mismatch",
 			source: "setup",
-			operationId: "fake.start",
-			inputSchemaRef: "builtin:fakeHms",
-			inputAdapterRef: "input:fake-hms@1",
-			effect: "read",
+			operationId: "fake.read",
+			inputSchemaRef: "builtin:fakeEmpty",
+			effect: "write",
+		},
+		{
+			actionId: "open",
+			eventAction: "fake-open",
+			source: "setup",
+			inputSchemaRef: "builtin:fakeEmpty",
+			effect: "navigate",
+			navigateTo: { artifactId: "fake.hub" },
+		},
+		{
+			actionId: "edit",
+			eventAction: "fake-edit",
+			source: "setup",
+			inputSchemaRef: "builtin:fakeEmpty",
+			effect: "draft",
+			draftAction: "edit",
+			draftDocument: "document:fake@1",
+		},
+		{
+			actionId: "apply",
+			eventAction: "fake-apply",
+			source: "setup",
+			operationId: "fake.apply",
+			inputSchemaRef: "builtin:fakeApply",
+			effect: "write",
+			draftDocument: "document:fake@1",
+			confidentialFields: ["token"],
 		},
 	],
+};
+
+/** A standalone launcher artifact (no toolchain) reading two adapters. */
+export const hub: ArtifactDefinitionV1 = {
+	kind: "artifact",
+	id: "fake.hub",
+	revision: 1,
+	title: "Fake hub",
+	launcher: { label: "Hub", group: "manage", order: 1 },
+	variants: [{ id: "standard", label: "標準", definition: {} }],
+	defaultVariant: "standard",
+	sourceBindings: [
+		{
+			source: "setup",
+			adapterRef: ADAPTER_REF,
+			query: "query:fake.setup@1",
+			target: "none",
+		},
+		{
+			source: "others",
+			adapterRef: OTHER_REF,
+			query: "query:other.list@1",
+			target: "none",
+		},
+	],
+	actionBindings: [],
 };
 
 export const schemas: Record<string, z.ZodType> = {
@@ -103,6 +156,18 @@ export const schemas: Record<string, z.ZodType> = {
 	"builtin:fakeStart": z.strictObject({
 		durationSeconds: z.number().int().min(1).max(86400),
 	}),
+	"builtin:fakeParams": z.strictObject({
+		offset: z.number().int().min(0).max(1000),
+		limit: z.number().int().min(1).max(50),
+		search: z.string().max(40).optional(),
+	}),
+	"builtin:fakeApply": z.strictObject({
+		expectedRevision: z.number().int(),
+		changes: z.array(
+			z.strictObject({ fieldId: z.string(), value: z.unknown() }),
+		),
+		token: z.string().min(1).optional(),
+	}),
 	"builtin:fakeTarget": z.strictObject({
 		itemId: z.string(),
 		expectedRevision: z.number().int(),
@@ -110,7 +175,11 @@ export const schemas: Record<string, z.ZodType> = {
 };
 
 export function makeHarness(
-	options: { now?: () => number; available?: () => boolean } = {},
+	options: {
+		now?: () => number;
+		available?: () => boolean;
+		secretKey?: () => Uint8Array | undefined;
+	} = {},
 ) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-actions-"));
 	const store = openStore(join(dir, "db"), [
@@ -123,6 +192,7 @@ export function makeHarness(
 	]);
 	const items = new Map<string, number>([["item-1", 3]]);
 	const calls = { afterCommit: 0 };
+	const sourceParams: unknown[] = [];
 	const invoked: Array<{
 		requestId: string;
 		issuedAt: string;
@@ -168,11 +238,19 @@ export function makeHarness(
 					{ inputSchemaRef: "builtin:fakeTarget", effect: "write" as const },
 				],
 				[
+					"fake.apply",
+					{ inputSchemaRef: "builtin:fakeApply", effect: "write" as const },
+				],
+				[
 					"fake.read",
 					{ inputSchemaRef: "builtin:fakeTarget", effect: "read" as const },
 				],
 			]),
-			queries: new Set(["query:fake.setup@1", "query:fake.current@1"]),
+			queries: new Set([
+				"query:fake.setup@1",
+				"query:fake.current@1",
+				"query:fake.records@1",
+			]),
 			inputAdapters: new Map([
 				[
 					"input:fake-hms@1",
@@ -215,7 +293,8 @@ export function makeHarness(
 			).run(
 				request.requestId,
 				request.operationName,
-				JSON.stringify(request.input),
+				// The owning domain never keeps a secret in its receipt.
+				JSON.stringify({ ...(request.input as object), token: undefined }),
 				request.issuedAt,
 			);
 			const seconds = (request.input as { durationSeconds?: number })
@@ -230,7 +309,11 @@ export function makeHarness(
 				.get(operationId.replace(/^op-/, ""))
 				? resultOf(tx, operationId.replace(/^op-/, ""))
 				: null,
-		sourceInTransaction: (_tx, query, targetRef) => {
+		sourceInTransaction: (_tx, query, targetRef, params) => {
+			if (query === "query:fake.records@1") {
+				sourceParams.push(params);
+				return { revision: 2, data: { rows: [], params } };
+			}
 			if (query === "query:fake.setup@1")
 				return { revision: 0, data: { defaults: [0, 0, 90] } };
 			const revision = targetRef ? items.get(targetRef) : undefined;
@@ -246,10 +329,27 @@ export function makeHarness(
 			calls.afterCommit++;
 		},
 	};
+	let otherAvailable = true;
+	const other: DomainAdapter = {
+		...adapter,
+		ref: OTHER_REF,
+		describe: () => ({
+			owner: "other",
+			operations: new Map(),
+			queries: new Set(["query:other.list@1"]),
+			inputAdapters: new Map(),
+			projections: new Set(),
+			availability: "availability:other@1",
+		}),
+		availableInTransaction: () => otherAvailable,
+		sourceInTransaction: () => ({ revision: 1, data: { rows: [] } }),
+	};
+	let hubActive = true;
 	let active = true;
+	let key: Uint8Array | undefined = new Uint8Array(32).fill(7);
 	const capabilities: CapabilityReads = {
-		artifactsInTransaction: () =>
-			active
+		artifactsInTransaction: () => [
+			...(active
 				? [
 						{
 							toolchainId: "fake.manage",
@@ -259,10 +359,27 @@ export function makeHarness(
 							adapterRef: ADAPTER_REF,
 						},
 					]
-				: [],
+				: []),
+			...(hubActive
+				? [
+						{
+							toolchainId: null,
+							toolchainRevisionId: null,
+							artifactRevisionId: HUB_ID,
+							title: "Fake hub",
+							adapterRef: null,
+							launcher: hub.launcher,
+						},
+					]
+				: []),
+		],
 		documentInTransaction: (_db, id) =>
-			id === ARTIFACT_ID
-				? { revisionId: id, digest: "a".repeat(64), document: artifact }
+			id === ARTIFACT_ID || id === HUB_ID
+				? {
+						revisionId: id,
+						digest: "a".repeat(64),
+						document: id === HUB_ID ? hub : artifact,
+					}
 				: null,
 		schemaInTransaction: (_db, ref) => schemas[ref] ?? null,
 	};
@@ -273,9 +390,10 @@ export function makeHarness(
 	const service = createActionRequests({
 		store,
 		capabilities,
-		registry: createAdapterRegistry([adapter]),
+		registry: createAdapterRegistry([adapter, other]),
 		now,
 		scope: SCOPE,
+		secretKey: options.secretKey ?? (() => key),
 	});
 	const event = (
 		patch: Partial<ToolchainActionEventV1> = {},
@@ -311,6 +429,7 @@ export function makeHarness(
 		adapter,
 		items,
 		calls,
+		sourceParams,
 		invoked,
 		time,
 		event,
@@ -318,6 +437,15 @@ export function makeHarness(
 		ledger,
 		setAvailable: (fn: () => boolean) => {
 			available = fn;
+		},
+		setOtherAvailable: (value: boolean) => {
+			otherAvailable = value;
+		},
+		setHubActive: (value: boolean) => {
+			hubActive = value;
+		},
+		setKey: (value: Uint8Array | undefined) => {
+			key = value;
 		},
 		setActive: (value: boolean) => {
 			active = value;

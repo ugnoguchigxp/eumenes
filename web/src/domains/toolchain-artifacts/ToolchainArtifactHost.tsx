@@ -6,29 +6,32 @@ import type {
 	Snapshot,
 } from "@eumenes/artifact-ui/contracts";
 import { Button } from "@eumenes/design-system";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import type {
 	ActionBindingV1,
 	ArtifactDefinitionV1,
 } from "../../../../api/domains/capabilities/contracts";
 import type { EumenesClient } from "../../../../client";
-import { ApiError } from "../../../../client/transport";
 import { queryRoots } from "../../queryKeys";
+import { useActionWiring } from "./action-wiring";
+import type { ActionOutcome } from "./dispatcher";
+import { useDraftActions } from "./draft-actions";
 import {
-	createActionDispatcher,
-	type ActionDispatcher,
-	type ActionOutcome,
-} from "./dispatcher";
-import { receiptOf, rejectionMessage, unsettledMessage } from "./messages";
-import { createOutbox } from "./outbox";
+	documentsOf,
+	useDocumentFields,
+	useDraftViews,
+} from "./document-hooks";
+import { toolchainArtifactsQuery } from "./launcher";
+import { receiptOf } from "./messages";
+import { navigationDestination } from "./navigation";
+import { useAnswer, useOpenQuestion } from "./questions";
 import type {
 	AdapterState,
-	AnswerInput,
-	OpenQuestion,
 	WebAdapterRegistry,
 	WebArtifactAdapter,
 } from "./registry";
+
 import "./ToolchainArtifactHost.css";
 
 export type ToolchainArtifactHostProps = {
@@ -43,12 +46,18 @@ export type ToolchainArtifactHostProps = {
 	targetRef?: string;
 	visible?: boolean;
 	onTargetChange?: (ref: string | undefined) => void;
+	/** Opens the registered artifact with this id (a navigate binding); false when unknown. */
+	onNavigate?: (artifactId: string) => Promise<boolean> | boolean;
 	conversationId?: string;
 };
 
 const noop = () => {};
 
-/** The event's binding: same event and source first, else the only binding of that event. */
+/**
+ * The event's binding: the one registered for this event and source (a registration holds at
+ * most one), else the only binding of that event. Panels with several actions register one
+ * binding and name the action in the event's `id` value.
+ */
 export function findActionBinding(
 	bindings: readonly ActionBindingV1[],
 	event: Pick<ArtifactEvent, "action" | "source">,
@@ -114,46 +123,6 @@ export function ToolchainArtifactHost(props: ToolchainArtifactHostProps) {
 	);
 }
 
-function openQuestionOf(
-	interactions: ReadonlyArray<{
-		id: string;
-		status: string;
-		revision: number;
-		artifactRevisionId: string | null;
-		question: {
-			questionId: string;
-			prompt: string;
-			inputSchemaRef: string;
-			expiresAt: string;
-			choices?: ReadonlyArray<{ ref: string; label: string }>;
-		} | null;
-	}>,
-	artifactRevisionId: string,
-): OpenQuestion | null {
-	const found = interactions.find(
-		(i) =>
-			i.status === "waiting_input" &&
-			i.artifactRevisionId === artifactRevisionId &&
-			i.question &&
-			Date.parse(i.question.expiresAt) > Date.now(),
-	);
-	if (!found?.question) return null;
-	return {
-		interactionId: found.id,
-		questionId: found.question.questionId,
-		revision: found.revision,
-		prompt: found.question.prompt,
-		inputSchemaRef: found.question.inputSchemaRef,
-		choices: found.question.choices,
-	};
-}
-
-function defaultAnswerInput(question: OpenQuestion, text: string): AnswerInput {
-	if (question.inputSchemaRef === "builtin:answerText" && text)
-		return { ok: true, value: { text } };
-	return { ok: false, message: "この質問への回答を確認してください。" };
-}
-
 function AdapterScreen({
 	client,
 	adapter,
@@ -165,37 +134,33 @@ function AdapterScreen({
 	targetRef,
 	visible = true,
 	onTargetChange,
+	onNavigate,
 	conversationId = "main",
 }: ToolchainArtifactHostProps & {
 	adapter: WebArtifactAdapter;
 	artifact: ArtifactDefinitionV1;
 	scopeRef: string;
 }) {
-	const cache = useQueryClient();
-	const [notice, setNotice] = useState<string | null>(null);
-	const [settledEpoch, setSettledEpoch] = useState(0);
-	const questionSource = artifact.actionBindings.find((a) => a.answer)?.source;
-	const interactions = useQuery({
-		queryKey: [
-			queryRoots.toolchainInteractions,
-			client.identity,
-			conversationId,
-			"waiting_input",
-		],
-		queryFn: ({ signal }) =>
-			client.toolchainInteractions(
-				{ conversationId, status: "waiting_input" },
-				signal,
-			),
-		enabled: !!questionSource,
-	});
-	const question = useMemo(
-		() =>
-			questionSource && interactions.data
-				? openQuestionOf(interactions.data, artifactRevisionId)
-				: null,
-		[questionSource, interactions.data, artifactRevisionId],
+	const { question, questionSource } = useOpenQuestion(
+		client,
+		artifact,
+		artifactRevisionId,
+		conversationId,
 	);
+	const catalogQuery = useQuery({
+		...toolchainArtifactsQuery(client),
+		// Navigation labels and a document's other screens come from the published list.
+		enabled:
+			documentsOf(artifact).length > 0 ||
+			artifact.actionBindings.some((a) => a.effect === "navigate"),
+	});
+	const catalog = useMemo(() => catalogQuery.data ?? [], [catalogQuery.data]);
+	const {
+		fields: documentFields,
+		documents,
+		ready: documentFieldsReady,
+	} = useDocumentFields(client, artifact, artifactRevisionId, catalog);
+	const drafts = useDraftViews(client.identity, documents);
 	const state: AdapterState = adapter.useArtifact({
 		client,
 		artifact,
@@ -203,6 +168,10 @@ function AdapterScreen({
 		targetRef,
 		setTargetRef: onTargetChange ?? noop,
 		visible,
+		catalog,
+		documentFields,
+		documentFieldsReady,
+		drafts,
 	});
 	const snapshot = useMemo<Snapshot>(
 		() =>
@@ -224,154 +193,45 @@ function AdapterScreen({
 				: state.snapshot,
 		[state.snapshot, questionSource, question],
 	);
-	const latest = useRef({ state, snapshot, question });
-	useEffect(() => {
-		latest.current = { state, snapshot, question };
+	const latest = useRef({
+		state,
+		snapshot,
+		question,
+		documentFields,
 	});
-
-	const describe = useCallback(
-		(
-			code: string | undefined,
-			fieldErrors: ReadonlyArray<{ field: string; message: string }>,
-		) =>
-			rejectionMessage(code, fieldErrors, (c, f) =>
-				latest.current.state.describeRejection?.(c, f),
-			),
-		[],
-	);
-
-	const outbox = useMemo(
-		() => createOutbox(client.identity),
-		[client.identity],
-	);
-	const dispatcherRef = useRef<ActionDispatcher | null>(null);
 	useEffect(() => {
-		const dispatcher = createActionDispatcher({
+		latest.current = { state, snapshot, question, documentFields };
+	});
+	const getLatest = useCallback(() => latest.current, []);
+	const { describe, dispatcherRef, notice, setNotice, settledEpoch } =
+		useActionWiring({
 			client,
-			outbox,
+			artifact,
 			artifactId,
 			artifactRevisionId,
 			scopeRef,
-			onSettled(event, outcome) {
-				setSettledEpoch((n) => n + 1);
-				const binding = artifact.actionBindings.find(
-					(a) => a.actionId === event.actionId,
-				);
-				if (outcome.kind === "accepted") {
-					if (binding && outcome.result)
-						latest.current.state.settled(binding, outcome.result, {
-							sent: performance.now(),
-							sentAt: Date.now(),
-						});
-					setNotice("前回の操作の結果を確認し、画面に反映しました。");
-				} else if (outcome.kind === "rejected") {
-					latest.current.state.refresh();
-					setNotice(
-						`前回の操作は完了しませんでした。${describe(outcome.code, outcome.fieldErrors)}`,
-					);
-				}
-			},
-			onDiscarded() {
-				setNotice(
-					"以前の操作を照合できていません。画面の状態を確認してから、必要なら操作し直してください。",
-				);
-			},
-			onUnknown() {
-				setNotice("結果を確認中の操作があります。");
-			},
+			getLatest,
 		});
-		dispatcherRef.current = dispatcher;
-		void dispatcher.start();
-		const retry = () => void dispatcher.reconcileAll();
-		window.addEventListener("online", retry);
-		window.addEventListener("focus", retry);
-		return () => {
-			window.removeEventListener("online", retry);
-			window.removeEventListener("focus", retry);
-			dispatcher.stop();
-			dispatcherRef.current = null;
-		};
-	}, [
+	const answer = useAnswer(client, getLatest);
+	const { draftAction, applyDraft } = useDraftActions({
 		client,
-		outbox,
-		artifactId,
-		artifactRevisionId,
-		scopeRef,
 		artifact,
+		getLatest,
+		dispatcherRef,
 		describe,
-	]);
-
-	const answerIds = useRef(new Map<string, string>());
-	const answer = useCallback(
-		async (event: ArtifactEvent): Promise<Receipt> => {
-			const { state: s, question: q } = latest.current;
-			if (!q)
-				return {
-					status: "rejected",
-					message: "回答できる質問がありません。",
-				};
-			const text = String(event.values.answer ?? "").trim();
-			const parsed = (s.answerInput ?? defaultAnswerInput)(q, text);
-			if (!parsed.ok) return { status: "rejected", message: parsed.message };
-			// A resend of the same answer keeps its id, so the server replays it once.
-			const key = `${q.interactionId}:${q.questionId}:${JSON.stringify(parsed.value)}`;
-			const eventId = answerIds.current.get(key) ?? crypto.randomUUID();
-			answerIds.current.set(key, eventId);
-			try {
-				await client.answerToolchainInteraction(q.interactionId, {
-					eventId,
-					questionId: q.questionId,
-					expectedRevision: q.revision,
-					input: parsed.value,
-				});
-				answerIds.current.delete(key);
-				void cache.invalidateQueries({
-					queryKey: [queryRoots.toolchainInteractions],
-				});
-				void cache.invalidateQueries({ queryKey: [queryRoots.dialogue] });
-				void cache.invalidateQueries({ queryKey: [queryRoots.conversation] });
-				return { status: "accepted", message: "回答を送りました。" };
-			} catch (error) {
-				if (error instanceof ApiError && error.status === 409) {
-					answerIds.current.delete(key);
-					void cache.invalidateQueries({
-						queryKey: [queryRoots.toolchainInteractions],
-					});
-					return {
-						status: "conflict",
-						message: "質問の状態が変わりました。最新の質問を読み込みます。",
-					};
-				}
-				if (
-					error instanceof ApiError &&
-					error.status >= 400 &&
-					error.status < 500 &&
-					error.status !== 429
-				) {
-					answerIds.current.delete(key);
-					void cache.invalidateQueries({
-						queryKey: [queryRoots.toolchainInteractions],
-					});
-					return {
-						status: "rejected",
-						message:
-							error.status === 410
-								? "この質問は期限切れです。"
-								: "回答を確認してください。",
-					};
-				}
-				return { status: "indeterminate", message: unsettledMessage };
-			}
-		},
-		[client, cache],
-	);
+	});
 
 	const dispatch = useCallback(
 		async (event: ArtifactEvent): Promise<Receipt> => {
 			const { state: s, snapshot: shown } = latest.current;
 			const binding = findActionBinding(artifact.actionBindings, event);
 			if (!binding)
-				return { status: "rejected", message: "この操作は利用できません" };
+				return (
+					s.sourceRead?.(event) ?? {
+						status: "rejected",
+						message: "この操作は利用できません",
+					}
+				);
 			const current = shown[event.source];
 			if (current && current.revision !== event.revision)
 				return {
@@ -379,7 +239,16 @@ function AdapterScreen({
 					message: "状態が変わりました。もう一度お試しください。",
 				};
 			if (binding.effect === "local") return s.local(binding, event);
+			if (binding.effect === "draft") return draftAction(binding, event);
+			if (binding.effect === "navigate") {
+				const destination = navigationDestination(binding, event.values);
+				const opened = destination ? await onNavigate?.(destination) : false;
+				return opened
+					? { status: "accepted", message: "" }
+					: { status: "rejected", message: "この画面は現在利用できません" };
+			}
 			if (binding.answer) return answer(event);
+			if (binding.draftDocument) return applyDraft(binding, event);
 			const timing = { sent: performance.now(), sentAt: Date.now() };
 			const dispatcher = dispatcherRef.current;
 			if (!dispatcher)
@@ -392,11 +261,19 @@ function AdapterScreen({
 				input: event.values,
 			});
 			if (outcome.kind === "accepted" && outcome.result)
-				s.settled(binding, outcome.result, timing);
+				s.settled(binding, outcome.result, timing, event.values);
 			if (outcome.kind === "rejected" && outcome.conflict) s.refresh();
 			return receiptOf(outcome, describe);
 		},
-		[artifact, answer, describe],
+		[
+			artifact,
+			answer,
+			describe,
+			draftAction,
+			applyDraft,
+			onNavigate,
+			dispatcherRef,
+		],
 	);
 
 	const variant = artifact.variants.find(

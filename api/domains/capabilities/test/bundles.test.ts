@@ -2,9 +2,12 @@ import { expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Hono } from "hono";
 import { openStore } from "../../../infrastructure/sqlite";
 import {
 	createCapabilities,
+	errorStatus,
+	registerCapabilities,
 	migrations,
 	toolchainRuntimeOf,
 	type BundleHost,
@@ -136,9 +139,11 @@ test("the shipped bundle's pin is the stored digest and its toolchain is data-dr
 				{
 					toolchainId: "timers.manage",
 					toolchainRevisionId: "toolchain:timers.manage@3",
+					artifactId: "timers.workspace",
 					artifactRevisionId: "artifact:timers.workspace@1",
 					title: "タイマー（データドリブン）",
 					adapterRef: "adapter:timers@1",
+					adapterRefs: ["adapter:timers@1"],
 				},
 			]);
 			const set = caps.toolchainSetInTransaction(
@@ -815,5 +820,57 @@ test("an install already at revision 2 is upgraded to 3, and revision 2 stays a 
 		});
 		await publish("toolchain:timers.manage@3");
 		expect(await active(store)).toBe("toolchain:timers.manage@3");
+	});
+});
+
+test("toolchain publication over HTTP is compare-and-set and can roll back", async () => {
+	await fixture(async ({ store, caps }) => {
+		await legacy(store, caps);
+		await caps.seed();
+		const app = new Hono();
+		app.onError((e, c) =>
+			c.json(
+				{ error: e.message },
+				errorStatus[e.message as keyof typeof errorStatus] ?? 400,
+			),
+		);
+		registerCapabilities(app, caps);
+		const publish = (id: string, body: unknown) =>
+			app.request(`/api/capabilities/toolchains/${id}/publish`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(body),
+			});
+		const to2 = {
+			revisionId: "toolchain:timers.manage@2",
+			expectedActiveRevisionId: "toolchain:timers.manage@3",
+		};
+		// A stale expectation changes nothing.
+		expect(
+			(
+				await publish("timers.manage", {
+					...to2,
+					expectedActiveRevisionId: "toolchain:timers.manage@2",
+				})
+			).status,
+		).toBe(409);
+		expect(await active(store)).toBe("toolchain:timers.manage@3");
+		expect((await publish("timers.manage", to2)).status).toBe(200);
+		expect(await active(store)).toBe("toolchain:timers.manage@2");
+		// The same request again is stale now.
+		expect((await publish("timers.manage", to2)).status).toBe(409);
+		expect(
+			(
+				await publish("timers.manage", {
+					revisionId: "toolchain:timers.manage@9",
+					expectedActiveRevisionId: "toolchain:timers.manage@2",
+				})
+			).status,
+		).toBe(404);
+		expect((await publish("nothing", to2)).status).toBe(404);
+		expect((await publish("timers.manage", { revisionId: "x" })).status).toBe(
+			400,
+		);
+		expect(await active(store)).toBe("toolchain:timers.manage@2");
 	});
 });

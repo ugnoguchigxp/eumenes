@@ -7,10 +7,12 @@ import {
 	storedLocalServiceCiphertexts,
 } from "./local-services";
 import { validSettings } from "./valid";
+import { createApplyInTransaction } from "./apply";
+import { isAllowedEnvRef } from "./env-ref";
+export { isAllowedEnvRef };
 import {
 	createCipheriv,
 	createDecipheriv,
-	createHash,
 	createHmac,
 	randomBytes,
 } from "node:crypto";
@@ -25,9 +27,7 @@ import { dirname, join } from "node:path";
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import {
-	applySchema,
 	defaultSubtitles,
-	isAgentConnection,
 	purposeSchema,
 	settingsSchema,
 	type ApplySettings,
@@ -77,36 +77,6 @@ export function defaults(env: Record<string, string | undefined>): Settings {
 		},
 		codingSupervision: { approveInstructions: true },
 	});
-}
-/** Official API hosts a provider key may be sent to; any other host needs an explicit allowlist. */
-const providerKeyHosts: Record<string, (host: string) => boolean> = {
-	OPENAI_API_KEY: (h) => h === "api.openai.com",
-	ANTHROPIC_API_KEY: (h) => h === "api.anthropic.com",
-	GEMINI_API_KEY: (h) => h === "generativelanguage.googleapis.com",
-	GOOGLE_API_KEY: (h) => h === "generativelanguage.googleapis.com",
-	AZURE_OPENAI_API_KEY: (h) =>
-		/^[a-z0-9][a-z0-9-]{0,62}\.openai\.azure\.com$/.test(h),
-	GROQ_API_KEY: (h) => h === "api.groq.com",
-	MISTRAL_API_KEY: (h) => h === "api.mistral.ai",
-	DEEPSEEK_API_KEY: (h) => h === "api.deepseek.com",
-};
-/** A connection may only name an environment variable meant for cloud credentials, bound to its host. */
-export function isAllowedEnvRef(
-	name: string,
-	allowlist: readonly string[],
-	baseUrl: string,
-): boolean {
-	if (name.startsWith("EUMENES_CLOUD_") || allowlist.includes(name))
-		return true;
-	const hostRule = Object.hasOwn(providerKeyHosts, name)
-		? providerKeyHosts[name]
-		: undefined;
-	if (!hostRule) return false;
-	try {
-		return hostRule(new URL(baseUrl).hostname);
-	} catch {
-		return false;
-	}
 }
 export async function createSettings(
 	store: SqliteStore,
@@ -225,7 +195,29 @@ export async function createSettings(
 			.get(`${c.id}:${c.epoch}`) as { encrypted: string } | null;
 		return row ? decrypt(row.encrypted, `${c.id}:${c.epoch}`) : null;
 	}
+	const applyInTransaction = createApplyInTransaction({
+		key: () => key,
+		envRefAllowlist,
+		encrypt,
+		credential,
+	});
+	function notifyChanged() {
+		for (const fn of listeners) fn();
+	}
 	return {
+		/**
+		 * A key derived from the master key for one purpose (e.g. HMAC digests of secret-bearing
+		 * requests). The master key itself never leaves this domain; undefined when unavailable.
+		 */
+		derivedKey(purpose: string): Uint8Array | undefined {
+			return key
+				? new Uint8Array(
+						createHmac("sha256", key)
+							.update(`eumenes:settings:derived:${purpose}`)
+							.digest(),
+					)
+				: undefined;
+		},
 		...localServiceSettings(store, encrypt, decrypt),
 		...objectRecognitionSettings(store, encrypt, decrypt, env),
 		get: () => store.read(read),
@@ -266,167 +258,13 @@ export async function createSettings(
 			};
 		},
 		valid: validSettings,
+		applyInTransaction,
+		notifyChanged,
 		/** Idempotent replay is guaranteed only for the newest 64 requests. */
 		async apply(raw: ApplySettings) {
-			const input = applySchema.parse(raw);
-			if (input.keys.some((k) => k.value) && !key)
-				throw new Error("invalid_secret_key_unavailable");
-			const digest = (
-				input.keys.some((k) => k.value)
-					? createHmac("sha256", key!)
-					: createHash("sha256")
-			)
-				.update(JSON.stringify(input))
-				.digest("hex");
-			const result = await store.write((db) => {
-				const previous = db
-					.query("SELECT digest,result FROM settings_requests WHERE id=?")
-					.get(input.requestId) as { digest: string; result: string } | null;
-				if (previous) {
-					if (previous.digest !== digest) throw new Error("request_conflict");
-					return JSON.parse(previous.result) as Settings;
-				}
-				const old = read(db);
-				if (old.revision !== input.expectedRevision)
-					throw new Error("revision_conflict");
-				const next = structuredClone(input.settings);
-				next.revision = old.revision + 1;
-				// A changed LARM origin receives the LARM token, so it needs explicit confirmation.
-				const originOf = (value: string | null | undefined) =>
-					value && URL.canParse(value) ? new URL(value).origin : null;
-				const oldLarm = originOf(old.larm.baseUrl);
-				const nextLarm = originOf(next.larm.baseUrl);
-				if (
-					oldLarm &&
-					nextLarm &&
-					oldLarm !== nextLarm &&
-					input.confirmLarmOrigin !== nextLarm
-				)
-					throw new Error("invalid_larm_origin_unconfirmed");
-				// One provider key may only be bound to a single host across all connections.
-				const envHosts = new Map<string, string>();
-				for (const c of next.connections) {
-					if (!c.envRef || !Object.hasOwn(providerKeyHosts, c.envRef)) continue;
-					const host = new URL(c.baseUrl).hostname;
-					const bound = envHosts.get(c.envRef);
-					if (bound && bound !== host)
-						throw new Error("invalid_env_ref_host_conflict");
-					envHosts.set(c.envRef, host);
-				}
-				if (
-					new Set(input.keys.map((k) => k.connectionId)).size !==
-					input.keys.length
-				)
-					throw new Error("invalid_duplicate_key");
-				for (const k of input.keys)
-					if (!next.connections.some((c) => c.id === k.connectionId))
-						throw new Error("invalid_key_connection");
-				for (const c of old.connections)
-					if (!next.connections.some((n) => n.id === c.id))
-						db.query(
-							"INSERT INTO settings_connection_epochs VALUES(?,?) ON CONFLICT(id) DO UPDATE SET epoch=MAX(epoch,excluded.epoch)",
-						).run(c.id, c.epoch + 1);
-				for (const c of next.connections) {
-					const prior = old.connections.find((x) => x.id === c.id);
-					const mutation = input.keys.find((k) => k.connectionId === c.id);
-					// A previously saved ref stays untouched (it fails on use instead).
-					if (
-						c.envRef &&
-						(c.envRef !== prior?.envRef || c.baseUrl !== prior.baseUrl) &&
-						!isAllowedEnvRef(c.envRef, envRefAllowlist, c.baseUrl)
-					)
-						throw new Error("invalid_env_ref");
-					const originChanged =
-						prior &&
-						new URL(prior.baseUrl).origin !== new URL(c.baseUrl).origin;
-					// A login-based agent connection (no key, no env ref) has nothing to rebind.
-					const keyless =
-						isAgentConnection(c) &&
-						!c.envRef &&
-						!prior?.envRef &&
-						!db
-							.query("SELECT 1 FROM settings_credentials WHERE id=?")
-							.get(`${c.id}:${prior?.epoch}`);
-					if (
-						originChanged &&
-						!mutation &&
-						!keyless &&
-						(!c.envRef || c.envRef === prior?.envRef)
-					)
-						throw new Error("invalid_origin_requires_new_key");
-					const revoked =
-						prior &&
-						((prior.enabled && !c.enabled) ||
-							prior.envRef !== c.envRef ||
-							originChanged);
-					const epochRow = db
-						.query("SELECT epoch FROM settings_connection_epochs WHERE id=?")
-						.get(c.id) as { epoch: number } | null;
-					c.epoch =
-						Math.max(prior?.epoch ?? 0, epochRow?.epoch ?? 0) +
-						(mutation || revoked ? 1 : 0);
-					db.query(
-						"INSERT INTO settings_connection_epochs VALUES(?,?) ON CONFLICT(id) DO UPDATE SET epoch=excluded.epoch",
-					).run(c.id, c.epoch);
-					if (mutation && mutation.value === null) c.envRef = null;
-					if (mutation?.value && c.envRef)
-						throw new Error("invalid_credential_source");
-					if (mutation?.value)
-						db.query("INSERT INTO settings_credentials VALUES(?,?)").run(
-							`${c.id}:${c.epoch}`,
-							encrypt(mutation.value, `${c.id}:${c.epoch}`),
-						);
-					else if (
-						prior &&
-						c.epoch !== prior.epoch &&
-						!mutation &&
-						!originChanged &&
-						!c.envRef
-					) {
-						let value: string | null = null;
-						try {
-							value = credential(db, prior);
-						} catch {
-							// A disallowed env ref never yields a value to copy.
-						}
-						if (value)
-							db.query("INSERT INTO settings_credentials VALUES(?,?)").run(
-								`${c.id}:${c.epoch}`,
-								encrypt(value, `${c.id}:${c.epoch}`),
-							);
-					}
-				}
-				for (const p of purposeSchema.options)
-					next.routes[p].epoch =
-						old.routes[p].epoch +
-						(old.routes[p].cloudAllowed && !next.routes[p].cloudAllowed
-							? 1
-							: 0);
-				// Only the current encrypted credential survives a replacement or deletion.
-				// Old snapshots are fenced by their connection epoch before inference.
-				const retained = new Set(
-					next.connections
-						.filter((c) => !c.envRef)
-						.map((c) => `${c.id}:${c.epoch}`),
-				);
-				for (const row of db
-					.query("SELECT id FROM settings_credentials")
-					.all() as { id: string }[])
-					if (!retained.has(row.id))
-						db.query("DELETE FROM settings_credentials WHERE id=?").run(row.id);
-				save(db, next);
-				db.query("INSERT INTO settings_requests VALUES(?,?,?)").run(
-					input.requestId,
-					digest,
-					JSON.stringify(next),
-				);
-				db.query(
-					"DELETE FROM settings_requests WHERE rowid <= (SELECT max(rowid) FROM settings_requests) - 64",
-				).run();
-				return next;
-			});
-			for (const fn of listeners) fn();
-			return result;
+			const result = await store.write((db) => applyInTransaction(db, raw));
+			notifyChanged();
+			return result.settings;
 		},
 	};
 }

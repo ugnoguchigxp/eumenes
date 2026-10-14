@@ -34,6 +34,11 @@ export function App() {
 						referenceId={drawing.referenceId}
 						revision={drawing.revision}
 						conversationId={drawing.conversationId}
+						embedded={
+							window.location.pathname === "/excalidraw" &&
+							new URLSearchParams(window.location.search).get("embedded") ===
+								"1"
+						}
 					/>
 				) : (
 					<Workspace client={client} store={store} />

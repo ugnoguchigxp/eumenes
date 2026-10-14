@@ -13,7 +13,8 @@ export async function waitForDrawing(
 		await new Promise((resolve) => setTimeout(resolve, 250));
 		s = await client.drawingSession(s.id, signal);
 	}
-	if (s.state !== "ready")
+	// A status read may observe idle before the document read. That read ensures its lease.
+	if (s.state !== "ready" && s.state !== "idle")
 		throw new Error(
 			"Excalidrawを起動できませんでした。接続設定を確認して再接続してください。",
 		);

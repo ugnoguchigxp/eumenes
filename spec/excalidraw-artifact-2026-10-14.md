@@ -1,0 +1,38 @@
+# Excalidraw Artifactのiframe編集
+
+## 実装
+
+採用した画像案を、通常の会話＋右側Artifactの分割表示に実装した。図一覧はハンバーガーメニューから開く一時的なサムネイル一覧で、選択時に閉じる。新規作成もこのメニューに置いた。タイトル、控えめな保存状態、保存ボタン、任意の全画面切替を編集領域の上に置く。
+
+ユーザー指定に従い、既存Eumenes編集画面を同一originのiframeにした。LARMのscene保存先、consumer、credential、配備は変更していない。正式画面は図IDの直接指定と埋め込み用の認証契約がないため、Eumenesの既存Excalidraw 0.18.1部品・API認証・保存・下書き・lease処理を再利用する。LARM側の追加開発依頼は不要だった。
+
+専用入口だけにSAMEORIGINとframe-ancestors selfを設定する。親子の通知はorigin、送信元window、現在の図IDを照合する。sceneとcredentialは通知しない。会話からのplan/openと登録済みOpenUIを保持し、発話の分類や意図判断を製品の条件分岐へ移していない。専用コードは画面配置、URLの契約検査、iframe操作と状態通知、サムネイル生成に限る。
+
+図を切り替える前とタブを閉じる前に、未保存状態を編集画面へ確認する。下書き復元、再接続、ダウンロードは既存処理を呼ぶ。別のArtifactを選んでもiframeを保持し、全画面切替でもキャンバスを作り直さない。図一覧を開いたときだけsceneからPNGを作り、取得用sessionは解放する。操作状態の定期GETは永続化された記録だけを読み、serviceのleaseを更新しない。
+
+## 確認中に修正した問題
+
+- 無操作状態を起動失敗とみなしていた。図のGETはleaseを確保できる既存契約なので、idleからも明示的な再表示を進める。
+- 保存後にiframeを再読み込みすると作成時の版へ戻った。保存が確定した版をiframe内のURLへreplaceStateで反映し、キャンバスを再マウントしない。別タブで開いた歴史版URLの意味は保持する。
+- ready状態を観測する前にidleへ移ると、Artifactに渡すURLが消えた。参照があるready/idleのsessionは同じ認証済みWeb入口を返す。状態GETによって再起動しないことも回帰試験で確認する。
+- 操作結果の定期取得を通知だけに替えると、会話の次の結果が画面へ反映されない再現が得られた。既存の読み取り専用の定期取得を維持した。
+
+## 検証の範囲
+
+Excalidrawと利用側Artifactのdomain verify、API結合試験、型検査、対象ファイルのlint/format、Webビルドを実施する。ブラウザはExcalidrawの試験だけを明示する。verify:allと全件ブラウザE2Eは実行しない。共有mainの設定画面等の並行差分は保持し、この変更の検証結果として扱わない。
+
+2026-10-14 10:43 JSTの正式接続試験は成功した。MacBook上のChromiumからArtifact内で矩形を描画し、タイトルを版2、sceneを版3としてLARMに保存した。サムネイル表示、iframe再読み込み後の版3・矩形1個の再取得、30秒の無操作後のEumenes lease解放、再接続後の同じsceneを確認した。ブラウザエラーは0件。保存済みの接続設定revision 1と既存SSH経路を使用し、資格情報をブラウザへ渡していない。
+
+証拠は `spec/verification/excalidraw-live/artifact-2026-10-14.json` と同日のArtifact画像。JSONのinitialFrameUrlは最初に開いた版1の入口であり、再読み込み時は編集画面自身が更新した版3のURLを使用した。今回の正式接続試験ではworkerの物理停止やbackend再起動を繰り返していない。workerの自然停止・別PIDでの復帰は以前の実機受入記録、backend再起動と保存失敗・下書き保護は対象fixture試験と区別する。
+
+## 試験運用の見直し
+
+起動・再表示・版指定の異なる失敗は、その都度新しいAPI状態とブラウザ結果を根拠に絞り込んだ。検証中にビルドを重ねた1回は入力が安定した試験として採用せず、ビルド完了後に対象画面だけを確認し直した。実行中の処理を経過時間だけで停止したり、idle期限・保存期待値を緩めたりしていない。
+
+## 最終結果
+
+Excalidraw verifyはbackend 7件・Web 18件、Artifact verifyは50件、API結合は4件成功。10:47時点の型検査（1,364ファイル）、対象lint/format、DesignSystemとWebビルドは成功。別タブ編集シナリオは42.4秒で成功し、最後の修正後のArtifact内iframeシナリオも、入力を変更しない単独実行で成功した。新規作成、描画、自動保存、実sceneのサムネイル、保存図への切替、再読み込み、任意の全画面、保存失敗中の切替とタブ閉じの阻止、同じ保存候補の再送、idle/reconnect、fixture再起動後の版5保存、タブ閉じを通した。正式接続試験は2.2分で成功。無関係の並行差分は編集・commitしていない。
+
+最終差分確認時、並行改修中の `web/src/domains/settings-data/records-adapter.tsx:37` に未知のtakeOver属性、`web/src/domains/toolchain-artifacts/ToolchainArtifactHost.tsx:417,663,731` に引数不足の型エラー4件が新たに出た。これらはこの変更の担当外であり修正していない。現在の共有main全体の型検査成功は宣言しない。Excalidraw・Artifactの対象verifyと本記録のブラウザ結果とは区別する。
+
+2026-10-14のcommit前に再確認した時点では、上記の並行改修中の型エラー4件は解消され、1,374ファイルの型検査は成功した。利用者の指示により、設定画面等の並行差分も含めてmainへまとめてcommit・pushする。verify:allと全件E2Eの追加実行はしていない。

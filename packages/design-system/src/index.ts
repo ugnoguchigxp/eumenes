@@ -110,3 +110,4 @@ export * from "./components/FullscreenDialog";
 export * from "./components/ObjectRecognitionWorkspace";
 export { DrawingWorkspace, type DrawingWorkspaceProps } from "./components/DrawingWorkspace";
 export { DrawingEditorFrame, type DrawingEditorFrameProps } from "./components/DrawingWorkspace";
+export { isDrawingFrameState, type DrawingFrameState, type DrawingFrameCommand } from "./components/DrawingWorkspace";

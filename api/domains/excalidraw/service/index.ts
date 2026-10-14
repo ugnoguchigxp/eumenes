@@ -33,7 +33,7 @@ export function createExcalidraw(deps: {
 	const publicView = (s: DrawingSession) => ({
 		...s,
 		url:
-			s.state === "ready" && s.referenceId
+			(s.state === "ready" || s.state === "idle") && s.referenceId
 				? `${deps.webOrigin}/#drawing/${s.referenceId}?${new URLSearchParams({
 						...(s.revision ? { revision: String(s.revision) } : {}),
 						...(s.conversationId !== "main"

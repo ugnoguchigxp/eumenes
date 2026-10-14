@@ -411,6 +411,7 @@ export type ArtifactEvent = {
 		| "drawing-new"
 		| "drawing-open"
 		| "drawing-refresh"
+		| "drawing-browse"
 		| "image-close"
 		| "image-delete"
 		| "image-generate"

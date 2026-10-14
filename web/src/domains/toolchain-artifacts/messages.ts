@@ -20,6 +20,7 @@ const codeMessages: Record<string, string> = {
 	scope_mismatch:
 		"この画面を開いた時と利用者の範囲が変わりました。画面を開き直してください。",
 	payload_too_large: "入力が大きすぎます。",
+	invalid_params: "表示の条件を確認してください。",
 	event_time_invalid:
 		"この端末の時刻がずれているため操作を受け付けられませんでした。端末の日時を正しく設定してから、もう一度お試しください。",
 	outbox_full:

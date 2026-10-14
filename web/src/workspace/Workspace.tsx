@@ -12,6 +12,7 @@ import { SettingsContent } from "./SettingsContent";
 import { WorkspaceArtifacts } from "./WorkspaceArtifacts";
 import { ConversationPanel } from "./ConversationPanel";
 import { useWorkspace } from "./useWorkspace";
+import { entryLabel, menuEntries } from "../domains/toolchain-artifacts";
 
 function WorkspaceContent({
 	client,
@@ -84,8 +85,8 @@ function WorkspaceContent({
 						{ label: "映っている物を調べる", onSelect: openRecognition },
 						{ label: "楽曲生成", onSelect: openMusic },
 						{ label: "音楽プレイリスト", onSelect: openPlaylist },
-						...toolchain.entries.map((entry) => ({
-							label: entry.title,
+						...menuEntries(toolchain.entries).map((entry) => ({
+							label: entryLabel(entry),
 							onSelect: () => toolchain.openEntry(entry),
 						})),
 						{ label: "UIショーケース", onSelect: openShowcase },

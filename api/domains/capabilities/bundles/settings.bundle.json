@@ -1,0 +1,1014 @@
+{
+	"formatVersion": 1,
+	"bundleId": "settings",
+	"pins": [],
+	"definitions": [],
+	"bindings": [],
+	"artifacts": [
+		{
+			"kind": "artifact",
+			"id": "settings.hub",
+			"revision": 1,
+			"title": "設定（データドリブン）",
+			"variants": [
+				{
+					"id": "standard",
+					"label": "標準",
+					"definition": {
+						"view": "settings-navigation",
+						"source": "settings-hub",
+						"title": "設定"
+					}
+				}
+			],
+			"defaultVariant": "standard",
+			"sourceBindings": [
+				{
+					"source": "settings-hub",
+					"adapterRef": "adapter:settings@1",
+					"query": "query:settings.document@1",
+					"target": "none"
+				}
+			],
+			"actionBindings": [
+				{
+					"actionId": "open",
+					"eventAction": "settings-open",
+					"source": "settings-hub",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "navigate",
+					"navigateTo": {
+						"byValue": "id",
+						"artifacts": {
+							"conversation": "settings.conversation",
+							"voice": "settings.voice-input",
+							"display": "settings.display",
+							"records": "settings.records"
+						}
+					}
+				}
+			],
+			"launcher": {
+				"label": "設定（データドリブン）",
+				"order": 100
+			}
+		},
+		{
+			"kind": "artifact",
+			"id": "settings.conversation",
+			"revision": 1,
+			"title": "会話の設定",
+			"variants": [
+				{
+					"id": "standard",
+					"label": "標準",
+					"definition": {
+						"view": "settings-section",
+						"source": "settings-conversation",
+						"title": "会話"
+					}
+				}
+			],
+			"defaultVariant": "standard",
+			"sourceBindings": [
+				{
+					"source": "settings-conversation",
+					"adapterRef": "adapter:settings@1",
+					"query": "query:settings.document@1",
+					"target": "none"
+				}
+			],
+			"actionBindings": [
+				{
+					"actionId": "edit",
+					"eventAction": "settings-edit",
+					"source": "settings-conversation",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "draft",
+					"draftAction": "edit",
+					"draftDocument": "document:settings@1"
+				},
+				{
+					"actionId": "apply",
+					"eventAction": "settings-apply",
+					"source": "settings-conversation",
+					"inputSchemaRef": "schema:settings-apply@1",
+					"effect": "write",
+					"operationId": "settings.apply",
+					"draftDocument": "document:settings@1",
+					"confidentialFields": ["keys"]
+				},
+				{
+					"actionId": "review",
+					"eventAction": "settings-review",
+					"source": "settings-conversation",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "navigate",
+					"navigateTo": {
+						"artifactId": "settings.changes"
+					}
+				}
+			],
+			"launcher": {
+				"label": "会話",
+				"group": "使い方を変える",
+				"order": 10,
+				"description": "AIの名前 あなたの名前 口調"
+			},
+			"fields": [
+				{
+					"fieldId": "conversation.agent-name",
+					"document": "document:settings@1",
+					"path": "$.general.agentName",
+					"label": "AIの名前",
+					"control": "text",
+					"help": "空欄の場合は名前を設定しません。",
+					"maxLength": 40
+				},
+				{
+					"fieldId": "conversation.user-name",
+					"document": "document:settings@1",
+					"path": "$.general.userName",
+					"label": "あなたの名前",
+					"control": "text",
+					"help": "空欄の場合は名前で呼びません。",
+					"maxLength": 40
+				},
+				{
+					"fieldId": "conversation.persona",
+					"document": "document:settings@1",
+					"path": "$.general.persona",
+					"label": "口調",
+					"control": "select",
+					"help": "次の返答から反映されます。",
+					"options": [
+						{
+							"value": "butler",
+							"label": "執事"
+						},
+						{
+							"value": "maid",
+							"label": "メイド"
+						},
+						{
+							"value": "strategist",
+							"label": "参謀"
+						},
+						{
+							"value": "sage",
+							"label": "老師"
+						}
+					]
+				}
+			]
+		},
+		{
+			"kind": "artifact",
+			"id": "settings.voice-input",
+			"revision": 1,
+			"title": "音声と入力",
+			"variants": [
+				{
+					"id": "standard",
+					"label": "標準",
+					"definition": {
+						"view": "settings-section",
+						"source": "settings-voice-input",
+						"title": "音声と入力"
+					}
+				}
+			],
+			"defaultVariant": "standard",
+			"sourceBindings": [
+				{
+					"source": "settings-voice-input",
+					"adapterRef": "adapter:settings@1",
+					"query": "query:settings.document@1",
+					"target": "none"
+				},
+				{
+					"source": "settings-tts-resources",
+					"adapterRef": "adapter:settings@1",
+					"query": "query:settings.tts-resources@1",
+					"target": "none"
+				},
+				{
+					"source": "settings-asr-languages",
+					"adapterRef": "adapter:settings@1",
+					"query": "query:settings.asr-languages@1",
+					"target": "none"
+				}
+			],
+			"actionBindings": [
+				{
+					"actionId": "edit",
+					"eventAction": "settings-edit",
+					"source": "settings-voice-input",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "draft",
+					"draftAction": "edit",
+					"draftDocument": "document:settings@1"
+				},
+				{
+					"actionId": "apply",
+					"eventAction": "settings-apply",
+					"source": "settings-voice-input",
+					"inputSchemaRef": "schema:settings-apply@1",
+					"effect": "write",
+					"operationId": "settings.apply",
+					"draftDocument": "document:settings@1",
+					"confidentialFields": ["keys"]
+				},
+				{
+					"actionId": "review",
+					"eventAction": "settings-review",
+					"source": "settings-voice-input",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "navigate",
+					"navigateTo": {
+						"artifactId": "settings.changes"
+					}
+				},
+				{
+					"actionId": "action",
+					"eventAction": "settings-action",
+					"source": "settings-voice-input",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				}
+			],
+			"launcher": {
+				"label": "音声と入力",
+				"group": "使い方を変える",
+				"order": 20,
+				"description": "読み上げ 聞き取り 機器"
+			},
+			"fields": [
+				{
+					"fieldId": "speech.enabled",
+					"document": "document:settings@1",
+					"path": "$.voice.autoSpeak",
+					"label": "回答を読み上げる",
+					"control": "toggle",
+					"group": "speech",
+					"help": "オフでも回答のテキストは会話に残ります。"
+				},
+				{
+					"fieldId": "speech.volume",
+					"document": "document:settings@1",
+					"path": "$.voice.outputVolume",
+					"label": "音量",
+					"control": "range",
+					"group": "speech",
+					"min": 0,
+					"max": 1,
+					"step": 0.05
+				},
+				{
+					"fieldId": "speech.barge-in",
+					"document": "document:settings@1",
+					"path": "$.voice.bargeIn",
+					"label": "話し始めたら読み上げを止める",
+					"control": "toggle",
+					"group": "speech"
+				},
+				{
+					"fieldId": "larm.speech-voice",
+					"document": "document:settings@1",
+					"path": "$.larm.voice",
+					"label": "キャラクター",
+					"control": "select",
+					"group": "speech",
+					"options": [
+						{
+							"value": "",
+							"label": "サービスの既定のキャラクター"
+						}
+					],
+					"searchable": true,
+					"visibleWhen": "condition:settings.speech-local@1"
+				},
+				{
+					"fieldId": "larm.speech-style",
+					"document": "document:settings@1",
+					"path": "$.larm.style",
+					"label": "話し方（スタイル）",
+					"control": "select",
+					"group": "speech",
+					"options": [
+						{
+							"value": "",
+							"label": "サービスの標準"
+						}
+					],
+					"detail": true,
+					"unset": "delete-key",
+					"visibleWhen": "condition:settings.larm-style@1"
+				},
+				{
+					"fieldId": "larm.speech-speed",
+					"document": "document:settings@1",
+					"path": "$.larm.speed",
+					"label": "話す速さ",
+					"control": "range",
+					"group": "speech",
+					"defaultValue": "1",
+					"min": 0.5,
+					"max": 2,
+					"step": 0.1,
+					"visibleWhen": "condition:settings.larm-speed@1"
+				},
+				{
+					"fieldId": "larm.speech-pitch",
+					"document": "document:settings@1",
+					"path": "$.larm.pitchScale",
+					"label": "声の高さ",
+					"control": "range",
+					"group": "speech",
+					"defaultValue": "0",
+					"detail": true,
+					"min": -0.15,
+					"max": 0.15,
+					"step": 0.01,
+					"visibleWhen": "condition:settings.larm-pitch@1"
+				},
+				{
+					"fieldId": "larm.speech-intonation",
+					"document": "document:settings@1",
+					"path": "$.larm.intonationScale",
+					"label": "抑揚",
+					"control": "range",
+					"group": "speech",
+					"defaultValue": "1",
+					"detail": true,
+					"min": 0,
+					"max": 2,
+					"step": 0.05,
+					"visibleWhen": "condition:settings.larm-intonation@1"
+				},
+				{
+					"fieldId": "larm.speech-auto",
+					"document": "document:settings@1",
+					"path": "$.larm.autoIntonation",
+					"label": "文章に合わせて抑揚・速さ・高さを変える（簡易）",
+					"control": "toggle",
+					"group": "speech",
+					"defaultValue": "false",
+					"detail": true,
+					"visibleWhen": "condition:settings.larm-intonation@1"
+				},
+				{
+					"fieldId": "larm.speech-strength",
+					"document": "document:settings@1",
+					"path": "$.larm.autoStrength",
+					"label": "自動調整の強さ",
+					"control": "range",
+					"group": "speech",
+					"defaultValue": "1",
+					"detail": true,
+					"min": 0,
+					"max": 2,
+					"step": 0.05,
+					"visibleWhen": "condition:settings.larm-auto-strength@1"
+				},
+				{
+					"fieldId": "resource.voice",
+					"document": "document:settings@1",
+					"path": "$.resources[id=$target].voice",
+					"label": "音声ID",
+					"control": "text",
+					"group": "speech",
+					"maxLength": 200,
+					"help": "サービスが提供する音声IDを入力してください。",
+					"target": "settings-tts-resources"
+				},
+				{
+					"fieldId": "resource.speed",
+					"document": "document:settings@1",
+					"path": "$.resources[id=$target].speed",
+					"label": "話す速さ",
+					"control": "range",
+					"group": "speech",
+					"defaultValue": "1",
+					"min": 0.5,
+					"max": 2,
+					"step": 0.1,
+					"target": "settings-tts-resources"
+				},
+				{
+					"fieldId": "input.languages",
+					"document": "document:settings@1",
+					"path": "$.general.asrLanguages",
+					"label": "利用する言語",
+					"control": "multiple",
+					"group": "input",
+					"help": "聞き取り結果に許可する言語です。最低1つ選んでください。",
+					"optionsSource": "query:settings.asr-languages@1"
+				},
+				{
+					"fieldId": "input.threshold",
+					"document": "document:settings@1",
+					"path": "$.voice.threshold",
+					"label": "声を検出するしきい値",
+					"control": "number",
+					"group": "input",
+					"detail": true,
+					"min": 0.001,
+					"max": 0.1,
+					"step": 0.001,
+					"help": "小さい値ほど小さな声を拾います。"
+				},
+				{
+					"fieldId": "input.silence",
+					"document": "document:settings@1",
+					"path": "$.voice.silenceMs",
+					"label": "発話を確定する無音時間（ミリ秒）",
+					"control": "number",
+					"group": "input",
+					"detail": true,
+					"min": 300,
+					"max": 3000,
+					"step": 100,
+					"help": "標準は1500ミリ秒（1.5秒）です。"
+				},
+				{
+					"fieldId": "input.echo-cancellation",
+					"document": "document:settings@1",
+					"path": "$.voice.echoCancellation",
+					"label": "エコーを抑える",
+					"control": "toggle",
+					"group": "input",
+					"detail": true
+				},
+				{
+					"fieldId": "input.noise-suppression",
+					"document": "document:settings@1",
+					"path": "$.voice.noiseSuppression",
+					"label": "周囲の雑音を抑える",
+					"control": "toggle",
+					"group": "input",
+					"detail": true
+				},
+				{
+					"fieldId": "input.auto-gain",
+					"document": "document:settings@1",
+					"path": "$.voice.autoGainControl",
+					"label": "マイクの音量を自動調整する",
+					"control": "toggle",
+					"group": "input",
+					"detail": true
+				},
+				{
+					"fieldId": "input.device",
+					"document": "document:settings@1",
+					"path": "$.voice.inputDevice",
+					"label": "マイク",
+					"control": "select",
+					"group": "devices",
+					"options": [
+						{
+							"value": "",
+							"label": "システム標準"
+						}
+					]
+				},
+				{
+					"fieldId": "output.device",
+					"document": "document:settings@1",
+					"path": "$.voice.outputDevice",
+					"label": "再生機器",
+					"control": "select",
+					"group": "devices",
+					"options": [
+						{
+							"value": "",
+							"label": "システム標準"
+						}
+					],
+					"visibleWhen": "condition:settings.output-device-selectable@1"
+				}
+			]
+		},
+		{
+			"kind": "artifact",
+			"id": "settings.display",
+			"revision": 1,
+			"title": "表示",
+			"variants": [
+				{
+					"id": "standard",
+					"label": "標準",
+					"definition": {
+						"view": "layout",
+						"direction": "stack",
+						"title": "表示の設定",
+						"children": [
+							{
+								"view": "settings-section",
+								"source": "settings-display",
+								"title": "表示"
+							},
+							{
+								"view": "subtitle-preview",
+								"source": "settings-display-preview"
+							}
+						]
+					}
+				}
+			],
+			"defaultVariant": "standard",
+			"sourceBindings": [
+				{
+					"source": "settings-display",
+					"adapterRef": "adapter:settings@1",
+					"query": "query:settings.document@1",
+					"target": "none"
+				},
+				{
+					"source": "settings-display-preview",
+					"adapterRef": "adapter:settings@1",
+					"query": "query:settings.document@1",
+					"target": "none"
+				}
+			],
+			"actionBindings": [
+				{
+					"actionId": "edit",
+					"eventAction": "settings-edit",
+					"source": "settings-display",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "draft",
+					"draftAction": "edit",
+					"draftDocument": "document:settings@1"
+				},
+				{
+					"actionId": "apply",
+					"eventAction": "settings-apply",
+					"source": "settings-display",
+					"inputSchemaRef": "schema:settings-apply@1",
+					"effect": "write",
+					"operationId": "settings.apply",
+					"draftDocument": "document:settings@1",
+					"confidentialFields": ["keys"]
+				},
+				{
+					"actionId": "review",
+					"eventAction": "settings-review",
+					"source": "settings-display",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "navigate",
+					"navigateTo": {
+						"artifactId": "settings.changes"
+					}
+				}
+			],
+			"launcher": {
+				"label": "表示",
+				"group": "使い方を変える",
+				"order": 30,
+				"description": "背景 テーマ 字幕"
+			},
+			"fields": [
+				{
+					"fieldId": "appearance.background",
+					"document": "document:settings@1",
+					"path": "$.general.background",
+					"label": "会話の背景",
+					"control": "select",
+					"defaultValue": "light-fairy",
+					"help": "保存すると会話画面の背景を切り替えます。Spatialの状態表示は、実際の機器の計測値にはまだ対応していません。",
+					"options": [
+						{
+							"value": "light-fairy",
+							"label": "光の妖精"
+						},
+						{
+							"value": "spatial",
+							"label": "Spatial"
+						}
+					],
+					"unset": "delete-key"
+				},
+				{
+					"fieldId": "appearance.theme",
+					"document": "document:settings@1",
+					"path": "$.general.theme",
+					"label": "テーマ",
+					"control": "select",
+					"options": [
+						{
+							"value": "system",
+							"label": "端末の設定に合わせる"
+						},
+						{
+							"value": "light",
+							"label": "ライト"
+						},
+						{
+							"value": "dark",
+							"label": "ダーク"
+						}
+					]
+				},
+				{
+					"fieldId": "appearance.subtitle-enabled",
+					"document": "document:settings@1",
+					"path": "$.general.subtitles.enabled",
+					"label": "読み上げ字幕を表示する",
+					"control": "toggle",
+					"help": "読み上げに合わせて画面中央に字幕を出します。"
+				},
+				{
+					"fieldId": "appearance.subtitle-style",
+					"document": "document:settings@1",
+					"path": "$.general.subtitles.style",
+					"label": "字幕のデザイン",
+					"control": "select",
+					"options": [
+						{
+							"value": "netflix",
+							"label": "シネマ（白文字・影）"
+						},
+						{
+							"value": "prime",
+							"label": "ボックス（半透明の黒背景）"
+						},
+						{
+							"value": "classic",
+							"label": "クラシック（黄文字・黒縁）"
+						},
+						{
+							"value": "glass",
+							"label": "ガラス（ぼかし背景）"
+						}
+					]
+				},
+				{
+					"fieldId": "appearance.subtitle-size",
+					"document": "document:settings@1",
+					"path": "$.general.subtitles.size",
+					"label": "字幕の大きさ",
+					"control": "select",
+					"options": [
+						{
+							"value": "medium",
+							"label": "中"
+						},
+						{
+							"value": "large",
+							"label": "大"
+						},
+						{
+							"value": "xlarge",
+							"label": "特大"
+						}
+					]
+				}
+			]
+		},
+		{
+			"kind": "artifact",
+			"id": "settings.changes",
+			"revision": 1,
+			"title": "設定の変更一覧",
+			"variants": [
+				{
+					"id": "standard",
+					"label": "標準",
+					"definition": {
+						"view": "settings-changes",
+						"source": "settings-changes",
+						"title": "設定の変更一覧"
+					}
+				}
+			],
+			"defaultVariant": "standard",
+			"sourceBindings": [
+				{
+					"source": "settings-changes",
+					"adapterRef": "adapter:settings@1",
+					"query": "query:settings.document@1",
+					"target": "none"
+				}
+			],
+			"actionBindings": [
+				{
+					"actionId": "apply",
+					"eventAction": "settings-apply",
+					"source": "settings-changes",
+					"inputSchemaRef": "schema:settings-apply@1",
+					"effect": "write",
+					"operationId": "settings.apply",
+					"draftDocument": "document:settings@1",
+					"confidentialFields": ["keys"]
+				},
+				{
+					"actionId": "discard",
+					"eventAction": "settings-discard",
+					"source": "settings-changes",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "draft",
+					"draftAction": "discard",
+					"draftDocument": "document:settings@1"
+				}
+			],
+			"launcher": {
+				"label": "変更一覧",
+				"group": "管理と確認",
+				"order": 50
+			}
+		},
+		{
+			"kind": "artifact",
+			"id": "settings.records",
+			"revision": 1,
+			"title": "記録",
+			"variants": [
+				{
+					"id": "standard",
+					"label": "標準",
+					"definition": {
+						"view": "records-workspace",
+						"source": "settings-records",
+						"title": "記録"
+					}
+				}
+			],
+			"defaultVariant": "standard",
+			"sourceBindings": [
+				{
+					"source": "settings-records",
+					"adapterRef": "adapter:records@1",
+					"query": "query:records.usage@1",
+					"target": "none",
+					"paramsSchemaRef": "schema:records-usage-page@1"
+				},
+				{
+					"source": "records-selections",
+					"adapterRef": "adapter:records@1",
+					"query": "query:records.selections@1",
+					"target": "none",
+					"paramsSchemaRef": "schema:records-selection-page@1"
+				},
+				{
+					"source": "records-recipes",
+					"adapterRef": "adapter:records@1",
+					"query": "query:records.recipes@1",
+					"target": "none",
+					"paramsSchemaRef": "schema:records-recipe-page@1"
+				},
+				{
+					"source": "records-diagnostics",
+					"adapterRef": "adapter:records@1",
+					"query": "query:records.diagnostics@1",
+					"target": "none"
+				},
+				{
+					"source": "records-export",
+					"adapterRef": "adapter:records@1",
+					"query": "query:records.export@1",
+					"target": "none"
+				}
+			],
+			"actionBindings": [
+				{
+					"actionId": "refresh",
+					"eventAction": "records-refresh",
+					"source": "settings-records",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				},
+				{
+					"actionId": "procedure-state",
+					"eventAction": "records-procedure-state",
+					"source": "settings-records",
+					"inputSchemaRef": "schema:records-recipe-state@1",
+					"effect": "write",
+					"operationId": "records.recipe-state"
+				},
+				{
+					"actionId": "procedure-delete",
+					"eventAction": "records-procedure-delete",
+					"source": "settings-records",
+					"inputSchemaRef": "schema:records-recipe-delete@1",
+					"effect": "write",
+					"operationId": "records.recipe-delete"
+				},
+				{
+					"actionId": "download",
+					"eventAction": "records-download",
+					"source": "settings-records",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				}
+			],
+			"launcher": {
+				"label": "記録",
+				"group": "管理と確認",
+				"order": 40,
+				"description": "AIの利用 ツールチェーン データと診断"
+			}
+		}
+	],
+	"schemas": [
+		{
+			"kind": "schema",
+			"id": "settings-apply",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"expectedRevision": {
+						"type": "integer",
+						"minimum": 0
+					},
+					"changes": {
+						"type": "array",
+						"minItems": 1,
+						"maxItems": 64,
+						"items": {
+							"type": "object",
+							"additionalProperties": false,
+							"properties": {
+								"fieldId": {
+									"type": "string",
+									"minLength": 1,
+									"maxLength": 80
+								},
+								"target": {
+									"type": "string",
+									"minLength": 1,
+									"maxLength": 64
+								},
+								"value": {
+									"type": "string",
+									"maxLength": 4096
+								},
+								"unset": {
+									"type": "boolean"
+								}
+							},
+							"required": ["fieldId"]
+						}
+					},
+					"keys": {
+						"type": "array",
+						"maxItems": 32,
+						"items": {
+							"type": "object",
+							"additionalProperties": false,
+							"properties": {
+								"connectionId": {
+									"type": "string",
+									"minLength": 1,
+									"maxLength": 64
+								},
+								"value": {
+									"type": "string",
+									"minLength": 1,
+									"maxLength": 4096
+								},
+								"delete": {
+									"type": "boolean"
+								}
+							},
+							"required": ["connectionId"]
+						}
+					}
+				},
+				"required": ["expectedRevision", "changes"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "records-usage-page",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"pageIndex": {
+						"type": "integer",
+						"minimum": 0,
+						"maximum": 100000
+					},
+					"pageSize": {
+						"type": "integer",
+						"enum": [10, 25, 50]
+					},
+					"sort": {
+						"type": "string",
+						"enum": ["started", "purpose", "source", "model", "status"]
+					},
+					"desc": {
+						"type": "boolean"
+					},
+					"q": {
+						"type": "string",
+						"maxLength": 200
+					}
+				}
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "records-selection-page",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"pageIndex": {
+						"type": "integer",
+						"minimum": 0,
+						"maximum": 100000
+					},
+					"pageSize": {
+						"type": "integer",
+						"enum": [10, 25, 50]
+					},
+					"sort": {
+						"type": "string",
+						"enum": ["createdAt", "process", "outcome"]
+					},
+					"desc": {
+						"type": "boolean"
+					},
+					"q": {
+						"type": "string",
+						"maxLength": 200
+					}
+				}
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "records-recipe-page",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"pageIndex": {
+						"type": "integer",
+						"minimum": 0,
+						"maximum": 100000
+					},
+					"pageSize": {
+						"type": "integer",
+						"enum": [10, 25, 50]
+					},
+					"sort": {
+						"type": "string",
+						"enum": ["updatedAt", "signature", "state", "successes", "failures"]
+					},
+					"desc": {
+						"type": "boolean"
+					},
+					"q": {
+						"type": "string",
+						"maxLength": 200
+					}
+				}
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "records-recipe-state",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"id": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 160
+					},
+					"enabled": {
+						"type": "boolean"
+					}
+				},
+				"required": ["id", "enabled"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "records-recipe-delete",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"id": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 160
+					}
+				},
+				"required": ["id"]
+			}
+		}
+	]
+}

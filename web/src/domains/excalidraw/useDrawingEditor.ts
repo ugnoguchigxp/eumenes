@@ -23,6 +23,7 @@ export function useDrawingEditor(
 		[error, setError] = useState("");
 	const [busy, setBusy] = useState(true),
 		[canvasEpoch, setCanvasEpoch] = useState(0);
+	const [unsaved, setUnsaved] = useState(false);
 	const current = useRef<Drawing | null>(null),
 		selected = useRef<DrawingSession | null>(null),
 		dirty = useRef(false),
@@ -151,10 +152,12 @@ export function useDrawingEditor(
 			const doc = await client.saveDrawing(selected.current.id, body, key);
 			pending.current = null;
 			current.current = doc;
+			setDrawing(doc);
 			setSession((s) => (s ? { ...s, revision: doc.revision } : s));
 			dirty.current =
 				JSON.stringify(latest.current) !==
 				JSON.stringify({ title: candidate.title, scene: candidate.scene });
+			setUnsaved(dirty.current);
 			if (dirty.current) {
 				protect();
 				setError("");
@@ -195,6 +198,7 @@ export function useDrawingEditor(
 		latest.current = next;
 		setTitle(next.title);
 		dirty.current = true;
+		setUnsaved(true);
 		protect();
 		setStatus("未保存の変更があります。");
 		if (timer.current) clearTimeout(timer.current);
@@ -248,6 +252,7 @@ export function useDrawingEditor(
 		pending.current = value.pending ? { ...value.pending, referenceId } : value;
 		latest.current = { title: value.title, scene: value.scene };
 		dirty.current = true;
+		setUnsaved(true);
 		setTitle(value.title);
 		setDrawing({ ...current.current, title: value.title, scene: value.scene });
 		setCanvasEpoch((v) => v + 1);
@@ -264,6 +269,17 @@ export function useDrawingEditor(
 		}
 		if (selected.current) await client.releaseDrawing(selected.current.id);
 		window.location.hash = "";
+	}
+	async function leaveFrame() {
+		if (dirty.current || pending.current || saving.current) {
+			protect();
+			setError(
+				"未保存の変更があります。保存またはダウンロードしてから操作してください。",
+			);
+			return false;
+		}
+		if (selected.current) await client.releaseDrawing(selected.current.id);
+		return true;
 	}
 	return {
 		drawing,
@@ -283,5 +299,7 @@ export function useDrawingEditor(
 		restore,
 		download: () => downloadScene(latest.current),
 		close,
+		unsaved,
+		leaveFrame,
 	};
 }

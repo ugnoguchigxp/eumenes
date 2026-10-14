@@ -5,6 +5,7 @@ import { zSchema } from "./schema";
 import { createRequirements } from "./requirements";
 import { createToolchains } from "./toolchains";
 import { createBound, finishPrepare } from "./bound";
+import { createPublishing } from "./publishing";
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import {
@@ -331,6 +332,7 @@ export function createCapabilities(
 			body: d.kind === "skill" ? (d.body ?? null) : null,
 		};
 	}
+	const toolchains = createToolchains(closure, now);
 	const bound = createBound({
 		closure,
 		register: registerBuiltinInTransaction,
@@ -339,7 +341,8 @@ export function createCapabilities(
 	return {
 		...createRequirements(store, register),
 		...createDotsPackages(store, register),
-		...createToolchains(closure),
+		...toolchains,
+		...createPublishing(store, toolchains),
 		getDefinitionInTransaction,
 		registerBuiltinInTransaction,
 		registerLearnedInTransaction,

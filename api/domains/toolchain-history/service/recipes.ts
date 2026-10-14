@@ -238,26 +238,30 @@ export function createRecipes(
 			).map(recipe),
 		);
 	}
-	function setRecipeState(id: string, state: "active" | "disabled") {
-		return store.write((db) => {
-			const changed = db
-				.query(
-					"UPDATE toolchain_recipes SET state=?,consecutive_failures=CASE WHEN ?='active' THEN 0 ELSE consecutive_failures END,updated_at=? WHERE id=?",
-				)
-				.run(state, state, now(), id).changes;
-			if (!changed) throw new Error("recipe_not_found");
-		});
+	/** Enable or disable one procedure inside the caller's writer transaction. */
+	function setRecipeStateInTransaction(
+		db: Database,
+		id: string,
+		state: "active" | "disabled",
+	) {
+		const changed = db
+			.query(
+				"UPDATE toolchain_recipes SET state=?,consecutive_failures=CASE WHEN ?='active' THEN 0 ELSE consecutive_failures END,updated_at=? WHERE id=?",
+			)
+			.run(state, state, now(), id).changes;
+		if (!changed) throw new Error("recipe_not_found");
 	}
-	function deleteRecipe(id: string) {
-		return store.write((db) => {
-			db.query("DELETE FROM toolchain_recipe_vectors WHERE recipe_id=?").run(
-				id,
-			);
-			db.query("DELETE FROM toolchain_recipe_search WHERE id=?").run(id);
-			if (!db.query("DELETE FROM toolchain_recipes WHERE id=?").run(id).changes)
-				throw new Error("recipe_not_found");
-		});
+	/** Delete one procedure and its search and vector rows inside the caller's writer transaction. */
+	function deleteRecipeInTransaction(db: Database, id: string) {
+		db.query("DELETE FROM toolchain_recipe_vectors WHERE recipe_id=?").run(id);
+		db.query("DELETE FROM toolchain_recipe_search WHERE id=?").run(id);
+		if (!db.query("DELETE FROM toolchain_recipes WHERE id=?").run(id).changes)
+			throw new Error("recipe_not_found");
 	}
+	const setRecipeState = (id: string, state: "active" | "disabled") =>
+		store.write((db) => setRecipeStateInTransaction(db, id, state));
+	const deleteRecipe = (id: string) =>
+		store.write((db) => deleteRecipeInTransaction(db, id));
 	return {
 		recipesByUrlInTransaction,
 		findRecipesInTransaction,
@@ -266,6 +270,8 @@ export function createRecipes(
 		pendingRecipeVectorsInTransaction,
 		saveRecipeVectorsInTransaction,
 		listRecipes,
+		setRecipeStateInTransaction,
+		deleteRecipeInTransaction,
 		setRecipeState,
 		deleteRecipe,
 	};

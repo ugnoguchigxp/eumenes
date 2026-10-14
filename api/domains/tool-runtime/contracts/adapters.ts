@@ -62,6 +62,16 @@ export interface DomainAdapter {
 		inputAdapters: ReadonlyMap<string, InputAdapter>;
 		projections: ReadonlySet<string>;
 		availability: string;
+		/**
+		 * Documents this adapter owns whose fields bundles may register (see documentFieldV1),
+		 * describing what a fixed path names in the document's schema.
+		 */
+		documents?: ReadonlyMap<
+			string,
+			import("../../capabilities/contracts").DocumentDescription
+		>;
+		/** Field visibility conditions implemented by this adapter's Web counterpart. */
+		conditions?: ReadonlySet<string>;
 	};
 	/** The adapter's domain is configured and usable on this host now. */
 	availableInTransaction(tx: Database): boolean;
@@ -83,11 +93,15 @@ export interface DomainAdapter {
 	): AdapterResult;
 	/** The saved result of an earlier operation by its domain operation id, or null. */
 	readInTransaction(tx: Database, operationId: string): AdapterResult | null;
-	/** Read one registered query for an OpenUI source; null when the target does not exist. */
+	/**
+	 * Read one registered query for an OpenUI source; null when the target does not exist.
+	 * `params` were validated against the source binding's `paramsSchemaRef` (absent otherwise).
+	 */
 	sourceInTransaction(
 		tx: Database,
 		query: string,
 		targetRef: string | undefined,
+		params?: unknown,
 	): { revision: number; data: unknown } | null;
 	/** Convert a source and its current revision to the operation input fields it implies. */
 	targetInput(

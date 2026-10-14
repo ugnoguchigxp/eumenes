@@ -64,8 +64,23 @@
    | --- | --- |
    | `title` | ランチャーとタブの名前。保存項目ごとに入口を増やさない |
    | `variants[]` | `definition`（登録viewのOpenUI JSON。layout可、16 KiB以内）と、質問が開いているときの `questionDefinition`（`question` leafを含む）。`defaultVariant` で既定を選ぶ。`?artifactVariant=<id>` で比較用に切替えられる |
-   | `sourceBindings[]` | OpenUIの `source` 名 → `adapterRef` と登録 `query`。`target` は `none`・`required`（hostが発行したID、例: timer id）・`optional` |
-   | `actionBindings[]` | 既存の `eventAction` と `source` → `operationId`（adapter操作）か `answer:true`（開いた質問への回答）、生入力の `inputSchemaRef`、必要なら `inputAdapterRef`（例 `input:timer-hms@1`）。`effect` は `write`・`read`・`local`（ローカル操作はbackendへ送らない） |
+   | `sourceBindings[]` | OpenUIの `source` 名 → `adapterRef` と登録 `query`。`target` は `none`・`required`（hostが発行したID、例: timer id）・`optional`。読み取りに条件（ページ・並べ替え・検索）が要るなら `paramsSchemaRef` を書き、クライアントは `GET …/sources/:source?params=<JSON>` で渡す（受付台帳を通さない） |
+   | `actionBindings[]` | 既存の `eventAction` と `source` → `operationId`（adapter操作）か `answer:true`（開いた質問への回答）、生入力の `inputSchemaRef`、必要なら `inputAdapterRef`（例 `input:timer-hms@1`）。`effect` は `write`（受付台帳を通る）、`local`（Web adapterが処理）、`navigate`（`navigateTo` の登録artifactを開く。固定 `artifactId` か、eventの値で選ぶ `{byValue, artifacts}`）、`draft`（共通下書きの `edit`・`discard`）。同じ `source`＋`eventAction` は一件だけ |
+   | `launcher`（任意） | ツールチェーン無しで画面を公開する。`group` 無しは上部メニュー、`group` 有りは画面内移動（Hub等）の行き先としてだけ公開。`label`・`description`・`order` |
+   | `fields[]`（任意） | adapterが所有する文書の登録項目（§3.1） |
+
+   **3.1 文書の項目と共通下書き**（設定で使用。[設計](../spec/settings-data-driven-design-2026-10-14.md)）
+
+   | 項目 | 内容 |
+   | --- | --- |
+   | `fieldId` | 全登録で一意の安定ID（例 `appearance.theme`） |
+   | `document`・`path` | adapterの文書（例 `document:settings@1`）と、審査済みの固定path（`$.general.theme`、配列要素は安定IDで `$.resources[id=$target].voice` と `target` に対象source）。adapterの `checkPath` が文書schemaで検査する。クライアントはpathを送らない |
+   | `control`・`options`・`optionsSource`・`min`・`max`・`step`・`maxLength`・`defaultValue` | 表示と入力。正本は文書schema。`defaultValue` は表示だけで変更として書かない |
+   | `unset` | 空入力の意味（`delete-key`・`null`・`empty-string`） |
+   | `visibleWhen` | adapterが宣言しWeb adapterが実装する登録条件（例 `condition:settings.larm-style@1`） |
+   | `confidential` | 秘密。下書きのメモリだけに置き、snapshot・変更一覧・outbox・受付台帳・ログに平文を残さない。送る操作は `confidentialFields` に入力keyを書き、台帳はHMACだけを保存する |
+
+   編集は `draft` actionで共通下書き（文書ごと・利用者ごとに一つ、複数画面で共有）へ入り、`draftDocument` を持つwrite actionが `{expectedRevision, changes, keys?}` を一つの操作として送る。adapterが保存済み文書へ変更を当てて全体を検証し、所有domainの既存公開操作で保存する。適用中の追加入力は残り、`revision_conflict` では下書きを保持して自動再送しない。
 
 6. **schemaを書く（必要な場合だけ）**: 既存の `builtin:` で足りなければ bundle の `schemas[]` に有限subsetのJSON Schemaを置く。使えるのは object/properties/required/additionalProperties:false、string（minLength・maxLength・enum）、number/integer（minimum・maximum・enum）、boolean、array（items・minItems・maxItems）。`$ref`・`pattern`・`format`・`oneOf`等は拒否される（黙って捨てない）。モデルへ渡すtool入力は平坦objectにする。
 7. **検査する**: 書き終えたら dry-run で全issueを一覧する。何も保存しない。
@@ -180,7 +195,7 @@
 
 - 同じ `kind:id@revision`（binding・artifactも同様）で内容を変えると `capability_revision_conflict`。変更は新revisionで追加する。
 - 公開ポインタは同じidの新しいtoolchain revisionを登録した時点で切り替わる。実行中のrunは開始時に凍結したrevisionとbinding digestで続く。
-- 切戻しは `publishToolchainRevisionInTransaction` で binding を持つ以前のrevisionへ戻す。binding の無い旧revisionは固定runtimeを削除済みなので、戻すとその能力は提供されなくなる（停止スイッチとして働く）。保存済みdomain状態・receiptは巻き戻さない。
+- 切戻しは認証済みの `POST /api/capabilities/toolchains/:id/publish`（単独公開の画面は `/api/capabilities/artifacts/:id/publish`）に `{revisionId, expectedActiveRevisionId}` を送り、binding を持つ以前のrevisionへ戻す。現在の公開revisionが期待と違えば409で何も変えない。binding の無い旧revisionは固定runtimeを削除済みなので、戻すとその能力は提供されなくなる（停止スイッチとして働く）。保存済みdomain状態・receiptは巻き戻さない。
 - 新規DBへの登録だけでなく、旧版をseed済みの隔離DBへ新版を追加するケースも試す。二度目のseedは冪等であること。
 
 ## 8. 確認・止まりやすい場所・完了報告

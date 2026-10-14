@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { configureLogging } from "../../../infrastructure/logger";
 import { ActionRequestError, ACTION_POLICY } from "..";
-import { ARTIFACT_ID, makeHarness } from "./action-fixture";
+import { ARTIFACT_ID, HUB_ID, OTHER_REF, makeHarness } from "./action-fixture";
 
 let h = makeHarness();
 afterEach(async () => {
@@ -394,6 +394,15 @@ test("registered artifacts, definitions and sources are read through the host, n
 			artifactRevisionId: ARTIFACT_ID,
 			title: "Fake workspace",
 			adapterRef: "adapter:fake@1",
+			launcher: null,
+		},
+		{
+			toolchainId: null,
+			toolchainRevisionId: null,
+			artifactRevisionId: HUB_ID,
+			title: "Fake hub",
+			adapterRef: null,
+			launcher: { label: "Hub", group: "manage", order: 1 },
 		},
 	]);
 	const view = h.service.artifact(ARTIFACT_ID);
@@ -451,4 +460,214 @@ test("the accepted and rejected log lines are written only after the transaction
 	} finally {
 		configureLogging({ level: "silent" });
 	}
+});
+
+test("a standalone launcher artifact is listed and readable only while every source adapter is available", async () => {
+	fresh();
+	expect(h.service.artifact(HUB_ID).artifact.id).toBe("fake.hub");
+	expect(h.service.source(HUB_ID, "others")).toEqual({
+		revision: 1,
+		data: { rows: [] },
+	});
+	expect(h.service.source(HUB_ID, "setup").revision).toBe(0);
+	h.setOtherAvailable(false);
+	expect(h.service.artifacts().map((a) => a.artifactRevisionId)).toEqual([
+		ARTIFACT_ID,
+	]);
+	expect(() => h.service.artifact(HUB_ID)).toThrow("adapter_unavailable");
+	expect(() => h.service.source(HUB_ID, "others")).toThrow(
+		"adapter_unavailable",
+	);
+	// The toolchain artifact does not depend on the other adapter.
+	expect(h.service.artifact(ARTIFACT_ID).artifactRevisionId).toBe(ARTIFACT_ID);
+	h.setOtherAvailable(true);
+	h.setHubActive(false);
+	expect(() => h.service.artifact(HUB_ID)).toThrow("artifact_not_found");
+	expect(OTHER_REF).toBe("adapter:other@1");
+});
+
+test("navigate and draft actions never reach the backend", async () => {
+	fresh();
+	for (const actionId of ["open", "edit"]) {
+		const error = await refused(
+			h.service.submit(h.event({ actionId, input: {} })),
+		);
+		expect([error.code, error.status as number]).toEqual(["local_action", 400]);
+	}
+	expect(h.ledger()).toBe(0);
+	expect(h.invoked).toHaveLength(0);
+});
+
+const applyInput = (token: string) => ({
+	expectedRevision: 4,
+	changes: [{ fieldId: "general.theme", value: "dark" }],
+	token,
+});
+
+test("a draft-apply write is validated by its schema; confidential keys are redacted and never persisted", async () => {
+	fresh();
+	const event = h.event({ actionId: "apply", input: applyInput("SECRET-ONE") });
+	const { request } = await h.service.submit(event);
+	expect(request.status).toBe("accepted");
+	// The adapter (the owning domain) receives the real input.
+	expect((h.invoked[0]!.input as { token: string }).token).toBe("SECRET-ONE");
+	const row = h.store.read((db) =>
+		db.query("SELECT * FROM tool_action_requests").get(),
+	) as Record<string, unknown>;
+	expect(JSON.parse(row.canonical_input_json as string)).toEqual({
+		expectedRevision: 4,
+		changes: [{ fieldId: "general.theme", value: "dark" }],
+		token: "[secret]",
+	});
+	expect(row.input_digest).toMatch(/^hmac:[0-9a-f]{64}$/);
+	// No table of the ledger holds the secret, and the view does not echo it.
+	const dump = JSON.stringify(
+		h.store.read((db) => [
+			db.query("SELECT * FROM tool_action_requests").all(),
+			db.query("SELECT * FROM tool_action_request_conflicts").all(),
+		]),
+	);
+	expect(dump).not.toContain("SECRET-ONE");
+	expect(JSON.stringify(request)).not.toContain("SECRET-ONE");
+	// Schema failures name fields only.
+	const invalid = await refused(
+		h.service.submit(
+			h.event({
+				actionId: "apply",
+				input: { expectedRevision: "x", changes: [], token: "SECRET-TWO" },
+			}),
+		),
+	);
+	expect(invalid.status).toBe(422);
+	expect(JSON.stringify(invalid.fieldErrors)).not.toContain("SECRET-TWO");
+	expect(h.ledger()).toBe(1);
+});
+
+test("confidential replay: same secret returns the stored result, a different secret is a 409", async () => {
+	fresh();
+	const event = h.event({ actionId: "apply", input: applyInput("SECRET-ONE") });
+	const first = await h.service.submit(event);
+	h.time.value += 30 * 3_600_000;
+	const again = await h.service.submit(event);
+	expect(again.replay).toBe(true);
+	expect(again.request.result?.receiptRef).toEqual(
+		first.request.result?.receiptRef,
+	);
+	expect(h.effects()).toBe(1);
+	const other = await refused(
+		h.service.submit({ ...event, input: applyInput("SECRET-TWO") }),
+	);
+	expect([other.code, other.status as number]).toEqual([
+		"request_conflict",
+		409,
+	]);
+	const conflicts = h.store.read((db) =>
+		db.query("SELECT input_digest FROM tool_action_request_conflicts").all(),
+	) as Array<{ input_digest: string }>;
+	expect(conflicts).toHaveLength(1);
+	expect(conflicts[0]!.input_digest).toMatch(/^hmac:/);
+	expect(JSON.stringify(conflicts)).not.toContain("SECRET");
+	expect(h.effects()).toBe(1);
+	// Without the host key the stored digest cannot be checked: refuse, do not guess.
+	h.setKey(undefined);
+	const unavailable = await refused(h.service.submit(event));
+	expect([unavailable.code, unavailable.status as number]).toEqual([
+		"secret_key_unavailable",
+		503,
+	]);
+});
+
+test("a confidential action without a host key is refused before anything is stored", async () => {
+	fresh();
+	h.setKey(undefined);
+	const error = await refused(
+		h.service.submit(h.event({ actionId: "apply", input: applyInput("S") })),
+	);
+	expect([error.code, error.status as number]).toEqual([
+		"secret_key_unavailable",
+		503,
+	]);
+	expect(h.ledger()).toBe(0);
+	expect(h.effects()).toBe(0);
+	// Ordinary actions do not need the key.
+	expect((await h.service.submit(h.event())).request.status).toBe("accepted");
+});
+
+test("source params are accepted only for sources with a params schema and are validated", async () => {
+	fresh();
+	expect(
+		h.service.source(ARTIFACT_ID, "records", undefined, {
+			offset: 10,
+			limit: 5,
+			search: "a",
+		}).data,
+	).toEqual({ rows: [], params: { offset: 10, limit: 5, search: "a" } });
+	h.service.source(ARTIFACT_ID, "records");
+	expect(h.sourceParams).toEqual([
+		{ offset: 10, limit: 5, search: "a" },
+		undefined,
+	]);
+	for (const params of [
+		{ offset: -1, limit: 5 },
+		{ offset: 0, limit: 5, extra: true },
+		"text",
+		null,
+	]) {
+		expect(() =>
+			h.service.source(ARTIFACT_ID, "records", undefined, params),
+		).toThrow("invalid_params");
+	}
+	// A source without a registered schema takes no params at all.
+	expect(() => h.service.source(ARTIFACT_ID, "setup", undefined, {})).toThrow(
+		"invalid_params",
+	);
+	expect(h.sourceParams).toHaveLength(2);
+	expect(h.ledger()).toBe(0);
+});
+
+test("conflict audit never stores a plain hash of confidential input", async () => {
+	fresh();
+	const start = h.event();
+	await h.service.submit(start);
+	const conflicts = () =>
+		h.store.read((db) =>
+			db.query("SELECT input_digest FROM tool_action_request_conflicts").all(),
+		) as Array<{ input_digest: string }>;
+	// Keyed: the event is audited as an HMAC, even for a plain action.
+	await refused(
+		h.service.submit({
+			...start,
+			input: { hours: "1", minutes: "0", seconds: "0" },
+		}),
+	);
+	expect(conflicts().map((c) => c.input_digest.startsWith("hmac:"))).toEqual([
+		true,
+	]);
+	h.setKey(undefined);
+	// No key, plain action: a plain digest is fine because the action has no secret.
+	await refused(
+		h.service.submit({
+			...start,
+			input: { hours: "2", minutes: "0", seconds: "0" },
+		}),
+	);
+	// No key, confidential action: nothing is stored.
+	const secret = { ...start, actionId: "apply", input: applyInput("SECRET-X") };
+	const error = await refused(h.service.submit(secret));
+	expect(error.code).toBe("request_conflict");
+	const all = conflicts();
+	expect(all).toHaveLength(2);
+	expect(all.filter((c) => /^[0-9a-f]{64}$/.test(c.input_digest))).toHaveLength(
+		1,
+	);
+	expect(JSON.stringify(all)).not.toContain("SECRET");
+	// An unknown artifact cannot be classified, so nothing is stored either.
+	await refused(
+		h.service.submit({
+			...start,
+			artifactRevisionId: "artifact:zz@1",
+			input: applyInput("SECRET-Y"),
+		}),
+	);
+	expect(conflicts()).toHaveLength(2);
 });

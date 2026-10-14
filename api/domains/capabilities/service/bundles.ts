@@ -9,13 +9,20 @@ import {
 	httpJsonBindingV1,
 	hash,
 	validators,
+	type ArtifactDefinitionV1,
 	type BundleHost,
 	type BundleIssue,
 	type CapabilityBundleV1,
 	type Definition,
 } from "../contracts";
 import { getDocument, insertDocument, type DocumentKind } from "../repository";
-import { schemaInTransaction } from "./documents";
+import { publishedArtifacts, publishRegisteredArtifact } from "./artifacts";
+import {
+	checkActionTargets,
+	checkFields,
+	claimField,
+	schemaProperties,
+} from "./bundle-fields";
 import { bundleFiles } from "./bundle-files";
 import {
 	compileJsonSchemaSubset,
@@ -85,7 +92,7 @@ type Adapter = NonNullable<ReturnType<BundleHost["adapters"]["get"]>>;
 type Entry = { d: Definition; path: string };
 type Issue = (code: BundleIssue["code"], path: string, ref?: string) => void;
 /** What every check reads: the bundle, what the host can run and what is already stored. */
-type Check = {
+export type Check = {
 	db: Database;
 	host: BundleHost;
 	bundle: Parsed;
@@ -97,6 +104,12 @@ type Check = {
 	hasDocument: (id: string, kind: DocumentKind) => boolean;
 	schemaRef: (ref: string, path: string) => void;
 	schemaResolves: (ref: string) => boolean;
+	/** Who registered each field id and (document, path): the published catalog plus this bundle. */
+	fieldClaims: Map<string, { artifactId: string; revision: number }>;
+	/** Documents with a confidential field anywhere in the catalog (published or this bundle). */
+	confidentialDocs: Set<string>;
+	/** An artifact id registered by this bundle or already published. */
+	hasArtifactId: (id: string) => boolean;
 };
 
 function collectDocs(bundle: Parsed): Doc[] {
@@ -164,11 +177,36 @@ function createCheck(
 		if (ref.startsWith("domain:")) return host.domainSchemas.has(ref);
 		return hasDocument(ref, "schema");
 	};
+	// Artifacts of this bundle replace the published revisions of the same ids.
+	const bundleArtifacts = new Set(bundle.artifacts.map((a) => a.id));
+	const published = publishedArtifacts(db);
+	const fieldClaims = new Map<
+		string,
+		{ artifactId: string; revision: number }
+	>();
+	const confidentialDocs = new Set<string>();
+	const catalog = [
+		...published
+			.map((p) => p.document)
+			.filter((a) => !bundleArtifacts.has(a.id)),
+		...bundle.artifacts,
+	];
+	for (const a of catalog)
+		for (const f of a.fields ?? [])
+			if (f.confidential) confidentialDocs.add(f.document);
+	for (const { document } of published)
+		if (!bundleArtifacts.has(document.id))
+			for (const f of document.fields ?? [])
+				claimField(fieldClaims, f, document.id, document.revision);
 	return {
 		db,
 		host,
 		bundle,
 		issue,
+		fieldClaims,
+		confidentialDocs,
+		hasArtifactId: (id) =>
+			bundleArtifacts.has(id) || published.some((p) => p.document.id === id),
 		definitions,
 		docs,
 		storedRevision,
@@ -230,23 +268,6 @@ function checkTool(
 		issue("unregistered_operation", `${at}/operationId`, tool.operationId);
 	else if (operation.inputSchemaRef !== tool.inputSchemaRef)
 		issue("schema_mismatch", `${at}/inputSchemaRef`, tool.inputSchemaRef);
-}
-
-/** Property names of an object schema reference, or null when it cannot be read. */
-function schemaProperties(c: Check, ref: string): string[] | null {
-	const local = c.bundle.schemas.find(
-		(x) => `schema:${x.id}@${x.revision}` === ref,
-	);
-	const json = local
-		? local.schema
-		: (() => {
-				const zod = schemaInTransaction(c.db, ref);
-				return zod ? (z.toJSONSchema(zod) as Record<string, unknown>) : null;
-			})();
-	const properties = json?.properties;
-	return properties && typeof properties === "object"
-		? Object.keys(properties)
-		: null;
 }
 
 /** Question schemas must be readable validators; the choice field must be one of their fields. */
@@ -335,6 +356,8 @@ function checkSources(c: Check, a: Artifact, path: string) {
 		adapterOf.set(s.source, s.adapterRef);
 		if (!adapter.queries.has(s.query))
 			c.issue("unregistered_query", `${at}/query`, s.query);
+		if (s.paramsSchemaRef)
+			c.schemaRef(s.paramsSchemaRef, `${at}/paramsSchemaRef`);
 	});
 	return adapterOf;
 }
@@ -363,12 +386,15 @@ function checkActions(
 				`${at}/inputAdapterRef`,
 				action.inputAdapterRef,
 			);
-		if (action.effect === "local" && (action.operationId || action.answer))
+		const sent = action.effect === "write";
+		if (!sent && (action.operationId || action.answer))
 			issue("invalid_format", at);
-		if (!action.operationId) return;
-		const adapter = host.adapters.get(adapterOf.get(action.source) ?? "");
-		if (adapter && !adapter.operations.has(action.operationId))
-			issue("unregistered_operation", `${at}/operationId`, action.operationId);
+		checkActionTargets(
+			c,
+			action,
+			at,
+			host.adapters.get(adapterOf.get(action.source) ?? ""),
+		);
 	});
 }
 
@@ -410,6 +436,7 @@ function checkBindingsAndArtifacts(c: Check) {
 		const path = `artifacts/${i}`;
 		const adapterOf = checkSources(c, a, path);
 		checkActions(c, a, path, adapterOf);
+		checkFields(c, a, path);
 		checkVariants(c, a, path, adapterOf);
 	});
 }
@@ -471,6 +498,13 @@ function registerAll(
 			createdAtMs: deps.now(),
 		});
 		registered.push(doc.revisionId);
+		if (doc.kind === "artifact")
+			publishRegisteredArtifact(
+				db,
+				doc.document as ArtifactDefinitionV1,
+				doc.revisionId,
+				deps.now(),
+			);
 	}
 	for (const { d, path } of order) {
 		const id = revisionOf(d);

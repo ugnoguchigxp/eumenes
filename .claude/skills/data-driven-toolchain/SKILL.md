@@ -27,7 +27,7 @@ description: Add, revise, or migrate an Eumenes toolchain in the data-driven for
    ```
 3. definitions: 新しい profile/skill/package/toolchain を**新revision**で書く。既存revisionの本文・schemaは絶対に変えない（hash衝突 `capability_revision_conflict`）。toolchainは `functionName`（全体で一意）、`useWhen` 1件以上、`examples` 3件以上、`dependencies`＝`packageRevisionId` の一件、`bindingRevisionId`、`artifactRevisionId`。旧形式の `artifact` 項目は不要（使われないので書かない）。
 4. binding: package の tool を adapter の操作名へ。`inputSchemaRef` は tool の `schemaKey` と同じ `builtin:<key>`、かつ adapter の操作schemaと一致。確認質問に domain 固有の回答schemaを使うなら `questions` に宣言する（自由文 `builtin:answerText` は宣言不要。対象選択は `choiceField` と adapter の `choicesInTransaction`）。
-5. artifact: `title`（入口・タブ名、入口は一件）、`variants`（OpenUI JSON と質問表示用 `questionDefinition`）、`sourceBindings`（adapterの登録query、target none/required/optional）、`actionBindings`（既存 eventAction → `operationId` か `answer:true`、`effect` write/read/local）。
+5. artifact: `title`（入口・タブ名、入口は一件）、`variants`（OpenUI JSON と質問表示用 `questionDefinition`）、`sourceBindings`（adapterの登録query、target none/required/optional）、`actionBindings`（既存 eventAction → `operationId` か `answer:true`、`effect` write/read/local/navigate/draft）。ツールチェーン無しで画面を出すなら `launcher`（group無し＝上部メニュー、group有り＝画面内移動先）。設定のような文書項目は `fields[]`（固定path・`confidential`・`visibleWhen`）と共通下書き（正本 §3.1）。
 6. 検査（何も保存しない dry-run）。issue が無くなるまで直す:
    ```sh
    bun run toolchain:bundle -- check api/domains/capabilities/bundles/<名前>.bundle.json
@@ -43,7 +43,7 @@ description: Add, revise, or migrate an Eumenes toolchain in the data-driven for
 
 ## 3. 旧形式を移行する場合の削除対象
 
-移行後に残さない（`no-legacy`）: `api/domains/capabilities/builtin/toolchains.ts` の旧toolchain定義、`api/domains/capabilities/contracts/runtime-meta.ts` の該当固定runtime、dialogue の専用分岐、Web の専用 host と `WorkspaceArtifacts` の分岐、それらの試験。DB上の旧revisionはデータとして残る。binding の無い旧revisionへ公開を戻すと能力が消える（停止スイッチ）ことを報告に書く。
+移行後に残さない（`no-legacy`）: `api/domains/capabilities/builtin/toolchains.ts` の旧toolchain定義、`api/domains/capabilities/contracts/runtime-meta.ts` の該当固定runtime、dialogue の専用分岐、Web の専用 host と `WorkspaceArtifacts` の分岐、それらの試験。DB上の旧revisionはデータとして残る。binding の無い旧revisionへ公開を戻すと能力が消える（停止スイッチ）ことを報告に書く。 公開の切替・切戻しは `POST /api/capabilities/toolchains/:id/publish`・`/artifacts/:id/publish`（`{revisionId, expectedActiveRevisionId}`）。
 
 ## 4. 守ること
 
