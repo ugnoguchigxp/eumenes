@@ -36,6 +36,7 @@ function show(
 		kanban?: KanbanNoticeView[];
 		unread?: number;
 		reading?: string[];
+		loadError?: string;
 	} = {},
 ) {
 	const onStop = vi.fn();
@@ -50,6 +51,7 @@ function show(
 				unread: over.unread ?? items.filter((n) => !n.read).length,
 				readingIds: over.reading ?? [],
 				error: null,
+				loadError: over.loadError ?? null,
 				onOpenBoard,
 				onRead,
 			}}
@@ -99,7 +101,7 @@ test("a Kanban notice opens the board and is marked read; timers keep their stop
 	fireEvent.click(screen.getByRole("button", { name: /通知センター/ }));
 	const drawer = await screen.findByRole("dialog", { name: "通知センター" });
 	// A read notice offers no read button; the unread one does.
-	expect(drawer.querySelectorAll("button")).toBeTruthy();
+	expect(drawer).toBeTruthy();
 	const open = screen.getAllByRole("button", { name: "タスクボードを開く" });
 	expect(open).toHaveLength(2);
 	fireEvent.click(open[0]!);
@@ -133,4 +135,11 @@ test("a notice being marked read disables its button", () => {
 	show({ kanban: [notice()], reading: ["n1"] });
 	const button = screen.getByRole("button", { name: "処理中…" });
 	expect((button as HTMLButtonElement).disabled).toBe(true);
+});
+
+test("a list load failure shows in the drawer only, never over the screen", async () => {
+	show({ loadError: "タスクの通知を取得できませんでした。" });
+	expect(screen.queryByRole("alert")).toBeNull();
+	fireEvent.click(screen.getByRole("button", { name: "通知センター" }));
+	await screen.findByText("タスクの通知を取得できませんでした。");
 });

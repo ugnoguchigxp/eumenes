@@ -2,6 +2,8 @@
 # Stands in for the `claude` CLI in browser tests. Arguments: [--session-id|--resume <id>]
 # --settings <hooks file> [prompt]. It shows each request and reports through the hooks the way
 # Claude Code does: SessionStart, then per turn UserPromptSubmit and Stop with one prompt_id.
+# Markers in a request change the turn (Kanban tests): [slow] works for 8 s instead of 1 s,
+# [perm] asks for a permission first (Notification, 6 s), [edit:path] reports a Write of that file.
 sid=""
 source="startup"
 settings=""
@@ -26,14 +28,54 @@ work() {
 	turn=$((turn + 1))
 	pid="fake-$$-$turn"
 	printf 'FAKE CLAUDE working on: %s\r\n' "$1"
-	escaped=$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g')
+	# JSON string: backslashes and quotes escaped, line breaks as \n (Kanban requests have them).
+	escaped=$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g' | awk 'NR > 1 { printf "\\n" } { printf "%s", $0 }')
 	hook "{\"hook_event_name\":\"UserPromptSubmit\",\"session_id\":\"$sid\",\"prompt_id\":\"$pid\",\"prompt\":\"$escaped\"}"
-	sleep 1
+	case "$1" in
+	*'[perm]'*)
+		hook "{\"hook_event_name\":\"Notification\",\"session_id\":\"$sid\",\"prompt_id\":\"$pid\",\"notification_type\":\"permission_prompt\"}"
+		sleep 6
+		;;
+	esac
+	for file in $(printf '%s' "$1" | grep -o '\[edit:[^]]*\]' | sed 's/^\[edit://; s/\]$//'); do
+		hook "{\"hook_event_name\":\"PostToolUse\",\"session_id\":\"$sid\",\"prompt_id\":\"$pid\",\"tool_name\":\"Write\",\"tool_input\":{\"file_path\":\"$file\"}}"
+	done
+	case "$1" in
+	*'[slow]'*) sleep 8 ;;
+	*) sleep 1 ;;
+	esac
 	printf 'FAKE CLAUDE done\r\n'
-	hook "{\"hook_event_name\":\"Stop\",\"session_id\":\"$sid\",\"prompt_id\":\"$pid\",\"last_assistant_message\":\"README のセットアップ手順を更新しました。テストは未実行です。\"}"
+	case "$1" in
+	*'commit して push'*) message="変更を commit して push しました。" ;;
+	*) message="README のセットアップ手順を更新しました。テストは未実行です。" ;;
+	esac
+	hook "{\"hook_event_name\":\"Stop\",\"session_id\":\"$sid\",\"prompt_id\":\"$pid\",\"last_assistant_message\":\"$message\"}"
 }
 hook "{\"hook_event_name\":\"SessionStart\",\"session_id\":\"$sid\",\"source\":\"$source\"}"
 [ -n "$prompt" ] && work "$prompt"
+# A pasted request (bracketed paste) may span several lines; Enter ends it. Typed lines are one
+# request each.
+esc=$(printf '\033')
+pasting=0
+buf=""
 while IFS= read -r line; do
-	work "$(printf '%s' "$line" | sed 's/\x1b\[20[01]~//g')"
+	case "$line" in
+	*"${esc}[200~"*) pasting=1; buf="" ;;
+	esac
+	if [ "$pasting" = 1 ]; then
+		if [ -n "$buf" ]; then
+			buf="$buf
+$line"
+		else
+			buf="$line"
+		fi
+		case "$line" in
+		*"${esc}[201~"*)
+			pasting=0
+			work "$(printf '%s' "$buf" | sed 's/\x1b\[20[01]~//g')"
+			;;
+		esac
+		continue
+	fi
+	work "$line"
 done

@@ -1,0 +1,76 @@
+{
+	"formatVersion": 1,
+	"bundleId": "settings-google",
+	"pins": [],
+	"definitions": [],
+	"bindings": [],
+	"artifacts": [
+		{
+			"kind": "artifact",
+			"id": "settings.google-accounts",
+			"revision": 1,
+			"title": "Google連携",
+			"variants": [
+				{
+					"id": "standard",
+					"label": "標準",
+					"definition": {
+						"view": "google-accounts",
+						"source": "google-accounts",
+						"title": "Google連携"
+					}
+				}
+			],
+			"defaultVariant": "standard",
+			"sourceBindings": [
+				{
+					"source": "google-accounts",
+					"adapterRef": "adapter:google-accounts@1",
+					"query": "query:google-accounts.status@1",
+					"target": "none"
+				}
+			],
+			"actionBindings": [
+				{
+					"actionId": "connect",
+					"eventAction": "google-connect",
+					"source": "google-accounts",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				},
+				{
+					"actionId": "cancel",
+					"eventAction": "google-cancel",
+					"source": "google-accounts",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				},
+				{
+					"actionId": "disconnect",
+					"eventAction": "google-disconnect",
+					"source": "google-accounts",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				},
+				{
+					"actionId": "back",
+					"eventAction": "google-back",
+					"source": "google-accounts",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "navigate",
+					"navigateTo": {
+						"artifactId": "settings.hub"
+					}
+				}
+			],
+			"launcher": {
+				"label": "Google連携",
+				"description": "Googleアカウントの接続と解除",
+				"group": "管理と確認",
+				"order": 80,
+				"icon": "connections"
+			}
+		}
+	],
+	"schemas": []
+}

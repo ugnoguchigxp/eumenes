@@ -129,32 +129,6 @@ export function createForget(deps: ForgetDeps) {
 		}
 	}
 
-	/** State items outside `known` whose evidence messages are all among `messageIds` (nothing else keeps them standing). */
-	function itemsResting(
-		db: Database,
-		messageIds: ReadonlySet<string>,
-		known: ReadonlySet<string>,
-	): string[] {
-		const listed = listState(db, {
-			contractVersion: VERSION,
-			access: access(db, "memory.forget"),
-			scopeKey: PROFILE_SCOPE,
-			includeInactive: true,
-		});
-		if (listed.status !== "ok") return refuse("memory_blocked");
-		return listed.items
-			.filter((item) => {
-				if (known.has(item.itemId)) return false;
-				const sources = item.evidence.filter(
-					(ref) => ref.namespace === "conversation",
-				);
-				return (
-					sources.length > 0 && sources.every((ref) => messageIds.has(ref.id))
-				);
-			})
-			.map((item) => item.itemId);
-	}
-
 	/** Plan -> forget journal (fsync) -> apply for one State item. */
 	function forgetStateId(
 		db: Database,
@@ -334,20 +308,12 @@ export function createForget(deps: ForgetDeps) {
 			for (const requested of input.itemIds)
 				if (!STATE_ID.test(requested)) return refuse("invalid_memory_item");
 			expandItems(db, input.itemIds, itemIds, true);
-			// Items and messages pull each other in until nothing more qualifies: the evidence of the items (B1) and the
-			// exchange partners (B3) are blocked, and an item whose evidence is all blocked has nothing left to stand on.
-			let messageIds: string[];
-			for (;;) {
-				messageIds = withPartners(db, [
-					...evidenceMessages(db, itemIds),
-					...input.messageIds,
-				]);
-				const resting = itemsResting(db, new Set(messageIds), itemIds);
-				if (resting.length === 0) break;
-				const before = itemIds.size;
-				expandItems(db, resting, itemIds, false);
-				if (itemIds.size === before) break;
-			}
+			// The evidence of the items (B1) and the exchange partners (B3) are blocked. Other items that rest on the
+			// same messages stay: they are facts the user did not ask to forget (the message only leaves the context).
+			const messageIds = withPartners(db, [
+				...evidenceMessages(db, itemIds),
+				...input.messageIds,
+			]);
 			const forgetId = deps.id();
 			const entry: BlockJournalEntry = {
 				forgetId,

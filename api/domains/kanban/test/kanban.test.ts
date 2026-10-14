@@ -1,37 +1,7 @@
-import { afterEach, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { expect, test } from "bun:test";
 import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
 import { createKanban, migrations, type KanbanService } from "..";
-
-const dirs: string[] = [];
-const stores: SqliteStore[] = [];
-afterEach(async () => {
-	for (const store of stores.splice(0)) await store.close();
-	for (const dir of dirs.splice(0))
-		rmSync(dir, { recursive: true, force: true });
-});
-
-/** `kanban/0001-cards` runs after the queue's first migration; a stub stands in for it. */
-export function openKanban() {
-	const dir = mkdtempSync(join(tmpdir(), "eumenes-kanban-"));
-	dirs.push(dir);
-	const file = join(dir, "db.sqlite3");
-	const store = openStore(file, [
-		{ id: "queue/0001-init", sql: "SELECT 1" },
-		...migrations,
-	]);
-	stores.push(store);
-	let tick = Date.parse("2026-10-14T00:00:00.000Z");
-	let seq = 0;
-	const kanban = createKanban({
-		store,
-		now: () => (tick += 1000),
-		id: () => `00000000-0000-4000-8000-${String(++seq).padStart(12, "0")}`,
-	});
-	return { store, kanban, file };
-}
+import { openKanban, stores } from "./kanban.fixture";
 
 let req = 0;
 const rid = () => `req-${++req}`;
@@ -334,6 +304,8 @@ test("actions are decided by the domain from the column and runnable", async () 
 		"edit",
 		"remove",
 		"run",
+		"review",
+		"reset",
 		"open",
 	]);
 });
@@ -348,7 +320,7 @@ test("a running card cannot be edited, moved or removed", async () => {
 			)
 			.run(a.cardId),
 	);
-	expect(kanban.board(VIEW).cards[0]?.actions).toEqual(["open"]);
+	expect(kanban.board(VIEW).cards[0]?.actions).toEqual(["stop", "open"]);
 	for (const run of [
 		(tx: import("bun:sqlite").Database) =>
 			kanban.editInTransaction(

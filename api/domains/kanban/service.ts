@@ -1,21 +1,23 @@
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../infrastructure/sqlite";
-import { sha256Hex } from "../../infrastructure/digest";
+import {
+	boardInTransaction,
+	cardActions,
+	cardInTransaction,
+} from "./board";
 import {
 	DEFAULT_PROJECT_ID,
 	type KanbanAddInput,
-	type KanbanBoardView,
-	type KanbanCardActionName,
 	type KanbanCardRefInput,
-	type KanbanCardView,
+	type KanbanDispatch,
 	type KanbanEditInput,
 	type KanbanMoveInput,
-	type KanbanReceipt,
+	type KanbanNoticeView,
+	type KanbanRunFinish,
 	type KanbanViewContext,
 } from "./contracts";
+import { createCore, type Applied, type KanbanOutcome } from "./core";
 import {
-	allCards,
-	boardRevision,
 	bumpBoard,
 	columnIds,
 	deleteCard,
@@ -23,91 +25,71 @@ import {
 	getReceipt,
 	insertCard,
 	placeColumn,
-	saveReceipt,
 	updateCard,
 	type CardRow,
 } from "./repository";
+import { createRuns } from "./runs";
+import {
+	handedRuns,
+	listNotices,
+	markNoticeRead,
+	unreadNotices,
+} from "./runs-repository";
 
-export type KanbanOutcome = { receipt: KanbanReceipt; replay: boolean };
+export type { KanbanOutcome } from "./core";
+export { cardActions };
 
 const iso = (ms: number) => new Date(ms).toISOString();
 
-/**
- * The actions allowed now, decided from the column (business rule, plan §3.8). P1 knows no runs:
- * a running card can only be opened; cards outside `running` can be edited, removed and run
- * (when runs can be tracked on this host).
- */
-export function cardActions(
-	card: Pick<CardRow, "column">,
-	view: KanbanViewContext,
-): KanbanCardActionName[] {
-	if (card.column === "running") return ["open"];
-	const actions: KanbanCardActionName[] = ["edit", "remove"];
-	if (view.runnable) actions.push("run");
-	if (card.column === "finished") actions.push("open");
-	return actions;
-}
+/** What the run recovery reads of a terminals request (structural; no terminals import). */
+export type KanbanRecoverPorts = {
+	request(
+		tx: Database,
+		runId: string,
+	): {
+		state: string;
+		reason?: string;
+		lastReport?: string;
+		files: readonly string[];
+	} | null;
+	/** Hands a run over to terminals inside the recovery transaction. */
+	enqueue(tx: Database, dispatch: KanbanDispatch): void;
+};
+const FINAL = new Set(["completed", "interrupted", "ended", "unknown", "cancelled"]);
 
-function cardView(card: CardRow, view: KanbanViewContext): KanbanCardView {
-	return {
-		id: card.id,
-		revision: card.revision,
-		title: card.title,
-		prompt: card.prompt,
-		column: card.column,
-		...(card.label ? { label: card.label } : {}),
-		reviewed: card.reviewed,
-		commitPushReported: card.commitPushReported,
-		followedByOtherRun: false,
-		projectId: card.projectId,
-		files: [],
-		position: card.position,
-		actions: cardActions(card, view),
-		createdAt: iso(card.createdAt),
-		updatedAt: iso(card.updatedAt),
-	};
-}
+/** A card back to a state without any run (todo): nothing of its conversation is kept. */
+const NO_RUN: Pick<
+	CardRow,
+	| "label"
+	| "reason"
+	| "reviewed"
+	| "commitPushReported"
+	| "claudeSessionId"
+	| "currentRunId"
+	| "lastReport"
+	| "files"
+> = {
+	label: null,
+	reason: null,
+	reviewed: false,
+	commitPushReported: false,
+	claudeSessionId: null,
+	currentRunId: null,
+	lastReport: null,
+	files: [],
+};
 
 export function createKanban(options: {
 	store: SqliteStore;
 	now?: () => number;
 	id?: () => string;
 }) {
-	const now = options.now ?? Date.now;
-	const newId = options.id ?? (() => crypto.randomUUID());
-
-	/** Replays a saved receipt for the same request, or applies the operation once. */
-	function operate(
-		tx: Database,
-		requestId: string,
-		operation: string,
-		input: unknown,
-		apply: () => KanbanReceipt,
-	): KanbanOutcome {
-		const digest = sha256Hex(JSON.stringify([operation, input]));
-		const saved = getReceipt(tx, requestId);
-		if (saved) {
-			if (saved.operation !== operation || saved.digest !== digest)
-				throw new Error("request_conflict");
-			return { receipt: saved.receipt, replay: true };
-		}
-		const receipt = apply();
-		saveReceipt(tx, requestId, operation, digest, receipt, now());
-		return { receipt, replay: false };
-	}
-
-	/** The card, after the revision check. */
-	function target(
-		tx: Database,
-		cardId: string,
-		expectedRevision: number,
-	): CardRow {
-		const card = getCard(tx, cardId);
-		if (!card) throw new Error("kanban_card_not_found");
-		if (card.revision !== expectedRevision)
-			throw new Error("revision_conflict");
-		return card;
-	}
+	const core = createCore({
+		now: options.now ?? Date.now,
+		newId: options.id ?? (() => crypto.randomUUID()),
+	});
+	const { now, newId, operate, target, receiptOf } = core;
+	const { pendingStops, stopUnconfirmed, ...runOperations } = createRuns(core);
 
 	function notRunning(card: CardRow) {
 		if (card.column === "running") throw new Error("kanban_card_busy");
@@ -127,19 +109,6 @@ export function createKanban(options: {
 		throw new Error("kanban_column_invalid");
 	}
 
-	function receiptOf(
-		action: KanbanReceipt["action"],
-		card: CardRow,
-	): KanbanReceipt {
-		return {
-			action,
-			cardId: card.id,
-			revision: card.revision,
-			title: card.title,
-			column: card.column,
-		};
-	}
-
 	function addInTransaction(
 		tx: Database,
 		input: KanbanAddInput,
@@ -155,9 +124,7 @@ export function createKanban(options: {
 				title: input.title,
 				prompt: input.prompt,
 				column: "todo",
-				label: null,
-				reviewed: false,
-				commitPushReported: false,
+				...NO_RUN,
 				projectId: DEFAULT_PROJECT_ID,
 				position: ids.length,
 				createdAt: at,
@@ -167,7 +134,7 @@ export function createKanban(options: {
 			ids.splice(index, 0, card.id);
 			placeColumn(tx, ids);
 			bumpBoard(tx);
-			return receiptOf("added", card);
+			return { receipt: receiptOf("added", card) };
 		});
 	}
 
@@ -183,7 +150,7 @@ export function createKanban(options: {
 			const prompt = input.prompt ?? card.prompt;
 			// Nothing changes: the revision stays, so a no-op edit never conflicts later.
 			if (title === card.title && prompt === card.prompt)
-				return receiptOf("edited", card);
+				return { receipt: receiptOf("edited", card) };
 			const edited: CardRow = {
 				...card,
 				title,
@@ -193,7 +160,7 @@ export function createKanban(options: {
 			};
 			updateCard(tx, edited);
 			bumpBoard(tx);
-			return receiptOf("edited", edited);
+			return { receipt: receiptOf("edited", edited) };
 		});
 	}
 
@@ -217,6 +184,8 @@ export function createKanban(options: {
 			const index = insertIndex(tx, ids, before);
 			const moved: CardRow = {
 				...card,
+				// Back to todo forgets the runs; by hand into finished is a Done by the person.
+				...(input.column === "todo" ? NO_RUN : {}),
 				column: input.column,
 				label: input.column === "finished" ? (card.label ?? "done") : null,
 				reviewed: sameColumn ? card.reviewed : false,
@@ -233,7 +202,7 @@ export function createKanban(options: {
 					columnIds(tx, card.column).filter((id) => id !== card.id),
 				);
 			bumpBoard(tx);
-			return receiptOf("moved", moved);
+			return { receipt: receiptOf("moved", moved) };
 		});
 	}
 
@@ -251,30 +220,101 @@ export function createKanban(options: {
 				columnIds(tx, card.column).filter((id) => id !== card.id),
 			);
 			bumpBoard(tx);
-			return receiptOf("removed", card);
+			return { receipt: receiptOf("removed", card) };
 		});
 	}
 
-	function boardInTransaction(
+	/** The person looked at a Done card (the column does not change). */
+	function reviewInTransaction(
 		tx: Database,
-		view: KanbanViewContext,
-	): KanbanBoardView {
-		return {
-			revision: boardRevision(tx),
-			queue: { state: "running", waiting: 0 },
-			runnable: view.runnable,
-			cards: allCards(tx).map((card) => cardView(card, view)),
-			runs: [],
-		};
+		input: KanbanCardRefInput,
+		requestId: string,
+	): KanbanOutcome {
+		return operate(tx, requestId, "review", input, () => {
+			const card = target(tx, input.cardId, input.expectedRevision);
+			if (card.label !== "done") throw new Error("kanban_state_invalid");
+			if (card.reviewed) return { receipt: receiptOf("reviewed", card) };
+			const reviewed: CardRow = {
+				...card,
+				reviewed: true,
+				revision: card.revision + 1,
+				updatedAt: now(),
+			};
+			updateCard(tx, reviewed);
+			bumpBoard(tx);
+			return { receipt: receiptOf("reviewed", reviewed) };
+		});
 	}
 
-	function cardInTransaction(
+	/** Done or Blocker back to the end of todo; the run history stays. */
+	function resetInTransaction(
 		tx: Database,
-		cardId: string,
-		view: KanbanViewContext,
-	): KanbanCardView | null {
-		const card = getCard(tx, cardId);
-		return card ? cardView(card, view) : null;
+		input: KanbanCardRefInput,
+		requestId: string,
+	): KanbanOutcome {
+		return operate(tx, requestId, "reset", input, (): Applied => {
+			const card = target(tx, input.cardId, input.expectedRevision);
+			notRunning(card);
+			if (card.column !== "finished") throw new Error("kanban_state_invalid");
+			const reset: CardRow = {
+				...card,
+				...NO_RUN,
+				column: "todo",
+				revision: card.revision + 1,
+				updatedAt: now(),
+			};
+			updateCard(tx, reset);
+			core.appendToColumn(tx, reset, "finished");
+			bumpBoard(tx);
+			return { receipt: receiptOf("reset", reset) };
+		});
+	}
+
+	const notices = (tx: Database, limit: number) => ({
+		notices: listNotices(tx, limit).map(
+			(row): KanbanNoticeView => ({
+				id: row.id,
+				kind: row.kind,
+				...(row.cardId ? { cardId: row.cardId } : {}),
+				...(row.runId ? { runId: row.runId } : {}),
+				text: row.text,
+				read: row.read,
+				createdAt: iso(row.createdAt),
+			}),
+		),
+		unread: unreadNotices(tx),
+	});
+
+	/**
+	 * Startup: runs that were handed over are settled from their terminals requests (a request that
+	 * is gone, or that terminals recovery already ended, blocks the run and stops the queue).
+	 */
+	async function recover(ports: KanbanRecoverPorts) {
+		await options.store.write((tx) => {
+			for (const run of handedRuns(tx)) {
+				const request = ports.request(tx, run.id);
+				if (request && !FINAL.has(request.state)) continue;
+				const out = runOperations.finishRunInTransaction(
+					tx,
+					request
+						? {
+								runId: run.id,
+								state: request.state as KanbanRunFinish["state"],
+								reason: request.reason,
+								lastReport: request.lastReport ?? "",
+								files: request.files,
+							}
+						: {
+								runId: run.id,
+								state: "unknown",
+								reason: "restarted",
+								lastReport: "",
+								files: [],
+							},
+				);
+				if (out?.dispatch) ports.enqueue(tx, out.dispatch);
+			}
+		});
 	}
 
 	return {
@@ -282,12 +322,30 @@ export function createKanban(options: {
 		editInTransaction,
 		moveInTransaction,
 		removeInTransaction,
+		reviewInTransaction,
+		resetInTransaction,
+		...runOperations,
 		boardInTransaction,
 		cardInTransaction,
 		receiptInTransaction: (tx: Database, requestId: string) =>
 			getReceipt(tx, requestId)?.receipt ?? null,
+		noticesInTransaction: notices,
 		board: (view: KanbanViewContext) =>
 			options.store.readSnapshot((tx) => boardInTransaction(tx, view)),
+		/** Newest first, with the unread count (`GET /api/kanban/notices`). */
+		notices: (limit: number) =>
+			options.store.readSnapshot((tx) => notices(tx, limit)),
+		/** Marks a notice read; `kanban_notice_not_found` when there is none. */
+		readNotice: (id: string) =>
+			options.store.write((tx) => {
+				if (!markNoticeRead(tx, id)) throw new Error("kanban_notice_not_found");
+			}),
+		/** Runs whose stop the person asked for and that nobody carried out yet. */
+		pendingStops: () => options.store.readSnapshot(pendingStops),
+		/** Records that a stopped run's process could not be confirmed gone. */
+		stopUnconfirmed: (runId: string) =>
+			options.store.write((tx) => stopUnconfirmed(tx, runId)),
+		recover,
 	};
 }
 

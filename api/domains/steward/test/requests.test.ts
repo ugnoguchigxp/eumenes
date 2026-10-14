@@ -171,6 +171,41 @@ test("an explicit remember of what is already stored makes a new confirmed versi
 	expect(JSON.stringify(decision.results)).toContain('"reconfirmed":true');
 });
 
+test("a remember request the model answers with none but points at the stored item is still reconfirmed", async () => {
+	const h = await setup();
+	h.inference.script("curate-memory", { ...empty, remember: [remember()] });
+	h.inference.script("dispose-exchanges", keepAll);
+	await h.run({ user: "辛いものが好きです", end: "completed" });
+	await h.drain();
+	const [before] = h.memory.list();
+	// The live model said "already stored, nothing to save" with the item's ref and a reason as its text.
+	h.inference.script("curate-memory", (data) => {
+		const longTerm = data.longTerm as Array<{ ref: string }>;
+		return {
+			...empty,
+			resolve: [
+				resolve({
+					action: "none",
+					refs: [longTerm[0]!.ref],
+					text: "既にある記憶と一致するため保存は不要です。",
+				}),
+			],
+		};
+	});
+	h.inference.script("dispose-exchanges", keepAll);
+	await h.run({
+		user: "辛いものが好きなこと、ちゃんと覚えておいてね",
+		end: "completed",
+		requests: [{ kind: "remember", what: "辛いものが好き" }],
+	});
+	await h.drain();
+	const [after] = h.memory.list();
+	expect(after).toMatchObject({ text: before!.text, origin: "user_confirmed" });
+	expect(h.inbox()).toContainEqual(
+		expect.objectContaining({ kind: "remember", state: "done" }),
+	);
+});
+
 test("a request the model never answers is given up after three tries", async () => {
 	const h = await setup();
 	const answer = { ...empty };

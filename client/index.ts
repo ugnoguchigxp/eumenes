@@ -1,3 +1,4 @@
+import { googleAccountsClient } from "./google-accounts";
 import { ocrClient } from "./ocr";
 import { objectRecognitionClient } from "./object-recognition";
 import { excalidrawClient } from "./excalidraw";
@@ -24,6 +25,7 @@ import { tasksClient } from "./tasks";
 import { codingClient } from "./coding";
 import { timersClient } from "./timers";
 import { terminalsClient } from "./terminals";
+import { kanbanClient } from "./kanban";
 import { toolchainActionsClient } from "./toolchain-actions";
 import { voiceDialogueClient } from "./voice-dialogue";
 import { webResearchClient } from "./web-research";
@@ -45,6 +47,7 @@ export function createClient(baseUrl: string, token?: string) {
 		...conversationClient(transport),
 		...dialogueClient(transport),
 		...larmClient(transport),
+		...googleAccountsClient(transport),
 		...settingsClient(transport),
 		...serviceTestsClient(transport),
 		...ttsDictionaryClient(transport),
@@ -60,6 +63,7 @@ export function createClient(baseUrl: string, token?: string) {
 		...toolchainHistoryClient(transport),
 		...timersClient(transport),
 		...terminalsClient(transport),
+		...kanbanClient(transport),
 		...toolchainActionsClient(transport),
 		...worldClient(transport),
 	};

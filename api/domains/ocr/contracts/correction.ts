@@ -138,16 +138,13 @@ export function validateCorrection(
 
 export function correctionPlainText(result: CorrectionResult) {
 	return result.blocks
-		.map((block) =>
-			block.kind === "paragraph"
-				? block.text
-				: Array.from({ length: block.rows }, (_, row) =>
-						block.cells
-							.filter((c) => c.row === row)
-							.sort((a, b) => a.column - b.column)
-							.map((c) => c.text)
-							.join("\t"),
-					).join("\n"),
-		)
+		.map((block) => {
+			if (block.kind === "paragraph") return block.text;
+			const grid = Array.from({ length: block.rows }, () =>
+				Array<string>(block.columns).fill(""),
+			);
+			for (const cell of block.cells) grid[cell.row]![cell.column] = cell.text;
+			return grid.map((row) => row.join("\t")).join("\n");
+		})
 		.join("\n\n");
 }

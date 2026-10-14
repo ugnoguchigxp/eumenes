@@ -1,4 +1,10 @@
 export const domains = {
+	"google-accounts": {
+		backend: "api/domains/google-accounts",
+		web: "web/src/domains/google-accounts",
+		components: "packages/design-system/src/components/GoogleAccounts",
+		depends: { api: [], web: [], test: [] },
+	},
 	excalidraw: {
 		backend: "api/domains/excalidraw",
 		web: "web/src/domains/excalidraw",

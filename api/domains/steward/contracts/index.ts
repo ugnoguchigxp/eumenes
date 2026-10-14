@@ -71,8 +71,11 @@ export const RETRY_DELAYS_MS = [0, 15_000, 60_000] as const;
 /** The wait before the first retry of a step whose inference request could not be taken, and its ceiling (it doubles). */
 export const CAPTURE_RETRY_MS = 30_000;
 export const CAPTURE_RETRY_MAX_MS = 5 * 60_000;
-/** The control request's deadline and output cap (inference refuses more than 30 s / 1500 tokens). */
-export const INFERENCE_MS = 25_000;
+/**
+ * The control request's deadline and output cap (inference allows a structured request 90 s and
+ * 1500 tokens). The cloud fallback reserves up to 60 s of the deadline, so LARM gets about 30 s.
+ */
+export const INFERENCE_MS = 90_000;
 export const MAX_OUTPUT_TOKENS = 1200;
 export const MAX_OUTPUT_BYTES = 32 * 1024;
 /** The queue deadline of a job: it covers waiting behind earlier jobs and the retries. */

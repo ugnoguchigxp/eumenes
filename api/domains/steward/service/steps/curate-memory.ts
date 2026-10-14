@@ -193,6 +193,7 @@ function prepareStep(env: StepEnv, unit: PreparedUnit["unit"]) {
 		refs: memory.refs,
 		digests,
 		turns,
+		noteTexts: memory.shortTerm.map((note) => String(note.text)),
 	};
 	return {
 		status: "ready" as const,

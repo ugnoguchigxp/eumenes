@@ -1,3 +1,4 @@
+import { createGoogleAccountsAdapter } from "./google-accounts-adapter";
 import { createOcrAdapter } from "./ocr-adapter";
 import type { SqliteStore } from "../infrastructure/sqlite";
 import type { QueueService } from "../domains/queue";
@@ -81,6 +82,7 @@ export async function createToolchain(
 		/** Tests that observe a pass immediately after a commit set 0. */
 		reconcileThrottleMs?: number;
 		/** Settings service for the data-driven settings screens (absent: no settings adapter). */
+		googleAccounts?: import("../domains/google-accounts").GoogleAccounts;
 		settings?: SettingsAdapterPorts;
 		/** Domain readers for the data-driven records screen (absent: no records adapter). */
 		records?: Omit<RecordsPorts, "history">;
@@ -111,6 +113,9 @@ export async function createToolchain(
 ) {
 	// Typed domain adapters this host offers; bundles naming any other adapter are not registered.
 	const registry = createAdapterRegistry([
+		...(options.googleAccounts
+			? [createGoogleAccountsAdapter(options.googleAccounts)]
+			: []),
 		...(options.music ? [createMusicScreenAdapter()] : []),
 		...(options.image ? [createImageScreenAdapter()] : []),
 		...(options.uiCompositions

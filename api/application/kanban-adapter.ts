@@ -4,19 +4,24 @@ import type {
 	FieldError,
 	InputAdapter,
 } from "../domains/tool-runtime";
+import type { Database } from "bun:sqlite";
 import {
 	kanbanAdd,
 	kanbanCardRef,
 	kanbanEdit,
+	kanbanFollowup,
+	kanbanList,
 	kanbanMove,
 } from "../domains/capabilities/contracts";
 import {
 	kanbanReceiptSchema,
+	type KanbanOperationContext,
 	type KanbanOutcome,
 	type KanbanReceipt,
 	type KanbanService,
 } from "../domains/kanban";
 import { sha256Hex } from "../infrastructure/digest";
+import { composeBoard, connectionOf, enqueueDispatch } from "./kanban-runs";
 
 export const KANBAN_ADAPTER_REF = "adapter:kanban@1";
 const BOARD = "query:kanban.board@1";
@@ -24,6 +29,7 @@ const ADD = "input:kanban.add@1";
 const EDIT = "input:kanban.edit@1";
 const MOVE = "input:kanban.move@1";
 const CARD = "input:kanban.card@1";
+const FOLLOWUP = "input:kanban.followup@1";
 
 /** Domain result schemas this adapter registers for `domain:` refs. */
 export const kanbanDomainSchemas = {
@@ -130,28 +136,37 @@ const kanbanInputAdapters = new Map<string, InputAdapter>([
 			r.revision();
 		}),
 	],
+	[
+		FOLLOWUP,
+		convert((r) => {
+			r.id("cardId");
+			r.revision();
+			r.text("note");
+		}),
+	],
 ]);
+
+const write = (inputSchemaRef: string) => ({
+	inputSchemaRef,
+	effect: "write" as const,
+});
 
 /** What the kanban adapter offers, without a kanban service (bundle checks, evaluation). */
 export const describeKanbanAdapter = () => ({
 	owner: "kanban",
 	operations: new Map([
-		[
-			"kanban.add",
-			{ inputSchemaRef: "builtin:kanbanAdd", effect: "write" as const },
-		],
-		[
-			"kanban.edit",
-			{ inputSchemaRef: "builtin:kanbanEdit", effect: "write" as const },
-		],
-		[
-			"kanban.move",
-			{ inputSchemaRef: "builtin:kanbanMove", effect: "write" as const },
-		],
-		[
-			"kanban.remove",
-			{ inputSchemaRef: "builtin:kanbanCardRef", effect: "write" as const },
-		],
+		["kanban.add", write("builtin:kanbanAdd")],
+		["kanban.edit", write("builtin:kanbanEdit")],
+		["kanban.move", write("builtin:kanbanMove")],
+		["kanban.remove", write("builtin:kanbanCardRef")],
+		["kanban.run", write("builtin:kanbanCardRef")],
+		["kanban.followup", write("builtin:kanbanFollowup")],
+		["kanban.commit-push", write("builtin:kanbanCardRef")],
+		["kanban.review", write("builtin:kanbanCardRef")],
+		["kanban.cancel", write("builtin:kanbanCardRef")],
+		["kanban.stop", write("builtin:kanbanCardRef")],
+		["kanban.reset", write("builtin:kanbanCardRef")],
+		["kanban.resume-queue", write("builtin:kanbanList")],
 	]),
 	queries: new Set([BOARD]),
 	inputAdapters: kanbanInputAdapters,
@@ -168,21 +183,35 @@ function result(receipt: KanbanReceipt, requestId: string, replay: boolean) {
 			digest: sha256Hex(JSON.stringify(receipt)),
 		},
 		resultRefs: [
-			{
-				owner: "kanban",
-				kind: "card",
-				id: receipt.cardId,
-				schemaRef: "domain:kanban.receipt@1",
-				revision: receipt.revision,
-			},
+			"cardId" in receipt
+				? {
+						owner: "kanban",
+						kind: "card",
+						id: receipt.cardId,
+						schemaRef: "domain:kanban.receipt@1",
+						revision: receipt.revision,
+					}
+				: {
+						owner: "kanban",
+						kind: "queue",
+						id: "queue",
+						schemaRef: "domain:kanban.receipt@1",
+					},
 		],
 		replay,
-		answerContext: {
-			action: receipt.action,
-			cardId: receipt.cardId,
-			title: receipt.title,
-			column: receipt.column,
-		},
+		answerContext:
+			"cardId" in receipt
+				? {
+						action: receipt.action,
+						cardId: receipt.cardId,
+						title: receipt.title,
+						column: receipt.column,
+						// Saving a run is not finishing it: the person is told in the notification center.
+						...(receipt.runId && ["run", "followup"].includes(receipt.action)
+							? { queued: true, reportedWhen: "通知センターでお知らせします" }
+							: {}),
+					}
+				: { action: receipt.action, queue: receipt.queue },
 	} satisfies AdapterResult;
 }
 
@@ -195,6 +224,68 @@ export function createKanbanAdapter(
 	kanban: KanbanService,
 	options: { runnable: () => boolean },
 ): DomainAdapter {
+	/** Runs are handed over through the host's connection (`connectKanbanRuns`). */
+	const connection = () => {
+		const connected = connectionOf(kanban);
+		if (!connected) throw new Error("kanban_not_connected");
+		return connected;
+	};
+	type Handler = (
+		tx: Database,
+		input: unknown,
+		requestId: string,
+		context: KanbanOperationContext,
+	) => KanbanOutcome<KanbanReceipt>;
+	const cancelUnsent = (tx: Database) => (runId: string) =>
+		connection().terminals.cancelQueuedInTransaction(tx, runId);
+	const handlers: Record<string, Handler> = {
+		"kanban.add": (tx, input, id) =>
+			kanban.addInTransaction(tx, kanbanAdd.parse(input), id),
+		"kanban.edit": (tx, input, id) =>
+			kanban.editInTransaction(tx, kanbanEdit.parse(input), id),
+		"kanban.move": (tx, input, id) =>
+			kanban.moveInTransaction(tx, kanbanMove.parse(input), id),
+		"kanban.remove": (tx, input, id) =>
+			kanban.removeInTransaction(tx, kanbanCardRef.parse(input), id),
+		"kanban.run": (tx, input, id, context) =>
+			kanban.runInTransaction(tx, kanbanCardRef.parse(input), id, context),
+		"kanban.followup": (tx, input, id, context) =>
+			kanban.followupInTransaction(
+				tx,
+				kanbanFollowup.parse(input),
+				id,
+				context,
+			),
+		"kanban.commit-push": (tx, input, id, context) =>
+			kanban.commitPushInTransaction(
+				tx,
+				kanbanCardRef.parse(input),
+				id,
+				context,
+			),
+		"kanban.review": (tx, input, id) =>
+			kanban.reviewInTransaction(tx, kanbanCardRef.parse(input), id),
+		"kanban.cancel": (tx, input, id) =>
+			kanban.cancelInTransaction(
+				tx,
+				kanbanCardRef.parse(input),
+				id,
+				cancelUnsent(tx),
+			),
+		"kanban.stop": (tx, input, id) =>
+			kanban.stopInTransaction(
+				tx,
+				kanbanCardRef.parse(input),
+				id,
+				cancelUnsent(tx),
+			),
+		"kanban.reset": (tx, input, id) =>
+			kanban.resetInTransaction(tx, kanbanCardRef.parse(input), id),
+		"kanban.resume-queue": (tx, input, id) => {
+			kanbanList.parse(input);
+			return kanban.resumeQueueInTransaction(tx, id);
+		},
+	};
 	return {
 		ref: KANBAN_ADAPTER_REF,
 		describe: describeKanbanAdapter,
@@ -211,39 +302,18 @@ export function createKanbanAdapter(
 				})),
 		}),
 		invokeInTransaction(tx, request) {
-			let outcome: KanbanOutcome;
-			switch (request.operationName) {
-				case "kanban.add":
-					outcome = kanban.addInTransaction(
-						tx,
-						kanbanAdd.parse(request.input),
-						request.requestId,
-					);
-					break;
-				case "kanban.edit":
-					outcome = kanban.editInTransaction(
-						tx,
-						kanbanEdit.parse(request.input),
-						request.requestId,
-					);
-					break;
-				case "kanban.move":
-					outcome = kanban.moveInTransaction(
-						tx,
-						kanbanMove.parse(request.input),
-						request.requestId,
-					);
-					break;
-				case "kanban.remove":
-					outcome = kanban.removeInTransaction(
-						tx,
-						kanbanCardRef.parse(request.input),
-						request.requestId,
-					);
-					break;
-				default:
-					throw new Error("capability_unavailable");
-			}
+			const handler = handlers[request.operationName];
+			if (!handler) throw new Error("capability_unavailable");
+			const outcome = handler(tx, request.input, request.requestId, {
+				origin: request.origin.kind === "conversation" ? "conversation" : "board",
+				...(request.origin.kind === "conversation"
+					? { conversationId: request.origin.conversationId }
+					: {}),
+				runnable: options.runnable(),
+			});
+			// A run that became ready is handed over in this transaction; it is sent after commit.
+			if (outcome.dispatch)
+				enqueueDispatch(connection().terminals, tx, outcome.dispatch);
 			return result(outcome.receipt, request.requestId, outcome.replay);
 		},
 		readInTransaction(tx, operationId) {
@@ -255,8 +325,14 @@ export function createKanbanAdapter(
 			const board = kanban.boardInTransaction(tx, {
 				runnable: options.runnable(),
 			});
-			return { revision: board.revision, data: board };
+			const connected = connectionOf(kanban);
+			const shown = connected
+				? composeBoard(board, tx, connected.terminals)
+				: board;
+			return { revision: shown.revision, data: shown };
 		},
 		targetInput: () => ({}),
+		/** Stops the person asked for run once their transaction committed. */
+		afterCommit: () => connectionOf(kanban)?.stopper.flush(),
 	};
 }

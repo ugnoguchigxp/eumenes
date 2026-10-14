@@ -54,9 +54,8 @@ export function useKanbanNotices(
 		notices: data?.notices ?? [],
 		unread: data?.unread ?? 0,
 		readingIds,
-		error:
-			readError ??
-			(query.isError ? "タスクの通知を取得できませんでした。" : null),
+		error: readError,
+		loadError: query.isError ? "タスクの通知を取得できませんでした。" : null,
 		onRead: markRead,
 		onOpenBoard: openBoard,
 	};

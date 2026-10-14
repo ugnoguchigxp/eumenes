@@ -1,6 +1,7 @@
 import type { Database } from "bun:sqlite";
 import { createHash } from "node:crypto";
 import sharp from "sharp";
+import * as bmp from "bmp-ts";
 import { readBounded } from "../../../infrastructure/bounded-read";
 import type { Prepared } from "../../capabilities";
 import type { ChatImage } from "../../inference";
@@ -70,7 +71,17 @@ export async function imageForInput(
 	bytes: Uint8Array,
 	timestamp: number | null,
 	signal: AbortSignal,
+	acceptedMimeTypes: ChatImage["mime"][],
+	maxBytes: number,
 ): Promise<ChatImage> {
+	let mime: ChatImage["mime"] | null = acceptedMimeTypes.includes("image/png")
+		? "image/png"
+		: acceptedMimeTypes.includes("image/jpeg")
+			? "image/jpeg"
+			: acceptedMimeTypes.includes("image/bmp")
+				? "image/bmp"
+				: null;
+	if (!mime) throw new Error("ocr_correction_vision_unavailable");
 	let source = bytes;
 	if (timestamp !== null) {
 		const proc = Bun.spawn(
@@ -130,22 +141,59 @@ export async function imageForInput(
 		source = output;
 	}
 	if (signal.aborted) throw new Error("cancelled");
-	const converted = await sharp(source, {
+	const normalized = sharp(source, {
 		failOn: "error",
 		limitInputPixels: 64_000_000,
 	})
 		.rotate()
 		.flatten({ background: "#ffffff" })
-		.png()
-		.toBuffer();
-	const meta = await sharp(converted).metadata();
-	if (!meta.width || !meta.height)
-		throw new Error("ocr_correction_image_invalid");
+		.toColourspace("srgb");
+	let converted: Buffer;
+	let width: number;
+	let height: number;
+	if (mime === "image/bmp") {
+		const raw = await normalized.raw().toBuffer({ resolveWithObject: true });
+		width = raw.info.width;
+		height = raw.info.height;
+		if (width * height * 3 + 54 > maxBytes)
+			throw new Error("ocr_correction_image_too_large");
+		const abgr = Buffer.alloc(width * height * 4);
+		for (let i = 0, j = 0; j < abgr.length; i += raw.info.channels, j += 4) {
+			abgr[j] = 255;
+			abgr[j + 1] = raw.data[i + 2]!;
+			abgr[j + 2] = raw.data[i + 1]!;
+			abgr[j + 3] = raw.data[i]!;
+		}
+		converted = bmp.encode({ data: abgr, width, height, bitPP: 24 }).data;
+	} else {
+		let result = await (
+			mime === "image/png"
+				? normalized.clone().png()
+				: normalized.clone().jpeg({ quality: 95 })
+		).toBuffer({ resolveWithObject: true });
+		if (
+			mime === "image/png" &&
+			result.data.length > maxBytes &&
+			acceptedMimeTypes.includes("image/jpeg")
+		) {
+			result = await normalized
+				.clone()
+				.jpeg({ quality: 95 })
+				.toBuffer({ resolveWithObject: true });
+			mime = "image/jpeg";
+		}
+		converted = result.data;
+		width = result.info.width;
+		height = result.info.height;
+	}
+	if (!width || !height) throw new Error("ocr_correction_image_invalid");
+	if (converted.length > maxBytes)
+		throw new Error("ocr_correction_image_too_large");
 	return {
-		mime: "image/png",
+		mime,
 		bytes: new Uint8Array(converted),
-		width: meta.width,
-		height: meta.height,
+		width,
+		height,
 	};
 }
 export function guidance(prepared: Prepared) {

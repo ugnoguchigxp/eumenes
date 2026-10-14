@@ -126,8 +126,9 @@ test("correction action renders structured table, evidence and explicit adoption
 							kind: "table",
 							rows: 1,
 							columns: 2,
-							evidence: { lineIndexes: [0, 1] },
-							uncertain: false,
+							evidence: { lineIndexes: [0] },
+							uncertain: true,
+							uncertainty: "罫線が薄い",
 							cells: [
 								{
 									row: 0,
@@ -144,13 +145,13 @@ test("correction action renders structured table, evidence and explicit adoption
 									rowSpan: 1,
 									columnSpan: 1,
 									text: "二行目",
-									evidence: { lineIndexes: [1] },
+									evidence: { lineIndexes: [], region: [0, 0, 50, 20] },
 									uncertain: false,
 								},
 							],
 						},
 					],
-					excludedLines: [],
+					excludedLines: [{ index: 1, reason: "重複" }],
 				},
 				createdAt: Date.now(),
 				updatedAt: Date.now(),
@@ -198,18 +199,22 @@ test("correction action renders structured table, evidence and explicit adoption
 		);
 		return Array.from(new Uint8Array(await blob.arrayBuffer()));
 	});
-	await panel
-		.locator('input[type="file"]')
-		.setInputFiles({
-			name: "correction.png",
-			mimeType: "image/png",
-			buffer: Buffer.from(bytes),
-		});
+	await panel.locator('input[type="file"]').setInputFiles({
+		name: "correction.png",
+		mimeType: "image/png",
+		buffer: Buffer.from(bytes),
+	});
 	await expect(
 		panel.getByRole("button", { name: "補正案を作る" }),
 	).toBeEnabled();
 	await panel.getByRole("button", { name: "補正案を作る" }).click();
 	await expect(panel.locator(".ocr-correction-table td")).toHaveCount(2);
+	await expect(panel.locator(".ocr-correction-table")).toContainText(
+		"判読困難: 罫線が薄い",
+	);
+	await expect(panel.locator(".ocr-correction-exclusions")).toContainText(
+		"2行目: 重複",
+	);
 	await expect(panel.locator(".ocr-correction-table td").first()).toContainText(
 		"補正後",
 	);

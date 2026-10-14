@@ -7,6 +7,7 @@
 <!-- domains:start -->
 | Domain | Backend 入口 | Web 入口 | Components | 依存 (api) | 依存 (web) | 依存 (試験のみ) |
 | --- | --- | --- | --- | --- | --- | --- |
+| `google-accounts` | `api/domains/google-accounts/index.ts` | `web/src/domains/google-accounts/` | `packages/design-system/src/components/GoogleAccounts/index.tsx` | なし | なし | なし |
 | `excalidraw` | `api/domains/excalidraw/index.ts` | `web/src/domains/excalidraw/` | なし | `capabilities`、`inference`、`larm`、`queue` | なし | なし |
 | `ocr` | `api/domains/ocr/index.ts` | `web/src/domains/ocr/index.ts` | `packages/design-system/src/components/OcrWorkspace/index.ts` | `capabilities`、`inference`、`queue` | なし | なし |
 | `object-recognition` | `api/domains/object-recognition/index.ts` | `web/src/domains/object-recognition/index.ts` | なし | `capabilities`、`queue` | なし | なし |

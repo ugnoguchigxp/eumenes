@@ -48,7 +48,10 @@ export type KanbanNotifications = {
 	/** Unread across the whole store, not only the listed page. */
 	unread: number;
 	readingIds: string[];
+	/** An action failed (shown wherever notices are). */
 	error: string | null;
+	/** The list could not be loaded (shown in the drawer only, never over the screen). */
+	loadError: string | null;
 	onOpenBoard: () => void;
 	onRead: (notice: KanbanNoticeView) => void;
 };
@@ -114,6 +117,7 @@ export function NotificationCenter({
 		(entry) => entry.source === "timer" || !entry.item.read,
 	);
 	const shownError = error ?? kanban?.error ?? null;
+	const drawerError = shownError ?? kanban?.loadError ?? null;
 	const count = notices.length + (kanban?.unread ?? 0);
 	const audioPrompt = onPrepareAudio && (
 		<NotificationCard
@@ -249,9 +253,9 @@ export function NotificationCenter({
 							<p>タイマーの終了やタスクの結果が、ここに表示されます。</p>
 						</div>
 					)}
-					{shownError && (
+					{drawerError && (
 						<p className="notification-error" role="alert">
-							{shownError}
+							{drawerError}
 						</p>
 					)}
 				</div>

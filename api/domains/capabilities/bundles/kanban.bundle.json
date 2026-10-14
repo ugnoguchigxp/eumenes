@@ -68,15 +68,91 @@
 					"effect": "write"
 				},
 				{
+					"actionId": "run",
+					"eventAction": "kanban-run",
+					"source": "kanban",
+					"operationId": "kanban.run",
+					"inputSchemaRef": "schema:kanban-card@1",
+					"inputAdapterRef": "input:kanban.card@1",
+					"effect": "write"
+				},
+				{
+					"actionId": "followup",
+					"eventAction": "kanban-followup",
+					"source": "kanban",
+					"operationId": "kanban.followup",
+					"inputSchemaRef": "schema:kanban-followup@1",
+					"inputAdapterRef": "input:kanban.followup@1",
+					"effect": "write"
+				},
+				{
+					"actionId": "commit-push",
+					"eventAction": "kanban-commit-push",
+					"source": "kanban",
+					"operationId": "kanban.commit-push",
+					"inputSchemaRef": "schema:kanban-card@1",
+					"inputAdapterRef": "input:kanban.card@1",
+					"effect": "write"
+				},
+				{
+					"actionId": "review",
+					"eventAction": "kanban-review",
+					"source": "kanban",
+					"operationId": "kanban.review",
+					"inputSchemaRef": "schema:kanban-card@1",
+					"inputAdapterRef": "input:kanban.card@1",
+					"effect": "write"
+				},
+				{
+					"actionId": "cancel",
+					"eventAction": "kanban-cancel",
+					"source": "kanban",
+					"operationId": "kanban.cancel",
+					"inputSchemaRef": "schema:kanban-card@1",
+					"inputAdapterRef": "input:kanban.card@1",
+					"effect": "write"
+				},
+				{
+					"actionId": "stop",
+					"eventAction": "kanban-stop",
+					"source": "kanban",
+					"operationId": "kanban.stop",
+					"inputSchemaRef": "schema:kanban-card@1",
+					"inputAdapterRef": "input:kanban.card@1",
+					"effect": "write"
+				},
+				{
+					"actionId": "reset",
+					"eventAction": "kanban-reset",
+					"source": "kanban",
+					"operationId": "kanban.reset",
+					"inputSchemaRef": "schema:kanban-card@1",
+					"inputAdapterRef": "input:kanban.card@1",
+					"effect": "write"
+				},
+				{
+					"actionId": "resume-queue",
+					"eventAction": "kanban-resume-queue",
+					"source": "kanban",
+					"operationId": "kanban.resume-queue",
+					"inputSchemaRef": "schema:kanban-resume@1",
+					"effect": "write"
+				},
+				{
 					"actionId": "open",
 					"eventAction": "kanban-open",
 					"source": "kanban",
 					"inputSchemaRef": "schema:kanban-open@1",
 					"effect": "navigate",
-					"navigateTo": { "artifactId": "terminals.workspace" }
+					"navigateTo": {
+						"artifactId": "terminals.workspace"
+					}
 				}
 			],
-			"launcher": { "label": "タスクボード", "order": 60 }
+			"launcher": {
+				"label": "タスクボード",
+				"order": 60
+			}
 		}
 	],
 	"schemas": [
@@ -88,10 +164,21 @@
 				"type": "object",
 				"additionalProperties": false,
 				"properties": {
-					"title": { "type": "string", "minLength": 1, "maxLength": 200 },
-					"prompt": { "type": "string", "minLength": 1, "maxLength": 9000 }
+					"title": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 200
+					},
+					"prompt": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 9000
+					}
 				},
-				"required": ["title", "prompt"]
+				"required": [
+					"title",
+					"prompt"
+				]
 			}
 		},
 		{
@@ -102,16 +189,29 @@
 				"type": "object",
 				"additionalProperties": false,
 				"properties": {
-					"cardId": { "type": "string", "minLength": 1, "maxLength": 64 },
+					"cardId": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 64
+					},
 					"expectedRevision": {
 						"type": "string",
 						"minLength": 1,
 						"maxLength": 10
 					},
-					"title": { "type": "string", "maxLength": 200 },
-					"prompt": { "type": "string", "maxLength": 9000 }
+					"title": {
+						"type": "string",
+						"maxLength": 200
+					},
+					"prompt": {
+						"type": "string",
+						"maxLength": 9000
+					}
 				},
-				"required": ["cardId", "expectedRevision"]
+				"required": [
+					"cardId",
+					"expectedRevision"
+				]
 			}
 		},
 		{
@@ -122,16 +222,34 @@
 				"type": "object",
 				"additionalProperties": false,
 				"properties": {
-					"cardId": { "type": "string", "minLength": 1, "maxLength": 64 },
+					"cardId": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 64
+					},
 					"expectedRevision": {
 						"type": "string",
 						"minLength": 1,
 						"maxLength": 10
 					},
-					"column": { "type": "string", "enum": ["todo", "finished"] },
-					"beforeCardId": { "type": "string", "maxLength": 64 }
+					"column": {
+						"type": "string",
+						"enum": [
+							"todo",
+							"finished"
+						]
+					},
+					"beforeCardId": {
+						"type": "string",
+						"maxLength": 64
+					}
 				},
-				"required": ["cardId", "expectedRevision", "column", "beforeCardId"]
+				"required": [
+					"cardId",
+					"expectedRevision",
+					"column",
+					"beforeCardId"
+				]
 			}
 		},
 		{
@@ -142,14 +260,62 @@
 				"type": "object",
 				"additionalProperties": false,
 				"properties": {
-					"cardId": { "type": "string", "minLength": 1, "maxLength": 64 },
+					"cardId": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 64
+					},
 					"expectedRevision": {
 						"type": "string",
 						"minLength": 1,
 						"maxLength": 10
 					}
 				},
-				"required": ["cardId", "expectedRevision"]
+				"required": [
+					"cardId",
+					"expectedRevision"
+				]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "kanban-followup",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"cardId": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 64
+					},
+					"expectedRevision": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 10
+					},
+					"note": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 4000
+					}
+				},
+				"required": [
+					"cardId",
+					"expectedRevision",
+					"note"
+				]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "kanban-resume",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {}
 			}
 		},
 		{
@@ -160,9 +326,15 @@
 				"type": "object",
 				"additionalProperties": false,
 				"properties": {
-					"cardId": { "type": "string", "minLength": 1, "maxLength": 64 }
+					"cardId": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 64
+					}
 				},
-				"required": ["cardId"]
+				"required": [
+					"cardId"
+				]
 			}
 		}
 	]

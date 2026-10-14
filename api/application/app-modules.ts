@@ -1,3 +1,7 @@
+import {
+	registerGoogleAccounts,
+	type GoogleAccounts,
+} from "../domains/google-accounts";
 import { registerOcr, type OcrService } from "../domains/ocr";
 import {
 	registerExcalidraw,
@@ -99,6 +103,7 @@ export type AppServices = {
 	larm: Pick<LarmPort, "status" | "connect"> & Partial<LarmPort>;
 	queue: QueueService;
 	scheduler: SchedulerService;
+	googleAccounts?: GoogleAccounts;
 	settings?: SettingsService;
 	inference?: InferenceService;
 	ttsDictionary?: TtsDictionaryService;
@@ -192,6 +197,9 @@ export function appModules(services: AppServices): AppModule[] {
 			mount: (app) => registerAttitudeDataset(app, s.attitudeDataset!),
 		},
 		{ mount: (app) => registerLarmStatus(app, s.larm) },
+		s.googleAccounts && {
+			mount: (app) => registerGoogleAccounts(app, s.googleAccounts!),
+		},
 		s.settings && { mount: (app) => registerSettings(app, s.settings!) },
 		s.inference && { mount: (app) => registerInference(app, s.inference!) },
 		s.serviceTests && {

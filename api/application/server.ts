@@ -1,3 +1,8 @@
+import {
+	createGoogleAccounts,
+	googleProviderFromEnv,
+	type GoogleProvider,
+} from "../domains/google-accounts";
 import { createOcr } from "../domains/ocr";
 import {
 	createExcalidraw,
@@ -86,7 +91,10 @@ const log = getLogger("server");
  * Constructs every service. Nothing is recovered, started or listening yet, and
  * the process environment is not read: all values come from `config`.
  */
-export async function buildServices(config: Config) {
+export async function buildServices(
+	config: Config,
+	dependencies: { googleProvider?: GoogleProvider } = {},
+) {
 	const { dbPath } = config;
 	const store = openStore(dbPath, migrations, { legacyOrder });
 	const changes = createChanges();
@@ -95,6 +103,13 @@ export async function buildServices(config: Config) {
 		requireOutbox: true,
 	});
 	const settings = await createSettings(store, { dbPath, env: config.env });
+	const googleAccounts = createGoogleAccounts(store, {
+		key: () => settings.derivedKey("google-accounts.credentials"),
+		secureCookies: new URL(config.origin).protocol === "https:",
+		provider:
+			dependencies.googleProvider ??
+			googleProviderFromEnv(config.env, config.origin),
+	});
 	const ttsDictionary = createTtsDictionary(store);
 	const datasetPath = resolve(config.attitudeDatasetPath);
 	const datasetStore = openAttitudeStore(datasetPath);
@@ -269,6 +284,7 @@ export async function buildServices(config: Config) {
 		webResearch,
 		settings,
 		conversation,
+		googleAccounts,
 		ttsDictionary,
 		memory,
 		steward,
@@ -388,6 +404,7 @@ export async function buildServices(config: Config) {
 		unsubscribeCommits,
 		unsubscribeStatus,
 		conversation,
+		googleAccounts,
 		ttsDictionary,
 		datasetStore,
 		attitudeDataset,
@@ -438,6 +455,7 @@ export function appServices(s: Services) {
 		scheduler: s.scheduler,
 		settings: s.settings,
 		inference: s.inference,
+		googleAccounts: s.googleAccounts,
 		ttsDictionary: s.ttsDictionary,
 		memory: s.memory,
 		steward: s.steward,
@@ -491,6 +509,12 @@ export function appServices(s: Services) {
 export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 	// Toolchain and procedure passages are embedded in the background; retrieval falls back
 	// to full-text search while a vector is missing.
+	const googleMaintenance = intervalLifecycle(
+		"google_accounts",
+		60_000,
+		() => s.googleAccounts.maintain(),
+		{ exclusive: true },
+	);
 	const vectorRefresh = intervalLifecycle(
 		"toolchain_vectors",
 		600_000,
@@ -695,6 +719,7 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		{ name: "task_maintenance", close: () => taskMaintenance.idle() },
 		{ name: "task_report_delivery", close: () => reportDelivery.idle() },
 		{ name: "store_retention", close: () => storeRetention.idle() },
+		googleMaintenance,
 		{ name: "timer_maintenance", close: () => timerMaintenance.idle() },
 		// Worker lease also expires independently if shutdown cannot deliver a stop.
 		{ name: "coding", close: () => s.codingComposition?.coding.close() },

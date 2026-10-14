@@ -14,6 +14,8 @@ import {
 	fixtureResearchOutput,
 	fixtureVerification,
 } from "../domains/agent-runtime/test/research-fixture";
+import { createKanban, registerKanban } from "../domains/kanban";
+import { connectKanbanRuns } from "./kanban-runs";
 import { migrations as terminalsMigrations } from "../domains/terminals";
 import { reportFinishedTasks } from "./claude-code-reports";
 import { createChanges } from "./events";
@@ -81,6 +83,8 @@ export async function harness(
 		terminals?: (
 			store: import("../infrastructure/sqlite").SqliteStore,
 		) => import("../domains/terminals").TerminalsService;
+		/** The task board over `terminals` (its runs are handed to those PTYs). */
+		kanban?: boolean;
 		settingsEnv?: Record<string, string | undefined>;
 		codexResearch?: {
 			model: string;
@@ -134,7 +138,12 @@ export async function harness(
 		),
 	]);
 	const terminals = options.terminals?.(store);
+	const kanban =
+		options.kanban && terminals ? createKanban({ store }) : undefined;
+	const kanbanRuns =
+		kanban && terminals ? connectKanbanRuns(kanban, terminals) : undefined;
 	await terminals?.recover();
+	await kanbanRuns?.recover();
 	const changes = createChanges();
 	const unsubscribeChanges = store.onCommit(() => changes.publish());
 	const conversation = createConversationService(store, {
@@ -518,6 +527,7 @@ export async function harness(
 		objectRecognition: !!options.recognitionFetcher,
 		ocr,
 		terminals,
+		kanban,
 	});
 	const music = options.musicGateway
 		? createMusic({
@@ -624,6 +634,7 @@ export async function harness(
 		toolchainActions: toolchain.actionRequests,
 		...toolchain,
 	});
+	if (kanban) registerKanban(app, kanban);
 	toolchain.agents.start();
 	queue.start();
 	const request = async (path: string, body?: unknown) =>
@@ -638,6 +649,7 @@ export async function harness(
 	return {
 		dir,
 		terminals,
+		kanban,
 		excalidraw,
 		drawingOperations,
 		image,
@@ -669,6 +681,7 @@ export async function harness(
 			return calls;
 		},
 		async close() {
+			kanbanRuns?.disconnect();
 			terminals?.closeAll();
 			unsubscribeChanges();
 			changes.close();

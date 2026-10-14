@@ -1,3 +1,4 @@
+export { GoogleAccounts, type GoogleAccountsProps } from "./components/GoogleAccounts";
 import "./styles/index.css";
 
 // ============================================

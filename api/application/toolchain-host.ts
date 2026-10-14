@@ -36,6 +36,7 @@ export function createToolchainHostLinks(services: {
 	};
 	inference: InferenceAdapterPorts & { usagePage: RecordsPorts["usagePage"] };
 	conversation: ConversationService;
+	googleAccounts?: import("../domains/google-accounts").GoogleAccounts;
 	ttsDictionary?: TtsDictionaryPorts;
 	memory?: MemoryAdapterPorts["memory"] &
 		Pick<
@@ -75,6 +76,7 @@ export function createToolchainHostLinks(services: {
 			conversation: services.conversation,
 			settings,
 			inference,
+			googleAccounts: services.googleAccounts,
 			ttsDictionary: services.ttsDictionary,
 			memory: services.memory
 				? { memory: services.memory, steward: services.steward }

@@ -1,3 +1,4 @@
+import { migrations as googleAccountsMigrations } from "../domains/google-accounts";
 import { migrations as ocrMigrations } from "../domains/ocr";
 import { migrations as excalidrawMigrations } from "../domains/excalidraw";
 import { migrations as objectRecognitionMigrations } from "../domains/object-recognition";
@@ -174,6 +175,7 @@ const catalog: readonly Migration[] = [
 	...codingMigrations,
 	...taskReportsMigrations,
 	...supervisionMigrations,
+	...googleAccountsMigrations,
 ];
 
 /**

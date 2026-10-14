@@ -109,10 +109,49 @@ test("the lineage is followed through repeated merges and the versions of each f
 	expect(stateIds(h)).toEqual([habit.id]);
 });
 
-test("an item whose evidence is all among the forgotten messages is forgotten too", async () => {
+test("forgetting one item leaves the other items that rest on the same message", async () => {
+	const h = await setup();
+	// One message carries three facts; the user asks to forget only one of them.
+	const e1 = await exchange(
+		h,
+		"私は野口です。辛いものが苦手で、コーヒーはブラック派です",
+		"了解",
+	);
+	const remember = async (key: string, text: string, quote: string) => {
+		const [result] = await h.curate([
+			{
+				op: "remember",
+				kind: "preference",
+				key,
+				text,
+				messageId: e1.inputMessageId,
+				quote,
+			},
+		]);
+		if (result?.status !== "applied") throw new Error("rejected");
+		return result.id as string;
+	};
+	const name = await remember("identity.name", "名前は野口", "野口です");
+	const spicy = await remember(
+		"food.spicy",
+		"辛いものが苦手",
+		"辛いものが苦手",
+	);
+	const coffee = await remember(
+		"drink.coffee",
+		"コーヒーはブラック",
+		"ブラック派",
+	);
+	const outcome = await h.forget([coffee], []);
+	expect(outcome.forgottenItemIds).toEqual([coffee]);
+	// The message leaves the context, but the facts the user did not name stay.
+	expect(outcome.blockedMessageIds).toContain(e1.inputMessageId);
+	expect(new Set(stateIds(h))).toEqual(new Set([name, spicy]));
+});
+
+test("forgetting only a message blocks it without forgetting the items that rest on it", async () => {
 	const h = await setup();
 	const e1 = await exchange(h, "私は辛いものが好きです", "了解");
-	const e2 = await exchange(h, "毎朝走っています", "了解");
 	const spicy = await h.remember({
 		conversationId: "c1",
 		messageId: e1.inputMessageId,
@@ -121,56 +160,12 @@ test("an item whose evidence is all among the forgotten messages is forgotten to
 		semanticKey: "food.spicy",
 		text: "辛いものが好き",
 	});
-	const run = await h.remember({
-		conversationId: "c1",
-		messageId: e2.inputMessageId,
-		quote: "毎朝走って",
-		kind: "habit",
-		semanticKey: "run",
-		text: "毎朝走る",
-	});
 	const outcome = await h.forget([], [e1.inputMessageId]);
-	expect(outcome.forgottenItemIds).toEqual([spicy.id]);
+	expect(outcome.forgottenItemIds).toEqual([]);
 	expect(outcome.blockedMessageIds.sort()).toEqual(
 		[e1.inputMessageId, e1.answerMessageId].sort(),
 	);
-	expect(stateIds(h)).toEqual([run.id]);
-});
-
-test("an item that also stands on another message stays when only one of them is forgotten", async () => {
-	const h = await setup();
-	const e1 = await exchange(h, "私は辛いものが好きです", "了解");
-	const e2 = await exchange(h, "辛いものが本当に好きです", "了解");
-	const [merged] = await h.curate([
-		{
-			op: "remember",
-			kind: "preference",
-			key: "food.spicy",
-			text: "辛いものが好き",
-			messageId: e1.inputMessageId,
-			quote: "辛いものが好き",
-		},
-	]);
-	if (merged?.status !== "applied") throw new Error("rejected");
-	const item = h.memory.list(true).find((entry) => entry.id === merged.id)!;
-	const [again] = await h.curate([
-		{
-			op: "update",
-			itemId: item.id,
-			revision: item.revision,
-			text: "辛いものが好き",
-			messageId: e2.inputMessageId,
-			quote: "辛いものが本当に好き",
-			explicit: true,
-		},
-	]);
-	if (again?.status !== "applied") throw new Error("rejected");
-	// The new version stands on e2 only; the old one on e1 only: forgetting e1 takes the whole fact (all versions).
-	const outcome = await h.forget([], [e1.inputMessageId]);
-	expect(outcome.forgottenItemIds).toContain(item.id);
-	expect(new Set(outcome.forgottenItemIds)).toEqual(
-		new Set([item.id, again.id as string]),
-	);
+	expect(stateIds(h)).toEqual([spicy.id]);
 });
 
 test("a replacement or merge by the steward does not expire a run in flight; a stop does", async () => {

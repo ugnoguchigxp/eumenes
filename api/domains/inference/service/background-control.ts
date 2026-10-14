@@ -7,6 +7,14 @@ import type { BackgroundControl } from "../contracts";
  * `route: "conversation"` keeps the saved conversation route (LARM preferred or cloud, as the settings allow).
  * `structuredOutput` makes the output schema a strict provider schema (see `controlJsonOptions`).
  */
+/** A background control request's deadline cap. */
+const BACKGROUND_MS = 30_000;
+/**
+ * The cap of a structured request on the conversation route (the steward): the cloud fallback
+ * reserves its own time out of the deadline, so the local attempt keeps 30 s of it.
+ */
+const STRUCTURED_BACKGROUND_MS = 90_000;
+
 export function captureBackgroundControl(
 	db: Database,
 	input: BackgroundControl,
@@ -34,7 +42,9 @@ export function captureBackgroundControl(
 		!Number.isSafeInteger(input.taskDeadline) ||
 		input.deadline <= Date.now() ||
 		input.deadline > input.taskDeadline ||
-		input.deadline > Date.now() + 30_000 ||
+		input.deadline >
+			Date.now() +
+				(input.structuredOutput ? STRUCTURED_BACKGROUND_MS : BACKGROUND_MS) ||
 		input.maxOutputTokens > 1500
 	)
 		throw new Error("invalid_background_control");

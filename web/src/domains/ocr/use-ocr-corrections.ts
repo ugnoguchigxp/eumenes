@@ -6,6 +6,16 @@ import type { OcrRecord } from "../../../../api/domains/ocr/contracts";
 import { ApiError } from "../../../../client/transport";
 import { queryRoots } from "../../queryKeys";
 
+const correctionStartErrors: Record<string, string> = {
+	ocr_correction_busy: "この資料は補正中です。進行中の案を確認してください。",
+	ocr_correction_capacity: "この資料の補正履歴が上限に達しました。",
+	ocr_correction_unavailable:
+		"補正を開始できません。LLMの接続と担当設定を確認してください。",
+	ocr_correction_text_too_large: "この資料は補正できる文字量を超えています。",
+	ocr_not_ready: "OCRが完了してから補正してください。",
+	revision_conflict: "OCR結果が更新されました。資料を読み込み直してください。",
+};
+
 export function useOcrCorrections(
 	client: EumenesClient,
 	conversationId: string,
@@ -52,9 +62,13 @@ export function useOcrCorrections(
 		items: NonNullable<typeof query.data>["items"];
 		nextCursor: number | null;
 	}>();
+	const firstPage = query.data?.items ?? [];
+	const firstIds = new Set(firstPage.map((c) => c.id));
 	const items = [
-		...(query.data?.items ?? []),
-		...(extra?.key === scope ? extra.items : []),
+		...firstPage,
+		...(extra?.key === scope
+			? extra.items.filter((c) => !firstIds.has(c.id))
+			: []),
 	];
 	const nextCursor =
 		extra?.key === scope ? extra.nextCursor : query.data?.nextCursor;
@@ -79,6 +93,7 @@ export function useOcrCorrections(
 				? event.values.candidateId
 				: "";
 		if (event.action === "ocr-correction-start") {
+			onError("");
 			try {
 				await client.ocrCorrectionCreate(id, {
 					requestId: event.id,
@@ -87,6 +102,12 @@ export function useOcrCorrections(
 					frameIndex: frame,
 				});
 			} catch (cause) {
+				if (cause instanceof ApiError && correctionStartErrors[cause.message]) {
+					await query.refetch();
+					const message = correctionStartErrors[cause.message]!;
+					onError(message);
+					return { status: "rejected", message };
+				}
 				const prior = await client
 					.ocrCorrectionGet(id, event.id, conversationId)
 					.catch(() => null);

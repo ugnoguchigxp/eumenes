@@ -123,6 +123,9 @@ export default defineConfig(({ command, mode }) => {
 				],
 			},
 			proxy: {
+				"^/oauth/google/(callback|result)(\\?|$)": {
+					target: env.EUMENES_PROXY_URL ?? "http://127.0.0.1:8787",
+				},
 				"/api": {
 					target: env.EUMENES_PROXY_URL ?? "http://127.0.0.1:8787",
 					configure(proxy) {

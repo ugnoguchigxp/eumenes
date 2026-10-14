@@ -22,6 +22,57 @@ import { correctionHandler } from "./correction-handler";
 
 const packageRevision = "package:ocr.correct@1";
 const limit = 20;
+function own(db: Database, id: string, owner: string) {
+	const r = correctionRow(db, id);
+	if (!r || r.owner !== owner) throw new Error("ocr_correction_not_found");
+	return r;
+}
+function readCorrectionConversation(
+	db: Database,
+	owner: string,
+	id: string,
+	sourceId?: string,
+) {
+	const r = own(db, id, owner);
+	if (sourceId && r.source_id !== sourceId)
+		throw new Error("ocr_correction_not_found");
+	const c = parsed(r);
+	const src = owned(db, r.source_id, owner);
+	const v = record(src);
+	if (
+		c.state !== "completed" ||
+		!c.result ||
+		v.revision !== c.sourceRevision ||
+		digest(v.result) !== c.sourceDigest
+	)
+		throw new Error("ocr_correction_not_ready");
+	const timestamp = sourceFrame(v.result!, c.frameIndex ?? undefined).timestamp;
+	const uncertainties = c.result.blocks.flatMap((block) =>
+		block.kind === "paragraph"
+			? block.uncertain
+				? [block.uncertainty ?? ""]
+				: []
+			: [
+					...(block.uncertain ? [block.uncertainty ?? ""] : []),
+					...block.cells
+						.filter((cell) => cell.uncertain)
+						.map((cell) => cell.uncertainty ?? ""),
+				],
+	);
+	const exclusions = c.result.excludedLines.map(
+		(entry) => `${entry.index + 1}行目: ${entry.reason}`,
+	);
+	const text = [
+		`LLM補正案（資料ID: ${r.source_id}、候補ID: ${id}${timestamp === null ? "" : `、フレーム時刻: ${timestamp}秒`}）`,
+		correctionPlainText(c.result),
+		`判読困難箇所: ${uncertainties.join("; ")}`,
+		...(exclusions.length
+			? [`補正案から除外したOCR行: ${exclusions.join("; ")}`]
+			: []),
+	].join("\n");
+	if (text.length > 8000) throw new Error("ocr_text_too_large");
+	return { text, conversationId: r.conversation_id };
+}
 export function createOcrCorrections(deps: {
 	store: SqliteStore;
 	queue: QueueService;
@@ -33,11 +84,6 @@ export function createOcrCorrections(deps: {
 		const c = deps.capabilities();
 		if (!c) throw new Error("ocr_correction_unavailable");
 		return c;
-	};
-	const own = (db: Database, id: string, owner: string) => {
-		const r = correctionRow(db, id);
-		if (!r || r.owner !== owner) throw new Error("ocr_correction_not_found");
-		return r;
 	};
 	queue.registerHandler(correctionHandler(inference, capabilities));
 	return {
@@ -71,6 +117,12 @@ export function createOcrCorrections(deps: {
 				const frame = sourceFrame(v.result, value.frameIndex);
 				if (frame.text.length > 12000 || frame.lines.length > 200)
 					throw new Error("ocr_correction_text_too_large");
+				const active = db
+					.query(
+						"SELECT 1 FROM ocr_corrections WHERE source_id=? AND frame_key=? AND json_extract(record_json,'$.state') IN ('queued','running','cancelling') LIMIT 1",
+					)
+					.get(sourceId, frame.key);
+				if (active) throw new Error("ocr_correction_busy");
 				const count = db
 					.query(
 						"SELECT count(*) n FROM ocr_corrections WHERE source_id=? AND frame_key=?",
@@ -272,24 +324,9 @@ export function createOcrCorrections(deps: {
 			});
 		},
 		conversationText(owner: string, id: string, sourceId?: string) {
-			return store.read((db) => {
-				const r = own(db, id, owner);
-				if (sourceId && r.source_id !== sourceId)
-					throw new Error("ocr_correction_not_found");
-				const c = parsed(r);
-				const src = owned(db, r.source_id, owner);
-				const v = record(src);
-				if (
-					c.state !== "completed" ||
-					!c.result ||
-					v.revision !== c.sourceRevision ||
-					digest(v.result) !== c.sourceDigest
-				)
-					throw new Error("ocr_correction_not_ready");
-				const text = `LLM補正案（資料ID: ${r.source_id}、候補ID: ${id}${c.frameIndex === null ? "" : `、フレーム: ${c.frameIndex}`}）\n${correctionPlainText(c.result)}\n判読困難箇所: ${c.result.blocks.flatMap((b) => (b.kind === "paragraph" ? (b.uncertain ? [b.uncertainty ?? ""] : []) : b.cells.filter((c) => c.uncertain).map((c) => c.uncertainty ?? ""))).join("; ")}`;
-				if (text.length > 8000) throw new Error("ocr_text_too_large");
-				return { text, conversationId: r.conversation_id };
-			});
+			return store.read((db) =>
+				readCorrectionConversation(db, owner, id, sourceId),
+			);
 		},
 		removeInTransaction(db: Database, sourceId: string) {
 			const rows = db

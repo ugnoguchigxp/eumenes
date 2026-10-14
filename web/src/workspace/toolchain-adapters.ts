@@ -1,3 +1,4 @@
+import { googleAccountsWebAdapter } from "../domains/google-accounts/toolchain-adapter";
 import { ocrWebAdapter } from "../domains/ocr/toolchain-adapter";
 import { createWebAdapterRegistry } from "../domains/toolchain-artifacts";
 import {
@@ -15,6 +16,7 @@ import { kanbanWebAdapter } from "../domains/kanban";
 
 /** Every domain adapter the common artifact host can render. Adding a domain adds one line. */
 export const toolchainWebAdapters = createWebAdapterRegistry([
+	googleAccountsWebAdapter,
 	timerWebAdapter,
 	musicScreenWebAdapter,
 	imageScreenWebAdapter,

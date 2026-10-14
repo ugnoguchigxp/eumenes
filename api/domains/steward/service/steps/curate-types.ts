@@ -92,6 +92,8 @@ export type CurateContext = {
 	refs: Record<string, MemoryRef>;
 	digests: Record<string, string>;
 	turns: Array<{ messageId: string; text: string }>;
+	/** The live short-term notes' texts: an added note that repeats one is not saved twice. */
+	noteTexts: string[];
 };
 export type Candidates = Record<string, string[]>;
 export type TurnVectors = Awaited<

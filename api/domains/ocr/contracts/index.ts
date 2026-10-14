@@ -125,6 +125,7 @@ export const errorStatus = {
 	ocr_connection_changed: 409,
 	ocr_correction_not_found: 404,
 	ocr_correction_not_ready: 409,
+	ocr_correction_busy: 409,
 	ocr_correction_capacity: 429,
 	ocr_correction_unavailable: 503,
 	ocr_correction_text_too_large: 413,

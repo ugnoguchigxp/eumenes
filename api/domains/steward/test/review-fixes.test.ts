@@ -276,8 +276,9 @@ test("five items can be forgotten at once", async () => {
 		requests: [{ kind: "forget", what: "五つ" }],
 	});
 	await h.drain();
-	// The six items shared one evidence message, which the forget blocks: they all go with it.
-	expect(h.memory.list()).toHaveLength(0);
+	// The six items share one evidence message. The forget blocks it, but only the five named items go:
+	// the sixth is a fact the user did not ask to forget.
+	expect(h.memory.list()).toHaveLength(1);
 	expect(h.inbox()).toMatchObject([{ state: "done" }]);
 });
 
@@ -523,6 +524,27 @@ test("a note is based on the user messages of every exchange the unit read, and 
 			c.inputMessageId,
 		]),
 	);
+});
+
+test("a note that repeats a live note is not added twice", async () => {
+	const h = await setup();
+	const note = (text: string) => ({
+		...empty,
+		notes: [{ op: "add", ref: null, kind: "activity", text, status: null }],
+	});
+	h.inference.script("curate-memory", note("週末に鎌倉へ自転車で出かける。"));
+	h.inference.script("dispose-exchanges", keepAll);
+	await h.exchange("週末は鎌倉へ自転車で", "いいですね");
+	await h.drain();
+	// The model writes the same note again (with other punctuation) while reading a later exchange.
+	h.inference.script("curate-memory", note("週末に、鎌倉へ自転車で出かける"));
+	h.inference.script("dispose-exchanges", keepAll);
+	await h.exchange("仕事はエンジニアです", "承知しました");
+	await h.drain();
+	const notes = h.store.read(
+		(db) => h.continuity.snapshotInTransaction(db, "c1").items,
+	);
+	expect(notes.map((n) => n.text)).toEqual(["週末に鎌倉へ自転車で出かける。"]);
 });
 
 // ---- finding 9: what counts as a failure, and the retry of a request that could not be taken ----

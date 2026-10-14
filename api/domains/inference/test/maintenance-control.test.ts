@@ -299,6 +299,13 @@ test("background control rejects model budget expansion, expired authority and u
 		{ ...input, deadline: Date.now() + 40000 },
 		{ ...input, taskDeadline: Date.now() - 1 },
 		{ ...input, executionGeneration: 0 },
+		// A structured request may wait up to 90 s (its cloud fallback reserves part of it), no longer.
+		{
+			...input,
+			structuredOutput: true,
+			deadline: Date.now() + 95000,
+			taskDeadline: Date.now() + 120000,
+		},
 	])
 		await expect(
 			h.store.write((db) =>

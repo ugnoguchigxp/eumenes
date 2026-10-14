@@ -1,3 +1,4 @@
+import { GoogleAccountsView } from "./google-accounts-components";
 import { OcrMediaView, OcrPanelView } from "./ocr-components";
 import { ObjectRecognitionWorkspaceView } from "./object-recognition-components";
 import { TerminalWorkspaceView } from "./terminal-components";
@@ -59,6 +60,7 @@ import {
 } from "./ui-composition-components";
 
 const renderers = {
+	"google-accounts": GoogleAccountsView,
 	"ui-workspace": UiWorkspaceView,
 	"text-block": TextBlockView,
 	"info-card": InfoCardView,

@@ -1,3 +1,4 @@
+import type { GoogleAccountsResource } from "./google-accounts-components";
 import type { WorkspaceAction } from "./workspace-actions";
 import type { OcrAction } from "./ocr-actions";
 import type { OcrResource } from "./ocr-components";
@@ -298,6 +299,15 @@ export const viewRegistry = {
 		label: "字幕の見本",
 		schema: z.strictObject({
 			view: z.literal("subtitle-preview"),
+			source,
+			title,
+		}),
+	},
+	"google-accounts": {
+		name: "GoogleAccountsView",
+		label: "Google連携",
+		schema: z.strictObject({
+			view: z.literal("google-accounts"),
 			source,
 			title,
 		}),
@@ -646,6 +656,7 @@ export type SettingsResource = {
 	volume: number;
 };
 export type Resource =
+	| GoogleAccountsResource
 	| ObjectRecognitionResource
 	| TerminalsResource
 	| KanbanResource
@@ -748,6 +759,10 @@ export type ArtifactEvent = {
 		| "settings-action"
 		| "settings-open"
 		| "settings-review"
+		| "google-connect"
+		| "google-cancel"
+		| "google-disconnect"
+		| "google-back"
 		| "settings-apply"
 		| "settings-discard"
 		| "timer-start"

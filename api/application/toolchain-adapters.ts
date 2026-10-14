@@ -1,3 +1,7 @@
+import {
+	GOOGLE_ACCOUNTS_ADAPTER_REF,
+	describeGoogleAccountsAdapter,
+} from "./google-accounts-adapter";
 import { z } from "zod";
 import { ocrRecord } from "../domains/ocr/contracts";
 import { describeOcrAdapter, OCR_ADAPTER_REF } from "./ocr-adapter";
@@ -141,6 +145,7 @@ export const hostAdapterDescriptions: Array<
 		ref: OBJECT_RECOGNITION_SCREEN_ADAPTER_REF,
 		describe: describeObjectRecognitionScreenAdapter,
 	},
+	{ ref: GOOGLE_ACCOUNTS_ADAPTER_REF, describe: describeGoogleAccountsAdapter },
 	{ ref: TTS_DICTIONARY_ADAPTER_REF, describe: describeTtsDictionaryAdapter },
 	{ ref: MEMORY_ADAPTER_REF, describe: describeMemoryAdapter },
 	{ ref: WORLD_ADAPTER_REF, describe: describeWorldAdapter },

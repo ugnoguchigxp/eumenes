@@ -125,8 +125,15 @@ function planOutput(
 		if (!ref) return plan.reject(source, "unknown_ref");
 		plan.add({ op: "stop", itemId: ref.id, revision: ref.revision }, source);
 	});
+	// Compared without spaces and punctuation, so a re-worded copy with the same words is caught too.
+	const fold = (text: string) =>
+		text.normalize("NFKC").replace(/[\s、。,.!?！？「」『』（）()・]/g, "");
+	const notes = new Set(context.noteTexts.map(fold));
 	output.notes.forEach((e, index) => {
 		const source: Source = { section: "notes", index };
+		if (e.op === "add" && notes.has(fold(e.text!)))
+			return plan.reject(source, "duplicate_note");
+		if (e.op === "add") notes.add(fold(e.text!));
 		if (e.op === "add")
 			return plan.add(
 				{
@@ -268,7 +275,11 @@ function planResolve(
 	}
 }
 
-/** A `remember` request that pointed at an item and wrote no new wording keeps the item's own text. */
+/**
+ * A `remember` request that pointed at an item and wrote no new wording keeps the item's own text. A request to
+ * remember is never answered with "nothing to do" when the model found the item already there: the user asked,
+ * so the item is saved again as the version the user confirmed (K14), with its own text, not the model's reason.
+ */
 function withKeptText(
 	env: StepEnv,
 	context: CurateContext,
@@ -281,7 +292,15 @@ function withKeptText(
 	);
 	return {
 		...output,
-		resolve: output.resolve.map((e) => {
+		resolve: output.resolve.map((raw) => {
+			const asked = context.requests[raw.request]?.kind === "remember";
+			const pointed = raw.refs.some(
+				(r) => context.refs[r]?.namespace === "state",
+			);
+			const e =
+				asked && raw.action === "none" && pointed
+					? { ...raw, action: "remember" as const, text: null }
+					: raw;
 			if (e.action !== "remember" || e.text) return e;
 			const ref = e.refs
 				.map((r) => context.refs[r])
