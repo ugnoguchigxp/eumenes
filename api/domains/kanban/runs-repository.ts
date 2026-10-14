@@ -200,7 +200,10 @@ export const stopRequestedIds = (db: Database): string[] =>
 export function getQueue(db: Database): QueueState {
 	const row = db
 		.query("SELECT queue_state,queue_reason FROM kanban_board WHERE id=1")
-		.get() as { queue_state: "running" | "paused"; queue_reason: string | null };
+		.get() as {
+		queue_state: "running" | "paused";
+		queue_reason: string | null;
+	};
 	return row.queue_state === "paused"
 		? {
 				state: "paused",

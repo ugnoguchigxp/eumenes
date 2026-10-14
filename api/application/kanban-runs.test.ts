@@ -172,7 +172,9 @@ test("three runs: one is handed at a time; the next goes in the transaction that
 	expect(h.spawned).toHaveLength(1);
 	expect(h.board().queue).toMatchObject({ state: "running", waiting: 2 });
 	expect(h.terminals.list().requests).toBe(0);
-	expect(h.spawned[0]!.command.at(-1)).toBe(`A の依頼\n\n${WORK_ONLY_INSTRUCTION}`);
+	expect(h.spawned[0]!.command.at(-1)).toBe(
+		`A の依頼\n\n${WORK_ONLY_INSTRUCTION}`,
+	);
 	expect(h.board().runs[0]).toMatchObject({ requestState: "delivered" });
 
 	await h.begin(0, "p1");
@@ -376,7 +378,11 @@ test("commit & push closes the idle work session and resumes the same conversati
 	expect(commit.command.slice(0, 3)).toEqual(["claude", "--resume", claudeId]);
 	expect(commit.settings?.permissions).toBeUndefined();
 	expect(commit.command.at(-1)).toContain('["note.md"]');
-	expect(h.spawned[0]!.killed || h.spawned[0]!.signals.length > 0 || h.spawned[0]!.closed).toBe(true);
+	expect(
+		h.spawned[0]!.killed ||
+			h.spawned[0]!.signals.length > 0 ||
+			h.spawned[0]!.closed,
+	).toBe(true);
 	await h.begin(1, "c1", "resume");
 	await h.stop(1, "c1", "push しました");
 	expect(h.card(a)).toMatchObject({
@@ -389,7 +395,11 @@ test("commit & push closes the idle work session and resumes the same conversati
 	// The next follow-up is back in work mode, again with the refusal.
 	await h.act("kanban.followup", { ...(await h.ref(a)), note: "もう一点" });
 	await until(() => h.spawned.length === 3);
-	expect(h.spawned[2]!.command.slice(0, 3)).toEqual(["claude", "--resume", claudeId]);
+	expect(h.spawned[2]!.command.slice(0, 3)).toEqual([
+		"claude",
+		"--resume",
+		claudeId,
+	]);
 	expect(h.spawned[2]!.settings?.permissions?.deny).toBeDefined();
 });
 
@@ -411,7 +421,10 @@ test("after a restart the sent run is a Blocker, the queue is stopped, and a fol
 	const second = make({}, fakePty(), { dir, store });
 	await second.terminals.recover();
 	await second.link.recover();
-	expect(second.card(a)).toMatchObject({ label: "blocker", reason: "restarted" });
+	expect(second.card(a)).toMatchObject({
+		label: "blocker",
+		reason: "restarted",
+	});
 	expect(second.board().queue).toMatchObject({
 		state: "paused",
 		reason: "restarted",

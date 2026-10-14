@@ -2,7 +2,8 @@
 # Stands in for the `claude` CLI in browser tests. Arguments: [--session-id|--resume <id>]
 # --settings <hooks file> [prompt]. It shows each request and reports through the hooks the way
 # Claude Code does: SessionStart, then per turn UserPromptSubmit and Stop with one prompt_id.
-# Markers in a request change the turn (Kanban tests): [slow] works for 8 s instead of 1 s,
+# Markers in a request change the turn (Kanban tests): [slow] works for 8 s and [long] for 30 s
+# instead of 1 s,
 # [perm] asks for a permission first (Notification, 6 s), [edit:path] reports a Write of that file.
 sid=""
 source="startup"
@@ -41,6 +42,7 @@ work() {
 		hook "{\"hook_event_name\":\"PostToolUse\",\"session_id\":\"$sid\",\"prompt_id\":\"$pid\",\"tool_name\":\"Write\",\"tool_input\":{\"file_path\":\"$file\"}}"
 	done
 	case "$1" in
+	*'[long]'*) sleep 30 ;;
 	*'[slow]'*) sleep 8 ;;
 	*) sleep 1 ;;
 	esac

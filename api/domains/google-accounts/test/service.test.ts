@@ -167,6 +167,12 @@ test("revision conflicts, wrong identity on reconnect, and changed OAuth client 
 	const flow = await h.begin();
 	await expect(h.service.begin(0)).rejects.toThrow("conflict");
 	await h.service.finish(flow);
+	const changed = createGoogleAccounts(h.store, {
+		key: h.key,
+		provider: { ...h.provider, identity: "different-client" },
+	});
+	expect(changed.view().status).toBe("reconnect");
+	expect(changed.view().result).toBeUndefined();
 	const next = await h.begin();
 	const original = h.provider.exchange;
 	h.provider.exchange = async (...args) => {
@@ -175,11 +181,6 @@ test("revision conflicts, wrong identity on reconnect, and changed OAuth client 
 	};
 	expect(await h.service.finish(next)).toBe("failed");
 	expect(h.service.view().profile?.sub).toBe("person-1");
-	const changed = createGoogleAccounts(h.store, {
-		key: h.key,
-		provider: { ...h.provider, identity: "different-client" },
-	});
-	expect(changed.view().status).toBe("reconnect");
 });
 test("refresh detects revocation, while network outages retain the account and retry", async () => {
 	const h = setup();
@@ -196,6 +197,7 @@ test("refresh detects revocation, while network outages retain the account and r
 	h.advance(60_001);
 	await h.service.maintain();
 	expect(h.service.view().status).toBe("reconnect");
+	expect(h.service.view().result).toBeUndefined();
 });
 test("refresh completion after disconnect is discarded and pending revocation survives restart", async () => {
 	const h = setup();

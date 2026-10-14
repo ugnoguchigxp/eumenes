@@ -1,3 +1,4 @@
+import { redactGoogleOAuthProxyError } from "./api/domains/google-accounts/proxy-errors";
 import { excalidrawAssets } from "./scripts/excalidraw-assets";
 import react from "@vitejs/plugin-react";
 import { defineConfig, loadEnv } from "vite";
@@ -125,6 +126,9 @@ export default defineConfig(({ command, mode }) => {
 			proxy: {
 				"^/oauth/google/(callback|result)(\\?|$)": {
 					target: env.EUMENES_PROXY_URL ?? "http://127.0.0.1:8787",
+					configure(proxy) {
+						proxy.on("error", redactGoogleOAuthProxyError);
+					},
 				},
 				"/api": {
 					target: env.EUMENES_PROXY_URL ?? "http://127.0.0.1:8787",

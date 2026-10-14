@@ -28,7 +28,10 @@ export type Applied<R extends KanbanReceipt = KanbanCardReceipt> = {
 };
 
 /** Pieces shared by the card and run operations of one service. */
-export function createCore(options: { now: () => number; newId: () => string }) {
+export function createCore(options: {
+	now: () => number;
+	newId: () => string;
+}) {
 	const { now, newId } = options;
 
 	/** Replays a saved receipt for the same request, or applies the operation once. */

@@ -1,7 +1,11 @@
 export { registerKanban } from "./controller";
 export { migrations } from "./repository";
 export { cardActions, createKanban } from "./service";
-export type { KanbanOutcome, KanbanRecoverPorts, KanbanService } from "./service";
+export type {
+	KanbanOutcome,
+	KanbanRecoverPorts,
+	KanbanService,
+} from "./service";
 export {
 	DEFAULT_PROJECT_ID,
 	errorStatus,

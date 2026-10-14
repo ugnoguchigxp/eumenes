@@ -163,6 +163,9 @@ test("settings account flow: denial, consent, persistence, revoked access, recon
 	).toHaveCount(0);
 	await open(page, false);
 	await expect(page.getByText("再接続が必要", { exact: true })).toBeVisible();
+	await expect(
+		page.getByText("Googleアカウントを接続しました。", { exact: true }),
+	).toHaveCount(0);
 	await page
 		.locator(".ds-google-accounts")
 		.screenshot({ path: "verification-reports/google-accounts/reconnect.png" });
@@ -207,10 +210,28 @@ test("settings account flow: denial, consent, persistence, revoked access, recon
 		page.getByRole("button", { name: "Googleアカウントを接続", exact: true }),
 	).toBeEnabled();
 	progress("complete");
+});
+
+test("narrow settings can scroll to the connection control and profile permissions", async ({
+	page,
+}) => {
+	await page.emulateMedia({ colorScheme: "dark" });
 	await page.setViewportSize({ width: 420, height: 900 });
+	await open(page);
+	const connect = page.getByRole("button", {
+		name: "Googleアカウントを接続",
+		exact: true,
+	});
+	await connect.scrollIntoViewIfNeeded();
+	await expect(connect).toBeInViewport();
+	await expect(connect).toBeEnabled();
+	mkdirSync("verification-reports/google-accounts", { recursive: true });
 	await page
-		.locator(".ds-google-accounts")
+		.getByRole("tabpanel", { name: "Google連携" })
 		.screenshot({ path: "verification-reports/google-accounts/narrow.png" });
+	const profile = page.getByText("プロフィール画像", { exact: true });
+	await profile.scrollIntoViewIfNeeded();
+	await expect(profile).toBeInViewport();
 	expect(
 		await page
 			.locator(".ds-google-accounts")

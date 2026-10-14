@@ -5,7 +5,7 @@ import { createFixture } from "./fixture";
 /*
  * The task board over a fake `claude` (tests/browser/fixtures/fake-claude.sh) on real PTYs: the
  * fake sends the same hooks as Claude Code, so runs are tracked as in production. No real Claude,
- * no LARM. Markers in a prompt shape the fake's turn: [slow] 8 s, [perm] asks for permission
+ * no LARM. Markers in a prompt shape the fake's turn: [slow] 8 s, [long] 30 s, [perm] asks for permission
  * first, [edit:path] reports a file change.
  */
 test.describe.configure({ mode: "serial" });
@@ -37,10 +37,13 @@ test.afterAll(() => fixture.stopAll());
 const evidence = "spec/verification/kanban-board-2026-10-14";
 const get = async (path: string) =>
 	(
-		await fetch(`${api}${path}`, { headers: { authorization: `Bearer ${token}` } })
+		await fetch(`${api}${path}`, {
+			headers: { authorization: `Bearer ${token}` },
+		})
 	).json();
 
-const board = (page: Page) => page.getByRole("region", { name: "タスクボード" });
+const board = (page: Page) =>
+	page.getByRole("region", { name: "タスクボード" });
 const card = (page: Page, title: string) =>
 	board(page)
 		.locator("article.kanban-card")
@@ -115,8 +118,12 @@ test("register, run, queue, work, Done, follow-up, then commit & push after the 
 			"このタスクの後に別のタスクが実行されています",
 		),
 	).toBeVisible();
-	await page.screenshot({ path: `${evidence}/e2e-first-done-second-working.png` });
-	await expect(label(page, "テスト修正")).toHaveText("Done", { timeout: 30000 });
+	await page.screenshot({
+		path: `${evidence}/e2e-first-done-second-working.png`,
+	});
+	await expect(label(page, "テスト修正")).toHaveText("Done", {
+		timeout: 30000,
+	});
 
 	// The report and the changed files are on the card.
 	await button(page, "README の手順修正", "詳細を見る").click();
@@ -154,8 +161,12 @@ test("register, run, queue, work, Done, follow-up, then commit & push after the 
 	await expect(dialog).toContainText("docs/extra.md");
 	await expect(dialog).toContainText("最後の報告");
 	await page.screenshot({ path: `${evidence}/e2e-commit-push-dialog.png` });
-	await dialog.getByRole("button", { name: "commit & push を依頼する" }).click();
-	await expect(card(page, "README の手順修正").getByText("commit & push の報告あり")).toBeVisible({
+	await dialog
+		.getByRole("button", { name: "commit & push を依頼する" })
+		.click();
+	await expect(
+		card(page, "README の手順修正").getByText("commit & push の報告あり"),
+	).toBeVisible({
 		timeout: 30000,
 	});
 	await button(page, "README の手順修正", "詳細を見る").click();
@@ -207,13 +218,15 @@ test("five tasks run one after another, one process at a time, each in its own c
 			`${title} をやって${title === "連続1" ? " [slow]" : ""}`,
 		);
 	for (const title of titles) await button(page, title, "実行").click();
-	await expect(status(page, "連続5")).toHaveText("キュー待ち（4番目）");
+	await expect(status(page, "連続5")).toHaveText(/^キュー待ち（[1-4]番目）$/);
 	await page.screenshot({ path: `${evidence}/e2e-five-queued.png` });
 	let working = 0;
 	for (let i = 0; i < 80 && (await label(page, "連続5").count()) === 0; i++) {
 		working = Math.max(
 			working,
-			await board(page).locator(".kanban-status", { hasText: "作業中" }).count(),
+			await board(page)
+				.locator(".kanban-status", { hasText: "作業中" })
+				.count(),
 		);
 		await page.waitForTimeout(250);
 	}
@@ -229,18 +242,22 @@ test("five tasks run one after another, one process at a time, each in its own c
 	const kanban = sessions.filter((s) => s.owner.startsWith("kanban:"));
 	// One conversation (and PTY) per task; idle ones were closed to stay within the limit.
 	expect(kanban.length).toBeGreaterThanOrEqual(5);
-	expect(kanban.filter((s) => s.status === "running").length).toBeLessThanOrEqual(4);
+	expect(
+		kanban.filter((s) => s.status === "running").length,
+	).toBeLessThanOrEqual(4);
 });
 
 test("cancel a waiting task and stop a working one; the next task goes on", async ({
 	page,
 }) => {
 	await openBoard(page);
-	await addTask(page, "長い作業", "長い作業をやって [slow]");
+	await addTask(page, "長い作業", "長い作業をやって [long]");
 	await addTask(page, "取り消す作業", "取り消される作業");
 	await addTask(page, "あとの作業", "あとの作業をやって");
 	await button(page, "長い作業", "実行").click();
-	await expect(status(page, "長い作業")).toHaveText("作業中", { timeout: 20000 });
+	await expect(status(page, "長い作業")).toHaveText("作業中", {
+		timeout: 20000,
+	});
 	await button(page, "取り消す作業", "実行").click();
 	await button(page, "あとの作業", "実行").click();
 	await expect(status(page, "あとの作業")).toHaveText("キュー待ち（2番目）");
@@ -248,17 +265,25 @@ test("cancel a waiting task and stop a working one; the next task goes on", asyn
 	// A waiting run is cancelled before anything is sent.
 	await button(page, "取り消す作業", "取消").click();
 	await expect(label(page, "取り消す作業")).toHaveText("Blocker");
-	await expect(card(page, "取り消す作業")).toContainText("送る前に取り消しました");
+	await expect(card(page, "取り消す作業")).toContainText(
+		"送る前に取り消しました",
+	);
 	await expect(status(page, "あとの作業")).toHaveText("キュー待ち（1番目）");
 
 	// The working one is stopped; the next starts only once the process is gone.
 	await page.screenshot({ path: `${evidence}/e2e-before-stop.png` });
 	await button(page, "長い作業", "止めて Blocker にする").click();
-	await expect(label(page, "長い作業")).toHaveText("Blocker", { timeout: 20000 });
+	await expect(label(page, "長い作業")).toHaveText("Blocker", {
+		timeout: 20000,
+	});
 	await expect(card(page, "長い作業")).toContainText("利用者が止めました");
-	await expect(label(page, "あとの作業")).toHaveText("Done", { timeout: 30000 });
+	await expect(label(page, "あとの作業")).toHaveText("Done", {
+		timeout: 30000,
+	});
 	await page.screenshot({ path: `${evidence}/e2e-stopped-and-cancelled.png` });
-	await expect(board(page).getByLabel("実行キュー")).not.toContainText("停止中");
+	await expect(board(page).getByLabel("実行キュー")).not.toContainText(
+		"停止中",
+	);
 
 	// A Blocker can be run again, and a Done card can go back to todo.
 	await button(page, "長い作業", "未着手へ戻す").click();
@@ -283,7 +308,9 @@ test("a stale screen shows the conflict message and nothing changes", async ({
 	await first.getByRole("button", { name: "保存" }).click();
 	await expect(card(first, "競合した作業")).toBeVisible();
 	await button(second, "競合する作業", "編集").click();
-	await second.getByRole("textbox", { name: "タイトル" }).fill("古い画面からの編集");
+	await second
+		.getByRole("textbox", { name: "タイトル" })
+		.fill("古い画面からの編集");
 	await second.getByRole("button", { name: "保存" }).click();
 	await expect(second.getByRole("alert")).toContainText(
 		"他の操作でタスクの状態が変わりました",

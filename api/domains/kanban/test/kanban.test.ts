@@ -306,7 +306,6 @@ test("actions are decided by the domain from the column and runnable", async () 
 		"run",
 		"review",
 		"reset",
-		"open",
 	]);
 });
 

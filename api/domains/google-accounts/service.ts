@@ -63,16 +63,22 @@ export function createGoogleAccounts(
 	function viewInTransaction(db: Database): GoogleAccountView {
 		try {
 			const { revision, state: s } = load(db);
+			const status =
+				s.status === "connected" && s.provider !== provider?.identity
+					? "reconnect"
+					: s.status;
 			return {
 				revision,
 				configured: !!provider && !!options.key(),
-				status:
-					s.status === "connected" && s.provider !== provider?.identity
-						? "reconnect"
-						: s.status,
+				status,
 				...(s.profile ? { profile: s.profile } : {}),
 				pending: !!s.attempt && s.attempt.expires > now(),
-				result: s.attempt && s.attempt.expires <= now() ? "expired" : s.result,
+				result:
+					s.attempt && s.attempt.expires <= now()
+						? "expired"
+						: s.result === "connected" && status !== "connected"
+							? undefined
+							: s.result,
 			};
 		} catch {
 			return {

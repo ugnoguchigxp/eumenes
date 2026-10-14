@@ -5,7 +5,6 @@ import {
 	WORK_ONLY_INSTRUCTION,
 	type KanbanDispatch,
 	type KanbanRunFinish,
-	type KanbanService,
 } from "..";
 import { openKanban } from "./kanban.fixture";
 
@@ -93,7 +92,9 @@ test("a run puts the card in running and only the first run is handed over", asy
 	});
 	expect(board.runs.map((r) => r.state)).toEqual(["handed", "waiting_turn"]);
 	// Every task starts its own conversation.
-	expect(board.runs[0]!.claudeSessionId).not.toBe(board.runs[1]!.claudeSessionId);
+	expect(board.runs[0]!.claudeSessionId).not.toBe(
+		board.runs[1]!.claudeSessionId,
+	);
 });
 
 test("the same request replays without handing over again; stale or busy cards are refused", async () => {
@@ -174,7 +175,16 @@ test("completion makes the card Done with the report and files, saves a notice a
 		reviewed: false,
 		commitPushReported: false,
 		followedByOtherRun: true,
-		actions: ["edit", "remove", "run", "followup", "commitPush", "review", "reset", "open"],
+		actions: [
+			"edit",
+			"remove",
+			"run",
+			"followup",
+			"commitPush",
+			"review",
+			"reset",
+			"open",
+		],
 	});
 	expect(kanban.board(VIEW).queue.handedRunId).toBe(out!.dispatch!.runId);
 	const { notices, unread } = await kanban.notices(10);
@@ -212,9 +222,7 @@ test("a run that did not complete is a Blocker with its reason; the queue goes o
 
 test("blocker reasons follow the terminals reason; a lost or restarted run stops the queue", async () => {
 	const { kanban, card, view, run, finish } = setup();
-	const cases: Array<
-		[KanbanRunFinish["state"], string | undefined, string]
-	> = [
+	const cases: Array<[KanbanRunFinish["state"], string | undefined, string]> = [
 		["ended", undefined, "ended"],
 		["ended", "resume_failed", "resume_failed"],
 		["unknown", "stopped_by_person", "stopped_by_person"],
@@ -269,7 +277,10 @@ test("resuming the queue hands over the oldest waiting run, and a run added whil
 	const resumed = await store.write((tx) =>
 		kanban.resumeQueueInTransaction(tx, rid()),
 	);
-	expect(resumed.receipt).toEqual({ action: "queue_resumed", queue: "running" });
+	expect(resumed.receipt).toEqual({
+		action: "queue_resumed",
+		queue: "running",
+	});
 	expect(resumed.dispatch).toMatchObject({ runId: queued.receipt.runId });
 	expect(kanban.board(VIEW).queue.state).toBe("running");
 	// Resuming a running queue is harmless.
@@ -284,7 +295,7 @@ test("a waiting run is cancelled into a Blocker; a handed one only while termina
 	const a = await card("A");
 	const b = await card("B");
 	const c = await card("C");
-	const one = await run(a.cardId);
+	await run(a.cardId);
 	await run(b.cardId);
 	const third = await run(c.cardId);
 	const cancel = (cardId: string, unsent: boolean) =>
@@ -299,14 +310,16 @@ test("a waiting run is cancelled into a Blocker; a handed one only while termina
 	const waiting = await cancel(b.cardId, false);
 	expect(waiting.receipt.action).toBe("cancelled");
 	expect(waiting.dispatch).toBeUndefined();
-	expect(view(b.cardId)).toMatchObject({ label: "blocker", reason: "cancelled" });
+	expect(view(b.cardId)).toMatchObject({
+		label: "blocker",
+		reason: "cancelled",
+	});
 	// Sent: refused, nothing changes.
 	await expect(cancel(a.cardId, false)).rejects.toThrow("kanban_card_busy");
 	expect(view(a.cardId).column).toBe("running");
 	// Handed but unsent: cancelled, and the next waiting run takes the slot.
 	const freed = await cancel(a.cardId, true);
 	expect(freed.dispatch?.runId).toBe(third.receipt.runId!);
-	expect(one.receipt.runId).toBeDefined();
 	// A person's cancel is not announced.
 	expect((await kanban.notices(10)).notices).toEqual([]);
 });
@@ -373,7 +386,9 @@ test("a follow-up continues the card's conversation in work mode; a note cannot 
 		conversationId: "main",
 	});
 	const body = follow.dispatch!.prompt;
-	expect(body).toContain(`追加の依頼: ${JSON.stringify("commit して push まで")}`);
+	expect(body).toContain(
+		`追加の依頼: ${JSON.stringify("commit して push まで")}`,
+	);
 	expect(body).toContain(`元の依頼: ${JSON.stringify("A の依頼")}`);
 	expect(body).toContain(`前回の報告: ${JSON.stringify("報告")}`);
 	expect(body.endsWith(WORK_ONLY_INSTRUCTION)).toBe(true);
@@ -395,7 +410,7 @@ test("a follow-up continues the card's conversation in work mode; a note cannot 
 });
 
 test("a follow-up needs a finished card whose conversation exists", async () => {
-	const { store, kanban, card, view, run, finish } = setup();
+	const { store, kanban, card, view, run } = setup();
 	const todo = await card("T");
 	const followup = (cardId: string) =>
 		store.write((tx) =>
@@ -411,14 +426,19 @@ test("a follow-up needs a finished card whose conversation exists", async () => 
 	await store.write((tx) =>
 		kanban.moveInTransaction(
 			tx,
-			{ cardId: todo.cardId, expectedRevision: 1, column: "finished", beforeCardId: null },
+			{
+				cardId: todo.cardId,
+				expectedRevision: 1,
+				column: "finished",
+				beforeCardId: null,
+			},
 			rid(),
 		),
 	);
 	await expect(followup(todo.cardId)).rejects.toThrow("kanban_state_invalid");
 	// A run cancelled before it was sent has none either.
 	const a = await card("A");
-	const r = await run(a.cardId);
+	await run(a.cardId);
 	await store.write((tx) =>
 		kanban.cancelInTransaction(
 			tx,
@@ -429,16 +449,20 @@ test("a follow-up needs a finished card whose conversation exists", async () => 
 	);
 	await expect(followup(a.cardId)).rejects.toThrow("kanban_state_invalid");
 	expect(view(a.cardId).actions).not.toContain("followup");
-	expect(r.receipt.runId).toBeDefined();
-	expect(finish).toBeDefined();
-	expect(kanban.board(VIEW).runs.filter((x) => x.kind === "followup")).toEqual([]);
+	// Nothing was sent, so there is no session to open either.
+	expect(view(a.cardId).actions).not.toContain("open");
+	expect(kanban.board(VIEW).runs.filter((x) => x.kind === "followup")).toEqual(
+		[],
+	);
 });
 
 test("commit & push comes only from the board, on a Done card, with the recorded files", async () => {
 	const { store, kanban, card, view, run, finish } = setup();
 	const a = await card("A");
 	const one = await run(a.cardId);
-	await finish(one.receipt.runId!, "completed", { files: ["src/a.ts", "b.md"] });
+	await finish(one.receipt.runId!, "completed", {
+		files: ["src/a.ts", "b.md"],
+	});
 	const commit = (context: typeof BOARD | typeof CHAT) =>
 		store.write((tx) =>
 			kanban.commitPushInTransaction(
@@ -568,11 +592,11 @@ test("notices are newest first, countable as unread, readable once; a waiting ru
 });
 
 test("recovery settles handed runs from their requests and stops the queue after a restart", async () => {
-	const { store, kanban, card, view, run } = setup();
+	const { kanban, card, view, run } = setup();
 	const a = await card("A");
 	const b = await card("B");
 	const c = await card("C");
-	const ra = await run(a.cardId);
+	await run(a.cardId);
 	await run(b.cardId);
 	await run(c.cardId);
 	const handed: KanbanDispatch[] = [];
@@ -581,14 +605,16 @@ test("recovery settles handed runs from their requests and stops the queue after
 		request: () => null,
 		enqueue: (_tx: Database, dispatch) => void handed.push(dispatch),
 	});
-	expect(view(a.cardId)).toMatchObject({ label: "blocker", reason: "restarted" });
+	expect(view(a.cardId)).toMatchObject({
+		label: "blocker",
+		reason: "restarted",
+	});
 	expect(kanban.board(VIEW).queue).toMatchObject({
 		state: "paused",
 		reason: "restarted",
 		waiting: 2,
 	});
 	expect(handed).toEqual([]);
-	expect(ra.receipt.runId).toBeDefined();
 });
 
 test("recovery adopts a final request the listener missed and hands over what follows", async () => {
@@ -629,7 +655,8 @@ test("board runs keep the open ones and each card's current run", async () => {
 	expect(first(board.runs)).toMatchObject({ state: "completed", title: "A" });
 	const count = (store as SqliteStore).read(
 		(db) =>
-			(db.query("SELECT COUNT(*) AS n FROM kanban_runs").get() as { n: number }).n,
+			(db.query("SELECT COUNT(*) AS n FROM kanban_runs").get() as { n: number })
+				.n,
 	);
 	// The history stays in the table.
 	expect(count).toBe(2);

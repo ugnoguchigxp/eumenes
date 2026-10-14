@@ -81,12 +81,12 @@ prompt cache は先頭から一致する部分にしか効かない。変わり�
 | 手入れ | 会話の `maintenance_revision` ごとに 1 つ |
 
 - ジョブ種別は `steward.step.v1`、`dedupeKey` ＝ unitId。資源は `inference.aux`。
-- **prepare** で対象がまだ有効か確かめ、推論の期限と request を取り、忘却の連番 `forget_seq` を単位に記録する。**execute** は schema 付きの推論 1 回（上限は期限25秒・出力1200 tokens）。**settle** は 1 つの transaction で、再検証、結果の適用、完了印、判断記録、Window の再公開、次の単位の enqueue を行う。
+- **prepare** で対象がまだ有効か確かめ、推論の期限と request を取り、忘却の連番 `forget_seq` を単位に記録する。**execute** は schema 付きの推論 1 回（上限は期限90秒・出力1200 tokens。会話と同じ route を使い、cloud への切替が期限から最大60秒を確保するので、LARM には約30秒が残る）。**settle** は 1 つの transaction で、再検証、結果の適用、完了印、判断記録、Window の再公開、次の単位の enqueue を行う。
 - 一時的な失敗（タイムアウト・接続失敗）は Queue の retry（最大3回）で同じジョブのまま再試行する。Queue で終わった（failed / expired / interrupted）単位、または出力が使えなかった単位は `failed` で閉じ、対象ごとに失敗を数える。`kick` が**新しい unitId** の単位を作り直す。3回失敗した往復は `skipped` の印で次へ進み（`dispose-exchanges` が見送られた往復は未処理と同じ扱い、`summarize` が見送られた往復は中身を失わないよう逐語のまま）、依頼は `none`（`steward_failed`）にする。
 - 往復の完了は、3つの反映 step すべてに印（`done` / `skipped`）が付いたときである。`summarize` を選ばれた往復は、要約に入るまで逐語のまま残る。
 - 長期記憶を書く step（`curate-memory`、`consolidate-memory`）の `concurrencyKey` は全会話共通の `steward:long-term`。Window だけを扱う step は `steward:<conversationId>`。
 - **起動時と各 settle の後**に `kickInTransaction` が呼ばれる。会話を指定しない起動時の kick は、steward が知っている会話と、memory の台帳に反映待ちの往復がある会話（`pendingConversationIdsInTransaction`）のすべてを対象にする。開いている単位があればそれを待つ。
-- 手入れが止まる条件: `maintenance_revision` が前回より進んだときだけ走る。1回の手入れは最大3 step。`changed: false` を返した step は次の revision まで走らない。前景の run が動いている間は遅延して再投入する（30秒 → 2分 → 10分）。例外として `consolidate-memory` は `PENDING_LIMIT` に達したときは待たない。
+- 手入れが止まる条件: `maintenance_revision` が前回より進んだときだけ走る。1回の手入れは最大3 step。`changed: false` を返した step は次の revision まで走らない。前景の run が動いている間は始めず、steward 内の timer で時刻が来たら kick する（30秒 → 2分 → 10分）。Queue には未来の時刻のジョブを積まない（同じ `concurrencyKey` の後続を止めるため）。例外として `consolidate-memory` は `PENDING_LIMIT` に達したときは待たない。
 
 ## 依頼キューと run の取り込み
 
@@ -117,7 +117,7 @@ prompt cache は先頭から一致する部分にしか効かない。変わり�
 
 `memory_message_block` に、記憶にも文脈にも使わないメッセージを message ID で記録する。理由は `scheduled_prompt` か `forgotten`。会話の原文は変えないので、会話画面の履歴はそのまま見える。単位はメッセージ（往復）で、同じ発言にあった他の話題も文脈から消える。記憶として保存済みの内容は残る。
 
-除外台帳に入れるもの: 忘れる記憶（過去の版を含む）の根拠のメッセージ、steward が `resolve.alsoIn` で返した往復、それらの相手側（ユーザー発言なら回答、回答ならユーザー発言）。会話ごとの除外では、会話 `''` の行（旧 `memory_agent_excluded_message` から移した行。どの会話か分からない）はすべての会話に適用される。
+除外台帳に入れるもの: 忘れる記憶（過去の版と統合の系譜を含む）の根拠のメッセージ、steward が `resolve.alsoIn` で返した往復、それらの相手側（ユーザー発言なら回答、回答ならユーザー発言）。同じメッセージを根拠にした他の記憶は消さない（本人が忘れてと言っていない事実だから。メッセージは文脈から外れるだけ）。会話ごとの除外では、会話 `''` の行（旧 `memory_agent_excluded_message` から移した行。どの会話か分からない）はすべての会話に適用される。
 
 ### 参照する場所
 

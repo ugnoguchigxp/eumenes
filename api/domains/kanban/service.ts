@@ -1,10 +1,6 @@
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../infrastructure/sqlite";
-import {
-	boardInTransaction,
-	cardActions,
-	cardInTransaction,
-} from "./board";
+import { boardInTransaction, cardActions, cardInTransaction } from "./board";
 import {
 	DEFAULT_PROJECT_ID,
 	type KanbanAddInput,
@@ -55,7 +51,13 @@ export type KanbanRecoverPorts = {
 	/** Hands a run over to terminals inside the recovery transaction. */
 	enqueue(tx: Database, dispatch: KanbanDispatch): void;
 };
-const FINAL = new Set(["completed", "interrupted", "ended", "unknown", "cancelled"]);
+const FINAL = new Set([
+	"completed",
+	"interrupted",
+	"ended",
+	"unknown",
+	"cancelled",
+]);
 
 /** A card back to a state without any run (todo): nothing of its conversation is kept. */
 const NO_RUN: Pick<
@@ -271,17 +273,15 @@ export function createKanban(options: {
 	}
 
 	const notices = (tx: Database, limit: number) => ({
-		notices: listNotices(tx, limit).map(
-			(row): KanbanNoticeView => ({
-				id: row.id,
-				kind: row.kind,
-				...(row.cardId ? { cardId: row.cardId } : {}),
-				...(row.runId ? { runId: row.runId } : {}),
-				text: row.text,
-				read: row.read,
-				createdAt: iso(row.createdAt),
-			}),
-		),
+		notices: listNotices(tx, limit).map((row): KanbanNoticeView => ({
+			id: row.id,
+			kind: row.kind,
+			...(row.cardId ? { cardId: row.cardId } : {}),
+			...(row.runId ? { runId: row.runId } : {}),
+			text: row.text,
+			read: row.read,
+			createdAt: iso(row.createdAt),
+		})),
 		unread: unreadNotices(tx),
 	});
 

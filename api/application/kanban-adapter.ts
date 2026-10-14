@@ -305,7 +305,8 @@ export function createKanbanAdapter(
 			const handler = handlers[request.operationName];
 			if (!handler) throw new Error("capability_unavailable");
 			const outcome = handler(tx, request.input, request.requestId, {
-				origin: request.origin.kind === "conversation" ? "conversation" : "board",
+				origin:
+					request.origin.kind === "conversation" ? "conversation" : "board",
 				...(request.origin.kind === "conversation"
 					? { conversationId: request.origin.conversationId }
 					: {}),

@@ -1,6 +1,6 @@
 # 記憶担当（Steward）実装計画 — ContextWindow を記憶として管理し続ける背景エージェント
 
-2026-10-14 / 状態: **計画**（未実装・未検証）/ 改訂7・再レビュー待ち。
+2026-10-14 / 状態: **実装済み・fixture 検証済み・live 一部検証済み**（記録は [verification](verification/memory-steward-2026-10-14/README.md)）/ 改訂7＋実装時の変更（§14.3）。
 実装形態: **TypeScript で直接実装**する。データドリブンの toolchain bundle にはしない。例外は2つで、会話エージェントが呼ぶ依頼ツール（§3.4）と、設定画面の閲覧（§8）は、既存の toolchain・bundle の仕組みに[登録と拡張の手順](../docs/toolchain-extension.md)どおりに載せる。
 
 関連: [前計画 memory-activation（2026-10-13）](memory-activation-implementation-plan-2026-10-13.md)、[LARM](../docs/larm.md)、[ログ](../docs/logging.md)、[domain 一覧](../docs/domains.md)。
@@ -324,7 +324,7 @@ staged ──(run が終わる transaction。§2.5 の表に従う)──▶ pen
 | L3 | cloud の session は変更しない（C2〜C4） |
 | L4 | control の出力 schema を全経路に渡す（C6・C7）。LARM には `jsonSchema: r.control.outputSchema`、OpenAI 互換には `response_format: json_schema`、Codex には tools がなくても `outputSchema`、Claude Agent SDK には `outputFormat` を渡す。Managed Agents は指示文と host の検証で受ける |
 | L5 | steward の各 step の schema は strict な json_schema の制約に合わせる（全 key を required、`additionalProperties: false`、任意の値は `null`）。host の正規化で `null` を「なし」として扱う |
-| L6 | background control の上限（30秒・1500 tokens）は**仮に据え置く**。step を分けて1回の出力を小さくしたため。上限で足りるかは、記録済みの JSON では判断できない。§11 の live で、step ごとの所要時間、出力 tokens、期限切れの率を測って決める |
+| L6 | background control の上限は、steward の構造化要求（`structuredOutput`）だけ**期限90秒**にする（出力は1500 tokens のまま）。live（2026-10-14）で、期限30秒では cloud 切替の確保（最大60秒）に食われて LARM の試行が 7ms で `local_timeout` になり、全 step が cloud に回ったため。90秒なら LARM に約30秒が残る（実測は1 step 3.5〜9.3秒、99回すべて LARM）。他の background control は30秒のまま |
 | L7 | profile 名・モデル名の固定をすべて削除する（K8）。対象は次の表 |
 
 | 場所 | 現状 | 変更 |
@@ -600,3 +600,13 @@ fixture で確かめるのは**ホストの契約**（保存、忘却、状態�
 | 5 | Queue の dedupe と再開が噛み合わない | §2.3・§5.2: `steward_unit`、dedupeKey = unitId、一時的な失敗は Queue の retry、終わった後は新しい単位、依頼と手入れの単位、依頼の冪等性は依頼の状態で判定 |
 | 6 | 長文で予算の規則が矛盾する | §2.4: 履歴の1件12KB（先頭と末尾を残す）で上限と直近2往復を両立させる。今回の入力は切らない。steward には1件6KB |
 | 7 | 失敗・取り消しの run の発言の経路がない | §2.5・K14: システム側の失敗はユーザー発言だけの往復として登録する。本人の取り消しは使わない。例外として `remember` の依頼は実行し、同じ内容でも保存し直す |
+
+### 14.3 実装と live 検証で変えたこと（2026-10-14）
+
+| # | 変更 | 理由 |
+|---|---|---|
+| 1 | 忘却は、同じメッセージを根拠にした**他の記憶を消さない**（レビュー指摘2の「根拠がすべて除外された記憶も消す」規則を撤回） | live で「コーヒーの好みを忘れて」が、同じ発言から作った名前と辛い物の記憶まで消した。本人が名指ししていない事実を消すのは過剰。同じ単位で忘れる発言から新しく記憶を作る問題は steward 側で落とす |
+| 2 | steward の推論の期限を90秒に（§4.2 L6） | 30秒では LARM の試行時間が残らず、全 step が cloud に回った（K7 違反） |
+| 3 | 依頼が `remember` のとき、モデルが既存の記憶を指して `none` を返しても、再確認として保存し直す（ref が誤っていても key で既存の記憶を探す） | live でモデルが「既に保存済み」と `none` を返し、K14 の約束が守られなかった |
+| 4 | 指示文に remember と notes の使い分けの例を足し、同じ本文の短期メモはホストが重複として落とす | live で趣味・仕事・習慣が短期メモになり、同じメモが2回作られた |
+| 5 | 判断記録・要約の依存元・短期メモの出所（多対多）・統合の系譜・`forget_seq` の判定・timer による kick など、2回目のレビューの指摘を反映 | §14.2 と独立レビューの指摘 |

@@ -285,21 +285,29 @@ function withKeptText(
 	context: CurateContext,
 	output: CurateOutput,
 ): CurateOutput {
+	const items = env.deps.memory.stateItemsInTransaction(env.db, false);
 	const known = new Map(
-		env.deps.memory
-			.stateItemsInTransaction(env.db, false)
-			.map((item) => [item.itemId, item.value.text] as const),
+		items.map((item) => [item.itemId, item.value.text] as const),
 	);
+	// The ref of the stored item with the request's key (the model may name the key but cite the wrong ref).
+	const refOfKey = (key: string | null) => {
+		const wanted = key?.trim().toLowerCase();
+		const item = wanted && items.find((i) => i.semanticKey === wanted);
+		if (!item) return undefined;
+		return Object.entries(context.refs).find(
+			([, r]) => r.namespace === "state" && r.id === item.itemId,
+		)?.[0];
+	};
 	return {
 		...output,
 		resolve: output.resolve.map((raw) => {
 			const asked = context.requests[raw.request]?.kind === "remember";
-			const pointed = raw.refs.some(
-				(r) => context.refs[r]?.namespace === "state",
-			);
+			const pointed =
+				raw.refs.find((r) => context.refs[r]?.namespace === "state") ??
+				(asked && raw.action === "none" ? refOfKey(raw.key) : undefined);
 			const e =
 				asked && raw.action === "none" && pointed
-					? { ...raw, action: "remember" as const, text: null }
+					? { ...raw, action: "remember" as const, refs: [pointed], text: null }
 					: raw;
 			if (e.action !== "remember" || e.text) return e;
 			const ref = e.refs

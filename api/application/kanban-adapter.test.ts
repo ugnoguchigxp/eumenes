@@ -197,7 +197,7 @@ test("operations change the board and the board source carries revision and runn
 		column: "finished",
 		label: "done",
 		revision: 3,
-		actions: ["edit", "remove", "run", "review", "reset", "open"],
+		actions: ["edit", "remove", "run", "review", "reset"],
 	});
 	state.runnable = false;
 	expect((board(store, adapter).data as KanbanBoardView).runnable).toBe(false);
@@ -411,11 +411,19 @@ test("run hands the first run to terminals in the same transaction, once, as the
 		origin: "board",
 		attemptId: (first.receipt as { runId: string }).runId,
 	});
-	expect(fake.state.enqueued[0]!.prompt).toContain("git commit と git push をしない");
+	expect(fake.state.enqueued[0]!.prompt).toContain(
+		"git commit と git push をしない",
+	);
 	// The second run waits for its turn; the same request again replays and sends nothing.
 	await store.write((tx) => invoke(tx, adapter, "kanban.run", ref(b)));
 	await store.write((tx) =>
-		invoke(tx, adapter, "kanban.run", { cardId: a, expectedRevision: 1 }, "run-1"),
+		invoke(
+			tx,
+			adapter,
+			"kanban.run",
+			{ cardId: a, expectedRevision: 1 },
+			"run-1",
+		),
 	);
 	expect(fake.state.enqueued).toHaveLength(1);
 	expect(boardData(store, adapter).queue).toMatchObject({ waiting: 1 });
@@ -448,7 +456,10 @@ test("commit & push is created only by the board's button, in commit mode", asyn
 			files: ["a.ts"],
 		}),
 	);
-	const ref = () => ({ cardId: a, expectedRevision: revisionOf(store, adapter, a) });
+	const ref = () => ({
+		cardId: a,
+		expectedRevision: revisionOf(store, adapter, a),
+	});
 	await expect(
 		store.write((tx) =>
 			adapter.invokeInTransaction(tx, {
@@ -490,7 +501,10 @@ test("cancel hands the unsent request back to terminals; a sent one is refused",
 	await store.write((tx) =>
 		invoke(tx, adapter, "kanban.run", { cardId: a, expectedRevision: 1 }),
 	);
-	const ref = () => ({ cardId: a, expectedRevision: revisionOf(store, adapter, a) });
+	const ref = () => ({
+		cardId: a,
+		expectedRevision: revisionOf(store, adapter, a),
+	});
 	await expect(
 		store.write((tx) => invoke(tx, adapter, "kanban.cancel", ref())),
 	).rejects.toThrow("kanban_card_busy");
@@ -498,7 +512,10 @@ test("cancel hands the unsent request back to terminals; a sent one is refused",
 	const out = await store.write((tx) =>
 		invoke(tx, adapter, "kanban.cancel", ref()),
 	);
-	expect(out.receipt).toMatchObject({ action: "cancelled", column: "finished" });
+	expect(out.receipt).toMatchObject({
+		action: "cancelled",
+		column: "finished",
+	});
 });
 
 test("the board shows each handed run's request state and activity; an unsent run offers cancel", async () => {
@@ -575,8 +592,13 @@ test("stop is carried out after commit; an unconfirmed stop pauses the queue; re
 	const resumed = await store.write((tx) =>
 		invoke(tx, adapter, "kanban.resume-queue", {}),
 	);
-	expect(resumed.receipt).toEqual({ action: "queue_resumed", queue: "running" });
-	expect(kanbanReceiptSchema.parse(resumed.receipt)).toEqual(resumed.receipt as never);
+	expect(resumed.receipt).toEqual({
+		action: "queue_resumed",
+		queue: "running",
+	});
+	expect(kanbanReceiptSchema.parse(resumed.receipt)).toEqual(
+		resumed.receipt as never,
+	);
 	expect(fake.state.enqueued.map((r) => r.owner)).toEqual([
 		`kanban:${a}`,
 		`kanban:${b}`,
@@ -597,7 +619,10 @@ test("follow-up, review and reset go through the domain; the follow-up input ada
 			files: [],
 		}),
 	);
-	const ref = () => ({ cardId: a, expectedRevision: revisionOf(store, adapter, a) });
+	const ref = () => ({
+		cardId: a,
+		expectedRevision: revisionOf(store, adapter, a),
+	});
 	const { inputAdapters } = describeKanbanAdapter();
 	expect(
 		inputAdapters.get("input:kanban.followup@1")!({
@@ -605,7 +630,10 @@ test("follow-up, review and reset go through the domain; the follow-up input ada
 			expectedRevision: "3",
 			note: "もう少し",
 		}),
-	).toEqual({ ok: true, value: { cardId: a, expectedRevision: 3, note: "もう少し" } });
+	).toEqual({
+		ok: true,
+		value: { cardId: a, expectedRevision: 3, note: "もう少し" },
+	});
 	expect(
 		inputAdapters.get("input:kanban.followup@1")!({
 			cardId: a,

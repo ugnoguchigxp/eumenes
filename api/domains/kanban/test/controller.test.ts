@@ -54,7 +54,9 @@ test("GET lists notices newest first with the unread count and honours limit", a
 		"タスク『A』が終わりました",
 	]);
 	expect(all.notices[0]).toMatchObject({ kind: "done", read: false });
-	const one = await (await ctx.app.request("/api/kanban/notices?limit=1")).json();
+	const one = await (
+		await ctx.app.request("/api/kanban/notices?limit=1")
+	).json();
 	expect(one.notices).toHaveLength(1);
 	expect(one.unread).toBe(2);
 	for (const bad of ["0", "51", "x", "1.5"])

@@ -158,7 +158,9 @@ export function createStopper(
 				void terminals
 					.stop(runId)
 					.then((result) =>
-						result === "unconfirmed" ? kanban.stopUnconfirmed(runId) : undefined,
+						result === "unconfirmed"
+							? kanban.stopUnconfirmed(runId)
+							: undefined,
 					)
 					.catch(async (error) => {
 						log.warn("kanban.stop_failed", { runId }, error);

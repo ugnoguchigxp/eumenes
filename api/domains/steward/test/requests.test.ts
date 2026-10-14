@@ -206,6 +206,37 @@ test("a remember request the model answers with none but points at the stored it
 	);
 });
 
+test("a remember request answered with none and a wrong ref is reconfirmed through its key", async () => {
+	const h = await setup();
+	h.inference.script("curate-memory", { ...empty, remember: [remember()] });
+	h.inference.script("dispose-exchanges", keepAll);
+	await h.run({ user: "辛いものが好きです", end: "completed" });
+	await h.drain();
+	const [before] = h.memory.list();
+	// The live model cited the exchange instead of the item, but named the item's key.
+	h.inference.script("curate-memory", {
+		...empty,
+		resolve: [
+			resolve({
+				action: "none",
+				refs: ["e1"],
+				kind: "preference",
+				key: before!.semanticKey,
+				text: "既に保存済みです。",
+			}),
+		],
+	});
+	h.inference.script("dispose-exchanges", keepAll);
+	await h.run({
+		user: "辛いものが好きなこと、覚えておいて",
+		end: "completed",
+		requests: [{ kind: "remember", what: "辛いものが好き" }],
+	});
+	await h.drain();
+	const [after] = h.memory.list();
+	expect(after).toMatchObject({ text: before!.text, origin: "user_confirmed" });
+});
+
 test("a request the model never answers is given up after three tries", async () => {
 	const h = await setup();
 	const answer = { ...empty };

@@ -20,10 +20,11 @@ import {
 
 const iso = (ms: number) => new Date(ms).toISOString();
 
+/** Blocker reasons of a run that never reached Claude Code: there is no session to show. */
+const NOT_SENT: readonly BlockerReason[] = ["cancelled", "send_failed"];
 /** Blocker reasons after which the conversation cannot be continued (run again instead). */
 const NO_FOLLOWUP: readonly BlockerReason[] = [
-	"cancelled",
-	"send_failed",
+	...NOT_SENT,
 	"resume_failed",
 	"tracking_lost",
 ];
@@ -33,7 +34,11 @@ export const hasConversation = (
 	card: Pick<CardRow, "claudeSessionId" | "label" | "reason">,
 ): boolean =>
 	card.claudeSessionId !== null &&
-	!(card.label === "blocker" && card.reason && NO_FOLLOWUP.includes(card.reason));
+	!(
+		card.label === "blocker" &&
+		card.reason &&
+		NO_FOLLOWUP.includes(card.reason)
+	);
 
 /**
  * The actions allowed now, decided from the column, label and current run (business rule, plan
@@ -59,7 +64,10 @@ export function cardActions(
 		if (view.runnable && card.claudeSessionId) actions.push("commitPush");
 		if (!card.reviewed) actions.push("review");
 	}
-	actions.push("reset", "open");
+	actions.push("reset");
+	// The Claude Code screen shows a session only when the last run reached one.
+	if (card.claudeSessionId && !(card.reason && NOT_SENT.includes(card.reason)))
+		actions.push("open");
 	return actions;
 }
 
@@ -135,7 +143,9 @@ export function boardInTransaction(
 		},
 		runnable: view.runnable,
 		cards: allCards(tx).map((card) => {
-			const run = card.currentRunId ? (byId.get(card.currentRunId) ?? null) : null;
+			const run = card.currentRunId
+				? (byId.get(card.currentRunId) ?? null)
+				: null;
 			return cardView(card, view, run, followedByOthers(tx, card, run));
 		}),
 		runs: runs.map(runView),

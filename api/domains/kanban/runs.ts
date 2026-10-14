@@ -1,63 +1,29 @@
 import type { Database } from "bun:sqlite";
 import type {
-	BlockerReason,
 	KanbanCardRefInput,
-	KanbanDispatch,
 	KanbanFollowupInput,
 	KanbanOperationContext,
 	KanbanQueueReceipt,
-	KanbanRunFinish,
-	NoticeKind,
-	QueueState,
 	RunKind,
 } from "./contracts";
 import { hasConversation } from "./board";
 import type { Applied, Core, KanbanOutcome } from "./core";
+import { createQueue } from "./queue";
 import { bumpBoard, getCard, updateCard, type CardRow } from "./repository";
 import {
 	getQueue,
 	getRun,
-	handedRuns,
-	insertNotice,
 	insertRun,
-	oldestWaiting,
 	setQueue,
 	setStopRequested,
 	stopRequestedIds,
-	transitionRun,
 	type RunRow,
 } from "./runs-repository";
-import {
-	BLOCKER_TEXT,
-	blockerReason,
-	commitPushBody,
-	followupBody,
-	noticeText,
-	pausesQueue,
-	QUEUE_PAUSED_TEXT,
-	quietReason,
-	taskBody,
-} from "./text";
+import { createSettle } from "./settle";
+import { commitPushBody, followupBody, taskBody } from "./text";
 
 /** How the application cancels a request that terminals has not sent yet. */
 export type CancelUnsent = (runId: string) => boolean;
-
-const dispatchOf = (run: RunRow): KanbanDispatch => ({
-	runId: run.id,
-	cardId: run.cardId,
-	kind: run.kind,
-	claudeSessionId: run.claudeSessionId,
-	target: run.kind === "task" ? "new" : "conversation",
-	mode: run.kind === "commit_push" ? "commit" : "work",
-	projectId: run.projectId,
-	prompt: run.body,
-	task: run.title.slice(0, 40),
-	origin: run.origin,
-	...(run.conversationId ? { conversationId: run.conversationId } : {}),
-});
-
-const mergeFiles = (a: readonly string[], b: readonly string[]): string[] =>
-	[...new Set([...a, ...b])].slice(0, 200);
 
 /**
  * Runs and the single execution queue (plan §3.6, §3.8): one run is handed to terminals at a time
@@ -65,55 +31,10 @@ const mergeFiles = (a: readonly string[], b: readonly string[]): string[] =>
  * writer transaction; the application hands the returned `KanbanDispatch` to terminals in it.
  */
 export function createRuns(core: Core) {
-	const { now, newId, operate, target, receiptOf, appendToColumn } = core;
-
-	function notify(
-		tx: Database,
-		kind: NoticeKind,
-		text: string,
-		card?: { id: string },
-		runId?: string,
-	) {
-		insertNotice(tx, {
-			id: newId(),
-			kind,
-			cardId: card?.id ?? null,
-			runId: runId ?? null,
-			text,
-			read: false,
-			createdAt: now(),
-		});
-	}
-
-	/** Pauses the queue (keeping the first reason when already paused). */
-	function pauseQueue(
-		tx: Database,
-		reason: Extract<QueueState, { state: "paused" }>["reason"],
-	): boolean {
-		if (getQueue(tx).state === "paused") return false;
-		setQueue(tx, { state: "paused", reason });
-		bumpBoard(tx);
-		notify(
-			tx,
-			"queue_paused",
-			noticeText("queue_paused", "", QUEUE_PAUSED_TEXT[reason]),
-		);
-		return true;
-	}
-
-	/** Hands the oldest waiting run over when the queue runs and no run is in progress. */
-	function nextDispatch(tx: Database): KanbanDispatch | undefined {
-		if (getQueue(tx).state === "paused" || handedRuns(tx).length > 0)
-			return undefined;
-		const next = oldestWaiting(tx);
-		if (!next) return undefined;
-		transitionRun(tx, next.id, ["waiting_turn"], {
-			state: "handed",
-			handedAt: now(),
-		});
-		bumpBoard(tx);
-		return dispatchOf({ ...next, state: "handed" });
-	}
+	const { now, newId, operate, receiptOf, appendToColumn } = core;
+	const queue = createQueue(core);
+	const { pauseQueue, nextDispatch } = queue;
+	const { blockRun, ...settled } = createSettle(core, queue);
 
 	const action = (kind: RunKind) =>
 		kind === "task" ? "run" : kind === "followup" ? "followup" : "commit_push";
@@ -158,7 +79,12 @@ export function createRuns(core: Core) {
 			currentRunId: run.id,
 			// A new task starts a new conversation: nothing of the earlier one is carried over.
 			...(fresh
-				? { reviewed: false, commitPushReported: false, lastReport: null, files: [] }
+				? {
+						reviewed: false,
+						commitPushReported: false,
+						lastReport: null,
+						files: [],
+					}
 				: {}),
 			revision: card.revision + 1,
 			updatedAt: at,
@@ -168,52 +94,6 @@ export function createRuns(core: Core) {
 		bumpBoard(tx);
 		const dispatch = nextDispatch(tx);
 		return { receipt: receiptOf(action(kind), running, run.id), dispatch };
-	}
-
-	/** Moves a running card to `finished` with a label (and the run-dependent fields). */
-	function finishCard(
-		tx: Database,
-		card: CardRow,
-		change: Partial<CardRow> & Pick<CardRow, "label" | "reason">,
-	): CardRow {
-		const done: CardRow = {
-			...card,
-			...change,
-			column: "finished",
-			revision: card.revision + 1,
-			updatedAt: now(),
-		};
-		updateCard(tx, done);
-		appendToColumn(tx, done, card.column);
-		bumpBoard(tx);
-		return done;
-	}
-
-	/** A run that ended without completing: the card becomes a Blocker, the queue may stop. */
-	function blockRun(
-		tx: Database,
-		run: RunRow,
-		reason: BlockerReason,
-		runState: "blocked" | "cancelled",
-	) {
-		transitionRun(tx, run.id, ["waiting_turn", "handed"], {
-			state: runState,
-			reason,
-			finishedAt: now(),
-		});
-		const card = getCard(tx, run.cardId);
-		if (card && card.currentRunId === run.id)
-			finishCard(tx, card, { label: "blocker", reason });
-		if (card && !quietReason(reason))
-			notify(
-				tx,
-				"blocker",
-				noticeText("blocker", run.title, BLOCKER_TEXT[reason]),
-				card,
-				run.id,
-			);
-		if (pausesQueue(reason))
-			pauseQueue(tx, reason === "restarted" ? "restarted" : "tracking_lost");
 	}
 
 	function runnable(context: KanbanOperationContext) {
@@ -233,7 +113,14 @@ export function createRuns(core: Core) {
 			const card = core.target(tx, input.cardId, input.expectedRevision);
 			idle(card);
 			runnable(context);
-			return startRun(tx, card, "task", taskBody(card.prompt), context, newId());
+			return startRun(
+				tx,
+				card,
+				"task",
+				taskBody(card.prompt),
+				context,
+				newId(),
+			);
 		});
 	}
 
@@ -255,7 +142,14 @@ export function createRuns(core: Core) {
 				lastReport: card.lastReport,
 				note: input.note,
 			});
-			return startRun(tx, card, "followup", body, context, card.claudeSessionId!);
+			return startRun(
+				tx,
+				card,
+				"followup",
+				body,
+				context,
+				card.claudeSessionId!,
+			);
 		});
 	}
 
@@ -360,98 +254,32 @@ export function createRuns(core: Core) {
 		tx: Database,
 		requestId: string,
 	): KanbanOutcome<KanbanQueueReceipt> {
-		return operate<KanbanQueueReceipt>(tx, requestId, "resume_queue", {}, () => {
-			if (getQueue(tx).state === "paused") {
-				setQueue(tx, { state: "running" });
-				bumpBoard(tx);
-			}
-			return {
-				receipt: { action: "queue_resumed", queue: "running" },
-				dispatch: nextDispatch(tx),
-			};
-		});
-	}
-
-	/**
-	 * A terminals request reached a final state. Only the card's current run changes the card; the
-	 * notice is saved with it; the queue moves on unless it was stopped. Returns what to hand over
-	 * next, or null when this is not a handed-over run of this board.
-	 */
-	function finishRunInTransaction(
-		tx: Database,
-		finish: KanbanRunFinish,
-	): { dispatch?: KanbanDispatch } | null {
-		const run = getRun(tx, finish.runId);
-		if (!run || run.state !== "handed") return null;
-		if (finish.state === "completed") {
-			transitionRun(tx, run.id, ["handed"], {
-				state: "completed",
-				finishedAt: now(),
-			});
-			const card = getCard(tx, run.cardId);
-			if (card && card.currentRunId === run.id) {
-				const report = finish.lastReport || card.lastReport;
-				const changed =
-					run.kind === "commit_push"
-						? { commitPushReported: true }
-						: {
-								reviewed: false,
-								commitPushReported: false,
-								files:
-									run.kind === "task"
-										? [...finish.files]
-										: mergeFiles(card.files, finish.files),
-							};
-				finishCard(tx, card, {
-					label: "done",
-					reason: null,
-					lastReport: report,
-					...changed,
-				});
-				const kind = run.kind === "commit_push" ? "commit_push" : "done";
-				notify(tx, kind, noticeText(kind, run.title), card, run.id);
-			}
-		} else {
-			blockRun(
-				tx,
-				run,
-				blockerReason(finish),
-				finish.state === "cancelled" ? "cancelled" : "blocked",
-			);
-		}
-		bumpBoard(tx);
-		return { dispatch: nextDispatch(tx) };
-	}
-
-	/**
-	 * Handing the run to terminals failed in the transaction that was to do it (tracking became
-	 * unavailable): the run is blocked and the queue stops.
-	 */
-	function dispatchFailedInTransaction(tx: Database, runId: string) {
-		const run = getRun(tx, runId);
-		if (run?.state === "handed") blockRun(tx, run, "send_failed", "blocked");
-		pauseQueue(tx, "tracking_lost");
-	}
-
-	/** The run's request waits for the person's permission (once per run). */
-	function waitingInTransaction(tx: Database, runId: string) {
-		const run = getRun(tx, runId);
-		if (run?.state !== "handed") return;
-		const card = getCard(tx, run.cardId);
-		if (card)
-			notify(tx, "waiting", noticeText("waiting", run.title), card, run.id);
+		return operate<KanbanQueueReceipt>(
+			tx,
+			requestId,
+			"resume_queue",
+			{},
+			() => {
+				if (getQueue(tx).state === "paused") {
+					setQueue(tx, { state: "running" });
+					bumpBoard(tx);
+				}
+				return {
+					receipt: { action: "queue_resumed", queue: "running" },
+					dispatch: nextDispatch(tx),
+				};
+			},
+		);
 	}
 
 	return {
+		...settled,
 		runInTransaction,
 		followupInTransaction,
 		commitPushInTransaction,
 		cancelInTransaction,
 		stopInTransaction,
 		resumeQueueInTransaction,
-		finishRunInTransaction,
-		dispatchFailedInTransaction,
-		waitingInTransaction,
 		pauseQueueInTransaction: pauseQueue,
 		pendingStops,
 		stopUnconfirmed,
