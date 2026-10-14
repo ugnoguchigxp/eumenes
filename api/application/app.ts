@@ -8,6 +8,11 @@ const digest = (value: string) => createHash("sha256").update(value).digest();
 const safeEqual = (a: string, b: string) =>
 	timingSafeEqual(digest(a), digest(b));
 const maxJsonBytes = 1024 * 1024;
+/** Writes sent per keystroke or pane resize; logged like reads so they do not flood the log. */
+const quietWriteRoutes = new Set([
+	"/api/terminals/:id/input",
+	"/api/terminals/:id/resize",
+]);
 /**
  * Routes that read their body through their own bounded streaming reader
  * (`readBounded`, with route-specific caps). The global Content-Length cap must not pre-empt them.
@@ -15,6 +20,7 @@ const maxJsonBytes = 1024 * 1024;
  */
 const streamBoundedRoutes = new Set([
 	"/api/object-recognition",
+	"/api/ocr",
 	"/api/voice/turns",
 	"/api/voice/preview",
 	"/api/service-tests/uploads",
@@ -62,7 +68,8 @@ export function createApp(options: AppOptions | LegacyAppOptions) {
 			};
 			if (c.res.status >= 500) log.error("http.completed", fields);
 			else if (c.res.status >= 400) log.warn("http.completed", fields);
-			else if (c.req.method === "GET") log.debug("http.completed", fields);
+			else if (c.req.method === "GET" || quietWriteRoutes.has(c.req.routePath))
+				log.debug("http.completed", fields);
 			else log.info("http.completed", fields);
 		});
 	});

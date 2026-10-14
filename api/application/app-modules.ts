@@ -1,3 +1,4 @@
+import { registerOcr, type OcrService } from "../domains/ocr";
 import {
 	registerExcalidraw,
 	type ExcalidrawService,
@@ -8,7 +9,10 @@ import {
 } from "../domains/object-recognition";
 import { CONVERSATION_DEFAULT_PRINCIPAL } from "../domains/conversation/contracts";
 import { registerImage, type ImageService } from "../domains/image";
-import { registerUiCompositions, type UiCompositionsService } from "../domains/ui-compositions";
+import {
+	registerUiCompositions,
+	type UiCompositionsService,
+} from "../domains/ui-compositions";
 import { registerMusic, type MusicService } from "../domains/music";
 import {
 	registerCodingSupervision,
@@ -50,10 +54,7 @@ import {
 } from "../domains/continuity";
 import { registerScheduler, type SchedulerService } from "../domains/scheduler";
 import { registerTimers, type TimersService } from "../domains/timers";
-import {
-	registerTerminals,
-	type TerminalsService,
-} from "../domains/terminals";
+import { registerTerminals, type TerminalsService } from "../domains/terminals";
 import {
 	registerToolchainActions,
 	type ActionRequests,
@@ -111,6 +112,7 @@ export type AppServices = {
 	excalidraw?: ExcalidrawService;
 	drawingOperations?: { list: (conversationId: string) => unknown };
 	objectRecognition?: ObjectRecognitionService;
+	ocr?: OcrService;
 	tasks?: TasksService;
 	coding?: CodingService;
 	codingSupervision?: CodingSupervision;
@@ -140,6 +142,16 @@ export function appModules(services: AppServices): AppModule[] {
 				),
 		},
 		s.dotsModule,
+		s.ocr && {
+			mount: (app) =>
+				registerOcr(
+					app,
+					s.ocr!,
+					CONVERSATION_DEFAULT_PRINCIPAL,
+					(text, conversationId, requestId) =>
+						s.dialogue.submit({ text, conversationId, requestId }),
+				),
+		},
 		s.objectRecognition && {
 			mount: (app) =>
 				registerObjectRecognition(
@@ -164,7 +176,9 @@ export function appModules(services: AppServices): AppModule[] {
 			},
 		},
 		s.image && { mount: (app) => registerImage(app, s.image!) },
-		s.uiCompositions && { mount: (app) => registerUiCompositions(app, s.uiCompositions!) },
+		s.uiCompositions && {
+			mount: (app) => registerUiCompositions(app, s.uiCompositions!),
+		},
 		s.music && { mount: (app) => registerMusic(app, s.music!) },
 		s.capabilities && {
 			mount: (app) => registerCapabilities(app, s.capabilities!),

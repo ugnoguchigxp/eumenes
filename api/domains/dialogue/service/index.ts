@@ -143,6 +143,7 @@ export function createDialogueService({
 		subscribeProgress: progress.subscribeProgress,
 		submitVoice: intake.submitVoice,
 		submit: intake.submit,
+		notify: intake.notify,
 		async recover() {
 			// Runs without a queue job predate the queue and are interrupted as before.
 			await store.write((db) => interruptUnfinished(db, clock()));

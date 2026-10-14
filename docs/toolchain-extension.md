@@ -2,7 +2,7 @@
 
 更新日: 2026年10月14日。ツールチェーンはデータドリブン形式（bundle＋登録adapter）で追加する。設計は[タイマー設計書](../spec/timer-data-driven-ui-acceptance-design-2026-10-13.md)、実装契約は[実装契約](../spec/timer-data-driven-implementation-contracts-2026-10-13.md)。
 
-移行状況: `timers.manage`（「タイマー」）が移行済み。楽曲生成**画面**は `music-screen.bundle.json` の単独公開artifactと登録adapterへ移し、ジャンル・雰囲気・楽器・テンポ・長さ・歌声の選択肢と初期値も画面定義へ登録した。生成・取消は既存の認証済み会話APIを使い、会話の `music.create` / `music.library` と音楽プレイリスト画面は旧形式のまま。物体認識**画面**も `object-recognition-screen.bundle.json` の単独公開artifactと登録adapterへ移し、会話の `object-recognition.manage` は旧形式のまま。Web検索・会話履歴・画像・Excalidraw・dotsも未移行。旧形式の保守は[付録](#付録-旧形式固定runtime-mapの保守)、ツールチェーン全体の移行は[§6](#6-旧形式のツールチェーンを移行する)。
+移行状況: `timers.manage`（「タイマー」）が移行済み。楽曲生成**画面**は `music-screen.bundle.json` の単独公開artifactと登録adapterへ移し、ジャンル・雰囲気・楽器・テンポ・長さ・歌声の選択肢と初期値も画面定義へ登録した。生成・取消は既存の認証済み会話APIを使い、会話の `music.create` / `music.library` と音楽プレイリスト画面は旧形式のまま。物体認識**画面**も `object-recognition-screen.bundle.json` の単独公開artifactと登録adapterへ移し、会話の `object-recognition.manage` は旧形式のまま。Web検索・会話履歴・画像・Excalidraw・dotsも未移行。Claude Code（`claude-code.request`、画面 `terminals.workspace@2`）は新規にデータドリブン形式で追加した（[Claude Code 画面](terminals.md)）。旧形式の保守は[付録](#付録-旧形式固定runtime-mapの保守)、ツールチェーン全体の移行は[§6](#6-旧形式のツールチェーンを移行する)。
 
 [作業規則](../AGENTS.md)を守る。依頼の解釈・担当選択・不足情報の判断はLLMに任せ、発話の語句・企業名・地域による振り分けを追加しない。コードで書くのは、登録済みの操作をdomainへ接続する型付きadapterだけにする。
 

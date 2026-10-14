@@ -321,7 +321,9 @@ test("camera recording finishes through the artifact controls", async ({
 	await expect(workspace.getByLabel("カメラプレビュー")).toBeVisible();
 	await workspace.getByRole("button", { name: "録画を開始" }).click();
 	await expect(workspace.locator(".recognition-record-dot")).toBeVisible();
-	await expect(workspace.getByRole("button", { name: "資料一覧", exact: true })).toBeDisabled();
+	await expect(
+		workspace.getByRole("button", { name: "資料一覧", exact: true }),
+	).toBeDisabled();
 	const finish = workspace.getByRole("button", {
 		name: "録画を終了して調べる",
 	});

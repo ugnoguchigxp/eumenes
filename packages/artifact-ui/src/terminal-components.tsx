@@ -3,7 +3,7 @@ import {
 	type TerminalOutput,
 	type TerminalSize,
 } from "@eumenes/design-system";
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import type { ArtifactRequest } from "./contracts";
 import { useAction } from "./components";
 import { useArtifactRuntime } from "./runtime";
@@ -20,7 +20,6 @@ export type TerminalsResource = {
 	kind: "terminal-workspace";
 	revision: number;
 	available: boolean;
-	canStart: boolean;
 	sessions: TerminalSessionResource[];
 };
 /** One live PTY session as the host connects it; credentials stay with the host. */
@@ -30,6 +29,7 @@ export type TerminalConnection = {
 	resize(size: TerminalSize): void;
 };
 
+/** Opens straight into a session: when the source has none, one starts as the view appears. */
 export function TerminalWorkspaceView({
 	request,
 }: {
@@ -38,31 +38,36 @@ export function TerminalWorkspaceView({
 	const action = useAction(request);
 	const runtime = useArtifactRuntime();
 	const resource = action.resource as TerminalsResource;
-	const cache = useRef(new Map<string, TerminalConnection>());
 	const open = runtime.openTerminal;
+	const autoStarted = useRef(false);
+	const startNow =
+		!!open && resource.available && resource.sessions.length === 0;
+	useEffect(() => {
+		if (!startNow || autoStarted.current) return;
+		autoStarted.current = true;
+		void action.send("terminal-start", {});
+	}, [startNow, action]);
+	// One connection per session run; a new run (restart) gets a new one and a fresh screen.
+	const keys = resource.sessions.map((s) => `${s.id}:${s.run}`).join(" ");
 	const connections = useMemo(() => {
 		const next = new Map<string, TerminalConnection>();
-		if (!open) return next;
-		for (const session of resource.sessions) {
-			const key = `${session.id}:${session.run}`;
-			next.set(key, cache.current.get(key) ?? open(action.source, session.id));
-		}
-		cache.current = next;
+		if (!open || !keys) return next;
+		for (const key of keys.split(" "))
+			next.set(key, open(action.source, key.slice(0, key.indexOf(":"))));
 		return next;
-	}, [open, action.source, resource.sessions]);
+	}, [open, action.source, keys]);
 	const message = !open
-		? "この画面ではターミナルを利用できません。"
+		? "この画面では Claude Code を利用できません。"
 		: !resource.available
 			? "Claude Code が見つかりません。サーバーの PATH に claude を用意してください。"
-			: action.message || undefined;
+			: action.status === "rejected"
+				? action.message
+				: undefined;
 	return (
 		<TerminalWorkspace
 			title={request.title}
 			message={message}
-			canAdd={resource.canStart && !action.pending && !!open}
-			onAdd={() => {
-				void action.send("terminal-start", {});
-			}}
+			emptyLabel="Claude Code を起動しています…"
 			panes={resource.sessions.flatMap((session) => {
 				const connection = connections.get(`${session.id}:${session.run}`);
 				if (!connection) return [];
@@ -77,9 +82,6 @@ export function TerminalWorkspaceView({
 						onResize: connection.resize,
 						onRestart: () => {
 							void action.send("terminal-restart", { id: session.id });
-						},
-						onClose: () => {
-							void action.send("terminal-close", { id: session.id });
 						},
 					},
 				];

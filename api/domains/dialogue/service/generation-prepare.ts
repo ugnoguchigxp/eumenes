@@ -9,7 +9,7 @@ import {
 import { prepareRouting } from "./delegate-conversation";
 import { researchResultContext } from "./research-result-context";
 import { markWorld, byId, transition } from "../repository";
-import type { Run } from "../contracts";
+import { isSystemPrompt, type Run } from "../contracts";
 import {
 	DEFAULT_DEADLINE_MS,
 	type DialogueDeps,
@@ -164,7 +164,7 @@ export function createPrepare(
 		}
 
 		const delegated =
-			!run.agentTaskId && run.sourceKind !== "schedule"
+			!run.agentTaskId && !isSystemPrompt(run.sourceKind)
 				? deps.delegation?.prepareInTransaction(tx, run)
 				: undefined;
 		const drawingResult = deps.excalidraw?.resultInTransaction(tx, run.id);

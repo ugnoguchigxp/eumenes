@@ -36,6 +36,7 @@ import {
 	useVoiceDialogue,
 } from "../domains/voice-dialogue";
 import { useSettings, useVoiceMute } from "../domains/settings";
+import { useClaudeCodeArtifacts } from "../domains/terminals";
 import { changeRoots, invalidateAllButLive, queryRoots } from "../queryKeys";
 import { useOpenPlaylist } from "./WorkspaceArtifacts";
 
@@ -62,6 +63,9 @@ export function useWorkspace({
 		void openById("object-recognition.workspace");
 	}, [openById]);
 	useRecognitionArtifacts(client, openRecognition);
+	const openClaudeCode = useCallback(() => {
+		void openById("terminals.workspace");
+	}, [openById]);
 	const openImage = useCallback(() => {
 		void openById("image.generation");
 	}, [openById]);
@@ -127,6 +131,12 @@ export function useWorkspace({
 		voice.audio,
 		(text, signal) => client.replayAudio(text, signal),
 	);
+	const playTone = timerAudio.play;
+	// A finished task or a question from a delegated session sounds the same short tone.
+	const chimeClaudeCode = useCallback(() => {
+		void playTone(new AbortController().signal).catch(() => {});
+	}, [playTone]);
+	useClaudeCodeArtifacts(client, openClaudeCode, chimeClaudeCode);
 	const replay = useReplay(client, settings.data?.voice, {
 		sessionAudio: voice.audio,
 		interruptLive: voice.interrupt,

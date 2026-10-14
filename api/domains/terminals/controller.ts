@@ -1,5 +1,7 @@
 import type { Context, Hono } from "hono";
+import { readBounded } from "../../infrastructure/bounded-read";
 import { parseJsonBody } from "../../infrastructure/http";
+import { HOOK_PATH, HOOK_TOKEN_HEADER, hookPayloadSchema } from "./hooks";
 import {
 	terminalIdSchema,
 	terminalInputSchema,
@@ -46,10 +48,29 @@ export function registerTerminals(app: Hono, service: TerminalsService) {
 		if (!parsed.ok) return parsed.response;
 		return c.json(service.restart(id, parsed.data));
 	});
-	app.delete("/api/terminals/:id", (c) => {
+	// Claude Code's own hooks (outside /api: the child never holds the API token). The run's
+	// token authenticates; the body is bounded and only the event and last answer are read.
+	app.post(`${HOOK_PATH}/:id`, async (c) => {
 		const id = idOf(c);
-		if (!id) return invalid(c);
-		service.remove(id);
+		const token = c.req.header(HOOK_TOKEN_HEADER);
+		if (!id || !token) return c.json({ error: "terminal_hook_forbidden" }, 403);
+		let payload: unknown;
+		try {
+			const bytes = await readBounded(c.req.raw.body, {
+				limit: 512 * 1024,
+				tooLarge: "payload_too_large",
+				missing: "invalid_terminal_input",
+			});
+			payload = JSON.parse(new TextDecoder().decode(bytes));
+		} catch (error) {
+			if (error instanceof Error && error.message === "payload_too_large")
+				return c.json({ error: "payload_too_large" }, 413);
+			return invalid(c);
+		}
+		const parsed = hookPayloadSchema.safeParse(payload);
+		// Events this host does not use are accepted and ignored.
+		if (!parsed.success) return c.body(null, 204);
+		service.hook(id, token, parsed.data);
 		return c.body(null, 204);
 	});
 	app.get("/api/terminals/:id/output", (c) => {

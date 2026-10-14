@@ -43,6 +43,19 @@ export const searchAgentCases = [
 		// Deliberately synthetic price/date; never a live quote.
 		facts: ["テスト用MSFT株価は2026年10月9日終値で500米ドルです。"],
 		answerPattern: /米ドル|USD|\$/i,
+		quotePattern:
+			/(?:\d[\d,]*(?:\.\d+)?\s*(?:米ドル|ドル|USD)|(?:USD|\$)\s*\d[\d,]*(?:\.\d+)?)/i,
+	},
+	{
+		id: "softbank-stock",
+		question: "ソフトバンク（9434）の株価を教えて",
+		expectedPackage: "package:web.recipe@1",
+		query: "ソフトバンク 9434 株価",
+		queryPattern: /ソフトバンク|9434/i,
+		// Regression fixture for a report with a price that the final answer omitted.
+		facts: ["テスト用ソフトバンク株価は2026年10月14日終値で241.8円です。"],
+		answerPattern: /241\.8\s*円/,
+		quotePattern: /\d[\d,]*(?:\.\d+)?\s*円/,
 	},
 	{
 		id: "weather",
@@ -77,6 +90,7 @@ export function assessSearchAgent(
 ) {
 	const worker = result.tasks.find((t) => t.kind === "worker");
 	const queries = result.operations.filter((o) => o.operation === "lookup");
+	const quotePattern = "quotePattern" in c ? c.quotePattern : null;
 	const checks = {
 		correctAgent: worker?.packageRevisionId === c.expectedPackage,
 		completed: result.status === "completed" && worker?.status === "completed",
@@ -92,18 +106,17 @@ export function assessSearchAgent(
 		queryTargetsRequest:
 			c.queryPattern.test(queries[0]?.query ?? "") &&
 			(c.id !== "luna" || /ニュース|news/i.test(queries[0]?.query ?? "")) &&
-			(c.id !== "stock" ||
+			(!quotePattern ||
 				/株価|stock|share|quote/i.test(queries[0]?.query ?? "")),
 		stockQuote:
-			c.id !== "stock" ||
+			!quotePattern ||
 			[
 				result.answer ?? "",
 				result.report?.claims.map((c) => c.text).join(" ") ?? "",
 			].every(
 				(text) =>
-					/(?:\d[\d,]*(?:\.\d+)?\s*(?:米ドル|ドル|USD)|(?:USD|\$)\s*\d[\d,]*(?:\.\d+)?)/i.test(
-						text,
-					) && /(?:\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}月\d{1,2}日)/.test(text),
+					quotePattern.test(text) &&
+					/(?:\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}月\d{1,2}日)/.test(text),
 			),
 		requestedResult:
 			c.id !== "luna"

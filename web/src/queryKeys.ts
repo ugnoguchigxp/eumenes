@@ -7,8 +7,10 @@ export const queryRoots = {
 	drawings: "drawings",
 	drawingOperations: "drawing-operations",
 	objectRecognition: "object-recognition",
+	ocr: "ocr",
 	agentTasks: "agent-tasks",
 	agentReports: "agent-reports",
+	toolchainSelections: "toolchain-selections",
 	conversation: "conversation",
 	dialogue: "dialogue",
 	larm: "larm",
@@ -20,6 +22,7 @@ export const queryRoots = {
 	inferenceUsage: "inference-usage",
 	voiceDialogue: "voice-dialogue",
 	timers: "timers",
+	terminals: "terminals",
 	toolchainArtifacts: "toolchain-artifacts",
 	toolchainInteractions: "toolchain-interactions",
 } as const;
@@ -31,6 +34,7 @@ export const queryRoots = {
  */
 export const changeRoots = [
 	queryRoots.objectRecognition,
+	queryRoots.ocr,
 	queryRoots.music,
 	queryRoots.image,
 	queryRoots.drawings,
@@ -45,6 +49,7 @@ export const changeRoots = [
 	queryRoots.inferenceUsage,
 	queryRoots.voiceDialogue,
 	queryRoots.timers,
+	queryRoots.terminals,
 	queryRoots.toolchainInteractions,
 ] as const;
 

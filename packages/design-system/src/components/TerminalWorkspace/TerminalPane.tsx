@@ -7,7 +7,7 @@ import { useEffect, useRef } from "react";
 import { cn } from "../../utils/cn";
 import { Button } from "../Button";
 
-export type TerminalStatus = "connecting" | "running" | "exited" | "failed";
+export type TerminalStatus = "running" | "exited";
 export type TerminalSize = { cols: number; rows: number };
 /** PTY output owned by the host. The pane only renders what it receives. */
 export type TerminalOutput = {
@@ -15,26 +15,18 @@ export type TerminalOutput = {
 };
 
 export type TerminalPaneProps = {
+	/** Accessible name of the pane; not shown. */
 	title: string;
 	status: TerminalStatus;
-	/** Reported by the host, e.g. the exit code or the connection error. */
+	/** Reported by the host once the run ended, e.g. the exit code. */
 	statusMessage?: string;
 	output: TerminalOutput;
 	/** Keystrokes and pasted text. Not sent unless status is running. */
 	onInput?: (data: string) => void;
 	onResize?: (size: TerminalSize) => void;
 	onRestart?: () => void;
-	/** Ends the session (stopping it when running) and removes the pane. */
-	onClose?: () => void;
 	fontSize?: number;
 	className?: string;
-};
-
-const STATUS_LABEL: Record<TerminalStatus, string> = {
-	connecting: "接続中",
-	running: "実行中",
-	exited: "終了",
-	failed: "失敗",
 };
 
 function readColor(host: HTMLElement, token: string): string | undefined {
@@ -64,7 +56,6 @@ export function TerminalPane({
 	onInput,
 	onResize,
 	onRestart,
-	onClose,
 	fontSize = 13,
 	className,
 }: TerminalPaneProps) {
@@ -148,39 +139,30 @@ export function TerminalPane({
 		terminal.options.cursorBlink = status === "running";
 	}, [status]);
 
-	const ended = status === "exited" || status === "failed";
 	return (
 		<section
 			className={cn("terminal-pane", className)}
 			data-status={status}
 			aria-label={title}
 		>
-			<header className="terminal-pane-header">
-				<h3>{title}</h3>
-				<div role={status === "failed" ? "alert" : "status"}>
-					<span className="terminal-pane-dot" aria-hidden="true" />
-					{statusMessage
-						? `${STATUS_LABEL[status]}: ${statusMessage}`
-						: STATUS_LABEL[status]}
-				</div>
-				{ended && onRestart && (
-					<Button type="button" variant="outline" size="sm" onClick={onRestart}>
-						再起動
-					</Button>
-				)}
-				{onClose && (
-					<Button
-						type="button"
-						variant="ghost"
-						size="sm"
-						aria-label={`${title}を閉じる`}
-						onClick={onClose}
-					>
-						閉じる
-					</Button>
-				)}
-			</header>
 			<div ref={hostRef} className="terminal-pane-screen" />
+			{status === "exited" && (
+				<footer className="terminal-pane-ended">
+					<p role="status">
+						{statusMessage ? `終了しました: ${statusMessage}` : "終了しました"}
+					</p>
+					{onRestart && (
+						<Button
+							type="button"
+							variant="outline"
+							size="sm"
+							onClick={onRestart}
+						>
+							再起動
+						</Button>
+					)}
+				</footer>
+			)}
 		</section>
 	);
 }

@@ -1,3 +1,4 @@
+import { createOcrAdapter } from "./ocr-adapter";
 import type { SqliteStore } from "../infrastructure/sqlite";
 import type { QueueService } from "../domains/queue";
 import type { InferencePort } from "../domains/inference";
@@ -63,6 +64,7 @@ export async function createToolchain(
 		image?: boolean;
 		uiCompositions?: import("../domains/ui-compositions").UiCompositionsService;
 		objectRecognition?: boolean;
+		ocr?: import("../domains/ocr").OcrService;
 		/** PTY sessions for the terminal screen (absent: not offered). */
 		terminals?: import("../domains/terminals").TerminalsService;
 		excalidraw?: boolean;
@@ -100,7 +102,10 @@ export async function createToolchain(
 	const registry = createAdapterRegistry([
 		...(options.music ? [createMusicScreenAdapter()] : []),
 		...(options.image ? [createImageScreenAdapter()] : []),
-		...(options.uiCompositions ? [createUiCompositionsAdapter(options.uiCompositions)] : []),
+		...(options.uiCompositions
+			? [createUiCompositionsAdapter(options.uiCompositions)]
+			: []),
+		...(options.ocr ? [createOcrAdapter(options.ocr)] : []),
 		...(options.objectRecognition
 			? [createObjectRecognitionScreenAdapter()]
 			: []),
@@ -144,6 +149,8 @@ export async function createToolchain(
 			...(options.image ? ["image"] : []),
 			...(options.uiCompositions ? ["ui-compositions"] : []),
 			...(options.objectRecognition ? ["object-recognition"] : []),
+			...(options.terminals ? ["claude-code"] : []),
+			...(options.ocr ? ["ocr"] : []),
 			...(options.excalidraw ? ["excalidraw"] : []),
 			...(options.conversation && options.history !== false ? ["history"] : []),
 		]),

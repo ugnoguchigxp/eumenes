@@ -1,3 +1,4 @@
+import { ocrClient } from "./ocr";
 import { objectRecognitionClient } from "./object-recognition";
 import { excalidrawClient } from "./excalidraw";
 import { imageClient } from "./image";
@@ -35,6 +36,7 @@ export function createClient(baseUrl: string, token?: string) {
 		...musicClient(transport),
 		...imageClient(transport),
 		...objectRecognitionClient(transport),
+		...ocrClient(transport),
 		...excalidrawClient(transport),
 		...requirementsClient(transport),
 		...dotsClient(transport),

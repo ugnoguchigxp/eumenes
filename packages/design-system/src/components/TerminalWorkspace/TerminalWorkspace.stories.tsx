@@ -41,58 +41,58 @@ const meta: Meta<typeof TerminalWorkspace> = {
 export default meta;
 type Story = StoryObj<typeof TerminalWorkspace>;
 
+const banner = (path: string) =>
+	`\x1b[1;38;5;209m✻ Claude Code\x1b[0m  ${path}`;
+
+export const Single: Story = {
+	args: {
+		title: "Claude Code",
+		panes: [
+			{
+				id: "a",
+				title: "Claude Code",
+				status: "running",
+				...echoSession(banner("~/Code/eumenes")),
+			},
+		],
+	},
+};
 export const TwoSessions: Story = {
 	args: {
 		title: "Claude Code",
 		panes: [
 			{
 				id: "a",
-				title: "claude — セッション 1",
+				title: "Claude Code 1",
 				status: "running",
-				...echoSession("\x1b[1;38;5;209m✻ Claude Code\x1b[0m  ~/Code/eumenes"),
+				...echoSession(banner("~/Code/eumenes")),
 			},
 			{
 				id: "b",
-				title: "claude — セッション 2",
+				title: "Claude Code 2",
 				status: "running",
-				...echoSession(
-					"\x1b[1;38;5;209m✻ Claude Code\x1b[0m  ~/Code/eumenes/web",
-				),
+				...echoSession(banner("~/Code/eumenes/web")),
 			},
 		],
 	},
 };
-export const Connecting: Story = {
-	args: {
-		panes: [
-			{
-				id: "a",
-				title: "claude",
-				status: "connecting",
-				output: { subscribe: () => () => {} },
-			},
-		],
-	},
+export const Starting: Story = {
+	args: { panes: [], emptyLabel: "Claude Code を起動しています…" },
 };
 export const Exited: Story = {
 	args: {
 		panes: [
 			{
 				id: "a",
-				title: "claude",
+				title: "Claude Code",
 				status: "exited",
 				statusMessage: "終了コード 0",
 				...echoSession("セッションは終了しました。"),
 				onRestart: () => {},
 			},
-			{
-				id: "b",
-				title: "claude",
-				status: "failed",
-				statusMessage: "接続できませんでした",
-				output: { subscribe: () => () => {} },
-				onRestart: () => {},
-			},
 		],
 	},
+};
+export const Unavailable: Story = {
+	args: { panes: [], message: "Claude Code が見つかりません。" },
 };

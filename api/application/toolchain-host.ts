@@ -4,7 +4,9 @@ import type { QueueService } from "../domains/queue";
 import type { TimersService } from "../domains/timers";
 import type { WebResearchService } from "../domains/web-research";
 import type { SqliteStore } from "../infrastructure/sqlite";
+import type { Notice } from "../domains/dialogue/contracts";
 import { createTerminals } from "../domains/terminals";
+import { reportFinishedTasks } from "./claude-code-reports";
 import { createToolchain } from "./toolchain";
 import type { Embed } from "./toolchain-vectors";
 import type { InferenceAdapterPorts } from "./inference-adapter";
@@ -98,6 +100,7 @@ export async function createHostToolchain(
 		store: SqliteStore;
 		queue: QueueService;
 		uiCompositions?: UiCompositionsService;
+		ocr?: import("../domains/ocr").OcrService;
 		inference: InferencePort &
 			Parameters<typeof createToolchainHostLinks>[0]["inference"];
 		webResearch: WebResearchService;
@@ -105,11 +108,17 @@ export async function createHostToolchain(
 		history?: boolean;
 		webResearchEnabled?: boolean;
 		embed?: Embed;
+		/** This server's loopback URL for Claude Code hooks, and the change publisher. */
+		terminalHooks?: { baseUrl: string; publish: () => void };
 	},
 ) {
 	const links = createToolchainHostLinks(s);
 	// Claude Code sessions start in the server's working directory (the repository).
-	const terminals = createTerminals({ cwd: process.cwd() });
+	const terminals = createTerminals({
+		cwd: process.cwd(),
+		hookBaseUrl: s.terminalHooks?.baseUrl,
+		onChange: s.terminalHooks?.publish,
+	});
 	const toolchain = await createToolchain(
 		s.store,
 		s.queue,
@@ -118,6 +127,7 @@ export async function createHostToolchain(
 		{
 			timers: s.timers,
 			uiCompositions: s.uiCompositions,
+			ocr: s.ocr,
 			...links.options,
 			history: s.history,
 			dots: true,
@@ -130,5 +140,19 @@ export async function createHostToolchain(
 			embed: s.embed,
 		},
 	);
-	return { toolchain: { ...toolchain, terminals }, links };
+	return {
+		toolchain: { ...toolchain, terminals },
+		links: {
+			...links,
+			attachDialogue(
+				dialogue: Parameters<typeof links.attachDialogue>[0] & {
+					notify(notice: Notice): Promise<unknown>;
+				},
+			) {
+				links.attachDialogue(dialogue);
+				// A finished conversation task is reported in that conversation.
+				reportFinishedTasks(terminals, dialogue, s.log);
+			},
+		},
+	};
 }

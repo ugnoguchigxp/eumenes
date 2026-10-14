@@ -1,3 +1,5 @@
+import type { OcrResource } from "./ocr-components";
+export type { OcrResource } from "./ocr-components";
 import type { CollectionResource } from "./collection-contracts";
 export type {
 	CollectionFormField,
@@ -155,6 +157,16 @@ export const viewRegistry = {
 				.max(6)
 				.optional(),
 		}),
+	},
+	"ocr-media": {
+		name: "OcrMedia",
+		label: "OCRの元資料",
+		schema: z.strictObject({ view: z.literal("ocr-media"), source, title }),
+	},
+	"ocr-panel": {
+		name: "OcrPanel",
+		label: "OCR結果と入力",
+		schema: z.strictObject({ view: z.literal("ocr-panel"), source, title }),
 	},
 	"object-recognition-workspace": {
 		name: "ObjectRecognitionWorkspace",
@@ -649,6 +661,7 @@ export type Resource =
 			mode?: "timer" | "stopwatch";
 			stopwatch?: { elapsedMs: number; running: boolean };
 	  }
+	| OcrResource
 	| DrawingResource
 	| MusicResource
 	| GenerationResource
@@ -683,6 +696,18 @@ export type ArtifactEvent = {
 	source: string;
 	revision: number;
 	action:
+		| "ocr-select"
+		| "ocr-frame"
+		| "ocr-line"
+		| "ocr-refresh"
+		| "ocr-cancel"
+		| "ocr-recheck"
+		| "ocr-remove"
+		| "ocr-configure"
+		| "ocr-copy"
+		| "ocr-incorporate"
+		| "ocr-recording"
+		| "ocr-thumbnail"
 		| "recognition-select"
 		| "recognition-cancel"
 		| "recognition-refresh"
@@ -692,7 +717,6 @@ export type ArtifactEvent = {
 		| "recognition-incorporate"
 		| "terminal-start"
 		| "terminal-restart"
-		| "terminal-close"
 		| "drawing-new"
 		| "drawing-open"
 		| "drawing-refresh"

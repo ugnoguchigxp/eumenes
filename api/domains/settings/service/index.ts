@@ -1,3 +1,4 @@
+import { ocrSettings } from "./ocr";
 import {
 	objectRecognitionSettings,
 	storedRecognitionCiphertext,
@@ -220,6 +221,7 @@ export async function createSettings(
 		},
 		...localServiceSettings(store, encrypt, decrypt),
 		...objectRecognitionSettings(store, encrypt, decrypt, env),
+		...ocrSettings(store, env),
 		get: () => store.read(read),
 		inTransaction: read,
 		credential: (c: Connection) => store.read((db) => credential(db, c)),

@@ -42,7 +42,7 @@ export const runSchema = z.object({
 	error: z.string().nullable(),
 	jobId: z.string().nullable(),
 	deadlineAt: z.string().nullable(),
-	sourceKind: z.enum(["manual", "voice", "schedule"]),
+	sourceKind: z.enum(["manual", "voice", "schedule", "notice"]),
 	scheduleId: z.string().nullable(),
 	occurrenceId: z.string().nullable(),
 	/**
@@ -56,6 +56,19 @@ export const runSchema = z.object({
 	updatedAt: z.string(),
 });
 export type Run = z.infer<typeof runSchema>;
+/**
+ * A prompt of the system's (a scheduled prompt, or a notice such as a finished delegated task):
+ * stored as a user message but never learned from, offered no toolchain, run in the background.
+ */
+export const isSystemPrompt = (kind: Run["sourceKind"]) =>
+	kind === "schedule" || kind === "notice";
+/** A notice the host asks the conversation to report on; its text is hidden from the chat. */
+export const noticeSchema = z.object({
+	requestId: z.string().min(1).max(200),
+	conversationId: z.string().min(1).max(120),
+	text: z.string().trim().min(1).max(8000),
+});
+export type Notice = z.infer<typeof noticeSchema>;
 export const progressSchema = z.object({
 	runId: z.string(),
 	status: runSchema.shape.status,

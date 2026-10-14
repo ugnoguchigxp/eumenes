@@ -1,3 +1,4 @@
+import { createOcr } from "../domains/ocr";
 import {
 	createExcalidraw,
 	registerDrawingOperations,
@@ -13,6 +14,7 @@ import {
 	fixtureResearchOutput,
 	fixtureVerification,
 } from "../domains/agent-runtime/test/research-fixture";
+import { reportFinishedTasks } from "./claude-code-reports";
 import { createChanges } from "./events";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -73,6 +75,9 @@ export async function harness(
 		drawingFetch?: typeof fetch;
 		drawingIdleMs?: number;
 		recognitionFetcher?: typeof fetch;
+		ocrFetcher?: typeof fetch;
+		/** PTY sessions for the Claude Code toolchain (a fake spawn in tests). */
+		terminals?: import("../domains/terminals").TerminalsService;
 		settingsEnv?: Record<string, string | undefined>;
 		codexResearch?: {
 			model: string;
@@ -489,6 +494,7 @@ export async function harness(
 				},
 			})
 		: undefined;
+	const ocr = options.ocrFetcher ? createOcr({ store, queue, connection: () => settings.ocrCredentials(), fetcher: options.ocrFetcher }) : undefined;
 	const toolchain = await createToolchain(store, queue, inference, web, {
 		...toolchainLinks.options,
 		timers,
@@ -499,6 +505,8 @@ export async function harness(
 		uiCompositions,
 		excalidraw: !!options.drawingConnection,
 		objectRecognition: !!options.recognitionFetcher,
+		ocr,
+		terminals: options.terminals,
 	});
 	const music = options.musicGateway
 		? createMusic({
@@ -579,6 +587,7 @@ export async function harness(
 	});
 	toolchainLinks.attachDialogue(dialogue);
 	const voice = createVoiceDialogue(store, dialogue, inference);
+	if (options.terminals) reportFinishedTasks(options.terminals, dialogue);
 	const app = createApp({
 		token: "fixture-token-for-toolchain-browser",
 		origin: process.env.EUMENES_ORIGIN ?? "http://localhost",
@@ -588,6 +597,7 @@ export async function harness(
 		image,
 		uiCompositions,
 		objectRecognition,
+		ocr,
 		music,
 		settings,
 		conversation,
@@ -598,6 +608,7 @@ export async function harness(
 		scheduler,
 		inference,
 		timers,
+		terminals: options.terminals,
 		toolchainHistory: toolchain.history,
 		toolchainActions: toolchain.actionRequests,
 		...toolchain,
@@ -620,6 +631,7 @@ export async function harness(
 		image,
 		uiCompositions,
 		objectRecognition,
+		ocr,
 		music,
 		app,
 		store,

@@ -1,3 +1,4 @@
+import { migrations as ocrMigrations } from "../domains/ocr";
 import { migrations as excalidrawMigrations } from "../domains/excalidraw";
 import { migrations as objectRecognitionMigrations } from "../domains/object-recognition";
 import { migrations as imageMigrations } from "../domains/image";
@@ -151,6 +152,7 @@ const catalog: readonly Migration[] = [
 	...uiCompositionsMigrations,
 	...excalidrawMigrations,
 	...objectRecognitionMigrations,
+	...ocrMigrations,
 	...webResearchMigrations,
 	...capabilitiesMigrations,
 	...toolRuntimeMigrations,

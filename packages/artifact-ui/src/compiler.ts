@@ -22,23 +22,25 @@ function checkSource(definition: ArtifactDefinition, snapshot: Snapshot) {
 					throw new Error("この表示では参照できない source です");
 			continue;
 		}
-		const kind = [
-			"image-workspace",
-			"image-creation-form",
-			"image-preview",
-			"image-gallery",
-		].includes(request.view)
-			? "image-workspace"
-			: request.view === "music-workspace" ||
-				  request.view === "music-player" ||
-				  request.view === "playlist" ||
-				  request.view === "music-library"
-				? "music"
-				: request.view === "generation-status"
-					? "generation"
-					: request.view === "collection-workspace"
-						? "collection"
-						: request.view;
+		const kind = ["ocr-media", "ocr-panel"].includes(request.view)
+			? "ocr-workspace"
+			: [
+						"image-workspace",
+						"image-creation-form",
+						"image-preview",
+						"image-gallery",
+				  ].includes(request.view)
+				? "image-workspace"
+				: request.view === "music-workspace" ||
+					  request.view === "music-player" ||
+					  request.view === "playlist" ||
+					  request.view === "music-library"
+					? "music"
+					: request.view === "generation-status"
+						? "generation"
+						: request.view === "collection-workspace"
+							? "collection"
+							: request.view;
 		if (request.source && snapshot[request.source]?.kind !== kind)
 			throw new Error("この表示では参照できない source です");
 	}

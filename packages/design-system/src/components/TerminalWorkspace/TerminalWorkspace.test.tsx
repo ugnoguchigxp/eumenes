@@ -83,7 +83,7 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-it("renders two sessions and routes output and input per pane", () => {
+it("renders sessions edge to edge and routes output and input per pane", () => {
 	const a = fakeOutput();
 	const b = fakeOutput();
 	const inputA = vi.fn();
@@ -117,6 +117,10 @@ it("renders two sessions and routes output and input per pane", () => {
 	expect(
 		screen.getByRole("region", { name: "セッション 2" }),
 	).toBeInTheDocument();
+	// No heading, buttons or state while running: only the screens.
+	expect(screen.queryByRole("heading")).not.toBeInTheDocument();
+	expect(screen.queryByRole("button")).not.toBeInTheDocument();
+	expect(screen.queryByRole("status")).not.toBeInTheDocument();
 	expect(resize).toHaveBeenCalledWith({ cols: 80, rows: 24 });
 
 	a.emit("hello");
@@ -128,43 +132,35 @@ it("renders two sessions and routes output and input per pane", () => {
 	expect(inputA).not.toHaveBeenCalled();
 });
 
-it("drops input until running and offers restart after exit", () => {
+it("drops input after the run ended and offers the restart", () => {
 	const session = fakeOutput();
 	const input = vi.fn();
 	const restart = vi.fn();
 	const pane = {
 		id: "a",
-		title: "claude",
+		title: "Claude Code",
 		output: session.output,
 		onInput: input,
 		onRestart: restart,
 	};
 	const { rerender, unmount } = render(
-		<TerminalWorkspace panes={[{ ...pane, status: "connecting" }]} />,
+		<TerminalWorkspace panes={[{ ...pane, status: "running" }]} />,
 	);
-	expect(screen.getByRole("status")).toHaveTextContent("接続中");
-	term(0).type("x");
-	expect(input).not.toHaveBeenCalled();
-	expect(
-		screen.queryByRole("button", { name: "再起動" }),
-	).not.toBeInTheDocument();
-
-	rerender(<TerminalWorkspace panes={[{ ...pane, status: "running" }]} />);
 	expect(term(0).options.disableStdin).toBe(false);
 	term(0).type("y");
 	expect(input).toHaveBeenCalledWith("y");
 
 	rerender(
 		<TerminalWorkspace
-			panes={[
-				{ ...pane, status: "failed", statusMessage: "接続できませんでした" },
-			]}
+			panes={[{ ...pane, status: "exited", statusMessage: "終了コード 0" }]}
 		/>,
 	);
-	expect(screen.getByRole("alert")).toHaveTextContent(
-		"失敗: 接続できませんでした",
+	expect(screen.getByRole("status")).toHaveTextContent(
+		"終了しました: 終了コード 0",
 	);
 	expect(term(0).options.disableStdin).toBe(true);
+	term(0).type("x");
+	expect(input).toHaveBeenCalledOnce();
 	fireEvent.click(screen.getByRole("button", { name: "再起動" }));
 	expect(restart).toHaveBeenCalledOnce();
 	expect(xterm.instances).toHaveLength(1);
@@ -174,39 +170,18 @@ it("drops input until running and offers restart after exit", () => {
 	expect(term(0).disposed).toBe(true);
 });
 
-it("opens and closes sessions through the host", () => {
-	const add = vi.fn();
-	const close = vi.fn();
+it("shows the host's message or the empty label without panes", () => {
 	const { rerender } = render(
-		<TerminalWorkspace title="Claude Code" panes={[]} onAdd={add} />,
+		<TerminalWorkspace panes={[]} emptyLabel="Claude Code を起動しています…" />,
 	);
-	expect(
-		screen.getByText("開いているターミナルはありません。"),
-	).toBeInTheDocument();
-	fireEvent.click(screen.getByRole("button", { name: "ターミナルを開く" }));
-	expect(add).toHaveBeenCalledOnce();
-
+	expect(screen.getByText("Claude Code を起動しています…")).toBeInTheDocument();
 	rerender(
-		<TerminalWorkspace
-			title="Claude Code"
-			onAdd={add}
-			canAdd={false}
-			message="上限に達しました"
-			panes={[
-				{
-					id: "a",
-					title: "claude",
-					status: "running",
-					output: fakeOutput().output,
-					onClose: close,
-				},
-			]}
-		/>,
+		<TerminalWorkspace panes={[]} message="Claude Code が見つかりません。" />,
+	);
+	expect(screen.getByRole("alert")).toHaveTextContent(
+		"Claude Code が見つかりません。",
 	);
 	expect(
-		screen.getByRole("button", { name: "ターミナルを開く" }),
-	).toBeDisabled();
-	expect(screen.getByRole("alert")).toHaveTextContent("上限に達しました");
-	fireEvent.click(screen.getByRole("button", { name: "claudeを閉じる" }));
-	expect(close).toHaveBeenCalledOnce();
+		screen.queryByText("Claude Code を起動しています…"),
+	).not.toBeInTheDocument();
 });

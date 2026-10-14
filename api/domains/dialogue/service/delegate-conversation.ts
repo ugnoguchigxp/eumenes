@@ -2,7 +2,7 @@ import type { Database } from "bun:sqlite";
 import type { AgentRuntime } from "../../agent-runtime";
 import type { Prepared } from "../../capabilities";
 import type { ConversationService } from "../../conversation";
-import type { Run } from "../contracts";
+import { isSystemPrompt, type Run } from "../contracts";
 import { linkAgent } from "../repository";
 import type { DialogueDeps } from "./context";
 
@@ -60,7 +60,7 @@ export function delegateConversation(
 
 /**
  * The routing input of a new conversation decision: the request text for retrieval and the
- * toolchains whose runtime is available now. Nothing is offered to scheduled prompts or while
+ * toolchains whose runtime is available now. Nothing is offered to system prompts or while
  * an agent task already belongs to the run.
  */
 export function prepareRouting(
@@ -71,7 +71,7 @@ export function prepareRouting(
 	available: { dots: boolean },
 ) {
 	const { agents, toolchains } = deps;
-	if (!toolchains || run.agentTaskId || run.sourceKind === "schedule")
+	if (!toolchains || run.agentTaskId || isSystemPrompt(run.sourceKind))
 		return undefined;
 	const context = agents?.conversationContextInTransaction?.(db);
 	const ready = (requires: string | undefined) =>

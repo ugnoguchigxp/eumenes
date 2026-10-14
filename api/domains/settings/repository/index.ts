@@ -38,4 +38,9 @@ export const migrations: readonly Migration[] = [
 		after: ["settings/0004-object-recognition"],
 		sql: `ALTER TABLE settings_object_recognition ADD COLUMN credential_source TEXT NOT NULL DEFAULT 'dedicated' CHECK(credential_source IN ('dedicated','larm'));`,
 	},
+	{
+		id: "settings/0006-ocr",
+		after: ["settings/0002-epochs"],
+		sql: `CREATE TABLE settings_ocr(id INTEGER PRIMARY KEY CHECK(id=1),revision INTEGER NOT NULL,base_url TEXT NOT NULL);`,
+	},
 ];

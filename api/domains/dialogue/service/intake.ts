@@ -2,7 +2,10 @@ import { getLogger } from "../../../infrastructure/logger";
 import type { TargetDefinition } from "../../scheduler";
 import type { Tx } from "../../queue";
 import {
+	isSystemPrompt,
+	noticeSchema,
 	promptTargetSchema,
+	type Notice,
 	type PromptTarget,
 	type Run,
 	type Submit,
@@ -18,7 +21,7 @@ import {
 } from "./context";
 const log = getLogger("dialogue");
 
-/** Input acceptance: idempotent run creation, manual/voice submit and the schedule target. */
+/** Input acceptance: idempotent run creation, manual/voice submit, notices and the schedule target. */
 export function createIntake(deps: DialogueDeps) {
 	const { store, conversation, larm, queue, memory, clock, id } = deps;
 	/** One transaction: user message + run + queue job. Throws (rolling all back) when the queue is full. */
@@ -70,7 +73,9 @@ export function createIntake(deps: DialogueDeps) {
 			Date.parse(now) + (input.deadlineMs ?? DEFAULT_DEADLINE_MS);
 		const generated = queue.enqueueInTransaction(db, {
 			// Scheduled runs get their own scope so background work cannot exhaust interactive acceptance.
-			scope: input.sourceKind === "schedule" ? "dialogue.schedule" : "dialogue",
+			scope: isSystemPrompt(input.sourceKind)
+				? "dialogue.schedule"
+				: "dialogue",
 			kind: input.resume ? COMMAND_KIND : GENERATE_KIND,
 			dedupeKey: input.resume ? `toolchain-command:${runId}` : runId,
 			payload: input.resume
@@ -81,7 +86,7 @@ export function createIntake(deps: DialogueDeps) {
 					}
 				: { runId },
 			subjectRef: runId,
-			lane: input.sourceKind === "schedule" ? "background" : "interactive",
+			lane: isSystemPrompt(input.sourceKind) ? "background" : "interactive",
 			resourceKey: "inference.llm",
 			maxAttempts: 1,
 			concurrencyKey: `conversation:${input.conversationId}`,
@@ -116,7 +121,7 @@ export function createIntake(deps: DialogueDeps) {
 		insert(db, run);
 		// The memory agent reads the user's words alongside the answer's generation. A scheduled prompt is
 		// stored as a user message but is the system's: it is never learned from, and starts nothing.
-		if (input.sourceKind === "schedule")
+		if (isSystemPrompt(input.sourceKind))
 			memory?.excludeMessageInTransaction(db, messageId);
 		else memory?.scheduleAgentInTransaction(db, input.conversationId);
 		return { run, fresh: true };
@@ -170,6 +175,25 @@ export function createIntake(deps: DialogueDeps) {
 				runId: accepted.run.id,
 				jobId: accepted.run.jobId ?? undefined,
 				utteranceId: accepted.run.utteranceId ?? undefined,
+				status: accepted.run.status,
+			});
+			if (accepted.fresh) queue.wake();
+			return accepted.run;
+		},
+		/** The system's notice: a hidden input the conversation answers (e.g. a task finished). */
+		async notify(input: Notice): Promise<Run> {
+			const notice = noticeSchema.parse(input);
+			const accepted = await store.write((db) =>
+				acceptInTransaction(db, {
+					...notice,
+					presentation: "artifact",
+					sourceKind: "notice",
+				}),
+			);
+			log.info(accepted.fresh ? "dialogue.accepted" : "dialogue.reused", {
+				requestId: accepted.run.requestId,
+				runId: accepted.run.id,
+				jobId: accepted.run.jobId ?? undefined,
 				status: accepted.run.status,
 			});
 			if (accepted.fresh) queue.wake();

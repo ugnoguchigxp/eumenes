@@ -9,6 +9,8 @@ import {
 	uiResponseFields,
 	uiSubmitRequest,
 } from "./ui-compositions";
+import { claudeCodeRequest } from "./claude-code";
+export { claudeCodeRequest };
 export { uiComposeRequest, uiCancelRequest, uiResponseFields, uiSubmitRequest };
 import { imageRequest, imagePlan } from "./image";
 export { imageRequest, imagePlan };
@@ -143,6 +145,7 @@ export const recipeFindInput = z
 	.strict();
 export const validators = {
 	uiComposeRequest,
+	claudeCodeRequest,
 	uiCancelRequest,
 	uiResponseFields,
 	uiSubmitRequest,
@@ -177,6 +180,7 @@ export const validators = {
 	timerTargetAnswer,
 	timerHms,
 	emptyInput,
+	ocrTarget: z.strictObject({ id: z.uuid() }),
 };
 export type SchemaKey = keyof typeof validators;
 export type Owner = { rootRunId: string; taskId: string; cancelEpoch: number };

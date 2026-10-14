@@ -1,3 +1,4 @@
+import { ocrWebAdapter } from "../domains/ocr/toolchain-adapter";
 import { createWebAdapterRegistry } from "../domains/toolchain-artifacts";
 import {
 	recordsWebAdapter,
@@ -18,6 +19,7 @@ export const toolchainWebAdapters = createWebAdapterRegistry([
 	imageScreenWebAdapter,
 	uiCompositionsWebAdapter,
 	objectRecognitionScreenWebAdapter,
+	ocrWebAdapter,
 	settingsWebAdapter,
 	recordsWebAdapter,
 	serviceTestsWebAdapter,

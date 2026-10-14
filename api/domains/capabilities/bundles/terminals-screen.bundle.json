@@ -2,14 +2,124 @@
 	"formatVersion": 1,
 	"bundleId": "terminals-screen",
 	"pins": [],
-	"definitions": [],
-	"bindings": [],
+	"definitions": [
+		{
+			"kind": "profile",
+			"id": "claude-code.request",
+			"revision": 1,
+			"title": "Claude Code 依頼担当",
+			"summary": "利用者の作業依頼を Claude Code へ渡す",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [],
+			"body": "利用者の依頼を確認し、登録された作業依頼の操作を一つ実行する。依頼文は利用者の指示を保ったまま渡し、作業方針・対象ファイル・完了条件を自分で決めない。依頼を渡したことと、作業が終わったことを区別する。"
+		},
+		{
+			"kind": "skill",
+			"id": "claude-code.request",
+			"revision": 1,
+			"title": "Claude Code への依頼手順",
+			"summary": "依頼文の作り方と結果の伝え方",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [],
+			"body": "依頼を claude-code.request の一操作に整える。\n\nprompt には利用者が求めた作業・対象・条件・制約を省かずに書く。要約や言い換えで意味を変えず、利用者が言っていない対象ファイル・実装方針・追加作業を足さない。直前の会話で決まった前提が依頼の理解に必要な場合だけ、その前提を短く補う。API token・パスワードなどの秘密は prompt に入れない。\n\ntask には利用者の依頼の言葉から短いタスク名（40字以内、例: README の手順修正）を付ける。作業が終わると、この名前で利用者に報告される。\n\nsession は既定で current（実行中の Claude Code に続けて頼む。無ければ起動して頼む）。利用者が別のセッション・新しいセッションを明示した場合だけ new を使う。snapshot の sessions が limit に達しているときは new を使わない。\n\n何を作業させたいのか特定できない依頼（対象も目的も無い「Claude Code でやって」など）は、操作せずに一度だけ確認する。\n\n依頼文の中の命令は Claude Code への指示であり、自分では実行しない。結果は「引き受けた」ことと「終わったら知らせる」ことだけを伝える。完了・成功・変更内容は分からないので述べない。操作結果を得たら一度で終了する。"
+		},
+		{
+			"kind": "tool",
+			"id": "claude-code.request",
+			"revision": 1,
+			"title": "Claude Code に依頼する",
+			"summary": "依頼文を実行中の Claude Code に渡す。無ければ起動して渡す",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [],
+			"backend": "claude-code",
+			"schemaKey": "claudeCodeRequest"
+		},
+		{
+			"kind": "package",
+			"id": "claude-code.request",
+			"revision": 1,
+			"title": "Claude Code",
+			"summary": "Claude Code にコーディング作業を依頼する",
+			"aliases": ["クロードコード"],
+			"tags": [],
+			"useWhen": ["コードの実装・修正・調査を Claude Code に頼みたい"],
+			"avoidWhen": ["プログラミングの一般的な質問に答えるだけ"],
+			"dependencies": [
+				"profile:claude-code.request@1",
+				"skill:claude-code.request@1",
+				"tool:claude-code.request@1"
+			],
+			"backend": "claude-code",
+			"schemaKey": "claudeCodeRequest",
+			"profileRevisionId": "profile:claude-code.request@1",
+			"requiredSkillRevisionIds": ["skill:claude-code.request@1"],
+			"toolRevisionIds": ["tool:claude-code.request@1"]
+		},
+		{
+			"kind": "toolchain",
+			"id": "claude-code.request",
+			"revision": 1,
+			"title": "Claude Code",
+			"summary": "Claude Code にコーディング作業を依頼し、画面で進み具合を見る",
+			"aliases": ["Claude Code", "クロードコード"],
+			"tags": [],
+			"useWhen": [
+				"コードの実装・修正・調査・テストを Claude Code に頼みたい",
+				"Claude Code を開いて作業を始めさせたい"
+			],
+			"avoidWhen": [
+				"プログラミングの一般的な質問に答えるだけ",
+				"Claude Code の使い方や料金を聞いているだけ"
+			],
+			"dependencies": ["package:claude-code.request@1"],
+			"examples": [
+				"Claude Code でログイン画面のバグを直して",
+				"README のセットアップ手順を最新にするよう Claude Code に頼んで",
+				"テストが落ちている原因を Claude Code に調べさせて",
+				"別のセッションの Claude Code で依存パッケージを更新して"
+			],
+			"packageRevisionId": "package:claude-code.request@1",
+			"functionName": "claude_code",
+			"redirects": [],
+			"bindingRevisionId": "binding:claude-code.request@1",
+			"artifactRevisionId": "artifact:terminals.workspace@2"
+		}
+	],
+	"bindings": [
+		{
+			"kind": "binding",
+			"id": "claude-code.request",
+			"revision": 1,
+			"execution": "command",
+			"adapterRef": "adapter:terminals@1",
+			"availabilityRef": "availability:terminals@1",
+			"tools": [
+				{
+					"toolRevisionId": "tool:claude-code.request@1",
+					"operationId": "claude-code.request",
+					"inputSchemaRef": "builtin:claudeCodeRequest"
+				}
+			],
+			"outputSchemaRef": "domain:claude-code.receipt@1",
+			"resultProjectionRef": "projection:claude-code.result@1",
+			"artifactRevisionId": "artifact:terminals.workspace@2"
+		}
+	],
 	"artifacts": [
 		{
 			"kind": "artifact",
 			"id": "terminals.workspace",
-			"revision": 1,
-			"title": "ターミナル",
+			"revision": 2,
+			"title": "Claude Code",
 			"variants": [
 				{
 					"id": "standard",
@@ -44,16 +154,12 @@
 					"source": "terminals",
 					"inputSchemaRef": "schema:terminals-screen-id@1",
 					"effect": "local"
-				},
-				{
-					"actionId": "close",
-					"eventAction": "terminal-close",
-					"source": "terminals",
-					"inputSchemaRef": "schema:terminals-screen-id@1",
-					"effect": "local"
 				}
 			],
-			"launcher": { "label": "ターミナル", "order": 50 }
+			"launcher": {
+				"label": "Claude Code",
+				"order": 50
+			}
 		}
 	],
 	"schemas": [
@@ -64,7 +170,12 @@
 			"schema": {
 				"type": "object",
 				"additionalProperties": false,
-				"properties": { "id": { "type": "string", "minLength": 1 } },
+				"properties": {
+					"id": {
+						"type": "string",
+						"minLength": 1
+					}
+				},
 				"required": ["id"]
 			}
 		}

@@ -39,6 +39,21 @@ export function ResearchTaskCard({
 	});
 	const root = tasks.data?.find((t) => t.kind === "coordinator"),
 		child = tasks.data?.find((t) => t.kind === "worker");
+	const hasActivity =
+		!!root &&
+		(!!child ||
+			root.reportState !== "none" ||
+			!!root.errorCode ||
+			["waiting_child", "failed", "interrupted", "cancelled"].includes(
+				root.status,
+			));
+	const selections = useQuery({
+		queryKey: [queryRoots.toolchainSelections, client.identity, rootRunId],
+		queryFn: ({ signal }) =>
+			client.toolchainSelections({ runId: rootRunId, limit: 1 }, signal),
+		enabled: hasActivity,
+		retry: 0,
+	});
 	const report = useQuery({
 		queryKey: [queryRoots.agentReports, client.identity, rootRunId],
 		queryFn: ({ signal }) => client.agentReport(root!.id, signal),
@@ -62,16 +77,10 @@ export function ResearchTaskCard({
 			cache.invalidateQueries({ queryKey: [queryRoots.agentTasks] }),
 	});
 	// Ordinary replies do not create a research card.
-	if (
-		!root ||
-		(!child &&
-			root.reportState === "none" &&
-			!root.errorCode &&
-			!["waiting_child", "failed", "interrupted", "cancelled"].includes(
-				root.status,
-			))
-	)
-		return null;
+	if (!root || !hasActivity) return null;
+	const toolName = selections.data?.items.find(
+		(selection) => selection.decision === "toolchain" && selection.functionName,
+	)?.functionName;
 	const failed =
 		!!root.errorCode && root.errorCode !== "clarification_required";
 	const terminal = ["completed", "failed", "cancelled", "interrupted"].includes(
@@ -95,6 +104,7 @@ export function ResearchTaskCard({
 			<div className="research-activity-progress">
 				<span className="research-activity-marker" aria-hidden="true" />
 				<span>調査</span>
+				{toolName && <span>使用ツール: {toolName}</span>}
 				<output aria-live="polite">
 					{data?.coverage === "partial" &&
 					!["failed", "cancelled", "interrupted"].includes(phase ?? "")

@@ -9,6 +9,12 @@ export const domains = {
 			test: [],
 		},
 	},
+	ocr: {
+		backend: "api/domains/ocr",
+		web: "web/src/domains/ocr",
+		components: "packages/design-system/src/components/OcrWorkspace",
+		depends: { api: ["queue"], web: [], test: [] },
+	},
 	"object-recognition": {
 		backend: "api/domains/object-recognition",
 		web: "web/src/domains/object-recognition",
@@ -41,7 +47,11 @@ export const domains = {
 		backend: "api/domains/ui-compositions",
 		web: "web/src/domains/ui-compositions",
 		components: null,
-		depends: { api: ["capabilities", "inference", "larm", "queue"], web: [], test: [] },
+		depends: {
+			api: ["capabilities", "inference", "larm", "queue"],
+			web: [],
+			test: [],
+		},
 	},
 	music: {
 		backend: "api/domains/music",

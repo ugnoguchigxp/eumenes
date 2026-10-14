@@ -1,3 +1,4 @@
+import { createOcr } from "../domains/ocr";
 import {
 	createExcalidraw,
 	registerDrawingOperations,
@@ -283,11 +284,22 @@ export async function buildServices(config: Config) {
 					...(config.worldPollMs ? { pollMs: config.worldPollMs } : {}),
 				});
 	let imageForCompositions: ImageService;
-	const uiCompositions = createUiCompositions({ store, queue, inference, image: () => imageForCompositions });
+	const uiCompositions = createUiCompositions({
+		store,
+		queue,
+		inference,
+		image: () => imageForCompositions,
+	});
+	const ocr = createOcr({
+		store,
+		queue,
+		connection: () => settings.ocrCredentials(),
+	});
 	const { toolchain, links } = await createHostToolchain({
 		store,
 		queue,
 		uiCompositions,
+		ocr,
 		inference,
 		webResearch,
 		settings,
@@ -302,6 +314,10 @@ export async function buildServices(config: Config) {
 		history: config.historyToolsEnabled,
 		webResearchEnabled: config.webResearchToolsEnabled,
 		embed: embedder,
+		terminalHooks: {
+			baseUrl: `http://${config.host}:${config.port}`,
+			publish: () => changes.publish(),
+		},
 	});
 	const enabled = config.toolchainEnabled;
 
@@ -414,6 +430,7 @@ export async function buildServices(config: Config) {
 		image,
 		uiCompositions,
 		objectRecognition,
+		ocr,
 		music,
 		queue,
 		webResearch,
@@ -464,6 +481,7 @@ export function appServices(s: Services) {
 		excalidraw: s.excalidraw,
 		drawingOperations: s.drawingOperations,
 		objectRecognition: s.objectRecognition,
+		ocr: s.ocr,
 		tasks: s.delegated.tasks,
 		coding: s.codingComposition?.coding,
 		codingSupervision: s.supervision,
@@ -496,7 +514,8 @@ export function appServices(s: Services) {
  * reverse so the shutdown order is exactly: commit/status subscriptions,
  * change stream, HTTP, timers, coding, in-flight maintenance (tasks, store retention,
  * timers), world,
- * supervision, delegated, scheduler, service tests, voice, agents, queue,
+ * supervision, delegated, scheduler, service tests, voice, excalidraw, Claude Code sessions,
+ * agents, queue,
  * web research, dialogue, inference, datasets, store.
  */
 export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {

@@ -20,11 +20,49 @@ const root = {
 	deadlineAt: "2026-10-09T00:03:00Z",
 	reportState: "available",
 };
+for (const functionName of ["web_search", "web_research"])
+	test(`the research card identifies the selected ${functionName} tool`, async () => {
+		const client = {
+			identity: `tool-${functionName}`,
+			agentTasks: vi.fn(async () => [root]),
+			toolchainSelections: vi.fn(async () => ({
+				items: [{ decision: "toolchain", functionName }],
+				nextCursor: null,
+			})),
+			agentReport: vi.fn(async () => ({
+				summary: "調査結果",
+				claims: [],
+				limitations: [],
+				sources: [],
+				coverage: "complete",
+			})),
+		} as unknown as EumenesClient;
+		const cache = new QueryClient({
+			defaultOptions: { queries: { retry: false } },
+		});
+		try {
+			render(
+				<QueryClientProvider client={cache}>
+					<ResearchTaskCard client={client} rootRunId="run" title="株価" />
+				</QueryClientProvider>,
+			);
+			expect(
+				await screen.findByText(`使用ツール: ${functionName}`),
+			).toBeTruthy();
+			expect(client.toolchainSelections).toHaveBeenCalledExactlyOnceWith(
+				{ runId: "run", limit: 1 },
+				expect.any(AbortSignal),
+			);
+		} finally {
+			cache.clear();
+		}
+	});
 test("deleted reports disappear even when a previous response remains in the query cache", async () => {
 	let current = root;
 	const client = {
 		identity: "card",
 		agentTasks: vi.fn(async () => [current]),
+		toolchainSelections: vi.fn(async () => ({ items: [], nextCursor: null })),
 		agentReport: vi.fn(async () => ({
 			summary: "OLD_REPORT",
 			claims: [],
@@ -65,6 +103,7 @@ test("failed research stays a status indicator; the agent's response supplies th
 		agentTasks: vi.fn(async () => [
 			{ ...root, reportState: "none", errorCode: "invalid_evidence" },
 		]),
+		toolchainSelections: vi.fn(async () => ({ items: [], nextCursor: null })),
 		agentReport: vi.fn(),
 	} as unknown as EumenesClient;
 	const cache = new QueryClient({
@@ -111,6 +150,7 @@ test("the card shows the acquisition mode taken from the persisted task state", 
 				acquisitionMode: "cached" as const,
 			},
 		]),
+		toolchainSelections: vi.fn(async () => ({ items: [], nextCursor: null })),
 		agentReport: vi.fn(),
 	} as unknown as EumenesClient;
 	const cache = new QueryClient({
@@ -137,6 +177,7 @@ test("ordinary replies do not leave an empty assistant activity bubble", async (
 	const client = {
 		identity: "ordinary-card",
 		agentTasks: vi.fn(async () => [{ ...root, reportState: "none" }]),
+		toolchainSelections: vi.fn(),
 		agentReport: vi.fn(),
 	} as unknown as EumenesClient;
 	const cache = new QueryClient({
@@ -155,6 +196,7 @@ test("ordinary replies do not leave an empty assistant activity bubble", async (
 			).toBe("success"),
 		);
 		expect(container.querySelector(".research-activity")).toBeNull();
+		expect(client.toolchainSelections).not.toHaveBeenCalled();
 	} finally {
 		cache.clear();
 	}
@@ -183,6 +225,7 @@ test("a replaced route shows the rediscovery mode instead of a plain search", as
 				acquisitionMode: "rediscover" as const,
 			},
 		]),
+		toolchainSelections: vi.fn(async () => ({ items: [], nextCursor: null })),
 		agentReport: vi.fn(),
 	} as unknown as EumenesClient;
 	const cache = new QueryClient({
@@ -212,6 +255,7 @@ for (const [status, label] of [
 			agentTasks: vi.fn(async () => [
 				{ ...root, status, phase: "read", reportState: "none" },
 			]),
+			toolchainSelections: vi.fn(async () => ({ items: [], nextCursor: null })),
 			agentReport: vi.fn(),
 		} as unknown as EumenesClient;
 		const cache = new QueryClient({
@@ -246,6 +290,7 @@ test("progress can stop research and refresh the persisted terminal state", asyn
 				reportState: "none",
 			},
 		]),
+		toolchainSelections: vi.fn(async () => ({ items: [], nextCursor: null })),
 		agentReport: vi.fn(),
 		cancelAgentTask: vi.fn(async () => {
 			status = "cancelled";

@@ -90,6 +90,7 @@ test("the shutdown order is fixed, and a freshly built set of services closes cl
 		"service_tests",
 		"voice",
 		"excalidraw",
+		"terminals",
 		"agents",
 		"capabilities",
 		"queue",

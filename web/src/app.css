@@ -616,31 +616,40 @@ select:focus-visible {
 .artifact-panel-body:has(.aui-ui-workspace) {
 	padding: 1rem;
 }
-.artifact-panel-body:has(:is(.music-workspace, .image-workspace)) {
+.artifact-panel-body:has(
+	:is(.music-workspace, .image-workspace, .terminal-workspace)
+) {
 	padding: 0;
 	overflow: hidden;
 }
 .artifact-panel-body:has(.aui-service-workspace) {
 	padding: 0;
 }
-.artifact-panel-body:has(:is(.music-workspace, .image-workspace))
+.artifact-panel-body:has(
+		:is(.music-workspace, .image-workspace, .terminal-workspace)
+	)
 	> .toolchain-artifact {
 	height: 100%;
 }
-.artifact-panel-body:has(:is(.music-workspace, .image-workspace)) .artifact-ui {
+.artifact-panel-body:has(
+		:is(.music-workspace, .image-workspace, .terminal-workspace)
+	)
+	.artifact-ui {
 	height: 100%;
 	display: flex;
 	flex-direction: column;
 }
 .artifact-panel-body
 	.artifact-ui
-	div:has(:is(.music-workspace, .image-workspace)) {
+	div:has(:is(.music-workspace, .image-workspace, .terminal-workspace)) {
 	display: flex;
 	flex-direction: column;
 	flex: 1;
 	min-height: 0;
 }
-.artifact-panel-body:has(:is(.music-workspace, .image-workspace))
+.artifact-panel-body:has(
+		:is(.music-workspace, .image-workspace, .terminal-workspace)
+	)
 	.aui-composition {
 	display: flex;
 	flex-direction: column;

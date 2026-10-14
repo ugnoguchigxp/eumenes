@@ -104,3 +104,32 @@ test("debounces resizes and remembers the latest size", async () => {
 	expect(resized).toHaveBeenLastCalledWith({ cols: 100, rows: 30 });
 	vi.useRealTimers();
 });
+
+test("reopens a dropped stream with a reset while the run lasts", async () => {
+	const ended = vi.fn();
+	const terminalOutput = vi
+		.fn()
+		.mockResolvedValueOnce(sse(`event: output\ndata: ${b64("one")}\n\n`))
+		.mockResolvedValueOnce(
+			sse(
+				`event: output\ndata: ${b64("one two")}\n\n`,
+				"event: exit\ndata: {}\n\n",
+			),
+		);
+	const connection = createTerminalConnection(
+		{ terminalInput: vi.fn(), resizeTerminal: vi.fn(), terminalOutput },
+		"s1",
+		{ onEnded: ended, onResized: () => {} },
+	);
+	const chunks: string[] = [];
+	connection.output.subscribe((chunk) =>
+		chunks.push(
+			typeof chunk === "string" ? chunk : new TextDecoder().decode(chunk),
+		),
+	);
+	await vi.waitFor(() => expect(ended).toHaveBeenCalledTimes(2), {
+		timeout: 3000,
+	});
+	expect(chunks).toEqual(["one", "\x1bc", "one two"]);
+	expect(terminalOutput).toHaveBeenCalledTimes(2);
+});

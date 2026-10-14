@@ -17,14 +17,15 @@ const spawn: SpawnPty = () => ({
 	write() {},
 	resize() {},
 	kill() {},
+	close() {},
 	exited: new Promise(() => {}),
 });
 
-test("terminal screen is registered as a launcher and reads the live session list", async () => {
+test("Claude Code screen is registered as a launcher and reads the live session list", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-terminals-screen-"));
 	const store = openStore(join(dir, "db"), migrations);
 	try {
-		const caps = createCapabilities(store, new Set(), {
+		const caps = createCapabilities(store, new Set(["claude-code"]), {
 			bundleHost: offlineBundleHost,
 		});
 		await caps.seed();
@@ -33,9 +34,9 @@ test("terminal screen is registered as a launcher and reads the live session lis
 			.filter((entry) => entry.artifactId === "terminals.workspace");
 		expect(entries).toEqual([
 			expect.objectContaining({
-				artifactRevisionId: "artifact:terminals.workspace@1",
+				artifactRevisionId: "artifact:terminals.workspace@2",
 				adapterRefs: [TERMINALS_ADAPTER_REF],
-				title: "ターミナル",
+				title: "Claude Code",
 			}),
 		]);
 
@@ -64,4 +65,70 @@ test("terminal screen is registered as a launcher and reads the live session lis
 		await store.close();
 		rmSync(dir, { recursive: true, force: true });
 	}
+});
+
+test("a Claude Code request is handed over once per request id", () => {
+	const commands: Array<readonly string[]> = [];
+	const terminals = createTerminals({
+		command: ["claude"],
+		spawn: (request) => {
+			commands.push(request.command);
+			return spawn(request);
+		},
+	});
+	const adapter = createTerminalsAdapter(terminals);
+	const tx = undefined as unknown as Parameters<
+		typeof adapter.invokeInTransaction
+	>[0];
+	const request = {
+		operationName: "claude-code.request",
+		input: { prompt: "README を直して", task: "README 修正" },
+		requestId: crypto.randomUUID(),
+		issuedAt: new Date().toISOString(),
+		origin: { kind: "ui" as const, scope: "s", actionRequestId: "a" },
+	};
+	const first = adapter.invokeInTransaction(tx, request);
+	expect(first).toMatchObject({
+		replay: false,
+		receipt: {
+			title: "Claude Code 1",
+			task: "README 修正",
+			run: 1,
+			started: true,
+		},
+		answerContext: {
+			delivered: "started",
+			task: "README 修正",
+			completed: false,
+			reportedWhenDone: true,
+		},
+	});
+	expect(adapter.invokeInTransaction(tx, request)).toMatchObject({
+		replay: true,
+		receipt: first.receipt,
+	});
+	expect(commands).toHaveLength(1);
+	expect(adapter.readInTransaction(tx, request.requestId)?.receipt).toEqual(
+		first.receipt,
+	);
+	expect(adapter.readInTransaction(tx, "unknown")).toBeNull();
+	expect(() =>
+		adapter.invokeInTransaction(tx, {
+			...request,
+			requestId: crypto.randomUUID(),
+			input: { prompt: "", task: "x" },
+		}),
+	).toThrow();
+	expect(adapter.snapshotInTransaction(tx)).toEqual({
+		limit: 4,
+		sessions: [
+			{
+				title: "Claude Code 1",
+				status: "running",
+				activity: "working",
+				task: "README 修正",
+			},
+		],
+	});
+	terminals.closeAll();
 });

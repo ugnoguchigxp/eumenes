@@ -20,4 +20,4 @@ Eumenes のルートで `bun install` を実行後、`bun run build:design-syste
 
 ## ターミナル
 
-`TerminalWorkspace` は xterm.js（`@xterm/xterm`、fit・unicode11・WebGL addon）で端末を1〜複数枚並べ、幅 720px 以上で2列、それ未満で縦に積みます。PTY・接続・認証は持たず、ホストが `output.subscribe` で出力を流し、`onInput`・`onResize`・`onRestart` を受けます。入力は `status: "running"` の間だけ送ります。配色は `--stage-background` と `--primary` から作り、テーマ切替に追従します。WebGL が使えない環境では DOM 描画に戻ります。
+`TerminalWorkspace` は xterm.js（`@xterm/xterm`、fit・unicode11・WebGL addon）の端末を見出しやボタン無しで端から端まで並べ、複数なら幅 720px 以上で2列、それ未満で縦に積みます。高さは利用側が与えます。PTY・接続・認証は持たず、ホストが `output.subscribe` で出力を流し、`onInput`・`onResize` を受けます。入力は `status: "running"` の間だけ送り、`exited` になると下端に状態と「再起動」（`onRestart`）を出します。配色は `--stage-background` と `--primary` から作り、テーマ切替に追従します。WebGL が使えない環境では DOM 描画に戻ります。

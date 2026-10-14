@@ -18,6 +18,17 @@ export function registerSettings(app: Hono, settings: SettingsService) {
 			),
 		);
 	});
+	app.get("/api/settings/ocr", (c) => c.json(settings.ocrConnection()));
+	app.put("/api/settings/ocr", async (c) => {
+		const raw = await readBounded(c.req.raw.body, {
+			limit: 16384,
+			tooLarge: "invalid_body_size",
+			missing: "invalid_body",
+		});
+		return c.json(
+			await settings.configureOcr(JSON.parse(new TextDecoder().decode(raw))),
+		);
+	});
 	app.get("/api/settings/object-recognition", (c) =>
 		c.json(settings.objectRecognitionConnection()),
 	);

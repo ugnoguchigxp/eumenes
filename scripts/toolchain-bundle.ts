@@ -25,6 +25,8 @@ const BACKENDS = [
 	"ui-compositions",
 	"excalidraw",
 	"object-recognition",
+	"ocr",
+	"claude-code",
 ];
 const USAGE =
 	"使い方: bun scripts/toolchain-bundle.ts pins <revisionId>... | check <file.bundle.json> [--json]";

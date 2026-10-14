@@ -28,9 +28,6 @@ export function terminalsClient(transport: Transport) {
 		resizeTerminal: async (id: string, size: Size) => {
 			await transport.call(`${path(id)}/resize`, json(size));
 		},
-		closeTerminal: async (id: string) => {
-			await transport.call(path(id), { method: "DELETE" });
-		},
 		/** Server-sent events of the session's PTY output (`output` base64 frames, then `exit`). */
 		terminalOutput: (id: string, signal: AbortSignal) =>
 			transport.call(`${path(id)}/output`, { signal }),

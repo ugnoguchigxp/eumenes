@@ -1,3 +1,4 @@
+import { OcrMediaView, OcrPanelView } from "./ocr-components";
 import { ObjectRecognitionWorkspaceView } from "./object-recognition-components";
 import { TerminalWorkspaceView } from "./terminal-components";
 import { DrawingWorkspaceView } from "./drawing-components";
@@ -61,6 +62,8 @@ const renderers = {
 	"text-block": TextBlockView,
 	"info-card": InfoCardView,
 	"object-recognition-workspace": ObjectRecognitionWorkspaceView,
+	"ocr-media": OcrMediaView,
+	"ocr-panel": OcrPanelView,
 	"terminal-workspace": TerminalWorkspaceView,
 	"drawing-workspace": DrawingWorkspaceView,
 	"image-workspace": ImageWorkspaceView,

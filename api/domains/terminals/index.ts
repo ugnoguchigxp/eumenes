@@ -4,6 +4,7 @@ export {
 	createTerminals,
 	type Pty,
 	type SpawnPty,
+	type TaskFinished,
 	type TerminalsService,
 } from "./service";
 export type {

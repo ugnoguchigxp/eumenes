@@ -23,7 +23,11 @@ import {
 } from "./selection-trace";
 import { generateConversation } from "./conversation-generation";
 import { researchCitations } from "./research-citations";
-import { type Run, type WorldContextSettleInput } from "../contracts";
+import {
+	isSystemPrompt,
+	type Run,
+	type WorldContextSettleInput,
+} from "../contracts";
 import { byId, transition } from "../repository";
 import {
 	GENERATE_KIND,
@@ -464,7 +468,7 @@ export function createGenerationHandler(
 					messageId,
 				);
 				// The answer joins the conversation the memory agent is reading (scheduled runs have no user words).
-				if (done && run.sourceKind !== "schedule")
+				if (done && !isSystemPrompt(run.sourceKind))
 					memory?.scheduleAgentInTransaction(tx, run.conversationId);
 				if (done) observeAnswer(postAnswer, tx, run.id, input.agent);
 				if (done) traceOutcome(deps, tx, run.id, agentOutcome(input.agent));

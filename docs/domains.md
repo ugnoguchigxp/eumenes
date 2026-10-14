@@ -8,6 +8,7 @@
 | Domain | Backend 入口 | Web 入口 | Components | 依存 (api) | 依存 (web) | 依存 (試験のみ) |
 | --- | --- | --- | --- | --- | --- | --- |
 | `excalidraw` | `api/domains/excalidraw/index.ts` | `web/src/domains/excalidraw/` | なし | `capabilities`、`inference`、`larm`、`queue` | なし | なし |
+| `ocr` | `api/domains/ocr/index.ts` | `web/src/domains/ocr/index.ts` | `packages/design-system/src/components/OcrWorkspace/index.ts` | `queue` | なし | なし |
 | `object-recognition` | `api/domains/object-recognition/index.ts` | `web/src/domains/object-recognition/index.ts` | なし | `capabilities`、`queue` | なし | なし |
 | `terminals` | `api/domains/terminals/index.ts` | `web/src/domains/terminals/index.ts` | なし | なし | なし | なし |
 | `background` | なし | `web/src/domains/background/index.ts` | なし | なし | なし | なし |
@@ -73,6 +74,8 @@
 | audio | なし | `web/src/domains/audio/index.ts` | `web/src/domains/audio/test/` |
 | queue | `api/domains/queue/index.ts` | なし | `api/domains/queue/test/` |
 | scheduler | `api/domains/scheduler/index.ts` | なし | `api/domains/scheduler/test/` |
+| ocr | `api/domains/ocr/index.ts` | `web/src/domains/ocr/index.ts`（アーティファクト「文字を読み取る」、`docs/ocr.md`） | `api/domains/ocr/test/`、`api/application/ocr-e2e.test.ts`、`api/application/ocr-adapter.test.ts`、`tests/browser/ocr.spec.ts` |
+| terminals | `api/domains/terminals/index.ts` | `web/src/domains/terminals/index.ts`（アーティファクト「ターミナル」、`docs/terminals.md`） | `api/domains/terminals/test/`、`api/application/terminals-adapter.test.ts`、`web/src/domains/terminals/connection.test.ts` |
 | timers | `api/domains/timers/index.ts` | `web/src/domains/timers` と `web/src/components/domains/timers/TimerArtifact.tsx` | `api/domains/timers/test/` |
 | dialogue | `api/domains/dialogue/index.ts` | `web/src/domains/dialogue/index.ts` | `api/domains/dialogue/test/`、`web/src/domains/dialogue/test/` |
 | voice-dialogue | `api/domains/voice-dialogue/index.ts` | `web/src/domains/voice-dialogue/index.ts` | `api/domains/voice-dialogue/test/`、`web/src/domains/voice-dialogue/test/` |

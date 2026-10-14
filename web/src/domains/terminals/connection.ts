@@ -1,5 +1,5 @@
 import type { TerminalConnection } from "@eumenes/artifact-ui";
-import type { EumenesClient } from "../../../../client";
+import { ApiError, type EumenesClient } from "../../../../client";
 
 type Size = { cols: number; rows: number };
 type TerminalPort = Pick<
@@ -10,6 +10,22 @@ type TerminalPort = Pick<
 /** Largest input request; a long paste is sent as several ordered requests. */
 const INPUT_CHUNK = 16_384;
 const RESIZE_DELAY_MS = 80;
+const RECONNECT_MS = { first: 500, max: 10_000 };
+/** Full terminal reset (RIS): the server replays the backlog on every connection. */
+const RESET = "\x1bc";
+
+const wait = (ms: number, signal: AbortSignal) =>
+	new Promise<void>((resolve) => {
+		const timer = setTimeout(resolve, ms);
+		signal.addEventListener(
+			"abort",
+			() => {
+				clearTimeout(timer);
+				resolve();
+			},
+			{ once: true },
+		);
+	});
 
 function decodeBase64(value: string): Uint8Array {
 	const binary = atob(value);
@@ -47,7 +63,8 @@ function cut(text: string, size: number) {
 /**
  * The live link of one session run: the output stream opens on subscribe, input is sent in
  * order (one request at a time, coalescing keystrokes typed meanwhile), and resizes are
- * debounced. `onEnded` fires when the stream stops (the run exited or the link dropped).
+ * debounced. `onEnded` fires whenever the stream stops (the run exited, or it dropped and is
+ * reopened), so the host reads the session list again.
  */
 export function createTerminalConnection(
 	client: TerminalPort,
@@ -76,30 +93,45 @@ export function createTerminalConnection(
 		output: {
 			subscribe(listener) {
 				const abort = new AbortController();
+				const { signal } = abort;
+				// One connection at a time. A stream that stops without `exit` (dropped as slow, a
+				// network break, the per-session stream limit) is opened again while the run lasts.
 				void (async () => {
-					try {
-						const response = await client.terminalOutput(
-							sessionId,
-							abort.signal,
-						);
-						const reader = response.body
-							?.pipeThrough(new TextDecoderStream())
-							.getReader();
-						if (!reader) return;
-						let buffer = "";
-						for (;;) {
-							const { value, done } = await reader.read();
-							if (done) break;
-							const parsed = parseEvents(buffer + value);
-							buffer = parsed.rest;
-							for (const { event, data } of parsed.events)
-								if (event === "output") listener(decodeBase64(data));
+					let delay = RECONNECT_MS.first;
+					for (let attempt = 0; !signal.aborted; attempt++) {
+						let exited = false;
+						try {
+							const response = await client.terminalOutput(sessionId, signal);
+							const reader = response.body
+								?.pipeThrough(new TextDecoderStream())
+								.getReader();
+							if (reader && attempt > 0) listener(RESET);
+							let buffer = "";
+							while (reader) {
+								const { value, done } = await reader.read();
+								if (done) break;
+								const parsed = parseEvents(buffer + value);
+								buffer = parsed.rest;
+								for (const { event, data } of parsed.events) {
+									if (event === "exit") exited = true;
+									else if (event === "output") {
+										listener(decodeBase64(data));
+										delay = RECONNECT_MS.first;
+									}
+								}
+							}
+						} catch (error) {
+							if (signal.aborted) return;
+							if (error instanceof ApiError && error.status === 404)
+								exited = true;
 						}
-					} catch {
-						if (abort.signal.aborted) return;
-						listener("\r\n\x1b[31m[接続が切れました]\x1b[0m\r\n");
+						if (signal.aborted) return;
+						// The list is read again either way: a new run replaces this connection.
+						hooks.onEnded();
+						if (exited) return;
+						await wait(delay, signal);
+						delay = Math.min(delay * 2, RECONNECT_MS.max);
 					}
-					if (!abort.signal.aborted) hooks.onEnded();
 				})();
 				return () => abort.abort();
 			},

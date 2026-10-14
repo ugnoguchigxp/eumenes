@@ -1,3 +1,6 @@
+import { z } from "zod";
+import { ocrRecord } from "../domains/ocr/contracts";
+import { describeOcrAdapter, OCR_ADAPTER_REF } from "./ocr-adapter";
 import type { Database } from "bun:sqlite";
 import type { ZodType } from "zod";
 import {
@@ -52,13 +55,26 @@ import {
 import {
 	describeTerminalsAdapter,
 	TERMINALS_ADAPTER_REF,
+	terminalsDomainSchemas,
 } from "./terminals-adapter";
-import { describeUiCompositionsAdapter, UI_COMPOSITIONS_ADAPTER_REF, uiCompositionsDomainSchemas } from "./ui-compositions-adapter";
+import {
+	describeUiCompositionsAdapter,
+	UI_COMPOSITIONS_ADAPTER_REF,
+	uiCompositionsDomainSchemas,
+} from "./ui-compositions-adapter";
 
 /** `domain:` result schemas registered by the host's adapters. */
 const domainSchemas: Readonly<Record<string, ZodType>> = {
 	...timerDomainSchemas,
+	"domain:ocr.receipt@1": z.union([
+		ocrRecord,
+		z.object({
+			action: z.literal("open"),
+			state: z.literal("ready_for_input"),
+		}),
+	]),
 	...uiCompositionsDomainSchemas,
+	...terminalsDomainSchemas,
 };
 
 /** What this host can execute, for checking bundles before they are registered. */
@@ -102,6 +118,7 @@ export const hostAdapterDescriptions: Array<
 	Pick<DomainAdapter, "ref" | "describe">
 > = [
 	{ ref: TIMER_ADAPTER_REF, describe: describeTimerAdapter },
+	{ ref: OCR_ADAPTER_REF, describe: describeOcrAdapter },
 	{ ref: SETTINGS_ADAPTER_REF, describe: describeSettingsAdapter },
 	{ ref: RECORDS_ADAPTER_REF, describe: describeRecordsAdapter },
 	{ ref: INFERENCE_ADAPTER_REF, describe: describeInferenceAdapter },
