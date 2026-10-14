@@ -7,8 +7,12 @@ import {
 } from "../contracts";
 import {
 	type UnitRow,
+	bumpGoalTodoFailure,
 	bumpInboxFailure,
+	bumpWorldEvent,
 	closeUnit,
+	deleteGoalTodos,
+	deleteWorldEvents,
 	insertDecision,
 	insertDecisionRefs,
 	pruneDecisions,
@@ -90,6 +94,21 @@ export function createUnitEnd(deps: StewardDeps, kick: Kick, wake: Wake) {
 				)
 					skipStep(env, id, key);
 			}
+		if (unit.step === "curate-goals")
+			for (const id of unit.targets.exchanges ?? [])
+				if (bumpGoalTodoFailure(db, id) >= MAX_FAILURES)
+					deleteGoalTodos(db, [id]);
+		const world = deps.world;
+		if (unit.kind === "world_events" && world) {
+			// An event that failed three times is given up (`STEWARD_GAVE_UP`); later events are not held back by it.
+			const exhausted = (unit.targets.events ?? []).filter(
+				(id) => bumpWorldEvent(db, id, "failures") >= MAX_FAILURES,
+			);
+			if (exhausted.length > 0) {
+				world.curation.giveUpEventsInTransaction(db, world.scope, exhausted);
+				deleteWorldEvents(db, exhausted);
+			}
+		}
 		let given = 0;
 		for (const id of unit.targets.requests ?? [])
 			if (bumpInboxFailure(db, id) >= MAX_FAILURES) {
@@ -110,6 +129,17 @@ export function createUnitEnd(deps: StewardDeps, kick: Kick, wake: Wake) {
 			writeState(db, { ...state, recallPending: null });
 	}
 
+	/** What a World unit's prepare registered with Memory is given back, whatever way the unit ended. Idempotent. */
+	function releaseWorld(db: Database, unit: UnitRow) {
+		const world = deps.world;
+		if (unit.kind !== "world_events" || !world) return;
+		world.curation.releaseCurationInTransaction(
+			db,
+			world.scope,
+			unit.targets.events ?? [],
+		);
+	}
+
 	function failUnit(
 		env: StepEnv,
 		unit: UnitRow,
@@ -120,6 +150,7 @@ export function createUnitEnd(deps: StewardDeps, kick: Kick, wake: Wake) {
 	) {
 		const { db } = env;
 		if (!closeUnit(db, unit.id, "failed", deps.clock())) return;
+		releaseWorld(db, unit);
 		if (count) {
 			countFailures(env, unit);
 			// The same targets wait before the next try (the timer kicks when it is over; nothing is enqueued for later).
@@ -144,6 +175,7 @@ export function createUnitEnd(deps: StewardDeps, kick: Kick, wake: Wake) {
 	) {
 		const { db } = env;
 		if (!closeUnit(db, unit.id, "stale", deps.clock())) return;
+		releaseWorld(db, unit);
 		record(env, unit, { jobId, errorCode: reason }, null);
 		log.info("steward.unit_stale", { stepId: unit.step, reason, jobId });
 		kick.kickOne(db, unit.conversationId);
@@ -186,6 +218,7 @@ export function createUnitEnd(deps: StewardDeps, kick: Kick, wake: Wake) {
 
 	return {
 		release,
+		releaseWorld,
 		record,
 		failUnit,
 		staleUnit,

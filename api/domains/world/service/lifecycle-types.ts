@@ -7,6 +7,7 @@ import {
 	type ForgetState,
 	type TombstoneReasonCode,
 } from "../repository/lifecycle";
+import type { IntakePorts } from "./extraction-intake";
 import type { WorldHostGate } from "./host-gate";
 import { type MemoryPort } from "./lifecycle-memory";
 import type { WorldService } from "./world-service";
@@ -44,6 +45,11 @@ export type LifecycleOptions = {
 	sources?: readonly SourceAdapter[];
 	/** Scopes to restore even when the database knows none (e.g. the default Scope). */
 	scopes?: readonly ScopeRef[];
+	/**
+	 * What the host answers about a message before it is taken as extraction input, and the
+	 * kick after receipt. Omitted: user messages only, nothing blocked, nobody told.
+	 */
+	intake?: Partial<IntakePorts>;
 	clock?: () => number;
 	/** Replace single Memory calls (tests); production uses the public API only. */
 	memory?: Partial<MemoryPort>;

@@ -7,9 +7,12 @@ import {
 	type RunEnd,
 	memoryRequestInput,
 } from "../contracts";
+import type { ForgetPurge } from "../../memory";
 import {
 	countOpenInbox,
 	deleteDecisionsByRefs,
+	deleteGoalTodos,
+	deleteRoutesOfMessages,
 	deleteSummaryDecisions,
 	endInboxOfMessages,
 	inboxOfRun,
@@ -151,20 +154,33 @@ export function createInbox(deps: StewardDeps, kick: Kick) {
 
 	/**
 	 * A forget (section 6.2): decisions that touched the forgotten items or messages go, and open requests that stand on
-	 * the forgotten messages end with their words cleared. Idempotent: it runs again for every block journal line at startup.
+	 * the forgotten messages end with their words cleared. The goals a forget names in `derived.goalIds` are deleted
+	 * here too (F11): the memory hands the same ids again for every block journal line at startup, so a database
+	 * restored from before the forget loses them again before the first answer. Idempotent.
 	 */
 	function purge(
 		db: Database,
-		purged: {
-			itemIds: readonly string[];
-			messageIds: readonly string[];
-			/** Conversations whose summary the forget deleted: the decisions that wrote it go with it. */
-			deletedSummaryConversationIds: readonly string[];
-		},
+		purged: Pick<
+			ForgetPurge,
+			"itemIds" | "messageIds" | "derived" | "deletedSummaryConversationIds"
+		>,
 	) {
-		deleteDecisionsByRefs(db, purged);
+		const goalIds = purged.derived.goalIds ?? [];
+		if (goalIds.length > 0 && deps.goals)
+			deps.goals.ops.forgetGoalsInTransaction(db, {
+				goalIds: [...goalIds],
+				entityIds: [],
+			});
+		deleteDecisionsByRefs(db, {
+			itemIds: purged.itemIds,
+			messageIds: purged.messageIds,
+			goalIds,
+		});
 		deleteSummaryDecisions(db, purged.deletedSummaryConversationIds);
 		endInboxOfMessages(db, purged.messageIds, "forgotten", deps.clock());
+		// What was judged of the forgotten messages, and the goal reflection still due for them, goes too.
+		deleteRoutesOfMessages(db, purged.messageIds);
+		deleteGoalTodos(db, purged.messageIds);
 	}
 	return {
 		stageRequestInTransaction,

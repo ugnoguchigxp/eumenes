@@ -514,7 +514,14 @@ export async function harness(
 				},
 			})
 		: undefined;
-	const ocr = options.ocrFetcher ? createOcr({ store, queue, connection: () => settings.ocrCredentials(), fetcher: options.ocrFetcher }) : undefined;
+	const ocr = options.ocrFetcher
+		? createOcr({
+				store,
+				queue,
+				connection: () => settings.ocrCredentials(),
+				fetcher: options.ocrFetcher,
+			})
+		: undefined;
 	const toolchain = await createToolchain(store, queue, inference, web, {
 		...toolchainLinks.options,
 		timers,

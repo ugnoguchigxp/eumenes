@@ -109,6 +109,25 @@ const refusal = (
 	stage: "host" | "world" | "memory" = "host",
 ): WorldApplyResult => ({ status, reasonCode, stage });
 
+function requireTransaction(db: Database) {
+	if (!db.inTransaction) throw new WorldHostStateError("transaction_required");
+}
+
+/**
+ * Does the database carry exactly the pinned World migrations? World
+ * answers `blocked SCHEMA_INCOMPATIBLE` before touching any of its tables;
+ * an empty request therefore tells without reading or writing anything.
+ * Needs a transaction (writer callback or readSnapshot).
+ */
+function schemaInTransaction(db: Database): WorldSchemaStatus {
+	requireTransaction(db);
+	const probe = readWorldSnapshot(db, {});
+	return probe.status === "blocked" &&
+		probe.reasonCode === "SCHEMA_INCOMPATIBLE"
+		? "incompatible"
+		: "current";
+}
+
 /**
  * Composition of World, the host SourceAdapters and Memory. Thin glue: all
  * World semantics and SQL stay in `eumenes-world-model`; this file builds
@@ -150,31 +169,17 @@ export function createWorldService(options: WorldServiceOptions) {
 		};
 	}
 
-	function requireTransaction(db: Database) {
-		if (!db.inTransaction)
-			throw new WorldHostStateError("transaction_required");
-	}
-
-	/**
-	 * Does the database carry exactly the pinned World migrations? World
-	 * answers `blocked SCHEMA_INCOMPATIBLE` before touching any of its tables;
-	 * an empty request therefore tells without reading or writing anything.
-	 * Needs a transaction (writer callback or readSnapshot).
-	 */
-	function schemaInTransaction(db: Database): WorldSchemaStatus {
-		requireTransaction(db);
-		const probe = readWorldSnapshot(db, {});
-		return probe.status === "blocked" &&
-			probe.reasonCode === "SCHEMA_INCOMPATIBLE"
-			? "incompatible"
-			: "current";
-	}
-
 	function statusInTransaction(db: Database): WorldStatus {
 		const { enabled } = readHostState(db);
 		const schema = schemaInTransaction(db);
 		return { enabled, schema, usable: enabled && schema === "current" };
 	}
+
+	/**
+	 * Entity operations applied by this process (a rolled-back one still counts). World lists one
+	 * page of entities only; beyond it, curation follows this to see that the entities changed.
+	 */
+	let entityGeneration = 0;
 
 	/** Writer-side apply: throws MemoryRegistrationRejected so the caller's transaction rolls back. */
 	function applyInWriter(
@@ -230,6 +235,8 @@ export function createWorldService(options: WorldServiceOptions) {
 				stage: "world",
 				...(result.restore === undefined ? {} : { restore: result.restore }),
 			};
+		if (result.status === "applied" && op.kind.startsWith("entity."))
+			entityGeneration += 1;
 		// A replay (no_op) already registered in its own transaction.
 		if (result.status === "no_op" || planned.dependents.length === 0)
 			return result;
@@ -419,6 +426,8 @@ export function createWorldService(options: WorldServiceOptions) {
 			request: Pick<WorldReadRequest, "access" | "scope">,
 		): Promise<WorldUsageCheck> =>
 			store.write((db) => validateUsageInTransaction(db, receipt, request)),
+
+		entityGeneration: (): number => entityGeneration,
 
 		// Host epochs. Opaque tokens; the host bumps them, World only compares.
 		restoreEpoch: (db: Database): string => readHostState(db).restoreEpoch,

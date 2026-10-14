@@ -2,6 +2,7 @@ import type { Database } from "bun:sqlite";
 import { type ScopeRef } from "eumenes-world-model";
 import { writeExtractFeedScopeSet } from "../repository/extraction";
 import {
+	NO_INTAKE_PORTS,
 	memoryFeedStages,
 	receiveSourceChanges,
 	scopeSetChanged,
@@ -173,6 +174,7 @@ export function createFeedOps(ctx: LifecycleCtx, forget: ForgetOps) {
 			rejectedRoots: number;
 			received: number;
 			skipped: number;
+			conversationIds: string[];
 		};
 		try {
 			out = await store.write((db) => {
@@ -227,7 +229,12 @@ export function createFeedOps(ctx: LifecycleCtx, forget: ForgetOps) {
 				const state = receiveUsable(db);
 				const receipt = receiveSourceChanges(
 					db,
-					{ worldOp, usable: () => state, now },
+					{
+						worldOp,
+						usable: () => state,
+						ports: { ...NO_INTAKE_PORTS, ...options.intake },
+						now,
+					},
 					scope,
 					{ scopeKeys, restoreEpoch: cursor.restoreEpoch },
 					ordered,
@@ -250,6 +257,7 @@ export function createFeedOps(ctx: LifecycleCtx, forget: ForgetOps) {
 					rejectedRoots: split.rejected,
 					received: receipt.received,
 					skipped: receipt.skipped,
+					conversationIds: receipt.conversationIds,
 				};
 			});
 		} catch (error) {
@@ -265,6 +273,14 @@ export function createFeedOps(ctx: LifecycleCtx, forget: ForgetOps) {
 				rejectedRoots: 0,
 			};
 		}
+		// The receipt is committed: only now may the steward be told. A failing callback
+		// never undoes it (the steward's start-up and poll find the pending events anyway).
+		if (out.conversationIds.length > 0)
+			try {
+				options.intake?.onEventsReceived?.(out.conversationIds);
+			} catch {
+				// the receipt stands
+			}
 		const forgets: ForgetReport[] = [];
 		for (const id of out.intakes) forgets.push(await advance(id));
 		return {

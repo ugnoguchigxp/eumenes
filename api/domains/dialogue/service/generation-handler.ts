@@ -7,6 +7,7 @@ import {
 import { z } from "zod";
 import { getLogger, withLogContext } from "../../../infrastructure/logger";
 import type { Receipt } from "../../inference";
+import type { SettleResult } from "../../memory";
 import type { HandlerDefinition } from "../../queue";
 import { settleConversationOperation } from "./generation-operation";
 import type { ConversationOperation } from "./conversation-tools";
@@ -34,6 +35,7 @@ import {
 	type GeneratePayload,
 } from "./context";
 import { createPrepare } from "./generation-prepare";
+import { goalsLayerStale } from "./goals-layer";
 import { adoptMemoryWindow, clearShownNotices } from "./memory-window";
 import type { Progress } from "./progress";
 const log = getLogger("dialogue");
@@ -64,6 +66,7 @@ function verifiedAnswerLinks(text: string, input: GenerateInput) {
 function shouldHoldBody(input: GenerateInput) {
 	return !!(
 		(input.memory && !input.memory.quiet) ||
+		input.goals ||
 		input.world ||
 		input.worldUsed ||
 		input.agent?.projection ||
@@ -358,14 +361,18 @@ export function createGenerationHandler(
 						return failedAnswer(deps, tx, run.id, verdict.reason);
 					}
 				}
-				if (input.memory && memory) {
-					const adopted = adoptMemoryWindow(
-						memory,
-						tx,
-						run,
-						input.memory,
-						outcome.result.recallPins,
-					);
+				// The goals layer stands apart from the memory window: a quiet window still has to see its goals change.
+				const goalsStale = goalsLayerStale(deps.goals, tx, input.goals);
+				if (goalsStale || (input.memory && memory)) {
+					const adopted: SettleResult = goalsStale
+						? { ok: false, reason: "memory_stale" }
+						: adoptMemoryWindow(
+								memory!,
+								tx,
+								run,
+								input.memory!,
+								outcome.result.recallPins,
+							);
 					if (!adopted.ok) {
 						// Not adopted: the World context's input dependencies go.
 						if (input.world)

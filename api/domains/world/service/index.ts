@@ -53,7 +53,6 @@ export type {
 	RecoverReport,
 	WorldLifecycle,
 } from "./lifecycle-adapter";
-export { conversationReasonSource } from "./reason-source";
 export { conditionText, createWorldClaims } from "./world-claims";
 export type {
 	ClaimFailure,
@@ -89,37 +88,56 @@ export {
 } from "./context-render";
 export type { BudgetAllocation, RenderTopic } from "./context-render";
 export { forgetUsageInScope, sliceDependentPrefix } from "./usage-ledger";
-export { SKIP_REASONS, extractEventId, scopeSetOf } from "./extraction-intake";
+export {
+	NO_INTAKE_PORTS,
+	SKIP_REASONS,
+	extractEventId,
+	isExtractionInput,
+	scopeSetOf,
+} from "./extraction-intake";
 export type {
 	FeedStages,
+	IntakePorts,
 	MemoryFeedStages,
 	SourceFeedStages,
 } from "./extraction-intake";
 export {
-	EXTRACT_CONFIRM_MS,
-	EXTRACT_INTERPRETATION_VERSION,
-	EXTRACT_STAGE_BUDGET_MS,
-	FOREGROUND_ACTIVE,
-	SLOT_BUSY,
-	WORLD_EXTRACT_KIND,
-	WORLD_EXTRACT_PURPOSE,
-	createWorldExtraction,
-	extractionPayloadSchema,
-} from "./extraction-handler";
-export { createForegroundHub } from "./foreground";
-export type { ForegroundHub, ForegroundSignal } from "./foreground";
+	CURATION_INTERPRETATION_VERSION,
+	CURATION_LIMITS,
+	CurationError,
+	WORLD_CURATE_PURPOSE,
+	createWorldCuration,
+	curationOutputShapeSchema,
+} from "./curation";
 export type {
-	ExtractionHandler,
-	ExtractionInference,
-	ExtractionOptions,
-	ExtractionOutput,
-	ExtractionPayload,
-	ExtractionPoint,
-	ExtractionQueue,
-	ExtractionReport,
-	PreparedExtraction,
-	WorldExtraction,
-} from "./extraction-handler";
+	ClaimForgetResult,
+	CurationClaimView,
+	CurationElement,
+	CurationEntityView,
+	CurationFinalized,
+	CurationHostEvent,
+	CurationHostTable,
+	CurationModelView,
+	CurationOptions,
+	CurationOutput,
+	CurationOutputClaim,
+	CurationOutputEntity,
+	CurationPrepareResult,
+	CurationSettleResult,
+	CurationSpeaker,
+	CurationTouched,
+	CurationUtterance,
+	CurationValue,
+	EntityForgetResult,
+	EvidenceMessages,
+	ForgetAccepted,
+	ForgetNothing,
+	ForgetUnavailable,
+	PendingCurationEvent,
+	PreparedCuration,
+	SourceForgetRequest,
+	WorldCuration,
+} from "./curation";
 export {
 	RUNTIME_REFUSALS,
 	createRuntimeObservation,

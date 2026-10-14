@@ -13,15 +13,17 @@ import {
 } from "./fixture";
 import {
 	assertionRows,
-	candidate,
 	checkpointRows,
+	claimOf,
+	curate,
+	curationFor,
 	drain,
 	inboxRows,
 	mirrorRows,
-	modelOutput,
-	rigFor,
-	runJob,
-} from "./extraction-fixture";
+	nothing,
+	pending,
+	testPorts,
+} from "./curation-fixture";
 import {
 	Crash,
 	crashHook,
@@ -34,7 +36,6 @@ import {
 // vs. application), A29 (forget/correction before pending extraction),
 // A42 (resume, empty feed, Scope addition).
 
-const empty = () => modelOutput();
 const stages = (life: Life) => life.lifecycle.feedStages(SCOPE);
 const OTHER = { principal: SCOPE.principal, scopeKey: "profile:other" };
 
@@ -101,6 +102,7 @@ const change = (
 	principal: SCOPE.principal,
 	scopeKey: SCOPE.scopeKey,
 	speaker: "user",
+	conversationId: "c1",
 	occurredAt: at,
 });
 
@@ -223,8 +225,8 @@ test("A42 a crash right after receipt: the unapplied inbox is resumed, nothing i
 		expect(mirrorRows(next)).toEqual(received);
 		expect(inboxRows(next)).toHaveLength(2);
 		// Resumed: the semantic application runs now, and only now.
-		const rig = rigFor(next, empty);
-		const ran = await drain(rig);
+		const rig = curationFor(next);
+		const ran = await drain(rig, nothing);
 		expect(ran).toHaveLength(1);
 		const done = stages(next).source;
 		expect(done.applied).toMatchObject({ applied: 2, pending: 0 });
@@ -242,7 +244,7 @@ test("A42 a crash right after receipt: the unapplied inbox is resumed, nothing i
 	}
 });
 
-test("A42 a crash while applying leaves nothing half applied; the next job applies once", async () => {
+test("A42 a crash while applying leaves nothing half applied; the next attempt applies once", async () => {
 	const text = "音声サービスは9月から利用できる。";
 	const life = await started();
 	try {
@@ -250,21 +252,26 @@ test("A42 a crash while applying leaves nothing half applied; the next job appli
 		await addMessage(life, "m1", text);
 		await addMessage(life, "m2", "別の話題の発言。");
 		await life.lifecycle.consumeSourceChanges(SCOPE);
-		const ids = mirrorRows(life).map((r) => r.event_id);
-		let crash = true;
-		const rig = rigFor(life, () => modelOutput(candidate(text, ids[0]!)), {
-			hook: (point) => {
-				// Dies after the FIRST event was settled inside the transaction.
-				if (point === "event_settled" && crash) {
-					crash = false;
-					throw new Crash("feed_cursor_saved");
-				}
-			},
-		});
-		const scheduled = await rig.extraction.schedule(SCOPE);
-		if (scheduled.status !== "scheduled") throw new Error("not scheduled");
-		await expect(runJob(rig, scheduled.jobId)).rejects.toThrow(Crash);
-		rig.jobs.get(scheduled.jobId)!.state = "failed";
+		const rig = curationFor(life);
+		const answer = () => ({ entities: [], claims: [claimOf()] });
+		const prepare = await life.store.write((db) =>
+			rig.curation.prepareCurationInTransaction(db, {
+				scope: SCOPE,
+				eventIds: pending(rig).map((e) => e.eventId),
+			}),
+		);
+		if (prepare.status !== "ready") throw new Error("not ready");
+		// The process dies after the window was settled, before the transaction committed.
+		await expect(
+			life.store.write((db) => {
+				const settled = rig.curation.settleCurationInTransaction(db, {
+					prepared: prepare.prepared,
+					output: answer(),
+				});
+				expect(settled.status).toBe("settled");
+				throw new Crash("feed_cursor_saved");
+			}),
+		).rejects.toThrow(Crash);
 		// The whole settle rolled back: both events are still unsettled, no claim exists.
 		expect(mirrorRows(life).map((r) => r.state)).toEqual([
 			"received",
@@ -277,19 +284,17 @@ test("A42 a crash while applying leaves nothing half applied; the next job appli
 		expect(checkpointRows(life)[0]!.applied_cursor).toBeNull();
 		expect(assertionRows(life)).toHaveLength(0);
 		expect(stages(life).source.applied.cursor).toBeNull();
-		// The crashed attempt is over: a new job takes the same input.
-		const ran = await drain(rig);
+		// A new attempt takes the same input and applies it once.
+		const ran = await drain(rig, answer);
 		expect(ran).toHaveLength(1);
 		expect(mirrorRows(life).map((r) => r.state)).toEqual([
 			"applied",
 			"applied",
 		]);
-		expect(assertionRows(life)).toHaveLength(1);
-		expect(assertionRows(life)[0]).toMatchObject({
-			lifecycle: "candidate",
-			origin: "user_report",
-		});
-		expect(rig.inference.state.cloudRequests).toBe(0);
+		expect(assertionRows(life).map((r) => [r.lifecycle, r.origin])).toEqual([
+			["candidate", "user_report"],
+			["active", "user_report"],
+		]);
 	} finally {
 		await life.cleanup();
 	}
@@ -301,10 +306,8 @@ test("A28 the applied position is the settled PREFIX: 13 inputs, 12 settled, one
 		for (let i = 1; i <= 13; i++)
 			await addMessage(life, `m${i}`, `発言${i}番です。`);
 		await life.lifecycle.consumeSourceChanges(SCOPE);
-		const rig = rigFor(life, empty);
-		const first = await rig.extraction.schedule(SCOPE);
-		if (first.status !== "scheduled") throw new Error("not scheduled");
-		await runJob(rig, first.jobId);
+		const rig = curationFor(life);
+		await curate(rig, nothing);
 		const mirror = mirrorRows(life);
 		expect(mirror.filter((r) => r.state === "applied")).toHaveLength(12);
 		const source = stages(life).source;
@@ -316,7 +319,7 @@ test("A28 the applied position is the settled PREFIX: 13 inputs, 12 settled, one
 			applied_cursor: mirror[11]!.received_cursor,
 			received_cursor: mirror[12]!.received_cursor,
 		});
-		await drain(rig);
+		await drain(rig, nothing);
 		expect(stages(life).source.applied).toMatchObject({
 			applied: 13,
 			pending: 0,
@@ -339,11 +342,11 @@ test("A29 a forget overtakes the pending extraction: nothing of the forgotten me
 		// Gone from World's inbox AND from the host record, before any extraction ran.
 		expect(inboxRows(life)).toHaveLength(1);
 		expect(mirrorRows(life)).toHaveLength(1);
-		const rig = rigFor(life, empty);
-		const ran = await drain(rig);
+		const rig = curationFor(life);
+		const ran = await drain(rig, nothing);
 		expect(ran).toHaveLength(1);
-		const prompts = rig.inference.state.prompts.join("\n");
-		expect(rig.inference.state.prompts).toHaveLength(1);
+		const prompts = JSON.stringify(rig.shown);
+		expect(rig.shown).toHaveLength(1);
 		expect(prompts).toContain("音声サービス");
 		expect(prompts).not.toContain("1234");
 		expect(mirrorRows(life).map((r) => r.state)).toEqual(["applied"]);
@@ -382,17 +385,17 @@ test("A29 a correction stops the old claim before the pending extraction, which 
 		) as { lifecycle: string };
 		expect(lifecycle.lifecycle).toBe("invalidated");
 		expect(mirrorRows(life)).toHaveLength(2);
-		const rig = rigFor(life, empty);
-		await drain(rig);
+		const rig = curationFor(life);
+		await drain(rig, nothing);
 		const states = mirrorRows(life).map((r) => [r.state, r.reason]);
 		expect(states).toEqual([
 			["rejected", "SUPERSEDED"],
 			["applied", null],
 		]);
 		// One model call, and it saw only the corrected text.
-		expect(rig.inference.state.prompts).toHaveLength(1);
-		expect(rig.inference.state.prompts[0]).toContain("10月");
-		expect(rig.inference.state.prompts[0]).not.toContain("9月");
+		expect(rig.shown).toHaveLength(1);
+		expect(JSON.stringify(rig.shown[0])).toContain("10月");
+		expect(JSON.stringify(rig.shown[0])).not.toContain("9月");
 	} finally {
 		await life.cleanup();
 	}
@@ -405,16 +408,12 @@ test("A29 forgetting does not wait for World or the model: it proceeds while Wor
 		await life.lifecycle.consumeSourceChanges(SCOPE);
 		expect(inboxRows(life)).toHaveLength(1);
 		await life.world.setEnabled(false);
-		// The model is absent too: any call would fail.
-		const rig = rigFor(life, () => {
-			throw new Error("model_absent");
-		});
+		// No model is involved in a forget: nothing is prepared or settled here.
 		await life.conversation.retract({ messageId: "m1" });
 		const report = await life.lifecycle.consumeSourceChanges(SCOPE);
 		expect(report.forgets.map((f) => f.state)).toEqual(["complete"]);
 		expect(inboxRows(life)).toHaveLength(0);
 		expect(mirrorRows(life)).toHaveLength(0);
-		expect(rig.inference.state.executed).toBe(0);
 	} finally {
 		await life.cleanup();
 	}
@@ -441,8 +440,8 @@ test("A42 adding a Scope discards the cursor and reads the feed again; unsettled
 		expect(new Set(inboxRows(next).map((r) => r.feed_key)).size).toBe(2);
 		expect(checkpointRows(next)).toHaveLength(2);
 		// Every event settles under the feed it was delivered under.
-		const rig = rigFor(next, empty);
-		await drain(rig);
+		const rig = curationFor(next);
+		await drain(rig, nothing);
 		expect(mirrorRows(next).map((r) => r.state)).toEqual([
 			"applied",
 			"applied",
@@ -466,8 +465,8 @@ test("A42 a restore epoch change drops the cursors; unsettled input is delivered
 	try {
 		await addMessage(life, "m1", "音声サービスは9月から利用できる。");
 		await life.lifecycle.consumeSourceChanges(SCOPE);
-		const rig = rigFor(life, empty);
-		await drain(rig);
+		const rig = curationFor(life);
+		await drain(rig, nothing);
 		await addMessage(life, "m2", "別の話題の発言。");
 		await life.lifecycle.consumeSourceChanges(SCOPE);
 		const [settled, open] = mirrorRows(life);
@@ -487,7 +486,7 @@ test("A42 a restore epoch change drops the cursors; unsettled input is delivered
 			"received",
 		]);
 		expect(mirrorRows(life)[1]!.event_id).toBe(open!.event_id);
-		await drain(rig);
+		await drain(rig, nothing);
 		expect(mirrorRows(life).map((r) => r.state)).toEqual([
 			"applied",
 			"applied",
@@ -497,10 +496,11 @@ test("A42 a restore epoch change drops the cursors; unsettled input is delivered
 	}
 });
 
-test("A42 an empty feed creates no job and no model request", async () => {
+test("A42 an empty feed leaves nothing pending: no window is prepared and nothing is written", async () => {
 	const life = await started();
 	try {
-		const rig = rigFor(life, empty);
+		const ports = testPorts();
+		const rig = curationFor(life, ports);
 		let commits = 0;
 		const stop = life.store.onCommit(() => {
 			commits += 1;
@@ -513,30 +513,20 @@ test("A42 an empty feed creates no job and no model request", async () => {
 				changes: 0,
 				received: 0,
 			});
-			expect(await rig.extraction.schedule(SCOPE)).toMatchObject({
-				status: "idle",
-				reason: "no_input",
-			});
+			expect(pending(rig)).toEqual([]);
 		}
 		expect(commits - baseline).toBe(0);
-		// Only the assistant spoke: still no input.
+		// Only the assistant spoke, and no run adopted it: still no input.
 		await addMessage(life, "a1", "承知しました。", "assistant");
 		await life.lifecycle.consumeSourceChanges(SCOPE);
-		expect(await rig.extraction.schedule(SCOPE)).toMatchObject({
-			status: "idle",
-		});
+		expect(pending(rig)).toEqual([]);
 		// Everything settled: no input either.
 		await addMessage(life, "m1", "音声サービスは9月から利用できる。");
 		await life.lifecycle.consumeSourceChanges(SCOPE);
-		await drain(rig);
-		expect(await rig.extraction.schedule(SCOPE)).toMatchObject({
-			status: "idle",
-			reason: "no_input",
-		});
+		await drain(rig, nothing);
+		expect(pending(rig)).toEqual([]);
 		stop();
-		expect(rig.jobs.size).toBe(1);
-		expect(rig.inference.state.executed).toBe(1);
-		expect(rig.inference.state.captured).toHaveLength(1);
+		expect(rig.shown).toHaveLength(1);
 	} finally {
 		await life.cleanup();
 	}
@@ -554,12 +544,12 @@ test("input scanned while World is OFF is never delivered or extracted", async (
 		await life.world.setEnabled(true);
 		await addMessage(life, "m2", "別の話題の発言。");
 		await life.lifecycle.consumeSourceChanges(SCOPE);
-		const rig = rigFor(life, empty);
-		await drain(rig);
+		const rig = curationFor(life);
+		await drain(rig, nothing);
 		// Only the input that arrived while World was ON was shown to the model.
-		expect(rig.inference.state.prompts).toHaveLength(1);
-		expect(rig.inference.state.prompts[0]).toContain("別の話題");
-		expect(rig.inference.state.prompts[0]).not.toContain("9月");
+		expect(rig.shown).toHaveLength(1);
+		expect(JSON.stringify(rig.shown[0])).toContain("別の話題");
+		expect(JSON.stringify(rig.shown[0])).not.toContain("9月");
 		expect(mirrorRows(life).map((r) => r.state)).toEqual([
 			"skipped",
 			"applied",

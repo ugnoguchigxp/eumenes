@@ -1,14 +1,13 @@
 /**
- * P5-02 (server side of A48): the grounded claim list and the explicit
- * correction / retraction / forget of the owner, over a REAL host store (temp
- * file, WAL, single writer, readonly reader, production migrations, the real
+ * P5-02 (server side of A48): the grounded claim list and the forget list of the
+ * owner, view only (claims are kept by the memory steward), over a REAL host store
+ * (temp file, WAL, single writer, readonly reader, production migrations, the real
  * conversation SourceAdapter, the real lifecycle). Fixture-grade claims; no
  * model, no network, no browser.
  */
 import { expect, test } from "bun:test";
 import { Hono } from "hono";
 import {
-	conversationReasonSource,
 	createWorldClaims,
 	registerWorldClaims,
 	type WorldClaimsContext,
@@ -27,10 +26,10 @@ import {
 	request,
 } from "./fixture";
 import {
+	Crash,
 	crashHook,
 	openLife,
 	reopenLife,
-	rows,
 	type Life,
 } from "./lifecycle-fixture";
 
@@ -47,23 +46,13 @@ function build(life: Life, ctx: WorldClaimsContext = CTX) {
 		world: life.world,
 		lifecycle: life.lifecycle,
 		state: () => ({ mode: "on", gateOpen: life.gate.isOpen() }),
-		reasonSource: conversationReasonSource(life.conversation, SCOPE),
 		readPurpose: PURPOSE,
-		writePurpose: PURPOSE,
 		now: () => NOW,
 	});
 	const app = new Hono();
 	registerWorldClaims(app, claims, () => ctx);
-	const call = async (method: "GET" | "POST", path: string, body?: unknown) => {
-		const response = await app.request(path, {
-			method,
-			...(body === undefined
-				? {}
-				: {
-						headers: { "content-type": "application/json" },
-						body: JSON.stringify(body),
-					}),
-		});
+	const call = async (method: "GET", path: string) => {
+		const response = await app.request(path, { method });
 		return {
 			status: response.status,
 			body: (await response.json().catch(() => null)) as any,
@@ -136,11 +125,6 @@ async function seed(life: Life) {
 		),
 	);
 }
-
-const ledger = (life: Life) =>
-	["world_assertion", "world_transition", "world_operation"].map((table) =>
-		rows(life, table),
-	);
 
 test("the list shows target, claim, adoption, evidence kind and freshness as separate fields; hypothesis and measured are never the adopted style", async () => {
 	const life = await openLife();
@@ -247,182 +231,6 @@ test("the detail carries conditions, supports, refutations, source versions and 
 	}
 });
 
-test("a correction carries the revision: a stale one is 409 with a reload hint and nothing is written", async () => {
-	const life = await openLife();
-	try {
-		await seed(life);
-		const { call } = build(life);
-		const before = ledger(life);
-		const stale = await call("POST", "/api/world/claims/correct", {
-			requestId: uuid(),
-			expectedRevision: 1,
-			target: { claimId: "claim-report" },
-			reasonMessageId: "m2",
-			value: { kind: "string", value: "10月" },
-		});
-		expect(stale.status).toBe(409);
-		expect(stale.body).toEqual({ error: "revision_conflict", reload: true });
-		expect(ledger(life)).toEqual(before);
-		// Retract with a stale revision is the same.
-		const staleRetract = await call("POST", "/api/world/claims/retract", {
-			requestId: uuid(),
-			expectedRevision: 1,
-			target: { claimId: "claim-report" },
-			reasonMessageId: "m2",
-		});
-		expect(staleRetract.status).toBe(409);
-		expect(staleRetract.body.reload).toBe(true);
-		expect(ledger(life)).toEqual(before);
-	} finally {
-		await life.cleanup();
-	}
-});
-
-test("an explicit correction supersedes the old revision, cites the person's statement and is adopted with it", async () => {
-	const life = await openLife();
-	try {
-		await seed(life);
-		const { call } = build(life);
-		const current = (await call("GET", "/api/world/claims")).body.items.find(
-			(r: any) => r.id === "claim-report",
-		);
-		const done = await call("POST", "/api/world/claims/correct", {
-			requestId: uuid(),
-			expectedRevision: current.revision,
-			target: { claimId: "claim-report" },
-			reasonMessageId: "m2",
-			value: { kind: "string", value: "10月" },
-		});
-		expect(done.status).toBe(200);
-		expect(done.body).toEqual({ status: "applied", claimId: "claim-report" });
-		const row = (await call("GET", "/api/world/claims")).body.items.find(
-			(r: any) => r.id === "claim-report",
-		);
-		expect(row.revision).toBe(current.revision + 2);
-		expect(row).toMatchObject({
-			adoption: "adopted",
-			origin: "user_report",
-			claim: { content: { kind: "value", value: { value: "10月" } } },
-		});
-		const detail = (await call("GET", "/api/world/claims/claim-report")).body;
-		expect(detail.sources.map((s: any) => s.id)).toEqual(["m2"]);
-		expect(detail.history.map((h: any) => [h.revision, h.lifecycle])).toEqual([
-			[4, "active"],
-			[3, "candidate"],
-			[2, "superseded"],
-			[1, "candidate"],
-		]);
-		// The old revision is not a current claim any more, and the old number is stale now.
-		const again = await call("POST", "/api/world/claims/correct", {
-			requestId: uuid(),
-			expectedRevision: current.revision,
-			target: { claimId: "claim-report" },
-			reasonMessageId: "m2",
-			value: { kind: "string", value: "11月" },
-		});
-		expect(again.status).toBe(409);
-	} finally {
-		await life.cleanup();
-	}
-});
-
-test("a retraction needs the person's own confirmed statement as the reason", async () => {
-	const life = await openLife();
-	try {
-		await seed(life);
-		const { call } = build(life);
-		const row = (await call("GET", "/api/world/claims")).body.items.find(
-			(r: any) => r.id === "claim-cand",
-		);
-		const before = ledger(life);
-		// An assistant message, an unknown id and a missing one: ONE answer, nothing written.
-		for (const reasonMessageId of ["a1", "nope", "m1-x"]) {
-			const refused = await call("POST", "/api/world/claims/retract", {
-				requestId: uuid(),
-				expectedRevision: row.revision,
-				target: { claimId: "claim-cand" },
-				reasonMessageId,
-			});
-			expect(refused).toMatchObject({
-				status: 400,
-				body: { error: "reason_source_unavailable" },
-			});
-		}
-		expect(ledger(life)).toEqual(before);
-		const done = await call("POST", "/api/world/claims/retract", {
-			requestId: uuid(),
-			expectedRevision: row.revision,
-			target: { claimId: "claim-cand" },
-			reasonMessageId: "m2",
-		});
-		expect(done.status).toBe(200);
-		const ids = (await call("GET", "/api/world/claims")).body.items.map(
-			(r: any) => r.id,
-		);
-		expect(ids).not.toContain("claim-cand");
-		// A retracted claim is gone from the list; asking for it is "not found".
-		expect((await call("GET", "/api/world/claims/claim-cand")).status).toBe(
-			404,
-		);
-	} finally {
-		await life.cleanup();
-	}
-});
-
-test("an ambiguous target returns the candidates and changes nothing (no auto-pick)", async () => {
-	const life = await openLife();
-	try {
-		await seed(life);
-		// A second claim on the same subject and predicate.
-		await life.world.apply(
-			registerClaim(
-				"r-5",
-				claim("claim-twin", [currentRef(life, "m1")], {
-					payload: { kind: "value", value: { kind: "boolean", value: false } },
-				}),
-			),
-		);
-		const { call } = build(life);
-		const before = ledger(life);
-		const common = () => ({
-			requestId: uuid(),
-			expectedRevision: 1,
-			target: { subjectId: "svc-1", predicate: "available" },
-		});
-		for (const [path, extra] of [
-			[
-				"correct",
-				{ reasonMessageId: "m2", value: { kind: "string", value: "x" } },
-			],
-			["retract", { reasonMessageId: "m2" }],
-			["forget", {}],
-		] as const) {
-			const answer = await call("POST", `/api/world/claims/${path}`, {
-				...common(),
-				...extra,
-			});
-			expect(answer.status).toBe(200);
-			expect(answer.body.status).toBe("unresolved");
-			expect(answer.body.candidates.map((c: any) => c.id).sort()).toEqual([
-				"claim-report",
-				"claim-twin",
-			]);
-		}
-		expect(ledger(life)).toEqual(before);
-		expect(rows(life, "world_host_forget_intake")).toBe(0);
-		// A target that matches nothing is "not found", not a guess.
-		const none = await call("POST", "/api/world/claims/retract", {
-			requestId: uuid(),
-			expectedRevision: 1,
-			target: { subjectId: "svc-1", predicate: "unknown" },
-			reasonMessageId: "m2",
-		});
-		expect(none.status).toBe(404);
-	} finally {
-		await life.cleanup();
-	}
-});
-
 test("Scope switch: only granted Scopes answer, the others look exactly like not found, and Scopes do not leak into each other", async () => {
 	const life = await openLife();
 	try {
@@ -466,17 +274,6 @@ test("Scope switch: only granted Scopes answer, the others look exactly like not
 		const absent = await call("GET", "/api/world/claims?scopeKey=profile:none");
 		expect(denied).toEqual(absent);
 		expect(denied.status).toBe(404);
-		// A change cannot be aimed at an ungranted Scope either.
-		const before = ledger(life);
-		const change = await call("POST", "/api/world/claims/retract", {
-			scopeKey: "profile:secret",
-			requestId: uuid(),
-			expectedRevision: 2,
-			target: { claimId: "claim-report" },
-			reasonMessageId: "m2",
-		});
-		expect(change.status).toBe(404);
-		expect(ledger(life)).toEqual(before);
 	} finally {
 		await life.cleanup();
 	}
@@ -501,16 +298,8 @@ test("no existence leak: an unknown claim, a hidden Scope and a forgotten claim 
 		const theirs = await stranger.call("GET", "/api/world/claims");
 		expect([200, 404]).toContain(theirs.status);
 		if (theirs.status === 200) expect(theirs.body.items).toEqual([]);
-		// A change aimed at a claim the caller cannot see is "not found" too.
-		const change = await stranger.call("POST", "/api/world/claims/retract", {
-			requestId: uuid(),
-			expectedRevision: 2,
-			target: { claimId: "claim-report" },
-			reasonMessageId: "m2",
-		});
-		expect(change).toEqual({ status: 404, body: { error: "not_found" } });
 		// Neither body names a reason (no "forbidden", no "hidden", no "exists").
-		for (const answer of [unknown, hidden, change])
+		for (const answer of [unknown, hidden])
 			expect(JSON.stringify(answer.body)).not.toMatch(
 				/forbid|hidden|exist|denied|permit/i,
 			);
@@ -519,25 +308,23 @@ test("no existence leak: an unknown claim, a hidden Scope and a forgotten claim 
 	}
 });
 
-test("forget: accepted, never shown as complete before the ledger says so; it persists across a restart", async () => {
+const accept = (life: Life, forgetId: string) =>
+	life.lifecycle.acceptForget({
+		forgetId,
+		scope: SCOPE,
+		reasonCode: "FORGET_REQUESTED",
+		roots: [{ kind: "assertion", id: "claim-cand", revision: 1 }],
+	});
+
+test("a forget is shown as the ledger says, never as complete before it is; it persists across a restart", async () => {
 	let life = await openLife();
 	try {
 		await seed(life);
 		const first = build(life);
-		const row = (await first.call("GET", "/api/world/claims")).body.items.find(
-			(r: any) => r.id === "claim-cand",
-		);
-		const accepted = await first.call("POST", "/api/world/claims/forget", {
-			requestId: uuid(),
-			expectedRevision: row.revision,
-			target: { claimId: "claim-cand" },
-		});
-		expect(accepted.status).toBe(200);
-		expect(accepted.body.status).toBe("accepted");
-		const forgetId = accepted.body.forget.forgetId;
+		await accept(life, "f-1");
 		// The display follows the ledger's own state, never a front-end guess.
 		const listed = await first.call("GET", "/api/world/forgets");
-		const mine = listed.body.forgets.find((f: any) => f.forgetId === forgetId);
+		const mine = listed.body.forgets.find((f: any) => f.forgetId === "f-1");
 		expect(mine).toBeDefined();
 		expect(["pending", "awaiting_confirmation", "complete"]).toContain(
 			mine.display,
@@ -546,7 +333,6 @@ test("forget: accepted, never shown as complete before the ledger says so; it pe
 		expect(mine.abandoned).toEqual({ parts: 0, roots: 0 });
 		// The claim is gone from the list (and from the ledger).
 		const after = await first.call("GET", "/api/world/claims");
-
 		if (after.status === 200)
 			expect(after.body.items.map((r: any) => r.id)).not.toContain(
 				"claim-cand",
@@ -557,8 +343,8 @@ test("forget: accepted, never shown as complete before the ledger says so; it pe
 		const again = build(life);
 		const restarted = (await again.call("GET", "/api/world/forgets")).body
 			.forgets;
-		expect(restarted.find((f: any) => f.forgetId === forgetId)).toMatchObject({
-			forgetId,
+		expect(restarted.find((f: any) => f.forgetId === "f-1")).toMatchObject({
+			forgetId: "f-1",
 			state: mine.state,
 			display: mine.display,
 		});
@@ -572,23 +358,8 @@ test("a forget interrupted by a crash is shown as awaiting confirmation (never c
 	try {
 		await seed(life);
 		const first = build(life);
-		const row = (await first.call("GET", "/api/world/claims")).body.items.find(
-			(r: any) => r.id === "claim-cand",
-		);
-		// The crash happens while the forget advances: it is accepted, durable
-		// and pending, and the person is told exactly that (not "failed").
-		const answer = await first.claims.forget(CTX, {
-			requestId: uuid(),
-			expectedRevision: row.revision,
-			target: { claimId: "claim-cand" },
-		});
-		expect(answer).toMatchObject({
-			status: "ok",
-			value: {
-				status: "accepted",
-				forget: { display: "awaiting_confirmation" },
-			},
-		});
+		// The crash happens while the forget advances: it is accepted, durable and pending.
+		await expect(accept(life, "f-crash")).rejects.toBeInstanceOf(Crash);
 		const during = (await first.call("GET", "/api/world/forgets")).body.forgets;
 		expect(during).toHaveLength(1);
 		expect(during[0]).toMatchObject({
@@ -598,16 +369,6 @@ test("a forget interrupted by a crash is shown as awaiting confirmation (never c
 		// The Scope is closed while the forget is unfinished: the list says
 		// "not found", the forget list says why.
 		expect((await first.call("GET", "/api/world/claims")).status).toBe(404);
-		// The change endpoints do not run against a closed Scope either.
-		const before = ledger(life);
-		const blocked = await first.call("POST", "/api/world/claims/retract", {
-			requestId: uuid(),
-			expectedRevision: 2,
-			target: { claimId: "claim-report" },
-			reasonMessageId: "m2",
-		});
-		expect(blocked.status).toBe(404);
-		expect(ledger(life)).toEqual(before);
 		// A new process: the unfinished forget is still unfinished, then resumed.
 		life = await reopenLife(life);
 		const again = build(life);
@@ -700,7 +461,7 @@ test("forget that is not finished is shown as pending / awaiting confirmation, a
 	}
 });
 
-test("World OFF (protect): reads and changes answer world_disabled; the forget list still tells the truth", async () => {
+test("World OFF (protect): reads answer world_disabled; the forget list still tells the truth", async () => {
 	const life = await openLife();
 	try {
 		await seed(life);
@@ -709,12 +470,6 @@ test("World OFF (protect): reads and changes answer world_disabled; the forget l
 		for (const answer of [
 			await call("GET", "/api/world/claims"),
 			await call("GET", "/api/world/claims/claim-report"),
-			await call("POST", "/api/world/claims/retract", {
-				requestId: uuid(),
-				expectedRevision: 2,
-				target: { claimId: "claim-report" },
-				reasonMessageId: "m2",
-			}),
 		]) {
 			expect(answer.status).toBe(409);
 			expect(answer.body).toEqual({ error: "world_disabled" });
@@ -727,39 +482,34 @@ test("World OFF (protect): reads and changes answer world_disabled; the forget l
 	}
 });
 
-test("invalid requests are 400 and write nothing; a body cannot name a principal", async () => {
+test("view only: the change routes do not exist over HTTP, the reads do", async () => {
 	const life = await openLife();
 	try {
 		await seed(life);
-		const { call } = build(life);
-		const before = ledger(life);
-		for (const body of [
-			null,
-			{},
-			{
-				requestId: "not-a-uuid",
-				expectedRevision: 1,
-				target: { claimId: "x" },
-			},
-			{
-				requestId: uuid(),
-				expectedRevision: 0,
-				target: { claimId: "x" },
-				reasonMessageId: "m2",
-			},
-			{
-				requestId: uuid(),
-				expectedRevision: 1,
-				target: { claimId: "claim-report" },
-				reasonMessageId: "m2",
-				principal: "someone-else",
-			},
-		]) {
-			const answer = await call("POST", "/api/world/claims/retract", body);
-			expect(answer.status).toBe(400);
-			expect(answer.body).toEqual({ error: "invalid_world_request" });
+		const { app } = build(life);
+		for (const action of ["correct", "retract", "forget"]) {
+			const response = await app.request(`/api/world/claims/${action}`, {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({
+					requestId: uuid(),
+					expectedRevision: 1,
+					target: { claimId: "claim-report" },
+				}),
+			});
+			expect(response.status).toBe(404);
 		}
-		expect(ledger(life)).toEqual(before);
+		// A claim is not changed by any other verb on a claim path either.
+		const put = await app.request("/api/world/claims/claim-report", {
+			method: "DELETE",
+		});
+		expect(put.status).toBe(404);
+		expect((await app.request("/api/world/claims")).status).toBe(200);
+		expect((await app.request("/api/world/claims/claim-report")).status).toBe(
+			200,
+		);
+		expect((await app.request("/api/world/forgets")).status).toBe(200);
+		expect((await app.request("/api/world/status")).status).toBe(200);
 	} finally {
 		await life.cleanup();
 	}

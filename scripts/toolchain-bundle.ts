@@ -29,6 +29,7 @@ const BACKENDS = [
 	"claude-code",
 	"kanban",
 	"steward",
+	"world-query",
 ];
 const USAGE =
 	"使い方: bun scripts/toolchain-bundle.ts pins <revisionId>... | check <file.bundle.json> [--json]";

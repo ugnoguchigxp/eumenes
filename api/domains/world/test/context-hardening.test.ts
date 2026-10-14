@@ -338,9 +338,9 @@ test("the block limit is what the shared budget leaves, and a cap only lowers it
 		ok: true,
 		blockLimitBytes: CONTEXT_TOTAL_BYTES,
 	});
-	expect(
-		allocateContextBudget({ ...base, blockCapBytes: 4096 }),
-	).toMatchObject({ ok: true, blockLimitBytes: 4096 });
+	expect(allocateContextBudget({ ...base, blockCapBytes: 4096 })).toMatchObject(
+		{ ok: true, blockLimitBytes: 4096 },
+	);
 	// A cap never makes room: with no room for the minimal slice it stays not ok.
 	expect(
 		allocateContextBudget({

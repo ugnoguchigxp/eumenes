@@ -3,10 +3,12 @@ export { migrations } from "./repository";
 export type {
 	StageInput,
 	StewardDeps,
+	StewardGoals,
 	StewardMemory,
 	StewardService,
+	StewardWorld,
 } from "./service";
-export { createStewardService } from "./service";
+export { createStewardService, createWorldView } from "./service";
 export type {
 	DecisionDto,
 	InferencePort,

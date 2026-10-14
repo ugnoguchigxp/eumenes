@@ -8,7 +8,7 @@
 		{
 			"kind": "artifact",
 			"id": "settings.world",
-			"revision": 3,
+			"revision": 4,
 			"title": "World",
 			"variants": [
 				{
@@ -20,8 +20,14 @@
 						"title": "World",
 						"headerChildren": [0],
 						"tabs": [
-							{ "label": "主張の一覧", "children": [1] },
-							{ "label": "忘却の状況", "children": [2] }
+							{
+								"label": "主張の一覧",
+								"children": [1]
+							},
+							{
+								"label": "忘却の状況",
+								"children": [2]
+							}
 						],
 						"children": [
 							{
@@ -64,55 +70,9 @@
 					"adapterRef": "adapter:world@1",
 					"query": "query:world.forgets@1",
 					"target": "none"
-				},
-				{
-					"source": "world-reason-messages",
-					"adapterRef": "adapter:world@1",
-					"query": "query:world.reason-messages@1",
-					"target": "none"
 				}
 			],
-			"actionBindings": [
-				{
-					"actionId": "correct",
-					"eventAction": "world-correct",
-					"source": "world-claims",
-					"inputSchemaRef": "schema:world-claim-correct@1",
-					"effect": "write",
-					"operationId": "world.correct",
-					"label": "訂正する",
-					"rowInput": {
-						"claimId": "$row.id",
-						"expectedRevision": "$row.revision"
-					}
-				},
-				{
-					"actionId": "retract",
-					"eventAction": "world-retract",
-					"source": "world-claims",
-					"inputSchemaRef": "schema:world-claim-retract@1",
-					"effect": "write",
-					"operationId": "world.retract",
-					"label": "撤回する",
-					"rowInput": {
-						"claimId": "$row.id",
-						"expectedRevision": "$row.revision"
-					}
-				},
-				{
-					"actionId": "forget",
-					"eventAction": "world-forget",
-					"source": "world-claims",
-					"inputSchemaRef": "schema:world-claim-forget@1",
-					"effect": "write",
-					"operationId": "world.forget",
-					"label": "忘れる",
-					"rowInput": {
-						"claimId": "$row.id",
-						"expectedRevision": "$row.revision"
-					}
-				}
-			],
+			"actionBindings": [],
 			"collections": [
 				{
 					"source": "world-status",
@@ -203,82 +163,6 @@
 							"label": "版",
 							"format": "number"
 						}
-					],
-					"rowActions": [
-						{
-							"actionId": "correct",
-							"when": {
-								"key": "correctable",
-								"in": [true]
-							},
-							"form": {
-								"fields": [
-									{
-										"fieldId": "reasonMessageId",
-										"label": "理由にする、あなたの発言",
-										"help": "変更を明示した本人の発言を選びます。",
-										"control": "select",
-										"optionsSource": "query:world.reason-messages@1",
-										"required": true
-									},
-									{
-										"fieldId": "valueKind",
-										"label": "新しい値の種類",
-										"control": "select",
-										"required": true,
-										"options": [
-											{
-												"value": "string",
-												"label": "文字"
-											},
-											{
-												"value": "boolean",
-												"label": "真偽（true または false）"
-											},
-											{
-												"value": "number",
-												"label": "数値"
-											}
-										]
-									},
-									{
-										"fieldId": "value",
-										"label": "新しい値",
-										"control": "text",
-										"maxLength": 1000,
-										"required": true,
-										"help": "真偽は true か false、数値は半角の数字で入力します。"
-									},
-									{
-										"fieldId": "unit",
-										"label": "単位（数値のとき）",
-										"control": "text",
-										"maxLength": 40
-									}
-								],
-								"prefill": {}
-							}
-						},
-						{
-							"actionId": "retract",
-							"form": {
-								"fields": [
-									{
-										"fieldId": "reasonMessageId",
-										"label": "理由にする、あなたの発言",
-										"help": "変更を明示した本人の発言を選びます。",
-										"control": "select",
-										"optionsSource": "query:world.reason-messages@1",
-										"required": true
-									}
-								],
-								"prefill": {}
-							}
-						},
-						{
-							"actionId": "forget",
-							"confirm": "この主張を、これまでの版もすべて忘れます。受け付けた時点では完了ではなく、完了は「忘却の状況」で確認します。よろしいですか？"
-						}
 					]
 				},
 				{
@@ -324,102 +208,9 @@
 				"label": "World",
 				"group": "管理と確認",
 				"order": 90,
-				"description": "Worldが覚えている主張 訂正 撤回 忘却の状況"
+				"description": "Worldが覚えている主張と忘却の状況（閲覧のみ）"
 			}
 		}
 	],
-	"schemas": [
-		{
-			"kind": "schema",
-			"id": "world-claim-correct",
-			"revision": 1,
-			"schema": {
-				"type": "object",
-				"additionalProperties": false,
-				"properties": {
-					"claimId": {
-						"type": "string",
-						"minLength": 1,
-						"maxLength": 256
-					},
-					"expectedRevision": {
-						"type": "integer",
-						"minimum": 1
-					},
-					"reasonMessageId": {
-						"type": "string",
-						"minLength": 1,
-						"maxLength": 256
-					},
-					"valueKind": {
-						"type": "string",
-						"enum": ["string", "boolean", "number"]
-					},
-					"value": {
-						"type": "string",
-						"minLength": 1,
-						"maxLength": 1000
-					},
-					"unit": {
-						"type": "string",
-						"maxLength": 40
-					}
-				},
-				"required": [
-					"claimId",
-					"expectedRevision",
-					"reasonMessageId",
-					"valueKind",
-					"value"
-				]
-			}
-		},
-		{
-			"kind": "schema",
-			"id": "world-claim-retract",
-			"revision": 1,
-			"schema": {
-				"type": "object",
-				"additionalProperties": false,
-				"properties": {
-					"claimId": {
-						"type": "string",
-						"minLength": 1,
-						"maxLength": 256
-					},
-					"expectedRevision": {
-						"type": "integer",
-						"minimum": 1
-					},
-					"reasonMessageId": {
-						"type": "string",
-						"minLength": 1,
-						"maxLength": 256
-					}
-				},
-				"required": ["claimId", "expectedRevision", "reasonMessageId"]
-			}
-		},
-		{
-			"kind": "schema",
-			"id": "world-claim-forget",
-			"revision": 1,
-			"schema": {
-				"type": "object",
-				"additionalProperties": false,
-				"properties": {
-					"claimId": {
-						"type": "string",
-						"minLength": 1,
-						"maxLength": 256
-					},
-					"expectedRevision": {
-						"type": "integer",
-						"minimum": 1
-					}
-				},
-				"required": ["claimId", "expectedRevision"]
-			}
-		}
-	]
+	"schemas": []
 }

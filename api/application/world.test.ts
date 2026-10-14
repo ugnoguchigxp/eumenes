@@ -120,31 +120,26 @@ async function startServerWorld(dir: string, enabled: boolean) {
 			keys: [],
 		});
 	}
-	const started = assembleServerWorld(loadConfig({}), {
+	const world = assembleServerWorld(loadConfig({}), {
 		store,
 		conversation,
 		memory,
-		queue: { stats: () => ({ lanes: {} }), registerHandler() {} } as never,
-		inference: {
-			foregroundBusy: () => false,
-			onActivity: () => () => {},
-		} as never,
+		steward: { kickInTransaction: () => {} },
 		dbPath,
 		memoryJournalPath,
 	});
 	const recovery = await memory.recover();
-	await started.world?.recover({
+	await world?.recover({
 		feedResyncRequired: recovery.feedResyncRequired === true,
 	});
 	const close = async () => {
-		started.worldForeground?.stop();
-		await started.world?.close();
+		await world?.close();
 		await store.close();
 	};
 	closers.push(close);
 	return {
 		store,
-		...started,
+		world,
 		async close() {
 			await close();
 			closers.splice(closers.indexOf(close), 1);
@@ -174,7 +169,6 @@ test("startup mode: setting off and no content assembles nothing", async () => {
 	const h = await startServerWorld(dir, false);
 	expect(resolveWorldMode(h.store)).toBe("off");
 	expect(h.world).toBeUndefined();
-	expect(h.worldForeground).toBeUndefined();
 });
 
 test("startup mode: setting off but World holds content means protect (forgetting keeps flowing, World stays OFF)", async () => {
@@ -187,21 +181,18 @@ test("startup mode: setting off but World holds content means protect (forgettin
 	h = await startServerWorld(dir, false);
 	expect(resolveWorldMode(h.store)).toBe("protect");
 	expect(h.world?.mode).toBe("protect");
-	expect(h.worldForeground).toBeUndefined();
-	expect(h.world?.extraction).toBeUndefined();
 	expect(h.world?.status()).toMatchObject({
 		gate: { open: true },
 		world: { enabled: false, usable: false },
 	});
 });
 
-test("startup mode: setting on runs the initial sync and then turns World ON, with extraction and foreground", async () => {
+test("startup mode: setting on runs the initial sync and then turns World ON, with the curation operations", async () => {
 	const dir = tempDir();
 	const h = await startServerWorld(dir, true);
 	expect(resolveWorldMode(h.store)).toBe("on");
 	expect(h.world?.mode).toBe("on");
-	expect(h.worldForeground).toBeDefined();
-	expect(h.world?.extraction).toBeDefined();
+	expect(h.world?.curation.pendingEventsInTransaction).toBeFunction();
 	expect(h.world?.status()).toMatchObject({
 		world: { enabled: true, usable: true },
 		initialSyncComplete: true,

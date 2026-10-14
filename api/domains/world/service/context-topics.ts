@@ -1,4 +1,16 @@
-import { TOPIC_MAX_ENTITIES } from "./context-render";
+import type { Database } from "bun:sqlite";
+import type {
+	Assertion,
+	ProjectionSnapshot,
+	ScopeRef,
+	WorldSlice,
+} from "eumenes-world-model";
+import { listEntities } from "eumenes-world-model/sqlite";
+import { TOPIC_MAX_ENTITIES, type RenderTopic } from "./context-render";
+import type { WorldService } from "./world-service";
+
+/** Most entities one `listEntities` call returns (the package's own maximum). */
+const MAX_LISTED_ENTITIES = 500;
 
 /** The part of a listed entity the matcher reads. */
 export type TopicCandidate = {
@@ -66,7 +78,7 @@ export function matchTopicEntities(
 	for (const raw of texts) {
 		const text = normalizeTopicText(raw);
 		if (text === "") continue;
-		const covered = new Array<boolean>(text.length).fill(false);
+		const covered = Array.from({ length: text.length }, () => false);
 		for (const [name, id] of names) {
 			if (found.length >= max) return found;
 			let from = 0;
@@ -84,4 +96,124 @@ export function matchTopicEntities(
 		}
 	}
 	return found.slice(0, max);
+}
+
+/** Relations that carry cause and dependency; the topic Slice follows these one step from a named target. */
+const TOPIC_RELATIONS: ReadonlySet<string> = new Set([
+	"increases",
+	"decreases",
+	"causes",
+	"enables",
+	"inhibits",
+	"depends_on",
+	"part_of",
+]);
+
+/**
+ * The part of a focused snapshot the topic Slice shows: what is asserted about a named target (its state, and its
+ * causal/dependency relations to others), and the claims of others that act on it through such a relation
+ * (depth 1). The assertions that dispute a kept one, and those a kept one disputes, stay so a contested claim
+ * keeps its refutations.
+ */
+export function topicAssertions(
+	assertions: readonly Assertion[],
+	focus: ReadonlySet<string>,
+): Assertion[] {
+	const direct = (assertion: Assertion) => {
+		const { payload } = assertion;
+		if (payload.kind === "relation")
+			return (
+				TOPIC_RELATIONS.has(payload.relation) &&
+				(focus.has(assertion.subjectId) || focus.has(payload.objectId))
+			);
+		return focus.has(assertion.subjectId);
+	};
+	const key = (ref: { id: string; revision: number }) =>
+		`${ref.id}\u0000${ref.revision}`;
+	const kept = new Set(assertions.filter(direct).map(key));
+	const related = new Set<string>();
+	for (const assertion of assertions) {
+		if (kept.has(key(assertion)))
+			for (const target of assertion.contradicts) related.add(key(target));
+		else if (assertion.contradicts.some((target) => kept.has(key(target))))
+			related.add(key(assertion));
+	}
+	return assertions.filter(
+		(assertion) => kept.has(key(assertion)) || related.has(key(assertion)),
+	);
+}
+
+type TopicAccess = { principal: string; scopeKeys: string[]; purpose: string };
+
+/**
+ * The known targets this turn's wording names, and the snapshot focused on them (depth 1) and cut to their
+ * state and direct causal/dependency claims. Names and aliases come from `listEntities` (live entities of the
+ * Scope only; merged ones are represented by their representative, forgotten ones are never listed) and are
+ * matched deterministically. Null when nothing is named, or when World refuses the read: the caller then
+ * reads the default Slice, which reports whatever the refusal was.
+ */
+export function readTopicSnapshot(
+	db: Database,
+	options: {
+		world: WorldService;
+		scope: ScopeRef;
+		access: TopicAccess;
+		texts: readonly string[] | undefined;
+		nowMs: number;
+	},
+): { ids: string[]; snapshot: ProjectionSnapshot } | null {
+	const { world, scope, access, texts } = options;
+	if (!texts || texts.every((text) => text.trim() === "")) return null;
+	const listed = listEntities(db, {
+		contractVersion: 1,
+		access: world.accessInTransaction(db, { access }),
+		scopeKey: scope.scopeKey,
+		limit: MAX_LISTED_ENTITIES,
+	});
+	if (listed.status !== "ready") return null;
+	const ids = matchTopicEntities(listed.entities, texts, TOPIC_MAX_ENTITIES);
+	if (ids.length === 0) return null;
+	const focus = world.readSnapshot(db, {
+		access,
+		scope,
+		asOf: options.nowMs,
+		focus: { subjectIds: ids, depth: 1 },
+	});
+	if (focus.status !== "ready") return null;
+	return {
+		ids,
+		snapshot: {
+			...focus.snapshot,
+			assertions: topicAssertions(focus.snapshot.assertions, new Set(ids)),
+		},
+	};
+}
+
+/** Display names of the targets a topic Slice mentions (as subject or relation object), in id order. */
+export function topicNames(
+	db: Database,
+	world: WorldService,
+	scope: ScopeRef,
+	access: TopicAccess,
+	slice: WorldSlice,
+): RenderTopic[] {
+	const ids = new Set<string>();
+	for (const unit of slice.units) {
+		ids.add(unit.conclusion.subjectId);
+		if (unit.conclusion.payload.kind === "relation")
+			ids.add(unit.conclusion.payload.objectId);
+	}
+	if (ids.size === 0 || ids.size > MAX_LISTED_ENTITIES) return [];
+	const listed = listEntities(db, {
+		contractVersion: 1,
+		access: world.accessInTransaction(db, { access }),
+		scopeKey: scope.scopeKey,
+		query: { ids: [...ids].sort() },
+		limit: MAX_LISTED_ENTITIES,
+	});
+	if (listed.status !== "ready") return [];
+	return listed.entities.map((entity) => ({
+		id: entity.id,
+		name: entity.displayName,
+	}));
 }

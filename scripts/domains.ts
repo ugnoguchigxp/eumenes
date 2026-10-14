@@ -31,7 +31,7 @@ export const domains = {
 		backend: "api/domains/kanban",
 		web: "web/src/domains/kanban",
 		components: null,
-		depends: { api: [], web: [], test: [] },
+		depends: { api: ["capabilities"], web: [], test: [] },
 	},
 	terminals: {
 		backend: "api/domains/terminals",
@@ -238,7 +238,7 @@ export const domains = {
 		web: null,
 		components: null,
 		depends: {
-			api: ["continuity", "conversation", "memory"],
+			api: ["continuity", "conversation", "goals", "memory", "world"],
 			web: [],
 			test: ["queue"],
 		},

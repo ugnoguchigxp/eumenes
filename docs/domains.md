@@ -11,7 +11,7 @@
 | `excalidraw` | `api/domains/excalidraw/index.ts` | `web/src/domains/excalidraw/` | なし | `capabilities`、`inference`、`larm`、`queue` | なし | なし |
 | `ocr` | `api/domains/ocr/index.ts` | `web/src/domains/ocr/index.ts` | `packages/design-system/src/components/OcrWorkspace/index.ts` | `capabilities`、`inference`、`queue` | なし | なし |
 | `object-recognition` | `api/domains/object-recognition/index.ts` | `web/src/domains/object-recognition/index.ts` | なし | `capabilities`、`queue` | なし | なし |
-| `kanban` | `api/domains/kanban/index.ts` | `web/src/domains/kanban/index.ts` | なし | なし | なし | なし |
+| `kanban` | `api/domains/kanban/index.ts` | `web/src/domains/kanban/index.ts` | なし | `capabilities` | なし | なし |
 | `terminals` | `api/domains/terminals/index.ts` | `web/src/domains/terminals/index.ts` | なし | なし | なし | なし |
 | `background` | なし | `web/src/domains/background/index.ts` | なし | なし | なし | なし |
 | `image` | `api/domains/image/index.ts` | `web/src/domains/image/index.ts` | なし | `capabilities`、`inference`、`larm`、`queue` | なし | なし |
@@ -40,7 +40,7 @@
 | `goals` | `api/domains/goals/index.ts` | なし | なし | なし | なし | なし |
 | `world` | `api/domains/world/index.ts` | なし | なし | `conversation`、`goals` | なし | `memory` |
 | `memory` | `api/domains/memory/index.ts` | なし | なし | `continuity`、`conversation` | なし | なし |
-| `steward` | `api/domains/steward/index.ts` | なし | なし | `continuity`、`conversation`、`memory` | なし | `queue` |
+| `steward` | `api/domains/steward/index.ts` | なし | なし | `continuity`、`conversation`、`goals`、`memory`、`world` | なし | `queue` |
 | `larm` | `api/domains/larm/index.ts` | なし | なし | なし | なし | なし |
 | `audio` | なし | `web/src/domains/audio/index.ts` | なし | なし | なし | なし |
 | `queue` | `api/domains/queue/index.ts` | なし | なし | なし | なし | なし |

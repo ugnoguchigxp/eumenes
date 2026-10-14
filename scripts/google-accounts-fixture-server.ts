@@ -29,7 +29,6 @@ const config = loadConfig({
 	EUMENES_API_TOKEN: "fixture-token-for-toolchain-browser",
 	EUMENES_ATTITUDE_DATASET: join(dir, "dataset.sqlite3"),
 	EUMENES_MEMORY_JOURNAL: join(dir, "journal.jsonl"),
-	EUMENES_WORLD: "off",
 	EUMENES_WEB_RESEARCH_TOOLS_ENABLED: "0",
 });
 configureLogging({ file: config.logFile, level: "warn" });

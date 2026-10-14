@@ -69,13 +69,21 @@ export function createSettle(deps: StewardDeps, kick: Kick, end: UnitEnd) {
 			return "applied";
 		}
 		db.exec("RELEASE steward_apply");
-		const before =
-			memory.windows.storedInTransaction(db, conversationId)?.version ?? null;
-		const snapshot = memory.publishWindowInTransaction(db, conversationId, {
-			...(applied.republishLongTerm ? { republishLongTerm: true } : {}),
-			...(applied.prefetch ? { prefetch: applied.prefetch } : {}),
-			...(applied.notices.length > 0 ? { addNotices: applied.notices } : {}),
-		});
+		// A World unit changes nothing the Window carries (the answer's World context is read per answer).
+		const publishes = unit.slot !== "world";
+		const before = publishes
+			? (memory.windows.storedInTransaction(db, conversationId)?.version ??
+				null)
+			: null;
+		const snapshot = publishes
+			? memory.publishWindowInTransaction(db, conversationId, {
+					...(applied.republishLongTerm ? { republishLongTerm: true } : {}),
+					...(applied.prefetch ? { prefetch: applied.prefetch } : {}),
+					...(applied.notices.length > 0
+						? { addNotices: applied.notices }
+						: {}),
+				})
+			: null;
 		end.record(
 			env,
 			unit,
@@ -85,7 +93,7 @@ export function createSettle(deps: StewardDeps, kick: Kick, end: UnitEnd) {
 				results: applied.results,
 				durationMs: result.durationMs,
 				outputTokens: result.outputTokens,
-				after: snapshot.version,
+				after: snapshot?.version ?? null,
 				refs: applied.refs,
 			},
 			before,
@@ -115,6 +123,7 @@ export function createSettle(deps: StewardDeps, kick: Kick, end: UnitEnd) {
 		// A retry runs the same unit again: its next prepare takes a new request.
 		if (outcome.type === "retry") {
 			end.release(db, held);
+			end.releaseWorld(db, unit);
 			return "applied" as const;
 		}
 		if (outcome.type !== "success" || !input) {
@@ -133,6 +142,7 @@ export function createSettle(deps: StewardDeps, kick: Kick, end: UnitEnd) {
 		const result = outcome.result;
 		if (!memory.readyInTransaction(db)) {
 			end.release(db, held);
+			end.releaseWorld(db, unit);
 			closeUnit(db, unit.id, "stale", deps.clock());
 			log.info("steward.unit_stale", {
 				stepId: unit.step,

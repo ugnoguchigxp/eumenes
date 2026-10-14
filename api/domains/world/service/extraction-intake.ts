@@ -25,6 +25,7 @@ export const SKIP_REASONS = [
 	"WORLD_OFF",
 	"GATE_CLOSED",
 	"RECEIVE_REFUSED",
+	"SOURCE_BLOCKED",
 ] as const;
 export type SkipReason = (typeof SKIP_REASONS)[number];
 
@@ -62,10 +63,44 @@ export function scopeSetOf(
 	return [...keys].sort();
 }
 
-/** A change a user made: the only kind of source change that can be an extraction input. */
-export const isExtractionInput = (change: SourceChange): boolean =>
-	(change.kind === "added" || change.kind === "corrected") &&
-	change.speaker === "user";
+/** What the host must answer about a message before World may take it as input. */
+export type IntakePorts = {
+	/**
+	 * True when the message is an assistant answer that was adopted (its run completed). It is
+	 * asked only for an added assistant message; without an answer the message is no input.
+	 */
+	isAdoptedAnswer(db: Database, messageId: string): boolean;
+	/** The blocked ones among these messages (the steward's exclusion ledger). A blocked message is never input. */
+	blockedMessageIds(db: Database, messageIds: Iterable<string>): Set<string>;
+	/**
+	 * Told, after the receiving transaction COMMITTED, which conversations got new pending events.
+	 * Never called inside a transaction; a failure of the callback never undoes the receipt.
+	 */
+	onEventsReceived?(conversationIds: string[]): void;
+};
+
+/** No adopted answers, nothing blocked: the ports of a host that wired none (user input only). */
+export const NO_INTAKE_PORTS: Pick<
+	IntakePorts,
+	"isAdoptedAnswer" | "blockedMessageIds"
+> = {
+	isAdoptedAnswer: () => false,
+	blockedMessageIds: () => new Set(),
+};
+
+/**
+ * A change that can become an extraction input: a user's addition or correction, or an added
+ * assistant answer that was adopted. Retractions and corrected answers are never input.
+ */
+export const isExtractionInput = (
+	db: Database,
+	ports: Pick<IntakePorts, "isAdoptedAnswer">,
+	change: SourceChange,
+): boolean => {
+	if (change.kind === "retracted") return false;
+	if (change.speaker === "user") return true;
+	return change.kind === "added" && ports.isAdoptedAnswer(db, change.source.id);
+};
 
 export type ReceiveContext = {
 	worldOp: (
@@ -76,6 +111,7 @@ export type ReceiveContext = {
 	) => WorldApplyResult;
 	/** True when World may be used right now (ON, schema current, gate open). */
 	usable: (db: Database) => { ok: true } | { ok: false; reason: SkipReason };
+	ports: Pick<IntakePorts, "isAdoptedAnswer" | "blockedMessageIds">;
 	now: () => number;
 };
 
@@ -83,6 +119,8 @@ export type ReceiveReport = {
 	received: number;
 	skipped: number;
 	duplicates: number;
+	/** Conversations that got a new pending event (sorted, unique). */
+	conversationIds: string[];
 };
 
 /**
@@ -98,9 +136,21 @@ export function receiveSourceChanges(
 	feed: { scopeKeys: readonly string[]; restoreEpoch: string },
 	changes: readonly SourceChange[],
 ): ReceiveReport {
-	const report: ReceiveReport = { received: 0, skipped: 0, duplicates: 0 };
-	for (const change of changes) {
-		if (!isExtractionInput(change)) continue;
+	const report: ReceiveReport = {
+		received: 0,
+		skipped: 0,
+		duplicates: 0,
+		conversationIds: [],
+	};
+	const inputs = changes.filter((change) =>
+		isExtractionInput(db, ctx.ports, change),
+	);
+	const blocked = ctx.ports.blockedMessageIds(
+		db,
+		inputs.map((change) => change.source.id),
+	);
+	const conversations = new Set<string>();
+	for (const change of inputs) {
 		const eventId = extractEventId(scope, change);
 		if (getExtractEvent(db, scope.principal, scope.scopeKey, eventId)) {
 			report.duplicates += 1;
@@ -123,8 +173,19 @@ export function receiveSourceChanges(
 			receivedCursor: change.cursor,
 			sourceKey: sourceKeyOf(change.source),
 			source: ref,
+			speaker: change.speaker,
+			conversationId: change.conversationId,
 			receivedAtMs: ctx.now(),
 		};
+		if (blocked.has(change.source.id)) {
+			insertExtractEvent(db, {
+				...base,
+				state: "skipped",
+				reason: "SOURCE_BLOCKED",
+			});
+			report.skipped += 1;
+			continue;
+		}
 		const usable = ctx.usable(db);
 		if (!usable.ok) {
 			insertExtractEvent(db, {
@@ -159,6 +220,7 @@ export function receiveSourceChanges(
 		if (result.status === "applied" || result.status === "no_op") {
 			insertExtractEvent(db, { ...base, state: "received" });
 			report.received += 1;
+			conversations.add(change.conversationId);
 			continue;
 		}
 		// A forgotten event is not an input any more: nothing to receive, nothing to wait for.
@@ -174,6 +236,7 @@ export function receiveSourceChanges(
 		});
 		report.skipped += 1;
 	}
+	report.conversationIds = [...conversations].sort();
 	return report;
 }
 

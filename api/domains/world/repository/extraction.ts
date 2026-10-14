@@ -62,6 +62,7 @@ export const EXTRACT_EVENT_STATES = [
 	"skipped",
 ] as const;
 export type ExtractEventState = (typeof EXTRACT_EVENT_STATES)[number];
+export type ExtractSpeaker = "user" | "assistant";
 
 export type ExtractSourceRef = {
 	namespace: string;
@@ -82,14 +83,15 @@ export type ExtractEventRow = {
 	receivedCursor: string;
 	sourceKey: string;
 	source: ExtractSourceRef;
+	/** Who wrote the message. Set when the event was received. */
+	speaker: ExtractSpeaker;
+	/** The conversation the message belongs to; null only for an event received before the steward existed. */
+	conversationId: string | null;
 	state: ExtractEventState;
 	reason: string | null;
 	heldContextDigest: string | null;
-	failures: number;
-	retryAtMs: number;
-	jobId: string | null;
+	/** The Memory dependents registered for the model's view of this event (until it is settled or released). */
 	manifestId: string | null;
-	requestId: string | null;
 	receivedAtMs: number;
 	settledAtMs: number | null;
 };
@@ -104,20 +106,18 @@ type Raw = {
 	received_cursor: string;
 	source_key: string;
 	source_json: string;
+	speaker: ExtractSpeaker;
+	conversation_id: string | null;
 	state: ExtractEventState;
 	reason: string | null;
 	held_context_digest: string | null;
-	failures: number;
-	retry_at_ms: number;
-	job_id: string | null;
 	manifest_id: string | null;
-	request_id: string | null;
 	received_at_ms: number;
 	settled_at_ms: number | null;
 };
 
 const COLUMNS =
-	"principal, scope_key, event_id, seq, feed_scope_keys, feed_restore_epoch, received_cursor, source_key, source_json, state, reason, held_context_digest, failures, retry_at_ms, job_id, manifest_id, request_id, received_at_ms, settled_at_ms";
+	"principal, scope_key, event_id, seq, feed_scope_keys, feed_restore_epoch, received_cursor, source_key, source_json, speaker, conversation_id, state, reason, held_context_digest, manifest_id, received_at_ms, settled_at_ms";
 
 const toRow = (raw: Raw): ExtractEventRow => ({
 	principal: raw.principal,
@@ -129,14 +129,12 @@ const toRow = (raw: Raw): ExtractEventRow => ({
 	receivedCursor: raw.received_cursor,
 	sourceKey: raw.source_key,
 	source: JSON.parse(raw.source_json) as ExtractSourceRef,
+	speaker: raw.speaker,
+	conversationId: raw.conversation_id,
 	state: raw.state,
 	reason: raw.reason,
 	heldContextDigest: raw.held_context_digest,
-	failures: raw.failures,
-	retryAtMs: raw.retry_at_ms,
-	jobId: raw.job_id,
 	manifestId: raw.manifest_id,
-	requestId: raw.request_id,
 	receivedAtMs: raw.received_at_ms,
 	settledAtMs: raw.settled_at_ms,
 });
@@ -182,6 +180,8 @@ export type NewExtractEvent = {
 	receivedCursor: string;
 	sourceKey: string;
 	source: ExtractSourceRef;
+	speaker: ExtractSpeaker;
+	conversationId: string;
 	state: "received" | "skipped";
 	reason?: string;
 	receivedAtMs: number;
@@ -196,8 +196,8 @@ export function insertExtractEvent(
 	const seq = nextExtractSeq(db, input.principal, input.scopeKey);
 	db.query(
 		`INSERT INTO world_host_extract_event
-		(principal, scope_key, event_id, seq, feed_scope_keys, feed_restore_epoch, received_cursor, source_key, source_json, state, reason, received_at_ms)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		(principal, scope_key, event_id, seq, feed_scope_keys, feed_restore_epoch, received_cursor, source_key, source_json, speaker, conversation_id, state, reason, received_at_ms)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 	).run(
 		input.principal,
 		input.scopeKey,
@@ -208,6 +208,8 @@ export function insertExtractEvent(
 		input.receivedCursor,
 		input.sourceKey,
 		JSON.stringify(input.source),
+		input.speaker,
+		input.conversationId,
 		input.state,
 		input.reason ?? null,
 		input.receivedAtMs,
@@ -216,20 +218,40 @@ export function insertExtractEvent(
 }
 
 /** Events still waiting for extraction, oldest first. `due` skips events in backoff. */
+/**
+ * Received events with a known conversation, oldest first. A held event is left out unless its
+ * held digest differs from `digest`; `conversationId` narrows the read to one conversation, so
+ * the limit counts only events that can be offered.
+ */
 export function listOpenExtractEvents(
 	db: Database,
 	principal: string,
 	scopeKey: string,
-	limit: number,
+	filter: {
+		digest: string | null;
+		conversationId?: string;
+		limit: number;
+	},
 ): ExtractEventRow[] {
 	return (
 		db
 			.query(
 				`SELECT ${COLUMNS} FROM world_host_extract_event
 				WHERE principal = ? AND scope_key = ? AND state = 'received'
+					AND conversation_id IS NOT NULL
+					AND (? IS NULL OR conversation_id = ?)
+					AND (held_context_digest IS NULL OR (? IS NOT NULL AND held_context_digest <> ?))
 				ORDER BY seq LIMIT ?`,
 			)
-			.all(principal, scopeKey, limit) as Raw[]
+			.all(
+				principal,
+				scopeKey,
+				filter.conversationId ?? null,
+				filter.conversationId ?? null,
+				filter.digest,
+				filter.digest,
+				filter.limit,
+			) as Raw[]
 	).map(toRow);
 }
 
@@ -279,7 +301,7 @@ export function settleExtractEvent(
 	const changed = db
 		.query(
 			`UPDATE world_host_extract_event
-			SET state = ?, reason = ?, settled_at_ms = ?, job_id = NULL, manifest_id = NULL, request_id = NULL, held_context_digest = NULL
+			SET state = ?, reason = ?, settled_at_ms = ?, manifest_id = NULL, held_context_digest = NULL
 			WHERE principal = ? AND scope_key = ? AND event_id = ? AND state = 'received'`,
 		)
 		.run(state, reason, nowMs, principal, scopeKey, eventId) as {
@@ -288,97 +310,39 @@ export function settleExtractEvent(
 	if (changed.changes !== 1) throw new WorldHostStateError("state_missing");
 }
 
-/** Records a semantic hold only for the events this attempt still owns. */
+/** Records a semantic hold: the event is not offered again until the entity snapshot changes. */
 export function holdExtractEvents(
 	db: Database,
 	principal: string,
 	scopeKey: string,
-	jobId: string,
 	eventIds: readonly string[],
 	contextDigest: string,
 ): void {
 	requireTransaction(db);
 	const update = db.query(
 		`UPDATE world_host_extract_event
-		SET held_context_digest = ?, reason = 'EXTRACTION_CONTEXT_HELD'
-		WHERE principal = ? AND scope_key = ? AND event_id = ? AND job_id = ? AND state = 'received'`,
+		SET held_context_digest = ?, reason = 'EXTRACTION_CONTEXT_HELD', manifest_id = NULL
+		WHERE principal = ? AND scope_key = ? AND event_id = ? AND state = 'received'`,
 	);
 	for (const eventId of eventIds) {
-		const changed = update.run(
-			contextDigest,
-			principal,
-			scopeKey,
-			eventId,
-			jobId,
-		);
+		const changed = update.run(contextDigest, principal, scopeKey, eventId);
 		if (changed.changes !== 1) throw new WorldHostStateError("state_missing");
 	}
 }
 
-/** Hands the events to one queue job and records what was fixed at prepare. */
-export function assignExtractJob(
-	db: Database,
-	principal: string,
-	scopeKey: string,
-	eventIds: readonly string[],
-	jobId: string,
-): void {
-	requireTransaction(db);
-	const update = db.query(
-		`UPDATE world_host_extract_event SET job_id = ?
-		WHERE principal = ? AND scope_key = ? AND event_id = ? AND state = 'received'`,
-	);
-	for (const id of eventIds) update.run(jobId, principal, scopeKey, id);
-}
-
-export function setExtractPrepared(
+/** Remembers (or clears, with null) the Memory dependents registered for the model's view of an event. */
+export function setExtractManifest(
 	db: Database,
 	principal: string,
 	scopeKey: string,
 	eventId: string,
 	manifestId: string | null,
-	requestId: string | null,
 ): void {
 	requireTransaction(db);
 	db.query(
-		`UPDATE world_host_extract_event SET manifest_id = ?, request_id = ?
+		`UPDATE world_host_extract_event SET manifest_id = ?
 		WHERE principal = ? AND scope_key = ? AND event_id = ? AND state = 'received'`,
-	).run(manifestId, requestId, principal, scopeKey, eventId);
-}
-
-/**
- * The job ended without settling these events: back to the pool. A failure
- * counts and delays the next try (exponential, capped); a plain release does not.
- */
-export function releaseExtractJob(
-	db: Database,
-	jobId: string,
-	failure: { nowMs: number; baseMs: number; maxMs: number } | null,
-): ExtractEventRow[] {
-	requireTransaction(db);
-	const rows = (
-		db
-			.query(
-				`SELECT ${COLUMNS} FROM world_host_extract_event WHERE job_id = ? AND state = 'received' ORDER BY seq`,
-			)
-			.all(jobId) as Raw[]
-	).map(toRow);
-	if (rows.length === 0) return rows;
-	if (failure)
-		db.query(
-			`UPDATE world_host_extract_event
-			SET job_id = NULL, manifest_id = NULL, request_id = NULL,
-				retry_at_ms = ? + MIN(?, ? * (1 << MIN(failures, 20))),
-				failures = failures + 1
-			WHERE job_id = ? AND state = 'received'`,
-		).run(failure.nowMs, failure.maxMs, failure.baseMs, jobId);
-	else
-		db.query(
-			`UPDATE world_host_extract_event
-			SET job_id = NULL, manifest_id = NULL, request_id = NULL
-			WHERE job_id = ? AND state = 'received'`,
-		).run(jobId);
-	return rows;
+	).run(manifestId, principal, scopeKey, eventId);
 }
 
 /**
@@ -513,28 +477,4 @@ export function writeExtractFeedScopeSet(
 		`INSERT INTO world_host_extract_feed (feed, principal, scope_key, scope_set) VALUES (?, ?, ?, ?)
 		ON CONFLICT (feed, principal, scope_key) DO UPDATE SET scope_set = excluded.scope_set`,
 	).run(feed, principal, scopeKey, scopeSet);
-}
-
-/** Events that stay in the pool: the job that held them does not take them. */
-export function unassignExtractEvents(
-	db: Database,
-	principal: string,
-	scopeKey: string,
-	eventIds: readonly string[],
-): void {
-	requireTransaction(db);
-	const update = db.query(
-		`UPDATE world_host_extract_event SET job_id = NULL, manifest_id = NULL, request_id = NULL
-		WHERE principal = ? AND scope_key = ? AND event_id = ? AND state = 'received'`,
-	);
-	for (const id of eventIds) update.run(principal, scopeKey, id);
-}
-
-/** A retried attempt starts over: what the failed attempt fixed is withdrawn, the job keeps the events. */
-export function clearExtractPrepared(db: Database, jobId: string): void {
-	requireTransaction(db);
-	db.query(
-		`UPDATE world_host_extract_event SET manifest_id = NULL, request_id = NULL
-		WHERE job_id = ? AND state = 'received'`,
-	).run(jobId);
 }

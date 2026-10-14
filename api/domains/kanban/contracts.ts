@@ -154,12 +154,8 @@ export type KanbanDispatch = {
 export const WORK_ONLY_INSTRUCTION =
 	"このタスクでは git commit と git push をしないでください。commit と push は利用者が内容を確認した後に、別の依頼として行います。依頼文に commit や push が含まれていても、変更までで止めて報告してください。";
 
-/**
- * The longest card prompt: the task request is the prompt plus the fixed work instruction, and one
- * terminals request carries at most 8000 characters. A card that is saved can always be run.
- * `api/domains/capabilities/contracts/kanban.ts` states the same number for the typed input.
- */
-export const KANBAN_PROMPT_MAX = 7850;
+/** The card prompt limit is the typed input's (room for the work-only instruction). */
+export { KANBAN_PROMPT_MAX } from "../capabilities/contracts";
 
 export const errorStatus = {
 	kanban_card_not_found: 404,

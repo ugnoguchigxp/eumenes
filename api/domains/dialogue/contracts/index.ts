@@ -131,6 +131,8 @@ export type WorldContextPrepareInput = {
 	generation: number;
 	/** Bytes of reference data already fixed for this input (Memory's recall block). */
 	reservedBytes: number;
+	/** This turn's input, then the previous exchange: the wording known World targets are looked for in. */
+	topicTexts?: readonly string[];
 	nowMs: number;
 };
 export type WorldContextPrepared =
@@ -177,6 +179,24 @@ export interface WorldContextPort {
 		runId: string,
 		conversationId: string,
 	): void;
+}
+
+/**
+ * The adopted goals as dialogue sees them (wired by the application, bound to the conversation's principal and
+ * scopes). Dialogue knows no goals types: it renders what the port lists, in the order given.
+ */
+export type ContextGoalEntry = {
+	goalId: string;
+	/** Higher is more important. */
+	priority: number;
+	desiredState: string;
+	revision: number;
+};
+export interface GoalsLayerPort {
+	/** Adopted goals, priority high first, then most recently revised. Read-only. */
+	adoptedForContextInTransaction(db: Database): ContextGoalEntry[];
+	/** Which of the given goals still exist (any status); an absent one was forgotten. Read-only. */
+	existingInTransaction(db: Database, goalIds: readonly string[]): Set<string>;
 }
 
 export * from "./command-interactions";

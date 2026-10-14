@@ -1,4 +1,3 @@
-import type { Database } from "bun:sqlite";
 import { randomBytes } from "node:crypto";
 import {
 	chmodSync,
@@ -25,30 +24,27 @@ import type { MemoryService } from "../domains/memory";
 import {
 	SourceCursorError,
 	createConversationSourceAdapter,
-	conversationReasonSource,
 	createWorldClaims,
 	createWorldContextBroker,
-	createWorldExtraction,
+	createWorldCuration,
 	createWorldHostGate,
 	createWorldLifecycle,
 	createWorldService,
 	type ConsumeReport,
 	type ContextBroker,
-	type ExtractionHandler,
-	type ExtractionInference,
-	type ExtractionQueue,
-	type ForegroundSignal,
+	type IntakePorts,
 	type LifecycleOptions,
 	type PreparedWorldContext,
 	type RecoverReport,
 	type WorldClaims,
 	type WorldClaimsContext,
-	type WorldExtraction,
+	type WorldCuration,
 	type WorldHostGate,
 	type WorldLifecycle,
 	type WorldService,
 	type WorldStatus,
-	WORLD_EXTRACT_PURPOSE,
+	NO_INTAKE_PORTS,
+	WORLD_CURATE_PURPOSE,
 	worldHasContent,
 } from "../domains/world";
 
@@ -82,7 +78,7 @@ export function resolveWorldMode(store: SqliteStore): WorldMode {
 /** AccessContext purposes the conversation SourceAdapter allows (deny by default). */
 export const WORLD_BROKER_PURPOSE = "dialogue.read";
 export const WORLD_LIFECYCLE_PURPOSE = "world.lifecycle";
-/** Explicit registration of targets and structured claims (no extraction yet). */
+/** Explicit registration of targets and structured claims by the host (the steward curates through `assembly.curation`). */
 export const WORLD_MANUAL_PURPOSE = "world.manual";
 
 export const WORLD_DEFAULT_SCOPE: ScopeRef = {
@@ -179,28 +175,12 @@ export type WorldAssemblyOptions = {
 	/** Delay between a commit notification and the feed pass it triggers. */
 	debounceMs?: number;
 	/**
-	 * Local extraction (P4-02). Only with mode `on`: the queue handler is
-	 * registered and a job is scheduled after a feed pass that left unsettled
-	 * input. Without it (or in `protect`) no extraction job ever exists.
+	 * What the host answers about a message before World takes it as input, and the kick after
+	 * receipt: the steward is told which conversations got new pending events. `onEventsReceived`
+	 * runs after the receiving transaction committed, never inside it. Omitted (tests):
+	 * user messages only, nothing blocked, nobody told. The server always passes it.
 	 */
-	extraction?: {
-		queue: ExtractionQueue & {
-			registerHandler(definition: ExtractionHandler): void;
-		};
-		inference: ExtractionInference;
-		/** Entities World knows (the package offers no listing; default none). */
-		entities?: (db: Database, scope: ScopeRef) => readonly unknown[];
-		/** Test seams: the model-call budget (30 s) and the cancel confirmation (5 s). */
-		stageBudgetMs?: number;
-		confirmMs?: number;
-		/**
-		 * Foreground priority (P4-03): conversation, ASR and TTS. While it is
-		 * active no extraction is scheduled, a claimed job is held un-run and a
-		 * running model call is cancelled. When it ends (or a cancelled call
-		 * finally ends) the held input is picked up again by a feed pass.
-		 */
-		foreground?: ForegroundSignal;
-	};
+	intake?: Partial<IntakePorts>;
 	/** Test seams for the lifecycle (Memory port, clock, crash hooks). */
 	lifecycle?: Partial<
 		Pick<LifecycleOptions, "memory" | "clock" | "hook" | "dependentPageSize">
@@ -227,8 +207,8 @@ export type WorldAssembly = {
 	readonly lifecycle: WorldLifecycle;
 	readonly gate: WorldHostGate;
 	readonly broker: ContextBroker;
-	/** Present only in mode `on` with an `extraction` option. */
-	readonly extraction: WorldExtraction | undefined;
+	/** The World half of the steward's curate-world step and its forget operations. */
+	readonly curation: WorldCuration;
 	/** The port dialogue consumes. World OFF makes it answer `disabled`. */
 	readonly context: WorldContextPort;
 	/** The owner's claim list and explicit corrections (P5-02). */
@@ -253,7 +233,7 @@ export type WorldAssembly = {
 	};
 	/** One feed/forget pass (single flight). `full` also resumes stuck forgets and sweeps releases. */
 	pump(options?: { full?: boolean }): Promise<PumpReport>;
-	/** Starts the commit-notification and poll triggers. Never creates inference jobs. */
+	/** Starts the commit-notification and poll triggers. World itself never starts a model call. */
 	start(): void;
 	/** Stops the triggers and waits for the pass in flight. Call before `store.close()`. */
 	close(): Promise<void>;
@@ -290,7 +270,7 @@ export function createWorldAssembly(
 			WORLD_BROKER_PURPOSE,
 			WORLD_LIFECYCLE_PURPOSE,
 			WORLD_MANUAL_PURPOSE,
-			WORLD_EXTRACT_PURPOSE,
+			WORLD_CURATE_PURPOSE,
 		],
 		cursorSecret: options.cursorSecret,
 	});
@@ -301,6 +281,7 @@ export function createWorldAssembly(
 		policyRevision: (db) => options.memory.policyRevisionInTransaction(db),
 		gate,
 	});
+	const intake: IntakePorts = { ...NO_INTAKE_PORTS, ...options.intake };
 	const lifecycle = createWorldLifecycle({
 		store,
 		world: service,
@@ -309,18 +290,23 @@ export function createWorldAssembly(
 		purpose: WORLD_LIFECYCLE_PURPOSE,
 		sources: [adapter],
 		scopes: [scope],
+		intake,
 		...options.lifecycle,
+	});
+	const curation = createWorldCuration({
+		world: service,
+		lifecycle,
+		sources: [adapter],
+		intake,
+		gate,
+		purpose: WORLD_CURATE_PURPOSE,
 	});
 	const claims = createWorldClaims({
 		store,
 		world: service,
 		lifecycle,
 		state: () => ({ mode: options.mode, gateOpen: gate.isOpen() }),
-		reasonSource: conversationReasonSource(options.conversation, scope),
 		readPurpose: WORLD_BROKER_PURPOSE,
-		writePurpose: WORLD_MANUAL_PURPOSE,
-		onForgetAdvanceFailed: (error) =>
-			log.warn("world.forget_advance_failed", { reason: "advance" }, error),
 	});
 	const broker = createWorldContextBroker({
 		store,
@@ -329,38 +315,8 @@ export function createWorldAssembly(
 		scopeOf: () => scope,
 	});
 
-	// The handler exists only while World is configured ON; it is inert (and
-	// creates nothing) whenever World is switched OFF or its gate is closed.
-	const extraction =
-		options.mode === "on" && options.extraction
-			? createWorldExtraction({
-					store,
-					world: service,
-					sources: [adapter],
-					queue: options.extraction.queue,
-					inference: options.extraction.inference,
-					gate,
-					purpose: WORLD_EXTRACT_PURPOSE,
-					...(options.extraction.foreground
-						? { foreground: options.extraction.foreground }
-						: {}),
-					...(options.extraction.entities
-						? { entities: options.extraction.entities }
-						: {}),
-					...(options.extraction.stageBudgetMs === undefined
-						? {}
-						: { stageBudgetMs: options.extraction.stageBudgetMs }),
-					...(options.extraction.confirmMs === undefined
-						? {}
-						: { confirmMs: options.extraction.confirmMs }),
-				})
-			: undefined;
-	if (extraction) options.extraction?.queue.registerHandler(extraction.handler);
-
 	let closed = false;
 	let unsubscribe: (() => void) | undefined;
-	const unsubscribeResume: Array<() => void> = [];
-	let resume: ReturnType<typeof setTimeout> | undefined;
 	let poll: ReturnType<typeof setInterval> | undefined;
 	let debounce: ReturnType<typeof setTimeout> | undefined;
 
@@ -469,17 +425,6 @@ export function createWorldAssembly(
 		for (const why of [sourceWhy, memoryWhy])
 			if (why !== null && why !== "CLOSED" && why !== "PAGE_LIMIT")
 				log.warn("world.feed_blocked", { reason: why.toLowerCase() });
-		// Unsettled input becomes ONE background job; no input, no job, no model call.
-		if (extraction && !closed)
-			try {
-				await extraction.schedule(scope);
-			} catch (error) {
-				log.warn(
-					"world.extraction_schedule_failed",
-					{ reason: "schedule" },
-					error,
-				);
-			}
 		let pendingForgets = 0;
 		if (full && !closed) {
 			const reports = await lifecycle.resumeForgets();
@@ -528,7 +473,7 @@ export function createWorldAssembly(
 		lifecycle,
 		gate,
 		broker,
-		extraction,
+		curation,
 		context: worldContextPort(broker),
 		claims,
 		claimsContext: () => ({
@@ -561,22 +506,6 @@ export function createWorldAssembly(
 				}, options.debounceMs ?? DEFAULT_DEBOUNCE_MS);
 				debounce.unref();
 			});
-			// Held input resumes when the foreground ends or a cancelled call finally
-			// ended. This only asks for a feed pass; the pass schedules a job only if
-			// unsettled input exists, so an idle system still makes no model request.
-			const resumePass = () => {
-				if (closed || resume) return;
-				if (options.extraction?.foreground?.active()) return;
-				resume = setTimeout(() => {
-					resume = undefined;
-					void pump();
-				}, options.debounceMs ?? DEFAULT_DEBOUNCE_MS);
-				resume.unref();
-			};
-			const foreground = options.extraction?.foreground;
-			if (extraction && foreground?.subscribe)
-				unsubscribeResume.push(foreground.subscribe(resumePass));
-			if (extraction) unsubscribeResume.push(extraction.onSlotFree(resumePass));
 			const pollMs = options.pollMs;
 			poll = setInterval(
 				() => {
@@ -593,13 +522,10 @@ export function createWorldAssembly(
 			closed = true;
 			unsubscribe?.();
 			unsubscribe = undefined;
-			for (const stop of unsubscribeResume.splice(0)) stop();
 			if (poll) clearInterval(poll);
 			if (debounce) clearTimeout(debounce);
-			if (resume) clearTimeout(resume);
 			poll = undefined;
 			debounce = undefined;
-			resume = undefined;
 			await running?.catch(() => {});
 		},
 	};

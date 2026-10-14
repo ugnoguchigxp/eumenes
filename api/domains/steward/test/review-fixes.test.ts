@@ -133,7 +133,7 @@ async function learn(h: StewardHarness, count = 1) {
 	h.inference.script("curate-memory", {
 		...empty,
 		remember: Array.from({ length: count }, (_, i) =>
-			item(`k.${i + 1}`, `覚えたこと${i + 1}`),
+			item(`k.${i + 1}`, `住所に関する記憶${i + 1}`),
 		),
 	});
 	h.inference.script("dispose-exchanges", keepAll);
@@ -245,8 +245,8 @@ test("a ref the model was not shown ends the whole forget, and so does a list lo
 		user: "全部忘れて",
 		end: "completed",
 		requests: [
-			{ kind: "forget", what: "一つ" },
-			{ kind: "forget", what: "全部" },
+			{ kind: "forget", what: "住所" },
+			{ kind: "forget", what: "住所の記憶すべて" },
 		],
 	});
 	await h.drain();
@@ -273,7 +273,7 @@ test("five items can be forgotten at once", async () => {
 	await h.run({
 		user: "五つ忘れて",
 		end: "completed",
-		requests: [{ kind: "forget", what: "五つ" }],
+		requests: [{ kind: "forget", what: "住所の記憶" }],
 	});
 	await h.drain();
 	// The six items share one evidence message. The forget blocks it, but only the five named items go:
@@ -304,7 +304,7 @@ test("a forget the memory refuses as too large ends the request without forgetti
 	await h.run({
 		user: "忘れて",
 		end: "completed",
-		requests: [{ kind: "forget", what: "ひとつ" }],
+		requests: [{ kind: "forget", what: "住所の記憶" }],
 	});
 	await h.drain();
 	expect(h.memory.list()).toHaveLength(3);

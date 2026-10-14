@@ -6,26 +6,22 @@ import type {
 	WorldClaimsContext,
 } from "../service/world-claims";
 
-const statusOf = (code: WorldClaimError): 400 | 404 | 409 | 503 => {
+const statusOf = (code: WorldClaimError): 404 | 409 | 503 => {
 	switch (code) {
 		// Unknown, hidden, other Scope, closed gate, forgotten: ONE answer.
 		case "not_found":
 			return 404;
 		case "world_disabled":
-		case "revision_conflict":
-		case "claim_not_changeable":
 			return 409;
 		case "world_unavailable":
 			return 503;
-		case "invalid_world_request":
-		case "reason_source_unavailable":
-			return 400;
 	}
 };
 
 /**
- * The owner's claim list and explicit corrections (P5-02). Mounted only while
- * World is configured (protect or on); with World OFF the routes do not exist.
+ * The owner's claim list, view only: claims are kept by the memory steward, the owner can look but not
+ * change them (plan G3). Mounted only while World is configured (protect or on); with World OFF the routes
+ * do not exist.
  * The Scope the caller may use is bound by the host (`context`), never by the
  * body or the query string.
  */
@@ -37,15 +33,8 @@ export function registerWorldClaims(
 	type Reply = ClaimResult<unknown>;
 	const reply = (c: Context, result: Reply) => {
 		if (result.status === "ok") return c.json(result.value);
-		return c.json(
-			{
-				error: result.code,
-				...("reload" in result ? { reload: true } : {}),
-			},
-			statusOf(result.code),
-		);
+		return c.json({ error: result.code }, statusOf(result.code));
 	};
-	const body = (c: Context) => c.req.json().catch(() => null);
 
 	app.get("/api/world/status", (c) => c.json(claims.status(context())));
 	app.get("/api/world/claims", (c) => {
@@ -72,13 +61,4 @@ export function registerWorldClaims(
 			claims.forgets(context(), scopeKey === undefined ? {} : { scopeKey }),
 		);
 	});
-	app.post("/api/world/claims/correct", async (c) =>
-		reply(c, await claims.correct(context(), await body(c))),
-	);
-	app.post("/api/world/claims/retract", async (c) =>
-		reply(c, await claims.retract(context(), await body(c))),
-	);
-	app.post("/api/world/claims/forget", async (c) =>
-		reply(c, await claims.forget(context(), await body(c))),
-	);
 }

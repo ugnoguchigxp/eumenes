@@ -1,16 +1,11 @@
 import type { z } from "zod";
 import {
-	claimChangeSchema,
 	claimDetailSchema,
 	claimListSchema,
-	forgetAcceptedSchema,
 	forgetListSchema,
 	worldClaimsStatusSchema,
-	type CorrectClaim,
-	type ForgetClaim,
-	type RetractClaim,
 } from "../api/domains/world/contracts/view";
-import { json, type Transport } from "./transport";
+import type { Transport } from "./transport";
 
 export function worldClient(t: Transport) {
 	const read = async <S extends z.ZodType>(
@@ -19,12 +14,6 @@ export function worldClient(t: Transport) {
 		signal?: AbortSignal,
 	): Promise<z.infer<S>> =>
 		schema.parse(await (await t.call(path, { signal })).json());
-	const post = async <S extends z.ZodType>(
-		schema: S,
-		path: string,
-		body: unknown,
-	): Promise<z.infer<S>> =>
-		schema.parse(await (await t.call(path, json(body))).json());
 	const scoped = (path: string, scopeKey?: string) =>
 		scopeKey === undefined
 			? path
@@ -43,12 +32,6 @@ export function worldClient(t: Transport) {
 			),
 		worldForgets: (scopeKey?: string, signal?: AbortSignal) =>
 			read(forgetListSchema, scoped("/api/world/forgets", scopeKey), signal),
-		correctWorldClaim: (input: CorrectClaim) =>
-			post(claimChangeSchema, "/api/world/claims/correct", input),
-		retractWorldClaim: (input: RetractClaim) =>
-			post(claimChangeSchema, "/api/world/claims/retract", input),
-		forgetWorldClaim: (input: ForgetClaim) =>
-			post(forgetAcceptedSchema, "/api/world/claims/forget", input),
 	};
 }
 export type WorldClient = ReturnType<typeof worldClient>;

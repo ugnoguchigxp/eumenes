@@ -7,6 +7,7 @@ export {
 export type { GoalsService } from "./service";
 export {
 	createGoalsService,
+	existingGoalIdsInTransaction,
 	forgetGoals,
 	goalEpochOf,
 	goalRevisionOf,

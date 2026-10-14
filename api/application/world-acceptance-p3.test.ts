@@ -6,8 +6,7 @@ import { withLanguageControl } from "../domains/voice-dialogue/test/control-fixt
  * from `./world` (the code `server.ts` runs).
  *
  * Fixture-grade, stated plainly:
- *   - the model is a fixture inference port (no real Local Provider run; see
- *     `world-real-local-provider.test.ts`, which is skipped and says so);
+ *   - the model is a fixture inference port (no real provider run);
  *   - TTS is a spy (no real audio);
  *   - claims are explicit structured claims (no automatic extraction, P4);
  *   - "forget a message" is composed in the test (conversation retraction +
@@ -27,6 +26,7 @@ import {
 	planForget,
 } from "eumenes-memory/sqlite";
 import { planAssertionTransition } from "eumenes-world-model";
+import worldPackage from "eumenes-world-model/package.json";
 import { createContinuityService } from "../domains/continuity";
 import {
 	CONVERSATION_DEFAULT_PRINCIPAL,
@@ -597,7 +597,7 @@ test("A35/A36/A37/A38/A39/A40/A41 one Scope end to end: register -> ask -> corre
 	expect(firstUsage).toMatchObject({
 		runId: first.id,
 		sliceStatus: "ready",
-		packageVersion: "0.0.0",
+		packageVersion: worldPackage.version,
 		goal: { id: goal.id, revision: goal.revision },
 	});
 	expect(versionIds(firstUsage)).toEqual(["claim-1"]);
@@ -737,7 +737,7 @@ test("A34 (host side) the host consumes only the vendored World tgz: package.jso
 	expect(pkg.dependencies["eumenes-world-model"]).toMatch(
 		/^file:vendor\/world\/eumenes-world-model-.+\.tgz$/,
 	);
-	expect(h.usage(run.id)?.packageVersion).toBe("0.0.0");
+	expect(h.usage(run.id)?.packageVersion).toBe(worldPackage.version);
 });
 
 test("A34-A41 World OFF (protect) + Memory OFF + model stopped: a forget is still processed and completes", async () => {

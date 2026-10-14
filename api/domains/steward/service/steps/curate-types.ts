@@ -1,6 +1,10 @@
 import { RECALL_LIMIT } from "../../../memory";
 import { stateKinds as stateKindsOf } from "../../../memory/contracts";
-import { REQUESTS_PER_UNIT, type RequestKind } from "../../contracts";
+import {
+	EXCHANGES_PER_UNIT,
+	REQUESTS_PER_UNIT,
+	type RequestKind,
+} from "../../contracts";
 import {
 	type LabelTable,
 	type MemoryRef,
@@ -66,12 +70,15 @@ export type Resolve = {
 	kind: (typeof stateKindsOf)[number] | null;
 	key: string | null;
 };
+/** The judgment of one exchange: does it need a World step, does it need a goal step (section 3.4 of the World plan). */
+export type Route = { exchange: string; world: boolean; goals: boolean };
 export type CurateOutput = {
 	remember: Remember[];
 	update: Update[];
 	stop: Stop[];
 	notes: Note[];
 	resolve: Resolve[];
+	route: Route[];
 	/** Elements the host dropped (unreadable or over a limit). */
 	dropped: number;
 };
@@ -79,6 +86,7 @@ export type CurateOutput = {
 export type RequestEntry = {
 	id: string;
 	what: string;
+	detail: string | null;
 	kind: RequestKind;
 	messageId: string;
 	/** The label of the exchange the request was made in. */
@@ -90,6 +98,17 @@ export type CurateContext = {
 	targetIds: string[];
 	requests: Record<string, RequestEntry>;
 	refs: Record<string, MemoryRef>;
+	/**
+	 * What the model was shown of each ref (a memory item's text, a World entity's name and aliases, a claim's text, a
+	 * goal's text), for the relevance check of a forget: a ref it does not share content with the request is not forgotten.
+	 */
+	shown: Record<string, string[]>;
+	/** A claim ref -> the World entities it is about: the forget of an entity already removes the claim. */
+	claimEntities: Record<string, string[]>;
+	/** The user's text of each exchange of the unit, by label. */
+	exchangeTexts: Record<string, string>;
+	/** The version of each target exchange's messages the model read (a route is bound to it). */
+	sources: Record<string, { revision: string; digest: string }>;
 	digests: Record<string, string>;
 	turns: Array<{ messageId: string; text: string }>;
 	/** The live short-term notes' texts: an added note that repeats one is not saved twice. */
@@ -102,6 +121,8 @@ export type TurnVectors = Awaited<
 export type CurateExtras = {
 	turnVectors: Promise<TurnVectors> | TurnVectors;
 	candidates: Candidates;
+	/** The user's text of each candidate (`c1`...), for the relevance check of a forget. */
+	candidateTexts: Record<string, string>;
 };
 
 export function parseCurate(raw: unknown): CurateOutput | null {
@@ -200,5 +221,18 @@ export function parseCurate(raw: unknown): CurateOutput | null {
 			REQUESTS_PER_UNIT,
 		),
 	);
-	return { remember, update, stop, notes, resolve, dropped };
+	// A judgment the host can not read is "needed": nothing is skipped on a guess (an exchange without one counts as needed too).
+	const route = take(
+		elements<Route>(
+			raw.route,
+			(e) => {
+				const exchange = text(e.exchange, 16);
+				return exchange
+					? { exchange, world: e.world !== false, goals: e.goals !== false }
+					: null;
+			},
+			EXCHANGES_PER_UNIT,
+		),
+	);
+	return { remember, update, stop, notes, resolve, route, dropped };
 }

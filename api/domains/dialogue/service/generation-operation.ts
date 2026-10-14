@@ -68,6 +68,8 @@ export function settleConversationOperation(
 		memory,
 		memoryWindow: input.memory,
 		recallPins: result.recallPins,
+		goals: deps.goals,
+		goalsLayer: input.goals,
 		world: worldContext,
 		worldView: input.world,
 		settle: {

@@ -17,12 +17,18 @@ const failureRules =
 export function researchResultContext(
 	sections: Pick<
 		ContextSections,
-		"system" | "longTerm" | "history" | "working" | "unprocessed" | "input"
+		| "system"
+		| "longTerm"
+		| "goals"
+		| "history"
+		| "working"
+		| "unprocessed"
+		| "input"
 	>,
 	projection: string | undefined,
 	failureCode?: string | null,
 ) {
-	const { input, longTerm, working } = sections;
+	const { input, longTerm, goals, working } = sections;
 	// Both lists are oldest first; the kept exchanges are the older part.
 	const history = [...sections.history];
 	const unprocessed = [...sections.unprocessed];
@@ -62,6 +68,7 @@ export function researchResultContext(
 	const assemble = () => [
 		system,
 		...longTerm,
+		...goals,
 		...history,
 		...working,
 		...unprocessed,

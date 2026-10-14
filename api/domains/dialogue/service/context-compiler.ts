@@ -56,6 +56,8 @@ export type ContextSections = {
 	system: ChatMessage;
 	/** L1 long-term memory */
 	longTerm: ChatMessage[];
+	/** The adopted goals, right after L1: they change rarely, so the layers behind them keep their cache */
+	goals: ChatMessage[];
 	/** L3 the exchanges kept verbatim, in the order they were appended */
 	history: ChatMessage[];
 	/** L2 working memory: the summary, then the short-term notes and the recently remembered */
@@ -84,7 +86,7 @@ type MemoryHistory = Pick<
 
 /**
  * The model-visible context of a run, in the fixed order
- * `[L0 system, L1 long-term?, L3 kept exchanges, L2 working memory?, unprocessed exchanges, L5 this input]`.
+ * `[L0 system, L1 long-term?, goals?, L3 kept exchanges, L2 working memory?, unprocessed exchanges, L5 this input]`.
  * L4 (notices, prefetched earlier exchanges, World, operation results) is placed by the caller
  * right before L5; `sections.tail` is the part of it that is decided here.
  *
@@ -99,6 +101,7 @@ export function compileContext(
 	general: Parameters<typeof buildSystemPrompt>[0] | undefined,
 	window: WindowSnapshot | null,
 	memory?: MemoryHistory,
+	goalsLayer?: ChatMessage | null,
 ): {
 	messages: ChatMessage[];
 	sections: ContextSections;
@@ -117,6 +120,7 @@ export function compileContext(
 	const longTerm: ChatMessage[] = window?.longTerm.text
 		? [{ role: "system", content: window.longTerm.text }]
 		: [];
+	const goals: ChatMessage[] = goalsLayer ? [goalsLayer] : [];
 	const working: ChatMessage[] = [];
 	if (window?.history.summaryText)
 		working.push({
@@ -277,12 +281,22 @@ export function compileContext(
 		messages: [
 			system,
 			...longTerm,
+			...goals,
 			...history,
 			...working,
 			...unprocessed,
 			input,
 		],
-		sections: { system, longTerm, history, working, unprocessed, input, tail },
+		sections: {
+			system,
+			longTerm,
+			goals,
+			history,
+			working,
+			unprocessed,
+			input,
+			tail,
+		},
 		shownMessageIds,
 		prefetchDropped,
 	};

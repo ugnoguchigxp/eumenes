@@ -18,12 +18,12 @@ import type { ServiceTestsPorts } from "./service-tests-adapter";
 import type { SettingsAdapterPorts } from "./settings-adapter";
 import { questionReader, type InteractionViews } from "./toolchain-adapters";
 import type { TtsDictionaryPorts } from "./tts-dictionary-adapter";
+import { createWorldQueryPorts } from "./world-query-adapter";
 import type { WorldAdapterPorts } from "./world-adapter";
 import type { WorldAssembly } from "./world";
 import type { UiCompositionsService } from "../domains/ui-compositions";
 
 /** How many of the person's latest statements a World correction may cite as its reason. */
-const REASON_MESSAGES = 20;
 
 /**
  * The domain services the data-driven toolchain screens execute through, as the server (and the
@@ -31,6 +31,8 @@ const REASON_MESSAGES = 20;
  * toolchain, so its open questions are attached later.
  */
 export function createToolchainHostLinks(services: {
+	/** The store the `world_query` reads run in (absent: the tool is not offered). */
+	store?: SqliteStore;
 	settings: SettingsAdapterPorts & {
 		derivedKey(purpose: string): Uint8Array | undefined;
 		diagnostics: RecordsPorts["diagnostics"];
@@ -57,21 +59,15 @@ export function createToolchainHostLinks(services: {
 	const worldPorts: WorldAdapterPorts | undefined = world && {
 		claims: world.claims,
 		context: world.claimsContext,
-		resumeForget: (forgetId) => world.lifecycle.resumeForget(forgetId),
-		reasonMessages: () =>
-			services.conversation
-				.get("main")
-				.messages.filter((m) => m.role === "user")
-				.slice(-REASON_MESSAGES)
-				.reverse()
-				.map((m) => ({ id: m.id, text: m.text })),
-		onForgetAdvanceFailed: (error) =>
-			services.log?.warn(
-				"world.forget_advance_failed",
-				{ reason: "forget_advance_failed" },
-				error,
-			),
 	};
+	const worldQueryPorts =
+		world && services.store
+			? createWorldQueryPorts({
+					store: services.store,
+					world: world.service,
+					context: world.claimsContext,
+				})
+			: undefined;
 	return {
 		options: {
 			conversation: services.conversation,
@@ -88,6 +84,7 @@ export function createToolchainHostLinks(services: {
 					: undefined,
 			blockedMessages: services.memory,
 			world: () => worldPorts,
+			worldQuery: worldQueryPorts ? () => worldQueryPorts : undefined,
 			serviceTests: services.serviceTests,
 			records: {
 				usagePage: inference.usagePage,

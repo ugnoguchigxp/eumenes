@@ -195,7 +195,10 @@ async function setup() {
 		/** compileContext as the prepare phase calls it: with the stored window (or none) and memory. */
 		async compile(
 			runId: string,
-			options: { window?: WindowSnapshot | null } = {},
+			options: {
+				window?: WindowSnapshot | null;
+				goals?: { role: "system"; content: string } | null;
+			} = {},
 		) {
 			return store.write((db) => {
 				const run = db
@@ -216,6 +219,7 @@ async function setup() {
 					undefined,
 					window,
 					memory,
+					options.goals,
 				);
 			});
 		},
@@ -538,4 +542,39 @@ test("notices and prefetched text are the tail, notices first; a prefetch standi
 	expect(texts(dropped.sections.tail)).not.toContain("重複");
 	expect(dropped.shownMessageIds).toContain(shown.input);
 	expect(dropped.shownMessageIds).not.toContain(hidden.input);
+});
+
+test("the goals layer sits right after long-term memory and before the kept history", async () => {
+	const h = await setup();
+	const kept = await h.exchange("保持の質問", "保持の答え");
+	await h.exchange("最新の質問", "最新の答え");
+	await h.dispose(kept.input, "keep");
+	await saveItem(h.store, h.memory, {
+		conversationId: "main",
+		messageId: kept.input,
+		quote: "保持の質問",
+		kind: "preference",
+		semanticKey: "k1",
+		text: "長期に入る好み",
+	});
+	await h.store.write((db) =>
+		h.memory.publishWindowInTransaction(db, "main", {
+			republishLongTerm: true,
+		}),
+	);
+	const goals = { role: "system" as const, content: "目標の層" };
+	await h.publish();
+	const run = await h.current("今回の入力");
+	const withGoals = await h.compile(run, { goals });
+	const order = texts(withGoals.messages);
+	const at = order.indexOf("目標の層");
+	expect(at).toBe(order.findIndex((t) => t.includes("長期に入る好み")) + 1);
+	expect(order.indexOf("保持の質問")).toBeGreaterThan(at);
+	expect(withGoals.sections.goals).toEqual([goals]);
+	// Without goals nothing is added and the other layers are as before.
+	const without = await h.compile(run);
+	expect(without.sections.goals).toEqual([]);
+	expect(texts(without.messages)).toEqual(
+		order.filter((t) => t !== "目標の層"),
+	);
 });

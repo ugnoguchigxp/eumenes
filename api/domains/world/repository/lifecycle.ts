@@ -83,7 +83,8 @@ export type ForgetOrigin =
 	| "request"
 	| "memory_feed"
 	| "source_feed"
-	| "restored";
+	| "restored"
+	| "steward";
 export const ROOT_KINDS = [
 	"source",
 	"state",

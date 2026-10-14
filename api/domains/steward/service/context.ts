@@ -15,7 +15,8 @@ export function localDay(ms: number): string {
 // ---- the memory the model is shown, with refs ----
 
 export type MemoryRef = {
-	namespace: "state" | "tendency" | "continuity";
+	/** Memory's own (state, tendency, note) and the shelves a forget request may also name: World's entities and claims, goals. */
+	namespace: "state" | "tendency" | "continuity" | "entity" | "claim" | "goal";
 	id: string;
 	revision: number;
 };

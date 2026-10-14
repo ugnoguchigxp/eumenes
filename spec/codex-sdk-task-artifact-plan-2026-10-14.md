@@ -1,6 +1,6 @@
 # 共通 Kanban と Codex SDK ツールチェーンの実装計画
 
-作成日・更新日: 2026-10-14、改訂2。状態: **計画・未実装**。対象 SDK は導入済みの `@openai/codex-sdk@0.160.0`。本書の登録名・API・テーブル名は追加予定であり、利用可能な機能を表すものではない。
+作成日: 2026-10-14、更新日: 2026-10-15、改訂3。状態: **計画・未実装**（外部レビューを既存実装と照合し、採用内容を反映）。対象 SDK は導入済みの `@openai/codex-sdk@0.160.0`。本書の登録名・API・テーブル名は追加予定であり、利用可能な機能を表すものではない。
 
 一つの Kanban「タスクボード」で、カードごとに Claude Code または Codex を選んで開発作業を依頼する。キューは実行担当ごとに独立した二本とし、GUI で進行状況、活動イベント、結果と Blocker を確認する。画面とカード管理は共有し、サブエージェント・指示・会話・実行機構は分離する。将来の Grok は登録された実行担当を増やす形で接続できるようにする。
 
@@ -37,7 +37,7 @@
 | [調査用 launcher](../api/domains/inference/adapters/codex-launcher.ts) | process group の終了などを参照する。ただし `--ephemeral`、調査用の出力量・再試行規則を開発担当に持ち込まない |
 | [登録手順](../docs/toolchain-extension.md)、[検証手順](../docs/toolchain-extension-verification.md) | bundle、DomainAdapter、Web adapter、公開 revision、共通受付台帳を使う |
 | [Timer adapter](../api/application/timer-adapter.ts)、[Web adapter](../web/src/domains/timers/toolchain-adapter.tsx) | transaction 内で受け付け、receipt を返し、source を再取得する接続例 |
-| [通知センター](../web/src/components/domains/timers/TimerNotificationCenter.tsx) | 現状はタイマー専用。Claude Code 計画の複数発信元対応と一つの変更として調整する |
+| [通知センター](../web/src/components/domains/timers/NotificationCenter.tsx)、[Kanban 通知 API](../api/domains/kanban/controller.ts) | タイマーと Kanban の既存接続を再利用。通知センターの API と Claude の通知 kind を維持する（§10） |
 | [Claude Code 計画](kanban-claude-code-plan-2026-10-14.md)、[Kanban 契約](../api/domains/kanban/contracts.ts) | 一部実装が進行中。カード・run・通知・既存 KanbanBoard を共有の正本として拡張する。Claude session と Codex thread は統合しない |
 | [Queue runner](../api/domains/queue/service/runner.ts) | lease と再実行の仕組みを持つ。副作用を伴う SDK 呼出しをそのまま再試行させない |
 
@@ -48,6 +48,7 @@
 - 公式資料は TypeScript SDK の `startThread`、継続実行、`resumeThread` と server-side 利用を説明している。対話的承認等を扱う独自クライアントには App Server が案内されている。[公式 SDK 文書](https://learn.chatgpt.com/docs/codex-sdk)
 - 導入済み `node_modules/@openai/codex-sdk/dist/index.d.ts` で、`runStreamed`、`AbortSignal`、`outputSchema`、`thread.started`、`turn.*`、`item.*`、`error` を確認した。`turn.started/completed` に turn ID はなく、承認要求へ応答する callback も型にない。App Server のイベントを SDK の型として扱わない。
 - SDK は `approvalPolicy` を指定できるが、それだけで対話的承認の GUI を実装できるとはしない。初期版は `never` と事前に制限された sandbox を組み合わせる。これは権限を無制限にする指定ではない。
+- 改訂3の照合時点でも導入済み SDK 0.160.0 の公開型を読み、上記のイベント、turn ID と承認 callback の不在、`resumeThread` と設定上書きの入口を再確認した。型の存在は実動作の証明ではない。`multi_agent: false` と持続する thread・プロジェクト指示の読取りの両立は P0 で別に実証する。
 - 標準の `workspace-write` は `.git` と、pointer が指す Git directory も read-only とする。通常の作業と commit の権限を分ける根拠とする。[公式の保護パス仕様](https://learn.chatgpt.com/docs/agent-approvals-security#protected-paths-in-writable-roots)
 
 資料の仕様とローカル CLI の動作は別に確認する。SDK・CLI の組合せ、Bun での実行、sandbox の実効権限は P0 の受入対象。
@@ -72,6 +73,20 @@
 | 可用性・結果 | `availability:codex-tasks@1`、`domain:codex-tasks.receipt@1`、`projection:codex-tasks.result@1` |
 
 会話用 tool は request/list/inspect/followup/answer/cancel/stop の各 `tool:codex-tasks.<操作>@1`。commit・push、権限の更新、実行不明からの復旧は UI 専用 operation とし、package の tool 一覧に含めない。worker の指示は受付 package の required skill に混ぜず、専用設定の revision 参照から解決する。モデル・reasoning effort は開発担当専用設定を使い、調査担当のモデルを固定流用しない。
+
+### 会話からの受付担当の選択
+
+同じ依頼を `kanban` と `codex_tasks` の両方へ送らない。以下を toolchain/package の `useWhen`・`avoidWhen`、受付 skill、対象選択の情報へ反映する。意味と対象の判断は LLM、対象 ID・保存済み担当・許可された操作の検証はホストが担う。
+
+| 依頼 | 受付と担当の決め方 |
+| --- | --- |
+| 新規で Codex を指定 | `codex_tasks`。executorId は Codex に固定 |
+| 新規で Claude を指定、または担当未指定 | `kanban`。指定担当、未指定なら最後に選んだ利用可能な担当（初回 Claude）を使い、採用した担当を回答する。既定が Codex でも別の受付担当へ重複委任せず、共通受付操作で一件を保存する |
+| 既存カードの実行・追加依頼・回答・停止 | 保存済みカード／対象 run の担当を優先。Codex 対象への「これを続けて」も `codex_tasks` へ渡せる。最後に選んだ担当で上書きしない |
+| 一覧・ボード整理・担当をまたぐ閲覧 | `kanban`。担当固有の worker は呼ばない |
+| 既存カードの担当変更 | 通常の followup とは分け、§4の変更操作へ進む。名前を言い換えただけで既存 run の担当を変えない |
+
+対象や担当が一意に定まらなければ、既存の確認質問を使う。担当の利用不能時は理由を返し、他担当へ自動で引き継がない。新規作成と既存操作の両方を自然言語受入で確認する。
 
 既存の bundle と同じく package は command 実行契約を使う。開発作業を research backend に登録しない。共通 Artifact は kanban bundle が一度だけ定義し、Codex bundle はその revision を pin 参照する。可用性は担当ごとに返し、Codex 不在でも共通ボード・Claude Code・保存済み履歴は使える。利用不能な担当へ自動で切り替えない。
 
@@ -143,26 +158,55 @@ Storybook とブラウザ受入では空・待ち・実行・長い出力・Bloc
 | 保存対象 | 主な内容 |
 | --- | --- |
 | `kanban_cards`（拡張） | カードの唯一の正本。scope、cardId、projectId、executorId、title、依頼、revision、currentRunId、列、確認済み。Codex 専用カード表は作らない |
-| `kanban_runs`（拡張） | runId、cardId、executorId、executor revision、workspaceRef、sessionRef、kind、凍結入力、状態、実行担当側の attemptRef、結果参照。過去 run の担当は不変 |
+| `kanban_runs`（拡張） | runId、cardId、executorId、executor revision、workspaceRef、sessionRef、kind、凍結入力、共通状態・理由、実行終了確認、実行担当側の attemptRef、結果参照、復旧時の照合結果。過去 run の担当は不変 |
 | `kanban_queues`（追加/拡張） | scope と executorId ごとの順番・paused/revision・理由・activeRun。初期二行で各 concurrency=1 |
-| `codex_task_attempts` | attemptId（共通 runId と1対1）、requestId、ownerRef=cardId、kind、凍結入力・指示revision・設定、状態、runnerEpoch、threadId、開始/終了、期限、結果、停止確認 |
+| `codex_task_attempts` | attemptId（共通 runId と1対1）、requestId、ownerRef=runId、cardId、kind、凍結入力・指示revision・設定、状態、runnerEpoch、threadId、開始/終了、期限、結果、停止確認 |
 | `codex_task_events` | attemptId、単調増加 seq、SDK itemId、eventType、発生/受信時刻、検証・編集済み payload、切詰め情報 |
 | Kanban 通知（拡張） | noticeId、scope、cardId、runId、executorId、kind、未読、音の claim/ack。Codex 用の重複通知表は作らない |
 | `codex_task_grants` | UI 受付に結び付いた一回分の Codex git/権限許可。cardId・元runId・executorId・workspaceRef、対象・有効期限・使用先 attempt、失効理由 |
 
 runner の進行とタスク revision を分ける。ログ一行の追加で確認画面の `expectedRevision` が毎回競合しないよう、イベントには seq、タスク操作には revision を用いる。変更操作は共通受付台帳の requestId/eventId と `expectedRevision` で保護する。最初の作成は新規 ID と requestId、一覧の順序等を変える場合は一覧 revision も使う。
 
+### 順序判断と実行接続の責務
+
+- kanban domain は担当別 FIFO、先頭候補、共通 run の遷移、キューを進める条件を所有し、登録担当を指す `KanbanDispatch` を返す。SDK/terminals の具象 service へ依存しない。
+- application は登録 port と workspace guard を接続し、kanban の候補を検証して、run の配送状態・workspace の予約・実行担当の `enqueueInTransaction` を単一 writer transaction で確定する。どれかの受付が失敗したら、この配送の予約と保存を一緒に戻す。業務上の順序判断を application に重複実装しない。
+- SDK/PTY の起動、git の外部照会、5秒・10秒の停止待ち、PTY の終了待ちは transaction の外で行う。終了・照会結果の保存時に run/epoch/revision と guard 所有者を再検証する。一方の実行待ちで writer を占有しない。
+
 ### 受付から結果採用まで
 
 1. 認証済み UI/会話操作を共通台帳で受け、同一 writer transaction で card、共通 run、担当別キュー位置、receipt を保存する。SDK/PTY を transaction 内で呼ばない。
-2. Kanban scheduler が各担当キューの先頭を独立に選び、空き枠・期限・権限・workspace guard を確認する。予約と実行担当の `enqueueInTransaction` を同じ transaction で行う。Codex は対応する attempt を一件だけ保存する。`store.onCommit` が各送信器を起こし、Codex は `queued → starting` と runnerEpoch を保存してから `runStreamed` を一度呼ぶ。
+2. kanban が各担当キューの先頭候補を独立に選び、application が空き枠・期限・権限・workspace guard を公開操作で確認する。上記の責務で予約と `enqueueInTransaction` を同じ transaction にまとめる。Codex は対応する attempt を一件だけ保存する。`store.onCommit` が各送信器を起こし、Codex は `queued → starting` と runnerEpoch を保存してから `runStreamed` を一度呼ぶ。
 3. iterator は生成時の `{attemptId, runnerEpoch}` を closure に固定する。受信時の「現在の task」では対応付けない。`thread.started` の ID を保存し、継続時には保存済み ID と照合する。
 4. イベントを検証して seq 順に保存し、実行の表示 projection を更新する。`turn.completed` は最終報告の候補とする。stream の正常終端、実行プロセスの終了、報告 schema を確認するまで Done にしない。
 5. SDK attempt の終了・最終報告と、購読先の kanban による run/currentRun の採用・通知を同一 writer transaction で確定する。実行担当の成功だけ保存してボード更新を失わない。commit 後に画面へ変更通知を送り、その担当の次の run を評価する。
 
-同一 requestId の再送は既存 receipt を返す。新しい attempt は明示的な再依頼だけで作る。「SDK が一度だけ副作用を実行する」保証はしない。送信と DB 保存の境界で結果不明になった場合は自動再送を禁止し、照合・人の確認へ進む。
+同一 requestId の再送は既存 receipt を返す。新しい attempt は明示的な依頼で作る。§9の一度の UI 操作で許可した二工程だけは、その許可の範囲で後半を一件作れるが、失敗した attempt の自動再試行には使わない。「SDK が一度だけ副作用を実行する」保証はしない。送信と DB 保存の境界で結果不明になった場合は自動再送を禁止し、照合・人の確認へ進む。
 
-### 状態遷移
+### 共通 run の状態・表示・進行条件
+
+`kanban_runs.state` は次表の共通状態とする。Claude の `handed` は配送済みを示す旧状態であり、実行開始の証拠にはしない。application の各 adapter が構造化された観測を共通入力へ写し、kanban が状態を採用する。詳細画面に担当固有の状態を併記できるが、カードやキューは次表を正本にする。
+
+| 共通状態 | Claude の観測 | Codex の観測 | カード表示・同担当キュー |
+| --- | --- | --- | --- |
+| `queued` | 旧 `waiting_turn`、担当へ未配送 | 共通 run の未配送 | 順番待ち。workspace 競合は理由を表示し、同キューの後続は追い越さない |
+| `dispatched` | 旧 `handed` かつ request は未実行 | attempt の `queued/starting` | 開始待ち。担当の実行枠を保持 |
+| `running` | request の送信・実行を確認 | `running` | 実行中。実行枠を保持 |
+| `waiting` | 入力・承認待ちを構造化された状態で確認 | 初期版では使わない。不足は終了後 `blocked` | 対応待ち。Terminal へ案内し、実行枠・guard を保持。idle と扱わない |
+| `settling` | request の終端を受け、結果採用を検証中 | `settling` | 結果確認中。確定前に次を配送しない |
+| `stopping` | 停止要求受付、終了待ち | `stopping` | 停止確認中。実行枠・guard を保持 |
+| `completed` | 正常な request 終端・報告を採用 | `succeeded` と有効な報告 | Done。実行終了確認後に次候補を評価。git グループの中間工程は§9の例外 |
+| `blocked` | 中断・失敗・停止の理由と実行終了を確認 | `blocked/failed`、または手動停止後の Blocker | 理由付き Blocker。終了確認済みなら次候補を評価。利用不能なら担当キューを pause |
+| `cancelled` | 未送信取消、または取消と実行終了を確認 | `cancelled` | 取消理由付き Blocker。未起動または終了確認後に次候補を評価 |
+| `unknown` | request の成否・停止が不明、追跡喪失 | `unknown` | 結果未確認の Blocker。担当キューを pause。停止未確認の guard は保持 |
+
+通常の遷移は `queued → dispatched → running → settling → completed/blocked`、実行中の `running ↔ waiting`、待機中の終端は `waiting → settling`、停止時の `dispatched/running/waiting/settling → stopping → blocked/cancelled/unknown`。起動前失敗・期限切れ・取消は `queued/dispatched` から該当終端へ進める。処理中のどの段階でも成否を確定できなければ `unknown` とする。受理済み取消を遅延した成功イベントで覆さない。
+
+run の実行終了確認と、workspace guard の解放は別の事実。Codex は process tree の終了確認が必要。Claude は request の終了後も idle PTY が guard を保持し、同じ担当の正当な継続では再利用できる。他担当への引渡しは§8の PTY 終了確認後だけ行う。したがって `completed` だけで共通 guard を解放しない。Claude が `unknown` を返した場合も、停止完了が別途確認でき、理由が明示的な手動停止なら `blocked` に対応付けられる。時刻や出力の文面から停止を推定しない。
+
+共通 run の `unknown` は、§8・§9の明示的な照合操作だけで `completed/blocked/cancelled` に解決できる。元 attempt の終端とイベントは書き換えず、照合の根拠と解決結果を別記録に残す。解決しても担当キューは自動再開しない。履歴の旧 run を照合した場合、新しい currentRun の状態を変更しない。
+
+### Codex attempt の状態遷移
 
 次の表は Codex attempt の状態であり、Claude request の既存状態を置き換えない。各実行 adapter が検証済みの結果を共通 run の Done/Blocker と停止確認へ写す。Claude の `Stop` による完了と Codex の構造化最終報告という観測の違いは、詳細に残す。
 
@@ -250,11 +294,19 @@ application の小さい workspace execution guard を共通化する。key は�
 - guard は終了確認後にのみ解放する。unknown の lease 時間切れだけでは解放しない。別 cwd の実行や通知閲覧を止めない。
 - 外部 Terminal やエディタの手作業まで排他できるとはしない。git 操作時には作業状態を再照合する。Claude/Codex の会話・実行機構を統合せず、共有する業務モデルはカード・run・キュー・通知に限る。
 
+#### Kanban 所有の idle PTY を終了する条件
+
+1. terminals の公開操作で、owner が Kanban、activity が確認済み idle、未完了 request・手入力による実行・入力／承認待ちがないこと、保存済み会話を再開できることを確認する。無イベント・経過時間・古い activity 表示は idle の証明にしない。
+2. 同じ writer transaction で session/guard の epoch と状態を再確認し、引渡しのための `releasing` を予約する。Kanban の新規配送だけでなく、直接の手入力と session 再利用も、この予約を検査する。先に入力が受け付けられていたら予約せず、先に予約されたら新たな入力を送らず再開可能になるまでの理由を返す。
+3. transaction の外で対象 PTY の終了を要求し、管理対象の同一性と終了を確認する。終了確認後の transaction で guard を解放し、待っている両キューの候補を再評価する。終了を確認できない場合は guard を保持して停止未確認を表示し、他担当へ引き渡さない。
+
+この操作は利用者が入力中の session を強制終了する一般機能ではない。direct 所有、手入力の処理中、入力・承認待ち、状態不明では自動終了の対象にしない。予約と入力受付の競合、終了失敗、backend 再起動中の `releasing` を試験する。
+
 ### backend の再起動
 
 backend 全体の再起動では各担当キューを回復待ちにし、それぞれの回復結果を保存する。一方の runner だけの再起動・障害はその担当だけを止める。Kanban から未配送の run は順序を保持し、期限切れだけ終端にする。Codex の未起動 queued は保持し、starting/running/settling/stopping は結果不明として記録して管理プロセスの生存・停止を照合する。Claude の配送済み request は Claude 計画の recover 契約を使う。前 epoch のイベントを新 attempt に採用せず、停止未確認の guard は保持する。
 
-threadId が残っていても、最後の操作が成功したと推定しない。保存済みイベントと git 等の読み取りで状況を表示し、人が確認後に対象 executorId と queueRevision を指定してキューを再開する。再開で古い attempt は送り直さない。Done の thread は通常どおり resume できる。メモリに残る SDK client 数をセッション数の上限にせず、実行終了後に解放する。
+threadId が残っていても、最後の操作が成功したと推定しない。保存済みイベントと git 等の読み取りで状況を表示し、人が確認後に対象 executorId と queueRevision を指定してキューを再開する。再開で古い attempt は送り直さない。git の検証済み工程は§9の記録を維持し、未確認工程だけを照合する。Done の thread は通常どおり resume できる。メモリに残る SDK client 数をセッション数の上限にせず、実行終了後に解放する。
 
 ## 9. commit と push
 
@@ -284,11 +336,34 @@ SDK の git 報告は、ホストの読み取りによる commit SHA、親 HEAD�
 
 この二工程は一つの操作グループとして当該担当のキュー枠と workspace guard を維持する。共通 Kanban には親 operationGroupId と前後二つの run を保存し、前半終了時はカードを Done にせず、後半の run を同じカードの currentRun にする。commit 後の HEAD/指紋と検証済み SHA を後半の許可に結び付け、間に別タスクを挟まない。他担当は別 workspace なら進める。push だけを頼む場合も、送信される commit の集合がこの task の確認済み範囲を超えれば Blocker にする。
 
+### git 工程の保存地点と再起動時の照合
+
+Codex の git attempt には、消費した許可 ID、operationGroupId、元 run、実行前の HEAD・branch・index/working tree の指紋、許可した変更の内容指紋と対象パス、push の remote/ref・送信対象を凍結する。パス名だけの一致を同じ変更の証拠にしない。内容の比較はホスト内で行い、GUI に Diff を追加しない。
+
+- commit の実行終了と結果をホストが検証したら、`commit_verified` と SHA・親 HEAD・tree・許可範囲の照合結果・検証時の状態指紋を保存する。この記録と共通 run の完了、operationGroup の工程更新は同じ writer transaction にする。
+- push の許可が引き続き有効なら、その transaction で後半の run/attempt の受付まで保存する。後半は `(operationGroupId, stage=push)` で一意にし、起動は commit 後とする。許可が失効していれば commit 成功の記録を残し、グループは Blocker にして確認画面へ戻す。commit をやり直さない。
+- `commit_verified` を持つ工程は backend 再起動で未確認へ戻さない。push が未起動の `queued` なら同じ受付を保持し、回復と明示的なキュー再開の後に、期限・指紋・元 run を再検証して一度だけ起動する。`starting` 以降の push は自動再送しない。
+
+部分成功の Blocker でグループを終える場合、実行終了を確認して枠・guardを解放する。後日のpush再依頼は、検証済みcommitを参照する新しいUI許可と新しい操作グループで受け付ける。旧グループの一意制約を解除して再実行しない。停止未確認なら枠・guardを保持する。
+
+`kanban.reconcile` は UI の要求を application の担当別 port へ渡す。管理プロセスの停止と workspace の排他を確認し、外部の git 読取りを transaction 外で行い、保存時に run/epoch・guard・許可記録を再確認する。
+
+| 落ちた地点／残る状態 | 照合と採用 |
+| --- | --- |
+| commit の副作用後、`commit_verified` 保存前 | 保存済みの許可と実行前状態から候補 commit を照合。親 HEAD、branch、tree/変更内容、対象パス、task・attempt への帰属を確認する。HEAD に commit がある、メッセージが似ている、SHA が報告にある、だけでは認定しない。条件を証明できなければ `unknown` のまま |
+| `commit_verified` 保存後、push 起動前 | 記録済み SHA を保持。後半受付を重複作成せず、再commitしない。未起動pushの許可失効・状態変更は確認をやり直す |
+| push 起動後、応答または保存前 | 許可された remote/ref と対象 SHA を読取り照合。ref が対象 SHA を指すこと、または取得した履歴で対象 SHA を含むことを証明できた場合だけ反映を確認する。照会不能・履歴不足・帰属不明は `unknown`。不一致だけで「副作用なし」として再pushしない |
+| 外部変更・余分なcommit・許可範囲との不一致 | 成功に変更せず根拠を表示する。整理または新たな許可を必要とし、同じ許可で新しい commit attempt を作らない |
+
+照合は元 attempt を再実行せず、その不明終端に結び付く回復結果を保存する。検証済み成功と通知は同じ transaction で一度だけ採用する。成功と認定できても担当キューの再開は別の明示操作とし、push の新しい権限を暗黙に付与しない。結果不明のまま利用者が停止を確認しただけの場合も、git 成功には昇格しない。
+
 Git の readonly 検査はホストの契約検証、作業対象の意味理解・commit メッセージ作成は LLM の役割。コマンド文字列を正規表現で判別することを権限制御の代替にしない。承認した git mode 内のあらゆる shell 操作を細粒度に制限できるとは仮定せず、P0 で権限の実効範囲と残る制約を記録する。
 
 ## 10. 通知と公開操作
 
-通知は共通 Kanban が `done`、`blocker`、`waiting`、`stopped`、`git_completed`、`queue_paused` を保存する。担当名を添え、クリックで同じボードの対象カード/run を開く。SDK/terminals が別の完了通知も出す二重経路を作らない。途中の全イベントやカード移動は通知しない。`executorId + runId + kind` 等の安定キーで重複を防ぎ、Done と検証済み git 成功を混同しない。
+通知は共通 Kanban が既存の `done`、`blocker`、`waiting`、`commit_push`、`queue_paused` を維持し、`stopped`、`git_completed` を追加する。Claude の既存 `commit_push` は「commit & push の報告」であり、過去の通知を検証済み成功へ変更しない。Codex の `git_completed` はホストが検証した工程だけに使い、mode と検証済み SHA を持たせる。二工程グループでは全工程成功時に一件だけ通知し、commit 成功/push 失敗は部分成功の SHA を添えた Blocker とする。
+
+担当名を添え、クリックで同じボードの対象カード/run を開く。SDK/terminals が別の完了通知も出す二重経路を作らない。途中の全イベントやカード移動は通知しない。`executorId + runId（グループなら operationGroupId）+ kind` の安定キーで照合後の再通知も防ぐ。手動停止を `stopped` で通知した場合は同じ終端の `blocker` を重ねない。Done と検証済み git 成功を混同しない。
 
 現行タイマー通知の claim/ack と鮮度制御の考え方を再利用する。Kanban 通知へ executorId を追加し、通知センターの発信元統合は一度だけ行う。タイマー表に開発タスクを保存しない。複数タブでも同じ音を重複再生せず、ブラウザに音を拒否されても未読通知は残す。Claude Code の direct 依頼の会話通知は別経路として維持する。
 
@@ -308,17 +383,17 @@ Git の readonly 検査はホストの契約検証、作業対象の意味理解
 
 Codex 専用の会話 tool `codex-tasks.request/list/inspect/followup/answer/cancel/stop` は application adapter で上記の共通操作に接続する。request は executorId=codex を固定し、既存カード操作はその対象 run が Codex であることを検証する。別担当のカードを黙って引き取らない。既存 kanban 担当には担当選択・キュー参照の新しい schema/skill revision を追加するが、Claude/Codex worker の指示・tool を一つの package に混在させない。
 
-board/detail/activity/executors は共通 artifact source API と登録 query で提供する。read は source 取得、write は `POST /api/toolchain-actions` に揃える。read の runId/cursor も scope と card の所属を検査する。UI が DB を開いたり SDK/PTY を直接起動したりしない。
+board/detail/activity/executors は共通 artifact source API と登録 query で提供する。ボードの read は source 取得、write は `POST /api/toolchain-actions` に揃える。read の runId/cursor も scope と card の所属を検査する。通知センターは既存の `GET /api/kanban/notices` と既読化 `POST /api/kanban/notices/:id/read` を維持し、ボードの source API へ置き換えない。同じ kanban 通知を参照し、別の通知正本を作らない。UI が DB を開いたり SDK/PTY を直接起動したりしない。
 
 ## 11. 実装順序、移行と変更先
 
 | 段階 | 作業 | 完了条件 |
 | --- | --- | --- |
-| P0 接続の事前確認 | SDK/CLI、イベント、schema、resume、Bun、権限、停止・再起動、git mode を隔離 fixture で確認 | §12 の技術的不確実性を解消。必要な launcher/設定だけ確定 |
-| P1 共通 Kanban 契約 | executor 登録 port、カード/run の担当、二本のキュー、workspace 割当/排他、migration | 既存 Claude カードを保持し、fake 二担当が独立して動く |
+| P0 接続の事前確認 | SDK/CLI、イベント、schema、サブエージェント無効化と持続thread・プロジェクト指示の両立、Bun、権限、停止・再起動、git mode を隔離 fixture で確認 | §12 の技術的不確実性を解消。実測した設定・制約を本書へ反映してから P1 以降へ進む |
+| P1 共通 Kanban 契約 | 完成した Claude 契約の保存形と移行判断を記録。その後、executor 登録 port、共通 run 状態表、二本のキュー、workspace 割当/排他、migration | 既存 Claude カードを保持し、旧画面の扱いを確定。fake 二担当で状態対応・終了待ち・writer rollback が通る |
 | P2 Codex runner と専用担当 | SDK attempt/events/復旧、専用 profile/skill/package/binding/DomainAdapter、共通 run への結果採用 | Codex 指定で専用担当へ到達し、ボードの同じカードが更新される |
 | P3 共通 GUI | KanbanBoard、二本のキュー表示、担当選択、ActivityTimeline、OpenUI、既存 Web adapter 拡張 | 入口一件。両担当の表示・操作・Blocker 対応が通る。IDE 機能なし |
-| P4 通知・git | 共通 Kanban 通知、既存センター、登録機能に応じた git 確認と実行 | 二重通知なし、担当取り違えなし、部分成功・結果不明を保持 |
+| P4 通知・git | 共通 Kanban 通知と既存 API、登録機能に応じた git 確認と実行、工程保存・再起動照合 | 二重通知なし、担当取り違えなし。commit成功を保持し、不明な工程を自動再実行しない |
 | P5 段階検証・live | 両担当の試験と限定した実 SDK 受入、第三担当 fixture | fixture と live を分けて記録し、移行と拡張の契約を確認 |
 
 追加先: `api/domains/codex-tasks/`（contracts/repository/service/adapters/test）、`api/application/codex-tasks-adapter.ts`、`api/domains/capabilities/bundles/codex-tasks.bundle.json`、型付き実行担当登録 port、`ActivityTimeline` と OpenUI 登録。
@@ -329,15 +404,25 @@ board/detail/activity/executors は共通 artifact source API と登録 query �
 
 ### 既存 Kanban からの移行
 
+**基本方針は新revision（本書では `@2`）への更新と既存データの移行。旧UIの変更操作を継続する互換層は原則作らず、再読込みで新版へ移す。** 未配布という説明だけで、seed済み定義の本文を同じrevisionへ上書きしない。データ保持、定義の版管理、古い画面の継続利用は別の判断として扱う。
+
+P1 の最初に、Claude 実装完了時のコミットと契約、保存済みカード/run/receipt、登録済み定義と参照、保存された Artifact・旧クライアントの継続要件を確認し、この節へ結果と採用経路を記録する。製品データは公開された読み取り操作で確認し、移行試験は隔離DBで行う。DBの削除や設定の初期化で互換問題を回避しない。
+
+| 確認結果 | 採用する経路 |
+| --- | --- |
+| 既存データまたはseed済み定義がある／利用状況を確認できない | 新revisionを追加しデータを移行。旧変更操作は新規受付せず `client_update_required` で新版へ案内。旧queryに `queues[]` を無理に返さず、新版のsourceへ再取得を求める |
+| 旧UI・保存済みArtifactの継続利用が具体的に必要 | その根拠・対象revision・終了条件を記録したうえで限定互換を追加。旧queryはClaudeカードとClaudeキューだけ。旧変更操作も同範囲に限定し、担当なしのキュー再開を全担当に広げない。Codexカードへの旧操作は拒否 |
+| 未配布で、保持対象のデータ・定義・参照もないことを確認済み | 互換層もデータ移行も不要。公開版は本書の新revisionへ揃える。同一revisionへの上書きを目的に追加の分岐を作らない |
+
 - `executorId` のない既存カード/run/通知は `claude-code` に backfill。既存のキュー順序・停止理由・receipt・session を保持し、Codex キューは空で追加する。
 - `claudeSessionId` は Claude 用 sessionRef へ対応付ける。列の即時削除や既存 thread の付け替えはせず、履歴読取を保つ。新しい Codex run に Claude session を渡さない。
 - board の単一 `queue` を `queues[]` にする新 query/schema/artifact revision を作る。既存入力 schema/revision を書き換えず、新しい公開 revision へ切り替える。新しい担当は新 schema からしか受け付けない。
-- 旧 UI/旧 artifact revision の変更操作は、旧来の Claude カード・Claude キューにだけ適用する互換規則を host に置く。特に executorId のない旧「キュー再開」を全担当へ広げない。Codex カードへの旧操作は `client_update_required` として読み直しを促す。
-- 旧 board query は旧 schema のまま Claude カードと Claude キューだけを返す。古い画面に新しい担当のカードや `queues[]` を混ぜない。旧並べ替えの参照先もこの範囲に検証する。
+- 旧 run の `waiting_turn` は共通 `queued` に、`completed/blocked/cancelled` は同名の状態と既存理由を保持して移す。`handed` は terminals の request を照合して§5の状態へ写し、観測できなければ `unknown` として担当キューを止める。`handed` を無条件に `running` にしない。
+- 旧操作の受付停止後も、既に受理した requestId の replay は既存 receipt を返し、副作用を再実行しない。限定互換を選ぶ場合だけ、旧並べ替えの参照先を含むClaude限定の範囲を検証する。
 - 実行中 run は開始時の登録 revision で終端まで追う。migration のために再送しない。起動時に運転中の未知状態があれば担当別 recover へ回す。
 - 初版の `codex_tasks` / 独立 Artifact は計画のみなので作成しない。もし実装着手時点で別作業が作成済みなら、データの有無を確認して移行計画を追加し、二つのカード正本を併存させない。
 
-現在進行中の [Claude Code 実装分担](kanban-implementation-assignments-2026-10-14.md) は改訂4の固定契約を前提としている。本書はその次の拡張計画であり、他の実行中タスクへ指示を送らない。製品実装時に最新の完成状態を確認し、固定契約の版更新と担当範囲を確定する。今回の編集対象は本書と Claude Code 計画の参照・適用範囲だけで、製品コード・分担指示は変更しない。
+[Claude Code 実装分担](kanban-implementation-assignments-2026-10-14.md) は改訂4の固定契約を前提としている。本書はその次の拡張計画であり、同じ契約を変更する Claude の実装作業と P1 以降を並行させない。他の実行中タスクへ指示を送らず、製品実装時に最新の完成状態を確認し、固定契約の版更新と担当範囲を確定する。改訂3の編集対象は本書のみで、製品コード・分担指示・Claude計画は変更しない。
 
 公開停止は executor 単位の受付・dispatch 停止設定とし、Codex 停止でも Claude Code と共通ボードを利用できる。履歴・停止操作は残す。第三担当を削除/無効化しても過去 run は表示できるようラベル・登録 revision を保存し、未完了 run がある登録は破棄しない。切戻しで実行済みのコード変更・commit・台帳を巻き戻さない。
 
@@ -346,7 +431,7 @@ board/detail/activity/executors は共通 artifact source API と登録 query �
 ### P0 で先に解消する事項
 
 1. 導入済み SDK/実際の CLI で、start → 複数 item → final schema → 終端を観測する。起動・resume のイベント順、失敗時、非対応 event を記録する。
-2. 同じ thread を別プロセス・backend 再起動後に再開できること。実行を5件以上繰り返しても SDK client/プロセスが溜まらないこと。
+2. 開発用 runner の設定で `multi_agent: false` を明示したまま、プロジェクト指示を読み、同じ thread を別プロセス・backend 再起動後に再開できること。調査用の `--ephemeral`、プロジェクト指示無効化、履歴制限をコピーしない。実際のCLI版・有効な設定・公開されたツール・再開の観測を記録し、サブエージェント起動が無効であることも確認する。実行を5件以上繰り返しても SDK client/プロセスが溜まらないこと。
 3. 通常 mode で編集・テストを実行でき、`.git` 更新・未許可ネットワーク・秘密領域へのアクセスが拒否されること。git mode の必要権限だけを設定できること。
 4. Abort、子コマンド実行中、backend 正常停止・強制終了で process tree を終了確認できること。不明なら guard を残して後続を拒否すること。
 5. 長いコマンド出力・SDK の巨大行でメモリが無制限にならず、切詰めか停止を追跡できること。イベント出力がターミナル同様に一文字ずつ流れる保証はせず、SDK が提供する更新粒度を記録する。
@@ -357,6 +442,8 @@ board/detail/activity/executors は共通 artifact source API と登録 query �
 | ケース | 観測可能な合格条件 |
 | --- | --- |
 | transaction rollback・同 requestId 再送・起動直後 crash | rollback 時に SDK 未呼出し、再送で attempt が増えない、成否不明を自動再実行しない |
+| 共通 run の状態対応 | Claude の未送信／実行／承認待ち／終了と Codex の各状態が§5の同じ表示・進行条件へ写る。`handed`だけでは実行中にしない。終了済みrunとidle PTYのguard保持を区別する |
+| application の配送と停止待ち | workspace予約・共通run更新・担当受付の途中失敗が一緒にrollback。5秒・10秒の待機中も別workspaceのキュー受付・起動がwriterを使える |
 | A 終了後 B 実行中に A の遅延/重複イベント | B の状態・結果・通知が変わらない |
 | 中止と完了の競合・停止未確認 | 受理済み取消後の結果を成功採用しない。停止未確認の次 task は起動しない |
 | DB 保存失敗・イベント上限・接続断 | 欠落/切詰めを明示し、cursor で復旧。保存不能を成功として進めない |
@@ -365,16 +452,18 @@ board/detail/activity/executors は共通 artifact source API と登録 query �
 | 回答・追加依頼・resume 不能 | 正しい thread/質問へ渡り、古い回答を拒否。復元不能を新規実行へすり替えない |
 | 通常依頼に commit/push 指示、UI 偽装 | git 操作が許可されず、会話 origin が git operation を開始できない |
 | commit 成功/push 失敗、push 応答不明 | SHA と工程別結果を保持、再commit・自動再pushなし、remote 照合を実施 |
+| git 工程の境界ごとの crash | commit副作用後／検証済み保存後／push受付後／push起動後で停止。検証済みSHAを失わず、後半runは一件だけ。許可失効ならpushを開始しない。不明な工程は照合し、同じ許可で再commitしない |
+| git 照合の不一致・確認不能 | 同じパスの異なる内容、異なる親HEAD、他者commit、remote照会失敗を成功としない。照合成功の再送でも結果・通知は一件、キューは自動再開しない |
 | 元から dirty・変更混在・確認後の更新 | git 許可が成立しないか失効する。無関係変更を含めない |
 | Claude PTY と Codex の同時起動 | 同じ cwd では片方だけが guard を取得。停止未確認で引き継がない |
 | 二本のキュー・別 workspace | Claude Code 一件と Codex 一件が同時に動き、各担当の二件目は待つ。両キューの FIFO を維持 |
 | 一方の Blocker/unknown/利用不能 | 通常の Blocker は停止確認後に同担当の次へ進める。unknown/利用不能は該当担当だけを止め、別 workspace の他担当は進む。再開の executor/revision を取り違えない |
-| 同じ workspace の競合・idle Claude PTY | 使用中の理由を表示。Kanban 所有の idle PTY は終了確認後に解放し、待機が永久に残らない。direct PTY は自動終了しない |
+| 同じ workspace の競合・idle Claude PTY | 使用中の理由を表示。確認済みidleのKanban PTYだけがreleasingへ進み、終了確認後に解放。承認待ち・手入力処理中・状態不明・directは自動終了しない。予約と手入力の両方の順序、終了失敗・再起動でも二担当が同じcwdに入らない |
 | 担当変更と旧イベント | 実行中は変更拒否、完了後の変更は新 session。旧担当の終端・回答・git 許可を新 run に適用しない |
-| 既存カード・旧 UI の移行 | Claude のカード・順序・履歴を保持、Codex キューは空。旧キュー再開は Claude だけ、旧 UI は Codex カードを変更できない |
+| 既存カード・旧 UI の移行 | Claudeのカード・順序・履歴・receiptを保持、Codexキューは空、seed済みrevisionを上書きしない。原則は旧操作を再読込みへ案内し、受付済みreplayは副作用なし。限定互換を採る場合は旧query/操作をClaudeだけに限定し、旧キュー再開が他担当へ及ばない |
 | テスト用第三担当 | 登録と capability 宣言だけで選択肢・三本目のキュー・通知が現れる。未対応の git/承認操作を表示・実行しない |
-| 独立担当の自然言語評価 | Codex 指定で codex_tasks、Claude 指定で既存担当。Codex 調査・他 task の thread/tool を使用しない |
-| 通知と再読込み・複数タブ | 終端保存と通知が原子的、通知音は一度、詳細への遷移先が正しい |
+| 独立担当の自然言語評価 | 新規Codex指定、Claude指定、未指定・既定Codex、既存Codexカードへの「続けて」、担当変更、曖昧な対象を確認。受付は一件、既存runの担当を既定で上書きせず、調査・別taskのthread/toolを使用しない |
+| 通知と再読込み・複数タブ | 終端保存と通知が原子的、通知音は一度、詳細への遷移先が正しい。既存notices APIと既読化を維持。Claudeのcommit_push報告を検証済みと表示せず、Codexのgit_completedは検証済み工程だけ。二工程・停止・照合で重複通知なし |
 | bundle と UI | fresh/既存DBで登録・再seed、入口一件、競合時再取得、他の OpenUI view と組合せ可能 |
 
 部分から結合へ進め、影響がある `kanban`、`codex-tasks`、`capabilities`、`tool-runtime`、`dialogue`、`artifact` と、実際に接続を変えた `terminals`/通知の利用側を `bun run verify -- --domain <name>` で確認する。application の結合試験は `api/application/codex-tasks-*.test.ts` と担当別 dispatch/回復の試験ファイルを明示して実行する。ブラウザは既存 Kanban の試験を拡張し、新設 `tests/browser/kanban-executors.spec.ts` を個別指定する。bundle の check と自然言語受入ケースも追加する。`verify:all` を一律必須にはしない。
@@ -384,3 +473,18 @@ board/detail/activity/executors は共通 artifact source API と登録 query �
 隔離したテスト repository とテスト用 bare remote を使い、(1) 共通ボードで Codex 選択・依頼・編集・検証・GUI イベント・Done 通知、(2) 不足情報で Blocker・回答・続行、(3) 作業中停止・停止確認・次タスク、(4) UI の commit/push・remote SHA 確認、(5) backend 再起動・同 thread 続行を確認する。さらに Claude Code と Codex を別のテスト作業場所で並行実行し、片方の停止が他方を止めないことを確認する。同じ作業場所では排他待機を確認する。実 LLM による担当選択は固定モデル試験と分ける。通常運用の remote への push、実製品 DB/秘密の複製は受入に含めない。Grok の実接続は今回の受入対象外。
 
 実装完了は、登録、固定試験、ブラウザ、実 SDK の結果を区別して報告する。計画作成段階ではこれらを実行しない。現在の残作業は P0〜P5 の全段階。まず P0 の観測で SDK/CLI の制約を確定し、その結果を本書へ反映してから製品実装へ進む。
+
+## 13. 改訂3で反映したレビュー
+
+| 論点 | 採用した内容 |
+| --- | --- |
+| 未配布契約の互換 | §11。新revisionとデータ移行を基本にし、旧UIの操作互換は具体的な継続要件がある場合だけ |
+| 共通runの状態 | §5。担当の観測、共通状態、表示、キュー進行、実行終了とguard解放を対応付け |
+| commit後の復旧 | §9。検証済み工程の保存、未確認工程の照合、許可失効、後半受付の一意性を定義 |
+| domainの責務 | §5。順序と状態判断はkanban、複数domainの接続はapplication、外部実行・待機はtransaction外 |
+| 会話の入口 | §3。新規依頼と既存対象を分け、保存済み担当を優先して二重受付を防止 |
+| idle PTY | §8。入力・承認待ちの除外、releasing予約と手入力受付の競合、終了確認を定義 |
+| 通知 | §10。既存APIとcommit_push報告を維持し、検証済みgit成功と区別 |
+| 開発runnerの事前確認 | §2・§12。導入済み公開型の再確認と、サブエージェント無効化・持続thread・プロジェクト指示の実動作確認を区別 |
+
+改訂3では計画書だけを変更し、差分・節間の整合・ローカル参照を点検する。製品コード、fixture、ブラウザ、実SDKの検証は未実施であり、P0〜P5の完了を意味しない。

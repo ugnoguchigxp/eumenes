@@ -74,6 +74,8 @@ export type SourceChange = {
 	principal: string;
 	scopeKey: string;
 	speaker: SourceSpeaker;
+	/** The conversation the message belongs to (the steward works per conversation). */
+	conversationId: string;
 	occurredAt: string;
 };
 export type SourceChangePage = {

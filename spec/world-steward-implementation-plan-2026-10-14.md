@@ -1,6 +1,6 @@
 # World Model を記憶担当（steward）につなぐ実装計画
 
-2026-10-14 / 状態: **計画**（未実装・未検証）/ 改訂4（外部レビュー2回分を反映）・再レビュー待ち。
+2026-10-14 / 状態: **計画**（未実装・未検証）/ 改訂4＋実装時の変更（§18）。実装済み・fixture 検証中。
 前提: [記憶担当の実装計画](memory-steward-implementation-plan-2026-10-14.md)（実装済み。以下「steward 計画」）、[World の host 側の説明](../api/domains/world/README.md)、World Model パッケージの設計書（`../eumenes_world_model/spec/world-model-design.md`）。
 実装形態: steward 計画と同じく TypeScript で直接実装する。会話エージェントが呼ぶツール（`world_query`）と設定画面の閲覧だけは、toolchain・bundle の手順（[登録と拡張の手順](../docs/toolchain-extension.md)）に載せる。
 
@@ -328,3 +328,15 @@ steward は world の上位なので、steward から world・goals の公開操
 | 1 | 目標だけを忘れたとき、元の会話・要約が残る | §6 F10（目標の全改訂の根拠の発言を除外台帳へ） |
 | 2 | 古い DB を戻すと忘れた目標が復活する | §6 F11（block journal の `derived.goalIds`、起動時に回答の前に再適用）、§12 |
 | 3 | 訂正版の event に古い振り分けが効く | §3.4（判定を発言の revision・digest に結び付け、不一致は true。feed が先なら判定待ち） |
+
+## 18. 実装で変えたこと（2026-10-15）
+
+| # | 変更 | 理由 |
+|---|---|---|
+| 1 | 対象（entity）に種類（kind）の欄を持たせず、種類は World の主張として表す。curate-world の出力から `kind` を外した | パッケージの Entity に kind がない（足すには migration が要る） |
+| 2 | `world_events` の窓は1往復分（最大2件） | パッケージは窓の全発言を各主張の根拠に持たせるので、忘却の巻き込みを小さくする |
+| 3 | curate-memory の入力の World の主張の ref は `k1`〜（`c1` は想起の候補と重なる） | 既存の ref と衝突するため |
+| 4 | `consolidate-world` は未実装 | World に event なしで仮説の取り下げ・統合をする公開操作がない |
+| 5 | `evidenceMessagesOf` は生きている主張の根拠だけを返す | パッケージの公開 read の制約。取り消し済みの主張の根拠を返すにはパッケージの API が要る |
+| 6 | 条件（condition）は扱わない（`unspecified`） | パッケージの条件は観測キーに対する構造式で、自由文から作れない |
+| 7 | アシスタントの回答の根拠の種類はパッケージ上 `document`（主張の origin は `model_hypothesis`） | パッケージにアシスタント用の発言の種類がない |

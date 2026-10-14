@@ -7,6 +7,8 @@ import {
 	windowIsEmpty,
 } from "./context-compiler";
 import { prepareRouting } from "./delegate-conversation";
+import { renderGoalsLayer } from "./goals-layer";
+import { topicTexts } from "./topic-texts";
 import { researchResultContext } from "./research-result-context";
 import { markWorld, byId, transition } from "../repository";
 import { endRun } from "./run-end";
@@ -28,7 +30,8 @@ export function createPrepare(
 	GenerateInput,
 	unknown
 >["prepareInTransaction"] {
-	const { conversation, larm, clock, memory, agents, worldContext } = deps;
+	const { conversation, larm, clock, memory, agents, worldContext, goals } =
+		deps;
 	return (tx, claim) => {
 		const run = byId(tx, claim.payload.runId);
 		if (!run || run.status !== "queued" || run.jobId !== claim.jobId)
@@ -61,6 +64,10 @@ export function createPrepare(
 			endRun(deps, tx, current, "failed", "memory_blocked");
 			return { status: "stale", reason: "memory_blocked" };
 		}
+		// The adopted goals come right after L1; their size is part of what World's budget must leave.
+		const goalsLayer = goals
+			? renderGoalsLayer(goals.adoptedForContextInTransaction(tx))
+			: null;
 		// World reads in the SAME transaction as Memory's recall and shares its budget.
 		const world =
 			worldContext && !agent?.failureCode && !agent?.actionPayload
@@ -70,14 +77,30 @@ export function createPrepare(
 						jobId: claim.jobId,
 						attempt: claim.attempt,
 						generation: claim.generation,
-						reservedBytes: window
-							? // The prefetch and this turn's recall share PREFETCH_BYTES: all of it is reserved.
-								window.longTerm.bytes +
-								window.shortTerm.bytes +
-								Buffer.byteLength(window.history.summaryText, "utf8") +
-								PREFETCH_BYTES +
-								Buffer.byteLength(noticeMessage(window)?.content ?? "", "utf8")
-							: 0,
+						reservedBytes:
+							(goalsLayer?.bytes ?? 0) +
+							(window
+								? // The prefetch and this turn's recall share PREFETCH_BYTES: all of it is reserved.
+									window.longTerm.bytes +
+									window.shortTerm.bytes +
+									Buffer.byteLength(window.history.summaryText, "utf8") +
+									PREFETCH_BYTES +
+									Buffer.byteLength(
+										noticeMessage(window)?.content ?? "",
+										"utf8",
+									)
+								: 0),
+						topicTexts: topicTexts(
+							tx,
+							current,
+							conversation,
+							new Set(
+								memory?.blockedMessageIdsOfConversationInTransaction(
+									tx,
+									run.conversationId,
+								) ?? [],
+							),
+						),
 						nowMs: Date.parse(clock()),
 					})
 				: undefined;
@@ -118,6 +141,7 @@ export function createPrepare(
 			larm.snapshotInTransaction?.(tx).general,
 			window,
 			memory,
+			goalsLayer?.message,
 		);
 		let messages = compiled.messages;
 		if (agent?.projection || agent?.failureCode)
@@ -248,6 +272,9 @@ export function createPrepare(
 					: {}),
 				...routing,
 				agent,
+				...(goalsLayer
+					? { goals: { goalIds: goalsLayer.shown.map((g) => g.goalId) } }
+					: {}),
 				// An empty window still travels: the exchanges recalled for this turn are checked against it.
 				...(prepared
 					? {

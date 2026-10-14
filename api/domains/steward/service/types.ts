@@ -1,8 +1,13 @@
 import type { Database } from "bun:sqlite";
+import type { ScopeRef } from "eumenes-world-model";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { ContinuityService } from "../../continuity";
 import type { ConversationService } from "../../conversation";
+import type { GoalAccess, GoalsService } from "../../goals";
 import type { MemoryService } from "../../memory";
+import type { WorldCuration } from "../../world";
+import type { DecisionRefType } from "../repository";
+import type { WorldViewReader } from "./world-view";
 import type {
 	ChatMessage,
 	ControlReceipt,
@@ -42,6 +47,44 @@ export type StewardMemory = Pick<
 	| "publishWindowInTransaction"
 >;
 
+/** What the steward calls of World's curation (the World package owns every rule of what becomes a claim). */
+export type StewardWorldCuration = Pick<
+	WorldCuration,
+	| "pendingEventsInTransaction"
+	| "prepareCurationInTransaction"
+	| "settleCurationInTransaction"
+	| "settleEmptyInTransaction"
+	| "giveUpEventsInTransaction"
+	| "releaseCurationInTransaction"
+	| "acceptSourceForgetInTransaction"
+	| "forgetClaimsInTransaction"
+	| "forgetEntitiesInTransaction"
+	| "evidenceMessagesOf"
+	| "forgetEpochInTransaction"
+>;
+/** World, when the application runs it: absent (World off), everything about World is skipped. */
+export interface StewardWorld {
+	curation: StewardWorldCuration;
+	/** The read side that shows the model World's claims and entities (`createWorldView` over World's public reads). */
+	view: WorldViewReader;
+	/** Advances an accepted forget; the steward calls it after the transaction that accepted it committed. */
+	resumeForget(forgetId: string): Promise<unknown> | unknown;
+	/** The one Scope the conversation's World lives in. */
+	scope: ScopeRef;
+}
+/** The goals the steward maintains (the application assembles the service). */
+export interface StewardGoals {
+	ops: Pick<
+		GoalsService,
+		| "applyInTransaction"
+		| "listForStewardInTransaction"
+		| "proposalsInTransaction"
+		| "resolveForgetInTransaction"
+		| "forgetGoalsInTransaction"
+	>;
+	access: GoalAccess;
+}
+
 export interface StewardDeps {
 	store: SqliteStore;
 	memory: StewardMemory;
@@ -58,6 +101,10 @@ export interface StewardDeps {
 	newId(): string;
 	/** Runs `run` once after `ms`; the returned function cancels it. Default: an unref'd `setTimeout`. */
 	setTimer?(run: () => void, ms: number): () => void;
+	/** Absent: World is off, and the World curation, its routing and the World parts of a forget are skipped. */
+	world?: StewardWorld;
+	/** Absent: no goal reflection, no goal upkeep, no goal in a forget. */
+	goals?: StewardGoals;
 }
 
 /** The transaction a step reads and writes in. */
@@ -68,7 +115,12 @@ export interface StepEnv {
 }
 
 export type PrepareResult =
-	| { status: "stale"; reason: string }
+	| {
+			status: "stale";
+			reason: string;
+			/** Nothing can be done now but may be later: the unit is made again after a wait, not at once. */
+			retryLater?: boolean;
+	  }
 	| {
 			status: "ready";
 			/** The data object the model reads. */
@@ -89,7 +141,7 @@ export interface ApplyResult {
 	output: unknown;
 	/** One entry per element: status and a code, never text. */
 	results: unknown;
-	refs: Array<{ type: "item" | "message" | "request"; id: string }>;
+	refs: Array<{ type: DecisionRefType; id: string }>;
 	notices: string[];
 	/** A reflecting step changed something: the upkeep revision moves on. */
 	changed: boolean;
@@ -129,7 +181,8 @@ export interface StepDefinition {
 	/** Writes long-term memory: serialized across conversations. */
 	longTerm: boolean;
 	instructions: string;
-	outputSchema: unknown;
+	/** The schema the answer must follow: strict, and bound to what this unit offers (the labels it gave). */
+	outputSchema(prepared: PreparedUnit): unknown;
 	prepare(env: StepEnv, unit: UnitRow): PrepareResult;
 	/** The model's text, normalized element by element; null when it is not usable at all. */
 	parse(raw: unknown): unknown | null;

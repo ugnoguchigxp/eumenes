@@ -9,6 +9,9 @@ import type {
 	UnitSlot,
 	UnitState,
 } from "../contracts";
+import { worldGoalsMigration } from "./world-goals";
+
+export * from "./world-goals";
 
 /**
  * The steward's tables (`steward/0001-init`): execution units, the inference requests they hold, the upkeep
@@ -62,6 +65,11 @@ export const migrations: readonly Migration[] = [
 		sql: migration,
 		after: ["conversation/0001-init"],
 	},
+	{
+		id: "steward/0002-world-goals",
+		sql: worldGoalsMigration,
+		after: ["steward/0001-init"],
+	},
 ];
 
 const CHUNK = 200;
@@ -86,6 +94,8 @@ export type UnitTargets = {
 	message?: string;
 	/** An upkeep unit made for the pending limit: it does not wait for the foreground. */
 	urgent?: boolean;
+	/** The World events a `world_events` unit curates (the events of one exchange, at most two). */
+	events?: string[];
 };
 export interface UnitRow {
 	id: string;
@@ -402,15 +412,17 @@ export function countOpenInbox(
 		}
 	).n;
 }
+/** Pending requests, oldest first. `goal` requests belong to the goal reflection, the others to curate-memory. */
 export function pendingInbox(
 	db: Database,
 	conversationId: string,
 	limit: number,
+	which: "goal" | "memory" = "memory",
 ): InboxRow[] {
 	return db
 		.query(
 			`SELECT ${inboxColumns} FROM steward_inbox WHERE conversation_id = ? AND state = 'pending'
-			 ORDER BY created_at, id LIMIT ?`,
+			 AND kind ${which === "goal" ? "=" : "<>"} 'goal' ORDER BY created_at, id LIMIT ?`,
 		)
 		.all(conversationId, limit) as InboxRow[];
 }
@@ -507,10 +519,17 @@ export function insertDecision(db: Database, input: DecisionInput): number {
 		);
 	return Number(result.lastInsertRowid);
 }
+export type DecisionRefType =
+	| "item"
+	| "message"
+	| "request"
+	| "claim"
+	| "entity"
+	| "goal";
 export function insertDecisionRefs(
 	db: Database,
 	decisionId: number,
-	refs: ReadonlyArray<{ type: "item" | "message" | "request"; id: string }>,
+	refs: ReadonlyArray<{ type: DecisionRefType; id: string }>,
 ) {
 	const insert = db.query(
 		"INSERT OR IGNORE INTO steward_decision_ref (decision_id, ref_type, ref_id) VALUES (?,?,?)",
@@ -537,10 +556,19 @@ export function pruneDecisions(
 		"DELETE FROM steward_decision WHERE conversation_id = ? AND id < ?",
 	).run(conversationId, cutoff.id);
 }
-/** Deletes every decision that touched one of these items or messages (and its index rows). */
+/**
+ * Deletes every decision that touched one of these items, messages, World claims or entities, or goals (and its
+ * index rows).
+ */
 export function deleteDecisionsByRefs(
 	db: Database,
-	refs: { itemIds: readonly string[]; messageIds: readonly string[] },
+	refs: {
+		itemIds?: readonly string[];
+		messageIds?: readonly string[];
+		claimIds?: readonly string[];
+		entityIds?: readonly string[];
+		goalIds?: readonly string[];
+	},
 ) {
 	const ids = new Set<number>();
 	const find = (type: string, values: readonly string[]) => {
@@ -552,8 +580,11 @@ export function deleteDecisionsByRefs(
 				.all(type, ...part) as Array<{ id: number }>)
 				ids.add(row.id);
 	};
-	find("item", refs.itemIds);
-	find("message", refs.messageIds);
+	find("item", refs.itemIds ?? []);
+	find("message", refs.messageIds ?? []);
+	find("claim", refs.claimIds ?? []);
+	find("entity", refs.entityIds ?? []);
+	find("goal", refs.goalIds ?? []);
 	for (const part of chunks([...ids])) {
 		db.query(
 			`DELETE FROM steward_decision_ref WHERE decision_id IN (${marks(part.length)})`,

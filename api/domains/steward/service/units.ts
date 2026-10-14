@@ -48,12 +48,15 @@ export function createUnitHandler(deps: StewardDeps, kick: Kick, wake: Wake) {
 		const messages =
 			before?.data === undefined
 				? input.messages
-				: buildMessages(step, before.data);
+				: buildMessages(step, prepared, before.data);
 		const receipt = await inference.executeControl(
 			input.requestId,
 			messages,
 			AbortSignal.any([context.signal, AbortSignal.timeout(INFERENCE_MS)]),
-			{ instructions: step.instructions, outputSchema: step.outputSchema },
+			{
+				instructions: step.instructions,
+				outputSchema: step.outputSchema(prepared),
+			},
 		);
 		// A malformed answer is data, not a failure: settle counts it and moves on.
 		let output: unknown | null = null;
@@ -102,7 +105,9 @@ export function createUnitHandler(deps: StewardDeps, kick: Kick, wake: Wake) {
 		cancelInTransaction(db, job) {
 			end.release(db, takeRequests(db, job.jobId));
 			const unit = readUnit(db, job.payload.unitId);
-			if (unit?.state === "open") closeUnit(db, unit.id, "stale", deps.clock());
+			if (unit?.state !== "open") return;
+			end.releaseWorld(db, unit);
+			closeUnit(db, unit.id, "stale", deps.clock());
 		},
 	};
 	return { handler };

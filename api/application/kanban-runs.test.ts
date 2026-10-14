@@ -12,8 +12,8 @@ import {
 	createTerminals,
 	migrations as terminalsMigrations,
 } from "../domains/terminals";
-import type { HookPayload } from "../domains/terminals/hooks";
-import type { TerminalsOptions } from "../domains/terminals/types";
+import type { HookPayload } from "../domains/terminals";
+import type { TerminalsOptions } from "../domains/terminals";
 import { fakePty, until } from "../domains/terminals/test/terminals.fixture";
 import { openStore, type SqliteStore } from "../infrastructure/sqlite";
 import { createKanbanAdapter } from "./kanban-adapter";

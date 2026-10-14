@@ -26,6 +26,10 @@ import { createRecordsAdapter, type RecordsPorts } from "./records-adapter";
 import { createMemoryAdapter, type MemoryAdapterPorts } from "./memory-adapter";
 import { createStewardAdapter } from "./steward-adapter";
 import {
+	createWorldQueryAdapter,
+	type WorldQueryAdapterPortsLookup,
+} from "./world-query-adapter";
+import {
 	createWorldAdapter,
 	type WorldAdapterPortsLookup,
 } from "./world-adapter";
@@ -97,6 +101,8 @@ export async function createToolchain(
 			service: Parameters<typeof createStewardAdapter>[0];
 			memory: Parameters<typeof createStewardAdapter>[1];
 		};
+		/** The conversation agent's `world_query` tool; the lookup answers undefined while World is not ON. */
+		worldQuery?: WorldQueryAdapterPortsLookup;
 		/** Messages memory forbids reusing; history reads drop them (absent: nothing is dropped). */
 		blockedMessages?: Parameters<typeof createReadPorts>[3];
 		/** The World screen; the lookup returns undefined while World is OFF. */
@@ -160,6 +166,9 @@ export async function createToolchain(
 		...(options.steward
 			? [createStewardAdapter(options.steward.service, options.steward.memory)]
 			: []),
+		...(options.worldQuery
+			? [createWorldQueryAdapter(options.worldQuery)]
+			: []),
 		...(options.world ? [createWorldAdapter(options.world)] : []),
 		...(options.serviceTests
 			? [createServiceTestsAdapter(options.serviceTests)]
@@ -178,6 +187,7 @@ export async function createToolchain(
 			...(options.terminals ? ["claude-code"] : []),
 			...(options.kanban && options.terminals ? ["kanban"] : []),
 			...(options.steward ? ["steward"] : []),
+			...(options.worldQuery ? ["world-query"] : []),
 			...(options.ocr ? ["ocr"] : []),
 			...(options.excalidraw ? ["excalidraw"] : []),
 			...(options.conversation && options.history !== false ? ["history"] : []),

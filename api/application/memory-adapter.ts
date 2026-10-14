@@ -81,6 +81,9 @@ const stepLabels: Record<DecisionDto["step"], string> = {
 	"consolidate-memory": "記憶の整理",
 	"compact-history": "履歴の圧縮",
 	"refine-summary": "要約の推敲",
+	"curate-world": "World の反映",
+	"curate-goals": "目標の反映",
+	"consolidate-goals": "目標の整理",
 };
 const outcomeLabels: Record<ExchangeDto["outcome"], string> = {
 	answered: "回答あり",

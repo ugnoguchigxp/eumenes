@@ -1,7 +1,10 @@
 import type { ExchangeStep } from "../../../memory";
 import type { StepId } from "../../contracts";
 import type { StepDefinition } from "../types";
+import { consolidateGoals } from "./consolidate-goals";
+import { curateGoals } from "./curate-goals";
 import { curateMemory } from "./curate-memory";
+import { curateWorld } from "./curate-world";
 import {
 	disposeExchanges,
 	prepareRecallStep,
@@ -15,10 +18,13 @@ import {
 
 export const steps: Record<StepId, StepDefinition> = {
 	"curate-memory": curateMemory,
+	"curate-goals": curateGoals,
+	"curate-world": curateWorld,
 	"dispose-exchanges": disposeExchanges,
 	summarize,
 	"prepare-recall": prepareRecallStep,
 	"consolidate-memory": consolidateMemory,
+	"consolidate-goals": consolidateGoals,
 	"compact-history": compactHistory,
 	"refine-summary": refineSummary,
 };
@@ -33,6 +39,7 @@ export const exchangeStepOf: Partial<Record<StepId, ExchangeStep>> = {
 /** Upkeep steps in the order a round tries them. */
 export const MAINTENANCE_ORDER = [
 	"consolidate-memory",
+	"consolidate-goals",
 	"compact-history",
 	"refine-summary",
 ] as const satisfies readonly StepId[];

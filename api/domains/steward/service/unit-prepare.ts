@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite";
 import {
+	CAPTURE_RETRY_MS,
 	FOREGROUND_DELAYS_MS,
 	INFERENCE_MS,
 	MAX_OUTPUT_TOKENS,
@@ -103,6 +104,8 @@ export function createPrepare(
 		const env: StepEnv = { db, deps, conversationId: unit.conversationId };
 		const step = steps[unit.step];
 		const close = (reason: string) => {
+			// A World unit that got as far as prepare has registered what its model would see: given back.
+			end.releaseWorld(db, unit);
 			closeUnit(db, unit.id, "stale", deps.clock());
 			return { status: "stale" as const, reason };
 		};
@@ -121,6 +124,15 @@ export function createPrepare(
 			if (unit.slot === "maintenance") end.markQuiet(db, unit);
 			// The recall preparation is not tried again for an exchange it cannot read.
 			if (unit.slot === "recall") end.dropRecall(db, unit);
+			if (prepared.retryLater) {
+				// Nothing can be done now (World can not be used, Memory refused): the timer makes the unit again.
+				wake.pause(
+					unit.conversationId,
+					unit.slot,
+					deps.nowMs() + CAPTURE_RETRY_MS,
+				);
+				return prepared;
+			}
 			// What made the unit empty changed the ledger: the next unit (or the end of the round) follows from it.
 			kick.kickOne(db, unit.conversationId);
 			return prepared;
@@ -162,7 +174,7 @@ export function createPrepare(
 				step,
 				requestId,
 				prepared: preparedUnit,
-				messages: buildMessages(step, prepared.data),
+				messages: buildMessages(step, preparedUnit, prepared.data),
 				startedAt: deps.nowMs(),
 			},
 		};

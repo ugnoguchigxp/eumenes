@@ -1,6 +1,10 @@
 import type { Migration } from "../../../infrastructure/sqlite";
 import { extractionMigration } from "./extraction";
 import { extractionHoldMigration } from "./extraction-hold";
+import {
+	extractionStewardMigration,
+	forgetOriginMigration,
+} from "./extraction-steward";
 import { gapTaskMigration } from "./gap-task";
 import { guardMigration } from "./guard";
 import { hostStateMigration } from "./index";
@@ -21,5 +25,15 @@ export const migrations: readonly Migration[] = [
 		id: "world/0008-extraction-hold",
 		after: ["world/0007-gap-task"],
 		sql: extractionHoldMigration,
+	},
+	{
+		id: "world/0009-extraction-steward",
+		after: ["world/0008-extraction-hold"],
+		sql: extractionStewardMigration,
+	},
+	{
+		id: "world/0010-forget-origin",
+		after: ["world/0009-extraction-steward"],
+		sql: forgetOriginMigration,
 	},
 ];

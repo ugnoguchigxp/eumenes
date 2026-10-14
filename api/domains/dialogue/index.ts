@@ -12,7 +12,10 @@ export {
 export type { DialogueService } from "./service";
 export { createDialogueService } from "./service";
 export { readActionOriginInTransaction } from "./service/action-origin";
+export { isAdoptedAnswerInTransaction } from "./service/adopted-answer";
 export type {
+	ContextGoalEntry,
+	GoalsLayerPort,
 	PostAnswerObservation,
 	PostAnswerObserverPort,
 	PostAnswerObserverResult,

@@ -17,6 +17,7 @@ import type {
 	PostAnswerObserverPort,
 	Run,
 	StewardPort,
+	GoalsLayerPort,
 	WorldContextPort,
 } from "../contracts";
 import { byId, interruptUnfinished, listRuns, linkAnswer } from "../repository";
@@ -54,6 +55,7 @@ export function createDialogueService({
 	image,
 	music,
 	worldContext,
+	goals,
 	toolchains,
 }: {
 	store: SqliteStore;
@@ -72,6 +74,7 @@ export function createDialogueService({
 	objectRecognition?: import("../contracts/object-recognition").ObjectRecognitionPort;
 	delegation?: import("../contracts/delegation").DelegationPort;
 	worldContext?: WorldContextPort;
+	goals?: GoalsLayerPort;
 	toolchains?: import("../contracts/toolchains").ToolchainRoutingPort;
 }) {
 	const deps: DialogueDeps = {
@@ -91,6 +94,7 @@ export function createDialogueService({
 		image,
 		music,
 		worldContext,
+		goals,
 		toolchains,
 	};
 	const progress = createProgress(deps);

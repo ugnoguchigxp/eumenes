@@ -54,7 +54,7 @@ import { createVoiceDialogue } from "../domains/voice-dialogue";
 import { createTtsDictionary } from "../domains/tts-dictionary";
 import { createContinuityService } from "../domains/continuity";
 import { createMemoryService } from "../domains/memory";
-import { createStewardAssembly, recoverSteward } from "./steward-assembly";
+import { recoverSteward } from "./steward-assembly";
 import {
 	createWebResearch,
 	createWebCache,
@@ -78,7 +78,7 @@ import { createServiceTests } from "../domains/service-tests";
 import { createDelegatedTasks } from "./delegated-tasks";
 import { createProductionCoding } from "./coding";
 import { createCodingTaskExecution } from "./coding-tasks";
-import { assembleServerWorld } from "./server-world";
+import { assembleCuration } from "./server-world";
 import {
 	PROCESS_SHUTDOWN_DEADLINE_MS,
 	SHUTDOWN_DEADLINE_MS,
@@ -254,11 +254,10 @@ export async function buildServices(
 		journalPath: memoryJournalPath,
 		embed: () => embedder,
 	});
-	const shared = { store, memory, conversation, queue, inference };
-	const stewardAssembly = createStewardAssembly({ ...shared, continuity });
-	const { steward } = stewardAssembly;
-	const worldDeps = { ...shared, dbPath, memoryJournalPath };
-	const { world, worldForeground } = assembleServerWorld(config, worldDeps);
+	const { stewardAssembly, steward, goals, world } = assembleCuration(config, {
+		...{ store, memory, conversation, continuity, queue, inference },
+		...{ dbPath, memoryJournalPath },
+	});
 	let imageForCompositions: ImageService;
 	const uiCompositions = createUiCompositions({
 		store,
@@ -375,6 +374,7 @@ export async function buildServices(
 		queue,
 		memory,
 		steward,
+		goals: goals.dialoguePort,
 		agents: enabled ? toolchain.agents : undefined,
 		postAnswer: enabled ? toolchain.postAnswer : undefined,
 		delegation: createDotsDialogue({
@@ -433,7 +433,6 @@ export async function buildServices(
 		memory,
 		steward,
 		settings,
-		worldForeground,
 		world,
 		toolchain,
 		dialogue,
@@ -590,8 +589,10 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		{ exclusive: false },
 	);
 	// Settles board runs whose result could not be applied, and prunes old runs (hourly).
-	const kanbanMaintenance = intervalLifecycle("kanban_maintenance", 30_000, () =>
-		s.toolchain.kanbanRuns.maintain(),
+	const kanbanMaintenance = intervalLifecycle(
+		"kanban_maintenance",
+		30_000,
+		() => s.toolchain.kanbanRuns.maintain(),
 	);
 	const timerMaintenance = intervalLifecycle("timer_maintenance", 1000, () =>
 		s.timers
@@ -728,7 +729,6 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		{ name: "scheduler", close: () => s.scheduler.close() },
 		{ name: "delegated", close: () => s.delegated.close() },
 		{ name: "supervision", close: () => s.supervision?.close() },
-		{ name: "world_foreground", close: () => s.worldForeground?.stop() },
 		// World consumers stop before anything closes the store.
 		{ name: "world", close: () => s.world?.close() },
 		{ name: "task_maintenance", close: () => taskMaintenance.idle() },

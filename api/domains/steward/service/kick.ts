@@ -20,11 +20,14 @@ import {
 	failedMaintenanceUnits,
 	insertUnit,
 	openUnitOf,
+	pendingGoalTodos,
 	pendingInbox,
 	readState,
+	resolveInbox,
 	setUnitJob,
 	writeState,
 } from "../repository";
+import { kickWorld } from "./kick-world";
 import { MAINTENANCE_ORDER, exchangeStepOf, steps } from "./steps";
 import { eligible } from "./steps/maintenance-steps";
 import type { StepEnv, StewardDeps } from "./types";
@@ -34,6 +37,8 @@ const log = getLogger("steward");
 
 /** The long-term writers (curate, consolidate) are serialized across conversations. */
 export const LONG_TERM_KEY = "steward:long-term";
+
+const isGoalUpkeep = (step: StepId) => step === "consolidate-goals";
 
 type UnitSpec = {
 	step: StepId;
@@ -126,6 +131,7 @@ export function createKick(deps: StewardDeps, wake: Wake) {
 			});
 			return true;
 		}
+		if (kickGoals(env)) return true;
 		for (const step of ["dispose-exchanges", "summarize"] as const) {
 			const key = exchangeStepOf[step]!;
 			const rows = d.memory.pendingExchangesInTransaction(
@@ -144,6 +150,41 @@ export function createKick(deps: StewardDeps, wake: Wake) {
 			return true;
 		}
 		return false;
+	}
+
+	/**
+	 * The goal reflection after curate-memory: the exchanges judged to need it (and the goal requests). Without goals
+	 * a goal request can not be served: it ends at once.
+	 */
+	function kickGoals(env: StepEnv): boolean {
+		const { db, deps: d, conversationId } = env;
+		const requests = pendingInbox(
+			db,
+			conversationId,
+			REQUESTS_PER_UNIT,
+			"goal",
+		);
+		if (!d.goals) {
+			for (const row of requests)
+				resolveInbox(db, row.id, "none", "goals_unavailable", d.clock());
+			return false;
+		}
+		const todos = pendingGoalTodos(db, conversationId, EXCHANGES_PER_UNIT);
+		if (todos.length === 0 && requests.length === 0) return false;
+		createUnit(db, conversationId, {
+			step: "curate-goals",
+			kind: todos.length > 0 ? "exchange_step" : "requests",
+			targets: {
+				exchanges: todos.map((row) => row.inputMessageId),
+				requests: requests.map((row) => row.id),
+			},
+			attempt: Math.max(
+				0,
+				...todos.map((row) => row.failures),
+				...requests.map((row) => row.failures),
+			),
+		});
+		return true;
 	}
 
 	function kickRecall(env: StepEnv) {
@@ -209,18 +250,20 @@ export function createKick(deps: StewardDeps, wake: Wake) {
 				? state.quiet.round
 				: { revision, count: 0 };
 		let chosen: StepId | null = null;
-		if (round.count < MAINTENANCE_STEPS_PER_ROUND)
-			for (const step of MAINTENANCE_ORDER) {
-				if (quiet[step] === revision) continue;
-				if (
-					failedMaintenanceUnits(db, conversationId, step, revision) >=
-					MAX_FAILURES
-				)
-					continue;
-				if (!eligible(env, step)) continue;
-				chosen = step;
-				break;
-			}
+		// The goal upkeep is rare and quiet after one look: it does not use up the round (the memory steps' three).
+		for (const step of MAINTENANCE_ORDER) {
+			if (round.count >= MAINTENANCE_STEPS_PER_ROUND && !isGoalUpkeep(step))
+				continue;
+			if (quiet[step] === revision) continue;
+			if (
+				failedMaintenanceUnits(db, conversationId, step, revision) >=
+				MAX_FAILURES
+			)
+				continue;
+			if (!eligible(env, step)) continue;
+			chosen = step;
+			break;
+		}
 		if (chosen !== null && state.nextMaintenanceAt !== null) {
 			// Upkeep deferred for a foreground run: nothing is enqueued before the time; the timer kicks again.
 			if (state.nextMaintenanceAt > now) {
@@ -248,7 +291,13 @@ export function createKick(deps: StewardDeps, wake: Wake) {
 		if (made)
 			writeState(db, {
 				...state,
-				quiet: { ...state.quiet, round: { revision, count: round.count + 1 } },
+				quiet: {
+					...state.quiet,
+					round: {
+						revision,
+						count: round.count + (isGoalUpkeep(chosen) ? 0 : 1),
+					},
+				},
 			});
 	}
 
@@ -261,6 +310,14 @@ export function createKick(deps: StewardDeps, wake: Wake) {
 				: kickReflect(env);
 			kickRecall(env);
 			kickMaintenance(env, reflecting);
+			kickWorld(env, wake, (spec) =>
+				createUnit(db, conversationId, {
+					step: "curate-world",
+					kind: "world_events",
+					targets: { events: spec.events },
+					attempt: spec.attempt,
+				}),
+			);
 		} catch (error) {
 			log.warn("steward.kick_failed", { reason: "kick_failed" }, error);
 		}
@@ -273,9 +330,16 @@ export function createKick(deps: StewardDeps, wake: Wake) {
 	 */
 	function kickInTransaction(db: Database, conversationId?: string) {
 		if (conversationId !== undefined) return kickOne(db, conversationId);
+		const world = deps.world;
 		const ids = new Set([
 			...conversationsWithWork(db),
 			...deps.memory.pendingConversationIdsInTransaction(db),
+			// Events World received that no step has touched yet (the notice that woke the steward is not durable).
+			...(world
+				? world.curation
+						.pendingEventsInTransaction(db, world.scope, 200)
+						.map((event) => event.conversationId)
+				: []),
 		]);
 		for (const id of ids) kickOne(db, id);
 	}

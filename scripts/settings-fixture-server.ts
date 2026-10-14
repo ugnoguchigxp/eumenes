@@ -9,7 +9,10 @@ import {
 	buildServices,
 	createLifecycles,
 } from "../api/application/server";
+import { migrations } from "../api/application/migrations";
+import { createSettings } from "../api/domains/settings";
 import { loadConfig } from "../api/infrastructure/config";
+import { openStore } from "../api/infrastructure/sqlite";
 import { configureLogging } from "../api/infrastructure/logger";
 
 /**
@@ -29,7 +32,6 @@ const config = loadConfig({
 	EUMENES_API_TOKEN: TOKEN,
 	EUMENES_ATTITUDE_DATASET: join(dir, "attitude-dataset/dataset.sqlite3"),
 	EUMENES_MEMORY_JOURNAL: join(dir, "memory-forget-journal.jsonl"),
-	EUMENES_WORLD: "on",
 	EUMENES_WORLD_POLL_MS: "3600000",
 	EUMENES_DELEGATED_TASKS_ENABLED: "1",
 	EUMENES_WEB_RESEARCH_TOOLS_ENABLED: "0",
@@ -37,6 +39,23 @@ const config = loadConfig({
 configureLogging({ file: config.logFile, level: config.logLevel });
 
 let server: ReturnType<typeof Bun.serve> | undefined;
+// World ON is a saved setting read at startup, so it is saved before the services are built.
+{
+	const store = openStore(config.dbPath, migrations);
+	const settings = await createSettings(store, {
+		dbPath: config.dbPath,
+		env: {},
+	});
+	const saved = settings.get();
+	saved.world.enabled = true;
+	await settings.apply({
+		requestId: crypto.randomUUID(),
+		expectedRevision: saved.revision,
+		settings: saved,
+		keys: [],
+	});
+	await store.close();
+}
 const services = await buildServices(config);
 const runner = createLifecycleRunner(
 	createLifecycles(services, {

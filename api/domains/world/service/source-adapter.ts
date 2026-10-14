@@ -252,6 +252,7 @@ export function createConversationSourceAdapter(
 		principal: event.principal,
 		scopeKey: event.scopeKey,
 		speaker: event.speaker,
+		conversationId: event.conversationId,
 		occurredAt: event.occurredAt,
 	});
 

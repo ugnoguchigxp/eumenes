@@ -5,9 +5,13 @@ import { migrations as memoryPackageMigrations } from "eumenes-memory/sqlite";
 import { configureLogging } from "../../../infrastructure/logger";
 import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
 import {
+	CONVERSATION_DEFAULT_PRINCIPAL,
+	CONVERSATION_DEFAULT_SCOPE,
 	createConversationService,
 	migrations as conversationMigrations,
+	type ConversationService,
 } from "../../conversation";
+import { createGoalsService, migrations as goalsMigrations } from "../../goals";
 import {
 	createContinuityService,
 	migrations as continuityMigrations,
@@ -29,15 +33,23 @@ import type {
 import { migrations as stewardMigrations } from "../repository";
 import { createStewardService } from "../service";
 import { steps } from "../service/steps";
+import type { StewardDeps, StewardWorld } from "../service/types";
 
-const migrations = [
+export const migrations = [
 	...conversationMigrations,
 	...continuityMigrations,
 	...memoryMigrations,
 	...memoryPackageMigrations,
 	...queueMigrations,
+	...goalsMigrations,
 	...stewardMigrations,
 ];
+
+/** The goals of the conversation (the Scope World and the Broker use too). */
+export const GOALS_ACCESS = {
+	principal: CONVERSATION_DEFAULT_PRINCIPAL,
+	scopeKeys: [CONVERSATION_DEFAULT_SCOPE],
+} as const;
 
 /** What the scripted model answers for one call: an object (sent as JSON), a raw string, or an error to throw. */
 export type Scripted =
@@ -49,6 +61,8 @@ export type ModelCall = {
 	step: string;
 	requestId: string;
 	data: Record<string, unknown>;
+	/** The output schema the request was made with. */
+	schema: unknown;
 };
 
 /** A scripted stand-in for the inference service: it answers by step id, records the calls and tracks the requests. */
@@ -82,10 +96,15 @@ export function createFakeInference() {
 			requests.set(id, "pending");
 			return id;
 		},
-		async executeControl(requestId, messages): Promise<ControlReceipt> {
+		async executeControl(
+			requestId,
+			messages,
+			_signal,
+			control,
+		): Promise<ControlReceipt> {
 			const step = stepOf(messages);
 			const data = JSON.parse(messages[1]!.content) as Record<string, unknown>;
-			calls.push({ step, requestId, data });
+			calls.push({ step, requestId, data, schema: control?.outputSchema });
 			const queue = scripts.get(step);
 			let answer = queue?.shift() ?? defaults[step];
 			if (answer === undefined) throw new Error("no_script");
@@ -135,15 +154,35 @@ export async function setupSteward(
 		runStates?: Record<string, RunLookup>;
 		/** Replaces the memory service the steward is given (a test makes one operation refuse). */
 		wrapMemory?: (memory: MemoryService) => MemoryService;
+		/** The steward maintains goals (the real goals service on the same database). */
+		goals?: boolean;
+		/** The World the steward curates: built once the store and the conversation exist. */
+		world?: (parts: {
+			store: SqliteStore;
+			conversation: ConversationService;
+			memory: MemoryService;
+			/** Kicks the steward (the World's notice that events arrived). */
+			kick(conversationId: string): Promise<void>;
+		}) => StewardWorld | Promise<StewardWorld>;
+		/** A database and conversation service made elsewhere (the real World's); `dir` is its folder. */
+		host?: {
+			store: SqliteStore;
+			conversation: ConversationService;
+			dir: string;
+			close(): Promise<void>;
+		};
 	} = {},
 ) {
 	configureLogging({ level: "silent" });
-	const dir = mkdtempSync(join(tmpdir(), "eumenes-steward-"));
-	const store: SqliteStore = openStore(join(dir, "db.sqlite3"), migrations);
+	const dir =
+		options.host?.dir ?? mkdtempSync(join(tmpdir(), "eumenes-steward-"));
+	const store: SqliteStore =
+		options.host?.store ?? openStore(join(dir, "db.sqlite3"), migrations);
 	const time = { ms: Date.parse("2026-10-14T12:00:00.000Z") };
 	const clock = () => new Date(time.ms).toISOString();
 	let counter = 0;
-	const conversation = createConversationService(store);
+	const conversation =
+		options.host?.conversation ?? createConversationService(store);
 	const continuity = createContinuityService(store, clock);
 	const memory = createMemoryService(store, conversation, continuity, {
 		journalPath: join(dir, "journal.jsonl"),
@@ -164,6 +203,13 @@ export async function setupSteward(
 	/** The steward's wake timer, driven by the test clock. */
 	const timers: Array<{ at: number; run: () => void; live: boolean }> = [];
 	const runStates: Record<string, RunLookup> = options.runStates ?? {};
+	const goals = options.goals ? createGoalsService(store, clock) : undefined;
+	const kickLate = async (conversationId: string) => {
+		await store.write((db) => steward.kickInTransaction(db, conversationId));
+	};
+	const world = options.world
+		? await options.world({ store, conversation, memory, kick: kickLate })
+		: undefined;
 	const steward = createStewardService({
 		store,
 		memory: options.wrapMemory ? options.wrapMemory(memory) : memory,
@@ -183,7 +229,9 @@ export async function setupSteward(
 				timer.live = false;
 			};
 		},
-	});
+		...(world ? { world } : {}),
+		...(goals ? { goals: { ops: goals, access: GOALS_ACCESS } } : {}),
+	} satisfies StewardDeps);
 	queue.registerHandler(steward.handler as never);
 	let messages = 0;
 	const yieldTurn = () => new Promise((resolve) => setImmediate(resolve));
@@ -194,6 +242,7 @@ export async function setupSteward(
 		conversation,
 		continuity,
 		memory,
+		goals,
 		queue,
 		steward,
 		inference,
@@ -289,7 +338,7 @@ export async function setupSteward(
 			answer?: string;
 			end: RunEnd;
 			requests?: Array<{
-				kind: "forget" | "remember" | "correct";
+				kind: "forget" | "remember" | "correct" | "goal";
 				what: string;
 				detail?: string;
 			}>;
@@ -496,6 +545,7 @@ export async function setupSteward(
 		exchangeRow: (inputMessageId: string) =>
 			store.read((db) => memory.exchangeInTransaction(db, inputMessageId)),
 		async close() {
+			if (options.host) return options.host.close();
 			await store.close().catch(() => {});
 			rmSync(dir, { recursive: true, force: true });
 		},

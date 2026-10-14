@@ -34,27 +34,12 @@ afterEach(async () => {
 async function setup(options: Parameters<typeof worldHarness>[0] = {}) {
 	const h = await worldHarness(options);
 	open.push(h);
-	const resumed: Array<Promise<unknown>> = [];
-	const failures: unknown[] = [];
 	const ports: WorldAdapterPorts = {
 		claims: h.world.claims,
 		context: h.world.claimsContext,
-		resumeForget: (id) => {
-			const run = h.world.lifecycle.resumeForget(id);
-			resumed.push(run.catch(() => undefined));
-			return run;
-		},
-		reasonMessages: () => [
-			{ id: "m2", text: "いいえ、音声サービスは10月からです。" },
-			{ id: "m1", text: "音声サービスは9月から利用できる。" },
-		],
-		onForgetAdvanceFailed: (error) => failures.push(error),
 	};
 	const adapter = createWorldAdapter(() => ports);
-	const settled = async () => {
-		await Promise.all(resumed.splice(0));
-	};
-	return { ...h, ports, adapter, failures, settled };
+	return { ...h, ports, adapter };
 }
 type Harness = Awaited<ReturnType<typeof setup>>;
 
@@ -95,26 +80,19 @@ const codeOf = async (promise: Promise<unknown>) => {
 const read = (h: Harness, query: string) =>
 	h.store.read((db) => h.adapter.sourceInTransaction(db, query, undefined))!
 		.data as Record<string, any>;
-const revisionOf = (h: Harness, id: string) =>
-	claimOf(h, id)!.revision as number;
 const claimOf = (h: Harness, id: string) =>
 	(read(h, "query:world.claims@1").items as Array<Record<string, any>>).find(
 		(row) => row.id === id,
 	);
 
-test("describe offers the World queries and three writes; the shipped bundle registers with no issue", async () => {
+test("describe offers the World queries and no operation; the shipped bundle registers with no issue and has no action", async () => {
 	const d = describeWorldAdapter();
 	expect([...d.queries].sort()).toEqual([
 		"query:world.claims@1",
 		"query:world.forgets@1",
-		"query:world.reason-messages@1",
 		"query:world.status@1",
 	]);
-	expect([...d.operations.keys()].sort()).toEqual([
-		"world.correct",
-		"world.forget",
-		"world.retract",
-	]);
+	expect([...d.operations.keys()]).toEqual([]);
 	const h = await setup();
 	const host = bundleHostOf([
 		...hostAdapterDescriptions,
@@ -133,13 +111,24 @@ test("describe offers the World queries and three writes; the shipped bundle reg
 		label: "World",
 		group: "管理と確認",
 	});
-	for (const action of artifact.actionBindings)
-		expect(d.operations.get(action.operationId)?.inputSchemaRef).toBe(
-			action.inputSchemaRef,
-		);
+	// View only (plan G3): no write action, no row action, no schema of a change.
+	expect(artifact.actionBindings).toEqual([]);
+	for (const collection of artifact.collections)
+		expect(collection.rowActions).toBeUndefined();
+	expect(worldBundle.schemas).toEqual([]);
+	// The adapter refuses the removed operations whoever asks.
+	for (const name of ["world.correct", "world.retract", "world.forget"])
+		expect(
+			await codeOf(
+				run(h, name, { claimId: "claim-report", expectedRevision: 1 }),
+			),
+		).toBe("capability_unavailable");
+	expect(
+		artifact.sourceBindings.map((b: { query: string }) => b.query).sort(),
+	).toEqual([...d.queries].sort());
 });
 
-test("World OFF has no ports: the adapter is unavailable, shows nothing and changes nothing", async () => {
+test("World OFF has no ports: the adapter is unavailable and shows nothing", async () => {
 	const h = await setup();
 	const off = createWorldAdapter(() => undefined);
 	expect(off.availableInTransaction(h.store.read((db) => db))).toBe(false);
@@ -156,20 +145,10 @@ test("World OFF has no ports: the adapter is unavailable, shows nothing and chan
 			crypto.randomUUID(),
 		),
 	).toBeNull();
-	const failing = h.store.write((db) =>
-		off.invokeInTransaction(db, {
-			operationName: "world.forget",
-			input: { claimId: "claim-report", expectedRevision: 1 },
-			requestId: crypto.randomUUID(),
-			issuedAt: new Date().toISOString(),
-			origin: { kind: "ui", scope: "s", actionRequestId: "a" },
-		}),
-	);
-	expect(await codeOf(failing)).toBe("capability_unavailable");
 	expect(h.adapter.availableInTransaction(h.store.read((db) => db))).toBe(true);
 });
 
-test("status, claims, forgets and the reason choices are plain rows with the words the screen shows", async () => {
+test("status, claims and forgets are plain rows with the words the screen shows", async () => {
 	const h = await setup();
 	expect(read(h, "query:world.status@1").items[0]).toMatchObject({
 		id: "world",
@@ -192,7 +171,6 @@ test("status, claims, forgets and the reason choices are plain rows with the wor
 		toneLabel: "採用済み",
 		originLabel: "本人の報告",
 		evidenceLabel: "本人の発言",
-		correctable: true,
 	});
 	// The grounds the legacy detail drawer showed are columns now.
 	const grounds = claimOf(h, "claim-report")!;
@@ -215,10 +193,21 @@ test("status, claims, forgets and the reason choices are plain rows with the wor
 		claim: "latency : 120 ms",
 	});
 	expect(read(h, "query:world.forgets@1").items).toEqual([]);
-	expect(read(h, "query:world.reason-messages@1").options).toEqual([
-		{ value: "m2", label: "いいえ、音声サービスは10月からです。" },
-		{ value: "m1", label: "音声サービスは9月から利用できる。" },
-	]);
+	expect(
+		claims.items.every(
+			(row: Record<string, unknown>) => !("correctable" in row),
+		),
+	).toBe(true);
+	// The reason choices belonged to the changes; there is no such query any more.
+	expect(
+		h.store.read((db) =>
+			h.adapter.sourceInTransaction(
+				db,
+				"query:world.reason-messages@1",
+				undefined,
+			),
+		),
+	).toBeNull();
 	expect(
 		h.store.read((db) =>
 			h.adapter.sourceInTransaction(db, "query:world.unknown@1", undefined),
@@ -226,212 +215,7 @@ test("status, claims, forgets and the reason choices are plain rows with the wor
 	).toBeNull();
 });
 
-test("a correction carries the revision seen and a statement of the person; a refusal changes nothing", async () => {
-	const h = await setup();
-	const seen = revisionOf(h, "claim-report");
-	const input = {
-		claimId: "claim-report",
-		expectedRevision: seen,
-		reasonMessageId: "m2",
-		valueKind: "boolean",
-		value: "false",
-	};
-	// Not an input of the registered shape, or a value that does not fit its kind.
-	expect(await codeOf(run(h, "world.correct", { ...input, extra: 1 }))).toBe(
-		"invalid_input",
-	);
-	expect(
-		await codeOf(run(h, "world.correct", { ...input, value: "maybe" })),
-	).toBe("invalid_input");
-	expect(
-		await codeOf(
-			run(h, "world.correct", { ...input, valueKind: "number", value: "x" }),
-		),
-	).toBe("invalid_input");
-	expect(
-		await codeOf(run(h, "world.correct", input, { origin: "conversation" })),
-	).toBe("capability_unavailable");
-	expect(
-		await codeOf(
-			run(h, "world.correct", { ...input, reasonMessageId: "nope" }),
-		),
-	).toBe("reason_source_unavailable");
-	expect(
-		await codeOf(run(h, "world.correct", { ...input, expectedRevision: 9 })),
-	).toBe("revision_conflict");
-	expect(
-		await codeOf(run(h, "world.correct", { ...input, claimId: "nothing" })),
-	).toBe("not_found");
-	expect(claimOf(h, "claim-report")).toMatchObject({
-		revision: seen,
-		claim: "available : はい",
-	});
-
-	const corrected = await run(h, "world.correct", input);
-	expect(corrected.receipt).toMatchObject({
-		kind: "claim-corrected",
-		claimId: "claim-report",
-		status: "applied",
-	});
-	expect(claimOf(h, "claim-report")).toMatchObject({
-		claim: "available : いいえ",
-		toneLabel: "採用済み",
-	});
-	expect(revisionOf(h, "claim-report")).toBeGreaterThan(seen);
-	// The revision the person saw is stale now.
-	expect(await codeOf(run(h, "world.correct", input))).toBe(
-		"revision_conflict",
-	);
-	// A number states its unit.
-	await run(h, "world.correct", {
-		claimId: "claim-measured",
-		expectedRevision: revisionOf(h, "claim-measured"),
-		reasonMessageId: "m1",
-		valueKind: "number",
-		value: "95",
-		unit: "ms",
-	});
-	expect(claimOf(h, "claim-measured")?.claim).toBe("latency : 95 ms");
-});
-
-test("a change in a transaction that fails afterwards leaves nothing behind", async () => {
-	const h = await setup();
-	const seen = revisionOf(h, "claim-report");
-	const failing = h.store.write((db) => {
-		h.ports.claims.retractInTransaction(db, h.ports.context(), {
-			requestId: crypto.randomUUID(),
-			expectedRevision: seen,
-			target: { claimId: "claim-report" },
-			reasonMessageId: "m2",
-		});
-		throw new Error("outer_failure");
-	});
-	expect(await codeOf(failing)).toBe("outer_failure");
-	expect(revisionOf(h, "claim-report")).toBe(seen);
-	const forgetting = h.store.write((db) => {
-		h.ports.claims.forgetInTransaction(db, h.ports.context(), {
-			requestId: crypto.randomUUID(),
-			expectedRevision: seen,
-			target: { claimId: "claim-report" },
-		});
-		throw new Error("outer_failure");
-	});
-	expect(await codeOf(forgetting)).toBe("outer_failure");
-	expect(read(h, "query:world.forgets@1").items).toEqual([]);
-});
-
-test("a retraction needs the statement too and keeps the claim as history", async () => {
-	const h = await setup();
-	const input = {
-		claimId: "claim-hyp",
-		expectedRevision: revisionOf(h, "claim-hyp"),
-		reasonMessageId: "m1",
-	};
-	expect(
-		await codeOf(
-			run(h, "world.retract", { ...input, reasonMessageId: "nope" }),
-		),
-	).toBe("reason_source_unavailable");
-	const retracted = await run(h, "world.retract", input);
-	expect(retracted.receipt).toMatchObject({
-		kind: "claim-retracted",
-		claimId: "claim-hyp",
-		status: "applied",
-	});
-	expect(claimOf(h, "claim-hyp")).toBeUndefined();
-	expect(await codeOf(run(h, "world.retract", input))).toBe("not_found");
-});
-
-test("a forget is accepted first and only the ledger says when it is complete", async () => {
-	const h = await setup();
-	const requestId = crypto.randomUUID();
-	const accepted = await run(
-		h,
-		"world.forget",
-		{
-			claimId: "claim-measured",
-			expectedRevision: revisionOf(h, "claim-measured"),
-		},
-		{ requestId },
-	);
-	expect(accepted.receipt).toMatchObject({
-		kind: "claim-forget",
-		status: "accepted",
-		display: "pending",
-		completed: false,
-	});
-	const forgetId = (accepted.receipt as { forgetId: string }).forgetId;
-	expect(read(h, "query:world.forgets@1").items).toMatchObject([
-		{
-			forgetId,
-			display: "pending",
-			displayLabel: "処理中（完了ではありません）",
-		},
-	]);
-	// The same request is the same forget; another one names a different claim.
-	const again = await run(
-		h,
-		"world.forget",
-		{
-			claimId: "claim-measured",
-			expectedRevision: revisionOf(h, "claim-measured"),
-		},
-		{ requestId },
-	);
-	expect((again.receipt as { forgetId: string }).forgetId).toBe(forgetId);
-	// The receipt is read with how far the forget got, under the same identity.
-	const before = h.store.read((db) =>
-		h.adapter.readInTransaction(db, requestId),
-	)!;
-	expect(before.receiptRef.digest).toBe(accepted.receiptRef.digest);
-	expect(before.receipt).toMatchObject({
-		status: "accepted",
-		completed: false,
-	});
-
-	h.adapter.afterCommit!();
-	await h.settled();
-	expect(h.failures).toEqual([]);
-	const after = h.store.read((db) =>
-		h.adapter.readInTransaction(db, requestId),
-	)!;
-	expect(after.receiptRef.digest).toBe(accepted.receiptRef.digest);
-	const row = (
-		read(h, "query:world.forgets@1").items as Array<Record<string, any>>
-	)[0]!;
-	expect(after.receipt).toMatchObject({
-		status: "accepted",
-		display: row.display,
-		completed: row.display === "complete",
-	});
-	expect(row.display).toBe("complete");
-	expect(claimOf(h, "claim-measured")).toBeUndefined();
-});
-
-test("a forget that stops while advancing stays accepted and pending, and is reported, not hidden", async () => {
-	const h = await setup({ stallForget: true });
-	const requestId = crypto.randomUUID();
-	await run(
-		h,
-		"world.forget",
-		{ claimId: "claim-cand", expectedRevision: revisionOf(h, "claim-cand") },
-		{ requestId },
-	);
-	h.adapter.afterCommit!();
-	await h.settled();
-	expect(h.failures).toHaveLength(1);
-	const row = (
-		read(h, "query:world.forgets@1").items as Array<Record<string, any>>
-	)[0]!;
-	expect(row.display).not.toBe("complete");
-	const receipt = h.store.read((db) =>
-		h.adapter.readInTransaction(db, requestId),
-	)!.receipt as Record<string, unknown>;
-	expect(receipt).toMatchObject({ status: "accepted", completed: false });
-	expect(receipt.display).toBe(row.display);
-});
-
-test("the World bundle runs through the action ledger", async () => {
+test("the World bundle runs through the action ledger as a view: sources read, no change is accepted", async () => {
 	const h = await setup();
 	const registry = createAdapterRegistry([h.adapter]);
 	const host = bundleHostOf(registry);
@@ -448,7 +232,7 @@ test("the World bundle runs through the action ledger", async () => {
 		registry,
 		scope: "test-scope",
 	});
-	const revisionId = "artifact:settings.world@2";
+	const revisionId = "artifact:settings.world@4";
 	expect(ledger.artifacts().map((a) => a.artifactRevisionId)).toContain(
 		revisionId,
 	);
@@ -458,49 +242,30 @@ test("the World bundle runs through the action ledger", async () => {
 			.map((i) => i.id)
 			.sort(),
 	).toEqual(["claim-cand", "claim-hyp", "claim-measured", "claim-report"]);
-	const send = (actionId: string, input: unknown) => {
+	// The three changes the earlier revision offered are not actions of this one.
+	for (const actionId of ["correct", "retract", "forget"]) {
 		const now = Date.now();
-		return ledger.submit({
-			version: 1,
-			eventId: crypto.randomUUID(),
-			eventCreatedAt: new Date(now).toISOString(),
-			eventExpiresAt: new Date(now + 60_000).toISOString(),
-			artifactId: "tab-1",
-			artifactRevisionId: revisionId,
-			source: "world-claims",
-			sourceRevision: rows.revision,
-			actionId,
-			scopeRef: ledger.scopeRef,
-			input,
-		});
-	};
-	const stale = await send("retract", {
-		claimId: "claim-hyp",
-		expectedRevision: 40,
-		reasonMessageId: "m1",
-	});
-	expect(stale.request).toMatchObject({
-		status: "rejected",
-		errorCode: "revision_conflict",
-	});
-	const forgot = await send("forget", {
-		claimId: "claim-report",
-		expectedRevision: revisionOf(h, "claim-report"),
-	});
-	expect(forgot.request.status).toBe("accepted");
-	// What the screen is handed is "accepted", not "done".
-	expect(forgot.request.result?.receipt).toMatchObject({
-		status: "accepted",
-		completed: false,
-	});
-	await h.settled();
-	expect(
-		(
-			ledger.source(revisionId, "world-forgets").data as {
-				items: Array<{ display: string }>;
-			}
-		).items,
-	).toHaveLength(1);
+		const sent = await ledger
+			.submit({
+				version: 1,
+				eventId: crypto.randomUUID(),
+				eventCreatedAt: new Date(now).toISOString(),
+				eventExpiresAt: new Date(now + 60_000).toISOString(),
+				artifactId: "tab-1",
+				artifactRevisionId: revisionId,
+				source: "world-claims",
+				sourceRevision: rows.revision,
+				actionId,
+				scopeRef: ledger.scopeRef,
+				input: { claimId: "claim-report", expectedRevision: 1 },
+			})
+			.then(
+				(result) => result.request.status,
+				(error: Error) => error.message,
+			);
+		expect(sent).not.toBe("accepted");
+	}
+	expect(claimOf(h, "claim-report")).toBeDefined();
 });
 
 test("an unavailable or partial list says why in the status row instead of passing for empty", async () => {
@@ -551,14 +316,19 @@ test("the forgets list marks the forgets still moving, and the bundle re-reads i
 		(c: { source: string }) => c.source === "world-forgets",
 	);
 	expect(forgets.refreshWhile).toEqual({ key: "inProgress", in: [true] });
-	await run(h, "world.forget", {
-		claimId: "claim-cand",
-		expectedRevision: revisionOf(h, "claim-cand"),
-	});
-	expect(read(h, "query:world.forgets@1").items[0].inProgress).toBe(true);
-	h.adapter.afterCommit!();
-	await h.settled();
+	// A forget now comes from the steward / the lifecycle, never from this screen.
+	const ctx = h.world.claimsContext();
+	const forgetId = `forget-${crypto.randomUUID()}`;
+	const request = {
+		forgetId,
+		scope: { principal: ctx.principal, scopeKey: ctx.scopeKeys[0]! },
+		reasonCode: "FORGET_REQUESTED" as const,
+		roots: [{ kind: "assertion" as const, id: "claim-cand", revision: 1 }],
+		origin: "request" as const,
+	};
+	await h.world.lifecycle.acceptForget(request);
 	expect(read(h, "query:world.forgets@1").items[0]).toMatchObject({
+		forgetId,
 		display: "complete",
 		inProgress: false,
 	});

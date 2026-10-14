@@ -34,6 +34,7 @@ import type {
 	StepDefinition,
 	StepEnv,
 } from "../types";
+import { goalsEligible } from "./consolidate-goals";
 import { allMessageIds, labelExchanges, withSummarySources } from "./shared";
 
 const SUMMARY_CHARS = 1200;
@@ -82,6 +83,8 @@ export function eligible(env: StepEnv, step: StepId): boolean {
 			return keepHistoryBytes(env) >= HISTORY_MAX_BYTES * COMPACT_THRESHOLD;
 		case "refine-summary":
 			return summaryChars(env) >= SUMMARY_CHARS * REFINE_THRESHOLD;
+		case "consolidate-goals":
+			return goalsEligible(env);
 		default:
 			return false;
 	}
@@ -281,7 +284,7 @@ export const consolidateMemory: StepDefinition = {
 	slot: "maintenance",
 	longTerm: true,
 	instructions: consolidateInstructions,
-	outputSchema: consolidateSchema,
+	outputSchema: () => consolidateSchema,
 	prepare: (env) => prepareConsolidate(env),
 	parse: parseConsolidate,
 	apply: (env, prepared, output) => applyConsolidate(env, prepared, output),
@@ -396,7 +399,7 @@ export const compactHistory: StepDefinition = {
 	slot: "maintenance",
 	longTerm: false,
 	instructions: compactInstructions,
-	outputSchema: compactSchema,
+	outputSchema: () => compactSchema,
 	prepare: (env) => prepareCompact(env),
 	parse(raw): CompactOutput | null {
 		if (!isRecord(raw)) return null;
@@ -450,7 +453,7 @@ export const refineSummary: StepDefinition = {
 	slot: "maintenance",
 	longTerm: false,
 	instructions: refineInstructions,
-	outputSchema: refineSchema,
+	outputSchema: () => refineSchema,
 	prepare: (env) => prepareRefine(env),
 	parse(raw) {
 		if (!isRecord(raw)) return null;

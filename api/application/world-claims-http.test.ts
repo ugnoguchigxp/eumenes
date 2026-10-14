@@ -187,6 +187,19 @@ test("World configured: same bearer and origin rules as every API route", async 
 test("World ON: list, detail, status and forgets over HTTP; the Scope comes from the host", async () => {
 	const h = await assemble("on");
 	await seed(h);
+	// View only: with a valid token the change routes still do not exist.
+	for (const action of ["correct", "retract", "forget"]) {
+		const change = await h.app.request(`/api/world/claims/${action}`, {
+			method: "POST",
+			headers: { ...auth, "content-type": "application/json" },
+			body: JSON.stringify({
+				requestId: crypto.randomUUID(),
+				expectedRevision: 1,
+				target: { claimId: "claim-1" },
+			}),
+		});
+		expect(change.status).toBe(404);
+	}
 	const status = await (await get(h.app, "/api/world/status")).json();
 	expect(status).toMatchObject({
 		mode: "on",

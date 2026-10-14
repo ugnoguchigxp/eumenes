@@ -3,9 +3,9 @@ import { z } from "zod";
 /** Input of the conversation agent's `memory_request` tool (the steward validates the same shape). */
 export const memoryRequest = z.strictObject({
 	kind: z
-		.enum(["forget", "remember", "correct"])
+		.enum(["forget", "remember", "correct", "goal"])
 		.describe(
-			"forget は本人が忘れてと頼んだとき、remember は覚えてと頼んだとき、correct は記憶の内容が違うと言われたとき。",
+			"forget は本人が忘れてと頼んだとき、remember は覚えてと頼んだとき、correct は記憶の内容が違うと言われたとき、goal は目標を登録・変更・完了・取り下げてと頼まれたとき。",
 		),
 	what: z
 		.string()

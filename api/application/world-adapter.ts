@@ -1,66 +1,22 @@
-import type { Database } from "bun:sqlite";
-import { createHash } from "node:crypto";
-import { z } from "zod";
-import type {
-	WorldClaims,
-	WorldClaimsContext,
-	ClaimFailure,
-} from "../domains/world";
+import type { WorldClaims, WorldClaimsContext } from "../domains/world";
 import type {
 	ClaimContent,
 	ClaimDetail,
 	ClaimRow,
 	ForgetView,
 } from "../domains/world/contracts/view";
-import type { AdapterResult, DomainAdapter } from "../domains/tool-runtime";
+import type { DomainAdapter } from "../domains/tool-runtime";
 
 export const WORLD_ADAPTER_REF = "adapter:world@1";
 const STATUS = "query:world.status@1";
 const CLAIMS = "query:world.claims@1";
 const FORGETS = "query:world.forgets@1";
-const REASONS = "query:world.reason-messages@1";
-/** How many of the person's latest statements are offered as the reason of a change. */
-const REASON_CHOICES = 20;
 
-const claimId = z.string().min(1).max(256);
-const revision = z.number().int().min(1);
-const reasonMessageId = z.string().min(1).max(256);
-const correct = z.strictObject({
-	claimId,
-	expectedRevision: revision,
-	reasonMessageId,
-	valueKind: z.enum(["string", "boolean", "number"]),
-	value: z.string().min(1).max(1000),
-	unit: z.string().max(40).optional(),
-});
-const retract = z.strictObject({
-	claimId,
-	expectedRevision: revision,
-	reasonMessageId,
-});
-const forget = z.strictObject({ claimId, expectedRevision: revision });
-
-/** What the World adapter reads and changes; each is a public operation of the World domain. */
+/** What the World adapter reads; each is a public read operation of the World domain. */
 export type WorldAdapterPorts = {
-	claims: Pick<
-		WorldClaims,
-		| "status"
-		| "list"
-		| "detail"
-		| "forgets"
-		| "correctInTransaction"
-		| "retractInTransaction"
-		| "forgetInTransaction"
-		| "forgetStatusInTransaction"
-	>;
-	/** Who the screen acts for: bound by the host, never by a request. */
+	claims: Pick<WorldClaims, "status" | "list" | "detail" | "forgets">;
+	/** Who the screen shows: bound by the host, never by a request. */
 	context: () => WorldClaimsContext;
-	/** Advances an accepted forget after the accepting transaction committed (World's lifecycle). */
-	resumeForget: (forgetId: string) => Promise<unknown>;
-	/** The person's latest statements of the conversation, newest first: the reason of a change. */
-	reasonMessages: () => ReadonlyArray<{ id: string; text: string }>;
-	/** Told (never the person) when advancing an accepted forget failed; it stays pending and is resumed. */
-	onForgetAdvanceFailed?: (error: unknown) => void;
 };
 /** Absent while World is configured OFF: the adapter is then unavailable and the screen is not offered. */
 export type WorldAdapterPortsLookup = () => WorldAdapterPorts | undefined;
@@ -124,8 +80,6 @@ const claimRow = (row: ClaimRow) => ({
 	evidenceLabel:
 		row.evidenceKinds.map((kind) => evidenceLabels[kind]).join("、") || "なし",
 	freshnessLabel: freshnessLabels[row.freshness],
-	// A relation changes by a new relation, not by a typed value.
-	correctable: row.claim.content.kind === "value",
 });
 
 const forgetRow = (view: ForgetView) => ({
@@ -215,55 +169,24 @@ const unavailableText = (what: string, code: string) => {
 	}
 };
 
-const preview = (text: string) =>
-	text.length > 40 ? `${text.slice(0, 40)}…` : text;
-const sha256 = (value: unknown) =>
-	createHash("sha256").update(JSON.stringify(value)).digest("hex");
-
-/** What the World adapter offers, without the domain (bundle checks, evaluation). */
+/** What the World adapter offers, without the domain (bundle checks, evaluation). View only: no operation. */
 export const describeWorldAdapter = () => ({
 	owner: "world",
-	operations: new Map(
-		(
-			[
-				["world.correct", "schema:world-claim-correct@1"],
-				["world.retract", "schema:world-claim-retract@1"],
-				["world.forget", "schema:world-claim-forget@1"],
-			] as const
-		).map(([name, inputSchemaRef]) => [
-			name,
-			{ inputSchemaRef, effect: "write" as const },
-		]),
-	),
-	queries: new Set([STATUS, CLAIMS, FORGETS, REASONS]),
+	operations: new Map<
+		string,
+		{ inputSchemaRef: string; effect: "read" | "write" }
+	>(),
+	queries: new Set([STATUS, CLAIMS, FORGETS]),
 	inputAdapters: new Map(),
 	projections: new Set<string>(),
 	availability: "availability:world@1",
 });
 
-/** The value a correction states, typed by its kind; a wrong form is an input error. */
-function correctedValue(input: z.infer<typeof correct>) {
-	if (input.valueKind === "string")
-		return { kind: "string" as const, value: input.value };
-	if (input.valueKind === "boolean") {
-		if (input.value !== "true" && input.value !== "false")
-			throw new Error("invalid_input");
-		return { kind: "boolean" as const, value: input.value === "true" };
-	}
-	const value = Number(input.value);
-	if (!input.value.trim() || !Number.isFinite(value))
-		throw new Error("invalid_input");
-	return { kind: "number" as const, value, unit: (input.unit ?? "").trim() };
-}
-
 /**
- * The typed World adapter: status, the claim list and the forget list, and the explicit
- * correction, retraction and forget of the owner. Changes are World's own transaction
- * operations, so the revision the person saw, the reason statement and the Scope gate stay in
- * the domain. A forget is only accepted here (its intake is durable with the action); it then
- * advances after the commit and the receipt states `accepted`, never `complete`, until World's
- * ledger says so. The adapter is unavailable while World is OFF (no ports).
- * One Scope only: the screen acts for the host-bound `context()` Scope and offers no Scope
+ * The typed World adapter: status, the claim list and the forget list, read only (plan G3: claims are kept
+ * by the memory steward; the owner can look but not change them, so the adapter has no operation).
+ * The adapter is unavailable while World is OFF (no ports).
+ * One Scope only: the screen shows the host-bound `context()` Scope and offers no Scope
  * choice (the legacy panel's choice appeared only with several Scopes, which this host has not).
  * The first 50 claims carry their grounds (condition, evidence, refutations, source
  * versions, history) as table columns; later rows show "—".
@@ -271,173 +194,16 @@ function correctedValue(input: z.infer<typeof correct>) {
 export function createWorldAdapter(
 	lookup: WorldAdapterPortsLookup,
 ): DomainAdapter {
-	/** Forgets accepted in transactions that have not committed yet. */
-	const accepted = new Set<string>();
-	const need = (): WorldAdapterPorts => {
-		const ports = lookup();
-		if (!ports) throw new Error("capability_unavailable");
-		return ports;
-	};
-	const failed = (failure: ClaimFailure): never => {
-		throw new Error(failure.code);
-	};
-	function done(
-		receipt: Record<string, unknown>,
-		requestId: string,
-		claim: string,
-		digested: Record<string, unknown> = receipt,
-	): AdapterResult {
-		return {
-			receipt,
-			receiptRef: {
-				owner: "world",
-				operationId: requestId,
-				digest: sha256(digested),
-			},
-			resultRefs: [
-				{
-					owner: "world",
-					kind: "claim",
-					id: claim,
-					schemaRef: "domain:world.claim@1",
-				},
-			],
-			replay: false,
-		};
-	}
-	/** The receipt of an accepted forget: what it is is fixed, how far it got is read fresh. */
-	function forgetReceipt(
-		requestId: string,
-		forgetId: string,
-		view: ForgetView,
-	) {
-		return {
-			receipt: {
-				version: 1,
-				kind: "claim-forget",
-				forgetId,
-				status: "accepted",
-				display: view.display,
-				// Only World's ledger can say a forget is complete.
-				completed: view.display === "complete",
-			},
-			identity: { version: 1, kind: "claim-forget", forgetId, requestId },
-		};
-	}
-	function invoke(tx: Database, name: string, raw: unknown, requestId: string) {
-		const ports = need();
-		const ctx = ports.context();
-		if (name === "world.correct") {
-			const input = correct.safeParse(raw);
-			if (!input.success) throw new Error("invalid_input");
-			const value = correctedValue(input.data);
-			const result = ports.claims.correctInTransaction(tx, ctx, {
-				requestId,
-				expectedRevision: input.data.expectedRevision,
-				target: { claimId: input.data.claimId },
-				reasonMessageId: input.data.reasonMessageId,
-				value,
-			});
-			if (result.status !== "ok") return failed(result);
-			if (result.value.status !== "applied")
-				throw new Error("invalid_world_request");
-			return done(
-				{
-					version: 1,
-					kind: "claim-corrected",
-					claimId: result.value.claimId,
-					status: "applied",
-				},
-				requestId,
-				result.value.claimId,
-			);
-		}
-		if (name === "world.retract") {
-			const input = retract.safeParse(raw);
-			if (!input.success) throw new Error("invalid_input");
-			const result = ports.claims.retractInTransaction(tx, ctx, {
-				requestId,
-				expectedRevision: input.data.expectedRevision,
-				target: { claimId: input.data.claimId },
-				reasonMessageId: input.data.reasonMessageId,
-			});
-			if (result.status !== "ok") return failed(result);
-			if (result.value.status !== "applied")
-				throw new Error("invalid_world_request");
-			return done(
-				{
-					version: 1,
-					kind: "claim-retracted",
-					claimId: result.value.claimId,
-					status: "applied",
-				},
-				requestId,
-				result.value.claimId,
-			);
-		}
-		if (name === "world.forget") {
-			const input = forget.safeParse(raw);
-			if (!input.success) throw new Error("invalid_input");
-			const result = ports.claims.forgetInTransaction(tx, ctx, {
-				requestId,
-				expectedRevision: input.data.expectedRevision,
-				target: { claimId: input.data.claimId },
-			});
-			if (result.status !== "ok") return failed(result);
-			if (result.value.status !== "accepted")
-				throw new Error("invalid_world_request");
-			const view = result.value.forget;
-			accepted.add(view.forgetId);
-			const { receipt, identity } = forgetReceipt(
-				requestId,
-				view.forgetId,
-				view,
-			);
-			return done(receipt, requestId, input.data.claimId, identity);
-		}
-		throw new Error("capability_unavailable");
-	}
 	return {
 		ref: WORLD_ADAPTER_REF,
 		describe: describeWorldAdapter,
 		availableInTransaction: () => lookup() !== undefined,
 		snapshotInTransaction: () => ({ items: [] }),
-		invokeInTransaction(tx, request) {
-			if (request.origin.kind !== "ui")
-				throw new Error("capability_unavailable");
-			return invoke(
-				tx,
-				request.operationName,
-				request.input,
-				request.requestId,
-			);
+		// View only: there is no operation to run and no receipt to read.
+		invokeInTransaction() {
+			throw new Error("capability_unavailable");
 		},
-		// A forget goes on after it was accepted: its receipt is read with how far it got now.
-		readInTransaction(tx, operationId) {
-			const ports = lookup();
-			if (!ports) return null;
-			const view = ports.claims.forgetStatusInTransaction(
-				tx,
-				ports.context(),
-				operationId,
-			);
-			if (!view) return null;
-			const { receipt, identity } = forgetReceipt(
-				operationId,
-				view.forgetId,
-				view,
-			);
-			return {
-				receipt,
-				receiptRef: {
-					owner: "world",
-					operationId,
-					digest: sha256(identity),
-				},
-				resultRefs: [],
-				replay: false,
-			};
-		},
+		readInTransaction: () => null,
 		sourceInTransaction(_tx, query) {
 			const ports = lookup();
 			if (!ports) return null;
@@ -538,29 +304,10 @@ export function createWorldAdapter(
 									},
 					};
 				}
-				case REASONS:
-					return {
-						revision: 0,
-						data: {
-							options: ports
-								.reasonMessages()
-								.slice(0, REASON_CHOICES)
-								.map((m) => ({ value: m.id, label: preview(m.text) })),
-						},
-					};
 				default:
 					return null;
 			}
 		},
 		targetInput: () => ({}),
-		afterCommit() {
-			const ports = lookup();
-			const ids = [...accepted];
-			accepted.clear();
-			for (const forgetId of ids)
-				void ports?.resumeForget(forgetId).catch((error: unknown) => {
-					ports.onForgetAdvanceFailed?.(error);
-				});
-		},
 	};
 }

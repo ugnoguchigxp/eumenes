@@ -54,9 +54,12 @@ The Broker port (`assembly.context`) is passed to `createDialogueService` as
 consumer (bounded pages). Triggers: a debounced `store.onCommit` notification
 (feeds only) and the poll (feeds, stuck forgets, `sweepPendingReleases`, and a
 retry of recovery while the gate is closed). The consumers never create
-inference requests; only in mode `on`, a pass that leaves unsettled input also
-schedules ONE `world.extract` queue job (see "Local extraction"). A feed pass with nothing new writes nothing (the cursor save is
-a no-op), so idle polling causes no commit and no change-stream traffic.
+inference requests and World owns no model call at all: extraction is the steward's
+`curate-world` step (see "Curation"). After a pass that received events, the feed consumer
+calls `intake.onEventsReceived(conversationIds)` once the receiving transaction committed;
+the application routes it to the steward's kick. A feed pass with nothing new writes
+nothing (the cursor save is a no-op), so idle polling causes no commit and no change-stream
+traffic.
 
 ### Enabling
 
@@ -64,8 +67,9 @@ a no-op), so idle polling causes no commit and no change-stream traffic.
 database refuses ON until `markInitialSyncComplete` was recorded. The initial
 sync drains both change feeds from the start (bounded, 2000 pages each) and
 records the flag only when both are drained. There is no HTTP route or UI.
-Explicit registration (targets, structured claims) goes through
-`assembly.service.apply(...)` with `manualAccess()`; there is no extraction yet.
+Explicit registration (targets, structured claims) by the host goes through
+`assembly.service.apply(...)` with `manualAccess()`. The steward curates conversation input through
+`assembly.curation` (below).
 
 ### Cursor secret
 
@@ -77,34 +81,47 @@ replaced silently. If the secret does change, the next pass cannot decode the
 stored cursor; the assembly answers with a restore (new epoch, cursors dropped,
 feeds read again), it does not stay stuck.
 
-## Continuous input and Local extraction (P4-01, P4-02)
+## Continuous input and curation (P4-01, steward-driven)
 
 ### Input receipt and progress (`service/extraction-intake.ts`, `repository/extraction.ts`)
 
 The source outbox and Memory's change feed keep SEPARATE cursors. A source-feed
 page is handled in ONE writer callback, in this order: retractions become forget
 intakes, corrections stop the claims standing on the old version, and only then
-every remaining user addition/correction is handed to World's inbox
-(`inbox.receive`, event id = hash of the Scope and the exact message revision, so
-a resend, a resync or a wider Scope set is the same event) and the cursor is
-saved. If that callback fails (database, Writer) nothing of it remains and the
-cursor does not move; a deterministic World refusal of one event records that
-input as `skipped` and never holds a retraction on the same page. The semantic
-application is a later step (`candidate.settle`, see below) and moves a separate
-World checkpoint.
+every remaining input is handed to World's inbox (`inbox.receive`, event id = hash of
+the Scope and the exact message revision, so a resend, a resync or a wider Scope set is
+the same event) and the cursor is saved. If that callback fails (database, Writer)
+nothing of it remains and the cursor does not move; a deterministic World refusal of one
+event records that input as `skipped` and never holds a retraction on the same page. The
+semantic application is a later step (`candidate.settle`, see "Curation") and moves a
+separate World checkpoint.
+
+What is an input (`isExtractionInput`, decided with the host's `IntakePorts`):
+
+| Message | Input? |
+|---|---|
+| user message, added or corrected | yes |
+| assistant message, `added`, and `intake.isAdoptedAnswer(db, messageId)` (its run completed) | yes |
+| assistant message that no run adopted, a corrected answer, a retraction | no |
+| any message `intake.blockedMessageIds` names (the steward's exclusion ledger) | no: recorded `skipped SOURCE_BLOCKED` |
+
+`isAdoptedAnswer` must already be true when the feed first sees the message (the answer and
+its run's completion commit together). The host record keeps the `speaker` and the
+`conversation_id` of every event (migration `world/0009-extraction-steward`). Without
+`intake` ports (tests) only user messages are input and nothing is blocked.
 
 - `lifecycle.feedStages(scope)` answers, per feed: owner (more at the source?),
   scanned (host cursor), received (delivered to World's inbox, with the cursor of
   the newest event) and applied (settled events; `cursor` is the received cursor
   of the settled PREFIX: it never passes the oldest unsettled event, and
-  `pending` events are never counted as applied). The Memory feed has no inbox
-  stage (its notifications become forget intakes/invalidations in the same
-  callback as the cursor).
+  `pending` events are never counted as applied). The package checkpoint's applied cursor is
+  the last event settled, in settle order (the steward settles per conversation, so the
+  order across conversations is not the arrival order); the host's prefix is what is reported.
 - The package has no read API for `world_inbox`/`world_checkpoint`, so the host
   keeps its own record, `world_host_extract_event`, written in the SAME writer
   callback as every `inbox.receive`/`candidate.settle` (ids and opaque cursors,
-  no text). World's tables stay authoritative for World; tests cross-check the
-  two. A package read API would let the host drop the record.
+  no text). Events received before `world/0009` have no conversation and are never listed
+  for the steward (history is not backfilled).
 - Input scanned while World is OFF or its gate is closed is recorded as
   `skipped` and never delivered or extracted. There is NO backfill of history: a
   resync (restore, Scope change) does not extract old messages for the first time.
@@ -116,57 +133,86 @@ World checkpoint.
   roots and deletes the host record (any state): nothing of the message remains.
 - Memory feed content is NOT an extraction input (no content reader exists).
 
-### Local extraction (`service/extraction-handler.ts`)
+### Curation (`service/curation*.ts`, `createWorldCuration`, `assembly.curation`)
 
-Queue kind `world.extract`, background lane, resource `inference.llm` (capacity 1),
-2 attempts. `createWorldAssembly({ extraction: { queue, inference } })` registers
-it ONLY in mode `on`; `protect`/`off` have no such job kind. `pump()` schedules
-after the feed passes: unsettled input becomes ONE job per Scope (the oldest
-events, at most 12); no input, nothing in backoff, or World OFF/gate closed
-creates no job and so no model call.
+The World half of the steward's `curate-world` step. The steward owns the model call (on the
+conversation's route, cloud allowed) and the transaction; every operation below runs inside the
+transaction the caller owns, and a thrown error means "roll that transaction back". No queue job
+and no model call exists in this domain.
 
-- prepare: re-reads every source through its adapter (retracted/changed events
-  are settled `rejected`, in order), builds the window with the package's
-  `prepareExtraction` (12 utterances / 32 KiB / 32 dependencies; an utterance that
-  cannot be split is final `rejected UTTERANCE_TOO_LARGE`, the next window starts
-  after it), registers Memory's external dependents of one manifest per event
-  BEFORE the model sees the text (refused -> `stale`, execute is never called),
-  then captures the inference request. Everything is fixed here.
-- execute: `captureMaintenanceControlInTransaction` + `executeControl` only (the
-  inference control path: route pinned to `larm-only`, `cloudAllowed=false`,
-  JSON output, exact context). 30 s stage budget; on expiry the call is aborted
-  and must be CONFIRMED ended (5 s) before the attempt is reported as
-  `extract_timeout` (retried once by the queue). A call that never ends gives
-  `extract_cancel_unconfirmed` (no retry) and the next execute is refused
-  (`extract_slot_busy`) until it ends: the slot is not reused.
-- settle: any source version that moved since prepare voids the result (nothing
-  adopted, events stay pending). The prompt/interpretation version/entities JSON
-  snapshot is also rechecked; changing it voids the old result. Otherwise `validateCandidates` runs against the
-  current states; ids, lifecycle (always `candidate`), origin, evidence ids and
-  times are assigned by the host, never the model. Malformed/oversize output ->
-  events `rejected` (final). 9th and later candidates -> `CANDIDATE_OVERFLOW`.
-  Accepted drafts and the manifest go through `candidate.settle` per event, in
-  order, in the queue's settle transaction with the inference receipt; any
-  failure rolls everything back.
-- Any `held` candidate holds the WHOLE window: no drafts, package settle or applied
-  cursor are written. Host and package inbox stay `received`. Memory manifests and
-  the inference request are released using the existing lifecycle. A host-only
-  `held_context_digest` prevents another job/request for the same extraction
-  context, including after restart. New context permits re-evaluation. An unchanged
-  held head blocks later application; source retraction/correction and forget still
-  take priority. Empty valid output and final rejected output keep their existing policy.
-- `world/0008-extraction-hold` appends a nullable column; old terminal events are
-  not reopened and history is not re-extracted. An older binary refuses a database
-  with this unknown migration. Downgrade by ignoring the column is not supported;
-  keep the migrated binary or use a separately planned backup restoration.
-- Failures that are not about the content (provider unavailable, timeout, Memory
-  refusal) leave the events pending with an exponential backoff (30 s .. 15 min).
+| Operation | What |
+|---|---|
+| `pendingEventsInTransaction(db, scope, limit, conversationId?)` | received, unsettled events, oldest first: message id, revision, digest, speaker, conversation id, seq. A window that was held is not listed until the Scope's entities changed. With `conversationId` only that conversation's events are read (in the query, so the limit counts offerable events only); events without a conversation never block. |
+| `prepareCurationInTransaction(db, { scope, eventIds })` | re-reads the sources, builds the window (12 utterances / 32 KiB / 32 dependencies, the package's `prepareExtraction`), registers Memory's external dependents BEFORE any model sees the text, and returns what the model sees plus an opaque host table. It may write (events whose source is gone, superseded, too large, blocked or an un-adopted answer are settled `rejected` for good and listed in `finalized`), so the caller commits even when the status is not `ready`. |
+| `settleCurationInTransaction(db, { prepared, output })` | re-validates (forget epoch, sources, entities), checks every element, places the claims event by event and adopts them, all in the caller's transaction. |
+| `settleEmptyInTransaction(db, scope, eventIds)` | events routed out: settled `applied` with no candidates (`ROUTED_EMPTY`). |
+| `giveUpEventsInTransaction(db, scope, eventIds)` | `rejected STEWARD_GAVE_UP`, final. |
+| `releaseCurationInTransaction(db, scope, eventIds)` | gives back the Memory dependents of a prepare that was never settled. Idempotent. |
 
-**Local classification relied on.** "Local" is the registered LARM section of the
-settings, reached through the inference control path that pins the route to
-`larm-only` with `cloudAllowed=false`; prepare reads the request snapshot back
-and refuses to run unless it says so (no snapshot, no proof, no run). A LAN
-address is never the criterion. Cloud fallback does not exist on that route.
+What the model sees (`PreparedCuration.model`): the utterances (`e1..`, speaker `user` or
+`assistant`, text), at most 30 candidate entities (`w1..`, name and aliases: entities whose
+name/alias starts with a word of the utterances, then the entities of the most recently recorded
+claims; relation objects of the shown claims are added up to 40) and the live claims about
+them (`c1..`, at most 40, newest first). Entities have no kind: the type of an entity is a claim.
+No host id, event id or message id is shown. A window that does not fit leaves the rest pending
+(`deferredEventIds`).
+
+The model's answer (`CurationOutput`) is `{ entities: [{ name, aliases }], claims: [{ op:
+assert|correct|retract, ref, subject, predicate, value, relation, evidence, origin, validFrom,
+validUntil }] }`; `subject` is `w1`, `new:<index of an entity of this output>` or a plain name
+resolved among the shown entities (ambiguous or unknown: the window is `held`). There is no
+entity `alias` operation (the package cannot add an alias to an entity) and no free text
+`condition` (a condition is left `unspecified`: the package's conditions are structured
+expressions over observations). Each element is judged on its own and dropped with a reason
+code (host codes lower case: `origin_mismatch`, `unknown_ref`, `unknown_evidence`,
+`invalid_element`, `invalid_valid_time`, `duplicate_claim`, `claim_conflict`,
+`correct_requires_user_report`, `retract_requires_user_report`, `correct_target_mismatch`, `not_in_evidence`,
+`unused_entity`, `entity_overflow`; World's upper case: `CANDIDATE_OVERFLOW` for the 9th claim, validator codes):
+
+- evidence, ids, times and the quote (the whole utterance) are the host's; `validateCandidates` checks the rest;
+- grounding: the subject and the relation object of a claim must be named in its evidence utterance
+  (the entity's name or an alias, or the name being registered; NFKC, trimmed, case-insensitive,
+  Latin-script edges need non-alphanumeric boundaries), and so must the subject of the claim a
+  `correct` or `retract` targets, else `not_in_evidence`. A new entity whose name occurs in no
+  utterance of the window is not registered (`not_in_evidence`), nor is one that no claim to be
+  written names as subject or relation object (`unused_entity`);
+- speaker and origin: a user utterance gives `user_report` only, an assistant answer
+  `model_hypothesis` only (a mismatch is dropped `origin_mismatch`). The package knows no
+  assistant utterance origin, so an assistant answer is passed as `document_claim`; its evidence kind is
+  therefore `document` and the claim's origin `model_hypothesis`;
+- adoption (steward plan section 3.3), all explicit adoptions in the same transaction: `user_report` -> active,
+  `model_hypothesis` -> active with the `hypothesis` tone, `correct` (the person's words, a value claim of
+  the same subject and predicate) -> supersede + adopt; a `correct` of a relation claim is, in the same
+  settle, a retract of it plus an assert of the new relation (same subject and kind, new object; two
+  elements under the claim's index), `retract` -> retract with the message as reason;
+- a result is `stale` (nothing written, dependents released) when World is unavailable, the forget
+  epoch moved, an event is gone or changed, a source became blocked, or a shown entity changed; an
+  answer without the object shape is `invalid_output` (nothing written, events stay pending);
+- any `held` candidate holds the WHOLE window: nothing is written, the events record the digest of
+  the Scope's entities and are listed again only after it changed. Repeated holds are the
+  steward's to count; it ends them with `giveUpEventsInTransaction`;
+- the result lists per element what happened and the ids touched (`claimIds`, `entityIds`, `messageIds`)
+  for the steward's decision refs.
+
+The Memory dependents registered at prepare are released by settle itself when it does not adopt
+(`stale`, `held`, `invalid_output`); `applied` keeps them (they now stand for the claims).
+
+### Forget operations
+
+All are durable intakes in the caller's transaction (`origin: "steward"`); the caller resumes the
+forget with `lifecycle.resumeForget(forgetId)` after that transaction committed, so `accepted` is never
+`complete`. The Scope's forget epoch moves with the intake.
+
+- `acceptSourceForgetInTransaction(db, { scope, messageIds, reasonCode: "SOURCE_BLOCKED", origin: "steward" })`: messages
+  the steward put on the exclusion ledger leave World as forgotten sources (World's tombstone reason is
+  `SOURCE_FORGOTTEN`: the package has no other for a source). The forget id is derived from the message set.
+- `forgetClaimsInTransaction(db, { scope, claimIds })`, `forgetEntitiesInTransaction(db, { scope, entityIds })`: every
+  revision of the claims; the entities with everything on them (the package reaches relations and merged members).
+- `evidenceMessagesOf(db, { scope, claimIds, entityIds })`: the conversation messages standing as evidence of those
+  claims (every revision) and of the live claims about those entities. Read it BEFORE the forget. Known limit:
+  the package's public reads list live claims only, so the evidence of an entity's already retracted or
+  invalidated claims is not returned.
+- `forgetEpochInTransaction(db, scope)`: a result prepared under another epoch must not be adopted.
 
 ## Decision API: `world.query` (P5-01)
 
@@ -210,9 +256,9 @@ is the one product entry for World's pure reasoning. Read-only, enumerated:
 - Condition evaluation gets no observations here, so a condition on a measurement stays
   `unknown`; an `explicitly_unconditional` claim is satisfied.
 
-## Grounded claim list and correction screen (P5-02)
+## Grounded claim list (P5-02, view only)
 
-`createWorldClaims({ store, world, lifecycle, state, reasonSource, ... })`
+`createWorldClaims({ store, world, lifecycle, state, ... })`
 (`service/world-claims.ts`) behind `registerWorldClaims` (`controller/claims.ts`), mounted by
 `createApp({ worldClaims })` only when World is assembled (mode `protect` or `on`). With
 World OFF nothing is assembled and every `/api/world/*` route is a plain 404 (the bearer and
@@ -225,14 +271,10 @@ never by a body or a query string.
 | `GET /api/world/claims[?scopeKey]` | list: target, claim, adoption, origin/evidence kinds, freshness, `tone` as SEPARATE fields; `complete:false` = a budget stopped the read; `stopped` = claims stopped by a changed source |
 | `GET /api/world/claims/:id[?scopeKey]` | detail: condition (`unknown` without observations, never assumed true), supports, refutations, source versions (current / changed / unavailable), history |
 | `GET /api/world/forgets[?scopeKey]` | the durable forget intake of the Scope (works with World OFF and with a closed gate): `pending`, `awaiting_confirmation`, `abandoned`, `complete`; only `complete` is "done" |
-| `POST /api/world/claims/correct` | explicit correction: supersede + explicit adoption in ONE writer transaction, citing the person's own confirmed message (`reasonMessageId`) |
-| `POST /api/world/claims/retract` | explicit retraction; the reason source is the person's own confirmed message |
-| `POST /api/world/claims/forget` | durable intake of a forget of every revision of the claim; the answer is `accepted` with the ledger's own state |
 
-- Every change carries `expectedRevision` (what the person saw) and a `requestId` (one per action).
-  A different current revision is `409 {error: "revision_conflict", reload: true}` and nothing is
-  written. The target is `{claimId}` or `{subjectId, predicate}`; a selector that matches more than
-  one live claim answers `200 {status: "unresolved", candidates}` and writes nothing.
+Claims are kept by the memory steward: the owner can look but not change them (plan G3), so there is no
+change route. A correction, retraction or forget of a claim is a steward operation (`service/curation-adopt.ts`).
+
 - Unknown claim, Scope not granted, other principal, a closed gate and a forgotten claim are ONE
   answer: `404 {error: "not_found"}`. World OFF is `409 world_disabled`.
 - `claimTone`: only an adopted report/document is `adopted`; an adopted `model_hypothesis` is
@@ -240,30 +282,15 @@ never by a body or a query string.
 - A forget that stops while advancing is still accepted (the intake is durable) and shown as
   pending; the host's pass resumes it. While a forget is unfinished the Scope gate is closed, so
   the list answers `not_found` and the screen explains that from the forget list.
-- `correctInTransaction`, `retractInTransaction` and `forgetInTransaction` (`service/world-claims-changes.ts`)
-  run the same changes inside a writer transaction the caller owns (the UI action ledger's
-  `adapter:world@1`). They answer a `ClaimResult` and leave nothing behind on a refusal (own
-  savepoint). The forget variant writes only the durable intake (`lifecycle.acceptForgetInTransaction`);
-  the caller advances it after its commit (`lifecycle.resumeForget`), so `accepted` is never
-  `complete`. `forgetStatusInTransaction(db, ctx, requestId)` reads how far that forget got.
 - No graph, no edge editing, and the screen is a settings page: it is not read aloud.
-- Known limits: correction and retraction need a confirmed message of the person as the reason
-  (the screen offers the latest 20 of the main conversation); a relation claim cannot be
-  corrected by value; source text is not shown (opaque id and version only); a retry of an
-  already applied change is a revision conflict (reload shows the result); the forget intake
-  covers revisions up to the one the person saw.
+- Known limits: source text is not shown (opaque id and version only).
 
 ## What is fixture-grade
 
-- Deterministic evidence uses a fixture inference port and a TTS spy. No real Local Provider was run: `api/application/world-real-local-provider.test.ts` is skipped by default, fails on purpose when forced, and is reported as **not executed** (carried to P4-05).
-- Automatic extraction (P4-02) is covered with fixture providers only: a stub LARM
-  port behind the REAL queue and inference service (`api/application/world-extraction.test.ts`)
-  and fakes (`test/extraction-handler.test.ts`). Extraction quality on a real model is not measured.
-- World's entities cannot be listed through the package, so the production
-  default for `extraction.entities` is none: every named subject is held
-  (`SUBJECT_UNRESOLVED`) until a listing exists. IDs also need to exist in the
-  supplied entity snapshot; an empty snapshot does not resolve them. This fix
-  preserves held input but does not supply the missing production listing port.
+- Deterministic evidence uses a fixture inference port and a TTS spy. No real Local Provider was run; curation runs on the conversation route and its live acceptance is the steward's.
+- Curation is covered with a fixture model (a function of what it is shown) on the real store, the real
+  World package and the real conversation adapter (`test/curation.test.ts`). Extraction quality on a real model is
+  not measured here; the steward's live acceptance does that.
 - No product entry point forgets a message yet. Nothing calls `conversation.retract` or Memory's host-source forget in production; the acceptance test composes both. The consumers handle either when it happens.
 - Only the default Scope (`local:owner` / `profile:owner`) is consumed.
 - Answers already adopted stay in the conversation history. They are conversation data and are removed by the conversation domain, not by World.
@@ -273,8 +300,8 @@ never by a body or a query string.
 ## Tests
 
 - `api/domains/world/test/*`: World domain, lifecycle, Broker (real store, production migrations);
-  `change-feed.test.ts` (P4-01: A28, A29, A42) and `extraction-handler.test.ts` (P4-02: A19, A20, A43).
-- `api/application/world-extraction.test.ts`: P4-02 on the real queue and inference (no Cloud request observed).
+  `change-feed.test.ts` (P4-01: A28, A29, A42), `curation.test.ts` (prepare, settle, held, forget operations)
+  and `steward-migration.test.ts`.
 - `api/application/world.test.ts`: mode flag, cursor secret, enabling, idle quietness, cursor reset.
 - `api/application/world-acceptance-p3.test.ts`: P3-09 on the real assembly (A34 host side, A35 to A41). It lives in `application` because the world domain may not depend on dialogue, voice or queue.
 - `api/domains/dialogue/test/world-context.test.ts`, `api/domains/voice-dialogue/test/world-release.test.ts`: A40 and A41 in depth.

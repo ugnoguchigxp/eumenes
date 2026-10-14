@@ -227,77 +227,10 @@ export const worldClaimsStatusSchema = z.strictObject({
 });
 export type WorldClaimsStatus = z.infer<typeof worldClaimsStatusSchema>;
 
-const id = z.string().min(1).max(256);
-const requestId = z.string().uuid();
-const target = z.union([
-	z.strictObject({ claimId: id }),
-	z.strictObject({ subjectId: id, predicate: id }),
-]);
-const base = {
-	scopeKey: id.optional(),
-	/** One per user action: a double submit is the same request. */
-	requestId,
-	/** The revision the person saw. A different current revision is a conflict. */
-	expectedRevision: z.number().int().min(1),
-	target,
-};
-/** The statement that makes the change explicit: a confirmed message of the person. */
-const reasonMessageId = id;
-
-export const correctClaimSchema = z.strictObject({
-	...base,
-	reasonMessageId,
-	value: z.union([
-		z.strictObject({ kind: z.literal("string"), value: z.string().min(1) }),
-		z.strictObject({ kind: z.literal("boolean"), value: z.boolean() }),
-		z.strictObject({
-			kind: z.literal("number"),
-			value: z.number().finite(),
-			unit: z.string(),
-		}),
-	]),
-});
-export type CorrectClaim = z.infer<typeof correctClaimSchema>;
-
-export const retractClaimSchema = z.strictObject({
-	...base,
-	reasonMessageId,
-});
-export type RetractClaim = z.infer<typeof retractClaimSchema>;
-
-export const forgetClaimSchema = z.strictObject(base);
-export type ForgetClaim = z.infer<typeof forgetClaimSchema>;
-
-/** The change was written to the ledger. */
-export const claimAppliedSchema = z.strictObject({
-	status: z.literal("applied"),
-	claimId: z.string(),
-});
-/** The target was not one claim: the person picks, nothing was changed. */
-export const claimUnresolvedSchema = z.strictObject({
-	status: z.literal("unresolved"),
-	candidates: z.array(claimRowSchema),
-});
-export const claimChangeSchema = z.union([
-	claimAppliedSchema,
-	claimUnresolvedSchema,
-]);
-export type ClaimChange = z.infer<typeof claimChangeSchema>;
-
-export const forgetAcceptedSchema = z.union([
-	z.strictObject({ status: z.literal("accepted"), forget: forgetViewSchema }),
-	claimUnresolvedSchema,
-]);
-export type ForgetAccepted = z.infer<typeof forgetAcceptedSchema>;
-
 /** Error codes (`{ error }` bodies). `not_found` also covers every refusal of access. */
 export const WORLD_CLAIM_ERRORS = [
 	"not_found",
 	"world_disabled",
 	"world_unavailable",
-	"revision_conflict",
-	"invalid_world_request",
-	"reason_source_unavailable",
-	"claim_not_changeable",
 ] as const;
 export type WorldClaimError = (typeof WORLD_CLAIM_ERRORS)[number];

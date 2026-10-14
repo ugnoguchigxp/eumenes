@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
-import type { KanbanNoticeView } from "../../../../../api/domains/kanban/contracts";
+import type { KanbanNoticeView } from "./NotificationCenter";
 import type { TimerNotificationDto } from "../../../../../api/domains/timers/contracts";
 import { NotificationCenter } from "./NotificationCenter";
 

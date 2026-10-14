@@ -8,21 +8,32 @@ export const STEWARD_RESOURCE = "inference.aux";
 
 export const stepIds = [
 	"curate-memory",
+	"curate-goals",
+	"curate-world",
 	"dispose-exchanges",
 	"summarize",
 	"prepare-recall",
 	"consolidate-memory",
+	"consolidate-goals",
 	"compact-history",
 	"refine-summary",
 ] as const;
 export type StepId = (typeof stepIds)[number];
-export const unitKinds = ["exchange_step", "requests", "maintenance"] as const;
+export const unitKinds = [
+	"exchange_step",
+	"requests",
+	"maintenance",
+	"world_events",
+] as const;
 export type UnitKind = (typeof unitKinds)[number];
-/** Which open unit a conversation may hold at once: reflecting steps, upkeep steps, the recall preparation. */
-export type UnitSlot = "reflect" | "maintenance" | "recall";
+/**
+ * Which open unit a conversation may hold at once: reflecting steps, upkeep steps, the recall preparation and
+ * the World curation (the events World received, outside the exchange chain).
+ */
+export type UnitSlot = "reflect" | "maintenance" | "recall" | "world";
 export type UnitState = "open" | "applied" | "stale" | "failed";
 
-export const requestKinds = ["forget", "remember", "correct"] as const;
+export const requestKinds = ["forget", "remember", "correct", "goal"] as const;
 export type RequestKind = (typeof requestKinds)[number];
 export type InboxState = "staged" | "pending" | "done" | "none" | "discarded";
 /** How a conversation run ended (the dialogue tells the steward); a replaced run is `stale`. */

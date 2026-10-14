@@ -15,6 +15,7 @@ const sections = (
 ): ContextSections => ({
 	system: system("人格"),
 	longTerm: [],
+	goals: [],
 	history: [],
 	working: [],
 	unprocessed: [],
@@ -173,4 +174,19 @@ test("history and reportless failure retain their separate data without placing 
 		expect(result.at(-1)).toEqual(input);
 		expect(result[0]!.content).not.toContain("当時の発言");
 	}
+});
+
+test("the goals layer keeps its place right after long-term memory and is never dropped", () => {
+	const result = researchResultContext(
+		sections({
+			longTerm: [system("L1")],
+			goals: [system("目標の層")],
+			history: [user("古い保持" + "あ".repeat(13000)), assistant("答え")],
+			working: [system("要約")],
+			input: user("今回の依頼"),
+		}),
+		JSON.stringify({ outcome: "answered" }),
+	);
+	expect(result.slice(1, 3).map((m) => m.content)).toEqual(["L1", "目標の層"]);
+	expect(result.filter((m) => m.content === "目標の層")).toHaveLength(1);
 });

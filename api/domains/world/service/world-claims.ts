@@ -12,7 +12,6 @@ import type {
 	ForgetList,
 	WorldClaimsStatus,
 } from "../contracts/claims";
-import { createClaimChanges } from "./world-claims-changes";
 import {
 	FORGET_LIMIT,
 	adoptionOf,
@@ -43,11 +42,9 @@ const defaultHasher: CanonicalHasher = (bytes) => sha256Hex(bytes);
 const CONDITION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 /**
- * The grounded claim list and the explicit correction / retraction / forget
- * of the owner (P5-02). A read is one bounded World snapshot of a Scope the
- * host granted; a change carries the revision the person saw and becomes a
- * World operation in the host's writer transaction. Nothing here edits an
- * edge, draws a graph or decides for the person.
+ * The grounded claim list of the owner (P5-02), view only: claims are kept by the
+ * memory steward. A read is one bounded World snapshot of a Scope the host
+ * granted. Nothing here edits an edge, draws a graph or decides for the person.
  */
 export function createWorldClaims(options: WorldClaimsOptions) {
 	const { store, world, lifecycle } = options;
@@ -290,14 +287,6 @@ export function createWorldClaims(options: WorldClaimsOptions) {
 		);
 	}
 
-	const changes = createClaimChanges({
-		options,
-		now,
-		resolveScope,
-		readScope,
-		typed,
-	});
-
-	return { status, list, detail, forgets, ...changes };
+	return { status, list, detail, forgets };
 }
 export type WorldClaims = ReturnType<typeof createWorldClaims>;

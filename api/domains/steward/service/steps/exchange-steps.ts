@@ -223,7 +223,7 @@ export const disposeExchanges: StepDefinition = {
 	slot: "reflect",
 	longTerm: false,
 	instructions: disposeInstructions,
-	outputSchema: disposeSchema,
+	outputSchema: () => disposeSchema,
 	prepare: (env, unit) => prepareDispose(env, unit),
 	parse: parseDispose,
 	apply: applyDispose,
@@ -343,7 +343,7 @@ export const summarize: StepDefinition = {
 	slot: "reflect",
 	longTerm: false,
 	instructions: summarizeInstructions,
-	outputSchema: summarizeSchema,
+	outputSchema: () => summarizeSchema,
 	prepare: (env, unit) => prepareSummarize(env, unit),
 	parse: parseSummarize,
 	apply: applySummarize,
@@ -401,7 +401,7 @@ export const prepareRecallStep: StepDefinition = {
 	slot: "recall",
 	longTerm: false,
 	instructions: recallInstructions,
-	outputSchema: recallSchema,
+	outputSchema: () => recallSchema,
 	prepare: (env, unit) => prepareRecall(env, unit),
 	parse: (raw): RecallOutput | null =>
 		isRecord(raw)

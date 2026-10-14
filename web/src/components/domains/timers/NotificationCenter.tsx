@@ -1,5 +1,17 @@
 import { useState } from "react";
-import type { KanbanNoticeView } from "../../../../../api/domains/kanban/contracts";
+/**
+ * A task-board notice as the center shows it. Structural, so the timers components do not
+ * depend on the kanban domain (the board's hook passes its notices in).
+ */
+export type KanbanNoticeView = {
+	id: string;
+	kind: "done" | "blocker" | "waiting" | "commit_push" | "queue_paused";
+	text: string;
+	read: boolean;
+	createdAt: string;
+	cardId?: string;
+	runId?: string;
+};
 import type { TimerNotificationDto } from "../../../../../api/domains/timers/contracts";
 import { Button, Drawer, NotificationCard } from "../../../design-system";
 import "./TimerNotifications.css";

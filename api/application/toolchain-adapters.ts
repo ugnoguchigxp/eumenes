@@ -35,6 +35,11 @@ import {
 	STEWARD_ADAPTER_REF,
 	stewardDomainSchemas,
 } from "./steward-adapter";
+import {
+	describeWorldQueryAdapter,
+	WORLD_QUERY_ADAPTER_REF,
+	worldQueryDomainSchemas,
+} from "./world-query-adapter";
 import { describeWorldAdapter, WORLD_ADAPTER_REF } from "./world-adapter";
 import {
 	describeServiceTestsAdapter,
@@ -91,6 +96,7 @@ const domainSchemas: Readonly<Record<string, ZodType>> = {
 	...terminalsDomainSchemas,
 	...kanbanDomainSchemas,
 	...stewardDomainSchemas,
+	...worldQueryDomainSchemas,
 };
 
 /** What this host can execute, for checking bundles before they are registered. */
@@ -153,6 +159,7 @@ export const hostAdapterDescriptions: Array<
 	{ ref: TERMINALS_ADAPTER_REF, describe: describeTerminalsAdapter },
 	{ ref: KANBAN_ADAPTER_REF, describe: describeKanbanAdapter },
 	{ ref: STEWARD_ADAPTER_REF, describe: describeStewardAdapter },
+	{ ref: WORLD_QUERY_ADAPTER_REF, describe: describeWorldQueryAdapter },
 ];
 
 /** The bundle host as if every adapter were registered (see `hostAdapterDescriptions`). */

@@ -10,6 +10,7 @@ import {
 	type AnswerTicket,
 } from "../../agent-runtime";
 import type {
+	GoalsLayerPort,
 	PostAnswerObserverPort,
 	Run,
 	StewardPort,
@@ -75,6 +76,11 @@ export interface GenerateInput {
 		 */
 		blockedAtPrepare?: string[];
 	};
+	/**
+	 * The goals the layer listed, fixed at prepare time; present only when it listed goals. At adoption a
+	 * forgotten (deleted) one ends the run as `memory_stale` (see `goalsLayerStale`).
+	 */
+	goals?: import("./goals-layer").PreparedGoals;
 	/** The World context fixed at prepare time (opaque here); re-checked before sending and at adoption. */
 	world?: { context: unknown };
 	/** World was read for this run (this or an earlier attempt): its body is held until adoption. */
@@ -122,6 +128,8 @@ export type DialogueDeps = {
 	toolchains?: import("../contracts/toolchains").ToolchainRoutingPort;
 	postAnswer?: PostAnswerObserverPort;
 	worldContext?: WorldContextPort;
+	/** The adopted goals, shown as a layer right after L1. Without it no goals layer exists. */
+	goals?: GoalsLayerPort;
 	/** Set by `createDialogueService` once intake exists (it accepts the resumed runs). */
 	interactions?: import("./command-interactions").CommandInteractions;
 };

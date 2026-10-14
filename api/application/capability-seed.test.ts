@@ -28,6 +28,7 @@ const backends = new Set([
 	"claude-code",
 	"kanban",
 	"steward",
+	"world-query",
 ]);
 const directory = new URL("../domains/capabilities/bundles/", import.meta.url);
 const bundles = readdirSync(directory)

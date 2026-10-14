@@ -3,3 +3,5 @@ export const REQUEST_FAILED_NOTICE =
 	"記憶の依頼を処理できませんでした。もう一度お願いします。";
 export const FORGET_LIMIT_NOTICE =
 	"一度に忘れられる件数を超えているため、忘れる依頼を実行できませんでした。件数を減らしてもう一度お願いします。";
+export const NOTHING_TO_FORGET_NOTICE =
+	"忘れる依頼に当てはまる記憶が見つからなかったため、何も忘れていません。";

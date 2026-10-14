@@ -15,8 +15,10 @@ import {
 	loadExchange,
 	localDay,
 } from "../context";
+import { describeGoals } from "../goals-view";
 import { instructions } from "../prompts/curate-memory";
 import { curateSchema } from "../schemas";
+import { describeWorld } from "../world-view";
 import type {
 	ExecuteContext,
 	PreparedUnit,
@@ -136,6 +138,60 @@ function buildPrepared(env: StepEnv, unit: PreparedUnit["unit"]) {
 	return { kept, requestRows, targetEntries };
 }
 
+/**
+ * World's claims and entities and the goals, as refs a forget request may name (F3, F4, F8). Shown only when the unit
+ * holds a forget request: they cost tokens and nothing else of this step uses them.
+ */
+function describeShelves(
+	env: StepEnv,
+	requestRows: readonly InboxRow[],
+	kept: ReadonlyArray<{ loaded: LoadedExchange; target: boolean }>,
+): {
+	refs: CurateContext["refs"];
+	shown: CurateContext["shown"];
+	claimEntities: CurateContext["claimEntities"];
+	data: Record<string, unknown>;
+} {
+	const refs: CurateContext["refs"] = {};
+	const shown: CurateContext["shown"] = {};
+	const claimEntities: CurateContext["claimEntities"] = {};
+	const data: Record<string, unknown> = {};
+	const forgets = requestRows.filter((row) => row.kind === "forget");
+	if (forgets.length === 0) return { refs, shown, claimEntities, data };
+	const world = describeWorld(env, [
+		...forgets.map((row) => row.what),
+		...kept.flatMap((e) => [e.loaded.user.text]),
+	]);
+	if (world && (world.entities.length > 0 || world.claims.length > 0)) {
+		for (const [ref, entry] of Object.entries(world.refs))
+			refs[ref] = { namespace: entry.kind, id: entry.id, revision: 0 };
+		for (const entity of world.entities)
+			shown[entity.ref] = [entity.name, ...entity.aliases];
+		for (const claim of world.claims) shown[claim.ref] = [claim.text];
+		for (const [ref, entry] of Object.entries(world.refs))
+			if (entry.kind === "claim") claimEntities[ref] = entry.entityIds ?? [];
+		data.worldEntities = world.entities;
+		data.worldClaims = world.claims;
+	}
+	const goals = describeGoals(env, [
+		"adopted",
+		"proposed",
+		"completed",
+		"withdrawn",
+	]);
+	if (goals && goals.goals.length > 0) {
+		for (const [ref, entry] of Object.entries(goals.refs))
+			refs[ref] = {
+				namespace: "goal",
+				id: entry.goalId,
+				revision: entry.revision,
+			};
+		for (const goal of goals.goals) shown[goal.ref] = [goal.text];
+		data.goals = goals.goals;
+	}
+	return { refs, shown, claimEntities, data };
+}
+
 function prepareStep(env: StepEnv, unit: PreparedUnit["unit"]) {
 	const built = buildPrepared(env, unit);
 	if (!built) return { status: "stale" as const, reason: "nothing_to_do" };
@@ -159,6 +215,7 @@ function prepareStep(env: StepEnv, unit: PreparedUnit["unit"]) {
 		requests[id] = {
 			id: row.id,
 			what: row.what,
+			detail: row.detail,
 			kind: row.kind,
 			messageId: row.messageId,
 			exchange,
@@ -172,9 +229,20 @@ function prepareStep(env: StepEnv, unit: PreparedUnit["unit"]) {
 		};
 	});
 	const memory = describeMemory(env);
+	const shelves = describeShelves(env, requestRows, kept);
 	const digests: Record<string, string> = {};
 	const turns: CurateContext["turns"] = [];
+	const sources: CurateContext["sources"] = {};
 	for (const entry of targetEntries) {
+		for (const id of [
+			entry.loaded.inputMessageId,
+			entry.loaded.answerMessageId,
+		]) {
+			if (id === null) continue;
+			const state = env.deps.conversation.sourceInTransaction(env.db, id);
+			if (state.state === "available")
+				sources[id] = { revision: state.revision, digest: state.digest };
+		}
 		Object.assign(digests, entry.loaded.digests);
 		turns.push({
 			messageId: entry.loaded.inputMessageId,
@@ -186,11 +254,20 @@ function prepareStep(env: StepEnv, unit: PreparedUnit["unit"]) {
 				text: entry.loaded.assistant.text,
 			});
 	}
+	const shownMemory: CurateContext["shown"] = {};
+	for (const entry of memory.longTerm)
+		shownMemory[String(entry.ref)] = [String(entry.text)];
 	const context: CurateContext = {
 		exchanges,
 		targetIds: targetEntries.map((e) => e.loaded.inputMessageId),
 		requests,
-		refs: memory.refs,
+		refs: { ...memory.refs, ...shelves.refs },
+		shown: { ...shownMemory, ...shelves.shown },
+		claimEntities: shelves.claimEntities,
+		exchangeTexts: Object.fromEntries(
+			kept.map((entry, i) => [`e${i + 1}`, entry.loaded.user.text]),
+		),
+		sources,
 		digests,
 		turns,
 		noteTexts: memory.shortTerm.map((note) => String(note.text)),
@@ -203,6 +280,7 @@ function prepareStep(env: StepEnv, unit: PreparedUnit["unit"]) {
 			requests: requestViews,
 			longTerm: memory.longTerm,
 			shortTerm: memory.shortTerm,
+			...shelves.data,
 		},
 		targets: {
 			exchanges: context.targetIds,
@@ -218,14 +296,19 @@ function prepareStep(env: StepEnv, unit: PreparedUnit["unit"]) {
 async function findCandidates(
 	prepared: PreparedUnit,
 	ctx: ExecuteContext,
-): Promise<{ views: Array<Record<string, unknown>>; map: Candidates }> {
+): Promise<{
+	views: Array<Record<string, unknown>>;
+	map: Candidates;
+	texts: Record<string, string>;
+}> {
 	const context = prepared.context as CurateContext;
 	const forgets = Object.values(context.requests)
 		.filter((r) => r.kind === "forget")
 		.slice(0, FORGET_SEARCHES);
 	const views: Array<Record<string, unknown>> = [];
 	const map: Candidates = {};
-	if (forgets.length === 0) return { views, map };
+	const texts: Record<string, string> = {};
+	if (forgets.length === 0) return { views, map, texts };
 	const { deps } = ctx;
 	const shown = new Set(
 		Object.values(context.exchanges).flatMap((e) =>
@@ -268,6 +351,7 @@ async function findCandidates(
 				const answer = run.find((m) => m.message.role === "assistant");
 				const label = `c${views.length + 1}`;
 				map[label] = run.map((m) => m.message.id);
+				texts[label] = user?.message.text ?? "";
 				views.push({
 					id: label,
 					at: (user ?? answer)?.message.createdAt ?? "",
@@ -279,7 +363,7 @@ async function findCandidates(
 			}
 		});
 	}
-	return { views, map };
+	return { views, map, texts };
 }
 
 async function beforeInfer(prepared: PreparedUnit, ctx: ExecuteContext) {
@@ -288,8 +372,12 @@ async function beforeInfer(prepared: PreparedUnit, ctx: ExecuteContext) {
 		context.turns,
 		ctx.signal,
 	);
-	const { views, map } = await findCandidates(prepared, ctx);
-	const extras: CurateExtras = { turnVectors, candidates: map };
+	const { views, map, texts } = await findCandidates(prepared, ctx);
+	const extras: CurateExtras = {
+		turnVectors,
+		candidates: map,
+		candidateTexts: texts,
+	};
 	return {
 		data: {
 			...(prepared.data as object),
@@ -304,7 +392,8 @@ export const curateMemory: StepDefinition = {
 	slot: "reflect",
 	longTerm: true,
 	instructions,
-	outputSchema: curateSchema,
+	outputSchema: (prepared) =>
+		curateSchema(Object.keys((prepared.context as CurateContext).requests)),
 	prepare: (env, unit) => prepareStep(env, unit),
 	parse: parseCurate,
 	beforeInfer,

@@ -11,8 +11,10 @@ import {
 } from "./ui-compositions";
 import { claudeCodeRequest } from "./claude-code";
 import { memoryRequest } from "./memory-request";
+import { worldQuery } from "./world-query";
 export { claudeCodeRequest };
 import {
+	KANBAN_PROMPT_MAX,
 	kanbanAdd,
 	kanbanCardAnswer,
 	kanbanCardRef,
@@ -23,6 +25,7 @@ import {
 	kanbanNoticeRef,
 } from "./kanban";
 export {
+	KANBAN_PROMPT_MAX,
 	kanbanAdd,
 	kanbanCardAnswer,
 	kanbanCardRef,
@@ -216,6 +219,7 @@ export const validators = {
 		frameIndex: z.number().int().nonnegative().max(59).optional(),
 	}),
 	memoryRequest,
+	worldQuery,
 };
 export type SchemaKey = keyof typeof validators;
 export type Owner = { rootRunId: string; taskId: string; cancelEpoch: number };

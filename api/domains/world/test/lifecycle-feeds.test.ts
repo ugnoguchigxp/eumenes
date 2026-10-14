@@ -76,6 +76,7 @@ const change = (kind: SourceChangeKind, id: string): SourceChange => ({
 	principal: SCOPE.principal,
 	scopeKey: SCOPE.scopeKey,
 	speaker: "user",
+	conversationId: "c1",
 	occurredAt: "2026-10-09T00:00:00.000Z",
 });
 const fakeAdapter = (changes: SourceChange[]): SourceAdapter => {

@@ -233,55 +233,6 @@ contracts("world client", [
 		path: "/api/world/forgets",
 		response: { scopeKey: "profile:owner", forgets: [forget] },
 	},
-	{
-		name: "correctWorldClaim",
-		call: (c) =>
-			c.correctWorldClaim({
-				requestId: uuid,
-				expectedRevision: 1,
-				target,
-				reasonMessageId: "m1",
-				value: { kind: "string", value: "coffee" },
-			}),
-		method: "POST",
-		path: "/api/world/claims/correct",
-		body: {
-			requestId: uuid,
-			expectedRevision: 1,
-			target,
-			reasonMessageId: "m1",
-			value: { kind: "string", value: "coffee" },
-		},
-		response: { status: "applied", claimId: "cl2" },
-	},
-	{
-		name: "retractWorldClaim",
-		call: (c) =>
-			c.retractWorldClaim({
-				requestId: uuid,
-				expectedRevision: 1,
-				target,
-				reasonMessageId: "m1",
-			}),
-		method: "POST",
-		path: "/api/world/claims/retract",
-		body: {
-			requestId: uuid,
-			expectedRevision: 1,
-			target,
-			reasonMessageId: "m1",
-		},
-		response: { status: "unresolved", candidates: [row] },
-	},
-	{
-		name: "forgetWorldClaim",
-		call: (c) =>
-			c.forgetWorldClaim({ requestId: uuid, expectedRevision: 1, target }),
-		method: "POST",
-		path: "/api/world/claims/forget",
-		body: { requestId: uuid, expectedRevision: 1, target },
-		response: { status: "accepted", forget },
-	},
 ]);
 
 const source = {

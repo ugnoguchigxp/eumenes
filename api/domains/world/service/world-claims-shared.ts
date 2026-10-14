@@ -1,5 +1,3 @@
-import type { Database } from "bun:sqlite";
-import type { SourceRef } from "eumenes-memory";
 import type {
 	Assertion,
 	CanonicalHasher,
@@ -19,7 +17,6 @@ import {
 	type ForgetView,
 	type WorldClaimError,
 } from "../contracts/claims";
-import type { WorldApplyResult } from "../contracts";
 import type { ForgetListItem, WorldLifecycle } from "./lifecycle-adapter";
 import type { WorldService } from "./world-service";
 
@@ -36,41 +33,22 @@ export type WorldClaimsOptions = {
 	lifecycle: WorldLifecycle;
 	/** Host mode and gate (the assembly knows them; World's tables do not). */
 	state: () => { mode: "protect" | "on"; gateOpen: boolean };
-	/**
-	 * The CURRENT source of a confirmed message of the person, or null (unknown,
-	 * not theirs, not confirmed, retracted: one answer). Evaluated on the
-	 * writer connection of the change.
-	 */
-	reasonSource: (db: Database, messageId: string) => SourceRef | null;
 	/** UTC epoch ms. World never reads a clock itself. Default Date.now. */
 	now?: () => number;
 	/** AccessContext purposes (the host's SourceAdapters must allow them). */
 	readPurpose: string;
-	writePurpose: string;
 	hasher?: CanonicalHasher;
-	/** Told (never the person) when a forget stopped while advancing; it stays pending and is resumed. */
-	onForgetAdvanceFailed?: (error: unknown) => void;
 };
 
 /** What a call can answer besides its data. Access refusals are all `not_found`. */
-export type ClaimFailure =
-	| { status: "failed"; code: WorldClaimError }
-	/** A request that wrote nothing and needs a person's choice. */
-	| { status: "failed"; code: "revision_conflict"; reload: true };
+export type ClaimFailure = { status: "failed"; code: WorldClaimError };
 export type ClaimResult<T> = { status: "ok"; value: T } | ClaimFailure;
 
-export const fail = (code: WorldClaimError): ClaimFailure =>
-	code === "revision_conflict"
-		? { status: "failed", code, reload: true }
-		: { status: "failed", code };
+export const fail = (code: WorldClaimError): ClaimFailure => ({
+	status: "failed",
+	code,
+});
 export const ok = <T>(value: T): ClaimResult<T> => ({ status: "ok", value });
-
-/** Thrown inside a writer callback to roll everything back and answer. */
-export class Abort extends Error {
-	constructor(readonly failure: ClaimFailure) {
-		super("world_claims_abort");
-	}
-}
 
 /** One bounded snapshot of a Scope: the projection and what it stands on. */
 export type ScopeRead = {
@@ -183,64 +161,6 @@ export function conditionText(spec: ConditionSpec): string {
 		}
 	};
 	return walk(spec.expression);
-}
-
-export type Target =
-	| { claimId: string }
-	| { subjectId: string; predicate: string };
-export type Located =
-	| { kind: "one"; entry: ProjectionEntry }
-	| { kind: "none" }
-	| { kind: "many"; entries: ProjectionEntry[] };
-export function locate(
-	entries: readonly ProjectionEntry[],
-	target: Target,
-): Located {
-	const found =
-		"claimId" in target
-			? entries.filter((e) => e.id === target.claimId)
-			: entries.filter(
-					(e) =>
-						e.subjectId === target.subjectId &&
-						e.predicate === target.predicate,
-				);
-	if (found.length === 0) return { kind: "none" };
-	if (found.length === 1) return { kind: "one", entry: found[0]! };
-	return { kind: "many", entries: found };
-}
-
-/** Maps a refusal of World / the host to the one error vocabulary. */
-export function failureOf(result: WorldApplyResult): ClaimFailure {
-	if (!("reasonCode" in result)) return fail("invalid_world_request");
-	switch (result.reasonCode) {
-		case "REVISION_CONFLICT":
-		case "STALE_REVISION":
-			return fail("revision_conflict");
-		case "WORLD_DISABLED":
-			return fail("world_disabled");
-		case "WORLD_RECOVERY_REQUIRED":
-		case "WRITER_BUSY":
-		case "STORE_CLOSING":
-		case "MEMORY_UNAVAILABLE":
-		case "SCHEMA_INCOMPATIBLE":
-			return fail("world_unavailable");
-		case "SOURCE_NOT_AVAILABLE":
-		case "SOURCE_VERSION_MISMATCH":
-		case "MEMORY_TOMBSTONED":
-			return fail("reason_source_unavailable");
-		case "TERMINAL_STATE":
-		case "TRANSITION_NOT_ALLOWED":
-			return fail("claim_not_changeable");
-		case "SCOPE_NOT_PERMITTED":
-		case "SCOPE_MISMATCH":
-		case "POLICY_CHANGED":
-		case "TOMBSTONED":
-		case "GATE_CLOSED":
-		case "MEMORY_SCOPE_NOT_PERMITTED":
-			return fail("not_found");
-		default:
-			return fail("invalid_world_request");
-	}
 }
 
 export function forgetView(item: ForgetListItem): ForgetView {
