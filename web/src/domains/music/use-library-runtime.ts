@@ -15,6 +15,7 @@ import {
 	type Snapshot,
 } from "@eumenes/artifact-ui/contracts";
 import { playlistStudioSource } from "./artifact-definition";
+import { useTrackArtwork } from "./use-music-artwork";
 function message(error: unknown) {
 	if (error instanceof ApiError) {
 		if (error.status === 507 || error.message === "music_storage_full")
@@ -110,6 +111,7 @@ export function useLibraryRuntime(
 		retry: false,
 		staleTime: 0,
 	});
+	const art = useTrackArtwork(client, enabled ? id : undefined);
 	const [operationError, setOperationError] = useState<string>();
 	const [busy, setBusy] = useState(false);
 	const lock = useRef(false),
@@ -123,6 +125,7 @@ export function useLibraryRuntime(
 		tracks.dataUpdatedAt,
 		tags.dataUpdatedAt,
 		detail.dataUpdatedAt,
+		art.signature,
 		tracks.isFetching,
 		tags.isFetching,
 		busy,
@@ -134,23 +137,21 @@ export function useLibraryRuntime(
 	useLayoutEffect(() => {
 		currentRevision.current = revision;
 	}, [revision]);
+	const fresh = detail.error ? undefined : detail.data;
+	const view = (t: (typeof items)[number]) => ({
+		...art.decorate(t),
+		subtitle: t.prompt,
+		url: fresh && t.id === id ? `/api/music/tracks/${t.id}/audio` : undefined,
+		downloadName: `${t.title}.${t.format}`,
+	});
 	const resource: Snapshot[string] = {
 		kind: "music",
 		revision,
 		currentId: id ?? "",
-		tracks: items.map((item) => {
-			const t =
-				detail.data?.id === item.id && !detail.error ? detail.data : item;
-			return {
-				...t,
-				subtitle: t.prompt,
-				url:
-					t.id === id && detail.data && !detail.error
-						? `/api/music/tracks/${t.id}/audio`
-						: undefined,
-				downloadName: `${t.title}.${t.format}`,
-			};
-		}),
+		canArtwork: art.available,
+		tracks: items.map((item) =>
+			view(fresh && fresh.id === item.id ? fresh : item),
+		),
 		library: {
 			filter: query,
 			tags: tags.data?.tags ?? [],
@@ -177,12 +178,7 @@ export function useLibraryRuntime(
 		!detail.error &&
 		!resource.tracks.some((t) => t.id === detail.data.id)
 	)
-		resource.tracks.unshift({
-			...detail.data,
-			subtitle: detail.data.prompt,
-			url: `/api/music/tracks/${detail.data.id}/audio`,
-			downloadName: `${detail.data.title}.${detail.data.format}`,
-		});
+		resource.tracks.unshift(view(detail.data));
 	async function refresh() {
 		await cache.invalidateQueries({ queryKey: ["music-library"] });
 	}
@@ -242,6 +238,13 @@ export function useLibraryRuntime(
 					setSelected({ playlistId: initial?.id, id: target.id });
 					break;
 				}
+				case "music-artwork":
+					if (event.values.id !== id || !(await art.request()))
+						return {
+							status: "rejected",
+							message: "この楽曲のイメージは作成できません。",
+						};
+					break;
 				case "music-favorite":
 				case "music-delete": {
 					const target =

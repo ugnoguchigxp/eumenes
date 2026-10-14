@@ -249,7 +249,7 @@ test("duplicate and simultaneous dispatches cannot create a second request", asy
 });
 test("artwork is requested for the selected completed track and its image is shown by the host", async () => {
 	const r = setup("completed", { prompt: "雨の夜のピアノ" });
-	await waitFor(() => expect(r.resource().creation?.canArtwork).toBe(true));
+	await waitFor(() => expect(r.resource().canArtwork).toBe(true));
 	expect(r.resource().tracks[0]!.artworkUrl).toBeUndefined();
 	expect(
 		await r.dispatch(r.event("music-artwork", { id: "missing" })),

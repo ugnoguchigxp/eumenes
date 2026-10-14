@@ -55,6 +55,10 @@ export function registerLibrary(app: Hono, s: MusicService) {
 				.audio(c.req.param("id"), c.req.header("Range"), c.req.raw.signal),
 		),
 	);
+	app.get("/api/music/tracks/:id/generation", (c) => {
+		const g = s.trackGeneration(c.req.param("id"));
+		return g ? c.json(g) : c.json({ error: "music_generation_not_found" }, 404);
+	});
 	app.get("/api/music/tracks/:id/metadata", (c) =>
 		handle(c, async () =>
 			c.json(await s.library().metadata(c.req.param("id"), c.req.raw.signal)),

@@ -136,6 +136,23 @@ function UiFinish({
 	);
 }
 
+async function startUiGeneration(
+	action: Pick<ReturnType<typeof useAction>, "send" | "pending">,
+	prompt: string,
+	motifId: string,
+	projectId: string,
+	onAccepted: () => void,
+) {
+	const text = prompt.trim();
+	if (!text || action.pending) return;
+	const accepted = await action.send("ui-generate", {
+		prompt: text,
+		motifId,
+		projectId,
+	});
+	if (accepted) onAccepted();
+}
+
 function UiReturnButton({ onClick }: { onClick: () => void }) {
 	return (
 		<div className="aui-ui-return">
@@ -168,6 +185,10 @@ export function UiWorkspaceView({ request }: { request: ArtifactRequest }) {
 	if (request.view !== "ui-workspace" || data?.kind !== "ui-workspace")
 		return null;
 	const selected = data.items.find((item) => item.id === data.selectedId);
+	const generateUi = (text: string) =>
+		void startUiGeneration(action, text, motifId, selected?.id ?? "", () =>
+			setTab("preview"),
+		);
 	const updateSelection = (next: UiSelection) => {
 		setSelection(next);
 		if (edited) setSelectionPending(true);
@@ -335,16 +356,7 @@ export function UiWorkspaceView({ request }: { request: ArtifactRequest }) {
 								className="aui-ui-editor-form"
 								onSubmit={(event) => {
 									event.preventDefault();
-									if (!prompt.trim() || action.pending) return;
-									void action
-										.send("ui-generate", {
-											prompt: prompt.trim(),
-											motifId,
-											projectId: selected?.id ?? "",
-										})
-										.then((accepted) => {
-											if (accepted) setTab("preview");
-										});
+									generateUi(prompt);
 								}}
 							>
 								{request.starterPrompts?.length ? (
@@ -354,10 +366,12 @@ export function UiWorkspaceView({ request }: { request: ArtifactRequest }) {
 											<button
 												key={starter.label}
 												type="button"
+												disabled={action.pending}
 												onClick={() => {
 													setPrompt(starter.prompt);
 													setEdited(true);
 													setSelectionPending(false);
+													generateUi(starter.prompt);
 												}}
 											>
 												{starter.label} <span aria-hidden="true">↗</span>

@@ -1,5 +1,10 @@
 import { createContext, useContext, type ReactNode } from "react";
-import type { ArtifactEvent, Receipt, Snapshot } from "./contracts";
+import type {
+	ArtifactEvent,
+	Receipt,
+	Snapshot,
+	TerminalConnection,
+} from "./contracts";
 
 export type ArtifactRuntime = {
 	snapshot: Snapshot;
@@ -28,6 +33,11 @@ export type ArtifactRuntime = {
 	 * their renderer; without an entry the view says the preview is unavailable.
 	 */
 	hostViews?: { "avatar-motion-lab"?: () => ReactNode };
+	/**
+	 * Connects one live PTY session of a terminal source (output stream, ordered input, resize).
+	 * Called once per session run; the stream opens on subscribe and closes on unsubscribe.
+	 */
+	openTerminal?: (source: string, sessionId: string) => TerminalConnection;
 };
 export const ArtifactRuntimeContext = createContext<ArtifactRuntime | null>(
 	null,

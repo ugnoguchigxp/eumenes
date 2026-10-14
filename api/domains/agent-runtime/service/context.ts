@@ -138,7 +138,7 @@ export function workerContext(
 		"\n" +
 		commonRules +
 		(search
-			? "\nOUTPUT_FORMATは返答の2形式の例です。どちらか一つを直接返します。invokeのargumentsは選んだTOOLSのinputSchemaに従い、不要な任意項目は省略します。finishのreportはoutcome・summary・claims・limitationsを必須とします。outcomeはanswered/partial/not_found/clarification_required/failedのいずれか。answered/partialでは根拠付きclaimsを1件以上、それ以外ではclaims=[]とし、不足をsummary・limitationsで説明します。例の文字列は実際の調査結果と提示済みの根拠参照に置き換えます。余分な項目や説明文は返しません。"
+			? "\nOUTPUT_FORMATは返答の2形式の例です。どちらか一つを直接返します。invokeのargumentsは選んだTOOLSのinputSchemaに従い、不要な任意項目は省略します。finishのreportはoutcome・summary・claims・limitationsを必須とします。limitationsは文字列の配列で、項目がなければ[]とします。claimsは最大8件で、各claimのevidenceは1～3件にします。outcomeはanswered/partial/not_found/clarification_required/failedのいずれか。answered/partialでは根拠付きclaimsを1件以上、それ以外ではclaims=[]とし、不足をsummary・limitationsで説明します。例の文字列は実際の調査結果と提示済みの根拠参照に置き換えます。余分な項目や説明文は返しません。"
 			: "") +
 		(ownSet
 			? "\n報告のevidenceにはe1などの根拠参照を使います。一度提示された根拠は後のstepでも使えます。available=falseの根拠は失効しており使いません。mode=replayのツールは成功済みの同じ操作の再提示だけに使えます。"

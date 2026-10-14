@@ -35,10 +35,18 @@ it("a camera stream obtained after unmount is stopped and never adopted", async 
 	resolve({ getTracks: () => [{ stop }] } as unknown as MediaStream); await Promise.resolve(); expect(stop).toHaveBeenCalledOnce();
 });
 it("a result finished after cancellation is explicitly discarded without claiming the upstream execution stopped", () => {
-	render(<ObjectRecognitionWorkspace items={[{ ...item, state: "cancelled", errorCode: "recognition_result_discarded", result: null }]} selectedId="one" configured />);
+	render(<ObjectRecognitionWorkspace items={[{ ...item, state: "cancelled", errorCode: "recognition_result_discarded", result: null }]} selectedId="one" configured mediaUrl="blob:fixture" />);
 	expect(screen.getByText("取消済み（処理終了・結果不採用）", { exact: true })).toBeTruthy();
-	expect(screen.getByText("この資料の解析は中止されました。")).toBeTruthy();
+	expect(screen.getByRole("img", { name: "desk.png" })).toBeTruthy();
 	expect(screen.queryByLabelText("検出枠")).toBeNull();
+});
+it("restores a failed video's source without displaying absent detections", () => {
+	const failed = { ...item, mime: "video/webm", name: "clip.webm", state: "failed" as const, result: null };
+	const { container } = render(<DetectionPreview item={failed} url="blob:fixture" />);
+	const video = screen.getByLabelText("保存した動画");
+	expect(video.getAttribute("src")).toBe("blob:fixture");
+	fireEvent.timeUpdate(video);
+	expect(container.querySelector("svg")).toBeNull();
 });
 it("distinguishes a saved camera image from an unconfirmed analysis submission", () => {
 	render(<ObjectRecognitionWorkspace items={[{ ...item, name: "camera.jpg", state: "failed", errorCode: "recognition_submission_unconfirmed", result: null }]} selectedId="one" configured />);

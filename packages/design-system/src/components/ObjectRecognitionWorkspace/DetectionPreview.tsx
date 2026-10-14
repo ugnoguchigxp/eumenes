@@ -33,15 +33,10 @@ export function DetectionPreview({
 	const height = result?.kind === "image" ? result.height : result?.video.height;
 	const frame = result?.kind === "video" ? result.frames[index] : undefined;
 	const objects = result?.kind === "image" ? result.objects : frame?.objects ?? [];
-	const hasMedia = !!result && !!url;
-	const emptyMessage =
-		item?.state === "cancelled"
-			? "この資料の解析は中止されました。"
-			: item?.state === "failed"
-				? "この資料の解析結果を表示できませんでした。"
-				: item
-					? "この資料の解析結果を待っています。"
-					: "カメラで撮影するか、画像・短い動画を選んでください。";
+	const hasMedia = !!item && !!url;
+	const emptyMessage = item
+		? "保存した画像・動画を読み込んでいます。"
+		: "カメラで撮影するか、画像・短い動画を選んでください。";
 
 	function seek(next: number) {
 		if (result?.kind !== "video" || !result.frames[next]) return;
@@ -84,9 +79,9 @@ export function DetectionPreview({
 					{!cameraActive && hasMedia && (
 						<div
 							className="recognition-media"
-							style={{ aspectRatio: `${width}/${height}` }}
+							style={width && height ? { aspectRatio: `${width}/${height}` } : undefined}
 						>
-							{result.kind === "image" ? (
+							{item.mime.startsWith("image/") ? (
 								<img src={url} alt={item?.name ?? "解析した画像"} />
 							) : (
 								<video
@@ -96,9 +91,10 @@ export function DetectionPreview({
 									controlsList="nofullscreen noremoteplayback"
 									disablePictureInPicture
 									playsInline
-									aria-label="解析した動画"
+									aria-label="保存した動画"
 									onLoadedMetadata={() => seek(index)}
 									onTimeUpdate={() => {
+									if (result?.kind !== "video") return;
 										const time = video.current?.currentTime ?? 0;
 										const found = result.frames.findIndex(
 											(f) => Math.abs(f.timestampSeconds - time) < 0.12,
@@ -108,7 +104,7 @@ export function DetectionPreview({
 									}}
 								/>
 							)}
-							{atFrame && (
+							{atFrame && result && (
 								<svg
 									className="recognition-boxes"
 									viewBox={`0 0 ${width} ${height}`}
@@ -141,7 +137,7 @@ export function DetectionPreview({
 									))}
 								</svg>
 							)}
-							<span className="recognition-media-tag">撮影済みの資料・解析結果</span>
+							<span className="recognition-media-tag">{result ? "撮影済みの資料・解析結果" : "保存した資料"}</span>
 						</div>
 					)}
 					{!cameraActive && !hasMedia && (

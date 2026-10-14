@@ -2,14 +2,14 @@ export type MusicResource = {
 	kind: "music";
 	revision: number;
 	currentId: string;
+	/** The host can generate artwork from the current track's prompt. */
+	canArtwork?: boolean;
 	creation?: {
 		busy: boolean;
 		status?: GenerationResource["status"];
 		title?: string;
 		description?: string;
 		canCancel?: boolean;
-		/** The host can generate artwork from a completed track's prompt. */
-		canArtwork?: boolean;
 	};
 	library?: {
 		filter: {

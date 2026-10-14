@@ -49,6 +49,10 @@ import {
 	describeObjectRecognitionScreenAdapter,
 	OBJECT_RECOGNITION_SCREEN_ADAPTER_REF,
 } from "./object-recognition-screen-adapter";
+import {
+	describeTerminalsAdapter,
+	TERMINALS_ADAPTER_REF,
+} from "./terminals-adapter";
 import { describeUiCompositionsAdapter, UI_COMPOSITIONS_ADAPTER_REF, uiCompositionsDomainSchemas } from "./ui-compositions-adapter";
 
 /** `domain:` result schemas registered by the host's adapters. */
@@ -112,6 +116,7 @@ export const hostAdapterDescriptions: Array<
 	{ ref: MEMORY_ADAPTER_REF, describe: describeMemoryAdapter },
 	{ ref: WORLD_ADAPTER_REF, describe: describeWorldAdapter },
 	{ ref: SERVICE_TESTS_ADAPTER_REF, describe: describeServiceTestsAdapter },
+	{ ref: TERMINALS_ADAPTER_REF, describe: describeTerminalsAdapter },
 ];
 
 /** The bundle host as if every adapter were registered (see `hostAdapterDescriptions`). */

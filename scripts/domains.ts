@@ -15,6 +15,12 @@ export const domains = {
 		components: null,
 		depends: { api: ["capabilities", "queue"], web: [], test: [] },
 	},
+	terminals: {
+		backend: "api/domains/terminals",
+		web: "web/src/domains/terminals",
+		components: null,
+		depends: { api: [], web: [], test: [] },
+	},
 	background: {
 		backend: null,
 		web: "web/src/domains/background",

@@ -17,3 +17,7 @@ Eumenes のルートで `bun install` を実行後、`bun run build:design-syste
 ## ラジオ選択
 
 `RadioButtonGroup` は `label`、`options`（value / label）、`value`、`onValueChange` を受け取る制御部品です。選択肢は行全体で押せ、長い文章は折り返します。選択中は丸印・枠・背景で示し、フォーカスは行の外周に表示します。native radio の矢印キー・フォーム検証を保ち、グループ名を自動で分離します。`disabled` 時も選択済みの行は判読できる状態を保ちます。
+
+## ターミナル
+
+`TerminalWorkspace` は xterm.js（`@xterm/xterm`、fit・unicode11・WebGL addon）で端末を1〜複数枚並べ、幅 720px 以上で2列、それ未満で縦に積みます。PTY・接続・認証は持たず、ホストが `output.subscribe` で出力を流し、`onInput`・`onResize`・`onRestart` を受けます。入力は `status: "running"` の間だけ送ります。配色は `--stage-background` と `--primary` から作り、テーマ切替に追従します。WebGL が使えない環境では DOM 描画に戻ります。

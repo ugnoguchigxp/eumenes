@@ -1,4 +1,5 @@
 import { ObjectRecognitionWorkspaceView } from "./object-recognition-components";
+import { TerminalWorkspaceView } from "./terminal-components";
 import { DrawingWorkspaceView } from "./drawing-components";
 import {
 	ImageWorkspaceView,
@@ -60,6 +61,7 @@ const renderers = {
 	"text-block": TextBlockView,
 	"info-card": InfoCardView,
 	"object-recognition-workspace": ObjectRecognitionWorkspaceView,
+	"terminal-workspace": TerminalWorkspaceView,
 	"drawing-workspace": DrawingWorkspaceView,
 	"image-workspace": ImageWorkspaceView,
 	"image-creation-form": ImageCreationView,

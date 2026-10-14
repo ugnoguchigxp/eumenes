@@ -2,6 +2,7 @@ import type {
 	ArtifactEvent,
 	Receipt,
 	Snapshot,
+	TerminalConnection,
 } from "@eumenes/artifact-ui/contracts";
 import type {
 	ActionBindingV1,
@@ -75,6 +76,8 @@ export type AdapterState = {
 		source: string,
 		file: File,
 	): Promise<Receipt & { value?: string }>;
+	/** Live PTY sessions of a terminal source (stream, ordered input, resize). */
+	openTerminal?(source: string, sessionId: string): TerminalConnection;
 	/** The target the host sends with an event of this source; undefined when it has none. */
 	targetOf(source: string): string | undefined;
 	/**

@@ -6,7 +6,7 @@ import type { InferencePort } from "../../inference";
 import type { QueueService } from "../../queue";
 import type { LarmPlayground } from "../../larm";
 import type { MusicRecord } from "../contracts";
-import { row, byRun, record, patch, list, media } from "../repository";
+import { row, byRun, byTrack, record, patch, list, media } from "../repository";
 import { registerMusicHandlers } from "./handlers";
 import { createArtwork } from "./artwork";
 /** Read-only source for registered music screens; the music domain owns this query. */
@@ -135,6 +135,14 @@ export function createMusic(deps: {
 			store.read((db) => {
 				const r = row(db, id);
 				return r ? record(r) : null;
+			}),
+		/** The generation behind a library track, so the playlist can reuse its artwork. */
+		trackGeneration: (trackId: string) =>
+			store.read((db) => {
+				const r = byTrack(db, trackId);
+				if (!r) return null;
+				const { id, artwork } = record(r);
+				return { id, ...(artwork ? { artwork } : {}) };
 			}),
 		list: (conversationId: string) =>
 			store.read((db) => list(db, conversationId)),

@@ -188,7 +188,7 @@ export function createToolchains(
 				? ranked
 						.filter((x) => x.signals > 0)
 						.slice(0, Math.min(8, Math.max(1, input.limit ?? 4)))
-				: ranked.slice(0, 8);
+				: ranked;
 		const functionOf = new Map(active.map((d) => [d.id, d.functionName!]));
 		return fused.map(({ d }, i) => ({
 			revisionId: d.revisionId,

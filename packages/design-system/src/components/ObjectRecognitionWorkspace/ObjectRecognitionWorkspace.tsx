@@ -106,6 +106,8 @@ export function ObjectRecognitionWorkspace(props: ObjectRecognitionWorkspaceProp
 						size="sm"
 						aria-haspopup="menu"
 						aria-expanded={historyOpen}
+						disabled={camera.recording}
+						title={camera.recording ? "録画を終了してから資料を選んでください。" : undefined}
 						onClick={() => historyOpen ? closeHistory() : setHistoryOpen(true)}
 					>
 						<Menu size={16} />
@@ -143,6 +145,7 @@ export function ObjectRecognitionWorkspace(props: ObjectRecognitionWorkspaceProp
 										className="recognition-history-item"
 										aria-current={saved.id === item?.id ? "true" : undefined}
 										onClick={() => {
+											camera.close();
 											props.onSelect?.(saved.id);
 											closeHistory();
 										}}

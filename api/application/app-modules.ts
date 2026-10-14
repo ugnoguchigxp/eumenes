@@ -51,6 +51,10 @@ import {
 import { registerScheduler, type SchedulerService } from "../domains/scheduler";
 import { registerTimers, type TimersService } from "../domains/timers";
 import {
+	registerTerminals,
+	type TerminalsService,
+} from "../domains/terminals";
+import {
 	registerToolchainActions,
 	type ActionRequests,
 } from "../domains/tool-runtime";
@@ -113,6 +117,8 @@ export type AppServices = {
 	taskReports?: TaskReports;
 	toolchainHistory?: ToolchainHistory;
 	timers?: TimersService;
+	/** PTY sessions of the terminal screen (absent: the routes do not exist). */
+	terminals?: TerminalsService;
 	/** UI actions and artifact registrations of bound toolchains. */
 	toolchainActions?: ActionRequests;
 	/** World claim list and corrections (P5-02). Absent with World OFF: the routes do not exist. */
@@ -203,6 +209,9 @@ export function appModules(services: AppServices): AppModule[] {
 		{ mount: (app) => registerQueue(app, s.queue) },
 		{ mount: (app) => registerScheduler(app, s.scheduler) },
 		s.timers && { mount: (app) => registerTimers(app, s.timers!) },
+		s.terminals && {
+			mount: (app) => registerTerminals(app, s.terminals!),
+		},
 		s.toolchainActions && {
 			mount: (app) => registerToolchainActions(app, s.toolchainActions!),
 		},

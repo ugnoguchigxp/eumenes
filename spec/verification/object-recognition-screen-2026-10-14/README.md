@@ -25,8 +25,13 @@
 
 解析中ボタンの表示を追加した後は、DesignSystem の 7 試験とビルド、ブラウザの対象 2 試験、差分確認が成功した。物体認識 gate の再実行は、並行作業中の `packages/artifact-ui/src/ui-composition-components.tsx` が参照する `lucide-react` の解決エラーで型チェックが停止した。対象画面の試験結果と、この未完了の全体確認は区別する。
 
+資料一覧を左上のメニューに移した後は、DesignSystem の 9 試験とビルド、物体認識 gate（backend 10・Web 2）、artifact gate（44）が成功した。ブラウザは対象2試験をそれぞれ明示実行して成功。履歴の開閉・選択、終了した資料の確認付き削除、削除後の一覧反映、録画資料の表示、狭いアーティファクト枠を確認した。解析中の資料は既存API契約に合わせて削除不可とした。
+
+履歴から元の画像・動画を復元する変更では、保存済み入力を解析状態にかかわらず読み込み、解析結果のない資料も元のメディアを表示する。検出枠は完了済みの結果に限る。履歴選択時にカメラを閉じて資料表示へ切り替え、録画中は資料一覧を開けない。DesignSystem 10 試験、Web runtime 2 試験、DesignSystem ビルド、物体認識 gate（backend 10・Web 2）が成功。ブラウザ fixture ではキャンセルした動画を再読込後の履歴から選び、シーク可能な元動画の再生とカメラからの切り替えを確認した。artifact gate は並行作業中の `terminal-components.tsx` の lint エラーで停止し、対象変更の検証とは区別する。
+
 ## 画面
 
 - [動画の時刻別検出と右側の物体一覧](artifact-video.png)
 - [解析中のボタンと進捗表示](artifact-running.png)
+- [左上メニューの資料一覧と削除操作](artifact-history.png)
 - [狭いアーティファクト枠での縦配置](artifact-narrow.png)

@@ -35,7 +35,7 @@
 
 .recognition-history-backdrop {
 	position: absolute;
-	inset: 0;
+	inset: 48px 0 0;
 	z-index: 19;
 	border: 0;
 	background: transparent;

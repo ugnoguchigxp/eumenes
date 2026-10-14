@@ -42,6 +42,7 @@ import { createMusicScreenAdapter } from "./music-screen-adapter";
 import { createImageScreenAdapter } from "./image-screen-adapter";
 import { createUiCompositionsAdapter } from "./ui-compositions-adapter";
 import { createObjectRecognitionScreenAdapter } from "./object-recognition-screen-adapter";
+import { createTerminalsAdapter } from "./terminals-adapter";
 import {
 	bundleHostOf,
 	createRegistryActions,
@@ -62,6 +63,8 @@ export async function createToolchain(
 		image?: boolean;
 		uiCompositions?: import("../domains/ui-compositions").UiCompositionsService;
 		objectRecognition?: boolean;
+		/** PTY sessions for the terminal screen (absent: not offered). */
+		terminals?: import("../domains/terminals").TerminalsService;
 		excalidraw?: boolean;
 		history?: boolean;
 		/** LARM embedding provider; without it retrieval uses full-text search only. */
@@ -101,6 +104,7 @@ export async function createToolchain(
 		...(options.objectRecognition
 			? [createObjectRecognitionScreenAdapter()]
 			: []),
+		...(options.terminals ? [createTerminalsAdapter(options.terminals)] : []),
 		...(options.timers
 			? [
 					createTimerAdapter(options.timers, {

@@ -474,6 +474,7 @@ export function appServices(s: Services) {
 		},
 		toolchainHistory: s.toolchain.history,
 		timers: s.timers,
+		terminals: s.toolchain.terminals,
 		toolchainActions: s.toolchain.actionRequests,
 		// With World OFF nothing is assembled and the routes do not exist.
 		...(s.world
@@ -677,6 +678,7 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		{ name: "queue", close: () => s.queue.close(10_000) },
 		{ name: "capabilities", close: () => s.toolchain.capabilities.close() },
 		{ name: "agents", close: () => s.toolchain.agents.close() },
+		{ name: "terminals", close: () => s.toolchain.terminals.closeAll() },
 		{
 			name: "excalidraw",
 			close: async () => {

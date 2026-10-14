@@ -50,10 +50,6 @@ test("survey demo creates a saved OpenUI form with all controls and submission",
 	await expect(
 		workshop.getByRole("textbox", { name: "6. UI制作プロンプト" }),
 	).toContainText("雰囲気: 上品");
-	await workshop.getByRole("button", { name: "アンケートのデモ" }).click();
-	await expect(
-		workshop.getByRole("textbox", { name: "6. UI制作プロンプト" }),
-	).toContainText("アンケートフォーム");
 	await workshop.locator(".aui-ui-editor").screenshot({
 		path: "spec/verification/ui-compositions-2026-10-14/creation-panel.png",
 	});
@@ -61,7 +57,7 @@ test("survey demo creates a saved OpenUI form with all controls and submission",
 	await page.screenshot({
 		path: "spec/verification/ui-compositions-2026-10-14/artifact-create.png",
 	});
-	await workshop.getByRole("button", { name: "UIを生成" }).click();
+	await workshop.getByRole("button", { name: "アンケートのデモ" }).click();
 	await expect(
 		workshop.getByRole("tab", { name: "プレビュー" }),
 	).toHaveAttribute("aria-selected", "true");
@@ -114,6 +110,32 @@ test("survey demo creates a saved OpenUI form with all controls and submission",
 	expect(overflowing).toBe(false);
 });
 
+test("edited prompt still starts generation from the main action", async ({
+	page,
+}) => {
+	await page.goto(origin);
+	await openFromLauncher(page, "UI自由制作");
+	const workshop = page.locator(".aui-ui-workspace");
+	await workshop
+		.getByRole("textbox", { name: "6. UI制作プロンプト" })
+		.fill("来場者の意見を集めるフォームを作ってください");
+	await workshop.getByRole("button", { name: "UIを生成" }).click();
+	await expect(
+		workshop.getByRole("tab", { name: "プレビュー" }),
+	).toHaveAttribute("aria-selected", "true");
+	await expect(
+		workshop
+			.getByRole("region", { name: "作品のプレビュー" })
+			.getByRole("heading", {
+				name: "来場者アンケート",
+			}),
+	).toBeVisible();
+	await workshop.getByRole("button", { name: "編集画面に戻る" }).click();
+	await expect(
+		workshop.getByRole("textbox", { name: "6. UI制作プロンプト" }),
+	).toHaveValue("来場者の意見を集めるフォームを作ってください");
+});
+
 test("workspace uses the host theme and standard artifact spacing", async ({
 	page,
 }) => {
@@ -154,7 +176,6 @@ test("workspace uses the host theme and standard artifact spacing", async ({
 		path: "spec/verification/ui-compositions-2026-10-14/theme-dark-create.png",
 	});
 	await workshop.getByRole("button", { name: "アンケートのデモ" }).click();
-	await workshop.getByRole("button", { name: "UIを生成" }).click();
 	await expect(
 		workshop.getByRole("region", { name: "作品のプレビュー" }),
 	).toBeVisible();

@@ -36,7 +36,7 @@
 | 制作 | queueと共通推論を使用。任意のモチーフ画像を実画素で渡し、許可済みOpenUI定義のみ採用 | 実装済み |
 | 登録 | bundle検査、会話ツール、launcher、source/actionを登録adapterへ接続 | 実装済み |
 | 画面 | Artifact幅で「作る」「プレビュー」を切替。目的・種類・要素・モチーフ・雰囲気から編集可能なプロンプトを組み立て、作品一覧・修正・回答送信まで操作 | 実装済み |
-| デモ | text・radio・checkbox・textarea・送信を備えたアンケートを開始例として提示 | 実装済み |
+| デモ | 「アンケートのデモ」を1回押すと、text・radio・checkbox・textarea・送信を備えたアンケートの制作を開始 | 実装済み |
 | 検証 | 部分→公開API結合→ブラウザ通し試験。実モデル接続はfixtureと分けて記録 | 下記参照 |
 
 ## 検証記録
@@ -46,11 +46,11 @@
 | 登録 | `bun run toolchain:bundle -- check api/domains/capabilities/bundles/ui-compositions.bundle.json` | 通過 |
 | 部分 | `bun run verify -- --domain ui-compositions` | 4試験通過。上書き、モチーフ画素、カード画面、取消後の古い結果を確認 |
 | 結合 | `bun test api/application/ui-compositions-e2e.test.ts` | 登録済みAPIから作成・表示・回答・上書き、会話から担当への委任と作品保存まで通過 |
-| 表示領域 | `bun run verify -- --domain artifact` | 44試験通過 |
-| ブラウザ | `bunx playwright test tests/browser/ui-compositions.spec.ts` | アンケート作成、全入力型、回答、再表示、狭幅表示を確認 |
+| 表示領域 | `bun run verify -- --domain artifact` | 以前に44試験通過。今回の再実行は担当外の `terminal-components.tsx` の整形エラーで途中停止。`bun run test:domain -- artifact` の44試験、対象ファイルの整形・lint、`bun check` は通過 |
+| ブラウザ | `bunx playwright test tests/browser/ui-compositions.spec.ts` | デモの1クリック制作、手入力からの制作、全入力型、回答、再表示、狭幅表示、テーマを確認。3試験通過 |
 | 型 | `bun check` | 通過 |
 | 登録領域 | `bun run verify -- --domain capabilities` | 共有作業による一度の無効化後、再実行で63試験・最終判定とも通過 |
-| 実モデル | `bun scripts/ui-compositions-live.ts --run`。保存済みLARM接続、隔離DB、合成モチーフ画像を使用 | アンケート作成・上書き修正・画像入力各1件が通過。初回はモチーフ付きのモデル出力が定義検証に失敗し、診断追加後の再実行で通過。出力の揺れは残る |
+| 実モデル | `bun scripts/ui-compositions-live.ts --run`。保存済みLARM接続、隔離DB、合成モチーフ画像を使用 | アンケート作成・上書き修正・画像入力各1件が通過。デモボタン修正後にも3件通過。初回はモチーフ付きのモデル出力が定義検証に失敗し、診断追加後の再実行で通過。出力の揺れは残る |
 
 ## Artifact画面の見直し
 

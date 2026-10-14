@@ -332,6 +332,17 @@ test("artwork is generated on request from the completed track's prompt at 256×
 		expect(content.status).toBe(200);
 		expect(content.headers.get("content-type")).toBe("image/png");
 		expect(new Uint8Array(await content.arrayBuffer())).toEqual(f.artwork);
+		// The playlist reaches the same artwork through the LARM track id.
+		expect(music.jobId).toBe("track");
+		const linked = await h.request("/api/music/tracks/track/generation");
+		expect(linked.status).toBe(200);
+		expect(await linked.json()).toEqual({
+			id: music.id,
+			artwork: { state: "completed", revision: 2, errorCode: null },
+		});
+		expect(
+			(await h.request("/api/music/tracks/larm-only/generation")).status,
+		).toBe(404);
 		await generate(3);
 		expect(
 			f.requests.filter((r) => r.path === "/v1/images/generations"),

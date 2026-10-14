@@ -1,0 +1,72 @@
+{
+	"formatVersion": 1,
+	"bundleId": "terminals-screen",
+	"pins": [],
+	"definitions": [],
+	"bindings": [],
+	"artifacts": [
+		{
+			"kind": "artifact",
+			"id": "terminals.workspace",
+			"revision": 1,
+			"title": "ターミナル",
+			"variants": [
+				{
+					"id": "standard",
+					"label": "標準",
+					"definition": {
+						"view": "terminal-workspace",
+						"source": "terminals",
+						"title": "Claude Code"
+					}
+				}
+			],
+			"defaultVariant": "standard",
+			"sourceBindings": [
+				{
+					"source": "terminals",
+					"adapterRef": "adapter:terminals@1",
+					"query": "query:terminals.sessions@1",
+					"target": "none"
+				}
+			],
+			"actionBindings": [
+				{
+					"actionId": "start",
+					"eventAction": "terminal-start",
+					"source": "terminals",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				},
+				{
+					"actionId": "restart",
+					"eventAction": "terminal-restart",
+					"source": "terminals",
+					"inputSchemaRef": "schema:terminals-screen-id@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "close",
+					"eventAction": "terminal-close",
+					"source": "terminals",
+					"inputSchemaRef": "schema:terminals-screen-id@1",
+					"effect": "local"
+				}
+			],
+			"launcher": { "label": "ターミナル", "order": 50 }
+		}
+	],
+	"schemas": [
+		{
+			"kind": "schema",
+			"id": "terminals-screen-id",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": { "id": { "type": "string", "minLength": 1 } },
+				"required": ["id"]
+			}
+		}
+	]
+}

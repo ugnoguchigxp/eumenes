@@ -216,7 +216,7 @@ export function MusicWorkspaceView({ request }: { request: ArtifactRequest }) {
 					void send("music-select", { id });
 				}}
 				onArtwork={
-					data.creation?.canArtwork
+					data.canArtwork
 						? (id) => {
 								void send("music-artwork", { id });
 							}

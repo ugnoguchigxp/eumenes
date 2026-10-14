@@ -115,7 +115,7 @@ test("recognition stays inside artifact: selected image, camera capture, video s
 	await expect
 		.poll(() =>
 			workspace
-				.getByLabel("解析した動画")
+				.getByLabel("保存した動画")
 				.evaluate((v: HTMLVideoElement) =>
 					v.seekable.length ? v.seekable.end(0) : 0,
 				),
@@ -126,7 +126,7 @@ test("recognition stays inside artifact: selected image, camera capture, video s
 		.poll(
 			() =>
 				workspace
-					.getByLabel("解析した動画")
+					.getByLabel("保存した動画")
 					.evaluate((v: HTMLVideoElement) => v.currentTime),
 			{ timeout: 5000 },
 		)
@@ -164,7 +164,9 @@ test("recognition stays inside artifact: selected image, camera capture, video s
 	await page
 		.getByRole("menuitem", { name: "映っている物を調べる", exact: true })
 		.click();
-	await workspace.getByRole("button", { name: "資料一覧", exact: true }).click();
+	await workspace
+		.getByRole("button", { name: "資料一覧", exact: true })
+		.click();
 	const history = workspace.getByRole("menu", { name: "資料一覧" });
 	await expect(
 		history.getByRole("menuitem", { name: /clip.webm/ }),
@@ -172,19 +174,43 @@ test("recognition stays inside artifact: selected image, camera capture, video s
 	await panel.screenshot({
 		path: "spec/verification/object-recognition-screen-2026-10-14/artifact-history.png",
 	});
+	await history.getByRole("menuitem", { name: /cancel.webm/ }).click();
+	await expect(workspace.getByLabel("保存した動画")).toBeVisible();
+	await expect
+		.poll(() =>
+			workspace
+				.getByLabel("保存した動画")
+				.evaluate((video: HTMLVideoElement) =>
+					video.seekable.length ? video.seekable.end(0) : 0,
+				),
+		)
+		.toBeGreaterThan(1);
+	await expect(workspace.getByLabel("検出枠")).toHaveCount(0);
+	await panel.screenshot({
+		path: "spec/verification/object-recognition-screen-2026-10-14/artifact-restored-cancelled.png",
+	});
+	await workspace
+		.getByRole("button", { name: "資料一覧", exact: true })
+		.click();
 	await history.getByRole("menuitem", { name: /desk.png/ }).click();
 	await expect(workspace.getByRole("img", { name: "desk.png" })).toBeVisible();
-	await workspace.getByRole("button", { name: "資料一覧", exact: true }).click();
+	await workspace
+		.getByRole("button", { name: "資料一覧", exact: true })
+		.click();
 	await history.getByRole("button", { name: "cancel.webmを削除" }).click();
 	await expect(
 		history.getByRole("group", { name: "cancel.webmの削除確認" }),
 	).toBeVisible();
 	await history.getByRole("button", { name: "削除する" }).click();
-	await workspace.getByRole("button", { name: "資料一覧", exact: true }).click();
+	await workspace
+		.getByRole("button", { name: "資料一覧", exact: true })
+		.click();
 	await expect(
 		history.getByRole("menuitem", { name: /cancel.webm/ }),
 	).toHaveCount(0);
-	await workspace.getByRole("button", { name: "資料一覧", exact: true }).click();
+	await workspace
+		.getByRole("button", { name: "資料一覧", exact: true })
+		.click();
 	await page.setViewportSize({ width: 1440, height: 1040 });
 	const separator = await page
 		.getByRole("separator", { name: "会話とアーティファクトのサイズを調整" })
@@ -202,6 +228,78 @@ test("recognition stays inside artifact: selected image, camera capture, video s
 	expect((await workspace.boundingBox())!.width).toBeLessThanOrEqual(
 		(await panel.boundingBox())!.width,
 	);
+});
+
+test("history restores a cancelled video's original playback while the camera is open", async ({
+	page,
+}) => {
+	await page.setViewportSize({ width: 1440, height: 1040 });
+	await page.goto(origin);
+	await page.getByRole("button", { name: "アーティファクトを開く" }).click();
+	await page
+		.getByRole("menuitem", { name: "映っている物を調べる", exact: true })
+		.click();
+	const workspace = page
+		.getByRole("complementary", { name: "アーティファクト" })
+		.locator(".recognition-workspace");
+	await workspace.getByLabel("物体認識の認証方式").selectOption("larm");
+	const videoBytes = readFileSync(
+		"tests/browser/fixtures/object-recognition-2s.webm",
+	);
+	await workspace.getByLabel("画像・動画を選ぶ").setInputFiles({
+		name: "cancel.webm",
+		mimeType: "video/webm",
+		buffer: videoBytes,
+	});
+	await expect(
+		workspace.getByRole("button", { name: "取消", exact: true }),
+	).toBeVisible();
+	await workspace.getByRole("button", { name: "取消", exact: true }).click();
+	await expect(workspace.getByText("中止", { exact: true })).toBeVisible();
+	const imageBytes = await page.evaluate(async () => {
+		const canvas = document.createElement("canvas");
+		canvas.width = 16;
+		canvas.height = 16;
+		return Array.from(
+			new Uint8Array(
+				await new Promise<Blob>((resolve) =>
+					canvas.toBlob((blob) => resolve(blob!), "image/png"),
+				).then((blob) => blob.arrayBuffer()),
+			),
+		);
+	});
+	await workspace.getByLabel("画像・動画を選ぶ").setInputFiles({
+		name: "desk.png",
+		mimeType: "image/png",
+		buffer: Buffer.from(imageBytes),
+	});
+	await expect(workspace.getByRole("img", { name: "desk.png" })).toBeVisible();
+	await page.reload();
+	await page.getByRole("button", { name: "アーティファクトを開く" }).click();
+	await page
+		.getByRole("menuitem", { name: "映っている物を調べる", exact: true })
+		.click();
+	await expect(workspace.getByRole("img", { name: "desk.png" })).toBeVisible();
+	await workspace.getByRole("button", { name: "カメラを開く" }).click();
+	await expect(workspace.getByLabel("カメラプレビュー")).toBeVisible();
+	await workspace
+		.getByRole("button", { name: "資料一覧", exact: true })
+		.click();
+	await workspace
+		.getByRole("menu", { name: "資料一覧" })
+		.getByRole("menuitem", { name: /cancel.webm/ })
+		.click();
+	await expect(workspace.getByLabel("カメラプレビュー")).toBeHidden();
+	const video = workspace.getByLabel("保存した動画");
+	await expect(video).toBeVisible();
+	await expect
+		.poll(() =>
+			video.evaluate((element: HTMLVideoElement) =>
+				element.seekable.length ? element.seekable.end(0) : 0,
+			),
+		)
+		.toBeGreaterThan(1);
+	await expect(workspace.getByLabel("検出枠")).toHaveCount(0);
 });
 
 test("camera recording finishes through the artifact controls", async ({
@@ -223,6 +321,7 @@ test("camera recording finishes through the artifact controls", async ({
 	await expect(workspace.getByLabel("カメラプレビュー")).toBeVisible();
 	await workspace.getByRole("button", { name: "録画を開始" }).click();
 	await expect(workspace.locator(".recognition-record-dot")).toBeVisible();
+	await expect(workspace.getByRole("button", { name: "資料一覧", exact: true })).toBeDisabled();
 	const finish = workspace.getByRole("button", {
 		name: "録画を終了して調べる",
 	});
@@ -230,7 +329,9 @@ test("camera recording finishes through the artifact controls", async ({
 	await page.waitForTimeout(1000);
 	await expect(finish).toBeVisible({ timeout: 5000 });
 	await finish.click({ timeout: 5000 });
-	await workspace.getByRole("button", { name: "資料一覧", exact: true }).click();
+	await workspace
+		.getByRole("button", { name: "資料一覧", exact: true })
+		.click();
 	await expect(
 		workspace.getByRole("menuitem", { name: /camera.webm/ }),
 	).toBeVisible();

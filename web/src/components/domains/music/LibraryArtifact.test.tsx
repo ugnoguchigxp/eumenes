@@ -24,7 +24,21 @@ const track = (id: string) => ({
 	favorite: false,
 	format: "opus",
 });
-function setup(definition = playlistArtifactDefinition("one"), saved = true) {
+function setup(
+	definition = playlistArtifactDefinition("one"),
+	saved = true,
+	generations: Record<
+		string,
+		{
+			id: string;
+			artwork?: {
+				state: "generating" | "completed" | "failed";
+				revision: number;
+				errorCode: null;
+			};
+		}
+	> = {},
+) {
 	vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
 	const query = trackQuery.parse({});
 	const api = {
@@ -64,6 +78,17 @@ function setup(definition = playlistArtifactDefinition("one"), saved = true) {
 		updateMusicPlaylist: vi.fn(async () => ({})),
 		musicFavorite: vi.fn(async () => {}),
 		deleteMusicTrack: vi.fn(async () => {}),
+		musicTrackGeneration: vi.fn(async (id: string) => generations[id] ?? null),
+		musicArtwork: vi.fn(async () => new Blob(["png"], { type: "image/png" })),
+		generateMusicArtwork: vi.fn(async (id: string) => {
+			const g = Object.values(generations).find((v) => v.id === id)!;
+			g.artwork = {
+				state: "completed",
+				revision: (g.artwork?.revision ?? 0) + 1,
+				errorCode: null,
+			};
+			return g;
+		}),
 	};
 	const cache = new QueryClient({
 		defaultOptions: { queries: { retry: false } },
@@ -249,4 +274,43 @@ test("returning to an earlier filter starts from its first page rather than its 
 	);
 	expect(r.api.musicTracks.mock.calls.at(-1)?.[0].cursor).toBeUndefined();
 	expect(r.api.musicTracks.mock.calls.at(-1)?.[0].q).toBe("");
+});
+test("a track generated here shows and regenerates its stored artwork in the playlist", async () => {
+	vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:artwork");
+	vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+	const r = setup(playlistArtifactDefinition("one"), true, {
+		a: {
+			id: "gen-a",
+			artwork: { state: "completed", revision: 1, errorCode: null },
+		},
+	});
+	fireEvent.click(await screen.findByRole("button", { name: "楽曲イメージ" }));
+	expect(
+		(
+			await screen.findByRole("img", { name: "保存曲aの楽曲イメージ" })
+		).getAttribute("src"),
+	).toBe("blob:artwork");
+	expect(r.api.musicTrackGeneration).toHaveBeenCalledWith(
+		"a",
+		expect.anything(),
+	);
+	expect(r.api.musicArtwork).toHaveBeenCalledWith("gen-a", expect.anything());
+	fireEvent.click(screen.getByRole("button", { name: "作り直す" }));
+	await waitFor(() =>
+		expect(r.api.generateMusicArtwork).toHaveBeenCalledWith("gen-a"),
+	);
+	await waitFor(() => expect(r.api.musicArtwork).toHaveBeenCalledTimes(2));
+});
+test("a LARM-only track has no artwork action in the playlist", async () => {
+	const r = setup();
+	fireEvent.click(await screen.findByRole("button", { name: "楽曲イメージ" }));
+	await waitFor(() =>
+		expect(r.api.musicTrackGeneration).toHaveBeenCalledWith(
+			"a",
+			expect.anything(),
+		),
+	);
+	expect(screen.getByText("この楽曲のイメージは未登録です。")).toBeTruthy();
+	expect(screen.queryByRole("button", { name: "イメージを作成" })).toBeNull();
+	expect(r.api.musicArtwork).not.toHaveBeenCalled();
 });

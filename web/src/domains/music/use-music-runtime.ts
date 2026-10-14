@@ -122,15 +122,15 @@ export function useMusicRuntime(
 			kind: "music",
 			revision,
 			currentId: selectedItem?.id ?? "",
+			canArtwork: true,
 			creation:
 				audioError && audioError === id
 					? {
 							...creation.creation,
-							canArtwork: true,
 							status: "failed",
 							title: "音声を取得できませんでした",
 						}
-					: { ...creation.creation, canArtwork: true },
+					: creation.creation,
 			tracks: items.map((item) => ({
 				id: item.id,
 				title: item.title,

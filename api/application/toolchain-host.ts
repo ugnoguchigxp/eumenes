@@ -4,6 +4,7 @@ import type { QueueService } from "../domains/queue";
 import type { TimersService } from "../domains/timers";
 import type { WebResearchService } from "../domains/web-research";
 import type { SqliteStore } from "../infrastructure/sqlite";
+import { createTerminals } from "../domains/terminals";
 import { createToolchain } from "./toolchain";
 import type { Embed } from "./toolchain-vectors";
 import type { InferenceAdapterPorts } from "./inference-adapter";
@@ -107,6 +108,8 @@ export async function createHostToolchain(
 	},
 ) {
 	const links = createToolchainHostLinks(s);
+	// Claude Code sessions start in the server's working directory (the repository).
+	const terminals = createTerminals({ cwd: process.cwd() });
 	const toolchain = await createToolchain(
 		s.store,
 		s.queue,
@@ -122,9 +125,10 @@ export async function createHostToolchain(
 			image: true,
 			excalidraw: true,
 			objectRecognition: true,
+			terminals,
 			webResearch: s.webResearchEnabled,
 			embed: s.embed,
 		},
 	);
-	return { toolchain, links };
+	return { toolchain: { ...toolchain, terminals }, links };
 }

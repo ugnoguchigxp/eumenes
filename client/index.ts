@@ -22,6 +22,7 @@ import { createTransport } from "./transport";
 import { tasksClient } from "./tasks";
 import { codingClient } from "./coding";
 import { timersClient } from "./timers";
+import { terminalsClient } from "./terminals";
 import { toolchainActionsClient } from "./toolchain-actions";
 import { voiceDialogueClient } from "./voice-dialogue";
 import { webResearchClient } from "./web-research";
@@ -56,6 +57,7 @@ export function createClient(baseUrl: string, token?: string) {
 		...codingSupervisionClient(transport),
 		...toolchainHistoryClient(transport),
 		...timersClient(transport),
+		...terminalsClient(transport),
 		...toolchainActionsClient(transport),
 		...worldClient(transport),
 	};

@@ -101,6 +101,9 @@ test("changing the viewed input while upload is pending prevents its late receip
 		identity: "fixture",
 		recognitionRecords: vi.fn(async () => records),
 		recognitionConnection: vi.fn(async () => ({ credentialConfigured: true })),
+		recognitionContent: vi.fn(
+			async () => new Blob(["saved image"], { type: "image/png" }),
+		),
 		recognitionUpload: vi.fn(() => upload),
 		recognitionGet: vi.fn(),
 	} as unknown as EumenesClient;
@@ -117,6 +120,12 @@ test("changing the viewed input while upload is pending prevents its late receip
 			expect(
 				hook.result.current.runtime.snapshot[recognitionSource].selectedId,
 			).toBe(old.id),
+		);
+		await waitFor(() =>
+			expect(client.recognitionContent).toHaveBeenCalledWith(
+				old.id,
+				expect.anything(),
+			),
 		);
 		let pending!: ReturnType<typeof hook.result.current.runtime.uploadFile>;
 		act(() => {

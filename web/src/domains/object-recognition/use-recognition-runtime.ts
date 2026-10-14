@@ -46,7 +46,7 @@ export function useRecognitionRuntime(
 			"content",
 			selected?.id,
 		],
-		enabled: !!selected && selected.state === "completed",
+		enabled: !!selected,
 		queryFn: ({ signal }) => client.recognitionContent(selected!.id, signal),
 		retry: false,
 	});

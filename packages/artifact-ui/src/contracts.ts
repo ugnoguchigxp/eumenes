@@ -6,6 +6,12 @@ export type {
 	CollectionRowAction,
 } from "./collection-contracts";
 import type { ObjectRecognitionResource } from "./object-recognition-components";
+import type { TerminalsResource } from "./terminal-components";
+export type {
+	TerminalConnection,
+	TerminalSessionResource,
+	TerminalsResource,
+} from "./terminal-components";
 export type { ObjectRecognitionResource } from "./object-recognition-components";
 import type { DrawingResource } from "./drawing-components";
 import { z } from "zod";
@@ -155,6 +161,15 @@ export const viewRegistry = {
 		label: "物体検出とカメラ入力",
 		schema: z.strictObject({
 			view: z.literal("object-recognition-workspace"),
+			source,
+			title,
+		}),
+	},
+	"terminal-workspace": {
+		name: "TerminalWorkspace",
+		label: "ターミナル",
+		schema: z.strictObject({
+			view: z.literal("terminal-workspace"),
 			source,
 			title,
 		}),
@@ -607,6 +622,7 @@ export type SettingsResource = {
 };
 export type Resource =
 	| ObjectRecognitionResource
+	| TerminalsResource
 	| ImageWorkspaceResource
 	| RecordsResource
 	| SubtitlePreviewResource
@@ -674,6 +690,9 @@ export type ArtifactEvent = {
 		| "recognition-credential-source"
 		| "recognition-remove"
 		| "recognition-incorporate"
+		| "terminal-start"
+		| "terminal-restart"
+		| "terminal-close"
 		| "drawing-new"
 		| "drawing-open"
 		| "drawing-refresh"

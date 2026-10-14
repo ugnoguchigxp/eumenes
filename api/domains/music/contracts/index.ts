@@ -28,6 +28,8 @@ export const musicRecord = z.object({
 	updatedAt: z.number(),
 });
 export type MusicRecord = z.infer<typeof musicRecord>;
+/** The generation that produced a library track (LARM-only tracks have none). */
+export const trackGeneration = musicRecord.pick({ id: true, artwork: true });
 
 import { trackQuery, trackId } from "../../larm/contracts";
 export const playlistRecord = z.object({

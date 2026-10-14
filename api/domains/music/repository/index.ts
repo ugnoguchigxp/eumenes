@@ -68,6 +68,14 @@ export function byRun(db: Database, id: string) {
 		.query(`SELECT ${COLUMNS} FROM music_generations WHERE run_id=?`)
 		.get(id) as Row | null;
 }
+/** A LARM library track id is the LARM job id recorded while the track was generated here. */
+export function byTrack(db: Database, trackId: string) {
+	return db
+		.query(
+			`SELECT ${COLUMNS} FROM music_generations WHERE json_extract(record_json,'$.jobId')=? ORDER BY rowid DESC LIMIT 1`,
+		)
+		.get(trackId) as Row | null;
+}
 export function record(r: Row): MusicRecord {
 	return JSON.parse(r.record_json);
 }
