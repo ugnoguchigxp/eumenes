@@ -458,7 +458,7 @@ select:focus-visible {
 }
 .chat-composer textarea {
 	width: 100%;
-	min-height: 118px;
+	min-height: 95px;
 	max-height: min(40dvh, 320px);
 	resize: vertical;
 	padding: 10px 6px;
@@ -536,7 +536,7 @@ select:focus-visible {
 		min-height: 0;
 	}
 	.chat-composer textarea {
-		min-height: 92px;
+		min-height: 70px;
 	}
 }
 @media (prefers-reduced-motion: reduce) {
@@ -935,6 +935,10 @@ select:focus-visible {
 .artifact-panel-body:has(:is(.music-workspace, .image-workspace)) {
 	padding: 0;
 	overflow: hidden;
+}
+.artifact-panel-body:has(:is(.music-workspace, .image-workspace))
+	> .toolchain-artifact {
+	height: 100%;
 }
 .artifact-panel-body:has(:is(.music-workspace, .image-workspace)) .artifact-ui {
 	height: 100%;

@@ -8,8 +8,8 @@
 		{
 			"kind": "artifact",
 			"id": "settings.dots",
-			"revision": 2,
-			"title": "外部作業",
+			"revision": 3,
+			"title": "Codexへの委任",
 			"variants": [
 				{
 					"id": "standard",
@@ -17,7 +17,7 @@
 					"definition": {
 						"view": "layout",
 						"direction": "stack",
-						"title": "外部作業",
+						"title": "Codexへの委任",
 						"children": [
 							{
 								"view": "collection-workspace",
@@ -334,7 +334,8 @@
 				}
 			],
 			"launcher": {
-				"label": "外部作業",
+				"icon": "external",
+				"label": "Codexへの委任",
 				"group": "管理と確認",
 				"order": 60,
 				"description": "dotsへの接続 プロジェクト 担当とSkill"

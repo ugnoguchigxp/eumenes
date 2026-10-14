@@ -359,3 +359,142 @@
 	flex: 1;
 	min-height: 0;
 }
+
+/* Registered multi-section settings screens can use the same compact tab shell. */
+.aui-composition-tabs {
+	gap: 0;
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	overflow: hidden;
+	background: var(--card);
+}
+.aui-composition-tabs > .aui-composition-title {
+	margin: 0;
+	padding: 1.25rem 1.5rem;
+	border-bottom: 1px solid var(--border);
+	font-size: clamp(1.35rem, 2vw, 1.8rem);
+	font-weight: 700;
+}
+.aui-composition-tabs .ds-tabs-list {
+	width: 100%;
+	padding: 0 1.25rem;
+	border-bottom: 1px solid var(--border);
+	overflow-x: auto;
+}
+.aui-composition-tabs .ds-tabs-content {
+	margin: 0;
+	padding: 1.25rem;
+}
+.aui-composition-tabs .ds-tabs-content[hidden] {
+	display: none;
+}
+.aui-composition-tabs .ds-settings-panel {
+	border: 0;
+	box-shadow: none;
+}
+.aui-composition-tabs .ds-settings-panel > :first-child {
+	display: none;
+}
+.aui-composition-tabs .ds-settings-panel > :last-child {
+	padding: 0;
+}
+.aui-composition-tabs .ds-settings-footer {
+	margin: 0 -1.25rem -1.25rem;
+}
+.aui-composition-tabs > .ds-tabs-root {
+	min-width: 0;
+}
+.aui-composition-tab-body {
+	display: grid;
+	gap: 1rem;
+}
+.aui-composition-tab-body > .aui-stack {
+	padding: 1rem;
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+}
+.aui-composition-tab-body > .aui-stack:first-child {
+	border-color: color-mix(in srgb, var(--primary) 30%, var(--border));
+}
+.aui-collection-workspace {
+	min-width: 0;
+	gap: 0.9rem;
+	padding: 1.3rem;
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	background: var(--card);
+}
+.aui-collection-workspace > h3 {
+	margin: 0;
+	font-size: 1.18rem;
+	font-weight: 700;
+}
+.aui-collection-workspace > p {
+	margin: 0;
+	color: var(--muted-foreground);
+	line-height: 1.55;
+}
+.aui-collection-workspace > table {
+	width: 100%;
+	border-collapse: separate;
+	border-spacing: 0;
+	border: 1px solid var(--border);
+	border-radius: 0.5rem;
+	overflow: hidden;
+}
+.aui-collection-workspace > table th,
+.aui-collection-workspace > table td {
+	padding: 0.72rem 0.8rem;
+	border-bottom: 1px solid var(--border);
+	text-align: left;
+	vertical-align: middle;
+}
+.aui-collection-workspace > table th {
+	background: color-mix(in srgb, var(--muted) 55%, var(--card));
+	color: var(--muted-foreground);
+	font-weight: 600;
+}
+.aui-collection-workspace > table tr:last-child td {
+	border-bottom: 0;
+}
+.aui-collection-workspace > form {
+	border-top: 1px solid var(--border);
+	padding-top: 1rem;
+}
+.aui-collection-workspace > form label {
+	display: grid;
+	gap: 0.4rem;
+	font-weight: 600;
+}
+.aui-collection-workspace > form input,
+.aui-collection-workspace > form select,
+.aui-collection-workspace > form textarea {
+	width: 100%;
+	min-height: 2.55rem;
+	border: 1px solid var(--border);
+	border-radius: 0.45rem;
+	padding: 0.5rem 0.7rem;
+	background: var(--background);
+	color: var(--foreground);
+}
+.aui-collection-workspace .aui-row-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.4rem;
+}
+.aui-collection-workspace .aui-row-actions > span {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.3rem;
+}
+@container (max-width: 620px) {
+	.aui-collection-workspace {
+		padding: 0.9rem;
+		overflow-x: auto;
+	}
+	.aui-composition-tabs .ds-tabs-content {
+		padding: 0.8rem;
+	}
+}
+.aui-composition-tabs > .ds-settings-footer { margin: 0; padding: 1rem 1.25rem; }
+.aui-composition-tabs > output { display: block; padding: 0 1.25rem .75rem; }

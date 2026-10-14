@@ -458,7 +458,6 @@ export const settingsArtifacts: Record<string, ArtifactDefinitionV1> = {
 					},
 				},
 			},
-			review("settings-hub"),
 		],
 	},
 	conversation: {

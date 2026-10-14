@@ -149,6 +149,14 @@ try {
 		name: "音楽ワークスペース",
 		exact: true,
 	});
+	const panelBody = page.locator(".artifact-panel-body:visible");
+	await expect.poll(async () => {
+		const panel = await panelBody.boundingBox();
+		const music = await workspace.boundingBox();
+		return panel && music
+			? Math.abs(panel.y + panel.height - (music.y + music.height))
+			: Number.POSITIVE_INFINITY;
+	}).toBeLessThanOrEqual(1);
 	const prompt = page.getByRole("textbox", { name: "音楽作成プロンプト" });
 	await expect(
 		page.getByRole("button", { name: "イメージを作成", exact: true }),

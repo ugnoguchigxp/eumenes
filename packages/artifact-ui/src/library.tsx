@@ -11,8 +11,16 @@ import {
 	SettingsSectionView,
 	SettingsNavigationView,
 	SettingsChangesView,
+	SettingsDraftBarView,
 } from "./settings-components";
 import { z } from "zod";
+import { useState } from "react";
+import {
+	Tabs,
+	TabsContent,
+	TabsList,
+	TabsTrigger,
+} from "@eumenes/design-system";
 import {
 	ComponentsView,
 	ImageFrame,
@@ -70,6 +78,94 @@ function RegisteredView({ request }: { request: ArtifactRequest }) {
 	const Component = renderers[request.view];
 	return <Component request={request} />;
 }
+function CompositionView({
+	request,
+}: {
+	request: z.infer<typeof layoutSchema>;
+}) {
+	const [selected, setSelected] = useState("0");
+	const tabs =
+		request.tabs ??
+		request.children.map((child, index) => ({
+			label: child.title ?? `画面 ${index + 1}`,
+			children: [index],
+		}));
+	if (request.direction === "form-preview")
+		return (
+			<section
+				aria-label={request.title ?? "組合せ表示"}
+				className="aui-composition aui-composition-form-preview"
+			>
+				<SettingsSectionView
+					request={request.children[0]!}
+					supplement={<RegisteredView request={request.children[1]!} />}
+				/>
+			</section>
+		);
+	if (request.direction === "tabs")
+		return (
+			<section
+				aria-label={request.title ?? "組合せ表示"}
+				className="aui-composition aui-composition-tabs"
+			>
+				{request.title && (
+					<h2 className="aui-composition-title">{request.title}</h2>
+				)}
+				<Tabs value={selected} onValueChange={setSelected}>
+					<TabsList aria-label={`${request.title ?? "画面"}の区分`}>
+						{tabs.map((tab, index) => (
+							<TabsTrigger key={index} value={String(index)}>
+								{tab.label}
+							</TabsTrigger>
+						))}
+					</TabsList>
+					{tabs.map((tab, index) => (
+						<TabsContent
+							key={index}
+							value={String(index)}
+							forceMount
+							hidden={selected !== String(index)}
+						>
+							<div className="aui-composition-tab-body">
+								{tab.children.map((childIndex) => {
+									const child = request.children[childIndex]!;
+									return child.view === "settings-section" &&
+										request.draftSource === child.source ? (
+										<SettingsSectionView
+											key={`${childIndex}:${child.source}`}
+											request={child}
+											hideFooter
+										/>
+									) : (
+										<RegisteredView
+											key={`${childIndex}:${child.view}:${child.source ?? "inline"}`}
+											request={child}
+										/>
+									);
+								})}
+							</div>
+						</TabsContent>
+					))}
+				</Tabs>
+				{request.draftSource && (
+					<SettingsDraftBarView source={request.draftSource} />
+				)}
+			</section>
+		);
+	return (
+		<section
+			aria-label={request.title ?? "組合せ表示"}
+			className={`aui-composition aui-composition-${request.direction}`}
+		>
+			{request.children.map((child, index) => (
+				<RegisteredView
+					key={`${index}:${child.view}:${child.source ?? "inline"}`}
+					request={child}
+				/>
+			))}
+		</section>
+	);
+}
 export const artifactLibrary = createLibrary({
 	id: "eumenes-artifact-v1",
 	components: [
@@ -87,22 +183,9 @@ export const artifactLibrary = createLibrary({
 			name: "Composition",
 			description: "登録済みの表示を並べる",
 			props: z.object({ request: layoutSchema }),
-			component: ({ props }) => {
-				const request = layoutSchema.parse(props.request);
-				return (
-					<section
-						aria-label={request.title ?? "組合せ表示"}
-						className={`aui-composition aui-composition-${request.direction}`}
-					>
-						{request.children.map((child, index) => (
-							<RegisteredView
-								key={`${index}:${child.view}:${child.source ?? "inline"}`}
-								request={child}
-							/>
-						))}
-					</section>
-				);
-			},
+			component: ({ props }) => (
+				<CompositionView request={layoutSchema.parse(props.request)} />
+			),
 		}),
 	],
 });

@@ -78,7 +78,7 @@ export function ConversationComposer({
 					}}
 					placeholder="メッセージを入力、または話しかけてください"
 					maxLength={8000}
-					rows={4}
+					rows={3}
 				/>
 				<div className="composer-actions">
 					<ChatImageInput state={state} />

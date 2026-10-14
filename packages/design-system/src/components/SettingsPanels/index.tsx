@@ -1,7 +1,8 @@
-import { useId, useState } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { Button } from "../Button";
 import { Card, CardContent, CardHeader, CardTitle } from "../Card";
 import { Input } from "../Input";
+import { BookOpen, Brain, CheckCircle2, ChevronRight, Database, Folder, MessageCircle, Mic, Monitor, Network, Search, ScrollText } from "lucide-react";
 import "./style.css";
 
 export type SettingsInputField = {
@@ -9,6 +10,7 @@ export type SettingsInputField = {
 	label: string;
 	help?: string;
 	control: "text" | "select" | "toggle" | "range" | "number" | "multiple";
+	presentation?: "segmented" | "cards";
 	value: string;
 	defaultValue?: string;
 	maxLength?: number;
@@ -35,9 +37,22 @@ export type SettingsPanelAction = {
 export type SettingsLink = {
 	id: string;
 	label: string;
+	icon?: "conversation" | "voice" | "display" | "connections" | "external" | "memory" | "dictionary" | "checks" | "records" | "world";
 	description?: string;
 	group: string;
 	enabled: boolean;
+};
+const linkIcons = {
+	conversation: MessageCircle,
+	voice: Mic,
+	display: Monitor,
+	connections: Network,
+	external: Folder,
+	memory: Brain,
+	dictionary: BookOpen,
+	checks: CheckCircle2,
+	records: ScrollText,
+	world: Database,
 };
 export type SettingsChangeRow = {
 	id: string;
@@ -57,6 +72,8 @@ export function SettingsSection({
 	busy = false,
 	blocked = false,
 	message,
+	supplement,
+	hideFooter = false,
 	onChange,
 	onReview,
 	onAction,
@@ -71,6 +88,8 @@ export function SettingsSection({
 	busy?: boolean;
 	blocked?: boolean;
 	message?: string;
+	supplement?: ReactNode;
+	hideFooter?: boolean;
 	onChange: (id: string, value: string) => void;
 	onReview: () => void;
 	onAction?: (id: string) => void;
@@ -144,24 +163,26 @@ export function SettingsSection({
 								))}
 						</div>
 					)}
-					<footer className="ds-settings-footer">
-						<output>
-							{dirty ? "未適用の変更があります" : "すべての変更を保存済み"}
-						</output>
-						{onApply && (
-							<Button type="submit" disabled={!dirty || busy || blocked}>
-								{busy ? "保存中…" : "設定の変更をすべて保存"}
-							</Button>
-						)}
-						<Button type="button" variant="secondary" onClick={onReview}>
-							変更一覧を開く
-						</Button>
-					</footer>
+					{supplement && <div className="ds-settings-supplement">{supplement}</div>}
+					{!hideFooter && <SettingsDraftBar dirty={dirty} busy={busy} blocked={blocked} onApply={onApply} onReview={onReview} />}
 				</form>
 				{message && <output aria-live="polite">{message}</output>}
 			</CardContent>
 		</Card>
 	);
+}
+export function SettingsDraftBar({ dirty, busy = false, blocked = false, onApply, onReview }: {
+	dirty: boolean;
+	busy?: boolean;
+	blocked?: boolean;
+	onApply?: () => void;
+	onReview: () => void;
+}) {
+	return <footer className="ds-settings-footer">
+		<output>{dirty ? "未適用の変更があります" : "すべての変更を保存済み"}</output>
+		{onApply && <Button type="button" disabled={!dirty || busy || blocked} onClick={onApply}>{busy ? "保存中…" : "設定の変更をすべて保存"}</Button>}
+		<Button type="button" variant="secondary" onClick={onReview}>変更一覧を開く</Button>
+	</footer>;
 }
 function SettingsField({
 	field,
@@ -218,12 +239,14 @@ function SettingsField({
 				</fieldset>
 			) : (
 				<>
-					<label htmlFor={prefix}>
-						{field.label}
-						{field.control === "range" && (
-							<span className="ds-settings-value">{value}</span>
-						)}
-					</label>
+					{field.presentation && field.control === "select" && !field.searchable ? (
+						<span className="ds-settings-field-label">{field.label}</span>
+					) : (
+						<label htmlFor={prefix}>
+							{field.label}
+							{field.control === "range" && <span className="ds-settings-value">{value}</span>}
+						</label>
+					)}
 					{field.searchable && (
 						<Input
 							aria-label={field.label + "を探す"}
@@ -232,7 +255,23 @@ function SettingsField({
 							onChange={(e) => setSearch(e.target.value)}
 						/>
 					)}
-					{field.control === "select" ? (
+					{field.control === "select" && field.presentation && !field.searchable ? (
+						<div className={`ds-settings-choice-group ds-settings-choice-group-${field.presentation}`} role="group" aria-label={field.label}>
+							{field.options?.map((option, index) => (
+								<button
+									type="button"
+									key={option.value}
+										className="ds-settings-choice"
+										aria-pressed={value === option.value}
+										disabled={field.disabled}
+										onClick={() => change(option.value)}
+									>
+										{field.presentation === "cards" && <span className="ds-settings-choice-preview" data-index={index % 4} aria-hidden="true" />}
+										<span>{option.label}</span>
+									</button>
+							))}
+						</div>
+					) : field.control === "select" ? (
 						<select
 							{...props}
 							value={value}
@@ -251,6 +290,11 @@ function SettingsField({
 							checked={value === "true"}
 							onChange={(e) => change(String(e.target.checked))}
 						/>
+					) : field.control === "range" ? (
+						<div className="ds-settings-range">
+							<Input {...props} type="range" value={value} min={field.minimum} max={field.maximum} step={field.step} onChange={(e) => change(e.target.value)} />
+							<output htmlFor={prefix}>{value}</output>
+						</div>
 					) : (
 						<Input
 							{...props}
@@ -279,13 +323,11 @@ export function SettingsNavigation({
 	entries,
 	dirty,
 	onOpen,
-	onReview,
 }: {
 	title: string;
 	entries: SettingsLink[];
 	dirty: boolean;
 	onOpen: (id: string) => void;
-	onReview: () => void;
 }) {
 	const [search, setSearch] = useState("");
 	const matched = entries.filter((entry) =>
@@ -297,12 +339,10 @@ export function SettingsNavigation({
 				<CardTitle>{title}</CardTitle>
 			</CardHeader>
 			<CardContent>
-				<Input
-					aria-label="設定項目を探す"
-					placeholder="設定項目を探す"
-					value={search}
-					onChange={(event) => setSearch(event.target.value)}
-				/>
+				<div className="ds-settings-search">
+					<Search aria-hidden="true" size={19} />
+					<Input aria-label="設定項目を探す" placeholder="設定項目を探す" value={search} onChange={(event) => setSearch(event.target.value)} />
+				</div>
 				<nav aria-label="設定アーティファクト" className="ds-settings-groups">
 					{[...new Set(matched.map((entry) => entry.group))].map((group) => (
 						<section key={group}>
@@ -320,8 +360,9 @@ export function SettingsNavigation({
 										}
 										onClick={() => onOpen(entry.id)}
 									>
+										{entry.icon && (() => { const Icon = linkIcons[entry.icon]; return <Icon aria-hidden="true" size={21} />; })()}
 										{entry.label}
-										<span>{entry.enabled ? "›" : "移行前"}</span>
+										<span>{entry.enabled ? <ChevronRight aria-hidden="true" size={18} /> : "移行前"}</span>
 									</Button>
 								))}
 						</section>
@@ -334,9 +375,6 @@ export function SettingsNavigation({
 					<output>
 						{dirty ? "未適用の変更があります" : "すべての変更を保存済み"}
 					</output>
-					<Button variant="secondary" onClick={onReview}>
-						変更一覧を開く
-					</Button>
 				</footer>
 			</CardContent>
 		</Card>
@@ -368,6 +406,7 @@ export function SettingsChanges({
 				<CardTitle>{title}</CardTitle>
 			</CardHeader>
 			<CardContent>
+				<h3 className="ds-settings-change-count">未適用の変更 {rows.length}件</h3>
 				<p className="ds-settings-hint">
 					この一覧の設定変更をまとめて適用します。辞書や記憶の個別操作は含みません。
 				</p>

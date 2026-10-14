@@ -246,6 +246,8 @@ export const documentFieldV1 = z.strictObject({
 	/** Shown under the detail disclosure. */
 	detail: z.boolean().optional(),
 	control: z.enum(["text", "select", "toggle", "range", "number", "multiple"]),
+	/** A visual treatment for registered select choices; values and validation are unchanged. */
+	presentation: z.enum(["segmented", "cards"]).optional(),
 	options: z
 		.array(
 			z.strictObject({
@@ -421,6 +423,20 @@ export const artifactDefinitionV1 = z
 		launcher: z
 			.strictObject({
 				label: z.string().min(1).max(80),
+				icon: z
+					.enum([
+						"conversation",
+						"voice",
+						"display",
+						"connections",
+						"external",
+						"memory",
+						"dictionary",
+						"checks",
+						"records",
+						"world",
+					])
+					.optional(),
 				/** Shown with the entry inside a hub screen. */
 				description: z.string().max(200).optional(),
 				/**

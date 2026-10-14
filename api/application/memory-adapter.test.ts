@@ -425,7 +425,7 @@ test("the memory bundle runs through the action ledger: a stale row is a conflic
 		registry,
 		scope: "test-scope",
 	});
-	const revisionId = "artifact:settings.memory@1";
+	const revisionId = "artifact:settings.memory@2";
 	expect(ledger.artifacts().map((a) => a.artifactRevisionId)).toContain(
 		revisionId,
 	);

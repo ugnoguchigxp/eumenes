@@ -316,15 +316,66 @@ export function parseRequest(value: unknown): ArtifactRequest {
 		throw new Error("未登録の表示です");
 	return viewRegistry[value.view as View].schema.parse(value);
 }
-export const layoutSchema = z.strictObject({
-	view: z.literal("layout"),
-	direction: z.enum(["stack", "grid"]).default("stack"),
-	title,
-	children: z
-		.array(z.union(Object.values(viewRegistry).map((v) => v.schema)))
-		.min(1)
-		.max(12),
-});
+export const layoutSchema = z
+	.strictObject({
+		view: z.literal("layout"),
+		direction: z
+			.enum(["stack", "grid", "tabs", "form-preview"])
+			.default("stack"),
+		title,
+		draftSource: source.optional(),
+		tabs: z
+			.array(
+				z.strictObject({
+					label: z.string().min(1).max(80),
+					children: z.array(z.number().int().min(0).max(11)).min(1),
+				}),
+			)
+			.max(12)
+			.optional(),
+		children: z
+			.array(z.union(Object.values(viewRegistry).map((v) => v.schema)))
+			.min(1)
+			.max(12),
+	})
+	.superRefine((value, context) => {
+		if (
+			value.draftSource &&
+			(value.direction !== "tabs" ||
+				!value.children.some(
+					(child) =>
+						child.view === "settings-section" &&
+						child.source === value.draftSource,
+				))
+		)
+			context.addIssue({
+				code: "custom",
+				message: "draftSource must name a settings section in tabs",
+			});
+		if (
+			value.direction === "form-preview" &&
+			(value.children.length !== 2 ||
+				value.children[0]?.view !== "settings-section" ||
+				value.children[1]?.view !== "subtitle-preview")
+		)
+			context.addIssue({
+				code: "custom",
+				message:
+					"form-preview requires a settings section and subtitle preview",
+			});
+		if (!value.tabs) return;
+		const indexes = value.tabs.flatMap((tab) => tab.children);
+		if (
+			value.direction !== "tabs" ||
+			indexes.length !== value.children.length ||
+			new Set(indexes).size !== value.children.length ||
+			indexes.some((index) => index >= value.children.length)
+		)
+			context.addIssue({
+				code: "custom",
+				message: "tabs must contain each child exactly once",
+			});
+	});
 export type ArtifactDefinition = ArtifactRequest | z.infer<typeof layoutSchema>;
 export function parseDocument(value: unknown): ArtifactDefinition {
 	if (

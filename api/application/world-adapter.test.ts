@@ -448,7 +448,7 @@ test("the World bundle runs through the action ledger", async () => {
 		registry,
 		scope: "test-scope",
 	});
-	const revisionId = "artifact:settings.world@1";
+	const revisionId = "artifact:settings.world@2";
 	expect(ledger.artifacts().map((a) => a.artifactRevisionId)).toContain(
 		revisionId,
 	);

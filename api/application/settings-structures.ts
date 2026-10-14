@@ -62,7 +62,7 @@ const addConnection = z
 					!c.model &&
 					c.contextWindow === undefined &&
 					c.voice === undefined &&
-					c.assign === undefined,
+					!c.assign,
 		{ message: "resource" },
 	);
 const deleteConnection = z.strictObject({ connectionId: id });

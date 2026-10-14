@@ -63,7 +63,7 @@
 		{
 			"kind": "artifact",
 			"id": "settings.conversation",
-			"revision": 2,
+			"revision": 3,
 			"title": "会話の設定",
 			"variants": [
 				{
@@ -117,6 +117,7 @@
 				}
 			],
 			"launcher": {
+				"icon": "conversation",
 				"label": "会話",
 				"group": "使い方を変える",
 				"order": 10,
@@ -172,7 +173,7 @@
 		{
 			"kind": "artifact",
 			"id": "settings.ai-connections",
-			"revision": 4,
+			"revision": 5,
 			"title": "AIと接続",
 			"variants": [
 				{
@@ -180,7 +181,12 @@
 					"label": "標準",
 					"definition": {
 						"view": "layout",
-						"direction": "stack",
+						"direction": "tabs",
+						"draftSource": "settings-ai",
+						"tabs": [
+							{ "label": "利用するAI", "children": [0] },
+							{ "label": "登録した接続", "children": [1, 2, 3, 4] }
+						],
 						"title": "AIと接続",
 						"children": [
 							{
@@ -412,6 +418,7 @@
 				}
 			],
 			"launcher": {
+				"icon": "connections",
 				"label": "AIと接続",
 				"group": "使い方を変える",
 				"order": 15,
@@ -1021,7 +1028,7 @@
 		{
 			"kind": "artifact",
 			"id": "settings.voice-input",
-			"revision": 2,
+			"revision": 3,
 			"title": "音声と入力",
 			"variants": [
 				{
@@ -1094,6 +1101,7 @@
 				}
 			],
 			"launcher": {
+				"icon": "voice",
 				"label": "音声と入力",
 				"group": "使い方を変える",
 				"order": 20,
@@ -1348,7 +1356,7 @@
 		{
 			"kind": "artifact",
 			"id": "settings.display",
-			"revision": 2,
+			"revision": 3,
 			"title": "表示",
 			"variants": [
 				{
@@ -1356,7 +1364,7 @@
 					"label": "標準",
 					"definition": {
 						"view": "layout",
-						"direction": "stack",
+						"direction": "form-preview",
 						"title": "表示の設定",
 						"children": [
 							{
@@ -1419,6 +1427,7 @@
 				}
 			],
 			"launcher": {
+				"icon": "display",
 				"label": "表示",
 				"group": "使い方を変える",
 				"order": 30,
@@ -1426,31 +1435,12 @@
 			},
 			"fields": [
 				{
-					"fieldId": "appearance.background",
-					"document": "document:settings@1",
-					"path": "$.general.background",
-					"label": "会話の背景",
-					"control": "select",
-					"defaultValue": "light-fairy",
-					"help": "保存すると会話画面の背景を切り替えます。Spatialの状態表示は、実際の機器の計測値にはまだ対応していません。",
-					"options": [
-						{
-							"value": "light-fairy",
-							"label": "光の妖精"
-						},
-						{
-							"value": "spatial",
-							"label": "Spatial"
-						}
-					],
-					"unset": "delete-key"
-				},
-				{
 					"fieldId": "appearance.theme",
 					"document": "document:settings@1",
 					"path": "$.general.theme",
 					"label": "テーマ",
 					"control": "select",
+					"presentation": "segmented",
 					"options": [
 						{
 							"value": "system",
@@ -1465,6 +1455,27 @@
 							"label": "ダーク"
 						}
 					]
+				},
+				{
+					"fieldId": "appearance.background",
+					"document": "document:settings@1",
+					"path": "$.general.background",
+					"label": "会話の背景",
+					"control": "select",
+					"presentation": "cards",
+					"defaultValue": "light-fairy",
+					"help": "保存すると会話画面の背景を切り替えます。Spatialの状態表示は、実際の機器の計測値にはまだ対応していません。",
+					"options": [
+						{
+							"value": "light-fairy",
+							"label": "光の妖精"
+						},
+						{
+							"value": "spatial",
+							"label": "Spatial"
+						}
+					],
+					"unset": "delete-key"
 				},
 				{
 					"fieldId": "appearance.subtitle-enabled",
@@ -1525,7 +1536,7 @@
 		{
 			"kind": "artifact",
 			"id": "settings.external-work",
-			"revision": 2,
+			"revision": 3,
 			"title": "外部作業",
 			"variants": [
 				{
@@ -1579,6 +1590,7 @@
 				}
 			],
 			"launcher": {
+				"icon": "external",
 				"label": "外部作業",
 				"group": "使い方を変える",
 				"order": 25,
@@ -1650,7 +1662,7 @@
 		{
 			"kind": "artifact",
 			"id": "settings.records",
-			"revision": 2,
+			"revision": 3,
 			"title": "記録",
 			"variants": [
 				{
@@ -1732,6 +1744,7 @@
 				}
 			],
 			"launcher": {
+				"icon": "records",
 				"label": "記録",
 				"group": "管理と確認",
 				"order": 40,

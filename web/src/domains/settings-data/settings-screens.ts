@@ -167,6 +167,7 @@ export function buildInputs({
 							: field.label,
 					...(field.help ? { help: field.help } : {}),
 					control: field.control,
+					...(field.presentation ? { presentation: field.presentation } : {}),
 					value: field.confidential
 						? SECRET_MASK.repeat(
 								view.secrets.find(
@@ -370,6 +371,7 @@ export function buildSnapshot({
 						return {
 							id: target.id,
 							label: entry ? entryLabel(entry) : target.id,
+							...(entry?.launcher?.icon ? { icon: entry.launcher.icon } : {}),
 							...(entry?.launcher?.description
 								? { description: entry.launcher.description }
 								: {}),

@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
 	SettingsSection,
 	SettingsNavigation,
 	SettingsChanges,
+	SettingsDraftBar,
 } from "@eumenes/design-system";
 import type { ArtifactRequest, ArtifactEvent } from "./contracts";
 import type {
@@ -12,10 +13,10 @@ import type {
 } from "./settings-contracts";
 import { useArtifactRuntime } from "./runtime";
 
-function useSettingsAction(request: ArtifactRequest) {
+function useSettingsAction(request: ArtifactRequest | string) {
 	const runtime = useArtifactRuntime();
 	const [message, setMessage] = useState("");
-	const source = request.source!;
+	const source = typeof request === "string" ? request : request.source!;
 	function send(
 		action: ArtifactEvent["action"],
 		values: ArtifactEvent["values"] = {},
@@ -35,7 +36,15 @@ function useSettingsAction(request: ArtifactRequest) {
 	}
 	return { resource: runtime.snapshot[source], send, message };
 }
-export function SettingsSectionView({ request }: { request: ArtifactRequest }) {
+export function SettingsSectionView({
+	request,
+	supplement,
+	hideFooter,
+}: {
+	request: ArtifactRequest;
+	supplement?: ReactNode;
+	hideFooter?: boolean;
+}) {
 	const action = useSettingsAction(request);
 	const resource = action.resource as SettingsSectionResource;
 	return (
@@ -51,6 +60,8 @@ export function SettingsSectionView({ request }: { request: ArtifactRequest }) {
 				busy={resource.busy}
 				blocked={resource.blocked}
 				message={resource.message}
+				supplement={supplement}
+				hideFooter={hideFooter}
 				onChange={(id, value) =>
 					action.send("settings-edit", { fieldId: id, value })
 				}
@@ -58,6 +69,22 @@ export function SettingsSectionView({ request }: { request: ArtifactRequest }) {
 				onApply={() => action.send("settings-apply")}
 			/>
 			<output>{action.message}</output>
+		</>
+	);
+}
+export function SettingsDraftBarView({ source }: { source: string }) {
+	const action = useSettingsAction(source);
+	const resource = action.resource as SettingsSectionResource;
+	return (
+		<>
+			<SettingsDraftBar
+				dirty={resource.dirty}
+				busy={resource.busy}
+				blocked={resource.blocked}
+				onApply={() => action.send("settings-apply")}
+				onReview={() => action.send("settings-review")}
+			/>
+			<output aria-live="polite">{action.message || resource.message}</output>
 		</>
 	);
 }
@@ -75,7 +102,6 @@ export function SettingsNavigationView({
 				entries={resource.entries}
 				dirty={resource.dirty}
 				onOpen={(id) => action.send("settings-open", { id })}
-				onReview={() => action.send("settings-review")}
 			/>
 			<output>{action.message}</output>
 		</>

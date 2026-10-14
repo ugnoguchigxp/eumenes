@@ -217,8 +217,7 @@ test("the hub shows a pending draft of any screen it opens, never 'all saved' ov
 	fireEvent.click(screen.getByText("開く:hub"));
 	await screen.findByText("未適用の変更があります");
 	expect(screen.queryByText("すべての変更を保存済み")).toBeNull();
-	fireEvent.click(screen.getByRole("button", { name: "変更一覧を開く" }));
-	await screen.findByText("会話 / 口調");
+	expect(screen.queryByRole("button", { name: "変更一覧を開く" })).toBeNull();
 	expect(backend.sent).toHaveLength(0);
 });
 

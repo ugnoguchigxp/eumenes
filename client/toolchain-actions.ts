@@ -87,6 +87,20 @@ const launcherEntry = z
 		launcher: z
 			.looseObject({
 				label: z.string().min(1),
+				icon: z
+					.enum([
+						"conversation",
+						"voice",
+						"display",
+						"connections",
+						"external",
+						"memory",
+						"dictionary",
+						"checks",
+						"records",
+						"world",
+					])
+					.optional(),
 				description: z.string().optional(),
 				group: z.string().optional(),
 				order: z.number().int().optional(),

@@ -61,6 +61,7 @@ async function openFromHub(page: Page, label: string) {
 
 type Request = import("@playwright/test").APIRequestContext;
 const CONFLICT = /状態が変わりました/;
+const DOTS = "Codexへの委任";
 
 async function dictionary(request: Request) {
 	const response = await request.get(
@@ -107,14 +108,10 @@ function nextAction(page: Page) {
 
 test("hub lists the P3 screens", async ({ page }) => {
 	await openHub(page);
-	for (const name of [
-		"読み方辞書",
-		"記憶",
-		"World",
-		"Codexへの委任",
-		"動作確認",
-	])
-		await expect(page.getByRole("button", { name, exact: true })).toBeVisible();
+	for (const name of ["読み方辞書", "記憶", "World", DOTS, "動作確認"])
+		await expect(
+			page.getByRole("button", { name, exact: true }).last(),
+		).toBeVisible();
 });
 
 test("dictionary: create, edit, delete, and every conflict is shown", async ({
@@ -186,6 +183,9 @@ test("dictionary: create, edit, delete, and every conflict is shown", async ({
 	await page.getByRole("button", { name: "実行する" }).click();
 	expect((await (await answered).json()).errorCode).toBe("revision_conflict");
 	expect(await dictionary(request)).toHaveLength(1);
+	// The dialog stays open with the refusal; closing it shows the list read again.
+	await expect(page.getByRole("dialog").getByText(CONFLICT)).toBeVisible();
+	await page.getByRole("button", { name: "やめる" }).click();
 	await expect(page.getByRole("cell", { name: "ほか" })).toBeVisible();
 	await page.getByRole("button", { name: "削除: 今日" }).click();
 	answered = nextAction(page);
@@ -200,7 +200,7 @@ const panel = (page: Page) =>
 
 test("dots: creating a connection shows the token once", async ({ page }) => {
 	await openHub(page);
-	await openFromHub(page, "Codexへの委任");
+	await openFromHub(page, DOTS);
 	const form = page.getByRole("form", { name: "接続を作成" });
 	await form.getByLabel(/^名前（必須）/).fill("ローカルdots");
 	const answered = nextAction(page);
@@ -224,7 +224,7 @@ test("dots: creating a connection shows the token once", async ({ page }) => {
 	expect(stored).not.toContain(token);
 	// The list survives a reload without ever offering the value again.
 	await openHub(page);
-	await openFromHub(page, "Codexへの委任");
+	await openFromHub(page, DOTS);
 	await expect(
 		panel(page).getByRole("cell", { name: "ローカルdots", exact: true }),
 	).toBeVisible();
@@ -244,11 +244,13 @@ test("memory: sections are listed and the connection can be cut and restored", a
 		"傾向",
 		"最近の活動・メモ（短期）",
 		"いまの文脈",
-		"記憶の履歴",
 	])
 		await expect(
 			screen.getByText(title, { exact: true }).first(),
 		).toBeVisible();
+	await screen.getByRole("tab", { name: "記憶の履歴" }).click();
+	await expect(screen.getByText("記憶の履歴", { exact: true }).last()).toBeVisible();
+	await screen.getByRole("tab", { name: "会話で使う記憶" }).click();
 	await expect(
 		screen.getByRole("cell", { name: "接続中", exact: true }),
 	).toBeVisible();

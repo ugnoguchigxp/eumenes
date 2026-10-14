@@ -28,13 +28,15 @@ const f = createFixture();
 const webPort = await f.port();
 const origin = `http://127.0.0.1:${webPort}`;
 process.env.EUMENES_ORIGIN = origin;
+const music = musicFixture();
 const h = await harness({
 	model: {
-		...musicFixture().model,
+		...music.model,
 		answer: async () => {
 			throw new Error("LLM must not run");
 		},
 	},
+	musicGateway: music.gateway,
 });
 let phase: "generating" | "completed" = "generating";
 let libraryMode = false;

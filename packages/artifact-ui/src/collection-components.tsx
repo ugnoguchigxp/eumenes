@@ -294,7 +294,10 @@ export function CollectionWorkspaceView({
 			: []),
 	];
 	return (
-		<section className="aui-stack" aria-label={data.title ?? request.title}>
+		<section
+			className="aui-stack aui-collection-workspace"
+			aria-label={data.title ?? request.title}
+		>
 			{request.title && <h3>{request.title}</h3>}
 			{data.description && <p>{data.description}</p>}
 			{data.paging ? (
@@ -371,7 +374,10 @@ export function CollectionWorkspaceView({
 					}}
 				/>
 			)}
-			<output aria-live="polite">{action.message || data.message}</output>
+			{/* A dialog shows its own refusal; it is not repeated outside. */}
+			<output aria-live="polite">
+				{(editing || pending) && failed ? "" : action.message || data.message}
+			</output>
 			<Modal
 				open={!!editing}
 				onOpenChange={(open) => {

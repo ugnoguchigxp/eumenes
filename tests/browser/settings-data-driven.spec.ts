@@ -193,6 +193,9 @@ test("display previews the subtitle before saving", async ({
 	const before = await savedSettings(request);
 	await openHub(page);
 	await openFromHub(page, "表示");
+	await page.getByRole("group", { name: "テーマ" }).getByRole("button", { name: "ダーク" }).click();
+	await expect(page.getByRole("group", { name: "テーマ" }).getByRole("button", { name: "ダーク" })).toHaveAttribute("aria-pressed", "true");
+	await page.getByRole("group", { name: "会話の背景" }).getByRole("button", { name: "Spatial" }).click();
 	await page.getByLabel("字幕のデザイン").selectOption("classic");
 	await page.getByLabel("字幕の大きさ").selectOption("xlarge");
 	const subtitle = page.getByTestId("subtitle");
@@ -344,6 +347,7 @@ test("AIと接続: a connection added from the list form carries its key apart, 
 	const name = `追加した接続-${Date.now()}`;
 	await openHub(page);
 	await openFromHub(page, "AIと接続");
+	await page.getByRole("tab", { name: "登録した接続" }).click();
 	const form = page.getByRole("form", { name: "クラウドAPIを登録" });
 	await form.getByLabel("接続名").fill(name);
 	await form.getByLabel("APIのベースURL").fill("https://example.test/v1");

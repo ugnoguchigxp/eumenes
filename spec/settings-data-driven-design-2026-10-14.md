@@ -49,7 +49,7 @@ adapterが所有する「文書」（設定ではsettings文書）の項目を�
 ### 2.3 共通下書き（Web）
 
 - 共通hostに文書ごとの下書きストアを置く（Workspace全体で一つ、`client.identity` で分ける）。複数のartifactが同じ文書の項目を表示しても同じ下書きを編集する。
-- `settings-edit` は項目IDで下書きへ反映（ローカル、項目schemaで検証）。`settings-review` は変更一覧artifactを開く。`settings-apply` は下書きを凍結して書込み操作として送る（受付台帳を通る）。`settings-discard` は下書きを破棄。
+- `settings-edit` は項目IDで下書きへ反映（ローカル、項目schemaで検証）。`settings-review` は変更一覧artifactを開く（各設定画面だけが持つ。Hub には置かない）。`settings-apply` は下書きを凍結して書込み操作として送る（受付台帳を通る）。`settings-discard` は下書きを破棄。
 - 適用成功で送った変更だけを下書きから外し、適用中の追加入力は残す。`revision_conflict` は下書きを保持して最新との差を示し、自動再送しない。同じ論理操作の再送は同じeventId。
 - 変更一覧の行は登録項目の保存値と下書き値の比較から作る。秘密は件数だけ。
 
@@ -163,3 +163,24 @@ adapterが所有する「文書」（設定ではsettings文書）の項目を�
 ### 10.4 予約画面は作らない（2026-10-14 利用者判断）
 
 予約（scheduler）の設定画面は新版の計画から外した。現行の `#settings` にある予約カテゴリは、現行版の削除とともに無くなる（scheduler domain自体と、会話からの時刻指定の起動は変えない）。
+
+## 11. P2・P3 の実装記録（2026-10-14）
+
+- 実装: §10 の契約（構造操作・collection・行入力の写像・行編集フォーム・`refreshWhile`・`collectionV1.description`）、settings（構造操作）・inference・tts-dictionary・memory・world・dots・service-tests の各adapter、bundle（`settings-ai-connections`・`settings-external-work` を `settings.bundle.json` に、辞書・記憶・World・Codexへの委任・動作確認を個別bundleに）。
+- 独立レビュー1回（high 1・medium 4・low数件）を受け、1回の修正パスで対応した。
+  - 行操作の guard を、フォーム・確認を開いた時点の行の digest から作り、現在の行と違えば conflict にする（high）。
+  - 秘密は非空のときだけ鍵を要求し、APIキー削除は `keys[].delete` で送る。変更一覧には件数だけ出す。
+  - 接続確認の取消は commit 後に `cancelling` を確かめてから中断する。接続と最初のモデルを一度に登録できる（モデル無しの接続だけの登録も可）。
+  - `requiresCleanDraft`、media 列（同一originの `/api/` だけ、押したときだけ取得）、必須selectの空選択肢、新しいエラーコードの文言、`refreshWhile` の連続読込失敗での停止。
+  - Codexへの委任に「委任した作業」（tasks の一覧と開始・停止・回答・忘却）。tasks サービスは toolchain の後に作られるため、host が遅延参照で渡す。
+  - Hub の「変更一覧を開く」は操作が定義されていなかったため削除した（変更一覧は各設定画面から開く）。
+- 確認（fixture）: 型検査0件、`verify --domain` を capabilities・tool-runtime・settings・inference・tts-dictionary・memory・world・dots・tasks・service-tests・artifact で実行し失敗0件、Web・client vitest 497件、bundle検査（settingsの6 bundle）、ブラウザ P3 6/6、`settings-data-driven` 7/8。
+- 未通過: `settings-data-driven` の「一覧フォームから接続を追加」は、並行作業で AIと接続 がタブ配置（rev5）に変わり、保存ボタンが「利用するAI」タブにしか無いため失敗する。並行作業側で試験と配置を合わせる。
+- 未確認: 実LARMでの接続確認と取消、実Codexでの委任作業、動作確認の実行。
+
+## 12. P4（新旧比較と seed 確認）の記録（2026-10-14）
+
+- fresh DB: fixture server と `toolchain:bundle check` で全bundleが登録され、ブラウザで Hub から全画面を開けることを確認した。
+- upgrade DB: 製品DBの複製（鍵は複製せず、確認後に削除）へ seed を当て、設定の13画面がすべて新revision（hub@4・conversation@3・ai-connections@5・voice-input@3・display@3・external-work@3・changes@2・records@3・dictionary@2・memory@2・world@2・dots@3・service-tests@3）へ切り替わることを確認した。同じ seed で他の作業中の `music-screen.bundle.json` が `revision_conflict` で skip された（設定とは無関係）。
+- 現行 `#settings` に残り、新版に無いもの: 動作確認の WAV アップロード、委任作業の Session一覧・報告の根拠・リマインド、接続種類ごとの既定値やヒント、辞書のまとめ保存、World の scope 選択、dots の one-time token を失ったときの再発行、予約（作らない、§10.4）。
+- 削除の判断は利用者が行う。削除する場合は §8 の再利用コードを先に移す。

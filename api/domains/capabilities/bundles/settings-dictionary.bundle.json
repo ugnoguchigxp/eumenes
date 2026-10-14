@@ -8,7 +8,7 @@
 		{
 			"kind": "artifact",
 			"id": "settings.dictionary",
-			"revision": 1,
+			"revision": 2,
 			"title": "読み方辞書",
 			"defaultVariant": "standard",
 			"variants": [
@@ -133,6 +133,7 @@
 				}
 			],
 			"launcher": {
+				"icon": "dictionary",
 				"label": "読み方辞書",
 				"group": "管理と確認",
 				"order": 50,

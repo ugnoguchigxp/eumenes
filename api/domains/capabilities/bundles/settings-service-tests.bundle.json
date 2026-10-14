@@ -8,7 +8,7 @@
 		{
 			"kind": "artifact",
 			"id": "settings.service-tests",
-			"revision": 2,
+			"revision": 3,
 			"title": "動作確認",
 			"variants": [
 				{
@@ -145,6 +145,7 @@
 				}
 			],
 			"launcher": {
+				"icon": "checks",
 				"label": "動作確認",
 				"group": "管理と確認",
 				"order": 70,

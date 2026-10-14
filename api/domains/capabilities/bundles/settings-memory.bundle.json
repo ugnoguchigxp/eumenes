@@ -8,7 +8,7 @@
 		{
 			"kind": "artifact",
 			"id": "settings.memory",
-			"revision": 1,
+			"revision": 2,
 			"title": "記憶",
 			"variants": [
 				{
@@ -16,7 +16,11 @@
 					"label": "標準",
 					"definition": {
 						"view": "layout",
-						"direction": "stack",
+						"direction": "tabs",
+						"tabs": [
+							{ "label": "会話で使う記憶", "children": [0, 1, 2, 3, 4] },
+							{ "label": "記憶の履歴", "children": [5] }
+						],
 						"title": "記憶",
 						"children": [
 							{
@@ -484,6 +488,7 @@
 				}
 			],
 			"launcher": {
+				"icon": "memory",
 				"label": "記憶",
 				"group": "管理と確認",
 				"order": 80,

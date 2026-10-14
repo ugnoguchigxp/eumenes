@@ -8,7 +8,7 @@
 		{
 			"kind": "artifact",
 			"id": "settings.world",
-			"revision": 1,
+			"revision": 2,
 			"title": "World",
 			"variants": [
 				{
@@ -313,6 +313,7 @@
 				}
 			],
 			"launcher": {
+				"icon": "world",
 				"label": "World",
 				"group": "管理と確認",
 				"order": 90,

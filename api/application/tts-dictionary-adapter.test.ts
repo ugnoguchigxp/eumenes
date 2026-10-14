@@ -244,7 +244,7 @@ test("the registered bundle saves and deletes through the action ledger", async 
 			eventCreatedAt: new Date(now).toISOString(),
 			eventExpiresAt: new Date(now + 60_000).toISOString(),
 			artifactId: "tab-1",
-			artifactRevisionId: "artifact:settings.dictionary@1",
+			artifactRevisionId: "artifact:settings.dictionary@2",
 			source: "dictionary-entries",
 			sourceRevision: 0,
 			actionId,
