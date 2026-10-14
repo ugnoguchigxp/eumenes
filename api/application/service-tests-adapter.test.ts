@@ -16,7 +16,6 @@ import {
 } from "../domains/tool-runtime";
 import { openStore, type SqliteStore } from "../infrastructure/sqlite";
 import { migrations } from "./migrations";
-import { describeDotsAdapter, DOTS_ADAPTER_REF } from "./dots-adapter";
 import {
 	createServiceTestsAdapter,
 	describeServiceTestsAdapter,
@@ -55,7 +54,6 @@ const ARTIFACT = `artifact:${artifact.id}@${artifact.revision}`;
 const host = () =>
 	bundleHostOf([
 		...hostAdapterDescriptions,
-		{ ref: DOTS_ADAPTER_REF, describe: describeDotsAdapter },
 		{ ref: SERVICE_TESTS_ADAPTER_REF, describe: describeServiceTestsAdapter },
 	]);
 

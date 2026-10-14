@@ -1,0 +1,67 @@
+{
+	"id": "language",
+	"label": "言語判定",
+	"kind": "language",
+	"category": "provider",
+	"sample": true,
+	"pointCount": 2484,
+	"stride": 8,
+	"binary": "language.bin",
+	"shape": {
+		"name": "three-direction-routing-branch",
+		"description": "A substantial common stem separates into exactly three light bundles. The center branch goes rearward in 3D, so oblique views retain three distinct ends.",
+		"topology": "one trunk, three terminal branches",
+		"components": 4,
+		"silhouette": "A forked three-route tree with an explicit junction, never a three-petal loop.",
+		"rootAxis": "+Z",
+		"label": "三方向の分岐"
+	},
+	"motion": {
+		"type": "selected-branch-routing",
+		"phaseMeaning": "0→0.28 follows the common trunk from bottom to junction; 0.28→1 follows each branch from junction to its endpoint. group 0 is common trunk; groups 1–3 are selectable destinations.",
+		"groupMeaning": {
+			"0": "shared trunk",
+			"1": "left branch",
+			"2": "rear-center branch",
+			"3": "right branch"
+		},
+		"cyclesPerSecond": 0.22,
+		"pulseWidth": 0.12,
+		"baseBrightness": 0.62,
+		"peakBrightness": 1.0,
+		"maxDisplacement": 0.004,
+		"restPoseRequired": true,
+		"deterministic": true,
+		"rules": [
+			"Animate brightness on anchored coordinates; never integrate particle positions over time.",
+			"Keep all structural points visible when idle, offline, or at zero activity.",
+			"Health selects one uniform color for the whole object; group is never a color category.",
+			"Use bounded, modulo-wrapped time. Activity changes speed and pulse amplitude, not the silhouette.",
+			"Reduced motion uses the rest coordinates and constant per-point weight."
+		],
+		"suggestion": "Brighten the trunk and one selected branch in sequence. Keep the other branches at base brightness so the three-direction identity never disappears.",
+		"selectedGroupRange": [1, 3]
+	},
+	"normalizationRadius": 1.45776207,
+	"bounds": {
+		"min": [-1.0069563388824463, -0.2985208332538605, -1.1200000047683716],
+		"max": [1.006836175918579, 0.5582196712493896, 1.1190458536148071]
+	},
+	"attributes": ["x", "y", "z", "phase", "group", "seed", "size", "weight"],
+	"coordinateSystem": "right-handed, Z-up",
+	"binaryFormat": "little-endian float32",
+	"version": "1.0.0",
+	"groups": [0, 1, 2, 3],
+	"sha256": "59fb38564f4649da083b7c0c8ad4afd610ff65822319f11fbb61b0128ffd33c9",
+	"provenance": "Approved monitoring-galaxy point-cloud form study; final deterministic provider geometry.",
+	"rendering": {
+		"primitive": "points",
+		"solidSurfaces": false,
+		"suggestedPixelSize": 1.35,
+		"additiveGlow": "restrained",
+		"sameColorAcrossAllPoints": true,
+		"recommendedMinimumObjectPixels": 64,
+		"doNotRandomizePositionsPerFrame": true,
+		"seedUsage": "Stable visual variation only; never make silhouette depend on seed or elapsed time."
+	}
+}

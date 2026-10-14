@@ -1,4 +1,4 @@
-import type { Pose } from "./motions";
+import type { Pose } from "./clips";
 
 const tau = Math.PI * 2;
 const ease = (value: number) => value * value * (3 - 2 * value);
@@ -10,8 +10,9 @@ function blink(time: number, at: number) {
 		? ease(elapsed / 0.12)
 		: 1 - ease((elapsed - 0.12) / 0.24);
 }
-const wave = (t: number, period: number, phase = 0) =>
-	Math.sin((t * tau) / period + phase);
+/** `lag` seconds delay the wave; it starts at rest so the static frame stays neutral. */
+const wave = (t: number, period: number, lag = 0) =>
+	Math.sin((Math.max(0, t - lag) * tau) / period);
 
 /**
  * Breathing, floating, slow sways, wing and flame drift and blinks from the display
@@ -32,11 +33,11 @@ export function sampleIdlePose(time: number, blinkWeight = 1): Pose {
 		"head.y": wave(t, 12) * 0.055,
 		"head.z": wave(t, 10) * 0.02,
 		"tail_01.z": wave(t, 7.5) * 0.03,
-		"tail_02.z": wave(t, 7.5, 0.9) * 0.05,
-		"tail_03.z": wave(t, 7.5, 1.8) * 0.07,
+		"tail_02.z": wave(t, 7.5, 1.1) * 0.05,
+		"tail_03.z": wave(t, 7.5, 2.2) * 0.07,
 		"tail_02.x": wave(t, 9.5) * 0.03,
 		"crown_02.z": wave(t, 5.5) * 0.06,
-		"crown_03.z": wave(t, 5.5, 0.8) * 0.09,
+		"crown_03.z": wave(t, 5.5, 0.7) * 0.09,
 		"light.energy": breath * 0.012 + 0.05,
 	};
 	if (close && blinkWeight > 0) pose["eyes.close"] = close * blinkWeight;
@@ -45,7 +46,7 @@ export function sampleIdlePose(time: number, blinkWeight = 1): Pose {
 		["outer", 0.035, 0],
 		["inner", 0.025, 0.6],
 	] as const) {
-		const swing = wave(t, 8, -delay) * amount;
+		const swing = wave(t, 8, delay) * amount;
 		pose[`arm_${layer}_l_02.z`] = swing;
 		pose[`arm_${layer}_r_02.z`] = -swing;
 		pose[`arm_${layer}_l_03.z`] = swing * 1.4;
@@ -55,15 +56,23 @@ export function sampleIdlePose(time: number, blinkWeight = 1): Pose {
 }
 
 /** Slow wandering gaze with brief saccades; the head turns partly toward the viewer. */
-export function sampleGazePose(time: number, bodyYaw: number, weight = 1): Pose {
+export function sampleGazePose(
+	time: number,
+	bodyYaw: number,
+	weight = 1,
+): Pose {
 	const t = Math.max(0, time);
 	const hold = 1.7,
 		k = Math.floor(t / hold),
 		local = t - k * hold;
-	const target = (n: number) => [
-		(Math.sin(n * 12.9898) * 43758.5453) % 1,
-		(Math.sin(n * 78.233) * 12543.1234) % 1,
-	];
+	// The first hold looks straight ahead, so the static frame stays neutral.
+	const target = (n: number) =>
+		n <= 0
+			? [0, 0]
+			: [
+					(Math.sin(n * 12.9898) * 43758.5453) % 1,
+					(Math.sin(n * 78.233) * 12543.1234) % 1,
+				];
 	const [ax, ay] = target(k - 1),
 		[bx, by] = target(k);
 	const s = ease(Math.min(1, local / 0.14));

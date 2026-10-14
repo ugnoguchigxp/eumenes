@@ -1,0 +1,72 @@
+{
+	"id": "asr",
+	"label": "ASR",
+	"kind": "asr",
+	"category": "provider",
+	"sample": true,
+	"pointCount": 2463,
+	"stride": 8,
+	"binary": "asr.bin",
+	"shape": {
+		"name": "receptive-point-bowl",
+		"description": "Open upward-facing parabolic bowl with an unmistakable doubled lip, curved bottom, nine meridians, and six inward receiving paths.",
+		"topology": "open bowl cage with convergent routes",
+		"components": 9,
+		"silhouette": "A concave receiver with visible floor and lip, never a sequence of free-standing wave rings.",
+		"openingAxis": "+Z",
+		"label": "音を集める椀"
+	},
+	"motion": {
+		"type": "bowl-convergence",
+		"phaseMeaning": "On incoming routes: 0 at their high outer ends →1 at bowl floor. On bowl traces: 0.36 at rim →1 toward floor. Rim phase is fixed at 0.36.",
+		"groupMeaning": {
+			"0": "bowl latitude traces",
+			"1": "bowl meridians",
+			"2": "mouth rim",
+			"3": "incoming route 1",
+			"4": "incoming route 2",
+			"5": "incoming route 3",
+			"6": "incoming route 4",
+			"7": "incoming route 5",
+			"8": "incoming route 6"
+		},
+		"cyclesPerSecond": 0.19,
+		"pulseWidth": 0.14,
+		"baseBrightness": 0.62,
+		"peakBrightness": 1.0,
+		"maxDisplacement": 0.005,
+		"restPoseRequired": true,
+		"deterministic": true,
+		"rules": [
+			"Animate brightness on anchored coordinates; never integrate particle positions over time.",
+			"Keep all structural points visible when idle, offline, or at zero activity.",
+			"Health selects one uniform color for the whole object; group is never a color category.",
+			"Use bounded, modulo-wrapped time. Activity changes speed and pulse amplitude, not the silhouette.",
+			"Reduced motion uses the rest coordinates and constant per-point weight."
+		],
+		"flowAxis": "inward and downward, +Z mouth to −Z floor",
+		"suggestion": "A brightness packet descends the six receive paths and converges along the bowl toward its floor. Let the floor softly accumulate light, without extinguishing the rim."
+	},
+	"normalizationRadius": 1.35092563,
+	"bounds": {
+		"min": [-1.0099999904632568, -1.0113682746887207, -0.7697226405143738],
+		"max": [1.0180000066757202, 1.0113682746887207, 1.1100000143051147]
+	},
+	"attributes": ["x", "y", "z", "phase", "group", "seed", "size", "weight"],
+	"coordinateSystem": "right-handed, Z-up",
+	"binaryFormat": "little-endian float32",
+	"version": "1.0.0",
+	"groups": [0, 1, 2, 3, 4, 5, 6, 7, 8],
+	"sha256": "241af8e872b61025c61fff45073b979d05f165878f83ad9ccc3ea9e4a7b0c344",
+	"provenance": "Approved monitoring-galaxy point-cloud form study; final deterministic provider geometry.",
+	"rendering": {
+		"primitive": "points",
+		"solidSurfaces": false,
+		"suggestedPixelSize": 1.35,
+		"additiveGlow": "restrained",
+		"sameColorAcrossAllPoints": true,
+		"recommendedMinimumObjectPixels": 64,
+		"doNotRandomizePositionsPerFrame": true,
+		"seedUsage": "Stable visual variation only; never make silhouette depend on seed or elapsed time."
+	}
+}

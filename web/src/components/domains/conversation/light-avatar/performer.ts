@@ -9,7 +9,7 @@ import {
 	wrapSpin,
 	type Motion,
 	type Pose,
-} from "./motions";
+} from "./clips";
 import { motionById, motionsIn } from "./motions/index";
 
 export type AvatarLayers = {
@@ -43,7 +43,9 @@ function createGestureSchedule() {
 			gesture,
 		};
 	};
-	return (time: number): { motion: Motion; local: number; seed: number } | null => {
+	return (
+		time: number,
+	): { motion: Motion; local: number; seed: number } | null => {
 		if (!gestures.length) return null;
 		if (time < cache.start) cache = { index: 0, start: 14, gesture: 0 };
 		for (let n = next(cache); n.start <= time; n = next(cache)) cache = n;
@@ -68,6 +70,8 @@ export function createPerformer() {
 		idleWeight = 1,
 		lastTime = 0,
 		plays = 0,
+		/** Per motion: the last (cue, round) seen and how many clips have started. */
+		starts = new Map<string, { key: string; count: number }>(),
 		choice: MotionChoice = {},
 		current = { variant: "", label: "" };
 	function clip(id: string, elapsed: number, loop: boolean, seed: number) {
@@ -79,8 +83,12 @@ export function createPerformer() {
 		const rate = choice.rate ?? (forced >= 0 ? 1 : variantRate(seed));
 		const t = Math.max(0, elapsed) * rate;
 		const round = loop ? Math.floor(t / motion.duration) : 0;
+		// Count clip starts per motion, so consecutive plays (cues or loop rounds) never repeat.
+		const key = `${seed}:${round}`;
+		const started = starts.get(id) ?? { key: "", count: -1 };
+		if (started.key !== key) starts.set(id, { key, count: started.count + 1 });
 		const index =
-			forced >= 0 ? forced : variantIndex(motion, seed * 7 + round);
+			forced >= 0 ? forced : variantIndex(motion, starts.get(id)!.count);
 		const variant = motion.variants[index]!;
 		const local = loop ? t - round * motion.duration : t;
 		return {

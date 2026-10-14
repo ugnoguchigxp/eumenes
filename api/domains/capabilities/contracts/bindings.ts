@@ -289,6 +289,8 @@ export const formFieldV1 = z.strictObject({
 		"secret",
 		"upload",
 	]),
+	/** A select option is stored as text by HTML; convert declared numeric values before dispatch. */
+	valueType: z.literal("number").optional(),
 	/** Show this field only for rows with one of these registered values. */
 	when: z
 		.strictObject({
@@ -469,6 +471,8 @@ export const artifactDefinitionV1 = z
 			.optional(),
 		/** Registered fields of adapter documents shown by this artifact. */
 		fields: z.array(documentFieldV1).max(128).optional(),
+		/** Shared drafts read by actions on this screen, without editing the document here. */
+		draftDependencies: z.array(hostRef("document")).max(8).optional(),
 		/** Registered list editors over adapter queries (see collectionV1). */
 		collections: z.array(collectionV1).max(8).optional(),
 	})

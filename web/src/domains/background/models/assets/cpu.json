@@ -1,0 +1,32 @@
+{
+	"id": "cpu",
+	"label": "CPU",
+	"kind": "cpu",
+	"category": "host",
+	"sample": true,
+	"pointCount": 4096,
+	"stride": 8,
+	"binary": "cpu.bin",
+	"shape": "渦巻粒子銀河",
+	"motion": "常回転。CPU使用率に応じて回転と微細波動が強まる。healthは独立。",
+	"normalizationRadius": 3.3805274630946536,
+	"bounds": {
+		"min": [-3.1706159114837646, -3.187525510787964, -0.5384815335273743],
+		"max": [3.091222047805786, 3.226442813873291, 0.4999224543571472]
+	},
+	"attributes": ["x", "y", "z", "phase", "group", "seed", "size", "weight"],
+	"coordinateSystem": "right-handed Z-up",
+	"sizeMeaning": "CPU original world-space particle radius; renderer should scale separately",
+	"sizeRange": [0.004736893344670534, 0.04049764946103096],
+	"groups": {
+		"0": "主腕",
+		"1": "副腕",
+		"2": "円盤",
+		"3": "中心",
+		"4": "ハロー",
+		"5": "明るい点"
+	},
+	"phaseMeaning": "元座標の方位角/2π",
+	"operationalDataConnected": false,
+	"source": "CPU 4096 v3 coordinates preserved exactly"
+}

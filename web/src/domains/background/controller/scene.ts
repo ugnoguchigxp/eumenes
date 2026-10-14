@@ -1,6 +1,4 @@
 import {
-	AmbientLight,
-	DirectionalLight,
 	OrthographicCamera,
 	Scene,
 	SRGBColorSpace,
@@ -12,40 +10,50 @@ import type {
 	SpatialModel,
 	SpatialModels,
 } from "../contracts";
-import { spatialModels } from "../models";
+import {
+	defaultSpatialOptions,
+	normalizeOptions,
+	type SpatialOptions,
+	activityStrength,
+} from "../options";
 import { createPlaceholder } from "../models/placeholder";
+import { createCameraController } from "./camera";
 
-/** One WebGL context for the background; models own only their local objects. */
+/** One context, one loop, immutable point buffers; the scene owns layout separately from model motion. */
 export function createSpatialScene(
 	host: HTMLElement,
 	initialItems: readonly SpatialItem[],
 	options: {
 		models?: SpatialModels;
+		settings?: Partial<SpatialOptions>;
 		onStatus: (status: SceneStatus) => void;
 	},
 ) {
 	const renderer = new WebGLRenderer({
 		alpha: true,
-		antialias: true,
+		antialias: false,
 		powerPreference: "low-power",
 	});
 	const scene = new Scene();
-	const camera = new OrthographicCamera(-4, 4, 4, -4, 0.1, 100);
-	camera.position.set(0, 0, 10);
-	const light = new DirectionalLight(0xffffff, 2);
-	light.position.set(3, 5, 8);
-	scene.add(new AmbientLight(0xffffff, 1.5), light);
-	const models = options.models ?? spatialModels;
+	const camera = new OrthographicCamera(-15, 15, 15, -15, 0.1, 100);
+	const view = createCameraController(camera);
+	const models = options.models ?? {};
 	const entries = new Map<string, { item: SpatialItem; model: SpatialModel }>();
 	const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
+	let settings = normalizeOptions(options.settings ?? defaultSpatialOptions);
 	let selected: string | null = null;
+	let retainedFocus: string | null = null;
 	let frame = 0,
 		epoch = 0,
 		lastFrame = 0,
-		previousTime = 0;
+		previousTime = 0,
+		orbit = 0,
+		seconds = 0;
 	let disposed = false;
 	let observer: ResizeObserver | undefined;
 	let status: SceneStatus | undefined;
+	const reduced = () => settings.reducedMotion || preference.matches;
+	const motionEnabled = () => !settings.paused && !reduced();
 	function notify(next: SceneStatus) {
 		if (status === next) return;
 		status = next;
@@ -56,13 +64,14 @@ export function createSpatialScene(
 		cancelAnimationFrame(frame);
 		frame = 0;
 		previousTime = 0;
+		lastFrame = 0;
 	}
 	function release(model: SpatialModel) {
 		scene.remove(model.object);
 		try {
 			model.dispose();
 		} catch {
-			// A broken model cannot prevent the other models/context being released.
+			/* Other models still need to be released. */
 		}
 	}
 	function dispose() {
@@ -90,33 +99,84 @@ export function createSpatialScene(
 		event.preventDefault();
 		fail();
 	}
-	function draw() {
-		if (!disposed && !document.hidden) renderer.render(scene, camera);
+	function place() {
+		for (const { item, model } of entries.values()) {
+			if (!item.orbit) model.object.position.set(...item.position);
+			else {
+				const angle = item.orbit.phase + orbit * (item.orbit.speed ?? 1);
+				model.object.position.set(
+					Math.cos(angle) * item.orbit.radius,
+					Math.sin(angle) * item.orbit.radius,
+					item.position[2],
+				);
+			}
+		}
+	}
+	function draw(dt = 0) {
+		if (disposed || document.hidden) return;
+		place();
+		let extent = 2.5;
+		for (const { item } of entries.values())
+			extent = Math.max(
+				extent,
+				item.orbit?.radius ?? Math.max(...item.position.map(Math.abs)),
+			);
+		const focus = selected
+			? entries.get(selected)?.model.object.position
+			: undefined;
+		const blend = view.update(dt, settings, focus, extent, reduced());
+		for (const { item, model } of entries.values())
+			model.configure?.(
+				settings,
+				settings.core +
+					((retainedFocus === item.id ? settings.focusCore : settings.core) -
+						settings.core) *
+						view.focusAmount,
+				motionEnabled(),
+				!selected || selected === item.id ? 1 : 1 - 0.85 * blend,
+			);
+		renderer.render(scene, camera);
 	}
 	function moving(item: SpatialItem) {
+		return activityStrength(item.state) > 0;
+	}
+	function needsLoop() {
 		return (
-			item.state.activity !== "idle" &&
-			!item.state.stale &&
-			!["disconnected", "unknown"].includes(item.state.health)
+			view.pending ||
+			(motionEnabled() &&
+				[...entries.values()].some(
+					({ item, model }) =>
+						(item.orbit && settings.orbitSpeed > 0) ||
+						(model.animate &&
+							(moving(item) || (model.configure && settings.spinSpeed > 0))),
+				))
 		);
 	}
 	function tick(time: number, generation: number) {
 		if (disposed || generation !== epoch) return;
-		if (time - lastFrame >= 1000 / 24) {
+		if (time - lastFrame >= 1000 / 30) {
 			try {
 				const delta = previousTime
-					? Math.min((time - previousTime) / 1000, 0.1)
+					? Math.min((time - previousTime) / 1000, 0.05)
 					: 0;
 				previousTime = lastFrame = time;
-				for (const { item, model } of entries.values())
-					if (moving(item)) model.animate?.(time / 1000, delta);
-				draw();
+				if (motionEnabled()) {
+					seconds = (seconds + delta) % 3600;
+					orbit =
+						(orbit + ((0.075 * settings.orbitSpeed) / 100) * delta) %
+						(Math.PI * 8);
+					for (const { item, model } of entries.values())
+						if (moving(item) || model.configure)
+							model.animate?.(seconds, delta);
+				}
+				draw(delta);
 			} catch {
 				fail();
 			}
 		}
-		if (!disposed && generation === epoch)
+		if (!disposed && generation === epoch && needsLoop())
 			frame = requestAnimationFrame((next) => tick(next, generation));
+		else frame = 0;
 	}
 	function synchronize() {
 		if (disposed) return;
@@ -127,13 +187,8 @@ export function createSpatialScene(
 		}
 		try {
 			draw();
-			notify("ready");
-			if (
-				!preference.matches &&
-				[...entries.values()].some(
-					({ item, model }) => model.animate && moving(item),
-				)
-			) {
+			notify(settings.paused ? "paused" : "ready");
+			if (needsLoop()) {
 				const generation = epoch;
 				frame = requestAnimationFrame((time) => tick(time, generation));
 			}
@@ -144,19 +199,7 @@ export function createSpatialScene(
 	function resize() {
 		const { width, height } = host.getBoundingClientRect();
 		if (!width || !height || disposed) return;
-		const aspect = width / height;
-		let halfWidth = 2.5,
-			halfHeight = 2;
-		for (const { item } of entries.values()) {
-			halfWidth = Math.max(halfWidth, Math.abs(item.position[0]) + 1);
-			halfHeight = Math.max(halfHeight, Math.abs(item.position[1]) + 1);
-		}
-		halfHeight = Math.max(halfHeight, halfWidth / aspect);
-		camera.left = -halfHeight * aspect;
-		camera.right = halfHeight * aspect;
-		camera.top = halfHeight;
-		camera.bottom = -halfHeight;
-		camera.updateProjectionMatrix();
+		view.resize(width, height);
 		renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
 		renderer.setSize(width, height, false);
 	}
@@ -164,8 +207,13 @@ export function createSpatialScene(
 		if (new Set(items.map((item) => item.id)).size !== items.length)
 			throw new Error("duplicate_spatial_id");
 		if (
-			items.some((item) =>
-				item.position.some((value) => !Number.isFinite(value)),
+			items.some(
+				(item) =>
+					item.position.some((value) => !Number.isFinite(value)) ||
+					(item.orbit &&
+						[item.orbit.radius, item.orbit.phase, item.orbit.speed ?? 1].some(
+							(value) => !Number.isFinite(value),
+						)),
 			)
 		)
 			throw new Error("invalid_spatial_position");
@@ -175,6 +223,10 @@ export function createSpatialScene(
 				release(entry.model);
 				entries.delete(id);
 			}
+		if (selected && !ids.has(selected)) {
+			selected = null;
+			view.begin();
+		}
 		for (const item of items) {
 			let entry = entries.get(item.id);
 			if (entry && entry.item.model !== item.model) {
@@ -191,13 +243,12 @@ export function createSpatialScene(
 				scene.add(entry.model.object);
 			}
 			entry.item = item;
-			entry.model.object.position.set(...item.position);
 			entry.model.update(item.state, item.id === selected);
 		}
 	}
 	try {
 		renderer.outputColorSpace = SRGBColorSpace;
-		renderer.setClearColor(0x000000, 0);
+		renderer.setClearColor(0x0b1018, 1);
 		renderer.domElement.setAttribute("aria-hidden", "true");
 		host.append(renderer.domElement);
 		reconcile(initialItems);
@@ -231,12 +282,20 @@ export function createSpatialScene(
 				fail();
 			}
 		},
+		setOptions(next: Partial<SpatialOptions>) {
+			if (disposed) return;
+			settings = normalizeOptions(next);
+			view.begin();
+			synchronize();
+		},
 		select(id: string | null) {
 			if (disposed) return;
-			selected = id;
+			selected = id && entries.has(id) ? id : null;
+			if (selected) retainedFocus = selected;
+			view.begin();
 			try {
 				for (const { item, model } of entries.values())
-					model.update(item.state, item.id === id);
+					model.update(item.state, item.id === selected);
 				synchronize();
 			} catch {
 				fail();

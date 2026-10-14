@@ -1,0 +1,66 @@
+{
+	"id": "attitude",
+	"label": "態度判定",
+	"kind": "attitude",
+	"category": "provider",
+	"sample": true,
+	"pointCount": 2160,
+	"stride": 8,
+	"binary": "attitude.bin",
+	"shape": {
+		"name": "three-open-center-petals",
+		"description": "Three independent hollow teardrop petals, gently saddle-curved in depth, with separate inner bases and a clean central opening.",
+		"topology": "three separate closed petal loops, no crossings",
+		"components": 3,
+		"silhouette": "A three-leaf floral outline with open center; no woven crossings and no spherical envelope.",
+		"primaryPlane": "XZ",
+		"label": "三枚の花弁"
+	},
+	"motion": {
+		"type": "three-petal-pulse",
+		"phaseMeaning": "Each independent petal has phase 0 at its inner base, rising along both sides to phase 1 at the outer tip. group is the petal index.",
+		"groupMeaning": {
+			"0": "upper petal",
+			"1": "lower-right petal",
+			"2": "lower-left petal"
+		},
+		"cyclesPerSecond": 0.105,
+		"pulseWidth": 0.22,
+		"baseBrightness": 0.62,
+		"peakBrightness": 1.0,
+		"maxDisplacement": 0.006,
+		"restPoseRequired": true,
+		"deterministic": true,
+		"rules": [
+			"Animate brightness on anchored coordinates; never integrate particle positions over time.",
+			"Keep all structural points visible when idle, offline, or at zero activity.",
+			"Health selects one uniform color for the whole object; group is never a color category.",
+			"Use bounded, modulo-wrapped time. Activity changes speed and pulse amplitude, not the silhouette.",
+			"Reduced motion uses the rest coordinates and constant per-point weight."
+		],
+		"suggestion": "Pulse gently from the three inner bases toward the petal tips. Use a soft whole-petal envelope if needed; never turn this into a circulating knot. All three petal outlines remain visible.",
+		"groupPhaseOffsets": [0, 0.1, 0.2]
+	},
+	"normalizationRadius": 1.11417062,
+	"bounds": {
+		"min": [-1.0160903930664062, -0.20833858847618103, -0.7659366726875305],
+		"max": [1.016113042831421, 0.31337976455688477, 1.0999987125396729]
+	},
+	"attributes": ["x", "y", "z", "phase", "group", "seed", "size", "weight"],
+	"coordinateSystem": "right-handed, Z-up",
+	"binaryFormat": "little-endian float32",
+	"version": "1.0.0",
+	"groups": [0, 1, 2],
+	"sha256": "9472d61f3b1329c5a1137f12f9ed99797e3cddf69e6a106aeb1f52e5ed8b97d8",
+	"provenance": "Approved monitoring-galaxy point-cloud form study; final deterministic provider geometry.",
+	"rendering": {
+		"primitive": "points",
+		"solidSurfaces": false,
+		"suggestedPixelSize": 1.35,
+		"additiveGlow": "restrained",
+		"sameColorAcrossAllPoints": true,
+		"recommendedMinimumObjectPixels": 64,
+		"doNotRandomizePositionsPerFrame": true,
+		"seedUsage": "Stable visual variation only; never make silhouette depend on seed or elapsed time."
+	}
+}

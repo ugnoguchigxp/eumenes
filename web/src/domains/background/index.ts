@@ -6,3 +6,6 @@ export type {
 	SpatialModels,
 	SpatialState,
 } from "./contracts";
+
+export { defaultSpatialOptions } from "./options";
+export type { SpatialOptions } from "./options";

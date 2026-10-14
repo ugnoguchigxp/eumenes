@@ -1,0 +1,78 @@
+{
+	"id": "tts",
+	"label": "TTS",
+	"kind": "tts",
+	"category": "provider",
+	"sample": true,
+	"pointCount": 2460,
+	"stride": 8,
+	"binary": "tts.bin",
+	"shape": {
+		"name": "outbound-wave-ring-array",
+		"description": "Six entirely separated, gradually expanding point rings distributed along the horizontal X axis. No bowl, bottom, connecting skin, or interior spokes.",
+		"topology": "six disjoint circular wavefronts",
+		"components": 6,
+		"silhouette": "An outward wave train with large empty axial gaps; clear direction from small to large rings.",
+		"propagationAxis": "+X",
+		"label": "広がる波輪"
+	},
+	"motion": {
+		"type": "sequential-expanding-rings",
+		"phaseMeaning": "Discrete axial propagation phase: ring k has phase k/6. Points in the same ring brighten together; group is its exact ring index.",
+		"groupMeaning": {
+			"0": "wave ring 1, radius 0.120",
+			"1": "wave ring 2, radius 0.277",
+			"2": "wave ring 3, radius 0.434",
+			"3": "wave ring 4, radius 0.591",
+			"4": "wave ring 5, radius 0.748",
+			"5": "wave ring 6, radius 0.905"
+		},
+		"cyclesPerSecond": 0.23,
+		"pulseWidth": 0.12,
+		"baseBrightness": 0.62,
+		"peakBrightness": 1.0,
+		"maxDisplacement": 0.009,
+		"restPoseRequired": true,
+		"deterministic": true,
+		"rules": [
+			"Animate brightness on anchored coordinates; never integrate particle positions over time.",
+			"Keep all structural points visible when idle, offline, or at zero activity.",
+			"Health selects one uniform color for the whole object; group is never a color category.",
+			"Use bounded, modulo-wrapped time. Activity changes speed and pulse amplitude, not the silhouette.",
+			"Reduced motion uses the rest coordinates and constant per-point weight."
+		],
+		"flowAxis": "+X",
+		"suggestion": "Brighten the six rings in order from the tiny source to the largest wavefront. Optional radial breathing is at most 1.0%, relative to each ring's own center; never slide or merge rings.",
+		"radialBreathingFraction": 0.01,
+		"groupCenters": [
+			[-1.045, 0, 0],
+			[-0.6399999999999999, 0, 0],
+			[-0.23499999999999988, 0, 0],
+			[0.17000000000000015, 0, 0],
+			[0.5750000000000002, 0, 0],
+			[0.9800000000000004, 0, 0]
+		]
+	},
+	"normalizationRadius": 1.34294645,
+	"bounds": {
+		"min": [-1.0540000200271606, -0.9101696014404297, -0.9125584959983826],
+		"max": [0.9889898300170898, 0.9139999747276306, 0.9129867553710938]
+	},
+	"attributes": ["x", "y", "z", "phase", "group", "seed", "size", "weight"],
+	"coordinateSystem": "right-handed, Z-up",
+	"binaryFormat": "little-endian float32",
+	"version": "1.0.0",
+	"groups": [0, 1, 2, 3, 4, 5],
+	"sha256": "3f5e01ee4ee02cd90ab898b27ddc45bdb47d7e1522ef0c743357e686a31c99fe",
+	"provenance": "Approved monitoring-galaxy point-cloud form study; final deterministic provider geometry.",
+	"rendering": {
+		"primitive": "points",
+		"solidSurfaces": false,
+		"suggestedPixelSize": 1.35,
+		"additiveGlow": "restrained",
+		"sameColorAcrossAllPoints": true,
+		"recommendedMinimumObjectPixels": 64,
+		"doNotRandomizePositionsPerFrame": true,
+		"seedUsage": "Stable visual variation only; never make silhouette depend on seed or elapsed time."
+	}
+}

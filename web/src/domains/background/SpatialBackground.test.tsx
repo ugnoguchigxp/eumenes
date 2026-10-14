@@ -11,12 +11,18 @@ import { SpatialBackground } from "./SpatialBackground";
 import { createSpatialScene } from "./controller/scene";
 
 vi.mock("./controller/scene", () => ({ createSpatialScene: vi.fn() }));
+vi.mock("./models", () => ({ loadSpatialModels: vi.fn(async () => ({})) }));
 afterEach(() => {
 	cleanup();
 	vi.clearAllMocks();
 });
 function mockScene() {
-	const scene = { dispose: vi.fn(), select: vi.fn(), setItems: vi.fn() };
+	const scene = {
+		dispose: vi.fn(),
+		select: vi.fn(),
+		setItems: vi.fn(),
+		setOptions: vi.fn(),
+	};
 	vi.mocked(createSpatialScene).mockImplementation(
 		(_host, _items, { onStatus }) => {
 			onStatus("ready");

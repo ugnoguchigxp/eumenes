@@ -699,6 +699,19 @@
 .aui-service-guidance {
 	margin: 12px 0 20px;
 }
+.aui-service-notice {
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	padding: 12px 16px;
+	background: var(--card);
+}
+.aui-service-notice button {
+	color: var(--primary);
+	text-decoration: underline;
+}
+.aui-service-notice summary {
+	cursor: pointer;
+}
 .aui-service-health,
 .aui-service-active {
 	border: 1px solid var(--border);
@@ -729,6 +742,8 @@
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
+	flex-wrap: wrap;
+	gap: 12px;
 	border-color: var(--accent);
 }
 .aui-service-main {

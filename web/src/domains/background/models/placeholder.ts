@@ -6,6 +6,7 @@ import {
 	TorusGeometry,
 } from "three";
 import type { SpatialModel } from "../contracts";
+import { healthColors } from "../options";
 
 /** Temporary glyph, replaced through the registry when a Dots model is accepted. */
 export function createPlaceholder(): SpatialModel {
@@ -21,13 +22,7 @@ export function createPlaceholder(): SpatialModel {
 	const ring = new Mesh(ringGeometry, ringMaterial);
 	object.add(mesh, ring);
 	let disposed = false;
-	const colors = {
-		healthy: "#64cfa8",
-		pressure: "#e7b75b",
-		fault: "#e77a85",
-		disconnected: "#5f6c81",
-		unknown: "#8191ac",
-	};
+	const colors = healthColors;
 	return {
 		object,
 		update(state, selected) {

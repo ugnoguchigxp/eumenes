@@ -65,6 +65,9 @@ CREATE INDEX conversation_outbox_source ON conversation_outbox(source_id, seq);
 export const retractionMigration = `
 ALTER TABLE messages ADD COLUMN retracted_at TEXT;
 `;
+export const presentationMigration = `
+ALTER TABLE messages ADD COLUMN presentation TEXT NOT NULL DEFAULT 'conversation' CHECK(presentation IN ('conversation','artifact'));
+`;
 export type OutboxOptions = {
 	principal: string;
 	scopeKey: string;
@@ -84,6 +87,7 @@ export function outboxReady(db: Database): boolean {
 		.get();
 }
 const retractionColumn = new WeakMap<Database, boolean>();
+const presentationColumn = new WeakMap<Database, boolean>();
 /**
  * True once retractionMigration has been applied. Checked once per connection
  * (migrations only run when the store opens), so non-retraction reads keep
@@ -96,6 +100,17 @@ export function retractionReady(db: Database): boolean {
 			db.query("PRAGMA table_info(messages)").all() as Array<{ name: string }>
 		).some((column) => column.name === "retracted_at");
 		retractionColumn.set(db, ready);
+	}
+	return ready;
+}
+/** Older migration fixtures still read and write ordinary messages. */
+function presentationReady(db: Database): boolean {
+	let ready = presentationColumn.get(db);
+	if (ready === undefined) {
+		ready = (
+			db.query("PRAGMA table_info(messages)").all() as Array<{ name: string }>
+		).some((column) => column.name === "presentation");
+		presentationColumn.set(db, ready);
 	}
 	return ready;
 }
@@ -377,8 +392,13 @@ export function appendMessage(
 	// A retracted id never comes back with different content.
 	if (outbox && latestEvent(db, message.id)?.kind === "retracted")
 		throw new Error("message_retracted");
+	const ready = presentationReady(db);
+	if (!ready && message.presentation === "artifact")
+		throw new Error("message_presentation_unavailable");
 	db.query(
-		"INSERT INTO messages (id, conversation_id, role, text, created_at, run_id) VALUES (?, ?, ?, ?, ?, ?)",
+		ready
+			? "INSERT INTO messages (id, conversation_id, role, text, created_at, run_id, presentation) VALUES (?, ?, ?, ?, ?, ?, ?)"
+			: "INSERT INTO messages (id, conversation_id, role, text, created_at, run_id) VALUES (?, ?, ?, ?, ?, ?)",
 	).run(
 		message.id,
 		message.conversationId,
@@ -386,6 +406,7 @@ export function appendMessage(
 		message.text,
 		message.createdAt,
 		message.runId,
+		...(ready ? [message.presentation ?? "conversation"] : []),
 	);
 	if (outbox && options)
 		insertEvent(db, options, {
@@ -405,11 +426,12 @@ type MessageRow = {
 	text: string;
 	created_at: string;
 	run_id: string | null;
+	presentation: "conversation" | "artifact";
 	motion: AvatarMotion | null;
 	delivery: string | null;
 };
 const messageSelect = (db: Database, where: string, columns = ""): string =>
-	`SELECT ${columns}m.id, m.conversation_id, m.role, m.text, m.created_at, m.run_id, a.motion, d.delivery FROM messages m LEFT JOIN answer_avatar_motions a ON a.run_id = m.run_id AND a.conversation_id = m.conversation_id AND m.role = 'assistant' LEFT JOIN answer_deliveries d ON d.run_id = m.run_id AND d.conversation_id = m.conversation_id AND m.role = 'assistant' WHERE ${where}${liveOnly(db, "m")}`;
+	`SELECT ${columns}m.id, m.conversation_id, m.role, m.text, m.created_at, m.run_id, ${presentationReady(db) ? "m.presentation" : "'conversation' AS presentation"}, a.motion, d.delivery FROM messages m LEFT JOIN answer_avatar_motions a ON a.run_id = m.run_id AND a.conversation_id = m.conversation_id AND m.role = 'assistant' LEFT JOIN answer_deliveries d ON d.run_id = m.run_id AND d.conversation_id = m.conversation_id AND m.role = 'assistant' WHERE ${where}${liveOnly(db, "m")}`;
 /** A stored delivery that no longer matches the schema is dropped, not fatal. */
 function safeDelivery(row: MessageRow): SpeechDelivery | undefined {
 	if (!row.delivery) return undefined;
@@ -432,6 +454,9 @@ function toMessage(row: MessageRow, db: Database): Message {
 		conversationId: row.conversation_id,
 		role: row.role,
 		text: row.text,
+		...(row.presentation === "artifact"
+			? { presentation: "artifact" as const }
+			: {}),
 		createdAt: row.created_at,
 		runId: row.run_id,
 		...(messageAttachments(db, row.id).length
@@ -568,7 +593,7 @@ export function getMessage(
 ): { message: Message; ordinal: number } | null {
 	const row = db
 		.query(
-			`SELECT m.rowid AS ordinal, m.id, m.conversation_id, m.role, m.text, m.created_at, m.run_id FROM messages m WHERE m.id = ?${liveOnly(db, "m")}`,
+			`SELECT m.rowid AS ordinal, m.id, m.conversation_id, m.role, m.text, m.created_at, m.run_id, ${presentationReady(db) ? "m.presentation" : "'conversation' AS presentation"} FROM messages m WHERE m.id = ?${liveOnly(db, "m")}`,
 		)
 		.get(id) as {
 		ordinal: number;
@@ -578,6 +603,7 @@ export function getMessage(
 		text: string;
 		created_at: string;
 		run_id: string | null;
+		presentation: "conversation" | "artifact";
 	} | null;
 	if (!row) return null;
 	return {
@@ -589,6 +615,9 @@ export function getMessage(
 			text: row.text,
 			createdAt: row.created_at,
 			runId: row.run_id,
+			...(row.presentation === "artifact"
+				? { presentation: "artifact" as const }
+				: {}),
 			...(messageAttachments(db, row.id).length
 				? { attachments: messageAttachments(db, row.id) }
 				: {}),
@@ -604,4 +633,9 @@ export const migrations: readonly Migration[] = [
 	{ id: "conversation/0004-outbox", sql: outboxMigration },
 	{ id: "conversation/0005-retraction", sql: retractionMigration },
 	attachmentsMigration,
+	{
+		id: "conversation/0007-presentation",
+		sql: presentationMigration,
+		after: ["conversation/0006-attachments"],
+	},
 ];

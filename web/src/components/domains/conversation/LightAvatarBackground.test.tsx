@@ -2,6 +2,7 @@ import { act, cleanup, render, waitFor } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import { LightAvatarBackground } from "./LightAvatarBackground";
 import { createLightAvatar } from "./light-avatar/model.js";
+import { setMotionLabOnScreen } from "./light-avatar/load";
 
 vi.mock("./light-avatar/model.js", () => ({ createLightAvatar: vi.fn() }));
 afterEach(() => {
@@ -46,6 +47,8 @@ test("a failed first static frame releases the model once and preserves its fail
 	vi.mocked(createLightAvatar).mockReturnValue({
 		canvas: document.createElement("canvas"),
 		beginMotion: vi.fn(),
+		setLayers: vi.fn(),
+		showSkeleton: vi.fn(),
 		resize: vi.fn(),
 		render: () => {
 			throw new Error("render failed");
@@ -71,6 +74,8 @@ test("hiding the tab pauses playback without rebuilding the model", async () => 
 	create.mockReturnValue({
 		canvas: document.createElement("canvas"),
 		beginMotion: vi.fn(),
+		setLayers: vi.fn(),
+		showSkeleton: vi.fn(),
 		resize: vi.fn(),
 		render: vi.fn(),
 		dispose,
@@ -117,6 +122,8 @@ function lostFixture() {
 		return {
 			canvas,
 			beginMotion: vi.fn(),
+			setLayers: vi.fn(),
+			showSkeleton: vi.fn(),
 			resize: vi.fn(),
 			render: vi.fn(),
 			dispose: vi.fn(),
@@ -192,4 +199,18 @@ test("unmounting while a rebuild is pending cancels it", async () => {
 	} finally {
 		vi.useRealTimers();
 	}
+});
+
+test("the background pauses while the settings motion lab is on screen", async () => {
+	const { create } = lostFixture();
+	const view = render(<LightAvatarBackground active />);
+	const state = () =>
+		view.container.firstElementChild?.getAttribute("data-avatar-state");
+	await waitFor(() => expect(state()).toBe("ready"));
+	act(() => setMotionLabOnScreen(true));
+	expect(state()).toBe("paused");
+	act(() => setMotionLabOnScreen(false));
+	expect(state()).toBe("ready");
+	// Pausing keeps the model: no second renderer is built.
+	expect(create).toHaveBeenCalledTimes(1);
 });

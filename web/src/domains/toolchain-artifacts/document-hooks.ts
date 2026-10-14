@@ -11,7 +11,7 @@ import { navigationTargets } from "./navigation";
 
 /** The documents an artifact shows fields of or applies drafts of. */
 export function documentsOf(artifact: ArtifactDefinitionV1): string[] {
-	const docs = new Set<string>();
+	const docs = new Set<string>(artifact.draftDependencies ?? []);
 	for (const field of artifact.fields ?? []) docs.add(field.document);
 	for (const action of artifact.actionBindings)
 		if (action.draftDocument) docs.add(action.draftDocument);

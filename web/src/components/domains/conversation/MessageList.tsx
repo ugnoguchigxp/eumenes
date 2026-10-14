@@ -68,7 +68,10 @@ export const MessageList = memo(function MessageList({
 		});
 	}, [conversation, lastAssistantId, lastAssistantText, streaming]);
 	const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-	const all = conversation?.messages ?? [];
+	const all =
+		conversation?.messages.filter(
+			(message) => message.presentation !== "artifact",
+		) ?? [];
 	const hidden = Math.max(0, all.length + (streaming ? 1 : 0) - visibleCount);
 	const visibleMessages = hidden ? all.slice(hidden) : all;
 	return (

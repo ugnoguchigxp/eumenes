@@ -36,6 +36,8 @@ export function createIntake(deps: DialogueDeps) {
 			if (
 				existing.conversationId !== input.conversationId ||
 				original?.text !== input.text ||
+				(original?.presentation ?? "conversation") !==
+					(input.presentation ?? "conversation") ||
 				JSON.stringify(original?.attachments?.map((a) => a.id) ?? []) !==
 					JSON.stringify(input.attachmentIds ?? []) ||
 				existing.utteranceId !== (input.utteranceId ?? null)
@@ -51,6 +53,7 @@ export function createIntake(deps: DialogueDeps) {
 			conversationId: input.conversationId,
 			role: "user",
 			text: input.text,
+			presentation: input.presentation ?? "conversation",
 			...(input.attachmentIds?.length
 				? {
 						attachments: conversation.attachmentsByIdsInTransaction(

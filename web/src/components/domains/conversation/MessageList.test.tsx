@@ -66,6 +66,36 @@ test("a result action stays inside the answer bubble and outside spoken text", (
 		expect.objectContaining({ text: "楽曲ができました。" }),
 	);
 });
+test("artifact control input stays available to the model but is absent from chat bubbles", () => {
+	const { container } = render(
+		<MessageList
+			conversation={{
+				id: "main",
+				revision: 1,
+				messages: [
+					{
+						...base,
+						id: "internal",
+						role: "user",
+						text: '{"prompt":"森","width":512}',
+						presentation: "artifact",
+					},
+					{
+						...base,
+						id: "answer",
+						role: "assistant",
+						text: "画像ができました。",
+					},
+				],
+			}}
+		/>,
+	);
+	expect(container.querySelector(".message-user")).toBeNull();
+	expect(container.querySelector(".message-assistant")?.textContent).toContain(
+		"画像ができました。",
+	);
+	expect(screen.queryByText(/width/)).toBeNull();
+});
 test("adopted emotion belongs beside the assistant name, preserves body and follows a custom name", () => {
 	const { container, rerender } = render(
 		<MessageList

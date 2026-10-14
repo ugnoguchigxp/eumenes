@@ -1,0 +1,121 @@
+$ bun scripts/verify.ts --domain capabilities
+[verify] selected=capabilities dependencyClosure=capabilities testClosure=capabilities
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts api/domains/capabilities
+size-budget ok (42 files)
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check api/domains/capabilities
+$ oxfmt --check api/domains/capabilities
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 5ms on 63 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint api/domains/capabilities
+$ oxlint --deny-warnings api/domains/capabilities
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun check -p /Users/y.noguchi/Code/eumenes/verification-reports/tsconfig.selected.json
+✓ No type errors in 60 files [100.08ms]
+[verify] TypeScript workspace closure: 60 files; api/infrastructure/flock.ts, api/infrastructure/logger.ts, api/infrastructure/sqlite, api/domains/capabilities, api/infrastructure/digest.ts, api/infrastructure/vector.ts, api/infrastructure/http.ts
+[verify] domain tests: /Users/y.noguchi/.bun/bin/bun run test:domain -- capabilities
+$ bun scripts/test-domain.ts capabilities
+bun test v1.4.3 (c6da4a4d3)
+
+api/domains/capabilities/test/prepare-learned.test.ts:
+(pass) C01 learned registration rejects conflicts, bad bundles and oversize; builtin hashes unchanged [20.30ms]
+(pass) C01 5000 learned definitions never enter FTS/alias/list and do not displace builtins [268.53ms]
+(pass) seed adds newer research rules and packages without touching old revisions [16.38ms]
+(pass) new research packages expose generic acquisition without topic-specific tools or skills [13.22ms]
+(pass) C02 prepare by ID keeps shared checks; independent registration does not disturb A; GC spares builtins/protected [16.04ms]
+
+api/domains/capabilities/test/requirement-schema.test.ts:
+(pass) enum values must also satisfy bounds and formats at every nested node [2.07ms]
+(pass) R04 unsupported keywords, incompatible keywords and resource limits reject before conversion [0.14ms]
+(pass) R05 standard schema conversion is strict and does not coerce, default or ignore fields [0.91ms]
+(pass) optional string bounds preserve explicit constraints and the overall value capacity [0.17ms]
+
+api/domains/capabilities/test/capabilities.test.ts:
+(pass) quick Web capability grants only lookup and read and preserves Luna tools [0.08ms]
+(pass) 5000 capability catalogue: bounded discovery, exact aliases, immutable revisions and owner isolation [4895.31ms]
+(pass) builtin SKILL is mandatory; disabling survives seed and dependency failure hides package [19.31ms]
+(pass) revoking a dependency permanently invalidates already issued candidates, even after re-enabling [13.97ms]
+(pass) builtin bundle upgrade preserves revision 1 fingerprints and activates a new revision for the larger input contract [14.42ms]
+(pass) deployed research skill v3 upgrades without a revision conflict and restart preserves hashes [28.04ms]
+(pass) seed still rejects a changed newest builtin revision [11.89ms]
+(pass) history and web catalogue selection can be enabled independently without editing archived revisions [19.55ms]
+
+api/domains/capabilities/test/timer-compatibility.test.ts:
+(pass) timer UI pausing keeps the deployed version 1 input schemas and accepts paused result state [1.11ms]
+(pass) the bound-command inputs accept exactly the shapes the UI and the questions send [0.47ms]
+
+api/domains/capabilities/test/music-versions.test.ts:
+(pass) installed V1 music definitions survive the V2 upgrade and repeated seeding [15.59ms]
+(pass) V1 keeps its schema while V2 enforces the verified integer duration and vocal fields [0.38ms]
+
+api/domains/capabilities/test/requirements.test.ts:
+(pass) profile validity compares instants with mixed fractional-second precision [0.85ms]
+(pass) R02/R03/R06 immutable profile revisions, CAS, independent catalogs and invalidation [16.31ms]
+
+api/domains/capabilities/test/learned.test.ts:
+
+api/domains/capabilities/test/image.test.ts:
+(pass) image seed is additive, repeatable and published with one flat request schema [14.84ms]
+
+api/domains/capabilities/test/bundles.test.ts:
+(pass) the shipped bundle's pin is the stored digest and its toolchain is data-driven [35.31ms]
+(pass) a bundle the host cannot run is skipped whole, and without a host nothing is added [40.86ms]
+(pass) old revisions keep their JSON and hash, and publication moves back and forth [28.78ms]
+(pass) rolling the pointer back to the unbound revision removes the chain from the offer until a bound revision is published [20.91ms]
+(pass) the dry run lists every problem and writes nothing [17.01ms]
+(pass) each kind of reference problem is refused [71.69ms]
+(pass) a failing toolchain rolls back its documents and keeps the published revision [14.03ms]
+(pass) documents are immutable: the same id with other content is a conflict, the same content a no-op [16.22ms]
+(pass) binding fields belong to toolchains only and need a matching binding [12.78ms]
+(pass) a bound tool is prepared with its own schema and only from an active package [17.30ms]
+(pass) stored schemas are served as validators; unknown and domain references are not [16.99ms]
+(pass) a bound toolchain is shown by its artifact registration: artifact is optional there, and unbound ones still need one [18.59ms]
+(pass) question schemas must be readable validators and the choice field one of their fields [24.83ms]
+(pass) an install already at revision 2 is upgraded to the latest, and revision 2 stays a valid rollback target [23.84ms]
+(pass) toolchain publication over HTTP is compare-and-set and can roll back [22.63ms]
+
+api/domains/capabilities/test/standalone-artifacts.test.ts:
+(pass) launcher artifacts are published without a toolchain, with the final entry shape [11.78ms]
+(pass) a newer revision switches the published pointer, an old one is a rollback, and re-import keeps the choice [13.03ms]
+(pass) fields are checked against the adapter that owns the document [8.89ms]
+(pass) a field id is unique across the whole published catalog, but a revision may keep its own [8.17ms]
+(pass) draft documents, navigation targets and apply operations must be registered [8.17ms]
+(pass) a refused bundle publishes nothing [10.23ms]
+(pass) a navigate-by-value map is checked for every target, and a default value stays display-only [11.41ms]
+(pass) a field must agree with what the document schema says about its path [10.91ms]
+(pass) confidential values travel only in declared input properties of every write that applies the document [10.01ms]
+(pass) source params schemas must resolve [11.90ms]
+(pass) revisions of one artifact id inside a bundle may carry the same fields [9.07ms]
+(pass) artifact publication over HTTP is compare-and-set [11.16ms]
+(pass) structure actions must be registered by the document's adapter with its input schema [9.37ms]
+(pass) collection sources, paging and row actions are checked against this artifact's bindings [9.22ms]
+(pass) row input keys must be top-level properties of the action's input, on write and structure actions only [8.27ms]
+(pass) the create form must match the action input and keep secrets declared [9.68ms]
+(pass) form options come from fixed values or a registered query of the source's adapter [8.28ms]
+(pass) a row edit form adds fields to the row-built input without overlapping it [8.63ms]
+(pass) form defaults fit their control, and refresh-while keeps to an existing source [11.72ms]
+(pass) structure actions can be row actions and create actions, and ids may be generated [12.08ms]
+(pass) a clean-draft requirement names a registered document that the artifact uses [12.25ms]
+
+api/domains/capabilities/test/json-schema-subset.test.ts:
+(pass) the finite subset becomes a strict validator with the stated bounds [0.82ms]
+(pass) anything outside the subset is refused with its path, never dropped [0.14ms]
+
+api/domains/capabilities/test/requirement-controller.test.ts:
+(pass) management API validates bodies, exposes CAS state and keeps requirement profiles out of executable catalog [9.81ms]
+
+ 63 pass
+ 0 fail
+ 700 expect() calls
+Ran 63 tests across 12 files. [6.10s]
+217 | 			"test:domain",
+218 | 			"--",
+219 | 			selected[0] ?? "",
+220 | 		]);
+221 | 	if (verificationRevision(root) !== startHash)
+222 | 		throw new Error("source changed during verification");
+                  ^
+error: source changed during verification
+      at /Users/y.noguchi/Code/eumenes/scripts/verify.ts:222:13
+
+error: script "verify" exited with code 1

@@ -86,7 +86,7 @@ profileは最大12要件・16 KiB、同時選択は4profile、合成後は12要�
 
 ## タイマーと音声
 
-タイマーは bundle 登録の `toolchain:timers.manage@3`（「タイマー（データドリブン）」）で、binding `binding:timers.command@2`（確認質問の回答schemaを宣言）と artifact `artifact:timers.workspace@1` を通じて登録 adapter `adapter:timers@1` が実行します（[登録手順](toolchain-extension.md#3-bundleだけで追加改訂する)）。
+タイマーは bundle 登録の `toolchain:timers.manage@4`（「タイマー」）で、binding `binding:timers.command@3`（確認質問の回答schemaを宣言）と artifact `artifact:timers.workspace@2` を通じて登録 adapter `adapter:timers@1` が実行します（[登録手順](toolchain-extension.md#3-bundleだけで追加改訂する)）。
 
 タイマーは権限・操作receiptを再検査したうえで、label、状態、残時間、期限を含む全itemsを回答モデルへ渡します。ページングされた一覧は `complete:false`、失敗は固定codeを含む構造化結果です。回答直前に状態をrefreshし、ユーザー本文を位置・内容検索で書き換えません。操作の再実行やホストでの定型文章化は行いません。
 

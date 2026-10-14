@@ -10,7 +10,28 @@ import {
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { ArtifactDefinitionV1 } from "../../../../api/domains/capabilities/contracts";
 import { createWebAdapterRegistry } from "./registry";
+import { parseForm } from "./collections";
 import { ToolchainArtifactHost } from "./ToolchainArtifactHost";
+
+test("a numeric select dispatches a number and rejects an unlisted choice", () => {
+	const fields = [
+		{
+			fieldId: "durationSeconds",
+			label: "長さ（秒）",
+			control: "select" as const,
+			valueType: "number" as const,
+			options: [
+				{ value: "5", label: "5秒" },
+				{ value: "10", label: "10秒" },
+			],
+		},
+	];
+	expect(parseForm(fields, { durationSeconds: "10" })).toEqual({
+		ok: true,
+		values: { durationSeconds: 10 },
+	});
+	expect(parseForm(fields, { durationSeconds: "7" }).ok).toBe(false);
+});
 
 const REV = "artifact:dictionary.screen@1";
 const DOC = "document:dictionary@1";

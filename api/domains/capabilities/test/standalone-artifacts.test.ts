@@ -920,10 +920,14 @@ const listing = (
 		collection?: Record<string, unknown>;
 		actions?: unknown[];
 		sources?: boolean;
+		draftDependencies?: string[];
 	} = {},
 ) =>
 	artifact("a", 1, {
 		fields: [],
+		...(over.draftDependencies
+			? { draftDependencies: over.draftDependencies }
+			: {}),
 		sourceBindings: artifact("a", 1).sourceBindings.map((s) =>
 			s.source === "notes-items" && over.sources !== false
 				? { ...s, paramsSchemaRef: "builtin:emptyInput" }
@@ -1346,6 +1350,12 @@ test("a clean-draft requirement names a registered document that the artifact us
 		]);
 		// Registered by an adapter but not used by this artifact.
 		expect(await clean("document:other@1")).toEqual([`invalid_format:${at}`]);
+		// A read-only dependency lets an action wait for another document's draft.
+		expect(
+			await clean("document:other@1", {
+				draftDependencies: ["document:other@1"],
+			}),
+		).toEqual([]);
 		// A registered field counts as use, without any draft action.
 		const field = {
 			...(artifact("x", 1).fields![0] as object),

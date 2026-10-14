@@ -1,0 +1,26 @@
+{
+	"id": "ssd",
+	"label": "SSD",
+	"kind": "ssd",
+	"category": "host",
+	"sample": true,
+	"pointCount": 1908,
+	"stride": 8,
+	"binary": "ssd.bin",
+	"shape": "離れた三層の四角い光棚",
+	"motion": "棚の形は固定。読書き活動は層を走る光。空き容量とI/Oは詳細値で区別。",
+	"normalizationRadius": 1.6,
+	"bounds": {
+		"min": [-0.95, -0.68, -0.65],
+		"max": [0.95, 0.68, 0.65]
+	},
+	"attributes": ["x", "y", "z", "phase", "group", "seed", "size", "weight"],
+	"coordinateSystem": "right-handed Z-up",
+	"groups": {
+		"0": "下層",
+		"1": "中層",
+		"2": "上層"
+	},
+	"phaseMeaning": "各部材に沿う光の移動位相。healthの推定には使わない。",
+	"operationalDataConnected": false
+}

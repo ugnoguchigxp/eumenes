@@ -59,6 +59,16 @@ export const settingsMessages: Record<string, string> = {
 };
 
 const groupInfo = (s: Settings): Record<string, SettingsFieldGroup> => ({
+	appearance: { id: "appearance", label: "背景とテーマ" },
+	subtitles: { id: "subtitles", label: "字幕" },
+	particles: { id: "particles", label: "粒子" },
+	motion: { id: "motion", label: "動き" },
+	state: {
+		id: "state",
+		label: "状態プレビュー",
+		description:
+			"実測取得経路は未接続です。デモ値は実際の状態や導入済みProviderを表しません。",
+	},
 	speech: {
 		id: "speech",
 		label: "読み上げ",
@@ -93,6 +103,8 @@ export function sectionDescription(fields: readonly RegisteredField[]) {
 		first.startsWith("$.general.persona")
 	)
 		return "名前と口調を設定します。変更は適用後、次の返答から反映されます。";
+	if (fields.some((f) => f.path.startsWith("$.general.spatial")))
+		return "背景・字幕・Spatialの粒子と動きをタブで調整します。変更は保存後に会話の背景へ反映します。状態プレビューは実測値ではありません。";
 	if (fields.some((f) => f.path === "$.general.theme"))
 		return "会話の背景、テーマ、読み上げ字幕を設定します。背景とテーマは保存後に反映します。字幕の見本は編集中の値を表示します。";
 	if (

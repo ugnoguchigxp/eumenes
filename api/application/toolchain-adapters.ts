@@ -22,7 +22,6 @@ import {
 	describeTtsDictionaryAdapter,
 	TTS_DICTIONARY_ADAPTER_REF,
 } from "./tts-dictionary-adapter";
-import { describeDotsAdapter, DOTS_ADAPTER_REF } from "./dots-adapter";
 import { describeMemoryAdapter, MEMORY_ADAPTER_REF } from "./memory-adapter";
 import { describeWorldAdapter, WORLD_ADAPTER_REF } from "./world-adapter";
 import {
@@ -102,7 +101,6 @@ export const hostAdapterDescriptions: Array<
 	{ ref: MEMORY_ADAPTER_REF, describe: describeMemoryAdapter },
 	{ ref: WORLD_ADAPTER_REF, describe: describeWorldAdapter },
 	{ ref: SERVICE_TESTS_ADAPTER_REF, describe: describeServiceTestsAdapter },
-	{ ref: DOTS_ADAPTER_REF, describe: describeDotsAdapter },
 ];
 
 /** The bundle host as if every adapter were registered (see `hostAdapterDescriptions`). */

@@ -1,6 +1,6 @@
 # 光の精霊 ボーン導入とアニメーション拡充 計画
 
-作成日: 2026-10-14。状態: **計画**（未実装）。
+作成日: 2026-10-14。状態: **実装済み・fixture検証済み**（実機GPUでの目視確認は未実施）。実施結果と計画からの変更は [§12](#12-実施結果2026-10-14)。
 
 対象: 会話画面の背景に出す光の精霊（`web/src/components/domains/conversation/light-avatar/`）と、設定の「表示」画面（`settings.display` artifact）。
 
@@ -226,3 +226,28 @@ P0→P1 の結果を見て、P1 の難所（粒子と線のスキニング）が
 - 音声の振幅入力そのものと、音声の pause/resume への追従（現行も未実装）。
 - 新しい感情の種類の追加（会話側の判定の変更を伴うため）。
 - 試験タブでの動作の編集・保存（姿勢エディタ）。
+
+## 12. 実施結果（2026-10-14）
+
+### 計画からの変更
+
+| 計画 | 実装 | 理由 |
+| --- | --- | --- |
+| 描画一式を `packages/design-system` へ移す（§3・§7） | 描画器は `web/.../light-avatar/` に残し、design-system には試写画面の部品 `LightSpiritLab`（操作と表示だけ）を置いた。artifact-ui の `avatar-motion-lab` は host が `ArtifactRuntime.hostViews` で渡す描画を置くだけ | three.js を design-system の dist に同梱せず、web の dynamic import（初回表示に含めない）を保つため |
+| ボーン25本（§4） | 29本（`core` と腕先 `tip` を独立ボーンにした） | 光の核と腕先の光をボーンの子として付け、揺れの追従の終端にも使うため |
+| `AnimationMixer` で層を重ねる（§5） | 自前の sampler（Catmull-Rom 接線の3次Hermite）と加算合成 | 鏡映、累積角の `spin`、発話中の振り向きへの変換、静止姿勢の検査を一つの形式で扱うため |
+| 速度を ±10% 揺らす（§5） | 0〜15% 速める側だけ | 遅くすると、8秒で待機へ戻るときにクリップが静止姿勢の前で切れるため |
+| 動作データに `loop` 項目 | 持たない | 繰り返しは発話中の再生と試写の「繰り返す」で決まるため |
+| 発話中は `spin` の振幅を半分（§5.2） | 発話中は1回転を `0.35·sin(spin/2)` の振り向きに変える | 振幅を半分にすると半回転で止まり、後ろを向いたままになるため |
+| `settings.display` revision 4（§6.1） | revision 5（`settings.spatial.bundle.json` に追加） | 作業中に別作業が revision 4（Spatial の項目）を登録済みだったため。revision 4 は登録内容のまま残した |
+| `direction: "form-preview"` を tabs の `arrangement` へ移す | `tabs[].arrangement: "form-preview"` を追加し、`direction: "form-preview"` も残した | revision 4 が `direction: "form-preview"` を使っているため |
+| 腕先の光の尾 | 腕先の直近8点を1つの Points で描き、腕先が動いたときだけ見える | 描画呼び出しを1回に抑えるため |
+
+このほか、試写タブが画面に出ている間は会話背景の精霊を一時停止する（`load.ts` の共有状態。背景は model を保持したまま `paused`）。カメラは跳ね・回転の余白のため 7.7→8.5（縦長 8.6→9.5）へ引いた。
+
+### 検証結果
+
+- fixture（単体）: `light-avatar`（動作データ検査・鏡映・瞬き・変化版の非連続・クロスフェード・発話中の振り向き・発話の繰り返し境界・待機中の仕草）、`LightAvatarBackground`（試写中の一時停止を含む）、`LightAvatarMotionLab`（画面外では描画器を作らない・再生・変化版・層・解放・WebGL2非対応）、design-system `LightSpiritLab`、artifact-ui の tabs `arrangement` 検査と host view。
+- `bun run verify -- --domain` conversation・avatar・capabilities・settings は通過。artifact は既存の `service-test-components.tsx` の関数行数予算（別作業の変更）で size-budget が止まるため、`bun run test:domain -- artifact` を個別に実行して通過。
+- ブラウザE2E（fixture）: `tests/browser/settings-data-driven.spec.ts`（10件、アニメーションタブの再生・変化版・切替で canvas 解放・設定に書き込まないことを含む）と `tests/browser/backgrounds.spec.ts` が通過。
+- 目視: Playwright（SwiftShader）で状態・感情・発話・待機中の仕草の各変化版を静止画で確認し、跳ね・回転・腕の開きで精霊が canvas に収まることを確認した。実機GPUでの動きとfpsは未確認。

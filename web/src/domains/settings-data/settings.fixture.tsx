@@ -484,11 +484,17 @@ export const settingsArtifacts: Record<string, ArtifactDefinitionV1> = {
 		...base("display", "表示", "使い方を変える", "背景 テーマ 字幕"),
 		variants: variant({
 			view: "layout",
-			direction: "stack",
+			direction: "tabs",
+			draftSource: "settings-display",
 			title: "表示の設定",
+			tabs: [
+				{ label: "表示", children: [0, 1], arrangement: "form-preview" },
+				{ label: "アニメーション", children: [2] },
+			],
 			children: [
 				{ view: "settings-section", source: "settings-display", title: "表示" },
 				{ view: "subtitle-preview", source: "settings-display-preview" },
+				{ view: "avatar-motion-lab", title: "光の精霊の動作" },
 			],
 		}),
 		sourceBindings: [

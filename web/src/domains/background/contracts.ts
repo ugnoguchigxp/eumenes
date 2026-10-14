@@ -1,10 +1,16 @@
 import type { Object3D } from "three";
+import type { SpatialOptions } from "./options";
 
 /** Measurements and health are supplied by their owner, never inferred by a model. */
 export type SpatialState = {
 	health: "healthy" | "pressure" | "fault" | "disconnected" | "unknown";
 	activity: "idle" | "starting" | "working";
 	stale: boolean;
+	/** Optional observations: absence means unavailable, not zero. */
+	utilization?: number;
+	strength?: number;
+	source?: "unconfirmed" | "demo" | "measurement";
+	observedAt?: number;
 };
 export type SpatialItem = {
 	id: string;
@@ -12,12 +18,20 @@ export type SpatialItem = {
 	model: string;
 	position: readonly [number, number, number];
 	state: SpatialState;
+	/** Layout motion around the invisible origin, independent from activity. */
+	orbit?: { radius: number; phase: number; speed?: number };
 };
 export type SpatialModel = {
 	/** Local origin, approximately one unit wide; the scene owns placement. */
 	object: Object3D;
 	update(state: SpatialState, selected: boolean): void;
-	/** Optional motion. Called only for active items while motion is enabled. */
+	configure?(
+		options: SpatialOptions,
+		corePercent: number,
+		motionEnabled: boolean,
+		visibility?: number,
+	): void;
+	/** Self-spin and activity motion; the scene independently owns orbital placement. */
 	animate?(seconds: number, deltaSeconds: number): void;
 	/** Owns all geometry, materials and textures created by this model. */
 	dispose(): void;

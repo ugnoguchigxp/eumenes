@@ -62,7 +62,7 @@ const artifact = {
 	kind: "artifact",
 	id: "timers.workspace",
 	revision: 1,
-	title: "タイマー（データドリブン）",
+	title: "タイマー",
 	defaultVariant: "standard",
 	variants: [
 		{

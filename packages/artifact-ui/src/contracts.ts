@@ -42,10 +42,15 @@ const question = z.strictObject({
 const musicChoices = z.array(z.string().min(1).max(80)).min(1).max(80);
 const imageChoices = z.array(z.string().min(1).max(80)).min(1).max(80);
 const imageCreationOptions = z.strictObject({
-	styleGroups: z.array(z.strictObject({
-		label: z.string().min(1).max(80),
-		options: imageChoices,
-	})).min(1).max(12),
+	styleGroups: z
+		.array(
+			z.strictObject({
+				label: z.string().min(1).max(80),
+				options: imageChoices,
+			}),
+		)
+		.min(1)
+		.max(12),
 	moods: imageChoices,
 	compositions: imageChoices,
 	lighting: imageChoices,
@@ -189,6 +194,17 @@ export const viewRegistry = {
 			catalogSource: source,
 			runsSource: source,
 			healthSource: source,
+		}),
+	},
+	"avatar-motion-lab": {
+		name: "AvatarMotionLab",
+		label: "光の精霊の動作試写",
+		// The host renders the 3D preview; nothing here is read from or written to a source.
+		schema: z.strictObject({
+			view: z.literal("avatar-motion-lab"),
+			// z.undefined() cannot be expressed in JSON Schema and would break the whole library.
+			source: z.never().optional(),
+			title,
 		}),
 	},
 	"subtitle-preview": {
@@ -374,6 +390,8 @@ export const layoutSchema = z
 				z.strictObject({
 					label: z.string().min(1).max(80),
 					children: z.array(z.number().int().min(0).max(11)).min(1),
+					/** `form-preview` shows the tab's subtitle preview inside its settings section. */
+					arrangement: z.enum(["form-preview"]).optional(),
 				}),
 			)
 			.min(1)
@@ -409,6 +427,18 @@ export const layoutSchema = z
 				message:
 					"form-preview requires a settings section and subtitle preview",
 			});
+		for (const tab of value.tabs ?? [])
+			if (
+				tab.arrangement === "form-preview" &&
+				(tab.children.length !== 2 ||
+					value.children[tab.children[0]!]?.view !== "settings-section" ||
+					value.children[tab.children[1]!]?.view !== "subtitle-preview")
+			)
+				context.addIssue({
+					code: "custom",
+					message:
+						"form-preview requires a settings section and subtitle preview",
+				});
 		if (value.headerChildren && value.direction !== "tabs")
 			context.addIssue({
 				code: "custom",

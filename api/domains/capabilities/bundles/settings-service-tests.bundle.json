@@ -8,7 +8,7 @@
 		{
 			"kind": "artifact",
 			"id": "settings.service-tests",
-			"revision": 5,
+			"revision": 6,
 			"title": "動作確認",
 			"variants": [
 				{
@@ -161,6 +161,11 @@
 							"label": "更新"
 						},
 						{
+							"key": "refreshGeneration",
+							"label": "更新世代",
+							"format": "number"
+						},
+						{
 							"key": "errors",
 							"label": "エラー"
 						},
@@ -178,15 +183,21 @@
 							"key": "diagnosisRevision",
 							"label": "診断時の設定版",
 							"format": "number"
+						},
+						{
+							"key": "diagnosisPhase",
+							"label": "診断の段階"
 						}
 					],
 					"rowActions": [
 						{
-							"actionId": "refresh"
+							"actionId": "refresh",
+							"requiresCleanDraft": "document:settings@1"
 						},
 						{
 							"actionId": "diagnose",
-							"confirm": "全サービスのHealthを確認します。時間がかかることがあります。"
+							"confirm": "全サービスのHealthを確認します。時間がかかることがあります。",
+							"requiresCleanDraft": "document:settings@1"
 						}
 					],
 					"refreshWhile": {
@@ -220,6 +231,10 @@
 							"label": "接続先"
 						},
 						{
+							"key": "sourceName",
+							"label": "送信先"
+						},
+						{
 							"key": "sourceCode",
 							"label": "接続先コード"
 						},
@@ -244,6 +259,11 @@
 						{
 							"key": "sample",
 							"label": "サンプル"
+						},
+						{
+							"key": "voiceInput",
+							"label": "声入力可",
+							"format": "boolean"
 						}
 					],
 					"rowActions": [
@@ -257,15 +277,49 @@
 								"fields": [
 									{
 										"fieldId": "text",
-										"label": "入力する文",
+										"label": "文章",
 										"control": "textarea",
 										"maxLength": 4096,
-										"help": "空欄の場合は短い挨拶で試します。"
+										"when": {
+											"key": "kindCode",
+											"in": ["llm", "tts", "embedding"]
+										}
+									},
+									{
+										"fieldId": "text",
+										"label": "文章",
+										"control": "textarea",
+										"maxLength": 4096,
+										"when": {
+											"key": "kindCode",
+											"in": ["decision"]
+										},
+										"help": "入力が「挨拶」か「質問・依頼」かを判定します。"
+									},
+									{
+										"fieldId": "text",
+										"label": "プロンプト",
+										"control": "textarea",
+										"maxLength": 4096,
+										"when": {
+											"key": "kindCode",
+											"in": ["image"]
+										}
+									},
+									{
+										"fieldId": "text",
+										"label": "曲の説明",
+										"control": "textarea",
+										"maxLength": 4096,
+										"when": {
+											"key": "kindCode",
+											"in": ["music"]
+										}
 									},
 									{
 										"fieldId": "comparison",
-										"label": "比較する文",
-										"control": "text",
+										"label": "比較する文章",
+										"control": "textarea",
 										"maxLength": 4096,
 										"when": {
 											"key": "kindCode",
@@ -275,17 +329,17 @@
 									},
 									{
 										"fieldId": "voice",
-										"label": "声",
+										"label": "声のID（空欄で既定の声）",
 										"control": "text",
 										"maxLength": 128,
 										"when": {
-											"key": "kindCode",
-											"in": ["tts"]
+											"key": "voiceInput",
+											"in": [true]
 										}
 									},
 									{
 										"fieldId": "width",
-										"label": "幅（画像）",
+										"label": "幅（px）",
 										"control": "number",
 										"min": 100,
 										"max": 1280,
@@ -297,7 +351,7 @@
 									},
 									{
 										"fieldId": "height",
-										"label": "高さ（画像）",
+										"label": "高さ（px）",
 										"control": "number",
 										"min": 100,
 										"max": 1280,
@@ -309,7 +363,7 @@
 									},
 									{
 										"fieldId": "format",
-										"label": "画像の形式",
+										"label": "形式",
 										"control": "select",
 										"options": [
 											{
@@ -328,31 +382,40 @@
 										"defaultValue": "webp"
 									},
 									{
-										"fieldId": "seed",
-										"label": "シード（画像）",
-										"control": "number",
-										"when": {
-											"key": "kindCode",
-											"in": ["image"]
-										}
-									},
-									{
 										"fieldId": "durationSeconds",
-										"label": "長さ（秒・楽曲）",
-										"control": "number",
-										"min": 1,
-										"max": 30,
+										"label": "長さ（秒）",
+										"control": "select",
+										"valueType": "number",
 										"when": {
 											"key": "kindCode",
 											"in": ["music"]
 										},
-										"defaultValue": "10"
+										"defaultValue": "10",
+										"options": [
+											{
+												"value": "5",
+												"label": "5秒"
+											},
+											{
+												"value": "10",
+												"label": "10秒"
+											},
+											{
+												"value": "20",
+												"label": "20秒"
+											},
+											{
+												"value": "30",
+												"label": "30秒"
+											}
+										],
+										"help": "歌声なし・MP3で短い曲を生成します。"
 									},
 									{
 										"fieldId": "uploadId",
 										"label": "音声ファイル（WAV・4 MBまで）",
 										"control": "upload",
-										"help": "未選択なら1秒の無音サンプルで通信を確認します。",
+										"help": "未選択なら1秒の無音サンプルで通信を確認します。文字起こしの品質は発話入りの音声で確認してください。",
 										"when": {
 											"key": "kindCode",
 											"in": ["asr"]
@@ -361,7 +424,8 @@
 									}
 								],
 								"prefill": {}
-							}
+							},
+							"requiresCleanDraft": "document:settings@1"
 						}
 					],
 					"create": {
@@ -423,11 +487,6 @@
 								]
 							},
 							{
-								"fieldId": "seed",
-								"label": "シード（画像）",
-								"control": "number"
-							},
-							{
 								"fieldId": "durationSeconds",
 								"label": "長さ（秒・楽曲）",
 								"control": "number",
@@ -442,6 +501,10 @@
 					"title": "確認の履歴",
 					"rowKey": "id",
 					"columns": [
+						{
+							"key": "kindCode",
+							"label": "種類コード"
+						},
 						{
 							"key": "model",
 							"label": "対象"
@@ -465,12 +528,12 @@
 						{
 							"key": "created",
 							"label": "開始",
-							"format": "date"
+							"format": "text"
 						},
 						{
 							"key": "ended",
 							"label": "終了",
-							"format": "date"
+							"format": "text"
 						},
 						{
 							"key": "error",
@@ -569,7 +632,8 @@
 						"in": [true]
 					}
 				}
-			]
+			],
+			"draftDependencies": ["document:settings@1"]
 		}
 	],
 	"schemas": [

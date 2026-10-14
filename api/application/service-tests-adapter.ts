@@ -104,10 +104,12 @@ function targetRow(target: ServiceTarget, revision: number) {
 		kind: kindLabels[target.kind],
 		kindCode: target.kind,
 		source: sourceLabels[target.source],
+		sourceName: target.source === "larm" ? "LARM" : target.name,
 		sourceCode: target.source,
+		voiceInput: target.kind === "tts" && target.source === "larm",
 		primary: target.primary,
 		onDemand: target.onDemand,
-		start: target.onDemand ? "実行時に起動" : "常駐",
+		start: target.onDemand ? "実行時に起動" : "対象を固定して実行",
 		testable: target.testable,
 		state: target.testable
 			? "試せます"
@@ -121,6 +123,7 @@ function runRow(run: ServiceRun) {
 		id: run.id,
 		targetId: run.targetId,
 		kind: kindLabels[run.kind as keyof typeof kindLabels] ?? "Health確認",
+		kindCode: run.kind,
 		model: run.model || "全サービス",
 		status: run.status,
 		statusLabel: statusLabels[run.status],
@@ -163,6 +166,7 @@ export function createServiceTestsAdapter(
 	const pending = new Map<string, { effect: () => boolean; at: number }>();
 	let refreshState: "idle" | "running" | "failed" = "idle";
 	let refreshError = "";
+	let refreshGeneration = 0;
 	function done(
 		receipt: Record<string, unknown>,
 		requestId: string,
@@ -231,6 +235,8 @@ export function createServiceTestsAdapter(
 			false,
 			() => {
 				refreshState = "running";
+				refreshError = "";
+				refreshGeneration++;
 				void service
 					.refresh()
 					.then(() => {
@@ -240,6 +246,9 @@ export function createServiceTestsAdapter(
 					.catch((error) => {
 						refreshState = "failed";
 						refreshError = error instanceof Error ? error.message : "";
+					})
+					.finally(() => {
+						refreshGeneration++;
 					});
 				return true;
 			},
@@ -247,9 +256,7 @@ export function createServiceTestsAdapter(
 	}
 	function status(runs: ServiceRun[]) {
 		const catalog = service.catalog();
-		const latest = runs.find(
-			(r) => r.kind === "diagnostics" && r.status !== "running",
-		);
+		const latest = runs.find((r) => r.kind === "diagnostics");
 		return [
 			{
 				id: "catalog",
@@ -259,24 +266,34 @@ export function createServiceTestsAdapter(
 				discoveredAt: catalog.discoveredAt,
 				targetCount: catalog.targets.length,
 				errors: catalog.errors
-					.slice(0, 3)
-					.map((code) => testErrorLabel(code))
-					.join(" / "),
+					.map((entry) => {
+						const separator = entry.indexOf(": ");
+						return separator < 0
+							? testErrorLabel(entry)
+							: `${entry.slice(0, separator)}：${testErrorLabel(entry.slice(separator + 2))}`;
+					})
+					.join("\n"),
 				refresh:
 					refreshState === "running"
 						? "更新中"
 						: refreshState === "failed"
 							? testErrorLabel(refreshError)
 							: "",
+				refreshGeneration,
 				// A running test, diagnosis or refresh: the screen re-reads while this is true.
 				busy:
 					refreshState === "running" ||
 					runs.some((r) => r.status === "running"),
 				control: !latest
 					? "未確認"
-					: latest.controlHealthy
-						? "正常"
-						: "確認できません",
+					: latest.controlHealthy === undefined
+						? "確認中"
+						: latest.controlHealthy
+							? "正常"
+							: "確認できません",
+				diagnosisPhase: latest
+					? (phaseLabels[latest.phase] ?? latest.phase)
+					: "",
 			},
 		];
 	}

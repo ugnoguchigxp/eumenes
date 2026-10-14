@@ -22,4 +22,5 @@ export function useImageArtifacts(
 		for (const item of added) seen.current.add(item.id);
 		if (added.length) open();
 	}, [query.data, open]);
+	return query.data ?? [];
 }

@@ -34,20 +34,20 @@ export const ImageViewer: React.FC<IImageViewerProps> = React.memo(
 				onOpenChange={onOpenChange}
 				noHeader
 				noPadding
-				contentClassName="bg-black/90 border border-black/40 shadow-xl focus:outline-none flex items-center justify-center max-h-[90vh]"
-				className="p-2 md:p-4 bg-transparent border-none shadow-none"
+				contentClassName="w-full min-w-0 overflow-hidden bg-black/90 border border-black/40 shadow-xl focus:outline-none flex items-center justify-center"
+				className="w-[min(900px,calc(100vw-2rem))] max-w-none max-h-[90dvh] p-2 md:p-4 bg-transparent border-none shadow-none"
 			>
-				<div className="w-full h-full flex items-center justify-center">
+				<div className="flex min-w-0 w-full items-center justify-center">
 					<img
 						ref={imgRef}
 						src={src || undefined}
 						alt={alt || "Image"}
 						className={cn(
 							"rounded-md object-contain shadow-lg",
-							"max-h-[80vh] w-auto",
+							"max-h-[80dvh] max-w-full w-auto h-auto",
 							"transition-opacity duration-200",
 						)}
-						style={{ maxWidth: `${maxWidthPx}px` }}
+						style={{ maxWidth: `min(${maxWidthPx}px, calc(100vw - 4rem), 100%)` }}
 					/>
 				</div>
 			</Modal>

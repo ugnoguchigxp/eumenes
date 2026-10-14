@@ -62,7 +62,6 @@ async function openFromHub(page: Page, label: string) {
 
 type Request = import("@playwright/test").APIRequestContext;
 const CONFLICT = /状態が変わりました/;
-const DOTS = "Codexへの委任";
 
 async function dictionary(request: Request) {
 	const response = await request.get(
@@ -109,7 +108,7 @@ function nextAction(page: Page) {
 
 test("hub lists the P3 screens", async ({ page }) => {
 	await openHub(page);
-	for (const name of ["読み方辞書", "記憶", "World", DOTS, "動作確認"])
+	for (const name of ["読み方辞書", "記憶", "World", "動作確認"])
 		await expect(
 			page.getByRole("button", { name, exact: true }).last(),
 		).toBeVisible();
@@ -199,41 +198,6 @@ test("dictionary: create, edit, delete, and every conflict is shown", async ({
 const panel = (page: Page) =>
 	page.getByRole("tabpanel").filter({ visible: true }).first();
 
-test("dots: creating a connection shows the token once", async ({ page }) => {
-	await openHub(page);
-	await openFromHub(page, DOTS);
-	await panel(page).getByRole("tab", { name: "dotsへの接続" }).click();
-	const form = page.getByRole("form", { name: "接続を作成" });
-	await form.getByLabel(/^名前（必須）/).fill("ローカルdots");
-	const answered = nextAction(page);
-	await form.getByRole("button", { name: "接続を作成" }).click();
-	expect((await (await answered).json()).status).toBe("accepted");
-	const dialog = page.getByRole("dialog", { name: "一度だけ表示する値" });
-	await expect(dialog).toBeVisible();
-	const token = (await dialog.getByText(/^[0-9a-f]{64}$/).innerText()).trim();
-	await dialog.getByRole("button", { name: "閉じる" }).click();
-	await expect(dialog).toHaveCount(0);
-	// The connection is listed, the secret is nowhere on the page any more.
-	await expect(
-		panel(page).getByRole("cell", { name: "ローカルdots", exact: true }),
-	).toBeVisible();
-	await expect(page.getByText(token)).toHaveCount(0);
-	await page.reload();
-	await expect(page.getByText(token)).toHaveCount(0);
-	const stored = await page.evaluate(
-		() => JSON.stringify(sessionStorage) + JSON.stringify(localStorage),
-	);
-	expect(stored).not.toContain(token);
-	// The list survives a reload without ever offering the value again.
-	await openHub(page);
-	await openFromHub(page, DOTS);
-	await panel(page).getByRole("tab", { name: "dotsへの接続" }).click();
-	await expect(
-		panel(page).getByRole("cell", { name: "ローカルdots", exact: true }),
-	).toBeVisible();
-	await expect(page.getByText(token)).toHaveCount(0);
-});
-
 test("memory: sections are listed and the connection can be cut and restored", async ({
 	page,
 	request,
@@ -319,7 +283,7 @@ test("service tests: full-screen workbench and catalog refresh", async ({
 }) => {
 	await openHub(page);
 	await openFromHub(page, "動作確認");
-	const screen = panel(page);
+	const screen = page.getByRole("region", { name: "サービスを試す" });
 	await expect(
 		screen.getByRole("heading", { name: "サービスを試す" }),
 	).toBeVisible();
@@ -347,13 +311,62 @@ test("service tests: full-screen workbench and catalog refresh", async ({
 	expect((await (await answered).json()).status).toBe("accepted");
 	// No LARM is configured on this fixture: the list is read again and reports the failure.
 	await expect(screen.getByText(/一覧取得：/)).toBeVisible();
-	await expect(screen.getByText(/確認に失敗しました/).first()).toBeVisible();
+	await screen.getByText("一部の一覧を取得できませんでした").click();
+	await expect(
+		screen.getByText(/SAAA-w-Image：LARMの接続先URLが設定されていません/),
+	).toBeVisible();
+});
+
+test("service tests: unapplied settings disable actions until applied", async ({
+	page,
+}) => {
+	await openHub(page);
+	await openFromHub(page, "会話");
+	await page.getByLabel("AIの名前").fill("変更中の名前");
+	await page.getByRole("tab", { name: "設定", exact: true }).click();
+	await openFromHub(page, "動作確認");
+	const screen = page.getByRole("region", { name: "サービスを試す" });
+	await expect(screen.getByText(/設定に未適用の変更があります/)).toBeVisible();
+	await expect(
+		screen.getByRole("button", { name: "一覧を更新" }),
+	).toBeDisabled();
+	await expect(screen.getByRole("button", { name: "自己診断" })).toBeDisabled();
+	await page.getByRole("tab", { name: "会話", exact: true }).click();
+	await page.getByRole("button", { name: "変更一覧を開く" }).click();
+	await page.getByRole("button", { name: "設定の変更をすべて適用" }).click();
+	await page.getByRole("tab", { name: "動作確認", exact: true }).click();
+	await expect(
+		screen.getByRole("button", { name: "一覧を更新" }),
+	).toBeEnabled();
 });
 
 test("service tests: selected service, input, result, and WAV control", async ({
 	page,
 }) => {
 	await page.setViewportSize({ width: 1600, height: 1100 });
+	const target = (
+		id: string,
+		kind: string,
+		kindCode: string,
+		sourceCode: "larm" | "cloud" = "larm",
+	) => ({
+		id,
+		name: sourceCode === "larm" ? "LARM" : "Cloud TTS",
+		model: id,
+		kind,
+		kindCode,
+		source: sourceCode === "larm" ? "LARM" : "クラウド",
+		sourceName: sourceCode === "larm" ? "LARM" : "Cloud TTS",
+		sourceCode,
+		voiceInput: kindCode === "tts" && sourceCode === "larm",
+		primary: true,
+		onDemand: false,
+		start: "対象を固定して実行",
+		state: "試せます",
+		testable: true,
+		revision: 2,
+		sample: "こんにちは。",
+	});
 	await page.route(
 		"**/api/toolchain-artifacts/*/sources/service-tests-status",
 		(route) =>
@@ -365,7 +378,7 @@ test("service tests: selected service, input, result, and WAV control", async ({
 							id: "catalog",
 							state: "最新",
 							discoveredAt: Date.now(),
-							targetCount: 2,
+							targetCount: 7,
 							errors: "",
 							refresh: "",
 							busy: false,
@@ -391,7 +404,9 @@ test("service tests: selected service, input, result, and WAV control", async ({
 							kind: "画像生成",
 							kindCode: "image",
 							source: "LARM",
+							sourceName: "LARM",
 							sourceCode: "larm",
+							voiceInput: false,
 							primary: true,
 							onDemand: true,
 							start: "実行時に起動",
@@ -407,7 +422,9 @@ test("service tests: selected service, input, result, and WAV control", async ({
 							kind: "音声認識",
 							kindCode: "asr",
 							source: "LARM",
+							sourceName: "LARM",
 							sourceCode: "larm",
+							voiceInput: false,
 							primary: true,
 							onDemand: false,
 							start: "常駐",
@@ -416,6 +433,11 @@ test("service tests: selected service, input, result, and WAV control", async ({
 							revision: 2,
 							sample: "無音サンプル",
 						},
+						target("embedding", "埋め込み", "embedding"),
+						target("tts-larm", "音声合成", "tts"),
+						target("decision", "判断", "decision"),
+						target("music", "楽曲生成", "music"),
+						target("tts-cloud", "音声合成", "tts", "cloud"),
 					],
 				},
 			}),
@@ -431,6 +453,7 @@ test("service tests: selected service, input, result, and WAV control", async ({
 							id: "11111111-1111-4111-8111-111111111111",
 							targetId: "image",
 							model: "qwen-image-2.1-turbo",
+							kindCode: "image",
 							status: "succeeded",
 							statusLabel: "成功",
 							phase: "完了",
@@ -448,14 +471,19 @@ test("service tests: selected service, input, result, and WAV control", async ({
 	);
 	await openHub(page);
 	await openFromHub(page, "動作確認");
-	const screen = panel(page);
+	const screen = page.getByRole("region", { name: "サービスを試す" });
 	await expect(screen.getByRole("heading", { name: "画像生成" })).toBeVisible();
-	await expect(screen.getByRole("textbox", { name: "入力する文" })).toHaveValue(
+	await expect(screen.getByRole("textbox", { name: "プロンプト" })).toHaveValue(
 		/朝の光/,
 	);
 	await expect(
-		screen.getByRole("spinbutton", { name: "幅（画像）" }),
+		screen.getByRole("spinbutton", { name: "幅（px）" }),
 	).toHaveValue("512");
+	await screen.getByRole("spinbutton", { name: "幅（px）" }).fill("99");
+	await expect(
+		screen.getByRole("button", { name: "▶ 画像を生成" }),
+	).toBeDisabled();
+	await screen.getByRole("spinbutton", { name: "幅（px）" }).fill("512");
 	await expect(
 		screen
 			.getByRole("region", { name: "結果" })
@@ -479,8 +507,208 @@ test("service tests: selected service, input, result, and WAV control", async ({
 		screen.getByLabel("音声ファイル（WAV・4 MBまで）"),
 	).toBeVisible();
 	await expect(screen.getByText(/無音サンプルで通信を確認/)).toBeVisible();
+	await expect(screen.getByRole("textbox", { name: "文章" })).toHaveCount(0);
 	await screen
 		.getByLabel("音声ファイル（WAV・4 MBまで）")
 		.setInputFiles("tests/browser/fixtures/speech.wav");
 	await expect(screen.getByText("speech.wav")).toBeVisible();
+	await screen.screenshot({ path: `${dir}/asr-dark.png` });
+	await screen.getByRole("button", { name: /埋め込み.*embedding/ }).click();
+	await expect(
+		screen.getByRole("textbox", { name: "比較する文章" }),
+	).toHaveValue("窓のそばで猫が寝ています。");
+	await screen.getByRole("button", { name: /音声合成.*tts-larm/ }).click();
+	await expect(
+		screen.getByRole("textbox", { name: "声のID（空欄で既定の声）" }),
+	).toBeVisible();
+	await screen.getByRole("button", { name: /判断.*decision/ }).click();
+	await expect(screen.getByText(/挨拶.*質問・依頼/)).toBeVisible();
+	await screen.getByRole("button", { name: /楽曲生成.*music/ }).click();
+	await expect(screen.getByRole("textbox", { name: "曲の説明" })).toBeVisible();
+	await expect(
+		screen.getByRole("combobox", { name: "長さ（秒）" }),
+	).toHaveValue("10");
+	await expect(
+		screen.getByRole("combobox", { name: "長さ（秒）" }).locator("option"),
+	).toHaveText(["5秒", "10秒", "20秒", "30秒"]);
+	await expect(screen.getByText(/歌声なし・MP3/)).toBeVisible();
+	await screen.getByRole("button", { name: "登録済みクラウド" }).click();
+	await screen.getByRole("button", { name: /音声合成.*tts-cloud/ }).click();
+	await expect(
+		screen.getByRole("textbox", { name: "声のID（空欄で既定の声）" }),
+	).toHaveCount(0);
+});
+
+test("service tests: diagnosis, cancellation and saved preview remain available", async ({
+	page,
+}) => {
+	const now = Date.now();
+	await page.route(
+		"**/api/toolchain-artifacts/*/sources/service-tests-status",
+		(route) =>
+			route.fulfill({
+				json: {
+					revision: 2,
+					data: [
+						{
+							id: "catalog",
+							state: "最新",
+							discoveredAt: now,
+							targetCount: 1,
+							errors: "",
+							refresh: "",
+							refreshGeneration: 0,
+							busy: true,
+							catalogRevision: 2,
+							diagnosisRevision: 2,
+							control: "正常",
+						},
+					],
+				},
+			}),
+	);
+	await page.route(
+		"**/api/toolchain-artifacts/*/sources/service-tests-catalog",
+		(route) =>
+			route.fulfill({
+				json: {
+					revision: 2,
+					data: [
+						{
+							id: "image",
+							name: "SAAA-w-Image",
+							model: "qwen-image-2.1-turbo",
+							kind: "画像生成",
+							kindCode: "image",
+							source: "LARM",
+							sourceName: "LARM",
+							sourceCode: "larm",
+							voiceInput: false,
+							primary: true,
+							onDemand: true,
+							start: "実行時に起動",
+							state: "試せます",
+							testable: true,
+							revision: 2,
+							sample: "朝の光が入る静かな書斎。",
+						},
+					],
+				},
+			}),
+	);
+	await page.route(
+		"**/api/toolchain-artifacts/*/sources/service-tests-runs",
+		(route) =>
+			route.fulfill({
+				json: {
+					revision: 3,
+					data: [
+						{
+							id: "22222222-2222-4222-8222-222222222222",
+							targetId: "image",
+							kindCode: "image",
+							model: "qwen-image-2.1-turbo",
+							status: "running",
+							statusLabel: "実行中",
+							phase: "起動・生成を待っています",
+							created: now,
+							ended: null,
+							error: "",
+							text: "",
+							revision: 2,
+							progress: 0.2,
+							previewAvailable: false,
+							retryArtifact: false,
+							preview: null,
+						},
+						{
+							id: "33333333-3333-4333-8333-333333333333",
+							targetId: "diagnostics",
+							kindCode: "diagnostics",
+							model: "全サービス",
+							status: "succeeded",
+							statusLabel: "成功",
+							phase: "診断完了",
+							created: now - 5000,
+							ended: now - 4000,
+							error: "",
+							text: "",
+							revision: 2,
+							previewAvailable: false,
+							retryArtifact: false,
+							preview: null,
+						},
+						{
+							id: "11111111-1111-4111-8111-111111111111",
+							targetId: "image",
+							kindCode: "image",
+							model: "qwen-image-2.1-turbo",
+							status: "succeeded",
+							statusLabel: "成功",
+							phase: "成功",
+							created: now - 9000,
+							ended: now - 8000,
+							error: "",
+							text: "生成しました。",
+							revision: 2,
+							previewAvailable: true,
+							retryArtifact: false,
+							preview: {
+								path: "/api/service-tests/runs/11111111-1111-4111-8111-111111111111/artifact",
+								mime: "image/png",
+							},
+						},
+					],
+				},
+			}),
+	);
+	await page.route(
+		"**/api/toolchain-artifacts/*/sources/service-tests-health",
+		(route) =>
+			route.fulfill({
+				json: {
+					revision: 3,
+					data: [
+						{
+							targetId: "image",
+							name: "画像生成",
+							model: "qwen-image-2.1-turbo",
+							state: "正常",
+							reason: "",
+							checkedAt: now - 4000,
+							latencyMs: 10,
+							running: false,
+						},
+					],
+				},
+			}),
+	);
+	await page.route("**/api/service-tests/runs/*/artifact", (route) =>
+		route.fulfill({
+			contentType: "image/png",
+			body: Buffer.from(
+				"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=",
+				"base64",
+			),
+		}),
+	);
+	await openHub(page);
+	await openFromHub(page, "動作確認");
+	const screen = page.getByRole("region", { name: "サービスを試す" });
+	await expect(
+		screen.getByRole("button", { name: "待機を終了" }),
+	).toBeVisible();
+	await expect(screen.getByText(/待機を終了しても生成が続く/)).toBeVisible();
+	await screen.getByText(/自己診断の結果/).click();
+	await expect(screen.getByText("LARM本体：正常")).toBeVisible();
+	await expect(screen.getByText("qwen-image-2.1-turbo").last()).toBeVisible();
+	await screen.getByText(/実行履歴/).click();
+	await screen.getByRole("button", { name: /成功/ }).click();
+	await expect(screen.getByRole("img", { name: "生成した画像" })).toBeVisible();
+	await expect(
+		screen.getByRole("link", { name: "結果を保存" }),
+	).toHaveAttribute("download", /\.png$/);
+	await expect(
+		screen.getByRole("img", { name: "生成した画像" }).locator(".."),
+	).toHaveAttribute("target", "_blank");
 });

@@ -6,6 +6,7 @@ import type {
 	Snapshot,
 } from "@eumenes/artifact-ui/contracts";
 import { Button } from "@eumenes/design-system";
+import { LightAvatarMotionLab } from "../../components/domains/conversation/LightAvatarMotionLab";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import type {
@@ -57,6 +58,10 @@ export type ToolchainArtifactHostProps = {
 
 const noop = () => {};
 
+/** Views drawn by this host; the 3D lab loads its renderer only when shown. */
+const hostViews: ArtifactRuntime["hostViews"] = {
+	"avatar-motion-lab": () => <LightAvatarMotionLab />,
+};
 /**
  * The event's binding: the one registered for this event and source (a registration holds at
  * most one), else the only binding of that event. Panels with several actions register one
@@ -349,11 +354,13 @@ function AdapterScreen({
 		() => ({
 			snapshot,
 			dispatch,
+			refresh: state.refresh,
 			settledEpoch,
 			fetchMedia: (path: string) => client.toolchainMedia(path),
+			hostViews,
 			...(state.uploadFile ? { uploadFile: state.uploadFile } : {}),
 		}),
-		[snapshot, dispatch, settledEpoch, client, state.uploadFile],
+		[snapshot, dispatch, settledEpoch, client, state.uploadFile, state.refresh],
 	);
 	return (
 		<div className="toolchain-artifact">

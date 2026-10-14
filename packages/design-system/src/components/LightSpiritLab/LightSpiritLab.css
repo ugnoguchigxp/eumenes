@@ -1,0 +1,104 @@
+.light-spirit-lab {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(16rem, 22rem);
+	gap: 1rem;
+	color: var(--foreground);
+	min-width: 0;
+}
+.light-spirit-lab-stage-column {
+	display: grid;
+	gap: 0.5rem;
+	align-content: start;
+	min-width: 0;
+}
+.light-spirit-lab-stage {
+	position: relative;
+	aspect-ratio: 4 / 5;
+	max-height: 36rem;
+	border-radius: var(--radius);
+	border: 1px solid var(--border);
+	/* The spirit is light on a dark field in both themes. */
+	background: radial-gradient(circle at 50% 40%, #1d2433, #0b0e16 70%);
+	overflow: hidden;
+}
+.light-spirit-lab-stage > * {
+	position: absolute;
+	inset: 0;
+}
+.light-spirit-lab-stage canvas {
+	width: 100%;
+	height: 100%;
+	display: block;
+}
+.light-spirit-lab-status {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.75rem;
+	font-size: 0.85rem;
+	color: var(--muted-foreground);
+	font-variant-numeric: tabular-nums;
+}
+.light-spirit-lab-message {
+	margin: 0;
+	font-size: 0.85rem;
+	color: var(--muted-foreground);
+}
+.light-spirit-lab-controls {
+	display: grid;
+	gap: 0.85rem;
+	align-content: start;
+	min-width: 0;
+}
+.light-spirit-lab-transport,
+.light-spirit-lab-speed,
+.light-spirit-lab-motions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.4rem;
+}
+.light-spirit-lab-transport svg {
+	width: 1rem;
+	height: 1rem;
+}
+.light-spirit-lab-group {
+	display: grid;
+	gap: 0.5rem;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	min-width: 0;
+}
+.light-spirit-lab-group > legend {
+	padding: 0 0 0.35rem;
+	font-size: 0.85rem;
+	font-weight: 600;
+}
+.light-spirit-lab-variant {
+	display: grid;
+	gap: 0.3rem;
+	font-size: 0.85rem;
+}
+.light-spirit-lab-variant select {
+	min-height: var(--ui-component-height, 2.25rem);
+	padding: 0 0.5rem;
+	border: 1px solid var(--input, var(--border));
+	border-radius: calc(var(--radius) - 2px);
+	background: var(--background);
+	color: var(--foreground);
+}
+.light-spirit-lab-toggle {
+	display: flex;
+	align-items: center;
+	gap: 0.6rem;
+	font-size: 0.9rem;
+}
+@media (max-width: 720px) {
+	.light-spirit-lab {
+		grid-template-columns: minmax(0, 1fr);
+	}
+	.light-spirit-lab-stage {
+		max-height: 26rem;
+		aspect-ratio: auto;
+		height: min(26rem, 70vh);
+	}
+}

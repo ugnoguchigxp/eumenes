@@ -1,0 +1,27 @@
+{
+	"id": "memory",
+	"label": "Memory",
+	"kind": "memory",
+	"category": "host",
+	"sample": true,
+	"pointCount": 1917,
+	"stride": 8,
+	"binary": "memory.bin",
+	"shape": "間隔をあけた三軸の編み格子",
+	"motion": "外形は固定。割当/解放を表す光帯だけが格子を通る。圧迫はhealth色で分離。",
+	"normalizationRadius": 1.6,
+	"bounds": {
+		"min": [-0.8626862691412466, -0.8618856836795925, -0.8637499999999999],
+		"max": [0.8637494560146644, 0.8641491584237138, 0.8637499999999999]
+	},
+	"attributes": ["x", "y", "z", "phase", "group", "seed", "size", "weight"],
+	"coordinateSystem": "right-handed Z-up",
+	"groups": {
+		"0": "X方向",
+		"1": "Y方向",
+		"2": "Z方向",
+		"3": "交点"
+	},
+	"phaseMeaning": "各部材に沿う光の移動位相。healthの推定には使わない。",
+	"operationalDataConnected": false
+}

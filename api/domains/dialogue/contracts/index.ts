@@ -4,6 +4,7 @@ const submitFields = z.object({
 	requestId: z.uuid(),
 	conversationId: z.string().min(1).max(120),
 	text: z.string().trim().max(8000),
+	presentation: z.enum(["conversation", "artifact"]).optional(),
 	attachmentIds: z
 		.array(z.uuid())
 		.max(8)

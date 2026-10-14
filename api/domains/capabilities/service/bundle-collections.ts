@@ -29,7 +29,9 @@ function validFormDefault(field: FormFieldV1) {
 		}
 		case "select":
 			return (
-				!field.options?.length || field.options.some((o) => o.value === value)
+				(!field.options?.length ||
+					field.options.some((o) => o.value === value)) &&
+				(field.valueType !== "number" || Number.isFinite(Number(value)))
 			);
 		default:
 			return field.maxLength === undefined || value.length <= field.maxLength;
@@ -66,6 +68,14 @@ function checkFormFields(
 			!field.optionsSource
 		)
 			c.issue("invalid_format", `${f}/options`);
+		if (
+			field.valueType === "number" &&
+			(field.control !== "select" ||
+				field.optionsSource ||
+				!field.options?.length ||
+				field.options.some((option) => !Number.isFinite(Number(option.value))))
+		)
+			c.issue("invalid_format", `${f}/valueType`);
 		if (field.defaultValue !== undefined && !validFormDefault(field))
 			c.issue("invalid_format", `${f}/defaultValue`, field.defaultValue);
 	});
@@ -138,10 +148,19 @@ function checkForm(
 /** Whether the artifact edits the document: a registered field or a draft action names it. */
 const usesDocument = (a: Artifact, document: string) =>
 	a.fields?.some((f) => f.document === document) ||
+	a.draftDependencies?.includes(document) ||
 	a.actionBindings.some((x) => x.draftDocument === document);
 
 /** Collections: a source, row actions built from rows, and a form for the create action. */
 export function checkCollections(c: Check, a: Artifact, path: string) {
+	a.draftDependencies?.forEach((document, index) => {
+		if (!documentOwner(c, document))
+			c.issue(
+				"unknown_reference",
+				`${path}/draftDependencies/${index}`,
+				document,
+			);
+	});
 	a.collections?.forEach((collection, i) => {
 		const at = `${path}/collections/${i}`;
 		const source = a.sourceBindings.find((s) => s.source === collection.source);

@@ -105,6 +105,54 @@ test("cancelled image generation discards a late synchronous response and never 
 	}
 });
 
+test("artifact image input keeps exact generation data without showing an internal chat utterance", async () => {
+	const f = imageFixture("success");
+	let resultPolicy = false;
+	const model = {
+		...f.model,
+		answer: async (...args: Parameters<typeof f.model.answer>) => {
+			const [messages] = args;
+			if (
+				messages.some((message) =>
+					message.content.startsWith('{"imageResult":'),
+				)
+			)
+				resultPolicy =
+					messages[0]?.content.includes(
+						"報告本文にURLやMarkdownリンクを作りません",
+					) ?? false;
+			return f.model.answer(...args);
+		},
+	};
+	const h = await harness({ model, imageGateway: f.gateway });
+	try {
+		const request = {
+			requestId: crypto.randomUUID(),
+			conversationId: "main",
+			text: imageQuestion,
+			presentation: "artifact",
+		};
+		const submitted = await (await h.request("/api/runs", request)).json();
+		const replayed = await (await h.request("/api/runs", request)).json();
+		expect(replayed.id).toBe(submitted.id);
+		await h.dialogue.waitForTerminal(submitted.id, { timeoutMs: 5000 });
+		const conversation = await (
+			await h.request("/api/conversations/main")
+		).json();
+		const input = conversation.messages.find(
+			(message: { id: string }) => message.id === submitted.inputMessageId,
+		);
+		expect(input).toMatchObject({
+			text: imageQuestion,
+			presentation: "artifact",
+		});
+		expect(h.image!.list("main")[0]?.state).toBe("completed");
+		expect(resultPolicy).toBe(true);
+	} finally {
+		await h.close();
+	}
+});
+
 test("capability revocation rejects a generated result at adoption", async () => {
 	let release!: () => void;
 	const gate = new Promise<void>((r) => {

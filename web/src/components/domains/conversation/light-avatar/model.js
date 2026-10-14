@@ -3,24 +3,37 @@
 /** @typedef {any} ThreeColor A color accepted by THREE.Color. */
 /** @typedef {any} ThreeObject A THREE.Object3D / Vector3 / Curve instance. */
 import * as THREE from "three";
-import { sampleMotion, blendPose } from "./motion.js";
-import { sampleIdlePose } from "./idle.ts";
-import { samplePerformancePose } from "./performance.ts";
+import {
+	armInfluence,
+	boneNames,
+	createSkeleton,
+	setInfluences,
+	skinningGLSL,
+	torsoInfluence,
+} from "./skeleton.ts";
+import { createPerformer, defaultLayers } from "./performer.ts";
+import { createSecondaryMotion } from "./secondary.ts";
+
+// The motion catalog ships with the renderer chunk so the lab never loads three.js early.
+export { motions } from "./motions/index.ts";
+export { motionGroups } from "./clips.ts";
 const TAU = Math.PI * 2;
 const clamp = THREE.MathUtils.clamp;
+// Every skinned vertex follows its two bones, then keeps the faint living shimmer.
 const commonDeform = `
-uniform float uTime; uniform float uEnergy; uniform float uThinking;
-uniform mat4 uHead; uniform vec3 uHeadPivot; uniform vec2 uHeadSpan;
-vec3 rigNormal(vec3 n,vec3 p){float w=smoothstep(uHeadSpan.x,uHeadSpan.y,p.y);return normalize(mix(n,(uHead*vec4(n,0.)).xyz,w));}
+uniform float uTime; uniform float uEnergy;
+${skinningGLSL}
+vec3 skinNormal(vec3 n){return normalize(mat3(skinMatrix())*n);}
 vec3 deform(vec3 p){
- float weight=smoothstep(uHeadSpan.x,uHeadSpan.y,p.y);
- vec3 turned=(uHead*vec4(p-uHeadPivot,1.)).xyz+uHeadPivot;
- p=mix(p,turned,weight);
+ p=(skinMatrix()*vec4(p,1.)).xyz;
  p.x+=sin(p.y*2.1+uTime*.7)*cos(p.z*2.8+uTime*.4)*.004;
  p.z+=sin(p.y*3.+p.x*2.-uTime*.6)*.004;
  return p;
 }
 `;
+// Rigid parts parented to a bone (core, its orbits) need no skinning.
+const rigidDeform =
+	"uniform float uTime;uniform float uEnergy;vec3 deform(vec3 p){return p;}";
 const noiseGLSL = `
 float hash(vec3 p){p=fract(p*.3183099+vec3(.1,.2,.3));p*=17.0;return fract(p.x*p.y*p.z*(p.x+p.y+p.z));}
 float noise(vec3 p){vec3 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(mix(hash(i),hash(i+vec3(1,0,0)),f.x),mix(hash(i+vec3(0,1,0)),hash(i+vec3(1,1,0)),f.x),f.y),mix(mix(hash(i+vec3(0,0,1)),hash(i+vec3(1,0,1)),f.x),mix(hash(i+vec3(0,1,1)),hash(i+vec3(1,1,1)),f.x),f.y),f.z);}
@@ -84,16 +97,16 @@ export function createLightAvatar(host) {
 
 		const scene = new THREE.Scene();
 		const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
-		camera.position.set(0, 0.22, 7.7);
-		camera.lookAt(0, 0.12, 0);
+		// Framed with headroom for jumps, spins and wide-open arms.
+		camera.position.set(0, 0.32, 8.5);
+		camera.lookAt(0, 0.22, 0);
 		const uniforms = {
 			uTime: { value: 0 },
 			uEnergy: { value: 0.1 },
-			uThinking: { value: 0 },
-			uFrontFacing: { value: 1 },
-			uHead: { value: new THREE.Matrix4() },
-			uHeadPivot: { value: new THREE.Vector3() },
-			uHeadSpan: { value: new THREE.Vector2() },
+			/** Accumulated particle drift; light.swirl speeds it up without jumps. */
+			uFlow: { value: 0 },
+			uSparkle: { value: 0 },
+			uBoneTexture: { value: /** @type {THREE.Texture | null} */ (null) },
 		};
 		const root = new THREE.Group();
 		scene.add(root);
@@ -190,7 +203,7 @@ export function createLightAvatar(host) {
 		const fillLight = new THREE.DirectionalLight("#bcd9ff", 1.3);
 		fillLight.position.set(3, 1, -2);
 		scene.add(fillLight);
-		const pearlMaterial = (fold = false, rigged = true) => {
+		const pearlMaterial = (fold = false) => {
 			const m = own(
 				new THREE.MeshPhysicalMaterial({
 					color: "#fff0da",
@@ -216,25 +229,23 @@ export function createLightAvatar(host) {
 				}),
 			);
 			m.onBeforeCompile = (/** @type {any} */ shader) => {
-				if (!rigged) return;
 				Object.assign(shader.uniforms, uniforms);
 				shader.vertexShader = commonDeform + shader.vertexShader;
 				shader.vertexShader = shader.vertexShader.replace(
 					"#include <beginnormal_vertex>",
-					"#include <beginnormal_vertex>\nobjectNormal=rigNormal(objectNormal,position);",
+					"#include <beginnormal_vertex>\nobjectNormal=skinNormal(objectNormal);",
 				);
 				shader.vertexShader = shader.vertexShader.replace(
 					"#include <begin_vertex>",
 					"#include <begin_vertex>\ntransformed=deform(transformed);",
 				);
 			};
-			m.customProgramCacheKey = () => `saaa-pearl-${fold}-${rigged}`;
+			m.customProgramCacheKey = () => `saaa-pearl-${fold}-skinned`;
 			materials.push(m);
 			return m;
 		};
 		const spiritGlass = pearlMaterial(),
-			foldGlass = pearlMaterial(true),
-			armGlass = pearlMaterial(true, false);
+			foldGlass = pearlMaterial(true);
 		const baseSpiritCompile = spiritGlass.onBeforeCompile;
 		spiritGlass.onBeforeCompile = (/** @type {any} */ shader, renderer) => {
 			baseSpiritCompile(shader, renderer);
@@ -274,7 +285,7 @@ export function createLightAvatar(host) {
 					blending: THREE.AdditiveBlending,
 					vertexShader:
 						commonDeform +
-						`varying vec3 vN;varying vec3 vV;varying vec3 vP;varying vec2 vUv;void main(){vec3 p=deform(position);vec4 mv=modelViewMatrix*vec4(p,1.);vN=normalize(normalMatrix*rigNormal(normal,position));vV=normalize(-mv.xyz);vP=p;vUv=uv;gl_Position=projectionMatrix*mv;}`,
+						`varying vec3 vN;varying vec3 vV;varying vec3 vP;varying vec2 vUv;void main(){vec3 p=deform(position);vec4 mv=modelViewMatrix*vec4(p,1.);vN=normalize(normalMatrix*skinNormal(normal));vV=normalize(-mv.xyz);vP=p;vUv=uv;gl_Position=projectionMatrix*mv;}`,
 					fragmentShader:
 						noiseGLSL +
 						`uniform vec3 uColor;uniform float uOpacity;uniform float uSoft;uniform float uBodyFade;uniform float uTime;uniform float uEnergy;varying vec3 vN;varying vec3 vV;varying vec3 vP;varying vec2 vUv;void main(){float rim=pow(1.-abs(dot(normalize(vN),normalize(vV))),2.3);float w=fbm(vP*3.+vec3(uTime*.12));float veins=pow(max(0.,sin(vUv.x*55.+vUv.y*19.+w*8.-uTime*.35)),mix(28.,85.,uSoft));float a=(.075+rim*(.55-.33*uSoft)+veins*(.16-.13*uSoft)+w*.035)*(uOpacity/.28);a*=mix(1.,.25+.75*smoothstep(-1.3,.35,vP.y),uBodyFade);vec3 c=mix(uColor,vec3(.56,.76,1.),pow(w,4.)*.65);float sheen=pow(max(0.,dot(normalize(vN),normalize(vec3(-.55,.65,1.)))),8.);c=mix(c,mix(uColor,vec3(.76,.83,1.),smoothstep(.48,.66,w)*.48),uSoft);gl_FragColor=vec4(c*(.65+uSoft*.18+rim*(1.-.65*uSoft)+veins*.6+uEnergy*.15+sheen*uSoft*.28),a);}`,
@@ -284,7 +295,7 @@ export function createLightAvatar(host) {
 			return m;
 		};
 		/** @param {ThreeColor} color */
-		const lineMaterial = (color, opacity = 0.3, rigged = true) => {
+		const lineMaterial = (color, opacity = 0.3, skinned = true) => {
 			const m = own(
 				new THREE.ShaderMaterial({
 					uniforms: {
@@ -296,9 +307,7 @@ export function createLightAvatar(host) {
 					depthWrite: false,
 					blending: THREE.AdditiveBlending,
 					vertexShader:
-						(rigged
-							? commonDeform
-							: "uniform float uTime; vec3 deform(vec3 p){return p;}") +
+						(skinned ? commonDeform : rigidDeform) +
 						`varying float vY;void main(){vY=position.y;gl_Position=projectionMatrix*modelViewMatrix*vec4(deform(position),1.);}`,
 					fragmentShader: `uniform vec3 uColor;uniform float uOpacity;uniform float uTime;varying float vY;void main(){float p=.6+.4*sin(vY*3.-uTime*.8);gl_FragColor=vec4(uColor*(.85+p*.4),uOpacity*(.4+p*.6));}`,
 				}),
@@ -307,7 +316,13 @@ export function createLightAvatar(host) {
 			return m;
 		};
 		/** @param {ThreeColor} color */
-		const pointMaterial = (color, size = 1, alpha = 0.65, cloud = false) => {
+		const pointMaterial = (
+			color,
+			size = 1,
+			alpha = 0.65,
+			cloud = false,
+			skinned = true,
+		) => {
 			const m = own(
 				new THREE.ShaderMaterial({
 					uniforms: {
@@ -316,19 +331,20 @@ export function createLightAvatar(host) {
 						uSize: { value: size },
 						uAlpha: { value: alpha },
 						uPixelRatio: { value: renderer.getPixelRatio() },
+						// Sparkles burst away from the core (bind space, or the core bone's own).
+						uBurst: {
+							value: skinned
+								? new THREE.Vector3(0, 0.06, 0.15)
+								: new THREE.Vector3(),
+						},
 					},
 					transparent: true,
 					depthWrite: false,
 					blending: THREE.AdditiveBlending,
 					vertexShader:
-						commonDeform +
-						`attribute float aSize;attribute float aPhase;varying float vAlpha;void main(){vec3 p=deform(position);float phase=aPhase+uTime*(.22+uEnergy*.38);p.x+=sin(phase+p.y*1.3)*(.013+uEnergy*.03);p.y+=sin(phase*1.5)*(.017+uEnergy*.024);vec4 mv=modelViewMatrix*vec4(p,1.);gl_Position=projectionMatrix*mv;gl_PointSize=clamp(aSize*uSize*uPixelRatio*(6.5/-mv.z),.6,${cloud ? "72." : "9."});vAlpha=.5+.5*sin(aPhase+uTime*.8);}`
-							.replace("uniform float uTime;", "uniform float uTime;")
-							.replace(
-								"attribute float aSize;",
-								"uniform float uSize;uniform float uPixelRatio;attribute float aSize;",
-							),
-					fragmentShader: `uniform vec3 uColor;uniform float uAlpha;uniform float uEnergy;varying float vAlpha;void main(){vec2 p=gl_PointCoord-.5;float d=dot(p,p);if(d>.25)discard;float a=${cloud ? "exp(-d*17.)*pow(1.-d*4.,1.5)" : "exp(-d*29.)"};gl_FragColor=vec4(uColor*(1.+uEnergy*.35),a*uAlpha*(.45+vAlpha*.55));}`,
+						(skinned ? commonDeform : rigidDeform) +
+						`uniform float uSize;uniform float uPixelRatio;uniform float uFlow;uniform float uSparkle;uniform vec3 uBurst;attribute float aSize;attribute float aPhase;varying float vAlpha;void main(){vec3 p=deform(position);float phase=aPhase+uFlow*(.22+uEnergy*.38);p.x+=sin(phase+p.y*1.3)*(.013+uEnergy*.03);p.y+=sin(phase*1.5)*(.017+uEnergy*.024);vec3 away=p-uBurst;p+=away/(length(away)+.05)*uSparkle*(.06+.42*fract(aPhase*3.7));vec4 mv=modelViewMatrix*vec4(p,1.);gl_Position=projectionMatrix*mv;gl_PointSize=clamp(aSize*uSize*uPixelRatio*(6.5/-mv.z)*(1.+uSparkle*.5),.6,${cloud ? "72." : "12."});vAlpha=.5+.5*sin(aPhase+uTime*.8);}`,
+					fragmentShader: `uniform vec3 uColor;uniform float uAlpha;uniform float uEnergy;uniform float uSparkle;varying float vAlpha;void main(){vec2 p=gl_PointCoord-.5;float d=dot(p,p);if(d>.25)discard;float a=${cloud ? "exp(-d*17.)*pow(1.-d*4.,1.5)" : "exp(-d*29.)"};gl_FragColor=vec4(uColor*(1.+uEnergy*.35+uSparkle*.7),a*uAlpha*(.45+vAlpha*.55));}`,
 				}),
 			);
 			materials.push(m);
@@ -337,8 +353,16 @@ export function createLightAvatar(host) {
 		/**
 		 * @param {number[][]} list
 		 * @param {ThreeColor} color
+		 * @param {import("./skeleton.ts").Influence[] | null} influences null for rigid bone children
 		 */
-		function makePoints(list, color, size = 1, alpha = 0.65, cloud = false) {
+		function makePoints(
+			list,
+			color,
+			influences,
+			size = 1,
+			alpha = 0.65,
+			cloud = false,
+		) {
 			const geo = own(new THREE.BufferGeometry());
 			geo.setAttribute(
 				"position",
@@ -352,7 +376,11 @@ export function createLightAvatar(host) {
 			}
 			geo.setAttribute("aSize", new THREE.Float32BufferAttribute(sizes, 1));
 			geo.setAttribute("aPhase", new THREE.Float32BufferAttribute(phases, 1));
-			return new THREE.Points(geo, pointMaterial(color, size, alpha, cloud));
+			if (influences) setInfluences(geo, influences);
+			return new THREE.Points(
+				geo,
+				pointMaterial(color, size, alpha, cloud, Boolean(influences)),
+			);
 		}
 		/** @param {ThreeColor} color */
 		function glow(color, size = 1) {
@@ -448,6 +476,19 @@ export function createLightAvatar(host) {
 			);
 		};
 
+		/** @param {THREE.BufferGeometry} geo Torso parts follow the bones by height. */
+		const byHeight = (geo) => {
+			const position = geo.getAttribute("position");
+			return setInfluences(
+				geo,
+				Array.from({ length: position.count }, (_, i) =>
+					torsoInfluence(position.getY(i)),
+				),
+			);
+		};
+		/** @param {number[][]} list */
+		const heightInfluences = (list) =>
+			list.map((p) => torsoInfluence(/** @type {number} */ (p[1])));
 		/** @param {string} kind */
 		function shellGeometry(kind) {
 			const positions = [],
@@ -488,13 +529,14 @@ export function createLightAvatar(host) {
 			geo.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
 			geo.setIndex(indices);
 			geo.computeVertexNormals();
-			return geo;
+			return byHeight(geo);
 		}
 		/**
+		 * Eyes ride the `eyes` bone; gaze and openness are set per frame.
 		 * @param {ThreeObject} group
-		 * @param {string} _kind
+		 * @param {THREE.Bone} socket
 		 */
-		function addReferenceEyes(group, _kind) {
+		function addReferenceEyes(group, socket) {
 			group.userData.eyes = [];
 			/** @type {[number, number, number][]} */
 			const eyes = [
@@ -506,23 +548,70 @@ export function createLightAvatar(host) {
 					own(new THREE.CapsuleGeometry(0.022, 0.09, 6, 10)),
 					own(new THREE.MeshBasicMaterial({ color: "#fff2b4" })),
 				);
-				eye.position.set(x, y, z + 0.02);
+				eye.position.set(x, y, z + 0.02).sub(skeleton.bindPosition("eyes"));
 				eye.rotation.z = x < 0 ? -0.12 : 0.12;
-				group.add(eye);
+				socket.add(eye);
 				const g = glow(palettes.gold, 0.16);
 				g.position.copy(eye.position);
-				group.add(g);
+				socket.add(g);
 				for (const part of [eye, g]) {
 					part.userData.rest = part.position.clone();
-					part.userData.eyeRoll = eye.rotation.z;
 					part.userData.isGlow = part === g;
 				}
 				group.userData.eyes.push(eye, g);
 			}
 		}
+		// Arm curves live in the flame's space; their quarter points become the arm joints.
+		const armCurves = /** @type {const} */ (["outer", "inner"]).flatMap(
+			(layer) =>
+				/** @type {const} */ ([-1, 1]).map((side) => {
+					const points =
+						layer === "outer"
+							? [
+									[side * 0.2, 0.33, -0.08],
+									[side * 0.64, 0.59, -0.02],
+									[side * 0.94, 0.99, 0.03],
+									[side * 0.99, 1.35, 0.04],
+									[side * 0.88, 1.58, 0.09],
+								]
+							: [
+									[side * 0.14, 0.18, 0.28],
+									[side * 0.43, 0.32, 0.35],
+									[side * 0.68, 0.62, 0.39],
+									[side * 0.72, 0.92, 0.43],
+									[side * 0.59, 1.14, 0.44],
+								];
+					const curve = new THREE.CatmullRomCurve3(
+						points.map(
+							(p) =>
+								new THREE.Vector3(
+									/** @type {number} */ (p[0]),
+									/** @type {number} */ (p[1]),
+									/** @type {number} */ (p[2]),
+								),
+						),
+					);
+					return { layer, side, curve };
+				}),
+		);
+		const skeleton = createSkeleton(
+			armCurves.map(({ layer, side, curve }) => ({
+				layer,
+				side,
+				joints:
+					/** @type {[[number, number, number], [number, number, number], [number, number, number], [number, number, number]]} */ (
+						[0, 1 / 3, 2 / 3, 1].map((u) => curve.getPoint(u).toArray())
+					),
+			})),
+		);
+		uniforms.uBoneTexture.value = skeleton.texture;
+		own(skeleton.texture);
+		const bone = (/** @type {import("./skeleton.ts").BoneName} */ name) =>
+			/** @type {THREE.Bone} */ (skeleton.bones.get(name));
 		/** @param {string} kind */
 		function makeFlame(kind) {
 			const group = new THREE.Group();
+			group.add(skeleton.root);
 			const body = new THREE.Mesh(shellGeometry(kind), spiritGlass);
 			group.add(body);
 			{
@@ -544,7 +633,9 @@ export function createLightAvatar(host) {
 					}
 					skin.push([p.x, p.y, p.z], [2 * cx - p.x, p.y, p.z]);
 				}
-				group.add(makePoints(skin, palettes.gold, 0.6, 0.28));
+				group.add(
+					makePoints(skin, palettes.gold, heightInfluences(skin), 0.6, 0.28),
+				);
 				for (let n = 0; n < 1000; n += 2) {
 					const u = 0.67 + random() * 0.29,
 						phi = random() * TAU,
@@ -552,7 +643,15 @@ export function createLightAvatar(host) {
 					const cx = profile(u, "b")[1];
 					headGlow.push([p.x, p.y, p.z], [2 * cx - p.x, p.y, p.z]);
 				}
-				group.add(makePoints(headGlow, palettes.white, 0.5, 0.14));
+				group.add(
+					makePoints(
+						headGlow,
+						palettes.white,
+						heightInfluences(headGlow),
+						0.5,
+						0.14,
+					),
+				);
 				const luminousVeil = new THREE.Mesh(
 					shellGeometry("b"),
 					surfaceMaterial(palettes.white, 0.15, true, true),
@@ -576,7 +675,7 @@ export function createLightAvatar(host) {
 				}
 				group.add(
 					new THREE.Line(
-						own(new THREE.BufferGeometry()).setFromPoints(points),
+						byHeight(own(new THREE.BufferGeometry()).setFromPoints(points)),
 						lineMaterial(
 							n % 7 === 0 ? palettes.blue : palettes.gold,
 							kind === "b"
@@ -602,29 +701,37 @@ export function createLightAvatar(host) {
 				);
 				particles.push([p.x, p.y, p.z]);
 			}
-			group.add(makePoints(particles, palettes.gold, 0.82, 0.5));
-			addReferenceEyes(group, kind);
+			group.add(
+				makePoints(
+					particles,
+					palettes.gold,
+					heightInfluences(particles),
+					0.82,
+					0.5,
+				),
+			);
+			addReferenceEyes(group, bone("eyes"));
+			// The core and its orbits are rigid children of the core bone, which sits at the core.
 			const core = glow(palettes.gold, 0.65);
-			core.position.set(0, 0.06, 0.15);
-			group.add(core);
+			bone("core").add(core);
 			group.userData.core = core;
 			const star = new THREE.Mesh(
 				own(new THREE.SphereGeometry(0.056, 16, 10)),
 				own(new THREE.MeshBasicMaterial({ color: "#fff4ca" })),
 			);
-			star.position.copy(core.position);
-			group.add(star);
+			bone("core").add(star);
+			group.userData.star = star;
 			const inner = [];
 			for (let n = 0; n < 500; n++) {
 				const r = 0.43 * Math.pow(random(), 0.5),
 					a = random() * TAU,
 					z = random() * 0.5;
-				inner.push([Math.cos(a) * r, 0.06 + Math.sin(a) * r, z - 0.25]);
+				inner.push([Math.cos(a) * r, Math.sin(a) * r, z - 0.4]);
 			}
-			group.add(makePoints(inner, palettes.white, 0.7, 0.4));
+			bone("core").add(makePoints(inner, palettes.white, null, 0.7, 0.4));
 			if (kind === "b") {
 				addArms(group);
-				addCoreParticles(group, core.position);
+				addCoreParticles(bone("core"));
 			}
 			return group;
 		}
@@ -686,118 +793,60 @@ export function createLightAvatar(host) {
 			geo.computeVertexNormals();
 			return geo;
 		}
-		const armBendGLSL = `uniform float uArmSwing;uniform float uArmReach;
- vec3 bendArm(vec3 p,float u){float w=smoothstep(0.,1.,u),a=uArmSwing*w,b=uArmReach*w;vec3 q=vec3(cos(a)*p.x-sin(a)*p.y,sin(a)*p.x+cos(a)*p.y,p.z);return vec3(q.x,cos(b)*q.y-sin(b)*q.z,sin(b)*q.y+cos(b)*q.z);}`;
 		/** @param {ThreeObject} group */
 		function addArms(group) {
 			const arms = [];
-			for (const layer of ["outer", "inner"])
-				for (const side of [-1, 1]) {
-					const arm = new THREE.Group(),
-						isOuter = layer === "outer";
-					const points = isOuter
-						? [
-								[side * 0.2, 0.33, -0.08],
-								[side * 0.64, 0.59, -0.02],
-								[side * 0.94, 0.99, 0.03],
-								[side * 0.99, 1.35, 0.04],
-								[side * 0.88, 1.58, 0.09],
-							]
-						: [
-								[side * 0.14, 0.18, 0.28],
-								[side * 0.43, 0.32, 0.35],
-								[side * 0.68, 0.62, 0.39],
-								[side * 0.72, 0.92, 0.43],
-								[side * 0.59, 1.14, 0.44],
-							];
-					const vectors = points.map((p) => new THREE.Vector3(...p)),
-						shoulder = /** @type {THREE.Vector3} */ (vectors[0]).clone();
-					arm.position.copy(shoulder);
-					vectors.forEach((p) => p.sub(shoulder));
-					const curve = new THREE.CatmullRomCurve3(vectors),
-						bend = { uArmSwing: { value: 0 }, uArmReach: { value: 0 } };
-					arm.userData = { side, layer, bend };
-					const glass = own(armGlass.clone());
-					glass.onBeforeCompile = (/** @type {any} */ shader) => {
-						Object.assign(shader.uniforms, bend);
-						shader.vertexShader = armBendGLSL + "\n" + shader.vertexShader;
-						shader.vertexShader = shader.vertexShader.replace(
-							"#include <beginnormal_vertex>",
-							"#include <beginnormal_vertex>\nobjectNormal=bendArm(objectNormal,uv.y);",
-						);
-						shader.vertexShader = shader.vertexShader.replace(
-							"#include <begin_vertex>",
-							"#include <begin_vertex>\ntransformed=bendArm(transformed,uv.y);",
-						);
-					};
-					glass.customProgramCacheKey = () => "saaa-flexible-arm";
-					arm.add(
-						new THREE.Mesh(
-							ribbonGeometry(curve, isOuter ? 0.175 : 0.11, 0, 0.3),
-							glass,
-						),
-					);
-					for (let k = 0; k < 3; k++) {
-						const points2 = [],
-							weights = [];
-						for (let j = 0; j < 80; j++) {
-							const u = j / 79,
-								p = curve.getPoint(u);
-							p.z += Math.sin(u * 7 + k) * 0.016;
-							p.x += Math.sin(u * Math.PI) * (k - 1) * 0.011;
-							points2.push(p);
-							weights.push(u);
-						}
-						const geometry = own(new THREE.BufferGeometry()).setFromPoints(
-							points2,
-						);
-						geometry.setAttribute(
-							"aU",
-							new THREE.Float32BufferAttribute(weights, 1),
-						);
-						const material = lineMaterial(palettes.gold, 0.18, false);
-						Object.assign(material.uniforms, bend);
-						material.vertexShader =
-							armBendGLSL +
-							"attribute float aU;varying float vY;void main(){vY=position.y;gl_Position=projectionMatrix*modelViewMatrix*vec4(bendArm(position,aU),1.);}";
-						arm.add(new THREE.Line(geometry, material));
+			for (const { layer, side, curve } of armCurves) {
+				const isOuter = layer === "outer";
+				/** @param {number} u */
+				const along = (u) => armInfluence(layer, side, u);
+				const ribbon = ribbonGeometry(curve, isOuter ? 0.175 : 0.11, 0, 0.3);
+				const uv = ribbon.getAttribute("uv");
+				setInfluences(
+					ribbon,
+					Array.from({ length: uv.count }, (_, i) => along(uv.getY(i))),
+				);
+				group.add(new THREE.Mesh(ribbon, foldGlass));
+				for (let k = 0; k < 3; k++) {
+					const points2 = [],
+						weights = [];
+					for (let j = 0; j < 80; j++) {
+						const u = j / 79,
+							p = curve.getPoint(u);
+						p.z += Math.sin(u * 7 + k) * 0.016;
+						p.x += Math.sin(u * Math.PI) * (k - 1) * 0.011;
+						points2.push(p);
+						weights.push(along(u));
 					}
-					const grains = [],
-						grainU = [];
-					for (let n = 0; n < 240; n++) {
-						const u = random(),
-							p = curve.getPoint(u),
-							t = curve.getTangent(u),
-							sideVector = new THREE.Vector3(-t.y, t.x, 0).normalize(),
-							r =
-								(isOuter ? 0.175 : 0.11) * Math.pow(Math.sin(u * Math.PI), 0.7);
-						p.addScaledVector(sideVector, (random() * 2 - 1) * r * 0.8);
-						p.z += gaussian() * 0.018;
-						grains.push([p.x, p.y, p.z]);
-						grainU.push(u);
-					}
-					const dust = makePoints(grains, palettes.gold, 0.65, 0.4);
-					dust.geometry.setAttribute(
-						"aU",
-						new THREE.Float32BufferAttribute(grainU, 1),
+					const geometry = setInfluences(
+						own(new THREE.BufferGeometry()).setFromPoints(points2),
+						weights,
 					);
-					Object.assign(dust.material.uniforms, bend);
-					dust.material.vertexShader =
-						armBendGLSL +
-						"\nattribute float aU;\n" +
-						dust.material.vertexShader.replace(
-							"vec3 p=deform(position);",
-							"vec3 p=bendArm(position,aU);",
-						);
-					arm.add(dust);
-					const tip = glow(palettes.gold, isOuter ? 0.135 : 0.105);
-					tip.position.copy(/** @type {THREE.Vector3} */ (vectors.at(-1)));
-					arm.add(tip);
-					arm.userData.tip = tip;
-					arm.userData.tipRest = tip.position.clone();
-					arms.push(arm);
-					group.add(arm);
+					group.add(
+						new THREE.Line(geometry, lineMaterial(palettes.gold, 0.18)),
+					);
 				}
+				const grains = [],
+					grainWeights = [];
+				for (let n = 0; n < 240; n++) {
+					const u = random(),
+						p = curve.getPoint(u),
+						t = curve.getTangent(u),
+						sideVector = new THREE.Vector3(-t.y, t.x, 0).normalize(),
+						r = (isOuter ? 0.175 : 0.11) * Math.pow(Math.sin(u * Math.PI), 0.7);
+					p.addScaledVector(sideVector, (random() * 2 - 1) * r * 0.8);
+					p.z += gaussian() * 0.018;
+					grains.push([p.x, p.y, p.z]);
+					grainWeights.push(along(u));
+				}
+				group.add(makePoints(grains, palettes.gold, grainWeights, 0.65, 0.4));
+				const tipName = /** @type {import("./skeleton.ts").BoneName} */ (
+					`arm_${layer}_${side < 0 ? "l" : "r"}_tip`
+				);
+				const tip = glow(palettes.gold, isOuter ? 0.135 : 0.105);
+				bone(tipName).add(tip);
+				arms.push({ layer, side, tip, bone: bone(tipName), size: tip.scale.x });
+			}
 			group.userData.arms = arms;
 			// Open, overlapping waist membranes curl around the luminous center and meet at a narrow hem.
 			for (const side of [-1, 1])
@@ -828,6 +877,7 @@ export function createLightAvatar(host) {
 							layer === 0 ? 0.31 : 0.19,
 							side * (layer === 0 ? 1.0 : -1.1),
 						);
+					byHeight(geo);
 					group.add(new THREE.Mesh(geo, foldGlass));
 					group.add(
 						new THREE.Mesh(geo, surfaceMaterial(palettes.gold, 0.07, true)),
@@ -842,18 +892,15 @@ export function createLightAvatar(host) {
 						}
 						group.add(
 							new THREE.Line(
-								own(new THREE.BufferGeometry()).setFromPoints(line),
+								byHeight(own(new THREE.BufferGeometry()).setFromPoints(line)),
 								lineMaterial(k === 0 ? palettes.blue : palettes.gold, 0.085),
 							),
 						);
 					}
 				}
 		}
-		/**
-		 * @param {ThreeObject} group
-		 * @param {ThreeObject} center
-		 */
-		function addCoreParticles(group, center) {
+		/** @param {ThreeObject} group the core bone; orbits are built around its origin */
+		function addCoreParticles(group) {
 			const list = [];
 			for (let n = 0; n < 2000; n++) {
 				const angle = random() * TAU,
@@ -871,17 +918,13 @@ export function createLightAvatar(host) {
 					/** @type {number} */ ([0.45, -0.65, 1.2][lane]),
 				);
 				p.applyAxisAngle(new THREE.Vector3(0, 0, 1), lane * 0.75);
-				p.add(center);
 				list.push([p.x, p.y, p.z]);
 			}
-			const swarm = makePoints(list, palettes.gold, 0.95, 1);
-			swarm.material.uniforms.uOrbitCenter = { value: center.clone() };
+			const swarm = makePoints(list, palettes.gold, null, 0.95, 1);
 			swarm.material.vertexShader = swarm.material.vertexShader.replace(
 				"vec3 p=deform(position);",
-				"vec3 q=position-uOrbitCenter;float a=uTime*.23*(.7+fract(aPhase)*.6),c=cos(a),s=sin(a);q.xz=mat2(c,-s,s,c)*q.xz;vec3 p=deform(q+uOrbitCenter);",
+				"vec3 q=position;float a=uFlow*.23*(.7+fract(aPhase)*.6),c=cos(a),s=sin(a);q.xz=mat2(c,-s,s,c)*q.xz;vec3 p=deform(q);",
 			);
-			swarm.material.vertexShader =
-				"uniform vec3 uOrbitCenter;" + swarm.material.vertexShader;
 			group.add(swarm);
 			group.userData.coreParticles = 2000;
 			for (let lane = 0; lane < 3; lane++) {
@@ -895,13 +938,12 @@ export function createLightAvatar(host) {
 						/** @type {number} */ ([0.45, -0.65, 1.2][lane]),
 					);
 					p.applyAxisAngle(new THREE.Vector3(0, 0, 1), lane * 0.75);
-					p.add(center);
 					points.push(p);
 				}
 				group.add(
 					new THREE.Line(
 						own(new THREE.BufferGeometry()).setFromPoints(points),
-						lineMaterial(palettes.gold, 0.1),
+						lineMaterial(palettes.gold, 0.1, false),
 					),
 				);
 			}
@@ -966,8 +1008,7 @@ export function createLightAvatar(host) {
 					),
 			}),
 		);
-		let current = "b",
-			yaw = 0,
+		let yaw = 0,
 			pitch = 0,
 			w = 1,
 			h = 1;
@@ -976,153 +1017,166 @@ export function createLightAvatar(host) {
 			h = Math.max(1, host.clientHeight);
 			renderer.setSize(w, h, false);
 			camera.aspect = w / h;
-			camera.position.z = camera.aspect < 0.65 ? 8.6 : 7.7;
+			camera.position.z = camera.aspect < 0.65 ? 9.5 : 8.5;
 			camera.updateProjectionMatrix();
 			const d = renderer.getPixelRatio();
 			base.setSize(Math.round(w * d), Math.round(h * d));
 			ping.setSize(Math.round((w * d) / 2), Math.round((h * d) / 2));
 			pong.setSize(Math.round((w * d) / 2), Math.round((h * d) / 2));
 		}
-		/** @type {string | null} */
-		let activeMode = null,
-			activeSpeaking = false,
-			idleGestureWeight = 1,
-			lastIdleTime = 0,
-			previousPose = sampleMotion("neutral", 0),
-			acting = previousPose;
-		const headEuler = new THREE.Euler(),
-			headRotation = new THREE.Quaternion(),
-			headCamera = new THREE.Vector3(),
-			headNormal = new THREE.Vector3(),
-			eyeQuaternion = new THREE.Quaternion();
+		const performer = createPerformer();
+		const secondary = createSecondaryMotion(skeleton);
+		const flame = models.b;
+		let layers = { ...defaultLayers },
+			/** @type {import("./clips.ts").Pose} */
+			pose = {},
+			/** @type {string | null} */
+			activeMode = null,
+			flow = 0,
+			lastTime = 0,
+			frontFacing = 1;
+		/** @type {THREE.SkeletonHelper | null} */
+		let skeletonHelper = null;
+		// Arm tips leave a short fading light trail; one draw call for all four arms.
+		const trailLength = 8;
+		const trailPositions = new Float32Array(
+			flame.userData.arms.length * trailLength * 3,
+		);
+		const trailGeometry = own(new THREE.BufferGeometry());
+		trailGeometry.setAttribute(
+			"position",
+			new THREE.BufferAttribute(trailPositions, 3).setUsage(
+				THREE.DynamicDrawUsage,
+			),
+		);
+		const trailAlpha = new Float32Array(
+			flame.userData.arms.length * trailLength,
+		);
+		trailGeometry.setAttribute(
+			"aAlpha",
+			new THREE.BufferAttribute(trailAlpha, 1).setUsage(THREE.DynamicDrawUsage),
+		);
+		const trailMaterial = own(
+			new THREE.ShaderMaterial({
+				uniforms: {
+					uColor: { value: palettes.gold },
+					uPixelRatio: { value: renderer.getPixelRatio() },
+				},
+				transparent: true,
+				depthWrite: false,
+				blending: THREE.AdditiveBlending,
+				vertexShader: `uniform float uPixelRatio;attribute float aAlpha;varying float vAlpha;void main(){vAlpha=aAlpha;vec4 mv=modelViewMatrix*vec4(position,1.);gl_Position=projectionMatrix*mv;gl_PointSize=(.35+aAlpha)*18.*uPixelRatio*(6.5/-mv.z);}`,
+				fragmentShader: `uniform vec3 uColor;varying float vAlpha;void main(){vec2 p=gl_PointCoord-.5;float d=dot(p,p);if(d>.25)discard;gl_FragColor=vec4(uColor,exp(-d*18.)*vAlpha*.6);}`,
+			}),
+		);
+		const trail = new THREE.Points(trailGeometry, trailMaterial);
+		trail.frustumCulled = false;
+		scene.add(trail);
+		let trailReady = false;
+		const tipWorld = new THREE.Vector3(),
+			scratch = new THREE.Vector3(),
+			eyesWorld = new THREE.Vector3(),
+			eyesForward = new THREE.Vector3(),
+			eyesQuaternion = new THREE.Quaternion();
+		let trailTime = 0;
+		/**
+		 * Shifts each tip's history once per advance of the clock (a redraw at the same time
+		 * keeps it) and hides samples that sit on the tip: no motion, no trail.
+		 * @param {number} time
+		 */
+		function updateTrail(time) {
+			if (time < trailTime) trailReady = false;
+			const advance = !trailReady || time > trailTime;
+			trailTime = time;
+			flame.userData.arms.forEach(
+				(/** @type {any} */ arm, /** @type {number} */ a) => {
+					arm.bone.getWorldPosition(tipWorld);
+					const base = a * trailLength * 3;
+					if (!trailReady)
+						for (let i = 0; i < trailLength; i++)
+							tipWorld.toArray(trailPositions, base + i * 3);
+					if (advance)
+						trailPositions.copyWithin(
+							base + 3,
+							base,
+							base + (trailLength - 1) * 3,
+						);
+					tipWorld.toArray(trailPositions, base);
+					for (let i = 0; i < trailLength; i++) {
+						const distance = scratch
+							.fromArray(trailPositions, base + i * 3)
+							.distanceTo(tipWorld);
+						trailAlpha[a * trailLength + i] =
+							(1 - i / trailLength) *
+							THREE.MathUtils.smoothstep(distance, 0.04, 0.22);
+					}
+				},
+			);
+			trailReady = true;
+			trailGeometry.getAttribute("position").needsUpdate = true;
+			trailGeometry.getAttribute("aAlpha").needsUpdate = true;
+		}
+		/** @param {string} name */
+		const c = (name) => pose[name] ?? 0;
 		/**
 		 * @param {number} [time]
-		 * @param {import("./model.js").AvatarMotion} [mode]
+		 * @param {string} [mode]
 		 * @param {number} [elapsed]
 		 * @param {boolean} [speaking]
 		 */
 		function render(time = 0, mode = "neutral", elapsed = 0, speaking = false) {
 			renderer.info.reset();
+			const dt = Math.min(0.25, Math.max(0, time - lastTime));
+			lastTime = time;
+			activeMode = mode;
+			pose = performer.sample(time, mode, elapsed, speaking, layers);
 			uniforms.uTime.value = time;
-			if (activeMode !== mode || activeSpeaking !== speaking) {
-				previousPose = { ...acting };
-				activeMode = mode;
-				activeSpeaking = speaking;
-			}
-			const phraseTime = Math.max(0, elapsed);
-			const softened = samplePerformancePose(mode, phraseTime, speaking);
-			acting = blendPose(previousPose, softened, Math.min(1, phraseTime / 0.7));
-			const fadeStep = Math.min(0.25, Math.max(0, time - lastIdleTime)) / 0.7;
-			const idleTarget = mode === "neutral" && !speaking ? 1 : 0;
-			idleGestureWeight += clamp(
-				idleTarget - idleGestureWeight,
-				-fadeStep,
-				fadeStep,
-			);
-			lastIdleTime = time;
-			const idle = sampleIdlePose(time, idleGestureWeight);
-			const p = { ...acting };
-			for (const part of /** @type {(keyof import("./motion.js").Pose)[]} */ ([
-				"lift",
-				"bx",
-				"by",
-				"bz",
-				"hx",
-				"hy",
-				"hz",
-				"left",
-				"right",
-				"leftInner",
-				"rightInner",
-				"energy",
-			]))
-				p[part] += /** @type {Record<string, number>} */ (idle)[part] ?? 0;
-			if (mode === "neutral" && !speaking) p.open *= idle.open;
-			uniforms.uEnergy.value = p.energy;
-			uniforms.uThinking.value = mode === "thinking" ? 1 : 0;
-			root.position.set(0, p.lift, p.forward);
+			uniforms.uEnergy.value = Math.max(0, c("light.energy"));
+			uniforms.uSparkle.value = Math.max(0, c("light.sparkle"));
+			flow += dt * (1 + Math.max(0, c("light.swirl")) * 2.5);
+			uniforms.uFlow.value = flow;
+			root.position.set(c("body.px"), c("body.py"), c("body.pz"));
 			root.rotation.set(
-				pitch + p.bx,
-				yaw + p.by + (current === "b" ? 0.34 : 0),
-				p.bz,
+				pitch + c("body.x"),
+				yaw + 0.34 + c("body.y") + c("spin"),
+				c("body.z"),
 			);
-			root.scale.setScalar(1);
-			const m = models[current],
-				pivot = uniforms.uHeadPivot.value;
-			pivot.set(0, 0.68, 0);
-			uniforms.uHeadSpan.value.set(0.57, 1.18);
-			headEuler.set(p.hx, p.hy, p.hz);
-			headRotation.setFromEuler(headEuler);
-			uniforms.uHead.value.makeRotationFromQuaternion(headRotation);
-			if (m.userData.arms)
-				m.userData.arms.forEach((/** @type {any} */ arm) => {
-					const d = arm.userData,
-						swing =
-							d.layer === "outer"
-								? d.side < 0
-									? p.left
-									: p.right
-								: d.side < 0
-									? p.leftInner
-									: p.rightInner,
-						reach =
-							d.layer === "outer"
-								? p.hx * 0.06
-								: (d.side < 0 ? p.rightInner : -p.leftInner) * 0.35;
-					d.bend.uArmSwing.value = swing;
-					d.bend.uArmReach.value = reach;
-					const q = d.tipRest.clone(),
-						c = Math.cos(swing),
-						s = Math.sin(swing),
-						x = c * q.x - s * q.y,
-						y = s * q.x + c * q.y;
-					d.tip.position.set(
-						x,
-						Math.cos(reach) * y - Math.sin(reach) * q.z,
-						Math.sin(reach) * y + Math.cos(reach) * q.z,
-					);
-				});
-			m.userData.core.scale.setScalar(
-				(current === "b" ? 0.6 : 0.65) * (1 + p.energy * 0.08),
+			skeleton.reset();
+			for (const bone of skeleton.ordered) {
+				const x = pose[`${bone.name}.x`],
+					y = pose[`${bone.name}.y`],
+					z = pose[`${bone.name}.z`];
+				if (x || y || z) bone.rotation.set(x ?? 0, y ?? 0, z ?? 0);
+			}
+			const open = clamp(1 - c("eyes.close"), 0.025, 1);
+			for (const eye of flame.userData.eyes) {
+				eye.position
+					.copy(eye.userData.rest)
+					.add(scratch.set(c("eyes.gx"), c("eyes.gy"), 0));
+				eye.scale.set(
+					eye.userData.isGlow ? 0.125 : 1,
+					eye.userData.isGlow ? open * 0.128 : open,
+					eye.userData.isGlow ? 0.16 : 1,
+				);
+			}
+			const energy = uniforms.uEnergy.value,
+				core = Math.max(-0.6, c("light.core"));
+			flame.userData.core.scale.setScalar(
+				0.6 * (1 + energy * 0.08 + core * 0.5),
 			);
+			flame.userData.star.scale.setScalar(1 + core * 0.45);
 			root.updateMatrixWorld(true);
-			const localCamera = headCamera
-				.copy(camera.position)
-				.applyMatrix4(new THREE.Matrix4().copy(root.matrixWorld).invert());
-			headNormal.set(0, 0, 1).applyQuaternion(headRotation);
-			uniforms.uFrontFacing.value = headNormal.dot(
-				localCamera.clone().sub(pivot).normalize(),
+			if (layers.secondary) secondary.update(time);
+			else secondary.reset();
+			skeleton.upload(flame);
+			flame.userData.eyes[0].parent.getWorldPosition(eyesWorld);
+			flame.userData.eyes[0].parent.getWorldQuaternion(eyesQuaternion);
+			eyesForward.set(0, 0, 1).applyQuaternion(eyesQuaternion);
+			frontFacing = eyesForward.dot(
+				scratch.copy(camera.position).sub(eyesWorld).normalize(),
 			);
-			if (m.userData.eyes)
-				m.userData.eyes.forEach((/** @type {any} */ eye) => {
-					const rest = eye.userData.rest,
-						weight = THREE.MathUtils.smoothstep(
-							rest.y,
-							uniforms.uHeadSpan.value.x,
-							uniforms.uHeadSpan.value.y,
-						);
-					const turned = rest
-						.clone()
-						.sub(pivot)
-						.applyQuaternion(headRotation)
-						.add(pivot);
-					eye.position.copy(rest).lerp(turned, weight);
-					eye.position.add(
-						new THREE.Vector3(p.gx, p.gy, 0).applyQuaternion(headRotation),
-					);
-					eyeQuaternion.setFromAxisAngle(
-						new THREE.Vector3(0, 0, 1),
-						eye.userData.eyeRoll,
-					);
-					eye.quaternion.copy(headRotation).multiply(eyeQuaternion);
-					const open = Math.max(0.025, p.open);
-					eye.scale.set(
-						eye.userData.isGlow ? 0.125 : 1,
-						eye.userData.isGlow ? open * 0.128 : open,
-						eye.userData.isGlow ? 0.16 : 1,
-					);
-					eye.visible = uniforms.uFrontFacing.value > 0.06;
-				});
+			for (const eye of flame.userData.eyes) eye.visible = frontFacing > 0.06;
+			updateTrail(time);
 			renderer.setRenderTarget(base);
 			renderer.render(scene, camera);
 			quad.material = blur;
@@ -1146,37 +1200,53 @@ export function createLightAvatar(host) {
 			canvas: renderer.domElement,
 			resize,
 			render,
-			beginMotion() {
-				activeMode = null;
+			/** @param {import("./performer.ts").MotionChoice} [choice] */
+			beginMotion(choice) {
+				performer.begin(choice);
+				trailReady = false;
+			},
+			/** @param {Partial<import("./performer.ts").AvatarLayers>} next */
+			setLayers(next) {
+				layers = { ...layers, ...next };
+			},
+			/** @param {boolean} visible */
+			showSkeleton(visible) {
+				if (visible && !skeletonHelper) {
+					skeletonHelper = new THREE.SkeletonHelper(skeleton.root);
+					own(skeletonHelper.geometry);
+					own(skeletonHelper.material);
+					scene.add(skeletonHelper);
+				} else if (!visible && skeletonHelper) {
+					scene.remove(skeletonHelper);
+					release(skeletonHelper.geometry);
+					release(skeletonHelper.material);
+					skeletonHelper = null;
+				}
 			},
 			stats() {
+				const playing = performer.current();
 				return {
 					time: Number(uniforms.uTime.value.toFixed(3)),
-					armCount: models[current].userData.arms?.length || 0,
-					armSwings:
-						models[current].userData.arms
-							?.map((/** @type {any} */ a) =>
-								Number(a.userData.bend.uArmSwing.value.toFixed(3)),
-							)
-							.join(",") || "",
-					coreParticles: models[current].userData.coreParticles || 0,
 					motion: activeMode,
-					headTilt: Number(acting.hz.toFixed(3)),
-					headNod: Number(acting.hx.toFixed(3)),
-					headTurn: Number(acting.hy.toFixed(3)),
-					eyeOpen: Number(acting.open.toFixed(3)),
-					bodyScale: root.scale.y,
-					eyesVisible: uniforms.uFrontFacing.value > 0.06,
-					frontFacing: Number(uniforms.uFrontFacing.value.toFixed(3)),
+					variant: playing.variant,
+					variantLabel: playing.label,
+					boneCount: boneNames.length,
+					armCount: flame.userData.arms.length,
+					coreParticles: flame.userData.coreParticles || 0,
+					headNod: Number(c("head.x").toFixed(3)),
+					headTurn: Number(c("head.y").toFixed(3)),
+					headTilt: Number(c("head.z").toFixed(3)),
+					spin: Number(c("spin").toFixed(3)),
+					lift: Number(c("body.py").toFixed(3)),
+					eyeOpen: Number(clamp(1 - c("eyes.close"), 0, 1).toFixed(3)),
+					eyesVisible: frontFacing > 0.06,
+					frontFacing: Number(frontFacing.toFixed(3)),
 					renderer: "Three.js WebGL",
 					revision: THREE.REVISION,
-					model: current,
 					geometries: renderer.info.memory.geometries,
 					drawCalls: renderer.info.render.calls,
 					points: renderer.info.render.points,
 					triangles: renderer.info.render.triangles,
-					yaw: Number(yaw.toFixed(3)),
-					pitch: Number(pitch.toFixed(3)),
 				};
 			},
 			dispose,

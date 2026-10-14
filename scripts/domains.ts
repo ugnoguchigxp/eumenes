@@ -143,7 +143,11 @@ export const domains = {
 		backend: "api/domains/settings",
 		web: "web/src/domains/settings",
 		components: null,
-		depends: { api: [], web: ["tts-dictionary", "dots"], test: [] },
+		depends: {
+			api: [],
+			web: ["tts-dictionary", "dots", "background"],
+			test: [],
+		},
 	},
 	inference: {
 		backend: "api/domains/inference",

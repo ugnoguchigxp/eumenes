@@ -8,7 +8,7 @@
 		{
 			"kind": "artifact",
 			"id": "settings.hub",
-			"revision": 4,
+			"revision": 5,
 			"title": "設定",
 			"variants": [
 				{
@@ -49,7 +49,6 @@
 							"dictionary": "settings.dictionary",
 							"memory": "settings.memory",
 							"world": "settings.world",
-							"dots": "settings.dots",
 							"service-tests": "settings.service-tests"
 						}
 					}

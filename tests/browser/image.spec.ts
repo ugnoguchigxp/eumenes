@@ -22,6 +22,106 @@ test.beforeAll(async () => {
 	await fixture.ready(origin);
 });
 test.afterAll(() => fixture.stopAll());
+test("enlarged image fits the viewport without dialog scrollbars", async ({
+	page,
+}) => {
+	await page.route("**/api/images/past-image/content", (route) =>
+		route.fulfill({
+			contentType: "image/svg+xml",
+			body: '<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1536"><rect width="1024" height="1536" fill="red"/></svg>',
+		}),
+	);
+	await page.goto(origin);
+	await page.getByRole("button", { name: "アーティファクトを開く" }).click();
+	await page.getByRole("menuitem", { name: "画像生成", exact: true }).click();
+	const studio = page.locator(".image-workspace");
+	await studio.getByRole("button", { name: "画像一覧", exact: true }).click();
+	await studio
+		.getByRole("button", { name: /画像 .*を表示/ })
+		.first()
+		.click();
+	const dialog = page.getByRole("dialog");
+	const image = dialog.getByRole("img");
+	await expect(image).toBeVisible();
+	for (const viewport of [
+		{ width: 1000, height: 700 },
+		{ width: 390, height: 844 },
+	]) {
+		await page.setViewportSize(viewport);
+		const fit = await dialog.evaluate((element) => {
+			const box = element.getBoundingClientRect();
+			const picture = element.querySelector("img")!.getBoundingClientRect();
+			return {
+				horizontalScroll: element.scrollWidth > element.clientWidth,
+				verticalScroll: element.scrollHeight > element.clientHeight,
+				dialogOutsideViewport:
+					box.left < 0 ||
+					box.right > window.innerWidth ||
+					box.top < 0 ||
+					box.bottom > window.innerHeight,
+				imageOutsideDialog:
+					picture.left < box.left ||
+					picture.right > box.right ||
+					picture.top < box.top ||
+					picture.bottom > box.bottom,
+				box: { x: box.x, y: box.y, width: box.width, height: box.height },
+				picture: {
+					x: picture.x,
+					y: picture.y,
+					width: picture.width,
+					height: picture.height,
+				},
+			};
+		});
+		const { box, picture, ...result } = fit;
+		expect(result, JSON.stringify({ viewport, box, picture })).toEqual({
+			horizontalScroll: false,
+			verticalScroll: false,
+			dialogOutsideViewport: false,
+			imageOutsideDialog: false,
+		});
+	}
+});
+test("artifact image request stays out of chat and its result opens the saved image", async ({
+	page,
+}) => {
+	await page.goto(origin);
+	await page.getByRole("button", { name: "アーティファクトを開く" }).click();
+	await page.getByRole("menuitem", { name: "画像生成", exact: true }).click();
+	const studio = page.locator(".image-workspace");
+	await expect(studio).toBeVisible();
+	await studio
+		.getByRole("textbox", { name: "画像作成プロンプト" })
+		.fill("暖かな色の空の画像");
+	await studio.getByRole("button", { name: "画像を生成", exact: true }).click();
+	await expect(
+		studio.getByText("画像が完成しました", { exact: true }),
+	).toBeVisible();
+	await expect(
+		page
+			.locator(".message-user")
+			.filter({ hasText: "次の入力の制作プロンプト" }),
+	).toHaveCount(0);
+	const result = page.getByRole("button", {
+		name: "アーティファクトで画像を確認する",
+	});
+	await expect(result).toBeVisible();
+	await result.click();
+	await expect(
+		studio.locator(
+			'.image-preview-frame img[src="/api/images/new-image/content"]',
+		),
+	).toBeVisible();
+	await page.reload();
+	await expect(
+		page
+			.locator(".message-user")
+			.filter({ hasText: "次の入力の制作プロンプト" }),
+	).toHaveCount(0);
+	await expect(
+		page.getByRole("button", { name: "アーティファクトで画像を確認する" }),
+	).toBeVisible();
+});
 test("OpenUI image studio: selected prompt, protected edits, artifact gallery and result operations", async ({
 	page,
 }) => {
@@ -82,6 +182,14 @@ test("OpenUI image studio: selected prompt, protected edits, artifact gallery an
 	await expect(
 		studio.getByText("画像が完成しました", { exact: true }),
 	).toBeVisible();
+	await expect(
+		page.getByRole("button", { name: "アーティファクトで画像を確認する" }),
+	).toBeVisible();
+	await expect(
+		page
+			.locator(".message-user")
+			.filter({ hasText: "次の入力の制作プロンプト" }),
+	).toHaveCount(0);
 	const picture = studio.getByRole("img", { name: "夕焼けの海", exact: true });
 	await expect(picture).toBeVisible();
 	expect((await picture.boundingBox())!.width).toBeLessThanOrEqual(160);

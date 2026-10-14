@@ -21,7 +21,6 @@ import {
 	type SettingsAdapterPorts,
 } from "./settings-adapter";
 import { createRecordsAdapter, type RecordsPorts } from "./records-adapter";
-import { createDotsAdapter, type DotsAdapterPorts } from "./dots-adapter";
 import { createMemoryAdapter, type MemoryAdapterPorts } from "./memory-adapter";
 import {
 	createWorldAdapter,
@@ -83,8 +82,6 @@ export async function createToolchain(
 		world?: WorldAdapterPortsLookup;
 		/** The 動作確認 screen. */
 		serviceTests?: ServiceTestsPorts;
-		/** The 外部作業 screen (dots configuration and events; packages come from capabilities). */
-		dotsScreen?: Omit<DotsAdapterPorts, "packages">;
 		/** Key for HMAC digests of secret-bearing UI actions (absent: such actions are refused). */
 		secretKey?: () => Uint8Array | undefined;
 		/** Open toolchain interactions for the timer question source (dialogue, created later). */
@@ -124,20 +121,6 @@ export async function createToolchain(
 		...(options.world ? [createWorldAdapter(options.world)] : []),
 		...(options.serviceTests
 			? [createServiceTestsAdapter(options.serviceTests)]
-			: []),
-		...(options.dots && options.dotsScreen
-			? [
-					createDotsAdapter({
-						...options.dotsScreen,
-						// Capabilities is created below; the adapter only calls it during operations.
-						packages: {
-							listDotsPackagesInTransaction: (db) =>
-								capabilities.listDotsPackagesInTransaction(db),
-							putDotsPackageInTransaction: (db, raw) =>
-								capabilities.putDotsPackageInTransaction(db, raw),
-						},
-					}),
-				]
 			: []),
 	]);
 	const capabilities = createCapabilities(

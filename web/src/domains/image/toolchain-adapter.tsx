@@ -12,7 +12,7 @@ export const IMAGE_SCREEN_ADAPTER_REF = "adapter:image-screen@1";
 /** Registered presentation with the existing authenticated image operations. */
 export const imageScreenWebAdapter: WebArtifactAdapter = {
 	adapterRef: IMAGE_SCREEN_ADAPTER_REF,
-	useArtifact({ client, artifact }) {
+	useArtifact({ client, artifact, targetRef }) {
 		const cache = useQueryClient();
 		const definition = artifact.variants.find(
 			(v) => v.id === artifact.defaultVariant,
@@ -29,6 +29,7 @@ export const imageScreenWebAdapter: WebArtifactAdapter = {
 			request?.view === "image-workspace"
 				? request.creationOptions?.defaults
 				: undefined,
+			targetRef,
 		);
 		return {
 			phase: error

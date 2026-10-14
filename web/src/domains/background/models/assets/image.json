@@ -1,0 +1,66 @@
+{
+	"id": "image",
+	"label": "画像生成",
+	"kind": "image",
+	"category": "provider",
+	"sample": true,
+	"pointCount": 2720,
+	"stride": 8,
+	"binary": "image.bin",
+	"shape": {
+		"name": "woven-point-light-curtain",
+		"description": "Rectangular, gently saddle-curved light fabric made only of separate warp and weft samples with point-traced border bindings. The over-under offset suggests weaving without solid faces.",
+		"topology": "28 warp traces, 22 weft traces, four point borders",
+		"components": 3,
+		"silhouette": "A clear rectangular curtain with bowed depth and airy, regular weave.",
+		"primaryPlane": "XZ",
+		"label": "縦横に織る光の幕"
+	},
+	"motion": {
+		"type": "woven-surface-scan",
+		"phaseMeaning": "Normalized Z height: phase 0 at the lower border →1 at the upper border. Both warp and weft share this phase so a coherent horizontal scan band crosses the fabric.",
+		"groupMeaning": {
+			"0": "vertical warp traces",
+			"1": "horizontal weft traces",
+			"2": "four edge bindings"
+		},
+		"cyclesPerSecond": 0.1,
+		"pulseWidth": 0.09,
+		"baseBrightness": 0.62,
+		"peakBrightness": 1.0,
+		"maxDisplacement": 0.004,
+		"restPoseRequired": true,
+		"deterministic": true,
+		"rules": [
+			"Animate brightness on anchored coordinates; never integrate particle positions over time.",
+			"Keep all structural points visible when idle, offline, or at zero activity.",
+			"Health selects one uniform color for the whole object; group is never a color category.",
+			"Use bounded, modulo-wrapped time. Activity changes speed and pulse amplitude, not the silhouette.",
+			"Reduced motion uses the rest coordinates and constant per-point weight."
+		],
+		"flowAxis": "+Z across XZ fabric",
+		"suggestion": "Send a narrow horizontal brightness band upward across both thread families, then optionally switch to a column scan derived from x. Do not turn the cloth into a filled plane or replace the dots with grid lines."
+	},
+	"normalizationRadius": 1.34356408,
+	"bounds": {
+		"min": [-1.0549999475479126, -0.21470801532268524, -0.8299999833106995],
+		"max": [1.0549999475479126, 0.21332326531410217, 0.8299999833106995]
+	},
+	"attributes": ["x", "y", "z", "phase", "group", "seed", "size", "weight"],
+	"coordinateSystem": "right-handed, Z-up",
+	"binaryFormat": "little-endian float32",
+	"version": "1.0.0",
+	"groups": [0, 1, 2],
+	"sha256": "138ac0fb7d6e4c2e9f71a09e38ec5c3d23c03f306554caa84e794c610207512d",
+	"provenance": "Approved monitoring-galaxy point-cloud form study; final deterministic provider geometry.",
+	"rendering": {
+		"primitive": "points",
+		"solidSurfaces": false,
+		"suggestedPixelSize": 1.35,
+		"additiveGlow": "restrained",
+		"sameColorAcrossAllPoints": true,
+		"recommendedMinimumObjectPixels": 64,
+		"doNotRandomizePositionsPerFrame": true,
+		"seedUsage": "Stable visual variation only; never make silhouette depend on seed or elapsed time."
+	}
+}

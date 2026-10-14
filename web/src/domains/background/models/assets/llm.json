@@ -1,0 +1,65 @@
+{
+	"id": "llm",
+	"label": "LLM",
+	"kind": "llm",
+	"category": "provider",
+	"sample": true,
+	"pointCount": 2592,
+	"stride": 8,
+	"binary": "llm.bin",
+	"shape": {
+		"name": "trefoil-braid-knot",
+		"description": "Three fine point filaments trace one continuous over-under trefoil knot, with large negative spaces and deep crossing separation.",
+		"topology": "closed (2,3) torus knot, three parallel micro-filaments",
+		"components": 3,
+		"silhouette": "Continuous woven knot; crossings retain front/back depth. Not three independent flower petals.",
+		"label": "三つ編みの結び目"
+	},
+	"motion": {
+		"type": "knot-circulation",
+		"phaseMeaning": "Normalized arclength, 0→1 around the closed trefoil; all three micro-strands share the same longitudinal phase.",
+		"groupMeaning": {
+			"0": "braid filament A",
+			"1": "braid filament B",
+			"2": "braid filament C"
+		},
+		"cyclesPerSecond": 0.115,
+		"pulseWidth": 0.115,
+		"baseBrightness": 0.62,
+		"peakBrightness": 1.0,
+		"maxDisplacement": 0.008,
+		"restPoseRequired": true,
+		"deterministic": true,
+		"rules": [
+			"Animate brightness on anchored coordinates; never integrate particle positions over time.",
+			"Keep all structural points visible when idle, offline, or at zero activity.",
+			"Health selects one uniform color for the whole object; group is never a color category.",
+			"Use bounded, modulo-wrapped time. Activity changes speed and pulse amplitude, not the silhouette.",
+			"Reduced motion uses the rest coordinates and constant per-point weight."
+		],
+		"suggestion": "Move a short bright packet continuously around the knot, with a faint second packet half a cycle behind. Do not unwind the knot or rotate its lobes independently.",
+		"flowAxis": "closed curve"
+	},
+	"normalizationRadius": 1.0704042,
+	"bounds": {
+		"min": [-0.8660944700241089, -1.0128453969955444, -0.5096805691719055],
+		"max": [1.0691795349121094, 1.012831211090088, 0.5098419189453125]
+	},
+	"attributes": ["x", "y", "z", "phase", "group", "seed", "size", "weight"],
+	"coordinateSystem": "right-handed, Z-up",
+	"binaryFormat": "little-endian float32",
+	"version": "1.0.0",
+	"groups": [0, 1, 2],
+	"sha256": "e35db652373980d832fb9e162be1dd38ef23933b18613005129cfb0c4b0fb79c",
+	"provenance": "Approved monitoring-galaxy point-cloud form study; final deterministic provider geometry.",
+	"rendering": {
+		"primitive": "points",
+		"solidSurfaces": false,
+		"suggestedPixelSize": 1.35,
+		"additiveGlow": "restrained",
+		"sameColorAcrossAllPoints": true,
+		"recommendedMinimumObjectPixels": 64,
+		"doNotRandomizePositionsPerFrame": true,
+		"seedUsage": "Stable visual variation only; never make silhouette depend on seed or elapsed time."
+	}
+}

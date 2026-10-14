@@ -1,4 +1,4 @@
-import { createContext, useContext } from "react";
+import { createContext, useContext, type ReactNode } from "react";
 import type { ArtifactEvent, Receipt, Snapshot } from "./contracts";
 
 export type ArtifactRuntime = {
@@ -9,6 +9,8 @@ export type ArtifactRuntime = {
 		file: File,
 	) => Promise<Receipt & { value?: string }>;
 	dispatch: (event: ArtifactEvent) => Promise<Receipt>;
+	/** Re-read this screen's registered sources after a failed read. */
+	refresh?: () => void;
 	/**
 	 * Reads a media file the host allows (a same-origin `/api/` path, with the session's
 	 * credentials) for a preview. The host refuses any other path.
@@ -21,6 +23,11 @@ export type ArtifactRuntime = {
 	settledEpoch?: number;
 	/** Theme controlled by the host's preview toolbar, when present. */
 	previewTheme?: "light" | "dark";
+	/**
+	 * Views the host draws itself (e.g. the WebGL avatar preview). The package never loads
+	 * their renderer; without an entry the view says the preview is unavailable.
+	 */
+	hostViews?: { "avatar-motion-lab"?: () => ReactNode };
 };
 export const ArtifactRuntimeContext = createContext<ArtifactRuntime | null>(
 	null,

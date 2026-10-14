@@ -130,6 +130,8 @@ function formFieldView(field: FormFieldV1): CollectionFormField {
 			: {}),
 		...(field.options ? { options: field.options } : {}),
 		...(field.maxLength ? { maxLength: field.maxLength } : {}),
+		...(field.min !== undefined ? { min: field.min } : {}),
+		...(field.max !== undefined ? { max: field.max } : {}),
 		...(field.required ? { required: true } : {}),
 	};
 }
@@ -378,7 +380,15 @@ export function parseForm(
 					ok: false,
 					message: `${field.label}を選択肢から選んでください。`,
 				};
-			out[field.fieldId] = text;
+			if (field.valueType === "number") {
+				const number = Number(text);
+				if (!Number.isFinite(number))
+					return {
+						ok: false,
+						message: `${field.label}の値を確認してください。`,
+					};
+				out[field.fieldId] = number;
+			} else out[field.fieldId] = text;
 		} else if (field.control === "number") {
 			const number = Number(text);
 			if (

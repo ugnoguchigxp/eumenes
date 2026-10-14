@@ -18,6 +18,7 @@ export function useImageRuntime(
 		format: "webp",
 		seed: 0,
 	},
+	targetRef?: string,
 ) {
 	const cache = useQueryClient();
 	const query = useQuery({
@@ -32,6 +33,10 @@ export function useImageRuntime(
 	});
 	const items = query.data ?? [];
 	const latest = items[0];
+	const shown =
+		(targetRef
+			? items.find((item) => item.artifactId === targetRef)
+			: undefined) ?? latest;
 	const creation = useImageCreation(client, conversationId, items, latest);
 	const library = useQuery({
 		queryKey: [queryRoots.image, "library"],
@@ -63,23 +68,25 @@ export function useImageRuntime(
 	const resource: ImageWorkspaceResource = {
 		kind: "image-workspace",
 		revision: Math.max(...items.map((i) => i.updatedAt), 0) + creation.revision,
-		identity: latest?.id ?? "studio",
-		initialTab: latest?.action === "library" ? "history" : "create",
+		identity: shown?.id ?? "studio",
+		initialTab: shown?.action === "library" ? "history" : "create",
 		title: "画像生成",
 		defaults: {
-			prompt: latest?.prompt ?? "",
-			width: latest?.width ?? defaults.width,
-			height: latest?.height ?? defaults.height,
-			format: latest?.format ?? defaults.format,
-			seed: latest?.seed ?? defaults.seed,
+			prompt: shown?.prompt ?? "",
+			width: shown?.width ?? defaults.width,
+			height: shown?.height ?? defaults.height,
+			format: shown?.format ?? defaults.format,
+			seed: shown?.seed ?? defaults.seed,
 		},
 		images,
 		selectedId:
-			selection?.latestId === latest?.id
-				? selection?.id
-				: latest?.state === "completed"
-					? (latest.artifactId ?? images[0]?.id)
-					: undefined,
+			targetRef && images.some((image) => image.id === targetRef)
+				? targetRef
+				: selection?.latestId === latest?.id
+					? selection?.id
+					: latest?.state === "completed"
+						? (latest.artifactId ?? images[0]?.id)
+						: undefined,
 		busy: creation.busy,
 		status: creation.creation.status,
 		statusTitle: creation.creation.title,

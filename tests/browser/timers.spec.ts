@@ -7,7 +7,7 @@ import { createFixture } from "./fixture";
 
 const TOKEN = "fixture-token-for-toolchain-browser";
 /** The single launcher entry and tab title of the registered (data-driven) timer screen. */
-const TITLE = "タイマー（データドリブン）";
+const TITLE = "タイマー";
 const ACTIONS = "/api/toolchain-actions";
 
 /**

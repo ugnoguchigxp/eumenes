@@ -110,3 +110,29 @@ it("busy generation blocks choices and submission", () => {
 		screen.getByLabelText("水彩", { selector: "input" }).closest("fieldset"),
 	).toHaveProperty("disabled", true);
 });
+it("uses registered choices and reset defaults without changing the form layout", () => {
+	render(
+		<ImageCreationForm
+			initialValues={defaults}
+			creationOptions={{
+				styleGroups: [{ label: "版画", options: ["木版画"] }],
+				moods: ["静か"],
+				compositions: ["指定なし", "左右対称"],
+				lighting: ["指定なし", "月明かり"],
+				defaults: { width: 640, height: 480, format: "webp", seed: 7 },
+			}}
+			onGenerate={vi.fn()}
+		/>,
+	);
+	expect(screen.queryByLabelText("水彩", { selector: "input" })).toBeNull();
+	fireEvent.click(screen.getByLabelText("木版画", { selector: "input" }));
+	expect(prompt().value).toBe("画風：木版画");
+	fireEvent.change(screen.getByLabelText("構図"), {
+		target: { value: "左右対称" },
+	});
+	expect(prompt().value).toBe("画風：木版画\n構図：左右対称");
+	fireEvent.click(screen.getByRole("button", { name: "リセット" }));
+	expect(screen.getByLabelText("幅（px）")).toHaveProperty("value", "640");
+	expect(screen.getByLabelText("保存形式")).toHaveProperty("value", "webp");
+	expect(screen.getByLabelText("シード")).toHaveProperty("value", "7");
+});

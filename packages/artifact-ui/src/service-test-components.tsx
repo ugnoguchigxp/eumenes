@@ -8,66 +8,13 @@ import type {
 } from "./collection-contracts";
 import type { ArtifactRequest, Receipt } from "./contracts";
 import { useArtifactRuntime } from "./runtime";
+import { ServiceTestPreview } from "./service-test-preview";
 
 function date(value: string) {
 	const parsed = Number(value);
 	return Number.isFinite(parsed) && parsed > 0
 		? new Date(parsed).toLocaleString("ja-JP")
 		: value;
-}
-
-function Preview({ row }: { row: CollectionRow }) {
-	const runtime = useArtifactRuntime();
-	const media = row.media?.preview;
-	const path = media?.path;
-	const fetchMedia = runtime.fetchMedia;
-	const [url, setUrl] = useState<string>();
-	const [error, setError] = useState("");
-	useEffect(() => {
-		if (!path || !fetchMedia) return;
-		let current = true;
-		let objectUrl: string | undefined;
-		void fetchMedia(path)
-			.then((blob) => {
-				if (!current) return;
-				objectUrl = URL.createObjectURL(blob);
-				setUrl(objectUrl);
-			})
-			.catch(() => {
-				if (current) setError("結果の読み込みに失敗しました。");
-			});
-		return () => {
-			current = false;
-			if (objectUrl) URL.revokeObjectURL(objectUrl);
-		};
-	}, [path, fetchMedia]);
-	if (!media) return null;
-	return (
-		<div className="aui-service-preview">
-			{error && <p role="alert">{error}</p>}
-			{url &&
-				(media.mime.startsWith("image/") ? (
-					<img src={url} alt="生成した画像" />
-				) : (
-					<audio src={url} controls preload="metadata">
-						<track
-							kind="captions"
-							srcLang="ja"
-							label="結果の文字起こし"
-							src={`data:text/vtt,${encodeURIComponent(`WEBVTT\n\n00:00:00.000 --> 00:10:00.000\n${row.cells.text ?? ""}`)}`}
-						/>
-					</audio>
-				))}
-			{url && (
-				<a
-					href={url}
-					download={`eumenes-${row.id}.${media.mime === "image/png" ? "png" : media.mime === "image/webp" ? "webp" : media.mime === "audio/mpeg" ? "mp3" : "wav"}`}
-				>
-					結果を保存
-				</a>
-			)}
-		</div>
-	);
 }
 
 function TestInput({
@@ -99,6 +46,15 @@ function TestInput({
 	const [error, setError] = useState("");
 	const [pending, setPending] = useState(false);
 	const uploadGeneration = useRef(0);
+	const invalidNumber = fields.some((field) => {
+		if (field.control !== "number") return false;
+		const value = Number(values[field.id]);
+		return (
+			!Number.isInteger(value) ||
+			(field.min !== undefined && value < field.min) ||
+			(field.max !== undefined && value > field.max)
+		);
+	});
 	useEffect(
 		() => () => {
 			uploadGeneration.current++;
@@ -176,11 +132,14 @@ function TestInput({
 				type={field.control === "number" ? "number" : "text"}
 				value={values[field.id] ?? ""}
 				maxLength={field.maxLength}
+				min={field.min}
+				max={field.max}
 				onChange={(event) => set(field.id, event.target.value)}
 			/>
 		);
 	};
-	if (!start?.form) return <p>このサービスは個別に試せません。</p>;
+	if (!start?.form)
+		return <p>{row.cells.state || "このサービスは個別に試せません。"}</p>;
 	return (
 		<form
 			className="aui-service-input"
@@ -215,7 +174,11 @@ function TestInput({
 					type="button"
 					disabled={busy || pending}
 					onClick={() => {
-						setValues(defaults());
+						setValues((current) => ({
+							...current,
+							text: row.cells.sample ?? "",
+							uploadId: "",
+						}));
 						uploadGeneration.current++;
 						setUploading(false);
 						setUploadName("");
@@ -236,16 +199,28 @@ function TestInput({
 			))}
 			{error && <p role="alert">{error}</p>}
 			<small>
-				送信先：{row.cells.source}{" "}
+				送信先：{row.cells.sourceName}{" "}
 				{row.cells.onDemand === "はい" ? "· 実行時に起動します" : ""}
 			</small>
-			<Button type="submit" disabled={busy || pending || uploading}>
+			<Button
+				type="submit"
+				disabled={
+					busy ||
+					pending ||
+					uploading ||
+					start.disabled ||
+					invalidNumber ||
+					(row.cells.kindCode !== "asr" && !values.text?.trim())
+				}
+			>
+				▶{" "}
 				{row.cells.kindCode === "image"
 					? "画像を生成"
 					: row.cells.kindCode === "music"
 						? "楽曲を生成"
-						: "▶ 簡単テストを実行"}
+						: "簡単テストを実行"}
 			</Button>
+			{start.hint && <small>{start.hint}</small>}
 		</form>
 	);
 }
@@ -264,7 +239,7 @@ function TestResult({
 			<h3>結果</h3>
 			{run ? (
 				<div className="aui-service-result" aria-live="polite">
-					<strong>{run.cells.statusLabel}</strong>
+					<strong>{run.cells.phase || run.cells.statusLabel}</strong>
 					{run.cells.progress !== "—" && run.cells.status === "running" && (
 						<progress
 							max={1}
@@ -282,7 +257,7 @@ function TestResult({
 								一覧名：{run.cells.model}
 							</p>
 						)}
-					<Preview key={run.id} row={run} />
+					<ServiceTestPreview key={run.id} row={run} />
 					{run.cells.status === "succeeded" &&
 						run.cells.previewAvailable === "いいえ" && (
 							<p>プレビューの保持期限が過ぎたか、サーバーが再起動しました。</p>
@@ -294,8 +269,8 @@ function TestResult({
 					)}
 					<small>
 						{date(run.cells.created ?? "")}
-						{run.cells.ended !== "—"
-							? ` · 終了 ${date(run.cells.ended ?? "")}`
+						{Number(run.cells.ended) > 0 && Number(run.cells.created) > 0
+							? ` · ${((Number(run.cells.ended) - Number(run.cells.created)) / 1000).toFixed(1)}秒`
 							: ""}
 					</small>
 					{catalogRevision && run.cells.revision !== catalogRevision && (
@@ -322,6 +297,172 @@ export function ServiceTestWorkspaceView({
 	return <ServiceTestWorkspace request={request} />;
 }
 
+function ServiceNotices({
+	info,
+	resources,
+	message,
+	onReload,
+}: {
+	info?: CollectionRow;
+	resources: Array<CollectionResource | undefined>;
+	message: string;
+	onReload: () => void;
+}) {
+	const dirty = info?.actions.some(
+		(action) =>
+			(action.actionId === "refresh" || action.actionId === "diagnose") &&
+			action.disabled,
+	);
+	return (
+		<>
+			{dirty && (
+				<output className="aui-service-notice">
+					設定に未適用の変更があります。「接続先」などで変更を適用すると試せます。
+				</output>
+			)}
+			{info?.cells.errors && info.cells.errors !== "—" && (
+				<details className="aui-service-notice">
+					<summary>一部の一覧を取得できませんでした</summary>
+					{info.cells.errors.split("\n").map((error) => (
+						<p key={error}>{error}</p>
+					))}
+				</details>
+			)}
+			{info?.cells.refresh && info.cells.refresh !== "—" && (
+				<p role="alert">{info.cells.refresh}</p>
+			)}
+			{resources.some((resource) => resource?.error) && (
+				<p role="alert" className="aui-service-notice">
+					情報を取得できませんでした。{" "}
+					<button type="button" onClick={onReload}>
+						再読み込み
+					</button>
+				</p>
+			)}
+			{message && <output aria-live="polite">{message}</output>}
+		</>
+	);
+}
+
+function ServiceHealth({
+	show,
+	onToggle,
+	diagnosis,
+	info,
+	health,
+}: {
+	show: boolean;
+	onToggle: (open: boolean) => void;
+	diagnosis?: CollectionRow;
+	info?: CollectionRow;
+	health?: CollectionResource;
+}) {
+	if (!show && !diagnosis) return null;
+	return (
+		<details
+			open={show}
+			className="aui-service-health"
+			onToggle={(event) => onToggle(event.currentTarget.open)}
+		>
+			<summary>
+				自己診断の結果 · {diagnosis?.cells.phase ?? "未確認"}
+				{info?.cells.diagnosisRevision !== "—" &&
+				info?.cells.diagnosisRevision !== info?.cells.catalogRevision
+					? "（設定変更前の結果）"
+					: ""}
+			</summary>
+			<p>LARM本体：{info?.cells.control ?? "未確認"}</p>
+			<div>
+				{(health?.rows ?? []).length ? (
+					(health?.rows ?? []).map((row) => (
+						<div key={row.id}>
+							<strong>{row.cells.model || row.cells.name}</strong>
+							<span>{row.cells.state}</span>
+							<small>{row.cells.reason}</small>
+							<small>{row.cells.checkedAt}</small>
+						</div>
+					))
+				) : (
+					<p>まだ診断結果はありません。</p>
+				)}
+			</div>
+		</details>
+	);
+}
+
+function ServiceActive({
+	active,
+	working,
+	onCancel,
+}: {
+	active?: CollectionRow;
+	working: boolean;
+	onCancel: (row: CollectionRow) => void;
+}) {
+	if (!active) return null;
+	return (
+		<div className="aui-service-active" aria-live="polite">
+			<span>
+				{active.cells.kindCode === "diagnostics"
+					? "自己診断"
+					: active.cells.model}{" "}
+				· {active.cells.phase}
+			</span>
+			<Button
+				variant="secondary"
+				disabled={working || active.cells.phase === "停止を確認中"}
+				onClick={() => onCancel(active)}
+			>
+				{active.cells.kindCode === "image" ? "待機を終了" : "中止"}
+			</Button>
+			{active.cells.kindCode === "image" && (
+				<small>待機を終了しても生成が続く場合があります。</small>
+			)}
+		</div>
+	);
+}
+
+function ServiceHeader({
+	title,
+	busy,
+	refresh,
+	diagnose,
+	onRefresh,
+	onDiagnose,
+}: {
+	title: string;
+	busy: boolean;
+	refresh?: CollectionRowAction;
+	diagnose?: CollectionRowAction;
+	onRefresh: () => void;
+	onDiagnose: () => void;
+}) {
+	return (
+		<header className="aui-service-header">
+			<div>
+				<small>SETTINGS / SERVICE TESTS</small>
+				<h2>{title}</h2>
+				<p>プロバイダを選んで、入力と結果を確認できます。</p>
+			</div>
+			<div className="aui-service-header-actions">
+				<Button
+					variant="secondary"
+					disabled={busy || !refresh || refresh.disabled}
+					onClick={onRefresh}
+				>
+					一覧を更新
+				</Button>
+				<Button
+					disabled={busy || !diagnose || diagnose.disabled}
+					onClick={onDiagnose}
+				>
+					自己診断
+				</Button>
+			</div>
+		</header>
+	);
+}
+
 function ServiceTestWorkspace({
 	request,
 }: {
@@ -340,8 +481,26 @@ function ServiceTestWorkspace({
 	const [showHealth, setShowHealth] = useState(false);
 	const [message, setMessage] = useState("");
 	const [working, setWorking] = useState(false);
+	const [refreshRun, setRefreshRun] = useState<{ generation: number } | null>(
+		null,
+	);
+	const loaded = useRef(false);
+	const refreshRead = useRef(runtime.refresh);
+	useEffect(() => {
+		refreshRead.current = runtime.refresh;
+	}, [runtime.refresh]);
 	const info = status?.rows[0];
+	const refreshPending =
+		!!refreshRun &&
+		Number(info?.cells.refreshGeneration ?? 0) < refreshRun.generation + 2;
 	const active = runs?.rows.find((row) => row.cells.status === "running");
+	const diagnosis = runs?.rows.find(
+		(row) => row.cells.kindCode === "diagnostics",
+	);
+	const refresh = info?.actions.find((action) => action.actionId === "refresh");
+	const diagnose = info?.actions.find(
+		(action) => action.actionId === "diagnose",
+	);
 	const targets = (catalog?.rows ?? []).filter(
 		(row) =>
 			row.cells.sourceCode === source &&
@@ -360,6 +519,10 @@ function ServiceTestWorkspace({
 		action: CollectionRowAction,
 		row: CollectionRow,
 	) {
+		if (action.actionId === "refresh")
+			setRefreshRun({
+				generation: Number(info?.cells.refreshGeneration ?? 0) || 0,
+			});
 		setWorking(true);
 		try {
 			const receipt = await runtime.dispatch({
@@ -374,46 +537,65 @@ function ServiceTestWorkspace({
 				},
 			});
 			setMessage(receipt.message);
+			if (action.actionId === "refresh" && receipt.status !== "accepted")
+				setRefreshRun(null);
 		} catch {
+			if (action.actionId === "refresh") setRefreshRun(null);
 			setMessage("操作に失敗しました。もう一度お試しください。");
 		} finally {
 			setWorking(false);
 		}
 	}
+	useEffect(() => {
+		if (!refreshPending) return;
+		const interval = window.setInterval(() => refreshRead.current?.(), 1500);
+		const timeout = window.setTimeout(() => {
+			setRefreshRun(null);
+			setMessage(
+				"一覧の更新結果を取得できませんでした。再読み込みしてください。",
+			);
+		}, 35_000);
+		return () => {
+			window.clearInterval(interval);
+			window.clearTimeout(timeout);
+		};
+	}, [refreshPending]);
+	useEffect(() => {
+		if (
+			loaded.current ||
+			!info ||
+			info.cells.discoveredAt !== "—" ||
+			!refresh ||
+			refresh.disabled ||
+			working ||
+			refreshPending ||
+			active ||
+			status.busy
+		)
+			return;
+		loaded.current = true;
+		void act(request.statusSource, refresh, info);
+	});
 	return (
 		<section
 			className="aui-service-workspace"
 			aria-label={request.title ?? "動作確認"}
 		>
-			<header className="aui-service-header">
-				<div>
-					<small>SETTINGS / SERVICE TESTS</small>
-					<h2>{request.title ?? "サービスを試す"}</h2>
-					<p>プロバイダを選んで、入力と結果を確認できます。</p>
-				</div>
-				<div className="aui-service-header-actions">
-					<Button
-						variant="secondary"
-						disabled={working || !!active || info?.cells.busy === "はい"}
-						onClick={() => {
-							const a = info?.actions.find((x) => x.actionId === "refresh");
-							if (a && info) void act(request.statusSource, a, info);
-						}}
-					>
-						一覧を更新
-					</Button>
-					<Button
-						disabled={working || !!active || info?.cells.busy === "はい"}
-						onClick={() => {
-							setShowHealth(true);
-							const a = info?.actions.find((x) => x.actionId === "diagnose");
-							if (a && info) void act(request.statusSource, a, info);
-						}}
-					>
-						自己診断
-					</Button>
-				</div>
-			</header>
+			<ServiceHeader
+				title={request.title ?? "サービスを試す"}
+				busy={
+					working || refreshPending || !!active || info?.cells.busy === "はい"
+				}
+				refresh={refresh}
+				diagnose={diagnose}
+				onRefresh={() => {
+					if (refresh && info) void act(request.statusSource, refresh, info);
+				}}
+				onDiagnose={() => {
+					setShowHealth(true);
+					if (diagnose && info) void act(request.statusSource, diagnose, info);
+				}}
+			/>
 			<div className="aui-service-toolbar">
 				<fieldset aria-label="接続先">
 					{[
@@ -447,56 +629,27 @@ function ServiceTestWorkspace({
 			<p className="aui-service-guidance">
 				自己診断は接続型プロバイダを一時接続してHealthを確認します。画像・楽曲の生成は行いません。
 			</p>
-			{info?.cells.errors && info.cells.errors !== "—" && (
-				<p role="alert">{info.cells.errors}</p>
-			)}
-			{status?.error && <p role="alert">{status.error}</p>}
-			{message && <output aria-live="polite">{message}</output>}
-			{showHealth && (
-				<details
-					open
-					className="aui-service-health"
-					onToggle={(event) => setShowHealth(event.currentTarget.open)}
-				>
-					<summary>
-						自己診断の結果 · {info?.cells.control ?? "未確認"}
-						{info?.cells.diagnosisRevision !== "—" &&
-						info?.cells.diagnosisRevision !== info?.cells.catalogRevision
-							? "（設定変更前の結果）"
-							: ""}
-					</summary>
-					<div>
-						{(health?.rows ?? []).length ? (
-							health.rows.map((row) => (
-								<div key={row.id}>
-									<strong>{row.cells.name}</strong>
-									<span>{row.cells.state}</span>
-									<small>{row.cells.reason}</small>
-								</div>
-							))
-						) : (
-							<p>まだ診断結果はありません。</p>
-						)}
-					</div>
-				</details>
-			)}
-			{active && (
-				<div className="aui-service-active" aria-live="polite">
-					<span>
-						{active.cells.model} · {active.cells.phase}
-					</span>
-					<Button
-						variant="secondary"
-						disabled={working}
-						onClick={() => {
-							const a = active.actions.find((x) => x.actionId === "cancel");
-							if (a) void act(request.runsSource, a, active);
-						}}
-					>
-						中止
-					</Button>
-				</div>
-			)}
+			<ServiceNotices
+				info={info}
+				resources={[status, catalog, runs, health]}
+				message={message}
+				onReload={() => runtime.refresh?.()}
+			/>
+			<ServiceHealth
+				show={showHealth}
+				onToggle={setShowHealth}
+				diagnosis={diagnosis}
+				info={info}
+				health={health}
+			/>
+			<ServiceActive
+				active={active}
+				working={working}
+				onCancel={(row) => {
+					const action = row.actions.find((item) => item.actionId === "cancel");
+					if (action) void act(request.runsSource, action, row);
+				}}
+			/>
 			<div className="aui-service-main">
 				<aside className="aui-service-list" aria-label="サービス一覧">
 					<input
@@ -527,7 +680,13 @@ function ServiceTestWorkspace({
 							>
 								<strong>{row.cells.kind}</strong>
 								<span>{row.cells.model}</span>
-								<small>{row.cells.state}</small>
+								<small>
+									{row.actions.some((action) => action.actionId === "start")
+										? row.cells.onDemand === "はい"
+											? "実行時に起動"
+											: "個別に確認できます"
+										: "試用未対応"}
+								</small>
 							</button>
 						))}
 						{targets.length === 0 && <p>該当するサービスはありません。</p>}
@@ -539,7 +698,7 @@ function ServiceTestWorkspace({
 							<h3>{selected.cells.kind}</h3>
 							<p>{selected.cells.model}</p>
 							<small>
-								{selected.cells.source} · {selected.cells.start}
+								{selected.cells.sourceName} · {selected.cells.start}
 							</small>
 						</header>
 						<div className="aui-service-columns">
@@ -549,6 +708,7 @@ function ServiceTestWorkspace({
 								source={request.catalogSource}
 								busy={
 									working ||
+									refreshPending ||
 									!!active ||
 									info?.cells.busy === "はい" ||
 									info?.cells.state === "更新が必要です"

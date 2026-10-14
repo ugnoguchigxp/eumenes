@@ -76,6 +76,7 @@ export interface Accept {
 	requestId: string;
 	conversationId: string;
 	text: string;
+	presentation?: "conversation" | "artifact";
 	utteranceId?: string;
 	sourceKind: Run["sourceKind"];
 	scheduleId?: string;

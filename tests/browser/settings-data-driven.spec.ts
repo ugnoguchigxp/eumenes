@@ -206,12 +206,50 @@ test("display previews the subtitle before saving", async ({
 		.getByRole("group", { name: "会話の背景" })
 		.getByRole("button", { name: "Spatial" })
 		.click();
+	await page.getByRole("button", { name: "字幕", exact: true }).click();
 	await page.getByLabel("字幕のデザイン").selectOption("classic");
 	await page.getByLabel("字幕の大きさ").selectOption("xlarge");
 	const subtitle = page.getByTestId("subtitle");
 	await expect(subtitle).toHaveAttribute("data-style", "classic");
 	await expect(subtitle).toHaveAttribute("data-size", "xlarge");
 	// Nothing is saved until the draft is applied.
+	expect(await savedSettings(request)).toEqual(before);
+});
+
+test("display has an animation tab that plays every motion on its own canvas", async ({
+	page,
+	request,
+}) => {
+	const before = await savedSettings(request);
+	await openHub(page);
+	await openFromHub(page, "表示");
+	const tabs = page.getByLabel("表示の設定の区分");
+	await expect(tabs.getByRole("tab", { name: "表示" })).toBeVisible();
+	// The hidden tab stays mounted but loads no renderer until shown.
+	await expect(page.locator(".light-spirit-lab canvas")).toHaveCount(0);
+	await tabs.getByRole("tab", { name: "アニメーション" }).click();
+	const lab = page.locator(".light-spirit-lab");
+	await expect(lab).toHaveAttribute("data-lab-state", "ready", {
+		timeout: 30000,
+	});
+	await expect(lab.locator("canvas")).toHaveCount(1);
+	for (const group of ["状態", "発話", "感情と仕草", "待機中の仕草"])
+		await expect(page.getByRole("group", { name: group })).toBeVisible();
+	await page.getByRole("button", { name: "うれしい" }).click();
+	await expect(lab.locator(".light-spirit-lab-status")).toContainText(
+		"うれしい",
+	);
+	await page.getByLabel("変化版").selectOption({ label: "跳ねて1回転" });
+	await expect(lab.locator(".light-spirit-lab-status")).toContainText(
+		"跳ねて1回転",
+	);
+	await page.getByRole("switch", { name: "発話を重ねる" }).click();
+	await page.getByRole("switch", { name: "ボーンを表示する" }).click();
+	await page.getByRole("button", { name: "停止" }).click();
+	await expect(page.getByRole("button", { name: "再生" })).toBeVisible();
+	await tabs.getByRole("tab", { name: "表示" }).click();
+	await expect(lab.locator("canvas")).toHaveCount(0);
+	// Trying motions never writes settings.
 	expect(await savedSettings(request)).toEqual(before);
 });
 

@@ -51,6 +51,7 @@ function setup(onClose?: () => void) {
 				requestId: string;
 				conversationId: string;
 				text: string;
+				presentation?: "conversation" | "artifact";
 			}) => ({ id: "new-run", status: "queued", revision: 1 }),
 		),
 		run: vi.fn(async () => ({ id: "new-run", status: "queued", revision: 1 })),
@@ -119,6 +120,7 @@ test("host passes precise edited input through authenticated submission, rejects
 		status: "accepted",
 	});
 	const input = r.api.submit.mock.calls[0]![0];
+	expect(input.presentation).toBe("artifact");
 	expect(JSON.parse(input.text.slice(input.text.indexOf("\n\n") + 2))).toEqual({
 		prompt: values.prompt,
 		width: 121,

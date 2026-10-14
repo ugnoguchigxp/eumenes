@@ -14,6 +14,7 @@ import {
 import { useStore } from "zustand";
 import type { EumenesClient } from "../../../client";
 import { useImageArtifacts } from "../domains/image";
+import { IMAGE_SCREEN_ADAPTER_REF } from "../domains/image/toolchain-adapter";
 import { useMusicArtifacts, usePlaylistArtifacts } from "../domains/music";
 import { MUSIC_SCREEN_ADAPTER_REF } from "../domains/music/toolchain-adapter";
 import { activeTimersQuery } from "../domains/timers/queries";
@@ -83,7 +84,11 @@ export function useWorkspace({
 	const openImage = useCallback(() => {
 		void openById("image.generation");
 	}, [openById]);
-	useImageArtifacts(client, "main", openImage);
+	const imageItems = useImageArtifacts(client, "main", openImage);
+	const openImageResult = useCallback(
+		(id: string) => void openByAdapter(IMAGE_SCREEN_ADAPTER_REF, id),
+		[openByAdapter],
+	);
 	const openTimer = useCallback(
 		(ref?: { timerId: string }) =>
 			void openByAdapter(TIMER_ADAPTER_REF, ref?.timerId),
@@ -313,6 +318,8 @@ export function useWorkspace({
 		openRecognition,
 		openPlaylist,
 		openMusic,
+		openImageResult,
+		imageItems,
 		musicItems,
 		toolchain,
 		activeTimers,

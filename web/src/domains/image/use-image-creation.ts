@@ -69,6 +69,7 @@ export function useImageCreation(
 			requestId: request.requestId,
 			conversationId,
 			text,
+			presentation: "artifact",
 		});
 		pending.current = undefined;
 		cache.setQueryData(

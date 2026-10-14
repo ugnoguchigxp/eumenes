@@ -7,6 +7,8 @@ export const messageSchema = z.object({
 	conversationId: z.string(),
 	role: z.enum(["user", "assistant"]),
 	text: z.string(),
+	/** Artifact controls can submit a full model request without showing it as a chat utterance. */
+	presentation: z.enum(["conversation", "artifact"]).optional(),
 	attachments: z.array(attachmentSchema).optional(),
 	createdAt: z.string(),
 	runId: z.string().nullable(),

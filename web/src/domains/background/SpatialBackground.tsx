@@ -1,56 +1,115 @@
-import { useEffect, useRef, useState } from "react";
-import { healthLabels, type SceneStatus, type SpatialItem } from "./contracts";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+	healthLabels,
+	type SceneStatus,
+	type SpatialItem,
+	type SpatialState,
+} from "./contracts";
 import { initialSpatialItems } from "./initial-items";
+import {
+	defaultSpatialOptions,
+	normalizeOptions,
+	type SpatialOptions,
+} from "./options";
 import "./style.css";
 
 type SceneModule = typeof import("./controller/scene");
-let sceneModule: Promise<SceneModule> | undefined;
+type ModelModule = typeof import("./models");
+let sceneModule:
+	| Promise<
+			readonly [
+				SceneModule,
+				Awaited<ReturnType<ModelModule["loadSpatialModels"]>>,
+			]
+	  >
+	| undefined;
 function loadScene() {
-	sceneModule ??= import("./controller/scene").catch((error: unknown) => {
+	sceneModule ??= Promise.all([
+		import("./controller/scene"),
+		import("./models").then((m) => m.loadSpatialModels()),
+	]).catch((error: unknown) => {
 		sceneModule = undefined;
 		throw error;
 	});
 	return sceneModule;
 }
 
+/** State acquisition is outside this component. Supplied item states are the only telemetry input. */
 export function SpatialBackground({
 	active,
 	items = initialSpatialItems,
+	options: input = defaultSpatialOptions,
+	standalone = false,
 }: {
 	active: boolean;
 	items?: readonly SpatialItem[];
+	options?: Partial<SpatialOptions>;
+	standalone?: boolean;
 }) {
+	const settings = useMemo(() => normalizeOptions(input), [input]);
 	const host = useRef<HTMLDivElement>(null);
 	const scene = useRef<ReturnType<SceneModule["createSpatialScene"]> | null>(
 		null,
 	);
-	const latestItems = useRef(items);
-	const latestSelection = useRef<string | null>(null);
 	const [status, setStatus] = useState<SceneStatus | "loading">("loading");
 	const [retry, setRetry] = useState(0);
 	const [details, setDetails] = useState(false);
 	const [selected, setSelected] = useState<string | null>(null);
+	const [demoOverrides, setDemoOverrides] = useState<
+		Record<string, Partial<SpatialState>>
+	>({});
+	const displayItems = useMemo(
+		() =>
+			items.map((item) =>
+				settings.demoEnabled
+					? {
+							...item,
+							state: {
+								health: settings.demoHealth,
+								activity: settings.demoActivity,
+								stale: settings.demoStale,
+								utilization: settings.demoUtilization / 100,
+								strength: settings.demoStrength / 100,
+								...demoOverrides[item.id],
+								source: "demo" as const,
+							},
+						}
+					: item,
+			),
+		[items, settings, demoOverrides],
+	);
+	const latest = useRef({ items: displayItems, settings, selected });
 	useEffect(() => {
-		latestItems.current = items;
-		scene.current?.setItems(items);
-	}, [items]);
+		latest.current = { items: displayItems, settings, selected };
+	}, [displayItems, settings, selected]);
 	useEffect(() => {
-		latestSelection.current = selected;
+		scene.current?.setItems(displayItems);
+	}, [displayItems]);
+	useEffect(() => {
+		scene.current?.setOptions(settings);
+	}, [settings]);
+	useEffect(() => {
 		scene.current?.select(selected);
 	}, [selected]);
+	useEffect(() => {
+		if (selected && !items.some((item) => item.id === selected))
+			queueMicrotask(() => setSelected(null));
+	}, [items, selected]);
 	useEffect(() => {
 		if (!active || !host.current) return;
 		const element = host.current;
 		let cancelled = false;
 		void loadScene()
-			.then(({ createSpatialScene }) => {
+			.then(([{ createSpatialScene }, models]) => {
 				if (cancelled) return;
-				scene.current = createSpatialScene(element, latestItems.current, {
+				scene.current = createSpatialScene(element, latest.current.items, {
+					models,
+					settings: latest.current.settings,
 					onStatus: (next) => {
 						if (!cancelled) setStatus(next);
 					},
 				});
-				scene.current.select(latestSelection.current);
+				scene.current.select(latest.current.selected);
 			})
 			.catch(() => {
 				if (!cancelled) setStatus("failed");
@@ -61,13 +120,21 @@ export function SpatialBackground({
 			scene.current = null;
 		};
 	}, [active, retry]);
-	const selection = items.find((item) => item.id === selected);
+	const selection = displayItems.find((item) => item.id === selected);
+	const override = (next: Partial<SpatialState>) => {
+		if (selection)
+			setDemoOverrides((current) => ({
+				...current,
+				[selection.id]: { ...current[selection.id], ...next },
+			}));
+	};
 	return (
-		<>
+		<div className={standalone ? "spatial-preview" : "spatial-container"}>
 			<div
 				ref={host}
 				className="spatial-background"
 				data-background-state={active ? status : "inactive"}
+				data-model-count={displayItems.length}
 				aria-hidden="true"
 			/>
 			{active && (
@@ -79,6 +146,11 @@ export function SpatialBackground({
 					>
 						{details ? "状態一覧を閉じる" : "状態を見る"}
 					</button>
+					{selected && (
+						<button type="button" onClick={() => setSelected(null)}>
+							全体に戻る
+						</button>
+					)}
 					{status === "failed" && (
 						<div className="spatial-background-error">
 							<output>背景を表示できません。状態一覧は確認できます。</output>
@@ -93,14 +165,21 @@ export function SpatialBackground({
 							</button>
 						</div>
 					)}
-					{details && (
+					{(details || status === "failed") && (
 						<section
 							className="spatial-background-summary"
 							aria-label="Spatialの状態"
 						>
 							<h2>状態一覧</h2>
+							<p>
+								{settings.demoEnabled
+									? "デモ値での状態プレビュー"
+									: items === initialSpatialItems
+										? "展示モデル · 実測取得前"
+										: "入力された状態を表示"}
+							</p>
 							<ul>
-								{items.map((item) => (
+								{displayItems.map((item) => (
 									<li key={item.id}>
 										<button
 											type="button"
@@ -115,11 +194,93 @@ export function SpatialBackground({
 									</li>
 								))}
 							</ul>
-							{selection && <output>選択中：{selection.label}</output>}
+							{selection && (
+								<div className="spatial-selection-detail">
+									<output>選択中：{selection.label}</output>
+									<p>
+										活動：
+										{
+											{ idle: "待機", starting: "準備中", working: "処理中" }[
+												selection.state.activity
+											]
+										}
+										<br />
+										利用率：
+										{selection.state.utilization === undefined
+											? "未取得"
+											: Math.round(selection.state.utilization * 100) + "%"}
+									</p>
+									{settings.demoEnabled && (
+										<fieldset>
+											<legend>このモデルのデモ値</legend>
+											<label>
+												health
+												<select
+													aria-label="health"
+													value={selection.state.health}
+													onChange={(e) =>
+														override({
+															health: e.target.value as SpatialState["health"],
+														})
+													}
+												>
+													{Object.entries(healthLabels).map(([key, label]) => (
+														<option key={key} value={key}>
+															{label}
+														</option>
+													))}
+												</select>
+											</label>
+											<label>
+												活動
+												<select
+													value={selection.state.activity}
+													onChange={(e) =>
+														override({
+															activity: e.target
+																.value as SpatialState["activity"],
+														})
+													}
+												>
+													<option value="idle">待機</option>
+													<option value="starting">準備中</option>
+													<option value="working">処理中</option>
+												</select>
+											</label>
+											<label>
+												利用率
+												<input
+													type="range"
+													min="0"
+													max="100"
+													value={(selection.state.utilization ?? 0) * 100}
+													onChange={(e) =>
+														override({
+															utilization: Number(e.target.value) / 100,
+														})
+													}
+												/>
+											</label>
+											<button
+												type="button"
+												onClick={() =>
+													setDemoOverrides((current) => {
+														const next = { ...current };
+														delete next[selection.id];
+														return next;
+													})
+												}
+											>
+												共通のデモ値に戻す
+											</button>
+										</fieldset>
+									)}
+								</div>
+							)}
 						</section>
 					)}
 				</div>
 			)}
-		</>
+		</div>
 	);
 }

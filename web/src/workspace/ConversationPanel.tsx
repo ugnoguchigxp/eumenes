@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { spatialPreferences } from "../components/SpatialPreferences";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { EumenesClient } from "../../../client";
 import type { AudioStore } from "../domains/audio";
 import { Button } from "../design-system";
@@ -7,6 +8,7 @@ import { ConversationBackground } from "../components/ConversationBackground";
 import { Subtitle } from "../components/domains/subtitle/Subtitle";
 import { ResearchTaskCard } from "../domains/agent-runtime";
 import { MusicResultLink } from "../domains/music/MusicResultLink";
+import { ImageResultLink } from "../domains/image/ImageResultLink";
 import { useConversationModel } from "../domains/settings";
 import { describeConnectionState } from "../errorMessages";
 import { ConversationComposer } from "./ConversationComposer";
@@ -116,6 +118,10 @@ export function ConversationPanel({
 	const subtitleText =
 		replay.subtitle ?? (phase === "playing" ? voice.subtitle : null);
 	const subtitles = settings.data?.general.subtitles;
+	const spatial = useMemo(
+		() => spatialPreferences(settings.data?.general),
+		[settings.data?.general],
+	);
 	return (
 		<section ref={panel} className="chat-panel" aria-label="会話">
 			{dragging && (
@@ -125,6 +131,7 @@ export function ConversationPanel({
 			)}
 			<ConversationBackground
 				kind={settings.data?.general.background ?? "light-fairy"}
+				spatial={spatial}
 				active={!settingsOpen && !settings.isPending}
 				cue={replay.avatarCue ?? voice.avatarCue}
 				phase={
@@ -225,11 +232,18 @@ export function ConversationPanel({
 					conversation={conversation.data}
 					renderInsideMessage={(message) =>
 						message.role === "assistant" ? (
-							<MusicResultLink
-								runId={message.runId}
-								items={state.musicItems}
-								onOpen={state.openMusic}
-							/>
+							<>
+								<MusicResultLink
+									runId={message.runId}
+									items={state.musicItems}
+									onOpen={state.openMusic}
+								/>
+								<ImageResultLink
+									runId={message.runId}
+									items={state.imageItems}
+									onOpen={state.openImageResult}
+								/>
+							</>
 						) : null
 					}
 					renderFollowingMessage={(message) => {

@@ -45,6 +45,7 @@ import {
 } from "./media-components";
 import { TimerWorkspaceView } from "./timer-components";
 import { SubtitlePreviewView } from "./subtitle-components";
+import { AvatarMotionLabView } from "./avatar-components";
 import { CollectionWorkspaceView } from "./collection-components";
 import { RecordsWorkspaceView } from "./records-components";
 import { ServiceTestWorkspaceView } from "./service-test-components";
@@ -59,6 +60,7 @@ const renderers = {
 	"records-workspace": RecordsWorkspaceView,
 	"collection-workspace": CollectionWorkspaceView,
 	"service-test-workspace": ServiceTestWorkspaceView,
+	"avatar-motion-lab": AvatarMotionLabView,
 	"subtitle-preview": SubtitlePreviewView,
 	"settings-section": SettingsSectionView,
 	"settings-navigation": SettingsNavigationView,
@@ -86,7 +88,7 @@ function CompositionView({
 	request: z.infer<typeof layoutSchema>;
 }) {
 	const [selected, setSelected] = useState("0");
-	const tabs =
+	const tabs: NonNullable<typeof request.tabs> =
 		request.tabs ??
 		request.children.map((child, index) => ({
 			label: child.title ?? `画面 ${index + 1}`,
@@ -140,22 +142,37 @@ function CompositionView({
 							hidden={selected !== String(index)}
 						>
 							<div className="aui-composition-tab-body">
-								{tab.children.map((childIndex) => {
-									const child = request.children[childIndex]!;
-									return child.view === "settings-section" &&
-										request.draftSource === child.source ? (
-										<SettingsSectionView
-											key={`${childIndex}:${child.source}`}
-											request={child}
-											hideFooter
-										/>
-									) : (
-										<RegisteredView
-											key={`${childIndex}:${child.view}:${child.source ?? "inline"}`}
-											request={child}
-										/>
-									);
-								})}
+								{tab.arrangement === "form-preview" ? (
+									<SettingsSectionView
+										request={request.children[tab.children[0]!]!}
+										hideFooter={
+											request.draftSource ===
+											request.children[tab.children[0]!]!.source
+										}
+										supplement={
+											<RegisteredView
+												request={request.children[tab.children[1]!]!}
+											/>
+										}
+									/>
+								) : (
+									tab.children.map((childIndex) => {
+										const child = request.children[childIndex]!;
+										return child.view === "settings-section" &&
+											request.draftSource === child.source ? (
+											<SettingsSectionView
+												key={`${childIndex}:${child.source}`}
+												request={child}
+												hideFooter
+											/>
+										) : (
+											<RegisteredView
+												key={`${childIndex}:${child.view}:${child.source ?? "inline"}`}
+												request={child}
+											/>
+										);
+									})
+								)}
 							</div>
 						</TabsContent>
 					))}

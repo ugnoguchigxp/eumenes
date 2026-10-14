@@ -45,6 +45,8 @@ export type CollectionFormField = {
 	accept?: string;
 	options?: { value: string; label: string }[];
 	maxLength?: number;
+	min?: number;
+	max?: number;
 	required?: boolean;
 	/** The value the form starts with (a toggle takes "true"/"false"). */
 	defaultValue?: string;

@@ -1,18 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { LightAvatar } from "./light-avatar/model.js";
 import { createAvatarPlayback, type AvatarCue } from "../../../domains/avatar";
+import {
+	lightAvatarLoaded,
+	loadLightAvatar,
+	motionLabOnScreen,
+	subscribeMotionLab,
+} from "./light-avatar/load";
 
-type ModelModule = typeof import("./light-avatar/model.js");
-let modulePromise: Promise<ModelModule> | null = null;
-const loadModule = () => {
-	modulePromise ??= import("./light-avatar/model.js").catch(
-		(error: unknown) => {
-			modulePromise = null;
-			throw error;
-		},
-	);
-	return modulePromise;
-};
 function scheduleIdle(callback: () => void): () => void {
 	if (typeof window.requestIdleCallback === "function") {
 		const id = window.requestIdleCallback(callback, { timeout: 300 });
@@ -52,7 +47,9 @@ export function LightAvatarBackground({
 		};
 	}, []);
 	const reducedRef = useRef(reduced);
-	const visibleRef = useRef(visible);
+	// The settings motion lab takes over while on screen; the background pauses meanwhile.
+	const labShown = useSyncExternalStore(subscribeMotionLab, motionLabOnScreen);
+	const visibleRef = useRef(visible && !labShown);
 	// Set by the lifecycle effect so the pause effect can rebuild only the playback.
 	const resync = useRef<(() => void) | null>(null);
 	useEffect(() => {
@@ -126,7 +123,7 @@ export function LightAvatarBackground({
 			controller.setCue(latest.current);
 		};
 		const start = () => {
-			void loadModule()
+			void loadLightAvatar()
 				.then(({ createLightAvatar }) => {
 					if (cancelled) return;
 					model = createLightAvatar(element);
@@ -157,7 +154,7 @@ export function LightAvatarBackground({
 				});
 		};
 		// The three.js chunk is large: first load waits until the main thread is idle.
-		const cancelIdle = modulePromise
+		const cancelIdle = lightAvatarLoaded()
 			? (start(), () => {})
 			: scheduleIdle(start);
 		return () => {
@@ -169,9 +166,9 @@ export function LightAvatarBackground({
 	}, [active]);
 	useEffect(() => {
 		reducedRef.current = reduced;
-		visibleRef.current = visible;
+		visibleRef.current = visible && !labShown;
 		resync.current?.();
-	}, [visible, reduced]);
+	}, [visible, reduced, labShown]);
 	useEffect(() => {
 		latest.current =
 			cue ??

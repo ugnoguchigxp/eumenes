@@ -50,3 +50,64 @@
 .spatial-background-summary button[aria-pressed="true"] {
 	border-color: var(--ring);
 }
+
+.spatial-container {
+	display: contents;
+}
+.spatial-preview {
+	position: relative;
+	isolation: isolate;
+	height: min(64vh, 540px);
+	min-height: 380px;
+	border-radius: 12px;
+	overflow: hidden;
+	margin-top: 16px;
+	background: #0b1018;
+}
+.spatial-preview .spatial-background {
+	z-index: 0;
+}
+.spatial-preview .spatial-background-controls {
+	top: 12px;
+}
+.spatial-background-summary {
+	max-height: min(65vh, 500px);
+	overflow-y: auto;
+}
+.spatial-background-summary p {
+	font-size: 0.72rem;
+	line-height: 1.6;
+}
+.spatial-background-controls > button {
+	margin: 0 4px 4px 0;
+}
+.spatial-selection-detail {
+	margin-top: 12px;
+	border-top: 1px solid var(--border);
+	padding-top: 12px;
+}
+.spatial-selection-detail fieldset {
+	margin: 8px 0;
+	padding: 8px;
+	border: 1px solid var(--border);
+}
+.spatial-selection-detail label {
+	display: grid;
+	gap: 4px;
+	margin-top: 8px;
+}
+.spatial-selection-detail select {
+	width: 100%;
+}
+@media (max-width: 600px) {
+	.spatial-preview {
+		min-height: 460px;
+	}
+	.spatial-background-controls {
+		right: 8px;
+		max-width: min(180px, 45%);
+	}
+	.spatial-background-summary {
+		padding: 8px;
+	}
+}

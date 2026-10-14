@@ -291,3 +291,83 @@ test("workspace is registered, composes with other views, and rejects unsafe hos
 	fireEvent.click(screen.getByRole("button", { name: "楽曲イメージ" }));
 	expect(result.container.querySelector("audio,img")).toBeNull();
 });
+
+test("a tab may show its subtitle preview inside its settings section, and only that pair", () => {
+	const settings = { view: "settings-section", source: "s", title: "表示" };
+	const preview = { view: "subtitle-preview", source: "p" };
+	const parse = (tabs: unknown, children: unknown[]) =>
+		compileArtifact(
+			JSON.stringify({ view: "layout", direction: "tabs", tabs, children }),
+			{
+				s: { kind: "settings-section", revision: 1 },
+				p: { kind: "subtitle-preview", revision: 1 },
+			} as unknown as Snapshot,
+		);
+	expect(() =>
+		parse(
+			[
+				{ label: "表示", children: [0, 1], arrangement: "form-preview" },
+				{ label: "アニメーション", children: [2] },
+			],
+			[settings, preview, { view: "avatar-motion-lab" }],
+		),
+	).not.toThrow();
+	expect(() =>
+		parse(
+			[
+				{ label: "表示", children: [1, 0], arrangement: "form-preview" },
+				{ label: "アニメーション", children: [2] },
+			],
+			[settings, preview, { view: "avatar-motion-lab" }],
+		),
+	).toThrow();
+	expect(() =>
+		parse(
+			[{ label: "表示", children: [0], arrangement: "form-preview" }],
+			[settings],
+		),
+	).toThrow();
+	// The lab reads no source: naming one is rejected.
+	expect(() =>
+		parse(
+			[{ label: "動作", children: [0] }],
+			[{ view: "avatar-motion-lab", source: "s" }],
+		),
+	).toThrow();
+});
+
+test("the avatar lab is drawn by the host, and says so when the host has none", () => {
+	const definition = JSON.stringify({
+		view: "layout",
+		direction: "tabs",
+		tabs: [
+			{ label: "曲", children: [0] },
+			{ label: "アニメーション", children: [1] },
+		],
+		children: [
+			{ view: "playlist", source: "m" },
+			{ view: "avatar-motion-lab", title: "光の精霊の動作" },
+		],
+	});
+	const view = render(
+		<ArtifactRenderer
+			definition={definition}
+			runtime={{
+				snapshot,
+				dispatch: vi.fn(),
+				hostViews: { "avatar-motion-lab": () => <p>試写面</p> },
+			}}
+		/>,
+	);
+	expect(screen.getByText("試写面")).toBeTruthy();
+	view.unmount();
+	render(
+		<ArtifactRenderer
+			definition={definition}
+			runtime={{ snapshot, dispatch: vi.fn() }}
+		/>,
+	);
+	expect(
+		screen.getByText("この画面では光の精霊の試写を利用できません。"),
+	).toBeTruthy();
+});

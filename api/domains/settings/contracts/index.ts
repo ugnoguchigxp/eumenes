@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { spatialSettingsShape } from "./spatial";
+export { spatialControls } from "./spatial";
 import { endpoint, cloudEndpoint } from "./endpoints";
 export { cloudEndpoint } from "./endpoints";
 export {
@@ -196,6 +198,7 @@ export const settingsSchema = z
 					.default(["ja", "en"]),
 				theme: z.enum(["system", "light", "dark"]),
 				background: backgroundSchema.optional(),
+				...spatialSettingsShape,
 				subtitles: subtitleSchema.default(defaultSubtitles),
 			})
 			.strict(),

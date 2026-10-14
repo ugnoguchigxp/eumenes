@@ -6,8 +6,6 @@ import type { WebResearchService } from "../domains/web-research";
 import type { SqliteStore } from "../infrastructure/sqlite";
 import { createToolchain } from "./toolchain";
 import type { Embed } from "./toolchain-vectors";
-import type { DotsAdapterPorts } from "./dots-adapter";
-import type { DotsTaskPorts } from "./dots-task-operations";
 import type { InferenceAdapterPorts } from "./inference-adapter";
 import type { MemoryAdapterPorts } from "./memory-adapter";
 import type { RecordsPorts } from "./records-adapter";
@@ -104,10 +102,6 @@ export async function createHostToolchain(
 		history?: boolean;
 		webResearchEnabled?: boolean;
 		embed?: Embed;
-		/** The tasks service is assembled after the toolchain, so it is read when an operation runs. */
-		dotsScreen?: Omit<DotsAdapterPorts, "packages" | "tasks"> & {
-			tasks: () => DotsTaskPorts;
-		};
 	},
 ) {
 	const links = createToolchainHostLinks(s);
@@ -127,27 +121,7 @@ export async function createHostToolchain(
 			objectRecognition: true,
 			webResearch: s.webResearchEnabled,
 			embed: s.embed,
-			dotsScreen: s.dotsScreen && {
-				...s.dotsScreen,
-				tasks: lateTasks(s.dotsScreen.tasks),
-			},
 		},
 	);
 	return { toolchain, links };
-}
-
-/** Task operations forwarded to a tasks service that exists only once the host is assembled. */
-function lateTasks(tasks: () => DotsTaskPorts): DotsTaskPorts {
-	return {
-		createInTransaction: (...a) => tasks().createInTransaction(...a),
-		requestStartInTransaction: (...a) =>
-			tasks().requestStartInTransaction(...a),
-		requestStopInTransaction: (...a) => tasks().requestStopInTransaction(...a),
-		answerInTransaction: (...a) => tasks().answerInTransaction(...a),
-		forgetInTransaction: (...a) => tasks().forgetInTransaction(...a),
-		getInTransaction: (...a) => tasks().getInTransaction(...a),
-		openQuestionInTransaction: (...a) =>
-			tasks().openQuestionInTransaction(...a),
-		listInTransaction: (...a) => tasks().listInTransaction(...a),
-	};
 }

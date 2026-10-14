@@ -2,7 +2,7 @@
 
 更新日: 2026年10月14日。ツールチェーンはデータドリブン形式（bundle＋登録adapter）で追加する。設計は[タイマー設計書](../spec/timer-data-driven-ui-acceptance-design-2026-10-13.md)、実装契約は[実装契約](../spec/timer-data-driven-implementation-contracts-2026-10-13.md)。
 
-移行状況: `timers.manage`（「タイマー（データドリブン）」）が移行済み。楽曲生成**画面**は `music-screen.bundle.json` の単独公開artifactと登録adapterへ移し、ジャンル・雰囲気・楽器・テンポ・長さ・歌声の選択肢と初期値も画面定義へ登録した。生成・取消は既存の認証済み会話APIを使い、会話の `music.create` / `music.library` と音楽プレイリスト画面は旧形式のまま。Web検索・会話履歴・画像・Excalidraw・物体認識・dotsも未移行。旧形式の保守は[付録](#付録-旧形式固定runtime-mapの保守)、ツールチェーン全体の移行は[§6](#6-旧形式のツールチェーンを移行する)。
+移行状況: `timers.manage`（「タイマー」）が移行済み。楽曲生成**画面**は `music-screen.bundle.json` の単独公開artifactと登録adapterへ移し、ジャンル・雰囲気・楽器・テンポ・長さ・歌声の選択肢と初期値も画面定義へ登録した。生成・取消は既存の認証済み会話APIを使い、会話の `music.create` / `music.library` と音楽プレイリスト画面は旧形式のまま。Web検索・会話履歴・画像・Excalidraw・物体認識・dotsも未移行。旧形式の保守は[付録](#付録-旧形式固定runtime-mapの保守)、ツールチェーン全体の移行は[§6](#6-旧形式のツールチェーンを移行する)。
 
 [作業規則](../AGENTS.md)を守る。依頼の解釈・担当選択・不足情報の判断はLLMに任せ、発話の語句・企業名・地域による振り分けを追加しない。コードで書くのは、登録済みの操作をdomainへ接続する型付きadapterだけにする。
 
@@ -405,6 +405,8 @@ const runtime: ArtifactRuntime = {
 新しい用途のsourceは所有domainの公開APIから作り、他用途のmusic hookへ混ぜない。ホストに許可されたsourceだけを公開し、操作時にも権限・版を確認する。音声の取得取消と生成そのものの取消は別であり、後者はAPI接続がある場合だけ有効にする。
 
 Artifactが保持する表示定義はJSONとし、専用の`kind`やReactコードを増やさない。ただし、現行のArtifactタブはインメモリーで、再読込み後のタブ復元は未実装。DBへのJSON保存・復元が要件なら別途範囲に含め、実装前に対応済みと書かない。
+
+WebGLなどパッケージに持ち込まない描画は、viewを `source` なしで登録し、ホストが `ArtifactRuntime.hostViews` で描画を渡す（例: 光の精霊の動作試写 `avatar-motion-lab`。`ToolchainArtifactHost` が `LightAvatarMotionLab` を渡す）。hostViewsの無いホストでは「利用できません」と表示する。tabsの各タブは `arrangement: "form-preview"` で、設定項目と字幕の見本を一つの設定欄にまとめて表示できる。
 
 LLMに表示の選択・構成を任せる場合は、公開済みview・source・入力schemaをSystemContextとツール契約へ提示する。UI登録だけで会話に新しいツールが公開されるわけではない。既存操作の結果を既定の画面で開く用途では、その返却経路を再利用する。
 

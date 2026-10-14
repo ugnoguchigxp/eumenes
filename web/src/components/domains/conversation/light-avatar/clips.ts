@@ -8,7 +8,7 @@ import { boneNames, type BoneName } from "./skeleton";
 export type Pose = Record<string, number>;
 export const motionGroups = {
 	state: "状態",
-	emotion: "感情",
+	emotion: "感情と仕草",
 	speech: "発話",
 	"idle-gesture": "待機中の仕草",
 } as const;
@@ -55,7 +55,10 @@ function arity(key: string) {
 	if (key === "body.position") return 3;
 	if (key === "eyes.gaze") return 2;
 	if (key === "spin" || key === "eyes.open") return 1;
-	if (key.startsWith("light.") && (lightChannels as readonly string[]).includes(key.slice(6)))
+	if (
+		key.startsWith("light.") &&
+		(lightChannels as readonly string[]).includes(key.slice(6))
+	)
 		return 1;
 	return 0;
 }
@@ -149,9 +152,7 @@ export function compileMotion(data: MotionData): Motion {
 				k.slice(1).every((v) => Math.abs(v - rest) < 1e-6);
 			// Loops and recoveries meet the rest pose; a spin may end on whole turns.
 			const endsAtRest =
-				key === "spin"
-					? Math.abs(Math.sin(last[1]! / 2)) < 1e-6
-					: atRest(last);
+				key === "spin" ? Math.abs(Math.sin(last[1]! / 2)) < 1e-6 : atRest(last);
 			if (!atRest(first) || !endsAtRest)
 				fail(`${where} は静止姿勢で始まり静止姿勢で終わる必要があります`);
 			for (const targets of channels(key))
@@ -159,13 +160,22 @@ export function compileMotion(data: MotionData): Motion {
 					tracks.push({
 						channel,
 						times: keys.map((k) => k[0]!),
-						values: keys.map((k) => (k[axis + 1]! - (rest && axis === 0 ? rest : 0)) * scale),
+						values: keys.map(
+							(k) => (k[axis + 1]! - (rest && axis === 0 ? rest : 0)) * scale,
+						),
 					}),
 				);
 		}
 		const blinks = variant.blinks ?? [];
 		for (const [at, length] of blinks)
-			if (!(at >= 0 && length > 0 && length <= 1.2 && at + length <= data.duration))
+			if (
+				!(
+					at >= 0 &&
+					length > 0 &&
+					length <= 1.2 &&
+					at + length <= data.duration
+				)
+			)
 				fail(`${variant.id} の瞬きが不正です`);
 		return { id: variant.id, label: variant.label, tracks, blinks };
 	});
@@ -240,8 +250,11 @@ export function wrapSpin(pose: Pose): Pose {
 	};
 }
 export const channel = (pose: Pose, name: string) => pose[name] ?? 0;
-export const boneChannel = (pose: Pose, bone: BoneName | "body", axis: "x" | "y" | "z") =>
-	pose[`${bone}.${axis}`] ?? 0;
+export const boneChannel = (
+	pose: Pose,
+	bone: BoneName | "body",
+	axis: "x" | "y" | "z",
+) => pose[`${bone}.${axis}`] ?? 0;
 /** Deterministic hash in [0, 1). */
 export function hash(value: number) {
 	const x = Math.sin(value * 127.1 + 311.7) * 43758.5453;
@@ -265,5 +278,8 @@ export function variantIndex(motion: Motion, seed: number) {
 		[order[0], order[1]] = [order[1]!, order[0]!];
 	return order[n % count]!;
 }
-/** Playback rate for the n-th play, within ±10%. */
-export const variantRate = (seed: number) => 0.9 + hash(seed + 0.25) * 0.2;
+/**
+ * Playback rate for the n-th play, up to 15% brisker. Never slower: playback recovers to
+ * neutral after the clip's duration, so a slower clip would be cut before its rest pose.
+ */
+export const variantRate = (seed: number) => 1 + hash(seed + 0.25) * 0.15;

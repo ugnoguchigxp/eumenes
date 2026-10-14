@@ -1,0 +1,65 @@
+{
+	"id": "embedding",
+	"label": "Embedding",
+	"kind": "embedding",
+	"category": "provider",
+	"sample": true,
+	"pointCount": 2064,
+	"stride": 8,
+	"binary": "embedding.bin",
+	"shape": {
+		"name": "nested-octahedral-coordinate-lattice",
+		"description": "Three exact octahedral wire lattices, six coordinate half-axes, and small point-node accents. Straight edges distinguish it from all curved Provider forms.",
+		"topology": "three nested 12-edge octahedra",
+		"components": 4,
+		"silhouette": "Six pointed coordinate tips and clean diamond facets with no filled faces.",
+		"label": "八面体の座標格子"
+	},
+	"motion": {
+		"type": "coordinate-node-convergence",
+		"phaseMeaning": "For every shell edge: 0 at its midpoint →1 at either endpoint. For the six axes: 0 at the origin →1 at outer coordinate vertices. Node accents have phase 1.",
+		"groupMeaning": {
+			"0": "outer octahedron",
+			"1": "middle octahedron",
+			"2": "inner octahedron",
+			"3": "six coordinate half-axes"
+		},
+		"cyclesPerSecond": 0.13,
+		"pulseWidth": 0.16,
+		"baseBrightness": 0.62,
+		"peakBrightness": 1.0,
+		"maxDisplacement": 0.003,
+		"restPoseRequired": true,
+		"deterministic": true,
+		"rules": [
+			"Animate brightness on anchored coordinates; never integrate particle positions over time.",
+			"Keep all structural points visible when idle, offline, or at zero activity.",
+			"Health selects one uniform color for the whole object; group is never a color category.",
+			"Use bounded, modulo-wrapped time. Activity changes speed and pulse amplitude, not the silhouette.",
+			"Reduced motion uses the rest coordinates and constant per-point weight."
+		],
+		"suggestion": "Send symmetric light packets from edge midpoints to their fixed coordinate endpoints; let endpoint accents glow on arrival. Keep every edge anchored and readable."
+	},
+	"normalizationRadius": 1.14780351,
+	"bounds": {
+		"min": [-1.1478012800216675, -1.1466008424758911, -1.1465555429458618],
+		"max": [1.145694613456726, 1.1462461948394775, 1.1465555429458618]
+	},
+	"attributes": ["x", "y", "z", "phase", "group", "seed", "size", "weight"],
+	"coordinateSystem": "right-handed, Z-up",
+	"binaryFormat": "little-endian float32",
+	"version": "1.0.0",
+	"groups": [0, 1, 2, 3],
+	"sha256": "7241114d0db3ce0b8d3a1beb496cbd47c7c652d239c8eecf4cec720714f97b27",
+	"provenance": "Approved monitoring-galaxy point-cloud form study; final deterministic provider geometry.",
+	"rendering": {
+		"primitive": "points",
+		"solidSurfaces": false,
+		"suggestedPixelSize": 1.35,
+		"additiveGlow": "restrained",
+		"sameColorAcrossAllPoints": true,
+		"recommendedMinimumObjectPixels": 64,
+		"doNotRandomizePositionsPerFrame": true,
+		"seedUsage": "Stable visual variation only; never make silhouette depend on seed or elapsed time."
+	}
+}

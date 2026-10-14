@@ -1,0 +1,842 @@
+{
+	"formatVersion": 1,
+	"bundleId": "settings-spatial",
+	"pins": [],
+	"definitions": [],
+	"bindings": [],
+	"artifacts": [
+		{
+			"kind": "artifact",
+			"id": "settings.display",
+			"revision": 4,
+			"title": "表示",
+			"variants": [
+				{
+					"id": "standard",
+					"label": "標準",
+					"definition": {
+						"view": "layout",
+						"direction": "form-preview",
+						"title": "表示の設定",
+						"children": [
+							{
+								"view": "settings-section",
+								"source": "settings-display",
+								"title": "表示"
+							},
+							{
+								"view": "subtitle-preview",
+								"source": "settings-display-preview"
+							}
+						]
+					}
+				}
+			],
+			"defaultVariant": "standard",
+			"sourceBindings": [
+				{
+					"source": "settings-display",
+					"adapterRef": "adapter:settings@1",
+					"query": "query:settings.document@1",
+					"target": "none"
+				},
+				{
+					"source": "settings-display-preview",
+					"adapterRef": "adapter:settings@1",
+					"query": "query:settings.document@1",
+					"target": "none"
+				}
+			],
+			"actionBindings": [
+				{
+					"actionId": "edit",
+					"eventAction": "settings-edit",
+					"source": "settings-display",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "draft",
+					"draftAction": "edit",
+					"draftDocument": "document:settings@1"
+				},
+				{
+					"actionId": "apply",
+					"eventAction": "settings-apply",
+					"source": "settings-display",
+					"inputSchemaRef": "schema:settings-apply@2",
+					"effect": "write",
+					"operationId": "settings.apply",
+					"draftDocument": "document:settings@1",
+					"confidentialFields": ["keys"]
+				},
+				{
+					"actionId": "review",
+					"eventAction": "settings-review",
+					"source": "settings-display",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "navigate",
+					"navigateTo": {
+						"artifactId": "settings.changes"
+					}
+				}
+			],
+			"launcher": {
+				"icon": "display",
+				"label": "表示",
+				"group": "使い方を変える",
+				"order": 30,
+				"description": "背景 テーマ 字幕 粒子 自転 公転"
+			},
+			"fields": [
+				{
+					"fieldId": "appearance.theme",
+					"document": "document:settings@1",
+					"path": "$.general.theme",
+					"label": "テーマ",
+					"control": "select",
+					"presentation": "segmented",
+					"options": [
+						{
+							"value": "system",
+							"label": "端末の設定に合わせる"
+						},
+						{
+							"value": "light",
+							"label": "ライト"
+						},
+						{
+							"value": "dark",
+							"label": "ダーク"
+						}
+					],
+					"group": "appearance"
+				},
+				{
+					"fieldId": "appearance.background",
+					"document": "document:settings@1",
+					"path": "$.general.background",
+					"label": "会話の背景",
+					"control": "select",
+					"presentation": "cards",
+					"defaultValue": "light-fairy",
+					"help": "保存すると会話画面の背景を切り替えます。Spatialの状態表示は、実際の機器の計測値にはまだ対応していません。",
+					"options": [
+						{
+							"value": "light-fairy",
+							"label": "光の妖精"
+						},
+						{
+							"value": "spatial",
+							"label": "Spatial"
+						}
+					],
+					"unset": "delete-key",
+					"group": "appearance"
+				},
+				{
+					"fieldId": "appearance.subtitle-enabled",
+					"document": "document:settings@1",
+					"path": "$.general.subtitles.enabled",
+					"label": "読み上げ字幕を表示する",
+					"control": "toggle",
+					"help": "読み上げに合わせて画面中央に字幕を出します。",
+					"group": "subtitles"
+				},
+				{
+					"fieldId": "appearance.subtitle-style",
+					"document": "document:settings@1",
+					"path": "$.general.subtitles.style",
+					"label": "字幕のデザイン",
+					"control": "select",
+					"options": [
+						{
+							"value": "netflix",
+							"label": "シネマ（白文字・影）"
+						},
+						{
+							"value": "prime",
+							"label": "ボックス（半透明の黒背景）"
+						},
+						{
+							"value": "classic",
+							"label": "クラシック（黄文字・黒縁）"
+						},
+						{
+							"value": "glass",
+							"label": "ガラス（ぼかし背景）"
+						}
+					],
+					"group": "subtitles"
+				},
+				{
+					"fieldId": "appearance.subtitle-size",
+					"document": "document:settings@1",
+					"path": "$.general.subtitles.size",
+					"label": "字幕の大きさ",
+					"control": "select",
+					"options": [
+						{
+							"value": "medium",
+							"label": "中"
+						},
+						{
+							"value": "large",
+							"label": "大"
+						},
+						{
+							"value": "xlarge",
+							"label": "特大"
+						}
+					],
+					"group": "subtitles"
+				},
+				{
+					"fieldId": "spatial.scatter",
+					"document": "document:settings@1",
+					"path": "$.general.spatialScatter",
+					"label": "粒子の拡散（%）",
+					"control": "range",
+					"group": "particles",
+					"defaultValue": "100",
+					"min": 0,
+					"max": 200,
+					"step": 1,
+					"help": "元の粒子座標から段階的に拡散します。100%が監視銀河の基準です。"
+				},
+				{
+					"fieldId": "spatial.core",
+					"document": "document:settings@1",
+					"path": "$.general.spatialCore",
+					"label": "元の形を残す割合（%）",
+					"control": "range",
+					"group": "particles",
+					"defaultValue": "40",
+					"min": 10,
+					"max": 90,
+					"step": 1
+				},
+				{
+					"fieldId": "spatial.focus-core",
+					"document": "document:settings@1",
+					"path": "$.general.spatialFocusCore",
+					"label": "フォーカス時に形を残す割合（%）",
+					"control": "range",
+					"group": "particles",
+					"defaultValue": "60",
+					"min": 10,
+					"max": 90,
+					"step": 1
+				},
+				{
+					"fieldId": "spatial.point-size",
+					"document": "document:settings@1",
+					"path": "$.general.spatialPointSize",
+					"label": "粒子の大きさ（%）",
+					"control": "range",
+					"group": "particles",
+					"defaultValue": "100",
+					"min": 50,
+					"max": 200,
+					"step": 1
+				},
+				{
+					"fieldId": "spatial.opacity",
+					"document": "document:settings@1",
+					"path": "$.general.spatialOpacity",
+					"label": "背景の明るさ（%）",
+					"control": "range",
+					"group": "particles",
+					"defaultValue": "80",
+					"min": 20,
+					"max": 100,
+					"step": 1
+				},
+				{
+					"fieldId": "spatial.orbit-speed",
+					"document": "document:settings@1",
+					"path": "$.general.spatialOrbitSpeed",
+					"label": "公転速度（%）",
+					"control": "range",
+					"group": "motion",
+					"defaultValue": "50",
+					"min": 0,
+					"max": 200,
+					"step": 1,
+					"help": "0%で公転だけを停止します。"
+				},
+				{
+					"fieldId": "spatial.spin-speed",
+					"document": "document:settings@1",
+					"path": "$.general.spatialSpinSpeed",
+					"label": "自転速度（%）",
+					"control": "range",
+					"group": "motion",
+					"defaultValue": "25",
+					"min": 0,
+					"max": 100,
+					"step": 1,
+					"help": "全モデルが自転します。CPUの自転は利用率にも連動します。"
+				},
+				{
+					"fieldId": "spatial.paused",
+					"document": "document:settings@1",
+					"path": "$.general.spatialPaused",
+					"label": "動きを停止",
+					"control": "toggle",
+					"group": "motion",
+					"defaultValue": "false"
+				},
+				{
+					"fieldId": "spatial.reduced-motion",
+					"document": "document:settings@1",
+					"path": "$.general.spatialReducedMotion",
+					"label": "動きを減らす",
+					"control": "toggle",
+					"group": "motion",
+					"defaultValue": "false",
+					"help": "端末側の設定も優先します。"
+				},
+				{
+					"fieldId": "spatial.view",
+					"document": "document:settings@1",
+					"path": "$.general.spatialView",
+					"label": "視点",
+					"control": "select",
+					"group": "motion",
+					"defaultValue": "oblique",
+					"options": [
+						{
+							"value": "oblique",
+							"label": "斜めから"
+						},
+						{
+							"value": "top",
+							"label": "上から"
+						}
+					]
+				},
+				{
+					"fieldId": "spatial.demo-enabled",
+					"document": "document:settings@1",
+					"path": "$.general.spatialDemoEnabled",
+					"label": "状態プレビューを使う",
+					"control": "toggle",
+					"group": "state",
+					"defaultValue": "false",
+					"help": "実測値ではありません。オフでは取得前の全モデルを未確認として表示します。12種類は展示用のモデルで、導入済みProviderの一覧ではありません。"
+				},
+				{
+					"fieldId": "spatial.demo-health",
+					"document": "document:settings@1",
+					"path": "$.general.spatialDemoHealth",
+					"label": "プレビューのhealth",
+					"control": "select",
+					"group": "state",
+					"defaultValue": "healthy",
+					"options": [
+						{
+							"value": "healthy",
+							"label": "正常"
+						},
+						{
+							"value": "pressure",
+							"label": "圧迫・応答悪化"
+						},
+						{
+							"value": "fault",
+							"label": "問題あり"
+						},
+						{
+							"value": "disconnected",
+							"label": "接続断"
+						},
+						{
+							"value": "unknown",
+							"label": "未確認"
+						}
+					]
+				},
+				{
+					"fieldId": "spatial.demo-activity",
+					"document": "document:settings@1",
+					"path": "$.general.spatialDemoActivity",
+					"label": "プレビューの活動",
+					"control": "select",
+					"group": "state",
+					"defaultValue": "working",
+					"options": [
+						{
+							"value": "idle",
+							"label": "待機"
+						},
+						{
+							"value": "starting",
+							"label": "準備中"
+						},
+						{
+							"value": "working",
+							"label": "処理中"
+						}
+					]
+				},
+				{
+					"fieldId": "spatial.demo-utilization",
+					"document": "document:settings@1",
+					"path": "$.general.spatialDemoUtilization",
+					"label": "プレビューの利用率（%）",
+					"control": "range",
+					"group": "state",
+					"defaultValue": "50",
+					"min": 0,
+					"max": 100,
+					"step": 1,
+					"help": "高利用率だけでhealthを赤にしません。"
+				},
+				{
+					"fieldId": "spatial.demo-strength",
+					"document": "document:settings@1",
+					"path": "$.general.spatialDemoStrength",
+					"label": "プレビューの活動量（%）",
+					"control": "range",
+					"group": "state",
+					"defaultValue": "65",
+					"min": 0,
+					"max": 100,
+					"step": 1
+				},
+				{
+					"fieldId": "spatial.demo-stale",
+					"document": "document:settings@1",
+					"path": "$.general.spatialDemoStale",
+					"label": "プレビューの情報が古い",
+					"control": "toggle",
+					"group": "state",
+					"defaultValue": "false"
+				}
+			]
+		},
+		{
+			"kind": "artifact",
+			"id": "settings.display",
+			"revision": 5,
+			"title": "表示",
+			"variants": [
+				{
+					"id": "standard",
+					"label": "標準",
+					"definition": {
+						"view": "layout",
+						"direction": "tabs",
+						"draftSource": "settings-display",
+						"title": "表示の設定",
+						"tabs": [
+							{
+								"label": "表示",
+								"children": [0, 1],
+								"arrangement": "form-preview"
+							},
+							{
+								"label": "アニメーション",
+								"children": [2]
+							}
+						],
+						"children": [
+							{
+								"view": "settings-section",
+								"source": "settings-display",
+								"title": "表示"
+							},
+							{
+								"view": "subtitle-preview",
+								"source": "settings-display-preview"
+							},
+							{
+								"view": "avatar-motion-lab",
+								"title": "光の精霊の動作"
+							}
+						]
+					}
+				}
+			],
+			"defaultVariant": "standard",
+			"sourceBindings": [
+				{
+					"source": "settings-display",
+					"adapterRef": "adapter:settings@1",
+					"query": "query:settings.document@1",
+					"target": "none"
+				},
+				{
+					"source": "settings-display-preview",
+					"adapterRef": "adapter:settings@1",
+					"query": "query:settings.document@1",
+					"target": "none"
+				}
+			],
+			"actionBindings": [
+				{
+					"actionId": "edit",
+					"eventAction": "settings-edit",
+					"source": "settings-display",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "draft",
+					"draftAction": "edit",
+					"draftDocument": "document:settings@1"
+				},
+				{
+					"actionId": "apply",
+					"eventAction": "settings-apply",
+					"source": "settings-display",
+					"inputSchemaRef": "schema:settings-apply@2",
+					"effect": "write",
+					"operationId": "settings.apply",
+					"draftDocument": "document:settings@1",
+					"confidentialFields": ["keys"]
+				},
+				{
+					"actionId": "review",
+					"eventAction": "settings-review",
+					"source": "settings-display",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "navigate",
+					"navigateTo": {
+						"artifactId": "settings.changes"
+					}
+				}
+			],
+			"launcher": {
+				"icon": "display",
+				"label": "表示",
+				"group": "使い方を変える",
+				"order": 30,
+				"description": "背景 テーマ 字幕 粒子 自転 公転 動作"
+			},
+			"fields": [
+				{
+					"fieldId": "appearance.theme",
+					"document": "document:settings@1",
+					"path": "$.general.theme",
+					"label": "テーマ",
+					"control": "select",
+					"presentation": "segmented",
+					"options": [
+						{
+							"value": "system",
+							"label": "端末の設定に合わせる"
+						},
+						{
+							"value": "light",
+							"label": "ライト"
+						},
+						{
+							"value": "dark",
+							"label": "ダーク"
+						}
+					],
+					"group": "appearance"
+				},
+				{
+					"fieldId": "appearance.background",
+					"document": "document:settings@1",
+					"path": "$.general.background",
+					"label": "会話の背景",
+					"control": "select",
+					"presentation": "cards",
+					"defaultValue": "light-fairy",
+					"help": "保存すると会話画面の背景を切り替えます。Spatialの状態表示は、実際の機器の計測値にはまだ対応していません。",
+					"options": [
+						{
+							"value": "light-fairy",
+							"label": "光の妖精"
+						},
+						{
+							"value": "spatial",
+							"label": "Spatial"
+						}
+					],
+					"unset": "delete-key",
+					"group": "appearance"
+				},
+				{
+					"fieldId": "appearance.subtitle-enabled",
+					"document": "document:settings@1",
+					"path": "$.general.subtitles.enabled",
+					"label": "読み上げ字幕を表示する",
+					"control": "toggle",
+					"help": "読み上げに合わせて画面中央に字幕を出します。",
+					"group": "subtitles"
+				},
+				{
+					"fieldId": "appearance.subtitle-style",
+					"document": "document:settings@1",
+					"path": "$.general.subtitles.style",
+					"label": "字幕のデザイン",
+					"control": "select",
+					"options": [
+						{
+							"value": "netflix",
+							"label": "シネマ（白文字・影）"
+						},
+						{
+							"value": "prime",
+							"label": "ボックス（半透明の黒背景）"
+						},
+						{
+							"value": "classic",
+							"label": "クラシック（黄文字・黒縁）"
+						},
+						{
+							"value": "glass",
+							"label": "ガラス（ぼかし背景）"
+						}
+					],
+					"group": "subtitles"
+				},
+				{
+					"fieldId": "appearance.subtitle-size",
+					"document": "document:settings@1",
+					"path": "$.general.subtitles.size",
+					"label": "字幕の大きさ",
+					"control": "select",
+					"options": [
+						{
+							"value": "medium",
+							"label": "中"
+						},
+						{
+							"value": "large",
+							"label": "大"
+						},
+						{
+							"value": "xlarge",
+							"label": "特大"
+						}
+					],
+					"group": "subtitles"
+				},
+				{
+					"fieldId": "spatial.scatter",
+					"document": "document:settings@1",
+					"path": "$.general.spatialScatter",
+					"label": "粒子の拡散（%）",
+					"control": "range",
+					"group": "particles",
+					"defaultValue": "100",
+					"min": 0,
+					"max": 200,
+					"step": 1,
+					"help": "元の粒子座標から段階的に拡散します。100%が監視銀河の基準です。"
+				},
+				{
+					"fieldId": "spatial.core",
+					"document": "document:settings@1",
+					"path": "$.general.spatialCore",
+					"label": "元の形を残す割合（%）",
+					"control": "range",
+					"group": "particles",
+					"defaultValue": "40",
+					"min": 10,
+					"max": 90,
+					"step": 1
+				},
+				{
+					"fieldId": "spatial.focus-core",
+					"document": "document:settings@1",
+					"path": "$.general.spatialFocusCore",
+					"label": "フォーカス時に形を残す割合（%）",
+					"control": "range",
+					"group": "particles",
+					"defaultValue": "60",
+					"min": 10,
+					"max": 90,
+					"step": 1
+				},
+				{
+					"fieldId": "spatial.point-size",
+					"document": "document:settings@1",
+					"path": "$.general.spatialPointSize",
+					"label": "粒子の大きさ（%）",
+					"control": "range",
+					"group": "particles",
+					"defaultValue": "100",
+					"min": 50,
+					"max": 200,
+					"step": 1
+				},
+				{
+					"fieldId": "spatial.opacity",
+					"document": "document:settings@1",
+					"path": "$.general.spatialOpacity",
+					"label": "背景の明るさ（%）",
+					"control": "range",
+					"group": "particles",
+					"defaultValue": "80",
+					"min": 20,
+					"max": 100,
+					"step": 1
+				},
+				{
+					"fieldId": "spatial.orbit-speed",
+					"document": "document:settings@1",
+					"path": "$.general.spatialOrbitSpeed",
+					"label": "公転速度（%）",
+					"control": "range",
+					"group": "motion",
+					"defaultValue": "50",
+					"min": 0,
+					"max": 200,
+					"step": 1,
+					"help": "0%で公転だけを停止します。"
+				},
+				{
+					"fieldId": "spatial.spin-speed",
+					"document": "document:settings@1",
+					"path": "$.general.spatialSpinSpeed",
+					"label": "自転速度（%）",
+					"control": "range",
+					"group": "motion",
+					"defaultValue": "25",
+					"min": 0,
+					"max": 100,
+					"step": 1,
+					"help": "全モデルが自転します。CPUの自転は利用率にも連動します。"
+				},
+				{
+					"fieldId": "spatial.paused",
+					"document": "document:settings@1",
+					"path": "$.general.spatialPaused",
+					"label": "動きを停止",
+					"control": "toggle",
+					"group": "motion",
+					"defaultValue": "false"
+				},
+				{
+					"fieldId": "spatial.reduced-motion",
+					"document": "document:settings@1",
+					"path": "$.general.spatialReducedMotion",
+					"label": "動きを減らす",
+					"control": "toggle",
+					"group": "motion",
+					"defaultValue": "false",
+					"help": "端末側の設定も優先します。"
+				},
+				{
+					"fieldId": "spatial.view",
+					"document": "document:settings@1",
+					"path": "$.general.spatialView",
+					"label": "視点",
+					"control": "select",
+					"group": "motion",
+					"defaultValue": "oblique",
+					"options": [
+						{
+							"value": "oblique",
+							"label": "斜めから"
+						},
+						{
+							"value": "top",
+							"label": "上から"
+						}
+					]
+				},
+				{
+					"fieldId": "spatial.demo-enabled",
+					"document": "document:settings@1",
+					"path": "$.general.spatialDemoEnabled",
+					"label": "状態プレビューを使う",
+					"control": "toggle",
+					"group": "state",
+					"defaultValue": "false",
+					"help": "実測値ではありません。オフでは取得前の全モデルを未確認として表示します。12種類は展示用のモデルで、導入済みProviderの一覧ではありません。"
+				},
+				{
+					"fieldId": "spatial.demo-health",
+					"document": "document:settings@1",
+					"path": "$.general.spatialDemoHealth",
+					"label": "プレビューのhealth",
+					"control": "select",
+					"group": "state",
+					"defaultValue": "healthy",
+					"options": [
+						{
+							"value": "healthy",
+							"label": "正常"
+						},
+						{
+							"value": "pressure",
+							"label": "圧迫・応答悪化"
+						},
+						{
+							"value": "fault",
+							"label": "問題あり"
+						},
+						{
+							"value": "disconnected",
+							"label": "接続断"
+						},
+						{
+							"value": "unknown",
+							"label": "未確認"
+						}
+					]
+				},
+				{
+					"fieldId": "spatial.demo-activity",
+					"document": "document:settings@1",
+					"path": "$.general.spatialDemoActivity",
+					"label": "プレビューの活動",
+					"control": "select",
+					"group": "state",
+					"defaultValue": "working",
+					"options": [
+						{
+							"value": "idle",
+							"label": "待機"
+						},
+						{
+							"value": "starting",
+							"label": "準備中"
+						},
+						{
+							"value": "working",
+							"label": "処理中"
+						}
+					]
+				},
+				{
+					"fieldId": "spatial.demo-utilization",
+					"document": "document:settings@1",
+					"path": "$.general.spatialDemoUtilization",
+					"label": "プレビューの利用率（%）",
+					"control": "range",
+					"group": "state",
+					"defaultValue": "50",
+					"min": 0,
+					"max": 100,
+					"step": 1,
+					"help": "高利用率だけでhealthを赤にしません。"
+				},
+				{
+					"fieldId": "spatial.demo-strength",
+					"document": "document:settings@1",
+					"path": "$.general.spatialDemoStrength",
+					"label": "プレビューの活動量（%）",
+					"control": "range",
+					"group": "state",
+					"defaultValue": "65",
+					"min": 0,
+					"max": 100,
+					"step": 1
+				},
+				{
+					"fieldId": "spatial.demo-stale",
+					"document": "document:settings@1",
+					"path": "$.general.spatialDemoStale",
+					"label": "プレビューの情報が古い",
+					"control": "toggle",
+					"group": "state",
+					"defaultValue": "false"
+				}
+			]
+		}
+	],
+	"schemas": []
+}

@@ -65,7 +65,9 @@ export function ImageWorkspaceView({ request }: { request: ArtifactRequest }) {
 	return (
 		<ImageWorkspace
 			{...props}
-			creationOptions={request.view === "image-workspace" ? request.creationOptions : undefined}
+			creationOptions={
+				request.view === "image-workspace" ? request.creationOptions : undefined
+			}
 			presentation={
 				request.view === "image-workspace" ? request.presentation : "embedded"
 			}
@@ -77,7 +79,9 @@ export function ImageCreationView({ request }: { request: ArtifactRequest }) {
 	return (
 		<ImageCreationForm
 			initialValues={props.defaults}
-			creationOptions={request.view === "image-workspace" ? request.creationOptions : undefined}
+			creationOptions={
+				request.view === "image-workspace" ? request.creationOptions : undefined
+			}
 			busy={props.busy}
 			pending={props.pending}
 			onGenerate={props.onGenerate}

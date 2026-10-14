@@ -21,7 +21,7 @@ const entry = {
 	toolchainId: "timers.manage",
 	toolchainRevisionId: "toolchain:timers.manage@2",
 	artifactRevisionId: "artifact:timers.workspace@1",
-	title: "タイマー（データドリブン）",
+	title: "タイマー",
 	adapterRef: "adapter:timers@1",
 };
 
@@ -68,7 +68,7 @@ test("one entry reopens one tab; the saved timer is chosen inside it", async () 
 	expect(tabs).toHaveLength(1);
 	expect(tabs[0]).toMatchObject({
 		kind: "toolchain",
-		title: "タイマー（データドリブン）",
+		title: "タイマー",
 		artifactRevisionId: "artifact:timers.workspace@1",
 	});
 	act(() => hook.result.current.workspace.setTarget(tabs[0]!.id, "timer-2"));
@@ -153,7 +153,7 @@ test("the menu keeps one entry per feature: grouped screens are reached through 
 	] as never;
 	expect(menuEntries(entries).map((e) => entryLabel(e))).toEqual([
 		"設定",
-		"タイマー（データドリブン）",
+		"タイマー",
 	]);
 	expect(artifactIdOf("artifact:settings.display@1")).toBe("settings.display");
 });
