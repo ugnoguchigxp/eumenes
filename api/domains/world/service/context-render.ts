@@ -67,8 +67,12 @@ export const worldBlockBytes = (block: string) => utf8(block);
 
 // --- shared input budget ---------------------------------------------------------
 
-/** Memory's own view limit plus the slice limit (8 KiB): the default shared budget. */
-export const CONTEXT_TOTAL_BYTES = 40_960;
+/**
+ * The default shared budget: Memory's own view plus the slice limit (8 KiB) plus 2 KiB of slack for the notice.
+ * Memory's view is long-term 16 KiB + short-term 8 KiB + recall 6 KiB + the history summary (at most 1200
+ * characters, 3600 bytes in Japanese) = 33,920 bytes; with the slice and the slack that is 44,560.
+ */
+export const CONTEXT_TOTAL_BYTES = 44_560;
 /** Fixed framing sentences, delimiters and the JSON envelope. */
 export const FRAME_BYTES = 1_536;
 /** A slice below this cannot hold even one explanation unit. */

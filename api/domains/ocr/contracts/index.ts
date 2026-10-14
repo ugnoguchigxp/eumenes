@@ -1,4 +1,5 @@
 import { z } from "zod";
+export * from "./correction";
 export const maxInputBytes = 16 * 1024 * 1024;
 export const inputMime = z.enum([
 	"image/jpeg",
@@ -122,4 +123,9 @@ export const errorStatus = {
 	ocr_capacity: 429,
 	ocr_text_too_large: 413,
 	ocr_connection_changed: 409,
+	ocr_correction_not_found: 404,
+	ocr_correction_not_ready: 409,
+	ocr_correction_capacity: 429,
+	ocr_correction_unavailable: 503,
+	ocr_correction_text_too_large: 413,
 } as const;

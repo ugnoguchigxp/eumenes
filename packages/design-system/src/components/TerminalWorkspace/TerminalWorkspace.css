@@ -44,6 +44,19 @@
 	overflow: hidden;
 	background: var(--terminal-background);
 }
+.terminal-pane[data-heading] {
+	grid-template-rows: auto minmax(0, 1fr) auto;
+}
+.terminal-pane-heading {
+	padding: 4px 12px;
+	overflow: hidden;
+	color: var(--muted-foreground);
+	font-size: 12px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	background: var(--card);
+	border-bottom: 1px solid var(--border);
+}
 .terminal-pane-screen {
 	min-width: 0;
 	min-height: 0;

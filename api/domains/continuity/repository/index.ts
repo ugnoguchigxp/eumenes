@@ -29,9 +29,25 @@ DROP TABLE continuity_items;
 ALTER TABLE continuity_items_v2 RENAME TO continuity_items;
 CREATE INDEX continuity_items_conversation ON continuity_items(conversation_id, created_at, id);
 `;
+/**
+ * A note comes from one or more messages. The sources live in their own table (many to many) and the old
+ * single `source_message_id` column goes: existing values are copied over first.
+ */
+export const itemSourceMigration = `
+CREATE TABLE continuity_item_source (
+ item_id TEXT NOT NULL, message_id TEXT NOT NULL, PRIMARY KEY (item_id, message_id)
+);
+CREATE INDEX continuity_item_source_message ON continuity_item_source(message_id);
+INSERT INTO continuity_item_source (item_id, message_id)
+ SELECT id, source_message_id FROM continuity_items WHERE source_message_id IS NOT NULL;
+ALTER TABLE continuity_items DROP COLUMN source_message_id;
+`;
 const columns =
-	"id, conversation_id, kind, text, status, revision, created_at, updated_at, origin, source_message_id, expires_at";
-function map(row: Record<string, unknown>): ContinuityItem {
+	"id, conversation_id, kind, text, status, revision, created_at, updated_at, origin, expires_at";
+function map(
+	row: Record<string, unknown>,
+	sources: ReadonlyMap<string, string[]>,
+): ContinuityItem {
 	return {
 		id: row.id as string,
 		conversationId: row.conversation_id as string,
@@ -42,7 +58,7 @@ function map(row: Record<string, unknown>): ContinuityItem {
 		createdAt: row.created_at as string,
 		updatedAt: row.updated_at as string,
 		origin: row.origin as ContinuityItem["origin"],
-		sourceMessageId: (row.source_message_id as string | null) ?? null,
+		sourceMessageIds: sources.get(row.id as string) ?? [],
 		expiresAt: (row.expires_at as string | null) ?? null,
 	};
 }
@@ -51,9 +67,41 @@ function bump(db: Database, conversationId: string) {
 		"INSERT INTO continuity_revisions (conversation_id, revision) VALUES (?, 1) ON CONFLICT(conversation_id) DO UPDATE SET revision = revision + 1",
 	).run(conversationId);
 }
+/** Ids bound per statement: far below SQLite's variable limit. */
+const SOURCE_CHUNK = 500;
+/** The source messages of the given items, in the order they were added. */
+function sourcesOf(
+	db: Database,
+	ids: readonly string[],
+): Map<string, string[]> {
+	const found = new Map<string, string[]>();
+	for (let start = 0; start < ids.length; start += SOURCE_CHUNK) {
+		const chunk = ids.slice(start, start + SOURCE_CHUNK);
+		const marks = chunk.map(() => "?").join(",");
+		const rows = db
+			.query(
+				`SELECT item_id AS itemId, message_id AS messageId FROM continuity_item_source WHERE item_id IN (${marks}) ORDER BY rowid`,
+			)
+			.all(...chunk) as Array<{ itemId: string; messageId: string }>;
+		for (const row of rows)
+			found.set(row.itemId, [...(found.get(row.itemId) ?? []), row.messageId]);
+	}
+	return found;
+}
+/** Adds source messages to an item (already present ones are kept as they are). */
+export function addSources(
+	db: Database,
+	itemId: string,
+	messageIds: readonly string[],
+) {
+	const insert = db.query(
+		"INSERT OR IGNORE INTO continuity_item_source (item_id, message_id) VALUES (?,?)",
+	);
+	for (const messageId of messageIds) insert.run(itemId, messageId);
+}
 export function insertItem(db: Database, item: ContinuityItem) {
 	db.query(
-		`INSERT INTO continuity_items (${columns}) VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+		`INSERT INTO continuity_items (${columns}) VALUES (?,?,?,?,?,?,?,?,?,?)`,
 	).run(
 		item.id,
 		item.conversationId,
@@ -64,9 +112,9 @@ export function insertItem(db: Database, item: ContinuityItem) {
 		item.createdAt,
 		item.updatedAt,
 		item.origin,
-		item.sourceMessageId,
 		item.expiresAt,
 	);
+	addSources(db, item.id, item.sourceMessageIds);
 	bump(db, item.conversationId);
 }
 /** Rewrites the text and/or expiry of an active item at its expected revision; false when it moved on. */
@@ -101,7 +149,7 @@ export function getItem(db: Database, id: string): ContinuityItem | null {
 	const row = db
 		.query(`SELECT ${columns} FROM continuity_items WHERE id = ?`)
 		.get(id);
-	return row ? map(row as Record<string, unknown>) : null;
+	return row ? map(row as Record<string, unknown>, sourcesOf(db, [id])) : null;
 }
 export function transitionItem(
 	db: Database,
@@ -120,10 +168,9 @@ export function transitionItem(
 	if (item) bump(db, item.conversationId);
 	return true;
 }
-/** Ids bound per statement: far below SQLite's variable limit. */
-const SOURCE_CHUNK = 500;
 /**
- * Physically deletes every note that came from one of the messages and returns their ids. A forgotten message must
+ * Physically deletes every note that came from any of the messages (one source in the set is enough) and returns
+ * their ids. A forgotten message must
  * not live on in a note, not even as a retracted row. The conversations' revisions move (they hold no text).
  */
 export function deleteBySource(
@@ -137,12 +184,17 @@ export function deleteBySource(
 		const marks = chunk.map(() => "?").join(",");
 		const rows = db
 			.query(
-				`SELECT id, conversation_id AS conversationId FROM continuity_items WHERE source_message_id IN (${marks})`,
+				`SELECT DISTINCT i.id AS id, i.conversation_id AS conversationId FROM continuity_items i
+				 JOIN continuity_item_source s ON s.item_id = i.id WHERE s.message_id IN (${marks})`,
 			)
 			.all(...chunk) as Array<{ id: string; conversationId: string }>;
 		const remove = db.query("DELETE FROM continuity_items WHERE id = ?");
+		const removeSources = db.query(
+			"DELETE FROM continuity_item_source WHERE item_id = ?",
+		);
 		for (const row of rows) {
 			remove.run(row.id);
+			removeSources.run(row.id);
 			noteIds.push(row.id);
 			bump(db, row.conversationId);
 		}
@@ -154,13 +206,16 @@ export function listItems(
 	conversationId: string,
 	activeOnly: boolean,
 ): ContinuityItem[] {
-	return (
-		db
-			.query(
-				`SELECT ${columns} FROM continuity_items WHERE conversation_id = ?${activeOnly ? " AND status='active'" : ""} ORDER BY rowid`,
-			)
-			.all(conversationId) as Record<string, unknown>[]
-	).map(map);
+	const rows = db
+		.query(
+			`SELECT ${columns} FROM continuity_items WHERE conversation_id = ?${activeOnly ? " AND status='active'" : ""} ORDER BY rowid`,
+		)
+		.all(conversationId) as Record<string, unknown>[];
+	const sources = sourcesOf(
+		db,
+		rows.map((row) => row.id as string),
+	);
+	return rows.map((row) => map(row, sources));
 }
 export function conversationRevision(
 	db: Database,
@@ -184,5 +239,10 @@ export const migrations: readonly Migration[] = [
 		id: "continuity/0002-short-term",
 		sql: shortTermMigration,
 		after: ["continuity/0001-init"],
+	},
+	{
+		id: "continuity/0003-item-source",
+		sql: itemSourceMigration,
+		after: ["continuity/0002-short-term"],
 	},
 ];

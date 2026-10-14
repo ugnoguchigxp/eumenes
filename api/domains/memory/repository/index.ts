@@ -130,7 +130,9 @@ CREATE INDEX memory_turn_vector_conversation ON memory_turn_vector(conversation_
 /**
  * The steward's ledgers: exchanges with their step marks, the conversation summary and its sources, the blocked
  * messages (what `memory_agent_excluded_message` held becomes `scheduled_prompt`), and the forget fence.
- * The old agent's cursor, request and exclusion tables go.
+ * The old agent's cursor, request and exclusion tables go. The old exclusions did not name a conversation (and the
+ * messages table belongs to conversation, not to this migration), so they become blocks of conversation '':
+ * a block of '' applies to every conversation, and a message id is unique anyway.
  */
 export const stewardLedgersMigration = `
 CREATE TABLE memory_exchange (
@@ -160,12 +162,23 @@ CREATE TABLE memory_message_block (
 );
 CREATE INDEX memory_message_block_conversation ON memory_message_block(conversation_id);
 INSERT INTO memory_message_block (message_id, conversation_id, reason, forget_id, created_at)
- SELECT e.message_id, COALESCE(m.conversation_id, ''), 'scheduled_prompt', NULL, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
- FROM memory_agent_excluded_message e LEFT JOIN messages m ON m.id = e.message_id;
+ SELECT message_id, '', 'scheduled_prompt', NULL, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+ FROM memory_agent_excluded_message;
 ALTER TABLE memory_item_provenance ADD COLUMN quote_matched INTEGER;
 DROP TABLE memory_agent_cursor;
 DROP TABLE memory_agent_request;
 DROP TABLE memory_agent_excluded_message;
+`;
+
+/**
+ * What a forget needs to be complete: the merge lineage (forgetting a merged item forgets what it was merged
+ * from, and the other way round) and the block journal lines whose derived-data purge has been applied (a
+ * restored database loses these marks, so the purge runs again for it).
+ */
+export const forgetClosureMigration = `
+CREATE TABLE memory_item_merge (item_id TEXT NOT NULL, source_id TEXT NOT NULL, PRIMARY KEY (item_id, source_id));
+CREATE INDEX memory_item_merge_source ON memory_item_merge(source_id);
+CREATE TABLE memory_block_applied (forget_id TEXT PRIMARY KEY, applied_at TEXT NOT NULL);
 `;
 
 /** Named migrations of this domain; the SQL above is frozen once deployed. */
@@ -189,6 +202,11 @@ export const migrations: readonly Migration[] = [
 	{
 		id: "memory/0005-steward-ledgers",
 		sql: stewardLedgersMigration,
-		after: ["memory/0004-turn-vectors", "conversation/0001-init"],
+		after: ["memory/0004-turn-vectors"],
+	},
+	{
+		id: "memory/0006-forget-closure",
+		sql: forgetClosureMigration,
+		after: ["memory/0005-steward-ledgers"],
 	},
 ];

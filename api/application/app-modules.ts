@@ -44,6 +44,7 @@ import {
 import { type LarmPort, registerLarmStatus } from "../domains/larm";
 import { type QueueService, registerQueue } from "../domains/queue";
 import { registerMemory, type MemoryService } from "../domains/memory";
+import { registerSteward, type StewardService } from "../domains/steward";
 import {
 	registerWebResearch,
 	type WebResearchService,
@@ -102,6 +103,7 @@ export type AppServices = {
 	inference?: InferenceService;
 	ttsDictionary?: TtsDictionaryService;
 	memory?: MemoryService;
+	steward?: StewardService;
 	webResearch?: WebResearchService;
 	continuity?: ContinuityService;
 	changes?: Changes;
@@ -210,6 +212,7 @@ export function appModules(services: AppServices): AppModule[] {
 			mount: (app) => registerTtsDictionary(app, s.ttsDictionary!),
 		},
 		s.memory && { mount: (app) => registerMemory(app, s.memory!) },
+		s.steward && { mount: (app) => registerSteward(app, s.steward!) },
 		s.webResearch && {
 			mount: (app) => registerWebResearch(app, s.webResearch!),
 		},

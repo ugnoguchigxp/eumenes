@@ -6,7 +6,10 @@ import type { EumenesClient } from "../../../../client";
 import { queryRoots } from "../../queryKeys";
 import { useClaudeCodeArtifacts } from "./useClaudeCodeArtifacts";
 
-function setup(initial: { requests: number; activity?: string }) {
+function setup(
+	initial: { requests: number; activity?: string },
+	owner = "direct",
+) {
 	let state = initial;
 	const client = {
 		identity: "claude-code-fixture",
@@ -19,6 +22,7 @@ function setup(initial: { requests: number; activity?: string }) {
 				{
 					id: "s1",
 					title: "Claude Code 1",
+					owner,
 					status: "running",
 					run: 1,
 					activity: state.activity,
@@ -67,4 +71,13 @@ test("chimes when work finishes or the session starts waiting, not for the loade
 	await waitFor(() => expect(h.chime).toHaveBeenCalledTimes(2));
 	await h.change({ requests: 0, activity: "waiting" });
 	expect(h.chime).toHaveBeenCalledTimes(2);
+});
+
+test("a Kanban task session never chimes on activity changes", async () => {
+	const h = setup({ requests: 0, activity: "working" }, "kanban:card-1");
+	await waitFor(() => expect(h.client.terminals).toHaveBeenCalledOnce());
+	await h.change({ requests: 0, activity: "idle" });
+	await h.change({ requests: 0, activity: "waiting" });
+	await h.change({ requests: 0, activity: "idle" });
+	expect(h.chime).not.toHaveBeenCalled();
 });

@@ -651,7 +651,23 @@ const memoryItem = (over: Record<string, unknown> = {}) => ({
 	...over,
 });
 
-test("memory CLI covers list, status, toggle, remember, actions and forget", async () => {
+const stewardDecision = {
+	id: 7,
+	conversationId: "main",
+	jobId: "j1",
+	step: "curate-memory",
+	createdAt: "2026-10-14T00:00:00.000Z",
+	output: { remember: [] },
+	results: [{ status: "applied" }],
+	windowVersionBefore: 2,
+	windowVersionAfter: 3,
+	durationMs: 1200,
+	outputTokens: 80,
+	errorCode: null,
+};
+
+// Writing memory is the steward's job (and the conversation's memory request): the CLI only reads and toggles.
+test("memory CLI covers list, status, toggle and the steward's decisions", async () => {
 	const api = fixtureApi({
 		"GET /api/memory/items": () => Response.json({ items: [memoryItem()] }),
 		"GET /api/memory/items?all=1": () =>
@@ -665,15 +681,8 @@ test("memory CLI covers list, status, toggle, remember, actions and forget", asy
 				enabled: (body as { enabled: boolean }).enabled,
 				healthy: true,
 			}),
-		"POST /api/memory/items": () => Response.json(memoryItem()),
-		"POST /api/memory/items/mem-1/stop": () =>
-			Response.json(memoryItem({ status: "stopped", revision: 2 })),
-		"POST /api/memory/items/mem-1/resume": () =>
-			Response.json(memoryItem({ revision: 3 })),
-		"POST /api/memory/items/mem-1/retract": () =>
-			Response.json(memoryItem({ status: "retracted" })),
-		"POST /api/memory/items/mem-1/forget": () =>
-			Response.json({ forgetId: "f1", completed: true }),
+		"GET /api/steward/decisions?conversationId=main": () =>
+			Response.json({ items: [stewardDecision] }),
 	});
 	try {
 		const run = async (...args: string[]) => {
@@ -691,33 +700,7 @@ test("memory CLI covers list, status, toggle, remember, actions and forget", asy
 		expect(await run("status")).toEqual({ enabled: true, healthy: true });
 		expect(await run("off")).toEqual({ enabled: false, healthy: true });
 		expect(await run("on")).toEqual({ enabled: true, healthy: true });
-		expect(
-			await run("remember", "m1", "drink", "preference", "I like tea"),
-		).toMatchObject({ id: "mem-1" });
-		expect(
-			api.seen.filter((r) => r.path === "/api/memory/items").at(-1)?.body,
-		).toMatchObject({
-			conversationId: "main",
-			messageId: "m1",
-			semanticKey: "drink",
-			kind: "preference",
-			quote: "I like tea",
-			text: "I like tea",
-		});
-		expect(await run("stop", "mem-1", "1")).toMatchObject({
-			status: "stopped",
-		});
-		expect(await run("resume", "mem-1", "2")).toMatchObject({ revision: 3 });
-		expect(await run("retract", "mem-1", "3")).toMatchObject({
-			status: "retracted",
-		});
-		expect(
-			api.seen.filter((r) => r.path.endsWith("/retract")).at(-1)?.body,
-		).toEqual({ expectedRevision: 3 });
-		expect(await run("forget", "mem-1")).toEqual({
-			forgetId: "f1",
-			completed: true,
-		});
+		expect(await run("decisions")).toEqual([stewardDecision]);
 	} finally {
 		await api.stop();
 	}
@@ -731,9 +714,9 @@ test("memory CLI rejects bad arguments with 2 and surfaces API failures as 3", a
 	try {
 		for (const [args, message] of [
 			[["memory", "bogus"], "usage: memory list"],
-			[["memory", "remember", "m1"], "usage: memory remember"],
-			[["memory", "stop", "mem-1"], "usage: memory stop"],
-			[["memory", "forget"], "item ID required"],
+			// The write subcommands were removed with the steward: they are unknown now.
+			[["memory", "remember", "m1"], "usage: memory list"],
+			[["memory", "forget"], "usage: memory list"],
 		] as const) {
 			const result = await cli([...args, "--json"], api.url);
 			expect([args.join(" "), result.code]).toEqual([args.join(" "), 2]);

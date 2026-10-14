@@ -3,19 +3,14 @@ import {
 	isTransientStoreError,
 	toErrorCode,
 } from "../../../infrastructure/error-code";
-import type { Run } from "../contracts";
-import {
-	byId,
-	linkAnswer,
-	unfinishedAgentRuns,
-} from "../repository";
+import { byId, linkAnswer, unfinishedAgentRuns } from "../repository";
 import { endRun, type RunEndState } from "./run-end";
 import { GENERATE_KIND, TERMINAL, type DialogueDeps } from "./context";
 const log = getLogger("dialogue");
 
 /** Agent-runtime reconciliation: turns agent events into answer jobs and syncs terminal states. */
 export function createAgentSync(deps: DialogueDeps) {
-	const { store, queue, clock, agents } = deps;
+	const { store, queue, agents } = deps;
 	let stopped = false,
 		pending = false,
 		reconciling: Promise<void> | null = null,

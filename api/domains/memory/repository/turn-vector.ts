@@ -26,18 +26,17 @@ export function putTurnVector(db: Database, row: TurnVectorRow) {
 		row.createdAt,
 	);
 }
-/** The vectors of one conversation in one space before an ordinal, newest first. */
-export function turnVectorsBefore(
+/** The newest vectors of one conversation in one space (at most the scan limit), newest first. */
+export function latestTurnVectors(
 	db: Database,
 	conversationId: string,
 	space: string,
-	beforeOrdinal: number,
 ): Array<Pick<TurnVectorRow, "messageId" | "ordinal" | "vector" | "digest">> {
 	return db
 		.query(
-			"SELECT message_id AS messageId, ordinal, vector, digest FROM memory_turn_vector WHERE conversation_id = ? AND space = ? AND ordinal < ? ORDER BY ordinal DESC LIMIT ?",
+			"SELECT message_id AS messageId, ordinal, vector, digest FROM memory_turn_vector WHERE conversation_id = ? AND space = ? ORDER BY ordinal DESC LIMIT ?",
 		)
-		.all(conversationId, space, beforeOrdinal, SCAN_LIMIT) as Array<
+		.all(conversationId, space, SCAN_LIMIT) as Array<
 		Pick<TurnVectorRow, "messageId" | "ordinal" | "vector" | "digest">
 	>;
 }

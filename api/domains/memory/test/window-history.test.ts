@@ -31,7 +31,9 @@ async function exchange(h: MemoryHarness, user: string, answer: string | null) {
 }
 const publish = (
 	h: MemoryHarness,
-	opts: Parameters<MemoryHarness["memory"]["publishWindowInTransaction"]>[2] = {},
+	opts: Parameters<
+		MemoryHarness["memory"]["publishWindowInTransaction"]
+	>[2] = {},
 ) => h.store.write((db) => h.memory.publishWindowInTransaction(db, "c1", opts));
 const verbatim = (h: MemoryHarness) =>
 	h.store.write((db) => {
@@ -125,7 +127,10 @@ test("section 2.3: an exchange leaves the verbatim history only when its verdict
 	const { keep, unprocessed } = await verbatim(h);
 	// summarized and not skipped: verbatim until the summary holds it; skipped: kept verbatim.
 	expect(keep).toEqual([kept.inputMessageId, skipped.inputMessageId]);
-	expect(unprocessed).toEqual([undecided.inputMessageId, waiting.inputMessageId]);
+	expect(unprocessed).toEqual([
+		undecided.inputMessageId,
+		waiting.inputMessageId,
+	]);
 	const window = await publish(h);
 	expect(window.history.summaryText).toBe("要約済みの質問について話した。");
 	expect(window.history.summaryRevision).toBe(1);

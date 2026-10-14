@@ -20,5 +20,11 @@ export const run: CommandRun = async (args, io) => {
 		show(await client.setMemoryEnabled(sub === "on"));
 		return 0;
 	}
-	throw new Error("usage: memory list|all|status|on|off");
+	if (sub === "decisions") {
+		show(await client.stewardDecisions(args.conversationId));
+		return 0;
+	}
+	throw new Error(
+		"usage: memory list|all|status|on|off|decisions [--conversation ID]",
+	);
 };

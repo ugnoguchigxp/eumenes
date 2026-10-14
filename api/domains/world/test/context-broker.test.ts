@@ -115,12 +115,12 @@ test("shared budget: Memory is never shrunk, the Goal is capped and dropped whol
 		goalCount: 2,
 		goalBytes: 500,
 	});
-	// Memory at its own 32 KiB limit is never shrunk: the slice takes what is left.
+	// Memory at its own limit (layers, history summary and notice: about 36 KB) is never shrunk: the slice takes what is left.
 	expect(
-		allocateContextBudget({ ...base, reservedBytes: 32768 }),
+		allocateContextBudget({ ...base, reservedBytes: 36_000 }),
 	).toMatchObject({
 		ok: true,
-		worldBytes: CONTEXT_TOTAL_BYTES - 32768 - 1536 - 500,
+		worldBytes: CONTEXT_TOTAL_BYTES - 36_000 - 1536 - 500,
 		goalCount: 2,
 	});
 	// A tight total: goals go first (whole), then the slice shrinks.

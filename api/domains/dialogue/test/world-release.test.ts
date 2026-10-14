@@ -122,9 +122,19 @@ function setup(
 			inputs: { immediateSeq: 0, policyRevision: "1" },
 			longTerm: { text: "memory-block", manifest: [], bytes: 12 },
 			shortTerm: { text: "", bytes: 0, pendingAdditions: 0 },
+			history: { keep: [], summaryText: "", summaryRevision: 0 },
 			prefetch: { text: "", pins: [], bytes: 0 },
 			notices: [],
 		}),
+		verbatimHistoryInTransaction: () => ({
+			keep: [],
+			unprocessed: [],
+			known: new Set<string>(),
+			blocked: new Set<string>(),
+		}),
+		blockedMessageIdsOfConversationInTransaction: () => [],
+		blockedMessageIdsInTransaction: () => new Set<string>(),
+		recordExchangeInTransaction: () => ({ registered: true }),
 		preparedWindow: () => ({
 			conversationId: "main",
 			version: 1,
@@ -134,7 +144,7 @@ function setup(
 			manifest: [],
 			pins: [],
 			noticeIds: [],
-			windowStartOrdinal: 0,
+			shownMessageIds: [],
 		}),
 		validateWindowInTransaction: () =>
 			options.memoryAdopts === false

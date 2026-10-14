@@ -6,6 +6,7 @@ import {
 	memoryTendenciesSchema,
 	shortTermSchema,
 } from "../api/domains/memory/contracts";
+import { decisionsResponseSchema } from "../api/domains/steward/contracts";
 import { json, type Transport } from "./transport";
 export function memoryClient(t: Transport) {
 	const post = async <S extends z.ZodType>(
@@ -47,5 +48,14 @@ export function memoryClient(t: Transport) {
 					)
 				).json(),
 			),
+		/** What the steward decided in a conversation, newest first. */
+		stewardDecisions: async (conversationId: string, limit?: number) =>
+			decisionsResponseSchema.parse(
+				await (
+					await t.call(
+						`/api/steward/decisions?conversationId=${encodeURIComponent(conversationId)}${limit === undefined ? "" : `&limit=${limit}`}`,
+					)
+				).json(),
+			).items,
 	};
 }

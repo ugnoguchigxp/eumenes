@@ -17,6 +17,8 @@ export type TerminalOutput = {
 export type TerminalPaneProps = {
 	/** Accessible name of the pane; not shown. */
 	title: string;
+	/** Small label above the screen for whose session this is (e.g. a Kanban task); none by default. */
+	heading?: string;
 	status: TerminalStatus;
 	/** Reported by the host once the run ended, e.g. the exit code. */
 	statusMessage?: string;
@@ -50,6 +52,7 @@ function readTheme(host: HTMLElement): ITheme {
 
 export function TerminalPane({
 	title,
+	heading,
 	status,
 	statusMessage,
 	output,
@@ -143,8 +146,10 @@ export function TerminalPane({
 		<section
 			className={cn("terminal-pane", className)}
 			data-status={status}
+			data-heading={heading ? "" : undefined}
 			aria-label={title}
 		>
+			{heading && <header className="terminal-pane-heading">{heading}</header>}
 			<div ref={hostRef} className="terminal-pane-screen" />
 			{status === "exited" && (
 				<footer className="terminal-pane-ended">

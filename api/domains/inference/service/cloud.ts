@@ -177,14 +177,14 @@ export async function cloudRequest(
 							parallel_tool_calls: false,
 						}
 					: {}),
-				// Not strict: the schemas of existing control callers are not all strict-compatible; the host validates the result.
+				// Only structured-output control requests carry a schema (see execute.ts), and it is strict like LARM's.
 				...(options?.jsonOutput && options.jsonSchema
 					? {
 							response_format: {
 								type: "json_schema",
 								json_schema: {
 									name: "control",
-									strict: false,
+									strict: true,
 									schema: options.jsonSchema,
 								},
 							},

@@ -1,7 +1,12 @@
 import type { Database } from "bun:sqlite";
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import type { MemoryItemDto, MemoryService } from "../domains/memory";
+import type {
+	ExchangeDto,
+	MemoryItemDto,
+	MemoryService,
+} from "../domains/memory";
+import type { DecisionDto, StewardService } from "../domains/steward";
 import type { AdapterResult, DomainAdapter } from "../domains/tool-runtime";
 
 export const MEMORY_ADAPTER_REF = "adapter:memory@1";
@@ -11,6 +16,8 @@ const HISTORY = "query:memory.item-history@1";
 const TENDENCIES = "query:memory.tendencies@1";
 const SHORT_TERM = "query:memory.short-term@1";
 const CONTEXT = "query:memory.context@1";
+const DECISIONS = "query:memory.steward-decisions@1";
+const EXCHANGES = "query:memory.steward-exchanges@1";
 /** The conversation whose short-term notes and context the screen shows (the app's one conversation). */
 export const MEMORY_SCREEN_CONVERSATION = "main";
 
@@ -34,6 +41,8 @@ export type MemoryAdapterPorts = {
 		| "storedContext"
 		| "setEnabledInTransaction"
 	>;
+	/** The steward's read model (its decision records and exchange ledger); without it those views are empty. */
+	steward?: Pick<StewardService, "decisions" | "exchanges">;
 	conversationId?: string;
 };
 
@@ -63,6 +72,28 @@ const noteKindLabels: Record<string, string> = {
 	open_question: "未解決",
 	activity: "活動",
 	memo: "メモ",
+};
+const stepLabels: Record<DecisionDto["step"], string> = {
+	"curate-memory": "記憶の判断",
+	"dispose-exchanges": "履歴の取捨",
+	summarize: "要約",
+	"prepare-recall": "想起の準備",
+	"consolidate-memory": "記憶の整理",
+	"compact-history": "履歴の圧縮",
+	"refine-summary": "要約の推敲",
+};
+const outcomeLabels: Record<ExchangeDto["outcome"], string> = {
+	answered: "回答あり",
+	failed: "回答なし（失敗）",
+};
+const markLabels: Record<string, string> = {
+	done: "済",
+	skipped: "見送り",
+};
+const dispositionLabels: Record<string, string> = {
+	keep: "逐語で残す",
+	summarize: "要約へ",
+	drop: "出さない",
 };
 const NO_QUOTE = "元の発言は見つかりません";
 const CURRENT = new Set(["active", "inactive"]);
@@ -142,6 +173,92 @@ function pageOf(rows: ItemRow[], query: z.infer<typeof page>) {
 	};
 }
 
+/** How many decision records (and exchanges) the timeline shows, newest first. */
+const DECISION_ROWS = 50;
+const PROPOSAL_CHARS = 300;
+const dateTime = (iso: string) => new Date(iso).toLocaleString("ja-JP");
+const asArray = (value: unknown): unknown[] =>
+	Array.isArray(value) ? value : [];
+
+/** What the model proposed, in a line: the size of each list it returned and its free text, bounded. */
+function proposalText(output: unknown): string {
+	if (output === null || typeof output !== "object") return "";
+	const record = output as Record<string, unknown>;
+	if (typeof record.redacted === "string")
+		return "忘却により本文を消去しました";
+	const parts: string[] = [];
+	for (const [key, value] of Object.entries(record)) {
+		if (Array.isArray(value)) {
+			if (value.length > 0) parts.push(`${key} ${value.length}件`);
+		} else if (typeof value === "string" && value !== "")
+			parts.push(`${key}: ${value}`);
+	}
+	const text = parts.join(" / ");
+	return text.length > PROPOSAL_CHARS
+		? `${text.slice(0, PROPOSAL_CHARS)}…`
+		: text;
+}
+
+/** Applied and rejected counts of a decision's results, with the reason codes of the rejected. */
+function resultText(decision: DecisionDto): string {
+	if (decision.errorCode) return `採用せず（${decision.errorCode}）`;
+	let applied = 0;
+	const rejected: string[] = [];
+	let unchanged = false;
+	for (const entry of asArray(decision.results)) {
+		const result = (entry ?? {}) as Record<string, unknown>;
+		if (result.status === "applied") applied++;
+		else if (result.status === "unchanged") unchanged = true;
+		else rejected.push(typeof result.code === "string" ? result.code : "不明");
+	}
+	if (unchanged) return "変更なし";
+	const text = [`適用 ${applied}件`];
+	if (rejected.length > 0)
+		text.push(`却下 ${rejected.length}件（${rejected.join("、")}）`);
+	return text.join(" / ");
+}
+
+function decisionRow(decision: DecisionDto) {
+	const { windowVersionBefore: before, windowVersionAfter: after } = decision;
+	return {
+		id: String(decision.id),
+		createdAt: dateTime(decision.createdAt),
+		stepLabel: stepLabels[decision.step] ?? decision.step,
+		proposal: proposalText(decision.output),
+		result: resultText(decision),
+		windowDiff:
+			after === null
+				? "変更なし"
+				: before === null
+					? `版 ${after}`
+					: `版 ${before} → ${after}`,
+		cost: [
+			decision.durationMs === null
+				? ""
+				: `${(decision.durationMs / 1000).toFixed(1)}秒`,
+			decision.outputTokens === null ? "" : `${decision.outputTokens} tokens`,
+		]
+			.filter(Boolean)
+			.join(" / "),
+	};
+}
+
+function exchangeRow(exchange: ExchangeDto) {
+	return {
+		id: exchange.inputMessageId,
+		ordinal: exchange.inputOrdinal,
+		outcomeLabel: outcomeLabels[exchange.outcome],
+		stateLabel: exchange.state === "done" ? "反映済み" : "反映待ち",
+		curated: markLabels[exchange.curated ?? ""] ?? "未",
+		disposed: markLabels[exchange.disposed ?? ""] ?? "未",
+		summarized: markLabels[exchange.summarized ?? ""] ?? "未",
+		dispositionLabel: exchange.disposition
+			? (dispositionLabels[exchange.disposition] ?? exchange.disposition)
+			: "未判断",
+		createdAt: dateTime(exchange.createdAt),
+	};
+}
+
 /** The rendered context text is shown in full up to this many characters. */
 const CONTEXT_TEXT_CHARS = 1500;
 const clip = (text: string) =>
@@ -165,7 +282,16 @@ export const describeMemoryAdapter = () => ({
 			],
 		),
 	),
-	queries: new Set([STATUS, ITEMS, HISTORY, TENDENCIES, SHORT_TERM, CONTEXT]),
+	queries: new Set([
+		STATUS,
+		ITEMS,
+		HISTORY,
+		TENDENCIES,
+		SHORT_TERM,
+		CONTEXT,
+		DECISIONS,
+		EXCHANGES,
+	]),
 	inputAdapters: new Map(),
 	projections: new Set<string>(),
 	availability: "availability:memory@1",
@@ -178,7 +304,7 @@ export const describeMemoryAdapter = () => ({
  * guards stay in the domain. Memory content is never changed by hand. Conversations cannot use it.
  */
 export function createMemoryAdapter(ports: MemoryAdapterPorts): DomainAdapter {
-	const { memory } = ports;
+	const { memory, steward } = ports;
 	const conversationId = ports.conversationId ?? MEMORY_SCREEN_CONVERSATION;
 	function done(
 		receipt: Record<string, unknown>,
@@ -331,6 +457,25 @@ export function createMemoryAdapter(ports: MemoryAdapterPorts): DomainAdapter {
 						},
 					};
 				}
+				case DECISIONS:
+					return {
+						revision: 0,
+						data: {
+							items: (
+								steward?.decisions(conversationId, DECISION_ROWS) ?? []
+							).map(decisionRow),
+						},
+					};
+				case EXCHANGES:
+					return {
+						revision: 0,
+						data: {
+							items: (steward?.exchanges(conversationId) ?? [])
+								.slice(-DECISION_ROWS)
+								.map(exchangeRow)
+								.reverse(),
+						},
+					};
 				default:
 					return null;
 			}

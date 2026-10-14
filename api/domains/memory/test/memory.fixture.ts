@@ -13,14 +13,17 @@ import {
 	createConversationService,
 } from "../../conversation";
 import {
+	type ContinuityKind,
 	createContinuityService,
 	migration as continuityMigration,
 	shortTermMigration,
+	itemSourceMigration,
 } from "../../continuity";
 import {
 	agentHardeningMigration,
 	turnVectorsMigration,
 	stewardLedgersMigration,
+	forgetClosureMigration,
 	contextWindowMigration,
 	createMemoryService,
 	migration,
@@ -42,11 +45,13 @@ export const memoryTestMigrations = [
 	retractionMigration,
 	continuityMigration,
 	shortTermMigration,
+	itemSourceMigration,
 	migration,
 	contextWindowMigration,
 	agentHardeningMigration,
 	turnVectorsMigration,
 	stewardLedgersMigration,
+	forgetClosureMigration,
 	...memoryPackageMigrations,
 ];
 
@@ -167,6 +172,22 @@ export async function setupMemory(
 				text,
 			});
 		},
+		/** A short-term note, written the way the steward writes one (its source message need not exist). */
+		note: (
+			conversationId: string,
+			input: { kind: ContinuityKind; text: string },
+		) =>
+			store.write((db) =>
+				continuity.addByAgentInTransaction(db, conversationId, {
+					...input,
+					sourceMessageIds: ["note-source"],
+				}),
+			),
+		/** Closes a note at the revision the caller saw. */
+		closeNote: (id: string, revision: number) =>
+			store.write((db) =>
+				continuity.closeByAgentInTransaction(db, id, revision, "resolved"),
+			),
 		/** Saves one item (see `saveItem`). */
 		remember: (input: SeedInput) => saveItem(store, memory, input),
 		/** The steward's save, element by element. */

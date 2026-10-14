@@ -11,6 +11,8 @@ import { useArtifactRuntime } from "./runtime";
 export type TerminalSessionResource = {
 	id: string;
 	title: string;
+	/** Whose session this is, shown small above the screen (a Kanban task); absent for direct ones. */
+	heading?: string;
 	status: "running" | "exited";
 	/** Advances on every (re)start; a new run gets a fresh connection and screen. */
 	run: number;
@@ -75,6 +77,7 @@ export function TerminalWorkspaceView({
 					{
 						id: `${session.id}:${session.run}`,
 						title: session.title,
+						heading: session.heading,
 						status: session.status,
 						statusMessage: session.statusMessage,
 						output: connection.output,

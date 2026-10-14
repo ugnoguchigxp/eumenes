@@ -2,7 +2,7 @@ import type { Database } from "bun:sqlite";
 import { deactivateState } from "eumenes-memory/sqlite";
 import type { HostSourceState, StateItem } from "eumenes-memory/sqlite";
 import type { CurationItem, CurationResult } from "../contracts";
-import { putProvenance } from "../repository";
+import { putMergeLineage, putProvenance } from "../repository";
 import {
 	MAX_EVIDENCE,
 	MAX_TEXT_CHARS,
@@ -22,7 +22,7 @@ export function createMerge(
 	evidence: EvidenceBuilder,
 	writer: StateWriter,
 ) {
-	const { windows, clock } = deps;
+	const { clock } = deps;
 	const { usableEvidence } = evidence;
 	const { items, writeState, activeAt } = writer;
 
@@ -88,6 +88,12 @@ export function createMerge(
 		});
 		if (!written.ok) return rejected("merge", written.reason);
 		putProvenance(db, written.item.itemId, null, "agent", clock(), null);
+		// Forgetting the merged item (or any source) must reach the others: they carry the same words.
+		putMergeLineage(
+			db,
+			written.item.itemId,
+			sources.map((source) => source.itemId),
+		);
 		// The merged item is stored; the sources it did not replace are stopped, in the same transaction.
 		const stoppedIds: string[] = [];
 		for (const source of sources) {
@@ -104,7 +110,8 @@ export function createMerge(
 			if (stopped.status !== "applied") return rejected("merge", "conflict");
 			stoppedIds.push(current.itemId);
 		}
-		windows.recordImmediateInTransaction(db, "state_replace", null);
+		// Not an immediate change: the merge is the steward's own work and reaches the next run through the next
+		// published window, so a run in flight stays adoptable.
 		return applied("merge", {
 			id: written.item.itemId,
 			revision: written.item.revision,

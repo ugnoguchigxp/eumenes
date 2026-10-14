@@ -1,5 +1,7 @@
 # 記憶と ContextWindow 実装計画（メモリー上の ContextWindow ＋ 記憶担当サブエージェント）
 
+> 記憶担当（steward）に関する部分（出力契約、スケジュール、ContextWindow の範囲、手動操作）は、[2026-10-14 の steward 計画](memory-steward-implementation-plan-2026-10-14.md)で置き換えた。
+
 2026-10-13 / 状態: **計画**（未実装・未検証）/ 改訂3。実装担当は Sonnet。本書の「決定事項」と各タスクの指定に従い、本書にない設計変更をしない。本書の記述と実際のコードが食い違う（関数名・型・表名が違う、前提の振る舞いが違う）場合は、推測で合わせず、実装を止めて食い違いを報告する。
 
 関連: [接続計画](memory-system-incremental-adoption-concept.md)、[本体の発展案](../../eumenes_memory/spec/eumenes-memory-evolution-proposal.md)、[LARM](../docs/larm.md)、[ログ](../docs/logging.md)。

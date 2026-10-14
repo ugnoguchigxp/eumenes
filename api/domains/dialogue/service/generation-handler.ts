@@ -420,14 +420,7 @@ export function createGenerationHandler(
 						run.conversationId,
 						outcome.result.receipt.delivery,
 					);
-				const done = endRun(
-					deps,
-					tx,
-					run,
-					"completed",
-					null,
-					messageId,
-				);
+				const done = endRun(deps, tx, run, "completed", null, messageId);
 				if (done) observeAnswer(postAnswer, tx, run.id, input.agent);
 				if (done) traceOutcome(deps, tx, run.id, agentOutcome(input.agent));
 				else if (input.world)

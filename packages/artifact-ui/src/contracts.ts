@@ -1,3 +1,5 @@
+import type { WorkspaceAction } from "./workspace-actions";
+import type { OcrAction } from "./ocr-actions";
 import type { OcrResource } from "./ocr-components";
 export type { OcrResource } from "./ocr-components";
 import type { CollectionResource } from "./collection-contracts";
@@ -9,6 +11,8 @@ export type {
 } from "./collection-contracts";
 import type { ObjectRecognitionResource } from "./object-recognition-components";
 import type { TerminalsResource } from "./terminal-components";
+import type { KanbanResource } from "./kanban-components";
+export type { KanbanBoardSource, KanbanResource } from "./kanban-components";
 export type {
 	TerminalConnection,
 	TerminalSessionResource,
@@ -182,6 +186,15 @@ export const viewRegistry = {
 		label: "ターミナル",
 		schema: z.strictObject({
 			view: z.literal("terminal-workspace"),
+			source,
+			title,
+		}),
+	},
+	"kanban-board": {
+		name: "KanbanBoard",
+		label: "タスクボード",
+		schema: z.strictObject({
+			view: z.literal("kanban-board"),
 			source,
 			title,
 		}),
@@ -635,6 +648,7 @@ export type SettingsResource = {
 export type Resource =
 	| ObjectRecognitionResource
 	| TerminalsResource
+	| KanbanResource
 	| ImageWorkspaceResource
 	| RecordsResource
 	| SubtitlePreviewResource
@@ -696,27 +710,21 @@ export type ArtifactEvent = {
 	source: string;
 	revision: number;
 	action:
-		| "ocr-select"
-		| "ocr-frame"
-		| "ocr-line"
-		| "ocr-refresh"
-		| "ocr-cancel"
-		| "ocr-recheck"
-		| "ocr-remove"
-		| "ocr-configure"
-		| "ocr-copy"
-		| "ocr-incorporate"
-		| "ocr-recording"
-		| "ocr-thumbnail"
-		| "recognition-select"
-		| "recognition-cancel"
-		| "recognition-refresh"
-		| "recognition-recheck"
-		| "recognition-credential-source"
-		| "recognition-remove"
-		| "recognition-incorporate"
-		| "terminal-start"
-		| "terminal-restart"
+		| OcrAction
+		| WorkspaceAction
+		| "kanban-add"
+		| "kanban-edit"
+		| "kanban-move"
+		| "kanban-remove"
+		| "kanban-run"
+		| "kanban-followup"
+		| "kanban-commit-push"
+		| "kanban-review"
+		| "kanban-cancel"
+		| "kanban-stop"
+		| "kanban-reset"
+		| "kanban-resume-queue"
+		| "kanban-open"
 		| "drawing-new"
 		| "drawing-open"
 		| "drawing-refresh"

@@ -36,6 +36,7 @@ import {
 	useVoiceDialogue,
 } from "../domains/voice-dialogue";
 import { useSettings, useVoiceMute } from "../domains/settings";
+import { useKanbanNotices } from "../domains/kanban/useKanbanNotices";
 import { useClaudeCodeArtifacts } from "../domains/terminals";
 import { changeRoots, invalidateAllButLive, queryRoots } from "../queryKeys";
 import { useOpenPlaylist } from "./WorkspaceArtifacts";
@@ -132,11 +133,13 @@ export function useWorkspace({
 		(text, signal) => client.replayAudio(text, signal),
 	);
 	const playTone = timerAudio.play;
-	// A finished task or a question from a delegated session sounds the same short tone.
-	const chimeClaudeCode = useCallback(() => {
+	// A finished task, a question from a delegated session or a new Kanban notice sounds the
+	// same short tone.
+	const chime = useCallback(() => {
 		void playTone(new AbortController().signal).catch(() => {});
 	}, [playTone]);
-	useClaudeCodeArtifacts(client, openClaudeCode, chimeClaudeCode);
+	useClaudeCodeArtifacts(client, openClaudeCode, chime);
+	const kanbanNotices = useKanbanNotices(client, chime, openById);
 	const replay = useReplay(client, settings.data?.voice, {
 		sessionAudio: voice.audio,
 		interruptLive: voice.interrupt,
@@ -301,6 +304,7 @@ export function useWorkspace({
 		runs,
 		voice,
 		timerAudio,
+		kanbanNotices,
 		replay,
 		mute,
 		automaticInput,

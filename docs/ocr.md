@@ -18,6 +18,14 @@ OCR domain は原本と結果を所有者・会話・受付 ID ごとに SQLite 
 
 `ocr.bundle.json` が profile・Skill・open/read/cancel の tool・package・toolchain・binding・Artifact・入力 schema を版付きで定義する。`adapter:ocr@1` は OCR domain の公開操作に接続する。会話の command 担当は登録された SystemContext と認可済み snapshot から操作を選ぶ。画面は JSON の `layout` に登録 view `ocr-media` と `ocr-panel` を組み合わせる。Web adapter が認証済み API と `uploadFile` bridge を使い、原本の Blob URL は表示時だけ作る。履歴のサムネイルは、見えている項目の保存原本をブラウザで縮小して一時的に表示する。ファイル選択は読み上げ名を持つアイコンボタン。履歴選択・時刻・行選択は local actionで、時刻・行の操作には選択中の資料IDを含める。取消・再確認・削除・会話追加は OCR の認証済み API を呼ぶ local action である。
 
+## LLM補正案
+
+OCRが完了した画像、または動画の選択中の1フレームで「補正案を作る」を押す。元画像とOCRの文字・行位置を、版付きの`ocr.correct@1` Profile/Skill/Packageを使う一回の専門推論へ渡す。補正専用ツールチェーンはなく、`ocr.workspace@4`の画面操作からOCR domainのAPIを呼ぶ。会話経由のOCR画面は`ocr.manage@4`から同じArtifactを開く。LLMは保存済みLARM接続のvision対応サービスを使い、モデル名は固定しない。
+
+候補は原文と別の履歴として資料・フレームごとに保存する。段落と表のセル、OCR行または元画像領域の根拠、判読困難箇所を保持し、入力行の対応・表の範囲と重なりを検査してから完了とする。表はセルの行・列と結合範囲で表示する。候補は明示的に採用すると既定表示・コピー対象に切り替わり、原文へ戻せる。原文と補正案の会話追加は別のボタンを使う。候補作成、一覧・詳細、取消、採用状態、会話追加は`/api/ocr/:id/corrections`以下のAPIが担当する。候補作成はrequestIdとOCR revisionで重複・競合を検査し、処理中は同じ資料・フレームにつき1件に制限する。
+
+WebP等の画像はbackendで向きを反映し、透明部分を白にしてPNGへ変換する。動画は配備環境の`ffmpeg`でOCR時刻のフレームを取り、実フレーム時刻が0.25秒を超えてずれた場合は補正を失敗にする。画像寸法・容量やOCR本文がLARM契約を超える場合も、資料の一部を黙って省かず失敗にする。取消と資料削除後に遅れて届いた推論結果は採用しない。Providerの生応答や画像の複製は候補に保存しない。
+
 ## 確認
 
 固定試験は OCR gateway・保存・所有者境界・取消、HTTP 結合、command 担当、ブラウザのファイル選択・行と polygon・履歴・会話追加・動画時刻を個別に確認する。実 gateway と実カメラの受入は固定試験と区別する。

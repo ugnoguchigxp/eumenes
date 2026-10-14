@@ -326,3 +326,40 @@ test("background control rejects model budget expansion, expired authority and u
 		await h.store.write((db) => h.inference.acceptInTransaction(db, receipt)),
 	).toBe(false);
 });
+test("user control runs without a dialogue parent and keeps its own bounded LARM receipt", async () => {
+	const h = await setup();
+	const id = await h.store.write((db) =>
+		h.inference.captureUserControlInTransaction(db, {
+			subject: `ocr-correction:${crypto.randomUUID()}`,
+			deadline: Date.now() + 9000,
+			maxOutputTokens: 2048,
+		}),
+	);
+	const receipt = await h.inference.executeControl(
+		id,
+		messages,
+		new AbortController().signal,
+	);
+	expect(receipt.value).toBe('{"ok":true}');
+	expect(
+		await h.store.write((db) => h.inference.acceptInTransaction(db, receipt)),
+	).toBe(true);
+	expect(
+		h.store.read((db) =>
+			db
+				.query(
+					"SELECT mode,output_limit,context_policy FROM inference_requests WHERE id=?",
+				)
+				.get(id),
+		),
+	).toEqual({ mode: "control", output_limit: 2048, context_policy: "exact" });
+	await expect(
+		h.store.write((db) =>
+			h.inference.captureUserControlInTransaction(db, {
+				subject: `ocr-correction:${crypto.randomUUID()}`,
+				deadline: Date.now() + 9000,
+				maxOutputTokens: 8193,
+			}),
+		),
+	).rejects.toThrow("invalid_user_control");
+});

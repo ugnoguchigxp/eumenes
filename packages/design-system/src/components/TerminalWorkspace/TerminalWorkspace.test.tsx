@@ -185,3 +185,29 @@ it("shows the host's message or the empty label without panes", () => {
 		screen.queryByText("Claude Code を起動しています…"),
 	).not.toBeInTheDocument();
 });
+
+it("shows a small heading only for a pane that has an owner", () => {
+	render(
+		<TerminalWorkspace
+			panes={[
+				{
+					id: "a",
+					title: "セッション 1",
+					status: "running",
+					output: fakeOutput().output,
+				},
+				{
+					id: "b",
+					title: "README の手順修正",
+					heading: "README の手順修正",
+					status: "running",
+					output: fakeOutput().output,
+				},
+			]}
+		/>,
+	);
+	expect(screen.getAllByText("README の手順修正")).toHaveLength(1);
+	expect(
+		screen.getByRole("region", { name: "セッション 1" }).querySelector(".terminal-pane-heading"),
+	).toBeNull();
+});

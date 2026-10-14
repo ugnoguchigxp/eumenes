@@ -3,16 +3,17 @@ import { harness } from "../api/application/toolchain.fixture";
 import { createTerminals } from "../api/domains/terminals";
 
 // A fake `claude` (shell script) on a real PTY; the conversation path is the registered toolchain.
-const terminals = createTerminals({
-	command: [
-		"/bin/sh",
-		join(import.meta.dir, "../tests/browser/fixtures/fake-claude.sh"),
-	],
-	// The fake reports through the same hooks as Claude Code.
-	hookBaseUrl: `http://127.0.0.1:${process.env.EUMENES_PORT}`,
-});
 const h = await harness({
-	terminals,
+	terminals: (store) =>
+		createTerminals({
+			store,
+			command: [
+				"/bin/sh",
+				join(import.meta.dir, "../tests/browser/fixtures/fake-claude.sh"),
+			],
+			// The fake reports through the same hooks as Claude Code.
+			hookBaseUrl: `http://127.0.0.1:${process.env.EUMENES_PORT}`,
+		}),
 	routeTool: "claude_code",
 	command: (messages) => {
 		const data = JSON.parse(messages.at(-1)!.content) as { request: string };
@@ -43,7 +44,6 @@ const server = Bun.serve({
 	fetch: h.app.fetch,
 });
 const stop = async () => {
-	terminals.closeAll();
 	await h.close();
 	server.stop(true);
 	process.exit(0);

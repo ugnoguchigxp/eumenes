@@ -3,6 +3,7 @@ import { createVoiceAccess } from "./voice-access";
 import { createSpeechLanguageCache } from "./speech-language";
 import { createVoiceBinding } from "./voice-binding";
 import { bindControlPolicy } from "./control-policy";
+import { captureBackgroundControl } from "./background-control";
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import { createLarm, type LarmPort } from "../../larm";
@@ -40,6 +41,7 @@ type RequestArgs =
 type ControlArgs = [string, Messages, AbortSignal, ControlContract?];
 const runControl = (env: Env, ...[id, m, s, c]: ControlArgs) =>
 	runRequest(env, id, m, s, undefined, undefined, undefined, c);
+import { createIndependentControls } from "./independent-control";
 export function createInference(
 	store: SqliteStore,
 	settings: SettingsService,
@@ -314,55 +316,10 @@ export function createInference(
 			db: Database,
 			input: BackgroundControl,
 		) {
-			if (
-				![input.taskId, input.decisionId].every((v) =>
-					/^[a-zA-Z0-9_.:-]{1,160}$/.test(v),
-				) ||
-				![
-					input.authorityEpoch,
-					input.executionGeneration,
-					input.maxOutputTokens,
-				].every((v) => Number.isSafeInteger(v) && v > 0) ||
-				!Number.isSafeInteger(input.deadline) ||
-				!Number.isSafeInteger(input.taskDeadline) ||
-				input.deadline <= Date.now() ||
-				input.deadline > input.taskDeadline ||
-				input.deadline > Date.now() + 30_000 ||
-				input.maxOutputTokens > 1500
-			)
-				throw new Error("invalid_background_control");
-			const binding = JSON.stringify([
-				input.taskId,
-				input.decisionId,
-				input.authorityEpoch,
-				input.executionGeneration,
-				input.deadline,
-				input.taskDeadline,
-				input.maxOutputTokens,
-			]);
-			const subject = `background:${input.taskId}:${input.decisionId}`;
-			const old = db
-				.query(
-					"SELECT r.id,b.binding FROM inference_requests r LEFT JOIN inference_background_controls b ON b.request_id=r.id WHERE r.subject=? AND r.purpose='llm'",
-				)
-				.get(subject) as { id: string; binding: string | null } | null;
-			if (old) {
-				if (old.binding !== binding)
-					throw new Error("background_control_conflict");
-				return old.id;
-			}
-			const snapshot = structuredClone(settings.inTransaction(db));
-			snapshot.routes.llm.mode = "larm-only";
-			snapshot.routes.llm.cloudAllowed = false;
-			const requestId = capture(db, subject, "llm", input.deadline, snapshot);
-			db.query(
-				"UPDATE inference_requests SET mode='control',output_limit=?,context_policy='exact',parents='[]' WHERE id=?",
-			).run(input.maxOutputTokens, requestId);
-			db.query("INSERT INTO inference_background_controls VALUES(?,?)").run(
-				requestId,
-				binding,
-			);
-			return requestId;
+			return captureBackgroundControl(db, input, {
+				snapshot: () => structuredClone(settings.inTransaction(db)),
+				capture,
+			});
 		},
 		captureControlInTransaction(
 			db: Database,
@@ -407,32 +364,7 @@ export function createInference(
 			);
 			return requestId;
 		},
-		/**
-		 * Host-only control request that does not depend on a pending parent
-		 * (e.g. after the source answer was accepted). Uses the *current* settings
-		 * snapshot, LARM only, exact context, never inherits another deadline.
-		 */
-		captureMaintenanceControlInTransaction(
-			db: Database,
-			input: { subject: string; deadline: number; maxOutputTokens: number },
-		) {
-			if (!input.subject || input.deadline <= Date.now())
-				throw new Error("invalid_maintenance_control");
-			const snapshot = structuredClone(settings.inTransaction(db));
-			snapshot.routes.llm.mode = "larm-only";
-			snapshot.routes.llm.cloudAllowed = false;
-			const requestId = capture(
-				db,
-				input.subject,
-				"llm",
-				input.deadline,
-				snapshot,
-			);
-			db.query(
-				"UPDATE inference_requests SET mode='control',output_limit=?,context_policy='exact',parents='[]' WHERE id=? AND status='pending'",
-			).run(Math.min(2048, Math.max(1, input.maxOutputTokens)), requestId);
-			return requestId;
-		},
+		...createIndependentControls(settings.inTransaction, capture),
 		executeControl(...[id, messages, signal, control]: ControlArgs) {
 			if (store.read((db) => get(db, id))?.mode !== "control")
 				throw new Error("invalid_control_request");

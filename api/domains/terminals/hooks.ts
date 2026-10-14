@@ -14,24 +14,49 @@ export const HOOK_TOKEN_HEADER = "x-eumenes-hook-token";
 /** The last answer kept for the report; longer text is cut. */
 export const LAST_MESSAGE_CHARS = 4000;
 
+/** Hooks the host listens to, in the order they are written into the settings file. */
+export const HOOK_EVENTS = [
+	"SessionStart",
+	"UserPromptSubmit",
+	"PostToolUse",
+	"Notification",
+	"Stop",
+] as const;
+
 export const hookPayloadSchema = z.object({
-	hook_event_name: z.enum([
-		"UserPromptSubmit",
-		"Stop",
-		"Notification",
-		"PostToolUse",
-	]),
-	/** UserPromptSubmit: the submitted request (matches a handed-over task to its turn). */
+	hook_event_name: z.enum(HOOK_EVENTS),
+	/** Claude Code's conversation id; must be the one the PTY was launched with. */
+	session_id: z.string().optional(),
+	/** One turn: UserPromptSubmit, PostToolUse, Notification and Stop of it share this value. */
+	prompt_id: z.string().optional(),
+	/** UserPromptSubmit: the submitted request (matches a handed-over request to its turn). */
 	prompt: z.string().optional(),
 	last_assistant_message: z.string().optional(),
 	/** Notification: `permission_prompt` / `elicitation_dialog` wait for the person. */
 	notification_type: z.string().optional(),
+	/** SessionStart: `startup`, `resume`, `clear` or `compact`. */
+	source: z.string().optional(),
+	/** PostToolUse: the tool and its input (only file paths are read from it). */
+	tool_name: z.string().optional(),
+	tool_input: z.unknown().optional(),
 });
 export type HookPayload = z.infer<typeof hookPayloadSchema>;
 
+/** Tools whose file path is recorded as a change of the request. */
+const EDIT_TOOLS = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]);
+/** The file an edit tool changed, as Claude Code reported it (absolute or project-relative). */
+export function editedPath(payload: HookPayload): string | undefined {
+	if (!payload.tool_name || !EDIT_TOOLS.has(payload.tool_name))
+		return undefined;
+	const input = payload.tool_input;
+	if (typeof input !== "object" || input === null) return undefined;
+	const { file_path, notebook_path } = input as Record<string, unknown>;
+	const path = file_path ?? notebook_path;
+	return typeof path === "string" && path.length > 0 ? path : undefined;
+}
+
 /** Notifications that wait for the person; `idle_prompt` (left idle after a turn) is not one. */
 export const waitsForPerson = (payload: HookPayload) =>
-	payload.notification_type === undefined ||
 	payload.notification_type === "permission_prompt" ||
 	payload.notification_type === "elicitation_dialog";
 
@@ -51,15 +76,20 @@ export function hookBaseUrl(value: string | undefined): string | undefined {
 		: undefined;
 }
 
+/** Git writes a `work` session of a Kanban card must not make (the person commits after review). */
+export const GIT_WRITE_DENY = ["Bash(git commit *)", "Bash(git push *)"];
+
 /**
  * Writes the settings that add the hooks to a private file (0600) and returns its path. The
  * token stays out of the process arguments; the command is built only from the checked URL, the
  * session UUID and a hex token, so the shell Claude Code runs it in sees no user text.
+ * `denyGitWrites` adds `permissions.deny` for `git commit` and `git push`.
  */
 export function writeHookSettings(
 	baseUrl: string,
 	sessionId: string,
 	token: string,
+	denyGitWrites = false,
 ): string {
 	const command = `curl -q -s -m 5 --noproxy '*' -X POST -H 'Content-Type: application/json' -H '${HOOK_TOKEN_HEADER}: ${token}' --data-binary @- '${baseUrl}${HOOK_PATH}/${sessionId}' >/dev/null 2>&1 || true`;
 	const entry = [{ hooks: [{ type: "command", command }] }];
@@ -70,12 +100,8 @@ export function writeHookSettings(
 	writeFileSync(
 		path,
 		JSON.stringify({
-			hooks: {
-				UserPromptSubmit: entry,
-				Stop: entry,
-				Notification: entry,
-				PostToolUse: entry,
-			},
+			hooks: Object.fromEntries(HOOK_EVENTS.map((event) => [event, entry])),
+			...(denyGitWrites ? { permissions: { deny: GIT_WRITE_DENY } } : {}),
 		}),
 		{ mode: 0o600, flag: "wx" },
 	);

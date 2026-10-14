@@ -1,6 +1,10 @@
 import type { Database } from "bun:sqlite";
 import type { ExchangeDto } from "../contracts";
-import { blockedInConversation, listExchanges, readSummary } from "../repository";
+import {
+	blockedInConversation,
+	listExchanges,
+	readSummary,
+} from "../repository";
 
 /** The two messages of an exchange: the user's and, when one was adopted, the answer. */
 export type ExchangeRef = {

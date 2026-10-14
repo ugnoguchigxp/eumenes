@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ocrRecord } from "../api/domains/ocr/contracts";
+import { correctionRecord, ocrRecord } from "../api/domains/ocr/contracts";
 import { json, type Transport } from "./transport";
 export function ocrClient(t: Transport) {
 	const root = "/api/ocr";
@@ -68,6 +68,103 @@ export function ocrClient(t: Transport) {
 				await t.call(
 					`${root}/${encodeURIComponent(id)}/conversation`,
 					json({ requestId, frameIndex, lineIndexes }),
+				)
+			).json(),
+		ocrCorrectionCreate: async (
+			id: string,
+			input: {
+				requestId: string;
+				conversationId: string;
+				expectedRevision: number;
+				frameIndex?: number;
+			},
+		) =>
+			correctionRecord.parse(
+				await (
+					await t.call(
+						`${root}/${encodeURIComponent(id)}/corrections`,
+						json(input),
+					)
+				).json(),
+			),
+		ocrCorrections: async (
+			id: string,
+			conversationId: string,
+			frameIndex?: number,
+			before?: number,
+			signal?: AbortSignal,
+		) =>
+			z
+				.object({
+					items: correctionRecord.array(),
+					nextCursor: z.number().nullable(),
+					preference: z.object({
+						preferredId: z.string().nullable(),
+						revision: z.number(),
+					}),
+				})
+				.parse(
+					await (
+						await t.call(
+							`${root}/${encodeURIComponent(id)}/corrections?${new URLSearchParams({ conversationId, ...(frameIndex === undefined ? {} : { frameIndex: String(frameIndex) }), ...(before === undefined ? {} : { before: String(before) }) })}`,
+							{ signal },
+						)
+					).json(),
+				),
+		ocrCorrectionGet: async (
+			id: string,
+			candidateId: string,
+			conversationId: string,
+		) =>
+			correctionRecord.parse(
+				await (
+					await t.call(
+						`${root}/${encodeURIComponent(id)}/corrections/${encodeURIComponent(candidateId)}?conversationId=${encodeURIComponent(conversationId)}`,
+					)
+				).json(),
+			),
+		ocrCorrectionCancel: async (
+			id: string,
+			candidateId: string,
+			conversationId: string,
+		) =>
+			correctionRecord.parse(
+				await (
+					await t.call(
+						`${root}/${encodeURIComponent(id)}/corrections/${encodeURIComponent(candidateId)}/cancel`,
+						json({ conversationId }),
+					)
+				).json(),
+			),
+		ocrCorrectionPrefer: async (
+			id: string,
+			input: {
+				conversationId: string;
+				frameIndex?: number;
+				preferredId: string | null;
+				expectedRevision: number;
+			},
+		) =>
+			z
+				.object({ preferredId: z.string().nullable(), revision: z.number() })
+				.parse(
+					await (
+						await t.call(
+							`${root}/${encodeURIComponent(id)}/corrections/preference`,
+							{ ...json(input), method: "PUT" },
+						)
+					).json(),
+				),
+		ocrCorrectionIncorporate: async (
+			id: string,
+			candidateId: string,
+			requestId: string,
+			conversationId: string,
+		) =>
+			(
+				await t.call(
+					`${root}/${encodeURIComponent(id)}/corrections/${encodeURIComponent(candidateId)}/conversation`,
+					json({ requestId, conversationId }),
 				)
 			).json(),
 	};

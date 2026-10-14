@@ -69,6 +69,11 @@ export interface GenerateInput {
 		 * the window is checked at adoption only when a recalled exchange stands on it.
 		 */
 		quiet?: true;
+		/**
+		 * The shown messages that were already blocked at prepare time (scheduled prompts). A shown message that
+		 * is blocked at adoption and not listed here was forgotten meanwhile: the answer is not adopted, quiet or not.
+		 */
+		blockedAtPrepare?: string[];
 	};
 	/** The World context fixed at prepare time (opaque here); re-checked before sending and at adoption. */
 	world?: { context: unknown };

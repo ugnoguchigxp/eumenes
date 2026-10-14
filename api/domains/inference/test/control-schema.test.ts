@@ -11,7 +11,7 @@ import { cloudRequest, type CloudEnv } from "../service/cloud";
 import type { RequestRow } from "../repository";
 import type { Connection, Resource } from "../../settings/contracts";
 
-// Every route that can serve a background control request receives the step's output schema.
+// The schema of a structured-output control request (the options execute.ts builds for it) reaches every route.
 const schema = {
 	type: "object",
 	properties: { done: { type: "boolean" } },
@@ -90,7 +90,7 @@ test("OpenAI-compatible cloud sends the schema as response_format and leaves ord
 	);
 	expect(bodies[0]!.response_format).toMatchObject({
 		type: "json_schema",
-		json_schema: { name: "control", schema },
+		json_schema: { name: "control", strict: true, schema },
 	});
 	expect("response_format" in bodies[1]!).toBe(false);
 });

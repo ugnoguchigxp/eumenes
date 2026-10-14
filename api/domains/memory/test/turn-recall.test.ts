@@ -453,7 +453,8 @@ test("there is no ordinal boundary: a hidden exchange between shown ones is foun
 	const shownOld = await exchange(h, "最初の京都の話", "清水寺の話ですね");
 	const hidden = await exchange(h, "二番目の京都の話", "紅葉の話ですね");
 	const shownNew = await exchange(h, "三番目の京都の話", "嵐山の話ですね");
-	for (const turn of [shownOld, hidden, shownNew]) await embed(h, turn.userId, A);
+	for (const turn of [shownOld, hidden, shownNew])
+		await embed(h, turn.userId, A);
 	const found = recall(h, {
 		excludeMessageIds: [shownOld.userId, shownNew.userId],
 	});

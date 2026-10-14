@@ -1,6 +1,8 @@
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { QueueService } from "../../queue";
+import type { InferencePort } from "../../inference";
+import type { Capabilities } from "../../capabilities";
 import {
 	maxInputBytes,
 	inputMime,
@@ -18,13 +20,25 @@ import {
 	row,
 } from "../repository";
 import { registerOcrHandlers } from "./handlers";
+import { createOcrCorrections } from "./corrections";
 export function createOcr(deps: {
 	store: SqliteStore;
 	queue: QueueService;
 	connection: () => Connection | null;
 	fetcher?: typeof fetch;
+	inference?: InferencePort;
+	capabilities?: () => Capabilities | null;
 }) {
 	const { store, queue } = deps;
+	const corrections =
+		deps.inference && deps.capabilities
+			? createOcrCorrections({
+					store,
+					queue,
+					inference: deps.inference,
+					capabilities: deps.capabilities,
+				})
+			: null;
 	function cancelInTransaction(db: Database, owner: string, id: string) {
 		const r = owned(db, id, owner);
 		const v = record(r);
@@ -61,6 +75,7 @@ export function createOcr(deps: {
 	}
 	registerOcrHandlers({ ...deps, enqueue });
 	return {
+		corrections,
 		async upload(
 			owner: string,
 			conversationId: string,
@@ -208,16 +223,19 @@ export function createOcr(deps: {
 				return updated;
 			}),
 		async remove(owner: string, id: string) {
-			await store.write((db) => {
+			const cancelled = await store.write((db) => {
 				const r = owned(db, id, owner);
 				if (!["completed", "failed", "cancelled"].includes(record(r).state))
 					throw new Error("ocr_not_ready");
+				const jobs = corrections?.removeInTransaction(db, id) ?? [];
 				db.query("DELETE FROM ocr_commands WHERE target_id=? AND owner=?").run(
 					id,
 					owner,
 				);
 				db.query("DELETE FROM ocr_inputs WHERE id=?").run(id);
+				return jobs;
 			});
+			if (cancelled.length) queue.flushCancellations(cancelled);
 		},
 		/** Raw OCR text and source coordinates are carried into the conversation without correction. */
 		conversationText(

@@ -16,6 +16,9 @@ import { migrations as dialogueMigrations } from "../domains/dialogue";
 import { migrations as goalsMigrations } from "../domains/goals";
 import { migrations as inferenceMigrations } from "../domains/inference";
 import { migrations as memoryMigrations } from "../domains/memory";
+import { migrations as stewardMigrations } from "../domains/steward";
+import { migrations as terminalsMigrations } from "../domains/terminals";
+import { migrations as kanbanMigrations } from "../domains/kanban";
 import { migrations as queueMigrations } from "../domains/queue";
 import { retiredResearchRoutesMigrations } from "./retired-migrations";
 import { migrations as toolchainHistoryMigrations } from "../domains/toolchain-history";
@@ -139,12 +142,15 @@ const catalog: readonly Migration[] = [
 	...dialogueMigrations,
 	...voiceMigrations,
 	...queueMigrations,
+	...terminalsMigrations,
+	...kanbanMigrations,
 	...schedulerMigrations,
 	...settingsMigrations,
 	...inferenceMigrations,
 	...ttsDictionaryMigrations,
 	...continuityMigrations,
 	...memoryMigrations,
+	...stewardMigrations,
 	...packageMigrations("memory-package", memoryPackageSql),
 	...serviceTestsMigrations,
 	...musicMigrations,

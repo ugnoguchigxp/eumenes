@@ -18,7 +18,7 @@ import type {
 import type { Connection, Resource, Settings } from "../../settings";
 import type { SettingsService } from "../../settings";
 import {
-	controlJsonSchema,
+	controlJsonOptions,
 	type ControlContract,
 	type Messages,
 	type Receipt,
@@ -182,7 +182,7 @@ function callOptionsFor(r: Request, attemptId: string): LarmCallOptions {
 				}
 			: {}),
 		...(r.row.mode === "control"
-			? { jsonOutput: true, jsonSchema: controlJsonSchema(r.control) }
+			? controlJsonOptions(r.control, r.row.structuredOutput)
 			: {}),
 		...(r.row.contextPolicy === "exact"
 			? { contextPolicy: "exact" as const }

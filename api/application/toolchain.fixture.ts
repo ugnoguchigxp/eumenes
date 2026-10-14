@@ -14,6 +14,7 @@ import {
 	fixtureResearchOutput,
 	fixtureVerification,
 } from "../domains/agent-runtime/test/research-fixture";
+import { migrations as terminalsMigrations } from "../domains/terminals";
 import { reportFinishedTasks } from "./claude-code-reports";
 import { createChanges } from "./events";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -76,8 +77,10 @@ export async function harness(
 		drawingIdleMs?: number;
 		recognitionFetcher?: typeof fetch;
 		ocrFetcher?: typeof fetch;
-		/** PTY sessions for the Claude Code toolchain (a fake spawn in tests). */
-		terminals?: import("../domains/terminals").TerminalsService;
+		/** PTY sessions for the Claude Code toolchain (a fake spawn in tests), over the harness store. */
+		terminals?: (
+			store: import("../infrastructure/sqlite").SqliteStore,
+		) => import("../domains/terminals").TerminalsService;
 		settingsEnv?: Record<string, string | undefined>;
 		codexResearch?: {
 			model: string;
@@ -123,7 +126,15 @@ export async function harness(
 	} = {},
 ) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-toolchain-"));
-	const store = openStore(join(dir, "db"), migrations);
+	// The terminals request table is registered by the host; added here until it is.
+	const store = openStore(join(dir, "db"), [
+		...migrations,
+		...terminalsMigrations.filter(
+			(entry) => !migrations.some((known) => known.id === entry.id),
+		),
+	]);
+	const terminals = options.terminals?.(store);
+	await terminals?.recover();
 	const changes = createChanges();
 	const unsubscribeChanges = store.onCommit(() => changes.publish());
 	const conversation = createConversationService(store, {
@@ -506,7 +517,7 @@ export async function harness(
 		excalidraw: !!options.drawingConnection,
 		objectRecognition: !!options.recognitionFetcher,
 		ocr,
-		terminals: options.terminals,
+		terminals,
 	});
 	const music = options.musicGateway
 		? createMusic({
@@ -587,7 +598,7 @@ export async function harness(
 	});
 	toolchainLinks.attachDialogue(dialogue);
 	const voice = createVoiceDialogue(store, dialogue, inference);
-	if (options.terminals) reportFinishedTasks(options.terminals, dialogue);
+	if (terminals) reportFinishedTasks(terminals, dialogue);
 	const app = createApp({
 		token: "fixture-token-for-toolchain-browser",
 		origin: process.env.EUMENES_ORIGIN ?? "http://localhost",
@@ -608,7 +619,7 @@ export async function harness(
 		scheduler,
 		inference,
 		timers,
-		terminals: options.terminals,
+		terminals,
 		toolchainHistory: toolchain.history,
 		toolchainActions: toolchain.actionRequests,
 		...toolchain,
@@ -626,6 +637,7 @@ export async function harness(
 		});
 	return {
 		dir,
+		terminals,
 		excalidraw,
 		drawingOperations,
 		image,
@@ -657,6 +669,7 @@ export async function harness(
 			return calls;
 		},
 		async close() {
+			terminals?.closeAll();
 			unsubscribeChanges();
 			changes.close();
 			await toolchain.agents.close();

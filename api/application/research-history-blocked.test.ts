@@ -45,7 +45,8 @@ function ports(blockedIds: string[]) {
 	return createReadPorts(
 		{ savedBodies: { validate: () => true } } as never,
 		conversation as never,
-		() => ({ authorizeReadOwnerInTransaction: () => ({ deadline: 1 }) }) as never,
+		() =>
+			({ authorizeReadOwnerInTransaction: () => ({ deadline: 1 }) }) as never,
 		{
 			blockedMessageIdsInTransaction: (_db, ids) =>
 				new Set([...ids].filter((id) => blockedIds.includes(id))),
@@ -53,9 +54,9 @@ function ports(blockedIds: string[]) {
 	);
 }
 const ids = (result: unknown) =>
-	(result as { result: { readings: Array<{ messageId: string }> } }).result.readings.map(
-		(reading) => reading.messageId,
-	);
+	(
+		result as { result: { readings: Array<{ messageId: string }> } }
+	).result.readings.map((reading) => reading.messageId);
 
 test("history.search and history.read leave blocked messages out of what the researcher sees", () => {
 	const p = ports(["forgotten"]);

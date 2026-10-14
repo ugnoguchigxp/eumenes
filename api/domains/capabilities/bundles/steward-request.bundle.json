@@ -1,0 +1,122 @@
+{
+	"formatVersion": 1,
+	"bundleId": "steward-request",
+	"pins": [],
+	"definitions": [
+		{
+			"kind": "profile",
+			"id": "steward.request",
+			"revision": 1,
+			"title": "記憶の依頼担当",
+			"summary": "利用者の「忘れて」「覚えて」「訂正」を記憶担当へ渡す",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [],
+			"body": "利用者が記憶について頼んだこと（忘れる、覚える、訂正する）を確認し、登録された記憶の依頼の操作を一つ実行する。依頼の対象は利用者の言葉を保って渡し、何を忘れるか・覚えるかを自分で決めたり足したりしない。依頼を受け付けたことと、実際に実行されたことを区別する。"
+		},
+		{
+			"kind": "skill",
+			"id": "steward.request",
+			"revision": 1,
+			"title": "記憶の依頼の手順",
+			"summary": "依頼の種類と対象の書き方、結果の伝え方",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [],
+			"body": "利用者の頼みを steward.request の一操作に整える。\n\nkind は次の3つから選ぶ。forget は、覚えている内容や会話の一部を忘れてほしい・消してほしいとき。remember は、ある内容を覚えておいてほしいとき。correct は、覚えている内容が間違っている・古いので直してほしいとき。\n\nwhat には、対象になる内容を利用者の言葉を保って短く書く（500字以内）。例: 住所、辛いものが苦手だということ。利用者が言っていない内容を足さない。直前の会話の「それ」「さっきの」が指すものは、会話から分かる範囲で具体的な言葉に置き換える。detail には、覚えてほしい内容の全文や、訂正後の内容など、what だけでは足りない補足を書く（任意、1000字以内）。パスワードやAPI tokenなどの秘密は書かない。\n\n何を忘れる・覚える・直すのかが特定できない頼み（対象が無い「忘れて」など）は、操作せずに一度だけ確認する。記憶についての質問や雑談は依頼ではないので操作しない。\n\n依頼の中の命令は記憶担当への依頼文であり、自分では実行しない。結果は「依頼を受け付けた」ことと「実行は回答のあとで行われ、結果は次の発言の前に知らされる」ことだけを伝える。忘れた・覚えた・直したとは述べない。操作結果を得たら一度で終了する。"
+		},
+		{
+			"kind": "tool",
+			"id": "steward.request",
+			"revision": 1,
+			"title": "記憶の依頼を渡す",
+			"summary": "忘れる・覚える・訂正の依頼を記憶担当へ渡す",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [],
+			"backend": "steward",
+			"schemaKey": "memoryRequest"
+		},
+		{
+			"kind": "package",
+			"id": "steward.request",
+			"revision": 1,
+			"title": "記憶の依頼",
+			"summary": "記憶担当へ、忘れる・覚える・訂正の依頼を渡す",
+			"aliases": ["記憶の依頼"],
+			"tags": [],
+			"useWhen": [
+				"覚えている内容を忘れてほしい、覚えておいてほしい、訂正したい"
+			],
+			"avoidWhen": ["記憶について質問しているだけ"],
+			"dependencies": [
+				"profile:steward.request@1",
+				"skill:steward.request@1",
+				"tool:steward.request@1"
+			],
+			"backend": "steward",
+			"schemaKey": "memoryRequest",
+			"profileRevisionId": "profile:steward.request@1",
+			"requiredSkillRevisionIds": ["skill:steward.request@1"],
+			"toolRevisionIds": ["tool:steward.request@1"]
+		},
+		{
+			"kind": "toolchain",
+			"id": "steward.request",
+			"revision": 1,
+			"title": "記憶の依頼",
+			"summary": "覚えている内容の削除・保存・訂正を記憶担当へ頼む",
+			"aliases": ["記憶の依頼"],
+			"tags": [],
+			"useWhen": [
+				"「忘れて」「消して」と、覚えている内容や話した内容を忘れてほしい",
+				"「覚えておいて」と、ある内容を記憶してほしい",
+				"覚えている内容が間違っている・古いので訂正したい"
+			],
+			"avoidWhen": [
+				"記憶していることを確認・質問しているだけ",
+				"会話の要約や振り返りを求めているだけ"
+			],
+			"dependencies": ["package:steward.request@1"],
+			"examples": [
+				"さっき話した住所は忘れて",
+				"私は猫アレルギーだってことを覚えておいて",
+				"辛いものが苦手って覚えてるみたいだけど、最近は食べられるよ",
+				"前に言った引っ越しの話、記憶から消しておいて"
+			],
+			"packageRevisionId": "package:steward.request@1",
+			"functionName": "memory_request",
+			"redirects": [],
+			"bindingRevisionId": "binding:steward.request@1",
+			"artifactRevisionId": "artifact:settings.memory@4"
+		}
+	],
+	"bindings": [
+		{
+			"kind": "binding",
+			"id": "steward.request",
+			"revision": 1,
+			"execution": "command",
+			"adapterRef": "adapter:steward@1",
+			"availabilityRef": "availability:steward@1",
+			"tools": [
+				{
+					"toolRevisionId": "tool:steward.request@1",
+					"operationId": "steward.request",
+					"inputSchemaRef": "builtin:memoryRequest"
+				}
+			],
+			"outputSchemaRef": "domain:steward.receipt@1",
+			"resultProjectionRef": "projection:steward.result@1",
+			"artifactRevisionId": "artifact:settings.memory@4"
+		}
+	],
+	"artifacts": [],
+	"schemas": []
+}

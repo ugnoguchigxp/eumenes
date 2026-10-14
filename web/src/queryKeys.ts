@@ -23,6 +23,7 @@ export const queryRoots = {
 	voiceDialogue: "voice-dialogue",
 	timers: "timers",
 	terminals: "terminals",
+	kanban: "kanban",
 	toolchainArtifacts: "toolchain-artifacts",
 	toolchainInteractions: "toolchain-interactions",
 } as const;
@@ -50,6 +51,7 @@ export const changeRoots = [
 	queryRoots.voiceDialogue,
 	queryRoots.timers,
 	queryRoots.terminals,
+	queryRoots.kanban,
 	queryRoots.toolchainInteractions,
 ] as const;
 

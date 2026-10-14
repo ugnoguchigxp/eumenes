@@ -73,7 +73,14 @@ export function registerTerminals(app: Hono, service: TerminalsService) {
 		const parsed = hookPayloadSchema.safeParse(payload);
 		// Events this host does not use are accepted and ignored.
 		if (!parsed.success) return c.body(null, 204);
-		service.hook(id, token, parsed.data);
+		try {
+			await service.hook(id, token, parsed.data);
+		} catch (error) {
+			if (error instanceof Error && error.message === "terminal_hook_forbidden")
+				throw error;
+			// A final state could not be saved: tell Claude Code's hook; it is tried once more.
+			return c.json({ error: "terminal_hook_save_failed" }, 503);
+		}
 		return c.body(null, 204);
 	});
 	app.get("/api/terminals/:id/output", (c) => {

@@ -25,6 +25,7 @@ export function Workspace({
 		openPlaylist,
 		toolchain,
 		timerAudio,
+		kanbanNotices,
 		voice,
 		mute,
 		settings,
@@ -50,6 +51,7 @@ export function Workspace({
 				repeatTone={timerAudio.repeat}
 				audioReady={timerAudio.ready}
 				prepareAudio={timerAudio.prepare}
+				kanban={kanbanNotices}
 				inputBusy={() => voice.audio()?.isInputBusy?.() ?? false}
 				muted={mute.muted || settings.data?.voice.outputVolume === 0}
 				busy={

@@ -395,17 +395,26 @@ test("what is said while memory is off is registered as skipped; switching on sk
 	expect(pending(h, "curated")).toEqual([after.inputMessageId]);
 });
 
-test("the forget fence moves with a forget and with every start-up reconciliation, never otherwise", async () => {
+test("the forget fence moves with a forget and with a reconciliation that applied something, never otherwise", async () => {
 	const h = await setup();
 	const seq = () => h.store.read((db) => h.memory.forgetSeqInTransaction(db));
-	// The reconciliation of the fixture's start-up already moved it once.
+	// A start-up with nothing to apply leaves it alone.
 	const start = seq();
-	expect(start).toBe(1);
+	expect(start).toBe(0);
 	const item = await h.seed("コーヒーが好き", "drink.coffee");
 	await exchange(h, "質問", "回答");
 	expect(seq()).toBe(start);
 	await h.forget([item.id]);
 	expect(seq()).toBe(start + 1);
+	// The forget's purge is recorded: a plain restart re-applies nothing and moves nothing.
+	await h.memory.recover();
+	expect(seq()).toBe(start + 1);
+	// A database that lost the record (an older copy restored) has the line applied again, and the fence moves.
+	await h.store.write((db) =>
+		db.query("DELETE FROM memory_block_applied").run(),
+	);
+	await h.memory.recover();
+	expect(seq()).toBe(start + 2);
 	await h.memory.recover();
 	expect(seq()).toBe(start + 2);
 });

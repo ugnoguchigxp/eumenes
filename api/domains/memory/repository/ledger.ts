@@ -121,6 +121,16 @@ export function pendingExchanges(
 			.all(conversationId, limit) as Record<string, unknown>[]
 	).map(mapExchange);
 }
+/** The conversations that have an exchange waiting for a step (the steward's startup kick). */
+export function pendingConversationIds(db: Database): string[] {
+	return (
+		db
+			.query(
+				"SELECT DISTINCT conversation_id AS id FROM memory_exchange WHERE state = 'pending'",
+			)
+			.all() as Array<{ id: string }>
+	).map((row) => row.id);
+}
 /** An exchange is done when all three step marks are set; otherwise it is pending. */
 function settleState(db: Database, inputMessageId: string, now: string) {
 	db.query(
@@ -360,7 +370,7 @@ export function blockedAmong(
 	for (const id of new Set(messageIds)) if (query.get(id)) blocked.add(id);
 	return blocked;
 }
-/** Every blocked message of a conversation (the exclusion list of a recall). */
+/** Every blocked message of a conversation (the exclusion list of a recall); blocks of '' (migrated, no conversation known) apply to all. */
 export function blockedInConversation(
 	db: Database,
 	conversationId: string,
@@ -368,10 +378,25 @@ export function blockedInConversation(
 	return (
 		db
 			.query(
-				"SELECT message_id AS id FROM memory_message_block WHERE conversation_id = ?",
+				"SELECT message_id AS id FROM memory_message_block WHERE conversation_id IN (?, '')",
 			)
 			.all(conversationId) as Array<{ id: string }>
 	).map((row) => row.id);
+}
+
+// ---- block journal lines already applied ----
+
+export function isBlockApplied(db: Database, forgetId: string): boolean {
+	return (
+		db
+			.query("SELECT 1 FROM memory_block_applied WHERE forget_id = ?")
+			.get(forgetId) != null
+	);
+}
+export function markBlockApplied(db: Database, forgetId: string, now: string) {
+	db.query(
+		"INSERT OR IGNORE INTO memory_block_applied (forget_id, applied_at) VALUES (?,?)",
+	).run(forgetId, now);
 }
 
 // ---- forget fence ----

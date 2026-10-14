@@ -18,6 +18,7 @@ import {
 	insertExchange,
 	isBlocked,
 	listExchanges,
+	pendingConversationIds,
 	pendingExchanges,
 	readExchange,
 	readForgetSeq,
@@ -42,8 +43,22 @@ export function createLedger(deps: {
 	clock: () => string;
 	/** Memory is switched on and healthy: what is said while it is not is never learned. */
 	active: (db: Database) => boolean;
+	/**
+	 * The message ids of the block journal (held in process). While memory is unhealthy the database may lack
+	 * a block the journal has, so the answers about blocked messages include these too.
+	 */
+	journalBlocked: ReadonlySet<string>;
 }) {
-	const { store, conversation, clock } = deps;
+	const { store, conversation, clock, journalBlocked } = deps;
+	const blockedWithJournal = (
+		db: Database,
+		messageIds: Iterable<string>,
+	): Set<string> => {
+		const ids = [...messageIds];
+		const blocked = blockedAmong(db, ids);
+		for (const id of ids) if (journalBlocked.has(id)) blocked.add(id);
+		return blocked;
+	};
 
 	function recordExchangeInTransaction(
 		db: Database,
@@ -109,6 +124,9 @@ export function createLedger(deps: {
 			step: ExchangeStep,
 			limit: number,
 		): ExchangeDto[] => pendingExchanges(db, conversationId, step, limit),
+		/** The conversations that have exchanges waiting for a step. */
+		pendingConversationIdsInTransaction: (db: Database): string[] =>
+			pendingConversationIds(db),
 		exchangeInTransaction: (
 			db: Database,
 			inputMessageId: string,
@@ -221,17 +239,22 @@ export function createLedger(deps: {
 		blockedMessageIdsInTransaction: (
 			db: Database,
 			messageIds: Iterable<string>,
-		): Set<string> => blockedAmong(db, messageIds),
+		): Set<string> => blockedWithJournal(db, messageIds),
 		isBlockedInTransaction: (db: Database, messageId: string): boolean =>
-			isBlocked(db, messageId),
-		/** Every blocked message of the conversation (the exclusion list of a recall). */
+			isBlocked(db, messageId) || journalBlocked.has(messageId),
+		/** Every blocked message of the conversation (the exclusion list of a recall), and the block journal's. */
 		blockedMessageIdsOfConversationInTransaction: (
 			db: Database,
 			conversationId: string,
-		): string[] => blockedInConversation(db, conversationId),
+		): string[] => [
+			...new Set([
+				...blockedInConversation(db, conversationId),
+				...journalBlocked,
+			]),
+		],
 		/** Read-only form for the application layer (research tools). */
 		blockedMessageIds: (messageIds: Iterable<string>): Set<string> =>
-			store.read((db) => blockedAmong(db, messageIds)),
+			store.read((db) => blockedWithJournal(db, messageIds)),
 		/** A scheduled prompt (a user message the user did not write) is never learned from. */
 		blockMessagesInTransaction(
 			db: Database,

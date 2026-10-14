@@ -59,15 +59,15 @@ test("items carry their evidence, period and who asked for them", async () => {
 
 test("short-term notes of the named conversation only; the conversation is required", async () => {
 	const { h, app } = await setup();
-	await h.continuity.add("c1", { kind: "goal", text: "Rust移行" });
-	await h.continuity.add("c2", { kind: "memo", text: "別の会話" });
+	await h.note("c1", { kind: "goal", text: "Rust移行" });
+	await h.note("c2", { kind: "memo", text: "別の会話" });
 	const response = await app.request(
 		"/api/memory/short-term?conversationId=c1",
 	);
 	expect(response.status).toBe(200);
 	const { items } = shortTermSchema.parse(await response.json());
 	expect(items.map((i) => i.text)).toEqual(["Rust移行"]);
-	expect(items[0]).toMatchObject({ origin: "user", expiresAt: null });
+	expect(items[0]).toMatchObject({ origin: "agent", expiresAt: null });
 	// No default conversation.
 	const missing = await app.request("/api/memory/short-term");
 	expect(missing.status).toBe(400);
@@ -77,7 +77,7 @@ test("short-term notes of the named conversation only; the conversation is requi
 		conversationQuerySchema.safeParse({ conversationId: "" }).success,
 	).toBe(false);
 	// Expired notes are not listed.
-	await h.continuity.add("c1", { kind: "memo", text: "一週間のメモ" });
+	await h.note("c1", { kind: "memo", text: "一週間のメモ" });
 	h.time.now = "2026-10-21T12:00:00.000Z";
 	const later = shortTermSchema.parse(
 		await (
@@ -135,7 +135,7 @@ test("tendencies are listed; there is no route to change or delete them by hand"
 test("the context endpoint shows both layers against their limits, and is off when memory is", async () => {
 	const { h, app } = await setup();
 	await h.seed("コーヒーが好き", "drink.coffee");
-	await h.continuity.add("c1", { kind: "goal", text: "Rust移行" });
+	await h.note("c1", { kind: "goal", text: "Rust移行" });
 	const response = await app.request("/api/memory/context?conversationId=c1");
 	const context = memoryContextSchema.parse(await response.json());
 	if ("disabled" in context && context.disabled) throw new Error("off");
@@ -157,7 +157,7 @@ test("the context endpoint shows both layers against their limits, and is off wh
 test("while the journal is inconsistent none of the new endpoints shows a body", async () => {
 	const { h, app } = await setup();
 	await h.seed("コーヒーが好き", "drink.coffee");
-	await h.continuity.add("c1", { kind: "goal", text: "Rust移行" });
+	await h.note("c1", { kind: "goal", text: "Rust移行" });
 	writeFileSync(join(h.dir, "journal.jsonl"), "not json\n");
 	expect((await h.memory.recover()).healthy).toBe(false);
 	expect(
@@ -175,8 +175,8 @@ test("while the journal is inconsistent none of the new endpoints shows a body",
 
 test("a note that expires leaves the short-term layer without any other change", async () => {
 	const { h } = await setup();
-	await h.continuity.add("c1", { kind: "memo", text: "一週間のメモ" });
-	await h.continuity.add("c1", { kind: "goal", text: "Rust移行" });
+	await h.note("c1", { kind: "memo", text: "一週間のメモ" });
+	await h.note("c1", { kind: "goal", text: "Rust移行" });
 	const first = await h.window();
 	expect(first.shortTerm.text).toContain("一週間のメモ");
 	expect((await h.window()).version).toBe(first.version);

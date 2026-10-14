@@ -49,6 +49,7 @@ import { createVoiceDialogue } from "../domains/voice-dialogue";
 import { createTtsDictionary } from "../domains/tts-dictionary";
 import { createContinuityService } from "../domains/continuity";
 import { createMemoryService } from "../domains/memory";
+import { createStewardAssembly, recoverSteward } from "./steward-assembly";
 import {
 	createWebResearch,
 	createWebCache,
@@ -72,12 +73,7 @@ import { createServiceTests } from "../domains/service-tests";
 import { createDelegatedTasks } from "./delegated-tasks";
 import { createProductionCoding } from "./coding";
 import { createCodingTaskExecution } from "./coding-tasks";
-import {
-	createWorldAssembly,
-	defaultWorldJournalPath,
-	resolveWorldCursorSecret,
-} from "./world";
-import { createWorldForeground } from "./world-foreground";
+import { assembleServerWorld } from "./server-world";
 import {
 	PROCESS_SHUTDOWN_DEADLINE_MS,
 	SHUTDOWN_DEADLINE_MS,
@@ -243,42 +239,11 @@ export async function buildServices(config: Config) {
 		journalPath: memoryJournalPath,
 		embed: () => embedder,
 	});
-	// Foreground priority of Local extraction (P4-03): only with World ON.
-	const worldForeground =
-		config.worldMode === "on"
-			? createWorldForeground({ store, queue, inference })
-			: undefined;
-	const world =
-		config.worldMode === "off"
-			? undefined
-			: createWorldAssembly({
-					store,
-					conversation,
-					memory,
-					mode: config.worldMode,
-					journalPath: resolve(
-						config.worldJournalPath ??
-							defaultWorldJournalPath(memoryJournalPath),
-					),
-					cursorSecret: resolveWorldCursorSecret({
-						dbPath,
-						keyDir: config.env.EUMENES_KEY_DIR,
-						env: { EUMENES_WORLD_CURSOR_SECRET: config.worldCursorSecret },
-					}),
-					// Local extraction exists only with World ON (P4-02).
-					...(config.worldMode === "on"
-						? {
-								extraction: {
-									queue,
-									inference,
-									...(worldForeground
-										? { foreground: worldForeground.hub }
-										: {}),
-								},
-							}
-						: {}),
-					...(config.worldPollMs ? { pollMs: config.worldPollMs } : {}),
-				});
+	const shared = { store, memory, conversation, queue, inference };
+	const stewardAssembly = createStewardAssembly({ ...shared, continuity });
+	const { steward } = stewardAssembly;
+	const worldDeps = { ...shared, dbPath, memoryJournalPath };
+	const { world, worldForeground } = assembleServerWorld(config, worldDeps);
 	let imageForCompositions: ImageService;
 	const uiCompositions = createUiCompositions({
 		store,
@@ -286,10 +251,14 @@ export async function buildServices(config: Config) {
 		inference,
 		image: () => imageForCompositions,
 	});
+	let ocrCapabilities: import("../domains/capabilities").Capabilities | null =
+		null;
 	const ocr = createOcr({
 		store,
 		queue,
 		connection: () => settings.ocrCredentials(),
+		inference,
+		capabilities: () => ocrCapabilities,
 	});
 	const { toolchain, links } = await createHostToolchain({
 		store,
@@ -302,6 +271,7 @@ export async function buildServices(config: Config) {
 		conversation,
 		ttsDictionary,
 		memory,
+		steward,
 		world,
 		serviceTests,
 		timers,
@@ -314,6 +284,7 @@ export async function buildServices(config: Config) {
 			publish: () => changes.publish(),
 		},
 	});
+	ocrCapabilities = toolchain.capabilities;
 	const enabled = config.toolchainEnabled;
 
 	const mediaGateway = () => {
@@ -387,6 +358,7 @@ export async function buildServices(config: Config) {
 		larm: inference,
 		queue,
 		memory,
+		steward,
 		agents: enabled ? toolchain.agents : undefined,
 		postAnswer: enabled ? toolchain.postAnswer : undefined,
 		delegation: createDotsDialogue({
@@ -407,6 +379,7 @@ export async function buildServices(config: Config) {
 			: undefined,
 	});
 	links.attachDialogue(dialogue);
+	stewardAssembly.attachDialogue(dialogue);
 	const voice = createVoiceDialogue(store, dialogue, inference);
 	scheduler.registerTarget(dialogue.promptTarget);
 	return {
@@ -441,6 +414,7 @@ export async function buildServices(config: Config) {
 		supervision,
 		continuity,
 		memory,
+		steward,
 		settings,
 		worldForeground,
 		world,
@@ -466,6 +440,7 @@ export function appServices(s: Services) {
 		inference: s.inference,
 		ttsDictionary: s.ttsDictionary,
 		memory: s.memory,
+		steward: s.steward,
 		continuity: s.continuity,
 		webResearch: s.webResearch,
 		changes: s.changes,
@@ -632,6 +607,14 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		{ name: "service_tests_recovery", recover: () => s.serviceTests.recover() },
 		{ name: "agents_recovery", recover: () => s.toolchain.agents.recover() },
 		{ name: "dialogue_recovery", recover: () => s.dialogue.recover() },
+		{
+			name: "terminals_recovery",
+			recover: () => s.toolchain.terminals.recover(),
+		},
+		{
+			name: "steward_recovery",
+			recover: () => s.store.write((db) => recoverSteward(s.steward, db)),
+		},
 		{ name: "web_research_recovery", recover: () => s.webResearch.recover() },
 		{ name: "queue_recovery", recover: () => s.queue.recover() },
 		{ name: "delegated_recovery", recover: () => s.delegated.recover() },

@@ -61,24 +61,22 @@ export const MESSAGE_MAX_BYTES = MESSAGE_HEAD_BYTES + MESSAGE_TAIL_BYTES;
 /** Failed units over the same target after which the target is given up (section 2.3). */
 export const MAX_FAILURES = 3;
 export const DECISIONS_PER_CONVERSATION = 1000;
+/** Closed units kept per conversation (the failure counts of upkeep read the recent ones). */
+export const UNITS_PER_CONVERSATION = 300;
 /** Upkeep: most steps in one round, and the waits while a foreground run is active. */
 export const MAINTENANCE_STEPS_PER_ROUND = 3;
 export const FOREGROUND_DELAYS_MS = [30_000, 120_000, 600_000] as const;
 /** Waits before a failed target is tried again (indexed by earlier failures). */
 export const RETRY_DELAYS_MS = [0, 15_000, 60_000] as const;
+/** The wait before the first retry of a step whose inference request could not be taken, and its ceiling (it doubles). */
+export const CAPTURE_RETRY_MS = 30_000;
+export const CAPTURE_RETRY_MAX_MS = 5 * 60_000;
 /** The control request's deadline and output cap (inference refuses more than 30 s / 1500 tokens). */
 export const INFERENCE_MS = 25_000;
 export const MAX_OUTPUT_TOKENS = 1200;
 export const MAX_OUTPUT_BYTES = 32 * 1024;
 /** The queue deadline of a job: it covers waiting behind earlier jobs and the retries. */
 export const JOB_DEADLINE_MS = 5 * 60_000;
-/** The verbatim history budget the compaction is measured against (the dialogue's `HISTORY_MAX_BYTES`). */
-export const HISTORY_BUDGET_BYTES = 48 * 1024;
-/** One message of the verbatim history is cut here (the dialogue's `HISTORY_MESSAGE_MAX_BYTES`). */
-export const HISTORY_MESSAGE_BYTES = 12 * 1024;
-/** Mirrors of memory's `LONG_TERM_BYTES` (what the long-term list shown to a step may fill) and `PENDING_LIMIT`. */
-export const LONG_TERM_LIST_BYTES = 16 * 1024;
-export const PENDING_LIMIT = 5;
 export const COMPACT_THRESHOLD = 0.75;
 export const REFINE_THRESHOLD = 0.9;
 
@@ -104,6 +102,10 @@ export interface InferencePort {
 			deadline: number;
 			taskDeadline: number;
 			maxOutputTokens: number;
+			/** "conversation": keep the conversation's own route (cloud allowed) instead of forcing the local one. */
+			route?: "conversation";
+			/** The output schema goes to the provider as a strict schema. */
+			structuredOutput?: boolean;
 		},
 	): string;
 	executeControl(
@@ -189,21 +191,25 @@ export interface StewardJobHandler<P, I, O> {
 
 // ---- read model ----
 
-export interface DecisionDto {
-	id: number;
-	conversationId: string;
-	jobId: string;
-	step: StepId;
-	createdAt: string;
+export const decisionSchema = z.object({
+	id: z.number(),
+	conversationId: z.string(),
+	jobId: z.string(),
+	step: z.enum(stepIds),
+	createdAt: z.string(),
 	/** The normalized output; null for a step that was not adopted, and after a forget touched it. */
-	output: unknown;
-	results: unknown;
-	windowVersionBefore: number | null;
-	windowVersionAfter: number | null;
-	durationMs: number | null;
-	outputTokens: number | null;
-	errorCode: string | null;
-}
+	output: z.unknown(),
+	results: z.unknown(),
+	windowVersionBefore: z.number().nullable(),
+	windowVersionAfter: z.number().nullable(),
+	durationMs: z.number().nullable(),
+	outputTokens: z.number().nullable(),
+	errorCode: z.string().nullable(),
+});
+export type DecisionDto = z.infer<typeof decisionSchema>;
+export const decisionsResponseSchema = z.object({
+	items: z.array(decisionSchema),
+});
 export const decisionsQuerySchema = z.object({
 	conversationId: z.string().min(1).max(120),
 	limit: z.coerce.number().int().min(1).max(200).optional(),

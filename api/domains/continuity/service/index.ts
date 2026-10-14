@@ -5,13 +5,9 @@ import {
 	MAX_ACTIVE_CONTINUITY,
 	type ContinuityKind,
 } from "../contracts";
-import type {
-	AddContinuity,
-	ContinuityItem,
-	ContinuitySnapshot,
-	ContinuityTransition,
-} from "../contracts";
+import type { ContinuityItem, ContinuitySnapshot } from "../contracts";
 import {
+	addSources,
 	conversationRevision,
 	getItem,
 	insertItem,
@@ -21,11 +17,11 @@ import {
 	updateItem,
 } from "../repository";
 
-/** What the memory agent writes: the message it read it from, and optionally a shorter life than the kind's default. */
+/** What the memory agent writes: the messages it read it from, and optionally a shorter life than the kind's default. */
 export interface AgentContinuityInput {
 	kind: ContinuityKind;
 	text: string;
-	sourceMessageId: string;
+	sourceMessageIds: readonly string[];
 	expiresAt?: string;
 }
 
@@ -34,10 +30,8 @@ export function createContinuityService(
 	clock: () => string = () => new Date().toISOString(),
 	id: () => string = () => crypto.randomUUID(),
 ) {
-	/** Runs inside the write transaction after an item is added; throwing rolls the add back. */
+	/** Runs inside the write transaction after an item is added or rewritten; throwing rolls it back. */
 	let guard: ((db: Database, conversationId: string) => void) | undefined;
-	/** Runs inside the write transaction after the user closes an item (never for an addition). */
-	let userChangeHook: ((db: Database) => void) | undefined;
 	/** When an item of this kind written `now` stops mattering (null: never). */
 	const expiryFor = (kind: ContinuityKind, now: string): string | null => {
 		const ttl = CONTINUITY_TTL_MS[kind];
@@ -69,51 +63,12 @@ export function createContinuityService(
 		revision: conversationRevision(db, conversationId),
 		items: liveItems(db, conversationId),
 	});
-	const transitionInTransaction = (
-		db: Database,
-		itemId: string,
-		input: ContinuityTransition,
-	): ContinuityItem => {
-		const existing = getItem(db, itemId);
-		if (!existing) throw new Error("invalid_continuity_item");
-		if (
-			!transitionItem(db, itemId, input.expectedRevision, input.status, clock())
-		)
-			throw new Error("revision_conflict");
-		userChangeHook?.(db);
-		return getItem(db, itemId) as ContinuityItem;
-	};
 	return {
-		setUserChangeHook(next: (db: Database) => void) {
-			userChangeHook = next;
-		},
 		setGuard(next: (db: Database, conversationId: string) => void) {
 			guard = next;
 		},
-		add(conversationId: string, input: AddContinuity): Promise<ContinuityItem> {
-			return store.write((db) => {
-				assertRoom(db, conversationId);
-				const now = clock();
-				const item: ContinuityItem = {
-					id: id(),
-					conversationId,
-					kind: input.kind,
-					text: input.text,
-					status: "active",
-					revision: 1,
-					createdAt: now,
-					updatedAt: now,
-					origin: "user",
-					sourceMessageId: null,
-					expiresAt: expiryFor(input.kind, now),
-				};
-				insertItem(db, item);
-				guard?.(db, conversationId);
-				return item;
-			});
-		},
 		/**
-		 * The memory agent's additions: same limits as the user's (count and the short-term byte budget), checked
+		 * An addition by the steward: bounded by the item count and the short-term byte budget, checked
 		 * in the caller's transaction. Throws `invalid_continuity_limit`; the caller counts that as a refusal.
 		 */
 		addByAgentInTransaction(
@@ -133,7 +88,7 @@ export function createContinuityService(
 				createdAt: now,
 				updatedAt: now,
 				origin: "agent",
-				sourceMessageId: input.sourceMessageId,
+				sourceMessageIds: [...new Set(input.sourceMessageIds)],
 				expiresAt: input.expiresAt ?? expiryFor(input.kind, now),
 			};
 			insertItem(db, item);
@@ -149,7 +104,12 @@ export function createContinuityService(
 			db: Database,
 			itemId: string,
 			expectedRevision: number,
-			change: { text?: string; expiresAt?: string },
+			change: {
+				text?: string;
+				expiresAt?: string;
+				/** Messages added to the item's sources (the union; none are removed). */
+				addSourceMessageIds?: readonly string[];
+			},
 		): ContinuityItem | null {
 			const existing = getItem(db, itemId);
 			if (!existing) return null;
@@ -168,6 +128,8 @@ export function createContinuityService(
 				)
 			)
 				return null;
+			if (change.addSourceMessageIds)
+				addSources(db, itemId, change.addSourceMessageIds);
 			guard?.(db, existing.conversationId);
 			return getItem(db, itemId);
 		},
@@ -190,14 +152,6 @@ export function createContinuityService(
 			messageIds: readonly string[],
 		): { noteIds: string[]; deleted: number } {
 			return deleteBySource(db, messageIds);
-		},
-		/** The user closing an item, in the caller's writer transaction (hooks included). */
-		transitionInTransaction,
-		transition(
-			itemId: string,
-			input: ContinuityTransition,
-		): Promise<ContinuityItem> {
-			return store.write((db) => transitionInTransaction(db, itemId, input));
 		},
 		list(conversationId: string, includeClosed = false): ContinuityItem[] {
 			return store.read((db) => listItems(db, conversationId, !includeClosed));

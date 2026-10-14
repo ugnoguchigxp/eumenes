@@ -54,6 +54,13 @@
 	font-size: 12px;
 	box-shadow: none;
 }
+.kanban-notification .notification-card-actions {
+	flex-wrap: wrap;
+	gap: 8px;
+}
+.kanban-notification-read {
+	opacity: 0.65;
+}
 .notification-ringing {
 	display: inline-flex;
 	align-items: center;

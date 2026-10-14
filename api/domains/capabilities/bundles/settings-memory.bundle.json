@@ -8,7 +8,7 @@
 		{
 			"kind": "artifact",
 			"id": "settings.memory",
-			"revision": 3,
+			"revision": 4,
 			"title": "記憶",
 			"variants": [
 				{
@@ -25,6 +25,10 @@
 							{
 								"label": "記憶の履歴",
 								"children": [5]
+							},
+							{
+								"label": "判断の記録",
+								"children": [6, 7]
 							}
 						],
 						"title": "記憶",
@@ -58,6 +62,16 @@
 								"view": "collection-workspace",
 								"source": "memory-history",
 								"title": "記憶の履歴"
+							},
+							{
+								"view": "collection-workspace",
+								"source": "steward-decisions",
+								"title": "記憶担当の判断（新しい順）"
+							},
+							{
+								"view": "collection-workspace",
+								"source": "steward-exchanges",
+								"title": "往復の台帳（新しい順）"
 							}
 						]
 					}
@@ -102,6 +116,18 @@
 					"query": "query:memory.item-history@1",
 					"target": "none",
 					"paramsSchemaRef": "schema:memory-page@1"
+				},
+				{
+					"source": "steward-decisions",
+					"adapterRef": "adapter:memory@1",
+					"query": "query:memory.steward-decisions@1",
+					"target": "none"
+				},
+				{
+					"source": "steward-exchanges",
+					"adapterRef": "adapter:memory@1",
+					"query": "query:memory.steward-exchanges@1",
+					"target": "none"
 				}
 			],
 			"actionBindings": [
@@ -333,6 +359,87 @@
 						{
 							"key": "quote",
 							"label": "元の発言",
+							"format": "text"
+						}
+					]
+				},
+				{
+					"source": "steward-decisions",
+					"title": "記憶担当の判断（新しい順）",
+					"rowKey": "id",
+					"rowsPath": "items",
+					"columns": [
+						{
+							"key": "createdAt",
+							"label": "時刻",
+							"format": "text"
+						},
+						{
+							"key": "stepLabel",
+							"label": "担当した作業",
+							"format": "badge"
+						},
+						{
+							"key": "proposal",
+							"label": "提案",
+							"format": "text"
+						},
+						{
+							"key": "result",
+							"label": "適用・却下と理由",
+							"format": "text"
+						},
+						{
+							"key": "windowDiff",
+							"label": "文脈の版",
+							"format": "text"
+						},
+						{
+							"key": "cost",
+							"label": "所要",
+							"format": "text"
+						}
+					]
+				},
+				{
+					"source": "steward-exchanges",
+					"title": "往復の台帳（新しい順）",
+					"rowKey": "id",
+					"rowsPath": "items",
+					"columns": [
+						{
+							"key": "createdAt",
+							"label": "時刻",
+							"format": "text"
+						},
+						{
+							"key": "outcomeLabel",
+							"label": "往復",
+							"format": "badge"
+						},
+						{
+							"key": "stateLabel",
+							"label": "状態",
+							"format": "badge"
+						},
+						{
+							"key": "curated",
+							"label": "記憶の判断",
+							"format": "text"
+						},
+						{
+							"key": "disposed",
+							"label": "履歴の取捨",
+							"format": "text"
+						},
+						{
+							"key": "summarized",
+							"label": "要約",
+							"format": "text"
+						},
+						{
+							"key": "dispositionLabel",
+							"label": "履歴での扱い",
 							"format": "text"
 						}
 					]

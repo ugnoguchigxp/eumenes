@@ -5,6 +5,7 @@ import type { TimersService } from "../domains/timers";
 import type { WebResearchService } from "../domains/web-research";
 import type { SqliteStore } from "../infrastructure/sqlite";
 import type { Notice } from "../domains/dialogue/contracts";
+import { createKanban } from "../domains/kanban";
 import { createTerminals } from "../domains/terminals";
 import { reportFinishedTasks } from "./claude-code-reports";
 import { createToolchain } from "./toolchain";
@@ -36,7 +37,13 @@ export function createToolchainHostLinks(services: {
 	inference: InferenceAdapterPorts & { usagePage: RecordsPorts["usagePage"] };
 	conversation: ConversationService;
 	ttsDictionary?: TtsDictionaryPorts;
-	memory?: MemoryAdapterPorts["memory"];
+	memory?: MemoryAdapterPorts["memory"] &
+		Pick<
+			import("../domains/memory").MemoryService,
+			"readyInTransaction" | "blockedMessageIdsInTransaction"
+		>;
+	/** The steward behind the `memory_request` tool (needs `memory`). */
+	steward?: import("../domains/steward").StewardService;
 	world?: WorldAssembly;
 	serviceTests?: ServiceTestsPorts;
 	log?: {
@@ -69,7 +76,14 @@ export function createToolchainHostLinks(services: {
 			settings,
 			inference,
 			ttsDictionary: services.ttsDictionary,
-			memory: services.memory ? { memory: services.memory } : undefined,
+			memory: services.memory
+				? { memory: services.memory, steward: services.steward }
+				: undefined,
+			steward:
+				services.steward && services.memory
+					? { service: services.steward, memory: services.memory }
+					: undefined,
+			blockedMessages: services.memory,
 			world: () => worldPorts,
 			serviceTests: services.serviceTests,
 			records: {
@@ -111,10 +125,12 @@ export async function createHostToolchain(
 	const links = createToolchainHostLinks(s);
 	// Claude Code sessions start in the server's working directory (the repository).
 	const terminals = createTerminals({
+		store: s.store,
 		cwd: process.cwd(),
 		hookBaseUrl: s.terminalHooks?.baseUrl,
 		onChange: s.terminalHooks?.publish,
 	});
+	const kanban = createKanban({ store: s.store });
 	const toolchain = await createToolchain(
 		s.store,
 		s.queue,
@@ -132,12 +148,13 @@ export async function createHostToolchain(
 			excalidraw: true,
 			objectRecognition: true,
 			terminals,
+			kanban,
 			webResearch: s.webResearchEnabled,
 			embed: s.embed,
 		},
 	);
 	return {
-		toolchain: { ...toolchain, terminals },
+		toolchain: { ...toolchain, terminals, kanban },
 		links: {
 			...links,
 			attachDialogue(

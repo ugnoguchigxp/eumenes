@@ -26,17 +26,12 @@ export const continuityItemSchema = z.object({
 	updatedAt: z.string(),
 	/** Written by the user, or by the memory agent from the conversation. */
 	origin: z.enum(["user", "agent"]),
-	/** The message an agent-written item came from. */
-	sourceMessageId: z.string().nullable(),
+	/** The messages an agent-written item comes from (forgetting any of them deletes the item). */
+	sourceMessageIds: z.array(z.string()),
 	/** After this time the item is no longer part of the context (its status stays). */
 	expiresAt: z.string().nullable(),
 });
 export type ContinuityItem = z.infer<typeof continuityItemSchema>;
-export type AddContinuity = { kind: ContinuityKind; text: string };
-export type ContinuityTransition = {
-	expectedRevision: number;
-	status: "resolved" | "retracted";
-};
 /** Goals, decisions, open questions, recent activity and memos that must survive restarts and topic changes. */
 export interface ContinuitySnapshot {
 	/** Changes whenever any item of the conversation changes. */

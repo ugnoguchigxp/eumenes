@@ -13,13 +13,19 @@ export const domains = {
 		backend: "api/domains/ocr",
 		web: "web/src/domains/ocr",
 		components: "packages/design-system/src/components/OcrWorkspace",
-		depends: { api: ["queue"], web: [], test: [] },
+		depends: { api: ["capabilities", "inference", "queue"], web: [], test: [] },
 	},
 	"object-recognition": {
 		backend: "api/domains/object-recognition",
 		web: "web/src/domains/object-recognition",
 		components: null,
 		depends: { api: ["capabilities", "queue"], web: [], test: [] },
+	},
+	kanban: {
+		backend: "api/domains/kanban",
+		web: "web/src/domains/kanban",
+		components: null,
+		depends: { api: [], web: [], test: [] },
 	},
 	terminals: {
 		backend: "api/domains/terminals",
@@ -220,6 +226,16 @@ export const domains = {
 		web: null,
 		components: null,
 		depends: { api: ["continuity", "conversation"], web: [], test: [] },
+	},
+	steward: {
+		backend: "api/domains/steward",
+		web: null,
+		components: null,
+		depends: {
+			api: ["continuity", "conversation", "memory"],
+			web: [],
+			test: ["queue"],
+		},
 	},
 	larm: {
 		backend: "api/domains/larm",

@@ -7,7 +7,7 @@ import {
 } from "../../../infrastructure/vector";
 import type { ConversationService } from "../../conversation";
 import type { MemoryVectorSpace, TurnRecall } from "../contracts";
-import { isBlocked, turnVectorsBefore } from "../repository";
+import { isBlocked, latestTurnVectors } from "../repository";
 
 /**
  * Exchanges and similarity of a recall. Embeddings of unrelated texts often score high (multilingual-e5 dot
@@ -43,8 +43,6 @@ type RecalledEntry = { at: string; user?: string; assistant?: string };
 function renderBlock(entries: readonly RecalledEntry[]): string {
 	return `${FRAME}\n${RECALL_BLOCK_OPEN}\n${safeJson(entries)}\n${RECALL_BLOCK_CLOSE}`;
 }
-/** The vector scan has no ordinal bound: what the prompt shows is left out by message id. */
-const ALL_ORDINALS = Number.MAX_SAFE_INTEGER;
 /** One message in a recalled exchange is cut here: a few short exchanges serve better than one long one. */
 const MESSAGE_CHARS = 500;
 
@@ -92,11 +90,10 @@ export function recallTurns(
 	const dimension = input.space.dimension;
 	const scored: Array<{ messageId: string; digest: string; score: number }> =
 		[];
-	for (const row of turnVectorsBefore(
+	for (const row of latestTurnVectors(
 		db,
 		input.conversationId,
 		vectorSpaceKey(input.space),
-		ALL_ORDINALS,
 	)) {
 		// Shown messages cannot be recalled; leaving them out here keeps them from using up the attempts.
 		if (skipped.has(row.messageId)) continue;
@@ -141,8 +138,7 @@ export function recallTurns(
 		if (
 			exchange.length === 0 ||
 			exchange.some(
-				({ message }) =>
-					skipped.has(message.id) || isBlocked(db, message.id),
+				({ message }) => skipped.has(message.id) || isBlocked(db, message.id),
 			)
 		)
 			continue;

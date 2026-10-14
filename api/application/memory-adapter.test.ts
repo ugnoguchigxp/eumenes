@@ -6,6 +6,7 @@ import { createCapabilities } from "../domains/capabilities";
 import { createContinuityService } from "../domains/continuity";
 import { createConversationService } from "../domains/conversation";
 import { createMemoryService } from "../domains/memory";
+import type { DecisionDto } from "../domains/steward";
 import {
 	createActionRequests,
 	createAdapterRegistry,
@@ -129,6 +130,8 @@ test("describe offers the memory queries and the one write (the connection switc
 		"query:memory.items@1",
 		"query:memory.short-term@1",
 		"query:memory.status@1",
+		"query:memory.steward-decisions@1",
+		"query:memory.steward-exchanges@1",
 		"query:memory.tendencies@1",
 	]);
 	expect([...d.operations.keys()]).toEqual(["memory.set-enabled"]);
@@ -284,13 +287,24 @@ test("tendencies, short-term notes and the context are read", async () => {
 	const tendencies = read(h, "query:memory.tendencies@1").items;
 	expect(tendencies).toMatchObject([{ text: "朝型", revision: 1 }]);
 
-	const note = await h.continuity.add("main", {
-		kind: "goal",
-		text: "旅行の計画",
-	});
+	const noteSource = await h.say("旅行に行きたい。");
+	const [added] = await h.store.write((db) =>
+		h.memory.applyCurationInTransaction(db, {
+			conversationId: "main",
+			items: [
+				{
+					op: "note_add",
+					kind: "goal",
+					text: "旅行の計画",
+					messageIds: [noteSource],
+				},
+			],
+		}),
+	);
+	if (added?.status !== "applied") throw new Error("note_rejected");
 	const notes = read(h, "query:memory.short-term@1").items;
 	expect(notes).toMatchObject([
-		{ id: note.id, revision: 1, kindLabel: "目的", text: "旅行の計画" },
+		{ id: added.id, revision: 1, kindLabel: "目的", text: "旅行の計画" },
 	]);
 
 	// No window has been built yet; once a run reads it, the screen shows that build.
@@ -317,6 +331,106 @@ test("tendencies, short-term notes and the context are read", async () => {
 	expect(built.shortTermText.length).toBeGreaterThan(0);
 });
 
+test("the steward timeline shows decisions with their proposal, result and window change, and the exchange ledger", async () => {
+	const h = await setup();
+	const decision = (
+		over: Partial<DecisionDto> & Pick<DecisionDto, "id" | "step">,
+	): DecisionDto => ({
+		conversationId: "main",
+		jobId: `job-${over.id}`,
+		createdAt: "2026-10-14T01:02:03.000Z",
+		output: null,
+		results: null,
+		windowVersionBefore: null,
+		windowVersionAfter: null,
+		durationMs: null,
+		outputTokens: null,
+		errorCode: null,
+		...over,
+	});
+	const decisions: DecisionDto[] = [
+		decision({
+			id: 2,
+			step: "curate-memory",
+			output: { remember: [{}, {}], stop: [], notes: [{}] },
+			results: [
+				{ section: "remember", status: "applied" },
+				{ section: "remember", status: "rejected", code: "blocked_source" },
+				{ section: "notes", status: "applied" },
+			],
+			windowVersionBefore: 3,
+			windowVersionAfter: 4,
+			durationMs: 1500,
+			outputTokens: 120,
+		}),
+		decision({
+			id: 1,
+			step: "summarize",
+			output: { summary: "旅行の相談", included: ["e1"] },
+			results: [{ status: "applied", revision: 1, included: 1 }],
+			windowVersionBefore: null,
+			windowVersionAfter: 1,
+		}),
+		decision({ id: 0, step: "dispose-exchanges", errorCode: "stale_forget" }),
+	];
+	const seen: Array<[string, number | undefined]> = [];
+	const adapter = createMemoryAdapter({
+		memory: h.memory,
+		steward: {
+			decisions: (conversationId, limit) => {
+				seen.push([conversationId, limit]);
+				return decisions;
+			},
+			exchanges: (conversationId) => h.memory.exchanges(conversationId),
+		},
+	});
+	const readWith = (query: string) =>
+		h.store.read((db) =>
+			adapter.sourceInTransaction(db, query, undefined, undefined),
+		)!.data as Record<string, any>;
+	const rows = readWith("query:memory.steward-decisions@1").items;
+	expect(seen).toEqual([["main", 50]]);
+	expect(rows.map((r: { id: string }) => r.id)).toEqual(["2", "1", "0"]);
+	expect(rows[0]).toMatchObject({
+		stepLabel: "記憶の判断",
+		proposal: "remember 2件 / notes 1件",
+		result: "適用 2件 / 却下 1件（blocked_source）",
+		windowDiff: "版 3 → 4",
+		cost: "1.5秒 / 120 tokens",
+	});
+	expect(rows[1]).toMatchObject({
+		stepLabel: "要約",
+		proposal: "summary: 旅行の相談 / included 1件",
+		windowDiff: "版 1",
+	});
+	expect(rows[2]).toMatchObject({
+		result: "採用せず（stale_forget）",
+		windowDiff: "変更なし",
+	});
+
+	const input = await h.say("旅行に行きたい");
+	await h.store.write((db) =>
+		h.memory.recordExchangeInTransaction(db, {
+			conversationId: "main",
+			runId: `run-${input}`,
+			inputMessageId: input,
+			answerMessageId: null,
+			outcome: "failed",
+		}),
+	);
+	expect(readWith("query:memory.steward-exchanges@1").items).toMatchObject([
+		{
+			id: input,
+			outcomeLabel: "回答なし（失敗）",
+			stateLabel: "反映待ち",
+			curated: "未",
+			dispositionLabel: "未判断",
+		},
+	]);
+	// Without a steward the timeline is empty, not an error.
+	expect(read(h, "query:memory.steward-decisions@1").items).toEqual([]);
+});
+
 test("the memory bundle runs through the action ledger: only the connection switch is offered", async () => {
 	const h = await setup();
 	const registry = createAdapterRegistry([h.adapter]);
@@ -334,7 +448,7 @@ test("the memory bundle runs through the action ledger: only the connection swit
 		registry,
 		scope: "test-scope",
 	});
-	const revisionId = "artifact:settings.memory@3";
+	const revisionId = "artifact:settings.memory@4";
 	expect(ledger.artifacts().map((a) => a.artifactRevisionId)).toContain(
 		revisionId,
 	);

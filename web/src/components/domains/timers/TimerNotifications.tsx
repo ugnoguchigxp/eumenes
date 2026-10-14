@@ -5,7 +5,10 @@ import { queryRoots } from "../../../queryKeys";
 import type { TimerNotificationDto } from "../../../../../api/domains/timers/contracts";
 import { useDeadline } from "../../../domains/timers/deadline";
 import { activeTimersQuery } from "../../../domains/timers/queries";
-import { TimerNotificationCenter } from "./TimerNotificationCenter";
+import {
+	NotificationCenter,
+	type KanbanNotifications,
+} from "./NotificationCenter";
 
 type Attempt = {
 	id: string;
@@ -15,7 +18,10 @@ type Attempt = {
 	delivered?: boolean;
 };
 
-/** Scope-wide notices survive panel changes and refreshes during a claim. */
+/**
+ * Scope-wide notices survive panel changes and refreshes during a claim. It owns the timer
+ * notices and shows the Kanban ones (loaded by the caller) in the same notification center.
+ */
 export function TimerNotifications({
 	client,
 	playTone,
@@ -25,6 +31,7 @@ export function TimerNotifications({
 	audioReady = true,
 	prepareAudio,
 	repeatTone,
+	kanban,
 }: {
 	client: EumenesClient;
 	playTone: (
@@ -38,6 +45,7 @@ export function TimerNotifications({
 	audioReady?: boolean;
 	prepareAudio?: () => Promise<void>;
 	repeatTone?: (signal: AbortSignal) => Promise<void>;
+	kanban?: KanbanNotifications;
 }) {
 	const cache = useQueryClient();
 	const clientId = useRef(crypto.randomUUID());
@@ -308,8 +316,9 @@ export function TimerNotifications({
 		})();
 	};
 	return (
-		<TimerNotificationCenter
+		<NotificationCenter
 			notices={notices}
+			kanban={kanban}
 			ringingId={canRing ? ringingId : null}
 			stoppingIds={stoppingIds}
 			onStop={stop}

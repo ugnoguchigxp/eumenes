@@ -100,3 +100,127 @@ test("icon upload, raw OCR lines, history and conversation use the registered ar
 	await panel.getByRole("button", { name: "資料一覧" }).click();
 	await expect(panel.locator(".ocr-history-thumbnail img")).toHaveCount(3);
 });
+test("correction action renders structured table, evidence and explicit adoption", async ({
+	page,
+}) => {
+	let candidate: any = null;
+	let preferredId: string | null = null;
+	let preferenceRevision = 0;
+	await page.route("**/api/ocr/**/corrections**", async (route) => {
+		const request = route.request();
+		const path = new URL(request.url()).pathname;
+		const sourceId = path.match(/\/api\/ocr\/([^/]+)\/corrections/)?.[1] ?? "";
+		if (request.method() === "POST" && path.endsWith("/corrections")) {
+			const input = request.postDataJSON();
+			candidate = {
+				id: input.requestId,
+				sourceId,
+				frameIndex: null,
+				sourceRevision: input.expectedRevision,
+				sourceDigest: "0".repeat(64),
+				state: "completed",
+				errorCode: null,
+				result: {
+					blocks: [
+						{
+							kind: "table",
+							rows: 1,
+							columns: 2,
+							evidence: { lineIndexes: [0, 1] },
+							uncertain: false,
+							cells: [
+								{
+									row: 0,
+									column: 0,
+									rowSpan: 1,
+									columnSpan: 1,
+									text: "補正後",
+									evidence: { lineIndexes: [0] },
+									uncertain: false,
+								},
+								{
+									row: 0,
+									column: 1,
+									rowSpan: 1,
+									columnSpan: 1,
+									text: "二行目",
+									evidence: { lineIndexes: [1] },
+									uncertain: false,
+								},
+							],
+						},
+					],
+					excludedLines: [],
+				},
+				createdAt: Date.now(),
+				updatedAt: Date.now(),
+			};
+			return route.fulfill({
+				status: 202,
+				contentType: "application/json",
+				body: JSON.stringify(candidate),
+			});
+		}
+		if (request.method() === "GET" && path.endsWith("/corrections"))
+			return route.fulfill({
+				contentType: "application/json",
+				body: JSON.stringify({
+					items:
+						candidate && candidate.sourceId === sourceId ? [candidate] : [],
+					nextCursor: null,
+					preference: { preferredId, revision: preferenceRevision },
+				}),
+			});
+		if (request.method() === "PUT" && path.endsWith("/preference")) {
+			const input = request.postDataJSON();
+			preferredId = input.preferredId;
+			preferenceRevision++;
+			return route.fulfill({
+				contentType: "application/json",
+				body: JSON.stringify({ preferredId, revision: preferenceRevision }),
+			});
+		}
+		return route.fallback();
+	});
+	await page.goto(origin);
+	await page.getByRole("button", { name: "アーティファクトを開く" }).click();
+	await page
+		.getByRole("menuitem", { name: "文字を読み取る", exact: true })
+		.click();
+	const panel = page.getByRole("complementary", { name: "アーティファクト" });
+	const bytes = await page.evaluate(async () => {
+		const canvas = document.createElement("canvas");
+		canvas.width = 320;
+		canvas.height = 240;
+		canvas.getContext("2d")?.fillRect(0, 0, 320, 240);
+		const blob = await new Promise<Blob>((resolve) =>
+			canvas.toBlob((b) => resolve(b!), "image/png"),
+		);
+		return Array.from(new Uint8Array(await blob.arrayBuffer()));
+	});
+	await panel
+		.locator('input[type="file"]')
+		.setInputFiles({
+			name: "correction.png",
+			mimeType: "image/png",
+			buffer: Buffer.from(bytes),
+		});
+	await expect(
+		panel.getByRole("button", { name: "補正案を作る" }),
+	).toBeEnabled();
+	await panel.getByRole("button", { name: "補正案を作る" }).click();
+	await expect(panel.locator(".ocr-correction-table td")).toHaveCount(2);
+	await expect(panel.locator(".ocr-correction-table td").first()).toContainText(
+		"補正後",
+	);
+	await panel.getByRole("button", { name: "根拠を見る" }).first().click();
+	await expect(panel.locator(".ocr-polygon.selected")).toHaveCount(1);
+	await panel.getByRole("button", { name: "この案を採用" }).click();
+	await expect(
+		panel.getByRole("heading", { name: "採用中の補正案" }),
+	).toBeVisible();
+	await panel.getByRole("button", { name: "原文を既定に戻す" }).click();
+	await expect(
+		panel.getByRole("heading", { name: "読み取った原文" }),
+	).toBeVisible();
+});

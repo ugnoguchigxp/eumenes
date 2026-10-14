@@ -27,6 +27,7 @@ const BACKENDS = [
 	"object-recognition",
 	"ocr",
 	"claude-code",
+	"steward",
 ];
 const USAGE =
 	"使い方: bun scripts/toolchain-bundle.ts pins <revisionId>... | check <file.bundle.json> [--json]";

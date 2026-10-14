@@ -128,7 +128,7 @@ const continuityNote = {
 	createdAt: "2026-10-13T00:00:00.000Z",
 	updatedAt: "2026-10-13T01:00:00.000Z",
 	origin: "agent",
-	sourceMessageId: "m1",
+	sourceMessageIds: ["m1"],
 	expiresAt: "2026-10-27T01:00:00.000Z",
 };
 const tendency = {
@@ -142,6 +142,20 @@ const memoryContext = {
 	longTerm: { text: "以下は…", bytes: 9, limit: 16384 },
 	shortTerm: { text: "", bytes: 0, limit: 8192, pendingAdditions: 0 },
 	notices: 1,
+};
+const decision = {
+	id: 7,
+	conversationId: "main",
+	jobId: "j1",
+	step: "curate-memory",
+	createdAt: "2026-10-14T00:00:00.000Z",
+	output: { remember: [] },
+	results: [{ status: "applied" }],
+	windowVersionBefore: 2,
+	windowVersionAfter: 3,
+	durationMs: 1200,
+	outputTokens: 80,
+	errorCode: null,
 };
 contracts("memory client", [
 	{
@@ -189,6 +203,14 @@ contracts("memory client", [
 		method: "GET",
 		path: "/api/memory/context?conversationId=main",
 		response: memoryContext,
+	},
+	{
+		name: "stewardDecisions",
+		call: (c) => c.stewardDecisions("main/1", 20),
+		method: "GET",
+		path: "/api/steward/decisions?conversationId=main%2F1&limit=20",
+		response: { items: [decision] },
+		result: [decision],
 	},
 	{
 		name: "memoryContext (off)",

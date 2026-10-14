@@ -68,6 +68,7 @@ export const terminalsWebAdapter: WebArtifactAdapter = {
 			sessions: data.sessions.map((s) => ({
 				id: s.id,
 				title: s.title,
+				...(s.owner.startsWith("kanban:") ? { heading: s.title } : {}),
 				status: s.status,
 				run: s.run,
 				...(s.status === "exited"

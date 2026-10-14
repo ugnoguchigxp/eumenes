@@ -23,6 +23,7 @@ import {
 } from "./settings-adapter";
 import { createRecordsAdapter, type RecordsPorts } from "./records-adapter";
 import { createMemoryAdapter, type MemoryAdapterPorts } from "./memory-adapter";
+import { createStewardAdapter } from "./steward-adapter";
 import {
 	createWorldAdapter,
 	type WorldAdapterPortsLookup,
@@ -44,6 +45,7 @@ import { createImageScreenAdapter } from "./image-screen-adapter";
 import { createUiCompositionsAdapter } from "./ui-compositions-adapter";
 import { createObjectRecognitionScreenAdapter } from "./object-recognition-screen-adapter";
 import { createTerminalsAdapter } from "./terminals-adapter";
+import { createKanbanAdapter } from "./kanban-adapter";
 import {
 	bundleHostOf,
 	createRegistryActions,
@@ -67,6 +69,8 @@ export async function createToolchain(
 		ocr?: import("../domains/ocr").OcrService;
 		/** PTY sessions for the terminal screen (absent: not offered). */
 		terminals?: import("../domains/terminals").TerminalsService;
+		/** The task board (needs `terminals` for its runs). */
+		kanban?: import("../domains/kanban").KanbanService;
 		excalidraw?: boolean;
 		history?: boolean;
 		/** LARM embedding provider; without it retrieval uses full-text search only. */
@@ -86,6 +90,13 @@ export async function createToolchain(
 		ttsDictionary?: TtsDictionaryPorts;
 		/** The 記憶 screen (memory and continuity services). */
 		memory?: MemoryAdapterPorts;
+		/** The conversation agent's `memory_request` tool (absent: not offered). */
+		steward?: {
+			service: Parameters<typeof createStewardAdapter>[0];
+			memory: Parameters<typeof createStewardAdapter>[1];
+		};
+		/** Messages memory forbids reusing; history reads drop them (absent: nothing is dropped). */
+		blockedMessages?: Parameters<typeof createReadPorts>[3];
 		/** The World screen; the lookup returns undefined while World is OFF. */
 		world?: WorldAdapterPortsLookup;
 		/** The 動作確認 screen. */
@@ -110,6 +121,13 @@ export async function createToolchain(
 			? [createObjectRecognitionScreenAdapter()]
 			: []),
 		...(options.terminals ? [createTerminalsAdapter(options.terminals)] : []),
+		...(options.kanban && options.terminals
+			? [
+					createKanbanAdapter(options.kanban, {
+						runnable: () => options.terminals!.trackable(),
+					}),
+				]
+			: []),
 		...(options.timers
 			? [
 					createTimerAdapter(options.timers, {
@@ -134,6 +152,9 @@ export async function createToolchain(
 			? [createTtsDictionaryAdapter(options.ttsDictionary)]
 			: []),
 		...(options.memory ? [createMemoryAdapter(options.memory)] : []),
+		...(options.steward
+			? [createStewardAdapter(options.steward.service, options.steward.memory)]
+			: []),
 		...(options.world ? [createWorldAdapter(options.world)] : []),
 		...(options.serviceTests
 			? [createServiceTestsAdapter(options.serviceTests)]
@@ -150,6 +171,7 @@ export async function createToolchain(
 			...(options.uiCompositions ? ["ui-compositions"] : []),
 			...(options.objectRecognition ? ["object-recognition"] : []),
 			...(options.terminals ? ["claude-code"] : []),
+			...(options.steward ? ["steward"] : []),
 			...(options.ocr ? ["ocr"] : []),
 			...(options.excalidraw ? ["excalidraw"] : []),
 			...(options.conversation && options.history !== false ? ["history"] : []),
@@ -162,6 +184,7 @@ export async function createToolchain(
 		web,
 		options.history === false ? undefined : options.conversation,
 		() => agents,
+		options.blockedMessages,
 	);
 	const recipes = createRecipePorts(
 		history,

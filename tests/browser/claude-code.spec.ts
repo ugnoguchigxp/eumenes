@@ -23,7 +23,7 @@ test.beforeAll(async () => {
 });
 test.afterAll(() => fixture.stopAll());
 
-const evidence = "spec/verification/claude-code-toolchain-2026-10-14";
+const evidence = "spec/verification/claude-code-requests-2026-10-14";
 
 async function ask(page: import("@playwright/test").Page, text: string) {
 	await page.getByRole("textbox").first().fill(text);

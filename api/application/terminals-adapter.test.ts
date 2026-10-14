@@ -3,7 +3,11 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createCapabilities } from "../domains/capabilities";
-import { createTerminals, type SpawnPty } from "../domains/terminals";
+import {
+	createTerminals,
+	migrations as terminalsMigrations,
+	type SpawnPty,
+} from "../domains/terminals";
 import { openStore } from "../infrastructure/sqlite";
 import { migrations } from "./migrations";
 import {
@@ -13,6 +17,13 @@ import {
 import { offlineBundleHost } from "./toolchain-adapters";
 
 const SESSIONS = "query:terminals.sessions@1";
+/** The host registers the terminals table; added here until it does. */
+const withTerminals = (list: typeof migrations) => [
+	...list,
+	...terminalsMigrations.filter(
+		(entry) => !list.some((known) => known.id === entry.id),
+	),
+];
 const spawn: SpawnPty = () => ({
 	write() {},
 	resize() {},
@@ -23,7 +34,7 @@ const spawn: SpawnPty = () => ({
 
 test("Claude Code screen is registered as a launcher and reads the live session list", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-terminals-screen-"));
-	const store = openStore(join(dir, "db"), migrations);
+	const store = openStore(join(dir, "db"), withTerminals(migrations));
 	try {
 		const caps = createCapabilities(store, new Set(["claude-code"]), {
 			bundleHost: offlineBundleHost,
@@ -40,7 +51,7 @@ test("Claude Code screen is registered as a launcher and reads the live session 
 			}),
 		]);
 
-		const terminals = createTerminals({ command: ["claude"], spawn });
+		const terminals = createTerminals({ command: ["claude"], spawn, store });
 		const adapter = createTerminalsAdapter(terminals);
 		const read = () =>
 			store.read((db) => adapter.sourceInTransaction(db, SESSIONS, undefined));
@@ -51,7 +62,11 @@ test("Claude Code screen is registered as a launcher and reads the live session 
 		const session = terminals.start({ cols: 80, rows: 24 });
 		expect(read()).toMatchObject({
 			revision: 1,
-			data: { sessions: [{ id: session.id, status: "running", run: 1 }] },
+			data: {
+				sessions: [
+					{ id: session.id, status: "running", run: 1, owner: "direct" },
+				],
+			},
 		});
 		expect(
 			store.read((db) => adapter.sourceInTransaction(db, SESSIONS, "other")),
@@ -67,7 +82,9 @@ test("Claude Code screen is registered as a launcher and reads the live session 
 	}
 });
 
-test("a Claude Code request is handed over once per request id", () => {
+test("a Claude Code request is saved once per request id and read back from the table", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "eumenes-terminals-adapter-"));
+	const store = openStore(join(dir, "db"), withTerminals(migrations));
 	const commands: Array<readonly string[]> = [];
 	const terminals = createTerminals({
 		command: ["claude"],
@@ -75,55 +92,100 @@ test("a Claude Code request is handed over once per request id", () => {
 			commands.push(request.command);
 			return spawn(request);
 		},
+		store,
+		hookBaseUrl: "http://127.0.0.1:8787",
+		curl: "curl",
 	});
-	const adapter = createTerminalsAdapter(terminals);
-	const tx = undefined as unknown as Parameters<
-		typeof adapter.invokeInTransaction
-	>[0];
-	const request = {
-		operationName: "claude-code.request",
-		input: { prompt: "README を直して", task: "README 修正" },
-		requestId: crypto.randomUUID(),
-		issuedAt: new Date().toISOString(),
-		origin: { kind: "ui" as const, scope: "s", actionRequestId: "a" },
-	};
-	const first = adapter.invokeInTransaction(tx, request);
-	expect(first).toMatchObject({
-		replay: false,
-		receipt: {
-			title: "Claude Code 1",
-			task: "README 修正",
-			run: 1,
-			started: true,
-		},
-		answerContext: {
-			delivered: "started",
-			task: "README 修正",
-			completed: false,
-			reportedWhenDone: true,
-		},
-	});
-	expect(adapter.invokeInTransaction(tx, request)).toMatchObject({
-		replay: true,
-		receipt: first.receipt,
-	});
-	expect(commands).toHaveLength(1);
-	expect(adapter.readInTransaction(tx, request.requestId)?.receipt).toEqual(
-		first.receipt,
-	);
-	expect(adapter.readInTransaction(tx, "unknown")).toBeNull();
-	expect(() =>
-		adapter.invokeInTransaction(tx, {
+	try {
+		const adapter = createTerminalsAdapter(terminals);
+		type Invocation = Parameters<typeof adapter.invokeInTransaction>[1];
+		const request: Invocation = {
+			operationName: "claude-code.request",
+			input: { prompt: "README を直して", task: "README 修正" },
+			requestId: crypto.randomUUID(),
+			issuedAt: new Date().toISOString(),
+			// Only the conversation id is read from the origin.
+			origin: {
+				kind: "conversation",
+				conversationId: "main",
+			} as Invocation["origin"],
+		};
+		const invoke = (input: Invocation) =>
+			store.write((tx) => adapter.invokeInTransaction(tx, input));
+		const first = await invoke(request);
+		expect(first).toMatchObject({
+			replay: false,
+			receipt: { task: "README 修正", target: "current" },
+			answerContext: {
+				delivered: "queued",
+				task: "README 修正",
+				completed: false,
+				reportedWhenDone: true,
+			},
+		});
+		await terminals.settled();
+		expect(commands).toHaveLength(1);
+		expect(commands[0]!.at(-1)).toBe("README を直して");
+		// The same operation request id is a replay: the saved request, nothing sent again.
+		expect(await invoke(request)).toMatchObject({
+			replay: true,
+			receipt: first.receipt,
+		});
+		await terminals.settled();
+		expect(commands).toHaveLength(1);
+		const read = store.read((db) =>
+			adapter.readInTransaction(db, request.requestId),
+		);
+		expect(read?.receipt).toEqual(first.receipt);
+		expect(read?.receiptRef.digest).toBe(first.receiptRef.digest);
+		expect(
+			store.read((db) => adapter.readInTransaction(db, "unknown")),
+		).toBeNull();
+		// The request is a direct one of the conversation, with no git restriction of its own.
+		const attemptId = (first.receipt as { attemptId: string }).attemptId;
+		expect(
+			store.read((db) => terminals.requestInTransaction(db, attemptId)),
+		).toMatchObject({
+			owner: "direct",
+			mode: "work",
+			origin: "conversation",
+			conversationId: "main",
+			state: "delivered",
+		});
+		await expect(
+			invoke({
+				...request,
+				requestId: crypto.randomUUID(),
+				input: { prompt: "", task: "x" },
+			}),
+		).rejects.toThrow();
+		const named = await invoke({
 			...request,
 			requestId: crypto.randomUUID(),
-			input: { prompt: "", task: "x" },
-		}),
-	).toThrow();
-	expect(adapter.snapshotInTransaction(tx)).toEqual({
-		limit: 4,
-		sessions: [
-			{ title: "Claude Code 1", status: "running", activity: "working" },
-		],
-	});
-	terminals.closeAll();
+			input: { prompt: "別のセッションで", task: "別件", session: "new" },
+		});
+		expect(named.receipt).toMatchObject({ target: "new" });
+		await terminals.settled();
+		expect(store.read((db) => adapter.snapshotInTransaction(db))).toEqual({
+			limit: 4,
+			sessions: [
+				{
+					title: "Claude Code 1",
+					status: "running",
+					activity: "working",
+					task: "README 修正",
+				},
+				{
+					title: "Claude Code 2",
+					status: "running",
+					activity: "working",
+					task: "別件",
+				},
+			],
+		});
+	} finally {
+		terminals.closeAll();
+		await store.close();
+		rmSync(dir, { recursive: true, force: true });
+	}
 });

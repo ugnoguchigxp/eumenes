@@ -10,7 +10,26 @@ import {
 	uiSubmitRequest,
 } from "./ui-compositions";
 import { claudeCodeRequest } from "./claude-code";
+import { memoryRequest } from "./memory-request";
 export { claudeCodeRequest };
+import {
+	kanbanAdd,
+	kanbanCardRef,
+	kanbanEdit,
+	kanbanFollowup,
+	kanbanList,
+	kanbanMove,
+	kanbanNoticeRef,
+} from "./kanban";
+export {
+	kanbanAdd,
+	kanbanCardRef,
+	kanbanEdit,
+	kanbanFollowup,
+	kanbanList,
+	kanbanMove,
+	kanbanNoticeRef,
+};
 export { uiComposeRequest, uiCancelRequest, uiResponseFields, uiSubmitRequest };
 import { imageRequest, imagePlan } from "./image";
 export { imageRequest, imagePlan };
@@ -146,6 +165,13 @@ export const recipeFindInput = z
 export const validators = {
 	uiComposeRequest,
 	claudeCodeRequest,
+	kanbanAdd,
+	kanbanEdit,
+	kanbanMove,
+	kanbanCardRef,
+	kanbanFollowup,
+	kanbanList,
+	kanbanNoticeRef,
 	uiCancelRequest,
 	uiResponseFields,
 	uiSubmitRequest,
@@ -181,6 +207,12 @@ export const validators = {
 	timerHms,
 	emptyInput,
 	ocrTarget: z.strictObject({ id: z.uuid() }),
+	ocrCorrectionRequest: z.strictObject({
+		sourceId: z.uuid(),
+		expectedRevision: z.number().int().nonnegative(),
+		frameIndex: z.number().int().nonnegative().max(59).optional(),
+	}),
+	memoryRequest,
 };
 export type SchemaKey = keyof typeof validators;
 export type Owner = { rootRunId: string; taskId: string; cancelEpoch: number };

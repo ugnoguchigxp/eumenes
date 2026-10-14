@@ -52,7 +52,10 @@ export function fitExchanges<T extends { bytes: number }>(
 	let i = 0;
 	for (; i < candidates.length; i++) {
 		const next = candidates[i]!;
-		if (fit.length > 0 && (fit.length >= maxCount || bytes + next.bytes > maxBytes))
+		if (
+			fit.length > 0 &&
+			(fit.length >= maxCount || bytes + next.bytes > maxBytes)
+		)
 			break;
 		fit.push(next);
 		bytes += next.bytes;

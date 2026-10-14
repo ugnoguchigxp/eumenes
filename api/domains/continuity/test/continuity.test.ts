@@ -3,17 +3,49 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore } from "../../../infrastructure/sqlite";
-import { createContinuityService, migration, shortTermMigration } from "..";
+import type { SqliteStore } from "../../../infrastructure/sqlite";
+import {
+	createContinuityService,
+	itemSourceMigration,
+	migration,
+	shortTermMigration,
+} from "..";
+import type { ContinuityKind } from "../contracts";
+
+type Service = ReturnType<typeof createContinuityService>;
+/** A note as the steward writes it (the only way notes are added). */
+const addNote = (
+	store: SqliteStore,
+	service: Service,
+	conversationId: string,
+	input: { kind: ContinuityKind; text: string },
+) =>
+	store.write((db) =>
+		service.addByAgentInTransaction(db, conversationId, {
+			...input,
+			sourceMessageIds: ["m1"],
+		}),
+	);
 
 test("goals, decisions and open questions persist across restart and track revisions", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-continuity-"));
 	const file = join(dir, "db.sqlite3");
 	try {
-		const store = openStore(file, [migration, shortTermMigration]);
+		const store = openStore(file, [
+			migration,
+			shortTermMigration,
+			itemSourceMigration,
+		]);
 		const service = createContinuityService(store);
-		const goal = await service.add("c1", { kind: "goal", text: "Rust移行" });
-		await service.add("c1", { kind: "open_question", text: "CIはどうする" });
-		await service.add("c2", { kind: "decision", text: "別の会話" });
+		const goal = await addNote(store, service, "c1", {
+			kind: "goal",
+			text: "Rust移行",
+		});
+		await addNote(store, service, "c1", {
+			kind: "open_question",
+			text: "CIはどうする",
+		});
+		await addNote(store, service, "c2", { kind: "decision", text: "別の会話" });
 		expect(service.list("c1").map((i) => i.kind)).toEqual([
 			"goal",
 			"open_question",
@@ -21,59 +53,32 @@ test("goals, decisions and open questions persist across restart and track revis
 		const before = store.read((db) =>
 			service.snapshotInTransaction(db, "c1"),
 		).revision;
-		const closed = await service.transition(goal.id, {
-			expectedRevision: 1,
-			status: "resolved",
-		});
-		expect(closed).toMatchObject({ status: "resolved", revision: 2 });
-		await expect(
-			service.transition(goal.id, { expectedRevision: 1, status: "retracted" }),
-		).rejects.toThrow("revision_conflict");
+		expect(
+			await store.write((db) =>
+				service.closeByAgentInTransaction(db, goal.id, 1, "resolved"),
+			),
+		).toBe(true);
+		expect(
+			service.list("c1", true).find((i) => i.id === goal.id),
+		).toMatchObject({ status: "resolved", revision: 2 });
+		expect(
+			await store.write((db) =>
+				service.closeByAgentInTransaction(db, goal.id, 1, "retracted"),
+			),
+		).toBe(false);
 		expect(service.list("c1").map((i) => i.id)).not.toContain(goal.id);
 		expect(service.list("c1", true)).toHaveLength(2);
 		expect(
 			store.read((db) => service.snapshotInTransaction(db, "c1")).revision,
 		).toBe(before + 1);
 		await store.close();
-		const reopened = openStore(file, [migration, shortTermMigration]);
-		expect(createContinuityService(reopened).list("c1")).toHaveLength(1);
-		await reopened.close();
-	} finally {
-		rmSync(dir, { recursive: true, force: true });
-	}
-});
-
-test("the user-change hook runs inside the transition transaction and never for an addition", async () => {
-	const dir = mkdtempSync(join(tmpdir(), "eumenes-continuity-hook-"));
-	try {
-		const store = openStore(join(dir, "db.sqlite3"), [
+		const reopened = openStore(file, [
 			migration,
 			shortTermMigration,
+			itemSourceMigration,
 		]);
-		const service = createContinuityService(store);
-		const calls: string[] = [];
-		service.setUserChangeHook((db) => {
-			// Same transaction: the closed state is already visible to the hook.
-			calls.push(
-				(
-					db.query("SELECT status FROM continuity_items").get() as {
-						status: string;
-					}
-				).status,
-			);
-		});
-		const goal = await service.add("c1", { kind: "goal", text: "Rust移行" });
-		expect(calls).toEqual([]);
-		await expect(
-			service.transition(goal.id, { expectedRevision: 9, status: "resolved" }),
-		).rejects.toThrow("revision_conflict");
-		expect(calls).toEqual([]);
-		await service.transition(goal.id, {
-			expectedRevision: 1,
-			status: "resolved",
-		});
-		expect(calls).toEqual(["resolved"]);
-		await store.close();
+		expect(createContinuityService(reopened).list("c1")).toHaveLength(1);
+		await reopened.close();
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
 	}
@@ -94,19 +99,23 @@ test("the short-term migration keeps existing rows and their order, and accepts 
 				).run(id, kind, `text-${id}`);
 		});
 		await old.close();
-		const store = openStore(file, [migration, shortTermMigration]);
+		const store = openStore(file, [
+			migration,
+			shortTermMigration,
+			itemSourceMigration,
+		]);
 		const service = createContinuityService(store);
 		const items = service.list("c1");
 		expect(items.map((i) => i.id)).toEqual(["b", "a"]);
 		expect(items[0]).toMatchObject({
 			revision: 3,
 			origin: "user",
-			sourceMessageId: null,
+			sourceMessageIds: [],
 			expiresAt: null,
 			updatedAt: "2026-10-02T00:00:00Z",
 		});
-		await service.add("c1", { kind: "activity", text: "調べもの" });
-		await service.add("c1", { kind: "memo", text: "メモ" });
+		await addNote(store, service, "c1", { kind: "activity", text: "調べもの" });
+		await addNote(store, service, "c1", { kind: "memo", text: "メモ" });
 		expect(service.list("c1").map((i) => i.kind)).toEqual([
 			"goal",
 			"decision",
@@ -125,6 +134,7 @@ test("activity lives 14 days and memo 7; an expired item stays active but leaves
 		const store = openStore(join(dir, "db.sqlite3"), [
 			migration,
 			shortTermMigration,
+			itemSourceMigration,
 		]);
 		const time = { now: "2026-10-01T00:00:00.000Z" };
 		let n = 0;
@@ -133,9 +143,18 @@ test("activity lives 14 days and memo 7; an expired item stays active but leaves
 			() => time.now,
 			() => `i${++n}`,
 		);
-		const activity = await service.add("c1", { kind: "activity", text: "A" });
-		const memo = await service.add("c1", { kind: "memo", text: "M" });
-		const goal = await service.add("c1", { kind: "goal", text: "G" });
+		const activity = await addNote(store, service, "c1", {
+			kind: "activity",
+			text: "A",
+		});
+		const memo = await addNote(store, service, "c1", {
+			kind: "memo",
+			text: "M",
+		});
+		const goal = await addNote(store, service, "c1", {
+			kind: "goal",
+			text: "G",
+		});
 		expect(activity.expiresAt).toBe("2026-10-15T00:00:00.000Z");
 		expect(memo.expiresAt).toBe("2026-10-08T00:00:00.000Z");
 		expect(goal.expiresAt).toBeNull();
@@ -159,29 +178,28 @@ test("activity lives 14 days and memo 7; an expired item stays active but leaves
 	}
 });
 
-test("the memory agent's operations bump the revision, honour revisions, and never call the user hook", async () => {
+test("the steward's operations bump the revision and honour revisions", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-continuity-agent-"));
 	try {
 		const store = openStore(join(dir, "db.sqlite3"), [
 			migration,
 			shortTermMigration,
+			itemSourceMigration,
 		]);
 		const time = { now: "2026-10-01T00:00:00.000Z" };
 		const service = createContinuityService(store, () => time.now);
-		let hooks = 0;
-		service.setUserChangeHook(() => hooks++);
 		const revision = () =>
 			store.read((db) => service.revisionInTransaction(db, "c1"));
 		const added = await store.write((db) =>
 			service.addByAgentInTransaction(db, "c1", {
 				kind: "activity",
 				text: "移行の調査",
-				sourceMessageId: "m1",
+				sourceMessageIds: ["m1"],
 			}),
 		);
 		expect(added).toMatchObject({
 			origin: "agent",
-			sourceMessageId: "m1",
+			sourceMessageIds: ["m1"],
 			revision: 1,
 			expiresAt: "2026-10-15T00:00:00.000Z",
 		});
@@ -223,19 +241,19 @@ test("the memory agent's operations bump the revision, honour revisions, and nev
 				service.updateByAgentInTransaction(db, added.id, 3, { text: "x" }),
 			),
 		).toBeNull();
-		expect(hooks).toBe(0);
 		await store.close();
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
 	}
 });
 
-test("the guard and the item limit apply to the memory agent, and expired items do not count", async () => {
+test("the guard and the item limit apply to the steward, and expired items do not count", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-continuity-limit-"));
 	try {
 		const store = openStore(join(dir, "db.sqlite3"), [
 			migration,
 			shortTermMigration,
+			itemSourceMigration,
 		]);
 		const time = { now: "2026-10-01T00:00:00.000Z" };
 		const service = createContinuityService(store, () => time.now);
@@ -254,7 +272,7 @@ test("the guard and the item limit apply to the memory agent, and expired items 
 				service.addByAgentInTransaction(db, "c1", {
 					kind,
 					text,
-					sourceMessageId: "m1",
+					sourceMessageIds: ["m1"],
 				}),
 			);
 		await add("x".repeat(60));
@@ -278,6 +296,7 @@ test("the guard and the item limit apply to the memory agent, and expired items 
 			const other = openStore(join(dir2, "db.sqlite3"), [
 				migration,
 				shortTermMigration,
+				itemSourceMigration,
 			]);
 			const clock = { now: "2026-10-01T00:00:00.000Z" };
 			const svc = createContinuityService(other, () => clock.now);
@@ -286,7 +305,7 @@ test("the guard and the item limit apply to the memory agent, and expired items 
 					svc.addByAgentInTransaction(db, "c1", {
 						kind: "memo",
 						text: `m${i}`,
-						sourceMessageId: "m1",
+						sourceMessageIds: ["m1"],
 					}),
 				);
 			await expect(
@@ -294,16 +313,13 @@ test("the guard and the item limit apply to the memory agent, and expired items 
 					svc.addByAgentInTransaction(db, "c1", {
 						kind: "goal",
 						text: "31",
-						sourceMessageId: "m1",
+						sourceMessageIds: ["m1"],
 					}),
 				),
 			).rejects.toThrow("invalid_continuity_limit");
-			await expect(
-				svc.add("c1", { kind: "goal", text: "user" }),
-			).rejects.toThrow("invalid_continuity_limit");
 			// Memos expire after seven days: the room is back.
 			clock.now = "2026-10-09T00:00:00.000Z";
-			await svc.add("c1", { kind: "goal", text: "user" });
+			await addNote(other, svc, "c1", { kind: "goal", text: "again" });
 			await other.close();
 		} finally {
 			rmSync(dir2, { recursive: true, force: true });
@@ -319,18 +335,19 @@ test("deleting by source message removes the notes and their text for good, move
 		const store = openStore(join(dir, "db.sqlite3"), [
 			migration,
 			shortTermMigration,
+			itemSourceMigration,
 		]);
 		const service = createContinuityService(store);
 		const mk = (
 			conversationId: string,
 			text: string,
-			sourceMessageId: string,
+			...sourceMessageIds: string[]
 		) =>
 			store.write((db) =>
 				service.addByAgentInTransaction(db, conversationId, {
 					kind: "memo",
 					text,
-					sourceMessageId,
+					sourceMessageIds,
 				}),
 			);
 		const a = await mk("c1", "忘れるべきメモ", "m1");
@@ -351,6 +368,7 @@ test("deleting by source message removes the notes and their text for good, move
 		const dump = store.read((db) =>
 			JSON.stringify([
 				db.query("SELECT * FROM continuity_items").all(),
+				db.query("SELECT * FROM continuity_item_source").all(),
 				db.query("SELECT * FROM continuity_revisions").all(),
 			]),
 		);
@@ -360,6 +378,81 @@ test("deleting by source message removes the notes and their text for good, move
 			service.deleteBySourceMessagesInTransaction(db, ["m1"]),
 		);
 		expect(again).toEqual({ noteIds: [], deleted: 0 });
+		await store.close();
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("a note has many sources: any one of them deletes it, an update adds sources, and old single sources are carried over", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "eumenes-continuity-src-"));
+	try {
+		// A database from before the source table: its single source column is copied, then the column goes.
+		const legacy = openStore(join(dir, "legacy.sqlite3"), [
+			migration,
+			shortTermMigration,
+		]);
+		await legacy.write((db) =>
+			db
+				.query(
+					"INSERT INTO continuity_items (id, conversation_id, kind, text, status, revision, created_at, updated_at, origin, source_message_id, expires_at) VALUES ('old','c1','memo','古いメモ','active',1,'t','t','agent','m9',NULL)",
+				)
+				.run(),
+		);
+		await legacy.close();
+		const store = openStore(join(dir, "legacy.sqlite3"), [
+			migration,
+			shortTermMigration,
+			itemSourceMigration,
+		]);
+		const service = createContinuityService(store);
+		expect(service.list("c1")[0]).toMatchObject({
+			id: "old",
+			sourceMessageIds: ["m9"],
+		});
+		expect(
+			store.read((db) =>
+				(
+					db.query("PRAGMA table_info(continuity_items)").all() as Array<{
+						name: string;
+					}>
+				).map((column) => column.name),
+			),
+		).not.toContain("source_message_id");
+
+		const note = await store.write((db) =>
+			service.addByAgentInTransaction(db, "c1", {
+				kind: "memo",
+				text: "二つの発言から",
+				sourceMessageIds: ["m1", "m2", "m1"],
+			}),
+		);
+		expect(note.sourceMessageIds).toEqual(["m1", "m2"]);
+		const updated = await store.write((db) =>
+			service.updateByAgentInTransaction(db, note.id, 1, {
+				text: "三つの発言から",
+				addSourceMessageIds: ["m2", "m3"],
+			}),
+		);
+		expect(updated?.sourceMessageIds).toEqual(["m1", "m2", "m3"]);
+		// Without new sources the existing ones stay.
+		const rewritten = await store.write((db) =>
+			service.updateByAgentInTransaction(db, note.id, 2, { text: "そのまま" }),
+		);
+		expect(rewritten?.sourceMessageIds).toEqual(["m1", "m2", "m3"]);
+		// One source in the set is enough.
+		const result = await store.write((db) =>
+			service.deleteBySourceMessagesInTransaction(db, ["m3"]),
+		);
+		expect(result).toEqual({ noteIds: [note.id], deleted: 1 });
+		expect(
+			store.read((db) =>
+				db
+					.query("SELECT * FROM continuity_item_source WHERE item_id = ?")
+					.all(note.id),
+			),
+		).toEqual([]);
+		expect(service.list("c1").map((item) => item.id)).toEqual(["old"]);
 		await store.close();
 	} finally {
 		rmSync(dir, { recursive: true, force: true });

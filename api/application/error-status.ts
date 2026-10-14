@@ -11,6 +11,7 @@ import { errorStatus as dots } from "../domains/dots/contracts";
 import { errorStatus as tasks } from "../domains/tasks/contracts";
 import { errorStatus as timers } from "../domains/timers/contracts";
 import { errorStatus as terminals } from "../domains/terminals/contracts";
+import { errorStatus as kanban } from "../domains/kanban/contracts";
 import { errorStatus as voiceDialogue } from "../domains/voice-dialogue/contracts";
 
 export type ErrorStatus = HttpErrorStatus;
@@ -83,6 +84,7 @@ const statusByCode = mergeErrorStatus(
 	tasks,
 	timers,
 	terminals,
+	kanban,
 	voiceDialogue,
 );
 

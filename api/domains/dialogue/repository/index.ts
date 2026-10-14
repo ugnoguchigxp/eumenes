@@ -153,8 +153,8 @@ export function transition(
 	error: string | null = null,
 ): boolean {
 	return (
-		db.query(UPDATE_RUN).run(status, now, error, null, id, revision)
-			.changes === 1
+		db.query(UPDATE_RUN).run(status, now, error, null, id, revision).changes ===
+		1
 	);
 }
 /** A run that ends. Only `endRun` calls this: the exchange and the steward must hear of the end in the same transaction. */
@@ -168,9 +168,8 @@ export function endTransition(
 	answerMessageId: string | null,
 ): boolean {
 	return (
-		db
-			.query(UPDATE_RUN)
-			.run(status, now, error, answerMessageId, id, revision).changes === 1
+		db.query(UPDATE_RUN).run(status, now, error, answerMessageId, id, revision)
+			.changes === 1
 	);
 }
 /** Runs without a queue job predate the queue: they are interrupted, and returned (as they were) so the end can be recorded. */

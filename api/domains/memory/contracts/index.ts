@@ -3,8 +3,12 @@ import type { ContinuityKind } from "../../continuity/contracts";
 import { CONVERSATION_DEFAULT_PRINCIPAL } from "../../conversation/contracts";
 import { continuityItemSchema } from "../../continuity/contracts";
 import type { VectorSpaceShape } from "../../../infrastructure/vector";
-/** Earlier exchanges sent verbatim; older ones reach the model only through memory (prefetch). */
+/** Without a ContextWindow (memory off) the newest runs sent verbatim; older ones are not sent. */
 export const TURN_WINDOW = 10;
+/** The verbatim exchanges (L3, unprocessed, the newest two) stay inside this size, whatever their length. */
+export const HISTORY_MAX_BYTES = 48 * 1024;
+/** One message of the history is cut to this size: head and tail stay, the middle is marked as left out. */
+export const HISTORY_MESSAGE_MAX_BYTES = 12 * 1024;
 /** The owner principal; defined once in conversation (the lower domain). */
 export const PRINCIPAL = CONVERSATION_DEFAULT_PRINCIPAL;
 /** The shared profile scope. Per-conversation continuity is composed into it for the active conversation. */
@@ -236,10 +240,17 @@ export type CurationItem =
 			op: "note_add";
 			kind: ContinuityKind;
 			text: string;
-			/** The message the note comes from. */
-			messageId: string;
+			/** The messages the note comes from (at least one, all of the conversation, none blocked). */
+			messageIds: string[];
 	  }
-	| { op: "note_update"; noteId: string; revision: number; text: string }
+	| {
+			op: "note_update";
+			noteId: string;
+			revision: number;
+			text: string;
+			/** Messages added to the note's sources (the union; none are removed). */
+			messageIds?: string[];
+	  }
 	| {
 			op: "note_close";
 			noteId: string;
@@ -295,6 +306,8 @@ export type CurationResult =
 	  }
 	| { status: "rejected"; op: CurationItem["op"]; reason: CurationRejection };
 
+/** One forget call accepts at most this many explicit `itemIds` (before the expansion by versions, merge lineage and evidence). More throws `forget_limit`. */
+export const FORGET_MAX_ITEMS = 5;
 /** The steward's forget request: State items (every version goes), messages it also found, and the conversation they came up in. */
 export type ForgetInput = {
 	conversationId: string;
@@ -314,4 +327,6 @@ export type ForgetPurge = {
 	itemIds: readonly string[];
 	messageIds: readonly string[];
 	conversationId: string;
+	/** The conversations whose summary this forget (or this replay of it) deleted: their summary-step decisions go too. */
+	deletedSummaryConversationIds: readonly string[];
 };

@@ -52,7 +52,7 @@ export function OcrMedia(props: OcrWorkspaceProps) {
 			{!item && <p>画像ファイルを選ぶか、カメラで撮影してください。</p>}
 			{item && props.mediaUrl && <div className="ocr-media-frame" style={width && height ? { aspectRatio: `${width}/${height}` } : undefined}>
 				{item.mime.startsWith("image/") ? <img src={props.mediaUrl} alt={`${item.name}の原本`}/> : <video ref={video} src={props.mediaUrl} controls playsInline aria-label={`${item.name}の元動画`}/>}
-				{width && height && item.state === "completed" && <svg viewBox={`0 0 ${width} ${height}`} aria-label="文字の検出位置" preserveAspectRatio="xMidYMid meet">{lines.map((line,index) => <polygon key={index} points={line.polygon.map(([x,y]) => `${x},${y}`).join(" ")} className={props.selectedLines.includes(index) ? "ocr-polygon selected" : "ocr-polygon"} onClick={() => props.onLine?.(index)} />)}</svg>}
+				{width && height && item.state === "completed" && <svg viewBox={`0 0 ${width} ${height}`} aria-label="文字の検出位置" preserveAspectRatio="xMidYMid meet">{lines.map((line,index) => <polygon key={index} points={line.polygon.map(([x,y]) => `${x},${y}`).join(" ")} className={props.selectedLines.includes(index) ? "ocr-polygon selected" : "ocr-polygon"} onClick={() => props.onLine?.(index)} />)}{props.highlightRegion && <rect x={props.highlightRegion[0]} y={props.highlightRegion[1]} width={props.highlightRegion[2]} height={props.highlightRegion[3]} className="ocr-correction-region"/>}</svg>}
 			</div>}
 		</div>
 		{item?.result?.kind === "video" && <div className="ocr-frames" aria-label="動画の解析時刻">{item.result.frames.map((frame,index) => <Button key={index} variant={props.frameIndex===index ? "default" : "secondary"} size="sm" onClick={() => props.onFrame?.(index)}>{frame.timestampSeconds}秒</Button>)}</div>}

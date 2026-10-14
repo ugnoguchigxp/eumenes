@@ -1,5 +1,9 @@
 export { registerContinuity } from "./controller";
-export { migration, shortTermMigration } from "./repository";
+export {
+	migration,
+	shortTermMigration,
+	itemSourceMigration,
+} from "./repository";
 export type { AgentContinuityInput, ContinuityService } from "./service";
 export { createContinuityService } from "./service";
 export type {

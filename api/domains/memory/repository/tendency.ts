@@ -38,11 +38,43 @@ export function quoteMatchedOf(db: Database, itemId: string): boolean | null {
 		.get(itemId) as { q: number | null } | null;
 	return row?.q == null ? null : row.q === 1;
 }
+/** Forgotten items leave no provenance and no merge lineage (as the merged item or as a source). */
 export function deleteProvenance(db: Database, itemIds: readonly string[]) {
 	const remove = db.query(
 		"DELETE FROM memory_item_provenance WHERE item_id = ?",
 	);
-	for (const id of itemIds) remove.run(id);
+	const removeMerged = db.query(
+		"DELETE FROM memory_item_merge WHERE item_id = ?",
+	);
+	const removeSource = db.query(
+		"DELETE FROM memory_item_merge WHERE source_id = ?",
+	);
+	for (const id of itemIds) {
+		remove.run(id);
+		removeMerged.run(id);
+		removeSource.run(id);
+	}
+}
+/** A merge: `itemId` was made from the sources (which were stopped). Forgetting any of them forgets all. */
+export function putMergeLineage(
+	db: Database,
+	itemId: string,
+	sourceIds: readonly string[],
+) {
+	const insert = db.query(
+		"INSERT OR IGNORE INTO memory_item_merge (item_id, source_id) VALUES (?,?)",
+	);
+	for (const sourceId of sourceIds) insert.run(itemId, sourceId);
+}
+/** The items directly linked to this one by a merge, in either direction (what it was merged from, what it was merged into). */
+export function mergeNeighbours(db: Database, itemId: string): string[] {
+	const rows = db
+		.query(
+			`SELECT source_id AS id FROM memory_item_merge WHERE item_id = ?1
+			 UNION SELECT item_id AS id FROM memory_item_merge WHERE source_id = ?1`,
+		)
+		.all(itemId) as Array<{ id: string }>;
+	return rows.map((row) => row.id);
 }
 
 // ---- tendencies: observations the agent derived from several items ----

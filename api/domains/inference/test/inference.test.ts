@@ -980,7 +980,7 @@ test("control calls preserve exact context, stay local, skip emotion judgement, 
 	).toEqual({ status: "rejected", mode: "control" });
 });
 
-test("the LARM route receives the control output schema and ordinary answers do not", async () => {
+test("only a structured-output control request sends the output schema to LARM; others stay plain JSON-object", async () => {
 	const seen: Array<Record<string, unknown> | undefined> = [];
 	const h = await setup({
 		local: async (_messages, _signal, options) => {
@@ -994,19 +994,74 @@ test("the LARM route receives the control output schema and ordinary answers do 
 		required: ["done"],
 		additionalProperties: false,
 	};
-	const id = await h.store.write((db) =>
+	const background = (decisionId: string, structuredOutput?: boolean) =>
+		h.store.write((db) =>
+			h.inference.captureBackgroundControlInTransaction!(db, {
+				taskId: "task",
+				decisionId,
+				authorityEpoch: 1,
+				executionGeneration: 1,
+				deadline: Date.now() + 20000,
+				taskDeadline: Date.now() + 30000,
+				maxOutputTokens: 512,
+				route: "conversation",
+				...(structuredOutput ? { structuredOutput } : {}),
+			}),
+		);
+	const control = { instructions: "step", outputSchema };
+	const signal = new AbortController().signal;
+	const plain = await h.store.write((db) =>
 		h.inference.captureMaintenanceControlInTransaction(db, {
 			subject: "schema-route",
 			deadline: Date.now() + 30000,
 			maxOutputTokens: 512,
 		}),
 	);
-	await h.inference.executeControl(id, messages, new AbortController().signal, {
-		instructions: "step",
-		outputSchema,
-	});
-	await h.inference.answer(messages, new AbortController().signal);
-	expect(seen).toEqual([outputSchema, undefined]);
+	await h.inference.executeControl(plain, messages, signal, control);
+	await h.inference.executeControl(
+		await background("plain"),
+		messages,
+		signal,
+		control,
+	);
+	await h.inference.executeControl(
+		await background("structured", true),
+		messages,
+		signal,
+		control,
+	);
+	await h.inference.answer(messages, signal);
+	expect(seen).toEqual([undefined, undefined, outputSchema, undefined]);
+});
+
+test("a background control keeps the conversation route only when asked, and a different binding conflicts", async () => {
+	const h = await setup();
+	const capture = (decisionId: string, route?: "conversation") =>
+		h.store.write((db) =>
+			h.inference.captureBackgroundControlInTransaction!(db, {
+				taskId: "task",
+				decisionId,
+				authorityEpoch: 1,
+				executionGeneration: 1,
+				deadline: Date.now() + 20000,
+				taskDeadline: Date.now() + 30000,
+				maxOutputTokens: 512,
+				...(route ? { route } : {}),
+			}),
+		);
+	const routeOf = (id: string) =>
+		h.store.read((db) => {
+			const row = db
+				.query("SELECT snapshot FROM inference_requests WHERE id=?")
+				.get(id) as { snapshot: string };
+			const { llm } = JSON.parse(row.snapshot).routes;
+			return [llm.mode, llm.cloudAllowed];
+		});
+	const larmOnly = await capture("a");
+	expect(routeOf(larmOnly)).toEqual(["larm-only", false]);
+	const conversation = await capture("b", "conversation");
+	expect(routeOf(conversation)).not.toEqual(["larm-only", false]);
+	await expect(capture("b")).rejects.toThrow("background_control_conflict");
 });
 
 // RT-12: a probe row must never stay "running" and block new probes.

@@ -11,6 +11,7 @@
 | [realtime.md](realtime.md) | SSE 通知と再接続の仕様、定期取得をしない方針 |
 | [larm.md](larm.md) | LARM の接続、claim、予算、session 構成 |
 | [logging.md](logging.md) | JSONL ログの保存先・相関 ID・障害調査の手順 |
+| [memory.md](memory.md) | 記憶担当(steward)：ContextWindow の層と予算、step と実行単位、依頼キュー、忘却の範囲、判断記録の見方 |
 
 ## 構造・検証
 

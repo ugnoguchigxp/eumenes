@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { configureLogging } from "../../../infrastructure/logger";
 import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
 import { createConversationService } from "../../conversation";
-import { createContinuityService } from "../../continuity";
+import { type ContinuityKind, createContinuityService } from "../../continuity";
 import { createMemoryService } from "..";
 import { memoryTestMigrations, saveItem } from "./memory.fixture";
 import {
@@ -51,6 +51,15 @@ async function setup() {
 		createdAt: "2026-10-01T00:00:00Z",
 		runId: null,
 	});
+	// The notes come from a message of their own, so forgetting what the items stand on leaves them.
+	await conversation.append({
+		id: "m-note",
+		conversationId: "c1",
+		role: "user",
+		text: "メモの元の発言",
+		createdAt: "2026-10-01T00:01:00Z",
+		runId: null,
+	});
 	let n = 0;
 	const remember = (
 		text: string,
@@ -79,6 +88,27 @@ async function setup() {
 		memory.forget({ conversationId: "c1", itemIds: [id], messageIds: [] });
 	const save = (input: Parameters<typeof saveItem>[2]) =>
 		saveItem(store, memory, input);
+	/** A short-term note through the steward's save contract; a refusal throws its reason. */
+	const note = async (input: { kind: ContinuityKind; text: string }) => {
+		const [result] = await store.write((db) =>
+			memory.applyCurationInTransaction(db, {
+				conversationId: "c1",
+				items: [{ op: "note_add", ...input, messageIds: ["m-note"] }],
+			}),
+		);
+		if (result?.status !== "applied")
+			throw new Error(result?.status === "rejected" ? result.reason : "failed");
+		return { id: must(result.id), revision: must(result.revision) };
+	};
+	const closeNote = async (id: string, revision: number) => {
+		const [result] = await store.write((db) =>
+			memory.applyCurationInTransaction(db, {
+				conversationId: "c1",
+				items: [{ op: "note_close", noteId: id, revision, status: "resolved" }],
+			}),
+		);
+		return result?.status === "applied";
+	};
 	const read = (conversationId = "c1") =>
 		store.write((db) => memory.windowForRunInTransaction(db, conversationId));
 	return {
@@ -92,6 +122,8 @@ async function setup() {
 		stop,
 		forget,
 		save,
+		note,
+		closeNote,
 		read,
 	};
 }
@@ -169,7 +201,7 @@ test("a continuity addition appears in the short-term layer and leaves the long-
 	const h = await setup();
 	await h.remember("コーヒーが好き");
 	const base = must(await h.read());
-	await h.continuity.add("c1", { kind: "goal", text: "Rustへ移行する" });
+	await h.note({ kind: "goal", text: "Rustへ移行する" });
 	const next = must(await h.read());
 	expect(next.longTerm.text).toBe(base.longTerm.text);
 	expect(next.shortTerm.text).toContain("目的");
@@ -178,13 +210,21 @@ test("a continuity addition appears in the short-term layer and leaves the long-
 	expect(must(await h.read("c2")).shortTerm.text).toBe("");
 });
 
-test("stop, retract, forget, the ON/OFF setting and the user closing a continuity item rebuild the long-term layer", async () => {
+test("stop, retract, forget, the ON/OFF setting rebuild the long-term layer; the steward closing a note changes only the short-term layer", async () => {
 	const h = await setup();
 	const a = await h.remember("コーヒーが好き");
 	const b = await h.remember("毎朝走っている", "habit", "毎朝走って");
 	const c = await h.remember("三つ目の事実");
-	await h.remember("四つ目の事実");
-	const goal = await h.continuity.add("c1", { kind: "goal", text: "目標" });
+	// The fourth stands on another message, so forgetting the others (all from m1) leaves it.
+	await h.save({
+		conversationId: "c1",
+		messageId: "m-note",
+		quote: "メモの元の発言",
+		kind: "preference",
+		semanticKey: "fourth",
+		text: "四つ目の事実",
+	});
+	const goal = await h.note({ kind: "goal", text: "目標" });
 	let window = must(await h.read());
 	expect(window.longTerm.text).toContain("コーヒーが好き");
 	const seen = async () => {
@@ -208,17 +248,15 @@ test("stop, retract, forget, the ON/OFF setting and the user closing a continuit
 	await h.memory.setEnabled(true);
 	expect(must(await h.read()).version).toBe(window.version);
 	const seq = (await h.read())!.inputs.immediateSeq;
-	await h.continuity.transition(goal.id, {
-		expectedRevision: 1,
-		status: "resolved",
-	});
-	const closed = await seen();
-	expect(closed.inputs.immediateSeq).toBeGreaterThan(seq);
+	expect(await h.closeNote(goal.id, 1)).toBe(true);
+	const closed = must(await h.read());
+	// Closing a note is the steward's own decision: no immediate change.
+	expect(closed.inputs.immediateSeq).toBe(seq);
 	expect(closed.shortTerm.text).toBe("");
 	expect(closed.longTerm.text).toContain("四つ目の事実");
 });
 
-test("replacing, stopping or denying a value is immediate; a plain addition is not", async () => {
+test("only a stop (or a forget) is immediate; additions, replacements and denials by the steward are not", async () => {
 	const h = await setup();
 	const first = await h.remember("コーヒーが好き");
 	await h.read();
@@ -236,6 +274,9 @@ test("replacing, stopping or denying a value is immediate; a plain addition is n
 	const start = await seq();
 	await h.remember("毎朝走っている", "habit", "毎朝走って");
 	expect(await seq()).toBe(start);
+	// A replacement and a denial are the steward's own work: they reach the next run through the next window.
+	await h.remember("コーヒーが好きです", "preference", "コーヒーが好き");
+	expect(await seq()).toBe(start);
 	await h.stop(first.id, first.revision);
 	expect(await seq()).toBe(start + 1);
 	await h.save({
@@ -247,7 +288,7 @@ test("replacing, stopping or denying a value is immediate; a plain addition is n
 		text: "辛い物が好き",
 		polarity: "negated",
 	});
-	expect(await seq()).toBe(start + 2);
+	expect(await seq()).toBe(start + 1);
 	const window = must(await h.read());
 	expect(window.longTerm.text).toContain("「辛い物が好き」ではない");
 });
@@ -275,7 +316,7 @@ test("the same inputs always render the same strings", async () => {
 	const h = await setup();
 	await h.remember("コーヒーが好き");
 	await h.remember("毎朝走っている", "habit", "毎朝走って");
-	await h.continuity.add("c1", { kind: "decision", text: "週に3回走る" });
+	await h.note({ kind: "decision", text: "週に3回走る" });
 	const one = await h.store.write((db) =>
 		h.memory.windows.rebuildInTransaction(db, "c1", { refreshLongTerm: true }),
 	);
@@ -396,11 +437,11 @@ test("window validation: additions keep a run valid; stop, own-run changes, sett
 	expect(await validate()).toEqual({ ok: true });
 	// An addition during the run does not expire it.
 	await h.remember("毎朝走っている", "habit", "毎朝走って");
-	await h.continuity.add("c1", { kind: "goal", text: "目標" });
+	await h.note({ kind: "goal", text: "目標" });
 	expect(await validate()).toEqual({ ok: true });
 	// A change attributed to the run itself is not a reason to expire it; anyone else's is.
 	await h.store.write((db) =>
-		h.memory.windows.recordImmediateInTransaction(db, "state_replace", "run-1"),
+		h.memory.windows.recordImmediateInTransaction(db, "state_stop", "run-1"),
 	);
 	expect(await validate("run-1")).toEqual({ ok: true });
 	expect(await validate("run-2")).toEqual({
@@ -478,14 +519,14 @@ test("the continuity guard limits the short-term layer to its budget", async () 
 	let error: unknown;
 	try {
 		for (; count < 30; count++)
-			await h.continuity.add("c1", {
+			await h.note({
 				kind: "goal",
 				text: `${count}`.padStart(3, "0") + "う".repeat(497),
 			});
 	} catch (caught) {
 		error = caught;
 	}
-	expect((error as Error).message).toBe("invalid_continuity_limit");
+	expect((error as Error).message).toBe("limit_reached");
 	expect(count).toBeGreaterThan(3);
 	expect(count).toBeLessThan(10);
 	// The refused addition rolled back with it.

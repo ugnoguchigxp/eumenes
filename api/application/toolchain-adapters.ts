@@ -26,6 +26,11 @@ import {
 	TTS_DICTIONARY_ADAPTER_REF,
 } from "./tts-dictionary-adapter";
 import { describeMemoryAdapter, MEMORY_ADAPTER_REF } from "./memory-adapter";
+import {
+	describeStewardAdapter,
+	STEWARD_ADAPTER_REF,
+	stewardDomainSchemas,
+} from "./steward-adapter";
 import { describeWorldAdapter, WORLD_ADAPTER_REF } from "./world-adapter";
 import {
 	describeServiceTestsAdapter,
@@ -53,6 +58,11 @@ import {
 	OBJECT_RECOGNITION_SCREEN_ADAPTER_REF,
 } from "./object-recognition-screen-adapter";
 import {
+	describeKanbanAdapter,
+	KANBAN_ADAPTER_REF,
+	kanbanDomainSchemas,
+} from "./kanban-adapter";
+import {
 	describeTerminalsAdapter,
 	TERMINALS_ADAPTER_REF,
 	terminalsDomainSchemas,
@@ -75,6 +85,8 @@ const domainSchemas: Readonly<Record<string, ZodType>> = {
 	]),
 	...uiCompositionsDomainSchemas,
 	...terminalsDomainSchemas,
+	...kanbanDomainSchemas,
+	...stewardDomainSchemas,
 };
 
 /** What this host can execute, for checking bundles before they are registered. */
@@ -134,6 +146,8 @@ export const hostAdapterDescriptions: Array<
 	{ ref: WORLD_ADAPTER_REF, describe: describeWorldAdapter },
 	{ ref: SERVICE_TESTS_ADAPTER_REF, describe: describeServiceTestsAdapter },
 	{ ref: TERMINALS_ADAPTER_REF, describe: describeTerminalsAdapter },
+	{ ref: KANBAN_ADAPTER_REF, describe: describeKanbanAdapter },
+	{ ref: STEWARD_ADAPTER_REF, describe: describeStewardAdapter },
 ];
 
 /** The bundle host as if every adapter were registered (see `hostAdapterDescriptions`). */

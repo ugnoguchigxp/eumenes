@@ -11,6 +11,7 @@ import { uiCompositionsWebAdapter } from "../domains/ui-compositions/toolchain-a
 import { objectRecognitionScreenWebAdapter } from "../domains/object-recognition/toolchain-adapter";
 import { serviceTestsWebAdapter } from "../domains/service-tests/toolchain-adapter";
 import { terminalsWebAdapter } from "../domains/terminals";
+import { kanbanWebAdapter } from "../domains/kanban";
 
 /** Every domain adapter the common artifact host can render. Adding a domain adds one line. */
 export const toolchainWebAdapters = createWebAdapterRegistry([
@@ -24,4 +25,5 @@ export const toolchainWebAdapters = createWebAdapterRegistry([
 	recordsWebAdapter,
 	serviceTestsWebAdapter,
 	terminalsWebAdapter,
+	kanbanWebAdapter,
 ]);

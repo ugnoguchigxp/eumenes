@@ -19,6 +19,7 @@ export type StewardMemory = Pick<
 	MemoryService,
 	| "readyInTransaction"
 	| "pendingExchangesInTransaction"
+	| "pendingConversationIdsInTransaction"
 	| "exchangeInTransaction"
 	| "exchangesInTransaction"
 	| "exchanges"
@@ -55,6 +56,8 @@ export interface StewardDeps {
 	clock(): string;
 	nowMs(): number;
 	newId(): string;
+	/** Runs `run` once after `ms`; the returned function cancels it. Default: an unref'd `setTimeout`. */
+	setTimer?(run: () => void, ms: number): () => void;
 }
 
 /** The transaction a step reads and writes in. */
@@ -91,13 +94,19 @@ export interface ApplyResult {
 	/** A reflecting step changed something: the upkeep revision moves on. */
 	changed: boolean;
 	republishLongTerm?: boolean;
-	prefetch?: { text: string; pins: { messageId: string; digest: string }[]; bytes: number };
+	prefetch?: {
+		text: string;
+		pins: { messageId: string; digest: string }[];
+		bytes: number;
+	};
 	/** An upkeep step found nothing to change. */
 	quiet?: boolean;
 	/** A forget ran: the decision keeps no body. */
 	redact?: boolean;
 	/** The result cannot be adopted (a conflict the step found while applying). */
 	stale?: string;
+	/** Nothing in the answer could be applied: it counts like an unusable answer. */
+	unusable?: boolean;
 }
 
 export interface PreparedUnit {

@@ -1,12 +1,8 @@
 import { classifyValidity, periodFromStateMs } from "eumenes-memory";
 import type { StateItem } from "eumenes-memory/sqlite";
 import { sha256Hex } from "../../../infrastructure/digest";
-import { LONG_TERM_LIST_BYTES } from "../contracts";
-import {
-	byteLength,
-	type ClippedText,
-	clipMessage,
-} from "./budget";
+import { LONG_TERM_BYTES } from "../../memory";
+import { byteLength, type ClippedText, clipMessage } from "./budget";
 import type { StepEnv } from "./types";
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -50,7 +46,7 @@ export function activeStateItems(env: StepEnv): StateItem[] {
 
 /**
  * The long-term list (State, then tendencies) and the live notes, each with a short ref. The list is cut at
- * `LONG_TERM_LIST_BYTES`, newest first.
+ * `LONG_TERM_BYTES`, newest first.
  */
 export function describeMemory(env: StepEnv): MemoryDescription {
 	const { db, deps, conversationId } = env;
@@ -64,7 +60,7 @@ export function describeMemory(env: StepEnv): MemoryDescription {
 	let bytes = 0;
 	const push = (entry: Record<string, unknown>) => {
 		const size = byteLength(JSON.stringify(entry));
-		if (bytes + size > LONG_TERM_LIST_BYTES) return false;
+		if (bytes + size > LONG_TERM_BYTES) return false;
 		bytes += size;
 		longTerm.push(entry);
 		return true;
@@ -87,7 +83,11 @@ export function describeMemory(env: StepEnv): MemoryDescription {
 		};
 		if (!push(entry)) break;
 		m++;
-		refs[ref] = { namespace: "state", id: item.itemId, revision: item.revision };
+		refs[ref] = {
+			namespace: "state",
+			id: item.itemId,
+			revision: item.revision,
+		};
 		if (recentIds.has(item.itemId)) recent.push(ref);
 	}
 	let t = 0;
@@ -156,10 +156,7 @@ export function loadExchange(
 	let assistant: ReturnType<typeof deps.conversation.messageInTransaction> =
 		null;
 	if (row.answerMessageId !== null) {
-		assistant = deps.conversation.messageInTransaction(
-			db,
-			row.answerMessageId,
-		);
+		assistant = deps.conversation.messageInTransaction(db, row.answerMessageId);
 		if (!assistant || assistant.message.role !== "assistant")
 			return { status: "gone" };
 	}
@@ -237,7 +234,8 @@ export function oneOf<T extends string>(
 	value: unknown,
 	allowed: readonly T[],
 ): T | null {
-	return typeof value === "string" && (allowed as readonly string[]).includes(value)
+	return typeof value === "string" &&
+		(allowed as readonly string[]).includes(value)
 		? (value as T)
 		: null;
 }

@@ -1,6 +1,8 @@
 import type { Tx } from "../../queue";
 import type { ConversationService } from "../../conversation";
 import {
+	HISTORY_MAX_BYTES,
+	HISTORY_MESSAGE_MAX_BYTES,
 	TURN_WINDOW,
 	type MemoryService,
 	type WindowSnapshot,
@@ -12,10 +14,6 @@ import { buildSystemPrompt } from "./system-prompt";
 
 // The size of the verbatim window is shared with memory.
 export { TURN_WINDOW };
-/** The verbatim exchanges (L3, unprocessed, the newest two) stay inside this size, whatever their length. */
-export const HISTORY_MAX_BYTES = 48 * 1024;
-/** One message of the history is cut to this size: head and tail stay, the middle is marked as left out. */
-export const HISTORY_MESSAGE_MAX_BYTES = 12 * 1024;
 const HISTORY_HEAD_BYTES = 8 * 1024;
 /** The newest exchanges that are never dropped for size (two cut exchanges always fit the budget). */
 const LATEST_EXCHANGES = 2;
@@ -36,8 +34,7 @@ export function clipHistoryText(
 	if (bytes.length <= limit) return text;
 	const marker = (omitted: number) => `\n（中略：約${omitted}文字）\n`;
 	// The marker counts against the limit, so the clipped text never exceeds it.
-	const tailBudget =
-		limit - HISTORY_HEAD_BYTES - bytesOf(marker(bytes.length));
+	const tailBudget = limit - HISTORY_HEAD_BYTES - bytesOf(marker(bytes.length));
 	let headEnd = HISTORY_HEAD_BYTES;
 	// A continuation byte (10xxxxxx) at the cut means the cut is inside a character.
 	while (headEnd > 0 && (bytes[headEnd]! & 0xc0) === 0x80) headEnd--;
@@ -81,7 +78,8 @@ type HistoryEntry = {
 };
 type MemoryHistory = Pick<
 	MemoryService,
-	"verbatimHistoryInTransaction" | "blockedMessageIdsOfConversationInTransaction"
+	| "verbatimHistoryInTransaction"
+	| "blockedMessageIdsOfConversationInTransaction"
 >;
 
 /**
@@ -143,7 +141,10 @@ export function compileContext(
 	const prior = recentPriorRuns(tx, run, TURN_WINDOW);
 	// Runs the ledger never took (cancelled, replaced, from before it) stay as they were: the newest TURN_WINDOW.
 	const refs = [
-		...(verbatim?.keep ?? []).map((ref) => ({ ...ref, layer: "keep" as const })),
+		...(verbatim?.keep ?? []).map((ref) => ({
+			...ref,
+			layer: "keep" as const,
+		})),
 		...(verbatim?.unprocessed ?? []).map((ref) => ({
 			...ref,
 			layer: "unprocessed" as const,
@@ -273,7 +274,14 @@ export function compileContext(
 	if (window && window.prefetch.text !== "" && !prefetchDropped)
 		tail.push({ role: "system", content: window.prefetch.text });
 	return {
-		messages: [system, ...longTerm, ...history, ...working, ...unprocessed, input],
+		messages: [
+			system,
+			...longTerm,
+			...history,
+			...working,
+			...unprocessed,
+			input,
+		],
 		sections: { system, longTerm, history, working, unprocessed, input, tail },
 		shownMessageIds,
 		prefetchDropped,

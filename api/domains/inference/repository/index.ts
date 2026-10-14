@@ -29,6 +29,8 @@ export interface RequestRow {
 	mode: "answer" | "control";
 	outputLimit: number | null;
 	contextPolicy: "legacy" | "exact";
+	/** The control output schema is enforced as a strict provider schema. */
+	structuredOutput: boolean;
 }
 export function get(db: Database, id: string): RequestRow | null {
 	const row = db
@@ -41,6 +43,7 @@ export function get(db: Database, id: string): RequestRow | null {
 				context_policy?: "legacy" | "exact";
 				control_engine?: "larm" | "codex_luna";
 				control_policy_request_id?: string | null;
+				structured_output?: number;
 		  })
 		| null;
 	return row
@@ -53,6 +56,7 @@ export function get(db: Database, id: string): RequestRow | null {
 				contextPolicy: row.context_policy ?? "legacy",
 				controlEngine: row.control_engine ?? "larm",
 				controlPolicyRequestId: row.control_policy_request_id ?? null,
+				structuredOutput: row.structured_output === 1,
 			}
 		: null;
 }
@@ -91,5 +95,10 @@ export const migrations: readonly Migration[] = [
 		id: "inference/0007-control-policy-binding",
 		sql: "ALTER TABLE inference_requests ADD COLUMN control_policy_request_id TEXT;",
 		after: ["inference/0006-control-engine"],
+	},
+	{
+		id: "inference/0008-structured-output",
+		sql: "ALTER TABLE inference_requests ADD COLUMN structured_output INTEGER NOT NULL DEFAULT 0 CHECK(structured_output IN (0,1));",
+		after: ["inference/0007-control-policy-binding"],
 	},
 ];

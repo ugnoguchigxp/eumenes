@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import type { Migration } from "../../../infrastructure/sqlite";
 import type {
 	DecisionDto,
 	InboxState,
@@ -55,13 +56,13 @@ CREATE INDEX steward_decision_ref_target ON steward_decision_ref(ref_type, ref_i
 `;
 
 /** Named migrations of this domain; the SQL above is frozen once deployed. */
-export const migrations = [
+export const migrations: readonly Migration[] = [
 	{
 		id: "steward/0001-init",
 		sql: migration,
 		after: ["conversation/0001-init"],
 	},
-] as const;
+];
 
 const CHUNK = 200;
 function chunks<T>(values: readonly T[]): T[][] {
@@ -70,7 +71,7 @@ function chunks<T>(values: readonly T[]): T[][] {
 		out.push(values.slice(i, i + CHUNK));
 	return out;
 }
-const marks = (n: number) => new Array(n).fill("?").join(",");
+const marks = (n: number) => Array.from({ length: n }, () => "?").join(",");
 
 // ---- units ----
 
@@ -83,6 +84,8 @@ export type UnitTargets = {
 	revision?: number;
 	/** The exchange the recall preparation stands on. */
 	message?: string;
+	/** An upkeep unit made for the pending limit: it does not wait for the foreground. */
+	urgent?: boolean;
 };
 export interface UnitRow {
 	id: string;
@@ -190,6 +193,13 @@ export function closeUnit(
 			.run(state, now, id).changes === 1
 	);
 }
+/** Keeps the newest `keep` closed units of a conversation (the open ones always stay). */
+export function pruneUnits(db: Database, conversationId: string, keep: number) {
+	db.query(
+		`DELETE FROM steward_unit WHERE conversation_id = ? AND state <> 'open' AND rowid NOT IN
+		 (SELECT rowid FROM steward_unit WHERE conversation_id = ? AND state <> 'open' ORDER BY rowid DESC LIMIT ?)`,
+	).run(conversationId, conversationId, keep);
+}
 /** Units of an upkeep step over one revision that ended in failure (the step is given up at the limit). */
 export function failedMaintenanceUnits(
 	db: Database,
@@ -246,7 +256,7 @@ export type QuietSteps = {
 	quiet?: Record<string, number>;
 	/** The round being run: its revision and the steps already started in it. */
 	round?: { revision: number; count: number };
-	/** The revision at which a pending-limit consolidation already ran. */
+	/** The number of pending additions a pending-limit consolidation was last made for. */
 	pending?: number;
 };
 export interface StateRow {
@@ -370,7 +380,9 @@ export function inboxOfRun(
 export function stagedRuns(db: Database): string[] {
 	return (
 		db
-			.query("SELECT DISTINCT run_id AS id FROM steward_inbox WHERE state = 'staged'")
+			.query(
+				"SELECT DISTINCT run_id AS id FROM steward_inbox WHERE state = 'staged'",
+			)
 			.all() as Array<{ id: string }>
 	).map((row) => row.id);
 }
@@ -407,21 +419,26 @@ export function setInboxPending(db: Database, id: string) {
 		"UPDATE steward_inbox SET state = 'pending' WHERE id = ? AND state = 'staged'",
 	).run(id);
 }
-/** Ends a request (done, none or discarded): its words are no longer kept (section 6). */
+/**
+ * Ends a request (done, none or discarded): its words are no longer kept (section 6). `afterForget`: the request was
+ * resolved in the same transaction as a forget whose purge already ended it as `forgotten` (its own message is among
+ * the blocked ones); the resolution the curation reached replaces that ending.
+ */
 export function resolveInbox(
 	db: Database,
 	id: string,
 	state: Extract<InboxState, "done" | "none" | "discarded">,
 	code: string | null,
 	now: string,
+	afterForget = false,
 ): boolean {
 	return (
 		db
 			.query(
 				`UPDATE steward_inbox SET state = ?, result_code = ?, what = '', detail = NULL, resolved_at = ?
-				 WHERE id = ? AND state IN ('staged','pending')`,
+				 WHERE id = ? AND (state IN ('staged','pending') OR (? = 1 AND state = 'none' AND result_code = 'forgotten'))`,
 			)
-			.run(state, code, now, id).changes === 1
+			.run(state, code, now, id, afterForget ? 1 : 0).changes === 1
 	);
 }
 export function bumpInboxFailure(db: Database, id: string): number {
@@ -546,20 +563,25 @@ export function deleteDecisionsByRefs(
 		).run(...part);
 	}
 }
-export function latestWindowVersion(
+/** The summary steps whose decisions stand on a conversation's summary. */
+const SUMMARY_STEPS = [
+	"summarize",
+	"compact-history",
+	"refine-summary",
+] as const;
+/** Deletes the summary-step decisions (and their refs) of these conversations: their summary was deleted. */
+export function deleteSummaryDecisions(
 	db: Database,
-	conversationId: string,
-): number | null {
-	return (
-		(
-			db
-				.query(
-					`SELECT window_version_after AS v FROM steward_decision WHERE conversation_id = ?
-					 AND window_version_after IS NOT NULL ORDER BY id DESC LIMIT 1`,
-				)
-				.get(conversationId) as { v: number } | null
-		)?.v ?? null
-	);
+	conversationIds: readonly string[],
+) {
+	for (const part of chunks(conversationIds)) {
+		const where = `conversation_id IN (${marks(part.length)}) AND step IN (${marks(SUMMARY_STEPS.length)})`;
+		const args = [...part, ...SUMMARY_STEPS];
+		db.query(
+			`DELETE FROM steward_decision_ref WHERE decision_id IN (SELECT id FROM steward_decision WHERE ${where})`,
+		).run(...args);
+		db.query(`DELETE FROM steward_decision WHERE ${where}`).run(...args);
+	}
 }
 const decisionColumns = `id, conversation_id AS conversationId, job_id AS jobId, step, created_at AS createdAt, output, results,
  window_version_before AS windowVersionBefore, window_version_after AS windowVersionAfter, duration_ms AS durationMs,

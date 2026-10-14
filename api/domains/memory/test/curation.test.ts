@@ -141,7 +141,7 @@ test("a blocked message is never evidence, even for an explicit request", async 
 	const results = await h.curate([
 		remember(id),
 		remember(id, { explicit: true, key: "k2" }),
-		{ op: "note_add", kind: "memo", text: "メモ", messageId: id },
+		{ op: "note_add", kind: "memo", text: "メモ", messageIds: [id] },
 	]);
 	expect(
 		results.map((r) => (r.status === "rejected" ? r.reason : "applied")),
@@ -523,7 +523,7 @@ test("notes: add, update and close in the conversation; the source must be a usa
 				op: "note_add",
 				kind: "decision",
 				text: "予算は3万円以内",
-				messageId: id,
+				messageIds: [id],
 			},
 		]),
 	);
@@ -531,7 +531,7 @@ test("notes: add, update and close in the conversation; the source must be a usa
 	expect(h.continuity.list("c1")[0]).toMatchObject({
 		id: added.id,
 		origin: "agent",
-		sourceMessageId: id,
+		sourceMessageIds: [id],
 	});
 	const updated = only(
 		await h.curate([
@@ -576,7 +576,7 @@ test("notes: add, update and close in the conversation; the source must be a usa
 	expect(
 		only(
 			await h.curate([
-				{ op: "note_add", kind: "memo", text: "x", messageId: foreign },
+				{ op: "note_add", kind: "memo", text: "x", messageIds: [foreign] },
 			]),
 		),
 	).toMatchObject({ status: "rejected", reason: "invalid_source" });
@@ -584,7 +584,7 @@ test("notes: add, update and close in the conversation; the source must be a usa
 	for (let i = 0; i < 40; i++) {
 		const r = only(
 			await h.curate([
-				{ op: "note_add", kind: "memo", text: `m${i}`, messageId: id },
+				{ op: "note_add", kind: "memo", text: `m${i}`, messageIds: [id] },
 			]),
 		);
 		if (r.status === "rejected" && r.reason === "limit_reached") limited++;

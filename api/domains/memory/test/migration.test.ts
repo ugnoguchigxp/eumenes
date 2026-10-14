@@ -5,9 +5,10 @@ import { join } from "node:path";
 import { openStore } from "../../../infrastructure/sqlite";
 import { createConversationService } from "../../conversation";
 import { stewardLedgersMigration } from "..";
+import { blockedInConversation } from "../repository";
 import { memoryTestMigrations } from "./memory.fixture";
 
-test("memory/0005-steward-ledgers moves the old exclusions to scheduled_prompt blocks and drops the agent's tables", async () => {
+test("memory/0005-steward-ledgers moves the old exclusions to unscoped scheduled_prompt blocks and drops the agent's tables", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-memory-0005-"));
 	try {
 		const path = join(dir, "db.sqlite3");
@@ -58,11 +59,15 @@ test("memory/0005-steward-ledgers moves the old exclusions to scheduled_prompt b
 				},
 				{
 					id: "scheduled-1",
-					conversationId: "c1",
+					conversationId: "",
 					reason: "scheduled_prompt",
 					forgetId: null,
 				},
 			]);
+			// An unscoped block is read as a block of every conversation.
+			expect(
+				upgraded.read((db) => blockedInConversation(db, "c1")).sort(),
+			).toEqual(["gone-message", "scheduled-1"]);
 			const tables = upgraded
 				.read(
 					(db) =>

@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+	useQuery,
+	useQueryClient,
+	type QueryClient,
+} from "@tanstack/react-query";
 import type {
 	ArtifactEvent,
 	OcrResource,
@@ -14,6 +18,7 @@ import {
 import { queryRoots } from "../../queryKeys";
 import { ocrSource } from "./source";
 import { ocrThumbnail } from "./thumbnail";
+import { useOcrCorrections } from "./use-ocr-corrections";
 function incorporationError(cause: unknown): Receipt {
 	if (cause instanceof ApiError && cause.message === "ocr_text_too_large")
 		return {
@@ -21,6 +26,80 @@ function incorporationError(cause: unknown): Receipt {
 			message: "会話に追加できる長さを超えました。行を選んで追加してください。",
 		};
 	throw cause;
+}
+async function incorporateOcr(
+	client: EumenesClient,
+	cache: QueryClient,
+	event: ArtifactEvent,
+	id: string,
+	selectedId: string | undefined,
+): Promise<Receipt> {
+	if (id !== selectedId)
+		return { status: "rejected", message: "対象を選び直してください。" };
+	const index =
+		event.values.frameIndex === ""
+			? undefined
+			: Number(event.values.frameIndex);
+	const lineValue = event.values.lineIndexes;
+	const lineIndexes =
+		typeof lineValue === "string" && lineValue
+			? lineValue.split(",").map(Number)
+			: undefined;
+	if (
+		index !== undefined &&
+		(!Number.isInteger(index) || index < 0 || index > 59)
+	)
+		return { status: "rejected", message: "時刻を選び直してください。" };
+	try {
+		await client.ocrIncorporate(id, event.id, index, lineIndexes);
+	} catch (cause) {
+		return incorporationError(cause);
+	}
+	await Promise.all([
+		cache.invalidateQueries({ queryKey: [queryRoots.conversation] }),
+		cache.invalidateQueries({ queryKey: [queryRoots.dialogue] }),
+	]);
+	return { status: "accepted", message: "原文を会話に追加しました。" };
+}
+function validUpload(file: File) {
+	return (
+		inputMime.safeParse(file.type).success &&
+		file.size > 0 &&
+		file.size <= maxInputBytes
+	);
+}
+async function uploadWithRecovery(
+	client: EumenesClient,
+	file: File,
+	conversationId: string,
+	requestId: string,
+) {
+	try {
+		return {
+			record: await client.ocrUpload(file, conversationId, requestId),
+			message: "解析を受け付けました。",
+		};
+	} catch {
+		const record = await client.ocrGet(requestId).catch(() => null);
+		if (!record) throw new Error("receipt_unconfirmed");
+		return { record, message: "保存済みの受付に復帰しました。" };
+	}
+}
+function useSourceUrl(blob: Blob | undefined, id: string | undefined) {
+	const [url, setUrl] = useState<{ id: string; value: string }>();
+	useEffect(() => {
+		if (!blob || !id) return;
+		const value = URL.createObjectURL(blob);
+		let active = true;
+		queueMicrotask(() => {
+			if (active) setUrl({ id, value });
+		});
+		return () => {
+			active = false;
+			URL.revokeObjectURL(value);
+		};
+	}, [blob, id]);
+	return url;
 }
 export function useOcrRuntime(client: EumenesClient, conversationId = "main") {
 	const cache = useQueryClient();
@@ -42,6 +121,8 @@ export function useOcrRuntime(client: EumenesClient, conversationId = "main") {
 	const [selection, setSelection] = useState<string>();
 	const [frameIndex, setFrameIndex] = useState(0);
 	const [selectedLines, setSelectedLines] = useState<number[]>([]);
+	const [highlightRegion, setHighlightRegion] =
+		useState<[number, number, number, number]>();
 	const [busy, setBusy] = useState(false);
 	const [recording, setRecording] = useState(false);
 	const [error, setError] = useState("");
@@ -50,13 +131,24 @@ export function useOcrRuntime(client: EumenesClient, conversationId = "main") {
 	const items = records.data ?? [];
 	const selected = items.find((i) => i.id === selection) ?? items[0];
 	const selectedId = selected?.id;
+	const correctionRuntime = useOcrCorrections(
+		client,
+		conversationId,
+		selected,
+		frameIndex,
+		setError,
+		(evidence) => {
+			setSelectedLines(evidence.lineIndexes);
+			setHighlightRegion(evidence.region);
+		},
+	);
 	const content = useQuery({
 		queryKey: [queryRoots.ocr, client.identity, "content", selectedId],
 		enabled: !!selectedId,
 		queryFn: ({ signal }) => client.ocrContent(selectedId!, signal),
 		retry: false,
 	});
-	const [url, setUrl] = useState<{ id: string; value: string }>();
+	const url = useSourceUrl(content.data, selectedId);
 	const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
 	const thumbnailUrls = useRef<Record<string, string>>({});
 	const thumbnailPending = useRef(new Set<string>());
@@ -72,24 +164,14 @@ export function useOcrRuntime(client: EumenesClient, conversationId = "main") {
 			thumbnailUrls.current = {};
 		};
 	}, []);
-	useEffect(() => {
-		if (!content.data || !selectedId) return;
-		const value = URL.createObjectURL(content.data);
-		let active = true;
-		queueMicrotask(() => {
-			if (active) setUrl({ id: selectedId, value });
-		});
-		return () => {
-			active = false;
-			URL.revokeObjectURL(value);
-		};
-	}, [content.data, selectedId]);
 	const revision =
 		items.reduce((sum, r) => sum + r.revision + 1, 0) +
 		(connection.data?.revision ?? 0) +
 		frameIndex +
 		(recording ? 1 : 0) +
-		selectedLines.reduce((sum, i) => sum + i + 1, 0);
+		selectedLines.reduce((sum, i) => sum + i + 1, 0) +
+		(highlightRegion?.reduce((sum, value) => sum + value, 0) ?? 0) +
+		correctionRuntime.revision;
 	const resource: OcrResource = {
 		kind: "ocr-workspace",
 		revision,
@@ -99,6 +181,8 @@ export function useOcrRuntime(client: EumenesClient, conversationId = "main") {
 		thumbnails,
 		frameIndex,
 		selectedLines,
+		highlightRegion,
+		...correctionRuntime.resource,
 		busy,
 		recording,
 		configured: !!connection.data?.credentialConfigured,
@@ -113,16 +197,16 @@ export function useOcrRuntime(client: EumenesClient, conversationId = "main") {
 					: undefined),
 	};
 	async function refresh() {
-		await Promise.all([records.refetch(), connection.refetch()]);
+		await Promise.all([
+			records.refetch(),
+			connection.refetch(),
+			correctionRuntime.refresh(),
+		]);
 	}
 	async function uploadFile(source: string, file: File): Promise<Receipt> {
 		if (source !== ocrSource || uploadLock.current)
 			return { status: "rejected", message: "入力を受け付けられません。" };
-		if (
-			!inputMime.safeParse(file.type).success ||
-			!file.size ||
-			file.size > maxInputBytes
-		) {
+		if (!validUpload(file)) {
 			setError(
 				"JPEG・PNG・WebP・MP4・MOV・WebMの16 MiB以内のファイルを選んでください。",
 			);
@@ -137,24 +221,21 @@ export function useOcrRuntime(client: EumenesClient, conversationId = "main") {
 		const requestId = crypto.randomUUID();
 		const epoch = ++viewEpoch.current;
 		try {
-			const r = await client.ocrUpload(file, conversationId, requestId);
+			const { record: r, message } = await uploadWithRecovery(
+				client,
+				file,
+				conversationId,
+				requestId,
+			);
 			if (viewEpoch.current === epoch) {
 				setSelection(r.id);
 				setFrameIndex(0);
 				setSelectedLines([]);
+				setHighlightRegion(undefined);
 			}
 			await records.refetch();
-			return { status: "accepted", message: "解析を受け付けました。" };
+			return { status: "accepted", message };
 		} catch {
-			const r = await client.ocrGet(requestId).catch(() => null);
-			if (r) {
-				if (viewEpoch.current === epoch) setSelection(r.id);
-				await records.refetch();
-				return {
-					status: "accepted",
-					message: "保存済みの受付に復帰しました。",
-				};
-			}
 			setError("受付を確認できませんでした。自動再送はしていません。");
 			return { status: "rejected", message: "受付未確認" };
 		} finally {
@@ -216,6 +297,8 @@ export function useOcrRuntime(client: EumenesClient, conversationId = "main") {
 			return { status: "accepted", message: "接続先を保存しました。" };
 		}
 		const id = typeof event.values.id === "string" ? event.values.id : "";
+		if (event.action.startsWith("ocr-correction-"))
+			return correctionRuntime.dispatch(event);
 		if (["ocr-frame", "ocr-line"].includes(event.action)) {
 			const index = Number(event.values.index);
 			if (
@@ -233,6 +316,8 @@ export function useOcrRuntime(client: EumenesClient, conversationId = "main") {
 					return { status: "rejected", message: "時刻を選び直してください。" };
 				setFrameIndex(index);
 				setSelectedLines([]);
+				setHighlightRegion(undefined);
+				correctionRuntime.reset();
 			} else {
 				const lines =
 					selected.result?.kind === "image"
@@ -247,6 +332,7 @@ export function useOcrRuntime(client: EumenesClient, conversationId = "main") {
 						? previous.filter((i) => i !== index)
 						: [...previous, index].sort((a, b) => a - b),
 				);
+				setHighlightRegion(undefined);
 			}
 			return { status: "accepted", message: "選択しました。" };
 		}
@@ -257,6 +343,8 @@ export function useOcrRuntime(client: EumenesClient, conversationId = "main") {
 			setSelection(id);
 			setFrameIndex(0);
 			setSelectedLines([]);
+			setHighlightRegion(undefined);
+			correctionRuntime.reset();
 		} else if (event.action === "ocr-cancel") {
 			await client.ocrCancel(id);
 			await records.refetch();
@@ -279,35 +367,12 @@ export function useOcrRuntime(client: EumenesClient, conversationId = "main") {
 				setSelection(undefined);
 				setFrameIndex(0);
 				setSelectedLines([]);
+				setHighlightRegion(undefined);
+				correctionRuntime.reset();
 			}
 			await records.refetch();
 		} else if (event.action === "ocr-incorporate") {
-			if (id !== selectedId)
-				return { status: "rejected", message: "対象を選び直してください。" };
-			const index =
-				event.values.frameIndex === ""
-					? undefined
-					: Number(event.values.frameIndex);
-			const lineValue = event.values.lineIndexes;
-			const lineIndexes =
-				typeof lineValue === "string" && lineValue
-					? lineValue.split(",").map(Number)
-					: undefined;
-			if (
-				index !== undefined &&
-				(!Number.isInteger(index) || index < 0 || index > 59)
-			)
-				return { status: "rejected", message: "時刻を選び直してください。" };
-			try {
-				await client.ocrIncorporate(id, event.id, index, lineIndexes);
-			} catch (cause) {
-				return incorporationError(cause);
-			}
-			await Promise.all([
-				cache.invalidateQueries({ queryKey: [queryRoots.conversation] }),
-				cache.invalidateQueries({ queryKey: [queryRoots.dialogue] }),
-			]);
-			return { status: "accepted", message: "原文を会話に追加しました。" };
+			return incorporateOcr(client, cache, event, id, selectedId);
 		} else return { status: "rejected", message: "未対応の操作です。" };
 		return { status: "accepted", message: "操作を受け付けました。" };
 	}

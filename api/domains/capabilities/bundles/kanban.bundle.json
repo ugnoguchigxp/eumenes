@@ -1,0 +1,169 @@
+{
+	"formatVersion": 1,
+	"bundleId": "kanban",
+	"pins": [],
+	"definitions": [],
+	"bindings": [],
+	"artifacts": [
+		{
+			"kind": "artifact",
+			"id": "kanban.board",
+			"revision": 1,
+			"title": "タスクボード",
+			"variants": [
+				{
+					"id": "standard",
+					"label": "標準",
+					"definition": {
+						"view": "kanban-board",
+						"source": "kanban",
+						"title": "タスクボード"
+					}
+				}
+			],
+			"defaultVariant": "standard",
+			"sourceBindings": [
+				{
+					"source": "kanban",
+					"adapterRef": "adapter:kanban@1",
+					"query": "query:kanban.board@1",
+					"target": "none"
+				}
+			],
+			"actionBindings": [
+				{
+					"actionId": "add",
+					"eventAction": "kanban-add",
+					"source": "kanban",
+					"operationId": "kanban.add",
+					"inputSchemaRef": "schema:kanban-add@1",
+					"inputAdapterRef": "input:kanban.add@1",
+					"effect": "write"
+				},
+				{
+					"actionId": "edit",
+					"eventAction": "kanban-edit",
+					"source": "kanban",
+					"operationId": "kanban.edit",
+					"inputSchemaRef": "schema:kanban-edit@1",
+					"inputAdapterRef": "input:kanban.edit@1",
+					"effect": "write"
+				},
+				{
+					"actionId": "move",
+					"eventAction": "kanban-move",
+					"source": "kanban",
+					"operationId": "kanban.move",
+					"inputSchemaRef": "schema:kanban-move@1",
+					"inputAdapterRef": "input:kanban.move@1",
+					"effect": "write"
+				},
+				{
+					"actionId": "remove",
+					"eventAction": "kanban-remove",
+					"source": "kanban",
+					"operationId": "kanban.remove",
+					"inputSchemaRef": "schema:kanban-card@1",
+					"inputAdapterRef": "input:kanban.card@1",
+					"effect": "write"
+				},
+				{
+					"actionId": "open",
+					"eventAction": "kanban-open",
+					"source": "kanban",
+					"inputSchemaRef": "schema:kanban-open@1",
+					"effect": "navigate",
+					"navigateTo": { "artifactId": "terminals.workspace" }
+				}
+			],
+			"launcher": { "label": "タスクボード", "order": 60 }
+		}
+	],
+	"schemas": [
+		{
+			"kind": "schema",
+			"id": "kanban-add",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"title": { "type": "string", "minLength": 1, "maxLength": 200 },
+					"prompt": { "type": "string", "minLength": 1, "maxLength": 9000 }
+				},
+				"required": ["title", "prompt"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "kanban-edit",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"cardId": { "type": "string", "minLength": 1, "maxLength": 64 },
+					"expectedRevision": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 10
+					},
+					"title": { "type": "string", "maxLength": 200 },
+					"prompt": { "type": "string", "maxLength": 9000 }
+				},
+				"required": ["cardId", "expectedRevision"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "kanban-move",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"cardId": { "type": "string", "minLength": 1, "maxLength": 64 },
+					"expectedRevision": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 10
+					},
+					"column": { "type": "string", "enum": ["todo", "finished"] },
+					"beforeCardId": { "type": "string", "maxLength": 64 }
+				},
+				"required": ["cardId", "expectedRevision", "column", "beforeCardId"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "kanban-card",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"cardId": { "type": "string", "minLength": 1, "maxLength": 64 },
+					"expectedRevision": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 10
+					}
+				},
+				"required": ["cardId", "expectedRevision"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "kanban-open",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"cardId": { "type": "string", "minLength": 1, "maxLength": 64 }
+				},
+				"required": ["cardId"]
+			}
+		}
+	]
+}

@@ -101,13 +101,13 @@ async function scenario() {
 			op: "note_add",
 			kind: "memo",
 			text: "千代田区に住んでいる",
-			messageId: address.inputMessageId,
+			messageIds: [address.inputMessageId],
 		},
 		{
 			op: "note_add",
 			kind: "memo",
 			text: "天気の話",
-			messageId: weather.inputMessageId,
+			messageIds: [weather.inputMessageId],
 		},
 	]);
 	await h.store.write((db) => {

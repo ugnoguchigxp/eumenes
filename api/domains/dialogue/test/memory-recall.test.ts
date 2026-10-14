@@ -16,6 +16,7 @@ import {
 	createContinuityService,
 	migration as continuityMigration,
 	shortTermMigration,
+	itemSourceMigration,
 } from "../../continuity";
 import {
 	createDialogueService,
@@ -30,7 +31,10 @@ import {
 	contextWindowMigration,
 	agentHardeningMigration,
 	turnVectorsMigration,
+	stewardLedgersMigration,
+	forgetClosureMigration,
 } from "../../memory";
+import { saveItem } from "./memory-seed";
 import { PREFETCH_BYTES } from "../../memory";
 import { conversationPolicy } from "../service/conversation-tools";
 import type {
@@ -47,10 +51,13 @@ const MIGRATIONS = [
 	queueLinkMigration,
 	continuityMigration,
 	shortTermMigration,
+	itemSourceMigration,
 	memoryMigration,
 	contextWindowMigration,
 	agentHardeningMigration,
 	turnVectorsMigration,
+	stewardLedgersMigration,
+	forgetClosureMigration,
 	...memoryPackageMigrations,
 ];
 const SPACE = {
@@ -267,16 +274,24 @@ async function setup(
 			}),
 		async seedState() {
 			const run = await harness.ask("私は辛いものが好きです");
-			await memory.remember({
+			await saveItem(store, memory, {
 				conversationId: "main",
 				messageId: run.inputMessageId,
 				quote: "辛いものが好き",
 				kind: "preference",
 				semanticKey: "food.spicy",
 				text: "辛いものが好き",
-				polarity: "affirmed",
 			});
 		},
+		/** The steward's verdict "drop": these exchanges leave the prompt (they stay recallable). */
+		dropFromPrompt: (...inputMessageIds: string[]) =>
+			store.write((db) => {
+				for (const id of inputMessageIds) {
+					memory.setDispositionInTransaction(db, id, "drop");
+					memory.markExchangeStepInTransaction(db, id, "curated", "done");
+					memory.markExchangeStepInTransaction(db, id, "disposed", "done");
+				}
+			}),
 	};
 	open.push(async () => {
 		await queue.close(100).catch(() => {});
@@ -287,11 +302,12 @@ async function setup(
 }
 type Harness = Awaited<ReturnType<typeof setup>>;
 
-/** Thirteen finished exchanges; the 1st and 2nd are outside the ten the next request sends, the 8th inside. */
+/** Thirteen finished exchanges; the steward dropped the 1st and 2nd from the prompt, the 8th is still sent verbatim. */
 async function history(h: Harness, firstIndex = 1) {
 	const runs = [];
 	for (let i = firstIndex; i < firstIndex + 13; i++)
 		runs.push(await h.ask(`${i === 8 ? "京都の近況" : `話題${i}`}を話します`));
+	await h.dropFromPrompt(runs[0]!.inputMessageId, runs[1]!.inputMessageId);
 	return runs;
 }
 const messageText = (h: Harness, id: string) =>
@@ -302,12 +318,12 @@ const recallOf = (messages: Message[]) =>
 	);
 
 for (const withState of [false, true]) {
-	test(`an exchange outside the verbatim window is recalled by this turn's vector, before the policy and the input (${withState ? "with" : "without"} stored memory)`, async () => {
+	test(`an exchange the prompt does not show is recalled by this turn's vector, before the policy and the input (${withState ? "with" : "without"} stored memory)`, async () => {
 		const h = await setup();
 		if (withState) await h.seedState();
 		const runs = await history(h);
 		const text = (i: number) => messageText(h, runs[i]!.inputMessageId);
-		// Runs 0 and 1 are out of the window of the ten newest; 7 is inside it. All three are about Kyoto.
+		// Runs 0 and 1 are not in the prompt; 7 is. All three are about Kyoto.
 		await h.putVector(runs[0]!.inputMessageId, KYOTO);
 		await h.putVector(runs[1]!.inputMessageId, KYOTO);
 		await h.putVector(runs[7]!.inputMessageId, KYOTO);
@@ -319,7 +335,7 @@ for (const withState of [false, true]) {
 		expect(recall).toBeDefined();
 		expect(recall.content).toContain(text(0));
 		expect(recall.content).toContain(text(1));
-		// What the window already sends is not repeated; neither is a topic that does not match.
+		// What the prompt already shows is not repeated; neither is a topic that does not match.
 		expect(recall.content).not.toContain(text(7));
 		expect(recall.content).not.toContain(text(3));
 		// Placed after the memory layers and the history, before the conversation policy and the input.
@@ -421,10 +437,10 @@ test("the prefetch and this turn's recall never carry the same message, and a ch
 	expect(stale.error).toBe("memory_stale");
 });
 
-test("the recall starts before the oldest exchange actually sent: runs the size limit cut from the window are searched too", async () => {
+test("the recall has no ordinal boundary: runs the size limit cut from the prompt are searched too", async () => {
 	const h = await setup();
 	const runs = [];
-	// Twelve exchanges of ~18 KB each: the history limit (48 KiB) keeps only the newest few of the ten.
+	// Twelve exchanges of ~18 KB each (cut to 12 KB in the prompt): the history limit (48 KiB) keeps only the newest few.
 	for (let i = 0; i < 12; i++)
 		runs.push(await h.ask(`話${i}は${"京都".repeat(3000)}`));
 	const texts = runs.map((r) => messageText(h, r.inputMessageId));
@@ -443,7 +459,7 @@ test("the recall starts before the oldest exchange actually sent: runs the size 
 	expect(recalled.some((text) => texts.slice(-10).includes(text))).toBe(true);
 });
 
-test("a prefetch standing on exchanges already sent verbatim is left out for the turn, and its messages are not checked", async () => {
+test("a prefetch standing on exchanges already shown is left out for the turn, and its messages are not checked", async () => {
 	const h = await setup();
 	const runs = await history(h);
 	const inside = [runs[7]!.inputMessageId, runs[7]!.answerMessageId!];
@@ -501,6 +517,33 @@ test("quiet window: no recall means no check, no receipt and a streamed body; a 
 	expect(recallOf(h.seen.at(-1)!)).toBeDefined();
 	expect(recalled.streamed).toEqual([]);
 	expect(h.memory.usage(recalled.run.id)).not.toBeNull();
+});
+
+test("a quiet window does not adopt an answer whose shown history was forgotten meanwhile", async () => {
+	const h = await setup();
+	const runs = await history(h);
+	h.query.current = undefined;
+	const block = (messageId: string, reason: "forgotten" | "scheduled_prompt") =>
+		h.store.write((db) =>
+			db
+				.query(
+					"INSERT INTO memory_message_block (message_id, conversation_id, reason, forget_id, created_at) VALUES (?,?,?,?,?)",
+				)
+				.run(messageId, "main", reason, null, "2026-10-13T12:00:00.000Z"),
+		);
+	// A shown message blocked before the prompt was built (a scheduled prompt) does not expire the run.
+	await block(runs[3]!.inputMessageId, "scheduled_prompt");
+	const known = await h.ask("天気は？");
+	expect(known.status).toBe("completed");
+	// One forgotten while the answer is generated does, although the window adds nothing to the prompt.
+	h.during.current = async () => {
+		await block(runs[4]!.inputMessageId, "forgotten");
+	};
+	const stale = await h.ask("天気は？");
+	expect(recallOf(h.seen.at(-1)!)).toBeUndefined();
+	expect(stale.status).toBe("failed");
+	expect(stale.error).toBe("memory_stale");
+	expect(h.memory.usage(stale.id)).toBeNull();
 });
 
 test("a toolchain operation is checked against the recalled messages even when the window is quiet", async () => {

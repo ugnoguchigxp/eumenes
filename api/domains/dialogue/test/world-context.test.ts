@@ -25,6 +25,7 @@ import { createContinuityService } from "../../continuity";
 import { createGoalsService, type Goal } from "../../goals";
 import type { InferencePort, Receipt } from "../../inference";
 import { PREFETCH_BYTES, createMemoryService } from "../../memory";
+import { saveItem } from "./memory-seed";
 import { createQueue } from "../../queue";
 import {
 	WORLD_BLOCK_CLOSE,
@@ -802,14 +803,13 @@ test("Memory and World are read in one prepare transaction and share one budget;
 	const message = h.conversation
 		.get("main")
 		.messages.find((m) => m.id === first.inputMessageId)!;
-	await h.memory!.remember({
+	await saveItem(h.store, h.memory!, {
 		conversationId: "main",
 		messageId: message.id,
 		quote: "辛いものが好き",
 		kind: "preference",
 		semanticKey: "food.spicy",
 		text: "辛いものが好き",
-		polarity: "affirmed",
 	});
 	h.prepared.length = 0;
 	const run = await h.ask();
@@ -847,14 +847,13 @@ test("the prompt order with every layer present: persona, long-term, short-term,
 		.get("main")
 		.messages.find((m) => m.id === first.inputMessageId)!;
 	const remember = (quote: string, key: string) =>
-		h.memory!.remember({
+		saveItem(h.store, h.memory!, {
 			conversationId: "main",
 			messageId: message.id,
 			quote,
 			kind: "preference",
 			semanticKey: key,
 			text: quote,
-			polarity: "affirmed",
 		});
 	await remember("辛いものが好き", "food");
 	// Toggling the setting republishes the long-term layer with the first fact.

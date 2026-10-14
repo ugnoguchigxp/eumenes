@@ -19,12 +19,7 @@ import type {
 	StewardPort,
 	WorldContextPort,
 } from "../contracts";
-import {
-	byId,
-	interruptUnfinished,
-	listRuns,
-	linkAnswer,
-} from "../repository";
+import { byId, interruptUnfinished, listRuns, linkAnswer } from "../repository";
 import { createAgentSync } from "./agent-sync";
 import {
 	DEFAULT_DEADLINE_MS,

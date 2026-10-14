@@ -88,7 +88,9 @@ export const recallSchema = obj({ query: nullableStr });
 
 export const consolidateSchema = obj({
 	merge: list(obj({ refs: strings, key: nullableStr, text: str })),
-	stop: list(obj({ ref: str, why: enumOf(["outdated", "duplicate", "wrong"]) })),
+	stop: list(
+		obj({ ref: str, why: enumOf(["outdated", "duplicate", "wrong"]) }),
+	),
 	tendencies: list(
 		obj({
 			op: enumOf(["add", "update", "retire"]),

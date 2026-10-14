@@ -10,6 +10,7 @@ import {
 import type { ConversationService } from "../../conversation";
 import type { ContinuityService } from "../../continuity";
 import {
+	FORGET_MAX_ITEMS,
 	PROFILE_SCOPE,
 	type ForgetInput,
 	type ForgetOutcome,
@@ -25,6 +26,8 @@ import {
 	deleteTurnVectors,
 	dropExchangesOfMessages,
 	insertBlocks,
+	markBlockApplied,
+	mergeNeighbours,
 	readSummary,
 	resetSummarized,
 } from "../repository";
@@ -38,6 +41,8 @@ export const STATE_ID = /^state:[0-9a-f]{64}$/;
 export type ForgetDeps = {
 	journalPath: string;
 	blockJournalPath: string;
+	/** The message ids of the block journal, held in process (memory adds to it as soon as a line is written). */
+	journalBlocked: Set<string>;
 	access: (db: Database, purpose: string) => AccessContext;
 	atMs: () => number;
 	clock: () => string;
@@ -57,6 +62,29 @@ function refuse(code: string): never {
 	throw new Error(code);
 }
 
+function deleteTurnVectorsOf(db: Database, messageIds: string[]): number {
+	const present = messageIds.filter(
+		(id) =>
+			db
+				.query("SELECT 1 FROM memory_turn_vector WHERE message_id = ?")
+				.get(id) != null,
+	);
+	deleteTurnVectors(db, present);
+	return present.length;
+}
+/** The input message ids of the exchanges these messages belong to (the ids a summary's sources are keyed by). */
+function inputsOf(db: Database, messageIds: readonly string[]): string[] {
+	const inputs = new Set(messageIds);
+	const find = db.query(
+		"SELECT input_message_id AS i FROM memory_exchange WHERE answer_message_id = ?",
+	);
+	for (const id of messageIds) {
+		const row = find.get(id) as { i: string } | null;
+		if (row) inputs.add(row.i);
+	}
+	return [...inputs];
+}
+
 export function createForget(deps: ForgetDeps) {
 	const { access, atMs, windows, conversation, continuity } = deps;
 
@@ -69,6 +97,62 @@ export function createForget(deps: ForgetDeps) {
 			itemId,
 		});
 		return fact.status === "ok" ? fact.itemIds : null;
+	}
+
+	/**
+	 * Adds the items and everything that must go with them to `into`: every version of each fact, and (transitively)
+	 * the items they were merged from or into. A requested item that is unknown is refused; one found through the
+	 * lineage that is already gone is skipped.
+	 */
+	function expandItems(
+		db: Database,
+		ids: Iterable<string>,
+		into: Set<string>,
+		requested: boolean,
+	) {
+		const stack = [...ids].map((id) => ({ id, requested }));
+		const explored = new Set<string>();
+		while (stack.length > 0) {
+			const next = stack.pop() as { id: string; requested: boolean };
+			const fact = factOf(db, next.id);
+			if (!fact) {
+				if (next.requested) refuse("invalid_memory_item");
+				continue;
+			}
+			for (const member of fact) {
+				into.add(member);
+				if (explored.has(member)) continue;
+				explored.add(member);
+				for (const neighbour of mergeNeighbours(db, member))
+					stack.push({ id: neighbour, requested: false });
+			}
+		}
+	}
+
+	/** State items outside `known` whose evidence messages are all among `messageIds` (nothing else keeps them standing). */
+	function itemsResting(
+		db: Database,
+		messageIds: ReadonlySet<string>,
+		known: ReadonlySet<string>,
+	): string[] {
+		const listed = listState(db, {
+			contractVersion: VERSION,
+			access: access(db, "memory.forget"),
+			scopeKey: PROFILE_SCOPE,
+			includeInactive: true,
+		});
+		if (listed.status !== "ok") return refuse("memory_blocked");
+		return listed.items
+			.filter((item) => {
+				if (known.has(item.itemId)) return false;
+				const sources = item.evidence.filter(
+					(ref) => ref.namespace === "conversation",
+				);
+				return (
+					sources.length > 0 && sources.every((ref) => messageIds.has(ref.id))
+				);
+			})
+			.map((item) => item.itemId);
 	}
 
 	/** Plan -> forget journal (fsync) -> apply for one State item. */
@@ -155,7 +239,9 @@ export function createForget(deps: ForgetDeps) {
 	 */
 	function purgeDerivedInTransaction(
 		db: Database,
-		purge: ForgetPurge & { forgetId: string },
+		purge: Omit<ForgetPurge, "deletedSummaryConversationIds"> & {
+			forgetId: string;
+		},
 	): boolean {
 		const now = deps.clock();
 		let changed = false;
@@ -192,7 +278,11 @@ export function createForget(deps: ForgetDeps) {
 		if (deleteTurnVectorsOf(db, existing) > 0) changed = true;
 		// Summaries that stand on them go, with their sources; the other exchanges they covered are summarized again.
 		const inputIds = inputsOf(db, existing);
-		for (const conversationId of conversationsSummarizing(db, inputIds)) {
+		const deletedSummaryConversationIds = conversationsSummarizing(
+			db,
+			inputIds,
+		);
+		for (const conversationId of deletedSummaryConversationIds) {
 			const summary = readSummary(db, conversationId);
 			deleteSummary(db, conversationId);
 			if (summary) {
@@ -212,32 +302,12 @@ export function createForget(deps: ForgetDeps) {
 				itemIds: purge.itemIds,
 				messageIds: existing,
 				conversationId: purge.conversationId,
+				deletedSummaryConversationIds,
 			});
+		// This line's purge is in the database now; a restored older database lacks the mark and runs it again.
+		markBlockApplied(db, purge.forgetId, now);
 		return changed;
 	}
-	function deleteTurnVectorsOf(db: Database, messageIds: string[]): number {
-		const present = messageIds.filter(
-			(id) =>
-				db
-					.query("SELECT 1 FROM memory_turn_vector WHERE message_id = ?")
-					.get(id) != null,
-		);
-		deleteTurnVectors(db, present);
-		return present.length;
-	}
-	/** The input message ids of the exchanges these messages belong to (the ids a summary's sources are keyed by). */
-	function inputsOf(db: Database, messageIds: readonly string[]): string[] {
-		const inputs = new Set(messageIds);
-		const find = db.query(
-			"SELECT input_message_id AS i FROM memory_exchange WHERE answer_message_id = ?",
-		);
-		for (const id of messageIds) {
-			const row = find.get(id) as { i: string } | null;
-			if (row) inputs.add(row.i);
-		}
-		return [...inputs];
-	}
-
 	return {
 		factOf,
 		forgetStateId,
@@ -258,17 +328,26 @@ export function createForget(deps: ForgetDeps) {
 				(input.itemIds.length === 0 && input.messageIds.length === 0)
 			)
 				return refuse("invalid_forget");
+			if (input.itemIds.length > FORGET_MAX_ITEMS)
+				return refuse("forget_limit");
 			const itemIds = new Set<string>();
-			for (const requested of input.itemIds) {
+			for (const requested of input.itemIds)
 				if (!STATE_ID.test(requested)) return refuse("invalid_memory_item");
-				const fact = factOf(db, requested);
-				if (!fact) return refuse("invalid_memory_item");
-				for (const id of fact) itemIds.add(id);
+			expandItems(db, input.itemIds, itemIds, true);
+			// Items and messages pull each other in until nothing more qualifies: the evidence of the items (B1) and the
+			// exchange partners (B3) are blocked, and an item whose evidence is all blocked has nothing left to stand on.
+			let messageIds: string[];
+			for (;;) {
+				messageIds = withPartners(db, [
+					...evidenceMessages(db, itemIds),
+					...input.messageIds,
+				]);
+				const resting = itemsResting(db, new Set(messageIds), itemIds);
+				if (resting.length === 0) break;
+				const before = itemIds.size;
+				expandItems(db, resting, itemIds, false);
+				if (itemIds.size === before) break;
 			}
-			const messageIds = withPartners(db, [
-				...evidenceMessages(db, itemIds),
-				...input.messageIds,
-			]);
 			const forgetId = deps.id();
 			const entry: BlockJournalEntry = {
 				forgetId,
@@ -279,6 +358,7 @@ export function createForget(deps: ForgetDeps) {
 			};
 			onJournaled();
 			appendJournal<BlockJournalEntry>(deps.blockJournalPath, entry);
+			for (const id of messageIds) deps.journalBlocked.add(id);
 			bumpForgetSeq(db);
 			windows.recordImmediateInTransaction(db, "state_forget", null);
 			let completed = true;

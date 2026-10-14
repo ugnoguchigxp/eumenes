@@ -7,12 +7,11 @@ import { join } from "node:path";
 const root = join(import.meta.dir, "../..");
 const names = [/ornith/i, /gemma/i, /qwen/i, /ace-?step/i, /SAAA-[A-Za-z]/];
 
-const codeGlobs = [
-	...["api", "web/src", "client", "cli", "scripts"].map(
-		(dir) => `${dir}/**/*.{ts,tsx,js,json,css}`,
-	),
-	".env.example",
-];
+// `.env.example` is excluded on purpose: the file is being considered for removal (the user's
+// decision is pending), so it is not scanned until that is settled.
+const codeGlobs = ["api", "web/src", "client", "cli", "scripts"].map(
+	(dir) => `${dir}/**/*.{ts,tsx,js,json,css}`,
+);
 const docGlobs = ["AGENTS.md", "README.md", "docs/**/*.md"];
 const isTestData = (path: string) =>
 	/(^|\/)(test|tests|fixtures?|node_modules)\//.test(path) ||

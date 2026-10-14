@@ -28,7 +28,7 @@ export type StateWrite =
 
 /** The State items and the one write of a State version (the building blocks of remember, update and merge). */
 export function createStateWriter(deps: CurationDeps) {
-	const { windows, clock } = deps;
+	const { clock } = deps;
 
 	function items(db: Database, includeInactive: boolean): readonly StateItem[] {
 		const listed = listState(db, {
@@ -125,9 +125,8 @@ export function createStateWriter(deps: CurationDeps) {
 				: {}),
 		});
 		if (result.status === "applied" || result.status === "unchanged") {
-			// A replaced value or a denial overrides what the published long-term layer says: it cannot wait for the next republish.
-			if (result.status === "applied" && (active || w.negated))
-				windows.recordImmediateInTransaction(db, "state_replace", null);
+			// No immediate change: a replaced or negated value is not content that must stop being used (only a stop or a
+			// forget is). A run in flight stays adoptable; the next published window carries the new version.
 			return {
 				ok: true,
 				item: result.item,

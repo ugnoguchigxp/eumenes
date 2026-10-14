@@ -1,6 +1,7 @@
 import { OcrMediaView, OcrPanelView } from "./ocr-components";
 import { ObjectRecognitionWorkspaceView } from "./object-recognition-components";
 import { TerminalWorkspaceView } from "./terminal-components";
+import { KanbanBoardView } from "./kanban-components";
 import { DrawingWorkspaceView } from "./drawing-components";
 import {
 	ImageWorkspaceView,
@@ -65,6 +66,7 @@ const renderers = {
 	"ocr-media": OcrMediaView,
 	"ocr-panel": OcrPanelView,
 	"terminal-workspace": TerminalWorkspaceView,
+	"kanban-board": KanbanBoardView,
 	"drawing-workspace": DrawingWorkspaceView,
 	"image-workspace": ImageWorkspaceView,
 	"image-creation-form": ImageCreationView,

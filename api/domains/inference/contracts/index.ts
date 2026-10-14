@@ -20,14 +20,23 @@ export function controlInstructions(control: ControlContract) {
 			: "\nOUTPUT_SCHEMA=" + JSON.stringify(control.outputSchema))
 	);
 }
-/** The output schema as a JSON Schema object for the providers that enforce it; absent when the contract has none. */
-export function controlJsonSchema(
+/**
+ * Provider options of a control request: JSON-object generation, plus the output schema when the request was
+ * captured with `structuredOutput`. The schema is then enforced as a strict schema (LARM, OpenAI-compatible
+ * cloud) or as the agent SDK's output schema. Other control callers' schemas (`z.toJSONSchema`) are not
+ * strict-compatible, so their requests stay plain JSON-object generation and the host validates the result.
+ */
+export function controlJsonOptions(
 	control: ControlContract | undefined,
-): Record<string, unknown> | undefined {
+	structuredOutput: boolean,
+): { jsonOutput: true; jsonSchema?: Record<string, unknown> } {
 	const schema = control?.outputSchema;
-	return schema && typeof schema === "object" && !Array.isArray(schema)
-		? (schema as Record<string, unknown>)
-		: undefined;
+	return structuredOutput &&
+		schema &&
+		typeof schema === "object" &&
+		!Array.isArray(schema)
+		? { jsonOutput: true, jsonSchema: schema as Record<string, unknown> }
+		: { jsonOutput: true };
 }
 /** One-off voice settings for a sample; never persisted. */
 export type SpeechOverride = Partial<
@@ -57,6 +66,10 @@ export interface BackgroundControl {
 	deadline: number;
 	taskDeadline: number;
 	maxOutputTokens: number;
+	/** `conversation` keeps the saved conversation route; absent means LARM only. */
+	route?: "conversation";
+	/** Enforce the control output schema as a strict provider schema; absent keeps plain JSON-object output. */
+	structuredOutput?: boolean;
 }
 export interface InferencePort {
 	codexResearchAvailable?(): boolean;
@@ -74,6 +87,11 @@ export interface InferencePort {
 			maxOutputTokens: number;
 			engine?: "codex_luna";
 		},
+	): string;
+	/** Authorized user action with its own deadline; the caller validates ownership and settles the result. */
+	captureUserControlInTransaction?(
+		db: Database,
+		input: { subject: string; deadline: number; maxOutputTokens: number },
 	): string;
 	executeControl?(
 		requestId: string,

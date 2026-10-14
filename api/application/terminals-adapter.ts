@@ -8,16 +8,18 @@ export const TERMINALS_ADAPTER_REF = "adapter:terminals@1";
 const SESSIONS = "query:terminals.sessions@1";
 const REQUEST = "claude-code.request";
 const RECEIPT = "domain:claude-code.receipt@1";
-/** Receipts kept for replay and re-reads; sessions themselves live only in this process. */
-const KEPT_RECEIPTS = 200;
+/** The project a conversation's direct request works in (the registry holds one for now). */
+const DEFAULT_PROJECT = "eumenes";
 
+/**
+ * What was handed over, fixed when the request was saved: the receipt's digest is recorded with
+ * the operation, so it carries nothing that changes while the work goes on (that is the request
+ * row's state, read from the table).
+ */
 export const claudeCodeReceipt = z.strictObject({
-	sessionId: z.string(),
-	title: z.string(),
+	attemptId: z.string(),
 	task: z.string(),
-	run: z.number().int(),
-	/** true: Claude Code was (re)started with the request; false: typed into a running session. */
-	started: z.boolean(),
+	target: z.enum(["current", "new"]),
 });
 type ClaudeCodeReceipt = z.infer<typeof claudeCodeReceipt>;
 export const terminalsDomainSchemas = { [RECEIPT]: claudeCodeReceipt };
@@ -40,10 +42,19 @@ export const describeTerminalsAdapter = () => ({
 	availability: "availability:terminals@1",
 });
 
+/** The same operation request id always names the same terminal request. */
+export function attemptIdOf(requestId: string): string {
+	const hex = sha256Hex(`terminal-request:${requestId}`);
+	const variant = "89ab"[Number.parseInt(hex[16]!, 16) % 4]!;
+	return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-${variant}${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+}
+
 export function createTerminalsAdapter(
-	terminals: Pick<TerminalsService, "available" | "list" | "request">,
+	terminals: Pick<
+		TerminalsService,
+		"available" | "list" | "enqueueInTransaction" | "requestInTransaction"
+	>,
 ): DomainAdapter {
-	const receipts = new Map<string, ClaudeCodeReceipt>();
 	function result(
 		receipt: ClaudeCodeReceipt,
 		requestId: string,
@@ -59,16 +70,17 @@ export function createTerminalsAdapter(
 			resultRefs: [
 				{
 					owner: "terminals",
-					kind: "claude-code-session",
-					id: receipt.sessionId,
+					kind: "claude-code-request",
+					id: receipt.attemptId,
 					schemaRef: RECEIPT,
-					revision: receipt.run,
+					revision: 1,
 				},
 			],
 			replay,
-			// Handing over is not completion: Claude Code works on it in the session.
+			// Saving is not completion: Claude Code takes the request when it is free, and the
+			// conversation is told when the work is over.
 			answerContext: {
-				delivered: receipt.started ? "started" : "added_to_running_work",
+				delivered: "queued",
 				task: receipt.task,
 				completed: false,
 				reportedWhenDone: true,
@@ -91,33 +103,62 @@ export function createTerminalsAdapter(
 				})),
 			};
 		},
-		invokeInTransaction(_tx, request) {
+		invokeInTransaction(tx, request) {
 			if (request.operationName !== REQUEST)
 				throw new Error("unsupported_operation");
-			const saved = receipts.get(request.requestId);
-			if (saved) return result(saved, request.requestId, true);
+			const attemptId = attemptIdOf(request.requestId);
+			const saved = terminals.requestInTransaction(tx, attemptId);
+			if (saved)
+				return result(
+					{
+						attemptId,
+						task: saved.task,
+						target: saved.target === "new" ? "new" : "current",
+					},
+					request.requestId,
+					true,
+				);
 			const input = claudeCodeRequest.parse(request.input);
-			const handed = terminals.request({
-				...input,
+			terminals.enqueueInTransaction(tx, {
+				attemptId,
+				owner: "direct",
+				target: input.session === "new" ? "new" : "current",
+				mode: "work",
+				projectId: DEFAULT_PROJECT,
+				prompt: input.prompt,
+				task: input.task,
+				origin:
+					request.origin.kind === "conversation" ? "conversation" : "board",
 				...(request.origin.kind === "conversation"
 					? { conversationId: request.origin.conversationId }
 					: {}),
 			});
-			const receipt = {
-				sessionId: handed.session.id,
-				title: handed.session.title,
-				task: input.task,
-				run: handed.session.run,
-				started: handed.started,
-			};
-			receipts.set(request.requestId, receipt);
-			if (receipts.size > KEPT_RECEIPTS)
-				receipts.delete(receipts.keys().next().value!);
-			return result(receipt, request.requestId, false);
+			return result(
+				{
+					attemptId,
+					task: input.task,
+					target: input.session === "new" ? "new" : "current",
+				},
+				request.requestId,
+				false,
+			);
 		},
-		readInTransaction(_tx, operationId) {
-			const saved = receipts.get(operationId);
-			return saved ? result(saved, operationId, true) : null;
+		readInTransaction(tx, operationId) {
+			const saved = terminals.requestInTransaction(
+				tx,
+				attemptIdOf(operationId),
+			);
+			return saved
+				? result(
+						{
+							attemptId: saved.id,
+							task: saved.task,
+							target: saved.target === "new" ? "new" : "current",
+						},
+						operationId,
+						true,
+					)
+				: null;
 		},
 		sourceInTransaction(_tx, query, targetRef) {
 			if (query !== SESSIONS || targetRef !== undefined) return null;

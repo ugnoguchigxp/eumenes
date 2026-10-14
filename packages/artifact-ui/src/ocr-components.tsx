@@ -21,6 +21,14 @@ export type OcrResource = Omit<
 	| "onConfigure"
 	| "onRecordingChange"
 	| "onThumbnailNeeded"
+	| "onCorrectionStart"
+	| "onCorrectionSelect"
+	| "onCorrectionCancel"
+	| "onCorrectionPrefer"
+	| "onCorrectionOriginal"
+	| "onCorrectionIncorporate"
+	| "onCorrectionMore"
+	| "onCorrectionEvidence"
 	| "message"
 > & { kind: "ocr-workspace"; revision: number };
 function useOcrProps(request: ArtifactRequest): OcrWorkspaceProps {
@@ -88,6 +96,36 @@ function useOcrProps(request: ArtifactRequest): OcrWorkspaceProps {
 				id,
 				frameIndex: frameIndex === undefined ? "" : String(frameIndex),
 				lineIndexes: lineIndexes?.join(",") ?? "",
+			});
+		},
+		onCorrectionStart: (id) => {
+			void action.send("ocr-correction-start", { id });
+		},
+		onCorrectionSelect: (id, candidateId) => {
+			void action.send("ocr-correction-select", { id, candidateId });
+		},
+		onCorrectionCancel: (id, candidateId) => {
+			void action.send("ocr-correction-cancel", { id, candidateId });
+		},
+		onCorrectionPrefer: (id, candidateId) => {
+			void action.send("ocr-correction-prefer", { id, candidateId });
+		},
+		onCorrectionOriginal: (id) => {
+			void action.send("ocr-correction-original", { id });
+		},
+		onCorrectionIncorporate: (id, candidateId) => {
+			void action.send("ocr-correction-incorporate", { id, candidateId });
+		},
+		onCorrectionMore: (id) => {
+			void action.send("ocr-correction-more", { id });
+		},
+		onCorrectionEvidence: (id, candidateId, blockIndex, row, column) => {
+			void action.send("ocr-correction-evidence", {
+				id,
+				candidateId,
+				blockIndex: String(blockIndex),
+				row: row === undefined ? "" : String(row),
+				column: column === undefined ? "" : String(column),
 			});
 		},
 	};

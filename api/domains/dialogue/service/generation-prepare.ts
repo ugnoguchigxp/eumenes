@@ -257,6 +257,12 @@ export function createPrepare(
 									compiled.shownMessageIds,
 								),
 								...(windowIsEmpty(prepared) ? { quiet: true as const } : {}),
+								blockedAtPrepare: [
+									...memory!.blockedMessageIdsInTransaction(
+										tx,
+										compiled.shownMessageIds,
+									),
+								],
 							},
 						}
 					: {}),

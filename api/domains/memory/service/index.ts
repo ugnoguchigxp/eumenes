@@ -33,6 +33,7 @@ import {
 	deleteTendenciesByEvidence,
 	getUsage,
 	insertUsage,
+	isBlockApplied,
 	provenanceOf,
 	pruneUsage,
 	readSettings,
@@ -208,18 +209,17 @@ export function createMemoryService(
 		);
 		if (fullBytes > SHORT_TERM_BYTES) reject("invalid_continuity_limit");
 	});
-	// The user closing an item takes effect for runs in flight; additions do not (they reach the short-term layer).
-	continuity.setUserChangeHook((db) =>
-		windows.recordImmediateInTransaction(db, "continuity_close", null),
-	);
 
 	conversation.setRetractHook(dropVectorsOnRetract(conversation));
 
+	/** The block journal's message ids: hidden from the history even while the database does not know them (memory unhealthy). */
+	const journalBlocked = new Set<string>();
 	const ledger = createLedger({
 		store,
 		conversation,
 		clock,
 		active: (db) => healthy && readSettings(db).enabled,
+		journalBlocked,
 	});
 	const curation = createCuration({
 		conversation,
@@ -236,6 +236,7 @@ export function createMemoryService(
 	const forgetter = createForget({
 		journalPath: options.journalPath,
 		blockJournalPath,
+		journalBlocked,
 		access,
 		atMs,
 		clock,
@@ -257,7 +258,15 @@ export function createMemoryService(
 		conversation,
 		atMs,
 		embed: options.embed,
-		recall: (db, input) => recallTurns(db, conversation, input),
+		// The next prompt shows these verbatim: a prefetch must not repeat them.
+		recall: (db, input) =>
+			recallTurns(db, conversation, {
+				...input,
+				excludeMessageIds: [
+					...(input.excludeMessageIds ?? []),
+					...verbatimMessageIds(db, input.conversationId),
+				],
+			}),
 	});
 
 	function setEnabledInTransaction(
@@ -274,6 +283,22 @@ export function createMemoryService(
 		return { enabled, healthy };
 	}
 
+	/**
+	 * The block journal's lines, and its message ids kept in process for the history to hide (also while memory is
+	 * unhealthy). null when the journal cannot be read; the ids held so far then stay.
+	 */
+	function readBlockJournal(): BlockJournalEntry[] | null {
+		try {
+			const lines = readJournal<BlockJournalEntry>(blockJournalPath);
+			journalBlocked.clear();
+			for (const line of lines)
+				for (const id of line.messageIds) journalBlocked.add(id);
+			return lines;
+		} catch {
+			return null;
+		}
+	}
+
 	async function recover(): Promise<{
 		healthy: boolean;
 		reapplied: number;
@@ -288,6 +313,8 @@ export function createMemoryService(
 		};
 		try {
 			return await store.write((db) => {
+				// First of all, whatever else fails: the history must hide what the journal says is forgotten.
+				const blocks = readBlockJournal();
 				try {
 					// A newer or tampered schema disables memory instead of being read.
 					assertMemorySchema(db);
@@ -295,17 +322,12 @@ export function createMemoryService(
 					return fail("schema_mismatch");
 				}
 				let entries: ForgetJournalEntry[];
-				let blocks: BlockJournalEntry[];
 				try {
 					entries = readJournal(options.journalPath);
 				} catch {
 					return fail("journal_unreadable");
 				}
-				try {
-					blocks = readJournal<BlockJournalEntry>(blockJournalPath);
-				} catch {
-					return fail("block_journal_unreadable");
-				}
+				if (blocks === null) return fail("block_journal_unreadable");
 				if (verifyForgetJournal(entries).status !== "ok")
 					return fail("journal_chain_broken");
 				const result = reconcileForgetJournal(db, {
@@ -354,8 +376,12 @@ export function createMemoryService(
 				// The same holds for tendencies derived from a re-applied forget's items.
 				if (deleteTendenciesByEvidence(db, "state", forgottenIds) > 0)
 					republish = true;
-				// Section 6.2 step 4 again for every intent: blocks, notes, vectors, summaries, steward data.
-				for (const line of blocks)
+				// Section 6.2 step 4 again for the intents whose purge this database has not recorded (a restored
+				// older database has lost the marks, so it is run again for all of them).
+				let appliedAny = false;
+				for (const line of blocks) {
+					if (isBlockApplied(db, line.forgetId)) continue;
+					appliedAny = true;
 					if (
 						forgetter.purgeDerivedInTransaction(db, {
 							forgetId: line.forgetId,
@@ -365,8 +391,10 @@ export function createMemoryService(
 						})
 					)
 						republish = true;
-				// Units that started before this reconciliation must not be adopted.
-				bumpForgetSeq(db);
+				}
+				// Units that started before something was (re)applied must not be adopted; a plain restart changes nothing.
+				if (result.reapplied > 0 || completedIntents > 0 || appliedAny)
+					bumpForgetSeq(db);
 				if (republish) {
 					windows.recordImmediateInTransaction(db, "state_forget", null);
 					windows.purgeInTransaction(db);
@@ -386,6 +414,7 @@ export function createMemoryService(
 				};
 			});
 		} catch {
+			readBlockJournal();
 			return fail("recover_failed");
 		}
 	}

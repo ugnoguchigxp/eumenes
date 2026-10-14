@@ -10,6 +10,14 @@ CREATE INDEX ocr_owner ON ocr_inputs(owner,conversation_id);
 CREATE TABLE ocr_commands(request_id TEXT PRIMARY KEY,owner TEXT NOT NULL,conversation_id TEXT NOT NULL,operation TEXT NOT NULL,target_id TEXT,result_json TEXT NOT NULL);
 `,
 	},
+	{
+		id: "ocr/0002-corrections",
+		after: ["ocr/0001-init"],
+		sql: `CREATE TABLE ocr_corrections(id TEXT PRIMARY KEY,source_id TEXT NOT NULL REFERENCES ocr_inputs(id) ON DELETE CASCADE,owner TEXT NOT NULL,conversation_id TEXT NOT NULL,frame_key INTEGER NOT NULL,source_revision INTEGER NOT NULL,source_digest TEXT NOT NULL,record_json TEXT NOT NULL,bindings_json TEXT NOT NULL,job_id TEXT,inference_request_id TEXT);
+CREATE INDEX ocr_corrections_source ON ocr_corrections(source_id,frame_key,id);
+CREATE UNIQUE INDEX ocr_corrections_active ON ocr_corrections(source_id,frame_key) WHERE json_extract(record_json,'$.state') IN ('queued','running','cancelling');
+CREATE TABLE ocr_correction_preference(source_id TEXT NOT NULL REFERENCES ocr_inputs(id) ON DELETE CASCADE,frame_key INTEGER NOT NULL,preferred_id TEXT,revision INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(source_id,frame_key));`,
+	},
 ];
 export type Row = {
 	id: string;

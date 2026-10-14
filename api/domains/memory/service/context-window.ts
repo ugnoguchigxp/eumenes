@@ -29,9 +29,7 @@ export type ImmediateKind =
 	| "state_stop"
 	| "state_retract"
 	| "state_forget"
-	| "state_replace"
 	| "settings"
-	| "continuity_close"
 	| "tendency_delete";
 
 /** The versions of everything a window was built from. */
@@ -98,6 +96,49 @@ function latestStateChange(db: Database, policyRevision: string): number {
 	return changes.seq;
 }
 
+/** The current, valid State of the profile as long-term lines, and the next time validity changes. */
+function currentState(db: Database, policyRevision: string, nowMs: number) {
+	const listed = listState(db, {
+		contractVersion: CONTRACT_VERSION,
+		access: {
+			principal: PRINCIPAL,
+			scopeKeys: [PROFILE_SCOPE],
+			purpose: "dialogue.read",
+			policyRevision,
+		},
+		scopeKey: PROFILE_SCOPE,
+	});
+	if (listed.status !== "ok") throw new Error("memory_blocked");
+	let nextBoundaryMs: number | null = null;
+	for (const item of listed.items)
+		for (const at of [item.validFromMs, item.validUntilMs])
+			if (
+				at !== null &&
+				at > nowMs &&
+				(nextBoundaryMs === null || at < nextBoundaryMs)
+			)
+				nextBoundaryMs = at;
+	const lines = listed.items
+		.filter((item) => {
+			if (item.subject !== "self") return false;
+			const validity = classifyValidity(
+				periodFromStateMs(item.validFromMs, item.validUntilMs),
+				nowMs,
+			);
+			return validity === "current" || validity === "unknown";
+		})
+		.map((item): StateLine => ({
+			itemId: item.itemId,
+			revision: item.revision,
+			kind: item.kind,
+			text: item.value.text,
+			negated: item.value.polarity === "negated",
+			period: formatPeriod(item),
+			order: item.updatedSeq,
+		}));
+	return { lines, nextBoundaryMs };
+}
+
 export function createContextWindowStore(deps: {
 	continuity: ContinuityService;
 	clock: () => string;
@@ -139,48 +180,6 @@ export function createContextWindowStore(deps: {
 		if (!parsed.history) return null;
 		cache.set(conversationId, parsed);
 		return parsed;
-	}
-
-	function currentState(db: Database, policyRevision: string, nowMs: number) {
-		const listed = listState(db, {
-			contractVersion: CONTRACT_VERSION,
-			access: {
-				principal: PRINCIPAL,
-				scopeKeys: [PROFILE_SCOPE],
-				purpose: "dialogue.read",
-				policyRevision,
-			},
-			scopeKey: PROFILE_SCOPE,
-		});
-		if (listed.status !== "ok") throw new Error("memory_blocked");
-		let nextBoundaryMs: number | null = null;
-		for (const item of listed.items)
-			for (const at of [item.validFromMs, item.validUntilMs])
-				if (
-					at !== null &&
-					at > nowMs &&
-					(nextBoundaryMs === null || at < nextBoundaryMs)
-				)
-					nextBoundaryMs = at;
-		const lines = listed.items
-			.filter((item) => {
-				if (item.subject !== "self") return false;
-				const validity = classifyValidity(
-					periodFromStateMs(item.validFromMs, item.validUntilMs),
-					nowMs,
-				);
-				return validity === "current" || validity === "unknown";
-			})
-			.map((item): StateLine => ({
-				itemId: item.itemId,
-				revision: item.revision,
-				kind: item.kind,
-				text: item.value.text,
-				negated: item.value.polarity === "negated",
-				period: formatPeriod(item),
-				order: item.updatedSeq,
-			}));
-		return { lines, nextBoundaryMs };
 	}
 
 	function rebuildInTransaction(
