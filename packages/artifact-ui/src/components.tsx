@@ -54,8 +54,8 @@ export function useAction(request: ArtifactRequest) {
 	async function send(
 		action: ArtifactEvent["action"],
 		values: ArtifactEvent["values"],
-	) {
-		if (lock.current) return;
+	): Promise<boolean> {
+		if (lock.current) return false;
 		lock.current = true;
 		setPending(true);
 		try {
@@ -67,6 +67,7 @@ export function useAction(request: ArtifactRequest) {
 				values,
 			});
 			setLast({ receipt, ...here });
+			return receipt.status === "accepted";
 		} catch {
 			setLast({
 				receipt: {
@@ -75,6 +76,7 @@ export function useAction(request: ArtifactRequest) {
 				},
 				...here,
 			});
+			return false;
 		} finally {
 			lock.current = false;
 			setPending(false);

@@ -6,7 +6,6 @@ import { ErrorBoundary } from "../components/ErrorBoundary";
 import { ArtifactLauncher } from "../components/domains/artifact/ArtifactLauncher";
 import { ResizableWorkspace } from "../components/domains/artifact/ResizableWorkspace";
 import { TimerNotifications } from "../components/domains/timers/TimerNotifications";
-import { Subtitle } from "../components/domains/subtitle/Subtitle";
 import { invalidateAllButLive } from "../queryKeys";
 import { SettingsContent } from "./SettingsContent";
 import { WorkspaceArtifacts } from "./WorkspaceArtifacts";
@@ -38,7 +37,6 @@ function WorkspaceContent({
 		settings,
 		activeRun,
 		replay,
-		phase,
 		onDirty,
 		cache,
 		artifacts,
@@ -123,19 +121,6 @@ function WorkspaceContent({
 					/>
 				</ErrorBoundary>
 			)}
-			{settings.data?.general.subtitles.enabled &&
-				!settingsOpen &&
-				(replay.subtitle ?? (phase === "playing" ? voice.subtitle : null)) && (
-					<Subtitle
-						text={
-							replay.subtitle ??
-							(phase === "playing" ? voice.subtitle : null) ??
-							""
-						}
-						style={settings.data.general.subtitles.style}
-						size={settings.data.general.subtitles.size}
-					/>
-				)}
 			<ResizableWorkspace
 				hidden={settingsOpen}
 				artifact={

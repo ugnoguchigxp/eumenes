@@ -1,20 +1,16 @@
 import type { ArtifactEvent, Receipt } from "@eumenes/artifact-ui";
 import { useQueryClient } from "@tanstack/react-query";
-import { useMemo } from "react";
 import type { ActionBindingV1 } from "../../../../api/domains/capabilities/contracts";
 import { invalidateAllButLive, queryRoots } from "../../queryKeys";
 import { useSettings } from "../settings";
-import {
-	dirtyEntries,
-	type RegisteredField,
-} from "../toolchain-artifacts/documents";
+import { dirtyEntries } from "../toolchain-artifacts/documents";
 import type { DraftView } from "../toolchain-artifacts/drafts";
 import type {
 	AdapterHostContext,
 	AdapterState,
 	WebArtifactAdapter,
 } from "../toolchain-artifacts/registry";
-import { createAccess, createRuleOf, isResourceTarget } from "./settings-rules";
+import { createAccess, createRuleOf, isSpeechTarget } from "./settings-rules";
 import {
 	applyDraft,
 	buildActions,
@@ -23,7 +19,7 @@ import {
 	groupsFor,
 	settingsMessages,
 } from "./settings-screens";
-import { useFieldOptions, useTtsTargets } from "./settings-sources";
+import { useFieldOptions, useTargets } from "./settings-sources";
 import { useVoiceTools } from "./useVoiceTools";
 
 export const SETTINGS_ADAPTER_REF = "adapter:settings@1";
@@ -32,6 +28,7 @@ export const SETTINGS_DOCUMENT = "document:settings@1";
 const emptyView: DraftView = {
 	version: 0,
 	entries: [],
+	structural: [],
 	secrets: [],
 	busy: false,
 	message: "",
@@ -51,15 +48,14 @@ function useSettingsArtifact(context: AdapterHostContext): AdapterState {
 	const saved = query.data;
 	const view = drafts[SETTINGS_DOCUMENT] ?? emptyView;
 	const all = documentFields[SETTINGS_DOCUMENT] ?? [];
-	const own = useMemo(
-		() =>
-			(artifact.fields ?? []).filter((f) => f.document === SETTINGS_DOCUMENT),
-		[artifact],
+	// The fields this screen registered (with their owner's context), in registration order.
+	const own = all.filter(
+		(f) => f.artifactRevisionId === context.artifactRevisionId,
 	);
 	const effective = saved ? applyDraft(saved, view.entries, all) : undefined;
 
 	const speechActive = own.some(
-		(f) => f.path.startsWith("$.larm.") || isResourceTarget(f),
+		(f) => f.path.startsWith("$.larm.") || isSpeechTarget(f),
 	);
 	// A review of a pending voice change needs the catalog to name the values it compares.
 	const voiceDraft = view.entries.some((entry) =>
@@ -67,7 +63,7 @@ function useSettingsArtifact(context: AdapterHostContext): AdapterState {
 			(f) => f.fieldId === entry.fieldId && f.path.startsWith("$.larm."),
 		),
 	);
-	const { targetData, targets } = useTtsTargets(client, all, saved);
+	const { targetData, targetsOf } = useTargets(client, all, saved);
 	const voice = useVoiceTools({
 		client,
 		saved,
@@ -85,15 +81,18 @@ function useSettingsArtifact(context: AdapterHostContext): AdapterState {
 	});
 	const fetchedOptions = useFieldOptions(client, all);
 	const ruleOf = createRuleOf({ effective, voice, fetchedOptions });
-	const access = createAccess({ saved, effective, voice, targets, ruleOf });
+	const access = createAccess({ saved, effective, voice, targetsOf, ruleOf });
 
 	const dirty =
-		dirtyEntries(view, all, access).length > 0 || view.secrets.length > 0;
+		dirtyEntries(view, all, access).length > 0 ||
+		view.structural.length > 0 ||
+		view.secrets.length > 0;
 	// The saved revision and the draft version never collide as one number.
 	const revision = access.revision * 1_000_000 + view.version;
-	const inputs = buildInputs({
+	const { inputs, targetGroups } = buildInputs({
 		effective,
-		own: own as RegisteredField[],
+		view,
+		own,
 		access,
 		ruleOf,
 		voice,
@@ -106,11 +105,11 @@ function useSettingsArtifact(context: AdapterHostContext): AdapterState {
 		bindings: artifact.actionBindings,
 		voice,
 	});
-	const groups = groupsFor(inputs, effective, voice, saved);
+	const groups = groupsFor(inputs, effective, voice, saved, targetGroups);
 	const snapshot = buildSnapshot({
 		effective,
 		artifact,
-		own: own as RegisteredField[],
+		own,
 		all,
 		access,
 		view,

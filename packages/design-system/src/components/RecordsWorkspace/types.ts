@@ -18,7 +18,7 @@ export type SavedProcedure = {
 export type RecordsTab = {
 	id: string;
 	label: string;
-	description: string;
+	description?: string;
 	rows: RecordRow[];
 	loading?: boolean;
 	error?: string;
@@ -31,6 +31,7 @@ export type RecordsTab = {
 };
 export type RecordsWorkspaceProps = {
 	title?: string;
+	compact?: boolean;
 	tabs: RecordsTab[];
 	busy?: boolean;
 	message?: string;

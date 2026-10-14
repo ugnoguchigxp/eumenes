@@ -1,5 +1,5 @@
-import type { JsonValue } from "../toolchain-artifacts/drafts";
-import type { FieldChange } from "../toolchain-artifacts/drafts";
+import type { JsonValue } from "./drafts";
+import type { FieldChange } from "./drafts";
 
 /**
  * The fixed document paths a registered field names: `$.a.b`, or an array element chosen by its

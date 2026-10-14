@@ -15,6 +15,8 @@ import type {
 import type { EumenesClient } from "../../../../client";
 import { queryRoots } from "../../queryKeys";
 import { useActionWiring } from "./action-wiring";
+import { useCollectionActions } from "./collection-actions";
+import { useCollections } from "./use-collections";
 import type { ActionOutcome } from "./dispatcher";
 import { useDraftActions } from "./draft-actions";
 import {
@@ -26,6 +28,7 @@ import { toolchainArtifactsQuery } from "./launcher";
 import { receiptOf } from "./messages";
 import { navigationDestination } from "./navigation";
 import { useAnswer, useOpenQuestion } from "./questions";
+import { SecretNotice, useSecretNotice } from "./secret-notice";
 import type {
 	AdapterState,
 	WebAdapterRegistry,
@@ -107,10 +110,8 @@ export function ToolchainArtifactHost(props: ToolchainArtifactHostProps) {
 		);
 	const adapterRef = detail.data.artifact.sourceBindings[0]?.adapterRef;
 	const adapter = adapterRef ? props.adapters.get(adapterRef) : undefined;
-	if (
-		!adapter ||
-		detail.data.artifact.sourceBindings.some((s) => s.adapterRef !== adapterRef)
-	)
+	// The first source's adapter drives the screen; sources of other adapters are only read.
+	if (!adapter)
 		return <Message alert>この画面はこのアプリでは表示できません。</Message>;
 	return (
 		<AdapterScreen
@@ -161,7 +162,8 @@ function AdapterScreen({
 		ready: documentFieldsReady,
 	} = useDocumentFields(client, artifact, artifactRevisionId, catalog);
 	const drafts = useDraftViews(client.identity, documents);
-	const state: AdapterState = adapter.useArtifact({
+	const collections = useCollections(client, artifact, artifactRevisionId);
+	const own: AdapterState = adapter.useArtifact({
 		client,
 		artifact,
 		artifactRevisionId,
@@ -173,11 +175,28 @@ function AdapterScreen({
 		documentFieldsReady,
 		drafts,
 	});
+	// A change to the saved data (a settled write, a conflict) reads the lists again too.
+	const reload = collections.reload;
+	const state: AdapterState = {
+		...own,
+		settled: async (...args) => {
+			await own.settled(...args);
+			reload();
+		},
+		refresh: () => {
+			own.refresh();
+			reload();
+		},
+	};
+	const withLists = useMemo<Snapshot>(
+		() => ({ ...own.snapshot, ...collections.resources }),
+		[own.snapshot, collections.resources],
+	);
 	const snapshot = useMemo<Snapshot>(
 		() =>
 			questionSource && question
 				? {
-						...state.snapshot,
+						...withLists,
 						[questionSource]: {
 							kind: "question",
 							revision: question.revision,
@@ -190,8 +209,8 @@ function AdapterScreen({
 							},
 						},
 					}
-				: state.snapshot,
-		[state.snapshot, questionSource, question],
+				: withLists,
+		[withLists, questionSource, question],
 	);
 	const latest = useRef({
 		state,
@@ -213,6 +232,16 @@ function AdapterScreen({
 			getLatest,
 		});
 	const answer = useAnswer(client, getLatest);
+	const { token: secretToken, reveal, close: closeSecret } = useSecretNotice();
+	const collectionEvent = useCollectionActions({
+		client,
+		artifact,
+		collections,
+		getLatest,
+		dispatcherRef,
+		describe,
+		reveal,
+	});
 	const { draftAction, applyDraft } = useDraftActions({
 		client,
 		artifact,
@@ -224,6 +253,8 @@ function AdapterScreen({
 	const dispatch = useCallback(
 		async (event: ArtifactEvent): Promise<Receipt> => {
 			const { state: s, snapshot: shown } = latest.current;
+			const collection = collectionEvent(event);
+			if (collection) return collection;
 			const binding = findActionBinding(artifact.actionBindings, event);
 			if (!binding)
 				return (
@@ -260,8 +291,10 @@ function AdapterScreen({
 				targetRef: s.targetOf(binding.source),
 				input: event.values,
 			});
-			if (outcome.kind === "accepted" && outcome.result)
+			if (outcome.kind === "accepted" && outcome.result) {
 				s.settled(binding, outcome.result, timing, event.values);
+				reveal(outcome.result.receipt);
+			}
 			if (outcome.kind === "rejected" && outcome.conflict) s.refresh();
 			return receiptOf(outcome, describe);
 		},
@@ -273,6 +306,8 @@ function AdapterScreen({
 			applyDraft,
 			onNavigate,
 			dispatcherRef,
+			collectionEvent,
+			reveal,
 		],
 	);
 
@@ -296,6 +331,7 @@ function AdapterScreen({
 	);
 	return (
 		<div className="toolchain-artifact">
+			<SecretNotice token={secretToken} onClose={closeSecret} />
 			{notice && (
 				<output className="toolchain-artifact-notice" aria-live="polite">
 					<span>{notice}</span>

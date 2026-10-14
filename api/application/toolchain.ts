@@ -21,6 +21,24 @@ import {
 	type SettingsAdapterPorts,
 } from "./settings-adapter";
 import { createRecordsAdapter, type RecordsPorts } from "./records-adapter";
+import { createDotsAdapter, type DotsAdapterPorts } from "./dots-adapter";
+import { createMemoryAdapter, type MemoryAdapterPorts } from "./memory-adapter";
+import {
+	createWorldAdapter,
+	type WorldAdapterPortsLookup,
+} from "./world-adapter";
+import {
+	createServiceTestsAdapter,
+	type ServiceTestsPorts,
+} from "./service-tests-adapter";
+import {
+	createTtsDictionaryAdapter,
+	type TtsDictionaryPorts,
+} from "./tts-dictionary-adapter";
+import {
+	createInferenceAdapter,
+	type InferenceAdapterPorts,
+} from "./inference-adapter";
 import {
 	bundleHostOf,
 	createRegistryActions,
@@ -53,6 +71,18 @@ export async function createToolchain(
 		settings?: SettingsAdapterPorts;
 		/** Domain readers for the data-driven records screen (absent: no records adapter). */
 		records?: Omit<RecordsPorts, "history">;
+		/** Inference service for the data-driven connection checks (needs `settings` too). */
+		inference?: InferenceAdapterPorts;
+		/** The reading dictionary for the data-driven 読み方辞書 screen (absent: not offered). */
+		ttsDictionary?: TtsDictionaryPorts;
+		/** The 記憶 screen (memory and continuity services). */
+		memory?: MemoryAdapterPorts;
+		/** The World screen; the lookup returns undefined while World is OFF. */
+		world?: WorldAdapterPortsLookup;
+		/** The 動作確認 screen. */
+		serviceTests?: ServiceTestsPorts;
+		/** The 外部作業 screen (dots configuration and events; packages come from capabilities). */
+		dotsScreen?: Omit<DotsAdapterPorts, "packages">;
 		/** Key for HMAC digests of secret-bearing UI actions (absent: such actions are refused). */
 		secretKey?: () => Uint8Array | undefined;
 		/** Open toolchain interactions for the timer question source (dialogue, created later). */
@@ -79,6 +109,31 @@ export async function createToolchain(
 			: []),
 		...(options.records
 			? [createRecordsAdapter({ ...options.records, history: () => history })]
+			: []),
+		...(options.inference && options.settings
+			? [createInferenceAdapter(options.inference, options.settings)]
+			: []),
+		...(options.ttsDictionary
+			? [createTtsDictionaryAdapter(options.ttsDictionary)]
+			: []),
+		...(options.memory ? [createMemoryAdapter(options.memory)] : []),
+		...(options.world ? [createWorldAdapter(options.world)] : []),
+		...(options.serviceTests
+			? [createServiceTestsAdapter(options.serviceTests)]
+			: []),
+		...(options.dots && options.dotsScreen
+			? [
+					createDotsAdapter({
+						...options.dotsScreen,
+						// Capabilities is created below; the adapter only calls it during operations.
+						packages: {
+							listDotsPackagesInTransaction: (db) =>
+								capabilities.listDotsPackagesInTransaction(db),
+							putDotsPackageInTransaction: (db, raw) =>
+								capabilities.putDotsPackageInTransaction(db, raw),
+						},
+					}),
+				]
 			: []),
 	]);
 	const capabilities = createCapabilities(

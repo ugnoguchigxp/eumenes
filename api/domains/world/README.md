@@ -228,6 +228,12 @@ never by a body or a query string.
 - A forget that stops while advancing is still accepted (the intake is durable) and shown as
   pending; the host's pass resumes it. While a forget is unfinished the Scope gate is closed, so
   the list answers `not_found` and the screen explains that from the forget list.
+- `correctInTransaction`, `retractInTransaction` and `forgetInTransaction` (`service/world-claims-changes.ts`)
+  run the same changes inside a writer transaction the caller owns (the UI action ledger's
+  `adapter:world@1`). They answer a `ClaimResult` and leave nothing behind on a refusal (own
+  savepoint). The forget variant writes only the durable intake (`lifecycle.acceptForgetInTransaction`);
+  the caller advances it after its commit (`lifecycle.resumeForget`), so `accepted` is never
+  `complete`. `forgetStatusInTransaction(db, ctx, requestId)` reads how far that forget got.
 - No graph, no edge editing, and the screen is a settings page: it is not read aloud.
 - Known limits: correction and retraction need a confirmed message of the person as the reason
   (the screen offers the latest 20 of the main conversation); a relation claim cannot be

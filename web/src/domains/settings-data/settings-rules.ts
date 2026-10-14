@@ -7,16 +7,19 @@ import type {
 } from "../toolchain-artifacts/documents";
 import type { FieldChange } from "../toolchain-artifacts/drafts";
 import { settingsConditions } from "./conditions";
-import { readPath } from "./paths";
+import { readPath } from "../toolchain-artifacts/paths";
 import type { VoiceTools } from "./useVoiceTools";
 
 /**
- * A field applied to one cloud TTS model: its path selects `$.resources[id=$target]`. The
- * targets are the saved resources whose purpose is "tts" (the `query:settings.tts-resources@1`
- * source lists the same set); the path, not a source name, tells the screens apart.
+ * A speech field of one cloud TTS model (`$.resources[id=$target].voice` or `.speed`): only the
+ * speech target being adjusted shows its fields. Other per-target fields show every target.
  */
-export function isResourceTarget(field: { path: string; target?: string }) {
-	return !!field.target && field.path.startsWith("$.resources[id=$target].");
+export function isSpeechTarget(field: { path: string; target?: string }) {
+	return (
+		!!field.target &&
+		(field.path === "$.resources[id=$target].voice" ||
+			field.path === "$.resources[id=$target].speed")
+	);
 }
 
 /** The registered fixed choices (the "default" entry), or a stand-in when none are registered. */
@@ -52,10 +55,10 @@ export function createRuleOf({
 		target?: string,
 	): FieldRule | null => {
 		if (!effective) return null;
-		if (isResourceTarget(field) && voice.target !== target) return null;
+		if (isSpeechTarget(field) && voice.target !== target) return null;
 		if (
 			field.visibleWhen &&
-			!settingsConditions[field.visibleWhen]?.({ effective, voice })
+			!settingsConditions[field.visibleWhen]?.({ effective, voice, target })
 		)
 			return null;
 		const rule: FieldRule = {
@@ -148,13 +151,15 @@ export function createAccess({
 	saved,
 	effective,
 	voice,
-	targets,
+	targetsOf,
 	ruleOf,
 }: {
 	saved: Settings | undefined;
 	effective: Settings | undefined;
 	voice: VoiceTools;
-	targets: ReadonlyArray<{ id: string; label: string }>;
+	targetsOf: (
+		field: RegisteredField,
+	) => ReadonlyArray<{ id: string; label: string }>;
 	ruleOf: (field: RegisteredField, target?: string) => FieldRule | null;
 }): DocumentAccess {
 	const access: DocumentAccess = {
@@ -163,7 +168,26 @@ export function createAccess({
 		read: (field, target) =>
 			saved ? readPath(saved, field.path, target) : undefined,
 		rule: (field, target) => ruleOf(field as RegisteredField, target),
-		targets: (field) => (isResourceTarget(field) ? targets : []),
+		targets: (field) => targetsOf(field as RegisteredField),
+		confirmations(dirty) {
+			// Credentials go to the new origin: the user confirms it, as the legacy page did.
+			const origin = (url: string | null | undefined) =>
+				url && URL.canParse(url) ? new URL(url).origin : null;
+			const changed = dirty.some((d) => d.field?.path === "$.larm.baseUrl");
+			const before = origin(saved?.larm.baseUrl);
+			const after = origin(effective?.larm.baseUrl);
+			return changed && before && after && before !== after
+				? [
+						{
+							structure: "structure:settings.confirm-larm-origin@1",
+							input: { origin: after },
+							prompt: `LARM の接続先を ${after} に変更します。LARM の認証情報はこの接続先へ送られます。変更しますか？`,
+							declined:
+								"LARMの接続先の変更を確認しなかったため適用していません。",
+						},
+					]
+				: [];
+		},
 		derive(field, _target, change) {
 			if (field.path !== "$.larm.voice" || "unset" in change) return [];
 			const id = String(change.value);

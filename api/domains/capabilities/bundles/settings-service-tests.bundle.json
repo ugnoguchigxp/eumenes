@@ -1,0 +1,489 @@
+{
+	"formatVersion": 1,
+	"bundleId": "settings-service-tests",
+	"pins": [],
+	"definitions": [],
+	"bindings": [],
+	"artifacts": [
+		{
+			"kind": "artifact",
+			"id": "settings.service-tests",
+			"revision": 1,
+			"title": "動作確認",
+			"variants": [
+				{
+					"id": "standard",
+					"label": "標準",
+					"definition": {
+						"view": "layout",
+						"direction": "stack",
+						"title": "動作確認",
+						"children": [
+							{
+								"view": "collection-workspace",
+								"source": "service-tests-status",
+								"title": "サービスの一覧"
+							},
+							{
+								"view": "collection-workspace",
+								"source": "service-tests-catalog",
+								"title": "試せるサービス"
+							},
+							{
+								"view": "collection-workspace",
+								"source": "service-tests-runs",
+								"title": "確認の履歴"
+							},
+							{
+								"view": "collection-workspace",
+								"source": "service-tests-health",
+								"title": "Healthの結果"
+							}
+						]
+					}
+				}
+			],
+			"defaultVariant": "standard",
+			"sourceBindings": [
+				{
+					"source": "service-tests-status",
+					"adapterRef": "adapter:service-tests@1",
+					"query": "query:service-tests.status@1",
+					"target": "none"
+				},
+				{
+					"source": "service-tests-catalog",
+					"adapterRef": "adapter:service-tests@1",
+					"query": "query:service-tests.catalog@1",
+					"target": "none"
+				},
+				{
+					"source": "service-tests-runs",
+					"adapterRef": "adapter:service-tests@1",
+					"query": "query:service-tests.runs@1",
+					"target": "none"
+				},
+				{
+					"source": "service-tests-health",
+					"adapterRef": "adapter:service-tests@1",
+					"query": "query:service-tests.health@1",
+					"target": "none"
+				},
+				{
+					"source": "service-tests-targets",
+					"adapterRef": "adapter:service-tests@1",
+					"query": "query:service-tests.targets@1",
+					"target": "none"
+				}
+			],
+			"actionBindings": [
+				{
+					"actionId": "refresh",
+					"eventAction": "collection-refresh",
+					"source": "service-tests-status",
+					"operationId": "service-tests.refresh",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "write",
+					"label": "一覧を更新",
+					"rowInput": {}
+				},
+				{
+					"actionId": "diagnose",
+					"eventAction": "collection-diagnose",
+					"source": "service-tests-status",
+					"operationId": "service-tests.diagnose",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "write",
+					"label": "Healthを確認",
+					"rowInput": {}
+				},
+				{
+					"actionId": "start",
+					"eventAction": "collection-start",
+					"source": "service-tests-catalog",
+					"operationId": "service-tests.start",
+					"inputSchemaRef": "schema:service-tests-start@1",
+					"effect": "write",
+					"label": "試す",
+					"rowInput": {
+						"targetId": "$row.id",
+						"revision": "$row.revision"
+					}
+				},
+				{
+					"actionId": "start-custom",
+					"eventAction": "collection-start-custom",
+					"source": "service-tests-catalog",
+					"operationId": "service-tests.start",
+					"inputSchemaRef": "schema:service-tests-start@1",
+					"effect": "write",
+					"label": "条件を指定して試す"
+				},
+				{
+					"actionId": "cancel",
+					"eventAction": "collection-cancel",
+					"source": "service-tests-runs",
+					"operationId": "service-tests.cancel",
+					"inputSchemaRef": "schema:service-tests-run@1",
+					"effect": "write",
+					"label": "中止",
+					"rowInput": {
+						"runId": "$row.id"
+					}
+				},
+				{
+					"actionId": "retry-artifact",
+					"eventAction": "collection-retry-artifact",
+					"source": "service-tests-runs",
+					"operationId": "service-tests.retry-artifact",
+					"inputSchemaRef": "schema:service-tests-run@1",
+					"effect": "write",
+					"label": "結果を再取得",
+					"rowInput": {
+						"runId": "$row.id"
+					}
+				}
+			],
+			"launcher": {
+				"label": "動作確認",
+				"group": "管理と確認",
+				"order": 70,
+				"description": "サービスの一覧 試用 Health確認"
+			},
+			"collections": [
+				{
+					"source": "service-tests-status",
+					"title": "サービスの一覧",
+					"rowKey": "id",
+					"columns": [
+						{
+							"key": "state",
+							"label": "一覧の状態"
+						},
+						{
+							"key": "discoveredAt",
+							"label": "最終確認",
+							"format": "date"
+						},
+						{
+							"key": "targetCount",
+							"label": "サービス数",
+							"format": "number"
+						},
+						{
+							"key": "control",
+							"label": "LARM制御APIのHealth"
+						},
+						{
+							"key": "refresh",
+							"label": "更新"
+						},
+						{
+							"key": "errors",
+							"label": "エラー"
+						}
+					],
+					"rowActions": [
+						{
+							"actionId": "refresh"
+						},
+						{
+							"actionId": "diagnose",
+							"confirm": "全サービスのHealthを確認します。時間がかかることがあります。"
+						}
+					],
+					"refreshWhile": {
+						"key": "busy",
+						"in": [true]
+					}
+				},
+				{
+					"source": "service-tests-catalog",
+					"title": "試せるサービス",
+					"rowKey": "id",
+					"columns": [
+						{
+							"key": "name",
+							"label": "サービス"
+						},
+						{
+							"key": "model",
+							"label": "モデル"
+						},
+						{
+							"key": "kind",
+							"label": "種類"
+						},
+						{
+							"key": "source",
+							"label": "接続先"
+						},
+						{
+							"key": "start",
+							"label": "起動"
+						},
+						{
+							"key": "state",
+							"label": "試用"
+						}
+					],
+					"rowActions": [
+						{
+							"actionId": "start",
+							"when": {
+								"key": "testable",
+								"in": [true]
+							}
+						}
+					],
+					"create": {
+						"actionId": "start-custom",
+						"fields": [
+							{
+								"fieldId": "targetId",
+								"label": "サービス",
+								"control": "select",
+								"required": true,
+								"optionsSource": "query:service-tests.targets@1"
+							},
+							{
+								"fieldId": "text",
+								"label": "入力する文",
+								"control": "textarea",
+								"maxLength": 4096,
+								"help": "空欄の場合は短い挨拶で試します。"
+							},
+							{
+								"fieldId": "comparison",
+								"label": "比較する文",
+								"control": "text",
+								"maxLength": 4096
+							},
+							{
+								"fieldId": "voice",
+								"label": "声",
+								"control": "text",
+								"maxLength": 128
+							},
+							{
+								"fieldId": "width",
+								"label": "幅（画像）",
+								"control": "number",
+								"min": 100,
+								"max": 1280
+							},
+							{
+								"fieldId": "height",
+								"label": "高さ（画像）",
+								"control": "number",
+								"min": 100,
+								"max": 1280
+							},
+							{
+								"fieldId": "format",
+								"label": "画像の形式",
+								"control": "select",
+								"options": [
+									{
+										"value": "png",
+										"label": "PNG"
+									},
+									{
+										"value": "webp",
+										"label": "WebP"
+									}
+								]
+							},
+							{
+								"fieldId": "seed",
+								"label": "シード（画像）",
+								"control": "number"
+							},
+							{
+								"fieldId": "durationSeconds",
+								"label": "長さ（秒・楽曲）",
+								"control": "number",
+								"min": 1,
+								"max": 30
+							}
+						]
+					}
+				},
+				{
+					"source": "service-tests-runs",
+					"title": "確認の履歴",
+					"rowKey": "id",
+					"columns": [
+						{
+							"key": "kind",
+							"label": "種類"
+						},
+						{
+							"key": "model",
+							"label": "対象"
+						},
+						{
+							"key": "statusLabel",
+							"label": "状態"
+						},
+						{
+							"key": "phase",
+							"label": "段階"
+						},
+						{
+							"key": "created",
+							"label": "開始",
+							"format": "date"
+						},
+						{
+							"key": "ended",
+							"label": "終了",
+							"format": "date"
+						},
+						{
+							"key": "error",
+							"label": "エラー"
+						},
+						{
+							"key": "text",
+							"label": "結果"
+						}
+					],
+					"rowActions": [
+						{
+							"actionId": "cancel",
+							"confirm": "実行中の確認を中止します。",
+							"when": {
+								"key": "status",
+								"in": ["running"]
+							}
+						},
+						{
+							"actionId": "retry-artifact",
+							"when": {
+								"key": "retryArtifact",
+								"in": [true]
+							}
+						}
+					],
+					"refreshWhile": {
+						"key": "status",
+						"in": ["running"]
+					}
+				},
+				{
+					"source": "service-tests-health",
+					"title": "Healthの結果",
+					"rowKey": "targetId",
+					"columns": [
+						{
+							"key": "name",
+							"label": "サービス"
+						},
+						{
+							"key": "model",
+							"label": "モデル"
+						},
+						{
+							"key": "state",
+							"label": "状態"
+						},
+						{
+							"key": "reason",
+							"label": "内容"
+						},
+						{
+							"key": "checkedAt",
+							"label": "確認時刻",
+							"format": "date"
+						},
+						{
+							"key": "latencyMs",
+							"label": "応答時間（ms）",
+							"format": "number"
+						}
+					],
+					"refreshWhile": {
+						"key": "running",
+						"in": [true]
+					}
+				}
+			]
+		}
+	],
+	"schemas": [
+		{
+			"kind": "schema",
+			"id": "service-tests-start",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"targetId": {
+						"type": "string",
+						"maxLength": 150,
+						"minLength": 1
+					},
+					"revision": {
+						"type": "integer",
+						"minimum": 0
+					},
+					"text": {
+						"type": "string",
+						"maxLength": 4096
+					},
+					"comparison": {
+						"type": "string",
+						"maxLength": 4096
+					},
+					"voice": {
+						"type": "string",
+						"maxLength": 128
+					},
+					"width": {
+						"type": "integer",
+						"minimum": 100,
+						"maximum": 1280
+					},
+					"height": {
+						"type": "integer",
+						"minimum": 100,
+						"maximum": 1280
+					},
+					"format": {
+						"type": "string",
+						"maxLength": 4,
+						"enum": ["png", "webp"]
+					},
+					"seed": {
+						"type": "integer"
+					},
+					"durationSeconds": {
+						"type": "integer",
+						"minimum": 1,
+						"maximum": 30
+					}
+				},
+				"required": ["targetId"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "service-tests-run",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"runId": {
+						"type": "string",
+						"maxLength": 36,
+						"minLength": 36
+					}
+				},
+				"required": ["runId"]
+			}
+		}
+	]
+}

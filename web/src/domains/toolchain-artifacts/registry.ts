@@ -12,6 +12,7 @@ import type { EumenesClient } from "../../../../client";
 import type { ToolchainArtifactEntry } from "../../../../client/toolchain-actions";
 import type { DocumentAccess, RegisteredField } from "./documents";
 import type { DraftView } from "./drafts";
+import { genericWebAdapter } from "./generic-adapter";
 
 /** An open question of the artifact's chain, as the host read it from the interactions API. */
 export type OpenQuestion = {
@@ -119,10 +120,14 @@ export type WebAdapterRegistry = {
 	get(adapterRef: string): WebArtifactAdapter | undefined;
 };
 
+/**
+ * An adapterRef with no domain Web adapter is shown by the generic one: lists, forms and writes
+ * come from the registration, so domain Web code is only needed for special UI.
+ */
 export function createWebAdapterRegistry(
 	adapters: readonly WebArtifactAdapter[],
 ): WebAdapterRegistry {
 	const map = new Map(adapters.map((a) => [a.adapterRef, a] as const));
 	if (map.size !== adapters.length) throw new Error("duplicate_web_adapter");
-	return { get: (ref) => map.get(ref) };
+	return { get: (ref) => map.get(ref) ?? genericWebAdapter };
 }

@@ -1,14 +1,14 @@
+import type { Database } from "bun:sqlite";
 import { createHash } from "node:crypto";
+import type { z } from "zod";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import { getLogger } from "../../../infrastructure/logger";
 import {
 	createLarmPlayground,
 	playgroundError,
-	silentWav,
 	type LarmPlayground,
 	type LarmTestTarget,
 	type TestOutput,
-	type TestProgress,
 } from "../../larm";
 import type { SettingsService } from "../../settings";
 import type { InferenceService } from "../../inference";
@@ -18,9 +18,9 @@ import {
 	type ServiceTarget,
 	type ServiceRun,
 	type StartTest,
-	type HealthRow,
 } from "../contracts";
 import { readRun, readRuns, updateRun, type RunRecord } from "../repository";
+import { diagnoseWork, startWork, type Work, type WorkDeps } from "./works";
 
 export function createServiceTests(
 	store: SqliteStore,
@@ -159,38 +159,30 @@ export function createServiceTests(
 		});
 		return refreshing;
 	}
-	async function reserve(input: {
-		requestKey: string;
-		hash: string;
-		record: RunRecord;
-	}) {
-		return store.write((db) => {
-			if (settings.inTransaction(db).revision !== input.record.revision)
-				throw new Error("invalid_stale_settings");
-			const old = db
-				.query(
-					"SELECT id,input_hash FROM service_test_runs WHERE request_key=?",
-				)
-				.get(input.requestKey) as { id: string; input_hash: string } | null;
-			if (old) {
-				if (old.input_hash !== input.hash)
-					throw new Error("invalid_request_key");
-				return { record: readRun(db, old.id)!, fresh: false };
-			}
-			if (readRuns(db).some((r) => r.status === "running"))
-				throw new Error("invalid_test_busy");
-			db.query("INSERT INTO service_test_runs VALUES(?,?,?,?,?)").run(
-				input.record.id,
-				input.requestKey,
-				input.hash,
-				input.record.created,
-				JSON.stringify(input.record),
-			);
-			db.query(
-				"DELETE FROM service_test_runs WHERE id NOT IN (SELECT id FROM service_test_runs ORDER BY created DESC LIMIT 50)",
-			).run();
-			return { record: input.record, fresh: true };
-		});
+	type Reservation = { requestKey: string; hash: string; record: RunRecord };
+	function reserveInTransaction(db: Database, input: Reservation) {
+		if (settings.inTransaction(db).revision !== input.record.revision)
+			throw new Error("invalid_stale_settings");
+		const old = db
+			.query("SELECT id,input_hash FROM service_test_runs WHERE request_key=?")
+			.get(input.requestKey) as { id: string; input_hash: string } | null;
+		if (old) {
+			if (old.input_hash !== input.hash) throw new Error("invalid_request_key");
+			return { record: readRun(db, old.id)!, fresh: false };
+		}
+		if (readRuns(db).some((r) => r.status === "running"))
+			throw new Error("invalid_test_busy");
+		db.query("INSERT INTO service_test_runs VALUES(?,?,?,?,?)").run(
+			input.record.id,
+			input.requestKey,
+			input.hash,
+			input.record.created,
+			JSON.stringify(input.record),
+		);
+		db.query(
+			"DELETE FROM service_test_runs WHERE id NOT IN (SELECT id FROM service_test_runs ORDER BY created DESC LIMIT 50)",
+		).run();
+		return { record: input.record, fresh: true };
 	}
 	const save = (id: string, change: Partial<RunRecord>) =>
 		store.write((db) => updateRun(db, id, change));
@@ -283,22 +275,45 @@ export function createServiceTests(
 		previews.clear();
 		uploads.clear();
 	});
-	async function start(raw: StartTest) {
+	const workDeps: WorkDeps = {
+		store,
+		save,
+		inference,
+		gateway,
+		uploads,
+		refresh,
+		catalog,
+		targets: () => discovered?.targets,
+	};
+	/**
+	 * A run accepted in a writer transaction; `launch` starts its work once that commits. It
+	 * returns false while the run's row is not committed yet (it may be called again later).
+	 */
+	type Accepted = { run: ServiceRun; launch?: () => boolean };
+	/** Start the work only if its running row committed (a rolled-back reservation never runs). */
+	function launchCommitted(record: RunRecord, work: Work) {
+		if (closed) return true;
+		if (store.read((db) => readRun(db, record.id))?.status !== "running")
+			return false;
+		launch(record, work);
+		return true;
+	}
+	function startInTransaction(
+		db: Database,
+		raw: z.input<typeof startSchema>,
+	): Accepted {
 		if (closed) throw new Error("invalid_test_closed");
 		const parsed = startSchema.safeParse(raw);
 		if (!parsed.success) throw new Error("invalid_test_input");
 		const input = parsed.data;
-		const s = settings.get();
+		const s = settings.inTransaction(db);
 		if (input.revision !== s.revision || catalog().stale)
 			throw new Error("invalid_stale_settings");
 		const target = catalog().targets.find((t) => t.id === input.targetId);
 		if (!target?.testable) throw new Error("invalid_test_target");
 		prune();
-		const upload = input.input.uploadId
-			? uploads.get(input.input.uploadId)
-			: undefined;
-		if (input.input.uploadId && !upload) throw new Error("invalid_upload");
-		const internal = discovered?.targets.get(target.id);
+		if (input.input.uploadId && !uploads.has(input.input.uploadId))
+			throw new Error("invalid_upload");
 		const record: RunRecord = {
 			id: crypto.randomUUID(),
 			targetId: target.id,
@@ -308,55 +323,38 @@ export function createServiceTests(
 			phase: "preparing",
 			created: Date.now(),
 			revision: s.revision,
-			target: internal,
+			target: discovered?.targets.get(target.id),
 		};
 		const hash = createHash("sha256")
 			.update(JSON.stringify({ ...input, requestKey: undefined }))
 			.digest("hex");
-		const accepted = await reserve({
+		const accepted = reserveInTransaction(db, {
 			requestKey: input.requestKey,
 			hash,
 			record,
 		});
-		if (!accepted.fresh) return publicRun(accepted.record);
-		launch(record, async (signal) => {
-			const progress = async (p: TestProgress) => {
-				const current = store.read((db) => readRun(db, record.id));
-				if (current?.status !== "running") return;
-				await save(record.id, p);
-			};
-			if (target.source === "cloud") {
-				const value = await inference.testResource(
-					target.id.slice(6),
-					target.kind === "llm"
-						? [{ role: "user", content: input.input.text }]
-						: target.kind === "asr"
-							? (upload?.bytes ?? silentWav())
-							: input.input.text,
-					signal,
-				);
-				return typeof value === "string"
-					? { text: value }
-					: { bytes: value, mime: "audio/wav" };
-			}
-			const g = gateway(s);
-			const fresh = await g.catalog(signal);
-			const next = fresh.targets.find((t) => t.id === target.id);
-			if (!internal || !next || next.revision !== internal.revision)
-				throw new Error("stale_catalog");
-			return g.execute(
-				next,
-				{ ...input.input, audio: upload?.bytes },
-				signal,
-				progress,
-			);
-		});
-		return publicRun(record);
+		if (!accepted.fresh) return { run: publicRun(accepted.record) };
+		const work = startWork(workDeps, record, input.input, target, s);
+		return {
+			run: publicRun(record),
+			launch: () => launchCommitted(record, work),
+		};
 	}
-	async function diagnose() {
+	async function start(raw: StartTest) {
+		const accepted = await store.write((db) => startInTransaction(db, raw));
+		accepted.launch?.();
+		return accepted.run;
+	}
+	/**
+	 * The catalog is refreshed by the launched work, not before the run is recorded: the
+	 * writer transaction cannot wait for the network.
+	 */
+	function diagnoseInTransaction(
+		db: Database,
+		requestKey: string = crypto.randomUUID(),
+	): Accepted {
 		if (closed) throw new Error("invalid_test_closed");
-		await refresh();
-		const s = settings.get();
+		const s = settings.inTransaction(db);
 		const record: RunRecord = {
 			id: crypto.randomUUID(),
 			targetId: "diagnostics",
@@ -368,92 +366,86 @@ export function createServiceTests(
 			revision: s.revision,
 			health: [],
 		};
-		await reserve({
-			requestKey: crypto.randomUUID(),
+		const accepted = reserveInTransaction(db, {
+			requestKey,
 			hash: "diagnostics",
 			record,
 		});
-		const selected = catalog().targets.filter((t) => t.primary);
-		const targets = new Map(discovered?.targets);
-		launch(record, async (signal) => {
-			const g = gateway(s);
-			const controlHealthy = await g.controlHealth(signal).catch(() => false);
-			await save(record.id, { controlHealthy });
-			const health: HealthRow[] = [];
-			for (const t of selected) {
-				signal.throwIfAborted();
-				const internal = targets.get(t.id);
-				const result =
-					t.source === "cloud"
-						? {
-								state: "unsupported" as const,
-								reason: t.testable
-									? "cloud_health_unsupported"
-									: "invalid_permission",
-								checkedAt: Date.now(),
-							}
-						: internal
-							? await g.health(
-									internal,
-									AbortSignal.any([signal, AbortSignal.timeout(120_000)]),
-								)
-							: {
-									state: "unknown" as const,
-									reason: "unsupported_protocol",
-									checkedAt: Date.now(),
-								};
-				health.push({
-					...result,
-					targetId: t.id,
-					name: t.name,
-					model: t.model,
-				});
-				await save(record.id, { health: [...health] });
-			}
-		});
-		return publicRun(record);
+		if (!accepted.fresh) return { run: publicRun(accepted.record) };
+		return {
+			run: publicRun(record),
+			launch: () => launchCommitted(record, diagnoseWork(workDeps, record, s)),
+		};
+	}
+	async function diagnose() {
+		const accepted = await store.write((db) => diagnoseInTransaction(db));
+		accepted.launch?.();
+		return accepted.run;
+	}
+	/**
+	 * Mark the run as stopping; the returned function aborts it once the write commits (false
+	 * while the stopping mark is not committed yet).
+	 */
+	function cancelInTransaction(db: Database, id: string) {
+		const r = readRun(db, id);
+		if (!r) throw new Error("invalid_test_run");
+		if (r.status !== "running") return () => true;
+		updateRun(db, id, { phase: "cancelling" });
+		return () => {
+			if (store.read((d) => readRun(d, id))?.phase !== "cancelling")
+				return false;
+			active.get(id)?.abort();
+			previews.delete(id);
+			return true;
+		};
 	}
 	async function cancel(id: string) {
-		const r = store.read((db) => readRun(db, id));
-		if (!r) throw new Error("invalid_test_run");
-		if (r.status !== "running") return;
-		active.get(id)?.abort();
-		previews.delete(id);
-		await save(id, { phase: "cancelling" });
+		const stop = await store.write((db) => cancelInTransaction(db, id));
+		stop();
 	}
-	async function retryArtifact(id: string) {
-		const r = store.read((db) => readRun(db, id));
+	function retryArtifactInTransaction(db: Database, id: string): Accepted {
+		const r = readRun(db, id);
 		if (
 			!r?.artifact ||
-			r.revision !== settings.get().revision ||
+			r.revision !== settings.inTransaction(db).revision ||
 			!["succeeded", "result-unavailable"].includes(r.status)
 		)
 			throw new Error("invalid_test_run");
-		if (active.size) throw new Error("invalid_test_busy");
-		await store.write((db) => {
-			if (readRuns(db).some((row) => row.status === "running"))
-				throw new Error("invalid_test_busy");
-			if (settings.inTransaction(db).revision !== r.revision)
-				throw new Error("invalid_stale_settings");
-			updateRun(db, id, {
-				status: "running",
-				phase: "fetching-result",
-				ended: undefined,
-				error: undefined,
-			});
+		if (active.size || readRuns(db).some((row) => row.status === "running"))
+			throw new Error("invalid_test_busy");
+		const running = updateRun(db, id, {
+			status: "running",
+			phase: "fetching-result",
+			ended: undefined,
+			error: undefined,
 		});
-		launch({ ...r, status: "running" }, (signal) =>
-			gateway().artifact(r.artifact!, signal),
+		return {
+			run: publicRun(running),
+			launch: () =>
+				launchCommitted(running, (signal) =>
+					gateway().artifact(r.artifact!, signal),
+				),
+		};
+	}
+	async function retryArtifact(id: string) {
+		const accepted = await store.write((db) =>
+			retryArtifactInTransaction(db, id),
 		);
-		return publicRun(store.read((db) => readRun(db, id))!);
+		accepted.launch?.();
+		return accepted.run;
 	}
 	return {
 		catalog,
 		refresh,
 		start,
+		startInTransaction,
 		diagnose,
+		diagnoseInTransaction,
 		cancel,
+		cancelInTransaction,
 		retryArtifact,
+		retryArtifactInTransaction,
+		runsInTransaction: (db: Database) => readRuns(db).map(publicRun),
 		runs: () => store.read((db) => readRuns(db)).map(publicRun),
 		run: (id: string) => {
 			const r = store.read((db) => readRun(db, id));

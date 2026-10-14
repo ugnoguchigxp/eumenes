@@ -21,6 +21,7 @@ import { migrations } from "./migrations";
 import { createConversationService } from "../domains/conversation";
 import { createSettings } from "../domains/settings";
 import { createInference } from "../domains/inference";
+import { createTtsDictionary } from "../domains/tts-dictionary";
 import { createQueue } from "../domains/queue";
 import { createScheduler } from "../domains/scheduler";
 import {
@@ -30,7 +31,7 @@ import {
 import { createDialogueService } from "../domains/dialogue";
 import { createVoiceDialogue } from "../domains/voice-dialogue";
 import { createToolchain } from "./toolchain";
-import { createToolchainHostLinks } from "./toolchain-adapters";
+import { createToolchainHostLinks } from "./toolchain-host";
 import { createTimers } from "../domains/timers";
 import { createToolchainRouting } from "./toolchain-routing";
 import { createTimerAnnouncements } from "./timer-announcements";
@@ -455,7 +456,12 @@ export async function harness(
 			)
 		: undefined;
 	// The data-driven settings and records screens, as the server composes them.
-	const toolchainLinks = createToolchainHostLinks(settings, inference);
+	const toolchainLinks = createToolchainHostLinks({
+		settings,
+		inference,
+		conversation,
+		ttsDictionary: createTtsDictionary(store),
+	});
 	const toolchain = await createToolchain(store, queue, inference, web, {
 		...toolchainLinks.options,
 		timers,

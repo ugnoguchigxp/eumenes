@@ -8,14 +8,11 @@ import {
 } from "eumenes-memory";
 import type { AccessContext } from "eumenes-memory";
 import {
-	applyForget,
 	assertMemorySchema,
 	assertUserState,
 	deactivateState,
 	listState,
-	planForget,
 	reactivateState,
-	readStateFact,
 	reconcileForgetJournal,
 	retractState,
 } from "eumenes-memory/sqlite";
@@ -52,7 +49,8 @@ import {
 	createContextWindowStore,
 	type WindowSnapshot,
 } from "./context-window";
-import { appendJournal, readJournal } from "./journal";
+import { STATE_ID, forgetChecked } from "./forget";
+import { readJournal } from "./journal";
 import { createAgentOperations } from "./operation";
 import { recallTurns, type RecallInput } from "./turn-recall";
 import { dropVectorsOnRetract } from "./retract-vectors";
@@ -66,7 +64,6 @@ const VERSION = 1 as const;
 const PACKAGE_VERSION = pkg.version;
 /** Active State items kept in the shared profile. Keeps the fixed view inside its byte budget. */
 const MAX_ACTIVE_ITEMS = 100;
-const STATE_ID = /^state:[0-9a-f]{64}$/;
 const sha = (text: string) => sha256Hex(text);
 
 /** The words an item stands on, cut out of the messages by their recorded byte ranges. */
@@ -334,16 +331,14 @@ export function createMemoryService(
 				: "invalid_memory_transition",
 		);
 	}
-	function transitionItem(
+	function transitionItemInTransaction(
+		db: Database,
 		action: keyof typeof TRANSITIONS,
 		itemId: string,
 		expectedRevision: number,
-	): Promise<MemoryItemDto> {
-		if (!STATE_ID.test(itemId))
-			return Promise.reject(new Error("invalid_memory_item"));
-		return store.write((db) =>
-			transitionInTransaction(db, action, itemId, expectedRevision),
-		);
+	): MemoryItemDto {
+		if (!STATE_ID.test(itemId)) return reject("invalid_memory_item");
+		return transitionInTransaction(db, action, itemId, expectedRevision);
 	}
 
 	/** Removes receipts that reference any of the given items, in one pass over the (pruned, bounded) table. */
@@ -398,6 +393,14 @@ export function createMemoryService(
 		remember: rememberInTransaction,
 		transition: transitionInTransaction,
 	});
+	const forgetDeps = {
+		journalPath: options.journalPath,
+		access,
+		atMs,
+		windows,
+		purgeUsageFor,
+		ready: () => healthy,
+	};
 	const views = createMemoryViews({
 		store,
 		continuity,
@@ -418,6 +421,20 @@ export function createMemoryService(
 		queue: options.queue,
 		inference: options.inference,
 	});
+
+	function setEnabledInTransaction(
+		db: Database,
+		enabled: boolean,
+	): MemoryStatus {
+		// Toggling to the same value must not invalidate runs in flight.
+		if (readSettings(db).enabled !== enabled) {
+			writeSettings(db, enabled);
+			windows.recordImmediateInTransaction(db, "settings", null);
+			// What was said while memory was off is never learned.
+			if (enabled) agent.skipUnreadInTransaction(db);
+		}
+		return { enabled, healthy };
+	}
 
 	async function recover(): Promise<{
 		healthy: boolean;
@@ -497,17 +514,9 @@ export function createMemoryService(
 			return { enabled: store.read((db) => readSettings(db).enabled), healthy };
 		},
 		setEnabled(enabled: boolean): Promise<MemoryStatus> {
-			return store.write((db) => {
-				// Toggling to the same value must not invalidate runs in flight.
-				if (readSettings(db).enabled !== enabled) {
-					writeSettings(db, enabled);
-					windows.recordImmediateInTransaction(db, "settings", null);
-					// What was said while memory was off is never learned.
-					if (enabled) agent.skipUnreadInTransaction(db);
-				}
-				return { enabled, healthy };
-			});
+			return store.write((db) => setEnabledInTransaction(db, enabled));
 		},
+		setEnabledInTransaction,
 		/**
 		 * Must complete before workers start. A broken journal makes memory unusable (fail closed).
 		 * The journal is read inside the writer queue, so it can never be older than the database head.
@@ -543,62 +552,28 @@ export function createMemoryService(
 		},
 		/** Reversible stop (not forgetting). */
 		stop: (itemId: string, expectedRevision: number) =>
-			transitionItem("stop", itemId, expectedRevision),
+			store.write((db) =>
+				transitionItemInTransaction(db, "stop", itemId, expectedRevision),
+			),
 		resume: (itemId: string, expectedRevision: number) =>
-			transitionItem("resume", itemId, expectedRevision),
+			store.write((db) =>
+				transitionItemInTransaction(db, "resume", itemId, expectedRevision),
+			),
 		/** Terminal "this is wrong" (kept as history; value stays). */
 		retract: (itemId: string, expectedRevision: number) =>
-			transitionItem("retract", itemId, expectedRevision),
+			store.write((db) =>
+				transitionItemInTransaction(db, "retract", itemId, expectedRevision),
+			),
+		transitionItemInTransaction,
 		/** Plan -> journal (fsync) -> apply, serialized in the single writer. Works even when memory is off. */
 		forget(itemId: string): Promise<{ forgetId: string; completed: boolean }> {
-			if (!STATE_ID.test(itemId))
-				return Promise.reject(new Error("invalid_memory_item"));
 			let journaled = false;
 			return store
-				.write((db) => {
-					if (!healthy) reject("memory_unavailable");
-					// Earlier versions of the same fact (superseded / stopped) carry the old value too.
-					const fact = readStateFact(db, {
-						contractVersion: VERSION,
-						access: access(db, "memory.forget"),
-						scopeKey: PROFILE_SCOPE,
-						itemId,
-					});
-					if (fact.status !== "ok") return reject("invalid_memory_item");
-					const ids = fact.itemIds;
-					let forgetId = "";
-					let completed = true;
-					for (const id of ids) {
-						const planned = planForget(db, {
-							contractVersion: CONTRACT_VERSIONS.lifecycle,
-							access: access(db, "memory.forget"),
-							target: {
-								type: "state_item",
-								itemId: id,
-								scopeKey: PROFILE_SCOPE,
-							},
-							clock: { atMs: atMs() },
-						});
-						if (planned.status !== "planned")
-							return reject("invalid_memory_item");
+				.write((db) =>
+					forgetChecked(forgetDeps, db, itemId, () => {
 						journaled = true;
-						appendJournal(options.journalPath, planned.plan.entry);
-						const applied = applyForget(db, {
-							contractVersion: CONTRACT_VERSIONS.lifecycle,
-							entry: planned.plan.entry,
-							clock: { atMs: atMs() },
-						});
-						if (id === itemId) forgetId = planned.plan.entry.forgetId;
-						completed = completed && applied.completed;
-						purgeUsageFor(db, [id]);
-						windows.recordImmediateInTransaction(db, "state_forget", null);
-						// The rendered windows still hold the forgotten text.
-						windows.purgeInTransaction(db);
-					}
-					// Summaries the agent derived from these items go with them (same transaction as the forget).
-					deleteTendenciesByStateEvidence(db, ids);
-					return { forgetId, completed };
-				})
+					}),
+				)
 				.catch(async (error: unknown) => {
 					// Only when an entry may have reached the journal ahead of the rolled-back database: reconcile
 					// before anything else runs. Rejections before the journal (validation, queue full) change nothing.
@@ -610,6 +585,25 @@ export function createMemoryService(
 					}
 					throw error;
 				});
+		},
+		/**
+		 * The same forget inside a writer transaction the caller owns. The journal is reconciled once that
+		 * transaction is over (it may roll back after the entry was written); a failure closes memory first.
+		 */
+		forgetInTransaction(db: Database, itemId: string) {
+			let journaled = false;
+			try {
+				const forgotten = forgetChecked(forgetDeps, db, itemId, () => {
+					journaled = true;
+				});
+				void recoverWithRetry();
+				return forgotten;
+			} catch (error) {
+				if (!journaled) throw error;
+				healthy = false;
+				void recoverWithRetry();
+				throw new Error("memory_forget_incomplete");
+			}
 		},
 		/**
 		 * Queues the memory agent when the conversation has messages it has not read (same transaction as the

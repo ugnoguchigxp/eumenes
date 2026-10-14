@@ -72,6 +72,8 @@ export interface DomainAdapter {
 		>;
 		/** Field visibility conditions implemented by this adapter's Web counterpart. */
 		conditions?: ReadonlySet<string>;
+		/** Structural draft operations this adapter applies inside its document's apply. */
+		structures?: ReadonlyMap<string, { inputSchemaRef: string }>;
 	};
 	/** The adapter's domain is configured and usable on this host now. */
 	availableInTransaction(tx: Database): boolean;

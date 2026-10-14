@@ -296,6 +296,13 @@ select:focus-visible {
 	padding: 5px 8px;
 	border: 1px solid var(--border);
 }
+.chat-panel > .subtitle {
+	position: absolute;
+	top: auto;
+	bottom: max(12px, env(safe-area-inset-bottom, 0px));
+	width: min(86%, 1100px);
+	transform: translateX(-50%);
+}
 .latest-button {
 	position: absolute;
 	z-index: 2;

@@ -25,8 +25,11 @@ export function documentOwner(
 	return owners.find(([ref]) => prefer.has(ref)) ?? owners[0];
 }
 
-/** Property names of an object schema reference, or null when it cannot be read. */
-export function schemaProperties(c: Check, ref: string): string[] | null {
+/** Top-level properties (and which are required) of a schema reference; null if unreadable. */
+export function schemaShape(
+	c: Check,
+	ref: string,
+): { properties: string[]; required: string[] } | null {
 	const local = c.bundle.schemas.find(
 		(x) => `schema:${x.id}@${x.revision}` === ref,
 	);
@@ -37,9 +40,17 @@ export function schemaProperties(c: Check, ref: string): string[] | null {
 				return zod ? (z.toJSONSchema(zod) as Record<string, unknown>) : null;
 			})();
 	const properties = json?.properties;
-	return properties && typeof properties === "object"
-		? Object.keys(properties)
-		: null;
+	if (!properties || typeof properties !== "object") return null;
+	const required = Array.isArray(json?.required)
+		? (json.required as unknown[]).filter(
+				(r): r is string => typeof r === "string",
+			)
+		: [];
+	return { properties: Object.keys(properties), required };
+}
+/** Property names of an object schema reference, or null when it cannot be read. */
+export function schemaProperties(c: Check, ref: string): string[] | null {
+	return schemaShape(c, ref)?.properties ?? null;
 }
 
 /** Record who registered a field id and a (document, path); false when another artifact has. */
@@ -248,12 +259,52 @@ function checkConfidential(
 		c.issue("permission", `${at}/confidentialFields`, action.draftDocument);
 }
 
+/** A staged structural operation is one the document's adapter registered, with its input. */
+function checkStructure(
+	c: Check,
+	action: Artifact["actionBindings"][number],
+	at: string,
+) {
+	if (action.draftAction !== "structure" || !action.draftDocument) return;
+	const owner = documentOwner(c, action.draftDocument);
+	if (!owner) return;
+	const registered = owner[1].structures?.get(action.structure!);
+	if (!registered)
+		c.issue("unknown_reference", `${at}/structure`, action.structure);
+	else if (registered.inputSchemaRef !== action.inputSchemaRef)
+		c.issue(
+			"schema_mismatch",
+			`${at}/inputSchemaRef`,
+			registered.inputSchemaRef,
+		);
+}
+
+/** Whether an action stages or sends an input: a write, or a structure staged in the draft. */
+export const takesInput = (action: Artifact["actionBindings"][number]) =>
+	action.effect === "write" ||
+	(action.effect === "draft" && action.draftAction === "structure");
+
+/** Row-built inputs (also generated ids): keys that exist in the action's input. */
+function checkRowInput(
+	c: Check,
+	action: Artifact["actionBindings"][number],
+	at: string,
+) {
+	if (!action.rowInput) return;
+	if (!takesInput(action)) c.issue("invalid_format", `${at}/rowInput`);
+	const properties = schemaProperties(c, action.inputSchemaRef);
+	for (const key of Object.keys(action.rowInput))
+		if (!properties?.includes(key))
+			c.issue("schema_mismatch", `${at}/rowInput/${key}`, key);
+}
+
 /** Draft, navigation and write actions: their document, destination and operation. */
 export function checkActionTargets(
 	c: Check,
 	action: Artifact["actionBindings"][number],
 	at: string,
 	sourceAdapter: HostAdapter | undefined,
+	artifactId: string,
 ) {
 	if (action.draftDocument) {
 		if (!documentOwner(c, action.draftDocument))
@@ -275,9 +326,12 @@ export function checkActionTargets(
 						([value, id]) =>
 							[`${at}/navigateTo/artifacts/${value}`, id] as const,
 					);
+		// A target that is not registered or published (yet) is shown disabled, not refused.
 		for (const [path, id] of targets)
-			if (!c.hasArtifactId(id)) c.issue("unknown_reference", path, id);
+			if (id === artifactId) c.issue("invalid_format", path, id);
 	}
+	checkStructure(c, action, at);
+	checkRowInput(c, action, at);
 	checkConfidential(c, action, at);
 	if (
 		action.operationId &&

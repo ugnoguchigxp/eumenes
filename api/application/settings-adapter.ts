@@ -15,13 +15,30 @@ import {
 	type Settings,
 } from "../domains/settings/contracts";
 import type { AdapterResult, DomainAdapter } from "../domains/tool-runtime";
+import {
+	type ApplyKey,
+	applyStructures,
+	connectionTargets,
+	followPurposeChange,
+	followRouteRules,
+	resourceTargets,
+	routeSummaries,
+	structureSchemaRefs,
+} from "./settings-structures";
 
 export const SETTINGS_ADAPTER_REF = "adapter:settings@1";
 export const SETTINGS_DOCUMENT = "document:settings@1";
 const DOCUMENT_QUERY = "query:settings.document@1";
 const TTS_RESOURCES_QUERY = "query:settings.tts-resources@1";
+const LLM_RESOURCES_QUERY = "query:settings.llm-resources@1";
+const ASR_RESOURCES_QUERY = "query:settings.asr-resources@1";
+const RESOURCES_QUERY = "query:settings.resources@1";
+const CONNECTIONS_QUERY = "query:settings.connections@1";
+const ROUTES_QUERY = "query:settings.routes@1";
+/** The connection's API key: a confidential field that travels in `keys`, not in `changes`. */
+const API_KEY_PATH = "$.connections[id=$target].apiKey";
 const ASR_LANGUAGES_QUERY = "query:settings.asr-languages@1";
-const APPLY_SCHEMA_REF = "schema:settings-apply@1";
+const APPLY_SCHEMA_REF = "schema:settings-apply@2";
 
 /**
  * Field visibility conditions the Web counterpart evaluates (see `voice-presentation.ts`). The
@@ -43,6 +60,12 @@ export const settingsConditions = [
 	"condition:settings.larm-auto-strength@1",
 	/** The browser can route playback to a chosen output device. */
 	"condition:settings.output-device-selectable@1",
+	/** The connection chosen as the field's target is a Claude Managed Agents connection. */
+	"condition:settings.connection-managed-agents@1",
+	/** The connection chosen as the field's target is an OpenAI-compatible HTTP connection. */
+	"condition:settings.connection-openai-compatible@1",
+	/** The model chosen as the field's target is a conversation (LLM) model. */
+	"condition:settings.resource-llm@1",
 ] as const;
 
 // ---- fixed paths ---------------------------------------------------------------------------
@@ -152,6 +175,8 @@ const finite = (value: number | null | undefined) =>
 
 /** What the settings schema says about a registered path (kind, bounds, optional, nullable). */
 export function describeSettingsPath(path: string): DocumentPathInfo | null {
+	if (path === API_KEY_PATH)
+		return { kind: "string", maxLength: 4096, optional: true, nullable: true };
 	const leaf = settingsLeaf(path);
 	if (!leaf) return null;
 	const inner = unwrap(leaf.schema) as unknown as {
@@ -197,12 +222,20 @@ export function describeSettingsPath(path: string): DocumentPathInfo | null {
 	};
 }
 
-/** `[id=$target]` paths list their targets with the TTS models query (the only array so far). */
+/**
+ * `[id=$target]` paths list their targets with a registered query: the TTS models for a model's
+ * voice and speed, all models for its other fields, the connections for a connection's.
+ */
 function settingsTargetQuery(path: string): string | null {
-	return parseSettingsPath(path)?.[0]?.key === "resources" &&
-		settingsLeaf(path)?.selects
+	if (path === API_KEY_PATH) return CONNECTIONS_QUERY;
+	const segments = parseSettingsPath(path);
+	if (!segments || !settingsLeaf(path)?.selects) return null;
+	if (segments[0]!.key === "connections") return CONNECTIONS_QUERY;
+	if (segments[0]!.key !== "resources") return null;
+	const last = segments.at(-1)!.key;
+	return last === "voice" || last === "speed"
 		? TTS_RESOURCES_QUERY
-		: null;
+		: RESOURCES_QUERY;
 }
 
 // ---- operation input -----------------------------------------------------------------------
@@ -231,11 +264,22 @@ const key = z
 	.refine((k) => (k.value === undefined) !== (k.delete === undefined), {
 		message: "value_or_delete",
 	});
-export const settingsApplyInput = z.strictObject({
-	expectedRevision: z.number().int().min(0),
-	changes: z.array(change).min(1).max(64),
-	keys: z.array(key).max(32).optional(),
+const structural = z.strictObject({
+	structure: z.string().max(80),
+	input: z.record(z.string(), z.unknown()),
 });
+export const settingsApplyInput = z
+	.strictObject({
+		expectedRevision: z.number().int().min(0),
+		structural: z.array(structural).max(16).optional(),
+		changes: z.array(change).max(64).optional(),
+		keys: z.array(key).max(32).optional(),
+	})
+	// A key alone is content: nothing_to_apply only when every list is empty.
+	.refine(
+		(i) => !!i.structural?.length || !!i.changes?.length || !!i.keys?.length,
+		{ message: "nothing_to_apply" },
+	);
 
 /** What the adapter needs to know about a registered field. */
 export type SettingsField = Pick<
@@ -319,13 +363,19 @@ function writeAt(
 /** The saved document with the changes applied; every rejection is a safe error code. */
 export function applyChanges(
 	saved: Settings,
-	changes: z.infer<typeof settingsApplyInput>["changes"],
+	changes: NonNullable<z.infer<typeof settingsApplyInput>["changes"]>,
 	lookup: (id: string) => SettingsField | undefined,
 	targets: (query: string) => ReadonlySet<string>,
 ): Settings {
 	const next = structuredClone(saved);
 	const seen = new Set<string>();
-	for (const item of changes) {
+	// A model's purpose first: it resets the purpose's own values, which later changes may set.
+	const isPurpose = (item: (typeof changes)[number]) =>
+		lookup(item.fieldId)?.path === "$.resources[id=$target].purpose";
+	const ordered = [...changes].sort(
+		(a, b) => Number(isPurpose(b)) - Number(isPurpose(a)),
+	);
+	for (const item of ordered) {
 		const field = lookup(item.fieldId);
 		if (!field || field.document !== SETTINGS_DOCUMENT)
 			throw new Error("field_not_registered");
@@ -360,33 +410,33 @@ export function applyChanges(
 			writeAt(next, segments, item.target, (container, name) => {
 				container[name] = value;
 			});
+			if (isPurpose(item)) followPurposeChange(saved, next, item.target!);
 		}
 	}
 	return next;
 }
 
-/**
- * The TTS models as targets: `label` names the model ("接続名 / モデル") and `selectLabel` is the
- * speech-target choice with its assignment state.
- */
-function ttsTargets(current: Settings, query: string) {
-	if (query !== TTS_RESOURCES_QUERY) return [];
-	return current.resources
-		.filter((r) => r.purpose === "tts")
-		.map((r) => {
-			const connection =
-				current.connections.find((c) => c.id === r.connectionId)?.name ??
-				"登録モデル";
-			const assigned = current.routes.tts.fallbackId === r.id;
-			return {
-				id: r.id,
-				label: `${connection} / ${r.model}`,
-				selectLabel: `${connection} / ${r.model}${assigned ? "（割当済み）" : "（未割当）"}`,
-				connection,
-				model: r.model,
-				assigned,
-			};
-		});
+type Credentials = ReadonlyArray<{ id: string; credentialAvailable: boolean }>;
+/** The targets a registered query lists for the document, or null for other queries. */
+function targetsOf(
+	query: string,
+	doc: Settings,
+	credentials: () => Credentials,
+) {
+	switch (query) {
+		case TTS_RESOURCES_QUERY:
+			return resourceTargets(doc, "tts");
+		case LLM_RESOURCES_QUERY:
+			return resourceTargets(doc, "llm");
+		case ASR_RESOURCES_QUERY:
+			return resourceTargets(doc, "asr");
+		case RESOURCES_QUERY:
+			return resourceTargets(doc);
+		case CONNECTIONS_QUERY:
+			return connectionTargets(doc, credentials());
+		default:
+			return null;
+	}
 }
 
 // ---- adapter -------------------------------------------------------------------------------
@@ -403,7 +453,22 @@ export const describeSettingsAdapter = () => ({
 			{ inputSchemaRef: APPLY_SCHEMA_REF, effect: "write" as const },
 		],
 	]),
-	queries: new Set([DOCUMENT_QUERY, TTS_RESOURCES_QUERY, ASR_LANGUAGES_QUERY]),
+	queries: new Set([
+		DOCUMENT_QUERY,
+		TTS_RESOURCES_QUERY,
+		LLM_RESOURCES_QUERY,
+		ASR_RESOURCES_QUERY,
+		RESOURCES_QUERY,
+		CONNECTIONS_QUERY,
+		ROUTES_QUERY,
+		ASR_LANGUAGES_QUERY,
+	]),
+	structures: new Map(
+		Object.entries(structureSchemaRefs).map(([ref, inputSchemaRef]) => [
+			ref,
+			{ inputSchemaRef },
+		]),
+	),
 	inputAdapters: new Map(),
 	projections: new Set<string>(),
 	availability: "availability:settings@1",
@@ -421,7 +486,7 @@ export const describeSettingsAdapter = () => ({
 
 export type SettingsAdapterPorts = Pick<
 	SettingsService,
-	"inTransaction" | "applyInTransaction" | "notifyChanged"
+	"inTransaction" | "applyInTransaction" | "notifyChanged" | "diagnostics"
 >;
 
 /**
@@ -450,14 +515,28 @@ export function createSettingsAdapter(
 			const input = parsed.data;
 			const saved = settings.inTransaction(tx);
 			let document: Settings;
+			let keys: ApplyKey[];
+			let confirmLarmOrigin: string | undefined;
 			try {
-				document = applyChanges(
+				// Structure first, then the field changes (which may name the new ids as targets).
+				const staged = applyStructures(
 					saved,
-					input.changes,
+					input.structural ?? [],
+					input.keys ?? [],
+				);
+				keys = staged.keys;
+				confirmLarmOrigin = staged.confirmLarmOrigin;
+				const credentials = () => settings.diagnostics().connections;
+				document = applyChanges(
+					staged.settings,
+					input.changes ?? [],
 					(id) => options.fields(tx, id),
 					(query) =>
-						new Set(ttsTargets(saved, query).map((target) => target.id)),
+						new Set(
+							targetsOf(query, staged.settings, credentials)?.map((t) => t.id),
+						),
 				);
+				followRouteRules(saved, document);
 			} catch (error) {
 				// A stale draft names what may no longer exist: report the conflict first.
 				if (saved.revision !== input.expectedRevision)
@@ -478,25 +557,27 @@ export function createSettingsAdapter(
 					requestId: request.requestId,
 					expectedRevision: input.expectedRevision,
 					settings: valid.data,
-					keys: (input.keys ?? []).map((k) => ({
+					keys: keys.map((k) => ({
 						connectionId: k.connectionId,
 						value: k.delete ? null : k.value!,
 					})),
+					...(confirmLarmOrigin !== undefined ? { confirmLarmOrigin } : {}),
 				});
 			} catch (error) {
 				if (error instanceof ZodError) throw new Error("invalid_settings");
 				throw error;
 			}
-			// Field ids and revision only: neither values nor secrets enter the receipt.
+			// Field and structure ids and the revision only: no values or secrets in the receipt.
 			const receipt = {
 				version: 1,
 				requestId: request.requestId,
 				revision: applied.settings.revision,
-				changed: input.changes.map((c) => ({
+				structural: (input.structural ?? []).map((s) => s.structure),
+				changed: (input.changes ?? []).map((c) => ({
 					fieldId: c.fieldId,
 					...(c.target ? { target: c.target } : {}),
 				})),
-				keys: input.keys?.length ?? 0,
+				keys: keys.length,
 			};
 			return {
 				receipt,
@@ -521,27 +602,38 @@ export function createSettingsAdapter(
 		readInTransaction: () => null,
 		sourceInTransaction(tx, query) {
 			const current = settings.inTransaction(tx);
+			const revision = current.revision;
 			if (query === DOCUMENT_QUERY)
-				return {
-					revision: current.revision,
-					data: { revision: current.revision, settings: current },
-				};
-			if (query === TTS_RESOURCES_QUERY)
-				return {
-					revision: current.revision,
-					data: {
-						localAvailable: current.routes.tts.mode !== "cloud-only",
-						targets: ttsTargets(current, query),
-					},
-				};
+				return { revision, data: { revision, settings: current } };
+			if (query === ROUTES_QUERY)
+				return { revision, data: { routes: routeSummaries(current) } };
 			if (query === ASR_LANGUAGES_QUERY)
 				return {
-					revision: current.revision,
+					revision,
 					data: {
 						options: asrLanguages.map(([value, label]) => ({ value, label })),
 					},
 				};
-			return null;
+			const targets = targetsOf(
+				query,
+				current,
+				() => settings.diagnostics().connections,
+			);
+			if (!targets) return null;
+			// `options` is the same list as select choices (value = target id).
+			return {
+				revision,
+				data: {
+					targets,
+					options: targets.map((t) => ({
+						value: t.id,
+						label: "selectLabel" in t ? t.selectLabel : t.label,
+					})),
+					...(query === TTS_RESOURCES_QUERY
+						? { localAvailable: current.routes.tts.mode !== "cloud-only" }
+						: {}),
+				},
+			};
 		},
 		targetInput: () => ({}),
 		afterCommit: () => settings.notifyChanged(),

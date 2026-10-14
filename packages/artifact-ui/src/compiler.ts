@@ -25,7 +25,9 @@ function checkSource(definition: ArtifactDefinition, snapshot: Snapshot) {
 				? "music"
 				: request.view === "generation-status"
 					? "generation"
-					: request.view;
+					: request.view === "collection-workspace"
+						? "collection"
+						: request.view;
 		if (request.source && snapshot[request.source]?.kind !== kind)
 			throw new Error("この表示では参照できない source です");
 	}

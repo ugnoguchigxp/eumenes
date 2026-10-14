@@ -92,7 +92,7 @@ adapterが所有する「文書」（設定ではsettings文書）の項目を�
 | 記録 | AI利用記録・選択記録・取得手順・診断の取得 | P1 |
 | AIと接続 | LARM接続、用途割当、クラウド接続とモデル、APIキー（秘密channel）、接続確認 | P2 |
 | 外部作業の実行前確認 | `codingSupervision.approveInstructions` | P2 |
-| 読み方辞書・記憶・予約・動作確認・外部作業（dots）・World | 各domainのadapterと新規view | P3 |
+| 読み方辞書・記憶・動作確認・外部作業（dots）・World | 各domainのadapterと新規view | P3 |
 
 ## 5. 段階と完了条件
 
@@ -100,7 +100,7 @@ adapterが所有する「文書」（設定ではsettings文書）の項目を�
 | --- | --- | --- |
 | P1 | §2の共通契約、settings adapter、settings bundle（P1の画面）、共通hostの下書き・秘密・移動、Web adapter | 現行OpenUI版の試験（会話・表示・音声・記録・変更一覧・競合・保存中の追加入力）と同じ観点の試験が新版で通る。現行画面は無変更 |
 | P2 | 用途割当・LARM・クラウド接続とモデル・APIキー・実行前確認 | 現行 `SettingsPage` の ai・connections・general の試験観点（key/envRef必須、https、origin確認、接続削除の連動）が新版で通る |
-| P3 | 辞書・記憶・予約・動作確認・dots・World・ツールチェーン記録を各domainのadapterとviewで | 各パネルの既存試験観点が新版で通る |
+| P3 | 辞書・記憶・動作確認・dots・World・ツールチェーン記録を各domainのadapterとviewで | 各パネルの既存試験観点が新版で通る |
 | P4 | 新旧の比較とseed確認 | fresh/upgrade DBでbundleが登録され、ブラウザで新版の全画面が操作できる。現行版削除の判断材料を記録 |
 
 ## 6. 変えないこと
@@ -121,7 +121,7 @@ adapterが所有する「文書」（設定ではsettings文書）の項目を�
 新版のWeb（`web/src/domains/settings-data`）は、現行版の次のコードを再利用している。現行版を削除するときは、先にこれらを新版側へ移す。
 
 - `web/src/domains/settings` の `useSettings`、`useVoiceSample`、音声カタログ（`VoiceCatalog`）、`presentationLabel`、`serviceSummary`
-- 現行のOpenUI版設定（Hub・会話・音声と入力・表示・記録・変更一覧）と `#settings` の `SettingsPage` は、P2・P3で同等の画面が揃うまで削除しない（AIと接続・APIキー・辞書・記憶・予約・動作確認・dots・Worldは現行版にしかない）。
+- 現行のOpenUI版設定（Hub・会話・音声と入力・表示・記録・変更一覧）と `#settings` の `SettingsPage` は、P2・P3で同等の画面が揃うまで削除しない（AIと接続・APIキー・辞書・記憶・動作確認・dots・Worldは現行版にしかない）。予約は新版で作らない（§10.4）。
 
 ## 9. P1 の実装記録（2026-10-14）
 
@@ -129,3 +129,37 @@ adapterが所有する「文書」（設定ではsettings文書）の項目を�
 - 独立レビュー1回（medium 6・low多数）を受け、1回の修正パスで対応した（`keys` の秘密宣言と登録時検査・outboxのfail-closed、Hubの未保存表示、変更一覧の値ラベル、項目と文書schemaの登録時整合検査、記録の読み取りを受付台帳から外してparams付きsource readへ、配布bundleを読むWeb試験、切戻しAPI）。
 - 確認: 型検査0件、lint・書式・サイズ予算・境界・domain文書、backend 1912件、Web・client 855件、bundle検査（timers・settings）、ブラウザ `settings-data-driven`・`settings-artifacts`・`settings-display`・`timers` の22件がすべて通過。
 - 未確認: 実LARM・実機器での音声設定の試聴と機器切替、記録の表の `pageSize` 変更等の実サーバでの全操作（検索まで確認）。
+
+## 10. P2・P3 の追加契約（2026-10-14）
+
+### 10.1 構造操作（P2）
+
+- action binding の `draftAction` に `structure` を加え、`structure: structure:<adapter>.<名前>@n`（adapterが `describe().structures` に登録）と入力の `inputSchemaRef` を持たせる。表示用に action binding の任意 `label`。
+- 共通下書きは構造操作を順に保持する（例: 接続の追加・削除、モデルの追加・削除、LARM接続先変更の確認）。追加する要素のIDはhostが生成したUUIDを入力に含め、同じ下書きの項目変更はそのIDを `target` にできる。
+- 適用の入力は `{ expectedRevision, structural?: [{ structure, input }], changes, keys? }`。adapterは保存済み文書へ構造操作を先に、項目変更を後に当て、全体を文書schemaと所有domainの関連条件で検証して既存の公開操作で保存する。
+- 変更一覧は構造操作を `label` と対象名で示す。秘密は件数だけ。
+
+### 10.2 一覧編集（collection、P2・P3）
+
+- artifact に任意の `collections[]` を加える。各要素は `source`（一覧を返すadapter query。params可）、`title`、`rowKey`（行の安定IDのfield）、`columns[]`（`key` は行オブジェクト内の固定path、`label`、`format`: text・date・number・boolean・badge）、`rowActions[]`（`actionId`・`label`・任意 `confirm` 文言・任意 `visibleWhen`）、任意 `create`（`actionId`・`label`・`fields[]`）、任意 `paging`。
+- 行操作は write action で、入力は action binding の `rowInput`（入力key → `$row.<path>` または文字列の定数）から作る。行の任意値・任意pathはクライアントから送らない（hostが登録された写像で作る）。
+- 作成・編集フォームの項目は `formFieldV1`（`fieldId`・`label`・`control`・`options`・`maxLength`・`min`・`max`・`required`・`confidential`）。入力は action の `inputSchemaRef` で検証し、`confidential` は `confidentialFields` に必ず含める。
+- 表示は artifact-ui の新しい view `collection-workspace`（DesignSystemの `ServerDataTable`・`Form`・`ConfirmModal`・`Button` を組み合わせる。DesignSystemの公開入口は変えない）。resource は共通hostが登録とsourceデータから作り、domain固有のWebコードを必須にしない。
+
+### 10.3 domain adapter（application）
+
+| adapter | 主なquery | 主な操作 | 段階 |
+| --- | --- | --- | --- |
+| `adapter:settings@1`（拡張） | 接続・モデル・用途割当の一覧 | `settings.apply` に構造操作（接続・モデルの追加と削除、LARM接続先変更の確認） | P2 |
+| `adapter:inference@1` | 接続確認の履歴、LARM詳細、直近の利用 | 接続確認の開始・取消 | P2 |
+| `adapter:tts-dictionary@1` | 辞書一覧 | 保存（`expected.spoken`）・削除 | P3 |
+| `adapter:memory@1` | 状態・記憶項目・傾向・短期・文脈 | 利用の有効化、忘却・停止・再開・撤回、傾向削除、継続性の遷移 | P3 |
+| `adapter:world@1` | 状態・主張一覧・忘却一覧 | 訂正・撤回・忘却 | P3 |
+| `adapter:dots@1` | 接続・プロジェクト・担当 | 接続・プロジェクト・担当の設定（`expectedRevision`・`expectedToken`、新規トークンは一度だけ表示） | P3 |
+| `adapter:service-tests@1` | カタログ・実行・診断 | 実行・取消・アップロード | P3 |
+
+各adapterは所有domainの既存公開操作（必要ならtransaction版を公開）を呼ぶだけで、業務判断を持たない。会話origin（`origin.kind !== "ui"`）は拒否する。
+
+### 10.4 予約画面は作らない（2026-10-14 利用者判断）
+
+予約（scheduler）の設定画面は新版の計画から外した。現行の `#settings` にある予約カテゴリは、現行版の削除とともに無くなる（scheduler domain自体と、会話からの時刻指定の起動は変えない）。

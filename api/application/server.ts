@@ -23,11 +23,8 @@ import { createMusic } from "../domains/music";
 import { createLarmPlayground } from "../domains/larm";
 import { larmEmbedder } from "./larm-embedder";
 import { createToolchainRouting } from "./toolchain-routing";
-import { createToolchain } from "./toolchain";
-import {
-	createToolchainHostLinks,
-	toolchainMaintenance,
-} from "./toolchain-adapters";
+import { toolchainMaintenance } from "./toolchain-adapters";
+import { createHostToolchain } from "./toolchain-host";
 import {
 	createAttitudeDataset,
 	openAttitudeStore,
@@ -284,26 +281,25 @@ export async function buildServices(config: Config) {
 						: {}),
 					...(config.worldPollMs ? { pollMs: config.worldPollMs } : {}),
 				});
-	const toolchainLinks = createToolchainHostLinks(settings, inference);
-	const toolchain = await createToolchain(
+	const { toolchain, links } = await createHostToolchain({
 		store,
 		queue,
 		inference,
 		webResearch,
-		{
-			timers,
-			conversation,
-			...toolchainLinks.options,
-			history: config.historyToolsEnabled,
-			dots: true,
-			music: true,
-			image: true,
-			excalidraw: true,
-			objectRecognition: true,
-			webResearch: config.webResearchToolsEnabled,
-			embed: embedder,
-		},
-	);
+		settings,
+		conversation,
+		ttsDictionary,
+		memory,
+		continuity,
+		world,
+		serviceTests,
+		timers,
+		log,
+		history: config.historyToolsEnabled,
+		webResearchEnabled: config.webResearchToolsEnabled,
+		embed: embedder,
+		dotsScreen: { config: dots.config, events: dotsEvents },
+	});
 	const enabled = config.toolchainEnabled;
 
 	const mediaGateway = () => {
@@ -395,7 +391,7 @@ export async function buildServices(config: Config) {
 				)
 			: undefined,
 	});
-	toolchainLinks.attachDialogue(dialogue);
+	links.attachDialogue(dialogue);
 	const voice = createVoiceDialogue(store, dialogue, inference);
 	scheduler.registerTarget(dialogue.promptTarget);
 	return {

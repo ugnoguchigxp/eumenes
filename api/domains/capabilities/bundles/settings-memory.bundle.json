@@ -1,0 +1,595 @@
+{
+	"formatVersion": 1,
+	"bundleId": "settings-memory",
+	"pins": [],
+	"definitions": [],
+	"bindings": [],
+	"artifacts": [
+		{
+			"kind": "artifact",
+			"id": "settings.memory",
+			"revision": 1,
+			"title": "記憶",
+			"variants": [
+				{
+					"id": "standard",
+					"label": "標準",
+					"definition": {
+						"view": "layout",
+						"direction": "stack",
+						"title": "記憶",
+						"children": [
+							{
+								"view": "collection-workspace",
+								"source": "memory-status",
+								"title": "会話への接続"
+							},
+							{
+								"view": "collection-workspace",
+								"source": "memory-items",
+								"title": "いつも使う記憶（長期）"
+							},
+							{
+								"view": "collection-workspace",
+								"source": "memory-tendencies",
+								"title": "傾向"
+							},
+							{
+								"view": "collection-workspace",
+								"source": "memory-short-term",
+								"title": "最近の活動・メモ（短期）"
+							},
+							{
+								"view": "collection-workspace",
+								"source": "memory-context",
+								"title": "いまの文脈"
+							},
+							{
+								"view": "collection-workspace",
+								"source": "memory-history",
+								"title": "記憶の履歴"
+							}
+						]
+					}
+				}
+			],
+			"defaultVariant": "standard",
+			"sourceBindings": [
+				{
+					"source": "memory-status",
+					"adapterRef": "adapter:memory@1",
+					"query": "query:memory.status@1",
+					"target": "none"
+				},
+				{
+					"source": "memory-items",
+					"adapterRef": "adapter:memory@1",
+					"query": "query:memory.items@1",
+					"target": "none",
+					"paramsSchemaRef": "schema:memory-page@1"
+				},
+				{
+					"source": "memory-tendencies",
+					"adapterRef": "adapter:memory@1",
+					"query": "query:memory.tendencies@1",
+					"target": "none"
+				},
+				{
+					"source": "memory-short-term",
+					"adapterRef": "adapter:memory@1",
+					"query": "query:memory.short-term@1",
+					"target": "none"
+				},
+				{
+					"source": "memory-context",
+					"adapterRef": "adapter:memory@1",
+					"query": "query:memory.context@1",
+					"target": "none"
+				},
+				{
+					"source": "memory-history",
+					"adapterRef": "adapter:memory@1",
+					"query": "query:memory.item-history@1",
+					"target": "none",
+					"paramsSchemaRef": "schema:memory-page@1"
+				}
+			],
+			"actionBindings": [
+				{
+					"actionId": "connect",
+					"eventAction": "memory-connect",
+					"source": "memory-status",
+					"inputSchemaRef": "schema:memory-set-enabled@1",
+					"effect": "write",
+					"operationId": "memory.set-enabled",
+					"label": "メモリーを接続",
+					"rowInput": {
+						"enabled": {
+							"literal": true
+						}
+					}
+				},
+				{
+					"actionId": "disconnect",
+					"eventAction": "memory-disconnect",
+					"source": "memory-status",
+					"inputSchemaRef": "schema:memory-set-enabled@1",
+					"effect": "write",
+					"operationId": "memory.set-enabled",
+					"label": "メモリーを切断",
+					"rowInput": {
+						"enabled": {
+							"literal": false
+						}
+					}
+				},
+				{
+					"actionId": "item-stop",
+					"eventAction": "memory-item-stop",
+					"source": "memory-items",
+					"inputSchemaRef": "schema:memory-item-revision@1",
+					"effect": "write",
+					"operationId": "memory.stop",
+					"label": "利用を止める",
+					"rowInput": {
+						"id": "$row.id",
+						"expectedRevision": "$row.revision"
+					}
+				},
+				{
+					"actionId": "item-resume",
+					"eventAction": "memory-item-resume",
+					"source": "memory-items",
+					"inputSchemaRef": "schema:memory-item-revision@1",
+					"effect": "write",
+					"operationId": "memory.resume",
+					"label": "再開する",
+					"rowInput": {
+						"id": "$row.id",
+						"expectedRevision": "$row.revision"
+					}
+				},
+				{
+					"actionId": "item-retract",
+					"eventAction": "memory-item-retract",
+					"source": "memory-items",
+					"inputSchemaRef": "schema:memory-item-revision@1",
+					"effect": "write",
+					"operationId": "memory.retract",
+					"label": "誤りとして撤回",
+					"rowInput": {
+						"id": "$row.id",
+						"expectedRevision": "$row.revision"
+					}
+				},
+				{
+					"actionId": "item-forget",
+					"eventAction": "memory-item-forget",
+					"source": "memory-items",
+					"inputSchemaRef": "schema:memory-id@1",
+					"effect": "write",
+					"operationId": "memory.forget",
+					"label": "完全に消す",
+					"rowInput": {
+						"id": "$row.id"
+					}
+				},
+				{
+					"actionId": "tendency-delete",
+					"eventAction": "memory-tendency-delete",
+					"source": "memory-tendencies",
+					"inputSchemaRef": "schema:memory-id@1",
+					"effect": "write",
+					"operationId": "memory.delete-tendency",
+					"label": "傾向を削除",
+					"rowInput": {
+						"id": "$row.id"
+					}
+				},
+				{
+					"actionId": "note-resolve",
+					"eventAction": "memory-note-resolve",
+					"source": "memory-short-term",
+					"inputSchemaRef": "schema:memory-continuity-transition@1",
+					"effect": "write",
+					"operationId": "memory.continuity-transition",
+					"label": "完了にする",
+					"rowInput": {
+						"id": "$row.id",
+						"expectedRevision": "$row.revision",
+						"status": {
+							"literal": "resolved"
+						}
+					}
+				},
+				{
+					"actionId": "note-retract",
+					"eventAction": "memory-note-retract",
+					"source": "memory-short-term",
+					"inputSchemaRef": "schema:memory-continuity-transition@1",
+					"effect": "write",
+					"operationId": "memory.continuity-transition",
+					"label": "取り消す",
+					"rowInput": {
+						"id": "$row.id",
+						"expectedRevision": "$row.revision",
+						"status": {
+							"literal": "retracted"
+						}
+					}
+				},
+				{
+					"actionId": "history-forget",
+					"eventAction": "memory-history-forget",
+					"source": "memory-history",
+					"inputSchemaRef": "schema:memory-id@1",
+					"effect": "write",
+					"operationId": "memory.forget",
+					"label": "完全に消す",
+					"rowInput": {
+						"id": "$row.id"
+					}
+				}
+			],
+			"collections": [
+				{
+					"source": "memory-status",
+					"title": "会話への接続",
+					"rowKey": "id",
+					"rowsPath": "items",
+					"columns": [
+						{
+							"key": "state",
+							"label": "状態",
+							"format": "badge"
+						},
+						{
+							"key": "integrity",
+							"label": "保存した記憶の整合性",
+							"format": "text"
+						}
+					],
+					"rowActions": [
+						{
+							"actionId": "connect",
+							"when": {
+								"key": "canConnect",
+								"in": [true]
+							}
+						},
+						{
+							"actionId": "disconnect",
+							"when": {
+								"key": "enabled",
+								"in": [true]
+							},
+							"confirm": "切断しても保存した記憶は残り、再接続すると利用を再開します。切断前の記憶を使って生成中の回答は採用されません。会話履歴は引き続き使われます。切断しますか？"
+						}
+					]
+				},
+				{
+					"source": "memory-items",
+					"title": "いつも使う記憶（長期）",
+					"rowKey": "id",
+					"rowsPath": "items",
+					"paging": true,
+					"columns": [
+						{
+							"key": "kindLabel",
+							"label": "種類",
+							"format": "badge"
+						},
+						{
+							"key": "text",
+							"label": "内容",
+							"format": "text"
+						},
+						{
+							"key": "statusLabel",
+							"label": "状態",
+							"format": "badge"
+						},
+						{
+							"key": "capturedByLabel",
+							"label": "記憶のしかた",
+							"format": "text"
+						},
+						{
+							"key": "validity",
+							"label": "期間",
+							"format": "text"
+						},
+						{
+							"key": "quote",
+							"label": "元の発言",
+							"format": "text"
+						}
+					],
+					"rowActions": [
+						{
+							"actionId": "item-stop",
+							"when": {
+								"key": "status",
+								"in": ["active"]
+							}
+						},
+						{
+							"actionId": "item-resume",
+							"when": {
+								"key": "status",
+								"in": ["inactive"]
+							}
+						},
+						{
+							"actionId": "item-retract",
+							"when": {
+								"key": "status",
+								"in": ["active", "inactive"]
+							},
+							"confirm": "この記憶を誤りとして撤回します。履歴には残り、回答には使われなくなります。よろしいですか？"
+						},
+						{
+							"actionId": "item-forget",
+							"confirm": "完全に消すと元に戻せません。よろしいですか？"
+						}
+					]
+				},
+				{
+					"source": "memory-tendencies",
+					"title": "傾向",
+					"rowKey": "id",
+					"rowsPath": "items",
+					"columns": [
+						{
+							"key": "text",
+							"label": "傾向",
+							"format": "text"
+						},
+						{
+							"key": "updatedAt",
+							"label": "更新",
+							"format": "date"
+						}
+					],
+					"rowActions": [
+						{
+							"actionId": "tendency-delete",
+							"confirm": "削除すると元に戻せません。よろしいですか？"
+						}
+					]
+				},
+				{
+					"source": "memory-short-term",
+					"title": "最近の活動・メモ（短期）",
+					"rowKey": "id",
+					"rowsPath": "items",
+					"columns": [
+						{
+							"key": "kindLabel",
+							"label": "種類",
+							"format": "badge"
+						},
+						{
+							"key": "text",
+							"label": "内容",
+							"format": "text"
+						},
+						{
+							"key": "originLabel",
+							"label": "記録のしかた",
+							"format": "text"
+						},
+						{
+							"key": "expiresAt",
+							"label": "期限",
+							"format": "date"
+						}
+					],
+					"rowActions": [
+						{
+							"actionId": "note-resolve"
+						},
+						{
+							"actionId": "note-retract"
+						}
+					]
+				},
+				{
+					"source": "memory-context",
+					"title": "いまの文脈",
+					"rowKey": "id",
+					"rowsPath": "items",
+					"columns": [
+						{
+							"key": "state",
+							"label": "状態",
+							"format": "text"
+						},
+						{
+							"key": "version",
+							"label": "版",
+							"format": "number"
+						},
+						{
+							"key": "longTerm",
+							"label": "長期",
+							"format": "text"
+						},
+						{
+							"key": "shortTerm",
+							"label": "短期",
+							"format": "text"
+						},
+						{
+							"key": "pendingAdditions",
+							"label": "追加待ち",
+							"format": "number"
+						},
+						{
+							"key": "notices",
+							"label": "次の会話で伝える通知",
+							"format": "number"
+						}
+					]
+				},
+				{
+					"source": "memory-history",
+					"title": "記憶の履歴（置き換え・撤回済みなど）",
+					"rowKey": "id",
+					"rowsPath": "items",
+					"paging": true,
+					"columns": [
+						{
+							"key": "kindLabel",
+							"label": "種類",
+							"format": "badge"
+						},
+						{
+							"key": "text",
+							"label": "内容",
+							"format": "text"
+						},
+						{
+							"key": "statusLabel",
+							"label": "状態",
+							"format": "badge"
+						},
+						{
+							"key": "capturedByLabel",
+							"label": "記憶のしかた",
+							"format": "text"
+						},
+						{
+							"key": "quote",
+							"label": "元の発言",
+							"format": "text"
+						}
+					],
+					"rowActions": [
+						{
+							"actionId": "history-forget",
+							"confirm": "完全に消すと元に戻せません。よろしいですか？"
+						}
+					]
+				}
+			],
+			"launcher": {
+				"label": "記憶",
+				"group": "管理と確認",
+				"order": 80,
+				"description": "保存した好みや事実 傾向 短期のメモ 会話への接続"
+			}
+		}
+	],
+	"schemas": [
+		{
+			"kind": "schema",
+			"id": "memory-page",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"pageIndex": {
+						"type": "integer",
+						"minimum": 0,
+						"maximum": 100000
+					},
+					"pageSize": {
+						"type": "integer",
+						"enum": [10, 25, 50]
+					},
+					"sort": {
+						"type": "string",
+						"enum": ["text", "kind", "status", "capturedBy"]
+					},
+					"desc": {
+						"type": "boolean"
+					},
+					"q": {
+						"type": "string",
+						"maxLength": 200
+					}
+				}
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "memory-set-enabled",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"enabled": {
+						"type": "boolean"
+					}
+				},
+				"required": ["enabled"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "memory-item-revision",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"id": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 200
+					},
+					"expectedRevision": {
+						"type": "integer",
+						"minimum": 1
+					}
+				},
+				"required": ["id", "expectedRevision"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "memory-id",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"id": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 200
+					}
+				},
+				"required": ["id"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "memory-continuity-transition",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"id": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 200
+					},
+					"expectedRevision": {
+						"type": "integer",
+						"minimum": 1
+					},
+					"status": {
+						"type": "string",
+						"enum": ["resolved", "retracted"]
+					}
+				},
+				"required": ["id", "expectedRevision", "status"]
+			}
+		}
+	]
+}

@@ -1,3 +1,4 @@
+import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { DeleteInput, Entry, SaveInput } from "../contracts";
 import { list, lookup, remove, upsert } from "../repository";
@@ -7,6 +8,29 @@ export function createTtsDictionary(store: SqliteStore) {
 	// Dropped inside the same synchronous transaction callback that writes, so
 	// no read can recompile from pre-commit data in between.
 	let compiled: ((text: string) => string) | null = null;
+	function saveInTransaction(db: Database, input: SaveInput): Entry[] {
+		const { original, entry, expected } = input;
+		const previous = original === null ? null : lookup(db, original);
+		// An identical retry must not touch updated_at.
+		if (original === entry.written && previous === entry.spoken)
+			return list(db);
+		if (previous !== expected.spoken) throw new Error("revision_conflict");
+		if (original !== entry.written && lookup(db, entry.written) !== null)
+			throw new Error("revision_conflict");
+		if (original !== null && original !== entry.written) remove(db, original);
+		upsert(db, entry, Date.now());
+		compiled = null;
+		return list(db);
+	}
+	function deleteInTransaction(db: Database, input: DeleteInput): Entry[] {
+		const previous = lookup(db, input.written);
+		if (previous === null) return list(db);
+		if (previous !== input.expected.spoken)
+			throw new Error("revision_conflict");
+		remove(db, input.written);
+		compiled = null;
+		return list(db);
+	}
 	return {
 		list: () => store.read(list),
 		/** Replaces registered written forms with their readings for one speech request. */
@@ -19,32 +43,14 @@ export function createTtsDictionary(store: SqliteStore) {
 				? text
 				: replaced;
 		},
+		/** The list inside the caller's transaction (UI adapters read and write in one). */
+		listInTransaction: (db: Database): Entry[] => list(db),
 		save: (input: SaveInput): Promise<Entry[]> =>
-			store.write((db) => {
-				const { original, entry, expected } = input;
-				const previous = original === null ? null : lookup(db, original);
-				// An identical retry must not touch updated_at.
-				if (original === entry.written && previous === entry.spoken)
-					return list(db);
-				if (previous !== expected.spoken) throw new Error("revision_conflict");
-				if (original !== entry.written && lookup(db, entry.written) !== null)
-					throw new Error("revision_conflict");
-				if (original !== null && original !== entry.written)
-					remove(db, original);
-				upsert(db, entry, Date.now());
-				compiled = null;
-				return list(db);
-			}),
+			store.write((db) => saveInTransaction(db, input)),
 		delete: (input: DeleteInput): Promise<Entry[]> =>
-			store.write((db) => {
-				const previous = lookup(db, input.written);
-				if (previous === null) return list(db);
-				if (previous !== input.expected.spoken)
-					throw new Error("revision_conflict");
-				remove(db, input.written);
-				compiled = null;
-				return list(db);
-			}),
+			store.write((db) => deleteInTransaction(db, input)),
+		saveInTransaction,
+		deleteInTransaction,
 	};
 }
 export type TtsDictionaryService = ReturnType<typeof createTtsDictionary>;

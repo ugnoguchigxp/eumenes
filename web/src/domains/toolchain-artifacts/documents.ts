@@ -43,6 +43,17 @@ export type DocumentAccess = {
 	rule(field: DocumentFieldV1, target?: string): FieldRule | null;
 	/** Array elements a field with a `target` applies to. */
 	targets(field: DocumentFieldV1): ReadonlyArray<{ id: string; label: string }>;
+	/**
+	 * Structural operations an apply must carry because the user has to confirm them (e.g. a
+	 * new origin for a connection that holds credentials). The host asks `prompt` first.
+	 */
+	confirmations?(dirty: ReadonlyArray<Resolved>): ReadonlyArray<{
+		structure: string;
+		input: Record<string, unknown>;
+		prompt: string;
+		/** Said when the user declines. */
+		declined: string;
+	}>;
 	/** Other fields an edit implies (by document path), e.g. a new voice resets its style. */
 	derive?(
 		field: DocumentFieldV1,
@@ -230,6 +241,14 @@ export function reviewRows(
 						: displayOf(field, rule, entry.change.value, "サービスの標準"),
 			};
 		});
+	rows.unshift(
+		...view.structural.map((entry) => ({
+			id: `structure:${entry.id}`,
+			label: "構成の変更",
+			before: "現在の構成",
+			after: entry.label,
+		})),
+	);
 	if (view.secrets.length)
 		rows.push({
 			id: "credentials",

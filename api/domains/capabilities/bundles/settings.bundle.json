@@ -8,7 +8,7 @@
 		{
 			"kind": "artifact",
 			"id": "settings.hub",
-			"revision": 1,
+			"revision": 3,
 			"title": "設定（データドリブン）",
 			"variants": [
 				{
@@ -43,7 +43,14 @@
 							"conversation": "settings.conversation",
 							"voice": "settings.voice-input",
 							"display": "settings.display",
-							"records": "settings.records"
+							"records": "settings.records",
+							"ai": "settings.ai-connections",
+							"external": "settings.external-work",
+							"dictionary": "settings.dictionary",
+							"memory": "settings.memory",
+							"world": "settings.world",
+							"dots": "settings.dots",
+							"service-tests": "settings.service-tests"
 						}
 					}
 				}
@@ -56,7 +63,7 @@
 		{
 			"kind": "artifact",
 			"id": "settings.conversation",
-			"revision": 1,
+			"revision": 2,
 			"title": "会話の設定",
 			"variants": [
 				{
@@ -92,7 +99,7 @@
 					"actionId": "apply",
 					"eventAction": "settings-apply",
 					"source": "settings-conversation",
-					"inputSchemaRef": "schema:settings-apply@1",
+					"inputSchemaRef": "schema:settings-apply@2",
 					"effect": "write",
 					"operationId": "settings.apply",
 					"draftDocument": "document:settings@1",
@@ -164,8 +171,800 @@
 		},
 		{
 			"kind": "artifact",
+			"id": "settings.ai-connections",
+			"revision": 3,
+			"title": "AIと接続",
+			"variants": [
+				{
+					"id": "standard",
+					"label": "標準",
+					"definition": {
+						"view": "layout",
+						"direction": "stack",
+						"title": "AIと接続",
+						"children": [
+							{
+								"view": "settings-section",
+								"source": "settings-ai",
+								"title": "AIと接続"
+							},
+							{
+								"view": "collection-workspace",
+								"source": "settings-connections",
+								"title": "クラウド接続"
+							},
+							{
+								"view": "collection-workspace",
+								"source": "settings-resources",
+								"title": "モデル"
+							},
+							{
+								"view": "collection-workspace",
+								"source": "inference-probe-targets",
+								"title": "接続の確認"
+							},
+							{
+								"view": "collection-workspace",
+								"source": "inference-probes",
+								"title": "接続確認の記録"
+							}
+						]
+					}
+				}
+			],
+			"defaultVariant": "standard",
+			"sourceBindings": [
+				{
+					"source": "settings-ai",
+					"adapterRef": "adapter:settings@1",
+					"query": "query:settings.document@1",
+					"target": "none"
+				},
+				{
+					"source": "settings-connections",
+					"adapterRef": "adapter:settings@1",
+					"query": "query:settings.connections@1",
+					"target": "none"
+				},
+				{
+					"source": "settings-resources",
+					"adapterRef": "adapter:settings@1",
+					"query": "query:settings.resources@1",
+					"target": "none"
+				},
+				{
+					"source": "settings-llm-resources",
+					"adapterRef": "adapter:settings@1",
+					"query": "query:settings.llm-resources@1",
+					"target": "none"
+				},
+				{
+					"source": "settings-asr-resources",
+					"adapterRef": "adapter:settings@1",
+					"query": "query:settings.asr-resources@1",
+					"target": "none"
+				},
+				{
+					"source": "settings-tts-resources",
+					"adapterRef": "adapter:settings@1",
+					"query": "query:settings.tts-resources@1",
+					"target": "none"
+				},
+				{
+					"source": "settings-routes",
+					"adapterRef": "adapter:settings@1",
+					"query": "query:settings.routes@1",
+					"target": "none"
+				},
+				{
+					"source": "inference-larm",
+					"adapterRef": "adapter:inference@1",
+					"query": "query:inference.larm@1",
+					"target": "none"
+				},
+				{
+					"source": "inference-last-usage",
+					"adapterRef": "adapter:inference@1",
+					"query": "query:inference.last-usage@1",
+					"target": "none"
+				},
+				{
+					"source": "inference-probes",
+					"adapterRef": "adapter:inference@1",
+					"query": "query:inference.probes@1",
+					"target": "none"
+				},
+				{
+					"source": "inference-probe-targets",
+					"adapterRef": "adapter:inference@1",
+					"query": "query:inference.probe-targets@1",
+					"target": "none"
+				}
+			],
+			"actionBindings": [
+				{
+					"actionId": "edit",
+					"eventAction": "settings-edit",
+					"source": "settings-ai",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "draft",
+					"draftAction": "edit",
+					"draftDocument": "document:settings@1"
+				},
+				{
+					"actionId": "apply",
+					"eventAction": "settings-apply",
+					"source": "settings-ai",
+					"inputSchemaRef": "schema:settings-apply@2",
+					"effect": "write",
+					"operationId": "settings.apply",
+					"draftDocument": "document:settings@1",
+					"confidentialFields": ["keys"]
+				},
+				{
+					"actionId": "review",
+					"eventAction": "settings-review",
+					"source": "settings-ai",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "navigate",
+					"navigateTo": {
+						"artifactId": "settings.changes"
+					}
+				},
+				{
+					"actionId": "add-connection",
+					"eventAction": "settings-add-connection",
+					"source": "settings-ai",
+					"inputSchemaRef": "schema:settings-add-connection@2",
+					"effect": "draft",
+					"draftAction": "structure",
+					"structure": "structure:settings.add-connection@1",
+					"draftDocument": "document:settings@1",
+					"label": "クラウドAPIを登録",
+					"rowInput": {
+						"connectionId": {
+							"generate": "uuid"
+						}
+					},
+					"confidentialFields": ["apiKey"]
+				},
+				{
+					"actionId": "delete-connection",
+					"eventAction": "settings-delete-connection",
+					"source": "settings-ai",
+					"inputSchemaRef": "schema:settings-delete-connection@1",
+					"effect": "draft",
+					"draftAction": "structure",
+					"structure": "structure:settings.delete-connection@1",
+					"draftDocument": "document:settings@1",
+					"label": "削除",
+					"rowInput": {
+						"connectionId": "$row.id"
+					}
+				},
+				{
+					"actionId": "add-resource",
+					"eventAction": "settings-add-resource",
+					"source": "settings-ai",
+					"inputSchemaRef": "schema:settings-add-resource@1",
+					"effect": "draft",
+					"draftAction": "structure",
+					"structure": "structure:settings.add-resource@1",
+					"draftDocument": "document:settings@1",
+					"label": "この接続にモデルを追加",
+					"rowInput": {
+						"resourceId": {
+							"generate": "uuid"
+						}
+					}
+				},
+				{
+					"actionId": "delete-resource",
+					"eventAction": "settings-delete-resource",
+					"source": "settings-ai",
+					"inputSchemaRef": "schema:settings-delete-resource@1",
+					"effect": "draft",
+					"draftAction": "structure",
+					"structure": "structure:settings.delete-resource@1",
+					"draftDocument": "document:settings@1",
+					"label": "削除",
+					"rowInput": {
+						"resourceId": "$row.id"
+					}
+				},
+				{
+					"actionId": "confirm-larm-origin",
+					"eventAction": "settings-confirm-larm-origin",
+					"source": "settings-ai",
+					"inputSchemaRef": "schema:settings-confirm-larm-origin@1",
+					"effect": "draft",
+					"draftAction": "structure",
+					"structure": "structure:settings.confirm-larm-origin@1",
+					"draftDocument": "document:settings@1",
+					"label": "LARMの接続先の変更を確認"
+				},
+				{
+					"actionId": "probe",
+					"eventAction": "settings-probe",
+					"source": "inference-probe-targets",
+					"inputSchemaRef": "schema:inference-probe-start@1",
+					"effect": "write",
+					"operationId": "inference.probe-start",
+					"rowInput": {
+						"target": "$row.id"
+					},
+					"label": "接続を確認"
+				},
+				{
+					"actionId": "probe-cancel",
+					"eventAction": "settings-probe-cancel",
+					"source": "inference-probes",
+					"inputSchemaRef": "schema:inference-probe-cancel@1",
+					"effect": "write",
+					"operationId": "inference.probe-cancel",
+					"rowInput": {
+						"id": "$row.id"
+					},
+					"label": "中止"
+				}
+			],
+			"launcher": {
+				"label": "AIと接続",
+				"group": "使い方を変える",
+				"order": 15,
+				"description": "LARM 利用先 クラウド接続 モデル"
+			},
+			"fields": [
+				{
+					"fieldId": "larm.url",
+					"document": "document:settings@1",
+					"path": "$.larm.baseUrl",
+					"label": "LARMのURL",
+					"control": "text",
+					"group": "larm",
+					"help": "空欄ならbackend既定のLARMに接続します。",
+					"maxLength": 2048,
+					"unset": "null"
+				},
+				{
+					"fieldId": "larm.profile",
+					"document": "document:settings@1",
+					"path": "$.larm.profile",
+					"label": "Profile",
+					"control": "text",
+					"group": "larm",
+					"maxLength": 200
+				},
+				{
+					"fieldId": "larm.audience",
+					"document": "document:settings@1",
+					"path": "$.larm.audience",
+					"label": "接続方式",
+					"control": "select",
+					"group": "larm",
+					"options": [
+						{
+							"value": "saaa-desktop",
+							"label": "LARMが提供する接続"
+						},
+						{
+							"value": "same-host",
+							"label": "同じ端末の接続"
+						}
+					]
+				},
+				{
+					"fieldId": "route.llm.mode",
+					"document": "document:settings@1",
+					"path": "$.routes.llm.mode",
+					"label": "会話：使い方",
+					"control": "select",
+					"group": "route-llm",
+					"options": [
+						{
+							"value": "larm-preferred",
+							"label": "LARMを優先・クラウドへ自動切替"
+						},
+						{
+							"value": "larm-only",
+							"label": "LARMのみ"
+						},
+						{
+							"value": "cloud-only",
+							"label": "クラウドのみ"
+						}
+					]
+				},
+				{
+					"fieldId": "route.llm.fallback",
+					"document": "document:settings@1",
+					"path": "$.routes.llm.fallbackId",
+					"label": "会話：クラウド代替先",
+					"control": "select",
+					"group": "route-llm",
+					"unset": "null",
+					"optionsSource": "query:settings.llm-resources@1"
+				},
+				{
+					"fieldId": "route.llm.cloud-allowed",
+					"document": "document:settings@1",
+					"path": "$.routes.llm.cloudAllowed",
+					"label": "会話：この用途でクラウド送信を許可",
+					"control": "toggle",
+					"group": "route-llm",
+					"help": "許可を取り消して適用すると、実行中のクラウド処理も取り消します。"
+				},
+				{
+					"fieldId": "route.asr.mode",
+					"document": "document:settings@1",
+					"path": "$.routes.asr.mode",
+					"label": "聞き取り：使い方",
+					"control": "select",
+					"group": "route-asr",
+					"options": [
+						{
+							"value": "larm-preferred",
+							"label": "LARMを優先・クラウドへ自動切替"
+						},
+						{
+							"value": "larm-only",
+							"label": "LARMのみ"
+						},
+						{
+							"value": "cloud-only",
+							"label": "クラウドのみ"
+						}
+					]
+				},
+				{
+					"fieldId": "route.asr.fallback",
+					"document": "document:settings@1",
+					"path": "$.routes.asr.fallbackId",
+					"label": "聞き取り：クラウド代替先",
+					"control": "select",
+					"group": "route-asr",
+					"unset": "null",
+					"optionsSource": "query:settings.asr-resources@1"
+				},
+				{
+					"fieldId": "route.asr.cloud-allowed",
+					"document": "document:settings@1",
+					"path": "$.routes.asr.cloudAllowed",
+					"label": "聞き取り：この用途でクラウド送信を許可",
+					"control": "toggle",
+					"group": "route-asr",
+					"help": "許可を取り消して適用すると、実行中のクラウド処理も取り消します。"
+				},
+				{
+					"fieldId": "route.tts.mode",
+					"document": "document:settings@1",
+					"path": "$.routes.tts.mode",
+					"label": "読み上げ：使い方",
+					"control": "select",
+					"group": "route-tts",
+					"options": [
+						{
+							"value": "larm-preferred",
+							"label": "LARMを優先・クラウドへ自動切替"
+						},
+						{
+							"value": "larm-only",
+							"label": "LARMのみ"
+						},
+						{
+							"value": "cloud-only",
+							"label": "クラウドのみ"
+						}
+					]
+				},
+				{
+					"fieldId": "route.tts.fallback",
+					"document": "document:settings@1",
+					"path": "$.routes.tts.fallbackId",
+					"label": "読み上げ：クラウド代替先",
+					"control": "select",
+					"group": "route-tts",
+					"unset": "null",
+					"optionsSource": "query:settings.tts-resources@1"
+				},
+				{
+					"fieldId": "route.tts.cloud-allowed",
+					"document": "document:settings@1",
+					"path": "$.routes.tts.cloudAllowed",
+					"label": "読み上げ：この用途でクラウド送信を許可",
+					"control": "toggle",
+					"group": "route-tts",
+					"help": "許可を取り消して適用すると、実行中のクラウド処理も取り消します。"
+				},
+				{
+					"fieldId": "connection.name",
+					"document": "document:settings@1",
+					"path": "$.connections[id=$target].name",
+					"label": "接続名",
+					"control": "text",
+					"group": "connection",
+					"maxLength": 80,
+					"target": "settings-connections"
+				},
+				{
+					"fieldId": "connection.url",
+					"document": "document:settings@1",
+					"path": "$.connections[id=$target].baseUrl",
+					"label": "APIのベースURL",
+					"control": "text",
+					"group": "connection",
+					"maxLength": 2048,
+					"target": "settings-connections"
+				},
+				{
+					"fieldId": "connection.env-ref",
+					"document": "document:settings@1",
+					"path": "$.connections[id=$target].envRef",
+					"label": "認証用の環境変数名",
+					"control": "text",
+					"group": "connection",
+					"help": "環境変数を使う場合はAPIキー欄を空にしてください。",
+					"maxLength": 128,
+					"unset": "null",
+					"target": "settings-connections"
+				},
+				{
+					"fieldId": "connection.enabled",
+					"document": "document:settings@1",
+					"path": "$.connections[id=$target].enabled",
+					"label": "この接続を有効にする",
+					"control": "toggle",
+					"group": "connection",
+					"target": "settings-connections"
+				},
+				{
+					"fieldId": "connection.agent",
+					"document": "document:settings@1",
+					"path": "$.connections[id=$target].agentId",
+					"label": "エージェントID",
+					"control": "text",
+					"group": "connection",
+					"unset": "null",
+					"target": "settings-connections",
+					"visibleWhen": "condition:settings.connection-managed-agents@1"
+				},
+				{
+					"fieldId": "connection.environment",
+					"document": "document:settings@1",
+					"path": "$.connections[id=$target].environmentId",
+					"label": "環境ID",
+					"control": "text",
+					"group": "connection",
+					"unset": "null",
+					"target": "settings-connections",
+					"visibleWhen": "condition:settings.connection-managed-agents@1"
+				},
+				{
+					"fieldId": "connection.api-key",
+					"document": "document:settings@1",
+					"path": "$.connections[id=$target].apiKey",
+					"label": "APIキーの更新",
+					"control": "text",
+					"group": "connection",
+					"confidential": true,
+					"unset": "null",
+					"help": "空欄なら保存済みのキーを維持します。キーは変更一覧にも表示しません。",
+					"target": "settings-connections"
+				},
+				{
+					"fieldId": "resource.purpose",
+					"document": "document:settings@1",
+					"path": "$.resources[id=$target].purpose",
+					"label": "用途",
+					"control": "select",
+					"group": "model",
+					"target": "settings-resources",
+					"options": [
+						{
+							"value": "llm",
+							"label": "会話"
+						},
+						{
+							"value": "asr",
+							"label": "聞き取り"
+						},
+						{
+							"value": "tts",
+							"label": "読み上げ"
+						}
+					],
+					"visibleWhen": "condition:settings.connection-openai-compatible@1"
+				},
+				{
+					"fieldId": "resource.model",
+					"document": "document:settings@1",
+					"path": "$.resources[id=$target].model",
+					"label": "モデル名",
+					"control": "text",
+					"group": "model",
+					"maxLength": 200,
+					"target": "settings-resources"
+				},
+				{
+					"fieldId": "resource.context",
+					"document": "document:settings@1",
+					"path": "$.resources[id=$target].contextWindow",
+					"label": "文脈長",
+					"control": "number",
+					"group": "model",
+					"min": 2048,
+					"max": 2000000,
+					"step": 1,
+					"target": "settings-resources",
+					"visibleWhen": "condition:settings.resource-llm@1"
+				}
+			],
+			"collections": [
+				{
+					"source": "settings-connections",
+					"title": "クラウド接続",
+					"rowKey": "id",
+					"rowsPath": "targets",
+					"columns": [
+						{
+							"key": "label",
+							"label": "接続名",
+							"format": "text"
+						},
+						{
+							"key": "kind",
+							"label": "種類",
+							"format": "badge"
+						},
+						{
+							"key": "enabled",
+							"label": "有効",
+							"format": "boolean"
+						},
+						{
+							"key": "credential",
+							"label": "認証",
+							"format": "badge"
+						}
+					],
+					"rowActions": [
+						{
+							"actionId": "delete-connection",
+							"confirm": "この接続と、登録済みのモデルを削除します。割当は解除されます。"
+						}
+					],
+					"create": {
+						"actionId": "add-connection",
+						"fields": [
+							{
+								"fieldId": "kind",
+								"label": "接続の種類",
+								"control": "select",
+								"required": false,
+								"defaultValue": "openai-compatible",
+								"options": [
+									{
+										"value": "openai-compatible",
+										"label": "OpenAI互換API"
+									},
+									{
+										"value": "codex-sdk",
+										"label": "Codex SDK"
+									},
+									{
+										"value": "claude-agent-sdk",
+										"label": "Claude Agent SDK"
+									},
+									{
+										"value": "claude-managed-agents",
+										"label": "Claude Managed Agents"
+									}
+								]
+							},
+							{
+								"fieldId": "name",
+								"label": "接続名",
+								"control": "text",
+								"required": true,
+								"maxLength": 80
+							},
+							{
+								"fieldId": "baseUrl",
+								"label": "APIのベースURL",
+								"control": "text",
+								"required": true,
+								"maxLength": 2048,
+								"help": "例: https://example.com/v1。末尾に用途別のAPIパスを追加します。"
+							},
+							{
+								"fieldId": "apiKey",
+								"label": "APIキー",
+								"control": "secret",
+								"confidential": true,
+								"maxLength": 4096
+							},
+							{
+								"fieldId": "envRef",
+								"label": "環境変数名（APIキーの代わり）",
+								"control": "text",
+								"maxLength": 128
+							},
+							{
+								"fieldId": "agentId",
+								"label": "エージェントID",
+								"control": "text",
+								"maxLength": 128,
+								"help": "Claude Managed Agentsのとき、保存済みのエージェントを指定します。"
+							},
+							{
+								"fieldId": "environmentId",
+								"label": "環境ID",
+								"control": "text",
+								"maxLength": 128,
+								"help": "Claude Managed Agentsのとき、環境を指定します。"
+							}
+						]
+					}
+				},
+				{
+					"source": "settings-resources",
+					"title": "モデル",
+					"rowKey": "id",
+					"rowsPath": "targets",
+					"columns": [
+						{
+							"key": "model",
+							"label": "モデル名",
+							"format": "text"
+						},
+						{
+							"key": "purpose",
+							"label": "用途",
+							"format": "badge"
+						},
+						{
+							"key": "connection",
+							"label": "接続",
+							"format": "text"
+						},
+						{
+							"key": "assigned",
+							"label": "代替先",
+							"format": "boolean"
+						}
+					],
+					"rowActions": [
+						{
+							"actionId": "delete-resource",
+							"confirm": "このモデルを削除します。代替先だった用途は解除されます。"
+						}
+					],
+					"create": {
+						"actionId": "add-resource",
+						"fields": [
+							{
+								"fieldId": "connectionId",
+								"label": "接続",
+								"control": "select",
+								"required": true,
+								"optionsSource": "query:settings.connections@1"
+							},
+							{
+								"fieldId": "purpose",
+								"label": "用途",
+								"control": "select",
+								"required": true,
+								"defaultValue": "llm",
+								"options": [
+									{
+										"value": "llm",
+										"label": "会話"
+									},
+									{
+										"value": "asr",
+										"label": "聞き取り"
+									},
+									{
+										"value": "tts",
+										"label": "読み上げ"
+									}
+								]
+							},
+							{
+								"fieldId": "model",
+								"label": "モデル名",
+								"control": "text",
+								"required": true,
+								"maxLength": 200
+							},
+							{
+								"fieldId": "contextWindow",
+								"label": "文脈長",
+								"control": "number",
+								"min": 2048,
+								"max": 2000000,
+								"help": "会話用途のときに指定します。省略すると8192です。"
+							},
+							{
+								"fieldId": "voice",
+								"label": "音声名",
+								"control": "text",
+								"maxLength": 200,
+								"help": "読み上げ用途のときに指定します。"
+							}
+						]
+					}
+				},
+				{
+					"source": "inference-probe-targets",
+					"title": "接続の確認",
+					"rowKey": "id",
+					"rowsPath": "targets",
+					"columns": [
+						{
+							"key": "label",
+							"label": "対象",
+							"format": "text"
+						},
+						{
+							"key": "purpose",
+							"label": "用途",
+							"format": "badge"
+						}
+					],
+					"rowActions": [
+						{
+							"actionId": "probe"
+						}
+					]
+				},
+				{
+					"source": "inference-probes",
+					"title": "接続確認の記録",
+					"rowKey": "id",
+					"rowsPath": "probes",
+					"columns": [
+						{
+							"key": "label",
+							"label": "対象",
+							"format": "text"
+						},
+						{
+							"key": "status",
+							"label": "結果",
+							"format": "badge"
+						},
+						{
+							"key": "error",
+							"label": "理由",
+							"format": "text"
+						},
+						{
+							"key": "created",
+							"label": "日時",
+							"format": "date"
+						}
+					],
+					"rowActions": [
+						{
+							"actionId": "probe-cancel",
+							"when": {
+								"key": "status",
+								"in": ["running"]
+							}
+						}
+					],
+					"refreshWhile": {
+						"key": "status",
+						"in": ["running"]
+					}
+				}
+			]
+		},
+		{
+			"kind": "artifact",
 			"id": "settings.voice-input",
-			"revision": 1,
+			"revision": 2,
 			"title": "音声と入力",
 			"variants": [
 				{
@@ -213,7 +1012,7 @@
 					"actionId": "apply",
 					"eventAction": "settings-apply",
 					"source": "settings-voice-input",
-					"inputSchemaRef": "schema:settings-apply@1",
+					"inputSchemaRef": "schema:settings-apply@2",
 					"effect": "write",
 					"operationId": "settings.apply",
 					"draftDocument": "document:settings@1",
@@ -492,7 +1291,7 @@
 		{
 			"kind": "artifact",
 			"id": "settings.display",
-			"revision": 1,
+			"revision": 2,
 			"title": "表示",
 			"variants": [
 				{
@@ -545,7 +1344,7 @@
 					"actionId": "apply",
 					"eventAction": "settings-apply",
 					"source": "settings-display",
-					"inputSchemaRef": "schema:settings-apply@1",
+					"inputSchemaRef": "schema:settings-apply@2",
 					"effect": "write",
 					"operationId": "settings.apply",
 					"draftDocument": "document:settings@1",
@@ -668,8 +1467,81 @@
 		},
 		{
 			"kind": "artifact",
+			"id": "settings.external-work",
+			"revision": 2,
+			"title": "外部作業",
+			"variants": [
+				{
+					"id": "standard",
+					"label": "標準",
+					"definition": {
+						"view": "settings-section",
+						"source": "settings-external-work",
+						"title": "外部作業"
+					}
+				}
+			],
+			"defaultVariant": "standard",
+			"sourceBindings": [
+				{
+					"source": "settings-external-work",
+					"adapterRef": "adapter:settings@1",
+					"query": "query:settings.document@1",
+					"target": "none"
+				}
+			],
+			"actionBindings": [
+				{
+					"actionId": "edit",
+					"eventAction": "settings-edit",
+					"source": "settings-external-work",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "draft",
+					"draftAction": "edit",
+					"draftDocument": "document:settings@1"
+				},
+				{
+					"actionId": "apply",
+					"eventAction": "settings-apply",
+					"source": "settings-external-work",
+					"inputSchemaRef": "schema:settings-apply@2",
+					"effect": "write",
+					"operationId": "settings.apply",
+					"draftDocument": "document:settings@1",
+					"confidentialFields": ["keys"]
+				},
+				{
+					"actionId": "review",
+					"eventAction": "settings-review",
+					"source": "settings-external-work",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "navigate",
+					"navigateTo": {
+						"artifactId": "settings.changes"
+					}
+				}
+			],
+			"launcher": {
+				"label": "外部作業",
+				"group": "使い方を変える",
+				"order": 25,
+				"description": "実行前の確認"
+			},
+			"fields": [
+				{
+					"fieldId": "coding.confirm-instructions",
+					"document": "document:settings@1",
+					"path": "$.codingSupervision.approveInstructions",
+					"label": "監督AIの指示を実行前に確認する",
+					"control": "toggle",
+					"help": "リポジトリ内の文章などに誘導された指示が自動で実行されるのを防ぎます。推奨はオンです。"
+				}
+			]
+		},
+		{
+			"kind": "artifact",
 			"id": "settings.changes",
-			"revision": 1,
+			"revision": 2,
 			"title": "設定の変更一覧",
 			"variants": [
 				{
@@ -696,7 +1568,7 @@
 					"actionId": "apply",
 					"eventAction": "settings-apply",
 					"source": "settings-changes",
-					"inputSchemaRef": "schema:settings-apply@1",
+					"inputSchemaRef": "schema:settings-apply@2",
 					"effect": "write",
 					"operationId": "settings.apply",
 					"draftDocument": "document:settings@1",
@@ -721,7 +1593,7 @@
 		{
 			"kind": "artifact",
 			"id": "settings.records",
-			"revision": 1,
+			"revision": 2,
 			"title": "記録",
 			"variants": [
 				{
@@ -806,15 +1678,258 @@
 				"label": "記録",
 				"group": "管理と確認",
 				"order": 40,
-				"description": "AIの利用 ツールチェーン データと診断"
+				"description": "AIの利用 ツールチェーン"
 			}
 		}
 	],
 	"schemas": [
 		{
 			"kind": "schema",
-			"id": "settings-apply",
+			"id": "settings-add-connection",
+			"revision": 2,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"connectionId": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 64,
+						"title": "接続ID"
+					},
+					"kind": {
+						"type": "string",
+						"enum": [
+							"openai-compatible",
+							"codex-sdk",
+							"claude-agent-sdk",
+							"claude-managed-agents"
+						],
+						"title": "接続の種類"
+					},
+					"name": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 80,
+						"title": "接続名"
+					},
+					"baseUrl": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 2048,
+						"title": "APIのベースURL",
+						"description": "APIキーを使う場合の送信先です。"
+					},
+					"envRef": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 128,
+						"title": "環境変数名（APIキーの代わり）"
+					},
+					"apiKey": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 4096,
+						"title": "APIキー",
+						"description": "環境変数名とどちらか一方を指定します。キーは保存せず暗号化して保管します。"
+					},
+					"agentId": {
+						"type": "string",
+						"maxLength": 128,
+						"title": "エージェントID",
+						"description": "Claude Managed Agentsの保存済みエージェント"
+					},
+					"environmentId": {
+						"type": "string",
+						"maxLength": 128,
+						"title": "環境ID",
+						"description": "Claude Managed Agentsの環境"
+					},
+					"enabled": {
+						"type": "boolean",
+						"title": "この接続を有効にする"
+					},
+					"resourceId": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 64,
+						"title": "モデルID"
+					},
+					"purpose": {
+						"type": "string",
+						"enum": ["llm", "asr", "tts"],
+						"title": "用途"
+					},
+					"model": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 200,
+						"title": "モデル名"
+					},
+					"contextWindow": {
+						"type": "integer",
+						"minimum": 2048,
+						"maximum": 2000000,
+						"title": "文脈長"
+					},
+					"voice": {
+						"type": "string",
+						"maxLength": 200,
+						"title": "音声名"
+					},
+					"assign": {
+						"type": "boolean",
+						"title": "この用途の代替先として使う",
+						"description": "既に代替先を選んでいる場合は、その選択を維持します。"
+					}
+				},
+				"required": ["connectionId", "name", "baseUrl"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "settings-delete-connection",
 			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"connectionId": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 64,
+						"title": "接続ID"
+					}
+				},
+				"required": ["connectionId"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "settings-add-resource",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"resourceId": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 64,
+						"title": "モデルID"
+					},
+					"connectionId": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 64,
+						"title": "接続ID"
+					},
+					"purpose": {
+						"type": "string",
+						"enum": ["llm", "asr", "tts"],
+						"title": "用途"
+					},
+					"model": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 200,
+						"title": "モデル名"
+					},
+					"contextWindow": {
+						"type": "integer",
+						"minimum": 2048,
+						"maximum": 2000000,
+						"title": "文脈長"
+					},
+					"voice": {
+						"type": "string",
+						"maxLength": 200,
+						"title": "音声名"
+					},
+					"assign": {
+						"type": "boolean",
+						"title": "この用途の代替先として使う",
+						"description": "既に代替先を選んでいる場合は、その選択を維持します。"
+					}
+				},
+				"required": ["resourceId", "connectionId", "purpose", "model"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "settings-delete-resource",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"resourceId": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 64,
+						"title": "モデルID"
+					}
+				},
+				"required": ["resourceId"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "settings-confirm-larm-origin",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"origin": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 2048,
+						"title": "新しいLARMの接続先（origin）",
+						"description": "変更後の接続先へLARMの認証情報を送ることを確認します。"
+					}
+				},
+				"required": ["origin"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "inference-probe-start",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"target": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 64
+					}
+				},
+				"required": ["target"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "inference-probe-cancel",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"id": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 64
+					}
+				},
+				"required": ["id"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "settings-apply",
+			"revision": 2,
 			"schema": {
 				"type": "object",
 				"additionalProperties": false,
@@ -823,9 +1938,101 @@
 						"type": "integer",
 						"minimum": 0
 					},
+					"structural": {
+						"type": "array",
+						"maxItems": 16,
+						"items": {
+							"type": "object",
+							"additionalProperties": false,
+							"properties": {
+								"structure": {
+									"type": "string",
+									"minLength": 1,
+									"maxLength": 80
+								},
+								"input": {
+									"type": "object",
+									"additionalProperties": false,
+									"properties": {
+										"connectionId": {
+											"type": "string",
+											"minLength": 1,
+											"maxLength": 64
+										},
+										"kind": {
+											"type": "string",
+											"enum": [
+												"openai-compatible",
+												"codex-sdk",
+												"claude-agent-sdk",
+												"claude-managed-agents"
+											]
+										},
+										"name": {
+											"type": "string",
+											"minLength": 1,
+											"maxLength": 80
+										},
+										"baseUrl": {
+											"type": "string",
+											"minLength": 1,
+											"maxLength": 2048
+										},
+										"envRef": {
+											"type": "string",
+											"minLength": 1,
+											"maxLength": 128
+										},
+										"agentId": {
+											"type": "string",
+											"maxLength": 128
+										},
+										"environmentId": {
+											"type": "string",
+											"maxLength": 128
+										},
+										"enabled": {
+											"type": "boolean"
+										},
+										"resourceId": {
+											"type": "string",
+											"minLength": 1,
+											"maxLength": 64
+										},
+										"purpose": {
+											"type": "string",
+											"enum": ["llm", "asr", "tts"]
+										},
+										"model": {
+											"type": "string",
+											"minLength": 1,
+											"maxLength": 200
+										},
+										"contextWindow": {
+											"type": "integer",
+											"minimum": 2048,
+											"maximum": 2000000
+										},
+										"voice": {
+											"type": "string",
+											"maxLength": 200
+										},
+										"assign": {
+											"type": "boolean"
+										},
+										"origin": {
+											"type": "string",
+											"minLength": 1,
+											"maxLength": 2048
+										}
+									}
+								}
+							},
+							"required": ["structure", "input"]
+						}
+					},
 					"changes": {
 						"type": "array",
-						"minItems": 1,
 						"maxItems": 64,
 						"items": {
 							"type": "object",
@@ -877,7 +2084,7 @@
 						}
 					}
 				},
-				"required": ["expectedRevision", "changes"]
+				"required": ["expectedRevision"]
 			}
 		},
 		{

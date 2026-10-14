@@ -1,5 +1,10 @@
+import type { Database } from "bun:sqlite";
 import type { ScopeRef } from "eumenes-world-model";
-import { getIntake, listIntakesOfScope } from "../repository/lifecycle";
+import {
+	getIntake,
+	listIntakesOfScope,
+	type IntakeRow,
+} from "../repository/lifecycle";
 import { createFeedOps } from "./lifecycle-feed";
 import { createForgetOps } from "./lifecycle-forget";
 import { createLifecycleCtx } from "./lifecycle-lock";
@@ -7,7 +12,9 @@ import { createRecoverOps } from "./lifecycle-recover";
 import { createRestoreOps } from "./lifecycle-restore";
 import type {
 	ForgetListItem,
+	ForgetRefusal,
 	ForgetReport,
+	ForgetRequest,
 	LifecycleOptions,
 } from "./lifecycle-types";
 import { sweepReleasePending } from "./usage-ledger";
@@ -34,17 +41,50 @@ export type {
  */
 export function createWorldLifecycle(options: LifecycleOptions) {
 	const ctx = createLifecycleCtx(options);
-	const { store, reportOf, unregisterFor } = ctx;
+	const { store, reportOf, unregisterFor, acceptInWriter } = ctx;
 	const forget = createForgetOps(ctx);
 	const restore = createRestoreOps(ctx, forget);
 	const recover = createRecoverOps(ctx, forget, restore);
 	const feed = createFeedOps(ctx, forget);
+
+	const itemOf = (db: Database, row: IntakeRow): ForgetListItem => ({
+		...reportOf(db, row),
+		origin: row.origin,
+		rootCount: row.roots.length,
+		createdAt: row.createdAt,
+		updatedAt: row.updatedAt,
+	});
 
 	return {
 		/** Durable intake, then World journal, World forget, Memory confirmation, reopen. */
 		acceptForget: forget.acceptForget,
 		/** Resume one forget from wherever it stopped. */
 		resumeForget: forget.advance,
+		/**
+		 * Only the durable intake, in the caller's writer transaction. The caller resumes the
+		 * forget (`resumeForget`) once that transaction has committed; until then it is pending.
+		 */
+		acceptForgetInTransaction: (
+			db: Database,
+			request: ForgetRequest,
+		): ForgetRefusal | ForgetListItem => {
+			const accepted = acceptInWriter(db, request);
+			if ("status" in accepted) return accepted;
+			return itemOf(db, getIntake(db, accepted.forgetId)!);
+		},
+		/** One forget of a Scope as this connection sees it, or null (unknown, or another Scope). */
+		forgetItemInTransaction: (
+			db: Database,
+			scope: ScopeRef,
+			forgetId: string,
+		): ForgetListItem | null => {
+			const row = getIntake(db, forgetId);
+			return row &&
+				row.principal === scope.principal &&
+				row.scopeKey === scope.scopeKey
+				? itemOf(db, row)
+				: null;
+		},
 		/** Resume every forget that is not complete (also done by recoverWorld). */
 		resumeForgets: forget.resumeForgets,
 		forgetStatus: (forgetId: string): ForgetReport | null =>
@@ -65,13 +105,7 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 					scope.principal,
 					scope.scopeKey,
 					Math.max(1, Math.min(limit, 200)),
-				).map((row) => ({
-					...reportOf(db, row),
-					origin: row.origin,
-					rootCount: row.roots.length,
-					createdAt: row.createdAt,
-					updatedAt: row.updatedAt,
-				})),
+				).map((row) => itemOf(db, row)),
 			),
 		recoverWorld: recover.recoverWorld,
 		/**

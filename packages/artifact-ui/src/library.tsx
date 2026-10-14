@@ -37,6 +37,7 @@ import {
 } from "./media-components";
 import { TimerWorkspaceView } from "./timer-components";
 import { SubtitlePreviewView } from "./subtitle-components";
+import { CollectionWorkspaceView } from "./collection-components";
 import { RecordsWorkspaceView } from "./records-components";
 
 const renderers = {
@@ -47,6 +48,7 @@ const renderers = {
 	"image-preview": ImagePreviewView,
 	"image-gallery": ImageGalleryView,
 	"records-workspace": RecordsWorkspaceView,
+	"collection-workspace": CollectionWorkspaceView,
 	"subtitle-preview": SubtitlePreviewView,
 	"settings-section": SettingsSectionView,
 	"settings-navigation": SettingsNavigationView,

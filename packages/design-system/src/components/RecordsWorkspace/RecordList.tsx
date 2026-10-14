@@ -5,10 +5,12 @@ import type { ColumnDef } from "@tanstack/react-table";
 
 export function RecordList({
 	tab,
+	detailMode,
 	busy,
 	onQuery,
 }: {
 	tab: RecordsTab;
+	detailMode: "inline" | "modal";
 	busy?: boolean;
 	onQuery: (query: TableQuery) => void;
 }) {
@@ -35,6 +37,7 @@ export function RecordList({
 			busy={busy || tab.loading}
 			error={tab.error}
 			onQuery={onQuery}
+			detailMode={detailMode}
 			detail={(row) => (
 				<>
 					<dl>

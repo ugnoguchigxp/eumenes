@@ -7,7 +7,12 @@ import type { VoiceTools } from "./useVoiceTools";
  * check on the effective document (saved plus draft) and on what the voice catalog and the
  * browser can do; it never evaluates registered text.
  */
-export type ConditionContext = { effective: Settings; voice: VoiceTools };
+export type ConditionContext = {
+	effective: Settings;
+	voice: VoiceTools;
+	/** The array element a per-target field is evaluated for (a connection or model id). */
+	target?: string;
+};
 
 const local = (c: ConditionContext) => c.voice.target === "local";
 const capability =
@@ -32,6 +37,18 @@ export const settingsConditions: Readonly<
 	/** The browser can route playback to a chosen output device. */
 	"condition:settings.output-device-selectable@1": (c) =>
 		c.voice.outputSupported,
+	/** The connection chosen as the field's target is a Claude Managed Agents connection. */
+	"condition:settings.connection-managed-agents@1": (c) =>
+		c.effective.connections.find((x) => x.id === c.target)?.kind ===
+		"claude-managed-agents",
+	/** The connection chosen as the field's target is an OpenAI-compatible HTTP connection. */
+	"condition:settings.connection-openai-compatible@1": (c) => {
+		const kind = c.effective.connections.find((x) => x.id === c.target)?.kind;
+		return kind === undefined || kind === "openai-compatible";
+	},
+	/** The model chosen as the field's target is a conversation (LLM) model. */
+	"condition:settings.resource-llm@1": (c) =>
+		c.effective.resources.find((x) => x.id === c.target)?.purpose === "llm",
 };
 
 export const settingsConditionIds = Object.keys(settingsConditions);

@@ -1,3 +1,4 @@
+import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { ContinuityItem, ContinuityService } from "../../continuity";
 import type { MemoryContextDto, MemoryTendencyDto } from "../contracts";
@@ -7,7 +8,7 @@ import {
 	readSettings,
 } from "../repository";
 import { LONG_TERM_BYTES, SHORT_TERM_BYTES } from "./context-render";
-import type { ContextWindowStore } from "./context-window";
+import type { ContextWindowStore, WindowSnapshot } from "./context-window";
 
 /**
  * What the settings screen reads besides State: short-term notes, tendencies, and the ContextWindow
@@ -21,6 +22,29 @@ export function createMemoryViews(deps: {
 	healthy: () => boolean;
 }) {
 	const { store, continuity, windows, healthy } = deps;
+	function deleteTendencyInTransaction(db: Database, id: string) {
+		if (!healthy()) throw new Error("memory_unavailable");
+		if (!deleteTendency(db, id)) throw new Error("invalid_memory_item");
+		windows.recordImmediateInTransaction(db, "tendency_delete", null);
+		// The rendered windows still carry the deleted text.
+		windows.purgeInTransaction(db);
+		return { ok: true as const };
+	}
+	const contextOf = (window: WindowSnapshot): MemoryContextDto => ({
+		version: window.version,
+		longTerm: {
+			text: window.longTerm.text,
+			bytes: window.longTerm.bytes,
+			limit: LONG_TERM_BYTES,
+		},
+		shortTerm: {
+			text: window.shortTerm.text,
+			bytes: window.shortTerm.bytes,
+			limit: SHORT_TERM_BYTES,
+			pendingAdditions: window.shortTerm.pendingAdditions,
+		},
+		notices: window.notices.length,
+	});
 	return {
 		/** Active, unexpired short-term notes of a conversation. Empty while memory is unhealthy. */
 		shortTerm(conversationId: string): ContinuityItem[] {
@@ -42,35 +66,26 @@ export function createMemoryViews(deps: {
 		},
 		/** Removes a tendency for good (the user's call); runs in flight are expired, as for any removal. */
 		deleteTendency(id: string): Promise<{ ok: true }> {
-			return store.write((db) => {
-				if (!healthy()) throw new Error("memory_unavailable");
-				if (!deleteTendency(db, id)) throw new Error("invalid_memory_item");
-				windows.recordImmediateInTransaction(db, "tendency_delete", null);
-				// The rendered windows still carry the deleted text.
-				windows.purgeInTransaction(db);
-				return { ok: true as const };
-			});
+			return store.write((db) => deleteTendencyInTransaction(db, id));
 		},
+		/** The same removal inside a writer transaction the caller owns. */
+		deleteTendencyInTransaction,
 		/** The conversation's ContextWindow as it would be read now (a write transaction: it may rebuild). */
 		context(conversationId: string): Promise<MemoryContextDto> {
 			return store.write((db): MemoryContextDto => {
 				if (!healthy() || !readSettings(db).enabled) return { disabled: true };
-				const window = windows.readForRunInTransaction(db, conversationId);
-				return {
-					version: window.version,
-					longTerm: {
-						text: window.longTerm.text,
-						bytes: window.longTerm.bytes,
-						limit: LONG_TERM_BYTES,
-					},
-					shortTerm: {
-						text: window.shortTerm.text,
-						bytes: window.shortTerm.bytes,
-						limit: SHORT_TERM_BYTES,
-						pendingAdditions: window.shortTerm.pendingAdditions,
-					},
-					notices: window.notices.length,
-				};
+				return contextOf(windows.readForRunInTransaction(db, conversationId));
+			});
+		},
+		/**
+		 * The ContextWindow last built for the conversation, read without building it (a read
+		 * connection cannot): `version` says which build it is. null when none was built yet.
+		 */
+		storedContext(conversationId: string): MemoryContextDto | null {
+			return store.read((db): MemoryContextDto | null => {
+				if (!healthy() || !readSettings(db).enabled) return { disabled: true };
+				const window = windows.storedInTransaction(db, conversationId);
+				return window ? contextOf(window) : null;
 			});
 		},
 	};

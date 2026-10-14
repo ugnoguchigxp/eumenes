@@ -34,8 +34,8 @@ const fieldLabel = (id: string) =>
 		.flatMap((a) => a.fields ?? [])
 		.find((f) => f.fieldId === id)!.label;
 
-function open() {
-	const backend = createSettingsBackend({ artifacts });
+function open(cloud?: boolean) {
+	const backend = createSettingsBackend({ artifacts, cloud });
 	render(<Screens backend={backend} start="hub" cache={newCache(backend)} />);
 	return backend;
 }
@@ -99,5 +99,30 @@ test("the shipped bundle's voice fields, languages source and review labels work
 			{ fieldId: "speech.volume", value: "0.4" },
 			{ fieldId: "input.languages", value: '["ja"]' },
 		]),
+	});
+});
+
+test("the shipped AI and connections screen lists each connection as a group with its registered fields", async () => {
+	const backend = open(false);
+	fireEvent.click(await screen.findByRole("button", { name: "AIと接続" }));
+	fireEvent.click(await screen.findByRole("button", { name: "クラウド音声" }));
+	fireEvent.change(
+		await screen.findByLabelText(fieldLabel("connection.name")),
+		{
+			target: { value: "登録どおりの接続" },
+		},
+	);
+	fireEvent.click(
+		screen.getByRole("button", { name: "設定の変更をすべて保存" }),
+	);
+	await screen.findAllByText("変更を適用しました");
+	expect(backend.sent[0]!.input).toMatchObject({
+		changes: [
+			{
+				fieldId: "connection.name",
+				target: backend.cloud.connectionId,
+				value: "登録どおりの接続",
+			},
+		],
 	});
 });

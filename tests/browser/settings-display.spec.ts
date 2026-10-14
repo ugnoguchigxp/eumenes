@@ -217,6 +217,25 @@ test("saved subtitle enablement, design and size are applied to speech overlays"
 	await expect(subtitle).toHaveAttribute("data-size", "medium");
 	await expect(subtitle.locator("p")).toHaveCSS("font-size", "24px");
 	await expect(subtitle).toContainText("承知しました。");
+	const assertPlacement = async () => {
+		const bounds = await subtitle.evaluate((element) => {
+			const panel = element.closest(".chat-panel")!.getBoundingClientRect();
+			const caption = element.getBoundingClientRect();
+			return {
+				withinChat: caption.left >= panel.left && caption.right <= panel.right,
+				nearBottom: panel.bottom - caption.bottom <= 20,
+				withinPanel: caption.bottom <= panel.bottom,
+			};
+		});
+		expect(bounds).toEqual({
+			withinChat: true,
+			nearBottom: true,
+			withinPanel: true,
+		});
+	};
+	await assertPlacement();
+	await page.setViewportSize({ width: 390, height: 844 });
+	await assertPlacement();
 	await page
 		.getByRole("button", { name: "読み上げを停止", exact: true })
 		.click();

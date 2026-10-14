@@ -17,6 +17,7 @@ import {
 } from "../contracts";
 import { getDocument, insertDocument, type DocumentKind } from "../repository";
 import { publishedArtifacts, publishRegisteredArtifact } from "./artifacts";
+import { checkCollections } from "./bundle-collections";
 import {
 	checkActionTargets,
 	checkFields,
@@ -108,8 +109,6 @@ export type Check = {
 	fieldClaims: Map<string, { artifactId: string; revision: number }>;
 	/** Documents with a confidential field anywhere in the catalog (published or this bundle). */
 	confidentialDocs: Set<string>;
-	/** An artifact id registered by this bundle or already published. */
-	hasArtifactId: (id: string) => boolean;
 };
 
 function collectDocs(bundle: Parsed): Doc[] {
@@ -205,8 +204,6 @@ function createCheck(
 		issue,
 		fieldClaims,
 		confidentialDocs,
-		hasArtifactId: (id) =>
-			bundleArtifacts.has(id) || published.some((p) => p.document.id === id),
 		definitions,
 		docs,
 		storedRevision,
@@ -394,6 +391,7 @@ function checkActions(
 			action,
 			at,
 			host.adapters.get(adapterOf.get(action.source) ?? ""),
+			a.id,
 		);
 	});
 }
@@ -437,6 +435,7 @@ function checkBindingsAndArtifacts(c: Check) {
 		const adapterOf = checkSources(c, a, path);
 		checkActions(c, a, path, adapterOf);
 		checkFields(c, a, path);
+		checkCollections(c, a, path);
 		checkVariants(c, a, path, adapterOf);
 	});
 }

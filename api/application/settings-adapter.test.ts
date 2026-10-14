@@ -20,6 +20,7 @@ import {
 	settingsLeaf,
 	type SettingsField,
 } from "./settings-adapter";
+import { createInferenceAdapter } from "./inference-adapter";
 import { offlineBundleHost } from "./toolchain-adapters";
 
 type BundleField = SettingsField & { visibleWhen?: string };
@@ -57,6 +58,7 @@ async function setup() {
 				return settings.applyInTransaction(db, input);
 			},
 			notifyChanged: settings.notifyChanged,
+			diagnostics: settings.diagnostics,
 		},
 		{ fields: (_tx, id) => registered.get(id) },
 	);
@@ -135,13 +137,25 @@ test("describe offers the settings document, one write operation, its queries an
 	const d = describeSettingsAdapter();
 	expect([...d.documents.keys()]).toEqual(["document:settings@1"]);
 	expect(d.operations.get("settings.apply")).toEqual({
-		inputSchemaRef: "schema:settings-apply@1",
+		inputSchemaRef: "schema:settings-apply@2",
 		effect: "write",
 	});
 	expect([...d.queries].sort()).toEqual([
 		"query:settings.asr-languages@1",
+		"query:settings.asr-resources@1",
+		"query:settings.connections@1",
 		"query:settings.document@1",
+		"query:settings.llm-resources@1",
+		"query:settings.resources@1",
+		"query:settings.routes@1",
 		"query:settings.tts-resources@1",
+	]);
+	expect([...d.structures.keys()].sort()).toEqual([
+		"structure:settings.add-connection@1",
+		"structure:settings.add-resource@1",
+		"structure:settings.confirm-larm-origin@1",
+		"structure:settings.delete-connection@1",
+		"structure:settings.delete-resource@1",
 	]);
 	expect([...d.conditions]).toEqual([...settingsConditions]);
 	// The registered adapter is the one described for offline bundle checks.
@@ -594,7 +608,7 @@ test("the registered settings bundle applies a draft through the action ledger a
 			eventCreatedAt: new Date(now).toISOString(),
 			eventExpiresAt: new Date(now + 60_000).toISOString(),
 			artifactId: "tab-1",
-			artifactRevisionId: "artifact:settings.conversation@1",
+			artifactRevisionId: "artifact:settings.conversation@2",
 			source,
 			sourceRevision: revision,
 			actionId: "apply",
@@ -710,4 +724,696 @@ test("a target must be one the field's query lists: another purpose's model is r
 			}),
 		),
 	).toBe("target_not_found");
+});
+
+// ---- structures (P2) -------------------------------------------------------------------------
+
+const ADD_CONNECTION = "structure:settings.add-connection@1";
+const DELETE_CONNECTION = "structure:settings.delete-connection@1";
+const ADD_RESOURCE = "structure:settings.add-resource@1";
+const DELETE_RESOURCE = "structure:settings.delete-resource@1";
+const CONFIRM_ORIGIN = "structure:settings.confirm-larm-origin@1";
+const uuid = () => crypto.randomUUID();
+const connectionInput = (id: string, extra: Record<string, unknown> = {}) => ({
+	connectionId: id,
+	name: "クラウド",
+	baseUrl: "https://api.example.com/v1",
+	...extra,
+});
+const structure = (structureRef: string, input: Record<string, unknown>) => ({
+	structure: structureRef,
+	input,
+});
+
+test("every structure and action of the bundle is registered with a matching schema", () => {
+	const d = describeSettingsAdapter();
+	const schemas = new Map(
+		(
+			bundle as unknown as {
+				schemas: Array<{ id: string; revision: number }>;
+			}
+		).schemas.map((x) => [`schema:${x.id}@${x.revision}`, x]),
+	);
+	for (const [ref, { inputSchemaRef }] of d.structures)
+		expect([ref, schemas.has(inputSchemaRef)]).toEqual([ref, true]);
+	const ai = (
+		bundle as unknown as {
+			artifacts: Array<{
+				id: string;
+				actionBindings: Array<{ structure?: string; inputSchemaRef: string }>;
+			}>;
+		}
+	).artifacts.find((a) => a.id === "settings.ai-connections")!;
+	const staged = ai.actionBindings.filter((a) => a.structure);
+	expect(staged.map((a) => a.structure).sort()).toEqual(
+		[...d.structures.keys()].sort(),
+	);
+	for (const action of staged)
+		expect(action.inputSchemaRef).toBe(
+			d.structures.get(action.structure!)!.inputSchemaRef,
+		);
+});
+
+test("a connection is added with its first model, its key and the route it fills", async () => {
+	const h = await setup();
+	const connectionId = uuid();
+	const resourceId = uuid();
+	const result = await apply(h, {
+		expectedRevision: rev(h),
+		structural: [
+			structure(
+				ADD_CONNECTION,
+				connectionInput(connectionId, {
+					purpose: "llm",
+					model: "gpt-x",
+					resourceId,
+					assign: true,
+				}),
+			),
+		],
+		keys: [{ connectionId, value: "sk-new-key" }],
+	});
+	const saved = h.settings.get();
+	expect(saved.connections).toEqual([
+		expect.objectContaining({
+			id: connectionId,
+			name: "クラウド",
+			enabled: true,
+			epoch: 1,
+			envRef: null,
+		}),
+	]);
+	expect(saved.connections[0]!.kind).toBeUndefined();
+	expect(saved.resources).toEqual([
+		expect.objectContaining({
+			id: resourceId,
+			connectionId,
+			purpose: "llm",
+			model: "gpt-x",
+			contextWindow: 8192,
+			voice: null,
+		}),
+	]);
+	expect(saved.routes.llm.fallbackId).toBe(resourceId);
+	expect(
+		h.settings.diagnostics().connections.find((c) => c.id === connectionId)
+			?.credentialAvailable,
+	).toBe(true);
+	expect(JSON.stringify(result)).not.toContain("sk-new-key");
+	expect((result.receipt as { structural: string[] }).structural).toEqual([
+		ADD_CONNECTION,
+	]);
+	// A purpose that already has a fallback keeps it.
+	const second = uuid();
+	await apply(h, {
+		expectedRevision: rev(h),
+		structural: [
+			structure(ADD_RESOURCE, {
+				resourceId: second,
+				connectionId,
+				purpose: "llm",
+				model: "gpt-y",
+				assign: true,
+			}),
+		],
+	});
+	expect(h.settings.get().routes.llm.fallbackId).toBe(resourceId);
+	expect(h.settings.get().resources).toHaveLength(2);
+});
+
+test("a new connection takes exactly one credential source, except CLI-login agent kinds", async () => {
+	const h = await setup();
+	const code = (
+		input: Record<string, unknown>,
+		keys?: Array<Record<string, unknown>>,
+	) =>
+		codeOf(
+			apply(h, {
+				expectedRevision: rev(h),
+				structural: [structure(ADD_CONNECTION, input)],
+				...(keys ? { keys } : {}),
+			}),
+		);
+	const a = uuid();
+	expect(await code(connectionInput(a))).toBe("credential_required");
+	expect(
+		await code(connectionInput(a, { envRef: "EUMENES_CLOUD_KEY" }), [
+			{ connectionId: a, value: "sk-both" },
+		]),
+	).toBe("invalid_credential_source");
+	// An environment variable alone is a source; so is a key alone.
+	expect(await code(connectionInput(a, { envRef: "EUMENES_CLOUD_KEY" }))).toBe(
+		"no_error",
+	);
+	const b = uuid();
+	expect(
+		await code(connectionInput(b), [{ connectionId: b, value: "sk-b" }]),
+	).toBe("no_error");
+	// Codex and Claude Agent SDK may use the CLI login; managed agents need a credential and ids.
+	const c = uuid();
+	expect(
+		await code(
+			connectionInput(c, {
+				kind: "codex-sdk",
+				purpose: "llm",
+				model: "codex",
+				resourceId: uuid(),
+			}),
+		),
+	).toBe("no_error");
+	const m = uuid();
+	expect(
+		await code(
+			connectionInput(m, {
+				kind: "claude-managed-agents",
+				agentId: "agent_1",
+				environmentId: "env_1",
+			}),
+		),
+	).toBe("credential_required");
+	expect(
+		await code(connectionInput(m, { kind: "claude-managed-agents" }), [
+			{ connectionId: m, value: "sk-m" },
+		]),
+	).toBe("invalid_settings");
+	// A repeated id, a half-given model and unknown input are refused.
+	expect(await code(connectionInput(a, { envRef: "EUMENES_CLOUD_KEY" }))).toBe(
+		"connection_exists",
+	);
+	expect(await code(connectionInput(uuid(), { model: "x" }))).toBe(
+		"invalid_input",
+	);
+	expect(await code({ ...connectionInput(uuid()), extra: 1 })).toBe(
+		"invalid_input",
+	);
+	expect(h.settings.get().connections.map((x) => x.kind ?? "http")).toEqual([
+		"http",
+		"http",
+		"codex-sdk",
+	]);
+});
+
+test("deleting a connection removes its models, frees the routes that used them and drops its key", async () => {
+	const h = await setup();
+	const { connectionId, resources } = await withModels(h);
+	// Route speech to the first model, cloud-only.
+	const current = h.settings.get();
+	const next = structuredClone(current);
+	next.routes.tts = {
+		...next.routes.tts,
+		mode: "cloud-only",
+		cloudAllowed: true,
+		fallbackId: resources[0]!,
+	};
+	await h.settings.apply({
+		requestId: uuid(),
+		expectedRevision: current.revision,
+		settings: next,
+		keys: [],
+	});
+	const other = uuid();
+	await apply(h, {
+		expectedRevision: rev(h),
+		structural: [
+			structure(
+				ADD_CONNECTION,
+				connectionInput(other, { envRef: "EUMENES_CLOUD_K" }),
+			),
+			structure(DELETE_CONNECTION, { connectionId }),
+		],
+		// The key of the deleted connection is dropped, not an error.
+		keys: [{ connectionId, value: "sk-late" }],
+	});
+	const saved = h.settings.get();
+	expect(saved.connections.map((c) => c.id)).toEqual([other]);
+	expect(saved.resources).toEqual([]);
+	expect(saved.routes.tts.fallbackId).toBeNull();
+	expect(saved.routes.tts.mode).toBe("larm-preferred");
+	expect(h.settings.diagnostics().connections.map((c) => c.id)).toEqual([
+		other,
+	]);
+	expect(
+		await codeOf(
+			apply(h, {
+				expectedRevision: rev(h),
+				structural: [structure(DELETE_CONNECTION, { connectionId })],
+			}),
+		),
+	).toBe("target_not_found");
+});
+
+test("models are added and deleted, and a change may name an added model as its target", async () => {
+	const h = await setup();
+	const { connectionId, resources } = await withModels(h);
+	const added = uuid();
+	await apply(h, {
+		expectedRevision: rev(h),
+		structural: [
+			structure(ADD_RESOURCE, {
+				resourceId: added,
+				connectionId,
+				purpose: "llm",
+				model: "",
+			}),
+		],
+		changes: [],
+	}).catch(() => undefined);
+	// The model name is required; an empty one is refused as input and nothing is added.
+	expect(h.settings.get().resources).toHaveLength(2);
+	await apply(h, {
+		expectedRevision: rev(h),
+		structural: [
+			structure(ADD_RESOURCE, {
+				resourceId: added,
+				connectionId,
+				purpose: "llm",
+				model: "tmp",
+			}),
+		],
+		changes: [{ fieldId: "resource.model", target: added, value: "gpt-final" }],
+	});
+	expect(h.settings.get().resources.find((r) => r.id === added)).toMatchObject({
+		model: "gpt-final",
+		contextWindow: 8192,
+	});
+	await apply(h, {
+		expectedRevision: rev(h),
+		structural: [structure(DELETE_RESOURCE, { resourceId: resources[0]! })],
+	});
+	expect(h.settings.get().resources.map((r) => r.id)).toEqual([
+		resources[1]!,
+		added,
+	]);
+	expect(
+		await codeOf(
+			apply(h, {
+				expectedRevision: rev(h),
+				structural: [structure(DELETE_RESOURCE, { resourceId: resources[0]! })],
+			}),
+		),
+	).toBe("target_not_found");
+	expect(
+		await codeOf(
+			apply(h, {
+				expectedRevision: rev(h),
+				structural: [
+					structure(ADD_RESOURCE, {
+						resourceId: uuid(),
+						connectionId: uuid(),
+						purpose: "llm",
+						model: "x",
+					}),
+				],
+			}),
+		),
+	).toBe("target_not_found");
+	expect(
+		await codeOf(
+			apply(h, {
+				expectedRevision: rev(h),
+				structural: [{ structure: "structure:settings.nothing@1", input: {} }],
+			}),
+		),
+	).toBe("structure_not_registered");
+	expect(await codeOf(apply(h, { expectedRevision: rev(h) }))).toBe(
+		"invalid_input",
+	);
+});
+
+test("changing a model's purpose resets the purpose's values and frees its route", async () => {
+	const h = await setup();
+	const { resources } = await withModels(h);
+	const current = h.settings.get();
+	const next = structuredClone(current);
+	next.routes.tts.fallbackId = resources[0]!;
+	next.routes.tts.mode = "cloud-only";
+	await h.settings.apply({
+		requestId: uuid(),
+		expectedRevision: current.revision,
+		settings: next,
+		keys: [],
+	});
+	// The context length given in the same draft wins over the reset, whatever the order.
+	await apply(h, {
+		expectedRevision: rev(h),
+		changes: [
+			{ fieldId: "resource.context", target: resources[0], value: "16384" },
+			{ fieldId: "resource.purpose", target: resources[0], value: "llm" },
+		],
+	});
+	const saved = h.settings.get();
+	expect(saved.resources.find((r) => r.id === resources[0])).toMatchObject({
+		purpose: "llm",
+		contextWindow: 16384,
+		voice: null,
+	});
+	expect(saved.routes.tts.fallbackId).toBeNull();
+	expect(saved.routes.tts.mode).toBe("larm-preferred");
+});
+
+test("turning cloud sending off leaves a cloud-only purpose LARM only", async () => {
+	const h = await setup();
+	const { resources } = await withModels(h);
+	const current = h.settings.get();
+	const next = structuredClone(current);
+	next.routes.tts = {
+		...next.routes.tts,
+		mode: "cloud-only",
+		cloudAllowed: true,
+		fallbackId: resources[0]!,
+	};
+	await h.settings.apply({
+		requestId: uuid(),
+		expectedRevision: current.revision,
+		settings: next,
+		keys: [],
+	});
+	await apply(h, {
+		expectedRevision: rev(h),
+		changes: [{ fieldId: "route.tts.cloud-allowed", value: "false" }],
+	});
+	expect(h.settings.get().routes.tts).toMatchObject({
+		mode: "larm-only",
+		cloudAllowed: false,
+		fallbackId: resources[0],
+	});
+	// The rule is not a rewrite of an explicit request: cloud-only without permission stays invalid.
+	expect(
+		await codeOf(
+			apply(h, {
+				expectedRevision: rev(h),
+				changes: [{ fieldId: "route.tts.mode", value: "cloud-only" }],
+			}),
+		),
+	).toBe("invalid_settings");
+	// A fallback is chosen and cleared through its field (unset is null).
+	await apply(h, {
+		expectedRevision: rev(h),
+		changes: [{ fieldId: "route.tts.fallback", unset: true }],
+	});
+	expect(h.settings.get().routes.tts.fallbackId).toBeNull();
+});
+
+test("a changed LARM origin needs its confirmation as a structure", async () => {
+	const h = await setup();
+	await apply(h, {
+		expectedRevision: rev(h),
+		changes: [{ fieldId: "larm.url", value: "http://127.0.0.1:8080" }],
+	});
+	const change = { fieldId: "larm.url", value: "http://127.0.0.1:9090" };
+	expect(
+		await codeOf(apply(h, { expectedRevision: rev(h), changes: [change] })),
+	).toBe("invalid_larm_origin_unconfirmed");
+	expect(
+		await codeOf(
+			apply(h, {
+				expectedRevision: rev(h),
+				structural: [
+					structure(CONFIRM_ORIGIN, { origin: "http://127.0.0.1:7777" }),
+				],
+				changes: [change],
+			}),
+		),
+	).toBe("invalid_larm_origin_unconfirmed");
+	await apply(h, {
+		expectedRevision: rev(h),
+		structural: [
+			structure(CONFIRM_ORIGIN, { origin: "http://127.0.0.1:9090" }),
+		],
+		changes: [change],
+	});
+	expect(h.settings.get().larm.baseUrl).toBe("http://127.0.0.1:9090");
+	// Clearing the URL is the field's null.
+	await apply(h, {
+		expectedRevision: rev(h),
+		changes: [{ fieldId: "larm.url", unset: true }],
+	});
+	expect(h.settings.get().larm.baseUrl).toBeNull();
+});
+
+test("connection fields use the connection query's targets, and the API key never travels in changes", async () => {
+	const h = await setup();
+	const { connectionId, resources } = await withModels(h);
+	await apply(h, {
+		expectedRevision: rev(h),
+		changes: [
+			{ fieldId: "connection.name", target: connectionId, value: "改名" },
+			{ fieldId: "connection.enabled", target: connectionId, value: "false" },
+		],
+	});
+	expect(h.settings.get().connections[0]).toMatchObject({
+		name: "改名",
+		enabled: false,
+	});
+	// A model id is not a connection target, and a connection is not a model target.
+	expect(
+		await codeOf(
+			apply(h, {
+				expectedRevision: rev(h),
+				changes: [
+					{ fieldId: "connection.name", target: resources[0], value: "x" },
+				],
+			}),
+		),
+	).toBe("target_not_found");
+	expect(
+		await codeOf(
+			apply(h, {
+				expectedRevision: rev(h),
+				changes: [
+					{ fieldId: "resource.model", target: connectionId, value: "x" },
+				],
+			}),
+		),
+	).toBe("target_not_found");
+	// The key field is a confidential channel: its values go in `keys`.
+	const keyField = registered.get("connection.api-key")!;
+	expect(keyField.path).toBe("$.connections[id=$target].apiKey");
+	expect(
+		await codeOf(
+			apply(h, {
+				expectedRevision: rev(h),
+				changes: [
+					{
+						fieldId: "connection.api-key",
+						target: connectionId,
+						value: "sk-x",
+					},
+				],
+			}),
+		),
+	).toBe("field_not_registered");
+	const d = describeSettingsAdapter().documents.get("document:settings@1")!;
+	expect(d.describePath(keyField.path)).toMatchObject({
+		kind: "string",
+		maxLength: 4096,
+		optional: true,
+		nullable: true,
+	});
+	expect(d.targetQuery!(keyField.path)).toBe("query:settings.connections@1");
+	expect(d.targetQuery!("$.resources[id=$target].model")).toBe(
+		"query:settings.resources@1",
+	);
+});
+
+test("sources list connections without credentials, models per purpose and the routes", async () => {
+	const h = await setup();
+	const { connectionId, resources } = await withModels(h);
+	const read = (query: string) =>
+		h.store.read((db) => h.adapter.sourceInTransaction(db, query, undefined))!
+			.data as Record<string, any>;
+	const connections = read("query:settings.connections@1");
+	expect(connections.targets).toEqual([
+		{
+			id: connectionId,
+			label: "クラウド音声",
+			kind: "openai-compatible",
+			enabled: true,
+			credential: "registered",
+		},
+	]);
+	expect(JSON.stringify(connections)).not.toContain("sk-first");
+	expect(read("query:settings.llm-resources@1").targets).toEqual([]);
+	expect(
+		read("query:settings.tts-resources@1").options.map(
+			(o: { value: string }) => o.value,
+		),
+	).toEqual(resources);
+	const all = read("query:settings.resources@1").targets;
+	expect(all.map((t: { purpose: string }) => t.purpose)).toEqual([
+		"tts",
+		"tts",
+	]);
+	expect(all[0]).toMatchObject({
+		label: "クラウド音声 / tts-0",
+		connectionId,
+		model: "tts-0",
+	});
+	const routes = read("query:settings.routes@1").routes;
+	expect(routes.tts).toMatchObject({
+		mode: "larm-preferred",
+		fallbackId: null,
+		fallbackLabel: null,
+		resourceCount: 2,
+	});
+	expect(routes.llm.resourceCount).toBe(0);
+});
+
+test("the AI and external-work artifacts apply through the action ledger with structure and keys", async () => {
+	const h = await setup();
+	const capabilities = createCapabilities(
+		h.store,
+		new Set(["web", "history", "timer"]),
+		{
+			bundleHost: offlineBundleHost,
+		},
+	);
+	await capabilities.seed();
+	const ledger = createActionRequests({
+		store: h.store,
+		capabilities,
+		registry: createAdapterRegistry([
+			createSettingsAdapter(h.settings, {
+				fields: publishedSettingsFields(() => capabilities),
+			}),
+			// The screen's probe sources name the inference adapter too.
+			createInferenceAdapter(
+				{
+					probes: () => [],
+					getProbe: () => null,
+					inspect: () => ({}),
+					usage: () => [],
+					startProbeInTransaction: () => ({ id: "x", launch() {} }),
+					cancelProbe() {},
+				},
+				h.settings,
+			),
+		]),
+		scope: "test-scope",
+		secretKey: () => h.settings.derivedKey("test"),
+	});
+	const connectionId = uuid();
+	const send = (input: unknown) => {
+		const now = Date.now();
+		return ledger.submit({
+			version: 1,
+			eventId: uuid(),
+			eventCreatedAt: new Date(now).toISOString(),
+			eventExpiresAt: new Date(now + 60_000).toISOString(),
+			artifactId: "tab-ai",
+			artifactRevisionId: "artifact:settings.ai-connections@3",
+			source: "settings-ai",
+			sourceRevision: rev(h),
+			actionId: "apply",
+			scopeRef: ledger.scopeRef,
+			input,
+		});
+	};
+	const accepted = await send({
+		expectedRevision: rev(h),
+		structural: [structure(ADD_CONNECTION, connectionInput(connectionId))],
+		changes: [{ fieldId: "route.llm.cloud-allowed", value: "false" }],
+		keys: [{ connectionId, value: "sk-ledger" }],
+	});
+	expect(accepted.request.status).toBe("accepted");
+	expect(h.settings.get().connections.map((c) => c.id)).toEqual([connectionId]);
+	expect(h.settings.get().routes.llm.cloudAllowed).toBe(false);
+	// The secret is neither in the stored result nor in the ledger row's input.
+	expect(JSON.stringify(accepted)).not.toContain("sk-ledger");
+	const row = h.store.read((db) =>
+		db.query("SELECT canonical_input_json FROM tool_action_requests").all(),
+	);
+	expect(JSON.stringify(row)).not.toContain("sk-ledger");
+});
+
+test("a key alone is an apply, and a key inside a structure's input is refused", async () => {
+	const h = await setup();
+	const { connectionId } = await withModels(h);
+	const before = rev(h);
+	await apply(h, {
+		expectedRevision: before,
+		keys: [{ connectionId, value: "sk-only-key" }],
+	});
+	expect(rev(h)).toBe(before + 1);
+	expect(
+		h.settings.diagnostics().connections.find((c) => c.id === connectionId)
+			?.credentialAvailable,
+	).toBe(true);
+	await apply(h, {
+		expectedRevision: rev(h),
+		keys: [{ connectionId, delete: true }],
+	});
+	expect(
+		h.settings.diagnostics().connections.find((c) => c.id === connectionId)
+			?.credentialAvailable,
+	).toBe(false);
+	// Nothing at all is still nothing to apply.
+	expect(await codeOf(apply(h, { expectedRevision: rev(h), keys: [] }))).toBe(
+		"invalid_input",
+	);
+	// The create form's key is moved to `keys` by the host: in the input it fails closed.
+	const added = crypto.randomUUID();
+	const code = await codeOf(
+		apply(h, {
+			expectedRevision: rev(h),
+			structural: [
+				{
+					structure: "structure:settings.add-connection@1",
+					input: {
+						connectionId: added,
+						name: "x",
+						baseUrl: "https://api.example.com/v1",
+						apiKey: "sk-in-input",
+					},
+				},
+			],
+		}),
+	);
+	expect(code).toBe("invalid_input");
+	expect(code).not.toContain("sk-in-input");
+});
+
+test("the AI screen's collections name registered actions with rows built by fixed paths", () => {
+	const ai = (
+		bundle as unknown as {
+			artifacts: Array<{
+				id: string;
+				actionBindings: Array<{
+					actionId: string;
+					structure?: string;
+					operationId?: string;
+					rowInput?: Record<string, unknown>;
+					confidentialFields?: string[];
+				}>;
+				collections?: Array<{
+					source: string;
+					rowActions: Array<{ actionId: string }>;
+					create?: { actionId: string };
+				}>;
+			}>;
+		}
+	).artifacts.find((a) => a.id === "settings.ai-connections")!;
+	const action = (id: string) =>
+		ai.actionBindings.find((a) => a.actionId === id)!;
+	expect(
+		ai.collections!.map((c) => [
+			c.source,
+			c.create?.actionId,
+			c.rowActions.map((r) => r.actionId),
+		]),
+	).toEqual([
+		["settings-connections", "add-connection", ["delete-connection"]],
+		["settings-resources", "add-resource", ["delete-resource"]],
+		["inference-probe-targets", undefined, ["probe"]],
+		["inference-probes", undefined, ["probe-cancel"]],
+	]);
+	expect(action("add-connection").rowInput).toEqual({
+		connectionId: { generate: "uuid" },
+	});
+	expect(action("add-connection").confidentialFields).toEqual(["apiKey"]);
+	expect(action("delete-connection").rowInput).toEqual({
+		connectionId: "$row.id",
+	});
+	expect(action("probe").operationId).toBe("inference.probe-start");
+	expect(action("probe-cancel").rowInput).toEqual({ id: "$row.id" });
 });

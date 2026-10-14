@@ -53,21 +53,27 @@
 	padding: 0.75rem;
 	overflow-wrap: anywhere;
 }
-.ds-server-table-detail dl {
+.ds-server-table-detail dl,
+.ds-server-table-modal dl {
 	display: grid;
 	grid-template-columns: minmax(5rem, 1fr) minmax(0, 3fr);
 	gap: 0.5rem;
 }
-.ds-server-table-detail dd {
+.ds-server-table-detail dd,
+.ds-server-table-modal dd {
 	margin: 0;
 	white-space: pre-wrap;
+}
+.ds-server-table-modal {
+	overflow-wrap: anywhere;
 }
 .ds-server-table td {
 	overflow-wrap: anywhere;
 	min-width: 4rem;
 }
 @media (max-width: 480px) {
-	.ds-server-table-detail dl {
+	.ds-server-table-detail dl,
+	.ds-server-table-modal dl {
 		grid-template-columns: 1fr;
 	}
 }

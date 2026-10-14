@@ -13,7 +13,7 @@ import { queryRoots } from "../../queryKeys";
 import { createWebAdapterRegistry } from "../toolchain-artifacts/registry";
 import { ToolchainArtifactHost } from "../toolchain-artifacts/ToolchainArtifactHost";
 import type { JsonValue } from "../toolchain-artifacts/drafts";
-import { writePath } from "./paths";
+import { writePath } from "../toolchain-artifacts/paths";
 import { settingsWebAdapter, SETTINGS_DOCUMENT } from "./adapter";
 import { recordsWebAdapter } from "./records-adapter";
 
@@ -373,6 +373,64 @@ const variant = (definition: unknown) => [
 	{ id: "standard", label: "標準", definition },
 ];
 
+export const aiFields: Field[] = [
+	field({
+		fieldId: "larm.url",
+		path: "$.larm.baseUrl",
+		label: "LARMのURL",
+		control: "text",
+		group: "larm",
+		maxLength: 2048,
+		unset: "null",
+	}),
+	field({
+		fieldId: "connection.name",
+		path: "$.connections[id=$target].name",
+		target: "settings-connections",
+		label: "接続名",
+		control: "text",
+		group: "connection",
+		maxLength: 80,
+	}),
+	field({
+		fieldId: "connection.enabled",
+		path: "$.connections[id=$target].enabled",
+		target: "settings-connections",
+		label: "この接続を有効にする",
+		control: "toggle",
+		group: "connection",
+	}),
+	field({
+		fieldId: "connection.api-key",
+		path: "$.connections[id=$target].apiKey",
+		target: "settings-connections",
+		label: "APIキーの更新",
+		control: "text",
+		group: "connection",
+		confidential: true,
+		unset: "null",
+	}),
+];
+
+const structure = (
+	actionId: string,
+	structureRef: string,
+	label: string,
+	source: string,
+	rowInput?: Binding["rowInput"],
+): Binding => ({
+	actionId,
+	eventAction: actionId,
+	source,
+	inputSchemaRef: "builtin:emptyInput",
+	effect: "draft",
+	draftAction: "structure",
+	structure: structureRef,
+	draftDocument: DOC,
+	label,
+	...(rowInput ? { rowInput } : {}),
+});
+
 export const settingsArtifacts: Record<string, ArtifactDefinitionV1> = {
 	hub: {
 		...base("hub", "設定（データドリブン）"),
@@ -487,12 +545,8 @@ export const settingsArtifacts: Record<string, ArtifactDefinitionV1> = {
 		fields: voiceFields,
 	},
 	records: {
-		...base(
-			"records",
-			"記録",
-			"管理と確認",
-			"AIの利用 ツールチェーン データと診断",
-		),
+		...base("records", "記録", "管理と確認", "AIの利用 ツールチェーン"),
+		revision: 2,
 		variants: variant({
 			view: "records-workspace",
 			source: "settings-records",
@@ -533,6 +587,98 @@ export const settingsArtifacts: Record<string, ArtifactDefinitionV1> = {
 			inputSchemaRef: "builtin:emptyInput",
 			...binding,
 		})),
+	},
+	"ai-connections": {
+		...base(
+			"ai-connections",
+			"AIと接続",
+			"使い方を変える",
+			"LARM 利用先 クラウド接続",
+		),
+		variants: variant({
+			view: "layout",
+			direction: "stack",
+			title: "AIと接続",
+			children: [
+				{ view: "settings-section", source: "settings-ai", title: "AIと接続" },
+				{
+					view: "collection-workspace",
+					source: "settings-connections",
+					title: "クラウド接続",
+				},
+			],
+		}),
+		sourceBindings: [
+			settingsSource("settings-ai"),
+			{
+				source: "settings-connections",
+				adapterRef: ADAPTER,
+				query: "query:settings.connections@1",
+				target: "none",
+			},
+		],
+		actionBindings: [
+			edit("settings-ai"),
+			apply("settings-ai"),
+			review("settings-ai"),
+			structure(
+				"add-connection",
+				"structure:settings.add-connection@1",
+				"クラウドAPIを登録",
+				"settings-connections",
+				{ connectionId: { generate: "uuid" } },
+			),
+			structure(
+				"delete-connection",
+				"structure:settings.delete-connection@1",
+				"接続を削除",
+				"settings-connections",
+				{ connectionId: "$row.id" },
+			),
+		],
+		collections: [
+			{
+				source: "settings-connections",
+				title: "クラウド接続",
+				rowKey: "id",
+				rowsPath: "targets",
+				columns: [
+					{ key: "label", label: "名前", format: "text" },
+					{ key: "baseUrl", label: "接続先", format: "text" },
+				],
+				rowActions: [
+					{
+						actionId: "delete-connection",
+						confirm: "この接続を削除する変更を、変更一覧へ追加します。",
+					},
+				],
+				create: {
+					actionId: "add-connection",
+					fields: [
+						{
+							fieldId: "name",
+							label: "接続名",
+							control: "text",
+							required: true,
+							maxLength: 80,
+						},
+						{
+							fieldId: "baseUrl",
+							label: "APIのベースURL",
+							control: "text",
+							required: true,
+						},
+						{
+							fieldId: "token",
+							label: "APIキー",
+							control: "secret",
+							confidential: true,
+						},
+					],
+				},
+			},
+		],
+		fields: aiFields,
 	},
 	changes: {
 		...base("changes", "設定の変更一覧", "管理と確認"),
@@ -619,6 +765,9 @@ export function createSettingsBackend(
 
 	const allFields = Object.values(artifacts).flatMap((a) => a.fields ?? []);
 	const sent: Array<{ input: Record<string, unknown>; eventId: string }> = [];
+	/** What the fake adapter was asked to confirm and to store as credentials. */
+	const confirmedOrigins: string[] = [];
+	const storedKeys: unknown[] = [];
 	const records = {
 		usage: { items: [] as unknown[], total: 0, pageIndex: 0, pageSize: 10 },
 		selections: {
@@ -681,7 +830,11 @@ export function createSettingsBackend(
 					value?: string;
 					unset?: true;
 				}>;
-				keys?: unknown;
+				structural?: Array<{
+					structure: string;
+					input: Record<string, string>;
+				}>;
+				keys?: Array<{ connectionId: string; value?: string; delete?: true }>;
 			};
 			sent.push({ input: input as never, eventId: event.eventId });
 			if (input.expectedRevision !== saved.revision)
@@ -695,6 +848,36 @@ export function createSettingsBackend(
 					},
 				};
 			const next = structuredClone(saved);
+			// Structural operations first, then the field changes (as the real adapter does).
+			for (const op of input.structural ?? []) {
+				const i = op.input;
+				if (op.structure === "structure:settings.add-connection@1")
+					next.connections.push({
+						id: i.connectionId!,
+						name: i.name!,
+						baseUrl: i.baseUrl!,
+						enabled: true,
+						epoch: 0,
+						envRef: null,
+					});
+				else if (op.structure === "structure:settings.delete-connection@1") {
+					next.connections = next.connections.filter(
+						(c) => c.id !== i.connectionId,
+					);
+					const gone = new Set(
+						next.resources
+							.filter((r) => r.connectionId === i.connectionId)
+							.map((r) => r.id),
+					);
+					next.resources = next.resources.filter((r) => !gone.has(r.id));
+					// Routes that pointed at a removed model fall back to none.
+					for (const route of Object.values(next.routes))
+						if (route.fallbackId && gone.has(route.fallbackId))
+							route.fallbackId = null;
+				} else if (op.structure === "structure:settings.confirm-larm-origin@1")
+					confirmedOrigins.push(i.origin!);
+			}
+			for (const key of input.keys ?? []) storedKeys.push(key);
 			for (const change of input.changes) {
 				const registered = allFields.find((f) => f.fieldId === change.fieldId)!;
 				writePath(
@@ -763,6 +946,21 @@ export function createSettingsBackend(
 									})),
 							},
 						};
+					case "settings-connections":
+						return {
+							revision: saved.revision,
+							data: {
+								targets: saved.connections.map((c) => ({
+									id: c.id,
+									label: c.name,
+									baseUrl: c.baseUrl,
+								})),
+								options: saved.connections.map((c) => ({
+									value: c.id,
+									label: c.name,
+								})),
+							},
+						};
 					case "settings-asr-languages":
 						return {
 							revision: 0,
@@ -805,6 +1003,8 @@ export function createSettingsBackend(
 		cloud,
 		original,
 		sent,
+		confirmedOrigins,
+		storedKeys,
 		records,
 		saved: () => saved,
 		setSaved(next: Settings) {

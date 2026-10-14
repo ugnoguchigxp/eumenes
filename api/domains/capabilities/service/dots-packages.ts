@@ -44,117 +44,117 @@ export function createDotsPackages(
 			}),
 		};
 	}
+	/** Save a user package in the caller's writer transaction (a new revision per save). */
+	function putDotsPackageInTransaction(db: Database, raw: unknown) {
+		const data = dotsPackageInput.parse(raw);
+		if (
+			(
+				db
+					.query(
+						"SELECT coalesce(sum(length(CAST(r.definition_json AS BLOB))),0) n FROM capability_revisions r JOIN capability_items i ON i.key=r.item_key WHERE i.origin='user'",
+					)
+					.get() as { n: number }
+			).n +
+				bytes(data) * 3 >
+			67108864
+		)
+			throw new Error("reference_capacity");
+		const old = read(db, data.id);
+		if ((old?.stateToken ?? null) !== data.expectedToken)
+			throw new Error("capability_revision_conflict");
+		if (
+			!old &&
+			(
+				db
+					.query(
+						"SELECT count(*) n FROM capability_items WHERE kind='package' AND origin='user' AND id LIKE 'dots.user.%'",
+					)
+					.get() as { n: number }
+			).n >= 32
+		)
+			throw new Error("reference_capacity");
+		if (bytes([data.profile, ...data.skills.map((s) => s.body)]) > 14000)
+			throw new Error("required_context_overflow");
+		const revision = (old?.revision ?? 0) + 1,
+			common = {
+				revision,
+				aliases: [],
+				tags: [],
+				useWhen: [],
+				avoidWhen: [],
+				dependencies: [],
+			};
+		const profileId = `${data.id}.role`,
+			skills = data.skills.map((_, i) => `${data.id}.skill${i + 1}`);
+		register(
+			db,
+			{
+				...common,
+				kind: "profile",
+				id: profileId,
+				title: data.title,
+				summary: data.summary,
+				body: data.profile,
+			},
+			"user",
+		);
+		for (const [i, s] of data.skills.entries())
+			register(
+				db,
+				{
+					...common,
+					kind: "skill",
+					id: skills[i]!,
+					title: s.title,
+					summary: s.title,
+					body: s.body,
+				},
+				"user",
+			);
+		const profileRevisionId = `profile:${profileId}@${revision}`,
+			requiredSkillRevisionIds = skills.map((id) => `skill:${id}@${revision}`),
+			toolRevisionIds = ["tool:dots.coordinate@1"];
+		register(
+			db,
+			{
+				...common,
+				kind: "package",
+				id: data.id,
+				title: data.title,
+				summary: data.summary,
+				backend: "dots",
+				schemaKey: "dotsDelegation",
+				profileRevisionId,
+				requiredSkillRevisionIds,
+				toolRevisionIds,
+				dependencies: [
+					profileRevisionId,
+					...requiredSkillRevisionIds,
+					...toolRevisionIds,
+				],
+			},
+			"user",
+		);
+		db.query("UPDATE capability_items SET enabled=? WHERE key=?").run(
+			data.enabled ? 1 : 0,
+			`package:${data.id}`,
+		);
+		return read(db, data.id)!;
+	}
+	const listDotsPackagesInTransaction = (db: Database) => ({
+		items: (
+			db
+				.query(
+					"SELECT id FROM capability_items WHERE kind='package' AND origin='user' AND id LIKE 'dots.user.%' ORDER BY id LIMIT 32",
+				)
+				.all() as { id: string }[]
+		).map((r) => read(db, r.id)!),
+	});
 	return {
-		listDotsPackages() {
-			return store.readSnapshot((db) => ({
-				items: (
-					db
-						.query(
-							"SELECT id FROM capability_items WHERE kind='package' AND origin='user' AND id LIKE 'dots.user.%' ORDER BY id LIMIT 32",
-						)
-						.all() as { id: string }[]
-				).map((r) => read(db, r.id)!),
-			}));
-		},
-		async putDotsPackage(raw: unknown) {
-			const data = dotsPackageInput.parse(raw);
-			return store.write((db) => {
-				if (
-					(
-						db
-							.query(
-								"SELECT coalesce(sum(length(CAST(r.definition_json AS BLOB))),0) n FROM capability_revisions r JOIN capability_items i ON i.key=r.item_key WHERE i.origin='user'",
-							)
-							.get() as { n: number }
-					).n +
-						bytes(data) * 3 >
-					67108864
-				)
-					throw new Error("reference_capacity");
-				const old = read(db, data.id);
-				if ((old?.stateToken ?? null) !== data.expectedToken)
-					throw new Error("capability_revision_conflict");
-				if (
-					!old &&
-					(
-						db
-							.query(
-								"SELECT count(*) n FROM capability_items WHERE kind='package' AND origin='user' AND id LIKE 'dots.user.%'",
-							)
-							.get() as { n: number }
-					).n >= 32
-				)
-					throw new Error("reference_capacity");
-				if (bytes([data.profile, ...data.skills.map((s) => s.body)]) > 14000)
-					throw new Error("required_context_overflow");
-				const revision = (old?.revision ?? 0) + 1,
-					common = {
-						revision,
-						aliases: [],
-						tags: [],
-						useWhen: [],
-						avoidWhen: [],
-						dependencies: [],
-					};
-				const profileId = `${data.id}.role`,
-					skills = data.skills.map((_, i) => `${data.id}.skill${i + 1}`);
-				register(
-					db,
-					{
-						...common,
-						kind: "profile",
-						id: profileId,
-						title: data.title,
-						summary: data.summary,
-						body: data.profile,
-					},
-					"user",
-				);
-				for (const [i, s] of data.skills.entries())
-					register(
-						db,
-						{
-							...common,
-							kind: "skill",
-							id: skills[i]!,
-							title: s.title,
-							summary: s.title,
-							body: s.body,
-						},
-						"user",
-					);
-				const profileRevisionId = `profile:${profileId}@${revision}`,
-					requiredSkillRevisionIds = skills.map(
-						(id) => `skill:${id}@${revision}`,
-					),
-					toolRevisionIds = ["tool:dots.coordinate@1"];
-				register(
-					db,
-					{
-						...common,
-						kind: "package",
-						id: data.id,
-						title: data.title,
-						summary: data.summary,
-						backend: "dots",
-						schemaKey: "dotsDelegation",
-						profileRevisionId,
-						requiredSkillRevisionIds,
-						toolRevisionIds,
-						dependencies: [
-							profileRevisionId,
-							...requiredSkillRevisionIds,
-							...toolRevisionIds,
-						],
-					},
-					"user",
-				);
-				db.query("UPDATE capability_items SET enabled=? WHERE key=?").run(
-					data.enabled ? 1 : 0,
-					`package:${data.id}`,
-				);
-				return read(db, data.id)!;
-			});
-		},
+		listDotsPackagesInTransaction,
+		putDotsPackageInTransaction,
+		listDotsPackages: () => store.readSnapshot(listDotsPackagesInTransaction),
+		putDotsPackage: (raw: unknown) =>
+			store.write((db) => putDotsPackageInTransaction(db, raw)),
 	};
 }

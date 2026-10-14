@@ -154,14 +154,13 @@ function useRecordsArtifact({
 	const diag = diagnostics.data as { keyError: string | null } | undefined;
 	const resource: Resource = {
 		kind: "records-workspace",
+		compact: true,
 		busy: usage.isFetching || selections.isFetching || recipes.isFetching,
 		revision,
 		tabs: [
 			{
 				id: "ai",
 				label: "AIの利用",
-				description:
-					"AIの利用記録です。詳細から切替・失敗理由とトークン数を確認できます。",
 				rows: (data.ai?.items ?? []).map(usageRow),
 				page: {
 					query: {
@@ -185,7 +184,6 @@ function useRecordsArtifact({
 			{
 				id: "toolchains",
 				label: "ツールチェーン",
-				description: "処理の選択と実行結果の記録です（30日保持）。",
 				rows: (data.toolchains?.items ?? []).map(selectionRow),
 				page: {
 					query: {

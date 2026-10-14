@@ -177,7 +177,31 @@ export const actionBindingV1 = z.strictObject({
 		])
 		.optional(),
 	/** draft only. */
-	draftAction: z.enum(["edit", "discard"]).optional(),
+	draftAction: z.enum(["edit", "discard", "structure"]).optional(),
+	/** draftAction "structure": the adapter's registered structural operation staged in the draft. */
+	structure: hostRef("structure").optional(),
+	/** Shown in change reviews and as the button text of collection actions. */
+	label: z.string().min(1).max(80).optional(),
+	/**
+	 * Collection row actions: the operation input built from the row by fixed paths
+	 * (`$row.revision`) or string literals; the client never sends row values by itself.
+	 */
+	rowInput: z
+		.record(
+			z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,40}$/),
+			z.union([
+				z.string().regex(/^\$row(\.[A-Za-z][A-Za-z0-9_]{0,40})+$/),
+				z.strictObject({
+					literal: z.union([z.string(), z.number(), z.boolean()]),
+				}),
+				/**
+				 * A new UUID the host generates once per staged/sent action (e.g. the id of a
+				 * connection added in a draft, so later field changes can target it).
+				 */
+				z.strictObject({ generate: z.literal("uuid") }),
+			]),
+		)
+		.optional(),
 	/**
 	 * The adapter document whose shared draft this action edits (draft) or applies (write: the
 	 * host sends the frozen draft changes as the operation input).
@@ -249,6 +273,115 @@ export const documentFieldV1 = z.strictObject({
 });
 export type DocumentFieldV1 = z.infer<typeof documentFieldV1>;
 
+/** A field of a collection's create/edit form; its values become the action input. */
+export const formFieldV1 = z.strictObject({
+	fieldId: z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,40}$/),
+	label: z.string().min(1).max(80),
+	help: z.string().max(300).optional(),
+	control: z.enum(["text", "textarea", "select", "toggle", "number", "secret"]),
+	options: z
+		.array(
+			z.strictObject({
+				value: z.string().max(200),
+				label: z.string().min(1).max(120),
+			}),
+		)
+		.max(64)
+		.optional(),
+	optionsSource: hostRef("query").optional(),
+	maxLength: z.number().int().positive().max(8192).optional(),
+	min: z.number().optional(),
+	max: z.number().optional(),
+	required: z.boolean().optional(),
+	/** A secret: never echoed, stored in the outbox or logged; the action must list it in confidentialFields. */
+	confidential: z.boolean().optional(),
+	/** The initial form value (toggle "true"/"false", numbers as decimal text); never for secrets. */
+	defaultValue: z.string().max(200).optional(),
+});
+export type FormFieldV1 = z.infer<typeof formFieldV1>;
+
+/** A registered list editor: rows from an adapter query, columns, row actions and a create form. */
+export const collectionV1 = z.strictObject({
+	source: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/),
+	title: z.string().max(80).optional(),
+	/** The row field holding its stable id. */
+	rowKey: z.string().regex(/^[A-Za-z][A-Za-z0-9_.]{0,80}$/),
+	/** Where the rows are inside the source data (default: the data itself is the array). */
+	rowsPath: z
+		.string()
+		.regex(/^[A-Za-z][A-Za-z0-9_.]{0,80}$/)
+		.optional(),
+	columns: z
+		.array(
+			z.strictObject({
+				key: z.string().regex(/^[A-Za-z][A-Za-z0-9_.]{0,80}$/),
+				label: z.string().min(1).max(60),
+				format: z
+					.enum(["text", "date", "number", "boolean", "badge"])
+					.default("text"),
+			}),
+		)
+		.min(1)
+		.max(12),
+	rowActions: z
+		.array(
+			z.strictObject({
+				actionId: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/),
+				/** Asked before the action is sent (e.g. deletes). */
+				confirm: z.string().max(200).optional(),
+				/**
+				 * Opens a form for the row before sending (row edit). Its values join the input built
+				 * by the action's rowInput; `prefill` fills the form from the row by fixed paths.
+				 */
+				form: z
+					.strictObject({
+						fields: z.array(formFieldV1).min(1).max(24),
+						prefill: z
+							.record(
+								z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,40}$/),
+								z.string().regex(/^\$row(\.[A-Za-z][A-Za-z0-9_]{0,40})+$/),
+							)
+							.default({}),
+					})
+					.optional(),
+				/** Shown only when the row field equals one of the values (finite, no expressions). */
+				when: z
+					.strictObject({
+						key: z.string().regex(/^[A-Za-z][A-Za-z0-9_.]{0,80}$/),
+						in: z
+							.array(z.union([z.string(), z.boolean(), z.number()]))
+							.min(1)
+							.max(16),
+					})
+					.optional(),
+			}),
+		)
+		.max(8)
+		.default([]),
+	create: z
+		.strictObject({
+			actionId: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/),
+			fields: z.array(formFieldV1).min(1).max(24),
+		})
+		.optional(),
+	/** The source accepts paging/search params (its binding has paramsSchemaRef). */
+	paging: z.boolean().optional(),
+	/**
+	 * Re-read the source every few seconds only while some row's field is in these values (e.g.
+	 * a running test); no other polling exists.
+	 */
+	refreshWhile: z
+		.strictObject({
+			key: z.string().regex(/^[A-Za-z][A-Za-z0-9_.]{0,80}$/),
+			in: z
+				.array(z.union([z.string(), z.boolean(), z.number()]))
+				.min(1)
+				.max(16),
+		})
+		.optional(),
+});
+export type CollectionV1 = z.infer<typeof collectionV1>;
+
 /** A presentation of the same sources and actions; variants differ only in layout. */
 export const artifactVariantV1 = z.strictObject({
 	id: z.string().regex(/^[a-z][a-z0-9-]{0,40}$/),
@@ -289,6 +422,8 @@ export const artifactDefinitionV1 = z
 			.optional(),
 		/** Registered fields of adapter documents shown by this artifact. */
 		fields: z.array(documentFieldV1).max(128).optional(),
+		/** Registered list editors over adapter queries (see collectionV1). */
+		collections: z.array(collectionV1).max(8).optional(),
 	})
 	.superRefine((a, ctx) => {
 		if (!a.variants.some((v) => v.id === a.defaultVariant))
@@ -312,6 +447,8 @@ export const artifactDefinitionV1 = z
 				ctx.addIssue({ code: "custom", message: "draftAction" });
 			if (action.effect === "draft" && !action.draftDocument)
 				ctx.addIssue({ code: "custom", message: "draftDocument" });
+			if ((action.draftAction === "structure") !== !!action.structure)
+				ctx.addIssue({ code: "custom", message: "structure" });
 		}
 	});
 export type ArtifactDefinitionV1 = z.infer<typeof artifactDefinitionV1>;
@@ -382,6 +519,8 @@ export type BundleHost = {
 			documents?: ReadonlyMap<string, DocumentDescription>;
 			/** Field visibility conditions the adapter's Web counterpart implements. */
 			conditions?: ReadonlySet<string>;
+			/** Structural draft operations (`structure:` refs) and their input schemas. */
+			structures?: ReadonlyMap<string, { inputSchemaRef: string }>;
 		}
 	>;
 	availability: ReadonlySet<string>;

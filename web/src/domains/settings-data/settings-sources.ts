@@ -4,21 +4,33 @@ import type { EumenesClient } from "../../../../client";
 import { queryRoots } from "../../queryKeys";
 import type { RegisteredField } from "../toolchain-artifacts/documents";
 
-/** The cloud TTS models the settings document can be adjusted for, read from their source. */
-export function useTtsTargets(
+const TTS_RESOURCES = "query:settings.tts-resources@1";
+type TargetData = {
+	localAvailable?: boolean;
+	targets: Array<{ id: string; label: string; selectLabel?: string }>;
+};
+
+/**
+ * The array elements (connections, models) per-target fields apply to, read from the target
+ * source of the screen that registered each field, so a review screen names them the same way.
+ * The cloud speech models also tell whether the local voice is available.
+ */
+export function useTargets(
 	client: EumenesClient,
 	all: ReadonlyArray<RegisteredField>,
 	saved: Settings | undefined,
 ) {
-	// The cloud models a field can be applied to come from the source of the screen that
-	// registered it, so the review screen names them the same way.
 	const targetSources = [
 		...new Map(
 			all
 				.filter((f) => f.target)
 				.map((f) => [
 					`${f.artifactRevisionId}|${f.target}`,
-					{ revision: f.artifactRevisionId, source: f.target! },
+					{
+						revision: f.artifactRevisionId,
+						source: f.target!,
+						query: f.sources.find((s) => s.source === f.target)?.query,
+					},
 				]),
 		).values(),
 	];
@@ -38,21 +50,30 @@ export function useTtsTargets(
 			retry: false,
 		})),
 	});
-	const targetData = targetReads
-		.map((read) => read.data?.data)
-		.find((data) => !!data && typeof data === "object" && "targets" in data) as
-		| {
-				localAvailable?: boolean;
-				targets: Array<{ id: string; label: string; selectLabel?: string }>;
-		  }
-		| undefined;
-	// `label` names a target inside field labels and review rows; `selectLabel` (with the
-	// assignment state) labels it in the target chooser.
-	const targets = (targetData?.targets ?? []).map(({ id, label }) => ({
-		id,
-		label,
-	}));
-	return { targetData, targets };
+	const dataOf = (read: (typeof targetReads)[number]) => {
+		const data = read.data?.data;
+		return data && typeof data === "object" && "targets" in data
+			? (data as TargetData)
+			: undefined;
+	};
+	const bySource = new Map<string, TargetData>();
+	targetSources.forEach((source, index) => {
+		const data = dataOf(targetReads[index]!);
+		if (data) bySource.set(`${source.revision}|${source.source}`, data);
+	});
+	const speechIndex = targetSources.findIndex((s) => s.query === TTS_RESOURCES);
+	const targetData =
+		speechIndex < 0 ? undefined : dataOf(targetReads[speechIndex]!);
+	return {
+		/** The targets of a field, labelled for field names and review rows. */
+		targetsOf: (field: RegisteredField) =>
+			(
+				bySource.get(`${field.artifactRevisionId}|${field.target}`)?.targets ??
+				[]
+			).map(({ id, label }) => ({ id, label })),
+		/** The cloud speech models, with the chooser labels (`selectLabel`). */
+		targetData,
+	};
 }
 
 /** Choices that come from an adapter query, by the query's id. */

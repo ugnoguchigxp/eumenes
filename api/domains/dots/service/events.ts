@@ -71,6 +71,14 @@ export function createEvents(input: {
 			// The command is durable. Maintenance retries enqueueing without rolling back a stop.
 		}
 	}
+	/** Whether the connection's dots delivery subscription is registered and unexpired. */
+	function statusInTransaction(db: Database, owner: string) {
+		const s = read(db, owner);
+		return {
+			subscribed: !!s && s.expiresAt > now(),
+			expiresAt: s?.expiresAt ?? null,
+		};
+	}
 	const headers = (s: Subscription, id: string, body: string) => {
 		const at = new Date(now());
 		return {
@@ -181,15 +189,9 @@ export function createEvents(input: {
 			});
 			queue.wake();
 		},
-		status(owner: string) {
-			return store.readSnapshot((db) => {
-				const s = read(db, owner);
-				return {
-					subscribed: !!s && s.expiresAt > now(),
-					expiresAt: s?.expiresAt ?? null,
-				};
-			});
-		},
+		statusInTransaction,
+		status: (owner: string) =>
+			store.readSnapshot((db) => statusInTransaction(db, owner)),
 		async subscribe(owner: string, raw: unknown) {
 			const data = subscribeSchema.parse(raw),
 				u = new URL(data.delivery.url);

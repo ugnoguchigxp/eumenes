@@ -12,6 +12,23 @@
 .ds-records-workspace {
 	min-width: 0;
 }
+.ds-records-workspace-compact .ds-records-header {
+	padding: 0.75rem 1rem 0.5rem;
+}
+.ds-records-workspace-compact .ds-records-title {
+	font-size: 1.125rem;
+	line-height: 1.4;
+}
+.ds-records-workspace-compact .ds-records-content {
+	padding: 0 1rem 1rem;
+}
+.ds-records-workspace-compact .ds-tabs-content {
+	margin-top: 0.5rem;
+}
+.ds-records-workspace-compact .ds-tabs-trigger {
+	min-height: 2rem;
+	padding-block: 0.25rem;
+}
 .ds-records-workspace [hidden] {
 	display: none;
 }

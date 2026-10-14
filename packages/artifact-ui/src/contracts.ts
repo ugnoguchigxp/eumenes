@@ -1,3 +1,10 @@
+import type { CollectionResource } from "./collection-contracts";
+export type {
+	CollectionFormField,
+	CollectionResource,
+	CollectionRow,
+	CollectionRowAction,
+} from "./collection-contracts";
 import type { ObjectRecognitionResource } from "./object-recognition-components";
 export type { ObjectRecognitionResource } from "./object-recognition-components";
 import type { DrawingResource } from "./drawing-components";
@@ -85,6 +92,15 @@ export const viewRegistry = {
 		label: "記録の閲覧と管理",
 		schema: z.strictObject({
 			view: z.literal("records-workspace"),
+			source,
+			title,
+		}),
+	},
+	"collection-workspace": {
+		name: "CollectionWorkspace",
+		label: "登録された一覧の表示と編集",
+		schema: z.strictObject({
+			view: z.literal("collection-workspace"),
 			source,
 			title,
 		}),
@@ -391,6 +407,7 @@ export type Resource =
 	| GenerationResource
 	| ImageResource
 	| QuestionResource
+	| CollectionResource
 	| FormResource
 	| MemoryResource
 	| SettingsResource
@@ -418,6 +435,9 @@ export type ArtifactEvent = {
 		| "image-cancel"
 		| "image-refresh"
 		| "image-select"
+		| "collection-action"
+		| "collection-create"
+		| "collection-page"
 		| "records-refresh"
 		| "records-query"
 		| "records-procedure-state"

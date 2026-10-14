@@ -7,7 +7,18 @@ import type { ActionDispatcher } from "./dispatcher";
 import { dirtyEntries, equalsSaved, parseWire, toWire } from "./documents";
 import { draftStoreFor, entryKey, splitEntryKey } from "./drafts";
 import { pendingMessage, receiptOf, unsettledMessage } from "./messages";
+import { SECRET_MASK } from "./drafts";
 import type { GetLatest } from "./screen-state";
+
+/** What the user did to a masked secret field: appended, deleted from the end, or replaced. */
+export function nextSecret(current: string, shown: string): string {
+	const mask = SECRET_MASK.repeat(current.length);
+	if (shown.startsWith(mask)) return current + shown.slice(mask.length);
+	const dots = shown.length - shown.replaceAll(SECRET_MASK, "").length;
+	if (dots === shown.length) return current.slice(0, dots);
+	const lead = /^•*/.exec(shown)![0].length;
+	return current.slice(0, lead) + shown.slice(lead).replaceAll(SECRET_MASK, "");
+}
 
 type Describe = (
 	code: string | undefined,
@@ -55,9 +66,12 @@ export function useDraftActions({
 			const access = s.documents?.[doc];
 			const { fieldId, target } = splitEntryKey(key);
 			// Only fields this screen registered can be edited from it.
-			const field = artifact.fields?.find(
+			const own = artifact.fields?.some(
 				(f) => f.document === doc && f.fieldId === fieldId,
 			);
+			const field = own
+				? (all[doc] ?? []).find((f) => f.fieldId === fieldId)
+				: undefined;
 			if (!field || !access?.ready)
 				return { status: "rejected", message: "未登録の設定項目です" };
 			if (
@@ -69,6 +83,25 @@ export function useDraftActions({
 			const rule = access.rule(field, target);
 			if (!rule || rule.disabled)
 				return { status: "rejected", message: "この設定項目は操作できません" };
+			// A secret field shows only a mask of its length, so the text of an edit is read as
+			// a change to the secret held in memory. Emptying it keeps the stored secret.
+			if (field.confidential && typeof event.values.value === "string") {
+				const next = nextSecret(
+					store.peekSecret(field.fieldId, target),
+					event.values.value,
+				);
+				if (next === "") {
+					store.remove(field.fieldId, target);
+					return accepted;
+				}
+				store.set({
+					fieldId: field.fieldId,
+					...(target ? { target } : {}),
+					change: { value: next },
+					confidential: true,
+				});
+				return accepted;
+			}
 			const parsed = parseWire(field, rule, event.values.value);
 			if (!parsed.ok) return { status: "rejected", message: parsed.message };
 			const apply = (
@@ -131,6 +164,17 @@ export function useDraftActions({
 					entry.confidential ||
 					dirty.has(entryKey(entry.fieldId, entry.target)),
 			);
+			// Operations the user must confirm (a changed origin) travel as structure, last.
+			const confirmed: Array<{
+				structure: string;
+				input: Record<string, unknown>;
+			}> = [];
+			for (const need of access.confirmations?.(
+				dirtyEntries(store.getView(), all[doc] ?? [], access),
+			) ?? []) {
+				if (!window.confirm(need.prompt)) return refused(need.declined);
+				confirmed.push({ structure: need.structure, input: need.input });
+			}
 			const frozen = store.freeze(() => true);
 			if (!frozen) return refused("適用できる変更がありません");
 			// The wire carries strings: booleans "true"/"false", numbers decimal, lists as JSON.
@@ -152,8 +196,16 @@ export function useDraftActions({
 						? { delete: true }
 						: { value: toWire(e.change.value) }),
 				}));
+			const structural = [
+				...frozen.structural.map(({ structure, input }) => ({
+					structure,
+					input,
+				})),
+				...confirmed,
+			];
 			const input = {
 				expectedRevision: access.revision,
+				...(structural.length ? { structural } : {}),
 				changes,
 				...(keys.length ? { keys } : {}),
 			};

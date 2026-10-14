@@ -4,6 +4,7 @@ import type { AudioStore } from "../domains/audio";
 import { Button } from "../design-system";
 import { MessageList } from "../components/domains/conversation/MessageList";
 import { ConversationBackground } from "../components/ConversationBackground";
+import { Subtitle } from "../components/domains/subtitle/Subtitle";
 import { ResearchTaskCard } from "../domains/agent-runtime";
 import { useConversationModel } from "../domains/settings";
 import { describeConnectionState } from "../errorMessages";
@@ -111,6 +112,9 @@ export function ConversationPanel({
 	const lastUsed = actualModel
 		? `直近の利用: ${actualModel.source === "cloud" ? "クラウド" : "LARM"} / ${actualModel.model}`
 		: undefined;
+	const subtitleText =
+		replay.subtitle ?? (phase === "playing" ? voice.subtitle : null);
+	const subtitles = settings.data?.general.subtitles;
 	return (
 		<section ref={panel} className="chat-panel" aria-label="会話">
 			{dragging && (
@@ -264,6 +268,13 @@ export function ConversationPanel({
 				</button>
 			)}
 			<ConversationComposer state={state} store={store} />
+			{subtitles?.enabled && subtitleText && (
+				<Subtitle
+					text={subtitleText}
+					style={subtitles.style}
+					size={subtitles.size}
+				/>
+			)}
 		</section>
 	);
 }

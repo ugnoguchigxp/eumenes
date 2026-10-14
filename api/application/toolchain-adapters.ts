@@ -19,15 +19,25 @@ import {
 	timerDomainSchemas,
 } from "./timer-adapter";
 import {
+	describeTtsDictionaryAdapter,
+	TTS_DICTIONARY_ADAPTER_REF,
+} from "./tts-dictionary-adapter";
+import { describeDotsAdapter, DOTS_ADAPTER_REF } from "./dots-adapter";
+import { describeMemoryAdapter, MEMORY_ADAPTER_REF } from "./memory-adapter";
+import { describeWorldAdapter, WORLD_ADAPTER_REF } from "./world-adapter";
+import {
+	describeServiceTestsAdapter,
+	SERVICE_TESTS_ADAPTER_REF,
+} from "./service-tests-adapter";
+import {
 	describeSettingsAdapter,
 	SETTINGS_ADAPTER_REF,
-	type SettingsAdapterPorts,
 } from "./settings-adapter";
+import { describeRecordsAdapter, RECORDS_ADAPTER_REF } from "./records-adapter";
 import {
-	describeRecordsAdapter,
-	RECORDS_ADAPTER_REF,
-	type RecordsPorts,
-} from "./records-adapter";
+	describeInferenceAdapter,
+	INFERENCE_ADAPTER_REF,
+} from "./inference-adapter";
 
 /** `domain:` result schemas registered by the host's adapters. */
 const domainSchemas: Readonly<Record<string, ZodType>> = {
@@ -52,6 +62,7 @@ export function bundleHostOf(
 					queries: d.queries,
 					documents: d.documents,
 					conditions: d.conditions,
+					structures: d.structures,
 				},
 			]),
 		),
@@ -76,6 +87,12 @@ export const hostAdapterDescriptions: Array<
 	{ ref: TIMER_ADAPTER_REF, describe: describeTimerAdapter },
 	{ ref: SETTINGS_ADAPTER_REF, describe: describeSettingsAdapter },
 	{ ref: RECORDS_ADAPTER_REF, describe: describeRecordsAdapter },
+	{ ref: INFERENCE_ADAPTER_REF, describe: describeInferenceAdapter },
+	{ ref: TTS_DICTIONARY_ADAPTER_REF, describe: describeTtsDictionaryAdapter },
+	{ ref: MEMORY_ADAPTER_REF, describe: describeMemoryAdapter },
+	{ ref: WORLD_ADAPTER_REF, describe: describeWorldAdapter },
+	{ ref: SERVICE_TESTS_ADAPTER_REF, describe: describeServiceTestsAdapter },
+	{ ref: DOTS_ADAPTER_REF, describe: describeDotsAdapter },
 ];
 
 /** The bundle host as if every adapter were registered (see `hostAdapterDescriptions`). */
@@ -240,39 +257,4 @@ export function toolchainMaintenance(
 		run("toolchain_interactions", s.dialogue.interactions),
 		run("toolchain_actions", s.toolchain.actionRequests),
 	];
-}
-
-/**
- * What the toolchain composition needs from services assembled around it: the settings-derived
- * key for HMAC digests of secret-bearing UI actions, and dialogue's open questions (dialogue is
- * assembled after the toolchain, so it is attached later).
- */
-export function createToolchainHostLinks(
-	settings: SettingsAdapterPorts & {
-		derivedKey(purpose: string): Uint8Array | undefined;
-		diagnostics: RecordsPorts["diagnostics"];
-	},
-	inference: {
-		usagePage: RecordsPorts["usagePage"];
-		usage: RecordsPorts["usage"];
-		inspect: RecordsPorts["larm"];
-	},
-) {
-	let interactions: InteractionViews | undefined;
-	return {
-		options: {
-			settings,
-			records: {
-				usagePage: inference.usagePage,
-				usage: inference.usage,
-				larm: inference.inspect,
-				diagnostics: settings.diagnostics,
-			},
-			secretKey: () => settings.derivedKey("tool-runtime.action-digest"),
-			interactions: questionReader(() => interactions),
-		},
-		attachDialogue(dialogue: { interactions: InteractionViews }) {
-			interactions = dialogue.interactions;
-		},
-	};
 }

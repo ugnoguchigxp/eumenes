@@ -19,13 +19,15 @@ import {
 	type RegisteredField,
 } from "../toolchain-artifacts/documents";
 import {
+	SECRET_MASK,
 	entryKey,
 	type DraftEntry,
 	type DraftView,
 } from "../toolchain-artifacts/drafts";
 import { artifactIdOf, entryLabel } from "../toolchain-artifacts/launcher";
 import { navigationTargets } from "../toolchain-artifacts/navigation";
-import { readPath, writePath } from "./paths";
+import { readPath, writePath } from "../toolchain-artifacts/paths";
+import { isSpeechTarget } from "./settings-rules";
 import type { VoiceTools } from "./useVoiceTools";
 
 /** Wording for the codes the settings adapter refuses an apply with. */
@@ -55,6 +57,10 @@ const groupInfo = (s: Settings): Record<string, SettingsFieldGroup> => ({
 			"\n録音の調整は適用後、次の音声開始から反映します。",
 	},
 	devices: { id: "devices", label: "機器", description: "" },
+	larm: { id: "larm", label: "LARM接続" },
+	"route-llm": { id: "route-llm", label: "会話の利用先" },
+	"route-asr": { id: "route-asr", label: "聞き取りの利用先" },
+	"route-tts": { id: "route-tts", label: "読み上げの利用先" },
 });
 
 /** The panel actions of the voice screen, performed locally (the browser or the voice API). */
@@ -74,6 +80,17 @@ export function sectionDescription(fields: readonly RegisteredField[]) {
 		return "名前と口調を設定します。変更は適用後、次の返答から反映されます。";
 	if (fields.some((f) => f.path === "$.general.theme"))
 		return "会話の背景、テーマ、読み上げ字幕を設定します。背景とテーマは保存後に反映します。字幕の見本は編集中の値を表示します。";
+	if (
+		fields.some(
+			(f) =>
+				f.path.startsWith("$.larm.baseUrl") ||
+				f.path.startsWith("$.routes") ||
+				f.path.startsWith("$.connections"),
+		)
+	)
+		return "LARM、AIの利用先、クラウド接続とモデルを設定します。変更は適用後に反映されます。";
+	if (fields.some((f) => f.path.startsWith("$.codingSupervision")))
+		return "外部作業の実行前の確認を設定します。変更は適用後に反映されます。";
 	return "声と音声入力を設定します。";
 }
 
@@ -101,8 +118,10 @@ export function buildInputs({
 	ruleOf,
 	voice,
 	speechActive,
+	view,
 }: {
 	effective: Settings | undefined;
+	view: DraftView;
 	own: ReadonlyArray<RegisteredField>;
 	access: DocumentAccess;
 	ruleOf: (field: RegisteredField, target?: string) => FieldRule | null;
@@ -110,6 +129,8 @@ export function buildInputs({
 	speechActive: boolean;
 }) {
 	const inputs: SettingsInputField[] = [];
+	// Each target of a per-target field (a connection, a model) is its own group.
+	const targetGroups = new Map<string, string>();
 	if (effective) {
 		for (const field of own) {
 			const list = field.target
@@ -118,12 +139,26 @@ export function buildInputs({
 			for (const target of list) {
 				const rule = ruleOf(field as RegisteredField, target.id);
 				if (!rule) continue;
+				const grouped = !!target.id && !isSpeechTarget(field);
+				const group = grouped
+					? `${field.group ?? "target"}~${target.id}`
+					: field.group;
+				if (grouped && group) targetGroups.set(group, target.label);
 				inputs.push({
 					id: entryKey(field.fieldId, target.id),
-					label: target.id ? `${target.label} の${field.label}` : field.label,
+					label:
+						target.id && !grouped
+							? `${target.label} の${field.label}`
+							: field.label,
 					...(field.help ? { help: field.help } : {}),
 					control: field.control,
-					value: toWire(readPath(effective, field.path, target.id)),
+					value: field.confidential
+						? SECRET_MASK.repeat(
+								view.secrets.find(
+									(x) => x.fieldId === field.fieldId && x.target === target.id,
+								)?.length ?? 0,
+							)
+						: toWire(readPath(effective, field.path, target.id)),
 					...(rule.defaultValue !== undefined
 						? { defaultValue: rule.defaultValue }
 						: {}),
@@ -132,7 +167,7 @@ export function buildInputs({
 					...(rule.max !== undefined ? { maximum: rule.max } : {}),
 					...(rule.step ? { step: rule.step } : {}),
 					...(rule.options ? { options: [...rule.options] } : {}),
-					...(field.group ? { group: field.group } : {}),
+					...(group ? { group } : {}),
 					...(field.detail ? { detail: true } : {}),
 					...(rule.disabled ? { disabled: true } : {}),
 					...(field.searchable ? { searchable: true } : {}),
@@ -159,7 +194,7 @@ export function buildInputs({
 			inputs.splice(at < 0 ? inputs.length : at, 0, selector);
 		}
 	}
-	return inputs;
+	return { inputs, targetGroups };
 }
 
 /** The voice panel's actions, enabled by one registered `settings-action` local binding. */
@@ -329,6 +364,7 @@ export function groupsFor(
 	effective: Settings | undefined,
 	voice: VoiceTools,
 	saved: Settings | undefined,
+	targetGroups: ReadonlyMap<string, string> = new Map(),
 ): SettingsFieldGroup[] {
 	if (!effective) return [];
 	const info = groupInfo(effective);
@@ -361,5 +397,7 @@ export function groupsFor(
 	const order: string[] = [];
 	for (const input of inputs)
 		if (input.group && !order.includes(input.group)) order.push(input.group);
-	return order.map((id) => info[id] ?? { id, label: id });
+	return order.map(
+		(id) => info[id] ?? { id, label: targetGroups.get(id) ?? id },
+	);
 }

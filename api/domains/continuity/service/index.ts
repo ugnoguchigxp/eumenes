@@ -68,6 +68,20 @@ export function createContinuityService(
 		revision: conversationRevision(db, conversationId),
 		items: liveItems(db, conversationId),
 	});
+	const transitionInTransaction = (
+		db: Database,
+		itemId: string,
+		input: ContinuityTransition,
+	): ContinuityItem => {
+		const existing = getItem(db, itemId);
+		if (!existing) throw new Error("invalid_continuity_item");
+		if (
+			!transitionItem(db, itemId, input.expectedRevision, input.status, clock())
+		)
+			throw new Error("revision_conflict");
+		userChangeHook?.(db);
+		return getItem(db, itemId) as ContinuityItem;
+	};
 	return {
 		setUserChangeHook(next: (db: Database) => void) {
 			userChangeHook = next;
@@ -165,26 +179,13 @@ export function createContinuityService(
 		): boolean {
 			return transitionItem(db, itemId, expectedRevision, status, clock());
 		},
+		/** The user closing an item, in the caller's writer transaction (hooks included). */
+		transitionInTransaction,
 		transition(
 			itemId: string,
 			input: ContinuityTransition,
 		): Promise<ContinuityItem> {
-			return store.write((db) => {
-				const existing = getItem(db, itemId);
-				if (!existing) throw new Error("invalid_continuity_item");
-				if (
-					!transitionItem(
-						db,
-						itemId,
-						input.expectedRevision,
-						input.status,
-						clock(),
-					)
-				)
-					throw new Error("revision_conflict");
-				userChangeHook?.(db);
-				return getItem(db, itemId) as ContinuityItem;
-			});
+			return store.write((db) => transitionInTransaction(db, itemId, input));
 		},
 		list(conversationId: string, includeClosed = false): ContinuityItem[] {
 			return store.read((db) => listItems(db, conversationId, !includeClosed));

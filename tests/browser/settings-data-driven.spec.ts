@@ -229,6 +229,21 @@ test("records show the tables and search through the source read, not an action"
 	await openFromHub(page, "記録");
 	await expect(page.getByRole("tab", { name: "AIの利用" })).toBeVisible();
 	await expect(page.getByRole("tab", { name: "ツールチェーン" })).toBeVisible();
+	await expect(page.getByText("データと診断")).toHaveCount(0);
+	await expect(
+		page.getByRole("button", { name: "診断データを保存" }),
+	).toHaveCount(0);
+	await expect(
+		page.getByText(
+			"AIの利用記録です。詳細から切替・失敗理由とトークン数を確認できます。",
+		),
+	).toHaveCount(0);
+	await page.getByRole("tab", { name: "ツールチェーン" }).click();
+	await expect(page.getByText("データと診断")).toHaveCount(0);
+	await expect(
+		page.getByText("処理の選択と実行結果の記録です（30日保持）。"),
+	).toHaveCount(0);
+	await page.getByRole("tab", { name: "AIの利用" }).click();
 	let posts = 0;
 	page.on("request", (r) => {
 		if (r.method() === "POST" && r.url().endsWith("/api/toolchain-actions"))
@@ -251,4 +266,146 @@ test("records show the tables and search through the source read, not an action"
 	expect(posts).toBe(0);
 	// The table answers from the same page shape the first read returned.
 	await expect(page.getByLabel(/を検索$/).first()).toHaveValue("model");
+});
+
+test("AIと接続: an API key is applied through the draft, never stored in the browser", async ({
+	page,
+	request,
+}) => {
+	const KEY = "sk-browser-test-secret-value";
+	const current = await savedSettings(request);
+	const connectionId = crypto.randomUUID();
+	const seeded = await request.post(
+		`http://127.0.0.1:${apiPort}/api/settings/apply`,
+		{
+			headers: auth,
+			data: {
+				requestId: crypto.randomUUID(),
+				expectedRevision: current.revision,
+				settings: {
+					...current,
+					connections: [
+						{
+							id: connectionId,
+							name: "検証用の接続",
+							baseUrl: "https://example.test/v1",
+							enabled: true,
+							epoch: 0,
+							envRef: null,
+						},
+					],
+				},
+				keys: [],
+			},
+		},
+	);
+	expect(seeded.ok()).toBe(true);
+	await openHub(page);
+	await openFromHub(page, "AIと接続");
+	await page.getByRole("button", { name: "検証用の接続" }).click();
+	// The settings adapter refuses an apply with a key and no other change, so rename too.
+	await page.getByLabel("接続名").fill("検証用の接続（更新）");
+	const field = page.getByLabel("APIキーの更新");
+	await field.pressSequentially(KEY);
+	// The field shows one mark per character, never the key.
+	await expect(field).toHaveValue("•".repeat(KEY.length));
+	await page.getByRole("button", { name: "変更一覧を開く" }).click();
+	await expect(page.getByText("更新・削除予定 1件")).toBeVisible();
+	await expect(page.locator("body")).not.toContainText(KEY);
+	const applied = page.waitForResponse(
+		(response) =>
+			response.request().method() === "POST" &&
+			response.url().endsWith("/api/toolchain-actions"),
+	);
+	await page.getByRole("button", { name: "設定の変更をすべて適用" }).click();
+	const reply = await applied;
+	const view = await reply.json();
+	expect(view.status).toBe("accepted");
+	const stored = await page.evaluate(() =>
+		JSON.stringify({ ...sessionStorage, ...localStorage }),
+	);
+	expect(stored).not.toContain(KEY);
+	const diagnostics = await request.get(
+		`http://127.0.0.1:${apiPort}/api/settings/diagnostics`,
+		{ headers: auth },
+	);
+	const body = (await diagnostics.json()) as {
+		connections: Array<{ id: string; credentialAvailable: boolean }>;
+	};
+	expect(
+		body.connections.find((c) => c.id === connectionId)?.credentialAvailable,
+	).toBe(true);
+	expect(JSON.stringify(body)).not.toContain(KEY);
+});
+
+test("AIと接続: a connection added from the list form carries its key apart, and can be deleted", async ({
+	page,
+	request,
+}) => {
+	const KEY = "sk-browser-added-secret-value";
+	const name = `追加した接続-${Date.now()}`;
+	await openHub(page);
+	await openFromHub(page, "AIと接続");
+	const form = page.getByRole("form", { name: "クラウドAPIを登録" });
+	await form.getByLabel("接続名").fill(name);
+	await form.getByLabel("APIのベースURL").fill("https://example.test/v1");
+	await form.getByLabel("APIキー").fill(KEY);
+	await form.getByRole("button", { name: "クラウドAPIを登録" }).click();
+	await page.getByRole("button", { name: "変更一覧を開く" }).first().click();
+	await expect(page.getByText(`クラウドAPIを登録（${name}）`)).toBeVisible();
+	await expect(page.getByText("更新・削除予定 1件")).toBeVisible();
+	await expect(page.locator("body")).not.toContainText(KEY);
+	const applied = page.waitForResponse(
+		(response) =>
+			response.request().method() === "POST" &&
+			response.url().endsWith("/api/toolchain-actions"),
+	);
+	await page.getByRole("button", { name: "設定の変更をすべて適用" }).click();
+	const reply = await applied;
+	// The key travels in `keys`, never inside the structural input.
+	const sent = JSON.parse(reply.request().postData()!) as {
+		input: {
+			structural: Array<{ input: Record<string, unknown> }>;
+			keys: Array<{ connectionId: string }>;
+		};
+	};
+	expect(sent.input.structural[0]!.input).not.toHaveProperty("apiKey");
+	expect(sent.input.keys[0]!.connectionId).toBe(
+		sent.input.structural[0]!.input.connectionId,
+	);
+	expect((await reply.json()).status).toBe("accepted");
+	expect(
+		await page.evaluate(() =>
+			JSON.stringify({ ...sessionStorage, ...localStorage }),
+		),
+	).not.toContain(KEY);
+	const connectionId = sent.input.keys[0]!.connectionId;
+	const diagnostics = (await (
+		await request.get(`http://127.0.0.1:${apiPort}/api/settings/diagnostics`, {
+			headers: auth,
+		})
+	).json()) as {
+		connections: Array<{ id: string; credentialAvailable: boolean }>;
+	};
+	expect(
+		diagnostics.connections.find((c) => c.id === connectionId)
+			?.credentialAvailable,
+	).toBe(true);
+	// Delete it again: a confirmed row action staged in the draft, then applied.
+	await page.getByRole("button", { name: `削除: ${name}` }).click();
+	await page.getByRole("button", { name: "実行する" }).click();
+	await page.getByRole("button", { name: "変更一覧を開く" }).first().click();
+	await expect(page.getByText(/削除/).first()).toBeVisible();
+	await page.getByRole("button", { name: "設定の変更をすべて適用" }).click();
+	await expect
+		.poll(async () =>
+			(
+				(await (
+					await request.get(`http://127.0.0.1:${apiPort}/api/settings`, {
+						headers: auth,
+					})
+				).json()) as { connections: Array<{ id: string }> }
+			).connections.some((c) => c.id === connectionId),
+		)
+		.toBe(false);
 });

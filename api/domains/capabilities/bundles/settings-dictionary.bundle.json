@@ -1,0 +1,245 @@
+{
+	"formatVersion": 1,
+	"bundleId": "settings-dictionary",
+	"pins": [],
+	"definitions": [],
+	"bindings": [],
+	"artifacts": [
+		{
+			"kind": "artifact",
+			"id": "settings.dictionary",
+			"revision": 1,
+			"title": "読み方辞書",
+			"defaultVariant": "standard",
+			"variants": [
+				{
+					"id": "standard",
+					"label": "標準",
+					"definition": {
+						"view": "collection-workspace",
+						"source": "dictionary-entries",
+						"title": "読み方辞書"
+					}
+				}
+			],
+			"sourceBindings": [
+				{
+					"source": "dictionary-entries",
+					"adapterRef": "adapter:tts-dictionary@1",
+					"query": "query:tts-dictionary.entries@1",
+					"target": "none",
+					"paramsSchemaRef": "schema:tts-dictionary-page@1"
+				}
+			],
+			"actionBindings": [
+				{
+					"actionId": "save",
+					"eventAction": "dictionary-save",
+					"source": "dictionary-entries",
+					"inputSchemaRef": "schema:tts-dictionary-save@1",
+					"effect": "write",
+					"operationId": "tts-dictionary.save",
+					"label": "登録する"
+				},
+				{
+					"actionId": "edit",
+					"eventAction": "dictionary-edit",
+					"source": "dictionary-entries",
+					"inputSchemaRef": "schema:tts-dictionary-update@1",
+					"effect": "write",
+					"operationId": "tts-dictionary.update",
+					"label": "編集",
+					"rowInput": {
+						"written": "$row.written",
+						"expectedSpoken": "$row.spoken"
+					}
+				},
+				{
+					"actionId": "delete",
+					"eventAction": "dictionary-delete",
+					"source": "dictionary-entries",
+					"inputSchemaRef": "schema:tts-dictionary-delete@1",
+					"effect": "write",
+					"operationId": "tts-dictionary.delete",
+					"label": "削除",
+					"rowInput": {
+						"written": "$row.written",
+						"expectedSpoken": "$row.spoken"
+					}
+				}
+			],
+			"collections": [
+				{
+					"source": "dictionary-entries",
+					"title": "登録済みの読み方",
+					"rowKey": "written",
+					"rowsPath": "items",
+					"paging": true,
+					"columns": [
+						{
+							"key": "written",
+							"label": "文字",
+							"format": "text"
+						},
+						{
+							"key": "spoken",
+							"label": "読み方",
+							"format": "text"
+						}
+					],
+					"rowActions": [
+						{
+							"actionId": "edit",
+							"form": {
+								"fields": [
+									{
+										"fieldId": "spoken",
+										"label": "読み方",
+										"control": "text",
+										"maxLength": 400,
+										"required": true
+									}
+								],
+								"prefill": {
+									"spoken": "$row.spoken"
+								}
+							}
+						},
+						{
+							"actionId": "delete",
+							"confirm": "この読み方を辞書から削除します。よろしいですか。"
+						}
+					],
+					"create": {
+						"actionId": "save",
+						"fields": [
+							{
+								"fieldId": "written",
+								"label": "文字",
+								"help": "句読点（。！？、!?.,;）は含められません。",
+								"control": "text",
+								"maxLength": 200,
+								"required": true
+							},
+							{
+								"fieldId": "spoken",
+								"label": "読み方",
+								"control": "text",
+								"maxLength": 400,
+								"required": true
+							}
+						]
+					}
+				}
+			],
+			"launcher": {
+				"label": "読み方辞書",
+				"group": "管理と確認",
+				"order": 50,
+				"description": "読み上げ時の文字の読み方を登録 編集 削除"
+			}
+		}
+	],
+	"schemas": [
+		{
+			"kind": "schema",
+			"id": "tts-dictionary-save",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"written": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 200
+					},
+					"spoken": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 400
+					}
+				},
+				"required": ["written", "spoken"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "tts-dictionary-update",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"written": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 200
+					},
+					"expectedSpoken": {
+						"type": "string",
+						"maxLength": 400
+					},
+					"spoken": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 400
+					}
+				},
+				"required": ["written", "expectedSpoken", "spoken"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "tts-dictionary-delete",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"written": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 200
+					},
+					"expectedSpoken": {
+						"type": "string",
+						"maxLength": 400
+					}
+				},
+				"required": ["written", "expectedSpoken"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "tts-dictionary-page",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"pageIndex": {
+						"type": "integer",
+						"minimum": 0,
+						"maximum": 100000
+					},
+					"pageSize": {
+						"type": "integer",
+						"enum": [10, 25, 50]
+					},
+					"sort": {
+						"type": "string",
+						"enum": ["written", "spoken"]
+					},
+					"desc": {
+						"type": "boolean"
+					},
+					"q": {
+						"type": "string",
+						"maxLength": 200
+					}
+				}
+			}
+		}
+	]
+}

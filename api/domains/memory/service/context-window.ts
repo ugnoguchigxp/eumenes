@@ -297,6 +297,8 @@ export function createContextWindowStore(deps: {
 	}
 
 	return {
+		/** The window last stored for the conversation, as it was built; never rebuilds (a read connection may call it). */
+		storedInTransaction: current,
 		/** Prepare-time read (write transaction). Rebuilds and stores when an input moved. */
 		readForRunInTransaction(
 			db: Database,

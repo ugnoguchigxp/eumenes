@@ -10,6 +10,7 @@ import "./RecordsWorkspace.css";
 /** Presentation only. Keeping both panels mounted preserves expanded rows and scroll. */
 export function RecordsWorkspace({
 	title = "記録",
+	compact = false,
 	tabs,
 	busy,
 	message,
@@ -26,16 +27,16 @@ export function RecordsWorkspace({
 		? selected
 		: (tabs[0]?.id ?? "");
 	return (
-		<Card className="ds-records-workspace">
-			<CardHeader>
+		<Card className={`ds-records-workspace${compact ? " ds-records-workspace-compact" : ""}`}>
+			<CardHeader className="ds-records-header">
 				<div className="ds-records-heading">
-					<CardTitle>{title}</CardTitle>
-					<Button variant="secondary" disabled={busy} onClick={onRefresh}>
+					<CardTitle className="ds-records-title">{title}</CardTitle>
+					<Button size={compact ? "sm" : "default"} variant="secondary" disabled={busy} onClick={onRefresh}>
 						記録を更新
 					</Button>
 				</div>
 			</CardHeader>
-			<CardContent>
+			<CardContent className="ds-records-content">
 				<Tabs value={active} onValueChange={setSelected}>
 					<TabsList aria-label="記録の種類">
 						{tabs.map((tab) => (
@@ -51,10 +52,11 @@ export function RecordsWorkspace({
 							forceMount
 							hidden={active !== tab.id}
 						>
-							<p className="ds-records-hint">{tab.description}</p>
+							{tab.description && <p className="ds-records-hint">{tab.description}</p>}
 							<div>
 								<RecordList
 									tab={tab}
+									detailMode={compact ? "modal" : "inline"}
 									busy={busy}
 									onQuery={(query) => onQuery(tab.id, query)}
 								/>
@@ -80,7 +82,7 @@ export function RecordsWorkspace({
 					))}
 				</Tabs>
 				<output aria-live="polite">{message}</output>
-				<details className="ds-records-fold">
+				{!compact && <details className="ds-records-fold">
 					<summary>データと診断</summary>
 					{dataDescription.map((text) => (
 						<p key={text}>{text}</p>
@@ -92,7 +94,7 @@ export function RecordsWorkspace({
 					<p className="ds-records-hint">
 						APIキー・会話本文・録音は含めません。
 					</p>
-				</details>
+				</details>}
 			</CardContent>
 		</Card>
 	);

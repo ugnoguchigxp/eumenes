@@ -1,0 +1,1375 @@
+{
+	"formatVersion": 1,
+	"bundleId": "settings-dots",
+	"pins": [],
+	"definitions": [],
+	"bindings": [],
+	"artifacts": [
+		{
+			"kind": "artifact",
+			"id": "settings.dots",
+			"revision": 1,
+			"title": "Codexへの委任",
+			"variants": [
+				{
+					"id": "standard",
+					"label": "標準",
+					"definition": {
+						"view": "layout",
+						"direction": "stack",
+						"title": "外部作業",
+						"children": [
+							{
+								"view": "collection-workspace",
+								"source": "dots-connections",
+								"title": "dotsへの接続"
+							},
+							{
+								"view": "collection-workspace",
+								"source": "dots-projects",
+								"title": "作業するプロジェクト"
+							},
+							{
+								"view": "collection-workspace",
+								"source": "dots-packages",
+								"title": "担当とSkill"
+							}
+						]
+					}
+				}
+			],
+			"defaultVariant": "standard",
+			"sourceBindings": [
+				{
+					"source": "dots-connections",
+					"adapterRef": "adapter:dots@1",
+					"query": "query:dots.connections@1",
+					"target": "none"
+				},
+				{
+					"source": "dots-projects",
+					"adapterRef": "adapter:dots@1",
+					"query": "query:dots.projects@1",
+					"target": "none"
+				},
+				{
+					"source": "dots-packages",
+					"adapterRef": "adapter:dots@1",
+					"query": "query:dots.packages@1",
+					"target": "none"
+				},
+				{
+					"source": "dots-connection-options",
+					"adapterRef": "adapter:dots@1",
+					"query": "query:dots.connection-options@1",
+					"target": "none"
+				},
+				{
+					"source": "dots-capability-options",
+					"adapterRef": "adapter:dots@1",
+					"query": "query:dots.capability-options@1",
+					"target": "none"
+				}
+			],
+			"actionBindings": [
+				{
+					"actionId": "connection-create",
+					"eventAction": "collection-connection-create",
+					"source": "dots-connections",
+					"operationId": "dots.connection-create",
+					"inputSchemaRef": "schema:dots-connection-create@1",
+					"effect": "write",
+					"label": "接続を作成"
+				},
+				{
+					"actionId": "connection-edit",
+					"eventAction": "collection-connection-edit",
+					"source": "dots-connections",
+					"operationId": "dots.connection-update",
+					"inputSchemaRef": "schema:dots-connection-update@1",
+					"effect": "write",
+					"label": "編集",
+					"rowInput": {
+						"id": "$row.id",
+						"expectedRevision": "$row.revision"
+					}
+				},
+				{
+					"actionId": "connection-enable",
+					"eventAction": "collection-connection-enable",
+					"source": "dots-connections",
+					"operationId": "dots.connection-enabled",
+					"inputSchemaRef": "schema:dots-connection-enabled@1",
+					"effect": "write",
+					"label": "有効にする",
+					"rowInput": {
+						"id": "$row.id",
+						"expectedRevision": "$row.revision",
+						"enabled": {
+							"literal": true
+						}
+					}
+				},
+				{
+					"actionId": "connection-disable",
+					"eventAction": "collection-connection-disable",
+					"source": "dots-connections",
+					"operationId": "dots.connection-enabled",
+					"inputSchemaRef": "schema:dots-connection-enabled@1",
+					"effect": "write",
+					"label": "無効にする",
+					"rowInput": {
+						"id": "$row.id",
+						"expectedRevision": "$row.revision",
+						"enabled": {
+							"literal": false
+						}
+					}
+				},
+				{
+					"actionId": "project-create",
+					"eventAction": "collection-project-create",
+					"source": "dots-projects",
+					"operationId": "dots.project-create",
+					"inputSchemaRef": "schema:dots-project-create@1",
+					"effect": "write",
+					"label": "プロジェクトを作成"
+				},
+				{
+					"actionId": "project-edit",
+					"eventAction": "collection-project-edit",
+					"source": "dots-projects",
+					"operationId": "dots.project-update",
+					"inputSchemaRef": "schema:dots-project-update@1",
+					"effect": "write",
+					"label": "編集",
+					"rowInput": {
+						"ref": "$row.ref",
+						"expectedRevision": "$row.revision"
+					}
+				},
+				{
+					"actionId": "project-enable",
+					"eventAction": "collection-project-enable",
+					"source": "dots-projects",
+					"operationId": "dots.project-enabled",
+					"inputSchemaRef": "schema:dots-project-enabled@1",
+					"effect": "write",
+					"label": "有効にする",
+					"rowInput": {
+						"ref": "$row.ref",
+						"expectedRevision": "$row.revision",
+						"enabled": {
+							"literal": true
+						}
+					}
+				},
+				{
+					"actionId": "project-disable",
+					"eventAction": "collection-project-disable",
+					"source": "dots-projects",
+					"operationId": "dots.project-enabled",
+					"inputSchemaRef": "schema:dots-project-enabled@1",
+					"effect": "write",
+					"label": "無効にする",
+					"rowInput": {
+						"ref": "$row.ref",
+						"expectedRevision": "$row.revision",
+						"enabled": {
+							"literal": false
+						}
+					}
+				},
+				{
+					"actionId": "package-create",
+					"eventAction": "collection-package-create",
+					"source": "dots-packages",
+					"operationId": "dots.package-create",
+					"inputSchemaRef": "schema:dots-package-create@1",
+					"effect": "write",
+					"label": "担当を作成"
+				},
+				{
+					"actionId": "package-edit",
+					"eventAction": "collection-package-edit",
+					"source": "dots-packages",
+					"operationId": "dots.package-update",
+					"inputSchemaRef": "schema:dots-package-update@1",
+					"effect": "write",
+					"label": "編集",
+					"rowInput": {
+						"id": "$row.id",
+						"expectedToken": "$row.stateToken"
+					}
+				},
+				{
+					"actionId": "package-enable",
+					"eventAction": "collection-package-enable",
+					"source": "dots-packages",
+					"operationId": "dots.package-enabled",
+					"inputSchemaRef": "schema:dots-package-enabled@1",
+					"effect": "write",
+					"label": "有効にする",
+					"rowInput": {
+						"id": "$row.id",
+						"expectedToken": "$row.stateToken",
+						"enabled": {
+							"literal": true
+						}
+					}
+				},
+				{
+					"actionId": "package-disable",
+					"eventAction": "collection-package-disable",
+					"source": "dots-packages",
+					"operationId": "dots.package-enabled",
+					"inputSchemaRef": "schema:dots-package-enabled@1",
+					"effect": "write",
+					"label": "無効にする",
+					"rowInput": {
+						"id": "$row.id",
+						"expectedToken": "$row.stateToken",
+						"enabled": {
+							"literal": false
+						}
+					}
+				}
+			],
+			"launcher": {
+				"label": "Codexへの委任",
+				"group": "管理と確認",
+				"order": 60,
+				"description": "dotsへの接続 プロジェクト 担当とSkill"
+			},
+			"collections": [
+				{
+					"source": "dots-connections",
+					"title": "dotsへの接続",
+					"rowKey": "id",
+					"columns": [
+						{
+							"key": "title",
+							"label": "名前"
+						},
+						{
+							"key": "mode",
+							"label": "接続方式"
+						},
+						{
+							"key": "enabled",
+							"label": "利用",
+							"format": "boolean"
+						},
+						{
+							"key": "subscription",
+							"label": "受信登録"
+						},
+						{
+							"key": "endpoint",
+							"label": "接続先"
+						}
+					],
+					"rowActions": [
+						{
+							"actionId": "connection-edit",
+							"form": {
+								"fields": [
+									{
+										"fieldId": "title",
+										"label": "名前",
+										"control": "text",
+										"required": true,
+										"maxLength": 120
+									},
+									{
+										"fieldId": "enabled",
+										"label": "利用する",
+										"control": "toggle"
+									},
+									{
+										"fieldId": "oauthIssuer",
+										"label": "発行元（OAuthを使う場合）",
+										"control": "text",
+										"maxLength": 2048,
+										"help": "外部のdotsから使うときだけ、発行元・公開鍵のURL・公開MCPのURL・ユーザー識別子の四つをすべて入力します。空欄はローカル専用の接続です。保存後に発行元・公開MCPのURL・ユーザーは変更できません。"
+									},
+									{
+										"fieldId": "oauthJwksUrl",
+										"label": "公開鍵のURL",
+										"control": "text",
+										"maxLength": 2048
+									},
+									{
+										"fieldId": "oauthResource",
+										"label": "公開MCPのURL",
+										"control": "text",
+										"maxLength": 2048
+									},
+									{
+										"fieldId": "oauthSubject",
+										"label": "ユーザー識別子",
+										"control": "text",
+										"maxLength": 200
+									}
+								],
+								"prefill": {
+									"title": "$row.title",
+									"enabled": "$row.enabled",
+									"oauthIssuer": "$row.oauthIssuer",
+									"oauthJwksUrl": "$row.oauthJwksUrl",
+									"oauthResource": "$row.oauthResource",
+									"oauthSubject": "$row.oauthSubject"
+								}
+							}
+						},
+						{
+							"actionId": "connection-enable",
+							"when": {
+								"key": "enabled",
+								"in": [false]
+							}
+						},
+						{
+							"actionId": "connection-disable",
+							"confirm": "無効にすると、この接続を使う進行中の作業が一時停止します。",
+							"when": {
+								"key": "enabled",
+								"in": [true]
+							}
+						}
+					],
+					"create": {
+						"actionId": "connection-create",
+						"fields": [
+							{
+								"fieldId": "title",
+								"label": "名前",
+								"control": "text",
+								"required": true,
+								"maxLength": 120,
+								"defaultValue": "dots"
+							},
+							{
+								"fieldId": "enabled",
+								"label": "利用する",
+								"control": "toggle",
+								"defaultValue": "true"
+							},
+							{
+								"fieldId": "oauthIssuer",
+								"label": "発行元（OAuthを使う場合）",
+								"control": "text",
+								"maxLength": 2048,
+								"help": "外部のdotsから使うときだけ、発行元・公開鍵のURL・公開MCPのURL・ユーザー識別子の四つをすべて入力します。空欄はローカル専用の接続です。保存後に発行元・公開MCPのURL・ユーザーは変更できません。"
+							},
+							{
+								"fieldId": "oauthJwksUrl",
+								"label": "公開鍵のURL",
+								"control": "text",
+								"maxLength": 2048
+							},
+							{
+								"fieldId": "oauthResource",
+								"label": "公開MCPのURL",
+								"control": "text",
+								"maxLength": 2048
+							},
+							{
+								"fieldId": "oauthSubject",
+								"label": "ユーザー識別子",
+								"control": "text",
+								"maxLength": 200
+							}
+						]
+					}
+				},
+				{
+					"source": "dots-projects",
+					"title": "作業するプロジェクト",
+					"rowKey": "ref",
+					"columns": [
+						{
+							"key": "title",
+							"label": "名前"
+						},
+						{
+							"key": "connection",
+							"label": "接続"
+						},
+						{
+							"key": "capability",
+							"label": "担当"
+						},
+						{
+							"key": "environmentLabel",
+							"label": "実行場所"
+						},
+						{
+							"key": "nativeProjectId",
+							"label": "プロジェクトID"
+						},
+						{
+							"key": "hostId",
+							"label": "ホストID"
+						},
+						{
+							"key": "operations",
+							"label": "許可する操作"
+						},
+						{
+							"key": "enabled",
+							"label": "利用",
+							"format": "boolean"
+						}
+					],
+					"rowActions": [
+						{
+							"actionId": "project-edit",
+							"form": {
+								"fields": [
+									{
+										"fieldId": "title",
+										"label": "名前",
+										"control": "text",
+										"required": true,
+										"maxLength": 120
+									},
+									{
+										"fieldId": "capabilityRevisionId",
+										"label": "担当（空欄は標準の調整担当）",
+										"control": "select",
+										"optionsSource": "query:dots.capability-options@1"
+									},
+									{
+										"fieldId": "nativeProjectId",
+										"label": "Codexのプロジェクト ID",
+										"control": "text",
+										"required": true,
+										"maxLength": 160
+									},
+									{
+										"fieldId": "hostId",
+										"label": "ホストID",
+										"control": "text",
+										"required": true,
+										"maxLength": 160,
+										"help": "この端末で動かすときは local など、Codex側で登録した値です。"
+									},
+									{
+										"fieldId": "environment",
+										"label": "実行場所",
+										"control": "select",
+										"required": true,
+										"options": [
+											{
+												"value": "local",
+												"label": "ローカル"
+											},
+											{
+												"value": "cloud",
+												"label": "クラウド"
+											}
+										]
+									},
+									{
+										"fieldId": "enabled",
+										"label": "利用する",
+										"control": "toggle"
+									},
+									{
+										"fieldId": "opRead",
+										"label": "許可: 参照",
+										"control": "toggle"
+									},
+									{
+										"fieldId": "opCreateSession",
+										"label": "許可: 新しいSession",
+										"control": "toggle"
+									},
+									{
+										"fieldId": "opContinueSession",
+										"label": "許可: 既存Sessionの続行",
+										"control": "toggle"
+									},
+									{
+										"fieldId": "opEdit",
+										"label": "許可: 編集",
+										"control": "toggle"
+									},
+									{
+										"fieldId": "opCheck",
+										"label": "許可: 検証",
+										"control": "toggle"
+									},
+									{
+										"fieldId": "opCommit",
+										"label": "許可: コミット",
+										"control": "toggle"
+									},
+									{
+										"fieldId": "opPush",
+										"label": "許可: プッシュ",
+										"control": "toggle"
+									},
+									{
+										"fieldId": "opPublish",
+										"label": "許可: 公開",
+										"control": "toggle"
+									},
+									{
+										"fieldId": "opSend",
+										"label": "許可: 外部への送信",
+										"control": "toggle"
+									}
+								],
+								"prefill": {
+									"title": "$row.title",
+									"capabilityRevisionId": "$row.capabilityRevisionId",
+									"nativeProjectId": "$row.nativeProjectId",
+									"hostId": "$row.hostId",
+									"environment": "$row.environment",
+									"enabled": "$row.enabled",
+									"opRead": "$row.opRead",
+									"opCreateSession": "$row.opCreateSession",
+									"opContinueSession": "$row.opContinueSession",
+									"opEdit": "$row.opEdit",
+									"opCheck": "$row.opCheck",
+									"opCommit": "$row.opCommit",
+									"opPush": "$row.opPush",
+									"opPublish": "$row.opPublish",
+									"opSend": "$row.opSend"
+								}
+							}
+						},
+						{
+							"actionId": "project-enable",
+							"when": {
+								"key": "enabled",
+								"in": [false]
+							}
+						},
+						{
+							"actionId": "project-disable",
+							"confirm": "無効にすると、このプロジェクトの進行中の作業が一時停止します。",
+							"when": {
+								"key": "enabled",
+								"in": [true]
+							}
+						}
+					],
+					"create": {
+						"actionId": "project-create",
+						"fields": [
+							{
+								"fieldId": "title",
+								"label": "名前",
+								"control": "text",
+								"required": true,
+								"maxLength": 120
+							},
+							{
+								"fieldId": "connectionRef",
+								"label": "接続",
+								"control": "select",
+								"required": true,
+								"optionsSource": "query:dots.connection-options@1"
+							},
+							{
+								"fieldId": "capabilityRevisionId",
+								"label": "担当（空欄は標準の調整担当）",
+								"control": "select",
+								"optionsSource": "query:dots.capability-options@1",
+								"defaultValue": "package:dots.orchestrate@2"
+							},
+							{
+								"fieldId": "nativeProjectId",
+								"label": "Codexのプロジェクト ID",
+								"control": "text",
+								"required": true,
+								"maxLength": 160
+							},
+							{
+								"fieldId": "hostId",
+								"label": "ホストID",
+								"control": "text",
+								"required": true,
+								"maxLength": 160,
+								"help": "この端末で動かすときは local など、Codex側で登録した値です。",
+								"defaultValue": "local"
+							},
+							{
+								"fieldId": "environment",
+								"label": "実行場所",
+								"control": "select",
+								"required": true,
+								"options": [
+									{
+										"value": "local",
+										"label": "ローカル"
+									},
+									{
+										"value": "cloud",
+										"label": "クラウド"
+									}
+								],
+								"defaultValue": "local"
+							},
+							{
+								"fieldId": "enabled",
+								"label": "利用する",
+								"control": "toggle",
+								"defaultValue": "true"
+							},
+							{
+								"fieldId": "opRead",
+								"label": "許可: 参照",
+								"control": "toggle",
+								"defaultValue": "true"
+							},
+							{
+								"fieldId": "opCreateSession",
+								"label": "許可: 新しいSession",
+								"control": "toggle",
+								"defaultValue": "true"
+							},
+							{
+								"fieldId": "opContinueSession",
+								"label": "許可: 既存Sessionの続行",
+								"control": "toggle"
+							},
+							{
+								"fieldId": "opEdit",
+								"label": "許可: 編集",
+								"control": "toggle",
+								"defaultValue": "true"
+							},
+							{
+								"fieldId": "opCheck",
+								"label": "許可: 検証",
+								"control": "toggle",
+								"defaultValue": "true"
+							},
+							{
+								"fieldId": "opCommit",
+								"label": "許可: コミット",
+								"control": "toggle"
+							},
+							{
+								"fieldId": "opPush",
+								"label": "許可: プッシュ",
+								"control": "toggle"
+							},
+							{
+								"fieldId": "opPublish",
+								"label": "許可: 公開",
+								"control": "toggle"
+							},
+							{
+								"fieldId": "opSend",
+								"label": "許可: 外部への送信",
+								"control": "toggle"
+							}
+						]
+					}
+				},
+				{
+					"source": "dots-packages",
+					"title": "担当とSkill",
+					"rowKey": "id",
+					"columns": [
+						{
+							"key": "title",
+							"label": "担当名"
+						},
+						{
+							"key": "summary",
+							"label": "どの作業に使うか"
+						},
+						{
+							"key": "skillCount",
+							"label": "Skill数",
+							"format": "number"
+						},
+						{
+							"key": "revision",
+							"label": "版",
+							"format": "number"
+						},
+						{
+							"key": "enabled",
+							"label": "利用",
+							"format": "boolean"
+						}
+					],
+					"rowActions": [
+						{
+							"actionId": "package-edit",
+							"form": {
+								"fields": [
+									{
+										"fieldId": "title",
+										"label": "担当名",
+										"control": "text",
+										"required": true,
+										"maxLength": 120
+									},
+									{
+										"fieldId": "summary",
+										"label": "どの作業に使うか",
+										"control": "text",
+										"required": true,
+										"maxLength": 600
+									},
+									{
+										"fieldId": "profile",
+										"label": "役割の指示",
+										"control": "textarea",
+										"required": true,
+										"maxLength": 8000
+									},
+									{
+										"fieldId": "enabled",
+										"label": "利用する",
+										"control": "toggle"
+									},
+									{
+										"fieldId": "skill1Title",
+										"label": "Skill 1 の名前",
+										"control": "text",
+										"maxLength": 120,
+										"required": true
+									},
+									{
+										"fieldId": "skill1Body",
+										"label": "Skill 1 の手順",
+										"control": "textarea",
+										"maxLength": 8000,
+										"required": true
+									},
+									{
+										"fieldId": "skill2Title",
+										"label": "Skill 2 の名前",
+										"control": "text",
+										"maxLength": 120
+									},
+									{
+										"fieldId": "skill2Body",
+										"label": "Skill 2 の手順",
+										"control": "textarea",
+										"maxLength": 8000
+									},
+									{
+										"fieldId": "skill3Title",
+										"label": "Skill 3 の名前",
+										"control": "text",
+										"maxLength": 120
+									},
+									{
+										"fieldId": "skill3Body",
+										"label": "Skill 3 の手順",
+										"control": "textarea",
+										"maxLength": 8000
+									},
+									{
+										"fieldId": "skill4Title",
+										"label": "Skill 4 の名前",
+										"control": "text",
+										"maxLength": 120
+									},
+									{
+										"fieldId": "skill4Body",
+										"label": "Skill 4 の手順",
+										"control": "textarea",
+										"maxLength": 8000
+									}
+								],
+								"prefill": {
+									"title": "$row.title",
+									"summary": "$row.summary",
+									"profile": "$row.profile",
+									"enabled": "$row.enabled",
+									"skill1Title": "$row.skill1Title",
+									"skill1Body": "$row.skill1Body",
+									"skill2Title": "$row.skill2Title",
+									"skill2Body": "$row.skill2Body",
+									"skill3Title": "$row.skill3Title",
+									"skill3Body": "$row.skill3Body",
+									"skill4Title": "$row.skill4Title",
+									"skill4Body": "$row.skill4Body"
+								}
+							}
+						},
+						{
+							"actionId": "package-enable",
+							"when": {
+								"key": "enabled",
+								"in": [false]
+							}
+						},
+						{
+							"actionId": "package-disable",
+							"confirm": "無効にすると、この担当をプロジェクトで選べなくなります。",
+							"when": {
+								"key": "enabled",
+								"in": [true]
+							}
+						}
+					],
+					"create": {
+						"actionId": "package-create",
+						"fields": [
+							{
+								"fieldId": "title",
+								"label": "担当名",
+								"control": "text",
+								"required": true,
+								"maxLength": 120
+							},
+							{
+								"fieldId": "summary",
+								"label": "どの作業に使うか",
+								"control": "text",
+								"required": true,
+								"maxLength": 600
+							},
+							{
+								"fieldId": "profile",
+								"label": "役割の指示",
+								"control": "textarea",
+								"required": true,
+								"maxLength": 8000
+							},
+							{
+								"fieldId": "enabled",
+								"label": "利用する",
+								"control": "toggle",
+								"defaultValue": "true"
+							},
+							{
+								"fieldId": "skill1Title",
+								"label": "Skill 1 の名前",
+								"control": "text",
+								"maxLength": 120,
+								"required": true
+							},
+							{
+								"fieldId": "skill1Body",
+								"label": "Skill 1 の手順",
+								"control": "textarea",
+								"maxLength": 8000,
+								"required": true
+							},
+							{
+								"fieldId": "skill2Title",
+								"label": "Skill 2 の名前",
+								"control": "text",
+								"maxLength": 120
+							},
+							{
+								"fieldId": "skill2Body",
+								"label": "Skill 2 の手順",
+								"control": "textarea",
+								"maxLength": 8000
+							},
+							{
+								"fieldId": "skill3Title",
+								"label": "Skill 3 の名前",
+								"control": "text",
+								"maxLength": 120
+							},
+							{
+								"fieldId": "skill3Body",
+								"label": "Skill 3 の手順",
+								"control": "textarea",
+								"maxLength": 8000
+							},
+							{
+								"fieldId": "skill4Title",
+								"label": "Skill 4 の名前",
+								"control": "text",
+								"maxLength": 120
+							},
+							{
+								"fieldId": "skill4Body",
+								"label": "Skill 4 の手順",
+								"control": "textarea",
+								"maxLength": 8000
+							}
+						]
+					}
+				}
+			]
+		}
+	],
+	"schemas": [
+		{
+			"kind": "schema",
+			"id": "dots-connection-create",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"title": {
+						"type": "string",
+						"maxLength": 120,
+						"minLength": 1
+					},
+					"enabled": {
+						"type": "boolean"
+					},
+					"oauthIssuer": {
+						"type": "string",
+						"maxLength": 2048
+					},
+					"oauthJwksUrl": {
+						"type": "string",
+						"maxLength": 2048
+					},
+					"oauthResource": {
+						"type": "string",
+						"maxLength": 2048
+					},
+					"oauthSubject": {
+						"type": "string",
+						"maxLength": 200
+					}
+				},
+				"required": ["title", "enabled"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "dots-connection-update",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"id": {
+						"type": "string",
+						"maxLength": 160,
+						"minLength": 1
+					},
+					"expectedRevision": {
+						"type": "integer",
+						"minimum": 0
+					},
+					"title": {
+						"type": "string",
+						"maxLength": 120,
+						"minLength": 1
+					},
+					"enabled": {
+						"type": "boolean"
+					},
+					"oauthIssuer": {
+						"type": "string",
+						"maxLength": 2048
+					},
+					"oauthJwksUrl": {
+						"type": "string",
+						"maxLength": 2048
+					},
+					"oauthResource": {
+						"type": "string",
+						"maxLength": 2048
+					},
+					"oauthSubject": {
+						"type": "string",
+						"maxLength": 200
+					}
+				},
+				"required": ["id", "expectedRevision", "title", "enabled"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "dots-connection-enabled",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"id": {
+						"type": "string",
+						"maxLength": 160,
+						"minLength": 1
+					},
+					"expectedRevision": {
+						"type": "integer",
+						"minimum": 0
+					},
+					"enabled": {
+						"type": "boolean"
+					}
+				},
+				"required": ["id", "expectedRevision", "enabled"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "dots-project-create",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"connectionRef": {
+						"type": "string",
+						"maxLength": 160,
+						"minLength": 1
+					},
+					"title": {
+						"type": "string",
+						"maxLength": 120,
+						"minLength": 1
+					},
+					"capabilityRevisionId": {
+						"type": "string",
+						"maxLength": 200
+					},
+					"nativeProjectId": {
+						"type": "string",
+						"maxLength": 160,
+						"minLength": 1
+					},
+					"hostId": {
+						"type": "string",
+						"maxLength": 160,
+						"minLength": 1
+					},
+					"environment": {
+						"type": "string",
+						"maxLength": 5,
+						"enum": ["local", "cloud"]
+					},
+					"enabled": {
+						"type": "boolean"
+					},
+					"opRead": {
+						"type": "boolean"
+					},
+					"opCreateSession": {
+						"type": "boolean"
+					},
+					"opContinueSession": {
+						"type": "boolean"
+					},
+					"opEdit": {
+						"type": "boolean"
+					},
+					"opCheck": {
+						"type": "boolean"
+					},
+					"opCommit": {
+						"type": "boolean"
+					},
+					"opPush": {
+						"type": "boolean"
+					},
+					"opPublish": {
+						"type": "boolean"
+					},
+					"opSend": {
+						"type": "boolean"
+					}
+				},
+				"required": [
+					"connectionRef",
+					"title",
+					"nativeProjectId",
+					"hostId",
+					"environment",
+					"enabled"
+				]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "dots-project-update",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"ref": {
+						"type": "string",
+						"maxLength": 160,
+						"minLength": 1
+					},
+					"expectedRevision": {
+						"type": "integer",
+						"minimum": 0
+					},
+					"title": {
+						"type": "string",
+						"maxLength": 120,
+						"minLength": 1
+					},
+					"capabilityRevisionId": {
+						"type": "string",
+						"maxLength": 200
+					},
+					"nativeProjectId": {
+						"type": "string",
+						"maxLength": 160,
+						"minLength": 1
+					},
+					"hostId": {
+						"type": "string",
+						"maxLength": 160,
+						"minLength": 1
+					},
+					"environment": {
+						"type": "string",
+						"maxLength": 5,
+						"enum": ["local", "cloud"]
+					},
+					"enabled": {
+						"type": "boolean"
+					},
+					"opRead": {
+						"type": "boolean"
+					},
+					"opCreateSession": {
+						"type": "boolean"
+					},
+					"opContinueSession": {
+						"type": "boolean"
+					},
+					"opEdit": {
+						"type": "boolean"
+					},
+					"opCheck": {
+						"type": "boolean"
+					},
+					"opCommit": {
+						"type": "boolean"
+					},
+					"opPush": {
+						"type": "boolean"
+					},
+					"opPublish": {
+						"type": "boolean"
+					},
+					"opSend": {
+						"type": "boolean"
+					}
+				},
+				"required": [
+					"ref",
+					"expectedRevision",
+					"title",
+					"nativeProjectId",
+					"hostId",
+					"environment",
+					"enabled"
+				]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "dots-project-enabled",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"ref": {
+						"type": "string",
+						"maxLength": 160,
+						"minLength": 1
+					},
+					"expectedRevision": {
+						"type": "integer",
+						"minimum": 0
+					},
+					"enabled": {
+						"type": "boolean"
+					}
+				},
+				"required": ["ref", "expectedRevision", "enabled"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "dots-package-create",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"title": {
+						"type": "string",
+						"maxLength": 120,
+						"minLength": 1
+					},
+					"summary": {
+						"type": "string",
+						"maxLength": 600,
+						"minLength": 1
+					},
+					"profile": {
+						"type": "string",
+						"maxLength": 8000,
+						"minLength": 1
+					},
+					"enabled": {
+						"type": "boolean"
+					},
+					"skill1Title": {
+						"type": "string",
+						"maxLength": 120,
+						"minLength": 1
+					},
+					"skill2Title": {
+						"type": "string",
+						"maxLength": 120
+					},
+					"skill3Title": {
+						"type": "string",
+						"maxLength": 120
+					},
+					"skill4Title": {
+						"type": "string",
+						"maxLength": 120
+					},
+					"skill1Body": {
+						"type": "string",
+						"maxLength": 8000,
+						"minLength": 1
+					},
+					"skill2Body": {
+						"type": "string",
+						"maxLength": 8000
+					},
+					"skill3Body": {
+						"type": "string",
+						"maxLength": 8000
+					},
+					"skill4Body": {
+						"type": "string",
+						"maxLength": 8000
+					}
+				},
+				"required": [
+					"title",
+					"summary",
+					"profile",
+					"enabled",
+					"skill1Title",
+					"skill1Body"
+				]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "dots-package-update",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"id": {
+						"type": "string",
+						"maxLength": 80,
+						"minLength": 1
+					},
+					"expectedToken": {
+						"type": "string",
+						"maxLength": 200,
+						"minLength": 1
+					},
+					"title": {
+						"type": "string",
+						"maxLength": 120,
+						"minLength": 1
+					},
+					"summary": {
+						"type": "string",
+						"maxLength": 600,
+						"minLength": 1
+					},
+					"profile": {
+						"type": "string",
+						"maxLength": 8000,
+						"minLength": 1
+					},
+					"enabled": {
+						"type": "boolean"
+					},
+					"skill1Title": {
+						"type": "string",
+						"maxLength": 120,
+						"minLength": 1
+					},
+					"skill2Title": {
+						"type": "string",
+						"maxLength": 120
+					},
+					"skill3Title": {
+						"type": "string",
+						"maxLength": 120
+					},
+					"skill4Title": {
+						"type": "string",
+						"maxLength": 120
+					},
+					"skill1Body": {
+						"type": "string",
+						"maxLength": 8000,
+						"minLength": 1
+					},
+					"skill2Body": {
+						"type": "string",
+						"maxLength": 8000
+					},
+					"skill3Body": {
+						"type": "string",
+						"maxLength": 8000
+					},
+					"skill4Body": {
+						"type": "string",
+						"maxLength": 8000
+					}
+				},
+				"required": [
+					"id",
+					"expectedToken",
+					"title",
+					"summary",
+					"profile",
+					"enabled",
+					"skill1Title",
+					"skill1Body"
+				]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "dots-package-enabled",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"id": {
+						"type": "string",
+						"maxLength": 80,
+						"minLength": 1
+					},
+					"expectedToken": {
+						"type": "string",
+						"maxLength": 200,
+						"minLength": 1
+					},
+					"enabled": {
+						"type": "boolean"
+					}
+				},
+				"required": ["id", "expectedToken", "enabled"]
+			}
+		}
+	]
+}

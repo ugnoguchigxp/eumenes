@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
 	flexRender,
 	getCoreRowModel,
@@ -7,6 +7,7 @@ import {
 	type SortingState,
 } from "@tanstack/react-table";
 import { Button } from "../Button";
+import { Modal } from "../Modal";
 import type { ReactNode } from "react";
 import "./ServerDataTable.css";
 
@@ -27,6 +28,7 @@ export type ServerDataTableProps<T extends { id: string }> = {
 	error?: string;
 	onQuery: (query: TableQuery) => void;
 	detail?: (row: T) => ReactNode;
+	detailMode?: "inline" | "modal";
 	emptyMessage?: string;
 };
 /** All sorting, filtering and pagination are controlled by the caller's API response. */
@@ -40,10 +42,12 @@ export function ServerDataTable<T extends { id: string }>({
 	error,
 	onQuery,
 	detail,
+	detailMode = "inline",
 	emptyMessage = "記録はまだありません。",
 }: ServerDataTableProps<T>) {
 	const [search, setSearch] = useState(query.q);
 	const [open, setOpen] = useState<string | null>(null);
+	const detailTrigger = useRef<HTMLButtonElement | null>(null);
 	const sorting: SortingState = [{ id: query.sort, desc: query.desc }];
 	const table = useReactTable({
 		data: rows,
@@ -81,6 +85,10 @@ export function ServerDataTable<T extends { id: string }>({
 		},
 	});
 	const visibleDetail = rows.find((row) => row.id === open);
+	useEffect(() => {
+		if (detailMode === "modal" && open !== null && !visibleDetail)
+			setOpen(null);
+	}, [detailMode, open, visibleDetail]);
 	const pageCount = Math.max(1, table.getPageCount());
 	return (
 		<section className="ds-server-table" aria-label={label}>
@@ -184,9 +192,17 @@ export function ServerDataTable<T extends { id: string }>({
 										<Button
 											variant="ghost"
 											size="sm"
-											aria-expanded={row.id === open}
+											aria-expanded={
+												detailMode === "inline" ? row.id === open : undefined
+											}
+											aria-haspopup={
+												detailMode === "modal" ? "dialog" : undefined
+											}
 											aria-label={`${label}: ${row.id}の詳細`}
-											onClick={() => setOpen(open === row.id ? null : row.id)}
+											onClick={(event) => {
+												detailTrigger.current = event.currentTarget;
+												setOpen(open === row.id ? null : row.id);
+											}}
 										>
 											詳細
 										</Button>
@@ -239,7 +255,7 @@ export function ServerDataTable<T extends { id: string }>({
 					次へ
 				</Button>
 			</div>
-			{detail && visibleDetail && (
+			{detail && visibleDetail && detailMode === "inline" && (
 				<div className="ds-server-table-detail">
 					<div className="ds-server-table-tools">
 						<strong>選択した行の詳細</strong>
@@ -249,6 +265,24 @@ export function ServerDataTable<T extends { id: string }>({
 					</div>
 					{detail(visibleDetail)}
 				</div>
+			)}
+			{detail && detailMode === "modal" && (
+				<Modal
+					open={!!visibleDetail}
+					onOpenChange={(isOpen) => {
+						if (!isOpen) setOpen(null);
+					}}
+					onCloseAutoFocus={(event) => {
+						event.preventDefault();
+						if (detailTrigger.current?.isConnected)
+							detailTrigger.current.focus();
+					}}
+					title={`${label}の詳細`}
+					contentClassName="ds-server-table-modal"
+					draggable={false}
+				>
+					{visibleDetail && detail(visibleDetail)}
+				</Modal>
 			)}
 		</section>
 	);

@@ -1005,6 +1005,39 @@ test("a probe stuck running for over 10 minutes is marked probe_stale and a new 
 	});
 	await until(() => probeRow(store, id)?.status === "succeeded");
 });
+test("a probe registered inside a transaction runs after the commit and only if it committed", async () => {
+	const { store, inference, settings } = await setup();
+	const registered = await store.write((db) =>
+		inference.startProbeInTransaction(db, "larm"),
+	);
+	expect(probeRow(store, registered.id)?.status).toBe("running");
+	registered.launch();
+	await until(() => probeRow(store, registered.id)?.status === "succeeded");
+	// A rolled-back registration leaves no row and launching it does nothing.
+	let lost: ReturnType<typeof inference.startProbeInTransaction> | undefined;
+	await store
+		.write((db) => {
+			lost = inference.startProbeInTransaction(db, "larm");
+			throw new Error("rolled_back");
+		})
+		.catch(() => undefined);
+	expect(probeRow(store, lost!.id)).toBeNull();
+	lost!.launch();
+	expect(probeRow(store, lost!.id)).toBeNull();
+	// An unknown target is refused before a row is written.
+	await expect(
+		store.write((db) =>
+			inference.startProbeInTransaction(db, crypto.randomUUID()),
+		),
+	).rejects.toThrow("invalid_probe_target");
+	// A resource target runs against its saved resource.
+	const resource = settings.get().resources[0]!;
+	const second = await store.write((db) =>
+		inference.startProbeInTransaction(db, resource.id),
+	);
+	second.launch();
+	await until(() => probeRow(store, second.id)?.status !== "running");
+});
 test("a recent running probe still blocks a new one", async () => {
 	const { store, inference, settings } = await setup();
 	await store.write((db) =>
