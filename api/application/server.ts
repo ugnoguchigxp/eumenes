@@ -481,6 +481,7 @@ export function appServices(s: Services) {
 		toolchainHistory: s.toolchain.history,
 		timers: s.timers,
 		terminals: s.toolchain.terminals,
+		kanban: s.toolchain.kanban,
 		toolchainActions: s.toolchain.actionRequests,
 		// With World OFF nothing is assembled and the routes do not exist.
 		...(s.world
@@ -636,6 +637,10 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 			recover: () => s.toolchain.terminals.recover(),
 		},
 		{
+			name: "kanban_recovery",
+			recover: () => s.toolchain.kanbanRuns.recover(),
+		},
+		{
 			name: "steward_recovery",
 			recover: () => s.store.write((db) => recoverSteward(s.steward, db)),
 		},
@@ -699,6 +704,7 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		{ name: "queue", close: () => s.queue.close(10_000) },
 		{ name: "capabilities", close: () => s.toolchain.capabilities.close() },
 		{ name: "agents", close: () => s.toolchain.agents.close() },
+		{ name: "kanban", close: () => s.toolchain.kanbanRuns.disconnect() },
 		{ name: "terminals", close: () => s.toolchain.terminals.closeAll() },
 		{
 			name: "excalidraw",

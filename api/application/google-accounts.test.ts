@@ -27,6 +27,7 @@ function fixture() {
 		rmSync(dir, { recursive: true, force: true });
 	});
 	let codeExchanges = 0;
+	let keyAvailable = true;
 	const provider: GoogleProvider = {
 		identity: "fixture",
 		authorization: ({ state }) => `https://accounts.google.com/?state=${state}`,
@@ -47,7 +48,7 @@ function fixture() {
 		async revoke() {},
 	};
 	const service = createGoogleAccounts(store, {
-		key: () => new Uint8Array(32).fill(1),
+		key: () => (keyAvailable ? new Uint8Array(32).fill(1) : undefined),
 		provider,
 	});
 	const app = createApp({
@@ -65,7 +66,16 @@ function fixture() {
 			},
 			body: JSON.stringify({ expectedRevision }),
 		});
-	return { app, post, service, store, exchanges: () => codeExchanges };
+	return {
+		app,
+		post,
+		service,
+		store,
+		exchanges: () => codeExchanges,
+		loseKey: () => {
+			keyAvailable = false;
+		},
+	};
 }
 test("OAuth callback is cookie-bound; API stays authenticated and rejects foreign origins", async () => {
 	const h = fixture();
@@ -178,4 +188,16 @@ test("stale callback cannot clear the browser cookie for a newer authorization",
 		{ headers: { Cookie: currentCookie } },
 	);
 	expect(valid.headers.get("Location")).toContain("connected");
+});
+
+test("unreadable account returns a sanitized non-cacheable error instead of disconnected", async () => {
+	const h = fixture();
+	await h.post("connect");
+	h.loseKey();
+	const response = await h.app.request("/api/google-accounts", {
+		headers: { Authorization: "Bearer test-token" },
+	});
+	expect(response.status).toBe(503);
+	expect(response.headers.get("Cache-Control")).toBe("no-store");
+	expect(await response.json()).toEqual({ error: "account_unavailable" });
 });

@@ -91,6 +91,7 @@ test("the shutdown order is fixed, and a freshly built set of services closes cl
 		"voice",
 		"excalidraw",
 		"terminals",
+		"kanban",
 		"agents",
 		"capabilities",
 		"queue",

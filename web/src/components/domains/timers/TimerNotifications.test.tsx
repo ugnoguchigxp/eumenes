@@ -215,6 +215,46 @@ test("busy output defers the claim until output becomes free", async () => {
 	await waitFor(() => expect(tone).toHaveBeenCalledOnce());
 });
 
+test("a claim taken just before the output became busy is reused once it is free", async () => {
+	const h = fixture();
+	const tone = vi.fn(async () => {});
+	const claim = h.api.claimTimerNotification.getMockImplementation()!;
+	let release!: () => void;
+	h.api.claimTimerNotification.mockImplementationOnce(async (...args) => {
+		await new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		return claim(...(args as []));
+	});
+	const rerender = (view: ReturnType<typeof h.show>, busy: boolean) =>
+		view.rerender(
+			<QueryClientProvider client={h.cache}>
+				<TimerNotifications
+					client={h.api as never}
+					playTone={tone}
+					busy={busy}
+				/>
+			</QueryClientProvider>,
+		);
+	const view = h.show(tone);
+	await waitFor(() => expect(h.api.claimTimerNotification).toHaveBeenCalled());
+	// Replay starts while the claim is in flight; the tone must wait, not be lost.
+	rerender(view, true);
+	await act(async () => release());
+	await h.refresh();
+	expect(tone).not.toHaveBeenCalled();
+	rerender(view, false);
+	// The interrupted attempt backs off for a second before it is retried.
+	await waitFor(() => expect(tone).toHaveBeenCalledOnce(), { timeout: 3000 });
+	await waitFor(() =>
+		expect(h.api.ackTimerNotification).toHaveBeenCalledWith(
+			"notice",
+			expect.objectContaining({ outcome: "played", claimId: "claim" }),
+		),
+	);
+	expect(h.api.claimTimerNotification).toHaveBeenCalledOnce();
+});
+
 test("dismissing a claimed notice aborts playback and never adopts played", async () => {
 	const h = fixture();
 	const tone = vi.fn(

@@ -12,6 +12,10 @@ export const KANBAN_ADAPTER_REF = "adapter:kanban@1";
 const DEFAULT_SOURCE = "kanban";
 
 const REJECTIONS: Record<string, string> = {
+	kanban_state_invalid:
+		"いまのタスクの状態ではこの操作はできません。最新の表示を確認してください。",
+	kanban_prompt_too_long:
+		"依頼内容が長すぎて送れません。依頼内容を短くしてから、もう一度お試しください。",
 	revision_conflict:
 		"他の操作でタスクの状態が変わりました。最新の表示を読み込みました。内容を確認して、もう一度お試しください。",
 	kanban_card_not_found:

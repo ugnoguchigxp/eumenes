@@ -1,0 +1,49 @@
+{
+	"criteriaId": "kanban-conversation-commit-push-guide-01",
+	"version": 1,
+	"caseId": "kanban-conversation-commit-push-guide-01",
+	"hostReads": ["kanban"],
+	"successMarkers": [],
+	"items": [
+		{
+			"id": "C1",
+			"statement": "run が一つも作られず、カードが変わらない",
+			"check": "kanban-no-extra-changes",
+			"params": {
+				"maxNewCards": 0,
+				"maxRuns": 0
+			},
+			"required": true
+		},
+		{
+			"id": "C2",
+			"statement": "返答または画面が、タスクボードで内容を確認してから commit & push を押すよう案内している",
+			"check": "screen-mentions",
+			"params": {
+				"sets": [
+					{
+						"id": "board",
+						"patterns": ["タスクボード|ボード"]
+					},
+					{
+						"id": "button",
+						"patterns": ["commit.{0,4}push|コミット.{0,6}プッシュ"]
+					},
+					{
+						"id": "press",
+						"patterns": ["押|ボタン|確認"]
+					}
+				],
+				"forbidden": [
+					{
+						"id": "done-claim",
+						"patterns": [
+							"pushしました|push しました|プッシュしました|コミットしました"
+						]
+					}
+				]
+			},
+			"required": true
+		}
+	]
+}

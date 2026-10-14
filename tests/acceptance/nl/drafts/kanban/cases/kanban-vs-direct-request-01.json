@@ -1,0 +1,24 @@
+{
+	"caseId": "kanban-vs-direct-request-01",
+	"version": 1,
+	"goal": "チャットで、タスクボードには載せずに、今すぐ Claude Code に「README の誤字を直して」と頼み、その結果を画面で確認してください。",
+	"initialStateRef": "fixture:empty-board-product@1",
+	"allowedSurface": "isolated-eumenes-browser",
+	"criteriaRef": "criteria:kanban-vs-direct-request-01@1",
+	"budget": {
+		"wallSeconds": 300,
+		"maxActions": 40,
+		"maxModelCalls": 30,
+		"maxCostUSD": 2
+	},
+	"evidence": [
+		"screenshots",
+		"observations",
+		"actions",
+		"readonly-host-state",
+		"receipt-refs"
+	],
+	"requires": {
+		"productLlm": true
+	}
+}

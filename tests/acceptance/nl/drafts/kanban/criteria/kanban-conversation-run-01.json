@@ -1,0 +1,60 @@
+{
+	"criteriaId": "kanban-conversation-run-01",
+	"version": 1,
+	"caseId": "kanban-conversation-run-01",
+	"hostReads": ["kanban"],
+	"successMarkers": [],
+	"items": [
+		{
+			"id": "C1",
+			"statement": "「README の手順修正」の run が会話由来で一件だけ作られ、カードが実行中の列にある",
+			"check": "kanban-runs",
+			"params": {
+				"newCount": 1,
+				"origin": "conversation",
+				"kind": "task",
+				"card": "README の手順修正"
+			},
+			"required": true
+		},
+		{
+			"id": "C2",
+			"statement": "もう一枚のカードが変わっていない",
+			"check": "kanban-no-extra-changes",
+			"params": {
+				"maxNewCards": 0,
+				"maxRuns": 1,
+				"mayChange": ["README の手順修正"]
+			},
+			"required": true
+		},
+		{
+			"id": "C3",
+			"statement": "返答または画面が、キューに入れたことと通知センターで知らせることを伝え、終わったとは言っていない",
+			"check": "screen-mentions",
+			"params": {
+				"sets": [
+					{
+						"id": "queued",
+						"patterns": [
+							"実行キューに入れ|キューに入れ|キューへ入れ|順番に実行"
+						]
+					},
+					{
+						"id": "center",
+						"patterns": ["通知センター|通知"]
+					}
+				],
+				"forbidden": [
+					{
+						"id": "completed-claim",
+						"patterns": [
+							"終わりました|完了しました|成功しました|直しました|修正しました|done です"
+						]
+					}
+				]
+			},
+			"required": true
+		}
+	]
+}

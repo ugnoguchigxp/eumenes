@@ -61,6 +61,14 @@ export function TimerNotifications({
 	const alarm = useRef<AbortController | null>(null);
 	const failures = useRef(new Map<string, { count: number; until: number }>());
 	const delivered = useRef(new Set<string>());
+	// A claim taken just before voice/replay became busy stays ours until its lease ends; it is
+	// reused once the output is free instead of waiting for the lease to run out.
+	const held = useRef<{
+		id: string;
+		claimId: string;
+		revision: number;
+		until: number;
+	} | null>(null);
 	const retryTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
 		undefined,
 	);
@@ -134,13 +142,27 @@ export function TimerNotifications({
 		)
 			return;
 		const now = Date.now();
-		const note = query.data.items.find(
-			(item) =>
-				item.status === "pending" &&
-				(failures.current.get(item.id)?.until ?? 0) <= now &&
-				Date.parse(query.data!.serverNow) - Date.parse(item.dueAt) <= 300_000,
-		);
+		const fresh = (item: TimerNotificationDto) =>
+			(failures.current.get(item.id)?.until ?? 0) <= now &&
+			Date.parse(query.data!.serverNow) - Date.parse(item.dueAt) <= 300_000;
+		const reusable = held.current;
+		const note =
+			query.data.items.find(
+				(item) => item.status === "pending" && fresh(item),
+			) ??
+			(reusable && !muted && reusable.until > now
+				? query.data.items.find(
+						(item) =>
+							item.id === reusable.id &&
+							item.status === "claimed" &&
+							fresh(item),
+					)
+				: undefined);
 		if (!note) return;
+		const reuse =
+			reusable && reusable.id === note.id && reusable.until > now
+				? reusable
+				: null;
 		const attempt: Attempt = {
 			id: note.id,
 			revision: note.revision,
@@ -159,25 +181,39 @@ export function TimerNotifications({
 					failures.current.delete(note.id);
 					return;
 				}
-				const claimed = await client.claimTimerNotification(note.id, {
-					clientId: clientId.current,
-					claimRequestId: crypto.randomUUID(),
-					expectedRevision: note.revision,
-				});
-				claimId = claimed.claimId;
-				attempt.revision = claimed.notification.revision;
-				if (!claimId) return;
-				const available =
-					Date.parse(claimed.leaseUntil ?? "") -
-					Date.parse(claimed.serverNow) -
-					1000;
-				if (
-					available <= 0 ||
-					Date.parse(claimed.serverNow) -
-						Date.parse(claimed.notification.dueAt) >
-						300_000
-				)
-					throw new Error("claim_expired");
+				let available: number;
+				if (reuse) {
+					claimId = reuse.claimId;
+					attempt.revision = reuse.revision;
+					available = reuse.until - Date.now();
+				} else {
+					const claimed = await client.claimTimerNotification(note.id, {
+						clientId: clientId.current,
+						claimRequestId: crypto.randomUUID(),
+						expectedRevision: note.revision,
+					});
+					claimId = claimed.claimId;
+					attempt.revision = claimed.notification.revision;
+					if (!claimId) return;
+					available =
+						Date.parse(claimed.leaseUntil ?? "") -
+						Date.parse(claimed.serverNow) -
+						1000;
+					if (
+						available > 0 &&
+						Date.parse(claimed.serverNow) -
+							Date.parse(claimed.notification.dueAt) <=
+							300_000
+					)
+						held.current = {
+							id: note.id,
+							claimId,
+							revision: attempt.revision,
+							until: Date.now() + available,
+						};
+					else available = 0;
+				}
+				if (available <= 0) throw new Error("claim_expired");
 				timeout = setTimeout(
 					() => attempt.controller.abort(),
 					Math.min(available, 10_000),
@@ -191,6 +227,7 @@ export function TimerNotifications({
 						claimId,
 						outcome: "played",
 					});
+					held.current = null;
 					failures.current.delete(note.id);
 					return;
 				}
@@ -213,6 +250,7 @@ export function TimerNotifications({
 					claimId,
 					outcome: "played",
 				});
+				held.current = null;
 				failures.current.delete(note.id);
 				if (repeatTone) setRingingId(note.id);
 			} catch {
@@ -228,6 +266,7 @@ export function TimerNotifications({
 					claimId &&
 					(attempt.delivered || !attempt.deferred || latest.current.muted)
 				) {
+					held.current = null;
 					try {
 						await client.ackTimerNotification(note.id, {
 							clientId: clientId.current,

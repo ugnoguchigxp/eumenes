@@ -60,6 +60,7 @@ import {
 import { registerScheduler, type SchedulerService } from "../domains/scheduler";
 import { registerTimers, type TimersService } from "../domains/timers";
 import { registerTerminals, type TerminalsService } from "../domains/terminals";
+import { registerKanban, type KanbanService } from "../domains/kanban";
 import {
 	registerToolchainActions,
 	type ActionRequests,
@@ -128,6 +129,8 @@ export type AppServices = {
 	timers?: TimersService;
 	/** PTY sessions of the terminal screen (absent: the routes do not exist). */
 	terminals?: TerminalsService;
+	/** The task board's notices (absent: the routes do not exist). */
+	kanban?: KanbanService;
 	/** UI actions and artifact registrations of bound toolchains. */
 	toolchainActions?: ActionRequests;
 	/** World claim list and corrections (P5-02). Absent with World OFF: the routes do not exist. */
@@ -234,6 +237,7 @@ export function appModules(services: AppServices): AppModule[] {
 		{ mount: (app) => registerQueue(app, s.queue) },
 		{ mount: (app) => registerScheduler(app, s.scheduler) },
 		s.timers && { mount: (app) => registerTimers(app, s.timers!) },
+		s.kanban && { mount: (app) => registerKanban(app, s.kanban!) },
 		s.terminals && {
 			mount: (app) => registerTerminals(app, s.terminals!),
 		},

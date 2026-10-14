@@ -1,0 +1,51 @@
+{
+	"criteriaId": "kanban-conversation-status-01",
+	"version": 1,
+	"caseId": "kanban-conversation-status-01",
+	"hostReads": ["kanban"],
+	"successMarkers": [],
+	"items": [
+		{
+			"id": "C1",
+			"statement": "返答または画面が、Done のカードの報告（セットアップ手順の更新・テスト未実行）を伝えている",
+			"check": "screen-mentions",
+			"params": {
+				"sets": [
+					{
+						"id": "report",
+						"patterns": ["セットアップ手順"]
+					},
+					{
+						"id": "untested",
+						"patterns": ["テスト.{0,6}未実行|未実行"]
+					}
+				]
+			},
+			"required": true
+		},
+		{
+			"id": "C2",
+			"statement": "返答が、未着手のカード「文書の整理」にも触れている",
+			"check": "screen-mentions",
+			"params": {
+				"sets": [
+					{
+						"id": "todo",
+						"patterns": ["文書の整理"]
+					}
+				]
+			},
+			"required": true
+		},
+		{
+			"id": "C3",
+			"statement": "ボードは何も変わっていない",
+			"check": "kanban-no-extra-changes",
+			"params": {
+				"maxNewCards": 0,
+				"maxRuns": 0
+			},
+			"required": true
+		}
+	]
+}

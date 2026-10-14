@@ -1,0 +1,24 @@
+{
+	"caseId": "kanban-conversation-commit-push-guide-01",
+	"version": 1,
+	"goal": "チャットで、Done のタスク「README の手順修正」を commit して push するよう頼み、返答を確認してください。",
+	"initialStateRef": "fixture:board-one-done-product@1",
+	"allowedSurface": "isolated-eumenes-browser",
+	"criteriaRef": "criteria:kanban-conversation-commit-push-guide-01@1",
+	"budget": {
+		"wallSeconds": 300,
+		"maxActions": 40,
+		"maxModelCalls": 30,
+		"maxCostUSD": 2
+	},
+	"evidence": [
+		"screenshots",
+		"observations",
+		"actions",
+		"readonly-host-state",
+		"receipt-refs"
+	],
+	"requires": {
+		"productLlm": true
+	}
+}

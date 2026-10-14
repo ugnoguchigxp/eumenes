@@ -1,0 +1,46 @@
+[
+  {
+    "split": false,
+    "width": 1280,
+    "initialTop": 0,
+    "firstBelowStatus": true,
+    "chatTop": 0,
+    "historyTop": 0,
+    "messageTop": -11,
+    "messageAtTop": true,
+    "overflow": false
+  },
+  {
+    "split": false,
+    "width": 390,
+    "initialTop": 0,
+    "firstBelowStatus": true,
+    "chatTop": 0,
+    "historyTop": 0,
+    "messageTop": -11,
+    "messageAtTop": true,
+    "overflow": false
+  },
+  {
+    "split": true,
+    "width": 1280,
+    "initialTop": 0,
+    "firstBelowStatus": true,
+    "chatTop": 0,
+    "historyTop": 0,
+    "messageTop": -11,
+    "messageAtTop": true,
+    "overflow": false
+  },
+  {
+    "split": true,
+    "width": 390,
+    "initialTop": 0,
+    "firstBelowStatus": true,
+    "chatTop": 0,
+    "historyTop": 0,
+    "messageTop": -11,
+    "messageAtTop": true,
+    "overflow": false
+  }
+]

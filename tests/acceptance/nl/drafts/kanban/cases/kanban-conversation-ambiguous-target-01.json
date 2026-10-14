@@ -1,0 +1,24 @@
+{
+	"caseId": "kanban-conversation-ambiguous-target-01",
+	"version": 1,
+	"goal": "チャットで「あのタスクを実行して」と頼んでください。どのタスクか聞かれたら「ログイン画面のバグ修正」と答えます。質問が出ている間に画面を再読み込みしても、そのあと答えれば続けられることを確認してください。",
+	"initialStateRef": "fixture:board-two-todo-product@1",
+	"allowedSurface": "isolated-eumenes-browser",
+	"criteriaRef": "criteria:kanban-conversation-ambiguous-target-01@1",
+	"budget": {
+		"wallSeconds": 420,
+		"maxActions": 50,
+		"maxModelCalls": 40,
+		"maxCostUSD": 2
+	},
+	"evidence": [
+		"screenshots",
+		"observations",
+		"actions",
+		"readonly-host-state",
+		"receipt-refs"
+	],
+	"requires": {
+		"productLlm": true
+	}
+}

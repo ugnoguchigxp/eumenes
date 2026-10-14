@@ -1,0 +1,24 @@
+{
+	"caseId": "kanban-conversation-fix-and-push-01",
+	"version": 1,
+	"goal": "チャットで、「README のセットアップ手順を直して push まで」という作業をタスクボードに登録してもらい、登録内容と、commit・push をどうするかの案内を画面で確認してください。",
+	"initialStateRef": "fixture:empty-board-product@1",
+	"allowedSurface": "isolated-eumenes-browser",
+	"criteriaRef": "criteria:kanban-conversation-fix-and-push-01@1",
+	"budget": {
+		"wallSeconds": 300,
+		"maxActions": 40,
+		"maxModelCalls": 30,
+		"maxCostUSD": 2
+	},
+	"evidence": [
+		"screenshots",
+		"observations",
+		"actions",
+		"readonly-host-state",
+		"receipt-refs"
+	],
+	"requires": {
+		"productLlm": true
+	}
+}

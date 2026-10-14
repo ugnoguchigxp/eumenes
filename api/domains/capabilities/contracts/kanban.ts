@@ -55,5 +55,7 @@ export const kanbanFollowup = z.strictObject({
 		.max(4000)
 		.describe("追加の依頼。利用者の言葉のまま。"),
 });
+/** The answer of a target question: the card the person chose (`choiceField: cardId`). */
+export const kanbanCardAnswer = z.strictObject({ cardId });
 export const kanbanList = z.strictObject({});
 export const kanbanNoticeRef = z.strictObject({ noticeId: z.uuid() });

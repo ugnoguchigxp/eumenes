@@ -17,3 +17,6 @@ playwright-report/
 .DS_Store
 *-E
 packages/design-system/dist/
+
+# Supplied with desktop releases, never committed as source.
+/api/domains/google-accounts/distribution-client.json

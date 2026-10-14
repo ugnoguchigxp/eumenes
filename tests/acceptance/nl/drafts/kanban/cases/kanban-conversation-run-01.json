@@ -1,0 +1,24 @@
+{
+	"caseId": "kanban-conversation-run-01",
+	"version": 1,
+	"goal": "チャットで、登録済みの「README の手順修正」をタスクボードの実行キューに入れるよう頼み、その結果を画面で確認してください。",
+	"initialStateRef": "fixture:board-two-todo-product@1",
+	"allowedSurface": "isolated-eumenes-browser",
+	"criteriaRef": "criteria:kanban-conversation-run-01@1",
+	"budget": {
+		"wallSeconds": 300,
+		"maxActions": 40,
+		"maxModelCalls": 30,
+		"maxCostUSD": 2
+	},
+	"evidence": [
+		"screenshots",
+		"observations",
+		"actions",
+		"readonly-host-state",
+		"receipt-refs"
+	],
+	"requires": {
+		"productLlm": true
+	}
+}

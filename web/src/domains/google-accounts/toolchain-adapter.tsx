@@ -66,13 +66,13 @@ export const googleAccountsWebAdapter: WebArtifactAdapter = {
 				}
 			: {};
 		return {
-			phase: state
-				? { kind: "ready" }
-				: query.isError
-					? {
-							kind: "error",
-							message: "Google連携の状態を読み込めませんでした。",
-						}
+			phase: query.isError
+				? {
+						kind: "error",
+						message: "Google連携の状態を読み込めませんでした。",
+					}
+				: state
+					? { kind: "ready" }
 					: { kind: "loading" },
 			snapshot,
 			targetOf: () => undefined,
@@ -81,7 +81,12 @@ export const googleAccountsWebAdapter: WebArtifactAdapter = {
 			},
 			settled: () => {},
 			async local(binding, event) {
-				if (!state || running.current || event.revision !== state.revision)
+				if (
+					!state ||
+					query.isError ||
+					running.current ||
+					event.revision !== state.revision
+				)
 					return {
 						status: "rejected",
 						message: "接続状態を確認してから、もう一度お試しください。",
@@ -94,12 +99,17 @@ export const googleAccountsWebAdapter: WebArtifactAdapter = {
 					return { status: "rejected", message: "この操作は利用できません。" };
 				running.current = true;
 				setBusy(true);
-				// Open synchronously with the click; delayed opening is blocked by browsers.
-				const popup =
-					binding.eventAction === "google-connect"
-						? window.open("about:blank", "_blank")
-						: null;
-				if (popup) popup.opener = null;
+				// If the browser denies a popup, the persisted attempt still supplies a link.
+				let popup: Window | null = null;
+				try {
+					if (binding.eventAction === "google-connect") {
+						popup = window.open("about:blank", "_blank");
+						if (popup) popup.opener = null;
+					}
+				} catch {
+					popup = null;
+				}
+
 				try {
 					if (binding.eventAction === "google-connect") {
 						const result = await client.connectGoogleAccount(state.revision);

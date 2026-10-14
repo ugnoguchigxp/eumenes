@@ -1,0 +1,53 @@
+{
+	"criteriaId": "kanban-conversation-register-01",
+	"version": 1,
+	"caseId": "kanban-conversation-register-01",
+	"hostReads": ["kanban"],
+	"successMarkers": [],
+	"items": [
+		{
+			"id": "C1",
+			"statement": "会話由来のカードが一枚だけ未着手に作られ、依頼内容に「README」「セットアップ手順」が含まれる",
+			"check": "kanban-cards",
+			"params": {
+				"newCount": 1,
+				"column": "todo",
+				"promptIncludes": ["README", "セットアップ"],
+				"titleMaxLength": 40
+			},
+			"required": true
+		},
+		{
+			"id": "C2",
+			"statement": "実行は始まっていない（run・terminals request が増えない）",
+			"check": "kanban-no-extra-changes",
+			"params": {
+				"maxNewCards": 1,
+				"maxRuns": 0
+			},
+			"required": true
+		},
+		{
+			"id": "C3",
+			"statement": "返答または画面が登録を伝え、作業が終わったとは言っていない",
+			"check": "screen-mentions",
+			"params": {
+				"sets": [
+					{
+						"id": "registered",
+						"patterns": ["登録|追加|載せ|作成"]
+					}
+				],
+				"forbidden": [
+					{
+						"id": "completed-claim",
+						"patterns": [
+							"終わりました|完了しました|成功しました|直しました|修正しました|done です"
+						]
+					}
+				]
+			},
+			"required": true
+		}
+	]
+}

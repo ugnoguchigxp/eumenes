@@ -27,6 +27,7 @@ const BACKENDS = [
 	"object-recognition",
 	"ocr",
 	"claude-code",
+	"kanban",
 	"steward",
 ];
 const USAGE =

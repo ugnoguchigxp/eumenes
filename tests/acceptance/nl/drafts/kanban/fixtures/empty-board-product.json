@@ -1,0 +1,13 @@
+{
+	"fixtureId": "empty-board-product",
+	"version": 1,
+	"description": "隔離DBの実backend。保存済みLARM設定で会話LLMが動く。タスクボードのカードは一枚もない。",
+	"stack": "product",
+	"seedTimers": [],
+	"seedCards": [],
+	"faults": [],
+	"expectedInitial": {
+		"timers": 0,
+		"cards": 0
+	}
+}

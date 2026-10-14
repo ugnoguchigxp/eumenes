@@ -14,6 +14,7 @@ import { memoryRequest } from "./memory-request";
 export { claudeCodeRequest };
 import {
 	kanbanAdd,
+	kanbanCardAnswer,
 	kanbanCardRef,
 	kanbanEdit,
 	kanbanFollowup,
@@ -23,6 +24,7 @@ import {
 } from "./kanban";
 export {
 	kanbanAdd,
+	kanbanCardAnswer,
 	kanbanCardRef,
 	kanbanEdit,
 	kanbanFollowup,
@@ -169,6 +171,7 @@ export const validators = {
 	kanbanEdit,
 	kanbanMove,
 	kanbanCardRef,
+	kanbanCardAnswer,
 	kanbanFollowup,
 	kanbanList,
 	kanbanNoticeRef,

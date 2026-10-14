@@ -1,113 +1,21 @@
 import { afterEach, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import type { Database } from "bun:sqlite";
+import { kanbanReceiptSchema, type KanbanBoardView } from "../domains/kanban";
 import {
-	createKanban,
-	kanbanReceiptSchema,
-	migrations as kanbanMigrations,
-	type KanbanBoardView,
-} from "../domains/kanban";
-import { openStore, type SqliteStore } from "../infrastructure/sqlite";
-import {
-	createKanbanAdapter,
 	describeKanbanAdapter,
 	kanbanDomainSchemas,
 	KANBAN_ADAPTER_REF,
 } from "./kanban-adapter";
-import { connectKanbanRuns } from "./kanban-runs";
-import { migrations } from "./migrations";
+import {
+	addCard,
+	board,
+	boardData,
+	cleanup,
+	invoke,
+	revisionOf,
+	setup,
+} from "./kanban-adapter.fixture";
 
-const dirs: string[] = [];
-const stores: SqliteStore[] = [];
-afterEach(async () => {
-	for (const store of stores.splice(0)) await store.close();
-	for (const dir of dirs.splice(0))
-		rmSync(dir, { recursive: true, force: true });
-});
-
-type Enqueued = import("../domains/terminals").EnqueueRequest;
-/** A terminals stand-in that records what is handed over and answers the board's questions. */
-function fakeTerminals() {
-	const state = {
-		enqueued: [] as Enqueued[],
-		unsent: false,
-		failEnqueue: undefined as string | undefined,
-		stops: [] as string[],
-		stopResult: "stopped" as "stopped" | "unconfirmed",
-		requests: new Map<string, { state: string }>(),
-		sessions: [] as ReturnType<TerminalsPort["activities"]>,
-	};
-	const terminals = {
-		enqueueInTransaction(_tx: Database, request: Enqueued) {
-			if (state.failEnqueue) throw new Error(state.failEnqueue);
-			state.enqueued.push(request);
-			return {} as never;
-		},
-		cancelQueuedInTransaction: () => state.unsent,
-		requestInTransaction: (_tx: Database, id: string) =>
-			(state.requests.get(id) as never) ?? null,
-		stop: async (id: string) => {
-			state.stops.push(id);
-			return state.stopResult;
-		},
-		activities: () => state.sessions,
-		onFinishedInTransaction: () => () => {},
-		onWaitingInTransaction: () => () => {},
-	} satisfies TerminalsPort;
-	return { terminals, state };
-}
-type TerminalsPort = import("./kanban-runs").KanbanTerminals;
-
-function setup(runnable = true) {
-	const dir = mkdtempSync(join(tmpdir(), "eumenes-kanban-adapter-"));
-	dirs.push(dir);
-	// The app migration list does not include kanban until the host registers it.
-	const store = openStore(join(dir, "db"), [
-		...migrations,
-		...kanbanMigrations.filter(
-			(kanban) => !migrations.some((m) => m.id === kanban.id),
-		),
-	]);
-	stores.push(store);
-	let seq = 0;
-	const kanban = createKanban({
-		store,
-		id: () => `00000000-0000-4000-8000-${String(++seq).padStart(12, "0")}`,
-	});
-	const state = { runnable };
-	const fake = fakeTerminals();
-	connectKanbanRuns(kanban, fake.terminals);
-	const adapter = createKanbanAdapter(kanban, {
-		runnable: () => state.runnable,
-	});
-	return { store, adapter, state, kanban, fake };
-}
-
-const origin = { kind: "ui" as const, scope: "s", actionRequestId: "a" };
-let n = 0;
-const invoke = (
-	tx: Database,
-	adapter: ReturnType<typeof setup>["adapter"],
-	operationName: string,
-	input: unknown,
-	requestId = `00000000-0000-4000-9000-${String(++n).padStart(12, "0")}`,
-) =>
-	adapter.invokeInTransaction(tx, {
-		operationName,
-		input,
-		requestId,
-		issuedAt: "2026-10-14T00:00:00.000Z",
-		origin,
-	});
-const board = (
-	store: SqliteStore,
-	adapter: ReturnType<typeof setup>["adapter"],
-) =>
-	store.read((tx) =>
-		adapter.sourceInTransaction(tx, "query:kanban.board@1", undefined)!,
-	);
+afterEach(cleanup);
 
 test("describes the operations, board query, input adapters and projection", () => {
 	const described = describeKanbanAdapter();
@@ -120,6 +28,7 @@ test("describes the operations, board query, input adapters and projection", () 
 			]),
 		),
 	).toEqual({
+		"kanban.list": "builtin:kanbanList:read",
 		"kanban.add": "builtin:kanbanAdd:write",
 		"kanban.edit": "builtin:kanbanEdit:write",
 		"kanban.move": "builtin:kanbanMove:write",
@@ -261,10 +170,10 @@ test("the same request id replays and can be read back", async () => {
 		store.read((tx) => adapter.readInTransaction(tx, "missing")),
 	).toBeNull();
 	expect((board(store, adapter).data as KanbanBoardView).cards).toHaveLength(1);
-	expect(store.read((tx) => adapter.snapshotInTransaction(tx))).toEqual({
-		cards: [
-			expect.objectContaining({ title: "A", column: "todo", revision: 1 }),
-		],
+	expect(store.read((tx) => adapter.snapshotInTransaction(tx))).toMatchObject({
+		runnable: true,
+		queue: { state: "running", waiting: 0 },
+		cards: [{ title: "A", column: "todo", revision: 1 }],
 	});
 });
 
@@ -355,27 +264,6 @@ test("input adapters turn the event strings into typed inputs and reject bad val
 	});
 });
 
-const addCard = async (
-	store: SqliteStore,
-	adapter: ReturnType<typeof setup>["adapter"],
-	title: string,
-) =>
-	(
-		(
-			await store.write((tx) =>
-				invoke(tx, adapter, "kanban.add", { title, prompt: `${title} の依頼` }),
-			)
-		).receipt as { cardId: string }
-	).cardId;
-const boardData = (
-	store: SqliteStore,
-	adapter: ReturnType<typeof setup>["adapter"],
-) => board(store, adapter).data as KanbanBoardView;
-const revisionOf = (
-	store: SqliteStore,
-	adapter: ReturnType<typeof setup>["adapter"],
-	cardId: string,
-) => boardData(store, adapter).cards.find((c) => c.id === cardId)!.revision;
 const conversation = {
 	kind: "conversation" as const,
 	owner: {} as never,

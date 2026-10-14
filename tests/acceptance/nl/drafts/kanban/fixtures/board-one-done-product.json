@@ -1,0 +1,25 @@
+{
+	"fixtureId": "board-one-done-product",
+	"version": 1,
+	"description": "隔離DBの実backend。Done のカード「README の手順修正」（最後の報告「README のセットアップ手順を更新しました。テストは未実行です。」、まだ commit していない）と、未着手のカード「文書の整理」がある。Done はhostが偽 claude のフックで実行を終えさせて作る。",
+	"stack": "product",
+	"seedTimers": [],
+	"seedCards": [
+		{
+			"title": "README の手順修正",
+			"prompt": "README のセットアップ手順を最新にする",
+			"state": "done",
+			"report": "README のセットアップ手順を更新しました。テストは未実行です。"
+		},
+		{
+			"title": "文書の整理",
+			"prompt": "docs の古い記述を整理する",
+			"state": "todo"
+		}
+	],
+	"faults": [],
+	"expectedInitial": {
+		"timers": 0,
+		"cards": 2
+	}
+}

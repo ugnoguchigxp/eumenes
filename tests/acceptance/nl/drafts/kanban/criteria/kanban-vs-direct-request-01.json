@@ -1,0 +1,30 @@
+{
+	"criteriaId": "kanban-vs-direct-request-01",
+	"version": 1,
+	"caseId": "kanban-vs-direct-request-01",
+	"hostReads": ["kanban", "terminals"],
+	"successMarkers": [],
+	"items": [
+		{
+			"id": "C1",
+			"statement": "タスクボードにカードも run も作られない",
+			"check": "kanban-no-extra-changes",
+			"params": {
+				"maxNewCards": 0,
+				"maxRuns": 0
+			},
+			"required": true
+		},
+		{
+			"id": "C2",
+			"statement": "Claude Code への直接依頼（owner が direct）が一件だけ作られ、「誤字」を含む",
+			"check": "terminal-requests",
+			"params": {
+				"newCount": 1,
+				"owner": "direct",
+				"promptIncludes": ["誤字"]
+			},
+			"required": true
+		}
+	]
+}

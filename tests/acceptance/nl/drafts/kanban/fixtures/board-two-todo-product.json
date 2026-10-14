@@ -1,0 +1,24 @@
+{
+	"fixtureId": "board-two-todo-product",
+	"version": 1,
+	"description": "隔離DBの実backend。未着手のカード「README の手順修正」「ログイン画面のバグ修正」が一枚ずつある（hostが開始前に登録）。",
+	"stack": "product",
+	"seedTimers": [],
+	"seedCards": [
+		{
+			"title": "README の手順修正",
+			"prompt": "README のセットアップ手順を最新にする",
+			"state": "todo"
+		},
+		{
+			"title": "ログイン画面のバグ修正",
+			"prompt": "ログイン画面で空のパスワードが通るバグを直す",
+			"state": "todo"
+		}
+	],
+	"faults": [],
+	"expectedInitial": {
+		"timers": 0,
+		"cards": 2
+	}
+}

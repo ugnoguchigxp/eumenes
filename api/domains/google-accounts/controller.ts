@@ -11,7 +11,11 @@ const revision = z.strictObject({ expectedRevision: z.number().int().min(0) });
 export function registerGoogleAccounts(app: Hono, service: GoogleAccounts) {
 	app.get("/api/google-accounts", (c) => {
 		c.header("Cache-Control", "no-store");
-		return c.json(service.view());
+		try {
+			return c.json(service.view());
+		} catch {
+			return c.json({ error: "account_unavailable" }, 503);
+		}
 	});
 	for (const operation of ["connect", "cancel", "disconnect"] as const) {
 		app.post(`/api/google-accounts/${operation}`, async (c) => {

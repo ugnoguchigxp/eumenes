@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore } from "../../../infrastructure/sqlite";
 import { createGoogleAccounts } from "../service";
-import { migrations, read } from "../repository";
+import { migrations, read, save } from "../repository";
+import { seal, unseal } from "../secrets";
 import {
 	GoogleAccountError,
 	type Authorization,
@@ -151,10 +152,15 @@ test("a cancelled in-flight exchange cannot restore a connection", async () => {
 		await wait;
 		return original(...args);
 	};
+	const shownRevision = h.service.view().revision;
 	const completion = h.service.finish(flow);
 	await started;
-	await h.service.cancel(h.service.view().revision);
-	release();
+	try {
+		await h.service.cancel(shownRevision);
+	} finally {
+		release();
+		await completion;
+	}
 	expect(await completion).toBe("failed");
 	expect(h.service.view()).toMatchObject({
 		status: "disconnected",
@@ -238,4 +244,130 @@ test("missing config/key disables authorization without exposing stored secrets"
 	const service = createGoogleAccounts(h.store, { key: () => undefined });
 	expect(service.view().configured).toBe(false);
 	await expect(service.begin(0)).rejects.toThrow("unconfigured");
+});
+
+test("background token maintenance preserves the displayed revision across reopening", async () => {
+	const h = setup();
+	await h.service.finish(await h.begin());
+	const shown = h.service.view();
+	h.advance(3600_000);
+	await h.service.maintain();
+	expect(h.calls.refresh).toBe(1);
+	expect(h.reopen().view()).toEqual(shown);
+	h.advance(3600_000);
+	h.provider.refresh = async () => {
+		throw new GoogleAccountError("provider_unavailable");
+	};
+	await h.service.maintain();
+	expect(h.reopen().view()).toEqual(shown);
+	await h.service.disconnect(shown.revision);
+	expect(h.service.view().status).toBe("disconnected");
+});
+test("disconnect and maintenance share revocation; cancellation cannot interrupt unlink", async () => {
+	const h = setup();
+	await h.service.finish(await h.begin());
+	let release!: () => void, entered!: () => void;
+	const started = new Promise<void>((r) => {
+		entered = r;
+	});
+	const waiting = new Promise<void>((r) => {
+		release = r;
+	});
+	h.provider.revoke = async () => {
+		h.calls.revoke++;
+		entered();
+		await waiting;
+	};
+	const disconnect = h.service.disconnect(h.service.view().revision);
+	await started;
+	const maintenance = h.service.maintain();
+	try {
+		await expect(h.service.cancel(h.service.view().revision)).rejects.toThrow(
+			"conflict",
+		);
+	} finally {
+		release();
+		await Promise.all([disconnect, maintenance]);
+	}
+	expect(h.calls.revoke).toBe(1);
+	expect(h.service.view().status).toBe("disconnected");
+});
+
+for (const offline of [false, true])
+	test(`disconnect revokes late authorization, offline=${offline}`, async () => {
+		const h = setup();
+		await h.service.finish(await h.begin());
+		const flow = await h.begin();
+		const original = h.provider.exchange;
+		let release!: () => void, entered!: () => void;
+		const started = new Promise<void>((r) => {
+			entered = r;
+		});
+		const waiting = new Promise<void>((r) => {
+			release = r;
+		});
+		h.provider.exchange = async (...args) => {
+			entered();
+			await waiting;
+			const result = await original(...args);
+			return {
+				...result,
+				tokens: { ...result.tokens, refresh: "late-refresh" },
+			};
+		};
+		const revoked: string[] = [];
+		h.provider.revoke = async (token) => {
+			revoked.push(token);
+			if (offline) throw new GoogleAccountError("provider_unavailable");
+		};
+		const completion = h.service.finish(flow);
+		await started;
+		const disconnect = h.service
+			.disconnect(h.service.view().revision)
+			.catch((error) => {
+				if (!offline) throw error;
+			});
+		// Flush the disconnect's transaction without waiting for external authorization.
+		await h.store.write(() => {});
+		const maintenance = h.service.maintain();
+		release();
+		await Promise.all([disconnect, maintenance, completion]);
+		if (offline) {
+			expect(h.reopen().view().status).toBe("disconnecting");
+			h.provider.revoke = async (token) => {
+				revoked.push(token);
+			};
+			h.advance(60_001);
+			await h.reopen().maintain();
+		}
+		expect(h.service.view().status).toBe("disconnected");
+		expect(revoked).toContain("late-refresh");
+		expect(revoked.filter((x) => x === "late-refresh")).toHaveLength(1);
+	});
+
+test("old encrypted records retain their public revision when maintenance first upgrades them", async () => {
+	const h = setup();
+	await h.service.finish(await h.begin());
+	await h.store.write((db) => {
+		const row = read(db);
+		const state = unseal<Record<string, unknown>>(row.sealed!, h.key());
+		delete state.viewRevision;
+		save(db, row.revision, seal(state, h.key()));
+	});
+	const shown = h.reopen().view();
+	h.advance(3600_000);
+	await h.service.maintain();
+	expect(h.reopen().view()).toEqual(shown);
+	await h.service.disconnect(shown.revision);
+	expect(h.service.view().revision).toBeGreaterThan(shown.revision);
+});
+test("unreadable stored credentials report an error rather than an unconnected account", async () => {
+	const h = setup();
+	await h.service.finish(await h.begin());
+	const wrongKey = createGoogleAccounts(h.store, {
+		key: () => new Uint8Array(32).fill(9),
+		provider: h.provider,
+	});
+	expect(() => wrongKey.view()).toThrow("unconfigured");
+	expect(h.service.view().status).toBe("connected");
 });

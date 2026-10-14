@@ -1,0 +1,24 @@
+{
+	"caseId": "kanban-conversation-followup-01",
+	"version": 1,
+	"goal": "チャットで、Done のタスク「README の手順修正」に、「用語集も更新して」と追加で直すよう頼み、その結果を画面で確認してください。",
+	"initialStateRef": "fixture:board-one-done-product@1",
+	"allowedSurface": "isolated-eumenes-browser",
+	"criteriaRef": "criteria:kanban-conversation-followup-01@1",
+	"budget": {
+		"wallSeconds": 300,
+		"maxActions": 40,
+		"maxModelCalls": 30,
+		"maxCostUSD": 2
+	},
+	"evidence": [
+		"screenshots",
+		"observations",
+		"actions",
+		"readonly-host-state",
+		"receipt-refs"
+	],
+	"requires": {
+		"productLlm": true
+	}
+}

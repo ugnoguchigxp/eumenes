@@ -8,6 +8,7 @@ import type { Notice } from "../domains/dialogue/contracts";
 import { createKanban } from "../domains/kanban";
 import { createTerminals } from "../domains/terminals";
 import { reportFinishedTasks } from "./claude-code-reports";
+import { connectKanbanRuns } from "./kanban-runs";
 import { createToolchain } from "./toolchain";
 import type { Embed } from "./toolchain-vectors";
 import type { InferenceAdapterPorts } from "./inference-adapter";
@@ -133,6 +134,8 @@ export async function createHostToolchain(
 		onChange: s.terminalHooks?.publish,
 	});
 	const kanban = createKanban({ store: s.store });
+	// Board runs go to Claude Code and their results come back to the cards.
+	const kanbanRuns = connectKanbanRuns(kanban, terminals);
 	const toolchain = await createToolchain(
 		s.store,
 		s.queue,
@@ -156,7 +159,7 @@ export async function createHostToolchain(
 		},
 	);
 	return {
-		toolchain: { ...toolchain, terminals, kanban },
+		toolchain: { ...toolchain, terminals, kanban, kanbanRuns },
 		links: {
 			...links,
 			attachDialogue(

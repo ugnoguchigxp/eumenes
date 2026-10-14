@@ -1,0 +1,57 @@
+{
+	"criteriaId": "kanban-conversation-followup-01",
+	"version": 1,
+	"caseId": "kanban-conversation-followup-01",
+	"hostReads": ["kanban"],
+	"successMarkers": [],
+	"items": [
+		{
+			"id": "C1",
+			"statement": "「README の手順修正」に追加で直す run が会話由来で一件だけ作られ、依頼が「用語集」を含む",
+			"check": "kanban-runs",
+			"params": {
+				"newCount": 1,
+				"origin": "conversation",
+				"kind": "followup",
+				"card": "README の手順修正",
+				"promptIncludes": ["用語集"]
+			},
+			"required": true
+		},
+		{
+			"id": "C2",
+			"statement": "返答または画面が、キューに入れたことを伝え、終わったとは言っていない",
+			"check": "screen-mentions",
+			"params": {
+				"sets": [
+					{
+						"id": "queued",
+						"patterns": [
+							"実行キューに入れ|キューに入れ|キューへ入れ|順番に実行"
+						]
+					}
+				],
+				"forbidden": [
+					{
+						"id": "completed-claim",
+						"patterns": [
+							"終わりました|完了しました|成功しました|直しました|修正しました|done です"
+						]
+					}
+				]
+			},
+			"required": true
+		},
+		{
+			"id": "C3",
+			"statement": "commit・push の run は作られない",
+			"check": "kanban-no-extra-changes",
+			"params": {
+				"maxNewCards": 0,
+				"maxRuns": 1,
+				"forbiddenRunKinds": ["commit_push"]
+			},
+			"required": true
+		}
+	]
+}

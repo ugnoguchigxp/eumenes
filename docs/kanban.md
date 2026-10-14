@@ -1,0 +1,92 @@
+# タスクボード（Kanban）と会話
+
+更新日: 2026年10月14日。設計の正本は[計画](../spec/kanban-claude-code-plan-2026-10-14.md)、担当分けと固定契約は[実装の分担](../spec/kanban-implementation-assignments-2026-10-14.md)。この文書は利用者と開発者向けの要約で、会話側（計画 P3）を中心に書く。実装済みと未検証を区別する（末尾「検証の状況」）。
+
+## 利用者向け
+
+タスクボードは、Claude Code に頼む作業を「カード」として登録し、順番に実行する画面である。ランチャーの「タスクボード」から開く。
+
+- 列は未着手（Todo）・実行中・完了（Done と Blocker）。実行は一つずつ、登録した順にキューで流れる。
+- 実行が終わっても会話には報告されない。結果は通知センター（Done・Blocker・許可待ち・commit & push の報告・キュー停止）に出る。カードを開くと最後の報告と変更したファイルを読める。
+- commit と push は人の操作に限る。Done のカードを確認してから、ボードの「commit & push」を押し、確認の小窓で送る。会話からも、ボードからの通常の実行からも行われない。
+
+### 会話でできること
+
+会話担当に頼むと、タスク管理担当（サブエージェント）がボードの操作を一つ選ぶ。確認が要るときは質問が返る。
+
+| 頼みの例 | 担当の操作 | 回答の要点 |
+| --- | --- | --- |
+| 「README の手順修正をタスクに登録して」 | `kanban.add` | 未着手に登録した。実行はしない |
+| 「タスクボードの状況を教えて」「Done の報告を教えて」 | `kanban.list` | 各カードの列・状態・最後の報告（長いものは先頭だけ） |
+| 「そのタスクの題名を直して」 | `kanban.edit` | 作業中のカードは直せない |
+| 「終わった扱いにして」「未着手に戻して」 | `kanban.move` | 作業中は動かせない。未着手へ戻すと実行の履歴を捨てる |
+| 「登録したタスクを実行して」 | `kanban.run` | 実行キューに入れた。終わったら通知センターで知らせる |
+| 「さっきのタスクにテストも追加するよう追加で直して」 | `kanban.followup` | Done・Blocker のカードに同じ会話で追加の依頼を送る。キューに入れただけ |
+| 「その実行を取り消して」 | `kanban.cancel` | 順番待ちだけ取り消せる。Claude Code に送った後はボードの「止めて Blocker にする」 |
+| 「このタスクを消して」 | `kanban.remove` | 作業中は消せない |
+
+- どのカードか一つに決まらないときは、ボードのカード（最大20枚）を選択肢にした質問が出る。選択肢はホストが出し、それ以外の答えは受け付けない。
+- 「このタスクを commit して push して」と頼んでも何も実行されず、タスクボードで確認して commit & push を押すよう案内される。
+- 「修正して push まで」のように登録や実行の依頼に commit・push が含まれるときは、作業の部分だけがカードになる（依頼内容は利用者の言葉のまま）。実行時は commit・push が制限されるので行われない。commit・push はボードのボタンで行う。
+- その場で Claude Code に直接頼みたいだけのときは、従来の「Claude Code」（`claude_code`）を使う。どちらを使うかは会話モデルが説明（useWhen・avoidWhen・examples）から選ぶ。語句で振り分けるコードは無い。
+
+## 開発者向け
+
+### 構成
+
+```
+会話モデルの関数 kanban({request})
+  → toolchain:kanban.manage@1（関数 kanban）
+  → package:kanban.manage@1（backend kanban）→ profile:kanban.manage@1・skill:kanban.manage@1・tool:kanban.{add,list,edit,move,run,followup,cancel,remove}@1
+  → binding:kanban.manage@1（command、adapter:kanban@1、availability:kanban@1）
+  → adapter の操作 kanban.* → kanban domain の公開 transaction 操作
+  → artifact:kanban.board@1（画面「タスクボード」）
+```
+
+| もの | 場所 |
+| --- | --- |
+| bundle（担当・SKILL・tool・package・toolchain・binding・画面） | `api/domains/capabilities/bundles/kanban.bundle.json` |
+| adapter（操作・UI の読取り・会話の snapshot・選択肢） | `api/application/kanban-adapter.ts` |
+| 会話に見せる形（snapshot・選択肢・`kanban.list` の結果・各操作の回答用 projection） | `api/application/kanban-conversation.ts` |
+| 入力の型（flat object） | `api/domains/capabilities/contracts/kanban.ts`（`builtin:kanbanAdd` ほか） |
+| 業務判断（列・revision・キュー・commit & push の起点） | `api/domains/kanban/**`（adapter は公開操作を呼ぶだけ） |
+
+- **tool と入力**: `kanban.add`=`kanbanAdd`、`kanban.list`=`kanbanList`、`kanban.edit`=`kanbanEdit`、`kanban.move`=`kanbanMove`、`kanban.run`・`kanban.cancel`・`kanban.remove`=`kanbanCardRef`、`kanban.followup`=`kanbanFollowup`。**commit & push の tool は無い**。adapter も会話 origin の `kanban.commit-push` を `commit_push_requires_board` で拒否する（二重の制限）。
+- **snapshot**（サブエージェントに見せる現在のデータ）: カードの id・revision・タイトル・列・ラベル・run の状態・今できる操作（`allowed`）、キューの状態、`runnable`。依頼内容と報告は含めない。最大50枚（超えた数は `omitted`）。
+- **確認質問**: binding の `questions` に `builtin:kanbanCardAnswer`（`{cardId}`）と `choiceField: cardId`。候補は adapter の `choicesInTransaction` が板のカードから出す（最大20、実行中・未着手・新しい Done の順）。回答は候補の id だけ受け付ける。
+- **`kanban.list`**: 読取りの操作。何も保存しないので、receipt は `{action: "listed", requestId}`、operation id は `list:<requestId>`。回答の直前に読み直すと、その時点のボードを返す。結果は最大50枚、報告は新しい Done の8枚まで各300字、全体は32 KiB 未満（試験あり）。固定の `guidance`（commit & push の案内、結果は通知センターへ）を必ず含める。
+- **書込みの回答**: 保存済み receipt から短い projection だけを作る。`kanban.run`・`kanban.followup` は `queued: true`・`completed: false`・`reportedWhen` を持ち、完了・成功を推測させない。
+
+### 試験
+
+```sh
+bun test api/application/kanban-toolchain.test.ts api/application/kanban-adapter.test.ts api/application/kanban-conversation.test.ts api/application/claude-code-toolchain.test.ts
+bun run toolchain:bundle -- check api/domains/capabilities/bundles/kanban.bundle.json
+bun run verify -- --domain kanban
+```
+
+- `kanban-toolchain.test.ts`: 実 dialogue と固定の command 出力で、登録・曖昧な対象（選択肢がホストのカード、範囲外の答えは拒否、選んだカードだけ実行）・実行（利用者の言葉＋作業のみの指示、`permissions.deny`、会話へ報告しない）・状況確認（Done の報告は list から、snapshot に本文なし）・commit & push の依頼（何も変わらない）・編集／移動／削除と古い revision。
+- `kanban-adapter.test.ts`・`kanban-conversation.test.ts`: 操作・replay・snapshot・選択肢・`kanban.list`・回答用 projection。共通の準備は `kanban-adapter.fixture.ts`。
+
+### 拡張するとき
+
+- 操作を足す: 入力の型を `contracts/kanban.ts` に足し（既存キーは変えない）、adapter の `describe().operations` と handler を足し、tool・package・binding・toolchain を新 revision で bundle に足す（公開済みの revision は書き換えない）。
+- `claude_code`（直接依頼）の説明は変えていない。使い分けが崩れるときは、両方の useWhen・avoidWhen・examples を新 revision で直し、下の自然言語受入で確かめる。
+
+## 自然言語受入（凍結前の案）
+
+`tests/acceptance/nl/drafts/kanban/` に、会話側の8ケース（登録・曖昧な対象・実行・状況確認・追加で直す・commit & push の案内・「修正して push まで」・直接依頼との使い分け）の case・criteria・fixture を置いた。case は現行の runner で読める。criteria と fixture は次の拡張が要るので、**まだ凍結（`frozen.lock.json`）に入れていない**。
+
+- fixture: `seedCards`（title・prompt・state: todo/done・report。Done は偽 claude のフックで実行を終えさせて作る）、`expectedInitial.cards`。
+- hostReads: `kanban`（カード・run・キュー）、`terminals`（依頼の owner）。
+- check: `kanban-cards`、`kanban-runs`、`kanban-no-extra-changes`、`interaction-choices`、`terminal-requests`、`screen-mentions` の `forbidden`（完了を言い切る語の不在）。
+- 拡張後に `drafts/kanban/*` を `cases/`・`criteria/`・`fixtures/` へ移し、`bun run nl-acceptance -- --freeze` で凍結する。実行は `--run --case <id> --with-product-llm`。
+
+## 検証の状況
+
+| 区分 | 状況 |
+| --- | --- |
+| fixture（固定試験） | 実装済み・検証済み: 上の試験 |
+| live（実 LLM・実 `claude`） | 未実施 |
+| 自然言語受入 | 案のみ（runner の拡張と凍結が未） |
+| 実機器 | 対象外 |

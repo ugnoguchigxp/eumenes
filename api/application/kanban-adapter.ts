@@ -15,12 +15,19 @@ import {
 } from "../domains/capabilities/contracts";
 import {
 	kanbanReceiptSchema,
+	type KanbanBoardView,
 	type KanbanOperationContext,
 	type KanbanOutcome,
 	type KanbanReceipt,
 	type KanbanService,
 } from "../domains/kanban";
 import { sha256Hex } from "../infrastructure/digest";
+import {
+	kanbanActionContext,
+	kanbanChoices,
+	kanbanListContext,
+	kanbanSnapshot,
+} from "./kanban-conversation";
 import { composeBoard, connectionOf, enqueueDispatch } from "./kanban-runs";
 
 export const KANBAN_ADAPTER_REF = "adapter:kanban@1";
@@ -30,6 +37,10 @@ const EDIT = "input:kanban.edit@1";
 const MOVE = "input:kanban.move@1";
 const CARD = "input:kanban.card@1";
 const FOLLOWUP = "input:kanban.followup@1";
+/** The target question of a conversation: the cards the person may mean (`choiceField: cardId`). */
+const CARD_ANSWER = "builtin:kanbanCardAnswer";
+/** `kanban.list` saves nothing; its operation id marks the request so the result can be read again. */
+const LIST_PREFIX = "list:";
 
 /** Domain result schemas this adapter registers for `domain:` refs. */
 export const kanbanDomainSchemas = {
@@ -150,11 +161,19 @@ const write = (inputSchemaRef: string) => ({
 	inputSchemaRef,
 	effect: "write" as const,
 });
+const read = (inputSchemaRef: string) => ({
+	inputSchemaRef,
+	effect: "read" as const,
+});
 
 /** What the kanban adapter offers, without a kanban service (bundle checks, evaluation). */
 export const describeKanbanAdapter = () => ({
 	owner: "kanban",
-	operations: new Map([
+	operations: new Map<
+		string,
+		{ inputSchemaRef: string; effect: "read" | "write" }
+	>([
+		["kanban.list", read("builtin:kanbanList")],
 		["kanban.add", write("builtin:kanbanAdd")],
 		["kanban.edit", write("builtin:kanbanEdit")],
 		["kanban.move", write("builtin:kanbanMove")],
@@ -199,19 +218,37 @@ function result(receipt: KanbanReceipt, requestId: string, replay: boolean) {
 					},
 		],
 		replay,
-		answerContext:
-			"cardId" in receipt
-				? {
-						action: receipt.action,
-						cardId: receipt.cardId,
-						title: receipt.title,
-						column: receipt.column,
-						// Saving a run is not finishing it: the person is told in the notification center.
-						...(receipt.runId && ["run", "followup"].includes(receipt.action)
-							? { queued: true, reportedWhen: "通知センターでお知らせします" }
-							: {}),
-					}
-				: { action: receipt.action, queue: receipt.queue },
+		answerContext: kanbanActionContext(receipt),
+	} satisfies AdapterResult;
+}
+
+/**
+ * The result of `kanban.list`. Nothing is saved for it: the receipt only names the request, so
+ * reading it again (the answer's refresh) shows the board as it is then.
+ */
+function listResult(
+	board: KanbanBoardView,
+	requestId: string,
+	replay: boolean,
+) {
+	const receipt = { action: "listed", requestId } as const;
+	return {
+		receipt,
+		receiptRef: {
+			owner: "kanban",
+			operationId: `${LIST_PREFIX}${requestId}`,
+			digest: sha256Hex(JSON.stringify(receipt)),
+		},
+		resultRefs: [
+			{
+				owner: "kanban",
+				kind: "board",
+				id: "board",
+				schemaRef: "domain:kanban.receipt@1",
+			},
+		],
+		replay,
+		answerContext: kanbanListContext(board),
 	} satisfies AdapterResult;
 }
 
@@ -236,6 +273,8 @@ export function createKanbanAdapter(
 		requestId: string,
 		context: KanbanOperationContext,
 	) => KanbanOutcome<KanbanReceipt>;
+	const boardOf = (tx: Database) =>
+		kanban.boardInTransaction(tx, { runnable: options.runnable() });
 	const cancelUnsent = (tx: Database) => (runId: string) =>
 		connection().terminals.cancelQueuedInTransaction(tx, runId);
 	const handlers: Record<string, Handler> = {
@@ -290,18 +329,14 @@ export function createKanbanAdapter(
 		ref: KANBAN_ADAPTER_REF,
 		describe: describeKanbanAdapter,
 		availableInTransaction: () => true,
-		snapshotInTransaction: (tx) => ({
-			cards: kanban
-				.boardInTransaction(tx, { runnable: options.runnable() })
-				.cards.map(({ id, revision, title, column, label }) => ({
-					id,
-					revision,
-					title,
-					column,
-					...(label ? { label } : {}),
-				})),
-		}),
+		snapshotInTransaction: (tx) => kanbanSnapshot(boardOf(tx)),
+		choicesInTransaction: (tx, inputSchemaRef) =>
+			inputSchemaRef === CARD_ANSWER ? kanbanChoices(boardOf(tx)) : [],
 		invokeInTransaction(tx, request) {
+			if (request.operationName === "kanban.list") {
+				kanbanList.parse(request.input);
+				return listResult(boardOf(tx), request.requestId, false);
+			}
 			const handler = handlers[request.operationName];
 			if (!handler) throw new Error("capability_unavailable");
 			const outcome = handler(tx, request.input, request.requestId, {
@@ -318,14 +353,18 @@ export function createKanbanAdapter(
 			return result(outcome.receipt, request.requestId, outcome.replay);
 		},
 		readInTransaction(tx, operationId) {
+			if (operationId.startsWith(LIST_PREFIX))
+				return listResult(
+					boardOf(tx),
+					operationId.slice(LIST_PREFIX.length),
+					true,
+				);
 			const saved = kanban.receiptInTransaction(tx, operationId);
 			return saved ? result(saved, operationId, true) : null;
 		},
 		sourceInTransaction(tx, query, targetRef) {
 			if (query !== BOARD || targetRef !== undefined) return null;
-			const board = kanban.boardInTransaction(tx, {
-				runnable: options.runnable(),
-			});
+			const board = boardOf(tx);
 			const connected = connectionOf(kanban);
 			const shown = connected
 				? composeBoard(board, tx, connected.terminals)

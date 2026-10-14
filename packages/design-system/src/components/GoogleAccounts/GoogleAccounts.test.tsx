@@ -25,3 +25,12 @@ it("pending auth exposes a separate-tab fallback and cancellation",()=>{
  fireEvent.click(screen.getByRole("button",{name:"キャンセル"}));
  expect(cancel).toHaveBeenCalledOnce();
 });
+it("does not reuse an unlink confirmation after the connected account changes",()=>{
+ const disconnect=vi.fn();
+ const view=render(<GoogleAccounts {...props} status="connected" profile={{name:"花子",email:"hanako@example.com"}} onDisconnect={disconnect}/>);
+ fireEvent.click(screen.getByRole("button",{name:"連携を解除"}));
+ expect(screen.getByRole("alertdialog")).toBeTruthy();
+ view.rerender(<GoogleAccounts {...props} status="connected" profile={{name:"太郎",email:"taro@example.com"}} onDisconnect={disconnect}/>);
+ expect(screen.queryByRole("alertdialog")).toBeNull();
+ expect(disconnect).not.toHaveBeenCalled();
+});

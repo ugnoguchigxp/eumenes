@@ -1,0 +1,55 @@
+{
+	"criteriaId": "kanban-conversation-fix-and-push-01",
+	"version": 1,
+	"caseId": "kanban-conversation-fix-and-push-01",
+	"hostReads": ["kanban"],
+	"successMarkers": [],
+	"items": [
+		{
+			"id": "C1",
+			"statement": "カードが一枚作られ、依頼内容が利用者の言葉（「push まで」を含む）のままである",
+			"check": "kanban-cards",
+			"params": {
+				"newCount": 1,
+				"column": "todo",
+				"promptIncludes": ["README", "push"]
+			},
+			"required": true
+		},
+		{
+			"id": "C2",
+			"statement": "commit_push の run が作られない",
+			"check": "kanban-no-extra-changes",
+			"params": {
+				"maxNewCards": 1,
+				"maxRuns": 0,
+				"forbiddenRunKinds": ["commit_push"]
+			},
+			"required": true
+		},
+		{
+			"id": "C3",
+			"statement": "返答または画面が、commit・push はタスクボードのボタンで行うと伝えている",
+			"check": "screen-mentions",
+			"params": {
+				"sets": [
+					{
+						"id": "button",
+						"patterns": ["ボタン|タスクボード|ボード"]
+					},
+					{
+						"id": "push",
+						"patterns": ["push|プッシュ"]
+					}
+				],
+				"forbidden": [
+					{
+						"id": "pushed",
+						"patterns": ["pushしました|push しました|プッシュしました"]
+					}
+				]
+			},
+			"required": true
+		}
+	]
+}

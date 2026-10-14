@@ -1,0 +1,57 @@
+{
+	"criteriaId": "kanban-conversation-ambiguous-target-01",
+	"version": 1,
+	"caseId": "kanban-conversation-ambiguous-target-01",
+	"hostReads": ["kanban", "interactions"],
+	"successMarkers": [],
+	"items": [
+		{
+			"id": "C1",
+			"statement": "対象を選ぶ質問（waiting_input）が保存され、再読み込みを挟んでも回答後に completed となり、receipt に結びつく",
+			"check": "interaction-lifecycle",
+			"params": {
+				"sequence": ["waiting_input", "completed"],
+				"maxQuestions": 3,
+				"requireReceiptRef": true,
+				"reloadBetween": true
+			},
+			"required": true
+		},
+		{
+			"id": "C2",
+			"statement": "質問の選択肢が、ボードの二枚のカードだけである",
+			"check": "interaction-choices",
+			"params": {
+				"labelsInclude": ["README の手順修正", "ログイン画面のバグ修正"],
+				"maxChoices": 2
+			},
+			"required": true
+		},
+		{
+			"id": "C3",
+			"statement": "実行キューに入ったのは「ログイン画面のバグ修正」だけで、もう一枚は未着手のまま",
+			"check": "kanban-cards",
+			"params": {
+				"seeded": {
+					"ログイン画面のバグ修正": {
+						"column": "running"
+					},
+					"README の手順修正": {
+						"column": "todo"
+					}
+				}
+			},
+			"required": true
+		},
+		{
+			"id": "C4",
+			"statement": "run は一件だけ",
+			"check": "kanban-no-extra-changes",
+			"params": {
+				"maxNewCards": 0,
+				"maxRuns": 1
+			},
+			"required": true
+		}
+	]
+}

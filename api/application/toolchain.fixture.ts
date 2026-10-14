@@ -14,7 +14,7 @@ import {
 	fixtureResearchOutput,
 	fixtureVerification,
 } from "../domains/agent-runtime/test/research-fixture";
-import { createKanban, registerKanban } from "../domains/kanban";
+import { createKanban } from "../domains/kanban";
 import { connectKanbanRuns } from "./kanban-runs";
 import { migrations as terminalsMigrations } from "../domains/terminals";
 import { reportFinishedTasks } from "./claude-code-reports";
@@ -630,11 +630,11 @@ export async function harness(
 		inference,
 		timers,
 		terminals,
+		kanban,
 		toolchainHistory: toolchain.history,
 		toolchainActions: toolchain.actionRequests,
 		...toolchain,
 	});
-	if (kanban) registerKanban(app, kanban);
 	toolchain.agents.start();
 	queue.start();
 	const request = async (path: string, body?: unknown) =>

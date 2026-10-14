@@ -5,6 +5,7 @@ import {
 	type Tokens,
 } from "./contracts";
 import { digest } from "./secrets";
+import { desktopRedirectUri, loadDesktopClient } from "./desktop-client";
 const scopes = ["openid", "email", "profile"];
 const allowedScopes = new Set([
 	...scopes,
@@ -20,7 +21,7 @@ function failure(error: unknown): GoogleAccountError {
 }
 /** Only basic identity scopes; endpoints and identity verification belong to Google's library. */
 export function createGoogleProvider(
-	config: { clientId: string; clientSecret: string; redirectUri: string },
+	config: { clientId: string; clientSecret?: string; redirectUri: string },
 	clientFactory = () =>
 		new OAuth2Client({
 			clientId: config.clientId,
@@ -140,13 +141,12 @@ export function createGoogleProvider(
 export function googleProviderFromEnv(
 	env: Record<string, string | undefined>,
 	origin: string,
+	bundledFile?: string,
 ): GoogleProvider | undefined {
-	const clientId = env.EUMENES_GOOGLE_CLIENT_ID;
-	const clientSecret = env.EUMENES_GOOGLE_CLIENT_SECRET;
-	if (!clientId || !clientSecret) return undefined;
+	const client = loadDesktopClient(env, bundledFile);
+	if (!client) return undefined;
 	return createGoogleProvider({
-		clientId,
-		clientSecret,
-		redirectUri: new URL("/oauth/google/callback", origin).href,
+		...client,
+		redirectUri: desktopRedirectUri(origin),
 	});
 }

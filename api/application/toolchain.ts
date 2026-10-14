@@ -176,6 +176,7 @@ export async function createToolchain(
 			...(options.uiCompositions ? ["ui-compositions"] : []),
 			...(options.objectRecognition ? ["object-recognition"] : []),
 			...(options.terminals ? ["claude-code"] : []),
+			...(options.kanban && options.terminals ? ["kanban"] : []),
 			...(options.steward ? ["steward"] : []),
 			...(options.ocr ? ["ocr"] : []),
 			...(options.excalidraw ? ["excalidraw"] : []),

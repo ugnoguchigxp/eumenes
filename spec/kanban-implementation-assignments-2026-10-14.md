@@ -132,7 +132,19 @@ values は `Record<string, string | boolean>`。数値は10進の文字列、`be
 - 触らない: kanban・terminals の backend、`packages/**`、bundle、共有ファイル（`client/index.ts` は監督者）。
 - 受入: 通知センターの試験（タイマーと Kanban が並ぶ、既読化、未読数、SE は新しい通知で一度、読込み時点では鳴らない、Kanban の PTY の activity では鳴らない）、`bunx vitest run` の対象、既存の `tests/browser/timers.spec.ts` が通ること。API は §4.1 どおりで、backend 未完成の間はモックで試験する。
 
-## 5. 第3波以降
+## 5. 第3波
 
-- W6 会話（P3）: profile・SKILL・tools・package・toolchain `kanban`・binding。W4 の後。
-- 監督者: 共有ファイルの登録、全体検証、ブラウザ E2E、実機・自然言語受入（P4）、レビュー。
+第2波の結果（監督者が登録済み）: `connectKanbanRuns`（host・fixture）、`kanban_recovery`・`kanban` close の lifecycle、`registerKanban` の mount、`client/index.ts` の `kanbanClient`。kanban の操作は `kanban.add`・`edit`・`move`・`remove`・`run`・`followup`・`commit-push`（会話 origin は `commit_push_requires_board`）・`review`・`cancel`・`stop`・`reset`・`resume-queue`。
+
+### W6 会話（計画 P3）
+
+- 目的: 計画 §3.13 の新しいサブエージェントとツールチェーンを `kanban.bundle.json` に追加し、会話から登録・一覧・編集・移動・実行・追加で直す・取消・削除ができるようにする（commit & push の tool は作らない）。
+- bundle（`api/domains/capabilities/bundles/kanban.bundle.json`）: profile `kanban.manage@1`（タスク管理担当）・skill `kanban.manage@1`・tools（`kanban.add`・`kanban.list`・`kanban.edit`・`kanban.move`・`kanban.run`・`kanban.followup`・`kanban.cancel`・`kanban.remove`。各 tool の `schemaKey` は builtin `kanbanAdd`・`kanbanList`・`kanbanEdit`・`kanbanMove`・`kanbanCardRef`・`kanbanFollowup`）・package `kanban.manage@1`（backend `kanban`）・toolchain `kanban.manage@1`（関数 `kanban`、useWhen・avoidWhen・examples 5件、`bindingRevisionId: binding:kanban.manage@1`、`artifactRevisionId: artifact:kanban.board@1`）・binding（各 tool → adapter の操作、`questions` で対象カードの選択 `choiceField: cardId`）。SKILL・profile の本文は計画 §3.13 どおり（commit & push は操作せず案内、「修正して push まで」は作業部分だけを登録・実行）。
+- adapter（`api/application/kanban-adapter.ts`）: `kanban.list`（read）の操作、`snapshotInTransaction`（カードの id・タイトル・列・ラベル・revision・run の状態、キューの状態。本文と報告は含めない）、`choicesInTransaction`（`kanbanCardRef` 等の対象選択の候補。最大20）、会話の回答用の `answerContext`（各操作の結果を短く。完了・成功を推測させない。実行は「キューに入れた・終わったら通知センターで知らせる」）。
+- 試験: `api/application/kanban-toolchain.test.ts`（新規、`toolchain.fixture.ts` の harness で routeTool `kanban` と固定の command 出力。登録・曖昧な対象の確認質問（候補がホストのデータから出る）・実行・状況確認・commit & push を頼まれて操作しない・会話で完了報告しない）、adapter 試験の追加、`bun run toolchain:bundle -- check`。自然言語受入の凍結ケース（`docs/nl-acceptance.md` の形式。登録、曖昧な対象、実行、状況確認、追加修正、commit & push の案内、「修正して push まで」、直接依頼 `claude_code` との使い分け）を用意する（実行は監督者）。
+- 書込み範囲: `api/domains/capabilities/bundles/kanban.bundle.json`、`api/application/kanban-adapter.ts`・`.test.ts`、`api/application/kanban-toolchain.test.ts`、自然言語受入のケースのファイル（`docs/nl-acceptance.md` で決まっている置き場所）、`docs/kanban.md`（新規。利用者・開発者向けの説明）。
+- 触らない: kanban・terminals domain（変更が必要なら報告）、共有ファイル（`scripts/toolchain-bundle.ts` の backend 一覧・`api/application/toolchain.ts` の backend 集合への `kanban` 追加は監督者。差分を報告）、web・packages、`toolchain.fixture.ts`（必要な変更は報告）。
+
+## 6. 監督者
+
+共有ファイルの登録、全体検証、ブラウザ E2E、実機・自然言語受入（P4）、レビュー。
