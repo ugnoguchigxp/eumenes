@@ -84,7 +84,7 @@ EUMENES_EXCALIDRAW_LIVE=1 bunx playwright test tests/browser/excalidraw-live.spe
 
 2026年10月14日、採用した画面案をmainに実装した。Excalidrawのdomain verify（backend 7件、Web 18件）、利用側Artifactのverify（50件）、API結合4件とWebビルドは成功。最終確認時には並行改修中のsettings-dataとToolchainArtifactHostに4件の型エラーがあったが、commit前の再確認では解消され、1,374ファイルの型検査が成功した。対象ブラウザの別タブ編集シナリオとArtifact内iframeシナリオは個別に成功し、未保存の図切替・タブ閉じの保護、下書き復元、保存失敗、無操作解放、再接続、fixtureの再起動復帰を確認した。全件E2Eは実行していない。
 
-正式接続ではMacBook上のブラウザでArtifact内に矩形を描画し、LARMへの版2/3保存、サムネイル表示、再読み込み後の版3・矩形1個、無操作解放後の再接続を確認した。workerの物理停止とbackend再起動は今回繰り返しておらず、以下の旧画面の実機受入と区別する。証拠と変更範囲は[iframe編集の記録](../spec/excalidraw-artifact-2026-10-14.md)、実接続の結果は`spec/verification/excalidraw-live/artifact-2026-10-14.json`に保存した。LARM側の追加開発・配備変更は不要だった。
+正式接続ではMacBook上のブラウザでArtifact内に矩形を描画し、LARMへの版2/3保存、サムネイル表示、再読み込み後の版3・矩形1個、無操作解放後の再接続を確認した。workerの物理停止とbackend再起動は今回繰り返しておらず、以下の旧画面の実機受入と区別する。証拠と変更範囲は[iframe編集の記録](../spec/.archived/excalidraw-artifact-2026-10-14.md)、実接続の結果は`spec/verification/excalidraw-live/artifact-2026-10-14.json`に保存した。LARM側の追加開発・配備変更は不要だった。
 
 ### 旧画面での実機受入
 

@@ -73,14 +73,9 @@ bun run verify -- --domain kanban
 - 操作を足す: 入力の型を `contracts/kanban.ts` に足し（既存キーは変えない）、adapter の `describe().operations` と handler を足し、tool・package・binding・toolchain を新 revision で bundle に足す（公開済みの revision は書き換えない）。
 - `claude_code`（直接依頼）の説明は変えていない。使い分けが崩れるときは、両方の useWhen・avoidWhen・examples を新 revision で直し、下の自然言語受入で確かめる。
 
-## 自然言語受入（凍結前の案）
+## 自然言語受入
 
-`tests/acceptance/nl/drafts/kanban/` に、会話側の8ケース（登録・曖昧な対象・実行・状況確認・追加で直す・commit & push の案内・「修正して push まで」・直接依頼との使い分け）の case・criteria・fixture を置いた。case は現行の runner で読める。criteria と fixture は次の拡張が要るので、**まだ凍結（`frozen.lock.json`）に入れていない**。
-
-- fixture: `seedCards`（title・prompt・state: todo/done・report。Done は偽 claude のフックで実行を終えさせて作る）、`expectedInitial.cards`。
-- hostReads: `kanban`（カード・run・キュー）、`terminals`（依頼の owner）。
-- check: `kanban-cards`、`kanban-runs`、`kanban-no-extra-changes`、`interaction-choices`、`terminal-requests`、`screen-mentions` の `forbidden`（完了を言い切る語の不在）。
-- 拡張後に `drafts/kanban/*` を `cases/`・`criteria/`・`fixtures/` へ移し、`bun run nl-acceptance -- --freeze` で凍結する。実行は `--run --case <id> --with-product-llm`。
+会話側の8ケースは `tests/acceptance/nl/drafts/kanban/` にあり、まだ凍結していない。凍結までの案と必要な拡張は[計画 §5.2.1](../spec/kanban-claude-code-plan-2026-10-14.md#521-自然言語受入の案凍結前)にある。
 
 ## 検証の状況
 

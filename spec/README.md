@@ -8,6 +8,7 @@ archive の基準: 本文の実施記録や完了記述で全項目が完了と�
 
 | 文書 | 状態 |
 | --- | --- |
+| [claude-agent-sdk-session-plan-2026-10-15.md](claude-agent-sdk-session-plan-2026-10-15.md) | Claude Agent SDKのサブスク／APIキー認証の明示切替、モデル一覧の実行時取得、チャット画面左上の推論先SelectBox、会話エージェントのSessionID維持（接続×認証×モデル単位の台帳とWindow照合）、サブエージェントのタスク単位セッション。レビュー用計画・未実装 |
 | [timer-data-driven-ui-acceptance-design-2026-10-13.md](timer-data-driven-ui-acceptance-design-2026-10-13.md) | Astraによるタイマーの定義登録・共通実行・OpenUI・質問継続の移行設計。既存Playwright回帰を維持し、自然言語目的によるAI自律UI受入を追加。設計案・未実装・試験未実行 |
 | [settings-openui-definition-storage-2026-10-12.md](settings-openui-definition-storage-2026-10-12.md) | 設定項目の軽量登録と保存先の詳細設計。実テーブル・列・JSONパス、管理操作と読取のbinding、型と保存範囲、追加手順と受入を定義。設計案・未実装 |
 | [settings-openui-redesign-2026-10-12.md](settings-openui-redesign-2026-10-12.md) | Astraレビューに基づく薄い設定入口と目的別OpenUIアーティファクトの全体設計。現行全項目の編集先、共同下書き、個別保存、タブの寿命、秘密入力、段階移行と受入を整理。設計案・未実装 |
@@ -47,6 +48,8 @@ archive の基準: 本文の実施記録や完了記述で全項目が完了と�
 | [queue-scheduler-implementation-plan.md](.archived/queue-scheduler-implementation-plan.md) | queue・scheduler の実装計画 |
 | [queue-scheduler-progress.md](.archived/queue-scheduler-progress.md) | 同進捗 |
 | [continuity-bookmarks-preimplementation-plan.md](.archived/continuity-bookmarks-preimplementation-plan.md) | continuity ブックマークの実装前計画 |
+| [excalidraw-artifact-2026-10-14.md](.archived/excalidraw-artifact-2026-10-14.md) | Excalidraw の iframe 編集。実装・`verify --domain excalidraw --domain artifact` 通過・正式接続の live 記録（[artifact-2026-10-14.json](verification/excalidraw-live/artifact-2026-10-14.json)）あり |
+| [larm-multimodal-contract-inquiry-prompt-2026-10-13.md](.archived/larm-multimodal-contract-inquiry-prompt-2026-10-13.md) | LARM 画像入力契約の問い合わせ Prompt。回答を受けた契約（MIME・入力予算）を `larm/contracts/chat-input.ts` に実装済み |
 
 ## 検証記録・レビュー・資料
 
