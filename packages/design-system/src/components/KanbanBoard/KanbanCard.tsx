@@ -25,6 +25,8 @@ const ACTION_ORDER: readonly KanbanCardAction[] = [
 	"run",
 	"followup",
 	"commitPush",
+	"commit",
+	"push",
 	"review",
 	"cancel",
 	"stop",
@@ -38,6 +40,8 @@ const NEEDS_RUN: ReadonlySet<KanbanCardAction> = new Set([
 	"run",
 	"followup",
 	"commitPush",
+	"commit",
+	"push",
 ]);
 /** Button truncates long labels; action wording is shown in full. */
 const LABEL_MAX = 40;
@@ -54,6 +58,8 @@ function actionLabel(action: KanbanCardAction, card: KanbanBoardCard) {
 			return card.column === "todo" ? "実行" : "やり直す";
 		case "followup":
 			return "追加で直す";
+		case "commit": return "commit";
+		case "push": return "push";
 		case "commitPush":
 			return "commit & push";
 		case "review":
@@ -93,6 +99,9 @@ export type KanbanCardProps = {
 	onEdit: KanbanBoardProps["onEdit"];
 	onMove: KanbanBoardProps["onMove"];
 	onAction: KanbanBoardProps["onAction"];
+	executors?: KanbanBoardProps["executors"];
+	onSelectExecutor?: KanbanBoardProps["onSelectExecutor"];
+	onInspect?: KanbanBoardProps["onInspect"];
 	onDragStart: (cardId: string, event: DragEvent<HTMLElement>) => void;
 	onDragEnd: () => void;
 	/** The card will change place or column: take focus back when the host redraws it. */
@@ -108,6 +117,9 @@ export function KanbanCard({
 	onEdit,
 	onMove,
 	onAction,
+	executors,
+	onSelectExecutor,
+	onInspect,
 	onDragStart,
 	onDragEnd,
 	keepFocus,
@@ -117,6 +129,7 @@ export function KanbanCard({
 	const [panel, setPanel] = useState<Panel>(null);
 	const [expanded, setExpanded] = useState(false);
 	// The card as the person saw it when the dialog opened (what they confirm is this revision).
+	const [gitAction,setGitAction]=useState<"commitPush"|"commit"|"push">("commitPush");
 	const [confirming, setConfirming] = useState<KanbanBoardCard | null>(null);
 	const article = useRef<HTMLElement>(null);
 	const opener = useRef<Element | null>(null);
@@ -175,7 +188,7 @@ export function KanbanCard({
 	const run = (action: KanbanCardAction) => {
 		if (action === "edit" || action === "followup" || action === "remove")
 			return open(action);
-		if (action === "commitPush") return setConfirming(card);
+		if (action === "commitPush" || action==="commit" || action==="push") {setGitAction(action);return setConfirming(card);}
 		onAction(action as Act, card.id, card.revision);
 	};
 	const disabled = (action: KanbanCardAction) =>
@@ -226,14 +239,31 @@ export function KanbanCard({
 						</span>
 					)}
 				</header>
+				{card.executorLabel && (
+					<p className="kanban-status">担当: {card.executorLabel}</p>
+				)}
+				{card.canSelectExecutor && executors && onSelectExecutor && (
+					<label className="kanban-field">
+						作業担当
+						<select
+							value={card.executorId ?? ""}
+							disabled={busy}
+							onChange={(event) =>
+								onSelectExecutor(card.id, card.revision, event.target.value)
+							}
+						>
+							{executors.map((entry) => (
+								<option key={entry.id} value={entry.id}>
+									{entry.label}
+								</option>
+							))}
+						</select>
+					</label>
+				)}
 				{card.statusText && <p className="kanban-status">{card.statusText}</p>}
 				{card.reasonText && <p className="kanban-reason">{card.reasonText}</p>}
-				{(card.reviewed || card.commitPushReported) && (
-					<ul className="kanban-marks">
-						{card.reviewed && <li>確認済み</li>}
-						{card.commitPushReported && <li>commit & push の報告あり</li>}
-					</ul>
-				)}
+				<KanbanMarks card={card}/>
+
 				{card.followedByOtherRun && (
 					<p className="kanban-warning">
 						<TriangleAlert aria-hidden="true" size={14} />
@@ -252,39 +282,17 @@ export function KanbanCard({
 					className="kanban-toggle"
 					aria-expanded={expanded}
 					aria-controls={detailId}
-					onClick={() => setExpanded((v) => !v)}
+					onClick={() => {
+						if (!expanded) onInspect?.(card.id);
+						setExpanded((v) => !v);
+					}}
 				>
 					{expanded ? "詳細を閉じる" : "詳細を見る"}
 				</Button>
 				{expanded && (
 					<div id={detailId} className="kanban-detail">
-						<section aria-label="依頼内容">
-							<h5>依頼内容</h5>
-							<p className="kanban-prompt">{card.prompt}</p>
-						</section>
-						<section aria-label="最後の報告">
-							<h5>最後の報告</h5>
-							{card.lastReport ? (
-								// biome-ignore lint/a11y/noNoninteractiveTabindex: scrollable region of a long report
-								<div className="kanban-report" tabIndex={0}>
-									{card.lastReport}
-								</div>
-							) : (
-								<p className="kanban-muted">報告はまだありません。</p>
-							)}
-						</section>
-						<section aria-label="変更したファイル">
-							<h5>変更したファイル</h5>
-							{card.files.length > 0 ? (
-								<ul className="kanban-files">
-									{card.files.map((file) => (
-										<li key={file}>{file}</li>
-									))}
-								</ul>
-							) : (
-								<p className="kanban-muted">記録された変更はありません。</p>
-							)}
-						</section>
+						<KanbanDetails card={card}/>
+
 					</div>
 				)}
 				{/* Kept mounted while a panel is open so cancelling can focus its button again. */}
@@ -388,13 +396,55 @@ export function KanbanCard({
 				<CommitPushDialog
 					card={confirming}
 					current={card}
+					mode={gitAction}
 					onShow={setConfirming}
-					onConfirm={() => {
+					onConfirm={(extra) => {
 						setConfirming(null);
-						onAction("commitPush", confirming.id, confirming.revision);
+						if(extra)onAction(gitAction,confirming.id,confirming.revision,extra);else onAction(gitAction, confirming.id, confirming.revision);
 					}}
 				/>
 			)}
 		</li>
 	);
 }
+
+function KanbanDetails({card}:{card:KanbanBoardCard}) {return <>
+						<section aria-label="依頼内容">
+							<h5>依頼内容</h5>
+							<p className="kanban-prompt">{card.prompt}</p>
+						</section>
+						<section aria-label="最後の報告">
+							<h5>最後の報告</h5>
+							{card.lastReport ? (
+								// biome-ignore lint/a11y/noNoninteractiveTabindex: scrollable region of a long report
+								<div className="kanban-report" tabIndex={0}>
+									{card.lastReport}
+								</div>
+							) : (
+								<p className="kanban-muted">報告はまだありません。</p>
+							)}
+						</section>
+						<section aria-label="変更したファイル">
+							<h5>変更したファイル</h5>
+							{card.files.length > 0 ? (
+								<ul className="kanban-files">
+									{card.files.map((file) => (
+										<li key={file}>{file}</li>
+									))}
+								</ul>
+							) : (
+								<p className="kanban-muted">記録された変更はありません。</p>
+							)}
+						</section>
+</>;}
+
+function KanbanMarks({card}:{card:KanbanBoardCard}) {return <>
+				{(card.reviewed || card.commitPushReported || card.git?.commitVerified) && (
+					<ul className="kanban-marks">
+						{card.reviewed && <li>確認済み</li>}
+						{card.commitPushReported && <li>commit & push の報告あり</li>}
+						{card.git?.commitVerified && <li>commit確認済み: {card.git.commitSha}</li>}
+						{card.git?.pushVerified && <li>push確認済み: {card.git.remoteSha}</li>}
+					</ul>
+				)}
+</>;}

@@ -153,13 +153,13 @@ test("seed upgrades the deployed board and terminal schemas without replacing ar
 		expect(published()).toEqual({
 			toolchains: [
 				"toolchain:claude-code.request@2",
-				"toolchain:kanban.manage@2",
+				"toolchain:kanban.manage@4",
 			],
-			board: ["artifact:kanban.board@2"],
+			board: ["artifact:kanban.board@4"],
 		});
 		await caps.seed();
 		expect(archived()).toEqual(before);
-		expect(published().board).toEqual(["artifact:kanban.board@2"]);
+		expect(published().board).toEqual(["artifact:kanban.board@4"]);
 	} finally {
 		await store.close();
 		rmSync(dir, { recursive: true, force: true });

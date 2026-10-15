@@ -13,14 +13,15 @@ export const DEFAULT_PROJECT_ID = "eumenes";
 export type KanbanColumn = "todo" | "running" | "finished";
 /** Cards in `finished` are either done (completed, awaiting the person) or blocked. */
 export type KanbanLabel = "done" | "blocker";
-export type RunKind = "task" | "followup" | "commit_push";
+export type RunKind = "task" | "followup" | "commit_push" | "commit" | "push";
 /** Kanban's view of a run; `handed` until the terminals request is final. */
-export type RunState =
+export type LegacyRunState =
 	| "waiting_turn"
 	| "handed"
 	| "completed"
 	| "blocked"
 	| "cancelled";
+export type RunState = import("./shared-contracts").CommonRunState;
 export type BlockerReason =
 	| "interrupted"
 	| "ended"
@@ -44,6 +45,8 @@ export type KanbanCardActionName =
 	| "run"
 	| "followup"
 	| "commitPush"
+	| "commit"
+	| "push"
 	| "review"
 	| "cancel"
 	| "stop"
@@ -54,13 +57,15 @@ export type NoticeKind =
 	| "blocker"
 	| "waiting"
 	| "commit_push"
-	| "queue_paused";
+	| "queue_paused"
+	| "git_completed"
+	| "stopped";
 
 export type KanbanRunView = {
 	id: string;
 	cardId: string;
 	kind: RunKind;
-	state: RunState;
+	state: LegacyRunState;
 	reason?: BlockerReason;
 	/** Fixed at creation: the card revision, title and prompt that are sent. */
 	cardRevision: number;
@@ -134,6 +139,10 @@ export type KanbanBoardView = {
 
 /** What kanban asks the application to hand to terminals (one at a time). */
 export type KanbanDispatch = {
+	executorId: string;
+	executorRevision: number;
+	workspaceRef: string;
+	sessionRef: string | null;
 	runId: string;
 	cardId: string;
 	kind: RunKind;
@@ -141,6 +150,7 @@ export type KanbanDispatch = {
 	/** `task` → new conversation; followup/commit_push → the card's conversation. */
 	target: "new" | "conversation";
 	mode: "work" | "commit";
+	git?: KanbanGitGrant;
 	projectId: string;
 	prompt: string;
 	task: string;
@@ -211,6 +221,13 @@ export type KanbanRunFinish = {
 	reason?: string;
 	lastReport: string;
 	files: readonly string[];
+	git?: {
+		mode: "commit" | "push" | "commit_push";
+		commitSha?: string;
+		remoteSha?: string;
+		commitVerified: boolean;
+		pushVerified: boolean;
+	};
 };
 
 /** The saved result of one card operation, replayed for the same request id. */
@@ -223,6 +240,8 @@ export const kanbanCardReceiptSchema = z.strictObject({
 		"run",
 		"followup",
 		"commit_push",
+		"commit",
+		"push",
 		"reviewed",
 		"cancelled",
 		"stop_requested",
@@ -248,3 +267,15 @@ export const kanbanReceiptSchema = z.union([
 export type KanbanCardReceipt = z.infer<typeof kanbanCardReceiptSchema>;
 export type KanbanQueueReceipt = z.infer<typeof kanbanQueueReceiptSchema>;
 export type KanbanReceipt = KanbanCardReceipt | KanbanQueueReceipt;
+
+/** Frozen host authorization, derived from the confirmed source run and registered target. */
+export type KanbanGitGrant = {
+	grantId: string;
+	mode: "commit" | "push" | "commit_push";
+	sourceRunId: string;
+	remoteId: string;
+	head: string;
+	snapshotDigest: string;
+	files: string[];
+	expiresAt: string;
+};

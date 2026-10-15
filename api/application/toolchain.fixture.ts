@@ -85,6 +85,11 @@ export async function harness(
 		) => import("../domains/terminals").TerminalsService;
 		/** The task board over `terminals` (its runs are handed to those PTYs). */
 		kanban?: boolean;
+		kanbanComposition?: (
+			store: import("../infrastructure/sqlite").SqliteStore,
+			settings: Awaited<ReturnType<typeof createSettings>>,
+			capabilities: () => import("../domains/capabilities").Capabilities,
+		) => ReturnType<typeof import("./kanban-sdk-host").createKanbanSdkHost>;
 		settingsEnv?: Record<string, string | undefined>;
 		codexResearch?: {
 			model: string;
@@ -137,10 +142,13 @@ export async function harness(
 			(entry) => !migrations.some((known) => known.id === entry.id),
 		),
 	]);
-	const terminals = options.terminals?.(store);
-	const kanban =
+	let terminals = options.terminals?.(store);
+	let kanban =
 		options.kanban && terminals ? createKanban({ store }) : undefined;
-	const kanbanRuns =
+	let kanbanRuns:
+		| ReturnType<typeof connectKanbanRuns>
+		| ReturnType<typeof import("./kanban-sdk-host").createKanbanSdkHost>["runs"]
+		| undefined =
 		kanban && terminals ? connectKanbanRuns(kanban, terminals) : undefined;
 	await terminals?.recover();
 	await kanbanRuns?.recover();
@@ -153,6 +161,18 @@ export async function harness(
 			dbPath: join(dir, "db"),
 			env: options.settingsEnv,
 		});
+	const kanbanSdk = options.kanbanComposition?.(
+		store,
+		settings,
+		() => toolchain.capabilities,
+	);
+	if (kanbanSdk) {
+		terminals = kanbanSdk.terminals;
+		kanban = kanbanSdk.kanban;
+		kanbanRuns = kanbanSdk.runs;
+		await terminals.recover();
+		await kanbanRuns.recover();
+	}
 	const parentContexts: string[] = [],
 		workerContexts: string[] = [],
 		routeContexts: string[] = [],
@@ -535,6 +555,7 @@ export async function harness(
 		ocr,
 		terminals,
 		kanban,
+		kanbanSdk,
 	});
 	const music = options.musicGateway
 		? createMusic({
@@ -688,7 +709,7 @@ export async function harness(
 			return calls;
 		},
 		async close() {
-			kanbanRuns?.disconnect();
+			await kanbanRuns?.disconnect();
 			terminals?.closeAll();
 			unsubscribeChanges();
 			changes.close();

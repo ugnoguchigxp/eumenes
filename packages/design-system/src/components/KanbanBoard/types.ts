@@ -13,6 +13,8 @@ export type KanbanCardAction =
 	| "run"
 	| "followup"
 	| "commitPush"
+	| "commit"
+	| "push"
 	| "review"
 	| "cancel"
 	| "stop"
@@ -23,6 +25,10 @@ export type KanbanBoardCard = {
 	id: string;
 	revision: number;
 	title: string;
+	executorId?: string;
+	executorLabel?: string;
+	canSelectExecutor?: boolean;
+	git?:{sourceRunId:string;head:string;snapshotDigest:string;branch:string;targets:Array<{id:string;label:string}>;files:string[];commitSha?:string;remoteSha?:string;commitVerified:boolean;pushVerified:boolean};
 	prompt: string;
 	column: KanbanBoardColumn;
 	/** Shown on cards in `finished`. */
@@ -40,6 +46,12 @@ export type KanbanBoardCard = {
 	/** ISO timestamp. */
 	updatedAt: string;
 	actions: KanbanCardAction[];
+};
+export type KanbanExecutorChoice = {
+	id: string;
+	label: string;
+	available: boolean;
+	unavailableText?: string;
 };
 
 export type KanbanBoardQueue = {
@@ -60,6 +72,9 @@ export type KanbanBoardProps = {
 	title?: string;
 	cards: KanbanBoardCard[];
 	queue: KanbanBoardQueue;
+	executors?: readonly KanbanExecutorChoice[];
+	queues?: Array<KanbanBoardQueue & { executorId: string; label: string }>;
+	defaultExecutorId?: string;
 	/** False: run actions are disabled and `notRunnableText` is shown. */
 	runnable: boolean;
 	notRunnableText?: string;
@@ -67,7 +82,22 @@ export type KanbanBoardProps = {
 	busy?: boolean;
 	/** Host wording for a rejected action or a conflict. */
 	message?: string;
-	onAdd: (input: { title: string; prompt: string }) => void;
+	onAdd: (input: {
+		title: string;
+		prompt: string;
+		executorId?: string;
+	}) => void;
+	onAddAndRun?: (input: {
+		title: string;
+		prompt: string;
+		executorId?: string;
+	}) => void;
+	onSelectExecutor?: (
+		cardId: string,
+		revision: number,
+		executorId: string,
+	) => void;
+	onInspect?: (cardId: string) => void;
 	onEdit: (
 		cardId: string,
 		revision: number,
@@ -88,8 +118,8 @@ export type KanbanBoardProps = {
 		action: Exclude<KanbanCardAction, "edit">,
 		cardId: string,
 		revision: number,
-		extra?: { note?: string },
+		extra?: { note?: string;sourceRunId?:string;remoteId?:string;head?:string;snapshotDigest?:string },
 	) => void;
-	onResumeQueue: () => void;
+	onResumeQueue: (executorId?: string) => void;
 	className?: string;
 };

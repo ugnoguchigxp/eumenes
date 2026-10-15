@@ -19,7 +19,7 @@ import type { SchemaProvider } from "./toolchain-adapters";
  * Dialogue's view of the toolchain registry and selection history. Retrieval merges
  * full-text, vector and past-selection ranks; it never decides for the conversation model.
  * A toolchain revision with a binding runs through its registered adapter; others keep the
- * host's fixed runtime map.
+ * host's fixed runtime map (the World investigation also needs World to be usable).
  */
 export function createToolchainRouting(
 	capabilities: Capabilities,
@@ -27,13 +27,20 @@ export function createToolchainRouting(
 	embedQuery: ToolchainRoutingPort["embedQuery"],
 	registry: AdapterRegistry,
 	schemas: SchemaProvider,
+	/** World is usable now; without it the World investigation is never offered. */
+	worldAvailable?: (db: Database) => boolean,
 ): ToolchainRoutingPort {
 	function runtimeInTransaction(
 		db: Database,
 		d: FixedDefinition,
 	): ToolchainRuntimeMeta | undefined {
 		const bound = capabilities.toolchainBindingInTransaction(db, d.revisionId);
-		if (!bound) return toolchainRuntimeOf(d.id);
+		if (!bound) {
+			const runtime = toolchainRuntimeOf(d.id);
+			return runtime?.requires === "world" && !worldAvailable?.(db)
+				? undefined
+				: runtime;
+		}
 		const adapter = registry.get(bound.binding.document.adapterRef);
 		return {
 			execution: "command",

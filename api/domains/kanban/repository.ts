@@ -19,6 +19,9 @@ export type CardRow = {
 	reviewed: boolean;
 	commitPushReported: boolean;
 	projectId: string;
+	executorId: string;
+	hasExecutionHistory: boolean;
+	sessionRef: string | null;
 	claudeSessionId: string | null;
 	currentRunId: string | null;
 	lastReport: string | null;
@@ -39,6 +42,9 @@ type RawCard = {
 	reviewed: number;
 	commit_push_reported: number;
 	project_id: string;
+	executor_id: string;
+	has_execution_history: number;
+	session_ref: string | null;
 	claude_session_id: string | null;
 	current_run_id: string | null;
 	last_report: string | null;
@@ -59,6 +65,9 @@ const toCard = (row: RawCard): CardRow => ({
 	reviewed: row.reviewed === 1,
 	commitPushReported: row.commit_push_reported === 1,
 	projectId: row.project_id,
+	executorId: row.executor_id,
+	hasExecutionHistory: row.has_execution_history === 1,
+	sessionRef: row.session_ref,
 	claudeSessionId: row.claude_session_id,
 	currentRunId: row.current_run_id,
 	lastReport: row.last_report,
@@ -98,8 +107,8 @@ export function insertCard(db: Database, card: CardRow) {
 	db.query(
 		`INSERT INTO kanban_cards(id,revision,title,prompt,column_name,label,reason,reviewed,
  commit_push_reported,project_id,claude_session_id,current_run_id,last_report,files_json,
- position,created_at,updated_at)
- VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+ position,created_at,updated_at,executor_id,session_ref,has_execution_history)
+ VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 	).run(
 		card.id,
 		card.revision,
@@ -118,6 +127,9 @@ export function insertCard(db: Database, card: CardRow) {
 		card.position,
 		card.createdAt,
 		card.updatedAt,
+		card.executorId,
+		card.sessionRef,
+		card.hasExecutionHistory ? 1 : 0,
 	);
 }
 
@@ -126,7 +138,7 @@ export function updateCard(db: Database, card: CardRow) {
 	db.query(
 		`UPDATE kanban_cards SET revision=?,title=?,prompt=?,column_name=?,label=?,reason=?,
  reviewed=?,commit_push_reported=?,claude_session_id=?,current_run_id=?,last_report=?,
- files_json=?,updated_at=? WHERE id=?`,
+ files_json=?,updated_at=?,executor_id=?,session_ref=?,has_execution_history=? WHERE id=?`,
 	).run(
 		card.revision,
 		card.title,
@@ -141,6 +153,9 @@ export function updateCard(db: Database, card: CardRow) {
 		card.lastReport,
 		JSON.stringify(card.files),
 		card.updatedAt,
+		card.executorId,
+		card.sessionRef,
+		card.hasExecutionHistory ? 1 : 0,
 		card.id,
 	);
 }
@@ -165,6 +180,18 @@ export const boardRevision = (db: Database): number =>
 
 export const bumpBoard = (db: Database) =>
 	db.query("UPDATE kanban_board SET revision=revision+1 WHERE id=1").run();
+export const defaultExecutor = (db: Database): string =>
+	(
+		db
+			.query("SELECT default_executor_id AS id FROM kanban_board WHERE id=1")
+			.get() as { id: string }
+	).id;
+export const rememberExecutor = (db: Database, id: string): boolean =>
+	db
+		.query(
+			"UPDATE kanban_board SET default_executor_id=? WHERE id=1 AND default_executor_id<>?",
+		)
+		.run(id, id).changes > 0;
 
 export function getReceipt(
 	db: Database,

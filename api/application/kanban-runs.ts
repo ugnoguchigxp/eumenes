@@ -98,6 +98,7 @@ const portsOf = (
 	kanban: KanbanService,
 	terminals: RecoveryTerminals,
 ): KanbanRecoverPorts => ({
+	handles: (id) => id === "claude-code",
 	request: (tx, runId) => terminals.requestInTransaction(tx, runId),
 	enqueue: (tx, dispatch) => handOver(kanban, terminals, tx, dispatch),
 });

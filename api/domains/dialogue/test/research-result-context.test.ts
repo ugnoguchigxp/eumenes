@@ -190,3 +190,43 @@ test("the goals layer keeps its place right after long-term memory and is never 
 	expect(result.slice(1, 3).map((m) => m.content)).toEqual(["L1", "目標の層"]);
 	expect(result.filter((m) => m.content === "目標の層")).toHaveLength(1);
 });
+
+test("a report citing World records adds the World rules; other reports do not", () => {
+	const world = researchResultContext(
+		sections({ input: user("freeeにすると月末締めはどうなる？") }),
+		JSON.stringify({
+			outcome: "answered",
+			coverage: "partial",
+			claims: [{ text: "経費精算に依存", sourceIds: ["w1"] }],
+			sources: [
+				{
+					sourceId: "w1",
+					kind: "world_claim",
+					origin: "model_hypothesis",
+				},
+			],
+		}),
+	);
+	const rules = world[0]!.content;
+	expect(rules).toContain("外部で確認された事実ではありません");
+	expect(rules).toContain("model_hypothesis");
+	expect(rules).toContain("仮説");
+	expect(rules).toContain("「影響はない」「依存はない」と言い切りません");
+	expect(rules).toContain("URLがないのでリンクにせず");
+	expect(rules).toContain("not_computed");
+	// The report stays user data in the result message; the rules say what to tell and what to hide.
+	expect(JSON.parse(world.at(-2)!.content).report.sources[0].kind).toBe(
+		"world_claim",
+	);
+	for (const projection of [
+		JSON.stringify({
+			sources: [{ sourceId: "s1", url: "https://example.com/" }],
+		}),
+		JSON.stringify({ outcome: "answered" }),
+		undefined,
+	])
+		expect(
+			researchResultContext(sections({ input: user("依頼") }), projection)[0]!
+				.content,
+		).not.toContain("world_claim");
+});

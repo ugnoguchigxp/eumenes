@@ -5,7 +5,14 @@ import { useState } from "react";
  */
 export type KanbanNoticeView = {
 	id: string;
-	kind: "done" | "blocker" | "waiting" | "commit_push" | "queue_paused";
+	kind:
+		| "done"
+		| "blocker"
+		| "waiting"
+		| "commit_push"
+		| "queue_paused"
+		| "git_completed"
+		| "stopped";
 	text: string;
 	read: boolean;
 	createdAt: string;
@@ -73,6 +80,8 @@ const KANBAN_TITLES: Record<KanbanNoticeView["kind"], string> = {
 	blocker: "タスクが止まりました",
 	waiting: "タスクが許可を待っています",
 	commit_push: "commit & push の報告",
+	git_completed: "Git工程を確認しました",
+	stopped: "タスクを止めました",
 	queue_paused: "実行キューが止まりました",
 };
 

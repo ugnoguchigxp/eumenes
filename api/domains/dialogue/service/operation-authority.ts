@@ -2,11 +2,7 @@ import type { Database } from "bun:sqlite";
 import type { InferencePort, Receipt } from "../../inference";
 import type { MemoryService, PreparedWindow } from "../../memory";
 import { shownMessageForgotten } from "./memory-window";
-import type {
-	GoalsLayerPort,
-	WorldContextPort,
-	WorldContextSettleInput,
-} from "../contracts";
+import type { GoalsLayerPort } from "../contracts";
 import { goalsLayerStale, type PreparedGoals } from "./goals-layer";
 
 /** Control may start an operation only while every input authority is current. */
@@ -26,9 +22,7 @@ export function operationRejection(
 		/** The goals layer the deciding prompt carried; a forgotten goal it listed makes the decision stale. */
 		goals?: GoalsLayerPort;
 		goalsLayer?: PreparedGoals;
-		world?: WorldContextPort;
-		worldView?: { context: unknown };
-		settle: WorldContextSettleInput;
+		settle: { runId: string };
 	},
 ): string | null {
 	if (
@@ -53,14 +47,6 @@ export function operationRejection(
 			input.settle.runId,
 			input.memoryWindow.window,
 			input.recallPins,
-		);
-		if (!verdict.ok) return verdict.reason;
-	}
-	if (input.worldView && input.world) {
-		const verdict = input.world.validateInTransaction(
-			db,
-			input.settle,
-			input.worldView.context,
 		);
 		if (!verdict.ok) return verdict.reason;
 	}

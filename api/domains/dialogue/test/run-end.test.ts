@@ -231,8 +231,6 @@ test("a run left without a job when the backend restarts is interrupted: a faile
 			sourceKind: "manual",
 			scheduleId: null,
 			occurrenceId: null,
-			worldUsed: false,
-			worldBlocked: false,
 			createdAt: "2026-10-13T00:00:00.000Z",
 			updatedAt: "2026-10-13T00:00:00.000Z",
 		});

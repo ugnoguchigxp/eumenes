@@ -6,9 +6,11 @@ import { deleteOldRuns, handedRuns } from "./runs-repository";
 
 /** What the run recovery reads of a terminals request (structural; no terminals import). */
 export type KanbanRecoverPorts = {
+	handles?: (executorId: string) => boolean;
 	request(
 		tx: Database,
 		runId: string,
+		executorId?: string,
 	): {
 		state: string;
 		reason?: string;
@@ -48,8 +50,9 @@ export function createRecovery(
 		tx: Database,
 		ports: Pick<KanbanRecoverPorts, "request">,
 		runId: string,
+		executorId: string,
 	) => {
-		const request = ports.request(tx, runId);
+		const request = ports.request(tx, runId, executorId);
 		return request && FINAL.has(request.state) ? request : null;
 	};
 
@@ -98,7 +101,8 @@ export function createRecovery(
 		recover: (ports: KanbanRecoverPorts) =>
 			store.write((tx) => {
 				for (const run of handedRuns(tx)) {
-					const request = ports.request(tx, run.id);
+					if (ports.handles && !ports.handles(run.executorId)) continue;
+					const request = ports.request(tx, run.id, run.executorId);
 					if (request && !FINAL.has(request.state)) continue;
 					settleHanded(tx, ports, run.id, request);
 				}
@@ -119,13 +123,18 @@ export function createRecovery(
 			const stuck =
 				check.always ||
 				store.readSnapshot((tx) =>
-					handedRuns(tx).some((run) => finalRequest(tx, ports, run.id)),
+					handedRuns(tx).some(
+						(run) =>
+							(!ports.handles || ports.handles(run.executorId)) &&
+							finalRequest(tx, ports, run.id, run.executorId),
+					),
 				);
 			if (!stuck) return 0;
 			return store.write((tx) => {
 				let settled = 0;
 				for (const run of handedRuns(tx)) {
-					const request = finalRequest(tx, ports, run.id);
+					if (ports.handles && !ports.handles(run.executorId)) continue;
+					const request = finalRequest(tx, ports, run.id, run.executorId);
 					if (!request) continue;
 					settleHanded(tx, ports, run.id, request);
 					settled++;

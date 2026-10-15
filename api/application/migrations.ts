@@ -9,6 +9,7 @@ import type { Migration } from "../infrastructure/sqlite";
 import { orderMigrations } from "../infrastructure/sqlite";
 import { migrations as agentRuntimeMigrations } from "../domains/agent-runtime";
 import { migrations as capabilitiesMigrations } from "../domains/capabilities";
+import { migrations as codexTasksMigrations } from "../domains/codex-tasks";
 import { migrations as codingMigrations } from "../domains/coding";
 import { migrations as supervisionMigrations } from "../domains/coding-supervision";
 import { migrations as continuityMigrations } from "../domains/continuity";
@@ -145,6 +146,7 @@ const catalog: readonly Migration[] = [
 	...queueMigrations,
 	...terminalsMigrations,
 	...kanbanMigrations,
+	...codexTasksMigrations,
 	...schedulerMigrations,
 	...settingsMigrations,
 	...inferenceMigrations,

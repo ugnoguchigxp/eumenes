@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 /**
- * Input of the conversation agent's `world_query` tool. The world domain validates the same limits (its
+ * Input of the World investigation's `world.query` tool. The world domain validates the same limits (its
  * `worldQueryToolSchema`; a test keeps every field equal): capabilities may not import the world domain.
  * `linkGaps` (turning a gap into a task) is not part of the model's vocabulary: it is an unknown key and is
  * rejected.
@@ -83,12 +83,12 @@ export const worldQuery = z.strictObject({
 	entityId: id
 		.optional()
 		.describe(
-			"relevance・influence・dependencies・scenarios で必須。起点にする対象のID。hostが示した対象の一覧のIDだけを使い、作らない。",
+			"relevance・influence・dependencies・scenarios で必須。起点にする対象のID。world.find が返したIDだけを使い、作らない。",
 		),
 	entityIds: startPoints
 		.optional()
 		.describe(
-			"snapshot・gaps の起点にする対象のID（任意、最大10件）。hostが示した対象の一覧のIDだけを使う。",
+			"snapshot・gaps の起点にする対象のID（任意、最大10件）。world.find が返したIDだけを使う。",
 		),
 	depth: z
 		.number()
@@ -113,3 +113,17 @@ export const worldQuery = z.strictObject({
 	budget: budget.optional(),
 });
 export type WorldQueryInput = z.infer<typeof worldQuery>;
+
+const FIND_NAMES = 5;
+const FIND_NAME_CHARS = 80;
+/** Input of `world.find`: the names the investigation looks for, matched against the Scope's live targets. */
+export const worldFind = z.strictObject({
+	names: z
+		.array(z.string().trim().min(1).max(FIND_NAME_CHARS))
+		.min(1)
+		.max(FIND_NAMES)
+		.describe(
+			"探す対象の名前や別名（1〜5件、各80文字まで）。依頼に出てくる名称をそのまま指定する。",
+		),
+});
+export type WorldFindInput = z.infer<typeof worldFind>;

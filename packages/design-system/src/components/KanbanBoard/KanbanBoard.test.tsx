@@ -562,3 +562,76 @@ test("busy disables every control and a host message is announced", () => {
 		expect(button).toBeDisabled();
 	expect(cardOf("README の手順修正")).not.toHaveAttribute("draggable", "true");
 });
+
+test("a registered third executor is selected explicitly and carried into add-and-run", async () => {
+	const onAddAndRun = vi.fn();
+	const choices = [
+		{ id: "one", label: "担当A", available: true },
+		{ id: "two", label: "担当B", available: true },
+		{ id: "third", label: "担当C", available: true },
+	];
+	const { user } = setup({ executors: choices, onAddAndRun });
+	await user.click(screen.getByRole("button", { name: "タスクを追加" }));
+	await user.selectOptions(screen.getByLabelText("作業担当"), "third");
+	await user.type(screen.getByLabelText("タイトル"), "依頼");
+	await user.type(screen.getByLabelText("依頼内容"), "対象を修正する");
+	await user.click(screen.getByRole("button", { name: "追加して実行" }));
+	expect(onAddAndRun).toHaveBeenCalledWith({
+		title: "依頼",
+		prompt: "対象を修正する",
+		executorId: "third",
+	});
+});
+
+test("an unavailable saved selection is retained and cannot run through another executor", async () => {
+	const onAddAndRun = vi.fn();
+	const { user } = setup({
+		defaultExecutorId: "two",
+		executors: [
+			{ id: "one", label: "担当A", available: true },
+			{ id: "two", label: "担当B", available: false },
+		],
+		onAddAndRun,
+	});
+	await user.click(screen.getByRole("button", { name: "タスクを追加" }));
+	await user.type(screen.getByLabelText("タイトル"), "依頼");
+	await user.type(screen.getByLabelText("依頼内容"), "対象を修正する");
+	expect((screen.getByLabelText("作業担当") as HTMLSelectElement).value).toBe(
+		"two",
+	);
+	expect(screen.getByRole("button", { name: "追加して実行" })).toBeDisabled();
+	expect(onAddAndRun).not.toHaveBeenCalled();
+});
+
+test("queue resume names its executor and display filtering does not call a write", async () => {
+	const { user, onResumeQueue, onAction, onMove } = setup({
+		executors: [
+			{ id: "one", label: "担当A", available: true },
+			{ id: "two", label: "担当B", available: true },
+		],
+		queues: [
+			{
+				executorId: "one",
+				label: "担当A",
+				state: "paused",
+				reasonText: "確認待ち",
+				waiting: 1,
+			},
+			{ executorId: "two", label: "担当B", state: "running", waiting: 2 },
+		],
+		cards: todoCards.map((card, index) => ({
+			...card,
+			executorId: index === 0 ? "one" : "two",
+		})),
+	});
+	await user.click(
+		within(screen.getByRole("region", { name: "担当A" })).getByRole("button", {
+			name: "再開",
+		}),
+	);
+	expect(onResumeQueue).toHaveBeenCalledWith("one");
+	await user.selectOptions(screen.getByLabelText("表示する担当"), "one");
+	expect(titles("未着手のタスク")).toEqual([todoCards[0]!.title]);
+	expect(onAction).not.toHaveBeenCalled();
+	expect(onMove).not.toHaveBeenCalled();
+});

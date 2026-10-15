@@ -7,12 +7,23 @@ import type {
 	RunState,
 } from "./contracts";
 
-/* Runs, the single execution queue and notices (migration kanban/0002-runs). */
+import {
+	ACTIVE_RUN_STATES,
+	DEFAULT_EXECUTOR_ID,
+	OPEN_RUN_STATES,
+} from "./shared-contracts";
+export { OPEN_RUN_STATES };
 
 export type RunRow = {
 	seq: number;
 	id: string;
 	cardId: string;
+	executorId: string;
+	executorRevision: number;
+	workspaceRef: string;
+	sessionRef: string | null;
+	executionStopped: boolean;
+	attemptRef: string | null;
 	kind: RunKind;
 	state: RunState;
 	reason: BlockerReason | null;
@@ -35,6 +46,12 @@ type RawRun = {
 	seq: number;
 	id: string;
 	card_id: string;
+	executor_id: string;
+	executor_revision: number;
+	workspace_ref: string;
+	session_ref: string | null;
+	execution_stopped: number;
+	attempt_ref: string | null;
 	kind: RunKind;
 	state: RunState;
 	reason: BlockerReason | null;
@@ -56,6 +73,12 @@ const toRun = (row: RawRun): RunRow => ({
 	seq: row.seq,
 	id: row.id,
 	cardId: row.card_id,
+	executorId: row.executor_id,
+	executorRevision: row.executor_revision,
+	workspaceRef: row.workspace_ref,
+	sessionRef: row.session_ref,
+	executionStopped: row.execution_stopped === 1,
+	attemptRef: row.attempt_ref,
 	kind: row.kind,
 	state: row.state,
 	reason: row.reason,
@@ -73,13 +96,11 @@ const toRun = (row: RawRun): RunRow => ({
 	finishedAt: row.finished_at,
 });
 
-export const OPEN_RUN_STATES: readonly RunState[] = ["waiting_turn", "handed"];
-
 export function insertRun(db: Database, run: Omit<RunRow, "seq">) {
 	db.query(
 		`INSERT INTO kanban_runs(id,card_id,kind,state,reason,card_revision,title,prompt,body,
- claude_session_id,project_id,origin,conversation_id,stop_requested,created_at,handed_at,finished_at)
- VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+ claude_session_id,project_id,origin,conversation_id,stop_requested,created_at,handed_at,finished_at,executor_id,executor_revision,workspace_ref,session_ref,execution_stopped,attempt_ref)
+ VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 	).run(
 		run.id,
 		run.cardId,
@@ -98,6 +119,12 @@ export function insertRun(db: Database, run: Omit<RunRow, "seq">) {
 		run.createdAt,
 		run.handedAt,
 		run.finishedAt,
+		run.executorId,
+		run.executorRevision,
+		run.workspaceRef,
+		run.sessionRef,
+		run.executionStopped ? 1 : 0,
+		run.attemptRef,
 	);
 }
 
@@ -138,27 +165,41 @@ export function transitionRun(
 	return result.changes > 0;
 }
 
-export const oldestWaiting = (db: Database): RunRow | null => {
+export const oldestWaiting = (
+	db: Database,
+	executorId = DEFAULT_EXECUTOR_ID,
+): RunRow | null => {
 	const row = db
 		.query(
-			"SELECT * FROM kanban_runs WHERE state='waiting_turn' ORDER BY seq LIMIT 1",
+			"SELECT * FROM kanban_runs WHERE state='queued' AND executor_id=? ORDER BY seq LIMIT 1",
 		)
-		.get() as RawRun | null;
+		.get(executorId) as RawRun | null;
 	return row ? toRun(row) : null;
 };
 
-export const handedRuns = (db: Database): RunRow[] =>
-	(
+export const handedRuns = (db: Database, executorId?: string): RunRow[] => {
+	const marks = ACTIVE_RUN_STATES.map(() => "?").join(",");
+	return (
 		db
-			.query("SELECT * FROM kanban_runs WHERE state='handed' ORDER BY seq")
-			.all() as RawRun[]
+			.query(
+				`SELECT * FROM kanban_runs WHERE state IN (${marks}) ${executorId ? "AND executor_id=?" : ""} ORDER BY seq`,
+			)
+			.all(
+				...ACTIVE_RUN_STATES,
+				...(executorId ? [executorId] : []),
+			) as RawRun[]
 	).map(toRun);
-
-export const waitingCount = (db: Database): number =>
+};
+export const waitingCount = (
+	db: Database,
+	executorId = DEFAULT_EXECUTOR_ID,
+): number =>
 	(
 		db
-			.query("SELECT COUNT(*) AS n FROM kanban_runs WHERE state='waiting_turn'")
-			.get() as { n: number }
+			.query(
+				"SELECT COUNT(*) AS n FROM kanban_runs WHERE state='queued' AND executor_id=?",
+			)
+			.get(executorId) as { n: number }
 	).n;
 
 /** Open runs and every card's current run: what the board shows. */
@@ -166,7 +207,7 @@ export const boardRuns = (db: Database): RunRow[] =>
 	(
 		db
 			.query(
-				`SELECT * FROM kanban_runs WHERE state IN ('waiting_turn','handed')
+				`SELECT * FROM kanban_runs WHERE state IN ('queued','dispatched','running','waiting','settling','stopping')
  OR id IN (SELECT current_run_id FROM kanban_cards WHERE current_run_id IS NOT NULL)
  ORDER BY seq`,
 			)
@@ -193,7 +234,7 @@ export const latestHandedRuns = (
 export const deleteOldRuns = (db: Database, before: number): number =>
 	db
 		.query(
-			`DELETE FROM kanban_runs WHERE state IN ('completed','blocked','cancelled')
+			`DELETE FROM kanban_runs WHERE state IN ('completed','blocked','cancelled','unknown')
  AND finished_at IS NOT NULL AND finished_at<?
  AND id NOT IN (SELECT current_run_id FROM kanban_cards WHERE current_run_id IS NOT NULL)`,
 		)
@@ -202,41 +243,56 @@ export const deleteOldRuns = (db: Database, before: number): number =>
 export const setStopRequested = (db: Database, id: string, value: boolean) =>
 	db
 		.query(
-			"UPDATE kanban_runs SET stop_requested=? WHERE id=? AND state='handed'",
+			"UPDATE kanban_runs SET stop_requested=? WHERE id=? AND state IN ('dispatched','running','waiting','settling','stopping')",
 		)
 		.run(value ? 1 : 0, id);
 
-export const stopRequestedIds = (db: Database): string[] =>
+export const stopRequestedIds = (
+	db: Database,
+	executorId = DEFAULT_EXECUTOR_ID,
+): string[] =>
 	(
 		db
 			.query(
-				"SELECT id FROM kanban_runs WHERE state='handed' AND stop_requested=1 ORDER BY seq",
+				"SELECT id FROM kanban_runs WHERE state IN ('dispatched','running','waiting','settling','stopping') AND stop_requested=1 AND executor_id=? ORDER BY seq",
 			)
-			.all() as Array<{ id: string }>
+			.all(executorId) as Array<{ id: string }>
 	).map((row) => row.id);
 
-export function getQueue(db: Database): QueueState {
+export function getQueue(
+	db: Database,
+	executorId = DEFAULT_EXECUTOR_ID,
+): QueueState {
 	const row = db
-		.query("SELECT queue_state,queue_reason FROM kanban_board WHERE id=1")
-		.get() as {
-		queue_state: "running" | "paused";
-		queue_reason: string | null;
-	};
-	return row.queue_state === "paused"
+		.query("SELECT state,reason FROM kanban_queues WHERE executor_id=?")
+		.get(executorId) as {
+		state: "running" | "paused";
+		reason: string | null;
+	} | null;
+	return row?.state === "paused"
 		? {
 				state: "paused",
-				reason: row.queue_reason as Extract<
+				reason: row.reason as Extract<
 					QueueState,
 					{ state: "paused" }
 				>["reason"],
 			}
 		: { state: "running" };
 }
-
-export const setQueue = (db: Database, queue: QueueState) =>
+export const setQueue = (
+	db: Database,
+	queue: QueueState,
+	executorId = DEFAULT_EXECUTOR_ID,
+) =>
 	db
-		.query("UPDATE kanban_board SET queue_state=?,queue_reason=? WHERE id=1")
-		.run(queue.state, queue.state === "paused" ? queue.reason : null);
+		.query(
+			"INSERT INTO kanban_queues(executor_id,state,reason) VALUES(?,?,?) ON CONFLICT(executor_id) DO UPDATE SET state=excluded.state,reason=excluded.reason,revision=revision+1",
+		)
+		.run(
+			executorId,
+			queue.state,
+			queue.state === "paused" ? queue.reason : null,
+		);
 
 export type NoticeRow = {
 	id: string;

@@ -30,6 +30,20 @@ export type KanbanManualActivity = {
 };
 export type KanbanBoardSource = {
 	revision: number;
+	defaultExecutorId?: string;
+	executors?: Array<{
+		id: string;
+		label: string;
+		available: boolean;
+		unavailableReason?: string;
+	}>;
+	queues?: Array<{
+		executorId: string;
+		state: "running" | "paused";
+		reason?: string;
+		waiting: number;
+		activeRunId?: string;
+	}>;
 	queue:
 		| {
 				state: "running";
@@ -63,12 +77,29 @@ export type KanbanBoardSource = {
 			reason?: KanbanBlockerReason;
 			currentRunId?: string;
 			lastReport?: string;
+			executorId?: string;
+			canSelectExecutor?: boolean;
+			git?: KanbanBoardCard["git"];
+			workspaceBusy?: { executorId: string; state: string };
 			actions: KanbanBoardCard["actions"];
 		}
 	>;
 	runs: Array<{
 		id: string;
-		state: "waiting_turn" | "handed" | "completed" | "blocked" | "cancelled";
+		state:
+			| "waiting_turn"
+			| "handed"
+			| "queued"
+			| "dispatched"
+			| "running"
+			| "waiting"
+			| "settling"
+			| "stopping"
+			| "unknown"
+			| "completed"
+			| "blocked"
+			| "cancelled";
+		executorId?: string;
 		requestState?: string;
 		activity?: "working" | "idle" | "waiting";
 		createdAt: string;
@@ -107,12 +138,27 @@ function statusText(
 	if (card.column !== "running") return undefined;
 	const run = board.runs.find((r) => r.id === card.currentRunId);
 	if (!run) return undefined;
-	if (run.state === "waiting_turn") {
+	if (run.state === "waiting_turn" || run.state === "queued") {
+		if (card.workspaceBusy) return "作業場所の引渡し待ち";
 		const waiting = board.runs
-			.filter((r) => r.state === "waiting_turn")
+			.filter(
+				(r) =>
+					(r.state === "waiting_turn" || r.state === "queued") &&
+					r.executorId === run.executorId,
+			)
 			.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 		return `キュー待ち（${waiting.findIndex((r) => r.id === run.id) + 1}番目）`;
 	}
+	const commonState = {
+		dispatched: "開始待ち",
+		running: "作業中",
+		waiting: "対応を待っています",
+		settling: "結果を確認中",
+		stopping: "停止を確認中",
+		unknown: "結果を確認できません",
+	};
+	if (run.state in commonState)
+		return commonState[run.state as keyof typeof commonState];
 	if (
 		board.queue.state === "paused" &&
 		board.queue.reason === "stop_unconfirmed" &&
@@ -153,12 +199,21 @@ function queueOf(board: KanbanBoardSource): KanbanBoardQueue {
 /** Maps the board source to the DesignSystem props, with the wording of states and reasons. */
 export function kanbanBoardProps(
 	board: KanbanBoardSource,
-): Pick<KanbanBoardProps, "cards" | "queue" | "runnable" | "notRunnableText"> {
+): Pick<
+	KanbanBoardProps,
+	"cards" | "queue" | "runnable" | "notRunnableText" | "executors" | "queues"
+> {
 	return {
 		cards: board.cards.map((card) => ({
 			id: card.id,
 			revision: card.revision,
 			title: card.title,
+			executorId: card.executorId,
+			executorLabel: board.executors?.find(
+				(entry) => entry.id === card.executorId,
+			)?.label,
+			canSelectExecutor: card.canSelectExecutor,
+			git: card.git,
 			prompt: card.prompt,
 			column: card.column,
 			label: card.label,
@@ -176,6 +231,27 @@ export function kanbanBoardProps(
 			actions: card.actions,
 		})),
 		queue: queueOf(board),
+		executors: board.executors?.map((entry) => ({
+			...entry,
+			unavailableText: entry.available
+				? undefined
+				: "この担当を利用できません。設定を確認してください",
+		})),
+		queues: board.queues?.map((queue) => ({
+			state: queue.state,
+			waiting: queue.waiting,
+			executorId: queue.executorId,
+			label:
+				board.executors?.find((entry) => entry.id === queue.executorId)
+					?.label ?? queue.executorId,
+			runningTitle: board.cards.find(
+				(card) => card.currentRunId === queue.activeRunId,
+			)?.title,
+			reasonText: queue.reason
+				? (QUEUE_PAUSED_TEXT[queue.reason as keyof typeof QUEUE_PAUSED_TEXT] ??
+					"理由を確認してください")
+				: undefined,
+		})),
 		runnable: board.runnable,
 		notRunnableText: NOT_RUNNABLE_TEXT,
 	};
@@ -189,6 +265,8 @@ const ACTION_EVENT: Record<
 	run: "kanban-run",
 	followup: "kanban-followup",
 	commitPush: "kanban-commit-push",
+	commit: "kanban-commit",
+	push: "kanban-push",
 	review: "kanban-review",
 	cancel: "kanban-cancel",
 	stop: "kanban-stop",
@@ -217,9 +295,41 @@ export function KanbanBoardView({ request }: { request: ArtifactRequest }) {
 			<KanbanBoard
 				{...kanbanBoardProps(data.board)}
 				title={request.title}
+				defaultExecutorId={data.board.defaultExecutorId}
 				busy={action.pending}
 				message={failed ? action.message : undefined}
-				onAdd={({ title, prompt }) => send("kanban-add", { title, prompt })}
+				onAdd={({ title, prompt, executorId }) =>
+					send("kanban-add", {
+						title,
+						prompt,
+						...(executorId ? { executorId } : {}),
+					})
+				}
+				onAddAndRun={
+					data.board.executors
+						? ({ title, prompt, executorId }) =>
+								send("kanban-add-run", {
+									title,
+									prompt,
+									executorId: executorId ?? "",
+								})
+						: undefined
+				}
+				onSelectExecutor={
+					data.board.executors
+						? (cardId, revision, executorId) =>
+								send("kanban-select-executor", {
+									cardId,
+									expectedRevision: String(revision),
+									executorId,
+								})
+						: undefined
+				}
+				onInspect={
+					data.board.executors
+						? (cardId) => send("kanban-inspect", { cardId })
+						: undefined
+				}
 				onEdit={(cardId, revision, change) =>
 					send("kanban-edit", {
 						cardId,
@@ -243,11 +353,13 @@ export function KanbanBoardView({ request }: { request: ArtifactRequest }) {
 							: {
 									cardId,
 									expectedRevision: String(revision),
-									...(extra?.note !== undefined ? { note: extra.note } : {}),
+									...extra,
 								},
 					)
 				}
-				onResumeQueue={() => send("kanban-resume-queue", {})}
+				onResumeQueue={(executorId) =>
+					send("kanban-resume-queue", executorId ? { executorId } : {})
+				}
 			/>
 			{unsettled && <Feedback message={action.message} />}
 		</>

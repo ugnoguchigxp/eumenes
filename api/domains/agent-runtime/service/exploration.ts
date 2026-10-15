@@ -20,6 +20,9 @@ export const RESEARCH_BUDGET = Object.freeze({
 });
 export const isHistory = (p: Prepared | undefined) =>
 	p?.package.backend === "history";
+/** The World investigation: reads of the host's own World, like the history route. */
+export const isWorld = (p: Prepared | undefined) =>
+	p?.package.backend === "world-query";
 const isRecipeWeb = (p: Prepared | undefined) =>
 	!!p && packageRuntimeOf(p.package.id)?.budget === "recipe";
 /** The short web confirmation routes: the quick budget, with or without saved procedures. */
@@ -52,15 +55,16 @@ export const operationLimits = (p: Prepared | undefined) =>
 				? SEARCH_BUDGET
 				: RESEARCH_BUDGET;
 export const modelLimit = (p: Prepared | undefined) =>
-	isHistory(p)
+	isHistory(p) || isWorld(p)
 		? RESEARCH_BUDGET.historyModelCalls
 		: isQuickWeb(p)
 			? QUICK_WEB_BUDGET.modelCalls
 			: RESEARCH_BUDGET.webModelCalls;
-/** Reads that stay inside the host (saved bodies, history) and use the local-call budget. */
+/** Reads that stay inside the host (saved bodies, history, World) and use the local-call budget. */
 export const localTool = (meta: ToolRuntimeMeta | undefined) =>
 	meta?.operation === "saved_read" ||
 	meta?.operation === "history" ||
+	meta?.operation === "world" ||
 	meta?.operation === "recipe";
 export const isSearch = (meta: ToolRuntimeMeta | undefined) =>
 	meta?.operation === "search";

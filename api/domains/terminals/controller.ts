@@ -26,14 +26,14 @@ export function registerTerminals(app: Hono, service: TerminalsService) {
 	app.post("/api/terminals", async (c) => {
 		const parsed = await parseJsonBody(c, terminalStartSchema, options);
 		if (!parsed.ok) return parsed.response;
-		return c.json(service.start(parsed.data), 201);
+		return c.json(await service.startGuarded(parsed.data), 201);
 	});
 	app.post("/api/terminals/:id/input", async (c) => {
 		const id = idOf(c);
 		if (!id) return invalid(c);
 		const parsed = await parseJsonBody(c, terminalInputSchema, options);
 		if (!parsed.ok) return parsed.response;
-		service.input(id, parsed.data.data);
+		await service.inputGuarded(id, parsed.data.data);
 		return c.body(null, 204);
 	});
 	app.post("/api/terminals/:id/resize", async (c) => {
@@ -49,7 +49,7 @@ export function registerTerminals(app: Hono, service: TerminalsService) {
 		if (!id) return invalid(c);
 		const parsed = await parseJsonBody(c, terminalSizeSchema, options);
 		if (!parsed.ok) return parsed.response;
-		return c.json(service.restart(id, parsed.data));
+		return c.json(await service.restartGuarded(id, parsed.data));
 	});
 	// Claude Code's own hooks (outside /api: the child never holds the API token). The run's
 	// token authenticates; the body is bounded and only the event and last answer are read.

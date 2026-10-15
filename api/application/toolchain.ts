@@ -1,3 +1,6 @@
+import { extendKanbanAdapter } from "./kanban-shared-adapter";
+import { createCodexTasksAdapter } from "./codex-tasks-adapter";
+import type { createKanbanSdkHost } from "./kanban-sdk-host";
 import { createGoogleAccountsAdapter } from "./google-accounts-adapter";
 import { createOcrAdapter } from "./ocr-adapter";
 import type { SqliteStore } from "../infrastructure/sqlite";
@@ -25,10 +28,7 @@ import {
 import { createRecordsAdapter, type RecordsPorts } from "./records-adapter";
 import { createMemoryAdapter, type MemoryAdapterPorts } from "./memory-adapter";
 import { createStewardAdapter } from "./steward-adapter";
-import {
-	createWorldQueryAdapter,
-	type WorldQueryAdapterPortsLookup,
-} from "./world-query-adapter";
+import type { WorldResearchPorts } from "./world-research-ports";
 import {
 	createWorldAdapter,
 	type WorldAdapterPortsLookup,
@@ -67,6 +67,7 @@ export async function createToolchain(
 	web: WebResearchService,
 	options: {
 		dots?: boolean;
+		kanbanSdk?: ReturnType<typeof createKanbanSdkHost>;
 		music?: boolean;
 		image?: boolean;
 		uiCompositions?: import("../domains/ui-compositions").UiCompositionsService;
@@ -101,8 +102,10 @@ export async function createToolchain(
 			service: Parameters<typeof createStewardAdapter>[0];
 			memory: Parameters<typeof createStewardAdapter>[1];
 		};
-		/** The conversation agent's `world_query` tool; the lookup answers undefined while World is not ON. */
-		worldQuery?: WorldQueryAdapterPortsLookup;
+		/** The World investigation's reads (`world.find`, `world.query`), built over the agent runtime; the toolchain is offered only while World is usable. */
+		worldResearch?: (
+			runtime: () => import("../domains/agent-runtime").AgentRuntime,
+		) => WorldResearchPorts;
 		/** Messages memory forbids reusing; history reads drop them (absent: nothing is dropped). */
 		blockedMessages?: Parameters<typeof createReadPorts>[3];
 		/** The World screen; the lookup returns undefined while World is OFF. */
@@ -117,8 +120,36 @@ export async function createToolchain(
 		>["interactions"];
 	} = {},
 ) {
+	const shared =
+		options.kanbanSdk &&
+		extendKanbanAdapter(
+			createKanbanAdapter(options.kanbanSdk.kanban, {
+				runnable: options.kanbanSdk.terminals.trackable,
+			}),
+			{
+				kanban: options.kanbanSdk.kanban,
+				registry: options.kanbanSdk.registry,
+				activity: options.kanbanSdk.activity,
+			},
+		);
 	// Typed domain adapters this host offers; bundles naming any other adapter are not registered.
 	const registry = createAdapterRegistry([
+		...(shared && options.kanbanSdk
+			? [
+					shared,
+					createCodexTasksAdapter({
+						tasks: options.kanbanSdk.tasks,
+						kanban: options.kanbanSdk.kanban,
+						shared,
+						allowed: options.kanbanSdk.allowed,
+						settingsSource: (tx) => ({
+							settings: options.kanbanSdk!.tasks.settingsInTransaction(tx),
+							allowed: options.kanbanSdk!.allowed(),
+							resources: options.kanbanSdk!.resources(tx),
+						}),
+					}),
+				]
+			: []),
 		...(options.googleAccounts
 			? [createGoogleAccountsAdapter(options.googleAccounts)]
 			: []),
@@ -166,9 +197,6 @@ export async function createToolchain(
 		...(options.steward
 			? [createStewardAdapter(options.steward.service, options.steward.memory)]
 			: []),
-		...(options.worldQuery
-			? [createWorldQueryAdapter(options.worldQuery)]
-			: []),
 		...(options.world ? [createWorldAdapter(options.world)] : []),
 		...(options.serviceTests
 			? [createServiceTestsAdapter(options.serviceTests)]
@@ -186,8 +214,9 @@ export async function createToolchain(
 			...(options.objectRecognition ? ["object-recognition"] : []),
 			...(options.terminals ? ["claude-code"] : []),
 			...(options.kanban && options.terminals ? ["kanban"] : []),
+			...(options.kanbanSdk ? ["codex-tasks"] : []),
 			...(options.steward ? ["steward"] : []),
-			...(options.worldQuery ? ["world-query"] : []),
+			...(options.worldResearch ? ["world-query"] : []),
 			...(options.ocr ? ["ocr"] : []),
 			...(options.excalidraw ? ["excalidraw"] : []),
 			...(options.conversation && options.history !== false ? ["history"] : []),
@@ -207,12 +236,36 @@ export async function createToolchain(
 		() => agents,
 		() => tools,
 	);
+	const world = options.worldResearch?.(() => agents);
+	const worldPorts = () => {
+		if (!world) throw new Error("capability_unavailable");
+		return world;
+	};
+	const isWorldTool = (id: string) =>
+		id === "world.find" || id === "world.query";
 	const adapter: ToolAdapter = {
 		...reads,
+		operationFingerprintInTransaction(db, r) {
+			return isWorldTool(r.tool.id)
+				? worldPorts().operationFingerprintInTransaction?.(db, r)
+				: reads.operationFingerprintInTransaction!(db, r);
+		},
 		localInTransaction(db, r) {
 			return r.tool.id === "recipe.find"
 				? recipes.findInTransaction(db, r)
-				: reads.localInTransaction!(db, r);
+				: isWorldTool(r.tool.id)
+					? worldPorts().localInTransaction!(db, r)
+					: reads.localInTransaction!(db, r);
+		},
+		// World readings are checked against the World; every other source against the reads.
+		validateEvidenceInTransaction(db, owner, sources, proofs) {
+			const readings = sources.filter((s) => s.kind !== "world_claim");
+			return (
+				reads.validateEvidenceInTransaction!(db, owner, readings, proofs) &&
+				(readings.length === sources.length ||
+					(world?.validateEvidenceInTransaction?.(db, owner, sources, []) ??
+						false))
+			);
 		},
 		startInTransaction(db, r) {
 			const raw = webToolArguments(
@@ -292,6 +345,8 @@ export async function createToolchain(
 			// a per-user scope would pass its own `authorityEpoch` here.
 		}),
 		schemas: createSchemaProvider(capabilities),
+		/** World is usable now (the World investigation is offered only then); absent: never. */
+		worldAvailable: world?.available,
 		tools,
 		agents,
 		history,

@@ -22,6 +22,7 @@ export type {
 	KanbanCardView,
 	KanbanColumn,
 	KanbanDispatch,
+	KanbanGitGrant,
 	KanbanEditInput,
 	KanbanFollowupInput,
 	KanbanMoveInput,
@@ -33,3 +34,17 @@ export type {
 	KanbanRunView,
 	KanbanViewContext,
 } from "./contracts";
+export type {
+	KanbanExecutor,
+	ExecutorRegistry,
+	CommonRunState,
+} from "./shared-contracts";
+export { DEFAULT_EXECUTOR_ID } from "./shared-contracts";
+export type { SharedBoardView } from "./shared-board";
+export {
+	readWorkspaceGuard,
+	reserveWorkspaceInTransaction,
+	beginWorkspaceReleaseInTransaction,
+	finishWorkspaceReleaseInTransaction,
+	markWorkspaceUnknownInTransaction,
+} from "./workspace-guard";

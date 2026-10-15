@@ -7,6 +7,20 @@ import {
 
 export { messageMetadataSchema, runObservationSchema, unknownObservation };
 export type { MessageMetadata, RunObservation } from "./observation";
+/** Independent SDK protocol shares the package's public contract boundary. */
+export { sdkId, sdkSpecSchema, sdkTerminal } from "./sdk-contracts";
+export type {
+	SdkSpec,
+	SdkState,
+	SdkReceipt,
+	SdkActivity,
+} from "./sdk-contracts";
+export { sdkEventsSchema } from "./sdk-schema";
+export type {
+	SdkGitRemote,
+	SdkGitResult,
+	SdkSnapshot,
+} from "./sdk-git-contracts";
 
 export const protocolVersion = "eumenes-coding/2" as const;
 /** Protocol digests use code-point ordering, independent of the host's locale. */

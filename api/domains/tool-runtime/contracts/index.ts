@@ -16,7 +16,7 @@ export type ToolResult = {
 	failures: Array<{ url: string; code: string }>;
 };
 export type Source = {
-	kind?: "web_source" | "conversation_source";
+	kind?: "web_source" | "conversation_source" | "world_claim";
 	sourceRef?: string;
 	sourceRevision?: string;
 	viewId?: string;
@@ -38,7 +38,9 @@ export type Source = {
 	sourceId: string;
 	url?: string;
 	title: string;
-	basis: "page" | "snippet" | "conversation";
+	basis: "page" | "snippet" | "conversation" | "world";
+	/** world_claim: where the claim came from (`user_report`, `model_hypothesis`, ...). */
+	origin?: string;
 	fetchedAt: string;
 	truncated: boolean;
 	body: string;

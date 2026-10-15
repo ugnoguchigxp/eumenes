@@ -20,7 +20,7 @@ export function delegateConversation(
 	conversation: ConversationService,
 	run: Run,
 	selected: {
-		route: "web" | "history" | "action";
+		route: "web" | "history" | "world" | "action";
 		request: string;
 		packageRevisionId?: string;
 		researcher?: "codex_luna";
@@ -75,7 +75,7 @@ export function prepareRouting(
 		return undefined;
 	const context = agents?.conversationContextInTransaction?.(db);
 	const ready = (requires: string | undefined) =>
-		requires === undefined
+		requires === undefined || requires === "world"
 			? !!agents
 			: requires === "luna"
 				? !!context?.lunaEnabled

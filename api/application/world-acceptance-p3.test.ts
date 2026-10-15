@@ -26,7 +26,6 @@ import {
 	planForget,
 } from "eumenes-memory/sqlite";
 import { planAssertionTransition } from "eumenes-world-model";
-import worldPackage from "eumenes-world-model/package.json";
 import { createContinuityService } from "../domains/continuity";
 import {
 	CONVERSATION_DEFAULT_PRINCIPAL,
@@ -39,17 +38,10 @@ import type { InferencePort, Receipt } from "../domains/inference";
 import { createMemoryService } from "../domains/memory";
 import { createQueue } from "../domains/queue";
 import { createVoiceDialogue } from "../domains/voice-dialogue";
-import {
-	WORLD_BLOCK_CLOSE,
-	WORLD_BLOCK_OPEN,
-	getWorldUsage,
-	sourceKeyOf,
-	type PreparedWorldContext,
-} from "../domains/world";
+import { sourceKeyOf } from "../domains/world";
 import { openStore } from "../infrastructure/sqlite";
 import { migrations } from "./migrations";
 import {
-	WORLD_BROKER_PURPOSE,
 	createWorldAssembly,
 	defaultWorldJournalPath,
 	manualAccess,
@@ -93,35 +85,6 @@ const tempDir = () => {
 	return dir;
 };
 
-type Hooks = {
-	duringGeneration?: () => Promise<void>;
-	beforeSettle?: () => Promise<void>;
-};
-
-/** What the fixture model derives its answer from: the active claim in the World block. */
-function claimFromWorldBlock(
-	messages: readonly { content: string }[],
-): string | null {
-	const holder = messages.find((m) => m.content.includes(WORLD_BLOCK_OPEN));
-	if (!holder) return null;
-	const text = holder.content;
-	const data = text.slice(
-		text.indexOf(WORLD_BLOCK_OPEN) + WORLD_BLOCK_OPEN.length,
-		text.indexOf(WORLD_BLOCK_CLOSE),
-	);
-	const parsed = JSON.parse(data) as {
-		claims?: {
-			lifecycle?: string;
-			conclusion?: { payload?: { value?: { value?: unknown } } };
-		}[];
-	};
-	for (const claim of parsed.claims ?? []) {
-		const value = claim.conclusion?.payload?.value?.value;
-		if (typeof value === "string") return value;
-	}
-	return null;
-}
-
 type BootOptions = {
 	dir: string;
 	mode: "on" | "protect";
@@ -161,7 +124,6 @@ async function boot(options: BootOptions) {
 	});
 
 	// --- fixture inference + TTS spy ------------------------------------
-	const hooks: Hooks = {};
 	const seen: { role: string; content: string }[][] = [];
 	const spoken: string[] = [];
 	let sends = 0;
@@ -187,12 +149,8 @@ async function boot(options: BootOptions) {
 			if (options.modelStopped) throw new Error("model_stopped");
 			sends += 1;
 			seen.push(messages.map((m) => ({ ...m })));
-			const claim = claimFromWorldBlock(messages);
-			const answer = claim === null ? UNKNOWN : `${claim}利用できます。`;
-			onDelta(answer.slice(0, 3));
-			await hooks.duringGeneration?.();
-			onDelta(answer.slice(3));
-			await hooks.beforeSettle?.();
+			const answer = UNKNOWN;
+			onDelta(answer);
 			const receipt: Receipt = {
 				requestId,
 				attemptId: `att-${sends}`,
@@ -206,20 +164,6 @@ async function boot(options: BootOptions) {
 		acceptInTransaction: () => true,
 	});
 
-	// The receipts the Broker fixed at prepare (the test only observes them).
-	const prepared: PreparedWorldContext[] = [];
-	const context = {
-		...world.context,
-		prepareInTransaction(
-			...args: Parameters<typeof world.context.prepareInTransaction>
-		): ReturnType<typeof world.context.prepareInTransaction> {
-			const result = world.context.prepareInTransaction(...args);
-			if (result.status === "ready")
-				prepared.push(result.context as PreparedWorldContext);
-			return result;
-		},
-	};
-
 	// Startup order: memory.recover -> world.recover -> queue.recover/start -> world.start.
 	const memoryRecovery = await memory.recover();
 	const worldRecovery = await world.recover({
@@ -232,7 +176,7 @@ async function boot(options: BootOptions) {
 		larm,
 		queue,
 		memory,
-		worldContext: context,
+		worldContext: world.context,
 	});
 	const voice = createVoiceDialogue(store, dialogue, larm);
 	await dialogue.recover();
@@ -257,10 +201,8 @@ async function boot(options: BootOptions) {
 		queue,
 		dialogue,
 		voice,
-		hooks,
 		seen,
 		spoken,
-		prepared,
 		memoryRecovery,
 		worldRecovery,
 		sends: () => sends,
@@ -362,14 +304,6 @@ async function boot(options: BootOptions) {
 				.get("main")
 				.messages.filter((m) => m.role === "assistant")
 				.map((m) => m.text),
-		usageRows: () =>
-			store.read(
-				(db) =>
-					db.query("SELECT run_id FROM world_host_usage").all() as {
-						run_id: string;
-					}[],
-			),
-		usage: (runId: string) => store.read((db) => getWorldUsage(db, runId)),
 
 		// --- forgetting ------------------------------------------------------
 		/**
@@ -454,15 +388,6 @@ async function boot(options: BootOptions) {
 						.get(id),
 				) as { lifecycle: string } | null
 			)?.lifecycle ?? null,
-		validate: (receipt: unknown) =>
-			world.service.validateUsage(receipt, {
-				access: {
-					principal: SCOPE.principal,
-					scopeKeys: [SCOPE.scopeKey],
-					purpose: WORLD_BROKER_PURPOSE,
-				},
-				scope: SCOPE,
-			}),
 	};
 	closers.push(() => h.close());
 	return h;
@@ -522,9 +447,6 @@ function adoptPlanOf(id: string) {
 	return result.value.plan;
 }
 
-const versionIds = (usage: { assertionVersions: unknown[] } | null) =>
-	((usage?.assertionVersions ?? []) as { id: string }[]).map((a) => a.id);
-
 const WORLD_TABLES = [
 	"world_entity",
 	"world_assertion",
@@ -551,179 +473,7 @@ function worldText(h: Booted): string {
 
 // ---------------------------------------------------------------------------
 
-test("A35/A36/A37/A38/A39/A40/A41 one Scope end to end: register -> ask -> correct -> re-ask -> forget during generation -> restart -> ask", async () => {
-	const dir = tempDir();
-	let h = await boot({ dir, mode: "on" });
-
-	// --- enabling: startup recovery opened the gate, the first feed pass ran, World is ON.
-	expect(h.worldRecovery.status).toBe("open");
-	expect(h.world.status()).toMatchObject({
-		mode: "on",
-		gate: { open: true, reason: null },
-		world: { enabled: true, schema: "current", usable: true },
-		initialSyncComplete: true,
-	});
-
-	// --- 1. explicit registration: a target and an explicit structured claim (A39).
-	await h.say("m1", "音声サービスは9月から利用できる。");
-	await h.registerTarget();
-	await h.registerClaim("claim-1", "m1", "9月から");
-	expect(h.count("world_assertion")).toBeGreaterThan(0);
-	// Memory knows the claim's input under an opaque, versioned dependent id.
-	const edges = h.store.read(
-		(db) =>
-			db
-				.query(
-					"SELECT dependent_id FROM memory_dependency WHERE dependent_type = 'external' AND dependent_id LIKE 'eumenes-world:%'",
-				)
-				.all() as { dependent_id: string }[],
-	);
-	expect(edges.length).toBeGreaterThan(0);
-	expect(edges.map((e) => e.dependent_id).join("")).not.toContain("音声");
-	const goal = await h.goals.adopt(
-		{ principal: SCOPE.principal, scopeKeys: [SCOPE.scopeKey] },
-		{
-			scopeKey: SCOPE.scopeKey,
-			desiredState: "来週までに音声機能を公開する",
-			source: { namespace: "conversation", kind: "message", id: "m1" },
-		},
-	);
-
-	// --- 2. question: the answer is adopted and stands on the Slice (A40, A37).
-	const first = await h.ask();
-	expect((await h.finish(first.id)).status).toBe("completed");
-	expect(h.answers()).toEqual(["9月から利用できます。"]);
-	const firstUsage = h.usage(first.id);
-	expect(firstUsage).toMatchObject({
-		runId: first.id,
-		sliceStatus: "ready",
-		packageVersion: worldPackage.version,
-		goal: { id: goal.id, revision: goal.revision },
-	});
-	expect(versionIds(firstUsage)).toEqual(["claim-1"]);
-	expect(h.usageRows()).toHaveLength(1);
-	expect(h.prepared).toHaveLength(1);
-	const firstReceipt = h.prepared[0]!.receipt;
-	expect((await h.validate(firstReceipt)).status).toBe("valid");
-
-	// --- 3. correction: the source changes; the feed stops what stood on it.
-	await h.conversation.correct({
-		messageId: "m1",
-		text: "音声サービスは10月から利用できる。",
-	});
-	await until(() => h.lifecycleOf("claim-1") === "invalidated");
-	expect(await h.validate(firstReceipt)).toMatchObject({ status: "blocked" });
-	await h.registerClaim("claim-2", "m1", "10月から");
-
-	// --- 4. re-question: the old Slice is not used; the new answer stands on claim-2 (A24 via A40).
-	const second = await h.speak();
-	await until(() => h.dialogue.get(second.runId)?.status === "completed");
-	await pause(200);
-	expect(h.answers()).toEqual([
-		"9月から利用できます。",
-		"10月から利用できます。",
-	]);
-	// A41: speech only after adoption, the complete answer once.
-	expect(h.spoken.join("")).toBe("10月から利用できます。");
-	expect(h.prepared).toHaveLength(2);
-	const sent = h.seen[1]!.find((m) => m.content.includes(WORLD_BLOCK_OPEN))!;
-	expect(sent.content).toContain("10月から");
-	expect(sent.content).not.toContain("9月から");
-	expect(versionIds(h.usage(second.runId))).toEqual(["claim-2"]);
-	// The first Slice stays refused for good.
-	expect(await h.validate(firstReceipt)).toMatchObject({ status: "blocked" });
-	const spokenBeforeForget = h.spoken.length;
-	const refBeforeForget = h.sourceRef("m1");
-
-	// --- 5. forget DURING generation (A38, A40, A41).
-	let progressText: string | undefined;
-	let spokenMid = -1;
-	let forgetId = "";
-	let pendingBefore: string[] = [];
-	let confirmedAfter: string[] = [];
-	h.hooks.duringGeneration = async () => {
-		// The first delta exists; none of it may be public or spoken.
-		const runId = h.prepared.at(-1)!.runId;
-		progressText = h.dialogue.progress(runId)?.text;
-		spokenMid = h.spoken.length;
-		forgetId = await h.forgetMessage("m1");
-		// Memory lists the World dependents as pending until World confirms them.
-		pendingBefore = h.externals(forgetId);
-		// The commit notification drives World's intake; no one calls it by hand.
-		await until(() => h.intakes().every((i) => i.state === "complete"));
-		await until(() => h.externals(forgetId).every((s) => s === "confirmed"));
-		confirmedAfter = h.externals(forgetId);
-	};
-	const third = await h.speak();
-	await until(() =>
-		["completed", "failed", "cancelled", "interrupted"].includes(
-			h.dialogue.get(third.runId)?.status ?? "",
-		),
-	);
-	await pause(300);
-	const forgotten = h.dialogue.get(third.runId)!;
-	expect(forgotten.status).toBe("failed");
-	expect(forgotten.worldUsed).toBe(true);
-	expect(progressText ?? "").toBe("");
-	expect(spokenMid).toBe(spokenBeforeForget);
-	expect(h.spoken).toHaveLength(spokenBeforeForget);
-	expect(h.answers()).toEqual([
-		"9月から利用できます。",
-		"10月から利用できます。",
-	]);
-	// Forget completes only through Memory's per-id confirmation.
-	expect(pendingBefore.length).toBeGreaterThan(0);
-	expect(pendingBefore.every((s) => s === "pending")).toBe(true);
-	expect(confirmedAfter.length).toBe(pendingBefore.length);
-	expect(confirmedAfter.every((s) => s === "confirmed")).toBe(true);
-	expect(h.intakes().length).toBeGreaterThan(0);
-	// No claim, no receipt, nothing of the message is left in World.
-	expect(h.count("world_assertion")).toBe(0);
-	expect(h.usageRows()).toEqual([]);
-	const afterForget = worldText(h);
-	expect(afterForget).not.toContain("9月");
-	expect(afterForget).not.toContain("10月");
-	expect(h.conversation.get("facts").messages.map((m) => m.text)).not.toContain(
-		"音声サービスは10月から利用できる。",
-	);
-	// The old operation cannot bring it back (no resurrection by replay or re-registration).
-	const replay = await h
-		.apply("c-claim-2", {
-			kind: "assertion.register",
-			assertion: claimOf("claim-2", refBeforeForget, "10月から"),
-		})
-		.catch(() => ({ status: "rejected" }));
-	expect(replay.status).not.toBe("applied");
-	expect(h.count("world_assertion")).toBe(0);
-
-	// --- 6. restart: same files, new process.
-	await h.close();
-	closers.length = 0;
-	h = await boot({ dir, mode: "on" });
-	expect(h.worldRecovery.status).toBe("open");
-	expect(h.count("world_assertion")).toBe(0);
-	expect(worldText(h)).not.toContain("9月");
-	expect(worldText(h)).not.toContain("10月");
-	expect(h.intakes().every((i) => i.state === "complete")).toBe(true);
-
-	// --- 7. question after the restart: the forgotten content is gone, nothing resurrects (A39).
-	const last = await h.ask();
-	expect((await h.finish(last.id)).status).toBe("completed");
-	expect(h.answers().at(-1)).toBe(UNKNOWN);
-	// No World block and nothing of the forgotten message in any instruction. (Earlier
-	// adopted answers stay in the conversation history: they are conversation data,
-	// forgotten by the conversation domain, not by World.)
-	const sentNow = h.seen.flat();
-	expect(sentNow.some((m) => m.content.includes(WORLD_BLOCK_OPEN))).toBe(false);
-	expect(
-		sentNow
-			.filter((m) => m.role === "system")
-			.some((m) => /9月|10月/.test(m.content)),
-	).toBe(false);
-	expect(h.usageRows().every((r) => r.run_id === last.id)).toBe(true);
-});
-
-test("A34 (host side) the host consumes only the vendored World tgz: package.json points at it and the receipt names the pinned package", async () => {
+test("the conversation gets only the names of the known targets the wording names: no claim text, no ids; nothing otherwise", async () => {
 	const dir = tempDir();
 	const h = await boot({ dir, mode: "on" });
 	await h.say("m1", "音声サービスは9月から利用できる。");
@@ -731,13 +481,40 @@ test("A34 (host side) the host consumes only the vendored World tgz: package.jso
 	await h.registerClaim("claim-1", "m1", "9月から");
 	const run = await h.ask();
 	expect((await h.finish(run.id)).status).toBe("completed");
+	const input = h.seen.at(-1)!;
+	expect(
+		input.filter((m) => m.content.startsWith("Worldに記録がある対象")),
+	).toEqual([
+		{
+			role: "system",
+			content:
+				"Worldに記録がある対象: 「音声サービス」（引用した名前のみ。詳しい内容は World の調査で確かめられる）",
+		},
+	]);
+	const text = JSON.stringify(input);
+	expect(text).not.toContain("9月から");
+	expect(text).not.toContain("svc-1");
+	expect(text).not.toContain("claim-1");
+
+	// A turn that names no known target gets no hint.
+	const other = await h.dialogue.submit({
+		requestId: crypto.randomUUID(),
+		conversationId: "other",
+		text: "今日の天気は？",
+	});
+	expect((await h.finish(other.id)).status).toBe("completed");
+	expect(JSON.stringify(h.seen.at(-1)).includes("Worldに記録がある対象")).toBe(
+		false,
+	);
+});
+
+test("A34 (host side) the host consumes only the vendored World tgz: package.json points at it", () => {
 	const pkg = JSON.parse(
 		readFileSync(join(import.meta.dir, "../../package.json"), "utf8"),
 	) as { dependencies: Record<string, string> };
 	expect(pkg.dependencies["eumenes-world-model"]).toMatch(
 		/^file:vendor\/world\/eumenes-world-model-.+\.tgz$/,
 	);
-	expect(h.usage(run.id)?.packageVersion).toBe(worldPackage.version);
 });
 
 test("A34-A41 World OFF (protect) + Memory OFF + model stopped: a forget is still processed and completes", async () => {

@@ -121,7 +121,7 @@ function plan(
 	const resolved = resolveArtifact(ctx, db, event.artifactRevisionId);
 	if (resolved instanceof ActionRequestError)
 		return { kind: "error", error: resolved };
-	const { entry, doc } = resolved;
+	const { doc } = resolved;
 	const definition = doc.document;
 	const action = definition.actionBindings.find(
 		(a) => a.actionId === event.actionId,
@@ -142,8 +142,7 @@ function plan(
 		(s) => s.source === action.source,
 	);
 	if (!source) return fail("source_not_found", 404);
-	if (entry.adapterRef && source.adapterRef !== entry.adapterRef)
-		return fail("artifact_unavailable", 503);
+	// The reviewed artifact source owns UI operations; its conversation binding may use another adapter.
 	const adapter = resolved.adapters.get(source.adapterRef);
 	if (!adapter) return fail("adapter_unavailable", 503);
 	const confidential = action.confidentialFields ?? [];

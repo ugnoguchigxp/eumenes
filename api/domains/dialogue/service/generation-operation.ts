@@ -59,8 +59,7 @@ export function settleConversationOperation(
 		recallPins?: Array<{ messageId: string; digest: string }>;
 	},
 ): "applied" | { status: "failed"; errorCode: string } {
-	const { larm, memory, worldContext, clock, agents, conversation, queue } =
-		deps;
+	const { larm, memory, clock, agents, conversation, queue } = deps;
 
 	const rejected = operationRejection(tx, {
 		inference: larm,
@@ -70,33 +69,14 @@ export function settleConversationOperation(
 		recallPins: result.recallPins,
 		goals: deps.goals,
 		goalsLayer: input.goals,
-		world: worldContext,
-		worldView: input.world,
-		settle: {
-			runId: run.id,
-			conversationId: run.conversationId,
-			jobId: claim.jobId,
-			attempt: claim.attempt,
-			generation: claim.generation,
-			inference: result.receipt
-				? {
-						requestId: result.receipt.requestId,
-						attemptId: result.receipt.attemptId,
-					}
-				: null,
-			nowMs: Date.parse(clock()),
-		},
+		settle: { runId: run.id },
 	});
 	if (rejected) {
-		if (input.world)
-			worldContext?.releaseInTransaction(tx, run.id, run.conversationId);
 		endRun(deps, tx, run, "failed", rejected);
 		return { status: "failed", errorCode: rejected };
 	}
 	// The initial receipt stays pending; the final answer is a later attempt
 	// on the same policy request. No control text is adopted or collected.
-	if (input.world)
-		worldContext?.releaseInTransaction(tx, run.id, run.conversationId);
 	const chosen = result.operation;
 	let resolved: ReturnType<
 		NonNullable<DialogueDeps["toolchains"]>["resolveInTransaction"]

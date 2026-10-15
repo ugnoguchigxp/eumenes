@@ -15,6 +15,7 @@ import {
 } from "../domains/capabilities/contracts";
 import {
 	kanbanReceiptSchema,
+	DEFAULT_EXECUTOR_ID,
 	type KanbanBoardView,
 	type KanbanOperationContext,
 	type KanbanOutcome,
@@ -279,7 +280,11 @@ export function createKanbanAdapter(
 		connection().terminals.cancelQueuedInTransaction(tx, runId);
 	const handlers: Record<string, Handler> = {
 		"kanban.add": (tx, input, id) =>
-			kanban.addInTransaction(tx, kanbanAdd.parse(input), id),
+			kanban.addInTransaction(
+				tx,
+				{ ...kanbanAdd.parse(input), executorId: DEFAULT_EXECUTOR_ID },
+				id,
+			),
 		"kanban.edit": (tx, input, id) =>
 			kanban.editInTransaction(tx, kanbanEdit.parse(input), id),
 		"kanban.move": (tx, input, id) =>
@@ -339,6 +344,15 @@ export function createKanbanAdapter(
 			}
 			const handler = handlers[request.operationName];
 			if (!handler) throw new Error("capability_unavailable");
+			if (
+				typeof request.input === "object" &&
+				request.input !== null &&
+				"cardId" in request.input &&
+				typeof request.input.cardId === "string" &&
+				kanban.cardExecutorInTransaction(tx, request.input.cardId).id !==
+					DEFAULT_EXECUTOR_ID
+			)
+				throw new Error("kanban_executor_mismatch");
 			const outcome = handler(tx, request.input, request.requestId, {
 				origin:
 					request.origin.kind === "conversation" ? "conversation" : "board",

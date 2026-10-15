@@ -33,7 +33,7 @@ export function gitBytes(
 	path: string,
 	args: string[],
 	env: Record<string, string> = {},
-	input?: string,
+	input?: string | Buffer,
 ) {
 	const result = spawnSync(
 		"/usr/bin/git",
@@ -64,7 +64,7 @@ export function git(
 	path: string,
 	args: string[],
 	env: Record<string, string> = {},
-	input?: string,
+	input?: string | Buffer,
 ) {
 	return gitBytes(path, args, env, input).toString();
 }
@@ -255,7 +255,16 @@ export function snapshot(
 	config: RunnerConfig,
 	workspaceId: string,
 ): WorkspaceSnapshot {
-	const w = workspace(config, workspaceId);
+	return snapshotWorkspace(workspace(config, workspaceId));
+}
+
+/** Same bounded byte/escape checks for an already registered SDK workspace. */
+export function snapshotWorkspace(w: {
+	id: string;
+	path: string;
+	baseSha: string;
+}): WorkspaceSnapshot {
+	const workspaceId = w.id;
 	const head = git(w.path, ["rev-parse", "HEAD"]).trim();
 	// Ignored files that .gitignore does not explain come from .git/info/exclude or core.excludesFile,
 	// which the agent can write to hide files from review.

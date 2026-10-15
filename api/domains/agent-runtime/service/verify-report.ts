@@ -63,7 +63,10 @@ export function verifyReport(
 			used.add(source.sourceId + ":" + (source.viewId ?? ""));
 			return {
 				sourceId: source.sourceId,
-				quote: source.kind === "conversation_source" ? "" : quote,
+				quote:
+					source.kind === "conversation_source" || source.kind === "world_claim"
+						? ""
+						: quote,
 				...(viewId ? { viewId } : {}),
 			};
 		}),
@@ -129,21 +132,27 @@ export function parentProjection(report: Report) {
 		coverage: report.coverage,
 		verification: report.verification,
 		sources: report.sources.map((s) =>
-			s.kind === "conversation_source"
+			s.kind === "world_claim"
 				? {
 						sourceId: s.sourceId,
 						kind: s.kind,
-						messageId: s.messageId,
-						speaker: s.speaker,
-						createdAt: s.createdAt,
-						revision: s.revision,
+						origin: s.origin,
 					}
-				: {
-						sourceId: s.sourceId,
-						url: s.url,
-						basis: s.basis,
-						fetchedAt: s.fetchedAt,
-					},
+				: s.kind === "conversation_source"
+					? {
+							sourceId: s.sourceId,
+							kind: s.kind,
+							messageId: s.messageId,
+							speaker: s.speaker,
+							createdAt: s.createdAt,
+							revision: s.revision,
+						}
+					: {
+							sourceId: s.sourceId,
+							url: s.url,
+							basis: s.basis,
+							fetchedAt: s.fetchedAt,
+						},
 		),
 	};
 }

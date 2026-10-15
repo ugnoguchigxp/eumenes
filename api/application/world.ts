@@ -25,16 +25,14 @@ import {
 	SourceCursorError,
 	createConversationSourceAdapter,
 	createWorldClaims,
-	createWorldContextBroker,
+	createWorldContextNames,
 	createWorldCuration,
 	createWorldHostGate,
 	createWorldLifecycle,
 	createWorldService,
 	type ConsumeReport,
-	type ContextBroker,
 	type IntakePorts,
 	type LifecycleOptions,
-	type PreparedWorldContext,
 	type RecoverReport,
 	type WorldClaims,
 	type WorldClaimsContext,
@@ -75,8 +73,8 @@ export function resolveWorldMode(store: SqliteStore): WorldMode {
 	return "protect";
 }
 
-/** AccessContext purposes the conversation SourceAdapter allows (deny by default). */
-export const WORLD_BROKER_PURPOSE = "dialogue.read";
+/** AccessContext purposes the conversation SourceAdapter allows (deny by default). `WORLD_READ_PURPOSE` is for the conversation's reads (names hint, World investigation). */
+export const WORLD_READ_PURPOSE = "dialogue.read";
 export const WORLD_LIFECYCLE_PURPOSE = "world.lifecycle";
 /** Explicit registration of targets and structured claims by the host (the steward curates through `assembly.curation`). */
 export const WORLD_MANUAL_PURPOSE = "world.manual";
@@ -206,10 +204,9 @@ export type WorldAssembly = {
 	readonly service: WorldService;
 	readonly lifecycle: WorldLifecycle;
 	readonly gate: WorldHostGate;
-	readonly broker: ContextBroker;
 	/** The World half of the steward's curate-world step and its forget operations. */
 	readonly curation: WorldCuration;
-	/** The port dialogue consumes. World OFF makes it answer `disabled`. */
+	/** The port dialogue consumes: the names of the known targets a turn mentions. World OFF gives none. */
 	readonly context: WorldContextPort;
 	/** The owner's claim list and explicit corrections (P5-02). */
 	readonly claims: WorldClaims;
@@ -239,25 +236,6 @@ export type WorldAssembly = {
 	close(): Promise<void>;
 };
 
-/** Adapts the Broker (typed context) to the opaque port dialogue consumes. */
-export function worldContextPort(broker: ContextBroker): WorldContextPort {
-	return {
-		prepareInTransaction: (db, input) => broker.prepareInTransaction(db, input),
-		checkBeforeSend: (context) =>
-			broker.checkBeforeSend(context as PreparedWorldContext),
-		validateInTransaction: (db, input, context) =>
-			broker.validateInTransaction(db, input, context as PreparedWorldContext),
-		recordUsageInTransaction: (db, input, context) =>
-			broker.recordUsageInTransaction(
-				db,
-				input,
-				context as PreparedWorldContext,
-			),
-		releaseInTransaction: (db, runId, conversationId) =>
-			broker.releaseInTransaction(db, runId, conversationId),
-	};
-}
-
 export function createWorldAssembly(
 	options: WorldAssemblyOptions,
 ): WorldAssembly {
@@ -267,7 +245,7 @@ export function createWorldAssembly(
 	const gate = createWorldHostGate("closed");
 	const adapter = createConversationSourceAdapter(options.conversation, {
 		allowedPurposes: [
-			WORLD_BROKER_PURPOSE,
+			WORLD_READ_PURPOSE,
 			WORLD_LIFECYCLE_PURPOSE,
 			WORLD_MANUAL_PURPOSE,
 			WORLD_CURATE_PURPOSE,
@@ -306,12 +284,11 @@ export function createWorldAssembly(
 		world: service,
 		lifecycle,
 		state: () => ({ mode: options.mode, gateOpen: gate.isOpen() }),
-		readPurpose: WORLD_BROKER_PURPOSE,
+		readPurpose: WORLD_READ_PURPOSE,
 	});
-	const broker = createWorldContextBroker({
-		store,
+	const context = createWorldContextNames({
 		world: service,
-		purpose: WORLD_BROKER_PURPOSE,
+		purpose: WORLD_READ_PURPOSE,
 		scopeOf: () => scope,
 	});
 
@@ -472,9 +449,8 @@ export function createWorldAssembly(
 		service,
 		lifecycle,
 		gate,
-		broker,
 		curation,
-		context: worldContextPort(broker),
+		context,
 		claims,
 		claimsContext: () => ({
 			principal: scope.principal,

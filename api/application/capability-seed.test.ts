@@ -28,6 +28,7 @@ const backends = new Set([
 	"ocr",
 	"claude-code",
 	"kanban",
+	"codex-tasks",
 	"steward",
 	"world-query",
 ]);
@@ -130,6 +131,13 @@ test("fresh initialization installs every repository seed and bundle without run
 				db.query("SELECT DISTINCT origin FROM capability_items").all(),
 			),
 		).toEqual([{ origin: "builtin" }]);
+		expect(
+			store.readSnapshot((db) =>
+				caps
+					.artifactsInTransaction(db)
+					.filter((a) => a.artifactId === "kanban.board"),
+			),
+		).toHaveLength(1);
 		const seeded = catalogSnapshot(store);
 		await caps.seed();
 		expect(catalogSnapshot(store)).toEqual(seeded);

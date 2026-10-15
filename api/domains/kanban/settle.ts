@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import { ACTIVE_RUN_STATES, OPEN_RUN_STATES } from "./shared-contracts";
 import type {
 	BlockerReason,
 	KanbanDispatch,
@@ -53,14 +54,22 @@ export function createSettle(core: Core, queue: Queue) {
 		reason: BlockerReason,
 		runState: "blocked" | "cancelled",
 	) {
-		transitionRun(tx, run.id, ["waiting_turn", "handed"], {
-			state: runState,
+		transitionRun(tx, run.id, OPEN_RUN_STATES, {
+			state: ["unknown", "tracking_lost", "restarted"].includes(reason)
+				? "unknown"
+				: runState,
 			reason,
 			finishedAt: now(),
 		});
 		const card = getCard(tx, run.cardId);
 		if (card && card.currentRunId === run.id)
-			finishCard(tx, card, { label: "blocker", reason });
+			finishCard(tx, card, {
+				label: "blocker",
+				reason,
+				hasExecutionHistory:
+					card.hasExecutionHistory ||
+					!["cancelled", "send_failed"].includes(reason),
+			});
 		if (card && !quietReason(reason))
 			notify(
 				tx,
@@ -70,7 +79,11 @@ export function createSettle(core: Core, queue: Queue) {
 				run.id,
 			);
 		if (pausesQueue(reason))
-			pauseQueue(tx, reason === "restarted" ? "restarted" : "tracking_lost");
+			pauseQueue(
+				tx,
+				reason === "restarted" ? "restarted" : "tracking_lost",
+				run.executorId,
+			);
 	}
 
 	/**
@@ -83,34 +96,52 @@ export function createSettle(core: Core, queue: Queue) {
 		finish: KanbanRunFinish,
 	): { dispatch?: KanbanDispatch } | null {
 		const run = getRun(tx, finish.runId);
-		if (!run || run.state !== "handed") return null;
+		if (!run || !ACTIVE_RUN_STATES.includes(run.state)) return null;
+		tx.query("UPDATE kanban_runs SET execution_stopped=? WHERE id=?").run(
+			finish.state === "unknown" ? 0 : 1,
+			run.id,
+		);
 		if (finish.state === "completed") {
-			transitionRun(tx, run.id, ["handed"], {
+			transitionRun(tx, run.id, ACTIVE_RUN_STATES, {
 				state: "completed",
 				finishedAt: now(),
 			});
 			const card = getCard(tx, run.cardId);
 			if (card && card.currentRunId === run.id) {
 				const report = finish.lastReport || card.lastReport;
-				const changed =
-					run.kind === "commit_push"
-						? { commitPushReported: true }
-						: {
-								reviewed: false,
-								commitPushReported: false,
-								files:
-									run.kind === "task"
-										? [...finish.files]
-										: mergeFiles(card.files, finish.files),
-							};
+				const changed = ["commit_push", "commit", "push"].includes(run.kind)
+					? { commitPushReported: !finish.git && run.kind === "commit_push" }
+					: {
+							reviewed: false,
+							commitPushReported: false,
+							files:
+								run.kind === "task"
+									? [...finish.files]
+									: mergeFiles(card.files, finish.files),
+						};
 				finishCard(tx, card, {
 					label: "done",
+					hasExecutionHistory: true,
 					reason: null,
 					lastReport: report,
 					...changed,
 				});
-				const kind = run.kind === "commit_push" ? "commit_push" : "done";
-				notify(tx, kind, noticeText(kind, run.title), card, run.id);
+				const kind = finish.git
+					? "git_completed"
+					: run.kind === "commit_push"
+						? "commit_push"
+						: "done";
+				notify(
+					tx,
+					kind,
+					noticeText(
+						kind,
+						run.title,
+						finish.git?.remoteSha ?? finish.git?.commitSha,
+					),
+					card,
+					run.id,
+				);
 			}
 		} else {
 			blockRun(
@@ -119,9 +150,16 @@ export function createSettle(core: Core, queue: Queue) {
 				blockerReason(finish),
 				finish.state === "cancelled" ? "cancelled" : "blocked",
 			);
+			if (finish.git?.commitVerified && finish.git.commitSha)
+				tx.query(
+					"UPDATE kanban_notices SET text=text||? WHERE run_id=? AND kind='blocker'",
+				).run(
+					`（commit確認済み: ${finish.git.commitSha}、push未確認）`,
+					run.id,
+				);
 		}
 		bumpBoard(tx);
-		return { dispatch: nextDispatch(tx) };
+		return { dispatch: nextDispatch(tx, run.executorId) };
 	}
 
 	/**
@@ -130,14 +168,15 @@ export function createSettle(core: Core, queue: Queue) {
 	 */
 	function dispatchFailedInTransaction(tx: Database, runId: string) {
 		const run = getRun(tx, runId);
-		if (run?.state === "handed") blockRun(tx, run, "send_failed", "blocked");
-		pauseQueue(tx, "tracking_lost");
+		if (run && ACTIVE_RUN_STATES.includes(run.state))
+			blockRun(tx, run, "send_failed", "blocked");
+		if (run) pauseQueue(tx, "tracking_lost", run.executorId);
 	}
 
 	/** The run's request waits for the person's permission (once per run). */
 	function waitingInTransaction(tx: Database, runId: string) {
 		const run = getRun(tx, runId);
-		if (run?.state !== "handed") return;
+		if (!run || !ACTIVE_RUN_STATES.includes(run.state)) return;
 		const card = getCard(tx, run.cardId);
 		if (card)
 			notify(tx, "waiting", noticeText("waiting", run.title), card, run.id);

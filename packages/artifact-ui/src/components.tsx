@@ -10,7 +10,7 @@ import {
 	Switch,
 	Textarea,
 } from "@eumenes/design-system";
-import { Fragment, useId, useRef, useState } from "react";
+import { Fragment, useEffect, useId, useRef, useState } from "react";
 import type {
 	ArtifactEvent,
 	ArtifactRequest,
@@ -405,7 +405,9 @@ function FieldInput({
 				>
 					<option value="">選んでください</option>
 					{field.options?.map((o) => (
-						<option key={o}>{o}</option>
+						<option key={o} value={o}>
+							{field.optionLabels?.[o] ?? o}
+						</option>
 					))}
 				</select>
 			) : field.type === "textarea" ? (
@@ -435,6 +437,16 @@ export function SmallForm({ request }: { request: ArtifactRequest }) {
 	const action = useAction(request);
 	const data = action.resource as FormResource;
 	const [values, setValues] = useState(data.defaults);
+	const [dirty, setDirty] = useState(false);
+	const defaults = useRef(data.defaults);
+	useEffect(() => {
+		// Refresh clean forms after a save, including hidden revision controls.
+		// An edited form retains its original precondition so external edits still conflict.
+		if (!dirty && defaults.current !== data.defaults) {
+			defaults.current = data.defaults;
+			setValues(data.defaults);
+		}
+	}, [data.defaults, dirty]);
 	const [sent, setSent] = useState(false);
 	const [validationMessage, setValidationMessage] = useState("");
 	const prefix = useId();
@@ -463,7 +475,10 @@ export function SmallForm({ request }: { request: ArtifactRequest }) {
 						}
 						setValidationMessage("");
 						if (!action.pending)
-							void action.send("submit", values).then(setSent);
+							void action.send("submit", values).then((accepted) => {
+								setSent(accepted);
+								if (accepted) setDirty(false);
+							});
 					}}
 				>
 					{data.fields.map((field) => (
@@ -481,6 +496,7 @@ export function SmallForm({ request }: { request: ArtifactRequest }) {
 							}
 							disabled={action.pending}
 							onChange={(value) => {
+								setDirty(true);
 								setSent(false);
 								setValidationMessage("");
 								setValues((v) => ({ ...v, [field.id]: value }));
@@ -499,6 +515,7 @@ export function SmallForm({ request }: { request: ArtifactRequest }) {
 								variant="secondary"
 								disabled={action.pending}
 								onClick={() => {
+									setDirty(false);
 									setValues(data.defaults);
 									setSent(false);
 									setValidationMessage("");

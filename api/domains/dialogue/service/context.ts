@@ -26,9 +26,6 @@ export const PROMPT_TARGET_KIND = "dialogue.prompt";
 export const DEFAULT_DEADLINE_MS = RESEARCH_BUDGET.rootMilliseconds;
 export const TERMINAL = ["completed", "failed", "cancelled", "interrupted"];
 
-/** The World pre-send check could not run (busy or closing writer): the queue may retry. */
-export class WorldContextRetry extends Error {}
-
 export type ChatMessage = {
 	role: "system" | "user" | "assistant";
 	content: string;
@@ -81,10 +78,6 @@ export interface GenerateInput {
 	 * forgotten (deleted) one ends the run as `memory_stale` (see `goalsLayerStale`).
 	 */
 	goals?: import("./goals-layer").PreparedGoals;
-	/** The World context fixed at prepare time (opaque here); re-checked before sending and at adoption. */
-	world?: { context: unknown };
-	/** World was read for this run (this or an earlier attempt): its body is held until adoption. */
-	worldUsed?: boolean;
 	agent?: AnswerTicket;
 }
 export interface Accept {

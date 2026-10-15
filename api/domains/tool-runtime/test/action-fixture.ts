@@ -179,6 +179,7 @@ export function makeHarness(
 		now?: () => number;
 		available?: () => boolean;
 		secretKey?: () => Uint8Array | undefined;
+		bindingAdapter?: string;
 	} = {},
 ) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-actions-"));
@@ -356,7 +357,7 @@ export function makeHarness(
 							toolchainRevisionId: "toolchain:fake.manage@1",
 							artifactRevisionId: ARTIFACT_ID,
 							title: "Fake workspace",
-							adapterRef: ADAPTER_REF,
+							adapterRef: options.bindingAdapter ?? ADAPTER_REF,
 						},
 					]
 				: []),

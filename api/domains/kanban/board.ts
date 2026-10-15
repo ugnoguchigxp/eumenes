@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import { DEFAULT_EXECUTOR_ID, ACTIVE_RUN_STATES } from "./shared-contracts";
 import type {
 	BlockerReason,
 	KanbanBoardView,
@@ -31,9 +32,11 @@ const NO_FOLLOWUP: readonly BlockerReason[] = [
 
 /** The card has a conversation that a follow-up or a commit can continue. */
 export const hasConversation = (
-	card: Pick<CardRow, "claudeSessionId" | "label" | "reason">,
+	card: Pick<CardRow, "claudeSessionId" | "label" | "reason"> & {
+		sessionRef?: string | null;
+	},
 ): boolean =>
-	card.claudeSessionId !== null &&
+	(card.sessionRef ?? card.claudeSessionId) !== null &&
 	!(
 		card.label === "blocker" &&
 		card.reason &&
@@ -55,7 +58,7 @@ export function cardActions(
 	currentRun?: Pick<RunRow, "state"> | null,
 ): KanbanCardActionName[] {
 	if (card.column === "running")
-		return currentRun?.state === "waiting_turn" ? ["cancel"] : ["stop", "open"];
+		return currentRun?.state === "queued" ? ["cancel"] : ["stop", "open"];
 	const actions: KanbanCardActionName[] = ["edit", "remove"];
 	if (view.runnable) actions.push("run");
 	if (card.column === "todo") return actions;
@@ -115,7 +118,14 @@ function runView(run: RunRow): KanbanRunView {
 		id: run.id,
 		cardId: run.cardId,
 		kind: run.kind,
-		state: run.state,
+		state:
+			run.state === "queued"
+				? "waiting_turn"
+				: ACTIVE_RUN_STATES.includes(run.state)
+					? "handed"
+					: run.state === "unknown"
+						? "blocked"
+						: (run.state as KanbanRunView["state"]),
 		...(run.reason ? { reason: run.reason } : {}),
 		cardRevision: run.cardRevision,
 		title: run.title,
@@ -130,10 +140,13 @@ function runView(run: RunRow): KanbanRunView {
 export function boardInTransaction(
 	tx: Database,
 	view: KanbanViewContext,
+	options: { allExecutors?: boolean } = {},
 ): KanbanBoardView {
-	const runs = boardRuns(tx);
+	const runs = boardRuns(tx).filter(
+		(run) => options.allExecutors || run.executorId === DEFAULT_EXECUTOR_ID,
+	);
 	const byId = new Map(runs.map((run) => [run.id, run]));
-	const handed = handedRuns(tx)[0];
+	const handed = handedRuns(tx, DEFAULT_EXECUTOR_ID)[0];
 	const followed = followedBy(latestHandedRuns(tx));
 	return {
 		revision: boardRevision(tx),
@@ -143,12 +156,17 @@ export function boardInTransaction(
 			...(handed ? { handedRunId: handed.id } : {}),
 		},
 		runnable: view.runnable,
-		cards: allCards(tx).map((card) => {
-			const run = card.currentRunId
-				? (byId.get(card.currentRunId) ?? null)
-				: null;
-			return cardView(card, view, run, followed(card, run));
-		}),
+		cards: allCards(tx)
+			.filter(
+				(card) =>
+					options.allExecutors || card.executorId === DEFAULT_EXECUTOR_ID,
+			)
+			.map((card) => {
+				const run = card.currentRunId
+					? (byId.get(card.currentRunId) ?? null)
+					: null;
+				return cardView(card, view, run, followed(card, run));
+			}),
 		runs: runs.map(runView),
 	};
 }

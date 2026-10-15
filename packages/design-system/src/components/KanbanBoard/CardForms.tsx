@@ -9,6 +9,7 @@ import {
 import { Button } from "../Button";
 import { Input } from "../Input";
 import { Textarea } from "../Textarea";
+import type { KanbanExecutorChoice } from "./types";
 
 export const TITLE_MAX = 40;
 /** A task request is the prompt plus fixed instructions; the host sends at most 8000 in all. */
@@ -48,8 +49,19 @@ type TaskFormProps = {
 	label: string;
 	submitLabel: string;
 	initial?: { title: string; prompt: string };
+	executors?: readonly KanbanExecutorChoice[];
+	defaultExecutorId?: string;
 	disabled?: boolean;
-	onSubmit: (value: { title: string; prompt: string }) => void;
+	onSubmit: (value: {
+		title: string;
+		prompt: string;
+		executorId?: string;
+	}) => void;
+	onSubmitAndRun?: (value: {
+		title: string;
+		prompt: string;
+		executorId?: string;
+	}) => void;
 	onCancel: () => void;
 };
 
@@ -58,19 +70,35 @@ export function TaskForm({
 	label,
 	submitLabel,
 	initial,
+	executors,
+	defaultExecutorId,
 	disabled,
 	onSubmit,
+	onSubmitAndRun,
 	onCancel,
 }: TaskFormProps) {
 	const ids = { title: useId(), prompt: useId(), left: useId() };
 	const [title, setTitle] = useState(initial?.title ?? "");
 	const [prompt, setPrompt] = useState(initial?.prompt ?? "");
+	const [executorId, setExecutorId] = useState(
+		defaultExecutorId ?? executors?.[0]?.id ?? "",
+	);
+	const executorField = useId();
+	const selected = executors?.find((entry) => entry.id === executorId);
 	const titleRef = useRef<HTMLInputElement>(null);
 	useEffect(() => titleRef.current?.focus(), []);
-	const next = { title: title.trim(), prompt: prompt.trim() };
+	const next = {
+		title: title.trim(),
+		prompt: prompt.trim(),
+		...(executors ? { executorId } : {}),
+	};
 	const changed =
 		!initial || next.title !== initial.title || next.prompt !== initial.prompt;
-	const ready = next.title !== "" && next.prompt !== "" && changed;
+	const ready =
+		next.title !== "" &&
+		next.prompt !== "" &&
+		changed &&
+		(!executors || !!selected);
 	const submit = (event: FormEvent) => {
 		event.preventDefault();
 		if (ready && !disabled) onSubmit(next);
@@ -82,6 +110,33 @@ export function TaskForm({
 			onSubmit={submit}
 			onKeyDown={cancelOnEscape(onCancel)}
 		>
+			{executors && (
+				<div className="kanban-field">
+					<label htmlFor={executorField}>作業担当</label>
+					<select
+						id={executorField}
+						value={executorId}
+						disabled={disabled}
+						onChange={(event) => setExecutorId(event.target.value)}
+					>
+						{!selected && (
+							<option value={executorId}>担当を選んでください</option>
+						)}
+						{executors.map((entry) => (
+							<option key={entry.id} value={entry.id}>
+								{entry.label}
+								{!entry.available ? "（利用できません）" : ""}
+							</option>
+						))}
+					</select>
+					{selected && !selected.available && (
+						<p role="status">
+							{selected.unavailableText ??
+								"設定を確認するか、別の担当を選んでください"}
+						</p>
+					)}
+				</div>
+			)}
 			<div className="kanban-field">
 				<label htmlFor={ids.title}>タイトル</label>
 				<Input
@@ -110,6 +165,16 @@ export function TaskForm({
 				<Button type="submit" size="sm" disabled={!ready || disabled}>
 					{submitLabel}
 				</Button>
+				{onSubmitAndRun && (
+					<Button
+						type="button"
+						size="sm"
+						disabled={!ready || disabled || !selected?.available}
+						onClick={() => onSubmitAndRun(next)}
+					>
+						追加して実行
+					</Button>
+				)}
 				<Button type="button" size="sm" variant="outline" onClick={onCancel}>
 					キャンセル
 				</Button>

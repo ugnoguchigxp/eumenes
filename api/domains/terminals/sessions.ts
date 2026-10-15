@@ -70,13 +70,16 @@ const conversationBusy = (list: Session[], session: Session) =>
 	);
 
 export function createEntry(init: {
+	id?: string;
 	title: string;
 	owner: SessionOwner;
 	mode: SessionMode;
 	cwd: string | undefined;
 }): Session {
 	return {
-		id: crypto.randomUUID(),
+		id: init.id ?? crypto.randomUUID(),
+		pendingManualInputs: 0,
+		manualInputSeen: false,
 		title: init.title,
 		owner: init.owner,
 		mode: init.mode,
@@ -88,6 +91,38 @@ export function createEntry(init: {
 	} as unknown as Session;
 }
 
+function openDirect(
+	rt: Runtime,
+	request: { title?: string } & TerminalSize,
+	id: string | undefined,
+	ops: {
+		liveCount: () => number;
+		nextTitle: () => string;
+		launch: (session: Session, spec: Launch) => void;
+		prune: () => void;
+	},
+): Session {
+	if (!rt.command) throw new Error("terminal_unavailable");
+	if (ops.liveCount() >= rt.limit) throw new Error("terminal_limit_reached");
+	const session = createEntry({
+		id,
+		title: request.title ?? ops.nextTitle(),
+		owner: "direct",
+		mode: "work",
+		cwd: rt.options.cwd,
+	});
+	ops.launch(session, {
+		size: request,
+		claude: { resume: false, id: crypto.randomUUID() },
+	});
+	rt.sessions.set(session.id, session);
+	ops.prune();
+	log.info("terminals.started", {
+		sessionId: session.id,
+		count: ops.liveCount(),
+	});
+	return session;
+}
 /** Terminates a run: SIGTERM, SIGKILL after a while; true when the exit was seen in time. */
 export async function terminate(
 	session: Session,
@@ -208,6 +243,12 @@ export function createSessions(
 
 	/** Starts a run in `session` (a new entry or an exited one); throws when it cannot start. */
 	function launch(session: Session, spec: Launch) {
+		options.workspace?.assertLaunch({
+			sessionId: session.id,
+			owner: session.owner,
+			cwd: session.cwd,
+			run: session.run + 1,
+		});
 		if (!rt.command) throw new Error("terminal_unavailable");
 		const token = rt.baseUrl ? newHookToken() : undefined;
 		const denyGitWrites =
@@ -301,27 +342,8 @@ export function createSessions(
 		trackingMs,
 
 		/** Opens a session for the screen (no request): a fresh conversation, nothing sent. */
-		open(request: { title?: string } & TerminalSize): Session {
-			if (!rt.command) throw new Error("terminal_unavailable");
-			if (liveCount() >= rt.limit) throw new Error("terminal_limit_reached");
-			const session = createEntry({
-				title: request.title ?? nextTitle(),
-				owner: "direct",
-				mode: "work",
-				cwd: options.cwd,
-			});
-			launch(session, {
-				size: request,
-				claude: { resume: false, id: crypto.randomUUID() },
-			});
-			rt.sessions.set(session.id, session);
-			prune();
-			log.info("terminals.started", {
-				sessionId: session.id,
-				count: liveCount(),
-			});
-			return session;
-		},
+		open: (request: { title?: string } & TerminalSize, id?: string) =>
+			openDirect(rt, request, id, { liveCount, nextTitle, launch, prune }),
 
 		/** Restarts an exited session; a Kanban card's conversation is resumed, not replaced. */
 		restart(id: string, size: TerminalSize): Session {
@@ -353,6 +375,8 @@ export function createSessions(
 		input(id: string, data: string) {
 			const session = find(id);
 			if (!isLive(session)) throw new Error("terminal_not_running");
+			if (session.closing) throw new Error("terminal_workspace_releasing");
+			session.manualInputSeen = true;
 			session.lastInputAtMs = rt.now();
 			session.lastUsedAtMs = session.lastInputAtMs;
 			session.pty.write(data);
@@ -398,7 +422,9 @@ export function createSessions(
 						!s.closing &&
 						s.owner.startsWith("kanban:") &&
 						s.activity === "idle" &&
-						!s.inflight,
+						!s.inflight &&
+						(!rt.options.workspace ||
+							(!s.manualInputSeen && s.pendingManualInputs === 0)),
 				)
 				.sort((a, b) => a.lastUsedAtMs - b.lastUsedAtMs)[0];
 		},

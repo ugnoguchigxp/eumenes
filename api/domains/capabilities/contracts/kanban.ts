@@ -9,7 +9,9 @@ const title = z
 	.trim()
 	.min(1)
 	.max(40)
-	.describe("作業の短い名前。利用者の依頼の言葉から選び、通知でこの名前を使う。");
+	.describe(
+		"作業の短い名前。利用者の依頼の言葉から選び、通知でこの名前を使う。",
+	);
 /** Leaves room for the work-only instruction appended when the card runs (8000 in total). */
 export const KANBAN_PROMPT_MAX = 7850;
 const prompt = z
@@ -17,7 +19,9 @@ const prompt = z
 	.trim()
 	.min(1)
 	.max(KANBAN_PROMPT_MAX)
-	.describe("作業担当に渡す依頼内容。利用者の指示・対象・条件を省略や言い換えなしで含める。");
+	.describe(
+		"作業担当に渡す依頼内容。利用者の指示・対象・条件を省略や言い換えなしで含める。",
+	);
 const cardId = z.uuid().describe("snapshot に示されたカードの id。");
 const expectedRevision = z
 	.number()
@@ -43,7 +47,9 @@ export const kanbanEdit = z.strictObject({
 export const kanbanMove = z.strictObject({
 	cardId,
 	expectedRevision,
-	column: z.enum(["todo", "finished"]).describe("移動先。finished に移すと Done。"),
+	column: z
+		.enum(["todo", "finished"])
+		.describe("移動先。finished に移すと Done。"),
 	beforeCardId,
 });
 export const kanbanCardRef = z.strictObject({ cardId, expectedRevision });

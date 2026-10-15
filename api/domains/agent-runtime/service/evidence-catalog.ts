@@ -19,6 +19,9 @@ export class EvidenceCatalog {
 		{ source: Source; excerptId: string; quote: string; document: string }
 	>();
 	private identities = new Map<string, string>();
+	/** World readings of one claim revision arrive as fresh Sources on every
+	 * query; the first one seen stays the single registered source. */
+	private worldSources = new Map<string, Source>();
 	private unavailable = new Set<string>();
 	full = false;
 	copy() {
@@ -26,6 +29,7 @@ export class EvidenceCatalog {
 		copy.documents = new Map(this.documents);
 		copy.entries = new Map(this.entries);
 		copy.identities = new Map(this.identities);
+		copy.worldSources = new Map(this.worldSources);
 		copy.unavailable = new Set(this.unavailable);
 		copy.full = this.full;
 		return copy;
@@ -58,7 +62,26 @@ export class EvidenceCatalog {
 			args.messageRef = this.document(args.messageRef);
 		return args;
 	}
-	observe(sources: Source[], limit = MATERIAL_BYTES) {
+	/** The same World claim revision (same text) read again by a later query is
+	 * the already registered source, so re-reading never spends catalog capacity.
+	 * A registered source that is no longer present is replaced, not reused. */
+	private canonical(source: Source, present: Set<string>) {
+		if (source.kind !== "world_claim" || !source.sourceRef) return source;
+		const key = JSON.stringify([
+			source.sourceRef,
+			source.sourceRevision ?? null,
+			source.scopeRef ?? null,
+			source.viewDigest ?? null,
+		]);
+		const known = this.worldSources.get(key);
+		if (known && present.has(`${known.sourceId}:${known.viewId ?? ""}`))
+			return known;
+		this.worldSources.set(key, source);
+		return source;
+	}
+	observe(raw: Source[], limit = MATERIAL_BYTES) {
+		const present = new Set(raw.map((s) => `${s.sourceId}:${s.viewId ?? ""}`));
+		const sources = raw.map((s) => this.canonical(s, present));
 		const budget = limit - MATERIAL_RESERVE_BYTES;
 		const observations: Array<{ excerpts: unknown[] }> = [];
 		const added: Array<{ reference: string; identity: string }> = [];
@@ -76,6 +99,7 @@ export class EvidenceCatalog {
 				basis: source.basis,
 				speaker: source.speaker,
 				createdAt: source.createdAt,
+				origin: source.origin,
 				truncated: source.truncated,
 				acquisitionTruncated: source.acquisitionTruncated,
 				previewTruncated: source.previewTruncated,
@@ -237,10 +261,11 @@ export class EvidenceCatalog {
 		return this.verificationEvidence(refs).map((e) => ({
 			sourceId: e.sourceId,
 			viewId: e.viewId,
-			quote:
-				this.entries.get(e.reference)!.source.kind === "conversation_source"
-					? ""
-					: e.quote,
+			quote: ["conversation_source", "world_claim"].includes(
+				this.entries.get(e.reference)!.source.kind ?? "",
+			)
+				? ""
+				: e.quote,
 		}));
 	}
 	referencedSources(refs: string[]) {

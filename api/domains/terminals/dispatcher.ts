@@ -45,7 +45,8 @@ export function createDispatcher(
 					s.owner.startsWith("kanban:") &&
 					(s.activity === "working" || s.activity === "waiting") &&
 					// Esc sends no hook: a turn without a request and without news is not running.
-					!activityStale(s, rt.now())) ||
+					(rt.options.workspace !== undefined ||
+						!activityStale(s, rt.now()))) ||
 				s.inflight?.exclusiveGroup === "kanban",
 		);
 	}
@@ -56,6 +57,7 @@ export function createDispatcher(
 		s.sessionStarted &&
 		s.activity === "idle" &&
 		!s.inflight &&
+		s.pendingManualInputs === 0 &&
 		rt.now() - s.lastInputAtMs >= manualInputWaitMs;
 
 	/** A launch needs a free slot; otherwise the least recently used idle Kanban session makes room. */

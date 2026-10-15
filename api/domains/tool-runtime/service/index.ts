@@ -209,7 +209,7 @@ export function createToolRuntime(
 						}
 					}
 					for (const source of sources.filter(
-						(s) => s.kind !== "conversation_source",
+						(s) => s.kind !== "conversation_source" && s.kind !== "world_claim",
 					))
 						db.query(
 							"INSERT OR IGNORE INTO tool_sources VALUES(?,?,?,?,?,?,?,?,?)",

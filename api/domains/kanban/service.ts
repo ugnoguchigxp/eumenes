@@ -1,6 +1,9 @@
 import type { Database } from "bun:sqlite";
+import { DEFAULT_EXECUTOR_ID, type ExecutorRegistry } from "./shared-contracts";
 import type { SqliteStore } from "../../infrastructure/sqlite";
 import { boardInTransaction, cardActions, cardInTransaction } from "./board";
+import { sharedBoardInTransaction } from "./shared-board";
+import { createSharedOperations } from "./shared-operations";
 import {
 	DEFAULT_PROJECT_ID,
 	KANBAN_PROMPT_MAX,
@@ -12,6 +15,7 @@ import {
 	type KanbanViewContext,
 } from "./contracts";
 import { createCore, type Applied, type KanbanOutcome } from "./core";
+import { createExecutionOperations, createExecutionAdopter } from "./execution";
 import {
 	bumpBoard,
 	columnIds,
@@ -20,6 +24,7 @@ import {
 	getReceipt,
 	insertCard,
 	placeColumn,
+	rememberExecutor,
 	updateCard,
 	type CardRow,
 } from "./repository";
@@ -41,6 +46,7 @@ const NO_RUN: Pick<
 	| "reviewed"
 	| "commitPushReported"
 	| "claudeSessionId"
+	| "sessionRef"
 	| "currentRunId"
 	| "lastReport"
 	| "files"
@@ -50,6 +56,7 @@ const NO_RUN: Pick<
 	reviewed: false,
 	commitPushReported: false,
 	claudeSessionId: null,
+	sessionRef: null,
 	currentRunId: null,
 	lastReport: null,
 	files: [],
@@ -59,10 +66,12 @@ export function createKanban(options: {
 	store: SqliteStore;
 	now?: () => number;
 	id?: () => string;
+	executors?: ExecutorRegistry;
 }) {
 	const core = createCore({
 		now: options.now ?? Date.now,
 		newId: options.id ?? (() => crypto.randomUUID()),
+		executors: options.executors,
 	});
 	const { now, newId, operate, target, receiptOf } = core;
 	const { pendingStops, stopUnconfirmed, ...runOperations } = createRuns(core);
@@ -98,11 +107,12 @@ export function createKanban(options: {
 
 	function addInTransaction(
 		tx: Database,
-		input: KanbanAddInput,
+		input: KanbanAddInput & { executorId?: string },
 		requestId: string,
 	): KanbanOutcome {
 		return operate(tx, requestId, "add", input, () => {
 			promptFits(input.prompt);
+			const executor = core.executor(input.executorId ?? DEFAULT_EXECUTOR_ID);
 			const ids = columnIds(tx, "todo");
 			const index = insertIndex(tx, ids, input.beforeCardId);
 			const at = now();
@@ -114,11 +124,14 @@ export function createKanban(options: {
 				column: "todo",
 				...NO_RUN,
 				projectId: DEFAULT_PROJECT_ID,
+				executorId: executor.id,
+				hasExecutionHistory: false,
 				position: ids.length,
 				createdAt: at,
 				updatedAt: at,
 			};
 			insertCard(tx, card);
+			rememberExecutor(tx, executor.id);
 			ids.splice(index, 0, card.id);
 			placeColumn(tx, ids);
 			bumpBoard(tx);
@@ -272,7 +285,7 @@ export function createKanban(options: {
 		unread: unreadNotices(tx),
 	});
 
-	return {
+	const service = {
 		addInTransaction,
 		editInTransaction,
 		moveInTransaction,
@@ -280,7 +293,11 @@ export function createKanban(options: {
 		reviewInTransaction,
 		resetInTransaction,
 		...runOperations,
+		...createExecutionOperations(core),
+		...createExecutionAdopter(core, runOperations),
 		boardInTransaction,
+		sharedBoardInTransaction: (tx: Database, view: KanbanViewContext) =>
+			sharedBoardInTransaction(tx, view, core.executors),
 		cardInTransaction,
 		receiptInTransaction: (tx: Database, requestId: string) =>
 			getReceipt(tx, requestId)?.receipt ?? null,
@@ -296,12 +313,19 @@ export function createKanban(options: {
 				if (!markNoticeRead(tx, id)) throw new Error("kanban_notice_not_found");
 			}),
 		/** Runs whose stop the person asked for and that nobody carried out yet. */
-		pendingStops: () => options.store.readSnapshot(pendingStops),
+		pendingStops: (executorId = DEFAULT_EXECUTOR_ID) =>
+			options.store.readSnapshot((tx) => pendingStops(tx, executorId)),
+		cardExecutorInTransaction: (tx: Database, cardId: string) => {
+			const card = getCard(tx, cardId);
+			if (!card) throw new Error("kanban_card_not_found");
+			return core.executor(card.executorId);
+		},
 		/** Records that a stopped run's process could not be confirmed gone. */
 		stopUnconfirmed: (runId: string) =>
 			options.store.write((tx) => stopUnconfirmed(tx, runId)),
 		...recovery,
 	};
+	return { ...service, ...createSharedOperations(core, service) };
 }
 
 export type KanbanService = ReturnType<typeof createKanban>;

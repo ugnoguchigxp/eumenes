@@ -1,4 +1,12 @@
 import {
+	describeSharedKanbanAdapter,
+	SHARED_KANBAN_ADAPTER_REF,
+} from "./kanban-shared-adapter";
+import {
+	describeCodexTasksAdapter,
+	CODEX_TASKS_ADAPTER_REF,
+} from "./codex-tasks-adapter";
+import {
 	GOOGLE_ACCOUNTS_ADAPTER_REF,
 	describeGoogleAccountsAdapter,
 } from "./google-accounts-adapter";
@@ -35,11 +43,6 @@ import {
 	STEWARD_ADAPTER_REF,
 	stewardDomainSchemas,
 } from "./steward-adapter";
-import {
-	describeWorldQueryAdapter,
-	WORLD_QUERY_ADAPTER_REF,
-	worldQueryDomainSchemas,
-} from "./world-query-adapter";
 import { describeWorldAdapter, WORLD_ADAPTER_REF } from "./world-adapter";
 import {
 	describeServiceTestsAdapter,
@@ -96,7 +99,6 @@ const domainSchemas: Readonly<Record<string, ZodType>> = {
 	...terminalsDomainSchemas,
 	...kanbanDomainSchemas,
 	...stewardDomainSchemas,
-	...worldQueryDomainSchemas,
 };
 
 /** What this host can execute, for checking bundles before they are registered. */
@@ -158,8 +160,12 @@ export const hostAdapterDescriptions: Array<
 	{ ref: SERVICE_TESTS_ADAPTER_REF, describe: describeServiceTestsAdapter },
 	{ ref: TERMINALS_ADAPTER_REF, describe: describeTerminalsAdapter },
 	{ ref: KANBAN_ADAPTER_REF, describe: describeKanbanAdapter },
+	{
+		ref: SHARED_KANBAN_ADAPTER_REF,
+		describe: () => describeSharedKanbanAdapter(describeKanbanAdapter()),
+	},
+	{ ref: CODEX_TASKS_ADAPTER_REF, describe: describeCodexTasksAdapter },
 	{ ref: STEWARD_ADAPTER_REF, describe: describeStewardAdapter },
-	{ ref: WORLD_QUERY_ADAPTER_REF, describe: describeWorldQueryAdapter },
 ];
 
 /** The bundle host as if every adapter were registered (see `hostAdapterDescriptions`). */

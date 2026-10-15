@@ -276,6 +276,7 @@ export async function buildServices(
 		capabilities: () => ocrCapabilities,
 	});
 	const { toolchain, links } = await createHostToolchain({
+		dbPath,
 		store,
 		queue,
 		uiCompositions,
@@ -289,6 +290,7 @@ export async function buildServices(
 		memory,
 		steward,
 		world,
+		goals: goals.goals,
 		serviceTests,
 		timers,
 		log,
@@ -392,6 +394,7 @@ export async function buildServices(
 					toolchain.embedQuery,
 					toolchain.registry,
 					toolchain.schemas,
+					toolchain.worldAvailable,
 				)
 			: undefined,
 	});

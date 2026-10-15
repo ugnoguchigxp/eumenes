@@ -1,6 +1,6 @@
 # 共通Kanban・Codex SDK実装の検証記録
 
-対象: `spec/codex-sdk-task-artifact-plan-2026-10-14.md` 改訂3から着手し、実測を改訂4へ反映。2026-10-15。
+対象: `spec/codex-sdk-task-artifact-plan-2026-10-14.md` 改訂3から着手し、実測を改訂4へ反映。独立CLI復元を改訂5へ反映し、作業を継続。2026-10-15。
 
 目的は共通ボード・担当別FIFO・workspace排他・SDK実行・共通通知・UI専用git工程をP0〜P5で実装・受入すること。依存順はP0実測→P1契約/移行→P2実行/登録→P3 GUI→P4通知/git→P5全体受入。P0の権限・停止・持続threadが成立するまで製品接続を開始しない。
 
@@ -80,3 +80,59 @@ macOS 26.6.2、Xcode SDK 26.2。現行`sys/event.h`はNOTE_TRACK/NOTE_TRACKERR/N
 | P5 | 未着手。domain/結合/移行/第三担当fixture/ブラウザ/自然言語/実SDKとClaude受入 |
 
 根拠: [公式SDK](https://learn.chatgpt.com/docs/codex-sdk)、[permissions](https://learn.chatgpt.com/docs/permissions)、[sandboxと保護パス](https://learn.chatgpt.com/docs/agent-approvals-security)。permission profileと旧sandbox設定は併用できないため、この候補は`default_permissions`のみで権限を選び、SDKのsandboxMode/networkAccessEnabledは渡さない。full accessは使わない。
+
+## 改訂5での継続（2026-10-15）
+
+ユーザーは独立CLIを復元ポイントとして設計を更新し、作業を続けるよう指定した。SDK自身の保存threadとresumeThreadを会話履歴の正本とし、runnerでは受付/実行状態/イベントcursor/報告/制御だけを保存する。backend停止時にSDKを終了する方式から、runnerが所有して継続する方式へ変更する。Dockerは採用しない。
+
+旧孤児停止試験は失敗のまま保持する。独立CLI化はOS全子孫の停止証明を与えないため、managedExecutionStoppedとworkspaceReleaseConfirmedを分け、前者だけでは自動引渡しを拒否する。全daemon封じ込めを不要とするユーザー承認は得ていない。担当別固定workspace＋手動引渡しか、管理可能な実行環境かを確認中。
+
+残作業: 独立CLIの部分/結合/live復元、重複実行防止、runner停止時unknown、停止操作、孤児時guard保持をP0で確認。その後P1〜P5へ継続する。上記の「停止」「最終」は改訂4時点の履歴であり現在の作業終了を表さない。initial_instructionsは通算1回、context_compile通算2回、compile_eval通算1回（最新compileの評価は完了時に記録）。
+
+### 改訂5の実測・部分/結合結果
+
+- packages/coding-runner/src/sdk-*へSDK専用CLIを追加。旧exec worker契約とconsumerは維持。SDK部分試験6件、runner全体68件（1217 assertions）成功。型/lint/sizeも成功。
+- 実SDK復元: `runner-live.ts --run`。接続元のSIGTERM/SIGKILL後にそれぞれ完了、同epoch・同thread、再送時のturn.completedは各一件、HEAD不変、履歴をrunnerへ複製しないことを確認。thread `01a13c77-8765-7663-9b6a-ac9abf19c024`。source SHA開始/終了一致。結果 `verification-reports/codex-tasks-p0/2026-10-14T22-11-30.188Z/runner-recovery.json`。接続元は独立runnerを呼ぶbackend-portの検証clientであり、実Eumenes serverの通し受入ではない。
+- 実SDK境界: `runner-boundaries.ts --run <record>`。manual Abort=cancelled/managedExecutionStopped=true、runner SIGKILL=unknown/同epoch/元指示再送なし、分離sleep残存=実測再現/引渡し拒否/guard保持。全ケースworkspaceReleaseConfirmed=false。source SHA一致。結果 `verification-reports/codex-tasks-p0/2026-10-14T22-13-54.910Z/runner-boundaries.json`。fixture残存processはPID/開始/実行バイナリ一致時だけcleanup。旧孤児の全子孫停止試験は失敗のまま。
+- P1: kanban/0003-executors、共通状態/担当FIFO/汎用executor registry/旧@1投影/workspace guard/構造化状態採用を追加中。既存domain39・Web18とapplication47件成功。新共通fixture6件、移行/第三担当/rollback/unknown採用を確認。実SDKのボード接続・実PTY入力との排他・新GUI・bundle公開・git工程は未実装/未受入。
+- 共有workspaceの引渡し方式は確認中。独立CLI化を全子孫停止保証の解決として扱わず、その判断に依存しないP1のみ先行する。
+
+### P1〜P3の追加結果（実装継続中）
+
+- codex-tasksの依存をcoding domainの公開入口へ接続し、fixture6件と選択domainの型/lint/format/size成功。公開入口を迂回するimportは除去した。最初の検証の型・依存規則の失敗は修正済み。試験追加前の「No tests selected」は未実装の試験が原因であり製品不具合として扱わない。
+- applicationのSDK↔共通ボード結合4件成功。backend port切断/再接続、単一writerでの結果/通知のrollbackと再照会、sameworkspaceの次カード保留、同thread続行、unknownのguard保持を確認。偽SDK engineを独立runnerの実HTTP/Unix socket経路で動かすfixtureであり、実Eumenes serverのliveではない。
+- SDK runner部分試験は8件に増加。明示的な新threadへの置換と、受付/前runのworkspace保有保存の途中crashでも、当該workspaceを凍結しつつinspectを継続するケースを追加。
+- DesignSystemのKanbanBoard29件・ActivityTimeline3件=32件成功。第三の登録担当、利用不能な選択の保持（fallbackなし）、担当別再開、表示filterがwriteを起こさないこと、長い詳細/HTML文字列/追従停止を確認。DesignSystem build成功。ブラウザ/Storybook browserは未実施。
+- P1〜P3の成果物はまだ製品ホスト/新bundleへ未接続。P4〜P5未着手。並行するWorld/research等の差分は保持し、その変更を本作業の成果に含めない。製品DB/秘密のコピー、branch/worktree作成、製品commit/push、他チャットへの送信は行っていない。
+
+
+### 改訂6のホスト接続・Git進捗（継続中、2026-10-15）
+
+- 共通ホスト、担当別登録、SDK専用設定、独立daemon接続、workspace/PTY入力排他、共通ボード/活動sourceを接続。旧kanban.bundle.jsonの内容はHEADと一致し、削除ファイルの復元漏れは見つからなかった。旧ボードのブラウザ4件とSDKボード1件はP3時点で成功。
+- 部分/結合: runner全体75件・1243 assertions成功。最初の併走実行は既存protocol試験1件が5秒timeoutとなり、他74件は成功した。liveが終了した条件で当該3件を確認し、全体を凍結して再実行した75件が成功。期待値やtimeoutは変更していない。SDK/card接続4件、capability seed/upgrade4件（171 assertions）、旧adapter13件、DS32件も成功。
+- 標準検証: codex-tasks（8件、35 assertions、970ms）、kanban（45件＋Web18件、4199ms）のsize/format/lint/型/試験・検証中のsource不変確認が成功。全体の型確認には担当外object-recognition browser試験のArrayBuffer/Iterable型不整合が一件残る。全体sizeにも担当外の既存/並行変更がある。これらを修正して検証を通す作業は行わない。
+- P4部分: UIの元run/HEAD/内容指紋/登録remoteに結び付く許可を保存し、別SDK turnのcommit→pushを同一操作group内で行う。private MCPは一工程のツールだけを公開し、通常shellはread-only/network禁止を維持。ホストがバイナリ/削除/新規ファイルの内容、親HEAD、tree、branch/remote、期限、SHAを照合する。部分試験5件では再送一回性、後からの変更/混在/余分なstage/remote変更/不明intentの拒否を確認。
+- 実SDKのGit受入: git-live.ts --run。最初はMCPの既定承認要求がapprovalPolicy=neverで拒否され、Git副作用は未開始、process観測の終了判定も未確認となった。privateなUI許可に限定する一工程のtool approval設定を公式MCP仕様に従って追加。実行バイナリが変わったPIDはsignalせず、同PID/開始時刻の生存中は完了を拒否し、zombie/終了後に観測対象の終了を判定する。
+- 二回目のliveはwork/commit/pushの3SDK turnが同threadで成功。親HEAD=baseline、変更path=value.jsのみ、remote SHA=検証済みcommit、commit数2、同一受付再送で同epoch、管理対象終了、source SHA開始/終了一致。記録: verification-reports/codex-tasks-p0/2026-10-15T00-40-20.993Z/git-live.json。これは隔離したrunner/ローカルbare remoteの受入であり、Eumenes APIの通しではない。全OS子孫の停止保証へ昇格しない。
+- SDK履歴はnative sessionだけを正本とする。CLIのcodex-runnerは製品DBを開かず、backend API認証の前に独立runner APIへ状態取得/停止を接続する。recoverによる未知工程の照合は残作業で、現状は保存状態の再照会。
+- 運用ログに適用済みkanban/0003-executorsのchecksum不一致を確認したため、0003のSQLをGit追加前へ戻し、追加は0004-gitに分離した。製品DBの書換えやmigration checksum更新は行わない。画面/受付の新しい参照は共通artifact@4・Kanban binding/toolchain@4・Codex binding/toolchain@2。登録整合性試験は成功。保存済みの旧revisionは更新しない。
+- ブラウザGit受入は継続中。最初は画面の文字列revisionを変換後のbuiltin数値schemaで検査して拒否した。画面用schema:kanban-git@1を追加し、実行時の厳密schemaを維持。登録参照のずれも検証で修正。次は受入済みの登録から画面操作を確認する。
+
+残作業はGitの不明工程の読取り照合とUI制御、partial成功/通知、活動の過去run/cursorとClaude source、PTY排他の競合試験、設定UIの繰返し保存、Eumenes APIの独立runner復元live、自然言語/両担当/ブラウザの最終受入。製品DB/秘密のコピー、製品commit/push、branch/worktree作成、他チャットへの送信は行っていない。
+
+### Kanban契約のHEAD復帰調査と画面反映の追加確認
+
+- 利用者が指定した対象は `api/domains/capabilities/contracts/kanban.ts`。Claudeの作業記録では2026-10-14T23:27:53.742Zにcontracts全体を整形し、23:28:03.422Zに同ファイルをHEADへ戻していた。Codexの22:56:07.707Zの読取り記録はHEADの契約と一致する。その後HEAD復帰までに同ファイルへ機能変更を加えた呼出しも見つからない。記録から復元できる変更は3か所の整形であり、入力契約の変更を推測して追加しない。共通担当用の契約は別のkanban-shared.tsに保持されている。
+- 対象ファイルだけ整形を復元した。kanban標準検証はdomain45件＋Web18件、size/format/lint/型とsource不変確認が成功（4106ms）。claude-code.tsや他作業のHEAD復帰には手を加えていない。
+- SDKブラウザの追加診断: 単発成功後の3回確認で2成功・1失敗。失敗時もrunnerの3実行はすべてsucceeded、pendingは空、保存済みカードはDone、Git runはcompleted。画面だけが開始待ちだった。timeoutだけを原因とする仮説は棄却する。
+- 次の診断付き3回は全成功したが、解消の根拠にはしない。取得中断と同じactive receiptの繰返し採用によるboard revision更新を観測したため、driverは内容とcursorが同じactive receiptを再採用しない。停止要求と終端結果はこの省略の対象外。結合5件が成功し、同じ観測3回で更新通知0件、終端採用と通知一件を確認した。警告はattempt/理由ごとに一度記録し、回復後は解除する。
+
+俯瞰評価: 診断3ラウンドで実行側と表示側を切り分けた。正常な長時間処理の停止や待ち時間の引上げは行わず、重複した状態出版を減らす方針へ変更した。画面反映の最終判断は変更後のブラウザ結果で行う。
+
+- 重複更新抑止後のブラウザ連続3回が成功。board revisionは各20、ボード応答は各9〜11件となり、変更前の約50 revision・約30応答から減少した。その後、Git制約とフォームを更新した候補でもSDKボード＋設定の連続保存のブラウザ2件が成功（41.4秒）。失敗記録は原因を完全に証明したものとして消去しない。
+- SDK Git部分9件成功。active hook・署名設定は変更せず拒否し、認証用Git設定によるURL書換え、存在しないremote ref、許可外の既存commitを含むpushを拒否する。最初のfixtureは利用者のglobal hooks設定を意図せず継承していたため、隔離repoのsetupで自身のhooksディレクトリを正本にした。製品設定は変更しない。
+- coding標準検証97件（runner79件＋domain18件）、1310 assertions、型・境界・size・format・lint・source不変確認が成功（99316ms）。初回の境界検査はSDK内部ファイルの直接再exportを拒否したため、既存contracts/clientの公開窓口へ揃えた。境界規則は緩めていない。
+- 共通フォームは、保存後に新しいdefaultsを反映し、編集済みのフォームは古いpreconditionを維持して外部更新との競合を検出する。追加2件とartifact標準検証46件が成功（2604ms）。試験のDOM matcher・browser専用option、および既存の今回差分のlint/整形を直してから確認した。
+- 最後のkanban標準検証もdomain45件＋Web18件、型・size・format・lint・source不変確認が成功（4056ms）。設定のモデル選択は保存済み候補だけを表示し、候補がない場合はAI接続設定へ案内する。利用不能な保存済み選択は保持し、自動で別モデルへ切り替えない。
+
+この追加結果でP4/P5全体の完了とはしない。unknownの明示照合、過去run/Claude活動、PTY競合、独立runnerを使うEumenes APIのnative live受入、自然言語/両担当の最終受入は引き続き残作業。

@@ -1,0 +1,68 @@
+.activity-timeline {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	gap: 8px;
+	color: var(--foreground);
+}
+.activity-timeline header {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 16px;
+}
+.activity-timeline h3 {
+	margin: 0;
+	font-size: 16px;
+	font-weight: 500;
+}
+.activity-timeline label {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 13px;
+}
+.activity-timeline-scroll {
+	max-height: 440px;
+	overflow: auto;
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	padding: 12px;
+	overflow-wrap: anywhere;
+}
+.activity-timeline-scroll:focus-visible {
+	outline: 2px solid var(--ring);
+	outline-offset: 2px;
+}
+.activity-timeline ol {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+}
+.activity-timeline li {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px 12px;
+	border-bottom: 1px solid var(--border);
+	padding: 10px 0;
+}
+.activity-timeline li:last-child {
+	border-bottom: 0;
+}
+.activity-timeline time,
+.activity-timeline-status {
+	font-size: 12px;
+	color: var(--muted-foreground);
+}
+.activity-timeline details {
+	flex-basis: 100%;
+}
+.activity-timeline pre {
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	margin: 8px 0;
+	font-size: 13px;
+}
+.activity-timeline [data-status="failed"] .activity-timeline-status {
+	color: var(--destructive);
+}

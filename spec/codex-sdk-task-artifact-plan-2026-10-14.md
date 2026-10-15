@@ -1,6 +1,6 @@
 # 共通 Kanban と Codex SDK ツールチェーンの実装計画
 
-作成日: 2026-10-14、更新日: 2026-10-15、改訂4。状態: **P0検証中・停止証明の要件未達、P1〜P5未着手**。対象 SDK は導入済みの `@openai/codex-sdk@0.160.0`。本書の登録名・API・テーブル名は追加予定であり、利用可能な機能を表すものではない。P0の実測と阻害要因は[検証記録](verification/codex-tasks-2026-10-15/README.md)に記載する。
+作成日: 2026-10-14、更新日: 2026-10-15、改訂6。状態: **P1〜P3のホスト接続・固定/ブラウザ確認済み、P4の隔離SDK commit/push受入済み。Git復旧・共通画面の最終受入とP5は継続中**。対象 SDK は導入済みの `@openai/codex-sdk@0.160.0`。本書の登録名・API・テーブル名は追加予定であり、利用可能な機能を表すものではない。P0の実測と設計変更は[検証記録](verification/codex-tasks-2026-10-15/README.md)に記載する。
 
 一つの Kanban「タスクボード」で、カードごとに Claude Code または Codex を選んで開発作業を依頼する。キューは実行担当ごとに独立した二本とし、GUI で進行状況、活動イベント、結果と Blocker を確認する。画面とカード管理は共有し、サブエージェント・指示・会話・実行機構は分離する。将来の Grok は登録された実行担当を増やす形で接続できるようにする。
 
@@ -26,6 +26,8 @@
 5. commit・push は共有カード詳細から、変更を作った実行担当へ依頼する別工程とする。共通の「commit して push」に加え、単独の commit/push はその担当が対応する場合だけ表示する。会話や通常の依頼文だけでは開始できない。
 6. 通知センターと短い通知音を使う。タスク発の通知を会話へ自動挿入しない。会話から状態を尋ねた場合は保存済みの状態を答える。
 7. Codex は TypeScript SDK のまま進める。実行中の対話的承認 UI は初期版に含めず、不足情報・権限不足は Blocker として終了し、回答や許可の更新後に新しい attempt で続ける。Claude Code の許可待ちは既存 Terminal へ案内する。
+8. CodexのSDK実行はEumenes backendから独立したCLI runnerが所有する。Eumenesだけが停止しても受理済み実行は継続し、backend再起動後に同じ実行を照会して表示・結果採用を復元する。Dockerは前提にしない。利用者が指定した変更であり、backend消失時の一律終了を要件から外す。
+9. 会話の履歴と継続の正本はSDK/CLIが保存するthread。runnerへ会話履歴を二重保存しない。runnerの永続記録は受付・実行ID・attempt・状態・イベントcursor・結果・停止操作・workspace保有の記録に限定する。
 
 初期値は実装判断であり、利用者の追加指定で変更できる。特に SDK の権限制御と停止確認は §12 の事前確認を通すまで実装可能と断定しない。
 
@@ -40,8 +42,24 @@
 | [通知センター](../web/src/components/domains/timers/NotificationCenter.tsx)、[Kanban 通知 API](../api/domains/kanban/controller.ts) | タイマーと Kanban の既存接続を再利用。通知センターの API と Claude の通知 kind を維持する（§10） |
 | [Claude Code 計画](kanban-claude-code-plan-2026-10-14.md)、[Kanban 契約](../api/domains/kanban/contracts.ts) | 一部実装が進行中。カード・run・通知・既存 KanbanBoard を共有の正本として拡張する。Claude session と Codex thread は統合しない |
 | [Queue runner](../api/domains/queue/service/runner.ts) | lease と再実行の仕組みを持つ。副作用を伴う SDK 呼出しをそのまま再試行させない |
+| [coding-runner](../packages/coding-runner/src/worker.ts)、[永続保存](../packages/coding-runner/src/storage.ts) | private spool、atomic write、flock、receipt、イベントcursorを再利用候補とする。既存exec workerはfixture専用制約・backend lease失効で停止・`codex/` branch制約があり、今回のSDK・main・独立継続へそのまま転用しない。既存契約・利用側を保持してSDK用の新入口/契約を追加する |
 
 既存の指示だけでは、開発権限、持続する SDK thread、イベント蓄積を満たせないため、新しい `codex-tasks` domain と SDK runner が必要。ただしカード管理は kanban に残す。二つの実行機構を接続する最小の登録 port を application に置き、任意コードを実行する plugin framework や別の Artifact ホストは追加しない。
+
+### CLI runnerとSDK履歴の復元ポイント
+
+Claude Code側は保存済みsessionを、Codex側はSDK/CLIの保存済みthreadを会話の復元ポイントとする。独立runnerはSDKを呼ぶ軽い実行ホストであり、Codexの会話履歴を独自に再実装しない。
+
+| 所有先 | 正本と復元対象 |
+| --- | --- |
+| kanban / backend | 共通card/run、担当FIFO、受付receipt、UI許可、結果採用、通知。runnerから再取得して単一writer transactionで採用 |
+| codex-tasks / backend | 共通runに結び付くattempt index、凍結指示/設定、runner参照、取り込んだseq、report/権限。SDKをbackend内で起動しない |
+| 独立CLI runner | executionId/attemptId/epoch、起動前intent、単調seqイベント、SDK終了/報告、制御操作receipt、workspaceの実行lease。backendとの接続の有無を実行権限と混同しない |
+| SDK / Codex CLI | threadIdと保存済み会話履歴。`resumeThread`で新しいturnを続行。進行中turnへの再接続APIがあるとは仮定しない |
+
+CLIは`serve/start/inspect/events/stop/recover`を同じ型付き実行操作へ接続する。Eumenesの一般CLIがbackend APIを呼ぶだけの方式ではbackend停止中の復元に使えないため、runnerの制御はprivateなローカル接続から直接照会できる。Web/一般CLIが製品DBを直接開く方式にはしない。runnerのprivate spoolには製品DB・設定・秘密を複製しない。
+
+Eumenesの接続断ではrunner epochを更新せず、SDK呼出しも増やさない。runner自身が終了し、SDK起動後の実行状態を証明できなければ`unknown`として保持する。SDK履歴が残っているだけで前のturnの成功・実行停止・未実行を推定しない。再開は照合後の明示操作で新attemptとし、以前の指示を自動再送しない。
 
 ### 確認した SDK の契約
 
@@ -176,8 +194,8 @@ runner の進行とタスク revision を分ける。ログ一行の追加で確
 ### 受付から結果採用まで
 
 1. 認証済み UI/会話操作を共通台帳で受け、同一 writer transaction で card、共通 run、担当別キュー位置、receipt を保存する。SDK/PTY を transaction 内で呼ばない。
-2. kanban が各担当キューの先頭候補を独立に選び、application が空き枠・期限・権限・workspace guard を公開操作で確認する。上記の責務で予約と `enqueueInTransaction` を同じ transaction にまとめる。Codex は対応する attempt を一件だけ保存する。`store.onCommit` が各送信器を起こし、Codex は `queued → starting` と runnerEpoch を保存してから `runStreamed` を一度呼ぶ。
-3. iterator は生成時の `{attemptId, runnerEpoch}` を closure に固定する。受信時の「現在の task」では対応付けない。`thread.started` の ID を保存し、継続時には保存済み ID と照合する。
+2. kanban が各担当キューの先頭候補を独立に選び、application が空き枠・期限・権限・workspace guard を公開操作で確認する。予約と `enqueueInTransaction` を同じ transaction にまとめ、Codexのattempt/outboxを一件保存する。commit後、同じexecutionIdとinput digestでrunnerへ受付を公開する。runnerは受付receiptとSDK起動intentを永続化してから`runStreamed`を一度呼ぶ。同executionId/digestの再照会は既存receiptであり再実行ではない。不明な送信をSDK再送へ変換しない。
+3. iterator は独立runnerが生成時の `{attemptId, runnerEpoch}` を closure に固定して所有し、イベントを永続化する。backendは保存済みcursor以降を取得する。Eumenes再接続を新epoch/新attemptにせず、`thread.started`のIDを保存・継続元と照合する。
 4. イベントを検証して seq 順に保存し、実行の表示 projection を更新する。`turn.completed` は最終報告の候補とする。stream の正常終端、実行プロセスの終了、報告 schema を確認するまで Done にしない。
 5. SDK attempt の終了・最終報告と、購読先の kanban による run/currentRun の採用・通知を同一 writer transaction で確定する。実行担当の成功だけ保存してボード更新を失わない。commit 後に画面へ変更通知を送り、その担当の次の run を評価する。
 
@@ -202,7 +220,7 @@ runner の進行とタスク revision を分ける。ログ一行の追加で確
 
 通常の遷移は `queued → dispatched → running → settling → completed/blocked`、実行中の `running ↔ waiting`、待機中の終端は `waiting → settling`、停止時の `dispatched/running/waiting/settling → stopping → blocked/cancelled/unknown`。起動前失敗・期限切れ・取消は `queued/dispatched` から該当終端へ進める。処理中のどの段階でも成否を確定できなければ `unknown` とする。受理済み取消を遅延した成功イベントで覆さない。
 
-run の実行終了確認と、workspace guard の解放は別の事実。Codex は process tree の終了確認が必要。Claude は request の終了後も idle PTY が guard を保持し、同じ担当の正当な継続では再利用できる。他担当への引渡しは§8の PTY 終了確認後だけ行う。したがって `completed` だけで共通 guard を解放しない。Claude が `unknown` を返した場合も、停止完了が別途確認でき、理由が明示的な手動停止なら `blocked` に対応付けられる。時刻や出力の文面から停止を推定しない。
+runの実行終了確認と会話履歴は別の事実。CodexはSDK stream、直接管理するCLI、観測済み管理プロセスの終了を確認して実行leaseを解放する。結果採用とbackendのguard解放は単一writer transactionで行い、担当別FIFOの次候補を評価する。追加依頼はleaseを再取得し、保存したthreadIdでresumeThreadする。履歴を保持するために終了後のleaseを保持する必要はない。Claudeのidle PTYは継続に再利用できるが、別の実行へ引き渡す際は管理PTYを終了確認する。管理対象の停止が不明ならguardを保持し、時刻や文面から停止を推定しない。
 
 共通 run の `unknown` は、§8・§9の明示的な照合操作だけで `completed/blocked/cancelled` に解決できる。元 attempt の終端とイベントは書き換えず、照合の根拠と解決結果を別記録に残す。解決しても担当キューは自動再開しない。履歴の旧 run を照合した場合、新しい currentRun の状態を変更しない。
 
@@ -216,7 +234,7 @@ run の実行終了確認と、workspace guard の解放は別の事実。Codex 
 | `starting` | SDK 起動を試みた。開始を確認すると `running`。起動前失敗を確証できれば `failed`、それ以外は `unknown` |
 | `running` | イベント取得中。正常終了候補は `settling`。停止要求は `stopping` |
 | `settling` | 終了・報告・保存を確認中。`succeeded` / `blocked` / `failed`。確認不能は `unknown` |
-| `stopping` | abort と process group の終了を待つ。停止確認後は `cancelled` または `blocked`。未確認なら `unknown` かつ排他保持 |
+| `stopping` | runnerがAbortと直接管理するCLI/既知のprocess groupの終了を待つ。管理対象の停止確認後は`cancelled/blocked`。未確認は`unknown`かつ排他保持 |
 | 終端 | `succeeded` / `blocked` / `failed` / `cancelled` / `unknown`。同 attempt を再実行しない |
 
 タスク表示は succeeded を Done、それ以外の終端を理由付き Blocker にする。終端済み attempt の遅延イベントは現行タスクを変更しない。重複終端は expectedState と attemptId/epoch の検査で無害化する。
@@ -273,11 +291,13 @@ Blocker の機械的理由には `auth_required`、`permission_required`、`sdk_
 - 長時間無イベント: 最終受信時刻と「更新がありません」を表示する。経過時間だけで成功・Blocker・再実行にしない。attempt の総期限は初期60分、到達時は同じ停止手順に入る。
 - 追加依頼: 同じ threadId を `resumeThread` で使う。thread の復元不能時は Blocker とし、勝手に別 thread で続きを実行しない。「新しいタスクとして依頼し直す」で、要約と元依頼を確認して新規作成できる。
 
-SDK の AbortSignal は process tree 全体の停止証明ではない。専用 launcher は attempt/epoch、process group、終了通知をホストへ返し、backend 消失時にも子プロセスを終了できる監視を持つ。PID 単独で復旧時に kill しない。OS 上の実行主体・生成時刻・nonce 等との照合を P0 で確立する。停止を確認できない構成ではリリースしない。
+SDKのAbortSignalは全子孫の停止証明ではない。独立CLI runnerはSDK呼出し・直接起動したCodex CLI・観測済み管理プロセス・停止receiptを所有する。Eumenes消失時は終了させず、元の期限と権限内で実行を継続する。runner自身の正常終了は実行中attemptを止めてreceiptを保存し、強制終了など停止を照合できない場合は`unknown`とする。保存PIDだけでkillせず、本人が起動したprocess handleまたは開始時刻/nonceを照合した管理対象だけを扱う。
+
+改訂6では復元を保存済みsessionID（CodexではthreadId）による継続に整理する。保証する実行境界はSDK turn・直接管理するCLI・観測済み管理プロセスであり、その終了確認で通常のleaseを解放する。全daemon子孫のOS封じ込めは、このCLI復元設計とは別の未達要件として記録する。独立CLI化がその問題を解決したとも、利用者が全子孫停止の失敗を承認したとも扱わない。過去の孤児再現試験は失敗のまま保持し、`workspaceReleaseConfirmed`や`stopConfirmed`を全子孫停止の証明として公開しない。観測した管理プロセスの残存・制御不能ではguardを保持する。コマンドの語句判定やLLMの自己申告を停止証明にしない。
 
 ## 8. 実行環境、再起動と他担当との排他
 
-新しい開発用 SDK adapter は `codex-tasks` 内に置く。認証は backend の承認済み Codex 実行環境を利用し、キーを task、Artifact、ログへ複製しない。実行に必要な環境だけを渡し、プロジェクト指示は読めるようにする。ユーザーの全 plugin/MCP/別 chat 操作を自動継承しない。既存の調査用 launcher の ephemeral 設定は使わず、thread の再開に必要な保存を保持する。
+backendのSDK実行接続は`codex-tasks`のrunner portとし、実際のSDK adapterは独立CLI runner内に置く。認証は承認済みCodex実行環境を利用し、キーをtask/Artifact/ログへ複製しない。実行に必要な環境だけを渡し、プロジェクト指示は読めるようにする。全plugin/MCP/別chat操作を自動継承せず、ephemeral設定を使わずSDK/CLIのthread保存を維持する。
 
 通常作業は `workspace-write`、実行先のネットワークアクセスは初期無効、許可の自動拡大なし。モデルとの通信と作業コマンドのネットワーク権限を区別する。依存取得などの追加権限は GUI で範囲を確認して別 attempt に渡す。非公開設定、LARM credential、Eumenes の製品 DB を子プロセスへ公開しないための deny/read 範囲を P0 で点検する。
 
@@ -304,7 +324,9 @@ application の小さい workspace execution guard を共通化する。key は�
 
 ### backend の再起動
 
-backend 全体の再起動では各担当キューを回復待ちにし、それぞれの回復結果を保存する。一方の runner だけの再起動・障害はその担当だけを止める。Kanban から未配送の run は順序を保持し、期限切れだけ終端にする。Codex の未起動 queued は保持し、starting/running/settling/stopping は結果不明として記録して管理プロセスの生存・停止を照合する。Claude の配送済み request は Claude 計画の recover 契約を使う。前 epoch のイベントを新 attempt に採用せず、停止未確認の guard は保持する。
+backend再起動では担当キューを照合待ちにし、未配送runの順序を保持する。Codexは同executionIdで既存runnerへ再接続し、受付receipt・現在状態・保存イベントの続き・最終報告を照合する。生きたrunnerが同epochで実行中なら、その状態を復元し、既存attemptをSDKで再起動しない。完了済みなら最終seqまで取得して一度だけ結果/通知を採用する。接続断だけでattemptを`unknown`や新epochへ変更しない。
+
+runner自身の再起動では、SDK起動intent前の未実行と、起動後/成否不明を区別する。後者は管理対象の照合とSDK保存履歴の参照を行うが、実行中turnへattachできると仮定せず`unknown`を保持する。照合できる永続終端receiptがあればその結果を採用できる。履歴だけを根拠に成功採用・再commit・再pushしない。停止未確認のguardを保持し、明示復旧後の新attemptだけを`resumeThread`で続ける。Claude側は既存recover契約を保持する。
 
 threadId が残っていても、最後の操作が成功したと推定しない。保存済みイベントと git 等の読み取りで状況を表示し、人が確認後に対象 executorId と queueRevision を指定してキューを再開する。再開で古い attempt は送り直さない。git の検証済み工程は§9の記録を維持し、未確認工程だけを照合する。Done の thread は通常どおり resume できる。メモリに残る SDK client 数をセッション数の上限にせず、実行終了後に解放する。
 
@@ -389,7 +411,7 @@ board/detail/activity/executors は共通 artifact source API と登録 query �
 
 | 段階 | 作業 | 完了条件 |
 | --- | --- | --- |
-| P0 接続の事前確認 | SDK/CLI、イベント、schema、サブエージェント無効化と持続thread・プロジェクト指示の両立、Bun、権限、停止・再起動、git mode を隔離 fixture で確認 | §12 の技術的不確実性を解消。実測した設定・制約を本書へ反映してから P1 以降へ進む |
+| P0 接続の事前確認 | 既存SDK/権限/git実測を保持。独立CLIの永続受付/イベント/状態、Eumenes切断と再接続、runner自身の終了/unknown、SDK履歴resumeを隔離fixtureで確認 | backend消失でSDKを再実行せず復元できる。管理対象の停止と保証範囲を記録し、制御不能はunknown/排他保持 |
 | P1 共通 Kanban 契約 | 完成した Claude 契約の保存形と移行判断を記録。その後、executor 登録 port、共通 run 状態表、二本のキュー、workspace 割当/排他、migration | 既存 Claude カードを保持し、旧画面の扱いを確定。fake 二担当で状態対応・終了待ち・writer rollback が通る |
 | P2 Codex runner と専用担当 | SDK attempt/events/復旧、専用 profile/skill/package/binding/DomainAdapter、共通 run への結果採用 | Codex 指定で専用担当へ到達し、ボードの同じカードが更新される |
 | P3 共通 GUI | KanbanBoard、二本のキュー表示、担当選択、ActivityTimeline、OpenUI、既存 Web adapter 拡張 | 入口一件。両担当の表示・操作・Blocker 対応が通る。IDE 機能なし |
@@ -404,7 +426,7 @@ board/detail/activity/executors は共通 artifact source API と登録 query �
 
 ### 既存 Kanban からの移行
 
-**基本方針は新revision（本書では `@2`）への更新と既存データの移行。旧UIの変更操作を継続する互換層は原則作らず、再読込みで新版へ移す。** 未配布という説明だけで、seed済み定義の本文を同じrevisionへ上書きしない。データ保持、定義の版管理、古い画面の継続利用は別の判断として扱う。
+**基本方針は新revision（共通Artifactは既存`@2`の次の`@3`）への更新と既存データの移行。旧UIの変更操作を継続する互換層は原則作らず、再読込みで新版へ移す。** seed済み定義の本文を同じrevisionへ上書きしない。データ保持、定義の版管理、古い画面の継続利用は別の判断として扱う。
 
 P1 の最初に、Claude 実装完了時のコミットと契約、保存済みカード/run/receipt、登録済み定義と参照、保存された Artifact・旧クライアントの継続要件を確認し、この節へ結果と採用経路を記録する。製品データは公開された読み取り操作で確認し、移行試験は隔離DBで行う。DBの削除や設定の初期化で互換問題を回避しない。
 
@@ -433,7 +455,7 @@ P1 の最初に、Claude 実装完了時のコミットと契約、保存済み�
 1. 導入済み SDK/実際の CLI で、start → 複数 item → final schema → 終端を観測する。起動・resume のイベント順、失敗時、非対応 event を記録する。
 2. 開発用 runner の設定で `multi_agent: false` を明示したまま、プロジェクト指示を読み、同じ thread を別プロセス・backend 再起動後に再開できること。調査用の `--ephemeral`、プロジェクト指示無効化、履歴制限をコピーしない。実際のCLI版・有効な設定・公開されたツール・再開の観測を記録し、サブエージェント起動が無効であることも確認する。実行を5件以上繰り返しても SDK client/プロセスが溜まらないこと。
 3. 通常 mode で編集・テストを実行でき、`.git` 更新・未許可ネットワーク・秘密領域へのアクセスが拒否されること。git mode の必要権限だけを設定できること。
-4. Abort、子コマンド実行中、backend 正常停止・強制終了で process tree を終了確認できること。不明なら guard を残して後続を拒否すること。
+4. backend正常停止/強制終了で独立runnerと受理済みSDK turnが継続し、再接続で同executionId/epoch/seqを復元できること。手動Abortはrunnerへ保存した制御操作を届け、管理対象CLIの終了を確認する。runner強制終了・起動境界crashは自動再送せずunknown/guard保持とする。管理対象の停止未確認なら次タスクを起動しないこと。過去の分離daemon再現は全子孫停止の失敗として保持し、管理対象の終了確認による通常FIFOと区別して記録する。
 5. 長いコマンド出力・SDK の巨大行でメモリが無制限にならず、切詰めか停止を追跡できること。イベント出力がターミナル同様に一文字ずつ流れる保証はせず、SDK が提供する更新粒度を記録する。
 6. git 用 granular policy が実装できない、承認を要する操作が SDK で進められない等の制約は隠さない。P0 不合格のまま full access や App Server へ自動変更しない。
 
@@ -443,11 +465,11 @@ P1 の最初に、Claude 実装完了時のコミットと契約、保存済み�
 
 SDK 0.160.0 / CLI 0.162.1 / Bun 1.4.3 / macOS 26.6.2で、編集・検証・AGENTS読取り・別プロセスresume・制限されたfilesystem/network・別attemptのcommit/local bare pushを観測した。権限は公開`configOverrides`からinline TOMLを渡し、`default_permissions`で選ぶ。filesystemのpath/globキーはSDKのdotted-path展開では正しく伝送できなかった。旧`sandboxMode/networkAccessEnabled`を併用しない。`features.multi_agent=false`を保ち、ephemeral・履歴無効化・調査用launcherは使っていない。
 
-停止は**未達**。process groupのみではCLIの別groupコマンドが残り、PID・開始時刻・実行バイナリによる子孫ポーリングを加えても、別sessionへ分離した後に親が即時終了する子を見落とした。固定fixtureに加え、実SDKの正常終端後も`/bin/sleep`が残ることを再現した。P0候補の正常終端を停止証明として扱わず、製品には登録していない。頻度の変更、コマンド文字列の禁止パターン、LLMへの禁止指示ではこの境界を代替しない。
+改訂4の全子孫停止保証は**未達のまま**。process group/子孫ポーリングが分離・即時reparent化した子を見落とすことをfixtureと実SDKで再現した。この記録や試験期待値は変更しない。改訂5では利用者の指定で復元ポイントを独立CLI＋SDK保存threadに置き、backend消失時の一律終了を外す。全daemon封じ込めは別の未達事項として保持する。改訂6では管理対象の終了確認で通常のworkspaceを引き渡す。Docker検討は製品実装へ採用しない。
 
-現行macOSのkqueue自動子孫追跡は非対応で、fork通知の子PIDも公開keventへ渡らないことを現行SDKヘッダーと[Apple公開ソース](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/sys/event.h)で確認した。続行には子孫の分離後も残るOSの管理単位を用意し、同じ孤児プロセス試験で停止・空の状態を証明できることが必要。Linuxのcgroup等を用いる実行環境への変更、またはmacOSの適切な監視・終了機構の導入は、実行環境と権限の設計変更として別途決定する。full accessやApp Serverへ切り替えない。
+現行macOSのkqueue自動子孫追跡は非対応で、fork通知の子PIDも公開keventへ渡らないことを現行SDKヘッダーと[Apple公開ソース](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/sys/event.h)で確認した。独立CLI化はこのOS制約を解消するものではなく、backendの寿命と実行の寿命を分ける設計変更である。full accessやApp Serverへ切り替えない。
 
-P1は、この停止要件が成立した後に開始する。並行作業で`kanban.bundle.json`、`terminals-screen.bundle.json`、tool-runtimeの受付とseed/upgrade試験が変わったため、その完成状態と公開参照を再確認する。復旧された`artifact:kanban.board@2`を共通担当対応の実装と扱わない。
+改訂5の独立CLI/復元受入は隔離fixtureで成立した。改訂6の管理対象終了とsessionID継続の契約で、共通契約・移行・実SDKのボード接続を進める。並行作業で`kanban.bundle.json`、`terminals-screen.bundle.json`、tool-runtimeの受付とseed/upgrade試験が変わったため、その完成状態と公開参照を再確認する。復旧された`artifact:kanban.board@2`を共通担当対応の実装と扱わない。
 
 | ケース | 観測可能な合格条件 |
 | --- | --- |
@@ -458,8 +480,10 @@ P1は、この停止要件が成立した後に開始する。並行作業で`ka
 | 中止と完了の競合・停止未確認 | 受理済み取消後の結果を成功採用しない。停止未確認の次 task は起動しない |
 | DB 保存失敗・イベント上限・接続断 | 欠落/切詰めを明示し、cursor で復旧。保存不能を成功として進めない |
 | 同一 item の更新、複数ページ、同時イベント | 出力二重追記なし、seq に重複欠落なし、UI メモリが上限内 |
-| SDK 正常終了だが質問/不正 report | 質問は Blocker、不正 report も Blocker。終了だけで Done にしない |
+| SDK 正常終了だが質問/不正 report | 質問は Blocker、不正 report も Blocker。終了だけで Done にしない。管理対象CLIの終了とworkspace所有runnerの解放は別に扱う |
 | 回答・追加依頼・resume 不能 | 正しい thread/質問へ渡り、古い回答を拒否。復元不能を新規実行へすり替えない |
+| Eumenesのみ終了・再接続 | 同じCLI runner・executionId・epochで実行継続。保存cursorからイベント再取得し、結果/通知は一件。SDKへの依頼回数は増えない |
+| CLI runner自身の終了・復元 | SDK起動前と起動後を区別。永続済み終端receiptは復元し、起動後不明はunknown/guard保持。SDK thread履歴だけで成功や停止を確定せず、指示を自動再送しない |
 | 通常依頼に commit/push 指示、UI 偽装 | git 操作が許可されず、会話 origin が git operation を開始できない |
 | commit 成功/push 失敗、push 応答不明 | SHA と工程別結果を保持、再commit・自動再pushなし、remote 照合を実施 |
 | git 工程の境界ごとの crash | commit副作用後／検証済み保存後／push受付後／push起動後で停止。検証済みSHAを失わず、後半runは一件だけ。許可失効ならpushを開始しない。不明な工程は照合し、同じ許可で再commitしない |
@@ -482,7 +506,13 @@ P1は、この停止要件が成立した後に開始する。並行作業で`ka
 
 隔離したテスト repository とテスト用 bare remote を使い、(1) 共通ボードで Codex 選択・依頼・編集・検証・GUI イベント・Done 通知、(2) 不足情報で Blocker・回答・続行、(3) 作業中停止・停止確認・次タスク、(4) UI の commit/push・remote SHA 確認、(5) backend 再起動・同 thread 続行を確認する。さらに Claude Code と Codex を別のテスト作業場所で並行実行し、片方の停止が他方を止めないことを確認する。同じ作業場所では排他待機を確認する。実 LLM による担当選択は固定モデル試験と分ける。通常運用の remote への push、実製品 DB/秘密の複製は受入に含めない。Grok の実接続は今回の受入対象外。
 
-実装完了は、登録、固定試験、ブラウザ、実 SDK の結果を区別して報告する。現在はP0の接続・権限・履歴・gitの実測まで進み、停止証明が未達。P1〜P5は未着手。停止可能な実行境界を決定・実証してから製品実装へ進む。
+実装完了は、登録、固定試験、ブラウザ、実SDKの結果を区別して報告する。現在は既存P0の接続・権限・SDK履歴・git実測を保持し、改訂5の独立CLI/復元受入を隔離fixtureで確認済み。P1〜P3の共通契約/移行・独立runner・画面部品を実装中。ホスト登録、P4〜P5は残作業。独立runnerの受付/永続イベント/接続復元/unknown/管理対象停止を確認してから製品へ接続する。
+
+## 14. 改訂5の設計変更（2026-10-15）
+
+利用者の「CLIを復元ポイントにする」「SDK単体でもsession履歴を持つ」という指定を反映した。会話履歴は既存SDKの保存threadを使い、独立CLIには実行制御と復元照合に必要な記録だけを置く。Eumenes停止時の一律終了から、独立実行と再接続へ変更した。Dockerを製品の前提にせず、過去の孤児停止失敗を成功扱いしない。管理対象の停止と全daemon子孫封じ込めの保証範囲を明記し、unknownの自動再送禁止・workspace排他・UI限定git権限は維持した。
+
+残作業はP0独立CLI受入→P1共通状態/移行/guard→P2SDK担当の登録と採用→P3共通GUI→P4通知/git→P5全体受入。既存exec runnerのfixture専用実行・backend lease・branch制約は変更せず、永続保存等の共通機構を使うSDK入口を追加する。
 
 ## 13. 改訂3で反映したレビュー
 
@@ -498,3 +528,42 @@ P1は、この停止要件が成立した後に開始する。並行作業で`ka
 | 開発runnerの事前確認 | §2・§12。導入済み公開型の再確認と、サブエージェント無効化・持続thread・プロジェクト指示の実動作確認を区別 |
 
 改訂3では計画書だけを変更し、差分・節間の整合・ローカル参照を点検する。製品コード、fixture、ブラウザ、実SDKの検証は未実施であり、P0〜P5の完了を意味しない。
+
+### 改訂5の実装進捗
+
+独立CLIは保存受付/起動intent/単調seq/最終report/制御receiptを保持する。接続元clientのSIGTERM/SIGKILL後の実SDK完了・同epoch/同thread再接続・同ID再送による重複起動防止、runner再起動後の完了結果復元を隔離repoで確認した。これは実Eumenes server/GUIの通し試験とは区別する。runner自身のSIGKILL後はunknownとして元指示を再送せず、manual Abortは管理CLI終了を確認した。実SDKのdaemon再現でもworkspaceReleaseConfirmed=falseを保持し、引渡しを拒否した。
+
+P1の保存形はkanban/0003-executorsへ追加し、既存migration/receipt bytesは保持する。stateは共通語彙、旧query@1は旧語彙へ投影する。旧handedはdispatchedとして移し、実開始は起動時の担当port照合で確定する。executor登録・FIFO・workspace guardはprovider名による分岐を持たない。部分試験で第三のfixture担当、移行、transaction rollback、unknown時の自担当queue停止とguard保持を確認。P1の実行port接続・PTY手入力排他とP2〜P5は残作業。
+
+### 2026-10-15の継続進捗
+
+- P1: 担当別FIFO、共通状態、旧Claudeカード/run/receiptを保持するmigration、workspace guardの予約/releasing/unknown、構造化観測の採用、担当選択と最後の選択の保存。旧query@1はClaudeカードを表示し、shared query@2は登録担当全体を表示する。実PTYの起動・入力・終了とguardを結ぶ接続は未完了。
+- P2: codex-tasks domainに凍結spec/起動outbox/seqイベント/結果/設定revisionを保存。coding domainの公開protocolを介して独立CLIを照会するapplication portを実装。起動要求前に出版intentを保存し、backend再接続は既存実行の照会から復元する。起動済みが不明な場合に同じSDK依頼を再送しない。domain6件、application4件のfixtureが成功。製品ホスト・bundle・設定画面への登録は未完了。
+- P3: KanbanBoardの担当選択/表示フィルター/担当別キューと、汎用ActivityTimelineの追従停止/折畳み/空/切断状態を実装。部品32件の固定試験成功。OpenUI登録を追加したが、共有source/detail/activityとWeb adapter・artifact@3の接続、ブラウザ受入は残作業。
+- 独立CLIにはlistを加え、backend停止中も実行IDとthreadIdを取得できる。会話履歴はSDKに残し、同じカードの明示的な継続はresumeThread、明示的な新規実行は新threadでworkspace保有だけを引き継ぐ。
+- 改訂6: 管理対象の終了確認でworkspaceを解放し次カードを進める。追加依頼は保存したthreadIdで再開する。分離daemonを見落とす制約と過去の失敗は保持し、workspaceReleaseConfirmedを全子孫停止の証明として立てない。
+
+残作業の依存順: P1の実PTY/入力とguardの接続→P2のホスト登録・専用設定・SDK worker/受付bundle→P3のsource/詳細/activity接続とbrowser→P4のUI git許可/工程/照合/通知音→P5の固定/自然言語/実SDK・Claude通し。共有workspace引渡し方式の判断に依存する部分は有効化しない。
+
+### 改訂6: sessionIDによる継続（2026-10-15）
+
+利用者の「sessionIDで引き継げばいい」という指摘に合わせ、追加の実行環境選択は求めない。実行中は独立runnerのexecutionId/epoch/cursorを再取得し、終了後の続行は保存したthreadIdで新turnを実行する。SDK履歴を独自保存せず、通常の終了で実行leaseを解放する。runner自身の起動後crashだけはunknownとして自動再送を止める。全daemon封じ込めの旧受入失敗はこの変更で成功へ置き換えない。
+
+共有Artifactの画面操作は、登録済みsourceBindingsのadapterを正本として実行する。会話受付bindingのadapterと一致することは要求しない。既存機構の一致制約では、Codex受付担当から共通Kanban画面を使う操作がartifact_unavailableになることをブラウザ経路で再現した。source・query・operation・effect・scope・revision・input・receiptの既存検証は維持する。同じArtifact revisionを参照する複数toolchainはメニューで一件にまとめる。旧Kanban bundleは復旧済みの内容を保全し、新しい共通登録はkanban.shared.bundle.json、Codex登録はkanban.worker-codex-tasks.bundle.jsonへ分離する。
+
+### P4の実行境界の具体化
+
+SDKのnative shellへ.git書込みや外部通信を広く開く方式では、UIで確認したファイル・送信先・SHAへの制限をホストで強制できない。既存coding-runnerのsnapshot、gitBytes、Git検証、MCP stdio登録を再利用する。git工程だけ、privateな凍結許可を読むMCPツールをSDKへ渡す。通常のnative toolsはgit工程もread-only・通信禁止とし、MCPのホスト操作が対象ファイルのhash、元HEAD、branch、remote URL、期限、操作IDを検証して固定のGit操作を実行する。秘密やProvider環境変数はモデル・製品ログへ渡さない。
+
+一件のUI受付をoperation groupとして保持し、commitとpushは別のSDK turn・privateなphase intent/receiptで記録する。両turnは保存した同じthreadを使い、verified commit SHAを永続化してからpush工程を開く。MCP操作は同IDのreceiptをreplayし、副作用不明のintentを自動再実行しない。共通カード・通知はgroupの終端を一度だけ採用し、codex-tasksはphaseの検証結果を保存する。管理対象が止まっていてもgit副作用不明ならunknown/guard保持とする。これはLLMの意味判断を移す実装ではなく、明示UI許可とGit外部仕様の制約を強制する実行境界である。
+
+
+### 現在の登録と検証（2026-10-15）
+
+共通画面の次版はartifact:kanban.board@4、Kanban受付はbinding/toolchain:kanban.manage@4、Codex受付はbinding/toolchain:codex-tasks.manage@2とする。旧kanban.bundle.jsonと登録済みrevisionは上書きせず、新bundleと次版で接続する。Kanban/0001〜0003は適用済みSQLとして保持し、Git保存形は0004-gitで追加する。Codexのnative履歴はrunnerに複製しない。
+
+P4のprivate MCPツールは、画面で一回確認した許可に結び付くcommitかpushの一方だけを公開する。required/enabled_toolsと、その一つのtools.<tool>.approval_mode=approveをホストconfigに固定する。通常作業はMCPを登録しない。任意のMCPやshellを包括承認する機構は追加しない。根拠は[公式MCP設定](https://learn.chatgpt.com/docs/extend/mcp)と、一回目の実SDKで未指定ツールの承認要求が拒否された再現結果。二回目は同threadのwork/commit/push、内容・親・remote SHA・再送一回性が成功した。
+
+現在の標準検証はcodex-tasks 8件とkanban 45件＋Web18件が成功。runner75件、DS32件、登録/upgrade4件、SDK/card結合4件、旧adapter13件も成功。ブラウザGit操作、unknownの照合、過去の活動、実Eumenes APIの復元・通し受入が残る。旧孤児停止試験の失敗は保持し、管理対象終了を全daemon不存在の証明と混同しない。
+
+画面反映の追加検証では、同じactive receiptの再採用を省略し、終端・停止要求の採用は維持した。結合5件とブラウザ連続3回が成功した。Gitの既存制約は、phaseの共通検証で接続する。既存hooks・署名設定を迂回する必要がある場合はBlockerとし、設定を変更しない。認証用Git設定を含めた実際のfetch/push URLも登録先と照合する。push対象の親がremoteの確認済みHEADと異なれば、他commitをまとめて送ることになるため拒否する。既に対象SHAがremoteにある場合は読取り確認だけを返す。根拠は[Git hooks仕様](https://git-scm.com/docs/githooks)と[Git設定のURL書換え仕様](https://git-scm.com/docs/git-config)。これらは語句や依頼内容による分岐ではなく、UIで許可した送信先・変更範囲を守るためのGit契約検証である。

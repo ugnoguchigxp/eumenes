@@ -24,12 +24,11 @@ import {
 } from "./selection-trace";
 import { generateConversation } from "./conversation-generation";
 import { researchCitations } from "./research-citations";
-import type { Run, WorldContextSettleInput } from "../contracts";
+import type { Run } from "../contracts";
 import { byId, transition } from "../repository";
 import { endRun, type RunEndState } from "./run-end";
 import {
 	GENERATE_KIND,
-	WorldContextRetry,
 	type DialogueDeps,
 	type GenerateInput,
 	type GeneratePayload,
@@ -40,10 +39,8 @@ import { adoptMemoryWindow, clearShownNotices } from "./memory-window";
 import type { Progress } from "./progress";
 const log = getLogger("dialogue");
 
-function answerCollection(run: Run | null, input: GenerateInput) {
-	// An unadopted World-backed body must not be collected as an attitude sample.
-	// Speech collects the adopted answer later, from the voice side.
-	return run && !(input.world || input.worldUsed)
+function answerCollection(run: Run | null) {
+	return run
 		? {
 				collection: {
 					conversationId: run.conversationId,
@@ -67,8 +64,6 @@ function shouldHoldBody(input: GenerateInput) {
 	return !!(
 		(input.memory && !input.memory.quiet) ||
 		input.goals ||
-		input.world ||
-		input.worldUsed ||
 		input.agent?.projection ||
 		input.agent?.failureCode ||
 		input.agent?.actionPayload ||
@@ -81,18 +76,8 @@ export function createGenerationHandler(
 	deps: DialogueDeps,
 	{ partials, publish }: Pick<Progress, "partials" | "publish">,
 ) {
-	const {
-		store,
-		conversation,
-		larm,
-		queue,
-		clock,
-		id,
-		memory,
-		agents,
-		postAnswer,
-		worldContext,
-	} = deps;
+	const { store, conversation, larm, clock, id, memory, agents, postAnswer } =
+		deps;
 
 	const handler: HandlerDefinition<
 		GeneratePayload,
@@ -114,8 +99,8 @@ export function createGenerationHandler(
 		}),
 		recovery: "interrupt",
 		resourceKey: "inference.llm",
-		prepareInTransaction: createPrepare(deps, { partials }),
-		async execute(input, { signal, jobId, attempt, generation }) {
+		prepareInTransaction: createPrepare(deps),
+		async execute(input, { signal }) {
 			const run = store.read((db) => byId(db, input.runId));
 			return withLogContext(
 				{
@@ -154,30 +139,6 @@ export function createGenerationHandler(
 						signal.throwIfAborted();
 					}
 					let holdBody = shouldHoldBody(input);
-					if (input.world && worldContext) {
-						// The last gate before the model. A source, policy or forget change makes
-						// the context stale; a stopped run or a replaced attempt must not send either.
-						// All of it is checked last, right before the send. Anything sent after this
-						// cannot be recalled: later changes can only stop the adoption.
-						const verdict = await worldContext.checkBeforeSend(
-							input.world.context,
-						);
-						if (!verdict.ok)
-							throw verdict.retryable
-								? new WorldContextRetry(verdict.reason)
-								: new Error(verdict.reason);
-						signal.throwIfAborted();
-						const now = store.read((db) => byId(db, input.runId));
-						if (now?.status !== "running" || now.revision !== input.revision)
-							throw new Error("cancelled");
-						const job = queue.get(jobId);
-						if (
-							job?.state !== "running" ||
-							job.attempt !== attempt ||
-							job.generation !== generation
-						)
-							throw new Error("attempt_changed");
-					}
 					let held = 0;
 					const delta = (text: string) => {
 						signal.throwIfAborted();
@@ -189,7 +150,7 @@ export function createGenerationHandler(
 							throw new Error("cancelled");
 						timing.firstDelta(text, holdBody);
 						if (holdBody) {
-							// Memory/World-backed text is not shown or spoken before the adoption check passes.
+							// Memory-backed text is not shown or spoken before the adoption check passes.
 							held += text.length;
 							if (held > 65536) throw new Error("chat_output_too_large");
 							return;
@@ -199,7 +160,7 @@ export function createGenerationHandler(
 						partials.set(input.runId, next);
 						publish(input.runId);
 					};
-					const preparation = answerCollection(run, input);
+					const preparation = answerCollection(run);
 					const decision = await prepareDecision(deps, input, signal);
 					const { recallPins } = decision;
 					holdBody ||= recallPins.length > 0 || !!decision.tools?.length;
@@ -277,8 +238,6 @@ export function createGenerationHandler(
 				},
 			);
 		},
-		classify: (error) =>
-			error instanceof WorldContextRetry ? "retry" : "fail",
 		settleInTransaction(tx, claim, input, outcome) {
 			const run = byId(tx, claim.payload.runId);
 			if (!run) return "stale";
@@ -289,14 +248,9 @@ export function createGenerationHandler(
 					run.status !== "running" ||
 					run.revision !== input.revision
 				) {
-					// The result is not adopted: nothing it stood on stays registered.
-					if (input?.world && run.status !== "completed")
-						worldContext?.releaseInTransaction(tx, run.id, run.conversationId);
 					return "stale";
 				}
 				if (!validAttachmentContext(deps, tx, input, run.conversationId)) {
-					if (input.world)
-						worldContext?.releaseInTransaction(tx, run.id, run.conversationId);
 					endRun(deps, tx, run, "failed", "attachment_source_unavailable");
 					return failedAnswer(
 						deps,
@@ -323,43 +277,7 @@ export function createGenerationHandler(
 				) {
 					endRun(deps, tx, run, "failed", "report_invalidated");
 					agents.failAnswerInTransaction(tx, run.id, "report_invalidated");
-					// Not adopted: the World context's input dependencies go.
-					if (input.world)
-						worldContext?.releaseInTransaction(tx, run.id, run.conversationId);
 					return failedAnswer(deps, tx, run.id, "report_invalidated");
-				}
-				const worldSettle: WorldContextSettleInput | null =
-					input.world && worldContext
-						? {
-								runId: run.id,
-								conversationId: run.conversationId,
-								jobId: claim.jobId,
-								attempt: claim.attempt,
-								generation: claim.generation,
-								inference: outcome.result.receipt
-									? {
-											requestId: outcome.result.receipt.requestId,
-											attemptId: outcome.result.receipt.attemptId,
-										}
-									: null,
-								nowMs: Date.parse(clock()),
-							}
-						: null;
-				if (input.world && worldContext && worldSettle) {
-					// Read-only, before anything is written: a stale World context adopts
-					// neither the answer nor a usage record.
-					const verdict = worldContext.validateInTransaction(
-						tx,
-						worldSettle,
-						input.world.context,
-					);
-					if (!verdict.ok) {
-						worldContext.releaseInTransaction(tx, run.id, run.conversationId);
-						if (run.agentTaskId)
-							agents?.failAnswerInTransaction(tx, run.id, verdict.reason);
-						endRun(deps, tx, run, "failed", verdict.reason);
-						return failedAnswer(deps, tx, run.id, verdict.reason);
-					}
 				}
 				// The goals layer stands apart from the memory window: a quiet window still has to see its goals change.
 				const goalsStale = goalsLayerStale(deps.goals, tx, input.goals);
@@ -374,13 +292,6 @@ export function createGenerationHandler(
 								outcome.result.recallPins,
 							);
 					if (!adopted.ok) {
-						// Not adopted: the World context's input dependencies go.
-						if (input.world)
-							worldContext?.releaseInTransaction(
-								tx,
-								run.id,
-								run.conversationId,
-							);
 						if (run.agentTaskId)
 							agents?.failAnswerInTransaction(tx, run.id, adopted.reason);
 						endRun(deps, tx, run, "failed", adopted.reason);
@@ -395,17 +306,8 @@ export function createGenerationHandler(
 					if (run.agentTaskId)
 						agents?.failAnswerInTransaction(tx, run.id, "permission_revoked");
 					endRun(deps, tx, run, "failed", "permission_revoked");
-					if (input.world)
-						worldContext?.releaseInTransaction(tx, run.id, run.conversationId);
 					return failedAnswer(deps, tx, run.id, "permission_revoked");
 				}
-				// The usage record and the answer are written together, after every check.
-				if (input.world && worldContext && worldSettle)
-					worldContext.recordUsageInTransaction(
-						tx,
-						worldSettle,
-						input.world.context,
-					);
 				if (input.agent && agents)
 					agents.completeAnswerInTransaction(tx, input.agent);
 				const messageId = id();
@@ -430,14 +332,10 @@ export function createGenerationHandler(
 				const done = endRun(deps, tx, run, "completed", null, messageId);
 				if (done) observeAnswer(postAnswer, tx, run.id, input.agent);
 				if (done) traceOutcome(deps, tx, run.id, agentOutcome(input.agent));
-				else if (input.world)
-					worldContext?.releaseInTransaction(tx, run.id, run.conversationId);
 				return done ? "applied" : "stale";
 			}
 			// A run that is already terminal (e.g. cancelled) keeps its state.
 			if (run.status !== "queued" && run.status !== "running") return "applied";
-			// Not adopted (failed, retried, expired, interrupted): drop the input dependencies.
-			worldContext?.releaseInTransaction(tx, run.id, run.conversationId);
 			const next: [RunEndState | "queued", string | null] =
 				outcome.type === "retry"
 					? ["queued", outcome.errorCode]
@@ -460,8 +358,6 @@ export function createGenerationHandler(
 			const run = byId(tx, job.payload.runId);
 			if (run && (run.status === "queued" || run.status === "running")) {
 				endRun(deps, tx, run, "cancelled", "cancel_requested");
-				// A late result is rejected by the queue; what the run registered is released.
-				worldContext?.releaseInTransaction(tx, run.id, run.conversationId);
 				traceFailure(deps, tx, run.id, "cancelled", "cancel_requested");
 			}
 		},

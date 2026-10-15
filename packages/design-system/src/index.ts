@@ -113,6 +113,7 @@ export * from "./components/FullscreenDialog";
 export * from "./components/ObjectRecognitionWorkspace";
 export * from "./components/TerminalWorkspace";
 export * from "./components/KanbanBoard";
+export * from "./components/ActivityTimeline";
 export { DrawingWorkspace, type DrawingWorkspaceProps } from "./components/DrawingWorkspace";
 export { DrawingEditorFrame, type DrawingEditorFrameProps } from "./components/DrawingWorkspace";
 export { isDrawingFrameOf, isDrawingFrameState, type DrawingFrameState, type DrawingFrameCommand } from "./components/DrawingWorkspace";

@@ -27,7 +27,6 @@
 		"api/domains/voice-dialogue/service/index.ts#createVoiceDialogue": 675,
 		"api/domains/web-research/service/index.ts#createWebResearch": 522,
 		"api/domains/web-research/service/saved-bodies.ts#createSavedBodies": 308,
-		"api/domains/world/service/context-broker.ts#createWorldContextBroker": 402,
 		"api/domains/world/service/runtime-adapter.ts#createRuntimeObservation": 484,
 		"api/domains/world/service/world-claims.ts#createWorldClaims": 565,
 		"api/domains/world/service/world-query.ts#createWorldQuery": 388,

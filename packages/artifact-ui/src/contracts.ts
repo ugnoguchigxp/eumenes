@@ -1,18 +1,12 @@
 import type { GoogleAccountsResource } from "./google-accounts-components";
-import type { WorkspaceAction } from "./workspace-actions";
-import type { OcrAction } from "./ocr-actions";
 import type { OcrResource } from "./ocr-components";
 export type { OcrResource } from "./ocr-components";
 import type { CollectionResource } from "./collection-contracts";
-export type {
-	CollectionFormField,
-	CollectionResource,
-	CollectionRow,
-	CollectionRowAction,
-} from "./collection-contracts";
+export type * from "./resource-exports";
 import type { ObjectRecognitionResource } from "./object-recognition-components";
 import type { TerminalsResource } from "./terminal-components";
 import type { KanbanResource } from "./kanban-components";
+import type { ActivityResource } from "./activity-components";
 export type { KanbanBoardSource, KanbanResource } from "./kanban-components";
 export type {
 	TerminalConnection,
@@ -50,7 +44,8 @@ const field = z
 			"boolean",
 		]),
 		required: z.boolean().optional(),
-		options: z.array(z.string().min(1).max(120)).min(1).max(8).optional(),
+		options: z.array(z.string().min(1).max(120)).min(1).max(128).optional(),
+		optionLabels: z.record(z.string(), z.string().min(1).max(200)).optional(),
 	})
 	.superRefine((f, ctx) => {
 		if (["select", "radio", "checkbox"].includes(f.type) && !f.options)
@@ -196,6 +191,15 @@ export const viewRegistry = {
 		label: "タスクボード",
 		schema: z.strictObject({
 			view: z.literal("kanban-board"),
+			source,
+			title,
+		}),
+	},
+	"activity-timeline": {
+		name: "ActivityTimeline",
+		label: "活動の記録",
+		schema: z.strictObject({
+			view: z.literal("activity-timeline"),
 			source,
 			title,
 		}),
@@ -660,6 +664,7 @@ export type Resource =
 	| ObjectRecognitionResource
 	| TerminalsResource
 	| KanbanResource
+	| ActivityResource
 	| ImageWorkspaceResource
 	| RecordsResource
 	| SubtitlePreviewResource
@@ -716,99 +721,7 @@ export type Resource =
 	| SettingsResource
 	| { kind: "components"; revision: number; example?: string };
 export type Snapshot = Readonly<Record<string, Resource>>;
-export type ArtifactEvent = {
-	id: string;
-	source: string;
-	revision: number;
-	action:
-		| OcrAction
-		| WorkspaceAction
-		| "kanban-add"
-		| "kanban-edit"
-		| "kanban-move"
-		| "kanban-remove"
-		| "kanban-run"
-		| "kanban-followup"
-		| "kanban-commit-push"
-		| "kanban-review"
-		| "kanban-cancel"
-		| "kanban-stop"
-		| "kanban-reset"
-		| "kanban-resume-queue"
-		| "kanban-open"
-		| "drawing-new"
-		| "drawing-open"
-		| "drawing-refresh"
-		| "drawing-delete"
-		| "drawing-browse"
-		| "image-close"
-		| "image-delete"
-		| "image-generate"
-		| "image-cancel"
-		| "image-refresh"
-		| "image-select"
-		| "collection-action"
-		| "collection-create"
-		| "collection-page"
-		| "records-refresh"
-		| "records-query"
-		| "records-procedure-state"
-		| "records-procedure-delete"
-		| "records-download"
-		| "settings-edit"
-		| "settings-action"
-		| "settings-open"
-		| "settings-review"
-		| "google-connect"
-		| "google-cancel"
-		| "google-disconnect"
-		| "google-back"
-		| "settings-apply"
-		| "settings-discard"
-		| "timer-start"
-		| "timer-cancel"
-		| "timer-pause"
-		| "timer-resume"
-		| "timer-new"
-		| "clock-mode"
-		| "stopwatch-start"
-		| "stopwatch-stop"
-		| "stopwatch-reset"
-		| "answer"
-		| "submit"
-		| "ui-generate"
-		| "ui-cancel"
-		| "ui-select"
-		| "ui-refresh"
-		| "memory-correct"
-		| "memory-select"
-		| "settings-save"
-		| "demo-click"
-		| "music-select"
-		| "music-generate"
-		| "music-cancel"
-		| "music-artwork"
-		| "music-search"
-		| "music-more"
-		| "music-refresh"
-		| "music-favorite"
-		| "music-delete"
-		| "generation-cancel"
-		| "generation-retry";
-	values: Record<string, string | boolean>;
-};
-/**
- * accepted/duplicate/conflict/rejected are final. pending (accepted for later settlement) and
- * indeterminate (the outcome is not known yet; the host reconciles the same operation) are
- * display states: neither is a confirmed success, and neither may be shown as a failure.
- */
-export type Receipt = {
-	status:
-		| "accepted"
-		| "duplicate"
-		| "conflict"
-		| "rejected"
-		| "pending"
-		| "indeterminate";
-	message: string;
-};
+export type { ArtifactEvent } from "./event-contracts";
+export type { Receipt } from "./receipt-contracts";
+
+export type { ActivityResource } from "./activity-components";

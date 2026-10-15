@@ -1,3 +1,8 @@
+/**
+ * Usage receipts and slice dependents: World no longer writes new ones (the context hint is names only;
+ * the World investigation reads claims directly). This module stays only to clean up the rows and Memory
+ * dependents that older versions left behind (forget, cancel, release retry).
+ */
 import type { Database } from "bun:sqlite";
 import { isMemoryContractError } from "eumenes-memory";
 import { isMemoryStoreError } from "eumenes-memory/sqlite";

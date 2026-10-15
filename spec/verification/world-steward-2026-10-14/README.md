@@ -62,3 +62,28 @@
 - 記録の形式（ref、登録、関係、訂正）は、軽量の cloud モデルでほぼ正しく書ける。仮説も具体的になった。
 - ホストの根拠の検査（`not_in_evidence`）が、言い換えた名前（「CSVを手で取り込む」→「CSV手動取り込み」）や、名前を省いた訂正（「来月じゃなくて再来月」）を落とす。小さいモデルの取り違えを防ぐための検査で、今は厳しすぎる。
 - L4 と L5 の失敗は会話用のモデル側（ツールの選び方、結果の言い換え）と、topic slice の範囲による。
+
+## World の照会を sub-agent の調査にした後（2026-10-15、[設計](../../world-research-subagent-2026-10-15.md)）
+
+### fixture
+
+| 範囲 | 結果 |
+|---|---|
+| `bun run verify -- --domain` world / dialogue / voice-dialogue / agent-runtime / tool-runtime / steward / memory / goals | 通過（world 168、steward 104、memory 121、goals 25、tool-runtime 37） |
+| `api/application/world-research.test.ts` | 17 通過（委譲、worker 入力、find の対象と目標、world_claim の読み取り、親への投影に ID と本文が入らない、調査中の取り消し・訂正・忘却で不採用、World OFF で提示しない、切り詰めで coverage partial） |
+| `world-acceptance-p3`、`capability-upgrade`、`capability-seed` の World 部分 | 通過。残る失敗は並行作業の kanban・codex-tasks（seed の一覧、`runner_path_not_canonical`）と既知の `toolchain` ambiguous target |
+
+### live（保存済み LARM、World の記録は cloud の軽量モデル）
+
+| 会話 | 質問 | 結果 |
+|---|---|---|
+| `world-haiku-c` | 「freee の移行について誰に聞けばいい？」 | 不合格。候補に World の調査は出たが、会話の AI は会話履歴の調査を選んだ（その調査も報告の形式の誤りで失敗） |
+| `world-haiku-c` | 「World の記録だと、freee にすると月末締めはどうなりそう？」 | 不合格（skill@2）。World の調査が選ばれ、調べ役は `world.find` → `world.query` ×2 まで動いたが、報告の claim に根拠参照（evidence）を書かず2回拒否された。会話の AI は履歴にあった旧方式の回答を写した |
+| `world-research-a` | 同上（新しい会話） | 不合格。候補の上位4件に World の調査が入らなかった（例文が質問の形に合っていない） |
+| `world-research-b`（skill@3、toolchain@5） | 「World の記録だと、freee にすると月末締めはどうなりそう？」 | 不合格。World の調査が選ばれたが、調べ役が `world.find` だけで照会せず not_found を返した |
+| `world-research-b` | 「freee の移行について誰に聞けばいい？」 | **一部**。World の調査が選ばれ、報告は根拠つき・partial（担当は佐藤、月末締めは現在3日、「freee が月末締め作業を減らす」は仮説）。回答に内部の語は出なかった。会話の AI が記録にない名前（「藤原」）と作業項目を足した |
+
+直したもの:
+- skill@3: claim は text と evidence（eN の配列）を必ず持つ、根拠が無いときの not_found／failed の書き方、要約のキー名 `claims` を `documents` に。
+- toolchain@5: 「〜にするとどうなりそう？」「誰に聞けばいい？」「World の記録だと…」の使う場面と例文。
+- skill@4、package@4、toolchain@6: 対象が見つかったら必ず `world.query` を呼んでから報告する、limitations にも内部の語を書かない。fixture 通過。live は未確認（kanban の migration `0003-executors` の checksum 不一致で backend が起動しないため）。

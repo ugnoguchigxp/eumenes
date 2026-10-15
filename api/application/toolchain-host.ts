@@ -5,10 +5,11 @@ import type { TimersService } from "../domains/timers";
 import type { WebResearchService } from "../domains/web-research";
 import type { SqliteStore } from "../infrastructure/sqlite";
 import type { Notice } from "../domains/dialogue/contracts";
-import { createKanban } from "../domains/kanban";
-import { createTerminals } from "../domains/terminals";
+import { createKanbanSdkHost } from "./kanban-sdk-host";
+import { join } from "node:path";
+
 import { reportFinishedTasks } from "./claude-code-reports";
-import { connectKanbanRuns } from "./kanban-runs";
+
 import { createToolchain } from "./toolchain";
 import type { Embed } from "./toolchain-vectors";
 import type { InferenceAdapterPorts } from "./inference-adapter";
@@ -18,7 +19,7 @@ import type { ServiceTestsPorts } from "./service-tests-adapter";
 import type { SettingsAdapterPorts } from "./settings-adapter";
 import { questionReader, type InteractionViews } from "./toolchain-adapters";
 import type { TtsDictionaryPorts } from "./tts-dictionary-adapter";
-import { createWorldQueryPorts } from "./world-query-adapter";
+import { createWorldResearchPorts } from "./world-research-ports";
 import type { WorldAdapterPorts } from "./world-adapter";
 import type { WorldAssembly } from "./world";
 import type { UiCompositionsService } from "../domains/ui-compositions";
@@ -31,7 +32,7 @@ import type { UiCompositionsService } from "../domains/ui-compositions";
  * toolchain, so its open questions are attached later.
  */
 export function createToolchainHostLinks(services: {
-	/** The store the `world_query` reads run in (absent: the tool is not offered). */
+	/** The store the World investigation's reads run in (absent: it is not offered). */
 	store?: SqliteStore;
 	settings: SettingsAdapterPorts & {
 		derivedKey(purpose: string): Uint8Array | undefined;
@@ -49,6 +50,8 @@ export function createToolchainHostLinks(services: {
 	/** The steward behind the `memory_request` tool (needs `memory`). */
 	steward?: import("../domains/steward").StewardService;
 	world?: WorldAssembly;
+	/** The adopted goals the World investigation may name for `gaps` (needs `world`). */
+	goals?: import("./world-research-ports").WorldResearchGoals;
 	serviceTests?: ServiceTestsPorts;
 	log?: {
 		warn(event: string, fields: { reason: string }, error?: unknown): void;
@@ -60,13 +63,16 @@ export function createToolchainHostLinks(services: {
 		claims: world.claims,
 		context: world.claimsContext,
 	};
-	const worldQueryPorts =
+	const worldResearch =
 		world && services.store
-			? createWorldQueryPorts({
-					store: services.store,
-					world: world.service,
-					context: world.claimsContext,
-				})
+			? (runtime: Parameters<typeof createWorldResearchPorts>[0]["runtime"]) =>
+					createWorldResearchPorts({
+						store: services.store!,
+						world: world.service,
+						context: world.claimsContext,
+						runtime,
+						goals: services.goals,
+					})
 			: undefined;
 	return {
 		options: {
@@ -84,7 +90,7 @@ export function createToolchainHostLinks(services: {
 					: undefined,
 			blockedMessages: services.memory,
 			world: () => worldPorts,
-			worldQuery: worldQueryPorts ? () => worldQueryPorts : undefined,
+			worldResearch,
 			serviceTests: services.serviceTests,
 			records: {
 				usagePage: inference.usagePage,
@@ -108,6 +114,7 @@ export function createToolchainHostLinks(services: {
 export async function createHostToolchain(
 	s: Parameters<typeof createToolchainHostLinks>[0] & {
 		store: SqliteStore;
+		dbPath?: string;
 		queue: QueueService;
 		uiCompositions?: UiCompositionsService;
 		ocr?: import("../domains/ocr").OcrService;
@@ -124,15 +131,21 @@ export async function createHostToolchain(
 ) {
 	const links = createToolchainHostLinks(s);
 	// Claude Code sessions start in the server's working directory (the repository).
-	const terminals = createTerminals({
+	let loadedCapabilities:
+		| import("../domains/capabilities").Capabilities
+		| undefined;
+	const sdkHost = createKanbanSdkHost({
 		store: s.store,
-		cwd: process.cwd(),
-		hookBaseUrl: s.terminalHooks?.baseUrl,
-		onChange: s.terminalHooks?.publish,
+		settings: s.settings,
+		dbPath: s.dbPath ?? join(process.cwd(), "data/eumenes.sqlite3"),
+		hooks: s.terminalHooks,
+		capabilities: () => {
+			if (!loadedCapabilities) throw new Error("capability_unavailable");
+			return loadedCapabilities;
+		},
 	});
-	const kanban = createKanban({ store: s.store });
-	// Board runs go to Claude Code and their results come back to the cards.
-	const kanbanRuns = connectKanbanRuns(kanban, terminals);
+	const { terminals, kanban } = sdkHost;
+	const kanbanRuns = sdkHost.runs;
 	const toolchain = await createToolchain(
 		s.store,
 		s.queue,
@@ -151,10 +164,12 @@ export async function createHostToolchain(
 			objectRecognition: true,
 			terminals,
 			kanban,
+			kanbanSdk: sdkHost,
 			webResearch: s.webResearchEnabled,
 			embed: s.embed,
 		},
 	);
+	loadedCapabilities = toolchain.capabilities;
 	return {
 		toolchain: { ...toolchain, terminals, kanban, kanbanRuns },
 		links: {

@@ -6,6 +6,17 @@ import { commands } from "./commands";
 import { USAGE, type CliArgs, type CliIo } from "./commands/types";
 
 const args = process.argv.slice(2);
+if (args[0] === "codex-runner") {
+	try {
+		await (await import("./codex-runner")).codexRunnerCli(args.slice(1));
+		process.exit(0);
+	} catch {
+		console.error(
+			"Codex実行の状態を取得・操作できません。独立runnerの起動と接続先を確認してください。",
+		);
+		process.exit(2);
+	}
+}
 const json = args.includes("--json");
 const wait = args.includes("--wait");
 const fresh = args.includes("--fresh");

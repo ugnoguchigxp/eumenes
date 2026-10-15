@@ -146,15 +146,27 @@ export function createLedger(rt: Runtime) {
 
 		/** queued -> sending, only while still queued; false when it was cancelled first. */
 		markSending: (id: string, sessionId: string, run: number) =>
-			store().write((tx) =>
-				repository.transition(
+			store().write((tx) => {
+				const row = repository.get(tx, id);
+				if (!row) return false;
+				if (
+					rt.options.workspace &&
+					!rt.options.workspace.reserveSending(tx, {
+						sessionId,
+						owner: row.owner,
+						cwd: rt.projects(row.projectId)?.cwd,
+						run,
+					})
+				)
+					return false;
+				return repository.transition(
 					tx,
 					id,
 					["queued"],
 					{ state: "sending", terminalSessionId: sessionId, terminalRun: run },
 					rt.nowIso(),
-				),
-			),
+				);
+			}),
 
 		/** sending -> delivered; a request that already started stays as it is. */
 		markDelivered: (id: string) =>

@@ -42,7 +42,7 @@ export function createStartTask(ctx: RuntimeContext, ops: TaskOps) {
 					jobId: existing.job_id ?? input.parentJobId ?? existing.id,
 				};
 			const request = input.input as {
-				kind?: "web" | "history" | "action";
+				kind?: "web" | "history" | "world" | "action";
 				question: string;
 				originalRequest?: string;
 				urls?: string[];
@@ -57,6 +57,9 @@ export function createStartTask(ctx: RuntimeContext, ops: TaskOps) {
 					request.packageRevisionId,
 				)
 			)
+				throw new Error("capability_unavailable");
+			// A World investigation has no default package: the toolchain names it.
+			if (request.kind === "world" && request.packageRevisionId === undefined)
 				throw new Error("capability_unavailable");
 			if (
 				request.researcher &&
@@ -104,7 +107,8 @@ export function createStartTask(ctx: RuntimeContext, ops: TaskOps) {
 			const workerInput = {
 				question: request.question,
 				detail: "normal",
-				...(request.kind !== "history"
+				// History and World readings stay inside the host: no URL reaches their worker.
+				...(request.kind !== "history" && request.kind !== "world"
 					? {
 							urls: requestUrls(
 								request.originalRequest ?? request.question,

@@ -64,29 +64,11 @@ export type {
 export { defaultMemoryPort } from "./lifecycle-memory";
 export type { MemoryPort } from "./lifecycle-memory";
 export {
-	KEEP_USAGE_PER_SCOPE,
-	createWorldContextBroker,
-} from "./context-broker";
-export type {
-	ContextBroker,
-	ContextBrokerOptions,
-	ContextPrepareInput,
-	ContextPrepared,
-	ContextSettleInput,
-	ContextVerdict,
-	PreparedWorldContext,
-} from "./context-broker";
-export {
-	CONTEXT_TOTAL_BYTES,
-	FRAME_BYTES,
-	WORLD_BLOCK_CLOSE,
-	WORLD_BLOCK_OPEN,
-	WORLD_MIN_BYTES,
-	allocateContextBudget,
-	renderWorldBlock,
-	safeJson,
-} from "./context-render";
-export type { BudgetAllocation, RenderTopic } from "./context-render";
+	createWorldContextNames,
+	MIN_NAME_CHARS,
+	normalizeTopicText,
+} from "./context-topics";
+export type { ContextNamesOptions, WorldContextNames } from "./context-topics";
 export { forgetUsageInScope, sliceDependentPrefix } from "./usage-ledger";
 export {
 	NO_INTAKE_PORTS,

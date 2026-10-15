@@ -133,6 +133,10 @@ export function noticeText(
 			return `タスク『${title}』が許可を待っています`;
 		case "commit_push":
 			return `タスク『${title}』の commit & push の報告があります`;
+		case "git_completed":
+			return `タスク『${title}』のGit工程を確認しました: ${reason ?? ""}`;
+		case "stopped":
+			return `タスク『${title}』を止めました`;
 		case "queue_paused":
 			return `実行キューが止まりました: ${reason ?? ""}`;
 	}
@@ -146,6 +150,7 @@ export function blockerReason(
 		case "interrupted":
 			return "interrupted";
 		case "ended":
+			if (finish.reason === "stopped_by_person") return "stopped_by_person";
 			return finish.reason === "resume_failed" ? "resume_failed" : "ended";
 		case "unknown":
 			if (finish.reason === "restarted") return "restarted";

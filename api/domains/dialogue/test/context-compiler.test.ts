@@ -113,8 +113,6 @@ async function setup() {
 					sourceKind: options.sourceKind ?? "manual",
 					scheduleId: null,
 					occurrenceId: null,
-					worldUsed: false,
-					worldBlocked: false,
 					createdAt: at,
 					updatedAt: at,
 				});
@@ -157,8 +155,6 @@ async function setup() {
 					sourceKind: "manual",
 					scheduleId: null,
 					occurrenceId: null,
-					worldUsed: false,
-					worldBlocked: false,
 					createdAt: at,
 					updatedAt: at,
 				});

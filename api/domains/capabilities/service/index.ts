@@ -343,6 +343,20 @@ export function createCapabilities(
 		...createDotsPackages(store, register),
 		...toolchains,
 		...createPublishing(store, toolchains),
+		instructionInTransaction(db: Database, revisionId: string) {
+			const definition = closure(db, revisionId)[0];
+			if (
+				!definition ||
+				!["profile", "skill"].includes(definition.kind) ||
+				!definition.body?.trim()
+			)
+				throw new Error("required_context_missing");
+			return {
+				revisionId: definition.revisionId,
+				hash: definition.hash,
+				body: definition.body,
+			};
+		},
 		getDefinitionInTransaction,
 		registerBuiltinInTransaction,
 		registerLearnedInTransaction,

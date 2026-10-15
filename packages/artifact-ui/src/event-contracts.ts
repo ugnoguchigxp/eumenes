@@ -1,0 +1,72 @@
+import type { KanbanEventAction } from "./kanban-contracts";
+import type { WorkspaceAction } from "./workspace-actions";
+import type { OcrAction } from "./ocr-actions";
+export type ArtifactEvent = {
+	id: string;
+	source: string;
+	revision: number;
+	action:
+		| OcrAction
+		| WorkspaceAction
+		| KanbanEventAction
+		| "drawing-new"
+		| "drawing-open"
+		| "drawing-refresh"
+		| "drawing-delete"
+		| "drawing-browse"
+		| "image-close"
+		| "image-delete"
+		| "image-generate"
+		| "image-cancel"
+		| "image-refresh"
+		| "image-select"
+		| "collection-action"
+		| "collection-create"
+		| "collection-page"
+		| "records-refresh"
+		| "records-query"
+		| "records-procedure-state"
+		| "records-procedure-delete"
+		| "records-download"
+		| "settings-edit"
+		| "settings-action"
+		| "settings-open"
+		| "settings-review"
+		| "google-connect"
+		| "google-cancel"
+		| "google-disconnect"
+		| "google-back"
+		| "settings-apply"
+		| "settings-discard"
+		| "timer-start"
+		| "timer-cancel"
+		| "timer-pause"
+		| "timer-resume"
+		| "timer-new"
+		| "clock-mode"
+		| "stopwatch-start"
+		| "stopwatch-stop"
+		| "stopwatch-reset"
+		| "answer"
+		| "submit"
+		| "ui-generate"
+		| "ui-cancel"
+		| "ui-select"
+		| "ui-refresh"
+		| "memory-correct"
+		| "memory-select"
+		| "settings-save"
+		| "demo-click"
+		| "music-select"
+		| "music-generate"
+		| "music-cancel"
+		| "music-artwork"
+		| "music-search"
+		| "music-more"
+		| "music-refresh"
+		| "music-favorite"
+		| "music-delete"
+		| "generation-cancel"
+		| "generation-retry";
+	values: Record<string, string | boolean>;
+};

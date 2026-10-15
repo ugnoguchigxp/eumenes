@@ -1,16 +1,11 @@
 import type { AnswerTicket } from "../../agent-runtime";
-import { PREFETCH_BYTES } from "../../memory";
 import type { HandlerDefinition } from "../../queue";
-import {
-	compileContext,
-	noticeMessage,
-	windowIsEmpty,
-} from "./context-compiler";
+import { compileContext, windowIsEmpty } from "./context-compiler";
 import { prepareRouting } from "./delegate-conversation";
 import { renderGoalsLayer } from "./goals-layer";
-import { topicTexts } from "./topic-texts";
+import { topicTexts, worldNamesHint } from "./topic-texts";
 import { researchResultContext } from "./research-result-context";
-import { markWorld, byId, transition } from "../repository";
+import { byId, transition } from "../repository";
 import { endRun } from "./run-end";
 import { isSystemPrompt, type Run } from "../contracts";
 import {
@@ -19,12 +14,10 @@ import {
 	type GenerateInput,
 	type GeneratePayload,
 } from "./context";
-import type { Progress } from "./progress";
 
-/** The claim-time half of a generation: fixes memory, World and history inside the claim transaction. */
+/** The claim-time half of a generation: fixes memory, goals, the World name hint and history inside the claim transaction. */
 export function createPrepare(
 	deps: DialogueDeps,
-	{ partials }: Pick<Progress, "partials">,
 ): HandlerDefinition<
 	GeneratePayload,
 	GenerateInput,
@@ -64,60 +57,31 @@ export function createPrepare(
 			endRun(deps, tx, current, "failed", "memory_blocked");
 			return { status: "stale", reason: "memory_blocked" };
 		}
-		// The adopted goals come right after L1; their size is part of what World's budget must leave.
+		// The adopted goals come right after L1.
 		const goalsLayer = goals
 			? renderGoalsLayer(goals.adoptedForContextInTransaction(tx))
 			: null;
-		// World reads in the SAME transaction as Memory's recall and shares its budget.
-		const world =
+		// World is read only by the research sub-agent; the conversation gets the names of the known targets
+		// this turn's wording mentions, as one line of L4 (nothing when none is named or World is unusable).
+		const worldHint =
 			worldContext && !agent?.failureCode && !agent?.actionPayload
-				? worldContext.prepareInTransaction(tx, {
-						runId: run.id,
-						conversationId: run.conversationId,
-						jobId: claim.jobId,
-						attempt: claim.attempt,
-						generation: claim.generation,
-						reservedBytes:
-							(goalsLayer?.bytes ?? 0) +
-							(window
-								? // The prefetch and this turn's recall share PREFETCH_BYTES: all of it is reserved.
-									window.longTerm.bytes +
-									window.shortTerm.bytes +
-									Buffer.byteLength(window.history.summaryText, "utf8") +
-									PREFETCH_BYTES +
-									Buffer.byteLength(
-										noticeMessage(window)?.content ?? "",
-										"utf8",
-									)
-								: 0),
-						topicTexts: topicTexts(
-							tx,
-							current,
-							conversation,
-							new Set(
-								memory?.blockedMessageIdsOfConversationInTransaction(
-									tx,
-									run.conversationId,
-								) ?? [],
+				? worldNamesHint(
+						worldContext.knownNamesInTransaction(tx, {
+							conversationId: run.conversationId,
+							texts: topicTexts(
+								tx,
+								current,
+								conversation,
+								new Set(
+									memory?.blockedMessageIdsOfConversationInTransaction(
+										tx,
+										run.conversationId,
+									) ?? [],
+								),
 							),
-						),
-						nowMs: Date.parse(clock()),
-					})
-				: undefined;
-		if (world?.status === "blocked") {
-			// Blocked is its own outcome: the run reports World as used+blocked.
-			markWorld(tx, run.id, "blocked");
-			if (run.agentTaskId)
-				agents?.failAnswerInTransaction(tx, run.id, world.reason);
-			// Never silently run without the World context; end the run with the reason.
-			endRun(deps, tx, current, "failed", world.reason);
-			return { status: "stale", reason: world.reason };
-		}
-		if (world?.status === "ready") {
-			markWorld(tx, run.id, "used");
-			// Whatever an earlier World-less attempt streamed is withdrawn.
-			partials.delete(run.id);
-		}
+						}),
+					)
+				: null;
 		if (larm.captureInTransaction && !larm.requestFor?.(tx, run.id, "llm")) {
 			const snapshot = larm.snapshotInTransaction?.(tx);
 			if (snapshot) {
@@ -150,15 +114,13 @@ export function createPrepare(
 				agent.projection ?? undefined,
 				agent.failureCode,
 			);
-		// Notices, prefetched exchanges and World come last, right before the current input; the
+		// Notices, prefetched exchanges and the World name hint come last, right before the current input; the
 		// operation results and the policy added below then land between them and the input.
 		messages.splice(
 			messages.length - 1,
 			0,
 			...compiled.sections.tail,
-			...(world?.status === "ready"
-				? [{ role: "system" as const, content: world.block }]
-				: []),
+			...(worldHint ? [worldHint] : []),
 		);
 		// This run's context is fixed by the host: the server must neither trim nor reorder it.
 		const requestId = larm.requestFor?.(tx, run.id, "llm");
@@ -292,12 +254,6 @@ export function createPrepare(
 								],
 							},
 						}
-					: {}),
-				...(world?.status === "ready"
-					? { world: { context: world.context } }
-					: {}),
-				...(world?.status === "ready" || run.worldUsed
-					? { worldUsed: true }
 					: {}),
 				requestId: larm.requestFor?.(tx, run.id, "llm") ?? undefined,
 			},

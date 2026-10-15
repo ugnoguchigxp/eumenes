@@ -340,3 +340,4 @@ steward は world の上位なので、steward から world・goals の公開操
 | 5 | `evidenceMessagesOf` は生きている主張の根拠だけを返す | パッケージの公開 read の制約。取り消し済みの主張の根拠を返すにはパッケージの API が要る |
 | 6 | 条件（condition）は扱わない（`unspecified`） | パッケージの条件は観測キーに対する構造式で、自由文から作れない |
 | 7 | アシスタントの回答の根拠の種類はパッケージ上 `document`（主張の origin は `model_hypothesis`） | パッケージにアシスタント用の発言の種類がない |
+| 8 | G8 の②（話題の対象の状態を L4 に入れる topic slice と既定の slice）とコマンド `world_query`（会話の AI が生の結果を読む方式）は 2026-10-15 に廃止。話題に出た既知の対象の名前だけを L4 の1行の手がかりにし、World の中身は research sub-agent の調査（`world.find`／`world.query`、別の LARM セッション、根拠つきの報告）で読む。World 用の入力予算（`CONTEXT_TOTAL_BYTES` の World 分、最小 slice、World の blocked）と slice の使用記録の書き込みは無くなった。目標の layer（G8 の①）は変えない | 会話の AI に World の中身を直接読ませない方針への変更。仕様: [world-research-subagent-2026-10-15.md](world-research-subagent-2026-10-15.md) |

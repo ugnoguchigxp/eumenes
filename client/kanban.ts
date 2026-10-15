@@ -4,7 +4,15 @@ import type { Transport } from "./transport";
 
 const noticeSchema = z.strictObject({
 	id: z.string(),
-	kind: z.enum(["done", "blocker", "waiting", "commit_push", "queue_paused"]),
+	kind: z.enum([
+		"done",
+		"blocker",
+		"waiting",
+		"commit_push",
+		"queue_paused",
+		"git_completed",
+		"stopped",
+	]),
 	cardId: z.string().optional(),
 	runId: z.string().optional(),
 	text: z.string(),

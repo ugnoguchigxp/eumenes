@@ -45,13 +45,6 @@ export const runSchema = z.object({
 	sourceKind: z.enum(["manual", "voice", "schedule", "notice"]),
 	scheduleId: z.string().nullable(),
 	occurrenceId: z.string().nullable(),
-	/**
-	 * P3-08: World was read for this run, or World refused (`worldBlocked`).
-	 * Explicit and sticky: a World-using run never streams or speaks its body
-	 * before adoption, and a blocked run is a failure, never "World not used".
-	 */
-	worldUsed: z.boolean().optional(),
-	worldBlocked: z.boolean().optional(),
 	createdAt: z.string(),
 	updatedAt: z.string(),
 });
@@ -72,10 +65,7 @@ export type Notice = z.infer<typeof noticeSchema>;
 export const progressSchema = z.object({
 	runId: z.string(),
 	status: runSchema.shape.status,
-	/** Empty while a World-using run is unadopted; the complete adopted body once. */
 	text: z.string().max(65_536),
-	worldUsed: z.boolean().optional(),
-	worldBlocked: z.boolean().optional(),
 	/** Machine-readable end reason of a failed run (never body text). */
 	error: z.string().nullable().optional(),
 });
@@ -118,67 +108,21 @@ export interface StewardPort {
 }
 
 /**
- * Optional World context owned by dialogue's caller (the Context Broker).
- * Dialogue knows no World types: it passes the opaque `context` back and
- * treats the block as reference data in its own labelled message. With no
- * port, or a port answering `disabled`, dialogue behaves as it always did.
+ * The World as dialogue sees it (wired by the application): only the names of the known targets this turn's
+ * wording mentions, so the model can tell that World has something to look up. Dialogue never reads World's
+ * content; that goes through the research sub-agent. With no port, or World unusable, no name is returned.
  */
-export type WorldContextPrepareInput = {
-	runId: string;
+export type WorldContextNamesInput = {
 	conversationId: string;
-	jobId: string;
-	attempt: number;
-	generation: number;
-	/** Bytes of reference data already fixed for this input (Memory's recall block). */
-	reservedBytes: number;
 	/** This turn's input, then the previous exchange: the wording known World targets are looked for in. */
-	topicTexts?: readonly string[];
-	nowMs: number;
-};
-export type WorldContextPrepared =
-	| { status: "disabled" }
-	/** The run ends with `reason`; it is never continued without the context. */
-	| { status: "blocked"; reason: string }
-	| { status: "ready"; block: string; context: unknown };
-export type WorldContextVerdict =
-	| { ok: true }
-	/** `retryable`: the check could not run (busy/closing writer); a later attempt may pass. */
-	| { ok: false; reason: string; retryable?: boolean };
-export type WorldContextSettleInput = {
-	runId: string;
-	conversationId: string;
-	jobId: string;
-	attempt: number;
-	generation: number;
-	inference: { requestId: string; attemptId: string } | null;
-	nowMs: number;
+	texts: readonly string[];
 };
 export interface WorldContextPort {
-	/** Same Writer transaction as the Memory recall. Writes nothing unless `ready`. */
-	prepareInTransaction(
+	/** Display names of the known targets the wording names (at most five), in the order they were found. */
+	knownNamesInTransaction(
 		db: Database,
-		input: WorldContextPrepareInput,
-	): WorldContextPrepared;
-	/** Just before the model is called; not ok means nothing is sent. */
-	checkBeforeSend(context: unknown): Promise<WorldContextVerdict>;
-	/** Adoption check in the Writer transaction; read-only. */
-	validateInTransaction(
-		db: Database,
-		input: WorldContextSettleInput,
-		context: unknown,
-	): WorldContextVerdict;
-	/** Same transaction as the answer message, after every check passed. */
-	recordUsageInTransaction(
-		db: Database,
-		input: WorldContextSettleInput,
-		context: unknown,
-	): void;
-	/** The run does not adopt: drop its usage record and input dependencies. */
-	releaseInTransaction(
-		db: Database,
-		runId: string,
-		conversationId: string,
-	): void;
+		input: WorldContextNamesInput,
+	): string[];
 }
 
 /**

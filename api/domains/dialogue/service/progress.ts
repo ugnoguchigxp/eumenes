@@ -20,17 +20,11 @@ export function createProgress(deps: DialogueDeps) {
 						.get(run.conversationId)
 						.messages.find((m) => m.id === run.answerMessageId)?.text
 				: null;
-		// A World-using run has no pre-adoption body, whatever was generated.
-		const live =
-			run.status === "running" && !run.worldUsed
-				? (partials.get(runId) ?? "")
-				: "";
+		const live = run.status === "running" ? (partials.get(runId) ?? "") : "";
 		return {
 			runId,
 			status: run.status,
 			text: answer ?? live,
-			worldUsed: run.worldUsed ?? false,
-			worldBlocked: run.worldBlocked ?? false,
 			error: run.status === "failed" ? run.error : null,
 		};
 	}

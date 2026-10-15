@@ -28,6 +28,7 @@ const BACKENDS = [
 	"ocr",
 	"claude-code",
 	"kanban",
+	"codex-tasks",
 	"steward",
 	"world-query",
 ];

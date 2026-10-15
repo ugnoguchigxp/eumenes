@@ -8,14 +8,16 @@
 export type ToolRuntimeMeta = {
 	/**
 	 * search: external search; read: external read; saved_read: read of a body saved earlier;
-	 * history: read of the conversation history; recipe: saved fetch procedures of the
-	 * toolchain (host-local); local_action: host action (no network).
+	 * history: read of the conversation history; world: read of the host's own World (claims
+	 * with their evidence); recipe: saved fetch procedures of the toolchain (host-local);
+	 * local_action: host action (no network).
 	 */
 	operation:
 		| "search"
 		| "read"
 		| "saved_read"
 		| "history"
+		| "world"
 		| "recipe"
 		| "local_action";
 	/**
@@ -53,6 +55,8 @@ const tools: Readonly<Record<string, ToolRuntimeMeta>> = {
 	"web.read_saved": { operation: "saved_read", requiresSavedBody: true },
 	"history.search": { operation: "history", cursorPaging: true },
 	"history.read": { operation: "history" },
+	"world.find": { operation: "world" },
+	"world.query": { operation: "world" },
 	"timer.start": { operation: "local_action" },
 	"timer.cancel": { operation: "local_action" },
 	"timer.list": { operation: "local_action" },
@@ -61,6 +65,7 @@ const packages: Readonly<Record<string, PackageRuntimeMeta>> = {
 	"web.quick": { budget: "quick", report: "search" },
 	"web.search": { report: "search" },
 	"web.recipe": { budget: "recipe", report: "search", context: "set" },
+	"world.query": { report: "search", context: "set" },
 };
 const toolchains: Readonly<
 	Record<string, import("./toolchains").ToolchainRuntimeMeta>
@@ -73,6 +78,7 @@ const toolchains: Readonly<
 		researcher: "codex_luna",
 	},
 	"history.research": { execution: "research", route: "history" },
+	"world.query": { execution: "research", route: "world", requires: "world" },
 	"excalidraw.edit": { execution: "excalidraw", requires: "excalidraw" },
 	"object-recognition.manage": {
 		execution: "command",

@@ -35,7 +35,6 @@ import {
 	forgetClosureMigration,
 } from "../../memory";
 import { saveItem } from "./memory-seed";
-import { PREFETCH_BYTES } from "../../memory";
 import { conversationPolicy } from "../service/conversation-tools";
 import type {
 	QueryVector,
@@ -125,8 +124,6 @@ async function setup(
 		stream?: boolean;
 		/** The model answers with a toolchain call instead of text. */
 		operation?: boolean;
-		/** Receives the bytes World is told to leave for the memory layers. */
-		reserved?: number[];
 	} = {},
 ) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-memory-recall-"));
@@ -208,20 +205,6 @@ async function setup(
 		// A conversation operation needs a toolchain runtime to exist; the stub refuses every toolchain.
 		...(options.operation
 			? { music: { resultInTransaction: () => undefined } as never }
-			: {}),
-		...(options.reserved
-			? {
-					worldContext: {
-						prepareInTransaction: (_db, input) => {
-							options.reserved!.push(input.reservedBytes);
-							return { status: "disabled" as const };
-						},
-						checkBeforeSend: async () => ({ ok: true as const }),
-						validateInTransaction: () => ({ ok: true as const }),
-						recordUsageInTransaction: () => {},
-						releaseInTransaction: () => {},
-					},
-				}
 			: {}),
 	});
 	const harness = {
@@ -561,11 +544,4 @@ test("a toolchain operation is checked against the recalled messages even when t
 	const plain = await h.ask("京都の天気を調べて");
 	expect(recallOf(h.seen.at(-1)!)).toBeUndefined();
 	expect(plain.error).toBe("toolchain_unavailable");
-});
-
-test("World is told to leave the whole prefetch-and-recall budget, not only the current prefetch", async () => {
-	const reserved: number[] = [];
-	const h = await setup({ reserved });
-	await h.ask("こんにちは");
-	expect(reserved).toEqual([PREFETCH_BYTES]);
 });

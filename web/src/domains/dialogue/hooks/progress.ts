@@ -15,8 +15,7 @@ export function useRunProgress(client: DialogueClient, runId?: string) {
 		if (
 			value?.runId === runId &&
 			value?.text &&
-			(value.status === "completed" ||
-				(value.status === "running" && !value.worldUsed)) &&
+			(value.status === "completed" || value.status === "running") &&
 			timing.current.id === runId &&
 			timing.current.received !== undefined &&
 			!timing.current.committed
@@ -46,8 +45,7 @@ export function useRunProgress(client: DialogueClient, runId?: string) {
 						if (
 							next.runId === runId &&
 							next.text &&
-							(next.status === "completed" ||
-								(next.status === "running" && !next.worldUsed)) &&
+							(next.status === "completed" || next.status === "running") &&
 							timing.current.received === undefined
 						) {
 							timing.current.received = performance.now();
@@ -87,12 +85,9 @@ export function useRunProgress(client: DialogueClient, runId?: string) {
 		})();
 		return () => controller.abort();
 	}, [client, runId, cache]);
-	// A World-using run shows no body until it completes (adoption); the server
-	// sends none either, this keeps a stale or foreign frame from showing one.
 	return value &&
 		value.runId === runId &&
-		(value.status === "completed" ||
-			(value.status === "running" && !value.worldUsed))
+		(value.status === "completed" || value.status === "running")
 		? value.text
 		: "";
 }

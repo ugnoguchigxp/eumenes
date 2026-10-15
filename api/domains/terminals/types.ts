@@ -1,4 +1,20 @@
 import type { SqliteStore } from "../../infrastructure/sqlite";
+import type { Database } from "bun:sqlite";
+export type TerminalWorkspaceIdentity = {
+	sessionId: string;
+	owner: SessionOwner;
+	cwd: string | undefined;
+	run: number;
+};
+export type TerminalWorkspacePort = {
+	reserveDirect: (identity: TerminalWorkspaceIdentity) => Promise<void>;
+	assertLaunch: (identity: TerminalWorkspaceIdentity) => void;
+	assertInput: (identity: TerminalWorkspaceIdentity) => Promise<void>;
+	reserveSending: (
+		tx: Database,
+		identity: TerminalWorkspaceIdentity,
+	) => boolean;
+};
 import type {
 	ProjectResolver,
 	RequestReason,
@@ -35,6 +51,7 @@ export type SpawnPty = (request: {
 }) => Pty;
 
 export type TerminalsOptions = {
+	workspace?: TerminalWorkspacePort;
 	/** The fixed program; null when it is not installed. Defaults to `claude` on PATH. */
 	command?: readonly string[] | null;
 	/** Working directory of the default project `eumenes` and of screen-started sessions. */
@@ -123,6 +140,8 @@ export type Session = {
 	startedAtMs: number;
 	lastInputAtMs: number;
 	lastUsedAtMs: number;
+	pendingManualInputs: number;
+	manualInputSeen: boolean;
 	inflight?: Inflight;
 	/** Being ended by the host (evicted, replaced by another mode, stopped); still counts as live. */
 	closing: boolean;

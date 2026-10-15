@@ -1,14 +1,11 @@
 /**
- * Topic targets (world-steward plan 4.1 (2)): the known targets a turn names are found by a deterministic
- * name/alias match, and the Slice is built from them (state + direct causal/dependency relations). Fixture-grade
- * on a REAL host store, like the Broker tests.
+ * Topic targets: the known targets a turn names are found by a deterministic name/alias match, and dialogue gets
+ * only their display names (never a claim, never an id). Fixture-grade on a REAL host store.
  */
 import { expect, test } from "bun:test";
-import { createWorldContextBroker, type ContextPrepareInput } from "..";
-import { TOPIC_BLOCK_MAX_BYTES } from "../service/context-render";
+import { createWorldContextNames } from "..";
 import { matchTopicEntities } from "../service/context-topics";
 import {
-	NOW,
 	PURPOSE,
 	addMessage,
 	adoptPlan,
@@ -63,20 +60,6 @@ test("match: longest name first, NFKC and case folded, ambiguous aliases skipped
 	).toHaveLength(5);
 });
 
-const prepareInput = (
-	runId: string,
-	over: Partial<ContextPrepareInput> = {},
-): ContextPrepareInput => ({
-	runId,
-	conversationId: "c1",
-	jobId: `job-${runId}`,
-	attempt: 1,
-	generation: 0,
-	reservedBytes: 0,
-	nowMs: NOW,
-	...over,
-});
-
 const register = (id: string, name: string, aliases: string[] = []) =>
 	request(`entity-${id}`, {
 		kind: "entity.register",
@@ -124,77 +107,48 @@ async function seedWorld(h: Harness) {
 	}
 }
 
-const broker = (h: Harness) =>
-	createWorldContextBroker({
-		store: h.store,
-		world: h.world,
-		clock: () => NOW,
-		purpose: PURPOSE,
-	});
-
-async function prepare(h: Harness, runId: string, topicTexts?: string[]) {
-	const out = await h.store.write((db) =>
-		broker(h).prepareInTransaction(
-			db,
-			prepareInput(runId, topicTexts ? { topicTexts } : {}),
-		),
+const names = (h: Harness, texts: string[]) =>
+	h.store.write((db) =>
+		createWorldContextNames({
+			world: h.world,
+			purpose: PURPOSE,
+		}).knownNamesInTransaction(db, { conversationId: "c1", texts }),
 	);
-	if (out.status !== "ready") throw new Error(JSON.stringify(out));
-	return out;
-}
 
-test("a named target builds the Slice from its state and direct relations only, with names, within the topic block", async () => {
+test("a named target gives its display name only, by name or alias, the current wording first", async () => {
 	await withHarness(async (h) => {
 		await seedWorld(h);
-		const out = await prepare(h, "r1", ["音声サービスは大丈夫？", "前の話"]);
-		expect(out.context.topicEntityIds).toEqual(["svc-1"]);
-		expect(out.context.slice.units.map((u) => u.assertionId).sort()).toEqual([
-			"c-dep",
-			"c-state",
+		expect(await names(h, ["音声サービスは大丈夫？", "前の話"])).toEqual([
+			"音声サービス",
 		]);
-		// Names make the ids readable; unrelated targets and their claims are absent.
-		expect(out.block).toContain('"entities"');
-		expect(out.block).toContain("LARM");
-		expect(out.block).toContain("音声サービス");
-		expect(out.block).not.toContain("c-weather");
-		expect(out.context.budget.blockBytes).toBeLessThanOrEqual(
-			TOPIC_BLOCK_MAX_BYTES,
-		);
 		// The target named only by an alias works too, and the previous exchange counts.
-		const byAlias = await prepare(h, "r2", ["どう？", "音声が止まった"]);
-		expect(byAlias.context.topicEntityIds).toEqual(["svc-1"]);
-	});
-});
-
-test("no known target named, or only an ambiguous alias: today's default Slice", async () => {
-	await withHarness(async (h) => {
-		await seedWorld(h);
-		const plain = await prepare(h, "r0");
-		for (const [i, texts] of [["こんにちは"], ["共通の件"], []].entries()) {
-			const out = await prepare(h, `r-${i}`, texts);
-			expect(out.context.topicEntityIds).toEqual([]);
-			expect(out.context.slice.units.map((u) => u.assertionId)).toEqual(
-				plain.context.slice.units.map((u) => u.assertionId),
-			);
-			expect(out.block).not.toContain('"entities"');
-		}
-		// The default Slice carries the unrelated claims too.
-		expect(
-			plain.context.slice.units.some((u) => u.assertionId === "c-weather"),
-		).toBe(true);
-	});
-});
-
-test("a named target with nothing to say falls back to the default Slice", async () => {
-	await withHarness(async (h) => {
-		await seedWorld(h);
-		const out = await prepare(h, "r1", ["LARMの話"]);
-		// LARM is the object of svc-1's dependency: the claim acts on it, so it is shown.
-		expect(out.context.topicEntityIds).toEqual(["svc-2"]);
-		expect(out.context.slice.units.map((u) => u.assertionId)).toEqual([
-			"c-dep",
+		expect(await names(h, ["どう？", "音声が止まった"])).toEqual([
+			"音声サービス",
 		]);
-		const quiet = await prepare(h, "r2", ["窓口Bの話"]);
-		expect(quiet.context.topicEntityIds).toEqual([]);
+		expect(await names(h, ["天気とLARMの話", "音声サービス"])).toEqual([
+			"LARM",
+			"天気",
+			"音声サービス",
+		]);
+		// Nothing but names: no claim text and no id comes with them.
+		const text = JSON.stringify(await names(h, ["音声サービスは大丈夫？"]));
+		expect(text).not.toContain("svc-1");
+		expect(text).not.toContain("c-state");
+	});
+});
+
+test("no known target named, only an ambiguous alias, or no wording: nothing", async () => {
+	await withHarness(async (h) => {
+		await seedWorld(h);
+		for (const texts of [["こんにちは"], ["共通の件"], [], [" "]])
+			expect(await names(h, texts)).toEqual([]);
+	});
+});
+
+test("World not usable: nothing, even when the wording names a target", async () => {
+	await withHarness(async (h) => {
+		await seedWorld(h);
+		await h.world.setEnabled(false);
+		expect(await names(h, ["音声サービスは大丈夫？"])).toEqual([]);
 	});
 });

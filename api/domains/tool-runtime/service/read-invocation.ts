@@ -152,6 +152,7 @@ export function createReadInvocation({
 		const isLocal =
 			localKind === "saved_read" ||
 			localKind === "history" ||
+			localKind === "world" ||
 			localKind === "recipe";
 		const localId = crypto.randomUUID();
 		const operation = isLocal

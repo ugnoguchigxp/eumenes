@@ -8,7 +8,6 @@
 import { expect, test } from "bun:test";
 import { MemoryStoreError } from "eumenes-memory/sqlite";
 import {
-	createWorldContextBroker,
 	createWorldLifecycle,
 	defaultMemoryPort,
 	readWorldJournal,
@@ -23,13 +22,11 @@ import {
 	PURPOSE,
 	SCOPE,
 	addMessage,
-	adoptPlan,
 	claim,
 	currentRef,
 	entityOp,
 	keyOf,
 	registerClaim,
-	request,
 } from "./fixture";
 import {
 	intakeStates,
@@ -712,81 +709,6 @@ test("concurrent recoverWorld calls are serialised: the gate stays shut while a 
 		expect(seen.length).toBeGreaterThan(0);
 		expect(seen.every((open) => !open)).toBe(true);
 		expect(life.gate.isOpen()).toBe(true);
-	} finally {
-		await life.cleanup();
-	}
-});
-
-// --- 7(a) forget epoch: an answer prepared before a forget can never be adopted ---------------
-
-test("accepting a forget moves the Scope's forget epoch: in-flight slice usage is rejected by it", async () => {
-	const life = await openLife();
-	try {
-		await seed(life);
-		// Adopt claim-3 (on m2) so the Slice has something to say.
-		expect(
-			(
-				await life.world.apply(
-					request("ad-3", {
-						kind: "assertion.transition",
-						plan: adoptPlan("claim-3", 1),
-					}),
-				)
-			).status,
-		).toBe("applied");
-		const broker = createWorldContextBroker({
-			store: life.store,
-			world: life.world,
-			clock: () => NOW,
-			purpose: PURPOSE,
-		});
-		const prepared = await life.store.write((db) =>
-			broker.prepareInTransaction(db, {
-				runId: "r-epoch",
-				conversationId: "c1",
-				jobId: "j",
-				attempt: 1,
-				generation: 0,
-				reservedBytes: 0,
-				nowMs: NOW,
-			}),
-		);
-		if (prepared.status !== "ready") throw new Error(JSON.stringify(prepared));
-		const verdict = () =>
-			life.store.readSnapshot((db) =>
-				broker.validateInTransaction(
-					db,
-					{
-						runId: "r-epoch",
-						conversationId: "c1",
-						jobId: "j",
-						attempt: 1,
-						generation: 0,
-						inference: null,
-						nowMs: NOW,
-					},
-					prepared.context,
-				),
-			);
-		expect(verdict()).toEqual({ ok: true });
-		const before = life.store.read((db) => life.world.forgetEpoch(db, SCOPE));
-		// Accepted but not advanced: World content is untouched, only the epoch moves.
-		await life.lifecycle.acceptForget(
-			{
-				forgetId: "epoch-1",
-				scope: SCOPE,
-				reasonCode: "FORGET_REQUESTED",
-				roots: [{ kind: "source", id: keyOf("m1") }],
-			},
-			{ advance: false },
-		);
-		expect(life.store.read((db) => life.world.forgetEpoch(db, SCOPE))).not.toBe(
-			before,
-		);
-		expect(verdict()).toEqual({
-			ok: false,
-			reason: "world_forget_epoch_changed",
-		});
 	} finally {
 		await life.cleanup();
 	}

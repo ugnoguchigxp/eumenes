@@ -1,6 +1,9 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { type ZodType } from "zod";
+export { sdkRunnerClient } from "./sdk-client";
+export { sdkDaemonClient } from "./sdk-daemon";
+export { registeredSdkGitRemotes } from "./sdk-git-operations";
 import {
 	protocolVersion,
 	toolInputs,

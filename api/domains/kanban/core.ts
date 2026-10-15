@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import { LEGACY_EXECUTOR, type ExecutorRegistry } from "./shared-contracts";
 import { sha256Hex } from "../../infrastructure/digest";
 import type {
 	KanbanCardReceipt,
@@ -31,8 +32,15 @@ export type Applied<R extends KanbanReceipt = KanbanCardReceipt> = {
 export function createCore(options: {
 	now: () => number;
 	newId: () => string;
+	executors?: ExecutorRegistry;
 }) {
 	const { now, newId } = options;
+	const executors = options.executors ?? (() => [LEGACY_EXECUTOR]);
+	function executor(id: string) {
+		const registered = executors().find((entry) => entry.id === id);
+		if (!registered) throw new Error("kanban_executor_unregistered");
+		return registered;
+	}
 
 	/** Replays a saved receipt for the same request, or applies the operation once. */
 	function operate<R extends KanbanReceipt = KanbanCardReceipt>(
@@ -92,6 +100,15 @@ export function createCore(options: {
 		if (from !== card.column) placeColumn(tx, columnIds(tx, from));
 	}
 
-	return { now, newId, operate, target, receiptOf, appendToColumn };
+	return {
+		now,
+		newId,
+		operate,
+		target,
+		receiptOf,
+		appendToColumn,
+		executor,
+		executors,
+	};
 }
 export type Core = ReturnType<typeof createCore>;

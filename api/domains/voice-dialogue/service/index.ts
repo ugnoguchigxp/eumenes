@@ -45,9 +45,7 @@ export function createVoiceDialogue(
 			!turn ||
 			!["responding", "synthesizing", "ready"].includes(turn.status) ||
 			!run ||
-			!["running", "completed"].includes(run.status) ||
-			// A World-using run is spoken only from its adopted (completed) answer.
-			(run.worldUsed && run.status !== "completed")
+			!["running", "completed"].includes(run.status)
 		)
 			return false;
 		const refs = store.read((db) => ({
@@ -567,11 +565,8 @@ export function createVoiceDialogue(
 			const turn = store.read((db) => get(db, id));
 			if (!turn) return null;
 			const state = audio.get(id);
-			const run = turn.runId ? dialogue.get(turn.runId) : null;
 			return {
 				...turn,
-				worldUsed: run?.worldUsed ?? false,
-				worldBlocked: run?.worldBlocked ?? false,
 				audioChunks: [...(state?.chunks.values() ?? [])].map((c) => ({
 					index: c.index,
 					text: c.text,

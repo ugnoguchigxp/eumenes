@@ -10,8 +10,30 @@ import {
 	uiSubmitRequest,
 } from "./ui-compositions";
 import { claudeCodeRequest } from "./claude-code";
+import {
+	kanbanSharedAdd,
+	kanbanExecutorRef,
+	kanbanSelectExecutor,
+	kanbanInspect,
+	kanbanGitRequest,
+	codexTaskRequest,
+	codexTaskRef,
+	codexTaskFollowup,
+	codexTaskConfigure,
+} from "./kanban-shared";
+export {
+	kanbanSharedAdd,
+	kanbanExecutorRef,
+	kanbanSelectExecutor,
+	kanbanInspect,
+	kanbanGitRequest,
+	codexTaskRequest,
+	codexTaskRef,
+	codexTaskFollowup,
+	codexTaskConfigure,
+};
 import { memoryRequest } from "./memory-request";
-import { worldQuery } from "./world-query";
+import { worldFind, worldQuery } from "./world-query";
 export { claudeCodeRequest };
 import {
 	KANBAN_PROMPT_MAX,
@@ -168,6 +190,15 @@ export const recipeFindInput = z
 	})
 	.strict();
 export const validators = {
+	kanbanSharedAdd,
+	kanbanExecutorRef,
+	kanbanSelectExecutor,
+	kanbanInspect,
+	kanbanGitRequest,
+	codexTaskRequest,
+	codexTaskRef,
+	codexTaskFollowup,
+	codexTaskConfigure,
 	uiComposeRequest,
 	claudeCodeRequest,
 	kanbanAdd,
@@ -219,6 +250,7 @@ export const validators = {
 		frameIndex: z.number().int().nonnegative().max(59).optional(),
 	}),
 	memoryRequest,
+	worldFind,
 	worldQuery,
 };
 export type SchemaKey = keyof typeof validators;

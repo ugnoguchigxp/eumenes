@@ -18,6 +18,7 @@ import { createLedger } from "./ledger";
 import * as repository from "./repository";
 import { toView } from "./requests";
 import { activityStale, createSessions, sessionView } from "./sessions";
+import { createWorkspaceSessions } from "./workspace";
 import type { Runtime, Session, TerminalSize, TerminalsOptions } from "./types";
 
 const log = getLogger("terminals");
@@ -132,6 +133,7 @@ export function createTerminals(options: TerminalsOptions = {}) {
 	};
 
 	return {
+		...createWorkspaceSessions(rt, sessions),
 		available: () => command !== null,
 		/** Requests can be tracked and saved on this host. */
 		trackable: rt.trackable,

@@ -1,4 +1,5 @@
 import type { KanbanBoardSource, KanbanResource } from "@eumenes/artifact-ui";
+import type { ActivityResource } from "@eumenes/artifact-ui/contracts";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { queryRoots } from "../../queryKeys";
@@ -61,6 +62,9 @@ function useKanbanArtifact({
 	client,
 	artifact,
 	artifactRevisionId,
+	targetRef,
+	setTargetRef,
+	visible,
 }: AdapterHostContext): AdapterState {
 	const source = artifact.sourceBindings[0]?.source ?? DEFAULT_SOURCE;
 	const board = useQuery({
@@ -76,6 +80,36 @@ function useKanbanArtifact({
 			return { revision: read.revision, board: read.data };
 		},
 		retry: false,
+	});
+	const activitySource = artifact.sourceBindings.find(
+		(s) => s.query === "query:kanban.activity@1",
+	)?.source;
+	const activity = useQuery({
+		queryKey: [
+			queryRoots.kanban,
+			client.identity,
+			artifactRevisionId,
+			activitySource,
+			targetRef,
+		],
+		enabled: !!activitySource && !!targetRef,
+		refetchInterval: visible ? 1500 : false,
+		queryFn: async ({ signal }) => {
+			const read = await client.toolchainArtifactSource(
+				artifactRevisionId,
+				activitySource!,
+				targetRef,
+				signal,
+			);
+			const data = read.data as Omit<ActivityResource, "kind" | "revision">;
+			if (!Array.isArray(data.entries))
+				throw new Error("kanban_activity_invalid");
+			return {
+				kind: "activity-timeline" as const,
+				revision: read.revision,
+				...data,
+			};
+		},
 	});
 	const { refetch } = board;
 	const reload = useCallback(() => {
@@ -97,12 +131,28 @@ function useKanbanArtifact({
 						message: "タスクボードを取得できません。接続を確認してください。",
 					}
 				: { kind: "loading" },
-		snapshot: resource ? { [source]: resource } : {},
+		snapshot: {
+			...(resource ? { [source]: resource } : {}),
+			...(activitySource
+				? {
+						[activitySource]: activity.data ?? {
+							kind: "activity-timeline" as const,
+							revision: 0,
+							entries: [],
+							connected: true,
+							emptyText: "カードの活動を選んでください",
+						},
+					}
+				: {}),
+		},
 		targetOf: () => undefined,
-		local: async () => ({
-			status: "rejected",
-			message: "この操作はできません。",
-		}),
+		local: async (_binding, event) => {
+			if (event.action === "kanban-inspect" && event.values?.cardId) {
+				setTargetRef(String(event.values.cardId));
+				return { status: "accepted", message: "活動を表示しました" };
+			}
+			return { status: "rejected", message: "この操作はできません。" };
+		},
 		settled: async () => {
 			await refetch();
 		},
@@ -117,5 +167,10 @@ function useKanbanArtifact({
 
 export const kanbanWebAdapter: WebArtifactAdapter = {
 	adapterRef: KANBAN_ADAPTER_REF,
+	useArtifact: useKanbanArtifact,
+};
+
+export const sharedKanbanWebAdapter: WebArtifactAdapter = {
+	adapterRef: "adapter:kanban@2",
 	useArtifact: useKanbanArtifact,
 };

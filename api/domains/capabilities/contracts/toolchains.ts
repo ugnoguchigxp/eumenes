@@ -54,11 +54,12 @@ export type ToolchainRuntimeMeta = {
 		| "music"
 		| "dots"
 		| "image"
-		| "excalidraw";
+		| "excalidraw"
+		| "world";
 	/** Fixed engine for research toolchains; omitted means the current model. */
 	researcher?: "codex_luna";
 	/** The research route the agent runtime keeps for its existing contracts. */
-	route?: "web" | "history";
+	route?: "web" | "history" | "world";
 	/**
 	 * Bound command toolchains (spec 2026-10-13 §5): resolved from the toolchain revision's
 	 * versioned binding and the host adapter registry, never from the fixed runtime map.

@@ -155,3 +155,61 @@ test("excerpt boundaries preserve Unicode and bound every quote to the public re
 		}
 	}
 });
+test("a world claim is cited by its excerpt and projected as a reference without text, title or URL", () => {
+	const claim: Source = {
+		kind: "world_claim",
+		sourceId: "11111111-1111-4111-8111-111111111111",
+		viewId: "22222222-2222-4222-8222-222222222222",
+		viewDigest: "digest",
+		sourceRef: "claim-1",
+		sourceRevision: "3",
+		scopeRef: "scope",
+		title: "INJECTION_TITLE",
+		basis: "world",
+		origin: "model_hypothesis",
+		fetchedAt: new Date().toISOString(),
+		truncated: false,
+		body: "対象: 経費精算システム / 項目: owner / 値: 経理部\nINJECTION_BODY",
+	};
+	const excerpt = evidenceExcerpts(claim.body)[0]!;
+	const report = verifyReport(
+		{
+			version: 2,
+			outcome: "answered",
+			summary: "経理部が担当と記録されています。",
+			claims: [
+				{
+					text: "経理部が担当",
+					evidence: [
+						{
+							sourceId: claim.sourceId,
+							viewId: claim.viewId,
+							excerptId: excerpt.excerptId,
+						},
+					],
+				},
+			],
+			limitations: [],
+			exploration: ["確認した操作2件。"],
+		},
+		[claim],
+		false,
+		true,
+	);
+	// The parent never receives a quote for a world claim.
+	expect(report.claims[0]!.evidence[0]!.quote).toBe("");
+	const projected = parentProjection(report);
+	expect(projected.sources).toEqual([
+		{
+			sourceId: claim.sourceId,
+			kind: "world_claim",
+			origin: "model_hypothesis",
+		},
+	]);
+	expect(JSON.stringify(projected)).not.toContain("INJECTION");
+	expect(JSON.stringify(projected)).not.toContain("url");
+	// The conversation model never sees World ids or revisions.
+	expect(JSON.stringify(projected)).not.toContain("claim-1");
+	expect(JSON.stringify(projected)).not.toContain("claimId");
+	expect(JSON.stringify(projected)).not.toContain("revision");
+});

@@ -717,3 +717,14 @@ test("conflict audit never stores a plain hash of confidential input", async () 
 	);
 	expect(conflicts()).toHaveLength(2);
 });
+
+test("a shared artifact routes writes to its registered source independently of the conversation binding", async () => {
+	fresh({ bindingAdapter: OTHER_REF });
+	const result = await h.service.submit(h.event());
+	expect(result.request.status).toBe("accepted");
+	expect(h.effects()).toBe(1);
+	expect(h.invoked[0]!.operationName).toBe("fake.start");
+	const wrong = await refused(h.service.submit(h.event({ source: "others" })));
+	expect((wrong as ActionRequestError).code).toBe("action_source_mismatch");
+	expect(h.effects()).toBe(1);
+});

@@ -1,10 +1,16 @@
 import type { Database } from "bun:sqlite";
+import {
+	DEFAULT_EXECUTOR_ID,
+	OPEN_RUN_STATES,
+	ACTIVE_RUN_STATES,
+} from "./shared-contracts";
 import type {
 	KanbanCardRefInput,
 	KanbanFollowupInput,
 	KanbanOperationContext,
 	KanbanQueueReceipt,
 	RunKind,
+	KanbanGitGrant,
 } from "./contracts";
 import { hasConversation } from "./board";
 import type { Applied, Core, KanbanOutcome } from "./core";
@@ -37,7 +43,7 @@ export function createRuns(core: Core) {
 	const { blockRun, ...settled } = createSettle(core, queue);
 
 	const action = (kind: RunKind) =>
-		kind === "task" ? "run" : kind === "followup" ? "followup" : "commit_push";
+		kind === "task" ? "run" : kind === "followup" ? "followup" : kind;
 
 	/** Creates a run for the card, puts the card in `running` and hands over what is ready. */
 	function startRun(
@@ -47,19 +53,36 @@ export function createRuns(core: Core) {
 		body: string,
 		context: KanbanOperationContext,
 		claudeSessionId: string,
+		git?: KanbanGitGrant,
 	): Applied {
 		const at = now();
+		const executor = core.executor(card.executorId);
+		if (!executor.available) throw new Error("kanban_executor_unavailable");
+		const sessionRef =
+			executor.sessionPolicy === "host-created"
+				? claudeSessionId
+				: kind === "task"
+					? null
+					: card.sessionRef;
+		const legacySessionId =
+			executor.sessionPolicy === "host-created" ? claudeSessionId : "";
 		const run: Omit<RunRow, "seq"> = {
 			id: newId(),
 			cardId: card.id,
+			executorId: executor.id,
+			executorRevision: executor.revision,
+			workspaceRef: executor.workspaceRef,
+			sessionRef,
+			executionStopped: false,
+			attemptRef: null,
 			kind,
-			state: "waiting_turn",
+			state: "queued",
 			reason: null,
 			cardRevision: card.revision,
 			title: card.title,
 			prompt: card.prompt,
 			body,
-			claudeSessionId,
+			claudeSessionId: legacySessionId,
 			projectId: card.projectId,
 			origin: context.origin,
 			conversationId: context.conversationId ?? null,
@@ -69,13 +92,19 @@ export function createRuns(core: Core) {
 			finishedAt: null,
 		};
 		insertRun(tx, run);
+		if (git)
+			tx.query("INSERT INTO kanban_run_git_grants VALUES(?,?)").run(
+				run.id,
+				JSON.stringify(git),
+			);
 		const fresh = kind === "task";
 		const running: CardRow = {
 			...card,
 			column: "running",
 			label: null,
 			reason: null,
-			claudeSessionId,
+			claudeSessionId: legacySessionId || null,
+			sessionRef,
 			currentRunId: run.id,
 			// A new task starts a new conversation: nothing of the earlier one is carried over.
 			...(fresh
@@ -92,7 +121,7 @@ export function createRuns(core: Core) {
 		updateCard(tx, running);
 		appendToColumn(tx, running, card.column);
 		bumpBoard(tx);
-		const dispatch = nextDispatch(tx);
+		const dispatch = nextDispatch(tx, executor.id);
 		return { receipt: receiptOf(action(kind), running, run.id), dispatch };
 	}
 
@@ -148,7 +177,7 @@ export function createRuns(core: Core) {
 				"followup",
 				body,
 				context,
-				card.claudeSessionId!,
+				card.claudeSessionId ?? "",
 			);
 		});
 	}
@@ -165,7 +194,7 @@ export function createRuns(core: Core) {
 				throw new Error("commit_push_requires_board");
 			const card = core.target(tx, input.cardId, input.expectedRevision);
 			idle(card);
-			if (card.label !== "done" || !card.claudeSessionId)
+			if (card.label !== "done" || !hasConversation(card))
 				throw new Error("kanban_state_invalid");
 			runnable(context);
 			return startRun(
@@ -174,10 +203,12 @@ export function createRuns(core: Core) {
 				"commit_push",
 				commitPushBody(card),
 				context,
-				card.claudeSessionId,
+				card.claudeSessionId ?? "",
 			);
 		});
 	}
+
+	const gitInTransaction = createGitOperation(core, startRun);
 
 	/** The card's run that is not final yet. */
 	function openRun(tx: Database, card: CardRow): RunRow {
@@ -185,7 +216,7 @@ export function createRuns(core: Core) {
 		if (
 			card.column !== "running" ||
 			!run ||
-			(run.state !== "waiting_turn" && run.state !== "handed")
+			!OPEN_RUN_STATES.includes(run.state)
 		)
 			throw new Error("kanban_state_invalid");
 		return run;
@@ -193,11 +224,14 @@ export function createRuns(core: Core) {
 
 	/** Cancels a run that was not sent (queue-waiting, or handed but still unsent). */
 	function cancelRun(tx: Database, run: RunRow): Applied {
+		tx.query("UPDATE kanban_runs SET execution_stopped=1 WHERE id=?").run(
+			run.id,
+		);
 		blockRun(tx, run, "cancelled", "cancelled");
 		const card = getCard(tx, run.cardId)!;
 		return {
 			receipt: receiptOf("cancelled", card, run.id),
-			dispatch: nextDispatch(tx),
+			dispatch: nextDispatch(tx, run.executorId),
 		};
 	}
 
@@ -211,7 +245,7 @@ export function createRuns(core: Core) {
 			const card = core.target(tx, input.cardId, input.expectedRevision);
 			const run = openRun(tx, card);
 			// Sent runs cannot be cancelled: they are stopped.
-			if (run.state === "handed" && !cancelUnsent(run.id))
+			if (ACTIVE_RUN_STATES.includes(run.state) && !cancelUnsent(run.id))
 				throw new Error("kanban_card_busy");
 			return cancelRun(tx, run);
 		});
@@ -230,7 +264,7 @@ export function createRuns(core: Core) {
 		return operate(tx, requestId, "stop", input, () => {
 			const card = core.target(tx, input.cardId, input.expectedRevision);
 			const run = openRun(tx, card);
-			if (run.state === "waiting_turn" || cancelUnsent(run.id))
+			if (run.state === "queued" || cancelUnsent(run.id))
 				return cancelRun(tx, run);
 			setStopRequested(tx, run.id, true);
 			bumpBoard(tx);
@@ -239,34 +273,36 @@ export function createRuns(core: Core) {
 	}
 
 	/** Runs whose stop was asked for and not carried out yet. */
-	const pendingStops = (tx: Database) => stopRequestedIds(tx);
+	const pendingStops = (tx: Database, executorId = DEFAULT_EXECUTOR_ID) =>
+		stopRequestedIds(tx, executorId);
 
 	/** The process of a stopped run could not be confirmed to be gone: the queue stops. */
 	function stopUnconfirmed(tx: Database, runId: string) {
 		const run = getRun(tx, runId);
-		if (!run || run.state !== "handed") return;
+		if (!run || !ACTIVE_RUN_STATES.includes(run.state)) return;
 		setStopRequested(tx, runId, false);
-		pauseQueue(tx, "stop_unconfirmed");
+		pauseQueue(tx, "stop_unconfirmed", run.executorId);
 		bumpBoard(tx);
 	}
 
 	function resumeQueueInTransaction(
 		tx: Database,
 		requestId: string,
+		executorId = DEFAULT_EXECUTOR_ID,
 	): KanbanOutcome<KanbanQueueReceipt> {
 		return operate<KanbanQueueReceipt>(
 			tx,
 			requestId,
 			"resume_queue",
-			{},
+			executorId === DEFAULT_EXECUTOR_ID ? {} : { executorId },
 			() => {
-				if (getQueue(tx).state === "paused") {
-					setQueue(tx, { state: "running" });
+				if (getQueue(tx, executorId).state === "paused") {
+					setQueue(tx, { state: "running" }, executorId);
 					bumpBoard(tx);
 				}
 				return {
 					receipt: { action: "queue_resumed", queue: "running" },
-					dispatch: nextDispatch(tx),
+					dispatch: nextDispatch(tx, executorId),
 				};
 			},
 		);
@@ -274,14 +310,73 @@ export function createRuns(core: Core) {
 
 	return {
 		...settled,
+		dispatchNextInTransaction: nextDispatch,
 		runInTransaction,
 		followupInTransaction,
 		commitPushInTransaction,
+		gitInTransaction,
 		cancelInTransaction,
 		stopInTransaction,
 		resumeQueueInTransaction,
 		pauseQueueInTransaction: pauseQueue,
 		pendingStops,
 		stopUnconfirmed,
+	};
+}
+
+function createGitOperation(
+	core: Core,
+	startRun: (
+		tx: Database,
+		card: CardRow,
+		kind: RunKind,
+		body: string,
+		context: KanbanOperationContext,
+		sessionId: string,
+		git?: KanbanGitGrant,
+	) => Applied,
+) {
+	const { operate, now } = core;
+	const idle = (card: CardRow) => {
+		if (card.column === "running") throw new Error("kanban_card_busy");
+	};
+	const runnable = (context: KanbanOperationContext) => {
+		if (!context.runnable) throw new Error("kanban_not_runnable");
+	};
+	return function gitInTransaction(
+		tx: Database,
+		input: KanbanCardRefInput,
+		requestId: string,
+		context: KanbanOperationContext,
+		grant: KanbanGitGrant,
+	): KanbanOutcome {
+		return operate(tx, requestId, grant.mode, { ...input, grant }, () => {
+			if (context.origin !== "board")
+				throw new Error("commit_push_requires_board");
+			const card = core.target(tx, input.cardId, input.expectedRevision);
+			idle(card);
+			runnable(context);
+			const executor = core.executor(card.executorId);
+			const capability =
+				grant.mode === "commit_push" ? "commitPush" : grant.mode;
+			if (
+				!executor.capabilities[capability] ||
+				!hasConversation(card) ||
+				card.currentRunId !== grant.sourceRunId ||
+				card.column !== "finished" ||
+				(grant.mode !== "push" && card.label !== "done") ||
+				Date.parse(grant.expiresAt) <= now()
+			)
+				throw new Error("kanban_git_grant_invalid");
+			return startRun(
+				tx,
+				card,
+				grant.mode,
+				commitPushBody(card),
+				context,
+				card.claudeSessionId ?? "",
+				grant,
+			);
+		});
 	};
 }

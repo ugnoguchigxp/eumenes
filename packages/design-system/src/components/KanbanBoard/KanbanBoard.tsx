@@ -49,6 +49,8 @@ export function KanbanBoard(props: KanbanBoardProps) {
 	} = props;
 	const headingId = useId();
 	const [adding, setAdding] = useState(false);
+	const [executorFilter, setExecutorFilter] = useState("");
+	const [lastExecutor, setLastExecutor] = useState(props.defaultExecutorId);
 	const [dragId, setDragId] = useState<string | null>(null);
 	const [target, setTarget] = useState<DropTarget | null>(null);
 	const addButton = useRef<HTMLButtonElement>(null);
@@ -116,9 +118,36 @@ export function KanbanBoard(props: KanbanBoardProps) {
 					タスクを追加
 				</Button>
 			</header>
+			{props.executors && (
+				<label className="kanban-executor-filter">
+					表示する担当{" "}
+					<select
+						value={executorFilter}
+						onChange={(event) => setExecutorFilter(event.target.value)}
+					>
+						<option value="">すべて</option>
+						{props.executors.map((entry) => (
+							<option key={entry.id} value={entry.id}>
+								{entry.label}
+							</option>
+						))}
+					</select>
+				</label>
+			)}
 			{adding && (
 				<TaskForm
 					label="タスクを追加"
+					executors={props.executors}
+					defaultExecutorId={lastExecutor}
+					onSubmitAndRun={
+						props.onAddAndRun &&
+						((value) => {
+							props.onAddAndRun?.(value);
+							setLastExecutor(value.executorId);
+							setAdding(false);
+							addButton.current?.focus();
+						})
+					}
 					submitLabel="追加"
 					disabled={busy}
 					onCancel={() => {
@@ -127,6 +156,7 @@ export function KanbanBoard(props: KanbanBoardProps) {
 					}}
 					onSubmit={(value) => {
 						onAdd(value);
+						setLastExecutor(value.executorId);
 						setAdding(false);
 						addButton.current?.focus();
 					}}
@@ -142,41 +172,59 @@ export function KanbanBoard(props: KanbanBoardProps) {
 					{notRunnableText ?? DEFAULT_NOT_RUNNABLE}
 				</p>
 			)}
-			<section
-				className="kanban-queue"
-				aria-label="実行キュー"
-				data-state={queue.state}
-			>
-				{queue.state === "paused" ? (
-					<>
-						<p role="status">
-							<OctagonAlert aria-hidden="true" size={16} />
-							実行キューは停止中: {queue.reasonText ?? "理由を確認できません"}
-							{queue.waiting > 0 && `（待機中 ${queue.waiting}件）`}
+			{(
+				props.queues ?? [{ ...queue, executorId: "", label: "実行キュー" }]
+			).map((shownQueue) => (
+				<section
+					key={shownQueue.executorId}
+					className="kanban-queue"
+					aria-label={shownQueue.label}
+					data-state={shownQueue.state}
+				>
+					{shownQueue.state === "paused" ? (
+						<>
+							<p role="status">
+								<OctagonAlert aria-hidden="true" size={16} />
+								{shownQueue.label}は停止中:{" "}
+								{shownQueue.reasonText ?? "理由を確認できません"}
+								{shownQueue.waiting > 0 && `（待機中 ${shownQueue.waiting}件）`}
+							</p>
+							<Button
+								type="button"
+								size="sm"
+								variant="outline"
+								disabled={busy}
+								onClick={() =>
+									onResumeQueue(shownQueue.executorId || undefined)
+								}
+							>
+								再開
+							</Button>
+						</>
+					) : (
+						<p>
+							{props.queues && `${shownQueue.label}: `}
+							{queueText(shownQueue)}
 						</p>
-						<Button
-							type="button"
-							size="sm"
-							variant="outline"
-							disabled={busy}
-							onClick={onResumeQueue}
-						>
-							再開
-						</Button>
-					</>
-				) : (
-					<p>{queueText(queue)}</p>
-				)}
-				{queue.manualText && (
-					<p className="kanban-queue-manual">{queue.manualText}</p>
-				)}
-			</section>
+					)}
+					{shownQueue.manualText && (
+						<p className="kanban-queue-manual">{shownQueue.manualText}</p>
+					)}
+				</section>
+			))}
 			<div className="kanban-columns">
 				{COLUMNS.map((column) => (
 					<KanbanColumn
 						key={column.id}
 						{...column}
-						cards={cards}
+						cards={
+							executorFilter
+								? cards.filter((card) => card.executorId === executorFilter)
+								: cards
+						}
+						executors={props.executors}
+						onSelectExecutor={props.onSelectExecutor}
+						onInspect={props.onInspect}
 						runnable={runnable}
 						busy={busy}
 						draggingId={dragId}

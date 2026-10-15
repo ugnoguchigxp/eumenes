@@ -2,7 +2,7 @@ import { getLogger } from "../../../infrastructure/logger";
 
 const log = getLogger("memory");
 
-/** Byte budgets of the layers. World's share (CONTEXT_TOTAL_BYTES) assumes their sum plus the history summary (SUMMARY_MAX_CHARS): check it when changing one. */
+/** Byte budgets of the layers. */
 export const LONG_TERM_BYTES = 16 * 1024;
 export const SHORT_TERM_BYTES = 8 * 1024;
 export const PREFETCH_BYTES = 6 * 1024;

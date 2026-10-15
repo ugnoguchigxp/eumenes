@@ -2,7 +2,7 @@
 
 The host integration of the `eumenes-world-model` package (vendored tgz). World
 semantics and SQL live in the package; this domain is the glue: source adapter,
-Memory registration, forget/restore lifecycle, Context Broker, usage receipts.
+Memory registration, forget/restore lifecycle, the names-only context hint, `world.query` and its research route.
 
 ## Assembly (`api/application/world.ts`)
 
@@ -45,8 +45,17 @@ Other environment variables (unchanged):
 4. `world.start()` (commit-notification and poll triggers)
 5. shutdown: `world.close()` (stop triggers, wait for the pass in flight) before any store close
 
-The Broker port (`assembly.context`) is passed to `createDialogueService` as
-`worldContext`. With World OFF it answers `disabled` and dialogue behaves as it always did.
+The names-only hint (`assembly.context`, `createWorldContextNames`) is passed to `createDialogueService` as
+`worldContext`. It reads the Scope's live target names and tells the conversation model which of them the
+utterance mentions; it carries no claim, no relation and no usage receipt. With World OFF it answers `disabled`
+and dialogue behaves as it always did.
+
+World content reaches the answer only through the research route: the conversation model delegates to the
+`world.query` toolchain, whose sub-agent calls `world.find` (names to target ids and matching adopted goals) and
+`world.query` (`api/application/world-research-ports.ts`). Each claim read becomes a `world_claim` Source and is
+re-checked when the report is adopted (same revision, not ended, and its source utterances still resolvable, so a
+forget whose World tombstone is still pending cannot support a report). The old per-turn context broker and the
+usage receipts are gone; `service/usage-ledger.ts` only cleans rows older versions left.
 
 ### Consumers
 
@@ -299,12 +308,13 @@ change route. A correction, retraction or forget of a claim is a steward operati
 
 ## Tests
 
-- `api/domains/world/test/*`: World domain, lifecycle, Broker (real store, production migrations);
+- `api/domains/world/test/*`: World domain, lifecycle, names hint (real store, production migrations);
   `change-feed.test.ts` (P4-01: A28, A29, A42), `curation.test.ts` (prepare, settle, held, forget operations)
   and `steward-migration.test.ts`.
 - `api/application/world.test.ts`: mode flag, cursor secret, enabling, idle quietness, cursor reset.
 - `api/application/world-acceptance-p3.test.ts`: P3-09 on the real assembly (A34 host side, A35 to A41). It lives in `application` because the world domain may not depend on dialogue, voice or queue.
-- `api/domains/dialogue/test/world-context.test.ts`, `api/domains/voice-dialogue/test/world-release.test.ts`: A40 and A41 in depth.
+- `api/domains/dialogue/test/world-context.test.ts`: the names-only hint in the dialogue.
+- `api/application/world-research.test.ts`: the research route end to end (find, query, adoption re-check, forget, readings limits).
 - `api/domains/world/test/world-query.test.ts`: P5-01 (A14 to A16, A47) on a real store, fake host Task port.
 - `api/domains/world/test/world-claims.test.ts`, `api/application/world-claims-http.test.ts`: P5-02 server side (A48) on a real store and the real HTTP app. Web: `web/src/components/domains/world/WorldPanel.test.tsx`; browser: `tests/browser/world.spec.ts` against `api/application/world-claims.fixture.ts` (fixture backend, stub model).
 - Run: `bun test api/application/world*.test.ts` and `bun run verify -- --domain world`.

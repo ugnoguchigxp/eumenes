@@ -148,7 +148,6 @@ export function createAnswer(ctx: RuntimeContext, ops: TaskOps) {
 					? JSON.parse(payload, (key, value) =>
 							key === "serverNow" ||
 							key === "observedAt" ||
-							key === "asOf" ||
 							key === "remainingSeconds"
 								? undefined
 								: value,

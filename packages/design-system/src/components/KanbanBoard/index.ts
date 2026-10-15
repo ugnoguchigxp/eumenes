@@ -4,5 +4,6 @@ export type {
 	KanbanBoardColumn,
 	KanbanBoardProps,
 	KanbanBoardQueue,
+	KanbanExecutorChoice,
 	KanbanCardAction,
 } from "./types";

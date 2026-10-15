@@ -107,8 +107,6 @@ export function createIntake(deps: DialogueDeps) {
 			sourceKind: input.sourceKind,
 			scheduleId: input.scheduleId ?? null,
 			occurrenceId: input.occurrenceId ?? null,
-			worldUsed: false,
-			worldBlocked: false,
 			createdAt: now,
 			updatedAt: now,
 		};

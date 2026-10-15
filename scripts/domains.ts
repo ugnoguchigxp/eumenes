@@ -33,6 +33,12 @@ export const domains = {
 		components: null,
 		depends: { api: ["capabilities"], web: [], test: [] },
 	},
+	"codex-tasks": {
+		backend: "api/domains/codex-tasks",
+		web: "web/src/domains/codex-tasks",
+		components: null,
+		depends: { api: ["coding"], web: [], test: [] },
+	},
 	terminals: {
 		backend: "api/domains/terminals",
 		web: "web/src/domains/terminals",
