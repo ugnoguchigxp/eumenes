@@ -174,7 +174,6 @@ const forget = {
 	createdAt: 1,
 	updatedAt: 1,
 };
-const target = { claimId: "cl1" };
 contracts("world client", [
 	{
 		name: "worldStatus",

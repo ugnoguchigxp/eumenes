@@ -1,0 +1,130 @@
+bun test v1.4.3 (c6da4a4d3)
+
+api/application/claude-code-toolchain.test.ts:
+(pass) a conversation request reaches Claude Code once saved, and its finished task is reported by name [254.07ms]
+(pass) a conversation request whose run cannot be tracked is stopped and reported [224.88ms]
+
+api/application/server.test.ts:
+(pass) importing server.ts has no side effects [6.81ms]
+(pass) a separate process that imports server.ts neither starts nor touches the data directory, and exits by itself [421.57ms]
+68 | 	expect(
+69 | 		items
+70 | 			.filter((item) => item.close)
+71 | 			.map((item) => item.name)
+72 | 			.reverse(),
+73 | 	).toEqual([
+        ^
+error: expect(received).toEqual(expected)
+
+  [
+    "commits",
+    "status",
+    "changes",
+    "http",
+    "timers",
+    "coding_execution",
+    "coding",
+    "kanban_maintenance",
+    "timer_maintenance",
++   "google_accounts",
+    "store_retention",
+    "task_report_delivery",
+    "task_maintenance",
+    "world",
+    "supervision",
+    "delegated",
+    "scheduler",
+    "service_tests",
+    "voice",
+    "excalidraw",
+    "terminals",
+    "kanban",
+    "agents",
+    "capabilities",
+    "queue",
+    "web_research",
+    "dialogue",
+    "inference",
+    "attitude_dataset",
+    "dataset_store",
+    "store",
+  ]
+
+- Expected  - 0
++ Received  + 1
+
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/application/server.test.ts:73:4)
+(fail) the shutdown order is fixed, and a freshly built set of services closes cleanly through it [370.92ms]
+(pass) SIGTERM after startup shuts down through closeAll and exits 0 [876.34ms]
+(pass) a busy port fails with port_in_use after closing [889.02ms]
+(pass) startupFailureReason passes only allow-listed codes [0.26ms]
+
+api/application/lifecycle.test.ts:
+(pass) recover and start follow registration order; close is the reverse [0.25ms]
+(pass) items without a hook are skipped, so per-phase order is expressed as separate items [0.06ms]
+(pass) a recover failure aborts startup and stops later recoveries [0.04ms]
+(pass) a failing close is logged by name and never skips the rest; the result is false [0.06ms]
+(pass) the overall deadline abandons a hung close, starts nothing further, and reports failure [1.22ms]
+(pass) a close that finishes in time clears its deadline timer [0.03ms]
+(pass) intervalLifecycle skips a tick while the previous one runs, and close waits for it [4.50ms]
+(pass) intervalLifecycle stop and idle can be used apart, and a rejecting job is contained [2.46ms]
+(pass) a non-exclusive interval fires every tick and does not track them [1.18ms]
+(pass) terminator: a successful shutdown exits 0 and a failed one exits 1 [3.52ms]
+(pass) terminator: a second signal while shutting down exits 130 at once [1.18ms]
+(pass) terminator: the 30 s process deadline exits 1 when shutdown never finishes [0.03ms]
+(pass) process guard: one rejection is logged and tolerated [0.06ms]
+(pass) process guard: more than 20 rejections in one window terminate; spread-out ones do not [0.10ms]
+(pass) process guard: an uncaught exception always terminates, without arguments [0.02ms]
+(pass) process guard: log fields never carry the error text [0.03ms]
+
+api/application/world-research.test.ts:
+(pass) a World question delegates to route world: the sub-agent finds the target, reads claims as sources and the report is projected [218.67ms]
+(pass) a claim retracted while the research ran keeps the report from being adopted [207.83ms]
+(pass) a target World does not know is reported as not found, with no readings [207.74ms]
+(pass) World off: the World investigation is not offered [186.59ms]
+(pass) a query the World refuses comes back as a machine failure code, not as a reading [202.57ms]
+(pass) a snapshot given one entityId (the live mistake) reads that single start point [207.59ms]
+(pass) an input that does not fit the mode comes back as invalid_input with the fields to repair [198.17ms]
+(pass) a finish whose claims omit evidence is rejected and repaired: the references e1.. were offered and the skill says how to cite them [207.66ms]
+(pass) a query that returns no readings: the sub-agent has no references and finishes with not_found and no claims [203.25ms]
+(pass) a claim revised (disputed) while the research ran keeps the report from being adopted [198.71ms]
+(pass) a source forgotten while the research ran keeps the report from being adopted, even before World's tombstone is written [194.92ms]
+(pass) a forgotten source whose World tombstone is already written keeps the report from being adopted [202.54ms]
+(pass) a snapshot cut by World's own budget: the readings stay within the cap, every reading says the read was partial and the report's coverage is partial [267.03ms]
+(pass) more than 20 matching targets: world.find lists a few within its byte budget and says it is truncated [200.47ms]
+(pass) a one-character name identifies nothing: world.find lists no target for it [185.72ms]
+(pass) a relation reading says the relation in plain words and never the stored identifier [0.11ms]
+(pass) a reading whose target has no resolvable name is not written [0.01ms]
+(pass) a reading whose value was clipped says so, and its digest is stable [0.09ms]
+(pass) an incomplete read marks its readings as truncated even when their text is whole [0.03ms]
+(pass) gap kinds and dependency states are written in plain words, and unnamed targets are left out and counted [0.11ms]
+(pass) a summary over its budget is cut and says so [0.14ms]
+(pass) a result summary points at readings as `document` / `documents`, never as `claims` (the report's own field) [0.06ms]
+
+api/domains/terminals/test/hardening.test.ts:
+(pass) nothing is sent before startup recovery; recovery cancels the leftover request as restarted [100.19ms]
+(pass) stop while the PTY is being launched waits for it, then stops it [15.74ms]
+(pass) stop while the launch fails answers final, never stopped without a final state [17.50ms]
+(pass) stop while a request is being marked sent into an idle PTY waits and then stops that PTY [90.79ms]
+(pass) a Kanban PTY left working by Esc stops holding the queue after 30 minutes without a hook [126.82ms]
+(pass) a turn with a request in flight never counts as stale [23.13ms]
+(pass) control characters other than line feed and tab are refused when a request is saved [21.29ms]
+(pass) an ESC that reached a saved request is dropped when it is pasted [23.70ms]
+(pass) final requests older than 30 days go, at most the newest 2000 final ones stay, open ones stay [49.62ms]
+(pass) a large PostToolUse is accepted; one beyond the bound is refused and logged with the request only [20.16ms]
+(pass) the hook token is in a private header file, not in the settings or any process argument [17.31ms]
+(pass) /clear changes Claude's session id: the request is interrupted and the new id is followed [14.38ms]
+(pass) tracking lost: the request is marked only after the exit is confirmed [301.90ms]
+(pass) tracking lost with a process that does not end: unknown (stop_unconfirmed) so Kanban pauses [133.65ms]
+(pass) restarting an exited Kanban session is refused while another PTY holds its conversation [38.63ms]
+(pass) every Kanban request is of the kanban group, whatever the caller sent [16.35ms]
+(pass) typing keeps one pending wake-up per PTY [15.15ms]
+(pass) a conversation request is never pasted into a PTY that was cleared; that PTY is closed and the conversation resumed [20.25ms]
+
+1 tests failed:
+(fail) the shutdown order is fixed, and a freshly built set of services closes cleanly through it [370.92ms]
+
+ 63 pass
+ 1 fail
+ 268 expect() calls
+Ran 64 tests across 5 files. [7.74s]

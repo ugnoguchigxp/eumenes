@@ -1,0 +1,255 @@
+$ bun scripts/verify.ts --domain coding --domain codex-tasks --domain kanban
+[verify] selected=coding,codex-tasks,kanban dependencyClosure=coding,codex-tasks,capabilities,kanban
+[verify] Shared DesignSystem dist: do not overlap dev, browser tests or other builds; endpoint hashes cannot detect change-and-restore.
+[verify] inventory
+[verify] boundaries
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts api/domains/coding packages/coding-runner/src packages/coding-runner/test api/domains/codex-tasks web/src/domains/codex-tasks api/domains/kanban web/src/domains/kanban
+size-budget ok (67 files)
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check api/domains/coding packages/coding-runner/src packages/coding-runner/test api/domains/codex-tasks web/src/domains/codex-tasks api/domains/kanban web/src/domains/kanban
+$ oxfmt --check api/domains/coding packages/coding-runner/src packages/coding-runner/test api/domains/codex-tasks web/src/domains/codex-tasks api/domains/kanban web/src/domains/kanban
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 8ms on 91 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint api/domains/coding packages/coding-runner/src packages/coding-runner/test api/domains/codex-tasks web/src/domains/codex-tasks api/domains/kanban web/src/domains/kanban
+$ oxlint --deny-warnings api/domains/coding packages/coding-runner/src packages/coding-runner/test api/domains/codex-tasks web/src/domains/codex-tasks api/domains/kanban web/src/domains/kanban
+[verify] design-system typecheck: /Users/y.noguchi/.bun/bin/bun run --cwd packages/design-system typecheck
+$ bun check
+✓ No type errors in 363 files [303.63ms]
+[verify] design-system build: /Users/y.noguchi/.bun/bin/bun run --cwd packages/design-system build
+$ bun check -p tsconfig.build.json && vite build
+✓ No type errors in 208 files [107.73ms]
+vite v7.3.6 building client environment for production...
+transforming...
+✓ 1977 modules transformed.
+rendering chunks...
+
+[vite:dts] Start generate declaration files...
+computing gzip size...
+dist/design-system.css    170.14 kB │ gzip:  29.78 kB
+dist/index.mjs          1,354.00 kB │ gzip: 316.26 kB
+[vite:dts] Start rollup declaration files...
+Analysis will use the bundled TypeScript version 5.9.3
+[vite:dts] Declaration files built in 2949ms.
+
+dist/design-system.css  170.14 kB │ gzip:  29.78 kB
+dist/index.js           952.09 kB │ gzip: 270.86 kB
+✓ built in 6.20s
+[verify] typecheck configuration
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun check -p /Users/y.noguchi/Code/eumenes/verification-reports/runs/2026-10-15T12-55-01-211Z-662df317-5b3f-4d03-87e0-7596c0943d98/tsconfig.selected.json
+✓ No type errors in 869 files [477.53ms]
+[verify] typecheck closure
+[verify] TypeScript workspace closure: 826 files
+[verify] bun tests: /Users/y.noguchi/.bun/bin/bun test ./api/domains/codex-tasks/test/service.test.ts ./api/domains/coding/test/coding.test.ts ./api/domains/coding/test/indexes.test.ts ./api/domains/kanban/test/controller.test.ts ./api/domains/kanban/test/kanban.test.ts ./api/domains/kanban/test/limits.test.ts ./api/domains/kanban/test/retention.test.ts ./api/domains/kanban/test/runs.test.ts ./api/domains/kanban/test/shared.test.ts ./packages/coding-runner/test/git.test.ts ./packages/coding-runner/test/observation.test.ts ./packages/coding-runner/test/protocol.test.ts ./packages/coding-runner/test/retention.test.ts ./packages/coding-runner/test/review.test.ts ./packages/coding-runner/test/runner.test.ts ./packages/coding-runner/test/sdk-git.test.ts ./packages/coding-runner/test/sdk-transport.test.ts ./packages/coding-runner/test/sdk.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+api/domains/codex-tasks/test/service.test.ts:
+(pass) outbox acceptance is durable and immutable; publication intent prevents cancellation races [16.28ms]
+(pass) event pages are ordered, replay-safe, scope checked and final adoption waits for the full cursor [8.38ms]
+(pass) identity mismatches and cursor gaps roll back all activity/result writes [5.81ms]
+(pass) a done report without managed termination or with a contradictory outcome cannot be adopted [5.48ms]
+(pass) backend disconnect cannot discard an accepted execution; results and shared adoption rollback together [6.92ms]
+(pass) configuration uses registered IDs and SQLite revision; incomplete or arbitrary paths never enable execution [6.49ms]
+(pass) Git success requires the frozen group/target and verified SHA; commit proof cannot be lost [5.98ms]
+(pass) settings receipt replays an accepted revision without applying a second change [5.94ms]
+
+api/domains/coding/test/coding.test.ts:
+(pass) coding domain > intent and reservation rollback together; duplicate operations never create another execution [282.24ms]
+(pass) coding domain > cursor and event adoption are atomic; duplicates, gaps and changed digests are checked [4914.07ms]
+(pass) coding domain > old authority cannot adopt output; confirmed stop remains usable after grant expiration [1283.49ms]
+(pass) coding domain > recovery preserves intent and reservation without replaying start [271.27ms]
+(pass) coding domain > gap cannot advance a zero cursor [1312.29ms]
+(pass) coding domain > public view hides session and instruction [285.17ms]
+(pass) receipt flags and state cannot regress after completion, and continuation waits for imported evidence [1286.98ms]
+(pass) an unchanged epoch cannot extend the execution deadline or replace network and operation authority [1422.52ms]
+(pass) the observation snapshot exposes adopted facts only, with message metadata [1223.01ms]
+(pass) terminal facts cannot be retracted, flipped or pointed at a non-terminal event [1181.40ms]
+(pass) a v1 session stays viewable but is never continued, with a fixed code [1220.95ms]
+(pass) a finished v1 execution (no observation on its receipt) is adopted, stopped and projected, never started [1230.61ms]
+(pass) a conflicting terminal is adopted as a conflict, not rejected as inconsistent [1197.79ms]
+
+api/domains/coding/test/indexes.test.ts:
+(pass) receipt update by execution uses coding_operations_execution [145.50ms]
+(pass) live() query uses coding_executions_state [140.48ms]
+(pass) LIVE_STATES lists every non-terminal state [0.10ms]
+(pass) countEvents uses coding_evidence_kind [143.03ms]
+(pass) supervision trim and purge use their task indexes [138.51ms]
+
+api/domains/kanban/test/controller.test.ts:
+(pass) GET lists notices newest first with the unread count and honours limit [15.57ms]
+(pass) POST read marks a notice read (204) and refuses an unknown one (404) [14.11ms]
+
+api/domains/kanban/test/kanban.test.ts:
+(pass) add appends to todo, and inserts before a card with beforeCardId [10.56ms]
+(pass) add rejects an unknown or foreign beforeCardId and saves nothing [9.82ms]
+(pass) edit bumps the revision; an unchanged edit does not [10.07ms]
+(pass) a stale expectedRevision is revision_conflict and nothing changes [9.12ms]
+(pass) move reorders within a column and between columns; Done is the label of finished [9.99ms]
+(pass) remove deletes the card and closes the gap [10.14ms]
+(pass) the same request id replays the saved receipt; a different input is request_conflict [9.59ms]
+(pass) actions are decided by the domain from the column and runnable [9.12ms]
+(pass) a running card cannot be edited, moved or removed [9.46ms]
+(pass) cards and order survive reopening the database [21.29ms]
+
+api/domains/kanban/test/limits.test.ts:
+(pass) the longest card prompt plus the work instruction fits one request [1.38ms]
+(pass) add and edit refuse a prompt that could not be run, and save nothing [11.07ms]
+(pass) a follow-up whose note fits is accepted whatever the earlier prompt and report quote to [0.11ms]
+(pass) the note's quoted length decides: the largest allowed note passes, one more is refused [0.08ms]
+(pass) a follow-up that cannot fit is refused at the operation, before anything is queued [9.78ms]
+
+api/domains/kanban/test/retention.test.ts:
+(pass) pruning deletes final runs and receipts older than 30 days, never a current or open run [11.13ms]
+(pass) prune() runs the retention with the service clock [9.43ms]
+(pass) followedByOtherRun is decided from the latest run of each card, and costs the same for any number of cards [20.66ms]
+
+api/domains/kanban/test/runs.test.ts:
+(pass) a run puts the card in running and only the first run is handed over [10.32ms]
+(pass) the same request replays without handing over again; stale or busy cards are refused [9.51ms]
+(pass) a run needs a host that can track it, and a prompt that fits the request [12.25ms]
+(pass) completion makes the card Done with the report and files, saves a notice and hands over the next run [12.50ms]
+(pass) a run that did not complete is a Blocker with its reason; the queue goes on [11.49ms]
+(pass) blocker reasons follow the terminals reason; a lost or restarted run stops the queue [15.98ms]
+(pass) resuming the queue hands over the oldest waiting run, and a run added while paused waits [12.14ms]
+(pass) a waiting run is cancelled into a Blocker; a handed one only while terminals has not sent it [14.26ms]
+(pass) stop records the request until it is carried out; an unsent run is cancelled instead; unconfirmed stops the queue [8.79ms]
+(pass) a follow-up continues the card's conversation in work mode; a note cannot make it commit [10.93ms]
+(pass) a follow-up needs a finished card whose conversation exists [12.87ms]
+(pass) commit & push comes only from the board, on a Done card, with the recorded files [11.98ms]
+(pass) review marks a Done card; reset and moving to todo forget the runs; a rerun starts a new conversation [12.37ms]
+(pass) notices are newest first, countable as unread, readable once; a waiting run is announced once [10.77ms]
+(pass) recovery settles handed runs from their requests and stops the queue after a restart [10.49ms]
+(pass) recovery adopts a final request the listener missed and hands over what follows [11.54ms]
+(pass) board runs keep the open ones and each card's current run [13.79ms]
+(pass) reconcile settles a handed run from its final request, hands over what follows, and leaves the rest alone [7.08ms]
+(pass) reconcile turns a request that ended without completing into a Blocker [6.84ms]
+
+api/domains/kanban/test/shared.test.ts:
+(pass) registry-driven queues are independent, FIFO and admit a third executor without a provider branch [9.98ms]
+(pass) structured progress preserves executor/attempt/session identity and never adopts an old attempt [9.28ms]
+(pass) workspace reservation and executor enqueue rollback together; release reserves against new input [9.13ms]
+(pass) busy workspace defers the same run; executor changes require revision and no execution history [9.77ms]
+(pass) migration preserves Claude identifiers, FIFO, paused reason and immutable request receipts [1.35ms]
+(pass) unknown execution pauses only its own queue, holds its guard, and cannot accept a late success [11.38ms]
+
+packages/coding-runner/test/git.test.ts:
+(pass) snapshot includes untracked, deletion, binary bytes and mode; explicit commit cannot capture other changes [3195.84ms]
+(pass) review snapshot change invalidates commit; a hook added by the agent is detected as tampering and never runs [1733.19ms]
+(pass) lost commit receipt reconciles evidence without creating another commit [2513.16ms]
+(pass) push uses fixed branch/remote/SHA; lost receipt is reconciled and a changed remote is rejected [3535.09ms]
+(pass) explicit staging treats wildcard characters as literal filenames [2399.50ms]
+(pass) a changed .git/config is refused before the next host git operation [1313.28ms]
+(pass) a clean or smudge filter attribute is forbidden [1273.84ms]
+(pass) files hidden through .git/info/exclude fail the snapshot, while .gitignore ones do not [1404.13ms]
+(pass) a relative gitdir in the worktree .git file still lets config.worktree be watched [1106.05ms]
+(pass) admin git-integrity shows the change and rebaselines only on request [1376.84ms]
+(pass) admin refuses to rebaseline while a reservation is active or a filter is configured [1240.62ms]
+(pass) a refusal before any Git effect leaves no receipt or owner record [1639.07ms]
+(pass) a spool interrupted after the in_progress record is resolved from Git evidence [2860.84ms]
+(pass) operations.lock is free while Git runs, and the same workspace stays guarded [3740.20ms]
+
+packages/coding-runner/test/observation.test.ts:
+(pass) decoder observation facts > messages are unknown without a phase and never inferred from position [0.21ms]
+(pass) decoder observation facts > an unsupported phase stays unknown and a blank message is empty [0.05ms]
+(pass) decoder observation facts > the 32768-unit limit keeps whole code points and reports truncation [0.24ms]
+(pass) decoder observation facts > a lone surrogate is a protocol fault, not a replacement character [0.02ms]
+(pass) decoder observation facts > only turn.completed and turn.failed are terminal; a general error is not [0.02ms]
+(pass) decoder observation facts > a classification needs an explicit contract [0.18ms]
+(pass) runner observation > completed turn: terminal seq, started process, complete capture [1123.52ms]
+(pass) runner observation > failed turn keeps a complete capture while the success gate is false [1133.25ms]
+(pass) runner observation > process exit without a terminal leaves the turn unconfirmed [1153.29ms]
+(pass) runner observation > a contradictory terminal is a conflict, not an overwrite [1083.33ms]
+(pass) runner observation > a 40000-character message is flagged as truncated without a capture fault [1124.86ms]
+(pass) runner observation > an empty message is reported as empty and a malformed line is a capture fault [3459.68ms]
+(pass) runner observation > stopping before spawn proves the CLI never started [190.60ms]
+(pass) runner observation > a receipt written before observations exist reads as unknown, never as success [1110.88ms]
+(pass) continuation and legacy specs > a v1 session or a non-completed turn is never continued [1268.72ms]
+(pass) continuation and legacy specs > a v1 spec is never started [182.09ms]
+
+packages/coding-runner/test/protocol.test.ts:
+(pass) SDK tools/list is fixed; unknown tool, unknown fields and protocol mismatch are rejected [275.91ms]
+(pass) RPC cancellation is not CLI stop; inspect retains the execution identity [1988.32ms]
+(pass) continue needs the exact completed session and a fresh operation; revocation forbids reuse [2035.03ms]
+
+packages/coding-runner/test/retention.test.ts:
+(pass) spool retention > only finished runs 24h past their deadline and not reserved are removed [1132.03ms]
+(pass) spool retention > a spool full of expired runs does not refuse start [2914.72ms]
+(pass) spool retention > stop ignores an unrelated broken spec when the index exists [184.09ms]
+(pass) spool retention > a replay after the record was pruned is an expired authority [1092.12ms]
+(pass) spool retention > a symlink in the spool aborts the prune [1127.81ms]
+(pass) spool size cache > re-walks only after the ttl or an invalidation [1.11ms]
+(pass) spool size cache > the event writer does not re-walk the spool for every event [1242.30ms]
+
+packages/coding-runner/test/review.test.ts:
+(pass) CLI failed cannot supply complete evidence or authorize commit [1369.68ms]
+(pass) CLI nonzero cannot supply complete evidence or authorize commit [1348.33ms]
+(pass) cancel after pause irreversibly revokes the exact session and stop operation IDs cannot be rebound [1242.67ms]
+(pass) worker replay of a reserved receipt with CLI spawn intent stays unknown without launching again [1120.20ms]
+(pass) concurrent start retries share one pinned configuration and one durable execution [1117.25ms]
+(pass) evidence byte ranges preserve UTF-8 and reject changed payload bytes [1217.24ms]
+(pass) snapshot rejects an oversized sparse file before loading its contents [340.73ms]
+(pass) evidence preserves a leading Unicode BOM as part of its authenticated payload [1151.14ms]
+(pass) terminal receipt waits for the durable process-exited event even when finalization is delayed [1671.72ms]
+(pass) concurrent atomic receipt replacements remain readable from the already opened private inode [390.96ms]
+
+packages/coding-runner/test/runner.test.ts:
+(pass) coding runner > review evidence is invalidated if the workspace changes during its turn [1198.76ms]
+(pass) coding runner > a spec that requests the registered network is refused before the CLI starts [353.73ms]
+(pass) coding runner > backend credentials and SSH agent are absent from the CLI environment [1151.26ms]
+(pass) coding runner > UTF-8 fragments, incomplete and oversized lines are bounded [0.29ms]
+(pass) coding runner > production refuses fixture configuration [189.19ms]
+(pass) coding runner > stdio MCP start, durable duplicate receipt, inspect and private normalized evidence [1361.15ms]
+(pass) coding runner > stop is an intent; owning worker confirms process group termination [1967.62ms]
+(pass) coding runner > MCP disconnect does not stop the worker; host lease eventually does [682.56ms]
+(pass) coding runner > background children are stopped before completion [1148.94ms]
+(pass) coding runner > oversized output drains and stops with incomplete evidence [1158.07ms]
+(pass) coding runner > saved spawn intent is never replayed, unknown PID is never signalled [1152.47ms]
+(pass) coding runner > workspace and executable replacement are rejected [265.36ms]
+
+packages/coding-runner/test/sdk-git.test.ts:
+(pass) approved binary/deletion/new-file commit is byte verified and push replay has one effect [2414.16ms]
+(pass) UI file permit and snapshot reject mixed or later changes before any effect [1222.25ms]
+(pass) staged unrelated content, expired permits and changed remote cannot enter commit [1282.69ms]
+(pass) unfinished intent never repeats commit even when no result receipt was saved [715.53ms]
+(pass) remote movement is detected before push without creating another commit [2234.04ms]
+(pass) active hooks and signing policy block a phase without bypassing or modifying configuration [931.78ms]
+(pass) authentication config cannot rewrite the approved remote URL [1014.18ms]
+(pass) push refuses an absent remote ref that would send unapproved history [2413.02ms]
+(pass) push refuses earlier unapproved local commits even when they are ancestors of the approved SHA [2377.59ms]
+
+packages/coding-runner/test/sdk-transport.test.ts:
+(pass) SDK waits for CLI cleanup after the completion event before returning [1146.87ms]
+(pass) CLI hanging after completion is killed after grace and SDK rejects success [3968.18ms]
+(pass) CLI nonzero exit after completion is still a failed SDK execution [958.95ms]
+(pass) SDK abort waits for cooperative CLI termination and does not return success [997.25ms]
+(pass) inherited output pipes cannot keep the SDK waiting after CLI exit [1973.00ms]
+
+packages/coding-runner/test/sdk.test.ts:
+(pass) durable acceptance replay never repeats SDK and events replay by cursor after restart [16.05ms]
+(pass) workspace aliases stay exclusive during execution and are released after managed termination [36.00ms]
+(pass) only explicit same-owner continuation resumes its native thread [24.01ms]
+(pass) crash after durable start intent restores unknown without SDK replay or PID signalling [9.37ms]
+(pass) private socket reconnect preserves execution and stop receipt has no repeat effect [20.78ms]
+(pass) runner root has a single owner and unregistered paths / expired requests are rejected [3.99ms]
+(pass) explicit replacement starts a fresh native thread while retaining the same workspace owner [23.39ms]
+(pass) a crash in multi-file workspace handoff blocks that workspace while records remain inspectable [14.77ms]
+
+ 155 pass
+ 0 fail
+ 1610 expect() calls
+Ran 155 tests across 18 files. [117.23s]
+[verify] web tests: /Users/y.noguchi/.bun/bin/bun x --no-install vitest run web/src/domains/kanban/toolchain-adapter.test.tsx web/src/domains/kanban/useKanbanNotices.test.tsx web/src/domains/kanban/view.test.tsx
+
+ RUN  v4.1.8 /Users/y.noguchi/Code/eumenes
+
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+
+ Test Files  3 passed (3)
+      Tests  18 passed (18)
+   Start at  21:57:11
+   Duration  5.08s (transform 768ms, setup 0ms, import 2.45s, tests 1.53s, environment 9.45s)
+
+[verify] pass: 135088 ms; /Users/y.noguchi/Code/eumenes/verification-reports/runs/2026-10-15T12-55-01-211Z-662df317-5b3f-4d03-87e0-7596c0943d98/report.json

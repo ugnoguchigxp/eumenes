@@ -1,0 +1,75 @@
+bun test v1.4.3 (c6da4a4d3)
+
+tests/acceptance/nl/tester-parser.test.ts:
+(pass) tester output parser > accepts the six screen operations [0.22ms]
+(pass) tester output parser > finds the object in fenced or chatty output and ignores extra keys [0.02ms]
+(pass) tester output parser > a missing reason is tolerated, but required fields are enforced [0.03ms]
+(pass) tester output parser > rejects malformed output without throwing [0.04ms]
+(pass) tester output parser > wait is limited to 15 seconds
+(pass) tester output parser > asking for evaluate, navigation or API access is forbidden, not retried [0.08ms]
+(pass) tester output parser > an unlisted but harmless action is a format error
+(pass) tester output parser > the scripted adapter replays its replies and repeats the last [0.14ms]
+
+tests/acceptance/nl/frozen.test.ts:
+(pass) the committed frozen set > matches its lock, parses, and every reference resolves [3.69ms]
+(pass) the committed frozen set > the main case and the pilot follow the design [3.40ms]
+(pass) the committed frozen set > cases carry a goal and budget only: no selector, step or click sequence [3.20ms]
+(pass) the committed frozen set > conversation cases need --with-product-llm, UI-only cases do not [2.87ms]
+(pass) the lock refuses a changed or unlocked set > a changed criteria file is a digest mismatch and is reported by loadFrozen [36.69ms]
+(pass) the lock refuses a changed or unlocked set > a changed case, fixture or pilot file is refused [18.16ms]
+(pass) the lock refuses a changed or unlocked set > an added file is unlocked and a deleted file is missing [17.32ms]
+(pass) the lock refuses a changed or unlocked set > a missing lock refuses everything [11.29ms]
+(pass) the lock refuses a changed or unlocked set > freezing a procedural goal is caught by the schema, not by the lock [20.35ms]
+(pass) the lock refuses a changed or unlocked set > an unknown check in the criteria is reported before any run [22.00ms]
+(pass) plans > the pilot is 4 groups x 3 runs within the 30 USD cap [0.14ms]
+(pass) plans > a real run needs a group, a baseline URL for baseline, and the flag for conversation cases [0.03ms]
+(pass) plans > a dry run lists every group and only warns [0.01ms]
+(pass) plans > the pilot plan cannot be reshaped from the command line [0.01ms]
+
+tests/acceptance/nl/runner.test.ts:
+(pass) run budgets stop the run and never repeat it > maxActions [59.92ms]
+(pass) run budgets stop the run and never repeat it > maxModelCalls [52.15ms]
+(pass) run budgets stop the run and never repeat it > maxCostUSD stops before the over-budget operation is performed [54.48ms]
+(pass) run budgets stop the run and never repeat it > wallSeconds interrupts a tester that never answers [1081.22ms]
+(pass) tester outcomes > give_up is inconclusive (tester) and no operation is performed for it [57.31ms]
+(pass) tester outcomes > a forbidden request stops the run without performing it [55.68ms]
+(pass) tester outcomes > unparseable replies are retried twice, then the run ends as a tester error [58.80ms]
+(pass) tester outcomes > done with nothing achieved is judged from the host, not the claim [54.84ms]
+(pass) harness failures are environment, not product > an unreadable host stops before the tester acts [53.74ms]
+(pass) harness failures are environment, not product > a non-empty initial state is a precondition failure [54.60ms]
+(pass) evidence > a run writes manifest, steps, screenshots and judge input [54.63ms]
+(pass) readonly host access > only GET on the allowlist is possible [0.18ms]
+(pass) readonly host access > receipts are found in nested result bodies [0.08ms]
+
+tests/acceptance/nl/judge.test.ts:
+(pass) main case: a correct run > is judged success only from host state, receipts and screen readings [0.60ms]
+(pass) main case: injected faults are detected > a double start is a failure (C1 extra_timers, C5) [0.10ms]
+(pass) main case: injected faults are detected > a double start that reused one timer still shows two started receipts [0.19ms]
+(pass) main case: injected faults are detected > 180 minutes instead of 180 seconds is a failure (wrong_duration) [0.16ms]
+(pass) main case: injected faults are detected > a success display with no timer in the host is a failure (fake_success_display) [0.04ms]
+(pass) main case: injected faults are detected > a seeded timer that changed is a failure (other_timer_modified) [0.18ms]
+(pass) main case: injected faults are detected > a remaining time that keeps running while paused is a failure [0.13ms]
+(pass) main case: injected faults are detected > the tester's reason or claim never turns a failing run into a success [0.04ms]
+(pass) termination decides inconclusive runs > give_up is inconclusive with failureClass tester [0.04ms]
+(pass) termination decides inconclusive runs > budget_wall is inconclusive (tester), even if the host looks complete [0.12ms]
+(pass) termination decides inconclusive runs > budget_actions is inconclusive (tester), even if the host looks complete [0.12ms]
+(pass) termination decides inconclusive runs > budget_model_calls is inconclusive (tester), even if the host looks complete [0.11ms]
+(pass) termination decides inconclusive runs > budget_cost is inconclusive (tester), even if the host looks complete [0.10ms]
+(pass) termination decides inconclusive runs > tester_error and forbidden_action are inconclusive (tester) [0.20ms]
+(pass) termination decides inconclusive runs > driver, environment and precondition stops are inconclusive (environment) [0.32ms]
+(pass) termination decides inconclusive runs > a concrete violation before the tester gives up is not blamed on the product [0.05ms]
+(pass) termination decides inconclusive runs > done without ever pausing is a failure with an undetermined class [0.04ms]
+(pass) termination decides inconclusive runs > a screen with no readable clock leaves the run inconclusive for review [0.10ms]
+(pass) termination decides inconclusive runs > no host observation at all is an environment problem [0.03ms]
+(pass) criteria hygiene > an unknown check makes the run inconclusive with failureClass criteria [0.03ms]
+(pass) criteria hygiene > clock candidates read mm:ss, h:mm:ss and Japanese units [0.05ms]
+(pass) other cases > cancel: paused is not a cancellation, cancelled is [3.12ms]
+(pass) other cases > cancel: creating a new timer instead is detected [2.68ms]
+(pass) other cases > network loss: a fault that never fired invalidates the run (environment) [2.79ms]
+(pass) other cases > network loss: a resend with a new id (two timers) is a failure [2.67ms]
+(pass) other cases > question continuation: waiting_input then completed across a reload [2.85ms]
+
+ 61 pass
+ 0 fail
+ 171 expect() calls
+Ran 61 tests across 4 files. [1.95s]

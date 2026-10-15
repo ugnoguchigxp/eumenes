@@ -22,6 +22,7 @@ import {
 	traceSelection,
 	type SelectionDraft,
 } from "./selection-trace";
+import { reviewConversationAnswer } from "./conversation-routing";
 import { generateConversation } from "./conversation-generation";
 import { researchCitations } from "./research-citations";
 import type { Run } from "../contracts";
@@ -190,6 +191,16 @@ export function createGenerationHandler(
 						)
 							await recordRejected(deps, input.runId, decision.draft);
 						throw error;
+					}
+					if (!generated.operation) {
+						const reviewed = await reviewConversationAnswer(
+							deps,
+							run!,
+							input,
+							decision,
+							signal,
+						);
+						if (reviewed.operation) generated = { ...generated, ...reviewed };
 					}
 					if (generated.operation) {
 						if (!deps.toolchains || input.agent)

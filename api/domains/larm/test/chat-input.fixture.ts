@@ -162,7 +162,15 @@ export function imageLarmFixture(
 			});
 		}
 		if (options.generationGate) await options.generationGate;
-		const text = options.response ?? "画像を確認しました。";
+		const reviewing = parsed.messages[0]?.content?.includes?.("FUNCTIONS=");
+		const text = reviewing
+			? JSON.stringify({
+					decision: "answer",
+					functionName: "",
+					request: "",
+					questionRef: "",
+				})
+			: (options.response ?? "画像を確認しました。");
 		if (options.generationNetworkError) throw new TypeError("fetch failed");
 		if (parsed.stream)
 			return new Response(

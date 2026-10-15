@@ -260,13 +260,10 @@ test("history restores a cancelled video's original playback while the camera is
 		const canvas = document.createElement("canvas");
 		canvas.width = 16;
 		canvas.height = 16;
-		return Array.from(
-			new Uint8Array(
-				await new Promise<Blob>((resolve) =>
-					canvas.toBlob((blob) => resolve(blob!), "image/png"),
-				).then((blob) => blob.arrayBuffer()),
-			),
+		const blob = await new Promise<Blob>((resolve) =>
+			canvas.toBlob((value) => resolve(value!), "image/png"),
 		);
+		return Array.from(new Uint8Array(await blob.arrayBuffer()));
 	});
 	await workspace.getByLabel("画像・動画を選ぶ").setInputFiles({
 		name: "desk.png",

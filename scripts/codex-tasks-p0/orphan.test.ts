@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 
-test("completion cannot claim stopped when a detached command outlives its parent", async () => {
+test("managed completion never certifies that detached descendants have stopped", async () => {
 	const dir = await mkdtemp(join(tmpdir(), "codex-task-orphan-"));
 	const fake = join(dir, "fake-codex");
 	await writeFile(
@@ -44,8 +44,12 @@ test("completion cannot claim stopped when a detached command outlives its paren
 			}),
 		);
 		expect(alive && receipt.stopConfirmed).toBe(false);
-		// P0 still requires termination, even when false confirmation has been prevented.
-		expect(alive).toBe(false);
+		// 2026-10-15: user-approved managed-execution contract. Full daemon
+		// containment remains unsupported; this test must never certify it.
+		expect(receipt.stopConfirmed).toBe(false);
+		expect(receipt.containment).toBe("unproven");
+		expect(receipt.cliExited).toBe(true);
+		expect(receipt.cliExitCode).toBe(0);
 	} finally {
 		if (alive) process.kill(child.pid, "SIGKILL");
 	}

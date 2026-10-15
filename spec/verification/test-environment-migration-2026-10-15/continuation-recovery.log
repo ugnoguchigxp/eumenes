@@ -1,0 +1,65 @@
+bun test v1.4.3 (c6da4a4d3)
+
+api/application/research-isolation.test.ts:
+(pass) research receives only the current request's URLs: search [248.63ms]
+(pass) research receives only the current request's URLs: https://example.com/current-source [191.90ms]
+
+api/application/music-e2e.test.ts:
+(pass) a prose-only creation claim is withheld and routed to the music agent [194.95ms]
+(pass) completed vocal music answers and repairs without re-offering entry operations [199.66ms]
+(pass) music pipeline success: conversation, worker, API, result, audio [189.78ms]
+(pass) music pipeline failure: conversation, worker, API, result, audio [184.01ms]
+(pass) music pipeline invalid-plan: conversation, worker, API, result, audio [179.52ms]
+(pass) music pipeline correctable-plan: conversation, worker, API, result, audio [178.79ms]
+(pass) cancel music while the provider is running, send DELETE and never adopt audio [184.54ms]
+(pass) vocal orchestral music forwards the worker's voice description, exact lyrics and language through the authenticated API [178.54ms]
+(pass) artwork is generated on request from the completed track's prompt at 256×256 and can be regenerated [212.49ms]
+(pass) artwork is refused for an unfinished track and a provider failure is recorded [371.38ms]
+
+api/application/toolchain-history.test.ts:
+(pass) every builtin and bundled toolchain registers as a complete set with flat tool schemas [193.44ms]
+(pass) a toolchain is offered only where its whole package is registered [165.40ms]
+(pass) an incomplete set or a reused function name is refused at registration [165.21ms]
+(pass) without vectors every available toolchain is offered; with vectors the top ones by similarity [170.33ms]
+(pass) a selection is traced from offer to outcome and later offered as reference data [171.08ms]
+(pass) a saved procedure is found by its signature and suspended after three failed reads [164.78ms]
+(pass) a proposed procedure is kept only when the answer cites the page it read [160.44ms]
+
+api/application/toolchain.test.ts:
+(pass) adoption removes a fabricated model citation and cannot reuse sources after failed research [203.77ms]
+(pass) a plain weather request carries useful details and actual citations through research, answer and replay [178.40ms]
+(pass) the current report follows earlier failed answers and stays adjacent to the repeated request [197.02ms]
+(pass) a premature unavailable forecast reads the next candidate before adopting an answer [188.91ms]
+(pass) authenticated search/read/report/answer resolves model excerpt selections to canonical citations [177.88ms]
+(pass) general research exposes available tools without a host invocation recommendation [177.62ms]
+(pass) authenticated API E2E: 東京の天気を調べて; child returns summary, never raw pages [182.98ms]
+(pass) authenticated API E2E: AAPLの株価を調べて; child returns summary, never raw pages [191.71ms]
+(pass) 1 inference slot: conversation continues while child waits; cancellation rejects late results [212.10ms]
+(pass) rolled-back cancellation cannot cancel another conversation's pending inference [201.21ms]
+(pass) bounded rejected worker output: {"badJson":true} [175.21ms]
+(pass) bounded rejected worker output: {"badQuote":true} [183.05ms]
+(pass) invalid tool arguments are repaired once; no acquisition occurs until the contract is valid [191.22ms]
+(pass) restart interrupts the whole tree; late acquisition cannot append an answer [181.78ms]
+(pass) data deletion invalidates the report and preserves accepted conversation [186.08ms]
+(pass) retention removes 14-day result data then 30-day task metadata without deleting the answer [186.09ms]
+(pass) queue capacity failure rolls back child creation and reaches a terminal answer [173.45ms]
+(pass) worker deadline cancels acquisition and returns a bounded failure to the parent [181.56ms]
+(pass) deleting a report during final inference cancels adoption of the old answer [181.58ms]
+(pass) CLI reads catalogue, task and summary through the authenticated API [465.31ms]
+(pass) ambiguous target returns a clarification question without acquiring data or treating it as a retrieval failure [173.68ms]
+(pass) a mismatched quote is rejected and repaired once using the same observations [179.62ms]
+(pass) a long accepted request remains intact when delegated to a research worker [184.12ms]
+
+api/application/chat-image-attachments.test.ts:
+(pass) Eumenes upload, atomic acceptance, image-only streaming, ordered history resend and authorization [203.52ms]
+(pass) fits=false is visible as a failed run and no inference POST is made [180.34ms]
+(pass) missing bytes fail instead of omitting images [172.69ms]
+(pass) queue capacity rejection rolls back the message and attachment association [172.20ms]
+(pass) Eumenes cancel during count adopts no answer [173.98ms]
+(pass) Eumenes cancel during generate adopts no answer [176.12ms]
+(pass) withdrawn source rejects a late answer even when another live message uses the same image [172.43ms]
+
+ 49 pass
+ 0 fail
+ 497 expect() calls
+Ran 49 tests across 5 files. [9.95s]

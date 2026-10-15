@@ -1,4 +1,6 @@
-import type { LarmPlayground } from "../domains/larm";
+import type { Config } from "../infrastructure/config";
+import type { SettingsService } from "../domains/settings";
+import { createLarmPlayground, type LarmPlayground } from "../domains/larm";
 import type { Embed } from "./toolchain-vectors";
 
 /**
@@ -15,4 +17,23 @@ export function larmEmbedder(
 		if (current?.key !== key) current = { key, client: create() };
 		return current.client.embed(texts, type, signal);
 	};
+}
+
+export function createSavedEmbedder(config: Config, settings: SettingsService) {
+	return larmEmbedder(
+		() => {
+			const s = settings.get();
+			return createLarmPlayground({
+				baseUrl: s.larm.baseUrl ?? undefined,
+				token: config.larmToken,
+				profile: s.larm.profile,
+				audience: s.larm.audience,
+				providerHosts: config.larmProviderHosts,
+			});
+		},
+		() => {
+			const s = settings.get();
+			return JSON.stringify([s.larm.baseUrl, s.larm.profile, s.larm.audience]);
+		},
+	);
 }

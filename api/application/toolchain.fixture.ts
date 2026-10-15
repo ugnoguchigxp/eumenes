@@ -207,6 +207,15 @@ export async function harness(
 					confidence: 0.99,
 				});
 			const system = messages[0]!.content;
+			// The default fixture declines operations on the prose-only route review.
+			// Tests of recovery supply their own model to select an offered operation.
+			if (system.includes("FUNCTIONS="))
+				return JSON.stringify({
+					decision: "answer",
+					functionName: "",
+					request: "",
+					questionRef: "",
+				});
 			const question = messages
 				.filter((m) => m.role === "user")
 				.at(-1)!.content;

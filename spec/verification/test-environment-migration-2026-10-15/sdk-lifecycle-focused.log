@@ -1,0 +1,24 @@
+bun test v1.4.3 (c6da4a4d3)
+
+scripts/codex-tasks-p0/orphan.test.ts:
+{"case":"detached-orphan","alive":true,"stopConfirmed":false,"state":"closed","identities":[{"born":"Thu Oct 15 21:58:06 2026","command":"/Users/y.noguchi/.bun/bin/bun","pid":32712}],"child":32719}
+(pass) managed completion never certifies that detached descendants have stopped [650.44ms]
+
+scripts/codex-tasks-p0/transport.test.ts:
+(pass) complete lines pass through and the transport closes without retaining the process group [551.05ms]
+(pass) a huge unterminated JSONL line is bounded and rejected before reaching the SDK parser [636.51ms]
+(pass) SIGTERM ends the running group including an ordinary command child [579.16ms]
+(pass) a command in a separate process group is stopped as a descendant [582.60ms]
+(pass) forced owner exit is detected and its detached command child is stopped [318.17ms]
+
+packages/coding-runner/test/sdk-transport.test.ts:
+(pass) SDK waits for CLI cleanup after the completion event before returning [924.58ms]
+(pass) CLI hanging after completion is killed after grace and SDK rejects success [3971.92ms]
+(pass) CLI nonzero exit after completion is still a failed SDK execution [953.62ms]
+(pass) SDK abort waits for cooperative CLI termination and does not return success [1004.76ms]
+(pass) inherited output pipes cannot keep the SDK waiting after CLI exit [1946.11ms]
+
+ 11 pass
+ 0 fail
+ 32 expect() calls
+Ran 11 tests across 3 files. [12.20s]

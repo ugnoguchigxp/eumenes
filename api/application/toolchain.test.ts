@@ -650,7 +650,10 @@ test("CLI reads catalogue, task and summary through the authenticated API", asyn
 });
 
 test("ambiguous target returns a clarification question without acquiring data or treating it as a retrieval failure", async () => {
-	const h = await harness({ clarify: true });
+	const h = await harness({
+		clarify: true,
+		parentAnswer: "どの地域の天気を調べますか？",
+	});
 	try {
 		const run = await h.dialogue.submit({
 			requestId: crypto.randomUUID(),

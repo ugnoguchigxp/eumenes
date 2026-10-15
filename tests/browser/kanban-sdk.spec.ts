@@ -31,6 +31,8 @@ test.beforeAll(async () => {
 	await fixture.ready(origin);
 });
 test.afterAll(() => fixture.stopAll());
+// Playwright requires a destructured fixture argument even when this hook uses only testInfo.
+// eslint-disable-next-line no-empty-pattern
 test.afterEach(async ({}, info) => {
 	await info.attach("source-network", {
 		body: JSON.stringify(network, null, 2),

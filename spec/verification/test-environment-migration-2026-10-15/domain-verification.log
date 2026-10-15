@@ -1,0 +1,146 @@
+$ bun scripts/verify.ts --domain ocr --domain google-accounts
+[verify] selected=ocr,google-accounts dependencyClosure=capabilities,delivery,attitude-dataset,larm,settings,inference,queue,ocr,google-accounts
+[verify] Shared DesignSystem dist: do not overlap dev, browser tests or other builds; endpoint hashes cannot detect change-and-restore.
+[verify] inventory
+[verify] boundaries
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts api/domains/ocr web/src/domains/ocr packages/design-system/src/components/OcrWorkspace api/domains/google-accounts web/src/domains/google-accounts packages/design-system/src/components/GoogleAccounts
+size-budget ok (35 files)
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check api/domains/ocr web/src/domains/ocr packages/design-system/src/components/OcrWorkspace api/domains/google-accounts web/src/domains/google-accounts packages/design-system/src/components/GoogleAccounts
+$ oxfmt --check api/domains/ocr web/src/domains/ocr packages/design-system/src/components/OcrWorkspace api/domains/google-accounts web/src/domains/google-accounts packages/design-system/src/components/GoogleAccounts
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 4ms on 36 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint api/domains/ocr web/src/domains/ocr packages/design-system/src/components/OcrWorkspace api/domains/google-accounts web/src/domains/google-accounts packages/design-system/src/components/GoogleAccounts
+$ oxlint --deny-warnings api/domains/ocr web/src/domains/ocr packages/design-system/src/components/OcrWorkspace api/domains/google-accounts web/src/domains/google-accounts packages/design-system/src/components/GoogleAccounts
+[verify] design-system typecheck: /Users/y.noguchi/.bun/bin/bun run --cwd packages/design-system typecheck
+$ bun check
+✓ No type errors in 362 files [168.83ms]
+[verify] design-system build: /Users/y.noguchi/.bun/bin/bun run --cwd packages/design-system build
+$ bun check -p tsconfig.build.json && vite build
+✓ No type errors in 207 files [120.90ms]
+vite v7.3.6 building client environment for production...
+transforming...
+✓ 1976 modules transformed.
+rendering chunks...
+
+[vite:dts] Start generate declaration files...
+computing gzip size...
+dist/design-system.css    170.14 kB │ gzip:  29.78 kB
+dist/index.mjs          1,353.93 kB │ gzip: 316.17 kB
+[vite:dts] Start rollup declaration files...
+Analysis will use the bundled TypeScript version 5.9.3
+[vite:dts] Declaration files built in 2797ms.
+
+dist/design-system.css  170.14 kB │ gzip:  29.78 kB
+dist/index.js           951.80 kB │ gzip: 270.77 kB
+✓ built in 5.47s
+[verify] typecheck configuration
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun check -p /Users/y.noguchi/Code/eumenes/verification-reports/runs/2026-10-15T11-02-19-360Z-72d482d9-0d10-46af-877c-d9f93fbb4721/tsconfig.selected.json
+✓ No type errors in 326 files [175.10ms]
+[verify] typecheck closure
+[verify] TypeScript workspace closure: 329 files
+[verify] bun tests: /Users/y.noguchi/.bun/bin/bun test ./api/domains/google-accounts/test/desktop-client.test.ts ./api/domains/google-accounts/test/provider.test.ts ./api/domains/google-accounts/test/proxy-errors.test.ts ./api/domains/google-accounts/test/service.test.ts ./api/domains/ocr/test/correction.test.ts ./api/domains/ocr/test/ocr.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+api/domains/google-accounts/test/desktop-client.test.ts:
+(pass) a distributed desktop client enables login without per-user environment settings [2.42ms]
+(pass) a developer override replaces the bundled client without mixing credentials [2.07ms]
+(pass) missing distribution config stays unconfigured and legacy Web credentials do not enable it [0.23ms]
+(pass) Web clients, malformed JSON, and incomplete credentials fail with sanitized errors [7.55ms]
+(pass) desktop OAuth callbacks remain on the local browser origin, including its chosen port [0.05ms]
+
+api/domains/google-accounts/test/provider.test.ts:
+(pass) authorization only requests basic identity with offline access, state, nonce and PKCE [0.69ms]
+(pass) valid signed identity is accepted and external avatar URLs are not exposed [1.70ms]
+(pass) rejects nonce with sanitized errors [0.54ms]
+(pass) rejects audience with sanitized errors [0.47ms]
+(pass) rejects issuer with sanitized errors [0.47ms]
+(pass) rejects expired with sanitized errors [0.44ms]
+(pass) rejects unverified with sanitized errors [0.45ms]
+(pass) rejects subject with sanitized errors [0.57ms]
+(pass) rejects forged signatures and unexpected service scopes [0.95ms]
+
+api/domains/google-accounts/test/proxy-errors.test.ts:
+(pass) proxy failure logging strips callback credentials without changing the route [0.05ms]
+
+api/domains/google-accounts/test/service.test.ts:
+(pass) connect persists encrypted credentials and exposes only public identity across reopening [15.95ms]
+(pass) state and browser binding reject forged callbacks without consuming the valid attempt [7.85ms]
+(pass) denial and expired attempts never exchange a code; fresh authorization still works [8.72ms]
+(pass) a cancelled in-flight exchange cannot restore a connection [8.20ms]
+(pass) revision conflicts, wrong identity on reconnect, and changed OAuth client fail closed [8.92ms]
+(pass) refresh detects revocation, while network outages retain the account and retry [6.39ms]
+(pass) refresh completion after disconnect is discarded and pending revocation survives restart [6.64ms]
+(pass) missing config/key disables authorization without exposing stored secrets [6.89ms]
+(pass) background token maintenance preserves the displayed revision across reopening [6.35ms]
+(pass) disconnect and maintenance share revocation; cancellation cannot interrupt unlink [6.10ms]
+(pass) disconnect revokes late authorization, offline=false [6.49ms]
+(pass) disconnect revokes late authorization, offline=true [6.13ms]
+(pass) old encrypted records retain their public revision when maintenance first upgrades them [5.72ms]
+(pass) unreadable stored credentials report an error rather than an unconnected account [6.08ms]
+
+api/domains/ocr/test/correction.test.ts:
+(pass) LLM correction preserves OCR, is idempotent, adopts explicitly, and enforces owner [38.67ms]
+(pass) a second correction on the same frame reports busy [20.70ms]
+(pass) vision input follows the connected service's JPEG or BMP contract [65.85ms]
+(pass) vision input uses JPEG when PNG exceeds image or full-request limits [74.17ms]
+(pass) selected video frame is extracted at its OCR timestamp [526.03ms]
+(pass) invalid evidence fails without changing the raw result [32.53ms]
+(pass) conversation export retains table uncertainty and excluded OCR lines [33.28ms]
+(pass) cancelling an in-flight correction discards its late reply [36.22ms]
+(pass) correction HTTP routes require the source conversation [27.89ms]
+(pass) table cells keep their grid spans and cannot overlap [0.25ms]
+
+api/domains/ocr/test/ocr.test.ts:
+(pass) OCR gateway sends only one multipart file and ignores untrusted statusUrl [1.02ms]
+(pass) image OCR stores raw lines and source, replay does not POST twice, owner is checked [28.15ms]
+(pass) video job tracks status and returns selected timestamp without resubmitting [1541.14ms]
+(pass) cancelling a video discards a late completed result [547.31ms]
+(pass) capacity counts active records beyond the 100-item history page [15.73ms]
+(pass) recheck is unavailable after connection changes [32.73ms]
+(pass) deleting a source removes retained command results [31.78ms]
+(pass) upload replay returns its receipt after configuration is removed [15.72ms]
+(pass) conversation export reports the dialogue size limit before submission [30.37ms]
+
+ 48 pass
+ 0 fail
+ 182 expect() calls
+Ran 48 tests across 6 files. [3.55s]
+[verify] web tests: /Users/y.noguchi/.bun/bin/bun x --no-install vitest run web/src/domains/google-accounts/toolchain-adapter.test.tsx
+
+ RUN  v4.1.8 /Users/y.noguchi/Code/eumenes
+
+
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+   Start at  20:02:30
+   Duration  5.03s (transform 268ms, setup 0ms, import 1.37s, tests 230ms, environment 3.25s)
+
+[verify] design-system tests: /Users/y.noguchi/.bun/bin/bun run --cwd packages/design-system test src/components/GoogleAccounts/GoogleAccounts.test.tsx
+$ vitest run --project unit src/components/GoogleAccounts/GoogleAccounts.test.tsx
+│ ┌────────────────────────────────────────────────────────────────────────────┐
+│ │  Info: Found a setup file with "setProjectAnnotations".                    │
+│ │  Skipping automatic provisioning of preview annotations to avoid           │
+│ │  conflicts. Since Storybook 10.3, "@storybook/addon-vitest" applies these  │
+│ │   automatically.                                                           │
+│ │  You can safely remove the "setProjectAnnotations" call from your setup    │
+│ │  file, or remove the file entirely if you don't have custom code there.    │
+│ └────────────────────────────────────────────────────────────────────────────┘
+
+ RUN  v4.0.16 /Users/y.noguchi/Code/eumenes/packages/design-system
+
+stdout | src/components/GoogleAccounts/GoogleAccounts.test.tsx
+Test setup running...
+
+stdout | src/components/GoogleAccounts/GoogleAccounts.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/GoogleAccounts/GoogleAccounts.test.tsx (4 tests) 83ms
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  20:02:38
+   Duration  773ms (transform 49ms, setup 120ms, import 85ms, tests 83ms, environment 333ms)
+
+[verify] pass: 19571 ms; /Users/y.noguchi/Code/eumenes/verification-reports/runs/2026-10-15T11-02-19-360Z-72d482d9-0d10-46af-877c-d9f93fbb4721/report.json

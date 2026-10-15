@@ -80,6 +80,7 @@ test("the shutdown order is fixed, and a freshly built set of services closes cl
 		"coding",
 		"kanban_maintenance",
 		"timer_maintenance",
+		"google_accounts",
 		"store_retention",
 		"task_report_delivery",
 		"task_maintenance",

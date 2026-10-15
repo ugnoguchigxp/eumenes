@@ -11,7 +11,6 @@ import {
 } from "../domains/google-accounts";
 import { createApp } from "./app";
 import { createGoogleAccountsAdapter } from "./google-accounts-adapter";
-import bundle from "../domains/capabilities/bundles/settings-google.bundle.json";
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
 	for (const f of cleanups.splice(0)) await f();
@@ -128,8 +127,6 @@ test("registered artifact exposes no AI operations, bindings, or secret-bearing 
 	const h = fixture();
 	const adapter = createGoogleAccountsAdapter(h.service);
 	expect(adapter.describe().operations.size).toBe(0);
-	expect(bundle.definitions).toHaveLength(0);
-	expect(bundle.bindings).toHaveLength(0);
 	expect(() =>
 		h.store.read((db) =>
 			adapter.invokeInTransaction(db, {

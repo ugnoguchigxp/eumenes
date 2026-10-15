@@ -145,7 +145,7 @@ export async function reviewConversationAnswer(
 		route = await routeConversation({
 			inference: larm,
 			requestId,
-			messages: decision.messages,
+			messages: decision.selectionMessages ?? decision.messages,
 			tools: decision.tools,
 			cards: decision.cards,
 			openQuestions: decision.openQuestions,

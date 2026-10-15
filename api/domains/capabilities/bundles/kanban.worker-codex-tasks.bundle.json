@@ -147,9 +147,7 @@
 			"backend": "codex-tasks",
 			"schemaKey": "kanbanList",
 			"profileRevisionId": "profile:codex-tasks.manage@1",
-			"requiredSkillRevisionIds": [
-				"skill:codex-tasks.manage@1"
-			],
+			"requiredSkillRevisionIds": ["skill:codex-tasks.manage@1"],
 			"toolRevisionIds": [
 				"tool:codex-tasks.request@1",
 				"tool:codex-tasks.list@1",
@@ -170,13 +168,8 @@
 				"Codexを明示した新規依頼",
 				"Codex担当の既存カードへの追加依頼・回答・停止"
 			],
-			"avoidWhen": [
-				"Claudeへの依頼",
-				"担当をまたぐボードの整理"
-			],
-			"dependencies": [
-				"package:codex-tasks.manage@1"
-			],
+			"avoidWhen": ["Claudeへの依頼", "担当をまたぐボードの整理"],
+			"dependencies": ["package:codex-tasks.manage@1"],
 			"packageRevisionId": "package:codex-tasks.manage@1",
 			"functionName": "codex_tasks",
 			"redirects": [],

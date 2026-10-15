@@ -32,6 +32,13 @@ test("SDK process failure reaches correlated logs and current answer context wit
 		transcribe: async () => "",
 		speak: async () => new Uint8Array(),
 		answer: async (messages, _signal, options) => {
+			if (messages[0]?.content.includes("FUNCTIONS="))
+				return JSON.stringify({
+					decision: "answer",
+					functionName: "",
+					request: "",
+					questionRef: "",
+				});
 			const question = messages
 				.filter((m) => m.role === "user")
 				.at(-1)!.content;
@@ -79,7 +86,10 @@ test("SDK process failure reaches correlated logs and current answer context wit
 			conversationId: "main",
 			text: "以前の記録",
 		});
-		await h.dialogue.waitForTerminal(previous.id, { timeoutMs: 5000 });
+		expect(
+			(await h.dialogue.waitForTerminal(previous.id, { timeoutMs: 5000 }))
+				?.status,
+		).toBe("completed");
 		const response = await h.request("/api/runs", {
 			requestId: crypto.randomUUID(),
 			conversationId: "main",
@@ -109,6 +119,7 @@ test("SDK process failure reaches correlated logs and current answer context wit
 		);
 	} finally {
 		await h.close();
+		configureLogging({ level: "silent" });
 		await rm(dir, { recursive: true, force: true });
 	}
 });

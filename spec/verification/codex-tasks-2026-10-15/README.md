@@ -1,5 +1,8 @@
 # 共通Kanban・Codex SDK実装の検証記録
 
+更新（2026-10-15）: 以下は各改訂時点の履歴。最新の停止契約は[計画の改訂7](../../codex-sdk-task-artifact-plan-2026-10-14.md)と[検証記録](../test-environment-migration-2026-10-15/sdk-lifecycle.md)を参照。利用者承認により、完全停止の未達試験を現行の管理対象終了・虚偽証明防止の契約へ変更した。過去の全daemon停止の失敗は取り消していない。
+
+
 対象: `spec/codex-sdk-task-artifact-plan-2026-10-14.md` 改訂3から着手し、実測を改訂4へ反映。独立CLI復元を改訂5へ反映し、作業を継続。2026-10-15。
 
 目的は共通ボード・担当別FIFO・workspace排他・SDK実行・共通通知・UI専用git工程をP0〜P5で実装・受入すること。依存順はP0実測→P1契約/移行→P2実行/登録→P3 GUI→P4通知/git→P5全体受入。P0の権限・停止・持続threadが成立するまで製品接続を開始しない。

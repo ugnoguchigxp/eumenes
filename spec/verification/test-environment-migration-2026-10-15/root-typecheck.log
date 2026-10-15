@@ -1,0 +1,5 @@
+tests/browser/object-recognition.spec.ts(265,5): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Argument of type 'ArrayBuffer | Iterable<number>' is not assignable to parameter of type 'ArrayBuffer | ArrayLike<number>'.
+      Type 'Iterable<number>' is not assignable to type 'ArrayBuffer | ArrayLike<number>'.
+Found 1 error in 1 file, checked 1,682 files [504.23ms]

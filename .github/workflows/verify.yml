@@ -24,13 +24,26 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.3
-      - run: bun install --frozen-lockfile
+      - name: Install and measure preparation
+        run: |
+          bun -e '
+            const started = performance.now();
+            const child = Bun.spawn([process.execPath, "install", "--frozen-lockfile"], { stdout: "inherit", stderr: "inherit" });
+            const exitCode = await child.exited;
+            await Bun.write("verification-reports/preparation.json", JSON.stringify({ schemaVersion: 1, os: process.platform, bun: Bun.version, ms: Math.round(performance.now() - started), exitCode, includes: "install and postinstall" }, null, 2));
+            process.exit(exitCode);
+          '
       - run: bun run verify:all
-      - if: failure()
+      - if: always()
         uses: actions/upload-artifact@v4
         with:
           name: verify-${{ matrix.os }}-${{ github.run_attempt }}
           path: |
+            verification-reports/preparation.json
             verification-reports/latest.json
+            verification-reports/runs/**/report.json
+            verification-reports/runs/**/inventory.json
+            verification-reports/runs/**/selection.json
+            verification-reports/runs/**/typecheck-files.json
           retention-days: 7
           if-no-files-found: ignore

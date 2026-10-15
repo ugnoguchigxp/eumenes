@@ -1,0 +1,14 @@
+
+Running 5 tests using 1 worker
+
+(node:1119) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 tests/browser/kanban-sdk.spec.ts:51:1 › shared board runs Codex, shows activity, resumes its thread and keeps Claude selectable (34.5s)
+  ✓  2 tests/browser/kanban-sdk.spec.ts:179:1 › Codex settings can be saved twice with the refreshed revision (5.8s)
+(node:1417) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  3 tests/browser/object-recognition.spec.ts:33:1 › recognition stays inside artifact: selected image, camera capture, video seek, cancel and conversation (1.2m)
+  ✓  4 tests/browser/object-recognition.spec.ts:233:1 › history restores a cancelled video's original playback while the camera is open (28.9s)
+  ✓  5 tests/browser/object-recognition.spec.ts:302:1 › camera recording finishes through the artifact controls (13.9s)
+
+  5 passed (2.7m)

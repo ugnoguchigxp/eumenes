@@ -1,0 +1,14 @@
+bun test v1.4.3 (c6da4a4d3)
+
+api/application/server.test.ts:
+(pass) importing server.ts has no side effects [324.46ms]
+(pass) a separate process that imports server.ts neither starts nor touches the data directory, and exits by itself [362.99ms]
+(pass) the shutdown order is fixed, and a freshly built set of services closes cleanly through it [392.65ms]
+(pass) SIGTERM after startup shuts down through closeAll and exits 0 [763.68ms]
+(pass) a busy port fails with port_in_use after closing [807.84ms]
+(pass) startupFailureReason passes only allow-listed codes [0.21ms]
+
+ 6 pass
+ 0 fail
+ 24 expect() calls
+Ran 6 tests across 1 file. [2.72s]

@@ -56,6 +56,8 @@ test("every builtin and bundled toolchain registers as a complete set with flat 
 		"world-query",
 		"ocr",
 		"ui-compositions",
+		"kanban",
+		"codex-tasks",
 	]);
 	const active = store.read((db) => capabilities.toolchainsInTransaction(db));
 	expect(active.map((d) => d.functionName).sort()).toEqual(

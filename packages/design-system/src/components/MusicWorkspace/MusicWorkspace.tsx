@@ -1,4 +1,4 @@
-import { ImageOff, Loader2, Star } from "lucide-react";
+import { ImageOff, Loader2 } from "lucide-react";
 import { useRef, useState, type ReactNode } from "react";
 import { Button } from "../Button";
 import { Modal } from "../Modal";
@@ -9,7 +9,7 @@ import {
 	type PlaylistTrack,
 } from "../MusicPlayer";
 import { Playlist } from "../Playlist";
-import { formatClockSeconds } from "../DigitalClock/format";
+import { MusicCurrentTrack } from "./MusicCurrentTrack";
 import { MusicVisualizer } from "./MusicVisualizer";
 import { MusicTrackDetails } from "./MusicTrackDetails";
 import { MusicCreationPanel } from "./MusicCreationPanel";
@@ -38,6 +38,19 @@ export type MusicWorkspaceProps = {
 	};
 };
 
+function useTrackDetails() {
+	const [detailId, setDetailId] = useState<string>();
+	const detailTrigger = useRef<HTMLElement | null>(null);
+	const openDetail = (id: string) => {
+		detailTrigger.current =
+			document.activeElement instanceof HTMLElement
+				? document.activeElement
+				: null;
+		setDetailId(id);
+	};
+	return { detailId, setDetailId, detailTrigger, openDetail };
+}
+
 export function MusicWorkspace({
 	tracks,
 	currentTrackId,
@@ -52,22 +65,13 @@ export function MusicWorkspace({
 	onArtwork,
 	creation,
 }: MusicWorkspaceProps) {
-	const [display, setDisplay] = useState<"visualizer" | "image">(
-		"visualizer",
-	);
+	const [display, setDisplay] = useState<"visualizer" | "image">("visualizer");
 	const [tab, setTab] = useState<"create" | "history">("create");
 	const [draft, setDraft] = useState<{ prompt: string; revision: number }>();
 	const [mode, setMode] = useState<"spectrum" | "waveform">("spectrum");
 	const [playback, setPlayback] = useState<MusicPlaybackState | null>(null);
-	const [detailId, setDetailId] = useState<string>();
-	const detailTrigger = useRef<HTMLElement | null>(null);
-	const openDetail = (id: string) => {
-		detailTrigger.current =
-			document.activeElement instanceof HTMLElement
-				? document.activeElement
-				: null;
-		setDetailId(id);
-	};
+	const { detailId, setDetailId, detailTrigger, openDetail } =
+		useTrackDetails();
 	const [page, setPage] = useState(0);
 	const [failedImage, setFailedImage] = useState<string>();
 	const current = tracks.find((t) => t.id === currentTrackId);
@@ -217,47 +221,13 @@ export function MusicWorkspace({
 							</Button>
 						</div>
 					)}
-					<div className="music-workspace-current">
-						<span className="music-workspace-status">
-							{activePlayback?.playing ? "再生中" : "選択中"}
-						</span>
-						<div className="music-workspace-title">
-							{current && onFavorite && (
-								<Button
-									size="icon"
-									variant="ghost"
-									className="music-workspace-favorite"
-									aria-pressed={!!current.favorite}
-									disabled={busy}
-									aria-label={`${current.title}を${current.favorite ? "お気に入りから解除" : "お気に入り登録"}`}
-									onClick={() => onFavorite(current.id, !current.favorite)}
-								>
-									<Star
-										aria-hidden="true"
-										fill={current.favorite ? "currentColor" : "none"}
-									/>
-								</Button>
-							)}
-							<h3>{current?.title ?? "楽曲を選択してください"}</h3>
-						</div>
-						<div className="music-workspace-current-meta">
-							<span>
-								{formatClockSeconds(activePlayback?.position ?? 0)} /{" "}
-								{formatClockSeconds(
-									activePlayback?.duration || current?.durationSeconds || 0,
-								)}
-							</span>
-							{current && (
-								<Button
-									size="sm"
-									variant="outline"
-									onClick={() => openDetail(current.id)}
-								>
-									詳細
-								</Button>
-							)}
-						</div>
-					</div>
+					<MusicCurrentTrack
+						current={current}
+						activePlayback={activePlayback}
+						busy={busy}
+						onFavorite={onFavorite}
+						openDetail={openDetail}
+					/>
 				</section>
 				<section className="music-workspace-library" aria-label="楽曲一覧">
 					{creation && (

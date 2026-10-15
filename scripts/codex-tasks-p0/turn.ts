@@ -6,7 +6,17 @@ import { join, dirname } from "node:path";
 const [directory, workspace, mode] = process.argv.slice(2);
 if (!directory || !workspace || !mode)
 	throw new Error("probe_arguments_missing");
-const sources = ["runtime.ts", "transport.ts", "process-tree.ts", "turn.ts"];
+const sources = [
+	"runtime.ts",
+	"transport.ts",
+	"turn.ts",
+	...[
+		"sdk-transport.ts",
+		"sdk-process-tree.ts",
+		"storage.ts",
+		"contracts.ts",
+	].map((file) => `../../packages/coding-runner/src/${file}`),
+];
 async function fingerprints() {
 	return Promise.all(
 		sources.map(async (file) =>

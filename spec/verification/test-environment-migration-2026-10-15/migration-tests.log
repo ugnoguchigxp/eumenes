@@ -1,0 +1,39 @@
+bun test v1.4.3 (c6da4a4d3)
+
+scripts/verification.test.ts:
+(pass) verification selection and runner coverage > repeated domains form a union, with strict argument validation and legacy support [0.14ms]
+(pass) verification selection and runner coverage > owned DS tests dispatch once to the unit project [1.15ms]
+(pass) verification selection and runner coverage > inventory includes generated Storybook sources and explicit browser exclusions [42.09ms]
+(pass) verification selection and runner coverage > production plan builds DS before root check/tests and never rebuilds at web build [239.97ms]
+(pass) selected root check consumes DS exports while DS sources use their own check [172.17ms]
+[verify] build: /Users/y.noguchi/.bun/bin/bun -e process.exit(7)
+[verify] fail: 14 ms; /var/folders/mx/jbv8qfwd52z14q0mby_273lhlp5gd2/T/eumenes-verify-OGwo3p/verification-reports/runs/2026-10-15T11-02-09-833Z-1eab5bd0-8d86-4066-a3d8-79e329b4b057/report.json
+Error: build failed (7)
+[verify] ok: /Users/y.noguchi/.bun/bin/bun -e process.exit(0)
+[verify] pass: 14 ms; /var/folders/mx/jbv8qfwd52z14q0mby_273lhlp5gd2/T/eumenes-verify-OGwo3p/verification-reports/runs/2026-10-15T11-02-10-017Z-5e3c534d-c1ee-4805-9ace-95ce4da52559/report.json
+(pass) verification evidence and integrity > failed preparation blocks consumers and preserves earlier reports [363.65ms]
+(pass) verification evidence and integrity > output hash covers names and bytes, rejects missing outputs [6.10ms]
+[verify] consumer
+[verify] invalidated: 2 ms; /var/folders/mx/jbv8qfwd52z14q0mby_273lhlp5gd2/T/eumenes-verify-p4gHPe/verification-reports/runs/2026-10-15T11-02-10-203Z-7f3690f1-acf2-45d4-8f76-be830e442c18/report.json
+DesignSystem dist changed during verification
+[verify] consumer
+[verify] invalidated: 2 ms; /var/folders/mx/jbv8qfwd52z14q0mby_273lhlp5gd2/T/eumenes-verify-sVuksg/verification-reports/runs/2026-10-15T11-02-10-377Z-5b0ddd84-d2d9-41bb-84a6-3387838e3e61/report.json
+DesignSystem output hash failed: Error: Missing build output: index.mjs
+(pass) verification evidence and integrity > a successful consumer cannot pass after dist changes or disappears [358.58ms]
+[verify] consumer
+[verify] invalidated: 2 ms; /var/folders/mx/jbv8qfwd52z14q0mby_273lhlp5gd2/T/eumenes-verify-NWij36/verification-reports/runs/2026-10-15T11-02-10-561Z-92e4de8a-f0bb-477e-aecb-40c0ed713fc2/report.json
+Source changed during verification
+(pass) verification evidence and integrity > source edits invalidate results even if all commands succeeded [169.76ms]
+(pass) verification evidence and integrity > SIGTERM records interruption and never launches later commands [213.37ms]
+
+scripts/verification-inputs.test.ts:
+(pass) generated reports and builds do not invalidate verification; prompts, assets and fixtures do [31.56ms]
+
+scripts/verification-metrics.test.ts:
+(pass) metrics separate failures and environments from passing timing samples [0.39ms]
+(pass) empty and failed cohorts never imply measured speed improvements [0.03ms]
+
+ 13 pass
+ 0 fail
+ 95 expect() calls
+Ran 13 tests across 3 files. [1.76s]

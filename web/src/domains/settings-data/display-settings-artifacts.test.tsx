@@ -5,10 +5,17 @@ import {
 	screen,
 	waitFor,
 } from "@testing-library/react";
-import { afterEach, expect, test } from "vitest";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { createSettingsBackend, newCache, Screens } from "./settings.fixture";
 
-afterEach(cleanup);
+beforeEach(() => {
+	// jsdom does not implement the browser preference API used by the motion tab.
+	vi.stubGlobal("matchMedia", () => ({ matches: false }));
+});
+afterEach(() => {
+	cleanup();
+	vi.unstubAllGlobals();
+});
 
 test("display edits preview before saving, review all five fields, keep a conflicted draft, save and discard in the shared draft", async () => {
 	const backend = createSettingsBackend();
@@ -61,7 +68,10 @@ test("display edits preview before saving, review all five fields, keep a confli
 	fireEvent.click(
 		await screen.findByRole("button", { name: "設定の変更をすべて保存" }),
 	);
-	await screen.findByText(/別の画面で設定が変更されました/);
+	// The section and shared draft bar both report the current result.
+	expect(
+		await screen.findAllByText(/別の画面で設定が変更されました/),
+	).toHaveLength(2);
 	expect(screen.getByLabelText("字幕のデザイン")).toHaveProperty(
 		"value",
 		"classic",
@@ -73,7 +83,7 @@ test("display edits preview before saving, review all five fields, keep a confli
 	fireEvent.click(
 		screen.getByRole("button", { name: "設定の変更をすべて保存" }),
 	);
-	await screen.findByText("変更を適用しました");
+	expect(await screen.findAllByText("変更を適用しました")).toHaveLength(2);
 	expect(backend.saved().general).toMatchObject({
 		background: "spatial",
 		theme: "dark",
@@ -113,7 +123,7 @@ test("an optional key is unset by sending an unset change, and the default stays
 	fireEvent.click(
 		screen.getByRole("button", { name: "設定の変更をすべて保存" }),
 	);
-	await screen.findByText("変更を適用しました");
+	expect(await screen.findAllByText("変更を適用しました")).toHaveLength(2);
 	expect(backend.sent[0]!.input).toMatchObject({
 		changes: [{ fieldId: "display.background", unset: true }],
 	});

@@ -178,9 +178,7 @@
 			"backend": "kanban",
 			"schemaKey": "kanbanList",
 			"profileRevisionId": "profile:kanban.manage@2",
-			"requiredSkillRevisionIds": [
-				"skill:kanban.manage@2"
-			],
+			"requiredSkillRevisionIds": ["skill:kanban.manage@2"],
 			"toolRevisionIds": [
 				"tool:kanban.add@2",
 				"tool:kanban.add-run@1",
@@ -199,11 +197,7 @@
 			"revision": 4,
 			"title": "タスクボード",
 			"summary": "共通ボードの登録・整理・実行と担当をまたぐ状況確認",
-			"aliases": [
-				"タスクボード",
-				"カンバン",
-				"タスク"
-			],
+			"aliases": ["タスクボード", "カンバン", "タスク"],
 			"tags": [],
 			"useWhen": [
 				"作業をタスクとして登録・整理したい",
@@ -213,9 +207,7 @@
 				"Codexを明示した新規依頼（codex_tasksを使う）",
 				"ボードに保存しない直接作業"
 			],
-			"dependencies": [
-				"package:kanban.manage@2"
-			],
+			"dependencies": ["package:kanban.manage@2"],
 			"examples": [
 				"README の手順修正をタスクに登録して",
 				"登録したタスクを実行キューに入れて",
@@ -533,11 +525,7 @@
 						"maxLength": 120
 					}
 				},
-				"required": [
-					"title",
-					"prompt",
-					"executorId"
-				]
+				"required": ["title", "prompt", "executorId"]
 			}
 		},
 		{
@@ -554,9 +542,7 @@
 						"maxLength": 120
 					}
 				},
-				"required": [
-					"executorId"
-				]
+				"required": ["executorId"]
 			}
 		},
 		{
@@ -583,11 +569,7 @@
 						"maxLength": 120
 					}
 				},
-				"required": [
-					"cardId",
-					"expectedRevision",
-					"executorId"
-				]
+				"required": ["cardId", "expectedRevision", "executorId"]
 			}
 		},
 		{
@@ -629,10 +611,7 @@
 						"maxLength": 120
 					}
 				},
-				"required": [
-					"cardId",
-					"expectedRevision"
-				]
+				"required": ["cardId", "expectedRevision"]
 			}
 		}
 	],

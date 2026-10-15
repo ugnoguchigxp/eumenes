@@ -178,10 +178,16 @@ export const nativeSdkEngine: SdkEngine = async ({
 	}
 	const process = optionalJson<{
 		state: string;
+		cliExited: boolean;
+		stopReason?: string;
 		observedProcessesStopped: boolean;
 	}>(join(directory, "process.json"));
 	const managedExecutionStopped =
-		process?.state === "closed" && process.observedProcessesStopped;
+		process?.state === "closed" &&
+		process.cliExited &&
+		process.observedProcessesStopped;
+	if (process?.stopReason && !signal.aborted)
+		failure = `sdk_${process.stopReason}`;
 	if (!completed && !failure) failure = "sdk_turn_incomplete";
 	if (failure) return { failure, managedExecutionStopped };
 	try {

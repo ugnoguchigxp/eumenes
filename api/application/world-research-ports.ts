@@ -77,6 +77,87 @@ export type WorldResearchPortsLookup = () => WorldResearchPorts | undefined;
 /** A lifecycle that no longer supports a report. */
 const ENDED = new Set(["retracted", "invalidated", "superseded"]);
 
+const accessOf = (ctx: WorldQueryContext, scopeKey: string) => ({
+	principal: ctx.principal,
+	scopeKeys: [scopeKey],
+	purpose: ctx.purpose ?? DEFAULT_PURPOSE,
+});
+
+function validateWorldEvidence(
+	db: Database,
+	owner: Owner,
+	sources: Parameters<
+		NonNullable<ToolAdapter["validateEvidenceInTransaction"]>
+	>[2],
+	world: WorldService,
+	scopeOf: (
+		db: Database,
+		owner: Owner,
+		stage: "read" | "adopt",
+	) => { ctx: WorldQueryContext; scopeKey: string },
+	now: () => number,
+) {
+	const claims = sources.filter((s) => s.kind === "world_claim");
+	if (!claims.length) return true;
+	try {
+		const { ctx, scopeKey } = scopeOf(db, owner, "adopt");
+		if (!world.statusInTransaction(db).usable) return false;
+		const access = accessOf(ctx, scopeKey);
+		const scope = { principal: ctx.principal, scopeKey };
+		// Claims still readable per subject, from one source-resolving read each.
+		const readable = new Map<string, Set<string>>();
+		const readableOf = (subjectId: string) => {
+			const known = readable.get(subjectId);
+			if (known) return known;
+			const read = world.readSnapshot(db, {
+				access,
+				scope,
+				asOf: now(),
+				focus: { subjectIds: [subjectId], depth: 0 },
+			});
+			const keys = new Set<string>();
+			if (read.status === "ready") {
+				const projection = buildProjection(
+					{ contractVersion: 1, snapshot: read.snapshot },
+					sha256Hex,
+				);
+				if (projection.ok)
+					for (const e of projection.value.entries)
+						keys.add(`${e.id}\u0000${e.revision}`);
+			}
+			readable.set(subjectId, keys);
+			return keys;
+		};
+		return claims.every((s) => {
+			// A claim forgotten, retracted or revised while the research ran must not support the report.
+			if (s.scopeRef !== scopeKey || !s.sourceRef) return false;
+			const history = world.readHistory(db, {
+				access,
+				scope,
+				assertionId: s.sourceRef,
+				limit: 1,
+			});
+			if (history.status !== "ready") return false;
+			const latest = history.revisions[0];
+			if (
+				!latest ||
+				String(latest.revision) !== s.sourceRevision ||
+				ENDED.has(latest.lifecycle)
+			)
+				return false;
+			// The history read checks the tombstone only. A forget is accepted (the utterance is retracted
+			// and Memory excludes it) before World's own tombstone is written by the feed, so the claim is
+			// also read through the source-resolving snapshot: a claim standing on a forgotten source is
+			// not in it, and must not support the report in that window.
+			return readableOf(latest.subjectId).has(
+				`${latest.id}\u0000${latest.revision}`,
+			);
+		});
+	} catch {
+		return false;
+	}
+}
+
 /**
  * The ports of the World investigation (`world.find`, `world.query`): local reads of the host's own
  * World for the research sub-agent. The Scope and the purpose are bound by the host from the root
@@ -107,11 +188,7 @@ export function createWorldResearchPorts(options: {
 		if (scopeKey === undefined) throw new Error("world_scope_unavailable");
 		return { ctx, scopeKey };
 	}
-	const accessOf = (ctx: WorldQueryContext, scopeKey: string) => ({
-		principal: ctx.principal,
-		scopeKeys: [scopeKey],
-		purpose: ctx.purpose ?? DEFAULT_PURPOSE,
-	});
+
 	/** The live targets of the Scope (display name and aliases); `truncated`: more than one listing holds. */
 	function entitiesOf(db: Database, ctx: WorldQueryContext, scopeKey: string) {
 		const listed = listEntities(db, {
@@ -379,66 +456,7 @@ export function createWorldResearchPorts(options: {
 				};
 			}
 		},
-		validateEvidenceInTransaction(db, owner, sources) {
-			const claims = sources.filter((s) => s.kind === "world_claim");
-			if (!claims.length) return true;
-			try {
-				const { ctx, scopeKey } = scopeOf(db, owner, "adopt");
-				if (!world.statusInTransaction(db).usable) return false;
-				const access = accessOf(ctx, scopeKey);
-				const scope = { principal: ctx.principal, scopeKey };
-				// Claims still readable per subject, from one source-resolving read each.
-				const readable = new Map<string, Set<string>>();
-				const readableOf = (subjectId: string) => {
-					const known = readable.get(subjectId);
-					if (known) return known;
-					const read = world.readSnapshot(db, {
-						access,
-						scope,
-						asOf: now(),
-						focus: { subjectIds: [subjectId], depth: 0 },
-					});
-					const keys = new Set<string>();
-					if (read.status === "ready") {
-						const projection = buildProjection(
-							{ contractVersion: 1, snapshot: read.snapshot },
-							sha256Hex,
-						);
-						if (projection.ok)
-							for (const e of projection.value.entries)
-								keys.add(`${e.id}\u0000${e.revision}`);
-					}
-					readable.set(subjectId, keys);
-					return keys;
-				};
-				return claims.every((s) => {
-					// A claim forgotten, retracted or revised while the research ran must not support the report.
-					if (s.scopeRef !== scopeKey || !s.sourceRef) return false;
-					const history = world.readHistory(db, {
-						access,
-						scope,
-						assertionId: s.sourceRef,
-						limit: 1,
-					});
-					if (history.status !== "ready") return false;
-					const latest = history.revisions[0];
-					if (
-						!latest ||
-						String(latest.revision) !== s.sourceRevision ||
-						ENDED.has(latest.lifecycle)
-					)
-						return false;
-					// The history read checks the tombstone only. A forget is accepted (the utterance is retracted
-					// and Memory excludes it) before World's own tombstone is written by the feed, so the claim is
-					// also read through the source-resolving snapshot: a claim standing on a forgotten source is
-					// not in it, and must not support the report in that window.
-					return readableOf(latest.subjectId).has(
-						`${latest.id}\u0000${latest.revision}`,
-					);
-				});
-			} catch {
-				return false;
-			}
-		},
+		validateEvidenceInTransaction: (db, owner, sources) =>
+			validateWorldEvidence(db, owner, sources, world, scopeOf, now),
 	};
 }

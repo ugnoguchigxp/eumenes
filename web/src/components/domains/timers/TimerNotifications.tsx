@@ -18,21 +18,7 @@ type Attempt = {
 	delivered?: boolean;
 };
 
-/**
- * Scope-wide notices survive panel changes and refreshes during a claim. It owns the timer
- * notices and shows the Kanban ones (loaded by the caller) in the same notification center.
- */
-export function TimerNotifications({
-	client,
-	playTone,
-	muted = false,
-	busy = false,
-	inputBusy,
-	audioReady = true,
-	prepareAudio,
-	repeatTone,
-	kanban,
-}: {
+type TimerNotificationsProps = {
 	client: EumenesClient;
 	playTone: (
 		signal: AbortSignal,
@@ -46,34 +32,12 @@ export function TimerNotifications({
 	prepareAudio?: () => Promise<void>;
 	repeatTone?: (signal: AbortSignal) => Promise<void>;
 	kanban?: KanbanNotifications;
-}) {
-	const cache = useQueryClient();
-	const clientId = useRef(crypto.randomUUID());
-	const active = useRef<{ attempt: Attempt | null }>({ attempt: null });
-	const lifecycle = useRef({ epoch: 0 });
-	const latest = useRef({ playTone, muted, busy, inputBusy });
-	useEffect(() => {
-		latest.current = { playTone, muted, busy, inputBusy };
-	}, [playTone, muted, busy, inputBusy]);
-	const [error, setError] = useState<string | null>(null);
-	const [stoppingIds, setStoppingIds] = useState<string[]>([]);
-	const [ringingId, setRingingId] = useState<string | null>(null);
-	const alarm = useRef<AbortController | null>(null);
-	const failures = useRef(new Map<string, { count: number; until: number }>());
-	const delivered = useRef(new Set<string>());
-	// A claim taken just before voice/replay became busy stays ours until its lease ends; it is
-	// reused once the output is free instead of waiting for the lease to run out.
-	const held = useRef<{
-		id: string;
-		claimId: string;
-		revision: number;
-		until: number;
-	} | null>(null);
-	const retryTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
-		undefined,
-	);
-	const [tick, setTick] = useState(0);
-	useEffect(() => () => clearTimeout(retryTimer.current), []);
+};
+
+function useTimerNotifications(
+	client: EumenesClient,
+	cache: ReturnType<typeof useQueryClient>,
+) {
 	const query = useQuery({
 		queryKey: [queryRoots.timers, "notifications"],
 		queryFn: async ({ signal }) => {
@@ -108,6 +72,52 @@ export function TimerNotifications({
 	);
 	const refresh = () =>
 		cache.invalidateQueries({ queryKey: [queryRoots.timers] });
+	return { query, refresh };
+}
+
+/**
+ * Scope-wide notices survive panel changes and refreshes during a claim. It owns the timer
+ * notices and shows the Kanban ones (loaded by the caller) in the same notification center.
+ */
+export function TimerNotifications({
+	client,
+	playTone,
+	muted = false,
+	busy = false,
+	inputBusy,
+	audioReady = true,
+	prepareAudio,
+	repeatTone,
+	kanban,
+}: TimerNotificationsProps) {
+	const cache = useQueryClient();
+	const clientId = useRef(crypto.randomUUID());
+	const active = useRef<{ attempt: Attempt | null }>({ attempt: null });
+	const lifecycle = useRef({ epoch: 0 });
+	const latest = useRef({ playTone, muted, busy, inputBusy });
+	useEffect(() => {
+		latest.current = { playTone, muted, busy, inputBusy };
+	}, [playTone, muted, busy, inputBusy]);
+	const [error, setError] = useState<string | null>(null);
+	const [stoppingIds, setStoppingIds] = useState<string[]>([]);
+	const [ringingId, setRingingId] = useState<string | null>(null);
+	const alarm = useRef<AbortController | null>(null);
+	const failures = useRef(new Map<string, { count: number; until: number }>());
+	const delivered = useRef(new Set<string>());
+	// A claim taken just before voice/replay became busy stays ours until its lease ends; it is
+	// reused once the output is free instead of waiting for the lease to run out.
+	const held = useRef<{
+		id: string;
+		claimId: string;
+		revision: number;
+		until: number;
+	} | null>(null);
+	const retryTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+		undefined,
+	);
+	const [tick, setTick] = useState(0);
+	useEffect(() => () => clearTimeout(retryTimer.current), []);
+	const { query, refresh } = useTimerNotifications(client, cache);
 	useEffect(() => {
 		const cycle = lifecycle.current;
 		const state = active.current;

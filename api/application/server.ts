@@ -14,7 +14,8 @@ import { CONVERSATION_DEFAULT_PRINCIPAL } from "../domains/conversation/contract
 import { createTaskReportDelivery } from "./task-report-delivery";
 import { createDotsDialogue } from "./dots-dialogue";
 import { createDotsTasks } from "./dots-tasks";
-import { registerDots } from "./dots-http";
+import { appServices } from "./server-app-services";
+export { appServices } from "./server-app-services";
 import { createEvents, createSecretBox } from "../domains/dots";
 import { createCodingSupervision } from "../domains/coding-supervision";
 import { codingObservationReader } from "./coding-observation";
@@ -28,7 +29,7 @@ import { createImage, type ImageService } from "../domains/image";
 import { createUiCompositions } from "../domains/ui-compositions";
 import { createMusic } from "../domains/music";
 import { createLarmPlayground } from "../domains/larm";
-import { larmEmbedder } from "./larm-embedder";
+import { createSavedEmbedder } from "./larm-embedder";
 import { createToolchainRouting } from "./toolchain-routing";
 import { toolchainMaintenance } from "./toolchain-adapters";
 import { createHostToolchain } from "./toolchain-host";
@@ -232,22 +233,7 @@ export async function buildServices(
 			})
 		: undefined;
 	// One embedder on the saved LARM connection serves both the toolchain routing and the memory turn vectors.
-	const embedder = larmEmbedder(
-		() => {
-			const s = settings.get();
-			return createLarmPlayground({
-				baseUrl: s.larm.baseUrl ?? undefined,
-				token: config.larmToken,
-				profile: s.larm.profile,
-				audience: s.larm.audience,
-				providerHosts: config.larmProviderHosts,
-			});
-		},
-		() => {
-			const s = settings.get();
-			return JSON.stringify([s.larm.baseUrl, s.larm.profile, s.larm.audience]);
-		},
-	);
+	const embedder = createSavedEmbedder(config, settings);
 	const continuity = createContinuityService(store);
 	const memoryJournalPath = resolve(config.memoryJournalPath);
 	const memory = createMemoryService(store, conversation, continuity, {
@@ -255,8 +241,14 @@ export async function buildServices(
 		embed: () => embedder,
 	});
 	const { stewardAssembly, steward, goals, world } = assembleCuration(config, {
-		...{ store, memory, conversation, continuity, queue, inference },
-		...{ dbPath, memoryJournalPath },
+		store,
+		memory,
+		conversation,
+		continuity,
+		queue,
+		inference,
+		dbPath,
+		memoryJournalPath,
 		worldResourceId: () => settings.get().world.curationResourceId,
 	});
 	let imageForCompositions: ImageService;
@@ -444,59 +436,6 @@ export async function buildServices(
 	};
 }
 export type Services = Awaited<ReturnType<typeof buildServices>>;
-
-export function appServices(s: Services) {
-	return {
-		capabilities: s.toolchain.capabilities,
-		agents: s.toolchain.agents,
-		attitudeDataset: s.attitudeDataset,
-		conversation: s.conversation,
-		dialogue: s.dialogue,
-		voice: s.voice,
-		larm: s.inference,
-		queue: s.queue,
-		scheduler: s.scheduler,
-		settings: s.settings,
-		inference: s.inference,
-		googleAccounts: s.googleAccounts,
-		ttsDictionary: s.ttsDictionary,
-		memory: s.memory,
-		steward: s.steward,
-		continuity: s.continuity,
-		webResearch: s.webResearch,
-		changes: s.changes,
-		serviceTests: s.serviceTests,
-		music: s.music,
-		image: s.image,
-		uiCompositions: s.uiCompositions,
-		excalidraw: s.excalidraw,
-		drawingOperations: s.drawingOperations,
-		objectRecognition: s.objectRecognition,
-		ocr: s.ocr,
-		tasks: s.delegated.tasks,
-		coding: s.codingComposition?.coding,
-		codingSupervision: s.supervision,
-		taskReports: s.taskReports,
-		dotsModule: {
-			mount: (app: import("hono").Hono) =>
-				registerDots(app, s.dots, s.dotsEvents, s.delegated.tasks),
-		},
-		toolchainHistory: s.toolchain.history,
-		timers: s.timers,
-		terminals: s.toolchain.terminals,
-		kanban: s.toolchain.kanban,
-		toolchainActions: s.toolchain.actionRequests,
-		// With World OFF nothing is assembled and the routes do not exist.
-		...(s.world
-			? {
-					worldClaims: {
-						claims: s.world.claims,
-						context: s.world.claimsContext,
-					},
-				}
-			: {}),
-	};
-}
 
 /**
  * Process lifecycle of the services. The three groups are separate because the

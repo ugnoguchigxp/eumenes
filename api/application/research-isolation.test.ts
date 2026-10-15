@@ -30,8 +30,9 @@ for (const currentUrl of [undefined, "https://example.com/current-source"])
 			expect(
 				(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 }))?.status,
 			).toBe("completed");
-			// The parent still sees the conversation; the research worker starts fresh.
-			expect(h.routeContexts.at(-1)).toContain(oldUrl);
+			// Selection excludes prior assistant claims; the final answer keeps the exchange.
+			expect(h.routeContexts.at(-1)).not.toContain(oldUrl);
+			expect(h.parentContexts.at(-1)).toContain(oldUrl);
 			expect(h.workerContexts.length).toBeGreaterThan(0);
 			for (const context of h.workerContexts) {
 				expect(context).not.toContain(oldUrl);

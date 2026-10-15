@@ -1,0 +1,191 @@
+{
+  "schemaVersion": 1,
+  "runId": "2026-10-15T12-55-01-211Z-662df317-5b3f-4d03-87e0-7596c0943d98",
+  "startedAt": "2026-10-15T12:55:01.211Z",
+  "scope": {
+    "all": false,
+    "selected": [
+      "coding",
+      "codex-tasks",
+      "kanban"
+    ]
+  },
+  "baseCommit": "2086a25baadbd78354672d085641cfc0b95858f8",
+  "revision": "437d267908ed50b4812313cf6ec5067a9cbcbfe00aa59956889b4a25a68ceee5",
+  "runtime": {
+    "bun": "1.4.3",
+    "node": "26.3.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "ci": false,
+    "runner": null
+  },
+  "result": "pass",
+  "steps": [
+    {
+      "name": "inventory",
+      "status": "pass",
+      "ms": 55
+    },
+    {
+      "name": "boundaries",
+      "status": "pass",
+      "ms": 82
+    },
+    {
+      "name": "size-budget",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "scripts/size-budget.ts",
+        "api/domains/coding",
+        "packages/coding-runner/src",
+        "packages/coding-runner/test",
+        "api/domains/codex-tasks",
+        "web/src/domains/codex-tasks",
+        "api/domains/kanban",
+        "web/src/domains/kanban"
+      ],
+      "status": "pass",
+      "ms": 185,
+      "exitCode": 0
+    },
+    {
+      "name": "format",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "format:check",
+        "api/domains/coding",
+        "packages/coding-runner/src",
+        "packages/coding-runner/test",
+        "api/domains/codex-tasks",
+        "web/src/domains/codex-tasks",
+        "api/domains/kanban",
+        "web/src/domains/kanban"
+      ],
+      "status": "pass",
+      "ms": 134,
+      "exitCode": 0
+    },
+    {
+      "name": "lint",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "lint",
+        "api/domains/coding",
+        "packages/coding-runner/src",
+        "packages/coding-runner/test",
+        "api/domains/codex-tasks",
+        "web/src/domains/codex-tasks",
+        "api/domains/kanban",
+        "web/src/domains/kanban"
+      ],
+      "status": "pass",
+      "ms": 93,
+      "exitCode": 0
+    },
+    {
+      "name": "design-system typecheck",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "typecheck"
+      ],
+      "status": "pass",
+      "ms": 324,
+      "exitCode": 0
+    },
+    {
+      "name": "design-system build",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "build"
+      ],
+      "status": "pass",
+      "ms": 10728,
+      "exitCode": 0
+    },
+    {
+      "name": "typecheck configuration",
+      "status": "pass",
+      "ms": 1
+    },
+    {
+      "name": "typecheck",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "check",
+        "-p",
+        "/Users/y.noguchi/Code/eumenes/verification-reports/runs/2026-10-15T12-55-01-211Z-662df317-5b3f-4d03-87e0-7596c0943d98/tsconfig.selected.json"
+      ],
+      "status": "pass",
+      "ms": 488,
+      "exitCode": 0
+    },
+    {
+      "name": "typecheck closure",
+      "status": "pass",
+      "ms": 146
+    },
+    {
+      "name": "bun tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "test",
+        "./api/domains/codex-tasks/test/service.test.ts",
+        "./api/domains/coding/test/coding.test.ts",
+        "./api/domains/coding/test/indexes.test.ts",
+        "./api/domains/kanban/test/controller.test.ts",
+        "./api/domains/kanban/test/kanban.test.ts",
+        "./api/domains/kanban/test/limits.test.ts",
+        "./api/domains/kanban/test/retention.test.ts",
+        "./api/domains/kanban/test/runs.test.ts",
+        "./api/domains/kanban/test/shared.test.ts",
+        "./packages/coding-runner/test/git.test.ts",
+        "./packages/coding-runner/test/observation.test.ts",
+        "./packages/coding-runner/test/protocol.test.ts",
+        "./packages/coding-runner/test/retention.test.ts",
+        "./packages/coding-runner/test/review.test.ts",
+        "./packages/coding-runner/test/runner.test.ts",
+        "./packages/coding-runner/test/sdk-git.test.ts",
+        "./packages/coding-runner/test/sdk-transport.test.ts",
+        "./packages/coding-runner/test/sdk.test.ts"
+      ],
+      "status": "pass",
+      "ms": 117276,
+      "exitCode": 0
+    },
+    {
+      "name": "web tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "x",
+        "--no-install",
+        "vitest",
+        "run",
+        "web/src/domains/kanban/toolchain-adapter.test.tsx",
+        "web/src/domains/kanban/useKanbanNotices.test.tsx",
+        "web/src/domains/kanban/view.test.tsx"
+      ],
+      "status": "pass",
+      "ms": 5290,
+      "exitCode": 0
+    }
+  ],
+  "totalMs": 135088,
+  "integrityErrors": [],
+  "build": {
+    "sharedOutput": true,
+    "inputRevision": "437d267908ed50b4812313cf6ec5067a9cbcbfe00aa59956889b4a25a68ceee5",
+    "distAfterBuild": "4cb27630a968cf3fd9b12d3cd9c878855205dd3ffae62ba12d4a45a5fa4c7e82",
+    "distAfterConsumers": "4cb27630a968cf3fd9b12d3cd9c878855205dd3ffae62ba12d4a45a5fa4c7e82"
+  },
+  "finalRevision": "437d267908ed50b4812313cf6ec5067a9cbcbfe00aa59956889b4a25a68ceee5",
+  "finishedAt": "2026-10-15T12:57:16.955Z"
+}

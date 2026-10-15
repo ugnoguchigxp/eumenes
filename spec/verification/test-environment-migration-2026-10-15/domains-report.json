@@ -1,0 +1,187 @@
+{
+  "schemaVersion": 1,
+  "runId": "2026-10-15T11-02-19-360Z-72d482d9-0d10-46af-877c-d9f93fbb4721",
+  "startedAt": "2026-10-15T11:02:19.360Z",
+  "scope": {
+    "all": false,
+    "selected": [
+      "ocr",
+      "google-accounts"
+    ]
+  },
+  "baseCommit": "2086a25baadbd78354672d085641cfc0b95858f8",
+  "revision": "060b65e4405c0bda92cdb3b75032206b2b19c900f95b7cbbbc7409d602526ea8",
+  "runtime": {
+    "bun": "1.4.3",
+    "node": "26.3.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "ci": false,
+    "runner": null
+  },
+  "result": "pass",
+  "steps": [
+    {
+      "name": "inventory",
+      "status": "pass",
+      "ms": 38
+    },
+    {
+      "name": "boundaries",
+      "status": "pass",
+      "ms": 32
+    },
+    {
+      "name": "size-budget",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "scripts/size-budget.ts",
+        "api/domains/ocr",
+        "web/src/domains/ocr",
+        "packages/design-system/src/components/OcrWorkspace",
+        "api/domains/google-accounts",
+        "web/src/domains/google-accounts",
+        "packages/design-system/src/components/GoogleAccounts"
+      ],
+      "status": "pass",
+      "ms": 135,
+      "exitCode": 0
+    },
+    {
+      "name": "format",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "format:check",
+        "api/domains/ocr",
+        "web/src/domains/ocr",
+        "packages/design-system/src/components/OcrWorkspace",
+        "api/domains/google-accounts",
+        "web/src/domains/google-accounts",
+        "packages/design-system/src/components/GoogleAccounts"
+      ],
+      "status": "pass",
+      "ms": 98,
+      "exitCode": 0
+    },
+    {
+      "name": "lint",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "lint",
+        "api/domains/ocr",
+        "web/src/domains/ocr",
+        "packages/design-system/src/components/OcrWorkspace",
+        "api/domains/google-accounts",
+        "web/src/domains/google-accounts",
+        "packages/design-system/src/components/GoogleAccounts"
+      ],
+      "status": "pass",
+      "ms": 83,
+      "exitCode": 0
+    },
+    {
+      "name": "design-system typecheck",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "typecheck"
+      ],
+      "status": "pass",
+      "ms": 190,
+      "exitCode": 0
+    },
+    {
+      "name": "design-system build",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "build"
+      ],
+      "status": "pass",
+      "ms": 6520,
+      "exitCode": 0
+    },
+    {
+      "name": "typecheck configuration",
+      "status": "pass",
+      "ms": 1
+    },
+    {
+      "name": "typecheck",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "check",
+        "-p",
+        "/Users/y.noguchi/Code/eumenes/verification-reports/runs/2026-10-15T11-02-19-360Z-72d482d9-0d10-46af-877c-d9f93fbb4721/tsconfig.selected.json"
+      ],
+      "status": "pass",
+      "ms": 186,
+      "exitCode": 0
+    },
+    {
+      "name": "typecheck closure",
+      "status": "pass",
+      "ms": 98
+    },
+    {
+      "name": "bun tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "test",
+        "./api/domains/google-accounts/test/desktop-client.test.ts",
+        "./api/domains/google-accounts/test/provider.test.ts",
+        "./api/domains/google-accounts/test/proxy-errors.test.ts",
+        "./api/domains/google-accounts/test/service.test.ts",
+        "./api/domains/ocr/test/correction.test.ts",
+        "./api/domains/ocr/test/ocr.test.ts"
+      ],
+      "status": "pass",
+      "ms": 3559,
+      "exitCode": 0
+    },
+    {
+      "name": "web tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "x",
+        "--no-install",
+        "vitest",
+        "run",
+        "web/src/domains/google-accounts/toolchain-adapter.test.tsx"
+      ],
+      "status": "pass",
+      "ms": 5302,
+      "exitCode": 0
+    },
+    {
+      "name": "design-system tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "test",
+        "src/components/GoogleAccounts/GoogleAccounts.test.tsx"
+      ],
+      "status": "pass",
+      "ms": 3079,
+      "exitCode": 0
+    }
+  ],
+  "totalMs": 19571,
+  "integrityErrors": [],
+  "build": {
+    "sharedOutput": true,
+    "inputRevision": "060b65e4405c0bda92cdb3b75032206b2b19c900f95b7cbbbc7409d602526ea8",
+    "distAfterBuild": "2515b0a13beb266b2e7e8930b835bd31496f4feeea9525f6ec8123f14ef6ed37",
+    "distAfterConsumers": "2515b0a13beb266b2e7e8930b835bd31496f4feeea9525f6ec8123f14ef6ed37"
+  },
+  "finalRevision": "060b65e4405c0bda92cdb3b75032206b2b19c900f95b7cbbbc7409d602526ea8",
+  "finishedAt": "2026-10-15T11:02:39.128Z"
+}

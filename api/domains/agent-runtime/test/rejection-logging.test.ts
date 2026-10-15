@@ -22,6 +22,10 @@ test("rolled-back and stale rejections are not logged as committed failures", as
 		const t = h.task(
 			h.agents.list("root").find((t) => t.kind === "worker")!.id,
 		);
+		// Other fixtures can finish background work while the process-wide logger is captured.
+		// Correlate every assertion to this task, including rollback and stale outcomes.
+		const ownLines = () =>
+			lines.filter((line) => JSON.parse(line).taskId === t.id);
 		const job = h.queue.get(t.job_id!)!;
 		const step = h.store.read((db) =>
 			db
@@ -61,7 +65,7 @@ test("rolled-back and stale rejections are not logged as committed failures", as
 			}),
 		).rejects.toThrow("rollback");
 		await Bun.sleep(0);
-		expect(lines).toHaveLength(0);
+		expect(ownLines()).toHaveLength(0);
 		await h.store.write((db) =>
 			h.agents.handler.settleInTransaction(
 				db,
@@ -72,11 +76,11 @@ test("rolled-back and stale rejections are not logged as committed failures", as
 		);
 		await Bun.sleep(0);
 		expect(
-			lines
+			ownLines()
 				.map((line) => JSON.parse(line))
 				.filter((entry) => entry.event === "agent.control_rejected"),
 		).toHaveLength(1);
-		const before = lines.length;
+		const before = ownLines().length;
 		expect(
 			await h.store.write((db) =>
 				h.agents.handler.settleInTransaction(
@@ -88,7 +92,7 @@ test("rolled-back and stale rejections are not logged as committed failures", as
 			),
 		).toBe("stale");
 		await Bun.sleep(0);
-		expect(lines).toHaveLength(before);
+		expect(ownLines()).toHaveLength(before);
 		const next = h.task(t.id);
 		const nextStep = h.store.read((db) =>
 			db
@@ -116,7 +120,7 @@ test("rolled-back and stale rejections are not logged as committed failures", as
 			),
 		).toBe("stale");
 		await Bun.sleep(0);
-		expect(lines).toHaveLength(before);
+		expect(ownLines()).toHaveLength(before);
 		expect(lines.join("")).not.toContain(value);
 	} finally {
 		await h.close();

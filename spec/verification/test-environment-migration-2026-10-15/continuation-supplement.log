@@ -1,0 +1,932 @@
+[supplement] web
+
+ RUN  v4.1.8 /Users/y.noguchi/Code/eumenes
+
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+
+ Test Files  89 passed (89)
+      Tests  484 passed (484)
+   Start at  21:27:20
+   Duration  16.62s (transform 7.12s, setup 0ms, import 33.56s, tests 30.35s, environment 70.72s)
+
+[supplement] client
+
+ RUN  v4.1.8 /Users/y.noguchi/Code/eumenes
+
+
+ Test Files  7 passed (7)
+      Tests  353 passed (353)
+   Start at  21:27:37
+   Duration  1.47s (transform 1.57s, setup 0ms, import 3.84s, tests 154ms, environment 4.93s)
+
+[supplement] design-system
+$ vitest run --project unit src/components/ActionButton/ActionButton.test.tsx src/components/ActionButton/CreateButton.test.tsx src/components/ActivityTimeline/ActivityTimeline.test.tsx src/components/AdaptiveText/AdaptiveText.test.tsx src/components/AsyncDataWrapper/AsyncDataWrapper.test.tsx src/components/Avatar/Avatar.test.tsx src/components/Badge/Badge.test.tsx src/components/Button/Button.test.tsx src/components/Calculator/Calculator.test.tsx "src/components/Canvas2D/Canvas2D.test.tsx" src/components/Card/Card.test.tsx src/components/ChatDock/ChatDock.test.tsx src/components/Checkbox/Checkbox.test.tsx src/components/Collapsible/Collapsible.test.tsx src/components/ConfirmModal/ConfirmModal.test.tsx src/components/ContentHeader/ContentHeader.test.tsx src/components/CopyClipButton/CopyClipButton.test.tsx src/components/DateDisplay/DateDisplay.test.tsx src/components/DateFormat/DateFormat.test.tsx src/components/DigitalClock/DigitalClock.test.tsx src/components/Drawer/Drawer.test.tsx src/components/DropdownMenu/DropdownMenu.test.tsx src/components/EditableSelect/EditableSelect.test.tsx src/components/ErrorState/ErrorState.test.tsx src/components/Form/Form.test.tsx src/components/FullscreenDialog/FullscreenDialog.test.tsx src/components/GenerationStatus/GenerationStatus.test.tsx src/components/GoogleAccounts/GoogleAccounts.test.tsx src/components/ImageViewer/ImageViewer.test.tsx src/components/ImageWorkspace/ImageCreationForm.test.tsx src/components/ImageWorkspace/ImageGallery.test.tsx src/components/ImageWorkspace/ImageWorkspace.test.tsx src/components/InfiniteListMenu/InfiniteListMenu.test.tsx src/components/Input/Input.test.tsx src/components/KanbanBoard/KanbanBoard.test.tsx src/components/KeypadModal/KeypadModal.test.tsx src/components/Label/Label.test.tsx src/components/LanguageSelector/LanguageSelector.test.tsx src/components/LightSpiritLab/LightSpiritLab.test.tsx src/components/MenuBar/MenuBar.test.tsx src/components/MenuButtonGroup/MenuButtonGroup.test.tsx src/components/MiniTable/MiniTable.test.tsx src/components/Modal/Modal.test.tsx src/components/MusicLibraryControls/MusicLibraryControls.test.tsx src/components/MusicPlayer/MusicPlayer.test.tsx src/components/MusicWorkspace/MusicCreationForm.test.tsx src/components/MusicWorkspace/MusicWorkspace.test.tsx src/components/NavigationStepper/NavigationStepper.test.tsx src/components/NotificationToast/NotificationToast.test.tsx src/components/NumberFormat/NumberFormat.test.tsx src/components/ObjectRecognitionWorkspace/ObjectRecognitionWorkspace.test.tsx src/components/OptionButtonGroup/OptionButtonGroup.test.tsx src/components/Pagination/Pagination.test.tsx src/components/Playlist/Playlist.test.tsx src/components/ProgressBar/ProgressBar.test.tsx src/components/RadioButtonGroup/RadioButtonGroup.test.tsx src/components/RecordsWorkspace/RecordsWorkspace.test.tsx src/components/ScaleInput/ScaleInput.test.tsx src/components/ScrollArea/ScrollArea.test.tsx src/components/SearchableSelect/SearchableSelect.test.tsx src/components/Select/Select.test.tsx src/components/SelectableTextInput/SelectableTextInput.test.tsx src/components/Separator/Separator.test.tsx src/components/ServerDataTable/ServerDataTable.test.tsx src/components/SimpleSearchInput/SimpleSearchInput.test.tsx src/components/Skeleton/Skeleton.test.tsx src/components/Spinner/Spinner.test.tsx src/components/Subtitle/Subtitle.test.tsx src/components/Switch/Switch.test.tsx src/components/Tabs/Tabs.test.tsx src/components/TerminalWorkspace/TerminalWorkspace.test.tsx src/components/TextInput/TextInput.test.tsx src/components/Textarea/Textarea.test.tsx src/components/TimerWorkspace/TimerWorkspace.test.tsx src/components/Tooltip/Tooltip.test.tsx src/components/TreeMenu/TreeMenu.test.tsx src/components/ViewSwitcher/ViewSwitcher.test.tsx src/contexts/CalendarContext.test.tsx src/hooks/useMobile.test.ts src/utils/cn.test.ts
+│ ┌────────────────────────────────────────────────────────────────────────────┐
+│ │  Info: Found a setup file with "setProjectAnnotations".                    │
+│ │  Skipping automatic provisioning of preview annotations to avoid           │
+│ │  conflicts. Since Storybook 10.3, "@storybook/addon-vitest" applies these  │
+│ │   automatically.                                                           │
+│ │  You can safely remove the "setProjectAnnotations" call from your setup    │
+│ │  file, or remove the file entirely if you don't have custom code there.    │
+│ └────────────────────────────────────────────────────────────────────────────┘
+
+ RUN  v4.0.16 /Users/y.noguchi/Code/eumenes/packages/design-system
+
+stdout | src/components/KanbanBoard/KanbanBoard.test.tsx
+Test setup running...
+
+stdout | src/components/KanbanBoard/KanbanBoard.test.tsx
+Test setup running...
+
+stdout | src/components/Select/Select.test.tsx
+Test setup running...
+
+stdout | src/components/TimerWorkspace/TimerWorkspace.test.tsx
+Test setup running...
+
+stdout | src/components/RecordsWorkspace/RecordsWorkspace.test.tsx
+Test setup running...
+
+stdout | src/components/LanguageSelector/LanguageSelector.test.tsx
+Test setup running...
+
+stdout | src/components/Calculator/Calculator.test.tsx
+Test setup running...
+
+stdout | src/components/Modal/Modal.test.tsx
+Test setup running...
+
+stdout | src/components/MusicWorkspace/MusicWorkspace.test.tsx
+Test setup running...
+
+stdout | src/components/Select/Select.test.tsx
+Test setup running...
+
+stdout | src/components/TimerWorkspace/TimerWorkspace.test.tsx
+Test setup running...
+
+stdout | src/components/Calculator/Calculator.test.tsx
+Test setup running...
+
+stdout | src/components/Modal/Modal.test.tsx
+Test setup running...
+
+stdout | src/components/RecordsWorkspace/RecordsWorkspace.test.tsx
+Test setup running...
+
+stdout | src/components/LanguageSelector/LanguageSelector.test.tsx
+Test setup running...
+
+stdout | src/components/MusicWorkspace/MusicWorkspace.test.tsx
+Test setup running...
+
+stdout | src/components/MusicWorkspace/MusicCreationForm.test.tsx
+Test setup running...
+
+stdout | src/components/MusicWorkspace/MusicCreationForm.test.tsx
+Test setup running...
+
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+ ✓ |unit| src/components/LanguageSelector/LanguageSelector.test.tsx (8 tests) 756ms
+ ✓ |unit| src/components/TimerWorkspace/TimerWorkspace.test.tsx (6 tests) 665ms
+   ✓ mode buttons expose their selection and fixed timer controls survive every state  373ms
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+ ✓ |unit| src/components/RecordsWorkspace/RecordsWorkspace.test.tsx (2 tests) 678ms
+   ✓ mounted tabs retain expanded rows, scroll and procedure confirmation; actions are explicit  588ms
+ ✓ |unit| src/components/Modal/Modal.test.tsx (36 tests) 914ms
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+ ✓ |unit| src/components/MusicWorkspace/MusicWorkspace.test.tsx (6 tests) 891ms
+ ✓ |unit| src/components/Select/Select.test.tsx (23 tests) 1120ms
+ ✓ |unit| src/components/MusicWorkspace/MusicCreationForm.test.tsx (5 tests) 1494ms
+   ✓ selects multiple genres including orchestra, filters the catalogue and removes only the chosen genre  649ms
+   ✓ preserves a hand-written prompt, requires a decision on changed choices and allows restoring overwritten text  367ms
+   ✓ reflects vocal characteristics and exact lyric line breaks, and removes them when vocals are turned off  389ms
+ ✓ |unit| src/components/Calculator/Calculator.test.tsx (12 tests) 1698ms
+stdout | src/components/ImageWorkspace/ImageWorkspace.test.tsx
+Test setup running...
+
+stdout | src/components/ImageWorkspace/ImageWorkspace.test.tsx
+Test setup running...
+
+stdout | src/components/ImageWorkspace/ImageCreationForm.test.tsx
+Test setup running...
+
+stdout | src/components/ImageWorkspace/ImageCreationForm.test.tsx
+Test setup running...
+
+stdout | src/components/ObjectRecognitionWorkspace/ObjectRecognitionWorkspace.test.tsx
+Test setup running...
+
+stdout | src/components/ObjectRecognitionWorkspace/ObjectRecognitionWorkspace.test.tsx
+Test setup running...
+
+stdout | src/components/KeypadModal/KeypadModal.test.tsx
+Test setup running...
+
+stdout | src/components/KeypadModal/KeypadModal.test.tsx
+Test setup running...
+
+stdout | src/components/LightSpiritLab/LightSpiritLab.test.tsx
+Test setup running...
+
+stdout | src/components/LightSpiritLab/LightSpiritLab.test.tsx
+Test setup running...
+
+stdout | src/components/DropdownMenu/DropdownMenu.test.tsx
+Test setup running...
+
+stdout | src/components/DropdownMenu/DropdownMenu.test.tsx
+Test setup running...
+
+stdout | src/components/Checkbox/Checkbox.test.tsx
+Test setup running...
+
+stdout | src/components/Checkbox/Checkbox.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/KanbanBoard/KanbanBoard.test.tsx (29 tests) 2588ms
+ ✓ |unit| src/components/LightSpiritLab/LightSpiritLab.test.tsx (4 tests) 349ms
+stdout | src/components/Input/Input.test.tsx
+Test setup running...
+
+stdout | src/components/Input/Input.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/ObjectRecognitionWorkspace/ObjectRecognitionWorkspace.test.tsx (10 tests) 453ms
+ ✓ |unit| src/components/ImageWorkspace/ImageCreationForm.test.tsx (6 tests) 675ms
+   ✓ explicit choices build the editable prompt and pass arbitrary integer dimensions unchanged  319ms
+ ✓ |unit| src/components/Checkbox/Checkbox.test.tsx (34 tests) 242ms
+ ✓ |unit| src/components/ImageWorkspace/ImageWorkspace.test.tsx (5 tests) 645ms
+   ✓ full-content navigation removes the editor from gallery and preserves edits when returning  335ms
+ ✓ |unit| src/components/KeypadModal/KeypadModal.test.tsx (22 tests) 657ms
+ ✓ |unit| src/components/Input/Input.test.tsx (53 tests) 160ms
+ ✓ |unit| src/components/DropdownMenu/DropdownMenu.test.tsx (19 tests) 815ms
+stdout | src/components/Button/Button.test.tsx
+Test setup running...
+
+stdout | src/components/Button/Button.test.tsx
+Test setup running...
+
+stdout | src/components/ContentHeader/ContentHeader.test.tsx
+Test setup running...
+
+stdout | src/components/ContentHeader/ContentHeader.test.tsx
+Test setup running...
+
+stdout | src/components/ConfirmModal/ConfirmModal.test.tsx
+Test setup running...
+
+stdout | src/components/ConfirmModal/ConfirmModal.test.tsx
+Test setup running...
+
+stdout | src/components/Spinner/Spinner.test.tsx
+Test setup running...
+
+stdout | src/components/Spinner/Spinner.test.tsx
+Test setup running...
+
+stdout | src/components/CopyClipButton/CopyClipButton.test.tsx
+Test setup running...
+
+stdout | src/components/CopyClipButton/CopyClipButton.test.tsx
+Test setup running...
+
+stdout | src/components/MusicPlayer/MusicPlayer.test.tsx
+Test setup running...
+
+stdout | src/components/MusicPlayer/MusicPlayer.test.tsx
+Test setup running...
+
+stdout | src/components/ScaleInput/ScaleInput.test.tsx
+Test setup running...
+
+stdout | src/components/ScaleInput/ScaleInput.test.tsx
+Test setup running...
+
+stdout | src/components/NavigationStepper/NavigationStepper.test.tsx
+Test setup running...
+
+stdout | src/components/NavigationStepper/NavigationStepper.test.tsx
+Test setup running...
+
+stdout | src/components/ImageWorkspace/ImageGallery.test.tsx
+Test setup running...
+
+stdout | src/components/ImageWorkspace/ImageGallery.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/ConfirmModal/ConfirmModal.test.tsx (28 tests) 266ms
+ ✓ |unit| src/components/ScaleInput/ScaleInput.test.tsx (8 tests) 247ms
+ ✓ |unit| src/components/Spinner/Spinner.test.tsx (32 tests) 319ms
+ ✓ |unit| src/components/Button/Button.test.tsx (37 tests) 320ms
+ ✓ |unit| src/components/CopyClipButton/CopyClipButton.test.tsx (24 tests) 284ms
+ ✓ |unit| src/components/ContentHeader/ContentHeader.test.tsx (36 tests) 276ms
+ ✓ |unit| src/components/NavigationStepper/NavigationStepper.test.tsx (8 tests) 241ms
+ ✓ |unit| src/components/MusicPlayer/MusicPlayer.test.tsx (8 tests) 435ms
+ ✓ |unit| src/components/ImageWorkspace/ImageGallery.test.tsx (3 tests) 244ms
+stdout | src/components/TextInput/TextInput.test.tsx
+Test setup running...
+
+stdout | src/components/TextInput/TextInput.test.tsx
+Test setup running...
+
+stdout | src/components/EditableSelect/EditableSelect.test.tsx
+Test setup running...
+
+stdout | src/components/EditableSelect/EditableSelect.test.tsx
+Test setup running...
+
+stdout | src/components/TerminalWorkspace/TerminalWorkspace.test.tsx
+Test setup running...
+
+stdout | src/components/TerminalWorkspace/TerminalWorkspace.test.tsx
+Test setup running...
+
+stdout | src/components/SearchableSelect/SearchableSelect.test.tsx
+Test setup running...
+
+stdout | src/components/SearchableSelect/SearchableSelect.test.tsx
+Test setup running...
+
+stdout | src/components/ProgressBar/ProgressBar.test.tsx
+Test setup running...
+
+stdout | src/components/GoogleAccounts/GoogleAccounts.test.tsx
+Test setup running...
+
+stdout | src/components/ErrorState/ErrorState.test.tsx
+Test setup running...
+
+stdout | src/components/GoogleAccounts/GoogleAccounts.test.tsx
+Test setup running...
+
+stdout | src/components/ProgressBar/ProgressBar.test.tsx
+Test setup running...
+
+stdout | src/components/ErrorState/ErrorState.test.tsx
+Test setup running...
+
+stdout | src/components/AsyncDataWrapper/AsyncDataWrapper.test.tsx
+Test setup running...
+
+stdout | src/components/AsyncDataWrapper/AsyncDataWrapper.test.tsx
+Test setup running...
+
+stdout | src/components/ActivityTimeline/ActivityTimeline.test.tsx
+Test setup running...
+
+stdout | src/components/ActivityTimeline/ActivityTimeline.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/EditableSelect/EditableSelect.test.tsx (8 tests) 269ms
+ ✓ |unit| src/components/TextInput/TextInput.test.tsx (8 tests) 308ms
+ ✓ |unit| src/components/SearchableSelect/SearchableSelect.test.tsx (16 tests) 283ms
+ ✓ |unit| src/components/ProgressBar/ProgressBar.test.tsx (11 tests) 275ms
+ ✓ |unit| src/components/ErrorState/ErrorState.test.tsx (39 tests) 337ms
+ ✓ |unit| src/components/AsyncDataWrapper/AsyncDataWrapper.test.tsx (29 tests) 234ms
+ ✓ |unit| src/components/GoogleAccounts/GoogleAccounts.test.tsx (4 tests) 304ms
+ ✓ |unit| src/components/TerminalWorkspace/TerminalWorkspace.test.tsx (4 tests) 300ms
+ ✓ |unit| src/components/ActivityTimeline/ActivityTimeline.test.tsx (3 tests) 127ms
+stdout | src/components/NotificationToast/NotificationToast.test.tsx
+Test setup running...
+
+stdout | src/components/NotificationToast/NotificationToast.test.tsx
+Test setup running...
+
+stdout | src/components/MusicLibraryControls/MusicLibraryControls.test.tsx
+Test setup running...
+
+stdout | src/components/MusicLibraryControls/MusicLibraryControls.test.tsx
+Test setup running...
+
+stdout | src/components/ActionButton/CreateButton.test.tsx
+Test setup running...
+
+stdout | src/components/ActionButton/CreateButton.test.tsx
+Test setup running...
+
+stdout | src/components/ChatDock/ChatDock.test.tsx
+Test setup running...
+
+stdout | src/components/GenerationStatus/GenerationStatus.test.tsx
+Test setup running...
+
+stdout | src/components/ChatDock/ChatDock.test.tsx
+Test setup running...
+
+stdout | src/components/GenerationStatus/GenerationStatus.test.tsx
+Test setup running...
+
+stdout | src/components/MenuButtonGroup/MenuButtonGroup.test.tsx
+Test setup running...
+
+stdout | src/components/MenuButtonGroup/MenuButtonGroup.test.tsx
+Test setup running...
+
+stdout | src/components/MenuBar/MenuBar.test.tsx
+Test setup running...
+
+stdout | src/components/MenuBar/MenuBar.test.tsx
+Test setup running...
+
+stdout | src/components/AdaptiveText/AdaptiveText.test.tsx
+Test setup running...
+
+stdout | src/components/AdaptiveText/AdaptiveText.test.tsx
+Test setup running...
+
+stdout | src/components/ServerDataTable/ServerDataTable.test.tsx
+Test setup running...
+
+stdout | src/components/ServerDataTable/ServerDataTable.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/AdaptiveText/AdaptiveText.test.tsx (13 tests) 177ms
+ ✓ |unit| src/components/NotificationToast/NotificationToast.test.tsx (14 tests) 253ms
+ ✓ |unit| src/components/GenerationStatus/GenerationStatus.test.tsx (2 tests) 178ms
+ ✓ |unit| src/components/MenuBar/MenuBar.test.tsx (21 tests) 211ms
+ ✓ |unit| src/components/MenuButtonGroup/MenuButtonGroup.test.tsx (34 tests) 203ms
+ ✓ |unit| src/components/MusicLibraryControls/MusicLibraryControls.test.tsx (2 tests) 221ms
+ ✓ |unit| src/components/ActionButton/CreateButton.test.tsx (26 tests) 213ms
+ ✓ |unit| src/components/ChatDock/ChatDock.test.tsx (7 tests) 219ms
+ ✓ |unit| src/components/ServerDataTable/ServerDataTable.test.tsx (2 tests) 301ms
+stdout | src/components/Tabs/Tabs.test.tsx
+Test setup running...
+
+stdout | src/components/Tabs/Tabs.test.tsx
+Test setup running...
+
+stdout | src/components/Skeleton/Skeleton.test.tsx
+Test setup running...
+
+stdout | src/components/Skeleton/Skeleton.test.tsx
+Test setup running...
+
+stdout | src/components/ImageViewer/ImageViewer.test.tsx
+Test setup running...
+
+stdout | src/components/ImageViewer/ImageViewer.test.tsx
+Test setup running...
+
+stdout | src/components/TreeMenu/TreeMenu.test.tsx
+Test setup running...
+
+stdout | src/components/TreeMenu/TreeMenu.test.tsx
+Test setup running...
+
+stdout | src/components/FullscreenDialog/FullscreenDialog.test.tsx
+Test setup running...
+
+stdout | src/components/FullscreenDialog/FullscreenDialog.test.tsx
+Test setup running...
+
+stdout | src/components/SimpleSearchInput/SimpleSearchInput.test.tsx
+Test setup running...
+
+stdout | src/components/Separator/Separator.test.tsx
+Test setup running...
+
+stdout | src/components/Separator/Separator.test.tsx
+Test setup running...
+
+stdout | src/components/SimpleSearchInput/SimpleSearchInput.test.tsx
+Test setup running...
+
+stdout | src/components/Canvas2D/Canvas2D.test.tsx
+Test setup running...
+
+stdout | src/components/Canvas2D/Canvas2D.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/ImageViewer/ImageViewer.test.tsx (7 tests) 177ms
+stdout | src/components/Playlist/Playlist.test.tsx
+Test setup running...
+
+stdout | src/components/Playlist/Playlist.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/SimpleSearchInput/SimpleSearchInput.test.tsx (5 tests) 162ms
+ ✓ |unit| src/components/Canvas2D/Canvas2D.test.tsx (5 tests) 167ms
+ ✓ |unit| src/components/Separator/Separator.test.tsx (34 tests) 190ms
+ ✓ |unit| src/components/Skeleton/Skeleton.test.tsx (38 tests) 257ms
+ ✓ |unit| src/components/FullscreenDialog/FullscreenDialog.test.tsx (1 test) 250ms
+ ✓ |unit| src/components/Playlist/Playlist.test.tsx (2 tests) 107ms
+ ✓ |unit| src/components/TreeMenu/TreeMenu.test.tsx (7 tests) 323ms
+ ✓ |unit| src/components/Tabs/Tabs.test.tsx (12 tests) 377ms
+stdout | src/components/Drawer/Drawer.test.tsx
+Test setup running...
+
+stdout | src/components/Drawer/Drawer.test.tsx
+Test setup running...
+
+stdout | src/components/Form/Form.test.tsx
+Test setup running...
+
+stdout | src/components/Form/Form.test.tsx
+Test setup running...
+
+stdout | src/components/OptionButtonGroup/OptionButtonGroup.test.tsx
+Test setup running...
+
+stdout | src/components/OptionButtonGroup/OptionButtonGroup.test.tsx
+Test setup running...
+
+stdout | src/components/DateFormat/DateFormat.test.tsx
+Test setup running...
+
+stdout | src/components/DateFormat/DateFormat.test.tsx
+Test setup running...
+
+stdout | src/components/ActionButton/ActionButton.test.tsx
+Test setup running...
+
+stdout | src/components/ActionButton/ActionButton.test.tsx
+Test setup running...
+
+stdout | src/components/Avatar/Avatar.test.tsx
+Test setup running...
+
+stdout | src/components/Avatar/Avatar.test.tsx
+Test setup running...
+
+stdout | src/components/RadioButtonGroup/RadioButtonGroup.test.tsx
+Test setup running...
+
+stdout | src/components/RadioButtonGroup/RadioButtonGroup.test.tsx
+Test setup running...
+
+stdout | src/components/Tooltip/Tooltip.test.tsx
+Test setup running...
+
+stdout | src/components/Tooltip/Tooltip.test.tsx
+Test setup running...
+
+stdout | src/components/SelectableTextInput/SelectableTextInput.test.tsx
+Test setup running...
+
+stdout | src/components/SelectableTextInput/SelectableTextInput.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/DateFormat/DateFormat.test.tsx (32 tests) 125ms
+ ✓ |unit| src/components/OptionButtonGroup/OptionButtonGroup.test.tsx (10 tests) 198ms
+ ✓ |unit| src/components/Drawer/Drawer.test.tsx (9 tests) 220ms
+ ✓ |unit| src/components/Avatar/Avatar.test.tsx (40 tests) 153ms
+ ✓ |unit| src/components/ActionButton/ActionButton.test.tsx (40 tests) 293ms
+ ✓ |unit| src/components/Tooltip/Tooltip.test.tsx (18 tests) 155ms
+ ✓ |unit| src/components/Form/Form.test.tsx (5 tests) 342ms
+ ✓ |unit| src/components/SelectableTextInput/SelectableTextInput.test.tsx (3 tests) 209ms
+ ✓ |unit| src/components/RadioButtonGroup/RadioButtonGroup.test.tsx (2 tests) 353ms
+     ✓ selects from the entire label and keeps separately named groups independent  328ms
+stdout | src/components/MiniTable/MiniTable.test.tsx
+Test setup running...
+
+stdout | src/components/MiniTable/MiniTable.test.tsx
+Test setup running...
+
+stdout | src/components/Label/Label.test.tsx
+Test setup running...
+
+stdout | src/components/Label/Label.test.tsx
+Test setup running...
+
+stdout | src/components/Textarea/Textarea.test.tsx
+Test setup running...
+
+stdout | src/components/Textarea/Textarea.test.tsx
+Test setup running...
+
+stdout | src/components/Card/Card.test.tsx
+Test setup running...
+
+stdout | src/components/Card/Card.test.tsx
+Test setup running...
+
+stdout | src/components/Badge/Badge.test.tsx
+Test setup running...
+
+stdout | src/components/Badge/Badge.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/MiniTable/MiniTable.test.tsx (4 tests) 198ms
+stdout | src/components/ScrollArea/ScrollArea.test.tsx
+Test setup running...
+
+stdout | src/components/ScrollArea/ScrollArea.test.tsx
+Test setup running...
+
+stdout | src/components/InfiniteListMenu/InfiniteListMenu.test.tsx
+Test setup running...
+
+stdout | src/components/DateDisplay/DateDisplay.test.tsx
+Test setup running...
+
+stdout | src/components/InfiniteListMenu/InfiniteListMenu.test.tsx
+Test setup running...
+
+stdout | src/components/DateDisplay/DateDisplay.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/Label/Label.test.tsx (21 tests) 257ms
+ ✓ |unit| src/components/Textarea/Textarea.test.tsx (3 tests) 274ms
+ ✓ |unit| src/components/Badge/Badge.test.tsx (22 tests) 127ms
+stdout | src/components/NumberFormat/NumberFormat.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/Card/Card.test.tsx (42 tests) 199ms
+stdout | src/components/NumberFormat/NumberFormat.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/DateDisplay/DateDisplay.test.tsx (13 tests) 159ms
+ ✓ |unit| src/components/NumberFormat/NumberFormat.test.tsx (16 tests) 182ms
+ ✓ |unit| src/components/ScrollArea/ScrollArea.test.tsx (29 tests) 365ms
+ ✓ |unit| src/components/InfiniteListMenu/InfiniteListMenu.test.tsx (9 tests) 349ms
+stdout | src/components/Pagination/Pagination.test.tsx
+Test setup running...
+
+stdout | src/components/Pagination/Pagination.test.tsx
+Test setup running...
+
+stdout | src/contexts/CalendarContext.test.tsx
+Test setup running...
+
+stdout | src/contexts/CalendarContext.test.tsx
+Test setup running...
+
+stdout | src/components/ViewSwitcher/ViewSwitcher.test.tsx
+Test setup running...
+
+stdout | src/components/ViewSwitcher/ViewSwitcher.test.tsx
+Test setup running...
+
+stdout | src/components/Subtitle/Subtitle.test.tsx
+Test setup running...
+
+stdout | src/components/Subtitle/Subtitle.test.tsx
+Test setup running...
+
+stdout | src/components/Collapsible/Collapsible.test.tsx
+Test setup running...
+
+stdout | src/components/Collapsible/Collapsible.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/Pagination/Pagination.test.tsx (7 tests) 58ms
+ ✓ |unit| src/contexts/CalendarContext.test.tsx (5 tests) 40ms
+ ✓ |unit| src/components/ViewSwitcher/ViewSwitcher.test.tsx (4 tests) 46ms
+ ✓ |unit| src/components/Subtitle/Subtitle.test.tsx (2 tests) 36ms
+stdout | src/components/Switch/Switch.test.tsx
+Test setup running...
+
+stdout | src/components/Switch/Switch.test.tsx
+Test setup running...
+
+stderr | src/components/Collapsible/Collapsible.test.tsx > Collapsible Components > Integration with Radix UI > handles Radix UI specific props
+React does not recognize the `asChild` prop on a DOM element. If you intentionally want it to appear in the DOM as a custom attribute, spell it as lowercase `aschild` instead. If you accidentally passed it from a parent component, remove it from the DOM element.
+React does not recognize the `forceMount` prop on a DOM element. If you intentionally want it to appear in the DOM as a custom attribute, spell it as lowercase `forcemount` instead. If you accidentally passed it from a parent component, remove it from the DOM element.
+React does not recognize the `defaultOpen` prop on a DOM element. If you intentionally want it to appear in the DOM as a custom attribute, spell it as lowercase `defaultopen` instead. If you accidentally passed it from a parent component, remove it from the DOM element.
+
+ ✓ |unit| src/components/Collapsible/Collapsible.test.tsx (27 tests) 64ms
+ ✓ |unit| src/components/Switch/Switch.test.tsx (9 tests) 32ms
+stdout | src/hooks/useMobile.test.ts
+Test setup running...
+
+stdout | src/hooks/useMobile.test.ts
+Test setup running...
+
+stdout | src/components/DigitalClock/DigitalClock.test.tsx
+Test setup running...
+
+stdout | src/components/DigitalClock/DigitalClock.test.tsx
+Test setup running...
+
+stdout | src/utils/cn.test.ts
+Test setup running...
+
+stdout | src/utils/cn.test.ts
+Test setup running...
+
+ ✓ |unit| src/components/DigitalClock/DigitalClock.test.tsx (1 test) 1ms
+ ✓ |unit| src/utils/cn.test.ts (2 tests) 4ms
+ ✓ |unit| src/hooks/useMobile.test.ts (4 tests) 11ms
+
+ Test Files  80 passed (80)
+      Tests  1197 passed (1197)
+   Start at  21:27:40
+   Duration  14.86s (transform 3.31s, setup 11.00s, import 12.14s, tests 28.30s, environment 68.68s)
+
+[supplement] web build
+vite v8.0.16 building client environment for production...
+[2Ktransforming...✓ 4494 modules transformed.
+rendering chunks...
+computing gzip size...
+dist-web/assets/recorder.worklet-D4tES5Cy.js                  0.46 kB
+dist-web/index.html                                           0.77 kB │ gzip:   0.37 kB
+dist-web/assets/Assistant-SemiBold-SCI4bEL9.woff2            20.21 kB
+dist-web/assets/Assistant-Regular-DVxZuzxb.woff2             20.23 kB
+dist-web/assets/Assistant-Medium-DrcxCXg3.woff2              20.32 kB
+dist-web/assets/Assistant-Bold-gm-uSS1B.woff2                20.38 kB
+dist-web/assets/ssd-5p5DIA10.bin                             61.05 kB
+dist-web/assets/memory-C6dgmXlb.bin                          61.34 kB
+dist-web/assets/embedding-CkJ-ohrL.bin                       66.04 kB
+dist-web/assets/attitude-CEjflslA.bin                        69.12 kB
+dist-web/assets/network-BsqG3UPx.bin                         69.12 kB
+dist-web/assets/tts-CDyNhsOA.bin                             78.72 kB
+dist-web/assets/asr-lRp7ZpbO.bin                             78.81 kB
+dist-web/assets/language-kdQilzrj.bin                        79.48 kB
+dist-web/assets/llm-CX_iwKZB.bin                             82.94 kB
+dist-web/assets/image-CB-F1WIL.bin                           87.04 kB
+dist-web/assets/music-DzszNefd.bin                           93.69 kB
+dist-web/assets/cpu-BobjL17J.bin                            131.07 kB
+dist-web/assets/background-C33PkqYV.css                       1.60 kB │ gzip:   0.57 kB
+dist-web/assets/DrawingEditor-Dk4Q2KaX.css                  142.19 kB │ gzip:  22.42 kB
+dist-web/assets/index-BvQwIFRw.css                          221.00 kB │ gzip:  38.80 kB
+dist-web/assets/array-BifhSqXX.js                             0.10 kB │ gzip:   0.11 kB
+dist-web/assets/channel-C1h-N6bm.js                           0.11 kB │ gzip:   0.12 kB
+dist-web/assets/pie-WAS4IAKB-BDJJQ5_8.js                      0.12 kB │ gzip:   0.12 kB
+dist-web/assets/info-A6RAGUB7-C84aV_Bh.js                     0.12 kB │ gzip:   0.13 kB
+dist-web/assets/radar-RG4KPBEZ-BG2Ls6hW.js                    0.12 kB │ gzip:   0.12 kB
+dist-web/assets/packet-AYTQ26CC-4W5p42D4.js                   0.12 kB │ gzip:   0.13 kB
+dist-web/assets/cynefin-OW5HDTMX-DruAkSHH.js                  0.12 kB │ gzip:   0.13 kB
+dist-web/assets/treemap-WGGIJYW6-B9_4MLQE.js                  0.12 kB │ gzip:   0.13 kB
+dist-web/assets/wardley-WFR3VGLG-DSu4aD5u.js                  0.12 kB │ gzip:   0.13 kB
+dist-web/assets/gitGraph-4MIJSDKK-CeLu12XO.js                 0.12 kB │ gzip:   0.13 kB
+dist-web/assets/railroad-74A4TZTK-Cd-AKMEc.js                 0.12 kB │ gzip:   0.13 kB
+dist-web/assets/treeView-Q6P3EWNA-CaxcbX-_.js                 0.12 kB │ gzip:   0.13 kB
+dist-web/assets/percentages-BXMCSKIN-BOySKFe0.js              0.12 kB │ gzip:   0.12 kB
+dist-web/assets/railroad-peg-WCYAUIDC-BpaUnb0S.js             0.13 kB │ gzip:   0.13 kB
+dist-web/assets/architecture-7GRP2DOG-DNxXk0i1.js             0.13 kB │ gzip:   0.13 kB
+dist-web/assets/railroad-abnf-HS5TGJTU-ggSD4qJs.js            0.13 kB │ gzip:   0.13 kB
+dist-web/assets/railroad-ebnf-LZEXJU2U-OV9jcvg4.js            0.13 kB │ gzip:   0.13 kB
+dist-web/assets/eventmodeling-NTZA5JFV-DvV2vmj8.js            0.13 kB │ gzip:   0.13 kB
+dist-web/assets/image-GAAHSSAO-BGTrRRQB.js                    0.13 kB │ gzip:   0.12 kB
+dist-web/assets/init-D6jRqBbL.js                              0.14 kB │ gzip:   0.12 kB
+dist-web/assets/chunk-Y2CYZVJY-DsF7k-Jl.js                    0.15 kB │ gzip:   0.14 kB
+dist-web/assets/subset-shared.chunk-8ffLbVba.js               0.18 kB │ gzip:   0.15 kB
+dist-web/assets/chunk-2Q5K7J3B-C1jixKkw.js                    0.19 kB │ gzip:   0.16 kB
+dist-web/assets/chunk-JWPE2WC7-DVXcaiue.js                    0.22 kB │ gzip:   0.17 kB
+dist-web/assets/chunk-XXDRQBXY-Dhe9IIJx.js                    0.26 kB │ gzip:   0.22 kB
+dist-web/assets/chunk-CLGD4ZFX-GRFufWFE.js                    0.32 kB │ gzip:   0.25 kB
+dist-web/assets/chunk-5VM5RSS4-ZNzvKenW.js                    0.36 kB │ gzip:   0.27 kB
+dist-web/assets/subset-worker.chunk-DKphdDbI.js               0.36 kB │ gzip:   0.28 kB
+dist-web/assets/file-open-7c801643-DZtJT5zp.js                0.44 kB │ gzip:   0.31 kB
+dist-web/assets/file-open-002ab408-BHUWm0Sh.js                0.52 kB │ gzip:   0.32 kB
+dist-web/assets/chunk-POPQ4Y6H-B1m2cOrv.js                    0.57 kB │ gzip:   0.40 kB
+dist-web/assets/directory-open-01563666-D4xXyWb_.js           0.58 kB │ gzip:   0.36 kB
+dist-web/assets/chunk-SRAX5OIU-AdWUEMd-.js                    0.59 kB │ gzip:   0.39 kB
+dist-web/assets/flowDiagram-HODETNUW-Cj3GnPBM.js              0.61 kB │ gzip:   0.32 kB
+dist-web/assets/infoDiagram-27XIBGKW-BhTTC0qB.js              0.65 kB │ gzip:   0.42 kB
+dist-web/assets/file-save-3189631c-CO9S4HFW.js                0.69 kB │ gzip:   0.44 kB
+dist-web/assets/classDiagram-ZZMXUADV-CGVQ_XSA.js             0.78 kB │ gzip:   0.44 kB
+dist-web/assets/classDiagram-v2-VYDZK3BY-CGVQ_XSA.js          0.78 kB │ gzip:   0.44 kB
+dist-web/assets/stateDiagram-v2-MP3YSRHH-CaphKJLD.js          0.78 kB │ gzip:   0.44 kB
+dist-web/assets/file-save-745eba88-Bwdfz6OZ.js                0.85 kB │ gzip:   0.49 kB
+dist-web/assets/swimlanesDiagram-VR7AAH4N-C9pYujGO.js         0.87 kB │ gzip:   0.49 kB
+dist-web/assets/sizeCapture-INFHLROL-B0uUizjq.js              0.87 kB │ gzip:   0.51 kB
+dist-web/assets/en-B4ZKOASM-DrukTy91.js                       0.89 kB │ gzip:   0.48 kB
+dist-web/assets/line-CdbfM002.js                              0.94 kB │ gzip:   0.47 kB
+dist-web/assets/ordinal-hYBb2elL.js                           1.17 kB │ gzip:   0.56 kB
+dist-web/assets/rolldown-runtime-CMxvf4Kt.js                  1.21 kB │ gzip:   0.67 kB
+dist-web/assets/chunk-GVQU2GXP-DPoeYyI_.js                    1.42 kB │ gzip:   0.79 kB
+dist-web/assets/directory-open-4ed118d0-1i309Asm.js           1.51 kB │ gzip:   0.76 kB
+dist-web/assets/chunk-ZUYEQ4TG-BzFOpW--.js                    1.57 kB │ gzip:   0.88 kB
+dist-web/assets/railroadDiagram-O6MQD6OU-1_XVqi8w.js          1.67 kB │ gzip:   0.77 kB
+dist-web/assets/abnfDiagram-VCTEODGH-DjjF-nKG.js              1.85 kB │ gzip:   0.90 kB
+dist-web/assets/chunk-P2QGCYS3-RwibUVX0.js                    1.94 kB │ gzip:   0.95 kB
+dist-web/assets/chunk-F27PBJKO-CuLAgfoR.js                    1.97 kB │ gzip:   0.88 kB
+dist-web/assets/pegDiagram-XKGWAZYB-CCrwvbKt.js               2.01 kB │ gzip:   0.94 kB
+dist-web/assets/ebnfDiagram-PWID7BFC-DNksrh6B.js              2.07 kB │ gzip:   0.89 kB
+dist-web/assets/dist-BbbXugLZ.js                              2.17 kB │ gzip:   0.97 kB
+dist-web/assets/path-BWPyau1x.js                              2.31 kB │ gzip:   0.99 kB
+dist-web/assets/roundRect-D01gJrlt.js                         2.87 kB │ gzip:   0.99 kB
+dist-web/assets/arc-D7FHHNNA.js                               3.47 kB │ gzip:   1.46 kB
+dist-web/assets/chunk-TLUHSLCS-BDVD2MIp.js                    3.89 kB │ gzip:   1.61 kB
+dist-web/assets/diagram-Z3DM3KII-DEdYm1qB.js                  4.28 kB │ gzip:   1.85 kB
+dist-web/assets/defaultLocale-C8Fc0cco.js                     4.64 kB │ gzip:   2.12 kB
+dist-web/assets/ci-info-Dge2IFBw.js                           5.26 kB │ gzip:   1.98 kB
+dist-web/assets/background-C5sUnUMH.js                        5.38 kB │ gzip:   2.43 kB
+dist-web/assets/scene-CAlj8RoD.js                             5.44 kB │ gzip:   2.65 kB
+dist-web/assets/linear-xRFGdGcy.js                            5.52 kB │ gzip:   2.25 kB
+dist-web/assets/chunk-PWAF6VOD-CDDoyyr1.js                    5.82 kB │ gzip:   2.68 kB
+dist-web/assets/diagram-UQ7AKVKN-BSmGKyXS.js                  6.06 kB │ gzip:   2.56 kB
+dist-web/assets/pieDiagram-E7YTZNPT-B7LEeWTz.js               6.23 kB │ gzip:   2.60 kB
+dist-web/assets/diagram-S7CK7UJ4-CzeiOXAT.js                  8.19 kB │ gzip:   3.66 kB
+dist-web/assets/si-LK-N5RQ5JYF-DtK41A4E.js                    8.58 kB │ gzip:   3.36 kB
+dist-web/assets/az-AZ-76LH7QW2-BbLyjEjz.js                    8.61 kB │ gzip:   3.59 kB
+dist-web/assets/zh-HK-E62DVLB3-lkHC38JQ.js                    9.08 kB │ gzip:   4.09 kB
+dist-web/assets/chunk-L3NEJ4N5-DDUW1uUm.js                    9.71 kB │ gzip:   2.93 kB
+dist-web/assets/cynefinDiagram-5FMLGOSQ-CjJ_2gE_.js           9.90 kB │ gzip:   3.51 kB
+dist-web/assets/kk-KZ-P5N5QNE5-0EHSg0OI.js                   10.12 kB │ gzip:   4.19 kB
+dist-web/assets/kaa-6HZHGXH3-C_2dCsqb.js                     10.17 kB │ gzip:   4.18 kB
+dist-web/assets/chunk-2E4U76K2-BX5TYoNQ.js                   10.38 kB │ gzip:   4.15 kB
+dist-web/assets/stateDiagram-D77RDMKH-CPi3sNWl.js            10.64 kB │ gzip:   3.73 kB
+dist-web/assets/diagram-VSXAHHWV-BlHBtQRq.js                 10.66 kB │ gzip:   4.12 kB
+dist-web/assets/dagre-GXQ25YYZ-Cvde-X-a.js                   10.96 kB │ gzip:   4.14 kB
+dist-web/assets/lt-LT-XHIRWOB4-DAK1PwUN.js                   12.50 kB │ gzip:   5.37 kB
+dist-web/assets/DrawingEditor-Bzh-jy14.js                    12.97 kB │ gzip:   4.78 kB
+dist-web/assets/vi-VN-M7AON7JQ-D3HK5KbQ.js                   13.86 kB │ gzip:   5.79 kB
+dist-web/assets/da-DK-5WZEPLOC-DEHOar9h.js                   14.41 kB │ gzip:   6.07 kB
+dist-web/assets/th-TH-HPSO5L25-CLAA-dkL.js                   15.52 kB │ gzip:   5.18 kB
+dist-web/assets/chunk-SVP7TREG-KE-yicHQ.js                   15.64 kB │ gzip:   4.35 kB
+dist-web/assets/diagram-VX7I27RA-7JCazCcW.js                 15.74 kB │ gzip:   5.51 kB
+dist-web/assets/nn-NO-6E72VCQL-DMAzg9ZX.js                   15.95 kB │ gzip:   6.72 kB
+dist-web/assets/mermaid-parser.core-Bc31ZoRQ.js              16.58 kB │ gzip:   3.92 kB
+dist-web/assets/nl-NL-IS3SIHDZ-CgN_a8BX.js                   16.73 kB │ gzip:   6.92 kB
+dist-web/assets/ishikawaDiagram-5VMMS53U-tQDOf2ud.js         17.34 kB │ gzip:   6.53 kB
+dist-web/assets/my-MM-5M5IBNSE-39K5Qemi.js                   17.57 kB │ gzip:   5.29 kB
+dist-web/assets/hu-HU-A5ZG7DT2-DI5Z95_i.js                   18.08 kB │ gzip:   7.58 kB
+dist-web/assets/fi-FI-Z5N7JZ37-OPz8Auwv.js                   18.40 kB │ gzip:   7.53 kB
+dist-web/assets/kab-KAB-ZGHBKWFO-Bvty9izM.js                 18.78 kB │ gzip:   7.55 kB
+dist-web/assets/zh-TW-RAJ6MFWO-DR0BcaFu.js                   18.99 kB │ gzip:   8.86 kB
+dist-web/assets/zh-CN-LNUGB5OW-BZsMiBBt.js                   19.05 kB │ gzip:   8.87 kB
+dist-web/assets/lv-LV-5QDEKY6T-GOJOU6oG.js                   19.14 kB │ gzip:   7.79 kB
+dist-web/assets/gl-ES-HMX3MZ6V-B-GNhJih.js                   19.39 kB │ gzip:   7.73 kB
+dist-web/assets/tr-TR-DEFEU3FU-BycHri4c.js                   19.51 kB │ gzip:   7.96 kB
+dist-web/assets/cs-CZ-2BRQDIVT-l8AJFzBj.js                   19.52 kB │ gzip:   8.40 kB
+dist-web/assets/pt-PT-UZXXM6DQ-CRZmSWx4.js                   19.65 kB │ gzip:   7.79 kB
+dist-web/assets/id-ID-SAP4L64H-DA3Nvgp0.js                   19.68 kB │ gzip:   7.68 kB
+dist-web/assets/ca-ES-6MX7JW3Y-Bjtbkclg.js                   19.79 kB │ gzip:   7.90 kB
+dist-web/assets/oc-FR-POXYY2M6-25meyKIh.js                   19.84 kB │ gzip:   7.79 kB
+dist-web/assets/nb-NO-T6EIAALU-DQEAARbM.js                   20.10 kB │ gzip:   8.19 kB
+dist-web/assets/he-IL-6SHJWFNN-3XM2LTJK.js                   20.32 kB │ gzip:   7.54 kB
+dist-web/assets/kanban-definition-UXKFOSKX-6X-IhpJv.js       20.35 kB │ gzip:   7.18 kB
+dist-web/assets/bg-BG-XCXSNQG7-C-ktnVcI.js                   20.76 kB │ gzip:   7.39 kB
+dist-web/assets/pt-BR-5N22H2LF-Cq18yZOg.js                   21.04 kB │ gzip:   8.21 kB
+dist-web/assets/eu-ES-A7QVB2H4-BAOXQiPA.js                   21.20 kB │ gzip:   8.22 kB
+dist-web/assets/es-ES-U4NZUMDT-CZ3DL0OI.js                   21.35 kB │ gzip:   8.49 kB
+dist-web/assets/sl-SI-NN7IZMDC-BfgQWpCi.js                   21.36 kB │ gzip:   8.59 kB
+dist-web/assets/sv-SE-XGPEYMSR-CoCrOqHQ.js                   21.51 kB │ gzip:   8.56 kB
+dist-web/assets/it-IT-JPQ66NNP-psbp-5eW.js                   22.06 kB │ gzip:   8.58 kB
+dist-web/assets/sk-SK-C5VTKIMK-I3d9-T-c.js                   22.31 kB │ gzip:   9.11 kB
+dist-web/assets/pl-PL-T2D74RX3-UK2IgX3b.js                   22.50 kB │ gzip:   9.23 kB
+dist-web/assets/sankeyDiagram-P5KCCOFB-Dvs8NlPp.js           22.82 kB │ gzip:   8.26 kB
+dist-web/assets/ro-RO-JPDTUUEW-QLbSjh1c.js                   23.15 kB │ gzip:   8.94 kB
+dist-web/assets/journeyDiagram-3NMN7TZE-Dcnbg9tj.js          23.20 kB │ gzip:   8.18 kB
+dist-web/assets/de-DE-XR44H4JA-Ci5wZEjy.js                   23.34 kB │ gzip:   8.97 kB
+dist-web/assets/ja-JP-DBVTYXUO-DeMZiRB9.js                   23.40 kB │ gzip:   8.79 kB
+dist-web/assets/fr-FR-RHASNOE6-kyc5ZZO4.js                   23.45 kB │ gzip:   8.87 kB
+dist-web/assets/mindmap-definition-YA3MSWOX-XUS_DQyZ.js      23.49 kB │ gzip:   8.03 kB
+dist-web/assets/bn-BD-2XOGV67Q-BDI13zXB.js                   23.60 kB │ gzip:   6.68 kB
+dist-web/assets/ko-KR-MTYHY66A-DhXbND6K.js                   23.88 kB │ gzip:   9.18 kB
+dist-web/assets/graphlib-B8gBHxth.js                         23.90 kB │ gzip:   8.31 kB
+dist-web/assets/fa-IR-HGAKTJCU-C7h9wWAE.js                   24.24 kB │ gzip:   8.44 kB
+dist-web/assets/wardleyDiagram-VM6X3IG4-DfE4aYAB.js          25.22 kB │ gzip:   6.55 kB
+dist-web/assets/ar-SA-G6X2FPQ2-Dswg5V1j.js                   25.67 kB │ gzip:   9.11 kB
+dist-web/assets/rough.esm-CSKSodPl.js                        27.10 kB │ gzip:   8.85 kB
+dist-web/assets/pa-IN-N4M65BXN-UneOtDL0.js                   27.98 kB │ gzip:   7.98 kB
+dist-web/assets/gitGraphDiagram-WWUBYQGX-BfirX-MN.js         29.01 kB │ gzip:   8.57 kB
+dist-web/assets/ku-TR-6OUDTVRD-gAHbryot.js                   29.32 kB │ gzip:   9.27 kB
+dist-web/assets/el-GR-BZB4AONW-CPnyIO0V.js                   29.67 kB │ gzip:   9.60 kB
+dist-web/assets/timeline-definition-24CTP7MA-B4X31YIU.js     30.42 kB │ gzip:   9.98 kB
+dist-web/assets/erDiagram-RLTQ6QDP-Do5SDZ0y.js               30.72 kB │ gzip:  10.57 kB
+dist-web/assets/ru-RU-B4JR7IUQ-C9LPQCoV.js                   30.74 kB │ gzip:   9.86 kB
+dist-web/assets/chunk-75Z2AOVW-rXmtoRSw.js                   30.87 kB │ gzip:   8.51 kB
+dist-web/assets/requirementDiagram-BXWQKSXE-v7ImXhj_.js      31.03 kB │ gzip:   9.79 kB
+dist-web/assets/uk-UA-QMV73CPH-BT8ACd-e.js                   31.64 kB │ gzip:  10.11 kB
+dist-web/assets/models-BOdEb6B5.js                           32.05 kB │ gzip:  10.55 kB
+dist-web/assets/pica-De6Atz67.js                             32.09 kB │ gzip:  12.54 kB
+dist-web/assets/hi-IN-IWLTKZ5I-ClkAnvLj.js                   32.35 kB │ gzip:   9.08 kB
+dist-web/assets/quadrantDiagram-AXDQQJYC-DT4QMaw7.js         33.54 kB │ gzip:   9.74 kB
+dist-web/assets/ta-IN-2NMHFXQM-CZa3q2Qt.js                   35.27 kB │ gzip:   8.50 kB
+dist-web/assets/chunk-OSK3NFVY-CyNugJh7.js                   36.46 kB │ gzip:   7.95 kB
+dist-web/assets/km-KH-HSX4SM5Z--HawwT8C.js                   36.65 kB │ gzip:   9.21 kB
+dist-web/assets/dagre-BJJUWK_n.js                            36.85 kB │ gzip:  13.22 kB
+dist-web/assets/chunk-IMKFNOWR-BTVKCeRy.js                   37.71 kB │ gzip:  12.29 kB
+dist-web/assets/vennDiagram-4TSXK5OY-BKh1-pEU.js             41.19 kB │ gzip:  15.11 kB
+dist-web/assets/blockDiagram-I7D4REHJ-B-aJA2cE.js            41.46 kB │ gzip:  13.34 kB
+dist-web/assets/mr-IN-CRQNXWMA-IxAZai66.js                   42.25 kB │ gzip:  10.67 kB
+dist-web/assets/xychartDiagram-S5SC5T6Z-DTO0TDci.js          44.19 kB │ gzip:  12.22 kB
+dist-web/assets/image-blob-reduce.esm-NzmDxm1v.js            45.46 kB │ gzip:  16.31 kB
+dist-web/assets/src-Bf2iXulb.js                              45.73 kB │ gzip:  16.03 kB
+dist-web/assets/chunk-LNGE3PJU-OosUmKKA.js                   46.39 kB │ gzip:  15.54 kB
+dist-web/assets/query-CNBAldPa.js                            47.63 kB │ gzip:  14.37 kB
+dist-web/assets/chunk-TICWLB2K-BdQHCuTt.js                   48.85 kB │ gzip:  15.76 kB
+dist-web/assets/chunk-GMAD6QVW-DW-5UIGn.js                   51.88 kB │ gzip:  16.69 kB
+dist-web/assets/model-BHstwcKd.js                            54.27 kB │ gzip:  18.46 kB
+dist-web/assets/chunk-SHT3W25Y-DsBYKq9E.js                   61.29 kB │ gzip:  19.84 kB
+dist-web/assets/c4Diagram-7LVT6UL2-C9DAP8C3.js               64.76 kB │ gzip:  18.54 kB
+dist-web/assets/ganttDiagram-EL5Y4UJY-CdGo0kWC.js            69.43 kB │ gzip:  22.77 kB
+dist-web/assets/radix-DRUU4_7D.js                            71.15 kB │ gzip:  24.60 kB
+dist-web/assets/zod-DmVkHjaJ.js                              76.79 kB │ gzip:  20.41 kB
+dist-web/assets/cose-bilkent-JH36ORCC-WrFpK_JA.js            81.44 kB │ gzip:  21.59 kB
+dist-web/assets/dist-DyHxO_7O.js                             88.72 kB │ gzip:  29.22 kB
+dist-web/assets/chunk-4HAMMTFA-VwdX7uGT.js                  104.85 kB │ gzip:  25.62 kB
+dist-web/assets/swimlanes-42K2YHIH-DJaiIpLe.js              111.16 kB │ gzip:  38.01 kB
+dist-web/assets/sequenceDiagram-WJ2MYXX4-BE-zrw6T.js        115.86 kB │ gzip:  30.62 kB
+dist-web/assets/architectureDiagram-5GKGNRK7-BOtd379r.js    149.33 kB │ gzip:  41.21 kB
+dist-web/assets/react-B9vwscPL.js                           178.34 kB │ gzip:  56.34 kB
+dist-web/assets/chunk-DU6HZSFF-BCN0_eVV.js                  236.88 kB │ gzip:  38.68 kB
+dist-web/assets/katex-Vhh-h91d.js                           258.88 kB │ gzip:  77.46 kB
+dist-web/assets/cytoscape.esm-dytuJj4e.js                   435.57 kB │ gzip: 137.96 kB
+dist-web/assets/three.module-CnRGkjOu.js                    557.33 kB │ gzip: 138.89 kB
+dist-web/assets/chunk-FOHPRMQF-Crrb2Aik.js                  662.67 kB │ gzip: 143.23 kB
+dist-web/assets/prod-BiGoKdjl.js                          1,055.38 kB │ gzip: 336.18 kB
+dist-web/assets/index-Df9KBhlJ.js                         1,428.44 kB │ gzip: 412.23 kB
+dist-web/assets/chunk-EIO257PC-DSYCGNLj.js                1,821.04 kB │ gzip: 744.22 kB
+
+✓ built in 846ms
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.

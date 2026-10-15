@@ -14,6 +14,7 @@ const route = {
 const settings = {
 	revision: 1,
 	codingSupervision: { approveInstructions: true },
+	world: { enabled: false, curationResourceId: null },
 	larm: {
 		baseUrl: "http://127.0.0.1:9000",
 		profile: "default",

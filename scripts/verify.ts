@@ -3,9 +3,7 @@ import {
 	constants,
 	mkdirSync,
 	openSync,
-	readdirSync,
 	rmSync,
-	statSync,
 	writeFileSync,
 } from "node:fs";
 import { join, resolve } from "node:path";
@@ -15,235 +13,263 @@ import {
 	checkBoundaries,
 	unusedDependencies,
 } from "./boundaries";
-import { closure, type Domain, domains, isDomain, ownedPaths } from "./domains";
-import { verificationRevision } from "./verification-inputs";
+import { closure } from "./domains";
+import { testInventory } from "./test-inventory";
+import {
+	createReport,
+	distRevision,
+	executeVerification,
+	type VerificationReport,
+	type VerificationStep,
+} from "./verification-run";
+import {
+	groupTests,
+	parseSelection,
+	selectionPaths,
+	sourceFiles,
+	testCommand,
+	testPattern,
+	type TestRunner,
+} from "./verification-selection";
 
-const args = process.argv.slice(2).filter((x) => x !== "--");
-const all = args.includes("--all");
-const index = args.indexOf("--domain");
-const requested = index >= 0 ? args[index + 1] : undefined;
-if (args.includes("--affected")) {
-	console.error("--affected is planned after MVP; select --domain or --all");
-	process.exit(2);
-}
-if ((!all && !requested) || (requested && !isDomain(requested))) {
-	console.error(`Use --domain <${Object.keys(domains).join("|")}> or --all`);
-	process.exit(2);
-}
-const selected = all
-	? (Object.keys(domains) as Domain[])
-	: [requested as Domain];
-const root = resolve(import.meta.dir, "..");
-const reports = join(root, "verification-reports");
-mkdirSync(reports, { recursive: true });
-const fd = openSync(
-	join(reports, "verify.lock"),
-	constants.O_CREAT | constants.O_RDWR,
-	0o600,
-);
-if (flock(fd, 6) !== 0) {
-	console.error("Another verification is running");
-	closeSync(fd);
-	process.exit(3);
-}
-function files(path: string): string[] {
-	try {
-		return readdirSync(path).flatMap((name) => {
-			if (
-				[
-					"node_modules",
-					"dist-web",
-					"verification-reports",
-					".git",
-					"test-results",
-					"playwright-report",
-				].includes(name)
-			)
-				return [];
-			const file = join(path, name);
-			return statSync(file).isDirectory() ? files(file) : [file];
-		});
-	} catch {
-		return [];
-	}
-}
-const startHash = verificationRevision(root);
-const started = performance.now();
-const steps: Array<{ name: string; ms: number; result: string }> = [];
-async function run(name: string, command: string[]) {
-	const start = performance.now();
-	console.log(`[verify] ${name}: ${command.join(" ")}`);
-	const child = Bun.spawn(command, {
-		cwd: root,
-		stdout: "inherit",
-		stderr: "inherit",
+export function verificationPlan(
+	root: string,
+	directory: string,
+	report: VerificationReport,
+): VerificationStep[] {
+	const { all, selected } = report.scope;
+	const selection = parseSelection(
+		all ? ["--all"] : selected.flatMap((domain) => ["--domain", domain]),
+	);
+	const paths = selectionPaths(selection.selected);
+	const tsFiles = [
+		...new Set(paths.flatMap((path) => sourceFiles(root, path))),
+	].filter((path) => /\.tsx?$/.test(path));
+	const checkPaths = all ? ["."] : paths;
+	const plan: VerificationStep[] = [];
+	const command = (name: string, args: string[]) =>
+		plan.push({ name, command: [process.execPath, ...args] });
+	plan.push({
+		name: "inventory",
+		action() {
+			const inventory = testInventory(root);
+			writeFileSync(
+				join(directory, "inventory.json"),
+				JSON.stringify(inventory, null, 2) + "\n",
+			);
+		},
 	});
-	const code = await child.exited;
-	steps.push({
-		name,
-		ms: Math.round(performance.now() - start),
-		result: code === 0 ? "pass" : `exit ${code}`,
+	plan.push({
+		name: "boundaries",
+		action() {
+			const files = all
+				? [
+						"api",
+						"web/src",
+						"client",
+						"cli",
+						"packages/artifact-ui/src",
+						"packages/coding-runner/src",
+						"packages/coding-runner/test",
+					].flatMap((path) => sourceFiles(root, path))
+				: tsFiles;
+			const errors = checkBoundaries(
+				files.filter((path) => /\.tsx?$/.test(path)),
+			);
+			if (all) errors.push(...unusedDependencies(allSourceFiles()));
+			if (errors.length) throw new Error(errors.join("\n"));
+		},
 	});
-	if (code !== 0) throw new Error(`${name} failed (${code})`);
-}
-try {
-	const paths = [...new Set(selected.flatMap(ownedPaths))].map((path) =>
-		resolve(root, path),
-	);
-	const tsFiles = paths.flatMap(files).filter((file) => /\.tsx?$/.test(file));
-	const errors = checkBoundaries(
-		(all
-			? files(join(root, "api")).concat(
-					files(join(root, "web/src")),
-					files(join(root, "client")),
-					files(join(root, "cli")),
-					files(join(root, "packages/artifact-ui/src")),
-					files(join(root, "packages/coding-runner/src")),
-					files(join(root, "packages/coding-runner/test")),
-				)
-			: tsFiles
-		)
-			.filter((file) => /\.tsx?$/.test(file))
-			.map((file) => file.slice(root.length + 1)),
-	);
-	if (all) {
-		// Declared-but-unused dependencies need the whole tree to be decidable.
-		errors.push(...unusedDependencies(allSourceFiles()));
-	}
-	if (errors.length) throw new Error(errors.join("\n"));
-	// Typecheck needs the production closure (api + web); tests add the test-only edges.
-	const dependencySet = [
-		...new Set(
-			selected.flatMap((d) => [...closure(d, "api"), ...closure(d, "web")]),
-		),
-	];
-	const testDependencySet = [
-		...new Set(selected.flatMap((d) => closure(d, "test"))),
-	];
-	console.log(
-		`[verify] selected=${selected.join(",")} dependencyClosure=${dependencySet.join(",")} testClosure=${testDependencySet.join(",")}`,
-	);
-	const checkPaths = all
-		? ["."]
-		: paths.map((path) => path.slice(root.length + 1));
-	await run("size-budget", [
-		process.execPath,
+	command("size-budget", [
 		"scripts/size-budget.ts",
 		...(all ? [] : checkPaths),
 	]);
-	if (all)
-		await run("sql-boundaries", [
+	if (all) {
+		command("sql-boundaries", ["scripts/sql-boundaries.ts"]);
+		command("domain-docs", ["scripts/domain-docs.ts", "--check"]);
+	}
+	command("format", ["run", "format:check", ...checkPaths]);
+	command("lint", ["run", "lint", ...checkPaths]);
+	// Regular check includes stories/tests; build's tsconfig deliberately excludes them.
+	command("design-system typecheck", [
+		"run",
+		"--cwd",
+		"packages/design-system",
+		"typecheck",
+	]);
+	plan.push({
+		name: "design-system build",
+		command: [
 			process.execPath,
-			"scripts/sql-boundaries.ts",
-		]);
-	if (all)
-		await run("domain-docs", [
-			process.execPath,
-			"scripts/domain-docs.ts",
-			"--check",
-		]);
-	await run("format", [process.execPath, "run", "format:check", ...checkPaths]);
-	await run("lint", [process.execPath, "run", "lint", ...checkPaths]);
-	if (all) await run("typecheck", [process.execPath, "run", "typecheck"]);
+			"run",
+			"--cwd",
+			"packages/design-system",
+			"build",
+		],
+		action() {
+			report.build.inputRevision = report.revision;
+			report.build.distAfterBuild = distRevision(
+				join(root, "packages/design-system/dist"),
+			);
+		},
+	});
+	if (all) command("typecheck", ["run", "typecheck"]);
 	else {
-		const config = join(reports, "tsconfig.selected.json");
+		const config = join(directory, "tsconfig.selected.json");
+		plan.push({
+			name: "typecheck configuration",
+			action() {
+				writeFileSync(
+					config,
+					JSON.stringify(
+						{
+							extends: join(root, "tsconfig.json"),
+							include: tsFiles
+								.filter((path) => !path.startsWith("packages/design-system/"))
+								.map((path) => join(root, path)),
+							compilerOptions: { noEmit: true },
+						},
+						null,
+						2,
+					),
+				);
+			},
+		});
+		command("typecheck", ["check", "-p", config]);
+		plan.push({
+			name: "typecheck closure",
+			action() {
+				const list = Bun.spawnSync(
+					[process.execPath, "check", "-p", config, "--listFilesOnly"],
+					{ cwd: root },
+				);
+				if (list.exitCode !== 0)
+					throw new Error(`typecheck file listing failed (${list.exitCode})`);
+				const used = list.stdout
+					.toString()
+					.split("\n")
+					.filter(
+						(file) => file.startsWith(root) && !file.includes("node_modules/"),
+					)
+					.map((file) => file.slice(root.length + 1));
+				writeFileSync(
+					join(directory, "typecheck-files.json"),
+					JSON.stringify(used, null, 2),
+				);
+				console.log(
+					`[verify] TypeScript workspace closure: ${used.length} files`,
+				);
+			},
+		});
+	}
+	const tests = all
+		? sourceFiles(root, "").filter(
+				(path) =>
+					testPattern.test(path) &&
+					!path.startsWith("spec/verification/") &&
+					!path.startsWith("tests/browser/") &&
+					path !== "tests/acceptance/nl/driver.test.ts",
+			)
+		: paths
+				.flatMap((path) => sourceFiles(root, path))
+				.filter((path) => testPattern.test(path));
+	const groups = groupTests(tests);
+	if (!tests.length)
+		plan.push({
+			name: "tests",
+			action() {
+				throw new Error("No tests selected");
+			},
+		});
+	for (const runner of Object.keys(groups) as TestRunner[]) {
+		if (groups[runner].length)
+			plan.push({
+				name: `${runner} tests`,
+				command: testCommand(runner, groups[runner]),
+			});
+	}
+	// DS was already built before every consumer; do not rebuild shared dist here.
+	if (all) command("web build", ["x", "--no-install", "vite", "build"]);
+	return plan;
+}
+
+if (import.meta.main) {
+	let selection: ReturnType<typeof parseSelection>;
+	try {
+		selection = parseSelection(process.argv.slice(2));
+	} catch (error) {
+		console.error(String(error));
+		process.exit(2);
+	}
+	const root = resolve(import.meta.dir, "..");
+	const reports = join(root, "verification-reports");
+	mkdirSync(reports, { recursive: true });
+	const fd = openSync(
+		join(reports, "verify.lock"),
+		constants.O_CREAT | constants.O_RDWR,
+		0o600,
+	);
+	if (flock(fd, 6) !== 0) {
+		console.error("Another verification is running");
+		closeSync(fd);
+		process.exit(3);
+	}
+	let directory: string | undefined;
+	try {
+		const report = createReport(root, {
+			all: selection.all,
+			selected: selection.selected,
+		});
+		directory = join(reports, "runs", report.runId);
+		mkdirSync(directory, { recursive: true });
+		const dependencySet = [
+			...new Set(
+				selection.selected.flatMap((domain) => [
+					...closure(domain, "api"),
+					...closure(domain, "web"),
+				]),
+			),
+		];
+		const testDependencySet = [
+			...new Set(
+				selection.selected.flatMap((domain) => closure(domain, "test")),
+			),
+		];
 		writeFileSync(
-			config,
+			join(directory, "selection.json"),
 			JSON.stringify(
-				{
-					extends: "../tsconfig.json",
-					include: tsFiles
-						.map((file) => file.slice(root.length + 1))
-						.map((file) => `../${file}`),
-					compilerOptions: { noEmit: true },
-				},
+				{ selected: selection.selected, dependencySet, testDependencySet },
 				null,
 				2,
 			),
 		);
-		await run("typecheck", [process.execPath, "check", "-p", config]);
-		const list = Bun.spawnSync(
-			[process.execPath, "check", "-p", config, "--listFilesOnly"],
-			{ cwd: root },
-		);
-		if (list.exitCode !== 0)
-			throw new Error(`typecheck file listing failed (${list.exitCode})`);
-		const used = list.stdout
-			.toString()
-			.split("\n")
-			.filter((x) => x.startsWith(root) && !x.includes("node_modules/"))
-			.map((x) => x.slice(root.length + 1));
 		console.log(
-			`[verify] TypeScript workspace closure: ${used.length} files; ${[...new Set(used.map((x) => x.split("/").slice(0, 3).join("/")))].join(", ")}`,
+			`[verify] selected=${selection.selected.join(",")} dependencyClosure=${dependencySet.join(",")}`,
 		);
-		rmSync(config);
+		console.log(
+			"[verify] Shared DesignSystem dist: do not overlap dev, browser tests or other builds; endpoint hashes cannot detect change-and-restore.",
+		);
+		let plan: VerificationStep[];
+		try {
+			plan = verificationPlan(root, directory, report);
+		} catch (error) {
+			plan = [
+				{
+					name: "plan",
+					action() {
+						throw error;
+					},
+				},
+			];
+		}
+		process.exitCode = await executeVerification(root, reports, report, plan);
+	} catch (error) {
+		console.error(error);
+		process.exitCode = 1;
+	} finally {
+		if (directory)
+			rmSync(join(directory, "tsconfig.selected.json"), { force: true });
+		flock(fd, 8);
+		closeSync(fd);
 	}
-	if (all) {
-		await run("tests", [
-			process.execPath,
-			"test",
-			"api",
-			"packages/coding-runner/test",
-			"packages/dots-mcp/test",
-			"scripts",
-		]);
-		await run("web tests", [process.execPath, "x", "vitest", "run", "web"]);
-		await run("client tests", [
-			process.execPath,
-			"x",
-			"vitest",
-			"run",
-			"client",
-		]);
-		await run("design-system typecheck", [
-			process.execPath,
-			"run",
-			"--cwd",
-			"packages/design-system",
-			"typecheck",
-		]);
-		await run("design-system tests", [
-			process.execPath,
-			"run",
-			"--cwd",
-			"packages/design-system",
-			"test",
-		]);
-		await run("web build", [process.execPath, "run", "build:web"]);
-	} else
-		await run("domain tests", [
-			process.execPath,
-			"run",
-			"test:domain",
-			"--",
-			selected[0] ?? "",
-		]);
-	if (verificationRevision(root) !== startHash)
-		throw new Error("source changed during verification");
-	const report = {
-		selected,
-		dependencySet,
-		testDependencySet,
-		revision: startHash,
-		steps,
-		totalMs: Math.round(performance.now() - started),
-		result: "pass",
-	};
-	writeFileSync(join(reports, "latest.json"), JSON.stringify(report, null, 2));
-	console.log(`[verify] passed ${report.totalMs} ms`);
-} catch (error) {
-	const report = {
-		selected,
-		revision: startHash,
-		steps,
-		totalMs: Math.round(performance.now() - started),
-		result: "fail",
-		error: String(error),
-	};
-	writeFileSync(join(reports, "latest.json"), JSON.stringify(report, null, 2));
-	console.error(error);
-	process.exitCode = 1;
-} finally {
-	flock(fd, 8);
-	closeSync(fd);
 }
