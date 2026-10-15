@@ -101,4 +101,32 @@ export const migrations: readonly Migration[] = [
 		sql: "ALTER TABLE inference_requests ADD COLUMN structured_output INTEGER NOT NULL DEFAULT 0 CHECK(structured_output IN (0,1));",
 		after: ["inference/0007-control-policy-binding"],
 	},
+	{
+		// Per call: the session lifetime it ran with, the task it belongs to, the billing path and agent session it used,
+		// the references (conversation message ids, memory item ids) an agent attempt was built from, and the prompt-cache usage and cost the provider reported.
+		id: "inference/0009-agent-sessions",
+		after: ["inference/0008-structured-output"],
+		sql: `ALTER TABLE inference_attempts ADD COLUMN session_role TEXT CHECK(session_role IN ('main','subagent','auxiliary'));
+ALTER TABLE inference_attempts ADD COLUMN task_id TEXT;
+ALTER TABLE inference_attempts ADD COLUMN billing_path TEXT;
+ALTER TABLE inference_attempts ADD COLUMN agent_session_id TEXT;
+ALTER TABLE inference_attempts ADD COLUMN cache_read_tokens INTEGER;
+ALTER TABLE inference_attempts ADD COLUMN cache_creation_tokens INTEGER;
+ALTER TABLE inference_attempts ADD COLUMN cost_usd REAL;
+ALTER TABLE inference_attempts ADD COLUMN refs TEXT;
+CREATE TABLE inference_agent_sessions (
+	id TEXT PRIMARY KEY,
+	role TEXT NOT NULL CHECK(role IN ('main','subagent')),
+	task_id TEXT,
+	connection_id TEXT NOT NULL,
+	auth TEXT NOT NULL CHECK(auth IN ('subscription','api-key')),
+	model TEXT NOT NULL,
+	learned_context_window INTEGER,
+	created INTEGER NOT NULL,
+	updated INTEGER NOT NULL
+);
+CREATE UNIQUE INDEX inference_agent_sessions_main ON inference_agent_sessions(connection_id, auth, model) WHERE role='main';
+CREATE UNIQUE INDEX inference_agent_sessions_task ON inference_agent_sessions(task_id, connection_id, auth, model) WHERE role='subagent';
+CREATE INDEX inference_attempts_revocable ON inference_attempts(status, request_id) WHERE refs IS NOT NULL AND accepted=0;`,
+	},
 ];

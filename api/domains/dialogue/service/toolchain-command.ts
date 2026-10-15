@@ -25,6 +25,14 @@ import type {
 
 const log = getLogger("dialogue");
 
+/** The route of a task sub-agent's calls: the saved sub-agent resource, or LARM only. */
+const subagentRoute = (settings?: {
+	subagent: { resourceId: string | null };
+}) =>
+	settings?.subagent.resourceId
+		? { resourceId: settings.subagent.resourceId }
+		: ("larm-only" as const);
+
 /**
  * The sub-agent's whole contract: one tool of the set with flat arguments, or one question
  * back to the user. No discriminated union: the model fills one object.
@@ -214,6 +222,8 @@ export function createToolchainCommandHandler(
 				policySubject: run.id,
 				deadline,
 				maxOutputTokens: 2048,
+				// The saved sub-agent resource (read in this transaction); none keeps the command on LARM.
+				route: subagentRoute(larm.snapshotInTransaction?.(tx)),
 			});
 			return {
 				status: "ready",
@@ -242,11 +252,19 @@ export function createToolchainCommandHandler(
 		},
 		async execute(input, { signal }) {
 			return withLogContext({ runId: input.runId }, async () => {
+				// A command is one call: its agent session ends with the call, whatever the outcome.
 				const receipt = await larm.executeControl!(
 					input.requestId,
 					input.messages,
 					signal,
 					input.control,
+					{ sessionRole: "subagent", taskId: input.runId },
+				).finally(() =>
+					larm
+						.releaseTaskSession?.(input.runId)
+						.catch((error) =>
+							log.warn("dialogue.task_session_release_failed", {}, error),
+						),
 				);
 				let value: unknown;
 				try {

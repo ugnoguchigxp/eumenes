@@ -1,4 +1,4 @@
-import type { InferencePort, Receipt } from "../../inference";
+import type { CallSession, InferencePort, Receipt } from "../../inference";
 import type { SpeechPreparation } from "../../delivery";
 import type { NativeTool } from "../../../infrastructure/chat-stream";
 import type { ToolchainCard } from "../../capabilities";
@@ -30,6 +30,16 @@ export async function generateConversation(input: {
 	/** Open questions a call may answer by `questionRef` (offered to the model with `tools`). */
 	openQuestions?: OpenQuestion[];
 	repair: () => void;
+	/**
+	 * Session lifetime of every call here, including the structural correction: `main` for the answer generation,
+	 * `auxiliary` for the function-selection call whose prose is never adopted as the answer.
+	 */
+	sessionRole: "main" | "auxiliary";
+	/**
+	 * Where `messages` splits for a resumed session (`main` calls only; providers without sessions send it whole)
+	 * and what the prompt was built from (forgetting one of them revokes the running call).
+	 */
+	session?: Pick<CallSession, "context" | "refs">;
 }): Promise<{
 	text: string;
 	receipt?: Receipt;
@@ -52,6 +62,13 @@ export async function generateConversation(input: {
 		];
 	}
 	const originalMessages = messages;
+	const callSession: CallSession = {
+		sessionRole: input.sessionRole,
+		...(input.sessionRole === "main" && input.session?.context
+			? { context: input.session.context }
+			: {}),
+		...(input.session?.refs ? { refs: input.session.refs } : {}),
+	};
 	for (let attempt = 0; attempt < 2; attempt++) {
 		signal.throwIfAborted();
 		const output = conversationOutput(input.delta, input.tools);
@@ -65,12 +82,14 @@ export async function generateConversation(input: {
 							output.delta,
 							input.preparation,
 							input.tools,
+							callSession,
 						)
 					: await inference.executeRequest(
 							input.requestId,
 							messages,
 							signal,
 							input.preparation,
+							callSession,
 						)
 				: undefined;
 		const text = receipt

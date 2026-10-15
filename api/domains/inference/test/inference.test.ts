@@ -38,7 +38,7 @@ const messages = [
 	{ role: "system" as const, content: "system" },
 	{ role: "user" as const, content: "hello" },
 ];
-test("answer requests use the main connection and control requests request independent auxiliary sessions", async () => {
+test("a call without a role is auxiliary: the output mode no longer decides the session", async () => {
 	const roles: unknown[] = [];
 	const h = await setup({
 		local: async (_messages, _signal, options) => {
@@ -55,7 +55,166 @@ test("answer requests use the main connection and control requests request indep
 		}),
 	);
 	await h.inference.executeControl(id, messages, new AbortController().signal);
-	expect(roles).toEqual(["main", "auxiliary"]);
+	expect(roles).toEqual(["auxiliary", "auxiliary"]);
+});
+test("the caller sets the session role per call; it is validated and recorded with the task on each attempt", async () => {
+	const seen: unknown[] = [];
+	const h = await setup({
+		local: async (_messages, _signal, options) => {
+			seen.push([options?.sessionRole, options?.taskId]);
+			return "{}";
+		},
+	});
+	const signal = new AbortController().signal;
+	const answerRequest = () =>
+		h.store.write((db) =>
+			h.inference.captureInTransaction(
+				db,
+				crypto.randomUUID(),
+				"llm",
+				Date.now() + 30000,
+			),
+		);
+	const controlRequest = () =>
+		h.store.write((db) =>
+			h.inference.captureBackgroundControlInTransaction(db, {
+				taskId: "task",
+				decisionId: crypto.randomUUID(),
+				authorityEpoch: 1,
+				executionGeneration: 1,
+				deadline: Date.now() + 20000,
+				taskDeadline: Date.now() + 30000,
+				maxOutputTokens: 512,
+			}),
+		);
+	// One answer request: a one-shot call, then the main answer, with the same request id.
+	const shared = await answerRequest();
+	const stream = (
+		id: string,
+		session?: Parameters<typeof h.inference.executeStream>[6],
+	) =>
+		h.inference.executeStream(
+			id,
+			messages,
+			signal,
+			() => {},
+			undefined,
+			undefined,
+			session,
+		);
+	await stream(shared, { sessionRole: "auxiliary" });
+	await stream(shared, { sessionRole: "main" });
+	await stream(await answerRequest());
+	// Control mode: a sub-agent call is allowed and carries its task.
+	await h.inference.executeControl(
+		await controlRequest(),
+		messages,
+		signal,
+		undefined,
+		{ sessionRole: "subagent", taskId: "agent:task-1" },
+	);
+	expect(seen).toEqual([
+		["auxiliary", undefined],
+		["main", undefined],
+		["auxiliary", undefined],
+		["subagent", "agent:task-1"],
+	]);
+	// Rejected before any attempt starts: main on a control request, a sub-agent without a task, a task on another role.
+	const before = h.inference.usage().length;
+	await expect(
+		h.inference.executeControl(
+			await controlRequest(),
+			messages,
+			signal,
+			undefined,
+			{
+				sessionRole: "main",
+			},
+		),
+	).rejects.toThrow("invalid_session_role");
+	await expect(
+		h.inference.executeControl(
+			await controlRequest(),
+			messages,
+			signal,
+			undefined,
+			{
+				sessionRole: "subagent",
+			},
+		),
+	).rejects.toThrow("invalid_session_role");
+	await expect(
+		h.inference.executeControl(
+			await controlRequest(),
+			messages,
+			signal,
+			undefined,
+			{
+				sessionRole: "auxiliary",
+				taskId: "task",
+			},
+		),
+	).rejects.toThrow("invalid_session_role");
+	await expect(
+		stream(await answerRequest(), {
+			sessionRole: "subagent",
+			taskId: "bad id",
+		}),
+	).rejects.toThrow("invalid_session_role");
+	expect(h.inference.usage()).toHaveLength(before);
+	const attempts = h.store.read((db) =>
+		db
+			.query(
+				"SELECT source,session_role,task_id,billing_path FROM inference_attempts ORDER BY started,rowid",
+			)
+			.all(),
+	);
+	expect(attempts).toEqual([
+		{
+			source: "larm",
+			session_role: "auxiliary",
+			task_id: null,
+			billing_path: "larm",
+		},
+		{
+			source: "larm",
+			session_role: "main",
+			task_id: null,
+			billing_path: "larm",
+		},
+		{
+			source: "larm",
+			session_role: "auxiliary",
+			task_id: null,
+			billing_path: "larm",
+		},
+		{
+			source: "larm",
+			session_role: "subagent",
+			task_id: "agent:task-1",
+			billing_path: "larm",
+		},
+	]);
+});
+test("a cloud fallback attempt records the role and the connection's billing path", async () => {
+	const h = await setup();
+	await h.inference.answer(messages, new AbortController().signal);
+	const row = h.store.read((db) =>
+		db
+			.query(
+				"SELECT session_role,billing_path FROM inference_attempts WHERE source='cloud'",
+			)
+			.get(),
+	);
+	expect(row).toEqual({
+		session_role: "auxiliary",
+		billing_path: "openai-compatible",
+	}); // The usage listing carries the path, for the chat screen's last-used display.
+	expect(
+		(h.inference.usage() as { source: string; billingPath: string }[])
+			.filter((u) => u.source === "cloud")
+			.map((u) => u.billingPath),
+	).toEqual(["openai-compatible"]);
 });
 async function setup(
 	options: {
@@ -1103,9 +1262,9 @@ test("a background control on a saved resource goes to that resource only, and f
 		keys: [],
 	});
 	expect(routeOf(await capture("a", extra))).toEqual(["cloud-only", extra]);
-	// Not a registered LLM resource: the saved conversation route.
+	// Not a registered LLM resource: no path to compare with the conversation route's cloud, so LARM only.
 	expect(routeOf(await capture("b", crypto.randomUUID()))).toEqual([
-		"larm-preferred",
+		"larm-only",
 		llm.id,
 	]);
 	// The conversation route forbids the cloud: the resource is not used.
@@ -1583,4 +1742,96 @@ test("a shorter TTS attempt deadline during classification cannot silently switc
 	).rejects.toThrow("speech_language_timeout");
 	expect(synthesized).toBe(0);
 	expect(h.calls).toHaveLength(0);
+});
+
+test("a dedicated resource that can not be used falls back to the conversation route only on the same billing path", async () => {
+	const h = await setup();
+	const saved = h.settings.get();
+	const llm = saved.resources.find((r) => r.purpose === "llm")!;
+	const conversation = saved.connections.find(
+		(c) => c.id === llm.connectionId,
+	)!;
+	const make = (kind: "codex-sdk" | undefined) => {
+		const connectionId = crypto.randomUUID();
+		const resourceId = crypto.randomUUID();
+		return {
+			connection: { ...conversation, id: connectionId, enabled: false, kind },
+			resource: { ...llm, id: resourceId, connectionId },
+		};
+	};
+	const samePath = make(undefined);
+	const otherPath = make("codex-sdk");
+	await h.settings.apply({
+		requestId: crypto.randomUUID(),
+		expectedRevision: saved.revision,
+		settings: {
+			...saved,
+			connections: [
+				...saved.connections,
+				samePath.connection,
+				otherPath.connection,
+			],
+			resources: [...saved.resources, samePath.resource, otherPath.resource],
+		},
+		keys: [],
+	});
+	const routeOf = (id: string) =>
+		h.store.read((db) => {
+			const row = db
+				.query("SELECT snapshot FROM inference_requests WHERE id=?")
+				.get(id) as { snapshot: string };
+			const { llm } = JSON.parse(row.snapshot).routes;
+			return [llm.mode, llm.cloudAllowed, llm.fallbackId];
+		});
+	const background = (decisionId: string, resourceId: string) =>
+		h.store.write((db) =>
+			h.inference.captureBackgroundControlInTransaction!(db, {
+				taskId: "task",
+				decisionId,
+				authorityEpoch: 1,
+				executionGeneration: 1,
+				deadline: Date.now() + 20000,
+				taskDeadline: Date.now() + 30000,
+				maxOutputTokens: 512,
+				route: { resourceId },
+			}),
+		);
+	const root = await h.store.write((db) =>
+		h.inference.captureInTransaction(db, "root", "llm", Date.now() + 60000),
+	);
+	expect(root).toBeTruthy();
+	const control = (subject: string, resourceId: string) =>
+		h.store.write((db) =>
+			h.inference.captureControlInTransaction!(db, {
+				subject,
+				policySubject: "root",
+				deadline: Date.now() + 20000,
+				maxOutputTokens: 512,
+				route: { resourceId },
+			}),
+		);
+	// Same billing path: the saved conversation route, as before.
+	const keep = ["larm-preferred", true, llm.id];
+	expect(routeOf(await background("same", samePath.resource.id))).toEqual(keep);
+	expect(routeOf(await control("agent:same", samePath.resource.id))).toEqual(
+		keep,
+	);
+	// Another billing path: the call stays on LARM, it is not moved to the conversation's cloud.
+	const larmOnly = ["larm-only", false, llm.id];
+	expect(routeOf(await background("other", otherPath.resource.id))).toEqual(
+		larmOnly,
+	);
+	expect(routeOf(await control("agent:other", otherPath.resource.id))).toEqual(
+		larmOnly,
+	);
+	// Without a route a control request stays on LARM, as before.
+	const plain = await h.store.write((db) =>
+		h.inference.captureControlInTransaction!(db, {
+			subject: "agent:plain",
+			policySubject: "root",
+			deadline: Date.now() + 20000,
+			maxOutputTokens: 512,
+		}),
+	);
+	expect(routeOf(plain)).toEqual(larmOnly);
 });

@@ -1,0 +1,8 @@
+
+Running 1 test using 1 worker
+
+(node:67905) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 tests/browser/workers-ai-settings.spec.ts:28:1 › register a secret, discover both speech tasks, save their selection, assign routes and reload (2.5s)
+
+  1 passed (3.6s)

@@ -59,6 +59,11 @@ export interface GenerateInput {
 	runId: string;
 	revision: number;
 	messages: ChatMessage[];
+	/**
+	 * Where `messages` splits for a provider that resumes a session (see `CallSession.context`): the leading
+	 * instruction layers (system, long-term, goals) and the adopted exchanges stored in the conversation ledger.
+	 */
+	sessionContext?: { instructionCount: number; historyCount: number };
 	requestId?: string;
 	/** The memory window fixed at prepare time; re-checked in the adoption transaction. */
 	memory?: {

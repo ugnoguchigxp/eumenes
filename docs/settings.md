@@ -30,17 +30,43 @@
 
 クラウドはOpenAI互換のChat Completions、multipart音声認識、WAV音声合成に対応します。ベースURLは、ループバック・プライベートLAN（10/172.16-31/192.168）・`.local`・リンクローカル以外では `https` が必要です。環境変数名で指定できるのは `EUMENES_CLOUD_` で始まる名前、主要プロバイダの標準キー名（`OPENAI_API_KEY`、`ANTHROPIC_API_KEY`、`GEMINI_API_KEY`、`GOOGLE_API_KEY`、`AZURE_OPENAI_API_KEY`、`GROQ_API_KEY`、`MISTRAL_API_KEY`、`DEEPSEEK_API_KEY`）、およびbackendの `EUMENES_ENV_REF_ALLOWLIST`（カンマ区切り）に載せた名前だけです。それ以外を指す既存設定は保存したままですが、利用時に `env_ref_not_allowed` で失敗します。接続名、ベースURL、モデルとAPIキーまたは環境変数名を登録し、用途に割り当てて「設定の変更をすべて保存」を押します。一つの接続に複数の用途のモデルを追加できます。接続確認と少量の生成テストは保存済み設定を使い、サービスの利用が発生します。
 
+### Cloudflare Workers AIの音声接続
+
+「AIと接続」の既存画面から登録します。
+
+1. 「登録した接続」で接続の種類を「Cloudflare Workers AI」にし、接続名・Account ID・APIトークンを入力して登録します。APIのURLは入力不要です。
+2. 「設定の変更をすべて保存」を押します。APIトークンは既存の秘密情報用経路で暗号化し、設定取得・変更一覧・操作の保存記録には値を返しません。
+3. 「音声モデル」で接続を選び、「接続確認・モデル一覧を更新」を押します。保存済みのAccount IDとAPIトークンを使ってbackendからCloudflareへ問い合わせます。未保存の接続変更やトークン更新がある間は取得・追加できません。
+4. 用途を「聞き取り（ASR）」「読み上げ（TTS）」から選び、モデルと、そのモデルで指定できる声・言語を選んで「選んだモデルを下書きに追加」を押します。ASRとTTSを追加してから、共通の保存ボタンで保存できます。
+5. 「利用するAI」の「聞き取りの利用先」「読み上げの利用先」で登録したモデルを選び、利用方法とクラウド送信の許可を確認して保存します。LARM優先の代替先にもクラウド専用先にも使えます。モデルの登録だけでは利用先を切り替えません。
+
+1つの接続をASR・TTSで共有します。モデル名・声の候補・言語の候補は実行時のcatalogと入出力schemaから取得し、コードにモデル名を固定しません。言語の候補が提供されないモデルでは言語コードを入力できますが、対応言語はモデルの仕様で確認してください。空欄ではサービスの既定を使います。
+
+モデル一覧の取得成功と音声の動作確認は別です。現在の変換処理が扱える入出力形式のモデルだけを選択でき、未対応のモデルは理由を表示します。ASRはJSONの`audio`にBase64またはバイト配列を渡し、`text`を返す契約に対応します。TTSは`text`または`prompt`、必要に応じて`speaker`／`voice`や`lang`／`language`を渡す契約に対応します。WAV出力を指定できる場合はWAVを要求し、MP3出力はbackendの`ffmpeg`でWAVに変換します。`ffmpeg`がない環境では変換が必要なモデルを選べません。音声ストリーミングと別の入出力形式は今回の対応範囲に含めません。
+
+Account ID・APIトークンの変更、接続の無効化・削除では、既存の接続世代による失効を適用し、古い一覧や実行結果を採用しません。従来のOpenAI互換接続やSDK接続はそのまま使えます。
+
+APIの根拠: [Workers AIの認証](https://developers.cloudflare.com/workers-ai/get-started/rest-api/)、[モデル検索](https://developers.cloudflare.com/api/resources/ai/subresources/models/methods/list/)、[入出力schema](https://developers.cloudflare.com/api/resources/ai/subresources/models/subresources/schema/methods/get/)。
+
 ### エージェントSDKの接続（会話用途のみ）
 
-クラウドAPIの登録で「接続の種類」を選ぶと、OpenAI互換API以外に Codex SDK・Claude Agent SDK・Claude Managed Agents を会話（`llm`）の代替先・クラウド専用先として使えます。会話担当もサブエージェント（研究worker・操作担当など）も同じ `llm` 経路を通るため、両方に適用されます。聞き取り・読み上げには割り当てられません。
+クラウドAPIの登録で「接続の種類」を選ぶと、OpenAI互換API以外に Codex SDK・Claude Agent SDK を会話（`llm`）の代替先・クラウド専用先として使えます。聞き取り・読み上げには割り当てられません。
 
 | 種類 | 実行 | 認証 | 会話のツール呼び出し |
 | --- | --- | --- | --- |
 | Codex SDK | Codex CLI（ネイティブツール・プラグイン・MCP・履歴を無効化、一時ディレクトリで読み取り専用） | APIキー（`OPENAI_API_KEY`等）またはCodex CLIのログイン | 出力schemaで「返答」か「関数呼び出し」を選ばせる |
-| Claude Agent SDK | Claude Code組込みツールを無効化し、設定ファイル・セッション保存なしで1ターン | APIキー（`ANTHROPIC_API_KEY`）またはClaude Codeのログイン | 会話の関数をin-process MCPツールとして渡し、呼び出された時点でターンを終了 |
-| Claude Managed Agents | 保存済みのエージェントID・環境IDからターンごとにセッションを作成し、終了後に削除 | APIキー必須 | セッションのoverrideでツールを会話の関数（custom tool）だけに置換 |
+| Claude Agent SDK | Claude Code組込みツールを無効化し、呼び出しごとの一時設定ディレクトリで実行 | 認証方式を明示して選ぶ（下記） | 会話の関数をin-process MCPツールとして渡し、呼び出された時点でターンを終了 |
 
-関数の実行はどの種類でもEumenesが行い、エージェント側では実行しません。過去の会話は先頭のsystemメッセージを指示、残りをJSONの履歴として1つのプロンプトに渡します。Managed Agentsはセッション作成を伴うため応答開始が遅く、既定のクラウド試行時間（会話60秒）を超える場合があります。
+Claude Agent SDK の認証方式は接続ごとに選び、課金経路が分かれます。
+
+- **サブスクリプション**: `claude setup-token` で発行したトークンを登録します（暗号化保存）。環境変数名では指定できません。ホストのClaude Codeのログインは使いません。
+- **APIキー**: `ANTHROPIC_API_KEY` 相当のキー（または許可された環境変数名）と、ベースURLを登録します。
+
+最初のメッセージを送る前に、SDKが報告した資格情報の種類を確認し、選んだ認証方式と一致しない場合（資格情報の混在を含む）は送信せずに失敗します。用途に割り当て済みの接続の認証方式・種類を、課金経路が変わる形で変更することはできません（`invalid_billing_path_change`）。認証方式を変えたときは新しい資格情報の登録が必要です。自動の代替（専用リソースが使えないときの会話経路への切替など）も課金経路をまたがず、またぐ場合はLARMだけで実行して `inference.route_billing_mismatch` を記録します。
+
+接続で使えるモデルは保存済みの資格情報で実行時に取得します（`GET /api/inference/connections/:id/models`。接続確認を兼ねます）。会話画面左上のモデル選択は接続ごとに課金経路を示してグループ化し、選択は次の発言から適用されます。サブエージェント（研究worker・操作担当など）が使う接続は「サブエージェントの接続」で1つ選び、未選択ならLARMを使います。
+
+関数の実行はどの種類でもEumenesが行い、エージェント側では実行しません。会話担当（`main`）のClaude Agent SDKセッションは、接続×認証方式×モデルごとに1つのセッションIDを使い続け、切り替えて戻せば以前のIDで再開します。履歴は毎回、会話台帳に保存された発言と採用回答から組み立てて渡し、SDKが書く記録は保存しません。忘却・取り下げ・要約は次の発言の履歴に反映され、忘却対象を参照して実行中の試行は中止されます。Claude Code の自動要約は無効化しており、文脈の予算は会話のWindowが管理します。サブエージェントはタスクごとに新しいセッションを使い、履歴を持ち越しません。それ以外の経路では、先頭のsystemメッセージを指示、残りを履歴として渡します。
 
 LARMのURL・Profile・audience・voiceは初回起動時に環境変数から取り込み、以降は設定画面に保存した値を使います。Profileは未保存でも起動でき、保存するまでLARMには接続しません（`larm_profile_missing`）。選択肢は、保存済みの接続先のcatalogで `llm` Providerを持つProfileです。URLが空欄の間は未設定扱いで、LARMには接続しません。LARM認証とクラウドキーの環境変数はbackendだけで読みます。環境変数を変更した場合はbackendを再起動してください。
 

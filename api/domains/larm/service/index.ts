@@ -719,8 +719,11 @@ export function createLarm(config: {
 		options?: LarmCallOptions,
 	) {
 		const scoped = AbortSignal.any([signal, lifetime.signal]);
-		if (options?.sessionRole === "auxiliary") {
-			// Independent sessions share the saved profile; admission and KV capacity belong to LARM.
+		if (
+			options?.sessionRole === "auxiliary" ||
+			options?.sessionRole === "subagent"
+		) {
+			// Independent sessions (one-shot calls and task sub-agents) share the saved profile; admission and KV capacity belong to LARM.
 			return withProvider("llm", scoped, async () => {
 				const helper = createLarm({
 					...config,

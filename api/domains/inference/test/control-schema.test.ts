@@ -136,15 +136,20 @@ test("Claude Agent SDK gets outputFormat and its structured output becomes the t
 			async *[Symbol.asyncIterator]() {
 				yield result;
 			},
+			accountInfo: async () => ({
+				apiKeySource: "ANTHROPIC_API_KEY",
+				apiProvider: "firstParty",
+			}),
 			close() {},
 		};
 	}) as unknown as typeof query;
 	const agents = createCloudAgents({}, { claudeQuery });
 	const result = await agents.run({
 		kind: "claude-agent-sdk",
+		auth: "api-key",
 		model: "fixture-model",
 		baseUrl: "https://api.example.test",
-		credential: null,
+		credential: "sk-test",
 		messages,
 		outputSchema: schema,
 		signal: new AbortController().signal,
@@ -154,9 +159,10 @@ test("Claude Agent SDK gets outputFormat and its structured output becomes the t
 	seen.options = undefined;
 	await agents.run({
 		kind: "claude-agent-sdk",
+		auth: "api-key",
 		model: "fixture-model",
 		baseUrl: "https://api.example.test",
-		credential: null,
+		credential: "sk-test",
 		messages,
 		signal: new AbortController().signal,
 	});
@@ -193,19 +199,22 @@ createInterface({ input: process.stdin }).on("line", (line) => {
 			{ PATH: "" },
 			{ codexExecutable: command },
 		);
-		const result = await agents.run({
-			kind: "codex-sdk",
-			model: "fixture-model",
-			baseUrl: "https://api.example.test/v1",
-			credential: null,
-			messages,
-			outputSchema: schema,
-			signal: AbortSignal.timeout(5000),
-		});
-		expect(result.text).toBe('{"done":true}');
-		expect(JSON.parse(await readFile(record, "utf8")).outputSchema).toEqual(
-			schema,
-		);
+		for (const reasoningEffort of [undefined, "low"] as const) {
+			const result = await agents.run({
+				kind: "codex-sdk",
+				model: "fixture-model",
+				baseUrl: "https://api.example.test/v1",
+				credential: null,
+				messages,
+				outputSchema: schema,
+				...(reasoningEffort ? { reasoningEffort } : {}),
+				signal: AbortSignal.timeout(5000),
+			});
+			expect(result.text).toBe('{"done":true}');
+			const turn = JSON.parse(await readFile(record, "utf8"));
+			expect(turn.outputSchema).toEqual(schema);
+			expect(turn.effort).toBe(reasoningEffort);
+		}
 	} finally {
 		await rm(dir, { recursive: true, force: true });
 	}

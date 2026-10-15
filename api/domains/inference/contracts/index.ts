@@ -12,6 +12,7 @@ export const delegatedTaskRules =
 export type ControlContract = {
 	instructions: string;
 	outputSchema: unknown;
+	reasoningEffort?: "low";
 };
 export function controlInstructions(control: ControlContract) {
 	const examples = (control.outputSchema as { examples?: unknown[] } | null)
@@ -77,6 +78,39 @@ export interface BackgroundControl {
 	/** Enforce the control output schema as a strict provider schema; absent keeps plain JSON-object output. */
 	structuredOutput?: boolean;
 }
+/**
+ * Session lifetime of one call, set by the caller and independent of the request's output mode.
+ * `main`: the conversation agent's answer (answer-mode calls only). `subagent`: one task's call (`taskId` required).
+ * `auxiliary` (default): a one-shot call.
+ */
+export type CallSession = {
+	sessionRole?: "main" | "subagent" | "auxiliary";
+	taskId?: string;
+	/**
+	 * `main` only. Where the call's messages split, by position: the first `instructionCount` messages are the
+	 * instructions; the first `historyCount` user/assistant messages after them are the adopted exchanges stored in
+	 * the conversation ledger (the history a session resumes from); every other message is this turn's input.
+	 * Providers that cannot resume a session (LARM, Codex, OpenAI-compatible) ignore it and send `messages` whole.
+	 */
+	context?: { instructionCount: number; historyCount: number };
+	/**
+	 * What the messages were built from: conversation message ids and memory item ids. Forgetting one of them
+	 * revokes the call while it runs (`revokeAgentAttemptsInTransaction`).
+	 */
+	refs?: {
+		messageIds: readonly string[];
+		itemIds: readonly string[];
+		/** The conversation the prompt belongs to: deleting its summary revokes the call (`deletedSummaryConversationIds`). */
+		conversationId?: string;
+	};
+};
+/** What a forget purge hands inference: the attempts standing on these references are revoked. */
+export type AgentAttemptRevocation = {
+	messageIds: readonly string[];
+	itemIds: readonly string[];
+	/** Conversations whose summary was deleted (the field name is memory's `ForgetPurge`). */
+	deletedSummaryConversationIds: readonly string[];
+};
 export interface InferencePort {
 	codexResearchAvailable?(): boolean;
 	captureBackgroundControlInTransaction?(
@@ -92,6 +126,8 @@ export interface InferencePort {
 			deadline: number;
 			maxOutputTokens: number;
 			engine?: "codex_luna";
+			/** `larm-only` (default) or the saved cloud LLM resource task sub-agents run on (see `BackgroundControl.route`). */
+			route?: "larm-only" | { resourceId: string };
 		},
 	): string;
 	/** Authorized user action with its own deadline; the caller validates ownership and settles the result. */
@@ -104,6 +140,7 @@ export interface InferencePort {
 		messages: Messages,
 		signal: AbortSignal,
 		control?: ControlContract,
+		session?: CallSession,
 	): Promise<Receipt>;
 	rejectControlInTransaction?(
 		db: Database,
@@ -111,6 +148,16 @@ export interface InferencePort {
 		code: string,
 	): void;
 	cancelRequestsInTransaction?(db: Database, requestIds: string[]): void;
+	/**
+	 * Revokes the running (or finished but not yet adopted) agent attempts that stood on a forgotten reference:
+	 * they are aborted once the transaction commits and their receipts are refused. Idempotent.
+	 */
+	revokeAgentAttemptsInTransaction?(
+		db: Database,
+		input: AgentAttemptRevocation,
+	): void;
+	/** A task finished (any outcome): drops its agent sessions. Unreleased ones expire (`recover`). */
+	releaseTaskSession?(taskId: string): Promise<void>;
 	flushCancelledRequests?(requestIds: string[]): void;
 	setContextPolicyInTransaction?(
 		db: Database,
@@ -169,6 +216,7 @@ export interface InferencePort {
 		input: Messages | string | Uint8Array,
 		signal: AbortSignal,
 		preparation?: SpeechPreparation,
+		session?: CallSession,
 	): Promise<Receipt>;
 	executeStream?(
 		requestId: string,
@@ -177,6 +225,7 @@ export interface InferencePort {
 		onDelta: (text: string) => void,
 		preparation?: SpeechPreparation,
 		tools?: NativeTool[],
+		session?: CallSession,
 	): Promise<Receipt>;
 	captureSpeechChunkInTransaction?(
 		db: Database,
@@ -217,6 +266,8 @@ export const usageSchema = z.object({
 	accepted: z.number(),
 	inputTokens: z.number().nullable(),
 	outputTokens: z.number().nullable(),
+	/** Who billed the attempt (`BillingPath`); null for attempts recorded before it was kept. */
+	billingPath: z.string().nullable().optional(),
 	providerDetails: z.array(exchangeSchema).optional(),
 });
 export type Usage = z.infer<typeof usageSchema>;
@@ -246,5 +297,37 @@ export const larmProfilesSchema = z.array(
 	z.object({ profile: z.string(), model: z.string().nullable() }),
 );
 export type LarmProfiles = z.infer<typeof larmProfilesSchema>;
+/** `GET /api/inference/connections/:id/models`: the models a saved agent connection offers, read at run time. */
+export const connectionModelsSchema = z.object({
+	models: z.array(
+		z.object({
+			id: z.string(),
+			displayName: z.string(),
+			purpose: z.enum(["asr", "tts"]).optional(),
+			speech: z
+				.object({
+					supported: z.boolean(),
+					reason: z.string().nullable(),
+					voices: z.array(z.string()),
+					languages: z.array(z.string()),
+					voiceRequired: z.boolean(),
+					languageRequired: z.boolean(),
+					voiceDefault: z.string().nullable(),
+					languageDefault: z.string().nullable(),
+					voiceSelectable: z.boolean(),
+					languageSelectable: z.boolean(),
+				})
+				.optional(),
+			/** Input context window; null when the provider does not report one (subscription: learned after the first turn). */
+			contextWindow: z.number().int().positive().nullable(),
+		}),
+	),
+	/** What the connection's credential resolved to; doubles as the connection test. */
+	account: z.object({
+		auth: z.enum(["subscription", "api-key"]),
+		subscriptionType: z.string().nullable(),
+	}),
+});
+export type ConnectionModels = z.infer<typeof connectionModelsSchema>;
 export const startedProbeSchema = z.object({ id: z.string() });
 export * from "./record-pages";

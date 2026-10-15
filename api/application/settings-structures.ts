@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+	agentAuths,
 	connectionKinds,
 	purposeSchema,
 	type Connection,
@@ -15,15 +16,19 @@ import {
  */
 export const structureRefs = {
 	addConnection: "structure:settings.add-connection@1",
+	addWorkersConnection: "structure:settings.add-connection@2",
 	deleteConnection: "structure:settings.delete-connection@1",
 	addResource: "structure:settings.add-resource@1",
+	addSpeechResource: "structure:settings.add-resource@2",
 	deleteResource: "structure:settings.delete-resource@1",
 	confirmLarmOrigin: "structure:settings.confirm-larm-origin@1",
 } as const;
 export const structureSchemaRefs: Record<string, string> = {
-	[structureRefs.addConnection]: "schema:settings-add-connection@2",
+	[structureRefs.addConnection]: "schema:settings-add-connection@3",
+	[structureRefs.addWorkersConnection]: "schema:settings-add-connection@4",
 	[structureRefs.deleteConnection]: "schema:settings-delete-connection@1",
 	[structureRefs.addResource]: "schema:settings-add-resource@1",
+	[structureRefs.addSpeechResource]: "schema:settings-add-resource@2",
 	[structureRefs.deleteResource]: "schema:settings-delete-resource@1",
 	[structureRefs.confirmLarmOrigin]: "schema:settings-confirm-larm-origin@1",
 };
@@ -34,6 +39,7 @@ const resource = {
 	model: z.string().min(1).max(200),
 	contextWindow: z.number().int().optional(),
 	voice: z.string().max(200).optional(),
+	language: z.string().min(1).max(80).optional(),
 	assign: z.boolean().optional(),
 };
 const addConnection = z
@@ -41,10 +47,14 @@ const addConnection = z
 		connectionId: id,
 		kind: z.enum(connectionKinds).optional(),
 		name: z.string().min(1).max(80),
-		baseUrl: z.string().min(1).max(2048),
+		baseUrl: z.string().min(1).max(2048).optional(),
+		accountId: z
+			.string()
+			.regex(/^[a-fA-F0-9]{32}$/)
+			.optional(),
 		envRef: z.string().min(1).max(128).optional(),
-		agentId: z.string().max(128).optional(),
-		environmentId: z.string().max(128).optional(),
+		/** Claude Agent SDK only: the other kinds ignore it. */
+		auth: z.enum(agentAuths).optional(),
 		enabled: z.boolean().optional(),
 		// The optional first model of the connection.
 		resourceId: id.optional(),
@@ -52,6 +62,7 @@ const addConnection = z
 		model: resource.model.optional(),
 		contextWindow: resource.contextWindow,
 		voice: resource.voice,
+		language: resource.language,
 		assign: resource.assign,
 	})
 	.refine(
@@ -62,6 +73,7 @@ const addConnection = z
 					!c.model &&
 					c.contextWindow === undefined &&
 					c.voice === undefined &&
+					c.language === undefined &&
 					!c.assign,
 		{ message: "resource" },
 	);
@@ -78,7 +90,10 @@ const confirmLarmOrigin = z.strictObject({
 
 export type ApplyKey = { connectionId: string; value?: string; delete?: true };
 
-/** Routes that would lose their cloud fallback fall back to LARM, as the legacy screen did. */
+/**
+ * Routes that would lose their cloud fallback fall back to LARM, as the legacy screen did; the
+ * dedicated World and sub-agent models of a removed model go back to the conversation route / LARM.
+ */
 function releaseFallbacks(doc: Settings, resourceIds: ReadonlySet<string>) {
 	for (const purpose of purposeSchema.options) {
 		const route = doc.routes[purpose];
@@ -86,9 +101,17 @@ function releaseFallbacks(doc: Settings, resourceIds: ReadonlySet<string>) {
 		route.fallbackId = null;
 		if (route.mode === "cloud-only") route.mode = "larm-preferred";
 	}
+	const curation = doc.world.curationResourceId;
+	if (curation && resourceIds.has(curation))
+		doc.world.curationResourceId = null;
+	const subagent = doc.subagent.resourceId;
+	if (subagent && resourceIds.has(subagent)) doc.subagent.resourceId = null;
 }
 
-/** The credential rule of a new connection: one source, except for CLI-login agent kinds. */
+/**
+ * The credential rule of a new connection: one source, except for the Codex SDK (CLI login).
+ * A Claude subscription connection needs its setup token as a stored key and never an env ref.
+ */
 function checkCredentialSource(
 	connection: Connection,
 	keys: readonly ApplyKey[],
@@ -97,9 +120,9 @@ function checkCredentialSource(
 		(k) => k.connectionId === connection.id && k.value !== undefined,
 	);
 	if (key && connection.envRef) throw new Error("invalid_credential_source");
-	const cliLogin =
-		connection.kind === "codex-sdk" || connection.kind === "claude-agent-sdk";
-	if (!key && !connection.envRef && !cliLogin)
+	if (connection.auth === "subscription" && connection.envRef)
+		throw new Error("invalid_credential_source");
+	if (!key && !connection.envRef && connection.kind !== "codex-sdk")
 		throw new Error("credential_required");
 }
 
@@ -123,25 +146,27 @@ export function applyStructures(
 	let confirm: string | undefined;
 	for (const { structure, input } of structural) {
 		switch (structure) {
-			case structureRefs.addConnection: {
+			case structureRefs.addConnection:
+			case structureRefs.addWorkersConnection: {
 				const c = addConnection.safeParse(input);
 				if (!c.success) throw new Error("invalid_input");
 				const v = c.data;
 				if (doc.connections.some((x) => x.id === v.connectionId))
 					throw new Error("connection_exists");
-				const agent = !!v.kind && v.kind !== "openai-compatible";
-				const managed = v.kind === "claude-managed-agents";
+				const typed = !!v.kind && v.kind !== "openai-compatible";
+				const workers = v.kind === "cloudflare-workers-ai";
+				if (!workers && !v.baseUrl) throw new Error("invalid_input");
+				const claude = v.kind === "claude-agent-sdk";
+				if (claude && !v.auth) throw new Error("auth_required");
 				const connection: Connection = {
 					id: v.connectionId,
-					...(agent ? { kind: v.kind } : {}),
-					...(managed
-						? {
-								agentId: v.agentId?.trim() || null,
-								environmentId: v.environmentId?.trim() || null,
-							}
-						: {}),
+					...(typed ? { kind: v.kind } : {}),
+					...(claude ? { auth: v.auth } : {}),
 					name: v.name,
-					baseUrl: v.baseUrl,
+					baseUrl: workers
+						? "https://api.cloudflare.com/client/v4"
+						: v.baseUrl!,
+					...(v.accountId ? { accountId: v.accountId } : {}),
 					enabled: v.enabled ?? true,
 					epoch: 0,
 					envRef: v.envRef ?? null,
@@ -156,6 +181,7 @@ export function applyStructures(
 						model: v.model!,
 						contextWindow: v.contextWindow,
 						voice: v.voice,
+						language: v.language,
 						assign: v.assign,
 					});
 				break;
@@ -182,7 +208,8 @@ export function applyStructures(
 				keys = keys.filter((k) => k.connectionId !== c.data.connectionId);
 				break;
 			}
-			case structureRefs.addResource: {
+			case structureRefs.addResource:
+			case structureRefs.addSpeechResource: {
 				const r = addResource.safeParse(input);
 				if (!r.success) throw new Error("invalid_input");
 				if (!doc.connections.some((x) => x.id === r.data.connectionId))
@@ -226,6 +253,7 @@ function addModel(
 		model: string;
 		contextWindow?: number;
 		voice?: string;
+		language?: string;
 		assign?: boolean;
 	},
 ) {
@@ -238,6 +266,7 @@ function addModel(
 		model: v.model,
 		contextWindow: v.purpose === "llm" ? (v.contextWindow ?? 8192) : null,
 		voice: v.purpose === "tts" ? (v.voice ?? "") : null,
+		...(v.language ? { language: v.language } : {}),
 	});
 	// Only an unassigned purpose takes the new model as its fallback.
 	if (v.assign && !doc.routes[v.purpose].fallbackId)
@@ -293,17 +322,17 @@ export function connectionTargets(
 		const registered = credentials.some(
 			(x) => x.id === c.id && x.credentialAvailable,
 		);
-		const cli = c.kind === "codex-sdk" || c.kind === "claude-agent-sdk";
 		return {
 			id: c.id,
 			label: c.name,
 			kind: c.kind ?? "openai-compatible",
+			...(c.auth ? { auth: c.auth } : {}),
 			enabled: c.enabled,
 			credential: c.envRef
 				? "environment"
 				: registered
 					? "registered"
-					: cli
+					: c.kind === "codex-sdk"
 						? "login"
 						: "none",
 		};

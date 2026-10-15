@@ -22,6 +22,7 @@ import {
 	migration as dialogueMigration,
 	queueLinkMigration,
 } from "..";
+import type { CallSession } from "../../inference";
 import type { LarmPort } from "../../larm";
 import { createQueue, migration as queueMigration } from "../../queue";
 import {
@@ -85,6 +86,8 @@ async function setup(
 		streamText?: string;
 		/** Records the context policy set on the run's LLM request. */
 		policies?: string[];
+		/** Serves the request through `executeRequest` and records the session each call was given. */
+		sessions?: Array<CallSession | undefined>;
 	} = {},
 ) {
 	const dir = options.dir ?? mkdtempSync(join(tmpdir(), "eumenes-memory-"));
@@ -102,6 +105,30 @@ async function setup(
 						requestId: string,
 						policy: string,
 					) => void options.policies!.push(`${requestId}:${policy}`),
+				}
+			: {}),
+		...(options.sessions
+			? {
+					requestFor: () => "request-1",
+					executeRequest: async (
+						_id: string,
+						messages: Array<{
+							role: "system" | "user" | "assistant";
+							content: string;
+						}>,
+						_signal: AbortSignal,
+						_preparation: unknown,
+						session?: CallSession,
+					) => {
+						options.sessions!.push(session);
+						seen.push(messages.map((m) => ({ ...m })));
+						return {
+							requestId: "request-1",
+							attemptId: "attempt",
+							value: "了解です",
+						};
+					},
+					acceptInTransaction: () => true,
 				}
 			: {}),
 		...(options.stream
@@ -287,6 +314,48 @@ test("every earlier exchange the steward has not decided on is sent; the notice 
 	expect(
 		h.seen.at(-1)!.some((m) => m.content.includes("記憶の担当からの連絡です")),
 	).toBe(false);
+});
+
+test("a main call names the history a resumed session starts from and what the prompt stands on", async () => {
+	const sessions: Array<CallSession | undefined> = [];
+	const h = await setup({ sessions });
+	const item = await seedFact(h);
+	const first = await h.ask("おすすめの料理は？");
+	await h.ask("もう一つ");
+	const sent = h.seen.at(-1)!;
+	const session = sessions.at(-1)!;
+	expect(session?.sessionRole).toBe("main");
+	// The instruction layers lead (persona, long-term memory); the adopted exchanges follow as the history.
+	const { instructionCount, historyCount } = session!.context!;
+	expect(
+		sent.slice(0, instructionCount).every((m) => m.role === "system"),
+	).toBe(true);
+	// The fresh fact is in the short-term layer: that is this turn's input, not an instruction.
+	expect(instructionCount).toBe(1);
+	expect(
+		sent
+			.slice(instructionCount)
+			.some((m) => m.role === "system" && m.content.includes("辛いものが好き")),
+	).toBe(true);
+	const history = sent
+		.slice(instructionCount)
+		.filter((m) => m.role !== "system")
+		.slice(0, historyCount);
+	expect(history.map((m) => m.content)).toEqual([
+		"私は辛いものが好きです",
+		"了解です",
+		"おすすめの料理は？",
+		"了解です",
+	]);
+	// Nothing else is history: the current input comes after it.
+	expect(sent.at(-1)!.content).toBe("もう一つ");
+	// What the prompt stood on: every shown message and the memory items behind the layers.
+	expect(session!.refs!.itemIds).toContain(item.id);
+	expect(session!.refs!.conversationId).toBe("main");
+	expect(session!.refs!.messageIds).toContain(first.inputMessageId);
+	expect(session!.refs!.messageIds).toContain(
+		inputOf(h, h.dialogue.get(first.id)!.inputMessageId).id,
+	);
 });
 
 test("the request's context policy is exact for every memory-enabled turn", async () => {

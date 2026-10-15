@@ -126,7 +126,13 @@ export function useCollectionActions({
 				}
 			}
 			const visibleForm = isCreate
-				? form
+				? form.filter(
+						(field) =>
+							!field.when ||
+							field.when.in.includes(
+								getPath(event.values, field.when.key) as never,
+							),
+					)
 				: form.filter(
 						(field) =>
 							!field.when ||

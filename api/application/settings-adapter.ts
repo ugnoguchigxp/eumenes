@@ -38,7 +38,7 @@ const ROUTES_QUERY = "query:settings.routes@1";
 /** The connection's API key: a confidential field that travels in `keys`, not in `changes`. */
 const API_KEY_PATH = "$.connections[id=$target].apiKey";
 const ASR_LANGUAGES_QUERY = "query:settings.asr-languages@1";
-const APPLY_SCHEMA_REF = "schema:settings-apply@2";
+const APPLY_SCHEMA_REF = "schema:settings-apply@3";
 
 /**
  * Field visibility conditions the Web counterpart evaluates (see `voice-presentation.ts`). The
@@ -60,12 +60,14 @@ export const settingsConditions = [
 	"condition:settings.larm-auto-strength@1",
 	/** The browser can route playback to a chosen output device. */
 	"condition:settings.output-device-selectable@1",
-	/** The connection chosen as the field's target is a Claude Managed Agents connection. */
-	"condition:settings.connection-managed-agents@1",
+	/** The connection chosen as the field's target is a Claude Agent SDK connection. */
+	"condition:settings.connection-claude-agent-sdk@1",
 	/** The connection chosen as the field's target is an OpenAI-compatible HTTP connection. */
 	"condition:settings.connection-openai-compatible@1",
 	/** The model chosen as the field's target is a conversation (LLM) model. */
 	"condition:settings.resource-llm@1",
+	"condition:settings.connection-workers-ai@1",
+	"condition:settings.connection-custom-url@1",
 ] as const;
 
 // ---- fixed paths ---------------------------------------------------------------------------
@@ -449,6 +451,10 @@ export const describeSettingsAdapter = () => ({
 	owner: "settings",
 	operations: new Map([
 		[
+			"settings.apply-v4",
+			{ inputSchemaRef: "schema:settings-apply@4", effect: "write" as const },
+		],
+		[
 			"settings.apply",
 			{ inputSchemaRef: APPLY_SCHEMA_REF, effect: "write" as const },
 		],
@@ -507,7 +513,7 @@ export function createSettingsAdapter(
 		invokeInTransaction(tx, request): AdapterResult {
 			if (
 				request.origin.kind !== "ui" ||
-				request.operationName !== "settings.apply"
+				!["settings.apply", "settings.apply-v4"].includes(request.operationName)
 			)
 				throw new Error("capability_unavailable");
 			const parsed = settingsApplyInput.safeParse(request.input);

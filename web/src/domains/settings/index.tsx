@@ -1,14 +1,15 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import type { EumenesClient } from "../../../../client";
-import type { Settings } from "../../../../api/domains/settings/contracts";
-import { queryRoots } from "../../queryKeys";
 import {
-	agentModelCatalog,
-	connectionKindDefaults,
-	connectionKindLabels,
-	type CatalogKind,
-} from "./shared";
+	billingPath,
+	type Settings,
+} from "../../../../api/domains/settings/contracts";
+import { queryRoots } from "../../queryKeys";
+import { billingPathLabels, UNKNOWN_CONTEXT_WINDOW } from "./shared";
+
+export { billingPathLabels };
+
 export function useSettings(client: EumenesClient) {
 	return useQuery({
 		queryKey: [queryRoots.settings, client.identity],
@@ -16,8 +17,30 @@ export function useSettings(client: EumenesClient) {
 		retry: 0,
 	});
 }
+
 const larmPrefix = "larm:";
-const catalogPrefix = "catalog:";
+const newModelPrefix = "new-model:";
+const larmGroup = { id: "larm", label: "LARM" };
+
+/** Query root of a connection's model list; the key is `[root, identity, connectionId, epoch]`. */
+
+export type ConversationModelOption = {
+	id: string;
+	/** The model's own name; the group label carries the billing path. */
+	label: string;
+	groupId: string;
+	groupLabel: string;
+};
+
+type Connection = Settings["connections"][number];
+
+function groupLabelOf(connection: Connection) {
+	const path = billingPath(connection);
+	return path === "openai-compatible"
+		? connection.name
+		: billingPathLabels[path];
+}
+
 /** Picks the conversation model (LARM or a cloud LLM) without opening the settings page. */
 export function useConversationModel(client: EumenesClient) {
 	const cache = useQueryClient();
@@ -41,38 +64,66 @@ export function useConversationModel(client: EumenesClient) {
 			? [{ profile: savedProfile, model: null }]
 			: []),
 	];
-	const llmResources = value
-		? value.resources.flatMap((r) => {
-				const c = value.connections.find((x) => x.id === r.connectionId);
-				return r.purpose === "llm" && c?.enabled ? [{ r, c }] : [];
-			})
-		: [];
-	const options = value
-		? [
-				...profiles.map((p) => ({
-					id: `${larmPrefix}${p.profile}`,
-					label: `LARM / ${p.model ?? p.profile}`,
-				})),
-				...llmResources.map(({ r, c }) => ({
+	const sdkConnections = (value?.connections ?? []).filter(
+		(c) => c.kind === "claude-agent-sdk" && c.enabled,
+	);
+	// The model list also tests the credential; a failed list only hides the unregistered models.
+	const modelLists = useQueries({
+		queries: sdkConnections.map((c) => ({
+			queryKey: [queryRoots.connectionModels, client.identity, c.id, c.epoch],
+			queryFn: ({ signal }: { signal: AbortSignal }) =>
+				client.connectionModels(c.id, signal),
+			retry: 0,
+			staleTime: 5 * 60_000,
+		})),
+	});
+	const options: ConversationModelOption[] = [];
+	// Unregistered models: picking one registers it as a resource on its connection.
+	const unregistered = new Map<
+		string,
+		{ connectionId: string; model: string; contextWindow: number }
+	>();
+	if (value) {
+		for (const p of profiles)
+			options.push({
+				id: `${larmPrefix}${p.profile}`,
+				label: p.model ?? p.profile,
+				groupId: larmGroup.id,
+				groupLabel: larmGroup.label,
+			});
+		for (const c of value.connections) {
+			if (!c.enabled) continue;
+			const groupLabel = groupLabelOf(c);
+			const listed =
+				modelLists[sdkConnections.findIndex((x) => x.id === c.id)]?.data
+					?.models ?? [];
+			const registered = value.resources.filter(
+				(r) => r.purpose === "llm" && r.connectionId === c.id,
+			);
+			for (const r of registered)
+				options.push({
 					id: r.id,
-					label: `${c.name} / ${r.model}`,
-				})),
-				// Catalog models not yet registered: picking one registers it with the CLI login.
-				...(Object.keys(agentModelCatalog) as CatalogKind[]).flatMap((kind) =>
-					agentModelCatalog[kind]
-						.filter(
-							({ model }) =>
-								!llmResources.some(
-									({ r, c }) => c.kind === kind && r.model === model,
-								),
-						)
-						.map(({ model }) => ({
-							id: `${catalogPrefix}${kind}:${model}`,
-							label: `${connectionKindLabels[kind]} / ${model}`,
-						})),
-				),
-			]
-		: [];
+					label: listed.find((m) => m.id === r.model)?.displayName ?? r.model,
+					groupId: c.id,
+					groupLabel,
+				});
+			for (const m of listed) {
+				if (registered.some((r) => r.model === m.id)) continue;
+				const id = `${newModelPrefix}${c.id}:${m.id}`;
+				unregistered.set(id, {
+					connectionId: c.id,
+					model: m.id,
+					contextWindow: m.contextWindow ?? UNKNOWN_CONTEXT_WINDOW,
+				});
+				options.push({
+					id,
+					label: m.displayName,
+					groupId: c.id,
+					groupLabel,
+				});
+			}
+		}
+	}
 	const selected =
 		route?.mode === "cloud-only" &&
 		route.fallbackId &&
@@ -81,6 +132,7 @@ export function useConversationModel(client: EumenesClient) {
 			: savedProfile
 				? `${larmPrefix}${savedProfile}`
 				: "";
+
 	async function select(id: string) {
 		if (!value || busy || id === selected) return;
 		setBusy(true);
@@ -92,8 +144,18 @@ export function useConversationModel(client: EumenesClient) {
 				settings.larm.profile = id.slice(larmPrefix.length);
 				if (llm.mode === "cloud-only") llm.mode = "larm-preferred";
 			} else {
-				if (id.startsWith(catalogPrefix))
-					id = registerCatalogModel(settings, id);
+				const entry = unregistered.get(id);
+				if (entry) {
+					id = crypto.randomUUID();
+					settings.resources.push({
+						id,
+						connectionId: entry.connectionId,
+						purpose: "llm",
+						model: entry.model,
+						contextWindow: entry.contextWindow,
+						voice: null,
+					});
+				}
 				llm.mode = "cloud-only";
 				llm.cloudAllowed = true;
 				llm.fallbackId = id;
@@ -119,40 +181,7 @@ export function useConversationModel(client: EumenesClient) {
 	}
 	return { ready: !!value, options, selected, busy, error, select };
 }
-/** Adds a catalog model to the first enabled connection of its kind (creating one if needed); returns the resource id. */
-function registerCatalogModel(settings: Settings, id: string) {
-	const rest = id.slice(catalogPrefix.length);
-	const kind = rest.slice(0, rest.indexOf(":")) as CatalogKind;
-	const entry = agentModelCatalog[kind].find(
-		(m) => m.model === rest.slice(kind.length + 1),
-	);
-	if (!entry) throw new Error("unknown_catalog_model");
-	let connection = settings.connections.find(
-		(c) => c.kind === kind && c.enabled,
-	);
-	if (!connection) {
-		connection = {
-			id: crypto.randomUUID(),
-			kind,
-			name: connectionKindLabels[kind],
-			baseUrl: connectionKindDefaults[kind].url,
-			enabled: true,
-			epoch: 0,
-			envRef: null,
-		};
-		settings.connections.push(connection);
-	}
-	const resourceId = crypto.randomUUID();
-	settings.resources.push({
-		id: resourceId,
-		connectionId: connection.id,
-		purpose: "llm",
-		model: entry.model,
-		contextWindow: entry.context,
-		voice: null,
-	});
-	return resourceId;
-}
+
 /** Toggles spoken replies without opening the settings page. */
 export function useVoiceMute(client: EumenesClient) {
 	const cache = useQueryClient();

@@ -31,6 +31,7 @@ import {
 	diagnosticsMigration,
 	controlMigration,
 	backgroundControlMigration,
+	migrations as inferenceMigrations,
 } from "../../inference";
 import type { LarmPort } from "../../larm";
 import { createCodingSupervision, migration } from "..";
@@ -173,6 +174,7 @@ export async function setup(
 		diagnosticsMigration,
 		controlMigration,
 		backgroundControlMigration,
+		...inferenceMigrations.slice(5).map((m) => m.sql),
 		migration,
 		...(options.migrations ?? []),
 	]);

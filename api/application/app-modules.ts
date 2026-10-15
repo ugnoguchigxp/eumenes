@@ -70,7 +70,11 @@ import {
 	type VoiceDialogueService,
 } from "../domains/voice-dialogue";
 import { registerSettings, type SettingsService } from "../domains/settings";
-import { registerInference, type InferenceService } from "../domains/inference";
+import {
+	registerInference,
+	type ConnectionModelsService,
+	type InferenceService,
+} from "../domains/inference";
 import {
 	registerTtsDictionary,
 	type TtsDictionaryService,
@@ -107,6 +111,7 @@ export type AppServices = {
 	googleAccounts?: GoogleAccounts;
 	settings?: SettingsService;
 	inference?: InferenceService;
+	connectionModels?: ConnectionModelsService;
 	ttsDictionary?: TtsDictionaryService;
 	memory?: MemoryService;
 	steward?: StewardService;
@@ -204,7 +209,9 @@ export function appModules(services: AppServices): AppModule[] {
 			mount: (app) => registerGoogleAccounts(app, s.googleAccounts!),
 		},
 		s.settings && { mount: (app) => registerSettings(app, s.settings!) },
-		s.inference && { mount: (app) => registerInference(app, s.inference!) },
+		s.inference && {
+			mount: (app) => registerInference(app, s.inference!, s.connectionModels),
+		},
 		s.serviceTests && {
 			mount: (app) => registerServiceTests(app, s.serviceTests!),
 		},

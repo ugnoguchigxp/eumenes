@@ -163,17 +163,36 @@ export async function harness(
 	const tools = createToolRuntime(store, caps, queue, adapter, now, actions);
 	const captures: string[] = [];
 	const engines: Array<string | undefined> = [];
+	const routes: unknown[] = [];
+	const sessions: unknown[] = [];
+	const releasedSessions: string[] = [];
+	/** The saved sub-agent resource the fixture settings hold. */
+	const subagent = { resourceId: null as string | null };
 	const inference = {
 		codexResearchAvailable: () => luna,
+		snapshotInTransaction: () => ({ subagent }),
 		captureControlInTransaction: (
 			_db: unknown,
-			i: { subject: string; engine?: string },
+			i: { subject: string; engine?: string; route?: unknown },
 		) => {
 			captures.push(i.subject);
 			engines.push(i.engine);
+			routes.push(i.route);
 			return `req-${captures.length}`;
 		},
-		executeControl: async () => ({}),
+		executeControl: async (
+			_id: string,
+			_messages: unknown,
+			_signal: AbortSignal,
+			_control?: unknown,
+			session?: unknown,
+		) => {
+			sessions.push(session);
+			return { value: "{}" };
+		},
+		releaseTaskSession: async (taskId: string) => {
+			releasedSessions.push(taskId);
+		},
 		acceptInTransaction: () => true,
 		rejectControlInTransaction: () => {},
 	};
@@ -317,6 +336,10 @@ export async function harness(
 		results,
 		captures,
 		engines,
+		routes,
+		sessions,
+		releasedSessions,
+		subagent,
 		task,
 		start,
 		startHistory: (runId: string, question: string) =>

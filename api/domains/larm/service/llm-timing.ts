@@ -60,7 +60,11 @@ export function startLlmTiming(
 		logged = true;
 		try {
 			const fields = {
-				profile: options?.sessionRole === "auxiliary" ? "auxiliary" : "main",
+				profile:
+					options?.sessionRole === "auxiliary" ||
+					options?.sessionRole === "subagent"
+						? "auxiliary"
+						: "main",
 				outcome,
 				...(firstDeltaAt === undefined
 					? {}

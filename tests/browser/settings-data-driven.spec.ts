@@ -360,7 +360,7 @@ test("AIと接続: an API key is applied through the draft, never stored in the 
 	await page.getByRole("button", { name: "検証用の接続", exact: true }).click();
 	// The settings adapter refuses an apply with a key and no other change, so rename too.
 	await page.getByLabel("接続名").first().fill("検証用の接続（更新）");
-	const field = page.getByLabel("APIキーの更新");
+	const field = page.getByLabel("APIキー／APIトークン／setup-tokenの更新");
 	await field.pressSequentially(KEY);
 	// The field shows one mark per character, never the key.
 	await expect(field).toHaveValue("•".repeat(KEY.length));
@@ -405,7 +405,7 @@ test("AIと接続: a connection added from the list form carries its key apart, 
 	const form = page.getByRole("form", { name: "クラウドAPIを登録" });
 	await form.getByLabel("接続名").fill(name);
 	await form.getByLabel("APIのベースURL").fill("https://example.test/v1");
-	await form.getByLabel("APIキー", { exact: true }).fill(KEY);
+	await form.getByLabel(/APIキー／APIトークン/).fill(KEY);
 	await form.getByRole("button", { name: "クラウドAPIを登録" }).click();
 	await expect(
 		page.getByRole("button", { name: "設定の変更をすべて保存" }),

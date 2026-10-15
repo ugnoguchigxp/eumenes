@@ -10,33 +10,61 @@ export {
 } from "./local-services";
 export const purposeSchema = z.enum(["llm", "asr", "tts"]);
 export type Purpose = z.infer<typeof purposeSchema>;
-/** How a cloud connection is driven: an OpenAI-compatible HTTP API or an agent SDK (LLM only). */
+/** The cloud protocol: OpenAI-compatible HTTP, Workers AI speech, or an agent SDK (LLM only). */
 export const connectionKinds = [
 	"openai-compatible",
+	"cloudflare-workers-ai",
 	"codex-sdk",
 	"claude-agent-sdk",
-	"claude-managed-agents",
 ] as const;
 export type ConnectionKind = (typeof connectionKinds)[number];
 export const isAgentConnection = (c: { kind?: ConnectionKind }) =>
-	!!c.kind && c.kind !== "openai-compatible";
-const managedAgentsId = z
-	.string()
-	.trim()
-	.regex(/^[A-Za-z0-9_-]{1,128}$/, "IDの形式が正しくありません");
+	c.kind === "codex-sdk" || c.kind === "claude-agent-sdk";
+/** How a Claude Agent SDK connection authenticates; chosen explicitly, never inferred from a stored key. */
+export const agentAuths = ["subscription", "api-key"] as const;
+export type AgentAuth = (typeof agentAuths)[number];
+/** Who bills a call: an automatic route change must never move a call to another billing path. */
+export type BillingPath =
+	| "larm"
+	| "claude-subscription"
+	| "claude-api-key"
+	| "codex"
+	| "openai-compatible"
+	| "cloudflare-workers-ai";
+export function billingPath(connection: {
+	kind?: ConnectionKind;
+	auth?: AgentAuth;
+}): Exclude<BillingPath, "larm"> {
+	switch (connection.kind) {
+		case "claude-agent-sdk":
+			return connection.auth === "subscription"
+				? "claude-subscription"
+				: "claude-api-key";
+		case "cloudflare-workers-ai":
+			return "cloudflare-workers-ai";
+		case "codex-sdk":
+			return "codex";
+		default:
+			return "openai-compatible";
+	}
+}
 export const connectionSchema = z
 	.object({
 		id: z.uuid(),
 		/** Absent: openai-compatible (settings saved before agent connections). */
 		kind: z.enum(connectionKinds).optional(),
-		/** Managed Agents only: the stored agent each session starts from. */
-		agentId: managedAgentsId.nullable().optional(),
-		/** Managed Agents only: the environment each session runs in. */
-		environmentId: managedAgentsId.nullable().optional(),
+		/** Claude Agent SDK only (required there): the credential is an API key or a `claude setup-token` OAuth token. */
+		auth: z.enum(agentAuths).optional(),
 		name: z.string().trim().min(1).max(80),
 		// Read path stays lenient so settings saved before the https rule still load;
 		// applySchema enforces cloudEndpoint on input.
 		baseUrl: endpoint,
+		/** Workers AI account; the API origin is fixed, never supplied by the catalog. */
+		accountId: z
+			.string()
+			.length(32)
+			.regex(/^[a-fA-F0-9]{32}$/)
+			.optional(),
 		enabled: z.boolean(),
 		epoch: z.number().int().nonnegative(),
 		envRef: z
@@ -60,6 +88,7 @@ export const resourceSchema = z
 		model: z.string().trim().min(1).max(200),
 		contextWindow: z.number().int().min(2048).max(2_000_000).nullable(),
 		voice: z.string().trim().max(200).nullable(),
+		language: z.string().trim().min(1).max(80).optional(),
 		speed: z.number().min(0.5).max(2).optional(),
 	})
 	.strict()
@@ -69,12 +98,6 @@ export const resourceSchema = z
 				code: "custom",
 				message: "会話モデルの文脈長が必要です",
 				path: ["contextWindow"],
-			});
-		if (r.purpose === "tts" && !r.voice)
-			ctx.addIssue({
-				code: "custom",
-				message: "読み上げ音声が必要です",
-				path: ["voice"],
 			});
 	});
 const routeSchema = z
@@ -225,6 +248,16 @@ export const settingsSchema = z
 			})
 			.strict()
 			.default({ enabled: false, curationResourceId: null }),
+		subagent: z
+			.object({
+				/**
+				 * The cloud LLM resource task sub-agents (research, operations) run on; null keeps them on LARM.
+				 * Read on each task step.
+				 */
+				resourceId: z.uuid().nullable().default(null),
+			})
+			.strict()
+			.default({ resourceId: null }),
 	})
 	.strict()
 	.superRefine((s, ctx) => {
@@ -256,7 +289,39 @@ export const settingsSchema = z
 		for (const r of s.resources)
 			if (!ids.has(r.connectionId))
 				ctx.addIssue({ code: "custom", message: "接続先がありません" });
+		for (const r of s.resources) {
+			const c = s.connections.find((c) => c.id === r.connectionId);
+			if (
+				r.purpose === "tts" &&
+				!r.voice &&
+				c?.kind !== "cloudflare-workers-ai"
+			)
+				ctx.addIssue({ code: "custom", message: "読み上げ音声が必要です" });
+		}
 		for (const c of s.connections) {
+			if (c.kind === "cloudflare-workers-ai") {
+				if (
+					!c.accountId ||
+					c.baseUrl !== "https://api.cloudflare.com/client/v4"
+				)
+					ctx.addIssue({
+						code: "custom",
+						message: "Workers AIのAccount IDと接続先が不正です",
+					});
+				if (
+					s.resources.some(
+						(r) => r.connectionId === c.id && r.purpose === "llm",
+					)
+				)
+					ctx.addIssue({
+						code: "custom",
+						message: "このWorkers AI接続は音声用途に使います",
+					});
+			} else if (c.accountId !== undefined)
+				ctx.addIssue({
+					code: "custom",
+					message: "Account IDはWorkers AI接続に指定します",
+				});
 			if (
 				isAgentConnection(c) &&
 				s.resources.some((r) => r.connectionId === c.id && r.purpose !== "llm")
@@ -265,13 +330,15 @@ export const settingsSchema = z
 					code: "custom",
 					message: "エージェントSDKの接続は会話用途にだけ使えます",
 				});
-			if (
-				c.kind === "claude-managed-agents" &&
-				(!c.agentId || !c.environmentId)
-			)
+			if ((c.kind === "claude-agent-sdk") !== !!c.auth)
 				ctx.addIssue({
 					code: "custom",
-					message: "Managed AgentsにはエージェントIDと環境IDが必要です",
+					message: "認証方式はClaude Agent SDKの接続にだけ、必ず指定します",
+				});
+			if (c.auth === "subscription" && c.envRef)
+				ctx.addIssue({
+					code: "custom",
+					message: "サブスクリプションの接続には環境変数のキーを指定できません",
 				});
 		}
 		for (const p of purposeSchema.options) {
@@ -299,6 +366,16 @@ export const settingsSchema = z
 				code: "custom",
 				message: "Worldの記録に使うAIが会話モデルとして登録されていません",
 				path: ["world", "curationResourceId"],
+			});
+		const subagentResource = s.subagent.resourceId;
+		if (
+			subagentResource &&
+			!s.resources.some((r) => r.id === subagentResource && r.purpose === "llm")
+		)
+			ctx.addIssue({
+				code: "custom",
+				message: "サブエージェントに使うAIが会話モデルとして登録されていません",
+				path: ["subagent", "resourceId"],
 			});
 	});
 export type Settings = z.infer<typeof settingsSchema>;

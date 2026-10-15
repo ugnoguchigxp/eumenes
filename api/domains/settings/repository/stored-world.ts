@@ -1,5 +1,5 @@
 import type { SqliteStore } from "../../../infrastructure/sqlite";
-import { settingsSchema } from "../contracts";
+import { parseStored } from ".";
 
 /**
  * The saved `world.enabled` for backend startup. A store without a settings
@@ -10,8 +10,6 @@ export function readStoredWorldEnabled(store: SqliteStore): boolean {
 		const row = db
 			.query("SELECT document FROM settings_document WHERE id=1")
 			.get() as { document: string } | null;
-		return row
-			? settingsSchema.parse(JSON.parse(row.document)).world.enabled
-			: false;
+		return row ? parseStored(db, row.document).world.enabled : false;
 	});
 }

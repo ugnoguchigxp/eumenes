@@ -2,7 +2,7 @@
 
 LLMのProfileは設定画面で保存した値（`larm.profile`）だけを使います。コード・既定値・手順にProfile名やモデル名を固定しません。未保存のときは `larm_profile_missing` で接続しません。初回の `LARM_PROFILE` 指定は、未保存の設定へ取り込みます。選択肢は、保存済みのLARM接続先に `GET /v3/agent-profiles` をProfile指定なしで送って得たcatalogから作り、`llm` Providerを持つProfileだけを挙げます（`backchannel` だけのProfileは含めません）。catalogを読めないときは保存済みのProfileをモデルなしで1件返します。
 
-主会話と補助のcontrol要求は、どちらも保存済みのProfileを使います。補助のcontrol要求は別のclient識別子で独立したConnectionと履歴を持ち、Profileの名前によらず同じ構成になります。LARMは共有KVとSessionを管理し、各Connectionのcontext window・出力予約はclaimを正本とします。モデル名はcatalogとclaimが返す値を使い、送信にはclaim値を使います。主会話の同一接続上の推論は順番に実行し、補助要求は独立したConnectionと履歴を使い、終了・取消時に解放します。待機中の要求はLARMのConnection lifecycleと呼出元の期限・取消に従い、readyとclaimableを確認するまで推論しません。control要求の出力schemaは、LARMには `response_format: json_schema`（strict）、OpenAI互換のcloudには `response_format: json_schema`、Codexには `outputSchema`、Claude Agent SDKには `outputFormat` で渡します。Managed Agentsには渡さず、指示文とhostの検証で受けます。
+主会話と補助のcontrol要求は、どちらも保存済みのProfileを使います。補助のcontrol要求は別のclient識別子で独立したConnectionと履歴を持ち、Profileの名前によらず同じ構成になります。LARMは共有KVとSessionを管理し、各Connectionのcontext window・出力予約はclaimを正本とします。モデル名はcatalogとclaimが返す値を使い、送信にはclaim値を使います。主会話の同一接続上の推論は順番に実行し、補助要求は独立したConnectionと履歴を使い、終了・取消時に解放します。待機中の要求はLARMのConnection lifecycleと呼出元の期限・取消に従い、readyとclaimableを確認するまで推論しません。control要求の出力schemaは、LARMには `response_format: json_schema`（strict）、OpenAI互換のcloudには `response_format: json_schema`、Codexには `outputSchema`、Claude Agent SDKには `outputFormat` で渡します。
 
 `GET /v3/agent-profiles?profile=...` から構成と `catalogRevision` を取得し、作成時に `expectedCatalogRevision` を指定します。同じclientとProfileの要求ではLARMが既存Connectionを再利用するため、各sessionに固有のclient識別子を使い、renew・再接続では同じ識別子を維持します。入力予算はclaimのcontext windowと正式なchat input計数から求めます。出力予約はclaimの上限以内で明示します。
 

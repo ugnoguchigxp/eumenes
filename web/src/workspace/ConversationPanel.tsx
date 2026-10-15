@@ -10,6 +10,7 @@ import { ResearchTaskCard } from "../domains/agent-runtime";
 import { MusicResultLink } from "../domains/music/MusicResultLink";
 import { ImageResultLink } from "../domains/image/ImageResultLink";
 import { useConversationModel } from "../domains/settings";
+import { ConversationModelSelect } from "./ConversationModelSelect";
 import { describeConnectionState } from "../errorMessages";
 import { ConversationComposer } from "./ConversationComposer";
 import type { WorkspaceState } from "./useWorkspace";
@@ -110,9 +111,6 @@ export function ConversationPanel({
 			element?.removeEventListener("drop", drop);
 		};
 	}, [state]);
-	const lastUsed = actualModel
-		? `直近の利用: ${actualModel.source === "cloud" ? "クラウド" : "LARM"} / ${actualModel.model}`
-		: undefined;
 	const subtitleText =
 		replay.subtitle ?? (phase === "playing" ? voice.subtitle : null);
 	const subtitles = settings.data?.general.subtitles;
@@ -143,6 +141,11 @@ export function ConversationPanel({
 				}
 			/>
 			<div className="conversation-status" aria-label="接続状態とモデル">
+				<ConversationModelSelect
+					model={model}
+					running={!!activeRun}
+					actualModel={actualModel}
+				/>
 				<span
 					className="connection-health"
 					data-state={connectionState}
@@ -154,17 +157,6 @@ export function ConversationPanel({
 						{describeConnectionState(connectionState)}
 					</span>
 				</span>
-				{model.ready ? (
-					<span className="model-label" title={lastUsed}>
-						{model.options.find((option) => option.id === model.selected)
-							?.label ?? actualModel?.model}
-					</span>
-				) : (
-					<span className="model-label">
-						{actualModel?.source === "cloud" && "クラウド / "}
-						{actualModel?.model}
-					</span>
-				)}
 			</div>
 			{model.error && (
 				<p className="chat-error" role="alert">

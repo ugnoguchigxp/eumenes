@@ -1,0 +1,11 @@
+
+Running 4 tests using 1 worker
+
+(node:68836) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 tests/browser/settings-data-driven.spec.ts:189:1 › display previews the subtitle before saving (8.0s)
+  ✓  2 tests/browser/settings-data-driven.spec.ts:219:1 › display has an animation tab that plays every motion on the background spirit (15.1s)
+  ✓  3 tests/browser/settings-data-driven.spec.ts:326:1 › AIと接続: an API key is applied through the draft, never stored in the browser (20.7s)
+  ✓  4 tests/browser/settings-data-driven.spec.ts:396:1 › AIと接続: a connection added from the list form carries its key apart, and can be deleted (12.7s)
+
+  4 passed (58.6s)

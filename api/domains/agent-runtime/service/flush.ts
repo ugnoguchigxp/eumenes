@@ -53,6 +53,12 @@ export function createFlush(ctx: RuntimeContext) {
 				catalogs.delete(id);
 				prepared.delete(id);
 				actionPrepared.delete(id);
+				// The task reported its result (or was cancelled): its agent sessions end with it.
+				void inference
+					.releaseTaskSession?.(id)
+					.catch((error) =>
+						log.warn("agent.task_session_release_failed", {}, error),
+					);
 			}
 		}
 		releases.clear();

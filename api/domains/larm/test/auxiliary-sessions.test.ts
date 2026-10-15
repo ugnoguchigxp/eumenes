@@ -232,6 +232,33 @@ test("main plus three helpers infer independently; fifth waits without claim or 
 	expect(f.connections.size).toBe(0);
 });
 
+test("a sub-agent call infers on its own connection like a helper, not on the main one", async () => {
+	const f = fixture();
+	const main = f.create();
+	const signal = AbortSignal.timeout(10000);
+	const work: Promise<string>[] = [];
+	try {
+		work.push(main.answer(history("main"), signal));
+		await until(() => f.inference.size === 1);
+		work.push(
+			main.answer(history("task"), signal, {
+				sessionRole: "subagent",
+				taskId: "agent:task-1",
+			}),
+		);
+		await until(() => f.inference.size === 2);
+		expect(new Set([...f.connections.values()].map((c) => c.client)).size).toBe(
+			2,
+		);
+		expect(f.inference.get("session1")!.messages).toEqual(history("task"));
+		for (const [id, entry] of f.inference) entry.output.resolve(id);
+		await Promise.all(work);
+	} finally {
+		await main.close();
+		await Promise.allSettled(work);
+	}
+});
+
 test("cancellation of a waiting helper releases it and never infers; parent close releases active helpers", async () => {
 	const f = fixture(),
 		main = f.create();

@@ -293,7 +293,15 @@ test("refusals of a connection apply are explained in words", async () => {
 	const backend = seeded();
 	fireEvent.click(await screen.findByRole("button", { name: "クラウド音声" }));
 	for (const [code, text] of [
-		["credential_required", "APIキーまたは環境変数名のどちらかが必要です。"],
+		[
+			"credential_required",
+			"認証情報が必要です。APIキー認証ではAPIキーか環境変数名、サブスクリプションでは setup-token のトークンを入力してください。",
+		],
+		["auth_required", "Claude Agent SDKの接続には認証方式の指定が必要です。"],
+		[
+			"invalid_billing_path_change",
+			"使用中のモデルがある接続の認証方式は変更できません。新しい接続を登録して、モデルを選び直してください。",
+		],
 		["connection_exists", "同じ接続がすでに登録されています。"],
 		[
 			"invalid_origin_requires_new_key",

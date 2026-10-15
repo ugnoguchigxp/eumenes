@@ -56,8 +56,14 @@ export type LarmCallOptions = {
 		pitchScale?: number;
 		intonationScale?: number;
 	};
-	/** Explicit execution role; helper calls use independent, short-lived 64K connections. */
-	sessionRole?: "main" | "auxiliary";
+	/**
+	 * Session lifetime of this call, set by the caller (independent of the output mode):
+	 * `main` the conversation agent's answer, `subagent` one task (requires `taskId`), `auxiliary` a one-shot call.
+	 * Helper calls on LARM use independent, short-lived 64K connections.
+	 */
+	sessionRole?: "main" | "subagent" | "auxiliary";
+	/** `subagent` only: the task whose calls share one agent session. */
+	taskId?: string;
 	speechLanguage?: SentenceLanguage;
 	tools?: NativeTool[];
 	onToolCalls?: (calls: NativeToolCall[]) => void;
@@ -66,6 +72,8 @@ export type LarmCallOptions = {
 	jsonOutput?: boolean;
 	/** Optional schema constraint for internal JSON control calls; host validation remains required. */
 	jsonSchema?: Record<string, unknown>;
+	/** Optional effort for SDK-backed control tasks; ignored by providers without this option. */
+	reasoningEffort?: "low";
 	contextPolicy?: "exact";
 	onExchange?: (exchange: LarmExchange) => Promise<void>;
 	speechVoice?: string;

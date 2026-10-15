@@ -164,10 +164,7 @@ function CompositionView({
 								{tab.arrangement === "form-preview" ? (
 									<SettingsSectionView
 										request={request.children[tab.children[0]!]!}
-										hideFooter={
-											request.draftSource ===
-											request.children[tab.children[0]!]!.source
-										}
+										hideFooter={!!request.draftSource}
 										supplement={
 											<RegisteredView
 												request={request.children[tab.children[1]!]!}
@@ -178,7 +175,7 @@ function CompositionView({
 									tab.children.map((childIndex) => {
 										const child = request.children[childIndex]!;
 										return child.view === "settings-section" &&
-											request.draftSource === child.source ? (
+											request.draftSource ? (
 											<SettingsSectionView
 												key={`${childIndex}:${child.source}`}
 												request={child}

@@ -20,6 +20,7 @@ import {
 	settingsMessages,
 } from "./settings-screens";
 import { useFieldOptions, useTargets } from "./settings-sources";
+import { useModelCatalog } from "./useModelCatalog";
 import { useVoiceTools } from "./useVoiceTools";
 
 export const SETTINGS_ADAPTER_REF = "adapter:settings@1";
@@ -79,6 +80,16 @@ function useSettingsArtifact(context: AdapterHostContext): AdapterState {
 			})),
 		},
 	});
+	const catalogActive = artifact.sourceBindings.some(
+		(s) => s.source === "settings-model-catalog",
+	);
+	const modelCatalog = useModelCatalog(
+		client,
+		saved,
+		effective,
+		view,
+		catalogActive,
+	);
 	const fetchedOptions = useFieldOptions(client, all);
 	const ruleOf = createRuleOf({ effective, voice, fetchedOptions });
 	const access = createAccess({ saved, effective, voice, targetsOf, ruleOf });
@@ -122,6 +133,8 @@ function useSettingsArtifact(context: AdapterHostContext): AdapterState {
 		documentFieldsReady,
 	});
 
+	if (catalogActive) snapshot["settings-model-catalog"] = modelCatalog.resource;
+
 	const phase: AdapterState["phase"] = query.isError
 		? {
 				kind: "error",
@@ -136,6 +149,13 @@ function useSettingsArtifact(context: AdapterHostContext): AdapterState {
 		event: ArtifactEvent,
 	): Promise<Receipt> {
 		const id = String(event.values.id ?? "");
+		if (binding.source === "settings-model-catalog")
+			return (
+				(await modelCatalog.run(id)) ?? {
+					status: "rejected",
+					message: "この操作は利用できません",
+				}
+			);
 		const action = actions.find((a) => a.id === id && !a.disabled);
 		if (binding.eventAction !== "settings-action" || !action)
 			return { status: "rejected", message: "この操作は利用できません" };
@@ -170,6 +190,8 @@ function useSettingsArtifact(context: AdapterHostContext): AdapterState {
 		documents: { [SETTINGS_DOCUMENT]: access },
 		describeRejection: (code) => (code ? settingsMessages[code] : undefined),
 		editLocal(key, wire) {
+			const catalogResult = modelCatalog.edit(key, wire);
+			if (catalogResult) return catalogResult;
 			if (key !== "speech.target" || voice.targets.length < 2) return null;
 			if (!voice.targets.some((t) => t.value === wire))
 				return { status: "rejected", message: "未登録の読み上げ先です" };

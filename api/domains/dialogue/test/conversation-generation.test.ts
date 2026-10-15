@@ -29,6 +29,7 @@ const chosen = (c: ToolchainCard, request: string) => ({
 
 function fixture(outputs: Partial<Receipt>[], tools = toolchainTools(CARDS)) {
 	const seen: Parameters<InferencePort["answer"]>[0][] = [];
+	const sessions: unknown[] = [];
 	const inference = {
 		executeRequest: async () => {
 			throw new Error("nonstream_not_expected");
@@ -38,8 +39,12 @@ function fixture(outputs: Partial<Receipt>[], tools = toolchainTools(CARDS)) {
 			messages: Parameters<InferencePort["answer"]>[0],
 			_signal: AbortSignal,
 			delta: (s: string) => void,
+			_preparation?: unknown,
+			_tools?: unknown,
+			session?: unknown,
 		) => {
 			seen.push(messages);
+			sessions.push(session);
 			const output = outputs.shift();
 			if (!output) throw new Error("extra_call");
 			if (output.value)
@@ -56,9 +61,13 @@ function fixture(outputs: Partial<Receipt>[], tools = toolchainTools(CARDS)) {
 	const deltas: string[] = [];
 	return {
 		seen,
+		sessions,
 		deltas,
 		repairs: () => repairs,
-		run: () =>
+		run: (
+			sessionRole: "main" | "auxiliary" = "main",
+			session?: Parameters<typeof generateConversation>[0]["session"],
+		) =>
 			generateConversation({
 				inference,
 				requestId: "request",
@@ -74,6 +83,8 @@ function fixture(outputs: Partial<Receipt>[], tools = toolchainTools(CARDS)) {
 				delta: (s) => deltas.push(s),
 				tools,
 				cards: CARDS,
+				sessionRole,
+				session,
 				repair: () => repairs++,
 			}),
 	};
@@ -87,6 +98,44 @@ test("ordinary dialogue streams one call and keeps preceding conversational cont
 	);
 	expect(h.deltas.join("")).toBe(result.text);
 	expect(result.operation).toBeUndefined();
+});
+test("every call, including the structural correction, carries the caller's session role", async () => {
+	const bad = {
+		toolCalls: [{ id: "call", name: "unknown_function", arguments: "{}" }],
+	};
+	const answer = fixture([bad, { value: "明日の予定でございます。" }]);
+	await answer.run("main");
+	expect(answer.sessions).toEqual([
+		{ sessionRole: "main" },
+		{ sessionRole: "main" },
+	]);
+	const selection = fixture([{ value: "選択" }]);
+	await selection.run("auxiliary");
+	expect(selection.sessions).toEqual([{ sessionRole: "auxiliary" }]);
+});
+test("the history split and the references reach every main call, the correction too, and never a one-shot call", async () => {
+	const bad = {
+		toolCalls: [{ id: "call", name: "unknown_function", arguments: "{}" }],
+	};
+	const session = {
+		context: { instructionCount: 1, historyCount: 2 },
+		refs: { messageIds: ["m1"], itemIds: ["i1"] },
+	};
+	const answer = fixture([bad, { value: "明日の予定でございます。" }]);
+	await answer.run("main", session);
+	expect(answer.sessions).toEqual([
+		{ sessionRole: "main", ...session },
+		{ sessionRole: "main", ...session },
+	]);
+	// The correction keeps the instruction block first and appends the rejected output to this turn's input.
+	expect(answer.seen[1]!.at(-1)!.content).toStartWith(
+		"UNTRUSTED_REJECTED_OUTPUT=",
+	);
+	const selection = fixture([{ value: "選択" }]);
+	await selection.run("auxiliary", session);
+	expect(selection.sessions).toEqual([
+		{ sessionRole: "auxiliary", refs: session.refs },
+	]);
 });
 test("one native research operation publishes no control text", async () => {
 	const h = fixture([
@@ -295,6 +344,7 @@ test("aborted generation never starts a correction", async () => {
 			delta: () => {},
 			tools: toolchainTools(CARDS),
 			cards: CARDS,
+			sessionRole: "main",
 			repair: () => repair++,
 		}),
 	).rejects.toThrow("cancelled");
@@ -326,6 +376,7 @@ test("cancellation after the provider returns prevents control repair and pendin
 			messages: [],
 			signal: controller.signal,
 			delta: (s) => published.push(s),
+			sessionRole: "main",
 			repair: () => repairs++,
 		}),
 	).rejects.toThrow();

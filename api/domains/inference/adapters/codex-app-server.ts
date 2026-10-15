@@ -10,6 +10,7 @@ export type CodexTurn = {
 	instructions: string;
 	prompt: string;
 	outputSchema?: unknown;
+	reasoningEffort?: "low";
 	signal: AbortSignal;
 	/** The current agent message so far (cumulative), on every delta. */
 	onMessage?: (text: string) => void;
@@ -202,6 +203,7 @@ export async function runCodexTurn(
 			threadId,
 			input: [{ type: "text", text: turn.prompt, text_elements: [] }],
 			...(turn.outputSchema ? { outputSchema: turn.outputSchema } : {}),
+			...(turn.reasoningEffort ? { effort: turn.reasoningEffort } : {}),
 		})) as { turn?: { id?: string } };
 		turnId = begun?.turn?.id;
 		return await done;

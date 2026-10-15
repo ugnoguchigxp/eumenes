@@ -34,8 +34,8 @@ const fieldLabel = (id: string) =>
 		.flatMap((a) => a.fields ?? [])
 		.find((f) => f.fieldId === id)!.label;
 
-function open(cloud?: boolean) {
-	const backend = createSettingsBackend({ artifacts, cloud });
+function open(cloud?: boolean, claude?: boolean) {
+	const backend = createSettingsBackend({ artifacts, cloud, claude });
 	render(<Screens backend={backend} start="hub" cache={newCache(backend)} />);
 	return backend;
 }
@@ -125,4 +125,49 @@ test("the shipped AI and connections screen lists each connection as a group wit
 			},
 		],
 	});
+});
+
+test("the shipped AI screen offers the auth method and the setup token of a Claude Agent SDK connection only", async () => {
+	const backend = open(false, true);
+	fireEvent.click(await screen.findByRole("button", { name: "AIと接続" }));
+	fireEvent.click(await screen.findByRole("button", { name: "クラウド音声" }));
+	expect(screen.queryByLabelText(fieldLabel("connection.auth"))).toBeNull();
+	fireEvent.click(await screen.findByRole("button", { name: "Claude購読" }));
+	const auth = (await screen.findByLabelText(
+		fieldLabel("connection.auth"),
+	)) as HTMLSelectElement;
+	expect([...auth.options].map((o) => o.textContent)).toEqual(
+		expect.arrayContaining(["サブスクリプション", "APIキー"]),
+	);
+	expect(screen.getByLabelText(fieldLabel("connection.api-key"))).toBeDefined();
+	expect(fieldLabel("connection.api-key")).toContain("setup-token");
+	expect(
+		bundle.artifacts
+			.flatMap((a) => a.fields ?? [])
+			.some((f) => JSON.stringify(f).includes("Managed")),
+	).toBe(false);
+	fireEvent.change(auth, { target: { value: "api-key" } });
+	fireEvent.click(
+		screen.getByRole("button", { name: "設定の変更をすべて保存" }),
+	);
+	await screen.findAllByText("変更を適用しました");
+	expect(backend.sent[0]!.input).toMatchObject({
+		changes: [
+			{
+				fieldId: "connection.auth",
+				target: backend.claude.connectionId,
+				value: "api-key",
+			},
+		],
+	});
+});
+
+test("the shipped conversation screen selects the sub-agent AI, none meaning LARM", async () => {
+	const backend = open(false, true);
+	fireEvent.click(await screen.findByRole("button", { name: "会話" }));
+	const select = (await screen.findByLabelText(
+		fieldLabel("subagent.resource"),
+	)) as HTMLSelectElement;
+	expect(select.value).toBe("");
+	expect(backend.sent).toHaveLength(0);
 });

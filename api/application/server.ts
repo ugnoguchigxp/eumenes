@@ -12,6 +12,7 @@ import { createLocalServices } from "../domains/larm";
 import { createObjectRecognition } from "../domains/object-recognition";
 import { CONVERSATION_DEFAULT_PRINCIPAL } from "../domains/conversation/contracts";
 import { createTaskReportDelivery } from "./task-report-delivery";
+import { createWebReview } from "./web-content-review";
 import { createDotsDialogue } from "./dots-dialogue";
 import { createDotsTasks } from "./dots-tasks";
 import { appServices } from "./server-app-services";
@@ -46,6 +47,7 @@ import {
 	createInference,
 	createCodexResearch,
 	createCloudAgents,
+	createConnectionModels,
 } from "../domains/inference";
 import { createQueue } from "../domains/queue";
 import { createScheduler } from "../domains/scheduler";
@@ -58,6 +60,7 @@ import { createMemoryService } from "../domains/memory";
 import { recoverSteward } from "./steward-assembly";
 import {
 	createWebResearch,
+	createWebAcquisition,
 	createWebCache,
 	openWebCache,
 } from "../domains/web-research";
@@ -145,7 +148,15 @@ export async function buildServices(
 	} catch {
 		log.warn("web.cache_unavailable", { reason: "cache_open_failed" });
 	}
-	const webResearch = createWebResearch({ store, queue, cache: webCache });
+	const webResearch = createWebResearch({
+		store,
+		queue,
+		cache: webCache,
+		acquisition: createWebAcquisition({
+			review: createWebReview(store, inference),
+		}),
+		acquisitionTimeoutMs: 30000,
+	});
 	const scheduler = createScheduler(store, queue);
 	const timers = createTimers(
 		store,
@@ -240,6 +251,8 @@ export async function buildServices(
 		journalPath: memoryJournalPath,
 		embed: () => embedder,
 	});
+	// Forgetting revokes agent calls still running on what was forgotten (a no-op when replayed at startup).
+	memory.registerForgetPurge(inference.revokeAgentAttemptsInTransaction);
 	const { stewardAssembly, steward, goals, world } = assembleCuration(config, {
 		store,
 		memory,
@@ -405,6 +418,7 @@ export async function buildServices(
 		datasetStore,
 		attitudeDataset,
 		inference,
+		connectionModels: createConnectionModels(settings, config.env, { store }),
 		serviceTests,
 		excalidraw,
 		drawingOperations,

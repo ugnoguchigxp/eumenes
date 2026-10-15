@@ -1,7 +1,36 @@
 import type { Hono } from "hono";
 import type { InferenceService } from "../service";
+import type { ConnectionModelsService } from "../service/connection-models";
 import { usagePageQuerySchema } from "../contracts";
-export function registerInference(app: Hono, service: InferenceService) {
+/** Credential and route failures of a model-list read; anything else is an upstream failure. */
+const modelListStatus = (code: string) =>
+	code === "cloud_credential_unavailable" ? 409 : 502;
+export function registerInference(
+	app: Hono,
+	service: InferenceService,
+	models?: ConnectionModelsService,
+) {
+	if (models)
+		app.get("/api/inference/connections/:id/models", async (c) => {
+			const refresh = c.req.query("refresh");
+			if (refresh !== undefined && refresh !== "1")
+				return c.json({ error: "invalid_request" }, 400);
+			try {
+				const result = await models.list(
+					c.req.param("id"),
+					AbortSignal.any([c.req.raw.signal, AbortSignal.timeout(30_000)]),
+					refresh === "1",
+				);
+				return result ? c.json(result) : c.json({ error: "not_found" }, 404);
+			} catch (error) {
+				const code =
+					error instanceof Error &&
+					/^[a-z][a-z0-9_]{0,100}$/.test(error.message)
+						? error.message
+						: "cloud_agent_failed";
+				return c.json({ error: code }, modelListStatus(code));
+			}
+		});
 	app.get("/api/inference/status", (c) => c.json(service.status()));
 	app.get("/api/inference/larm", (c) => c.json(service.inspect()));
 	app.get("/api/inference/larm/profiles", async (c) =>

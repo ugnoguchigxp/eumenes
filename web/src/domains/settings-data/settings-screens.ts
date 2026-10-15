@@ -40,7 +40,11 @@ export const settingsMessages: Record<string, string> = {
 	target_not_found:
 		"対象のモデルや接続が見つかりません。画面を更新してやり直してください。",
 	invalid_value: "入力値がこの項目の条件に合いません。",
-	credential_required: "APIキーまたは環境変数名のどちらかが必要です。",
+	credential_required:
+		"認証情報が必要です。APIキー認証ではAPIキーか環境変数名、サブスクリプションでは setup-token のトークンを入力してください。",
+	auth_required: "Claude Agent SDKの接続には認証方式の指定が必要です。",
+	invalid_billing_path_change:
+		"使用中のモデルがある接続の認証方式は変更できません。新しい接続を登録して、モデルを選び直してください。",
 	invalid_credential_source:
 		"APIキーと環境変数名は同時に使えません。どちらか一方にしてください。",
 	connection_exists: "同じ接続がすでに登録されています。",

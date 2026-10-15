@@ -137,7 +137,7 @@ test("describe offers the settings document, one write operation, its queries an
 	const d = describeSettingsAdapter();
 	expect([...d.documents.keys()]).toEqual(["document:settings@1"]);
 	expect(d.operations.get("settings.apply")).toEqual({
-		inputSchemaRef: "schema:settings-apply@2",
+		inputSchemaRef: "schema:settings-apply@3",
 		effect: "write",
 	});
 	expect([...d.queries].sort()).toEqual([
@@ -152,7 +152,9 @@ test("describe offers the settings document, one write operation, its queries an
 	]);
 	expect([...d.structures.keys()].sort()).toEqual([
 		"structure:settings.add-connection@1",
+		"structure:settings.add-connection@2",
 		"structure:settings.add-resource@1",
+		"structure:settings.add-resource@2",
 		"structure:settings.confirm-larm-origin@1",
 		"structure:settings.delete-connection@1",
 		"structure:settings.delete-resource@1",
@@ -189,7 +191,8 @@ test("describePath accepts leaves and stable-id array elements and rejects objec
 		"$.resources[id=$target].voice",
 		"$.resources[id=$target].speed",
 		"$.connections[id=$target].name",
-		"$.connections[id=$target].agentId",
+		"$.connections[id=$target].auth",
+		"$.subagent.resourceId",
 	])
 		expect(ok(path)).toBe(true);
 	for (const path of [
@@ -608,7 +611,7 @@ test("the registered settings bundle applies a draft through the action ledger a
 			eventCreatedAt: new Date(now).toISOString(),
 			eventExpiresAt: new Date(now + 60_000).toISOString(),
 			artifactId: "tab-1",
-			artifactRevisionId: "artifact:settings.conversation@5",
+			artifactRevisionId: "artifact:settings.conversation@7",
 			source,
 			sourceRevision: revision,
 			actionId: "apply",
@@ -763,9 +766,9 @@ test("every structure and action of the bundle is registered with a matching sch
 				actionBindings: Array<{ structure?: string; inputSchemaRef: string }>;
 			}>;
 		}
-	).artifacts.find((a) => a.id === "settings.ai-connections")!;
-	const staged = ai.actionBindings.filter((a) => a.structure);
-	expect(staged.map((a) => a.structure).sort()).toEqual(
+	).artifacts.filter((a) => a.id === "settings.ai-connections");
+	const staged = ai.flatMap((a) => a.actionBindings.filter((a) => a.structure));
+	expect([...new Set(staged.map((a) => a.structure))].sort()).toEqual(
 		[...d.structures.keys()].sort(),
 	);
 	for (const action of staged)
@@ -869,7 +872,7 @@ test("a new connection takes exactly one credential source, except CLI-login age
 	expect(
 		await code(connectionInput(b), [{ connectionId: b, value: "sk-b" }]),
 	).toBe("no_error");
-	// Codex and Claude Agent SDK may use the CLI login; managed agents need a credential and ids.
+	// Codex may use the CLI login; Claude Agent SDK needs its auth method and a stored credential.
 	const c = uuid();
 	expect(
 		await code(
@@ -882,20 +885,55 @@ test("a new connection takes exactly one credential source, except CLI-login age
 		),
 	).toBe("no_error");
 	const m = uuid();
+	expect(await code(connectionInput(m, { kind: "claude-agent-sdk" }))).toBe(
+		"auth_required",
+	);
 	expect(
 		await code(
-			connectionInput(m, {
-				kind: "claude-managed-agents",
-				agentId: "agent_1",
-				environmentId: "env_1",
-			}),
+			connectionInput(m, { kind: "claude-agent-sdk", auth: "subscription" }),
 		),
 	).toBe("credential_required");
 	expect(
-		await code(connectionInput(m, { kind: "claude-managed-agents" }), [
-			{ connectionId: m, value: "sk-m" },
-		]),
-	).toBe("invalid_settings");
+		await code(
+			connectionInput(m, {
+				kind: "claude-agent-sdk",
+				auth: "api-key",
+			}),
+		),
+	).toBe("credential_required");
+	// A subscription takes the setup token as a stored key, never an environment variable.
+	expect(
+		await code(
+			connectionInput(m, {
+				kind: "claude-agent-sdk",
+				auth: "subscription",
+				envRef: "EUMENES_CLOUD_KEY",
+			}),
+		),
+	).toBe("invalid_credential_source");
+	expect(
+		await code(
+			connectionInput(m, { kind: "claude-agent-sdk", auth: "subscription" }),
+			[{ connectionId: m, value: "setup-token" }],
+		),
+	).toBe("no_error");
+	const k = uuid();
+	expect(
+		await code(
+			connectionInput(k, {
+				kind: "claude-agent-sdk",
+				auth: "api-key",
+				envRef: "EUMENES_CLOUD_KEY",
+			}),
+		),
+	).toBe("no_error");
+	// The removed Managed Agents kind and its fields are no longer input.
+	expect(
+		await code(connectionInput(uuid(), { kind: "claude-managed-agents" }), []),
+	).toBe("invalid_input");
+	expect(await code(connectionInput(uuid(), { agentId: "agent_1" }), [])).toBe(
+		"invalid_input",
+	);
 	// A repeated id, a half-given model and unknown input are refused.
 	expect(await code(connectionInput(a, { envRef: "EUMENES_CLOUD_KEY" }))).toBe(
 		"connection_exists",
@@ -906,10 +944,16 @@ test("a new connection takes exactly one credential source, except CLI-login age
 	expect(await code({ ...connectionInput(uuid()), extra: 1 })).toBe(
 		"invalid_input",
 	);
-	expect(h.settings.get().connections.map((x) => x.kind ?? "http")).toEqual([
-		"http",
-		"http",
-		"codex-sdk",
+	expect(
+		h.settings
+			.get()
+			.connections.map((x) => `${x.kind ?? "http"}:${x.auth ?? "-"}`),
+	).toEqual([
+		"http:-",
+		"http:-",
+		"codex-sdk:-",
+		"claude-agent-sdk:subscription",
+		"claude-agent-sdk:api-key",
 	]);
 });
 
@@ -960,6 +1004,93 @@ test("deleting a connection removes its models, frees the routes that used them 
 			}),
 		),
 	).toBe("target_not_found");
+});
+
+test("connection targets name the auth method and never claim a Claude login", async () => {
+	const h = await setup();
+	const [subscription, apiKey, codex] = [uuid(), uuid(), uuid()];
+	await apply(h, {
+		expectedRevision: rev(h),
+		structural: [
+			structure(
+				ADD_CONNECTION,
+				connectionInput(subscription, {
+					kind: "claude-agent-sdk",
+					auth: "subscription",
+				}),
+			),
+			structure(
+				ADD_CONNECTION,
+				connectionInput(apiKey, {
+					kind: "claude-agent-sdk",
+					auth: "api-key",
+					envRef: "EUMENES_CLOUD_KEY",
+				}),
+			),
+			structure(ADD_CONNECTION, connectionInput(codex, { kind: "codex-sdk" })),
+		],
+		keys: [{ connectionId: subscription, value: "setup-token" }],
+	});
+	const targets = (
+		h.store.read((db) =>
+			h.adapter.sourceInTransaction(
+				db,
+				"query:settings.connections@1",
+				undefined,
+			),
+		)!.data as { targets: Array<Record<string, unknown>> }
+	).targets;
+	expect(targets.map((t) => [t.kind, t.auth, t.credential])).toEqual([
+		["claude-agent-sdk", "subscription", "registered"],
+		["claude-agent-sdk", "api-key", "environment"],
+		["codex-sdk", undefined, "login"],
+	]);
+	expect(JSON.stringify(targets)).not.toContain("setup-token");
+});
+
+test("deleting a model or connection also frees the dedicated World and sub-agent models that used it", async () => {
+	const h = await setup();
+	const { connectionId } = await withModels(h);
+	const worldModel = uuid();
+	const subagentModel = uuid();
+	await apply(h, {
+		expectedRevision: rev(h),
+		structural: [
+			structure(ADD_RESOURCE, {
+				resourceId: worldModel,
+				connectionId,
+				purpose: "llm",
+				model: "world-model",
+			}),
+			structure(ADD_RESOURCE, {
+				resourceId: subagentModel,
+				connectionId,
+				purpose: "llm",
+				model: "subagent-model",
+			}),
+		],
+	});
+	const current = h.settings.get();
+	current.world.curationResourceId = worldModel;
+	current.subagent.resourceId = subagentModel;
+	await h.settings.apply({
+		requestId: uuid(),
+		expectedRevision: current.revision,
+		settings: current,
+		keys: [],
+	});
+	await apply(h, {
+		expectedRevision: rev(h),
+		structural: [structure(DELETE_RESOURCE, { resourceId: subagentModel })],
+	});
+	expect(h.settings.get().subagent.resourceId).toBeNull();
+	expect(h.settings.get().world.curationResourceId).toBe(worldModel);
+	await apply(h, {
+		expectedRevision: rev(h),
+		structural: [structure(DELETE_CONNECTION, { connectionId })],
+	});
+	expect(h.settings.get().world.curationResourceId).toBeNull();
+	expect(h.settings.get().resources).toEqual([]);
 });
 
 test("models are added and deleted, and a change may name an added model as its target", async () => {
@@ -1302,7 +1433,7 @@ test("the AI and external-work artifacts apply through the action ledger with st
 			eventCreatedAt: new Date(now).toISOString(),
 			eventExpiresAt: new Date(now + 60_000).toISOString(),
 			artifactId: "tab-ai",
-			artifactRevisionId: "artifact:settings.ai-connections@5",
+			artifactRevisionId: "artifact:settings.ai-connections@7",
 			source: "settings-ai",
 			sourceRevision: rev(h),
 			actionId: "apply",

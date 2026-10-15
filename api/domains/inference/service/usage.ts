@@ -16,7 +16,7 @@ const columns = {
 const from =
 	"FROM inference_attempts a JOIN inference_requests r ON r.id=a.request_id";
 const select =
-	"SELECT a.id,a.request_id AS requestId,r.subject,r.purpose,a.source,a.model,a.status,a.reason,a.started,a.ended,a.accepted,a.input_tokens AS inputTokens,a.output_tokens AS outputTokens,a.provider_details AS providerDetails";
+	"SELECT a.id,a.request_id AS requestId,r.subject,r.purpose,a.source,a.model,a.status,a.reason,a.started,a.ended,a.accepted,a.input_tokens AS inputTokens,a.output_tokens AS outputTokens,a.billing_path AS billingPath,a.provider_details AS providerDetails";
 const decodeRaw = (row: unknown) => {
 	const value = row as Record<string, unknown>;
 	return {

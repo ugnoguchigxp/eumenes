@@ -8,6 +8,7 @@ import {
 	ttsVoicesSchema,
 } from "../api/domains/larm/contracts";
 import {
+	connectionModelsSchema,
 	larmDetailsSchema,
 	larmProfilesSchema,
 	probeSchema,
@@ -22,6 +23,7 @@ import {
 } from "../api/domains/settings/contracts";
 import { json, type Transport } from "./transport";
 export type {
+	ConnectionModels,
 	LarmDetails,
 	LarmProfiles,
 	Usage,
@@ -64,6 +66,19 @@ export function settingsClient(t: Transport) {
 		applySettings: async (input: ApplySettings) =>
 			settingsSchema.parse(
 				await (await t.call("/api/settings/apply", json(input))).json(),
+			),
+		connectionModels: async (
+			connectionId: string,
+			signal?: AbortSignal,
+			refresh = false,
+		) =>
+			connectionModelsSchema.parse(
+				await (
+					await t.call(
+						`/api/inference/connections/${encodeURIComponent(connectionId)}/models${refresh ? "?refresh=1" : ""}`,
+						{ signal },
+					)
+				).json(),
 			),
 		settingsDiagnostics: async () =>
 			diagnosticsSchema.parse(

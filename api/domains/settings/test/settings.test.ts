@@ -879,3 +879,240 @@ test("world.curationResourceId must name a registered LLM resource", async () =>
 	};
 	expect(settingsSchema.safeParse(withResource).success).toBe(true);
 });
+
+function claude(
+	s: Settings,
+	auth: "subscription" | "api-key",
+	extra: Partial<Settings["connections"][number]> = {},
+) {
+	const connection = crypto.randomUUID();
+	const resource = crypto.randomUUID();
+	s.connections.push({
+		id: connection,
+		kind: "claude-agent-sdk",
+		auth,
+		name: `Claude ${auth}`,
+		baseUrl: "https://claude.example.test",
+		enabled: true,
+		epoch: 0,
+		envRef: null,
+		...extra,
+	});
+	s.resources.push({
+		id: resource,
+		connectionId: connection,
+		purpose: "llm",
+		model: `claude-${auth}`,
+		contextWindow: 8192,
+		voice: null,
+	});
+	return { connection, resource };
+}
+const save = (
+	h: Awaited<ReturnType<typeof setup>>,
+	s: Settings,
+	keys: Array<{ connectionId: string; value: string | null }> = [],
+) =>
+	h.settings.apply({
+		requestId: crypto.randomUUID(),
+		expectedRevision: s.revision,
+		settings: s,
+		keys,
+	});
+
+test("auth is required exactly for Claude Agent SDK connections and a subscription takes no env ref", async () => {
+	const h = await setup();
+	const s = h.settings.get();
+	const { connection } = claude(s, "api-key");
+	expect(settingsSchema.safeParse(s).success).toBe(true);
+	const conn = s.connections.find((c) => c.id === connection)!;
+	delete conn.auth;
+	expect(settingsSchema.safeParse(s).success).toBe(false);
+	conn.auth = "subscription";
+	conn.envRef = "EUMENES_CLOUD_KEY";
+	expect(settingsSchema.safeParse(s).success).toBe(false);
+	conn.envRef = null;
+	expect(settingsSchema.safeParse(s).success).toBe(true);
+	conn.kind = "codex-sdk";
+	expect(settingsSchema.safeParse(s).success).toBe(false);
+	conn.kind = undefined;
+	expect(settingsSchema.safeParse(s).success).toBe(false);
+});
+
+test("stored settings are migrated once: Managed Agents removed, auth filled, nothing else changed", async () => {
+	const h = await setup();
+	const s = h.settings.get();
+	const keyed = claude(s, "api-key");
+	const bare = claude(s, "subscription");
+	const viaEnv = claude(s, "api-key", { envRef: "EUMENES_CLOUD_KEY" });
+	const managed = crypto.randomUUID();
+	const managedResource = crypto.randomUUID();
+	await save(h, s, [{ connectionId: keyed.connection, value: "sk-keep" }]);
+	const kept = h.settings.get();
+	const epoch = kept.connections.find((c) => c.id === managed)?.epoch;
+	expect(epoch).toBeUndefined();
+	// Rewrite the stored document into the shape before this change.
+	const legacy = JSON.parse(JSON.stringify(kept));
+	for (const c of legacy.connections) delete c.auth;
+	delete legacy.subagent;
+	legacy.connections.push({
+		id: managed,
+		kind: "claude-managed-agents",
+		agentId: "agent_1",
+		environmentId: "env_1",
+		name: "Managed",
+		baseUrl: "https://managed.example.test",
+		enabled: true,
+		epoch: 3,
+		envRef: null,
+	});
+	legacy.resources.push({
+		id: managedResource,
+		connectionId: managed,
+		purpose: "llm",
+		model: "managed-model",
+		contextWindow: 8192,
+		voice: null,
+	});
+	legacy.routes.llm = {
+		...legacy.routes.llm,
+		mode: "cloud-only",
+		fallbackId: managedResource,
+	};
+	legacy.world.curationResourceId = managedResource;
+	await h.store.write((db) => {
+		db.query("UPDATE settings_document SET document=? WHERE id=1").run(
+			JSON.stringify(legacy),
+		);
+		db.query("INSERT INTO settings_credentials VALUES(?,?)").run(
+			`${managed}:3`,
+			"orphan",
+		);
+	});
+	// The read path migrates before the strict parse, even before startup persists it.
+	const migrated = h.settings.get();
+	expect(migrated.connections.map((c) => [c.id, c.auth])).toEqual([
+		[keyed.connection, "api-key"],
+		[bare.connection, "subscription"],
+		[viaEnv.connection, "api-key"],
+	]);
+	expect(migrated.resources.map((r) => r.id)).not.toContain(managedResource);
+	expect(migrated.routes.llm.fallbackId).toBeNull();
+	expect(migrated.routes.llm.mode).toBe("larm-preferred");
+	expect(migrated.world.curationResourceId).toBeNull();
+	expect(migrated.subagent).toEqual({ resourceId: null });
+	expect(h.settings.credential(migrated.connections[0]!)).toBe("sk-keep");
+	// Startup persists the migration once and drops the removed connection's secret.
+	const reopened = await createSettings(h.store, { dbPath: h.dbPath, env: {} });
+	const stored = JSON.parse(
+		h.store.read(
+			(db) =>
+				(
+					db
+						.query("SELECT document FROM settings_document WHERE id=1")
+						.get() as {
+						document: string;
+					}
+				).document,
+		),
+	);
+	expect(JSON.stringify(stored)).not.toMatch(/managed|agentId|environmentId/i);
+	expect(reopened.get()).toEqual(migrated);
+	expect(
+		h.store.read((db) =>
+			db
+				.query("SELECT 1 FROM settings_credentials WHERE id LIKE ?")
+				.get(`${managed}:%`),
+		),
+	).toBeNull();
+	expect(
+		h.store.read(
+			(db) =>
+				(
+					db
+						.query("SELECT epoch FROM settings_connection_epochs WHERE id=?")
+						.get(managed) as { epoch: number }
+				).epoch,
+		),
+	).toBe(4);
+	// A migrated document passes through unchanged and can be saved again.
+	const again = await createSettings(h.store, { dbPath: h.dbPath, env: {} });
+	expect(again.get()).toEqual(migrated);
+	await save(h, again.get());
+});
+
+test("a connection in use never changes its billing path in place; other changes of path are allowed", async () => {
+	const h = await setup();
+	const s = h.settings.get();
+	const used = claude(s, "api-key");
+	const idle = claude(s, "subscription");
+	// LARM first with a cloud fallback is the existing explicit configuration.
+	s.routes.llm.fallbackId = used.resource;
+	await save(h, s, [
+		{ connectionId: used.connection, value: "sk-used" },
+		{ connectionId: idle.connection, value: "setup-token" },
+	]);
+	// A World and a sub-agent model on another billing path than the conversation route are stored.
+	const next = h.settings.get();
+	next.world.curationResourceId = idle.resource;
+	next.subagent.resourceId = idle.resource;
+	await save(h, next);
+	// Switching a routed connection from API key to subscription is refused, key or not.
+	const swapped = h.settings.get();
+	swapped.connections.find((c) => c.id === used.connection)!.auth =
+		"subscription";
+	await expect(
+		save(h, structuredClone(swapped), [
+			{ connectionId: used.connection, value: "setup-token-2" },
+		]),
+	).rejects.toThrow("invalid_billing_path_change");
+	// So is a dedicated model's connection.
+	const dedicated = h.settings.get();
+	dedicated.connections.find((c) => c.id === idle.connection)!.auth = "api-key";
+	await expect(
+		save(h, dedicated, [{ connectionId: idle.connection, value: "sk-idle" }]),
+	).rejects.toThrow("invalid_billing_path_change");
+	// Unassigned, the path may change; it takes a credential of the new method and drops the old.
+	const free = h.settings.get();
+	free.world.curationResourceId = null;
+	free.subagent.resourceId = null;
+	free.connections.find((c) => c.id === idle.connection)!.auth = "api-key";
+	await expect(save(h, structuredClone(free))).rejects.toThrow(
+		"credential_required",
+	);
+	await save(h, free, [{ connectionId: idle.connection, value: "sk-idle" }]);
+	const saved = h.settings.get();
+	const idleConnection = saved.connections.find(
+		(c) => c.id === idle.connection,
+	)!;
+	expect(idleConnection.auth).toBe("api-key");
+	expect(h.settings.credential(idleConnection)).toBe("sk-idle");
+	// Without a new credential the old one does not carry over to the new method.
+	const back = h.settings.get();
+	back.connections.find((c) => c.id === idle.connection)!.auth = "subscription";
+	await expect(save(h, back)).rejects.toThrow("credential_required");
+	expect(
+		h.settings.get().connections.find((c) => c.id === idle.connection)!.auth,
+	).toBe("api-key");
+});
+
+test("subagent.resourceId must name a registered LLM resource and defaults to LARM", async () => {
+	const h = await setup();
+	const s = h.settings.get();
+	expect(s.subagent).toEqual({ resourceId: null });
+	expect(
+		settingsSchema.safeParse({
+			...s,
+			subagent: { resourceId: crypto.randomUUID() },
+		}).success,
+	).toBe(false);
+	const { resource } = claude(s, "api-key", { envRef: "EUMENES_CLOUD_KEY" });
+	s.subagent.resourceId = resource;
+	expect(settingsSchema.safeParse(s).success).toBe(true);
+	expect(
+		settingsSchema.safeParse({ ...s, subagent: { resourceId: resource, x: 1 } })
+			.success,
+	).toBe(false);
+	await save(h, s);
+	expect(h.settings.get().subagent.resourceId).toBe(resource);
+});

@@ -3,7 +3,10 @@ import { createVoiceAccess } from "./voice-access";
 import { createSpeechLanguageCache } from "./speech-language";
 import { createVoiceBinding } from "./voice-binding";
 import { bindControlPolicy } from "./control-policy";
-import { captureBackgroundControl } from "./background-control";
+import {
+	captureBackgroundControl,
+	routeToResource,
+} from "./background-control";
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import { createLarm, type LarmPort } from "../../larm";
@@ -15,6 +18,8 @@ import type {
 	Connection,
 } from "../../settings";
 import type {
+	AgentAttemptRevocation,
+	CallSession,
 	InferencePort,
 	ControlContract,
 	Messages,
@@ -34,13 +39,33 @@ import { probeWav } from "./wav";
 import { finishProbe, openProbe } from "./probe";
 import { safeError } from "./errors";
 import { validateReceipt as checkReceipt } from "./receipt-authority";
+import { createAgentSweeper } from "./agent-sweep";
+import { releaseTaskSessions } from "./agent-session";
+import { revokeAgentAttempts } from "./agent-revoke";
 /** Each clause gets its own short deadline; the turn's authority is still enforced through `parents`. */
 const SPEECH_CHUNK_DEADLINE_MS = 60_000;
 type RequestArgs =
 	Parameters<typeof runRequest> extends [unknown, ...infer R] ? R : never;
-type ControlArgs = [string, Messages, AbortSignal, ControlContract?];
-const runControl = (env: Env, ...[id, m, s, c]: ControlArgs) =>
-	runRequest(env, id, m, s, undefined, undefined, undefined, c);
+type ControlArgs = [
+	string,
+	Messages,
+	AbortSignal,
+	ControlContract?,
+	CallSession?,
+];
+const runControl = (env: Env, ...[id, m, s, c, session]: ControlArgs) =>
+	runRequest(
+		env,
+		id,
+		m,
+		s,
+		undefined,
+		undefined,
+		undefined,
+		c,
+		undefined,
+		session,
+	);
 import { createIndependentControls } from "./independent-control";
 export function createInference(
 	store: SqliteStore,
@@ -162,8 +187,22 @@ export function createInference(
 		return id;
 	}
 	let commitGeneration = 0;
+	/** Requests whose running agent call a forget revoked; aborted once that transaction has committed. */
+	const revokedRequests = new Set<string>();
+	const sweeper = createAgentSweeper(store);
 	const stopCommits = store.onCommit(() => {
 		commitGeneration++;
+		for (const requestId of revokedRequests) {
+			const revoked = store.read((db) =>
+				db
+					.query(
+						"SELECT 1 FROM inference_attempts WHERE request_id=? AND status='revoked'",
+					)
+					.get(requestId),
+			);
+			if (revoked) active.get(requestId)?.controller.abort();
+		}
+		revokedRequests.clear();
 	});
 	const env: Env = {
 		store,
@@ -329,6 +368,7 @@ export function createInference(
 				deadline: number;
 				maxOutputTokens: number;
 				engine?: "codex_luna";
+				route?: "larm-only" | { resourceId: string };
 			},
 		) {
 			if (
@@ -344,8 +384,12 @@ export function createInference(
 			const root = policy ? get(db, policy.id) : null;
 			if (!root || !allowed(db, root)) throw new Error("permission_revoked");
 			const snapshot = structuredClone(root.snapshot);
-			snapshot.routes.llm.mode = "larm-only";
-			snapshot.routes.llm.cloudAllowed = false;
+			if (input.route && input.route !== "larm-only")
+				routeToResource(snapshot, input.route.resourceId, input.subject);
+			else {
+				snapshot.routes.llm.mode = "larm-only";
+				snapshot.routes.llm.cloudAllowed = false;
+			}
 			const requestId = capture(
 				db,
 				input.subject,
@@ -365,10 +409,10 @@ export function createInference(
 			return requestId;
 		},
 		...createIndependentControls(settings.inTransaction, capture),
-		executeControl(...[id, messages, signal, control]: ControlArgs) {
+		executeControl(...[id, messages, signal, control, session]: ControlArgs) {
 			if (store.read((db) => get(db, id))?.mode !== "control")
 				throw new Error("invalid_control_request");
-			return runControl(env, id, messages, signal, control);
+			return runControl(env, id, messages, signal, control, session);
 		},
 		codexResearchAvailable: () => !!options.codexResearch,
 		rejectControlInTransaction(db: Database, receipt: Receipt, _code: string) {
@@ -396,6 +440,14 @@ export function createInference(
 					"UPDATE inference_requests SET status='cancelled' WHERE id=? AND status='pending'",
 				).run(requestId);
 		},
+		revokeAgentAttemptsInTransaction(
+			db: Database,
+			input: AgentAttemptRevocation,
+		) {
+			for (const requestId of revokeAgentAttempts(db, input))
+				revokedRequests.add(requestId);
+		},
+		releaseTaskSession: (taskId: string) => releaseTaskSessions(store, taskId),
 		flushCancelledRequests(requestIds: string[]) {
 			for (const requestId of requestIds)
 				if (store.read((db) => get(db, requestId))?.status === "cancelled")
@@ -432,10 +484,41 @@ export function createInference(
 			input: Messages | string | Uint8Array,
 			signal: AbortSignal,
 			preparation?: SpeechPreparation,
-		) => executeRequest(id, input, signal, undefined, preparation),
+			session?: CallSession,
+		) =>
+			executeRequest(
+				id,
+				input,
+				signal,
+				undefined,
+				preparation,
+				undefined,
+				undefined,
+				undefined,
+				session,
+			),
 		executeStream: (
-			...args: Parameters<NonNullable<InferencePort["executeStream"]>>
-		) => executeRequest(...args),
+			...[
+				id,
+				messages,
+				signal,
+				onDelta,
+				preparation,
+				tools,
+				session,
+			]: Parameters<NonNullable<InferencePort["executeStream"]>>
+		) =>
+			executeRequest(
+				id,
+				messages,
+				signal,
+				onDelta,
+				preparation,
+				tools,
+				undefined,
+				undefined,
+				session,
+			),
 		liveRequest: (id: string) => store.read((db) => usable(db, id)),
 		captureSpeechChunkInTransaction(
 			db: Database,
@@ -630,6 +713,8 @@ export function createInference(
 					"UPDATE inference_probes SET status='interrupted' WHERE status IN ('running','cancelling')",
 				).run();
 			});
+			// Task sessions nobody released and a crashed host's temporary directories, now and then hourly.
+			await sweeper.start();
 		},
 		async close() {
 			speechLanguages.clear();
@@ -638,6 +723,7 @@ export function createInference(
 			closed = true;
 			unsubscribe();
 			stopCommits();
+			sweeper.stop();
 			for (const stop of statusSubscriptions.values()) stop();
 			statusSubscriptions.clear();
 			listeners.clear();

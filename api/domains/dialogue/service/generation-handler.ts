@@ -164,6 +164,24 @@ export function createGenerationHandler(
 					const preparation = answerCollection(run);
 					const decision = await prepareDecision(deps, input, signal);
 					const { recallPins } = decision;
+					// What this turn's prompt stands on: forgetting any of it revokes the call while it runs.
+					const window = input.memory?.window;
+					const callSession = {
+						context: input.sessionContext,
+						...(window
+							? {
+									refs: {
+										messageIds: [
+											...window.shownMessageIds,
+											...window.pins.map((pin) => pin.messageId),
+											...recallPins.map((pin) => pin.messageId),
+										],
+										itemIds: window.manifest,
+										conversationId: run!.conversationId,
+									},
+								}
+							: {}),
+					};
 					holdBody ||= recallPins.length > 0 || !!decision.tools?.length;
 					timing.policy(holdBody);
 					let generated: Awaited<ReturnType<typeof generateConversation>>;
@@ -178,6 +196,9 @@ export function createGenerationHandler(
 							tools: decision.tools,
 							cards: decision.cards,
 							openQuestions: decision.openQuestions,
+							// The selection call is one-shot; a direct call is the answer generation itself.
+							sessionRole: decision.selectionMessages ? "auxiliary" : "main",
+							session: callSession,
 							repair: () => {
 								partials.delete(input.runId);
 								held = 0;
@@ -221,6 +242,8 @@ export function createGenerationHandler(
 							signal,
 							delta,
 							preparation,
+							sessionRole: "main",
+							session: callSession,
 							repair: () => {
 								partials.delete(input.runId);
 								held = 0;

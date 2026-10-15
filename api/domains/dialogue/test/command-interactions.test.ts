@@ -141,6 +141,13 @@ test("a direct answer after toolchain selection retains the full exchange", asyn
 	const selection = h.conversationCalls.at(-2)!;
 	const answer = h.conversationCalls.at(-1)!;
 	expect(selection.tools).toHaveLength(1);
+	// The one-shot selection is auxiliary; only the answer generation is the main session.
+	expect(selection.session).toEqual({ sessionRole: "auxiliary" });
+	// The adopted exchange is the history a resumed session starts from; the system prompt is the one instruction.
+	expect(answer.session).toEqual({
+		sessionRole: "main",
+		context: { instructionCount: 1, historyCount: 2 },
+	});
 	expect(selection.history.some((m) => m.role === "assistant")).toBe(false);
 	expect(answer.tools).toHaveLength(0);
 	expect(
@@ -156,6 +163,7 @@ type Call = {
 	tools: Array<{
 		function: { name: string; parameters: Record<string, unknown> };
 	}>;
+	session?: unknown;
 };
 
 function setup(
@@ -200,9 +208,14 @@ function setup(
 		choices: {} as Record<string, Array<{ ref: string; label: string }>>,
 		// The command sub-agent's replies, consumed in order.
 		commands: [] as Command[],
+		// The saved sub-agent resource (settings.subagent.resourceId).
+		subagentResourceId: null as string | null,
 	};
 	const conversationCalls: Call[] = [];
 	const commandSchemas: string[] = [];
+	const commandSessions: unknown[] = [];
+	const releasedSessions: string[] = [];
+	const commandCaptures: Array<Record<string, unknown>> = [];
 	const commandPrompts: Array<Array<{ role: string; content: string }>> = [];
 	const started: Array<Record<string, any>> = [];
 	const routed: string[][] = [];
@@ -214,12 +227,23 @@ function setup(
 		setContextPolicyInTransaction: () => {},
 		validateReceiptInTransaction: () => true,
 		acceptInTransaction: () => true,
-		captureControlInTransaction: () => "control",
+		releaseTaskSession: async (taskId: string) => {
+			releasedSessions.push(taskId);
+		},
+		snapshotInTransaction: () => ({
+			subagent: { resourceId: state.subagentResourceId },
+		}),
+		captureControlInTransaction: (_db: unknown, input: { subject: string }) => {
+			if (input.subject.endsWith(":command"))
+				commandCaptures.push(input as Record<string, unknown>);
+			return "control";
+		},
 		executeControl: async (
 			requestId: string,
 			prompt: Array<{ role: string; content: string }>,
 			_signal?: AbortSignal,
 			control?: { outputSchema?: unknown },
+			session?: unknown,
 		) => {
 			if (prompt[0]?.content.includes("OUTPUT_SCHEMA="))
 				return {
@@ -233,6 +257,7 @@ function setup(
 					}),
 				} as Receipt;
 			commandPrompts.push(prompt);
+			commandSessions.push(session);
 			commandSchemas.push(JSON.stringify(control?.outputSchema ?? null));
 			await state.gate;
 			const next = state.commands.shift();
@@ -253,8 +278,9 @@ function setup(
 			delta: (text: string) => void,
 			_p: unknown,
 			tools: Call["tools"] | undefined,
+			session?: unknown,
 		) => {
-			const call = { history, tools: tools ?? [] };
+			const call = { history, tools: tools ?? [], session };
 			const index = conversationCalls.push(call) - 1;
 			// By default the conversation hands the utterance to the offered function.
 			const result =
@@ -446,6 +472,9 @@ function setup(
 		conversationCalls,
 		commandPrompts,
 		commandSchemas,
+		commandSessions,
+		releasedSessions,
+		commandCaptures,
 		started,
 		routed,
 		settled,
@@ -755,6 +784,30 @@ test("a binding without questions allows only free text, and the model is offere
 	await h.commandRun();
 	await until(() => h.interaction()?.status === "waiting_input");
 	expect(h.interaction()!.question!.inputSchemaRef).toBe("builtin:answerText");
+});
+
+test("the command sub-agent runs as a sub-agent of its run, on LARM unless a sub-agent resource is saved", async () => {
+	const h = setup();
+	h.state.commands.push({ action: "clarify", question: "どれ" });
+	const first = await h.commandRun();
+	await until(() => h.commandSessions.length === 1);
+	expect(h.commandCaptures[0]!.route).toBe("larm-only");
+	expect(h.commandSessions[0]).toEqual({
+		sessionRole: "subagent",
+		taskId: first.id,
+	});
+	// The command is one call: its session is released as the call ends.
+	await until(() => h.releasedSessions.includes(first.id));
+	const resourceId = crypto.randomUUID();
+	h.state.subagentResourceId = resourceId;
+	h.state.commands.push({ action: "clarify", question: "どれ" });
+	const second = await h.commandRun("別の操作を開始して");
+	await until(() => h.commandSessions.length === 2);
+	expect(h.commandCaptures[1]!.route).toEqual({ resourceId });
+	expect(h.commandSessions[1]).toEqual({
+		sessionRole: "subagent",
+		taskId: second.id,
+	});
 });
 
 test("a binding with questions offers exactly those schemas to the model", async () => {

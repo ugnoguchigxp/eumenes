@@ -717,6 +717,8 @@ export const artifactRevisionOf = (key: string) => rev(key);
 export function createSettingsBackend(
 	options: {
 		cloud?: boolean;
+		/** Also saves a Claude Agent SDK connection using a subscription, with one model. */
+		claude?: boolean;
 		/** The registrations to serve (default: the fixture's); keys are `settings.<key>` ids. */
 		artifacts?: Record<string, ArtifactDefinitionV1>;
 	} = {},
@@ -733,6 +735,27 @@ export function createSettingsBackend(
 	saved.larm.baseUrl = "http://127.0.0.1:9001";
 	const original = structuredClone(saved);
 	const cloud = { connectionId: crypto.randomUUID(), id: crypto.randomUUID() };
+	const claude = { connectionId: crypto.randomUUID(), id: crypto.randomUUID() };
+	if (options.claude) {
+		saved.connections.push({
+			id: claude.connectionId,
+			kind: "claude-agent-sdk",
+			auth: "subscription",
+			name: "Claude購読",
+			baseUrl: "https://claude.example.test",
+			enabled: true,
+			epoch: 0,
+			envRef: null,
+		});
+		saved.resources.push({
+			id: claude.id,
+			connectionId: claude.connectionId,
+			purpose: "llm",
+			model: "agent-model",
+			contextWindow: 8192,
+			voice: null,
+		});
+	}
 	if (options.cloud !== undefined) {
 		saved.connections.push({
 			id: cloud.connectionId,
@@ -856,16 +879,43 @@ export function createSettingsBackend(
 			// Structural operations first, then the field changes (as the real adapter does).
 			for (const op of input.structural ?? []) {
 				const i = op.input;
-				if (op.structure === "structure:settings.add-connection@1")
+				if (
+					[
+						"structure:settings.add-connection@1",
+						"structure:settings.add-connection@2",
+					].includes(op.structure)
+				)
 					next.connections.push({
 						id: i.connectionId!,
 						name: i.name!,
-						baseUrl: i.baseUrl!,
+						baseUrl:
+							i.kind === "cloudflare-workers-ai"
+								? "https://api.cloudflare.com/client/v4"
+								: i.baseUrl!,
+						...(i.kind
+							? { kind: i.kind as Settings["connections"][number]["kind"] }
+							: {}),
+						...(i.accountId ? { accountId: i.accountId } : {}),
 						enabled: true,
 						epoch: 0,
 						envRef: null,
 					});
-				else if (op.structure === "structure:settings.delete-connection@1") {
+				else if (
+					[
+						"structure:settings.add-resource@1",
+						"structure:settings.add-resource@2",
+					].includes(op.structure)
+				) {
+					next.resources.push({
+						id: i.resourceId!,
+						connectionId: i.connectionId!,
+						purpose: i.purpose as "asr" | "tts",
+						model: i.model!,
+						contextWindow: null,
+						voice: i.voice ?? null,
+						...(i.language ? { language: i.language } : {}),
+					});
+				} else if (op.structure === "structure:settings.delete-connection@1") {
 					next.connections = next.connections.filter(
 						(c) => c.id !== i.connectionId,
 					);
@@ -916,6 +966,10 @@ export function createSettingsBackend(
 	);
 	const client = {
 		identity: crypto.randomUUID(),
+		connectionModels: vi.fn(async () => ({
+			models: [],
+			account: { auth: "api-key", subscriptionType: null },
+		})),
 		settings: vi.fn(async () => saved),
 		toolchainArtifacts: vi.fn(async () => entries),
 		toolchainArtifact: vi.fn(async (revisionId: string) => {
@@ -1006,6 +1060,7 @@ export function createSettingsBackend(
 		artifacts,
 		client: client as unknown as EumenesClient & typeof client,
 		cloud,
+		claude,
 		original,
 		sent,
 		confirmedOrigins,

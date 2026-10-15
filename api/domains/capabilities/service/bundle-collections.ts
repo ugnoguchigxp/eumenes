@@ -51,7 +51,11 @@ function checkFormFields(
 		const f = `${at}/fields/${k}`;
 		if (!shape?.properties.includes(field.fieldId))
 			c.issue("schema_mismatch", `${f}/fieldId`, field.fieldId);
-		else if (field.required && !shape.required.includes(field.fieldId))
+		else if (
+			field.required &&
+			!field.when &&
+			!shape.required.includes(field.fieldId)
+		)
 			c.issue("schema_mismatch", `${f}/required`, field.fieldId);
 		if (
 			field.confidential &&

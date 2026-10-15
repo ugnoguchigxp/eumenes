@@ -1,12 +1,14 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { BetaManagedAgentsCustomToolInputSchema } from "@anthropic-ai/sdk/resources/beta/agents/agents";
 import {
 	createSdkMcpServer,
 	query,
 	tool,
+	type AccountInfo,
+	type Options,
+	type Query,
 	type SDKResultMessage,
 } from "@anthropic-ai/claude-agent-sdk";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
@@ -14,25 +16,52 @@ import type {
 	NativeTool,
 	NativeToolCall,
 } from "../../../infrastructure/chat-stream";
-import type { ConnectionKind } from "../../settings/contracts";
+import type { AgentAuth, ConnectionKind } from "../../settings/contracts";
 import { getLogger } from "../../../infrastructure/logger";
 import type { Messages } from "../contracts";
 import { runCodexTurn } from "./codex-app-server";
+import {
+	AGENT_ROOT_PREFIX,
+	hostHistoryStore,
+	normalizeHistory,
+	splitMessages,
+	trackClaudeRoot,
+	transcriptEntries,
+	type ContextSplit,
+} from "./claude-session";
 import { codexRuntime, type CodexRuntime } from "./codex-sdk";
 
-export type CloudAgentKind = Exclude<ConnectionKind, "openai-compatible">;
+export type CloudAgentKind = Extract<
+	ConnectionKind,
+	"codex-sdk" | "claude-agent-sdk"
+>;
+/**
+ * A Claude Agent SDK call that belongs to a session of the host's ledger. `main` resumes from the history the host
+ * assembled (`context` says where `messages` splits); `subagent` keeps one session id per task and no history.
+ */
+export type AgentSessionCall = {
+	id: string;
+	role: "main" | "subagent";
+	context?: ContextSplit;
+	/** The SDK asked to delete the session: drops the ledger row. */
+	drop(): Promise<void>;
+};
 export type CloudAgentCall = {
 	kind: CloudAgentKind;
+	/** The saved connection (log correlation only). */
+	connectionId?: string;
+	session?: AgentSessionCall;
 	model: string;
 	baseUrl: string;
-	/** Null: the SDK's own login (Codex / Claude Code); Managed Agents requires a key. */
+	/** Null: Codex keeps its own login; a Claude Agent SDK call without a credential fails. */
 	credential: string | null;
-	agentId?: string | null;
-	environmentId?: string | null;
+	/** Claude Agent SDK only: which credential `credential` is (an API key or a `claude setup-token` OAuth token). */
+	auth?: AgentAuth;
 	messages: Messages;
 	tools?: NativeTool[];
-	/** JSON Schema the final text must satisfy (control requests); ignored by Managed Agents. */
+	/** JSON Schema the final text must satisfy (control requests). */
 	outputSchema?: Record<string, unknown>;
+	reasoningEffort?: "low";
 	signal: AbortSignal;
 	onDelta?: (text: string) => void;
 };
@@ -41,6 +70,12 @@ export type CloudAgentResult = {
 	toolCalls?: NativeToolCall[];
 	inputTokens?: number | null;
 	outputTokens?: number | null;
+	cacheReadTokens?: number | null;
+	cacheCreationTokens?: number | null;
+	/** Reported only on the API-key path; a subscription call has no per-call price. */
+	costUsd?: number | null;
+	/** The model's input context window as the CLI reported it (learned after a turn). */
+	contextWindow?: number | null;
 };
 export type CloudAgents = {
 	run(call: CloudAgentCall): Promise<CloudAgentResult>;
@@ -51,24 +86,28 @@ const outputLimit = 262_144;
 const code = /^[a-z][a-z0-9_]{0,100}$/;
 const fail = (reason: string) => new Error(`cloud_agent_${reason}`);
 
-/** Leading system messages become the instructions; the rest is one prompt.
- * A multi-turn history is passed as JSON so message text cannot forge turns. */
-function promptParts(messages: Messages) {
-	let i = 0;
-	while (i < messages.length && messages[i]!.role === "system") i++;
-	const system = messages
-		.slice(0, i)
-		.map((m) => m.content)
-		.join("\n\n");
-	const turns = messages.slice(i);
+/**
+ * Leading system messages become the instructions; the rest is one prompt. A multi-turn prompt is passed as JSON
+ * so message text cannot forge turns. With a session context the history is split off first and the prompt is
+ * this turn's input only.
+ */
+function promptParts(messages: Messages, context?: ContextSplit) {
+	const parts = splitMessages(messages, context, () =>
+		fail("invalid_session_context"),
+	);
+	const { turns: history, pending } = normalizeHistory(parts.history);
+	const turns = [...pending, ...parts.turn];
 	const prompt =
 		turns.length === 1 && turns[0]!.role === "user"
 			? turns[0]!.content
-			: "The conversation so far, oldest first, as JSON. Write only the next assistant turn.\n" +
+			: (context
+					? "The context of this turn and the current request, oldest first, as JSON. Write only the next assistant turn.\n"
+					: "The conversation so far, oldest first, as JSON. Write only the next assistant turn.\n") +
 				JSON.stringify(turns.map(({ role, content }) => ({ role, content })));
 	if (!prompt.trim()) throw fail("empty_prompt");
 	return {
-		system: system || "You are a helpful assistant.",
+		system: parts.instructions.join("\n\n") || "You are a helpful assistant.",
+		history,
 		prompt,
 	};
 }
@@ -208,7 +247,8 @@ async function runCodex(
 	runtime: CodexRuntime,
 	call: CloudAgentCall,
 ): Promise<CloudAgentResult> {
-	const cwd = await mkdtemp(join(tmpdir(), "eumenes-agent-"));
+	const cwd = await mkdtemp(join(tmpdir(), AGENT_ROOT_PREFIX));
+	const untrack = trackClaudeRoot(cwd);
 	try {
 		const { system, prompt } = promptParts(call.messages);
 		const tools = call.tools?.length ? call.tools : undefined;
@@ -228,6 +268,9 @@ async function runCodex(
 				model: call.model,
 				instructions: system + (tools ? codexFunctions(tools) : ""),
 				prompt,
+				...(call.reasoningEffort
+					? { reasoningEffort: call.reasoningEffort }
+					: {}),
 				...(tools
 					? { outputSchema: codexChoiceSchema(tools) }
 					: call.outputSchema
@@ -262,7 +305,23 @@ async function runCodex(
 			outputTokens: result.outputTokens,
 		};
 	} finally {
-		await rm(cwd, { recursive: true, force: true });
+		await removeRoot(cwd, untrack);
+	}
+}
+
+/**
+ * Removes a per-call directory and then releases its protection from the sweep. A removal that fails (the sweep
+ * collects it later) is logged without the path and never turns the call's result into a failure.
+ */
+async function removeRoot(root: string, untrack: () => void) {
+	try {
+		await rm(root, { recursive: true, force: true, maxRetries: 3 });
+	} catch (error) {
+		log.warn("inference.agent_dir_remove_failed", {
+			reason: (error as NodeJS.ErrnoException | undefined)?.code ?? "unknown",
+		});
+	} finally {
+		untrack();
 	}
 }
 
@@ -288,20 +347,48 @@ function zodShape(parameters: Record<string, unknown>): z.ZodRawShape {
 }
 
 /** Anthropic clients append /v1 themselves; accept a base saved with it. */
-const anthropicBase = (url: string) => url.replace(/\/v1\/?$/, "");
+export const anthropicBase = (url: string) => url.replace(/\/v1\/?$/, "");
 
 /** Only the API key and protocol headers leave the process; ambient
  * ANTHROPIC_AUTH_TOKEN / ANTHROPIC_CUSTOM_HEADERS must not reach the connection's host. */
 const anthropicHeader =
 	/^(x-api-key|anthropic-[a-z0-9-]+|content-type|accept|user-agent|x-stainless-[a-z0-9-]+|idempotency-key|x-client-request-id)$/;
-function anthropicFetch(input: RequestInfo | URL, init?: RequestInit) {
-	const headers = new Headers();
-	for (const [name, value] of new Headers(init?.headers))
-		if (anthropicHeader.test(name)) headers.set(name, value);
-	return fetch(input, { ...init, headers });
+export function anthropicFetch(
+	send: (
+		input: RequestInfo | URL,
+		init?: RequestInit,
+	) => Promise<Response> = fetch,
+) {
+	return (input: RequestInfo | URL, init?: RequestInit) => {
+		const headers = new Headers();
+		for (const [name, value] of new Headers(init?.headers))
+			if (anthropicHeader.test(name)) headers.set(name, value);
+		return send(input, { ...init, headers });
+	};
 }
 
-// USER / LOGNAME: on macOS the Claude Code login is read from the keychain entry keyed by the user name.
+/**
+ * What the CLI must report about the credential it was given before it may receive a message.
+ * One table for both routes: exactly one credential source is reported (`apiKeySource` for a key,
+ * `tokenSource` for the OAuth token, the other absent or `"none"`), on the first-party API. A mixture, an
+ * `ANTHROPIC_AUTH_TOKEN`, a cloud provider and the legacy `"oauth"` never match.
+ */
+const unset = (value: string | undefined) =>
+	value === undefined || value === "none";
+const authObservation: Record<AgentAuth, (account: AccountInfo) => boolean> = {
+	"api-key": (a) =>
+		a.apiKeySource === "ANTHROPIC_API_KEY" &&
+		unset(a.tokenSource) &&
+		a.apiProvider === "firstParty",
+	// `subscriptionType` is not required: the real subscription route has not been observed.
+	subscription: (a) =>
+		a.tokenSource === "CLAUDE_CODE_OAUTH_TOKEN" &&
+		unset(a.apiKeySource) &&
+		a.apiProvider === "firstParty",
+};
+export const observedAuthMatches = (auth: AgentAuth, account: AccountInfo) =>
+	authObservation[auth](account);
+
 const claudeEnvKeys = [
 	"PATH",
 	"HOME",
@@ -313,15 +400,127 @@ const claudeEnvKeys = [
 	"SSL_CERT_FILE",
 	"SSL_CERT_DIR",
 	"NODE_EXTRA_CA_CERTS",
-	"CLAUDE_CONFIG_DIR",
 ];
+
+/**
+ * The CLI's environment for one call: exactly one credential for the chosen route.
+ * ANTHROPIC_AUTH_TOKEN, cloud-provider variables and the ambient CLAUDE_CONFIG_DIR never pass;
+ * the config directory is the call's own, so no stored login can answer instead.
+ */
+export function claudeAgentEnv(
+	environment: Readonly<Record<string, string | undefined>>,
+	input: {
+		auth: AgentAuth;
+		credential: string;
+		baseUrl: string;
+		configDir: string;
+		/** Fixes the SDK's session project key (`[A-Za-z0-9_-]`, no `:`) instead of deriving it from the cwd. */
+		projectDirName?: string;
+	},
+): Record<string, string> {
+	const env: Record<string, string> = {
+		CLAUDE_AGENT_SDK_CLIENT_APP: "eumenes",
+		CLAUDE_CONFIG_DIR: input.configDir,
+		...(input.projectDirName
+			? { CLAUDE_CODE_PROJECT_DIR_NAME: input.projectDirName }
+			: {}),
+	};
+	for (const key of claudeEnvKeys)
+		if (environment[key] !== undefined) env[key] = environment[key]!;
+	if (input.auth === "api-key") {
+		env.ANTHROPIC_API_KEY = input.credential;
+		env.ANTHROPIC_BASE_URL = anthropicBase(input.baseUrl);
+	} else env.CLAUDE_CODE_OAUTH_TOKEN = input.credential;
+	return env;
+}
+
+/** A per-call working directory and config directory, removed afterwards. */
+export async function withClaudeDirs<T>(
+	run: (dirs: { cwd: string; configDir: string }) => Promise<T>,
+): Promise<T> {
+	const root = await mkdtemp(join(tmpdir(), AGENT_ROOT_PREFIX));
+	const untrack = trackClaudeRoot(root);
+	try {
+		const cwd = join(root, "work");
+		const configDir = join(root, "config");
+		await mkdir(cwd);
+		await mkdir(configDir);
+		return await run({ cwd, configDir });
+	} finally {
+		await removeRoot(root, untrack);
+	}
+}
+
+export type GatedQuery = {
+	q: Query;
+	account: AccountInfo;
+	/** Lets the withheld first user message (if any) reach the model. */
+	release(): void;
+	/** Ends the query without anything having been sent. */
+	close(): void;
+};
+
+/**
+ * Starts a streaming-input query and checks the credential's observed route before the first
+ * user message is yielded. A mismatch closes the query without sending and throws
+ * `cloud_agent_auth_mismatch`. `prompt: null` never sends a turn (metadata queries).
+ */
+export async function startGatedQuery(
+	startQuery: typeof query,
+	auth: AgentAuth,
+	prompt: string | null,
+	options: Options,
+	connectionId?: string,
+): Promise<GatedQuery> {
+	const gate = Promise.withResolvers<boolean>();
+	async function* messages() {
+		if (!(await gate.promise) || prompt === null) return;
+		yield {
+			type: "user" as const,
+			message: { role: "user" as const, content: prompt },
+			parent_tool_use_id: null,
+		};
+	}
+	const q = startQuery({ prompt: messages(), options });
+	const close = () => {
+		gate.resolve(false);
+		q.close();
+	};
+	let account: AccountInfo;
+	try {
+		account = await q.accountInfo();
+	} catch (error) {
+		close();
+		throw error;
+	}
+	if (!observedAuthMatches(auth, account)) {
+		close();
+		log.warn("inference.cloud_agent_auth_mismatch", {
+			reason: "cloud_agent_auth_mismatch",
+			auth,
+			...(connectionId ? { connectionId } : {}),
+			apiProvider: account.apiProvider ?? "unknown",
+			apiKeySource: account.apiKeySource ?? "unknown",
+			tokenSource: account.tokenSource ?? "unknown",
+		});
+		throw fail("auth_mismatch");
+	}
+	return { q, account, release: () => gate.resolve(true), close };
+}
 
 async function runClaudeAgent(
 	environment: Readonly<Record<string, string | undefined>>,
 	call: CloudAgentCall,
 	startQuery: typeof query,
 ): Promise<CloudAgentResult> {
-	const { system, prompt } = promptParts(call.messages);
+	if (!call.auth) throw fail("unconfigured");
+	if (!call.credential) throw new Error("cloud_credential_unavailable");
+	const { auth, credential } = call;
+	const session = call.session;
+	const { system, history, prompt } = promptParts(
+		call.messages,
+		session?.role === "main" ? session.context : undefined,
+	);
 	const tools = call.tools ?? [];
 	let captured: NativeToolCall | undefined;
 	const abortController = new AbortController();
@@ -349,71 +548,98 @@ async function runClaudeAgent(
 				),
 			})
 		: undefined;
-	const env: Record<string, string> = {
-		CLAUDE_AGENT_SDK_CLIENT_APP: "eumenes",
-	};
-	for (const key of claudeEnvKeys)
-		if (environment[key] !== undefined) env[key] = environment[key]!;
-	if (call.credential) {
-		env.ANTHROPIC_API_KEY = call.credential;
-		env.ANTHROPIC_BASE_URL = anthropicBase(call.baseUrl);
-	}
 	// Text streams with or without tools; a captured call ends the turn and the
 	// caller withdraws any text that preceded it.
 	const stream = !!call.onDelta;
-	const cwd = await mkdtemp(join(tmpdir(), "eumenes-agent-"));
 	const onAbort = () => abortController.abort();
 	call.signal.addEventListener("abort", onAbort, { once: true });
-	let q: ReturnType<typeof query> | undefined;
+	let gated: GatedQuery | undefined;
 	let result: SDKResultMessage | undefined;
 	let streamed = 0;
 	try {
-		q = startQuery({
-			prompt,
-			options: {
-				abortController,
-				cwd,
-				env,
-				model: call.model,
-				systemPrompt: tools.length
-					? `${system}\n\nCall at most one function per turn.`
-					: system,
-				tools: [],
-				allowedTools: tools.map((t) => `mcp__eumenes__${t.function.name}`),
-				mcpServers: server ? { eumenes: server } : {},
-				strictMcpConfig: true,
-				settingSources: [],
-				persistSession: false,
-				permissionMode: "dontAsk",
-				includePartialMessages: stream,
-				...(call.outputSchema && !tools.length
-					? { outputFormat: { type: "json_schema", schema: call.outputSchema } }
-					: {}),
-				// The structured-output tool call and its retries need turns of their own.
-				maxTurns: tools.length ? 2 : call.outputSchema ? 3 : 1,
-			},
-		});
-		for await (const message of q) {
-			if (
-				stream &&
-				message.type === "stream_event" &&
-				message.parent_tool_use_id === null &&
-				message.event.type === "content_block_delta" &&
-				message.event.delta.type === "text_delta"
-			) {
-				streamed += message.event.delta.text.length;
-				call.onDelta!(message.event.delta.text);
+		await withClaudeDirs(async ({ cwd, configDir }) => {
+			gated = await startGatedQuery(
+				startQuery,
+				auth,
+				prompt,
+				{
+					abortController,
+					cwd,
+					env: claudeAgentEnv(environment, {
+						auth,
+						credential,
+						baseUrl: call.baseUrl,
+						configDir,
+						...(session ? { projectDirName: `eumenes-${session.role}` } : {}),
+					}),
+					model: call.model,
+					systemPrompt: tools.length
+						? `${system}\n\nCall at most one function per turn.`
+						: system,
+					tools: [],
+					allowedTools: tools.map((t) => `mcp__eumenes__${t.function.name}`),
+					mcpServers: server ? { eumenes: server } : {},
+					strictMcpConfig: true,
+					settingSources: [],
+					permissionMode: "dontAsk",
+					includePartialMessages: stream,
+					...(call.outputSchema && !tools.length
+						? {
+								outputFormat: {
+									type: "json_schema",
+									schema: call.outputSchema,
+								},
+							}
+						: {}),
+					// The structured-output tool call and its retries need turns of their own.
+					maxTurns: tools.length ? 2 : call.outputSchema ? 3 : 1,
+					...(session
+						? {
+								// The host's history is the only history: `load` answers with it, the SDK's own record is dropped.
+								persistSession: true,
+								sessionStore: hostHistoryStore({
+									sessionId: session.id,
+									entries: transcriptEntries(session.id, history, {
+										cwd,
+										model: call.model,
+									}),
+									onDelete: session.drop,
+								}),
+								...(history.length
+									? { resume: session.id }
+									: { sessionId: session.id }),
+								// The window is budgeted by the host; an overflow is a plain failure.
+								settings: { autoCompactEnabled: false },
+							}
+						: { persistSession: false }),
+				},
+				call.connectionId,
+			);
+			gated.release();
+			try {
+				for await (const message of gated.q) {
+					if (
+						stream &&
+						message.type === "stream_event" &&
+						message.parent_tool_use_id === null &&
+						message.event.type === "content_block_delta" &&
+						message.event.delta.type === "text_delta"
+					) {
+						streamed += message.event.delta.text.length;
+						call.onDelta!(message.event.delta.text);
+					}
+					if (message.type === "assistant" && message.error)
+						throw fail(message.error);
+					if (message.type === "result") result = message;
+				}
+			} finally {
+				gated.close();
 			}
-			if (message.type === "assistant" && message.error)
-				throw fail(message.error);
-			if (message.type === "result") result = message;
-		}
+		});
 	} catch (error) {
 		if (!captured) throw error;
 	} finally {
 		call.signal.removeEventListener("abort", onAbort);
-		q?.close();
-		await rm(cwd, { recursive: true, force: true });
 	}
 	call.signal.throwIfAborted();
 	if (captured) return { text: "", toolCalls: [captured] };
@@ -431,151 +657,25 @@ async function runClaudeAgent(
 		text,
 		inputTokens: result.usage.input_tokens,
 		outputTokens: result.usage.output_tokens,
+		cacheReadTokens: result.usage.cache_read_input_tokens,
+		cacheCreationTokens: result.usage.cache_creation_input_tokens,
+		costUsd: auth === "api-key" ? result.total_cost_usd : null,
+		contextWindow: modelContextWindow(result, call.model),
 	};
 }
 
-async function runManagedAgents(
-	call: CloudAgentCall,
-): Promise<CloudAgentResult> {
-	if (!call.credential) throw new Error("cloud_credential_unavailable");
-	if (!call.agentId || !call.environmentId) throw fail("unconfigured");
-	const client = new Anthropic({
-		apiKey: call.credential,
-		authToken: null,
-		baseURL: anthropicBase(call.baseUrl),
-		fetch: anthropicFetch,
-		maxRetries: 1,
-	});
-	const { system, prompt } = promptParts(call.messages);
-	const tools = call.tools ?? [];
-	// Overrides replace the stored toolset: the session sees only host functions.
-	const session = await client.beta.sessions.create(
-		{
-			agent: {
-				type: "agent_with_overrides",
-				id: call.agentId,
-				model: call.model,
-				system,
-				tools: tools.map((t) => ({
-					type: "custom" as const,
-					name: t.function.name,
-					description: t.function.description,
-					input_schema: t.function
-						.parameters as BetaManagedAgentsCustomToolInputSchema,
-				})),
-				mcp_servers: [],
-				skills: [],
-			},
-			environment_id: call.environmentId,
-			title: "Eumenes conversation",
-		},
-		// A retried create after a lost response would leave an orphan session.
-		{ signal: call.signal, maxRetries: 0 },
-	);
-	let settled = false;
-	try {
-		// Stream first: events emitted before the stream opens arrive late in one batch.
-		const events = await client.beta.sessions.events.stream(
-			session.id,
-			undefined,
-			{ signal: call.signal },
-		);
-		await client.beta.sessions.events.send(
-			session.id,
-			{
-				events: [
-					{ type: "user.message", content: [{ type: "text", text: prompt }] },
-				],
-			},
-			{ signal: call.signal },
-		);
-		let text = "";
-		for await (const event of events) {
-			if (event.type === "agent.message") {
-				for (const block of event.content)
-					if (block.type === "text") {
-						text = checkedText(text + block.text);
-						if (!tools.length) call.onDelta?.(block.text);
-					}
-			} else if (event.type === "agent.custom_tool_use") {
-				settled = true;
-				call.signal.throwIfAborted();
-				return {
-					text: "",
-					toolCalls: [
-						{
-							id: event.id,
-							name: event.name,
-							arguments: JSON.stringify(event.input),
-						},
-					],
-				};
-			} else if (
-				(event.type === "agent.tool_use" ||
-					event.type === "agent.mcp_tool_use") &&
-				event.evaluated_permission === "ask"
-			) {
-				// Nobody approves sandbox tools on a conversation turn.
-				await client.beta.sessions.events.send(
-					session.id,
-					{
-						events: [
-							{
-								type: "user.tool_confirmation",
-								tool_use_id: event.id,
-								result: "deny",
-							},
-						],
-					},
-					{ signal: call.signal },
-				);
-			} else if (event.type === "session.error") {
-				throw fail("session_error");
-			} else if (event.type === "session.status_idle") {
-				if (event.stop_reason.type === "requires_action") continue;
-				settled = true;
-				if (event.stop_reason.type !== "end_turn")
-					throw fail(event.stop_reason.type);
-				break;
-			} else if (event.type === "session.status_terminated") {
-				settled = true;
-				throw fail("session_terminated");
-			}
-		}
-		call.signal.throwIfAborted();
-		if (!text.trim()) throw fail("empty_output");
-		if (tools.length) call.onDelta?.(text);
-		return { text, inputTokens: null, outputTokens: null };
-	} finally {
-		// One session per turn; cleanup must not depend on the turn's signal.
-		void cleanupSession(client, session.id, settled);
-	}
+/** The context window the CLI reported for the model of this call (positive integers only). */
+function modelContextWindow(result: SDKResultMessage, model: string) {
+	const usage = result.modelUsage as
+		| Record<string, { contextWindow?: unknown } | undefined>
+		| undefined;
+	const value = usage?.[model]?.contextWindow;
+	return typeof value === "number" && Number.isSafeInteger(value) && value > 0
+		? value
+		: null;
 }
 
-async function cleanupSession(
-	client: Anthropic,
-	sessionId: string,
-	settled: boolean,
-) {
-	const options = { timeout: 15_000, maxRetries: 1 };
-	if (!settled)
-		await client.beta.sessions.events
-			.send(sessionId, { events: [{ type: "user.interrupt" }] }, options)
-			.catch(() => {});
-	try {
-		await client.beta.sessions.delete(sessionId, undefined, options);
-	} catch {
-		try {
-			await client.beta.sessions.archive(sessionId, undefined, options);
-		} catch {
-			log.warn("inference.cloud_agent_session_leaked", {
-				reason: "cloud_agent_session_cleanup_failed",
-			});
-		}
-	}
-}
-
-function safeAgentError(error: unknown) {
+export function safeAgentError(error: unknown) {
 	if (error instanceof Error && code.test(error.message)) return error;
 	if (error instanceof Anthropic.APIError && typeof error.status === "number")
 		return new Error(`cloud_agent_http_${error.status}`);
@@ -600,13 +700,11 @@ export function createCloudAgents(
 					if (!codex) throw fail("codex_unavailable");
 					return await runCodex(codex, call);
 				}
-				if (call.kind === "claude-agent-sdk")
-					return await runClaudeAgent(
-						environment,
-						call,
-						options.claudeQuery ?? query,
-					);
-				return await runManagedAgents(call);
+				return await runClaudeAgent(
+					environment,
+					call,
+					options.claudeQuery ?? query,
+				);
 			} catch (error) {
 				call.signal.throwIfAborted();
 				throw safeAgentError(error);

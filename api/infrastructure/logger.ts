@@ -88,8 +88,24 @@ export interface LogFields {
 	applied?: number;
 	rejected?: number;
 	requestedRejected?: number;
+	/** Saved connection id (an opaque id, never a URL or credential). */
+	connectionId?: string;
+	/** Agent connection auth: `subscription` or `api-key`. */
+	auth?: string;
+	/** Billing path the call ran or would have run on. */
+	billingPath?: string;
+	/** Credential kinds the agent CLI reported (enum values, never the credential). */
+	apiProvider?: string;
+	apiKeySource?: string;
+	tokenSource?: string;
 }
 const keys = new Set<keyof LogFields>([
+	"connectionId",
+	"auth",
+	"billingPath",
+	"apiProvider",
+	"apiKeySource",
+	"tokenSource",
 	"profile",
 	"ttftMs",
 	"providerTtftMs",

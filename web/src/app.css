@@ -133,21 +133,21 @@ select:focus-visible {
 	white-space: nowrap;
 }
 .model-select {
-	padding: 0 18px 0 4px;
-	border: 1px solid transparent;
-	border-radius: 6px;
-	color: inherit;
-	background: transparent;
-	font: inherit;
-	cursor: pointer;
-}
-.model-select:hover,
-.model-select:focus-visible {
-	border-color: var(--border);
-}
-.model-select option {
+	width: auto;
+	max-width: min(260px, 100%);
+	min-height: 28px;
+	padding: 0 6px;
 	color: var(--foreground);
-	background: var(--card);
+	font-size: 0.75rem;
+}
+.model-select > span {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.model-hint {
+	flex-basis: 100%;
+	color: var(--muted-foreground);
 }
 .chat-history {
 	flex: 1;

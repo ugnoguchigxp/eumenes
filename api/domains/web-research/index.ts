@@ -4,6 +4,10 @@ export { migration, attemptTimeoutMigration } from "./repository";
 export { createWebCache, openWebCache, type WebCache } from "./service/cache";
 export { createWebAcquisition } from "./adapters/llm-fetch";
 export { webToolArguments } from "./adapters/toolchain";
+export {
+	createWebContentReview,
+	contentReviewSchema,
+} from "./adapters/content-review";
 export type { AcquisitionPort, Acquisition } from "./adapters/llm-fetch";
 
 export { migrations } from "./repository";

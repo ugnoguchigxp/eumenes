@@ -1,15 +1,27 @@
+import { workersSpeechRequest } from "../adapters/workers-ai-speech";
 import { readChatResponse } from "../../../infrastructure/chat-stream";
 import { readBounded } from "../../../infrastructure/bounded-read";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
+import { billingPath } from "../../settings/contracts";
 import {
 	isAgentConnection,
 	type SettingsService,
 	type Connection,
 	type Resource,
 } from "../../settings";
-import type { CloudAgentKind, CloudAgents } from "../adapters/cloud-agents";
+import type {
+	AgentSessionCall,
+	CloudAgentKind,
+	CloudAgents,
+} from "../adapters/cloud-agents";
 import type { Messages } from "../contracts";
 import type { RequestRow } from "../repository";
+import {
+	acquireAgentSession,
+	dropAgentSession,
+	learnContextWindow,
+} from "./agent-session";
+import type { CallSessionRole } from "./attempt-record";
 
 export type CloudEnv = {
 	store: SqliteStore;
@@ -46,24 +58,85 @@ function fitMessages(row: RequestRow, resource: Resource, input: Messages) {
 	return { messages, reserve };
 }
 
+type AttemptUsage = {
+	input?: unknown;
+	output?: unknown;
+	cacheRead?: unknown;
+	cacheCreation?: unknown;
+	costUsd?: unknown;
+};
+
+/** Token counts, prompt-cache usage, cost and the billing path of the connection that served the attempt. */
 async function recordUsage(
 	env: CloudEnv,
 	attemptId: string,
-	input: unknown,
-	output: unknown,
+	connection: Connection,
+	usage: AttemptUsage,
 ) {
 	const count = (v: unknown) =>
 		typeof v === "number" && Number.isSafeInteger(v) && v >= 0 ? v : null;
+	const cost =
+		typeof usage.costUsd === "number" &&
+		Number.isFinite(usage.costUsd) &&
+		usage.costUsd >= 0
+			? usage.costUsd
+			: null;
 	await env.store.write((db) =>
 		db
 			.query(
-				"UPDATE inference_attempts SET input_tokens=?,output_tokens=? WHERE id=?",
+				"UPDATE inference_attempts SET input_tokens=?,output_tokens=?,cache_read_tokens=?,cache_creation_tokens=?,cost_usd=?,billing_path=? WHERE id=?",
 			)
-			.run(count(input), count(output), attemptId),
+			.run(
+				count(usage.input),
+				count(usage.output),
+				count(usage.cacheRead),
+				count(usage.cacheCreation),
+				cost,
+				billingPath(connection),
+				attemptId,
+			),
 	);
 }
 
-/** An agent SDK connection (Codex / Claude Agent SDK / Managed Agents) answering one LLM turn. */
+/**
+ * The Claude Agent SDK session a call belongs to: `main` and `subagent` calls use the ledger's id for their
+ * combination (the attempt row records it); a one-shot call, or another agent kind, has none.
+ */
+async function agentSession(
+	env: CloudEnv,
+	connection: Connection,
+	resource: Resource,
+	role: CallSessionRole | undefined,
+	attemptId: string,
+): Promise<AgentSessionCall | undefined> {
+	if (
+		!role ||
+		role.sessionRole === "auxiliary" ||
+		connection.kind !== "claude-agent-sdk" ||
+		!connection.auth
+	)
+		return undefined;
+	const id = await acquireAgentSession(env.store, {
+		role: role.sessionRole,
+		taskId: role.taskId,
+		connectionId: connection.id,
+		auth: connection.auth,
+		model: resource.model,
+	});
+	await env.store.write((db) =>
+		db
+			.query("UPDATE inference_attempts SET agent_session_id=? WHERE id=?")
+			.run(id, attemptId),
+	);
+	return {
+		id,
+		role: role.sessionRole,
+		...(role.context ? { context: role.context } : {}),
+		drop: () => dropAgentSession(env.store, id),
+	};
+}
+
+/** An agent SDK connection (Codex / Claude Agent SDK) answering one LLM turn. */
 async function agentRequest(
 	env: CloudEnv,
 	row: RequestRow,
@@ -75,21 +148,31 @@ async function agentRequest(
 	attemptId: string,
 	onDelta?: (text: string) => void,
 	options?: import("../../larm").LarmCallOptions,
+	role?: CallSessionRole,
 ) {
 	if (input.some((m) => m.images?.length))
 		throw new Error("image_not_supported");
 	if (row.purpose !== "llm") throw new Error("cloud_agent_purpose_unsupported");
 	if (!env.agents) throw new Error("cloud_agent_unavailable");
+	const session = await agentSession(
+		env,
+		connection,
+		resource,
+		role,
+		attemptId,
+	);
 	const result = await env.agents.run({
 		kind: connection.kind as CloudAgentKind,
+		connectionId: connection.id,
+		...(session ? { session } : {}),
 		model: resource.model,
 		baseUrl: connection.baseUrl,
 		credential,
-		agentId: connection.agentId,
-		environmentId: connection.environmentId,
+		auth: connection.auth,
 		messages: fitMessages(row, resource, input).messages,
 		tools: options?.tools,
 		outputSchema: options?.jsonOutput ? options.jsonSchema : undefined,
+		reasoningEffort: options?.reasoningEffort,
 		signal,
 		onDelta,
 	});
@@ -99,7 +182,15 @@ async function agentRequest(
 			throw new Error("chat_tool_calls_unexpected");
 		options.onToolCalls(result.toolCalls);
 	}
-	await recordUsage(env, attemptId, result.inputTokens, result.outputTokens);
+	if (session && result.contextWindow)
+		await learnContextWindow(env.store, session.id, result.contextWindow);
+	await recordUsage(env, attemptId, connection, {
+		input: result.inputTokens,
+		output: result.outputTokens,
+		cacheRead: result.cacheReadTokens,
+		cacheCreation: result.cacheCreationTokens,
+		costUsd: result.costUsd,
+	});
 	return result.text;
 }
 
@@ -114,6 +205,7 @@ export async function cloudRequest(
 	attemptId: string,
 	onDelta?: (text: string) => void,
 	options?: import("../../larm").LarmCallOptions,
+	role?: CallSessionRole,
 ) {
 	const credential = env.settings.credential(connection);
 	if (isAgentConnection(connection))
@@ -128,8 +220,28 @@ export async function cloudRequest(
 			attemptId,
 			onDelta,
 			options,
+			role,
 		);
 	if (!credential) throw new Error("cloud_credential_unavailable");
+	if (connection.kind === "cloudflare-workers-ai") {
+		const value = await workersSpeechRequest(
+			env.fetch ?? fetch,
+			connection,
+			credential,
+			resource,
+			input as string | Uint8Array,
+			signal,
+		);
+		if (
+			row.purpose === "asr" &&
+			typeof value === "string" &&
+			!value.trim() &&
+			!row.subject.startsWith("probe:")
+		)
+			throw new Error("invalid_response_text");
+		await recordUsage(env, attemptId, connection, {});
+		return value;
+	}
 	const base = new URL(
 		connection.baseUrl.endsWith("/")
 			? connection.baseUrl
@@ -216,12 +328,10 @@ export async function cloudRequest(
 			options.onToolCalls(result.toolCalls);
 		}
 		signal.throwIfAborted();
-		await recordUsage(
-			env,
-			attemptId,
-			result.usage?.prompt_tokens,
-			result.usage?.completion_tokens,
-		);
+		await recordUsage(env, attemptId, connection, {
+			input: result.usage?.prompt_tokens,
+			output: result.usage?.completion_tokens,
+		});
 		return result.text;
 	}
 
@@ -263,11 +373,9 @@ export async function cloudRequest(
 		| { prompt_tokens?: unknown; completion_tokens?: unknown }
 		| undefined;
 	signal.throwIfAborted();
-	await recordUsage(
-		env,
-		attemptId,
-		usage?.prompt_tokens,
-		usage?.completion_tokens,
-	);
+	await recordUsage(env, attemptId, connection, {
+		input: usage?.prompt_tokens,
+		output: usage?.completion_tokens,
+	});
 	return value;
 }

@@ -37,15 +37,21 @@ export const settingsConditions: Readonly<
 	/** The browser can route playback to a chosen output device. */
 	"condition:settings.output-device-selectable@1": (c) =>
 		c.voice.outputSupported,
-	/** The connection chosen as the field's target is a Claude Managed Agents connection. */
-	"condition:settings.connection-managed-agents@1": (c) =>
+	/** The connection chosen as the field's target is a Claude Agent SDK connection. */
+	"condition:settings.connection-claude-agent-sdk@1": (c) =>
 		c.effective.connections.find((x) => x.id === c.target)?.kind ===
-		"claude-managed-agents",
+		"claude-agent-sdk",
 	/** The connection chosen as the field's target is an OpenAI-compatible HTTP connection. */
 	"condition:settings.connection-openai-compatible@1": (c) => {
 		const kind = c.effective.connections.find((x) => x.id === c.target)?.kind;
 		return kind === undefined || kind === "openai-compatible";
 	},
+	"condition:settings.connection-workers-ai@1": (c) =>
+		c.effective.connections.find((x) => x.id === c.target)?.kind ===
+		"cloudflare-workers-ai",
+	"condition:settings.connection-custom-url@1": (c) =>
+		c.effective.connections.find((x) => x.id === c.target)?.kind !==
+		"cloudflare-workers-ai",
 	/** The model chosen as the field's target is a conversation (LLM) model. */
 	"condition:settings.resource-llm@1": (c) =>
 		c.effective.resources.find((x) => x.id === c.target)?.purpose === "llm",

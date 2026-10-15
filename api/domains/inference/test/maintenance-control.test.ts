@@ -16,6 +16,7 @@ import {
 	diagnosticsMigration,
 	controlMigration,
 	backgroundControlMigration,
+	migrations as inferenceMigrations,
 } from "..";
 
 const cleanup: Array<() => Promise<void>> = [];
@@ -37,6 +38,7 @@ async function setup() {
 		diagnosticsMigration,
 		controlMigration,
 		backgroundControlMigration,
+		...inferenceMigrations.slice(5).map((m) => m.sql),
 	]);
 	const settings = await createSettings(store, { dbPath, env: {} });
 	const s = settings.get();

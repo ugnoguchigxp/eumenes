@@ -17,6 +17,7 @@ export const queryRoots = {
 	larmDetails: "larm-details",
 	larmProfiles: "larm-profiles",
 	larmVoices: "larm-voices",
+	connectionModels: "connection-models",
 	settings: "settings",
 	settingsDiagnostics: "settings-diagnostics",
 	inferenceUsage: "inference-usage",
@@ -58,6 +59,7 @@ export const changeRoots = [
 /** Roots whose queries call live providers; they are fetched on demand only. */
 export const liveProviderRoots: readonly string[] = [
 	queryRoots.settingsDiagnostics,
+	queryRoots.connectionModels,
 	queryRoots.larmVoices,
 ];
 

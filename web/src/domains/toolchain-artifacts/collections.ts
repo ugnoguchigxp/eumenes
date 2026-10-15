@@ -275,7 +275,9 @@ export function collectionResource({
 													),
 											),
 											formOptions,
-										).map(formFieldView),
+										).map((field) =>
+											formFieldView({ ...field, when: undefined }),
+										),
 										values: prefillOf(a.form, raw),
 									},
 								}

@@ -212,6 +212,8 @@ dialogue の context-compiler が組み立てる各層を、次のように振�
 | P9 | 文書更新（`docs/settings.md`・`docs/logging.md` 等） | docs | 全体 |
 | P10 | `subagent` 段階 2（現在状態と資料の分離） | agent-runtime / inference | P7（別計画で詳細化） |
 
+実装状況（2026-10-16）: P1〜P9 を実装（fixture 試験済み）。P10 は別計画。live 未検証: 本物の Messages API での履歴受理（V6）、キャッシュ（V7）、サブスクリプションの実経路、同一 taskId の 2 step 目の再開、末尾が未回答 user の履歴（現在は今回の入力の先頭へ移す）。既知の制限: 文脈の組み立てから attempt 記録までの間に忘却が確定した場合、その試行は失効しない（採用は Window の再検査で止まる）。
+
 ## 6. 事前検証（P0）
 
 | ID | 検証内容 | 結果による分岐 |
@@ -223,6 +225,20 @@ dialogue の context-compiler が組み立てる各層を、次のように振�
 | V5 | ストリーミング入力で最初のメッセージを流す前に `initializationResult()` / `accountInfo()` が得られ、その時点でモデル送信が起きていないか | 送信が先行するなら、送信前検証をプロンプトなしの事前 `query()` で行う |
 | V6 | 組み立てた履歴（thinking ブロックを含まない assistant エントリ）で再開したとき、API 側の履歴編集検査・thinking の扱いでエラーにならないか | エラーになる場合は assistant エントリの形式を V1 の採取結果に合わせて調整、不可なら V1 の分岐に従う |
 | V7 | 連続 3 ターンで、2 ターン目以降に `cache_read_input_tokens` が履歴部分に相当する量だけ出るか | 出なければ組み立て順・エントリ形式を見直す |
+
+### 6.1 P0 結果（2026-10-16、ローカル模擬サーバーのみ・SDK 0.3.289／同梱 CLI 2.1.289）
+
+外部への接続は 0 件。本物の Messages API・サブスクリプションの実経路は未検証。
+
+| ID | 結果 | 実装への反映 |
+|---|---|---|
+| V1 | 成立（模擬）。`resume` で同じ SessionID が続き、`/v1/messages` の messages は `load` が返した履歴＋今回の入力そのもの。`append` を捨てても次回は `load` に従う | §4.5 のとおり実装。エントリは採取形（`parentUuid` の一本鎖、`type`・`uuid`・`timestamp`・`sessionId`・`message` ほか）で組み立てる |
+| V2 | `settings:{autoCompactEnabled:false}` は受理され `isAutoCompactEnabled=false` になる。その状態で上限を超えると送信前に `Prompt is too long`（`is_error`）で止まる | 予算管理は Window 側の責務。エラーは通常の失敗として扱う |
+| V3 | 成立。`[A-Za-z0-9_-]{1,64}`・予約名以外。`options.env` に `CLAUDE_CONFIG_DIR` が必要 | store 経由の resume は**ホストプロセスの** `os.tmpdir()` に `claude-resume-<uuid>/`（履歴全文を含む）を作る。正常終了で非同期削除、ホスト強制終了で残留するため、起動時の回収対象に含める |
+| V4 | api-key 側のみ。`apiKeySource`・`tokenSource` の組で、キー／`CLAUDE_CODE_OAUTH_TOKEN`／`ANTHROPIC_AUTH_TOKEN`／混在／なしを区別できた。`apiProvider` は全ケース `firstParty`、`subscriptionType` は未出現 | 判定表: subscription＝`tokenSource=CLAUDE_CODE_OAUTH_TOKEN` かつ `apiKeySource` なし、api-key＝`apiKeySource=ANTHROPIC_API_KEY` かつ `tokenSource=none`。それ以外（混在含む）は拒否 |
+| V5 | 成立。未 yield の入力で `initializationResult()`・`accountInfo()` が返り、その時点で HTTP 要求は 0 件。`GET /v1/models` は呼ばれず、`initializationResult().models` は静的な別名のみ | 送信前検証は §4.2 のまま |
+| V6 | 一部。thinking を含まない assistant エントリは本文のまま送られる。本物の API の受理は不明 | live で確認 |
+| V7 | 未実施 | live で確認 |
 
 ## 7. 検証計画
 

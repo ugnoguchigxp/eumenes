@@ -5,6 +5,7 @@ import {
 	LlmFetchError,
 	type SearchProvider,
 	type SafeHttpFetcher,
+	type BuiltinContextGuardOptions,
 } from "llm-fetch";
 import type {
 	ResearchRequest,
@@ -132,6 +133,7 @@ export function createWebAcquisition(
 		search?: SearchProvider;
 		now?: () => number;
 		fetcher?: SafeHttpFetcher;
+		review?: BuiltinContextGuardOptions["review"];
 	} = {},
 ): AcquisitionPort {
 	const now = options.now ?? Date.now;
@@ -188,8 +190,12 @@ export function createWebAcquisition(
 			cache: { enabled: false },
 			// Scan ordinary pages with hundreds of metadata/attribute segments in
 			// full; preserve denial when inspection is incomplete or finds an attack.
-			contextGuard: { maxSegments: 4096, maxCharacters: 2_000_000 },
-			readTimeoutMs: 15000,
+			contextGuard: {
+				maxSegments: 4096,
+				maxCharacters: 2_000_000,
+				...(options.review ? { review: options.review } : {}),
+			},
+			readTimeoutMs: options.review ? 30000 : 15000,
 			fetcher: async (target, input) => {
 				const requestedAtMs = now();
 				const response = await transport(target, input);

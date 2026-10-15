@@ -56,6 +56,13 @@ export function createRuleOf({
 	): FieldRule | null => {
 		if (!effective) return null;
 		if (isSpeechTarget(field) && voice.target !== target) return null;
+		const resource = effective.resources.find((r) => r.id === target);
+		const workers =
+			effective.connections.find((c) => c.id === resource?.connectionId)
+				?.kind === "cloudflare-workers-ai";
+		if (field.path === "$.resources[id=$target].speed" && workers) return null;
+		if (field.path === "$.resources[id=$target].language" && !workers)
+			return null;
 		if (
 			field.visibleWhen &&
 			!settingsConditions[field.visibleWhen]?.({ effective, voice, target })

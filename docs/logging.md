@@ -103,6 +103,10 @@ Toolchainのlive検証も、一時DBを削除する前に運用ログを `verifi
 
 `api/infrastructure/logger.test.ts` はJSON形式、並行処理のID分離、秘密の除外、世代管理、書込み失敗時の継続、HTTPの相関ID、閲覧時の絞込みを確認します。`api/application/logging.test.ts` は一時DBとLARM未設定のbackendを実際に起動し、入力受付→ジョブ→推論失敗→終了のログを確認します。これらはfixture試験であり、liveのProvider疎通や実マイク・再生の受入ではありません。
 
+## Claude Agent SDKの認証・経路
+
+送信前検証でSDKが報告した資格情報の種類が接続の認証方式と一致しない場合、`inference.cloud_agent_auth_mismatch` に `connectionId`・`auth` と、SDKが返した列挙値 `apiProvider`・`apiKeySource`・`tokenSource` を記録し、メッセージを送らずに失敗します。資格情報そのものは記録しません。専用リソースが使えず会話経路へ戻すと課金経路が変わる場合は、`inference.route_billing_mismatch` に `taskId`・専用リソースの `connectionId` と `billingPath`、戻せなかった会話経路の課金経路（`source`）を記録してLARMだけで実行します。attemptには `session_role`・`task_id`・`billing_path`・`agent_session_id` とキャッシュ使用量・費用を保存し、実行記録APIから辿れます。忘却で失効した試行は `revoked` になり採用されません。
+
 ## Codex SDKによる調査の失敗
 
 LunaのSDK呼出しでは `inference.attempt_failed` に `phase=sdk_start/sdk_turn/sdk_output` と安全な分類を残します。`codex_research_process_exit` はCLIランタイムの異常終了、`codex_research_http_401` などは外部応答のHTTP状態、`codex_research_invalid_json_schema` などは許可したProviderコード、`codex_research_invalid_event` はSDKイベントの不正です。最終応答のJSON・契約違反は共通workerの `agent.control_rejected` に記録し、構文違反・schema違反・不正な根拠を区別します。未分類は `codex_research_failed` とし、原因を推測しません。

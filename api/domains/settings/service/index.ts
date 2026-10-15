@@ -35,7 +35,7 @@ import {
 	type Connection,
 	type Settings,
 } from "../contracts";
-import { read, save } from "../repository";
+import { persistStoredMigration, read, save } from "../repository";
 export function defaults(env: Record<string, string | undefined>): Settings {
 	const route = () => ({
 		mode: "larm-preferred" as const,
@@ -183,6 +183,7 @@ export async function createSettings(
 	await store.write((db) => {
 		if (!db.query("SELECT id FROM settings_document").get())
 			save(db, defaults(env));
+		else persistStoredMigration(db);
 	});
 	const listeners = new Set<() => void>();
 	function credential(db: Database, c: Connection): string | null {

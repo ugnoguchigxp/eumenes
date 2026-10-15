@@ -210,6 +210,17 @@ export function createPrepare(
 						dots: !!delegated && delegated.available !== false,
 					})
 				: undefined;
+		// The history a resumed session starts from is exactly the adopted exchanges this prompt shows (the
+		// kept and the not yet processed ones); the layers around them and everything added later are this turn's input.
+		const adopted = new Set([
+			...compiled.sections.history,
+			...compiled.sections.unprocessed,
+		]);
+		const sessionContext = {
+			instructionCount:
+				1 + compiled.sections.longTerm.length + compiled.sections.goals.length,
+			historyCount: messages.filter((m) => adopted.has(m)).length,
+		};
 		// A prefetch left out of this turn is neither sent nor checked at adoption.
 		const prepared =
 			window && compiled.prefetchDropped
@@ -221,6 +232,7 @@ export function createPrepare(
 				runId: run.id,
 				revision: current.revision,
 				messages,
+				sessionContext,
 				currentRequest: {
 					messageId: run.inputMessageId,
 					messageIndex: messages.indexOf(compiled.sections.input),

@@ -2,6 +2,7 @@ import { createHash, createHmac } from "node:crypto";
 import type { Database } from "bun:sqlite";
 import {
 	applySchema,
+	billingPath,
 	isAgentConnection,
 	purposeSchema,
 	type ApplySettings,
@@ -80,6 +81,25 @@ export function createApplyInTransaction(deps: {
 		for (const k of input.keys)
 			if (!next.connections.some((c) => c.id === k.connectionId))
 				throw new Error("invalid_key_connection");
+		// A connection in use by a cloud route (or a dedicated model) never changes its billing path
+		// in place: that would move the saved route to another bill without the user choosing a
+		// route. The user adds a connection and selects it instead.
+		const routed = new Set<string>(
+			[
+				...purposeSchema.options.map((p) => next.routes[p].fallbackId),
+				next.world.curationResourceId,
+				next.subagent.resourceId,
+			].filter((id): id is string => !!id),
+		);
+		for (const c of next.connections) {
+			const prior = old.connections.find((x) => x.id === c.id);
+			if (
+				prior &&
+				billingPath(prior) !== billingPath(c) &&
+				next.resources.some((r) => r.connectionId === c.id && routed.has(r.id))
+			)
+				throw new Error("invalid_billing_path_change");
+		}
 		for (const c of old.connections)
 			if (!next.connections.some((n) => n.id === c.id))
 				db.query(
@@ -95,11 +115,19 @@ export function createApplyInTransaction(deps: {
 				!isAllowedEnvRef(c.envRef, deps.envRefAllowlist, c.baseUrl)
 			)
 				throw new Error("invalid_env_ref");
+			// A subscription connection sends nothing to its base URL, so its origin binds no key.
 			const originChanged =
-				prior && new URL(prior.baseUrl).origin !== new URL(c.baseUrl).origin;
+				prior &&
+				c.auth !== "subscription" &&
+				new URL(prior.baseUrl).origin !== new URL(c.baseUrl).origin;
+			// The stored secret is an API key or a setup token: a new auth method needs its own.
+			const authChanged = !!prior && prior.auth !== c.auth;
+			if (authChanged && c.auth && !mutation?.value && !c.envRef)
+				throw new Error("credential_required");
 			// A login-based agent connection (no key, no env ref) has nothing to rebind.
 			const keyless =
 				isAgentConnection(c) &&
+				c.kind !== "claude-agent-sdk" &&
 				!c.envRef &&
 				!prior?.envRef &&
 				!db
@@ -112,10 +140,14 @@ export function createApplyInTransaction(deps: {
 				(!c.envRef || c.envRef === prior?.envRef)
 			)
 				throw new Error("invalid_origin_requires_new_key");
+			const providerChanged =
+				!!prior && (prior.kind !== c.kind || prior.accountId !== c.accountId);
 			const revoked =
 				prior &&
 				((prior.enabled && !c.enabled) ||
 					prior.envRef !== c.envRef ||
+					authChanged ||
+					providerChanged ||
 					originChanged);
 			const epochRow = db
 				.query("SELECT epoch FROM settings_connection_epochs WHERE id=?")
@@ -139,6 +171,7 @@ export function createApplyInTransaction(deps: {
 				c.epoch !== prior.epoch &&
 				!mutation &&
 				!originChanged &&
+				!authChanged &&
 				!c.envRef
 			) {
 				let value: string | null = null;

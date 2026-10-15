@@ -338,14 +338,20 @@ function CollectionForm({
 				});
 			}}
 		>
-			{fields.map((field) => (
-				<label key={field.id} htmlFor={`${prefix}-${field.id}`}>
-					{field.label}
-					{field.required && "（必須）"}
-					{input(field)}
-					{field.help && <small>{field.help}</small>}
-				</label>
-			))}
+			{fields
+				.filter(
+					(field) =>
+						!field.when ||
+						field.when.in.includes(values[field.when.key] as never),
+				)
+				.map((field) => (
+					<label key={field.id} htmlFor={`${prefix}-${field.id}`}>
+						{field.label}
+						{field.required && "（必須）"}
+						{input(field)}
+						{field.help && <small>{field.help}</small>}
+					</label>
+				))}
 			{notice && <p role="alert">{notice}</p>}
 			{uploadError && <p role="alert">{uploadError}</p>}
 			<Button type="submit" disabled={busy || uploading}>

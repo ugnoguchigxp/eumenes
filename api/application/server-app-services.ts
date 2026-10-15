@@ -14,6 +14,7 @@ export function appServices(s: Services) {
 		scheduler: s.scheduler,
 		settings: s.settings,
 		inference: s.inference,
+		connectionModels: s.connectionModels,
 		googleAccounts: s.googleAccounts,
 		ttsDictionary: s.ttsDictionary,
 		memory: s.memory,

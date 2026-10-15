@@ -19,6 +19,7 @@ import type { Connection, Resource, Settings } from "../../settings";
 import type { SettingsService } from "../../settings";
 import {
 	controlJsonOptions,
+	type CallSession,
 	type ControlContract,
 	type Messages,
 	type Receipt,
@@ -28,6 +29,12 @@ import { createSpeechLanguageCache } from "./speech-language";
 import type { SentenceLanguageDecision } from "../../larm";
 import { get, type RequestRow } from "../repository";
 import { cloudRequest } from "./cloud";
+import {
+	recordAttemptStart,
+	resolveSession,
+	sessionCallOptions,
+	type CallSessionRole,
+} from "./attempt-record";
 import { fallbackErrors, safeError } from "./errors";
 import { CodexResearchFailure } from "../adapters/codex-failure";
 import type { CloudAgents } from "../adapters/cloud-agents";
@@ -112,6 +119,8 @@ type Request = {
 	onDelta?: (text: string) => void;
 	preparation?: SpeechPreparation;
 	control?: ControlContract;
+	/** The call's session lifetime (llm only); written on every attempt row and passed to the provider. */
+	session?: CallSessionRole;
 	/** Why the previous attempt was abandoned (recorded on the next attempt). */
 	reason: string | null;
 	/** True once any answer text reached the caller: no silent fallback after that. */
@@ -140,32 +149,6 @@ function attemptDuration(r: Request, source: Source) {
 	return Math.min(configured, Math.max(1, remaining - reserve));
 }
 
-async function recordAttemptStart(r: Request, source: Source) {
-	const connection = source === "cloud" ? r.selected?.connection : undefined;
-	const attemptId = crypto.randomUUID();
-	await r.env.store.write((db) =>
-		db
-			.query(
-				"INSERT INTO inference_attempts(id,request_id,source,connection_id,resource_id,model,status,reason,started) VALUES(?,?,?,?,?,?,'running',?,?)",
-			)
-			.run(
-				attemptId,
-				r.row.id,
-				source,
-				connection?.id ?? null,
-				source === "cloud" ? (r.selected?.resource.id ?? null) : null,
-				source === "cloud"
-					? (r.selected?.resource.model ?? null)
-					: source === "codex"
-						? r.env.options.codexResearch!.model
-						: (r.row.snapshot.larm.profile ?? null),
-				r.reason,
-				Date.now(),
-			),
-	);
-	return attemptId;
-}
-
 /** Provider options and bounded exchange correlation across language, delivery and synthesis. */
 function callOptionsFor(r: Request, attemptId: string): LarmCallOptions {
 	const exchanges: LarmExchange[] = [];
@@ -184,9 +167,13 @@ function callOptionsFor(r: Request, attemptId: string): LarmCallOptions {
 		...(r.row.mode === "control"
 			? controlJsonOptions(r.control, r.row.structuredOutput)
 			: {}),
+		...(r.row.mode === "control" && r.control?.reasoningEffort
+			? { reasoningEffort: r.control.reasoningEffort }
+			: {}),
 		...(r.row.contextPolicy === "exact"
 			? { contextPolicy: "exact" as const }
 			: {}),
+		...sessionCallOptions(r.session),
 		...(r.row.outputLimit ? { maxOutputTokens: r.row.outputLimit } : {}),
 
 		onExchange: async (exchange: LarmExchange) => {
@@ -328,11 +315,10 @@ function startWork(
 			args.attemptId,
 			args.delta,
 			args.callOptions,
+			r.session,
 		);
 	const p = env.port(row.snapshot);
 	if (row.purpose === "llm") {
-		args.callOptions.sessionRole =
-			row.mode === "control" ? "auxiliary" : "main";
 		if (args.delta && p.answerStream)
 			return p.answerStream(
 				r.input as Messages,
@@ -421,7 +407,14 @@ async function attempt(r: Request, source: Source): Promise<Receipt> {
 	)
 		throw new Error("cloud_fallback_unconfigured");
 	const started = performance.now();
-	const attemptId = await recordAttemptStart(r, source);
+	const attemptId = await recordAttemptStart(env.store, {
+		row,
+		source,
+		selected: r.selected,
+		reason: r.reason,
+		session: r.session,
+		codexModel: env.options.codexResearch?.model,
+	});
 	const logFields = {
 		inferenceId: row.id,
 		subjectId: row.subject,
@@ -601,13 +594,16 @@ async function attempt(r: Request, source: Source): Promise<Receipt> {
 									: row.purpose),
 						)?.model
 				: undefined;
-		await env.store.write((db) =>
-			db
-				.query(
-					"UPDATE inference_attempts SET status='succeeded',ended=?,model=COALESCE(?,model) WHERE id=?",
-				)
-				.run(Date.now(), localModel ?? null, attemptId),
+		// A forget may have revoked the attempt meanwhile: it stays revoked and its receipt is never adopted.
+		const finished = await env.store.write(
+			(db) =>
+				db
+					.query(
+						"UPDATE inference_attempts SET status='succeeded',ended=?,model=COALESCE(?,model) WHERE id=? AND status='running'",
+					)
+					.run(Date.now(), localModel ?? null, attemptId).changes,
 		);
+		if (finished !== 1) throw new Error("permission_revoked");
 		log.info("inference.attempt_succeeded", {
 			...logFields,
 			durationMs: Math.round(performance.now() - started),
@@ -636,7 +632,7 @@ async function attempt(r: Request, source: Source): Promise<Receipt> {
 		await env.store.write((db) =>
 			db
 				.query(
-					"UPDATE inference_attempts SET status='failed',reason=?,ended=? WHERE id=?",
+					"UPDATE inference_attempts SET status='failed',reason=?,ended=? WHERE id=? AND status='running'",
 				)
 				.run(code, Date.now(), attemptId),
 		);
@@ -718,6 +714,7 @@ export async function executeRequest(
 	tools?: import("../../../infrastructure/chat-stream").NativeTool[],
 	control?: ControlContract,
 	voiceOverride?: SpeechOverride,
+	session?: CallSession,
 ): Promise<Receipt> {
 	caller.throwIfAborted();
 	if (env.isClosed()) throw new Error("inference_closed");
@@ -726,6 +723,7 @@ export async function executeRequest(
 	const row: RequestRow = found;
 	if (voiceOverride && row.purpose !== "tts")
 		throw new Error("invalid_voice_override");
+	const resolvedSession = resolveSession(row, session);
 	if (
 		row.purpose === "asr" &&
 		(!(input instanceof Uint8Array) ||
@@ -774,6 +772,7 @@ export async function executeRequest(
 		preparation,
 		tools,
 		control,
+		session: resolvedSession,
 		reason: null,
 		published: false,
 	};
