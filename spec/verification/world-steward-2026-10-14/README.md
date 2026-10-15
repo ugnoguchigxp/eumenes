@@ -86,4 +86,11 @@
 直したもの:
 - skill@3: claim は text と evidence（eN の配列）を必ず持つ、根拠が無いときの not_found／failed の書き方、要約のキー名 `claims` を `documents` に。
 - toolchain@5: 「〜にするとどうなりそう？」「誰に聞けばいい？」「World の記録だと…」の使う場面と例文。
-- skill@4、package@4、toolchain@6: 対象が見つかったら必ず `world.query` を呼んでから報告する、limitations にも内部の語を書かない。fixture 通過。live は未確認（kanban の migration `0003-executors` の checksum 不一致で backend が起動しないため）。
+- skill@4、package@4、toolchain@6: 対象が見つかったら必ず `world.query` を呼んでから報告する、limitations にも内部の語を書かない。
+- `world.query` の port: snapshot・gaps で `entityId` を1件だけ渡したら起点1件として読む（live で調べ役が繰り返した誤り）。mode に合わない入力は `invalid_input` と直すべき項目名を返す（以前は理由のない失敗で、同じ入力を3回繰り返した）。
+
+| 会話 | 質問 | 結果 |
+|---|---|---|
+| `world-research-c`（skill@4） | 「World の記録だと、freee にすると月末締めはどうなりそう？」 | 不合格。照会はしたが snapshot に `entityId` を渡して入力エラーを3回繰り返し、not_found（上の port の修正で対応） |
+| `world-research-d` | 「World の記録だと、freee にすると月末締めはどうなりそう？」 | **合格**。`world.find` → `world.query`（snapshot）→ 報告 partial（根拠5件）。回答は「今は3日」「銀行・カード連携に対応」を本人の報告として、「月末締め作業が減る」を仮説として分けて伝え、断定しなかった。内部の語なし |
+| `world-research-d` | 「freee の移行について誰に聞けばいい？」 | **合格**。報告 partial（根拠4件）。回答は「佐藤さんに相談するのがよさそう」で、記録にない名前は出なかった |
