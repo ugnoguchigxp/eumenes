@@ -5,6 +5,7 @@ import type { ConversationService } from "../../conversation";
 import { isSystemPrompt, type Run } from "../contracts";
 import { linkAgent } from "../repository";
 import type { DialogueDeps } from "./context";
+import { originalRequestInTransaction } from "./request-context";
 
 /** How much of the preceding conversation joins the current utterance as the retrieval query. */
 const QUERY_CONTEXT_BYTES = 1024;
@@ -32,9 +33,7 @@ export function delegateConversation(
 		actionCapability?: Prepared;
 	},
 ) {
-	const original = conversation
-		.messagesInTransaction(db, run.conversationId)
-		.find((m) => m.id === run.inputMessageId)!.text;
+	const original = originalRequestInTransaction(db, conversation, run);
 	const root = agents.startInTransaction(db, {
 		rootRunId: run.id,
 		input: {
@@ -68,6 +67,7 @@ export function prepareRouting(
 	deps: DialogueDeps,
 	run: Run,
 	messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
+	currentRequest: (typeof messages)[number],
 	available: { dots: boolean },
 ) {
 	const { agents, toolchains } = deps;
@@ -97,17 +97,21 @@ export function prepareRouting(
 			runtime.binding ? runtime.binding.available : ready(runtime.requires),
 		)
 		.map((entry) => entry.id);
-	const turns = messages.filter((m) => m.role !== "system");
-	const current = turns.at(-1)?.content ?? "";
+	const index = messages.indexOf(currentRequest);
+	if (index < 0) throw new Error("run_input_missing");
+	const turns = messages.slice(0, index).filter((m) => m.role !== "system");
 	let before = "";
-	for (const m of turns.slice(0, -1).slice(-QUERY_CONTEXT_TURNS).reverse()) {
+	for (const m of turns.slice(-QUERY_CONTEXT_TURNS).reverse()) {
 		const next = `${m.content}\n${before}`;
 		if (new TextEncoder().encode(next).length > QUERY_CONTEXT_BYTES) break;
 		before = next;
 	}
 	return {
 		routing: {
-			query: (before ? before + "\n" : "") + current,
+			query:
+				(before ? "referenceContext=" + JSON.stringify(before) + "\n" : "") +
+				"currentRequest=" +
+				JSON.stringify(currentRequest.content),
 			available: ids,
 			conversationId: run.conversationId,
 			utteranceId: run.utteranceId ?? null,

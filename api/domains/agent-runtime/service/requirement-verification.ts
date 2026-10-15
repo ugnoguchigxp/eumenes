@@ -14,6 +14,7 @@ import {
 	type RequirementVerification,
 } from "../contracts/requirements";
 import type { Task, Report } from "../contracts";
+import { delegatedTaskRules } from "../../inference";
 import { EvidenceCatalog } from "./evidence-catalog";
 import {
 	readRequirements,
@@ -87,6 +88,8 @@ export function prepareRequirementVerification(
 		{
 			role: "system" as const,
 			content:
+				delegatedTaskRules +
+				"\n" +
 				policy +
 				"\nTOOLS=[]\nOUTPUT_SCHEMA=" +
 				JSON.stringify(z.toJSONSchema(requirementVerification)),

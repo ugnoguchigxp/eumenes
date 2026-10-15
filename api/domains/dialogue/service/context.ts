@@ -34,6 +34,7 @@ export type ChatMessage = {
 	images?: import("../../inference").ChatImage[];
 };
 export interface GenerateInput {
+	currentRequest: import("./request-context").CurrentRequest;
 	tools?: NativeTool[];
 	/**
 	 * A new conversation decision: the execute phase retrieves candidate toolchains for this

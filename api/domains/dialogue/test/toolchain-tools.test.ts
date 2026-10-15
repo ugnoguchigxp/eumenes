@@ -105,7 +105,7 @@ test("the policy is placed before the current request and carries past selection
 		{ role: "system" as const, content: "人格" },
 		{ role: "user" as const, content: "鎌倉の天気" },
 	];
-	appendConversationPolicy(messages, true, [
+	appendConversationPolicy(messages, true, messages[1]!, [
 		{ request: "横浜の天気", functionName: "web_search", outcome: "answered" },
 	]);
 	expect(messages.at(-1)!.content).toBe("鎌倉の天気");

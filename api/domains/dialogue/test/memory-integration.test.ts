@@ -277,7 +277,8 @@ test("every earlier exchange the steward has not decided on is sent; the notice 
 	expect(sent[0]!.role).toBe("system");
 	expect(sent[1]!.content).toBe("質問1");
 	expect(sent.at(-1)!.content).toBe("質問12");
-	const notice = sent.at(-2)!;
+	const notice = sent.at(-3)!;
+	expect(sent.at(-2)!.content).toStartWith("CURRENT_REQUEST=");
 	expect(notice.role).toBe("system");
 	expect(notice.content).toContain("記憶の担当からの連絡です");
 	expect(notice.content).toContain("- 保存できませんでした");

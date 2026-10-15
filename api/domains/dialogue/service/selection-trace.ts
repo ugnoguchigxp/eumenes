@@ -15,6 +15,7 @@ import type {
 	ToolchainRoutingPort,
 } from "../contracts/toolchains";
 import type { DialogueDeps, GenerateInput } from "./context";
+import { currentRequestMessage, markCurrentRequest } from "./request-context";
 import {
 	appendConversationPolicy,
 	toolchainTools,
@@ -67,7 +68,8 @@ export async function prepareDecision(
 	signal: AbortSignal,
 ) {
 	const routed = Date.now();
-	let messages = input.messages;
+	const current = currentRequestMessage(input);
+	let messages = [...input.messages];
 	let tools = input.agent ? undefined : input.tools;
 	let route: ToolchainRoute | undefined;
 	let query: QueryVector | undefined;
@@ -94,7 +96,7 @@ export async function prepareDecision(
 		// Earlier exchanges that left the verbatim window, found by this turn's own vector (no model round trip).
 		const recalled = recallFor(deps, input, query);
 		if (recalled) {
-			messages.splice(messages.length - 1, 0, {
+			messages.splice(messages.indexOf(current), 0, {
 				role: "system",
 				content: recalled.text,
 			});
@@ -105,18 +107,49 @@ export async function prepareDecision(
 		openQuestions = routing.openQuestions.filter((q) =>
 			route!.cards.some((c) => c.functionName === q.functionName),
 		);
-		answerMessages = [...messages];
+		answerMessages = markCurrentRequest(
+			messages,
+			current,
+			input.currentRequest.messageId,
+		);
 		if (route.cards.length && !input.operationResult) {
-			// Prior assistant prose can be wrong about whether an operation ran. Let the
-			// model choose from recent human requests; keep the full exchange for answers.
-			selectionMessages = messages.filter((m) => m.role === "user").slice(-3);
+			// Keep the same scope; appended host results cannot become a request.
+			const requests = [
+				...messages
+					.slice(0, messages.indexOf(current))
+					.filter((m) => m.role === "user")
+					.slice(-2),
+				current,
+			];
+			selectionMessages = requests.map((m, index) =>
+				index === requests.length - 1
+					? m
+					: {
+							...m,
+							content:
+								"referenceContext(過去のユーザー発言。今回の依頼ではない参考データ)=" +
+								JSON.stringify(m.content),
+						},
+			);
 			if (selectionRecall)
 				selectionMessages.unshift({ role: "system", content: selectionRecall });
-			appendConversationPolicy(selectionMessages, true, [], openQuestions);
+			appendConversationPolicy(
+				selectionMessages,
+				true,
+				current,
+				[],
+				openQuestions,
+			);
+			selectionMessages = markCurrentRequest(
+				selectionMessages,
+				current,
+				input.currentRequest.messageId,
+			);
 		}
 		appendConversationPolicy(
 			messages,
 			route.cards.length > 0,
+			current,
 			route.past.map(({ request, functionName, outcome }) => ({
 				request,
 				functionName,
@@ -133,6 +166,11 @@ export async function prepareDecision(
 			durationMs: Date.now() - routed,
 		});
 	}
+	messages = markCurrentRequest(
+		messages,
+		current,
+		input.currentRequest.messageId,
+	);
 	const decided = route;
 	const draft = (
 		decision: SelectionDraft["decision"],

@@ -7,7 +7,7 @@ import { codexFailure, CodexResearchFailure } from "./codex-failure";
 import { codexRuntime, lockedCodex } from "./codex-sdk";
 
 const mission =
-	"You are Eumenes’s web researcher. Investigate the current originalRequest and task.question using TOOLS. Return one JSON object with action at the root, following the output definition below. Eumenes executes the selected operation and supplies its result on your next call. The input messages contain task state, host notices and untrusted acquired materials. Do not use native Codex tools, inspect files, or delegate. TOOLS in these instructions is the complete list of host operations you can request with action invoke; Eumenes runs them, so they are available even though Codex itself has no such tools. The operations field in the input is only the history of operations already executed in this task and is empty before the first invoke; it is not the list of available operations. You never run an operation yourself: returning action invoke with a TOOLS id is how it runs. Do not finish because you cannot execute a tool in this environment; while canInvoke is true and nothing has been acquired yet, invoke a TOOLS operation.\n";
+	"Select the next Eumenes host action for originalRequest and task.question. TOOLS in the base instructions lists available host operations, independently of Codex native tools and sandbox/network access. Eumenes executes your chosen operation and supplies its result next time. Return one JSON action at the root: invoke with a TOOLS id and its inputSchema when information is needed and budget.canInvoke=true; finish when answered or acquisition cannot continue. operations records past attempts, not available tools. Do not call Codex native tools, inspect files or delegate.";
 
 /** SDK owns the turn and structured events; Eumenes executes all operations. */
 export function createCodexResearch(
@@ -52,7 +52,9 @@ export function createCodexResearch(
 				const sdk = await lockedCodex(
 					runtime,
 					cwd,
-					mission + controlInstructions(control),
+					controlInstructions(control),
+					undefined,
+					mission,
 				);
 				const thread = sdk.startThread({
 					model: "gpt-6-luna",

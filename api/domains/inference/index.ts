@@ -17,4 +17,8 @@ export type {
 export { migrations } from "./repository";
 export { createCodexResearch } from "./adapters/codex-research";
 export { createCloudAgents } from "./adapters/cloud-agents";
-export { controlInstructions, type ControlContract } from "./contracts";
+export {
+	controlInstructions,
+	delegatedTaskRules,
+	type ControlContract,
+} from "./contracts";

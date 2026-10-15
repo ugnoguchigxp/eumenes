@@ -1,3 +1,4 @@
+import { delegatedTaskRules } from "../../inference";
 import { afterEach, expect, test } from "bun:test";
 import { Hono } from "hono";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -116,7 +117,12 @@ test("an earlier mistaken answer does not enter the next toolchain choice", asyn
 	await until(() => h.started.length === 1);
 	const selection = h.conversationCalls[2]!;
 	expect(selection.tools).toHaveLength(1);
-	expect(selection.history.map((m) => m.content)).toContain("操作を実行して");
+	const reference = selection.history.find((m) =>
+		m.content.startsWith("referenceContext"),
+	)!;
+	expect(
+		JSON.parse(reference.content.slice(reference.content.indexOf("=") + 1)),
+	).toBe("操作を実行して");
 	expect(selection.history.map((m) => m.content)).toContain(
 		"先ほどの操作を実行して",
 	);
@@ -663,6 +669,8 @@ test("the resumed command run gets the question and the answer as data and compl
 	});
 	const prompt = JSON.stringify(h.commandPrompts.at(-1));
 	expect(prompt).toContain("previousQuestions");
+	expect(h.commandPrompts.at(-1)![0]!.content).toContain(delegatedTaskRules);
+	expect(h.commandPrompts.at(-1)).toHaveLength(2);
 	expect(prompt).toContain("何秒ですか");
 	expect(prompt).toContain("durationSeconds");
 	// The original request is the first utterance, not the answer's.

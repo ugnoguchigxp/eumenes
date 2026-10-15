@@ -2,7 +2,11 @@ import { z } from "zod";
 import type { Database } from "bun:sqlite";
 import { parseLlmJson } from "../../../infrastructure/llm-json";
 import { getLogger, withLogContext } from "../../../infrastructure/logger";
-import { controlInstructions, type ControlContract } from "../../inference";
+import {
+	controlInstructions,
+	delegatedTaskRules,
+	type ControlContract,
+} from "../../inference";
 import { recognitionCommand } from "../../capabilities";
 import type { HandlerDefinition } from "../../queue";
 import { ANSWER_TEXT_SCHEMA } from "../contracts/command-interactions";
@@ -69,6 +73,8 @@ function commandPrompt(
 ) {
 	const control: ControlContract = {
 		instructions:
+			delegatedTaskRules +
+			"\n" +
 			set.profile +
 			"\n\n" +
 			set.skills.join("\n\n") +

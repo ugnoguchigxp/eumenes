@@ -56,7 +56,9 @@ function setup(
 		answer: (messages, signal) =>
 			new Promise((resolve, reject) => {
 				calls.push({
-					texts: messages.map((m) => m.content.slice(0, 20)),
+					texts: messages
+						.filter((m) => m.role !== "system")
+						.map((m) => m.content.slice(0, 20)),
 					resolve,
 				});
 				signal?.addEventListener("abort", () => reject(new Error("aborted")));
@@ -93,9 +95,9 @@ test("a run only sees earlier accepted turns; later inputs never leak into it", 
 	await until(() => h.calls.length === 3);
 	h.calls[2]?.resolve("ansC");
 	await until(() => h.dialogue.get(c.id)?.status === "completed");
-	expect(h.calls[0]?.texts.slice(1)).toEqual(["A"]);
-	expect(h.calls[1]?.texts.slice(1)).toEqual(["A", "ansA", "B"]);
-	expect(h.calls[2]?.texts.slice(1)).toEqual(["A", "ansA", "B", "ansB", "C"]);
+	expect(h.calls[0]?.texts).toEqual(["A"]);
+	expect(h.calls[1]?.texts).toEqual(["A", "ansA", "B"]);
+	expect(h.calls[2]?.texts).toEqual(["A", "ansA", "B", "ansB", "C"]);
 	await h.queue.close(100);
 });
 
@@ -107,7 +109,7 @@ test("a failed earlier run leaves only its input in later history", async () => 
 	await until(() => h.calls.length === 1);
 	await h.dialogue.cancel(a.id);
 	await until(() => h.calls.length === 2);
-	expect(h.calls[1]?.texts.slice(1)).toEqual(["A", "B"]);
+	expect(h.calls[1]?.texts).toEqual(["A", "B"]);
 	await h.queue.close(100);
 });
 
@@ -215,7 +217,7 @@ test("scheduled prompt creates exactly one background run per occurrence; intera
 	const live = await submit(h.dialogue, "今すぐ", "other");
 	await h.queue.tick();
 	await until(() => h.calls.length === 1);
-	expect(h.calls[0]?.texts.slice(1)).toEqual(["今すぐ"]);
+	expect(h.calls[0]?.texts).toEqual(["今すぐ"]);
 	expect(h.dialogue.get(live.id)?.status).toBe("running");
 	expect(h.dialogue.get(runs[0]?.id ?? "")?.status).toBe("queued");
 	h.calls[0]?.resolve("はい");

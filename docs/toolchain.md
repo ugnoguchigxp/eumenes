@@ -12,6 +12,10 @@ LLMが返すJSONは `api/infrastructure/llm-json.ts` の共通処理を一度通
 
 ## 会話から担当への経路
 
+会話担当はrunの `inputMessageId` に対応する原文を今回の依頼として固定する。`GenerateInput.currentRequest` はホストが選んだ入力IDと位置を持ち、会話・添付画像の整形後も同じ入力を指す。先頭のsystem指示で役割を定義し、原文直前の `CURRENT_REQUEST` で対象を明示する。検索結果・操作結果・確認事項・構造修正の資料が後からuserメッセージとして加わっても、末尾の発言を今回の依頼として選び直さない。原文より後ろに追加されたホストの実行状態は `EXECUTION_STATE` で区切り、原文の前へ配置する。候補選択、自然文回答後の経路再判定、構造修正、結果の回答に同じ指定を使う。過去発言・記憶は指示語や継続条件の理解に使う参考文脈であり、明示された今回の対象・日時・条件を置き換えない。
+
+委譲先は共通の `delegatedTaskRules` で、具体化した `request` / `question` と同じ依頼の原文 `originalRequest` を、参考資料・snapshot・catalog・実行状態から区別する。通常Web・SDK経由の調査・履歴・Worldのworkerと要件検証、登録adapterの操作担当、音楽生成・再生・画像・描画の計画担当に適用する。子へ親の会話履歴や人格を追加せず、既存のツール・資料・容量上限を維持する。確認回答からの再開は、既存のinteractionに凍結された依頼と対応する `previousQuestions` の回答を使い、回答文で元の依頼を置き換えない。意味の解釈と検索語の選定はLLMが行い、ホストは入力の同一性・schema・権限・期限・取消を検査する。
+
 会話本文は、画面・音声へ投影する前に共通の出力契約を確認する。正式なfunction呼出し以外に、本文中の登録済み・提示済みfunction名に続く括弧、Providerの内部制御区切りが現れた場合は、本文の契約違反として既存の一回限りのモデル修正へ進む。本文から操作を復元・実行したり、該当部分だけを削除して回答を採用したりしない。再修正も不正なら回答を保存せず失敗で終了する。
 
 streamでは、function名や制御区切りになり得る末尾だけを保留し、形式が確定した通常本文を順次表示する。不正な制御表現は途中の分割chunkも公開しない。修正時の本文・引数の抜粋は各4096文字以内の未信頼データとしてモデルにだけ渡し、ログには拒否の固定分類を残す。楽曲・調査・タイマー等の選択と不足情報の判断はLLMに委ねる。入力の語句・分割状態・依頼の内容で分岐しない。
@@ -109,6 +113,8 @@ EUMENES_LIVE_LLM_NATIVE=1 bun scripts/llm-native-live.ts --suite all --cases api
 調査失敗の回答では、CURRENT_RESEARCH_FAILUREを今回のホスト確定状態としてsystem通知で渡します。報告と取得資料は未信頼のデータのままです。失敗分類以上の原因を推測せず、過去の会話の障害説明を現在の原因へ流用せず、システム障害をキーワード不足に置き換えません。コードが未知・抽象的なら詳細不明と伝えます。
 
 ### Lunaへ渡す出力定義
+
+SDKのホスト操作選択ルールは短いdeveloper指示へ置き、版付きの調査方針・TOOLS・出力定義はbase指示へ一度だけ渡す。TOOLSはCodexのnative tool一覧やsandboxのネットワーク権限から独立したEumenesの操作一覧であり、invokeのJSONを受けたホストが実行する。SDKのスキル・環境・permissions・会話モードの説明はこの制御呼出しでは提示しない。実行時のread-only sandbox、承認禁止、プロセス・receipt・期限・取消の制御は維持する。会話用SDKの入力構成は変更しない。
 
 `ControlContract.instructions` は指示とTOOLS、`outputSchema` はホストの契約から生成した定義です。Web調査には契約のmetadataに2つの出力例を持たせ、SystemContextの `OUTPUT_FORMAT` にその例だけを渡します。引数の定義はTOOLSのinputSchemaに一度だけ記載します。その他の既存担当はOUTPUT_SCHEMAを使います。指示文から定義を読み戻しません。
 

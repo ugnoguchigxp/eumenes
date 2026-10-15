@@ -1,3 +1,4 @@
+import { delegatedTaskRules } from "../../inference";
 import { expect, test } from "bun:test";
 import { musicContext } from "../service/context";
 import { musicBuiltins } from "../../capabilities";
@@ -14,6 +15,8 @@ test("music context carries the original theme as data and the registered skill 
 		originalRequest: "雨の日の読書に合う音楽を45秒",
 	};
 	const c = musicContext(prepared, request);
+	expect(c.control.instructions).toContain(delegatedTaskRules);
+	expect(c.messages).toHaveLength(2);
 	expect(JSON.parse(c.messages[1]!.content)).toEqual(request);
 	expect(c.control.instructions).toContain("指定の秒数をそのまま");
 	expect(c.control.instructions).not.toContain(request.question);

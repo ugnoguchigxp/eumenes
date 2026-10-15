@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { configureLogging } from "../../../infrastructure/logger";
 import type { InferencePort, Receipt } from "../../inference";
+import { markCurrentRequest } from "../service/request-context";
 import { generateConversation } from "../service/conversation-generation";
 import { toolchainTools } from "../service/conversation-tools";
 import type { ToolchainCard } from "../../capabilities";
@@ -61,10 +62,14 @@ function fixture(outputs: Partial<Receipt>[], tools = toolchainTools(CARDS)) {
 			generateConversation({
 				inference,
 				requestId: "request",
-				messages: [
-					{ role: "assistant", content: "鎌倉の話です。" },
-					{ role: "user", content: "明日は？" },
-				],
+				messages: (() => {
+					const current = { role: "user" as const, content: "明日は？" };
+					return markCurrentRequest(
+						[{ role: "assistant", content: "鎌倉の話です。" }, current],
+						current,
+						"fixed-input",
+					);
+				})(),
 				signal: AbortSignal.timeout(1000),
 				delta: (s) => deltas.push(s),
 				tools,
@@ -77,7 +82,9 @@ test("ordinary dialogue streams one call and keeps preceding conversational cont
 	const h = fixture([{ value: "明日の予定でございます。" }]);
 	const result = await h.run();
 	expect(h.seen).toHaveLength(1);
-	expect(h.seen[0]![0]!.content).toBe("鎌倉の話です。");
+	expect(h.seen[0]!.find((m) => m.role === "assistant")!.content).toBe(
+		"鎌倉の話です。",
+	);
 	expect(h.deltas.join("")).toBe(result.text);
 	expect(result.operation).toBeUndefined();
 });
@@ -430,4 +437,26 @@ test("an argument violation records the contract path and code", async () => {
 			repairAttempt: 0,
 		}),
 	);
+});
+
+test("structural repair preserves the anchored request before appended rejected output", async () => {
+	const h = fixture([
+		{ toolCalls: [call("web_search", { request: 42 })] },
+		{ toolCalls: [call("web_search", { request: "明日の鎌倉の天気" })] },
+	]);
+	await h.run();
+	expect(h.seen).toHaveLength(2);
+	for (const messages of h.seen) {
+		const index = messages.findIndex(
+			(m) =>
+				m.role === "system" &&
+				m.content.includes('CURRENT_REQUEST={"messageId":"fixed-input"}'),
+		);
+		expect(index).toBeGreaterThanOrEqual(0);
+		expect(messages[index + 1]).toMatchObject({
+			role: "user",
+			content: "明日は？",
+		});
+	}
+	expect(h.seen[1]!.at(-1)!.content).toStartWith("UNTRUSTED_REJECTED_OUTPUT=");
 });

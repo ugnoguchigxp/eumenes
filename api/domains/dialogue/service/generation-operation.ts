@@ -1,3 +1,4 @@
+import { originalRequestInTransaction } from "./request-context";
 import type { Database } from "bun:sqlite";
 import type { Run } from "../contracts";
 import type { Receipt } from "../../inference";
@@ -96,9 +97,7 @@ export function settleConversationOperation(
 	const { runtime, packageRevisionId } = resolved;
 	if (runtime.execution === "excalidraw") {
 		if (!deps.excalidraw) throw new Error("excalidraw_unavailable");
-		const original = conversation
-			.messagesInTransaction(tx, run.conversationId)
-			.find((m) => m.id === run.inputMessageId)!.text;
+		const original = originalRequestInTransaction(tx, conversation, run);
 		const saved = deps.excalidraw.startInTransaction(tx, {
 			runId: run.id,
 			conversationId: run.conversationId,
@@ -109,9 +108,7 @@ export function settleConversationOperation(
 		linkAnswer(tx, run.id, saved.jobId);
 	} else if (runtime.execution === "image") {
 		if (!deps.image) throw new Error("image_unavailable");
-		const original = conversation
-			.messagesInTransaction(tx, run.conversationId)
-			.find((m) => m.id === run.inputMessageId)!.text;
+		const original = originalRequestInTransaction(tx, conversation, run);
 		const saved = deps.image.startInTransaction(tx, {
 			runId: run.id,
 			conversationId: run.conversationId,
@@ -125,9 +122,7 @@ export function settleConversationOperation(
 		runtime.execution === "music-playback"
 	) {
 		if (!deps.music) throw new Error("music_unavailable");
-		const original = conversation
-			.messagesInTransaction(tx, run.conversationId)
-			.find((m) => m.id === run.inputMessageId)!.text;
+		const original = originalRequestInTransaction(tx, conversation, run);
 		// The music domain's planner is this toolchain's sub-agent (profile, SKILL, tools).
 		const saved = (
 			runtime.execution === "music-create"

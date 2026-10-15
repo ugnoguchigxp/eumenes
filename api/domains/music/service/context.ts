@@ -1,5 +1,6 @@
 import { musicPlan, musicPlanV2, type Prepared } from "../../capabilities";
 import { z } from "zod";
+import { delegatedTaskRules } from "../../inference";
 export function musicContext(
 	prepared: Prepared,
 	request: unknown,
@@ -16,7 +17,11 @@ export function musicContext(
 		throw new Error("required_context_missing");
 	const outputSchema = z.toJSONSchema(schema);
 	const instructions =
-		guidance.join("\n\n") + "\nOUTPUT_SCHEMA=" + JSON.stringify(outputSchema);
+		delegatedTaskRules +
+		"\n" +
+		guidance.join("\n\n") +
+		"\nOUTPUT_SCHEMA=" +
+		JSON.stringify(outputSchema);
 	return {
 		messages: [
 			{ role: "system" as const, content: instructions },

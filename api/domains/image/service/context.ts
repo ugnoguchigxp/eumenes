@@ -1,5 +1,6 @@
 import { imagePlan, type Prepared } from "../../capabilities";
 import { z } from "zod";
+import { delegatedTaskRules } from "../../inference";
 export function imageContext(
 	prepared: Prepared,
 	request: unknown,
@@ -21,6 +22,8 @@ export function imageContext(
 	if (!tools?.length || tools.some((t) => !t))
 		throw new Error("required_tool_missing");
 	const instructions =
+		delegatedTaskRules +
+		"\n" +
 		guidance.join("\n\n") +
 		"\nTOOLS=" +
 		JSON.stringify(

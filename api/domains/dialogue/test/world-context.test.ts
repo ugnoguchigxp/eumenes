@@ -484,7 +484,8 @@ test("the model gets one line naming the asked-about target: no claim text, no i
 	expect(hints).toEqual([{ role: "system", content: HINT }]);
 	// Right before this turn's input, after the persona prompt.
 	expect(sent[0]!.content).not.toContain("Worldに記録がある対象");
-	expect(sent.at(-2)).toEqual(hints[0]!);
+	expect(sent.at(-3)).toEqual(hints[0]!);
+	expect(sent.at(-2)!.content).toStartWith("CURRENT_REQUEST=");
 	expect(sent.at(-1)).toMatchObject({ role: "user" });
 	// Names only: the claim (even an injection-like one), its ids and the goal never reach the model.
 	const text = JSON.stringify(sent);
@@ -502,7 +503,7 @@ test("no known target named: no hint; the wording the port is asked about is thi
 	expect(
 		h.seen[0]!.some((m) => m.content.includes("Worldに記録がある対象")),
 	).toBe(false);
-	expect(h.seen[0]!.map((m) => m.role)).toEqual(["system", "user"]);
+	expect(h.seen[0]!.map((m) => m.role)).toEqual(["system", "system", "user"]);
 	expect(h.asked.map((a) => a.texts)).toEqual([["今日の天気は？"]]);
 });
 
@@ -526,12 +527,16 @@ test("World OFF is unchanged: no hint; the answer streams as before", async () =
 	expect((await h.finish(run.id)).status).toBe("completed");
 	expect(h.answers()).toEqual([ANSWER]);
 	// Persona prompt, then only this run's input.
-	expect(h.seen[0]!.map((m) => m.role)).toEqual(["system", "user"]);
+	expect(h.seen[0]!.map((m) => m.role)).toEqual(["system", "system", "user"]);
 	// Without any port at all the handler behaves the same.
 	const plain = await setup({ world: false, withPort: false });
 	const second = await plain.ask();
 	expect((await plain.finish(second.id)).status).toBe("completed");
-	expect(plain.seen[0]!.map((m) => m.role)).toEqual(["system", "user"]);
+	expect(plain.seen[0]!.map((m) => m.role)).toEqual([
+		"system",
+		"system",
+		"user",
+	]);
 });
 
 test("a refused inference receipt adopts no answer", async () => {
@@ -580,14 +585,15 @@ test("the prompt order with every layer present: persona, long-term, short-term,
 	expect(sent[1]!.content).toContain("- 好み: 辛いものが好き");
 	expect(sent[2]!.content).toContain("直近の状況についての参照情報");
 	expect(sent[2]!.content).toContain("猫も好き");
-	const tail = sent.slice(-3);
+	const tail = sent.slice(-4);
 	expect(tail[0]!.role).toBe("system");
 	expect(tail[0]!.content).toContain("記憶の担当からの連絡です");
 	expect(tail[1]!.role).toBe("system");
 	expect(tail[1]!.content).toBe(HINT);
-	expect(tail[2]!.role).toBe("user");
+	expect(tail[2]!.content).toStartWith("CURRENT_REQUEST=");
+	expect(tail[3]!.role).toBe("user");
 	// History sits between the layers and the notice.
-	expect(sent.slice(3, -3).every((m) => m.role !== "system")).toBe(true);
+	expect(sent.slice(3, -4).every((m) => m.role !== "system")).toBe(true);
 });
 
 test("goals layer: adopted goals are one message right after the system prompt, and the World hint does not repeat them", async () => {

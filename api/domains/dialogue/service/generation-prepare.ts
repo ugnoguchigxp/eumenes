@@ -206,7 +206,7 @@ export function createPrepare(
 			!musicResult &&
 			!delegated?.receipt &&
 			!note
-				? prepareRouting(tx, deps, run, messages, {
+				? prepareRouting(tx, deps, run, messages, compiled.sections.input, {
 						dots: !!delegated && delegated.available !== false,
 					})
 				: undefined;
@@ -221,6 +221,10 @@ export function createPrepare(
 				runId: run.id,
 				revision: current.revision,
 				messages,
+				currentRequest: {
+					messageId: run.inputMessageId,
+					messageIndex: messages.indexOf(compiled.sections.input),
+				},
 				actionResultIndex,
 				...(imageResult || musicResult ? { mediaResult: true as const } : {}),
 				...(actionResultIndex !== undefined ||

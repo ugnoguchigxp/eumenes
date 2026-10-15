@@ -61,6 +61,8 @@ export async function lockedCodex(
 	cwd: string,
 	instructions: string,
 	auth?: { apiKey?: string; baseUrl?: string },
+	/** A host control task needs no Codex conversation, skills or environment narration. */
+	controlInstructions?: string,
 ) {
 	const instructionsFile = join(cwd, "instructions.md");
 	await writeFile(instructionsFile, instructions, { mode: 0o600 });
@@ -76,6 +78,16 @@ export async function lockedCodex(
 		...(auth?.apiKey ? { apiKey: auth.apiKey } : {}),
 		...(auth?.baseUrl ? { baseUrl: auth.baseUrl } : {}),
 		config: {
+			...(controlInstructions
+				? {
+						developer_instructions: controlInstructions,
+						include_permissions_instructions: false,
+						include_apps_instructions: false,
+						include_collaboration_mode_instructions: false,
+						include_environment_context: false,
+						skills: { include_instructions: false },
+					}
+				: {}),
 			features: { ...disabledFeatures, skip_host_skill_discovery: true },
 			tools: { view_image: false },
 			project_doc_max_bytes: 0,

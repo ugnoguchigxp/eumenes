@@ -1,3 +1,4 @@
+import { delegatedTaskRules } from "../../inference";
 import { expect, test } from "bun:test";
 import { imagePlan, imageBuiltins, type Prepared } from "../../capabilities";
 import { imageContext } from "../service/context";
@@ -36,6 +37,8 @@ test("registered image instructions and tools are distinct from current request 
 		originalRequest: "generate a forest",
 	};
 	const c = imageContext(prepared, request);
+	expect(c.control.instructions).toContain(delegatedTaskRules);
+	expect(c.messages).toHaveLength(2);
 	expect(JSON.parse(c.messages[1]!.content)).toEqual(request);
 	expect(c.control.instructions).not.toContain(request.question);
 	expect(c.control.instructions).toContain("TOOLS=");

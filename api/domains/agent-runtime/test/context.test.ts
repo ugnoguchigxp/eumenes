@@ -10,7 +10,7 @@ import { verifyReport } from "../service/verify-report";
 import type { Prepared } from "../../capabilities";
 import type { Source } from "../../tool-runtime";
 import type { Task } from "../contracts";
-import { controlInstructions } from "../../inference";
+import { controlInstructions, delegatedTaskRules } from "../../inference";
 import { searchAction } from "../service/research-contract";
 import { researchReport } from "../service/research-contract";
 import { z } from "zod";
@@ -527,7 +527,7 @@ test("a replayed observation moved after new material never pushes the packet pa
 
 test("every route carries the shared rules, and the step contract is also returned as values", async () => {
 	const { commonRules } = await import("../service/context");
-	for (const id of ["web.quick", "web.search", undefined]) {
+	for (const id of ["web.quick", "web.search", "web.recipe", undefined]) {
 		const p = {
 			...prepared,
 			package: { ...prepared.package, ...(id ? { id } : {}) },
@@ -543,9 +543,15 @@ test("every route carries the shared rules, and the step contract is also return
 		);
 		const system = context.messages[0]!.content;
 		expect(system).toContain(commonRules);
+		expect(system).toContain(delegatedTaskRules);
+		expect(context.messages).toHaveLength(3);
 		expect(system).toBe(controlInstructions(context.control));
 		expect(context.control.instructions).not.toContain("\nOUTPUT_SCHEMA=");
 		if (id) {
+			// An own-set route replaces the generic policy, but still needs the
+			// instruction to derive its query from the current user's request.
+			expect(system).toContain("今回のユーザーの依頼（originalRequest）から");
+			expect(system).toContain("検索キーワードを選び");
 			expect(system).not.toContain("\nOUTPUT_SCHEMA=");
 			const examples = JSON.parse(system.split("\nOUTPUT_FORMAT=")[1]!);
 			expect(examples).toHaveLength(2);

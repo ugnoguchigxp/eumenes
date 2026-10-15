@@ -17,7 +17,7 @@ import {
 	searchAction,
 } from "./research-contract";
 import { z } from "zod";
-import { controlInstructions } from "../../inference";
+import { controlInstructions, delegatedTaskRules } from "../../inference";
 import { EvidenceCatalog, MATERIAL_BYTES } from "./evidence-catalog";
 import {
 	modelLimit,
@@ -134,6 +134,11 @@ export function workerContext(
 				: firstResearchAction,
 	);
 	const instructionsFor = (contracts: unknown) =>
+		delegatedTaskRules +
+		"\n" +
+		(search
+			? "今回のユーザーの依頼（originalRequest）から、対象・知りたい内容・日時・条件を表す検索キーワードを選び、検索ツールのqueryに指定します。省略された対象はtask.questionで補います。\n"
+			: "") +
 		routePolicy +
 		"\n" +
 		commonRules +

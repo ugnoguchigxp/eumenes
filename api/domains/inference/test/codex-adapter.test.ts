@@ -71,14 +71,29 @@ test("Codex adapter fixes Luna, sends only supplied context, disables native too
 			expect(record.argv).toContain(flag);
 		expect(JSON.parse(record.input)).toEqual({ messages: [messages[1]] });
 		expect(record.instructions).toContain(control.instructions);
-		expect(record.instructions).toContain(
-			"Investigate the current originalRequest and task.question",
+		const developer = record.argv.find((v: string) =>
+			v.startsWith("developer_instructions="),
 		);
+		const hostControl = JSON.parse(
+			developer.slice("developer_instructions=".length),
+		);
+		expect(hostControl).toContain("Select the next Eumenes host action");
+		expect(hostControl).toContain(
+			"independently of Codex native tools and sandbox/network access",
+		);
+		expect(hostControl).not.toContain(messages[1]!.content);
+		expect(Buffer.byteLength(hostControl)).toBeLessThan(700);
+		expect(record.instructions).toBe(controlInstructions(control));
+		for (const flag of [
+			"include_permissions_instructions=false",
+			"include_apps_instructions=false",
+			"include_collaboration_mode_instructions=false",
+			"include_environment_context=false",
+			"skills.include_instructions=false",
+		])
+			expect(record.argv).toContain(flag);
 		expect(record.instructions).not.toContain(messages[1]!.content);
 		expect(record.instructionMode).toBe(0o600);
-		expect(
-			record.argv.some((v: string) => v.startsWith("developer_instructions=")),
-		).toBe(false);
 		expect(record.env.LARM_API_TOKEN).toBeUndefined();
 		expect(record.env.EUMENES_API_TOKEN).toBeUndefined();
 		expect(record.cwd).not.toBe(process.cwd());
@@ -267,7 +282,9 @@ test("the schema comes from the step contract, and per-step notices stay out of 
 		expect(
 			JSON.parse(record.instructions.split("\nOUTPUT_SCHEMA=")[1]!),
 		).toEqual(schema);
-		expect(record.instructions).toContain("action at the root");
+		expect(
+			record.argv.find((v: string) => v.startsWith("developer_instructions=")),
+		).toContain("JSON action at the root");
 	} finally {
 		await f.close();
 	}

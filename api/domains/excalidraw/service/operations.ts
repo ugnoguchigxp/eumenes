@@ -8,7 +8,11 @@ import {
 	type Capabilities,
 	type Prepared,
 } from "../../capabilities";
-import type { InferencePort, Receipt } from "../../inference";
+import {
+	delegatedTaskRules,
+	type InferencePort,
+	type Receipt,
+} from "../../inference";
 import type { QueueService, HandlerDefinition } from "../../queue";
 import { references } from "../repository";
 import type { ExcalidrawService } from "./index";
@@ -111,6 +115,7 @@ export function registerDrawingOperations(deps: {
 				prepared.package.profileRevisionId,
 				...(prepared.package.requiredSkillRevisionIds ?? []),
 			];
+			const outputSchema = z.toJSONSchema(drawingPlan);
 			const instructions =
 				ids
 					.map(
@@ -118,6 +123,7 @@ export function registerDrawingOperations(deps: {
 							prepared.dependencies.find((d) => d.revisionId === id)?.body,
 					)
 					.join("\n\n") +
+				`\n${delegatedTaskRules}` +
 				"\nTOOLS=" +
 				JSON.stringify(
 					prepared.dependencies
@@ -125,11 +131,8 @@ export function registerDrawingOperations(deps: {
 						.map((d) => ({ id: d.id, summary: d.summary })),
 				) +
 				"\nOUTPUT_SCHEMA=" +
-				JSON.stringify(z.toJSONSchema(drawingPlan));
-			const control = {
-				instructions,
-				outputSchema: z.toJSONSchema(drawingPlan),
-			};
+				JSON.stringify(outputSchema);
+			const control = { instructions, outputSchema };
 			const requestId = inference.captureControlInTransaction(db, {
 				subject: `excalidraw:${r.id}:plan`,
 				policySubject: r.run_id,
