@@ -10,7 +10,6 @@ import { createScheduler } from "../domains/scheduler";
 import { createTimers } from "../domains/timers";
 import { createUiCompositions } from "../domains/ui-compositions";
 import { createVoiceDialogue } from "../domains/voice-dialogue";
-import type { ImageService } from "../domains/image";
 import type { Capabilities } from "../domains/capabilities";
 import { getLogger } from "../infrastructure/logger";
 import type { Config } from "../infrastructure/config";
@@ -21,6 +20,7 @@ import { buildMedia } from "./server-media";
 import { buildTasks } from "./server-tasks";
 import { assembleCuration } from "./server-world";
 import { createTimerAnnouncements } from "./timers/timer-announcements";
+import { createSpecialistPort } from "./toolchain/specialist-port";
 import { createToolchainRouting } from "./toolchain/toolchain-routing";
 import { createHostToolchain } from "./toolchain/toolchain-host";
 
@@ -84,13 +84,7 @@ export async function buildServices(
 		memoryJournalPath,
 		worldResourceId: () => settings.get().world.curationResourceId,
 	});
-	let imageForCompositions: ImageService;
-	const uiCompositions = createUiCompositions({
-		store,
-		queue,
-		inference,
-		image: () => imageForCompositions,
-	});
+	const uiCompositions = createUiCompositions();
 	let ocrCapabilities: Capabilities | null = null;
 	const ocr = createOcr({
 		store,
@@ -133,7 +127,16 @@ export async function buildServices(
 		capabilities: toolchain.capabilities,
 		dialogue: () => dialogue,
 	});
-	imageForCompositions = media.image;
+	const toolchains = enabled
+		? createToolchainRouting(
+				toolchain.capabilities,
+				toolchain.history,
+				toolchain.embedQuery,
+				toolchain.registry,
+				toolchain.schemas,
+				toolchain.worldAvailable,
+			)
+		: undefined;
 	const dialogue = createDialogueService({
 		objectRecognition: enabled
 			? media.objectRecognition.port(CONVERSATION_DEFAULT_PRINCIPAL)
@@ -156,16 +159,17 @@ export async function buildServices(
 			capabilities: toolchain.capabilities,
 		}),
 		...(world ? { worldContext: world.context } : {}),
-		toolchains: enabled
-			? createToolchainRouting(
-					toolchain.capabilities,
-					toolchain.history,
-					toolchain.embedQuery,
-					toolchain.registry,
-					toolchain.schemas,
-					toolchain.worldAvailable,
-				)
-			: undefined,
+		...(toolchains
+			? {
+					toolchains,
+					specialist: createSpecialistPort({
+						routing: toolchains,
+						registry: toolchain.registry,
+						schemas: toolchain.schemas,
+						clock: () => new Date().toISOString(),
+					}),
+				}
+			: {}),
 	});
 	links.attachDialogue(dialogue);
 	stewardAssembly.attachDialogue(dialogue);

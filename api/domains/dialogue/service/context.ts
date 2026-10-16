@@ -10,9 +10,12 @@ import {
 	type AnswerTicket,
 } from "../../agent-runtime";
 import type {
+	Addressee,
 	GoalsLayerPort,
 	Run,
+	SpecialistPort,
 	StewardPort,
+	Viewing,
 	WorldContextPort,
 } from "../contracts";
 
@@ -24,8 +27,24 @@ import type { CommandInteractions } from "./command-interactions";
 export const GENERATE_KIND = "dialogue.generate";
 /** A toolchain's command sub-agent: one typed operation from the conversation's request. */
 export const COMMAND_KIND = "dialogue.toolchain_command";
+/** One turn of a specialist session: the user talks to the toolchain's specialist directly. */
+export const SPECIALIST_KIND = "dialogue.specialist_turn";
 /** The generation job; a command sub-agent's clarifying question travels as data. */
-export type GeneratePayload = { runId: string; commandNote?: string };
+export type GeneratePayload = {
+	runId: string;
+	commandNote?: string;
+	/**
+	 * Set when a specialist handed the user's request back (out of its scope): the host line the
+	 * main agent reads before it answers. Unlike a command note it leaves the toolchain offer on.
+	 */
+	specialistHandoff?: string;
+};
+/** `epoch` fixes the addressee the turn was accepted for; `request` is the first turn's handed-over request. */
+export type SpecialistTurnPayload = {
+	runId: string;
+	epoch: number;
+	request?: string;
+};
 export const PROMPT_TARGET_KIND = "dialogue.prompt";
 export const DEFAULT_DEADLINE_MS = RESEARCH_BUDGET.rootMilliseconds;
 export const TERMINAL = ["completed", "failed", "cancelled", "interrupted"];
@@ -108,6 +127,10 @@ export interface Accept {
 	 * conversation decision (the toolchain was already chosen when the question was asked).
 	 */
 	resume?: { interactionId: string; toolchainRevisionId: string };
+	/** The saved item the screen shows; kept with the run and shown to the main agent only if issued. */
+	viewing?: Viewing;
+	/** The addressee the sender saw; checked in the acceptance transaction. */
+	addressee?: Addressee;
 }
 
 /** Everything the dialogue service parts share: the injected ports. */
@@ -131,6 +154,8 @@ export type DialogueDeps = {
 	worldContext?: WorldContextPort;
 	/** The adopted goals, shown as a layer right after L1. Without it no goals layer exists. */
 	goals?: GoalsLayerPort;
+	/** Session toolchains and their domain work; without it no specialist session exists. */
+	specialist?: SpecialistPort;
 	/** Set by `createDialogueService` once intake exists (it accepts the resumed runs). */
 	interactions?: CommandInteractions;
 };

@@ -23,6 +23,10 @@ function setup() {
 		watchRun: async () => {},
 		run: async (id) => accepted.get(id)!,
 		cancel: async (id) => accepted.get(id)!,
+		specialistSession: async () => ({ session: null }),
+		specialistCommand: async () => {
+			throw new Error("not_used");
+		},
 		async submit(input: Submit) {
 			let run = accepted.get(input.requestId);
 			if (run && run.inputMessageId !== input.text)
@@ -40,6 +44,7 @@ function setup() {
 					error: null,
 					jobId: null,
 					deadlineAt: null,
+					specialistSessionId: null,
 					sourceKind: "manual",
 					scheduleId: null,
 					occurrenceId: null,

@@ -3,6 +3,7 @@ import type { InferencePort } from "../../domains/inference";
 import type { QueueService } from "../../domains/queue";
 import type { TimersService } from "../../domains/timers";
 import type { WebResearchService } from "../../domains/web-research";
+import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../infrastructure/sqlite";
 import type { Notice } from "../../domains/dialogue/contracts";
 import { createKanbanSdkHost } from "../work/kanban-sdk-host";
@@ -23,6 +24,8 @@ import { createWorldResearchPorts } from "../world/world-research-ports";
 import type { WorldAdapterPorts } from "../world/world-adapter";
 import type { WorldAssembly } from "../world/world";
 import type { UiCompositionsService } from "../../domains/ui-compositions";
+
+type SessionLive = (tx: Database, sessionId: string) => boolean;
 
 /** How many of the person's latest statements a World correction may cite as its reason. */
 
@@ -59,6 +62,7 @@ export function createToolchainHostLinks(services: {
 }) {
 	const { settings, inference, world } = services;
 	let interactions: InteractionViews | undefined;
+	let sessionLive: SessionLive | undefined;
 	const worldPorts: WorldAdapterPorts | undefined = world && {
 		claims: world.claims,
 		documents: world.documents,
@@ -101,9 +105,16 @@ export function createToolchainHostLinks(services: {
 			},
 			secretKey: () => settings.derivedKey("tool-runtime.action-digest"),
 			interactions: questionReader(() => interactions),
+			// Until dialogue is attached no specialist session exists, so none is live.
+			specialistSessionLive: (tx: Database, sessionId: string) =>
+				sessionLive?.(tx, sessionId) ?? false,
 		},
-		attachDialogue(dialogue: { interactions: InteractionViews }) {
+		attachDialogue(dialogue: {
+			interactions: InteractionViews;
+			specialistSessionLiveInTransaction: SessionLive;
+		}) {
 			interactions = dialogue.interactions;
+			sessionLive = dialogue.specialistSessionLiveInTransaction;
 		},
 	};
 }

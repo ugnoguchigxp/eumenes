@@ -3,10 +3,10 @@ import { z } from "zod";
 import {
 	artifactDefinitionV1,
 	bundleSchemaV1,
-	commandBindingV1,
+	bindingV1,
 	validators,
 	type ArtifactDefinitionV1,
-	type CommandBindingV1,
+	type BindingV1,
 	type FixedDocument,
 } from "../contracts";
 import { getDocument, type StoredDocument } from "../repository";
@@ -27,12 +27,12 @@ function typed<T>(
 			}
 		: null;
 }
-/** A stored command binding (HTTP bindings are not command bindings). */
-export function commandBindingInTransaction(
+/** A stored command or session binding (HTTP bindings are neither). */
+export function bindingInTransaction(
 	db: Database,
 	revisionId: string,
-): FixedDocument<CommandBindingV1> | null {
-	return typed(getDocument(db, revisionId), "binding", commandBindingV1);
+): FixedDocument<BindingV1> | null {
+	return typed(getDocument(db, revisionId), "binding", bindingV1);
 }
 export function artifactInTransaction(
 	db: Database,

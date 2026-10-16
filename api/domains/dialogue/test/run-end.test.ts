@@ -211,6 +211,7 @@ test("a run left without a job when the backend restarts is interrupted: a faile
 		insert(db, {
 			id: "r-orphan",
 			agentTaskId: null,
+			specialistSessionId: null,
 			requestId: "req-orphan",
 			conversationId: "main",
 			utteranceId: null,

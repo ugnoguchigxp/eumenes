@@ -152,6 +152,19 @@ export function ConversationPanel({
 				}
 			/>
 			<div className="conversation-status" aria-label="接続状態とモデル">
+				<span
+					className="conversation-addressee"
+					data-kind={state.specialist.addressee.kind}
+				>
+					<span className="conversation-addressee-label">宛先</span>
+					<strong>{state.specialist.addressee.label}</strong>
+					{state.specialist.addressee.kind === "normal" &&
+						state.specialist.addressee.suspended && (
+							<span className="conversation-addressee-hold">
+								（{state.specialist.addressee.suspended}は一時保留）
+							</span>
+						)}
+				</span>
 				<ConversationModelSelect
 					model={model}
 					running={!!activeRun || speechModels.busy}
@@ -179,6 +192,18 @@ export function ConversationPanel({
 					</span>
 				</span>
 			</div>
+			{state.specialist.notice && (
+				<output className="conversation-notice">
+					<span>{state.specialist.notice}</span>
+					<Button
+						variant="ghost"
+						size="sm"
+						onClick={state.specialist.dismissNotice}
+					>
+						閉じる
+					</Button>
+				</output>
+			)}
 			{(model.error || speechModels.error) && (
 				<p className="chat-error" role="alert">
 					{model.error || speechModels.error}

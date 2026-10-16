@@ -8,6 +8,8 @@ archive の基準: その文書が担当した実装がコードにあり、本�
 
 | 文書 | 状態 |
 | --- | --- |
+| [toolchain-specialist-dialogue-implementation-plan-2026-10-17.md](toolchain-specialist-dialogue-implementation-plan-2026-10-17.md) | 実装・固定試験済み。専門担当への共通切替とUI自由制作の対話編集。ブラウザE2E・実モデル受入・実機器受入は未実施 |
+| [toolchain-specialist-dialogue-p0-contract-2026-10-17.md](toolchain-specialist-dialogue-p0-contract-2026-10-17.md) | 上記のP0契約と担当分け。型契約はコードで固定。実装済み。実モデル測定は未実施 |
 | [codex-sdk-task-artifact-plan-2026-10-14.md](codex-sdk-task-artifact-plan-2026-10-14.md) | 共通KanbanとCodex SDK。P1〜P3とP4の隔離commit/pushは記録済み。改訂7の終了確認は実装し、ブラウザなし全件検証はpass。全子孫停止は未保証。P5は継続 |
 | [kanban-claude-code-plan-2026-10-14.md](kanban-claude-code-plan-2026-10-14.md) | Claude Code実行。P1〜P3は実装・固定試験済み。実 `claude` のフック確認は記録済み。実 LARM の自然言語受入は未実施 |
 | [kanban-implementation-assignments-2026-10-14.md](kanban-implementation-assignments-2026-10-14.md) | 上記の分担と固定契約。P1〜P3は実装済み。P4は実 `claude` のフックまで。自然言語受入は計画側に残る |
@@ -34,7 +36,7 @@ archive の基準: その文書が担当した実装がコードにあり、本�
 | [excalidraw-artifact-2026-10-14.md](.archived/excalidraw-artifact-2026-10-14.md) | Excalidraw の iframe 編集。実装・`verify --domain excalidraw --domain artifact` 通過・正式接続の live 記録（[artifact-2026-10-14.json](verification/excalidraw-live/artifact-2026-10-14.json)）あり |
 | [larm-multimodal-contract-inquiry-prompt-2026-10-13.md](.archived/larm-multimodal-contract-inquiry-prompt-2026-10-13.md) | LARM 画像入力契約の問い合わせ Prompt。回答を受けた契約（MIME・入力予算）を `larm/contracts/chat-input.ts` に実装済み |
 | [ruri-sentence-language-tts-implementation-plan-2026-10-12.md](.archived/ruri-sentence-language-tts-implementation-plan-2026-10-12.md) | 廃案（2026-10-16）。Ruriの文章全体ja/en二分類は [正規表現判定](.archived/regex-speech-language-routing-plan-2026-10-16.md) に置換。接続記録は検証記録に残す |
-| [openui-artifact-free-creation-implementation-plan-2026-10-14.md](.archived/openui-artifact-free-creation-implementation-plan-2026-10-14.md) | UI自由制作。保存・制作・登録・画面・デモは実装済み。部分、公開API結合、ブラウザ、実モデルを記録。親runへの自動追記は対象外 |
+| [openui-artifact-free-creation-implementation-plan-2026-10-14.md](.archived/openui-artifact-free-creation-implementation-plan-2026-10-14.md) | 旧UI自由制作の実装・検証記録。一回生成方式は2026-10-17に廃案とし、[専門担当との対話編集計画](toolchain-specialist-dialogue-implementation-plan-2026-10-17.md)で置換済み（旧コードは削除） |
 | [music-playback-work-record-2026-10-11.md](.archived/music-playback-work-record-2026-10-11.md) | 保存曲の検索・再生。実装・固定試験・live・`verify:all` を記録し、残作業なし。実スピーカーの聴取は対象外 |
 | [music-toolchain-work-record-2026-10-11.md](.archived/music-toolchain-work-record-2026-10-11.md) | 楽曲生成 toolchain。作業単位10で Opus・実生成・全体回帰まで記録。再生分離は playback 記録 |
 | [music-generation-ui-work-record-2026-10-11.md](.archived/music-generation-ui-work-record-2026-10-11.md) | 生成UI。個別検証完了。全体gateは担当外のログ試験 |

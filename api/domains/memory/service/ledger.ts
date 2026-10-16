@@ -14,6 +14,7 @@ import {
 	blockedAmong,
 	blockedInConversation,
 	bumpExchangeFailure,
+	deleteSpecialistBlocks,
 	insertBlocks,
 	insertExchange,
 	isBlocked,
@@ -255,13 +256,19 @@ export function createLedger(deps: {
 		/** Read-only form for the application layer (research tools). */
 		blockedMessageIds: (messageIds: Iterable<string>): Set<string> =>
 			store.read((db) => blockedWithJournal(db, messageIds)),
-		/** A scheduled prompt (a user message the user did not write) is never learned from. */
+		/**
+		 * A scheduled prompt (a user message the user did not write) and a specialist session's messages
+		 * are never learned from nor shown to the conversation.
+		 */
 		blockMessagesInTransaction(
 			db: Database,
 			input: {
 				conversationId: string;
 				messageIds: readonly string[];
-				reason: Extract<BlockReason, "scheduled_prompt">;
+				reason: Extract<
+					BlockReason,
+					"scheduled_prompt" | "specialist_dialogue"
+				>;
 			},
 		) {
 			insertBlocks(
@@ -274,6 +281,16 @@ export function createLedger(deps: {
 				})),
 				clock(),
 			);
+		},
+		/**
+		 * Hand specialist messages back to the conversation (the user's out-of-scope request forwarded to
+		 * the main agent): only the specialist-dialogue block is lifted, a forgotten message stays blocked.
+		 */
+		unblockSpecialistMessagesInTransaction(
+			db: Database,
+			messageIds: readonly string[],
+		) {
+			deleteSpecialistBlocks(db, messageIds);
 		},
 		/** The forget fence: it moves with every forget; a step that started before a move is not adopted. */
 		forgetSeqInTransaction: (db: Database): number => readForgetSeq(db),

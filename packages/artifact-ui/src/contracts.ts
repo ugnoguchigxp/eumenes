@@ -20,6 +20,7 @@ import type { ImageWorkspaceResource } from "./image-components";
 export type { ImageWorkspaceResource } from "./image-components";
 import type { RecordsResource } from "./records-components";
 import type { MusicResource, GenerationResource } from "./media-contracts";
+import type { UiStudioResource } from "./ui-studio-contracts";
 import type {
 	SettingsSectionResource,
 	SettingsNavigationResource,
@@ -29,6 +30,12 @@ import type {
 export type { MusicResource, GenerationResource } from "./media-contracts";
 
 const title = z.string().max(120).optional();
+const emphases = ["normal", "strong", "muted"] as const;
+const layoutGaps = ["compact", "normal", "relaxed"] as const;
+const layoutWidths = ["narrow", "normal", "wide"] as const;
+/** Nested layouts: root included, at most this deep and this many views per definition. */
+const maxLayoutDepth = 4;
+const maxDefinitionViews = 60;
 const source = z.string().regex(/^[a-z][a-z0-9-]{0,63}$/);
 const field = z
 	.strictObject({
@@ -128,6 +135,7 @@ export const viewRegistry = {
 			source: z.never().optional(),
 			title: z.string().min(1).max(120),
 			body: z.string().max(2000).optional(),
+			emphasis: z.enum(emphases).optional(),
 		}),
 	},
 	"info-card": {
@@ -140,23 +148,10 @@ export const viewRegistry = {
 			body: z.string().max(1000),
 		}),
 	},
-	"ui-workspace": {
-		name: "UiWorkspace",
-		label: "UI制作と保存作品",
-		schema: z.strictObject({
-			view: z.literal("ui-workspace"),
-			source,
-			title,
-			starterPrompts: z
-				.array(
-					z.strictObject({
-						label: z.string().min(1).max(80),
-						prompt: z.string().min(1).max(4000),
-					}),
-				)
-				.max(6)
-				.optional(),
-		}),
+	"ui-studio": {
+		name: "UiStudio",
+		label: "UI制作",
+		schema: z.strictObject({ view: z.literal("ui-studio"), source, title }),
 	},
 	"ocr-media": {
 		name: "OcrMedia",
@@ -490,98 +485,136 @@ export function parseRequest(value: unknown): ArtifactRequest {
 		throw new Error("未登録の表示です");
 	return viewRegistry[value.view as View].schema.parse(value);
 }
-export const layoutSchema = z
-	.strictObject({
-		view: z.literal("layout"),
-		direction: z
-			.enum(["stack", "grid", "tabs", "form-preview"])
-			.default("stack"),
-		appearance: z.enum(["clean", "warm", "elegant", "friendly"]).optional(),
-		title,
-		draftSource: source.optional(),
-		headerChildren: z.array(z.number().int().min(0).max(11)).max(12).optional(),
-		headerLayout: z.enum(["stack", "inline"]).optional(),
-		tabs: z
-			.array(
-				z.strictObject({
-					label: z.string().min(1).max(80),
-					children: z.array(z.number().int().min(0).max(11)).min(1),
-					/** `form-preview` shows the tab's subtitle preview inside its settings section. */
-					arrangement: z.enum(["form-preview"]).optional(),
-				}),
-			)
-			.min(1)
-			.max(12)
-			.optional(),
-		children: z
-			.array(z.union(Object.values(viewRegistry).map((v) => v.schema)))
-			.min(1)
-			.max(12),
-	})
-	.superRefine((value, context) => {
-		if (
-			value.draftSource &&
-			(value.direction !== "tabs" ||
-				!value.children.some(
-					(child) =>
-						child.view === "settings-section" &&
-						child.source === value.draftSource,
-				))
+const layoutShape = z.strictObject({
+	view: z.literal("layout"),
+	direction: z.enum(["stack", "grid", "tabs", "form-preview"]).default("stack"),
+	appearance: z.enum(["clean", "warm", "elegant", "friendly"]).optional(),
+	gap: z.enum(layoutGaps).optional(),
+	width: z.enum(layoutWidths).optional(),
+	title,
+	draftSource: source.optional(),
+	headerChildren: z.array(z.number().int().min(0).max(11)).max(12).optional(),
+	headerLayout: z.enum(["stack", "inline"]).optional(),
+	tabs: z
+		.array(
+			z.strictObject({
+				label: z.string().min(1).max(80),
+				children: z.array(z.number().int().min(0).max(11)).min(1),
+				/** `form-preview` shows the tab's subtitle preview inside its settings section. */
+				arrangement: z.enum(["form-preview"]).optional(),
+			}),
 		)
-			context.addIssue({
-				code: "custom",
-				message: "draftSource must name a settings section in tabs",
-			});
+		.min(1)
+		.max(12)
+		.optional(),
+});
+export type Layout = z.infer<typeof layoutShape> & {
+	children: Array<ArtifactRequest | Layout>;
+};
+/** Depth (this node = 1) and number of views of a definition subtree, layouts included. */
+function layoutExtent(node: ArtifactRequest | Layout): {
+	depth: number;
+	views: number;
+} {
+	if (node.view !== "layout") return { depth: 1, views: 1 };
+	let depth = 0;
+	let views = 1;
+	for (const child of node.children) {
+		const extent = layoutExtent(child);
+		depth = Math.max(depth, extent.depth);
+		views += extent.views;
+	}
+	return { depth: depth + 1, views };
+}
+function refineLayout(value: Layout, context: z.RefinementCtx) {
+	const extent = layoutExtent(value);
+	if (extent.depth > maxLayoutDepth)
+		context.addIssue({
+			code: "custom",
+			message: `layout nesting is limited to ${maxLayoutDepth} levels`,
+		});
+	if (extent.views > maxDefinitionViews)
+		context.addIssue({
+			code: "custom",
+			message: `a definition holds at most ${maxDefinitionViews} views`,
+		});
+	if (
+		value.draftSource &&
+		(value.direction !== "tabs" ||
+			!value.children.some(
+				(child) =>
+					child.view === "settings-section" &&
+					child.source === value.draftSource,
+			))
+	)
+		context.addIssue({
+			code: "custom",
+			message: "draftSource must name a settings section in tabs",
+		});
+	if (
+		value.direction === "form-preview" &&
+		(value.children.length !== 2 ||
+			value.children[0]?.view !== "settings-section" ||
+			value.children[1]?.view !== "subtitle-preview")
+	)
+		context.addIssue({
+			code: "custom",
+			message: "form-preview requires a settings section and subtitle preview",
+		});
+	for (const tab of value.tabs ?? [])
 		if (
-			value.direction === "form-preview" &&
-			(value.children.length !== 2 ||
-				value.children[0]?.view !== "settings-section" ||
-				value.children[1]?.view !== "subtitle-preview")
+			tab.arrangement === "form-preview" &&
+			(tab.children.length !== 2 ||
+				value.children[tab.children[0]!]?.view !== "settings-section" ||
+				value.children[tab.children[1]!]?.view !== "subtitle-preview")
 		)
 			context.addIssue({
 				code: "custom",
 				message:
 					"form-preview requires a settings section and subtitle preview",
 			});
-		for (const tab of value.tabs ?? [])
-			if (
-				tab.arrangement === "form-preview" &&
-				(tab.children.length !== 2 ||
-					value.children[tab.children[0]!]?.view !== "settings-section" ||
-					value.children[tab.children[1]!]?.view !== "subtitle-preview")
-			)
-				context.addIssue({
-					code: "custom",
-					message:
-						"form-preview requires a settings section and subtitle preview",
-				});
-		if (value.headerChildren && value.direction !== "tabs")
-			context.addIssue({
-				code: "custom",
-				message: "headerChildren requires tabs",
-			});
-		if (value.headerChildren && !value.tabs)
-			context.addIssue({
-				code: "custom",
-				message: "headerChildren requires explicit tabs",
-			});
-		if (!value.tabs) return;
-		const indexes = [
-			...(value.headerChildren ?? []),
-			...value.tabs.flatMap((tab) => tab.children),
-		];
-		if (
-			value.direction !== "tabs" ||
-			indexes.length !== value.children.length ||
-			new Set(indexes).size !== value.children.length ||
-			indexes.some((index) => index >= value.children.length)
-		)
-			context.addIssue({
-				code: "custom",
-				message: "tabs must contain each child exactly once",
-			});
-	});
-export type ArtifactDefinition = ArtifactRequest | z.infer<typeof layoutSchema>;
+	if (value.headerChildren && value.direction !== "tabs")
+		context.addIssue({
+			code: "custom",
+			message: "headerChildren requires tabs",
+		});
+	if (value.headerChildren && !value.tabs)
+		context.addIssue({
+			code: "custom",
+			message: "headerChildren requires explicit tabs",
+		});
+	if (!value.tabs) return;
+	const indexes = [
+		...(value.headerChildren ?? []),
+		...value.tabs.flatMap((tab) => tab.children),
+	];
+	if (
+		value.direction !== "tabs" ||
+		indexes.length !== value.children.length ||
+		new Set(indexes).size !== value.children.length ||
+		indexes.some((index) => index >= value.children.length)
+	)
+		context.addIssue({
+			code: "custom",
+			message: "tabs must contain each child exactly once",
+		});
+}
+export const layoutSchema: z.ZodType<Layout> = z.lazy(() =>
+	layoutShape
+		.extend({
+			children: z
+				.array(
+					z.union([
+						...Object.values(viewRegistry).map((v) => v.schema),
+						layoutSchema,
+					]),
+				)
+				.min(1)
+				.max(12),
+		})
+		.superRefine(refineLayout),
+);
+export type ArtifactDefinition = ArtifactRequest | Layout;
 export function parseDocument(value: unknown): ArtifactDefinition {
 	if (
 		value &&
@@ -595,7 +628,9 @@ export function parseDocument(value: unknown): ArtifactDefinition {
 export function definitionRequests(
 	definition: ArtifactDefinition,
 ): ArtifactRequest[] {
-	return definition.view === "layout" ? definition.children : [definition];
+	return definition.view === "layout"
+		? definition.children.flatMap(definitionRequests)
+		: [definition];
 }
 export function definitionName(definition: ArtifactDefinition): string {
 	return definition.view === "layout"
@@ -714,24 +749,7 @@ export type Resource =
 	| QuestionResource
 	| CollectionResource
 	| FormResource
-	| {
-			kind: "ui-workspace";
-			revision: number;
-			items: Array<{
-				id: string;
-				title: string;
-				prompt?: string;
-				state: "generating" | "ready" | "failed" | "cancelled";
-				updatedAt: number;
-				generation: number;
-				definition?: unknown;
-				description?: string;
-				errorCode?: string;
-				motifId?: string;
-			}>;
-			images: Array<{ id: string; title?: string }>;
-			selectedId?: string;
-	  }
+	| UiStudioResource
 	| MemoryResource
 	| SettingsResource
 	| { kind: "components"; revision: number; example?: string };

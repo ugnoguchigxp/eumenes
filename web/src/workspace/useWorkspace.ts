@@ -25,6 +25,7 @@ import { useTimerTone, type AudioStore } from "../domains/audio";
 import { useArtifactWorkspace } from "../domains/artifact";
 import { useConversation } from "../domains/conversation";
 import { useCancel, useRuns, useSubmit } from "../domains/dialogue";
+import { useSpecialistWorkspace } from "./useSpecialistWorkspace";
 import {
 	useAutomaticSpeech,
 	useReplay,
@@ -244,6 +245,12 @@ export function useWorkspace({
 		editedRecognition.current = recognitionId ?? null;
 		setInput({ text, dictated: false });
 	}
+	const specialist = useSpecialistWorkspace({
+		client,
+		artifacts,
+		toolchain,
+		runSignature: latestRun ? `${latestRun.id}:${latestRun.status}` : "",
+	});
 	const send = chatSend(
 		input,
 		setInput,
@@ -251,6 +258,8 @@ export function useWorkspace({
 		submit,
 		automaticInput,
 		watchTimerRun,
+		specialist.viewing,
+		specialist.addresseeNow,
 	);
 	useEffect(() => {
 		if (voice.turn?.runId) watchTimerRun(voice.turn.runId);
@@ -296,6 +305,7 @@ export function useWorkspace({
 		send,
 		submit,
 		cancel,
+		specialist,
 	};
 }
 

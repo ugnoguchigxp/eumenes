@@ -37,10 +37,12 @@ export type ToolchainRuntimeMeta = {
 	 * research: an agent-runtime worker with the package's profile, SKILL and tools.
 	 * command: a command sub-agent turns the request into one typed operation of the package.
 	 * music-create / music-playback: the music domain's own planner runs the package.
+	 * session: the conversation hands over to the package's specialist for several direct turns.
 	 */
 	execution:
 		| "research"
 		| "command"
+		| "session"
 		| "music-create"
 		| "music-playback"
 		| "image"

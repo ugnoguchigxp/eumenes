@@ -11,9 +11,12 @@ import { toolchainWebAdapters } from "./toolchain-adapters";
 export default function WorkspaceArtifacts({
 	client,
 	artifacts,
+	onCloseTab,
 }: {
 	client: EumenesClient;
 	artifacts: ReturnType<typeof useArtifactWorkspace>;
+	/** Closing a tab goes through the specialist session: unsaved work asks first. */
+	onCloseTab: (tabId: string) => void;
 }) {
 	const { openById } = useToolchainArtifacts(client, artifacts.open);
 	return artifacts.tabs.length > 0 ? (
@@ -22,7 +25,7 @@ export default function WorkspaceArtifacts({
 				tabs={artifacts.tabs}
 				activeTabId={artifacts.activeTabId}
 				onSelect={artifacts.select}
-				onClose={artifacts.close}
+				onClose={onCloseTab}
 				renderToolchain={(tab, visible) => (
 					<ToolchainArtifactHost
 						client={client}

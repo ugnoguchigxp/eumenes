@@ -16,7 +16,7 @@
 | `terminals` | 0 | `api/domains/terminals/index.ts` | `web/src/domains/terminals/index.ts` | なし | なし | なし | なし |
 | `background` | 0 | なし | `web/src/domains/background/index.ts` | なし | なし | なし | なし |
 | `image` | 3 | `api/domains/image/index.ts` | `web/src/domains/image/index.ts` | なし | `capabilities`、`inference`、`larm`、`queue` | なし | なし |
-| `ui-compositions` | 3 | `api/domains/ui-compositions/index.ts` | `web/src/domains/ui-compositions/` | なし | `capabilities`、`inference`、`larm`、`queue` | なし | なし |
+| `ui-compositions` | 3 | `api/domains/ui-compositions/index.ts` | `web/src/domains/ui-compositions/` | なし | なし | なし | なし |
 | `music` | 3 | `api/domains/music/index.ts` | `web/src/domains/music/index.ts` | `web/src/components/domains/music/` | `capabilities`、`inference`、`larm`、`queue` | なし | なし |
 | `dots` | 1 | `api/domains/dots/index.ts` | なし | なし | `queue` | なし | なし |
 | `task-reports` | 1 | `api/domains/task-reports/index.ts` | なし | なし | `tasks` | なし | なし |

@@ -6,6 +6,7 @@ import { artifactLibrary } from "./library";
 import { ArtifactRuntimeContext, type ArtifactRuntime } from "./runtime";
 export { compileArtifact, compileLang } from "./compiler";
 export { artifactLibrary } from "./library";
+export { tokenizeJsonLines } from "./json-tokens";
 export * from "./contracts";
 export type { ArtifactRuntime } from "./runtime";
 

@@ -4,6 +4,7 @@ export {
 	queueLinkMigration,
 	agentLinkMigration,
 	worldStateMigration,
+	specialistMigration,
 } from "./repository";
 export {
 	commandInteractionsMigration,
@@ -23,6 +24,7 @@ export { migrations } from "./repository";
 
 export { type DelegationPort } from "./contracts/delegation";
 export { INTERACTION_POLICY } from "./contracts/command-interactions";
+export type { SpecialistPort, SpecialistSet } from "./contracts";
 export type {
 	BoundCommandPort,
 	BoundCommandSet,

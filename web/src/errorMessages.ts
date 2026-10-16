@@ -16,6 +16,17 @@ const messages: Record<string, string> = {
 	invalid_env_ref: "この環境変数は認証情報として指定できません。",
 	invalid_larm_origin_unconfirmed:
 		"LARM の接続先の変更が確認されませんでした。",
+	work_busy:
+		"専門担当が作業中です。完了を待つか、停止または「会話に戻る」を使ってください。",
+	addressee_changed:
+		"宛先が変わりました。内容を確認してもう一度送信してください。",
+	work_unsaved: "未保存の変更があります。保存するか破棄してください。",
+	generation_in_progress: "生成中のため、今は操作できません。",
+	save_conflict: "保存作品が別の場所で更新されています。下書きは残っています。",
+	undo_limit_reached:
+		"元に戻せる変更の上限に達しました。保存すると続けて編集できます。",
+	session_ended: "制作は終了しています。",
+	session_expired: "制作の期限が切れたため、未保存の案は破棄されました。",
 	voice_session_inactive:
 		"音声セッションが終了しています。もう一度開始してください。",
 	voice_sequence_out_of_order:

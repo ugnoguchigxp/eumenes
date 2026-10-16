@@ -15,9 +15,10 @@ export function topicTexts(
 	run: Run,
 	conversation: ConversationService,
 	blocked: ReadonlySet<string>,
+	withoutSpecialist = false,
 ): string[] {
 	const ids = [run.inputMessageId];
-	const previous = recentPriorRuns(tx, run, 1)[0];
+	const previous = recentPriorRuns(tx, run, 1, withoutSpecialist)[0];
 	if (previous) {
 		ids.push(previous.inputMessageId);
 		if (previous.status === "completed" && previous.answerMessageId !== null)

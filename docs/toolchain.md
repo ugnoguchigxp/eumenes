@@ -34,7 +34,7 @@ streamでは、function名や制御区切りになり得る末尾だけを保留
 
 通常の会話入力から、登録済みのツールチェーン(定形セット)を選べます。`EUMENES_TOOLCHAIN_ENABLED` は既定 `1`、`0` なら従来の会話生成へ戻ります。内部JSONを読み上げや態度収集へ渡しません。子の待機中は推論枠を解放します。
 
-ツールチェーンは「サブエージェント・SystemContext・SKILL・ツールの使い方・ツール詳細・Artifact」の一組です([設計](../spec/.archived/toolchain-set-routing-design-2026-10-12.md)、[登録手順](toolchain-extension.md#1-全体像))。会話担当の判断は「直接回答する・確認質問を返す・提示された関数を一つ呼ぶ」だけで、関数の引数は全ツールチェーン共通の `{ request }` です。経路・ツール・引数はツールチェーン内のサブエージェントが決めます。
+ツールチェーンは「サブエージェント・SystemContext・SKILL・ツールの使い方・ツール詳細・Artifact」の一組です([設計](../spec/.archived/toolchain-set-routing-design-2026-10-12.md)、[登録手順](toolchain-extension.md#1-全体像))。会話担当の判断は「直接回答する・確認質問を返す・提示された関数を一つ呼ぶ」だけで、関数の引数は全ツールチェーン共通の `{ request }` です（専門担当へ切り替える session 型は、hostが発行した保存作品の `target` と、未保存作業を破棄して切り替える `resolveUnsaved` を任意で持ちます）。経路・ツール・引数はツールチェーン内のサブエージェントが決めます。session 型では切替後の発言が専門担当へ直接届き、担当は会話からの依頼で通常担当へ戻ります（[計画](../spec/toolchain-specialist-dialogue-implementation-plan-2026-10-17.md)）。
 
 調査担当には今回の依頼を渡し、検索キーワードは担当が選びます。過去の会話から出典URLを集めて渡しません。URLの直接読取りは今回の依頼に明示されたURL、今回の検索結果、今回の依頼に合う保存済み手順の候補に限ります。
 
@@ -50,7 +50,7 @@ streamでは、function名や制御区切りになり得る末尾だけを保留
 | `ocr` | `ocr.manage` | `package:ocr.manage@1` | 操作担当→OCR | — | — | — | — | 操作結果 |
 | `kanban` / `codex_tasks` | `kanban.manage` / `codex-tasks.manage` | `package:kanban.manage@2` / `package:codex-tasks.manage@1` | 操作担当→タスクボード | — | — | — | — | 操作結果 |
 | `claude_code` | `claude-code.request` | `package:claude-code.request@2` | 操作担当→作業依頼表 | — | — | — | — | 受付 |
-| `ui_create` | UI自由制作 | `package:ui.compose@1` | 制作担当 | — | — | — | — | 作品参照 |
+| `ui_create` | `ui.compose` | `package:ui.studio@1` | 専門担当へ切替（session）。以後の発言は担当が直接受ける | — | — | — | 1ターン最大6 | 下書き反映・作品参照 |
 | `memory_request` | `steward.request` | `package:steward.request@2` | 記憶担当への依頼 | — | — | — | — | 依頼結果 |
 
 候補の提示: 発話(直前の会話の短い抜粋を含む)に対し、ツールチェーンの`title`・`summary`・`useWhen`・`examples`へのFTS(trigram)、LARMのembedding(multilingual-e5-small、passageとして保存、発話はquery)、似た依頼での過去の選択をRRFで統合し、上位4件を関数として提示します。embeddingを利用できない・ベクトル未生成の間は、利用可能な全ツールチェーンを提示します。候補検索は分類ではなく、選択は会話担当が行います。似た依頼での過去の選択(依頼文・関数名・結果)を最大3件、参考データとして会話担当へ渡します。

@@ -11,10 +11,7 @@ import {
 	type FixedDefinition,
 } from "../contracts";
 import { zSchema } from "./schema";
-import {
-	artifactInTransaction,
-	commandBindingInTransaction,
-} from "./documents";
+import { artifactInTransaction, bindingInTransaction } from "./documents";
 export function registerRevision(
 	db: Database,
 	d: Definition,
@@ -186,7 +183,7 @@ function invalidArtifact(d: Definition) {
 	);
 }
 /**
- * A bound toolchain names a stored command binding and the artifact it presents. Every tool
+ * A bound toolchain names a stored command or session binding and the artifact it presents. Every tool
  * the binding connects must belong to the frozen package, with the binding's input schema equal
  * to the tool's own, so the model, the host and the UI validate the same shape.
  */
@@ -204,7 +201,7 @@ function validateBinding(
 		!artifactRevisionIdPattern.test(d.artifactRevisionId)
 	)
 		throw new Error("invalid_toolchain");
-	const binding = commandBindingInTransaction(db, d.bindingRevisionId);
+	const binding = bindingInTransaction(db, d.bindingRevisionId);
 	const pack = dependencies[0]!;
 	if (
 		!binding ||

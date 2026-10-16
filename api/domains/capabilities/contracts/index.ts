@@ -5,10 +5,12 @@ export { drawingRequest, drawingPlan };
 import { z } from "zod";
 import { guidedResearchInput } from "./guided-research";
 import {
-	uiComposeRequest,
-	uiCancelRequest,
+	uiDraftApply,
 	uiResponseFields,
 	uiSubmitRequest,
+	uiTargetRef,
+	uiWorkSave,
+	uiWorkStep,
 } from "./ui-compositions";
 import { claudeCodeRequest } from "./claude-code";
 import {
@@ -55,7 +57,14 @@ export {
 	kanbanList,
 	kanbanMove,
 };
-export { uiComposeRequest, uiCancelRequest, uiResponseFields, uiSubmitRequest };
+export {
+	uiDraftApply,
+	uiResponseFields,
+	uiSubmitRequest,
+	uiTargetRef,
+	uiWorkSave,
+	uiWorkStep,
+};
 import { imageRequest, imagePlan } from "./image";
 export { imageRequest, imagePlan };
 import {
@@ -175,7 +184,6 @@ export const validators = {
 	codexTaskRef,
 	codexTaskFollowup,
 	codexTaskConfigure,
-	uiComposeRequest,
 	claudeCodeRequest,
 	kanbanAdd,
 	kanbanEdit,
@@ -185,7 +193,10 @@ export const validators = {
 	kanbanFollowup,
 	kanbanList,
 	kanbanNoticeRef,
-	uiCancelRequest,
+	uiDraftApply,
+	uiWorkStep,
+	uiWorkSave,
+	uiTargetRef,
 	uiResponseFields,
 	uiSubmitRequest,
 	recognitionManage,

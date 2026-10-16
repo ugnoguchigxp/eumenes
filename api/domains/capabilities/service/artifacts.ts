@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite";
 import type {
 	ArtifactDefinitionV1,
-	CommandBindingV1,
+	BindingV1,
 	FixedDefinition,
 	FixedDocument,
 } from "../contracts";
@@ -62,7 +62,7 @@ export function createArtifacts(deps: {
 		db: Database,
 		toolchainRevisionId: string,
 	) => {
-		binding: FixedDocument<CommandBindingV1>;
+		binding: FixedDocument<BindingV1>;
 		artifact: FixedDocument<ArtifactDefinitionV1>;
 	} | null;
 	now: () => number;

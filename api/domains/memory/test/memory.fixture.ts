@@ -25,6 +25,7 @@ import {
 	stewardLedgersMigration,
 	forgetClosureMigration,
 	seedImportMigration,
+	specialistBlockReasonMigration,
 	contextWindowMigration,
 	createMemoryService,
 	migration,
@@ -54,6 +55,7 @@ export const memoryTestMigrations = [
 	stewardLedgersMigration,
 	forgetClosureMigration,
 	seedImportMigration,
+	specialistBlockReasonMigration,
 	...memoryPackageMigrations,
 ];
 

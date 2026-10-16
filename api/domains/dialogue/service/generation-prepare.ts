@@ -6,11 +6,13 @@ import { prepareRouting } from "./delegate-conversation";
 import { renderGoalsLayer } from "./goals-layer";
 import { topicTexts, worldNamesHint } from "./topic-texts";
 import { researchResultContext } from "./research-result-context";
+import { specialistWorkMessage, viewingMessage } from "./specialist-context";
 import { byId, transition } from "../repository";
 import { endRun } from "./run-end";
 import { isSystemPrompt, type Run } from "../contracts";
 import {
 	DEFAULT_DEADLINE_MS,
+	type ChatMessage,
 	type DialogueDeps,
 	type GenerateInput,
 	type GeneratePayload,
@@ -79,6 +81,7 @@ export function createPrepare(
 										run.conversationId,
 									) ?? [],
 								),
+								!!deps.specialist,
 							),
 						}),
 					)
@@ -107,6 +110,7 @@ export function createPrepare(
 			window,
 			memory,
 			goalsLayer?.message,
+			!!deps.specialist,
 		);
 		let messages = compiled.messages;
 		if (agent?.projection || agent?.failureCode)
@@ -123,6 +127,26 @@ export function createPrepare(
 			...(!agent?.failureCode ? compiled.sections.tail : []),
 			...(worldHint ? [worldHint] : []),
 		);
+		// Specialist work stays out of the conversation's context; the main agent gets a short host record of it.
+		const specialistLines: ChatMessage[] =
+			deps.specialist && !isSystemPrompt(run.sourceKind) && !agent
+				? [
+						specialistWorkMessage(deps, tx, current),
+						viewingMessage(deps, tx, current),
+						...(claim.payload.specialistHandoff
+							? [
+									{
+										role: "system" as const,
+										content: `${systemContext(
+											"dialogue.contexts.generation-prepare.specialist-handoff",
+											{},
+										)}\nspecialistHandoff=${claim.payload.specialistHandoff}`,
+									},
+								]
+							: []),
+					].filter((line): line is ChatMessage => line !== null)
+				: [];
+		messages.splice(messages.length - 1, 0, ...specialistLines);
 		// This run's context is fixed by the host: the server must neither trim nor reorder it.
 		const requestId = larm.requestFor?.(tx, run.id, "llm");
 		if (requestId) larm.setContextPolicyInTransaction?.(tx, requestId, "exact");

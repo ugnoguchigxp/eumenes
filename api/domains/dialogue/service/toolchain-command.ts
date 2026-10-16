@@ -27,7 +27,7 @@ import type {
 const log = getLogger("dialogue");
 
 /** The route of a task sub-agent's calls: the saved sub-agent resource, or LARM only. */
-const subagentRoute = (settings?: {
+export const subagentRoute = (settings?: {
 	subagent: { resourceId: string | null };
 }) =>
 	settings?.subagent.resourceId

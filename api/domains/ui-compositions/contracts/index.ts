@@ -1,71 +1,168 @@
 import { z } from "zod";
-import { uiComposeRequest } from "../../capabilities/contracts";
 import { parseDefinition } from "@eumenes/artifact-ui/contracts";
 
-export const composeInput = uiComposeRequest;
+/** The only views a composition may use. Every other registered view is refused. */
+const allowedViews = new Set(["layout", "text-block", "info-card", "form"]);
+const allowedDirections = new Set(["stack", "grid"]);
+export const limits = {
+	definitionBytes: 16_384,
+	depth: 4,
+	views: 60,
+	forms: 1,
+	/** Undo steps kept for one work (changes after the saved state). */
+	changes: 50,
+	history: 50,
+	/** Saved items offered as a session's starting point (the port allows at most 20). */
+	choices: 20,
+} as const;
+/** The name of the saved form's source inside a saved composition's definition. */
+export const formSource = "composition-form";
+
+/** A refusal carrying only a safe, lowercase code; `detail` is a short note for repair, never data. */
+export class UiCompositionError extends Error {
+	constructor(
+		readonly code: string,
+		readonly detail?: string,
+	) {
+		super(code);
+	}
+}
+export const fail = (code: string, detail?: string): never => {
+	throw new UiCompositionError(code, detail);
+};
+
 export const submitInput = z.record(
 	z.string(),
 	z.union([z.string(), z.boolean(), z.array(z.string())]),
 );
-export const designSpec = z.strictObject({
-	title: z.string().trim().min(1).max(120),
-	description: z.string().max(2000),
-	layout: z.enum(["stack", "grid"]).optional(),
-	appearance: z.enum(["clean", "warm", "elegant", "friendly"]).optional(),
-	cards: z
-		.array(
-			z.strictObject({
-				title: z.string().min(1).max(120),
-				body: z.string().max(1000),
-			}),
-		)
-		.max(6)
-		.optional(),
-	fields: z
-		.array(
-			z.strictObject({
-				id: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/),
-				label: z.string().min(1).max(120),
-				type: z.enum([
-					"text",
-					"radio",
-					"checkbox",
-					"textarea",
-					"select",
-					"number",
-					"boolean",
-				]),
-				required: z.boolean(),
-				options: z.array(z.string().min(1).max(120)).min(1).max(8).optional(),
-			}),
-		)
-		.max(8),
-});
-export function validatedDesign(raw: unknown) {
-	const spec = designSpec.parse(raw);
-	if (new Set(spec.fields.map((f) => f.id)).size !== spec.fields.length)
-		throw new Error("ui_fields_duplicate");
-	for (const field of spec.fields) {
+/** The saved form's fields (the inline `fields` of the definition's one form). */
+export const formFields = z
+	.array(
+		z.strictObject({
+			id: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/),
+			label: z.string().min(1).max(120),
+			type: z.enum([
+				"text",
+				"textarea",
+				"number",
+				"select",
+				"radio",
+				"checkbox",
+				"boolean",
+			]),
+			required: z.boolean().optional(),
+			options: z.array(z.string().min(1).max(120)).min(1).max(128).optional(),
+			optionLabels: z.record(z.string(), z.string()).optional(),
+		}),
+	)
+	.max(8);
+export type FormFields = z.infer<typeof formFields>;
+export type Definition = Record<string, unknown>;
+
+const isRecord = (value: unknown): value is Definition =>
+	!!value && typeof value === "object" && !Array.isArray(value);
+
+/** Limits and allowlist, independent of the schema the artifact parser enforces. */
+function walk(
+	node: unknown,
+	depth: number,
+	count: { views: number; forms: number },
+) {
+	if (!isRecord(node)) return fail("ui_definition_invalid");
+	if (depth > limits.depth) return fail("ui_definition_too_deep");
+	if (++count.views > limits.views) return fail("ui_definition_too_many_views");
+	if ("source" in node) return fail("ui_source_forbidden");
+	const view = node.view;
+	if (typeof view !== "string" || !allowedViews.has(view))
+		return fail("ui_view_not_allowed", String(view).slice(0, 40));
+	if (view === "layout") {
 		if (
-			["radio", "checkbox", "select"].includes(field.type) !== !!field.options
+			node.direction !== undefined &&
+			!allowedDirections.has(node.direction as string)
 		)
-			throw new Error("ui_field_options_invalid");
-		if (field.options && new Set(field.options).size !== field.options.length)
-			throw new Error("ui_field_options_duplicate");
+			return fail("ui_layout_direction_not_allowed");
+		if (!Array.isArray(node.children)) return fail("ui_definition_invalid");
+		for (const child of node.children) walk(child, depth + 1, count);
+	} else if (view === "form") {
+		if (++count.forms > limits.forms) return fail("ui_form_limit");
+		if (!Array.isArray(node.fields)) return fail("ui_definition_invalid");
 	}
-	const definition = {
-		view: "layout",
-		direction: spec.layout ?? "stack",
-		appearance: spec.appearance ?? "clean",
-		title: spec.title,
-		children: [
-			{ view: "text-block", title: spec.title, body: spec.description },
-			...(spec.cards ?? []).map((card) => ({ view: "info-card", ...card })),
-			...(spec.fields.length
-				? [{ view: "form", source: "composition-form", title: "" }]
-				: []),
-		],
-	};
-	parseDefinition(JSON.stringify(definition));
-	return { spec, definition };
+}
+function formOf(node: unknown): Definition | undefined {
+	if (!isRecord(node)) return undefined;
+	if (node.view === "form") return node;
+	if (!Array.isArray(node.children)) return undefined;
+	for (const child of node.children) {
+		const found = formOf(child);
+		if (found) return found;
+	}
+	return undefined;
+}
+
+/**
+ * A definition the specialist may propose: allowed views only, no `source`, within the size,
+ * depth and view-count limits, and valid for the artifact parser. Returns the form's fields.
+ */
+export function validatedDefinition(raw: unknown): {
+	definition: Definition;
+	fields: FormFields | null;
+} {
+	if (!isRecord(raw)) return fail("ui_definition_invalid");
+	const json = JSON.stringify(raw);
+	if (new TextEncoder().encode(json).length > limits.definitionBytes)
+		return fail("ui_definition_too_large");
+	walk(raw, 1, { views: 0, forms: 0 });
+	try {
+		parseDefinition(json);
+	} catch (error) {
+		const issue = error instanceof z.ZodError ? error.issues[0] : undefined;
+		return fail(
+			"ui_definition_invalid",
+			issue
+				? `${issue.path.join("/").slice(0, 80)}: ${issue.message.slice(0, 120)}`
+				: undefined,
+		);
+	}
+	const form = formOf(raw);
+	const fields = form ? formFields.safeParse(form.fields) : null;
+	if (fields && !fields.success) return fail("ui_definition_invalid", "form");
+	return { definition: raw, fields: fields?.success ? fields.data : null };
+}
+/** The fields of the definition's inline form, or null when it has none. */
+export function fieldsOfDefinition(definition: Definition): FormFields | null {
+	const parsed = formFields.safeParse(formOf(definition)?.fields);
+	return parsed.success ? parsed.data : null;
+}
+
+function mapForms(
+	node: unknown,
+	replace: (form: Definition) => Definition,
+): unknown {
+	if (!isRecord(node)) return node;
+	if (node.view === "form") return replace(node);
+	return Array.isArray(node.children)
+		? {
+				...node,
+				children: node.children.map((child) => mapForms(child, replace)),
+			}
+		: node;
+}
+/** What a saved composition shows: its form is the answer form fed by the saved fields. */
+export function savedRendering(definition: Definition): Definition {
+	return mapForms(definition, (form) => ({
+		view: "form",
+		source: formSource,
+		...(form.title !== undefined ? { title: form.title } : {}),
+	})) as Definition;
+}
+/** The editable definition of a saved composition: the answer form is inlined again. */
+export function inlineForm(
+	definition: Definition,
+	fields: FormFields | null,
+): Definition {
+	return mapForms(definition, (form) => {
+		if (form.source !== formSource || !fields?.length) return form;
+		const { source: _source, ...rest } = form;
+		return { ...rest, fields };
+	}) as Definition;
 }

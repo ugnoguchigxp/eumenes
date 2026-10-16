@@ -25,7 +25,6 @@ export function appServices(s: Services) {
 		serviceTests: s.serviceTests,
 		music: s.music,
 		image: s.image,
-		uiCompositions: s.uiCompositions,
 		excalidraw: s.excalidraw,
 		drawingOperations: s.drawingOperations,
 		objectRecognition: s.objectRecognition,

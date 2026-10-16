@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { z } from "zod";
+import { addresseeSchema, viewingSchema } from "./specialist";
 const submitFields = z.object({
 	requestId: z.uuid(),
 	conversationId: z.string().min(1).max(120),
@@ -11,6 +12,10 @@ const submitFields = z.object({
 		.refine((ids) => new Set(ids).size === ids.length)
 		.optional(),
 	utteranceId: z.string().min(1).max(120).optional(),
+	/** The saved item on screen, as a host source issued it; re-checked against the issued choices. */
+	viewing: viewingSchema.optional(),
+	/** Who the screen showed as listening; a different addressee now refuses the send (`addressee_changed`). */
+	addressee: addresseeSchema.optional(),
 });
 const hasInput = (v: { text: string; attachmentIds?: string[] }) =>
 	!!(v.text || v.attachmentIds?.length);
@@ -45,6 +50,8 @@ export const runSchema = z.object({
 	sourceKind: z.enum(["manual", "voice", "schedule", "notice"]),
 	scheduleId: z.string().nullable(),
 	occurrenceId: z.string().nullable(),
+	/** The specialist session this run is a turn of; null for the main conversation's runs. */
+	specialistSessionId: z.string().nullable(),
 	createdAt: z.string(),
 	updatedAt: z.string(),
 });
@@ -127,3 +134,4 @@ export interface GoalsLayerPort {
 }
 
 export * from "./command-interactions";
+export * from "./specialist";

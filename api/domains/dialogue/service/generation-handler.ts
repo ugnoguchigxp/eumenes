@@ -35,6 +35,7 @@ import {
 	type GeneratePayload,
 } from "./context";
 import { createPrepare } from "./generation-prepare";
+import { flushDeferred } from "./specialist-core";
 import { goalsLayerStale } from "./goals-layer";
 import { adoptMemoryWindow, clearShownNotices } from "./memory-window";
 import type { Progress } from "./progress";
@@ -98,6 +99,7 @@ export function createGenerationHandler(
 		schema: z.object({
 			runId: z.string(),
 			commandNote: z.string().max(500).optional(),
+			specialistHandoff: z.string().max(500).optional(),
 		}),
 		recovery: "interrupt",
 		resourceKey: "inference.llm",
@@ -181,6 +183,7 @@ export function createGenerationHandler(
 							tools: decision.tools,
 							cards: decision.cards,
 							openQuestions: decision.openQuestions,
+							sessions: decision.sessions,
 							// The selection call is one-shot; a direct call is the answer generation itself.
 							sessionRole: decision.selectionMessages ? "auxiliary" : "main",
 							session: callSession,
@@ -375,6 +378,8 @@ export function createGenerationHandler(
 					: endRun(deps, tx, run, next[0], next[1]);
 			return moved ? "applied" : "stale";
 		},
+		// A session switched or ended while this settled: abort what that withdrew.
+		afterCommit: () => flushDeferred(deps),
 		cancelInTransaction(tx, job) {
 			const run = byId(tx, job.payload.runId);
 			if (run && (run.status === "queued" || run.status === "running")) {

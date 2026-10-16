@@ -82,7 +82,7 @@ export const domains = {
 		web: "web/src/domains/ui-compositions",
 		components: null,
 		depends: {
-			api: ["capabilities", "inference", "larm", "queue"],
+			api: [],
 			web: [],
 			test: [],
 		},

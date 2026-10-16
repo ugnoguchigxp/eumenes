@@ -39,6 +39,7 @@ import {
 	parseRequest,
 	viewRegistry,
 	type ArtifactRequest,
+	type Layout,
 } from "./contracts";
 
 import {
@@ -54,15 +55,12 @@ import { AvatarMotionLabView } from "./avatar-components";
 import { CollectionWorkspaceView } from "./collection-components";
 import { RecordsWorkspaceView } from "./records-components";
 import { ServiceTestWorkspaceView } from "./service-test-components";
-import {
-	UiWorkspaceView,
-	TextBlockView,
-	InfoCardView,
-} from "./ui-composition-components";
+import { TextBlockView, InfoCardView } from "./ui-composition-components";
+import { UiStudioView } from "./ui-studio-components";
 
 const renderers = {
 	"google-accounts": GoogleAccountsView,
-	"ui-workspace": UiWorkspaceView,
+	"ui-studio": UiStudioView,
 	"text-block": TextBlockView,
 	"info-card": InfoCardView,
 	"object-recognition-workspace": ObjectRecognitionWorkspaceView,
@@ -97,15 +95,21 @@ const renderers = {
 	memory: MemoryReview,
 	settings: SettingsForm,
 };
-function RegisteredView({ request }: { request: ArtifactRequest }) {
+type Node = ArtifactRequest | Layout;
+function RegisteredView({ request }: { request: Node }) {
+	if (request.view === "layout") return <CompositionView request={request} />;
 	const Component = renderers[request.view];
 	return <Component request={request} />;
 }
-function CompositionView({
-	request,
-}: {
-	request: z.infer<typeof layoutSchema>;
-}) {
+/** The settings form-preview arrangements are validated to hold plain views. */
+function plain(node: Node | undefined): ArtifactRequest {
+	if (!node || node.view === "layout")
+		throw new Error("組合せの構成が正しくありません");
+	return node;
+}
+const keyOf = (node: Node) =>
+	node.view === "layout" ? "layout" : (node.source ?? node.view);
+function CompositionView({ request }: { request: Layout }) {
 	const [selected, setSelected] = useState("0");
 	const tabs: NonNullable<typeof request.tabs> =
 		request.tabs ??
@@ -120,8 +124,8 @@ function CompositionView({
 				className="aui-composition aui-composition-form-preview"
 			>
 				<SettingsSectionView
-					request={request.children[0]!}
-					supplement={<RegisteredView request={request.children[1]!} />}
+					request={plain(request.children[0])}
+					supplement={<RegisteredView request={plain(request.children[1])} />}
 				/>
 			</section>
 		);
@@ -135,7 +139,7 @@ function CompositionView({
 				return (
 					<div
 						className="aui-composition-header-child"
-						key={`${index}:${child.source ?? child.view}`}
+						key={`${index}:${keyOf(child)}`}
 					>
 						<RegisteredView request={child} />
 					</div>
@@ -175,11 +179,11 @@ function CompositionView({
 							<div className="aui-composition-tab-body">
 								{tab.arrangement === "form-preview" ? (
 									<SettingsSectionView
-										request={request.children[tab.children[0]!]!}
+										request={plain(request.children[tab.children[0]!])}
 										hideFooter={!!request.draftSource}
 										supplement={
 											<RegisteredView
-												request={request.children[tab.children[1]!]!}
+												request={plain(request.children[tab.children[1]!])}
 											/>
 										}
 									/>
@@ -195,7 +199,7 @@ function CompositionView({
 											/>
 										) : (
 											<RegisteredView
-												key={`${childIndex}:${child.view}:${child.source ?? "inline"}`}
+												key={`${childIndex}:${child.view}:${keyOf(child)}`}
 												request={child}
 											/>
 										);
@@ -212,10 +216,12 @@ function CompositionView({
 			aria-label={request.title ?? "組合せ表示"}
 			className={`aui-composition aui-composition-${request.direction}`}
 			data-appearance={request.appearance}
+			data-gap={request.gap}
+			data-width={request.width}
 		>
 			{request.children.map((child, index) => (
 				<RegisteredView
-					key={`${index}:${child.view}:${child.source ?? "inline"}`}
+					key={`${index}:${child.view}:${keyOf(child)}`}
 					request={child}
 				/>
 			))}

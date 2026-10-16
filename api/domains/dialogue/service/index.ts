@@ -1,4 +1,7 @@
 import { createToolchainCommandHandler } from "./toolchain-command";
+import { createSpecialistOps } from "./specialist-commands";
+import { flushCancelled } from "./specialist-core";
+import { createSpecialistTurnHandler } from "./specialist-turn";
 import { createCommandInteractions } from "./command-interactions";
 import type { Database } from "bun:sqlite";
 import { getLogger } from "../../../infrastructure/logger";
@@ -54,6 +57,7 @@ export function createDialogueService({
 	worldContext,
 	goals,
 	toolchains,
+	specialist,
 }: {
 	store: SqliteStore;
 	conversation: ConversationService;
@@ -72,6 +76,7 @@ export function createDialogueService({
 	worldContext?: WorldContextPort;
 	goals?: GoalsLayerPort;
 	toolchains?: import("../contracts/toolchains").ToolchainRoutingPort;
+	specialist?: import("../contracts").SpecialistPort;
 }) {
 	const deps: DialogueDeps = {
 		store,
@@ -91,6 +96,7 @@ export function createDialogueService({
 		worldContext,
 		goals,
 		toolchains,
+		specialist,
 	};
 	const progress = createProgress(deps);
 	const intake = createIntake(deps);
@@ -102,6 +108,8 @@ export function createDialogueService({
 	deps.interactions = interactions;
 	queue.registerHandler(createGenerationHandler(deps, progress));
 	queue.registerHandler(createToolchainCommandHandler(deps));
+	queue.registerHandler(createSpecialistTurnHandler(deps));
+	const specialistOps = createSpecialistOps(deps);
 	const agentSync = createAgentSync(deps);
 	const service = {
 		linkOperationJobInTransaction(db: Database, runId: string, jobId: string) {
@@ -129,6 +137,28 @@ export function createDialogueService({
 			linkAnswer(db, runId, job.id);
 		},
 		interactions,
+		/** The conversation's live specialist session, or null (`GET /api/conversations/:id/specialist`). */
+		specialistSession: specialistOps.session,
+		/** True only for an active or suspended session that has not expired (the guard of the work's screen operations). */
+		specialistSessionLiveInTransaction: specialistOps.liveInTransaction,
+		/** return / resume / discard / close from the screen: idempotent by requestId, guarded by the revision. */
+		specialistCommand: specialistOps.command,
+		/**
+		 * The application's periodic sweep: ends sessions past their expiry, retries closing ones and ends
+		 * suspended work that was saved meanwhile. The InTransaction form returns what to flush after commit.
+		 */
+		sweepSpecialistSessions: specialistOps.sweep,
+		sweepSpecialistSessionsInTransaction: specialistOps.sweepInTransaction,
+		/** At startup every session that is not ended ends as `restarted` (unsaved work does not survive). */
+		recoverSpecialistSessions: specialistOps.recover,
+		recoverSpecialistSessionsInTransaction: specialistOps.recoverInTransaction,
+		/** After the commit of an InTransaction form: abort the jobs and requests it cancelled. */
+		flushSpecialistCancellations(cancelled: {
+			jobs: string[];
+			runs: string[];
+		}) {
+			flushCancelled(deps, cancelled.jobs, cancelled.runs);
+		},
 		promptTarget: intake.promptTarget,
 		progress: progress.progress,
 		subscribeProgress: progress.subscribeProgress,

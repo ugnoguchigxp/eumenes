@@ -183,6 +183,23 @@ CREATE INDEX memory_item_merge_source ON memory_item_merge(source_id);
 CREATE TABLE memory_block_applied (forget_id TEXT PRIMARY KEY, applied_at TEXT NOT NULL);
 `;
 
+/**
+ * A specialist session's user and assistant messages are blocked like a scheduled prompt (they are neither
+ * learned from nor shown to the conversation), under their own reason so that handing one back to the
+ * conversation can lift exactly that block. The CHECK cannot be altered, so the table is rebuilt with its rows.
+ */
+export const specialistBlockReasonMigration = `
+CREATE TABLE memory_message_block_next (
+ message_id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL,
+ reason TEXT NOT NULL CHECK(reason IN ('scheduled_prompt','forgotten','specialist_dialogue')), forget_id TEXT, created_at TEXT NOT NULL
+);
+INSERT INTO memory_message_block_next (message_id, conversation_id, reason, forget_id, created_at)
+ SELECT message_id, conversation_id, reason, forget_id, created_at FROM memory_message_block;
+DROP TABLE memory_message_block;
+ALTER TABLE memory_message_block_next RENAME TO memory_message_block;
+CREATE INDEX memory_message_block_conversation ON memory_message_block(conversation_id);
+`;
+
 /** Named migrations of this domain; the SQL above is frozen once deployed. */
 export const migrations: readonly Migration[] = [
 	{ id: "memory/0001-init", sql: migration },
@@ -215,5 +232,10 @@ export const migrations: readonly Migration[] = [
 		id: "memory/0007-seed-import",
 		sql: seedImportMigration,
 		after: ["memory/0006-forget-closure"],
+	},
+	{
+		id: "memory/0008-specialist-block-reason",
+		sql: specialistBlockReasonMigration,
+		after: ["memory/0007-seed-import"],
 	},
 ];

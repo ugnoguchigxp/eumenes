@@ -26,7 +26,19 @@ export type ConversationOperation = {
 	request: string;
 	/** The open question this request answers (the toolchain asked it earlier). */
 	questionRef?: string;
+	/** A session toolchain only: the saved item to start from (a host-issued ref). */
+	target?: string;
+	/** A session toolchain only: the user confirmed dropping the unsaved work of another target. */
+	resolveUnsaved?: "discard";
 };
+/**
+ * The session toolchains among the offered cards, by function name, with the saved items each may start
+ * from (host-issued refs with a label). A card in it takes `{request, target?, resolveUnsaved?}`.
+ */
+export type SessionOffers = ReadonlyMap<
+	string,
+	ReadonlyArray<{ ref: string; label: string }>
+>;
 /** A question the user has not answered yet, offered to the model as reference data. */
 export type OpenQuestion = {
 	questionRef: string;
@@ -49,6 +61,37 @@ const delegatedRequestSchema = {
 		},
 	},
 };
+/** A session toolchain's function schema: the request, the saved item to start from, the unsaved-work decision. */
+function sessionRequestSchemaFor(
+	targets: ReadonlyArray<{ ref: string; label: string }>,
+) {
+	return {
+		...delegatedRequestSchema,
+		properties: {
+			...delegatedRequestSchema.properties,
+			...(targets.length
+				? {
+						target: {
+							type: "string",
+							enum: targets.map((t) => t.ref),
+							description:
+								"保存済みの項目を元に編集を始めるときだけ、その項目のref。候補: " +
+								targets
+									.map((t) => `${t.ref}=${JSON.stringify(t.label)}`)
+									.join("、") +
+								"。新しく作るときは省略する。",
+						},
+					}
+				: {}),
+			resolveUnsaved: {
+				type: "string",
+				enum: ["discard"],
+				description:
+					"別の作業の未保存の変更を破棄して切り替えることを、利用者が明確に承諾した直後の呼出しだけdiscardを指定する。通常は省略する。",
+			},
+		},
+	};
+}
 /** The `{ request }` function schema, with `questionRef` limited to the refs open for it. */
 function requestSchemaFor(refs: string[]) {
 	if (!refs.length) return delegatedRequestSchema;
@@ -65,6 +108,13 @@ function requestSchemaFor(refs: string[]) {
 		},
 	};
 }
+const sessionRequest = z
+	.object({
+		request: toolchainRequest.shape.request,
+		target: z.string().min(1).max(200).optional(),
+		resolveUnsaved: z.literal("discard").optional(),
+	})
+	.strict();
 const answeringRequest = z
 	.object({
 		request: toolchainRequest.shape.request,
@@ -79,6 +129,7 @@ const answeringRequest = z
 export function toolchainTools(
 	cards: ToolchainCard[],
 	openQuestions: OpenQuestion[] = [],
+	sessions: SessionOffers = new Map(),
 ): NativeTool[] {
 	const offered = new Set(cards.map((c) => c.functionName));
 	return cards.map((card) => ({
@@ -94,11 +145,13 @@ export function toolchainTools(
 					.filter((r) => offered.has(r.functionName))
 					.map((r) => `${r.when}には${r.functionName}を使う。`)
 					.join(""),
-			parameters: requestSchemaFor(
-				openQuestions
-					.filter((q) => q.functionName === card.functionName)
-					.map((q) => q.questionRef),
-			),
+			parameters: sessions.has(card.functionName)
+				? sessionRequestSchemaFor(sessions.get(card.functionName)!)
+				: requestSchemaFor(
+						openQuestions
+							.filter((q) => q.functionName === card.functionName)
+							.map((q) => q.questionRef),
+					),
 		},
 	}));
 }
@@ -139,6 +192,7 @@ export function operation(
 	permitted: NativeTool[],
 	cards: ToolchainCard[],
 	openQuestions: OpenQuestion[] = [],
+	sessions: SessionOffers = new Map(),
 ): ConversationOperation {
 	if (calls.length !== 1)
 		throw operationRejection("call_count", undefined, [], calls.length);
@@ -157,6 +211,35 @@ export function operation(
 				? [{ validationPath: "arguments", validationCode: error.code }]
 				: [],
 		);
+	}
+	const session = sessions.get(card.functionName);
+	if (session) {
+		const parsed = sessionRequest.safeParse(args);
+		if (!parsed.success)
+			throw operationRejection(
+				"arguments_invalid",
+				call,
+				validationIssues(parsed.error, args),
+			);
+		// Only a ref the host issued for this toolchain can be a target.
+		if (
+			parsed.data.target !== undefined &&
+			!session.some((t) => t.ref === parsed.data.target)
+		)
+			throw operationRejection("target_not_offered", call);
+		return {
+			kind: "toolchain",
+			toolchainId: card.id,
+			revisionId: card.revisionId,
+			functionName: card.functionName,
+			request: parsed.data.request,
+			...(parsed.data.target === undefined
+				? {}
+				: { target: parsed.data.target }),
+			...(parsed.data.resolveUnsaved
+				? { resolveUnsaved: "discard" as const }
+				: {}),
+		};
 	}
 	const answering =
 		!!args &&

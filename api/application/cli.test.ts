@@ -808,6 +808,7 @@ const runBody = (over: Record<string, unknown> = {}) => ({
 	jobId: null,
 	deadlineAt: null,
 	sourceKind: "manual",
+	specialistSessionId: null,
 	scheduleId: null,
 	occurrenceId: null,
 	createdAt: NOW,

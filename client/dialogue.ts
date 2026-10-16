@@ -1,6 +1,9 @@
 import {
 	runSchema,
+	specialistSessionResponseSchema,
 	type PublicSubmit,
+	type SpecialistCommand,
+	type SpecialistCommandKind,
 } from "../api/domains/dialogue/contracts";
 import type { Transport } from "./transport";
 import { json } from "./transport";
@@ -34,6 +37,30 @@ export function dialogueClient(transport: Transport) {
 					await transport.call(`/api/runs/${encodeURIComponent(id)}`, {
 						signal,
 					})
+				).json(),
+			),
+		/** The conversation's live specialist session, or null. */
+		specialistSession: async (conversationId: string, signal?: AbortSignal) =>
+			specialistSessionResponseSchema.parse(
+				await (
+					await transport.call(
+						`/api/conversations/${encodeURIComponent(conversationId)}/specialist`,
+						{ signal },
+					)
+				).json(),
+			),
+		/** return / resume / discard / close; a repeated requestId returns the first result. */
+		specialistCommand: async (
+			sessionId: string,
+			kind: SpecialistCommandKind,
+			body: SpecialistCommand,
+		) =>
+			specialistSessionResponseSchema.parse(
+				await (
+					await transport.call(
+						`/api/specialist-sessions/${encodeURIComponent(sessionId)}/${kind}`,
+						json(body),
+					)
 				).json(),
 			),
 		cancel: async (id: string) =>

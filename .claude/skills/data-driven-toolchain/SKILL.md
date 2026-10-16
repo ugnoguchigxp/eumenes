@@ -15,7 +15,8 @@ description: Add, revise, or migrate an Eumenes toolchain in the data-driven for
    - 既存adapterに操作が要る → adapter操作＋入力schema＋bundle（§4）。
    - 新しいdomain → DomainAdapter＋Web adapter＋登録各1行＋bundle（§5）。
    - 旧形式の移行 → §6（§5に加え旧経路を削除）。
-   - 単純HTTP APIだけで済ませたい → 現状は未対応（bundleはcommand bindingのみ）。adapterで実装する。
+   - 単純HTTP APIだけで済ませたい → 現状は未対応（bundleはcommand・session bindingのみ）。adapterで実装する。
+   - 専門担当と複数往復で成果物を編集させたい → session binding（`execution:"session"`）と adapter の `session` 実装。例は `ui-compositions.bundle.json` と `api/application/media/ui-compositions-adapter.ts`。
 3. `git status` で対象ファイルが他作業で未commitになっていないか確認する。他人の変更には触れない。
 
 ## 1. bundle を書く（全種類で必要）

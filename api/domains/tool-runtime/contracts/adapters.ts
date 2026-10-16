@@ -18,7 +18,18 @@ export type AdapterOrigin =
 			conversationId: string;
 			messageId: string;
 	  }
-	| { kind: "ui"; scope: string; actionRequestId: string };
+	| { kind: "ui"; scope: string; actionRequestId: string }
+	/**
+	 * A specialist-session turn (spec toolchain-specialist-dialogue 2026-10-17 §4). The host fixes
+	 * the work; the adapter accepts the operation only while `runId` holds that work's turn.
+	 */
+	| {
+			kind: "specialist";
+			sessionId: string;
+			runId: string;
+			conversationId: string;
+			workRef: string;
+	  };
 
 type ResultRef = {
 	owner: string;
@@ -46,6 +57,62 @@ export type FieldError = { field: string; message: string };
 export type InputAdapter = (
 	raw: Record<string, unknown>,
 ) => { ok: true; value: unknown } | { ok: false; errors: FieldError[] };
+
+/** The domain's view of one specialist session's work (host data, never model text). */
+export type SessionWorkState = {
+	workRef: string;
+	/** The saved item this work edits; null while a new work was never saved. */
+	savedRef: string | null;
+	/** Changes not yet saved by the user. */
+	dirty: boolean;
+	/** A specialist turn (queued or running) holds the work; undo/redo/save are refused. */
+	busy: boolean;
+	/** Draft revision; advances on every accepted change, undo, redo and save. */
+	revision: number;
+	/** Short label for notices and the conversation's work record (e.g. the AI-chosen title). */
+	label: string;
+	/** The current work handed to the specialist model as input data (bounded, no secrets). */
+	current: unknown;
+};
+
+/**
+ * The work a domain keeps for a specialist session (spec §4.5, §5). Dialogue owns the session,
+ * its expiry and the conversation's addressee; the domain owns the draft and its history. Every
+ * call runs inside the caller's writer transaction and is idempotent where noted.
+ */
+export interface SessionWorkAdapter {
+	/**
+	 * Start a work for a new session: empty when `targetRef` is null, otherwise from that saved
+	 * item (a ref this adapter issued through `choicesInTransaction`). Throws `target_not_found`.
+	 */
+	openInTransaction(
+		tx: Database,
+		input: { sessionId: string; targetRef: string | null },
+	): SessionWorkState;
+	/** The work's current state, or null when it was ended. */
+	stateInTransaction(tx: Database, workRef: string): SessionWorkState | null;
+	/**
+	 * Whether `targetRef` names a saved item a session may start from now (the same set
+	 * `choicesInTransaction` draws from, without its 20-item cut).
+	 */
+	hasTargetInTransaction(tx: Database, targetRef: string): boolean;
+	/** A specialist turn takes the work (from intake, so queued counts). Throws `work_busy`. */
+	beginTurnInTransaction(tx: Database, workRef: string, runId: string): void;
+	/**
+	 * Release the turn and invalidate anything it still had in flight. No-op unless `runId`
+	 * holds the work, so late or repeated calls are harmless.
+	 */
+	endTurnInTransaction(tx: Database, workRef: string, runId: string): void;
+	/**
+	 * End the work. `discard` drops the draft and its undo history (saved items stay);
+	 * `close` requires no unsaved change (throws `work_unsaved`). Idempotent on an ended work.
+	 */
+	endInTransaction(
+		tx: Database,
+		workRef: string,
+		mode: "discard" | "close",
+	): void;
+}
 
 export interface DomainAdapter {
 	/** `adapter:<owner>@<n>` */
@@ -121,6 +188,8 @@ export interface DomainAdapter {
 	): Array<{ ref: string; label: string }>;
 	/** Called after the writer transaction commits (wake schedulers, publish changes). */
 	afterCommit?(): void;
+	/** Present when a session binding may use this adapter (spec §4.1). */
+	session?: SessionWorkAdapter;
 }
 
 export interface AdapterRegistry {

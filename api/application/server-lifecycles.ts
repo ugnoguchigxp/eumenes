@@ -2,6 +2,7 @@ import { getLogger } from "../infrastructure/logger";
 import { intervalLifecycle, type Lifecycle } from "./lifecycle";
 import { recoverSteward } from "./world/steward-assembly";
 import type { Services } from "./server-services";
+import { createSpecialistSessionsLifecycle } from "./toolchain/specialist-sessions";
 import { toolchainMaintenance } from "./toolchain/toolchain-adapters";
 
 const log = getLogger("server");
@@ -222,6 +223,7 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 			close: () => Promise.race([s.inference.close(), Bun.sleep(5_000)]),
 		},
 		{ name: "dialogue", close: () => s.dialogue.close() },
+		createSpecialistSessionsLifecycle(s.dialogue),
 		{ name: "web_research", close: () => s.webResearch.close() },
 		{ name: "queue", close: () => s.queue.close(10_000) },
 		{ name: "capabilities", close: () => s.toolchain.capabilities.close() },

@@ -12,6 +12,7 @@ import {
 	createMemoryService,
 	migrations as hostMemoryMigrations,
 	seedImportMigration,
+	specialistBlockReasonMigration,
 	stewardLedgersMigration,
 } from "..";
 import {
@@ -33,7 +34,11 @@ test("adding the Seed migration preserves existing memory, conversation and conn
 	];
 	let store = openStore(
 		path,
-		all.filter((m) => m.sql !== seedImportMigration),
+		all.filter(
+			(m) =>
+				m.sql !== seedImportMigration &&
+				m.sql !== specialistBlockReasonMigration,
+		),
 	);
 	const create = () =>
 		createMemoryService(
@@ -96,7 +101,9 @@ test("memory/0005-steward-ledgers moves the old exclusions to unscoped scheduled
 	try {
 		const path = join(dir, "db.sqlite3");
 		const without = memoryTestMigrations.filter(
-			(migration) => migration !== stewardLedgersMigration,
+			(migration) =>
+				migration !== stewardLedgersMigration &&
+				migration !== specialistBlockReasonMigration,
 		);
 		const old = openStore(path, without);
 		const conversation = createConversationService(old);

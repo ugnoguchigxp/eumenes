@@ -11,6 +11,7 @@ import {
 	operationRejection,
 	type ConversationOperation,
 	type OpenQuestion,
+	type SessionOffers,
 } from "./conversation-tools";
 
 const log = getLogger("dialogue");
@@ -30,6 +31,8 @@ export async function generateConversation(input: {
 	cards?: ToolchainCard[];
 	/** Open questions a call may answer by `questionRef` (offered to the model with `tools`). */
 	openQuestions?: OpenQuestion[];
+	/** The session toolchains among `cards` and the saved items each may start from. */
+	sessions?: SessionOffers;
 	repair: () => void;
 	/**
 	 * Session lifetime of every call here, including the structural correction: `main` for the answer generation,
@@ -116,6 +119,7 @@ export async function generateConversation(input: {
 					input.tools,
 					input.cards ?? [],
 					input.openQuestions ?? [],
+					input.sessions,
 				),
 				repaired: attempt > 0,
 			};

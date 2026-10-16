@@ -17,9 +17,11 @@ import type {
 } from "../contracts/toolchains";
 import type { DialogueDeps, GenerateInput } from "./context";
 import { currentRequestMessage, markCurrentRequest } from "./request-context";
+import { sessionOffers } from "./specialist-context";
 import {
 	appendConversationPolicy,
 	toolchainTools,
+	type SessionOffers,
 	type ConversationOperation,
 	type OpenQuestion,
 } from "./conversation-tools";
@@ -76,6 +78,7 @@ export async function prepareDecision(
 	let query: QueryVector | undefined;
 	let recallPins: TurnRecall["pins"] = [];
 	let openQuestions: OpenQuestion[] = [];
+	let sessions: SessionOffers = new Map();
 	let selectionMessages: typeof messages | undefined;
 	let answerMessages: typeof messages | undefined;
 	let selectionRecall: string | undefined;
@@ -158,8 +161,9 @@ export async function prepareDecision(
 			})),
 			openQuestions,
 		);
+		sessions = sessionOffers(deps, route.cards, input.runId);
 		tools = route.cards.length
-			? toolchainTools(route.cards, openQuestions)
+			? toolchainTools(route.cards, openQuestions, sessions)
 			: undefined;
 		log.info("dialogue.candidates_selected", {
 			candidateCount: route.cards.length,
@@ -203,6 +207,7 @@ export async function prepareDecision(
 		tools,
 		cards: route?.cards,
 		openQuestions,
+		sessions,
 		draft,
 		recallPins,
 	};

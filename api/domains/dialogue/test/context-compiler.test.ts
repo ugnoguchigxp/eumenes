@@ -100,6 +100,7 @@ async function setup() {
 				insert(db, {
 					id: runId,
 					agentTaskId: null,
+					specialistSessionId: null,
 					requestId: `req${i}`,
 					conversationId: "main",
 					utteranceId: null,
@@ -142,6 +143,7 @@ async function setup() {
 				insert(db, {
 					id: `r${i}`,
 					agentTaskId: null,
+					specialistSessionId: null,
 					requestId: `req${i}`,
 					conversationId: "main",
 					utteranceId: null,

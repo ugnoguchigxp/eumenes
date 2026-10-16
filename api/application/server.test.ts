@@ -101,6 +101,7 @@ test("the shutdown order is fixed, and a freshly built set of services closes cl
 		"capabilities",
 		"queue",
 		"web_research",
+		"specialist_sessions",
 		"dialogue",
 		"inference",
 		"attitude_dataset",

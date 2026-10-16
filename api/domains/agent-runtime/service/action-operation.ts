@@ -62,7 +62,8 @@ export function createActionOperation({
 }) {
 	/**
 	 * The command must be what its binding says: the adapter, and for the tool the operation.
-	 * The binding is the stored, versioned document, not what the caller claims.
+	 * The binding is the stored, versioned document, not what the caller claims. Only a command
+	 * binding runs actions; a session binding's tools belong to the specialist port.
 	 */
 	function checkBinding(db: Database, command: ActionCommand) {
 		const stored = capabilities.documentInTransaction(

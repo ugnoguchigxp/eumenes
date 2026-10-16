@@ -676,15 +676,19 @@ test("a bound toolchain is shown by its artifact registration: artifact is optio
 				component: "TimerArtifact",
 			});
 			expect(
-				caps.toolchainBindingInTransaction(db, "toolchain:timers.manage@3")
-					?.binding.document.questions,
+				(
+					caps.toolchainBindingInTransaction(db, "toolchain:timers.manage@3")!
+						.binding.document as { questions?: unknown }
+				).questions,
 			).toEqual([
 				{ inputSchemaRef: "builtin:timerDurationAnswer" },
 				{ inputSchemaRef: "builtin:timerTargetAnswer", choiceField: "timerId" },
 			]);
 			expect(
-				caps.toolchainBindingInTransaction(db, "toolchain:timers.manage@2")
-					?.binding.document.questions,
+				(
+					caps.toolchainBindingInTransaction(db, "toolchain:timers.manage@2")!
+						.binding.document as { questions?: unknown }
+				).questions,
 			).toBeUndefined();
 		});
 		const bound = {

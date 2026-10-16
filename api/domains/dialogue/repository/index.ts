@@ -1,6 +1,7 @@
 import type { Database } from "bun:sqlite";
 import type { Migration } from "../../../infrastructure/sqlite";
 import type { Run } from "../contracts";
+import { specialistMigration } from "./specialist";
 import {
 	commandInteractionsMigration,
 	questionChoicesMigration,
@@ -32,6 +33,7 @@ export const agentLinkMigration = `ALTER TABLE dialogue_runs ADD COLUMN agent_ta
 export const worldStateMigration = `ALTER TABLE dialogue_runs ADD COLUMN world_state TEXT CHECK (world_state IN ('used','blocked'));`;
 /** Nothing writes `world_state` any more (the conversation gets no World slice), so the column goes. */
 const worldStateDropMigration = `ALTER TABLE dialogue_runs DROP COLUMN world_state;`;
+export * from "./specialist";
 export function linkAgent(
 	db: Database,
 	runId: string,
@@ -75,6 +77,8 @@ function map(row: Record<string, unknown>): Run {
 		sourceKind: row.source_kind as Run["sourceKind"],
 		scheduleId: row.schedule_id as string | null,
 		occurrenceId: row.occurrence_id as string | null,
+		specialistSessionId:
+			(row.specialist_session_id as string | null | undefined) ?? null,
 		createdAt: row.created_at as string,
 		updatedAt: row.updated_at as string,
 	};
@@ -173,12 +177,21 @@ export function interruptUnfinished(db: Database, now: string): Run[] {
 	).run(now);
 	return runs;
 }
-/** The newest `limit` runs accepted before `run`, oldest first (the verbatim part of the model-visible history). */
-export function recentPriorRuns(db: Database, run: Run, limit: number): Run[] {
+/**
+ * The newest `limit` runs accepted before `run`, oldest first (the verbatim part of the model-visible history).
+ * `withoutSpecialist` leaves the specialist sessions' runs out before the limit applies (they are not the
+ * conversation's history); it needs the specialist migration, so only a host that wires sessions sets it.
+ */
+export function recentPriorRuns(
+	db: Database,
+	run: Run,
+	limit: number,
+	withoutSpecialist = false,
+): Run[] {
 	return (
 		db
 			.query(
-				`SELECT ${columns} FROM dialogue_runs WHERE conversation_id = ? AND seq < (SELECT seq FROM dialogue_runs WHERE id = ?) ORDER BY seq DESC LIMIT ?`,
+				`SELECT ${columns} FROM dialogue_runs WHERE conversation_id = ? AND seq < (SELECT seq FROM dialogue_runs WHERE id = ?)${withoutSpecialist ? " AND specialist_session_id IS NULL" : ""} ORDER BY seq DESC LIMIT ?`,
 			)
 			.all(run.conversationId, run.id, limit) as Record<string, unknown>[]
 	)
@@ -216,5 +229,10 @@ export const migrations: readonly Migration[] = [
 		id: "dialogue/0007-drop-world-state",
 		sql: worldStateDropMigration,
 		after: ["dialogue/0006-interaction-choices"],
+	},
+	{
+		id: "dialogue/0008-specialist-sessions",
+		sql: specialistMigration,
+		after: ["dialogue/0007-drop-world-state"],
 	},
 ];

@@ -105,6 +105,8 @@ export function compileContext(
 	window: WindowSnapshot | null,
 	memory?: MemoryHistory,
 	goalsLayer?: ChatMessage | null,
+	/** Leave the specialist sessions' runs out of the fallback history before its size limit applies. */
+	withoutSpecialist = false,
 ): {
 	messages: ChatMessage[];
 	sections: ContextSections;
@@ -145,7 +147,7 @@ export function compileContext(
 				run.conversationId,
 			) ?? [],
 		);
-	const prior = recentPriorRuns(tx, run, TURN_WINDOW);
+	const prior = recentPriorRuns(tx, run, TURN_WINDOW, withoutSpecialist);
 	// Runs the ledger never took (cancelled, replaced, from before it) stay as they were: the newest TURN_WINDOW.
 	const refs = [
 		...(verbatim?.keep ?? []).map((ref) => ({

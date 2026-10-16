@@ -77,6 +77,11 @@ export async function createToolchain(
 		music?: boolean;
 		image?: boolean;
 		uiCompositions?: import("../../domains/ui-compositions").UiCompositionsService;
+		/** Whether a specialist session still owns its work (UI undo/redo/save guard). */
+		specialistSessionLive?: (
+			tx: import("bun:sqlite").Database,
+			sessionId: string,
+		) => boolean;
 		objectRecognition?: boolean;
 		ocr?: import("../../domains/ocr").OcrService;
 		/** PTY sessions for the terminal screen (absent: not offered). */
@@ -162,7 +167,11 @@ export async function createToolchain(
 		...(options.music ? [createMusicScreenAdapter()] : []),
 		...(options.image ? [createImageScreenAdapter()] : []),
 		...(options.uiCompositions
-			? [createUiCompositionsAdapter(options.uiCompositions)]
+			? [
+					createUiCompositionsAdapter(options.uiCompositions, {
+						sessionLive: options.specialistSessionLive,
+					}),
+				]
 			: []),
 		...(options.ocr ? [createOcrAdapter(options.ocr)] : []),
 		...(options.objectRecognition

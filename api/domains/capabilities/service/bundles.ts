@@ -5,10 +5,10 @@ import {
 	bytes,
 	artifactDefinitionV1,
 	capabilityBundleV1,
-	commandBindingV1,
 	hash,
 	validators,
 	type ArtifactDefinitionV1,
+	type BindingV1,
 	type BundleHost,
 	type BundleIssue,
 	type CapabilityBundleV1,
@@ -64,6 +64,8 @@ const registryCodes: Record<string, BundleIssue["code"]> = {
 };
 
 type Parsed = CapabilityBundleV1;
+type CommandBinding = Extract<BindingV1, { execution: "command" }>;
+type SessionBinding = Extract<BindingV1, { execution: "session" }>;
 type Doc = {
 	kind: DocumentKind;
 	itemId: string;
@@ -244,7 +246,7 @@ function checkDocuments({ db, bundle, docs, issue }: Check) {
 
 function checkTool(
 	c: Check,
-	tool: z.infer<typeof commandBindingV1>["tools"][number],
+	tool: BindingV1["tools"][number],
 	adapter: Adapter | undefined,
 	seen: Set<string>,
 	at: string,
@@ -267,7 +269,7 @@ function checkTool(
 /** Question schemas must be readable validators; the choice field must be one of their fields. */
 function checkQuestions(
 	c: Check,
-	questions: NonNullable<z.infer<typeof commandBindingV1>["questions"]>,
+	questions: NonNullable<CommandBinding["questions"]>,
 	path: string,
 ) {
 	const seen = new Set<string>();
@@ -285,17 +287,28 @@ function checkQuestions(
 	});
 }
 
-function checkCommandBinding(
-	c: Check,
-	b: z.infer<typeof commandBindingV1>,
-	path: string,
-) {
+/** What a binding of either execution names: adapter, availability, artifact and its tools. */
+function checkBindingBase(c: Check, b: BindingV1, path: string) {
 	const { host, issue } = c;
 	const adapter = host.adapters.get(b.adapterRef);
 	if (!adapter)
 		issue("unregistered_adapter", `${path}/adapterRef`, b.adapterRef);
 	if (!host.availability.has(b.availabilityRef))
 		issue("unavailable", `${path}/availabilityRef`, b.availabilityRef);
+	if (!c.hasDocument(b.artifactRevisionId, "artifact"))
+		issue(
+			"unknown_reference",
+			`${path}/artifactRevisionId`,
+			b.artifactRevisionId,
+		);
+	const seen = new Set<string>();
+	b.tools.forEach((tool, j) =>
+		checkTool(c, tool, adapter, seen, `${path}/tools/${j}`),
+	);
+}
+
+function checkCommandBinding(c: Check, b: CommandBinding, path: string) {
+	const { host, issue } = c;
 	if (!host.projections.has(b.resultProjectionRef))
 		issue(
 			"unregistered_projection",
@@ -303,17 +316,15 @@ function checkCommandBinding(
 			b.resultProjectionRef,
 		);
 	c.schemaRef(b.outputSchemaRef, `${path}/outputSchemaRef`);
-	if (!c.hasDocument(b.artifactRevisionId, "artifact"))
-		issue(
-			"unknown_reference",
-			`${path}/artifactRevisionId`,
-			b.artifactRevisionId,
-		);
 	checkQuestions(c, b.questions ?? [], path);
-	const seen = new Set<string>();
-	b.tools.forEach((tool, j) =>
-		checkTool(c, tool, adapter, seen, `${path}/tools/${j}`),
-	);
+	checkBindingBase(c, b, path);
+}
+
+/** A session binding has no output or projection; its target schema (if any) must resolve. */
+function checkSessionBinding(c: Check, b: SessionBinding, path: string) {
+	if (b.session.targetSchemaRef)
+		c.schemaRef(b.session.targetSchemaRef, `${path}/session/targetSchemaRef`);
+	checkBindingBase(c, b, path);
 }
 
 type Artifact = z.infer<typeof artifactDefinitionV1>;
@@ -403,7 +414,9 @@ function checkVariants(
 
 function checkBindingsAndArtifacts(c: Check) {
 	c.bundle.bindings.forEach((b, i) =>
-		checkCommandBinding(c, b, `bindings/${i}`),
+		b.execution === "session"
+			? checkSessionBinding(c, b, `bindings/${i}`)
+			: checkCommandBinding(c, b, `bindings/${i}`),
 	);
 	c.bundle.artifacts.forEach((a, i) => {
 		const path = `artifacts/${i}`;

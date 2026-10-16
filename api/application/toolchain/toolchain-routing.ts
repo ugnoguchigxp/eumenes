@@ -2,12 +2,14 @@ import type { Database } from "bun:sqlite";
 import { z } from "zod";
 import {
 	toolchainRuntimeOf,
+	type BindingV1,
 	type Capabilities,
 	type FixedDefinition,
 	type ToolchainRuntimeMeta,
 } from "../../domains/capabilities";
 import type { ToolchainHistory } from "../../domains/toolchain-history";
 import type { ToolchainRoutingPort } from "../../domains/dialogue";
+import type { SpecialistSet } from "../../domains/dialogue/contracts/specialist";
 import type {
 	BoundCommandPort,
 	BoundCommandSet,
@@ -43,7 +45,7 @@ export function createToolchainRouting(
 		}
 		const adapter = registry.get(bound.binding.document.adapterRef);
 		return {
-			execution: "command",
+			execution: bound.binding.document.execution,
 			binding: {
 				bindingRevisionId: bound.binding.revisionId,
 				adapterRef: bound.binding.document.adapterRef,
@@ -62,6 +64,26 @@ export function createToolchainRouting(
 		if (!adapter || !adapter.availableInTransaction(db))
 			throw new Error("adapter_unavailable");
 		return adapter;
+	}
+	/** The binding's tools with the package tool's id and summary and the flat JSON schema. */
+	function boundTools(
+		db: Database,
+		set: ReturnType<Capabilities["toolchainSetInTransaction"]>,
+		tools: BindingV1["tools"],
+	) {
+		return tools.map((t) => {
+			const tool = set.tools.find((x) => x.revisionId === t.toolRevisionId);
+			const schema = schemas.resolveInTransaction(db, t.inputSchemaRef);
+			if (!tool || !schema) throw new Error("required_context_missing");
+			return {
+				id: tool.id,
+				toolRevisionId: t.toolRevisionId,
+				operationName: t.operationId,
+				inputSchemaRef: t.inputSchemaRef,
+				summary: tool.summary,
+				schema: z.toJSONSchema(schema) as Record<string, unknown>,
+			};
+		});
 	}
 	const bound: BoundCommandPort = {
 		snapshotInTransaction: (db, bindingRevisionId) =>
@@ -167,27 +189,15 @@ export function createToolchainRouting(
 			let binding: BoundCommandSet | undefined;
 			if (set.binding) {
 				const doc = set.binding.document;
+				if (doc.execution !== "command")
+					throw new Error("capability_unavailable");
 				binding = {
 					bindingRevisionId: set.binding.revisionId,
 					adapterRef: doc.adapterRef,
 					artifactRevisionId: doc.artifactRevisionId,
 					packageRevisionId: set.package.revisionId,
 					questions: doc.questions ?? [],
-					tools: doc.tools.map((t) => {
-						const tool = set.tools.find(
-							(x) => x.revisionId === t.toolRevisionId,
-						);
-						const schema = schemas.resolveInTransaction(db, t.inputSchemaRef);
-						if (!tool || !schema) throw new Error("required_context_missing");
-						return {
-							id: tool.id,
-							toolRevisionId: t.toolRevisionId,
-							operationName: t.operationId,
-							inputSchemaRef: t.inputSchemaRef,
-							summary: tool.summary,
-							schema: z.toJSONSchema(schema) as Record<string, unknown>,
-						};
-					}),
+					tools: boundTools(db, set, doc.tools),
 				};
 			}
 			return {
@@ -201,6 +211,28 @@ export function createToolchainRouting(
 					schema: Record<string, unknown> | null;
 				}>,
 				...(binding ? { binding } : {}),
+			};
+		},
+		sessionSetInTransaction(db, revisionId): SpecialistSet {
+			const set = capabilities.toolchainSetInTransaction(db, revisionId);
+			const doc = set.binding?.document;
+			if (!set.binding || doc?.execution !== "session")
+				throw new Error("capability_unavailable");
+			const adapter = registry.get(doc.adapterRef);
+			if (!adapter?.availableInTransaction(db))
+				throw new Error("capability_unavailable");
+			return {
+				toolchainId: set.toolchain.id,
+				toolchainRevisionId: set.toolchain.revisionId,
+				title: set.toolchain.title,
+				bindingRevisionId: set.binding.revisionId,
+				adapterRef: doc.adapterRef,
+				artifactRevisionId: doc.artifactRevisionId,
+				packageRevisionId: set.package.revisionId,
+				profile: set.profile,
+				skills: set.skills,
+				tools: boundTools(db, set, doc.tools),
+				targetSchemaRef: doc.session.targetSchemaRef ?? null,
 			};
 		},
 		bound,

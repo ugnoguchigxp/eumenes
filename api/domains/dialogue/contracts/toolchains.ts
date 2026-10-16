@@ -75,6 +75,14 @@ export interface ToolchainRoutingPort {
 	};
 	/** Host services of bound command toolchains (adapter snapshot, input checks, preparation). */
 	bound?: BoundCommandPort;
+	/**
+	 * The session toolchain a specialist runs with (spec toolchain-specialist-dialogue §4.1).
+	 * Throws `capability_unavailable` for a non-session or unavailable toolchain.
+	 */
+	sessionSetInTransaction?(
+		db: Database,
+		toolchainRevisionId: string,
+	): import("./specialist").SpecialistSet;
 	recordSelectionInTransaction(
 		db: Database,
 		input: {

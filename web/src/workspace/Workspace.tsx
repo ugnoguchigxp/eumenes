@@ -5,6 +5,8 @@ import { ArtifactLauncher } from "../components/domains/artifact/ArtifactLaunche
 import { ResizableWorkspace } from "../components/domains/artifact/ResizableWorkspace";
 import { TimerNotifications } from "../components/domains/timers/TimerNotifications";
 import { ConversationPanel } from "./ConversationPanel";
+import { SpecialistCloseConfirm } from "./SpecialistCloseConfirm";
+import { SpecialistBridgeContext } from "../domains/toolchain-artifacts/specialist-bridge";
 import { useWorkspace } from "./useWorkspace";
 import {
 	artifactIdOf,
@@ -34,6 +36,7 @@ export function Workspace({
 		activeRun,
 		replay,
 		artifacts,
+		specialist,
 	} = state;
 	return (
 		<main className="app-shell">
@@ -82,13 +85,20 @@ export function Workspace({
 								</output>
 							}
 						>
-							<WorkspaceArtifacts client={client} artifacts={artifacts} />
+							<SpecialistBridgeContext.Provider value={specialist.bridge}>
+								<WorkspaceArtifacts
+									client={client}
+									artifacts={artifacts}
+									onCloseTab={specialist.closeTab}
+								/>
+							</SpecialistBridgeContext.Provider>
 						</Suspense>
 					) : null
 				}
 			>
 				<ConversationPanel client={client} store={store} state={state} />
 			</ResizableWorkspace>
+			<SpecialistCloseConfirm confirm={specialist.confirm} />
 		</main>
 	);
 }

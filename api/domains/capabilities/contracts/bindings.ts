@@ -74,6 +74,37 @@ export const commandBindingV1 = z.strictObject({
 	questions: z.array(bindingQuestion).max(8).optional(),
 });
 export type CommandBindingV1 = z.infer<typeof commandBindingV1>;
+
+/**
+ * A specialist-session toolchain (spec toolchain-specialist-dialogue 2026-10-17 §4.1): after the
+ * conversation hands over, the user talks to the package's specialist directly over several turns.
+ * `tools` are the operations the specialist model may call (always with a host-fixed work, never a
+ * client one). Undo/redo/save and other screen-only operations are artifact actions, not tools.
+ */
+export const sessionBindingV1 = z.strictObject({
+	kind: z.literal("binding"),
+	id: slug,
+	revision: revisionNumber,
+	execution: z.literal("session"),
+	adapterRef: hostRef("adapter"),
+	availabilityRef: hostRef("availability"),
+	tools: z.array(bindingTool).min(1).max(16),
+	artifactRevisionId: z.string().regex(artifactRevisionIdPattern),
+	session: z.strictObject({
+		/**
+		 * The schema whose `choicesInTransaction` lists the saved items a session may start from
+		 * (host-issued refs offered to the conversation model). Omitted: sessions start empty only.
+		 */
+		targetSchemaRef: schemaRef.optional(),
+	}),
+});
+export type SessionBindingV1 = z.infer<typeof sessionBindingV1>;
+/** Any binding kind; unknown `execution` values are rejected. */
+export const bindingV1 = z.discriminatedUnion("execution", [
+	commandBindingV1,
+	sessionBindingV1,
+]);
+export type BindingV1 = z.infer<typeof bindingV1>;
 /** Where one OpenUI source's data comes from: a registered adapter query. */
 const sourceBindingV1 = z.strictObject({
 	/** The `source` name used inside the OpenUI definition. */
@@ -485,7 +516,7 @@ export const capabilityBundleV1 = z.strictObject({
 	bundleId: slug,
 	pins: z.array(bundlePin).max(64).default([]),
 	definitions: z.array(z.record(z.string(), z.unknown())).max(64),
-	bindings: z.array(commandBindingV1).max(32).default([]),
+	bindings: z.array(bindingV1).max(32).default([]),
 	artifacts: z.array(artifactDefinitionV1).max(16).default([]),
 	schemas: z.array(bundleSchemaV1).max(32).default([]),
 });

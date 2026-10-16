@@ -9,6 +9,7 @@ import { transition, linkAnswer } from "../repository";
 import { endRun } from "./run-end";
 import { delegateConversation } from "./delegate-conversation";
 import { operationRejection } from "./operation-authority";
+import { startSpecialistSession } from "./specialist-start";
 
 /** Accept the natural-language answer atomically with the rest of the run's settlement. */
 function acceptAnswer(
@@ -170,6 +171,17 @@ export function settleConversationOperation(
 			deadlineAtMs: Date.parse(run.deadlineAt!),
 		});
 		linkAnswer(tx, run.id, job.id);
+	} else if (runtime.execution === "session") {
+		// The conversation hands over to the toolchain's specialist (or asks the user about unsaved work).
+		const started = startSpecialistSession(deps, tx, run, chosen);
+		if (!started.ok) {
+			endRun(deps, tx, run, "failed", started.code);
+			deps.toolchains?.settleSelectionInTransaction(tx, run.id, {
+				outcome: "failed",
+				code: started.code,
+			});
+			return { status: "failed", errorCode: started.code };
+		}
 	} else {
 		if (!agents || !runtime.route)
 			throw new Error("invalid_conversation_operation");

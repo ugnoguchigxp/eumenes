@@ -2,6 +2,7 @@ import { ChatImageInput, ChatImagePreviews } from "./ChatImageInput";
 import { useStore } from "zustand";
 import type { AudioStore } from "../domains/audio";
 import { Button, Textarea } from "../design-system";
+import { ApiError } from "../../../client/transport";
 import { describeError } from "../errorMessages";
 import type { WorkspaceState } from "./useWorkspace";
 
@@ -76,7 +77,11 @@ export function ConversationComposer({
 						if ((event.metaKey || event.ctrlKey) && event.key === "Enter")
 							event.currentTarget.form?.requestSubmit();
 					}}
-					placeholder="メッセージを入力、または話しかけてください"
+					placeholder={
+						state.specialist.addressee.kind === "specialist"
+							? `${state.specialist.addressee.label}へのメッセージを入力、または話しかけてください`
+							: "メッセージを入力、または話しかけてください"
+					}
 					maxLength={8000}
 					rows={3}
 				/>
@@ -149,7 +154,10 @@ export function ConversationComposer({
 			{(submit.isError || voice.error || audioError) && (
 				<p className="chat-error" role="alert">
 					{submit.isError
-						? `送信できませんでした: ${describeError(submit.error)}`
+						? submit.error instanceof ApiError &&
+							submit.error.message === "addressee_changed"
+							? describeError(submit.error)
+							: `送信できませんでした: ${describeError(submit.error)}`
 						: voice.error || (audioError ? describeError(audioError) : null)}
 				</p>
 			)}

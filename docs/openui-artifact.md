@@ -84,7 +84,7 @@ LLM の UI ツール、質問台帳、LARM の実画像生成、永続化、Memo
 
 ## 音楽と生成状態の組合せ（2026-10-11）
 
-DesignSystemのMusicPlayer・Playlist・GenerationStatusをOpenUIに登録した。既存の単一view形式を維持し、次のJSONで他の登録済みviewと組み合わせる。layoutはstack/grid、childrenは1〜12個の登録済みview。ネストしたlayout、任意URL・関数・未知のpropsは受け付けない。
+DesignSystemのMusicPlayer・Playlist・GenerationStatusをOpenUIに登録した。既存の単一view形式を維持し、次のJSONで他の登録済みviewと組み合わせる。layoutはstack/grid、childrenは1〜12個の登録済みviewまたは子layout。入れ子はrootを含めて深さ4まで、1定義のview数は60まで。layoutは任意の `gap`（compact/normal/relaxed）と `width`（narrow/normal/wide）、text-blockは任意の `emphasis`（normal/strong/muted）を持てる。任意URL・関数・未知のpropsは受け付けない。
 
 ```json
 {
@@ -146,3 +146,7 @@ DesignSystemに`Subtitle`と`SubtitlePreview`を追加し、既存の字幕描�
 選択内容の文章化は利用者が明示したフォーム値の直列化であり、テーマの意味解釈は既存の画像担当に渡す。手編集後の選択変更では自動上書きを止め、反映・編集継続・復元の操作を提供する。sourceの更新や制作・一覧の切り替えで草稿を破棄しない。画像URLは許可済みsnapshotで供給し、表示JSONに保持しない。生成、取消、選択、更新、閉じるのイベントはホストがsource・revision・重複・利用可否を検証する。
 
 `drawing-workspace`はDesignSystemのDrawingWorkspaceを使う。snapshotの保存済み図の参照、起動状態、実行時URLと`drawing-new`/`drawing-open`/`drawing-refresh`を接続し、他の登録済みviewとlayoutで並べられる。表示JSONにはscene・credential・実行時URLを埋め込まない。URLからの編集画面もEumenesの認証済みAPIを使い、保存未確定の下書きを保護する。手順は[Excalidraw連携](excalidraw.md)を参照する。
+
+## UI自由制作
+
+UI自由制作は専門担当との対話で作る（[計画](../spec/toolchain-specialist-dialogue-implementation-plan-2026-10-17.md)）。制作画面は `{"view":"ui-studio","source":"ui-studio","title":"UI自由制作"}` で、プレビューを主にし、元に戻す・やり直す・保存・破棄・会話に戻る・作品履歴・デスクトップ／モバイル切替を持つ。生成できる定義は layout（入れ子可）、text-block、info-card、inline `fields` の form（1定義に1つ）に限る。保存は保存ボタンだけで行い、編集中のフォームは試用として回答を記録しない。主表示は「プレビュー／ソース」で切り替えられ、ソースは表示中の採用済み定義JSONを読取専用で示す。履歴から保存作品を開いている間は「新規作成」で編集中の案または空の状態へ戻れる。

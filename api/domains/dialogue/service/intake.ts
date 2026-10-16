@@ -10,15 +10,29 @@ import {
 	type Run,
 	type Submit,
 } from "../contracts";
-import { byRequest, byUtterance, insert } from "../repository";
+import {
+	byRequest,
+	byUtterance,
+	insert,
+	patchSession,
+	setRunSession,
+	setRunViewing,
+} from "../repository";
 import {
 	DEFAULT_DEADLINE_MS,
 	COMMAND_KIND,
 	GENERATE_KIND,
 	PROMPT_TARGET_KIND,
+	SPECIALIST_KIND,
 	type Accept,
 	type DialogueDeps,
 } from "./context";
+import {
+	blockSpecialistMessages,
+	expiryAfter,
+	flushCancelled,
+} from "./specialist-core";
+import { addresseeMatches, addressedSession } from "./specialist-intake";
 const log = getLogger("dialogue");
 
 /** Input acceptance: idempotent run creation, manual/voice submit, notices and the schedule target. */
@@ -28,7 +42,12 @@ export function createIntake(deps: DialogueDeps) {
 	function acceptInTransaction(
 		db: Tx,
 		input: Accept,
-	): { run: Run; fresh: boolean } {
+	): {
+		run: Run;
+		fresh: boolean;
+		/** What ending an expired session withdrew: abort it after the commit. */
+		cancelled?: { flush: string[]; runs: string[] };
+	} {
 		const existing =
 			byRequest(db, input.requestId) ??
 			(input.utteranceId ? byUtterance(db, input.utteranceId) : null);
@@ -51,6 +70,14 @@ export function createIntake(deps: DialogueDeps) {
 		const now = clock();
 		const runId = id();
 		const messageId = id();
+		// An active specialist session takes the utterance directly: no main-agent generation at all.
+		const { session: addressee, cancelled } =
+			!isSystemPrompt(input.sourceKind) && !input.resume
+				? addressedSession(deps, db, input.conversationId, now)
+				: { session: null, cancelled: { flush: [], runs: [] } };
+		// What the screen showed when the user sent must still be who listens, or nothing is stored.
+		if (input.addressee && !addresseeMatches(input.addressee, addressee))
+			throw new Error("addressee_changed");
 		conversation.appendInTransaction(db, {
 			id: messageId,
 			conversationId: input.conversationId,
@@ -76,15 +103,25 @@ export function createIntake(deps: DialogueDeps) {
 			scope: isSystemPrompt(input.sourceKind)
 				? "dialogue.schedule"
 				: "dialogue",
-			kind: input.resume ? COMMAND_KIND : GENERATE_KIND,
-			dedupeKey: input.resume ? `toolchain-command:${runId}` : runId,
-			payload: input.resume
-				? {
-						runId,
-						toolchainRevisionId: input.resume.toolchainRevisionId,
-						interactionId: input.resume.interactionId,
-					}
-				: { runId },
+			kind: addressee
+				? SPECIALIST_KIND
+				: input.resume
+					? COMMAND_KIND
+					: GENERATE_KIND,
+			dedupeKey: addressee
+				? `specialist-turn:${runId}`
+				: input.resume
+					? `toolchain-command:${runId}`
+					: runId,
+			payload: addressee
+				? { runId, epoch: addressee.epoch }
+				: input.resume
+					? {
+							runId,
+							toolchainRevisionId: input.resume.toolchainRevisionId,
+							interactionId: input.resume.interactionId,
+						}
+					: { runId },
 			subjectRef: runId,
 			lane: isSystemPrompt(input.sourceKind) ? "background" : "interactive",
 			resourceKey: "inference.llm",
@@ -107,6 +144,7 @@ export function createIntake(deps: DialogueDeps) {
 			sourceKind: input.sourceKind,
 			scheduleId: input.scheduleId ?? null,
 			occurrenceId: input.occurrenceId ?? null,
+			specialistSessionId: addressee?.id ?? null,
 			createdAt: now,
 			updatedAt: now,
 		};
@@ -120,6 +158,25 @@ export function createIntake(deps: DialogueDeps) {
 			);
 		else larm.captureInTransaction?.(db, runId, "llm", deadlineAtMs);
 		insert(db, run);
+		if (addressee) {
+			// The utterance belongs to the session: the work is taken for its turn (refused while busy), the
+			// message is kept from memory and the main agent's context, and the idle expiry restarts.
+			setRunSession(db, runId, addressee.id);
+			blockSpecialistMessages(deps, db, input.conversationId, [messageId]);
+			// A turn still holds the work: this utterance waits in the queue behind it (the conversation's
+			// concurrency key keeps them in order) and takes the work when the earlier turn ends.
+			if (addressee.activeRunId === null) {
+				deps.specialist!.beginTurnInTransaction(
+					db,
+					addressee.adapterRef,
+					addressee.workRef,
+					runId,
+				);
+				patchSession(db, addressee.id, { activeRunId: runId }, now);
+			}
+			patchSession(db, addressee.id, { expiresAt: expiryAfter(now) }, now);
+		}
+		if (input.viewing) setRunViewing(db, runId, input.viewing);
 		// A scheduled prompt is stored as a user message but is the system's: it is never learned from.
 		if (isSystemPrompt(input.sourceKind))
 			memory?.blockMessagesInTransaction(db, {
@@ -127,7 +184,7 @@ export function createIntake(deps: DialogueDeps) {
 				messageIds: [messageId],
 				reason: "scheduled_prompt",
 			});
-		return { run, fresh: true };
+		return { run, fresh: true, cancelled };
 	}
 
 	const promptTarget: TargetDefinition<PromptTarget> = {
@@ -175,6 +232,11 @@ export function createIntake(deps: DialogueDeps) {
 				utteranceId: accepted.run.utteranceId ?? undefined,
 				status: accepted.run.status,
 			});
+			flushCancelled(
+				deps,
+				accepted.cancelled?.flush ?? [],
+				accepted.cancelled?.runs ?? [],
+			);
 			if (accepted.fresh) queue.wake();
 			return accepted.run;
 		},
@@ -194,6 +256,11 @@ export function createIntake(deps: DialogueDeps) {
 				jobId: accepted.run.jobId ?? undefined,
 				status: accepted.run.status,
 			});
+			flushCancelled(
+				deps,
+				accepted.cancelled?.flush ?? [],
+				accepted.cancelled?.runs ?? [],
+			);
 			if (accepted.fresh) queue.wake();
 			return accepted.run;
 		},
@@ -211,6 +278,11 @@ export function createIntake(deps: DialogueDeps) {
 				utteranceId: accepted.run.utteranceId ?? undefined,
 				status: accepted.run.status,
 			});
+			flushCancelled(
+				deps,
+				accepted.cancelled?.flush ?? [],
+				accepted.cancelled?.runs ?? [],
+			);
 			if (accepted.fresh) queue.wake();
 			return accepted.run;
 		},

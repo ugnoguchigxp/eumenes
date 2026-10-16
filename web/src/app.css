@@ -74,6 +74,36 @@ select:focus-visible {
 	font-size: 0.6875rem;
 	line-height: 1.5;
 }
+.conversation-addressee {
+	display: inline-flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 2px 6px;
+	color: var(--foreground);
+}
+.conversation-addressee-label,
+.conversation-addressee-hold {
+	color: var(--muted-foreground);
+}
+.conversation-addressee[data-kind="specialist"] strong {
+	padding: 0 8px;
+	border-radius: 999px;
+	color: var(--primary);
+	background: color-mix(in srgb, var(--primary) 12%, var(--card));
+}
+.conversation-notice {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	margin: 8px clamp(16px, 3.5vw, 58px);
+	padding: 6px 12px;
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	color: var(--foreground);
+	background: color-mix(in srgb, var(--primary) 8%, var(--card));
+	font-size: 0.78rem;
+}
 .connection-health {
 	display: inline-flex;
 	align-items: center;
@@ -614,7 +644,7 @@ select:focus-visible {
 	scrollbar-width: thin;
 	scrollbar-color: var(--border) transparent;
 }
-.artifact-panel-body:has(.aui-ui-workspace) {
+.artifact-panel-body:has(.aui-ui-studio) {
 	padding: 1rem;
 }
 .artifact-panel-body:has(

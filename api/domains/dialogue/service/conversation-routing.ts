@@ -16,6 +16,7 @@ import {
 	operation,
 	type ConversationOperation,
 	type OpenQuestion,
+	type SessionOffers,
 } from "./conversation-tools";
 
 const routeSchema = z
@@ -24,6 +25,9 @@ const routeSchema = z
 		functionName: z.string(),
 		request: z.string(),
 		questionRef: z.string(),
+		/** A session toolchain's start options (omitted for the others). */
+		target: z.string().optional(),
+		resolveUnsaved: z.literal("discard").optional(),
 	})
 	.strict();
 
@@ -34,6 +38,8 @@ const outputSchema = {
 		functionName: { type: "string" },
 		request: { type: "string" },
 		questionRef: { type: "string" },
+		target: { type: "string" },
+		resolveUnsaved: { enum: ["discard"] },
 	},
 	required: ["decision", "functionName", "request", "questionRef"],
 	additionalProperties: false,
@@ -47,6 +53,7 @@ export async function routeConversation(input: {
 	tools: NativeTool[];
 	cards: ToolchainCard[];
 	openQuestions: OpenQuestion[];
+	sessions?: SessionOffers;
 	signal: AbortSignal;
 }): Promise<{
 	decision: "toolchain" | "answer";
@@ -91,12 +98,17 @@ export async function routeConversation(input: {
 					arguments: JSON.stringify({
 						request: parsed.request,
 						...(parsed.questionRef ? { questionRef: parsed.questionRef } : {}),
+						...(parsed.target ? { target: parsed.target } : {}),
+						...(parsed.resolveUnsaved
+							? { resolveUnsaved: parsed.resolveUnsaved }
+							: {}),
 					}),
 				},
 			],
 			input.tools,
 			input.cards,
 			input.openQuestions,
+			input.sessions,
 		);
 		return { decision: "toolchain", operation: selected, receipt };
 	} catch {
@@ -143,6 +155,7 @@ export async function reviewConversationAnswer(
 			tools: decision.tools,
 			cards: decision.cards,
 			openQuestions: decision.openQuestions,
+			sessions: decision.sessions,
 			signal,
 		});
 	} catch (error) {

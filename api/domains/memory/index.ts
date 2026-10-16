@@ -7,6 +7,7 @@ export {
 	stewardLedgersMigration,
 	forgetClosureMigration,
 	seedImportMigration,
+	specialistBlockReasonMigration,
 } from "./repository";
 export type { MemoryService } from "./service";
 export { createMemoryService } from "./service";

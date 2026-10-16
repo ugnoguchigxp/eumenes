@@ -5,7 +5,7 @@ import { createArtifacts } from "./artifacts";
 import { indexSearch, validateToolchain } from "./registry";
 import {
 	artifactInTransaction,
-	commandBindingInTransaction,
+	bindingInTransaction as storedBindingInTransaction,
 } from "./documents";
 import {
 	dot,
@@ -17,7 +17,7 @@ import {
 	hash,
 	type FixedDefinition,
 	type FixedDocument,
-	type CommandBindingV1,
+	type BindingV1,
 	type ToolchainCard,
 	type VectorSpace,
 } from "../contracts";
@@ -243,13 +243,13 @@ export function createToolchains(
 		if (!profile || skills.some((b) => !b))
 			throw new Error("required_context_missing");
 		const binding = toolchain.bindingRevisionId
-			? commandBindingInTransaction(db, toolchain.bindingRevisionId)
+			? storedBindingInTransaction(db, toolchain.bindingRevisionId)
 			: undefined;
 		if (binding === null) throw new Error("required_context_missing");
 		return {
 			toolchain,
 			package: pack,
-			binding: binding as FixedDocument<CommandBindingV1> | undefined,
+			binding: binding as FixedDocument<BindingV1> | undefined,
 			profile,
 			skills: skills as string[],
 			tools: (pack.toolRevisionIds ?? []).map((id) => {
@@ -264,11 +264,11 @@ export function createToolchains(
 			}),
 		};
 	}
-	/** The binding and artifact registration a bound toolchain revision names. */
+	/** The (command or session) binding and artifact registration a bound toolchain revision names. */
 	function bindingInTransaction(db: Database, toolchainRevisionId: string) {
 		const d = get(db, toolchainRevisionId);
 		if (d?.kind !== "toolchain" || !d.bindingRevisionId) return null;
-		const binding = commandBindingInTransaction(db, d.bindingRevisionId);
+		const binding = storedBindingInTransaction(db, d.bindingRevisionId);
 		const artifact = d.artifactRevisionId
 			? artifactInTransaction(db, d.artifactRevisionId)
 			: null;

@@ -9,7 +9,10 @@ type ExchangeOutcome = "answered" | "failed";
 export type ExchangeStep = "curated" | "disposed" | "summarized";
 export type StepMark = "done" | "skipped";
 export type Disposition = "keep" | "summarize" | "drop";
-export type BlockReason = "scheduled_prompt" | "forgotten";
+export type BlockReason =
+	| "scheduled_prompt"
+	| "forgotten"
+	| "specialist_dialogue";
 
 export interface ExchangeRow {
 	inputMessageId: string;
@@ -350,6 +353,16 @@ export function insertBlocks(
 			block.forgetId,
 			now,
 		);
+}
+/** Lift the specialist-dialogue block of these messages; a block of any other reason (e.g. forgotten) stays. */
+export function deleteSpecialistBlocks(
+	db: Database,
+	messageIds: readonly string[],
+) {
+	const remove = db.query(
+		"DELETE FROM memory_message_block WHERE message_id = ? AND reason = 'specialist_dialogue'",
+	);
+	for (const id of messageIds) remove.run(id);
 }
 export function isBlocked(db: Database, messageId: string): boolean {
 	return (

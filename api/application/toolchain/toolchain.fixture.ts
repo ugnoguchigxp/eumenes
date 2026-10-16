@@ -6,7 +6,7 @@ import {
 import type { DrawingConnection } from "../../domains/excalidraw";
 import { createObjectRecognition } from "../../domains/object-recognition";
 import { CONVERSATION_DEFAULT_PRINCIPAL } from "../../domains/conversation/contracts";
-import { createImage, type ImageService } from "../../domains/image";
+import { createImage } from "../../domains/image";
 import { createUiCompositions } from "../../domains/ui-compositions";
 import { createMusic } from "../../domains/music";
 import type { LarmPlayground } from "../../domains/larm";
@@ -39,6 +39,7 @@ import { createVoiceDialogue } from "../../domains/voice-dialogue";
 import { createToolchain } from "./toolchain";
 import { createToolchainHostLinks } from "./toolchain-host";
 import { createTimers } from "../../domains/timers";
+import { createSpecialistPort } from "./specialist-port";
 import { createToolchainRouting } from "./toolchain-routing";
 import { createTimerAnnouncements } from "../timers/timer-announcements";
 import { createApp } from "../app";
@@ -71,7 +72,6 @@ export async function harness(
 		musicGateway?: () => LarmPlayground;
 		imageGateway?: () => LarmPlayground;
 		uiCompositions?: boolean;
-		uiDesignOutput?: unknown;
 		routeTool?: string;
 		command?: (
 			messages: import("../../domains/inference/contracts").Messages,
@@ -202,11 +202,6 @@ export async function harness(
 		},
 		answer: async (messages, _signal, callOptions) => {
 			calls++;
-			if (
-				options.uiCompositions &&
-				messages[0]?.content.includes("あなたはOpenUI画面の制作担当です")
-			)
-				return JSON.stringify(options.uiDesignOutput ?? {});
 			if (messages[0]!.content.includes("転記された発話の主要な言語"))
 				return JSON.stringify({
 					status: "identified",
@@ -546,17 +541,8 @@ export async function harness(
 		conversation,
 		ttsDictionary: createTtsDictionary(store),
 	});
-	let imageForCompositions: ImageService | undefined;
 	const uiCompositions = options.uiCompositions
-		? createUiCompositions({
-				store,
-				queue,
-				inference,
-				image: () => {
-					if (!imageForCompositions) throw new Error("ui_motif_unavailable");
-					return imageForCompositions;
-				},
-			})
+		? createUiCompositions()
 		: undefined;
 	const ocr = options.ocrFetcher
 		? createOcr({
@@ -607,7 +593,6 @@ export async function harness(
 					dialogue.finishOperationInTransaction(db, runId),
 			})
 		: undefined;
-	imageForCompositions = image;
 	const excalidraw = options.drawingConnection
 		? createExcalidraw({
 				store,
@@ -639,6 +624,13 @@ export async function harness(
 				fetcher: options.recognitionFetcher,
 			})
 		: undefined;
+	const routing = createToolchainRouting(
+		toolchain.capabilities,
+		toolchain.history,
+		toolchain.embedQuery,
+		toolchain.registry,
+		toolchain.schemas,
+	);
 	const dialogue = createDialogueService({
 		excalidraw: drawingOperations,
 		objectRecognition: objectRecognition?.port(CONVERSATION_DEFAULT_PRINCIPAL),
@@ -649,13 +641,13 @@ export async function harness(
 		larm: inference,
 		queue,
 		agents: toolchain.agents,
-		toolchains: createToolchainRouting(
-			toolchain.capabilities,
-			toolchain.history,
-			toolchain.embedQuery,
-			toolchain.registry,
-			toolchain.schemas,
-		),
+		toolchains: routing,
+		specialist: createSpecialistPort({
+			routing,
+			registry: toolchain.registry,
+			schemas: toolchain.schemas,
+			clock: () => new Date().toISOString(),
+		}),
 	});
 	toolchainLinks.attachDialogue(dialogue);
 	const voice = createVoiceDialogue(store, dialogue, inference);
@@ -667,7 +659,6 @@ export async function harness(
 		excalidraw,
 		drawingOperations,
 		image,
-		uiCompositions,
 		objectRecognition,
 		ocr,
 		music,

@@ -12,7 +12,7 @@
 | --- | --- | --- |
 | bundle | `api/domains/capabilities/bundles/<名前>.bundle.json`（`CapabilityBundleV1`） | 依存revisionのpin、definitions、bindings、artifacts、schemas。コード・URLは実行しない |
 | definition | bundle の `definitions[]`（既存の `Definition`） | profile・skill（本文はJSON内のUTF-8）・tool・package・toolchain。toolchainは会話に出す関数名・説明・例・依存package一つ |
-| binding | bundle の `bindings[]`（`CommandBindingV1`） | packageの各toolを登録adapterの操作名と入力schema参照へ結ぶ |
+| binding | bundle の `bindings[]`（`BindingV1` = `execution:"command"` の `CommandBindingV1` または `execution:"session"` の `SessionBindingV1`） | packageの各toolを登録adapterの操作名と入力schema参照へ結ぶ。sessionは専門担当との継続対話で、adapterに `session`（作業の開始・状態・ターン・終了）の実装が要る |
 | artifact | bundle の `artifacts[]`（`ArtifactDefinitionV1`） | OpenUI定義のvariant、source（adapterの登録query）、action（既存event→操作・回答・ローカル） |
 | schema | `builtin:<キー>`（`capabilities/contracts` のvalidators）、`domain:<owner>.<名前>@n`（hostの結果schema）、`schema:<id>@n`（bundle内JSON Schemaの有限subset） | 入力・出力・質問の検査。同じ参照をhost・UI・モデル提示で共有する |
 | DomainAdapter | `api/application/<domain>-adapter.ts` | 操作・query・入力変換・projectionの実装。domainの既存公開transaction操作を呼ぶ |
@@ -54,7 +54,7 @@ Seedに含めるのは再利用する定義だけで、会話、実行・操作�
 | 旧形式のツールチェーンを移す | [§6](#6-旧形式のツールチェーンを移行する) | §5に加え旧経路の削除 |
 | 新しい画面部品が要る | [§10 E](#10-e-designsystemopenuiartifactを追加する) | DesignSystem部品とOpenUI登録 |
 | 履歴調査の要件profile・dotsの担当 | [§9 A](#9-a-登録apiで追加する) | なし。登録API |
-| 単純なHTTP JSON API | 未対応 | bundleの `bindings` はcommand bindingだけを受け付ける。HTTP APIはadapterで実装する |
+| 単純なHTTP JSON API | 未対応 | bundleの `bindings` はcommand・session bindingだけを受け付ける。HTTP APIはadapterで実装する |
 
 まず「何を入力して何が返れば完了か」「どのadapterを再利用するか」「今回どこまで確認するか」を短く記録する。既存adapterで同じ操作ができるならadapterを増やさず§3を使う。
 

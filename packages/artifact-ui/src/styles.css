@@ -83,6 +83,22 @@
 	color: var(--muted-foreground);
 	white-space: pre-wrap;
 }
+.aui-text-block[data-emphasis="strong"] h2 {
+	font-size: 1.5rem;
+	font-weight: 750;
+	line-height: 1.25;
+}
+.aui-text-block[data-emphasis="strong"] p {
+	color: var(--foreground);
+}
+.aui-text-block[data-emphasis="muted"] h2 {
+	color: var(--muted-foreground);
+	font-size: 0.9375rem;
+	font-weight: 500;
+}
+.aui-text-block[data-emphasis="muted"] p {
+	font-size: 0.8125rem;
+}
 .aui-choice {
 	display: flex !important;
 	align-items: center;
@@ -362,6 +378,20 @@
 	display: grid;
 	gap: 1rem;
 	min-width: 0;
+}
+.aui-composition[data-gap="compact"] {
+	gap: 0.5rem;
+}
+.aui-composition[data-gap="relaxed"] {
+	gap: 1.75rem;
+}
+.aui-composition[data-width="narrow"] {
+	max-width: 28rem;
+	margin-inline: auto;
+}
+.aui-composition[data-width="wide"] {
+	max-width: 72rem;
+	margin-inline: auto;
 }
 .aui-composition-grid {
 	grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
