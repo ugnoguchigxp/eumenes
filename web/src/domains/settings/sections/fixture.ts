@@ -40,6 +40,7 @@ export function settingsFixture(): Settings {
 			agentName: "",
 			userName: "",
 			persona: "butler",
+			asrLanguages: ["ja", "en"],
 			theme: "system",
 			subtitles: defaultSubtitles,
 		},

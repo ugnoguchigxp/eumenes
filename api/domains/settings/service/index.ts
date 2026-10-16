@@ -71,6 +71,7 @@ export function defaults(env: Record<string, string | undefined>): Settings {
 			agentName: "",
 			userName: "",
 			persona: "butler",
+			asrLanguages: ["ja", "en"],
 			theme: "system",
 			background: "light-fairy",
 			subtitles: defaultSubtitles,
