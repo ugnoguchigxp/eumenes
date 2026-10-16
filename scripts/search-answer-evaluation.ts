@@ -1,6 +1,6 @@
 /** Offline acceptance only. Never imported into a product request or worker context. */
 import { z } from "zod";
-import { checkLiveCitations } from "../api/application/toolchain-live-check";
+import { checkLiveCitations } from "../api/application/toolchain/toolchain-live-check";
 import type { LarmCallOptions } from "../api/domains/larm";
 
 export type SearchAnswerSample = {

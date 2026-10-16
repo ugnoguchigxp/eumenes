@@ -1,4 +1,4 @@
-import { worldHarness } from "../api/application/world-claims.fixture";
+import { worldHarness } from "../api/application/world/world-claims.fixture";
 const h = await worldHarness({
 	...(process.env.WORLD_FIXTURE_DIR
 		? { dir: process.env.WORLD_FIXTURE_DIR }

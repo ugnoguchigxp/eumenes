@@ -14,15 +14,15 @@ import type { ImageService } from "../domains/image";
 import type { Capabilities } from "../domains/capabilities";
 import { getLogger } from "../infrastructure/logger";
 import type { Config } from "../infrastructure/config";
-import { createDotsDialogue } from "./dots-dialogue";
-import { createSavedEmbedder } from "./larm-embedder";
+import { createDotsDialogue } from "./work/dots-dialogue";
+import { createSavedEmbedder } from "./world/larm-embedder";
 import { buildCore, buildWebResearch } from "./server-core";
 import { buildMedia } from "./server-media";
 import { buildTasks } from "./server-tasks";
 import { assembleCuration } from "./server-world";
-import { createTimerAnnouncements } from "./timer-announcements";
-import { createToolchainRouting } from "./toolchain-routing";
-import { createHostToolchain } from "./toolchain-host";
+import { createTimerAnnouncements } from "./timers/timer-announcements";
+import { createToolchainRouting } from "./toolchain/toolchain-routing";
+import { createHostToolchain } from "./toolchain/toolchain-host";
 
 const log = getLogger("server");
 

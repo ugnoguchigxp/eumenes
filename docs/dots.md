@@ -156,7 +156,7 @@ Queue が満杯でもコマンドを保存し、60秒ごとの maintenance で�
 
 ```sh
 bun run verify -- --domain dots
-bun test api/domains/dots api/application/dots-tasks.test.ts api/application/dots-review.test.ts api/application/dots-dialogue.test.ts api/application/dots-http.test.ts scripts/dots-gateway.test.ts packages/dots-mcp/test
+bun test api/domains/dots api/application/work/dots-tasks.test.ts api/application/work/dots-review.test.ts api/application/work/dots-dialogue.test.ts api/application/work/dots-http.test.ts scripts/dots-gateway.test.ts packages/dots-mcp/test
 ```
 
 実 dots の製品受入には、認証付きの公開 MCP 接続と対象プロジェクトの登録が必要。接続後に、新規 Session、ブロッカー、回答後の同一 Session の再開、成果と根拠、no_next_work、取消後の全子停止、再起動時の照合、予定からの一回のリマインドを確認する。これらを確認するまで、製品接続の完成とは記録しない。

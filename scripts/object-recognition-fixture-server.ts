@@ -1,5 +1,5 @@
-import { harness } from "../api/application/toolchain.fixture";
-import { objectRecognitionFixture } from "../api/application/object-recognition.fixture";
+import { harness } from "../api/application/toolchain/toolchain.fixture";
+import { objectRecognitionFixture } from "../api/application/media/object-recognition.fixture";
 const f = objectRecognitionFixture();
 const h = await harness({
 	model: f.model,

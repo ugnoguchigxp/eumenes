@@ -1,8 +1,8 @@
 import type { DraftReport } from "../contracts/requirements";
 /** Test-only model stub. It exercises host contracts, not semantic accuracy. */
 export function fixtureResearchOutput(data: any, raw: string) {
-	if (data.reportMode === "search" || data.reportMode === "guided-web")
-		return raw;
+	if (data.reportMode === "guided-web") return guidedOutput(raw);
+	if (data.reportMode === "search") return raw;
 	let action: any;
 	try {
 		action = JSON.parse(raw);
@@ -61,3 +61,35 @@ export const fixtureVerification = (draft: DraftReport) => ({
 		supported: true,
 	})),
 });
+
+/**
+ * Stubs write one report shape (outcome/summary/claims). The guided contract reports
+ * completion, an answer and claim statuses instead; translate a finish into that form.
+ */
+function guidedOutput(raw: string) {
+	let action: any;
+	try {
+		action = JSON.parse(raw);
+	} catch {
+		return raw;
+	}
+	const report = action?.action === "finish" ? action.report : undefined;
+	if (!report || typeof report.outcome !== "string") return raw;
+	const answered = ["answered", "partial"].includes(report.outcome);
+	return JSON.stringify({
+		action: "finish",
+		report: {
+			completion: report.outcome === "answered" ? "complete" : "incomplete",
+			answer: report.summary,
+			summary: report.summary,
+			claims: (report.claims ?? []).map(
+				(claim: { text: string; evidence: string[] }) => ({
+					text: claim.text,
+					status: answered && claim.evidence.length ? "verified" : "unknown",
+					evidence: claim.evidence,
+				}),
+			),
+			limitations: report.limitations ?? [],
+		},
+	});
+}

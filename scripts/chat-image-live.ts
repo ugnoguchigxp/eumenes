@@ -5,7 +5,7 @@ import * as bmp from "bmp-ts";
 import { createLarm } from "../api/domains/larm";
 import { liveLarmSettings } from "./live-larm";
 import { resolveLarmToken } from "../api/infrastructure/auth-config";
-import { harness } from "../api/application/toolchain.fixture";
+import { harness } from "../api/application/toolchain/toolchain.fixture";
 
 if (!process.argv.includes("--run")) throw new Error("image_live_requires_run");
 const saved = liveLarmSettings();

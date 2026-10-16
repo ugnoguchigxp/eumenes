@@ -6,10 +6,10 @@ import {
 	resolveWorldCursorSecret,
 	resolveWorldMode,
 	WORLD_DEFAULT_SCOPE,
-} from "./world";
+} from "./world/world";
 import { isAdoptedAnswerInTransaction } from "../domains/dialogue";
-import { createGoalsAssembly, GOALS_ACCESS } from "./goals-assembly";
-import { createStewardAssembly } from "./steward-assembly";
+import { createGoalsAssembly, GOALS_ACCESS } from "./world/goals-assembly";
+import { createStewardAssembly } from "./world/steward-assembly";
 import type { MemoryService } from "../domains/memory";
 import { createWorldView, type StewardService } from "../domains/steward";
 import { WORLD_CURATE_PURPOSE } from "../domains/world";

@@ -1,4 +1,4 @@
-import { harness } from "../api/application/toolchain.fixture";
+import { harness } from "../api/application/toolchain/toolchain.fixture";
 import { createCodexResearch } from "../api/domains/inference";
 import { createWebAcquisition } from "../api/domains/web-research";
 import { createLiveLarm } from "./live-larm";
@@ -8,7 +8,7 @@ import {
 	searchAgentCases,
 	assessSearchAgent,
 	type SearchAgentResult,
-} from "../api/application/search-agents.fixture";
+} from "../api/application/toolchain/search-agents.fixture";
 const args = process.argv.slice(2);
 const selectedId = args[args.indexOf("--case") + 1];
 const cases = args.includes("--case")

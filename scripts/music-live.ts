@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { chromium } from "@playwright/test";
-import { harness } from "../api/application/toolchain.fixture";
+import { harness } from "../api/application/toolchain/toolchain.fixture";
 import { createLarmPlayground, type LarmPort } from "../api/domains/larm";
 import { createLiveLarm, liveLarmSettings } from "./live-larm";
 import { resolveLarmToken } from "../api/infrastructure/auth-config";

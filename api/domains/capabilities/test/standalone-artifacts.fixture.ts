@@ -104,7 +104,6 @@ export const host = (): BundleHost => ({
 	inputAdapters: new Set(),
 	projections: new Set(),
 	domainSchemas: new Set(),
-	connections: new Set(),
 });
 
 export const action = (over: Record<string, unknown>) => ({

@@ -48,7 +48,7 @@ export function billingPath(connection: {
 			return "openai-compatible";
 	}
 }
-export const connectionSchema = z
+const connectionSchema = z
 	.object({
 		id: z.uuid(),
 		/** Absent: openai-compatible (settings saved before agent connections). */
@@ -80,7 +80,7 @@ export const connectionSchema = z
 			.nullable(),
 	})
 	.strict();
-export const resourceSchema = z
+const resourceSchema = z
 	.object({
 		id: z.uuid(),
 		connectionId: z.uuid(),

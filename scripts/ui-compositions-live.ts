@@ -2,8 +2,8 @@ import type { LarmPort } from "../api/domains/larm";
 import { ZodError } from "zod";
 import { parseLlmJson } from "../api/infrastructure/llm-json";
 import { validatedDesign } from "../api/domains/ui-compositions/contracts";
-import { harness } from "../api/application/toolchain.fixture";
-import { imageFixture } from "../api/application/image.fixture";
+import { harness } from "../api/application/toolchain/toolchain.fixture";
+import { imageFixture } from "../api/application/media/image.fixture";
 import { createLiveLarm, liveLarmSettings } from "./live-larm";
 
 if (!process.argv.includes("--run")) throw new Error("ui_live_requires_run");

@@ -11,7 +11,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { migrations } from "../api/application/migrations";
-import { offlineBundleHost } from "../api/application/toolchain-adapters";
+import { offlineBundleHost } from "../api/application/toolchain/toolchain-adapters";
 import { createCapabilities } from "../api/domains/capabilities";
 import { openStore } from "../api/infrastructure/sqlite";
 

@@ -1,4 +1,4 @@
-import { workersSettingsFixture } from "../api/application/workers-ai-settings.fixture";
+import { workersSettingsFixture } from "../api/application/settings/workers-ai-settings.fixture";
 
 const fixture = await workersSettingsFixture();
 const server = Bun.serve({

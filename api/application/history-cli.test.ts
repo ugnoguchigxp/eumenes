@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { harness } from "./toolchain.fixture";
+import { harness } from "./toolchain/toolchain.fixture";
 test("history CLI uses authenticated POST API, emits opaque continuation refs, and refuses stale or cross-conversation refs", async () => {
 	const h = await harness();
 	const server = Bun.serve({

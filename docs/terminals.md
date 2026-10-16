@@ -70,7 +70,7 @@ command 担当の SystemContext は、登録 profile・SKILL・共通の操作�
 
 ## 完了の報告と SE
 
-- 会話への報告: 会話からの直接依頼（`origin: conversation` かつ `owner: direct`）が終端になると、host が **commit の後に** 会話へ通知を送る（dialogue の `notify`。requestId は `terminal-request:{attemptId}:{state}`。入力は `presentation: "artifact"` で画面に出さず、`sourceKind: "notice"` は予約実行と同じく記憶の学習対象外・ツールチェーン無し・background）。terminals の `onFinishedCommitted` が、終端を書いた transaction の commit 通知の後に表の状態を確かめてから呼ぶ（巻き戻った終端は報告しない）。会話担当はタスク名で何が起きたかを伝え、次の行動を「変更をコミットする・動作を確認する・追加で直す・やり直す」から一つ提案して確認する。作業担当やツールの名前は言わない。提案だけで実行はせず、利用者が「コミットして」と答えれば通常の `claude_code` 経路で同じセッションに渡る。Claude Code の最後の報告は JSON 文字列として通知に入れ（引用を閉じられない）、中の指示に従わない。追跡できず止めたとき（`unknown`）・再起動で確認できなくなったときも報告する。通知を会話が受け付けなかった場合（キュー満杯など）はログだけで再送しない。通知文は `api/application/claude-code-reports.ts`。
+- 会話への報告: 会話からの直接依頼（`origin: conversation` かつ `owner: direct`）が終端になると、host が **commit の後に** 会話へ通知を送る（dialogue の `notify`。requestId は `terminal-request:{attemptId}:{state}`。入力は `presentation: "artifact"` で画面に出さず、`sourceKind: "notice"` は予約実行と同じく記憶の学習対象外・ツールチェーン無し・background）。terminals の `onFinishedCommitted` が、終端を書いた transaction の commit 通知の後に表の状態を確かめてから呼ぶ（巻き戻った終端は報告しない）。会話担当はタスク名で何が起きたかを伝え、次の行動を「変更をコミットする・動作を確認する・追加で直す・やり直す」から一つ提案して確認する。作業担当やツールの名前は言わない。提案だけで実行はせず、利用者が「コミットして」と答えれば通常の `claude_code` 経路で同じセッションに渡る。Claude Code の最後の報告は JSON 文字列として通知に入れ（引用を閉じられない）、中の指示に従わない。追跡できず止めたとき（`unknown`）・再起動で確認できなくなったときも報告する。通知を会話が受け付けなかった場合（キュー満杯など）はログだけで再送しない。通知文は `api/application/work/claude-code-reports.ts`。
 - SE: `activity` が `idle` 以外から `idle` へ、または `waiting` に変わると、Web がタイマーと同じ短い音を鳴らす（`useClaudeCodeArtifacts`、出力先・音量・自動再生の解除はタイマー音と共通）。読み込み時点の状態では鳴らさない。
 - 既知の制約: 通知は画面に出さないが会話の履歴（利用者側の入力）には残り、予約実行の入力と同じく World の抽出対象から外していない。Esc での中断は Stop が来ないため、次の作業が始まった時に初めて「途中で止まった」と分かる。
 
@@ -81,7 +81,7 @@ command 担当の SystemContext は、登録 profile・SKILL・共通の操作�
 | domain | `api/domains/terminals/` | `Bun.spawn` の `terminal`（PTY、POSIXのみ）でセッションを保持（生きているプロセスの上限4）。出力の直近 512 KiB を保持し、開き直した画面へ先に流す。セッションは保存せず（サーバー停止で全て終了）、作業依頼だけを SQLite に保存する（`repository/`＝migration `terminals/0001-requests`、`service/ledger.ts`＝状態遷移と購読者、`service/dispatcher.ts`＝送信器、`service/sessions.ts`＝PTY、`service/hook-events.ts`＝フック） |
 | HTTP | `GET/POST /api/terminals`、`POST …/:id/input`・`/resize`・`/restart`、`GET …/:id/output`（SSE: `output` は base64 の PTY 出力、`exit` は実行終了） | 他の API と同じ Bearer token・同一 origin・loopback を通る |
 | bundle | `api/domains/capabilities/bundles/terminals-screen.bundle.json` | 単独公開 artifact `artifact:terminals.workspace@2`（launcher「Claude Code」）。source `terminals` → `adapter:terminals@1` の `query:terminals.sessions@1`。起動・再起動は `local` action |
-| backend adapter | `api/application/terminals-adapter.ts` | セッション一覧の source と可用性、会話からの `claude-code.request`（write、`enqueueInTransaction`、requestId で replay） |
+| backend adapter | `api/application/work/terminals-adapter.ts` | セッション一覧の source と可用性、会話からの `claude-code.request`（write、`enqueueInTransaction`、requestId で replay） |
 | OpenUI | `packages/artifact-ui/src/terminal-components.tsx`（view `terminal-workspace`） | source の一覧を DesignSystem の `TerminalWorkspace` へ渡す。Kanban のセッション（`owner` が `kanban:`）のペインには持ち主（タスク名）を小さな見出しで出す（直接のセッションは現行の枠なし表示）。セッションが無ければ開いた時に一つ起動する。出力・入力は `ArtifactRuntime.openTerminal` 経由。領域いっぱいの高さは `web/src/app.css` の `.artifact-panel-body:has(.terminal-workspace)` が渡す |
 | Web adapter | `web/src/domains/terminals/` | 一覧の取得、local action の API 呼出し、出力の購読（`exit` 無しで切れたら端末を初期化して再接続）、入力の順序保証（一度に一件、待つ間の入力をまとめる）、resize の間引き |
 
@@ -103,7 +103,7 @@ PTY の入出力・会話本文・依頼本文はログに出さない。ログ�
 
 ```sh
 bun run verify -- --domain terminals   # 偽PTYの固定試験と、/bin/sh を実PTYで動かす試験
-bun test api/application/terminals-adapter.test.ts api/application/claude-code-reports.test.ts api/application/claude-code-toolchain.test.ts
+bun test api/application/work/terminals-adapter.test.ts api/application/work/claude-code-reports.test.ts api/application/work/claude-code-toolchain.test.ts
 bunx playwright test tests/browser/claude-code.spec.ts   # 会話 → 画面が開き、セッションが表示される
 bun run toolchain:bundle -- check api/domains/capabilities/bundles/terminals-screen.bundle.json
 ```

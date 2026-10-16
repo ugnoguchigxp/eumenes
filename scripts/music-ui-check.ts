@@ -1,8 +1,8 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { extname, resolve } from "node:path";
 import { chromium, expect as baseExpect } from "@playwright/test";
-import { musicFixture } from "../api/application/music.fixture";
-import { harness } from "../api/application/toolchain.fixture";
+import { musicFixture } from "../api/application/media/music.fixture";
+import { harness } from "../api/application/toolchain/toolchain.fixture";
 import { createFixture } from "../tests/browser/fixture";
 import { openFromLauncher } from "../tests/browser/artifact-launcher";
 const expect = baseExpect.configure({ timeout: 20000 });

@@ -12,7 +12,7 @@ import { join } from "node:path";
 import { openStore } from "../api/infrastructure/sqlite";
 import { migrations } from "../api/application/migrations";
 import { createCapabilities } from "../api/domains/capabilities";
-import { offlineBundleHost } from "../api/application/toolchain-adapters";
+import { offlineBundleHost } from "../api/application/toolchain/toolchain-adapters";
 import { createLarmPlayground } from "../api/domains/larm";
 import { resolveLarmToken } from "../api/infrastructure/auth-config";
 import { liveLarmSettings } from "./live-larm";

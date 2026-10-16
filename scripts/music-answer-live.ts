@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { harness } from "../api/application/toolchain.fixture";
-import { musicLibraryFixture } from "../api/application/music-library.fixture";
+import { harness } from "../api/application/toolchain/toolchain.fixture";
+import { musicLibraryFixture } from "../api/application/media/music-library.fixture";
 import { createLiveLarm } from "./live-larm";
 import type { Messages } from "../api/domains/inference/contracts";
 import { buildSystemPrompt } from "../api/domains/dialogue/service/system-prompt";

@@ -4,7 +4,7 @@
 
 ## 保存と状態
 
-`tasks` domainが `work_tasks`、委任の履歴、操作の受付、状態イベント、質問と回答、実行基盤への参照を所有する。内部調査の `agent_tasks` とは別の台帳で、通常会話のrunが終わっても保持する。Queue/Schedulerへの結合は `api/application/delegated-tasks.ts` で公開操作を一つのwriter transactionへ組み合わせる。
+`tasks` domainが `work_tasks`、委任の履歴、操作の受付、状態イベント、質問と回答、実行基盤への参照を所有する。内部調査の `agent_tasks` とは別の台帳で、通常会話のrunが終わっても保持する。Queue/Schedulerへの結合は `api/application/work/delegated-tasks.ts` で公開操作を一つのwriter transactionへ組み合わせる。
 
 登録のみではジョブ・Scheduleを作らない。開始時は実行portの利用可能性を検査し、タスク・最初の処理・毎分のScheduleを同時保存する。Queue側の処理完了はタスク全体の完了ではない。工程・状態・権限の版・実行世代を別に管理し、古い判断と回答を拒否する。
 
@@ -86,6 +86,6 @@ forgetはこれを待たずに本文・タイトル・質問回答・会話と�
 
 ## 検証
 
-タスク単体は `bun run verify -- --domain tasks`、Scheduler公開操作の変更は `--domain scheduler`、利用するQueueは `--domain queue` を確認する。結合試験は `bun test api/application/delegated-tasks.test.ts`。横断変更は影響のある利用側domainも選んでverifyする。
+タスク単体は `bun run verify -- --domain tasks`、Scheduler公開操作の変更は `--domain scheduler`、利用するQueueは `--domain queue` を確認する。結合試験は `bun test api/application/work/delegated-tasks.test.ts`。横断変更は影響のある利用側domainも選んでverifyする。
 
 [検証記録](../spec/verification/delegated-coding/README.md)でfixture、live、実機器を分ける。現在のfixture成功を、CLI実行・監督・音声の製品受入とは扱わない。

@@ -1,7 +1,7 @@
 {
 	"files": {},
 	"functions": {
-		"api/application/delegated-tasks.ts#createDelegatedTasks": 400,
+		"api/application/work/delegated-tasks.ts#createDelegatedTasks": 400,
 		"api/domains/attitude-dataset/service/index.ts#createAttitudeDataset": 618,
 		"api/domains/capabilities/service/index.ts#createCapabilities": 379,
 		"api/domains/coding/service/index.ts#createCoding": 365,
@@ -32,7 +32,7 @@
 	},
 	"testFiles": {
 		"api/application/migrations.test.ts": 1125,
-		"api/application/settings-adapter.test.ts": 1660,
+		"api/application/settings/settings-adapter.test.ts": 1660,
 		"api/domains/settings/test/settings.test.ts": 1143,
 		"web/src/domains/settings-data/settings.fixture.tsx": 1135
 	}

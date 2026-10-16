@@ -11,7 +11,6 @@ const host = (): BundleHost => ({
 	inputAdapters: new Set(),
 	projections: new Set(),
 	domainSchemas: new Set(),
-	connections: new Set(),
 });
 
 test("the model-named Web research toolchain is retired and the model-neutral one registers in its place", async () => {

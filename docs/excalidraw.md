@@ -40,7 +40,7 @@ ready URLはEumenesのWeb originにある`/#drawing/{referenceId}?revision={revi
 
 ## 検証と配備状況
 
-`bun test api/domains/excalidraw/test/excalidraw.test.ts api/application/excalidraw-e2e.test.ts`、`bun run verify -- --domain excalidraw`、影響のある利用側domainのverifyを使う。ブラウザfixtureは`bunx playwright test tests/browser/excalidraw.spec.ts`。fixtureは実サービスの応答形状（保存応答はmetadata、sceneは別GET）に合わせ、LARM/backend保存先は隔離する。
+`bun test api/domains/excalidraw/test/excalidraw.test.ts api/application/media/excalidraw-e2e.test.ts`、`bun run verify -- --domain excalidraw`、影響のある利用側domainのverifyを使う。ブラウザfixtureは`bunx playwright test tests/browser/excalidraw.spec.ts`。fixtureは実サービスの応答形状（保存応答はmetadata、sceneは別GET）に合わせ、LARM/backend保存先は隔離する。
 
 `bun scripts/excalidraw-live.ts --check`はbackend settingsの読み取り専用操作で保存済みLARM入口と専用接続の有無を確認する。consumer未設定時にLLM/admin tokenでlease要求はしない。
 

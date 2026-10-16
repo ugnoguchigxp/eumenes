@@ -101,7 +101,6 @@ export async function harness(
 						inputAdapters: new Set(),
 						projections: new Set(),
 						domainSchemas: new Set(),
-						connections: new Set(),
 					}),
 				}
 			: {},

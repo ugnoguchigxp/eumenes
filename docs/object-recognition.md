@@ -35,6 +35,6 @@ profile・skill・packageは`object-recognition.manage@1`、toolは同ID@1。too
 
 ## 検証
 
-`bun run verify -- --domain object-recognition`、影響のある利用側domainのverify。登録の試験は`api/application/object-recognition-screen-adapter.test.ts`、API結合は`api/application/object-recognition-e2e.test.ts`、ブラウザfixtureは`tests/browser/object-recognition.spec.ts`。カメラfixtureはChromiumの仮想カメラで、MacBook実カメラ受入とは区別する。
+`bun run verify -- --domain object-recognition`、影響のある利用側domainのverify。登録の試験は`api/application/media/object-recognition-screen-adapter.test.ts`、API結合は`api/application/media/object-recognition-e2e.test.ts`、ブラウザfixtureは`tests/browser/object-recognition.spec.ts`。カメラfixtureはChromiumの仮想カメラで、MacBook実カメラ受入とは区別する。
 
 `bun scripts/object-recognition-live.ts`はbackend settingsのreadonly保存設定を確認する。`--file <path>`を指定すると、設定済みの稼働backendの公開APIへ一度送信し、完了・元媒体取得を確認する。credentialsや本文を証拠に保存しない。正式配備は設定の有無だけでは確認済みとしない。記録は[作業記録](../spec/object-recognition-work-record-2026-10-13.md)。

@@ -1,5 +1,5 @@
-import { harness } from "../api/application/toolchain.fixture";
-import { excalidrawFixture } from "../api/application/excalidraw.fixture";
+import { harness } from "../api/application/toolchain/toolchain.fixture";
+import { excalidrawFixture } from "../api/application/media/excalidraw.fixture";
 const f = excalidrawFixture();
 const h = await harness({
 	model: f.model,

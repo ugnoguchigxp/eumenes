@@ -29,7 +29,7 @@ import { openStore } from "../infrastructure/sqlite";
 import type { Config } from "../infrastructure/config";
 import { createChanges } from "./events";
 import { legacyOrder, migrations } from "./migrations";
-import { createWebReview } from "./web-content-review";
+import { createWebReview } from "./toolchain/web-content-review";
 
 const log = getLogger("server");
 

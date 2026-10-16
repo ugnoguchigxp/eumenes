@@ -7,8 +7,8 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { harness } from "../api/application/toolchain.fixture";
-import { createKanbanSdkHost } from "../api/application/kanban-sdk-host";
+import { harness } from "../api/application/toolchain/toolchain.fixture";
+import { createKanbanSdkHost } from "../api/application/work/kanban-sdk-host";
 import { createTerminals } from "../api/domains/terminals";
 import { SdkService } from "../packages/coding-runner/src/sdk-service";
 import { serveSdk } from "../packages/coding-runner/src/sdk-server";

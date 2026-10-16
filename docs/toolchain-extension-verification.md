@@ -47,7 +47,7 @@ bun run verify -- --domain web-research
 bun run test:search
 
 # 公開契約・履歴との分離・失敗回答・診断に影響する場合の追加結合試験。
-bun test api/application/search-results.test.ts api/application/requirements-toolchain.test.ts api/application/research-history.test.ts api/application/toolchain.test.ts api/application/control-logging.test.ts api/application/agent-voice-response.test.ts
+bun test api/application/toolchain/search-results.test.ts api/application/toolchain/requirements-toolchain.test.ts api/application/toolchain/research-history.test.ts api/application/toolchain/toolchain.test.ts api/application/control-logging.test.ts api/application/toolchain/agent-voice-response.test.ts
 ```
 
 「単体だけ」「結合だけ」と依頼された場合は、上記をまとめて実行せず、その段階のファイルだけを指定する。型検査やブラウザも含める場合は、その範囲を明示する。
@@ -71,7 +71,7 @@ bun test api/application/search-results.test.ts api/application/requirements-too
 
 1. **bundle**: `bun run toolchain:bundle -- check <bundle>` がissue無し。pinは `bun run toolchain:bundle -- pins <revisionId>...` の値と一致。旧revisionのhashが変わらないこと、fresh DBと旧版seed済みDBの両方で登録できること、二度目のseedが冪等であることを `api/domains/capabilities/test/bundles.test.ts` の形で確認する。
 2. **adapter**: 追加・変更した操作ごとに、正常・domainの拒否・同requestIdのreplay・revision競合・会話originの対象検査を単体で確認する。domainの業務判断はdomainの試験に置き、adapterでは接続だけを試す。
-3. **会話の結合**: 固定モデルで候補提示 → command → 保存receipt → 回答と、clarify → 質問保存 → 回答 → 再開を通す（例 `api/application/timer-toolchain.test.ts`、`api/domains/dialogue/test/command-interactions.test.ts`）。
+3. **会話の結合**: 固定モデルで候補提示 → command → 保存receipt → 回答と、clarify → 質問保存 → 回答 → 再開を通す（例 `api/application/timers/timer-toolchain.test.ts`、`api/domains/dialogue/test/command-interactions.test.ts`）。
 4. **UI操作**: 受付と実行の原子性、同eventIdの再送、異なる入力の409、時刻窓、source/action偽装の拒否、field errorの非保存は共通機構の試験（`api/domains/tool-runtime/test/action-requests.test.ts`）が持つ。新しいdomainでは、そのadapterを通る代表操作を1件以上の結合試験で通す。
 5. **Web**: Web adapterの試験（source解決、`settled` の反映、競合時の `refresh`、通信断のindeterminate）と、`bunx playwright test tests/browser/<domain>.spec.ts`。入口が一件であること、再読込みでタブが自動で増えないことを含める。
 6. **自然言語受入（必要な場合）**: 凍結ケースを `tests/acceptance/nl/` に置き `--freeze` でlockを更新、`bun run nl-acceptance -- --dry-run --case <id>` で計画を確認してから実行する（[自然言語UI受入](nl-acceptance.md)）。テスターモデルの能力が結果を左右するため、モデルと版を記録し、別モデルは別群にする。

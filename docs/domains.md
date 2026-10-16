@@ -58,7 +58,7 @@
 | coding-supervision | `api/domains/coding-supervision/index.ts` | client/API（`docs/coding-supervision.md`） | `api/domains/coding-supervision/test/`、application結合試験 |
 | task-reports | `api/domains/task-reports/index.ts` | client/API | `api/domains/task-reports/test/` |
 | coding | `api/domains/coding/index.ts` | client/API（`docs/coding-runner.md`） | `api/domains/coding/test/`、`packages/coding-runner/test/`、application結合試験 |
-| tasks | `api/domains/tasks/index.ts` | 共通client/API・CLI（`docs/delegated-tasks.md`） | `api/domains/tasks/test/`、結合試験 `api/application/delegated-tasks.test.ts` |
+| tasks | `api/domains/tasks/index.ts` | 共通client/API・CLI（`docs/delegated-tasks.md`） | `api/domains/tasks/test/`、結合試験 `api/application/work/delegated-tasks.test.ts` |
 | attitude-dataset | `api/domains/attitude-dataset/index.ts` | CLI/API（`docs/ruri-collection.md`） | `api/domains/attitude-dataset/test/` |
 | delivery | `api/domains/delivery/index.ts` | なし | `api/domains/delivery/test/` |
 | avatar | なし | `web/src/domains/avatar/index.ts` | `web/src/domains/avatar/test/` |
@@ -70,16 +70,16 @@
 | continuity | `api/domains/continuity/index.ts` | なし | `api/domains/continuity/test/` |
 | capabilities | `api/domains/capabilities/index.ts` | CLI/API | `api/domains/capabilities/test/` |
 | tool-runtime | `api/domains/tool-runtime/index.ts` | なし | `api/domains/tool-runtime/test/` |
-| agent-runtime | `api/domains/agent-runtime/index.ts` | `web/src/domains/agent-runtime/index.ts` | `api/domains/agent-runtime/test/`、`api/application/toolchain.test.ts`、`tests/browser/toolchain.spec.ts` |
-| toolchain-history | `api/domains/toolchain-history/index.ts` | `web/src/domains/toolchain-history/index.tsx`（設定の「ツールチェーンの記録」） / CLI/API（`docs/toolchain.md`） | `api/domains/toolchain-history/test/`、結合試験 `api/application/toolchain-history.test.ts`・`toolchain-recipe-e2e.test.ts` |
+| agent-runtime | `api/domains/agent-runtime/index.ts` | `web/src/domains/agent-runtime/index.ts` | `api/domains/agent-runtime/test/`、`api/application/toolchain/toolchain.test.ts`、`tests/browser/toolchain.spec.ts` |
+| toolchain-history | `api/domains/toolchain-history/index.ts` | `web/src/domains/toolchain-history/index.tsx`（設定の「ツールチェーンの記録」） / CLI/API（`docs/toolchain.md`） | `api/domains/toolchain-history/test/`、結合試験 `api/application/toolchain/toolchain-history.test.ts`・`toolchain-recipe-e2e.test.ts` |
 | web-research | `api/domains/web-research/index.ts` | CLI/API | `api/domains/web-research/test/` |
 | memory | `api/domains/memory/index.ts` | なし | `api/domains/memory/test/` |
 | larm | `api/domains/larm/index.ts` | なし | `api/domains/larm/test/` |
 | audio | なし | `web/src/domains/audio/index.ts` | `web/src/domains/audio/test/` |
 | queue | `api/domains/queue/index.ts` | なし | `api/domains/queue/test/` |
 | scheduler | `api/domains/scheduler/index.ts` | なし | `api/domains/scheduler/test/` |
-| ocr | `api/domains/ocr/index.ts` | `web/src/domains/ocr/index.ts`（アーティファクト「文字を読み取る」、`docs/ocr.md`） | `api/domains/ocr/test/`、`api/application/ocr-e2e.test.ts`、`api/application/ocr-adapter.test.ts`、`tests/browser/ocr.spec.ts` |
-| terminals | `api/domains/terminals/index.ts` | `web/src/domains/terminals/index.ts`（アーティファクト「ターミナル」、`docs/terminals.md`） | `api/domains/terminals/test/`、`api/application/terminals-adapter.test.ts`、`web/src/domains/terminals/connection.test.ts` |
+| ocr | `api/domains/ocr/index.ts` | `web/src/domains/ocr/index.ts`（アーティファクト「文字を読み取る」、`docs/ocr.md`） | `api/domains/ocr/test/`、`api/application/media/ocr-e2e.test.ts`、`api/application/media/ocr-adapter.test.ts`、`tests/browser/ocr.spec.ts` |
+| terminals | `api/domains/terminals/index.ts` | `web/src/domains/terminals/index.ts`（アーティファクト「ターミナル」、`docs/terminals.md`） | `api/domains/terminals/test/`、`api/application/work/terminals-adapter.test.ts`、`web/src/domains/terminals/connection.test.ts` |
 | timers | `api/domains/timers/index.ts` | `web/src/domains/timers` と `web/src/components/domains/timers/TimerArtifact.tsx` | `api/domains/timers/test/` |
 | dialogue | `api/domains/dialogue/index.ts` | `web/src/domains/dialogue/index.ts` | `api/domains/dialogue/test/`、`web/src/domains/dialogue/test/` |
 | voice-dialogue | `api/domains/voice-dialogue/index.ts` | `web/src/domains/voice-dialogue/index.ts` | `api/domains/voice-dialogue/test/`、`web/src/domains/voice-dialogue/test/` |
@@ -98,7 +98,7 @@ backend の domain は `contracts/`(公開型・schema)、`controller/`(HTTP 登
 - 適用済みの migration の SQL は 1 文字も変更・並べ替え・削除しません。変更は checksum 不一致(`migration_checksum_mismatch:<id>`)で起動失敗になります。直す場合は新しい migration を `after` 付きで足します。DB にあってコードに無い id は `migration_unknown_applied:<id>` で起動失敗になります(DB がコードより新しい)。
 - `api/application/migrations.test.ts` の GOLDEN が凍結済みの順序と SQL を固定しています。このテストが落ちたら実装を戻し、期待値は更新しません。
 
-Toolchainは `capabilities` が不変revision・候補検索・必須依存を、`tool-runtime` が所有者付き実行参照・入力検査・短期観測を、`agent-runtime` が制御step・子の予算・要約検査・採用ticketを所有します。既存Web取得を呼ぶadapterは `api/application/toolchain.ts` が組み立てます。下位domainは上位のSQLを参照しません。CLI/Webは共通clientからHTTPを使います。
+Toolchainは `capabilities` が不変revision・候補検索・必須依存を、`tool-runtime` が所有者付き実行参照・入力検査・短期観測を、`agent-runtime` が制御step・子の予算・要約検査・採用ticketを所有します。既存Web取得を呼ぶadapterは `api/application/toolchain/toolchain.ts` が組み立てます。下位domainは上位のSQLを参照しません。CLI/Webは共通clientからHTTPを使います。
 
 ## 音声 MVP の所有境界
 

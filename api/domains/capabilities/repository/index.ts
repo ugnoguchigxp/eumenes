@@ -95,7 +95,7 @@ DELETE FROM capability_items WHERE kind='toolchain' AND id LIKE 'web.research.%'
 	},
 ];
 
-export type DocumentKind = "binding" | "http-binding" | "artifact" | "schema";
+export type DocumentKind = "binding" | "artifact" | "schema";
 export type StoredDocument = {
 	revisionId: string;
 	kind: DocumentKind;

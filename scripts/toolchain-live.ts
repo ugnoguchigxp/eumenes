@@ -17,7 +17,7 @@ import {
 	checkLiveResearch,
 	checkLiveForecastDate,
 	checkLiveCitations,
-} from "../api/application/toolchain-live-check";
+} from "../api/application/toolchain/toolchain-live-check";
 import {
 	resolveApiToken,
 	resolveLarmToken,

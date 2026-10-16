@@ -1,4 +1,4 @@
-import { harness } from "../api/application/toolchain.fixture";
+import { harness } from "../api/application/toolchain/toolchain.fixture";
 const image = {
 	kind: "image",
 	model: "ocr-fixture",

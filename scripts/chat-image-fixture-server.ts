@@ -1,4 +1,4 @@
-import { harness } from "../api/application/toolchain.fixture";
+import { harness } from "../api/application/toolchain/toolchain.fixture";
 import { imageLarmFixture } from "../api/domains/larm/test/chat-input.fixture";
 const f = imageLarmFixture();
 await f.p.connect();

@@ -47,7 +47,6 @@ const host = (): BundleHost => ({
 	inputAdapters: new Set(["input:timer-hms@1"]),
 	projections: new Set(["projection:timer-result@1"]),
 	domainSchemas: new Set(["domain:timers.receipt@1"]),
-	connections: new Set(),
 });
 /** The timer toolchain as it was published before bundles existed. */
 const legacyToolchain: Definition = {

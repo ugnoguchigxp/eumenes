@@ -15,7 +15,6 @@ test("deployed search schemas survive upgrade; current packages use the new tool
 		inputAdapters: new Set(),
 		projections: new Set(),
 		domainSchemas: new Set(),
-		connections: new Set(),
 	};
 	const old = createCapabilities(store, new Set(["web"]));
 	const current = createCapabilities(store, new Set(["web"]), {

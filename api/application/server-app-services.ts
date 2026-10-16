@@ -1,5 +1,5 @@
 import type { Services } from "./server-services";
-import { registerDots } from "./dots-http";
+import { registerDots } from "./work/dots-http";
 
 export function appServices(s: Services) {
 	return {

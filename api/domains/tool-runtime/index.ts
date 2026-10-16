@@ -15,10 +15,6 @@ export {
 	ActionRequestError,
 	type CapabilityReads,
 } from "./service/action-types";
-export {
-	createHttpJsonExecutor,
-	type HttpJsonConnection,
-} from "./service/http-json";
 export { registerToolchainActions } from "./controller";
 export * from "./contracts";
 export { migrations } from "./repository";

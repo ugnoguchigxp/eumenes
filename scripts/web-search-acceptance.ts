@@ -1,9 +1,9 @@
 /** One frozen measurement batch; never edits prompts or retries a failed case. */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { harness } from "../api/application/toolchain.fixture";
+import { harness } from "../api/application/toolchain/toolchain.fixture";
 import { createWebAcquisition } from "../api/domains/web-research";
-import { createWebReview } from "../api/application/web-content-review";
+import { createWebReview } from "../api/application/toolchain/web-content-review";
 import { createLiveLarm } from "./live-larm";
 import {
 	evaluateSearchAnswer,

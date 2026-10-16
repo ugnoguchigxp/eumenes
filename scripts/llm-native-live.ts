@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve, join } from "node:path";
-import { loadEvaluationCases } from "../api/application/llm-native-evaluation.fixture";
-import { evaluateRequirements } from "../api/application/llm-native-runner.fixture";
+import { loadEvaluationCases } from "../api/application/toolchain/llm-native-evaluation.fixture";
+import { evaluateRequirements } from "../api/application/toolchain/llm-native-runner.fixture";
 import { createLiveLarm } from "./live-larm";
 import { createCodexResearch } from "../api/domains/inference";
 import { chooseSpeechDelivery } from "../api/domains/delivery";
@@ -12,7 +12,10 @@ const option = (name: string, fallback: string) => {
 };
 const suite = option("--suite", "all"),
 	casesPath = resolve(
-		option("--cases", "api/application/testdata/llm-native/cases.json"),
+		option(
+			"--cases",
+			"api/application/toolchain/testdata/llm-native/cases.json",
+		),
 	),
 	out = resolve(option("--out", "spec/verification/llm-native-2026-10-10")),
 	repeats = Number(option("--repeats", "2"));

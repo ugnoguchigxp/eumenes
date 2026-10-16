@@ -1,8 +1,8 @@
 import { getLogger } from "../infrastructure/logger";
 import { intervalLifecycle, type Lifecycle } from "./lifecycle";
-import { recoverSteward } from "./steward-assembly";
+import { recoverSteward } from "./world/steward-assembly";
 import type { Services } from "./server-services";
-import { toolchainMaintenance } from "./toolchain-adapters";
+import { toolchainMaintenance } from "./toolchain/toolchain-adapters";
 
 const log = getLogger("server");
 

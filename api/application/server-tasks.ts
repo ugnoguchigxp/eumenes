@@ -5,18 +5,18 @@ import { createEvents, createSecretBox } from "../domains/dots";
 import { createTaskReports } from "../domains/task-reports";
 import type { SchedulerService } from "../domains/scheduler";
 import type { Config } from "../infrastructure/config";
-import { createProductionCoding } from "./coding";
-import { codingObservationReader } from "./coding-observation";
+import { createProductionCoding } from "./work/coding";
+import { codingObservationReader } from "./work/coding-observation";
 import {
 	purgeTaskDependents,
 	superviseCodingExecution,
 	unavailableCodingWorkflow,
-} from "./coding-supervision";
-import { createCodingTaskExecution } from "./coding-tasks";
-import { createDelegatedTasks } from "./delegated-tasks";
-import { createDotsTasks } from "./dots-tasks";
+} from "./work/coding-supervision";
+import { createCodingTaskExecution } from "./work/coding-tasks";
+import { createDelegatedTasks } from "./work/delegated-tasks";
+import { createDotsTasks } from "./work/dots-tasks";
 import type { Core } from "./server-core";
-import { createTaskReportDelivery } from "./task-report-delivery";
+import { createTaskReportDelivery } from "./work/task-report-delivery";
 
 /**
  * Delegated tasks with their kinds: coding (with supervision and reports) and

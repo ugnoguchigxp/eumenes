@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { configureLogging } from "../infrastructure/logger";
-import { harness, forbidden } from "./toolchain.fixture";
+import { harness, forbidden } from "./toolchain/toolchain.fixture";
 
 afterEach(() => configureLogging({ level: "silent" }));
 function capture() {

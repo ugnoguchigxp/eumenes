@@ -19,7 +19,6 @@ test("new Web revisions upgrade and reseed without changing archived definitions
 		inputAdapters: new Set(),
 		projections: new Set(),
 		domainSchemas: new Set(),
-		connections: new Set(),
 	});
 	try {
 		await createCapabilities(store, new Set(["web"])).seed();

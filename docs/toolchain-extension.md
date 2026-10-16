@@ -42,7 +42,7 @@ Seedに含めるのは再利用する定義だけで、会話、実行・操作�
 
 新規追加は引き続き§3のbundleを使う。`seeds/toolchains.json` は旧形式の互換データで、ここに新しい担当を追加しない。旧形式を移行するときは該当定義をJSONから削除する。読み込み窓口の `builtin/toolchains.ts` は維持する。
 
-全Seedの初期化確認は `bun test api/application/capability-seed.test.ts`。隔離DBで全bundleの登録漏れ、会話等の非投入、再投入の冪等性、DB再オープン後の無効化・公開版保持、通常のサーバー初期化からの自動投入を確認する。部分試験は `bun run verify -- --domain capabilities`、会話側の回帰は `bun run verify -- --domain dialogue` を使う。
+全Seedの初期化確認は `bun test api/application/toolchain/capability-seed.test.ts`。隔離DBで全bundleの登録漏れ、会話等の非投入、再投入の冪等性、DB再オープン後の無効化・公開版保持、通常のサーバー初期化からの自動投入を確認する。部分試験は `bun run verify -- --domain capabilities`、会話側の回帰は `bun run verify -- --domain dialogue` を使う。
 
 ## 2. 追加の種類を選ぶ
 
@@ -54,7 +54,7 @@ Seedに含めるのは再利用する定義だけで、会話、実行・操作�
 | 旧形式のツールチェーンを移す | [§6](#6-旧形式のツールチェーンを移行する) | §5に加え旧経路の削除 |
 | 新しい画面部品が要る | [§10 E](#10-e-designsystemopenuiartifactを追加する) | DesignSystem部品とOpenUI登録 |
 | 履歴調査の要件profile・dotsの担当 | [§9 A](#9-a-登録apiで追加する) | なし。登録API |
-| 単純なHTTP JSON API | 未対応 | `HttpJsonBindingV1` と実行器（`tool-runtime/service/http-json.ts`）はfixture試験のみで、hostの接続設定に未接続 |
+| 単純なHTTP JSON API | 未対応 | bundleの `bindings` はcommand bindingだけを受け付ける。HTTP APIはadapterで実装する |
 
 まず「何を入力して何が返れば完了か」「どのadapterを再利用するか」「今回どこまで確認するか」を短く記録する。既存adapterで同じ操作ができるならadapterを増やさず§3を使う。
 
@@ -165,7 +165,7 @@ Seedに含めるのは再利用する定義だけで、会話、実行・操作�
 
 ### 5.1 backendのadapter
 
-`DomainAdapter`（`api/domains/tool-runtime/contracts/adapters.ts`）を `api/application/<domain>-adapter.ts` に実装する。例は [timer-adapter.ts](../api/application/timer-adapter.ts)。
+`DomainAdapter`（`api/domains/tool-runtime/contracts/adapters.ts`）を `api/application/<domain>-adapter.ts` に実装する。例は [timer-adapter.ts](../api/application/timers/timer-adapter.ts)。
 
 | メソッド | 役割 |
 | --- | --- |
@@ -180,8 +180,8 @@ Seedに含めるのは再利用する定義だけで、会話、実行・操作�
 
 登録は3か所。
 
-- `api/application/toolchain.ts` の `createAdapterRegistry([...])` に1件。
-- `api/application/toolchain-adapters.ts` の `hostAdapterDescriptions` に1件（bundle検査・評価用。domainサービス無しで`describe`を返す）、結果schemaがあれば `domainSchemas` に1件。
+- `api/application/toolchain/toolchain.ts` の `createAdapterRegistry([...])` に1件。
+- `api/application/toolchain/toolchain-adapters.ts` の `hostAdapterDescriptions` に1件（bundle検査・評価用。domainサービス無しで`describe`を返す）、結果schemaがあれば `domainSchemas` に1件。
 - domain側に公開transaction操作と、必要ならcommit後通知を用意する。
 
 ### 5.2 Webのadapter
@@ -227,8 +227,8 @@ Seedに含めるのは再利用する定義だけで、会話、実行・操作�
 | 確認 | 成功条件 | 入口 |
 | --- | --- | --- |
 | bundle | `check` がissue無し。fresh・upgrade両方で登録でき、旧revisionのhashが変わらない | `bun run toolchain:bundle -- check …`、`api/domains/capabilities/test/bundles.test.ts` |
-| adapter | 各操作の正常・拒否・replay・revision競合、conversation originの対象検査 | adapterの単体試験（例 `api/application/timer-question.test.ts`） |
-| 会話 | 候補提示 → command → 保存receipt → 回答。clarifyで質問が保存され、回答で再開する | `api/application/timer-toolchain.test.ts`、`api/domains/dialogue/test/command-interactions.test.ts` |
+| adapter | 各操作の正常・拒否・replay・revision競合、conversation originの対象検査 | adapterの単体試験（例 `api/application/timers/timer-question.test.ts`） |
+| 会話 | 候補提示 → command → 保存receipt → 回答。clarifyで質問が保存され、回答で再開する | `api/application/timers/timer-toolchain.test.ts`、`api/domains/dialogue/test/command-interactions.test.ts` |
 | UI操作 | 受付と実行の原子性、同ID再送、時刻窓、source/action偽装の拒否 | `api/domains/tool-runtime/test/action-requests.test.ts` |
 | 画面 | 入口一件、操作、競合、通信断からの照合 | Web adapterの試験、`tests/browser/<domain>.spec.ts` |
 | 自然言語受入 | 凍結した目的・基準で、host状態から判定 | [自然言語UI受入](nl-acceptance.md) |
@@ -517,7 +517,7 @@ builtins.push(briefSkill, {
 | 2 | `api/domains/capabilities/builtin/<対象>.ts` | toolのDefinitionを追加し、利用packageの新revisionに依存とtoolRevisionIdsを追加 |
 | 3 | `api/domains/capabilities/contracts/runtime-meta.ts` | toolsへ操作分類・URL範囲・保存本文の要否を登録 |
 | 4 | 所有domainのadapter/service | tool IDを実際の公開操作へ変換し、入出力を共通契約へ合わせる |
-| 5 | `api/application/toolchain.ts`、必要なら`research-history-ports.ts` | 外部・保存本文・履歴の適切な実行先へ接続する |
+| 5 | `api/application/toolchain/toolchain.ts`、必要なら`research-history-ports.ts` | 外部・保存本文・履歴の適切な実行先へ接続する |
 | 6 | Bの起動先と試験 | 改訂packageを起動し、モデルへ提示されたツールを実行して結果を返す |
 
 会話が既存の担当を選び、workerが新ツールを使うだけなら、会話のツールを増やす必要はない。Provider側のschemaも含め、提示する引数とホストが受理する引数を一致させる。Zodの独自refineがJSON Schemaで表現されない場合は、既存の契約変換とホスト検査の両方を確認する。
@@ -564,7 +564,7 @@ metadataはrevision本文に保存されず、ID単位で全revisionへ適用さ
 
 | 種類 | 主な変更先 | 最小の接続単位 |
 | --- | --- | --- |
-| 別サービスから資料を取得 | 所有domain、`api/application/toolchain.ts`、capabilitiesのseed/backend有効集合 | 受付・キュー実行・取得結果・取消・根拠の所有者/版検査 |
+| 別サービスから資料を取得 | 所有domain、`api/application/toolchain/toolchain.ts`、capabilitiesのseed/backend有効集合 | 受付・キュー実行・取得結果・取消・根拠の所有者/版検査 |
 | 同じツール群を別モデルで実行 | `api/domains/inference/contracts/index.ts`、同service/adapter、agent-runtimeのstart-task/step-handler、会話の公開条件 | engineの保存・capture・execute・receipt採用・stream/非stream・取消 |
 | データを書き換える操作 | 所有domainの公開操作、tool-runtimeのActionAdapter/ActionEnvelope、agent-runtime、会話と結果返却 | 現在の人間の依頼による権限・冪等性・transaction・操作receipt・失効 |
 
@@ -593,7 +593,7 @@ export const archiveBuiltins: Definition[] = [
 ];
 ```
 
-1. `builtin-seed.ts`で配列をimportし、`backends.has("archive")`のとき依存順に登録する。`api/application/toolchain.ts`の有効backend集合へ、サービスが利用可能な場合だけarchiveを追加する。
+1. `builtin-seed.ts`で配列をimportし、`backends.has("archive")`のとき依存順に登録する。`api/application/toolchain/toolchain.ts`の有効backend集合へ、サービスが利用可能な場合だけarchiveを追加する。
 2. `runtime-meta.ts`のtoolsへ `"archive.read": {operation:"read",urlScope:"request_or_observed"}`、packagesへ `"archive.read": {budget:"quick",report:"search"}` を追加する。この予算とV2報告が用途に合う場合に限る。
 3. 所有domainで以下のToolAdapter契約を実装し、application層で既存adapterと接続する。ネットワーク実行はtransaction内に置かず、キューの実行段階へ渡す。
 4. `get`と`cancelInTransaction`はtool IDを受け取らないため、受付時のoperationIdから同じbackendへ戻せるようにする。開始だけを新サービスへ向け、完了照会や取消をWebへ流さない。再起動後の照合も所有domainの保存情報を使う。
@@ -610,7 +610,7 @@ export const archiveBuiltins: Definition[] = [
 
 契約の正本は[ToolAdapterとToolResult](../api/domains/tool-runtime/contracts/index.ts)。現在の`research-history-ports.ts`はWeb保存本文と履歴を扱うため、新backendの資料を無条件に渡さない。受け取る資料に応じた変換と検査をapplication層で接続する。新backend固有のデータを、架空の履歴参照や既存Webの所有者参照に置き換えない。
 
-別モデルの最小参照実装は[Codexアダプタ](../api/domains/inference/adapters/codex-research.ts)、更新操作は[timer-operation](../api/domains/agent-runtime/service/timer-operation.ts)と`api/application/toolchain.ts`のtimerActions。サービス仕様の違う新担当に、そのまま流用して完成と扱わない。接続設定・認証・取消・receiptを満たす最小範囲を実装する。
+別モデルの最小参照実装は[Codexアダプタ](../api/domains/inference/adapters/codex-research.ts)、更新操作は[timer-operation](../api/domains/agent-runtime/service/timer-operation.ts)と`api/application/toolchain/toolchain.ts`のtimerActions。サービス仕様の違う新担当に、そのまま流用して完成と扱わない。接続設定・認証・取消・receiptを満たす最小範囲を実装する。
 
 ### 付録R revision更新と起動時登録
 

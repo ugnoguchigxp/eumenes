@@ -1,7 +1,7 @@
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { harness } from "../api/application/toolchain.fixture";
+import { harness } from "../api/application/toolchain/toolchain.fixture";
 import { createTerminals } from "../api/domains/terminals";
 
 // The task board over a fake `claude` (shell script) on real PTYs. The fake reports through the

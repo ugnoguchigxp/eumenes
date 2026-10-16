@@ -5,7 +5,7 @@ description: Add, revise, or migrate an Eumenes toolchain in the data-driven for
 
 # データドリブン形式のツールチェーン追加・移行
 
-正本は `docs/toolchain-extension.md`（手順）と `docs/toolchain-extension-verification.md`（検証）。この skill は作業順と判断の要点だけを持つ。細部は必ず正本を読む。実在の完成例は `api/domains/capabilities/bundles/timers.bundle.json`、`api/application/timer-adapter.ts`、`web/src/domains/timers/toolchain-adapter.tsx`。
+正本は `docs/toolchain-extension.md`（手順）と `docs/toolchain-extension-verification.md`（検証）。この skill は作業順と判断の要点だけを持つ。細部は必ず正本を読む。実在の完成例は `api/domains/capabilities/bundles/timers.bundle.json`、`api/application/timers/timer-adapter.ts`、`web/src/domains/timers/toolchain-adapter.tsx`。
 
 ## 0. 着手前に決める
 
@@ -15,7 +15,7 @@ description: Add, revise, or migrate an Eumenes toolchain in the data-driven for
    - 既存adapterに操作が要る → adapter操作＋入力schema＋bundle（§4）。
    - 新しいdomain → DomainAdapter＋Web adapter＋登録各1行＋bundle（§5）。
    - 旧形式の移行 → §6（§5に加え旧経路を削除）。
-   - 単純HTTP APIだけで済ませたい → 現状は未対応（http-json実行器はhost未接続）。adapterで実装する。
+   - 単純HTTP APIだけで済ませたい → 現状は未対応（bundleはcommand bindingのみ）。adapterで実装する。
 3. `git status` で対象ファイルが他作業で未commitになっていないか確認する。他人の変更には触れない。
 
 ## 1. bundle を書く（全種類で必要）
@@ -37,7 +37,7 @@ description: Add, revise, or migrate an Eumenes toolchain in the data-driven for
 ## 2. adapter が要る場合
 
 - backend: `DomainAdapter`（`api/domains/tool-runtime/contracts/adapters.ts`）を `api/application/<domain>-adapter.ts` に実装。操作は domain の**既存の公開 transaction 操作**を呼ぶだけにし、業務判断・時計・保存は domain に残す。拒否は `/^[a-z_]+$/` の code で投げる。会話 origin では `snapshotInTransaction` で見せた対象だけを許す。
-- 登録: `api/application/toolchain.ts` の `createAdapterRegistry([...])` と `api/application/toolchain-adapters.ts` の `hostAdapterDescriptions`（結果schemaがあれば `domainSchemas`）に各1件。
+- 登録: `api/application/toolchain/toolchain.ts` の `createAdapterRegistry([...])` と `api/application/toolchain/toolchain-adapters.ts` の `hostAdapterDescriptions`（結果schemaがあれば `domainSchemas`）に各1件。
 - 入力schemaを足すなら `api/domains/capabilities/contracts/` に**新しい**キーを追加（既存キーは変えない）。bundle内 `schemas[]` の有限subsetで済むならコード不要。
 - Web: `WebArtifactAdapter` を `web/src/domains/<domain>/toolchain-adapter.tsx` に実装し、`web/src/workspace/toolchain-adapters.ts` に1行。`WorkspaceArtifacts` に分岐を足さない。`settled` で確定receiptを画面へ、`refresh` で競合時に読み直す（自動再送しない）。
 

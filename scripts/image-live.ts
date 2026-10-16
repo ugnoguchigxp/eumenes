@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createLarmPlayground, type LarmPort } from "../api/domains/larm";
 import { resolveLarmToken } from "../api/infrastructure/auth-config";
-import { harness } from "../api/application/toolchain.fixture";
+import { harness } from "../api/application/toolchain/toolchain.fixture";
 import { createLiveLarm, liveLarmSettings } from "./live-larm";
 if (!process.argv.includes("--run"))
 	throw new Error(

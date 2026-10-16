@@ -6,7 +6,7 @@ import { openStore, type SqliteStore } from "../infrastructure/sqlite";
 import { createTaskReports } from "../domains/task-reports";
 import { createTasks } from "../domains/tasks";
 import { createTaskSchema } from "../domains/tasks/contracts";
-import { purgeTaskDependents } from "./coding-supervision";
+import { purgeTaskDependents } from "./work/coding-supervision";
 import { migrations } from "./migrations";
 
 const stores: SqliteStore[] = [],

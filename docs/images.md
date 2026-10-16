@@ -23,7 +23,7 @@ WebとclientはAPIを使い、画像URLは同一originの認証proxyを通りま
 
 ## 検証
 
-固定試験: `bun test api/domains/image/test api/domains/larm/test/image-library.test.ts api/domains/capabilities/test/image.test.ts api/application/image-e2e.test.ts`。JSON合成・ホスト操作は`web/src/domains/image/`、部品はDesignSystemのImageWorkspace、画面操作は`tests/browser/image.spec.ts`で確認します。所有domainと影響のある利用側domainをverifyし、ブラウザE2Eは対象domainの試験ファイルを指定して個別に実行します。
+固定試験: `bun test api/domains/image/test api/domains/larm/test/image-library.test.ts api/domains/capabilities/test/image.test.ts api/application/media/image-e2e.test.ts`。JSON合成・ホスト操作は`web/src/domains/image/`、部品はDesignSystemのImageWorkspace、画面操作は`tests/browser/image.spec.ts`で確認します。所有domainと影響のある利用側domainをverifyし、ブラウザE2Eは対象domainの試験ファイルを指定して個別に実行します。
 
 実接続: `bun scripts/image-live.ts --run`は隔離backendの設定APIに接続先を保存し、実モデルの担当選択から画像生成までを一度だけ行います。`--library-only`では新しい画像を生成せず、実モデルの一覧表示計画とLARM一覧取得を確認します。生成した確認画像はLARMに残します。結果は`verification-reports/image-toolchain/`に保存し、通常ログには本文や秘密を入れません。
 

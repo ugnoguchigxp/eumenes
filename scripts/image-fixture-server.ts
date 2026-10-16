@@ -1,5 +1,5 @@
-import { harness } from "../api/application/toolchain.fixture";
-import { imageFixture } from "../api/application/image.fixture";
+import { harness } from "../api/application/toolchain/toolchain.fixture";
+import { imageFixture } from "../api/application/media/image.fixture";
 const f = imageFixture();
 const h = await harness({
 	model: f.model,

@@ -74,52 +74,6 @@ export const commandBindingV1 = z.strictObject({
 	questions: z.array(bindingQuestion).max(8).optional(),
 });
 export type CommandBindingV1 = z.infer<typeof commandBindingV1>;
-
-const fieldMap = z.record(
-	z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,40}$/),
-	z.union([
-		z.strictObject({ literal: z.union([z.string(), z.number(), z.boolean()]) }),
-		z.strictObject({
-			inputField: z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,40}$/),
-		}),
-	]),
-);
-/**
- * A simple declarative HTTP JSON API (§5.3). Finite field mapping only: literals and fields of
- * the validated input. The connection (base URL, credentials) is resolved by the backend from a
- * registered connection; the model and the browser never choose the destination.
- */
-export const httpJsonBindingV1 = z.strictObject({
-	kind: z.literal("http-binding"),
-	id: slug,
-	revision: revisionNumber,
-	transport: z.literal("http-json"),
-	connectionRef: hostRef("connection"),
-	method: z.enum(["GET", "POST"]),
-	pathTemplate: z
-		.string()
-		.regex(/^\/[A-Za-z0-9._~\-/{}]{0,200}$/)
-		.refine((p) => !p.includes(".."), "path"),
-	pathFields: fieldMap.default({}),
-	queryFields: fieldMap.default({}),
-	bodyFields: fieldMap.default({}),
-	inputSchemaRef: schemaRef,
-	outputSchemaRef: schemaRef,
-	permission: z.enum(["read", "write"]),
-	timeoutMs: z.number().int().min(100).max(30_000),
-	maxResponseBytes: z.number().int().min(1).max(1_048_576),
-	retry: z.union([
-		z.strictObject({ mode: z.literal("none") }),
-		/** POST may be resent only with a registered idempotency key header and lookup. */
-		z.strictObject({
-			mode: z.literal("idempotency-key"),
-			header: z.string().regex(/^[A-Za-z][A-Za-z0-9-]{0,60}$/),
-			maxAttempts: z.number().int().min(1).max(3),
-		}),
-	]),
-});
-export type HttpJsonBindingV1 = z.infer<typeof httpJsonBindingV1>;
-
 /** Where one OpenUI source's data comes from: a registered adapter query. */
 const sourceBindingV1 = z.strictObject({
 	/** The `source` name used inside the OpenUI definition. */
@@ -531,10 +485,7 @@ export const capabilityBundleV1 = z.strictObject({
 	bundleId: slug,
 	pins: z.array(bundlePin).max(64).default([]),
 	definitions: z.array(z.record(z.string(), z.unknown())).max(64),
-	bindings: z
-		.array(z.union([commandBindingV1, httpJsonBindingV1]))
-		.max(32)
-		.default([]),
+	bindings: z.array(commandBindingV1).max(32).default([]),
 	artifacts: z.array(artifactDefinitionV1).max(16).default([]),
 	schemas: z.array(bundleSchemaV1).max(32).default([]),
 });
@@ -581,7 +532,6 @@ export type BundleHost = {
 	projections: ReadonlySet<string>;
 	/** `domain:` refs the host registered (builtin and bundle refs are checked by capabilities). */
 	domainSchemas: ReadonlySet<string>;
-	connections: ReadonlySet<string>;
 };
 
 /** One reason a bundle cannot be registered; the dry-run lists all of them. */

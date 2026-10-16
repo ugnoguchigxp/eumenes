@@ -7,7 +7,7 @@ import {
 	boot,
 	SCOPE,
 	type Step,
-} from "../api/application/world-research.fixture";
+} from "../api/application/world/world-research.fixture";
 import { createLiveLarm } from "./live-larm";
 import { worldDocumentInput } from "../api/domains/world/contracts/documents";
 

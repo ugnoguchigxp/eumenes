@@ -46,8 +46,8 @@
 | もの | 場所 |
 | --- | --- |
 | bundle（担当・SKILL・tool・package・toolchain・binding・画面） | `api/domains/capabilities/bundles/kanban.bundle.json` |
-| adapter（操作・UI の読取り・会話の snapshot・選択肢） | `api/application/kanban-adapter.ts` |
-| 会話に見せる形（snapshot・選択肢・`kanban.list` の結果・各操作の回答用 projection） | `api/application/kanban-conversation.ts` |
+| adapter（操作・UI の読取り・会話の snapshot・選択肢） | `api/application/work/kanban-adapter.ts` |
+| 会話に見せる形（snapshot・選択肢・`kanban.list` の結果・各操作の回答用 projection） | `api/application/work/kanban-conversation.ts` |
 | 入力の型（flat object） | `api/domains/capabilities/contracts/kanban.ts`（`builtin:kanbanAdd` ほか） |
 | 業務判断（列・revision・キュー・commit & push の起点） | `api/domains/kanban/**`（adapter は公開操作を呼ぶだけ） |
 
@@ -60,7 +60,7 @@
 ### 試験
 
 ```sh
-bun test api/application/kanban-toolchain.test.ts api/application/kanban-adapter.test.ts api/application/kanban-conversation.test.ts api/application/claude-code-toolchain.test.ts
+bun test api/application/work/kanban-toolchain.test.ts api/application/work/kanban-adapter.test.ts api/application/work/kanban-conversation.test.ts api/application/work/claude-code-toolchain.test.ts
 bun run toolchain:bundle -- check api/domains/capabilities/bundles/kanban.bundle.json
 bun run verify -- --domain kanban
 ```

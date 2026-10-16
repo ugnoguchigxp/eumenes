@@ -6,7 +6,6 @@ import {
 	artifactDefinitionV1,
 	capabilityBundleV1,
 	commandBindingV1,
-	httpJsonBindingV1,
 	hash,
 	validators,
 	type ArtifactDefinitionV1,
@@ -86,8 +85,6 @@ function definitionSources(node: unknown, out = new Set<string>()) {
 			else definitionSources(value, out);
 	return out;
 }
-const placeholders = (path: string) =>
-	[...path.matchAll(/\{([A-Za-z][A-Za-z0-9_]*)\}/g)].map((m) => m[1]!);
 
 type Adapter = NonNullable<ReturnType<BundleHost["adapters"]["get"]>>;
 type Entry = { d: Definition; path: string };
@@ -122,7 +119,7 @@ function collectDocs(bundle: Parsed): Doc[] {
 			path: `schemas/${i}`,
 		})),
 		...bundle.bindings.map((b, i) => ({
-			kind: (b.kind === "binding" ? "binding" : "http-binding") as DocumentKind,
+			kind: "binding" as const,
 			itemId: b.id,
 			revision: b.revision,
 			revisionId: `binding:${b.id}@${b.revision}`,
@@ -319,27 +316,6 @@ function checkCommandBinding(
 	);
 }
 
-function checkHttpBinding(
-	c: Check,
-	b: z.infer<typeof httpJsonBindingV1>,
-	path: string,
-) {
-	const { host, issue } = c;
-	if (!host.connections.has(b.connectionRef))
-		issue("unknown_reference", `${path}/connectionRef`, b.connectionRef);
-	c.schemaRef(b.inputSchemaRef, `${path}/inputSchemaRef`);
-	c.schemaRef(b.outputSchemaRef, `${path}/outputSchemaRef`);
-	if (b.method === "GET" && b.permission !== "read")
-		issue("permission", `${path}/permission`);
-	if (b.method === "GET" && Object.keys(b.bodyFields).length)
-		issue("invalid_format", `${path}/bodyFields`);
-	if (b.retry.mode === "idempotency-key" && b.method !== "POST")
-		issue("invalid_format", `${path}/retry`);
-	const wanted = placeholders(b.pathTemplate).sort().join(",");
-	if (wanted !== Object.keys(b.pathFields).sort().join(","))
-		issue("invalid_format", `${path}/pathFields`);
-}
-
 type Artifact = z.infer<typeof artifactDefinitionV1>;
 
 /** Source name to its adapter, for the sources whose adapter and query the host runs. */
@@ -426,10 +402,9 @@ function checkVariants(
 }
 
 function checkBindingsAndArtifacts(c: Check) {
-	c.bundle.bindings.forEach((b, i) => {
-		if (b.kind === "binding") checkCommandBinding(c, b, `bindings/${i}`);
-		else checkHttpBinding(c, b, `bindings/${i}`);
-	});
+	c.bundle.bindings.forEach((b, i) =>
+		checkCommandBinding(c, b, `bindings/${i}`),
+	);
 	c.bundle.artifacts.forEach((a, i) => {
 		const path = `artifacts/${i}`;
 		const adapterOf = checkSources(c, a, path);

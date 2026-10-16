@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { chromium, expect } from "@playwright/test";
 import { createLarmPlayground, type LarmPort } from "../api/domains/larm";
 import { resolveLarmToken } from "../api/infrastructure/auth-config";
-import { harness } from "../api/application/toolchain.fixture";
+import { harness } from "../api/application/toolchain/toolchain.fixture";
 import { createFixture } from "../tests/browser/fixture";
 import { createLiveLarm, liveLarmSettings } from "./live-larm";
 if (!process.argv.includes("--run"))
