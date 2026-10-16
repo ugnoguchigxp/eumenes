@@ -122,7 +122,7 @@ test("native decision shares the voice lease, uses its own auth, and rotates cre
 				expect(headers.get("Accept")).toBe("application/json");
 				return result({
 					answers: {
-						motion: { type: "choice", choice: "greeting", confidence: 0.9 },
+						emotion: { type: "choice", choice: "none", confidence: 0.9 },
 					},
 				});
 			}
@@ -132,18 +132,22 @@ test("native decision shares the voice lease, uses its own auth, and rotates cre
 	try {
 		await larm.prepareVoice!(freshSignal());
 		const questions = {
-			motion: {
+			emotion: {
 				type: "choice" as const,
 				instructions: "choose",
-				criteria: { greeting: "hello" },
+				criteria: { none: "plain", warmth: "hello" },
 			},
 		};
-		await larm.judge!({ utterance: "こんにちは" }, questions, freshSignal());
+		await larm.judge!(
+			{ current_chunk: "こんにちは" },
+			questions,
+			freshSignal(),
+		);
 		await larm.speak("こんにちは", freshSignal());
 		expect(bodies).toEqual([
 			{
 				model: "model-system-one",
-				state: { utterance: "こんにちは" },
+				state: { current_chunk: "こんにちは" },
 				questions,
 			},
 		]);

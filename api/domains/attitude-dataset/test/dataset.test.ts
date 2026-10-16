@@ -202,13 +202,23 @@ test("stop, cancellation and restart reject collection late responses; no second
 	expect(service.status().enabled).toBe(false);
 	expect(service.status().pending).toBe(0);
 });
-test("non-ruri, malformed, timeout, probes and missing identity never count as successful real Ruri units", async () => {
+test("unscored, malformed, timeout, probes and missing identity never count as successful classifier units", async () => {
 	const { service } = setup();
 	await service.setEnabled(true);
 	await service.decide({
 		...args("laya"),
 		model: "laya-multilingual",
-		judge: async () => ({ ...result(), model: "laya-multilingual" }),
+		judge: async () => ({
+			model: "laya-multilingual",
+			answers: {
+				emotion: {
+					type: "choice",
+					choice: "none",
+					confidence: 0.9,
+					answer_confidence: 0.9,
+				},
+			},
+		}),
 	});
 	await service.decide({
 		...args("bad"),
