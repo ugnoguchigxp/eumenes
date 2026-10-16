@@ -30,4 +30,4 @@ live補足: ブラウザ切り分けの追加1回は実PortのanswerStreamが残
 
 差分点検: 既存Opus作業の差分を保持した。発話の語句によるルーティング・独自のタグ辞書・別タグ生成モデルを追加していない。追加の正規表現は曲ID、URL、エラーコードの契約・安全性検査に限定する。担当外の変更を追加していない。お気に入り変更・削除はfixtureのみ、実スピーカーの聴取は未実施。今回の実装・固定試験・live確認の残作業はなし。実機器確認済みとは扱わない。
 
-証拠: [検証資料](verification/music-playback-2026-10-11/README.md) にdomainログ、全体gateのJSONとログ、実LLM会話・実LARM読取とRangeの時系列、プレイヤー画像を保存した。接続設定は保存済みのControlを正本とし、設定の変更・credentialのコピーは行っていない。
+証拠: [検証資料](../verification/music-playback-2026-10-11/README.md) にdomainログ、全体gateのJSONとログ、実LLM会話・実LARM読取とRangeの時系列、プレイヤー画像を保存した。接続設定は保存済みのControlを正本とし、設定の変更・credentialのコピーは行っていない。

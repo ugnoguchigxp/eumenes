@@ -1,6 +1,6 @@
 # 日英混在回答の区間別TTS振分け（正規表現判定）実装計画 2026-10-16
 
-状態: 実装済み・fixture検証済み（2026-10-16、`bun run verify -- --domain delivery --domain inference --domain larm --domain voice-dialogue --domain settings` 通過）。live（`mixed-speech-live`）と実機器受入は未実施。[Ruri文章二分類計画](ruri-sentence-language-tts-implementation-plan-2026-10-12.md) を廃案にし、本計画で置き換える。
+状態: 実装済み・fixture検証済み（2026-10-16、`bun run verify -- --domain delivery --domain inference --domain larm --domain voice-dialogue --domain settings` 通過）。live（`mixed-speech-live`）と実機器受入は未実施。[Ruri文章二分類計画](.archived/ruri-sentence-language-tts-implementation-plan-2026-10-12.md) を廃案にし、本計画で置き換える。
 
 ## 1. 目的と方針
 

@@ -284,4 +284,4 @@ LLMは利用者の意図を解釈し、対応能力の範囲内で変更案を�
 - [DesignSystemとOpenUIとArtifactの登録手順](../docs/toolchain-extension.md#10-e-designsystemopenuiartifactを追加する)
 - [UIの検証手順](../docs/toolchain-extension-verification.md#uiを追加変更した場合)
 - [現行設定と接続仕様](../docs/settings.md)
-- [Ruri文章言語判定の実装計画](ruri-sentence-language-tts-implementation-plan-2026-10-12.md)
+- [Ruri文章言語判定の実装計画](.archived/ruri-sentence-language-tts-implementation-plan-2026-10-12.md)

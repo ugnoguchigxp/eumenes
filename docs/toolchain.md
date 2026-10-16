@@ -30,22 +30,28 @@ streamでは、function名や制御区切りになり得る末尾だけを保留
 
 | 会話の関数 | ツールチェーン | package | 実行 | 検索 | 読取り | 保存本文 | モデル呼出し | 報告 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `web_search` | `web.search` | `package:web.recipe@1` | 調査担当(LARM)、手順キャッシュ付き | 1 | 2 | なし | 5 | search報告 |
-| `web_research` | `web.research.luna` | `package:web.search@1` | Codex Luna | 1 | 3 | 4 | 12 | search報告 |
+| `web_search` | `web.search` | `package:web.recipe@3` | 調査担当(LARM)。guided。手順キャッシュ付き | 2 | 4 | 保存本文はlocal予算 | 5 | guided報告 |
+| `web_research` | `web.research.luna` | `package:web.search@3` | Codex Luna。guided | 2 | 6 | 保存本文はlocal予算 | 12 | guided報告 |
 | `conversation_history` | `history.research` | `package:history.research@2` | 調査担当 | — | — | 履歴 | 7 | V3報告 |
+| `world_query` | `world.query` | `package:world.query@5` | World有効時の調査担当。ホスト内の読取 | — | — | Worldの主張・収集資料 | 7 | search報告 |
 | `timer` | `timers.manage` | `package:timers.manage@1` | 操作担当→タイマー操作 | — | — | — | 1+回答 | 操作結果 |
 | `music` / `music_library` | `music.create` / `music.library` | `package:music.create@2` / `package:music.playback@1` | 音楽domainの計画担当 | — | — | — | 計画+回答 | 音楽結果 |
 | `delegate_project` | `dots.delegate` | `package:dots.orchestrate@2` | 操作担当→dots委任 | — | — | — | 1+回答 | 委任結果 |
+| `ocr` | `ocr.manage` | `package:ocr.manage@1` | 操作担当→OCR | — | — | — | — | 操作結果 |
+| `kanban` / `codex_tasks` | `kanban.manage` / `codex-tasks.manage` | `package:kanban.manage@2` / `package:codex-tasks.manage@1` | 操作担当→タスクボード | — | — | — | — | 操作結果 |
+| `claude_code` | `claude-code.request` | `package:claude-code.request@2` | 操作担当→作業依頼表 | — | — | — | — | 受付 |
+| `ui_create` | UI自由制作 | `package:ui.compose@1` | 制作担当 | — | — | — | — | 作品参照 |
+| `memory_request` | `steward.request` | `package:steward.request@2` | 記憶担当への依頼 | — | — | — | — | 依頼結果 |
 
 候補の提示: 発話(直前の会話の短い抜粋を含む)に対し、ツールチェーンの`title`・`summary`・`useWhen`・`examples`へのFTS(trigram)、LARMのembedding(multilingual-e5-small、passageとして保存、発話はquery)、似た依頼での過去の選択をRRFで統合し、上位4件を関数として提示します。embeddingを利用できない・ベクトル未生成の間は、利用可能な全ツールチェーンを提示します。候補検索は分類ではなく、選択は会話担当が行います。似た依頼での過去の選択(依頼文・関数名・結果)を最大3件、参考データとして会話担当へ渡します。
 
 選択の記録: 会話の判断ごとに、提示した候補(順位・FTS順位・類似度・過去の選択由来)、判断(ツールチェーン・回答・契約違反)、選んだ関数と渡した依頼、サブエージェントのtask、結果(outcome)、手順キャッシュの利用を `toolchain-history` に30日保存します。`/api/toolchain-history/selections`、`bun run cli -- toolchain-history list|show`、設定「ツールチェーンの記録」で確認できます。ログには相関IDと固定分類だけを出し、依頼文は出しません。
 
-`web_search` の手順キャッシュ: サブエージェントは最初に`recipe.find`で保存済みの取得手順を探し、同じ要求かをLLMが判断します。一致すればそのURLを取得し直して回答し、なければ検索1回・読取り1回で調べます。answeredで、読み取ったページを根拠に引用した場合だけ、報告の`recipe`(signature・URL・読む箇所)をホストが保存します。値は保存しません。同じ手順の取得が3回続けて失敗すると停止します。
+`web_search` の手順キャッシュ: サブエージェントは最初に`recipe.find`で保存済みの取得手順を探し、同じ要求かをLLMが判断します。一致すればそのURLを取得し直して回答し、なければ `web_search` の予算（検索2、ページ読取4、モデル呼出し5）の範囲で調べます。answeredで、読み取ったページを根拠に引用した場合だけ、報告の`recipe`(signature・URL・読む箇所)をホストが保存します。値は保存しません。同じ手順の取得が3回続けて失敗すると停止します。
 
 操作担当(`timer`・`delegate_project`): ツールチェーンのprofile・SKILL・ツール詳細とsnapshot(タイマー一覧・委任catalog)を読み込み、ツールを一つ選んで平坦な引数で返すか、確認質問を一つ返します。ホストは型付きの操作に変換して既存の実行経路で実行します。確認質問は会話担当が自分の言葉で尋ねます。
 
-search報告の経路(`web.recipe@1`・`web.search@1`)は既存の検索報告処理を使い、quickは簡単な検索の指示、Lunaは検索用の指示を使います。検索抜粋で回答可能ならそこで報告し、本文は必要なときだけ読みます。要件抽出・確認profile・要件別の採点・finish後の意味検証はありません。既存の報告version 2と出典参照検査を再利用し、成功時はfinishから直接会話回答へ進みます。構造や参照が不正な場合の修正(一回まで)、権限・取消・期限の検査は維持します。ニュースは指定件数、指定がなければ重要度順の3〜5トピックを短く要約し、内容の裏取り・逐語照合・採点はしません。情報が少なければ得られた分を返し、抜粋だけの結果はpartialを保持します。各モデル呼出しは独立しているため、有効な根拠の正確な抜粋と実行済みの操作条件を毎回提示します。
+公開中のWeb経路（`package:web.recipe@3`・`package:web.search@3`、schema `guidedResearch`、SKILL `skill:web.guided@2`）は、検索結果の抜粋を主張の根拠にしません。必要な事実は本文の提示箇所で確認します。`web.read` は `{url}` だけを受け、次候補を `readAhead` で最大5件指定できます。ホストは最初の2件を開始し、新しい本文が無いまま10秒経つと次の2件を追加します。保存済み本文の `web.find` / `web.read_saved` と手順の `recipe.find` はページ読取とは別のlocal予算（4）です。`finish.report` は `completion`、利用者へ届く `answer`、`summary`、事実ごとの `claims`（`verified` / `unknown` / `conflicting` と本文根拠 `eN`）、`limitations` を持ちます。十分性の判断と回答は同じfinishで返し、別の採点呼出しは追加しません。不明や矛盾を説明した回答は `complete` にできます。構造や参照が不正な場合の修正（一回まで）、権限・取消・期限の検査は維持します。各モデル呼出しは独立しているため、有効な根拠の抜粋と実行済みの操作条件を毎回提示します。
 
 実装目標(SystemContextの層構成、会話方針と公開ツールの一致、結果返却の必須規則など)と現行との差分は [Web検索 実装目標](../spec/web-search-target-2026-10-11.md) にあります。今回の会話契約と根拠容量の修正範囲は[実装計画](../spec/web-search-repair-implementation-plan-2026-10-11.md)のA〜Dです。後続の構造改善とは区別します。
 
@@ -53,7 +59,7 @@ Lunaはbackendの `@openai/codex-sdk@0.160.0` から `startThread` / `runStreame
 
 各stepは空の一時ディレクトリでephemeral・read-onlyとして実行し、ユーザー設定・exec規則・native検索・shell・JS実行・MCP・apps・追加エージェントを使いません。CLIの保存済み認証だけを再利用し、製品DB・LARM認証・設定を渡しません。stepの固定指示(共通規則・経路方針・TOOLS・OUTPUT_SCHEMA)だけでCLIの基本指示を置き換え、修正依頼などstepごとの通知・依頼データ・取得資料はJSONの入力として渡します。出力schemaはworkerの契約から値として受け取り、指示文から読み戻しません。取消は子processの終了を待たずに失敗として返し、終了の回収は最大1.5秒だけ待ちます。イベント列(256 KiB)と最終応答(64 KiB)の上限は別です。ホストのSKILL・plugin・画像生成・ブラウザ等の不要な機能も無効にします。出力定義をSystemContextへ渡し、SDKのagent_messageの最後の応答を、`turn.completed` が一件で全イベントの正常終了を確認して採用します。途中の候補、失敗・未完了・重複完了を採用しません。SDKに公開されていないephemeral・設定/exec規則の無視・process groupの強制終了・イベント256 KiB/エラー出力64 KiBの容量制約だけを小さな起動補助で強制します。SDKがモデル呼出し・JSONL解析・turnイベントを扱い、起動補助は調査判断を行いません。一時ファイルは終了・取消時に削除します。途中の説明文を操作として実行しません。Lunaは既存のinvoke/finish契約で操作を選び、Eumenesの検索・本文取得・保存本文・資料guard・根拠参照を使います。担当は子の入力と推論requestへ保存され、step間で変わりません。共通の期限・取消・receipt採用検査を通し、CLIの終了と取消では所有するprocess groupを停止します。Providerの生応答はログへ保存しません。SDKの接続方法は[公式SDK仕様](https://developers.openai.com/codex/sdk)に従います。起動補助が必要な根拠は、採用SDKのThreadOptionsにephemeral/ignore-user-config/ignore-rulesがなく、AbortSignalのSIGTERMだけでは終了を拒む子や孫が残る取消回帰試験です。
 
-子は取得本文を読み、短い要約、主張、出典、未確認点を返します。メインへ本文・生引用・ページタイトルは渡しません。主張の引用が実際に子へ提示した資料に含まれるかを確認しますが、この検査だけで主張の意味まで正しいと保証するものではありません。メインでも報告を未信頼データとして扱います。調査cardに進行状態・停止・出典・確認できなかった点を表示します。
+子は取得本文を読みます。guidedのWeb経路は利用者向けのanswerと事実ごとの確度を、履歴経路は短い要約と主張を返します。メインへ本文・生引用・ページタイトルは渡しません。主張の引用が実際に子へ提示した資料に含まれるかを確認しますが、この検査だけで主張の意味まで正しいと保証するものではありません。メインでも報告を未信頼データとして扱います。調査cardに進行状態・停止・出典・確認できなかった点を表示します。
 
 話題や地域を限定せず、検索・本文取得・保存本文の確認を使います。検索語、取得先、資料の解釈はLLMが選びます。天気・株価専用の読取りや、発話の固定文法による取得先学習は実行しません(手順キャッシュの一致判断はLLMが行います)。上流の取得拒否やguard拒否を迂回しません。結果データは14日、本文を含まない処理metadataは30日で整理し、既存の会話は残します。
 
@@ -63,7 +69,7 @@ domain の責務は [domains.md](domains.md)、Web 取得は [web-research.md](w
 
 ## 要件profileとV3報告
 
-要件profileとV3報告は `history` 経路だけが使います。Web経路(`web.recipe@1`・`web.search@1`)はprofileを受けず、指定された場合は開始時に `invalid_requirement_contract` で拒否します。
+要件profileとV3報告は `history` 経路だけが使います。Web経路（`web.recipe@3`・`web.search@3`）はprofileを受けず、指定された場合は開始時に `invalid_requirement_contract` で拒否します。
 
 利用者が再利用する確認基準は `kind:requirement` のデータとして登録します。要件profileは実行権限を持たず、package検索・ツールの依存閉包へ入りません。履歴のサブエージェントは、開始時に固定した要件catalogから適用するprofileの短いrefを最初の応答で選びます(最大4件)。会話担当はprofileを選びません。workerは最初の操作と同じ応答で依頼の条件を抽出し、ホストが登録profileと合成して、取得開始前に凍結します。原文、版付きSKILL/profileの本文、選択した要件データがモデル入力へ届きます。
 

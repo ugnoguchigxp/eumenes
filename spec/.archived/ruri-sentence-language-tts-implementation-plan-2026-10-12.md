@@ -1,6 +1,6 @@
 # Ruri 文章言語判定と TTS 振分けの実装計画
 
-> 2026-10-16 廃案。Ruriによる判定をやめ、[正規表現判定の計画](regex-speech-language-routing-plan-2026-10-16.md) に置き換える。
+> 2026-10-16 廃案。Ruriによる判定をやめ、[正規表現判定の計画](../regex-speech-language-routing-plan-2026-10-16.md) に置き換える。
 
 作成日: 2026-10-12。状態: **Eumenesの接続準備と固定試験、日英TTSの公開接続確認を実施済み。二分類Providerの公開配備とEumenes公開API経路の接続を確認済み。全体gateと実機器受入は実施記録を参照**。
 
@@ -18,7 +18,7 @@
 | 公開接続 | 確定したLARM契約に対応し、discovery・確保・claim・認証・renew・解放と両TTSの実音声取得が通る |
 | 製品受入 | 公開APIとブラウザの経路で順次再生と失敗表示を確認し、全体検証と実機器3往復が通る |
 
-計画作成後の実装依頼に基づき作業を実施した。後掲の残作業と[検証記録](verification/ruri-sentence-language-2026-10-12/README.md)を正本とし、公開配備の未完了と区別する。
+計画作成後の実装依頼に基づき作業を実施した。後掲の残作業と[検証記録](../verification/ruri-sentence-language-2026-10-12/README.md)を正本とし、公開配備の未完了と区別する。
 
 ## Ruri 試作の前提
 
@@ -45,16 +45,16 @@ Eumenesはモデルファイルを直接読まず、学習データ・モデル�
 
 | 所有先と参照 | 現行動作と今回の判断 |
 | --- | --- |
-| [dialogueの生成処理](../api/domains/dialogue/service/generation-handler.ts) | Memory・World・担当結果等に応じて本文公開を保留する。保留条件を変更しない |
-| [voice-dialogueの回答処理](../api/domains/voice-dialogue/service/respond.ts) | 回答の完了・採用とautoSpeakを確認してから合成する。この順序を維持する |
-| [読み上げ本文の整形](../api/domains/voice-dialogue/service/spoken-text.ts) | 表示本文を保持したまま、引用リンク等を既存規則で読み上げ用に整える。全文を判定の入力にする |
-| [音声区間の分割](../api/domains/voice-dialogue/service/sentences.ts) | 読点・句点等と240文字の上限で分割する。これは文章言語を決める機能ではない |
-| [音声合成キュー](../api/domains/voice-dialogue/service/index.ts) | 未再生の合成音声を最大3区間に制限し、区間要求を作り、receiptを検査して採用する |
-| [inferenceの共通実行](../api/domains/inference/service/execute.ts) | 合成前処理、設定snapshot、期限、取消、結果・交換記録を扱う。分類はこの経路に付随させる |
-| [LARM接続](../api/domains/larm/service/connect.ts) | discovery・Connection確保・claim・renewを持つ。追加Providerも同じライフサイクルで扱う |
-| [LARM Provider管理](../api/domains/larm/service/profiles.ts) | `tts` と `system-one` はそれぞれ一つだけ。分類用と英語TTSを別に識別する最小拡張が必要 |
-| [Web再生キュー](../web/src/domains/voice-dialogue/hooks/index.ts) | 前の区間の再生終了と通知を待ち、原文順に進む |
-| [音声controller](../web/src/domains/audio/controller/index.ts) | 実際の終了通知、再生世代、停止後のcallback拒否を持つ |
+| [dialogueの生成処理](../../api/domains/dialogue/service/generation-handler.ts) | Memory・World・担当結果等に応じて本文公開を保留する。保留条件を変更しない |
+| [voice-dialogueの回答処理](../../api/domains/voice-dialogue/service/respond.ts) | 回答の完了・採用とautoSpeakを確認してから合成する。この順序を維持する |
+| [読み上げ本文の整形](../../api/domains/voice-dialogue/service/spoken-text.ts) | 表示本文を保持したまま、引用リンク等を既存規則で読み上げ用に整える。全文を判定の入力にする |
+| [音声区間の分割](../../api/domains/voice-dialogue/service/sentences.ts) | 読点・句点等と240文字の上限で分割する。これは文章言語を決める機能ではない |
+| [音声合成キュー](../../api/domains/voice-dialogue/service/index.ts) | 未再生の合成音声を最大3区間に制限し、区間要求を作り、receiptを検査して採用する |
+| [inferenceの共通実行](../../api/domains/inference/service/execute.ts) | 合成前処理、設定snapshot、期限、取消、結果・交換記録を扱う。分類はこの経路に付随させる |
+| [LARM接続](../../api/domains/larm/service/connect.ts) | discovery・Connection確保・claim・renewを持つ。追加Providerも同じライフサイクルで扱う |
+| [LARM Provider管理](../../api/domains/larm/service/profiles.ts) | `tts` と `system-one` はそれぞれ一つだけ。分類用と英語TTSを別に識別する最小拡張が必要 |
+| [Web再生キュー](../../web/src/domains/voice-dialogue/hooks/index.ts) | 前の区間の再生終了と通知を待ち、原文順に進む |
+| [音声controller](../../web/src/domains/audio/controller/index.ts) | 実際の終了通知、再生世代、停止後のcallback拒否を持つ |
 
 分類は、最初のLARM TTS要求の合成前処理で一度呼ぶ。判定対象はその要求の短い分割片ではなく、`spokenText(answer)` の全文とする。複数文の回答でも一つのラベルで全区間を振り分ける。文ごとの振分けを行うには入力単位と精度の別検証が必要である。
 
@@ -118,7 +118,7 @@ runId付きの再読み上げでは、採用済みの元回答から同じ整形
 
 ## 設定と TTS の振分け
 
-2026-10-12 20時の追加指定により、以下の英語voice・speedの可変設定と画面は廃止した。現行は女性・中性→Rosie、男性→Jasper、英語速度1.0の固定動作。分類Provider選択を含む追加の音声設定欄を撤去済み。詳細は [固定動作の検証記録](verification/ruri-sentence-language-2026-10-12/fixed-voice-pair.md)。下の記述は初期計画の経緯として残す。
+2026-10-12 20時の追加指定により、以下の英語voice・speedの可変設定と画面は廃止した。現行は女性・中性→Rosie、男性→Jasper、英語速度1.0の固定動作。分類Provider選択を含む追加の音声設定欄を撤去済み。詳細は [固定動作の検証記録](../verification/ruri-sentence-language-2026-10-12/fixed-voice-pair.md)。下の記述は初期計画の経緯として残す。
 
 既存settings文書に、自動二分類の有効状態と英語用voice・speedを追加する。旧設定の読取りでは無効を既定とし、勝手に試作モデルを有効化しない。日本語の保存値は維持する。設定変更は既存API・revision・失効の仕組みを使い、接続先用の環境変数は追加しない。
 
@@ -252,10 +252,10 @@ P02〜P05は公開Provider未配備でも進める。公開schemaが不明な間
 
 実施記録は作業完了・試験終了後に追記する。項目は、変更箇所と理由、実行した検証、入力条件・model版・試行数、結果と相関ID、未確認範囲、残作業・続行条件とする。実装済み・固定試験済み・実接続済み・実機器受入済みを区別する。
 
-関連手順: [LARM接続](../docs/larm.md)、[ツールチェーン登録と拡張](../docs/toolchain-extension.md)、[段階別検証](../docs/toolchain-extension-verification.md)、[運用ログ](../docs/logging.md)。
+関連手順: [LARM接続](../../docs/larm.md)、[ツールチェーン登録と拡張](../../docs/toolchain-extension.md)、[段階別検証](../../docs/toolchain-extension-verification.md)、[運用ログ](../../docs/logging.md)。
 
-2026-10-12実施: [検証記録](verification/ruri-sentence-language-2026-10-12/README.md)に変更範囲、Pages・LARM正本、fixture / live / 実機器の区別、公開配備の続行条件を記録した。
+2026-10-12実施: [検証記録](../verification/ruri-sentence-language-2026-10-12/README.md)に変更範囲、Pages・LARM正本、fixture / live / 実機器の区別、公開配備の続行条件を記録した。
 
-2026-10-12夕方の公開配備対応: [公開接続の実施記録](verification/ruri-sentence-language-2026-10-12/public-connection.md)。先行adapterの `state.current_chunk` を公開契約の文字列 `state` に変更し、capabilityによる発見とclaimされたendpointの検証・使用を追加した。
+2026-10-12夕方の公開配備対応: [公開接続の実施記録](../verification/ruri-sentence-language-2026-10-12/public-connection.md)。先行adapterの `state.current_chunk` を公開契約の文字列 `state` に変更し、capabilityによる発見とclaimされたendpointの検証・使用を追加した。
 
-通常環境はsettings APIで試用を有効化済み（revision 18）。[最新の公開接続・有効化記録](verification/ruri-sentence-language-2026-10-12/public-connection.md)に、全体gate未完了・実機器未受入・P95目標未達を含めて記録した。
+通常環境はsettings APIで試用を有効化済み（revision 18）。[最新の公開接続・有効化記録](../verification/ruri-sentence-language-2026-10-12/public-connection.md)に、全体gate未完了・実機器未受入・P95目標未達を含めて記録した。
