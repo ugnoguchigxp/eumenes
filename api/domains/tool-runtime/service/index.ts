@@ -19,6 +19,7 @@ import type {
 import { createActionInvocations } from "./action-invocation";
 import { resultSources } from "./source-results";
 import { get, hasReadMetadata, hasSupersededColumn } from "../repository";
+import { invocationHistory } from "../repository/read-history";
 export function createToolRuntime(
 	store: SqliteStore,
 	capabilities: Capabilities,
@@ -81,6 +82,18 @@ export function createToolRuntime(
 		now,
 		capabilities,
 		adapter,
+		canReplayPartial(db, inv) {
+			try {
+				return (
+					!!inv.result_ref &&
+					resolve(db, inv.result_ref, inv.owner_task_id).sources.some(
+						(s) => s.basis === "page" && s.body.trim(),
+					)
+				);
+			} catch {
+				return false;
+			}
+		},
 	});
 	function resolve(db: Database, ref: string, taskId: string) {
 		const entry = vault.get(ref);
@@ -373,26 +386,7 @@ export function createToolRuntime(
 					.get(taskId, toolRevisionId) as { n: number }
 			).n,
 		/** Every invocation of the task (including superseded ones) for budget/provenance checks. */
-		invocationsInTransaction: (db: Database, taskId: string) =>
-			(
-				db
-					.query(
-						"SELECT * FROM tool_invocations WHERE owner_task_id=? ORDER BY created_at,id",
-					)
-					.all(taskId) as Array<Invocation & { superseded?: number }>
-			).map((r) => ({
-				id: r.id,
-				arguments: r.args_json
-					? (JSON.parse(r.args_json) as unknown)
-					: undefined,
-				operationFingerprint: r.operation_fingerprint ?? null,
-				toolRevisionId: r.tool_revision_id,
-				stepId: r.step_id,
-				argsDigest: r.args_digest,
-				state: r.state,
-				origin: (r.origin ?? "tool") as "tool" | "candidate-cache",
-				superseded: !!r.superseded,
-			})),
+		invocationsInTransaction: invocationHistory,
 		/**
 		 * Hide the task's current invocations from observations (so their sources grant no
 		 * reads) while countInTransaction/countRealInTransaction keep counting them.

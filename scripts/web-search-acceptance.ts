@@ -119,7 +119,7 @@ const model = {
 		: {}),
 };
 const operations: unknown[] = [];
-const freshDocuments: SearchAnswerSample["documents"] = [];
+const freshDocuments = new Map<string, SearchAnswerSample["documents"]>();
 let review: ReturnType<typeof createWebReview>;
 const acquisition = createWebAcquisition({ review: (input) => review(input) });
 const h = await harness({
@@ -130,7 +130,10 @@ const h = await harness({
 		save("operations.json", operations);
 		if (active.startsWith("live-")) {
 			const received = await acquisition.execute(request, signal);
-			freshDocuments.push(...received.result.documents);
+			freshDocuments.set(active, [
+				...(freshDocuments.get(active) ?? []),
+				...received.result.documents,
+			]);
 			save("fresh-acquisition-" + operations.length + ".json", received);
 			return received;
 		}
@@ -174,7 +177,7 @@ const h = await harness({
 		const offset = active === "stock" ? 0 : 2;
 		const recorded = acquisitions[offset]!.data;
 		if (request.operation === "lookup")
-			return { result: recorded, freshUntilMs: null };
+			return { result: { ...recorded, documents: [] }, freshUntilMs: null };
 		const document = acquisitions
 			.flatMap((a) => a.data.documents ?? [])
 			.find((d) => d.url === (request as { url?: string }).url);
@@ -199,6 +202,7 @@ if (args.includes("--live"))
 			"live-stock",
 			{
 				...stockSample,
+				reviewed: undefined,
 				now: new Date().toISOString(),
 				expected: [
 					"対象はソフトバンク株式会社9434。現在値と、取得資料が裏付ける価格の対象日時・単位・出典を示す。終値・PTS・別会社の値や日時を混同しない。資料で確認できない項目は不明とし、過去の固定資料の値で補わない。",
@@ -209,6 +213,7 @@ if (args.includes("--live"))
 			"live-weather-after-stock",
 			{
 				...weatherSample,
+				reviewed: undefined,
 				now: new Date().toISOString(),
 				expected: [
 					"今回の対象は鎌倉市の今日（nowの日本時間の日付）の予報と気温。横浜の情報、翌日の値、前の株価で代用しない。取得資料の対象・項目・値・単位・対象日時を保ち、出典を示す。",
@@ -239,7 +244,7 @@ try {
 				: null;
 		const answer = h.dialogue.answerText(run.id);
 		const sourceDocuments = id.startsWith("live-")
-			? [...freshDocuments]
+			? [...(freshDocuments.get(id) ?? [])]
 			: id === "definition"
 				? sample.documents
 				: acquisitions.flatMap((a) => a.data.documents ?? []);
@@ -252,7 +257,7 @@ try {
 			answer,
 			correctAgent:
 				tasks.filter((t) => t.kind === "worker").length === 1 &&
-				child?.packageRevisionId === "package:web.recipe@2",
+				child?.packageRevisionId === "package:web.recipe@3",
 			budget: !!child && child.modelCalls <= 5,
 			sample: { ...sample, documents: sourceDocuments, report, answer },
 		};

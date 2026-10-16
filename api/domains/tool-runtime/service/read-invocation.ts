@@ -28,12 +28,14 @@ export function createReadInvocation({
 	now,
 	capabilities,
 	adapter,
+	canReplayPartial,
 }: {
 	refs: Map<string, ReadReference>;
 	localOperations: Map<string, AdapterOperation>;
 	now: () => number;
 	capabilities: Capabilities;
 	adapter: ToolAdapter;
+	canReplayPartial: (db: Database, invocation: Invocation) => boolean;
 }) {
 	function invokeInTransaction(
 		db: Database,
@@ -136,7 +138,10 @@ export function createReadInvocation({
 							ref.tool.id,
 							JSON.parse(i.args_json),
 							isSearch,
-						) === fingerprint),
+						) === fingerprint) &&
+				(!toolRuntimeOf(ref.tool.revisionId)?.urlScope ||
+					get(db, i.id)!.state !== "partial" ||
+					canReplayPartial(db, get(db, i.id)!)),
 		);
 		if (replay) {
 			const existing = get(db, replay.id)!;

@@ -3,12 +3,6 @@ import type { Prepared } from "../../capabilities";
 
 export const guidedWeb = (p: Prepared | undefined) =>
 	p?.package.schemaKey === "guidedResearch";
-const mission = z
-	.object({
-		facts: z.array(z.string().min(1).max(200)).min(1).max(8),
-		conditions: z.array(z.string().min(1).max(160)).max(4),
-	})
-	.strict();
 const claim = z
 	.object({
 		text: z.string().min(1).max(500),
@@ -41,29 +35,44 @@ export const guidedReport = z
 			.optional(),
 	})
 	.strict();
+const invoke = z
+	.object({
+		action: z.literal("invoke"),
+		tool: z.string().min(1).max(200),
+		arguments: z.record(z.string(), z.unknown()),
+		/** Each planned argument has the same canonical read input as the first call. */
+		readAhead: z
+			.array(z.object({ url: z.string().url().max(2048) }).strict())
+			.max(5)
+			.optional(),
+	})
+	.strict();
+const wait = z.object({ action: z.literal("wait") }).strict();
+const finish = z
+	.object({ action: z.literal("finish"), report: guidedReport })
+	.strict();
 export const guidedAction = z.discriminatedUnion("action", [
-	z
-		.object({
-			action: z.literal("invoke"),
-			tool: z.string().min(1).max(200),
-			arguments: z.record(z.string(), z.unknown()),
-			/** Each planned argument has the same canonical read input as the first call. */
-			readAhead: z
-				.array(z.object({ url: z.string().url().max(2048) }).strict())
-				.max(5)
-				.optional(),
-			mission: mission.optional(),
-		})
-		.strict(),
-	z.object({ action: z.literal("wait"), mission: mission.optional() }).strict(),
-	z
-		.object({
-			action: z.literal("finish"),
-			report: guidedReport,
-			mission: mission.optional(),
-		})
-		.strict(),
+	invoke,
+	wait,
+	finish,
 ]);
+
+// Published skill v1 asks for this field. Keep its output contract readable,
+// without storing or comparing a second copy of the user's request.
+const legacyMission = z
+	.object({
+		facts: z.array(z.string().min(1).max(200)).min(1).max(8),
+		conditions: z.array(z.string().min(1).max(160)).max(4),
+	})
+	.strict();
+const archivedAction = z.discriminatedUnion("action", [
+	invoke.extend({ mission: legacyMission.optional() }),
+	wait.extend({ mission: legacyMission.optional() }),
+	finish.extend({ mission: legacyMission.optional() }),
+]);
+export const guidedActionFor = (p: Prepared) =>
+	p.package.requiredSkillRevisionIds?.includes("skill:web.guided@1")
+		? archivedAction
+		: guidedAction;
 export type GuidedAction = z.infer<typeof guidedAction>;
 export type GuidedReport = z.infer<typeof guidedReport>;
-export type WebMission = z.infer<typeof mission>;

@@ -1,12 +1,9 @@
 import type { Database } from "bun:sqlite";
 import type { Task } from "../contracts";
-import type { WebMission } from "./guided-contract";
 
 /** Stored in the existing task acquisition column; pending reads use normal tool receipts. */
 export type WebReadState = {
 	kind: "guided-web";
-	mission?: WebMission;
-	tool?: string;
 	executionRef?: string;
 	stepId?: string;
 	parentJobId?: string;

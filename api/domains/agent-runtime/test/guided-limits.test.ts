@@ -35,7 +35,6 @@ test("per-host slots cap paired/hedged reads while required pending work is reta
 			tool: "web.read",
 			arguments: { url: urls[0] },
 			readAhead: urls.slice(1).map((url) => ({ url })),
-			mission: { facts: ["資料の事実"], conditions: [] },
 		});
 		expect(h.started).toHaveLength(2);
 		now += 10000;
@@ -65,7 +64,6 @@ test("retryable read failures wait for cooldown without another model call or an
 			action: "invoke",
 			tool: "web.read",
 			arguments: { url },
-			mission: { facts: ["本文の内容"], conditions: [] },
 		});
 		h.results.set("op1", {
 			state: "partial",
@@ -92,6 +90,29 @@ test("retryable read failures wait for cooldown without another model call or an
 		await h.agents.reconcile();
 		expect(h.started).toHaveLength(2);
 		expect(h.task(id).model_calls).toBe(2);
+		h.results.set("op2", h.doc("再取得で確認した本文。", url));
+		await h.agents.reconcile();
+		await h.runRawModelStep(id, {
+			action: "finish",
+			report: {
+				completion: "complete",
+				answer: "再取得で確認した本文。",
+				summary: "再取得で確認した本文。",
+				claims: [
+					{
+						text: "再取得で確認した本文。",
+						status: "verified",
+						evidence: ["e1"],
+					},
+				],
+				limitations: [],
+			},
+		});
+		expect(h.task(id).state).toBe("completed");
+		expect(h.agents.report(id)?.claims[0]?.evidence[0]?.quote).toContain(
+			"再取得で確認した本文。",
+		);
+		expect(h.task(id).tool_calls).toBe(2);
 	} finally {
 		await h.close();
 	}

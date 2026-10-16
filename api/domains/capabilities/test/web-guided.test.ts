@@ -1,9 +1,14 @@
 import { expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore } from "../../../infrastructure/sqlite";
-import { createCapabilities, migrations, type BundleHost } from "..";
+import {
+	createCapabilities,
+	migrations,
+	capabilityBundleV1,
+	type BundleHost,
+} from "..";
 
 test("new Web revisions upgrade and reseed without changing archived definitions", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "web-bundle-"));
@@ -18,18 +23,37 @@ test("new Web revisions upgrade and reseed without changing archived definitions
 	});
 	try {
 		await createCapabilities(store, new Set(["web"])).seed();
+		const caps = createCapabilities(store, new Set(["web"]), {
+			bundleHost: host,
+		});
+		const bundle = capabilityBundleV1.parse(
+			JSON.parse(
+				readFileSync(
+					new URL("../bundles/web-guided.bundle.json", import.meta.url),
+					"utf8",
+				),
+			),
+		);
+		const boundary = bundle.definitions.findIndex(
+			(d) => d.kind === "skill" && d.id === "web.guided" && d.revision === 2,
+		);
+		expect(boundary).toBeGreaterThan(0);
+		await store.write((db) =>
+			caps.importBundleInTransaction(
+				db,
+				{ ...bundle, definitions: bundle.definitions.slice(0, boundary) },
+				host(),
+			),
+		);
 		const archived = () =>
 			store.read((db) =>
 				db
 					.query(
-						"SELECT id,definition_hash FROM capability_revisions WHERE id IN ('package:web.recipe@1','package:web.search@1','package:web.quick@2','profile:web.research@1','skill:web.search@1','tool:web.read@1') ORDER BY id",
+						"SELECT id,definition_hash FROM capability_revisions WHERE id IN ('package:web.recipe@1','package:web.search@1','package:web.quick@2','profile:web.research@1','skill:web.search@1','tool:web.read@1','skill:web.guided@1','package:web.recipe@2','package:web.search@2','package:web.quick@3','toolchain:web.search@2','toolchain:web.research.luna@2') ORDER BY id",
 					)
 					.all(),
 			);
 		const before = archived();
-		const caps = createCapabilities(store, new Set(["web"]), {
-			bundleHost: host,
-		});
 		await caps.seed();
 		expect(archived()).toEqual(before);
 		const active = () =>
@@ -41,14 +65,14 @@ test("new Web revisions upgrade and reseed without changing archived definitions
 					.all(),
 			);
 		expect(active()).toEqual([
-			{ key: "package:web.quick", active_revision_id: "package:web.quick@3" },
+			{ key: "package:web.quick", active_revision_id: "package:web.quick@4" },
 			{
 				key: "toolchain:web.research.luna",
-				active_revision_id: "toolchain:web.research.luna@2",
+				active_revision_id: "toolchain:web.research.luna@3",
 			},
 			{
 				key: "toolchain:web.search",
-				active_revision_id: "toolchain:web.search@2",
+				active_revision_id: "toolchain:web.search@3",
 			},
 		]);
 		const registered = active();

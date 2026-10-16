@@ -37,8 +37,8 @@ export function createWebReadPlan(ctx: RuntimeContext, ops: TaskOps) {
 		];
 		const pending = tools.pending();
 		const runningUrls = pending.flatMap((r) => {
-			const a = JSON.parse(r.args_json);
-			return typeof a.url === "string" ? [a.url] : [];
+			const a = r.args_json ? JSON.parse(r.args_json) : null;
+			return typeof a?.url === "string" ? [a.url] : [];
 		});
 		let started = 0;
 		for (let i = 0; i < state.queue.length && started < WEB_READ_POLICY.pair;) {
@@ -54,7 +54,9 @@ export function createWebReadPlan(ctx: RuntimeContext, ops: TaskOps) {
 				state.hedgeAt = null;
 				break;
 			}
-			const retryAfter = state.reads.findLast((r) => r.url === url)?.retryAfter;
+			const retryAfter = [...state.reads]
+				.reverse()
+				.find((r) => r.url === url)?.retryAfter;
 			if (retryAfter !== undefined && retryAfter > now()) {
 				i++;
 				continue;
@@ -90,7 +92,9 @@ export function createWebReadPlan(ctx: RuntimeContext, ops: TaskOps) {
 			? Math.min(
 					now() + WEB_READ_POLICY.hedgeMs,
 					...state.queue.flatMap((url) => {
-						const at = state.reads.findLast((r) => r.url === url)?.retryAfter;
+						const at = [...state.reads]
+							.reverse()
+							.find((r) => r.url === url)?.retryAfter;
 						return at !== undefined && at > now() ? [at] : [];
 					}),
 				)
@@ -104,7 +108,6 @@ export function createWebReadPlan(ctx: RuntimeContext, ops: TaskOps) {
 		db: Database,
 		t: Task,
 		input: {
-			tool: string;
 			executionRef: string;
 			stepId: string;
 			jobId: string;
@@ -128,7 +131,7 @@ export function createWebReadPlan(ctx: RuntimeContext, ops: TaskOps) {
 			state.reads
 				.map((r) => r.url)
 				.filter((url) => {
-					const latest = state.reads.findLast((r) => r.url === url)!;
+					const latest = [...state.reads].reverse().find((r) => r.url === url)!;
 					return latest.retryAfter === undefined;
 				}),
 		);
@@ -138,7 +141,6 @@ export function createWebReadPlan(ctx: RuntimeContext, ops: TaskOps) {
 			(u) => !attempted.has(u),
 		);
 		Object.assign(state, {
-			tool: input.tool,
 			executionRef: input.executionRef,
 			stepId: input.stepId,
 			parentJobId: input.jobId,

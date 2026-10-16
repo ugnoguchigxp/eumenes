@@ -9,7 +9,7 @@ test("structural Web views preserve table rows and heading/header references und
 		"# 対象A\n## 2026-10-16\n|時間|値|単位|\n|---|---|---|\n|13:00|25.4|℃|\n```text\npublic source text\n```\n";
 	const source: Source = {
 		sourceId: "s",
-		viewId: "v",
+		viewId: crypto.randomUUID(),
 		title: "資料",
 		url: "https://example.org/page",
 		fetchedAt: new Date().toISOString(),

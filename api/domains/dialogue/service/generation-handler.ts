@@ -122,7 +122,6 @@ export function createGenerationHandler(
 						signal.throwIfAborted();
 						return {
 							text: verifiedAnswerLinks(direct, input),
-							selection: agentOutcome(input.agent),
 						};
 					}
 					if (input.agent?.actionPayload && agents) {

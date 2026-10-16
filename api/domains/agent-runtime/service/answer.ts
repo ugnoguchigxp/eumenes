@@ -1,6 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { hash, toolRuntimeOf } from "../../capabilities";
-import type { AdoptedEvidence, AnswerTicket, Report } from "../contracts";
+import type { AdoptedEvidence, AnswerTicket, Report, Task } from "../contracts";
 import { get, byRoot, update } from "../repository";
 import { isPageRead, isSearch } from "./exploration";
 import { validateRequirementAdoption } from "./requirement-verification";
@@ -8,6 +8,40 @@ import { active, owner, type RuntimeContext } from "./runtime-context";
 import type { TaskOps } from "./task-ops";
 import { parentProjection, isNegativeReport } from "./verify-report";
 import { guidedWeb } from "./guided-contract";
+
+/** Failure projections carry operational counts, never rejected evidence or claims. */
+function failureProjection(
+	root: Task,
+	guided: boolean,
+	searches: Array<{ state: string }>,
+	reads: Array<{ state: string }>,
+) {
+	if (root.error_code === "clarification_required")
+		return JSON.stringify({
+			clarification: JSON.parse(root.input_json ?? "{}").clarificationQuestion,
+		});
+	const succeeded = (items: Array<{ state: string }>) =>
+		items.filter((item) => ["succeeded", "partial"].includes(item.state))
+			.length;
+	return JSON.stringify({
+		...(guided
+			? {
+					delivery: "guided-web",
+					completion: "incomplete",
+					answer:
+						"検索処理を完了できず、依頼された情報を確認できませんでした。",
+				}
+			: {}),
+		failure: root.error_code,
+		researchProgress: {
+			searchAttempts: searches.length,
+			searchesSucceeded: succeeded(searches),
+			readAttempts: reads.length,
+			readsSucceeded: succeeded(reads),
+			verifiedReport: false,
+		},
+	});
+}
 
 export function createAnswer(ctx: RuntimeContext, ops: TaskOps) {
 	const { store, capabilities, tools, now } = ctx.deps;
@@ -70,8 +104,6 @@ export function createAnswer(ctx: RuntimeContext, ops: TaskOps) {
 						(task) => tools.invocationsInTransaction?.(db, task.id) ?? [],
 					)
 				: [];
-		const succeeded = (state: string) =>
-			state === "succeeded" || state === "partial";
 		const searches = progress.filter(
 			(item) =>
 				item.origin === "tool" && isSearch(toolRuntimeOf(item.toolRevisionId)),
@@ -106,35 +138,7 @@ export function createAnswer(ctx: RuntimeContext, ops: TaskOps) {
 				? (safe?.safe_projection_json ??
 					JSON.stringify(parentProjection(report)))
 				: root.error_code
-					? JSON.stringify(
-							root.error_code === "clarification_required"
-								? {
-										clarification: JSON.parse(root.input_json ?? "{}")
-											.clarificationQuestion,
-									}
-								: {
-										...(guidedWeb(p)
-											? {
-													delivery: "guided-web",
-													completion: "incomplete",
-													answer:
-														"検索処理を完了できず、依頼された情報を確認できませんでした。",
-												}
-											: {}),
-										failure: root.error_code,
-										researchProgress: {
-											searchAttempts: searches.length,
-											searchesSucceeded: searches.filter((item) =>
-												succeeded(item.state),
-											).length,
-											readAttempts: reads.length,
-											readsSucceeded: reads.filter((item) =>
-												succeeded(item.state),
-											).length,
-											verifiedReport: false,
-										},
-									},
-						)
+					? failureProjection(root, guidedWeb(p), searches, reads)
 					: null,
 		};
 	}

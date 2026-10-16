@@ -1,11 +1,28 @@
 import { expect, test } from "bun:test";
 import { harness, workerPacket } from "./toolchain.fixture";
 
-for (const fullResearch of [false, true])
-	test(`source-linked answers survive stock → weather without parent regeneration (${fullResearch ? "broad" : "quick"})`, async () => {
+for (const [fullResearch, invalidateLatest] of [
+	[false, false],
+	[true, false],
+	[false, true],
+] as const)
+	test(`source-linked answers survive stock → weather without parent regeneration (${fullResearch ? "broad" : "quick"}${invalidateLatest ? ", superseded search" : ""})`, async () => {
 		let parents = 0;
 		const queries: string[] = [];
 		const requests: unknown[] = [];
+		const replaced = new Set<string>();
+		const invalidated = new Set<string>();
+		async function supersede(query: string): Promise<void> {
+			await h.store.write((db) => {
+				expect(
+					db
+						.query(
+							"UPDATE tool_invocations SET superseded=1 WHERE json_extract(args_json, '$.query')=?",
+						)
+						.run(query).changes,
+				).toBe(1);
+			});
+		}
 		const stock = {
 			url: "https://example.org/9434",
 			text: "ソフトバンク（9434）、2026年10月16日13:11、リアルタイム株価243.8円。",
@@ -20,22 +37,31 @@ for (const fullResearch of [false, true])
 				parents++;
 				return "会話モデルで書き換えてはいけない";
 			},
-			control: (messages) => {
+			control: async (messages) => {
 				const data = workerPacket(messages);
 				expect(Buffer.byteLength(JSON.stringify(messages))).toBeLessThanOrEqual(
 					65536,
 				);
 				expect(data.reportMode).toBe("guided-web");
+				expect(data).not.toHaveProperty("mission");
 				if (!data.operations.length)
 					return JSON.stringify({
 						action: "invoke",
 						tool: "web.lookup",
 						arguments: { query: data.task.question },
-						mission: {
-							facts: [data.originalRequest],
-							conditions: ["対象・値・日時と出典"],
-						},
 					});
+				if (invalidateLatest && !replaced.has(data.originalRequest)) {
+					replaced.add(data.originalRequest);
+					return JSON.stringify({
+						action: "invoke",
+						tool: "web.lookup",
+						arguments: { query: "superseded: " + data.task.question },
+					});
+				}
+				if (invalidateLatest && !invalidated.has(data.originalRequest)) {
+					await supersede("superseded: " + data.task.question);
+					invalidated.add(data.originalRequest);
+				}
 				const page = data.observations.find((o: any) => o.basis === "page");
 				if (!page)
 					return JSON.stringify({
@@ -134,18 +160,19 @@ for (const fullResearch of [false, true])
 					.list(id)
 					.find((t) => t.kind === "worker")!;
 				expect(child.packageRevisionId).toBe(
-					fullResearch ? "package:web.search@2" : "package:web.recipe@2",
+					fullResearch ? "package:web.search@3" : "package:web.recipe@3",
 				);
-				expect(child.modelCalls).toBe(3);
+				expect(child.modelCalls).toBe(invalidateLatest ? 4 : 3);
 			}
 			expect(parents).toBe(0);
-			expect(queries).toHaveLength(2);
-			expect(queries[1]).toContain("鎌倉");
-			expect(queries[1]).not.toContain("株価");
+			expect(queries).toHaveLength(invalidateLatest ? 4 : 2);
+			const weatherQuery = queries[invalidateLatest ? 2 : 1];
+			expect(weatherQuery).toContain("鎌倉");
+			expect(weatherQuery).not.toContain("株価");
 			expect(requests.filter((r: any) => r.operation === "read")).toMatchObject(
 				[
 					{ source: { query: queries[0], rank: 1, provider: "fixture" } },
-					{ source: { query: queries[1], rank: 1, provider: "fixture" } },
+					{ source: { query: weatherQuery, rank: 1, provider: "fixture" } },
 				],
 			);
 		} finally {

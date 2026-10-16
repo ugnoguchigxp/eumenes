@@ -241,19 +241,17 @@ export async function createToolchain(
 		if (!world) throw new Error("capability_unavailable");
 		return world;
 	};
-	const isWorldTool = (id: string) =>
-		id === "world.find" || id === "world.query" || id === "world.documents";
 	const adapter: ToolAdapter = {
 		...reads,
 		operationFingerprintInTransaction(db, r) {
-			return isWorldTool(r.tool.id)
+			return r.tool.backend === "world-query"
 				? worldPorts().operationFingerprintInTransaction?.(db, r)
 				: reads.operationFingerprintInTransaction!(db, r);
 		},
 		localInTransaction(db, r) {
 			return r.tool.id === "recipe.find"
 				? recipes.findInTransaction(db, r)
-				: isWorldTool(r.tool.id)
+				: r.tool.backend === "world-query"
 					? worldPorts().localInTransaction!(db, r)
 					: reads.localInTransaction!(db, r);
 		},
@@ -275,30 +273,12 @@ export async function createToolchain(
 				r.arguments as Record<string, unknown>,
 				r.requestId,
 			);
-			// Carry the originating search hit into llm-fetch without asking the worker
-			// to repeat it or changing the canonical URL-only read tool contract.
-			if (raw.operation === "read") {
-				for (const inv of tools
-					.invocationsInTransaction(db, r.owner.taskId)
-					.toReversed()) {
-					const operation = tools.getInTransaction(db, inv.id);
-					const hit =
-						operation &&
-						web
-							.get(operation.operation_id)
-							?.result?.hits.find((h) => h.url === raw.url);
-					const args = inv.arguments as { query?: unknown };
-					if (hit && typeof args?.query === "string") {
-						raw.source = {
-							provider: hit.provider,
-							query: args.query,
-							rank: hit.rank ?? 1,
-							snippet: hit.snippet,
-						};
-						break;
-					}
-				}
-			}
+			if (raw.operation === "read")
+				raw.source = tools
+					.observationsInTransaction(db, r.owner.taskId)
+					.flatMap((o) => o.sources)
+					.filter((s) => s.basis === "snippet" && s.url === raw.url && s.source)
+					.at(-1)?.source;
 			const op = web.submitInTransaction(db, raw, {
 				deadlineAtMs: r.deadline,
 				parentJobId: r.parentJobId,
@@ -343,9 +323,7 @@ export async function createToolchain(
 		tools,
 		queue,
 		inference,
-		...(options.reconcileThrottleMs === undefined
-			? {}
-			: { reconcileThrottleMs: options.reconcileThrottleMs }),
+		reconcileThrottleMs: options.reconcileThrottleMs,
 		onSearchReport: recipes.onSearchReport,
 	});
 	const vectors = createVectorRefresh(
@@ -380,6 +358,5 @@ export async function createToolchain(
 		refreshVectors: vectors.refresh,
 		/** Embed one request for retrieval; undefined when embedding is unavailable or slow. */
 		embedQuery: vectors.embedQuery,
-		postAnswer: undefined,
 	};
 }

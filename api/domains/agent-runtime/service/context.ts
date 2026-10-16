@@ -115,7 +115,6 @@ export function workerContext(
 		...fixed,
 		...(guided
 			? {
-					mission: webReadState(task).mission,
 					collection: {
 						corpusRevision: webReadState(task).arrivals,
 						pending: webReadState(task).reads.filter((r) => !r.settled).length,
@@ -177,7 +176,7 @@ export function workerContext(
 					: "前回の出力は構文補正後も契約に合いませんでした。lastResult.issuesの違反箇所を修正してください。元の依頼の条件を保持し、不明な値や根拠を作りません。TOOLSが空ならfinishだけを返します。固定の出力定義と現在のTOOLS・根拠参照に合わせて一度だけ修正します。拒否コード=") +
 				(task.error_code ?? "invalid_control_json"),
 		});
-	// Keep the exact mission after reference material and repair state without
+	// Keep the exact request after reference material and repair state without
 	// repeating it or importing the parent's history.
 	messages.push({ role: "user", content: JSON.stringify(trusted) });
 	if (bytes(messages) > 65536) throw new Error("required_context_overflow");

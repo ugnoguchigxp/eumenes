@@ -1,0 +1,145 @@
+{
+  "baseCommit": "47d5621e95f7b56e8df0836a2aa68c56011ff1b1",
+  "frozenAt": "2026-10-16T12:17:33.742539+00:00",
+  "snapshot": "/var/folders/mx/jbv8qfwd52z14q0mby_273lhlp5gd2/T/eumenes-web-guide-repair-frozen-yh7dvql8",
+  "editedFiles": [
+    "api/application/toolchain.ts",
+    "api/application/workers-ai-settings.test.ts",
+    "api/domains/agent-runtime/service/answer.ts",
+    "api/domains/agent-runtime/service/web-read-plan.ts",
+    "api/domains/agent-runtime/test/guided-limits.test.ts",
+    "api/domains/agent-runtime/test/guided-web.test.ts",
+    "api/domains/agent-runtime/test/structured-web.test.ts",
+    "api/domains/dialogue/service/generation-handler.ts",
+    "api/domains/tool-runtime/service/index.ts",
+    "api/domains/tool-runtime/service/read-invocation.ts",
+    "api/domains/web-research/test/acquisition.test.ts",
+    "scripts/web-search-acceptance.ts",
+    "api/domains/tool-runtime/repository/read-history.ts",
+    "api/domains/tool-runtime/test/read-retry.test.ts"
+  ],
+  "sourceFilesChecked": 3576,
+  "sourceChangesSinceFreeze": {
+    "workspace": [],
+    "snapshot": []
+  },
+  "implementationComplete": false,
+  "contextLimits": {
+    "workerBytes": 65536,
+    "materialsBytes": 32768,
+    "maxMeasuredWorkerBytes": 11140,
+    "measuredPackets": 10,
+    "instructionsChanged": false
+  },
+  "verification": {
+    "partial": {
+      "pass": 24,
+      "fail": 0
+    },
+    "integration": {
+      "pass": 31,
+      "fail": 0,
+      "includesWorld": 26,
+      "includesQuickAndBroadSwitch": 2
+    },
+    "officialDomains": {
+      "passed": true,
+      "bunPass": 631,
+      "webPass": 17
+    },
+    "rootTypecheck": {
+      "passed": true,
+      "files": 1761
+    },
+    "applicationSize": {
+      "passed": false,
+      "function": "api/application/toolchain.ts#createToolchain",
+      "limit": 300,
+      "before": 323,
+      "after": 324
+    },
+    "liveEvaluationControls": {
+      "matched": 13,
+      "total": 13
+    },
+    "acceptance": [
+      {
+        "case": "stock",
+        "dialogueStatus": "completed",
+        "workers": [
+          {
+            "packageRevisionId": "package:web.recipe@2",
+            "status": "failed",
+            "errorCode": "invalid_report",
+            "modelCalls": 2,
+            "toolCalls": 0
+          }
+        ],
+        "accepted": false
+      },
+      {
+        "case": "weather-after-stock",
+        "dialogueStatus": "completed",
+        "workers": [
+          {
+            "packageRevisionId": "package:web.recipe@2",
+            "status": "failed",
+            "errorCode": "invalid_report",
+            "modelCalls": 2,
+            "toolCalls": 0
+          }
+        ],
+        "accepted": false
+      },
+      {
+        "case": "definition",
+        "dialogueStatus": "completed",
+        "workers": [
+          {
+            "packageRevisionId": "package:web.recipe@2",
+            "status": "failed",
+            "errorCode": "invalid_control_json",
+            "modelCalls": 2,
+            "toolCalls": 0
+          }
+        ],
+        "accepted": false
+      },
+      {
+        "case": "live-stock",
+        "dialogueStatus": "completed",
+        "workers": [
+          {
+            "packageRevisionId": "package:web.recipe@2",
+            "status": "failed",
+            "errorCode": "invalid_report",
+            "modelCalls": 2,
+            "toolCalls": 0
+          }
+        ],
+        "accepted": false
+      },
+      {
+        "case": "live-weather-after-stock",
+        "dialogueStatus": "completed",
+        "workers": [
+          {
+            "packageRevisionId": "package:web.recipe@2",
+            "status": "failed",
+            "errorCode": "invalid_report",
+            "modelCalls": 2,
+            "toolCalls": 0
+          }
+        ],
+        "accepted": false
+      }
+    ]
+  },
+  "unresolved": [
+    "Initial mission is optional in the presented action schema but required by applyGuidedAction; all five measured cases stop before tool execution.",
+    "Rejection reports invalid_report without a missing mission field path, so the repair receives no actionable field information.",
+    "createToolchain remains over the 300-line function size limit."
+  ],
+  "postFreezeSourceEdits": false,
+  "worldReadableWebExperiment": "Not implemented or measured; current Web packages do not expose World tools."
+}

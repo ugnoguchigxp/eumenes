@@ -8,20 +8,23 @@ const urls = [
 	"https://c.example/three",
 	"https://d.example/four",
 ];
-const mission = {
-	facts: ["指定した対象の現在値と対象日時"],
-	conditions: ["本文の出典を示す"],
-};
 async function searched(h: Awaited<ReturnType<typeof harness>>, id: string) {
 	await h.start(id);
 	const child = h.agents.list(id).find((t) => t.kind === "worker")!;
-	expect(child.packageRevisionId).toBe("package:web.quick@3");
-	await h.runRawModelStep(child.id, {
+	expect(child.packageRevisionId).toBe("package:web.quick@4");
+	const first = await h.runRawModelStep(child.id, {
 		action: "invoke",
 		tool: "web.lookup",
 		arguments: { query: "依頼から選んだ検索語" },
-		mission,
 	});
+	if (first.prep.status === "ready") {
+		expect(first.prep.input.control).toBeDefined();
+		expect(
+			JSON.stringify(first.prep.input.control?.outputSchema),
+		).not.toContain('"mission"');
+	}
+	expect(h.started).toHaveLength(1);
+	expect(webReadState(h.task(child.id))).not.toHaveProperty("mission");
 	h.results.set("op1", {
 		state: "succeeded",
 		result: {
@@ -185,7 +188,7 @@ test("an evaluation cannot cite a body that arrived after its corpus was frozen"
 		});
 		expect(h.task(id).state).toBe("queued");
 		expect(h.task(id).error_code).toBe("invalid_evidence");
-		expect(h.agents.report(id)).toBeNull();
+		expect(() => h.agents.report(id)).toThrow("report_not_ready");
 		await h.runRawModelStep(id, finish("e2"));
 		expect(h.task(id).state).toBe("completed");
 	} finally {

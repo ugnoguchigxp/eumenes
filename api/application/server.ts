@@ -384,7 +384,6 @@ export async function buildServices(
 		steward,
 		goals: goals.dialoguePort,
 		agents: enabled ? toolchain.agents : undefined,
-		postAnswer: enabled ? toolchain.postAnswer : undefined,
 		delegation: createDotsDialogue({
 			store,
 			tasks: delegated.tasks,

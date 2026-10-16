@@ -1,0 +1,119 @@
+{
+  "baseCommit": "47d5621e95f7b56e8df0836a2aa68c56011ff1b1",
+  "frozenAt": "2026-10-16T12:41:19.589680+00:00",
+  "snapshot": "/var/folders/mx/jbv8qfwd52z14q0mby_273lhlp5gd2/T/eumenes-web-guide-refactor-frozen-u7ccci7d",
+  "implementation": "refactored; acceptance remains incomplete",
+  "validationStoppedByUser": true,
+  "contextLimits": {
+    "workerBytes": 65536,
+    "materialsBytes": 32768
+  },
+  "changes": [
+    "failure-only partial read retry and direct answer adoption fixes",
+    "remove persisted mission and unused plumbing",
+    "reuse active source provenance",
+    "versioned skill and package upgrades; preserve archived definitions",
+    "createToolchain reduced from 324 to 300 lines"
+  ],
+  "verification": {
+    "partial": {
+      "pass": 17,
+      "fail": 1
+    },
+    "integration": {
+      "pass": 35,
+      "fail": 0
+    },
+    "officialBackend": {
+      "pass": 631,
+      "fail": 1
+    },
+    "webSeparately": {
+      "pass": 17,
+      "fail": 0
+    },
+    "rootTypecheck": {
+      "files": 1762,
+      "errors": 0
+    },
+    "size": "passed including application",
+    "liveEvaluatorControls": {
+      "matched": 13,
+      "total": 13
+    },
+    "acceptance": [
+      {
+        "case": "stock",
+        "workers": [
+          {
+            "packageRevisionId": "package:web.recipe@3",
+            "status": "completed",
+            "modelCalls": 4,
+            "toolCalls": 4,
+            "errorCode": null
+          }
+        ],
+        "assessment": false
+      },
+      {
+        "case": "weather-after-stock",
+        "workers": [
+          {
+            "packageRevisionId": "package:web.recipe@3",
+            "status": "failed",
+            "modelCalls": 5,
+            "toolCalls": 4,
+            "errorCode": "invalid_control_json"
+          }
+        ],
+        "assessment": false
+      },
+      {
+        "case": "definition",
+        "workers": [
+          {
+            "packageRevisionId": "package:web.recipe@3",
+            "status": "completed",
+            "modelCalls": 3,
+            "toolCalls": 2,
+            "errorCode": null
+          }
+        ],
+        "assessment": null
+      },
+      {
+        "case": "live-stock",
+        "workers": [
+          {
+            "packageRevisionId": "package:web.recipe@3",
+            "status": "completed",
+            "modelCalls": 4,
+            "toolCalls": 4,
+            "errorCode": null
+          }
+        ],
+        "assessment": null
+      },
+      {
+        "case": "live-weather-after-stock",
+        "workers": [
+          {
+            "packageRevisionId": "package:web.recipe@3",
+            "status": "completed",
+            "modelCalls": 4,
+            "toolCalls": 4,
+            "errorCode": null
+          }
+        ],
+        "assessment": null
+      }
+    ]
+  },
+  "unresolved": [
+    "lookup-upgrade.test.ts still requests package:web.search@2 as active; current is @3.",
+    "Frozen stock answer conflates price date and PTS information.",
+    "Frozen weather report exceeds the evidence reference limit and is rejected.",
+    "Live stock and weather workers completed, but final answer evaluation was interrupted; not accepted as passed."
+  ],
+  "postMeasurementSourceEdits": false
+}

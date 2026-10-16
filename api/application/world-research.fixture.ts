@@ -421,7 +421,6 @@ export async function boot(steps: Step[], options: BootOptions = {}) {
 		larm: inference,
 		queue,
 		agents: toolchain.agents,
-		postAnswer: toolchain.postAnswer,
 		toolchains: routing,
 		worldContext: world.context,
 	} as never);

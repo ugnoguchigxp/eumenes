@@ -642,7 +642,6 @@ export async function harness(
 		larm: inference,
 		queue,
 		agents: toolchain.agents,
-		postAnswer: toolchain.postAnswer,
 		toolchains: createToolchainRouting(
 			toolchain.capabilities,
 			toolchain.history,

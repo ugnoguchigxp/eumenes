@@ -140,7 +140,9 @@ test("the spatial settings bundle keeps its latest screen and shares the new sav
 		);
 		expect(imported.issues).toEqual([]);
 		expect(
-			h.ledger.artifacts().find((a) => a.artifactId === "settings.display")
+			h.ledger
+				.artifacts()
+				.find((a) => a.artifactRevisionId === "artifact:settings.display@9")
 				?.artifactRevisionId,
 		).toBe("artifact:settings.display@9");
 		const doc = h.store.read((db) =>

@@ -43,12 +43,14 @@ test("read provenance survives extraction and typed errors retain retry policy",
 });
 
 function request() {
-	return submitResearchSchema.parse({
+	const parsed = submitResearchSchema.parse({
 		requestId: crypto.randomUUID(),
 		operation: "read",
 		url: "https://example.com/",
 		retention: "stable",
 	});
+	if (parsed.operation !== "read") throw new Error("expected_read_request");
+	return parsed;
 }
 function acquisition(
 	finalUrl = "https://example.com/",

@@ -18,7 +18,7 @@ import { prepareRequirementVerification } from "./requirement-verification";
 import { STEP_KIND, active, type RuntimeContext } from "./runtime-context";
 import type { TaskOps } from "./task-ops";
 import { createToolSelection } from "./tool-selection";
-import { guidedWeb, guidedAction } from "./guided-contract";
+import { guidedWeb, guidedActionFor } from "./guided-contract";
 import { webReadState, saveWebReadState } from "./web-read-state";
 
 import {
@@ -238,7 +238,7 @@ export function createStepHandler(ctx: RuntimeContext, ops: TaskOps) {
 				input.mode === "verify_requirements"
 					? requirementVerification
 					: input.guided
-						? guidedAction
+						? guidedActionFor(prepared.get(t.id)!)
 						: input.search
 							? searchAction
 							: input.first
