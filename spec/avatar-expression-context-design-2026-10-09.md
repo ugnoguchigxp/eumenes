@@ -1,6 +1,8 @@
 # アバター表情とTTS感情制御の現状調査と改善設計
 
-調査日：2026-10-09。対象：現在のEumenes作業ツリーとgnosis上のRyzen AI MAX+ 395。状態：**調査・小規模評価・設計まで。製品実装は未変更、実装は承認後。**
+調査日：2026-10-09。対象：当時のEumenes作業ツリーとgnosis上のRyzen AI MAX+ 395。
+
+2026-10-16 の再確認。接続済みの Laya 判断、motion / tone、再生開始との同期は [Laya計画](.archived/laya-voicevox-avatar-plan.md) の「今回接続した範囲」。本書が残した全文待ちの廃止、チャンク単位の判断、製品へのヒステリシスは未実装。`voice-dialogue` の delivery は `granularity: "answer"`。`deliveryState` の `current_chunk` は渡された全文の抜粋であり、チャンク列の遷移制御ではない。比較用のヒステリシスは [判断ベンチ](decision-model-benchmark-design.md) のスクリプト内にあり、製品経路には接続していない。
 
 ## 判断と推奨方針
 

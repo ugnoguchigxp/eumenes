@@ -2,7 +2,7 @@
 
 **モデル推論を一度記録し、その結果を使って精度・棄却閾値・表情遷移を何度でも比較する**構成を推奨する。製品のAPI・DB・UI・起動処理・依存関係に組み込まず、Ryzen上で明示的に実行するScriptとして完結させる。
 
-2026-10-09に実装の承認を受け、独立CLI・モデルadapter・集計・自己検証を実装した。実際のコマンド・対応範囲は[scripts/decision-bench/README.md](/Users/y.noguchi/Code/eumenes/scripts/decision-bench/README.md)を参照する。以下は設計上の方針と初版の差を含む。
+2026-10-09に実装の承認を受け、独立CLI・モデルadapter・集計・自己検証を実装した。2026-10-16 の再確認でも `scripts/decision-bench` に validate / run / calibrate / score / self-test、`resources.jsonl`（メモリとCPU）、比較用ヒステリシスがある。実時間の保持、GPU/NPU利用率、bootstrap、対象tokenだけのpoolingは未実装。製品の delivery / TTS には未接続。実際のコマンドは[scripts/decision-bench/README.md](../scripts/decision-bench/README.md)を参照する。以下は設計上の方針と初版の差を含む。
 
 ## 最小構成
 

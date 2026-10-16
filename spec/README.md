@@ -8,17 +8,17 @@ archive の基準: その文書が担当した実装がコードにあり、本�
 
 | 文書 | 状態 |
 | --- | --- |
-| [codex-sdk-task-artifact-plan-2026-10-14.md](codex-sdk-task-artifact-plan-2026-10-14.md) | 共通KanbanとCodex SDK。P1〜P3のホスト接続とP4の隔離commit/pushは記録済み。Git復旧・共通画面の最終受入とP5は継続 |
-| [kanban-claude-code-plan-2026-10-14.md](kanban-claude-code-plan-2026-10-14.md) | Claude Code実行。P1〜P3は実装・固定試験済み。実 `claude` の通しと自然言語受入（P4）は未実施 |
-| [kanban-implementation-assignments-2026-10-14.md](kanban-implementation-assignments-2026-10-14.md) | 上記の分担と固定契約。P4の実機・自然言語受入は計画側に残る |
-| [web-research-cache-implementation-plan-2026-10-09.md](web-research-cache-implementation-plan-2026-10-09.md) | 初期実装とレビューは第15章以降。調査メモなど未実装範囲が残る |
-| [delegated-coding-implementation-2026-10-09/](delegated-coding-implementation-2026-10-09/README.md) | 委任コーディングの実装計画(01〜06)。実CLI隔離と全体受入は未完了 |
-| [improvement-plan-2026-10-10.md](improvement-plan-2026-10-10.md) | 改善手順の初版。延期項目は第2版へ移管。第2版の未完了が残るため同時archiveしない |
-| [improvement-plan-2026-10-10-r2.md](improvement-plan-2026-10-10-r2.md) | 第2版。多数のWPは実施記録あり。CI関連・FE-4・VO-16・FE-9・DT-11・DT-13が残るためarchiveしない |
-| [test-quality-improvement-options-2026-10-15.md](test-quality-improvement-options-2026-10-15.md) | Replay・JiTTest等の評価候補。未着手 |
-| [external-apps-artifacts-implementation-plan-2026-10-09.md](external-apps-artifacts-implementation-plan-2026-10-09.md) | 外部アプリ成果物。レビュー用草案、実装前 |
-| [avatar-expression-context-design-2026-10-09.md](avatar-expression-context-design-2026-10-09.md) | アバター表情とTTS感情の設計。製品実装は未着手 |
-| [decision-model-benchmark-design.md](decision-model-benchmark-design.md) | 初版は実装済み（[scripts/decision-bench/README.md](../scripts/decision-bench/README.md)）。実時間の保持、GPU/NPU利用率などは未実装 |
+| [codex-sdk-task-artifact-plan-2026-10-14.md](codex-sdk-task-artifact-plan-2026-10-14.md) | 共通KanbanとCodex SDK。P1〜P3とP4の隔離commit/pushは記録済み。改訂7の終了確認は実装し、ブラウザなし全件検証はpass。全子孫停止は未保証。P5は継続 |
+| [kanban-claude-code-plan-2026-10-14.md](kanban-claude-code-plan-2026-10-14.md) | Claude Code実行。P1〜P3は実装・固定試験済み。実 `claude` のフック確認は記録済み。実 LARM の自然言語受入は未実施 |
+| [kanban-implementation-assignments-2026-10-14.md](kanban-implementation-assignments-2026-10-14.md) | 上記の分担と固定契約。P1〜P3は実装済み。P4は実 `claude` のフックまで。自然言語受入は計画側に残る |
+| [web-research-cache-implementation-plan-2026-10-09.md](web-research-cache-implementation-plan-2026-10-09.md) | 第15〜17章のキャッシュとToolchain接続は記録済み。調査メモは未実装。公開Webは後続のguidedが正本 |
+| [delegated-coding-implementation-2026-10-09/](delegated-coding-implementation-2026-10-09/README.md) | 01〜03と06のfixtureは記録済み。04の会話配送、05のモーダル、07、実CLI隔離は未完了 |
+| [improvement-plan-2026-10-10.md](improvement-plan-2026-10-10.md) | 改善手順の初版。延期項目は第2版へ移管済み。残件は第2版の再確認節 |
+| [improvement-plan-2026-10-10-r2.md](improvement-plan-2026-10-10-r2.md) | 第2版。2026-10-16再確認でも FE-4、FE-15、VO-16、DT-11、DT-13のpeer、CI保留が残る。FE-9の対象画面は置換済み |
+| [test-quality-improvement-options-2026-10-15.md](test-quality-improvement-options-2026-10-15.md) | Replay・JiTTest等の評価候補。2026-10-16時点でも未導入 |
+| [external-apps-artifacts-implementation-plan-2026-10-09.md](external-apps-artifacts-implementation-plan-2026-10-09.md) | 外部アプリの汎用契約。実装前。個別アーティファクトは別計画で実装済み |
+| [avatar-expression-context-design-2026-10-09.md](avatar-expression-context-design-2026-10-09.md) | 表情とTTS感情の設計。接続済みのLaya判断は別計画。チャンク判断とヒステリシスは未実装 |
+| [decision-model-benchmark-design.md](decision-model-benchmark-design.md) | 初版スクリプトは実装済み（[scripts/decision-bench/README.md](../scripts/decision-bench/README.md)）。実時間保持とGPU/NPU利用率は未実装。製品経路には未接続 |
 
 ## archive 済み(spec/.archived/)
 
