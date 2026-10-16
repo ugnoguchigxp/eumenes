@@ -3,10 +3,93 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore } from "../../../infrastructure/sqlite";
-import { createConversationService } from "../../conversation";
-import { stewardLedgersMigration } from "..";
+import {
+	createConversationService,
+	migrations as conversationMigrations,
+} from "../../conversation";
+import { migrations as packageSql } from "eumenes-memory/sqlite";
+import {
+	createMemoryService,
+	migrations as hostMemoryMigrations,
+	seedImportMigration,
+	stewardLedgersMigration,
+} from "..";
+import {
+	createContinuityService,
+	migrations as continuityMigrations,
+} from "../../continuity";
 import { blockedInConversation } from "../repository";
 import { memoryTestMigrations } from "./memory.fixture";
+
+test("adding the Seed migration preserves existing memory, conversation and connection settings", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "memory-seed-upgrade-"));
+	const path = join(dir, "db.sqlite3");
+	const journalPath = join(dir, "journal.jsonl");
+	const all = [
+		...conversationMigrations,
+		...continuityMigrations,
+		...hostMemoryMigrations,
+		...packageSql.map((sql, i) => ({ id: `package/${i + 1}`, sql })),
+	];
+	let store = openStore(
+		path,
+		all.filter((m) => m.sql !== seedImportMigration),
+	);
+	const create = () =>
+		createMemoryService(
+			store,
+			createConversationService(store),
+			createContinuityService(store),
+			{ journalPath },
+		);
+	try {
+		const memory = create();
+		expect((await memory.recover()).healthy).toBe(true);
+		await createConversationService(store).append({
+			id: "before",
+			conversationId: "old",
+			role: "user",
+			text: "既存の記憶",
+			createdAt: "2026-10-01T00:00:00Z",
+			runId: "run-old",
+		});
+		await store.write((db) =>
+			memory.applyCurationInTransaction(db, {
+				conversationId: "old",
+				items: [
+					{
+						op: "remember",
+						kind: "preference",
+						key: "old.preference",
+						text: "既存の記憶",
+						messageId: "before",
+						explicit: true,
+					},
+				],
+			}),
+		);
+		await memory.setEnabled(false);
+		const before = memory.list(true);
+		expect(before).toHaveLength(1);
+		await store.close();
+		store = openStore(path, all);
+		const upgraded = create();
+		expect((await upgraded.recover()).healthy).toBe(true);
+		expect(upgraded.list(true)).toEqual(before);
+		expect(upgraded.status()).toMatchObject({ enabled: false, healthy: true });
+		expect(
+			store.read((db) =>
+				db.query("SELECT text FROM messages WHERE id = 'before'").get(),
+			),
+		).toEqual({ text: "既存の記憶" });
+		expect(
+			store.read((db) => db.query("SELECT * FROM memory_seed_import").all()),
+		).toEqual([]);
+	} finally {
+		await store.close();
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
 
 test("memory/0005-steward-ledgers moves the old exclusions to unscoped scheduled_prompt blocks and drops the agent's tables", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-memory-0005-"));

@@ -10,12 +10,16 @@ import {
 	type RuntimeContext,
 } from "./runtime-context";
 import type { TaskOps } from "./task-ops";
+import { guidedWeb } from "./guided-contract";
+import { createWebReadPlan } from "./web-read-plan";
+import { armRuntimeTimer } from "./reconcile-timer";
 
 export function createReconcile(
 	ctx: RuntimeContext,
 	ops: TaskOps,
 	flush: () => void,
 ) {
+	const webReads = createWebReadPlan(ctx, ops);
 	const { store, capabilities, tools, queue, now, log } = ctx.deps;
 	const {
 		prepared,
@@ -180,6 +184,18 @@ export function createReconcile(
 						}
 					}
 				}
+				for (const [id, p] of prepared)
+					if (guidedWeb(p)) {
+						const due = store.read((db) => {
+							const t = get(db, id);
+							return active(t) && webReads.due(db, t);
+						});
+						if (!due) continue;
+						await store.write((db) => {
+							const t = get(db, id);
+							if (active(t)) webReads.advance(db, t);
+						});
+					}
 				const expired = store.read(
 					(db) =>
 						db
@@ -233,7 +249,7 @@ export function createReconcile(
 			state.lastPassEnded = now();
 			if (state.closed) return;
 			try {
-				arm();
+				armRuntimeTimer(ctx, schedule);
 			} catch (error) {
 				log.warn(
 					"agent.reconcile_arm_failed",
@@ -255,25 +271,6 @@ export function createReconcile(
 			if (state.dirty) schedule();
 		});
 		return state.reconciling;
-	}
-	function arm() {
-		if (state.timer) clearTimeout(state.timer);
-		if (state.closed) return;
-		const deadline = store.read(
-			(db) =>
-				db
-					.query(
-						"SELECT MIN(deadline) AS deadline FROM agent_tasks WHERE state NOT IN ('completed','failed','cancelled','interrupted')",
-					)
-					.get() as { deadline: number | null },
-		);
-		if (deadline.deadline !== null) {
-			state.timer = setTimeout(
-				schedule,
-				Math.max(1, deadline.deadline - now()),
-			);
-			state.timer.unref();
-		}
 	}
 	const stop = store.onCommit(schedule);
 	return { schedule, reconcile, stop };

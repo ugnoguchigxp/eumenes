@@ -1,10 +1,7 @@
+import { listAllState } from "./state-snapshot";
 import type { Database } from "bun:sqlite";
 import { classifyValidity, periodFromStateMs } from "eumenes-memory";
-import {
-	assertUserState,
-	deactivateState,
-	listState,
-} from "eumenes-memory/sqlite";
+import { assertUserState, deactivateState } from "eumenes-memory/sqlite";
 import type { HostSourceState, StateItem } from "eumenes-memory/sqlite";
 import {
 	type CurationItem,
@@ -31,7 +28,7 @@ export function createStateWriter(deps: CurationDeps) {
 	const { clock } = deps;
 
 	function items(db: Database, includeInactive: boolean): readonly StateItem[] {
-		const listed = listState(db, {
+		const listed = listAllState(db, {
 			...deps.scoped(db, "memory.write"),
 			includeInactive,
 		});

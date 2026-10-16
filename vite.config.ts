@@ -13,18 +13,14 @@ const first = (value: string | string[] | undefined) =>
 	Array.isArray(value) ? value[0] : value;
 
 /**
- * CSP for the SPA. Script inline is allowed only on the dev server (React
- * Refresh preamble). The HMR WebSocket is limited to the request's own host.
+ * CSP for the SPA. HMR is off, so no inline React Refresh preamble is needed.
+ * The Vite client WebSocket is limited to the request's own host.
  */
-function spaCsp(
-	host: string | undefined,
-	dev: boolean,
-	embedded = false,
-): string {
+function spaCsp(host: string | undefined, embedded = false): string {
 	const ws = host && /^[a-z0-9.-]+(:\d+)?$/i.test(host) ? ` ws://${host}` : "";
 	return [
 		"default-src 'self'",
-		`script-src 'self'${dev ? " 'unsafe-inline'" : ""}`,
+		"script-src 'self'",
 		"style-src 'self' 'unsafe-inline'",
 		"img-src 'self' blob: data: https:",
 		"media-src 'self' blob: data:",
@@ -73,7 +69,7 @@ export default defineConfig(({ command, mode }) => {
 						res.setHeader("X-Frame-Options", embedded ? "SAMEORIGIN" : "DENY");
 						res.setHeader(
 							"Content-Security-Policy",
-							spaCsp(req.headers.host, true, embedded),
+							spaCsp(req.headers.host, embedded),
 						);
 						next();
 					});
@@ -84,7 +80,7 @@ export default defineConfig(({ command, mode }) => {
 						res.setHeader("X-Frame-Options", embedded ? "SAMEORIGIN" : "DENY");
 						res.setHeader(
 							"Content-Security-Policy",
-							spaCsp(req.headers.host, false, embedded),
+							spaCsp(req.headers.host, embedded),
 						);
 						next();
 					});
@@ -101,6 +97,9 @@ export default defineConfig(({ command, mode }) => {
 		},
 		server: {
 			host: "127.0.0.1",
+			// No hot reload: seeing source changes always requires a server restart.
+			hmr: false,
+			watch: null,
 			cors: false,
 			fs: {
 				strict: true,

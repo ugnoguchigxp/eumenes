@@ -2,6 +2,8 @@ import type { Database } from "bun:sqlite";
 import { z } from "zod";
 import type {
 	CompareResult,
+	ValidTime,
+	EvaluationResult,
 	DependencyResult,
 	GapResult,
 	InfluenceResult,
@@ -216,6 +218,9 @@ export type WorldQueryBasis = {
 	origin: string;
 	causalEligible: boolean;
 	condition: unknown;
+	validTime?: ValidTime;
+	conditionEvaluation?: EvaluationResult;
+	evaluatedAt?: number;
 	refutations: { id: string; revision: number }[];
 	sources: {
 		namespace: string;

@@ -126,6 +126,7 @@ function planOutput(
 				itemId: ref.id,
 				revision: ref.revision,
 				text: e.text,
+				...(e.negated === undefined ? {} : { negated: e.negated }),
 				messageId,
 				quote: e.quote,
 			},
@@ -327,6 +328,7 @@ function planResolve(
 						itemId: ref.id,
 						revision: ref.revision,
 						text: e.text ?? "",
+						...(e.negated === undefined ? {} : { negated: e.negated }),
 						messageId: request.messageId,
 						explicit: true,
 					},
@@ -340,6 +342,7 @@ function planResolve(
 					kind: e.kind,
 					key: e.key,
 					text: e.text,
+					...(e.negated === undefined ? {} : { negated: e.negated }),
 					messageId: request.messageId,
 					explicit: true,
 				},
@@ -355,6 +358,7 @@ function planResolve(
 					itemId: ref.id,
 					revision: ref.revision,
 					text: e.text,
+					...(e.negated === undefined ? {} : { negated: e.negated }),
 					messageId: request.messageId,
 					explicit: true,
 				},
@@ -378,7 +382,7 @@ function withKeptText(
 ): CurateOutput {
 	const items = env.deps.memory.stateItemsInTransaction(env.db, false);
 	const known = new Map(
-		items.map((item) => [item.itemId, item.value.text] as const),
+		items.map((item) => [item.itemId, item.value] as const),
 	);
 	// The ref of the stored item with the request's key (the model may name the key but cite the wrong ref).
 	const refOfKey = (key: string | null) => {
@@ -405,7 +409,13 @@ function withKeptText(
 				.map((r) => context.refs[r])
 				.find((r) => r?.namespace === "state");
 			const existing = ref ? known.get(ref.id) : undefined;
-			return existing ? { ...e, text: existing } : e;
+			return existing
+				? {
+						...e,
+						text: existing.text,
+						negated: existing.polarity === "negated",
+					}
+				: e;
 		}),
 	};
 }

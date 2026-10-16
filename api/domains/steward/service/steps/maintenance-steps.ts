@@ -93,7 +93,12 @@ export function eligible(env: StepEnv, step: StepId): boolean {
 // ---- consolidate-memory ----
 
 type ConsolidateOutput = {
-	merge: Array<{ refs: string[]; key: string | null; text: string }>;
+	merge: Array<{
+		refs: string[];
+		key: string | null;
+		text: string;
+		negated?: boolean;
+	}>;
 	stop: Array<{ ref: string; why: "outdated" | "duplicate" | "wrong" }>;
 	tendencies: Array<{
 		op: "add" | "update" | "retire";
@@ -121,7 +126,12 @@ function parseConsolidate(raw: unknown): ConsolidateOutput | null {
 				const body = text(e.text, 500);
 				const refs = labels(e.refs);
 				return body && refs.length >= 2
-					? { refs, key: optionalText(e.key, 200), text: body }
+					? {
+							refs,
+							key: optionalText(e.key, 200),
+							text: body,
+							...(typeof e.negated === "boolean" ? { negated: e.negated } : {}),
+						}
 					: null;
 			},
 			6,
@@ -172,6 +182,7 @@ function prepareConsolidate(env: StepEnv) {
 		data: {
 			today: localDay(env.deps.nowMs()),
 			longTerm: memory.longTerm,
+			longTermCoverage: memory.coverage,
 		},
 		targets: {},
 		summaryRevision: null,
@@ -197,6 +208,7 @@ function planConsolidate(
 			sources: sources.map((s) => ({ itemId: s!.id, revision: s!.revision })),
 			key: e.key,
 			text: e.text,
+			...(e.negated === undefined ? {} : { negated: e.negated }),
 		});
 		kinds.push("merge");
 	}

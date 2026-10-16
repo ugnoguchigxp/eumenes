@@ -6,6 +6,7 @@ export {
 	turnVectorsMigration,
 	stewardLedgersMigration,
 	forgetClosureMigration,
+	seedImportMigration,
 } from "./repository";
 export type { MemoryService } from "./service";
 export { createMemoryService } from "./service";

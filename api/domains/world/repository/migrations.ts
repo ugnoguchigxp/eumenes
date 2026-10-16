@@ -1,3 +1,4 @@
+import { documentsMigration } from "./documents";
 import type { Migration } from "../../../infrastructure/sqlite";
 import { extractionMigration } from "./extraction";
 import { extractionHoldMigration } from "./extraction-hold";
@@ -35,5 +36,10 @@ export const migrations: readonly Migration[] = [
 		id: "world/0010-forget-origin",
 		after: ["world/0009-extraction-steward"],
 		sql: forgetOriginMigration,
+	},
+	{
+		id: "world/0011-documents",
+		after: ["world/0010-forget-origin"],
+		sql: documentsMigration,
 	},
 ];

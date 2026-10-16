@@ -33,6 +33,7 @@ import {
 	turnVectorsMigration,
 	stewardLedgersMigration,
 	forgetClosureMigration,
+	seedImportMigration,
 } from "../../memory";
 import { saveItem } from "./memory-seed";
 import { conversationPolicy } from "../service/conversation-tools";
@@ -57,6 +58,7 @@ const MIGRATIONS = [
 	turnVectorsMigration,
 	stewardLedgersMigration,
 	forgetClosureMigration,
+	seedImportMigration,
 	...memoryPackageMigrations,
 ];
 const SPACE = {

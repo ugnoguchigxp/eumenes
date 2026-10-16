@@ -5,6 +5,7 @@ import {
 	type ToolRuntimeMeta,
 } from "../../capabilities";
 import type { Task } from "../contracts";
+import { guidedWeb } from "./guided-contract";
 export const RESEARCH_BUDGET = Object.freeze({
 	rootMilliseconds: 180000,
 	workerMilliseconds: 150000,
@@ -47,13 +48,20 @@ const RECIPE_WEB_BUDGET = Object.freeze({
 });
 const SEARCH_BUDGET = Object.freeze({ ...RESEARCH_BUDGET, searches: 1 });
 export const operationLimits = (p: Prepared | undefined) =>
-	isRecipeWeb(p)
-		? RECIPE_WEB_BUDGET
-		: isQuickWeb(p)
-			? QUICK_WEB_BUDGET
-			: returnsSearchResults(p)
-				? SEARCH_BUDGET
-				: RESEARCH_BUDGET;
+	guidedWeb(p)
+		? {
+				...RESEARCH_BUDGET,
+				localCalls: 4,
+				externalCalls: isQuickWeb(p) ? 6 : 8,
+				reads: isQuickWeb(p) ? 4 : 6,
+			}
+		: isRecipeWeb(p)
+			? RECIPE_WEB_BUDGET
+			: isQuickWeb(p)
+				? QUICK_WEB_BUDGET
+				: returnsSearchResults(p)
+					? SEARCH_BUDGET
+					: RESEARCH_BUDGET;
 export const modelLimit = (p: Prepared | undefined) =>
 	isHistory(p) || isWorld(p)
 		? RESEARCH_BUDGET.historyModelCalls

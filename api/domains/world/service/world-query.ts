@@ -2,6 +2,7 @@ import type { Database } from "bun:sqlite";
 import { sha256Hex } from "../../../infrastructure/digest";
 import {
 	buildProjection,
+	evaluateConditions,
 	checkDependencies,
 	compareScenarios,
 	edgesFromEntries,
@@ -127,7 +128,17 @@ export function parseWorldQuery(
 	return { ok: false, code: overLimit ? "limit_exceeded" : "invalid_request" };
 }
 
-function basisOf(entry: ProjectionEntry): WorldQueryBasis {
+function basisOf(entry: ProjectionEntry, asOf: number): WorldQueryBasis {
+	const evaluated = evaluateConditions({
+		contractVersion: 1,
+		asOf,
+		authorized: true,
+		maxAgeMs: CONDITION_MAX_AGE_MS,
+		condition: entry.assertion.condition,
+		validTime: entry.assertion.validTime,
+		observations: [],
+	});
+	if (!evaluated.ok) throw new Error("world_condition_invalid");
 	const payload = entry.assertion.payload;
 	return {
 		id: entry.id,
@@ -142,6 +153,9 @@ function basisOf(entry: ProjectionEntry): WorldQueryBasis {
 		origin: entry.origin,
 		causalEligible: entry.causalEligible,
 		condition: entry.assertion.condition,
+		validTime: entry.assertion.validTime,
+		conditionEvaluation: evaluated.value,
+		evaluatedAt: asOf,
 		refutations: entry.refutations.map((ref) => ({
 			id: ref.id,
 			revision: ref.revision,
@@ -415,7 +429,7 @@ export function createWorldQuery(options: WorldQueryOptions) {
 		};
 
 		if (request.mode === "snapshot") {
-			const all = entries.map(basisOf);
+			const all = entries.map((entry) => basisOf(entry, asOf));
 			const fit = fitItems(all, WORLD_QUERY_LIMITS.snapshotBytes);
 			const reasons = [
 				...retrieval.reasons,
@@ -533,7 +547,7 @@ export function createWorldQuery(options: WorldQueryOptions) {
 			if (entry) wanted.set(`${entry.id}\u0000${entry.revision}`, entry);
 		}
 		const fit = fitItems(
-			[...wanted.values()].map(basisOf),
+			[...wanted.values()].map((entry) => basisOf(entry, asOf)),
 			WORLD_QUERY_LIMITS.basisBytes,
 		);
 

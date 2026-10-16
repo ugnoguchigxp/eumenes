@@ -1,12 +1,8 @@
+import { listAllState } from "./state-snapshot";
 import type { Database } from "bun:sqlite";
 import { CONTRACT_VERSIONS } from "eumenes-memory";
 import type { AccessContext } from "eumenes-memory";
-import {
-	applyForget,
-	listState,
-	planForget,
-	readStateFact,
-} from "eumenes-memory/sqlite";
+import { applyForget, planForget, readStateFact } from "eumenes-memory/sqlite";
 import type { ConversationService } from "../../conversation";
 import type { ContinuityService } from "../../continuity";
 import {
@@ -31,6 +27,8 @@ import {
 	mergeNeighbours,
 	readSummary,
 	resetSummarized,
+	seedFenceForItems,
+	SEED_IMPORT_FENCE,
 } from "../repository";
 import type { ContextWindowStore } from "./context-window";
 import { appendJournal, type BlockJournalEntry } from "./journal";
@@ -177,7 +175,7 @@ export function createForget(deps: ForgetDeps) {
 		db: Database,
 		itemIds: ReadonlySet<string>,
 	): string[] {
-		const listed = listState(db, {
+		const listed = listAllState(db, {
 			contractVersion: VERSION,
 			access: access(db, "memory.forget"),
 			scopeKey: PROFILE_SCOPE,
@@ -312,7 +310,7 @@ export function createForget(deps: ForgetDeps) {
 			onJournaled: () => void,
 		): ForgetOutcome {
 			if (!deps.ready()) return refuse("memory_unavailable");
-			const derived = input.derived;
+			let derived = input.derived;
 			if (derived !== undefined && !isDerived(derived))
 				return refuse("invalid_forget");
 			if (
@@ -328,6 +326,9 @@ export function createForget(deps: ForgetDeps) {
 			for (const requested of input.itemIds)
 				if (!STATE_ID.test(requested)) return refuse("invalid_memory_item");
 			expandItems(db, input.itemIds, itemIds, true);
+			const seedDigest = seedFenceForItems(db, itemIds);
+			if (seedDigest)
+				derived = { ...derived, [SEED_IMPORT_FENCE]: [seedDigest] };
 			// The evidence of the items (B1) and the exchange partners (B3) are blocked. Other items that rest on the
 			// same messages stay: they are facts the user did not ask to forget (the message only leaves the context).
 			const messageIds = withPartners(db, [

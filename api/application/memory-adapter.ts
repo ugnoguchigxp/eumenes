@@ -121,7 +121,9 @@ function itemRow(item: MemoryItemDto) {
 		status: item.status,
 		statusLabel: statusLabels[item.status] ?? "不明な状態",
 		capturedBy: item.capturedBy,
-		capturedByLabel: capturedByLabels[item.capturedBy],
+		capturedByLabel:
+			item.evidence.find((e) => e.source)?.source?.label ??
+			capturedByLabels[item.capturedBy],
 		validity: validityText(item),
 		quote: quote ? `「${quote}」` : NO_QUOTE,
 	};

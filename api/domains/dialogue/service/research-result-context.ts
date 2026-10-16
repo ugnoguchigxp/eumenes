@@ -9,19 +9,19 @@ const presentation =
 // Only for a report that cites World records (sources of kind world_claim): they have no URL and are not external facts.
 const worldRules =
 	"Worldの記録: sourcesのうちkindがworld_claimのものは、本人と会話から作ったWorldの記録であり、外部で確認された事実ではありません。回答では「記録では」のように記録として伝え、事実として断定しません。そのclaimのsourceIdsが指すsourceのoriginがmodel_hypothesisなら「仮説」と明示し、事実として言い切りません。coverageがpartialのときは確認できた範囲だけを述べ、「影響はない」「依存はない」と言い切りません。Worldの出典にはURLがないのでリンクにせず、「Worldの記録によると」のように文章で示します。sourceId・origin・mode名・not_computedなどの内部の語は回答に出しません。";
+const documentRules =
+	"収集資料: kindがworld_documentの出典は、利用者の発言や本人についての記憶ではありません。収集時の資料であり、現在の外部正本の確認結果ではありません。資料名を示し、対象・期間・条件・不足を残して報告します。URLを作らず、資料に書かれた規程と観測事実を区別します。";
 const policy = requiredRules + "\n" + presentation;
 const failureRules =
 	"今回の回答は、既に調査担当へ渡した依頼の実行結果を説明する回答です。失敗説明はCURRENT_RESEARCH_FAILUREを正本とし、失敗した処理と、分かっている原因または詳細不明を短い自然な言葉で伝えます。過去の会話にある障害説明を流用しません。モデル実行の失敗、検索・読取りの失敗、出力形式の拒否を区別します。モデル呼出しが失敗しただけなら制御JSON不正・検索失敗と断定しません。システム障害を利用者のキーワード不足に置き換えて追加指定を求めません。内部の形式名やコードは回答に出しません。";
 
-const citesWorld = (projection: string | undefined) => {
+const citesWorld = (projection: string | undefined, kind = "world_claim") => {
 	if (!projection) return false;
 	try {
 		const { sources } = JSON.parse(projection) as { sources?: unknown };
 		return (
 			Array.isArray(sources) &&
-			sources.some(
-				(s) => (s as { kind?: unknown } | null)?.kind === "world_claim",
-			)
+			sources.some((s) => (s as { kind?: unknown } | null)?.kind === kind)
 		);
 	} catch {
 		return false;
@@ -57,6 +57,7 @@ export function researchResultContext(
 			"\n" +
 			policy +
 			(citesWorld(projection) ? "\n" + worldRules : "") +
+			(citesWorld(projection, "world_document") ? "\n" + documentRules : "") +
 			(failureCode
 				? "\n" +
 					failureRules +

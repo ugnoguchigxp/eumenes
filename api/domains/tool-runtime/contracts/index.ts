@@ -5,7 +5,13 @@ export type ToolResult = {
 	readings?: Source[];
 	notes?: unknown;
 	proofs?: Array<{ kind: "conversation_source"; scopeRef: string }>;
-	hits: Array<{ url: string; title: string; snippet: string }>;
+	hits: Array<{
+		url: string;
+		title: string;
+		snippet: string;
+		provider?: string;
+		rank?: number;
+	}>;
 	documents: Array<{
 		url: string;
 		title: string;
@@ -13,10 +19,19 @@ export type ToolResult = {
 		fetchedAt: string;
 		truncated: boolean;
 	}>;
-	failures: Array<{ url: string; code: string }>;
+	failures: Array<{
+		url: string;
+		code: string;
+		retryable?: boolean;
+		cooldownMs?: number;
+	}>;
 };
 export type Source = {
-	kind?: "web_source" | "conversation_source" | "world_claim";
+	kind?:
+		| "web_source"
+		| "conversation_source"
+		| "world_claim"
+		| "world_document";
 	sourceRef?: string;
 	sourceRevision?: string;
 	viewId?: string;
@@ -44,6 +59,8 @@ export type Source = {
 	fetchedAt: string;
 	truncated: boolean;
 	body: string;
+	source?: { provider: string; query: string; rank: number; snippet?: string };
+	security?: { decision: string; reasonCodes: string[] };
 };
 export type SourceMetadata = Omit<Source, "body">;
 export type AdapterOperation = {

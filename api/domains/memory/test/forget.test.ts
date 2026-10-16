@@ -61,8 +61,9 @@ test("forget removes every version of a fact beyond the 1000-row listing cap, an
 					`v${i}`,
 					row.polarity as string,
 					row.origin as string,
-					-1 - i,
-					-1 - i,
+					// Pagination cursors require positive sequences; keep all 1,100 historical rows, with ties.
+					row.created_seq as number,
+					row.updated_seq as number,
 				);
 			}
 			db.query(

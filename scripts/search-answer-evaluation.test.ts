@@ -74,10 +74,22 @@ test("a judge cannot grant nonexistent evidence or a code-only citation", async 
 			(await evaluateSearchAnswer(sample, async () => JSON.stringify(pass))).ok,
 		).toBe(false);
 });
-test("honest uncertainty and unsupported attribution are separate from complete acceptance", async () => {
+test("response completion is independent of unavailable fact certainty", async () => {
 	const result = await evaluateSearchAnswer(stockSample, async () =>
 		JSON.stringify({ ...pass, requestSatisfied: "unknown" }),
 	);
 	expect(result.ok).toBe(false);
 	expect(result.verdict!.unsupportedStatements).toEqual([]);
+	expect(
+		(await evaluateSearchAnswer(stockSample, async () => JSON.stringify(pass)))
+			.ok,
+	).toBe(true);
+});
+test("every reviewed regression rejects even a judge that blindly passes every dimension", async () => {
+	for (const control of searchAnswerControls) {
+		const result = await evaluateSearchAnswer(control.sample, async () =>
+			JSON.stringify(pass),
+		);
+		expect(result.ok, control.id).toBe(control.expected);
+	}
 });

@@ -1,6 +1,7 @@
+import { listAllState } from "./state-snapshot";
 import type { Database } from "bun:sqlite";
 import { classifyValidity, periodFromStateMs } from "eumenes-memory";
-import { latestMemoryChangeSeq, listState } from "eumenes-memory/sqlite";
+import { latestMemoryChangeSeq } from "eumenes-memory/sqlite";
 import type { ContinuityService } from "../../continuity";
 import { PRINCIPAL, PROFILE_SCOPE } from "../contracts";
 import {
@@ -26,6 +27,7 @@ import {
 import { buildHistory, type WindowHistory } from "./context-history";
 
 export type ImmediateKind =
+	| "state_import"
 	| "state_stop"
 	| "state_retract"
 	| "state_forget"
@@ -98,7 +100,7 @@ function latestStateChange(db: Database, policyRevision: string): number {
 
 /** The current, valid State of the profile as long-term lines, and the next time validity changes. */
 function currentState(db: Database, policyRevision: string, nowMs: number) {
-	const listed = listState(db, {
+	const listed = listAllState(db, {
 		contractVersion: CONTRACT_VERSION,
 		access: {
 			principal: PRINCIPAL,

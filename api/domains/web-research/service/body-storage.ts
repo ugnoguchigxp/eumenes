@@ -52,6 +52,7 @@ export function createBodyStorage(
 					doc.fetchedAt,
 					bounded,
 					doc.acquisitionTruncated,
+					...(doc.source || doc.security ? [doc.source, doc.security] : []),
 				]),
 			);
 			const existing = bodies.get(id);

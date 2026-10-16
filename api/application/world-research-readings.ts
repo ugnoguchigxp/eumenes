@@ -191,6 +191,11 @@ export function sourceOf(
 	const cut = (!claim.relation && value.cut) || condition.cut || predicate.cut;
 	const freshness = String(claim.freshness);
 	const body = [
+		...(claim.conditionEvaluation
+			? [
+					`条件計算: ${JSON.stringify(claim.conditionEvaluation)} / 判定時刻(UTC): ${new Date(claim.evaluatedAt!).toISOString()} / 観測値: 未提供 / 有効期間: ${JSON.stringify(claim.validTime ?? null)}`,
+				]
+			: []),
 		`対象: ${subject} / 項目: ${predicate.text} / ${content}`,
 		`由来: ${ORIGIN_TEXT[claim.origin] ?? claim.origin}。状態: ${STATUS_TEXT[claim.status] ?? claim.status}。鮮度: ${FRESHNESS_TEXT[freshness] ?? "不明"}。条件: ${condition.text}。反証: ${refutations}。`,
 	].join("\n");

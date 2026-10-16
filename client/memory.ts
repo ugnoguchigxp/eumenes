@@ -7,6 +7,10 @@ import {
 	shortTermSchema,
 } from "../api/domains/memory/contracts";
 import { decisionsResponseSchema } from "../api/domains/steward/contracts";
+import {
+	memorySeedResultSchema,
+	type MemorySeed,
+} from "../api/domains/memory/contracts";
 import { json, type Transport } from "./transport";
 export function memoryClient(t: Transport) {
 	const post = async <S extends z.ZodType>(
@@ -16,6 +20,10 @@ export function memoryClient(t: Transport) {
 	): Promise<z.infer<S>> =>
 		schema.parse(await (await t.call(path, json(body))).json());
 	return {
+		previewMemorySeeds: (seeds: readonly MemorySeed[]) =>
+			post(memorySeedResultSchema, "/api/memory/seeds/preview", { seeds }),
+		importMemorySeeds: (seeds: readonly MemorySeed[]) =>
+			post(memorySeedResultSchema, "/api/memory/seeds/import", { seeds }),
 		memoryStatus: async () =>
 			memoryStatusSchema.parse(
 				await (await t.call("/api/memory/status")).json(),

@@ -15,6 +15,7 @@ export function verifyReport(
 	visible: Source[],
 	hasFailures: boolean,
 	requireViews = false,
+	structuredWeb = false,
 ): Report {
 	const result = (
 		raw && typeof raw === "object" && "version" in raw
@@ -43,9 +44,10 @@ export function verifyReport(
 			const referenced = "excerptId" in evidence;
 			const quote = referenced
 				? source &&
-					evidenceExcerpts(source.body).find(
-						(e) => e.excerptId === evidence.excerptId,
-					)?.quote
+					evidenceExcerpts(
+						source.body,
+						structuredWeb && source.basis === "page",
+					).find((e) => e.excerptId === evidence.excerptId)?.quote
 				: evidence.quote.replaceAll("\r\n", "\n");
 			if (!source || !quote || !source.body.includes(quote))
 				throw new ValidationFailure("invalid_evidence", [
@@ -64,7 +66,9 @@ export function verifyReport(
 			return {
 				sourceId: source.sourceId,
 				quote:
-					source.kind === "conversation_source" || source.kind === "world_claim"
+					source.kind === "conversation_source" ||
+					source.kind === "world_claim" ||
+					source.kind === "world_document"
 						? ""
 						: quote,
 				...(viewId ? { viewId } : {}),
@@ -132,11 +136,12 @@ export function parentProjection(report: Report) {
 		coverage: report.coverage,
 		verification: report.verification,
 		sources: report.sources.map((s) =>
-			s.kind === "world_claim"
+			s.kind === "world_claim" || s.kind === "world_document"
 				? {
 						sourceId: s.sourceId,
 						kind: s.kind,
 						origin: s.origin,
+						...(s.kind === "world_document" ? { title: s.title } : {}),
 					}
 				: s.kind === "conversation_source"
 					? {

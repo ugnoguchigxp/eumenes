@@ -22,6 +22,12 @@ const publicUrl = z
 	.url()
 	.max(2048)
 	.refine((value) => isPublicHttpUrl(value));
+export const searchSourceSchema = z.object({
+	provider: z.string().max(80),
+	query: z.string().max(400),
+	rank: z.number().int().min(1),
+	snippet: z.string().max(500).optional(),
+});
 export const submitResearchSchema = z.discriminatedUnion("operation", [
 	z
 		.object({
@@ -46,12 +52,14 @@ export const submitResearchSchema = z.discriminatedUnion("operation", [
 			operation: z.literal("read"),
 			url: publicUrl,
 			retention: z.enum(["none", "stable"]).default("none"),
+			source: searchSourceSchema.optional(),
 		})
 		.strict(),
 ]);
 export type ResearchSubmit = z.input<typeof submitResearchSchema>;
 export type ResearchRequest = z.output<typeof submitResearchSchema>;
 export const documentSchema = z.object({
+	source: searchSourceSchema.optional(),
 	url: publicUrl,
 	title: z.string().max(500),
 	text: z.string().max(12000),
@@ -76,6 +84,7 @@ export const resultSchema = z.object({
 				title: z.string().max(300),
 				snippet: z.string().max(500),
 				provider: z.string().max(80),
+				rank: z.number().int().min(1).optional(),
 				trust: z.literal("untrusted"),
 				tainted: z.literal(true),
 				verification: z.literal("search_summary"),
@@ -92,6 +101,8 @@ export const resultSchema = z.object({
 					.regex(/^[a-z_]+$/)
 					.max(80),
 				guardDecision: z.enum(["deny", "require_approval"]).optional(),
+				retryable: z.boolean().optional(),
+				cooldownMs: z.number().min(0).optional(),
 				guardReasonCodes: z.array(z.string().max(80)).max(16).optional(),
 			}),
 		)

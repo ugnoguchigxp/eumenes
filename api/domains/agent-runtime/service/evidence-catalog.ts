@@ -13,6 +13,7 @@ export const MATERIAL_BYTES = 32768;
 const MATERIAL_RESERVE_BYTES = 512;
 /** Task-scoped immutable references. Bodies remain in the tool vault; no durable copy. */
 export class EvidenceCatalog {
+	constructor(private structuredWeb = false) {}
 	private documents = new Map<string, string>();
 	private entries = new Map<
 		string,
@@ -25,7 +26,7 @@ export class EvidenceCatalog {
 	private unavailable = new Set<string>();
 	full = false;
 	copy() {
-		const copy = new EvidenceCatalog();
+		const copy = new EvidenceCatalog(this.structuredWeb);
 		copy.documents = new Map(this.documents);
 		copy.entries = new Map(this.entries);
 		copy.identities = new Map(this.identities);
@@ -66,8 +67,13 @@ export class EvidenceCatalog {
 	 * the already registered source, so re-reading never spends catalog capacity.
 	 * A registered source that is no longer present is replaced, not reused. */
 	private canonical(source: Source, present: Set<string>) {
-		if (source.kind !== "world_claim" || !source.sourceRef) return source;
+		if (
+			(source.kind !== "world_claim" && source.kind !== "world_document") ||
+			!source.sourceRef
+		)
+			return source;
 		const key = JSON.stringify([
+			source.kind,
 			source.sourceRef,
 			source.sourceRevision ?? null,
 			source.scopeRef ?? null,
@@ -97,6 +103,13 @@ export class EvidenceCatalog {
 				title: source.title,
 				url: source.url,
 				basis: source.basis,
+				...(this.structuredWeb
+					? {
+							source: source.source,
+							security: source.security,
+							fetchedAt: source.fetchedAt,
+						}
+					: {}),
 				speaker: source.speaker,
 				createdAt: source.createdAt,
 				origin: source.origin,
@@ -113,7 +126,11 @@ export class EvidenceCatalog {
 				document = `d${this.documents.size + 1}`;
 				this.documents.set(key, document);
 			}
-			const excerpts: Array<{ reference: string; quote: string }> = [];
+			const excerpts: Array<{
+				reference: string;
+				quote: string;
+				context?: string[];
+			}> = [];
 			const observation = () => ({
 				...metadata,
 				document,
@@ -121,8 +138,17 @@ export class EvidenceCatalog {
 				messageRef: source.messageRef ? document : undefined,
 				excerpts,
 			});
-			const all = evidenceExcerpts(source.body);
+			const all = evidenceExcerpts(
+				source.body,
+				this.structuredWeb && source.basis === "page",
+			);
 			for (const excerpt of all) {
+				const context = excerpt.context?.flatMap((id) => {
+					const ref = this.identities.get(
+						`${source.sourceId}:${source.viewId ?? ""}:${id}`,
+					);
+					return ref ? [ref] : [];
+				});
 				const identity = `${source.sourceId}:${source.viewId ?? ""}:${excerpt.excerptId}`;
 				let reference = this.identities.get(identity);
 				if (!reference) {
@@ -139,7 +165,11 @@ export class EvidenceCatalog {
 						quote: excerpt.quote,
 						document,
 					});
-					excerpts.push({ reference, quote: excerpt.quote });
+					excerpts.push({
+						reference,
+						quote: excerpt.quote,
+						...(context?.length ? { context } : {}),
+					});
 					if (
 						bytes(this.list()) > EVIDENCE_LIST_BYTES ||
 						bytes({
@@ -156,7 +186,11 @@ export class EvidenceCatalog {
 					added.push({ reference, identity });
 					continue;
 				}
-				excerpts.push({ reference, quote: this.entries.get(reference)!.quote });
+				excerpts.push({
+					reference,
+					quote: this.entries.get(reference)!.quote,
+					...(context?.length ? { context } : {}),
+				});
 			}
 			// A source without any excerpt (an empty page with a cursor) still
 			// shows its metadata; one whose excerpts did not fit is withheld.
@@ -261,7 +295,7 @@ export class EvidenceCatalog {
 		return this.verificationEvidence(refs).map((e) => ({
 			sourceId: e.sourceId,
 			viewId: e.viewId,
-			quote: ["conversation_source", "world_claim"].includes(
+			quote: ["conversation_source", "world_claim", "world_document"].includes(
 				this.entries.get(e.reference)!.source.kind ?? "",
 			)
 				? ""

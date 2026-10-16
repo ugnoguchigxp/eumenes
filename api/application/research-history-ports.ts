@@ -202,6 +202,7 @@ export function createReadPorts(
 				inv.deadline,
 			);
 			const snippets: Source[] = result.hits.map((h) => {
+				const query = JSON.parse(inv.args_json ?? "{}").query;
 				const sourceId = crypto.randomUUID();
 				return {
 					kind: "web_source",
@@ -216,6 +217,16 @@ export function createReadPorts(
 					basis: "snippet",
 					fetchedAt: result.observedAt,
 					body: h.snippet,
+					...(typeof query === "string" && h.provider
+						? {
+								source: {
+									provider: h.provider,
+									query,
+									rank: h.rank ?? 1,
+									snippet: h.snippet,
+								},
+							}
+						: {}),
 					truncated: true,
 				};
 			});

@@ -113,6 +113,15 @@ export function createBound(deps: {
 	return {
 		seedBundlesInTransaction: bundles.seedBundlesInTransaction,
 		api: {
+			activePackageRevisionInTransaction(db: Database, id: string): string {
+				const row = db
+					.query(
+						"SELECT active_revision_id FROM capability_items WHERE kind='package' AND id=? AND enabled=1",
+					)
+					.get(id) as { active_revision_id: string } | null;
+				if (!row) throw new Error("capability_unavailable");
+				return row.active_revision_id;
+			},
 			prepareActiveByIdInTransaction,
 			prepareBoundInTransaction,
 			documentInTransaction,

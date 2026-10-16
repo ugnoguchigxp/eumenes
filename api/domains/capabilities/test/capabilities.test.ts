@@ -277,6 +277,8 @@ test("builtin bundle upgrade preserves revision 1 fingerprints and activates a n
 					d.id != "web.recipe" &&
 					d.id != "recipe.find" &&
 					d.revision < 3 &&
+					// The historical fixture predates the versioned search schema.
+					!(d.kind === "tool" && d.id === "web.lookup" && d.revision === 2) &&
 					!(d.kind === "skill" && d.revision === 2) &&
 					!(d.kind === "profile" && d.revision === 2),
 			))

@@ -33,6 +33,7 @@ import {
 	turnVectorsMigration,
 	stewardLedgersMigration,
 	forgetClosureMigration,
+	seedImportMigration,
 } from "../../memory";
 import { addNote, saveItem, type SeedInput } from "./memory-seed";
 
@@ -52,6 +53,7 @@ const MIGRATIONS = [
 	turnVectorsMigration,
 	stewardLedgersMigration,
 	forgetClosureMigration,
+	seedImportMigration,
 	...memoryPackageMigrations,
 ];
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));

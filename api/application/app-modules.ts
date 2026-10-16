@@ -86,7 +86,11 @@ import {
 	registerToolchainHistory,
 	type ToolchainHistory,
 } from "../domains/toolchain-history";
-import { registerWorldClaims } from "../domains/world";
+import {
+	registerWorldClaims,
+	registerWorldDocuments,
+	type WorldDocuments,
+} from "../domains/world";
 import type { WorldClaims, WorldClaimsContext } from "../domains/world";
 import {
 	registerServiceTests,
@@ -139,7 +143,11 @@ export type AppServices = {
 	/** UI actions and artifact registrations of bound toolchains. */
 	toolchainActions?: ActionRequests;
 	/** World claim list and corrections (P5-02). Absent with World OFF: the routes do not exist. */
-	worldClaims?: { claims: WorldClaims; context: () => WorldClaimsContext };
+	worldClaims?: {
+		claims: WorldClaims;
+		documents?: WorldDocuments;
+		context: () => WorldClaimsContext;
+	};
 };
 
 /**
@@ -252,8 +260,14 @@ export function appModules(services: AppServices): AppModule[] {
 			mount: (app) => registerToolchainActions(app, s.toolchainActions!),
 		},
 		s.worldClaims && {
-			mount: (app) =>
-				registerWorldClaims(app, s.worldClaims!.claims, s.worldClaims!.context),
+			mount: (app) => {
+				registerWorldClaims(app, s.worldClaims!.claims, s.worldClaims!.context);
+				if (s.worldClaims!.documents)
+					registerWorldDocuments(app, s.worldClaims!.documents!, () => {
+						const ctx = s.worldClaims!.context();
+						return { principal: ctx.principal, scopeKey: ctx.scopeKeys[0]! };
+					});
+			},
 		},
 	];
 	return modules.filter((module): module is AppModule => module !== undefined);

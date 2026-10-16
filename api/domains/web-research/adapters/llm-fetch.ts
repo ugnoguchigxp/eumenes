@@ -127,6 +127,23 @@ export function acquisitionRejectionReasons(error: unknown): string[] {
 				.slice(0, 7)
 		: [];
 }
+export function readFailure(
+	url: string,
+	error: unknown,
+): ResearchResult["failures"][number] {
+	return {
+		url,
+		code: acquisitionError(error),
+		...(error instanceof LlmFetchError
+			? {
+					retryable: error.retryable,
+					cooldownMs: error.cooldownMs,
+					guardDecision: error.guardDecision,
+					guardReasonCodes: acquisitionRejectionReasons(error),
+				}
+			: {}),
+	};
+}
 
 export function createWebAcquisition(
 	options: {
@@ -163,6 +180,7 @@ export function createWebAcquisition(
 	async function read(
 		url: string,
 		signal: AbortSignal,
+		source?: Extract<ResearchRequest, { operation: "read" }>["source"],
 	): Promise<{
 		document: ResearchDocument;
 		body: AcquiredBody;
@@ -171,7 +189,7 @@ export function createWebAcquisition(
 		const transport =
 			options.fetcher ??
 			createSafeHttpFetcher({
-				timeoutMs: 15000,
+				timeoutMs: 30000,
 				userAgent: "Eumenes/0.1 (llm-fetch/0.1.4)",
 				allowedContentTypes: [
 					"text/html",
@@ -195,7 +213,7 @@ export function createWebAcquisition(
 				maxCharacters: 2_000_000,
 				...(options.review ? { review: options.review } : {}),
 			},
-			readTimeoutMs: options.review ? 30000 : 15000,
+			readTimeoutMs: 30000,
 			fetcher: async (target, input) => {
 				const requestedAtMs = now();
 				const response = await transport(target, input);
@@ -219,6 +237,7 @@ export function createWebAcquisition(
 		try {
 			const doc = await client.read({
 				url,
+				source,
 				maxCharacters: 64000,
 				render: "never",
 				requestedUse: "answer_with_citation",
@@ -244,8 +263,14 @@ export function createWebAcquisition(
 					text,
 					fetchedAt: doc.fetchedAt,
 					acquisitionTruncated: doc.truncated || status === 206,
+					source: doc.source,
+					security: {
+						decision: doc.security.decision,
+						reasonCodes: [...(doc.security.reasonCodes ?? [])].slice(0, 16),
+					},
 				},
 				document: {
+					source: doc.source,
 					url: doc.finalUrl,
 					title: limited(doc.title, 500),
 					text: limited(text, 12000),
@@ -279,7 +304,7 @@ export function createWebAcquisition(
 				failures: [],
 			};
 			if (request.operation === "read") {
-				const value = await read(request.url, signal);
+				const value = await read(request.url, signal, request.source);
 				result.documents.push(value.document);
 				bodies.push(value.body);
 				return {
@@ -308,6 +333,7 @@ export function createWebAcquisition(
 				title: limited(hit.title, 300),
 				snippet: limited(hit.snippet, 500),
 				provider: limited(hit.provider, 80),
+				rank: hit.rank,
 				trust: "untrusted",
 				tainted: true,
 				verification: "search_summary",
@@ -315,23 +341,17 @@ export function createWebAcquisition(
 			for (const hit of result.hits.slice(0, request.readPages)) {
 				signal.throwIfAborted();
 				try {
-					const value = await read(hit.url, signal);
+					const value = await read(hit.url, signal, {
+						provider: hit.provider,
+						query: request.query,
+						rank: hit.rank ?? 1,
+						snippet: hit.snippet,
+					});
 					result.documents.push(value.document);
 					bodies.push(value.body);
 				} catch (error) {
 					signal.throwIfAborted();
-					result.failures.push({
-						url: hit.url,
-						code: acquisitionError(error),
-						...(error instanceof LlmFetchError
-							? {
-									guardDecision: error.guardDecision,
-									guardReasonCodes: error.guardReasonCodes
-										? [...error.guardReasonCodes].slice(0, 16)
-										: undefined,
-								}
-							: {}),
-					});
+					result.failures.push(readFailure(hit.url, error));
 				}
 			}
 			return { result, bodies, freshUntilMs: null };

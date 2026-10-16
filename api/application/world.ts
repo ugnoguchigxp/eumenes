@@ -25,6 +25,8 @@ import {
 	SourceCursorError,
 	createConversationSourceAdapter,
 	createWorldClaims,
+	createWorldDocuments,
+	type WorldDocuments,
 	createWorldContextNames,
 	createWorldCuration,
 	createWorldHostGate,
@@ -210,6 +212,7 @@ export type WorldAssembly = {
 	readonly context: WorldContextPort;
 	/** The owner's claim list and explicit corrections (P5-02). */
 	readonly claims: WorldClaims;
+	readonly documents: WorldDocuments;
 	/** Who the HTTP surface acts for: bound by the host, never by a request. */
 	readonly claimsContext: () => WorldClaimsContext;
 	/**
@@ -452,6 +455,7 @@ export function createWorldAssembly(
 		curation,
 		context,
 		claims,
+		documents: createWorldDocuments(options.store),
 		claimsContext: () => ({
 			principal: scope.principal,
 			scopeKeys: [scope.scopeKey],

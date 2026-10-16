@@ -31,11 +31,14 @@ import {
 import { acceptRequirementVerification } from "./requirement-verification";
 import { owner, active, type RuntimeContext } from "./runtime-context";
 import type { TaskOps } from "./task-ops";
+import { guidedAction, guidedWeb } from "./guided-contract";
+import { applyGuidedAction } from "./guided-step";
 
 export type StepInput = {
 	catalog: EvidenceCatalog;
 	mode: "research" | "verify_requirements";
 	search: boolean;
+	guided?: boolean;
 	first: boolean;
 	taskId: string;
 	stepId: string;
@@ -61,6 +64,7 @@ type StepHandler = HandlerDefinition<
 export type Tx = Parameters<StepHandler["settleInTransaction"]>[0];
 export type Claim = Parameters<StepHandler["settleInTransaction"]>[1];
 type ControlAction =
+	| z.infer<typeof guidedAction>
 	| z.infer<typeof requirementVerification>
 	| z.infer<typeof firstResearchAction>
 	| z.infer<typeof searchAction>
@@ -256,6 +260,19 @@ export function createStepActions(ctx: RuntimeContext, ops: TaskOps) {
 			update(db, get(db, t.id)!, "completed", "completed");
 			ready(db, root, null, t.id);
 			releases.add(t.id);
+		} else if (guidedWeb(p)) {
+			applyGuidedAction(
+				ctx,
+				ops,
+				db,
+				t,
+				root,
+				claim,
+				input,
+				p,
+				parsed.data,
+				(action) => invokeStepTool(ctx, ops, db, t, claim, input, p, action),
+			);
 		} else {
 			const research = (
 				input.search

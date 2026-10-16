@@ -2,6 +2,7 @@
 
 - 作業開始時に `initial_instructions` MCP ツールを一度だけ実行する。個別タスクごとに再実行しない。
 - ユーザーが明示的に依頼した場合を除き、新しい作業ブランチを作成せず、mainで作業する。
+- ユーザーの明示的な許可なしに、サーバーを停止・起動・再起動しない。検証や障害調査のために必要な場合も、事前に許可を得る。
 - ユーザーの明示依頼なしに、別の Codex チャットへメッセージを送らない。SAAA と `hono-standard` は参照専用とし、製品 DB・設定・秘密をコピーしない。
 - domain の業務判断・SQL・試験を各 domain に置く。下位 domain は上位 domain を参照しない。複数 domain の保存は単一 writer の transaction と公開操作で行う。
 - ツールチェーンの追加・改訂・移行はデータドリブン形式（bundle＋登録adapter）で行い、[登録と拡張の手順](docs/toolchain-extension.md)と[検証手順](docs/toolchain-extension-verification.md)に従う。作業順の要約は `.claude/skills/data-driven-toolchain/SKILL.md`。UIが必要な場合は、登録手順のDesignSystem・OpenUI・Artifactの追加手順も参照する。

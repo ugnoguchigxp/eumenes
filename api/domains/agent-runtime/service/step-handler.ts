@@ -18,6 +18,8 @@ import { prepareRequirementVerification } from "./requirement-verification";
 import { STEP_KIND, active, type RuntimeContext } from "./runtime-context";
 import type { TaskOps } from "./task-ops";
 import { createToolSelection } from "./tool-selection";
+import { guidedWeb, guidedAction } from "./guided-contract";
+import { webReadState, saveWebReadState } from "./web-read-state";
 
 import {
 	createStepActions,
@@ -88,7 +90,15 @@ export function createStepHandler(ctx: RuntimeContext, ops: TaskOps) {
 				// A replay must present the requested result again, even if newer results exist.
 				const latest = obs.findIndex((o) => o.invocationId === t.invocation_id);
 				if (latest >= 0) obs.push(...obs.splice(latest, 1));
-				const catalog = (catalogs.get(t.id) ?? new EvidenceCatalog()).copy();
+				const guided = guidedWeb(p);
+				if (guided) {
+					const state = webReadState(t);
+					state.presented = state.arrivals;
+					saveWebReadState(db, t.id, state);
+				}
+				const catalog = (
+					catalogs.get(t.id) ?? new EvidenceCatalog(guided)
+				).copy();
 				const mode =
 					t.phase === "verify_requirements"
 						? "verify_requirements"
@@ -153,6 +163,7 @@ export function createStepHandler(ctx: RuntimeContext, ops: TaskOps) {
 						catalog,
 						mode,
 						search,
+						guided,
 						first: !frozen,
 						taskId: t.id,
 						stepId: claim.payload.stepId,
@@ -226,11 +237,13 @@ export function createStepHandler(ctx: RuntimeContext, ops: TaskOps) {
 			const parsed = (
 				input.mode === "verify_requirements"
 					? requirementVerification
-					: input.search
-						? searchAction
-						: input.first
-							? firstResearchAction
-							: researchAction
+					: input.guided
+						? guidedAction
+						: input.search
+							? searchAction
+							: input.first
+								? firstResearchAction
+								: researchAction
 			).safeParse(outcome.result.action);
 			if (outcome.result.invalid || !parsed.success) {
 				rejectInvalidControl(db, t, claim, input, outcome, parsed);

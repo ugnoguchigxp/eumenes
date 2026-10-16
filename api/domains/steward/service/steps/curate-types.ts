@@ -52,6 +52,7 @@ export type Update = {
 	text: string;
 	evidence: string;
 	quote: string | null;
+	negated?: boolean;
 };
 export type Stop = { ref: string; why: (typeof STOP_WHY)[number] };
 export type Note = {
@@ -69,6 +70,7 @@ export type Resolve = {
 	text: string | null;
 	kind: (typeof stateKindsOf)[number] | null;
 	key: string | null;
+	negated?: boolean;
 };
 /** The judgment of one exchange: does it need a World step, does it need a goal step (section 3.4 of the World plan). */
 export type Route = { exchange: string; world: boolean; goals: boolean };
@@ -168,6 +170,7 @@ export function parseCurate(raw: unknown): CurateOutput | null {
 					text: body,
 					evidence,
 					quote: optionalText(e.quote, 1024),
+					...(typeof e.negated === "boolean" ? { negated: e.negated } : {}),
 				};
 			},
 			6 - remember.length,
@@ -216,6 +219,7 @@ export function parseCurate(raw: unknown): CurateOutput | null {
 					text: optionalText(e.text, 500),
 					kind: oneOf(e.kind, stateKindsOf),
 					key: optionalText(e.key, 200),
+					...(typeof e.negated === "boolean" ? { negated: e.negated } : {}),
 				};
 			},
 			REQUESTS_PER_UNIT,

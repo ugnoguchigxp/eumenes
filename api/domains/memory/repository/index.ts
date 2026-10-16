@@ -1,5 +1,7 @@
 import type { Database } from "bun:sqlite";
 import type { Migration } from "../../../infrastructure/sqlite";
+import { seedImportMigration } from "./seeds";
+export * from "./seeds";
 export * from "./window";
 export * from "./tendency";
 export * from "./ledger";
@@ -208,5 +210,10 @@ export const migrations: readonly Migration[] = [
 		id: "memory/0006-forget-closure",
 		sql: forgetClosureMigration,
 		after: ["memory/0005-steward-ledgers"],
+	},
+	{
+		id: "memory/0007-seed-import",
+		sql: seedImportMigration,
+		after: ["memory/0006-forget-closure"],
 	},
 ];

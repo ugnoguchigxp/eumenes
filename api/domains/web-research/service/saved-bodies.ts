@@ -16,6 +16,8 @@ export type AcquiredBody = {
 	text: string;
 	fetchedAt: string;
 	acquisitionTruncated: boolean;
+	source?: { provider: string; query: string; rank: number; snippet?: string };
+	security?: { decision: string; reasonCodes: string[] };
 };
 export type SavedView = {
 	kind: "web_source";
@@ -36,10 +38,19 @@ export type SavedView = {
 	end: number;
 	nextCursor: string | null;
 	previousCursor: string | null;
+	source?: AcquiredBody["source"];
+	security?: AcquiredBody["security"];
 };
 const sha = (s: string) => createHash("sha256").update(s).digest("hex");
 const key = (o: BodyOwner) =>
 	JSON.stringify([o.rootRunId, o.taskId, o.cancelEpoch]);
+const provenance = (b: AcquiredBody) => ({
+	url: b.url,
+	title: b.title,
+	fetchedAt: b.fetchedAt,
+	source: b.source,
+	security: b.security,
+});
 /** Search-only normalization with a code-point position map; quotes always use the original text. */
 export function normalizedPositions(text: string) {
 	const parts: string[] = [],
@@ -174,10 +185,8 @@ export function createSavedBodies(
 			sourceRevision: g.sourceRevision,
 			viewId,
 			viewDigest,
-			url: b.url,
-			title: b.title,
+			...provenance(b),
 			basis: "page",
-			fetchedAt: b.fetchedAt,
 			body,
 			truncated: b.acquisitionTruncated || start > 0 || end < b.points.length,
 			acquisitionTruncated: b.acquisitionTruncated,

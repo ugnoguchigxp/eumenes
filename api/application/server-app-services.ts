@@ -48,6 +48,7 @@ export function appServices(s: Services) {
 			? {
 					worldClaims: {
 						claims: s.world.claims,
+						documents: s.world.documents,
 						context: s.world.claimsContext,
 					},
 				}

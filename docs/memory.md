@@ -14,8 +14,40 @@
 | `dialogue` | 会話。run の終わりで往復の登録と steward への通知を呼び、`compileContext` で Window を prompt に並べる |
 
 - steward は memory、continuity、conversation を使う。dialogue は memory だけを見る。複数 domain への保存は、step の settle が1つの transaction の中で各 domain の公開操作を呼んで行う。
-- 記憶の手動変更はない。HTTP・CLI・設定画面は閲覧だけで、残る変更は「メモリーの接続」の入り切りだけである。本人の意思は会話で伝える（依頼キュー）。
+- 通常の記憶の変更は会話で伝える（依頼キュー）。設定画面は閲覧と「メモリーの接続」の入り切りに限る。導入時の例外として、本人の許可を得た未確認Seed候補を追加する管理API・CLIがある（下記）。
 - profile 名・モデル名はコードに固定しない。steward の推論は会話と同じ route、同じ接続先で行われる。例外は World の記録（curate-world）で、設定 `world.curationResourceId` に登録済みのクラウドの会話モデルを選ぶと、その resource だけで推論する（未設定・resource がない・接続が無効・会話の route がクラウドを許可しないときは会話と同じ route）。
+
+## パッケージの利用とSeedの導入
+
+`eumenes-memory` の公開SQLite APIをMemory domainから使う。判断は既存のstewardの `prepare → infer → settle` で行い、保存は単一writerのtransactionで行う。単体検証用のExamplesやCodex専用クライアントを会話経路へ組み込まない。モデル・接続先は既存の保存済み設定を使う。
+
+配布物は `vendor/eumenes-memory/eumenes-memory-0.0.1-1f2c941571da.tgz` に固定する。パッケージ版は0.0.1、SQLite契約は8のままで、パッケージ側の初期化や再作成は不要。State一覧の `after / nextCursor` に対応し、ホストの同じ読み取り内で全ページを読む。ホスト側には候補資料と登録済みdigestを保持する追加migration `memory/0007-seed-import` がある。既存のmigration・記憶・設定を削除しない。
+
+Seedは本人の確認済み発言として扱わない。構造化された候補の分類を受け取り、次のように扱う。
+
+| 候補の種類 | 導入時の扱い |
+| --- | --- |
+| `state` | 本人の好み・事実・制約・習慣を `agent_inferred` として追加。適用範囲・利用場面・条件と未確認表示を本文に保持 |
+| `host_procedure` | 保留。記憶から実行指示へ昇格させない。採用するなら別途、適切な指示・Skill・ツールとして設計する |
+| `continuity` | 保留。会話を特定できない案件メモを、共通プロフィールへ入れない |
+
+他者の情報は通常の会話の `route.world`、会話ごとの目的・決定は短期メモで扱う。現在の本人の指示をSeedより優先する。Memory担当には保存キー・由来・表示件数と全件数も渡し、条件の保持と省略範囲を判断できるようにする。
+
+初回導入では、稼働中のAPIに対して候補を確認し、登録する。CLIはファイルを読みAPIへ渡すだけで、製品DBを直接開かない。
+
+```sh
+bun run cli -- memory seed preview /absolute/path/to/seed.jsonl --json
+bun run cli -- memory seed import /absolute/path/to/seed.jsonl --json
+bun run cli -- memory list --json
+```
+
+APIは `POST /api/memory/seeds/preview` と `POST /api/memory/seeds/import`（本文 `{ seeds: [...] }`）。登録は本人が許可した初回データセットに限る。`ready` の項目だけを全件まとめて確定し、同じキーの既存項目は状態・種類にかかわらず `existing_key` として保留する。意味が似ているかはコードで判定しない。上限100件を超える場合は全件 `blocked / capacity`、途中の保存失敗は全件巻き戻す。Memoryの接続設定は変更しない。
+
+同じデータセットの再投入は `unchanged`、別データセットは `blocked / different_dataset`。受付記録は本文を含まないdigestのみで、後の訂正・停止・忘却をSeedで上書きしない。候補の元資料と出典参照はホスト所有の候補資料として保存し、引用もその資料を指す。Eumenesに架空の本人発言を作らず、元のCodexログは読まない。設定画面では出典を「未確認のSeed候補」と表示する。
+
+登録後は通常の会話から確認・訂正・停止・忘却する。候補の `review` は見直しの目安で、自動的な期限としては使わない。忘却は既存の版・統合履歴の閉包をたどり、候補資料も削除する。忘却journalを維持して古いDBを復元した場合も、登録済みdigestを再適用し、Seedの再投入による復活を防ぐ。元の外部Seedファイル自体の削除は、このAPIの対象ではない。
+
+今回のSeedは50候補（State28・手順18・案件4）。実データをリポジトリのfixtureへ複製しない。隔離環境での導入確認と既存環境への登録状況は、[導入検証記録](../spec/verification/memory-package-adoption-2026-10-16/README.md)に分けて記載する。
 
 ## ContextWindow の層と並び順
 
@@ -36,6 +68,7 @@ prompt cache は先頭から一致する部分にしか効かない。変わり�
 | 条件 | 作り直すか |
 | --- | --- |
 | 記憶の停止・置き換え・忘却（immediate change） | する。使ってはいけない内容を残さないため |
+| Seed候補の追加登録 | する。登録前のWindowを破棄し、次のrunで反映する |
 | policy の変更（メモリーの入り切り） | する |
 | 有効期間の境界をまたいだ | する。期限切れの内容を「現在」として出さないため |
 | `consolidate-memory` が `republishLongTerm: true` を返した | する |

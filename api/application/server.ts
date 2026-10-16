@@ -137,7 +137,7 @@ export async function buildServices(
 	});
 	const queue = createQueue(store, {
 		resourceAliases: { "larm.llm": "inference.llm" },
-		resources: { "inference.llm": 1, "inference.aux": 2, "web.fetch": 2 },
+		resources: { "inference.llm": 1, "inference.aux": 2, "web.fetch": 6 },
 	});
 	const cachePath = resolve(
 		join(dirname(dbPath), "cache/web-research.sqlite3"),

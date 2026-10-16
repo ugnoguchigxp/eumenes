@@ -1,0 +1,172 @@
+{
+  "frozenAt": "2026-10-16T11:06:49.367962+00:00",
+  "baseCommit": "32ff7f72e74d67beed09ae8418b4555c46035628",
+  "ownedFiles": 47,
+  "sourceChangesAfterFreeze": [],
+  "partial": {
+    "pass": 21,
+    "fail": 3
+  },
+  "domainTests": {
+    "pass": 627,
+    "fail": 3
+  },
+  "integration": {
+    "worldPass": 26,
+    "webFail": 2
+  },
+  "domainBreakdown": {
+    "tool-runtime": {
+      "pass": 38
+    },
+    "capabilities": {
+      "pass": 66
+    },
+    "world": {
+      "pass": 172
+    },
+    "dialogue": {
+      "pass": 213
+    },
+    "web-research": {
+      "pass": 55
+    },
+    "agent-runtime": {
+      "pass": 83,
+      "fail_entries": 6
+    }
+  },
+  "typeErrorsInOwnedFiles": 10,
+  "typeErrorsOther": 8,
+  "diagnostics": [
+    {
+      "file": "api/application/toolchain.ts",
+      "line": 283,
+      "code": "TS2550",
+      "message": "Property 'toReversed' does not exist on type '{ id: string; arguments: unknown; operationFingerprint: string | null; toolRevisionId: string; stepId: string; argsDigest: string; state: string; origin: \"candidate-cache\" | \"tool\"; superseded: boolean; }[]'. Do you need to change your target library? Try changing the 'lib' compiler option to 'es2023' or later.",
+      "owned": true
+    },
+    {
+      "file": "api/application/workers-ai-settings.test.ts",
+      "line": 143,
+      "code": "TS2339",
+      "message": "Property 'artifactId' does not exist on type 'ArtifactListEntry'.",
+      "owned": false
+    },
+    {
+      "file": "api/domains/agent-runtime/service/web-read-plan.ts",
+      "line": 40,
+      "code": "TS2345",
+      "message": "Argument of type 'string | null | undefined' is not assignable to parameter of type 'string'.",
+      "owned": true
+    },
+    {
+      "file": "api/domains/agent-runtime/service/web-read-plan.ts",
+      "line": 57,
+      "code": "TS2550",
+      "message": "Property 'findLast' does not exist on type '{ id: string; url: string; settled: boolean; retryAfter?: number | undefined; }[]'. Do you need to change your target library? Try changing the 'lib' compiler option to 'es2023' or later.",
+      "owned": true
+    },
+    {
+      "file": "api/domains/agent-runtime/service/web-read-plan.ts",
+      "line": 57,
+      "code": "TS7006",
+      "message": "Parameter 'r' implicitly has an 'any' type.",
+      "owned": true
+    },
+    {
+      "file": "api/domains/agent-runtime/service/web-read-plan.ts",
+      "line": 93,
+      "code": "TS2550",
+      "message": "Property 'findLast' does not exist on type '{ id: string; url: string; settled: boolean; retryAfter?: number | undefined; }[]'. Do you need to change your target library? Try changing the 'lib' compiler option to 'es2023' or later.",
+      "owned": true
+    },
+    {
+      "file": "api/domains/agent-runtime/service/web-read-plan.ts",
+      "line": 93,
+      "code": "TS7006",
+      "message": "Parameter 'r' implicitly has an 'any' type.",
+      "owned": true
+    },
+    {
+      "file": "api/domains/agent-runtime/service/web-read-plan.ts",
+      "line": 131,
+      "code": "TS2550",
+      "message": "Property 'findLast' does not exist on type '{ id: string; url: string; settled: boolean; retryAfter?: number | undefined; }[]'. Do you need to change your target library? Try changing the 'lib' compiler option to 'es2023' or later.",
+      "owned": true
+    },
+    {
+      "file": "api/domains/agent-runtime/service/web-read-plan.ts",
+      "line": 131,
+      "code": "TS7006",
+      "message": "Parameter 'r' implicitly has an 'any' type.",
+      "owned": true
+    },
+    {
+      "file": "api/domains/dialogue/service/generation-handler.ts",
+      "line": 108,
+      "code": "TS2322",
+      "message": "Type '(input: GenerateInput, { signal }: { signal: AbortSignal; jobId: string; attempt: number; generation: number; }) => Promise<{ text: string; selection: { outcome: SelectionOutcome; code?: string | ... 1 more ... | undefined; }; receipt?: undefined; recallPins?: undefined; } | { ...; } | { ...; }>' is not assignable to type '(input: GenerateInput, context: { signal: AbortSignal; jobId: string; attempt: number; generation: number; }) => Promise<{ text: string; receipt?: Receipt | undefined; operation?: ConversationOperation | undefined; selection?: SelectionDraft | undefined; recallPins?: { ...; }[] | undefined; }>'.",
+      "owned": true
+    },
+    {
+      "file": "api/domains/web-research/test/acquisition.test.ts",
+      "line": 18,
+      "code": "TS2353",
+      "message": "Object literal may only specify known properties, and 'source' does not exist in type '{ requestId: string; freshness: \"live\" | \"normal\"; operation: \"lookup\"; query: string; language: string; region?: string | undefined; timeRange?: \"day\" | \"month\" | \"week\" | \"year\" | undefined; readPages: number; }'.",
+      "owned": true
+    },
+    {
+      "file": "scripts/dots-mvp/mcp.ts",
+      "line": 5,
+      "code": "TS2307",
+      "message": "Cannot find module '@modelcontextprotocol/server' or its corresponding type declarations.",
+      "owned": false
+    },
+    {
+      "file": "scripts/dots-mvp/mcp.ts",
+      "line": 66,
+      "code": "TS7006",
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "owned": false
+    },
+    {
+      "file": "scripts/dots-mvp/mcp.ts",
+      "line": 86,
+      "code": "TS7006",
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "owned": false
+    },
+    {
+      "file": "scripts/dots-mvp/mcp.ts",
+      "line": 97,
+      "code": "TS7006",
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "owned": false
+    },
+    {
+      "file": "scripts/dots-mvp/mcp.ts",
+      "line": 156,
+      "code": "TS7006",
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "owned": false
+    },
+    {
+      "file": "scripts/dots-mvp/mvp.test.ts",
+      "line": 5,
+      "code": "TS2307",
+      "message": "Cannot find module 'standardwebhooks' or its corresponding type declarations.",
+      "owned": false
+    },
+    {
+      "file": "scripts/dots-mvp/webhook.ts",
+      "line": 6,
+      "code": "TS2307",
+      "message": "Cannot find module 'standardwebhooks' or its corresponding type declarations.",
+      "owned": false
+    }
+  ],
+  "officialVerify": "size-budget failed: createAnswer 301 lines",
+  "live": "not run because local gates failed",
+  "sourceEditedAfterVerification": false
+}

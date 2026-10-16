@@ -113,7 +113,6 @@ ALTER TABLE inference_attempts ADD COLUMN agent_session_id TEXT;
 ALTER TABLE inference_attempts ADD COLUMN cache_read_tokens INTEGER;
 ALTER TABLE inference_attempts ADD COLUMN cache_creation_tokens INTEGER;
 ALTER TABLE inference_attempts ADD COLUMN cost_usd REAL;
-ALTER TABLE inference_attempts ADD COLUMN refs TEXT;
 CREATE TABLE inference_agent_sessions (
 	id TEXT PRIMARY KEY,
 	role TEXT NOT NULL CHECK(role IN ('main','subagent')),
@@ -126,7 +125,13 @@ CREATE TABLE inference_agent_sessions (
 	updated INTEGER NOT NULL
 );
 CREATE UNIQUE INDEX inference_agent_sessions_main ON inference_agent_sessions(connection_id, auth, model) WHERE role='main';
-CREATE UNIQUE INDEX inference_agent_sessions_task ON inference_agent_sessions(task_id, connection_id, auth, model) WHERE role='subagent';
+CREATE UNIQUE INDEX inference_agent_sessions_task ON inference_agent_sessions(task_id, connection_id, auth, model) WHERE role='subagent';`,
+	},
+	{
+		// Keep 0009 byte-for-byte as deployed. Revocable attempt references were added later.
+		id: "inference/0010-attempt-refs",
+		after: ["inference/0009-agent-sessions"],
+		sql: `ALTER TABLE inference_attempts ADD COLUMN refs TEXT;
 CREATE INDEX inference_attempts_revocable ON inference_attempts(status, request_id) WHERE refs IS NOT NULL AND accepted=0;`,
 	},
 ];

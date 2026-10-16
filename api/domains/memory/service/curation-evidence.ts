@@ -14,6 +14,8 @@ import {
 } from "./curation-shared";
 import { evidenceWindow, foldedLength, locateQuoteSpan } from "./quote";
 import { parseDatePart } from "./validity";
+import { seedEvidence } from "./seed-sources";
+import { SEED_NAMESPACE } from "../repository/seeds";
 
 export type ValidityBounds =
 	| null
@@ -120,6 +122,18 @@ export function createEvidence(deps: CurationDeps) {
 	): Array<{ evidence: Evidence; host: HostSourceState }> {
 		const out: Array<{ evidence: Evidence; host: HostSourceState }> = [];
 		for (const ref of source.evidence) {
+			if (ref.namespace === SEED_NAMESPACE && ref.range) {
+				const seed = seedEvidence(db, ref);
+				if (seed && byteLength(seed.quote) <= MAX_QUOTE_BYTES)
+					out.push({
+						host: seed.source,
+						evidence: {
+							source: { ...ref, representation: "text", range: ref.range },
+							quote: seed.quote,
+						},
+					});
+				continue;
+			}
 			if (ref.namespace !== "conversation" || !ref.range) continue;
 			if (isBlocked(db, ref.id) || sourceTombstoned(db, ref.id)) continue;
 			const found = conversation.messageInTransaction(db, ref.id);

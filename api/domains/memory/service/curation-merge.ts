@@ -71,7 +71,7 @@ export function createMerge(
 			.sort((a, b) => b.host.ordinal - a.host.ordinal)
 			.slice(0, MAX_EVIDENCE);
 		const hosts = new Map(kept.map((entry) => [entry.host.id, entry.host]));
-		const confirmed = sources.some(
+		const confirmed = sources.every(
 			(source) =>
 				source.origin === "user_confirmed" || source.origin === "user_edited",
 		);
@@ -79,7 +79,8 @@ export function createMerge(
 			kind,
 			semanticKey: key,
 			text,
-			negated: item.negated === true,
+			negated:
+				item.negated ?? sources.every((s) => s.value.polarity === "negated"),
 			evidence: kept.map((entry) => entry.evidence),
 			sources: [...hosts.values()],
 			origin: confirmed ? "user_confirmed" : "agent_inferred",

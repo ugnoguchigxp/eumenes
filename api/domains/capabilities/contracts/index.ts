@@ -3,6 +3,7 @@ export { recognitionManage, recognitionCommand };
 import { drawingRequest, drawingPlan } from "./excalidraw";
 export { drawingRequest, drawingPlan };
 import { z } from "zod";
+import { guidedResearchInput } from "./guided-research";
 import {
 	uiComposeRequest,
 	uiCancelRequest,
@@ -33,7 +34,7 @@ export {
 	codexTaskConfigure,
 };
 import { memoryRequest } from "./memory-request";
-import { worldFind, worldQuery } from "./world-query";
+import { worldDocuments, worldFind, worldQuery } from "./world-query";
 export { claudeCodeRequest };
 import {
 	KANBAN_PROMPT_MAX,
@@ -98,28 +99,8 @@ export const researchInput = z
 		detail: z.enum(["brief", "normal"]).default("normal"),
 	})
 	.strict();
-export const lookupInput = z
-	.object({
-		query: z.string().trim().min(1).max(400),
-		language: z
-			.string()
-			.regex(/^[a-z]{2}$/)
-			.default("ja"),
-		region: z
-			.string()
-			.regex(/^[A-Z]{2}$/)
-			.describe(
-				"検索対象の国・地域をISO 3166-1 alpha-2で指定する。検索言語とは独立に選ぶ。",
-			)
-			.optional(),
-		timeRange: z
-			.enum(["day", "week", "month", "year"])
-			.describe(
-				"ページの公開・更新時刻の制限。値や予報の対象日とは別。公開期間を絞る依頼の場合だけ指定し、通常は省略する。",
-			)
-			.optional(),
-	})
-	.strict();
+import { lookupInput, lookupInputV1 } from "./lookup";
+export { lookupInput };
 export const readInput = z.object({ url: publicUrl }).strict();
 export const forecastInput = z
 	.object({
@@ -237,7 +218,9 @@ export const validators = {
 	forecast: forecastInput,
 	quote: quoteInput,
 	research: researchInput,
-	lookup: lookupInput,
+	guidedResearch: guidedResearchInput,
+	lookup: lookupInputV1,
+	lookupV2: lookupInput,
 	read: readInput,
 	recipeFind: recipeFindInput,
 	toolchainRequest,
@@ -257,6 +240,7 @@ export const validators = {
 		frameIndex: z.number().int().nonnegative().max(59).optional(),
 	}),
 	memoryRequest,
+	worldDocuments,
 	worldFind,
 	worldQuery,
 };

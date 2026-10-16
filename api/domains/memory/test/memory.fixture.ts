@@ -24,6 +24,7 @@ import {
 	turnVectorsMigration,
 	stewardLedgersMigration,
 	forgetClosureMigration,
+	seedImportMigration,
 	contextWindowMigration,
 	createMemoryService,
 	migration,
@@ -52,6 +53,7 @@ export const memoryTestMigrations = [
 	turnVectorsMigration,
 	stewardLedgersMigration,
 	forgetClosureMigration,
+	seedImportMigration,
 	...memoryPackageMigrations,
 ];
 

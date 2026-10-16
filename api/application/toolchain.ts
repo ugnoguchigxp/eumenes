@@ -242,7 +242,7 @@ export async function createToolchain(
 		return world;
 	};
 	const isWorldTool = (id: string) =>
-		id === "world.find" || id === "world.query";
+		id === "world.find" || id === "world.query" || id === "world.documents";
 	const adapter: ToolAdapter = {
 		...reads,
 		operationFingerprintInTransaction(db, r) {
@@ -259,7 +259,9 @@ export async function createToolchain(
 		},
 		// World readings are checked against the World; every other source against the reads.
 		validateEvidenceInTransaction(db, owner, sources, proofs) {
-			const readings = sources.filter((s) => s.kind !== "world_claim");
+			const readings = sources.filter(
+				(s) => s.kind !== "world_claim" && s.kind !== "world_document",
+			);
 			return (
 				reads.validateEvidenceInTransaction!(db, owner, readings, proofs) &&
 				(readings.length === sources.length ||
@@ -273,6 +275,30 @@ export async function createToolchain(
 				r.arguments as Record<string, unknown>,
 				r.requestId,
 			);
+			// Carry the originating search hit into llm-fetch without asking the worker
+			// to repeat it or changing the canonical URL-only read tool contract.
+			if (raw.operation === "read") {
+				for (const inv of tools
+					.invocationsInTransaction(db, r.owner.taskId)
+					.toReversed()) {
+					const operation = tools.getInTransaction(db, inv.id);
+					const hit =
+						operation &&
+						web
+							.get(operation.operation_id)
+							?.result?.hits.find((h) => h.url === raw.url);
+					const args = inv.arguments as { query?: unknown };
+					if (hit && typeof args?.query === "string") {
+						raw.source = {
+							provider: hit.provider,
+							query: args.query,
+							rank: hit.rank ?? 1,
+							snippet: hit.snippet,
+						};
+						break;
+					}
+				}
+			}
 			const op = web.submitInTransaction(db, raw, {
 				deadlineAtMs: r.deadline,
 				parentJobId: r.parentJobId,

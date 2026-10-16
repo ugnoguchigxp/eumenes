@@ -20,6 +20,7 @@ import {
 	migration as memoryMigration,
 	stewardLedgersMigration,
 	forgetClosureMigration,
+	seedImportMigration,
 	turnVectorsMigration,
 	type MemoryItemDto,
 	type MemoryService,
@@ -41,6 +42,7 @@ export const memoryMigrations = [
 	turnVectorsMigration,
 	stewardLedgersMigration,
 	forgetClosureMigration,
+	seedImportMigration,
 	...memoryPackageMigrations,
 ];
 

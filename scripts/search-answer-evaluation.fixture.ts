@@ -13,6 +13,17 @@ const report = (url: string, quote: string, text: string) => ({
 	sources: [{ sourceId: "s1", url }],
 });
 export const stockSample: SearchAnswerSample = {
+	reviewed: {
+		statements: [
+			["9434"],
+			["リアルタイム", "現在値", "現在の株価"],
+			["243.8"],
+			["円"],
+			["13:11", "13時11分"],
+			["日付は未確認", "日付は資料では確認できません", "日付は確認できません"],
+		],
+		quoted: [["9434"], ["243.8"], ["13:11"]],
+	},
 	request:
 		"ソフトバンク（9434）の現在の株価を教えて。価格とその日時、出典を示してください。",
 	now: "2026-10-16T13:25:00+09:00",
@@ -31,6 +42,17 @@ export const stockSample: SearchAnswerSample = {
 	answer: `ソフトバンク（9434）のリアルタイム株価は243.8円、13:11表示です。価格の日付は資料では確認できません。[出典](${stockUrl})`,
 };
 export const weatherSample: SearchAnswerSample = {
+	reviewed: {
+		statements: [
+			["鎌倉"],
+			["予報"],
+			["25.4"],
+			["℃", "度", "°C"],
+			["2026年10月16日", "2026-10-16", "10月16日"],
+			["13時", "13:00"],
+		],
+		quoted: [["鎌倉"], ["2026年10月16日", "2026-10-16"], ["25.4"], ["13"]],
+	},
 	request: "今度は鎌倉の今日の天気を教えて。予報と気温、出典を示してください。",
 	now: stockSample.now,
 	expected: [
@@ -48,6 +70,10 @@ export const weatherSample: SearchAnswerSample = {
 };
 const definitionText = "仙台市は宮城県の県庁所在地です。";
 export const definitionSample: SearchAnswerSample = {
+	reviewed: {
+		statements: [["仙台市"], ["宮城県"]],
+		quoted: [["仙台市"], ["宮城県"]],
+	},
 	request: "仙台市は何県にあるか調べて教えて",
 	now: stockSample.now,
 	expected: ["仙台市は宮城県にある。日時や数値を求める依頼ではない。"],
@@ -60,6 +86,17 @@ const completeStockText =
 	"ソフトバンク（9434）のリアルタイム株価：2026年10月16日13:11 JST、243.8円。前日終値242.7円。";
 const completeStock: SearchAnswerSample = {
 	...stockSample,
+	reviewed: {
+		statements: [
+			["9434"],
+			["リアルタイム", "現在値"],
+			["243.8"],
+			["円"],
+			["2026年10月16日", "2026-10-16"],
+			["13:11", "13時11分"],
+		],
+		quoted: [["9434"], ["243.8"], ["2026年10月16日"], ["13:11"]],
+	},
 	expected: [
 		"ソフトバンク9434、リアルタイム株価243.8円、2026年10月16日13:11 JST。前日終値は別項目。",
 	],
@@ -97,8 +134,8 @@ export const searchAnswerControls: Array<{
 		sample: completeStock,
 	},
 	{ id: "timeless-definition", expected: true, sample: definitionSample },
-	// An honest partial answer must not be mistaken for complete acceptance.
-	{ id: "honest-missing-stock-date", expected: false, sample: stockSample },
+	// A complete response can honestly explain an unknown fact.
+	{ id: "honest-missing-stock-date", expected: true, sample: stockSample },
 	{
 		id: "realtime-as-close-and-undated-pts",
 		expected: false,

@@ -99,11 +99,14 @@ export function createStartTask(ctx: RuntimeContext, ops: TaskOps) {
 			}
 			const packageId =
 				request.packageRevisionId ??
-				(request.kind === "history"
-					? "package:history.research@2"
-					: request.researcher === "codex_luna"
-						? "package:web.search@1"
-						: "package:web.quick@2");
+				capabilities.activePackageRevisionInTransaction(
+					db,
+					request.kind === "history"
+						? "history.research"
+						: request.researcher === "codex_luna"
+							? "web.search"
+							: "web.quick",
+				);
 			const workerInput = {
 				question: request.question,
 				detail: "normal",

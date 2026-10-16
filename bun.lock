@@ -13,7 +13,7 @@
         "@openai/codex-sdk": "0.160.0",
         "@tanstack/react-query": "5.101.0",
         "bmp-ts": "^1.0.9",
-        "eumenes-memory": "file:vendor/eumenes-memory/eumenes-memory-0.0.1.tgz",
+        "eumenes-memory": "file:vendor/eumenes-memory/eumenes-memory-0.0.1-1f2c941571da.tgz",
         "eumenes-world-model": "file:vendor/world/eumenes-world-model-0.0.1.tgz",
         "google-auth-library": "11.1.0",
         "hono": "4.12.34",
@@ -1334,7 +1334,7 @@
 
     "etag": ["etag@1.8.1", "", {}, "sha512-aIL5Fx7mawVa300al2BnEE4iNvo1qETxLrPI/o05L7z6go7fCw1J6EQmbK4FmJ2AS7kgVF/KEZWufBfdClMcPg=="],
 
-    "eumenes-memory": ["eumenes-memory@vendor/eumenes-memory/eumenes-memory-0.0.1.tgz", {}, "sha512-8pEDcT+Yg/gBj51mH7AC6/ZDc+CYI8HCeu+iuhzIuQuHJXzS1zb3/qS2OBNI02/i8Bil9VvDEsEenzYshKQ3mg=="],
+    "eumenes-memory": ["eumenes-memory@vendor/eumenes-memory/eumenes-memory-0.0.1-1f2c941571da.tgz", {}, "sha512-mE3JPiEW4bhB+215MmKXoeoJBsliZfT1AN4Uly0HS6yfZCwkpEKLvP/iEGRD3vcVneVqL6sWpcuxKczcyvDJ0Q=="],
 
     "eumenes-world-model": ["eumenes-world-model@vendor/world/eumenes-world-model-0.0.1.tgz", {}, "sha512-NRG/JMrI+xu2MlnwRgKB0A8x4y6snR+8v0ElDJbKhtqf/cKrzTEzhC+JB36uXAseITvoYKEu2Ti1YRl8F24qQg=="],
 

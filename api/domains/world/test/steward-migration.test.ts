@@ -8,7 +8,11 @@ import {
 	MigrationUnknownAppliedError,
 } from "../../../infrastructure/sqlite";
 
-const STEWARD = ["world/0009-extraction-steward", "world/0010-forget-origin"];
+const STEWARD = [
+	"world/0009-extraction-steward",
+	"world/0010-forget-origin",
+	"world/0011-documents",
+];
 
 test("the steward migrations keep old events and forgets, add speaker and conversation, drop the job columns, and an old binary refuses the database", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-world-upgrade-"));

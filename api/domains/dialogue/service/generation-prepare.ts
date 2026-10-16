@@ -5,6 +5,7 @@ import { prepareRouting } from "./delegate-conversation";
 import { renderGoalsLayer } from "./goals-layer";
 import { topicTexts, worldNamesHint } from "./topic-texts";
 import { researchResultContext } from "./research-result-context";
+import { guidedAnswer } from "./guided-answer";
 import { byId, transition } from "../repository";
 import { endRun } from "./run-end";
 import { isSystemPrompt, type Run } from "../contracts";
@@ -82,7 +83,11 @@ export function createPrepare(
 						}),
 					)
 				: null;
-		if (larm.captureInTransaction && !larm.requestFor?.(tx, run.id, "llm")) {
+		if (
+			!guidedAnswer(agent?.projection) &&
+			larm.captureInTransaction &&
+			!larm.requestFor?.(tx, run.id, "llm")
+		) {
 			const snapshot = larm.snapshotInTransaction?.(tx);
 			if (snapshot) {
 				for (const p of ["llm", "asr", "tts"] as const) {

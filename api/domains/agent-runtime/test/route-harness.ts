@@ -71,6 +71,8 @@ export async function harness(
 	luna = false,
 	/** A registered domain adapter for bound operations; also seeds the package that uses one. */
 	actions?: ActionAdapter,
+	/** Opt in to the versioned Web bundle; archived-route tests keep their old contracts. */
+	guided = false,
 ) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-route-"));
 	const store = openStore(join(dir, "db"), [
@@ -91,6 +93,18 @@ export async function harness(
 	const caps = createCapabilities(
 		store,
 		new Set(actions ? ["web", "history", "timer"] : ["web", "history"]),
+		guided
+			? {
+					bundleHost: () => ({
+						adapters: new Map(),
+						availability: new Set(),
+						inputAdapters: new Set(),
+						projections: new Set(),
+						domainSchemas: new Set(),
+						connections: new Set(),
+					}),
+				}
+			: {},
 	);
 	await caps.seed();
 	await store.write((db) => {
@@ -225,7 +239,7 @@ export async function harness(
 	async function runRawModelStep(
 		taskId: string,
 		action: unknown,
-		afterPrepare?: () => void,
+		afterPrepare?: () => void | Promise<void>,
 		outputText?: string,
 	) {
 		const t = task(taskId);
@@ -245,7 +259,7 @@ export async function harness(
 		);
 		if (prep.status !== "ready") return { prep, applied: null };
 
-		afterPrepare?.();
+		await afterPrepare?.();
 		const applied = await store.write((db) =>
 			agents.handler.settleInTransaction(db, claim as never, prep.input, {
 				type: "success",

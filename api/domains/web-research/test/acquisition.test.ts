@@ -2,6 +2,45 @@ import { expect, test } from "bun:test";
 import { createBuiltinContextGuard } from "llm-fetch";
 import { createWebAcquisition } from "..";
 import { resultSchema, submitResearchSchema } from "../contracts";
+import { LlmFetchError } from "llm-fetch";
+import { readFailure } from "../adapters/llm-fetch";
+
+test("read provenance survives extraction and typed errors retain retry policy", async () => {
+	const port = acquisition();
+	const source = {
+		provider: "fixture",
+		query: "user-selected target",
+		rank: 2,
+		snippet: "candidate only",
+	};
+	try {
+		const value = await port.execute(
+			{ ...request(), source },
+			AbortSignal.timeout(2000),
+		);
+		expect(value.result.documents[0]!.source).toEqual(source);
+		expect(value.bodies![0]!.source).toEqual(source);
+		expect(value.bodies![0]!.security?.decision).toBe("allow");
+		expect(
+			readFailure(
+				"https://example.com/",
+				new LlmFetchError("RATE_LIMITED", "sensitive upstream text", {
+					retryable: true,
+					cooldownMs: 1234,
+				}),
+			),
+		).toEqual({
+			url: "https://example.com/",
+			code: "web_rate_limited",
+			retryable: true,
+			cooldownMs: 1234,
+			guardDecision: undefined,
+			guardReasonCodes: [],
+		});
+	} finally {
+		await port.close();
+	}
+});
 
 function request() {
 	return submitResearchSchema.parse({

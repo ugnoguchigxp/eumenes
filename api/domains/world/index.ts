@@ -213,3 +213,6 @@ export type {
 	WorldStatus,
 	WorldUsageCheck,
 } from "./contracts";
+
+export { createWorldDocuments, type WorldDocuments } from "./service/documents";
+export { registerWorldDocuments } from "./controller/documents";

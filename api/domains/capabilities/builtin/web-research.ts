@@ -62,6 +62,17 @@ export const builtins: Definition[] = [
 	},
 	{
 		...base,
+		revision: 2,
+		kind: "tool",
+		id: "web.lookup",
+		title: "Web検索",
+		summary: "公開Webを検索して候補を取得",
+		dependencies: [],
+		backend: "web",
+		schemaKey: "lookupV2",
+	},
+	{
+		...base,
 		kind: "tool",
 		id: "web.read",
 		title: "本文読取",

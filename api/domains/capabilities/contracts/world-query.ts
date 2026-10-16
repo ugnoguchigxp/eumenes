@@ -127,3 +127,10 @@ export const worldFind = z.strictObject({
 		),
 });
 export type WorldFindInput = z.infer<typeof worldFind>;
+
+/** Reference documents: searches return handles, reads return original text. */
+export const worldDocuments = z.strictObject({
+	query: z.string().trim().min(1).max(120).optional(),
+	documentId: z.string().trim().min(1).max(200).optional(),
+	offset: z.number().int().min(0).max(262144).optional(),
+});

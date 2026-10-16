@@ -1,3 +1,4 @@
+import { listAllState } from "./state-snapshot";
 import type { Database } from "bun:sqlite";
 import {
 	CONTRACT_VERSIONS,
@@ -7,7 +8,6 @@ import {
 import type { AccessContext } from "eumenes-memory";
 import {
 	assertMemorySchema,
-	listState,
 	reconcileForgetJournal,
 } from "eumenes-memory/sqlite";
 import type { ForgetJournalEntry, StateItem } from "eumenes-memory/sqlite";
@@ -38,7 +38,12 @@ import {
 	pruneUsage,
 	readSettings,
 	writeSettings,
+	purgeSeedSources,
+	SEED_NAMESPACE,
 } from "../repository";
+import type { MemorySeed } from "../contracts/seeds";
+import { createSeedImport } from "./seeds";
+import { seedEvidence } from "./seed-sources";
 import { createAgentVectors } from "./agent-vectors";
 import { SHORT_TERM_BYTES, noteLines, renderShortTerm } from "./context-render";
 import { verbatimHistory, verbatimMessageIds } from "./context-history";
@@ -69,19 +74,35 @@ function evidenceOf(
 	db: Database,
 	item: StateItem,
 ): MemoryItemDto["evidence"] {
-	return item.evidence
-		.filter((ref) => ref.namespace === "conversation")
-		.map((ref) => {
-			const found = conversation.messageInTransaction(db, ref.id);
-			const slice =
-				found && ref.range
-					? sliceUtf8Range(found.message.text, ref.range)
-					: undefined;
-			return {
+	return item.evidence.flatMap<MemoryItemDto["evidence"][number]>((ref) => {
+		if (ref.namespace === SEED_NAMESPACE) {
+			const found = seedEvidence(db, ref);
+			return [
+				{
+					messageId: null,
+					quote: found?.quote ?? null,
+					source: {
+						namespace: ref.namespace,
+						kind: ref.kind,
+						id: ref.id,
+						label: "未確認のSeed候補",
+					},
+				},
+			];
+		}
+		if (ref.namespace !== "conversation") return [];
+		const found = conversation.messageInTransaction(db, ref.id);
+		const slice =
+			found && ref.range
+				? sliceUtf8Range(found.message.text, ref.range)
+				: undefined;
+		return [
+			{
 				messageId: ref.id,
 				quote: slice?.status === "ok" ? slice.text : null,
-			};
-		});
+			},
+		];
+	});
 }
 
 function itemDto(
@@ -161,7 +182,7 @@ export function createMemoryService(
 		includeInactive: boolean,
 		purpose = "memory.read",
 	): readonly StateItem[] {
-		const result = listState(db, {
+		const result = listAllState(db, {
 			...scoped(db, purpose),
 			includeInactive,
 		});
@@ -221,7 +242,7 @@ export function createMemoryService(
 		active: (db) => healthy && readSettings(db).enabled,
 		journalBlocked,
 	});
-	const curation = createCuration({
+	const curationDeps = {
 		conversation,
 		continuity,
 		windows,
@@ -230,8 +251,12 @@ export function createMemoryService(
 		atMs,
 		ready: () => healthy,
 		scoped,
-	});
-	const purgeHooks: Array<(db: Database, purge: ForgetPurge) => void> = [];
+	};
+	const curation = createCuration(curationDeps);
+	const seedImport = createSeedImport(curationDeps);
+	const purgeHooks: Array<(db: Database, purge: ForgetPurge) => void> = [
+		purgeSeedSources,
+	];
 	const blockJournalPath = blockJournalPathOf(options.journalPath);
 	const forgetter = createForget({
 		journalPath: options.journalPath,
@@ -421,6 +446,12 @@ export function createMemoryService(
 	}
 
 	return {
+		previewSeeds(input: { seeds: readonly MemorySeed[] }) {
+			return store.read((db) => seedImport.preview(db, input));
+		},
+		importSeeds(input: { seeds: readonly MemorySeed[] }) {
+			return store.write((db) => seedImport.importInTransaction(db, input));
+		},
 		policyRevisionInTransaction,
 		windows,
 		status(): MemoryStatus {
@@ -442,7 +473,7 @@ export function createMemoryService(
 			// Fail closed: with an inconsistent journal a forgotten value may still be in this database.
 			if (!healthy) return [];
 			return store.read((db) => {
-				const result = listState(db, {
+				const result = listAllState(db, {
 					...scoped(db, "memory.list"),
 					includeInactive,
 				});

@@ -13,12 +13,17 @@ export const HISTORY_MESSAGE_MAX_BYTES = 12 * 1024;
 export const PRINCIPAL = CONVERSATION_DEFAULT_PRINCIPAL;
 /** The shared profile scope. Per-conversation continuity is composed into it for the active conversation. */
 export const PROFILE_SCOPE = "profile:owner";
-export const stateKinds = [
-	"preference",
-	"personal_fact",
-	"constraint",
-	"habit",
-] as const;
+import { stateKinds } from "./state-kinds";
+export { stateKinds } from "./state-kinds";
+export {
+	memorySeedInputSchema,
+	memorySeedSchema,
+	memorySeedResultSchema,
+	parseMemorySeedJsonl,
+	seedStateText,
+	type MemorySeed,
+	type MemorySeedResult,
+} from "./seeds";
 export const settingsSchema = z.object({ enabled: z.boolean() });
 /** Who asked for an item: the user in conversation (`request`), or the steward on its own (`agent`). `manual`: rows from before manual changes were removed. */
 export type MemoryCapturedBy = "request" | "agent" | "manual";
@@ -35,7 +40,12 @@ export interface MemoryItemDto {
 	validFromMs: number | null;
 	validUntilMs: number | null;
 	/** The words the item stands on; `quote` is null when the message or the range is no longer readable. */
-	evidence: { messageId: string; quote: string | null }[];
+	evidence: {
+		messageId: string | null;
+		quote: string | null;
+		/** Candidate provenance is separate from conversation messages. */
+		source?: { namespace: string; kind: string; id: string; label: string };
+	}[];
 	/** Calendar period as `YYYY`, `YYYY-MM` or `YYYY-MM-DD`; null when the item has none. */
 	validity: { from?: string; until?: string } | null;
 	capturedBy: MemoryCapturedBy;
@@ -103,7 +113,18 @@ export const memoryItemSchema: z.ZodType<MemoryItemDto> = z.object({
 	validFromMs: z.number().nullable(),
 	validUntilMs: z.number().nullable(),
 	evidence: z.array(
-		z.object({ messageId: z.string(), quote: z.string().nullable() }),
+		z.object({
+			messageId: z.string().nullable(),
+			quote: z.string().nullable(),
+			source: z
+				.object({
+					namespace: z.string(),
+					kind: z.string(),
+					id: z.string(),
+					label: z.string(),
+				})
+				.optional(),
+		}),
 	),
 	validity: z
 		.object({ from: z.string().optional(), until: z.string().optional() })

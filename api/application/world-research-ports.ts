@@ -1,3 +1,4 @@
+import { documentReadings, documentsCurrent } from "./world-document-readings";
 import type { Database } from "bun:sqlite";
 import { buildProjection } from "eumenes-world-model";
 import { listEntities, maxListEntities } from "eumenes-world-model/sqlite";
@@ -7,6 +8,7 @@ import { worldFind } from "../domains/capabilities/contracts/world-query";
 import { readActionOriginInTransaction } from "../domains/dialogue";
 import {
 	createWorldQuery,
+	createWorldDocuments,
 	MIN_NAME_CHARS,
 	normalizeTopicText,
 	type WorldQueryContext,
@@ -158,6 +160,38 @@ function validateWorldEvidence(
 	}
 }
 
+/** snapshot and gaps start from `entityIds`; one `entityId` there is read as that single start point. */
+function startPointsOf(raw: unknown): unknown {
+	if (typeof raw !== "object" || raw === null) return raw;
+	const { mode, entityId, entityIds, ...rest } = raw as Record<string, unknown>;
+	if (
+		(mode === "snapshot" || mode === "gaps") &&
+		typeof entityId === "string" &&
+		entityIds === undefined
+	)
+		return { ...rest, mode, entityIds: [entityId] };
+	return raw;
+}
+
+/** The live targets of the Scope (display name and aliases); `truncated`: more than one listing holds. */
+function entitiesOf(
+	world: WorldService,
+	db: Database,
+	ctx: WorldQueryContext,
+	scopeKey: string,
+) {
+	const listed = listEntities(db, {
+		contractVersion: 1,
+		access: world.accessInTransaction(db, {
+			access: accessOf(ctx, scopeKey),
+		}),
+		scopeKey,
+		limit: maxListEntities,
+	});
+	if (listed.status !== "ready") throw new Error("world_unavailable");
+	return { entities: listed.entities, truncated: listed.truncated };
+}
+
 /**
  * The ports of the World investigation (`world.find`, `world.query`): local reads of the host's own
  * World for the research sub-agent. The Scope and the purpose are bound by the host from the root
@@ -175,7 +209,8 @@ export function createWorldResearchPorts(options: {
 	now?: () => number;
 }): WorldResearchPorts {
 	const { store, world } = options;
-	const query = createWorldQuery({ store, world });
+	const query = createWorldQuery({ store, world, now: options.now });
+	const documents = createWorldDocuments(store);
 	const now = options.now ?? Date.now;
 
 	/** The Scope of this task: refused unless the task belongs to a conversation run. */
@@ -189,19 +224,6 @@ export function createWorldResearchPorts(options: {
 		return { ctx, scopeKey };
 	}
 
-	/** The live targets of the Scope (display name and aliases); `truncated`: more than one listing holds. */
-	function entitiesOf(db: Database, ctx: WorldQueryContext, scopeKey: string) {
-		const listed = listEntities(db, {
-			contractVersion: 1,
-			access: world.accessInTransaction(db, {
-				access: accessOf(ctx, scopeKey),
-			}),
-			scopeKey,
-			limit: maxListEntities,
-		});
-		if (listed.status !== "ready") throw new Error("world_unavailable");
-		return { entities: listed.entities, truncated: listed.truncated };
-	}
 	/** Display names of exactly these targets: the ones a result stands on are resolved by id, not from a capped listing. */
 	function namesOf(
 		db: Database,
@@ -231,7 +253,7 @@ export function createWorldResearchPorts(options: {
 		if (!world.statusInTransaction(db).usable)
 			throw new Error("world_unavailable");
 		const wanted = [...new Set(names.map(normalize))].filter(usableName);
-		const listing = entitiesOf(db, ctx, scopeKey);
+		const listing = entitiesOf(world, db, ctx, scopeKey);
 		const rank = (entity: {
 			displayName: string;
 			aliases: readonly string[];
@@ -297,24 +319,6 @@ export function createWorldResearchPorts(options: {
 		};
 	}
 
-	// --- world.query -------------------------------------------------------
-
-	/** snapshot and gaps start from `entityIds`; one `entityId` there is read as that single start point. */
-	function startPointsOf(raw: unknown): unknown {
-		if (typeof raw !== "object" || raw === null) return raw;
-		const { mode, entityId, entityIds, ...rest } = raw as Record<
-			string,
-			unknown
-		>;
-		if (
-			(mode === "snapshot" || mode === "gaps") &&
-			typeof entityId === "string" &&
-			entityIds === undefined
-		)
-			return { ...rest, mode, entityIds: [entityId] };
-		return raw;
-	}
-
 	function run(db: Database, owner: Owner, raw: unknown) {
 		const parsed = worldQueryToolSchema.safeParse(startPointsOf(raw));
 		const observedAt = new Date(now()).toISOString();
@@ -344,7 +348,6 @@ export function createWorldResearchPorts(options: {
 				...base,
 				failures: [{ url: "world", code: answered.code }],
 			};
-		// A snapshot is its own basis; the other modes attach the claims their result stands on.
 		const basis =
 			answered.result.mode === "snapshot"
 				? answered.result.entries
@@ -434,6 +437,21 @@ export function createWorldResearchPorts(options: {
 		},
 		localInTransaction(db, r) {
 			try {
+				if (r.tool.id === "world.documents") {
+					const { ctx, scopeKey } = scopeOf(db, r.owner, "read");
+					if (!world.statusInTransaction(db).usable)
+						throw new Error("world_unavailable");
+					return {
+						state: "succeeded",
+						result: documentReadings(
+							documents,
+							db,
+							{ principal: ctx.principal, scopeKey },
+							r.arguments,
+							now(),
+						),
+					};
+				}
 				if (r.tool.id === "world.find")
 					return {
 						state: "succeeded",
@@ -456,7 +474,25 @@ export function createWorldResearchPorts(options: {
 				};
 			}
 		},
-		validateEvidenceInTransaction: (db, owner, sources) =>
-			validateWorldEvidence(db, owner, sources, world, scopeOf, now),
+		validateEvidenceInTransaction: (db, owner, sources) => {
+			try {
+				if (sources.some((s) => s.kind === "world_document")) {
+					const { ctx, scopeKey } = scopeOf(db, owner, "adopt");
+					if (
+						!world.statusInTransaction(db).usable ||
+						!documentsCurrent(
+							documents,
+							db,
+							{ principal: ctx.principal, scopeKey },
+							sources,
+						)
+					)
+						return false;
+				}
+				return validateWorldEvidence(db, owner, sources, world, scopeOf, now);
+			} catch {
+				return false;
+			}
+		},
 	};
 }

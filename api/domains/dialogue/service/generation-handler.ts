@@ -1,3 +1,4 @@
+import { createAnswerStream } from "./generation-stream";
 import { generationTiming } from "./generation-timing";
 import { observeAnswer } from "./post-answer";
 import {
@@ -25,6 +26,7 @@ import {
 import { reviewConversationAnswer } from "./conversation-routing";
 import { generateConversation } from "./conversation-generation";
 import { researchCitations } from "./research-citations";
+import { guidedAnswer } from "./guided-answer";
 import type { Run } from "../contracts";
 import { byId, transition } from "../repository";
 import { endRun, type RunEndState } from "./run-end";
@@ -115,6 +117,14 @@ export function createGenerationHandler(
 					log.info("dialogue.generation_started");
 					const timing = generationTiming();
 					resolveAttachmentContext(deps, input, run!.conversationId);
+					const direct = guidedAnswer(input.agent?.projection);
+					if (direct) {
+						signal.throwIfAborted();
+						return {
+							text: verifiedAnswerLinks(direct, input),
+							selection: agentOutcome(input.agent),
+						};
+					}
 					if (input.agent?.actionPayload && agents) {
 						// Refresh time/state before phrasing, without repeating the operation.
 						// A later change still rejects this generated answer at adoption.
@@ -142,27 +152,16 @@ export function createGenerationHandler(
 						signal.throwIfAborted();
 					}
 					let holdBody = shouldHoldBody(input);
-					let held = 0;
-					const delta = (text: string) => {
-						signal.throwIfAborted();
-						const current = store.read((db) => byId(db, input.runId));
-						if (
-							current?.status !== "running" ||
-							current.revision !== input.revision
-						)
-							throw new Error("cancelled");
-						timing.firstDelta(text, holdBody);
-						if (holdBody) {
-							// Memory-backed text is not shown or spoken before the adoption check passes.
-							held += text.length;
-							if (held > 65536) throw new Error("chat_output_too_large");
-							return;
-						}
-						const next = (partials.get(input.runId) ?? "") + text;
-						if (next.length > 65536) throw new Error("chat_output_too_large");
-						partials.set(input.runId, next);
-						publish(input.runId);
-					};
+					const body = createAnswerStream(
+						store,
+						input,
+						signal,
+						partials,
+						publish,
+						timing,
+						() => holdBody,
+					);
+					const delta = body.delta;
 					const preparation = answerCollection(run);
 					const decision = await prepareDecision(deps, input, signal);
 					const { recallPins } = decision;
@@ -203,7 +202,7 @@ export function createGenerationHandler(
 							session: callSession,
 							repair: () => {
 								partials.delete(input.runId);
-								held = 0;
+								body.reset();
 								publish(input.runId);
 							},
 						});
@@ -248,7 +247,7 @@ export function createGenerationHandler(
 							session: callSession,
 							repair: () => {
 								partials.delete(input.runId);
-								held = 0;
+								body.reset();
 								publish(input.runId);
 							},
 						});

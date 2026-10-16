@@ -85,7 +85,7 @@ export function createStateOps(
 			kind: target.item.kind,
 			semanticKey: target.item.semanticKey,
 			text,
-			negated: item.negated === true,
+			negated: item.negated ?? target.item.value.polarity === "negated",
 			evidence: [built.evidence],
 			sources: [built.source],
 			origin: explicit ? "user_confirmed" : "agent_inferred",

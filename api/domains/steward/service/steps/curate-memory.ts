@@ -279,6 +279,7 @@ function prepareStep(env: StepEnv, unit: PreparedUnit["unit"]) {
 			exchanges: views,
 			requests: requestViews,
 			longTerm: memory.longTerm,
+			longTermCoverage: memory.coverage,
 			shortTerm: memory.shortTerm,
 			...shelves.data,
 		},

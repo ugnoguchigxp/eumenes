@@ -428,7 +428,7 @@ export async function harness(
 				: {}),
 	});
 	const queue = createQueue(store, {
-		resources: { "inference.llm": 1, "inference.aux": 2, "web.fetch": 2 },
+		resources: { "inference.llm": 1, "inference.aux": 2, "web.fetch": 6 },
 		pollMs: 5,
 		limits: options.queueLimits,
 	});

@@ -7,6 +7,7 @@ import { validateRequirementAdoption } from "./requirement-verification";
 import { active, owner, type RuntimeContext } from "./runtime-context";
 import type { TaskOps } from "./task-ops";
 import { parentProjection, isNegativeReport } from "./verify-report";
+import { guidedWeb } from "./guided-contract";
 
 export function createAnswer(ctx: RuntimeContext, ops: TaskOps) {
 	const { store, capabilities, tools, now } = ctx.deps;
@@ -112,6 +113,14 @@ export function createAnswer(ctx: RuntimeContext, ops: TaskOps) {
 											.clarificationQuestion,
 									}
 								: {
+										...(guidedWeb(p)
+											? {
+													delivery: "guided-web",
+													completion: "incomplete",
+													answer:
+														"検索処理を完了できず、依頼された情報を確認できませんでした。",
+												}
+											: {}),
 										failure: root.error_code,
 										researchProgress: {
 											searchAttempts: searches.length,

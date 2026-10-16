@@ -52,7 +52,13 @@ export const curateSchema = (requestLabels: readonly string[]) =>
 			}),
 		),
 		update: list(
-			obj({ ref: str, text: str, evidence: str, quote: nullableStr }),
+			obj({
+				ref: str,
+				text: str,
+				evidence: str,
+				quote: nullableStr,
+				negated: bool,
+			}),
 		),
 		stop: list(
 			obj({
@@ -78,6 +84,7 @@ export const curateSchema = (requestLabels: readonly string[]) =>
 				text: nullableStr,
 				kind: nullableEnum(stateKinds),
 				key: nullableStr,
+				negated: { type: ["boolean", "null"] },
 			}),
 		),
 		route: list(obj({ exchange: str, world: bool, goals: bool })),
@@ -98,7 +105,9 @@ export const summarizeSchema = obj({ summary: str, included: strings });
 export const recallSchema = obj({ query: nullableStr });
 
 export const consolidateSchema = obj({
-	merge: list(obj({ refs: strings, key: nullableStr, text: str })),
+	merge: list(
+		obj({ refs: strings, key: nullableStr, text: str, negated: bool }),
+	),
 	stop: list(
 		obj({ ref: str, why: enumOf(["outdated", "duplicate", "wrong"]) }),
 	),

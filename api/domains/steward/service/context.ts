@@ -27,6 +27,12 @@ export type MemoryDescription = {
 	shortTerm: Array<Record<string, unknown>>;
 	/** The items the long-term layer does not carry yet ("recently remembered"). */
 	recent: string[];
+	coverage: {
+		stateTotal: number;
+		stateShown: number;
+		tendenciesTotal: number;
+		tendenciesShown: number;
+	};
 };
 
 /** The active State items of the profile that count now (past ones are not offered). */
@@ -67,11 +73,14 @@ export function describeMemory(env: StepEnv): MemoryDescription {
 		return true;
 	};
 	let m = 0;
-	for (const item of activeStateItems(env)) {
+	const stateItems = activeStateItems(env);
+	for (const item of stateItems) {
 		const ref = `m${m + 1}`;
 		const entry: Record<string, unknown> = {
 			ref,
 			kind: item.kind,
+			key: item.semanticKey,
+			origin: item.origin,
 			text: item.value.text,
 			...(item.value.polarity === "negated" ? { polarity: "negated" } : {}),
 			...(item.validFromMs === null
@@ -92,7 +101,8 @@ export function describeMemory(env: StepEnv): MemoryDescription {
 		if (recentIds.has(item.itemId)) recent.push(ref);
 	}
 	let t = 0;
-	for (const row of deps.memory.tendencies()) {
+	const tendencies = deps.memory.tendencies();
+	for (const row of tendencies) {
 		const ref = `t${t + 1}`;
 		if (!push({ ref, kind: "tendency", text: row.text })) break;
 		t++;
@@ -110,7 +120,18 @@ export function describeMemory(env: StepEnv): MemoryDescription {
 		};
 		shortTerm.push({ ref, kind: item.kind, text: item.text });
 	}
-	return { refs, longTerm, shortTerm, recent };
+	return {
+		refs,
+		longTerm,
+		shortTerm,
+		recent,
+		coverage: {
+			stateTotal: stateItems.length,
+			stateShown: m,
+			tendenciesTotal: tendencies.length,
+			tendenciesShown: t,
+		},
+	};
 }
 
 // ---- exchanges ----

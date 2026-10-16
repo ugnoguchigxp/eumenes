@@ -21,12 +21,13 @@ import {
 	createWebAcquisition,
 	acquisitionError,
 	acquisitionRejectionReasons,
+	readFailure,
 	type AcquisitionPort,
 	type Acquisition,
 } from "../adapters/llm-fetch";
 import { cacheKey, type WebCache, type CacheHit } from "./cache";
 
-import { createSavedBodies } from "./saved-bodies";
+import { createSavedBodies, type AcquiredBody } from "./saved-bodies";
 const KIND = "web-research.acquire";
 const log = getLogger("web-research");
 interface Prepared {
@@ -38,6 +39,43 @@ interface Prepared {
 }
 interface Executed extends Acquisition {
 	hit: CacheHit | null;
+}
+function typedReadFailure(
+	error: unknown,
+	request: ResearchRequest,
+	now: number,
+): Executed | null {
+	if (request.operation !== "read") return null;
+	const failure = readFailure(request.url, error);
+	// Guard rejection remains a failed operation with the existing security audit.
+	if (failure.retryable === undefined || failure.guardDecision) return null;
+	return {
+		freshUntilMs: null,
+		hit: null,
+		bodies: [],
+		result: {
+			provider: "llm-fetch@0.1.4",
+			observedAt: new Date(now).toISOString(),
+			cache: "bypass",
+			hits: [],
+			documents: [],
+			failures: [failure],
+		},
+	};
+}
+function acquiredBodies(value: Acquisition): AcquiredBody[] {
+	return (
+		value.bodies ??
+		value.result.documents.map((d) => ({
+			url: d.url,
+			title: d.title,
+			text: d.text,
+			fetchedAt: d.fetchedAt,
+			acquisitionTruncated: d.truncated,
+			source: d.source,
+			security: { decision: d.guardDecision, reasonCodes: d.guardReasonCodes },
+		}))
+	);
 }
 const digest = (request: ResearchRequest) => {
 	const { requestId: _id, ...input } = request;
@@ -59,7 +97,7 @@ export function createWebResearch({
 	acquisition = createWebAcquisition(),
 	now = Date.now,
 	id = () => crypto.randomUUID(),
-	acquisitionTimeoutMs = 15000,
+	acquisitionTimeoutMs = 30000,
 	timers = {
 		set: (fn: () => void, ms: number): unknown => setTimeout(fn, ms),
 		clear: (handle: unknown) => clearTimeout(handle as never),
@@ -243,6 +281,9 @@ export function createWebResearch({
 					hit: null,
 				};
 			} catch (error) {
+				context.signal.throwIfAborted();
+				const typed = typedReadFailure(error, input.request, now());
+				if (typed) return typed;
 				const reasons = acquisitionRejectionReasons(error);
 				if (reasons.length) {
 					if (rejectionReasons.size >= 128)
@@ -296,17 +337,7 @@ export function createWebResearch({
 							queue.get(claim.jobId)?.state !== "completed"
 						)
 							return;
-						savedBodies.stage(
-							runId,
-							value.bodies ??
-								value.result.documents.map((d) => ({
-									url: d.url,
-									title: d.title,
-									text: d.text,
-									fetchedAt: d.fetchedAt,
-									acquisitionTruncated: d.truncated,
-								})),
-						);
+						savedBodies.stage(runId, acquiredBodies(value));
 						delivery.remember(runId, value);
 						log.info("web.completed", {
 							runId,

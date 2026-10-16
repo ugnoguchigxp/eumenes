@@ -56,6 +56,7 @@ const tools: Readonly<Record<string, ToolRuntimeMeta>> = {
 	"history.search": { operation: "history", cursorPaging: true },
 	"history.read": { operation: "history" },
 	"world.find": { operation: "world" },
+	"world.documents": { operation: "world" },
 	"world.query": { operation: "world" },
 	"timer.start": { operation: "local_action" },
 	"timer.cancel": { operation: "local_action" },
