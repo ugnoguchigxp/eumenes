@@ -92,3 +92,84 @@ test("trailing punctuation is not part of a raw URL, balanced parentheses are", 
 		"(). 以上",
 	);
 });
+
+test("required citations restore only accepted claim sources and never an unused acquired page", () => {
+	const report = JSON.stringify({
+		claims: [{ text: "晴れ、最高26度。", sourceIds: ["weather", "weather"] }],
+		sources: [
+			{ sourceId: "weather", url },
+			{ sourceId: "unused", url: "https://example.org/other-region" },
+		],
+	});
+	const answer = researchCitations("晴れ、最高26度。", report, {
+		requireSources: true,
+	});
+	expect(answer).toBe(`晴れ、最高26度。\n\n出典：[tenki.jp](<${url}>)`);
+	expect(answer).not.toContain("other-region");
+	expect(researchCitations(answer, report, { requireSources: true })).toBe(
+		answer,
+	);
+	for (const citation of [url, `<${url}>`])
+		expect(
+			researchCitations(`晴れ。${citation}`, report, { requireSources: true }),
+		).toContain(`[${new URL(url).hostname}](<${url}>)`);
+	expect(
+		researchCitations(`晴れ。\n[unused]: ${url}`, report, {
+			requireSources: true,
+		}),
+	).toContain(`[${new URL(url).hostname}](<${url}>)`);
+	expect(
+		researchCitations(`晴れ。[天気](${url})`, report, { requireSources: true }),
+	).toBe(`晴れ。[天気](<${url}>)`);
+});
+
+test("code-only citations receive a visible fallback, including an unclosed fence", () => {
+	const report = JSON.stringify({
+		sources: [{ sourceId: "s", url }],
+		claims: [{ sourceIds: ["s"] }],
+	});
+	for (const text of [
+		`晴れ。 \`[出典](${url})\``,
+		`晴れ。\n\`\`\`text\n[出典](${url})\n\`\`\``,
+		`晴れ。\n\`\`\`text\n[出典](${url})`,
+	]) {
+		const answer = researchCitations(text, report, { requireSources: true });
+		expect(answer.endsWith(`\n\n出典：[tenki.jp](<${url}>)`)).toBe(true);
+		expect(researchCitations(answer, report, { requireSources: true })).toBe(
+			answer,
+		);
+	}
+});
+
+test("missing, stale and non-web references cannot create fallback links", () => {
+	for (const value of [
+		null,
+		{
+			claims: [{ sourceIds: ["missing"] }],
+			sources: [{ sourceId: "other", url }],
+		},
+		{
+			claims: [{ sourceIds: ["world"] }],
+			sources: [{ sourceId: "world", kind: "world_claim" }],
+		},
+	])
+		expect(
+			researchCitations("未確認です。", JSON.stringify(value), {
+				requireSources: true,
+			}),
+		).toBe("未確認です。");
+});
+
+test("required citation URLs use safe Markdown destinations and keep the answer bound", () => {
+	const tricky = "https://example.org/page(foo)";
+	const report = JSON.stringify({
+		claims: [{ sourceIds: ["s"] }],
+		sources: [{ sourceId: "s", url: tricky }],
+	});
+	expect(
+		researchCitations("確認済み。", report, { requireSources: true }),
+	).toContain(`[example.org](<${tricky}>)`);
+	expect(() =>
+		researchCitations("x".repeat(65536), report, { requireSources: true }),
+	).toThrow("chat_output_too_large");
+});

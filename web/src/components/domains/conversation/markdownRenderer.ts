@@ -1,6 +1,6 @@
 const SAFE_PROTOCOL = /^(?:https?:|mailto:)/i;
 const INLINE_TOKEN =
-	/`([^`\n]+)`|\[([^\]\n]{1,1024})\]\(((?:[^()\s]|\([^()\s]*\)){1,2048})\)|\*\*([^*\n]+)\*\*|\*([^*\n]+)\*|~~([^~\n]+)~~/g;
+	/`([^`\n]+)`|\[([^\]\n]{1,1024})\]\((<[^<>\s]{1,2048}>|(?:[^()\s<>]|\([^()\s<>]*\)){1,2048})\)|\*\*([^*\n]+)\*\*|\*([^*\n]+)\*|~~([^~\n]+)~~/g;
 
 function escapeHtml(value: string): string {
 	return value
@@ -50,9 +50,10 @@ function renderInline(value: string): string {
 		if (match[1] !== undefined) {
 			output += `<code>${escapeHtml(match[1])}</code>`;
 		} else if (match[2] !== undefined && match[3] !== undefined) {
-			const host = hiddenHost(match[2], match[3]);
-			output += SAFE_PROTOCOL.test(match[3])
-				? `<a href="${escapeHtml(match[3])}" rel="noreferrer noopener" target="_blank">${renderInline(match[2])}${host ? `<span class="link-host">(${escapeHtml(host)})</span>` : ""}</a>`
+			const href = match[3].startsWith("<") ? match[3].slice(1, -1) : match[3];
+			const host = hiddenHost(match[2], href);
+			output += SAFE_PROTOCOL.test(href)
+				? `<a href="${escapeHtml(href)}" rel="noreferrer noopener" target="_blank">${renderInline(match[2])}${host ? `<span class="link-host">(${escapeHtml(host)})</span>` : ""}</a>`
 				: escapeHtml(match[0]);
 		} else if (match[4] !== undefined) {
 			output += `<strong>${renderInline(match[4])}</strong>`;

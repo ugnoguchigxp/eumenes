@@ -47,7 +47,9 @@ import type { LarmPort } from "../domains/larm";
 export function workerPacket(
 	messages: import("../domains/inference/contracts").Messages,
 ): any {
-	const data = JSON.parse(messages.find((m) => m.role === "user")!.content);
+	const data = JSON.parse(
+		messages.filter((m) => m.role === "user").at(-1)!.content,
+	);
 	const untrusted = messages.find((m) =>
 		m.content.startsWith("UNTRUSTED_MATERIALS"),
 	);
@@ -118,6 +120,7 @@ export async function harness(
 			messages: import("../domains/inference/contracts").Messages,
 		) => string | Promise<string> | undefined;
 		acquire?: AcquisitionPort["execute"];
+		acquisitionTimeoutMs?: number;
 		parent?: (
 			messages: import("../domains/inference/contracts").Messages,
 		) => string | Promise<string>;
@@ -511,7 +514,12 @@ export async function harness(
 			};
 		},
 	};
-	const web = createWebResearch({ store, queue, acquisition });
+	const web = createWebResearch({
+		store,
+		queue,
+		acquisition,
+		acquisitionTimeoutMs: options.acquisitionTimeoutMs,
+	});
 	const scheduler = createScheduler(store, queue, { now: options.timerNow });
 	const timers = options.timers
 		? createTimers(

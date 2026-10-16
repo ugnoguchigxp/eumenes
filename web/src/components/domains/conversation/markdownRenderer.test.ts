@@ -57,6 +57,17 @@ test("urls with one level of parentheses stay intact", () => {
 	expect(renderSafeMarkdown("[x](javascript:alert(1))")).not.toContain("<a ");
 });
 
+test("citation angle destinations render a safe, clickable URL", () => {
+	const url = "https://example.org/page(foo)?a=1&b=2";
+	expect(renderSafeMarkdown(`[出典](<${url}>)`)).toContain(
+		'href="https://example.org/page(foo)?a=1&amp;b=2"',
+	);
+	expect(renderSafeMarkdown("[x](<javascript:alert(1)>)")).not.toContain("<a ");
+	expect(renderSafeMarkdown("`[出典](<https://example.org>)`")).not.toContain(
+		"<a ",
+	);
+});
+
 test("mermaid fences do not emit a duplicate hidden source", () => {
 	const html = renderSafeMarkdown("```mermaid\ngraph TD;A-->B\n```");
 	expect(html).toContain("mermaid-block");

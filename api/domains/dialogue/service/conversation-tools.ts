@@ -36,13 +36,25 @@ const requestSchema = z.toJSONSchema(toolchainRequest) as Record<
 	string,
 	unknown
 >;
+const requestProperties = requestSchema.properties as Record<string, unknown>;
+const delegatedRequestSchema = {
+	...requestSchema,
+	properties: {
+		...requestProperties,
+		request: {
+			...(requestProperties.request as Record<string, unknown>),
+			description:
+				"今回の依頼のうち、この担当へ渡す内容。明示された対象名・識別子・地域・日時・数値・単位は原文のまま保持し、省略された対象だけ文脈で補う。",
+		},
+	},
+};
 /** The `{ request }` function schema, with `questionRef` limited to the refs open for it. */
 function requestSchemaFor(refs: string[]) {
-	if (!refs.length) return requestSchema;
+	if (!refs.length) return delegatedRequestSchema;
 	return {
-		...requestSchema,
+		...delegatedRequestSchema,
 		properties: {
-			...(requestSchema.properties as Record<string, unknown>),
+			...delegatedRequestSchema.properties,
 			questionRef: {
 				type: "string",
 				enum: refs,

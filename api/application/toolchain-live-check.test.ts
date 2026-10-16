@@ -37,9 +37,18 @@ test("answer links point to acquired pages, not invented paths or home pages", (
 		"ソース：[tenki.jp](https://tenki.jp/forecast/invented)",
 		`[tenki.jp](${url}) [別の資料](https://example.com)`,
 		"ソース：[出典](javascript:alert(1))",
+		`晴れ。\n\`\`\`text\n[出典](${url})\n\`\`\``,
+		`晴れ。 \`[出典](${url})\``,
+		`晴れ。\n\`\`\`text\n[出典](${url})`,
 	])
 		expect(checkLiveCitations(report, answer)).toBe(false);
 	expect(checkLiveCitations(null, `[tenki.jp](${url})`)).toBe(false);
+});
+test("acceptance checks angle destinations and entity escaping through rendered anchors", () => {
+	const url = "https://example.org/page(foo)?a=1&b=2";
+	expect(checkLiveCitations({ sources: [{ url }] }, `[出典](<${url}>)`)).toBe(
+		true,
+	);
 });
 const stock = {
 	claims: [

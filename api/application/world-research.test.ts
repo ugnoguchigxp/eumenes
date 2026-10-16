@@ -76,7 +76,9 @@ type Step = (packet: Packet, hooks: Hooks) => unknown | Promise<unknown>;
 type Hooks = Awaited<ReturnType<typeof boot>>["hooks"];
 
 function workerPacket(messages: Messages): Packet {
-	const data = JSON.parse(messages.find((m) => m.role === "user")!.content);
+	const data = JSON.parse(
+		messages.filter((m) => m.role === "user").at(-1)!.content,
+	);
 	const untrusted = messages.find((m) =>
 		m.content.startsWith("UNTRUSTED_MATERIALS"),
 	);

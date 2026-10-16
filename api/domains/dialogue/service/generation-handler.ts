@@ -57,7 +57,9 @@ function verifiedAnswerLinks(text: string, input: GenerateInput) {
 	if (input.mediaResult)
 		return researchCitations(text, null, { preserveLinkLabels: false });
 	if (input.agent?.projection || input.agent?.failureCode)
-		return researchCitations(text, input.agent.projection);
+		return researchCitations(text, input.agent.projection, {
+			requireSources: true,
+		});
 	return text;
 }
 

@@ -1,3 +1,5 @@
+import { renderSafeMarkdown } from "../../web/src/components/domains/conversation/markdownRenderer";
+
 type EvidenceReport = {
 	claims: Array<{ text: string; evidence: Array<{ quote: string }> }>;
 };
@@ -87,7 +89,23 @@ export function checkLiveCitations(
 	report: { sources: Array<{ url?: string }> } | null,
 	answer: string | undefined,
 ) {
-	const links = [...(answer ?? "").matchAll(/\[[^\]\n]+\]\(([^)\s]+)\)/g)];
+	// Inspect anchors emitted by the actual chat renderer, not Markdown-looking
+	// strings inside code, images, or unsupported destination syntax.
+	const links = [
+		...renderSafeMarkdown(answer ?? "").matchAll(/<a href="([^"]+)"/g),
+	].map((link) =>
+		link[1]!.replace(
+			/&(amp|quot|#39|lt|gt);/g,
+			(entity) =>
+				({
+					"&amp;": "&",
+					"&quot;": '"',
+					"&#39;": "'",
+					"&lt;": "<",
+					"&gt;": ">",
+				})[entity]!,
+		),
+	);
 	const urls = new Set(report?.sources.map((source) => source.url));
-	return links.length > 0 && links.every((link) => urls.has(link[1]!));
+	return links.length > 0 && links.every((link) => urls.has(link));
 }

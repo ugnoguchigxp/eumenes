@@ -109,7 +109,9 @@ export function explorationBudget(
 		maxReads: operationLimits(p).reads,
 		maxModelCalls: modelLimit(p),
 		canOperate:
-			t.model_calls < modelLimit(p) - (returnsSearchResults(p) ? 1 : 2) &&
+			// model_calls includes this prepared call. Keep the following finish
+			// (and, for research, verification) calls without reserving it twice.
+			t.model_calls <= modelLimit(p) - (returnsSearchResults(p) ? 1 : 2) &&
 			t.deadline - now > RESEARCH_BUDGET.operationReserveMilliseconds,
 	};
 }

@@ -288,7 +288,9 @@ export function createStepActions(ctx: RuntimeContext, ops: TaskOps) {
 					(action.report as { outcome?: string }).outcome ?? "",
 				) &&
 				input.grants.some((g) => !g.replayOnly) &&
-				!tools.invocationsInTransaction(db, t.id).length
+				!tools
+					.invocationsInTransaction(db, t.id)
+					.some((i) => toolRuntimeOf(i.toolRevisionId)?.operation !== "recipe")
 			)
 				throw new ValidationFailure("invalid_report", [
 					{

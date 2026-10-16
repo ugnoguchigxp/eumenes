@@ -84,7 +84,9 @@ function observeContext(
 		(m) => m.role === "system" && m.content.includes("TOOLS="),
 	);
 	if (!system) return;
-	const data = JSON.parse(messages.find((m) => m.role === "user")!.content);
+	const data = JSON.parse(
+		messages.filter((m) => m.role === "user").at(-1)!.content,
+	);
 	const listed = JSON.parse(system.content.split("TOOLS=")[1]!.split("\n")[0]!);
 	record({
 		stage: "worker_context",

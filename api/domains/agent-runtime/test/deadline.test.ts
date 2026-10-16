@@ -26,7 +26,7 @@ test("an operation granted with 70 seconds remains valid after the model spends 
 		);
 		expect(step.prep.status).toBe("ready");
 		expect(
-			JSON.parse((step.prep as any).input.messages[1].content).budget.canInvoke,
+			JSON.parse((step.prep as any).input.messages[2].content).budget.canInvoke,
 		).toBe(true);
 		expect(h.started).toHaveLength(1);
 		expect(h.task(child.id).state).toBe("waiting_tool");
@@ -50,7 +50,7 @@ test("an operation granted with 70 seconds remains valid after the model spends 
 			},
 		});
 		expect(final.prep.status).toBe("ready");
-		const packet = JSON.parse((final.prep as any).input.messages[1].content);
+		const packet = JSON.parse((final.prep as any).input.messages[2].content);
 		expect(packet.budget.canInvoke).toBe(false);
 		expect(h.started).toHaveLength(1);
 		expect(h.task(child.id).state).toBe("completed");
@@ -95,7 +95,7 @@ test("a failed model-selected read retains the deadline and reserves finish plus
 		expect(final.prep.status).toBe("ready");
 		const packet = JSON.parse(
 			(final.prep as { input: { messages: { content: string }[] } }).input
-				.messages[1]!.content,
+				.messages[2]!.content,
 		);
 		expect(packet.budget.canInvoke).toBe(false);
 		expect(h.started).toHaveLength(1);

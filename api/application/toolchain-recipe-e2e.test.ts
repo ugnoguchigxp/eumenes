@@ -117,3 +117,145 @@ test("the conversation sees one flat request function per offered toolchain", as
 		await h.close();
 	}
 });
+
+// Scripted protocol test only: this does not measure the model's region selection.
+test.each([false, true])(
+	"host permits a scripted replacement read and finish within five calls: %s",
+	async (prematureFinish) => {
+		const wrong = "https://example.org/yokohama";
+		const correct = "https://example.org/kamakura";
+		const used: string[] = [];
+		let gaveUp = false;
+		const h = await harness({
+			control: (messages) => {
+				if (!messages[0]!.content.includes("TOOLS=")) return undefined;
+				const data = workerPacket(messages);
+				const invoke = (tool: string, args: unknown) => {
+					used.push(tool);
+					return JSON.stringify({ action: "invoke", tool, arguments: args });
+				};
+				if (!data.operations.length)
+					return invoke("recipe.find", { query: "鎌倉の天気" });
+				if (prematureFinish && !gaveUp) {
+					gaveUp = true;
+					return JSON.stringify({
+						action: "finish",
+						report: {
+							outcome: "not_found",
+							summary: "保存手順の候補がありません。",
+							claims: [],
+							limitations: [],
+						},
+					});
+				}
+				if (!data.operations.some((op: any) => op.tool === "web.lookup"))
+					return invoke("web.lookup", { query: "鎌倉 今日 天気" });
+				const pages = data.observations.filter((o: any) => o.basis === "page");
+				if (!pages.length)
+					return invoke("web.read", { url: prematureFinish ? correct : wrong });
+				const matched = pages.find((o: any) => o.url === correct);
+				if (!matched) {
+					expect(data.budget.canInvoke).toBe(true);
+					return invoke("web.read", { url: correct });
+				}
+				expect(data.budget.canInvoke).toBe(false);
+				return JSON.stringify({
+					action: "finish",
+					report: {
+						outcome: "answered",
+						summary: "鎌倉市の予報です。",
+						claims: [
+							{
+								text: "2026年10月16日の鎌倉市は晴れ、最高25℃・最低18℃。",
+								evidence: [matched.excerpts[0].reference],
+							},
+						],
+						limitations: [],
+					},
+				});
+			},
+			acquire: async (request) => ({
+				freshUntilMs: null,
+				result: {
+					provider: "llm-fetch@0.1.4",
+					observedAt: new Date().toISOString(),
+					cache: "bypass",
+					failures: [],
+					hits:
+						request.operation === "lookup"
+							? [
+									{
+										url: wrong,
+										title: "横浜市の天気",
+										snippet: "横浜市の予報です。",
+										provider: "fixture",
+										trust: "untrusted",
+										tainted: true,
+										verification: "search_summary",
+									},
+									{
+										url: correct,
+										title: "鎌倉市の天気",
+										snippet: "鎌倉市の予報です。",
+										provider: "fixture",
+										trust: "untrusted",
+										tainted: true,
+										verification: "search_summary",
+									},
+								]
+							: [],
+					documents:
+						request.operation === "read"
+							? [
+									{
+										url: request.url,
+										title:
+											request.url === correct ? "鎌倉市の天気" : "横浜市の天気",
+										text:
+											request.url === correct
+												? "2026年10月16日の鎌倉市は晴れ、最高25℃・最低18℃。"
+												: "2026年10月16日の横浜市は曇り、最高23℃。",
+										fetchedAt: new Date().toISOString(),
+										truncated: false,
+										trust: "untrusted",
+										tainted: true,
+										verification: "source_read",
+										guardDecision: "allow",
+										guardReasonCodes: [],
+									},
+								]
+							: [],
+				},
+			}),
+			parent: () => "2026年10月16日の鎌倉市は晴れ、最高25℃・最低18℃です。",
+		});
+		try {
+			const run = await h.dialogue.submit({
+				requestId: crypto.randomUUID(),
+				conversationId: "replacement",
+				text: "鎌倉の今日の天気と気温を出典付きで教えて",
+			});
+			expect(
+				(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 8000 }))?.status,
+			).toBe("completed");
+			const child = h.toolchain.agents
+				.list(run.id)
+				.find((t) => t.kind === "worker")!;
+			expect(child).toMatchObject({
+				status: "completed",
+				modelCalls: 5,
+				toolCalls: prematureFinish ? 3 : 4,
+			});
+			expect(used).toEqual(
+				prematureFinish
+					? ["recipe.find", "web.lookup", "web.read"]
+					: ["recipe.find", "web.lookup", "web.read", "web.read"],
+			);
+			const answer = h.dialogue.answerText(run.id)!;
+			expect(answer).toContain(correct);
+			expect(answer).not.toContain(wrong);
+		} finally {
+			await h.close();
+		}
+	},
+);
