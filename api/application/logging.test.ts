@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { waitFor } from "../infrastructure/wait-for";
 
 test("real backend persists startup, correlated job failure and final shutdown without credentials or conversation text", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-log-process-"));
@@ -60,15 +61,11 @@ test("real backend persists startup, correlated job failure and final shutdown w
 		});
 		expect(response.status).toBe(202);
 		const run = (await response.json()) as { id: string; jobId: string };
-		for (
-			let n = 0;
-			n < 100 &&
-			!entries().some(
+		await waitFor(() =>
+			entries().some(
 				(entry) => entry.event === "queue.settled" && entry.jobId === run.jobId,
-			);
-			n++
-		)
-			await Bun.sleep(25);
+			),
+		);
 		const records = entries();
 		expect(
 			records.find((entry) => entry.event === "dialogue.accepted"),

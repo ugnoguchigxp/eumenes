@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { readChatResponse } from "./chat-stream";
+import { waitFor } from "./wait-for";
 const encode = (text: string) => new TextEncoder().encode(text);
 const delta = (content: string) =>
 	`data: ${JSON.stringify({ choices: [{ index: 0, delta: { content } }] })}\r\n\r\n`;
@@ -28,7 +29,7 @@ test("provider UTF-8 splits publish answer text before completion and exclude re
 			'data: {"choices":[{"index":0,"delta":{"reasoning_content":"hidden"}}]}\n\n',
 		),
 	);
-	for (let i = 0; i < 100 && !parts.length; i++) await Bun.sleep(1);
+	await waitFor(() => parts.length > 0);
 	expect(parts).toEqual(["こんにちは"]);
 	expect(finished).toBe(false);
 	sink.enqueue(encode(delta("。") + "data: [DONE]\n\n"));

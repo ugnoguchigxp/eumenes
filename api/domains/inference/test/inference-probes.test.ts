@@ -1,6 +1,7 @@
 import { afterEach, expect, spyOn, test } from "bun:test";
 import { WriterBusyError } from "../../../infrastructure/sqlite";
-import { cleanup, until, setup, probeRow } from "./inference.fixture";
+import { cleanup, setup, probeRow } from "./inference.fixture";
+import { waitFor } from "../../../infrastructure/wait-for";
 afterEach(async () => {
 	for (const close of cleanup.splice(0)) await close();
 });
@@ -16,7 +17,7 @@ test("a probe stuck running for over 10 minutes is marked probe_stale and a new 
 		status: "failed",
 		error: "probe_stale",
 	});
-	await until(() => probeRow(store, id)?.status === "succeeded");
+	await waitFor(() => probeRow(store, id)?.status === "succeeded");
 });
 test("a probe registered inside a transaction runs after the commit and only if it committed", async () => {
 	const { store, inference, settings } = await setup();
@@ -25,7 +26,7 @@ test("a probe registered inside a transaction runs after the commit and only if 
 	);
 	expect(probeRow(store, registered.id)?.status).toBe("running");
 	registered.launch();
-	await until(() => probeRow(store, registered.id)?.status === "succeeded");
+	await waitFor(() => probeRow(store, registered.id)?.status === "succeeded");
 	// A rolled-back registration leaves no row and launching it does nothing.
 	let lost: ReturnType<typeof inference.startProbeInTransaction> | undefined;
 	await store
@@ -49,7 +50,7 @@ test("a probe registered inside a transaction runs after the commit and only if 
 		inference.startProbeInTransaction(db, resource.id),
 	);
 	second.launch();
-	await until(() => probeRow(store, second.id)?.status !== "running");
+	await waitFor(() => probeRow(store, second.id)?.status !== "running");
 });
 test("a probe cancel is a mark written by the transaction: a rollback leaves it running", async () => {
 	const { store, inference, settings } = await setup();
@@ -101,7 +102,7 @@ test("the final probe status survives a momentarily full writer queue", async ()
 			: write(operation)) as typeof store.write);
 	try {
 		const { id } = await inference.startProbe("larm");
-		await until(() => probeRow(store, id)?.status === "succeeded");
+		await waitFor(() => probeRow(store, id)?.status === "succeeded");
 		expect(writes).toBeGreaterThanOrEqual(3);
 	} finally {
 		spy.mockRestore();

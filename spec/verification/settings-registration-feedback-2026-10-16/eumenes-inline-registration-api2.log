@@ -1,0 +1,27 @@
+bun test v1.4.3 (c6da4a4d3)
+
+api/application/settings-registration.test.ts:
+(pass) unsaved-row registration upgrades the existing screen without rewriting it and refuses credential previews [58.43ms]
+(pass) registration rejects bad input without writes and saves the corrected connection through HTTP [27.89ms]
+
+api/application/workers-ai-settings.test.ts:
+(pass) the published Workers AI settings applies registration, catalog selection and route assignment through the ledger [38.16ms]
+534 | 		options: { dryRun?: boolean } = {},
+535 | 	): { issues: BundleIssue[]; registered: string[] } {
+536 | 		const dryRun = options.dryRun === true;
+537 | 		const done = (issues: BundleIssue[], registered: string[]) => {
+538 | 			if (issues.length && !dryRun)
+539 | 				throw new Error("invalid_capability_bundle");
+                    ^
+error: invalid_capability_bundle
+      at done (/Users/y.noguchi/Code/eumenes/api/domains/capabilities/service/bundles.ts:539:15)
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/infrastructure/sqlite/index.ts:330:20)
+      at transaction (bun:sqlite:401:27)
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/infrastructure/sqlite/index.ts:336:6)
+(fail) published settings upgrade preserves the old artifact and repeats without changing revisions [14.98ms]
+(pass) the spatial settings bundle keeps its latest screen and shares the new save contract without a revision collision [20.53ms]
+
+ 4 pass
+ 1 fail
+ 29 expect() calls
+Ran 5 tests across 2 files. [436.00ms]

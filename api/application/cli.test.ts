@@ -9,6 +9,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { waitFor } from "../infrastructure/wait-for";
 
 const root = resolve(import.meta.dir, "../..");
 const scratch = mkdtempSync(join(tmpdir(), "eumenes-cli-test-"));
@@ -260,7 +261,7 @@ test("web SIGINT exits with unconfirmed cancellation even if the API never confi
 		},
 	);
 	try {
-		for (let i = 0; i < 100 && !polls; i++) await Bun.sleep(10);
+		await waitFor(() => !!polls);
 		expect(polls).toBeGreaterThan(0);
 		child.kill("SIGINT");
 		const [code, output, error] = await Promise.all([
@@ -313,7 +314,7 @@ test("SIGINT also cancels a web status request whose response never arrives", as
 		},
 	);
 	try {
-		for (let i = 0; i < 100 && !polls; i++) await Bun.sleep(10);
+		await waitFor(() => !!polls);
 		expect(polls).toBeGreaterThan(0);
 		child.kill("SIGINT");
 		const [code, error] = await Promise.all([

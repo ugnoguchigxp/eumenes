@@ -207,7 +207,7 @@ function AdapterScreen({
 		...own,
 		settled: async (...args) => {
 			await own.settled(...args);
-			reload();
+			await reload();
 		},
 		refresh: () => {
 			own.refresh();

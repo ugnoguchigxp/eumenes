@@ -12,7 +12,7 @@ createRoot(document.getElementById("root")!).render(
 		<ToolchainArtifactHost
 			client={client}
 			artifactId="workers-ai-browser"
-			artifactRevisionId="artifact:settings.ai-connections@7"
+			artifactRevisionId="artifact:settings.ai-connections@8"
 			adapters={createWebAdapterRegistry([settingsWebAdapter])}
 		/>
 	</QueryClientProvider>,

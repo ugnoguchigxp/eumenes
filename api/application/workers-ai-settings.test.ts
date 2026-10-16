@@ -12,7 +12,7 @@ test("the published Workers AI settings applies registration, catalog selection 
 				eventCreatedAt: new Date().toISOString(),
 				eventExpiresAt: new Date(Date.now() + 60_000).toISOString(),
 				artifactId: "tab-ai",
-				artifactRevisionId: "artifact:settings.ai-connections@7",
+				artifactRevisionId: "artifact:settings.ai-connections@8",
 				source: "settings-ai",
 				sourceRevision: h.settings.get().revision,
 				actionId: "apply",
@@ -115,7 +115,7 @@ test("published settings upgrade preserves the old artifact and repeats without 
 			h.ledger
 				.artifacts()
 				.some(
-					(a) => a.artifactRevisionId === "artifact:settings.ai-connections@7",
+					(a) => a.artifactRevisionId === "artifact:settings.ai-connections@8",
 				),
 		).toBe(true);
 	} finally {

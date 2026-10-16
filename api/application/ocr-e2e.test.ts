@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { harness } from "./toolchain.fixture";
+import { waitFor } from "../infrastructure/wait-for";
 const result = {
 	kind: "image",
 	model: "ocr-fixture",
@@ -73,12 +74,7 @@ test("authenticated OCR upload persists, returns source, and adds selected raw l
 			body: form,
 		});
 		expect(upload.status).toBe(202);
-		for (
-			let i = 0;
-			i < 100 && h.ocr!.get("local:owner", id).state !== "completed";
-			i++
-		)
-			await Bun.sleep(10);
+		await waitFor(() => h.ocr!.get("local:owner", id).state === "completed");
 		const saved = await (await h.request(`/api/ocr/${id}`)).json();
 		expect(saved.state).toBe("completed");
 		expect(saved.result.text).toBe("原文のまま");

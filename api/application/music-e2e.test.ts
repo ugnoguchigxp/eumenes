@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { harness } from "./toolchain.fixture";
 import { musicFixture, musicQuestion, musicTestPlan } from "./music.fixture";
+import { waitFor } from "../infrastructure/wait-for";
 
 test("a prose-only creation claim is withheld and routed to the music agent", async () => {
 	const f = musicFixture("success");
@@ -197,16 +198,10 @@ test("cancel music while the provider is running, send DELETE and never adopt au
 				text: musicQuestion,
 			})
 		).json();
-		for (let i = 0; i < 500 && !h.music!.list("main")[0]?.jobId; i++)
-			await Bun.sleep(5);
+		await waitFor(() => !!h.music!.list("main")[0]?.jobId);
 		expect(h.music!.list("main")[0]?.jobId).toBe("track");
 		await h.dialogue.cancel(r.id);
-		for (
-			let i = 0;
-			i < 100 && !f.requests.some((r) => r.method === "DELETE");
-			i++
-		)
-			await Bun.sleep(5);
+		await waitFor(() => f.requests.some((r) => r.method === "DELETE"));
 		expect(f.requests.filter((r) => r.method === "DELETE")).toHaveLength(1);
 		expect(h.music!.list("main")[0]?.state).toBe("cancelled");
 		expect(h.dialogue.get(r.id)?.status).toBe("cancelled");
@@ -299,12 +294,9 @@ test("artwork is generated on request from the completed track's prompt at 256×
 				revision,
 				errorCode: null,
 			});
-			for (
-				let i = 0;
-				i < 500 && h.music!.get(music.id)?.artwork?.state === "generating";
-				i++
-			)
-				await Bun.sleep(10);
+			await waitFor(
+				() => h.music!.get(music.id)?.artwork?.state !== "generating",
+			);
 			expect(h.music!.get(music.id)?.artwork).toEqual({
 				state: "completed",
 				revision,
@@ -317,12 +309,9 @@ test("artwork is generated on request from the completed track's prompt at 256×
 		expect((await h.request(`/api/music/${music.id}/artwork`, {})).status).toBe(
 			409,
 		);
-		for (
-			let i = 0;
-			i < 500 && h.music!.get(music.id)?.artwork?.state === "generating";
-			i++
-		)
-			await Bun.sleep(10);
+		await waitFor(
+			() => h.music!.get(music.id)?.artwork?.state !== "generating",
+		);
 		const image = f.requests.find((r) => r.path === "/v1/images/generations")!;
 		expect(image.body).toMatchObject({ width: 256, height: 256 });
 		const text = JSON.stringify(image.body);
@@ -392,12 +381,9 @@ test("artwork is refused for an unfinished track and a provider failure is recor
 		expect((await g.request(`/api/music/${music.id}/artwork`, {})).status).toBe(
 			202,
 		);
-		for (
-			let i = 0;
-			i < 500 && g.music!.get(music.id)?.artwork?.state === "generating";
-			i++
-		)
-			await Bun.sleep(10);
+		await waitFor(
+			() => g.music!.get(music.id)?.artwork?.state !== "generating",
+		);
 		expect(g.music!.get(music.id)?.artwork).toMatchObject({
 			state: "failed",
 			revision: 1,

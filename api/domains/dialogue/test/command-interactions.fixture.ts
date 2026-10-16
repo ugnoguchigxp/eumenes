@@ -25,6 +25,7 @@ import {
 	type ToolchainRoutingPort,
 } from "..";
 import { COMMAND_KIND } from "../service/context";
+import { waitFor } from "../../../infrastructure/wait-for";
 export const REVISION = "toolchain:fake.manage@1";
 export const BINDING = "binding:fake.command@1";
 export const PACKAGE = "package:fake.manage@1";
@@ -72,13 +73,8 @@ export const lastUser = (history: Call["history"]) =>
 	[...history].reverse().find((m) => m.role === "user")?.content ?? "";
 export const pause = (ms: number) =>
 	new Promise((resolve) => setTimeout(resolve, ms));
-export async function until(check: () => boolean, ms = 4000) {
-	for (let i = 0; i < ms / 10; i++) {
-		if (check()) return;
-		await pause(10);
-	}
-	throw new Error("timeout");
-}
+export const until = (check: () => boolean, ms = 4000) =>
+	waitFor(check, { timeout: ms });
 export const open: Array<() => Promise<void>> = [];
 export type Command = Record<string, unknown>;
 export type Call = {

@@ -1,6 +1,55 @@
 import { expect, test } from "bun:test";
 import { workersSettingsFixture } from "./workers-ai-settings.fixture";
 
+test("unsaved-row registration upgrades the existing screen without rewriting it and refuses credential previews", async () => {
+	const h = await workersSettingsFixture(false, 7);
+	try {
+		const before = h.store.read((db) =>
+			h.caps.documentInTransaction(db, "artifact:settings.ai-connections@7"),
+		);
+		const register = (bundle: unknown, dryRun = false) =>
+			h.store.write((db) =>
+				h.caps.importBundleInTransaction(db, bundle, h.host(), { dryRun }),
+			);
+		expect((await register(h.bundle)).issues).toEqual([]);
+		expect((await register(h.bundle)).issues).toEqual([]);
+		expect(
+			h.store.read((db) =>
+				h.caps.documentInTransaction(db, "artifact:settings.ai-connections@7"),
+			),
+		).toEqual(before);
+		expect(
+			h.ledger
+				.artifacts()
+				.some(
+					(a) => a.artifactRevisionId === "artifact:settings.ai-connections@8",
+				),
+		).toBe(true);
+		for (const [field, code] of [
+			["apiKey", "permission"],
+			["unknown", "schema_mismatch"],
+		]) {
+			const bundle = structuredClone(h.bundle);
+			const screen = bundle.artifacts.find(
+				(a: { id: string; revision: number }) =>
+					a.id === "settings.ai-connections" && a.revision === 8,
+			);
+			screen.revision = 9;
+			screen.collections.find(
+				(c: { source: string }) => c.source === "settings-connections",
+			).create.preview.label = field;
+			const result = await register(bundle, true);
+			expect(
+				result.issues.some(
+					(i) => i.code === code && i.path.includes("preview"),
+				),
+			).toBe(true);
+		}
+	} finally {
+		await h.close();
+	}
+});
+
 test("registration rejects bad input without writes and saves the corrected connection through HTTP", async () => {
 	const h = await workersSettingsFixture();
 	try {
@@ -18,7 +67,7 @@ test("registration rejects bad input without writes and saves the corrected conn
 					eventCreatedAt: new Date().toISOString(),
 					eventExpiresAt: new Date(Date.now() + 60_000).toISOString(),
 					artifactId: "registration-test",
-					artifactRevisionId: "artifact:settings.ai-connections@7",
+					artifactRevisionId: "artifact:settings.ai-connections@8",
 					source: "settings-ai",
 					sourceRevision: h.settings.get().revision,
 					actionId: "apply",

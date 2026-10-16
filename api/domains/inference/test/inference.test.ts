@@ -1,12 +1,12 @@
 import { afterEach, expect, spyOn, test } from "bun:test";
 import {
 	cleanup,
-	until,
 	messages,
 	setup,
 	wav,
 	freshSignal,
 } from "./inference.fixture";
+import { waitFor } from "../../../infrastructure/wait-for";
 afterEach(async () => {
 	for (const close of cleanup.splice(0)) await close();
 });
@@ -183,7 +183,7 @@ test("revocation aborts pending cloud; regrant does not revive old request", asy
 		}) as typeof fetch,
 	});
 	const promise = h.inference.answer(messages, new AbortController().signal);
-	for (let i = 0; i < 50 && !signal; i++) await Bun.sleep(2);
+	await waitFor(() => !!signal);
 	const changed = h.settings.get();
 	changed.routes.llm.cloudAllowed = false;
 	await h.settings.apply({
@@ -269,7 +269,7 @@ test("late provider deltas are fenced after caller cancellation", async () => {
 	const work = h.inference.answerStream(messages, controller.signal, (x) =>
 		parts.push(x),
 	);
-	await until(() => h.inference.usage().length > 0);
+	await waitFor(() => h.inference.usage().length > 0);
 	controller.abort();
 	await expect(work).rejects.toThrow();
 	expect(() => publish("late")).toThrow();

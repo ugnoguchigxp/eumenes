@@ -117,6 +117,7 @@ test("input and cloud edits join the shared change review and save to the regist
 	fireEvent.change(screen.getByLabelText("発話を確定する無音時間（ミリ秒）"), {
 		target: { value: "1800" },
 	});
+	await waitFor(() => expect(saveButton()).toHaveProperty("disabled", false));
 	fireEvent.click(screen.getByRole("button", { name: "変更一覧を開く" }));
 	await screen.findByText("音声と入力 / クラウド音声 / multilingual の音声ID");
 	fireEvent.click(
@@ -229,6 +230,7 @@ test("every registered voice/input setting reaches the shared draft, applies, an
 	set("調整する読み上げ先", backend.cloud.id);
 	set(/の音声ID/, "nova");
 	set(/の話す速さ/, "1.2");
+	await waitFor(() => expect(saveButton()).toHaveProperty("disabled", false));
 	fireEvent.click(screen.getByRole("button", { name: "変更一覧を開く" }));
 	fireEvent.click(
 		await screen.findByRole("button", { name: "設定の変更をすべて適用" }),

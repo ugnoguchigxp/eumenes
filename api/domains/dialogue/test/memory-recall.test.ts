@@ -41,6 +41,7 @@ import type {
 	QueryVector,
 	ToolchainRoutingPort,
 } from "../contracts/toolchains";
+import { waitFor as until } from "../../../infrastructure/wait-for";
 
 const MIGRATIONS = [
 	conversationMigration,
@@ -72,13 +73,6 @@ const OTHER = [0, 0, 1];
 type Message = { role: string; content: string };
 const RECALL_HEADER = "past_turns_reference_data";
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-async function until(check: () => boolean) {
-	for (let i = 0; i < 300; i++) {
-		if (check()) return;
-		await pause(10);
-	}
-	throw new Error("timeout");
-}
 const open: Array<() => Promise<void>> = [];
 afterEach(async () => {
 	for (const close of open.splice(0)) await close();

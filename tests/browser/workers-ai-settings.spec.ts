@@ -48,8 +48,23 @@ test("register a secret, discover both speech tasks, save their selection, assig
 		.getByRole("button", { name: "クラウドAPIを登録", exact: true })
 		.click();
 	const save = page.getByRole("button", { name: "設定の変更をすべて保存" });
+	const connections = page.getByRole("table", { name: "クラウド接続" });
+	await expect(
+		connections.getByRole("row", { name: /Workers音声.*未保存/ }),
+	).toBeVisible();
+	await expect(
+		page
+			.getByRole("region", { name: "設定の保存" })
+			.getByRole("button", { name: "設定の変更をすべて保存" }),
+	).toBeInViewport();
 	await save.click();
 	await expect(save).toBeDisabled();
+	await expect(
+		connections.getByRole("row", { name: /Workers音声.*保存済み/ }),
+	).toBeVisible();
+	await expect(
+		connections.getByText("Workers音声", { exact: true }),
+	).toHaveCount(1);
 	await expect(
 		page
 			.getByText("変更を適用しました", { exact: true })

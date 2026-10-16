@@ -32,6 +32,7 @@ import {
 	migration as voiceMigration,
 } from "../domains/voice-dialogue";
 import type { LarmPort } from "../domains/larm";
+import { waitFor } from "../infrastructure/wait-for";
 
 test("the existing 60-second Scheduler monitor feeds supervision through the public task execution port", async () => {
 	let delegated!: ReturnType<typeof createDelegatedTasks>,
@@ -144,7 +145,7 @@ test("supervision releases the shared inference slot while waiting on a CLI step
 		lane: "interactive",
 	});
 	await h.queue.tick();
-	for (let n = 0; n < 100 && !foreground; n++) await Bun.sleep(2);
+	await waitFor(() => !!foreground);
 	expect(foreground).toBe(true);
 	finish(receipt(h.steps[0]!));
 	await h.drain();

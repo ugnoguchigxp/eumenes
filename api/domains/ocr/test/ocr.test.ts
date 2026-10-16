@@ -8,6 +8,7 @@ import { createOcr, migrations } from "..";
 import { ocrGateway } from "../service/gateway";
 import { imageResult, videoResult, type Connection } from "../contracts";
 import { binding } from "../repository";
+import { waitFor as until } from "../../../infrastructure/wait-for";
 const line = {
 	text: "原文のまま",
 	confidence: 0.72,
@@ -45,13 +46,6 @@ const cleanup: Array<() => Promise<void>> = [];
 afterEach(async () => {
 	for (const c of cleanup.splice(0)) await c();
 });
-async function until(check: () => boolean) {
-	for (let i = 0; i < 200; i++) {
-		if (check()) return;
-		await Bun.sleep(10);
-	}
-	throw new Error("condition_not_reached");
-}
 function setup(fetcher: typeof fetch) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-ocr-"));
 	const store = openStore(join(dir, "db"), [...queueMigrations, ...migrations]);

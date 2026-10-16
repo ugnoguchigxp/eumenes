@@ -1,0 +1,19 @@
+$ bun scripts/verify.ts --domain capabilities --domain settings --domain artifact
+[verify] selected=capabilities,settings,artifact dependencyClosure=capabilities,settings,artifact,delivery,avatar,conversation
+[verify] Shared DesignSystem dist: do not overlap dev, browser tests or other builds; endpoint hashes cannot detect change-and-restore.
+[verify] inventory
+[verify] boundaries
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts api/domains/capabilities api/domains/settings web/src/domains/settings web/src/domains/artifact web/src/components/domains/artifact packages/artifact-ui/src
+size-budget ok (120 files)
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check api/domains/capabilities api/domains/settings web/src/domains/settings web/src/domains/artifact web/src/components/domains/artifact packages/artifact-ui/src
+$ oxfmt --check api/domains/capabilities api/domains/settings web/src/domains/settings web/src/domains/artifact web/src/components/domains/artifact packages/artifact-ui/src
+Checking formatting...
+
+api/domains/settings/service/index.ts (0ms)
+
+Format issues found in above 1 files. Run without `--check` to fix.
+Finished in 9ms on 176 files using 10 threads.
+error: script "format:check" exited with code 1
+[verify] fail: 639 ms; /Users/y.noguchi/Code/eumenes/verification-reports/runs/2026-10-16T13-57-55-348Z-72b3e644-0c8d-40b4-b665-5c94459cf8a8/report.json
+Error: format failed (1)
+error: script "verify" exited with code 1

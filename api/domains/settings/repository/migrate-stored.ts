@@ -13,7 +13,6 @@ const isObject = (v: unknown): v is Json =>
  *   (a stored key or an env ref: "api-key"; nothing: "subscription").
  * - The removed Managed Agents fields are dropped.
  * - The LARM sentence-language switch becomes `englishSpeechEnabled`; its classifier selector is dropped.
- * - The removed ASR language allow-list is dropped (transcripts are no longer language-gated).
  * It is idempotent: a migrated document passes through unchanged.
  */
 export function migrateStoredSettings(
@@ -29,10 +28,6 @@ export function migrateStoredSettings(
 		if (sentenceLanguageEnabled !== undefined)
 			larm.englishSpeechEnabled ??= sentenceLanguageEnabled;
 		raw = { ...raw, larm };
-	}
-	if (isObject(raw) && isObject(raw.general) && "asrLanguages" in raw.general) {
-		const { asrLanguages: _languages, ...general } = raw.general;
-		raw = { ...raw, general };
 	}
 	if (!isObject(raw) || !Array.isArray(raw.connections))
 		return { document: raw, removedConnectionIds: [] };

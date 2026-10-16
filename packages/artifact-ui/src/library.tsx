@@ -154,6 +154,9 @@ function CompositionView({
 				) : (
 					heading
 				)}
+				{request.draftSource && (
+					<SettingsDraftBarView source={request.draftSource} />
+				)}
 				<Tabs value={selected} onValueChange={setSelected}>
 					<TabsList aria-label={`${request.title ?? "画面"}の区分`}>
 						{tabs.map((tab, index) => (
@@ -202,9 +205,6 @@ function CompositionView({
 						</TabsContent>
 					))}
 				</Tabs>
-				{request.draftSource && (
-					<SettingsDraftBarView source={request.draftSource} />
-				)}
 			</section>
 		);
 	return (

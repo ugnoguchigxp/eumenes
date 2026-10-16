@@ -65,7 +65,10 @@ export function totalOf(
 	return typeof total === "number" ? total : rowCount;
 }
 
-function format(value: unknown, as: CollectionV1["columns"][number]["format"]) {
+export function formatCollectionValue(
+	value: unknown,
+	as: CollectionV1["columns"][number]["format"],
+) {
 	if (value === undefined || value === null || value === "") return "—";
 	switch (as) {
 		case "media":
@@ -242,7 +245,7 @@ export function collectionResource({
 				cells: Object.fromEntries(
 					collection.columns.map((c) => [
 						c.key,
-						format(getPath(raw, c.key), c.format),
+						formatCollectionValue(getPath(raw, c.key), c.format),
 					]),
 				),
 				...mediaOf(collection, raw),

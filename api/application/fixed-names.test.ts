@@ -16,6 +16,8 @@ const names = [
 	/\bgemini-\d/i,
 	/\bclaude-(?:opus|sonnet|haiku|fable|\d)/i,
 	/\bvoicevox-core\b/i,
+	// Classifier model ids; the attitude classifier is the catalog's system-one provider.
+	/\bruri-v\d/i,
 	// A name derived from a model (an engine, toolchain or label named after it).
 	/(?<![a-z])luna(?![a-z])/i,
 ];
@@ -85,6 +87,7 @@ test("the name patterns match profile and model names and not the audience value
 	expect(matches('profile: "ornith1.5Strix"')).toBe(true);
 	expect(matches("SAAA-w-Image")).toBe(true);
 	expect(matches("qwen-image-2.1-turbo")).toBe(true);
+	expect(matches('model: "ruri-v3-30m-speaking-attitude"')).toBe(true);
 	for (const name of [
 		"gpt-6-luna",
 		"voicevox-core",

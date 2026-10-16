@@ -5,6 +5,7 @@ import { Webhook, type WebhookPost } from "../../../../packages/dots-mcp/src";
 import { createEvents, createSecretBox } from "..";
 import * as repo from "../repository";
 import { connect, fileStore, makeCommand, type FileStore } from "./support";
+import { waitFor as until } from "../../../infrastructure/wait-for";
 
 const closers: Array<() => Promise<void>> = [];
 afterEach(async () => {
@@ -18,13 +19,6 @@ const subscription = (url: string, key = secret(), ttlMs?: number) => ({
 	...(ttlMs ? { ttlMs } : {}),
 });
 type Sent = { url: string; body: string; headers: Record<string, string> };
-async function until(cond: () => boolean) {
-	for (let i = 0; i < 400; i++) {
-		if (cond()) return;
-		await new Promise((r) => setTimeout(r, 5));
-	}
-	throw new Error("condition not reached");
-}
 
 function setup(respond?: (sent: Sent) => ReturnType<WebhookPost>) {
 	const fs: FileStore = fileStore();

@@ -1,6 +1,6 @@
 # Ruri判定の収集・レビュー
 
-LARMのSystem Oneは発話態度専用の`ruri-v3-30m-speaking-attitude`を使います。接続先・モデル・認証はLARMのdiscovery/claimから取得します。Layaの互換経路も残しています。分類スコアは合成データ由来の暫定校正であり、実会話で正解する確率ではありません。instructionを変更してもRuriの固定タスクは変わりません。
+LARMのSystem Oneは発話態度専用の分類モデルを使います。Eumenesはモデル名で判別せず、catalogのProvider `system-one`（capability `decision.system-one`、protocol `larm.system-one.v1`）を発話態度の分類器として扱い、応答が6分類のlogitとprobabilityを持つかどうかでスコア契約を判定します。接続先・モデル・認証はLARMのdiscovery/claimから取得します。スコアを返さない応答（Laya互換）は選択結果だけを採用し、`state.current_chunk` 以外は送りません。分類スコアは合成データ由来の暫定校正であり、実会話で正解する確率ではありません。instructionを変更してもRuriの固定タスクは変わりません。
 
 ## 収集を開始・停止する
 

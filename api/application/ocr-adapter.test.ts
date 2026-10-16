@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import type { LarmPort } from "../domains/larm";
 import { harness } from "./toolchain.fixture";
+import { waitFor } from "../infrastructure/wait-for";
 test("OCR bundle exposes one artifact and the command agent opens it", async () => {
 	const model: LarmPort = {
 		status: () => ({ state: "ready", capabilities: ["llm"] }),
@@ -112,12 +113,7 @@ test("OCR command read is scoped to the conversation and exposes bounded raw res
 			new File(["png"], "note.png", { type: "image/png" }),
 			id,
 		);
-		for (
-			let i = 0;
-			i < 100 && h.ocr!.get("local:owner", id).state !== "completed";
-			i++
-		)
-			await Bun.sleep(10);
+		await waitFor(() => h.ocr!.get("local:owner", id).state === "completed");
 		const { createOcrAdapter } = await import("./ocr-adapter");
 		const adapter = createOcrAdapter(h.ocr!);
 		const invoke = (conversationId: string) =>

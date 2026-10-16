@@ -1,9 +1,10 @@
 import { expect, test } from "bun:test";
 import { eventsClient } from "../../client/events";
 import { ApiError, type Transport } from "../../client/transport";
+import { waitFor } from "../infrastructure/wait-for";
 
 async function until(predicate: () => boolean) {
-	for (let i = 0; i < 200 && !predicate(); i++) await Bun.sleep(1);
+	await waitFor(() => !!predicate());
 	expect(predicate()).toBe(true);
 }
 function fixture() {

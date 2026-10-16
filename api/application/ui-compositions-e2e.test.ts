@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { harness } from "./toolchain.fixture";
+import { waitFor } from "../infrastructure/wait-for";
 
 const artifactRevisionId = "artifact:ui.workshop@1";
 const survey = {
@@ -83,12 +84,7 @@ test("registered UI workshop creates, displays, submits, and overwrites a survey
 			result: { resultRefs: Array<{ id: string }> };
 		};
 		const id = accepted.result.resultRefs[0]!.id;
-		for (
-			let i = 0;
-			i < 200 && h.uiCompositions!.get(id)?.state !== "ready";
-			i++
-		)
-			await Bun.sleep(10);
+		await waitFor(() => h.uiCompositions!.get(id)?.state === "ready");
 		expect(h.uiCompositions!.get(id)?.state).toBe("ready");
 		const form = await read("composition-form", id);
 		expect(
@@ -108,12 +104,7 @@ test("registered UI workshop creates, displays, submits, and overwrites a survey
 			projectId: id,
 		});
 		expect(revised.status).toBe(200);
-		for (
-			let i = 0;
-			i < 200 && h.uiCompositions!.get(id)?.state !== "ready";
-			i++
-		)
-			await Bun.sleep(10);
+		await waitFor(() => h.uiCompositions!.get(id)?.state === "ready");
 		expect(h.uiCompositions!.list()).toHaveLength(1);
 		expect(h.uiCompositions!.get(id)?.generation).toBe(2);
 		const saved = (await (
@@ -148,12 +139,7 @@ test("conversation delegates UI creation to the registered command and saves its
 		const done = await h.dialogue.waitForTerminal(run.id, { timeoutMs: 8000 });
 		expect(done?.status).toBe("completed");
 		expect(h.commandContexts).toHaveLength(1);
-		for (
-			let i = 0;
-			i < 200 && h.uiCompositions!.list()[0]?.state !== "ready";
-			i++
-		)
-			await Bun.sleep(10);
+		await waitFor(() => h.uiCompositions!.list()[0]?.state === "ready");
 		expect(h.uiCompositions!.list()).toHaveLength(1);
 		expect(h.uiCompositions!.list()[0]?.state).toBe("ready");
 		expect(h.uiCompositions!.list()[0]?.prompt).toBe(prompt);

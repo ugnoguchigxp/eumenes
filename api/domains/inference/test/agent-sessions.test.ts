@@ -25,6 +25,7 @@ import {
 	sweepTaskSessions,
 	TASK_SESSION_TTL_MS,
 } from "../service/agent-session";
+import { waitFor } from "../../../infrastructure/wait-for";
 
 const cleanup: Array<() => Promise<void>> = [];
 afterEach(async () => {
@@ -417,7 +418,7 @@ test("the sweeper reclaims an expired task row that was written back after the r
 		0,
 	);
 	expect(rows()).toBe(1);
-	for (let i = 0; i < 50 && rows() > 0; i++) await Bun.sleep(20);
+	await waitFor(() => rows() === 0);
 	expect(rows()).toBe(0);
 	sweeper.stop();
 	await acquireAgentSession(

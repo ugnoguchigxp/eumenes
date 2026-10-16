@@ -22,6 +22,7 @@ import {
 	SERVICE_TESTS_ADAPTER_REF,
 } from "./service-tests-adapter";
 import { bundleHostOf, hostAdapterDescriptions } from "./toolchain-adapters";
+import { waitFor } from "../infrastructure/wait-for";
 
 type Bundle = {
 	artifacts: Array<{
@@ -420,7 +421,7 @@ test("start is refused for an unsupported target, a stale view and while another
 	expect(
 		(await h.send("start", {}, h.catalogRow("image"))).request.status,
 	).toBe("accepted");
-	for (let i = 0; !release && i < 200; i++) await Bun.sleep(5);
+	await waitFor(() => !!release);
 	const busy = await h.send("start", {}, h.catalogRow("image"));
 	expect(busy.request.errorCode).toBe("invalid_test_busy");
 
@@ -575,7 +576,7 @@ test("the screen re-reads only while something runs: the bundle names the field 
 	await refreshed(h);
 	expect(h.rows("service-tests-status")[0]).toMatchObject({ busy: false });
 	await h.send("diagnose", {}, { id: "catalog" });
-	for (let i = 0; !release && i < 200; i++) await Bun.sleep(5);
+	await waitFor(() => !!release);
 	expect(h.rows("service-tests-status")[0]).toMatchObject({ busy: true });
 	expect(h.rows("service-tests-runs")[0]).toMatchObject({ status: "running" });
 	expect(h.rows("service-tests-health")).toMatchObject([
@@ -604,7 +605,7 @@ test("a cancel still aborts the run when a progress save rewrote its phase befor
 	});
 	await refreshed(h);
 	await h.send("start", {}, h.catalogRow("image"));
-	for (let i = 0; !progress && i < 200; i++) await Bun.sleep(5);
+	await waitFor(() => !!progress);
 	// Commit the cancel, then let a progress save overwrite the phase before afterCommit.
 	await invoke(h, "service-tests.cancel", {
 		runId: (h.rows("service-tests-runs")[0] as { id: string }).id,

@@ -1,0 +1,100 @@
+{
+  "artifactRevisionId": "artifact:settings.world@6",
+  "seed": {
+    "seedId": "grok-984-v1",
+    "received": 1001,
+    "accepted": 984,
+    "held": 17,
+    "manifestDigest": "7a7f8ef7da7c3460469e8e34d2bff8a0376c44a78f070452225197b44dce5eb3",
+    "liveReimport": {
+      "inserted": 0,
+      "unchanged": 984
+    },
+    "meaning": "Reference documents, not automatically extracted or adopted claims"
+  },
+  "change": {
+    "defaultTab": "資料",
+    "pageSizes": [
+      10,
+      25,
+      50
+    ],
+    "documentPaging": "Scope-bound SQL count/search/sort/page; detail excerpt explicitly limited to first 2048 Unicode characters",
+    "claimPaging": "Page and sort loaded authorized claim projection; fetch grounds only for selected page, including rows beyond 50; partial read note retained",
+    "status": "Right header dot; green for usable enabled open World, red for offline/disabled/gated/error; reacts to browser offline",
+    "mechanisms": "Existing bundle, adapter registry, collections source paging and DesignSystem ServerDataTable/Modal"
+  },
+  "fixedTests": {
+    "worldDocumentsAndAdapterAndResearch": {
+      "passed": 14,
+      "assertions": 191,
+      "includes": "1000 fixture documents, all pages, search beyond first page, scope isolation, Unicode preview bound, invalid params and withdrawal; 1000 fixture claims with page-99 grounds"
+    },
+    "webArtifactAndHost": {
+      "passed": 69,
+      "failed": 0
+    },
+    "bundleDryRun": "passed",
+    "workspaceTypecheck": "passed (1839 files)",
+    "webProductionBuild": "passed; chunk size warnings remain",
+    "targetedLint": "passed",
+    "diffCheck": "passed"
+  },
+  "domainVerify": {
+    "status": "invalidated",
+    "reason": "Source changed during verification in concurrent workspace",
+    "allStepsPassed": true,
+    "report": "verification-reports/runs/2026-10-16T13-35-10-015Z-61e22289-0457-4501-85c5-a5810e18513a/report.json",
+    "notCountedAsCompletedVerification": true
+  },
+  "additionalUpgradeTest": {
+    "status": "failed outside this change",
+    "reason": "world-bundle-upgrade.test.ts fixture could not find the capability registry table after parallel capability changes; not modified"
+  },
+  "staticBrowser": {
+    "passed": true,
+    "documents": 984,
+    "lastPage": 20,
+    "lastPageRows": 34,
+    "claimRow1000Detail": true,
+    "headerHeight": 52.984375,
+    "onlineColor": "rgb(31, 122, 77)",
+    "offlineColor": "rgb(196, 49, 49)",
+    "pageErrors": []
+  },
+  "live": {
+    "restartedBy": "user; agent did not restart any server",
+    "productApi": {
+      "verifiedDocuments": 984,
+      "pages": 20,
+      "metadataMatched": [
+        "id",
+        "revision",
+        "title",
+        "collection",
+        "digest",
+        "manifestDigest"
+      ],
+      "artifactSourceLastPageRows": 34,
+      "connection": "online"
+    },
+    "productBrowser": {
+      "documents": 984,
+      "nextPage": true,
+      "search": true,
+      "detail": true,
+      "claimsTab": true,
+      "onlineIndicator": true,
+      "pageErrors": 0
+    }
+  },
+  "scopeReview": "No corpus or held-document edits, no raw-document-to-claim rules, no fixed response or intent classification branches, no production DB opened by CLI or Web. Import and live inspection used authenticated APIs.",
+  "contextToolsThisTask": {
+    "context_compile": 1,
+    "compile_eval": 1
+  },
+  "contextToolsConversationTotal": {
+    "context_compile": 2,
+    "compile_eval": 2
+  }
+}

@@ -3,6 +3,7 @@ import { harness } from "./toolchain.fixture";
 import { musicFixture } from "./music.fixture";
 import type { LarmPort } from "../domains/larm";
 import { configureLogging } from "../infrastructure/logger";
+import { waitFor } from "../infrastructure/wait-for";
 
 afterEach(() => configureLogging({ level: "silent" }));
 const control =
@@ -14,7 +15,7 @@ const wave = () => {
 	return wav;
 };
 async function until(check: () => boolean) {
-	for (let i = 0; i < 1000 && !check(); i++) await Bun.sleep(5);
+	await waitFor(check);
 	expect(check()).toBe(true);
 }
 for (const mode of ["repair", "repeat"] as const)

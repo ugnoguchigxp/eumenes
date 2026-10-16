@@ -139,6 +139,16 @@ function checkForm(
 	);
 	// A secret the form does not collect cannot be declared confidential for it.
 	const ids = new Set(create.fields.map((f) => f.fieldId));
+	for (const [column, fieldId] of Object.entries(create.preview ?? {})) {
+		const field = create.fields.find((f) => f.fieldId === fieldId);
+		const where = `${at}/create/preview/${column}`;
+		if (!collection.columns.some((c) => c.key === column) || !field)
+			c.issue("schema_mismatch", where, fieldId);
+		else if (field.confidential || field.control === "secret")
+			c.issue("permission", where, fieldId);
+		if (action.draftAction !== "structure")
+			c.issue("invalid_format", where, fieldId);
+	}
 	action.confidentialFields?.forEach((name, k) => {
 		if (!ids.has(name))
 			c.issue(

@@ -36,7 +36,10 @@ import {
 import { describeRecordsAdapter } from "./records-adapter";
 
 /** Isolated settings/action-ledger fixture. It never reads the product DB or sends network requests. */
-export async function workersSettingsFixture(legacy = false) {
+export async function workersSettingsFixture(
+	legacy = false,
+	maxAiRevision?: number,
+) {
 	const dir = mkdtempSync(join(tmpdir(), "workers-settings-api-"));
 	const store = openStore(join(dir, "db"), [
 		...settingsMigrations,
@@ -99,7 +102,16 @@ export async function workersSettingsFixture(legacy = false) {
 										: true,
 						),
 					}
-				: bundle,
+				: maxAiRevision === undefined
+					? bundle
+					: {
+							...bundle,
+							artifacts: bundle.artifacts.filter(
+								(a: { id: string; revision: number }) =>
+									a.id !== "settings.ai-connections" ||
+									a.revision <= maxAiRevision,
+							),
+						},
 			host(),
 		),
 	);

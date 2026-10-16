@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { z } from "zod";
 import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
 import { createQueue, migration, type HandlerDefinition } from "..";
+import { waitFor as until } from "../../../infrastructure/wait-for";
 
 const dirs: string[] = [];
 const stores: SqliteStore[] = [];
@@ -34,13 +35,6 @@ const yieldTurn = () => new Promise((r) => setImmediate(r));
 const flush = async () => {
 	for (let i = 0; i < 20; i++) await yieldTurn();
 };
-async function until(cond: () => boolean) {
-	for (let i = 0; i < 2000; i++) {
-		if (cond()) return;
-		await yieldTurn();
-	}
-	throw new Error("condition not reached");
-}
 /** Injected `sleep`: waits until the test fires it (by duration), or the signal aborts. */
 function manualSleep() {
 	const waiters = new Set<{ ms: number; done: () => void }>();

@@ -17,6 +17,7 @@ import {
 	migration as schedulerMigration,
 } from "../../scheduler";
 import { createDialogueService, migration, queueLinkMigration } from "..";
+import { waitFor as until } from "../../../infrastructure/wait-for";
 
 const dirs: string[] = [];
 const stores: SqliteStore[] = [];
@@ -33,13 +34,6 @@ const migrations = [
 	schedulerMigration,
 	queueLinkMigration,
 ];
-async function until(cond: () => boolean) {
-	for (let i = 0; i < 3000; i++) {
-		if (cond()) return;
-		await new Promise((r) => setImmediate(r));
-	}
-	throw new Error("condition not reached");
-}
 type Call = { texts: string[]; resolve: (v: string) => void };
 function setup(
 	queueOptions: Parameters<typeof createQueue>[1] = {},

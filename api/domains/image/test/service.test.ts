@@ -10,6 +10,7 @@ import type { LarmPlayground, LarmTestTarget } from "../../larm";
 import { createQueue, migrations as queueMigrations } from "../../queue";
 import { migrations, registerImage } from "..";
 import { createImage, imageListInTransaction } from "../service";
+import { waitFor as until } from "../../../infrastructure/wait-for";
 
 const prepared = {
 	package: {
@@ -63,13 +64,6 @@ afterEach(async () => {
 	for (const s of stores.splice(0)) await s.close().catch(() => {});
 	for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
 });
-async function until(cond: () => boolean) {
-	for (let i = 0; i < 400; i++) {
-		if (cond()) return;
-		await new Promise((r) => setTimeout(r, 5));
-	}
-	throw new Error("condition not reached");
-}
 
 type Options = {
 	planValue?: string;

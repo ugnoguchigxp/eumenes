@@ -3,6 +3,7 @@ import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
+import { waitFor } from "../../api/infrastructure/wait-for";
 
 async function fixture(body: string) {
 	const dir = await mkdtemp(join(tmpdir(), "codex-task-transport-"));
@@ -16,14 +17,17 @@ async function fixture(body: string) {
 	return { dir, launcher };
 }
 
-async function waitFor(file: string) {
-	for (let n = 0; n < 100; n++) {
+async function readWhenWritten(file: string) {
+	let value: { pid: number; group: number; state: string };
+	await waitFor(async () => {
 		try {
-			return JSON.parse(await readFile(file, "utf8"));
-		} catch {}
-		await Bun.sleep(20);
-	}
-	throw new Error("fixture_timeout");
+			value = JSON.parse(await readFile(file, "utf8"));
+			return true;
+		} catch {
+			return false;
+		}
+	});
+	return value!;
 }
 
 function alive(pid: number) {
@@ -49,7 +53,7 @@ test("complete lines pass through and the transport closes without retaining the
 		'{"type":"turn.completed"}\n',
 	);
 	expect(await p.exited).toBe(0);
-	const receipt = await waitFor(join(f.dir, "process.json"));
+	const receipt = await readWhenWritten(join(f.dir, "process.json"));
 	expect(receipt.state).toBe("closed");
 	expect(alive(receipt.group)).toBe(false);
 });
@@ -69,7 +73,7 @@ test("a huge unterminated JSONL line is bounded and rejected before reaching the
 	expect(output).toBe(
 		'{"type":"error","message":"codex_task_transport_limit"}\n',
 	);
-	const receipt = await waitFor(join(f.dir, "process.json"));
+	const receipt = await readWhenWritten(join(f.dir, "process.json"));
 	expect(alive(receipt.group)).toBe(false);
 });
 
@@ -84,11 +88,11 @@ test("SIGTERM ends the running group including an ordinary command child", async
 		stdin: "pipe",
 	});
 	p.stdin.end();
-	const child = await waitFor(join(f.dir, "child.json"));
+	const child = await readWhenWritten(join(f.dir, "child.json"));
 	expect(alive(child.pid)).toBe(true);
 	p.kill("SIGTERM");
 	await p.exited;
-	for (let n = 0; n < 50 && alive(child.pid); n++) await Bun.sleep(20);
+	await waitFor(() => !alive(child.pid));
 	expect(alive(child.pid)).toBe(false);
 });
 
@@ -103,11 +107,11 @@ test("a command in a separate process group is stopped as a descendant", async (
 		stdin: "pipe",
 	});
 	p.stdin.end();
-	const child = await waitFor(join(f.dir, "child.json"));
+	const child = await readWhenWritten(join(f.dir, "child.json"));
 	try {
 		p.kill("SIGTERM");
 		await p.exited;
-		for (let n = 0; n < 100 && alive(child.pid); n++) await Bun.sleep(20);
+		await waitFor(() => !alive(child.pid));
 		expect(alive(child.pid)).toBe(false);
 	} finally {
 		if (alive(child.pid)) process.kill(child.pid, "SIGKILL");
@@ -128,11 +132,11 @@ test("forced owner exit is detected and its detached command child is stopped", 
 		stdout: "pipe",
 		stderr: "pipe",
 	});
-	const child = await waitFor(join(f.dir, "child.json"));
+	const child = await readWhenWritten(join(f.dir, "child.json"));
 	try {
 		p.kill("SIGKILL");
 		await p.exited;
-		for (let n = 0; n < 100 && alive(child.pid); n++) await Bun.sleep(20);
+		await waitFor(() => !alive(child.pid));
 		expect(alive(child.pid)).toBe(false);
 	} finally {
 		if (alive(child.pid)) process.kill(child.pid, "SIGKILL");

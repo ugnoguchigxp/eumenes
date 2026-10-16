@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { harness } from "./toolchain.fixture";
 import { musicLibraryFixture, playbackQuestion } from "./music-library.fixture";
+import { waitFor } from "../infrastructure/wait-for";
 const token = "Bearer fixture-token-for-toolchain-browser";
 test("playback planning corrects model JSON before the library request", async () => {
 	const f = musicLibraryFixture(true);
@@ -169,7 +170,7 @@ test("cancelled playback never adopts a late library response", async () => {
 				text: playbackQuestion,
 			})
 		).json();
-		for (let i = 0; i < 100 && !started; i++) await Bun.sleep(5);
+		await waitFor(() => !!started);
 		expect(started).toBe(true);
 		await h.dialogue.cancel(r.id);
 		release();

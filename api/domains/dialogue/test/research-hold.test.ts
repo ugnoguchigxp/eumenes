@@ -25,6 +25,7 @@ import {
 	queueLinkMigration,
 	worldStateMigration,
 } from "..";
+import { waitFor as until } from "../../../infrastructure/wait-for";
 
 const dirs: string[] = [];
 const stores: SqliteStore[] = [];
@@ -32,13 +33,6 @@ afterEach(async () => {
 	for (const s of stores.splice(0)) await s.close().catch(() => {});
 	for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
 });
-async function until(cond: () => boolean) {
-	for (let i = 0; i < 400; i++) {
-		if (cond()) return;
-		await new Promise((r) => setTimeout(r, 5));
-	}
-	throw new Error("condition not reached");
-}
 
 test("a failed research answer streams no partial text and its final text carries no ungranted URL", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-research-hold-"));

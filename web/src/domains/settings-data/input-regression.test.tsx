@@ -166,6 +166,63 @@ test("unregistered input blocks saving other changes across tabs until it is reg
 	await waitFor(() => expect(save()).toHaveProperty("disabled", false));
 });
 
+test("registered connection stays visibly pending until saving succeeds, with save and errors above the form", async () => {
+	const { backend } = open();
+	const { element, f } = await form();
+	fireEvent.change(f.getByLabelText("接続名（必須）"), {
+		target: { value: "worker ai" },
+	});
+	fireEvent.change(f.getByLabelText("Account ID（必須）"), {
+		target: { value: "a".repeat(32) },
+	});
+	fireEvent.change(f.getByLabelText(/APIキー／APIトークン/), {
+		target: { value: "private-registration-token" },
+	});
+	fireEvent.submit(element);
+	const connections = within(
+		screen.getByRole("table", { name: "クラウド接続" }),
+	);
+	const pending = await connections.findByRole("row", {
+		name: /worker ai.*未保存/,
+	});
+	expect(within(pending).getByText("worker ai")).toBeTruthy();
+	expect(within(pending).queryByRole("button")).toBeNull();
+	expect(backend.saved().connections).toHaveLength(0);
+	const toolbar = screen.getByRole("region", { name: "設定の保存" });
+	expect(
+		within(toolbar).getByRole("button", { name: "設定の変更をすべて保存" }),
+	).toBe(save());
+	expect(
+		toolbar.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING,
+	).toBeTruthy();
+	backend.client.submitToolchainAction.mockResolvedValueOnce({
+		httpStatus: 200,
+		view: {
+			eventId: crypto.randomUUID(),
+			status: "rejected",
+			errorCode: "secret_key_unavailable",
+			createdAt: new Date().toISOString(),
+		},
+	} as never);
+	fireEvent.click(save());
+	await within(toolbar).findByText(/認証情報を保存できませんでした/);
+	expect(within(pending).getByText(/worker ai/)).toBeTruthy();
+	expect(screen.queryByText("すべての変更を保存済み")).toBeNull();
+	fireEvent.click(save());
+	await within(toolbar).findByText("変更を適用しました");
+	await connections.findByRole("row", { name: /worker ai.*保存済み/ });
+	expect(
+		connections.queryByRole("row", { name: /worker ai.*未保存/ }),
+	).toBeNull();
+	expect(connections.getAllByText("worker ai")).toHaveLength(1);
+	expect(backend.saved().connections[0]?.name).toBe("worker ai");
+	expect(
+		within(screen.getByRole("table", { name: "クラウド接続" })).getByText(
+			"worker ai",
+		),
+	).toBeTruthy();
+});
+
 test("middle insertion, deletion and selection replacement preserve the complete token through a rejected save and retry", async () => {
 	const { backend, store } = open("ai-connections", true);
 	await tab("利用するAI");

@@ -397,6 +397,13 @@ export const collectionV1 = z.strictObject({
 		.strictObject({
 			actionId: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/),
 			fields: z.array(formFieldV1).min(1).max(24),
+			/** Map a displayed column to a non-confidential form field for unsaved rows. */
+			preview: z
+				.record(
+					z.string().regex(/^[A-Za-z][A-Za-z0-9_.]{0,80}$/),
+					z.string().regex(/^[a-zA-Z][a-zA-Z0-9_.-]{0,80}$/),
+				)
+				.optional(),
 		})
 		.optional(),
 	/** The source accepts paging/search params (its binding has paramsSchemaRef). */

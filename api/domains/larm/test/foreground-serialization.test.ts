@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { createLarm } from "..";
+import { waitFor } from "../../../infrastructure/wait-for";
 
 test("foreground answers serialize without allowing a cancelled queued call to overtake an active call", async () => {
 	let finish!: () => void;
@@ -71,7 +72,7 @@ test("foreground answers serialize without allowing a cancelled queued call to o
 		abort = new AbortController();
 	const first = p.answer(messages("first"), signal);
 	try {
-		while (!inputs.length) await Bun.sleep(1);
+		await waitFor(() => inputs.length > 0);
 		const cancelled = p.answer(messages("cancelled"), abort.signal);
 		const rejected = Promise.allSettled([cancelled]);
 		const third = p.answer(messages("third"), signal);

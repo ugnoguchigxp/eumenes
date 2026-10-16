@@ -4,13 +4,13 @@ import { afterEach, expect, spyOn, test } from "bun:test";
 import {
 	ATTITUDE_MODEL,
 	cleanup,
-	until,
 	setup,
 	wav,
 	freshSignal,
 	judged,
 	enableEnglishSpeech,
 } from "./inference.fixture";
+import { waitFor } from "../../../infrastructure/wait-for";
 afterEach(async () => {
 	for (const close of cleanup.splice(0)) await close();
 });
@@ -184,7 +184,7 @@ test("decision timeout keeps manual voice, fences late results and cancellation 
 		"こんにちは。",
 		abort.signal,
 	);
-	await until(() => judging !== undefined && !judging.aborted);
+	await waitFor(() => judging !== undefined && !judging.aborted);
 	abort.abort();
 	await expect(pending).rejects.toThrow();
 	resolve(judged);
@@ -277,7 +277,7 @@ test("a sample shares the existing port through unrelated saves", async () => {
 	const sample = h.inference
 		.speak("試聴です。", freshSignal(), { voice: "Zundamon", speed: 1.1 })
 		.catch((e) => e);
-	await until(() => entered);
+	await waitFor(() => entered);
 	const unrelated = h.settings.get();
 	unrelated.general.agentName = "changed-name";
 	await h.settings.apply({

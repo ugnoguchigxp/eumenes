@@ -428,7 +428,10 @@ test("a structural create is staged in the draft with a host-made id, its secret
 	fireEvent.change(inputs[1]!, { target: { value: SECRET } });
 	fireEvent.submit(form);
 	// The review names the staged operation and counts the secret; it shows no value.
-	await screen.findByText("項目の追加（新しい項目）");
+	expect(await screen.findAllByText("項目の追加（新しい項目）")).toHaveLength(
+		2,
+	);
+	expect(screen.getByRole("row", { name: /新しい項目.*未保存/ })).toBeTruthy();
 	expect(screen.getByText("更新・削除予定 1件")).toBeTruthy();
 	expect(document.body.textContent).not.toContain(SECRET);
 	expect(submit).not.toHaveBeenCalled();

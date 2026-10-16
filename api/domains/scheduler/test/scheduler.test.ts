@@ -6,6 +6,7 @@ import { z } from "zod";
 import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
 import { createQueue, migration as queueMigration } from "../../queue";
 import { createScheduler, migration, type TargetDefinition } from "..";
+import { waitFor } from "../../../infrastructure/wait-for";
 
 const dirs: string[] = [];
 const stores: SqliteStore[] = [];
@@ -424,7 +425,7 @@ test("a paused schedule's stale retry time does not spin the loop", async () => 
 	);
 	expect(paused?.state).toBe("paused");
 	h.scheduler.start();
-	for (let i = 0; i < 50 && delays.length < 6; i++) await Bun.sleep(0);
+	await waitFor(() => delays.length >= 6);
 	await h.scheduler.close();
 	expect(delays.length).toBeGreaterThan(0);
 	// Without the fix the stale past retry time yields a 10ms spin.
@@ -443,7 +444,7 @@ test("a due backlog larger than the tick limit drains without waiting pollMs per
 	});
 	for (let i = 0; i < 100; i++) await create(h, { type: "once", at: iso(T0) });
 	h.scheduler.start();
-	for (let i = 0; i < 200 && delays.length < 10; i++) await Bun.sleep(0);
+	await waitFor(() => delays.length >= 10);
 	await h.scheduler.close();
 	expect(
 		h.store.read(

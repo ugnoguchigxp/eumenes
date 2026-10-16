@@ -78,7 +78,7 @@ command 担当の SystemContext は、登録 profile・SKILL・共通の操作�
 
 | 層 | 置き場所 | 役割 |
 | --- | --- | --- |
-| domain | `api/domains/terminals/` | `Bun.spawn` の `terminal`（PTY、POSIXのみ）でセッションを保持（生きているプロセスの上限4）。出力の直近 512 KiB を保持し、開き直した画面へ先に流す。セッションは保存せず（サーバー停止で全て終了）、作業依頼だけを SQLite に保存する（`repository/`＝migration `terminals/0001-requests`、`ledger.ts`＝状態遷移と購読者、`dispatcher.ts`＝送信器、`sessions.ts`＝PTY、`hook-events.ts`＝フック） |
+| domain | `api/domains/terminals/` | `Bun.spawn` の `terminal`（PTY、POSIXのみ）でセッションを保持（生きているプロセスの上限4）。出力の直近 512 KiB を保持し、開き直した画面へ先に流す。セッションは保存せず（サーバー停止で全て終了）、作業依頼だけを SQLite に保存する（`repository/`＝migration `terminals/0001-requests`、`service/ledger.ts`＝状態遷移と購読者、`service/dispatcher.ts`＝送信器、`service/sessions.ts`＝PTY、`service/hook-events.ts`＝フック） |
 | HTTP | `GET/POST /api/terminals`、`POST …/:id/input`・`/resize`・`/restart`、`GET …/:id/output`（SSE: `output` は base64 の PTY 出力、`exit` は実行終了） | 他の API と同じ Bearer token・同一 origin・loopback を通る |
 | bundle | `api/domains/capabilities/bundles/terminals-screen.bundle.json` | 単独公開 artifact `artifact:terminals.workspace@2`（launcher「Claude Code」）。source `terminals` → `adapter:terminals@1` の `query:terminals.sessions@1`。起動・再起動は `local` action |
 | backend adapter | `api/application/terminals-adapter.ts` | セッション一覧の source と可用性、会話からの `claude-code.request`（write、`enqueueInTransaction`、requestId で replay） |

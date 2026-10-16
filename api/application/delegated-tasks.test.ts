@@ -19,6 +19,7 @@ import {
 	createDelegatedTasks,
 	type TaskExecutionPort,
 } from "./delegated-tasks";
+import { waitFor as until } from "../infrastructure/wait-for";
 
 const cleanup: (() => Promise<void>)[] = [];
 afterEach(async () => {
@@ -190,13 +191,6 @@ const cmd = (expectedRevision: number) => ({
 	requestId: crypto.randomUUID(),
 	expectedRevision,
 });
-async function until(predicate: () => boolean) {
-	for (let i = 0; i < 200; i++) {
-		if (predicate()) return;
-		await Bun.sleep(5);
-	}
-	throw new Error("fixture_timeout");
-}
 const jobs = (h: ReturnType<typeof setup>, kind: string) =>
 	h.queue.list({ kind }).items;
 

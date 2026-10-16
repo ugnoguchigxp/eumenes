@@ -1,6 +1,7 @@
 import { test, expect } from "bun:test";
 import { harness, forbidden } from "./toolchain.fixture";
 import { checkLiveCitations } from "./toolchain-live-check";
+import { waitFor } from "../infrastructure/wait-for";
 test("adoption removes a fabricated model citation and cannot reuse sources after failed research", async () => {
 	const options = {
 		parentAnswer:
@@ -263,7 +264,7 @@ test("1 inference slot: conversation continues while child waits; cancellation r
 			conversationId: "main",
 			text: "東京の天気を調べて",
 		});
-		for (let i = 0; i < 200 && !h.acquisitions; i++) await Bun.sleep(5);
+		await waitFor(() => !!h.acquisitions);
 		expect(h.acquisitions).toBe(1);
 		expect(h.queue.stats().resources["inference.llm"]!.inUse).toBe(0);
 		const next = await h.dialogue.submit({
@@ -305,7 +306,7 @@ test("rolled-back cancellation cannot cancel another conversation's pending infe
 			conversationId: "second",
 			text: "AAPLの株価を調べて",
 		});
-		for (let i = 0; i < 200 && h.acquisitions < 2; i++) await Bun.sleep(5);
+		await waitFor(() => h.acquisitions >= 2);
 		expect(h.acquisitions).toBe(2);
 		await expect(
 			h.store.write((db) => {
@@ -407,7 +408,7 @@ test("restart interrupts the whole tree; late acquisition cannot append an answe
 			conversationId: "other",
 			text: "東京の天気を調べて",
 		});
-		for (let i = 0; i < 200 && !h.acquisitions; i++) await Bun.sleep(5);
+		await waitFor(() => !!h.acquisitions);
 		await h.toolchain.agents.recover();
 		release();
 		expect(
@@ -536,7 +537,7 @@ test("worker deadline cancels acquisition and returns a bounded failure to the p
 			conversationId: "main",
 			text: "東京の天気を調べて",
 		});
-		for (let i = 0; i < 200 && !h.acquisitions; i++) await Bun.sleep(5);
+		await waitFor(() => !!h.acquisitions);
 		await h.store.write((db) =>
 			db
 				.query(
@@ -574,8 +575,7 @@ test("deleting a report during final inference cancels adoption of the old answe
 			conversationId: "main",
 			text: "東京の天気を調べて",
 		});
-		for (let i = 0; i < 200 && !h.parentContexts.length; i++)
-			await Bun.sleep(5);
+		await waitFor(() => h.parentContexts.length > 0);
 		expect(h.parentContexts).toHaveLength(1);
 		await h.store.write((db) =>
 			h.toolchain.agents.deleteTaskDataInTransaction(db, run.id),

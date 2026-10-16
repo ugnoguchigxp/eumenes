@@ -24,13 +24,6 @@ import {
 /** A neutral stand-in for the model name a connected system-one classifier reports. */
 export const ATTITUDE_MODEL = "attitude-test-model";
 export const cleanup: Array<() => Promise<void>> = [];
-export async function until(condition: () => boolean) {
-	for (let i = 0; i < 200; i++) {
-		if (condition()) return;
-		await Bun.sleep(5);
-	}
-	throw new Error("condition_not_reached");
-}
 export const messages = [
 	{ role: "system" as const, content: "system" },
 	{ role: "user" as const, content: "hello" },

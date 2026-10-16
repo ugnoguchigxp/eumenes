@@ -9,6 +9,7 @@ import { createUiCompositions } from "..";
 import { migrations } from "../repository";
 import { validatedDesign } from "../contracts";
 import { compileArtifact } from "@eumenes/artifact-ui";
+import { waitFor } from "../../../infrastructure/wait-for";
 
 const dirs: string[] = [];
 const closes: Array<() => Promise<void>> = [];
@@ -237,7 +238,7 @@ test("cancelled generation cannot replace the saved state after a late model res
 		),
 	);
 	const id = started.item.id;
-	for (let i = 0; i < 100 && observed.length === 0; i++) await Bun.sleep(5);
+	await waitFor(() => observed.length > 0);
 	expect(observed).toHaveLength(1);
 	const cancelled = await store.write((db) =>
 		service.cancelInTransaction(db, id, crypto.randomUUID()),

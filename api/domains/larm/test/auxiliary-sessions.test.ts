@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { createLarm } from "..";
 import type { LarmPort } from "..";
+import { waitFor as until } from "../../../infrastructure/wait-for";
 
 function deferred<T>() {
 	let resolve!: (value: T) => void;
@@ -8,13 +9,6 @@ function deferred<T>() {
 		resolve = r;
 	});
 	return { promise, resolve };
-}
-async function until(condition: () => boolean) {
-	for (let i = 0; i < 300; i++) {
-		if (condition()) return;
-		await Bun.sleep(5);
-	}
-	throw new Error("condition_not_reached");
 }
 function fixture() {
 	type Connection = {

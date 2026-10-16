@@ -5,8 +5,8 @@ const clean: Array<() => Promise<void>> = [];
 afterEach(async () => {
 	for (const f of clean.splice(0)) await f();
 });
-const setup = async () => {
-	const f = await dotsFixture();
+const setup = async (now?: () => number) => {
+	const f = await dotsFixture(now);
 	clean.push(f.close);
 	return f;
 };
@@ -284,7 +284,8 @@ test("report delivery saves one attributed message to its originating conversati
 });
 
 test("a bound reminder remains usable after completion and grant expiry, but cannot restart work", async () => {
-	const f = await setup(),
+	let skew = 0;
+	const f = await setup(() => Date.now() + skew),
 		input = f.input();
 	input.grant.expiresAt = new Date(Date.now() + 1500).toISOString();
 	const r = await f.tasks.create(input),
@@ -305,7 +306,7 @@ test("a bound reminder remains usable after completion and grant expiry, but can
 			completionChecks: [{ status: "satisfied", evidenceRefs: ["check"] }],
 		}),
 	);
-	await Bun.sleep(1600);
+	skew = 1600;
 	const reminder = f.dots.getCommand("dots", bound.commandId);
 	await f.dots.claim("dots", {
 		commandId: reminder.commandId,

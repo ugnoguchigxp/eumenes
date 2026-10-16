@@ -19,15 +19,9 @@ import {
 	type StewardRunEnd,
 } from "..";
 import { insert } from "../repository";
+import { waitFor as until } from "../../../infrastructure/wait-for";
 
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-async function until(check: () => boolean) {
-	for (let i = 0; i < 300; i++) {
-		if (check()) return;
-		await pause(10);
-	}
-	throw new Error("timeout");
-}
 const open: Array<() => Promise<void>> = [];
 afterEach(async () => {
 	configureLogging({ level: "silent" });

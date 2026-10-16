@@ -19,6 +19,7 @@ import {
 	type LogFields,
 } from "./logger";
 import { createApp } from "../application/app";
+import { waitFor } from "./wait-for";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -232,8 +233,7 @@ test("following logs survives rotation without duplicates and retries an incompl
 	})();
 	const errors = new Response(child.stderr).text();
 	async function until(count: number) {
-		for (let n = 0; n < 100 && !output.includes(`"count":${count}`); n++)
-			await Bun.sleep(25);
+		await waitFor(() => output.includes(`"count":${count}`));
 		expect(output).toContain(`"count":${count}`);
 	}
 	try {

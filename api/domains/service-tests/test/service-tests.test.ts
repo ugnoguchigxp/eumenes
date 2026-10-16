@@ -17,6 +17,7 @@ import {
 } from "../../larm";
 import { createServiceTests, migration, registerServiceTests } from "..";
 import { inputSchema, type StartTest } from "../contracts";
+import { waitFor } from "../../../infrastructure/wait-for";
 const cleanup: Array<() => Promise<void>> = [];
 afterEach(async () => {
 	for (const c of cleanup.splice(0)) await c();
@@ -126,7 +127,7 @@ test("busy rejection and cancelled late result never becomes a preview", async (
 		},
 	});
 	const a = await h.service.start(h.request());
-	for (let i = 0; !finish && i < 100; i++) await Bun.sleep(1);
+	await waitFor(() => !!finish);
 	await expect(h.service.start(h.request())).rejects.toThrow(
 		"invalid_test_busy",
 	);
@@ -146,7 +147,7 @@ test("settings changes invalidate in-flight results and stale requests", async (
 	});
 	const old = h.request();
 	const a = await h.service.start(old);
-	for (let i = 0; !finish && i < 100; i++) await Bun.sleep(1);
+	await waitFor(() => !!finish);
 	const s = h.settings.get();
 	s.larm.profile = "SAAA";
 	await h.settings.apply({

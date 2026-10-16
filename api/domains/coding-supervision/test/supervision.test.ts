@@ -10,6 +10,7 @@ import {
 } from "./fixture";
 import type { Observation } from "../contracts";
 import { supervisorInstruction } from "../service/prompt";
+import { waitFor } from "../../../infrastructure/wait-for";
 
 test("60 unchanged running ticks and silent CLI never consume inference or claim completion", async () => {
 	const h = await setup();
@@ -280,7 +281,7 @@ test("stale decisions after cancellation cannot execute a step", async () => {
 	});
 	await h.observe();
 	await h.queue.tick();
-	for (let i = 0; i < 100 && !release; i++) await Bun.sleep(2);
+	await waitFor(() => !!release);
 	const t = h.tasks.get(h.taskId).task;
 	await h.tasks.stop(h.taskId, {
 		requestId: crypto.randomUUID(),

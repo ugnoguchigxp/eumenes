@@ -14,18 +14,12 @@ import {
 	correctionResult,
 	validateCorrection,
 } from "../contracts";
+import { waitFor as until } from "../../../infrastructure/wait-for";
 
 const close: Array<() => Promise<void>> = [];
 afterEach(async () => {
 	for (const f of close.splice(0)) await f();
 });
-async function until(check: () => boolean) {
-	for (let i = 0; i < 200; i++) {
-		if (check()) return;
-		await Bun.sleep(10);
-	}
-	throw new Error("condition_not_reached");
-}
 const plan = {
 	blocks: [
 		{

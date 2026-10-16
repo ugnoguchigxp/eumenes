@@ -89,7 +89,7 @@ export function SettingsDraftBarView({ source }: { source: string }) {
 	const action = useSettingsAction(source);
 	const resource = action.resource as SettingsSectionResource;
 	return (
-		<>
+		<section aria-label="設定の保存" className="aui-settings-save-bar">
 			<SettingsDraftBar
 				dirty={resource.dirty}
 				busy={resource.busy}
@@ -98,7 +98,7 @@ export function SettingsDraftBarView({ source }: { source: string }) {
 				onReview={() => action.send("settings-review")}
 			/>
 			<output aria-live="polite">{action.message || resource.message}</output>
-		</>
+		</section>
 	);
 }
 export function SettingsNavigationView({

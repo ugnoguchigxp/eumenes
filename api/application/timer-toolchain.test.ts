@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import type { Database } from "bun:sqlite";
 import { harness } from "./toolchain.fixture";
+import { waitFor } from "../infrastructure/wait-for";
 
 /** The bound timer toolchain's adapter operation for a timer tool. */
 const timerBinding = (toolId: string) => ({
@@ -16,8 +17,7 @@ async function manualActionRoot(
 	h: Awaited<ReturnType<typeof harness>>,
 	runId: string,
 ) {
-	for (let i = 0; i < 100 && h.routeContexts.length === 0; i++)
-		await Bun.sleep(5);
+	await waitFor(() => h.routeContexts.length > 0);
 	const id = crypto.randomUUID();
 	await h.store.write((db) => {
 		db.query(

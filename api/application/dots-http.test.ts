@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { Webhook } from "../../packages/dots-mcp/src";
 import { dotsFixture } from "./dots-fixture";
 import { registerDots } from "./dots-http";
+import { waitFor } from "../infrastructure/wait-for";
 const clean: Array<() => Promise<void>> = [];
 afterEach(async () => {
 	for (const f of clean.splice(0)) await f();
@@ -152,12 +153,7 @@ test("Events are signed reference envelopes; receipt does not complete a task; u
 	).toHaveLength(1);
 	const r = await f.tasks.create(f.input());
 	f.queue.start();
-	for (
-		let i = 0;
-		i < 100 && !f.deliveries.some((x) => JSON.parse(x.body).eventId);
-		i++
-	)
-		await Bun.sleep(10);
+	await waitFor(() => f.deliveries.some((x) => JSON.parse(x.body).eventId));
 	const d = f.deliveries.find((d) => JSON.parse(d.body).eventId)!;
 	expect(d).toBeDefined();
 	const event = JSON.parse(d.body);
@@ -212,15 +208,11 @@ test("queue saturation preserves a stop and retries its reference delivery after
 	expect(f.tasks.get(r.taskId).task.state).toBe("stopping");
 	await f.events.maintenance();
 	f.queue.start();
-	for (
-		let i = 0;
-		i < 100 &&
-		!f.deliveries.some(
+	await waitFor(() =>
+		f.deliveries.some(
 			(d) => JSON.parse(d.body).data?.command_id === stop.commandId,
-		);
-		i++
-	)
-		await Bun.sleep(10);
+		),
+	);
 	expect(
 		f.deliveries.some(
 			(d) => JSON.parse(d.body).data?.command_id === stop.commandId,

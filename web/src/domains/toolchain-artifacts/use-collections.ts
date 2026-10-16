@@ -169,7 +169,7 @@ export function useCollections(
 	});
 	const reload = useCallback(() => {
 		failures.current.clear();
-		void cache.invalidateQueries({
+		return cache.invalidateQueries({
 			queryKey: [
 				queryRoots.toolchainArtifacts,
 				client.identity,

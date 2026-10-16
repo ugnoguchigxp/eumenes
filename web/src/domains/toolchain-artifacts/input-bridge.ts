@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import type { Snapshot } from "@eumenes/artifact-ui";
 import type { ArtifactDefinitionV1 } from "../../../../api/domains/capabilities/contracts";
+import { withDraftRows } from "./collection-drafts";
 import {
 	DELETE_SUFFIX,
 	draftStoreFor,
@@ -63,6 +64,9 @@ export function withEditingState(
 ): Snapshot {
 	return Object.fromEntries(
 		Object.entries(snapshot).map(([source, resource]) => {
+			if (resource.kind === "collection") {
+				return [source, withDraftRows(source, resource, artifact, drafts)];
+			}
 			if (
 				![
 					"settings-section",

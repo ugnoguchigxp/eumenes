@@ -102,6 +102,8 @@ Seedに含めるのは再利用する定義だけで、会話、実行・操作�
 
    編集は `draft` actionで共通下書き（文書ごと・利用者ごとに一つ、複数画面で共有）へ入り、`draftDocument` を持つwrite actionが `{expectedRevision, changes, keys?}` を一つの操作として送る。adapterが保存済み文書へ変更を当てて全体を検証し、所有domainの既存公開操作で保存する。適用中の追加入力は残り、`revision_conflict` では下書きを保持して自動再送しない。
 
+   collectionの構造追加は、登録直後から一覧に「未保存」の行として表示する。入力field IDと一覧の列keyが異なる場合は、`collections[].create.preview` に `{ "一覧の列key": "入力fieldId" }` を登録する（例: `{ "label": "name" }`）。秘密fieldは参照できない。保存後はsourceの再取得を待って保存済み行へ切り替え、同じIDの行を重複表示しない。公開済みartifactは書き換えず、新revisionでこの対応を追加する。
+
 6. **schemaを書く（必要な場合だけ）**: 既存の `builtin:` で足りなければ bundle の `schemas[]` に有限subsetのJSON Schemaを置く。使えるのは object/properties/required/additionalProperties:false、string（minLength・maxLength・enum）、number/integer（minimum・maximum・enum）、boolean、array（items・minItems・maxItems）。`$ref`・`pattern`・`format`・`oneOf`等は拒否される（黙って捨てない）。モデルへ渡すtool入力は平坦objectにする。
 7. **検査する**: 書き終えたら dry-run で全issueを一覧する。何も保存しない。
 

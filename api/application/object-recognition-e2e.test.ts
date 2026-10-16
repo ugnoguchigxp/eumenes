@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { harness } from "./toolchain.fixture";
 import { objectRecognitionFixture } from "./object-recognition.fixture";
+import { waitFor } from "../infrastructure/wait-for";
 test("authenticated upload → detection → stored source → conversation; command package opens the artifact", async () => {
 	const f = objectRecognitionFixture();
 	const h = await harness({ model: f.model, recognitionFetcher: f.fetcher });
@@ -44,13 +45,9 @@ test("authenticated upload → detection → stored source → conversation; com
 			body: form,
 		});
 		expect(result.status).toBe(202);
-		for (
-			let i = 0;
-			i < 100 &&
-			h.objectRecognition!.get("local:owner", id).state !== "completed";
-			i++
-		)
-			await Bun.sleep(10);
+		await waitFor(
+			() => h.objectRecognition!.get("local:owner", id).state === "completed",
+		);
 		const saved = await (
 			await h.request(`/api/object-recognition/${id}`)
 		).json();
@@ -145,13 +142,9 @@ test("settings API switches recognition to the existing backend LARM token witho
 				body: form,
 			},
 		);
-		for (
-			let i = 0;
-			i < 100 &&
-			h.objectRecognition!.get("local:owner", id).state !== "completed";
-			i++
-		)
-			await Bun.sleep(10);
+		await waitFor(
+			() => h.objectRecognition!.get("local:owner", id).state === "completed",
+		);
 		expect(authorized).toBe(true);
 		expect(h.objectRecognition!.get("local:owner", id).state).toBe("completed");
 		const bindings = h.store.read((db) =>

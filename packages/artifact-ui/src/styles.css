@@ -379,7 +379,7 @@
 	gap: 0;
 	border: 1px solid var(--border);
 	border-radius: var(--radius);
-	overflow: hidden;
+	overflow: clip;
 	background: var(--card);
 }
 .aui-composition-tabs > .aui-composition-title {
@@ -681,13 +681,23 @@
 		padding: 0.8rem;
 	}
 }
-.aui-composition-tabs > .ds-settings-footer {
+.aui-settings-save-bar {
+	position: sticky;
+	top: 0;
+	z-index: 10;
+	background: var(--card);
+	border-bottom: 1px solid var(--border);
+}
+.aui-settings-save-bar > .ds-settings-footer {
 	margin: 0;
 	padding: 1rem 1.25rem;
 }
-.aui-composition-tabs > output {
+.aui-settings-save-bar > output {
 	display: block;
 	padding: 0 1.25rem 0.75rem;
+}
+.aui-settings-save-bar > output:empty {
+	display: none;
 }
 .aui-service-workspace {
 	color: var(--foreground);

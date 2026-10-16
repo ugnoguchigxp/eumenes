@@ -1,0 +1,54 @@
+{
+  "date": "2026-10-16",
+  "request": "登録直後から一覧へ表示し、未保存と保存済みを区別する",
+  "implementation": {
+    "artifact": "artifact:settings.ai-connections@8",
+    "previousRevisionPreserved": true,
+    "mapping": {
+      "label": "name",
+      "kind": "kind",
+      "auth": "auth"
+    },
+    "mechanism": "registered collection columns + staged structural draft; source reread before settling"
+  },
+  "checks": {
+    "web": {
+      "passed": 112,
+      "files": 16
+    },
+    "contracts": {
+      "passed": 17,
+      "files": 2
+    },
+    "typecheck": {
+      "passed": true,
+      "files": 431
+    },
+    "lint": true,
+    "formatChangedFiles": true,
+    "size": true,
+    "bundleDryRun": true,
+    "domainVerify": {
+      "passed": false,
+      "reason": "pre-existing formatting in api/domains/settings/service/index.ts"
+    },
+    "additionalBackendSuite": {
+      "passed": 4,
+      "failed": 1,
+      "reason": "legacy upgrade fixture invalid_capability_bundle also reproduced before this change"
+    }
+  },
+  "live": {
+    "savedConnectionConfirmed": {
+      "name": "worker ai",
+      "enabled": true
+    },
+    "serverStartedOrStoppedByAgent": false,
+    "productSettingsWrittenByAgent": false,
+    "newUiPendingUserRestart": true
+  },
+  "notRun": [
+    "isolated browser E2E starts its own servers, not authorized",
+    "Cloudflare live model discovery or generation"
+  ]
+}

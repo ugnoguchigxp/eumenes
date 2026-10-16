@@ -1,0 +1,27 @@
+bun test v1.4.3 (c6da4a4d3)
+
+api/application/settings-registration.test.ts:
+(pass) unsaved-row registration upgrades the existing screen without rewriting it and refuses credential previews [57.62ms]
+(pass) registration rejects bad input without writes and saves the corrected connection through HTTP [33.16ms]
+
+api/domains/capabilities/test/bundles.test.ts:
+(pass) the shipped bundle's pin is the stored digest and its toolchain is data-driven [58.47ms]
+(pass) a bundle the host cannot run is skipped whole, and without a host nothing is added [67.59ms]
+(pass) old revisions keep their JSON and hash, and publication moves back and forth [49.15ms]
+(pass) rolling the pointer back to the unbound revision removes the chain from the offer until a bound revision is published [36.75ms]
+(pass) the dry run lists every problem and writes nothing [19.57ms]
+(pass) each kind of reference problem is refused [127.62ms]
+(pass) a failing toolchain rolls back its documents and keeps the published revision [19.47ms]
+(pass) documents are immutable: the same id with other content is a conflict, the same content a no-op [22.19ms]
+(pass) binding fields belong to toolchains only and need a matching binding [13.36ms]
+(pass) a bound tool is prepared with its own schema and only from an active package [30.83ms]
+(pass) stored schemas are served as validators; unknown and domain references are not [16.02ms]
+(pass) a bound toolchain is shown by its artifact registration: artifact is optional there, and unbound ones still need one [31.07ms]
+(pass) question schemas must be readable validators and the choice field one of their fields [43.29ms]
+(pass) an install already at revision 2 is upgraded to the latest, and revision 2 stays a valid rollback target [37.29ms]
+(pass) toolchain publication over HTTP is compare-and-set and can roll back [36.80ms]
+
+ 17 pass
+ 0 fail
+ 137 expect() calls
+Ran 17 tests across 2 files. [941.00ms]

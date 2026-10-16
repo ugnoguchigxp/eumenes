@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { harness } from "./toolchain.fixture";
 import { imageLarmFixture } from "../domains/larm/test/chat-input.fixture";
 import { syntheticImages } from "../domains/conversation/test/image.fixture";
+import { waitFor } from "../infrastructure/wait-for";
 
 async function upload(
 	h: Awaited<ReturnType<typeof harness>>,
@@ -279,8 +280,7 @@ test("withdrawn source rejects a late answer even when another live message uses
 				attachmentIds: [a.id],
 			})
 		).json();
-		while (!f.requests.some((r) => r.operation === "generate"))
-			await Bun.sleep(1);
+		await waitFor(() => f.requests.some((r) => r.operation === "generate"));
 		await h.conversation.append({
 			id: "another-source",
 			role: "user",

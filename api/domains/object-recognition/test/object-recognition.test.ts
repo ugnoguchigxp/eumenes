@@ -12,6 +12,7 @@ import {
 	videoResult,
 	type Connection,
 } from "../contracts";
+import { waitFor as until } from "../../../infrastructure/wait-for";
 const object = {
 	classId: 41,
 	label: "cup",
@@ -43,13 +44,6 @@ const cleanups: (() => Promise<void>)[] = [];
 afterEach(async () => {
 	for (const c of cleanups.splice(0)) await c();
 });
-async function until(check: () => boolean) {
-	for (let i = 0; i < 200; i++) {
-		if (check()) return;
-		await Bun.sleep(10);
-	}
-	throw new Error("condition_not_reached");
-}
 function setup(fetcher: typeof fetch) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-recognition-"));
 	const store = openStore(join(dir, "db"), [...queueMigrations, ...migrations]);

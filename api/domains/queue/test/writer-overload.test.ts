@@ -9,6 +9,7 @@ import {
 	type SqliteStore,
 } from "../../../infrastructure/sqlite";
 import { createQueue, migration, type HandlerDefinition } from "..";
+import { waitFor as until } from "../../../infrastructure/wait-for";
 
 const dirs: string[] = [];
 const stores: SqliteStore[] = [];
@@ -17,13 +18,6 @@ afterEach(async () => {
 	for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
 });
 const yieldTurn = () => new Promise((r) => setImmediate(r));
-async function until(cond: () => boolean) {
-	for (let i = 0; i < 2000; i++) {
-		if (cond()) return;
-		await yieldTurn();
-	}
-	throw new Error("condition not reached");
-}
 function realStore() {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-overload-"));
 	dirs.push(dir);

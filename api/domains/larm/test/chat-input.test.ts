@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { imageLarmFixture } from "./chat-input.fixture";
 import type { ChatMessage } from "../contracts";
 import { chatRequest } from "../service/chat-request";
+import { waitFor } from "../../../infrastructure/wait-for";
 
 const messages: ChatMessage[] = [
 	{ role: "system", content: "画像を説明" },
@@ -124,7 +125,7 @@ for (const stage of ["count", "generate"] as const)
 		try {
 			const work = f.p.answer(messages, abort.signal);
 			const result = Promise.allSettled([work]);
-			while (!f.requests.some((r) => r.operation === stage)) await Bun.sleep(1);
+			await waitFor(() => f.requests.some((r) => r.operation === stage));
 			abort.abort();
 			expect((await result)[0]!.status).toBe("rejected");
 			expect(f.requests.filter((r) => r.operation === stage)).toHaveLength(1);

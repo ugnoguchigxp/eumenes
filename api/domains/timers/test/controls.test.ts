@@ -12,6 +12,7 @@ import {
 } from "../../scheduler";
 import { join } from "node:path";
 import { rmSync } from "node:fs";
+import { waitFor } from "../../../infrastructure/wait-for";
 
 const T0 = Date.parse("2026-10-09T00:00:00Z");
 const input = (revision: number, now: number) => ({
@@ -61,8 +62,7 @@ test("pause freezes milliseconds past the original due time, resumes the same ID
 		h.setNow(T0 + 38750);
 		await h.scheduler.tick();
 		await h.queue.tick();
-		for (let i = 0; i < 20 && h.timers.get(id)?.timer.state !== "elapsed"; i++)
-			await new Promise((resolve) => setTimeout(resolve, 5));
+		await waitFor(() => h.timers.get(id)?.timer.state === "elapsed");
 		expect(h.timers.get(id)?.timer.state).toBe("elapsed");
 		expect(h.timers.notifications().items).toHaveLength(1);
 	} finally {

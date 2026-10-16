@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { configureLogging } from "../infrastructure/logger";
 import { harness, forbidden } from "./toolchain.fixture";
+import { waitFor } from "../infrastructure/wait-for";
 
 afterEach(() => configureLogging({ level: "silent" }));
 function wav() {
@@ -10,7 +11,7 @@ function wav() {
 	return value;
 }
 async function until(check: () => boolean) {
-	for (let i = 0; i < 1000 && !check(); i++) await Bun.sleep(5);
+	await waitFor(check);
 	expect(check()).toBe(true);
 }
 async function accept(h: Awaited<ReturnType<typeof harness>>) {

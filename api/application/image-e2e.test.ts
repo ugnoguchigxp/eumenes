@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { harness } from "./toolchain.fixture";
 import { imageFixture, imageQuestion, imageTestPlan } from "./image.fixture";
+import { waitFor } from "../infrastructure/wait-for";
 for (const mode of [
 	"success",
 	"failure",
@@ -86,12 +87,7 @@ test("cancelled image generation discards a late synchronous response and never 
 				text: imageQuestion,
 			})
 		).json();
-		for (
-			let n = 0;
-			!f.requests.some((r) => r.method === "POST") && n < 500;
-			n++
-		)
-			await Bun.sleep(5);
+		await waitFor(() => f.requests.some((r) => r.method === "POST"));
 		expect(f.requests.filter((r) => r.method === "POST")).toHaveLength(1);
 		await h.dialogue.cancel(submitted.id);
 		release();
@@ -168,12 +164,7 @@ test("capability revocation rejects a generated result at adoption", async () =>
 				text: imageQuestion,
 			})
 		).json();
-		for (
-			let n = 0;
-			!f.requests.some((r) => r.method === "POST") && n < 500;
-			n++
-		)
-			await Bun.sleep(5);
+		await waitFor(() => f.requests.some((r) => r.method === "POST"));
 		expect(f.requests.filter((r) => r.method === "POST")).toHaveLength(1);
 		await h.store.write((db) =>
 			h.toolchain.capabilities.setEnabledInTransaction(

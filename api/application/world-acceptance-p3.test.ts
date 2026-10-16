@@ -49,6 +49,7 @@ import {
 	type WorldAssembly,
 	type WorldAssemblyOptions,
 } from "./world";
+import { waitFor } from "../infrastructure/wait-for";
 
 const SCOPE = {
 	principal: CONVERSATION_DEFAULT_PRINCIPAL,
@@ -64,13 +65,8 @@ const QUESTION = "音声サービスはいつから使えますか？";
 const UNKNOWN = "分かりません。";
 
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-async function until(check: () => boolean, ms = 5000) {
-	for (let i = 0; i < ms / 10; i++) {
-		if (check()) return;
-		await pause(10);
-	}
-	throw new Error("timeout");
-}
+const until = (check: () => boolean, ms = 5000) =>
+	waitFor(check, { timeout: ms });
 
 const dirs: string[] = [];
 const closers: Array<() => Promise<void>> = [];

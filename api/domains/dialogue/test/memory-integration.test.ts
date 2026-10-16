@@ -36,6 +36,7 @@ import {
 	seedImportMigration,
 } from "../../memory";
 import { addNote, saveItem, type SeedInput } from "./memory-seed";
+import { waitFor as until } from "../../../infrastructure/wait-for";
 
 const MIGRATIONS = [
 	conversationMigration,
@@ -57,13 +58,6 @@ const MIGRATIONS = [
 	...memoryPackageMigrations,
 ];
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-async function until(check: () => boolean) {
-	for (let i = 0; i < 300; i++) {
-		if (check()) return;
-		await pause(10);
-	}
-	throw new Error("timeout");
-}
 /** The memory layers (long-term and short-term) of the last request, as one block. */
 const isMemoryLayer = (m: { role: string; content: string }, at: number) =>
 	at > 0 && m.role === "system" && m.content.includes("参照情報です");
