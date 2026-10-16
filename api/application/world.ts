@@ -74,10 +74,10 @@ export function resolveWorldMode(store: SqliteStore): WorldMode {
 }
 
 /** AccessContext purposes the conversation SourceAdapter allows (deny by default). `WORLD_READ_PURPOSE` is for the conversation's reads (names hint, World investigation). */
-export const WORLD_READ_PURPOSE = "dialogue.read";
-export const WORLD_LIFECYCLE_PURPOSE = "world.lifecycle";
+const WORLD_READ_PURPOSE = "dialogue.read";
+const WORLD_LIFECYCLE_PURPOSE = "world.lifecycle";
 /** Explicit registration of targets and structured claims by the host (the steward curates through `assembly.curation`). */
-export const WORLD_MANUAL_PURPOSE = "world.manual";
+const WORLD_MANUAL_PURPOSE = "world.manual";
 
 export const WORLD_DEFAULT_SCOPE: ScopeRef = {
 	principal: CONVERSATION_DEFAULT_PRINCIPAL,
@@ -179,11 +179,11 @@ export type WorldAssemblyOptions = {
 	>;
 };
 
-export type InitialSyncReport =
+type InitialSyncReport =
 	| { complete: true }
 	| { complete: false; reason: string };
 
-export type PumpReport =
+type PumpReport =
 	| { status: "skipped"; reason: string }
 	| {
 			status: "ran";

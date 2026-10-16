@@ -1,3 +1,4 @@
+import { systemContext } from "../../../infrastructure/system-context";
 import Anthropic from "@anthropic-ai/sdk";
 import {
 	createSdkMcpServer,
@@ -65,7 +66,7 @@ export type CloudAgentCall = {
 	signal: AbortSignal;
 	onDelta?: (text: string) => void;
 };
-export type CloudAgentResult = {
+type CloudAgentResult = {
 	text: string;
 	toolCalls?: NativeToolCall[];
 	inputTokens?: number | null;
@@ -101,12 +102,18 @@ function promptParts(messages: Messages, context?: ContextSplit) {
 		turns.length === 1 && turns[0]!.role === "user"
 			? turns[0]!.content
 			: (context
-					? "The context of this turn and the current request, oldest first, as JSON. Write only the next assistant turn.\n"
-					: "The conversation so far, oldest first, as JSON. Write only the next assistant turn.\n") +
+					? systemContext("inference.contexts.cloud-agents.turn-context", {}) +
+						"\n"
+					: systemContext(
+							"inference.contexts.cloud-agents.conversation-context",
+							{},
+						) + "\n") +
 				JSON.stringify(turns.map(({ role, content }) => ({ role, content })));
 	if (!prompt.trim()) throw fail("empty_prompt");
 	return {
-		system: parts.instructions.join("\n\n") || "You are a helpful assistant.",
+		system:
+			parts.instructions.join("\n\n") ||
+			systemContext("inference.contexts.cloud-agents.default-system", {}),
 		history,
 		prompt,
 	};
@@ -149,7 +156,8 @@ function codexChoiceSchema(tools: NativeTool[]) {
 }
 function codexFunctions(tools: NativeTool[]) {
 	return (
-		"\n\nFUNCTIONS: When one of these functions should handle the request, set tool to {name, arguments} and reply to null; otherwise set reply to your answer and tool to null.\n" +
+		systemContext("inference.contexts.cloud-agents.function-selection", {}) +
+		"\n" +
 		JSON.stringify(tools.map((t) => t.function))
 	);
 }
@@ -386,7 +394,7 @@ const authObservation: Record<AgentAuth, (account: AccountInfo) => boolean> = {
 		unset(a.apiKeySource) &&
 		a.apiProvider === "firstParty",
 };
-export const observedAuthMatches = (auth: AgentAuth, account: AccountInfo) =>
+const observedAuthMatches = (auth: AgentAuth, account: AccountInfo) =>
 	authObservation[auth](account);
 
 const claudeEnvKeys = [
@@ -574,7 +582,12 @@ async function runClaudeAgent(
 					}),
 					model: call.model,
 					systemPrompt: tools.length
-						? `${system}\n\nCall at most one function per turn.`
+						? system +
+							"\n\n" +
+							systemContext(
+								"inference.contexts.cloud-agents.single-function",
+								{},
+							)
 						: system,
 					tools: [],
 					allowedTools: tools.map((t) => `mcp__eumenes__${t.function.name}`),

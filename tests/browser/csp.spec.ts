@@ -58,7 +58,9 @@ test("the SPA policy is sent and the main screens raise no CSP violation", async
 	const csp = response?.headers()["content-security-policy"] ?? "";
 	expect(csp).toContain("default-src 'self'");
 	expect(csp).toContain("frame-ancestors 'none'");
-	expect(csp).toContain("img-src 'self' blob: data:;");
+	expect(csp).toContain(
+		"img-src 'self' blob: data: https://*.googleusercontent.com;",
+	);
 	await expect(page.locator("#root")).not.toBeEmpty();
 	// Conversation (initial screen), then settings.
 	await openSettings(page, "記録");

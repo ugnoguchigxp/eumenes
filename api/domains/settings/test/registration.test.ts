@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { prepareConnectionRegistration } from "../contracts/registration";
+import { prepareConnectionRegistration } from "../contracts";
 
 const workers = () => ({
 	connectionId: crypto.randomUUID(),

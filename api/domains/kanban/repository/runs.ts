@@ -7,12 +7,7 @@ import type {
 	RunState,
 } from "../contracts";
 
-import {
-	ACTIVE_RUN_STATES,
-	DEFAULT_EXECUTOR_ID,
-	OPEN_RUN_STATES,
-} from "../contracts/shared";
-export { OPEN_RUN_STATES };
+import { ACTIVE_RUN_STATES, DEFAULT_EXECUTOR_ID } from "../contracts/shared";
 
 export type RunRow = {
 	seq: number;

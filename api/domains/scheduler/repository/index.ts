@@ -314,11 +314,7 @@ export function listOccurrences(
  * Deletes old occurrences, keeping each schedule's latest dispatched one (it
  * feeds the overlap check) and the row with the highest `seq` (next is MAX+1).
  */
-export function pruneOccurrences(
-	db: Database,
-	before: number,
-	limit: number,
-): number {
+function pruneOccurrences(db: Database, before: number, limit: number): number {
 	return db
 		.query(
 			`DELETE FROM scheduler_occurrences WHERE id IN (
@@ -332,11 +328,7 @@ export function pruneOccurrences(
 }
 
 /** Deletes cancelled/completed schedules with their occurrences, except the one with the highest `created_seq`. */
-export function pruneSchedules(
-	db: Database,
-	before: number,
-	limit: number,
-): number {
+function pruneSchedules(db: Database, before: number, limit: number): number {
 	const ids = (
 		db
 			.query(

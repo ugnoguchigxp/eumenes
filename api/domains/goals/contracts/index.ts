@@ -1,24 +1,24 @@
 import { z } from "zod";
 
 /** Bounds are enforced by rejection; nothing is truncated. */
-export const MAX_DESIRED_STATE_LENGTH = 500;
-export const MAX_KEY_LENGTH = 256;
-export const MAX_SNAPSHOT_SCOPES = 32;
+const MAX_DESIRED_STATE_LENGTH = 500;
+const MAX_KEY_LENGTH = 256;
+const MAX_SNAPSHOT_SCOPES = 32;
 /** Adopted goals per (principal, scope): keeps the snapshot inside a fixed budget. */
 export const MAX_ADOPTED_GOALS = 30;
 /** Open proposals per (principal, scope). */
 export const MAX_PROPOSED_GOALS = 50;
 /** Conversation messages one goal revision may cite as its basis. */
-export const MAX_SOURCE_MESSAGES = 20;
+const MAX_SOURCE_MESSAGES = 20;
 /** World entities one goal change may link. */
-export const MAX_GOAL_ENTITIES = 20;
+const MAX_GOAL_ENTITIES = 20;
 /** Operations one steward batch may carry. */
 export const MAX_GOAL_OPS = 50;
 /** Goals and entities one forget call may name. */
-export const MAX_FORGET_IDS = 500;
-export const MIN_PRIORITY = 0;
-export const MAX_PRIORITY = 100;
-export const DEFAULT_PRIORITY = 50;
+const MAX_FORGET_IDS = 500;
+const MIN_PRIORITY = 0;
+const MAX_PRIORITY = 100;
+const DEFAULT_PRIORITY = 50;
 
 export const goalStatuses = [
 	"proposed",
@@ -34,7 +34,7 @@ const key = z.string().min(1).max(MAX_KEY_LENGTH);
  * Opaque reference to the utterance or operation behind a goal change.
  * Structurally compatible with the Memory SourceRef; goals never resolves it.
  */
-export const goalSourceSchema = z
+const goalSourceSchema = z
 	.object({
 		namespace: key,
 		kind: key,

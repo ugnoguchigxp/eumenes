@@ -57,5 +57,3 @@ export const ttsVoicesSchema = z
 			),
 	);
 export type TtsVoices = z.infer<typeof ttsVoicesSchema>;
-export type TtsVoice = TtsVoices["voices"][number];
-export type TtsRange = NonNullable<TtsVoice["capabilities"]["speed"]>;

@@ -42,7 +42,7 @@ export function splitEntryKey(key: string): {
 		: { fieldId: key.slice(0, at), target: key.slice(at + 1) };
 }
 
-export const sameChange = (a: FieldChange, b: FieldChange) =>
+const sameChange = (a: FieldChange, b: FieldChange) =>
 	JSON.stringify(a) === JSON.stringify(b);
 
 /**

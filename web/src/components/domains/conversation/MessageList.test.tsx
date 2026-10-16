@@ -9,7 +9,7 @@ const delivery: SpeechDelivery = {
 	emotion: "joy",
 	emotionConfidence: 0.9,
 	confidence: 0.9,
-	source: "laya",
+	source: "system-one",
 	motion: "joyful",
 	tone: "bright",
 	latencyMs: 100,
@@ -183,14 +183,14 @@ test("Ruri emotion is displayed and attributed to Ruri", () => {
 						text: "おめでとうございます。",
 						createdAt: "2026-10-09",
 						runId: "r",
-						delivery: { ...delivery, source: "ruri" },
+						delivery: { ...delivery, source: "scored" },
 					},
 				],
 			}}
 		/>,
 	);
 	expect(
-		view.container.querySelector('[data-emotion-source="ruri"]'),
+		view.container.querySelector('[data-emotion-source="scored"]'),
 	).not.toBeNull();
 });
 

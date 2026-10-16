@@ -48,7 +48,7 @@ export type AdapterHostContext = {
 	drafts: Readonly<Record<string, DraftView>>;
 };
 
-export type AdapterPhase =
+type AdapterPhase =
 	| { kind: "loading" }
 	| { kind: "error"; message: string }
 	/** The data cannot be shown (e.g. its body expired); the selector stays usable. */
@@ -56,7 +56,7 @@ export type AdapterPhase =
 	| { kind: "ready" };
 
 /** When the request left, measured on the page's clocks, for server-clock binding. */
-export type SendTiming = { sent: number; sentAt: number };
+type SendTiming = { sent: number; sentAt: number };
 
 export type AnswerInput =
 	| { ok: true; value: Record<string, unknown> }

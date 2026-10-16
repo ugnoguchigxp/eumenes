@@ -63,4 +63,3 @@ export function schedulerClient(transport: Transport) {
 			operate(id, "cancel", expectedRevision),
 	};
 }
-export type SchedulerClient = ReturnType<typeof schedulerClient>;

@@ -564,4 +564,3 @@ export function createRuntimeObservation(options: RuntimeObservationOptions) {
 		reconcile,
 	};
 }
-export type RuntimeObservation = ReturnType<typeof createRuntimeObservation>;

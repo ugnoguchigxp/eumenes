@@ -1,15 +1,5 @@
-export type {
-	ChatMessage,
-	ChatImage,
-	ChatInput,
-	ChatContentPart,
-} from "./contracts/chat-input";
-export type {
-	LarmPort,
-	LarmStatus,
-	LarmExchange,
-	LarmCallOptions,
-} from "./contracts";
+export type { ChatMessage, ChatImage, ChatInput } from "./contracts/chat-input";
+export type { LarmPort, LarmExchange, LarmCallOptions } from "./contracts";
 export { registerLarmStatus } from "./controller";
 export { createLarm } from "./service";
 export {
@@ -17,10 +7,8 @@ export {
 	type LarmPlayground,
 } from "./service/playground";
 export type {
-	EmbeddingSpace,
 	LarmTestTarget,
 	TestKind,
-	TestInput,
 	TestOutput,
 	TestHealth,
 	TestProgress,
@@ -30,14 +18,9 @@ export { findServiceTarget } from "./service/playground-select";
 export { silentWav, code as playgroundError } from "./service/playground-http";
 
 export {
-	trackId,
 	trackQuery,
 	trackQueryParams,
-	musicTrack,
-	musicTracks,
-	musicTags,
 	type TrackQuery,
-	type MusicTrack,
 } from "./contracts/music-library";
 export { MusicLibraryError } from "./service/music-library";
 export { createLocalServices } from "./service/local-services";

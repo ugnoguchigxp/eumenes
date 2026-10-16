@@ -5,8 +5,6 @@ import type { ToolchainArtifactEntry } from "../../../../client/toolchain-action
 import { queryRoots } from "../../queryKeys";
 import type { ArtifactTab } from "../artifact";
 
-export type ToolchainTab = Extract<ArtifactTab, { kind: "toolchain" }>;
-
 /** The launcher list: one entry per registered artifact, never one per saved item. */
 export function toolchainArtifactsQuery(client: EumenesClient) {
 	return {

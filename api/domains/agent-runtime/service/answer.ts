@@ -28,8 +28,6 @@ function failureProjection(
 			? {
 					delivery: "guided-web",
 					completion: "incomplete",
-					answer:
-						"検索処理を完了できず、依頼された情報を確認できませんでした。",
 				}
 			: {}),
 		failure: root.error_code,

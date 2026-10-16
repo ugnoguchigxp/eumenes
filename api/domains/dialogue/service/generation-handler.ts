@@ -25,7 +25,6 @@ import {
 import { reviewConversationAnswer } from "./conversation-routing";
 import { generateConversation } from "./conversation-generation";
 import { researchCitations } from "./research-citations";
-import { guidedAnswer } from "./guided-answer";
 import type { Run } from "../contracts";
 import { byId, transition } from "../repository";
 import { endRun, type RunEndState } from "./run-end";
@@ -117,13 +116,6 @@ export function createGenerationHandler(
 					log.info("dialogue.generation_started");
 					const timing = generationTiming();
 					resolveAttachmentContext(deps, input, run!.conversationId);
-					const direct = guidedAnswer(input.agent?.projection);
-					if (direct) {
-						signal.throwIfAborted();
-						return {
-							text: verifiedAnswerLinks(direct, input),
-						};
-					}
 					if (input.agent?.actionPayload && agents) {
 						// Refresh time/state before phrasing, without repeating the operation.
 						// A later change still rejects this generated answer at adoption.

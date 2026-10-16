@@ -1,4 +1,4 @@
-export { migrations, migration } from "./repository";
+export { migrations } from "./repository";
 export { createConfiguration } from "./service/configuration";
 export { createCommands } from "./service/commands";
 export { createInbox } from "./service/inbox";

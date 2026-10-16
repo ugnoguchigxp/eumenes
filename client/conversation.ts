@@ -73,10 +73,6 @@ export type ConversationClient = Pick<
 	ReturnType<typeof conversationClient>,
 	"identity" | "conversation"
 >;
-export type HistoryClient = Pick<
-	ReturnType<typeof conversationClient>,
-	"historySearch" | "historyRead"
->;
 
 export type {
 	HistoryView,

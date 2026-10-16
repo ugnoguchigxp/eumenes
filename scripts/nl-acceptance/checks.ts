@@ -567,10 +567,6 @@ register("fault-triggered", {
 			: unknown("fault_not_triggered", p.kind, "environment");
 	},
 });
-
-export function checkNames(): string[] {
-	return Object.keys(checks);
-}
 /** Validates every item's check name and parameters, listing all problems. */
 export function validateCriteriaItems(criteria: Criteria): string[] {
 	const issues: string[] = [];

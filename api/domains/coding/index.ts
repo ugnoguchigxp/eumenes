@@ -27,8 +27,4 @@ export { canonicalJSON as codingCanonicalJSON } from "../../../packages/coding-r
 export { sdkDaemonClient } from "../../../packages/coding-runner/src/client";
 
 export { registeredSdkGitRemotes } from "../../../packages/coding-runner/src/client";
-export type {
-	SdkGitRemote,
-	SdkGitResult,
-	SdkSnapshot,
-} from "../../../packages/coding-runner/src/contracts";
+export type { SdkGitRemote } from "../../../packages/coding-runner/src/contracts";

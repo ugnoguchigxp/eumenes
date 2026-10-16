@@ -4,7 +4,7 @@ import {
 	type ExecutorRegistry,
 } from "../contracts/shared";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
-import { boardInTransaction, cardActions, cardInTransaction } from "./board";
+import { boardInTransaction, cardInTransaction } from "./board";
 import { sharedBoardInTransaction } from "./shared-board";
 import { createSharedOperations } from "./shared-operations";
 import {
@@ -37,7 +37,6 @@ import { listNotices, markNoticeRead, unreadNotices } from "../repository/runs";
 
 export type { KanbanOutcome } from "./core";
 export type { KanbanRecoverPorts } from "./recovery";
-export { cardActions };
 
 const iso = (ms: number) => new Date(ms).toISOString();
 

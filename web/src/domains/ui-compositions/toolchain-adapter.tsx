@@ -3,7 +3,7 @@ import type { Resource, Snapshot } from "@eumenes/artifact-ui/contracts";
 import type { WebArtifactAdapter } from "../toolchain-artifacts/registry";
 import { queryRoots } from "../../queryKeys";
 
-export const UI_COMPOSITIONS_ADAPTER_REF = "adapter:ui-compositions@1";
+const UI_COMPOSITIONS_ADAPTER_REF = "adapter:ui-compositions@1";
 
 export const uiCompositionsWebAdapter: WebArtifactAdapter = {
 	adapterRef: UI_COMPOSITIONS_ADAPTER_REF,

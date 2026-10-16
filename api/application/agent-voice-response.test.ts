@@ -19,6 +19,9 @@ async function accept(h: Awaited<ReturnType<typeof harness>>) {
 		id = crypto.randomUUID();
 	h.voice.start(session, 1);
 	await h.voice.accept(session, 1, 1, id, wav());
+	await until(() => h.voice.get(id)?.status !== "recognizing");
+	const turn = h.voice.get(id)!;
+	if (turn.status === "input_ready") await h.voice.commit(id, turn.revision);
 	return id;
 }
 test("silence completes without creating a dialogue, cancelling another run or synthesizing speech", async () => {

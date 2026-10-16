@@ -7,7 +7,7 @@ import type { Embed } from "./toolchain-vectors";
  * Bind embedding to the saved LARM connection. The client (and its catalog cache) is reused
  * until the saved connection changes; the connection target is never taken from elsewhere.
  */
-export function larmEmbedder(
+function larmEmbedder(
 	create: () => LarmPlayground,
 	connectionKey: () => string,
 ): Embed {

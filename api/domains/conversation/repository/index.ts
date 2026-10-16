@@ -65,7 +65,7 @@ CREATE INDEX conversation_outbox_source ON conversation_outbox(source_id, seq);
 export const retractionMigration = `
 ALTER TABLE messages ADD COLUMN retracted_at TEXT;
 `;
-export const presentationMigration = `
+const presentationMigration = `
 ALTER TABLE messages ADD COLUMN presentation TEXT NOT NULL DEFAULT 'conversation' CHECK(presentation IN ('conversation','artifact'));
 `;
 export type OutboxOptions = {
@@ -74,7 +74,7 @@ export type OutboxOptions = {
 	/** When true a missing outbox table is an error instead of "not recorded". */
 	required: boolean;
 };
-export function textRevision(text: string): TextRevision {
+function textRevision(text: string): TextRevision {
 	const digest = createHash("sha256").update(text).digest("hex");
 	return { revision: `sha256:${digest}`, digest };
 }
@@ -625,6 +625,13 @@ export function getMessage(
 	};
 }
 
+/** Delivery sources were named after classifier models; store the contract names instead. */
+const neutralSourceMigration = `
+UPDATE answer_deliveries
+SET delivery=json_set(delivery,'$.source',CASE json_extract(delivery,'$.source') WHEN 'ruri' THEN 'scored' ELSE 'system-one' END)
+WHERE json_extract(delivery,'$.source') IN ('laya','ruri');
+`;
+
 /** Named migrations of this domain; the SQL above is frozen once deployed. */
 export const migrations: readonly Migration[] = [
 	{ id: "conversation/0001-init", sql: migration },
@@ -637,5 +644,10 @@ export const migrations: readonly Migration[] = [
 		id: "conversation/0007-presentation",
 		sql: presentationMigration,
 		after: ["conversation/0006-attachments"],
+	},
+	{
+		id: "conversation/0008-neutral-delivery-source",
+		sql: neutralSourceMigration,
+		after: ["conversation/0007-presentation"],
 	},
 ];

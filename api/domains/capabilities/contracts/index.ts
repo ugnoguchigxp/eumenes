@@ -1,5 +1,5 @@
 import { recognitionManage, recognitionCommand } from "./object-recognition";
-export { recognitionManage, recognitionCommand };
+export { recognitionCommand };
 import { drawingRequest, drawingPlan } from "./excalidraw";
 export { drawingRequest, drawingPlan };
 import { z } from "zod";
@@ -31,7 +31,6 @@ export {
 	codexTaskRequest,
 	codexTaskRef,
 	codexTaskFollowup,
-	codexTaskConfigure,
 };
 import { memoryRequest } from "./memory-request";
 import { worldDocuments, worldFind, worldQuery } from "./world-query";
@@ -50,13 +49,11 @@ import {
 export {
 	KANBAN_PROMPT_MAX,
 	kanbanAdd,
-	kanbanCardAnswer,
 	kanbanCardRef,
 	kanbanEdit,
 	kanbanFollowup,
 	kanbanList,
 	kanbanMove,
-	kanbanNoticeRef,
 };
 export { uiComposeRequest, uiCancelRequest, uiResponseFields, uiSubmitRequest };
 import { imageRequest, imagePlan } from "./image";
@@ -77,18 +74,8 @@ import {
 	timerStart,
 	timerTargetAnswer,
 } from "./timers";
-export {
-	timerCancel,
-	timerCommand,
-	timerDurationAnswer,
-	timerHms,
-	timerList,
-	timerStart,
-	timerTargetAnswer,
-};
 import { answerText, emptyInput } from "./inputs";
-export { answerText, emptyInput };
-export { timerResultContext, type TimerResultContext } from "./timers";
+export { timerResultContext } from "./timers";
 import { publicUrl } from "./public-url";
 import { toolchainRequest } from "./toolchains";
 export { publicUrl };
@@ -100,9 +87,10 @@ export const researchInput = z
 	})
 	.strict();
 import { lookupInput, lookupInputV1 } from "./lookup";
+import type { ToolchainArtifact, ToolchainRedirect } from "./toolchains";
 export { lookupInput };
-export const readInput = z.object({ url: publicUrl }).strict();
-export const forecastInput = z
+const readInput = z.object({ url: publicUrl }).strict();
+const forecastInput = z
 	.object({
 		areaCode: z
 			.string()
@@ -112,7 +100,7 @@ export const forecastInput = z
 			),
 	})
 	.strict();
-export const quoteInput = z
+const quoteInput = z
 	.object({
 		symbol: z
 			.string()
@@ -122,14 +110,14 @@ export const quoteInput = z
 			),
 	})
 	.strict();
-export const savedFindInput = z
+const savedFindInput = z
 	.object({
 		sourceRef: z.string().uuid(),
 		query: z.string().trim().min(1).max(200),
 		cursor: z.string().uuid().optional(),
 	})
 	.strict();
-export const savedReadInput = z
+const savedReadInput = z
 	.object({
 		sourceRef: z.string().uuid(),
 		cursor: z.string().uuid().optional(),
@@ -138,13 +126,13 @@ export const savedReadInput = z
 	})
 	.strict()
 	.refine((v) => !(v.cursor && v.start));
-export const historyInput = z
+const historyInput = z
 	.object({
 		question: z.string().min(1).max(8000),
 		detail: z.enum(["brief", "normal"]).default("normal"),
 	})
 	.strict();
-export const historySearch = z
+const historySearch = z
 	.object({
 		query: z.string().trim().max(200).default(""),
 		from: z.string().datetime({ offset: true }).optional(),
@@ -157,7 +145,7 @@ export const historySearch = z
 	.refine(
 		(v) => !v.from || !v.until || Date.parse(v.from) < Date.parse(v.until),
 	);
-export const historyRead = z
+const historyRead = z
 	.object({
 		messageRef: z.string().uuid(),
 		before: z.number().int().min(0).max(9).default(2),
@@ -167,7 +155,7 @@ export const historyRead = z
 	.strict()
 	.refine((v) => v.before + v.after < 10);
 /** Saved fetch procedures of the current toolchain; the sub-agent judges whether one matches. */
-export const recipeFindInput = z
+const recipeFindInput = z
 	.object({
 		query: z
 			.string()
@@ -274,9 +262,9 @@ export type Definition = {
 	/** Toolchain only: the one package (profile, SKILL, tools) its sub-agent runs. */
 	packageRevisionId?: string;
 	/** Toolchain only: the result display. */
-	artifact?: import("./toolchains").ToolchainArtifact;
+	artifact?: ToolchainArtifact;
 	/** Toolchain only: which other toolchain to use instead, and when. */
-	redirects?: import("./toolchains").ToolchainRedirect[];
+	redirects?: ToolchainRedirect[];
 	/**
 	 * Toolchain only, new revisions only (absent from the JSON of earlier ones): the stored
 	 * binding that connects the package's tools to a host adapter, and the stored artifact

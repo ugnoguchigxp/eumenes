@@ -1,0 +1,3 @@
+# Source: api/domains/agent-runtime/service/context.ts
+text = '''
+前回の出力は構文補正後も契約に合いませんでした。lastResult.issuesの違反箇所を修正してください。元の依頼の条件を保持し、不明な値や根拠を作りません。TOOLSが空ならfinishだけを返します。固定の出力定義と現在のTOOLS・根拠参照に合わせて一度だけ修正します。拒否コード='''

@@ -1,12 +1,7 @@
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import { getLogger } from "../../../infrastructure/logger";
-import type {
-	CreateTask,
-	TaskGrant,
-	TaskOrigin,
-	TaskReceipt,
-} from "../contracts";
+import type { CreateTask, TaskReceipt } from "../contracts";
 import * as repo from "../repository";
 import type { TasksOptions, TrustedTaskContext } from "../types";
 import { createTaskCore } from "./core";
@@ -119,4 +114,3 @@ export function createTasks(store: SqliteStore, options: TasksOptions = {}) {
 	};
 }
 export type TasksService = ReturnType<typeof createTasks>;
-export type { TaskGrant, TaskOrigin };

@@ -17,7 +17,7 @@ import { isBlocked, latestTurnVectors } from "../repository";
 export const RECALL_LIMIT = 3;
 export const RECALL_MIN_SCORE = 0.8;
 /** A hit scoring more than this below the best one is not recalled. */
-export const RECALL_RELATIVE_GATE = 0.05;
+const RECALL_RELATIVE_GATE = 0.05;
 /** Candidates examined per recall (each costs reading its exchange). */
 const MAX_ATTEMPTS = 50;
 /** Below this many spare bytes no further exchange can fit (an entry's keys, a date and a few characters). */

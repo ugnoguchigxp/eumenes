@@ -22,8 +22,8 @@ export const sourceKeyOf = (ref: {
  * scope-checked by Memory itself; every other input is scope-checked by the
  * host SourceAdapter, because Memory does not scope-check source dependencies.
  */
-export const MEMORY_STATE_ITEM_NAMESPACE = "memory";
-export const MEMORY_STATE_ITEM_KIND = "state_item";
+const MEMORY_STATE_ITEM_NAMESPACE = "memory";
+const MEMORY_STATE_ITEM_KIND = "state_item";
 export const isMemoryStateItem = (ref: SourceRef): boolean =>
 	ref.namespace === MEMORY_STATE_ITEM_NAMESPACE &&
 	ref.kind === MEMORY_STATE_ITEM_KIND;

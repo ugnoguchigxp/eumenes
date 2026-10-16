@@ -15,7 +15,7 @@ import {
 import { noticeText, QUEUE_PAUSED_TEXT } from "./text";
 import { readWorkspaceGuard } from "../repository/workspace-guard";
 
-export const dispatchOf = (run: RunRow): KanbanDispatch => ({
+const dispatchOf = (run: RunRow): KanbanDispatch => ({
 	runId: run.id,
 	executorId: run.executorId,
 	executorRevision: run.executorRevision,

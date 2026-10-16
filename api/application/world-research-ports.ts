@@ -73,8 +73,6 @@ export type WorldResearchPorts = Pick<
 	/** World is configured, ON and its gate is open. */
 	available(db: Database): boolean;
 };
-/** Absent while World is not ON: the toolchain is then not offered. */
-export type WorldResearchPortsLookup = () => WorldResearchPorts | undefined;
 
 /** A lifecycle that no longer supports a report. */
 const ENDED = new Set(["retracted", "invalidated", "superseded"]);

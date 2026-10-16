@@ -18,7 +18,7 @@
  *   player_installed  player = this utterance's chunk queue (fresh epoch)
  *   delivered_marked  key added to delivered (dedupes chunks and whole utterances)
  */
-export type Session = {
+type Session = {
 	/** Unique per opened session; closures compare it to detect a stale session. */
 	token: number;
 	id: string;
@@ -27,7 +27,7 @@ export type Session = {
 	pending: number;
 	failed: boolean;
 };
-export type VoicePhase = "idle" | "starting" | "active";
+type VoicePhase = "idle" | "starting" | "active";
 export type VoiceState = {
 	phase: VoicePhase;
 	/** The start in flight, 0 when none. */

@@ -28,7 +28,7 @@ export type TesterInput = {
 	/** Set when the previous reply was unusable, so the model can correct the format. */
 	correction?: string;
 };
-export type TesterReply = {
+type TesterReply = {
 	text: string;
 	usage?: { inputTokens: number; outputTokens: number };
 	costUSD?: number;

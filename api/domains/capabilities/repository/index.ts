@@ -35,7 +35,7 @@ export function get(db: Database, revisionId: string): FixedDefinition | null {
 }
 
 /** Passage embeddings of toolchains, per vector space. Appended migration. */
-export const toolchainVectorsMigration = `
+const toolchainVectorsMigration = `
 CREATE TABLE capability_toolchain_vectors(
  revision_id TEXT NOT NULL,item INTEGER NOT NULL,space TEXT NOT NULL,
  text_digest TEXT NOT NULL,vector BLOB NOT NULL,
@@ -46,7 +46,7 @@ CREATE INDEX capability_toolchain_vectors_space ON capability_toolchain_vectors(
  * Immutable binding, artifact and schema revisions shipped by bundles. A toolchain revision
  * refers to them by id; they are never updated, and an id never changes its digest.
  */
-export const documentsMigration = `
+const documentsMigration = `
 CREATE TABLE capability_documents(
  id TEXT PRIMARY KEY,
  kind TEXT NOT NULL CHECK(kind IN ('binding','http-binding','artifact','schema')),
@@ -59,7 +59,7 @@ CREATE TABLE capability_documents(
  * pointer into `capability_documents`, switched by registering a newer revision or by an
  * explicit publish, as the active revision of a toolchain is.
  */
-export const artifactPointersMigration = `
+const artifactPointersMigration = `
 CREATE TABLE capability_artifact_pointers(
  artifact_id TEXT PRIMARY KEY,active_revision_id TEXT NOT NULL,
  generation INTEGER NOT NULL DEFAULT 0,updated_at_ms INTEGER NOT NULL);
@@ -102,9 +102,6 @@ export type StoredDocument = {
 	digest: string;
 	document: unknown;
 };
-/** The id prefix of a document kind (`binding:` is shared by command and HTTP bindings). */
-export const documentPrefix = (kind: DocumentKind) =>
-	kind === "http-binding" ? "binding" : kind;
 export function getDocument(
 	db: Database,
 	revisionId: string,

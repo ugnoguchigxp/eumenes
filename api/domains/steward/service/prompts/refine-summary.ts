@@ -1,9 +1,6 @@
+import { systemContext } from "../../../../infrastructure/system-context";
 import { PREFACE } from "./common";
 
-export const instructions = `${PREFACE}
-
-今回の仕事は「要約の書き直し」です。summary（今の要約）は上限に近づいています。大事な内容を残したまま、短く書き直します。
-
-- 経緯、決まったこと、残っている話題を優先します。言い回しや重複を省きます。
-- 書き直した全文を summary に書きます。今より短く、1200 文字以内にします。
-- 書き直す価値がなければ、今の要約をそのまま書いて changed を false にします。`;
+export const instructions =
+	String(PREFACE) +
+	systemContext("steward.contexts.refine-summary.instructions-text", {});

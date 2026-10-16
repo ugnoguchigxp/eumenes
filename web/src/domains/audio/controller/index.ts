@@ -142,7 +142,7 @@ export function createIncrementalEncoder(rate: number) {
 		},
 	};
 }
-export type IncrementalEncoder = ReturnType<typeof createIncrementalEncoder>;
+type IncrementalEncoder = ReturnType<typeof createIncrementalEncoder>;
 /** Seconds between partial results grows with the utterance so total work stays near-linear. */
 export const partialInterval = (seconds: number) =>
 	Math.min(2, 0.6 + 0.1 * seconds);

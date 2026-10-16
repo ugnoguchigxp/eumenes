@@ -22,7 +22,7 @@ export const messageMetadataSchema = z
 		"runner_classification_unconfirmed",
 	);
 export type MessageMetadata = z.infer<typeof messageMetadataSchema>;
-export const captureIssueCodes = [
+const captureIssueCodes = [
 	"partial_line",
 	"line_limit",
 	"output_limit",

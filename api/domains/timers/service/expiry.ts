@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { Database } from "bun:sqlite";
-import type { HandlerDefinition, JobClaim } from "../../queue";
+import type { HandlerDefinition } from "../../queue";
 import { openStates } from "../../queue/contracts";
 import { TIMER_EXPIRE_KIND, type TimerNotificationDto } from "../contracts";
 import {
@@ -228,5 +228,3 @@ function readyTimer(
 export function isOpenJob(state: string) {
 	return (openStates as readonly string[]).includes(state);
 }
-
-export type ExpireClaim = JobClaim<z.infer<typeof expireJobSchema>>;

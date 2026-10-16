@@ -115,7 +115,7 @@ export function decider(r: Request, attemptSignal: AbortSignal) {
 				);
 }
 
-export function logDelivery(r: Request, delivery: SpeechDelivery) {
+function logDelivery(r: Request, delivery: SpeechDelivery) {
 	log.info("inference.delivery_selected", {
 		inferenceId: r.row.id,
 		subjectId: r.row.subject,

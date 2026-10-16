@@ -225,7 +225,7 @@ const operationDigest = (
 		.digest("hex");
 
 /** Every goal of the access in the given statuses (all by default), for the steward to review. */
-export function listGoalsForSteward(
+function listGoalsForSteward(
 	db: Database,
 	access: GoalAccess,
 	statuses: readonly GoalStatus[] = goalStatuses,
@@ -243,7 +243,7 @@ export function listGoalsForSteward(
 }
 
 /** Adopted goals for context: priority high first, then most recently revised. */
-export function adoptedGoalsForContext(
+function adoptedGoalsForContext(
 	db: Database,
 	access: GoalAccess,
 ): ContextGoal[] {
@@ -263,7 +263,7 @@ export function adoptedGoalsForContext(
  * the steward calls it first to write the durable intent (block journal) and
  * to block the messages, then deletes in the same transaction.
  */
-export function resolveGoalForget(
+function resolveGoalForget(
 	db: Database,
 	input: ForgetGoalsInput,
 ): ForgetGoalsResult {
@@ -278,10 +278,7 @@ export function resolveGoalForget(
  * Idempotent: a repeat finds nothing and returns empty lists. The goal epoch
  * of every affected scope moves, so anything built from goals is invalidated.
  */
-export function forgetGoals(
-	db: Database,
-	input: ForgetGoalsInput,
-): ForgetGoalsResult {
+function forgetGoals(db: Database, input: ForgetGoalsInput): ForgetGoalsResult {
 	const result = resolveGoalForget(db, input);
 	if (result.goalIds.length === 0) return result;
 	for (const scope of scopesOfGoals(db, result.goalIds))

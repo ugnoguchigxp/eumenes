@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { prepareConnectionRegistration } from "../domains/settings/contracts/registration";
+import { prepareConnectionRegistration } from "../domains/settings/contracts";
 import {
 	purposeSchema,
 	type Purpose,
@@ -12,7 +12,7 @@ import {
  * before the draft's field changes; the whole result is then checked by the settings schema and
  * the settings domain. Ids of added elements come from the host (UUIDs in the input).
  */
-export const structureRefs = {
+const structureRefs = {
 	addConnection: "structure:settings.add-connection@1",
 	addWorkersConnection: "structure:settings.add-connection@2",
 	deleteConnection: "structure:settings.delete-connection@1",

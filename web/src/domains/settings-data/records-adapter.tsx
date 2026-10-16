@@ -22,7 +22,7 @@ import type {
 	WebArtifactAdapter,
 } from "../toolchain-artifacts/registry";
 
-export const RECORDS_ADAPTER_REF = "adapter:records@1";
+const RECORDS_ADAPTER_REF = "adapter:records@1";
 const QUERY = {
 	usage: "query:records.usage@1",
 	selections: "query:records.selections@1",

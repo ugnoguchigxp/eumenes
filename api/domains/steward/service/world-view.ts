@@ -20,7 +20,7 @@ const LISTED_ENTITIES = 500;
 const MAX_WORDS = 20;
 const CLAIM_TEXT_CHARS = 160;
 
-export type WorldRef = {
+type WorldRef = {
 	kind: "entity" | "claim";
 	id: string;
 	/** A claim: the entities it is about (its subject and its relation object). */

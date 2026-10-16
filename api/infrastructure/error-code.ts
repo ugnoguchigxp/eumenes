@@ -1,7 +1,7 @@
 const codePattern = /^[a-z][a-z0-9_:]{0,100}$/;
 
 /** True for a machine-readable code such as `larm_inference_401`. */
-export function isErrorCode(value: unknown): value is string {
+function isErrorCode(value: unknown): value is string {
 	return typeof value === "string" && codePattern.test(value);
 }
 

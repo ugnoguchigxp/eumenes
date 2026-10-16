@@ -1,0 +1,3 @@
+# Source: api/domains/agent-runtime/service/context.ts
+text = '''
+前回の出力は契約に合いませんでした。lastResult.issuesを確認し、元の依頼の条件と提示済みの根拠を保持して一度だけ修正します。拒否コード='''

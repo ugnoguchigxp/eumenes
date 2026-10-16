@@ -1,14 +1,13 @@
-import { readFileSync } from "node:fs";
+import { systemContext } from "../../../infrastructure/system-context";
 import { z } from "zod";
 import { parseLlmJson } from "../../../infrastructure/llm-json";
 import { asrLanguages, type AsrLanguage } from "../../settings/contracts";
 
 const codes = [...asrLanguages.map(([code]) => code), "other"] as const;
 const result = z.object({ languages: z.array(z.enum(codes)).max(4) }).strict();
-const policy = readFileSync(
-	new URL("../prompts/transcript-language.md", import.meta.url),
-	"utf8",
-);
+const policy =
+	systemContext("voice-dialogue.contexts.transcript-language.policy", {}) +
+	"\n";
 
 /** Kana is written only in Japanese, so such a transcript needs no model call. */
 export function scriptLanguage(text: string): AsrLanguage | null {

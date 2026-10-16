@@ -96,9 +96,7 @@ export type Config = {
 };
 
 /** Comma-separated host list: lower-cased, trimmed, de-duplicated; empty becomes undefined. */
-export function parseHostList(
-	raw: string | undefined,
-): readonly string[] | undefined {
+function parseHostList(raw: string | undefined): readonly string[] | undefined {
 	const hosts = [
 		...new Set(
 			(raw ?? "")

@@ -90,7 +90,7 @@ export const publicHttpsPost: WebhookPost = async (
 		req.end(body);
 	});
 };
-export function signedHeaders(
+function signedHeaders(
 	s: Subscription,
 	id: string,
 	body: string,

@@ -1,15 +1,10 @@
 import { z } from "zod";
 import type { HttpErrorStatus } from "../../../infrastructure/http";
 
-export const MIN_INTERVAL_MS = 60_000;
-export const MAX_INTERVAL_MS = 365 * 24 * 60 * 60 * 1000;
-export const misfirePolicies = ["coalesce", "skip"] as const;
-export const scheduleStates = [
-	"active",
-	"paused",
-	"cancelled",
-	"completed",
-] as const;
+const MIN_INTERVAL_MS = 60_000;
+const MAX_INTERVAL_MS = 365 * 24 * 60 * 60 * 1000;
+const misfirePolicies = ["coalesce", "skip"] as const;
+const scheduleStates = ["active", "paused", "cancelled", "completed"] as const;
 
 const offsetTime = z.iso.datetime({ offset: true });
 export const createScheduleSchema = z.object({
@@ -62,7 +57,7 @@ export const scheduleListSchema = z.object({
 	nextCursor: z.string().nullable(),
 });
 
-export const occurrenceSchema = z.object({
+const occurrenceSchema = z.object({
 	id: z.string(),
 	scheduleId: z.string(),
 	scheduleRevision: z.number().int(),

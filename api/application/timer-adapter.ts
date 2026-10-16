@@ -30,7 +30,7 @@ export const timerDomainSchemas = {
  * The existing time fields (hours, minutes, seconds as text) to `durationSeconds`. Only
  * non-negative whole numbers; the operation schema then checks 1 second to 24 hours.
  */
-export const timerHms: InputAdapter = (raw) => {
+const timerHms: InputAdapter = (raw) => {
 	const errors: Array<{ field: string; message: string }> = [];
 	const parts = (["hours", "minutes", "seconds"] as const).map((field) => {
 		const value = raw[field];

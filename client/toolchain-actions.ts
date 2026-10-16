@@ -11,7 +11,6 @@ import {
 import {
 	toolchainActionEventV1,
 	type ActionRequestView,
-	type ExecutionResultV1,
 	type ToolchainActionEventV1,
 } from "../api/domains/tool-runtime/contracts";
 import type { Transport } from "./transport";
@@ -62,7 +61,6 @@ const actionRequestView = z.looseObject({
 function asView(value: z.infer<typeof actionRequestView>): ActionRequestView {
 	return value as unknown as ActionRequestView;
 }
-export type { ExecutionResultV1 };
 
 /** A list answer is a bare array or `{ items }`; both carry the same rows. */
 /** A list response `{ <key>: item[] }` as the backend sends it. */
@@ -123,7 +121,6 @@ const sourceResponse = z.looseObject({
 	revision: z.number().int().min(0),
 	data: z.unknown(),
 });
-export type ToolchainArtifactSource = z.infer<typeof sourceResponse>;
 
 const interactionView = z.looseObject({
 	id: z.string(),
@@ -152,9 +149,9 @@ export type SubmittedAction = { httpStatus: number; view: ActionRequestView };
  * A media path a registered screen may preview: this API's own `/api/` paths only. Anything
  * with another origin, a protocol, a parent step or a doubled slash is refused before a request.
  */
-export const mediaPathPattern =
+const mediaPathPattern =
 	/^\/api\/[A-Za-z0-9._~%-]+(?:\/[A-Za-z0-9._~%-]+)*(?:\?[A-Za-z0-9._~%=&-]{0,300})?$/;
-export function isMediaPath(path: string) {
+function isMediaPath(path: string) {
 	return mediaPathPattern.test(path) && !path.split("?")[0]!.includes("..");
 }
 

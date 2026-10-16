@@ -15,7 +15,7 @@ export const HOOK_TOKEN_HEADER = "x-eumenes-hook-token";
 export const LAST_MESSAGE_CHARS = 4000;
 
 /** Hooks the host listens to, in the order they are written into the settings file. */
-export const HOOK_EVENTS = [
+const HOOK_EVENTS = [
 	"SessionStart",
 	"UserPromptSubmit",
 	"PostToolUse",
@@ -77,7 +77,7 @@ export function hookBaseUrl(value: string | undefined): string | undefined {
 }
 
 /** Git writes a `work` session of a Kanban card must not make (the person commits after review). */
-export const GIT_WRITE_DENY = ["Bash(git commit *)", "Bash(git push *)"];
+const GIT_WRITE_DENY = ["Bash(git commit *)", "Bash(git push *)"];
 
 /** The 0600 file next to a settings file that holds the token header (`curl -H @file`). */
 export const headerFileOf = (settingsPath: string) =>

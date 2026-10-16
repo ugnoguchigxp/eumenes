@@ -9,7 +9,7 @@ import { useRef } from "react";
 import type { Submit } from "../../../../../api/domains/dialogue/contracts";
 import { conversationKey } from "../../conversation";
 import { queryRoots } from "../../../queryKeys";
-export const runsKey = (identity: string, id: string) =>
+const runsKey = (identity: string, id: string) =>
 	[queryRoots.dialogue, identity, id, "runs"] as const;
 export function invalidateDialogueViews(
 	cache: QueryClient,

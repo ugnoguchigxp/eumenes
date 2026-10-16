@@ -1,3 +1,4 @@
+import { systemContext } from "../../../infrastructure/system-context";
 import { readFileSync } from "node:fs";
 import type { Definition } from "../contracts";
 
@@ -30,7 +31,7 @@ export const timerBuiltins: Definition[] = [
 		title: "タイマー担当",
 		summary: "現在の依頼のタイマーを保存確認してから報告する",
 		dependencies: [],
-		body: "相対時間の開始、照会、取消だけを扱います。保存済みreceiptの前に開始や取消を報告しません。",
+		body: systemContext("capabilities.contexts.timers.body", {}),
 	},
 	{
 		...base,

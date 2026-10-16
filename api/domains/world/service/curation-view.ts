@@ -21,7 +21,7 @@ const segmenter = new Intl.Segmenter("ja", { granularity: "word" });
 const TOO_SHORT = /^[\p{Script=Hiragana}\p{Script=Katakana}\p{ASCII}]$/u;
 
 /** Distinct words of the texts, in the order they appear. Deterministic: no model is involved. */
-export function wordsOf(texts: readonly string[], max = MAX_WORDS): string[] {
+function wordsOf(texts: readonly string[], max = MAX_WORDS): string[] {
 	const seen = new Set<string>();
 	const words: string[] = [];
 	for (const text of texts)

@@ -9,7 +9,7 @@ import type {
 	WebArtifactAdapter,
 } from "../toolchain-artifacts/registry";
 
-export const KANBAN_ADAPTER_REF = "adapter:kanban@1";
+const KANBAN_ADAPTER_REF = "adapter:kanban@1";
 const DEFAULT_SOURCE = "kanban";
 
 const REJECTIONS: Record<string, string> = {

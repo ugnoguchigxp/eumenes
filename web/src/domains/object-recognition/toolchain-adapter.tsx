@@ -1,7 +1,7 @@
 import type { WebArtifactAdapter } from "../toolchain-artifacts/registry";
 import { useRecognitionRuntime } from "./use-recognition-runtime";
 
-export const OBJECT_RECOGNITION_SCREEN_ADAPTER_REF =
+const OBJECT_RECOGNITION_SCREEN_ADAPTER_REF =
 	"adapter:object-recognition-screen@1";
 
 /** Registered view with the existing authenticated media and recognition operations. */

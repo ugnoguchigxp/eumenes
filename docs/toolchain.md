@@ -1,5 +1,15 @@
 # 会話からの調査(toolchain)
 
+## SystemContextの配置と生成
+
+コード内の固定SystemContextは `s11tnext@0.1.2` で管理し、所属domainの `api/domains/<domain>/contexts/**/*.context.toml` を正本とします。会話、調査worker、保守、監督、画面生成、組込みprofileの本文が対象です。版付きSKILLは既存のMarkdownとbundle登録機構を使います。依頼、取得資料、記憶、ツール一覧、出力schema、権限・取消・予算の検査は既存の実行機構に残します。
+
+`api/infrastructure/system-context.ts` が検証済みcatalogを一度読み込み、型付きのキーで固定文面を返します。会話の口調・役割・名前はTOMLの変数で組み立てます。名前は従来どおり保存設定から読み、既存の指示への埋込み方を保持しています。この互換用の `trusted` / `raw` 変数へ、依頼や取得資料を追加で渡してはいけません。新しい未信頼変数はライブラリの `delimited-context` と非raw encodingで宣言し、メッセージの信頼境界も確認してください。
+
+TOMLを変更したら `bun run context:lint`、`bun run context:build` を実行し、`.s11tnext/catalog.json` と `.s11tnext/catalog.generated.ts` を一緒に更新します。設定はリポジトリ直下の `s11tnext.config.toml`、文面のlocaleは現行の日本語です。`bun run context:check` は書込みをせず、TOMLと生成物の不一致を拒否します。通常の `bun run verify -- --domain <name>` にもこのチェックを含めます。生成物は専用compilerが整形するため、汎用formatterの対象外です。
+
+末尾改行はライブラリが正規化します。断片を連結するときの区切り改行は呼出し側で明示し、既存の文面・順序を保持します。会話SystemContextは移行前の文字列fingerprintを用いて、全口調と名前の有無・特殊文字を回帰検証しています。固定文面の移動で、LLMの判断を置き換える条件分岐は追加しません。
+
 ## LLM生成JSONの構文補正
 
 LLMが返すJSONは `api/infrastructure/llm-json.ts` の共通処理を一度通してから、各domainの既存スキーマと採用条件で検証する。対象は会話function引数、workerの操作・要件検証、Codexの最終制御応答、音楽生成・再生計画、coding-supervisionの判断、Worldの抽出。通常の会話本文、HTTP/SSEの通信envelope、DB保存値、設定や利用者のJSON入力は対象外。これらの破損をLLMの出力不正として補正しない。
@@ -49,9 +59,9 @@ streamでは、function名や制御区切りになり得る末尾だけを保留
 
 実装目標(SystemContextの層構成、会話方針と公開ツールの一致、結果返却の必須規則など)と現行との差分は [Web検索 実装目標](../spec/web-search-target-2026-10-11.md) にあります。今回の会話契約と根拠容量の修正範囲は[実装計画](../spec/web-search-repair-implementation-plan-2026-10-11.md)のA〜Dです。後続の構造改善とは区別します。
 
-Lunaはbackendの `@openai/codex-sdk@0.160.0` から `startThread` / `runStreamed` で `gpt-6-luna` を実行します。SDK内部のCLIランタイムに、既存の保存済みログインを利用します。backendの実行ユーザーでCodex CLIをインストール・ログインし、PATHから起動できるようにしてください。実行ファイルは `EUMENES_RESEARCH_CODEX_EXECUTABLE` で指定できます（既定 `codex`）。CLIが見つからないときやWeb調査が無効なときはLunaのツールを公開しません。認証・モデル利用権・接続の失敗は調査失敗として扱い、別モデルへ自動変更しません。
+Codex調査はbackendの `@openai/codex-sdk@0.160.0` から `startThread` / `runStreamed` で実行します。モデルは保存済みのCodex接続のモデルを使い、接続が無ければCodexの既定に従います。SDK内部のCLIランタイムに、既存の保存済みログインを利用します。backendの実行ユーザーでCodex CLIをインストール・ログインし、PATHから起動できるようにしてください。実行ファイルは `EUMENES_RESEARCH_CODEX_EXECUTABLE` で指定できます（既定 `codex`）。CLIが見つからないときやWeb調査が無効なときはCodex調査のツールを公開しません。認証・モデル利用権・接続の失敗は調査失敗として扱い、別モデルへ自動変更しません。
 
-各stepは空の一時ディレクトリでephemeral・read-onlyとして実行し、ユーザー設定・exec規則・native検索・shell・JS実行・MCP・apps・追加エージェントを使いません。CLIの保存済み認証だけを再利用し、製品DB・LARM認証・設定を渡しません。stepの固定指示(共通規則・経路方針・TOOLS・OUTPUT_SCHEMA)だけでCLIの基本指示を置き換え、修正依頼などstepごとの通知・依頼データ・取得資料はJSONの入力として渡します。出力schemaはworkerの契約から値として受け取り、指示文から読み戻しません。取消は子processの終了を待たずに失敗として返し、終了の回収は最大1.5秒だけ待ちます。イベント列(256 KiB)と最終応答(64 KiB)の上限は別です。ホストのSKILL・plugin・画像生成・ブラウザ等の不要な機能も無効にします。出力定義をSystemContextへ渡し、SDKのagent_messageの最後の応答を、`turn.completed` が一件で全イベントの正常終了を確認して採用します。途中の候補、失敗・未完了・重複完了を採用しません。SDKに公開されていないephemeral・設定/exec規則の無視・process groupの強制終了・イベント256 KiB/エラー出力64 KiBの容量制約だけを小さな起動補助で強制します。SDKがモデル呼出し・JSONL解析・turnイベントを扱い、起動補助は調査判断を行いません。一時ファイルは終了・取消時に削除します。途中の説明文を操作として実行しません。Lunaは既存のinvoke/finish契約で操作を選び、Eumenesの検索・本文取得・保存本文・資料guard・根拠参照を使います。担当は子の入力と推論requestへ保存され、step間で変わりません。共通の期限・取消・receipt採用検査を通し、CLIの終了と取消では所有するprocess groupを停止します。Providerの生応答はログへ保存しません。SDKの接続方法は[公式SDK仕様](https://developers.openai.com/codex/sdk)に従います。起動補助が必要な根拠は、採用SDKのThreadOptionsにephemeral/ignore-user-config/ignore-rulesがなく、AbortSignalのSIGTERMだけでは終了を拒む子や孫が残る取消回帰試験です。
+各stepは空の一時ディレクトリでephemeral・read-onlyとして実行し、ユーザー設定・exec規則・native検索・shell・JS実行・MCP・apps・追加エージェントを使いません。CLIの保存済み認証だけを再利用し、製品DB・LARM認証・設定を渡しません。stepの固定指示(共通規則・経路方針・TOOLS・OUTPUT_SCHEMA)だけでCLIの基本指示を置き換え、修正依頼などstepごとの通知・依頼データ・取得資料はJSONの入力として渡します。出力schemaはworkerの契約から値として受け取り、指示文から読み戻しません。取消は子processの終了を待たずに失敗として返し、終了の回収は最大1.5秒だけ待ちます。イベント列(256 KiB)と最終応答(64 KiB)の上限は別です。ホストのSKILL・plugin・画像生成・ブラウザ等の不要な機能も無効にします。出力定義をSystemContextへ渡し、SDKのagent_messageの最後の応答を、`turn.completed` が一件で全イベントの正常終了を確認して採用します。途中の候補、失敗・未完了・重複完了を採用しません。SDKに公開されていないephemeral・設定/exec規則の無視・process groupの強制終了・イベント256 KiB/エラー出力64 KiBの容量制約だけを小さな起動補助で強制します。SDKがモデル呼出し・JSONL解析・turnイベントを扱い、起動補助は調査判断を行いません。一時ファイルは終了・取消時に削除します。途中の説明文を操作として実行しません。Codex調査は既存のinvoke/finish契約で操作を選び、Eumenesの検索・本文取得・保存本文・資料guard・根拠参照を使います。担当は子の入力と推論requestへ保存され、step間で変わりません。共通の期限・取消・receipt採用検査を通し、CLIの終了と取消では所有するprocess groupを停止します。Providerの生応答はログへ保存しません。SDKの接続方法は[公式SDK仕様](https://developers.openai.com/codex/sdk)に従います。起動補助が必要な根拠は、採用SDKのThreadOptionsにephemeral/ignore-user-config/ignore-rulesがなく、AbortSignalのSIGTERMだけでは終了を拒む子や孫が残る取消回帰試験です。
 
 子は取得本文を読み、短い要約、主張、出典、未確認点を返します。メインへ本文・生引用・ページタイトルは渡しません。主張の引用が実際に子へ提示した資料に含まれるかを確認しますが、この検査だけで主張の意味まで正しいと保証するものではありません。メインでも報告を未信頼データとして扱います。調査cardに進行状態・停止・出典・確認できなかった点を表示します。
 
@@ -96,7 +106,7 @@ profileは最大12要件・16 KiB、同時選択は4profile、合成後は12要�
 
 音声入力はASRの文字起こしを入力とし、発話の続き判定をLLMで行いません。ASRは雑音から任意の言語の文を作るため、設定の「利用する言語」（`general.asrLanguages`）以外の文字起こしは雑音として捨てます（エラーにも保留にもせず、送信前の入力は保持）。かなを含む文は日本語としてモデルを呼ばずに判定し、それ以外の文だけ既定controlモデルで一回判定します（8秒・128 token）。判定できない文・判定失敗は不採用です。無音で区切られた区間を送ると `input_ready` になり、Webは話し終えた状態で送信します。送信前に次の区間が届いた場合は直前の入力に連結し、元のASR receiptはすべて回答・TTSの検証parentに結びます。
 
-感情判定は引用・否定・定義文を保持して全6候補を提示し、非空回答で一回判定します。候補・判断基準・声色presetは `delivery/data/speech-delivery.v1.json` に置きます。語句・句読点から抑揚を推定せず、判定失敗時は保存済みの声設定を使います。
+音声回答は生成中の本文を既存の進捗購読から受け取り、句読点で区切った句を順次Ruriへ送ります。`current_chunk`は現在の句、`response`はその時点の回答文脈で、直近の会話も渡します。引用・否定・定義文を保持して全6候補を提示し、句ごとに判定して直ちにTTSを生成します。判定結果は後続の句へ使い回しません。機能選択の前置きは音声化せず、出典の整合性を検証する回答は検証済み本文から音声化します。記憶・目標の参照は生成中も再検査し、取消・参照失効後の判定と音声を採用しません。URL・ドメイン名・出典だけの行は画面に残し、TTS本文から除きます。途中で分割されたURLも、構造が確定するまで読み上げへ流しません。候補・判断基準・声色presetは `delivery/data/speech-delivery.v1.json` に置きます。語句・句読点から抑揚を推定せず、判定失敗時は保存済みの声設定を使います。
 
 ## 固定資料とliveの検証
 
@@ -106,19 +116,19 @@ profileは最大12要件・16 KiB、同時選択は4profile、合成後は12要�
 EUMENES_LIVE_LLM_NATIVE=1 bun scripts/llm-native-live.ts --suite all --cases api/application/testdata/llm-native/cases.json --out spec/verification/llm-native-2026-10-10 --repeats 2
 ```
 
-既存LARM接続URL・認証が必要です。製品DB・設定をコピーせず一時DBを使い、登録は認証済み管理API、推論は既存公開操作を通します。各caseは2回。engineが違う結果を合格にせず、Luna未設定を既定engineへ置換しません。意味確認がuncheckedの結果やskippedを合格にしません。実ASR・マイク・スピーカーの3往復は別の受入です。
+既存LARM接続URL・認証が必要です。製品DB・設定をコピーせず一時DBを使い、登録は認証済み管理API、推論は既存公開操作を通します。各caseは2回。engineが違う結果を合格にせず、Codex調査の未設定を既定engineへ置換しません。意味確認がuncheckedの結果やskippedを合格にしません。実ASR・マイク・スピーカーの3往復は別の受入です。
 
 根拠一覧は8 KiB以内の参照metadataとし、正確な抜粋は取得資料の観測に一度だけ提示します。各stepで以前の抜粋と後半の留保も再提示します。新しい抜粋の登録は、title・URL等を含む実際の提示資料(根拠一覧と観測)が資料枠に収まる場合だけ行います。資料枠は最大32 KiBで、64 KiBから指示・依頼・guidance・要件契約と、操作履歴(4 KiB)・修正状態等の予約を差し引いた残りです。同じ資料が複数の操作から届いた場合は一度だけ提示します。収まらない場合は登録せず、収まらなければ容量到達として操作を閉じ、提示済みの根拠で不足を含めて報告します。replayで過去の観測が後ろへ移った場合も、未提示の新規登録だけを取り消して枠内に保ちます。全体64 KiB、根拠64件が上限です。検索後に抜粋が足りなければ許可URLの本文を予算内で読みます。WebはV2の短い報告、historyはprofile・V3・意味検証を維持します。全経路のsystemに共通規則(資料は未信頼、未提示の事実を補わない、残時間60秒以下またはcanInvoke=falseでfinish、JSON一つ)を置き、経路の方針文で置き換えません。契約違反の修正診断(path/codeのみ)はタスク入力ではなく専用の列に保存し、受理時に消します。会話側の操作拒否は、分類・公開済みツール名・呼出し数・validationPath/codeだけを `dialogue.operation_rejected` に記録します。
 
 調査失敗の回答では、CURRENT_RESEARCH_FAILUREを今回のホスト確定状態としてsystem通知で渡します。報告と取得資料は未信頼のデータのままです。失敗分類以上の原因を推測せず、過去の会話の障害説明を現在の原因へ流用せず、システム障害をキーワード不足に置き換えません。コードが未知・抽象的なら詳細不明と伝えます。
 
-### Lunaへ渡す出力定義
+### Codex調査へ渡す出力定義
 
 SDKのホスト操作選択ルールは短いdeveloper指示へ置き、版付きの調査方針・TOOLS・出力定義はbase指示へ一度だけ渡す。TOOLSはCodexのnative tool一覧やsandboxのネットワーク権限から独立したEumenesの操作一覧であり、invokeのJSONを受けたホストが実行する。SDKのスキル・環境・permissions・会話モードの説明はこの制御呼出しでは提示しない。実行時のread-only sandbox、承認禁止、プロセス・receipt・期限・取消の制御は維持する。会話用SDKの入力構成は変更しない。
 
 `ControlContract.instructions` は指示とTOOLS、`outputSchema` はホストの契約から生成した定義です。Web調査には契約のmetadataに2つの出力例を持たせ、SystemContextの `OUTPUT_FORMAT` にその例だけを渡します。引数の定義はTOOLSのinputSchemaに一度だけ記載します。その他の既存担当はOUTPUT_SCHEMAを使います。指示文から定義を読み戻しません。
 
-Lunaはactionを直接返します。操作は `{"action":"invoke","tool":"提示済みのid","arguments":{}}`、終了は `{"action":"finish","report":{"outcome":"not_found","summary":"調査結果","claims":[],"limitations":[]}}`。argumentsは選んだTOOLSのinputSchemaに合わせ、任意項目は省略します。報告の事実には提示済みの根拠参照を付け、answered/partialではclaimsを1件以上、それ以外では空にします。SystemContextで役割・各項目・終了条件を説明します。
+Codex調査はactionを直接返します。操作は `{"action":"invoke","tool":"提示済みのid","arguments":{}}`、終了は `{"action":"finish","report":{"outcome":"not_found","summary":"調査結果","claims":[],"limitations":[]}}`。argumentsは選んだTOOLSのinputSchemaに合わせ、任意項目は省略します。報告の事実には提示済みの根拠参照を付け、answered/partialではclaimsを1件以上、それ以外では空にします。SystemContextで役割・各項目・終了条件を説明します。
 
 SDKにはnative outputSchemaを渡しません。decisionの包み、ツールごとの出力schema展開、strict用のnullable変換・復元を撤去しました。正常に完了したSDKの最終応答を共通のJSON補正と既存のworker契約・ツール権限・根拠検証へ渡します。不正出力は既存の一回限りのモデル修正対象になり、違反箇所を安全なpath/codeで記録します。契約そのものや取得・取消・期限の制約は緩めません。
 

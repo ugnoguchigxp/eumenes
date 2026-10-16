@@ -6,12 +6,7 @@ export {
 	outboxMigration,
 	retractionMigration,
 } from "./repository";
-export type {
-	ChangeResult,
-	ConversationSourceState,
-	OutboxEvent,
-	OutboxKind,
-} from "./contracts";
+export type { OutboxEvent } from "./contracts";
 export {
 	CONVERSATION_DEFAULT_PRINCIPAL,
 	CONVERSATION_DEFAULT_SCOPE,
@@ -19,15 +14,8 @@ export {
 	CONVERSATION_SOURCE_NAMESPACE,
 	CONVERSATION_SOURCE_REPRESENTATION,
 } from "./contracts";
-export type {
-	ConversationService,
-	ConversationServiceOptions,
-} from "./service";
+export type { ConversationService } from "./service";
 export { createConversationService } from "./service";
 export { migrations } from "./repository";
 
-export type {
-	HistoryOwner,
-	HistoryView,
-	HistoryScope,
-} from "./contracts/history";
+export type { HistoryOwner } from "./contracts/history";

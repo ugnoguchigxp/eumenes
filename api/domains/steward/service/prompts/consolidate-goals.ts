@@ -1,11 +1,6 @@
+import { systemContext } from "../../../../infrastructure/system-context";
 import { PREFACE } from "./common";
 
-export const instructions = `${PREFACE}
-
-今回の仕事は「目標の整理」です。入力の proposals（提案中の目標。ref は g1 など）と adopted（採用済みの目標。参考用で、ref はありません）を読み、取り下げるべき提案だけを withdraw に書きます。
-
-- 同じ内容を述べている複数の提案は、いちばん分かりやすい 1 件を残して、ほかを duplicate として取り下げます。採用済みの目標と同じ内容の提案も duplicate です。
-- 明らかに古くなった提案（もう話題に出ない、状況が変わった）は stale として取り下げます。迷うときは取り下げません。
-- 提案の数が上限（limit）に近い（count が limit の 90% 以上）ときは、今の会話と関係の薄い提案から low_relevance として取り下げ、上限に余裕を作ります。
-- 採用済みの目標は取り下げません（ref もありません）。
-- 取り下げるものがなければ withdraw を空にして changed を false にします。`;
+export const instructions =
+	String(PREFACE) +
+	systemContext("steward.contexts.consolidate-goals.instructions-text", {});

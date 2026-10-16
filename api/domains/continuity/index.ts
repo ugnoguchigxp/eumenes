@@ -4,12 +4,7 @@ export {
 	shortTermMigration,
 	itemSourceMigration,
 } from "./repository";
-export type { AgentContinuityInput, ContinuityService } from "./service";
+export type { ContinuityService } from "./service";
 export { createContinuityService } from "./service";
-export type {
-	ContinuityItem,
-	ContinuityKind,
-	ContinuitySnapshot,
-} from "./contracts";
-export { continuityItemSchema } from "./contracts";
+export type { ContinuityItem, ContinuityKind } from "./contracts";
 export { migrations } from "./repository";

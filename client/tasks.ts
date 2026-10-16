@@ -9,6 +9,7 @@ import {
 } from "../api/domains/tasks/contracts";
 import { json, type Transport } from "./transport";
 
+import type { OrchestrationGrant } from "../api/domains/tasks/contracts";
 export function tasksClient(transport: Transport) {
 	const path = (id: string) => `/api/tasks/${encodeURIComponent(id)}`;
 	const post = async (target: string, body: unknown): Promise<TaskReceipt> =>
@@ -66,9 +67,7 @@ export function tasksClient(transport: Transport) {
 			input: {
 				requestId: string;
 				expectedRevision: number;
-				grant:
-					| TaskGrantInput
-					| import("../api/domains/tasks/contracts").OrchestrationGrant;
+				grant: TaskGrantInput | OrchestrationGrant;
 			},
 		) => post(`${path(id)}/amend`, input),
 		answerTask: (

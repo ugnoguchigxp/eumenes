@@ -123,13 +123,13 @@ test("each punctuation clause is judged by Ruri and synthesized with its own ton
 	expect(states[0]?.conversation).toContain("話してください。");
 	expect(h.voice.get(id)?.audioChunks.map((chunk) => chunk.delivery)).toEqual([
 		expect.objectContaining({
-			source: "ruri",
+			source: "scored",
 			emotion: "joy",
 			motion: "joyful",
 			tone: "bright",
 		}),
 		expect.objectContaining({
-			source: "ruri",
+			source: "scored",
 			emotion: "empathy",
 			motion: "listening",
 			tone: "gentle",
@@ -232,7 +232,7 @@ test("a rejected clause decision does not prevent the next clause from being jud
 			motion: "neutral",
 		}),
 		expect.objectContaining({
-			source: "ruri",
+			source: "scored",
 			emotion: "joy",
 			motion: "joyful",
 		}),
@@ -296,4 +296,31 @@ test("goal-backed voice answers stream, and forgetting a goal aborts a pending j
 	await settle();
 	expect(spoken).toBe(0);
 	expect(h.voice.get(id)?.audioChunks).toEqual([]);
+});
+
+test("URLs and source lines remain on screen but never reach the speech judge or TTS, including split URL tokens", async () => {
+	const source = stream(),
+		spoken: string[] = [],
+		judged: string[] = [];
+	const h = await setup(undefined, {
+		transcribe: async () => "話してください。",
+		answerStream: source.answerStream,
+		judge: async (state) => {
+			judged.push(state.current_chunk!);
+			return ruri("none");
+		},
+		speak: async (text) => {
+			spoken.push(text);
+			return wav();
+		},
+	});
+	const id = await start(h, source);
+	const answer =
+		"本文です。\n出典：[example.com](https://example.com/report)\nhttps://example.com/a.b を表示します。";
+	for (const char of answer) source.push(char);
+	source.finish();
+	await until(() => h.voice.get(id)?.status === "ready");
+	expect(spoken).toEqual(["本文です。", "を表示します。"]);
+	expect(judged).toEqual(spoken);
+	expect(h.dialogue.answerText(h.voice.get(id)!.runId!)).toBe(answer);
 });

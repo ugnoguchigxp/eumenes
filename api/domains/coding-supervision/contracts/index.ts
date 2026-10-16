@@ -9,7 +9,7 @@ const ref = z
 	.max(160)
 	.regex(/^[a-zA-Z0-9_.:-]+$/);
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
-export const actions = [
+const actions = [
 	"wait",
 	"inspect_more",
 	"answer_question",
@@ -52,7 +52,7 @@ export const decisionSchema = z
 	);
 export type Decision = z.infer<typeof decisionSchema>;
 /** Execution facts kept apart: speech, turn terminal, process, capture and report limits. */
-export const executionObservationSchema = z.strictObject({
+const executionObservationSchema = z.strictObject({
 	run: runObservationSchema,
 	processState: z.enum([
 		"intent",
@@ -148,7 +148,7 @@ export const stepKinds = [
 	"request_push",
 ] as const;
 export type StepKind = (typeof stepKinds)[number];
-export interface WorkflowPolicy {
+interface WorkflowPolicy {
 	checkIds: string[];
 	checksDigest: string;
 	reviewPolicyDigest: string;
@@ -244,7 +244,7 @@ export interface DiagnosticIntent {
 	deadline: number;
 	focus?: ReadFocus;
 }
-export interface DiagnosticBudget {
+interface DiagnosticBudget {
 	/** executionId:generation:authorityEpoch; the budget never resets for the same key. */
 	scope: string;
 	total: number;
@@ -270,7 +270,7 @@ export const approvalChoices = {
 	approve: "承認する",
 	reject: "却下する",
 } as const;
-export interface PendingApproval {
+interface PendingApproval {
 	/** Task question that carries the approval prompt. */
 	questionId: string;
 	/** The exact decision to replay once approved; its instruction is the stored text. */

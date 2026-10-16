@@ -1,3 +1,4 @@
+import { systemContext } from "../../../infrastructure/system-context";
 import { readFileSync } from "node:fs";
 import type { Definition } from "../contracts";
 const common = {
@@ -15,7 +16,7 @@ export const historyBuiltins: Definition[] = [
 		id: "history.research",
 		title: "会話履歴担当",
 		summary: "許可された保存済み発言を確認",
-		body: "会話原文を調べ、以前の発言として話者・日時・根拠・不足を報告します。Web検索へ会話を送りません。",
+		body: systemContext("capabilities.contexts.history.body", {}),
 	},
 	{
 		...common,

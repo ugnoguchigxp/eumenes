@@ -68,7 +68,13 @@ export function backupBeforeMigration(
 			dirname(canonical),
 			`${backupPrefix(canonical)}${stamp}-${n}.bak`,
 		);
-	db.query("VACUUM INTO ?").run(target);
+	// Create the copy private from the start; chmod alone would leave a window.
+	const mask = process.umask(0o077);
+	try {
+		db.query("VACUUM INTO ?").run(target);
+	} finally {
+		process.umask(mask);
+	}
 	chmodSync(target, 0o600);
 	pruneBackups(canonical, options.keep ?? PRE_MIGRATION_BACKUPS_KEPT);
 	log.info("sqlite.pre_migration_backup", { reason: "pending_migrations" });

@@ -79,7 +79,7 @@ export type WindowSnapshot = {
 const EMPTY_PREFETCH: WindowPrefetch = { text: "", pins: [], bytes: 0 };
 const MAX_NOTICES = 5;
 /** A notice is one short sentence; longer text is cut so it cannot crowd out World. */
-export const MAX_NOTICE_CHARS = 200;
+const MAX_NOTICE_CHARS = 200;
 const CONTRACT_VERSION = 1 as const;
 
 /** The package's change counter for the shared profile: it moves whenever State there changes. */

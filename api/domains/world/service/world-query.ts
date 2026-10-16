@@ -37,7 +37,7 @@ import { getGapTask, putGapTask } from "../repository/gap-task";
 import type { WorldService } from "./world-service";
 
 /** AccessContext purpose used when the host names none: the dialogue read purpose. */
-export const WORLD_QUERY_DEFAULT_PURPOSE = "dialogue.read";
+const WORLD_QUERY_DEFAULT_PURPOSE = "dialogue.read";
 /** Condition freshness policy of this query surface. No observations are supplied, so conditions with measurements stay unknown. */
 const CONDITION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
@@ -97,7 +97,7 @@ const bytesOf = (value: unknown) =>
 	new TextEncoder().encode(JSON.stringify(value)).length;
 
 /** Request shape and size, before anything touches the database. */
-export function parseWorldQuery(
+function parseWorldQuery(
 	raw: unknown,
 ):
 	| { ok: true; request: WorldQueryRequest }

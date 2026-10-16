@@ -18,19 +18,19 @@ import { WorldJournalCorruptError } from "./world-journal";
 import type { ForgetRefusal, ForgetRequest } from "./lifecycle-types";
 
 export const MAX_CHUNK_ROOTS = 500;
-export const MAX_ROOTS_PER_FORGET = 50_000;
+const MAX_ROOTS_PER_FORGET = 50_000;
 export const MAX_REGISTRATIONS = 200;
 export const MAX_TOMBSTONES = 200;
 export const FEED_PAGE = 500;
 export const FEED_MAX_ROWS = 5000;
 export const INVALIDATE_KEYS = 20;
-export const MAX_ID_BYTES = 200;
+const MAX_ID_BYTES = 200;
 /** Splits a forget id from its part number; reserved, so a caller id may not contain it. */
-export const PART_SEPARATOR = "~";
+const PART_SEPARATOR = "~";
 export const DEFAULT_DEPENDENT_PAGE = 100;
 
 export const short = (text: string) => sha256Hex(text).slice(0, 24);
-export const utf8 = (text: string) => new TextEncoder().encode(text).length;
+const utf8 = (text: string) => new TextEncoder().encode(text).length;
 
 export class StepBlocked extends Error {
 	constructor(readonly reason: string) {
@@ -38,7 +38,7 @@ export class StepBlocked extends Error {
 	}
 }
 
-export const memoryUnavailable = (error: unknown): boolean =>
+const memoryUnavailable = (error: unknown): boolean =>
 	error instanceof MemoryStoreError;
 export const transientReason = (error: unknown): string | null => {
 	if (error instanceof WriterBusyError) return "WRITER_BUSY";

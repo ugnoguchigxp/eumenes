@@ -6,20 +6,10 @@ export { createTasks, type TasksService } from "./service";
  */
 export const migration = `${initMigration}\n${retentionMigration}`;
 export { registerTasks } from "./controller";
-export type {
-	TaskFence,
-	TaskKindDefinition,
-	TasksOptions,
-	TrustedTaskContext,
-} from "./types";
+export type { TaskFence, TaskKindDefinition } from "./types";
 export type {
 	WorkTask,
 	CodingWorkTask,
 	OrchestrationWorkTask,
-	OrchestrationGrant,
-	TaskReceipt,
-	TaskGrant,
-	TaskOrigin,
-	TaskQuestion,
 } from "./contracts";
 export { migrations } from "./repository";

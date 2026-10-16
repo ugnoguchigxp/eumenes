@@ -5,7 +5,11 @@ import { join } from "node:path";
 import type { SourceRef } from "eumenes-memory";
 import { planAssertionTransition } from "eumenes-world-model";
 import { migrations } from "./migrations";
-import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
+import {
+	openStore,
+	type Migration,
+	type SqliteStore,
+} from "../../../infrastructure/sqlite";
 import {
 	CONVERSATION_DEFAULT_PRINCIPAL,
 	CONVERSATION_DEFAULT_SCOPE,
@@ -56,13 +60,18 @@ export type Harness = {
 /** A temp-file store with the World host schema (Conversation, Memory, World migrations). */
 export async function openHarness(
 	over: Partial<WorldServiceOptions> = {},
-	options: { enabled?: boolean; initialSync?: boolean } = {},
+	options: {
+		enabled?: boolean;
+		initialSync?: boolean;
+		/** Composition tests pass the full production schema instead of World's. */
+		migrations?: readonly Migration[];
+	} = {},
 ): Promise<Harness> {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-world-host-"));
 	const path = join(dir, "db.sqlite3");
 	let store: SqliteStore | undefined;
 	try {
-		store = openStore(path, migrations);
+		store = openStore(path, options.migrations ?? migrations);
 		await store.write((db) => {
 			db.exec(
 				"CREATE TABLE host_probe (n INTEGER NOT NULL); CREATE TABLE host_queue (cursor TEXT NOT NULL);",
@@ -107,7 +116,7 @@ export async function openHarness(
 export async function withHarness<T>(
 	run: (h: Harness) => Promise<T>,
 	over: Partial<WorldServiceOptions> = {},
-	options: { enabled?: boolean; initialSync?: boolean } = {},
+	options: Parameters<typeof openHarness>[1] = {},
 ): Promise<T> {
 	const harness = await openHarness(over, options);
 	try {

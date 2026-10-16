@@ -164,7 +164,10 @@ export function eventsClient(
 	// Coming back to the page or the network retries a stream that is not live.
 	let resumeTimer: ReturnType<typeof setTimeout> | undefined;
 	function resume() {
-		if (typeof document !== "undefined" && document.visibilityState === "hidden")
+		if (
+			typeof document !== "undefined" &&
+			document.visibilityState === "hidden"
+		)
 			return;
 		clearTimeout(resumeTimer);
 		resumeTimer = setTimeout(() => {

@@ -53,6 +53,102 @@ export interface IDropdownMenuProps {
 	className?: string;
 }
 
+type Placement = Required<
+	Pick<
+		IDropdownMenuProps,
+		"align" | "side" | "autoFlip" | "autoSide" | "offset" | "minWidthPx"
+	>
+>;
+
+/** Fixed-position style that keeps the menu next to its trigger and inside the viewport. */
+function menuPosition(
+	triggerRect: DOMRect,
+	menuRect: DOMRect,
+	{ align, side, autoFlip, autoSide, offset, minWidthPx }: Placement,
+): React.CSSProperties {
+	const vw = window.innerWidth;
+	const vh = window.innerHeight;
+	const margin = 8;
+
+	const spaceBelow = vh - triggerRect.bottom - margin;
+	const spaceAbove = triggerRect.top - margin;
+
+	let resolvedSide: "bottom" | "top" = side;
+	if (autoSide) {
+		if (spaceBelow >= menuRect.height) {
+			resolvedSide = "bottom";
+		} else if (spaceAbove >= menuRect.height) {
+			resolvedSide = "top";
+		} else {
+			resolvedSide = spaceBelow >= spaceAbove ? "bottom" : "top";
+		}
+	}
+
+	const minWidth = Math.max(minWidthPx, triggerRect.width);
+
+	let top =
+		resolvedSide === "bottom"
+			? triggerRect.bottom + offset
+			: triggerRect.top - menuRect.height - offset;
+
+	const menuWidth = Math.max(menuRect.width, minWidth);
+	const leftAlignLeft = triggerRect.left;
+	const leftAlignRight = triggerRect.right - menuWidth;
+
+	let resolvedAlign: "left" | "right" = align;
+
+	if (autoFlip) {
+		const preferredLeft = align === "left" ? leftAlignLeft : leftAlignRight;
+		const preferredOverflowsLeft = preferredLeft < margin;
+		const preferredOverflowsRight = preferredLeft + menuWidth > vw - margin;
+
+		const flipIsUseful =
+			(align === "left" && preferredOverflowsRight) ||
+			(align === "right" && preferredOverflowsLeft);
+
+		if (flipIsUseful) {
+			resolvedAlign = align === "left" ? "right" : "left";
+		} else if (preferredOverflowsLeft || preferredOverflowsRight) {
+			// If overflow exists but flip would not help (e.g. near right edge with align=right),
+			// keep alignment and clamp to stay near the trigger.
+			resolvedAlign = align;
+		}
+	}
+
+	const leftUnclamped =
+		resolvedAlign === "left" ? leftAlignLeft : leftAlignRight;
+	const left = Math.min(
+		vw - margin - menuWidth,
+		Math.max(margin, leftUnclamped),
+	);
+
+	if (autoSide) {
+		if (resolvedSide === "bottom" && top + menuRect.height > vh - margin) {
+			const flippedTop = triggerRect.top - menuRect.height - offset;
+			if (flippedTop >= margin) top = flippedTop;
+		} else if (resolvedSide === "top" && top < margin) {
+			const flippedBottom = triggerRect.bottom + offset;
+			if (flippedBottom + menuRect.height <= vh - margin) top = flippedBottom;
+		}
+	}
+
+	const maxHeight =
+		resolvedSide === "bottom"
+			? Math.max(120, vh - top - margin)
+			: Math.max(120, triggerRect.top - margin);
+
+	return {
+		position: "fixed",
+		top,
+		left,
+		minWidth,
+		maxHeight,
+		overflowY: "auto",
+		zIndex: 50,
+		visibility: "visible",
+	};
+}
+
 /**
  * ドロップダウンメニュー
  */
@@ -101,91 +197,13 @@ export const DropdownMenu: React.FC<IDropdownMenuProps> = React.memo(
 			const menuEl = menuRef.current;
 			if (!triggerEl || !menuEl) return;
 
-			const triggerRect = triggerEl.getBoundingClientRect();
-			const menuRect = menuEl.getBoundingClientRect();
-
-			const vw = window.innerWidth;
-			const vh = window.innerHeight;
-			const margin = 8;
-
-			const spaceBelow = vh - triggerRect.bottom - margin;
-			const spaceAbove = triggerRect.top - margin;
-
-			let resolvedSide: "bottom" | "top" = side;
-			if (autoSide) {
-				if (spaceBelow >= menuRect.height) {
-					resolvedSide = "bottom";
-				} else if (spaceAbove >= menuRect.height) {
-					resolvedSide = "top";
-				} else {
-					resolvedSide = spaceBelow >= spaceAbove ? "bottom" : "top";
-				}
-			}
-
-			const minWidth = Math.max(minWidthPx, triggerRect.width);
-
-			let top =
-				resolvedSide === "bottom"
-					? triggerRect.bottom + offset
-					: triggerRect.top - menuRect.height - offset;
-
-			const menuWidth = Math.max(menuRect.width, minWidth);
-			const leftAlignLeft = triggerRect.left;
-			const leftAlignRight = triggerRect.right - menuWidth;
-
-			let resolvedAlign: "left" | "right" = align;
-
-			if (autoFlip) {
-				const preferredLeft = align === "left" ? leftAlignLeft : leftAlignRight;
-				const preferredOverflowsLeft = preferredLeft < margin;
-				const preferredOverflowsRight = preferredLeft + menuWidth > vw - margin;
-
-				const flipIsUseful =
-					(align === "left" && preferredOverflowsRight) ||
-					(align === "right" && preferredOverflowsLeft);
-
-				if (flipIsUseful) {
-					resolvedAlign = align === "left" ? "right" : "left";
-				} else if (preferredOverflowsLeft || preferredOverflowsRight) {
-					// If overflow exists but flip would not help (e.g. near right edge with align=right),
-					// keep alignment and clamp to stay near the trigger.
-					resolvedAlign = align;
-				}
-			}
-
-			const leftUnclamped =
-				resolvedAlign === "left" ? leftAlignLeft : leftAlignRight;
-			const left = Math.min(
-				vw - margin - menuWidth,
-				Math.max(margin, leftUnclamped),
+			setMenuStyle(
+				menuPosition(
+					triggerEl.getBoundingClientRect(),
+					menuEl.getBoundingClientRect(),
+					{ align, side, autoFlip, autoSide, offset, minWidthPx },
+				),
 			);
-
-			if (autoSide) {
-				if (resolvedSide === "bottom" && top + menuRect.height > vh - margin) {
-					const flippedTop = triggerRect.top - menuRect.height - offset;
-					if (flippedTop >= margin) top = flippedTop;
-				} else if (resolvedSide === "top" && top < margin) {
-					const flippedBottom = triggerRect.bottom + offset;
-					if (flippedBottom + menuRect.height <= vh - margin)
-						top = flippedBottom;
-				}
-			}
-
-			const maxHeight =
-				resolvedSide === "bottom"
-					? Math.max(120, vh - top - margin)
-					: Math.max(120, triggerRect.top - margin);
-
-			setMenuStyle({
-				position: "fixed",
-				top,
-				left,
-				minWidth,
-				maxHeight,
-				overflowY: "auto",
-				zIndex: 50,
-				visibility: "visible",
-			});
 		}, [align, autoFlip, autoSide, minWidthPx, offset, side]);
 
 		// 外側クリックで閉じる

@@ -1,10 +1,9 @@
 import { z } from "zod";
-export const musicArtwork = z.object({
+const musicArtwork = z.object({
 	state: z.enum(["generating", "completed", "failed"]),
 	revision: z.number().int(),
 	errorCode: z.string().nullable(),
 });
-export type MusicArtwork = z.infer<typeof musicArtwork>;
 export const musicRecord = z.object({
 	id: z.string(),
 	runId: z.string(),
@@ -52,4 +51,4 @@ export const playlistUpdate = z.strictObject({
 	currentId: trackId.nullable().optional(),
 });
 
-export { trackQuery, type TrackQuery } from "../../larm/contracts";
+export { trackQuery } from "../../larm/contracts";

@@ -1,0 +1,8 @@
+text = '''
+ユーザーの名前は「[[name]]」です。必要なときだけ名前で呼びかけてください。'''
+
+[variables.name]
+type = "string"
+trust = "trusted"
+placement = "inline"
+encoding = "raw"

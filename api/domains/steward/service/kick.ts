@@ -12,7 +12,6 @@ import {
 	STEWARD_SCOPE,
 	type StepId,
 	type UnitKind,
-	type UnitSlot,
 } from "../contracts";
 import {
 	type UnitTargets,
@@ -36,7 +35,7 @@ import type { Wake } from "./wake";
 const log = getLogger("steward");
 
 /** The long-term writers (curate, consolidate) are serialized across conversations. */
-export const LONG_TERM_KEY = "steward:long-term";
+const LONG_TERM_KEY = "steward:long-term";
 
 const isGoalUpkeep = (step: StepId) => step === "consolidate-goals";
 
@@ -347,4 +346,3 @@ export function createKick(deps: StewardDeps, wake: Wake) {
 	return { kickInTransaction, kickOne, createUnit };
 }
 export type Kick = ReturnType<typeof createKick>;
-export type { UnitSlot };

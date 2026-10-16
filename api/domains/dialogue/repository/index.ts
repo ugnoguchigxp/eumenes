@@ -31,7 +31,7 @@ export const agentLinkMigration = `ALTER TABLE dialogue_runs ADD COLUMN agent_ta
 /** P3-08: whether World was read for the run ('used') or refused it ('blocked'). Frozen once deployed; dropped by `worldStateDropMigration`. */
 export const worldStateMigration = `ALTER TABLE dialogue_runs ADD COLUMN world_state TEXT CHECK (world_state IN ('used','blocked'));`;
 /** Nothing writes `world_state` any more (the conversation gets no World slice), so the column goes. */
-export const worldStateDropMigration = `ALTER TABLE dialogue_runs DROP COLUMN world_state;`;
+const worldStateDropMigration = `ALTER TABLE dialogue_runs DROP COLUMN world_state;`;
 export function linkAgent(
 	db: Database,
 	runId: string,

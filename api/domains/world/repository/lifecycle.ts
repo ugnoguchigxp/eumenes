@@ -64,7 +64,7 @@ CREATE TABLE world_host_restore (
 );
 `;
 
-export const FORGET_STATES = [
+const FORGET_STATES = [
 	"pending",
 	"journaled",
 	"world_applied",
@@ -97,7 +97,7 @@ export const ROOT_KINDS = [
 	"projection",
 	"slice",
 ] as const;
-export type RootKind = (typeof ROOT_KINDS)[number];
+type RootKind = (typeof ROOT_KINDS)[number];
 export type ForgetRoot = {
 	kind: RootKind;
 	id: string;

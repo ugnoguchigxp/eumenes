@@ -55,16 +55,16 @@ CREATE TABLE world_host_extract_feed (
 ) WITHOUT ROWID;
 `;
 
-export const EXTRACT_EVENT_STATES = [
+const EXTRACT_EVENT_STATES = [
 	"received",
 	"applied",
 	"rejected",
 	"skipped",
 ] as const;
-export type ExtractEventState = (typeof EXTRACT_EVENT_STATES)[number];
-export type ExtractSpeaker = "user" | "assistant";
+type ExtractEventState = (typeof EXTRACT_EVENT_STATES)[number];
+type ExtractSpeaker = "user" | "assistant";
 
-export type ExtractSourceRef = {
+type ExtractSourceRef = {
 	namespace: string;
 	kind: string;
 	id: string;

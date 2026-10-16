@@ -34,4 +34,3 @@ export function worldClient(t: Transport) {
 			read(forgetListSchema, scoped("/api/world/forgets", scopeKey), signal),
 	};
 }
-export type WorldClient = ReturnType<typeof worldClient>;

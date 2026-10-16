@@ -14,36 +14,17 @@ export { createDialogueService } from "./service";
 export { readActionOriginInTransaction } from "./service/action-origin";
 export { isAdoptedAnswerInTransaction } from "./service/adopted-answer";
 export type {
-	ContextGoalEntry,
 	GoalsLayerPort,
-	StewardPort,
 	StewardRunEnd,
 	WorldContextNamesInput,
 	WorldContextPort,
 } from "./contracts";
 export { migrations } from "./repository";
 
-export {
-	delegationCommand,
-	type DelegationPort,
-	type DelegationCommand,
-} from "./contracts/delegation";
-export {
-	INTERACTION_POLICY,
-	interactionAnswer,
-	interactionCancel,
-	interactionStatuses,
-	ANSWER_TEXT_SCHEMA,
-	type InteractionAnswer,
-	type InteractionAnswerResult,
-	type InteractionStatus,
-	type InteractionView,
-} from "./contracts/command-interactions";
-export type { CommandInteractions } from "./service/command-interactions";
+export { type DelegationPort } from "./contracts/delegation";
+export { INTERACTION_POLICY } from "./contracts/command-interactions";
 export type {
 	BoundCommandPort,
 	BoundCommandSet,
 	ToolchainRoutingPort,
-	ToolchainRoute,
-	QueryVector,
 } from "./contracts/toolchains";

@@ -195,7 +195,7 @@ export async function memoryForgetSource(
 	});
 }
 
-export function receiptOf(life: Life, forgetId: string) {
+function receiptOf(life: Life, forgetId: string) {
 	return life.store.read((db) =>
 		getForgetReceipt(db, {
 			contractVersion: CONTRACT_VERSIONS.lifecycle,

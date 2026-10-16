@@ -1,6 +1,6 @@
 import type { Migration } from "../../../infrastructure/sqlite";
 
-export const migration = `
+const migration = `
 CREATE TABLE toolchain_selections(
  id TEXT PRIMARY KEY,run_id TEXT NOT NULL UNIQUE,conversation_id TEXT NOT NULL,
  utterance_id TEXT,request_id TEXT,

@@ -38,4 +38,3 @@ export function createSettle(ctx: CurationCtx, adoption: Adoption) {
 		return write(ctx, adoption, db, prepared, verified.rows, plan, todo);
 	};
 }
-export type CurationSettle = ReturnType<typeof createSettle>;

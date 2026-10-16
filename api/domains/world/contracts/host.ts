@@ -1,4 +1,4 @@
-import type { AccessContext, SourceRef } from "eumenes-memory";
+import type { AccessContext } from "eumenes-memory";
 import type { ScopeRef } from "eumenes-world-model";
 import type {
 	WorldHistoryResult,
@@ -16,7 +16,7 @@ export type WorldFeed = (typeof WORLD_FEEDS)[number];
 export const WORLD_PROVIDER_REF = "eumenes-world";
 
 /** The caller names the purpose and scopes; the host adds the policy revision. */
-export type WorldRequestAccess = Omit<AccessContext, "policyRevision">;
+type WorldRequestAccess = Omit<AccessContext, "policyRevision">;
 
 export type WorldApplyRequest = {
 	access: WorldRequestAccess;
@@ -36,7 +36,7 @@ export type WorldReadRequest = {
 };
 
 /** Host-side reasons. World's own reason codes pass through unchanged. */
-export const WORLD_HOST_REASON_CODES = [
+const WORLD_HOST_REASON_CODES = [
 	"WORLD_DISABLED",
 	"SOURCE_NOT_AVAILABLE",
 	"SOURCE_REPRESENTATION_REQUIRED",
@@ -114,10 +114,4 @@ export type WorldStatus = {
 	schema: WorldSchemaStatus;
 	/** True only when World may be used: enabled and the schema matches the pinned migrations. */
 	usable: boolean;
-};
-
-/** A source input after the host's scope check. */
-export type ResolvedInput = {
-	ref: SourceRef;
-	type: "source" | "state_item";
 };

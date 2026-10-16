@@ -21,7 +21,7 @@ import { externalIdOf } from "./memory-adapter";
  * Scope and the run id only, so a cancel or a forget finds them without the
  * prepared context.
  */
-export function sliceDependentPrefix(
+function sliceDependentPrefix(
 	scope: { principal: string; scopeKey: string },
 	runId: string,
 ): string {
@@ -47,7 +47,7 @@ export type UnregisterDependents = (
  * `sweepReleasePending` to retry. Returns true when Memory released them.
  * Other (programming) errors still propagate.
  */
-export function releaseScopeDependents(
+function releaseScopeDependents(
 	db: Database,
 	scope: ScopeLike,
 	ids: readonly string[],

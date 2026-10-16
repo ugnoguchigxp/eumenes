@@ -327,4 +327,3 @@ export function createHttpJsonExecutor(config: {
 		},
 	};
 }
-export type HttpJsonExecutor = ReturnType<typeof createHttpJsonExecutor>;

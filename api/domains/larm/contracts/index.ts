@@ -7,7 +7,6 @@ import {
 export * from "./chat-input";
 export {
 	imageArtifactId,
-	imageArtifact,
 	imageArtifactDelete,
 	imageLibrary,
 } from "./image-library";
@@ -71,12 +70,7 @@ export type LarmStatus = {
 	error?: string;
 };
 import type { TtsVoices } from "./voices";
-export {
-	ttsVoicesSchema,
-	type TtsVoices,
-	type TtsVoice,
-	type TtsRange,
-} from "./voices";
+export { ttsVoicesSchema, type TtsVoices } from "./voices";
 export interface LarmPort {
 	decisionModel?(): string | null;
 	judge?(
@@ -132,7 +126,7 @@ export interface LarmPort {
 	close(): Promise<void>;
 }
 
-export const larmStatusSchema: z.ZodType<LarmStatus> = z.object({
+const larmStatusSchema: z.ZodType<LarmStatus> = z.object({
 	state: z.enum(["unconfigured", "idle", "ready", "connecting", "failed"]),
 	capabilities: z.array(z.enum(["llm", "asr", "tts"])),
 	chatInput: chatInputSchema.optional(),
@@ -142,7 +136,6 @@ export const statusResponseSchema = z.object({
 	service: z.string(),
 	larm: larmStatusSchema,
 });
-export type StatusResponse = z.infer<typeof statusResponseSchema>;
 
 /** HTTP status of each error code this domain throws; merged by `api/application/error-status.ts`. */
 export const errorStatus = {
@@ -158,5 +151,4 @@ export {
 	musicTracks,
 	musicTags,
 	type TrackQuery,
-	type MusicTrack,
 } from "./music-library";

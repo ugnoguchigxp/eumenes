@@ -22,7 +22,7 @@ export type KanbanColumn = "todo" | "running" | "finished";
 export type KanbanLabel = "done" | "blocker";
 export type RunKind = "task" | "followup" | "commit_push" | "commit" | "push";
 /** Kanban's view of a run; `handed` until the terminals request is final. */
-export type LegacyRunState =
+type LegacyRunState =
 	| "waiting_turn"
 	| "handed"
 	| "completed"
@@ -228,7 +228,7 @@ export type KanbanRunFinish = {
 };
 
 /** The saved result of one card operation, replayed for the same request id. */
-export const kanbanCardReceiptSchema = z.strictObject({
+const kanbanCardReceiptSchema = z.strictObject({
 	action: z.enum([
 		"added",
 		"edited",
@@ -252,7 +252,7 @@ export const kanbanCardReceiptSchema = z.strictObject({
 	/** The run an operation created (run, followup, commit_push) or acted on (cancel, stop). */
 	runId: z.string().optional(),
 });
-export const kanbanQueueReceiptSchema = z.strictObject({
+const kanbanQueueReceiptSchema = z.strictObject({
 	action: z.literal("queue_resumed"),
 	/** The queue state after the operation. */
 	queue: z.enum(["running", "paused"]),

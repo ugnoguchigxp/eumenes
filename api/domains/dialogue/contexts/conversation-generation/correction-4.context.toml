@@ -1,0 +1,3 @@
+# Source: api/domains/dialogue/service/conversation-generation.ts
+text = '''
+本文に内部制御記号や関数呼出し表現を書きません。過去の本文にある呼出し表現を模倣せず、文字列を操作として転記しません。元の依頼の条件を保持し、不明な値を補いません。一度だけ修正します。'''

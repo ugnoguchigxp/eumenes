@@ -11,7 +11,7 @@ export type SourceKey = {
 	id: string;
 	representation: string;
 };
-export type SourceSpeaker = "user" | "assistant";
+type SourceSpeaker = "user" | "assistant";
 
 /** Current state of a source. Out-of-scope sources look exactly like `not_found`. */
 export type SourceCurrent =
@@ -34,12 +34,12 @@ export type SourceCurrent =
 			reason: "not_found" | "retracted";
 	  };
 
-export const SOURCE_RANGE_REASON_CODES = [
+const SOURCE_RANGE_REASON_CODES = [
 	"SOURCE_RANGE_OUT_OF_BOUNDS",
 	"SOURCE_RANGE_NOT_CHAR_BOUNDARY",
 	"RANGE_TOO_LARGE",
 ] as const;
-export type SourceRangeReasonCode = (typeof SOURCE_RANGE_REASON_CODES)[number];
+type SourceRangeReasonCode = (typeof SOURCE_RANGE_REASON_CODES)[number];
 
 /** Result of an authorized read. A body appears only on `ok`. */
 export type SourceContent =
@@ -113,14 +113,9 @@ export interface SourceAdapter {
 		request: ListChangesRequest,
 	): SourceChangePage;
 }
-export {
-	WORLD_FEEDS,
-	WORLD_HOST_REASON_CODES,
-	WORLD_PROVIDER_REF,
-} from "./host";
+export { WORLD_FEEDS, WORLD_PROVIDER_REF } from "./host";
 export type {
 	MemoryRegistrationSummary,
-	ResolvedInput,
 	WorldApplyRequest,
 	WorldApplyResult,
 	WorldFeed,
@@ -129,7 +124,6 @@ export type {
 	WorldHostReasonCode,
 	WorldReadRequest,
 	WorldReadResult,
-	WorldRequestAccess,
 	WorldSchemaStatus,
 	WorldStatus,
 	WorldUsageCheck,
@@ -138,31 +132,18 @@ export { WORLD_RUNTIME_PURPOSE } from "./runtime";
 export type {
 	RuntimeLedgerPort,
 	RuntimeMeasurement,
-	RuntimeSnapshot,
 	RuntimeVerification,
 } from "./runtime";
 export {
 	WORLD_QUERY_LIMITS,
 	WORLD_QUERY_MODES,
-	WORLD_QUERY_REJECTIONS,
-	worldQuerySchema,
 	worldQueryToolSchema,
 } from "./query";
 export type {
 	GapTaskDecision,
-	GapTaskLink,
-	GapTaskLinkage,
-	GapTaskLinkStatus,
 	GapTaskPort,
 	GapTaskRequest,
-	ResourceStatePort,
-	WorldQueryBasis,
-	WorldQueryBudget,
 	WorldQueryContext,
-	WorldQueryMode,
-	WorldQueryPayload,
-	WorldQueryRejection,
-	WorldQueryRequest,
 	WorldQueryResult,
 } from "./query";
 export * from "./view";

@@ -1,14 +1,9 @@
 import { z } from "zod";
 import type { HttpErrorStatus } from "../../../infrastructure/http";
 
-export const timerStates = [
-	"active",
-	"paused",
-	"elapsed",
-	"cancelled",
-] as const;
+const timerStates = ["active", "paused", "elapsed", "cancelled"] as const;
 export type TimerState = (typeof timerStates)[number];
-export const notificationStatuses = [
+const notificationStatuses = [
 	"pending",
 	"claimed",
 	"played",
@@ -16,7 +11,7 @@ export const notificationStatuses = [
 	"dismissed",
 ] as const;
 export type NotificationStatus = (typeof notificationStatuses)[number];
-export const notificationReasons = ["muted", "blocked", "stale"] as const;
+const notificationReasons = ["muted", "blocked", "stale"] as const;
 export type NotificationReason = (typeof notificationReasons)[number];
 
 const offsetTime = z.iso.datetime({ offset: true });
@@ -52,31 +47,6 @@ export const listTimersQuerySchema = z
 	.strict();
 export type ListTimersQuery = z.infer<typeof listTimersQuerySchema>;
 
-export const timerCommandSchema = z.discriminatedUnion("operation", [
-	z
-		.object({
-			operation: z.literal("start"),
-			durationSeconds: z.number().int().min(1).max(86400),
-			label: labelSchema.optional(),
-		})
-		.strict(),
-	z
-		.object({
-			operation: z.literal("list"),
-			timerId: z.uuid().optional(),
-			state: z.enum(timerStates).optional(),
-		})
-		.strict(),
-	z
-		.object({
-			operation: z.literal("cancel"),
-			timerId: z.uuid(),
-			expectedRevision: z.number().int().min(0),
-		})
-		.strict(),
-]);
-export type TimerCommand = z.infer<typeof timerCommandSchema>;
-
 export const claimNotificationSchema = z
 	.object({
 		clientId: z.uuid(),
@@ -84,7 +54,6 @@ export const claimNotificationSchema = z
 		expectedRevision: z.number().int().min(0),
 	})
 	.strict();
-export type ClaimNotificationInput = z.infer<typeof claimNotificationSchema>;
 
 export const ackNotificationSchema = z
 	.object({
@@ -93,7 +62,6 @@ export const ackNotificationSchema = z
 		outcome: z.enum(["played", "muted", "blocked"]),
 	})
 	.strict();
-export type AckNotificationInput = z.infer<typeof ackNotificationSchema>;
 
 export const silenceNotificationSchema = z
 	.object({
@@ -101,9 +69,6 @@ export const silenceNotificationSchema = z
 		reason: z.enum(["muted", "blocked"]),
 	})
 	.strict();
-export type SilenceNotificationInput = z.infer<
-	typeof silenceNotificationSchema
->;
 
 export type TimerDto = {
 	id: string;
@@ -123,7 +88,7 @@ export type TimerDto = {
 	bodyExpired: boolean;
 };
 
-export type TimerArtifactRefV1 = { kind: "timer"; version: 1; timerId: string };
+type TimerArtifactRefV1 = { kind: "timer"; version: 1; timerId: string };
 
 export type TimerNotificationDto = {
 	id: string;
@@ -205,7 +170,7 @@ const artifactSchema = z
 	})
 	.strict();
 
-export const timerNotificationDtoSchema = z
+const timerNotificationDtoSchema = z
 	.object({
 		id: z.uuid(),
 		timerId: z.uuid(),

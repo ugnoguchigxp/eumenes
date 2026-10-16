@@ -282,7 +282,7 @@ test("only adopted, confident motion labels a running or completed answer; cance
 	await until(() => h.calls.length === 1);
 	const decision = {
 		id: crypto.randomUUID(),
-		source: "laya" as const,
+		source: "system-one" as const,
 		motion: "joyful" as const,
 		tone: "natural" as const,
 		confidence: 0.2,

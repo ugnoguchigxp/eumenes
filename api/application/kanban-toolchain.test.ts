@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { createTerminals, type SpawnPty } from "../domains/terminals";
 import { WORK_ONLY_INSTRUCTION } from "../domains/kanban";
 import { harness } from "./toolchain.fixture";
-import { settle, waitFor } from "../infrastructure/wait-for";
+import { waitFor } from "../infrastructure/wait-for";
 
 type Store = Parameters<
 	NonNullable<NonNullable<Parameters<typeof harness>[0]>["terminals"]>
@@ -340,7 +340,8 @@ test("running from the conversation queues the user's words under the work-only 
 		// The notification center gets the notice; the conversation gets nothing.
 		const notices = h.kanban!.notices(10).notices;
 		expect(notices.map((notice) => notice.kind)).toEqual(["done"]);
-		await settle(100);
+		// A negative check: give a late, timer-driven notice real time to appear.
+		await Bun.sleep(150);
 		expect(count(h, "SELECT COUNT(*) AS n FROM dialogue_runs")).toBe(
 			runsBefore,
 		);

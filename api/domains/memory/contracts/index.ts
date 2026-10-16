@@ -17,16 +17,14 @@ import { stateKinds } from "./state-kinds";
 export { stateKinds } from "./state-kinds";
 export {
 	memorySeedInputSchema,
-	memorySeedSchema,
 	memorySeedResultSchema,
 	parseMemorySeedJsonl,
 	seedStateText,
 	type MemorySeed,
-	type MemorySeedResult,
 } from "./seeds";
 export const settingsSchema = z.object({ enabled: z.boolean() });
 /** Who asked for an item: the user in conversation (`request`), or the steward on its own (`agent`). `manual`: rows from before manual changes were removed. */
-export type MemoryCapturedBy = "request" | "agent" | "manual";
+type MemoryCapturedBy = "request" | "agent" | "manual";
 export interface MemoryItemDto {
 	id: string;
 	kind: string;
@@ -100,7 +98,7 @@ export const memoryStatusSchema: z.ZodType<MemoryStatus> = z.object({
 	enabled: z.boolean(),
 	healthy: z.boolean(),
 });
-export const memoryItemSchema: z.ZodType<MemoryItemDto> = z.object({
+const memoryItemSchema: z.ZodType<MemoryItemDto> = z.object({
 	id: z.string(),
 	kind: z.string(),
 	semanticKey: z.string(),

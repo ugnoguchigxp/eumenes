@@ -112,7 +112,9 @@ test("renders the select with the billing path and the last used model as toolti
 	const trigger = await screen.findByRole("combobox", {
 		name: "会話エージェント",
 	});
-	await waitFor(() => expect(trigger.textContent).toContain("LARM / larm-m"));
+	await waitFor(() => expect(trigger.textContent).toContain("larm-m"));
+	expect(trigger.textContent).not.toContain("LARM /");
+	expect(trigger.getAttribute("title")).toContain("現在の経路: LARM / larm-m");
 	expect(trigger.getAttribute("title")).toContain(
 		"直近の利用: クラウド / model-a",
 	);

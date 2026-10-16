@@ -111,7 +111,7 @@ test("off by default; authentic unit reuses normal judgment, strips raw metadata
 	expect(sample.expression_transition).toBeNull();
 	expect(sample.split).toBeNull();
 	expect(sample.adopted).toBeNull();
-	expect(sample.selected_delivery.source).toBe("ruri");
+	expect(sample.selected_delivery.source).toBe("scored");
 	expect(sample.user_utterance).toBe("日本語の発言");
 	expect(sample.granularity).toBe("answer");
 	expect(sample.chunk_order).toBeNull();
@@ -126,7 +126,7 @@ test("off by default; authentic unit reuses normal judgment, strips raw metadata
 	expect(blind).not.toHaveProperty("criteria");
 	service.adopt(a.identity, delivery);
 	await service.drain();
-	expect((service.get(id, false) as Sample).adopted?.source).toBe("ruri");
+	expect((service.get(id, false) as Sample).adopted?.source).toBe("scored");
 	expect((service.get(id, false) as Sample).adopted?.tone).toBeNull();
 	service.adopt(a.identity, delivery, {
 		tone: "bright",
@@ -158,7 +158,7 @@ test("every technical reply uses the same single full-six judgment and records n
 		},
 	};
 	const delivery = await service.decide(a);
-	expect(delivery.source).toBe("ruri");
+	expect(delivery.source).toBe("scored");
 	expect(calls).toBe(1);
 	expect(Object.keys(criteria)).toEqual(emotionSchema.options);
 	await service.drain();
@@ -206,10 +206,10 @@ test("unscored, malformed, timeout, probes and missing identity never count as s
 	const { service } = setup();
 	await service.setEnabled(true);
 	await service.decide({
-		...args("laya"),
-		model: "laya-multilingual",
+		...args("unscored"),
+		model: "unscored-judge",
 		judge: async () => ({
-			model: "laya-multilingual",
+			model: "unscored-judge",
 			answers: {
 				emotion: {
 					type: "choice",
@@ -400,7 +400,7 @@ test("available judge is called once even when cached model identity is absent",
 			return result();
 		},
 	});
-	expect(delivery.source).toBe("ruri");
+	expect(delivery.source).toBe("scored");
 	await service.drain();
 	expect(calls).toBe(1);
 	expect(prepares).toBe(0);
@@ -459,7 +459,7 @@ test("human review cannot introduce credential-looking text into the dataset or 
 	expect(service.export().jsonl).toBe("");
 });
 
-test("six malformed Ruri scores do not count toward the 300 successful judgments", async () => {
+test("six malformed classifier scores do not count toward the 300 successful judgments", async () => {
 	const { service } = setup();
 	await service.setEnabled(true);
 	const r = result("warmth");

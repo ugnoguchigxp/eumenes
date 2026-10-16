@@ -386,115 +386,125 @@ test("failure to read an accepted voice turn is shown instead of leaving silent 
 	}
 });
 
-test("chunk playback stays ordered and interruption releases the old queue for a new utterance", async () => {
-	const query = new QueryClient({
-		defaultOptions: { queries: { retry: false } },
-	});
-	const wrapper = ({ children }: PropsWithChildren) => (
-		<QueryClientProvider client={query}>{children}</QueryClientProvider>
-	);
-	let speech = () => {},
-		segment = (_wav: Uint8Array) => {},
-		sessionId = "";
-	const endings: Array<() => void> = [];
-	const starts: Array<() => void> = [];
-	const play = vi.fn(
-		async (
-			_bytes: Uint8Array,
-			onEnded: () => void,
-			options?: Parameters<AudioController["play"]>[2],
-		) => {
-			endings.push(onEnded);
-			starts.push(options?.onStarted ?? (() => {}));
-		},
-	);
-	const createAudio: CreateAudio = (_state, onSpeech, onSegment) => {
-		speech = onSpeech;
-		segment = onSegment;
-		return {
-			start: async () => {},
-			stop: async () => {},
-			stopPlayback: () => {},
-			play,
+for (const status of ["responding", "ready"] as const)
+	test(`chunk playback stays ordered during ${status} and interruption releases the old queue`, async () => {
+		const query = new QueryClient({
+			defaultOptions: { queries: { retry: false } },
+		});
+		const wrapper = ({ children }: PropsWithChildren) => (
+			<QueryClientProvider client={query}>{children}</QueryClientProvider>
+		);
+		let speech = () => {},
+			segment = (_wav: Uint8Array) => {},
+			sessionId = "";
+		const endings: Array<() => void> = [];
+		const starts: Array<() => void> = [];
+		const play = vi.fn(
+			async (
+				_bytes: Uint8Array,
+				onEnded: () => void,
+				options?: Parameters<AudioController["play"]>[2],
+			) => {
+				endings.push(onEnded);
+				starts.push(options?.onStarted ?? (() => {}));
+			},
+		);
+		const createAudio: CreateAudio = (_state, onSpeech, onSegment) => {
+			speech = onSpeech;
+			segment = onSegment;
+			return {
+				start: async () => {},
+				stop: async () => {},
+				stopPlayback: () => {},
+				play,
+			};
 		};
-	};
-	const voiceAudio = vi.fn(
-		async (_id: string, _index?: number) => new Uint8Array(44),
-	);
-	const voicePlayed = vi.fn(async (_id: string, _index?: number) => ({})),
-		voiceCancel = vi.fn(async (_id: string) => ({}));
-	const client = {
-		identity: "http://127.0.0.1:8787",
-		voiceStart: async (id: string) => {
-			sessionId = id;
-			return {};
-		},
-		voiceStop: async () => ({}),
-		voiceSend: async () => ({}),
-		voiceAudio,
-		voicePlayed,
-		voiceCancel,
-		voiceTurn: async (id: string) => ({
-			utteranceId: id,
-			sessionId,
-			generation: 1,
-			sequence: 1,
-			status: "ready",
-			text: "質問",
-			runId: "run",
-			error: null,
-			revision: 3,
-			audioChunks: [
-				{ index: 0, text: "先。", delivery: { motion: "greeting" } },
-				{ index: 1, text: "続き。" },
-			],
-			audioComplete: true,
-		}),
-	} as unknown as VoiceDialogueClient;
-	const store = createAudioStore();
-	const hook = renderHook(() => useVoiceDialogue(client, store, createAudio), {
-		wrapper,
+		const voiceAudio = vi.fn(
+			async (_id: string, _index?: number) => new Uint8Array(44),
+		);
+		const voicePlayed = vi.fn(async (_id: string, _index?: number) => ({})),
+			voiceCancel = vi.fn(async (_id: string) => ({}));
+		const client = {
+			identity: "http://127.0.0.1:8787",
+			voiceStart: async (id: string) => {
+				sessionId = id;
+				return {};
+			},
+			voiceStop: async () => ({}),
+			voiceSend: async () => ({}),
+			voiceAudio,
+			voicePlayed,
+			voiceCancel,
+			voiceTurn: async (id: string) => ({
+				utteranceId: id,
+				sessionId,
+				generation: 1,
+				sequence: 1,
+				status,
+				text: "質問",
+				runId: "run",
+				error: null,
+				revision: 3,
+				audioChunks: [
+					{ index: 0, text: "先。", delivery: { motion: "greeting" } },
+					{
+						index: 1,
+						text: "続き。",
+						...(status === "responding"
+							? { delivery: { motion: "listening" } }
+							: {}),
+					},
+				],
+				audioComplete: status === "ready",
+			}),
+		} as unknown as VoiceDialogueClient;
+		const store = createAudioStore();
+		const hook = renderHook(
+			() => useVoiceDialogue(client, store, createAudio),
+			{
+				wrapper,
+			},
+		);
+		await act(async () => hook.result.current.start());
+		act(() => segment(new Uint8Array(44)));
+		await waitFor(() => expect(play).toHaveBeenCalledTimes(1));
+		expect(voiceAudio).toHaveBeenCalledTimes(1);
+		expect(hook.result.current.avatarCue).toBeNull();
+		act(() => starts[0]?.());
+		expect(hook.result.current.avatarCue?.motion).toBe("greeting");
+		expect(hook.result.current.avatarCue?.speaking).toBe(true);
+		const oldId = voiceAudio.mock.calls[0]?.[0];
+		act(() => {
+			speech();
+			segment(new Uint8Array(44));
+		});
+		await waitFor(() => expect(play).toHaveBeenCalledTimes(2));
+		expect(hook.result.current.avatarCue).toBeNull();
+		act(() => starts[0]?.());
+		expect(hook.result.current.avatarCue).toBeNull();
+		act(() => starts[1]?.());
+		const newCue = hook.result.current.avatarCue;
+		expect(newCue?.motion).toBe("greeting");
+		act(() => endings[0]?.());
+		expect(hook.result.current.avatarCue).toEqual(newCue);
+		expect(voiceCancel).toHaveBeenCalledWith(oldId);
+		await act(async () => {
+			endings[0]?.();
+			endings[1]?.();
+		});
+		await waitFor(() => expect(play).toHaveBeenCalledTimes(3));
+		act(() => starts[2]?.());
+		expect(hook.result.current.avatarCue).toMatchObject({
+			motion: status === "responding" ? "listening" : "neutral",
+			speaking: true,
+		});
+		await act(async () => endings[2]?.());
+		expect(hook.result.current.avatarCue).toBeNull();
+		expect(voicePlayed).not.toHaveBeenCalledWith(oldId, expect.anything());
+		expect(voiceAudio.mock.calls.map((call) => call[1])).toEqual([0, 0, 1]);
+		hook.unmount();
+		query.clear();
 	});
-	await act(async () => hook.result.current.start());
-	act(() => segment(new Uint8Array(44)));
-	await waitFor(() => expect(play).toHaveBeenCalledTimes(1));
-	expect(voiceAudio).toHaveBeenCalledTimes(1);
-	expect(hook.result.current.avatarCue).toBeNull();
-	act(() => starts[0]?.());
-	expect(hook.result.current.avatarCue?.motion).toBe("greeting");
-	expect(hook.result.current.avatarCue?.speaking).toBe(true);
-	const oldId = voiceAudio.mock.calls[0]?.[0];
-	act(() => {
-		speech();
-		segment(new Uint8Array(44));
-	});
-	await waitFor(() => expect(play).toHaveBeenCalledTimes(2));
-	expect(hook.result.current.avatarCue).toBeNull();
-	act(() => starts[0]?.());
-	expect(hook.result.current.avatarCue).toBeNull();
-	act(() => starts[1]?.());
-	const newCue = hook.result.current.avatarCue;
-	expect(newCue?.motion).toBe("greeting");
-	act(() => endings[0]?.());
-	expect(hook.result.current.avatarCue).toEqual(newCue);
-	expect(voiceCancel).toHaveBeenCalledWith(oldId);
-	await act(async () => {
-		endings[0]?.();
-		endings[1]?.();
-	});
-	await waitFor(() => expect(play).toHaveBeenCalledTimes(3));
-	act(() => starts[2]?.());
-	expect(hook.result.current.avatarCue).toMatchObject({
-		motion: "neutral",
-		speaking: true,
-	});
-	await act(async () => endings[2]?.());
-	expect(hook.result.current.avatarCue).toBeNull();
-	expect(voicePlayed).not.toHaveBeenCalledWith(oldId, expect.anything());
-	expect(voiceAudio.mock.calls.map((call) => call[1])).toEqual([0, 0, 1]);
-	hook.unmount();
-	query.clear();
-});
 
 test("an unfinalized speech candidate neither cancels nor hides an accepted recognition", async () => {
 	const query = new QueryClient({

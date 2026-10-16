@@ -9,7 +9,6 @@ export {
 } from "./repository";
 export { registerInference } from "./controller";
 export type {
-	AgentAttemptRevocation,
 	CallSession,
 	InferencePort,
 	Receipt,
@@ -23,8 +22,5 @@ export {
 	createConnectionModels,
 	type ConnectionModelsService,
 } from "./service/connection-models";
-export {
-	controlInstructions,
-	delegatedTaskRules,
-	type ControlContract,
-} from "./contracts";
+export { controlInstructions, type ControlContract } from "./contracts";
+export { delegatedTaskRules } from "./service/delegated-task-rules";

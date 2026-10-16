@@ -15,13 +15,13 @@ import {
 import { createActionRequests } from "../service/action-requests";
 import type { CapabilityReads } from "../service/action-types";
 
-export const ADAPTER_REF = "adapter:fake@1";
+const ADAPTER_REF = "adapter:fake@1";
 export const ARTIFACT_ID = "artifact:fake.workspace@1";
 export const OTHER_REF = "adapter:other@1";
 export const HUB_ID = "artifact:fake.hub@1";
-export const SCOPE = "default";
+const SCOPE = "default";
 
-export const artifact: ArtifactDefinitionV1 = {
+const artifact: ArtifactDefinitionV1 = {
 	kind: "artifact",
 	id: "fake.workspace",
 	revision: 1,
@@ -121,7 +121,7 @@ export const artifact: ArtifactDefinitionV1 = {
 };
 
 /** A standalone launcher artifact (no toolchain) reading two adapters. */
-export const hub: ArtifactDefinitionV1 = {
+const hub: ArtifactDefinitionV1 = {
 	kind: "artifact",
 	id: "fake.hub",
 	revision: 1,
@@ -146,7 +146,7 @@ export const hub: ArtifactDefinitionV1 = {
 	actionBindings: [],
 };
 
-export const schemas: Record<string, z.ZodType> = {
+const schemas: Record<string, z.ZodType> = {
 	"builtin:fakeHms": z.strictObject({
 		hours: z.string(),
 		minutes: z.string(),

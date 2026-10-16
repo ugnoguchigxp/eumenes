@@ -3,9 +3,9 @@ import type { Fetcher } from "./profiles";
 
 const log = getLogger("larm");
 /** Budget of a control request: POSTs (create, claim, renew) may wait on LARM this long. */
-export const CONTROL_TIMEOUT_MS = 15_000;
+const CONTROL_TIMEOUT_MS = 15_000;
 /** Read-only status checks made for a caller must answer quickly. */
-export const STATUS_CHECK_TIMEOUT_MS = 3_000;
+const STATUS_CHECK_TIMEOUT_MS = 3_000;
 
 /** The authenticated control-plane request of one port; it never leaves the control origin. */
 export function createControl({

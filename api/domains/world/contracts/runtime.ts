@@ -42,7 +42,7 @@ export type RuntimeMeasurement = {
 	value?: number;
 };
 
-export type RuntimeSnapshot =
+type RuntimeSnapshot =
 	| {
 			status: "available";
 			source: SourceKey;

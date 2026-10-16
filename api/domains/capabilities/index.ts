@@ -6,11 +6,6 @@ export {
 	vectorSpaceKey,
 	toolchainPassages,
 } from "./service/toolchains";
-export { flatObjectSchema } from "./service/registry";
-export {
-	compileJsonSchemaSubset,
-	UnsupportedSchema,
-} from "./service/json-schema-subset";
 export { migration, learnedMigration } from "./repository";
 export * from "./contracts";
 export { registerCapabilities } from "./controller";

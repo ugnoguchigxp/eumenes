@@ -24,11 +24,7 @@ import type { CurationOptions } from "./curation-types";
 export const WORLD_CURATE_PURPOSE = "world.curate";
 /** Evidence older than this is `stale` (freshness policy of a curated claim). */
 export const FRESHNESS_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
-export const CURATION_INTERPRETATION_VERSION = "curate-v1";
-/** Most entities the Scope digest and a candidate lookup read at once (the package's list limit). */
-export const LIST_LIMIT = 500;
-/** One id list per `listEntities` call (the package's limit). */
-export const IDS_PER_CALL = 500;
+const CURATION_INTERPRETATION_VERSION = "curate-v1";
 
 export const short = (text: string) => sha256Hex(text).slice(0, 24);
 export const utf8Length = (text: string) =>

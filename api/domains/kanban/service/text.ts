@@ -9,7 +9,7 @@ import {
 /* Wording and request text of the Kanban domain (plan §3.8, §3.9, §3.12). */
 
 /** The longest text one terminals request carries. */
-export const MAX_BODY = 8000;
+const MAX_BODY = 8000;
 /** How much of the earlier request and report a follow-up repeats at most (only a fallback summary). */
 const CONTEXT_CHARS = [1000, 500, 250, 100];
 /** Characters kept for the file list of a commit request. */

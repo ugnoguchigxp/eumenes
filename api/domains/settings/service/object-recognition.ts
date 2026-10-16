@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { resolveLarmToken } from "../../../infrastructure/auth-config";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import { cloudEndpoint } from "../contracts";
-export const objectRecognitionConnectionInput = z.strictObject({
+const objectRecognitionConnectionInput = z.strictObject({
 	expectedRevision: z.number().int().nonnegative(),
 	baseUrl: cloudEndpoint.refine((v) => new URL(v).pathname === "/").optional(),
 	credentialSource: z.enum(["dedicated", "larm"]).optional(),

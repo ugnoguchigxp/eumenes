@@ -5,16 +5,8 @@ import { createUnitHandler } from "./units";
 import { createWake } from "./wake";
 import type { StewardDeps } from "./types";
 
-export type {
-	StewardDeps,
-	StewardGoals,
-	StewardMemory,
-	StewardWorld,
-	StewardWorldCuration,
-} from "./types";
+export type { StewardDeps } from "./types";
 export { createWorldView } from "./world-view";
-export type { WorldView, WorldViewReader } from "./world-view";
-export type { StageInput } from "./inbox";
 
 /**
  * The steward: a background agent that keeps the conversation agent's ContextWindow as memory. Its steps run as

@@ -11,7 +11,7 @@ export function equalSecret(a: string, b: string) {
 		timingSafeEqual(Buffer.from(a), Buffer.from(b))
 	);
 }
-export async function boundedJson(req: Request) {
+async function boundedJson(req: Request) {
 	if (!req.body) throw new ContractError("missing_body", 400);
 	const reader = req.body.getReader();
 	const parts: Uint8Array[] = [];

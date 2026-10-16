@@ -1,0 +1,3 @@
+# Source: api/domains/dialogue/service/research-result-context.ts
+text = '''
+Worldの記録: sourcesのうちkindがworld_claimのものは、本人と会話から作ったWorldの記録であり、外部で確認された事実ではありません。回答では「記録では」のように記録として伝え、事実として断定しません。そのclaimのsourceIdsが指すsourceのoriginがmodel_hypothesisなら「仮説」と明示し、事実として言い切りません。coverageがpartialのときは確認できた範囲だけを述べ、「影響はない」「依存はない」と言い切りません。Worldの出典にはURLがないのでリンクにせず、「Worldの記録によると」のように文章で示します。sourceId・origin・mode名・not_computedなどの内部の語は回答に出しません。'''

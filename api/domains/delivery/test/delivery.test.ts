@@ -47,7 +47,7 @@ test("full reply and recent conversation decide emotion; speech motion and voice
 		emotion: "warmth",
 		motion: "agreeing",
 		tone: "bright",
-		source: "laya",
+		source: "system-one",
 	});
 	expect(acceptedEmotion(delivery)).toBe("warmth");
 	expect(
@@ -60,7 +60,7 @@ test("full reply and recent conversation decide emotion; speech motion and voice
 });
 test("unnecessary, uncertain, invalid or truncated choices never become emotion icons", async () => {
 	for (const [value, source, reason] of [
-		[decision("none"), "laya", undefined],
+		[decision("none"), "system-one", undefined],
 		[decision("warmth", 0.59), "fallback", "low-confidence"],
 		[decision("sleepy"), "fallback", "invalid"],
 		[decision("joy", Number.NaN), "fallback", "invalid"],
@@ -130,7 +130,7 @@ test("selected-answer probability is required and is not question applicability"
 		new AbortController().signal,
 	);
 	expect(result).toMatchObject({
-		source: "laya",
+		source: "system-one",
 		emotion: "joy",
 		emotionConfidence: 0.9,
 	});

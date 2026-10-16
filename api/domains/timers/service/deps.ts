@@ -4,7 +4,7 @@ import type { SchedulerService } from "../../scheduler";
 import type { LogFields } from "../../../infrastructure/logger";
 import type { TimerCompletion } from "../contracts";
 
-export type TimerLog = {
+type TimerLog = {
 	debug(event: string, fields?: LogFields): void;
 	warn(event: string, fields?: LogFields, error?: unknown): void;
 };

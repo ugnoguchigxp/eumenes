@@ -16,6 +16,11 @@ import type {
 	WorldContextPort,
 } from "../contracts";
 
+import type { CurrentRequest } from "./request-context";
+import type { MusicPort } from "../contracts/music";
+import type { ImagePort } from "../contracts/image";
+import type { ObjectRecognitionPort } from "../contracts/object-recognition";
+import type { CommandInteractions } from "./command-interactions";
 export const GENERATE_KIND = "dialogue.generate";
 /** A toolchain's command sub-agent: one typed operation from the conversation's request. */
 export const COMMAND_KIND = "dialogue.toolchain_command";
@@ -33,7 +38,7 @@ export type ChatMessage = {
 	images?: import("../../inference").ChatImage[];
 };
 export interface GenerateInput {
-	currentRequest: import("./request-context").CurrentRequest;
+	currentRequest: CurrentRequest;
 	tools?: NativeTool[];
 	/**
 	 * A new conversation decision: the execute phase retrieves candidate toolchains for this
@@ -117,15 +122,15 @@ export type DialogueDeps = {
 	/** Told in the transaction in which a run ends, after its exchange is in memory's ledger. */
 	steward?: StewardPort;
 	agents?: AgentRuntime;
-	music?: import("../contracts/music").MusicPort;
-	excalidraw?: import("../contracts/image").ImagePort;
-	image?: import("../contracts/image").ImagePort;
-	objectRecognition?: import("../contracts/object-recognition").ObjectRecognitionPort;
+	music?: MusicPort;
+	excalidraw?: ImagePort;
+	image?: ImagePort;
+	objectRecognition?: ObjectRecognitionPort;
 	delegation?: import("../contracts/delegation").DelegationPort;
 	toolchains?: import("../contracts/toolchains").ToolchainRoutingPort;
 	worldContext?: WorldContextPort;
 	/** The adopted goals, shown as a layer right after L1. Without it no goals layer exists. */
 	goals?: GoalsLayerPort;
 	/** Set by `createDialogueService` once intake exists (it accepts the resumed runs). */
-	interactions?: import("./command-interactions").CommandInteractions;
+	interactions?: CommandInteractions;
 };

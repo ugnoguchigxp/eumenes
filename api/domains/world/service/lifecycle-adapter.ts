@@ -18,8 +18,6 @@ import type {
 	LifecycleOptions,
 } from "./lifecycle-types";
 import { sweepReleasePending } from "./usage-ledger";
-
-export { isValidRoot } from "./lifecycle-shared";
 export type {
 	ConsumeReport,
 	ForgetListItem,

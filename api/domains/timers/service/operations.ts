@@ -4,7 +4,6 @@ import {
 	DEFAULT_TIMER_LABEL,
 	type CancelTimerInput,
 	type ListTimersQuery,
-	type StartTimerInput,
 	type TimerOrigin,
 	type TimerReceipt,
 	type TimerState,
@@ -517,5 +516,3 @@ export function getInTransaction(
 	if (!timer || timer.scope !== scope) return null;
 	return toDto(timer, nowMs);
 }
-
-export type { StartTimerInput };

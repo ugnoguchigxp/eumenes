@@ -38,7 +38,7 @@ export const CURATION_LIMITS = {
 
 // --- what the model sees ----------------------------------------------------------
 
-export type CurationUtterance = {
+type CurationUtterance = {
 	/** `e1`, `e2`, ... in the order of the window. A claim cites its evidence by this label. */
 	label: string;
 	speaker: CurationSpeaker;
@@ -214,7 +214,7 @@ export type CurationElement = {
 	messageId?: string;
 };
 
-export type CurationTouched = {
+type CurationTouched = {
 	claimIds: string[];
 	entityIds: string[];
 	messageIds: string[];
@@ -283,7 +283,7 @@ export type ForgetAccepted = {
 };
 
 export type ForgetNothing = { status: "nothing" };
-export type ForgetUnavailable = {
+type ForgetUnavailable = {
 	status: "unavailable";
 	reason: string;
 };

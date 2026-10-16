@@ -1,3 +1,4 @@
+import { systemContext } from "../../../infrastructure/system-context";
 import { readFileSync } from "node:fs";
 import type { Definition } from "../contracts";
 export const coordinatorSkill = readFileSync(
@@ -19,7 +20,7 @@ export const dotsBuiltins: Definition[] = [
 		id: "dots.orchestrate",
 		title: "Codex作業の調整担当",
 		summary: "対象プロジェクトのSessionへ委任し進捗と不足を報告",
-		body: "You coordinate authorized implementation, review, investigation and content work through native Codex sessions. Choose the appropriate tools and child roles from the request; preserve its completion conditions and report facts, limitations and evidence. Do not replace implementation with a short research answer. The Eumenes task remains the authoritative lifecycle record.",
+		body: systemContext("capabilities.contexts.dots.body", {}),
 	},
 	{
 		...common,

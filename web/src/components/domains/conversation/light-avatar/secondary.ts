@@ -9,7 +9,7 @@ type Chain = {
 	damping: number;
 };
 /** Crown, hem and the outer arm joints trail behind and overshoot the main motion. */
-export const followChains: Chain[] = [
+const followChains: Chain[] = [
 	{
 		bones: ["crown_01", "crown_02", "crown_03"],
 		end: [-0.22, 2.15, 0],

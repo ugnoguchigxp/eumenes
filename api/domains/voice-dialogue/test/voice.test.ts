@@ -480,7 +480,7 @@ test("replay HTTP returns the adopted Laya motion with the same audio and suppor
 					id: crypto.randomUUID(),
 					motion: "joyful",
 					tone: "bright",
-					source: "laya",
+					source: "system-one",
 					confidence: 0.9,
 					latencyMs: 10,
 				},

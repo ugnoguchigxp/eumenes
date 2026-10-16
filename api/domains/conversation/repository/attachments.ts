@@ -19,7 +19,7 @@ CREATE INDEX attachment_pending_expiry ON conversation_attachments(expires_at);
 CREATE INDEX message_attachment_id ON message_attachments(attachment_id);
 `,
 };
-export function attachmentsReady(db: Database) {
+function attachmentsReady(db: Database) {
 	return !!db
 		.query("SELECT 1 FROM sqlite_master WHERE name='conversation_attachments'")
 		.get();

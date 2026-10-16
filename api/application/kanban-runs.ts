@@ -208,7 +208,7 @@ export function connectKanbanRuns(
  * committed. The process end is confirmed by terminals (which then writes the final state, and
  * the card becomes a Blocker); when it cannot be confirmed the queue stops.
  */
-export function createStopper(
+function createStopper(
 	kanban: KanbanService,
 	terminals: Pick<TerminalsService, "stop"> & RecoveryTerminals,
 ) {

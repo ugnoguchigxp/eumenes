@@ -32,8 +32,8 @@
 	},
 	"testFiles": {
 		"api/application/migrations.test.ts": 1125,
-		"api/application/settings-adapter.test.ts": 1659,
+		"api/application/settings-adapter.test.ts": 1660,
 		"api/domains/settings/test/settings.test.ts": 1143,
-		"web/src/domains/settings-data/settings.fixture.tsx": 1112
+		"web/src/domains/settings-data/settings.fixture.tsx": 1135
 	}
 }

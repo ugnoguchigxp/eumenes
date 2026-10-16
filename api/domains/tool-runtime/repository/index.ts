@@ -75,7 +75,7 @@ ALTER TABLE tool_action_invocations ADD COLUMN operation_name TEXT;
  * result_json) are deleted after settlement; the row stays as a tombstone for a while so a
  * late resend of the same eventId never turns into a new execution.
  */
-export const actionRequestsMigration = `
+const actionRequestsMigration = `
 CREATE TABLE tool_action_requests(
   event_id TEXT PRIMARY KEY,
   scope TEXT NOT NULL,

@@ -35,7 +35,7 @@ CREATE TABLE world_host_feed_cursor (
 `;
 
 /** Epoch seen by a Scope that has never had a forget. */
-export const INITIAL_FORGET_EPOCH = "forget-0";
+const INITIAL_FORGET_EPOCH = "forget-0";
 
 export class WorldHostStateError extends Error {
 	constructor(

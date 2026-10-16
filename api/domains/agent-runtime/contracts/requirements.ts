@@ -17,7 +17,7 @@ export const requestRequirement = z
 	})
 	.strict();
 export type RequestRequirement = z.infer<typeof requestRequirement>;
-export const frozenRequirement = requirementSpec.safeExtend({
+const frozenRequirement = requirementSpec.safeExtend({
 	id: requirementId,
 	origin: z.discriminatedUnion("kind", [
 		z
@@ -49,15 +49,14 @@ export const requirementContract = z
 	})
 	.strict();
 export type RequirementContract = z.infer<typeof requirementContract>;
-export type FrozenRequirement = z.infer<typeof frozenRequirement>;
 export const checkStatus = z.enum([
 	"satisfied",
 	"unsatisfied",
 	"unknown",
 	"not_applicable",
 ]);
-export const evidenceRefs = z.array(z.string().regex(/^e[1-9][0-9]*$/)).max(3);
-export const requirementCheck = z
+const evidenceRefs = z.array(z.string().regex(/^e[1-9][0-9]*$/)).max(3);
+const requirementCheck = z
 	.object({
 		requirementId: requirementId,
 		status: checkStatus,
@@ -66,8 +65,7 @@ export const requirementCheck = z
 		reason: z.string().min(1).max(300),
 	})
 	.strict();
-export type RequirementCheck = z.infer<typeof requirementCheck>;
-export const externalRuleBase = z
+const externalRuleBase = z
 	.object({
 		id: z.string().regex(/^x[1-9][0-9]*$/),
 		requirementId: requirementId,
@@ -161,7 +159,7 @@ export const requirementVerification = z
 	})
 	.strict();
 export type RequirementVerification = z.infer<typeof requirementVerification>;
-export const canonicalEvidence = z
+const canonicalEvidence = z
 	.object({
 		sourceId: z.string(),
 		viewId: z.string().uuid(),

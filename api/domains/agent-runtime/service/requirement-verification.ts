@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { systemContext } from "../../../infrastructure/system-context";
 import type { Database } from "bun:sqlite";
 import { z } from "zod";
 import {
@@ -23,10 +23,8 @@ import {
 	validateDraft,
 } from "./requirements";
 import { verifyReport } from "./verify-report";
-const policy = readFileSync(
-	new URL("../prompts/verify-requirements.md", import.meta.url),
-	"utf8",
-);
+const policy =
+	systemContext("agent-runtime.contexts.verify-requirements.policy", {}) + "\n";
 export function prepareRequirementVerification(
 	db: Database,
 	task: Task,
@@ -99,8 +97,10 @@ export function prepareRequirementVerification(
 	if (task.json_repairs && task.error_code)
 		messages.push({
 			role: "system",
-			content:
-				"前回の構造違反を固定schemaで一度だけ修正します。条件・報告候補を変えません。",
+			content: systemContext(
+				"agent-runtime.contexts.requirement-verification.content",
+				{},
+			),
 		});
 	if (bytes(messages) > 65536) throw new Error("required_context_overflow");
 	return {
@@ -115,7 +115,7 @@ export function prepareRequirementVerification(
 		evidenceManifest,
 	};
 }
-export function validateVerification(
+function validateVerification(
 	verification: RequirementVerification,
 	draft: ReturnType<typeof readDraft>["draft"],
 ) {

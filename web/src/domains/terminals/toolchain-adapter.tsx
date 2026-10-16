@@ -7,7 +7,7 @@ import { queryRoots } from "../../queryKeys";
 import type { WebArtifactAdapter } from "../toolchain-artifacts/registry";
 import { createTerminalConnection } from "./connection";
 
-export const TERMINALS_ADAPTER_REF = "adapter:terminals@1";
+const TERMINALS_ADAPTER_REF = "adapter:terminals@1";
 /** Size of a new session until its pane measures itself. */
 const INITIAL_SIZE = { cols: 120, rows: 32 };
 

@@ -12,13 +12,8 @@ import { createPrepare } from "./curation-prepare";
 import { createSettle } from "./curation-settle";
 import type { CurationOptions, PendingCurationEvent } from "./curation-types";
 
-export {
-	CURATION_INTERPRETATION_VERSION,
-	CurationError,
-	WORLD_CURATE_PURPOSE,
-} from "./curation-ctx";
+export { WORLD_CURATE_PURPOSE } from "./curation-ctx";
 export type * from "./curation-types";
-export { CURATION_LIMITS } from "./curation-types";
 export { curationOutputShapeSchema } from "./curation-output";
 
 /** Events listed per call at most. */

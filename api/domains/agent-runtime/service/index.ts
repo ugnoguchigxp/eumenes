@@ -10,16 +10,10 @@ import { createLifecycle } from "./lifecycle";
 import { createMaintenance } from "./maintenance";
 import { createQueries } from "./queries";
 import { createReconcile } from "./reconcile";
-import {
-	createRuntimeState,
-	STEP_KIND,
-	type SearchReportHook,
-} from "./runtime-context";
+import { createRuntimeState, type SearchReportHook } from "./runtime-context";
 import { createStartTask } from "./start-task";
 import { createStepHandler } from "./step-handler";
 import { createTaskOps } from "./task-ops";
-
-export { STEP_KIND };
 
 export function createAgentRuntime({
 	store,

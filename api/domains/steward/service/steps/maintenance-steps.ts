@@ -42,7 +42,7 @@ const SUMMARY_CHARS = 1200;
 // ---- eligibility (the kick asks before it makes a unit) ----
 
 /** Bytes the verbatim history (the keep group) would take, each message cut at the history's per-message cap. */
-export function keepHistoryBytes(env: StepEnv): number {
+function keepHistoryBytes(env: StepEnv): number {
 	const { db, deps, conversationId } = env;
 	const rows = deps.memory
 		.exchangesInTransaction(db, conversationId)
@@ -68,7 +68,7 @@ export function keepHistoryBytes(env: StepEnv): number {
 	}
 	return bytes;
 }
-export const summaryChars = (env: StepEnv): number =>
+const summaryChars = (env: StepEnv): number =>
 	[
 		...(env.deps.memory.summaryInTransaction(env.db, env.conversationId)
 			?.text ?? ""),

@@ -1,3 +1,4 @@
+import { systemContext } from "../../../infrastructure/system-context";
 import { readFileSync } from "node:fs";
 import type { Definition } from "../contracts";
 const base = {
@@ -15,7 +16,7 @@ export const objectRecognitionBuiltins: Definition[] = [
 		id: "object-recognition.manage",
 		title: "物体検出操作担当",
 		summary: "入力画面と保存済み検出結果の操作を選ぶ",
-		body: "物体認識の操作担当です。ユーザーの意図を認可済みsnapshotと公開ツールに基づいて解釈します。画面表示・結果照会・取消要求を区別し、未取得の観測を作りません。",
+		body: systemContext("capabilities.contexts.object-recognition.body", {}),
 	},
 	{
 		...base,

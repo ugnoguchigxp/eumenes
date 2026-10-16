@@ -24,6 +24,7 @@
 		"test-results/**",
 		"playwright-report/**",
 		".serena/**",
-		".claude/**"
+		".claude/**",
+		".s11tnext/**"
 	]
 }

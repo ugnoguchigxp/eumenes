@@ -19,7 +19,6 @@ export const toolchainRequest = z
 			),
 	})
 	.strict();
-export type ToolchainRequest = z.infer<typeof toolchainRequest>;
 
 /**
  * How a toolchain shows its result on screen: the web component that renders it.

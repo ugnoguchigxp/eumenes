@@ -43,7 +43,7 @@ export type ActionApi = Pick<
 >;
 
 /** A request that has not answered by then is an unknown outcome and enters reconciliation. */
-export const SEND_TIMEOUT_MS = 15_000;
+const SEND_TIMEOUT_MS = 15_000;
 
 /** Reconcile a few times after an unknown outcome, then wait for reconnect, focus or a resend. */
 export const RECONCILE_DELAYS_MS = [2_000, 6_000, 15_000] as const;

@@ -94,12 +94,23 @@ export function createSpeechSynthesizer({
 						if (!selectedVoice) throw error;
 					}
 				}
-				if (!requestedVoice && !english)
+				// A catalog that declares styled voices governs the voice choice: its
+				// default replaces the claim's voice, and an undescribed voice is refused.
+				// Other services keep the claim's voice and accept voices the catalog omits.
+				const governed =
+					!english &&
+					!!catalog?.voices.some(
+						(v) =>
+							v.styles.length > 0 ||
+							v.capabilities.pitch_scale !== undefined ||
+							v.capabilities.intonation_scale !== undefined,
+					);
+				if (!requestedVoice && governed)
 					selectedVoice = catalog?.default_voice ?? selectedVoice;
 				if (!selectedVoice) selectedVoice = p.voice = catalog?.default_voice;
 				if (!selectedVoice) throw new Error("larm_tts_voice_unconfigured");
 				const speaker = catalog?.voices.find((v) => v.id === selectedVoice);
-				if (!english && catalog && !speaker) {
+				if (catalog && governed && !speaker) {
 					log.warn("larm.tts_voice_missing", {
 						kind: selectedVoice,
 						count: catalog.voices.length,

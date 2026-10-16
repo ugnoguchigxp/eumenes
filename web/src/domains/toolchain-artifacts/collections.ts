@@ -53,7 +53,7 @@ export function rowsOf(collection: CollectionV1, data: unknown): unknown[] {
 	return Array.isArray(rows) ? rows : [];
 }
 
-export function totalOf(
+function totalOf(
 	collection: CollectionV1,
 	data: unknown,
 	rowCount: number,
@@ -382,8 +382,6 @@ export function createdId(
 	const value = key ? input[key] : undefined;
 	return typeof value === "string" ? value : undefined;
 }
-
-export type FormValues = Readonly<Record<string, string | boolean>>;
 export type ParsedForm =
 	| { ok: true; values: Record<string, unknown> }
 	| { ok: false; message: string };

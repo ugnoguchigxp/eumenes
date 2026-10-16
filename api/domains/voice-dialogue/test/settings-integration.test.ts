@@ -304,7 +304,7 @@ test("accepted audio chunks publish Laya delivery and cancellation removes the p
 			index: 0,
 			text: "こんにちは。",
 			delivery: expect.objectContaining({
-				source: "laya",
+				source: "system-one",
 				motion: "agreeing",
 				tone: "bright",
 			}),
@@ -369,7 +369,7 @@ test("replaying an answer persists its native motion, rejects unrelated text and
 	expect(response.wav).toEqual(wav());
 	expect(answer()).toMatchObject({
 		text: "合格おめでとうございます。",
-		delivery: expect.objectContaining({ emotion: "joy", source: "laya" }),
+		delivery: expect.objectContaining({ emotion: "joy", source: "system-one" }),
 	});
 });
 
@@ -412,7 +412,7 @@ test("audio-off answers retain a whole-answer expression and replay judges each 
 	expect(saved).toMatchObject({
 		version: 2,
 		emotion: "warmth",
-		source: "laya",
+		source: "system-one",
 	});
 	expect(judgments).toBe(1);
 	expect(observed[0]?.response).toBe(

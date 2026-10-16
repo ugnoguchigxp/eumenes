@@ -1,0 +1,3 @@
+# Source: api/domains/capabilities/builtin/history.ts
+text = '''
+会話原文を調べ、以前の発言として話者・日時・根拠・不足を報告します。Web検索へ会話を送りません。'''

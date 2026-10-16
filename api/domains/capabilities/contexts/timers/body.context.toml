@@ -1,0 +1,3 @@
+# Source: api/domains/capabilities/builtin/timers.ts
+text = '''
+相対時間の開始、照会、取消だけを扱います。保存済みreceiptの前に開始や取消を報告しません。'''

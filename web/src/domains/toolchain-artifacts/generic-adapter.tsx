@@ -20,7 +20,7 @@ import type {
 } from "./registry";
 
 /** Stands for every adapterRef that has no domain Web adapter. */
-export const GENERIC_ADAPTER_REF = "*";
+const GENERIC_ADAPTER_REF = "*";
 
 const emptyAccess = (): DocumentAccess => ({
 	ready: false,

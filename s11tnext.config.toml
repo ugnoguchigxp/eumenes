@@ -1,0 +1,17 @@
+source_dir = "api/domains"
+out_dir = ".s11tnext"
+
+[authoring]
+source_locale = "ja-JP"
+
+[release_profiles.application]
+required_locales = ["$source"]
+
+[generation]
+typescript_indent = "tab"
+
+[governance]
+require_owner = false
+
+[keyspaces]
+[variable_profiles]

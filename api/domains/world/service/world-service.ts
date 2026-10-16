@@ -60,7 +60,7 @@ import type { WorldHostGate } from "./host-gate";
  * Operations that only make World safer (stop, erase, restore). They keep
  * working while World is OFF: forgetting and corrections never wait for a flag.
  */
-export const PROTECTIVE_KINDS: ReadonlySet<WorldOperation["kind"]> = new Set([
+const PROTECTIVE_KINDS: ReadonlySet<WorldOperation["kind"]> = new Set([
 	"invalidate",
 	"forget.chunk",
 	"forget.reopen",

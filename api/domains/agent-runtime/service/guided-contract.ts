@@ -18,7 +18,7 @@ const claim = z
 				message: "body evidence required",
 			});
 	});
-export const guidedReport = z
+const guidedReport = z
 	.object({
 		completion: z.enum(["complete", "incomplete"]),
 		answer: z.string().trim().min(1).max(8000),

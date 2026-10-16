@@ -31,7 +31,7 @@ const code = (error: unknown) =>
 		? error.message
 		: "scheduler_failed";
 const iso = (ms: number) => new Date(ms).toISOString();
-export const SCHEDULER_RETENTION = {
+const SCHEDULER_RETENTION = {
 	occurrenceMs: 14 * 86_400_000,
 	scheduleMs: 30 * 86_400_000,
 };

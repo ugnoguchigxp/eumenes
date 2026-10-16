@@ -9,7 +9,7 @@ import type { FieldChange } from "./drafts";
 type Segment = { key: string; select: boolean };
 const SEGMENT = /^([A-Za-z][A-Za-z0-9_]{0,40})(\[id=\$target\])?$/;
 
-export function parsePath(path: string): Segment[] | null {
+function parsePath(path: string): Segment[] | null {
 	if (!path.startsWith("$.")) return null;
 	const segments: Segment[] = [];
 	for (const part of path.slice(2).split(".")) {

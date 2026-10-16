@@ -27,7 +27,7 @@ export type RuntimeObservationOptions = {
 	register?: typeof registerWorldDependents;
 };
 
-export const RUNTIME_REFUSALS = [
+const RUNTIME_REFUSALS = [
 	"LEDGER_UNAVAILABLE",
 	"NOT_VERIFIED",
 	"SCOPE_MISMATCH",

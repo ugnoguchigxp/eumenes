@@ -31,7 +31,6 @@ import {
 
 export { conditionText } from "./world-claims-shared";
 export type {
-	ClaimFailure,
 	ClaimResult,
 	WorldClaimsContext,
 	WorldClaimsOptions,

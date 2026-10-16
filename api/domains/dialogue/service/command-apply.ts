@@ -6,6 +6,7 @@ import type { Run } from "../contracts";
 import type { DialogueDeps } from "./context";
 import { delegateConversation } from "./delegate-conversation";
 
+import type { DelegationCommand } from "../contracts/delegation";
 export type CommandInput = {
 	runId: string;
 	revision: number;
@@ -87,7 +88,7 @@ export function applyCommand(
 		deps.delegation.invokeInTransaction(
 			tx,
 			run,
-			result.command as import("../contracts/delegation").DelegationCommand,
+			result.command as DelegationCommand,
 			input.snapshot,
 		);
 		answerJob();

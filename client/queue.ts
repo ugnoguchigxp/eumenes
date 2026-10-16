@@ -46,4 +46,3 @@ export function queueClient(transport: Transport) {
 			),
 	};
 }
-export type QueueClient = ReturnType<typeof queueClient>;

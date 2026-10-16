@@ -31,7 +31,7 @@ type RequestRow = {
 	receipt: string | null;
 	saved: number | null;
 };
-export type DeliveryRow = {
+type DeliveryRow = {
 	event: string;
 	request: string;
 	subscription: string;

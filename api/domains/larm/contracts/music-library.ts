@@ -28,7 +28,6 @@ export const musicTrack = z.object({
 	audioUrl: z.string().min(1),
 	metadataUrl: z.string().min(1),
 });
-export type MusicTrack = z.infer<typeof musicTrack>;
 export const musicTracks = z.object({
 	tracks: musicTrack.array().max(100),
 	total: z.number().int().nonnegative(),

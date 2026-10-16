@@ -34,7 +34,7 @@ import type { ContextWindowStore } from "./context-window";
 import { appendJournal, type BlockJournalEntry } from "./journal";
 
 const VERSION = 1 as const;
-export const STATE_ID = /^state:[0-9a-f]{64}$/;
+const STATE_ID = /^state:[0-9a-f]{64}$/;
 
 /** What forgetting needs from the memory service around it. */
 export type ForgetDeps = {

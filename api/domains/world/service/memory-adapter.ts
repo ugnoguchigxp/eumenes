@@ -25,7 +25,7 @@ const MAX_DEPENDENTS_PER_CALL = 256;
 /** Memory's identifier limit for a dependency id. */
 const MAX_DEPENDENCY_ID_BYTES = 1024;
 /** Inputs one World version may have before the host refuses it (never truncated). */
-export const DEFAULT_MAX_INPUTS_PER_VERSION = 256;
+const DEFAULT_MAX_INPUTS_PER_VERSION = 256;
 
 /**
  * Memory refused (or could not take) the dependent registration. Thrown INSIDE

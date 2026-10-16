@@ -49,8 +49,8 @@ export const sendSchema = z
 		deadlineMs: z.number().int().min(1000).max(86400000).default(600000),
 	})
 	.strict();
-export const argsSchema = z.object({ queue_id: z.literal(QUEUE) }).strict();
-export const deliverySchema = z
+const argsSchema = z.object({ queue_id: z.literal(QUEUE) }).strict();
+const deliverySchema = z
 	.object({
 		mode: z.literal("webhook"),
 		url: z.url(),

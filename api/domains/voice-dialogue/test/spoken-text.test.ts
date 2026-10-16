@@ -20,6 +20,19 @@ test("displayed citations stay out of speech while inline labels and surrounding
 	expect(spokenText("出典：資料は見つかりませんでした。")).toBe(
 		"出典：資料は見つかりませんでした。",
 	);
+	expect(
+		spokenText(
+			"本文です。\n出典：https://example.com/report\n参考資料：[example.com](<https://example.com/>)",
+		),
+	).toBe("本文です。");
+	expect(
+		spokenText(
+			"URL https://example.com/a.b?q=1 を参照。www.example.com と tenki.jp/path も表示します。",
+		),
+	).toBe("URL  を参照。 と  も表示します。");
+	expect(
+		spokenText("[詳しい説明](https://example.com/)を確認。値は3.14です。"),
+	).toBe("詳しい説明を確認。値は3.14です。");
 });
 
 test("links and citations arriving across any token boundary never change or duplicate emitted speech", () => {

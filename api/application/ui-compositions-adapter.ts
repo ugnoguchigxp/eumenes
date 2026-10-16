@@ -13,7 +13,7 @@ export const UI_COMPOSITIONS_ADAPTER_REF = "adapter:ui-compositions@1";
 const LIST = "query:ui-compositions.list@1";
 const FORM = "query:ui-compositions.form@1";
 const INPUT = "input:ui-compositions.response@1";
-export const uiCompositionsReceipt = z.strictObject({
+const uiCompositionsReceipt = z.strictObject({
 	projectId: z.string(),
 	state: z.string(),
 	responseId: z.string().optional(),

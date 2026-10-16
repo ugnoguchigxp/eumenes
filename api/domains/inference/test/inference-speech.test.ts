@@ -107,7 +107,7 @@ test("Laya judges the spoken text and carries one decision with bounded immutabl
 	expect(receipt.delivery).toMatchObject({
 		motion: "agreeing",
 		tone: "bright",
-		source: "laya",
+		source: "system-one",
 		confidence: 0.8,
 	});
 	expect(parameters[0]?.speed).toBeCloseTo(1.15);
@@ -125,7 +125,10 @@ test("Laya judges the spoken text and carries one decision with bounded immutabl
 		freshSignal(),
 	);
 	expect(replay.wav).toEqual(wav());
-	expect(replay.delivery).toMatchObject({ motion: "agreeing", source: "laya" });
+	expect(replay.delivery).toMatchObject({
+		motion: "agreeing",
+		source: "system-one",
+	});
 	const replayAttempts = h.inference
 		.usage()
 		.filter((attempt) => !beforeReplay.has(attempt.id));
@@ -339,7 +342,7 @@ test("Ruri dataset captures real-turn receipt adoption once; a technical collect
 		() => {},
 		preparation,
 	);
-	expect(receipt.delivery!.source).toBe("ruri");
+	expect(receipt.delivery!.source).toBe("scored");
 	expect(calls).toBe(1);
 	await h.dataset!.drain();
 	expect(h.dataset!.status().successful).toBe(1);
@@ -358,7 +361,7 @@ test("Ruri dataset captures real-turn receipt adoption once; a technical collect
 		false,
 	) as Sample;
 	expect(sample.user_utterance).toBe("設定方法は？");
-	expect(sample.adopted?.source).toBe("ruri");
+	expect(sample.adopted?.source).toBe("scored");
 	expect(sample.adopted?.voice_application).toBe("manual");
 	expect(sample.adopted?.tone).toBeNull();
 	expect(sample.primary_label).toBeNull();

@@ -6,7 +6,7 @@ const candidate = saveDrawing.extend({
 	expectedRevision: z.number().int().nonnegative(),
 });
 /** referenceId is the saved reference, or the draft id of a new drawing. */
-export const draftSchema = candidate.extend({
+const draftSchema = candidate.extend({
 	referenceId: z.uuid(),
 	pending: candidate.optional(),
 });

@@ -8,8 +8,6 @@ import {
 	type SqlTimer,
 	type TimerRow,
 } from "./rows";
-
-export { pauseResumeMigration } from "./pause-migration";
 export { migration, migrations } from "./migrations";
 export type { NotificationRow, OperationRow, TimerRow } from "./rows";
 export { countLive, markPaused, markResumed } from "./controls";

@@ -3,14 +3,14 @@ import { setTimeout as delay } from "node:timers/promises";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 
 /** A "running" probe older than this lost its final update; its task cannot still be alive. */
-export const PROBE_STALE_MS = 10 * 60_000;
+const PROBE_STALE_MS = 10 * 60_000;
 const WRITE_RETRY_DELAYS_MS = [200, 400, 800] as const;
 
 /**
  * Retries a bookkeeping write while the single writer is momentarily saturated,
  * so a probe row is not left "running" until the next restart.
  */
-export async function writeWithRetry<T>(
+async function writeWithRetry<T>(
 	write: () => Promise<T>,
 	delaysMs: readonly number[] = WRITE_RETRY_DELAYS_MS,
 ): Promise<T> {

@@ -1,0 +1,3 @@
+# Source: api/domains/agent-runtime/service/requirement-verification.ts
+text = '''
+前回の構造違反を固定schemaで一度だけ修正します。条件・報告候補を変えません。'''

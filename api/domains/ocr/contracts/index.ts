@@ -11,7 +11,7 @@ export const inputMime = z.enum([
 ]);
 const dimension = z.number().int().positive().max(65536);
 const point = z.tuple([z.number().nonnegative(), z.number().nonnegative()]);
-export const ocrLine = z.object({
+const ocrLine = z.object({
 	text: z.string().max(10000),
 	confidence: z.number().finite().min(0).max(1),
 	polygon: z.array(point).length(4),
@@ -67,7 +67,7 @@ export const ocrResult = z
 		)
 			ctx.addIssue({ code: "custom", message: "frame_order_invalid" });
 	});
-export const ocrState = z.enum([
+const ocrState = z.enum([
 	"queued",
 	"starting",
 	"running",
@@ -92,7 +92,7 @@ export const ocrRecord = z.object({
 });
 export type OcrRecord = z.infer<typeof ocrRecord>;
 export type OcrResult = z.infer<typeof ocrResult>;
-export const upstreamId = z
+const upstreamId = z
 	.string()
 	.min(1)
 	.max(200)

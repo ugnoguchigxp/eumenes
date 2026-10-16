@@ -53,7 +53,7 @@ type GoalChange = {
 	entities: string[];
 	request: string | null;
 };
-export type CurateGoalsOutput = { goals: GoalChange[]; dropped: number };
+type CurateGoalsOutput = { goals: GoalChange[]; dropped: number };
 
 type GoalsContext = {
 	exchanges: LabelTable;

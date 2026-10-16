@@ -13,7 +13,7 @@ const safeError = (error: unknown) =>
 		? error.message
 		: "music_artwork_failed";
 /** The track's own production prompt drives the image; the title is shown by the UI, not drawn. */
-export function artworkPrompt(r: MusicRecord) {
+function artworkPrompt(r: MusicRecord) {
 	return [
 		`Square album cover artwork for the song "${r.title}".`,
 		r.description && `Theme: ${r.description}`,

@@ -57,7 +57,7 @@ export const changeRoots = [
 ] as const;
 
 /** Roots whose queries call live providers; they are fetched on demand only. */
-export const liveProviderRoots: readonly string[] = [
+const liveProviderRoots: readonly string[] = [
 	queryRoots.settingsDiagnostics,
 	queryRoots.connectionModels,
 	queryRoots.larmVoices,

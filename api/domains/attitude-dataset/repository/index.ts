@@ -30,7 +30,18 @@ CREATE TABLE dataset_errors (id INTEGER PRIMARY KEY CHECK(id=1), count INTEGER N
 INSERT INTO dataset_errors VALUES(1,0);
 `;
 
+/** Delivery sources were named after classifier models; store the contract names instead. */
+const neutralSource = (json: string, path: string) =>
+	`${json}=json_set(${json},'${path}',CASE json_extract(${json},'${path}') WHEN 'ruri' THEN 'scored' ELSE 'system-one' END) WHERE json_extract(${json},'${path}') IN ('laya','ruri')`;
+export const neutralSourceMigration = `
+UPDATE dataset_adoptions SET ${neutralSource("delivery", "$.source")};
+UPDATE dataset_units SET ${neutralSource("sample", "$.adopted.source")};
+UPDATE dataset_units SET ${neutralSource("sample", "$.selected_delivery.source")};
+UPDATE dataset_units SET reason='invalid-or-unscored' WHERE reason='invalid-or-non-ruri';
+`;
+
 /** Named migrations of this domain; the SQL above is frozen once deployed. */
-export const migrations: readonly Migration[] = [
+const migrations: readonly Migration[] = [
 	{ id: "attitude-dataset/0001-init", sql: migration },
+	{ id: "attitude-dataset/0002-neutral-source", sql: neutralSourceMigration },
 ];

@@ -8,7 +8,7 @@ import {
 import type { WorldService } from "./world-service";
 
 /** Most known targets one turn's wording is resolved to. */
-export const TOPIC_MAX_ENTITIES = 5;
+const TOPIC_MAX_ENTITIES = 5;
 
 /** Most entities one `listEntities` call returns (the package's own maximum). */
 const MAX_LISTED_ENTITIES = 500;
@@ -32,7 +32,7 @@ export const normalizeTopicText = (text: string): string =>
  * Names (display name and aliases, normalized) that identify exactly ONE entity. A name shared by two or more
  * entities is ambiguous and is never matched; a name too short to identify anything is dropped as well.
  */
-export function unambiguousNames(
+function unambiguousNames(
 	entities: readonly TopicCandidate[],
 ): Map<string, string> {
 	const owners = new Map<string, Set<string>>();
@@ -152,4 +152,3 @@ export function createWorldContextNames(options: ContextNamesOptions) {
 		},
 	};
 }
-export type WorldContextNames = ReturnType<typeof createWorldContextNames>;

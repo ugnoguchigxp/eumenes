@@ -31,7 +31,7 @@ const field = (
 	...f,
 });
 
-export const conversationFields: Field[] = [
+const conversationFields: Field[] = [
 	field({
 		fieldId: "conversation.agent-name",
 		path: "$.general.agentName",
@@ -60,7 +60,7 @@ export const conversationFields: Field[] = [
 		],
 	}),
 ];
-export const displayFields: Field[] = [
+const displayFields: Field[] = [
 	field({
 		fieldId: "display.background",
 		path: "$.general.background",
@@ -114,7 +114,7 @@ export const displayFields: Field[] = [
 		],
 	}),
 ];
-export const voiceFields: Field[] = [
+const voiceFields: Field[] = [
 	field({
 		fieldId: "speech.enabled",
 		path: "$.voice.autoSpeak",
@@ -373,7 +373,7 @@ const variant = (definition: unknown) => [
 	{ id: "standard", label: "標準", definition },
 ];
 
-export const aiFields: Field[] = [
+const aiFields: Field[] = [
 	field({
 		fieldId: "larm.url",
 		path: "$.larm.baseUrl",
@@ -431,7 +431,7 @@ const structure = (
 	...(rowInput ? { rowInput } : {}),
 });
 
-export const settingsArtifacts: Record<string, ArtifactDefinitionV1> = {
+const settingsArtifacts: Record<string, ArtifactDefinitionV1> = {
 	hub: {
 		...base("hub", "設定"),
 		launcher: { label: "設定" },
@@ -707,8 +707,6 @@ export const settingsArtifacts: Record<string, ArtifactDefinitionV1> = {
 		],
 	},
 };
-
-export const artifactRevisionOf = (key: string) => rev(key);
 
 /**
  * A fake backend: the settings document with the same `apply` semantics as the real adapter

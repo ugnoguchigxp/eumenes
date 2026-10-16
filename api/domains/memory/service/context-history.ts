@@ -7,7 +7,7 @@ import {
 } from "../repository";
 
 /** The two messages of an exchange: the user's and, when one was adopted, the answer. */
-export type ExchangeRef = {
+type ExchangeRef = {
 	inputMessageId: string;
 	answerMessageId: string | null;
 };
@@ -22,16 +22,10 @@ export type WindowHistory = {
 	summaryRevision: number;
 };
 
-export const EMPTY_HISTORY: WindowHistory = {
-	keep: [],
-	summaryText: "",
-	summaryRevision: 0,
-};
-
 /** How an exchange reaches the prompt (the table of section 2.3). */
-export type VerbatimClass = "keep" | "unprocessed" | "gone";
+type VerbatimClass = "keep" | "unprocessed" | "gone";
 
-export function verbatimClass(row: ExchangeDto): VerbatimClass {
+function verbatimClass(row: ExchangeDto): VerbatimClass {
 	switch (row.disposition) {
 		case "keep":
 			return "keep";

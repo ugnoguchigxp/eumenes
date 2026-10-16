@@ -2,7 +2,6 @@ import { z } from "zod";
 import type { HttpErrorStatus } from "../../../infrastructure/http";
 import {
 	eventSchema,
-	receiptSchema,
 	runObservationSchema,
 	type CodingEvent,
 	type ExecutionReceipt,
@@ -46,11 +45,6 @@ export interface ObservationSnapshot {
 	messages: CodingEvent[];
 	fileChange: CodingEvent | null;
 }
-export const codingEventsSchema = z.strictObject({
-	events: z.array(eventSchema),
-	cursor: z.number().int(),
-	receipt: receiptSchema.nullable(),
-});
 export const codingWorkspaceViewSchema = z.strictObject({
 	id: z.string(),
 	branch: z.string(),

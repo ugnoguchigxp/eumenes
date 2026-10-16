@@ -1,6 +1,6 @@
 import type { createClient } from "../../client";
 
-export type Client = ReturnType<typeof createClient>;
+type Client = ReturnType<typeof createClient>;
 
 /** Parsed command line shared by every command. `positional` excludes the command name. */
 export type CliArgs = {

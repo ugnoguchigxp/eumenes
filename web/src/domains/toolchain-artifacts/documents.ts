@@ -2,7 +2,6 @@ import type { SettingsChangeRow } from "@eumenes/design-system";
 import type { DocumentFieldV1 } from "../../../../api/domains/capabilities/contracts";
 import {
 	entryKey,
-	sameChange,
 	type DraftEntry,
 	type DraftView,
 	type FieldChange,
@@ -162,10 +161,6 @@ export function equalsSaved(
 	return JSON.stringify(change.value) === JSON.stringify(saved);
 }
 
-export function changeToWire(change: FieldChange): string {
-	return "unset" in change ? "" : toWire(change.value);
-}
-
 export type Resolved = {
 	entry: DraftEntry;
 	field: RegisteredField | undefined;
@@ -265,5 +260,3 @@ export function reviewRows(
 	}
 	return rows;
 }
-
-export { sameChange };

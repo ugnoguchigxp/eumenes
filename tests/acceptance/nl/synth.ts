@@ -12,8 +12,8 @@ import type {
 export const T0 = 1_700_000_000_000;
 const SERVER_OFFSET = 5_000;
 export const MAIN_ID = "10000000-0000-4000-8000-000000000001";
-export const SECOND_ID = "10000000-0000-4000-8000-000000000002";
-export const SEEDED_ID = "10000000-0000-4000-8000-0000000000aa";
+const SECOND_ID = "10000000-0000-4000-8000-000000000002";
+const SEEDED_ID = "10000000-0000-4000-8000-0000000000aa";
 
 export function criteriaOf(caseId: string): Criteria {
 	const { set } = loadFrozen();

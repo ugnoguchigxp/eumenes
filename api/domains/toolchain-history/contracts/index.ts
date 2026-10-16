@@ -54,7 +54,7 @@ export type PastSelection = {
 	functionName: string;
 	outcome: SelectionOutcome | null;
 };
-export type RecipeState = "active" | "suspended" | "disabled";
+type RecipeState = "active" | "suspended" | "disabled";
 export type Recipe = {
 	id: string;
 	toolchainId: string;

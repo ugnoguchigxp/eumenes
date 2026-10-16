@@ -1,0 +1,2 @@
+text = '''
+The context of this turn and the current request, oldest first, as JSON. Write only the next assistant turn.'''

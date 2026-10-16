@@ -80,6 +80,7 @@ export function verificationPlan(
 			if (errors.length) throw new Error(errors.join("\n"));
 		},
 	});
+	command("system-context", ["run", "context:check"]);
 	command("size-budget", [
 		"scripts/size-budget.ts",
 		...(all ? [] : checkPaths),

@@ -1,0 +1,4 @@
+text = '''
+
+
+FUNCTIONS: When one of these functions should handle the request, set tool to {name, arguments} and reply to null; otherwise set reply to your answer and tool to null.'''

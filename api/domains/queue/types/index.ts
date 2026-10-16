@@ -61,7 +61,7 @@ export interface JobClaim<P = unknown> {
 	deadlineAtMs: number | null;
 }
 
-export type PrepareResult<I> =
+type PrepareResult<I> =
 	| { status: "ready"; input: I }
 	| { status: "stale"; reason: string };
 

@@ -17,7 +17,7 @@ export * from "./world-goals";
  * The steward's tables (`steward/0001-init`): execution units, the inference requests they hold, the upkeep
  * control per conversation, the request inbox and the decision records with their reference index.
  */
-export const migration = `
+const migration = `
 CREATE TABLE steward_unit (
  id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL,
  kind TEXT NOT NULL CHECK(kind IN ('exchange_step','requests','maintenance')),
@@ -261,7 +261,7 @@ export function takeRequests(db: Database, jobId: string): string[] {
 
 // ---- upkeep control ----
 
-export type QuietSteps = {
+type QuietSteps = {
 	/** Upkeep steps that found nothing to change: step -> the revision they were quiet at. */
 	quiet?: Record<string, number>;
 	/** The round being run: its revision and the steps already started in it. */

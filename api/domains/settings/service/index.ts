@@ -17,12 +17,7 @@ import {
 	createHmac,
 	randomBytes,
 } from "node:crypto";
-import {
-	chmodSync,
-	existsSync,
-	mkdirSync,
-	readFileSync,
-} from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { Database } from "bun:sqlite";
 import { createFileExclusive } from "../../../infrastructure/atomic-file";

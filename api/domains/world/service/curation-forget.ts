@@ -218,4 +218,3 @@ export function createForget(ctx: CurationCtx) {
 			world.forgetEpoch(db, scope),
 	};
 }
-export type CurationForget = ReturnType<typeof createForget>;

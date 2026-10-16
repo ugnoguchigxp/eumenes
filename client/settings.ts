@@ -27,14 +27,7 @@ const usagePageSchema = z.object({
 	pageIndex: z.number(),
 	pageSize: z.number(),
 });
-export type {
-	ConnectionModels,
-	LarmDetails,
-	LarmProfiles,
-	Usage,
-	Probe,
-} from "../api/domains/inference/contracts";
-export type { Diagnostics } from "../api/domains/settings/contracts";
+export type { Usage } from "../api/domains/inference/contracts";
 
 export function settingsClient(t: Transport) {
 	return {

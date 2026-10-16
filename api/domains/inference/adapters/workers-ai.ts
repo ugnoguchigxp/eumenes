@@ -6,7 +6,7 @@ export const object = (value: unknown): Json =>
 	typeof value === "object" && value !== null && !Array.isArray(value)
 		? (value as Json)
 		: {};
-export const strings = (value: unknown): string[] =>
+const strings = (value: unknown): string[] =>
 	Array.isArray(value)
 		? value.filter((v): v is string => typeof v === "string")
 		: [];

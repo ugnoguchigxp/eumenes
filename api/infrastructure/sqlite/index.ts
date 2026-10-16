@@ -33,7 +33,7 @@ export class WriterOwnedError extends Error {
 	}
 }
 /** An applied migration was edited afterwards. Carries the id only, never SQL. */
-export class MigrationChecksumError extends Error {
+class MigrationChecksumError extends Error {
 	constructor(public readonly migrationId: string) {
 		super(`migration_checksum_mismatch:${migrationId}`);
 	}

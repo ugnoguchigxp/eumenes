@@ -13,7 +13,7 @@ import type {
  * transaction and only sent after it committed; every later change is a guarded update
  * (`expected state -> new state`), so a final state is never overwritten.
  */
-export const migration = `
+const migration = `
 CREATE TABLE terminal_requests (
  id TEXT PRIMARY KEY,
  digest TEXT NOT NULL,

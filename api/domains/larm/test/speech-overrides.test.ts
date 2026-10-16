@@ -126,3 +126,37 @@ test("a voice whose catalog entry declares no styles or ranges receives neither"
 		response_format: "wav",
 	});
 });
+
+test("a catalog without styled voices keeps the claim's voice, even one it does not list", async () => {
+	const catalog = ttsVoicesSchema.parse({
+		model: "model-tts-plain",
+		default_voice: "plain",
+		voices: [{ id: "plain" }],
+	});
+	const provider: Provider = {
+		name: "tts",
+		model: catalog.model,
+		baseUrl: "http://localhost",
+		protocol: "openai.audio-speech.v1",
+		token: "fixture",
+		voice: "claimed",
+	};
+	const voices: unknown[] = [];
+	const speak = createSpeechSynthesizer({
+		voice: undefined,
+		config: { speed: 1 },
+		voiceCatalogs: new WeakMap([[provider, catalog]]),
+		readVoices: async () => catalog,
+		withProvider: async (_name, _signal, use) => use(provider, "connection"),
+		japaneseVoice: () => provider,
+		infer: async (_p, _operation, init) => {
+			voices.push(JSON.parse(String(init.body)).voice);
+			const bytes = new Uint8Array(44);
+			bytes.set(new TextEncoder().encode("RIFF"));
+			bytes.set(new TextEncoder().encode("WAVE"), 8);
+			return new Response(bytes);
+		},
+	});
+	await speak("Sample", new AbortController().signal);
+	expect(voices).toEqual(["claimed"]);
+});

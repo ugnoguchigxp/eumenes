@@ -22,7 +22,7 @@ export const historyReadInput = z
 	})
 	.strict()
 	.refine((v) => v.before + v.after < 10);
-export const historyViewSchema = z.object({
+const historyViewSchema = z.object({
 	kind: z.literal("conversation_source"),
 	messageRef: ref,
 	messageId: z.string(),
@@ -39,7 +39,7 @@ export const historyViewSchema = z.object({
 	truncated: z.boolean(),
 	nextCursor: ref.nullable(),
 });
-export const historyScopeSchema = z.object({
+const historyScopeSchema = z.object({
 	conversationId: z.string(),
 	conversationRevision: z.number(),
 	scopeRef: ref,

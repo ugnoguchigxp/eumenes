@@ -22,7 +22,7 @@ const publicUrl = z
 	.url()
 	.max(2048)
 	.refine((value) => isPublicHttpUrl(value));
-export const searchSourceSchema = z.object({
+const searchSourceSchema = z.object({
 	provider: z.string().max(80),
 	query: z.string().max(400),
 	rank: z.number().int().min(1),
@@ -58,7 +58,7 @@ export const submitResearchSchema = z.discriminatedUnion("operation", [
 ]);
 export type ResearchSubmit = z.input<typeof submitResearchSchema>;
 export type ResearchRequest = z.output<typeof submitResearchSchema>;
-export const documentSchema = z.object({
+const documentSchema = z.object({
 	source: searchSourceSchema.optional(),
 	url: publicUrl,
 	title: z.string().max(500),

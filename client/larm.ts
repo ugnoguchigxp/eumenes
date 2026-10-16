@@ -15,4 +15,3 @@ export function larmClient(transport: Transport) {
 			),
 	};
 }
-export type LarmClient = ReturnType<typeof larmClient>;

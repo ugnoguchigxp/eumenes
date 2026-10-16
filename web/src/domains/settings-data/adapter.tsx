@@ -1,7 +1,7 @@
 import type { ArtifactEvent, Receipt } from "@eumenes/artifact-ui";
 import { useQueryClient } from "@tanstack/react-query";
 import type { ActionBindingV1 } from "../../../../api/domains/capabilities/contracts";
-import { prepareConnectionRegistration } from "../../../../api/domains/settings/contracts/registration";
+import { prepareConnectionRegistration } from "../../../../api/domains/settings/contracts";
 import { invalidateAllButLive, queryRoots } from "../../queryKeys";
 import { useSettings } from "../settings";
 import { dirtyEntries } from "../toolchain-artifacts/documents";
@@ -24,7 +24,7 @@ import { useFieldOptions, useTargets } from "./settings-sources";
 import { useModelCatalog } from "./useModelCatalog";
 import { useVoiceTools } from "./useVoiceTools";
 
-export const SETTINGS_ADAPTER_REF = "adapter:settings@1";
+const SETTINGS_ADAPTER_REF = "adapter:settings@1";
 export const SETTINGS_DOCUMENT = "document:settings@1";
 
 const emptyView: DraftView = {

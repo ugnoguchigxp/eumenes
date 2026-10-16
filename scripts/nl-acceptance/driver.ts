@@ -19,13 +19,13 @@ export const VIEWPORT = { width: 1280, height: 800 } as const;
 export const LOCALE = "ja-JP";
 export const TIMEZONE = "Asia/Tokyo";
 
-export type Observation = {
+type Observation = {
 	snapshot: string;
 	screenshot: Uint8Array;
 	/** Runner clock right after the snapshot was taken, for aligning screen and host. */
 	capturedAtMs: number;
 };
-export type ActionResult = { ok: true } | { ok: false; code: string };
+type ActionResult = { ok: true } | { ok: false; code: string };
 
 /**
  * The only way the runner touches the page for the tester: observe, and perform one of

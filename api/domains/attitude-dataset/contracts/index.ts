@@ -53,7 +53,7 @@ export const reviewSchema = z
 				r.expression_transition === null),
 		"unreviewed_labels_must_be_null",
 	);
-export type Review = Omit<z.infer<typeof reviewSchema>, "revision">;
+type Review = Omit<z.infer<typeof reviewSchema>, "revision">;
 export type Identity = NonNullable<SpeechPreparation["collection"]>;
 export type VoiceAdoption = {
 	tone: SpeechDelivery["tone"] | null;

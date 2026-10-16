@@ -1,7 +1,5 @@
 import type { SourceRef } from "eumenes-memory";
 import {
-	NOW,
-	SCOPE,
 	addMessage,
 	adoptPlan,
 	claim,
@@ -11,7 +9,7 @@ import {
 	type Harness,
 } from "./fixture";
 
-export const yes = (id: string) => ({
+const yes = (id: string) => ({
 	kind: "explicitly_unconditional",
 	adoptionEvidenceId: `ev-${id}-0`,
 });
@@ -60,5 +58,3 @@ export async function messageRef(h: Harness, id = "m1"): Promise<SourceRef> {
 	await addMessage(h, id, "AはBを引き起こし、BはCを引き起こす。");
 	return currentRef(h, id);
 }
-
-export { NOW, SCOPE };

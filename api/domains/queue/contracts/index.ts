@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const jobStates = [
+const jobStates = [
 	"queued",
 	"running",
 	"retry_wait",
@@ -19,7 +19,7 @@ export const openStates: readonly JobState[] = [
 	"retry_wait",
 	"cancel_requested",
 ];
-export const lanes = ["interactive", "background"] as const;
+const lanes = ["interactive", "background"] as const;
 export type Lane = (typeof lanes)[number];
 
 export const jobSchema = z.object({

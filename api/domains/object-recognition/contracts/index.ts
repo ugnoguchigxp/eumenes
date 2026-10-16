@@ -9,7 +9,7 @@ export const inputMime = z.enum([
 	"video/webm",
 ]);
 const dimension = z.number().int().positive().max(65536);
-export const detectedObject = z
+const detectedObject = z
 	.object({
 		classId: z.number().int().min(0).max(79),
 		label: z.string().min(1).max(120),
@@ -66,7 +66,7 @@ export const detectionResult = z
 		)
 			c.addIssue({ code: "custom", message: "frame_order_invalid" });
 	});
-export const recognitionState = z.enum([
+const recognitionState = z.enum([
 	"queued",
 	"starting",
 	"running",
@@ -90,8 +90,7 @@ export const recognitionRecord = z.object({
 	canRecheck: z.boolean().optional(),
 });
 export type RecognitionRecord = z.infer<typeof recognitionRecord>;
-export type DetectionResult = z.infer<typeof detectionResult>;
-export const upstreamId = z
+const upstreamId = z
 	.string()
 	.min(1)
 	.max(200)

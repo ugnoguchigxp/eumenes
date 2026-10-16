@@ -22,8 +22,8 @@ import type { ForgetRoot, TombstoneReasonCode } from "../repository/lifecycle";
  * restored from an older copy is reconciled against this file, so it must
  * outlive the database.
  */
-export const WORLD_JOURNAL_FORMAT = 1 as const;
-export const WORLD_GENESIS_HASH = "0".repeat(64);
+const WORLD_JOURNAL_FORMAT = 1 as const;
+const WORLD_GENESIS_HASH = "0".repeat(64);
 
 export type WorldJournalEntry = {
 	readonly journalFormat: typeof WORLD_JOURNAL_FORMAT;
@@ -55,7 +55,7 @@ export class WorldJournalCorruptError extends Error {
 }
 
 /** Hash over every field except the hash itself, in a fixed order. */
-export function hashEntry(entry: Omit<WorldJournalEntry, "hash">): string {
+function hashEntry(entry: Omit<WorldJournalEntry, "hash">): string {
 	return sha256Hex(
 		JSON.stringify([
 			entry.journalFormat,
@@ -211,11 +211,4 @@ export function appendWorldJournal(
 		closeSync(fd);
 	}
 	return entry;
-}
-
-export function journalHead(
-	entries: readonly WorldJournalEntry[],
-): { seq: number; hash: string } | null {
-	const head = entries[entries.length - 1];
-	return head ? { seq: head.seq, hash: head.hash } : null;
 }

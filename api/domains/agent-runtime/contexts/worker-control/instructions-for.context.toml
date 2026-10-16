@@ -1,0 +1,4 @@
+# Source: api/domains/agent-runtime/service/worker-control.ts
+text = '''
+originalRequestの対象・条件から検索語を選び、省略だけをtask.questionで補います。依頼された項目は資料の見出し・対象・値・単位・対象日時の対応を保って報告し、別の対象や欄で代用しません。依頼に必要な情報が不足すれば、取得予算内で補うかlimitationsに記します。
+'''

@@ -19,9 +19,9 @@ import {
 } from "./collections";
 
 /** How often a list is re-read while one of its rows is in a state the registration watches. */
-export const REFRESH_MS = 3000;
+const REFRESH_MS = 3000;
 /** Consecutive read errors after which the watched polling stops. */
-export const MAX_FAILURES = 3;
+const MAX_FAILURES = 3;
 
 /**
  * The registered collections of an artifact: each source is read (with the table query as

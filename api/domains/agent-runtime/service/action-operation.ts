@@ -15,7 +15,7 @@ import { get } from "../repository";
  * binding maps the tool to, and the input already checked against the tool's schema. The agent
  * runtime knows no domain; the adapter behind `adapterRef` executes it.
  */
-export const actionCommand = z.strictObject({
+const actionCommand = z.strictObject({
 	bindingRevisionId: z
 		.string()
 		.regex(/^binding:[a-z][a-z0-9._-]{0,100}@[1-9][0-9]*$/),

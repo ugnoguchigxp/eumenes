@@ -1,7 +1,7 @@
 import type { z } from "zod";
 import type { Tx } from "../../queue";
 
-export interface TargetOccurrence<P> {
+interface TargetOccurrence<P> {
 	scheduleId: string;
 	occurrenceId: string;
 	scheduledAtMs: number;

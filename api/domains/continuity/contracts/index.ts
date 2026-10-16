@@ -14,7 +14,7 @@ export const CONTINUITY_TTL_MS: Partial<Record<ContinuityKind, number>> = {
 	activity: 14 * 24 * 60 * 60 * 1000,
 	memo: 7 * 24 * 60 * 60 * 1000,
 };
-export const continuityStatuses = ["active", "resolved", "retracted"] as const;
+const continuityStatuses = ["active", "resolved", "retracted"] as const;
 export const continuityItemSchema = z.object({
 	id: z.string(),
 	conversationId: z.string(),

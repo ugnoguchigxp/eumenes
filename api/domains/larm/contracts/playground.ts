@@ -59,7 +59,7 @@ export interface TestOutput {
 	mime?: string;
 	artifact?: TestArtifact;
 }
-export type HealthState =
+type HealthState =
 	| "healthy"
 	| "busy"
 	| "unhealthy"

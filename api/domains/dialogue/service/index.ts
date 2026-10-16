@@ -24,7 +24,6 @@ import { createAgentSync } from "./agent-sync";
 import {
 	DEFAULT_DEADLINE_MS,
 	GENERATE_KIND,
-	PROMPT_TARGET_KIND,
 	TERMINAL,
 	type DialogueDeps,
 } from "./context";
@@ -32,10 +31,10 @@ import { createGenerationHandler } from "./generation-handler";
 import { createIntake } from "./intake";
 import { endRun, runEndedInTransaction } from "./run-end";
 import { createProgress } from "./progress";
+import type { MusicPort } from "../contracts/music";
+import type { ImagePort } from "../contracts/image";
+import type { ObjectRecognitionPort } from "../contracts/object-recognition";
 const log = getLogger("dialogue");
-
-export { GENERATE_KIND, PROMPT_TARGET_KIND };
-export { buildSystemPrompt } from "./system-prompt";
 
 export function createDialogueService({
 	store,
@@ -65,10 +64,10 @@ export function createDialogueService({
 	memory?: MemoryService;
 	steward?: StewardPort;
 	agents?: AgentRuntime;
-	music?: import("../contracts/music").MusicPort;
-	excalidraw?: import("../contracts/image").ImagePort;
-	image?: import("../contracts/image").ImagePort;
-	objectRecognition?: import("../contracts/object-recognition").ObjectRecognitionPort;
+	music?: MusicPort;
+	excalidraw?: ImagePort;
+	image?: ImagePort;
+	objectRecognition?: ObjectRecognitionPort;
 	delegation?: import("../contracts/delegation").DelegationPort;
 	worldContext?: WorldContextPort;
 	goals?: GoalsLayerPort;

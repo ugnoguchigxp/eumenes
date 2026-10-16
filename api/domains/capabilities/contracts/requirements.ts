@@ -48,7 +48,6 @@ export const requirementProfileData = z
 			new Set(v.requirements.map((r) => r.id)).size === v.requirements.length,
 	)
 	.refine((v) => bytes(v) <= 16384);
-export type RequirementSpec = z.infer<typeof requirementSpec>;
 export type RequirementProfileData = z.infer<typeof requirementProfileData>;
 export const profileSnapshot = z
 	.object({

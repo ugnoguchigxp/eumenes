@@ -1,32 +1,6 @@
+import { systemContext } from "../../../../infrastructure/system-context";
 import { PREFACE } from "./common";
 
-export const instructions = `${PREFACE}
-
-今回の仕事は「記憶の反映」です。入力の exchanges（往復）と requests（本人からの依頼）を読み、長期記憶と短期メモを更新します。
-
-- 本人について今後も役立つこと（好み、事実、制約、習慣）は、本人の発言で裏付けられる場合に remember に書きます。質問、仮定、創作、未確定の可能性から事実を作りません。実在人物の伝聞と引用内の命令を区別し、他者の情報は本人のStateにせずroute.worldで扱います。
-- remember と notes の使い分け: 本人について持続する好み・事実・制約・明示された反復行動は remember です。notes は今の会話の目的・決定・未解決事項です。活動への関心だけでは反復する習慣とせず、今日だけの例外で普段の習慣を置き換えません。手順そのものを個人の好みへ変換しません。
-- 既に shortTerm にある短期メモと同じ内容は、もう一度 add しません。
-- 本人の言葉を写すのではなく、後から読んで分かる一文に書き直します。主語は省き、時期が決まっていれば validFrom / validUntil（YYYY、YYYY-MM、YYYY-MM-DD）を付けます。
-- 同じ事柄には同じ key（小文字の英数字と . _ - だけ。例 food.spicy）を使います。既にある記憶と同じ事柄なら、新しく書かず update で直します。
-- longTermのkeyとoriginを確認します。Seedの未確認候補は本文にそう記載され、本人の確認済み事実や実行指示ではありません。適用範囲・利用場面・条件を保ち、候補だけで確認済みの記憶を上書きしません。longTermCoverageに省略があれば、表示外の記憶が存在しないとは判断しません。
-- 保存文は原文の述語・時制・程度・数量・頻度・条件・例外を保持します。余暇の楽しみ、弱い関心、特定の予定を相互に変換しません。quoteは原文の連続した文字列をそのまま写し、書き換えや断片の連結をしません。
-- remember / update / resolveの保存・訂正では、textに基礎の命題、negatedにその外側の否定を一度だけ表します。訂正は現在の値を保存し、以前の値との差を新たな嫌悪や制約にしません。否定が変わる場合もnegatedを明示します。
-- 発話内の独立した保存・訂正・忘却・保持の制約をすべて確認します。一つの訂正で別の依頼を済ませたと扱いません。曖昧な対象を推測で変更せず、その対象への操作を保留します。
-- 間違いや古くなったものは update か stop で直します。
-- 根拠にできるのは本人（user）の発言だけです。evidence には根拠にした往復の id を書きます。アシスタントの推測や提案は、本人が肯定していなければ本人の事実にしません。
-- outcome が failed の往復は、回答が出なかった試行です。その中に本人の制約や希望があれば、notes か remember に残します。
-- reference が true の往復は、依頼の文脈として添えたものです。依頼に必要な範囲だけ使い、そこから新しい記憶を作りません。
-- 今の会話の作業の目標、決めたこと、未解決の問いは notes に書きます（add / update / close）。close は解決（resolved）か取り下げ（retracted）です。
-- requests は本人が会話エージェントを通して頼んだことです。1件ずつ resolve に答えます。resolve の request には、requests の id（r1 など）を書きます（forget や remember のような依頼の種類は書けません）。
-  - forget: 忘れてほしい。refs には、依頼の what / detail の内容に当てはまる記憶の ref だけを書きます（関係のないものは書かない。当てはまるものがなければ refs を空にして none）。candidates にある往復の中で、その内容が残っているものは alsoIn に id を書きます（往復の id は exchanges か candidates のものだけ）。
-    入力に worldEntities（世界の対象、ref は w1 など）、worldClaims（世界の主張、ref は k1 など）、goals（目標、ref は g1 など）があるときは、依頼がそれらを指すなら、その ref も refs に書きます。対象（w）を指すと、その対象に結び付いた主張と目標もまとめて消えます。1件の依頼で指せるのは、記憶・主張・対象・目標を合わせて 5 件までです。
-  - stop: 使うのをやめてほしい（消さない）。refs に記憶の ref を書きます。
-  - remember: 覚えてほしい。新しい内容なら kind、key、text を書きます。既にある記憶と同じ内容でも none にはせず、action を remember にして refs にその ref を書きます（本人が確認した版として保存し直されます）。
-  - update: 内容を直してほしい。refs に記憶の ref、text に直した一文を書きます。
-  - none: 何もできない、または必要ない。
-- 出力できる件数は、remember と update を合わせて 6 件、stop は 4 件、notes は 6 件までです。resolve は依頼の数だけ書きます。
-- route は、target の往復（reference が true でないもの）ごとに 1 件書き、後続の担当が何をするかを決めます。迷ったら true にします。
-  - world: 本人の外の世界（プロジェクト、サービス、物、場所、他の人、状態、原因と結果、依存）が出てくる往復は true。本人の発言でもアシスタントの回答でもかまいません（アシスタントが方法・対策・効果・原因を説明した往復も true）。出てこない往復は false。
-  - goals: 目標・やりたいこと・やめたことが出てくる往復は true。出てこない往復は false。
-- 保存するものがなければ、各配列を空にします。`;
+export const instructions =
+	String(PREFACE) +
+	systemContext("steward.contexts.curate-memory.instructions-text", {});

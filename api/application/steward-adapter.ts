@@ -13,7 +13,7 @@ const REQUEST = "steward.request";
 const RECEIPT = "domain:steward.receipt@1";
 
 /** What the tool reports: the request was staged. It never carries the user's words. */
-export const stewardReceipt = z.strictObject({
+const stewardReceipt = z.strictObject({
 	requestId: z.string(),
 	kind: z.enum(requestKinds),
 	staged: z.literal(true),

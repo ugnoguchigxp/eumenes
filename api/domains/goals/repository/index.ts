@@ -2,7 +2,7 @@ import type { Database } from "bun:sqlite";
 import type { Migration } from "../../../infrastructure/sqlite";
 import type { Goal, GoalSource, GoalStatus } from "../contracts";
 
-export const migration = `
+const migration = `
 CREATE TABLE goals_ledger (
  id TEXT PRIMARY KEY, principal TEXT NOT NULL, scope_key TEXT NOT NULL,
  desired_state TEXT NOT NULL, priority INTEGER NOT NULL CHECK(priority BETWEEN 0 AND 100),
@@ -26,7 +26,7 @@ CREATE TABLE goals_scope_epochs (
  * Idempotency key of adopt/propose (append-only; the base migration may already
  * be applied). operation_digest fingerprints the payload for conflict detection.
  */
-export const operationMigration = `
+const operationMigration = `
 ALTER TABLE goals_ledger ADD COLUMN operation_key TEXT;
 ALTER TABLE goals_ledger ADD COLUMN operation_digest TEXT;
 CREATE UNIQUE INDEX goals_ledger_operation ON goals_ledger(principal, scope_key, operation_key) WHERE operation_key IS NOT NULL;
@@ -37,7 +37,7 @@ CREATE UNIQUE INDEX goals_ledger_operation ON goals_ledger(principal, scope_key,
  * the World entities a goal concerns (accumulated over its revisions). Message
  * and entity ids are opaque here; goals never resolves them.
  */
-export const sourceMigration = `
+const sourceMigration = `
 CREATE TABLE goals_source (
  goal_id TEXT NOT NULL, revision INTEGER NOT NULL, message_id TEXT NOT NULL,
  PRIMARY KEY (goal_id, revision, message_id)

@@ -46,7 +46,7 @@ export function sessionView(s: Session): TerminalSessionView {
 }
 
 /** A turn the person started (no request of ours) counts as running for this long after its last hook. */
-export const MANUAL_TURN_MS = 30 * 60 * 1000;
+const MANUAL_TURN_MS = 30 * 60 * 1000;
 /**
  * `working` / `waiting` with no request on the PTY and no hook for `MANUAL_TURN_MS`: the turn was
  * most likely interrupted (Esc sends no hook), so it no longer holds back the Kanban queue.
@@ -124,7 +124,7 @@ function openDirect(
 	return session;
 }
 /** Terminates a run: SIGTERM, SIGKILL after a while; true when the exit was seen in time. */
-export async function terminate(
+async function terminate(
 	session: Session,
 	killAfterMs: number,
 	stopConfirmMs: number,

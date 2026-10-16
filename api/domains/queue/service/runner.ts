@@ -611,4 +611,3 @@ export function createRunner(
 		lastScanMs: () => lastScanMs,
 	};
 }
-export type Runner = ReturnType<typeof createRunner>;

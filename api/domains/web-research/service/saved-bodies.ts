@@ -52,7 +52,7 @@ const provenance = (b: AcquiredBody) => ({
 	security: b.security,
 });
 /** Search-only normalization with a code-point position map; quotes always use the original text. */
-export function normalizedPositions(text: string) {
+function normalizedPositions(text: string) {
 	const parts: string[] = [],
 		positions: number[] = [],
 		ends: number[] = [];

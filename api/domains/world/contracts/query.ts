@@ -25,7 +25,7 @@ export const WORLD_QUERY_MODES = [
 	"scenarios",
 	"gaps",
 ] as const;
-export type WorldQueryMode = (typeof WORLD_QUERY_MODES)[number];
+type WorldQueryMode = (typeof WORLD_QUERY_MODES)[number];
 
 /** Upper bounds. A request above any of them is rejected, never clamped. */
 export const WORLD_QUERY_LIMITS = {
@@ -100,7 +100,6 @@ const budgetSchema = z.strictObject({
 		WORLD_QUERY_LIMITS.budget.presentationBytes,
 	).optional(),
 });
-export type WorldQueryBudget = z.infer<typeof budgetSchema>;
 
 const common = {
 	/** Defaults to the only scope the host allows. A scope the host did not grant is `not_available`. */
@@ -196,7 +195,7 @@ export type WorldQueryContext = {
 	origin?: unknown;
 };
 
-export const WORLD_QUERY_REJECTIONS = [
+const WORLD_QUERY_REJECTIONS = [
 	"invalid_request",
 	"unknown_mode",
 	"limit_exceeded",
@@ -230,7 +229,7 @@ export type WorldQueryBasis = {
 	}[];
 };
 
-export type GapTaskLinkStatus =
+type GapTaskLinkStatus =
 	| "created"
 	/** The same Gap already has its Task: nothing new was created. */
 	| "linked"

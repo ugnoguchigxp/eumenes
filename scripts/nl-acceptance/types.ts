@@ -15,7 +15,7 @@ export const GROUPS = [
 export type Group = (typeof GROUPS)[number];
 const groupSchema = z.enum(GROUPS);
 
-export const budgetSchema = z.strictObject({
+const budgetSchema = z.strictObject({
 	wallSeconds: z.number().int().positive(),
 	maxActions: z.number().int().positive(),
 	maxModelCalls: z.number().int().positive(),
@@ -23,7 +23,7 @@ export const budgetSchema = z.strictObject({
 });
 export type Budget = z.infer<typeof budgetSchema>;
 
-export const evidenceKinds = [
+const evidenceKinds = [
 	"screenshots",
 	"observations",
 	"actions",
@@ -40,7 +40,7 @@ const PROCEDURAL =
  * artifact screens without the conversation input, whose answers in the isolated fixture come
  * from a canned model rather than the product (UI and conversation cases are kept apart).
  */
-export const allowedSurfaces = [
+const allowedSurfaces = [
 	"isolated-eumenes-browser",
 	"isolated-eumenes-artifacts",
 ] as const;
@@ -94,7 +94,7 @@ export const fixtureSchema = z
 	.readonly();
 export type FixtureDef = z.infer<typeof fixtureSchema>;
 
-export const hostReads = ["timers", "interactions"] as const;
+const hostReads = ["timers", "interactions"] as const;
 export const criteriaSchema = z
 	.strictObject({
 		criteriaId: z.string().regex(/^[a-z0-9][a-z0-9-]*$/),
@@ -162,7 +162,7 @@ export type FailureClass =
 	| "environment"
 	| "criteria"
 	| "undetermined";
-export type Verdict = "success" | "failure" | "inconclusive";
+type Verdict = "success" | "failure" | "inconclusive";
 
 export type Termination = {
 	reason:

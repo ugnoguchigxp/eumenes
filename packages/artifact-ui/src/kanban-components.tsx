@@ -12,7 +12,7 @@ import { Feedback, useAction } from "./components";
  * api/domains/kanban/contracts.ts), restricted to what this view reads. artifact-ui does not
  * import API types, so the shape is mirrored here; the Web adapter passes the API view through.
  */
-export type KanbanBlockerReason =
+type KanbanBlockerReason =
 	| "interrupted"
 	| "ended"
 	| "unknown"
@@ -23,7 +23,7 @@ export type KanbanBlockerReason =
 	| "stopped_by_person"
 	| "resume_failed";
 /** Work typed by hand in a Claude Code session of the board that holds the queue back. */
-export type KanbanManualActivity = {
+type KanbanManualActivity = {
 	activity: "working" | "waiting";
 	/** Its state is old: the queue no longer waits for it. */
 	stale: boolean;
@@ -128,8 +128,7 @@ const QUEUE_PAUSED_TEXT = {
 	stop_unconfirmed: "止めたタスクの終了を確認できていません",
 	restarted: "再起動で実行状況を確認できなくなったため止めました",
 } as const;
-export const NOT_RUNNABLE_TEXT =
-	"この環境では作業の状態を追えないため実行できません";
+const NOT_RUNNABLE_TEXT = "この環境では作業の状態を追えないため実行できません";
 
 function statusText(
 	board: KanbanBoardSource,
@@ -197,7 +196,7 @@ function queueOf(board: KanbanBoardSource): KanbanBoardQueue {
 }
 
 /** Maps the board source to the DesignSystem props, with the wording of states and reasons. */
-export function kanbanBoardProps(
+function kanbanBoardProps(
 	board: KanbanBoardSource,
 ): Pick<
 	KanbanBoardProps,

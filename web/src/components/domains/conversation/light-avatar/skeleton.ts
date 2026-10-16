@@ -1,7 +1,7 @@
 import * as THREE from "three";
 
 /** Fixed bone names shared by the motion data and any future glTF clips. */
-export const armBones = (["outer", "inner"] as const).flatMap((layer) =>
+const armBones = (["outer", "inner"] as const).flatMap((layer) =>
 	(["l", "r"] as const).flatMap((side) =>
 		(["01", "02", "03", "tip"] as const).map(
 			(joint) => `arm_${layer}_${side}_${joint}` as const,

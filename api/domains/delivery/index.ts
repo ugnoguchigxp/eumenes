@@ -2,7 +2,6 @@ export {
 	acceptedAvatarMotion,
 	acceptedEmotion,
 	deliveryState,
-	emotionPerformance,
 	chooseSpeechDelivery,
 	speechParameters,
 	speechQuestions,
@@ -16,7 +15,6 @@ export {
 	avatarMotionSchema,
 	type SpeechDelivery,
 	type AvatarMotion,
-	type ChoiceQuestions,
 } from "./contracts";
 export { decisionDetails, type DecisionDetails } from "./service/result";
 export type { Judge } from "./service";

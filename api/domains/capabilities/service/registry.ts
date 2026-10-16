@@ -226,7 +226,7 @@ function validateBinding(
 	}
 }
 /** A JSON Schema a model can fill directly: an object without top-level unions. */
-export function flatObjectSchema(schema: Record<string, unknown>) {
+function flatObjectSchema(schema: Record<string, unknown>) {
 	return (
 		schema.type === "object" &&
 		!("oneOf" in schema) &&

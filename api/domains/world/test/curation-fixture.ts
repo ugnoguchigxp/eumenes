@@ -39,12 +39,6 @@ export function testPorts() {
 }
 export type TestPorts = ReturnType<typeof testPorts>;
 
-export const SERVICE_ENTITY = {
-	id: "svc-1",
-	displayName: "音声サービス",
-	aliases: ["音声"],
-};
-
 export type Rig = {
 	life: Life;
 	curation: WorldCuration;

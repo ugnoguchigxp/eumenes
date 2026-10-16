@@ -43,10 +43,12 @@ function setup(projection: Record<string, unknown>) {
 	]);
 	stores.push(store);
 	let generated = 0;
+	const contexts: string[] = [];
 	const larm: LarmPort & InferencePort = {
 		status: () => ({ state: "ready", capabilities: ["llm"] }),
 		connect: async () => {},
-		answer: async () => {
+		answer: async (messages) => {
+			contexts.push(JSON.stringify(messages));
 			generated++;
 			return "生成された回答";
 		},
@@ -123,13 +125,14 @@ function setup(projection: Record<string, unknown>) {
 		recorded,
 		settled,
 		generated: () => generated,
+		contexts,
 	};
 }
-const submit = async (h: ReturnType<typeof setup>) => {
+const submit = async (h: ReturnType<typeof setup>, text = "調べて") => {
 	const run = await h.dialogue.submit({
 		requestId: crypto.randomUUID(),
 		conversationId: "main",
-		text: "調べて",
+		text,
 	});
 	await h.store.write((db) =>
 		db
@@ -140,7 +143,7 @@ const submit = async (h: ReturnType<typeof setup>) => {
 	return run;
 };
 
-test("a guided direct answer is adopted without generation and settles the selection once", async () => {
+test("a guided report is phrased by the conversation agent and settles the selection once", async () => {
 	const h = setup({
 		delivery: "guided-web",
 		answer: "調査結果の本文です。",
@@ -148,7 +151,7 @@ test("a guided direct answer is adopted without generation and settles the selec
 	});
 	const run = await submit(h);
 	await until(() => h.dialogue.get(run.id)?.status === "completed");
-	expect(h.generated()).toBe(0);
+	expect(h.generated()).toBe(1);
 	expect(h.settled).toEqual([{ outcome: "answered" }]);
 	expect(h.recorded).toEqual([]);
 	const stored = h.dialogue.get(run.id)!;
@@ -158,7 +161,7 @@ test("a guided direct answer is adopted without generation and settles the selec
 				.query("SELECT text FROM messages WHERE id=?")
 				.get(stored.answerMessageId) as { text: string } | null,
 	);
-	expect(message?.text).toBe("調査結果の本文です。");
+	expect(message?.text).toBe("生成された回答");
 	await h.queue.close(100);
 });
 
@@ -170,3 +173,26 @@ test("a guided direct answer without a reported outcome settles as completed", a
 	expect(h.recorded).toEqual([]);
 	await h.queue.close(100);
 });
+
+for (const request of [
+	"今日の天気は？",
+	"今日の天気を詳しく調べて、詳細を教えて",
+]) {
+	test(`guided report retains the request and conversation policy: ${request}`, async () => {
+		const report =
+			"晴れ。最高25度、最低18度。湿度42〜72%。風は北西。紫外線に注意。重ね着がおすすめ。";
+		const h = setup({
+			delivery: "guided-web",
+			answer: report,
+			outcome: "answered",
+		});
+		const run = await submit(h, request);
+		await until(() => h.dialogue.get(run.id)?.status === "completed");
+		expect(h.generated()).toBe(1);
+		expect(h.contexts[0]).toContain(request);
+		expect(h.contexts[0]).toContain(report);
+		expect(h.contexts[0]).toContain("最大2点");
+		expect(h.contexts[0]).toContain("詳しく解説");
+		await h.queue.close(100);
+	});
+}

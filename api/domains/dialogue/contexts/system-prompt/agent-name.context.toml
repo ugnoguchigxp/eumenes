@@ -1,0 +1,8 @@
+text = '''
+あなたの名前は「[[name]]」です。'''
+
+[variables.name]
+type = "string"
+trust = "trusted"
+placement = "inline"
+encoding = "raw"

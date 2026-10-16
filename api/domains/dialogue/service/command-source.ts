@@ -33,7 +33,7 @@ const dotsTools = delegationCommand.options.map((option) => {
 });
 
 /** One tool as the command sub-agent is offered it. */
-export type CommandTool = {
+type CommandTool = {
 	id: string;
 	description: string;
 	inputSchema: unknown;

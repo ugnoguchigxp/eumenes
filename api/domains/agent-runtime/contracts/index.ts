@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { SourceMetadata } from "../../tool-runtime";
+import type { ReportRequirements } from "./requirements";
 export const reportSchema = z
 	.object({
 		summary: z.string().min(1).max(2000),
@@ -46,7 +47,7 @@ export type Report = ReportBase &
 		| {
 				version: 3;
 				outcome: ReportOutcome;
-				requirements: import("./requirements").ReportRequirements;
+				requirements: ReportRequirements;
 		  }
 	);
 export * from "./requirements";
@@ -59,17 +60,6 @@ const excerptEvidenceSchema = z
 			.max(12),
 	})
 	.strict();
-/** Model references are resolved to canonical quotes before storage or projection. */
-export const referencedReportSchema = reportSchema.extend({
-	claims: z
-		.array(
-			reportSchema.shape.claims.element.extend({
-				evidence: z.array(excerptEvidenceSchema).min(1).max(3),
-			}),
-		)
-		.min(1)
-		.max(8),
-});
 export const legacyWorkerReportSchema = reportSchema.extend({
 	claims: z
 		.array(

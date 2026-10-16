@@ -1,5 +1,5 @@
 import type { SpeechDelivery } from "../../delivery";
-export type Chunk = {
+type Chunk = {
 	index: number;
 	text: string;
 	wav: Uint8Array;

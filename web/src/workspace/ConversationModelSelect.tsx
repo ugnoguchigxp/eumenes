@@ -13,6 +13,7 @@ import {
 	type ConversationModelOption,
 	type useConversationModel,
 } from "../domains/settings";
+import { shortModelName } from "./model-name";
 
 type ActualModel = {
 	source: string;
@@ -102,7 +103,9 @@ export function ConversationModelSelect({
 					title={tooltip}
 				>
 					<SelectValue placeholder="会話エージェント">
-						{selected ? optionName(selected) : actualModel?.model}
+						{selected
+							? shortModelName(selected.label)
+							: actualModel && shortModelName(actualModel.model)}
 					</SelectValue>
 				</SelectTrigger>
 				<SelectContent>

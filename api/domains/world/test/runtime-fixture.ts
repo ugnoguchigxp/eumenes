@@ -12,7 +12,7 @@ import { SCOPE } from "./fixture";
  * measurements exists (see contracts/runtime.ts), so this is the ONLY
  * implementation of the port and every test that uses it is fixture-grade.
  */
-export const LEDGER_NAMESPACE = "runtime-ledger";
+const LEDGER_NAMESPACE = "runtime-ledger";
 
 export const keyOf = (id: string): SourceKey => ({
 	namespace: LEDGER_NAMESPACE,

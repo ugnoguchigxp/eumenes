@@ -56,7 +56,7 @@ export const speechDeliverySchema = z.object({
 	emotionConfidence: z.number().min(0).max(1).optional(),
 	motion: avatarMotionSchema,
 	tone: speechToneSchema,
-	source: z.enum(["laya", "ruri", "system-one", "fallback"]),
+	source: z.enum(["scored", "system-one", "fallback"]),
 	reason: z
 		.enum([
 			"unavailable",

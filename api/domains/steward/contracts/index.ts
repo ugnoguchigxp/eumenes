@@ -6,7 +6,7 @@ export const STEWARD_KIND = "steward.step.v1";
 export const STEWARD_SCOPE = "steward";
 export const STEWARD_RESOURCE = "inference.aux";
 
-export const stepIds = [
+const stepIds = [
 	"curate-memory",
 	"curate-goals",
 	"curate-world",
@@ -19,7 +19,7 @@ export const stepIds = [
 	"refine-summary",
 ] as const;
 export type StepId = (typeof stepIds)[number];
-export const unitKinds = [
+const unitKinds = [
 	"exchange_step",
 	"requests",
 	"maintenance",
@@ -47,8 +47,8 @@ export type RunEnd =
 export type RunLookup = "active" | RunEnd;
 
 /** The conversation agent's `memory_request` input (the tool's own schema is registered in capabilities). */
-export const WHAT_MAX_CHARS = 500;
-export const DETAIL_MAX_CHARS = 1000;
+const WHAT_MAX_CHARS = 500;
+const DETAIL_MAX_CHARS = 1000;
 export const memoryRequestInput = z.strictObject({
 	kind: z.enum(requestKinds),
 	what: z.string().trim().min(1).max(WHAT_MAX_CHARS),
@@ -161,13 +161,13 @@ export interface QueuePort {
 	): { job: { id: string }; fresh: boolean };
 }
 /** The queue's handler contract, restated for the one handler the steward registers. */
-export type StewardJobClaim<P> = {
+type StewardJobClaim<P> = {
 	jobId: string;
 	generation: number;
 	attempt: number;
 	payload: P;
 };
-export type StewardSettleOutcome<O> =
+type StewardSettleOutcome<O> =
 	| { type: "success"; result: O; resultRef?: string }
 	| { type: "retry"; errorCode: string; availableAtMs: number }
 	| { type: "failed"; errorCode: string }
@@ -208,7 +208,7 @@ export interface StewardJobHandler<P, I, O> {
 
 // ---- read model ----
 
-export const decisionSchema = z.object({
+const decisionSchema = z.object({
 	id: z.number(),
 	conversationId: z.string(),
 	jobId: z.string(),

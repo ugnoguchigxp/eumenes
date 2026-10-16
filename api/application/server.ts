@@ -130,7 +130,7 @@ const SAFE_STARTUP_CODES = [
 	/^config_invalid:[A-Z0-9_]+$/,
 	/^migration_[a-z_]+:[A-Za-z0-9/._-]{1,120}$/,
 	/^migration_[a-z_]+$/,
-	/^(database_writer_owned|world_cursor_secret_invalid|api_token_file_invalid|loopback_host_required|port_in_use)$/,
+	/^(database_writer_owned|database_integrity_check_failed|world_cursor_secret_invalid|api_token_file_invalid|loopback_host_required|port_in_use)$/,
 	/^secret_key_[a-z_]+$/,
 ];
 

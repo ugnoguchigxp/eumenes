@@ -1,10 +1,11 @@
 import type { Capability } from "../contracts";
 
+import type { ChatInput } from "../contracts/chat-input";
 export type ProviderName = Capability | "system-one" | "tts-english";
 export type Provider = {
 	/** External catalog name, retained across renewal when the internal role differs. */
 	claimName?: string;
-	chatInput?: import("../contracts/chat-input").ChatInput;
+	chatInput?: ChatInput;
 	vision?: boolean;
 	name: ProviderName;
 	baseUrl: string;

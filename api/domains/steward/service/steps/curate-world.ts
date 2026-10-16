@@ -27,7 +27,7 @@ import type {
  */
 type WorldContext = { prepared: PreparedCuration };
 
-export type CurateWorldOutput = {
+type CurateWorldOutput = {
 	entities: unknown[];
 	claims: unknown[];
 	changed: boolean;

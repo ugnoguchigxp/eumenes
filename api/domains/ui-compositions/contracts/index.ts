@@ -41,7 +41,6 @@ export const designSpec = z.strictObject({
 		)
 		.max(8),
 });
-export type DesignSpec = z.infer<typeof designSpec>;
 export function validatedDesign(raw: unknown) {
 	const spec = designSpec.parse(raw);
 	if (new Set(spec.fields.map((f) => f.id)).size !== spec.fields.length)

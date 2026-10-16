@@ -6,7 +6,7 @@ import type { StepEnv } from "./types";
 const GOALS_SHOWN = 40;
 const GOAL_TEXT_CHARS = 200;
 
-export type GoalRefEntry = {
+type GoalRefEntry = {
 	goalId: string;
 	revision: number;
 	status: GoalStatus;

@@ -20,7 +20,7 @@ export type AdapterOrigin =
 	  }
 	| { kind: "ui"; scope: string; actionRequestId: string };
 
-export type ResultRef = {
+type ResultRef = {
 	owner: string;
 	kind: string;
 	id: string;
@@ -137,7 +137,7 @@ export function createAdapterRegistry(
 }
 
 /** The common envelope around a domain receipt. It never replaces the receipt. */
-export type ExecutionOutcome =
+type ExecutionOutcome =
 	| "completed"
 	| "needs_input"
 	| "failed"

@@ -1,3 +1,4 @@
+import { systemContext } from "../../../infrastructure/system-context";
 import { measureStage } from "../../../infrastructure/performance";
 import type { Database } from "bun:sqlite";
 import { getLogger } from "../../../infrastructure/logger";
@@ -127,7 +128,7 @@ export async function prepareDecision(
 					: {
 							...m,
 							content:
-								"referenceContext(過去のユーザー発言。今回の依頼ではない参考データ)=" +
+								systemContext("dialogue.contexts.selection-trace.content", {}) +
 								JSON.stringify(m.content),
 						},
 			);

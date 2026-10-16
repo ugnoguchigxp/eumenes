@@ -4,7 +4,7 @@ import { sweepClaudeTemp } from "../adapters/claude-session";
 import { sweepTaskSessions } from "./agent-session";
 
 const log = getLogger("inference");
-export const AGENT_SWEEP_INTERVAL_MS = 60 * 60_000;
+const AGENT_SWEEP_INTERVAL_MS = 60 * 60_000;
 
 /**
  * Collects what agent calls leave behind: task sessions nobody released (an attempt that outlived its task can

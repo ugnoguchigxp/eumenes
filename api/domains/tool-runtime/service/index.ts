@@ -84,7 +84,9 @@ export function createToolRuntime(
 		adapter,
 		retryAvailableAt(db, inv) {
 			if (!inv.result_ref || inv.finished_at == null) return undefined;
-			const entry = resolve(db, inv.result_ref, inv.owner_task_id);
+			// An expired or lost result has no cooldown left to honour.
+			const entry = held(db, inv.result_ref, inv.owner_task_id);
+			if (!entry) return undefined;
 			const cooldown = Math.max(
 				0,
 				...entry.failures
@@ -95,18 +97,22 @@ export function createToolRuntime(
 			return at > now() ? at : undefined;
 		},
 		canReplayPartial(db, inv) {
-			try {
-				return (
-					!!inv.result_ref &&
-					resolve(db, inv.result_ref, inv.owner_task_id).sources.some(
-						(s) => s.basis === "page" && s.body.trim(),
-					)
-				);
-			} catch {
-				return false;
-			}
+			return !!(
+				inv.result_ref &&
+				held(db, inv.result_ref, inv.owner_task_id)?.sources.some(
+					(s) => s.basis === "page" && s.body.trim(),
+				)
+			);
 		},
 	});
+	/** The result if it is still held, else undefined (expired, lost or superseded). */
+	function held(db: Database, ref: string, taskId: string) {
+		try {
+			return resolve(db, ref, taskId);
+		} catch {
+			return undefined;
+		}
+	}
 	function resolve(db: Database, ref: string, taskId: string) {
 		const entry = vault.get(ref);
 		if (!entry || entry.expires <= now()) throw new Error("result_expired");

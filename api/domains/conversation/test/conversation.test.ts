@@ -147,7 +147,7 @@ test("answer-wide delivery persists provenance, upgrades fallback, and keeps an 
 		const plain = {
 			...fallback,
 			id: crypto.randomUUID(),
-			source: "laya" as const,
+			source: "system-one" as const,
 			reason: undefined,
 			confidence: 0.9,
 			emotionConfidence: 0.9,

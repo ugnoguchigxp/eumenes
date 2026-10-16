@@ -10,7 +10,7 @@ const hash = z.string().regex(/^[a-f0-9]{64}$/);
 const targets = ["state", "host_procedure", "continuity"] as const;
 
 /** External candidate data, never an instruction or a confirmed statement by the owner. */
-export const memorySeedSchema = z
+const memorySeedSchema = z
 	.strictObject({
 		schema_version: z.literal(1),
 		id: text,

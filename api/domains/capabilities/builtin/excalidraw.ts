@@ -1,3 +1,4 @@
+import { systemContext } from "../../../infrastructure/system-context";
 import { readFileSync } from "node:fs";
 import type { Definition } from "../contracts";
 const base = {
@@ -15,7 +16,7 @@ export const excalidrawBuiltins: Definition[] = [
 		id: "excalidraw.edit",
 		title: "図の編集担当",
 		summary: "図の作成・再表示を案内する",
-		body: "あなたは図の編集担当です。利用者の依頼からExcalidrawの新しい図または保存済み図の編集入口を選び、ツールの出力契約を満たします。保存先と権限はホストが管理します。",
+		body: systemContext("capabilities.contexts.excalidraw.body", {}),
 	},
 	{
 		...base,

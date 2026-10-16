@@ -19,7 +19,7 @@ const CONTEXT = "query:memory.context@1";
 const DECISIONS = "query:memory.steward-decisions@1";
 const EXCHANGES = "query:memory.steward-exchanges@1";
 /** The conversation whose short-term notes and context the screen shows (the app's one conversation). */
-export const MEMORY_SCREEN_CONVERSATION = "main";
+const MEMORY_SCREEN_CONVERSATION = "main";
 
 const setEnabled = z.strictObject({ enabled: z.boolean() });
 const page = z.strictObject({

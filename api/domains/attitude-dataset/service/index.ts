@@ -368,7 +368,7 @@ export function createAttitudeDataset(store: SqliteStore, path: string) {
 					sample ? "succeeded" : "failed",
 					sensitive
 						? "skip:sensitive-text"
-						: (originalSkip ?? (sample ? null : "invalid-or-non-ruri")),
+						: (originalSkip ?? (sample ? null : "invalid-or-unscored")),
 					sample ? JSON.stringify(sample) : null,
 					id,
 				);

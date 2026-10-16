@@ -5,7 +5,6 @@ export {
 	supersedeMigration,
 	actionMigration,
 	actionAdapterMigration,
-	actionRequestsMigration,
 } from "./repository";
 export {
 	createActionRequests,
@@ -15,18 +14,10 @@ export {
 	ACTION_POLICY,
 	ActionRequestError,
 	type CapabilityReads,
-	type ArtifactListEntry,
-	type ArtifactView,
-	type SourceView,
-	type SubmitResult,
 } from "./service/action-types";
 export {
 	createHttpJsonExecutor,
-	type HttpJsonExecutor,
 	type HttpJsonConnection,
-	type HttpJsonRequest,
-	type HttpJsonResult,
-	type HttpJsonFailureCode,
 } from "./service/http-json";
 export { registerToolchainActions } from "./controller";
 export * from "./contracts";

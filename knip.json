@@ -5,6 +5,7 @@
 		".": {
 			"entry": [
 				"scripts/*.ts",
+				"scripts/*/cli.ts",
 				"**/*.test.{ts,tsx}",
 				"**/*.fixture.ts",
 				"tests/browser/**/*.ts"

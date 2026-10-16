@@ -16,14 +16,14 @@ export function parseDatePart(text: string): DatePart | null {
 	if (match[3] === undefined) return { precision: "month", year, month };
 	return { precision: "day", year, month, day: Number(match[3]) };
 }
-export function formatDatePart(date: DatePart): string {
+function formatDatePart(date: DatePart): string {
 	if (date.precision === "year") return String(date.year).padStart(4, "0");
 	if (date.precision === "month")
 		return `${String(date.year).padStart(4, "0")}-${pad(date.month ?? 1)}`;
 	return `${String(date.year).padStart(4, "0")}-${pad(date.month ?? 1)}-${pad(date.day ?? 1)}`;
 }
 /** The host's local calendar day of an instant, `YYYY-MM-DD`. */
-export function localDay(ms: number): string {
+function localDay(ms: number): string {
 	const date = new Date(ms);
 	return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }

@@ -20,7 +20,7 @@ import type {
 import type { UnitRow, UnitTargets } from "../repository";
 
 /** What the steward uses of memory: the ledgers, the save contract, the forget, the vectors and the Window. */
-export type StewardMemory = Pick<
+type StewardMemory = Pick<
 	MemoryService,
 	| "readyInTransaction"
 	| "pendingExchangesInTransaction"
@@ -73,7 +73,7 @@ export interface StewardWorld {
 	scope: ScopeRef;
 }
 /** The goals the steward maintains (the application assembles the service). */
-export interface StewardGoals {
+interface StewardGoals {
 	ops: Pick<
 		GoalsService,
 		| "applyInTransaction"

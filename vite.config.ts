@@ -23,7 +23,7 @@ function spaCsp(host: string | undefined, embedded = false): string {
 		"script-src 'self'",
 		"style-src 'self' 'unsafe-inline'",
 		// Images are same-origin API content, blob: object URLs or data: URLs; no remote host.
-		"img-src 'self' blob: data:",
+		"img-src 'self' blob: data: https://*.googleusercontent.com",
 		"media-src 'self' blob: data:",
 		"font-src 'self' data:",
 		`connect-src 'self'${ws}`,

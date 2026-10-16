@@ -16,7 +16,7 @@ const DEFAULT_PROJECT = "eumenes";
  * the operation, so it carries nothing that changes while the work goes on (that is the request
  * row's state, read from the table).
  */
-export const claudeCodeReceipt = z.strictObject({
+const claudeCodeReceipt = z.strictObject({
 	attemptId: z.string(),
 	task: z.string(),
 	target: z.enum(["current", "new"]),
@@ -43,7 +43,7 @@ export const describeTerminalsAdapter = () => ({
 });
 
 /** The same operation request id always names the same terminal request. */
-export function attemptIdOf(requestId: string): string {
+function attemptIdOf(requestId: string): string {
 	const hex = sha256Hex(`terminal-request:${requestId}`);
 	const variant = "89ab"[Number.parseInt(hex[16]!, 16) % 4]!;
 	return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-${variant}${hex.slice(17, 20)}-${hex.slice(20, 32)}`;

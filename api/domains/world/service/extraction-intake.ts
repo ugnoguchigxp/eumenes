@@ -21,13 +21,13 @@ import { readFeedCursor } from "../repository";
 import { sourceKeyOf } from "./inputs";
 
 /** Why a scanned change is not an extraction input (never delivered to World). */
-export const SKIP_REASONS = [
+const SKIP_REASONS = [
 	"WORLD_OFF",
 	"GATE_CLOSED",
 	"RECEIVE_REFUSED",
 	"SOURCE_BLOCKED",
 ] as const;
-export type SkipReason = (typeof SKIP_REASONS)[number];
+type SkipReason = (typeof SKIP_REASONS)[number];
 
 /**
  * Stable event identity of one source change: the same message revision
@@ -92,7 +92,7 @@ export const NO_INTAKE_PORTS: Pick<
  * A change that can become an extraction input: a user's addition or correction, or an added
  * assistant answer that was adopted. Retractions and corrected answers are never input.
  */
-export const isExtractionInput = (
+const isExtractionInput = (
 	db: Database,
 	ports: Pick<IntakePorts, "isAdoptedAnswer">,
 	change: SourceChange,

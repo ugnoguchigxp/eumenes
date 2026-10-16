@@ -64,7 +64,7 @@ export class ActionRequestError extends Error {
 	}
 }
 
-export type LauncherMeta = { label: string; group?: string; order?: number };
+type LauncherMeta = { label: string; group?: string; order?: number };
 export type ArtifactListEntry = {
 	/** null for a standalone launcher artifact. */
 	toolchainId: string | null;

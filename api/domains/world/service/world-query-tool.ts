@@ -6,7 +6,7 @@ import {
 } from "../contracts/query";
 import type { WorldQuery } from "./world-query";
 
-export const WORLD_QUERY_TOOL_ID = "world.query";
+const WORLD_QUERY_TOOL_ID = "world.query";
 
 /**
  * The model-callable definition of `world.query`. It is a DEFINITION only:
@@ -35,4 +35,3 @@ export function createWorldQueryTool(deps: {
 		},
 	};
 }
-export type WorldQueryTool = ReturnType<typeof createWorldQueryTool>;

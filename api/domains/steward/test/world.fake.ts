@@ -12,7 +12,7 @@ import type {
 import type { StewardWorld, StewardWorldCuration } from "../service/types";
 import type { WorldView } from "../service/world-view";
 
-export const FAKE_SCOPE: ScopeRef = { principal: "p1", scopeKey: "s1" };
+const FAKE_SCOPE: ScopeRef = { principal: "p1", scopeKey: "s1" };
 
 /**
  * A scripted stand-in for World's curation: the same operations, the events in a table of the SAME database (so a

@@ -94,7 +94,7 @@ const properties = {
 			voice_application: {
 				enum: ["preset", "baseline", "manual", "unmeasured", null],
 			},
-			source: { enum: ["laya", "ruri", "system-one", "fallback"] },
+			source: { enum: ["scored", "system-one", "fallback"] },
 			reason: nullable("string"),
 		},
 	},
@@ -114,7 +114,7 @@ const properties = {
 };
 export const exportSchema = {
 	$schema: "https://json-schema.org/draft/2020-12/schema",
-	title: "Eumenes Ruri speaking attitude sample v1",
+	title: "Eumenes speaking attitude sample v1",
 	type: "object",
 	additionalProperties: false,
 	properties,

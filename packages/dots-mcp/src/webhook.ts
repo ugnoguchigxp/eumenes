@@ -9,7 +9,7 @@ export type WebhookPost = (
 	headers: Record<string, string>,
 	signal: AbortSignal,
 ) => Promise<{ status: number; body: string; retryAfter: string | null }>;
-export function pinnedLookup(address: LookupAddress): LookupFunction {
+function pinnedLookup(address: LookupAddress): LookupFunction {
 	return (_hostname, options, callback) => {
 		// Node/Bun may ask for all addresses when choosing an IP family.
 		if (options.all) callback(null, [address]);

@@ -1,5 +1,3 @@
-import type { Source } from "../../tool-runtime";
-
 /** Exact, bounded spans of the visible body. IDs are local to a source and model step. */
 export function evidenceExcerpts(
 	body: string,
@@ -67,9 +65,4 @@ export function evidenceExcerpts(
 		start = end;
 	}
 	return excerpts;
-}
-
-export function evidenceObservation(source: Source) {
-	const { body, ...metadata } = source;
-	return { ...metadata, excerpts: evidenceExcerpts(body) };
 }

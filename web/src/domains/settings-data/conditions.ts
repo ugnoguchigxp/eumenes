@@ -56,5 +56,3 @@ export const settingsConditions: Readonly<
 	"condition:settings.resource-llm@1": (c) =>
 		c.effective.resources.find((x) => x.id === c.target)?.purpose === "llm",
 };
-
-export const settingsConditionIds = Object.keys(settingsConditions);

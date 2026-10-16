@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { HttpErrorStatus } from "../../../infrastructure/http";
-export const reportKinds = [
+const reportKinds = [
 	"progress",
 	"blocker",
 	"completed",
@@ -43,7 +43,7 @@ export const reportBodySchema = z
 	})
 	.refine((v) => v.kind === "completed" || v.summary.length <= 600);
 export type ReportBody = z.infer<typeof reportBodySchema>;
-export const taskReportSchema = reportBodySchema.safeExtend({
+const taskReportSchema = reportBodySchema.safeExtend({
 	id: z.string(),
 	taskId: z.string(),
 	sequence: z.number().int(),

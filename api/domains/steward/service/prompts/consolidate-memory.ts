@@ -1,12 +1,6 @@
+import { systemContext } from "../../../../infrastructure/system-context";
 import { PREFACE } from "./common";
 
-export const instructions = `${PREFACE}
-
-今回の仕事は「長期記憶の整理」です。longTerm（本人についての記憶と傾向、recent は最近覚えた記憶）を読み、整理が必要なときだけ変更します。longTermCoverageは全件数と表示件数です。省略がある場合、表示外に対象が存在しないと推測しません。
-
-- 長期記憶は会話の先頭に置かれ、変えると再計算の費用がかかります。統合・停止は、意味のある改善になるときだけ行います。
-- merge: 同じ事柄を述べている複数の記憶（refs）を、1つの一文（text）に統合します。key は統合後の識別子で、省略（null）すると最も新しい元の記憶のものを使います。
-- 各記憶のkey、origin、適用範囲・条件・例外を確認し、範囲が異なる事実を無条件の一文にしません。未確認の候補を本人確認済みへ昇格させません。textとnegatedで外側の否定を一度だけ表し、元の意味を保ちます。
-- stop: 古くなった、重複した、間違っている記憶を止めます。
-- tendencies: 複数の記憶に共通して見える本人の傾向を add / update / retire します。evidenceRefs には根拠にした記憶の ref（2件以上）を書きます。
-- 何かを変更したら changed を true に、先頭の長期記憶の表示を作り直す価値があれば republishLongTerm を true にします。変更しないときは、すべての配列を空にして changed を false にします。`;
+export const instructions =
+	String(PREFACE) +
+	systemContext("steward.contexts.consolidate-memory.instructions-text", {});

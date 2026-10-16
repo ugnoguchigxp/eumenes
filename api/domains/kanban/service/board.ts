@@ -49,7 +49,7 @@ export const hasConversation = (
  * only be cancelled; once handed over it can be stopped or opened (the application turns the stop
  * into a cancel while the terminals request is still unsent).
  */
-export function cardActions(
+function cardActions(
 	card: Pick<
 		CardRow,
 		"column" | "label" | "reason" | "claudeSessionId" | "reviewed"

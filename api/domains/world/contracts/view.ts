@@ -10,11 +10,11 @@ import { z } from "zod";
  */
 
 /** Adoption state: the claim's lifecycle, never mixed with freshness or evidence. */
-export const CLAIM_ADOPTIONS = ["adopted", "disputed", "candidate"] as const;
+const CLAIM_ADOPTIONS = ["adopted", "disputed", "candidate"] as const;
 export type ClaimAdoption = (typeof CLAIM_ADOPTIONS)[number];
 
 /** Where the claim came from (World's `origin`). */
-export const CLAIM_ORIGINS = [
+const CLAIM_ORIGINS = [
 	"runtime_observation",
 	"user_report",
 	"document_claim",
@@ -22,7 +22,7 @@ export const CLAIM_ORIGINS = [
 ] as const;
 export type ClaimOrigin = (typeof CLAIM_ORIGINS)[number];
 
-export const EVIDENCE_KINDS = [
+const EVIDENCE_KINDS = [
 	"user_statement",
 	"document",
 	"runtime_measurement",
@@ -30,8 +30,7 @@ export const EVIDENCE_KINDS = [
 ] as const;
 export type ClaimEvidenceKind = (typeof EVIDENCE_KINDS)[number];
 
-export const CLAIM_FRESHNESS = ["fresh", "stale", "unknown"] as const;
-export type ClaimFreshness = (typeof CLAIM_FRESHNESS)[number];
+const CLAIM_FRESHNESS = ["fresh", "stale", "unknown"] as const;
 
 /**
  * How a claim may be STYLED. Only `adopted` (the person's report or a
@@ -39,7 +38,7 @@ export type ClaimFreshness = (typeof CLAIM_FRESHNESS)[number];
  * and a measured result are different tones, and an unadopted claim is a
  * candidate whatever its origin.
  */
-export const CLAIM_TONES = [
+const CLAIM_TONES = [
 	"adopted",
 	"measured",
 	"hypothesis",
@@ -64,7 +63,7 @@ export function claimTone(
 	return "adopted";
 }
 
-export const typedValueSchema = z.union([
+const typedValueSchema = z.union([
 	z.strictObject({ kind: z.literal("string"), value: z.string() }),
 	z.strictObject({ kind: z.literal("boolean"), value: z.boolean() }),
 	z.strictObject({
@@ -74,10 +73,9 @@ export const typedValueSchema = z.union([
 	}),
 	z.strictObject({ kind: z.literal("entity"), entityId: z.string() }),
 ]);
-export type ClaimValue = z.infer<typeof typedValueSchema>;
 
 /** A claim's content: a value, or a relation to another target. */
-export const claimContentSchema = z.union([
+const claimContentSchema = z.union([
 	z.strictObject({ kind: z.literal("value"), value: typedValueSchema }),
 	z.strictObject({
 		kind: z.literal("relation"),
@@ -88,7 +86,7 @@ export const claimContentSchema = z.union([
 export type ClaimContent = z.infer<typeof claimContentSchema>;
 
 /** One row of the list. Target, claim, adoption, evidence kind and freshness are SEPARATE fields. */
-export const claimRowSchema = z.strictObject({
+const claimRowSchema = z.strictObject({
 	id: z.string(),
 	revision: z.number().int().min(1),
 	target: z.strictObject({ subjectId: z.string() }),
@@ -104,7 +102,7 @@ export const claimRowSchema = z.strictObject({
 });
 export type ClaimRow = z.infer<typeof claimRowSchema>;
 
-export const scopeChoiceSchema = z.strictObject({ scopeKey: z.string() });
+const scopeChoiceSchema = z.strictObject({ scopeKey: z.string() });
 
 export const claimListSchema = z.strictObject({
 	scopeKey: z.string(),
@@ -134,7 +132,7 @@ const evidenceViewSchema = z.strictObject({
 });
 export type EvidenceView = z.infer<typeof evidenceViewSchema>;
 
-export const CONDITION_STATES = ["satisfied", "violated", "unknown"] as const;
+const CONDITION_STATES = ["satisfied", "violated", "unknown"] as const;
 
 export const claimDetailSchema = z.strictObject({
 	claim: claimRowSchema,
@@ -186,7 +184,7 @@ export const claimDetailSchema = z.strictObject({
 export type ClaimDetail = z.infer<typeof claimDetailSchema>;
 
 /** Forgetting, as honestly as the ledger can tell. Only `complete` means done. */
-export const FORGET_DISPLAYS = [
+const FORGET_DISPLAYS = [
 	"pending",
 	"awaiting_confirmation",
 	"abandoned",
@@ -194,7 +192,7 @@ export const FORGET_DISPLAYS = [
 ] as const;
 export type ForgetDisplay = (typeof FORGET_DISPLAYS)[number];
 
-export const forgetViewSchema = z.strictObject({
+const forgetViewSchema = z.strictObject({
 	forgetId: z.string(),
 	display: z.enum(FORGET_DISPLAYS),
 	state: z.string(),
@@ -228,7 +226,7 @@ export const worldClaimsStatusSchema = z.strictObject({
 export type WorldClaimsStatus = z.infer<typeof worldClaimsStatusSchema>;
 
 /** Error codes (`{ error }` bodies). `not_found` also covers every refusal of access. */
-export const WORLD_CLAIM_ERRORS = [
+const WORLD_CLAIM_ERRORS = [
 	"not_found",
 	"world_disabled",
 	"world_unavailable",

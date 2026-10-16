@@ -1,4 +1,4 @@
-import { boneNames, type BoneName } from "./skeleton";
+import { boneNames } from "./skeleton";
 
 /**
  * Flat pose channels, all additive with 0 as rest:
@@ -13,10 +13,10 @@ export const motionGroups = {
 	"idle-gesture": "待機中の仕草",
 } as const;
 export type MotionGroup = keyof typeof motionGroups;
-export const lightChannels = ["energy", "sparkle", "swirl", "core"] as const;
+const lightChannels = ["energy", "sparkle", "swirl", "core"] as const;
 
 type Key = number[];
-export type MotionVariantData = {
+type MotionVariantData = {
 	id: string;
 	label: string;
 	/** Keys are `[time, ...values]`; unsided `arm_<layer>_<joint>` keys author the right arm and mirror to the left. */
@@ -249,12 +249,6 @@ export function wrapSpin(pose: Pose): Pose {
 		spin: spin - Math.round(spin / (2 * Math.PI)) * 2 * Math.PI,
 	};
 }
-export const channel = (pose: Pose, name: string) => pose[name] ?? 0;
-export const boneChannel = (
-	pose: Pose,
-	bone: BoneName | "body",
-	axis: "x" | "y" | "z",
-) => pose[`${bone}.${axis}`] ?? 0;
 /** Deterministic hash in [0, 1). */
 export function hash(value: number) {
 	const x = Math.sin(value * 127.1 + 311.7) * 43758.5453;

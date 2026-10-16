@@ -30,7 +30,7 @@ const schema = z.strictObject({
 		.optional(),
 });
 /** Per code and per execution/generation/authority; consumed when the read is reserved. */
-export const diagnosticLimits = { perCode: 2, total: 4, readMs: 5000 } as const;
+const diagnosticLimits = { perCode: 2, total: 4, readMs: 5000 } as const;
 /** These do not improve by looking again: one confirming read, then stop. */
 const settled = new Set([
 	"capture_incomplete",
@@ -55,7 +55,7 @@ const readFailure: Record<string, string> = {
 	coding_observation_stale: "observation_stale",
 	supervision_read_timeout: "read_timeout",
 };
-export type ReadResult =
+type ReadResult =
 	| { ok: true; observation: Observation }
 	| { ok: false; code: string };
 

@@ -112,7 +112,6 @@ export const worldQuery = z.strictObject({
 	scopeKey: id.optional().describe("指定しない。利用者が求めたときだけ。"),
 	budget: budget.optional(),
 });
-export type WorldQueryInput = z.infer<typeof worldQuery>;
 
 const FIND_NAMES = 5;
 const FIND_NAME_CHARS = 80;
@@ -126,7 +125,6 @@ export const worldFind = z.strictObject({
 			"探す対象の名前や別名（1〜5件、各80文字まで）。依頼に出てくる名称をそのまま指定する。",
 		),
 });
-export type WorldFindInput = z.infer<typeof worldFind>;
 
 /** Reference documents: searches return handles, reads return original text. */
 export const worldDocuments = z.strictObject({

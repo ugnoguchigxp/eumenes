@@ -128,19 +128,21 @@ test("web CLI uses authenticated API, fresh search, explicit stable retention an
 			requests.push({ path, method: req.method });
 			if (path === "/api/web-research/runs" && req.method === "POST") {
 				submitted.push((await req.json()) as Record<string, unknown>);
-				return Response.json({ id: "fixture-run", status: "queued" });
+				return Response.json(webRun({ status: "queued" }));
 			}
 			if (path.endsWith("/cancel"))
-				return Response.json({ id: "fixture-run", status: "cancelled" });
+				return Response.json(webRun({ status: "cancelled" }));
 			if (path.endsWith("/cache/status"))
-				return Response.json({ enabled: true, entries: 0 });
+				return Response.json({
+					enabled: true,
+					entries: 0,
+					bytes: 0,
+					generation: 1,
+					lastSweepAt: null,
+				});
 			if (path.endsWith("/cache/clear"))
 				return Response.json({ cleared: true });
-			return Response.json({
-				id: "fixture-run",
-				status: "completed",
-				result: { cache: "bypass" },
-			});
+			return Response.json(webRun({ status: "completed" }));
 		},
 	});
 	const url = `http://127.0.0.1:${server.port}`;
@@ -201,9 +203,7 @@ test("web wait distinguishes cancellation, failure and expired delivery", async 
 		port: 0,
 		fetch: (req) =>
 			Response.json(
-				req.method === "POST"
-					? { id: "fixture-run", status: "queued" }
-					: { id: "fixture-run", ...terminal },
+				webRun(req.method === "POST" ? { status: "queued" } : terminal),
 			),
 	});
 	try {
@@ -236,7 +236,7 @@ test("web SIGINT exits with unconfirmed cancellation even if the API never confi
 		fetch: (req) => {
 			if (new URL(req.url).pathname.endsWith("/cancel")) cancels++;
 			if (req.method === "GET") polls++;
-			return Response.json({ id: "fixture-run", status: "queued" });
+			return Response.json(webRun({ status: "queued" }));
 		},
 	});
 	const child = Bun.spawn(
@@ -289,7 +289,7 @@ test("SIGINT also cancels a web status request whose response never arrives", as
 				polls++;
 				return new Promise<Response>(() => {});
 			}
-			return Response.json({ id: "fixture-run", status: "queued" });
+			return Response.json(webRun({ status: "queued" }));
 		},
 	});
 	const child = Bun.spawn(
@@ -363,38 +363,99 @@ function fixtureApi(
 	};
 }
 
+/** A web research run as the API returns it. */
+const webRun = (over: Record<string, unknown>) => ({
+	id: "fixture-run",
+	requestId: "fixture-request",
+	jobId: "fixture-job",
+	operation: "lookup",
+	status: "queued",
+	createdAt: "2026-10-10T00:00:00.000Z",
+	finishedAt: null,
+	errorCode: null,
+	result: null,
+	resultExpired: false,
+	...over,
+});
+
 const tempDir = () => mkdtempSync(join(scratch, "case-"));
 
 test("collection CLI maps each subcommand to the attitude API and prints JSON", async () => {
+	// Response shapes follow the attitude API contract the client validates.
+	const status = {
+		enabled: false,
+		target: 300,
+		successful: 0,
+		unreviewed: 0,
+		reviewed: 0,
+		held: 0,
+		skipped: 0,
+		skip_reasons: {},
+		pending: 0,
+		failed: 0,
+		storage_errors: 0,
+		score_notice: "fixture",
+	};
+	const started = { ...status, enabled: true };
+	const summaries = [
+		{
+			sample_id: "s1",
+			review_status: "unreviewed",
+			revision: 3,
+			granularity: "answer",
+			chunk_order: null,
+		},
+	];
 	const sample = {
+		sample_id: "s1",
+		conversation_id: "c1",
 		revision: 3,
 		primary_label: "calm",
 		acceptable_labels: ["calm"],
 		expression_transition: null,
-		review_status: "pending",
+		review_status: "unreviewed",
 		correction_reason: null,
 		template_group_id: "g1",
 		template_group_confirmed: false,
 		coverage_tags: ["a"],
+		current_chunk: "こんにちは。",
+		split: null,
 	};
+	const report = {
+		...status,
+		contrasting_context_groups: [],
+		short_texts: 0,
+		dominant_class_fraction: null,
+		classes: {},
+		rejections: {},
+		coverage: {},
+		missing_classes: [],
+		missing_coverage: [],
+		differences: [],
+		granularity: { answer: 1, chunk: 0 },
+		splits: {},
+		warnings: [],
+	};
+	const reviewed = { sample_id: "s1", revision: 4, review_status: "reviewed" };
+	const splitResult = { counts: { train: 1 }, groups: 1, warning: null };
 	const ok = (value: unknown) => () => Response.json(value);
 	const api = fixtureApi({
-		"GET /api/attitude-dataset/status": ok({ running: false }),
-		"POST /api/attitude-dataset/start": ok({ running: true }),
-		"POST /api/attitude-dataset/stop": ok({ running: false }),
-		"GET /api/attitude-dataset/samples": ok([{ id: "s1" }]),
+		"GET /api/attitude-dataset/status": ok(status),
+		"POST /api/attitude-dataset/start": ok(started),
+		"POST /api/attitude-dataset/stop": ok(status),
+		"GET /api/attitude-dataset/samples": ok(summaries),
 		"GET /api/attitude-dataset/samples/s1": ok(sample),
 		"GET /api/attitude-dataset/samples/s1?predictions=show": ok({
 			...sample,
 			predictions: [],
 		}),
-		"POST /api/attitude-dataset/samples/s1/review": ok({ ok: true }),
-		"GET /api/attitude-dataset/report": ok({ total: 1 }),
-		"POST /api/attitude-dataset/split": ok({ split: true }),
+		"POST /api/attitude-dataset/samples/s1/review": ok(reviewed),
+		"GET /api/attitude-dataset/report": ok(report),
+		"POST /api/attitude-dataset/split": ok(splitResult),
 		"GET /api/attitude-dataset/export": ok({
 			jsonl: "r\n",
 			partitions: { train: "t\n", calibration: "c\n", eval: "e\n" },
-			report: { total: 1 },
+			report,
 			schema: { v: 1 },
 		}),
 	});
@@ -406,19 +467,19 @@ test("collection CLI maps each subcommand to the attitude API and prints JSON", 
 	);
 	try {
 		const cases: [string[], unknown][] = [
-			[["collection", "--json"], { running: false }],
-			[["collection", "status", "--json"], { running: false }],
-			[["collection", "start", "--json"], { running: true }],
-			[["collection", "stop", "--json"], { running: false }],
-			[["collection", "list", "--json"], [{ id: "s1" }]],
+			[["collection", "--json"], status],
+			[["collection", "status", "--json"], status],
+			[["collection", "start", "--json"], started],
+			[["collection", "stop", "--json"], status],
+			[["collection", "list", "--json"], summaries],
 			[["collection", "show", "s1", "--json"], sample],
 			[
 				["collection", "show", "s1", "predictions", "--json"],
 				{ ...sample, predictions: [] },
 			],
-			[["collection", "report", "--json"], { total: 1 }],
-			[["collection", "split", "--json"], { split: true }],
-			[["collection", "review", "s1", reviewFile, "--json"], { ok: true }],
+			[["collection", "report", "--json"], report],
+			[["collection", "split", "--json"], splitResult],
+			[["collection", "review", "s1", reviewFile, "--json"], reviewed],
 		];
 		for (const [args, expected] of cases) {
 			const result = await cli(args, api.url);

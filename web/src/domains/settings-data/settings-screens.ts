@@ -99,7 +99,7 @@ const panelActions: Record<string, { label: string; group: string }> = {
 	"devices-discover": { label: "音声機器を確認", group: "devices" },
 };
 
-export function sectionDescription(fields: readonly RegisteredField[]) {
+function sectionDescription(fields: readonly RegisteredField[]) {
 	const first = fields[0]?.path ?? "";
 	if (
 		first.startsWith("$.general.agentName") ||

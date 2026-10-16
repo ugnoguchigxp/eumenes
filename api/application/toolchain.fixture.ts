@@ -344,9 +344,13 @@ export async function harness(
 						.filter((o: any) => o.basis === "page")
 						.map((o: any) => o.url),
 				);
-				const hit = data.observations.find(
-					(o: any) => o.basis === "snippet" && !seen.has(o.url),
-				);
+				const hit =
+					data.observations.find(
+						(o: any) => o.basis === "snippet" && !seen.has(o.url),
+					) ??
+					data.candidates?.find(
+						(candidate: { url: string }) => !seen.has(candidate.url),
+					);
 				const tool = available.find(
 					(t: any) => t.id === (hit ? "web.read" : "web.lookup"),
 				);

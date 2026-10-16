@@ -1,5 +1,5 @@
 import { z } from "zod";
-export const sceneSchema = z.strictObject({
+const sceneSchema = z.strictObject({
 	elements: z.array(z.unknown()),
 	appState: z.record(z.string(), z.unknown()),
 	files: z.record(z.string(), z.unknown()),

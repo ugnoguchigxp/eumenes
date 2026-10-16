@@ -10,6 +10,8 @@ import { ResearchTaskCard } from "../domains/agent-runtime";
 import { MusicResultLink } from "../domains/music/MusicResultLink";
 import { ImageResultLink } from "../domains/image/ImageResultLink";
 import { useConversationModel } from "../domains/settings";
+import { useSpeechModels } from "../domains/settings/useSpeechModels";
+import { SpeechModelSelect } from "./SpeechModelSelect";
 import { ConversationModelSelect } from "./ConversationModelSelect";
 import { describeConnectionState } from "../errorMessages";
 import { ConversationComposer } from "./ConversationComposer";
@@ -46,6 +48,7 @@ export function ConversationPanel({
 		scrollLatest,
 	} = state;
 	const model = useConversationModel(client);
+	const speechModels = useSpeechModels(client);
 	const panel = useRef<HTMLElement>(null);
 	const depth = useRef(0);
 	const [dragging, setDragging] = useState(false);
@@ -151,8 +154,18 @@ export function ConversationPanel({
 			<div className="conversation-status" aria-label="接続状態とモデル">
 				<ConversationModelSelect
 					model={model}
-					running={!!activeRun}
+					running={!!activeRun || speechModels.busy}
 					actualModel={actualModel}
+				/>
+				<SpeechModelSelect
+					models={speechModels}
+					disabled={
+						!!activeRun ||
+						model.busy ||
+						voice.active ||
+						phase === "playing" ||
+						replay.playingId !== null
+					}
 				/>
 				<span
 					className="connection-health"
@@ -166,9 +179,9 @@ export function ConversationPanel({
 					</span>
 				</span>
 			</div>
-			{model.error && (
+			{(model.error || speechModels.error) && (
 				<p className="chat-error" role="alert">
-					{model.error}
+					{model.error || speechModels.error}
 				</p>
 			)}
 			{status.isError && (

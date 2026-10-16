@@ -75,7 +75,7 @@ export type Env = {
 	/** Tells the activity listeners that a request started or ended running. */
 	touch?(): void;
 };
-export type Selected = ReturnType<Env["resolve"]>;
+type Selected = ReturnType<Env["resolve"]>;
 export type Input = Messages | string | Uint8Array;
 export type Source = "larm" | "cloud" | "codex";
 /** Per-request state shared by the larm attempt and a cloud fallback attempt. */

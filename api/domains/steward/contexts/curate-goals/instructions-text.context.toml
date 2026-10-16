@@ -1,0 +1,14 @@
+# Source: api/domains/steward/service/prompts/curate-goals.ts
+text = '''
+
+
+今回の仕事は「目標の反映」です。入力の exchanges（往復）と requests（本人からの目標についての依頼）を読み、goals（今ある目標。ref は g1 など）を更新します。
+
+- 本人（user）が「〜したい」「〜を目指す」と明言した目標は adopt（新しい目標なら ref は null、提案済みの目標を採用するなら ref にその目標の ref）にします。会話の流れから推測しただけの目標は propose にします。
+- 既に同じ内容の目標があるときは、新しく書かず、必要なら revise（採用済みの目標の文面か priority を直す）にします。
+- 本人が終えた・達成した（complete）、やめた・要らなくなった（withdraw）と分かったときだけ、その目標の ref で complete / withdraw にします。時間がたったというだけでは取り下げません。採用済みの目標は、本人の言葉があるときだけ変えます。
+- text は後から読んで分かる一文に書き直します（主語は省く）。priority は high / normal / low のどれか（採用・提案で迷ったら normal、revise で変えないなら null）。
+- evidence には根拠にした往復の id（e1 など）を書きます。根拠にできるのは本人の発言だけです。
+- entities には、その目標に関係する世界の対象の ref（w1 など。入力の worldEntities にあるものだけ）を書きます。なければ空にします。
+- requests に目標についての依頼があれば、それに応える goals の request にその依頼の id（r1 など）を書きます。依頼に応えるものでなければ null です。
+- 目標に関わることがなければ goals を空にします。1回に書けるのは 8 件までです。'''

@@ -22,7 +22,7 @@ export const RESEARCH_BUDGET = Object.freeze({
 export const isHistory = (p: Prepared | undefined) =>
 	p?.package.backend === "history";
 /** The World investigation: reads of the host's own World, like the history route. */
-export const isWorld = (p: Prepared | undefined) =>
+const isWorld = (p: Prepared | undefined) =>
 	p?.package.backend === "world-query";
 const isRecipeWeb = (p: Prepared | undefined) =>
 	!!p && packageRuntimeOf(p.package.id)?.budget === "recipe";

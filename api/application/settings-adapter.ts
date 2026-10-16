@@ -27,7 +27,7 @@ import {
 } from "./settings-structures";
 
 export const SETTINGS_ADAPTER_REF = "adapter:settings@1";
-export const SETTINGS_DOCUMENT = "document:settings@1";
+const SETTINGS_DOCUMENT = "document:settings@1";
 const DOCUMENT_QUERY = "query:settings.document@1";
 const TTS_RESOURCES_QUERY = "query:settings.tts-resources@1";
 const LLM_RESOURCES_QUERY = "query:settings.llm-resources@1";
@@ -75,7 +75,7 @@ export const settingsConditions = [
 type Segment = { key: string; selectById: boolean };
 
 /** `$.a.b` / `$.resources[id=$target].voice` as segments, or null when not that shape. */
-export function parseSettingsPath(path: string): Segment[] | null {
+function parseSettingsPath(path: string): Segment[] | null {
 	if (!path.startsWith("$")) return null;
 	const segments: Segment[] = [];
 	for (const part of path.slice(1).split(".").slice(1)) {
@@ -270,7 +270,7 @@ const structural = z.strictObject({
 	structure: z.string().max(80),
 	input: z.record(z.string(), z.unknown()),
 });
-export const settingsApplyInput = z
+const settingsApplyInput = z
 	.strictObject({
 		expectedRevision: z.number().int().min(0),
 		structural: z.array(structural).max(16).optional(),
@@ -363,7 +363,7 @@ function writeAt(
 }
 
 /** The saved document with the changes applied; every rejection is a safe error code. */
-export function applyChanges(
+function applyChanges(
 	saved: Settings,
 	changes: NonNullable<z.infer<typeof settingsApplyInput>["changes"]>,
 	lookup: (id: string) => SettingsField | undefined,

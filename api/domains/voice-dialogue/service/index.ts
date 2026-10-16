@@ -330,7 +330,7 @@ export function createVoiceDialogue(
 					text: c.text,
 					...(c.delivery ? { delivery: c.delivery } : {}),
 				})),
-				audioComplete: state?.finished ?? false,
+				audioComplete: state?.finished ?? turn.status === "played",
 				audioSkipped: state?.skipped ?? 0,
 			};
 		},

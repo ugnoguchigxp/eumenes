@@ -1,0 +1,4 @@
+# Source: api/domains/agent-runtime/service/worker-control.ts
+text = '''
+
+検索語・読込先・報告内容はtaskとrequirementContractから決めます。'''

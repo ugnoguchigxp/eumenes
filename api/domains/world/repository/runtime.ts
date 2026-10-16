@@ -41,7 +41,7 @@ CREATE INDEX world_host_runtime_observation_prediction ON world_host_runtime_obs
 CREATE INDEX world_host_runtime_observation_open ON world_host_runtime_observation (principal, scope_key, state) WHERE state = 'observed';
 `;
 
-export const RUNTIME_OBSERVATION_STATES = [
+const RUNTIME_OBSERVATION_STATES = [
 	"observed",
 	"incomparable",
 	"superseded",

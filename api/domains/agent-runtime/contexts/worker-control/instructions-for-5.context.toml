@@ -1,0 +1,4 @@
+# Source: api/domains/agent-runtime/service/worker-control.ts
+text = '''
+
+資料操作のsourceRefにはdocumentの短い参照を使います。報告のevidenceにはe1などの根拠参照を使います。一度提示された根拠は後のstepでも使えます。available=falseの根拠は失効しており使いません。operationsの成功済み操作を同じ引数で繰り返しません。結果と根拠は提示済みです。不足すれば現在のTOOLSから別操作を選びます。会話記録にはspeakerとcreatedAtを添え、過去のAssistant発言を現在の事実保証にしません。'''

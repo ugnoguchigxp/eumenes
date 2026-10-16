@@ -59,7 +59,7 @@ select:focus-visible {
 	gap: 4px 10px;
 	width: fit-content;
 	max-width: min(
-		420px,
+		640px,
 		calc(
 			100% - 92px - env(safe-area-inset-left, 0px) -
 				env(safe-area-inset-right, 0px)

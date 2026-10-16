@@ -12,6 +12,7 @@ import { createKanbanAdapter } from "./kanban-adapter";
 import { connectKanbanRuns } from "./kanban-runs";
 import { migrations } from "./migrations";
 
+import type { EnqueueRequest } from "../domains/terminals";
 const dirs: string[] = [];
 const stores: SqliteStore[] = [];
 /** Closes the stores and removes the directories `setup` made; register it with `afterEach`. */
@@ -21,7 +22,7 @@ export async function cleanup() {
 		rmSync(dir, { recursive: true, force: true });
 }
 
-type Enqueued = import("../domains/terminals").EnqueueRequest;
+type Enqueued = EnqueueRequest;
 /** A terminals stand-in that records what is handed over and answers the board's questions. */
 function fakeTerminals() {
 	const state = {

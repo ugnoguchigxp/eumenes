@@ -25,7 +25,7 @@ function clip(text: string, bytes: number) {
 	return { text: cut.replace(/�+$/u, ""), clipped: true };
 }
 /** The question text is the task record the user reviews before approving. */
-export function approvalPrompt(d: Decision) {
+function approvalPrompt(d: Decision) {
 	const body = clip(d.instruction ?? "", INSTRUCTION_MAX_BYTES);
 	if (body.clipped) throw new Error("supervision_instruction_too_long");
 	return [
@@ -49,7 +49,7 @@ export function approvalView(s: Supervisor) {
 		: null;
 }
 /** Instructions are approved only when the user picked exactly the approve choice. */
-export const isApproved = (answer: string | null) =>
+const isApproved = (answer: string | null) =>
 	answer === approvalChoices.approve;
 
 /** The approval gate: ask once per generated instruction, then replay it only if approved. */

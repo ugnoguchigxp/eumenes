@@ -7,9 +7,10 @@ import {
 	type InteractionStatus,
 } from "../contracts/command-interactions";
 
+import type { CommandInteractions } from "../service/command-interactions";
 /** The slice of the dialogue service the interaction routes use. */
 type InteractionsService = {
-	interactions: import("../service/command-interactions").CommandInteractions;
+	interactions: CommandInteractions;
 };
 
 /** HTTP status of each code the interaction operations throw; unknown codes stay 500. */

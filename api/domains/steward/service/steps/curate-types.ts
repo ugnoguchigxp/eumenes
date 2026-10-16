@@ -17,7 +17,7 @@ import {
 } from "../context";
 import type { StepEnv } from "../types";
 
-export const NOTE_KINDS = [
+const NOTE_KINDS = [
 	"goal",
 	"decision",
 	"open_question",
@@ -37,7 +37,7 @@ export const CANDIDATES_TOTAL = 6;
 export const CANDIDATE_CHARS = 500;
 export const FORGET_SEARCHES = 3;
 
-export type Remember = {
+type Remember = {
 	kind: (typeof stateKindsOf)[number];
 	key: string;
 	text: string;
@@ -47,15 +47,15 @@ export type Remember = {
 	validUntil: string | null;
 	negated: boolean;
 };
-export type Update = {
+type Update = {
 	ref: string;
 	text: string;
 	evidence: string;
 	quote: string | null;
 	negated?: boolean;
 };
-export type Stop = { ref: string; why: (typeof STOP_WHY)[number] };
-export type Note = {
+type Stop = { ref: string; why: (typeof STOP_WHY)[number] };
+type Note = {
 	op: "add" | "update" | "close";
 	ref: string | null;
 	kind: (typeof NOTE_KINDS)[number] | null;

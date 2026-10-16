@@ -11,9 +11,9 @@ import { z } from "zod";
 const revisionNumber = z.number().int().min(1).max(1_000_000);
 const slug = z.string().regex(/^[a-z][a-z0-9._-]{0,100}$/);
 /** `adapter:timers@1`, `availability:timers@1`, `input:timer-hms@1`, `projection:timer-result@1`. */
-export const hostRefPattern =
+const hostRefPattern =
 	/^(adapter|availability|input|projection|connection|query|document|condition|structure):[a-z][a-z0-9._-]{0,80}(@[1-9][0-9]*)?$/;
-export const hostRef = (kind: string) =>
+const hostRef = (kind: string) =>
 	z
 		.string()
 		.regex(hostRefPattern)
@@ -25,20 +25,18 @@ export const hostRef = (kind: string) =>
  */
 export const schemaRefPattern =
 	/^(builtin:[A-Za-z][A-Za-z0-9]{0,60}|domain:[a-z][a-z0-9.-]{0,80}@[1-9][0-9]*|schema:[a-z][a-z0-9.-]{0,80}@[1-9][0-9]*)$/;
-export const schemaRef = z.string().regex(schemaRefPattern);
+const schemaRef = z.string().regex(schemaRefPattern);
 /** A registered operation name of an adapter (not the receipt's UUID operationId). */
-export const operationName = z.string().regex(/^[a-z][a-z0-9.-]{0,80}$/);
-export const revisionIdPattern =
+const operationName = z.string().regex(/^[a-z][a-z0-9.-]{0,80}$/);
+const revisionIdPattern =
 	/^(package|profile|skill|tool|toolchain|requirement):[a-z][a-z0-9._-]{0,100}@[1-9][0-9]*$/;
 export const bindingRevisionIdPattern =
 	/^binding:[a-z][a-z0-9._-]{0,100}@[1-9][0-9]*$/;
 export const artifactRevisionIdPattern =
 	/^artifact:[a-z][a-z0-9._-]{0,100}@[1-9][0-9]*$/;
-export const schemaRevisionIdPattern =
-	/^schema:[a-z][a-z0-9.-]{0,80}@[1-9][0-9]*$/;
 
 /** One tool of the frozen package mapped to one adapter operation. */
-export const bindingTool = z.strictObject({
+const bindingTool = z.strictObject({
 	toolRevisionId: z
 		.string()
 		.regex(/^tool:[a-z][a-z0-9._-]{0,100}@[1-9][0-9]*$/),
@@ -48,14 +46,13 @@ export const bindingTool = z.strictObject({
 });
 
 /** A question schema a command binding allows (see `commandBindingV1.questions`). */
-export const bindingQuestion = z.strictObject({
+const bindingQuestion = z.strictObject({
 	inputSchemaRef: schemaRef,
 	choiceField: z
 		.string()
 		.regex(/^[A-Za-z][A-Za-z0-9_]{0,40}$/)
 		.optional(),
 });
-export type BindingQuestion = z.infer<typeof bindingQuestion>;
 
 /** A command toolchain executed by a typed host adapter. */
 export const commandBindingV1 = z.strictObject({
@@ -124,7 +121,7 @@ export const httpJsonBindingV1 = z.strictObject({
 export type HttpJsonBindingV1 = z.infer<typeof httpJsonBindingV1>;
 
 /** Where one OpenUI source's data comes from: a registered adapter query. */
-export const sourceBindingV1 = z.strictObject({
+const sourceBindingV1 = z.strictObject({
 	/** The `source` name used inside the OpenUI definition. */
 	source: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/),
 	adapterRef: hostRef("adapter"),
@@ -138,10 +135,9 @@ export const sourceBindingV1 = z.strictObject({
 	 */
 	paramsSchemaRef: schemaRef.optional(),
 });
-export type SourceBindingV1 = z.infer<typeof sourceBindingV1>;
 
 /** One UI event of a source connected to an operation or a question answer. */
-export const actionBindingV1 = z.strictObject({
+const actionBindingV1 = z.strictObject({
 	actionId: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/),
 	/** The existing ArtifactEvent action this binding accepts (compatibility layer). */
 	eventAction: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/),
@@ -223,7 +219,7 @@ export type ActionBindingV1 = z.infer<typeof actionBindingV1>;
  * fixed, reviewed pointer checked by the adapter against its own schema; clients never send paths.
  * `$.a.b` or an array element chosen by stable id: `$.resources[id=$target].voice`.
  */
-export const documentFieldV1 = z.strictObject({
+const documentFieldV1 = z.strictObject({
 	fieldId: z.string().regex(/^[a-z][a-z0-9.-]{0,80}$/),
 	document: hostRef("document"),
 	path: z
@@ -276,7 +272,7 @@ export const documentFieldV1 = z.strictObject({
 export type DocumentFieldV1 = z.infer<typeof documentFieldV1>;
 
 /** A field of a collection's create/edit form; its values become the action input. */
-export const formFieldV1 = z.strictObject({
+const formFieldV1 = z.strictObject({
 	fieldId: z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,40}$/),
 	label: z.string().min(1).max(80),
 	help: z.string().max(300).optional(),
@@ -325,7 +321,7 @@ export const formFieldV1 = z.strictObject({
 export type FormFieldV1 = z.infer<typeof formFieldV1>;
 
 /** A registered list editor: rows from an adapter query, columns, row actions and a create form. */
-export const collectionV1 = z.strictObject({
+const collectionV1 = z.strictObject({
 	source: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/),
 	title: z.string().max(80).optional(),
 	/** A short note shown above the list (e.g. that registering sends data to a cloud API). */
@@ -425,7 +421,7 @@ export const collectionV1 = z.strictObject({
 export type CollectionV1 = z.infer<typeof collectionV1>;
 
 /** A presentation of the same sources and actions; variants differ only in layout. */
-export const artifactVariantV1 = z.strictObject({
+const artifactVariantV1 = z.strictObject({
 	id: z.string().regex(/^[a-z][a-z0-9-]{0,40}$/),
 	label: z.string().min(1).max(80),
 	/** OpenUI JSON definition text, checked by the registered artifact-ui parser on the Web. */
@@ -518,10 +514,9 @@ export const bundleSchemaV1 = z.strictObject({
 	revision: revisionNumber,
 	schema: z.record(z.string(), z.unknown()),
 });
-export type BundleSchemaV1 = z.infer<typeof bundleSchemaV1>;
 
 /** An existing revision the bundle depends on, fixed by its stored digest. */
-export const bundlePin = z.strictObject({
+const bundlePin = z.strictObject({
 	revisionId: z.string().regex(revisionIdPattern),
 	digest: z.string().regex(/^[0-9a-f]{64}$/),
 });

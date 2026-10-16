@@ -223,30 +223,7 @@ export function KanbanCard({
 				onDragStart={(e) => onDragStart(card.id, e)}
 				onDragEnd={onDragEnd}
 			>
-				<header className="kanban-card-head">
-					{movable && (
-						<GripVertical
-							className="kanban-grip"
-							aria-hidden="true"
-							size={16}
-						/>
-					)}
-					<h4 id={titleId} className="kanban-card-title">
-						{card.title}
-					</h4>
-					{card.label === "done" && (
-						<span className="kanban-label" data-label="done">
-							<Check aria-hidden="true" size={14} />
-							Done
-						</span>
-					)}
-					{card.label === "blocker" && (
-						<span className="kanban-label" data-label="blocker">
-							<OctagonAlert aria-hidden="true" size={14} />
-							Blocker
-						</span>
-					)}
-				</header>
+				<KanbanCardHead card={card} titleId={titleId} movable={movable} />
 				{card.executorLabel && (
 					<p className="kanban-status">担当: {card.executorLabel}</p>
 				)}
@@ -372,31 +349,15 @@ export function KanbanCard({
 					/>
 				)}
 				{panel === "remove" && (
-					<fieldset className="kanban-form" aria-label="削除の確認">
-						<p>「{card.title}」を削除します。元に戻せません。</p>
-						<div className="kanban-form-actions">
-							<Button
-								type="button"
-								size="sm"
-								variant="destructive"
-								disabled={busy}
-								onClick={() => {
-									onAction("remove", card.id, card.revision);
-									close("card");
-								}}
-							>
-								削除する
-							</Button>
-							<Button
-								type="button"
-								size="sm"
-								variant="outline"
-								onClick={() => close("trigger")}
-							>
-								やめる
-							</Button>
-						</div>
-					</fieldset>
+					<RemoveConfirm
+						title={card.title}
+						disabled={busy}
+						onCancel={() => close("trigger")}
+						onConfirm={() => {
+							onAction("remove", card.id, card.revision);
+							close("card");
+						}}
+					/>
 				)}
 			</article>
 			{confirming && (
@@ -469,5 +430,70 @@ function KanbanMarks({ card }: { card: KanbanBoardCard }) {
 				</ul>
 			)}
 		</>
+	);
+}
+
+function KanbanCardHead({
+	card,
+	titleId,
+	movable,
+}: {
+	card: KanbanBoardCard;
+	titleId: string;
+	movable: boolean;
+}) {
+	return (
+		<header className="kanban-card-head">
+			{movable && (
+				<GripVertical className="kanban-grip" aria-hidden="true" size={16} />
+			)}
+			<h4 id={titleId} className="kanban-card-title">
+				{card.title}
+			</h4>
+			{card.label === "done" && (
+				<span className="kanban-label" data-label="done">
+					<Check aria-hidden="true" size={14} />
+					Done
+				</span>
+			)}
+			{card.label === "blocker" && (
+				<span className="kanban-label" data-label="blocker">
+					<OctagonAlert aria-hidden="true" size={14} />
+					Blocker
+				</span>
+			)}
+		</header>
+	);
+}
+
+function RemoveConfirm({
+	title,
+	disabled,
+	onCancel,
+	onConfirm,
+}: {
+	title: string;
+	disabled: boolean;
+	onCancel: () => void;
+	onConfirm: () => void;
+}) {
+	return (
+		<fieldset className="kanban-form" aria-label="削除の確認">
+			<p>「{title}」を削除します。元に戻せません。</p>
+			<div className="kanban-form-actions">
+				<Button
+					type="button"
+					size="sm"
+					variant="destructive"
+					disabled={disabled}
+					onClick={onConfirm}
+				>
+					削除する
+				</Button>
+				<Button type="button" size="sm" variant="outline" onClick={onCancel}>
+					やめる
+				</Button>
+			</div>
+		</fieldset>
 	);
 }

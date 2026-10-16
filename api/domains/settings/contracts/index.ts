@@ -11,7 +11,7 @@ export {
 export const purposeSchema = z.enum(["llm", "asr", "tts"]);
 export type Purpose = z.infer<typeof purposeSchema>;
 /** The cloud protocol: OpenAI-compatible HTTP, Workers AI speech, or an agent SDK (LLM only). */
-export const connectionKinds = [
+const connectionKinds = [
 	"openai-compatible",
 	"cloudflare-workers-ai",
 	"codex-sdk",
@@ -21,7 +21,7 @@ export type ConnectionKind = (typeof connectionKinds)[number];
 export const isAgentConnection = (c: { kind?: ConnectionKind }) =>
 	c.kind === "codex-sdk" || c.kind === "claude-agent-sdk";
 /** How a Claude Agent SDK connection authenticates; chosen explicitly, never inferred from a stored key. */
-export const agentAuths = ["subscription", "api-key"] as const;
+const agentAuths = ["subscription", "api-key"] as const;
 export type AgentAuth = (typeof agentAuths)[number];
 /** Who bills a call: an automatic route change must never move a call to another billing path. */
 export type BillingPath =
@@ -108,8 +108,8 @@ const routeSchema = z
 		epoch: z.number().int().nonnegative(),
 	})
 	.strict();
-export const subtitleStyles = ["netflix", "prime", "classic", "glass"] as const;
-export const subtitleSchema = z
+const subtitleStyles = ["netflix", "prime", "classic", "glass"] as const;
+const subtitleSchema = z
 	.object({
 		enabled: z.boolean(),
 		style: z.enum(subtitleStyles),
@@ -160,9 +160,8 @@ const asrLanguageCodes = asrLanguages.map(([code]) => code) as [
 	AsrLanguage,
 	...AsrLanguage[],
 ];
-export const personas = ["butler", "maid", "strategist", "sage"] as const;
-export type Persona = (typeof personas)[number];
-export const backgroundSchema = z.enum(["light-fairy", "spatial"]);
+const personas = ["butler", "maid", "strategist", "sage"] as const;
+const backgroundSchema = z.enum(["light-fairy", "spatial"]);
 export type BackgroundKind = z.infer<typeof backgroundSchema>;
 export const settingsSchema = z
 	.object({
@@ -429,4 +428,115 @@ export const diagnosticsSchema = z.object({
 		}),
 	),
 });
-export type Diagnostics = z.infer<typeof diagnosticsSchema>;
+
+/** The same registration contract is checked before staging and before saving. */
+const connectionRegistrationSchema = z.strictObject({
+	connectionId: z.uuid(),
+	kind: connectionSchema.shape.kind,
+	auth: connectionSchema.shape.auth,
+	name: connectionSchema.shape.name,
+	baseUrl: cloudEndpoint.optional(),
+	accountId: connectionSchema.shape.accountId,
+	envRef: connectionSchema.shape.envRef.unwrap().optional(),
+	enabled: z.boolean().optional(),
+	resourceId: z.uuid().optional(),
+	purpose: purposeSchema.optional(),
+	model: resourceSchema.shape.model.optional(),
+	contextWindow: resourceSchema.shape.contextWindow.unwrap().optional(),
+	voice: resourceSchema.shape.voice.unwrap().optional(),
+	language: resourceSchema.shape.language,
+	assign: z.boolean().optional(),
+});
+
+export function prepareConnectionRegistration(input: unknown, hasKey: boolean) {
+	const parsed = connectionRegistrationSchema.safeParse(input);
+	if (!parsed.success)
+		return {
+			ok: false as const,
+			code: "invalid_input",
+			field: String(parsed.error.issues[0]?.path[0] ?? ""),
+			message: "形式・文字数・入力範囲を確認してください。",
+		};
+	const v = parsed.data;
+	const workers = v.kind === "cloudflare-workers-ai";
+	const claude = v.kind === "claude-agent-sdk";
+	const refuse = (code: string, field: string, message: string) => ({
+		ok: false as const,
+		code,
+		field,
+		message,
+	});
+	if (workers && !v.accountId)
+		return refuse(
+			"invalid_input",
+			"accountId",
+			"Account IDを入力してください。",
+		);
+	if (!workers && !v.baseUrl)
+		return refuse(
+			"invalid_input",
+			"baseUrl",
+			"APIのベースURLを入力してください。",
+		);
+	if (!workers && v.accountId)
+		return refuse(
+			"invalid_input",
+			"accountId",
+			"Account IDはWorkers AI接続に指定します。",
+		);
+	if (claude && !v.auth)
+		return refuse("auth_required", "auth", "認証方式を選んでください。");
+	if (
+		v.purpose
+			? !v.resourceId || !v.model
+			: v.model ||
+				v.contextWindow !== undefined ||
+				v.voice !== undefined ||
+				v.language !== undefined ||
+				v.assign
+	)
+		return refuse(
+			"invalid_input",
+			"purpose",
+			"モデルを追加する場合は用途とモデル名を指定してください。",
+		);
+	if ((hasKey && v.envRef) || (claude && v.auth === "subscription" && v.envRef))
+		return refuse(
+			"invalid_credential_source",
+			"envRef",
+			"APIキー／トークンと環境変数名は併用できません。",
+		);
+	if (!hasKey && !v.envRef && v.kind !== "codex-sdk")
+		return refuse(
+			"credential_required",
+			"apiKey",
+			"APIキー／APIトークンを入力してください。",
+		);
+	if (
+		v.purpose &&
+		((workers && v.purpose === "llm") ||
+			(isAgentConnection(v) && v.purpose !== "llm"))
+	)
+		return refuse(
+			"invalid_input",
+			"purpose",
+			"この接続で利用できる用途を選んでください。",
+		);
+	if (v.purpose === "tts" && !workers && !v.voice)
+		return refuse("invalid_input", "voice", "読み上げ音声を入力してください。");
+	return {
+		ok: true as const,
+		input: v,
+		connection: connectionSchema.parse({
+			id: v.connectionId,
+			...(v.kind && v.kind !== "openai-compatible" ? { kind: v.kind } : {}),
+			...(claude ? { auth: v.auth } : {}),
+			name: v.name,
+			baseUrl: workers ? "https://api.cloudflare.com/client/v4" : v.baseUrl,
+			...(v.accountId ? { accountId: v.accountId } : {}),
+			enabled: v.enabled ?? true,
+			epoch: 0,
+			envRef: v.envRef ?? null,
+		}),
+	};
+}

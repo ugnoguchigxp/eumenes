@@ -19,7 +19,7 @@ export const speechQuestions: ChoiceQuestions = {
 		criteria: speechDeliverySettings.criteria,
 	},
 };
-export const resultSchema = z.object({
+const resultSchema = z.object({
 	answers: z.object({
 		emotion: z.object({
 			type: z.literal("choice"),
@@ -39,7 +39,7 @@ export const resultSchema = z.object({
 		.optional(),
 });
 
-export const emotionPerformance = speechDeliverySettings.performance;
+const emotionPerformance = speechDeliverySettings.performance;
 
 /** Bound dynamic data without hiding the reply's ending or copying system instructions. */
 function excerpt(value: string, limit: number) {
@@ -148,12 +148,7 @@ export async function chooseSpeechDelivery(
 			emotion: choice.choice,
 			emotionConfidence: confidence,
 			...emotionPerformance[choice.choice],
-			source: details.scored
-				? "ruri"
-				: (details.model ?? details.claimed_model) &&
-					  !(details.model ?? details.claimed_model)!.startsWith("laya")
-					? "system-one"
-					: "laya",
+			source: details.scored ? "scored" : "system-one",
 			model: details.model,
 			calibrationStatus: details.calibration_status,
 			confidence,
