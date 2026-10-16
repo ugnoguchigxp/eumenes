@@ -11,25 +11,8 @@ export {
 	imageArtifactDelete,
 	imageLibrary,
 } from "./image-library";
-import type {
-	SentenceLanguage,
-	SentenceLanguageDecision,
-} from "./sentence-language";
-export {
-	sentenceLanguageDecisionSchema,
-	sentenceLanguageSchema,
-} from "./sentence-language";
-export type {
-	SentenceLanguage,
-	SentenceLanguageDecision,
-} from "./sentence-language";
-export const speechRoutingSchema = z.object({
-	englishTts: z.boolean(),
-	languageProviders: z
-		.array(z.object({ name: z.string(), model: z.string() }))
-		.max(100),
-});
-export type SpeechRouting = z.infer<typeof speechRoutingSchema>;
+/** Selects the Japanese or the English voice for one synthesis. */
+type SpeechLanguage = "ja" | "en";
 import type { HttpErrorStatus } from "../../../infrastructure/http";
 export type Capability = "llm" | "asr" | "tts";
 export type LarmExchange = {
@@ -64,7 +47,7 @@ export type LarmCallOptions = {
 	sessionRole?: "main" | "subagent" | "auxiliary";
 	/** `subagent` only: the task whose calls share one agent session. */
 	taskId?: string;
-	speechLanguage?: SentenceLanguage;
+	speechLanguage?: SpeechLanguage;
 	tools?: NativeTool[];
 	onToolCalls?: (calls: NativeToolCall[]) => void;
 	maxOutputTokens?: number;
@@ -95,12 +78,6 @@ export {
 	type TtsRange,
 } from "./voices";
 export interface LarmPort {
-	classifySentenceLanguage?(
-		text: string,
-		signal: AbortSignal,
-		options?: LarmCallOptions,
-	): Promise<SentenceLanguageDecision>;
-	speechRouting?(signal: AbortSignal): Promise<SpeechRouting>;
 	decisionModel?(): string | null;
 	judge?(
 		state: Record<string, string>,
@@ -110,7 +87,7 @@ export interface LarmPort {
 		>,
 		signal: AbortSignal,
 	): Promise<unknown>;
-	voices?(signal: AbortSignal, language?: SentenceLanguage): Promise<TtsVoices>;
+	voices?(signal: AbortSignal, language?: SpeechLanguage): Promise<TtsVoices>;
 	status(): LarmStatus;
 	onChange?(listener: () => void): () => void;
 	inspect?(): {

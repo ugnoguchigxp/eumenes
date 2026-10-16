@@ -41,6 +41,7 @@ test("per-request voice and style use the existing provider and leave subsequent
 		readVoices: async () => catalog,
 		withProvider: async (_name, _signal, use) =>
 			use(provider, "existing-connection"),
+		japaneseVoice: () => provider,
 		infer: async (p, _operation, init, _signal, connection) => {
 			expect(p).toBe(provider);
 			expect(connection).toBe("existing-connection");

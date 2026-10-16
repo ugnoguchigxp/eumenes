@@ -12,13 +12,6 @@ export type {
 } from "./contracts";
 export { registerLarmStatus } from "./controller";
 export { createLarm } from "./service";
-export { speechRoutingSchema, type SpeechRouting } from "./contracts";
-export {
-	sentenceLanguageDecisionSchema,
-	sentenceLanguageSchema,
-	type SentenceLanguage,
-	type SentenceLanguageDecision,
-} from "./contracts";
 export {
 	createLarmPlayground,
 	type LarmPlayground,

@@ -1983,7 +1983,7 @@ test("a failed connect exposes only a machine-readable error code", async () => 
 });
 
 test.each(["model-tts-english", "voicevox-core"])(
-	"language and English speech bind catalog models, dedicated credentials and renewed claims (%s)",
+	"English speech binds the catalog model, a dedicated credential and renewed claims; the sentence classifier is never claimed (%s)",
 	async (englishModel) => {
 		const fake = fixture(
 			false,
@@ -2005,7 +2005,6 @@ test.each(["model-tts-english", "voicevox-core"])(
 			speed: 1.5,
 			pitchScale: 0.1,
 			intonationScale: 1.6,
-			sentenceLanguageProvider: "language-fixture",
 			fetch: async (input, init) => {
 				const path = new URL(String(input)).pathname;
 				if (path === "/v1/audio/voices") {
@@ -2022,20 +2021,8 @@ test.each(["model-tts-english", "voicevox-core"])(
 									],
 					});
 				}
-				if (path === "/language-fixture/v1/systemone") {
-					headers.push(new Headers(init?.headers).get("Authorization")!);
-					const body = JSON.parse(String(init?.body));
-					expect(body.model).toBe("model-language-fixture");
-					expect(body.state).toBe("A whole English answer.");
-					expect(body.questions.language.criteria).toEqual({
-						ja: "Japanese",
-						en: "English",
-					});
-					return result({
-						model: body.model,
-						answers: { language: { type: "choice", choice: "en" } },
-					});
-				}
+				if (path.endsWith("/v1/systemone") && path.includes("language"))
+					throw new Error("classifier_must_not_be_called");
 				if (path === "/tts-english/v1/audio/speech") {
 					headers.push(new Headers(init?.headers).get("Authorization")!);
 					expect(JSON.parse(String(init?.body))).toEqual({
@@ -2055,128 +2042,59 @@ test.each(["model-tts-english", "voicevox-core"])(
 		});
 		try {
 			const signal = new AbortController().signal;
-			expect(await larm.speechRouting!(signal)).toEqual({
-				englishTts: true,
-				languageProviders: [
-					{ name: "language-fixture", model: "model-language-fixture" },
-				],
-			});
-			expect(fake.requests).toHaveLength(0); // Discovery alone does not reserve.
-			const decision = await larm.classifySentenceLanguage!(
-				"A whole English answer.",
-				signal,
-				{
+			const speak = () =>
+				larm.speak("First clause.", signal, {
+					speechLanguage: "en",
+					speed: 2,
+					pitchScale: 0.2,
+					intonationScale: 2,
 					onExchange: async (x) => {
 						exchanges.push(x);
 					},
-				},
-			);
-			expect(decision.language).toBe("en");
-			expect(decision.model).toBe("model-language-fixture");
-			expect(
-				(
-					await larm.speak("First clause.", signal, {
-						speechLanguage: decision.language,
-						speed: 2,
-						pitchScale: 0.2,
-						intonationScale: 2,
-						onExchange: async (x) => {
-							exchanges.push(x);
-						},
-					})
-				).length,
-			).toBe(44);
-			await larm.classifySentenceLanguage!("A whole English answer.", signal);
+				});
+			// English speech on a lease that must renew does not wait on its own use.
+			expect((await speak()).length).toBe(44);
+			expect((await speak()).length).toBe(44);
+			// The second clause uses the credential re-claimed after renewal.
 			expect(headers).toEqual([
-				"Bearer secret-language-fixture-1",
+				"Bearer secret-tts-english-1",
 				"Bearer secret-tts-english-2",
-				"Bearer secret-language-fixture-2",
 			]);
+			expect(fake.calls.some((x) => x.endsWith("/renew"))).toBe(true);
 			expect(exchanges.map((x) => [x.operation, x.model])).toEqual([
-				["systemone", "model-language-fixture"],
+				["audio/speech", englishModel],
 				["audio/speech", englishModel],
 			]);
+			expect(larm.inspect!().providers.map((p) => p.name)).not.toContain(
+				"sentence-language",
+			);
 			expect(
 				larm.inspect!().providers.find((p) => p.name === "tts-english")?.model,
 			).toBe(englishModel);
 		} finally {
 			await larm.close();
 		}
-		expect(fake.calls.some((x) => x.endsWith("/renew"))).toBe(true);
 		expect(fake.calls.some((x) => x.startsWith("DELETE"))).toBe(true);
 	},
 );
 
-for (const body of [
-	{
-		state_tokens_dropped: -1,
-		answers: { language: { type: "choice", choice: "en" } },
-	},
-	{
-		usage: { truncated: "false" },
-		answers: { language: { type: "choice", choice: "en" } },
-	},
-	{ answers: { language: { type: "choice", choice: "fr" } } },
-	{ answers: { language: { type: "text", choice: "en" } } },
-	{
-		model: "attitude-model",
-		answers: { language: { type: "choice", choice: "ja" } },
-	},
-	{ truncated: true, answers: { language: { type: "choice", choice: "ja" } } },
-	{
-		usage: { state_tokens_dropped: 1 },
-		answers: { language: { type: "choice", choice: "en" } },
-	},
-])
-	test("sentence language rejects invalid or shortened System One results", async () => {
-		const fake = fixture(
-			false,
-			"test-profile",
-			900_000,
-			"model-tts",
-			false,
-			true,
-		);
-		const larm = createLarm({
-			baseUrl: "http://127.0.0.1:9810",
-			profile: "test-profile",
-			token: "control",
-			sentenceLanguageProvider: "language-fixture",
-			fetch: (input, init) =>
-				new URL(String(input)).pathname === "/language-fixture/v1/systemone"
-					? Promise.resolve(result(body))
-					: fake.fetcher(input, init),
-		});
-		try {
-			await expect(
-				larm.classifySentenceLanguage!("text", new AbortController().signal),
-			).rejects.toThrow("speech_language_invalid");
-		} finally {
-			await larm.close();
-		}
-	});
-
-test("missing classifier and English providers never reuse attitude or Japanese synthesis", async () => {
+test("a missing English provider never reuses Japanese synthesis and is rechecked once per lease", async () => {
 	const fake = fixture(false, "test-profile", 900_000, "model-tts", true);
 	const larm = createLarm({
 		baseUrl: "http://127.0.0.1:9810",
 		profile: "test-profile",
 		token: "control",
-		sentenceLanguageProvider: "language-fixture",
 		fetch: fake.fetcher,
 	});
 	try {
 		const signal = new AbortController().signal;
-		expect(await larm.speechRouting!(signal)).toEqual({
-			englishTts: false,
-			languageProviders: [],
-		});
-		await expect(
-			larm.classifySentenceLanguage!("text", signal),
-		).rejects.toThrow("speech_language_unavailable");
-		await expect(
-			larm.speak("text", signal, { speechLanguage: "en" }),
-		).rejects.toThrow("speech_tts_target_unavailable");
+		for (let i = 0; i < 3; i++)
+			await expect(
+				larm.speak("text", signal, { speechLanguage: "en" }),
+			).rejects.toThrow("speech_tts_target_unavailable");
+		expect(
+			fake.calls.filter((x) => x === "GET /v1/agent-connections/connection1"),
+		).toHaveLength(1);
 		expect(
 			fake.calls.some(
 				(x) => x.includes("/systemone") || x.includes("/audio/speech"),
@@ -2203,7 +2121,6 @@ test.each(["model", "host", "renew"])(
 			baseUrl: "http://127.0.0.1:9810",
 			profile: "test-profile",
 			token: "control",
-			sentenceLanguageProvider: "language-fixture",
 			fetch: async (input, init) => {
 				const response = await fake.fetcher(input, init);
 				if (!new URL(String(input)).pathname.endsWith("/claim"))
@@ -2212,12 +2129,11 @@ test.each(["model", "host", "renew"])(
 				if (fault === "renew" && claims === 1) return response;
 				const body = await response.json();
 				for (const p of body.providers)
-					if (p.name === "tts-english" || p.name === "language-fixture") {
+					if (p.name === "tts-english") {
 						if (fault !== "host") p.model = "wrong-model";
 						else
 							Object.assign(p.configuration.fields, {
 								baseURL: "http://192.168.1.123/v1",
-								daemonURL: "http://192.168.1.123/v1",
 							});
 					}
 				return result(body);
@@ -2229,186 +2145,15 @@ test.each(["model", "host", "renew"])(
 			await expect(
 				larm.speak("English", signal, { speechLanguage: "en" }),
 			).rejects.toThrow("speech_tts_target_unavailable");
-			await expect(
-				larm.classifySentenceLanguage!("English", signal),
-			).rejects.toThrow("speech_language_unavailable");
 			expect((await larm.speak("日本語", signal)).length).toBe(44);
-			expect(
-				fake.calls.some(
-					(x) =>
-						x.includes("/tts-english/") || x.includes("/language-fixture/"),
-				),
-			).toBe(false);
+			expect(fake.calls.some((x) => x.includes("/tts-english/"))).toBe(false);
 		} finally {
 			await larm.close();
 		}
 	},
 );
 
-test("sentence capability discovery binds the shared voice profile without a fixed model selector", async () => {
-	const fake = fixture(
-		false,
-		"test-profile",
-		900_000,
-		"model-tts",
-		false,
-		true,
-	);
-	let requests = 0;
-	const larm = createLarm({
-		baseUrl: "http://127.0.0.1:9810",
-		profile: "test-profile",
-		token: "control",
-		fetch: async (input, init) => {
-			if (
-				new URL(String(input)).pathname === "/language-fixture/v1/systemone"
-			) {
-				requests++;
-				expect(JSON.parse(String(init?.body)).state).toBe(
-					"自然文のまま分類します。",
-				);
-				return result({
-					model: "model-language-fixture",
-					answers: { language: { type: "choice", choice: "ja" } },
-				});
-			}
-			const response = await fake.fetcher(input, init);
-			if (new URL(String(input)).pathname.endsWith("/claim")) {
-				const body = await response.json();
-				body.providers.find(
-					(p: { name: string }) => p.name === "language-fixture",
-				).capability = "decision.system-one";
-				return result(body); // Claim transport capability is generic System One.
-			}
-			return response;
-		},
-	});
-	try {
-		const signal = new AbortController().signal;
-		await larm.prepareVoice!(signal);
-		expect(larm.decisionModel!()).toBe("model-system-one");
-		for (let i = 0; i < 2; i++)
-			expect(
-				(
-					await larm.classifySentenceLanguage!(
-						"自然文のまま分類します。",
-						signal,
-					)
-				).language,
-			).toBe("ja");
-		expect(requests).toBe(2);
-		expect(fake.requests).toHaveLength(1);
-		expect(fake.requests[0]?.providers).toBeUndefined();
-	} finally {
-		await larm.close();
-	}
-});
-
-test.each(["missing", "foreign", "mismatched"])(
-	"invalid claimed sentence endpoint (%s) never receives a credential",
-	async (kind) => {
-		const fake = fixture(
-			false,
-			"test-profile",
-			900_000,
-			"model-tts",
-			false,
-			true,
-		);
-		const larm = createLarm({
-			baseUrl: "http://127.0.0.1:9810",
-			profile: "test-profile",
-			token: "control",
-			fetch: async (input, init) => {
-				const response = await fake.fetcher(input, init);
-				if (!new URL(String(input)).pathname.endsWith("/claim"))
-					return response;
-				const body = await response.json();
-				const p = body.providers.find(
-					(x: { name: string }) => x.name === "language-fixture",
-				);
-				if (kind === "missing") delete p.endpoint;
-				else
-					p.endpoint =
-						kind === "foreign"
-							? "http://192.168.1.123/v1/systemone"
-							: "http://127.0.0.1/language-fixture/v1/other";
-				return result(body);
-			},
-		});
-		try {
-			await expect(
-				larm.classifySentenceLanguage!("text", new AbortController().signal),
-			).rejects.toThrow("speech_language_unavailable");
-			expect(fake.calls.some((x) => x.includes("/systemone"))).toBe(false);
-		} finally {
-			await larm.close();
-		}
-	},
-);
-
-test("daemon epoch loss discards the old sentence credential and claims a new connection once", async () => {
-	const fake = fixture(
-		false,
-		"test-profile",
-		900_000,
-		"model-tts",
-		false,
-		true,
-	);
-	let claims = 0;
-	const tokens: string[] = [];
-	const larm = createLarm({
-		baseUrl: "http://127.0.0.1:9810",
-		profile: "test-profile",
-		token: "control",
-		fetch: async (input, init) => {
-			const path = new URL(String(input)).pathname;
-			if (path === "/language-fixture/v1/systemone") {
-				tokens.push(new Headers(init?.headers).get("Authorization")!);
-				return tokens.length === 1
-					? result({ error: { code: "unauthorized" } }, 401)
-					: result({ answers: { language: { type: "choice", choice: "en" } } });
-			}
-			if (
-				path === "/v1/agent-connections/connection1" &&
-				init?.method === "GET"
-			)
-				return result({ error: "not_found" }, 404);
-			const response = await fake.fetcher(input, init);
-			if (path.endsWith("/claim")) {
-				claims++;
-				const body = await response.json();
-				if (claims === 2)
-					body.providers.find(
-						(p: { name: string }) => p.name === "language-fixture",
-					).credential.token = "replacement-sentence-token";
-				return result(body);
-			}
-			return response;
-		},
-	});
-	try {
-		expect(
-			(
-				await larm.classifySentenceLanguage!(
-					"English text.",
-					new AbortController().signal,
-				)
-			).language,
-		).toBe("en");
-		expect(tokens).toEqual([
-			"Bearer secret-language-fixture-1",
-			"Bearer replacement-sentence-token",
-		]);
-		expect(claims).toBe(2);
-		expect(fake.requests).toHaveLength(2);
-	} finally {
-		await larm.close();
-	}
-});
-
-test("a cached pre-deployment voice lease reclaims the added sentence provider after epoch loss", async () => {
+test("a cached pre-deployment voice lease reclaims the added English provider after epoch loss", async () => {
 	const fake = fixture(
 		false,
 		"test-profile",
@@ -2423,8 +2168,10 @@ test("a cached pre-deployment voice lease reclaims the added sentence provider a
 		baseUrl: "http://127.0.0.1:9810",
 		profile: "test-profile",
 		token: "control",
+		voice: "fixture-voice",
 		fetch: async (input, init) => {
-			const path = new URL(String(input)).pathname;
+			const url = new URL(String(input));
+			const path = url.pathname;
 			if (
 				lost &&
 				path === "/v1/agent-connections/connection1" &&
@@ -2433,10 +2180,23 @@ test("a cached pre-deployment voice lease reclaims the added sentence provider a
 				return result({ error: "not_found" }, 404);
 			if (lost && path === "/v1/agent-connections" && init?.method === "POST")
 				lost = false;
-			if (path === "/language-fixture/v1/systemone")
+			if (path === "/v1/audio/voices") {
+				const model = url.searchParams.get("model");
 				return result({
-					answers: { language: { type: "choice", choice: "en" } },
+					model,
+					default_voice: model === "model-tts" ? "fixture-voice" : "Rosie",
+					voices:
+						model === "model-tts"
+							? [{ id: "fixture-voice", voice_presentation: "feminine" }]
+							: [{ id: "Rosie", voice_presentation: "feminine" }],
 				});
+			}
+			if (path === "/tts-english/v1/audio/speech") {
+				const wav = new Uint8Array(44);
+				wav.set(new TextEncoder().encode("RIFF"));
+				wav.set(new TextEncoder().encode("WAVE"), 8);
+				return new Response(wav);
+			}
 			const response = await fake.fetcher(input, init);
 			if (
 				legacy &&
@@ -2448,11 +2208,11 @@ test("a cached pre-deployment voice lease reclaims the added sentence provider a
 				if (body.profiles)
 					for (const p of body.profiles)
 						p.providers = p.providers.filter(
-							(x: { name: string }) => x.name !== "language-fixture",
+							(x: { name: string }) => x.name !== "tts-english",
 						);
 				if (body.providers)
 					body.providers = body.providers.filter(
-						(x: { name: string }) => x.name !== "language-fixture",
+						(x: { name: string }) => x.name !== "tts-english",
 					);
 				return result(body, response.status);
 			}
@@ -2465,8 +2225,8 @@ test("a cached pre-deployment voice lease reclaims the added sentence provider a
 		legacy = false;
 		lost = true;
 		expect(
-			(await larm.classifySentenceLanguage!("English.", signal)).language,
-		).toBe("en");
+			(await larm.speak("English.", signal, { speechLanguage: "en" })).length,
+		).toBe(44);
 		expect(fake.requests).toHaveLength(2);
 	} finally {
 		await larm.close();

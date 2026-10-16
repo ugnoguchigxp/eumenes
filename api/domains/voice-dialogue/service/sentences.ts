@@ -1,7 +1,15 @@
+import { speechSegments } from "../../delivery";
+
 /** VOICEVOX fails on clauses with no phoneme (e.g. "。", "…", "！？"). */
 const speakable = (text: string) => /[\p{L}\p{N}]/u.test(text);
 
 const MAX_CLAUSE = 240;
+
+/** Splits a finished clause at Japanese/English boundaries; each part is routed on its own. */
+const parts = (clause: string) =>
+	speechSegments(clause)
+		.map((s) => s.text)
+		.filter(speakable);
 
 /** Incremental speech clauses, independent of provider token boundaries. */
 export class SpeechSentences {
@@ -42,14 +50,13 @@ export class SpeechSentences {
 					boundary--;
 			}
 			if (!boundary) {
-				if (final && speakable(this.buffer.trim()))
-					chunks.push(this.buffer.trim());
+				if (final) chunks.push(...parts(this.buffer.trim()));
 				if (final) this.buffer = "";
 				return chunks;
 			}
 			const chunk = this.buffer.slice(0, boundary).trim();
 			this.buffer = this.buffer.slice(boundary);
-			if (speakable(chunk)) chunks.push(chunk);
+			chunks.push(...parts(chunk));
 		}
 	}
 }

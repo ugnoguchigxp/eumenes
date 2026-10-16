@@ -20,6 +20,7 @@ export type Infer = (
 export function createSpeechSynthesizer({
 	withProvider,
 	infer,
+	japaneseVoice,
 	readVoices,
 	voiceCatalogs,
 	config,
@@ -27,6 +28,8 @@ export function createSpeechSynthesizer({
 }: {
 	withProvider: WithProvider;
 	infer: Infer;
+	/** The Japanese voice of the lease already held by the English synthesis. */
+	japaneseVoice: () => Provider | undefined;
 	readVoices: (p: Provider, signal: AbortSignal) => Promise<TtsVoices>;
 	voiceCatalogs: WeakMap<Provider, TtsVoices>;
 	config: {
@@ -54,9 +57,12 @@ export function createSpeechSynthesizer({
 				let selectedVoice = requestedVoice ?? p.voice;
 				const voicevox = !english && p.model === "voicevox-core";
 				if (english) {
-					const japanese = await withProvider("tts", signal, (jp) =>
-						Promise.resolve(voiceCatalogs.get(jp) ?? readVoices(jp, signal)),
-					);
+					// Reading the paired Japanese catalog must not reacquire the lease
+					// this call already holds: a renewal would wait on this very use.
+					const jp = japaneseVoice();
+					if (!jp) throw new Error("larm_credential_expired");
+					const japanese =
+						voiceCatalogs.get(jp) ?? (await readVoices(jp, signal));
 					const englishCatalog =
 						voiceCatalogs.get(p) ?? (await readVoices(p, signal));
 					selectedVoice = pairedEnglishVoice(

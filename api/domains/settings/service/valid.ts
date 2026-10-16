@@ -12,13 +12,6 @@ export function validSettings(
 	const before = snapshot.routes[purpose];
 	const after = current.routes[purpose];
 	if (
-		purpose === "tts" &&
-		(snapshot.larm.sentenceLanguageEnabled ||
-			current.larm.sentenceLanguageEnabled) &&
-		JSON.stringify(snapshot.larm) !== JSON.stringify(current.larm)
-	)
-		return false;
-	if (
 		connection &&
 		(!after.cloudAllowed ||
 			after.epoch !== before.epoch ||

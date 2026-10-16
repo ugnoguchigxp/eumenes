@@ -1,7 +1,7 @@
 import { providerChatInput } from "./chat-input";
 import type { Capability } from "../contracts";
 import {
-	optionalSpeechProviders,
+	englishSpeechProvider,
 	claimedSpeechProvider,
 } from "./speech-providers";
 import { providerEndpoint, readJson, record, string } from "./guards";
@@ -177,7 +177,6 @@ export async function claimProviders(
 		catalogProviders: Rec[];
 		fullProfile: boolean;
 		hosts: ProviderHosts;
-		languageProvider?: string;
 	},
 ): Promise<{ expiresAt: number; providers: Map<ProviderName, Provider> }> {
 	const { id, created, required, catalogProviders, hosts } = input;
@@ -233,15 +232,10 @@ export async function claimProviders(
 	}
 	const decision = decisionProvider(claimed, created, catalogProviders, hosts);
 	if (input.fullProfile && decision) providers.set("system-one", decision);
-	if (input.fullProfile)
-		for (const [role, provider] of optionalSpeechProviders(
-			claimed,
-			created,
-			catalogProviders,
-			hosts,
-			input.languageProvider,
-		))
-			providers.set(role, provider);
+	const english = input.fullProfile
+		? englishSpeechProvider(claimed, created, catalogProviders, hosts)
+		: undefined;
+	if (english) providers.set("tts-english", english);
 	return { expiresAt, providers };
 }
 
@@ -402,7 +396,7 @@ export async function renewProviders(
 		const info = claimed.providers
 			.map(record)
 			.find((p) => p.name === (previous.claimName ?? name));
-		if (name === "tts-english" || name === "sentence-language") {
+		if (name === "tts-english") {
 			if (
 				!info ||
 				info.model !== previous.model ||

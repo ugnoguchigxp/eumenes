@@ -24,4 +24,8 @@ export {
 	type DecisionDetails,
 } from "./service/result";
 export type { Judge } from "./service";
-export { SpeechLanguageError } from "./contracts/sentence-language";
+export {
+	speechLanguage,
+	speechSegments,
+	type SpeechLanguage,
+} from "./service/speech-language";

@@ -232,17 +232,11 @@ if (import.meta.main) {
 			["ja", "音声接続を確認します。"],
 			["en", "This is a speech connection check."],
 		] as const) {
-			const classified = await main.classifySentenceLanguage!(
-				text,
-				voiceSignal,
-			);
-			if (classified.language !== language)
-				throw new Error("live_language_label_mismatch");
 			const audio = await main.speak(text, voiceSignal, {
 				speechLanguage: language,
 			});
 			if (audio.length <= 44) throw new Error("live_audio_empty");
-			providerResults.push({ language, bytes: audio.length, classified: true });
+			providerResults.push({ language, bytes: audio.length });
 		}
 		const judgement = (await main.judge!(
 			{ current_chunk: "音声接続を確認します。" },

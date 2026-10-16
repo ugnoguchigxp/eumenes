@@ -38,18 +38,10 @@ const messages: Record<string, string> = {
 	asr_language_unverified:
 		"音声の言語を確認できませんでした。もう一度話すか、文字で入力してください。",
 	asr_language_not_allowed: "設定で許可されていない言語です。",
-	speech_language_unavailable:
-		"文章の言語を判定する接続先を利用できません。音声設定を確認してください。",
-	speech_language_invalid: "読み上げる文章の言語を確認できませんでした。",
 	larm_tts_voice_presentation_unavailable:
 		"選んだ日本語の声の種類を確認できません。声の一覧を再取得してください。",
 	larm_tts_voice_presentation_mismatch:
 		"対応する英語の声の公開情報が一致しないため、読み上げを続けられません。",
-	speech_language_timeout: "文章の言語確認が時間切れになりました。",
-	speech_language_failed:
-		"文章の言語確認に失敗したため、読み上げを停止しました。",
-	speech_language_capacity:
-		"読み上げの準備が混み合っています。少し待ってからお試しください。",
 	speech_tts_target_unavailable:
 		"選択した言語の声を利用できません。音声設定を確認してください。",
 	image_invalid: "画像を読み取れません。破損していない画像を選んでください。",

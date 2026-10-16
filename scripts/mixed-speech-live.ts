@@ -2,14 +2,19 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createClient } from "../client";
+import { speechLanguage } from "../api/domains/delivery";
 import { liveLarmSettings } from "./live-larm";
+
+/** Mixed Japanese/English answer: each clause part must reach the voice of its language. */
+const ANSWER =
+	"設定画面を開いたら、Open the settings を押してください。API キーは Docker の環境変数に入れます。Thank you for waiting. 以上です。";
 
 if (import.meta.main) {
 	if (!process.argv.includes("--run"))
-		throw new Error("sentence_language_api_live_requires_run");
+		throw new Error("mixed_speech_live_requires_run");
 	const saved = liveLarmSettings();
-	const dir = mkdtempSync(join(tmpdir(), "eumenes-ruri-api-"));
-	const output = resolve("verification-reports/sentence-language-api-live");
+	const dir = mkdtempSync(join(tmpdir(), "eumenes-mixed-speech-"));
+	const output = resolve("verification-reports/mixed-speech-live");
 	mkdirSync(output, { recursive: true });
 	const reservation = Bun.serve({
 		hostname: "127.0.0.1",
@@ -40,7 +45,8 @@ if (import.meta.main) {
 	const report: Record<string, unknown> = {
 		date: new Date().toISOString(),
 		profile: saved.profile,
-		samples: [],
+		answer: ANSWER,
+		segments: [],
 	};
 	try {
 		let ready = false;
@@ -57,7 +63,7 @@ if (import.meta.main) {
 		}
 		if (!ready) throw new Error("isolated_backend_start_timeout");
 		let settings = await client.settings();
-		settings.larm = { ...saved, sentenceLanguageEnabled: false };
+		settings.larm = { ...saved, englishSpeechEnabled: true };
 		for (const purpose of ["llm", "asr", "tts"] as const)
 			settings.routes[purpose].mode = "larm-only";
 		settings = await client.applySettings({
@@ -66,68 +72,46 @@ if (import.meta.main) {
 			settings,
 			keys: [],
 		});
-		const routing = await client.speechRouting();
-		const provider =
-			routing.languageProviders.find(
-				(p) => p.name === saved.sentenceLanguageProvider,
-			) ??
-			(routing.languageProviders.length === 1
-				? routing.languageProviders[0]
-				: undefined);
-		if (!provider || !routing.englishTts)
-			throw new Error("public_speech_provider_missing");
-		settings.larm.sentenceLanguageProvider = provider.name;
-		settings.larm.sentenceLanguageEnabled = true;
-		await client.applySettings({
-			requestId: crypto.randomUUID(),
-			expectedRevision: settings.revision,
-			settings,
-			keys: [],
-		});
-		report.provider = provider;
-		for (const [language, text, model] of [
-			["ja", "日本語の読み上げを確認します。", "voicevox-core"],
-			[
-				"en",
-				"This is an English speech connection check.",
-				"kitten-tts-nano-0.8-fp32",
-			],
-		] as const) {
+		const models = {
+			ja: (await client.larmVoices(undefined, "ja")).model,
+			en: (await client.larmVoices(undefined, "en")).model,
+		};
+		if (!models.ja || !models.en || models.ja === models.en)
+			throw new Error("speech_voices_not_distinct");
+		report.models = models;
+		const parts = await client.replaySentences(ANSWER);
+		const languages = new Set(parts.map(speechLanguage));
+		if (!languages.has("ja") || !languages.has("en"))
+			throw new Error("mixed_answer_not_split");
+		for (const [i, text] of parts.entries()) {
+			const language = speechLanguage(text);
+			const before = new Set((await client.inferenceUsage()).map((x) => x.id));
 			const bytes = await client.replayAudio(text, AbortSignal.timeout(60_000));
 			if (
 				bytes.length <= 44 ||
 				new TextDecoder().decode(bytes.slice(0, 4)) !== "RIFF"
 			)
 				throw new Error("api_audio_invalid");
-			writeFileSync(join(output, `${language}.wav`), bytes);
+			writeFileSync(join(output, `${i}-${language}.wav`), bytes);
 			const attempt = (await client.inferenceUsage()).find(
-				(x) => x.purpose === "tts" && x.accepted === 1 && x.model === model,
+				(x) => !before.has(x.id) && x.purpose === "tts" && x.accepted === 1,
 			);
-			if (
-				!attempt ||
-				!attempt.providerDetails?.some(
-					(x) => x.operation === "systemone" && x.model === provider.model,
-				) ||
-				!attempt.providerDetails.some(
-					(x) => x.operation === "audio/speech" && x.model === model,
-				)
-			)
-				throw new Error("api_speech_receipt_invalid");
-			(report.samples as unknown[]).push({
+			if (!attempt || attempt.model !== models[language])
+				throw new Error("api_speech_route_invalid");
+			(report.segments as unknown[]).push({
+				text,
 				language,
 				bytes: bytes.length,
 				model: attempt.model,
-				accepted: attempt.accepted,
-				exchanges: attempt.providerDetails,
 			});
 		}
-		report.result = "public_api_routing_passed";
+		report.result = "mixed_speech_routing_passed";
 	} catch (error) {
 		report.result = "failed";
 		report.error =
 			error instanceof Error && /^[a-z][a-z0-9_]{0,100}$/.test(error.message)
 				? error.message
-				: "api_live_failed";
+				: "mixed_speech_live_failed";
 		process.exitCode = 1;
 	} finally {
 		backend.kill("SIGTERM");

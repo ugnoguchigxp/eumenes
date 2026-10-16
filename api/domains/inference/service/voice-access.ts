@@ -28,16 +28,6 @@ export function createVoiceAccess({
 	) => Promise<Receipt>;
 }) {
 	return {
-		speechRouting: async (signal: AbortSignal) => {
-			const snapshot = settings.get();
-			const value = (await port(snapshot).speechRouting?.(signal)) ?? {
-				englishTts: false,
-				languageProviders: [],
-			};
-			if (JSON.stringify(snapshot.larm) !== JSON.stringify(settings.get().larm))
-				throw new Error("stale_voice_settings");
-			return value;
-		},
 		voices: async (signal: AbortSignal, language?: "ja" | "en") => {
 			const snapshot = settings.get();
 			const value = await port(snapshot).voices?.(signal, language);

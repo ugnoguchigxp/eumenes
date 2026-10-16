@@ -111,7 +111,6 @@ export function createVoiceResponder({
 				granularity: "answer",
 				chunkOrder: null,
 			},
-			languageSource: { text: spokenText(answer), scope: `answer:${run.id}` },
 			context: dialogue.answerContext?.(run.id) ?? { answer, turns: [] },
 			delivery: dialogue.answerDelivery?.(run.id),
 		});

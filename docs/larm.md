@@ -6,7 +6,7 @@ LLMのProfileは設定画面で保存した値（`larm.profile`）だけを使�
 
 `GET /v3/agent-profiles?profile=...` から構成と `catalogRevision` を取得し、作成時に `expectedCatalogRevision` を指定します。同じclientとProfileの要求ではLARMが既存Connectionを再利用するため、各sessionに固有のclient識別子を使い、renew・再接続では同じ識別子を維持します。入力予算はclaimのcontext windowと正式なchat input計数から求めます。出力予約はclaimの上限以内で明示します。
 
-LLMのみの要求は `providers: ["llm"]`、音声の要求は `providers` を省略して選択Profile全体を取得します。不要なProviderを事前予約しません。Providerの接続先・model・tokenはclaimの `configuration.fields.baseURL` / `daemonURL`、`configuration.fields.model`、`credential.token` を使い、公開endpointとの整合性を確認します。ASR、日英TTS、Ruriの態度・文章言語判定とembeddingは新Profileのcatalogから発見する既存経路を使います。期限前のrenew後は再claimでtokenを更新し、終了時に解放し、失効時は既存の再接続処理を使います。
+LLMのみの要求は `providers: ["llm"]`、音声の要求は `providers` を省略して選択Profile全体を取得します。不要なProviderを事前予約しません。Providerの接続先・model・tokenはclaimの `configuration.fields.baseURL` / `daemonURL`、`configuration.fields.model`、`credential.token` を使い、公開endpointとの整合性を確認します。ASR、日英TTS、Ruriの態度判定とembeddingは新Profileのcatalogから発見する既存経路を使います。期限前のrenew後は再claimでtokenを更新し、終了時に解放し、失効時は既存の再接続処理を使います。
 
 2026-10-12の実接続で主1＋補助3の同時応答、履歴分離、5つ目の待機と解放後の利用、ASR、日英TTS、Ruri両Provider、384次元embeddingを確認しました。設定の初期選択・保存済み選択の維持、renew・再claim・再接続・取消は固定試験でも検証しています。詳細は [検証記録](../spec/verification/ornith-profile-2026-10-12/README.md)。音声ファイルの取得は実機器の3往復受入に数えません。
 
@@ -69,21 +69,19 @@ music domainのプレイリストは会話/run・検索条件・曲IDを保存�
 
 読取り専用の実接続確認は `bun scripts/music-playback-live.ts --run`。保存済み曲だけを検索・再生し、生成・変更・削除は許可しない。固定試験とは区別して記録する。
 
-## 文章言語による読み上げの振分け（試用）
+## 日英混在文の読み上げ振分け
 
-本文を採用してから、読み上げ対象の全文を一度 `ja` / `en` に分類する。`ja` は既存の日本語TTS、`en` はcatalogの `speech.tts.english` capabilityを持つProviderへ渡す。回答LLMの出力形式は変更しない。句読点で分割した区間は同じラベルを共有し、合成を最大3区間まで先行させ、再生は前の区間終了後に進める。生成中の逐次発声と日英混在文の区間分割は今回の対象外。
+読み上げ本文を句読点の句に分け、さらに日本語とラテン文字の境界で区間に分ける（`delivery` の `speechSegments`）。各区間の言語は文字種と語の形だけで決め、LARM の分類器・単語辞書は使わない。日本語を含む句ではラテン文字の通常語が2語以上続く部分を `en` とし、略語（`API`）、コード・アドレス形（`example.com`）、語中に大文字を含む語（`iPhone`）は語数に数えない。全語が大文字始まりの部分は固有名詞として `ja` に残す。日本語を含まない句は通常語が1語以上あれば `en`。規則と評価表は [計画](../spec/regex-speech-language-routing-plan-2026-10-16.md) と `api/domains/delivery/test/speech-language.test.ts`。
 
-[全体コンセプト](https://chatgpt.com/space/page_9fab9c53bce8819181c9c8256a3b303a)の原則に従い、公開Profileを正本とする。実験モデルの名前・ローカル保存先・起動済みポートから接続先を推測しない。保存済みsettingsからProfileを発見し、確保・ready・claim・専用認証・renew後の再claim・解放を共通機構で扱う。英語TTSも態度判定も分類器も、独立したProviderの認証を使う。
+合成要求ごとに inference が本文から `speechLanguage` を再計算する（区間は再計算しても同じ言語になる）。`en` は catalog の `speech.tts.english` capability を持つ Provider へ、`ja` は既存の日本語TTSへ渡す。区間に分かれていない混在本文（設定画面の試聴など）は `ja`。合成は最大3区間まで先行させ、再生は前の区間終了後に進める。回答LLMの出力形式は変更しない。
 
-接続の内部設定は `larm.sentenceLanguageEnabled`（省略時無効）、`sentenceLanguageProvider`（分類用Provider名。省略時は `decision.sentence-language` の唯一の候補を自動選択）。通常環境は有効化済み。2026-10-12のユーザー指定で、Webの分類・英語声・英語速度の設定欄を削除した。英語の声は日本語の公開 `voice_presentation` が女性・中性ならRosie、男性ならJasperへ固定し、速度は常に1.0。旧 `englishVoice` / `englishMasculineVoice` / `englishSpeed` は保存文書の互換読取り用に受理するが実行には使わない。日本語の声・style・pitch・intonation・速度を英語へ流用せず、日本語の読み辞書も適用しない。接続確認API `/api/inference/speech-routing` と `/api/inference/voices?language=en` は維持し、言語の任意指定を通常回答の合成APIには公開しない。
+[全体コンセプト](https://chatgpt.com/space/page_9fab9c53bce8819181c9c8256a3b303a)の原則に従い、公開Profileを正本とする。英語TTSは独立したProviderの認証を使い、確保・claim・renew後の再claim・解放を共通機構で扱う。
 
-分類のadapterは既存 `larm.system-one.v1` / `/v1/systemone` のchoice契約に対応する。catalogの `decision.sentence-language` を発見し、選択したProviderのclaim endpoint・model・専用tokenを使ってHTTP要求を送る。文字列の `state` に全文を入れ、`questions.language` の `ja/en` choiceを要求する。応答の `answers.language.type=choice` / `choice=ja|en` を検証する。返されたmodelがclaimと異なる場合、切詰め・入力tokenの破棄が報告された場合は拒否する。態度用 `system-one` Providerには送らない。別protocolで公開された場合はその契約の確認とadapter追加が必要。
+接続の内部設定は `larm.englishSpeechEnabled`（省略時無効）。旧 `sentenceLanguageEnabled` は保存文書の移行で引き継ぎ、`sentenceLanguageProvider` は削除する。英語の声は日本語の公開 `voice_presentation` が女性・中性ならRosie、男性ならJasperへ固定し、速度は常に1.0。旧 `englishVoice` / `englishMasculineVoice` / `englishSpeed` は保存文書の互換読取り用に受理するが実行には使わない。`en` 区間には日本語の声・style・pitch・intonation・速度・読み辞書・話し方判定を使わない。英語TTSの到達確認は `/api/inference/voices?language=en`。言語の任意指定は合成APIに公開しない。
 
-共有結果はbackendのメモリ内、64件・10分まで。同一回答・本文・設定で再利用し、失敗や取消中の遅着結果は保持しない。初回の接続準備は既存TTS期限内で行い、その後の分類に暫定2秒の上限を置く。この上限は待ち続けないための期限であり、通常の処理時間ではない。分類の不足・不正・失敗・timeoutと選択先TTS不在は読み上げの失敗として扱い、区間ごとの再試行や別TTSへの推測転送を行わない。本文は残す。
+英語TTSを確保できない場合（`speech_tts_target_unavailable`）は、その区間を `ja` として日本語TTSで合成し、読み辞書と話し方判定を適用する（`inference.english_speech_fallback` を warn で記録）。英語TTSの合成エラーは日本語TTSへ転送しない。LARM の合成がフォールバック対象の失敗で終わり、route が許せばクラウドTTS（Cloudflare Workers AI など）へ進む。クラウドでは言語判定を行わず、日本語読み辞書を適用する。
 
-2026-10-12夕方の配備後、`SAAA-gemma4-26b` の `sentence-language` / `ruri-v3-30m-sentence-language` と既存態度用 `system-one` の共存を確認した。接続を保持し、分類のHTTP要求ごとにモデルを初期化しない。分類結果を使った日英両TTSと、Eumenes公開APIからの音声取得・receipt採用が成功した。実機器3往復は未実施。
-
-再確認は `bun scripts/sentence-language-live.ts --run`。保存済みbackend設定と公開接続だけを使い、既知の日英文で両TTSの通信とWAV取得を確認する。保存されたProvider、またはcapabilityに合う唯一の候補を使って二分類を確認する。`--benchmark` を付けると日本語・英語・態度との同時要求を各200回測る。このPCでの通常分類P95は日本語27.36ms・英語52.68ms。同時要求の両方完了までのP95は107.82ms、失敗0/600、同じConnectionを使用した。LARMホスト内の測定とネットワークを含むこの測定を区別する。公開API経路は `bun scripts/sentence-language-api-live.ts --run` で隔離backendの設定API・分類・合成・receipt採用を確認する。結果は `verification-reports/sentence-language-live/`、実施記録は [検証記録](../spec/verification/ruri-sentence-language-2026-10-12/README.md)。合成音声の取得はスピーカー再生の実機器受入に数えない。
+再確認は `bun scripts/mixed-speech-live.ts --run`。隔離backendに保存済みLARM設定を保存し、固定の日英混在回答を区間化して、区間ごとに日本語・英語TTSのどちらで合成されたか（attemptのmodel）とWAV取得を `verification-reports/mixed-speech-live/` に記録する。合成音声の取得はスピーカー再生の実機器受入に数えない。旧Ruri分類の接続記録は [検証記録](../spec/verification/ruri-sentence-language-2026-10-12/README.md) に残す。
 
 ## チャットの画像入力
 

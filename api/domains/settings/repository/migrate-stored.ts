@@ -12,12 +12,23 @@ const isObject = (v: unknown): v is Json =>
  * - Claude Agent SDK connections get the explicit `auth` the key used to imply
  *   (a stored key or an env ref: "api-key"; nothing: "subscription").
  * - The removed Managed Agents fields are dropped.
+ * - The LARM sentence-language switch becomes `englishSpeechEnabled`; its classifier selector is dropped.
  * It is idempotent: a migrated document passes through unchanged.
  */
 export function migrateStoredSettings(
 	db: Database,
 	raw: unknown,
 ): { document: unknown; removedConnectionIds: string[] } {
+	if (isObject(raw) && isObject(raw.larm)) {
+		const {
+			sentenceLanguageEnabled,
+			sentenceLanguageProvider: _provider,
+			...larm
+		} = raw.larm;
+		if (sentenceLanguageEnabled !== undefined)
+			larm.englishSpeechEnabled ??= sentenceLanguageEnabled;
+		raw = { ...raw, larm };
+	}
 	if (!isObject(raw) || !Array.isArray(raw.connections))
 		return { document: raw, removedConnectionIds: [] };
 	const hasCredential = (c: Json) =>

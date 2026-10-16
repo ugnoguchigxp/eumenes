@@ -1,7 +1,6 @@
 import { providerRequest } from "./provider-request";
 import { measureStage } from "../../../infrastructure/performance";
 import { createSpeechSynthesizer } from "./speech";
-import { createSentenceLanguageOperations } from "./sentence-language";
 import { answerRequest } from "./answer-request";
 import {
 	isNetworkError,
@@ -55,7 +54,6 @@ export function createLarm(config: {
 	audience?: string;
 	client?: string;
 	voice?: string;
-	sentenceLanguageProvider?: string;
 	fetch?: Fetcher;
 	speed?: number;
 	style?: string;
@@ -114,6 +112,8 @@ export function createLarm(config: {
 	let mainAnswer = Promise.resolve();
 	const voiceCatalogs = new WeakMap<Provider, TtsVoices>();
 	let lease: Lease | undefined;
+	/** Leases confirmed without an English voice; later English clauses skip the recheck. */
+	const withoutEnglish = new WeakSet<Lease>();
 	let connecting: Promise<Lease> | undefined;
 	let lastError: string | undefined;
 	let closed = false;
@@ -438,7 +438,6 @@ export function createLarm(config: {
 					required,
 					catalogProviders,
 					fullProfile,
-					languageProvider: config.sentenceLanguageProvider,
 					hosts: hostsFor(),
 				});
 				const current: Lease = {
@@ -535,21 +534,15 @@ export function createLarm(config: {
 				{ kind: name },
 			);
 			let provider = current.providers.get(name);
-			if (
-				(name === "sentence-language" || name === "tts-english") &&
-				!provider
-			) {
+			if (name === "tts-english" && !provider && !withoutEnglish.has(current)) {
 				// A pre-deployment voice lease may lack the newly published role.
 				// Check its current control state before treating the role as absent.
 				current = await untilAborted(connect(required, signal, true), signal);
 				provider = current.providers.get(name);
+				if (!provider) withoutEnglish.add(current);
 			}
-			if ((name === "sentence-language" || name === "tts-english") && !provider)
-				throw new Error(
-					name === "sentence-language"
-						? "speech_language_unavailable"
-						: "speech_tts_target_unavailable",
-				);
+			if (name === "tts-english" && !provider)
+				throw new Error("speech_tts_target_unavailable");
 			if (name === "system-one" && !provider)
 				throw new Error("larm_system_one_unavailable");
 			if (
@@ -787,19 +780,6 @@ export function createLarm(config: {
 	}
 
 	return {
-		...createSentenceLanguageOperations({
-			withProvider,
-			infer,
-			catalog: (signal) => {
-				if (!profile) throw new Error("larm_profile_missing");
-				return fetchCatalog(
-					(path, init, statuses) =>
-						control(path, { ...init, signal }, statuses),
-					profile,
-					[],
-				);
-			},
-		}),
 		decisionModel: () => lease?.providers.get("system-one")?.model ?? null,
 		async judge(state, questions, signal) {
 			if (judging) throw new Error("larm_decision_busy");
@@ -959,6 +939,7 @@ export function createLarm(config: {
 		speak: createSpeechSynthesizer({
 			withProvider,
 			infer,
+			japaneseVoice: () => lease?.providers.get("tts"),
 			readVoices,
 			voiceCatalogs,
 			config,

@@ -50,14 +50,10 @@ test("DOMException names map to microphone messages", () => {
 	expect(name("SomethingElse")).toBe("エラーが発生しました。");
 });
 
-test.each([
-	["speech_language_unavailable", "音声設定"],
-	["speech_language_invalid", "言語を確認できません"],
-	["speech_language_timeout", "時間切れ"],
-	["speech_language_failed", "読み上げを停止"],
-	["speech_language_capacity", "混み合って"],
-	["speech_tts_target_unavailable", "声を利用できません"],
-])("speech routing failure %s explains why audio stopped", (code, message) => {
-	expect(describeError(new Error(code))).toContain(message);
-	expect(describeError(new Error(code))).not.toContain(code);
-});
+test.each([["speech_tts_target_unavailable", "声を利用できません"]])(
+	"speech routing failure %s explains why audio stopped",
+	(code, message) => {
+		expect(describeError(new Error(code))).toContain(message);
+		expect(describeError(new Error(code))).not.toContain(code);
+	},
+);

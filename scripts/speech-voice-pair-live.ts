@@ -1,4 +1,4 @@
-import { writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { createClient } from "../client";
 import { readApiToken } from "../api/infrastructure/auth-config";
 
@@ -20,7 +20,7 @@ if (import.meta.main) {
 		male?.voice_presentation !== "masculine"
 	)
 		throw new Error("requested_voice_pair_unavailable");
-	settings.larm.sentenceLanguageEnabled = true;
+	settings.larm.englishSpeechEnabled = true;
 	settings = await client.applySettings({
 		requestId: crypto.randomUUID(),
 		expectedRevision: settings.revision,
@@ -103,8 +103,11 @@ if (import.meta.main) {
 			report.restored = false;
 			process.exitCode = 1;
 		}
+		mkdirSync("verification-reports/speech-voice-pair-live", {
+			recursive: true,
+		});
 		writeFileSync(
-			"spec/verification/ruri-sentence-language-2026-10-12/voice-pair-live.json",
+			"verification-reports/speech-voice-pair-live/result.json",
 			JSON.stringify(report, null, 2),
 		);
 		console.log(JSON.stringify(report, null, 2));

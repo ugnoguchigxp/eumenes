@@ -5,9 +5,10 @@ import { getLogger } from "../../../infrastructure/logger";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { LarmCallOptions, LarmExchange, LarmPort } from "../../larm";
 import {
-	SpeechLanguageError,
 	chooseSpeechDelivery,
+	speechLanguage,
 	speechParameters,
+	type SpeechLanguage,
 } from "../../delivery";
 import type {
 	DeliveryContext,
@@ -25,8 +26,6 @@ import {
 	type Receipt,
 	type SpeechOverride,
 } from "../contracts";
-import { createSpeechLanguageCache } from "./speech-language";
-import type { SentenceLanguageDecision } from "../../larm";
 import { get, type RequestRow } from "../repository";
 import { cloudRequest } from "./cloud";
 import {
@@ -62,7 +61,6 @@ export type InferenceOptions = {
 	localMs?: number;
 	cloudMs?: number;
 	decisionMs?: number;
-	sentenceLanguageMs?: number;
 	attitudeDataset?: AttitudeDataset;
 	/** Rewrites text just before synthesis (e.g. pronunciation dictionary). */
 	speechText?: (text: string) => string;
@@ -87,7 +85,6 @@ export type Env = {
 	active: Map<string, Running>;
 	cooldown: Map<string, number>;
 	collectionAdoptions: Map<string, CollectionAdoption>;
-	speechLanguages: ReturnType<typeof createSpeechLanguageCache>;
 	port(s: Settings): LarmPort;
 	resolve(
 		row: RequestRow,
@@ -451,119 +448,89 @@ async function attempt(r: Request, source: Source): Promise<Receipt> {
 				}
 			}
 		: undefined;
-	let selectingLanguage = false;
 	try {
-		let language: SentenceLanguageDecision | undefined;
+		let language: SpeechLanguage | undefined;
 		if (
 			row.purpose === "tts" &&
 			source === "larm" &&
-			row.snapshot.larm.sentenceLanguageEnabled
+			row.snapshot.larm.englishSpeechEnabled
 		) {
-			selectingLanguage = true;
-			const text = r.preparation?.languageSource?.text ?? (r.input as string);
-			const identity = JSON.stringify({
-				scope: r.preparation?.languageSource?.scope ?? row.subject,
-				snapshot: row.snapshot,
-			});
-			language = await env.speechLanguages.select(
-				identity,
-				text,
-				attemptSignal,
-				async (cacheSignal) => {
-					const p = env.port(row.snapshot);
-					if (!p.classifySentenceLanguage)
-						throw new SpeechLanguageError("speech_language_unavailable");
-					// Admission stays within the TTS deadline; measure the classifier
-					// budget after the shared voice lease is ready.
-					try {
-						await fenced(
-							p.prepareVoice?.(cacheSignal) ?? Promise.resolve(),
-							cacheSignal,
-						);
-					} catch (error) {
-						if (cacheSignal.aborted) throw error;
-						throw new SpeechLanguageError("speech_language_failed");
-					}
-					const budget = AbortSignal.timeout(
-						env.options.sentenceLanguageMs ?? 2000,
-					);
-					const scoped = AbortSignal.any([cacheSignal, budget]);
-					try {
-						return await fenced(
-							p.classifySentenceLanguage(text, scoped, callOptions),
-							scoped,
-						);
-					} catch (error) {
-						if (cacheSignal.aborted) throw error;
-						if (budget.aborted)
-							throw new SpeechLanguageError("speech_language_timeout");
-						if (error instanceof SpeechLanguageError) throw error;
-						if (
-							error instanceof Error &&
-							(error.message === "speech_language_unavailable" ||
-								error.message === "speech_language_invalid")
-						)
-							throw new SpeechLanguageError(error.message);
-						throw new SpeechLanguageError("speech_language_failed");
-					}
-				},
-			);
-			attemptSignal.throwIfAborted();
-			if (!env.store.read((db) => env.allowed(db, row, connection)))
-				throw new Error("permission_revoked");
-			callOptions.speechLanguage = language.language;
-			selectingLanguage = false;
+			language = speechLanguage(r.input as string);
+			callOptions.speechLanguage = language;
 			log.info("inference.speech_language_selected", {
 				...logFields,
-				kind: language.language,
-				durationMs: language.latencyMs,
+				kind: language,
 			});
 		}
-		// English speech preserves the original words rather than applying a Japanese reading dictionary.
-		const sent =
-			row.purpose === "tts" &&
-			language?.language !== "en" &&
-			env.options.speechText
-				? env.options.speechText(r.input as string)
-				: r.input;
-		let delivery: SpeechDelivery | undefined =
-			row.purpose === "tts" && r.preparation?.delivery?.version === 2
-				? r.preparation.delivery
-				: undefined;
-		if (
-			row.purpose === "tts" &&
-			source === "larm" &&
-			language?.language !== "en" &&
-			env.port(row.snapshot).judge
-		)
-			delivery = await chooseTtsDelivery(r, {
-				sent: sent as string,
-				decide,
-				callOptions,
-				attemptSignal,
-				connection,
-			});
+		const prepare = async () => {
+			// English speech preserves the original words rather than applying a Japanese reading dictionary.
+			const sent =
+				row.purpose === "tts" && language !== "en" && env.options.speechText
+					? env.options.speechText(r.input as string)
+					: r.input;
+			let delivery: SpeechDelivery | undefined =
+				row.purpose === "tts" && r.preparation?.delivery?.version === 2
+					? r.preparation.delivery
+					: undefined;
+			if (
+				row.purpose === "tts" &&
+				source === "larm" &&
+				language !== "en" &&
+				env.port(row.snapshot).judge
+			)
+				delivery = await chooseTtsDelivery(r, {
+					sent: sent as string,
+					decide,
+					callOptions,
+					attemptSignal,
+					connection,
+				});
+			return { sent, delivery };
+		};
+		let { sent, delivery } = await prepare();
 		log.info("inference.prepared", {
 			...logFields,
 			durationMs: performance.now() - started,
 		});
-		const value = await measureStage(
-			"inference",
-			"provider",
-			() =>
-				fenced(
-					startWork(r, {
-						source,
-						sent,
+		const provide = () =>
+			measureStage(
+				"inference",
+				"provider",
+				() =>
+					fenced(
+						startWork(r, {
+							source,
+							sent,
+							attemptSignal,
+							attemptId,
+							callOptions,
+							delta,
+						}),
 						attemptSignal,
-						attemptId,
-						callOptions,
-						delta,
-					}),
-					attemptSignal,
-				),
-			logFields,
-		);
+					),
+				logFields,
+			);
+		let value: Awaited<ReturnType<typeof provide>>;
+		try {
+			value = await provide();
+		} catch (error) {
+			// Without an English voice the Japanese voice still speaks the clause.
+			if (
+				language !== "en" ||
+				attemptSignal.aborted ||
+				!(error instanceof Error) ||
+				error.message !== "speech_tts_target_unavailable"
+			)
+				throw error;
+			log.warn("inference.english_speech_fallback", {
+				...logFields,
+				reason: error.message,
+			});
+			language = "ja";
+			callOptions.speechLanguage = language;
+			({ sent, delivery } = await prepare());
+			value = await provide();
+		}
 		if (
 			row.purpose === "llm" &&
 			row.mode !== "control" &&
@@ -611,7 +578,7 @@ async function attempt(r: Request, source: Source): Promise<Receipt> {
 		if (env.options.attitudeDataset && r.preparation?.collection && delivery)
 			env.collectionAdoptions.set(row.id, {
 				identity: r.preparation.collection,
-				voice: voiceAdoption(r, source, delivery, language?.language),
+				voice: voiceAdoption(r, source, delivery, language),
 				delivery,
 			});
 		return {
@@ -620,14 +587,11 @@ async function attempt(r: Request, source: Source): Promise<Receipt> {
 			value,
 			...(r.toolCalls?.length ? { toolCalls: r.toolCalls } : {}),
 			...(delivery ? { delivery } : {}),
-			...(language ? { language } : {}),
 		};
 	} catch (error) {
 		const code =
 			abort.signal.aborted && !r.signal.aborted
-				? selectingLanguage
-					? "speech_language_timeout"
-					: "local_timeout"
+				? "local_timeout"
 				: safeError(error, r.signal);
 		await env.store.write((db) =>
 			db
@@ -646,9 +610,6 @@ async function attempt(r: Request, source: Source): Promise<Receipt> {
 			},
 			error,
 		);
-		if (error instanceof SpeechLanguageError && code === error.message)
-			throw error;
-		if (code === "speech_language_timeout") throw new SpeechLanguageError(code);
 		throw new Error(code);
 	} finally {
 		clearTimeout(timer);
@@ -777,7 +738,12 @@ export async function executeRequest(
 		published: false,
 	};
 	const routeConfig = row.snapshot.routes[row.purpose];
-	const key = `${row.purpose}:${JSON.stringify({ larm: row.snapshot.larm, route: routeConfig, resource: selected?.resource, connection: selected?.connection })}`;
+	// English and Japanese clauses use separate LARM voices; one voice's outage must not cool down the other.
+	const voice =
+		row.purpose === "tts" && row.snapshot.larm.englishSpeechEnabled
+			? speechLanguage(request.input as string)
+			: undefined;
+	const key = `${row.purpose}:${JSON.stringify({ larm: row.snapshot.larm, route: routeConfig, resource: selected?.resource, connection: selected?.connection, voice })}`;
 	try {
 		return await runAttempts(request, key);
 	} catch (error) {

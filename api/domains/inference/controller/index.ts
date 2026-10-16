@@ -40,13 +40,6 @@ export function registerInference(
 			),
 		),
 	);
-	app.get("/api/inference/speech-routing", async (c) =>
-		c.json(
-			await service.speechRouting(
-				AbortSignal.any([c.req.raw.signal, AbortSignal.timeout(15_000)]),
-			),
-		),
-	);
 	app.get("/api/inference/voices", async (c) => {
 		const language = c.req.query("language");
 		if (language !== undefined && language !== "ja" && language !== "en")

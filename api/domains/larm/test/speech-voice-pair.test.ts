@@ -54,6 +54,7 @@ function setup(
 			signal.throwIfAborted();
 			return use(name === "tts" ? jp : en, "connection");
 		},
+		japaneseVoice: () => jp,
 		readVoices: async (p) => {
 			onRead?.();
 			discoveries++;

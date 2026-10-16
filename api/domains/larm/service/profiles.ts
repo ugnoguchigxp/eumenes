@@ -1,10 +1,6 @@
 import type { Capability } from "../contracts";
 
-export type ProviderName =
-	| Capability
-	| "system-one"
-	| "tts-english"
-	| "sentence-language";
+export type ProviderName = Capability | "system-one" | "tts-english";
 export type Provider = {
 	/** External catalog name, retained across renewal when the internal role differs. */
 	claimName?: string;
@@ -40,7 +36,6 @@ export const protocols: Record<ProviderName, string> = {
 	asr: "openai.audio-transcriptions.v1",
 	tts: "openai.audio-speech.v1",
 	"system-one": "larm.system-one.v1",
-	"sentence-language": "larm.system-one.v1",
 	"tts-english": "openai.audio-speech.v1",
 };
 export const endpoints: Record<ProviderName, string> = {
@@ -48,7 +43,6 @@ export const endpoints: Record<ProviderName, string> = {
 	asr: "/v1/audio/transcriptions",
 	tts: "/v1/audio/speech",
 	"system-one": "/v1/systemone",
-	"sentence-language": "/v1/systemone",
 	"tts-english": "/v1/audio/speech",
 };
 export type Fetcher = (

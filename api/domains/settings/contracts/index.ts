@@ -174,9 +174,8 @@ export const settingsSchema = z
 				profile: z.string().trim().min(1).max(200).optional(),
 				audience: z.enum(["saaa-desktop", "same-host"]),
 				voice: z.string().max(200),
-				sentenceLanguageEnabled: z.boolean().optional(),
-				/** Provider selector within the saved Agent Profile; no model or URL is stored. */
-				sentenceLanguageProvider: z.string().trim().max(200).optional(),
+				/** Routes English stretches of spoken text to the catalog's English voice. */
+				englishSpeechEnabled: z.boolean().optional(),
 				/** Legacy fields accepted for stored documents; English voices and speed are fixed. */
 				englishVoice: z.string().trim().max(200).optional(),
 				englishMasculineVoice: z.string().trim().max(200).optional(),

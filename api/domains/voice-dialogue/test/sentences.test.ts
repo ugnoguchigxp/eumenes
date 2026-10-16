@@ -38,3 +38,21 @@ test("no clause exceeds 240 characters even when the first boundary is far away"
 	expect(urlChunks.length).toBeGreaterThan(1);
 	expect(urlChunks.every((c) => c.length <= 240)).toBe(true);
 });
+test("finished clauses split at Japanese/English boundaries for every token split", () => {
+	const source =
+		"設定は Open the settings で変えます。API キーは Docker に入れます。Thank you for waiting.";
+	for (let split = 0; split <= source.length; split++) {
+		const sentences = new SpeechSentences();
+		const chunks = [
+			...sentences.append(source.slice(0, split)),
+			...sentences.append(source, true),
+		];
+		expect(chunks).toEqual([
+			"設定は",
+			"Open the settings",
+			"で変えます。",
+			"API キーは Docker に入れます。",
+			"Thank you for waiting.",
+		]);
+	}
+});

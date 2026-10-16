@@ -797,18 +797,17 @@ test("settings_requests keeps only the newest 64 requests", async () => {
 	);
 });
 
-test("old settings keep sentence routing disabled and English settings persist independently", async () => {
+test("old settings keep English speech routing disabled and English settings persist independently", async () => {
 	const h = await setup();
 	const value = h.settings.get();
-	expect(value.larm.sentenceLanguageEnabled ?? false).toBe(false);
+	expect(value.larm.englishSpeechEnabled ?? false).toBe(false);
 	const japanese = {
 		voice: value.larm.voice,
 		style: value.larm.style,
 		speed: value.larm.speed,
 	};
 	Object.assign(value.larm, {
-		sentenceLanguageEnabled: true,
-		sentenceLanguageProvider: "catalog-language",
+		englishSpeechEnabled: true,
 		englishVoice: "Rosie",
 		englishMasculineVoice: "Jasper",
 		englishSpeed: 1.2,
@@ -825,8 +824,7 @@ test("old settings keep sentence routing disabled and English settings persist i
 	expect(reopened.get().larm.style).toBe(japanese.style);
 	expect(reopened.get().larm.speed).toBe(japanese.speed);
 	expect(reopened.get().larm).toMatchObject({
-		sentenceLanguageEnabled: true,
-		sentenceLanguageProvider: "catalog-language",
+		englishSpeechEnabled: true,
 		englishVoice: "Rosie",
 		englishMasculineVoice: "Jasper",
 		englishSpeed: 1.2,
@@ -838,6 +836,30 @@ test("old settings keep sentence routing disabled and English settings persist i
 				larm: { ...value.larm, englishSpeed },
 			}).success,
 		).toBe(false);
+});
+
+test("a stored sentence-language switch migrates to englishSpeechEnabled and drops the classifier selector", async () => {
+	const h = await setup();
+	const raw = JSON.parse(
+		(
+			h.store.read((db) =>
+				db.query("SELECT document FROM settings_document WHERE id=1").get(),
+			) as { document: string }
+		).document,
+	);
+	raw.larm.sentenceLanguageEnabled = true;
+	raw.larm.sentenceLanguageProvider = "catalog-language";
+	await h.store.write((db) => {
+		db.query("UPDATE settings_document SET document=? WHERE id=1").run(
+			JSON.stringify(raw),
+		);
+	});
+	const migrated = readStoredLarm(h.dbPath);
+	expect(migrated.englishSpeechEnabled).toBe(true);
+	expect(migrated).not.toHaveProperty("sentenceLanguageEnabled");
+	expect(migrated).not.toHaveProperty("sentenceLanguageProvider");
+	const reopened = await createSettings(h.store, { dbPath: h.dbPath, env: {} });
+	expect(reopened.get().larm).toEqual(migrated);
 });
 
 test("world.curationResourceId must name a registered LLM resource", async () => {

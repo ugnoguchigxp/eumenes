@@ -3,10 +3,7 @@ import {
 	excalidrawConnectionSchema,
 	type ExcalidrawConnectionInput,
 } from "../api/domains/settings/contracts";
-import {
-	speechRoutingSchema,
-	ttsVoicesSchema,
-} from "../api/domains/larm/contracts";
+import { ttsVoicesSchema } from "../api/domains/larm/contracts";
 import {
 	connectionModelsSchema,
 	larmDetailsSchema,
@@ -44,12 +41,6 @@ export function settingsClient(t: Transport) {
 						...json(excalidrawConnectionInput.parse(input)),
 						method: "PUT",
 					})
-				).json(),
-			),
-		speechRouting: async (signal?: AbortSignal) =>
-			speechRoutingSchema.parse(
-				await (
-					await t.call("/api/inference/speech-routing", { signal })
 				).json(),
 			),
 		larmVoices: async (signal?: AbortSignal, language?: "ja" | "en") =>

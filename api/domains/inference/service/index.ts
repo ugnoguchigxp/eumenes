@@ -1,6 +1,5 @@
 import { createUsageReader } from "./usage";
 import { createVoiceAccess } from "./voice-access";
-import { createSpeechLanguageCache } from "./speech-language";
 import { createVoiceBinding } from "./voice-binding";
 import { bindControlPolicy } from "./control-policy";
 import {
@@ -73,7 +72,6 @@ export function createInference(
 	options: InferenceOptions = {},
 ) {
 	const ports = new Map<string, LarmPort>();
-	const speechLanguages = createSpeechLanguageCache();
 	const collectionAdoptions = new Map<string, CollectionAdoption>();
 	const unsubscribeCollection = options.attitudeDataset
 		? store.onCommit(() => {
@@ -131,7 +129,6 @@ export function createInference(
 					style: s.larm.style,
 					pitchScale: s.larm.pitchScale,
 					intonationScale: s.larm.intonationScale,
-					sentenceLanguageProvider: s.larm.sentenceLanguageProvider,
 				});
 			ports.set(key, p);
 			const unsubscribeStatus = p.onChange?.(() => {
@@ -163,7 +160,6 @@ export function createInference(
 		);
 	}
 	const unsubscribe = settings.onChange(() => {
-		speechLanguages.clear();
 		prune();
 		for (const a of active.values())
 			if (!store.read((db) => allowed(db, a.row, a.connection)))
@@ -211,7 +207,6 @@ export function createInference(
 		active,
 		cooldown,
 		collectionAdoptions,
-		speechLanguages,
 		port,
 		resolve,
 		allowed,
@@ -717,7 +712,6 @@ export function createInference(
 			await sweeper.start();
 		},
 		async close() {
-			speechLanguages.clear();
 			unsubscribeCollection();
 			collectionAdoptions.clear();
 			closed = true;

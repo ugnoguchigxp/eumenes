@@ -20,11 +20,11 @@ if (import.meta.main) {
 	const results: Record<string, unknown>[] = [];
 	let phase = "read-settings",
 		unchanged = false,
-		classifier = false;
+		englishSpeech = false;
 	try {
 		const baseline = await client.settings();
-		classifier = !!baseline.larm.sentenceLanguageEnabled;
-		if (!classifier) throw new Error("saved_sentence_language_not_enabled");
+		englishSpeech = !!baseline.larm.englishSpeechEnabled;
+		if (!englishSpeech) throw new Error("saved_english_speech_not_enabled");
 		phase = "catalog";
 		const catalog = await client.larmVoices();
 		if (!catalog.voices.length || catalog.voices.length > 16)
@@ -86,7 +86,7 @@ if (import.meta.main) {
 				{
 					date: new Date().toISOString(),
 					lane: "current-api-real-larm",
-					classifier,
+					englishSpeech,
 					unchanged,
 					results,
 				},
