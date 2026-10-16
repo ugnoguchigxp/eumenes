@@ -2955,9 +2955,7 @@
 					"effect": "write",
 					"operationId": "settings.apply-v4",
 					"draftDocument": "document:settings@1",
-					"confidentialFields": [
-						"keys"
-					]
+					"confidentialFields": ["keys"]
 				},
 				{
 					"actionId": "review",

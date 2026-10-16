@@ -9,7 +9,11 @@ import type {
 	DocumentFieldV1,
 } from "../domains/capabilities";
 import type { SettingsService } from "../domains/settings";
-import { settingsSchema, type Settings } from "../domains/settings/contracts";
+import {
+	asrLanguages,
+	settingsSchema,
+	type Settings,
+} from "../domains/settings/contracts";
 import type { AdapterResult, DomainAdapter } from "../domains/tool-runtime";
 import {
 	type ApplyKey,
@@ -31,6 +35,7 @@ const ASR_RESOURCES_QUERY = "query:settings.asr-resources@1";
 const RESOURCES_QUERY = "query:settings.resources@1";
 const CONNECTIONS_QUERY = "query:settings.connections@1";
 const ROUTES_QUERY = "query:settings.routes@1";
+const ASR_LANGUAGES_QUERY = "query:settings.asr-languages@1";
 /** The connection's API key: a confidential field that travels in `keys`, not in `changes`. */
 const API_KEY_PATH = "$.connections[id=$target].apiKey";
 const APPLY_SCHEMA_REF = "schema:settings-apply@3";
@@ -462,6 +467,7 @@ export const describeSettingsAdapter = () => ({
 		RESOURCES_QUERY,
 		CONNECTIONS_QUERY,
 		ROUTES_QUERY,
+		ASR_LANGUAGES_QUERY,
 	]),
 	structures: new Map(
 		Object.entries(structureSchemaRefs).map(([ref, inputSchemaRef]) => [
@@ -607,6 +613,13 @@ export function createSettingsAdapter(
 				return { revision, data: { revision, settings: current } };
 			if (query === ROUTES_QUERY)
 				return { revision, data: { routes: routeSummaries(current) } };
+			if (query === ASR_LANGUAGES_QUERY)
+				return {
+					revision,
+					data: {
+						options: asrLanguages.map(([value, label]) => ({ value, label })),
+					},
+				};
 			const targets = targetsOf(
 				query,
 				current,
