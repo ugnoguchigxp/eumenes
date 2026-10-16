@@ -39,4 +39,4 @@ LARMの画像保持方針はclaimの`chatInput.retention`から取得し、添�
 - 部分・API結合: `bun test api/domains/conversation/test/attachments.test.ts api/domains/larm/test/chat-input.test.ts api/application/toolchain/chat-image-attachments.test.ts`
 - ブラウザfixture: `bun x playwright test tests/browser/chat-image-attachments.spec.ts`
 - 限定live受入: `bun scripts/chat-image-live.ts --run`。保存済み接続設定を読み、隔離DBのEumenes経路から非機密の合成画像を送る。自身のConnectionだけを解放する。
-- [実装と検証記録](../spec/chat-image-attachments-work-record-2026-10-13.md)
+- [実装と検証記録](../spec/.archived/chat-image-attachments-work-record-2026-10-13.md)

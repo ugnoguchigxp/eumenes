@@ -26,7 +26,7 @@
 | 記録 | records-v2.png |
 | 変更一覧 | changes-v2.png |
 
-外観と密度の見本であり、項目、型、保存先、API、操作、未提供機能の有無は[全体設計](../../settings-openui-redesign-2026-10-12.md)と[登録・保存先](../../settings-openui-definition-storage-2026-10-12.md)を正本にする。例示値は利用者の保存設定ではない。
+外観と密度の見本であり、項目、型、保存先、API、操作、未提供機能の有無は[全体設計](../../.archived/settings-openui-redesign-2026-10-12.md)と[登録・保存先](../../.archived/settings-openui-definition-storage-2026-10-12.md)を正本にする。例示値は利用者の保存設定ではない。
 
 ## 取り下げたもの
 

@@ -1,6 +1,6 @@
 # Goals・WorldのLLM-Native修正 実施記録
 
-2026-10-10。[実装計画](../../llm-native-remaining-domains-implementation-plan-2026-10-10.md)のG01・W01を実装した。Memoryは接続前条件の文書化に留めた。製品DBや設定の変更、依存パッケージの更新、他チャットへの送信は行っていない。
+2026-10-10。[実装計画](../../.archived/llm-native-remaining-domains-implementation-plan-2026-10-10.md)のG01・W01を実装した。Memoryは接続前条件の文書化に留めた。製品DBや設定の変更、依存パッケージの更新、他チャットへの送信は行っていない。
 
 ## 実装結果
 

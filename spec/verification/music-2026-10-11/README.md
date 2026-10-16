@@ -7,7 +7,7 @@
 - [生成した30秒のMP3](track.mp3)
 - [Artifactと会話の画面](artifact.png)
 - [全経過のJSON](events.json)
-- [実装と調査の作業記録](../../music-toolchain-work-record-2026-10-11.md)
+- [実装と調査の作業記録](../../.archived/music-toolchain-work-record-2026-10-11.md)
 
 ## 実行条件
 

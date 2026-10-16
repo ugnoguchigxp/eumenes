@@ -1,6 +1,6 @@
 # 残存domainのLLM-Native監査
 
-2026-10-10の実装前監査。監査時は製品コードを変更せず、当時のworking treeを読み、到達経路と再現結果から判定した。その後G01・W01を実装したため、現在の状態は[実装計画](../../llm-native-remaining-domains-implementation-plan-2026-10-10.md)と[検証記録](../../verification/llm-native-remaining-domains-2026-10-10/README.md)を参照する。以下のprobeとsnapshotは修正前の証拠であり、修正後の成功試験ではない。
+2026-10-10の実装前監査。監査時は製品コードを変更せず、当時のworking treeを読み、到達経路と再現結果から判定した。その後G01・W01を実装したため、現在の状態は[実装計画](../../.archived/llm-native-remaining-domains-implementation-plan-2026-10-10.md)と[検証記録](../../verification/llm-native-remaining-domains-2026-10-10/README.md)を参照する。以下のprobeとsnapshotは修正前の証拠であり、修正後の成功試験ではない。
 
 ## 結論
 
@@ -21,7 +21,7 @@ P2は有効化された処理のデータ喪失、P3は現在未接続の問題�
 - 基点HEADは`30f9524905f8fdf281a53b7c207c467d27e2f1e5`。未commit差分を含むworking treeを正本とした。HEADだけの監査ではない。
 - [snapshot-manifest.json](snapshot-manifest.json)は517ファイルのSHA-256を記録する。これは版の照合用であり、517ファイルすべての精読を意味しない。
 - [snapshot-recheck.json](snapshot-recheck.json)で監査中の並行変更を検出した。toolchain、dialogueのserviceとdelegate、inferenceのexecuteの現行差分を再読した。G01・W01・M01の根拠ファイルに変更はなかった。
-- 前回の[監査](../llm-native-design-2026-10-10/README.md)と[計画](../../llm-native-implementation-plan-2026-10-10.md)を境界資料として参照した。削除済みの天気・株価専用分岐や定型応答は復活させない。並行中のLuna・要件検証の実装を本監査の成果と扱わない。
+- 前回の[監査](../llm-native-design-2026-10-10/README.md)と[計画](../../.archived/llm-native-implementation-plan-2026-10-10.md)を境界資料として参照した。削除済みの天気・株価専用分岐や定型応答は復活させない。並行中のLuna・要件検証の実装を本監査の成果と扱わない。
 - SAAA、hono-standard、隣接リポジトリの製品DB・設定・秘密をコピーしていない。他のCodexチャットへ送信していない。
 
 | 対象 | 実際に確認した層 | 到達性と結果 |

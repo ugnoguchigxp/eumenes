@@ -161,4 +161,4 @@ bun test api/domains/dots api/application/work/dots-tasks.test.ts api/applicatio
 
 実 dots の製品受入には、認証付きの公開 MCP 接続と対象プロジェクトの登録が必要。接続後に、新規 Session、ブロッカー、回答後の同一 Session の再開、成果と根拠、no_next_work、取消後の全子停止、再起動時の照合、予定からの一回のリマインドを確認する。これらを確認するまで、製品接続の完成とは記録しない。
 
-参照: [実装計画](../spec/dots-toolchain-agent-skill-implementation-plan-2026-10-10.md)、[MCP server](https://developers.openai.com/plugins/build/mcp-server)、[MCP Events](https://developers.openai.com/plugins/build/mcp-events)、[OAuth](https://developers.openai.com/plugins/build/auth)。
+参照: [実装計画](../spec/.archived/dots-toolchain-agent-skill-implementation-plan-2026-10-10.md)、[MCP server](https://developers.openai.com/plugins/build/mcp-server)、[MCP Events](https://developers.openai.com/plugins/build/mcp-events)、[OAuth](https://developers.openai.com/plugins/build/auth)。

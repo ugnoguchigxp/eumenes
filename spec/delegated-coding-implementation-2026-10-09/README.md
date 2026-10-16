@@ -1,6 +1,6 @@
 # 委任タスクと CLI 監督機能の全体実装計画
 
-作成日: 2026-10-09 JST。状態: 全体の実装計画。計画01のタスク基盤、計画02のCLI/MCP基盤、計画03の監督ロジックと報告台帳の先行契約を実装済み。実CLIの隔離・固定操作ワーカー・実モデル計測とlive受入、会話配送、モーダルは未完了。各文書の実装記録と検証記録を参照する。
+作成日: 2026-10-09 JST。状態: 全体の実装計画。計画01のタスク基盤、計画02のCLI/MCP基盤、計画03の監督ロジックと報告台帳の先行契約を実装済み。計画04は報告DTO・不変台帳・outbox・読取りまでで、会話受付・配達・音声は未実装。計画05の4列タスクモーダルは未実装。後続の共通タスクボード（`api/domains/kanban`）は Claude Code / Codex のカード用であり、本書の work_tasks 投影ではない。計画06は fixture 範囲を検証記録に残し、live・LARM・実配送は未実施。計画07は設計のまま。実CLIの隔離・固定操作ワーカー・実モデル計測とlive受入は未完了。各文書の実装記録と検証記録を参照する。
 
 Eumenes の会話から仕事をタスクとして登録し、独立した監督サブエージェントが CLI コーディングエージェントへ実装、検証、レビュー、修正、commit、push を依頼する。状況は毎分確認し、節目、完了、ユーザー判断が必要なブロッカーを元の会話へ報告する。ユーザーは会話を続けながら、タスクメニューから Kanban モーダルで状況を確認できる。
 
@@ -15,8 +15,8 @@ Eumenes の会話から仕事をタスクとして登録し、独立した監督
 | [03 監督サブエージェント](03-coding-supervision.md) | 独立した文脈、観測、判断、レビュー修正ループ | 01 と 02、04 の報告契約 |
 | [04 会話との委任と報告](04-conversation-and-reports.md) | 会話受付、報告配送、追加指示、音声 | 01、03 の公開契約 |
 | [05 タスクモーダル](05-task-modal.md) | Kanban、登録、詳細、回答、停止、更新 | 01 の API、04 の報告 DTO |
-| [06 発言・終端の観測契約](06-agent-observation-contract.md) | 公開発言の分類、不明・欠落・終端の整理、監督への読取り接続 | 02 C5・03 S2/S6の差分。設計案・実装前 |
-| [07 復旧質問と回答](07-recovery-question.md) | 監督打切り後の固定選択肢質問、中止・新世代再開の遷移。承認質問と記録を共通化 | 06から分離。06実装後。設計案・実装前 |
+| [06 発言・終端の観測契約](06-agent-observation-contract.md) | 公開発言の分類、不明・欠落・終端の整理、監督への読取り接続 | 02 C5・03 S2/S6の差分。fixture範囲は実装済み。live・LARM・実配送は未実施 |
+| [07 復旧質問と回答](07-recovery-question.md) | 監督打切り後の固定選択肢質問、中止・新世代再開の遷移。承認質問と記録を共通化 | 06から分離。2026-10-16時点でも設計案・実装前 |
 
 実装順は章番号の順に一括完成させる方式ではない。最初に全体契約を固定し、fixture で一往復を作ってから機能を厚くする。工程と統合ゲートは本書を正本とする。状態と ID は 01、runner と Git は 02、判断と予算は 03、報告と会話採用は 04、UI の投影は 05 を正本とし、変更時は利用側計画も同時に更新する。
 
@@ -141,7 +141,7 @@ Web と製品 CLI は `client/` の HTTP API を使う。MCP client は backend 
 ## 9 関連計画と参照
 
 - [外部アプリと成果物計画](../external-apps-artifacts-implementation-plan-2026-10-09.md): 結果種別、能力分岐、会話横表示の変更点が重なる。共通 discriminator と API 結合を先に合意し、調査分岐を複数箇所で書き換えない。本計画の必須依存にはしない。
-- [調査経路学習計画](../research-route-learning-implementation-plan-2026-10-09.md): control 推論、背景資源、capabilities、agent-runtime の変更を調整する。独立した資源名で同じ LARM 枠を二重計上しない。
+- [調査経路学習計画](../.archived/research-route-learning-implementation-plan-2026-10-09.md): control 推論、背景資源、capabilities、agent-runtime の変更を調整する。独立した資源名で同じ LARM 枠を二重計上しない。
 - [SAAA coding](/Users/y.noguchi/Code/SAAA/src-tauri/src/coding/README.md)、[terminal](/Users/y.noguchi/Code/SAAA/src-tauri/src/coding/terminal/README.md)、[Steward](/Users/y.noguchi/Code/SAAA/src-tauri/src/steward/README.md): 受付と完了の分離、実行証拠、cursor、報告 outbox を参照。
 - [Codex JSON 出力](https://learn.chatgpt.com/docs/non-interactive-mode#make-output-machine-readable)、[SDK](https://learn.chatgpt.com/docs/codex-sdk)、[app-server](https://learn.chatgpt.com/docs/app-server): 2026-10-09 の本検討で確認。採用版の契約は P0 で再検証する。
 - [MCP transport](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports)、[Tauri sidecar](https://v2.tauri.app/develop/sidecar/): stdio と native 移行の根拠。

@@ -3,6 +3,8 @@
 作成日: 2026-10-09 Asia/Tokyo
 状態: 初期実装に着手済み。第1〜14章は設計・工程の計画であり、実装済みの範囲と検証結果は第15章に記録する。
 
+2026-10-16 の再確認。第15〜17章の取得キャッシュ、Toolchain 接続、天気・明示 ticker、制御 mode による調査接続は当時の記録どおり。調査メモ（M1/M2）、派生資料の選択、Records の Recall 自動提供、ニュース/RSS はコードに無い。公開中の Web 経路は後から guided（`package:web.recipe@3` / `package:web.search@3`、[toolchain](../docs/toolchain.md)）へ置き換わっており、第1章の llm-fetch / Luna 主経路は現行の公開契約ではない。
+
 範囲更新: Web調査の記憶利用に必要な変更は、Eumenesに加えて別プロジェクト `../eumenes_memory` も実装対象とする。既存の公開機能を再利用し、不足する共通契約・永続処理・試験を本体で拡張する。具体的な分担と配布・接続工程は第13章に記す。
 
 Eumenesの簡単な調べものはllm-fetch、天気・株価は専用データAPI、込み入った調査はCodex Lunaで処理する。鮮度が重要な情報は原則毎回取得する。SQLiteキャッシュは比較的変わりにくい資料本文と調査結果に限定し、使われなくなったデータを自動削除する。
@@ -331,7 +333,7 @@ cacheのSQLはEumenes所有の取得metadataと本体所有のRecords等に分�
 
 - [Eumenesのdomain入口](../docs/domains.md)
 - [運用ログ](../docs/logging.md)
-- [EumenesとMemorySystemの接続計画](memory-system-incremental-adoption-concept.md)
+- [EumenesとMemorySystemの接続計画](.archived/memory-system-incremental-adoption-concept.md)
 - [MemorySystemの実装計画](../../eumenes_memory/spec/implementation-plan.md)
 - [MemorySystemの公開SQLite API](../../eumenes_memory/src/sqlite.ts)
 - [ContextStillのCodex調査契約](/Users/y.noguchi/Code/contextStill/spec/docs/codex-research-contract-2026-10-04.html)

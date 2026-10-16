@@ -4,6 +4,17 @@
 
 **想定読者**: この文書だけを読んで作業する実装者(新しいセッションの Sonnet 5.5)。会話の文脈は引き継がれない前提で、各 WP に「問題・前提・書込許可・手順・試験・検証・完了条件」を書いた。旧計画の延期項目は、本書の WP に現在のコードに合わせて書き直してある。旧計画の該当節は読まなくてよい。
 
+## 2026-10-16 の残件
+
+実施記録の末尾（2026-10-10）を、現行ツリーで照合した。各 WP の再試験はしていない。archive はしない。
+
+- 未着手のまま: FE-4（`scripts/deadcode-budget.ts` は無い）、FE-15（`scripts/bundle-budget.ts` は無い）、DT-11（`packages/coding-runner` に `spawnSync` が残る）、VO-16（`settle_lost` と `busyInTransaction` は無い）。
+- ユーザー判断で保留のまま: FE-1、FE-2、FE-16。
+- FE-9: 対象だった `web/src/domains/service-tests/index.tsx` は無い。現行画面 `web/src/domains/service-tests/toolchain-adapter.tsx` は blob URL を作らない。WP の手順は未実施で、当時の失効 URL 表示は現行画面に無い。
+- DT-13: 配布物は `eumenes-world-model-0.0.1` で、manifest と installed の version は一致する。installed の package.json に `peerDependencies` は無く、`api/application/vendor.test.ts` は tgz 内 package.json と installed の一致を見ていない。版上げまで進み、peer と一致検査は残る。
+- 実施記録に残した VO-1 の follow-up: `api/domains/larm/service/playground-http.ts` は `instanceof TypeError` のまま。`playground.ts` は `EUMENES_LARM_PROVIDER_HOSTS` を読む。`api/domains/queue/service/runner.ts` の `toErrorCode` は 1 引数のローカル関数のまま。
+- 上記以外の WP は 2026-10-10 の実施記録を正とする。
+
 ---
 
 ## 0. 作業者への共通規則(全 WP に適用・必読)
@@ -88,7 +99,7 @@
   ```
 
 - **調整が必要な進行中の計画**
-  - [llm-native-implementation-plan-2026-10-10.md](llm-native-implementation-plan-2026-10-10.md) と [conversation-and-research-simplification-plan-2026-10-10.md](conversation-and-research-simplification-plan-2026-10-10.md) は、agent-runtime と dialogue を大きく変える。
+  - [llm-native-implementation-plan-2026-10-10.md](.archived/llm-native-implementation-plan-2026-10-10.md) と [conversation-and-research-simplification-plan-2026-10-10.md](.archived/conversation-and-research-simplification-plan-2026-10-10.md) は、agent-runtime と dialogue を大きく変える。
   - AG-7、AG-10〜AG-13 に着手する前に、`git log --oneline -20 -- api/domains/agent-runtime api/domains/dialogue` と `git status` で、これらの計画が作業中でないかを確認する。
   - 作業中なら、その WP は延期して報告する。
 
@@ -4136,3 +4147,4 @@
 - 2026-10-10 レビュー指摘3件: (1) DT-1 purge を supervision 有無から独立化=tasks に kind 非依存の `TasksOptions.purgeInTransaction`、server は `purgeTaskDependents`(coding-supervision の `purgeCodingSupervision`+task-reports purge)を常時配線。purgeCandidates に除外 id を追加し、purge 失敗 task は per-process で1時間スキップして古い失敗50件が新しい task を塞がない(`ORDER BY finished_ms,id`)。試験=retention.test.ts(50件失敗/kind 未登録)・application/task-purge.test.ts。(2) dev-proxy の canonicalLoopbackRedirect は `^/(?![/\\])` の絶対パスのみ受理し expected origin+url で組立て(`//host` 等は null)。(3) auth-config は再 stat(ino/dev/mtime/size)一致時のみ stale partial を unlink、置換済み有効 token は共有、EEXIST/EPERM fallback の ENOENT 相当 recovered を最大3回再試行(`TokenFs` 注入で競合を試験)。
 - 検証: `verify --domain tasks`/`coding-supervision` 成功、`bun test api/infrastructure api/application` 419 pass、tsc/oxlint/boundaries 成功。web/client は未変更のため vitest 未実行。
 - 2026-10-10 全体: 実施済み WP を除く残りは、(1) CI 関連 FE-1/FE-2/FE-15/FE-16(ユーザー判断で保留)、(2) FE-4(knip ratchet。`scripts/verify.ts` を触るため CI 保留に合わせて未着手)、(3) VO-16・FE-9(別セッション変更中の service-tests ファイルに触れるため延期)、(4) DT-11(任意。`worker.ts` が書込許可外、git は現状 fixture のみ)、(5) DT-13・(vendor の world-model tgz 再梱包。ワーカーの Bash が権限判定で拒否。ユーザー確認が必要)。このため本書は archive しない。`verify:all` は独立レビュー修正前の時点で成功(438s、ブラウザ 43 pass / 1 skip)。修正後の最終 `verify:all` は、別セッションが追加中の `api/domains/dots/` 等の format 差分で未完了(本作業の差分ではない)。live・実機器の3往復受入は未実施。
+- 2026-10-16 再確認: 冒頭「2026-10-16 の残件」を現行ツリーで照合した。FE-4・FE-15・DT-11・VO-16 は未着手。FE-1/FE-2/FE-16 は保留のまま。FE-9 の対象画面は置換済みで、当時の blob URL 経路は現行画面に無い。DT-13 は 0.0.1 まで進み、peerDependencies と tgz 一致検査は残る。VO-1 の playground / queue の follow-up も残る。再試験はしていない。archive しない。

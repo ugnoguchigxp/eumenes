@@ -22,21 +22,23 @@ Eumenesは、**ユーザーを継続的に理解し、任された仕事を進�
 
 | 機能 | 現在の実装と利用条件 |
 | --- | --- |
-| 会話・音声 | 文字入力、発話単位のASR、回答の表示・読み上げ、ミュート、再生中の割込み。会話・実行状態をSQLiteに保存し、SSEで画面へ通知する。音声には対応するASR・TTS接続とブラウザのマイク許可が必要。 |
+| 会話・音声 | 文字入力、発話単位のASR、回答の表示・読み上げ、ミュート、再生中の割込み。会話・実行状態をSQLiteに保存し、SSEで画面へ通知する。日英混在の回答は句・言語境界で区間化し、文字種の正規表現と語数規則で日本語TTSと英語TTSへ振り分ける（fixture検証済み。liveと実機器の3往復は未実施）。チャットへJPG・PNG・BMPを添付できる。音声には対応するASR・TTS接続とブラウザのマイク許可が必要。 |
 | ツールチェーン | ツール、専門担当、SystemContext、SKILL、Artifactを一組として登録。全文検索・embedding・過去の選択から候補を提示し、会話担当が回答・確認・担当への依頼を選ぶ。選択・実行結果は記録画面とCLIで照会できる。 |
-| Web・会話履歴の調査 | 専門担当が予算・期限内で検索や本文取得を反復し、出典と未確認点を報告する。Web取得の保存・キャッシュ、取得手順の再利用、履歴検索を実装。Codex調査の経路にはbackendの実行ユーザーで利用できるCodex CLIと認証が必要で、モデルは保存済みのCodex接続（未登録ならCodexの既定）に従う。 |
-| 記憶と再利用 | 記憶担当による情報の保存、短期・長期の会話文脈、embeddingによる過去の会話の想起、記憶の停止・撤回・忘却を実装。記憶の有効設定と接続状態に従う。ツールチェーンの選択履歴と保存済み取得手順も再利用する。 |
-| Personal World | 基盤・部分実装。会話・Memoryの変更取り込み、条件付きの抽出、会話への文脈提供、根拠付き主張の照会・訂正・忘却、依存・影響の判断照会を実装。`EUMENES_WORLD`は既定で無効。実モデルの抽出品質や継続仕事への接続など、目指す全体像には残件がある。[実装と制約](api/domains/world/README.md)を参照。 |
-| タイマー・予約 | 会話または画面からのタイマー操作、満了通知、設定からの一回・固定間隔の会話予約。予約はEumenes起動中に実行する。 |
+| Web・会話履歴の調査 | 一つの事実確認はLARMの調査担当、ニュースや複数資料はCodex調査担当が、guidedの手順で本文を読んで回答文と根拠を返す。取得本文は未信頼としてガードを通す。Web取得の保存・キャッシュ、取得手順の再利用、履歴検索を実装。Codex調査にはbackendの実行ユーザーで利用できるCodex CLIと認証が必要で、モデルは保存済みのCodex接続（未登録ならCodexの既定）に従う。 |
+| 記憶と再利用 | 記憶担当が会話の往復から保存・要約・忘却を判断する。短期・長期の会話文脈、embeddingによる過去の会話の想起、記憶の停止・撤回・忘却、Seed候補のpreview/importを実装。記憶の有効設定と接続状態に従う。ツールチェーンの選択履歴と保存済み取得手順も再利用する。 |
+| Personal World | 基盤・部分実装。会話・Memoryの変更取り込み、条件付きの抽出、根拠付き主張の照会・訂正・忘却、依存・影響の判断照会を実装。有効化は設定の `world.enabled`（既定は無効）で、環境変数 `EUMENES_WORLD` は読まない。会話には既知の対象の名前だけを手がかりとして渡し、主張は `world_query` の調査担当が根拠付きで報告する。収集資料は会話と分けた台帳に置ける。内容が残ったままオフにすると、次回起動は忘却の反映だけの保護モードになる。実モデルの抽出品質や継続仕事への接続など、目指す全体像には残件がある。[実装と制約](api/domains/world/README.md)を参照。 |
+| タイマー・予約 | 会話またはタイマー画面からの開始・一時停止・再開・取消と、満了通知。一回・固定間隔の会話予約はAPI（`/api/schedules`）から作り、Eumenes起動中に実行する。予約の作成画面は設定ページとともに削除済み。 |
 | 画像・音楽 | 画像の生成・一覧・取得・削除、楽曲生成、保存曲の検索・お気に入り・プレイリスト・再生を接続。LARM側の対応サービスが必要。画像の参照画像編集は未対応。 |
-| 図・物体認識 | Excalidraw編集画面の準備・保存図の再表示、静止画・短い動画の物体検出と会話への追加。各gatewayと専用の接続・認証設定が必要。画面があることだけでは配備・受入完了を意味しない。 |
+| 図・物体認識・文字認識 | Excalidraw編集画面の準備・保存図の再表示、静止画・短い動画の物体検出と会話への追加、画像・短い動画のOCRと補正案。各gatewayと専用の接続・認証設定が必要。画面があることだけでは配備・受入完了を意味しない。OCRの実gatewayと実カメラの受入は未実施。 |
+| 作業ボード | タスクボードでカードを登録し、Claude CodeまたはCodexへ順番に依頼する。会話からの直接依頼は「Claude Code」画面の作業依頼表を使う。commitとpushはボード上の人の操作に限る。固定試験とブラウザfixtureはある。実 `claude` の通しと自然言語受入、Codex側の最終受入は未完了。 |
+| 画面の自由制作 | 登録済みの見出し・本文・情報カード・フォームの範囲で、会話または「UI自由制作」からOpenUI画面を作り、同じ作品を上書き修正できる。任意のHTML・外部API実行は対象外。fixtureと実モデルの記録がある。 |
 | 再起動時の扱い | キュー上の未着手ジョブ、タイマー満了、会話予約は再起動後に再開する。実行中だった会話生成と専門担当の調査は、再起動・終了時に中断（`backend_restarted`／`backend_stopped`）として記録し、自動では再開しない。再起動をまたぐ継続は到達点であり、現状は未実装。 |
 | 作業委任 | Codex／dotsへの依頼、許可範囲、質問・進捗・報告、停止確認を保存する。dots接続・プロジェクト登録・受信登録が必要。直接CLIを実行するcoding runnerの本番隔離は未完成。詳しくは下記の制限を参照。 |
 | OpenUIアーティファクト | 会話と並べるタブに、設定・タイマー・画像・音楽・図などの登録済みviewを表示・合成する。JSONには表示定義を持ち、状態・認証・操作の検査はホスト側が担当する。 |
 | 俯瞰 | 記録・実行状態の照会とSpatial背景の表示基盤がある。Spatialの形状サンプルは実測・Provider監視と未接続で、状況と仕事を統合する俯瞰モニターの完成ではない。[現在の表示基盤](docs/backgrounds.md)を参照。 |
 | ハーネスの自己改善 | 採用必須の構想。既存の試験・評価・実行記録を、改善候補の期限付き試験運用、本採用・棄却、切り戻しへつなぐ全体機構は、実装・受入済みとしていない。 |
 
-ツールチェーン・履歴・Web調査は既定で有効です。`EUMENES_TOOLCHAIN_ENABLED`、`EUMENES_HISTORY_TOOLS_ENABLED`、`EUMENES_WEB_RESEARCH_TOOLS_ENABLED`で切り替えられます。embeddingが利用できない間は利用可能な全候補を提示します。候補の検索は担当の選択を代行せず、モデルの報告や判断の正しさを保証するものでもありません。詳細は[ツールチェーン](docs/toolchain.md)を参照してください。
+ツールチェーン・履歴・Web調査は既定で有効です。`EUMENES_TOOLCHAIN_ENABLED`、`EUMENES_HISTORY_TOOLS_ENABLED`、`EUMENES_WEB_RESEARCH_TOOLS_ENABLED`で切り替えられます。Worldのオン／オフは環境変数ではなく設定の `world.enabled` です。embeddingが利用できない間は利用可能な全候補を提示します。候補の検索は担当の選択を代行せず、モデルの報告や判断の正しさを保証するものでもありません。詳細は[ツールチェーン](docs/toolchain.md)を参照してください。
 
 ## セットアップと起動
 
@@ -57,8 +59,8 @@ Eumenesは、**ユーザーを継続的に理解し、任された仕事を進�
 ## 画面の入口
 
 - 会話で調査・履歴確認・タイマー・制作・作業委任を依頼します。利用可能な担当と接続設定に応じて、確認質問や結果が返ります。
-- 右上の「アーティファクトを開く」から、設定、画像生成、図を描く・編集する、映っている物を調べる、楽曲生成、音楽プレイリスト、タイマーを開けます。会話とアーティファクトの表示幅を調整できます。
-- 設定アーティファクトの「会話」「音声と入力」「表示」で編集し、「設定の変更をすべて保存」で共通下書きを保存します。「記録」ではAIの利用、ツールチェーンの選択、保存済み取得手順を確認できます。右上の歯車から開いていた従来の設定画面は削除し、設定はこのアーティファクトに一本化しました。接続管理は「AIと接続」から行います。
+- 右上の「アーティファクトを開く」から、設定、画像生成、図を描く・編集する、映っている物を調べる、文字を読み取る、楽曲生成（制作と保存曲の再生）、UI自由制作、Claude Code、タスクボード、タイマーを開けます。会話とアーティファクトの表示幅を調整できます。
+- 設定アーティファクトでは、会話、AIと接続、音声と入力、表示、外部作業を編集し、「設定の変更をすべて保存」で共通下書きを保存します。記録、記憶、Worldの閲覧、Google連携、動作確認はそれぞれの画面から開きます。右上の歯車から開いていた従来の設定画面は削除し、設定はこのアーティファクトに一本化しました。Google連携の実アカウント受入と配布用クライアントの同梱は未実施です。
 - 「動作確認」は個別の接続テスト・生成を行い、「自己診断」は接続状態を確認します。試用ではサービス利用が発生します。
 
 ## CLI
@@ -78,6 +80,8 @@ bun run cli -- toolchain-history list --json
 bun run cli -- toolchain-history recipes --json
 bun run cli -- memory status --json
 bun run cli -- memory list --json
+bun run cli -- memory seed preview /absolute/path/to/seed.jsonl --json
+bun run cli -- memory seed import /absolute/path/to/seed.jsonl --json
 bun run cli -- timer list --json
 ```
 
@@ -128,6 +132,6 @@ EUMENES_LIVE_ASR_WAV=/absolute/path/speech.wav EUMENES_LIVE_EXPECT_TEXT=こん�
 [docs索引](docs/README.md)と[domain一覧・所有境界](docs/domains.md)が文書の入口です。用途別には以下を参照してください。
 
 - 調査・拡張：[ツールチェーン](docs/toolchain.md)、[Web取得](docs/web-research.md)、[登録と拡張](docs/toolchain-extension.md)、[拡張の検証](docs/toolchain-extension-verification.md)
-- 制作・観測：[画像](docs/images.md)、[音楽を含むLARMサービス](docs/larm.md)、[Excalidraw](docs/excalidraw.md)、[物体認識](docs/object-recognition.md)、[OpenUI](docs/openui-artifact.md)
-- 作業委任：[dots](docs/dots.md)、[委任タスクの基盤](docs/delegated-tasks.md)、[CLI runner](docs/coding-runner.md)、[コーディング監督](docs/coding-supervision.md)
-- 運用・設計：[設定](docs/settings.md)、[SSE通知](docs/realtime.md)、[spec索引](spec/README.md)
+- 制作・観測：[画像](docs/images.md)、[チャットの画像入力](docs/chat-images.md)、[音楽を含むLARMサービス](docs/larm.md)、[Excalidraw](docs/excalidraw.md)、[物体認識](docs/object-recognition.md)、[OCR](docs/ocr.md)、[OpenUI](docs/openui-artifact.md)
+- 作業：[タスクボード](docs/kanban.md)、[Claude Code画面](docs/terminals.md)、[dots](docs/dots.md)、[委任タスクの基盤](docs/delegated-tasks.md)、[CLI runner](docs/coding-runner.md)、[コーディング監督](docs/coding-supervision.md)
+- 運用・設計：[設定](docs/settings.md)、[記憶](docs/memory.md)、[Google連携](docs/google-accounts.md)、[SSE通知](docs/realtime.md)、[spec索引](spec/README.md)

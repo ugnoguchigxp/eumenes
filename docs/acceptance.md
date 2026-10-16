@@ -96,7 +96,7 @@ fixture: voice-dialogue選択検証 backend16件・Web5件成功。ブラウザ�
 
 2026-10-08 TTSの調整設定: キャラクター、発話スタイル、話す速さ、声の高さ、抑揚、再生音量を保存し、各発話へ反映する。claimしたTTS ProviderのbaseUrl・model・tokenによるcatalog取得、表示名と送信IDの分離、voice変更時のdefault_style、catalog範囲、取得失敗・保存済みvoice消失時の保存値保持と明示リセット、合成クレジットの復号をfixtureで確認。VOICEVOX専用値は他modelへ送らず、cloudのvoice・speedは用途別設定を使う。応答句の記号と注意語による簡易抑揚を追加したが、Layaによる意味の判断ではない。
 
-settings・inference・larm・voice-dialogue・audioの個別verifyは成功。直近のverify:allはbackend154件・Web27件・browser fixture10件と型・境界・ビルド検査が成功したが、検証中に別作業の背景アバターなどのソースが変わり、最後の入力hash一致検査で失敗。最終checkout全体の合格とは扱わない。詳細は[実行ログ](../spec/verification/acceptance/tts-settings-all.log)。LayaのAPI接続、手動ロック、アバターの再生同期は[実装計画](../spec/laya-voicevox-avatar-plan.md)として整理し、未実装。実Laya・実VOICEVOXの音質と遅延、および実マイク・ヘッドホンの3往復は今回未受入。Context Stillはcontext_compile2回・compile_eval2回。
+settings・inference・larm・voice-dialogue・audioの個別verifyは成功。直近のverify:allはbackend154件・Web27件・browser fixture10件と型・境界・ビルド検査が成功したが、検証中に別作業の背景アバターなどのソースが変わり、最後の入力hash一致検査で失敗。最終checkout全体の合格とは扱わない。詳細は[実行ログ](../spec/verification/acceptance/tts-settings-all.log)。LayaのAPI接続、手動ロック、アバターの再生同期は[実装計画](../spec/.archived/laya-voicevox-avatar-plan.md)として整理し、未実装。実Laya・実VOICEVOXの音質と遅延、および実マイク・ヘッドホンの3往復は今回未受入。Context Stillはcontext_compile2回・compile_eval2回。
 
 
 2026-10-09 音声入力後の無回答調査と修正: 直近の取消されたLLM 5件をrun/job/HTTP IDで照合し、3件はセッション停止、2件は発話単位の取消要求による中断を確認。最新の例はASR 827msで成功し、その後LLMが1487msで取消された。停止ボタンと画面の自動停止・設定変更の区別、および発話取消の画面側の発生理由はログだけでは断定しない。

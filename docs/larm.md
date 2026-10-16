@@ -71,7 +71,7 @@ music domainのプレイリストは会話/run・検索条件・曲IDを保存�
 
 ## 日英混在文の読み上げ振分け
 
-読み上げ本文を句読点の句に分け、さらに日本語とラテン文字の境界で区間に分ける（`delivery` の `speechSegments`）。各区間の言語は文字種と語の形だけで決め、LARM の分類器・単語辞書は使わない。日本語を含む句ではラテン文字の通常語が2語以上続く部分を `en` とし、略語（`API`）、コード・アドレス形（`example.com`）、語中に大文字を含む語（`iPhone`）は語数に数えない。全語が大文字始まりの部分は固有名詞として `ja` に残す。日本語を含まない句は通常語が1語以上あれば `en`。規則と評価表は [計画](../spec/regex-speech-language-routing-plan-2026-10-16.md) と `api/domains/delivery/test/speech-language.test.ts`。
+読み上げ本文を句読点の句に分け、さらに日本語とラテン文字の境界で区間に分ける（`delivery` の `speechSegments`）。各区間の言語は文字種と語の形だけで決め、LARM の分類器・単語辞書は使わない。日本語を含む句ではラテン文字の通常語が2語以上続く部分を `en` とし、略語（`API`）、コード・アドレス形（`example.com`）、語中に大文字を含む語（`iPhone`）は語数に数えない。全語が大文字始まりの部分は固有名詞として `ja` に残す。日本語を含まない句は通常語が1語以上あれば `en`。規則と評価表は [計画](../spec/.archived/regex-speech-language-routing-plan-2026-10-16.md) と `api/domains/delivery/test/speech-language.test.ts`。
 
 合成要求ごとに inference が本文から `speechLanguage` を再計算する（区間は再計算しても同じ言語になる）。`en` は catalog の `speech.tts.english` capability を持つ Provider へ、`ja` は既存の日本語TTSへ渡す。区間に分かれていない混在本文（設定画面の試聴など）は `ja`。合成は最大3区間まで先行させ、再生は前の区間終了後に進める。回答LLMの出力形式は変更しない。
 

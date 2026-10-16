@@ -19,12 +19,12 @@ queue／スケジューラーとの接続計画は、その公開契約と実装
 
 | 土台 | 確認した実装 | 先行実装での扱い |
 | --- | --- | --- |
-| 会話原文 | [conversation service](../api/domains/conversation/service/index.ts) | 原文の正本。公開APIを通して発言を参照する |
-| 永続化 | [SqliteStore](../api/infrastructure/sqlite/index.ts) | 既存の単一writerとトランザクションを使う |
-| 文字対話 | [dialogue service](../api/domains/dialogue/service/index.ts) | 現在は履歴を組み立ててLARMを呼ぶ。本段階では変更しない |
-| 音声対話 | [voice-dialogue service](../api/domains/voice-dialogue/service/index.ts) | dialogueに合流する。本段階では変更しない |
-| クライアント | [client transport](../client/transport.ts) | 既存transportを注入してドメイン別クライアントを作る |
-| 検証 | [verify](../scripts/verify.ts)、[domain registry](../scripts/domains.ts) | ドメイン登録後に対象を指定して検証する |
+| 会話原文 | [conversation service](../../api/domains/conversation/service/index.ts) | 原文の正本。公開APIを通して発言を参照する |
+| 永続化 | [SqliteStore](../../api/infrastructure/sqlite/index.ts) | 既存の単一writerとトランザクションを使う |
+| 文字対話 | [dialogue service](../../api/domains/dialogue/service/index.ts) | 現在は履歴を組み立ててLARMを呼ぶ。本段階では変更しない |
+| 音声対話 | [voice-dialogue service](../../api/domains/voice-dialogue/service/index.ts) | dialogueに合流する。本段階では変更しない |
+| クライアント | [client transport](../../client/transport.ts) | 既存transportを注入してドメイン別クライアントを作る |
+| 検証 | [verify](../../scripts/verify.ts)、[domain registry](../../scripts/domains.ts) | ドメイン登録後に対象を指定して検証する |
 
 ユーザーからqueueとスケジューラーの実装開始が共有されている。本書作成時の作業ディレクトリでは対応するドメインのファイル・公開契約を確認できていない。未着手とは判断せず、開発中の領域として扱い、名称・状態遷移・取消API・ジョブ形式を推測して定義しない。他のCodexチャットへの連絡は行わない。
 

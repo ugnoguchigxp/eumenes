@@ -1,6 +1,6 @@
 # World Model と steward の接続 — 検証記録（2026-10-15）
 
-対象: [接続計画](../../world-steward-implementation-plan-2026-10-14.md)（改訂4＋§18）。fixture と live を分けて記録する。
+対象: [接続計画](../../.archived/world-steward-implementation-plan-2026-10-14.md)（改訂4＋§18）。fixture と live を分けて記録する。
 
 ## fixture
 
@@ -63,7 +63,7 @@
 - ホストの根拠の検査（`not_in_evidence`）が、言い換えた名前（「CSVを手で取り込む」→「CSV手動取り込み」）や、名前を省いた訂正（「来月じゃなくて再来月」）を落とす。小さいモデルの取り違えを防ぐための検査で、今は厳しすぎる。
 - L4 と L5 の失敗は会話用のモデル側（ツールの選び方、結果の言い換え）と、topic slice の範囲による。
 
-## World の照会を sub-agent の調査にした後（2026-10-15、[設計](../../world-research-subagent-2026-10-15.md)）
+## World の照会を sub-agent の調査にした後（2026-10-15、[設計](../../.archived/world-research-subagent-2026-10-15.md)）
 
 ### fixture
 

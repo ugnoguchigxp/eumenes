@@ -40,4 +40,4 @@ skip は既存の `voice-media.spec.ts` の macOS 条件。Chromium の fake-med
 
 `dots_reported` は dots の構造化した報告を採用した値で、native Session や検証結果の独立した証明ではない。Session 作成後・参照保存前の通信断と native 操作の権限制約は、dots／Codex 側でも照合・確認する。
 
-運用手順: [docs/dots.md](../../../docs/dots.md)。設計判断: [実装計画](../../dots-toolchain-agent-skill-implementation-plan-2026-10-10.md)。
+運用手順: [docs/dots.md](../../../docs/dots.md)。設計判断: [実装計画](../../.archived/dots-toolchain-agent-skill-implementation-plan-2026-10-10.md)。
