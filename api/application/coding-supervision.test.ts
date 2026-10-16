@@ -116,10 +116,10 @@ test("supervision releases the shared inference slot while waiting on a CLI step
 	);
 	h.decision(proposal("run_checks"));
 	await h.observe();
-	for (let n = 0; n < 100 && !finish; n++) {
+	await waitFor(async () => {
 		await h.queue.tick();
-		await Bun.sleep(2);
-	}
+		return !!finish;
+	});
 	expect(h.steps).toHaveLength(1);
 	expect(h.queue.stats().resources["inference.llm"]?.inUse).toBe(0);
 	let foreground = false;

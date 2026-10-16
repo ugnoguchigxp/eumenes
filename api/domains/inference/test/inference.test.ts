@@ -6,7 +6,7 @@ import {
 	wav,
 	freshSignal,
 } from "./inference.fixture";
-import { waitFor } from "../../../infrastructure/wait-for";
+import { settle, waitFor } from "../../../infrastructure/wait-for";
 afterEach(async () => {
 	for (const close of cleanup.splice(0)) await close();
 });
@@ -153,7 +153,7 @@ test("local timeout fences a late adapter result; immutable snapshot and revocat
 	expect(receipt.value).toBe("cloud-answer");
 	expect(JSON.parse(h.payloads[0] as string).model).toBe("fixture-llm");
 	localResolve("late-local");
-	await Bun.sleep(10);
+	await settle();
 	const revoked = h.settings.get();
 	revoked.routes.llm.cloudAllowed = false;
 	await h.settings.apply({
@@ -195,7 +195,7 @@ test("revocation aborts pending cloud; regrant does not revive old request", asy
 	await expect(promise).rejects.toThrow("cancelled");
 	expect(signal?.aborted).toBe(true);
 	finish(Response.json({ choices: [{ message: { content: "late" } }] }));
-	await Bun.sleep(5);
+	await settle();
 	expect(
 		(h.inference.usage() as { accepted: number }[]).some((u) => u.accepted),
 	).toBe(false);
@@ -274,7 +274,7 @@ test("late provider deltas are fenced after caller cancellation", async () => {
 	await expect(work).rejects.toThrow();
 	expect(() => publish("late")).toThrow();
 	release();
-	await Bun.sleep(1);
+	await settle();
 	expect(parts).toHaveLength(0);
 	expect(h.calls).toHaveLength(0);
 });

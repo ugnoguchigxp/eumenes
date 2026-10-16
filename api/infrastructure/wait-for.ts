@@ -13,3 +13,13 @@ export async function waitFor(
 		await Bun.sleep(interval);
 	}
 }
+
+/**
+ * Test support: lets already-scheduled promise continuations and I/O callbacks run, by
+ * yielding to the event loop `turns` times. Replaces a fixed sleep after releasing a gate
+ * when no observable condition marks the end of the late work.
+ */
+export async function settle(turns = 25): Promise<void> {
+	for (let i = 0; i < turns; i++)
+		await new Promise<void>((resolve) => setImmediate(resolve));
+}

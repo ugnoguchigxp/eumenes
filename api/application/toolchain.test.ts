@@ -1,7 +1,7 @@
 import { test, expect } from "bun:test";
 import { harness, forbidden } from "./toolchain.fixture";
 import { checkLiveCitations } from "./toolchain-live-check";
-import { waitFor } from "../infrastructure/wait-for";
+import { settle, waitFor } from "../infrastructure/wait-for";
 test("adoption removes a fabricated model citation and cannot reuse sources after failed research", async () => {
 	const options = {
 		parentAnswer:
@@ -277,7 +277,7 @@ test("1 inference slot: conversation continues while child waits; cancellation r
 		).toBe("completed");
 		await h.dialogue.cancel(slow.id);
 		release();
-		await Bun.sleep(30);
+		await settle();
 		expect(h.dialogue.get(slow.id)?.status).toBe("cancelled");
 		expect(h.dialogue.answerText(slow.id)).toBe(null);
 		expect(

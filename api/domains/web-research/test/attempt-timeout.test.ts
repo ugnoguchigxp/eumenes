@@ -11,6 +11,7 @@ import {
 	type AcquisitionPort,
 } from "..";
 import type { ResearchResult } from "../contracts";
+import { waitFor } from "../../../infrastructure/wait-for";
 
 const cleanup: (() => Promise<void>)[] = [];
 afterEach(async () => {
@@ -78,12 +79,10 @@ const read = (url = "https://example.com/") => ({
 	freshness: "live" as const,
 });
 async function until(cond: () => boolean, tick: () => Promise<void>) {
-	for (let i = 0; i < 150; i++) {
+	await waitFor(async () => {
 		await tick();
-		if (cond()) return;
-		await Bun.sleep(2);
-	}
-	throw new Error("condition timeout");
+		return cond();
+	});
 }
 function submit(
 	s: ReturnType<typeof setup>,

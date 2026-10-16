@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { snapshotStream } from "./snapshot-stream";
+import { settle } from "./wait-for";
 test("a pending reader receives each snapshot once and terminal delivery releases the observer", async () => {
 	let emit: (value: { text: string; done: boolean }) => void = () => {},
 		stopped = false;
@@ -24,7 +25,7 @@ test("a pending reader receives each snapshot once and terminal delivery release
 		secondArrived = true;
 		return value;
 	});
-	await Bun.sleep(1);
+	await settle();
 	expect(secondArrived).toBe(false);
 	emit({ text: "先の回答", done: true });
 	expect(new TextDecoder().decode((await second).value)).toContain("先の回答");

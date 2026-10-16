@@ -382,7 +382,6 @@ test("cancel of running job rejects late result and keeps the slot until the han
 	c.gates.get("a")?.resolve("late answer");
 	await until(() => h.queue.get(a.job.id)?.state === "cancelled");
 	expect(item(h.store, "a")).toEqual({ state: "cancelled", result: null });
-	await until(() => c.gates.has("b") || false).catch(() => {});
 	await h.queue.tick();
 	await until(() => c.gates.has("b"));
 });

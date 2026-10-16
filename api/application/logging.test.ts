@@ -39,11 +39,13 @@ test("real backend persists startup, correlated job failure and final shutdown w
 	}
 	try {
 		let ready: { port: number } | undefined;
-		for (let n = 0; n < 100; n++) {
-			ready = entries().find((entry) => entry.event === "server.listening");
-			if (ready || child.exitCode !== null) break;
-			await Bun.sleep(50);
-		}
+		await waitFor(
+			() => {
+				ready = entries().find((entry) => entry.event === "server.listening");
+				return !!ready || child.exitCode !== null;
+			},
+			{ timeout: 10000 },
+		);
 		expect(ready).toBeDefined();
 		const base = `http://127.0.0.1:${ready!.port}`;
 		const requestId = crypto.randomUUID();

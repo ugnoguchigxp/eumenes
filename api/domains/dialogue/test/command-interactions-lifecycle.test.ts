@@ -8,13 +8,13 @@ import {
 	ADAPTER,
 	operationCall,
 	lastUser,
-	pause,
 	until,
 	open,
 	setup,
 	answerFor,
 	resumedJobs,
 } from "./command-interactions.fixture";
+import { settle } from "../../../infrastructure/wait-for";
 afterEach(async () => {
 	for (const close of open.splice(0).reverse()) await close();
 });
@@ -268,7 +268,7 @@ test("a model result that arrives after the interaction was cancelled is not ado
 	});
 	release();
 	await until(() => h.status(runId) === "cancelled");
-	await pause(50);
+	await settle();
 	expect(h.started).toHaveLength(0);
 	expect(h.interaction()!.status).toBe("cancelled");
 });

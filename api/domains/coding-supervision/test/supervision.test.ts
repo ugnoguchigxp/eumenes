@@ -429,10 +429,10 @@ test("a changed question while a step runs cannot adopt its stale receipt", asyn
 	);
 	h.decision(proposal("run_checks"));
 	await h.observe();
-	for (let n = 0; n < 100 && !finish; n++) {
+	await waitFor(async () => {
 		await h.queue.tick();
-		await Bun.sleep(2);
-	}
+		return !!finish;
+	});
 	await h.observe(
 		observation({
 			eventSeq: 2,

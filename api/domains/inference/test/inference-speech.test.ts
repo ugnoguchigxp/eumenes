@@ -10,7 +10,7 @@ import {
 	judged,
 	enableEnglishSpeech,
 } from "./inference.fixture";
-import { waitFor } from "../../../infrastructure/wait-for";
+import { settle, waitFor } from "../../../infrastructure/wait-for";
 afterEach(async () => {
 	for (const close of cleanup.splice(0)) await close();
 });
@@ -173,7 +173,7 @@ test("decision timeout keeps manual voice, fences late results and cancellation 
 	expect(parameters[0]).not.toHaveProperty("intonationScale");
 	expect(judging?.aborted).toBe(true);
 	resolve(judged);
-	await Bun.sleep(1);
+	await settle();
 	expect(receipt.delivery?.source).toBe("fallback");
 	const next = await h.store.write((db) =>
 		h.inference.captureInTransaction(db, "cancel", "tts", Date.now() + 10000),

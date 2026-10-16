@@ -14,6 +14,7 @@ import {
 	revisionOf,
 	setup,
 } from "./kanban-adapter.fixture";
+import { waitFor } from "../infrastructure/wait-for";
 
 afterEach(cleanup);
 
@@ -460,7 +461,7 @@ test("stop is carried out after commit; an unconfirmed stop pauses the queue; re
 	fake.state.stopResult = "unconfirmed";
 	adapter.afterCommit!();
 	adapter.afterCommit!();
-	await Bun.sleep(30);
+	await waitFor(() => fake.state.stops.length > 0);
 	expect(fake.state.stops).toEqual([runId]);
 	expect(boardData(store, adapter).queue).toMatchObject({
 		state: "paused",

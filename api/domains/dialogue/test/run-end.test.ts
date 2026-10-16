@@ -21,7 +21,6 @@ import {
 import { insert } from "../repository";
 import { waitFor as until } from "../../../infrastructure/wait-for";
 
-const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const open: Array<() => Promise<void>> = [];
 afterEach(async () => {
 	configureLogging({ level: "silent" });

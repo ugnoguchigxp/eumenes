@@ -38,6 +38,8 @@ export type DeliveryContext = {
 /** Internal preparation; a reused delivery must come from an adopted receipt. */
 export type SpeechPreparation = {
 	context?: DeliveryContext;
+	/** Judge each spoken clause instead of the complete LLM answer. */
+	deliveryScope?: "chunk";
 	collection?: {
 		conversationId: string;
 		turnId: string;

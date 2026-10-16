@@ -43,6 +43,7 @@ import type {
 	WorkflowPort,
 } from "../contracts";
 import { fence } from "../service/policy";
+import { waitFor } from "../../../infrastructure/wait-for";
 const clean: Array<() => Promise<void>> = [];
 afterEach(async () => {
 	for (const fn of clean.splice(0)) await fn();
@@ -317,12 +318,10 @@ export async function setup(
 		);
 	};
 	async function drain() {
-		for (let i = 0; i < 200; i++) {
+		await waitFor(async () => {
 			await queue.tick();
-			await Bun.sleep(2);
-			if (queue.stats().openJobs === 0) return;
-		}
-		throw new Error("fixture_queue_timeout");
+			return queue.stats().openJobs === 0;
+		});
 	}
 	return {
 		store,

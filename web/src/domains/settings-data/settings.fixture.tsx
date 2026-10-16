@@ -3,6 +3,7 @@ import { useState } from "react";
 import { vi } from "vitest";
 import type { ArtifactDefinitionV1 } from "../../../../api/domains/capabilities/contracts";
 import {
+	asrLanguages,
 	settingsSchema,
 	type Settings,
 } from "../../../../api/domains/settings/contracts";
@@ -137,6 +138,14 @@ export const voiceFields: Field[] = [
 		label: "話し始めたら読み上げを止める",
 		control: "toggle",
 		group: "speech",
+	}),
+	field({
+		fieldId: "input.languages",
+		path: "$.general.asrLanguages",
+		label: "利用する言語",
+		control: "multiple",
+		group: "input",
+		optionsSource: "query:settings.asr-languages@1",
 	}),
 	field({
 		fieldId: "input.threshold",
@@ -517,6 +526,12 @@ export const settingsArtifacts: Record<string, ArtifactDefinitionV1> = {
 				source: "settings-tts-resources",
 				adapterRef: ADAPTER,
 				query: TTS,
+				target: "none",
+			},
+			{
+				source: "settings-asr-languages",
+				adapterRef: ADAPTER,
+				query: "query:settings.asr-languages@1",
 				target: "none",
 			},
 		],
@@ -1006,6 +1021,16 @@ export function createSettingsBackend(
 								options: saved.connections.map((c) => ({
 									value: c.id,
 									label: c.name,
+								})),
+							},
+						};
+					case "settings-asr-languages":
+						return {
+							revision: 0,
+							data: {
+								options: asrLanguages.map(([value, label]) => ({
+									value,
+									label,
 								})),
 							},
 						};

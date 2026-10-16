@@ -22,7 +22,7 @@ import {
 	SERVICE_TESTS_ADAPTER_REF,
 } from "./service-tests-adapter";
 import { bundleHostOf, hostAdapterDescriptions } from "./toolchain-adapters";
-import { waitFor } from "../infrastructure/wait-for";
+import { settle, waitFor } from "../infrastructure/wait-for";
 
 type Bundle = {
 	artifacts: Array<{
@@ -192,12 +192,10 @@ async function setup(overrides: Partial<LarmPlayground> = {}) {
 	const catalogRow = (id: string) =>
 		rows("service-tests-catalog").find((r) => r.id === id)!;
 	async function finished(timeoutMs = 2000) {
-		for (let i = 0; i < timeoutMs / 5; i++) {
-			if (!rows("service-tests-runs").some((r) => r.status === "running"))
-				return;
-			await Bun.sleep(5);
-		}
-		throw new Error("not_finished");
+		await waitFor(
+			() => !rows("service-tests-runs").some((r) => r.status === "running"),
+			{ timeout: timeoutMs },
+		);
 	}
 	return {
 		service,
@@ -253,15 +251,13 @@ async function refreshed(h: Harness) {
 	expect((await h.send("refresh", {}, { id: "catalog" })).request.status).toBe(
 		"accepted",
 	);
-	for (let i = 0; i < 400; i++) {
+	await waitFor(() => {
 		const status = h.rows("service-tests-status")[0] as {
 			state: string;
 			busy: boolean;
 		};
-		if (status.state === "最新" && !status.busy) return;
-		await Bun.sleep(5);
-	}
-	throw new Error("catalog_not_refreshed");
+		return status.state === "最新" && !status.busy;
+	});
 }
 
 test("the service-tests bundle passes a dry-run import against this host, and needs the adapter", async () => {
@@ -529,7 +525,7 @@ test("a write whose transaction does not commit starts nothing", async () => {
 	).rejects.toThrow("later_failure");
 	// A later, unrelated commit runs the leftover effect: it finds no committed run and drops it.
 	h.adapter.afterCommit?.();
-	await Bun.sleep(20);
+	await settle();
 	expect(h.executed).toHaveLength(0);
 	expect(h.rows("service-tests-runs")).toEqual([]);
 });

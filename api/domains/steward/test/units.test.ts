@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { keepAll, setupSteward, type StewardHarness } from "./steward.fixture";
+import { waitFor } from "../../../infrastructure/wait-for";
 
 const harnesses: StewardHarness[] = [];
 afterEach(async () => {
@@ -130,7 +131,7 @@ test("a step whose inference is not available is neither counted nor retried at 
 	h.inference.state.unavailable = true;
 	const { inputMessageId } = await h.exchange("a", "b");
 	await h.queue.tick();
-	await new Promise((resolve) => setTimeout(resolve, 20));
+	await waitFor(() => h.units()[0]?.state === "stale");
 	const [unit] = h.units();
 	expect(unit!.state).toBe("stale");
 	expect(h.exchangeRow(inputMessageId)!.failures).toEqual({});

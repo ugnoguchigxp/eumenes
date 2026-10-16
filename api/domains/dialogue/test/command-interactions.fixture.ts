@@ -71,8 +71,6 @@ export const operationCall = (args: Record<string, unknown>) => [
 ];
 export const lastUser = (history: Call["history"]) =>
 	[...history].reverse().find((m) => m.role === "user")?.content ?? "";
-export const pause = (ms: number) =>
-	new Promise((resolve) => setTimeout(resolve, ms));
 export const until = (check: () => boolean, ms = 4000) =>
 	waitFor(check, { timeout: ms });
 export const open: Array<() => Promise<void>> = [];

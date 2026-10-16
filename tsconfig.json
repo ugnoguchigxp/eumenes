@@ -12,6 +12,7 @@
 		"allowImportingTsExtensions": true,
 		"resolveJsonModule": true,
 		"noUncheckedIndexedAccess": true,
+		"noImplicitOverride": true,
 		"allowJs": true,
 		"checkJs": false
 	},

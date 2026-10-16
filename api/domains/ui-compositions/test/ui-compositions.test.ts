@@ -9,7 +9,7 @@ import { createUiCompositions } from "..";
 import { migrations } from "../repository";
 import { validatedDesign } from "../contracts";
 import { compileArtifact } from "@eumenes/artifact-ui";
-import { waitFor } from "../../../infrastructure/wait-for";
+import { settle, waitFor } from "../../../infrastructure/wait-for";
 
 const dirs: string[] = [];
 const closes: Array<() => Promise<void>> = [];
@@ -118,12 +118,8 @@ async function untilReady(
 	service: ReturnType<typeof createUiCompositions>,
 	id: string,
 ) {
-	for (let i = 0; i < 200; i++) {
-		const item = service.get(id);
-		if (item?.state === "ready") return item;
-		await Bun.sleep(10);
-	}
-	throw new Error("generation did not finish");
+	await waitFor(() => service.get(id)?.state === "ready");
+	return service.get(id)!;
 }
 
 test("survey design is generated, saved, submitted, and overwritten in place", async () => {
@@ -245,7 +241,7 @@ test("cancelled generation cannot replace the saved state after a late model res
 	);
 	expect(cancelled.receipt.state).toBe("cancelled");
 	release();
-	await Bun.sleep(30);
+	await settle();
 	expect(service.get(id)?.state).toBe("cancelled");
 	expect(service.get(id)?.definition).toBeUndefined();
 });

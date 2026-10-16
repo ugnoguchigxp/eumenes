@@ -12,14 +12,10 @@ import {
 import type { LarmPort } from "../../larm";
 import { createQueue, migration as queueMigration } from "../../queue";
 import { createDialogueService, migration, queueLinkMigration } from "..";
+import { settle, waitFor } from "../../../infrastructure/wait-for";
 
-const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 async function awaitStatus(get: () => string | undefined, status: string) {
-	for (let i = 0; i < 100; i++) {
-		if (get() === status) return;
-		await pause(10);
-	}
-	throw new Error(`expected ${status}, got ${get()}`);
+	await waitFor(() => get() === status);
 }
 
 test("request ID is idempotent and answer adoption is atomic", async () => {
@@ -170,7 +166,7 @@ test("cancelled inference cannot append an answer", async () => {
 		await awaitStatus(() => dialogue.get(run.id)?.status, "running");
 		expect((await dialogue.cancel(run.id))?.status).toBe("cancelled");
 		resolveAnswer("古い回答");
-		await pause(20);
+		await settle();
 		expect(dialogue.get(run.id)?.status).toBe("cancelled");
 		expect(conversation.get("main").messages.map((m) => m.text)).toEqual([
 			"先ほどの依頼",

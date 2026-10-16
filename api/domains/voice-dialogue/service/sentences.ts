@@ -15,11 +15,21 @@ const parts = (clause: string) =>
 export class SpeechSentences {
 	private buffer = "";
 	private prefix = "";
+	private consumed = 0;
+	private committed = 0;
+	/** Text rendering may rewrite only the suffix that has never left the buffer. */
+	constructor(private readonly allowBufferedRewrite = false) {}
 	append(prefix: string, final = false): string[] {
-		if (!prefix.startsWith(this.prefix))
-			throw new Error("speech_stream_diverged");
+		if (!prefix.startsWith(this.prefix)) {
+			if (
+				!this.allowBufferedRewrite ||
+				!prefix.startsWith(this.prefix.slice(0, this.committed))
+			)
+				throw new Error("speech_stream_diverged");
+			this.consumed = this.committed;
+			this.buffer = prefix.slice(this.consumed);
+		} else this.buffer += prefix.slice(this.prefix.length);
 		if (prefix.length > 65536) throw new Error("speech_source_too_large");
-		this.buffer += prefix.slice(this.prefix.length);
 		this.prefix = prefix;
 		const chunks: string[] = [];
 		for (;;) {
@@ -56,7 +66,13 @@ export class SpeechSentences {
 			}
 			const chunk = this.buffer.slice(0, boundary).trim();
 			this.buffer = this.buffer.slice(boundary);
-			chunks.push(...parts(chunk));
+			this.consumed += boundary;
+			const emitted = parts(chunk);
+			if (emitted.length)
+				this.committed =
+					this.consumed -
+					(this.prefix.slice(0, this.consumed).match(/\s*$/)?.[0].length ?? 0);
+			chunks.push(...emitted);
 		}
 	}
 }

@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { harness } from "./toolchain.fixture";
 import { imageFixture, imageQuestion, imageTestPlan } from "./image.fixture";
-import { waitFor } from "../infrastructure/wait-for";
+import { settle, waitFor } from "../infrastructure/wait-for";
 for (const mode of [
 	"success",
 	"failure",
@@ -91,7 +91,7 @@ test("cancelled image generation discards a late synchronous response and never 
 		expect(f.requests.filter((r) => r.method === "POST")).toHaveLength(1);
 		await h.dialogue.cancel(submitted.id);
 		release();
-		await Bun.sleep(50);
+		await settle();
 		expect(h.image!.list("main")[0]!.state).toBe("cancelled");
 		expect(h.image!.list("main")[0]!.artifactId).toBeNull();
 		expect(f.requests.filter((r) => r.method === "POST")).toHaveLength(1);

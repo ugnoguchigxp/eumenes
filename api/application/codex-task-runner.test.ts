@@ -23,6 +23,7 @@ import {
 	adoptCodexTaskInTransaction,
 } from "./codex-task-port";
 import { connectCodexTaskRunner } from "./codex-task-runner";
+import { waitFor } from "../infrastructure/wait-for";
 
 const cleanup: (() => Promise<void>)[] = [];
 afterEach(async () => {
@@ -177,12 +178,11 @@ async function eventually(
 	check: () => boolean,
 	action: () => Promise<unknown>,
 ) {
-	for (let i = 0; i < 100; i++) {
-		if (check()) return;
+	await waitFor(async () => {
+		if (check()) return true;
 		await action();
-		await Bun.sleep(5);
-	}
-	throw new Error("fixture_timeout");
+		return false;
+	});
 }
 
 test("backend port disconnect/reconnect adopts the same SDK execution, thread and one notification", async () => {

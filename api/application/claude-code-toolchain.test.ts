@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { createTerminals, type SpawnPty } from "../domains/terminals";
 import { harness } from "./toolchain.fixture";
+import { waitFor } from "../infrastructure/wait-for";
 
 type Store = Parameters<
 	NonNullable<NonNullable<Parameters<typeof harness>[0]>["terminals"]>
@@ -55,12 +56,9 @@ function fakeClaude() {
 }
 
 async function until<T>(read: () => T | null | undefined | false): Promise<T> {
-	for (let i = 0; i < 400; i++) {
-		const value = read();
-		if (value) return value;
-		await Bun.sleep(10);
-	}
-	throw new Error("until_timeout");
+	let value: T | null | undefined | false = undefined;
+	await waitFor(() => !!(value = read()));
+	return value as T;
 }
 
 test("a conversation request reaches Claude Code once saved, and its finished task is reported by name", async () => {
@@ -185,22 +183,22 @@ test("a conversation request reaches Claude Code once saved, and its finished ta
 			last_assistant_message: lastAnswer,
 		});
 		expect(stopped.status).toBe(204);
-		let report: {
+		type Notice = {
 			id: string;
 			source_kind: string;
 			input_message_id: string;
-		} | null = null;
-		for (let i = 0; i < 200 && !report; i++) {
-			await Bun.sleep(10);
-			report = h.store.read(
+		};
+		const readNotice = () =>
+			h.store.read(
 				(db) =>
 					db
 						.query(
 							"SELECT id, source_kind, input_message_id FROM dialogue_runs WHERE source_kind='notice'",
 						)
-						.get() as typeof report,
+						.get() as Notice | null,
 			);
-		}
+		await waitFor(() => !!readNotice());
+		const report = readNotice();
 		expect(report?.source_kind).toBe("notice");
 		expect(
 			(await h.dialogue.waitForTerminal(report!.id, { timeoutMs: 8000 }))

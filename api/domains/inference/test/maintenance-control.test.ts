@@ -18,6 +18,7 @@ import {
 	backgroundControlMigration,
 	migrations as inferenceMigrations,
 } from "..";
+import { waitFor } from "../../../infrastructure/wait-for";
 
 const cleanup: Array<() => Promise<void>> = [];
 afterEach(async () => {
@@ -110,15 +111,16 @@ const cap = (
 
 test("I01 captures after the source answer was accepted, with its own deadline and fixed control limits", async () => {
 	const h = await setup();
+	const expiry = Date.now() + 1;
 	const source = await h.store.write((db) =>
-		h.inference.captureInTransaction(db, "answer-1", "llm", Date.now() + 1),
+		h.inference.captureInTransaction(db, "answer-1", "llm", expiry),
 	);
 	await h.store.write((db) =>
 		db
 			.query("UPDATE inference_requests SET status='accepted' WHERE id=?")
 			.run(source),
 	);
-	await Bun.sleep(5); // original deadline is now past
+	await waitFor(() => Date.now() > expiry); // original deadline is now past
 	const before = Date.now();
 	const id = await cap(h, "research-route:d1:author-1");
 	const row = h.store.read((db) =>

@@ -13,7 +13,7 @@ class ArtifactBoundary extends Component<
 	{ resetKey: string; children: ReactNode },
 	{ failed: boolean; resetKey: string }
 > {
-	state = { failed: false, resetKey: this.props.resetKey };
+	override state = { failed: false, resetKey: this.props.resetKey };
 	static getDerivedStateFromError() {
 		return { failed: true };
 	}
@@ -25,7 +25,7 @@ class ArtifactBoundary extends Component<
 			? null
 			: { failed: false, resetKey: props.resetKey };
 	}
-	render() {
+	override render() {
 		return this.state.failed ? (
 			<p role="alert">
 				このアーティファクトを表示できません。情報を更新して再試行してください。

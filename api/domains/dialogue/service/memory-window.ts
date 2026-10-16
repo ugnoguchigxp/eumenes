@@ -33,20 +33,44 @@ export function adoptMemoryWindow(
 	},
 	recallPins: ReadonlyArray<{ messageId: string; digest: string }> = [],
 ): SettleResult {
-	// Also for a quiet window: history forgotten meanwhile must not stand behind an adopted answer.
+	const verdict = validateMemoryWindow(
+		memory,
+		tx,
+		run.id,
+		prepared,
+		recallPins,
+	);
+	if (verdict.ok && !(prepared.quiet && recallPins.length === 0))
+		memory.recordUsageInTransaction(
+			tx,
+			run.id,
+			run.conversationId,
+			prepared.window,
+		);
+	return verdict;
+}
+
+/** The same checks before releasing a streaming clause, without recording final usage. */
+export function validateMemoryWindow(
+	memory: MemoryService,
+	tx: Database,
+	runId: string,
+	prepared: {
+		window: PreparedWindow;
+		quiet?: true;
+		blockedAtPrepare?: string[];
+	},
+	recallPins: ReadonlyArray<{ messageId: string; digest: string }> = [],
+): SettleResult {
 	if (shownMessageForgotten(memory, tx, prepared))
 		return { ok: false, reason: "memory_stale" };
 	if (prepared.quiet && recallPins.length === 0) return { ok: true };
-	const { window } = prepared;
-	const verdict = memory.validateWindowInTransaction(
+	return memory.validateWindowInTransaction(
 		tx,
-		run.id,
-		window,
+		runId,
+		prepared.window,
 		recallPins,
 	);
-	if (verdict.ok)
-		memory.recordUsageInTransaction(tx, run.id, run.conversationId, window);
-	return verdict;
 }
 
 /** The notices this answer carried are shown once: only an adopted answer clears them. */

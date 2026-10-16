@@ -9,6 +9,7 @@ import {
 	revisionOf,
 	setup,
 } from "./kanban-adapter.fixture";
+import { waitFor } from "../infrastructure/wait-for";
 
 afterEach(cleanup);
 
@@ -16,12 +17,9 @@ type Harness = ReturnType<typeof setup>;
 
 /** Waits until `read` returns something truthy (the stop and the retry run after the commit). */
 async function until<T>(read: () => T | undefined | false): Promise<T> {
-	for (let i = 0; i < 200; i++) {
-		const value = read();
-		if (value) return value;
-		await Bun.sleep(5);
-	}
-	throw new Error("until_timeout");
+	let value: T | undefined | false = undefined;
+	await waitFor(() => !!(value = read()));
+	return value as T;
 }
 
 /** A card with a run handed over to the fake terminals. */

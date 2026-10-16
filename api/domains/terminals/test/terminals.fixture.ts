@@ -8,6 +8,7 @@ import { migrations } from "../repository";
 import { createTerminals } from "../service";
 import { type HookPayload, headerFileOf } from "../service/hooks";
 import type { SpawnPty, TerminalsOptions } from "../service/types";
+import { waitFor } from "../../../infrastructure/wait-for";
 
 /** What the fake PTY did, with the facts a test needs read at spawn time. */
 export type Spawned = {
@@ -214,10 +215,5 @@ export function hooked(
 	return harness;
 }
 
-export async function until(condition: () => boolean, ms = 2000) {
-	const end = Date.now() + ms;
-	while (!condition()) {
-		if (Date.now() > end) throw new Error("until_timeout");
-		await Bun.sleep(5);
-	}
-}
+export const until = (condition: () => boolean, ms = 2000) =>
+	waitFor(condition, { timeout: ms });

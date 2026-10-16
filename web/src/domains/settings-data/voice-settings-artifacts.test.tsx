@@ -141,6 +141,25 @@ test("input and cloud edits join the shared change review and save to the regist
 	});
 });
 
+test("the allowed recognition languages save and at least one stays selected", async () => {
+	const { backend } = openVoice();
+	await ready();
+	fireEvent.click(screen.getByRole("button", { name: "聞き取り" }));
+	// Unchecking every language is refused: at least one must stay selected.
+	fireEvent.click(screen.getByLabelText("英語"));
+	fireEvent.click(screen.getByLabelText("日本語"));
+	expect((screen.getByLabelText("日本語") as HTMLInputElement).checked).toBe(
+		true,
+	);
+	fireEvent.click(screen.getByRole("button", { name: "変更一覧を開く" }));
+	await screen.findByText("音声と入力 / 利用する言語");
+	fireEvent.click(
+		screen.getByRole("button", { name: "設定の変更をすべて適用" }),
+	);
+	await screen.findByText("変更を適用しました");
+	expect(backend.saved().general.asrLanguages).toEqual(["ja"]);
+});
+
 test("invalid numbers are refused and never reach the draft", async () => {
 	const { backend } = openVoice();
 	await ready();

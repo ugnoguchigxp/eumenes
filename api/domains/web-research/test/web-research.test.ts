@@ -23,6 +23,7 @@ import {
 	type ResearchRequest,
 	type ResearchResult,
 } from "../contracts";
+import { waitFor } from "../../../infrastructure/wait-for";
 
 const cleanup: (() => Promise<void>)[] = [];
 afterEach(async () => {
@@ -115,12 +116,10 @@ async function until(
 	condition: () => boolean,
 	tick: () => Promise<void> = async () => {},
 ) {
-	for (let i = 0; i < 150; i++) {
+	await waitFor(async () => {
 		await tick();
-		if (condition()) return;
-		await Bun.sleep(5);
-	}
-	throw new Error("condition timeout");
+		return condition();
+	});
 }
 
 test("API idempotency, validation, run polling and cancellation are backed by Queue", async () => {

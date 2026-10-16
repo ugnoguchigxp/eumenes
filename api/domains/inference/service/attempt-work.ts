@@ -140,6 +140,7 @@ export async function chooseTtsDelivery(
 	const { env, preparation } = r;
 	const p = env.port(r.row.snapshot);
 	const delivery =
+		preparation?.deliveryScope !== "chunk" &&
 		preparation?.delivery?.version === 2
 			? preparation.delivery
 			: await args.decide(
@@ -159,7 +160,11 @@ export async function chooseTtsDelivery(
 	if (!env.store.read((db) => env.allowed(db, r.row, args.connection)))
 		throw new Error("permission_revoked");
 
-	if (delivery.source !== "fallback" && r.row.snapshot.larm.autoIntonation)
+	if (
+		delivery.source !== "fallback" &&
+		r.row.snapshot.larm.autoIntonation &&
+		args.callOptions.speechLanguage !== "en"
+	)
 		Object.assign(
 			args.callOptions,
 			speechParameters(delivery, {

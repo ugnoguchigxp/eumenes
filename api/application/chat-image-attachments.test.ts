@@ -243,10 +243,7 @@ for (const stage of ["count", "generate"] as const)
 					attachmentIds: [a.id],
 				})
 			).json();
-			for (let i = 0; !f.requests.some((r) => r.operation === stage); i++) {
-				if (i > 2000) throw new Error("stage_not_reached");
-				await Bun.sleep(1);
-			}
+			await waitFor(() => f.requests.some((r) => r.operation === stage));
 			await h.dialogue.cancel(run.id);
 			expect(
 				(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 }))?.status,

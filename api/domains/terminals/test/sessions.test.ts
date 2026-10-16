@@ -4,6 +4,7 @@ import { registerTerminals } from "../controller";
 import { createTerminals } from "../service";
 import { childEnv } from "../service/spawn";
 import { fakePty } from "./terminals.fixture";
+import { waitFor } from "../../../infrastructure/wait-for";
 
 async function readEvents(response: Response, count: number) {
 	const reader = response
@@ -92,7 +93,7 @@ test("a PTY that cannot be released still ends the session, without an unhandled
 		});
 		const session = terminals.start({ cols: 80, rows: 24 });
 		pty.spawned[0]!.exit(0);
-		await Bun.sleep(10);
+		await waitFor(() => terminals.list().sessions[0]?.status === "exited");
 		expect(terminals.list().sessions[0]).toMatchObject({
 			id: session.id,
 			status: "exited",

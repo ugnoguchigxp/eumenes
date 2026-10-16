@@ -3,6 +3,7 @@ import { conversationSchema } from "../domains/conversation/contracts";
 import { harness } from "./toolchain.fixture";
 import { createTimerAnnouncements } from "./timer-announcements";
 import { createConversationService } from "../domains/conversation";
+import { waitFor } from "../infrastructure/wait-for";
 
 test("a three-minute tool request posts one assistant completion at the deadline and survives recovery", async () => {
 	const startedAt = Date.now();
@@ -30,10 +31,10 @@ test("a three-minute tool request posts one assistant completion at the deadline
 		).toBe(false);
 		now = startedAt + 180000;
 		await h.scheduler.tick();
-		for (let i = 0; i < 40 && !h.timers!.notifications().items.length; i++) {
+		await waitFor(async () => {
 			await h.queue.tick();
-			await Bun.sleep(25);
-		}
+			return h.timers!.notifications().items.length > 0;
+		});
 		const completions = (await messages()).filter(
 			(message) => message.text === "3分のタイマーが終了しました。",
 		);

@@ -1,4 +1,4 @@
-import { createAnswerStream } from "./generation-stream";
+import { answerSession, createAnswerStream } from "./generation-stream";
 import { generationTiming } from "./generation-timing";
 import {
 	resolveAttachmentContext,
@@ -41,9 +41,10 @@ import { adoptMemoryWindow, clearShownNotices } from "./memory-window";
 import type { Progress } from "./progress";
 const log = getLogger("dialogue");
 
-function answerCollection(run: Run | null) {
+function answerCollection(run: Run | null, chunkSpeech: boolean) {
 	return run
 		? {
+				...(chunkSpeech ? { deliveryScope: "chunk" as const } : {}),
 				collection: {
 					conversationId: run.conversationId,
 					turnId: run.id,
@@ -64,13 +65,12 @@ function verifiedAnswerLinks(text: string, input: GenerateInput) {
 	return text;
 }
 
-function shouldHoldBody(input: GenerateInput) {
+function shouldHoldBody(input: GenerateInput, chunkSpeech = false) {
 	return !!(
-		(input.memory && !input.memory.quiet) ||
-		input.goals ||
+		(!chunkSpeech && ((input.memory && !input.memory.quiet) || input.goals)) ||
 		input.agent?.projection ||
 		input.agent?.failureCode ||
-		input.agent?.actionPayload ||
+		(!chunkSpeech && input.agent?.actionPayload) ||
 		input.mediaResult
 	);
 }
@@ -103,7 +103,9 @@ export function createGenerationHandler(
 		recovery: "interrupt",
 		resourceKey: "inference.llm",
 		prepareInTransaction: createPrepare(deps),
-		async execute(input, { signal }) {
+		async execute(input, { signal: caller }) {
+			let signal = caller;
+			let closeStream = () => {};
 			const run = store.read((db) => byId(db, input.runId));
 			return withLogContext(
 				{
@@ -148,39 +150,32 @@ export function createGenerationHandler(
 						};
 						signal.throwIfAborted();
 					}
-					let holdBody = shouldHoldBody(input);
+					const chunkSpeech =
+						!!run?.utteranceId &&
+						store.read(
+							(db) => larm.snapshotFor?.(db, run.id)?.voice.autoSpeak ?? true,
+						);
+					let holdBody = shouldHoldBody(input, chunkSpeech);
+					const decision = await prepareDecision(deps, input, signal);
+					const { recallPins } = decision;
 					const body = createAnswerStream(
-						store,
+						deps,
 						input,
 						signal,
 						partials,
 						publish,
 						timing,
 						() => holdBody,
+						recallPins,
 					);
+					closeStream = body.close;
+					signal = body.signal;
 					const delta = body.delta;
-					const preparation = answerCollection(run);
-					const decision = await prepareDecision(deps, input, signal);
-					const { recallPins } = decision;
+					const preparation = answerCollection(run, chunkSpeech);
 					// What this turn's prompt stands on: forgetting any of it revokes the call while it runs.
-					const window = input.memory?.window;
-					const callSession = {
-						context: input.sessionContext,
-						...(window
-							? {
-									refs: {
-										messageIds: [
-											...window.shownMessageIds,
-											...window.pins.map((pin) => pin.messageId),
-											...recallPins.map((pin) => pin.messageId),
-										],
-										itemIds: window.manifest,
-										conversationId: run!.conversationId,
-									},
-								}
-							: {}),
-					};
-					holdBody ||= recallPins.length > 0 || !!decision.tools?.length;
+					const callSession = answerSession(input, recallPins);
+					holdBody ||=
+						(!chunkSpeech && recallPins.length > 0) || !!decision.tools?.length;
 					timing.policy(holdBody);
 					let generated: Awaited<ReturnType<typeof generateConversation>>;
 					try {
@@ -232,6 +227,9 @@ export function createGenerationHandler(
 						};
 					}
 					if (decision.selectionMessages && decision.answerMessages) {
+						holdBody =
+							shouldHoldBody(input, chunkSpeech) ||
+							(!chunkSpeech && recallPins.length > 0);
 						// Selection prose has no authority as an answer; answer with the full exchange.
 						generated = await generateConversation({
 							inference: larm,
@@ -268,7 +266,7 @@ export function createGenerationHandler(
 						recallPins,
 					};
 				},
-			);
+			).finally(() => closeStream());
 		},
 		settleInTransaction(tx, claim, input, outcome) {
 			const run = byId(tx, claim.payload.runId);

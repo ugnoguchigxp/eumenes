@@ -16,6 +16,7 @@ import {
 } from "..";
 import type { QueueService } from "../../queue";
 import type { SchedulerService } from "../../scheduler";
+import { waitFor } from "../../../infrastructure/wait-for";
 
 const T0 = Date.parse("2026-10-09T00:00:00.000Z");
 
@@ -294,11 +295,10 @@ test("due boundary: 179999 stays active, 180000 elapses with one notification", 
 });
 
 async function settle(queue: QueueService) {
-	for (let i = 0; i < 10; i++) {
+	await waitFor(async () => {
 		await queue.tick();
-		await new Promise((resolve) => setTimeout(resolve, 20));
-		if (queue.stats().openJobs === 0) return;
-	}
+		return queue.stats().openJobs === 0;
+	});
 }
 
 test("a fresh claim lease lasts 15s and a second client is rejected", async () => {

@@ -28,6 +28,7 @@ import {
 	testPattern,
 } from "./verification-selection";
 import { verificationPlan } from "./verify";
+import { waitFor } from "../api/infrastructure/wait-for";
 
 const root = resolve(import.meta.dir, "..");
 const temporary: string[] = [];
@@ -139,12 +140,13 @@ describe("verification selection and runner coverage", () => {
 			"web tests",
 			"design-system tests",
 			"web build",
+			"bundle-budget",
 		];
 		for (let i = 1; i < order.length; i++)
 			expect(names.indexOf(order[i]!)).toBeGreaterThan(
 				names.indexOf(order[i - 1]!),
 			);
-		expect(plan.at(-1)?.command).toEqual([
+		expect(plan.find((step) => step.name === "web build")?.command).toEqual([
 			process.execPath,
 			"x",
 			"--no-install",
@@ -280,12 +282,9 @@ describe("verification evidence and integrity", () => {
 			stderr: "pipe",
 		});
 		try {
-			const deadline = Date.now() + 10000;
-			while (!(await Bun.file(join(dir, "ready")).exists())) {
-				if (Date.now() > deadline)
-					throw new Error("Signal fixture did not become ready");
-				await Bun.sleep(20);
-			}
+			await waitFor(() => Bun.file(join(dir, "ready")).exists(), {
+				timeout: 10000,
+			});
 			child.kill("SIGTERM");
 			expect(await child.exited).toBe(143);
 			const report = JSON.parse(

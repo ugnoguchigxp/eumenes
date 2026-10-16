@@ -32,6 +32,7 @@ import {
 	type WorldAssembly,
 } from "./world";
 import { assembleServerWorld } from "./server-world";
+import { waitFor } from "../infrastructure/wait-for";
 
 const dirs: string[] = [];
 const closers: Array<() => Promise<void>> = [];
@@ -375,10 +376,9 @@ test("a retraction reaches World by commit notification alone", async () => {
 					state: string;
 				}[],
 		);
-	for (let i = 0; i < 300 && intakes().length === 0; i++) await pause(10);
+	await waitFor(() => intakes().length > 0);
 	expect(intakes().length).toBeGreaterThan(0);
-	for (let i = 0; i < 300 && intakes().some((r) => r.state !== "complete"); i++)
-		await pause(10);
+	await waitFor(() => intakes().every((r) => r.state === "complete"));
 	expect(intakes().every((r) => r.state === "complete")).toBe(true);
 });
 

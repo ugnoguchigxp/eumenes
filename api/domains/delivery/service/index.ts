@@ -55,7 +55,7 @@ export function deliveryState(text: string, context?: DeliveryContext) {
 		text: excerpt(turn.text, 120),
 	}));
 	if (turns?.length) state.conversation = JSON.stringify(turns);
-	state.current_chunk = excerpt(context?.answer || text, 600);
+	state.current_chunk = excerpt(text, 600);
 	state.response = excerpt(context?.answer || text, 600);
 	if (
 		(context?.turns.length ?? 0) > 4 ||

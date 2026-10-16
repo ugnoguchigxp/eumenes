@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { waitFor } from "../infrastructure/wait-for";
 
 const root = resolve(import.meta.dir, "../..");
 async function port() {
@@ -104,12 +105,16 @@ test.each(["127.0.0.1", "localhost"])(
 		const dev = launch(apiPort, webPort, webHost);
 		try {
 			const url = `http://${webHost}:${webPort}/api/status`;
-			let response: Response | null = null;
-			for (let i = 0; i < 100; i++) {
-				response = await get(url);
-				if (response?.ok) break;
-				await Bun.sleep(50);
-			}
+			let latest: Response | null = null;
+			// A server that never answers fails the assertion below, with its output.
+			await waitFor(
+				async () => {
+					latest = await get(url);
+					return !!latest?.ok;
+				},
+				{ timeout: 10000, interval: 50 },
+			).catch(() => {});
+			const response = latest as Response | null;
 			expect(response?.status, dev.output()).toBe(200);
 			expect(await response!.json()).toMatchObject({
 				service: "eumenes",

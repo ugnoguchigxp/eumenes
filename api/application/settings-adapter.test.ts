@@ -141,6 +141,7 @@ test("describe offers the settings document, one write operation, its queries an
 		effect: "write",
 	});
 	expect([...d.queries].sort()).toEqual([
+		"query:settings.asr-languages@1",
 		"query:settings.asr-resources@1",
 		"query:settings.connections@1",
 		"query:settings.document@1",

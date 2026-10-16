@@ -87,12 +87,8 @@ async function setup(overrides: Partial<LarmPlayground> = {}) {
 	return { service, store, settings, g, request };
 }
 async function settled(h: Awaited<ReturnType<typeof setup>>, id: string) {
-	for (let i = 0; i < 500; i++) {
-		const r = h.service.run(id)!;
-		if (r.status !== "running") return r;
-		await Bun.sleep(2);
-	}
-	throw new Error("not_finished");
+	await waitFor(() => h.service.run(id)!.status !== "running");
+	return h.service.run(id)!;
 }
 test("idempotent acceptance, isolated results and no plaintext input persistence", async () => {
 	let calls = 0;

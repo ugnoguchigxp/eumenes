@@ -110,13 +110,15 @@ async function attempt(r: Request, source: Source): Promise<Receipt> {
 					? env.options.speechText(r.input as string)
 					: r.input;
 			let delivery: SpeechDelivery | undefined =
-				row.purpose === "tts" && r.preparation?.delivery?.version === 2
+				row.purpose === "tts" &&
+				r.preparation?.deliveryScope !== "chunk" &&
+				r.preparation?.delivery?.version === 2
 					? r.preparation.delivery
 					: undefined;
 			if (
 				row.purpose === "tts" &&
 				source === "larm" &&
-				language !== "en" &&
+				(language !== "en" || r.preparation?.deliveryScope === "chunk") &&
 				env.port(row.snapshot).judge
 			)
 				delivery = await chooseTtsDelivery(r, {
@@ -175,6 +177,7 @@ async function attempt(r: Request, source: Source): Promise<Receipt> {
 		if (
 			row.purpose === "llm" &&
 			row.mode !== "control" &&
+			r.preparation?.deliveryScope !== "chunk" &&
 			!r.toolCalls?.length &&
 			typeof value === "string"
 		)

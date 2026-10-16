@@ -7,6 +7,7 @@ import {
 	speechQuestions,
 	type Emotion,
 } from "..";
+import { settle } from "../../../infrastructure/wait-for";
 const decision = (
 	emotion: string = "warmth",
 	probability = 0.9,
@@ -159,7 +160,7 @@ test("timeout is bounded and caller cancellation or a late answer cannot restore
 	);
 	expect(result.reason).toBe("timeout");
 	finish(decision());
-	await Bun.sleep(1);
+	await settle();
 	expect(acceptedEmotion(result)).toBeNull();
 	const abort = new AbortController();
 	const work = chooseSpeechDelivery(
@@ -220,7 +221,7 @@ test("long data stays bounded, preserves beginnings and endings, excludes system
 	expect(state.response?.startsWith("開始")).toBe(true);
 	expect(state.response?.endsWith("終端")).toBe(true);
 	expect(JSON.parse(state.conversation!)).toHaveLength(4);
-	expect(state.current_chunk?.startsWith("開始")).toBe(true);
+	expect(state.current_chunk).toBe("句");
 	expect(Array.from(state.current_chunk!).length).toBeLessThanOrEqual(600);
 	const { current_chunk: _current, ...legacy } = state;
 	expect(new TextEncoder().encode(JSON.stringify(legacy)).length).toBeLessThan(

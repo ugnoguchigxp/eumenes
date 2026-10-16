@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { waitFor } from "./wait-for";
+import { settle, waitFor } from "./wait-for";
 
 test("resolves once the condition holds, without waiting out the timeout", async () => {
 	let ticks = 0;
@@ -14,4 +14,19 @@ test("accepts an async condition and fails when it is never met", async () => {
 	await expect(waitFor(() => false, { timeout: 20 })).rejects.toThrow(
 		"wait_for_timeout",
 	);
+});
+
+test("settle runs queued continuations without waiting in real time", async () => {
+	let done = false;
+	setImmediate(() => {
+		Promise.resolve()
+			.then(() => Promise.resolve())
+			.then(() => {
+				done = true;
+			});
+	});
+	const started = performance.now();
+	await settle();
+	expect(done).toBe(true);
+	expect(performance.now() - started).toBeLessThan(200);
 });

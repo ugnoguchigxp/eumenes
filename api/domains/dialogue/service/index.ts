@@ -214,9 +214,10 @@ export function createDialogueService({
 		},
 		answerContext(runId: string): DeliveryContext | null {
 			const run = store.read((db) => byId(db, runId));
-			if (run?.status !== "completed" || !run.answerMessageId) return null;
-			const answer = conversation.message(run.answerMessageId);
-			if (!answer) return null;
+			if (!run || !["running", "completed"].includes(run.status)) return null;
+			const answer = run.answerMessageId
+				? conversation.message(run.answerMessageId)
+				: null;
 			// Later queued user messages must not leak into this answer's decision.
 			const input = conversation.message(run.inputMessageId);
 			const before = conversation.turnsBefore(
@@ -225,7 +226,7 @@ export function createDialogueService({
 				3,
 			);
 			return {
-				answer: answer.text,
+				answer: answer?.text ?? progress.progress(runId)?.text ?? "",
 				turns: (input ? [...before, input] : before).map(({ role, text }) => ({
 					role,
 					text,

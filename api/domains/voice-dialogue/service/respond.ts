@@ -5,7 +5,7 @@ import type { InferencePort } from "../../inference";
 import type { SpeechPreparation } from "../../delivery";
 import type { VoiceTurn } from "../contracts";
 import type { Speech } from "./speech-state";
-import { spokenText } from "./spoken-text";
+import { spokenPrefix, spokenText } from "./spoken-text";
 import { getLogger } from "../../../infrastructure/logger";
 const log = getLogger("voice-dialogue");
 export type VoiceAdvance = (
@@ -68,67 +68,129 @@ export function createVoiceResponder({
 			larm.snapshotFor?.(db, turn.utteranceId),
 		);
 		const autoSpeak = !snapshot || snapshot.voice.autoSpeak;
+		const speechController = new AbortController();
+		const stopSpeech = () => speechController.abort(controller.signal.reason);
+		controller.signal.addEventListener("abort", stopSpeech, { once: true });
 		let speech: Speech | undefined;
-		// Text may stream to the UI, but speech waits for the adopted complete answer.
-		// A partial "なるほど" must not decide the expression of the whole response.
-		if (autoSpeak)
-			await store.write((db) =>
-				larm.skipInTransaction?.(db, turn.utteranceId, "tts"),
-			);
-		const waitMs = run.deadlineAt
-			? Math.max(0, Date.parse(run.deadlineAt) - Date.now()) + 10_000
-			: undefined;
-		const final = await dialogue.waitForTerminal(run.id, {
-			signal: controller.signal,
-			timeoutMs: waitMs,
-		});
-		if (controller.signal.aborted) return;
-		if (final && ["queued", "running"].includes(final.status)) {
-			// Stop waiting and make sure a late answer can never be adopted.
-			await dialogue.cancel(run.id);
-			throw new Error("dialogue_wait_timeout");
-		}
-		if (final?.status !== "completed" || !final.answerMessageId)
-			throw new Error(final?.error ?? "dialogue_incomplete");
-		const answer = dialogue.answerText(run.id);
-		if (!answer) throw new Error("answer_missing");
-		if (!autoSpeak) {
-			log.info("voice.synthesis_skipped", {
-				runId: run.id,
-				reason: "auto_speak_disabled",
+		let preparation: SpeechPreparation | undefined;
+		let unsubscribe = () => {};
+		let streamError: unknown;
+		let sourcePrefix = "";
+		const append = (text: string, final = false) => {
+			if (!text.startsWith(sourcePrefix))
+				throw new Error("speech_stream_diverged");
+			sourcePrefix = text;
+			speech!.append(spokenPrefix(text, final), final);
+		};
+		try {
+			if (autoSpeak) {
+				await store.write((db) =>
+					larm.skipInTransaction?.(db, turn.utteranceId, "tts"),
+				);
+				controller.signal.throwIfAborted();
+				preparation = {
+					deliveryScope: "chunk",
+					collection: {
+						conversationId: run.conversationId,
+						turnId: run.id,
+						granularity: "chunk",
+						chunkOrder: null,
+					},
+					context: dialogue.answerContext?.(run.id) ?? {
+						answer: "",
+						turns: [],
+					},
+				};
+				speech = createSpeech(
+					turn.utteranceId,
+					run.id,
+					speechController,
+					preparation,
+				);
+				log.info("voice.synthesis_started", { runId: run.id });
+				unsubscribe =
+					dialogue.subscribeProgress?.(run.id, (progress) => {
+						if (controller.signal.aborted || speechController.signal.aborted)
+							return;
+						if (
+							["failed", "cancelled", "interrupted"].includes(progress.status)
+						) {
+							speechController.abort();
+							audio.delete(turn.utteranceId);
+							return;
+						}
+						if (progress.status !== "running" || !progress.text) return;
+						try {
+							preparation!.context = {
+								...(dialogue.answerContext?.(run.id) ?? preparation!.context!),
+								answer: spokenText(progress.text),
+							};
+							append(progress.text);
+						} catch (error) {
+							streamError = error;
+							speechController.abort();
+						}
+					}) ?? (() => {});
+			}
+			const waitMs = run.deadlineAt
+				? Math.max(0, Date.parse(run.deadlineAt) - Date.now()) + 10_000
+				: undefined;
+			const final = await dialogue.waitForTerminal(run.id, {
+				signal: controller.signal,
+				timeoutMs: waitMs,
 			});
-			await store.write((db) =>
-				larm.skipInTransaction?.(db, turn.utteranceId, "tts"),
-			);
-			await advance(turn.utteranceId, "completed");
-			return;
-		}
-		if (!(await advance(turn.utteranceId, "synthesizing"))) return;
-		log.info("voice.synthesis_started", { runId: run.id });
-		speech = createSpeech(turn.utteranceId, run.id, controller, {
-			collection: {
-				conversationId: run.conversationId,
-				turnId: run.id,
-				granularity: "answer",
-				chunkOrder: null,
-			},
-			context: dialogue.answerContext?.(run.id) ?? { answer, turns: [] },
-			delivery: dialogue.answerDelivery?.(run.id),
-		});
-		speech.append(spokenText(answer), true);
-		await speech!.work;
-		if (controller.signal.aborted) return;
-		if (speech!.error) throw speech!.error;
-		log.info("voice.synthesis_completed", {
-			runId: run.id,
-			count: speech!.chunks.size,
-		});
-		if (speech!.skipped > 0)
-			log.warn("voice.speech_truncated", {
+			if (controller.signal.aborted) return;
+			if (streamError) throw streamError;
+			if (final && ["queued", "running"].includes(final.status)) {
+				await dialogue.cancel(run.id);
+				throw new Error("dialogue_wait_timeout");
+			}
+			if (final?.status !== "completed" || !final.answerMessageId)
+				throw new Error(final?.error ?? "dialogue_incomplete");
+			const answer = dialogue.answerText(run.id);
+			if (!answer) throw new Error("answer_missing");
+			if (!speech) {
+				log.info("voice.synthesis_skipped", {
+					runId: run.id,
+					reason: "auto_speak_disabled",
+				});
+				await store.write((db) =>
+					larm.skipInTransaction?.(db, turn.utteranceId, "tts"),
+				);
+				await advance(turn.utteranceId, "completed");
+				return;
+			}
+			if (!(await advance(turn.utteranceId, "synthesizing"))) return;
+			preparation!.context = dialogue.answerContext?.(run.id) ?? {
+				answer,
+				turns: preparation!.context?.turns ?? [],
+			};
+			append(answer, true);
+			await speech.work;
+			if (controller.signal.aborted) return;
+			if (speech.error) throw speech.error;
+			log.info("voice.synthesis_completed", {
 				runId: run.id,
-				count: speech!.skipped,
+				count: speech.chunks.size,
 			});
-		await advance(turn.utteranceId, speech!.chunks.size ? "ready" : "played");
-		if (!speech!.chunks.size) audio.delete(turn.utteranceId);
+			if (speech.skipped > 0)
+				log.warn("voice.speech_truncated", {
+					runId: run.id,
+					count: speech.skipped,
+				});
+			await advance(turn.utteranceId, speech.chunks.size ? "ready" : "played");
+			if (!speech.chunks.size) audio.delete(turn.utteranceId);
+		} catch (error) {
+			speechController.abort();
+			audio.delete(turn.utteranceId);
+			throw error;
+		} finally {
+			unsubscribe();
+			controller.signal.removeEventListener("abort", stopSpeech);
+			if (controller.signal.aborted) {
+				speechController.abort();
+				audio.delete(turn.utteranceId);
+			}
+		}
 	};
 }

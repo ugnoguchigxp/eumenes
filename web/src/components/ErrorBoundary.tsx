@@ -6,13 +6,13 @@ type State = { failed: boolean };
 
 /** Keeps a render failure inside its own region; only the label and error name are logged. */
 export class ErrorBoundary extends Component<Props, State> {
-	state: State = { failed: false };
+	override state: State = { failed: false };
 
 	static getDerivedStateFromError(): State {
 		return { failed: true };
 	}
 
-	componentDidCatch(error: Error, _info: ErrorInfo) {
+	override componentDidCatch(error: Error, _info: ErrorInfo) {
 		console.error("ui.render_failed", {
 			label: this.props.label,
 			name: error.name,
@@ -24,7 +24,7 @@ export class ErrorBoundary extends Component<Props, State> {
 		this.props.onReset?.();
 	};
 
-	render() {
+	override render() {
 		if (!this.state.failed) return this.props.children;
 		return (
 			<div className="error-boundary" role="alert">

@@ -33,6 +33,7 @@ import {
 import { createApp } from "./app";
 import { appModules } from "./app-modules";
 import { createChanges, type Changes } from "./events";
+import { settle, waitFor } from "../infrastructure/wait-for";
 
 const webServices: WebResearchService[] = [];
 const dirs: string[] = [];
@@ -258,10 +259,9 @@ test("register → fire → history → pause/resume → cancel through the API"
 	expect(occurrences.items).toHaveLength(1);
 	const occ = occurrences.items[0];
 	expect(occ?.state).toBe("dispatched");
-	for (let i = 0; i < 200; i++) {
-		if (h.dialogue.get(occ?.subjectRef ?? "")?.status === "completed") break;
-		await new Promise((r) => setTimeout(r, 5));
-	}
+	await waitFor(
+		() => h.dialogue.get(occ?.subjectRef ?? "")?.status === "completed",
+	);
 	const run = (await (await h.call(`/api/runs/${occ?.subjectRef}`)).json()) as {
 		status: string;
 		sourceKind: string;
@@ -600,7 +600,7 @@ test("service-test concurrency limits cover the slow endpoints but not cancel or
 		post("/api/service-tests/runs"),
 		post("/api/service-tests/diagnose"),
 	];
-	await new Promise((resolve) => setTimeout(resolve, 10));
+	await settle();
 	// The budget of 2 is shared by all slow endpoints.
 	expect((await post("/api/service-tests/uploads")).status).toBe(429);
 	expect((await post("/api/service-tests/catalog/refresh")).status).toBe(429);

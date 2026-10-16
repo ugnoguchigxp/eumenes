@@ -1,183 +1,9 @@
 import { createApp } from "../../../application/app";
 import { registerVoiceDialogue } from "..";
-import {
-	inputMigration,
-	inputSimplificationMigration,
-	inputTextDedupMigration,
-} from "../repository/input";
-import { afterEach, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { openStore } from "../../../infrastructure/sqlite";
-import {
-	createConversationService,
-	migration as conversationMigration,
-	avatarMotionMigration as conversationAvatarMotionMigration,
-	answerDeliveryMigration as conversationAnswerDeliveryMigration,
-} from "../../conversation";
-import {
-	createDialogueService,
-	migration as dialogueMigration,
-	queueLinkMigration,
-} from "../../dialogue";
-import { createQueue, migration as queueMigration } from "../../queue";
-import { migration as schedulerMigration } from "../../scheduler";
-import {
-	createSettings,
-	migration as settingsMigration,
-	epochsMigration as settingsEpochsMigration,
-} from "../../settings";
-import {
-	createInference,
-	migration as inferenceMigration,
-	parentsMigration as inferenceParentsMigration,
-	diagnosticsMigration as inferenceDiagnosticsMigration,
-	migrations as inferenceMigrations,
-} from "../../inference";
-import { createVoiceDialogue, migration, sequenceMigration } from "..";
+import { expect, test } from "bun:test";
 import type { LarmPort } from "../../larm";
-const cleanup: Array<() => Promise<void>> = [];
-afterEach(async () => {
-	for (const close of cleanup.splice(0)) await close();
-});
-function wav() {
-	const b = new Uint8Array(48);
-	b.set(new TextEncoder().encode("RIFF"));
-	b.set(new TextEncoder().encode("WAVE"), 8);
-	return b;
-}
-async function setup(
-	fetcher?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
-	local: Partial<LarmPort> = {},
-) {
-	const dir = mkdtempSync(join(tmpdir(), "eumenes-settings-voice-"));
-	const dbPath = join(dir, "test.db");
-	const store = openStore(dbPath, [
-		conversationMigration,
-		conversationAvatarMotionMigration,
-		conversationAnswerDeliveryMigration,
-		dialogueMigration,
-		migration,
-		queueMigration,
-		schedulerMigration,
-		queueLinkMigration,
-		sequenceMigration,
-		inputMigration,
-		inputSimplificationMigration,
-		inputTextDedupMigration,
-		settingsMigration,
-		inferenceMigration,
-		settingsEpochsMigration,
-		inferenceParentsMigration,
-		inferenceDiagnosticsMigration,
-		...inferenceMigrations.slice(3).map((m) => m.sql),
-	]);
-	const settings = await createSettings(store, { dbPath, env: {} });
-	const value = settings.get();
-	const c = crypto.randomUUID();
-	value.connections.push({
-		id: c,
-		name: "fixture",
-		baseUrl: "http://127.0.0.1:18899/v1",
-		epoch: 0,
-		enabled: true,
-		envRef: null,
-	});
-	for (const p of ["llm", "asr", "tts"] as const) {
-		const id = crypto.randomUUID();
-		value.resources.push({
-			id,
-			connectionId: c,
-			purpose: p,
-			model: `fixture-${p}`,
-			contextWindow: p === "llm" ? 8192 : null,
-			voice: p === "tts" ? "test" : null,
-		});
-		value.routes[p].fallbackId = id;
-	}
-	await settings.apply({
-		requestId: crypto.randomUUID(),
-		expectedRevision: 0,
-		settings: value,
-		keys: [{ connectionId: c, value: "fixture-key" }],
-	});
-	const calls: string[] = [];
-	const defaultFetch = async (url: unknown) => {
-		calls.push(String(url));
-		return String(url).endsWith("audio/transcriptions")
-			? Response.json({ text: "fixture speech" })
-			: String(url).endsWith("audio/speech")
-				? new Response(wav())
-				: Response.json({
-						choices: [{ message: { content: "fixture answer" } }],
-					});
-	};
-	const inference = createInference(store, settings, {
-		fetch: fetcher ?? defaultFetch,
-		larmFactory: () => ({
-			status: () => ({ state: "unconfigured", capabilities: [] }),
-			connect: async () => {},
-			transcribe: async () => {
-				throw new Error("larm_unconfigured");
-			},
-			speak: async () => {
-				throw new Error("larm_unconfigured");
-			},
-			close: async () => {},
-			...local,
-			answer: async (messages, signal, options) =>
-				local.answer
-					? local.answer(messages, signal, options)
-					: Promise.reject(new Error("larm_unconfigured")),
-		}),
-	});
-	const conversation = createConversationService(store);
-	const queue = createQueue(store, { pollMs: 5 });
-	const dialogue = createDialogueService({
-		store,
-		conversation,
-		larm: inference,
-		queue,
-	});
-	const voice = createVoiceDialogue(store, dialogue, inference);
-	queue.start();
-	cleanup.push(async () => {
-		await voice.close();
-		await queue.close();
-		await inference.close();
-		await store.close();
-		rmSync(dir, { recursive: true, force: true });
-	});
-	return {
-		store,
-		settings,
-		inference,
-		conversation,
-		dialogue,
-		voice,
-		queue,
-		calls,
-	};
-}
-async function until(condition: () => boolean) {
-	for (let i = 0; i < 300; i++) {
-		if (condition()) return;
-		await Bun.sleep(5);
-	}
-	throw new Error("condition_not_reached");
-}
-/** Uploads one segment and sends it once transcribed, as the Web does when the speaker is idle. */
-async function say(
-	h: Awaited<ReturnType<typeof setup>>,
-	session: string,
-	id: string,
-) {
-	await h.voice.accept(session, 1, 1, id, wav());
-	await until(() => h.voice.get(id)?.status !== "recognizing");
-	const turn = h.voice.get(id)!;
-	if (turn.status === "input_ready") await h.voice.commit(id, turn.revision);
-}
+import { setup, say, until, wav } from "./settings-voice.fixture";
+
 test("one voice turn uses fallback in all three stages, adopts one answer, and does not repeat duplicate upload", async () => {
 	const h = await setup();
 	const session = crypto.randomUUID(),
@@ -323,7 +149,7 @@ test("revoking a cloud answer aborts downstream TTS and never publishes late aud
 	).toHaveLength(0);
 });
 
-test("streaming text is visible but speech waits for completion; cancellation prevents partial-answer emotion", async () => {
+test("streaming text starts speech before completion and cancellation removes partial audio", async () => {
 	let sink!: ReadableStreamDefaultController<Uint8Array>;
 	const spoken: string[] = [];
 	const h = await setup(async (url, init) => {
@@ -368,8 +194,9 @@ test("streaming text is visible but speech waits for completion; cancellation pr
 	expect(h.conversation.get("main").messages.map((m) => m.text)).toEqual([
 		"質問",
 	]);
-	expect(h.voice.takeAudio(id, 0)).toBeNull();
-	expect(spoken).toEqual([]);
+	await until(() => h.voice.get(id)?.audioChunks.length === 1);
+	expect(h.voice.takeAudio(id, 0)).toEqual(wav());
+	expect(spoken).toEqual(["先にお届けします。"]);
 	await h.voice.cancel(id);
 	expect(h.voice.takeAudio(id, 0)).toBeNull();
 	expect(h.dialogue.progress(runId)?.text).toBe("");
@@ -488,7 +315,7 @@ test("accepted audio chunks publish Laya delivery and cancellation removes the p
 			.get("main")
 			.messages.find((message) => message.role === "assistant")?.delivery
 			?.emotion,
-	).toBe("warmth");
+	).toBeUndefined();
 	expect(h.voice.takeAudio(id, 0)).toEqual(wav());
 	await h.voice.cancel(id);
 	expect(h.voice.get(id)?.audioChunks).toEqual([]);
@@ -546,7 +373,7 @@ test("replaying an answer persists its native motion, rejects unrelated text and
 	});
 });
 
-test("one adopted full-answer emotion works with audio off and is reused for all clauses and replay", async () => {
+test("audio-off answers retain a whole-answer expression and replay judges each clause", async () => {
 	let judgments = 0;
 	const observed: Array<Record<string, string>> = [];
 	const h = await setup(undefined, {
@@ -598,12 +425,13 @@ test("one adopted full-answer emotion works with audio off and is reused for all
 			new AbortController().signal,
 			run.id,
 		);
-		expect(speech.delivery?.id).toBe(saved?.id);
+		expect(speech.delivery?.id).not.toBe(saved?.id);
+		expect(speech.delivery?.emotion).toBe("warmth");
 	}
-	expect(judgments).toBe(1);
+	expect(judgments).toBe(4);
 });
 
-test("automatic three-clause speech shares the adopted full-answer decision", async () => {
+test("automatic three-clause speech judges each clause independently", async () => {
 	let judgments = 0;
 	const h = await setup(undefined, {
 		transcribe: async () => "大切な猫の名前です。",
@@ -631,9 +459,12 @@ test("automatic three-clause speech shares the adopted full-answer decision", as
 	const saved = h.dialogue.answerDelivery(turn.runId!);
 	expect(turn.audioChunks).toHaveLength(3);
 	for (const chunk of turn.audioChunks)
-		expect(chunk.delivery?.id).toBe(saved?.id);
-	expect(saved?.emotion).toBe("warmth");
-	expect(judgments).toBe(1);
+		expect(chunk.delivery?.emotion).toBe("warmth");
+	expect(
+		new Set(turn.audioChunks.map((chunk) => chunk.delivery?.id)).size,
+	).toBe(3);
+	expect(saved).toBeUndefined();
+	expect(judgments).toBe(3);
 });
 
 test("cancelling during final Laya classification rejects late emotion and assistant text", async () => {
@@ -723,6 +554,63 @@ test("a transcript is ready as heard, with no language or endpoint control", asy
 	expect(h.voice.get(id)?.text).toBe("Hello, 今日の予定は？");
 	expect(controlRequests(h)).toEqual({ n: 0 });
 });
+
+test("kana settles Japanese without a control call", async () => {
+	const h = await setup(undefined, {
+		status: ready,
+		transcribe: async () => "今日の予定は？",
+	});
+	const session = crypto.randomUUID(),
+		id = crypto.randomUUID();
+	h.voice.start(session, 1);
+	await h.voice.accept(session, 1, 1, id, wav());
+	await until(() => h.voice.get(id)?.status === "input_ready");
+	expect(controlRequests(h)).toEqual({ n: 0 });
+});
+
+for (const [label, settingsLanguages, heard] of [
+	[
+		"a language outside the allowed set",
+		["ja", "en"],
+		"Ellos son los primeros.",
+	],
+	["English when only Japanese is allowed", ["ja"], "Hello there"],
+	["an unjudgeable transcript", ["ja", "en"], "Mmm hmm"],
+] as const)
+	test(`${label} is dropped as noise and keeps the pending input`, async () => {
+		let count = 0;
+		const h = await setup(
+			undefined,
+			{
+				status: ready,
+				transcribe: async () => (count++ === 0 ? "天気を教えて" : heard),
+			},
+			(text) =>
+				text.startsWith("Ellos")
+					? ["es"]
+					: text.startsWith("Mmm")
+						? []
+						: ["en"],
+		);
+		const value = h.settings.get();
+		value.general.asrLanguages = [...settingsLanguages];
+		await h.settings.apply({
+			requestId: crypto.randomUUID(),
+			expectedRevision: value.revision,
+			settings: value,
+			keys: [],
+		});
+		const session = crypto.randomUUID(),
+			first = crypto.randomUUID(),
+			second = crypto.randomUUID();
+		h.voice.start(session, 1);
+		await h.voice.accept(session, 1, 1, first, wav());
+		await until(() => h.voice.get(first)?.status === "input_ready");
+		await h.voice.accept(session, 1, 2, second, wav());
+		await until(() => h.voice.get(second)?.status === "input_ready");
+		expect(h.voice.get(second)?.text).toBe("天気を教えて");
+		expect(h.dialogue.list("main")).toHaveLength(0);
+	});
 
 test("empty final ASR creates no dialogue", async () => {
 	const h = await setup(undefined, {

@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { eventsClient } from "../../client/events";
 import { ApiError, type Transport } from "../../client/transport";
-import { waitFor } from "../infrastructure/wait-for";
+import { settle, waitFor } from "../infrastructure/wait-for";
 
 async function until(predicate: () => boolean) {
 	await waitFor(() => !!predicate());
@@ -69,7 +69,7 @@ test("two listeners share one authenticated transport, fragmented frames and las
 		stopB();
 	}
 	await until(() => f.cancelled() === 1);
-	await Bun.sleep(20);
+	await settle();
 	expect(f.requests).toHaveLength(1);
 });
 
@@ -106,7 +106,7 @@ test("a half-open stream reconnects; heartbeat comments do not invalidate snapsh
 	});
 	try {
 		f.send(0, ": heartbeat\n\n");
-		await Bun.sleep(2);
+		await settle();
 		expect(notifications).toBe(0);
 		await until(() => f.requests.length === 2);
 		expect(f.cancelled()).toBe(1);
@@ -131,7 +131,7 @@ test("401, 403 and 404 stop automatic reconnect", async () => {
 			{ retryMs: 1 },
 		);
 		const stop = client.subscribeChanges(() => {});
-		await Bun.sleep(15);
+		await settle();
 		stop();
 		expect(calls).toBe(1);
 	}
@@ -157,7 +157,7 @@ test("explicit reconnect repairs a stopped stream without changing mounted liste
 		updates++;
 	});
 	try {
-		await Bun.sleep(15);
+		await settle();
 		expect(calls).toBe(1);
 		unavailable = false;
 		client.reconnectChanges();
@@ -207,7 +207,7 @@ test("reconnectChanges is a no-op while connected unless forced", async () => {
 		f.send(0, "id: s:1\nevent: reset\ndata: {}\n\n");
 		await until(() => client.changesState() === "connected");
 		client.reconnectChanges();
-		await Bun.sleep(10);
+		await settle();
 		expect(f.requests.length).toBe(1);
 		client.reconnectChanges({ force: true });
 		await until(() => f.requests.length === 2);

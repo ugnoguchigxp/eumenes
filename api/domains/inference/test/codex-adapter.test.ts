@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createCodexResearch, controlInstructions } from "..";
 import { codexFailure } from "../adapters/codex-failure";
+import { waitFor } from "../../../infrastructure/wait-for";
 
 const control = {
 	instructions: "固定の調査指示\nTOOLS=[]",
@@ -224,8 +225,7 @@ test("Codex adapter kills its process on cancellation and discards partial answe
 		const abort = new AbortController();
 		const work = adapter.execute(messages, abort.signal, control);
 		// Wait for the fixture's spawn receipt rather than depending on a startup duration.
-		for (let i = 0; i < 200 && !(await Bun.file(f.record).exists()); i++)
-			await Bun.sleep(5);
+		await waitFor(() => Bun.file(f.record).exists());
 		const record = JSON.parse(await readFile(f.record, "utf8"));
 		abort.abort(new Error("cancelled"));
 		await expect(work).rejects.toThrow("cancelled");
@@ -321,8 +321,7 @@ test("cancellation returns even when the child never closes its streams", async 
 		const adapter = createCodexResearch({ HOME: f.dir, PATH: "" }, f.command)!;
 		const abort = new AbortController();
 		const work = adapter.execute(messages, abort.signal, control);
-		for (let i = 0; i < 200 && !(await Bun.file(f.record).exists()); i++)
-			await Bun.sleep(5);
+		await waitFor(() => Bun.file(f.record).exists());
 		const started = performance.now();
 		abort.abort(new Error("cancelled"));
 		await expect(work).rejects.toThrow("cancelled");

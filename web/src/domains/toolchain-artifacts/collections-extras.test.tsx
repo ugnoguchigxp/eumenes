@@ -309,8 +309,8 @@ test("a media column fetches nothing until asked, then previews a same-origin fi
 	vi.stubGlobal(
 		"URL",
 		class extends URL {
-			static createObjectURL = created;
-			static revokeObjectURL = revoked;
+			static override createObjectURL = created;
+			static override revokeObjectURL = revoked;
 		},
 	);
 	const { client } = setup(
