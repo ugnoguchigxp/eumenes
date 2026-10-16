@@ -65,7 +65,8 @@ export const documentSchema = z.object({
 });
 export type ResearchDocument = z.infer<typeof documentSchema>;
 export const resultSchema = z.object({
-	provider: z.literal("llm-fetch@0.1.3"),
+	// Keep retained results from the previous release readable.
+	provider: z.enum(["llm-fetch@0.1.3", "llm-fetch@0.1.4"]),
 	observedAt: z.string().datetime(),
 	cache: z.enum(["miss", "hit", "bypass"]),
 	hits: z

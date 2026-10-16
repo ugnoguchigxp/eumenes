@@ -58,6 +58,14 @@
 
 ## 証跡
 
+### 公開版0.1.4の再取り込み（2026-10-16）
+
+npmレジストリの0.1.4公開を確認後、Eumenes本体と同梱dots-mcpの依存を公開版0.1.4に固定して再インストールした。以前のvendorアーカイブ参照とファイルは削除した。本体・MCPは同じインストール先を解決し、配布ファイル18個はローカルの0.1.4リリース用ビルドと全て一致した。
+
+新規取得結果・User-Agent・キャッシュの版情報を0.1.4に更新した。保存済みの0.1.3結果は引き続き読める。関連する部分・結合試験31件、Web research＋Dotsのdomain検証56件が成功した。今回、アプリ実APIでの元ページ再取得は実施しておらず、前記の未完了状態と区別する。
+
+`published-014-install.log`, `published-014-targeted.log`, `published-014-verify.log`, `published-014-proof.json` に導入・検証結果を保存した。
+
 生HTML・本文・実モデル結果はGit管理外の `verification-reports/web-guard-2026-10-15/` に保存する。通常ログには本文やprovider応答を出していない。
 
 - `guard.json`, `baseline.json`: 元の拒否と検査診断

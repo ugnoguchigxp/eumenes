@@ -172,7 +172,7 @@ export function createWebAcquisition(
 			options.fetcher ??
 			createSafeHttpFetcher({
 				timeoutMs: 15000,
-				userAgent: "Eumenes/0.1 (llm-fetch/0.1.3)",
+				userAgent: "Eumenes/0.1 (llm-fetch/0.1.4)",
 				allowedContentTypes: [
 					"text/html",
 					"text/plain",
@@ -271,7 +271,7 @@ export function createWebAcquisition(
 		async execute(request, signal) {
 			const bodies: AcquiredBody[] = [];
 			const result: ResearchResult = {
-				provider: "llm-fetch@0.1.3",
+				provider: "llm-fetch@0.1.4",
 				observedAt: new Date(now()).toISOString(),
 				cache: "bypass",
 				hits: [],

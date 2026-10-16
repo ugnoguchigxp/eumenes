@@ -47,7 +47,7 @@ export function cacheKey(request: ResearchRequest) {
 	return createHash("sha256")
 		.update(
 			JSON.stringify([
-				"llm-fetch@0.1.3",
+				"llm-fetch@0.1.4",
 				"guard-v3",
 				"result-v1",
 				scope,
