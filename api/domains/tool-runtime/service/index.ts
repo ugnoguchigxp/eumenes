@@ -141,14 +141,9 @@ export function createToolRuntime(
 	 * callers that only carry source information forward.
 	 */
 	function liveSources(db: Database, taskId: string): Source[] {
-		return currentInvocations(db, taskId).flatMap((inv) => {
-			if (!inv.result_ref) return [];
-			try {
-				return resolve(db, inv.result_ref, taskId).sources;
-			} catch {
-				return [];
-			}
-		});
+		return currentInvocations(db, taskId).flatMap((inv) =>
+			inv.result_ref ? (held(db, inv.result_ref, taskId)?.sources ?? []) : [],
+		);
 	}
 	function observations(db: Database, taskId: string) {
 		const invocations = currentInvocations(db, taskId);
