@@ -2,7 +2,7 @@
 
 状態: 実装済み・固定試験済み。実LARMでの品質受入は未実施。作成日: 2026-10-14。
 
-対象は画像ファイル・撮影画像・短い動画の既存OCRアーティファクト。補正を担当する「SubAgent」はEumenes内で版付きProfileとSkillを持つ専門実行単位を指す。この設計作業で別のCodexチャットへ仕事を送る意味ではない。ボタンから直接起動するため、**補正専用ツールチェーンは登録しない**。会話経由で開いたOCR画面にもボタンを表示するため、既存`ocr.manage`の表示先revisionだけは更新する。登録と検証は[ツールチェーン登録](../docs/toolchain-extension.md)と[検証手順](../docs/toolchain-extension-verification.md)に従う。
+対象は画像ファイル・撮影画像・短い動画の既存OCRアーティファクト。補正を担当する「SubAgent」はEumenes内で版付きProfileとSkillを持つ専門実行単位を指す。この設計作業で別のCodexチャットへ仕事を送る意味ではない。ボタンから直接起動するため、**補正専用ツールチェーンは登録しない**。会話経由で開いたOCR画面にもボタンを表示するため、既存`ocr.manage`の表示先revisionだけは更新する。登録と検証は[ツールチェーン登録](../../docs/toolchain-extension.md)と[検証手順](../../docs/toolchain-extension-verification.md)に従う。
 
 ## 1. 目的と完了条件
 
@@ -14,11 +14,11 @@ OCR完了後に利用者が「補正案を作る」を押すと、元画像とOC
 
 | 現状 | 根拠と判断 |
 | --- | --- |
-| OCRは元ファイル、原文、行のconfidence・polygon、動画フレームと時刻を保存する | [`docs/ocr.md`](../docs/ocr.md)、`api/domains/ocr/contracts/index.ts`、`repository/index.ts`。原本と位置を補正入力・比較表示の根拠にする |
+| OCRは元ファイル、原文、行のconfidence・polygon、動画フレームと時刻を保存する | [`docs/ocr.md`](../../docs/ocr.md)、`api/domains/ocr/contracts/index.ts`、`repository/index.ts`。原本と位置を補正入力・比較表示の根拠にする |
 | OCR画面は元資料と結果欄を表示し、コピー・会話への追加ができる | `packages/design-system/src/components/OcrWorkspace/OcrPanel.tsx`、`web/src/domains/ocr/use-ocr-runtime.ts`。既存の履歴と画面を拡張する |
 | 現行の`ocr.manage`は原文を読む・開く・取消を担当し、補正は未定義 | `api/domains/capabilities/bundles/ocr.bundle.json`。旧revisionを変更せず、新しい定義とartifact revisionを登録する |
 | LLMの型付き出力、版付きProfile/Skill、キュー、取消後の受理判定がある | `api/domains/image/service/handlers.ts`、`api/domains/capabilities/service/bound.ts`、`api/domains/inference`。ただし画像生成の`captureControlInTransaction`は会話実行中の親要求を要する。ボタンには認可済みUI操作を起点とする独立した制御要求が必要 |
-| LARMの会話入力は画像を受けられるが、visionとchatInput契約・容量制限が必要 | [`docs/chat-images.md`](../docs/chat-images.md)、`api/domains/larm/service/chat-input.ts`。保存済み接続先の能力を実行時に検査する |
+| LARMの会話入力は画像を受けられるが、visionとchatInput契約・容量制限が必要 | [`docs/chat-images.md`](../../docs/chat-images.md)、`api/domains/larm/service/chat-input.ts`。保存済み接続先の能力を実行時に検査する |
 | OCRはWebPと動画を受けるが、LLM入力はJPEG/PNG/BMP画像。backend側の動画フレーム抽出経路は見つからない | `api/domains/larm/contracts/chat-input.ts`と現行source検索。形式変換と動画から正確な時刻の1フレームを得る処理を先行させる |
 
 [共通資料](https://chatgpt.com/space/page_e38fb71deba88191bcefebcaa046ea60)はOCR原文の保存と、訂正・分析を別操作にすることを指定している。本機能はその別操作として追加する。元OCR APIの契約やLARM接続先を変更しない。

@@ -1,6 +1,6 @@
 # アーティファクト枠内の画像UI
 
-[実装・検証記録](../../image-embedded-implementation-2026-10-13.md)。通常の制作・一覧をembedded表示にし、会話と並べる。preview表示のみ160px以内へ縮小し、ダウンロード画像の実寸は維持。
+[実装・検証記録](../../.archived/image-embedded-implementation-2026-10-13.md)。通常の制作・一覧をembedded表示にし、会話と並べる。preview表示のみ160px以内へ縮小し、ダウンロード画像の実寸は維持。
 
 | 段階 | 結果 |
 | --- | --- |

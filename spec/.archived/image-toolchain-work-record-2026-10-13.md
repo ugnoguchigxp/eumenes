@@ -29,7 +29,7 @@
 - verify:allは着手時から存在する `web/src/domains/settings/MemoryItemsPanel.test.tsx: forbidden dependency settings -> memory` で境界チェック中に停止。担当外のため修正せず、以降の全体gateは未実行。新機能の単体・利用側成功と全体成功を区別する。
 - 実APIの生成・画像取得・デコードは成功。実LLMの担当選択・計画・結果採用はlibrary表示で確認した。実LLM経由の画像生成から会話返却までを一続きにしたlive生成は未実施（画像生成POSTは今回1回）。機器依存の操作は本機能にないため実機器試験は対象外。
 - 最終差分: 対象発話や題材の専用分岐・辞書・固定応答は製品コードに追加しない。追加した分岐は登録runtime・API引数・状態・MIME・権限・許可取得URLの接続と検証だけ。既存の別作業の未コミット差分を保持。
-- 検証証拠は [image-toolchain-2026-10-13](verification/image-toolchain-2026-10-13/) に保存。画像本体とlive経過は上記verification-reportsの専用出力先。
+- 検証証拠は [image-toolchain-2026-10-13](../verification/image-toolchain-2026-10-13) に保存。画像本体とlive経過は上記verification-reportsの専用出力先。
 - context_compile 1回、compile_eval 1回（runId 00000000-0000-0000-18dd-f51d9b6052d4）。
 
 残作業・制約: 依頼された実装・固定試験・実LARMの生成・UI受入は完了。全体gateの完了には担当外の設定試験の境界違反解消が必要。担当外の改修依頼なしには修正しない。

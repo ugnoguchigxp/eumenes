@@ -18,7 +18,7 @@
 
 初版の取得結果の「保存」は、backendメモリー内の期限付き保管とする。タスク中に読み返す用途であり、別の依頼で古い検索結果を再利用する永続キャッシュではない。backend再起動後の継続読取りは提供せず、参照期限切れを明示する。既存の安定資料キャッシュの利用条件は維持する。
 
-既存設計との関係は、[Web取得の計画](web-research-cache-implementation-plan-2026-10-09.md)、[取得経路の学習計画](research-route-learning-implementation-plan-2026-10-09.md)、[Memory接続計画](memory-system-incremental-adoption-concept.md)、[domain境界](../docs/domains.md)に従う。本書は検索中の読取り操作と会話原文への参照を追加する差分計画である。別リポジトリのMemory本体の変更は前提にしない。
+既存設計との関係は、[Web取得の計画](web-research-cache-implementation-plan-2026-10-09.md)、[取得経路の学習計画](.archived/research-route-learning-implementation-plan-2026-10-09.md)、[Memory接続計画](memory-system-incremental-adoption-concept.md)、[domain境界](../docs/domains.md)に従う。本書は検索中の読取り操作と会話原文への参照を追加する差分計画である。別リポジトリのMemory本体の変更は前提にしない。
 
 基準はEumenesの `bc8cc6c` と作成時点の作業ツリー。関連箇所には進行中の未コミット変更があるため、実装着手時に最新コードと差分を読み直し、本書の関数名・契約との対応を更新する。他の変更を巻き戻さない。
 

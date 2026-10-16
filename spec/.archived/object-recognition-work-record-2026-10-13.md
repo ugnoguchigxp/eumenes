@@ -10,7 +10,7 @@
 
 既存の認証・Origin検査、settingsの暗号化、SQLite単一writer、queue、会話の公開保存操作、command型ツールチェーン、DesignSystem/OpenUIを利用する。一般の画像・動画添付保存は現状存在しないため、今回の認可付き入力保存APIを選択と撮影で共有する。新規ライブラリは不要。
 
-1. 生成した画面デザインを保存（完了）: [workspace.png](design/object-recognition-2026-10-13/workspace.png)。imagegen組込みツール、ui-mockup、白基調・teal・左右にpreview/座標一覧・時刻列・進捗/取消/会話追加というプロンプトで生成。
+1. 生成した画面デザインを保存（完了）: [workspace.png](../design/object-recognition-2026-10-13/workspace.png)。imagegen組込みツール、ui-mockup、白基調・teal・左右にpreview/座標一覧・時刻列・進捗/取消/会話追加というプロンプトで生成。
 2. settings・API契約・保存・queueの解析/照会/取消。
 3. profile・SKILL・flat tool・package・toolchainをcommand経路へ登録。
 4. DesignSystemの入力/検出表示とOpenUIのJSON/source/actions、ブラウザhost。
@@ -51,7 +51,7 @@ profile/skill/tool/package/toolchainはobject-recognition.manage@1。SystemConte
 | 実接続・正式配備 | backend保存設定の再確認（16:58 JST）でも未登録。上流の正式配備・業務credential発行は未確認。実解析liveは未実施 |
 | MacBook物理カメラ | 未実施。ブラウザ仮想カメラ成功と区別 |
 
-証拠は[verification](verification/object-recognition-2026-10-13/)に保存。生成デザインと正確な生成指示は[design](design/object-recognition-2026-10-13/)に保存し、製品UIにbitmapを組み込んでいない。画面はアーティファクト部分のみ。動画の全画面操作も提供しない。
+証拠は[verification](../verification/object-recognition-2026-10-13)に保存。生成デザインと正確な生成指示は[design](../design/object-recognition-2026-10-13)に保存し、製品UIにbitmapを組み込んでいない。画面はアーティファクト部分のみ。動画の全画面操作も提供しない。
 
 差分点検: 固定発話・個別物体名による製品側のroutingや意味判定は追加していない。API・schema・状態・所有者・登録backendへの分岐に限る。資料切替中の遅い受付応答も選択を上書きしない。未コミットの画像・Excalidraw・設定等の別作業は維持した。共通ファイルの編集は登録・接続・契約と、操作引数検証の切り出しに限る。git diff --checkは成功。
 
@@ -70,9 +70,9 @@ initial_instructions 1回、context_compile 1回、compile_eval 1回。compile r
 
 追加実装済み: 認証方式 `dedicated` / `larm` を追加し、共有方式では既存の `resolveLarmToken` で `LARM_API_TOKEN`（既存LARM互換の次候補は `LARM_CONTROL_TOKEN`）を参照する。追加migration 0005で既存設定は専用方式のまま保持し、0004のSQLを変更していない。共有credentialをSQLiteへ再保存しない。公開API・Artifactに返すのは方式と利用可能のbooleanだけ。同じ接続先では専用ciphertextを残して復帰でき、別の接続先に変更すると以前の専用credentialを消去する。共有方式でcredential欠落時は失敗し、専用方式へ自動fallbackしない。高entropy長期credentialのprivate fingerprintをjob bindingへ保存し、設定revisionが同じでも共有credential変更後の応答を不採用とする。指紋は公開API・モデル・ログに渡さない。
 
-Artifact内の既存画面に認証方式選択を追加した。操作は既存OpenUI action→認証済みsettings PUTを使い、接続先を再入力せず保存済み設定を維持する。接続先が未登録の場合は切替を無効にし、LARM制御入口を物体認識入口として推測しない。認証方式の説明と利用手順は [docs/object-recognition.md](../docs/object-recognition.md) を更新した。
+Artifact内の既存画面に認証方式選択を追加した。操作は既存OpenUI action→認証済みsettings PUTを使い、接続先を再入力せず保存済み設定を維持する。接続先が未登録の場合は切替を無効にし、LARM制御入口を物体認識入口として推測しない。認証方式の説明と利用手順は [docs/object-recognition.md](../../docs/object-recognition.md) を更新した。
 
-追加対応の検証結果（証拠: [shared-credential verification](verification/object-recognition-shared-credential-2026-10-13/)）:
+追加対応の検証結果（証拠: [shared-credential verification](../verification/object-recognition-shared-credential-2026-10-13)）:
 
 | 確認 | 結果 |
 | --- | --- |
@@ -100,4 +100,4 @@ Artifact内の既存画面に認証方式選択を追加した。操作は既存
 
 実画像でyolo26nのbus 1件・person 4件、3秒動画の6時刻の検出、開始後の協調取消、動画1秒の観測を会話へ取り込む実LLM run completedを確認。19:41:49にbackendを正常終了し19:42:07に再起動。設定・結果・元媒体が保持され、workerのidle停止後も閲覧できた。新しい解析でworkerのgeneration 4→5の再起動と成功を確認。OCRは停止したまま。公開設定・結果と運用ログにcredential値がないことも確認した。backendとSSHトンネルは稼働したままにしている。
 
-前回の「接続先未登録・正式配備未確認」は以前の調査時点の結果であり、今回の実測では更新されている。[実接続記録](verification/object-recognition-live-2026-10-13/README.md)に接続経路・正式配備・各stage・相関ID・起動状態を保存。実カメラ、今回のlive結果のブラウザ表示、実際に動く物体の動画は未実施。別のmemory-agentで既存ProfileのLARM404を観測したが担当外として未修正。製品実装は変更せず、実接続確認だけを追加した。
+前回の「接続先未登録・正式配備未確認」は以前の調査時点の結果であり、今回の実測では更新されている。[実接続記録](../verification/object-recognition-live-2026-10-13/README.md)に接続経路・正式配備・各stage・相関ID・起動状態を保存。実カメラ、今回のlive結果のブラウザ表示、実際に動く物体の動画は未実施。別のmemory-agentで既存ProfileのLARM404を観測したが担当外として未修正。製品実装は変更せず、実接続確認だけを追加した。

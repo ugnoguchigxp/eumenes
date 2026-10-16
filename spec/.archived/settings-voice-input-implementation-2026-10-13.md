@@ -24,4 +24,4 @@ SettingsSectionの制御入力・区分・詳細欄・許可操作を拡張す�
 
 ## 現在地
 
-音声と入力の実装・部分試験・結合試験・ブラウザ通し確認を完了。詳細は[検証記録](verification/settings-voice-input-2026-10-13/README.md)。全体gateは既存の担当外size-budgetで停止。旧設定画面の削除とほかのフォームの移行は後続。
+音声と入力の実装・部分試験・結合試験・ブラウザ通し確認を完了。詳細は[検証記録](../verification/settings-voice-input-2026-10-13/README.md)。全体gateは既存の担当外size-budgetで停止。旧設定画面の削除とほかのフォームの移行は後続。

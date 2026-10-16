@@ -1,6 +1,6 @@
 # 記憶（Memory と Steward）
 
-会話エージェントの記憶と ContextWindow は、背景エージェント「記憶担当（steward）」が管理する。本書は現在の仕組みと調査手順の正本である。設計の経緯は[記憶担当の実装計画](../spec/memory-steward-implementation-plan-2026-10-14.md)、domain の依存は[domain 一覧](domains.md)、ログの見方は[ログ](logging.md)にある。
+会話エージェントの記憶と ContextWindow は、背景エージェント「記憶担当（steward）」が管理する。本書は現在の仕組みと調査手順の正本である。設計の経緯は[記憶担当の実装計画](../spec/.archived/memory-steward-implementation-plan-2026-10-14.md)、domain の依存は[domain 一覧](domains.md)、ログの見方は[ログ](logging.md)にある。
 
 「実装済み」と「実機で観測済み」は別である。fixture 試験の結果と live の観測結果は混ぜず、`spec/verification/memory-steward-2026-10-14/README.md` に分けて記録する。
 

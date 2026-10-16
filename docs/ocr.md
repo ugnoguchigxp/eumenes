@@ -1,6 +1,6 @@
 # OCR：画像・動画から文字を読み取る
 
-2026年10月14日、`ocr-host` の画像・短い動画の OCR と「文字を読み取る」Artifact を登録した。共通資料の API 契約は [Eumenes Excalidraw OCR OpenCV 連携の共通資料](https://chatgpt.com/space/page_e38fb71deba88191bcefebcaa046ea60) を正本とする。画面の操作契約は [設計記録](../spec/ocr-artifact-design-2026-10-14.md) を参照する。
+2026年10月14日、`ocr-host` の画像・短い動画の OCR と「文字を読み取る」Artifact を登録した。共通資料の API 契約は [Eumenes Excalidraw OCR OpenCV 連携の共通資料](https://chatgpt.com/space/page_e38fb71deba88191bcefebcaa046ea60) を正本とする。画面の操作契約は [設計記録](../spec/.archived/ocr-artifact-design-2026-10-14.md) を参照する。
 
 ## 接続と入力
 

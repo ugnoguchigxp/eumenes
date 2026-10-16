@@ -22,4 +22,4 @@
 
 差分点検：着手時の対象ファイルを`/tmp/eumenes-singleton-artifact-2026-10-12`へコピーし、それとの比較で今回の変更を点検した。Workspace.tsxには作業中に別のpane表示条件の変更が入っており、それを保持して最新の型・画面確認を行った。他の大きな別作業差分を巻き戻していない。追加した分岐はUI source／表示選択／契約・状態管理であり、利用者の語句や音楽の意味判断を固定ルールで代替していない。DB・LLM・公開APIは変更せず、画像生成はモックのまま。今回の修正はcommit／pushしていない。
 
-証拠：[メニュー](verification/singleton-music-artifact-2026-10-12/launcher.png)、[2画面とplaylist選択](verification/singleton-music-artifact-2026-10-12/playlist.png)、同ディレクトリのAPI経路・画像未呼出し・ログ・全体結果。通知エラーは音楽専用fixtureに通知APIがないためで、今回の操作失敗ではない。外部の音楽生成・画像生成は実行していない。実LLMの判断や実機器受入とは区別する。Context Stillはこの修正でcontext_compile／compile_evalを各1回使用。
+証拠：[メニュー](../verification/singleton-music-artifact-2026-10-12/launcher.png)、[2画面とplaylist選択](../verification/singleton-music-artifact-2026-10-12/playlist.png)、同ディレクトリのAPI経路・画像未呼出し・ログ・全体結果。通知エラーは音楽専用fixtureに通知APIがないためで、今回の操作失敗ではない。外部の音楽生成・画像生成は実行していない。実LLMの判断や実機器受入とは区別する。Context Stillはこの修正でcontext_compile／compile_evalを各1回使用。

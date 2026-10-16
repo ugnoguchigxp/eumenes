@@ -58,7 +58,7 @@ verify:allはbackend試験の失敗で後続を実行しなかった。その後
 
 ## 保存した証拠・差分点検
 
-[画面・検証記録](verification/music-generation-ui-2026-10-11/README.md)にdesktop／ジャンル／生成中／390pxの画像、API経路のfixture記録、domainログ、全体2回と個別回帰の結果を保存した。着手時に既存の未コミット変更を退避参照し、今回の差分だけを比較した。担当外の変更を巻き戻さず、キーワードによる意味判断や画像生成通信を追加していない。git diff --checkは成功。
+[画面・検証記録](../verification/music-generation-ui-2026-10-11/README.md)にdesktop／ジャンル／生成中／390pxの画像、API経路のfixture記録、domainログ、全体2回と個別回帰の結果を保存した。着手時に既存の未コミット変更を退避参照し、今回の差分だけを比較した。担当外の変更を巻き戻さず、キーワードによる意味判断や画像生成通信を追加していない。git diff --checkは成功。
 
 context_compile／compile_evalは本会話で各2回（設計段階1回、実装段階1回）。実装の評価は固定試験後に登録した。
 
@@ -66,6 +66,6 @@ context_compile／compile_evalは本会話で各2回（設計段階1回、実装
 
 利用者から「画像にはテンポや雰囲気があったが、実装の画像では見えない」と指摘。項目自体は存在していたが、展開した60ジャンルが縦方向を占めていた。MusicCreationFormの雰囲気・楽器・テンポ・長さを上部へ移し、ジャンル一覧を高さ16remの独立したスクロール領域にした。全ジャンル、検索、キーボード操作、歌声、プロンプト反映を保持する。意味判断やLLMの指示、API・OpenUI契約は変更していない。
 
-完了条件は、desktop初期表示で基本4項目の全体がスクロール領域内に収まり、雰囲気・テンポの選択がpromptへ反映され、既存の生成・取消・再生と390px幅の操作が通ること。ブラウザ確認に実座標の検証を追加して成功した。MusicCreationForm／MusicWorkspaceの9試験、部品build（型検査含む）、format・lint・size・差分確認も成功。証拠は[修正後の画面](verification/music-basic-fields-2026-10-11/overview.png)と同フォルダのログ・API記録。
+完了条件は、desktop初期表示で基本4項目の全体がスクロール領域内に収まり、雰囲気・テンポの選択がpromptへ反映され、既存の生成・取消・再生と390px幅の操作が通ること。ブラウザ確認に実座標の検証を追加して成功した。MusicCreationForm／MusicWorkspaceの9試験、部品build（型検査含む）、format・lint・size・差分確認も成功。証拠は[修正後の画面](../verification/music-basic-fields-2026-10-11/overview.png)と同フォルダのログ・API記録。
 
 今回の変更は既存部品内の配置とスクロール範囲だけのため、部品→利用画面の結合→生成・取消・再生の通し確認に絞った。直前の全体gateで残った担当外のログ試験はこの修正で解消したと扱わず、全体gateは再実行していない。画像生成は引き続き無効、外部生成も実行していない。

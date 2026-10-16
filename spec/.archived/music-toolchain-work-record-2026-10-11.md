@@ -4,7 +4,7 @@
 
 現在の状態: 楽曲担当・Skill・SystemContext・生成API・OpenUI Artifactの接続とCodex Skill化を実施済み。最新の作業単位10では生成のOpus対応、実生成1曲、保存音声のブラウザ確認、全体回帰を完了した。各作業時点の結果は末尾の続行記録で区別する。音楽再生プレイヤーツールチェーンの分離は後続作業。
 
-会話から楽曲生成APIを利用し、生成した曲をArtifactで再生する機能の着手記録。初回の記録時点では既存コードの調査と再利用候補の整理まで行った。その時点では新機能の実装、楽曲生成APIの実行、動作試験は行っていない。続行後の実装・検証結果は末尾の作業単位別記録と[受入記録](verification/music-2026-10-11/README.md)を参照。ユーザーの依頼により、実装を進める前にこの記録を保存した。
+会話から楽曲生成APIを利用し、生成した曲をArtifactで再生する機能の着手記録。初回の記録時点では既存コードの調査と再利用候補の整理まで行った。その時点では新機能の実装、楽曲生成APIの実行、動作試験は行っていない。続行後の実装・検証結果は末尾の作業単位別記録と[受入記録](../verification/music-2026-10-11/README.md)を参照。ユーザーの依頼により、実装を進める前にこの記録を保存した。
 
 後でCodexのSkillにするため、事実と手順候補を分けている。以下は初回調査の記録を保存したもので、末尾の「続行記録」以降に実装・検証の実績を追記する。
 
@@ -38,7 +38,7 @@ Tetrisは試験入力にだけ使う。特定の作品名や発話に対応し�
 
 ### 楽曲APIと実行管理
 
-接続の実装は [playground.ts](../api/domains/larm/service/playground.ts)、型は [playground contracts](../api/domains/larm/contracts/playground.ts)。`createLarmPlayground` がサービス発見、実行、成果物取得、既存楽曲jobの追跡を提供する。楽曲用selectorは `SAAA-w-music`、protocolは `larm.music-generation.v1`。
+接続の実装は [playground.ts](../../api/domains/larm/service/playground.ts)、型は [playground contracts](../../api/domains/larm/contracts/playground.ts)。`createLarmPlayground` がサービス発見、実行、成果物取得、既存楽曲jobの追跡を提供する。楽曲用selectorは `SAAA-w-music`、protocolは `larm.music-generation.v1`。
 
 現在の楽曲要求は以下の形になっている。これは既存コードの事実であり、今回新たに決めた仕様ではない。
 
@@ -60,30 +60,30 @@ Tetrisは試験入力にだけ使う。特定の作品名や発話に対応し�
 - 完了時はjobId、成果物metadataのID、取得先のpathなどを検査し、音声を取得する。サービス一覧のモデル名と実行モデル名は異なることがあり、実行モデル名を別に扱う。
 - 取消後に遅れて202応答が返った場合も、jobIdを回収して同じjobへ取消を送る処理がある。
 
-サービス試用側の [service/index.ts](../api/domains/service-tests/service/index.ts) には、保存済み設定を使う接続、進捗保存、成果物の扱い、再起動時に既知のjobを追跡する処理がある。製品の楽曲機能を試用domainへ依存させる案はまだ採用していない。まず下位のLARM接続を再利用する。
+サービス試用側の [service/index.ts](../../api/domains/service-tests/service/index.ts) には、保存済み設定を使う接続、進捗保存、成果物の扱い、再起動時に既知のjobを追跡する処理がある。製品の楽曲機能を試用domainへ依存させる案はまだ採用していない。まず下位のLARM接続を再利用する。
 
-設定画面の利用範囲は [settings.md](../docs/settings.md)、過去の試験とliveの記録は [service-testsの検証記録](verification/service-tests/README.md) にある。過去の成功を、今回の会話からArtifactまでの成功として扱わない。
+設定画面の利用範囲は [settings.md](../../docs/settings.md)、過去の試験とliveの記録は [service-testsの検証記録](../verification/service-tests/README.md) にある。過去の成功を、今回の会話からArtifactまでの成功として扱わない。
 
 ### 会話とツールチェーン
 
 | 参照先 | 確認した役割 |
 | --- | --- |
-| [conversation-tools.ts](../api/domains/dialogue/service/conversation-tools.ts) | 会話に公開するツール、入力の契約、ツールに対応した方針 |
-| [generation-operation.ts](../api/domains/dialogue/service/generation-operation.ts) | 会話モデルが選んだ操作を受け付け、委任する処理 |
-| [generation-prepare.ts](../api/domains/dialogue/service/generation-prepare.ts) | 結果を受け取った会話の次の入力を組み立てる処理 |
-| [start-task.ts](../api/domains/agent-runtime/service/start-task.ts) | 既存のweb、historyなどの経路選択 |
-| [toolchain.ts](../api/application/toolchain.ts) | capability、tool、agent-runtimeの組立て |
-| [server.ts](../api/application/server.ts) | domain、queue、inference、dialogueの接続と起動 |
+| [conversation-tools.ts](../../api/domains/dialogue/service/conversation-tools.ts) | 会話に公開するツール、入力の契約、ツールに対応した方針 |
+| [generation-operation.ts](../../api/domains/dialogue/service/generation-operation.ts) | 会話モデルが選んだ操作を受け付け、委任する処理 |
+| [generation-prepare.ts](../../api/domains/dialogue/service/generation-prepare.ts) | 結果を受け取った会話の次の入力を組み立てる処理 |
+| [start-task.ts](../../api/domains/agent-runtime/service/start-task.ts) | 既存のweb、historyなどの経路選択 |
+| [toolchain.ts](../../api/application/toolchain.ts) | capability、tool、agent-runtimeの組立て |
+| [server.ts](../../api/application/server.ts) | domain、queue、inference、dialogueの接続と起動 |
 
 既存の研究用runtimeをそのまま楽曲生成に使えるとはまだ判断していない。長時間の生成待ち、音声成果物、取消を既存の契約にどう載せるかが残っている。新しいexecutorやdomainの追加は未決定である。
 
-登録の種類と変更箇所は [ツールチェーン拡張手順](../docs/toolchain-extension.md)、検証の区切りは [ツールチェーン拡張の検証手順](../docs/toolchain-extension-verification.md) を参照する。
+登録の種類と変更箇所は [ツールチェーン拡張手順](../../docs/toolchain-extension.md)、検証の区切りは [ツールチェーン拡張の検証手順](../../docs/toolchain-extension-verification.md) を参照する。
 
 ### Artifactと再生
 
-[Artifactの型](../web/src/domains/artifact/store/index.ts) と [ArtifactPanel](../web/src/components/domains/artifact/ArtifactPanel.tsx) を確認した。現在はmarkdown、showcase、timerに対応し、楽曲専用の表示はない。
+[Artifactの型](../../web/src/domains/artifact/store/index.ts) と [ArtifactPanel](../../web/src/components/domains/artifact/ArtifactPanel.tsx) を確認した。現在はmarkdown、showcase、timerに対応し、楽曲専用の表示はない。
 
-会話runからArtifactを開く参考として [useTimerArtifacts.ts](../web/src/domains/timers/useTimerArtifacts.ts) を確認した。楽曲について同じ接続方式を採用するかは未決定。UIの更新方式は [realtime.md](../docs/realtime.md) のSSE方針と整合させる必要がある。
+会話runからArtifactを開く参考として [useTimerArtifacts.ts](../../web/src/domains/timers/useTimerArtifacts.ts) を確認した。楽曲について同じ接続方式を採用するかは未決定。UIの更新方式は [realtime.md](../../docs/realtime.md) のSSE方針と整合させる必要がある。
 
 「再生を動的に作る」を、生成結果に応じてプレイヤーを構成することまでとするか、LLMによるUI定義の生成まで含めるかは、実装前に整理する。固定の楽曲プレイヤーを追加しただけで、要求をすべて満たしたとは扱わない。
 
@@ -103,7 +103,7 @@ Tetrisは試験入力にだけ使う。特定の作品名や発話に対応し�
 
 今回の楽曲作業で新たに実行したテストは0件。fixture、実LLM、実生成API、ブラウザ再生はいずれも未実施。
 
-既存の [LARM試験](../api/domains/larm/test/playground.test.ts) には成果物取得と遅延応答後の取消があり、[fixture server](../scripts/larm-fixture-server.ts) には生成受付、完了状態、metadata、音声の応答がある。これだけでは、実LLMによるテーマの装飾や30秒の実音声生成は確認できない。
+既存の [LARM試験](../../api/domains/larm/test/playground.test.ts) には成果物取得と遅延応答後の取消があり、[fixture server](../../scripts/larm-fixture-server.ts) には生成受付、完了状態、metadata、音声の応答がある。これだけでは、実LLMによるテーマの装飾や30秒の実音声生成は確認できない。
 
 実装後は部分、結合、通しの順に確認する。途中で通し試験を行う場合は、何を確認するためかを先に明示する。過去の依頼では通し確認を1回に限定し、失敗後の再試行や追加修正を止める指定が繰り返されている。今回の実行時にも回数と停止条件を明記し、無断で試行を重ねない。
 
@@ -159,7 +159,7 @@ Skill化の際は、汎用手順を本文、Eumenes固有のパスと契約を�
 
 ## 続行記録 作業単位4 実生成とブラウザ再生
 
-実LLMによる担当選択と生成指示作成、LARMの楽曲生成API、音声取得、会話への結果返却、Artifact再生を1回実行して成功。曲名は「8-Bit Tetris Rush」、実音声はMP3・48kHz・ステレオ・30.000秒。依頼から最終回答まで約56.5秒。ブラウザで約1秒再生し、時刻の進行とエラーがないことを確認した。音声、画面、全経過、生成指示と会話の全文を[受入記録](verification/music-2026-10-11/README.md)へ保存した。
+実LLMによる担当選択と生成指示作成、LARMの楽曲生成API、音声取得、会話への結果返却、Artifact再生を1回実行して成功。曲名は「8-Bit Tetris Rush」、実音声はMP3・48kHz・ステレオ・30.000秒。依頼から最終回答まで約56.5秒。ブラウザで約1秒再生し、時刻の進行とエラーがないことを確認した。音声、画面、全経過、生成指示と会話の全文を[受入記録](../verification/music-2026-10-11/README.md)へ保存した。
 
 表示確認でタブの初期名「楽曲を制作中」が完了後も残る点を見つけ、初期名を「楽曲」へ変更した。音声は再生成していない。実スピーカーでの聴取と音楽的な品質評価は行っていない。
 
@@ -190,8 +190,8 @@ Skill化の際は、汎用手順を本文、Eumenes固有のパスと契約を�
 
 ## 最終確認
 
-- `verify --domain music`: 成功。部分試験3件を含む。[最終出力](verification/music-2026-10-11/verify-music-final.txt)
-- `verify --domain dialogue`: 成功。backend 119件、web 6件。[最終出力](verification/music-2026-10-11/verify-dialogue-final.txt)
+- `verify --domain music`: 成功。部分試験3件を含む。[最終出力](../verification/music-2026-10-11/verify-music-final.txt)
+- `verify --domain dialogue`: 成功。backend 119件、web 6件。[最終出力](../verification/music-2026-10-11/verify-dialogue-final.txt)
 - 全体の型検査、lint、整形、サイズ、SQL境界、差分の空白検査は成功。全体検査の一括判定に関する制約は作業単位5のとおり。
 - 製品実装、今回指定の実生成、ブラウザ再生、作業単位別の記録を完了。実生成は1回。変更は未コミット。
 
@@ -217,7 +217,7 @@ Skill化の際は、汎用手順を本文、Eumenes固有のパスと契約を�
 
 ユーザーの指定でMusicPlayerとPlaylistをDesignSystemへ実装。画像生成したUI案を参考に、再生・一時停止・シーク・前後10秒・前後の曲・曲選択を追加した。サムネイル生成は後続の画像生成ツールチェーンで検討するため、現在は音符の仮表示。追加依頼の生成中画面はGenerationStatusとして独立させ、音楽や画像に依存しないpropsで状態・実測進捗・取消・失敗を表示する。
 
-DesignSystem全単体1,095件、新規部品9件、型、build、ブラウザ12項目を確認。目視で見つかったPlaylistのCSS分離ミスは修正して再確認した。OpenUI登録・JSON合成・既存MusicArtifactの置換は未実施。楽曲生成APIを再実行せず、ブラウザ再生はローカル試験音源を使った。詳細・実画面・画像生成promptは [検証記録](verification/music-player-2026-10-11/README.md) に保存。
+DesignSystem全単体1,095件、新規部品9件、型、build、ブラウザ12項目を確認。目視で見つかったPlaylistのCSS分離ミスは修正して再確認した。OpenUI登録・JSON合成・既存MusicArtifactの置換は未実施。楽曲生成APIを再実行せず、ブラウザ再生はローカル試験音源を使った。詳細・実画面・画像生成promptは [検証記録](../verification/music-player-2026-10-11/README.md) に保存。
 
 
 ## 続行記録 作業単位8 OpenUI登録・JSON合成・保存済み楽曲での確認
@@ -228,7 +228,7 @@ MusicPlayer・Playlist・GenerationStatusをOpenUIへ登録し、既存viewも�
 
 全体回帰は1回で成功。backend等1,471、Web 293、client 329、DesignSystem 1,095、ブラウザ44が成功。スキップはbackend 1・ブラウザ1。全体の型・lint・整形・境界・サイズ・build、検証入力の同一性も成功。所要468,965 ms。長い既存関数の制限を守るため、Appの音楽タブを開くcallbackとShowcaseのサンプルタブを同じファイル内で分離した。
 
-詳細、失敗原因、保存音声fixtureの範囲、JSON登録例、実画面は [OpenUI音楽UIの検証記録](verification/music-openui-2026-10-11/README.md) と [OpenUIのドキュメント](../docs/openui-artifact-showcase.md) に保存。現行タブはインメモリー保持で、新規DB永続化は追加していない。音楽生成取消・再試行の新しいAPI接続、画像生成サムネイル、実スピーカーでの聴取は今回の対象外。
+詳細、失敗原因、保存音声fixtureの範囲、JSON登録例、実画面は [OpenUI音楽UIの検証記録](../verification/music-openui-2026-10-11/README.md) と [OpenUIのドキュメント](../../docs/openui-artifact-showcase.md) に保存。現行タブはインメモリー保持で、新規DB永続化は追加していない。音楽生成取消・再試行の新しいAPI接続、画像生成サムネイル、実スピーカーでの聴取は今回の対象外。
 
 ## 続行記録 作業単位9 ツールチェーン登録文書へUI追加手順を統合
 
@@ -241,6 +241,6 @@ MusicPlayer・Playlist・GenerationStatusをOpenUIへ登録し、既存viewも�
 
 ユーザーが全機能の統合を分割し、今回は楽曲生成ツールチェーンのOpus対応だけを指定した。保存済みControl接続のOpenAPI・musicサービスを確認し、既存の生成・音声保存・認証取得・OpenUI経路を再利用。生成形式をOpusへ変更し、`audio/ogg` とOgg / Opus識別ヘッダーを検査する。保存拡張子は `.opus`。指示・schema・package版とプレイヤー部品は変更していない。
 
-部分・結合28件、LARM・music・dialogue domain、全体回帰が成功。実接続は30秒の確認曲1曲のみ。Opus・48 kHz・30.0065秒を取得し、確認曲だけを削除して404を確認した。最初のブラウザ待機は旧locatorで停止したためスクリプトを修正し、生成を再送せず同じ保存音声を認証付きfixtureから再生して確認した。全体検証初回の静的検査違反も確認用スクリプト内だけを修正し、2回目で成功。失敗・成功・未実施を分けた[詳細記録](verification/music-opus-2026-10-11/README.md)と証拠を保存した。
+部分・結合28件、LARM・music・dialogue domain、全体回帰が成功。実接続は30秒の確認曲1曲のみ。Opus・48 kHz・30.0065秒を取得し、確認曲だけを削除して404を確認した。最初のブラウザ待機は旧locatorで停止したためスクリプトを修正し、生成を再送せず同じ保存音声を認証付きfixtureから再生して確認した。全体検証初回の静的検査違反も確認用スクリプト内だけを修正し、2回目で成功。失敗・成功・未実施を分けた[詳細記録](../verification/music-opus-2026-10-11/README.md)と証拠を保存した。
 
 残作業は、次の依頼での音楽再生プレイヤーツールチェーン分離と追加統合。ライブラリ・タグ検索・お気に入り・Range中継・実スピーカーでの聴取は今回未実施。テーマ固有の製品分岐と担当外の変更は追加していない。`context_compile` 1回、`compile_eval` 1回。

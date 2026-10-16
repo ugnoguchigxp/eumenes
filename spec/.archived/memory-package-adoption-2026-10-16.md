@@ -50,4 +50,4 @@ JSONLの分類は抽出時のLLM判断として受け取る。コードが本文
 
 旧 `lookup` validatorは直前版の説明も含むschemaに固定し、現行schemaを `lookupV2` として追加。`tool:web.lookup@2` を新設し、作業中のdata-driven Web bundleの検索tool参照とpinだけを新版へ合わせた。実行は既存のWeb操作を使い、新しい意味判断や専用実行器は追加していない。旧版の保存内容を保つ移行・再seed・新packageのvalidateを回帰試験に追加した。元のbundleの担当・Skill・結果契約・実行方針は変更していない。
 
-詳細は[検証記録](verification/memory-package-adoption-2026-10-16/README.md)。
+詳細は[検証記録](../verification/memory-package-adoption-2026-10-16/README.md)。

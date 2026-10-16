@@ -1,9 +1,9 @@
 # 記憶担当（Steward）実装計画 — ContextWindow を記憶として管理し続ける背景エージェント
 
-2026-10-14 / 状態: **実装済み・fixture 検証済み・live 一部検証済み**（記録は [verification](verification/memory-steward-2026-10-14/README.md)）/ 改訂7＋実装時の変更（§14.3）。
-実装形態: **TypeScript で直接実装**する。データドリブンの toolchain bundle にはしない。例外は2つで、会話エージェントが呼ぶ依頼ツール（§3.4）と、設定画面の閲覧（§8）は、既存の toolchain・bundle の仕組みに[登録と拡張の手順](../docs/toolchain-extension.md)どおりに載せる。
+2026-10-14 / 状態: **実装済み・fixture 検証済み・live 一部検証済み**（記録は [verification](../verification/memory-steward-2026-10-14/README.md)）/ 改訂7＋実装時の変更（§14.3）。
+実装形態: **TypeScript で直接実装**する。データドリブンの toolchain bundle にはしない。例外は2つで、会話エージェントが呼ぶ依頼ツール（§3.4）と、設定画面の閲覧（§8）は、既存の toolchain・bundle の仕組みに[登録と拡張の手順](../../docs/toolchain-extension.md)どおりに載せる。
 
-関連: [前計画 memory-activation（2026-10-13）](memory-activation-implementation-plan-2026-10-13.md)、[LARM](../docs/larm.md)、[ログ](../docs/logging.md)、[domain 一覧](../docs/domains.md)。
+関連: [前計画 memory-activation（2026-10-13）](memory-activation-implementation-plan-2026-10-13.md)、[LARM](../../docs/larm.md)、[ログ](../../docs/logging.md)、[domain 一覧](../../docs/domains.md)。
 本書は前計画のうち「記憶担当サブエージェント」の部分（出力契約、スケジュール、ContextWindow の範囲、手動操作）を置き換える。Window の版管理、採用時の検証、usage receipt、忘却 journal は前計画のものを使う。
 
 改訂6・改訂7 の変更点は §14 にまとめる（外部レビュー2回分への対応）。

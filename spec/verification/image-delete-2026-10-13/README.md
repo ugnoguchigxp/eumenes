@@ -1,6 +1,6 @@
 # 画像一覧の物理削除確認
 
-[実装記録](../../image-delete-implementation-2026-10-13.md)に目的・契約・結果・未確認範囲をまとめた。
+[実装記録](../../.archived/image-delete-implementation-2026-10-13.md)に目的・契約・結果・未確認範囲をまとめた。
 
 2026-10-13配備LARMの[OpenAPI削除契約](larm-delete-contract.json)をbackend保存設定とControl認証で読取確認。DELETE /v1/image-artifacts/{id}はHTTP200、idとdeleted:true。実LARM画像の削除は行っていない。
 

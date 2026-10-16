@@ -1,10 +1,12 @@
 # 検索キーワードによる取得先学習と動的SKILLの実装計画
 
+> 2026-10-16 廃止として archive。`research-routes` は 2026-10-12 に削除され、手順は `toolchain-history` へ移った。T25 の live gate は未了のまま経路がなくなった。
+
 作成日: 2026-10-09 JST。状態: 実装前・文書レビュー反映済み。実装担当: Sonnetを含む実装エージェント。
 
 小さな作業単位、契約、依存順、試験IDをまとめた[実装チェックリスト](research-route-learning-implementation-tasks-2026-10-09.md)を実装の手順書とする。設計の正本は本書、作業の順序はチェックリスト。両者の変更は同時に反映する。
 
-既存コードとの照合による[文書レビュー記録](verification/research-routes/plan-review-2026-10-09.md)を付属する。レビューで確認したのは設計と既存契約の適合であり、本機能の実装・検証完了ではない。
+既存コードとの照合による[文書レビュー記録](../verification/research-routes/plan-review-2026-10-09.md)を付属する。レビューで確認したのは設計と既存契約の適合であり、本機能の実装・検証完了ではない。
 
 初回はWeb検索で取得先を見つけ、対象と日時が合うデータを取得できた手順を保存する。同じ検索キーワードの次回依頼では、保存した1サイトを直接確認して最新値を取得する。サイトにアクセスできない、構造が変わった、必要なデータが得られない場合は再検索し、新しい取得先で成功してから登録を更新する。
 
@@ -14,7 +16,7 @@
 
 baselineは commit `0492c6bf44cfbb6328fdf899e05570068ef9c004`。直前の実装・レビューのfixtureはbackend 363件、Web 94件、browser 16件、関連9 domain gateが合格。実LARMと公開Webの隔離backendでは天気29.0秒、株価34.8秒だった。ただし工程別の所要時間は計測していない。agent内の通常4制御推論にメインの回答生成が加わり、正常系で通常5回のモデル呼出しになる。これらは今回の変更後の合格結果ではない。
 
-既存の[Toolchain実装計画](.archived/toolchain-web-research-implementation-plan-2026-10-09.md)と[レビュー記録](verification/toolchain/review-2026-10-09.md)、[domain規則](../docs/domains.md)、[ログ規則](../docs/logging.md)を前提とする。着手時に差分を確認し、並行作業を戻さない。
+既存の[Toolchain実装計画](toolchain-web-research-implementation-plan-2026-10-09.md)と[レビュー記録](../verification/toolchain/review-2026-10-09.md)、[domain規則](../../docs/domains.md)、[ログ規則](../../docs/logging.md)を前提とする。着手時に差分を確認し、並行作業を戻さない。
 
 | 現在の実装 | 今回の変更 |
 | --- | --- |

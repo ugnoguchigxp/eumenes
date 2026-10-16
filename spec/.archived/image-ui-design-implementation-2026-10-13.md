@@ -36,7 +36,7 @@ UI接続: image-workspaceにpresentation=fullscreenを追加。image-creation-fo
 状態: 承認デザインのUI実装済み、部分・結合・ブラウザfixture・実保存画像表示の確認済み。残作業は全体gateの担当外エラー解消後の全件検証。変更範囲の実装・受入項目は完了、全体検証の成功とは区別する。
 続行条件: 設定/メモリの依存境界、およびタイマー試験の型エラーを担当作業で解消した状態で全体gateを実行する。
 
-固定記録: [verification/image-ui-2026-10-13](verification/image-ui-2026-10-13/README.md)。暗/明/狭幅の画面とgate結果を保存。docs/images.mdとOpenUI showcaseに入口・JSON構成・確認方法を記述。
+固定記録: [verification/image-ui-2026-10-13](../verification/image-ui-2026-10-13/README.md)。暗/明/狭幅の画面とgate結果を保存。docs/images.mdとOpenUI showcaseに入口・JSON構成・確認方法を記述。
 Context Still: 今回context_compile 1 / compile_eval 1、会話累計各2。initial_instructionsは会話開始時の1回のみ。
 
 
@@ -46,5 +46,5 @@ Context Still: 今回context_compile 1 / compile_eval 1、会話累計各2。ini
 確認: DS14件、画像host/OpenUI9件とimage gate成功。製品DS/Web build成功。ブラウザの既存制作・相互切り替え・草稿保持・狭幅・拡大/取得経路1件成功、一覧のタイトル左/「画像生成」右を暗黙の戻り操作と分けて目視確認。初回はブラウザと共通部品buildを重ねた状態でvisible後のboundingBoxがnullとなった。試験期待値は変えず、全build完了後に1回再確認して成功した。並行buildでの再描画が原因候補であり、別の製品修正はしていない。
 全体gate: 既存settings→memory依存境界で初期停止、後続未実行。担当外を変更せず記録。API/LLM/削除を変えない表示変更のため、実LARM生成/削除は追加しない。
 差分点検: headerの一つの切り替えボタンと既存label更新に限定し、意味判断の追加なし。変更範囲の実装・画面確認完了、全件gateの既存障害は前述の継続条件を維持。
-証拠: [一覧の最新画面](verification/image-switch-2026-10-13/gallery-light.png)、[狭幅](verification/image-switch-2026-10-13/gallery-mobile.png)、[image gate](verification/image-switch-2026-10-13/verify-image.json)、[全体gate](verification/image-switch-2026-10-13/verify-all.json)、[ブラウザ](verification/image-switch-2026-10-13/browser.log)。
+証拠: [一覧の最新画面](../verification/image-switch-2026-10-13/gallery-light.png)、[狭幅](../verification/image-switch-2026-10-13/gallery-mobile.png)、[image gate](../verification/image-switch-2026-10-13/verify-image.json)、[全体gate](../verification/image-switch-2026-10-13/verify-all.json)、[ブラウザ](../verification/image-switch-2026-10-13/browser.log)。
 Context Still: 今回compile/eval各1、会話累計各4。

@@ -1,6 +1,6 @@
 # 記憶担当（steward）検証記録 — 2026-10-14
 
-対象: [記憶担当の実装計画](../../memory-steward-implementation-plan-2026-10-14.md)（改訂7＋§14.3）。
+対象: [記憶担当の実装計画](../../.archived/memory-steward-implementation-plan-2026-10-14.md)（改訂7＋§14.3）。
 fixture（記録済みの LLM 出力を使う試験）と live（保存済みの LARM 接続先で実際に会話）を分けて記録する。実機器（音声）の受入は対象外。
 
 ## fixture

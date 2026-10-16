@@ -141,7 +141,7 @@ Web と製品 CLI は `client/` の HTTP API を使う。MCP client は backend 
 ## 9 関連計画と参照
 
 - [外部アプリと成果物計画](../external-apps-artifacts-implementation-plan-2026-10-09.md): 結果種別、能力分岐、会話横表示の変更点が重なる。共通 discriminator と API 結合を先に合意し、調査分岐を複数箇所で書き換えない。本計画の必須依存にはしない。
-- [調査経路学習計画](../research-route-learning-implementation-plan-2026-10-09.md): control 推論、背景資源、capabilities、agent-runtime の変更を調整する。独立した資源名で同じ LARM 枠を二重計上しない。
+- [調査経路学習計画](../.archived/research-route-learning-implementation-plan-2026-10-09.md): control 推論、背景資源、capabilities、agent-runtime の変更を調整する。独立した資源名で同じ LARM 枠を二重計上しない。
 - [SAAA coding](/Users/y.noguchi/Code/SAAA/src-tauri/src/coding/README.md)、[terminal](/Users/y.noguchi/Code/SAAA/src-tauri/src/coding/terminal/README.md)、[Steward](/Users/y.noguchi/Code/SAAA/src-tauri/src/steward/README.md): 受付と完了の分離、実行証拠、cursor、報告 outbox を参照。
 - [Codex JSON 出力](https://learn.chatgpt.com/docs/non-interactive-mode#make-output-machine-readable)、[SDK](https://learn.chatgpt.com/docs/codex-sdk)、[app-server](https://learn.chatgpt.com/docs/app-server): 2026-10-09 の本検討で確認。採用版の契約は P0 で再検証する。
 - [MCP transport](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports)、[Tauri sidecar](https://v2.tauri.app/develop/sidecar/): stdio と native 移行の根拠。

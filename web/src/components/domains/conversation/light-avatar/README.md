@@ -9,7 +9,7 @@
 | `model.js` | `90139c966b307f121020371adeaecbc674def31349406efc85d36767a6d6aacd` |
 | `motion.js` | `3194fdf23f98084a6a60a76972dccc3f9b85fb26a4ab9a92d91540df5249f68c` |
 
-移植時の形状・色・camera・shader・透過描画は維持し、2026-10-14 に骨格（ボーン）と層構成の動作へ置き換えた。計画と経緯は [骨格導入計画](../../../../../../spec/light-spirit-skeletal-animation-plan-2026-10-14.md)。
+移植時の形状・色・camera・shader・透過描画は維持し、2026-10-14 に骨格（ボーン）と層構成の動作へ置き換えた。計画と経緯は [骨格導入計画](../../../../../../spec/.archived/light-spirit-skeletal-animation-plan-2026-10-14.md)。
 
 ## 骨格
 

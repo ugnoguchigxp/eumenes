@@ -125,7 +125,7 @@ LARM回答待ちの間も、段階0の基準確認、画面のfixture、Eumenes�
 
 ## LARMに確認する事項
 
-問い合わせ用Prompt: [LARMの画像入力契約確認](.archived/larm-multimodal-contract-inquiry-prompt-2026-10-13.md)。送信・上流設定変更はこの計画に含めない。
+問い合わせ用Prompt: [LARMの画像入力契約確認](larm-multimodal-contract-inquiry-prompt-2026-10-13.md)。送信・上流設定変更はこの計画に含めない。
 
 確認するのは、配備版の送信形式、主・補助profileの画像対応と能力フィールド、3形式の対応範囲、枚数・容量・寸法上限、画像tokenの計数、画像履歴の再送、画像とstream/tool/JSON出力の組合せ、lease・取消・データ保持の条件。回答は現行仕様・実測・未確認を分け、秘密を含めず最小要求例と根拠を添える。
 
@@ -143,7 +143,7 @@ LARM契約が未確定なら、それに依存する送信実装とlive確認が
 
 ## 参照
 
-- [domain境界](../docs/domains.md)
-- [LARMの接続とsession構成](../docs/larm.md)
-- [検証手順](../docs/verification.md)
-- [ログの取り扱い](../docs/logging.md)
+- [domain境界](../../docs/domains.md)
+- [LARMの接続とsession構成](../../docs/larm.md)
+- [検証手順](../../docs/verification.md)
+- [ログの取り扱い](../../docs/logging.md)

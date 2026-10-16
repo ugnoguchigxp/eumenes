@@ -22,5 +22,5 @@
 
 差分点検: 製品はOpenUIの既存embeddedモードを使い、APIや保存画像の寸法を変えない。共通app.cssは音楽の既存高さ条件を同値に維持し、画像を条件へ追加しただけ（formatterによる既存空行1行の整理を含む）。画像DSで埋込時だけpreviewとフォームの表示を変更。LLMの意味判断に代わる分類・個別題材の分岐はない。既存他作業の変更は保持した。
 状態: アーティファクト枠内UI実装済み、部分/結合/browser/実保存画像表示を確認済み。残作業は既存settings境界解消後の全体gate。今回の表示要求の実装・画面確認は完了し、全体gate成功とは区別する。
-証拠: [確認記録](verification/image-embedded-2026-10-13/README.md)。
+証拠: [確認記録](../verification/image-embedded-2026-10-13/README.md)。
 Context Still: 今回context_compile/compile_eval各1、会話累計各5。initial_instructionsは初回の1回のみ。

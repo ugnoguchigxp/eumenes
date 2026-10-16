@@ -1,6 +1,6 @@
 # 取得先学習・動的SKILL 実装計画の文書レビュー
 
-2026-10-09 JST。対象は[実装計画](../../research-route-learning-implementation-plan-2026-10-09.md)。既存コードは `0492c6bf44cfbb6328fdf899e05570068ef9c004`。Sonnet向け[実装チェックリスト](../../research-route-learning-implementation-tasks-2026-10-09.md)も対象に追加した。本記録は設計レビューであり、将来の機能を実装・試験した結果ではない。
+2026-10-09 JST。対象は[実装計画](../../.archived/research-route-learning-implementation-plan-2026-10-09.md)。既存コードは `0492c6bf44cfbb6328fdf899e05570068ef9c004`。Sonnet向け[実装チェックリスト](../../.archived/research-route-learning-implementation-tasks-2026-10-09.md)も対象に追加した。本記録は設計レビューであり、将来の機能を実装・試験した結果ではない。
 
 修正前の計画には、ドメインの業務配置、回答後の推論、任意学習の障害分離、キャッシュURLの許可、削除・更新時の参照に不足があった。そのまま実装すると既存の契約に抵触するため、計画を修正した。優先度は実装前に解消する必要の大きさを表す。
 

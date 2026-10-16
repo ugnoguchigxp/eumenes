@@ -1,16 +1,16 @@
 # OCR アーティファクトの画面設計
 
-状態: 画面案を基に実装済み。[固定試験と未実施項目](verification/ocr-2026-10-14/README.md)は別記録。2026年10月14日。
+状態: 画面案を基に実装済み。[固定試験と未実施項目](../verification/ocr-2026-10-14/README.md)は別記録。2026年10月14日。
 
-OCRで読み取った原文を、元の画像・動画と照らして確認し、必要な箇所だけコピーまたは会話へ追加できる画面とする。保存済み資料の一覧・再表示・削除は、既存の「図を描く・編集する」と「映っている物を調べる」の操作に揃える。接続・入力上限・結果の正本は[Eumenes Excalidraw OCR OpenCV 連携の共通資料](https://chatgpt.com/space/page_e38fb71deba88191bcefebcaa046ea60)。登録と実行は[データドリブン形式の手順](../docs/toolchain-extension.md)に従う。
+OCRで読み取った原文を、元の画像・動画と照らして確認し、必要な箇所だけコピーまたは会話へ追加できる画面とする。保存済み資料の一覧・再表示・削除は、既存の「図を描く・編集する」と「映っている物を調べる」の操作に揃える。接続・入力上限・結果の正本は[Eumenes Excalidraw OCR OpenCV 連携の共通資料](https://chatgpt.com/space/page_e38fb71deba88191bcefebcaa046ea60)。登録と実行は[データドリブン形式の手順](../../docs/toolchain-extension.md)に従う。
 
 画面案からOCR API接続、DB、画面部品を実装した。以下の画像は実装前に作った配置案であり、実際のファイル選択はアイコンボタンに変更した。PDFの直接解析、原文の自動修正・要約、新しい認証方式、物体認識全体の共通化は対象外とする。
 
 ## 画面案
 
-![OCR結果の画面](design/ocr-2026-10-14/artifact-result.png)
+![OCR結果の画面](../design/ocr-2026-10-14/artifact-result.png)
 
-![保存済み資料の一覧を開いた画面](design/ocr-2026-10-14/artifact-history-v2.png)
+![保存済み資料の一覧を開いた画面](../design/ocr-2026-10-14/artifact-history-v2.png)
 
 画像は配置と操作の案であり、表示中の文字・時刻・confidenceはサンプルである。製品の表示文言は以下の契約を正本とする。
 

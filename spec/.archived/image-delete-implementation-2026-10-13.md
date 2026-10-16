@@ -31,5 +31,5 @@
 差分点検: 着手前snapshotと照合して既存共有ファイルへの変更をimageの公開削除契約・イベント・部品接続に限定。生成Skill/SystemContext・DB・別domain・認証方式は変更していない。明示した画像IDの操作で意味分類や個別題材の分岐を追加していない。既存の未コミット差分は保持。
 
 状態: 削除機能実装済み、固定試験・ブラウザ確認済み。全体gate成功と実LARM画像削除の確認とは区別する。残作業は担当外の設定境界/タイマー型エラー解消後の全体検証。続行条件はそれらの担当作業による解消であり、本件では改修しない。
-固定証拠: [削除の確認](verification/image-delete-2026-10-13/README.md)。OpenAPI抜粋、gate結果、ブラウザ記録、確認画面を保存。
+固定証拠: [削除の確認](../verification/image-delete-2026-10-13/README.md)。OpenAPI抜粋、gate結果、ブラウザ記録、確認画面を保存。
 Context Still: 今回context_compile/compile_eval各1、会話累計各3。initial_instructionsは会話初回の1回のみ。

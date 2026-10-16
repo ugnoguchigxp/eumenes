@@ -1,6 +1,8 @@
 # 取得先学習・動的SKILL 実装チェックリスト
 
-2026-10-09。実装前。Sonnetを含む実装エージェントが、設計を作り直さず小さな単位で実装するための手順書。[設計の正本](research-route-learning-implementation-plan-2026-10-09.md)と[レビュー記録](verification/research-routes/plan-review-2026-10-09.md)を先に読む。
+> 2026-10-16 廃止として archive。設計の正本と同じく、`research-routes` は 2026-10-12 に削除済み。T25 の live gate は未了のまま経路がなくなった。
+
+2026-10-09。実装前。Sonnetを含む実装エージェントが、設計を作り直さず小さな単位で実装するための手順書。[設計の正本](research-route-learning-implementation-plan-2026-10-09.md)と[レビュー記録](../verification/research-routes/plan-review-2026-10-09.md)を先に読む。
 
 ## 実装状況(2026-10-09 更新)
 

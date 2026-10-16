@@ -35,4 +35,4 @@ LARM契約: ユーザー提示の配備revision `86e879abe56ee54802d345c8b38f26f
 
 制約: 元画像と送信用画像は3 MiBまで。実要求は過去画像込み8枚・4 MiBという現行claimの上限を受ける。超過時は明示停止し、自動縮小や履歴削除はしない。画像の長期記憶・クラウド画像入力・カメラ・動画は今回の対象外。
 
-証拠: [検証資料](verification/chat-image-attachments-2026-10-13/README.md)。
+証拠: [検証資料](../verification/chat-image-attachments-2026-10-13/README.md)。

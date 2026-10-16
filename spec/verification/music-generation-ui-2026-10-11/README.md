@@ -1,6 +1,6 @@
 # 楽曲生成UIの確認
 
-実装の範囲、版と未確認事項は[作業記録](../../music-generation-ui-work-record-2026-10-11.md)。画像は固定モデル・認証付きAPI fixture・保存済みOpusによる実際の画面。外部の楽曲生成と画像生成は実行していない。
+実装の範囲、版と未確認事項は[作業記録](../../.archived/music-generation-ui-work-record-2026-10-11.md)。画像は固定モデル・認証付きAPI fixture・保存済みOpusによる実際の画面。外部の楽曲生成と画像生成は実行していない。
 
 - [ジャンルとプロンプト](genres.png)
 - [歌声・声質・歌詞](desktop.png)

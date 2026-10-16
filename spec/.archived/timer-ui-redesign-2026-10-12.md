@@ -32,7 +32,7 @@
 - artifact gateは設定画面の並行変更3ファイルのformatで停止（`settings-components.tsx`、`settings-contracts.ts`、`ArtifactShowcase.tsx`）。その箇所は編集しない。関連Web85件を別途実行して成功。
 - verify:allは `api/domains/agent-runtime/service/step-actions.ts#createStepActions` が306行で300行制限を超えるためsize-budgetで停止。担当外なので修正しない。全体型/buildは別途実行して成功したが、全体gate成功とは記録しない。
 
-証拠: [検証ログ](verification/timer-ui-redesign-2026-10-12/)、[設定・計測の画面画像](verification/timer-ui-redesign/)。live LLM・実スピーカー/マイク受入は変更していないため未実施。fixtureの音声試験を実機器受入とは扱わない。
+証拠: [検証ログ](../verification/timer-ui-redesign-2026-10-12)、[設定・計測の画面画像](../verification/timer-ui-redesign)。live LLM・実スピーカー/マイク受入は変更していないため未実施。fixtureの音声試験を実機器受入とは扱わない。
 
 差分点検: 発話・場面を識別する分岐、LLMの意味判断の代替、API/DB/通知音の変更を追加していない。プリセットは明示的な利用者操作であり自動の用途判断に使わない。表示部品にAPI・interval・業務状態の正本を持たせず、hostが既存保存状態と時計補正からpropsを供給する。並行の設定画面等の変更を保持し、担当外を上書きしていない。
 

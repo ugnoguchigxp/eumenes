@@ -18,7 +18,7 @@
 - 回帰：`bun run verify -- --domain music`、`bun run verify -- --domain artifact`、横断変更の`bun run verify:all`。担当外の失敗は原因・影響を記録し、勝手に修正しない。
 - 最終差分：着手時の既存差分と分けて今回分を確認し、個別曲・語句に依存する処理が増えていないことを点検する。
 
-実装、部品単体、OpenUI・ホスト結合、保存済みMP3での画面確認を完了。回帰検証とOpus確認を次に実施する。最終結果・入力hash・残作業は[検証記録](verification/music-desktop-2026-10-11/README.md)へ保存する。live生成・実機器受入は表示変更の範囲外。
+実装、部品単体、OpenUI・ホスト結合、保存済みMP3での画面確認を完了。回帰検証とOpus確認を次に実施する。最終結果・入力hash・残作業は[検証記録](../verification/music-desktop-2026-10-11/README.md)へ保存する。live生成・実機器受入は表示変更の範囲外。
 
 ## 接続した表示
 

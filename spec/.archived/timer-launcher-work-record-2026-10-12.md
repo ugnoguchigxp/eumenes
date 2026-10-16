@@ -27,7 +27,7 @@
 
 差分点検: API・DB・LLMの指示・ツール定義に変更なし。発話や題材を判別する処理を追加していない。数値入力の変換・検査は既存APIの1〜86,400秒契約への接続に限定。既存の広範囲な差分は保持し、担当外へ編集していない。新規Artifact種別・専用render callback・ライブラリを追加していない。
 
-証拠: [検証ログ](verification/timer-launcher-2026-10-12/)。live LLM・実機器は表示とAPI接続だけの変更なので未実施。ブラウザのAudioWorklet実マイク試験1件は既定のスキップで、実機器受入済みとはしない。
+証拠: [検証ログ](../verification/timer-launcher-2026-10-12)。live LLM・実機器は表示とAPI接続だけの変更なので未実施。ブラウザのAudioWorklet実マイク試験1件は既定のスキップで、実機器受入済みとはしない。
 
 Context Still: context_compile 1回 / compile_eval 1回。runId: `00000000-0000-0000-18dd-cb1bdc090c5d`。
 
@@ -54,7 +54,7 @@ Context Still: context_compile 1回 / compile_eval 1回。runId: `00000000-0000-
 
 差分点検: 今回の製品変更はWorkspace.tsx、WorkspaceArtifacts.tsx、TimerPicker.tsxとTimerArtifact.cssに限定。タイマーのLLM指示・ツール定義・意味判断・操作API・DBは再利用し、語句や個別発話への専用処理を追加していない。他の未コミット変更は担当外として保持。
 
-証拠: [検証ログと一覧画像](verification/timer-single-entry-2026-10-13/)。
+証拠: [検証ログと一覧画像](../verification/timer-single-entry-2026-10-13)。
 
 残事項: 入口整理と名称の設計反映は実施済み。音声通知の待機失敗の原因確認と担当外の境界エラーの修正が全体検証成功の条件。新版本体は移行設計に従う別段階。
 

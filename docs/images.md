@@ -27,7 +27,7 @@ WebとclientはAPIを使い、画像URLは同一originの認証proxyを通りま
 
 実接続: `bun scripts/image-live.ts --run`は隔離backendの設定APIに接続先を保存し、実モデルの担当選択から画像生成までを一度だけ行います。`--library-only`では新しい画像を生成せず、実モデルの一覧表示計画とLARM一覧取得を確認します。生成した確認画像はLARMに残します。結果は`verification-reports/image-toolchain/`に保存し、通常ログには本文や秘密を入れません。
 
-2026-10-13の実生成では512×384 PNGを取得・表示し、約14秒、258,329 bytes、指定どおりの寸法を確認しました。実モデルの一覧表示も新規生成0回で確認しました。経路ごとの確認結果は[作業記録](../spec/image-toolchain-work-record-2026-10-13.md)を参照してください。
+2026-10-13の実生成では512×384 PNGを取得・表示し、約14秒、258,329 bytes、指定どおりの寸法を確認しました。実モデルの一覧表示も新規生成0回で確認しました。経路ごとの確認結果は[作業記録](../spec/.archived/image-toolchain-work-record-2026-10-13.md)を参照してください。
 
 
-2026-10-13の承認デザインに合わせた画面は[実装記録](../spec/image-ui-design-implementation-2026-10-13.md)を参照してください。`bun scripts/image-ui-check.ts --run` は隔離backendのUIからLARM保存画像の先頭12枚を読み取り、制作・一覧・取得・狭幅・閉じるを確認します。計画モデルはfixtureで、画像生成POSTは拒否します。既存画像を使うUI確認を実モデルの新規生成成功と混同しません。
+2026-10-13の承認デザインに合わせた画面は[実装記録](../spec/.archived/image-ui-design-implementation-2026-10-13.md)を参照してください。`bun scripts/image-ui-check.ts --run` は隔離backendのUIからLARM保存画像の先頭12枚を読み取り、制作・一覧・取得・狭幅・閉じるを確認します。計画モデルはfixtureで、画像生成POSTは拒否します。既存画像を使うUI確認を実モデルの新規生成成功と混同しません。
