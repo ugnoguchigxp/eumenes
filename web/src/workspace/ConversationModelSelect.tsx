@@ -53,7 +53,7 @@ function groupOptions(options: ConversationModelOption[]) {
 
 /**
  * Switches the conversation agent from the chat screen. The route is saved at once and
- * applies from the next utterance, so the control is locked while an answer is running.
+ * applies from the next utterance, so the control is silently locked while an answer is running.
  */
 export function ConversationModelSelect({
 	model,
@@ -121,10 +121,8 @@ export function ConversationModelSelect({
 					))}
 				</SelectContent>
 			</Select>
-			{(running || switched) && (
-				<output className="model-hint">
-					{running ? "回答中は切り替えできません" : "次の発言から適用されます"}
-				</output>
+			{switched && !running && (
+				<output className="model-hint">次の発言から適用されます</output>
 			)}
 		</>
 	);

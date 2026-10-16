@@ -62,13 +62,6 @@ function makeClient() {
 		larmProfiles: vi.fn(async () => [
 			{ profile: "profile-x", model: "larm-m" },
 		]),
-		connectionModels: vi.fn(async () => ({
-			models: [
-				{ id: "model-a", displayName: "Model A", contextWindow: 100_000 },
-				{ id: "model-b", displayName: "Model B", contextWindow: 500_000 },
-			],
-			account: { auth: "subscription" as const, subscriptionType: null },
-		})),
 		applySettings: vi.fn(async (input: { settings: Settings }) => ({
 			...input.settings,
 			revision: saved.revision + 1,
@@ -133,15 +126,13 @@ test("the tooltip names the billing path that served the last answer", async () 
 	);
 });
 
-test("is disabled with a hint while an answer is running", async () => {
+test("is disabled without a hint while an answer is running", async () => {
 	renderView(true);
 	const trigger = await screen.findByRole("combobox", {
 		name: "会話エージェント",
 	});
 	expect((trigger as HTMLButtonElement).disabled).toBe(true);
-	expect(screen.getByRole("status").textContent).toContain(
-		"回答中は切り替えできません",
-	);
+	expect(screen.queryByRole("status")).toBeNull();
 });
 
 test("picking an item calls applySettings and shows the next-utterance hint", async () => {
@@ -149,12 +140,11 @@ test("picking an item calls applySettings and shows the next-utterance hint", as
 	const trigger = await screen.findByRole("combobox", {
 		name: "会話エージェント",
 	});
-	await waitFor(() => expect(client.connectionModels).toHaveBeenCalled());
 	fireEvent.keyDown(trigger, { key: "Enter" });
-	fireEvent.click(await screen.findByRole("option", { name: "Model B" }));
+	fireEvent.click(await screen.findByRole("option", { name: "model-a" }));
 	await waitFor(() => expect(client.applySettings).toHaveBeenCalledTimes(1));
 	const sent = client.applySettings.mock.calls[0]?.[0].settings as Settings;
-	expect(sent.resources.some((r) => r.model === "model-b")).toBe(true);
+	expect(sent.routes.llm.fallbackId).toBe(resourceId);
 	await waitFor(() =>
 		expect(screen.getByRole("status").textContent).toContain(
 			"次の発言から適用",
@@ -162,5 +152,5 @@ test("picking an item calls applySettings and shows the next-utterance hint", as
 	);
 	// The hint ends once the next utterance starts.
 	result.rerender(view(true));
-	expect(screen.getByRole("status").textContent).toContain("回答中");
+	expect(screen.queryByRole("status")).toBeNull();
 });

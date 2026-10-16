@@ -29,7 +29,10 @@ afterEach(async () => {
 	for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
 });
 
-function setup(projection: Record<string, unknown>) {
+function setup(
+	projection: Record<string, unknown>,
+	failureCode: string | null = null,
+) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-guided-answer-"));
 	dirs.push(dir);
 	const store = openStore(join(dir, "db.sqlite3"), [
@@ -67,7 +70,7 @@ function setup(projection: Record<string, unknown>) {
 		reportEpoch: 3,
 		reportDigest: null,
 		projection: JSON.stringify(projection),
-		failureCode: null,
+		failureCode,
 	};
 	const agents = {
 		startInTransaction(
@@ -196,3 +199,28 @@ for (const request of [
 		await h.queue.close(100);
 	});
 }
+
+test("failed investigation answers from the current failure without borrowing a previous answer", async () => {
+	const h = setup(
+		{
+			failure: "invalid_control_json",
+			researchProgress: {
+				searchAttempts: 1,
+				searchesSucceeded: 1,
+				readAttempts: 0,
+				verifiedReport: false,
+			},
+		},
+		"invalid_control_json",
+	);
+	const first = await submit(h, "古い銘柄は999ドルで時価総額88兆円でした");
+	await until(() => h.dialogue.get(first.id)?.status === "completed");
+	const next = await submit(h, "本日の株価を教えて");
+	await until(() => h.dialogue.get(next.id)?.status === "completed");
+	expect(h.contexts[1]).not.toContain("999ドル");
+	expect(h.contexts[1]).not.toContain("88兆円");
+	expect(h.contexts[1]).toContain("本日の株価を教えて");
+	expect(h.contexts[1]).toContain("verifiedReport");
+	expect(h.contexts[1]).toContain("CURRENT_RESEARCH_FAILURE");
+	await h.queue.close(100);
+});

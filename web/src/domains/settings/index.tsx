@@ -1,4 +1,4 @@
-import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import type { EumenesClient } from "../../../../client";
 import {
@@ -6,7 +6,7 @@ import {
 	type Settings,
 } from "../../../../api/domains/settings/contracts";
 import { queryRoots } from "../../queryKeys";
-import { billingPathLabels, UNKNOWN_CONTEXT_WINDOW } from "./shared";
+import { billingPathLabels } from "./shared";
 
 export { billingPathLabels };
 
@@ -19,10 +19,7 @@ export function useSettings(client: EumenesClient) {
 }
 
 const larmPrefix = "larm:";
-const newModelPrefix = "new-model:";
 const larmGroup = { id: "larm", label: "LARM" };
-
-/** Query root of a connection's model list; the key is `[root, identity, connectionId, epoch]`. */
 
 export type ConversationModelOption = {
 	id: string;
@@ -64,25 +61,8 @@ export function useConversationModel(client: EumenesClient) {
 			? [{ profile: savedProfile, model: null }]
 			: []),
 	];
-	const sdkConnections = (value?.connections ?? []).filter(
-		(c) => c.kind === "claude-agent-sdk" && c.enabled,
-	);
-	// The model list also tests the credential; a failed list only hides the unregistered models.
-	const modelLists = useQueries({
-		queries: sdkConnections.map((c) => ({
-			queryKey: [queryRoots.connectionModels, client.identity, c.id, c.epoch],
-			queryFn: ({ signal }: { signal: AbortSignal }) =>
-				client.connectionModels(c.id, signal),
-			retry: 0,
-			staleTime: 5 * 60_000,
-		})),
-	});
+	// Only registered resources are offered; a connection's full model list (aliases, unwanted tiers) stays in settings.
 	const options: ConversationModelOption[] = [];
-	// Unregistered models: picking one registers it as a resource on its connection.
-	const unregistered = new Map<
-		string,
-		{ connectionId: string; model: string; contextWindow: number }
-	>();
 	if (value) {
 		for (const p of profiles)
 			options.push({
@@ -94,34 +74,9 @@ export function useConversationModel(client: EumenesClient) {
 		for (const c of value.connections) {
 			if (!c.enabled) continue;
 			const groupLabel = groupLabelOf(c);
-			const listed =
-				modelLists[sdkConnections.findIndex((x) => x.id === c.id)]?.data
-					?.models ?? [];
-			const registered = value.resources.filter(
-				(r) => r.purpose === "llm" && r.connectionId === c.id,
-			);
-			for (const r of registered)
-				options.push({
-					id: r.id,
-					label: listed.find((m) => m.id === r.model)?.displayName ?? r.model,
-					groupId: c.id,
-					groupLabel,
-				});
-			for (const m of listed) {
-				if (registered.some((r) => r.model === m.id)) continue;
-				const id = `${newModelPrefix}${c.id}:${m.id}`;
-				unregistered.set(id, {
-					connectionId: c.id,
-					model: m.id,
-					contextWindow: m.contextWindow ?? UNKNOWN_CONTEXT_WINDOW,
-				});
-				options.push({
-					id,
-					label: m.displayName,
-					groupId: c.id,
-					groupLabel,
-				});
-			}
+			for (const r of value.resources)
+				if (r.purpose === "llm" && r.connectionId === c.id)
+					options.push({ id: r.id, label: r.model, groupId: c.id, groupLabel });
 		}
 	}
 	const selected =
@@ -144,18 +99,6 @@ export function useConversationModel(client: EumenesClient) {
 				settings.larm.profile = id.slice(larmPrefix.length);
 				if (llm.mode === "cloud-only") llm.mode = "larm-preferred";
 			} else {
-				const entry = unregistered.get(id);
-				if (entry) {
-					id = crypto.randomUUID();
-					settings.resources.push({
-						id,
-						connectionId: entry.connectionId,
-						purpose: "llm",
-						model: entry.model,
-						contextWindow: entry.contextWindow,
-						voice: null,
-					});
-				}
 				llm.mode = "cloud-only";
 				llm.cloudAllowed = true;
 				llm.fallbackId = id;

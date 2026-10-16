@@ -10,6 +10,7 @@ const withoutUrls = (text: string) =>
 /** Keep citations in the displayed answer; speak prose and descriptive inline link labels. */
 export function spokenText(text: string): string {
 	return text
+		.replace(/出典\s*[:：][\s\S]*$/, "")
 		.split(/\r?\n/)
 		.map((line) => {
 			const source = citation.exec(line);
@@ -31,6 +32,7 @@ export function spokenText(text: string): string {
 export function spokenPrefix(text: string, final = false): string {
 	if (!final) {
 		const unfinished = [
+			/出(?:典\s*)?$/,
 			/\[[^\]\n]*(?:\](?:\([^()\n]*)?)?$/,
 			/https?:\/\/[^\s<>"'、。！？\]）)]*$/i,
 			/\b(?:[a-z0-9][a-z0-9-]*\.)+[a-z0-9-]*(?::\d*)?(?:\/[^\s<>"'、。！？\]）)]*)?$/i,

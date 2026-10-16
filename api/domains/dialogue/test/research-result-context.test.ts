@@ -50,7 +50,7 @@ test("current host failure overrides conflicting history without trusting report
 		result.some(
 			(m) => m.role === "assistant" && m.content.includes("過去の障害は"),
 		),
-	).toBe(true);
+	).toBe(false);
 	expect(notice.content).not.toContain("過去の障害は");
 	expect(result.at(-1)!.content).toBe("今日のAIニュースを教えて。");
 	expect(result.at(-2)!.role).toBe("user");
@@ -229,4 +229,40 @@ test("a report citing World records adds the World rules; other reports do not",
 			researchResultContext(sections({ input: user("依頼") }), projection)[0]!
 				.content,
 		).not.toContain("world_claim");
+});
+
+test("failed research cannot borrow facts or response style from any memory layer", () => {
+	const input = user("本日の株価は？");
+	const old = "旧報告の株価999ドル、利益88億ドル。長い指標一覧。";
+	const projection = JSON.stringify({
+		failure: "invalid_control_json",
+		researchProgress: {
+			searchAttempts: 1,
+			searchesSucceeded: 1,
+			readAttempts: 0,
+			verifiedReport: false,
+		},
+	});
+	const result = researchResultContext(
+		sections({
+			longTerm: [system(old)],
+			goals: [system(old)],
+			history: [user("以前の株価は？"), assistant(old)],
+			working: [system(old)],
+			unprocessed: [assistant(old)],
+			input,
+		}),
+		projection,
+		"invalid_control_json",
+	);
+	expect(result).toHaveLength(3);
+	expect(JSON.stringify(result)).not.toContain(old);
+	expect(result.at(-1)).toBe(input);
+	expect(
+		JSON.parse(result.at(-2)!.content).report.researchProgress,
+	).toMatchObject({
+		searchesSucceeded: 1,
+		readAttempts: 0,
+		verifiedReport: false,
+	});
 });

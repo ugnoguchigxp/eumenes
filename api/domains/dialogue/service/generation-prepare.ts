@@ -120,7 +120,7 @@ export function createPrepare(
 		messages.splice(
 			messages.length - 1,
 			0,
-			...compiled.sections.tail,
+			...(!agent?.failureCode ? compiled.sections.tail : []),
 			...(worldHint ? [worldHint] : []),
 		);
 		// This run's context is fixed by the host: the server must neither trim nor reorder it.

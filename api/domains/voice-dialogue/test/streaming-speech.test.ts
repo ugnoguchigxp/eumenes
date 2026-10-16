@@ -320,7 +320,7 @@ test("URLs and source lines remain on screen but never reach the speech judge or
 	for (const char of answer) source.push(char);
 	source.finish();
 	await until(() => h.voice.get(id)?.status === "ready");
-	expect(spoken).toEqual(["本文です。", "を表示します。"]);
+	expect(spoken).toEqual(["本文です。"]);
 	expect(judged).toEqual(spoken);
 	expect(h.dialogue.answerText(h.voice.get(id)!.runId!)).toBe(answer);
 });

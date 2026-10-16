@@ -98,11 +98,11 @@ export function researchResultContext(
 	// that give later system messages less weight. Acquired reports stay user data.
 	const assemble = () => [
 		system,
-		...longTerm,
-		...goals,
-		...history,
-		...working,
-		...unprocessed,
+		// A failed operation is explained from its current result, never old facts.
+		// The accepted report (if any) stays below; no semantic input classification.
+		...(!failureCode
+			? [...longTerm, ...goals, ...history, ...working, ...unprocessed]
+			: []),
 		result,
 		input,
 	];

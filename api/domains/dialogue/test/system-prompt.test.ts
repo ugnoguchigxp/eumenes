@@ -2,8 +2,8 @@ import { expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { buildSystemPrompt } from "../service/system-prompt";
 
-// Fingerprints captured before extraction: whitespace, persona, names and literal
-// placeholder-like input must remain identical through the TOML compiler.
+// Reviewed TTS instruction fingerprints: preserve persona, names and literal
+// placeholder-like input through the TOML compiler.
 const cases = [
 	{
 		input: {
@@ -11,7 +11,7 @@ const cases = [
 			agentName: "",
 			userName: "",
 		},
-		sha256: "704d3e484735e17df073a0390fc97a012a045e60fc19303bb8dda25850f6770d",
+		sha256: "cf585da33a524964c8e60fadd10fd7235bbbf9c63a4c921c94faa6527c4b7de3",
 	},
 	{
 		input: {
@@ -19,7 +19,7 @@ const cases = [
 			agentName: "エウメネス",
 			userName: "野口",
 		},
-		sha256: "52f219629d4108a3e82c49f1508c7a6f52dc565083c8c4b31c8365fdd76af935",
+		sha256: "0556b0b2959ed38fbaff7d7eb149e00f6b052b9b88d10133d0a5f0fe054bb5ad",
 	},
 	{
 		input: {
@@ -27,7 +27,7 @@ const cases = [
 			agentName: "<x>\n[[role]]",
 			userName: "「<y>」&",
 		},
-		sha256: "41d1a17dd8893c87458bd4c3aa6c6cff7b09c5439d30aa7476367ce919d4cb7c",
+		sha256: "301706792585fdf09b3b34f5dd9583dad2674a971aa4bb1c3531ab108a0fc1e4",
 	},
 	{
 		input: {
@@ -35,7 +35,7 @@ const cases = [
 			agentName: "",
 			userName: "",
 		},
-		sha256: "734e45cd6eaad583dfaddb582ec9dd9e2186d54ed4a8ef1b6074cf1e2990ec0d",
+		sha256: "2ad528a753d3e4b849e11c278e1215a880618692ca76abaf89acf81e68f3955e",
 	},
 	{
 		input: {
@@ -43,7 +43,7 @@ const cases = [
 			agentName: "エウメネス",
 			userName: "野口",
 		},
-		sha256: "6e5c5e7a946daf0320045163e28d3c6e0206ea3ebc1188890747e7bf156666de",
+		sha256: "305bd86ac285d45073672d1fe789c37e7952057bde884456ef96f01093278c57",
 	},
 	{
 		input: {
@@ -51,7 +51,7 @@ const cases = [
 			agentName: "<x>\n[[role]]",
 			userName: "「<y>」&",
 		},
-		sha256: "f20440666402e1be48fb2124343c500152d7731c1b738ff94480e55939aece3c",
+		sha256: "67f9f21368ec54e4f6b6aba2a381d02e70c63c9beb6871e7a0c6c920d6729730",
 	},
 	{
 		input: {
@@ -59,7 +59,7 @@ const cases = [
 			agentName: "",
 			userName: "",
 		},
-		sha256: "05682b08034869d08ef270b265e0ca0e10b6af358e2b748f4bd6a3956cf8b881",
+		sha256: "69731ec01b6a61b522d623cec6e7d72df5f13f74d77a4eb5235694697c3fb24b",
 	},
 	{
 		input: {
@@ -67,7 +67,7 @@ const cases = [
 			agentName: "エウメネス",
 			userName: "野口",
 		},
-		sha256: "6487292b2aad40747d8732a3c5bdf535c31b76c7a4a819e697c16d12de9742b4",
+		sha256: "b37f1aa3f9e7f38c5b885efd776d58a11d1cb2e4ad0cd4d4eda5d3820737344a",
 	},
 	{
 		input: {
@@ -75,7 +75,7 @@ const cases = [
 			agentName: "<x>\n[[role]]",
 			userName: "「<y>」&",
 		},
-		sha256: "cdbe67083ca4c32a02a072771777172e46f46bffebbcadc1e3cfe595da27b5ac",
+		sha256: "326d6f8aca9b382ec940f618cac6d8def236807b7fd03e62006c0fce1515255c",
 	},
 	{
 		input: {
@@ -83,7 +83,7 @@ const cases = [
 			agentName: "",
 			userName: "",
 		},
-		sha256: "0b4e05782b79019eda361cda1443cc85eae55341c51c3392a2a6ad433be9ef93",
+		sha256: "747843133baf7365ee3fe06e5706cf15ef1c3ee25117abfa9af2efd8763fdf17",
 	},
 	{
 		input: {
@@ -91,7 +91,7 @@ const cases = [
 			agentName: "エウメネス",
 			userName: "野口",
 		},
-		sha256: "d8d93a9f6adfaf6f92609a88303359f8669459dc156f12a62d07672afa99e060",
+		sha256: "385a0f7524cfc368fa68d0f47b841faad03d421219bb5b5346f8ea7f644d7813",
 	},
 	{
 		input: {
@@ -99,7 +99,7 @@ const cases = [
 			agentName: "<x>\n[[role]]",
 			userName: "「<y>」&",
 		},
-		sha256: "5c1047a322b33373507f7418b4531cf4308b9ff2298e223101696cf6396cfd91",
+		sha256: "e0a60375dd8b51935dd2f6365fe99c86af99080ea9c598c2d26d4c923ba9d7a0",
 	},
 ] as const;
 

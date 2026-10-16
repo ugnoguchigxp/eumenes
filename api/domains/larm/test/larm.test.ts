@@ -464,7 +464,7 @@ test("without a saved profile the port reports larm_profile_missing and never co
 	expect(contacted).toBe(0);
 	await larm.close();
 });
-test("conversation profiles come from the unselected catalog and skip profiles without an llm provider", async () => {
+test("conversation profiles come from the unselected catalog and keep only default, current profiles with an llm provider", async () => {
 	const urls: string[] = [];
 	const larm = createLarm({
 		baseUrl: "http://127.0.0.1:9810",
@@ -477,16 +477,41 @@ test("conversation profiles come from the unselected catalog and skip profiles w
 				contractVersion: "agent-connection.v3",
 				catalogRevision: "rev1",
 				profiles: [
-					{ id: "chat-a", providers: [{ name: "llm", model: "model-a" }] },
+					{
+						id: "chat-a",
+						selectionPolicy: "default",
+						providers: [{ name: "llm", model: "model-a" }],
+					},
 					{
 						id: "chat-b",
+						selectionPolicy: "default",
 						providers: [
 							{ name: "llm", model: "model-b" },
 							{ name: "asr", model: "model-asr" },
 						],
 					},
-					{ id: "backchannel-only", providers: [{ name: "backchannel" }] },
-					{ id: "image-only", providers: [], services: [{ name: "image" }] },
+					{
+						id: "background-only",
+						selectionPolicy: "explicit-only",
+						providers: [{ name: "llm", model: "model-background" }],
+					},
+					{
+						id: "retired",
+						selectionPolicy: "default",
+						deprecated: true,
+						providers: [{ name: "llm", model: "model-old" }],
+					},
+					{
+						id: "backchannel-only",
+						selectionPolicy: "default",
+						providers: [{ name: "backchannel" }],
+					},
+					{
+						id: "image-only",
+						selectionPolicy: "default",
+						providers: [],
+						services: [{ name: "image" }],
+					},
 				],
 			});
 		},

@@ -247,7 +247,8 @@ export function createLarm(config: {
 			await connect(["llm"], undefined, true);
 		},
 		async conversationProfiles(signal) {
-			// The unselected catalog lists every profile; only those with an llm provider can hold a conversation.
+			// The unselected catalog lists every profile; only the generally selectable ones with an llm provider
+			// hold a conversation. Explicit-only profiles serve a named consumer (background work, classifiers).
 			try {
 				const catalog = record(
 					await readJson(
@@ -262,6 +263,8 @@ export function createLarm(config: {
 					Array.isArray(catalog.profiles) ? catalog.profiles : []
 				).flatMap((item) => {
 					const entry = record(item);
+					if (entry.selectionPolicy !== "default" || entry.deprecated === true)
+						return [];
 					const llm = (
 						Array.isArray(entry.providers) ? entry.providers.map(record) : []
 					).find((p) => p.name === "llm");

@@ -5,7 +5,6 @@ import { afterEach, expect, test, vi } from "vitest";
 import type { Settings } from "../../../../api/domains/settings/contracts";
 import { useConversationModel } from ".";
 import { settingsFixture } from "./sections/fixture";
-import { UNKNOWN_CONTEXT_WINDOW } from "./shared";
 
 afterEach(cleanup);
 
@@ -56,14 +55,6 @@ function setup(saved = settings()) {
 		larmProfiles: vi.fn(async () => [
 			{ profile: "profile-x", model: "larm-m" },
 		]),
-		connectionModels: vi.fn(async () => ({
-			models: [
-				{ id: "model-a", displayName: "Model A", contextWindow: 100_000 },
-				{ id: "model-b", displayName: "Model B", contextWindow: 500_000 },
-				{ id: "model-c", displayName: "Model C", contextWindow: null },
-			],
-			account: { auth: "subscription" as const, subscriptionType: "pro" },
-		})),
 		applySettings: vi.fn(async (input: { settings: Settings }) => ({
 			...input.settings,
 			revision: saved.revision + 1,
@@ -79,27 +70,16 @@ function setup(saved = settings()) {
 	return { client, hook };
 }
 
-test("options group LARM profiles, registered resources and unregistered models by billing path", async () => {
-	const { client, hook } = setup();
+test("options group LARM profiles and registered resources by billing path, without the connection's other models", async () => {
+	const { hook } = setup();
 	await waitFor(() =>
 		expect(hook.result.current.options.map((o) => o.label)).toEqual([
 			"larm-m",
-			"Model A",
-			"Model B",
-			"Model C",
+			"model-a",
 		]),
 	);
-	// Only the enabled connection is asked for its models.
-	expect(client.connectionModels).toHaveBeenCalledTimes(1);
-	expect(client.connectionModels).toHaveBeenCalledWith(
-		subscriptionId,
-		expect.anything(),
-	);
-	const groups = hook.result.current.options.map((o) => o.groupLabel);
-	expect(groups).toEqual([
+	expect(hook.result.current.options.map((o) => o.groupLabel)).toEqual([
 		"LARM",
-		"Claude（サブスク）",
-		"Claude（サブスク）",
 		"Claude（サブスク）",
 	]);
 	expect(hook.result.current.options[1]?.id).toBe(registeredId);
@@ -116,40 +96,9 @@ test("the group label of an api-key connection shows the API billing path", asyn
 	);
 });
 
-test("picking an unregistered model registers a resource on its connection and selects it", async () => {
-	const { client, hook } = setup();
-	await waitFor(() => expect(hook.result.current.options).toHaveLength(4));
-	const option = hook.result.current.options.find((o) => o.label === "Model B");
-	await act(() => hook.result.current.select(option?.id ?? ""));
-	const sent = client.applySettings.mock.calls[0]?.[0].settings as Settings;
-	const added = sent.resources.find((r) => r.model === "model-b");
-	expect(added).toMatchObject({
-		connectionId: subscriptionId,
-		purpose: "llm",
-		contextWindow: 500_000,
-	});
-	expect(sent.routes.llm).toMatchObject({
-		mode: "cloud-only",
-		cloudAllowed: true,
-		fallbackId: added?.id,
-	});
-	await waitFor(() => expect(hook.result.current.selected).toBe(added?.id));
-});
-
-test("a model without a reported context window gets the conservative constant", async () => {
-	const { client, hook } = setup();
-	await waitFor(() => expect(hook.result.current.options).toHaveLength(4));
-	const option = hook.result.current.options.find((o) => o.label === "Model C");
-	await act(() => hook.result.current.select(option?.id ?? ""));
-	const sent = client.applySettings.mock.calls[0]?.[0].settings as Settings;
-	expect(sent.resources.find((r) => r.model === "model-c")?.contextWindow).toBe(
-		UNKNOWN_CONTEXT_WINDOW,
-	);
-});
-
 test("picking a registered resource selects it without adding one", async () => {
 	const { client, hook } = setup();
-	await waitFor(() => expect(hook.result.current.options).toHaveLength(4));
+	await waitFor(() => expect(hook.result.current.options).toHaveLength(2));
 	await act(() => hook.result.current.select(registeredId));
 	const sent = client.applySettings.mock.calls[0]?.[0].settings as Settings;
 	expect(sent.resources).toHaveLength(1);

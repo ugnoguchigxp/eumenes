@@ -8,7 +8,7 @@ import { useSpeechModels } from "./useSpeechModels";
 
 afterEach(cleanup);
 
-function setup() {
+function setup(workersModels: unknown[] = []) {
 	const saved = settingsFixture();
 	saved.connections = [
 		{
@@ -20,6 +20,19 @@ function setup() {
 			epoch: 0,
 			envRef: null,
 		},
+		...(workersModels.length
+			? [
+					{
+						id: "workers",
+						kind: "cloudflare-workers-ai" as const,
+						name: "Workers",
+						baseUrl: "https://workers.test",
+						enabled: true,
+						epoch: 0,
+						envRef: null,
+					},
+				]
+			: []),
 	];
 	saved.resources = (["asr", "tts"] as const).map((purpose) => ({
 		id: purpose,
@@ -34,6 +47,10 @@ function setup() {
 		settings: vi.fn(async () => saved),
 		larmDetails: vi.fn(async () => ({
 			providers: [{ name: "asr", model: "local-recognition" }],
+		})),
+		connectionModels: vi.fn(async () => ({
+			models: workersModels,
+			account: { auth: "api-key", subscriptionType: null },
 		})),
 		applySettings: vi.fn(async ({ settings }: { settings: Settings }) => ({
 			...settings,
@@ -81,4 +98,79 @@ test("failed save keeps the saved selection and reports an error", async () => {
 	await act(() => hook.result.current.select("tts", "tts"));
 	expect(hook.result.current.error).toBeTruthy();
 	expect(hook.result.current.tts.selected).toBe("larm");
+});
+
+const speech = (overrides: Record<string, unknown> = {}) => ({
+	supported: true,
+	reason: null,
+	voices: [],
+	languages: [],
+	voiceRequired: false,
+	languageRequired: false,
+	voiceDefault: null,
+	languageDefault: null,
+	voiceSelectable: false,
+	languageSelectable: false,
+	...overrides,
+});
+
+test("lists unregistered Workers AI speech models and registers one when picked", async () => {
+	const { saved, client, hook } = setup([
+		{
+			id: "@cf/vendor/speak",
+			displayName: "@cf/vendor/speak",
+			purpose: "tts",
+			speech: speech({ voiceRequired: true, voiceDefault: "angus" }),
+			contextWindow: null,
+		},
+		{
+			id: "@cf/vendor/listen",
+			displayName: "@cf/vendor/listen",
+			purpose: "asr",
+			speech: speech(),
+			contextWindow: null,
+		},
+		{
+			id: "@cf/vendor/unsupported",
+			displayName: "@cf/vendor/unsupported",
+			purpose: "tts",
+			speech: speech({ supported: false }),
+			contextWindow: null,
+		},
+		{
+			id: "@cf/vendor/no-default",
+			displayName: "@cf/vendor/no-default",
+			purpose: "tts",
+			speech: speech({ voiceRequired: true }),
+			contextWindow: null,
+		},
+	]);
+	await waitFor(() =>
+		expect(hook.result.current.tts.options.map((o) => o.label)).toEqual([
+			"LARM",
+			"音声接続 / test-tts",
+			"Workers / @cf/vendor/speak",
+		]),
+	);
+	expect(hook.result.current.asr.options.map((o) => o.label)).toContain(
+		"Workers / @cf/vendor/listen",
+	);
+	const option = hook.result.current.tts.options[2]!;
+	await act(() => hook.result.current.select("tts", option.id));
+	const sent = client.applySettings.mock.calls[0]![0].settings;
+	const added = sent.resources.find(
+		(r: Settings["resources"][number]) => r.model === "@cf/vendor/speak",
+	)!;
+	expect(added).toMatchObject({
+		connectionId: "workers",
+		purpose: "tts",
+		voice: "angus",
+		contextWindow: null,
+	});
+	expect(sent.resources).toHaveLength(saved.resources.length + 1);
+	expect(sent.routes.tts).toMatchObject({
+		mode: "cloud-only",
+		cloudAllowed: true,
+		fallbackId: added.id,
+	});
 });

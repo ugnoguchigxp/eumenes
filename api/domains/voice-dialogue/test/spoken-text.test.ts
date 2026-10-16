@@ -8,18 +8,18 @@ test("displayed citations stay out of speech while inline labels and surrounding
 	const displayed = `${body}\n\nソース：${link}`;
 	expect(spokenText(displayed)).toBe(body);
 	expect(displayed).toContain("https://tenki.jp/forecast/3/17/4610/14204/");
-	expect(spokenText(`出典：${link}\n雨はありません。`)).toBe(
-		"雨はありません。",
-	);
+	expect(spokenText(`出典：${link}\n雨はありません。`)).toBe("");
 	expect(spokenText(`詳しくは${link}で確認できます。`)).toBe(
 		"詳しくはで確認できます。",
 	);
 	expect(spokenText(`ソース：${link}。今日は晴れです。`)).toBe(
 		"今日は晴れです。",
 	);
-	expect(spokenText("出典：資料は見つかりませんでした。")).toBe(
-		"出典：資料は見つかりませんでした。",
-	);
+	expect(spokenText("出典：資料は見つかりませんでした。")).toBe("");
+	for (const marker of ["出典：", "出典:", "出典 ："]) {
+		expect(spokenText(`本文です。${marker}資料名\n補足です。`)).toBe("本文です。");
+	}
+	expect(spokenText("資料の出典を説明します。")).toBe("資料の出典を説明します。");
 	expect(
 		spokenText(
 			"本文です。\n出典：https://example.com/report\n参考資料：[example.com](<https://example.com/>)",
@@ -37,6 +37,8 @@ test("displayed citations stay out of speech while inline labels and surrounding
 
 test("links and citations arriving across any token boundary never change or duplicate emitted speech", () => {
 	for (const body of [
+		`${"あ".repeat(239)}出典：資料名\n補足です。`,
+		"本文です。出典 : 資料名、説明。\n続きです。",
 		"見てください。[公式の例。](https://example.com/test)もあります。\n出典：[資料](https://example.com/)\n最後です。",
 		"最初の行\nソース：[資料](https://example.com/)\n最後です。",
 		"普通の[角括弧]も読みます。",
