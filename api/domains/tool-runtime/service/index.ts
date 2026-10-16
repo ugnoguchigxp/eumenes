@@ -84,7 +84,6 @@ export function createToolRuntime(
 		adapter,
 		retryAvailableAt(db, inv) {
 			if (!inv.result_ref || inv.finished_at == null) return undefined;
-			// An expired or lost result has no cooldown left to honour.
 			const entry = held(db, inv.result_ref, inv.owner_task_id);
 			if (!entry) return undefined;
 			const cooldown = Math.max(
@@ -105,7 +104,7 @@ export function createToolRuntime(
 			);
 		},
 	});
-	/** The result if it is still held, else undefined (expired, lost or superseded). */
+	/** The result if still held; an expired or lost one has no cooldown or sources left. */
 	function held(db: Database, ref: string, taskId: string) {
 		try {
 			return resolve(db, ref, taskId);
